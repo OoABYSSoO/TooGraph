@@ -67,6 +67,7 @@ class NodeSystemStateType(str, Enum):
     FILE = "file"
     KNOWLEDGE_BASE = "knowledge_base"
     SKILL = "skill"
+    RESULT_PACKAGE = "result_package"
 
 
 class StateWriteMode(str, Enum):
@@ -154,7 +155,6 @@ class NodeSystemStateDefinition(BaseModel):
     type: NodeSystemStateType = NodeSystemStateType.TEXT
     value: Any = Field(default=None)
     color: str = ""
-    prompt_visible: bool = Field(default=True, alias="promptVisible")
     binding: NodeSystemStateBindingMetadata | None = None
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)

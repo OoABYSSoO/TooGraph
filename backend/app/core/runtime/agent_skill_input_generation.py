@@ -6,7 +6,7 @@ from typing import Any, Callable
 
 from app.core.model_catalog import get_default_video_model_ref, resolve_runtime_model_name
 from app.core.runtime.agent_multimodal import collect_input_attachments, prepare_model_input_attachments
-from app.core.runtime.agent_prompt import format_prompt_value, format_state_prompt_lines
+from app.core.runtime.agent_prompt import format_graph_state_input_prompt_lines
 from app.core.runtime.agent_response_generation import _resolve_media_runtime_config
 from app.core.runtime.skill_bindings import ResolvedAgentSkillBinding
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition
@@ -115,10 +115,7 @@ def build_skill_input_system_prompt(
         parts.append("\n== Graph State Inputs ==")
         for key, value in input_values.items():
             definition = resolved_state_schema.get(key)
-            if definition is not None and not definition.prompt_visible:
-                continue
-            display = format_prompt_value(value)
-            parts.extend(format_state_prompt_lines(key, definition, value=display))
+            parts.extend(format_graph_state_input_prompt_lines(key, definition, value))
 
     parts.append("\n== Bound Skills ==")
     example: dict[str, dict[str, Any]] = {}

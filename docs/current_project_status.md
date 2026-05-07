@@ -26,11 +26,12 @@
 - 手动选择的 LLM 节点 Skill 在协议里存为单值 `config.skillKey`。不要使用 `config.skills` 数组；数组会暗示单节点多技能语义，属于旧协议残留。
 - 添加到 LLM 节点的 skill 会在节点提示词编辑区生成可编辑的技能说明胶囊；移除 skill 时对应胶囊会移除。
 - 胶囊内容是节点级覆盖，不会反向写回技能包原始文档。
-- `skillBindings` 只保存技能身份和 `outputMapping`。它不保存 `inputMapping`、静态参数 `config` 或无意义的 `trigger`。
+- 静态手动选择的 Skill 使用 `config.skillKey` 和协议拥有的 `skillBindings.outputMapping`。`outputMapping` 由图协议、前端和运行时维护，只用于确定 skill 输出写入哪个 state 与运行审计；LLM 不看也不修改它。
 - 技能输入由 LLM 节点在运行前根据当前输入 state、技能 `description`、`llmInstruction` 和 `inputSchema` 生成。上游 `skill` state 只传“选择了哪个技能”，不传具体技能参数。
-- 在 LLM 节点卡片选择带 `outputSchema` 的 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
+- 在 LLM 节点卡片选择带 `outputSchema` 的静态 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
+- 动态能力执行来自输入 `skill` state 或未来的 `subgraph` state，不复用 `skillBindings.outputMapping`，也不会推断普通输出映射。这类节点必须只写一个 `result_package` state。包内 `outputs.<outputKey>` 保存 `{ name, description, type, value }`，不额外捏造 `fieldKey`；下游 LLM 节点会把这些虚拟输出拆开并复用普通 state/file 展开逻辑。
 - 图运行前不再做旧草稿兼容补齐。提交到运行时的图必须已经符合当前协议。
-- `promptVisible` 是待移除的历史字段。新的上下文边界应由节点 `reads` 决定：LLM 节点只接收自己显式读取的 state。
+- `promptVisible` 已移除。上下文边界由节点 `reads` 决定：LLM 节点只接收自己显式读取的 state。
 - `state_schema` 支持 `binding` 元数据，用来标记某个 state 是否由技能输出自动绑定。
 - `file` / `image` / `audio` / `video` 类型 state 的值是本地 artifact 路径或路径列表，不再有单独的 `file_list`、`array` 或 `object` state 类型。LLM 节点接收 `file` state 时，会读取文本类文件并只把“文件名 + 原文全文”拼入模型上下文；图片、音频和视频路径会走多模态附件处理，不作为文本读取。
 - Input 节点输出文件、图片、音频或视频时都写入本地路径；Output 节点可通过 documents 预览展示这些 artifact。
@@ -112,6 +113,7 @@
 - 后端 Skill catalog 合并官方 Skill 和用户自定义 Skill。官方 Skill 只读，用户 Skill 可在 Skills 页面启用、停用和删除。
 - 后端提供本地执行器策略读取和白名单追加 API，用于支持 `local_workspace_executor` 的显式权限流。
 - validator 负责 `node_system` graph 结构校验。必填技能输入不再做静态绑定校验，而是在 LLM 节点生成技能输入后由运行时检查。
+- 动态读取 `skill` state 的 LLM 节点必须写唯一 `result_package` state；静态 `skillKey` 与动态 `skill` state 不能混用；没有静态 `skillKey` 的 `skillBindings` 会被视为旧协议并拒绝。
 - LangGraph runtime 是当前运行主链。
 - 后端不再在 graph run 入口修补旧模板结构；提交什么图，就按当前协议校验和执行什么图。
 - graph run、run detail、SSE 事件、状态快照和 artifact 输出仍是审计与回放的基础。

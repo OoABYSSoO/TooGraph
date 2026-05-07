@@ -134,7 +134,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
 
         self.assertNotIn("agent_skill_required_input_missing", [issue.code for issue in validation.issues])
 
-    def test_binding_only_skill_still_goes_through_agent_node_validation(self) -> None:
+    def test_binding_only_skill_is_rejected_as_legacy_attachment(self) -> None:
         graph = _graph_with_agent_config(
             {
                 "skillBindings": [
@@ -144,19 +144,71 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
                 ]
             }
         )
-        definition = _agent_skill_definition(
-            "desktop_profile",
-            eligibility=SkillLlmNodeEligibility.NEEDS_MANIFEST,
-            blockers=["Skill manifest is missing a script runtime entrypoint."],
+
+        validation = validate_graph(graph)
+
+        self.assertIn("agent_skill_binding_without_skill_key", [issue.code for issue in validation.issues])
+
+    def test_dynamic_skill_node_requires_single_result_package_output(self) -> None:
+        graph = NodeSystemGraphDocument.model_validate(
+            {
+                "graph_id": "graph-1",
+                "name": "Graph",
+                "state_schema": {
+                    "selected_skill": {"type": "skill", "value": {"skillKey": "web_search"}},
+                    "question": {"type": "text", "value": "q"},
+                    "answer": {"type": "text", "value": ""},
+                },
+                "nodes": {
+                    "agent": {
+                        "kind": "agent",
+                        "ui": {"position": {"x": 0, "y": 0}},
+                        "reads": [{"state": "selected_skill"}, {"state": "question"}],
+                        "writes": [{"state": "answer"}],
+                        "config": {"skillKey": ""},
+                    },
+                },
+                "edges": [],
+                "conditional_edges": [],
+            }
         )
 
+        validation = validate_graph(graph)
+
+        self.assertIn("dynamic_skill_output_state_invalid", [issue.code for issue in validation.issues])
+
+    def test_static_skill_node_cannot_also_read_dynamic_skill_state(self) -> None:
+        graph = NodeSystemGraphDocument.model_validate(
+            {
+                "graph_id": "graph-1",
+                "name": "Graph",
+                "state_schema": {
+                    "selected_skill": {"type": "skill", "value": {"skillKey": "file_reader"}},
+                    "question": {"type": "text", "value": "q"},
+                    "answer": {"type": "text", "value": ""},
+                },
+                "nodes": {
+                    "agent": {
+                        "kind": "agent",
+                        "ui": {"position": {"x": 0, "y": 0}},
+                        "reads": [{"state": "selected_skill"}, {"state": "question"}],
+                        "writes": [{"state": "answer"}],
+                        "config": {"skillKey": "web_search"},
+                    },
+                },
+                "edges": [],
+                "conditional_edges": [],
+            }
+        )
+        definition = _agent_skill_definition("web_search")
+
         with (
-            patch("app.core.compiler.validator.get_skill_registry", return_value={"desktop_profile": object()}),
-            patch("app.core.compiler.validator.get_skill_catalog_registry", return_value={"desktop_profile": definition}),
+            patch("app.core.compiler.validator.get_skill_registry", return_value={"web_search": object()}),
+            patch("app.core.compiler.validator.get_skill_catalog_registry", return_value={"web_search": definition}),
         ):
             validation = validate_graph(graph)
 
-        self.assertIn("agent_skill_not_agent_node_ready", [issue.code for issue in validation.issues])
+        self.assertIn("agent_static_and_dynamic_skill_mixed", [issue.code for issue in validation.issues])
 
 
 if __name__ == "__main__":

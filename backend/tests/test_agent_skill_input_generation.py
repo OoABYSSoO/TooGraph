@@ -8,8 +8,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.runtime.agent_skill_input_generation import build_skill_input_system_prompt
 from app.core.runtime.skill_bindings import ResolvedAgentSkillBinding
-from app.core.schemas.node_system import NodeSystemAgentSkillBinding
+from app.core.schemas.node_system import NodeSystemAgentSkillBinding, NodeSystemStateDefinition, NodeSystemStateType
 from app.core.schemas.skills import SkillDefinition, SkillIoField
+from app.core.storage.skill_artifact_store import create_uploaded_skill_artifact, resolve_skill_artifact_path
 
 
 class AgentSkillInputGenerationTests(unittest.TestCase):
@@ -34,6 +35,107 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
 
         self.assertIn("llmInstruction: Generate a query", prompt)
         self.assertNotIn("agentInstruction", prompt)
+
+    def test_skill_input_prompt_does_not_expose_output_mapping_to_llm(self) -> None:
+        prompt = build_skill_input_system_prompt(
+            input_values={"question": "latest release"},
+            bindings=[
+                ResolvedAgentSkillBinding(
+                    binding=NodeSystemAgentSkillBinding(
+                        skillKey="web_search",
+                        outputMapping={
+                            "query": "planned_query",
+                            "source_urls": "search_sources",
+                        },
+                    ),
+                    source="node_config",
+                )
+            ],
+            skill_definitions={
+                "web_search": SkillDefinition(
+                    skillKey="web_search",
+                    name="Web Search",
+                    inputSchema=[SkillIoField(key="query", name="Query", valueType="text", required=True)],
+                    outputSchema=[
+                        SkillIoField(key="query", name="Query", valueType="text", description="Executed query."),
+                        SkillIoField(key="source_urls", name="Source URLs", valueType="json", description="Original URLs."),
+                    ],
+                )
+            },
+            state_schema={
+                "planned_query": NodeSystemStateDefinition(
+                    name="联网搜索 Query",
+                    description="实际交给搜索技能执行的查询语句。",
+                    type=NodeSystemStateType.TEXT,
+                ),
+                "search_sources": NodeSystemStateDefinition(
+                    name="联网搜索 Source URLs",
+                    description="搜索技能返回的原文网页 URL 列表。",
+                    type=NodeSystemStateType.JSON,
+                ),
+            },
+        )
+
+        self.assertNotIn("== Bound Skill Output Mapping ==", prompt)
+        self.assertNotIn("outputKey: query", prompt)
+        self.assertNotIn("targetState: planned_query", prompt)
+        self.assertNotIn("targetName: 联网搜索 Query", prompt)
+        self.assertIn("== Required JSON Shape ==", prompt)
+        self.assertIn('"web_search"', prompt)
+        self.assertIn('"query"', prompt)
+
+    def test_skill_input_prompt_expands_result_package_inputs_before_planning_arguments(self) -> None:
+        artifact = create_uploaded_skill_artifact(
+            file_name="search-source.md",
+            content_type="text/markdown",
+            payload=b"Downloaded source text for the next skill input.",
+        )
+        try:
+            prompt = build_skill_input_system_prompt(
+                input_values={
+                    "search_result": {
+                        "kind": "result_package",
+                        "sourceType": "skill",
+                        "sourceKey": "web_search",
+                        "outputs": {
+                            "artifact_paths": {
+                                "name": "Artifact Paths",
+                                "description": "Downloaded source documents.",
+                                "type": "file",
+                                "value": [artifact["local_path"]],
+                            }
+                        },
+                    }
+                },
+                bindings=[
+                    ResolvedAgentSkillBinding(
+                        binding=NodeSystemAgentSkillBinding(skillKey="extract_facts"),
+                        source="node_config",
+                    )
+                ],
+                skill_definitions={
+                    "extract_facts": SkillDefinition(
+                        skillKey="extract_facts",
+                        name="Extract Facts",
+                        inputSchema=[SkillIoField(key="document_summary", name="Document Summary", valueType="text", required=True)],
+                    )
+                },
+                state_schema={
+                    "search_result": NodeSystemStateDefinition.model_validate(
+                        {
+                            "name": "Search Result",
+                            "type": "result_package",
+                        }
+                    )
+                },
+            )
+
+            self.assertIn("key: artifact_paths", prompt)
+            self.assertIn("type: file", prompt)
+            self.assertIn("Downloaded source text for the next skill input.", prompt)
+            self.assertNotIn(artifact["local_path"], prompt)
+        finally:
+            resolve_skill_artifact_path(artifact["local_path"]).unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

@@ -44,10 +44,9 @@ class TemplateLayoutTests(unittest.TestCase):
         nodes = template["nodes"]
 
         self.assertEqual(states["artifact_paths"]["type"], "file")
-        self.assertTrue(states["artifact_paths"]["promptVisible"])
         self.assertEqual(states["source_urls"]["type"], "json")
-        self.assertFalse(states["source_urls"]["promptVisible"])
         self.assertEqual(states["final_reply"]["type"], "markdown")
+        self.assertFalse(any("promptVisible" in definition for definition in states.values()))
 
         search_node = nodes["run_web_search"]
         self.assertEqual(search_node["kind"], "agent")
@@ -141,9 +140,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["generated_skill_files"]["type"], "json")
         self.assertEqual(states["test_status"]["type"], "text")
         self.assertEqual(states["final_skill_path"]["type"], "file")
-        self.assertFalse(states["existing_skill_catalog"]["promptVisible"])
-        self.assertFalse(states["builder_result"]["promptVisible"])
-        self.assertFalse(states["repair_attempt_count"]["promptVisible"])
+        self.assertFalse(any("promptVisible" in definition for definition in states.values()))
 
         metadata = template["metadata"]
         self.assertEqual(

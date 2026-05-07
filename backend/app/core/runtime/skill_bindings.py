@@ -85,10 +85,12 @@ def resolve_agent_skill_bindings(
             ResolvedAgentSkillBinding(binding=binding, source="node_config")
         )
         bound_keys.add(skill_key)
-    for skill_key in iter_skill_state_input_keys(node, input_values=input_values, state_schema=state_schema):
+        return bindings
+
+    for skill_key in iter_skill_state_input_keys(node, input_values=input_values, state_schema=state_schema)[:1]:
         if skill_key in bound_keys:
             continue
-        binding = configured_bindings.get(skill_key) or NodeSystemAgentSkillBinding(skillKey=skill_key)
+        binding = NodeSystemAgentSkillBinding(skillKey=skill_key)
         bindings.append(
             ResolvedAgentSkillBinding(binding=binding, source="skill_state")
         )
@@ -143,6 +145,34 @@ def map_skill_outputs(binding: NodeSystemAgentSkillBinding, skill_result: dict[s
         state_key: skill_result.get(output_key)
         for output_key, state_key in binding.output_mapping.items()
     }
+
+
+def build_skill_output_mapping_details(
+    binding: NodeSystemAgentSkillBinding,
+    *,
+    skill_definition: SkillDefinition | None,
+    state_schema: dict[str, NodeSystemStateDefinition],
+) -> list[dict[str, str]]:
+    output_fields = {
+        field.key: field
+        for field in (skill_definition.output_schema if skill_definition is not None else [])
+    }
+    details: list[dict[str, str]] = []
+    for output_key, state_key in binding.output_mapping.items():
+        field = output_fields.get(output_key)
+        state_definition = state_schema.get(state_key)
+        detail: dict[str, str] = {
+            "output_key": output_key,
+            "output_name": field.name if field is not None else "",
+            "output_type": field.value_type if field is not None else "",
+            "output_description": field.description if field is not None else "",
+            "state_key": state_key,
+            "state_name": state_definition.name if state_definition is not None else "",
+            "state_type": state_definition.type.value if state_definition is not None else "",
+            "state_description": state_definition.description if state_definition is not None else "",
+        }
+        details.append(detail)
+    return details
 
 
 def _infer_skill_output_state_key(

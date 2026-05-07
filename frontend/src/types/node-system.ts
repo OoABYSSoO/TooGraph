@@ -16,7 +16,6 @@ export type StateDefinition = {
   type: string;
   value?: unknown;
   color: string;
-  promptVisible?: boolean;
   binding?: {
     kind: "skill_output";
     skillKey: string;

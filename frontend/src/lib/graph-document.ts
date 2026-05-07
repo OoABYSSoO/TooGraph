@@ -55,8 +55,8 @@ const STATE_FIELD_TYPE_VALUES = new Set([
   "file",
   "knowledge_base",
   "skill",
+  "result_package",
 ]);
-const PROMPT_VISIBLE_SKILL_OUTPUT_TYPES = new Set(["file"]);
 
 export function createDraftFromTemplate(template: TemplateRecord): GraphPayload {
   const rawTemplate = toRaw(template) as TemplateRecord;
@@ -192,6 +192,8 @@ function defaultMaterializedStateValueForType(type: string): unknown {
       return {};
     case "skill":
       return [];
+    case "result_package":
+      return {};
     default:
       return "";
   }
@@ -638,9 +640,6 @@ function buildSyncedSubgraphBoundaryStateDefinition(
     value: shouldKeepValue ? currentDefinition?.value : defaultMaterializedStateValueForType(nextType),
     color: boundaryDefinition?.color?.trim() || currentDefinition?.color?.trim() || resolveMaterializedStateColor(stateKey, existingKeys),
   };
-  if (currentDefinition?.promptVisible !== undefined) {
-    nextDefinition.promptVisible = currentDefinition.promptVisible;
-  }
   if (currentDefinition?.binding !== undefined) {
     nextDefinition.binding = currentDefinition.binding;
   }
@@ -843,7 +842,6 @@ function createManagedSkillOutputState(
     name: `${skillName} ${fieldName}`,
     description: field.description.trim() || `${skillName} output: ${field.key}`,
     type: stateType,
-    promptVisible: PROMPT_VISIBLE_SKILL_OUTPUT_TYPES.has(stateType),
     binding: {
       kind: "skill_output",
       skillKey: skill.skillKey,

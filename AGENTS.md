@@ -58,7 +58,9 @@ These instructions apply to all work in this repository and should persist acros
   - LLM nodes perform one model turn. They reason, classify, plan, generate structured state, or prepare one capability call.
   - One LLM node may use at most one explicit capability source: no capability, one selected Skill, one incoming `skill` state, or one incoming `subgraph` state. If a workflow needs multiple capabilities, express the sequence with multiple nodes and edges.
   - A manually selected LLM-node Skill must be stored as scalar `config.skillKey`, never as `config.skills` or any other array. Arrays here imply multi-skill semantics and are considered legacy-invalid protocol.
-  - When an LLM node uses a Skill or dynamic Subgraph, the LLM prepares invocation inputs and output mapping before execution. The runtime executes the capability and writes raw structured outputs to state; the same LLM node should not summarize, repackage, or make follow-up capability calls.
+  - When an LLM node uses a Skill or dynamic Subgraph, the LLM prepares invocation inputs before execution. The runtime executes the capability and writes raw structured outputs to state; the same LLM node should not summarize, repackage, or make follow-up capability calls.
+  - Static manually selected Skills use `config.skillKey` plus protocol-owned `skillBindings.outputMapping`. That mapping is created by the graph/editor/runtime, is visible in run audit details, and must not be exposed as something the LLM chooses or rewrites.
+  - Dynamic capability execution from an incoming `skill` or `subgraph` state must write exactly one `result_package` state. The package wraps outputs as `outputs.<outputKey> = { name, description, type, value }`; do not add a redundant `fieldKey` property. Downstream LLM prompt assembly unpacks those virtual outputs and then uses the same state rendering rules as static states.
   - Manual reusable graph embedding belongs to Subgraph nodes. `subgraph` state exists for dynamic graph capability selection inside templates such as the companion loop, not as a normal card-level dropdown on LLM nodes.
   - Skill nodes execute controlled capabilities and side effects, such as writing local files, updating memory stores, downloading resources, or creating revisions.
   - Output nodes display, preview, export, or link results. They should not own persistent mutation logic.
@@ -76,6 +78,7 @@ These instructions apply to all work in this repository and should persist acros
 
 - Treat `node_system` as the only formal graph protocol. Do not introduce parallel graph formats, hidden node contracts, or product-specific execution paths that bypass the protocol.
 - Treat `state_schema` as the single source of truth for graph node inputs and outputs. Node data that must flow between nodes should be represented in schema-backed state, not passed through ad hoc side channels.
+- Do not keep compatibility shims for old graph protocols such as `config.skills`, binding-only `skillBindings`, `promptVisible`, static `inputMapping`, or dynamic skill output mapping inference. Old graphs should be rebuilt or deleted instead of silently repaired.
 - Graph validation, graph execution, run records, and UI previews should all derive from the same protocol shape. If a feature needs new node I/O, update the protocol/schema path instead of special-casing one screen or endpoint.
 
 ## Explicit Capabilities and Permissions

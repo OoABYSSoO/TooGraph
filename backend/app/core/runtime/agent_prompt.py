@@ -35,20 +35,7 @@ def build_auto_system_prompt(
         parts.append("\n== Graph State Inputs ==")
         for key, value in input_values.items():
             definition = resolved_state_schema.get(key)
-            if definition is not None and not definition.prompt_visible:
-                continue
-            if _is_file_reference_prompt_state(definition):
-                parts.extend(format_state_prompt_lines(key, definition))
-                parts.extend(
-                    format_file_state_prompt_lines(
-                        value,
-                        allow_text=definition.type == NodeSystemStateType.FILE,
-                        declared_state_type=definition.type,
-                    )
-                )
-                continue
-            display = format_prompt_value(value)
-            parts.extend(format_state_prompt_lines(key, definition, value=display))
+            parts.extend(format_graph_state_input_prompt_lines(key, definition, value))
 
     if skill_context:
         parts.append("\n== Skill Results ==")
@@ -85,6 +72,26 @@ def format_prompt_value(value: Any) -> str:
     if isinstance(sanitized, (dict, list)):
         return json.dumps(sanitized, ensure_ascii=False, indent=2)
     return "" if sanitized is None else str(sanitized)
+
+
+def format_graph_state_input_prompt_lines(
+    key: str,
+    definition: NodeSystemStateDefinition | None,
+    value: Any,
+) -> list[str]:
+    if _is_result_package_prompt_state(definition):
+        return format_result_package_prompt_lines(key, definition, value)
+    if _is_file_reference_prompt_state(definition):
+        lines = format_state_prompt_lines(key, definition)
+        lines.extend(
+            format_file_state_prompt_lines(
+                value,
+                allow_text=definition.type == NodeSystemStateType.FILE,
+                declared_state_type=definition.type,
+            )
+        )
+        return lines
+    return format_state_prompt_lines(key, definition, value=format_prompt_value(value))
 
 
 def sanitize_prompt_value(value: Any) -> Any:
@@ -143,6 +150,73 @@ def format_file_state_prompt_lines(
     return lines
 
 
+def format_result_package_prompt_lines(
+    key: str,
+    definition: NodeSystemStateDefinition | None,
+    value: Any,
+) -> list[str]:
+    lines = format_state_prompt_lines(key, definition)
+    if not isinstance(value, dict) or value.get("kind") != "result_package":
+        lines.append(f"  value: {format_prompt_value(value)}")
+        return lines
+
+    for package_key in ("sourceType", "sourceKey", "sourceName", "status", "error", "errorType"):
+        package_value = value.get(package_key)
+        if package_value not in (None, "", [], {}):
+            lines.append(f"  {package_key}: {format_prompt_value(package_value)}")
+    if value.get("inputs") not in (None, "", [], {}):
+        lines.append(f"  inputs: {format_prompt_value(value.get('inputs'))}")
+
+    outputs = value.get("outputs")
+    if not isinstance(outputs, dict) or not outputs:
+        return lines
+
+    lines.append("  outputs:")
+    for output_key, raw_output in outputs.items():
+        if not isinstance(raw_output, dict):
+            virtual_definition = NodeSystemStateDefinition(
+                name=str(output_key),
+                type=NodeSystemStateType.JSON if isinstance(raw_output, (dict, list)) else NodeSystemStateType.TEXT,
+            )
+            lines.extend(_indent_lines(format_state_prompt_lines(str(output_key), virtual_definition, value=format_prompt_value(raw_output)), 4))
+            continue
+
+        output_type = _coerce_result_package_output_type(raw_output.get("type"))
+        virtual_definition = NodeSystemStateDefinition(
+            name=str(raw_output.get("name") or output_key),
+            description=str(raw_output.get("description") or ""),
+            type=output_type,
+        )
+        output_value = raw_output.get("value")
+        lines.extend(_indent_lines(format_state_prompt_lines(str(output_key), virtual_definition), 4))
+        if _is_file_reference_prompt_state(virtual_definition):
+            lines.extend(
+                _indent_lines(
+                    format_file_state_prompt_lines(
+                        output_value,
+                        allow_text=output_type == NodeSystemStateType.FILE,
+                        declared_state_type=output_type,
+                    ),
+                    4,
+                )
+            )
+        else:
+            lines.extend(_indent_lines([f"  value: {format_prompt_value(output_value)}"], 4))
+    return lines
+
+
+def _coerce_result_package_output_type(value: Any) -> NodeSystemStateType:
+    try:
+        return NodeSystemStateType(str(value or "json").strip())
+    except ValueError:
+        return NodeSystemStateType.JSON
+
+
+def _indent_lines(lines: list[str], spaces: int) -> list[str]:
+    prefix = " " * spaces
+    return [f"{prefix}{line}" if line else line for line in lines]
+
+
 def _is_file_reference_prompt_state(definition: NodeSystemStateDefinition | None) -> bool:
     return definition is not None and definition.type in {
         NodeSystemStateType.FILE,
@@ -150,6 +224,10 @@ def _is_file_reference_prompt_state(definition: NodeSystemStateDefinition | None
         NodeSystemStateType.AUDIO,
         NodeSystemStateType.VIDEO,
     }
+
+
+def _is_result_package_prompt_state(definition: NodeSystemStateDefinition | None) -> bool:
+    return definition is not None and definition.type == NodeSystemStateType.RESULT_PACKAGE
 
 
 def _collect_file_state_references(value: Any) -> list[dict[str, str]]:
@@ -242,6 +320,8 @@ def example_output_value_for_state(definition: NodeSystemStateDefinition | None)
         return {}
     if definition.type == NodeSystemStateType.SKILL:
         return []
+    if definition.type == NodeSystemStateType.RESULT_PACKAGE:
+        return {}
     if definition.type == NodeSystemStateType.NUMBER:
         return 0
     if definition.type == NodeSystemStateType.BOOLEAN:
@@ -290,6 +370,11 @@ def format_state_output_contract_lines(state_type: NodeSystemStateType) -> list[
         return [
             "  output_format: JSON array inside the JSON value",
             "  output_rule: 这个字段的值必须是数组；不要把数组再序列化成字符串。",
+        ]
+    if state_type == NodeSystemStateType.RESULT_PACKAGE:
+        return [
+            "  output_format: result_package JSON object",
+            "  output_rule: 这个字段只能由动态能力运行时写入；不要在普通 LLM 输出中手写或改写包壳。",
         ]
     if state_type in {
         NodeSystemStateType.FILE,

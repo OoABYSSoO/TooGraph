@@ -529,12 +529,17 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
     },
   ]);
   assert.equal(nextDocument.state_schema.state_1?.name, "联网搜索 Query");
+  assert.equal(nextDocument.state_schema.state_1?.description, "Search query.");
   assert.equal(nextDocument.state_schema.state_1?.type, "text");
-  assert.equal(nextDocument.state_schema.state_1?.promptVisible, false);
   assert.equal(nextDocument.state_schema.state_2?.type, "json");
-  assert.equal(nextDocument.state_schema.state_2?.promptVisible, false);
+  assert.equal(nextDocument.state_schema.state_2?.name, "联网搜索 Source URLs");
+  assert.equal(nextDocument.state_schema.state_2?.description, "URLs.");
   assert.equal(nextDocument.state_schema.state_3?.type, "file");
-  assert.equal(nextDocument.state_schema.state_3?.promptVisible, true);
+  assert.equal(nextDocument.state_schema.state_3?.name, "联网搜索 Artifact Paths");
+  assert.equal(nextDocument.state_schema.state_3?.description, "Files.");
+  assert.equal("promptVisible" in (nextDocument.state_schema.state_1 ?? {}), false);
+  assert.equal("promptVisible" in (nextDocument.state_schema.state_2 ?? {}), false);
+  assert.equal("promptVisible" in (nextDocument.state_schema.state_3 ?? {}), false);
   assert.deepEqual(nextDocument.state_schema.state_3?.binding, {
     kind: "skill_output",
     skillKey: "web_search",

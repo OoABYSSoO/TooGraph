@@ -13,7 +13,8 @@
   -> 决定需要哪些技能
   -> 把选中的技能作为 skill state 传给下游 LLM 节点
   -> 下游 LLM 节点根据绑定技能的说明决定如何填写技能输入并运行技能
-  -> 将技能输出透传到绑定 state
+  -> 将动态能力输出封装为 result_package state
+  -> 下游节点拆包后按普通 state/file 语义阅读结果
   -> 评估结果是否需要继续调用技能
   -> 生成 final_reply
   -> 可选地整理并写回人设、记忆和会话摘要
@@ -41,7 +42,7 @@
 - 技能系统去掉旧 `targets` / `executionTargets` 分流。
 - skill manifest 顶层和 `inputSchema` / `outputSchema` 字段从 `label` 收束为 `name`。
 - `description` 承载选择条件，`llmInstruction` 承载绑定后的使用说明。
-- `state_schema` 增加 `skill` 类型和技能绑定元数据；`promptVisible` 是待移除的历史字段，未来上下文边界由节点 `reads` 决定。
+- `state_schema` 增加 `skill`、`result_package` 类型和技能绑定元数据；`promptVisible` 已移除，上下文边界由节点 `reads` 决定。
 - LLM 节点卡片已改为单选 Skill 控件；动态 `subgraph` state 只服务于模板内运行时能力选择，不作为普通卡片下拉项。
 - LLM 节点提示词区域支持技能说明胶囊，胶囊可编辑、可随技能移除。
 - 旧内置模板已删除，旧模板运行入口兼容修补已删除。
@@ -50,9 +51,10 @@
 - LLM 节点会读取 `file` state 中的文本类文件，并只把文件名与原文全文放入模型上下文；图片、音频和视频路径走多模态附件处理。
 - `web_search` 不再输出 `context`，只输出 `query`、`source_urls`、`artifact_paths` 和 `errors`。
 - `web_search` 对搜索源请求默认最多尝试 5 次，避免一次瞬时 TLS 或连接中断直接导致空结果。
-- `skillBindings` 已收束为技能身份和 `outputMapping`，不再包含 `inputMapping`、静态参数 `config` 或无意义的 `trigger`。
+- 静态手动选择 skill 的 `skillBindings` 已收束为技能身份和 `outputMapping`，不再包含 `inputMapping`、静态参数 `config` 或无意义的 `trigger`。
 - LLM 节点卡片选择带 `outputSchema` 的 skill 时，会自动创建 managed skill output state、写入节点输出端口，并同步 `skillBindings.outputMapping`。
 - 技能输入由 LLM 节点在运行前根据当前输入 state、技能说明和 `inputSchema` 生成；必填技能输入缺失时由运行时记录可恢复错误。
+- 动态 `skill` state 执行结果已收束为唯一 `result_package` 输出：运行时封包，下游 prompt 组装时拆包，复用普通 state 和 artifact 展开逻辑。
 - 图运行前不再兼容补齐旧绑定。旧草稿、旧模板和旧技能需要按当前协议重建。
 - 已新增通用 `advanced_web_research_loop` 内置模板，用于验证“搜索技能执行 -> 证据评估 -> condition 控制补搜 -> 依据筛选 -> final_reply”的图式工具循环。它不是桌宠自主循环模板，但可作为联网研究子流程和后续桌宠模板的参考构件。
 - 已新增通用 `create_user_skill` 内置模板，用于通过用户确认、示例确认、设计确认、写入、测试和有限修复循环创建用户自定义 Skill。
@@ -63,7 +65,7 @@
 - 子图运行审计聚合、事件定位、从缩略图点击跳转到内部节点，以及更完整的嵌套可视化能力。
 - 真实的 `autonomous_decision` 技能。
 - 新版桌宠自主循环模板。
-- 将内部 `agent` kind 迁移为面向用户和协议一致的 LLM 节点语义，并移除 `promptVisible`。
+- 将内部 `agent` kind 迁移为面向用户和协议一致的 LLM 节点语义。
 - 增加 `subgraph` state 类型和运行时动态子图执行能力。
 - 用户 Skill 创建和管理的 UI 完善，例如文件预览、revision 对比、回滚入口和测试运行入口。
 - 当前仍残留 `backend/app/companion/commands.py` 中的 `graph_patch.draft` 草案记录 stub。它是历史遗留入口，只能记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、graph revision、undo 或完整审计闭环；下一轮应删除它，或按新的图优先命令流重建。
@@ -272,7 +274,9 @@ effective_capability =
 
 - 决策节点只决定应使用哪个技能或子图。
 - 执行 LLM 节点读取绑定能力的 schema 和说明，决定具体输入并触发一次运行。
-- 技能或子图输出通过绑定 state 透传给下游节点。
+- 静态手动绑定 skill 时，技能输出通过 `skillBindings.outputMapping` 写入明确 state。
+- 动态输入 `skill` 或 `subgraph` state 时，运行时只写一个 `result_package` state，包内 `outputs.<outputKey>` 保存 `{ name, description, type, value }`，不额外写 `fieldKey`。
+- 下游 LLM 节点接收 `result_package` 时先拆包成虚拟输出，再按普通 state 和 artifact 展开逻辑拼上下文。
 - 分析 LLM 节点读取能力输出，负责整理、比较、总结或生成最终回复。
 
 以“总结鸣潮最新版本内容”为例：
@@ -283,12 +287,36 @@ intent_agent
   -> decision_agent 选择 web_search
   -> selected_skill: { skillKey: "web_search" }
   -> search_llm 绑定 selected_skill，决定 query="鸣潮 最新版本 更新内容" 并运行 web_search
-  -> source_urls / artifact_paths / errors
-  -> summary_llm 读取 artifact_paths 对应原文文件，总结版本内容
+  -> search_result_package
+  -> summary_llm 拆包读取 source_urls / artifact_paths / errors，其中 artifact_paths 对应原文文件
   -> final_reply
 ```
 
 关键点：`decision_agent` 不生成 `query`；`search_llm` 才生成技能输入。
+
+`search_result_package` 的核心形状如下：
+
+```json
+{
+  "kind": "result_package",
+  "sourceType": "skill",
+  "sourceKey": "web_search",
+  "outputs": {
+    "source_urls": {
+      "name": "Source URLs",
+      "description": "搜索结果对应的原文网页 URL",
+      "type": "json",
+      "value": ["https://example.com/source"]
+    },
+    "artifact_paths": {
+      "name": "Artifact Paths",
+      "description": "下载到本地的原文文档路径",
+      "type": "file",
+      "value": ["uploads/.../doc.md"]
+    }
+  }
+}
+```
 
 ## 技能说明胶囊
 
@@ -306,6 +334,8 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 ## 技能绑定 State
 
+本节只描述静态手动选择 skill 的绑定语义。动态 `skill` / `subgraph` state 执行不使用本节的 `outputMapping`，而是写唯一 `result_package` state。
+
 技能如果有明确输出，应能自动生成绑定 state。
 
 绑定 state 的目标：
@@ -313,6 +343,7 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 - 技能输出进入图状态，供下游节点读取。
 - 节点卡片选择技能时，系统根据 `outputSchema` 自动创建 managed binding state。
 - 自动创建的 state 会被加入当前 LLM 节点的输出端口，并写入 `skillBindings.outputMapping`。
+- `skillBindings.outputMapping` 是协议层和审计层数据，不进入 LLM 的技能输入规划 prompt；LLM 只负责生成技能调用输入。
 - `skillBindings` 不表达技能输入。技能输入属于 LLM 节点运行时的决策结果，而不是图协议中的静态连线。
 - 不再用 `promptVisible` 控制上下文可见性。LLM 节点是否看到某个 state，由该节点是否 `reads` 这个 state 决定。
 - Output 节点可以展示本地 artifact、网址、错误和摘要。
@@ -377,6 +408,20 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
   }
 ]
 ```
+
+## 动态结果包 State
+
+动态执行节点的输入来自上游 `skill` 或未来的 `subgraph` state。这意味着上游只决定“用哪个能力”，执行节点负责为该能力生成一次调用输入并运行它。
+
+固定规则：
+
+- 动态执行节点不能同时有静态 `config.skillKey`。
+- 动态执行节点不能依赖 `skillBindings.outputMapping`，也不能从写入端口推断普通技能输出映射。
+- 动态执行节点必须只写一个 `result_package` state。
+- `result_package.outputs` 的对象键就是能力输出字段 key。每个值包含 `name`、`description`、`type`、`value`；不要额外增加 `fieldKey`。
+- 下游节点读取 `result_package` 时，prompt 组装器会把 `outputs` 拆成虚拟 state。`type=file` 的值继续走本地 artifact 展开逻辑，所以联网搜索下载的原文可以和静态绑定时一样进入上下文。
+
+这种封包/拆包方式让动态能力和静态绑定在下游拥有同一套阅读逻辑：差别只在于动态结果缺少静态 state key，但不缺少输出名称、描述、类型和值。
 
 ## `autonomous_decision`
 

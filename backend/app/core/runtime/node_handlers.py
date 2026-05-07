@@ -11,6 +11,8 @@ from app.core.runtime.condition_eval import evaluate_condition_rule, resolve_bra
 from app.core.runtime.input_boundary import coerce_input_boundary_value, first_truthy
 from app.core.runtime.reference_resolution import resolve_condition_source
 from app.core.runtime.skill_bindings import (
+    ResolvedAgentSkillBinding,
+    build_skill_output_mapping_details,
     map_skill_outputs,
     resolve_agent_skill_output_binding,
     resolve_agent_skill_bindings,
@@ -21,6 +23,7 @@ from app.core.schemas.node_system import (
     NodeSystemConditionNode,
     NodeSystemInputNode,
     NodeSystemStateDefinition,
+    NodeSystemStateType,
     StateWriteMode,
 )
 from app.core.storage.skill_artifact_store import create_skill_artifact_context
@@ -107,6 +110,22 @@ def execute_agent_node(
     runtime_config = resolve_agent_runtime_config_func(node)
     skill_definitions = get_skill_definition_registry_func(include_disabled=False)
     resolved_bindings = resolve_agent_skill_bindings(node, input_values=input_values, state_schema=state_schema)
+    resolved_bindings = [
+        ResolvedAgentSkillBinding(
+            binding=(
+                resolve_agent_skill_output_binding(
+                    resolved_binding.binding,
+                    node=node,
+                    state_schema=state_schema,
+                    skill_definition=skill_definitions.get(resolved_binding.binding.skill_key),
+                )
+                if resolved_binding.source == "node_config"
+                else resolved_binding.binding
+            ),
+            source=resolved_binding.source,
+        )
+        for resolved_binding in resolved_bindings
+    ]
     generated_skill_inputs: dict[str, dict[str, Any]] = {}
     skill_input_reasoning = ""
     if resolved_bindings:
@@ -130,12 +149,6 @@ def execute_agent_node(
 
         started_at = perf_counter()
         skill_definition = skill_definitions.get(skill_key)
-        binding = resolve_agent_skill_output_binding(
-            binding,
-            node=node,
-            state_schema=state_schema,
-            skill_definition=skill_definition,
-        )
         input_schema = list(getattr(skill_definition, "input_schema", []) or [])
         skill_inputs = dict(generated_skill_inputs.get(skill_key) or {})
         missing_inputs = missing_required_skill_inputs(skill_inputs, input_schema)
@@ -168,9 +181,23 @@ def execute_agent_node(
                 )
             skill_result = invoke_skill_func(skill_func, skill_inputs, **skill_invoke_kwargs)
         duration_ms = int((perf_counter() - started_at) * 1000)
-        state_writes = map_skill_outputs(binding, skill_result)
         skill_status, skill_error = _resolve_skill_invocation_status(skill_key, skill_result)
         skill_error_type = _resolve_skill_error_type(skill_result)
+        if resolved_binding.source == "skill_state":
+            state_writes = map_dynamic_skill_result_package(
+                node,
+                state_schema,
+                skill_key=skill_key,
+                skill_definition=skill_definition,
+                skill_inputs=skill_inputs,
+                skill_result=skill_result,
+                status=skill_status,
+                error=skill_error,
+                error_type=skill_error_type,
+                duration_ms=duration_ms,
+            )
+        else:
+            state_writes = map_skill_outputs(binding, skill_result)
         if missing_inputs:
             warnings.append(f"Skill '{skill_key}' failed before execution: {skill_error or 'Unknown error.'}")
         elif skill_status == "failed":
@@ -187,6 +214,11 @@ def execute_agent_node(
                 "inputs": skill_inputs,
                 "outputs": skill_result,
                 "output_mapping": dict(binding.output_mapping),
+                "output_mapping_details": build_skill_output_mapping_details(
+                    binding,
+                    skill_definition=skill_definition,
+                    state_schema=state_schema,
+                ),
                 "state_writes": state_writes,
                 "duration_ms": duration_ms,
                 "status": skill_status,
@@ -199,6 +231,7 @@ def execute_agent_node(
     write_modes = {binding.state: binding.mode for binding in node.writes}
     if output_keys and all(state_name in mapped_skill_outputs for state_name in output_keys):
         output_values = dict(mapped_skill_outputs)
+        final_result_value = first_truthy_func(output_values.values())
         finalize_kwargs: dict[str, Any] = {
             "state": state,
             "node_name": node_name,
@@ -216,7 +249,7 @@ def execute_agent_node(
             "skill_outputs": skill_outputs,
             "runtime_config": runtime_config,
             "warnings": list(dict.fromkeys(warnings)),
-            "final_result": first_truthy_func(output_values.values()) or "",
+            "final_result": "" if final_result_value in (None, "", [], {}) else str(final_result_value),
         }
 
     stream_delta_kwargs: dict[str, Any] = {
@@ -268,7 +301,7 @@ def execute_agent_node(
         "skill_outputs": skill_outputs,
         "runtime_config": runtime_config,
         "warnings": list(dict.fromkeys(warnings)),
-        "final_result": first_truthy_func(output_values.values()) or response_payload.get("summary") or "",
+        "final_result": str(first_truthy_func(output_values.values()) or response_payload.get("summary") or ""),
     }
 
 
@@ -286,6 +319,88 @@ def _next_skill_artifact_invocation_index(state: dict[str, Any], node_name: str,
     next_index = max(0, current_index) + 1
     raw_counters[counter_key] = next_index
     return next_index
+
+
+def map_dynamic_skill_result_package(
+    node: NodeSystemAgentNode,
+    state_schema: dict[str, NodeSystemStateDefinition],
+    *,
+    skill_key: str,
+    skill_definition: Any | None,
+    skill_inputs: dict[str, Any],
+    skill_result: dict[str, Any],
+    status: str,
+    error: str,
+    error_type: str,
+    duration_ms: int,
+) -> dict[str, Any]:
+    output_state_keys = [
+        write.state
+        for write in node.writes
+        if state_schema.get(write.state) is not None
+        and state_schema[write.state].type == NodeSystemStateType.RESULT_PACKAGE
+    ]
+    if len(output_state_keys) != 1:
+        raise ValueError("Dynamic skill execution requires exactly one result_package output state.")
+    state_key = output_state_keys[0]
+    return {
+        state_key: build_dynamic_skill_result_package(
+            skill_key=skill_key,
+            skill_definition=skill_definition,
+            skill_inputs=skill_inputs,
+            skill_result=skill_result,
+            status=status,
+            error=error,
+            error_type=error_type,
+            duration_ms=duration_ms,
+        )
+    }
+
+
+def build_dynamic_skill_result_package(
+    *,
+    skill_key: str,
+    skill_definition: Any | None,
+    skill_inputs: dict[str, Any],
+    skill_result: dict[str, Any],
+    status: str,
+    error: str,
+    error_type: str,
+    duration_ms: int,
+) -> dict[str, Any]:
+    output_fields = list(getattr(skill_definition, "output_schema", []) or [])
+    outputs: dict[str, Any] = {}
+    if output_fields:
+        for field in output_fields:
+            outputs[field.key] = {
+                "name": field.name,
+                "description": field.description,
+                "type": field.value_type,
+                "value": skill_result.get(field.key),
+            }
+    else:
+        for key, value in skill_result.items():
+            if key in {"status", "error", "error_type", "recoverable", "missing_inputs"}:
+                continue
+            outputs[key] = {
+                "name": key,
+                "description": "",
+                "type": "json" if isinstance(value, (dict, list)) else "text",
+                "value": value,
+            }
+
+    return {
+        "kind": "result_package",
+        "sourceType": "skill",
+        "sourceKey": skill_key,
+        "sourceName": str(getattr(skill_definition, "name", "") or skill_key),
+        "status": status,
+        "inputs": skill_inputs,
+        "outputs": outputs,
+        "durationMs": duration_ms,
+        "error": error,
+        "errorType": error_type,
+    }
 
 
 def missing_required_skill_inputs(skill_inputs: dict[str, Any], input_schema: list[Any] | None) -> list[str]:

@@ -14,6 +14,7 @@ from app.core.schemas.node_system import (
     NodeSystemInputNode,
     NodeSystemOutputNode,
     NodeSystemSubgraphNode,
+    NodeSystemStateType,
     ValidationIssue,
 )
 from app.core.schemas.skills import SkillLlmNodeEligibility, SkillCatalogStatus, SkillDefinition
@@ -296,6 +297,60 @@ def _validate_agent_node(
     skill_catalog: dict[str, SkillDefinition],
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
+    dynamic_skill_state_reads = _agent_skill_state_reads(node, state_schema)
+    if node.config.skill_bindings and not node.config.skill_key:
+        issues.append(
+            ValidationIssue(
+                code="agent_skill_binding_without_skill_key",
+                message=(
+                    f"LLM node '{node_name}' defines skillBindings without a static skillKey. "
+                    "Use skillKey for static skills or a skill state input with one result_package output for dynamic skills."
+                ),
+                path=f"nodes.{node_name}.config.skillBindings",
+            )
+        )
+    for binding_index, binding in enumerate(node.config.skill_bindings):
+        if node.config.skill_key and binding.skill_key != node.config.skill_key:
+            issues.append(
+                ValidationIssue(
+                    code="agent_skill_binding_mismatched_skill_key",
+                    message=(
+                        f"LLM node '{node_name}' maps skill '{binding.skill_key}', but its static skillKey is "
+                        f"'{node.config.skill_key}'."
+                    ),
+                    path=f"nodes.{node_name}.config.skillBindings.{binding_index}.skillKey",
+                )
+            )
+
+    if node.config.skill_key and dynamic_skill_state_reads:
+        issues.append(
+            ValidationIssue(
+                code="agent_static_and_dynamic_skill_mixed",
+                message=(
+                    f"LLM node '{node_name}' cannot combine a static skillKey with skill state inputs. "
+                    "Use either a static mounted skill or a dynamic skill executor."
+                ),
+                path=f"nodes.{node_name}.reads",
+            )
+        )
+    if not node.config.skill_key and dynamic_skill_state_reads:
+        result_package_writes = [
+            binding.state
+            for binding in node.writes
+            if getattr(state_schema.get(binding.state), "type", None) == NodeSystemStateType.RESULT_PACKAGE
+        ]
+        if len(node.writes) != 1 or len(result_package_writes) != 1:
+            issues.append(
+                ValidationIssue(
+                    code="dynamic_skill_output_state_invalid",
+                    message=(
+                        f"LLM node '{node_name}' reads a skill state dynamically and must write exactly one "
+                        "result_package state."
+                    ),
+                    path=f"nodes.{node_name}.writes",
+                )
+            )
+
     skill_refs = _iter_agent_skill_refs(node_name, node)
     for skill_key, skill_path in skill_refs:
         definition = skill_catalog.get(skill_key)
@@ -372,16 +427,21 @@ def _validate_agent_node(
 
 def _iter_agent_skill_refs(node_name: str, node: NodeSystemAgentNode) -> list[tuple[str, str]]:
     refs: list[tuple[str, str]] = []
-    seen: set[str] = set()
     if node.config.skill_key:
         refs.append((node.config.skill_key, f"nodes.{node_name}.config.skillKey"))
-        seen.add(node.config.skill_key)
-    for binding_index, binding in enumerate(node.config.skill_bindings):
-        if binding.skill_key in seen:
-            continue
-        refs.append((binding.skill_key, f"nodes.{node_name}.config.skillBindings.{binding_index}.skillKey"))
-        seen.add(binding.skill_key)
     return refs
+
+
+def _agent_skill_state_reads(
+    node: NodeSystemAgentNode,
+    state_schema: dict[str, object],
+) -> list[str]:
+    state_keys: list[str] = []
+    for binding in node.reads:
+        definition = state_schema.get(binding.state)
+        if getattr(definition, "type", None) == NodeSystemStateType.SKILL:
+            state_keys.append(binding.state)
+    return state_keys
 
 
 def _validate_condition_node(

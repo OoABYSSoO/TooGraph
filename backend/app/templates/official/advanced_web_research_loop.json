@@ -10,7 +10,6 @@
       "type": "text",
       "value": "帮我总结今天的 AI 新闻",
       "color": "#d97706",
-      "promptVisible": true,
       "binding": null
     },
     "research_plan": {
@@ -19,7 +18,6 @@
       "type": "markdown",
       "value": "",
       "color": "#2563eb",
-      "promptVisible": true,
       "binding": null
     },
     "current_query": {
@@ -28,7 +26,6 @@
       "type": "text",
       "value": "",
       "color": "#0f766e",
-      "promptVisible": true,
       "binding": null
     },
     "executed_queries": {
@@ -37,7 +34,6 @@
       "type": "json",
       "value": [],
       "color": "#7c3aed",
-      "promptVisible": true,
       "binding": {
         "kind": "skill_output",
         "skillKey": "web_search",
@@ -52,7 +48,6 @@
       "type": "json",
       "value": [],
       "color": "#9333ea",
-      "promptVisible": false,
       "binding": {
         "kind": "skill_output",
         "skillKey": "web_search",
@@ -67,7 +62,6 @@
       "type": "file",
       "value": [],
       "color": "#10b981",
-      "promptVisible": true,
       "binding": {
         "kind": "skill_output",
         "skillKey": "web_search",
@@ -82,7 +76,6 @@
       "type": "json",
       "value": [],
       "color": "#dc2626",
-      "promptVisible": true,
       "binding": {
         "kind": "skill_output",
         "skillKey": "web_search",
@@ -97,7 +90,6 @@
       "type": "json",
       "value": {},
       "color": "#0891b2",
-      "promptVisible": true,
       "binding": null
     },
     "key_evidence_notes": {
@@ -106,7 +98,6 @@
       "type": "markdown",
       "value": "",
       "color": "#4f46e5",
-      "promptVisible": true,
       "binding": null
     },
     "final_reply": {
@@ -115,7 +106,6 @@
       "type": "markdown",
       "value": "",
       "color": "#b45309",
-      "promptVisible": true,
       "binding": null
     }
   },

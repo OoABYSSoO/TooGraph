@@ -9,6 +9,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.runtime.agent_multimodal import collect_input_attachments, prepare_model_input_attachments
+from app.core.schemas.node_system import NodeSystemStateDefinition
+from app.core.storage.skill_artifact_store import create_uploaded_skill_artifact, resolve_skill_artifact_path
 
 
 class AgentMultimodalArtifactTests(unittest.TestCase):
@@ -36,6 +38,38 @@ class AgentMultimodalArtifactTests(unittest.TestCase):
         self.assertEqual(attachments[0]["source"], "skill_artifact")
         self.assertEqual(attachments[0]["state_key"], "downloaded_files")
         self.assertEqual(attachments[0]["local_path"], "run_1/download/clip.mp4")
+
+    def test_collects_media_references_inside_result_package_outputs(self) -> None:
+        artifact = create_uploaded_skill_artifact(
+            file_name="reference.png",
+            content_type="image/png",
+            payload=b"fake-png",
+        )
+        try:
+            attachments = collect_input_attachments(
+                {
+                    "dynamic_result": {
+                        "kind": "result_package",
+                        "outputs": {
+                            "reference_image": {
+                                "name": "Reference Image",
+                                "type": "image",
+                                "value": [artifact["local_path"]],
+                            }
+                        },
+                    }
+                },
+                state_schema={
+                    "dynamic_result": NodeSystemStateDefinition.model_validate({"type": "result_package"}),
+                },
+            )
+
+            self.assertEqual(len(attachments), 1)
+            self.assertEqual(attachments[0]["type"], "image")
+            self.assertEqual(attachments[0]["state_key"], "dynamic_result")
+            self.assertEqual(attachments[0]["local_path"], artifact["local_path"])
+        finally:
+            resolve_skill_artifact_path(artifact["local_path"]).unlink(missing_ok=True)
 
     def test_prepare_large_video_artifact_uses_frame_fallback_through_same_attachment_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

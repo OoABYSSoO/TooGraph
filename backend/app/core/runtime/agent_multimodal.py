@@ -181,6 +181,9 @@ def _iter_artifact_candidate_records(
     if envelope is not None and _extract_local_path(envelope):
         records.append(envelope)
         return records
+    if definition is not None and definition.type == NodeSystemStateType.RESULT_PACKAGE:
+        records.extend(_iter_result_package_artifact_candidate_records(value))
+        return records
     if isinstance(value, dict):
         if _extract_local_path(value):
             records.append(value)
@@ -204,6 +207,37 @@ def _iter_artifact_candidate_records(
     ):
         records.append({"local_path": value, "content_type": _declared_file_state_content_type(definition.type)})
     return records
+
+
+def _iter_result_package_artifact_candidate_records(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, dict) or value.get("kind") != "result_package":
+        return []
+
+    outputs = value.get("outputs")
+    if not isinstance(outputs, dict):
+        return []
+
+    records: list[dict[str, Any]] = []
+    for raw_output in outputs.values():
+        if not isinstance(raw_output, dict):
+            continue
+        output_type = _coerce_state_type(raw_output.get("type"))
+        if output_type not in {
+            NodeSystemStateType.FILE,
+            NodeSystemStateType.IMAGE,
+            NodeSystemStateType.AUDIO,
+            NodeSystemStateType.VIDEO,
+        }:
+            continue
+        records.extend(_iter_artifact_candidate_records(raw_output.get("value"), NodeSystemStateDefinition(type=output_type)))
+    return records
+
+
+def _coerce_state_type(value: Any) -> NodeSystemStateType:
+    try:
+        return NodeSystemStateType(str(value or "json").strip())
+    except ValueError:
+        return NodeSystemStateType.JSON
 
 
 def _build_artifact_media_attachment(

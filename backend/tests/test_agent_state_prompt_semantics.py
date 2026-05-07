@@ -56,40 +56,6 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertIn("description: 给用户看的中文总结", prompt)
         self.assertIn('"state_1": "在此填写完整内容"', prompt)
 
-    def test_auto_prompt_hides_skill_bound_state_when_marked_prompt_invisible(self) -> None:
-        state_schema = {
-            "search_urls": NodeSystemStateDefinition(
-                name="Search URLs",
-                description="Raw URLs returned by the bound web search skill.",
-                type=NodeSystemStateType.FILE,
-                value=[],
-                promptVisible=False,
-            ),
-            "question": NodeSystemStateDefinition(
-                name="Question",
-                description="Visible user request.",
-                type=NodeSystemStateType.TEXT,
-                value="",
-            ),
-            "answer": NodeSystemStateDefinition(
-                name="Answer",
-                type=NodeSystemStateType.MARKDOWN,
-                value="",
-            ),
-        }
-
-        prompt = build_auto_system_prompt(
-            ["answer"],
-            {"search_urls": ["https://example.com/a"], "question": "Summarize the latest AI news"},
-            {},
-            state_schema=state_schema,
-        )
-
-        self.assertNotIn("key: search_urls", prompt)
-        self.assertNotIn("https://example.com/a", prompt)
-        self.assertIn("key: question", prompt)
-        self.assertIn("Summarize the latest AI news", prompt)
-
     def test_auto_prompt_emphasizes_output_state_value_formats(self) -> None:
         state_schema = {
             "state_1": NodeSystemStateDefinition(
@@ -222,6 +188,67 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         finally:
             for relative_path in artifact_paths:
                 resolve_skill_artifact_path(relative_path).unlink(missing_ok=True)
+
+    def test_auto_prompt_expands_result_package_outputs_as_virtual_states(self) -> None:
+        artifact = create_uploaded_skill_artifact(
+            file_name="search-source.md",
+            content_type="text/markdown",
+            payload=b"Original source paragraph from the downloaded page.",
+        )
+        try:
+            prompt = build_auto_system_prompt(
+                ["answer"],
+                {
+                    "dynamic_search_result": {
+                        "kind": "result_package",
+                        "sourceType": "skill",
+                        "sourceKey": "web_search",
+                        "sourceName": "联网搜索",
+                        "status": "succeeded",
+                        "inputs": {"query": "鸣潮 最新版本信息"},
+                        "outputs": {
+                            "source_urls": {
+                                "name": "Source URLs",
+                                "description": "搜索结果对应的原文网页 URL",
+                                "type": "json",
+                                "value": ["https://example.test/news"],
+                            },
+                            "artifact_paths": {
+                                "name": "Artifact Paths",
+                                "description": "搜索技能下载到本地的原文文档路径",
+                                "type": "file",
+                                "value": [artifact["local_path"]],
+                            },
+                        },
+                    }
+                },
+                {},
+                state_schema={
+                    "dynamic_search_result": NodeSystemStateDefinition.model_validate(
+                        {
+                            "name": "动态能力运行结果",
+                            "description": "动态选择的技能运行后得到的完整结果包",
+                            "type": "result_package",
+                        }
+                    ),
+                    "answer": NodeSystemStateDefinition(type=NodeSystemStateType.MARKDOWN),
+                },
+            )
+
+            self.assertIn("sourceType: skill", prompt)
+            self.assertIn("sourceKey: web_search", prompt)
+            self.assertIn("sourceName: 联网搜索", prompt)
+            self.assertIn("key: source_urls", prompt)
+            self.assertIn("name: Source URLs", prompt)
+            self.assertIn("https://example.test/news", prompt)
+            self.assertIn("key: artifact_paths", prompt)
+            self.assertIn("type: file", prompt)
+            self.assertIn("文件名：", prompt)
+            self.assertIn(Path(artifact["local_path"]).name, prompt)
+            self.assertIn("Original source paragraph from the downloaded page.", prompt)
+            self.assertNotIn(artifact["local_path"], prompt)
+        finally:
+            resolve_skill_artifact_path(artifact["local_path"]).unlink(missing_ok=True)
 
     def test_auto_prompt_does_not_read_media_paths_as_text_file_content(self) -> None:
         image_artifact = create_uploaded_skill_artifact(

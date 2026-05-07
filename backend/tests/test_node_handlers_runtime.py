@@ -191,7 +191,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["skill_outputs"][0]["inputs"], {"kb": "docs", "question": "q"})
         self.assertEqual(result["outputs"], {"answer": "q"})
 
-    def test_execute_agent_node_invokes_union_of_card_and_skill_state_inputs(self) -> None:
+    def test_execute_agent_node_static_skill_ignores_skill_state_inputs(self) -> None:
         state_schema = {
             "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
             "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -246,9 +246,9 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             first_truthy_func=lambda values: next((value for value in values if value), None),
         )
 
-        self.assertEqual(invoked, ["web_search", "file_reader"])
-        self.assertEqual(result["selected_skills"], ["web_search", "file_reader"])
-        self.assertEqual(result["outputs"], {"answer": "web_search,file_reader"})
+        self.assertEqual(invoked, ["web_search"])
+        self.assertEqual(result["selected_skills"], ["web_search"])
+        self.assertEqual(result["outputs"], {"answer": "web_search"})
 
     def test_execute_agent_node_uses_llm_generated_skill_inputs(self) -> None:
         state_schema = {
@@ -321,7 +321,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         state_schema = {
             "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
             "query": NodeSystemStateDefinition.model_validate({"type": "text"}),
-            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "dynamic_result": NodeSystemStateDefinition.model_validate({"type": "result_package"}),
         }
         node = NodeSystemAgentNode.model_validate(
             {
@@ -329,7 +329,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "name": "tool_executor",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "allowed_skills"}, {"state": "query"}],
-                "writes": [{"state": "answer"}],
+                "writes": [{"state": "dynamic_result"}],
                 "config": {"skillKey": ""},
             }
         )
@@ -354,7 +354,14 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                         SkillIoField(key="query", name="Query", valueType="text", required=True),
                         SkillIoField(key="max_results", name="Max Results", valueType="text"),
                     ],
-                    outputSchema=[SkillIoField(key="summary", name="Summary", valueType="markdown")],
+                    outputSchema=[
+                        SkillIoField(
+                            key="summary",
+                            name="Summary",
+                            valueType="markdown",
+                            description="Search result summary.",
+                        )
+                    ],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
@@ -367,11 +374,8 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
-                {"answer": skill_context["web_search"]["summary"]},
-                "",
-                [],
-                runtime_config,
+            generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("dynamic skill results should be packaged without an extra LLM response")
             ),
             finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
             first_truthy_func=lambda values: next((value for value in values if value), None),
@@ -379,17 +383,56 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
 
         self.assertEqual(captured_inputs, [{"query": "Wuthering Waves latest version", "max_results": "8"}])
         self.assertEqual(result["skill_outputs"][0]["binding_source"], "skill_state")
+        self.assertEqual(result["skill_outputs"][0]["output_mapping"], {})
+        self.assertEqual(result["skill_outputs"][0]["output_mapping_details"], [])
         self.assertEqual(
             result["skill_outputs"][0]["inputs"],
             {"query": "Wuthering Waves latest version", "max_results": "8"},
         )
-        self.assertEqual(result["outputs"], {"answer": "searched"})
+        self.assertEqual(
+            result["outputs"],
+            {
+                "dynamic_result": {
+                    "kind": "result_package",
+                    "sourceType": "skill",
+                    "sourceKey": "web_search",
+                    "sourceName": "Web Search",
+                    "status": "succeeded",
+                    "inputs": {"query": "Wuthering Waves latest version", "max_results": "8"},
+                    "outputs": {
+                        "summary": {
+                            "name": "Summary",
+                            "description": "Search result summary.",
+                            "type": "markdown",
+                            "value": "searched",
+                        }
+                    },
+                    "durationMs": result["outputs"]["dynamic_result"]["durationMs"],
+                    "error": "",
+                    "errorType": "",
+                }
+            },
+        )
+        self.assertIsInstance(result["final_result"], str)
+        self.assertIn('"kind": "result_package"', result["final_result"].replace("'", '"'))
 
     def test_execute_agent_node_infers_skill_output_mapping_from_state_outputs(self) -> None:
         state_schema = {
-            "query": NodeSystemStateDefinition.model_validate({"type": "text"}),
-            "source_urls": NodeSystemStateDefinition.model_validate({"type": "json"}),
-            "artifact_paths": NodeSystemStateDefinition.model_validate({"type": "file"}),
+            "query": NodeSystemStateDefinition.model_validate({"name": "Search Query", "type": "text"}),
+            "source_urls": NodeSystemStateDefinition.model_validate(
+                {
+                    "name": "联网搜索 Source URLs",
+                    "description": "搜索技能返回的原文网页 URL 列表。",
+                    "type": "json",
+                }
+            ),
+            "artifact_paths": NodeSystemStateDefinition.model_validate(
+                {
+                    "name": "联网搜索 Artifact Paths",
+                    "description": "搜索技能写入本地的原文文档路径。",
+                    "type": "file",
+                }
+            ),
         }
         node = NodeSystemAgentNode.model_validate(
             {
@@ -422,8 +465,18 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     name="Web Search",
                     inputSchema=[SkillIoField(key="query", name="Query", valueType="text", required=True)],
                     outputSchema=[
-                        SkillIoField(key="source_urls", name="Source URLs", valueType="json"),
-                        SkillIoField(key="artifact_paths", name="Artifact Paths", valueType="file"),
+                        SkillIoField(
+                            key="source_urls",
+                            name="Source URLs",
+                            valueType="json",
+                            description="Original source URLs.",
+                        ),
+                        SkillIoField(
+                            key="artifact_paths",
+                            name="Artifact Paths",
+                            valueType="file",
+                            description="Downloaded local documents.",
+                        ),
                         SkillIoField(key="errors", name="Errors", valueType="json"),
                     ],
                     runtimeReady=True,
@@ -468,11 +521,36 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "artifact_paths": "artifact_paths",
             },
         )
+        self.assertEqual(
+            result["skill_outputs"][0]["output_mapping_details"],
+            [
+                {
+                    "output_key": "source_urls",
+                    "output_name": "Source URLs",
+                    "output_type": "json",
+                    "output_description": "Original source URLs.",
+                    "state_key": "source_urls",
+                    "state_name": "联网搜索 Source URLs",
+                    "state_type": "json",
+                    "state_description": "搜索技能返回的原文网页 URL 列表。",
+                },
+                {
+                    "output_key": "artifact_paths",
+                    "output_name": "Artifact Paths",
+                    "output_type": "file",
+                    "output_description": "Downloaded local documents.",
+                    "state_key": "artifact_paths",
+                    "state_name": "联网搜索 Artifact Paths",
+                    "state_type": "file",
+                    "state_description": "搜索技能写入本地的原文文档路径。",
+                },
+            ],
+        )
 
     def test_execute_agent_node_reports_missing_llm_generated_skill_input_without_invoking_script(self) -> None:
         state_schema = {
             "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
-            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "dynamic_result": NodeSystemStateDefinition.model_validate({"type": "result_package"}),
         }
         node = NodeSystemAgentNode.model_validate(
             {
@@ -480,7 +558,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "name": "tool_executor",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "allowed_skills"}],
-                "writes": [{"state": "answer"}],
+                "writes": [{"state": "dynamic_result"}],
                 "config": {"skillKey": ""},
             }
         )
@@ -511,11 +589,8 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
-                {"answer": skill_context["web_search"]["error"]},
-                "",
-                [],
-                runtime_config,
+            generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("dynamic skill failures should be packaged without an extra LLM response")
             ),
             finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
             first_truthy_func=lambda values: next((value for value in values if value), None),
@@ -524,9 +599,16 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(invoked, [])
         self.assertEqual(result["selected_skills"], ["web_search"])
         self.assertEqual(result["skill_outputs"][0]["binding_source"], "skill_state")
+        self.assertEqual(result["skill_outputs"][0]["output_mapping"], {})
+        self.assertEqual(result["skill_outputs"][0]["output_mapping_details"], [])
         self.assertEqual(result["skill_outputs"][0]["status"], "failed")
         self.assertEqual(result["skill_outputs"][0]["error_type"], "missing_required_input")
         self.assertIn("query", result["skill_outputs"][0]["error"])
+        self.assertEqual(result["outputs"]["dynamic_result"]["kind"], "result_package")
+        self.assertEqual(result["outputs"]["dynamic_result"]["status"], "failed")
+        self.assertEqual(result["outputs"]["dynamic_result"]["errorType"], "missing_required_input")
+        self.assertIn("query", result["outputs"]["dynamic_result"]["error"])
+        self.assertIsInstance(result["final_result"], str)
         self.assertIn("Skill 'web_search' failed before execution", result["warnings"][0])
 
     def test_execute_agent_node_maps_bound_skill_outputs_into_state_outputs(self) -> None:
