@@ -7,13 +7,15 @@ These instructions apply to all work in this repository and should persist acros
 - When creating git commits for this project, always write the commit message in Chinese.
 - After making repository changes, commit and push the changes unless the user explicitly asks not to.
 
-## Dev Restart Workflow
+## Start Workflow
 
-- After making code changes, restart the local dev environment with the repository's standard cross-platform restart command: `npm run dev`.
-- Treat `node scripts/start.mjs` as the underlying standard restart command for this repository; `npm run dev` should resolve to it.
-- On Windows PowerShell, if execution policy blocks `npm.ps1`, use `npm.cmd run dev`.
+- After making code changes, restart GraphiteUI with the repository's standard cross-platform command: `npm start`.
+- Treat `node scripts/start.mjs` as the underlying standard start command for this repository; `npm start` should resolve to it.
+- GraphiteUI uses a single-port start model. The default public URL is `http://127.0.0.1:3477`, and the port can be overridden with `PORT=<port> npm start`.
+- `npm run dev` is intentionally not a supported project command.
+- On Windows PowerShell, if execution policy blocks `npm.ps1`, use `npm.cmd start`.
 - `scripts/start.sh` remains the standard Bash wrapper for Linux, macOS, Git Bash, and WSL, and should stay behaviorally aligned with `scripts/start.mjs`.
-- If a task only involves documentation or other non-runtime changes, use judgment; for code changes, default to restarting with the standard restart flow above.
+- If a task only involves documentation or other non-runtime changes, use judgment; for code changes, default to restarting with the standard start flow above.
 
 ## Local LLM Runtime
 
@@ -24,7 +26,7 @@ These instructions apply to all work in this repository and should persist acros
   - `LOCAL_BASE_URL=<OpenAI-compatible base URL, for example http://127.0.0.1:8888/v1>`
   - `LOCAL_API_KEY=<optional api key>`
   - `LOCAL_TEXT_MODEL=<model name exposed by your gateway>`
-- Keep GraphiteUI's own dev startup guidance on `npm run dev` and `node scripts/start.mjs`; those commands are not replaced by local runtime instructions.
+- Keep GraphiteUI's own startup guidance on `npm start` and `node scripts/start.mjs`; those commands are not replaced by local runtime instructions.
 
 ## UI Implementation Policy
 
@@ -44,7 +46,7 @@ These instructions apply to all work in this repository and should persist acros
 
 - Keep changes scoped to the request, but leave the touched area coherent: remove confusing duplication, stale UI states, and obvious footguns introduced or exposed by the work.
 - Protect user data and local configuration. Do not commit local runtime state, logs, generated build output, credentials, or machine-specific settings unless explicitly requested.
-- Treat `backend/data/settings`, `.dev_*` logs, `dist`, and `.worktrees` as local/runtime artifacts unless a task explicitly targets them.
+- Treat `backend/data/settings`, `.graphiteui_*`, `.dev_*` logs, `dist`, and `.worktrees` as local/runtime artifacts unless a task explicitly targets them.
 - Prefer automatic, discoverable behavior over hidden manual steps when it improves the user's workflow, but make side effects visible and reversible.
 - Before finishing, run the smallest meaningful verification set for the changed surface; for UI work, include a visual check when practical. Clearly report any skipped or failing verification.
 
@@ -103,4 +105,4 @@ These instructions apply to all work in this repository and should persist acros
 
 ## Notes
 
-- `scripts/start.mjs` and `scripts/start.sh` should both release occupied frontend/backend ports before starting services again.
+- `scripts/start.mjs` and `scripts/start.sh` should release occupied GraphiteUI ports before starting services again.
