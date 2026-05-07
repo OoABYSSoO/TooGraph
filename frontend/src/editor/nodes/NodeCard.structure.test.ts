@@ -161,6 +161,13 @@ test("SubgraphMiniMap uses thicker always-animated sequence lines without arrowh
 test("SubgraphMiniMap mirrors main canvas run highlight colors", () => {
   const miniMapSource = readFileSync(resolve(currentDirectory, "SubgraphMiniMap.vue"), "utf8").replace(/\r\n/g, "\n");
 
+  assert.match(miniMapSource, /\.subgraph-mini-map__node--input \{[\s\S]*border-color:\s*rgba\(8,\s*145,\s*178,\s*0\.26\);/);
+  assert.match(miniMapSource, /\.subgraph-mini-map__node--input \.subgraph-mini-map__node-kind \{[\s\S]*background:\s*#0891b2;/);
+  assert.match(miniMapSource, /\.subgraph-mini-map__node--agent \{[\s\S]*border-color:\s*rgba\(37,\s*99,\s*235,\s*0\.24\);/);
+  assert.match(miniMapSource, /\.subgraph-mini-map__node--condition \{[\s\S]*border-color:\s*rgba\(217,\s*119,\s*6,\s*0\.28\);/);
+  assert.match(miniMapSource, /\.subgraph-mini-map__node--output \{[\s\S]*border-color:\s*rgba\(79,\s*70,\s*229,\s*0\.26\);/);
+  assert.match(miniMapSource, /\.subgraph-mini-map__node--output \.subgraph-mini-map__node-kind \{[\s\S]*background:\s*#4f46e5;/);
+  assert.match(miniMapSource, /\.subgraph-mini-map__node--subgraph \{[\s\S]*border-color:\s*rgba\(13,\s*148,\s*136,\s*0\.28\);/);
   assert.match(miniMapSource, /\.subgraph-mini-map__node--queued,[\s\S]*\.subgraph-mini-map__node--running[\s\S]*border-color:\s*rgba\(16,\s*185,\s*129,\s*0\.58\);/);
   assert.match(miniMapSource, /\.subgraph-mini-map__node--paused \{[\s\S]*border-color:\s*rgba\(245,\s*158,\s*11,\s*0\.58\);/);
   assert.match(miniMapSource, /\.subgraph-mini-map__node--success \{[\s\S]*border-color:\s*rgba\(16,\s*185,\s*129,\s*0\.62\);/);
@@ -678,10 +685,22 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
 });
 
 test("NodeCard uses a calmer display hierarchy on the canvas", () => {
+  assert.match(componentSource, /'node-card--input': view\.body\.kind === 'input'/);
+  assert.match(componentSource, /'node-card--agent': view\.body\.kind === 'agent'/);
+  assert.match(componentSource, /'node-card--output': view\.body\.kind === 'output'/);
   assert.match(componentSource, /\.node-card \{[\s\S]*background:\s*var\(--graphite-surface-card\);/);
+  assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-kind-rgb:\s*154,\s*52,\s*18;/);
+  assert.match(componentSource, /\.node-card \{[\s\S]*border:\s*1px solid rgba\(var\(--node-card-kind-rgb\),\s*0\.2\);/);
+  assert.match(componentSource, /\.node-card::before \{[\s\S]*background:\s*rgba\(var\(--node-card-kind-rgb\),\s*0\.72\);/);
+  assert.match(componentSource, /\.node-card--input \{[\s\S]*--node-card-kind-rgb:\s*8,\s*145,\s*178;/);
+  assert.match(componentSource, /\.node-card--agent \{[\s\S]*--node-card-kind-rgb:\s*37,\s*99,\s*235;/);
+  assert.match(componentSource, /\.node-card--condition \{[\s\S]*--node-card-kind-rgb:\s*217,\s*119,\s*6;/);
+  assert.match(componentSource, /\.node-card--output \{[\s\S]*--node-card-kind-rgb:\s*79,\s*70,\s*229;/);
+  assert.match(componentSource, /\.node-card--subgraph \{[\s\S]*--node-card-kind-rgb:\s*13,\s*148,\s*136;/);
   assert.match(componentSource, /\.node-card__title \{[\s\S]*font-family:\s*var\(--graphite-font-display\);/);
   assert.match(componentSource, /\.node-card__title \{[\s\S]*font-size:\s*1\.72rem;/);
   assert.match(componentSource, /\.node-card__eyebrow \{[\s\S]*font-family:\s*var\(--graphite-font-mono\);/);
+  assert.match(componentSource, /\.node-card__eyebrow \{[\s\S]*color:\s*rgba\(var\(--node-card-kind-rgb\),\s*0\.84\);/);
 });
 
 test("NodeCard shows a persistent human review capsule in the top action dock", () => {

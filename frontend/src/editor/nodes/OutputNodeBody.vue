@@ -278,11 +278,14 @@ const { t } = useI18n();
 .node-card__preview-markdown :deep(pre) {
   position: relative;
   overflow-x: auto;
+  border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 14px;
   padding: 2.1rem 1rem 1rem;
-  background: #1f2937;
-  color: #f8fafc;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  background: rgba(255, 252, 247, 0.96);
+  color: #1f2937;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 10px 22px rgba(60, 41, 20, 0.06);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.84rem;
   line-height: 1.58;
@@ -298,11 +301,11 @@ const { t } = useI18n();
   position: absolute;
   top: 0.54rem;
   right: 0.7rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(154, 52, 18, 0.16);
   border-radius: 999px;
   padding: 0.08rem 0.45rem;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(248, 250, 252, 0.8);
+  background: rgba(255, 244, 232, 0.92);
+  color: rgba(154, 52, 18, 0.74);
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.04em;

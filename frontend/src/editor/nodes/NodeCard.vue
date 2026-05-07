@@ -5,7 +5,10 @@
     :class="{
       'node-card--selected': selected,
       'node-card--hovered': hovered,
+      'node-card--input': view.body.kind === 'input',
+      'node-card--agent': view.body.kind === 'agent',
       'node-card--condition': view.body.kind === 'condition',
+      'node-card--output': view.body.kind === 'output',
       'node-card--subgraph': view.body.kind === 'subgraph',
       'node-card--floating-panel-open': hasFloatingPanelOpen,
     }"
@@ -1789,10 +1792,11 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 <style scoped>
 .node-card {
   --node-card-inline-padding: 24px;
+  --node-card-kind-rgb: 154, 52, 18;
   position: relative;
   width: var(--node-card-width, 460px);
   min-height: var(--node-card-min-height, 260px);
-  border: 1px solid rgba(154, 52, 18, 0.18);
+  border: 1px solid rgba(var(--node-card-kind-rgb), 0.2);
   border-radius: var(--node-card-radius, 28px);
   overflow: visible;
   background: var(--graphite-surface-card);
@@ -1802,17 +1806,46 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   flex-direction: column;
 }
 
+.node-card::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 18px;
+  bottom: 18px;
+  width: 4px;
+  border-radius: 999px;
+  background: rgba(var(--node-card-kind-rgb), 0.72);
+  opacity: 0.78;
+  pointer-events: none;
+}
+
+.node-card--input {
+  --node-card-kind-rgb: 8, 145, 178;
+}
+
+.node-card--agent {
+  --node-card-kind-rgb: 37, 99, 235;
+}
+
 .node-card--condition {
+  --node-card-kind-rgb: 217, 119, 6;
   width: var(--node-card-width, 560px);
 }
 
+.node-card--output {
+  --node-card-kind-rgb: 79, 70, 229;
+}
+
 .node-card--subgraph {
+  --node-card-kind-rgb: 13, 148, 136;
   width: var(--node-card-width, 820px);
 }
 
 .node-card--selected {
-  border-color: rgba(154, 52, 18, 0.32);
-  box-shadow: 0 22px 40px rgba(154, 52, 18, 0.14);
+  border-color: rgba(var(--node-card-kind-rgb), 0.38);
+  box-shadow:
+    0 22px 40px rgba(60, 41, 20, 0.1),
+    0 0 0 2px rgba(var(--node-card-kind-rgb), 0.08);
 }
 
 .node-card__header {
@@ -1823,14 +1856,14 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 }
 
 .node-card__eyebrow {
-  border: 1px solid rgba(154, 52, 18, 0.18);
+  border: 1px solid rgba(var(--node-card-kind-rgb), 0.18);
   border-radius: 999px;
   padding: 4px 14px;
   font-family: var(--graphite-font-mono);
   font-size: 0.86rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(154, 52, 18, 0.84);
+  color: rgba(var(--node-card-kind-rgb), 0.84);
   background: rgba(255, 255, 255, 0.78);
 }
 
@@ -1850,7 +1883,7 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 
 .node-card__text-trigger:hover,
 .node-card__text-trigger:focus-visible {
-  border-color: rgba(154, 52, 18, 0.14);
+  border-color: rgba(var(--node-card-kind-rgb), 0.14);
   background: rgba(255, 250, 241, 0.94);
   box-shadow: 0 10px 22px rgba(60, 41, 20, 0.08);
 }
@@ -1962,7 +1995,7 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 }
 
 .node-card__body {
-  border-top: 1px solid rgba(154, 52, 18, 0.14);
+  border-top: 1px solid rgba(var(--node-card-kind-rgb), 0.14);
   padding: 18px var(--node-card-inline-padding) 24px;
   display: grid;
   gap: 14px;

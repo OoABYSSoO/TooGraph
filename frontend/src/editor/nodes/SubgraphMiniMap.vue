@@ -207,12 +207,12 @@ function formatStatus(status: SubgraphThumbnailStatus) {
 }
 
 .subgraph-mini-map__node--input {
-  border-color: rgba(20, 120, 78, 0.24);
-  background: rgba(246, 253, 248, 0.98);
+  border-color: rgba(8, 145, 178, 0.26);
+  background: rgba(240, 249, 255, 0.98);
 }
 
 .subgraph-mini-map__node--input .subgraph-mini-map__node-kind {
-  background: #16a34a;
+  background: #0891b2;
 }
 
 .subgraph-mini-map__node--agent {
@@ -234,12 +234,12 @@ function formatStatus(status: SubgraphThumbnailStatus) {
 }
 
 .subgraph-mini-map__node--output {
-  border-color: rgba(154, 52, 18, 0.24);
-  background: rgba(255, 250, 245, 0.98);
+  border-color: rgba(79, 70, 229, 0.26);
+  background: rgba(245, 243, 255, 0.98);
 }
 
 .subgraph-mini-map__node--output .subgraph-mini-map__node-kind {
-  background: #9a3412;
+  background: #4f46e5;
 }
 
 .subgraph-mini-map__node--subgraph {
