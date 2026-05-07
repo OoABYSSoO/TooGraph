@@ -31,6 +31,10 @@ test("Graphite select theme matches the warm state-editor dropdown style", () =>
   assert.match(selectThemeSource, /\.graphite-select-popper\.el-popper \{[\s\S]*background:\s*rgba\(255,\s*248,\s*240,\s*0\.98\);/);
   assert.match(selectThemeSource, /\.graphite-select-popper \.el-select-dropdown__item\.is-selected \{[\s\S]*color:\s*#9a3412;/);
   assert.match(selectThemeSource, /\.graphite-select \.el-select__wrapper \{[\s\S]*background:\s*rgba\(255,\s*251,\s*246,\s*0\.88\);/);
+  assert.match(selectThemeSource, /\.node-card__agent-skill-popper\.el-popper \{[\s\S]*min-width:\s*min\(280px,\s*calc\(100vw - 24px\)\)\s*!important;/);
+  assert.match(selectThemeSource, /\.node-card__agent-skill-popper\.el-popper \{[\s\S]*max-width:\s*min\(360px,\s*calc\(100vw - 24px\)\);/);
+  assert.match(selectThemeSource, /\.node-card__agent-skill-popper\.el-popper \{[\s\S]*background:\s*rgba\(248,\s*251,\s*255,\s*0\.98\);/);
+  assert.match(selectThemeSource, /\.node-card__agent-skill-popper \.el-select-dropdown__item\.is-selected \{[\s\S]*color:\s*#1d4ed8;/);
 });
 
 test("Vue files use themed Element Plus selects instead of native select dropdowns", () => {

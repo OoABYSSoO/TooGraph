@@ -9,11 +9,12 @@
           :placeholder="skillPlaceholder"
           :disabled="skillSelectDisabled"
           filterable
+          fit-input-width
           popper-class="graphite-select-popper node-card__agent-skill-popper"
           :aria-label="t('nodeCard.selectSkill')"
           @update:model-value="emit('update:selected-skill', String($event ?? ''))"
         >
-          <ElOption :label="t('nodeCard.noSkill')" value="" />
+          <ElOption :label="t('nodeCard.noSkillOption')" value="" />
           <ElOption
             v-if="selectedSkillMissing"
             :label="selectedSkillKey"
@@ -204,35 +205,6 @@ const skillPlaceholder = computed(() => {
 .node-card__agent-skill-select :deep(.is-disabled .el-select__wrapper) {
   opacity: 0.62;
   background: rgba(239, 246, 255, 0.58);
-}
-
-:deep(.node-card__agent-skill-popper.el-popper) {
-  border: 1px solid rgba(37, 99, 235, 0.16);
-  border-radius: 16px;
-  background: rgba(248, 251, 255, 0.98);
-  box-shadow: 0 20px 40px rgba(30, 64, 175, 0.12);
-}
-
-:deep(.node-card__agent-skill-popper .el-select-dropdown__list) {
-  padding: 8px;
-}
-
-:deep(.node-card__agent-skill-popper .el-select-dropdown__item) {
-  height: auto;
-  min-height: 42px;
-  border-radius: 12px;
-  color: #1e3a8a;
-  padding: 8px 10px;
-}
-
-:deep(.node-card__agent-skill-popper .el-select-dropdown__item.hover),
-:deep(.node-card__agent-skill-popper .el-select-dropdown__item:hover) {
-  background: rgba(37, 99, 235, 0.08);
-}
-
-:deep(.node-card__agent-skill-popper .el-select-dropdown__item.is-selected) {
-  color: #1d4ed8;
-  background: rgba(37, 99, 235, 0.12);
 }
 
 .node-card__skill-option {
