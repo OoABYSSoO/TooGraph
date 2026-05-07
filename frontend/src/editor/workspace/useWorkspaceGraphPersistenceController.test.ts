@@ -3,7 +3,13 @@ import test from "node:test";
 import { ref } from "vue";
 
 import type { EditorWorkspaceTab, PersistedEditorWorkspace } from "@/lib/editor-workspace";
-import type { GraphDocument, GraphPayload, GraphSaveResponse, GraphValidationResponse } from "@/types/node-system";
+import type {
+  GraphDocument,
+  GraphPayload,
+  GraphSaveResponse,
+  GraphValidationResponse,
+  TemplateSaveResponse,
+} from "@/types/node-system";
 
 import { useWorkspaceGraphPersistenceController } from "./useWorkspaceGraphPersistenceController.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
@@ -89,12 +95,14 @@ function createHarness(options: { locked?: boolean } = {}) {
   });
   const savedGraph = graphDocument("Saved Graph", "graph_saved") as GraphDocument;
   const savedDocuments: Array<GraphPayload | GraphDocument> = [];
+  const savedTemplateDocuments: Array<GraphPayload | GraphDocument> = [];
   const registeredDocuments: Array<{ tabId: string; document: GraphPayload | GraphDocument }> = [];
   const routeSyncs: Array<{ graphId: string | null; mode: "push" | "replace" | "none" }> = [];
   const committedDocuments: Array<{ tabId: string; document: GraphPayload | GraphDocument }> = [];
   const feedback: Array<{ tabId: string; feedback: Partial<WorkspaceRunFeedback> }> = [];
   const downloads: Array<{ source: string; fileName: string }> = [];
   let graphLoadCount = 0;
+  let templateLoadCount = 0;
 
   const controller = useWorkspaceGraphPersistenceController({
     activeTab,
@@ -126,6 +134,9 @@ function createHarness(options: { locked?: boolean } = {}) {
     loadGraphs: async () => {
       graphLoadCount += 1;
     },
+    loadTemplates: async () => {
+      templateLoadCount += 1;
+    },
     saveGraph: async (document) => {
       savedDocuments.push(document);
       return {
@@ -133,6 +144,25 @@ function createHarness(options: { locked?: boolean } = {}) {
         saved: true,
         validation: { valid: true, issues: [] },
       } satisfies GraphSaveResponse;
+    },
+    saveGraphAsTemplate: async (document) => {
+      savedTemplateDocuments.push(document);
+      return {
+        template_id: "user_template_1",
+        saved: true,
+        template: {
+          template_id: "user_template_1",
+          label: document.name,
+          description: "",
+          default_graph_name: document.name,
+          source: "user",
+          state_schema: document.state_schema,
+          nodes: document.nodes,
+          edges: document.edges,
+          conditional_edges: document.conditional_edges,
+          metadata: document.metadata,
+        },
+      } satisfies TemplateSaveResponse;
     },
     fetchGraph: async () => savedGraph,
     validateGraph: async () =>
@@ -155,6 +185,7 @@ function createHarness(options: { locked?: boolean } = {}) {
     documentsByTabId,
     savedGraph,
     savedDocuments,
+    savedTemplateDocuments,
     registeredDocuments,
     routeSyncs,
     committedDocuments,
@@ -162,6 +193,9 @@ function createHarness(options: { locked?: boolean } = {}) {
     downloads,
     get graphLoadCount() {
       return graphLoadCount;
+    },
+    get templateLoadCount() {
+      return templateLoadCount;
     },
     controller,
   };
@@ -321,6 +355,17 @@ test("useWorkspaceGraphPersistenceController can save a subgraph tab as a standa
   assert.equal(harness.activeTab.value?.kind, "existing");
   assert.equal(harness.activeTab.value?.graphId, "graph_saved");
   assert.deepEqual(harness.routeSyncs, [{ graphId: "graph_saved", mode: "replace" }]);
+});
+
+test("useWorkspaceGraphPersistenceController saves the active graph as a user template and refreshes templates", async () => {
+  const harness = createHarness();
+
+  await harness.controller.saveActiveGraphAsTemplate();
+
+  assert.equal(harness.savedTemplateDocuments[0]?.name, "Draft");
+  assert.equal(harness.templateLoadCount, 1);
+  assert.equal(harness.feedback.at(-1)?.feedback.tone, "success");
+  assert.equal(harness.feedback.at(-1)?.feedback.message, "Saved template user_template_1.");
 });
 
 test("useWorkspaceGraphPersistenceController renames through dirty commits and honors locked graphs", () => {

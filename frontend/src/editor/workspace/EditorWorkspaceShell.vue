@@ -57,6 +57,7 @@
             @toggle-run-activity-panel="toggleActiveRunActivityPanelFromActionCapsule"
             @save-active-graph="saveActiveGraph"
             @save-active-graph-as-new="saveActiveGraphAsNewGraph"
+            @save-active-graph-as-template="saveActiveGraphAsTemplate"
             @validate-active-graph="validateActiveGraph"
             @import-python-graph="openPythonGraphImportDialog"
             @export-active-graph="exportActiveGraph"
@@ -224,7 +225,15 @@ import { fetchKnowledgeBases } from "@/api/knowledge";
 import { fetchRun, resumeRun } from "@/api/runs";
 import { fetchSettings } from "@/api/settings";
 import { fetchSkillDefinitions } from "@/api/skills";
-import { exportLangGraphPython, fetchGraph, importGraphFromPythonSource, runGraph, saveGraph, validateGraph } from "@/api/graphs";
+import {
+  exportLangGraphPython,
+  fetchGraph,
+  importGraphFromPythonSource,
+  runGraph,
+  saveGraph,
+  saveGraphAsTemplate,
+  validateGraph,
+} from "@/api/graphs";
 import { resolveAgentRuntimeCatalog } from "@/editor/nodes/agentConfigModel";
 import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
 import { clonePlainValue } from "@/lib/graph-document";
@@ -353,7 +362,7 @@ const {
 });
 
 const graphById = computed(() => new Map(props.graphs.map((graph) => [graph.graph_id, graph])));
-const savedGraphs = computed(() => props.graphs);
+const graphTemplates = computed(() => props.templates);
 const agentRuntimeCatalog = computed(() => resolveAgentRuntimeCatalog(settings.value));
 const activeTab = computed(() => workspace.value.tabs.find((tab) => tab.tabId === workspace.value.activeTabId) ?? null);
 const pendingCloseTab = computed(() =>
@@ -660,6 +669,7 @@ const {
   renameActiveGraph,
   saveActiveGraph,
   saveActiveGraphAsNewGraph,
+  saveActiveGraphAsTemplate,
   saveTab,
   validateActiveGraph,
   exportActiveGraph,
@@ -674,7 +684,9 @@ const {
   updateWorkspaceTab,
   syncRouteToTab,
   loadGraphs: () => graphStore.loadGraphs(),
+  loadTemplates: () => graphStore.loadTemplates(),
   saveGraph,
+  saveGraphAsTemplate,
   fetchGraph,
   validateGraph,
   exportLangGraphPython,
@@ -713,7 +725,7 @@ const {
   dataEdgeStateEditorRequestByTabId,
   nodeCreationMenuByTabId,
   persistedPresets,
-  graphs: savedGraphs,
+  templates: graphTemplates,
   guardGraphEditForTab,
   markDocumentDirty,
   setMessageFeedbackForTab,

@@ -54,7 +54,12 @@ test("EditorActionCapsule renders non-primary graph actions as icon buttons with
     componentSource,
     /<ElTooltip :content="t\('editor\.exportPythonGraph'\)" placement="bottom">[\s\S]*:aria-label="t\('editor\.exportPythonGraph'\)"[\s\S]*@click="\$emit\('export-active-graph'\)"/,
   );
+  assert.match(
+    componentSource,
+    /<ElTooltip :content="t\('editor\.saveAsTemplate'\)" placement="bottom">[\s\S]*:aria-label="t\('editor\.saveAsTemplate'\)"[\s\S]*@click="\$emit\('save-active-graph-as-template'\)"/,
+  );
   assert.match(componentSource, /\(event: "save-active-graph-as-new"\): void;/);
+  assert.match(componentSource, /\(event: "save-active-graph-as-template"\): void;/);
   assert.doesNotMatch(componentSource, /copy\.newGraph/);
 });
 

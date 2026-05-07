@@ -7,6 +7,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parents[3]
 DATA_DIR = BASE_DIR / "data"
 GRAPH_DATA_DIR = DATA_DIR / "graphs"
+USER_TEMPLATE_DATA_DIR = DATA_DIR / "templates" / "user"
 PRESET_DATA_DIR = DATA_DIR / "presets"
 RUN_DATA_DIR = DATA_DIR / "runs"
 CHECKPOINT_DATA_DIR = DATA_DIR / "checkpoints"

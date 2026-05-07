@@ -16,6 +16,16 @@
           <ElIcon aria-hidden="true"><CollectionTag /></ElIcon>
         </button>
       </ElTooltip>
+      <ElTooltip :content="t('editor.saveAsTemplate')" placement="bottom">
+        <button
+          type="button"
+          class="editor-action-capsule__icon-button editor-action-capsule__icon-button--save-template"
+          :aria-label="t('editor.saveAsTemplate')"
+          @click="$emit('save-active-graph-as-template')"
+        >
+          <ElIcon aria-hidden="true"><CollectionTag /></ElIcon>
+        </button>
+      </ElTooltip>
       <ElTooltip :content="t('editor.validateGraph')" placement="bottom">
         <button type="button" class="editor-action-capsule__icon-button" :aria-label="t('editor.validateGraph')" @click="$emit('validate-active-graph')">
           <ElIcon aria-hidden="true"><CircleCheck /></ElIcon>
@@ -83,6 +93,7 @@ defineEmits<{
   (event: "toggle-run-activity-panel"): void;
   (event: "save-active-graph"): void;
   (event: "save-active-graph-as-new"): void;
+  (event: "save-active-graph-as-template"): void;
   (event: "validate-active-graph"): void;
   (event: "import-python-graph"): void;
   (event: "export-active-graph"): void;

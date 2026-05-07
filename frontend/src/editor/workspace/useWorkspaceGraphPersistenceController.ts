@@ -12,7 +12,14 @@ import {
   type EditorWorkspaceTab,
   type PersistedEditorWorkspace,
 } from "../../lib/editor-workspace.ts";
-import type { GraphCorePayload, GraphDocument, GraphPayload, GraphSaveResponse, GraphValidationResponse } from "../../types/node-system.ts";
+import type {
+  GraphCorePayload,
+  GraphDocument,
+  GraphPayload,
+  GraphSaveResponse,
+  GraphValidationResponse,
+  TemplateSaveResponse,
+} from "../../types/node-system.ts";
 
 import { buildPythonExportFileName } from "./pythonExportModel.ts";
 import { formatValidationFeedback } from "./runFeedbackModel.ts";
@@ -31,7 +38,9 @@ type WorkspaceGraphPersistenceControllerInput = {
   updateWorkspaceTab: (tabId: string, updater: (tab: EditorWorkspaceTab) => EditorWorkspaceTab) => void;
   syncRouteToTab: (tab: WorkspaceRouteTab, mode: "push" | "replace") => void;
   loadGraphs: () => Promise<void>;
+  loadTemplates: () => Promise<void>;
   saveGraph: (document: GraphPayload | GraphDocument) => Promise<GraphSaveResponse>;
+  saveGraphAsTemplate: (document: GraphPayload | GraphDocument) => Promise<TemplateSaveResponse>;
   fetchGraph: (graphId: string) => Promise<GraphDocument>;
   validateGraph: (document: GraphPayload | GraphDocument) => Promise<GraphValidationResponse>;
   exportLangGraphPython: (document: GraphPayload | GraphDocument) => Promise<string>;
@@ -241,6 +250,34 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
     await saveTabAsNewGraph(input.activeTab.value.tabId);
   }
 
+  async function saveActiveGraphAsTemplate() {
+    const tab = input.activeTab.value;
+    if (!tab) {
+      return;
+    }
+    const document = input.documentsByTabId.value[tab.tabId];
+    if (!document) {
+      return;
+    }
+
+    try {
+      const documentToSave = pruneUnreferencedStateSchemaInDocument(document);
+      const response = await input.saveGraphAsTemplate(documentToSave);
+      await input.loadTemplates();
+      input.setMessageFeedbackForTab(tab.tabId, {
+        tone: "success",
+        message: `Saved template ${response.template_id}.`,
+      });
+      return response.saved;
+    } catch (error) {
+      input.setMessageFeedbackForTab(tab.tabId, {
+        tone: "danger",
+        message: error instanceof Error ? error.message : "Failed to save graph as template.",
+      });
+      throw error;
+    }
+  }
+
   async function validateActiveGraph() {
     const tab = input.activeTab.value;
     if (!tab) {
@@ -294,6 +331,7 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
     renameActiveGraph,
     saveActiveGraph,
     saveActiveGraphAsNewGraph,
+    saveActiveGraphAsTemplate,
     saveTab,
     saveTabAsNewGraph,
     validateActiveGraph,

@@ -8,6 +8,7 @@ import {
   buildNodeFromPreset,
   buildSubgraphNodeFromGraph,
 } from "../../lib/graph-node-creation.ts";
+import { createDraftFromTemplate } from "../../lib/graph-document.ts";
 import type {
   GraphDocument,
   GraphPayload,
@@ -15,6 +16,7 @@ import type {
   NodeCreationContext,
   NodeCreationEntry,
   PresetDocument,
+  TemplateRecord,
 } from "../../types/node-system.ts";
 
 import { resolveBuiltinNodeCreationPreset } from "./nodeCreationBuiltins.ts";
@@ -24,7 +26,7 @@ type CreateNodeFromCreationEntryInput = {
   entry: NodeCreationEntry;
   context?: NodeCreationContext | null;
   persistedPresets: PresetDocument[];
-  graphs?: GraphDocument[];
+  templates?: TemplateRecord[];
   createdNodeId?: string;
 };
 
@@ -53,11 +55,11 @@ function resolveCreationPreset(entry: NodeCreationEntry, persistedPresets: Prese
   );
 }
 
-function resolveCreationGraph(entry: NodeCreationEntry, graphs: GraphDocument[] = []) {
-  if (!entry.graphId) {
+function resolveCreationTemplate(entry: NodeCreationEntry, templates: TemplateRecord[] = []) {
+  if (!entry.templateId) {
     return null;
   }
-  return graphs.find((graph) => graph.graph_id === entry.graphId) ?? null;
+  return templates.find((template) => template.template_id === entry.templateId) ?? null;
 }
 
 export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocument>(
@@ -95,10 +97,16 @@ export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocume
   }
 
   if (input.entry.mode === "subgraph") {
-    const graph = resolveCreationGraph(input.entry, input.graphs);
-    if (!graph) {
+    const template = resolveCreationTemplate(input.entry, input.templates);
+    if (!template) {
       throw new Error(`Unable to resolve subgraph source for ${input.entry.id}.`);
     }
+    const graph = createDraftFromTemplate(template);
+    graph.metadata = {
+      ...graph.metadata,
+      sourceTemplateId: template.template_id,
+      sourceTemplateSource: template.source ?? "official",
+    };
     const created = buildSubgraphNodeFromGraph(graph, {
       id: createdNodeId,
       position: input.context?.position ?? { x: 0, y: 0 },

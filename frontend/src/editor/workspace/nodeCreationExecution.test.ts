@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createNodeFromCreationEntry, createNodeFromDroppedFile } from "./nodeCreationExecution.ts";
-import type { GraphPayload, NodeCreationEntry } from "@/types/node-system";
+import type { GraphPayload, NodeCreationEntry, TemplateRecord } from "@/types/node-system";
 
 function createBaseDocument(): GraphPayload {
   return {
@@ -45,6 +45,60 @@ function createBaseDocument(): GraphPayload {
             operator: "exists",
             value: null,
           },
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+}
+
+function createSubgraphTemplate(): TemplateRecord {
+  return {
+    template_id: "template_research",
+    label: "Research Template",
+    description: "Reusable research template.",
+    default_graph_name: "Research Flow",
+    source: "official",
+    state_schema: {
+      topic: {
+        name: "Topic",
+        description: "Research topic.",
+        type: "text",
+        value: "old topic",
+        color: "#d97706",
+      },
+      answer: {
+        name: "Answer",
+        description: "Research answer.",
+        type: "markdown",
+        value: "",
+        color: "#2563eb",
+      },
+    },
+    nodes: {
+      input_topic: {
+        kind: "input",
+        name: "Topic Input",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "topic", mode: "replace" }],
+        config: { value: "old topic", boundaryType: "text" },
+      },
+      output_answer: {
+        kind: "output",
+        name: "Answer Output",
+        description: "",
+        ui: { position: { x: 320, y: 0 } },
+        reads: [{ state: "answer", required: true }],
+        writes: [],
+        config: {
+          displayMode: "markdown",
+          persistEnabled: false,
+          persistFormat: "md",
+          fileNameTemplate: "",
         },
       },
     },
@@ -160,6 +214,47 @@ test("createNodeFromCreationEntry builds the builtin condition preset and auto-w
       },
     },
   ]);
+});
+
+test("createNodeFromCreationEntry creates subgraphs from graph templates", () => {
+  const document = createBaseDocument();
+  const entry: NodeCreationEntry = {
+    id: "template-template_research",
+    family: "subgraph",
+    label: "Research Template Subgraph",
+    description: "Use a graph template as an embedded subgraph instance.",
+    mode: "subgraph",
+    origin: "builtin",
+    templateId: "template_research",
+    templateSource: "official",
+    acceptsValueTypes: ["text"],
+  };
+
+  const result = createNodeFromCreationEntry(document, {
+    entry,
+    createdNodeId: "subgraph_created",
+    persistedPresets: [],
+    templates: [createSubgraphTemplate()],
+    context: {
+      position: { x: 320, y: 80 },
+      sourceNodeId: "input_question",
+      sourceAnchorKind: "state-out",
+      sourceStateKey: "question",
+      sourceValueType: "text",
+    },
+  });
+
+  assert.equal(result.createdNodeId, "subgraph_created");
+  assert.equal(result.document.nodes.subgraph_created.kind, "subgraph");
+  const createdNode = result.document.nodes.subgraph_created;
+  assert.equal(createdNode.kind === "subgraph" ? createdNode.name : "", "Research Flow Subgraph");
+  assert.deepEqual(createdNode.kind === "subgraph" ? createdNode.reads : [], [{ state: "question", required: true }]);
+  assert.deepEqual(createdNode.kind === "subgraph" ? createdNode.writes : [], [{ state: "state_2", mode: "replace" }]);
+  assert.deepEqual(result.document.edges, [{ source: "input_question", target: "subgraph_created" }]);
+  assert.equal(
+    createdNode.kind === "subgraph" ? createdNode.config.graph.metadata.sourceTemplateId : null,
+    "template_research",
+  );
 });
 
 test("createNodeFromDroppedFile builds an input node from the uploaded asset envelope", async () => {

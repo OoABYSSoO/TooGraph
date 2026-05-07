@@ -1,6 +1,14 @@
 import type { Ref } from "vue";
 
-import type { GraphDocument, GraphPayload, GraphPosition, NodeCreationContext, NodeCreationEntry, PresetDocument } from "../../types/node-system.ts";
+import type {
+  GraphDocument,
+  GraphPayload,
+  GraphPosition,
+  NodeCreationContext,
+  NodeCreationEntry,
+  PresetDocument,
+  TemplateRecord,
+} from "../../types/node-system.ts";
 
 import {
   buildClosedNodeCreationMenuState,
@@ -23,7 +31,7 @@ type WorkspaceNodeCreationControllerInput = {
   dataEdgeStateEditorRequestByTabId: Ref<Record<string, CreatedStateEdgeEditorRequest | null>>;
   nodeCreationMenuByTabId: Ref<Record<string, NodeCreationMenuState>>;
   persistedPresets: Ref<PresetDocument[]>;
-  graphs: Ref<GraphDocument[]>;
+  templates: Ref<TemplateRecord[]>;
   guardGraphEditForTab: (tabId: string) => boolean;
   markDocumentDirty: (tabId: string, document: GraphPayload | GraphDocument) => void;
   setMessageFeedbackForTab: (
@@ -47,7 +55,7 @@ export function useWorkspaceNodeCreationController(input: WorkspaceNodeCreationC
     return buildNodeCreationEntries({
       builtins: buildBuiltinNodeCreationEntries(),
       presets: input.persistedPresets.value,
-      graphs: input.graphs.value,
+      templates: input.templates.value,
       query: menuState?.query ?? "",
       sourceValueType: context?.sourceValueType ?? context?.targetValueType ?? null,
       sourceAnchorKind: context?.sourceAnchorKind ?? context?.targetAnchorKind ?? null,
@@ -99,7 +107,7 @@ export function useWorkspaceNodeCreationController(input: WorkspaceNodeCreationC
         entry,
         context: menuState.context,
         persistedPresets: input.persistedPresets.value,
-        graphs: input.graphs.value,
+        templates: input.templates.value,
       });
       input.markDocumentDirty(tabId, result.document);
       openCreatedStateEdgeEditorForTab(tabId, menuState.context, result);

@@ -233,7 +233,7 @@ GraphiteUI/
 │   │   ├── knowledge/        # 知识库导入、切分、检索
 │   │   ├── memory/           # memory API 支撑模块
 │   │   ├── skills/           # 内置 skill registry 和 definitions
-│   │   ├── templates/        # 内置 graph 模板
+│   │   ├── templates/        # 官方 graph 模板加载器和 official 模板目录
 │   │   └── tools/            # OpenAI-compatible 调用工具
 │   └── tests/                # 后端 pytest 测试
 ├── knowledge/GraphiteUI-official/
@@ -267,28 +267,22 @@ GraphiteUI/
 | `GET /api/runs/{run_id}` | 查看运行详情 |
 | `GET /api/runs/{run_id}/nodes/{node_id}` | 查看单个节点执行详情 |
 | `POST /api/runs/{run_id}/resume` | 从可恢复 checkpoint 或暂停快照继续运行 |
-| `GET /api/templates` | 列出内置模板 |
+| `GET /api/templates` | 列出官方和用户自定义 graph 模板 |
+| `POST /api/templates/save` | 将当前 graph 保存为用户自定义模板 |
 | `GET /api/presets` | 列出 agent presets |
 | `GET /api/knowledge/bases` | 列出知识库 |
 | `GET /api/skills/definitions` | 列出可用 skills |
 | `GET /api/settings` / `POST /api/settings` | 读取和更新设置 |
 
-## 内置模板
+## 图模板
 
-内置模板位于 `backend/app/templates/`：
+官方模板位于 `backend/app/templates/official/`，会进入 Git 管理。前端“保存为模板”创建的是用户自定义模板，写入 `backend/data/templates/user/`，属于本地用户数据，不进入 Git 管理。子图节点创建菜单从这两类模板中选择来源，不再直接从已保存 graph 列表创建子图。
 
-- `conditional_edge_validation.json`
-- `cycle_counter_demo.json`
-- `hello_world.json`
-- `human_review_demo.json`
-- `poem_generator.json`
-- `download_video_preview.json`
-- `game_ad_creative_factory.json`（界面名称：广告创意分析demo模板）
-- `web_research_loop.json`
+当前官方模板：
 
-其中 `web_research_loop.json` 是当前联网搜索基线模板：它会规划搜索词、调用 `web_search`、判断证据是否足够、按需循环补查，并分别输出最终答案、证据链接和本地 source documents。
+- `advanced_web_research_loop.json`（界面名称：高级联网搜索）
 
-`game_ad_creative_factory.json` 是当前广告创意分析 demo 基线模板：它以游戏类型为输入，采集市场资料和公开广告视频，下载 1 条本地视频 artifact，分析视频创意模式，并输出 brief、脚本、分镜、视频生成提示词和评审结果。
+`advanced_web_research_loop.json` 是当前联网搜索基线模板：它会规划搜索词、调用 `web_search`、判断证据是否足够、按需循环补查，并分别输出最终答案、证据链接和本地 source documents。
 
 ## 文档与知识库
 

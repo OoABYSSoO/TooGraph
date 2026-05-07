@@ -71,20 +71,13 @@ backend/.venv/
 backend/*.db
 backend/*.sqlite
 backend/*.sqlite3
-backend/data/*.db
-backend/data/*.sqlite
-backend/data/*.sqlite3
-backend/data/graphs/
-backend/data/checkpoints/
-backend/data/companion/
-backend/data/memories/runtime/
-backend/data/presets/
-backend/data/runs/
-backend/data/settings/
-backend/data/skills/
-backend/data/model_logs/
-backend/data/kb/_downloads/
-backend/data/kb/*/
+backend/data/**
+!backend/data/
+!backend/data/kb/
+!backend/data/kb/.gitkeep
+!backend/data/memories/
+!backend/data/memories/.gitkeep
+!backend/data/memories/example_memory.json
 
 # Demo files to exclude
 demo/

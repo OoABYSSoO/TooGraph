@@ -14,18 +14,23 @@ from app.core.schemas.node_system import NodeSystemGraphPayload
 from app.templates.loader import list_template_records
 
 
+def _official_template_records() -> list[dict]:
+    return [record for record in list_template_records() if record.get("source") == "official"]
+
+
 class TemplateLayoutTests(unittest.TestCase):
     def test_builtin_template_registry_contains_advanced_web_research_loop(self) -> None:
-        records = list_template_records()
+        records = _official_template_records()
 
         self.assertEqual([record["template_id"] for record in records], ["advanced_web_research_loop"])
         template = records[0]
+        self.assertEqual(template["source"], "official")
         self.assertEqual(template["label"], "高级联网搜索")
         self.assertEqual(template["default_graph_name"], "高级联网搜索")
         self.assertIn("多轮搜索", template["description"])
 
     def test_advanced_web_research_loop_contract(self) -> None:
-        template = list_template_records()[0]
+        template = _official_template_records()[0]
         states = template["state_schema"]
         nodes = template["nodes"]
 
@@ -90,11 +95,11 @@ class TemplateLayoutTests(unittest.TestCase):
         )
 
     def test_advanced_web_research_loop_is_runtime_compatible(self) -> None:
-        template = list_template_records()[0]
+        template = _official_template_records()[0]
         payload = {
             key: value
             for key, value in template.items()
-            if key not in {"template_id", "label", "description", "default_graph_name"}
+            if key not in {"template_id", "label", "description", "default_graph_name", "source"}
         }
         graph = NodeSystemGraphPayload.model_validate(
             {

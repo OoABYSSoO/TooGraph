@@ -1,6 +1,6 @@
 import { NODE_CREATION_FAMILY_PRIORITY } from "./nodeCreationBuiltins.ts";
 
-import type { GraphDocument, NodeCreationContext, NodeCreationEntry, PresetDocument } from "@/types/node-system";
+import type { NodeCreationContext, NodeCreationEntry, PresetDocument, TemplateRecord } from "@/types/node-system";
 
 type NodeCreationAnchorKind = "flow-out" | "route-out" | "state-out" | "state-in";
 
@@ -27,7 +27,7 @@ type CreatedStateEdgeEditorResult = {
 type BuildNodeCreationEntriesInput = {
   builtins: NodeCreationEntry[];
   presets: PresetDocument[];
-  graphs?: GraphDocument[];
+  templates?: TemplateRecord[];
   query: string;
   sourceValueType: string | null;
   sourceAnchorKind?: NodeCreationAnchorKind | null;
@@ -121,28 +121,30 @@ function toPresetEntry(preset: PresetDocument): NodeCreationEntry {
   };
 }
 
-function listGraphAcceptedValueTypes(graph: GraphDocument) {
+function listTemplateAcceptedValueTypes(template: TemplateRecord) {
   const acceptedTypes = Array.from(
     new Set(
-      Object.values(graph.nodes)
+      Object.values(template.nodes)
         .filter((node) => node.kind === "input" && node.writes.length > 0)
-        .map((node) => graph.state_schema[node.writes[0].state]?.type?.trim() ?? "")
+        .map((node) => template.state_schema[node.writes[0].state]?.type?.trim() ?? "")
         .filter((valueType) => valueType.length > 0),
     ),
   );
   return acceptedTypes.length > 0 ? acceptedTypes : null;
 }
 
-function toSubgraphEntry(graph: GraphDocument): NodeCreationEntry {
+function toSubgraphTemplateEntry(template: TemplateRecord): NodeCreationEntry {
+  const templateSource = template.source ?? "official";
   return {
-    id: `graph-${graph.graph_id}`,
+    id: `template-${template.template_id}`,
     family: "subgraph",
-    label: `${graph.name.trim() || graph.graph_id} Subgraph`,
-    description: "Use a saved graph as an embedded subgraph instance.",
+    label: `${template.label.trim() || template.default_graph_name.trim() || template.template_id} Subgraph`,
+    description: "Use a graph template as an embedded subgraph instance.",
     mode: "subgraph",
-    origin: "persisted",
-    graphId: graph.graph_id,
-    acceptsValueTypes: listGraphAcceptedValueTypes(graph),
+    origin: templateSource === "user" ? "persisted" : "builtin",
+    templateId: template.template_id,
+    templateSource,
+    acceptsValueTypes: listTemplateAcceptedValueTypes(template),
   };
 }
 
@@ -156,6 +158,7 @@ function matchesNodeCreationQuery(entry: NodeCreationEntry, query: string) {
     entry.description,
     entry.family,
     entry.presetId ?? "",
+    entry.templateId ?? "",
     entry.nodeKind ?? "",
     entry.id,
   ].map((value) => value.toLowerCase());
@@ -223,10 +226,10 @@ export function sortNodeCreationEntries(entries: NodeCreationEntry[]) {
 
 export function buildNodeCreationEntries(input: BuildNodeCreationEntriesInput) {
   const presetEntries = input.presets.map(toPresetEntry);
-  const graphEntries = (input.graphs ?? []).map(toSubgraphEntry);
+  const templateEntries = (input.templates ?? []).map(toSubgraphTemplateEntry);
   return sortNodeCreationEntries(
     filterNodeCreationEntries(
-      [...input.builtins, ...presetEntries, ...graphEntries],
+      [...input.builtins, ...presetEntries, ...templateEntries],
       input.query,
       input.sourceValueType,
       input.sourceAnchorKind ?? null,

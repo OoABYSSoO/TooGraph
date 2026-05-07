@@ -4,6 +4,7 @@ import type {
   GraphRunResponse,
   GraphSaveResponse,
   GraphValidationResponse,
+  TemplateSaveResponse,
   TemplateRecord,
 } from "@/types/node-system";
 
@@ -15,6 +16,10 @@ export async function fetchTemplates(): Promise<TemplateRecord[]> {
 
 export async function fetchTemplate(templateId: string): Promise<TemplateRecord> {
   return apiGet<TemplateRecord>(`/api/templates/${templateId}`);
+}
+
+export async function saveGraphAsTemplate(payload: GraphPayload): Promise<TemplateSaveResponse> {
+  return apiPost("/api/templates/save", payload);
 }
 
 export async function fetchGraphs(): Promise<GraphDocument[]> {

@@ -187,16 +187,25 @@ export type GraphRunResponse = {
   status: string;
 };
 
+export type TemplateSource = "official" | "user";
+
 export type TemplateRecord = {
   template_id: string;
   label: string;
   description: string;
   default_graph_name: string;
+  source?: TemplateSource;
   state_schema: Record<string, StateDefinition>;
   nodes: Record<string, GraphNode>;
   edges: GraphEdge[];
   conditional_edges: ConditionalEdge[];
   metadata: Record<string, unknown>;
+};
+
+export type TemplateSaveResponse = {
+  template_id: string;
+  saved: boolean;
+  template: TemplateRecord;
 };
 
 export type PresetDefinition = {
@@ -251,6 +260,8 @@ export type NodeCreationEntry = {
   nodeKind?: "input" | "output";
   presetId?: string;
   graphId?: string;
+  templateId?: string;
+  templateSource?: TemplateSource;
   acceptsValueTypes?: string[] | null;
 };
 

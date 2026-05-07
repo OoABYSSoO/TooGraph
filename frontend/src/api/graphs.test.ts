@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { exportLangGraphPython, importGraphFromPythonSource, runGraph } from "./graphs.ts";
+import { exportLangGraphPython, importGraphFromPythonSource, runGraph, saveGraphAsTemplate } from "./graphs.ts";
 import type { GraphPayload } from "@/types/node-system";
 
 const originalFetch = globalThis.fetch;
@@ -71,6 +71,58 @@ test("importGraphFromPythonSource posts Python source and returns an imported gr
   assert.equal(requestedUrl, "/api/graphs/import/python");
   assert.deepEqual(JSON.parse(requestBody), { source: "GRAPHITEUI_EXPORT_VERSION = 1" });
   assert.equal(graph.name, "Imported Graph");
+
+  globalThis.fetch = originalFetch;
+});
+
+test("saveGraphAsTemplate posts graph payload to the template save endpoint", async () => {
+  let requestedUrl = "";
+  let requestBody = "";
+
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    requestedUrl = String(input);
+    requestBody = String(init?.body ?? "");
+    return new Response(
+      JSON.stringify({
+        template_id: "user_template_1",
+        saved: true,
+        template: {
+          template_id: "user_template_1",
+          label: "Template Graph",
+          description: "",
+          default_graph_name: "Template Graph",
+          source: "user",
+          state_schema: {},
+          nodes: {},
+          edges: [],
+          conditional_edges: [],
+          metadata: {},
+        },
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+  }) as typeof fetch;
+
+  const payload: GraphPayload = {
+    graph_id: null,
+    name: "Template Graph",
+    state_schema: {},
+    nodes: {},
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const response = await saveGraphAsTemplate(payload);
+
+  assert.equal(requestedUrl, "/api/templates/save");
+  assert.deepEqual(JSON.parse(requestBody), payload);
+  assert.equal(response.template_id, "user_template_1");
 
   globalThis.fetch = originalFetch;
 });
