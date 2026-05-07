@@ -2,7 +2,7 @@ import type { SubgraphThumbnailEdgeViewModel, SubgraphThumbnailNodeViewModel } f
 import { buildSequenceFlowPath, type SequenceFlowPathConfig } from "../canvas/flowEdgePath.ts";
 
 export type SubgraphMiniMapLayoutConfig = {
-  maxColumnCount: number;
+  defaultColumnCount: number;
   nodeWidth: number;
   nodeHeight: number;
   columnGap: number;
@@ -34,7 +34,7 @@ export type SubgraphMiniMapLayout = {
 };
 
 export const SUBGRAPH_MINI_MAP_LAYOUT_DEFAULTS: SubgraphMiniMapLayoutConfig = {
-  maxColumnCount: 4,
+  defaultColumnCount: 3,
   nodeWidth: 136,
   nodeHeight: 38,
   columnGap: 42,
@@ -57,6 +57,7 @@ const SUBGRAPH_MINI_MAP_SEQUENCE_FLOW_PATH_CONFIG: SequenceFlowPathConfig = {
   upstreamTopClearance: 58,
   upstreamNodeTopGutter: 18,
   upstreamCornerRadius: 8,
+  lowerRowThreshold: 56,
 };
 
 export function resolveSubgraphMiniMapColumnCount(
@@ -65,12 +66,11 @@ export function resolveSubgraphMiniMapColumnCount(
   config: SubgraphMiniMapLayoutConfig = SUBGRAPH_MINI_MAP_LAYOUT_DEFAULTS,
 ) {
   const boundedNodeCount = Math.max(1, Math.floor(nodeCount));
-  const maxColumnCount = Math.max(1, Math.min(config.maxColumnCount, boundedNodeCount));
   if (!Number.isFinite(availableWidth) || availableWidth <= 0) {
-    return maxColumnCount;
+    return Math.max(1, Math.min(config.defaultColumnCount, boundedNodeCount));
   }
 
-  for (let columnCount = maxColumnCount; columnCount > 1; columnCount -= 1) {
+  for (let columnCount = boundedNodeCount; columnCount > 1; columnCount -= 1) {
     if (requiredWidthForColumns(columnCount, config) <= availableWidth) {
       return columnCount;
     }

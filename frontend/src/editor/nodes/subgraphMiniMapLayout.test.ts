@@ -25,8 +25,11 @@ function makeNode(id: string): SubgraphThumbnailNodeViewModel {
   };
 }
 
-test("resolveSubgraphMiniMapColumnCount defaults to four columns and wraps by available width", () => {
-  assert.equal(resolveSubgraphMiniMapColumnCount(9, Number.POSITIVE_INFINITY), 4);
+test("resolveSubgraphMiniMapColumnCount defaults to three columns and adapts from one to all visible nodes", () => {
+  assert.equal(resolveSubgraphMiniMapColumnCount(9, Number.POSITIVE_INFINITY), 3);
+  assert.equal(resolveSubgraphMiniMapColumnCount(2, Number.POSITIVE_INFINITY), 2);
+  assert.equal(resolveSubgraphMiniMapColumnCount(9, requiredWidthForColumns(9)), 9);
+  assert.equal(resolveSubgraphMiniMapColumnCount(9, requiredWidthForColumns(6)), 6);
   assert.equal(resolveSubgraphMiniMapColumnCount(9, requiredWidthForColumns(4)), 4);
   assert.equal(resolveSubgraphMiniMapColumnCount(9, requiredWidthForColumns(4) - 1), 3);
   assert.equal(resolveSubgraphMiniMapColumnCount(9, requiredWidthForColumns(2) + 1), 2);
@@ -84,11 +87,11 @@ test("buildSubgraphMiniMapLayout routes sequence edges as curves from right outp
       "M 518 43",
       "L 532 43",
       "L 536 43",
-      "Q 540 43 540 39",
-      "L 540 14",
-      "Q 540 6 532 6",
-      "L 12 6",
-      "Q 4 6 4 14",
+      "Q 540 43 540 47",
+      "L 540 75",
+      "Q 540 83 532 83",
+      "L 12 83",
+      "Q 4 83 4 91",
       "L 4 119",
       "Q 4 123 8 123",
       "L 12 123",

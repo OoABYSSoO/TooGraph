@@ -9,6 +9,7 @@ const UPSTREAM_HORIZONTAL_CLEARANCE = 72;
 const UPSTREAM_TOP_CLEARANCE = 160;
 const UPSTREAM_NODE_TOP_GUTTER = 48;
 const UPSTREAM_CORNER_RADIUS = 18;
+const LOWER_ROW_THRESHOLD = 120;
 
 export type SequenceFlowPathConfig = {
   terminalOverlap: number;
@@ -22,6 +23,7 @@ export type SequenceFlowPathConfig = {
   upstreamTopClearance: number;
   upstreamNodeTopGutter: number;
   upstreamCornerRadius: number;
+  lowerRowThreshold: number;
 };
 
 export const DEFAULT_SEQUENCE_FLOW_PATH_CONFIG: SequenceFlowPathConfig = {
@@ -36,6 +38,7 @@ export const DEFAULT_SEQUENCE_FLOW_PATH_CONFIG: SequenceFlowPathConfig = {
   upstreamTopClearance: UPSTREAM_TOP_CLEARANCE,
   upstreamNodeTopGutter: UPSTREAM_NODE_TOP_GUTTER,
   upstreamCornerRadius: UPSTREAM_CORNER_RADIUS,
+  lowerRowThreshold: LOWER_ROW_THRESHOLD,
 };
 
 export type SequenceFlowPathInput = {
@@ -57,7 +60,7 @@ export function buildSequenceFlowPath(input: SequenceFlowPathInput, config: Sequ
   const sourceLaneOffset = resolveLaneOffset(input.sourceLaneIndex, input.sourceLaneCount, config);
   const targetLaneOffset = resolveLaneOffset(input.targetLaneIndex, input.targetLaneCount, config);
 
-  if (shouldUseVerticalDropPath(input)) {
+  if (shouldUseVerticalDropPath(input, config)) {
     return buildVerticalDropPath(input, sourceLaneOffset, targetLaneOffset, config);
   }
 
@@ -173,14 +176,14 @@ function buildTightBezierPath(input: SequenceFlowPathInput, sourceLaneOffset: nu
   ].join(" ");
 }
 
-function shouldUseVerticalDropPath(input: SequenceFlowPathInput) {
+function shouldUseVerticalDropPath(input: SequenceFlowPathInput, config: SequenceFlowPathConfig) {
   if (input.targetY <= input.sourceY || input.targetX > input.sourceX) {
     return false;
   }
-  if (input.sourceNodeX === undefined || input.targetNodeX === undefined) {
+  if (input.sourceNodeY === undefined || input.targetNodeY === undefined) {
     return false;
   }
-  return input.targetNodeX >= input.sourceNodeX;
+  return input.targetNodeY - input.sourceNodeY >= config.lowerRowThreshold;
 }
 
 function resolveVerticalDropSourceRailX(input: SequenceFlowPathInput, config: SequenceFlowPathConfig) {

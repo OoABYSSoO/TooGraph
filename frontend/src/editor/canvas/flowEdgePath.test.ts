@@ -153,6 +153,64 @@ test("buildSequenceFlowPath routes vertically stacked downstream nodes through t
   );
 });
 
+test("buildSequenceFlowPath routes clear lower-row left targets below the cards", () => {
+  assert.equal(
+    buildSequenceFlowPath({
+      sourceX: 500,
+      sourceY: 220,
+      targetX: 200,
+      targetY: 420,
+      sourceNodeX: 500,
+      sourceNodeY: 200,
+      targetNodeX: 200,
+      targetNodeY: 400,
+    }),
+    [
+      "M 500 220",
+      "L 528 220",
+      "L 554 220",
+      "Q 572 220 572 238",
+      "L 572 302",
+      "Q 572 320 554 320",
+      "L 146 320",
+      "Q 128 320 128 338",
+      "L 128 402",
+      "Q 128 420 146 420",
+      "L 172 420",
+      "L 200 420",
+    ].join(" "),
+  );
+});
+
+test("buildSequenceFlowPath keeps slightly lower left targets on the upstream return path", () => {
+  assert.equal(
+    buildSequenceFlowPath({
+      sourceX: 500,
+      sourceY: 220,
+      targetX: 200,
+      targetY: 280,
+      sourceNodeX: 500,
+      sourceNodeY: 200,
+      targetNodeX: 200,
+      targetNodeY: 260,
+    }),
+    [
+      "M 500 220",
+      "L 528 220",
+      "L 554 220",
+      "Q 572 220 572 202",
+      "L 572 170",
+      "Q 572 152 554 152",
+      "L 146 152",
+      "Q 128 152 128 170",
+      "L 128 262",
+      "Q 128 280 146 280",
+      "L 172 280",
+      "L 200 280",
+    ].join(" "),
+  );
+});
+
 test("buildSequenceFlowPath staggers upstream source exits and target entries before the shared short leads", () => {
   assert.equal(
     buildSequenceFlowPath({
