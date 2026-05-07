@@ -12,7 +12,7 @@
 
 - [future/companion-autonomous-agent-roadmap.md](future/companion-autonomous-agent-roadmap.md)
   - 桌宠、自主工具循环、技能生成和长期协作能力的唯一长期参考
-  - 包含 graph-first 运行模型、子图组件、skill manifest 契约、skill state、技能说明胶囊、技能绑定 state、`autonomous_decision`、`graphite_skill_builder` 和 function call 取舍
+  - 包含 graph-first 运行模型、子图组件、skill manifest 契约、skill state、技能说明胶囊、技能绑定 state、`autonomous_decision`、`graphiteUI_skill_builder` 和 function call 取舍
 
 ## 已清理
 

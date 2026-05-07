@@ -42,7 +42,7 @@
 - Agent 节点会合并卡片 skills 与 `skill` state 传入的 skills。
 - Agent 节点提示词区域支持技能说明胶囊，胶囊可编辑、可随技能移除。
 - 旧内置模板已删除，旧模板运行入口兼容修补已删除。
-- 旧技能包已删除，只保留新的 `web_search`。
+- 旧技能包已删除，当前官方 Skill 包包括 `web_search`、`local_workspace_executor` 和 `graphiteUI_skill_builder`。
 - `file` / `image` / `audio` / `video` state 已采用路径透传语义，值可以是本地路径字符串或路径数组；`file_list`、`array`、`object` 不再作为 state 类型存在。
 - Agent 节点会读取 `file` state 中的文本类文件，并只把文件名与原文全文放入模型上下文；图片、音频和视频路径走多模态附件处理。
 - `web_search` 不再输出 `context`，只输出 `query`、`source_urls`、`artifact_paths` 和 `errors`。
@@ -52,6 +52,7 @@
 - 技能输入由 Agent 节点的 LLM 在运行时根据当前输入 state、技能说明和 `inputSchema` 生成；必填技能输入缺失时由运行时记录可恢复错误。
 - 图运行前不再兼容补齐旧绑定。旧草稿、旧模板和旧技能需要按当前协议重建。
 - 已新增通用 `advanced_web_research_loop` 内置模板，用于验证“搜索技能执行 -> 证据评估 -> condition 控制补搜 -> 依据筛选 -> final_reply”的图式工具循环。它不是桌宠自主循环模板，但可作为联网研究子流程和后续桌宠模板的参考构件。
+- 已新增通用 `create_user_skill` 内置模板，用于通过用户确认、示例确认、设计确认、写入、测试和有限修复循环创建用户自定义 Skill。
 - 子图缩略图已能投射内部节点运行状态颜色，并在节点卡片上显示当前内部运行摘要。
 
 尚未完成：
@@ -59,7 +60,7 @@
 - 子图运行审计聚合、事件定位、从缩略图点击跳转到内部节点，以及更完整的嵌套可视化能力。
 - 真实的 `autonomous_decision` 技能。
 - 新版桌宠自主循环模板。
-- `graphite_skill_builder`。
+- 用户 Skill 创建和管理的 UI 完善，例如文件预览、revision 对比、回滚入口和测试运行入口。
 - 当前仍残留 `backend/app/companion/commands.py` 中的 `graph_patch.draft` 草案记录 stub。它是历史遗留入口，只能记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、graph revision、undo 或完整审计闭环；下一轮应删除它，或按新的图优先命令流重建。
 - 审批恢复 UI、图补丁预览、GraphCommandBus、graph revision、undo 和完整审计闭环。
 
@@ -390,38 +391,36 @@ Agent 节点提示词区域中，绑定的技能以胶囊展示。
 - 安装或启用 skill。
 - 修改图、文件、记忆或人设。
 
-## `graphite_skill_builder`
+## `graphiteUI_skill_builder`
 
-`graphite_skill_builder` 是未来的“生成 skill 的 skill”。它应在用户确认后生成 GraphiteUI 格式的 skill 草案，而不是直接安装和启用。
+`graphiteUI_skill_builder` 已作为官方 Skill 落地。它是通用的用户 Skill 构建器，不限定只给某个模板使用；当前 `create_user_skill` 模板会调用它完成写入、校验、测试、修复和回滚。
 
-输入：
+它负责：
 
-- `capability_name`
-- `user_goal`
-- `required_permissions`
-- `expected_inputs`
-- `expected_outputs`
-- `side_effects`
-- `safety_boundaries`
-- `examples`
+- 检查当前官方和用户 Skill 目录，判断是否已有能力可复用。
+- 校验 GraphiteUI Skill 包结构、manifest、输入输出 schema、运行入口和必要文件。
+- 写入用户自定义 Skill 到 `backend/data/skills/user/<skill_key>/`。
+- 对已有用户 Skill 应用补丁。
+- 运行 smoke test 并返回结构化测试结果。
+- 读取 revision 或回滚到指定 revision。
 
-输出：
+它不负责：
 
-- `status`
-- `draft_path`
-- `skill_key`
-- `manifest_path`
-- `instruction_path`
-- `runtime_entrypoint_path`
-- `files`
-- `permissions_summary`
-- `safety_review`
-- `next_steps`
+- 写入、覆盖或启用 `skill/<skill_key>/` 下的官方 Skill。
+- 代替用户做需求确认、示例确认或设计确认。
+- 直接授予额外文件系统或命令执行权限。
+- 绕过 Skill registry、权限检查、图运行记录或审计路径。
 
-建议草稿路径：
+用户 Skill 的持久化路径是：
 
 ```text
-backend/data/skill_drafts/<skill_key>/
+backend/data/skills/user/<skill_key>/
+```
+
+revision 路径是：
+
+```text
+backend/data/skills/revisions/<skill_key>/
 ```
 
 ## Function Call 的位置

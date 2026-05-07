@@ -9,10 +9,10 @@
 - 桌宠不是独立运行时。桌宠本质也是按图模板发起一次 graph run，并通过运行来源、状态和技能目录表达上下文。
 - 旧的 `companion_agentic_tool_loop`、`companion_chat_loop`、`web_research_loop` 等模板不再随仓库提供，也不再通过后端兼容逻辑修补。
 - 新版桌宠自主循环模板 `companion_autonomous_loop` 尚未创建和注册。当前桌宠浮窗仍会尝试读取这个模板，因此桌宠对话入口的 UI 已存在，但完整对话循环还不能作为当前可用能力描述。
-- 当前仓库提供一个新的内置图模板：`advanced_web_research_loop`（高级联网搜索）。它是通用研究模板，不是桌宠专用自主循环模板。
+- 当前仓库提供两个官方图模板：`advanced_web_research_loop`（高级联网搜索）和 `create_user_skill`（创建自定义技能）。它们都是通用模板，不是桌宠专用自主循环模板。
 - 技能系统已收束为统一技能库，不再区分“桌宠技能”和“Agent 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
-- 当前只保留一个内置技能包：`web_search`。其余旧技能包已经删除，后续需要按新结构逐个专门编写。
-- `subgraph` 已是正式节点类型：可从已保存整张图创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
+- 当前官方技能包包括 `web_search`、`local_workspace_executor` 和 `graphiteUI_skill_builder`。旧技能包已经删除，后续新能力应按当前统一 Skill 结构专门编写。
+- `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
 
 ## 当前协议
 
@@ -34,6 +34,8 @@
 
 ## 当前技能
 
+官方 Skill 位于 `skill/<skill_key>/`，会进入 Git 管理；用户自定义 Skill 位于 `backend/data/skills/user/<skill_key>/`，属于本地用户数据，不进入 Git 管理。Skill catalog 会同时返回官方和用户 Skill，并通过 `sourceScope` / `canManage` 区分来源与可管理性。
+
 ### `web_search`
 
 - 位置：`skill/web_search/`
@@ -50,6 +52,24 @@
 - `artifact_paths`：成功保存到本地的来源原文文件路径，类型应绑定为 `file`，值可以是路径字符串或路径数组。
 - `errors`：结构化错误列表。
 
+### `local_workspace_executor`
+
+- 位置：`skill/local_workspace_executor/`
+- 显示名称：`本地工作区执行器`
+- 作用：提供受策略约束的文件读取、文件写入、目录查看、路径删除、命令运行和脚本运行能力。
+- 默认写入范围限制在 `backend/data` 下；默认执行范围限制在 `backend/data/skills/user` 和 `backend/data/tmp` 下。
+- 权限策略由受保护的 `backend/data/settings/security/local_executor_policy.json` 管理。遇到越权路径时，技能返回 `blocked` 状态、阻断原因和建议追加的最小白名单，而不是静默执行。
+- 命令和脚本执行会拒绝 `python -c`、`bash -c`、`node -e` 这类内联执行形式；该技能是 GraphiteUI 层面的权限门禁，不是操作系统级沙箱。
+
+### `graphiteUI_skill_builder`
+
+- 位置：`skill/graphiteUI_skill_builder/`
+- 显示名称：`GraphiteUI Skill Builder`
+- 作用：构建、校验、测试、修订和回滚 GraphiteUI 用户自定义 Skill 包。
+- 写入范围固定为 `backend/data/skills/user/<skill_key>/`，不会写入或覆盖 `skill/<skill_key>/` 下的官方 Skill。
+- 支持检查现有 Skill、校验 manifest / schema / 运行入口、写入完整 Skill 包、应用补丁、运行 smoke test、读取 revision 和回滚 revision。
+- revision 存放在 `backend/data/skills/revisions/<skill_key>/`，用于让生成和修复过程可回溯。
+
 ## 当前内置图模板
 
 ### `advanced_web_research_loop`
@@ -62,6 +82,15 @@
 - 技能语义：搜索节点绑定 `web_search`，技能输入仍由该 Agent 节点运行时 LLM 生成；模板不使用 `inputMapping` 或静态技能参数。
 - 输出语义：`query`、`source_urls`、`artifact_paths`、`errors` 通过 managed binding state 透传；后续 Agent 读取 `artifact_paths` 对应的本地原文，负责证据筛选和最终总结。
 - 模型语义：模板默认使用全局模型配置，不写死某个 provider。Agent 节点和桌宠模型下拉的第一项是“全局（实时读取当前全局设定的模型）”，后面才是具体模型 override。若全局本地网关未启动，运行该模板前需要在 Model Providers 页面选择可用模型，或在图中为 Agent 节点设置 override。
+
+### `create_user_skill`
+
+- 位置：`backend/app/templates/official/create_user_skill.json`
+- 显示名称：`创建自定义技能`
+- 作用：把用户的技能想法转化为可安装在本地用户目录中的 GraphiteUI Skill 包。
+- 主要流程：检查现有技能是否已满足需求 -> 生成澄清问题并暂停等待用户回答 -> 整理确认后的需求 -> 生成示例输入输出并暂停确认 -> 设计 Skill 包并暂停确认 -> 调用 `graphiteUI_skill_builder` 写入用户 Skill -> 运行 smoke test -> 测试失败时自动修复并重试 -> 输出创建结果。
+- 循环语义：示例确认、设计确认和测试修复都有明确循环上限；修复耗尽后会进入人工复核断点，由用户决定继续还是停止。
+- 权限语义：模板只创建用户自定义 Skill，不直接创建官方 Skill。需要成为官方 Skill 时，应由开发者手动移动到 `skill/<skill_key>/` 并纳入 Git 管理。
 
 ## 当前前端能力
 
@@ -76,6 +105,8 @@
 ## 当前后端能力
 
 - FastAPI 提供 graphs / runs / templates / presets / settings / skills / knowledge / memories API。
+- 后端 Skill catalog 合并官方 Skill 和用户自定义 Skill。官方 Skill 只读，用户 Skill 可在 Skills 页面启用、停用和删除。
+- 后端提供本地执行器策略读取和白名单追加 API，用于支持 `local_workspace_executor` 的显式权限流。
 - validator 负责 `node_system` graph 结构校验。必填技能输入不再做静态绑定校验，而是在 Agent LLM 生成技能输入后由运行时检查。
 - LangGraph runtime 是当前运行主链。
 - 后端不再在 graph run 入口修补旧模板结构；提交什么图，就按当前协议校验和执行什么图。
@@ -87,7 +118,7 @@
 - 继续收束 `subgraph` 子图体验：补齐父子图运行详情页的审计聚合、事件定位和从缩略图点击跳转到内部节点。
 - 用新结构手工重建桌宠自主循环模板。
 - 设计并实现真正的 `autonomous_decision` 技能，用于根据技能目录、用户意图和运行策略选择技能，但不直接执行技能。
-- 设计并实现 `graphite_skill_builder`，用于在用户确认后生成符合 GraphiteUI 项目结构的 skill 草案。
+- 补齐用户 Skill 创建和管理的产品化体验，例如文件预览、revision 对比、回滚入口和测试运行入口。
 - 完成更完整的图运行展示。
 - 清理或按新命令流重建历史 `graph_patch.draft` stub，并完成图补丁预览、GraphCommandBus、graph revision、undo 和审计闭环。
 - 将人设、记忆、会话摘要等长期状态更新表达为可审计的图模板流程，而不是隐藏产品逻辑。
