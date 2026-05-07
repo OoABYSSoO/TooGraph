@@ -103,7 +103,7 @@ export function buildSubgraphMiniMapLayout(
       return [
         {
           ...edge,
-          path: buildOrthogonalEdgePath(source, target),
+          path: buildCurvedEdgePath(source, target),
         },
       ];
     }),
@@ -114,22 +114,24 @@ function requiredWidthForColumns(columnCount: number, config: SubgraphMiniMapLay
   return config.paddingX * 2 + columnCount * config.nodeWidth + Math.max(0, columnCount - 1) * config.columnGap;
 }
 
-function buildOrthogonalEdgePath(source: SubgraphMiniMapPlacedNode, target: SubgraphMiniMapPlacedNode) {
+function buildCurvedEdgePath(source: SubgraphMiniMapPlacedNode, target: SubgraphMiniMapPlacedNode) {
   const sourcePoint = edgePoint(source, "end");
   const targetPoint = edgePoint(target, "start");
-  if (source.row === target.row && sourcePoint.x <= targetPoint.x) {
-    return `M ${sourcePoint.x} ${sourcePoint.y} H ${targetPoint.x}`;
-  }
-  if (source.row === target.row) {
-    const detourX = sourcePoint.x + Math.round(source.width * 0.13);
-    const detourY = sourcePoint.y + Math.round(source.height * 0.72);
-    return `M ${sourcePoint.x} ${sourcePoint.y} H ${detourX} V ${detourY} H ${targetPoint.x} V ${targetPoint.y}`;
-  }
-  const midX =
-    sourcePoint.x <= targetPoint.x
-      ? Math.round((sourcePoint.x + targetPoint.x) / 2)
-      : sourcePoint.x + Math.round(source.width * 0.13);
-  return `M ${sourcePoint.x} ${sourcePoint.y} H ${midX} V ${targetPoint.y} H ${targetPoint.x}`;
+  const horizontalDistance = targetPoint.x - sourcePoint.x;
+  const controlOffset = Math.round(Math.max(18, Math.min(96, Math.abs(horizontalDistance) / 2)));
+  const targetControlDirection = horizontalDistance >= 0 ? -1 : 1;
+  const sameRowBacktrack = source.row === target.row && horizontalDistance < 0;
+  const rowBow = sameRowBacktrack ? Math.round(Math.max(28, Math.min(48, source.height + 10))) : 0;
+  const firstControl = {
+    x: sourcePoint.x + controlOffset,
+    y: sourcePoint.y + rowBow,
+  };
+  const secondControl = {
+    x: targetPoint.x + targetControlDirection * controlOffset,
+    y: targetPoint.y + rowBow,
+  };
+
+  return `M ${sourcePoint.x} ${sourcePoint.y} C ${firstControl.x} ${firstControl.y} ${secondControl.x} ${secondControl.y} ${targetPoint.x} ${targetPoint.y}`;
 }
 
 function edgePoint(node: SubgraphMiniMapPlacedNode, side: "start" | "end") {

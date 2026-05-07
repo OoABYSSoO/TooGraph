@@ -892,16 +892,15 @@ test("buildNodeCardViewModel derives subgraph boundary and thumbnail summary", (
 
   assert.equal(model.kindLabel, "SUBGRAPH");
   assert.equal(model.body.kind, "subgraph");
-  assert.deepEqual(model.body.thumbnailNodes.map((item) => item.label), ["Input", "Summarize", "Output"]);
+  assert.deepEqual(model.body.thumbnailNodes.map((item) => item.label), ["Summarize"]);
   assert.deepEqual(
     model.body.thumbnailNodes.map((item) => ({ id: item.id, column: item.column, row: item.row, status: item.status, active: item.active })),
     [
-      { id: "input_question", column: 1, row: 1, status: "idle", active: false },
-      { id: "summarize", column: 2, row: 1, status: "idle", active: false },
-      { id: "output_answer", column: 3, row: 1, status: "idle", active: false },
+      { id: "summarize", column: 1, row: 1, status: "idle", active: false },
     ],
   );
-  assert.equal(model.body.thumbnailColumnCount, 3);
+  assert.deepEqual(model.body.thumbnailEdges, []);
+  assert.equal(model.body.thumbnailColumnCount, 1);
   assert.equal(model.body.thumbnailRowCount, 1);
   assert.equal(model.body.inputCount, 1);
   assert.equal(model.body.outputCount, 1);
@@ -986,7 +985,6 @@ test("buildNodeCardViewModel projects subgraph runtime status onto thumbnail nod
   assert.deepEqual(
     model.body.thumbnailNodes.map((item) => ({ id: item.id, label: item.label, status: item.status, active: item.active })),
     [
-      { id: "input_question", label: "Input", status: "success", active: false },
       { id: "search_sources", label: "Search Sources", status: "success", active: false },
       { id: "summarize", label: "Summarize Evidence", status: "running", active: true },
     ],
@@ -1111,21 +1109,19 @@ test("buildNodeCardViewModel compacts subgraph thumbnails and includes condition
 
   assert.equal(model.body.kind, "subgraph");
   assert.equal(model.body.thumbnailColumnCount, 4);
-  assert.equal(model.body.thumbnailRowCount, 2);
+  assert.equal(model.body.thumbnailRowCount, 1);
   assert.deepEqual(
     model.body.thumbnailNodes.map((item) => ({ id: item.id, column: item.column, row: item.row })),
     [
-      { id: "start", column: 1, row: 1 },
-      { id: "search", column: 2, row: 1 },
-      { id: "review", column: 3, row: 1 },
-      { id: "refine", column: 4, row: 1 },
-      { id: "final", column: 1, row: 2 },
-      { id: "done", column: 2, row: 2 },
+      { id: "search", column: 1, row: 1 },
+      { id: "review", column: 2, row: 1 },
+      { id: "refine", column: 3, row: 1 },
+      { id: "final", column: 4, row: 1 },
     ],
   );
   assert.deepEqual(
     model.body.thumbnailEdges.map((edge) => `${edge.source}->${edge.target}`),
-    ["start->search", "search->review", "refine->search", "final->done", "review->refine", "review->final"],
+    ["search->review", "refine->search", "review->refine", "review->final"],
   );
 });
 

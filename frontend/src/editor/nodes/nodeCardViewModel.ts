@@ -300,8 +300,9 @@ function buildSubgraphThumbnail(node: Extract<GraphNode, { kind: "subgraph" }>, 
       })),
     ),
   ];
+  const visibleEntries = entries.filter(([, innerNode]) => isSubgraphThumbnailVisibleNode(innerNode));
   const orderedIds = orderSubgraphThumbnailNodeIds(
-    entries.map(([id]) => id),
+    visibleEntries.map(([id]) => id),
     edgePairs,
   );
   const columnCount = Math.max(1, Math.min(4, orderedIds.length));
@@ -334,10 +335,14 @@ function buildSubgraphThumbnail(node: Extract<GraphNode, { kind: "subgraph" }>, 
     ];
   });
   const statusByNodeId = new Map(nodes.map((item) => [item.id, item.status]));
+  const visibleNodeIds = new Set(nodes.map((item) => item.id));
   const seenEdgeKeys = new Set<string>();
   return {
     nodes,
     edges: edgePairs.flatMap((edge) => {
+      if (!visibleNodeIds.has(edge.source) || !visibleNodeIds.has(edge.target)) {
+        return [];
+      }
       const edgeKey = `${edge.source}->${edge.target}`;
       if (seenEdgeKeys.has(edgeKey)) {
         return [];
@@ -356,6 +361,10 @@ function buildSubgraphThumbnail(node: Extract<GraphNode, { kind: "subgraph" }>, 
     columnCount,
     rowCount: Math.max(1, ...nodes.map((item) => item.row)),
   };
+}
+
+function isSubgraphThumbnailVisibleNode(node: GraphNode) {
+  return node.kind !== "input" && node.kind !== "output";
 }
 
 function orderSubgraphThumbnailNodeIds(nodeIds: string[], edges: Array<{ source: string; target: string }>) {
