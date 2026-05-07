@@ -4,6 +4,7 @@
       <div class="node-card__agent-skill-select-shell" @pointerdown.stop @click.stop>
         <ElSelect
           class="node-card__agent-skill-select graphite-select"
+          :class="{ 'node-card__agent-skill-select--empty': isSkillEmpty }"
           :model-value="selectedSkillKey"
           :placeholder="skillPlaceholder"
           :disabled="skillSelectDisabled"
@@ -110,11 +111,12 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const isSkillEmpty = computed(() => !props.selectedSkillKey.trim());
 const selectedSkillMissing = computed(
   () => Boolean(props.selectedSkillKey) && !props.availableSkillDefinitions.some((definition) => definition.skillKey === props.selectedSkillKey),
 );
 const skillSelectDisabled = computed(
-  () => props.loading || Boolean(props.error) || (props.availableSkillDefinitions.length === 0 && !props.selectedSkillKey),
+  () => props.loading || Boolean(props.error),
 );
 const skillPlaceholder = computed(() => {
   if (props.loading) {
@@ -123,10 +125,7 @@ const skillPlaceholder = computed(() => {
   if (props.error) {
     return t("nodeCard.skillLoadFailed");
   }
-  if (props.availableSkillDefinitions.length === 0) {
-    return t("nodeCard.noSkills");
-  }
-  return t("nodeCard.selectSkill");
+  return isSkillEmpty.value ? t("nodeCard.noSkill") : t("nodeCard.selectSkill");
 });
 </script>
 
@@ -164,6 +163,18 @@ const skillPlaceholder = computed(() => {
   background: rgba(239, 246, 255, 0.9);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
   padding: 0 14px;
+}
+
+.node-card__agent-skill-select--empty :deep(.el-select__wrapper) {
+  border-style: dashed;
+  border-width: 1.5px;
+  border-color: rgba(37, 99, 235, 0.5);
+  background: rgba(239, 246, 255, 0.58);
+}
+
+.node-card__agent-skill-select--empty :deep(.el-select__wrapper:hover) {
+  border-color: rgba(37, 99, 235, 0.68);
+  background: rgba(219, 234, 254, 0.66);
 }
 
 .node-card__agent-skill-select :deep(.el-select__wrapper:hover) {
