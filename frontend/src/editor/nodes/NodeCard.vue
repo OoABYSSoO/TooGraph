@@ -37,6 +37,7 @@
       @toggle-advanced="toggleAdvancedPanel"
       @preset-action="handlePresetActionClick"
       @delete-action="handleDeleteActionClick"
+      @edit-subgraph-action="handleEditSubgraphActionClick"
       @human-review="handleHumanReviewActionClick"
       @update:agent-temperature="handleAgentTemperatureInputValue"
       @update:agent-breakpoint-timing="handleAgentBreakpointTimingSelect"
@@ -570,6 +571,7 @@ const emit = defineEmits<{
   (event: "create-port-state", payload: { nodeId: string; side: "input" | "output"; field: StateFieldDraft }): void;
   (event: "delete-node", payload: { nodeId: string }): void;
   (event: "save-node-preset", payload: { nodeId: string }): void;
+  (event: "open-subgraph-editor", payload: { nodeId: string }): void;
   (event: "open-human-review", payload: { nodeId: string }): void;
   (event: "locked-edit-attempt"): void;
   (event: "refresh-agent-models"): void;
@@ -860,7 +862,7 @@ const agentTemperatureInput = computed(() => {
 });
 const hasAdvancedSettings = computed(() => props.node.kind === "agent" || props.node.kind === "output");
 const canSavePreset = computed(() => props.node.kind === "agent");
-const isTopActionVisible = computed(() => props.humanReviewPending || props.selected || activeTopAction.value !== null);
+const isTopActionVisible = computed(() => props.humanReviewPending || props.selected || Boolean(props.hovered) || activeTopAction.value !== null);
 const hasFloatingPanelOpen = computed(
   () =>
     activeTopAction.value !== null ||
@@ -1519,8 +1521,29 @@ function handleDeleteActionClick() {
   startTopActionConfirmWindow("delete");
 }
 
+function handleEditSubgraphActionClick() {
+  if (guardLockedGraphInteraction()) {
+    return;
+  }
+  if (props.node.kind !== "subgraph") {
+    return;
+  }
+  isSkillPickerOpen.value = false;
+  closePortPicker();
+  closeStateEditor();
+  clearTextEditorConfirmState();
+  clearStateEditorConfirmState();
+  clearRemovePortStateConfirmState();
+  commitOpenTextEditorIfNeeded();
+  if (activeTopAction.value === "edit-subgraph") {
+    confirmOpenSubgraphEditor();
+    return;
+  }
+  startTopActionConfirmWindow("edit-subgraph");
+}
+
 function handleNodeCardClickCapture(event: Event) {
-  if (activeTopAction.value !== "delete" && activeTopAction.value !== "preset") {
+  if (activeTopAction.value !== "delete" && activeTopAction.value !== "preset" && activeTopAction.value !== "edit-subgraph") {
     return;
   }
   const target = event.target;
@@ -1546,6 +1569,17 @@ function confirmDeleteNode() {
   }
   clearTopActionConfirmState();
   emit("delete-node", { nodeId: props.nodeId });
+}
+
+function confirmOpenSubgraphEditor() {
+  if (guardLockedGraphInteraction()) {
+    return;
+  }
+  if (props.node.kind !== "subgraph") {
+    return;
+  }
+  clearTopActionConfirmState();
+  emit("open-subgraph-editor", { nodeId: props.nodeId });
 }
 
 function confirmSavePreset() {

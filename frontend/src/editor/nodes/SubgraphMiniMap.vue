@@ -19,30 +19,40 @@
           :d="edge.path"
         />
       </svg>
-      <span
+      <ElTooltip
         v-for="node in layout.nodes"
         :key="node.id"
-        class="subgraph-mini-map__node"
-        :class="[
-          `subgraph-mini-map__node--${node.kind}`,
-          `subgraph-mini-map__node--${node.status}`,
-          { 'subgraph-mini-map__node--active': node.active },
-        ]"
-        :style="nodeStyle(node)"
-        :title="`${node.label} - ${formatStatus(node.status)}`"
+        :content="node.label"
+        placement="top"
+        effect="light"
+        popper-class="subgraph-mini-map__node-tooltip"
+        :show-after="180"
+        :hide-after="0"
       >
-        <span class="subgraph-mini-map__node-kind" aria-hidden="true" />
-        <span class="subgraph-mini-map__node-status" aria-hidden="true" />
-        <span class="subgraph-mini-map__node-label">{{ node.label }}</span>
-      </span>
+        <span
+          class="subgraph-mini-map__node"
+          :class="[
+            `subgraph-mini-map__node--${node.kind}`,
+            `subgraph-mini-map__node--${node.status}`,
+            { 'subgraph-mini-map__node--active': node.active },
+          ]"
+          :style="nodeStyle(node)"
+          :aria-label="node.label"
+        >
+          <span class="subgraph-mini-map__node-kind" aria-hidden="true" />
+          <span class="subgraph-mini-map__node-status" aria-hidden="true" />
+          <span class="subgraph-mini-map__node-label">{{ node.label }}</span>
+        </span>
+      </ElTooltip>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { ElTooltip } from "element-plus";
 
-import type { SubgraphThumbnailEdgeViewModel, SubgraphThumbnailNodeViewModel, SubgraphThumbnailStatus } from "./nodeCardViewModel";
+import type { SubgraphThumbnailEdgeViewModel, SubgraphThumbnailNodeViewModel } from "./nodeCardViewModel";
 import { buildSubgraphMiniMapLayout } from "./subgraphMiniMapLayout";
 import type { SubgraphMiniMapPlacedNode } from "./subgraphMiniMapLayout";
 
@@ -83,25 +93,6 @@ function nodeStyle(node: SubgraphMiniMapPlacedNode) {
     width: `${node.width}px`,
     height: `${node.height}px`,
   };
-}
-
-function formatStatus(status: SubgraphThumbnailStatus) {
-  if (status === "queued") {
-    return "queued";
-  }
-  if (status === "running") {
-    return "running";
-  }
-  if (status === "paused") {
-    return "paused";
-  }
-  if (status === "success") {
-    return "success";
-  }
-  if (status === "failed") {
-    return "failed";
-  }
-  return "idle";
 }
 </script>
 
@@ -204,6 +195,25 @@ function formatStatus(status: SubgraphThumbnailStatus) {
   height: 22px;
   border-radius: 999px;
   background: rgba(120, 113, 108, 0.38);
+}
+
+:global(.subgraph-mini-map__node-tooltip.el-popper) {
+  max-width: min(360px, calc(100vw - 32px));
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: rgba(255, 252, 247, 0.96);
+  box-shadow: 0 12px 28px rgba(60, 41, 20, 0.14);
+  color: #292524;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+:global(.subgraph-mini-map__node-tooltip .el-popper__arrow::before) {
+  border-color: rgba(154, 52, 18, 0.14);
+  background: rgba(255, 252, 247, 0.96);
 }
 
 .subgraph-mini-map__node--input {

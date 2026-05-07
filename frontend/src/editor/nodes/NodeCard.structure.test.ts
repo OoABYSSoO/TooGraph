@@ -183,6 +183,18 @@ test("SubgraphMiniMap keeps active runtime nodes flashing regardless of reduced-
   assert.doesNotMatch(miniMapSource, /@media \(prefers-reduced-motion:\s*no-preference\) \{[\s\S]*\.subgraph-mini-map__node--active/);
 });
 
+test("SubgraphMiniMap uses a styled tooltip for full node names instead of the native title row", () => {
+  const miniMapSource = readFileSync(resolve(currentDirectory, "SubgraphMiniMap.vue"), "utf8").replace(/\r\n/g, "\n");
+
+  assert.match(miniMapSource, /import \{ ElTooltip \} from "element-plus";/);
+  assert.match(miniMapSource, /<ElTooltip[\s\S]*v-for="node in layout\.nodes"[\s\S]*:content="node\.label"[\s\S]*popper-class="subgraph-mini-map__node-tooltip"/);
+  assert.match(miniMapSource, /:aria-label="node\.label"/);
+  assert.match(miniMapSource, /:global\(\.subgraph-mini-map__node-tooltip\.el-popper\) \{[\s\S]*background:\s*rgba\(255,\s*252,\s*247,\s*0\.96\);/);
+  assert.match(miniMapSource, /:global\(\.subgraph-mini-map__node-tooltip\.el-popper\) \{[\s\S]*border-radius:\s*12px;/);
+  assert.doesNotMatch(miniMapSource, /:title=/);
+  assert.doesNotMatch(miniMapSource, /\$\{node\.label\} - \$\{formatStatus\(node\.status\)\}/);
+});
+
 test("NodeCard keeps state pill geometry but hides the pill chrome visually", () => {
   assert.match(portListSurfaceSource, /\.node-card__port-pill \{[\s\S]*display:\s*inline-flex;/);
   assert.match(portListSurfaceSource, /\.node-card__port-pill \{[\s\S]*align-items:\s*center;/);
@@ -617,12 +629,14 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.match(componentSource, /@toggle-advanced="toggleAdvancedPanel"/);
   assert.match(componentSource, /@delete-action="handleDeleteActionClick"/);
   assert.match(componentSource, /@preset-action="handlePresetActionClick"/);
+  assert.match(componentSource, /@edit-subgraph-action="handleEditSubgraphActionClick"/);
   assert.match(componentSource, /@human-review="handleHumanReviewActionClick"/);
   assert.match(topActionsSource, /import \{[\s\S]*ElButton,[\s\S]*ElPopover[\s\S]*\} from "element-plus";/);
-  assert.match(topActionsSource, /import \{[\s\S]*CollectionTag[\s\S]*Delete[\s\S]*Operation[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(topActionsSource, /import \{[\s\S]*CollectionTag[\s\S]*Delete[\s\S]*EditPen[\s\S]*Operation[\s\S]*\} from "@element-plus\/icons-vue";/);
   assert.match(topActionsSource, /class="node-card__top-actions"/);
   assert.match(topActionsSource, /node-card__top-action-button/);
   assert.match(topActionsSource, /class="node-card__top-action-button node-card__top-action-button--advanced"/);
+  assert.match(topActionsSource, /class="node-card__top-action-button node-card__top-action-button--edit-subgraph"/);
   assert.match(topActionsSource, /class="node-card__top-action-button node-card__top-action-button--preset"/);
   assert.match(topActionsSource, /class="node-card__top-action-button node-card__top-action-button--delete"/);
   assert.match(topActionsSource, /@click\.stop="emit\('toggle-advanced'\)"/);
@@ -630,15 +644,20 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.match(topActionsSource, /:popper-style="actionPopoverStyle"/);
   assert.match(componentSource, /import \{ useNodeFloatingPanels \} from "\.\/useNodeFloatingPanels";/);
   assert.match(componentSource, /const \{[\s\S]*activeTopAction,[\s\S]*addGlobalFloatingPanelListeners,[\s\S]*clearTopActionConfirmState,[\s\S]*clearTopActionTimeout,[\s\S]*removeGlobalFloatingPanelListeners,[\s\S]*startTopActionConfirmWindow,[\s\S]*\} = useNodeFloatingPanels\(\{/);
-  assert.match(floatingPanelsComposableSource, /export type NodeTopAction = "advanced" \| "delete" \| "preset";/);
+  assert.match(floatingPanelsComposableSource, /export type NodeTopAction = "advanced" \| "delete" \| "preset" \| "edit-subgraph";/);
   assert.match(floatingPanelsComposableSource, /const activeTopAction = ref<NodeTopAction \| null>\(null\);/);
   assert.match(floatingPanelsComposableSource, /const topActionTimeoutRef = ref<unknown \| null>\(null\);/);
   assert.match(floatingPanelsComposableSource, /function clearTopActionConfirmState\(\)/);
-  assert.match(floatingPanelsComposableSource, /function startTopActionConfirmWindow\(action: "delete" \| "preset"\)/);
+  assert.match(floatingPanelsComposableSource, /function startTopActionConfirmWindow\(action: "delete" \| "preset" \| "edit-subgraph"\)/);
   assert.match(componentSource, /if \(activeTopAction\.value === "delete"\) \{[\s\S]*confirmDeleteNode\(\);[\s\S]*return;/);
   assert.match(componentSource, /if \(activeTopAction\.value === "preset"\) \{[\s\S]*confirmSavePreset\(\);[\s\S]*return;/);
+  assert.match(componentSource, /if \(activeTopAction\.value === "edit-subgraph"\) \{[\s\S]*confirmOpenSubgraphEditor\(\);[\s\S]*return;/);
   assert.match(topActionsSource, /@click\.stop="emit\('delete-action'\)"/);
   assert.match(topActionsSource, /@click\.stop="emit\('preset-action'\)"/);
+  assert.match(topActionsSource, /@click\.stop="emit\('edit-subgraph-action'\)"/);
+  assert.match(topActionsSource, /v-if="bodyKind === 'subgraph'"/);
+  assert.match(topActionsSource, /:visible="activeTopAction === 'edit-subgraph'"/);
+  assert.match(topActionsSource, /t\("nodeCard\.editSubgraphQuestion"\)/);
   assert.match(topActionsSource, /:visible="activeTopAction === 'preset'"/);
   assert.match(topActionsSource, /placement="top"/);
   assert.match(topActionsSource, /:popper-style="confirmPopoverStyle"/);
@@ -684,6 +703,11 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.doesNotMatch(componentSource, /<details class="node-card__advanced-panel"/);
 });
 
+test("NodeCard keeps top actions visible while the canvas hover-linger state remains active", () => {
+  assert.match(componentSource, /const isTopActionVisible = computed\(\(\) => props\.humanReviewPending \|\| props\.selected \|\| Boolean\(props\.hovered\) \|\| activeTopAction\.value !== null\);/);
+  assert.match(componentSource, /:is-top-action-visible="isTopActionVisible"/);
+});
+
 test("NodeCard uses a calmer display hierarchy on the canvas", () => {
   assert.match(componentSource, /'node-card--input': view\.body\.kind === 'input'/);
   assert.match(componentSource, /'node-card--agent': view\.body\.kind === 'agent'/);
@@ -716,7 +740,7 @@ test("NodeCard shows a persistent human review capsule in the top action dock", 
   assert.match(topActionsSource, /@click\.stop="emit\('human-review'\)"/);
   assert.match(componentSource, /function handleHumanReviewActionClick\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(topActionsSource, /t\("nodeCard\.humanReview"\)/);
-  assert.match(componentSource, /const isTopActionVisible = computed\(\(\) => props\.humanReviewPending \|\| props\.selected \|\| activeTopAction\.value !== null\);/);
+  assert.match(componentSource, /const isTopActionVisible = computed\(\(\) => props\.humanReviewPending \|\| props\.selected \|\| Boolean\(props\.hovered\) \|\| activeTopAction\.value !== null\);/);
   assert.match(topActionsSource, /\.node-card__human-review-button \{[\s\S]*background:\s*rgba\(217,\s*119,\s*6,\s*0\.12\);/);
 });
 

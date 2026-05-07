@@ -1,6 +1,6 @@
 import { ref } from "vue";
 
-export type NodeTopAction = "advanced" | "delete" | "preset";
+export type NodeTopAction = "advanced" | "delete" | "preset" | "edit-subgraph";
 
 export type NodeFloatingPanelCloseOptions = {
   commitTextEditor?: boolean;
@@ -106,7 +106,7 @@ export function useNodeFloatingPanels(options: UseNodeFloatingPanelsOptions) {
 
   function clearTopActionConfirmState() {
     clearTopActionTimeout();
-    if (activeTopAction.value === "delete" || activeTopAction.value === "preset") {
+    if (activeTopAction.value === "delete" || activeTopAction.value === "preset" || activeTopAction.value === "edit-subgraph") {
       activeTopAction.value = null;
     }
   }
@@ -135,7 +135,7 @@ export function useNodeFloatingPanels(options: UseNodeFloatingPanelsOptions) {
     activeRemovePortStateConfirmAnchorId.value = null;
   }
 
-  function startTopActionConfirmWindow(action: "delete" | "preset") {
+  function startTopActionConfirmWindow(action: "delete" | "preset" | "edit-subgraph") {
     clearTopActionTimeout();
     activeTopAction.value = action;
     topActionTimeoutRef.value = timeoutScheduler.setTimeout(() => {

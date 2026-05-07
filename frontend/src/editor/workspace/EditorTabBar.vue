@@ -641,19 +641,19 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
 }
 
 .editor-tab-bar__tab-shell--subgraph {
-  border-color: rgba(37, 99, 235, 0.28);
-  background: rgba(239, 246, 255, 0.34);
-  color: rgba(37, 73, 121, 0.94);
+  border-color: rgba(13, 148, 136, 0.32);
+  background: rgba(240, 253, 250, 0.38);
+  color: rgba(15, 118, 110, 0.96);
 }
 
 .editor-tab-bar__tab-shell--subgraph.editor-tab-bar__tab-shell--active {
-  border-color: rgba(37, 99, 235, 0.44);
-  color: rgba(30, 64, 175, 0.98);
+  border-color: rgba(13, 148, 136, 0.48);
+  color: rgba(15, 118, 110, 1);
   box-shadow:
-    inset 0 3px 0 rgba(37, 99, 235, 0.58),
+    inset 0 3px 0 rgba(13, 148, 136, 0.58),
     inset 0 1px 0 rgba(255, 255, 255, 0.94),
-    inset 0 -1px 0 rgba(37, 99, 235, 0.06),
-    inset 0 0 0 1px rgba(37, 99, 235, 0.1);
+    inset 0 -1px 0 rgba(13, 148, 136, 0.08),
+    inset 0 0 0 1px rgba(13, 148, 136, 0.12);
 }
 
 .editor-tab-bar__tab-shell--dragging {
@@ -684,11 +684,11 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
 
 .editor-tab-bar__tab-kind {
   flex: 0 0 auto;
-  border: 1px solid rgba(37, 99, 235, 0.24);
+  border: 1px solid rgba(13, 148, 136, 0.24);
   border-radius: 999px;
   padding: 2px 5px;
-  background: rgba(239, 246, 255, 0.72);
-  color: rgba(30, 64, 175, 0.86);
+  background: rgba(240, 253, 250, 0.78);
+  color: rgba(15, 118, 110, 0.9);
   font-size: 0.62rem;
   font-weight: 800;
   line-height: 1;

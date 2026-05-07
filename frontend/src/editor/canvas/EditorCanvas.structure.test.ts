@@ -1132,6 +1132,10 @@ test("EditorCanvas emits a subgraph editor request when a subgraph node is doubl
   assert.match(componentSource, /emit\("open-subgraph-editor", \{ nodeId \}\);/);
 });
 
+test("EditorCanvas forwards subgraph edit requests from the node top action dock", () => {
+  assert.match(componentSource, /@open-subgraph-editor="emit\('open-subgraph-editor', \$event\)"/);
+});
+
 test("EditorCanvas forwards node-card state editing and top-action events", () => {
   assert.match(componentSource, /@update-node-metadata="emit\('update-node-metadata', \$event\)"/);
   assert.doesNotMatch(componentSource, /@rename-state="emit\('rename-state', \$event\)"/);

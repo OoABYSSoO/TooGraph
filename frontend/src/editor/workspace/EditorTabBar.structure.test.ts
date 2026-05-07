@@ -57,7 +57,9 @@ test("EditorTabBar visually marks subgraph tabs without changing them into norma
   assert.match(componentSource, /'editor-tab-bar__tab-shell--subgraph': tab\.kind === 'subgraph'/);
   assert.match(componentSource, /v-if="tab\.kind === 'subgraph'"/);
   assert.match(componentSource, /class="editor-tab-bar__tab-kind"/);
-  assert.match(componentSource, /\.editor-tab-bar__tab-shell--subgraph \{[\s\S]*border-color:\s*rgba\(37,\s*99,\s*235,\s*0\.28\);/);
+  assert.match(componentSource, /\.editor-tab-bar__tab-shell--subgraph \{[\s\S]*border-color:\s*rgba\(13,\s*148,\s*136,\s*0\.32\);/);
+  assert.match(componentSource, /\.editor-tab-bar__tab-shell--subgraph\.editor-tab-bar__tab-shell--active \{[\s\S]*inset 0 3px 0 rgba\(13,\s*148,\s*136,\s*0\.58\)/);
+  assert.match(componentSource, /\.editor-tab-bar__tab-kind \{[\s\S]*border:\s*1px solid rgba\(13,\s*148,\s*136,\s*0\.24\);/);
   assert.match(componentSource, /\.editor-tab-bar__tab-kind \{[\s\S]*font-size:\s*0\.62rem;/);
 });
 

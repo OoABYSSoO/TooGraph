@@ -100,6 +100,28 @@
       </div>
     </ElPopover>
     <ElPopover
+      v-if="bodyKind === 'subgraph'"
+      :visible="activeTopAction === 'edit-subgraph'"
+      placement="top"
+      :show-arrow="false"
+      :popper-style="confirmPopoverStyle"
+      popper-class="node-card__confirm-popover node-card__confirm-popover--edit-subgraph"
+    >
+      <template #reference>
+        <ElButton
+          round
+          data-top-action-surface="true"
+          class="node-card__top-action-button node-card__top-action-button--edit-subgraph"
+          :class="{ 'node-card__top-action-button--confirm node-card__top-action-button--confirm-success': activeTopAction === 'edit-subgraph' }"
+          @click.stop="emit('edit-subgraph-action')"
+        >
+          <ElIcon v-if="activeTopAction === 'edit-subgraph'"><Check /></ElIcon>
+          <ElIcon v-else><EditPen /></ElIcon>
+        </ElButton>
+      </template>
+      <div class="node-card__confirm-hint node-card__confirm-hint--edit-subgraph">{{ t("nodeCard.editSubgraphQuestion") }}</div>
+    </ElPopover>
+    <ElPopover
       v-if="canSavePreset"
       :visible="activeTopAction === 'preset'"
       placement="top"
@@ -148,7 +170,7 @@
 <script setup lang="ts">
 import type { CSSProperties } from "vue";
 import { ElButton, ElIcon, ElInput, ElOption, ElPopover, ElSelect } from "element-plus";
-import { Check, CollectionTag, Delete, Operation } from "@element-plus/icons-vue";
+import { Check, CollectionTag, Delete, EditPen, Operation } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 import type { NodeTopAction } from "./useNodeFloatingPanels";
@@ -188,6 +210,7 @@ const emit = defineEmits<{
   (event: "toggle-advanced"): void;
   (event: "preset-action"): void;
   (event: "delete-action"): void;
+  (event: "edit-subgraph-action"): void;
   (event: "human-review"): void;
   (event: "update:agent-temperature", value: string | number): void;
   (event: "update:agent-breakpoint-timing", value: string | number | boolean | undefined): void;
@@ -299,6 +322,11 @@ const { t } = useI18n();
 
 .node-card__top-action-button--delete:hover {
   color: rgb(185, 28, 28);
+}
+
+.node-card__top-action-button--edit-subgraph:hover {
+  border-color: rgba(13, 148, 136, 0.28);
+  color: #0f766e;
 }
 
 .node-card__top-action-button--confirm {

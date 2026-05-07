@@ -271,6 +271,7 @@
           @create-port-state="emit('create-port-state', $event)"
           @delete-node="emit('delete-node', $event)"
           @save-node-preset="emit('save-node-preset', $event)"
+          @open-subgraph-editor="emit('open-subgraph-editor', $event)"
           @open-human-review="emit('open-human-review', $event)"
           @locked-edit-attempt="emit('locked-edit-attempt')"
           @refresh-agent-models="emit('refresh-agent-models')"
