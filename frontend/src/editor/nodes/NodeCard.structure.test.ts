@@ -692,6 +692,11 @@ test("NodeCard uses a calmer display hierarchy on the canvas", () => {
   assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-kind-rgb:\s*154,\s*52,\s*18;/);
   assert.match(componentSource, /\.node-card \{[\s\S]*border:\s*1px solid rgba\(var\(--node-card-kind-rgb\),\s*0\.2\);/);
   assert.match(componentSource, /\.node-card::before \{[\s\S]*background:\s*rgba\(var\(--node-card-kind-rgb\),\s*0\.72\);/);
+  const nodeCardAccentBlock = componentSource.match(/\.node-card::before \{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(nodeCardAccentBlock, /top:\s*24px;/);
+  assert.match(nodeCardAccentBlock, /width:\s*7px;/);
+  assert.match(nodeCardAccentBlock, /height:\s*104px;/);
+  assert.doesNotMatch(nodeCardAccentBlock, /bottom:/);
   assert.match(componentSource, /\.node-card--input \{[\s\S]*--node-card-kind-rgb:\s*8,\s*145,\s*178;/);
   assert.match(componentSource, /\.node-card--agent \{[\s\S]*--node-card-kind-rgb:\s*37,\s*99,\s*235;/);
   assert.match(componentSource, /\.node-card--condition \{[\s\S]*--node-card-kind-rgb:\s*217,\s*119,\s*6;/);

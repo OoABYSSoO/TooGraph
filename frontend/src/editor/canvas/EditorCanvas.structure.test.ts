@@ -215,6 +215,19 @@ test("EditorCanvas stacks zoom controls above the minimap at the bottom right", 
   assert.match(minimapSource, /\.editor-minimap__surface \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*1;/);
 });
 
+test("EditorMinimap mirrors main node type colors in the bottom-right thumbnail", () => {
+  assert.match(minimapSource, /'editor-minimap__node--input': node\.kind === 'input'/);
+  assert.match(minimapSource, /'editor-minimap__node--agent': node\.kind === 'agent'/);
+  assert.match(minimapSource, /'editor-minimap__node--condition': node\.kind === 'condition'/);
+  assert.match(minimapSource, /'editor-minimap__node--output': node\.kind === 'output'/);
+  assert.match(minimapSource, /'editor-minimap__node--subgraph': node\.kind === 'subgraph'/);
+  assert.match(minimapSource, /\.editor-minimap__node--input \{[\s\S]*fill:\s*rgba\(8,\s*145,\s*178,\s*0\.42\);/);
+  assert.match(minimapSource, /\.editor-minimap__node--agent \{[\s\S]*fill:\s*rgba\(37,\s*99,\s*235,\s*0\.42\);/);
+  assert.match(minimapSource, /\.editor-minimap__node--condition \{[\s\S]*fill:\s*rgba\(217,\s*119,\s*6,\s*0\.46\);/);
+  assert.match(minimapSource, /\.editor-minimap__node--output \{[\s\S]*fill:\s*rgba\(79,\s*70,\s*229,\s*0\.42\);/);
+  assert.match(minimapSource, /\.editor-minimap__node--subgraph \{[\s\S]*fill:\s*rgba\(13,\s*148,\s*136,\s*0\.44\);/);
+});
+
 test("EditorCanvas delegates external node focus viewport projection to a model", () => {
   const focusNodeViewportModelSource = readFocusNodeViewportModelSource();
 

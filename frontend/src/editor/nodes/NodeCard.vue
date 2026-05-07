@@ -1810,9 +1810,9 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   content: "";
   position: absolute;
   left: 14px;
-  top: 18px;
-  bottom: 18px;
-  width: 4px;
+  top: 24px;
+  width: 7px;
+  height: 104px;
   border-radius: 999px;
   background: rgba(var(--node-card-kind-rgb), 0.72);
   opacity: 0.78;
