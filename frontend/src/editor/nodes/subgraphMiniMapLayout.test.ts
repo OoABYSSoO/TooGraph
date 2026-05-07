@@ -60,7 +60,39 @@ test("buildSubgraphMiniMapLayout routes sequence edges as curves from right outp
 
   const layout = buildSubgraphMiniMapLayout(nodes, edges, requiredWidthForColumns(4));
 
-  assert.equal(layout.edges[0]?.path ?? "", "M 162 43 C 183 43 183 43 204 43");
-  assert.equal(layout.edges[1]?.path ?? "", "M 340 43 C 436 91 122 43 26 43");
-  assert.equal(layout.edges[2]?.path ?? "", "M 518 43 C 614 43 122 123 26 123");
+  assert.equal(layout.edges[0]?.path ?? "", "M 162 43 L 176 43 C 183 43 183 43 190 43 L 204 43");
+  assert.equal(
+    layout.edges[1]?.path ?? "",
+    [
+      "M 340 43",
+      "L 354 43",
+      "L 358 43",
+      "Q 362 43 362 39",
+      "L 362 14",
+      "Q 362 6 354 6",
+      "L 12 6",
+      "Q 4 6 4 14",
+      "L 4 39",
+      "Q 4 43 8 43",
+      "L 12 43",
+      "L 26 43",
+    ].join(" "),
+  );
+  assert.equal(
+    layout.edges[2]?.path ?? "",
+    [
+      "M 518 43",
+      "L 532 43",
+      "L 536 43",
+      "Q 540 43 540 39",
+      "L 540 14",
+      "Q 540 6 532 6",
+      "L 12 6",
+      "Q 4 6 4 14",
+      "L 4 119",
+      "Q 4 123 8 123",
+      "L 12 123",
+      "L 26 123",
+    ].join(" "),
+  );
 });

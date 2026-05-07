@@ -1,4 +1,5 @@
 import type { SubgraphThumbnailEdgeViewModel, SubgraphThumbnailNodeViewModel } from "./nodeCardViewModel";
+import { buildSequenceFlowPath, type SequenceFlowPathConfig } from "../canvas/flowEdgePath.ts";
 
 export type SubgraphMiniMapLayoutConfig = {
   maxColumnCount: number;
@@ -42,6 +43,20 @@ export const SUBGRAPH_MINI_MAP_LAYOUT_DEFAULTS: SubgraphMiniMapLayoutConfig = {
   paddingY: 24,
   minCanvasWidth: 320,
   minCanvasHeight: 172,
+};
+
+const SUBGRAPH_MINI_MAP_SEQUENCE_FLOW_PATH_CONFIG: SequenceFlowPathConfig = {
+  terminalOverlap: 14,
+  terminalStagger: 7,
+  laneSpacing: 12,
+  downstreamTightMinControl: 10,
+  downstreamControlMin: 18,
+  downstreamControlMax: 60,
+  downstreamControlRatio: 0.32,
+  upstreamHorizontalClearance: 22,
+  upstreamTopClearance: 58,
+  upstreamNodeTopGutter: 18,
+  upstreamCornerRadius: 8,
 };
 
 export function resolveSubgraphMiniMapColumnCount(
@@ -103,7 +118,7 @@ export function buildSubgraphMiniMapLayout(
       return [
         {
           ...edge,
-          path: buildCurvedEdgePath(source, target),
+          path: buildMiniMapSequenceEdgePath(source, target),
         },
       ];
     }),
@@ -114,24 +129,22 @@ function requiredWidthForColumns(columnCount: number, config: SubgraphMiniMapLay
   return config.paddingX * 2 + columnCount * config.nodeWidth + Math.max(0, columnCount - 1) * config.columnGap;
 }
 
-function buildCurvedEdgePath(source: SubgraphMiniMapPlacedNode, target: SubgraphMiniMapPlacedNode) {
+function buildMiniMapSequenceEdgePath(source: SubgraphMiniMapPlacedNode, target: SubgraphMiniMapPlacedNode) {
   const sourcePoint = edgePoint(source, "end");
   const targetPoint = edgePoint(target, "start");
-  const horizontalDistance = targetPoint.x - sourcePoint.x;
-  const controlOffset = Math.round(Math.max(18, Math.min(96, Math.abs(horizontalDistance) / 2)));
-  const targetControlDirection = horizontalDistance >= 0 ? -1 : 1;
-  const sameRowBacktrack = source.row === target.row && horizontalDistance < 0;
-  const rowBow = sameRowBacktrack ? Math.round(Math.max(28, Math.min(48, source.height + 10))) : 0;
-  const firstControl = {
-    x: sourcePoint.x + controlOffset,
-    y: sourcePoint.y + rowBow,
-  };
-  const secondControl = {
-    x: targetPoint.x + targetControlDirection * controlOffset,
-    y: targetPoint.y,
-  };
-
-  return `M ${sourcePoint.x} ${sourcePoint.y} C ${firstControl.x} ${firstControl.y} ${secondControl.x} ${secondControl.y} ${targetPoint.x} ${targetPoint.y}`;
+  return buildSequenceFlowPath(
+    {
+      sourceX: sourcePoint.x,
+      sourceY: sourcePoint.y,
+      targetX: targetPoint.x,
+      targetY: targetPoint.y,
+      sourceNodeX: source.x,
+      sourceNodeY: source.y,
+      targetNodeX: target.x,
+      targetNodeY: target.y,
+    },
+    SUBGRAPH_MINI_MAP_SEQUENCE_FLOW_PATH_CONFIG,
+  );
 }
 
 function edgePoint(node: SubgraphMiniMapPlacedNode, side: "start" | "end") {
