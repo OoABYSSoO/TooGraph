@@ -8,11 +8,6 @@
       }"
     >
       <svg class="subgraph-mini-map__edges" :viewBox="`0 0 ${layout.canvasWidth} ${layout.canvasHeight}`" aria-hidden="true">
-        <defs>
-          <marker id="subgraph-mini-map-arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
-            <path d="M 0 0 L 10 5 L 0 10 z" />
-          </marker>
-        </defs>
         <path
           v-for="edge in layout.edges"
           :key="`${edge.source}-${edge.target}`"
@@ -22,7 +17,6 @@
             { 'subgraph-mini-map__edge--active': edge.active },
           ]"
           :d="edge.path"
-          marker-end="url(#subgraph-mini-map-arrow)"
         />
       </svg>
       <span
@@ -143,26 +137,35 @@ function formatStatus(status: SubgraphThumbnailStatus) {
 .subgraph-mini-map__edge {
   fill: none;
   stroke: rgba(87, 83, 78, 0.5);
-  stroke-width: 2.2;
+  stroke-width: 3.2;
+  stroke-dasharray: 12 12;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.subgraph-mini-map__edges marker path {
-  fill: rgba(87, 83, 78, 0.68);
+  animation: subgraph-mini-map-flow-line 1.6s linear infinite;
+  opacity: 0.9;
 }
 
 .subgraph-mini-map__edge--active {
-  stroke: rgba(37, 99, 235, 0.74);
-  stroke-width: 2.6;
+  stroke: rgba(16, 185, 129, 0.82);
+  stroke-width: 3.8;
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.28));
+}
+
+.subgraph-mini-map__edge--queued,
+.subgraph-mini-map__edge--running {
+  stroke: rgba(16, 185, 129, 0.74);
+}
+
+.subgraph-mini-map__edge--paused {
+  stroke: rgba(245, 158, 11, 0.72);
 }
 
 .subgraph-mini-map__edge--success {
-  stroke: rgba(20, 120, 78, 0.64);
+  stroke: rgba(180, 83, 9, 0.58);
 }
 
 .subgraph-mini-map__edge--failed {
-  stroke: rgba(220, 38, 38, 0.78);
+  stroke: rgba(239, 68, 68, 0.8);
 }
 
 .subgraph-mini-map__node {
@@ -171,7 +174,7 @@ function formatStatus(status: SubgraphThumbnailStatus) {
   grid-template-columns: 5px 8px minmax(0, 1fr);
   align-items: center;
   gap: 9px;
-  border: 1px solid rgba(120, 113, 108, 0.22);
+  border: 1.5px solid rgba(120, 113, 108, 0.24);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);
   color: #292524;
@@ -248,40 +251,46 @@ function formatStatus(status: SubgraphThumbnailStatus) {
 }
 
 .subgraph-mini-map__node--queued,
-.subgraph-mini-map__node--running,
-.subgraph-mini-map__node--paused {
-  border-color: rgba(37, 99, 235, 0.62);
+.subgraph-mini-map__node--running {
+  border-color: rgba(16, 185, 129, 0.58);
   box-shadow:
-    0 0 0 3px rgba(37, 99, 235, 0.1),
-    0 10px 22px rgba(37, 99, 235, 0.14);
+    0 0 0 3px rgba(16, 185, 129, 0.12),
+    0 10px 22px rgba(16, 185, 129, 0.16);
+}
+
+.subgraph-mini-map__node--paused {
+  border-color: rgba(245, 158, 11, 0.58);
+  box-shadow:
+    0 0 0 3px rgba(245, 158, 11, 0.12),
+    0 10px 22px rgba(245, 158, 11, 0.16);
 }
 
 .subgraph-mini-map__node--success {
-  border-color: rgba(20, 120, 78, 0.44);
+  border-color: rgba(180, 83, 9, 0.42);
 }
 
 .subgraph-mini-map__node--failed {
-  border-color: rgba(220, 38, 38, 0.68);
+  border-color: rgba(239, 68, 68, 0.68);
   box-shadow:
-    0 0 0 3px rgba(220, 38, 38, 0.1),
+    0 0 0 3px rgba(239, 68, 68, 0.1),
     0 10px 22px rgba(127, 29, 29, 0.14);
 }
 
 .subgraph-mini-map__node--queued .subgraph-mini-map__node-status,
 .subgraph-mini-map__node--running .subgraph-mini-map__node-status {
-  background: #2563eb;
+  background: #10b981;
 }
 
 .subgraph-mini-map__node--paused .subgraph-mini-map__node-status {
-  background: #d97706;
+  background: #f59e0b;
 }
 
 .subgraph-mini-map__node--success .subgraph-mini-map__node-status {
-  background: #16a34a;
+  background: #b45309;
 }
 
 .subgraph-mini-map__node--failed .subgraph-mini-map__node-status {
-  background: #dc2626;
+  background: #ef4444;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -297,6 +306,16 @@ function formatStatus(status: SubgraphThumbnailStatus) {
   }
   50% {
     transform: translateY(-1px);
+  }
+}
+
+@keyframes subgraph-mini-map-flow-line {
+  from {
+    stroke-dashoffset: 0;
+  }
+
+  to {
+    stroke-dashoffset: -24;
   }
 }
 </style>

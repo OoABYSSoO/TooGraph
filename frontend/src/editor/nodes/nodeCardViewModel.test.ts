@@ -993,10 +993,10 @@ test("buildNodeCardViewModel projects subgraph runtime status onto thumbnail nod
   );
   assert.deepEqual(model.body.runtimeSummary, {
     tone: "running",
-    completedCount: 2,
+    completedCount: 1,
     activeCount: 1,
     failedCount: 0,
-    totalCount: 3,
+    totalCount: 2,
     currentNodeLabel: "Summarize Evidence",
   });
 });

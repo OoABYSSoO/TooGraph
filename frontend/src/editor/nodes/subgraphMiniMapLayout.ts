@@ -115,15 +115,20 @@ function requiredWidthForColumns(columnCount: number, config: SubgraphMiniMapLay
 }
 
 function buildOrthogonalEdgePath(source: SubgraphMiniMapPlacedNode, target: SubgraphMiniMapPlacedNode) {
-  const sourcePoint = edgePoint(source, source.x <= target.x ? "end" : "start");
-  const targetPoint = edgePoint(target, source.x <= target.x ? "start" : "end");
-  if (source.row === target.row) {
+  const sourcePoint = edgePoint(source, "end");
+  const targetPoint = edgePoint(target, "start");
+  if (source.row === target.row && sourcePoint.x <= targetPoint.x) {
     return `M ${sourcePoint.x} ${sourcePoint.y} H ${targetPoint.x}`;
   }
-  if (source.column === target.column) {
-    return `M ${sourcePoint.x} ${sourcePoint.y} V ${targetPoint.y}`;
+  if (source.row === target.row) {
+    const detourX = sourcePoint.x + Math.round(source.width * 0.13);
+    const detourY = sourcePoint.y + Math.round(source.height * 0.72);
+    return `M ${sourcePoint.x} ${sourcePoint.y} H ${detourX} V ${detourY} H ${targetPoint.x} V ${targetPoint.y}`;
   }
-  const midX = Math.round((sourcePoint.x + targetPoint.x) / 2);
+  const midX =
+    sourcePoint.x <= targetPoint.x
+      ? Math.round((sourcePoint.x + targetPoint.x) / 2)
+      : sourcePoint.x + Math.round(source.width * 0.13);
   return `M ${sourcePoint.x} ${sourcePoint.y} H ${midX} V ${targetPoint.y} H ${targetPoint.x}`;
 }
 

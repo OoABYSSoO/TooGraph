@@ -107,7 +107,17 @@ test("SubgraphNodeBody renders a status-aware DAG mini map with node names", () 
   assert.match(subgraphNodeBodySource, /import SubgraphMiniMap from "\.\/SubgraphMiniMap\.vue";/);
   assert.match(subgraphNodeBodySource, /<SubgraphMiniMap[\s\S]*:nodes="body\.thumbnailNodes"[\s\S]*:edges="body\.thumbnailEdges"/);
   assert.match(subgraphNodeBodySource, /summary\.currentNodeLabel/);
+  assert.match(subgraphNodeBodySource, /v-if="body\.runtimeSummary"/);
+  assert.doesNotMatch(subgraphNodeBodySource, /body\.inputCount[\s\S]*in/);
+  assert.doesNotMatch(subgraphNodeBodySource, /body\.outputCount[\s\S]*out/);
   assert.doesNotMatch(subgraphNodeBodySource, /v-for="item in body\.thumbnailNodes"[\s\S]*class="subgraph-node-body__mini-node"/);
+});
+
+test("SubgraphNodeBody shows subgraph skill capability pills in the same blue skill tone", () => {
+  assert.match(subgraphNodeBodySource, /class="subgraph-node-body__capabilities"/);
+  assert.match(subgraphNodeBodySource, /\.subgraph-node-body__capabilities span \{[\s\S]*border-color:\s*rgba\(37,\s*99,\s*235,\s*0\.22\);/);
+  assert.match(subgraphNodeBodySource, /\.subgraph-node-body__capabilities span \{[\s\S]*background:\s*rgba\(239,\s*246,\s*255,\s*0\.92\);/);
+  assert.match(subgraphNodeBodySource, /\.subgraph-node-body__capabilities span \{[\s\S]*color:\s*#1d4ed8;/);
 });
 
 test("SubgraphNodeBody places state port rails before the DAG mini map", () => {
@@ -135,12 +145,26 @@ test("SubgraphMiniMap keeps SVG edges and nodes in the same fixed canvas coordin
   assert.match(miniMapSource, /\.subgraph-mini-map__edges \{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;/);
 });
 
-test("SubgraphMiniMap uses wider readable nodes and clearer edge styling", () => {
+test("SubgraphMiniMap uses thicker always-animated sequence lines without arrowheads", () => {
   const miniMapSource = readFileSync(resolve(currentDirectory, "SubgraphMiniMap.vue"), "utf8").replace(/\r\n/g, "\n");
 
-  assert.match(miniMapSource, /stroke-width:\s*2\.2;/);
+  assert.doesNotMatch(miniMapSource, /<marker\b/);
+  assert.doesNotMatch(miniMapSource, /marker-end=/);
+  assert.match(miniMapSource, /stroke-width:\s*3\.2;/);
+  assert.match(miniMapSource, /stroke-dasharray:\s*12 12;/);
+  assert.match(miniMapSource, /animation:\s*subgraph-mini-map-flow-line 1\.6s linear infinite;/);
   assert.match(miniMapSource, /stroke-linejoin:\s*round;/);
-  assert.match(miniMapSource, /markerWidth="10"/);
+  assert.match(miniMapSource, /@keyframes subgraph-mini-map-flow-line/);
+  assert.match(miniMapSource, /to \{[\s\S]*stroke-dashoffset:\s*-24;/);
+});
+
+test("SubgraphMiniMap mirrors main canvas run highlight colors", () => {
+  const miniMapSource = readFileSync(resolve(currentDirectory, "SubgraphMiniMap.vue"), "utf8").replace(/\r\n/g, "\n");
+
+  assert.match(miniMapSource, /\.subgraph-mini-map__node--queued,[\s\S]*\.subgraph-mini-map__node--running[\s\S]*border-color:\s*rgba\(16,\s*185,\s*129,\s*0\.58\);/);
+  assert.match(miniMapSource, /\.subgraph-mini-map__node--paused \{[\s\S]*border-color:\s*rgba\(245,\s*158,\s*11,\s*0\.58\);/);
+  assert.match(miniMapSource, /\.subgraph-mini-map__node--success \{[\s\S]*border-color:\s*rgba\(180,\s*83,\s*9,\s*0\.42\);/);
+  assert.match(miniMapSource, /\.subgraph-mini-map__node--failed \{[\s\S]*border-color:\s*rgba\(239,\s*68,\s*68,\s*0\.68\);/);
 });
 
 test("NodeCard keeps state pill geometry but hides the pill chrome visually", () => {

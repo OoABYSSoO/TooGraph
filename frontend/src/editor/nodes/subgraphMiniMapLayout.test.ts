@@ -50,7 +50,7 @@ test("buildSubgraphMiniMapLayout lays nodes out row-major from the measured widt
   );
 });
 
-test("buildSubgraphMiniMapLayout routes edges from the same responsive node frames", () => {
+test("buildSubgraphMiniMapLayout routes sequence edges from right output to left input frames", () => {
   const nodes = ["one", "two", "three", "four", "five"].map(makeNode);
   const edges: SubgraphThumbnailEdgeViewModel[] = [
     { source: "one", target: "two", active: false, status: "idle" },
@@ -59,6 +59,6 @@ test("buildSubgraphMiniMapLayout routes edges from the same responsive node fram
 
   const layout = buildSubgraphMiniMapLayout(nodes, edges, requiredWidthForColumns(4));
 
-  assert.match(layout.edges[0]?.path ?? "", /^M \d+ \d+ H \d+$/);
-  assert.match(layout.edges[1]?.path ?? "", /^M \d+ \d+ H \d+ V \d+ H \d+$/);
+  assert.equal(layout.edges[0]?.path ?? "", "M 162 43 H 204");
+  assert.equal(layout.edges[1]?.path ?? "", "M 518 43 H 536 V 123 H 26");
 });

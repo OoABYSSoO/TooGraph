@@ -80,11 +80,8 @@
       </div>
 
       <div class="subgraph-node-body__thumbnail" aria-label="Subgraph preview">
-        <div class="subgraph-node-body__summary">
-          <span>{{ body.inputCount }} in</span>
-          <span>{{ body.outputCount }} out</span>
+        <div v-if="body.runtimeSummary" class="subgraph-node-body__summary">
           <span
-            v-if="body.runtimeSummary"
             class="subgraph-node-body__runtime"
             :class="`subgraph-node-body__runtime--${body.runtimeSummary.tone}`"
           >
@@ -217,8 +214,7 @@ const emit = defineEmits<{
   justify-content: center;
 }
 
-.subgraph-node-body__summary span,
-.subgraph-node-body__capabilities span {
+.subgraph-node-body__summary span {
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.78);
@@ -229,14 +225,26 @@ const emit = defineEmits<{
   padding: 6px 8px;
 }
 
-.subgraph-node-body__runtime--running {
-  border-color: rgba(37, 99, 235, 0.18);
+.subgraph-node-body__capabilities span {
+  border: 1px solid;
+  border-color: rgba(37, 99, 235, 0.22);
+  border-radius: 999px;
+  background: rgba(239, 246, 255, 0.92);
   color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 6px 8px;
+}
+
+.subgraph-node-body__runtime--running {
+  border-color: rgba(16, 185, 129, 0.22);
+  color: #047857;
 }
 
 .subgraph-node-body__runtime--success {
-  border-color: rgba(22, 163, 74, 0.18);
-  color: #15803d;
+  border-color: rgba(180, 83, 9, 0.2);
+  color: #92400e;
 }
 
 .subgraph-node-body__runtime--failed {
