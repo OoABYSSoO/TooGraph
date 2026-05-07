@@ -93,6 +93,12 @@ class TemplateLayoutTests(unittest.TestCase):
             {binding["state"]: binding["mode"] for binding in nodes["review_evidence"]["writes"]},
             {"evidence_review": "replace", "current_query": "replace"},
         )
+        self.assertIn("原文地址", nodes["select_evidence"]["config"]["taskInstruction"])
+        self.assertIn("网页 URL", nodes["select_evidence"]["config"]["taskInstruction"])
+        self.assertNotIn("文件名标识", nodes["select_evidence"]["config"]["taskInstruction"])
+        self.assertIn("网页 URL", nodes["final_answer"]["config"]["taskInstruction"])
+        self.assertIn("不要引用 doc_001.md", nodes["final_answer"]["config"]["taskInstruction"])
+        self.assertNotIn("依据只标文件名", nodes["final_answer"]["config"]["taskInstruction"])
 
     def test_advanced_web_research_loop_is_runtime_compatible(self) -> None:
         template = _official_template_records()[0]

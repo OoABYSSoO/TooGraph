@@ -63,7 +63,7 @@
     },
     "artifact_paths": {
       "name": "联网搜索 Artifact Paths",
-      "description": "成功下载到本地的网页正文文件路径列表。",
+      "description": "成功下载到本地的网页正文文件路径列表；每个文件头部包含 Source URL 原文地址。",
       "type": "file",
       "value": [],
       "color": "#10b981",
@@ -287,7 +287,7 @@
         "skills": [],
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "从已下载原文中筛选最重要的 3 到 5 个依据文档。key_evidence_notes 写成 Markdown：每个依据用文件名标识，说明它支持了什么事实、为什么重要、还有什么局限。只做依据整理，不写面向用户的最终回答。",
+        "taskInstruction": "从已下载原文中筛选最重要的 3 到 5 个依据文档。每份原文头部都有 Source URL 原文地址；key_evidence_notes 写成 Markdown 时，每个依据必须用网页 URL/原文地址标识，说明它支持了什么事实、为什么重要、还有什么局限。不要把 doc_001.md 这类本地文件名当作证据来源。只做依据整理，不写面向用户的最终回答。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -314,7 +314,7 @@
         "skills": [],
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "根据关键依据笔记和本地原文生成最终回复。先直接回答用户问题，再列出最重要依据，依据只标文件名和关键信息，不要编造原文中不存在的事实。若资料不足，明确说明缺口和已尝试的搜索。",
+        "taskInstruction": "根据关键依据笔记和本地原文生成最终回复。先直接回答用户问题，再列出最重要依据；依据来源必须写网页 URL/原文地址和关键信息，不要引用 doc_001.md 这类本地文件名，不要编造原文中不存在的事实。若资料不足，明确说明缺口和已尝试的搜索。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -398,7 +398,7 @@
   ],
   "metadata": {
     "category": "research",
-    "templateVersion": "2026-05-06",
+    "templateVersion": "2026-05-07",
     "maxSearchRounds": 5,
     "graphProtocol": "node_system"
   }

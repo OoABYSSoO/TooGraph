@@ -161,6 +161,7 @@ def _normalize_results(raw_results: object, *, max_results: int) -> list[dict[st
     if not isinstance(raw_results, list):
         return []
     normalized: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
     for item in raw_results[:max_results]:
         if not isinstance(item, dict):
             continue
@@ -168,6 +169,10 @@ def _normalize_results(raw_results: object, *, max_results: int) -> list[dict[st
         url = _compact_text(item.get("url"))
         if not title or not url:
             continue
+        url_key = _source_url_key(url)
+        if url_key in seen_urls:
+            continue
+        seen_urls.add(url_key)
         normalized_item: dict[str, Any] = {
             "title": title,
             "url": url,
@@ -254,7 +259,14 @@ def _fetch_and_store_source_document(
         document_title = extracted_title or title
         file_name = f"doc_{file_index:03d}.md"
         document_path = output_dir / file_name
-        document_path.write_text(_render_source_document_markdown(content=page_text), encoding="utf-8")
+        document_path.write_text(
+            _render_source_document_markdown(
+                title=document_title,
+                source_url=url,
+                content=page_text,
+            ),
+            encoding="utf-8",
+        )
         return {
             **document,
             "title": document_title,
@@ -425,8 +437,17 @@ def _extract_readable_page_text(html: str, *, content_type: str, fallback_title:
     return title, _compact_multiline_text(body.get_text("\n", strip=True))
 
 
-def _render_source_document_markdown(*, content: str) -> str:
-    return f"{content.rstrip()}\n"
+def _render_source_document_markdown(*, title: str, source_url: str, content: str) -> str:
+    document_title = _compact_text(title) or "Source Document"
+    source_url = _compact_text(source_url)
+    sections = [f"# {document_title}"]
+    if source_url:
+        sections.append(f"Source URL: {source_url}")
+    body = _compact_multiline_text(content)
+    if body:
+        sections.extend(["---", body])
+    markdown = "\n\n".join(sections).rstrip()
+    return f"{markdown}\n"
 
 
 def _final_response(
@@ -519,6 +540,19 @@ def _truncate_text(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     return f"{text[:max_chars].rstrip()}\n\n[Content truncated by web_search skill at {max_chars} characters.]"
+
+
+def _source_url_key(url: str) -> str:
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        return _compact_text(url)
+    normalized_path = parsed.path.rstrip("/") or "/"
+    return parsed._replace(
+        scheme=parsed.scheme.lower(),
+        netloc=parsed.netloc.lower(),
+        path=normalized_path,
+        fragment="",
+    ).geturl()
 
 
 def _resolve_duckduckgo_url(href: str) -> str:

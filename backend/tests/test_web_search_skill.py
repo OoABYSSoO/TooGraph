@@ -199,9 +199,9 @@ class WebSearchSkillTests(unittest.TestCase):
                 self.assertEqual(result["errors"], [])
                 self.assertTrue(document_path.is_file())
                 document_text = document_path.read_text(encoding="utf-8")
+                self.assertIn("# Full Article Title", document_text)
+                self.assertIn(f"Source URL: {article_url}", document_text)
                 self.assertIn("Detailed evidence paragraph", document_text)
-                self.assertNotIn("Source URL:", document_text)
-                self.assertNotIn("Fetched at:", document_text)
         finally:
             server.shutdown()
             server.server_close()
@@ -261,6 +261,45 @@ class WebSearchSkillTests(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+    def test_web_search_skill_deduplicates_candidate_urls_before_fetching_documents(self) -> None:
+        web_search = _load_web_search_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            artifact_dir = Path(temp_dir) / "run_1" / "searcher" / "web_search" / "invocation_001"
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "GRAPHITE_SKILL_ARTIFACT_DIR": str(artifact_dir),
+                        "GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
+                    },
+                    clear=True,
+                ),
+                patch.object(web_search, "_search_with_duckduckgo") as duckduckgo_search,
+                patch.object(web_search, "_load_source_page_text") as load_page_text,
+            ):
+                duckduckgo_search.return_value = {
+                    "results": [
+                        {
+                            "title": "Duplicate Article",
+                            "url": "https://example.org/duplicate",
+                            "content": "First duplicate snippet.",
+                        },
+                        {
+                            "title": "Duplicate Article Mirror",
+                            "url": "https://example.org/duplicate",
+                            "content": "Second duplicate snippet.",
+                        },
+                    ]
+                }
+                load_page_text.return_value = ("Duplicate Article", "Readable duplicate article body.")
+
+                result = web_search.web_search_skill(query="dedupe candidates")
+
+            self.assertEqual(load_page_text.call_count, 1)
+            self.assertEqual(result["source_urls"], ["https://example.org/duplicate"])
+            self.assertEqual(result["artifact_paths"], ["run_1/searcher/web_search/invocation_001/doc_001.md"])
+            self.assertEqual(result["errors"], [])
 
     def test_web_search_skill_keeps_trying_candidates_until_target_documents_are_saved(self) -> None:
         web_search = _load_web_search_module()
