@@ -1,5 +1,7 @@
+from contextlib import asynccontextmanager
 import os
 from pathlib import Path
+from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +23,17 @@ from app.core.storage.database import initialize_storage
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 FRONTEND_DIST_DIR = Path(os.environ.get("GRAPHITEUI_FRONTEND_DIST", ROOT_DIR / "frontend" / "dist"))
+
+
+def startup() -> None:
+    initialize_storage()
+    mark_interrupted_active_runs()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    startup()
+    yield
 
 
 def _frontend_file_path(dist_dir: Path, full_path: str) -> Path | None:
@@ -62,6 +75,7 @@ app = FastAPI(
     title="GraphiteUI Backend",
     version="0.1.0",
     description="Backend scaffold for GraphiteUI.",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -83,12 +97,6 @@ app.include_router(settings_router)
 app.include_router(skill_artifacts_router)
 app.include_router(skills_router)
 app.include_router(templates_router)
-
-
-@app.on_event("startup")
-def startup() -> None:
-    initialize_storage()
-    mark_interrupted_active_runs()
 
 
 @app.api_route("/health", methods=["GET", "HEAD"])

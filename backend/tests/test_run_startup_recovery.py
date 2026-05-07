@@ -7,11 +7,14 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.main import startup
+from app.main import app, startup
 from app.core.runtime.run_recovery import mark_interrupted_active_runs
 
 
 class RunStartupRecoveryTests(unittest.TestCase):
+    def test_app_uses_lifespan_instead_of_deprecated_startup_event_handler(self) -> None:
+        self.assertEqual(app.router.on_startup, [])
+
     def test_startup_marks_interrupted_active_runs_after_storage_initialization(self) -> None:
         calls: list[str] = []
 
