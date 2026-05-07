@@ -9,7 +9,6 @@
           :placeholder="skillPlaceholder"
           :disabled="skillSelectDisabled"
           filterable
-          fit-input-width
           popper-class="graphite-select-popper node-card__agent-skill-popper"
           :aria-label="t('nodeCard.selectSkill')"
           @update:model-value="emit('update:selected-skill', String($event ?? ''))"
@@ -26,20 +25,7 @@
             :key="definition.skillKey"
             :label="definition.name"
             :value="definition.skillKey"
-          >
-            <div class="node-card__skill-option">
-              <div class="node-card__skill-option-title">{{ definition.name }}</div>
-              <div class="node-card__skill-option-copy">{{ definition.description }}</div>
-              <div class="node-card__skill-option-meta">
-                <span>{{ definition.kind }}</span>
-                <span>{{ definition.mode }}</span>
-                <span>{{ definition.scope }}</span>
-                <span>{{ definition.runtime.type }}:{{ definition.runtime.entrypoint || definition.skillKey }}</span>
-                <span v-if="definition.inputSchema.length > 0">{{ t("nodeCard.inputCount", { count: definition.inputSchema.length }) }}</span>
-                <span v-if="definition.outputSchema.length > 0">{{ t("nodeCard.outputCount", { count: definition.outputSchema.length }) }}</span>
-              </div>
-            </div>
-          </ElOption>
+          />
         </ElSelect>
       </div>
       <ElPopover
@@ -205,37 +191,6 @@ const skillPlaceholder = computed(() => {
 .node-card__agent-skill-select :deep(.is-disabled .el-select__wrapper) {
   opacity: 0.62;
   background: rgba(239, 246, 255, 0.58);
-}
-
-.node-card__skill-option {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-}
-
-.node-card__skill-option-title {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: #1e3a8a;
-}
-
-.node-card__skill-option-copy {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.76rem;
-  line-height: 1.4;
-  color: rgba(30, 58, 138, 0.72);
-}
-
-.node-card__skill-option-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  font-size: 0.66rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #2563eb;
 }
 
 .node-card__agent-toggle-card {
