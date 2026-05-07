@@ -1090,13 +1090,4 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .companion-pet__anchor,
-  .companion-pet__avatar,
-  .companion-pet__icon-button,
-  .companion-pet__send {
-    animation: none;
-    transition: none;
-  }
-}
 </style>

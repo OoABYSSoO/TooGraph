@@ -112,7 +112,8 @@ test("CompanionMascot blinks occasionally while idle", () => {
   assert.match(componentSource, /92%\s*\{[\s\S]*scaleY\(0\.08\)/);
 });
 
-test("CompanionMascot respects reduced motion preferences", () => {
-  assert.match(componentSource, /@media \(prefers-reduced-motion: reduce\)/);
-  assert.match(componentSource, /animation:\s*none/);
+test("CompanionMascot keeps full animation effects even when reduced motion is enabled", () => {
+  assert.doesNotMatch(componentSource, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.doesNotMatch(componentSource, /animation:\s*none/);
+  assert.doesNotMatch(componentSource, /transition:\s*none/);
 });

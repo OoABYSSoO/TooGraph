@@ -45,6 +45,12 @@ test("CompanionPet tracks dragging and click pulses for mascot animation", () =>
   assert.match(componentSource, /tapNonce\.value \+= 1;/);
 });
 
+test("CompanionPet keeps companion transitions enabled even when reduced motion is enabled", () => {
+  assert.doesNotMatch(componentSource, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.doesNotMatch(componentSource, /animation:\s*none/);
+  assert.doesNotMatch(componentSource, /transition:\s*none/);
+});
+
 test("CompanionPet exposes advisory and approval permission tiers", () => {
   assert.match(componentSource, /<ElSelect[\s\S]*v-model="companionMode"/);
   assert.match(componentSource, /v-for="option in COMPANION_MODE_OPTIONS"/);

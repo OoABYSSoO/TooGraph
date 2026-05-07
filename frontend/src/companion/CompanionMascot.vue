@@ -568,11 +568,4 @@ function clearTapTimeout() {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .companion-mascot,
-  .companion-mascot * {
-    animation: none !important;
-    transition: none !important;
-  }
-}
 </style>
