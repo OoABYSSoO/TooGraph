@@ -247,7 +247,7 @@ class NodeSystemSkillInstructionBlock(BaseModel):
 
 
 class NodeSystemAgentConfig(BaseModel):
-    skills: list[str] = Field(default_factory=list)
+    skill_key: str = Field(default="", alias="skillKey")
     skill_bindings: list[NodeSystemAgentSkillBinding] = Field(default_factory=list, alias="skillBindings")
     skill_instruction_blocks: dict[str, NodeSystemSkillInstructionBlock] = Field(
         default_factory=dict,
@@ -260,6 +260,19 @@ class NodeSystemAgentConfig(BaseModel):
     temperature: float = Field(default=0.2, ge=0, le=2)
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_legacy_skills_array(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "skills" in data:
+            raise ValueError("'skills' is no longer supported for agent config. Use single 'skillKey' instead.")
+        return data
+
+    @field_validator("skill_key")
+    @classmethod
+    def validate_optional_skill_key(cls, value: str) -> str:
+        stripped = value.strip()
+        return _validate_identifier(stripped, label="Skill key") if stripped else ""
 
     @field_validator("thinking_mode", mode="before")
     @classmethod

@@ -32,7 +32,7 @@ function createDocument(): GraphPayload {
         reads: [{ state: "state_1", required: true }],
         writes: [{ state: "state_2", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           modelSource: "override",
           model: "gpt-5-mini",
           thinkingMode: "off",

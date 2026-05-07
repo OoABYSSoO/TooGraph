@@ -33,8 +33,8 @@ const builtins: NodeCreationEntry[] = [
   {
     id: "preset-agent-empty",
     family: "agent",
-    label: "Empty Agent Node",
-    description: "Blank agent node.",
+    label: "Empty LLM Node",
+    description: "Blank one-turn LLM node.",
     mode: "preset",
     origin: "builtin",
     presetId: "preset.agent.empty.v0",
@@ -77,7 +77,7 @@ const presets: PresetDocument[] = [
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -123,7 +123,7 @@ const presets: PresetDocument[] = [
         ],
         writes: [],
         config: {
-          skills: ["web_search"],
+          skillKey: "web_search",
           taskInstruction: "",
           modelSource: "global",
           model: "",

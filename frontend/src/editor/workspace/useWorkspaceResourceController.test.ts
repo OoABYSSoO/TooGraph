@@ -24,7 +24,7 @@ function createPreset(): PresetDocument {
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",

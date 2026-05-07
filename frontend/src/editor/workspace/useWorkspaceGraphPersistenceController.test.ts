@@ -27,7 +27,7 @@ function graphDocument(name: string, graphId: string | null = null): GraphPayloa
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",

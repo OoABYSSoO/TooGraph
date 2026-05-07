@@ -21,7 +21,7 @@ function createDocument(): GraphPayload {
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",

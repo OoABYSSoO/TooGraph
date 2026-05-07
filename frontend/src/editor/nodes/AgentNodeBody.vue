@@ -101,24 +101,20 @@
     :thinking-mode-value="thinkingModeValue"
     :thinking-options="thinkingOptions"
     :thinking-enabled="thinkingEnabled"
-    :breakpoint-enabled="breakpointEnabled"
     :confirm-popover-style="confirmPopoverStyle"
     @model-visible-change="emit('model-visible-change', $event)"
     @update:model-value="emit('update:model-value', $event)"
     @update:thinking-mode="emit('update:thinking-mode', $event)"
-    @update:breakpoint-enabled="emit('update:breakpoint-enabled', $event)"
   />
   <AgentSkillPicker
-    :open="skillPickerOpen"
-    :show-trigger="showSkillPickerTrigger"
+    :selected-skill-key="selectedSkillKey"
     :loading="skillDefinitionsLoading"
     :error="skillDefinitionsError"
     :available-skill-definitions="availableSkillDefinitions"
-    :attached-skill-badges="attachedSkillBadges"
-    :popover-style="agentAddPopoverStyle"
-    @toggle="emit('toggle-skill-picker')"
-    @attach="emit('attach-skill', $event)"
-    @remove="emit('remove-skill', $event)"
+    :breakpoint-enabled="breakpointEnabled"
+    :confirm-popover-style="confirmPopoverStyle"
+    @update:selected-skill="emit('select-skill', $event)"
+    @update:breakpoint-enabled="emit('update:breakpoint-enabled', $event)"
   />
   <div class="node-card__surface node-card__prompt-surface">
     <div v-if="skillInstructionBlocks.length > 0" class="node-card__skill-instruction-capsules">
@@ -175,7 +171,6 @@ import AgentSkillPicker from "./AgentSkillPicker.vue";
 import StatePortList from "./StatePortList.vue";
 import type { AgentThinkingControlMode } from "./agentConfigModel";
 import type { NodeCardViewModel, NodePortViewModel } from "./nodeCardViewModel";
-import type { AttachedSkillBadge } from "./skillPickerModel";
 import type { SkillDefinition } from "@/types/skills";
 import type { StateColorOption, StateFieldDraft, StateFieldType } from "@/editor/workspace/statePanelFields";
 
@@ -230,12 +225,10 @@ const props = defineProps<{
   thinkingOptions: AgentThinkingOption[];
   thinkingEnabled: boolean;
   breakpointEnabled: boolean;
-  skillPickerOpen: boolean;
-  showSkillPickerTrigger: boolean;
+  selectedSkillKey: string;
   skillDefinitionsLoading: boolean;
   skillDefinitionsError: string | null;
   availableSkillDefinitions: SkillDefinition[];
-  attachedSkillBadges: AttachedSkillBadge[];
 }>();
 
 const emit = defineEmits<{
@@ -260,9 +253,7 @@ const emit = defineEmits<{
   (event: "update:model-value", value: string | number | boolean | undefined): void;
   (event: "update:thinking-mode", value: string | number | boolean | undefined): void;
   (event: "update:breakpoint-enabled", value: string | number | boolean): void;
-  (event: "toggle-skill-picker"): void;
-  (event: "attach-skill", skillKey: string): void;
-  (event: "remove-skill", skillKey: string): void;
+  (event: "select-skill", skillKey: string): void;
   (event: "update-skill-instruction", payload: { skillKey: string; content: string }): void;
   (event: "task-input", inputEvent: Event): void;
 }>();

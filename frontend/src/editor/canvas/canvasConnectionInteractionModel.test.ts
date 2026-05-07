@@ -732,7 +732,7 @@ function agentNode(name: string, writes: string[], reads: string[]) {
     reads: reads.map((state) => ({ state })),
     writes: writes.map((state) => ({ state })),
     config: {
-      skills: [],
+      skillKey: "",
       taskInstruction: "",
       modelSource: "global" as const,
       model: "",

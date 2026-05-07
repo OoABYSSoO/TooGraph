@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { GLOBAL_RUNTIME_MODEL_OPTION_VALUE, buildRuntimeModelOptions, resolveRuntimeModelCatalog } from "./runtimeModelCatalog.ts";
 import type { SettingsPayload } from "../types/settings.ts";
 
-test("buildRuntimeModelOptions uses the same configured catalog rules as agent nodes", () => {
+test("buildRuntimeModelOptions uses the same configured catalog rules as LLM nodes", () => {
   const settings: SettingsPayload = {
     model: {
       text_model: "gpt-5.5",

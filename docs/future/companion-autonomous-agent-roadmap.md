@@ -11,8 +11,8 @@
   -> 判断用户意图
   -> 查看当前技能目录
   -> 决定需要哪些技能
-  -> 把选中的技能作为 skill state 传给下游 Agent
-  -> 下游 Agent 根据绑定技能的说明决定如何填写技能输入并运行技能
+  -> 把选中的技能作为 skill state 传给下游 LLM 节点
+  -> 下游 LLM 节点根据绑定技能的说明决定如何填写技能输入并运行技能
   -> 将技能输出透传到绑定 state
   -> 评估结果是否需要继续调用技能
   -> 生成 final_reply
@@ -25,7 +25,10 @@
 
 - 图优先：持久化操作、工具调用、记忆更新、技能生成和图编辑都应通过 graph/template/skill 表达。
 - 协议唯一：`node_system` 是唯一正式图协议，`state_schema` 是节点输入输出的唯一数据来源。
-- 技能统一：不存在“桌宠专用技能”和“Agent 节点专用技能”两套能力库。
+- 图才是 Agent：单个节点不应承担多轮自主体语义；LLM 节点只做一次模型运行、一次结构化输出或一次能力调用准备。
+- LLM 单能力：一个 LLM 节点最多使用一个能力来源。多个技能或子图调用必须拆成多个节点与边，由图负责编排。
+- 单值技能配置：手动选择的 LLM 节点技能只能存为 `config.skillKey` 单个字符串；`config.skills` 数组是旧协议残留，不应继续使用。
+- 技能统一：不存在“桌宠专用技能”和“LLM 节点专用技能”两套能力库。
 - 能力显式：联网、文件读写、媒体下载、图编辑、记忆写入、模型调用和技能生成都必须体现为 skill、模板、命令或运行时原语。
 - 权限显式：安装 skill 不等于授权任意使用。高风险副作用必须有清晰审批路径。
 - 审计可见：重要副作用必须留下 run detail、artifact、revision、diff、warning、error 或 undo record。
@@ -38,18 +41,18 @@
 - 技能系统去掉旧 `targets` / `executionTargets` 分流。
 - skill manifest 顶层和 `inputSchema` / `outputSchema` 字段从 `label` 收束为 `name`。
 - `description` 承载选择条件，`agentInstruction` 承载绑定后的使用说明。
-- `state_schema` 增加 `skill` 类型、`promptVisible` 和技能绑定元数据。
-- Agent 节点会合并卡片 skills 与 `skill` state 传入的 skills。
-- Agent 节点提示词区域支持技能说明胶囊，胶囊可编辑、可随技能移除。
+- `state_schema` 增加 `skill` 类型和技能绑定元数据；`promptVisible` 是待移除的历史字段，未来上下文边界由节点 `reads` 决定。
+- LLM 节点卡片已改为单选 Skill 控件；动态 `subgraph` state 只服务于模板内运行时能力选择，不作为普通卡片下拉项。
+- LLM 节点提示词区域支持技能说明胶囊，胶囊可编辑、可随技能移除。
 - 旧内置模板已删除，旧模板运行入口兼容修补已删除。
 - 旧技能包已删除，当前官方 Skill 包包括 `web_search`、`local_workspace_executor` 和 `graphiteUI_skill_builder`。
 - `file` / `image` / `audio` / `video` state 已采用路径透传语义，值可以是本地路径字符串或路径数组；`file_list`、`array`、`object` 不再作为 state 类型存在。
-- Agent 节点会读取 `file` state 中的文本类文件，并只把文件名与原文全文放入模型上下文；图片、音频和视频路径走多模态附件处理。
+- LLM 节点会读取 `file` state 中的文本类文件，并只把文件名与原文全文放入模型上下文；图片、音频和视频路径走多模态附件处理。
 - `web_search` 不再输出 `context`，只输出 `query`、`source_urls`、`artifact_paths` 和 `errors`。
 - `web_search` 对搜索源请求默认最多尝试 5 次，避免一次瞬时 TLS 或连接中断直接导致空结果。
 - `skillBindings` 已收束为技能身份和 `outputMapping`，不再包含 `inputMapping`、静态参数 `config` 或无意义的 `trigger`。
-- Agent 节点卡片添加带 `outputSchema` 的 skill 时，会自动创建 managed skill output state、写入节点输出端口，并同步 `skillBindings.outputMapping`。
-- 技能输入由 Agent 节点的 LLM 在运行时根据当前输入 state、技能说明和 `inputSchema` 生成；必填技能输入缺失时由运行时记录可恢复错误。
+- LLM 节点卡片选择带 `outputSchema` 的 skill 时，会自动创建 managed skill output state、写入节点输出端口，并同步 `skillBindings.outputMapping`。
+- 技能输入由 LLM 节点在运行前根据当前输入 state、技能说明和 `inputSchema` 生成；必填技能输入缺失时由运行时记录可恢复错误。
 - 图运行前不再兼容补齐旧绑定。旧草稿、旧模板和旧技能需要按当前协议重建。
 - 已新增通用 `advanced_web_research_loop` 内置模板，用于验证“搜索技能执行 -> 证据评估 -> condition 控制补搜 -> 依据筛选 -> final_reply”的图式工具循环。它不是桌宠自主循环模板，但可作为联网研究子流程和后续桌宠模板的参考构件。
 - 已新增通用 `create_user_skill` 内置模板，用于通过用户确认、示例确认、设计确认、写入、测试和有限修复循环创建用户自定义 Skill。
@@ -60,6 +63,8 @@
 - 子图运行审计聚合、事件定位、从缩略图点击跳转到内部节点，以及更完整的嵌套可视化能力。
 - 真实的 `autonomous_decision` 技能。
 - 新版桌宠自主循环模板。
+- 将内部 `agent` kind 迁移为面向用户和协议一致的 LLM 节点语义，并移除 `promptVisible`。
+- 增加 `subgraph` state 类型和运行时动态子图执行能力。
 - 用户 Skill 创建和管理的 UI 完善，例如文件预览、revision 对比、回滚入口和测试运行入口。
 - 当前仍残留 `backend/app/companion/commands.py` 中的 `graph_patch.draft` 草案记录 stub。它是历史遗留入口，只能记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、graph revision、undo 或完整审计闭环；下一轮应删除它，或按新的图优先命令流重建。
 - 审批恢复 UI、图补丁预览、GraphCommandBus、graph revision、undo 和完整审计闭环。
@@ -75,7 +80,7 @@
 ```text
 input_question
   -> plan_search 写 research_plan 和 current_query
-  -> run_web_search 绑定 web_search，并由 Agent LLM 生成 query 运行技能
+  -> run_web_search 绑定 web_search，并由 LLM 节点生成 query 运行技能
   -> review_evidence 阅读 artifact_paths 原文，写 evidence_review，并在需要补搜时写下一轮 current_query
   -> should_continue_search
       true: run_web_search
@@ -88,9 +93,9 @@ input_question
 
 设计约束：
 
-- `web_search` 的输入由搜索 Agent 运行时决定，不由决策节点或静态 mapping 提前生成。
+- `web_search` 的输入由搜索 LLM 节点运行时决定，不由决策节点或静态 mapping 提前生成。
 - `query`、`source_urls`、`artifact_paths`、`errors` 通过 `skillBindings.outputMapping` 写入 managed binding state。
-- `artifact_paths` 是 `file` state；下游 Agent 看到的是本地文档文件名和原文全文。
+- `artifact_paths` 是 `file` state；下游 LLM 节点看到的是本地文档文件名和原文全文。
 - 补搜回边必须是 condition 的原生分支，便于 `loopLimit` 生效。
 - `exhausted` 分支表示达到循环上限后用已有证据收束，而不是失败。
 - 证据评估节点不应为了追求完美资料无限补搜。已有约 5 份可读原文并足以回答时，应进入整理阶段，并在最终回复中说明资料局限。
@@ -161,7 +166,7 @@ input_question
 
 只有一种真实执行底座：graph run。
 
-桌宠运行时不是第二套 `companion_run`，Agent 节点运行时也不是另一套 `graph_run`。桌宠只是用 `origin=companion` 这类运行来源元数据启动图模板。运行来源用于策略判断、审计和 UI 展示，不用于创造第二套执行协议。
+桌宠运行时不是第二套 `companion_run`，LLM 节点运行时也不是另一套 `graph_run`。桌宠只是用 `origin=companion` 这类运行来源元数据启动图模板。运行来源用于策略判断、审计和 UI 展示，不用于创造第二套执行协议。
 
 当前代码里仍有待迁移的旧标记：前端桌宠构图代码会写入 `companion_run`、`companion_permission_tier`、`companion_graph_patch_drafts_enabled` 等元数据。这些字段只代表历史遗留状态，不是目标协议；新一轮实现应迁移到统一的运行来源元数据，例如 `origin=companion`，并避免继续扩展第二套桌宠运行协议。
 
@@ -170,7 +175,7 @@ input_question
 - 不需要 `executionTargets`。
 - 不需要 skill `targets`。
 - 不需要 Companion Skill / Agent Skill 两套能力库。
-- 模板显式绑定某个 skill，或上游 state 传入某个 skill，都表示下游 Agent 可以使用这个 skill。
+- 模板显式绑定某个 skill，或上游 state 传入某个 skill，都表示下游 LLM 节点需要使用这个 skill。
 
 ## Skill Manifest 契约
 
@@ -226,7 +231,7 @@ input_question
 
 ## Skill State 契约
 
-`skill` 是 `state_schema` 的一等类型，用于在图中显式传递“允许当前 Agent 使用的技能描述符”。
+`skill` 是 `state_schema` 的一等类型，用于在图中显式传递“当前 LLM 节点需要使用的技能描述符”。
 
 最小形式：
 
@@ -240,30 +245,35 @@ input_question
 ]
 ```
 
-有效技能集合按并集计算：
+有效能力来源按单一来源计算：
 
 ```text
-effective_skills = agent.config.skills ∪ state_schema[type=skill] 输入中的 skillKey
+effective_capability =
+  selected_skill
+  OR input_state[type=skill]
+  OR input_state[type=subgraph]
+  OR none
 ```
 
 规则：
 
-- 卡片添加的 skill 与 state 传入的 skill 一视同仁。
-- 合并时按 `skillKey` 去重。
-- `skill` state 只表达“可使用的技能”，不等于安装、启用或授权。
+- LLM 节点卡片只能手动选择一个 skill。
+- `skill` state 只表达“选中的一个技能”，不等于安装、启用或授权。
+- `subgraph` state 只表达“选中的一个可运行子图能力”，主要服务桌宠主循环等动态模板。
+- 一个 LLM 节点不能同时使用卡片 skill、输入 skill state 和输入 subgraph state；冲突时应作为协议错误处理。
 - 真正执行前仍必须通过 skill registry、运行时注册状态、健康状态、`runPolicies` 和审批检查。
-- 不引入 union/intersection 配置；默认就是并集，避免过度设计。
+- 多个能力调用必须拆成多个节点，由图结构显式编排。
 
 ## 绑定技能的语义
 
-如果某个 Agent 节点已经被添加了 skill，或从 state 收到了 skill，那么语义不是“要不要用这个技能”，而是“本节点需要使用这个技能，如何使用由本节点决定”。
+如果某个 LLM 节点已经选择了 skill，或从 state 收到了 skill/subgraph，那么语义不是“要不要用这个能力”，而是“本节点需要使用这个能力，如何生成调用输入由本节点决定”。
 
 职责划分：
 
-- 决策节点只决定应使用哪些技能。
-- 执行节点读取绑定技能的 `agentInstruction`，决定具体输入并运行技能。
-- 技能输出通过绑定 state 透传给下游节点。
-- 分析节点读取技能输出，负责整理、比较、总结或生成最终回复。
+- 决策节点只决定应使用哪个技能或子图。
+- 执行 LLM 节点读取绑定能力的 schema 和说明，决定具体输入并触发一次运行。
+- 技能或子图输出通过绑定 state 透传给下游节点。
+- 分析 LLM 节点读取能力输出，负责整理、比较、总结或生成最终回复。
 
 以“总结鸣潮最新版本内容”为例：
 
@@ -271,26 +281,26 @@ effective_skills = agent.config.skills ∪ state_schema[type=skill] 输入中的
 intent_agent
   -> 判断这是最新版本信息需求
   -> decision_agent 选择 web_search
-  -> allowed_skills: [{ skillKey: "web_search" }]
-  -> search_agent 绑定 allowed_skills，决定 query="鸣潮 最新版本 更新内容" 并运行 web_search
+  -> selected_skill: { skillKey: "web_search" }
+  -> search_llm 绑定 selected_skill，决定 query="鸣潮 最新版本 更新内容" 并运行 web_search
   -> source_urls / artifact_paths / errors
-  -> summary_agent 读取 artifact_paths 对应原文文件，总结版本内容
+  -> summary_llm 读取 artifact_paths 对应原文文件，总结版本内容
   -> final_reply
 ```
 
-关键点：`decision_agent` 不生成 `query`；`search_agent` 才生成技能输入。
+关键点：`decision_agent` 不生成 `query`；`search_llm` 才生成技能输入。
 
 ## 技能说明胶囊
 
-Agent 节点提示词区域中，绑定的技能以胶囊展示。
+LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 规则：
 
-- 添加 skill 时，根据 `agentInstruction` 自动生成技能说明胶囊。
+- 选择 skill 时，根据 `agentInstruction` 自动生成技能说明胶囊。
 - 点击胶囊可以查看和编辑本节点的技能说明。
 - 编辑只影响当前节点，不反向修改 skill 包。
 - 移除 skill 时自动移除胶囊。
-- 胶囊内容最终会追加到该 Agent 节点的模型提示词中。
+- 胶囊内容最终会追加到该 LLM 节点的模型提示词中。
 
 这比手写隐藏标记块更适合当前产品，因为用户能看到、编辑、移除，并能理解提示词里为什么多出这段技能说明。
 
@@ -301,15 +311,15 @@ Agent 节点提示词区域中，绑定的技能以胶囊展示。
 绑定 state 的目标：
 
 - 技能输出进入图状态，供下游节点读取。
-- 节点卡片添加技能时，系统根据 `outputSchema` 自动创建 managed binding state。
-- 自动创建的 state 会被加入当前 Agent 的输出端口，并写入 `skillBindings.outputMapping`。
-- `skillBindings` 不表达技能输入。技能输入属于 Agent 节点运行时的 LLM 决策结果，而不是图协议中的静态连线。
-- 大体量或不适合进 prompt 的内容可以设置 `promptVisible=false`。
+- 节点卡片选择技能时，系统根据 `outputSchema` 自动创建 managed binding state。
+- 自动创建的 state 会被加入当前 LLM 节点的输出端口，并写入 `skillBindings.outputMapping`。
+- `skillBindings` 不表达技能输入。技能输入属于 LLM 节点运行时的决策结果，而不是图协议中的静态连线。
+- 不再用 `promptVisible` 控制上下文可见性。LLM 节点是否看到某个 state，由该节点是否 `reads` 这个 state 决定。
 - Output 节点可以展示本地 artifact、网址、错误和摘要。
 - 用户仍能像普通 state 一样查看和编辑这些 state。
-- 如果输出是下游 Agent 需要阅读的正文材料，应绑定为 `file`；它的值可以是单个本地路径，也可以是本地路径数组。
-- `file` 进入 Agent prompt 时只包含文件名和原文全文；本地路径、来源网址、抓取时间、provider 和运行元数据不进入模型上下文。
-- `image` / `audio` / `video` 也使用本地路径或路径数组，但进入 Agent 时应作为多模态附件处理，不作为文本文件读取。
+- 如果输出是下游 LLM 节点需要阅读的正文材料，应绑定为 `file`；它的值可以是单个本地路径，也可以是本地路径数组。
+- `file` 进入 LLM prompt 时只包含文件名和原文全文；本地路径、来源网址、抓取时间、provider 和运行元数据不进入模型上下文。
+- `image` / `audio` / `video` 也使用本地路径或路径数组，但进入 LLM 节点时应作为多模态附件处理，不作为文本文件读取。
 
 示例：
 
@@ -317,7 +327,6 @@ Agent 节点提示词区域中，绑定的技能以胶囊展示。
 {
   "name": "web_search_source_urls",
   "type": "json",
-  "promptVisible": false,
   "binding": {
     "kind": "skill_output",
     "skillKey": "web_search",
@@ -333,7 +342,6 @@ Agent 节点提示词区域中，绑定的技能以胶囊展示。
   {
     "name": "web_search_query",
     "type": "text",
-    "promptVisible": false,
     "binding": {
       "kind": "skill_output",
       "skillKey": "web_search",
@@ -343,7 +351,6 @@ Agent 节点提示词区域中，绑定的技能以胶囊展示。
   {
     "name": "web_search_source_urls",
     "type": "json",
-    "promptVisible": false,
     "binding": {
       "kind": "skill_output",
       "skillKey": "web_search",
@@ -353,7 +360,6 @@ Agent 节点提示词区域中，绑定的技能以胶囊展示。
   {
     "name": "web_search_artifact_paths",
     "type": "file",
-    "promptVisible": true,
     "binding": {
       "kind": "skill_output",
       "skillKey": "web_search",
@@ -363,7 +369,6 @@ Agent 节点提示词区域中，绑定的技能以胶囊展示。
   {
     "name": "web_search_errors",
     "type": "json",
-    "promptVisible": false,
     "binding": {
       "kind": "skill_output",
       "skillKey": "web_search",

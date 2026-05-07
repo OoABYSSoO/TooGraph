@@ -190,7 +190,7 @@ test("EditorWorkspaceShell wires node top-action events into state updates, node
   assert.match(presetControllerSource, /input\.showPresetSaveToast\("success", message\);/);
   assert.doesNotMatch(componentSource, /async function saveNodePresetForTab\(tabId: string, nodeId: string\)/);
   assert.doesNotMatch(componentSource, /buildPresetPayloadForNode\(document, nodeId\)/);
-  assert.doesNotMatch(componentSource, /Only agent nodes can be saved as presets\./);
+  assert.doesNotMatch(componentSource, /Only LLM nodes can be saved as presets\./);
   assert.match(presetControllerSource, /input\.showPresetSaveToast\("error", message\);/);
 });
 

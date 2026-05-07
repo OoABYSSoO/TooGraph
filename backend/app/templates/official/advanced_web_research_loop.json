@@ -151,7 +151,7 @@
         { "state": "current_query", "mode": "replace" }
       ],
       "config": {
-        "skills": [],
+        "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
         "taskInstruction": "你负责把用户问题转成可执行的联网研究计划。research_plan 写成简洁 Markdown，包含研究目标、需要覆盖的关键问题、证据充足标准和最多补充搜索轮次。current_query 只能写一条适合公开网页检索的首轮搜索词，不要写解释。",
@@ -182,7 +182,7 @@
         { "state": "search_errors", "mode": "append" }
       ],
       "config": {
-        "skills": ["web_search"],
+        "skillKey": "web_search",
         "skillBindings": [
           {
             "skillKey": "web_search",
@@ -231,7 +231,7 @@
         { "state": "current_query", "mode": "replace" }
       ],
       "config": {
-        "skills": [],
+        "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
         "taskInstruction": "阅读 artifact_paths 中的本地原文，判断当前证据是否足以回答用户问题。evidence_review 必须写成 JSON 对象，包含 needs_more_search(boolean)、confidence(0 到 1)、reason、missing_aspects(array)、next_query(string)。只有在资料为空、明显跑偏、少于 3 份可读原文，或缺少的关键角度会直接阻止回答时，才把 needs_more_search 设为 true。若已经有约 5 份可读原文并且能回答用户问题，即使仍可继续寻找一手来源，也应把 needs_more_search 设为 false，并在 reason 中说明证据局限；不要为了追求完美来源而反复补搜。如果 needs_more_search 为 true，给出一条更窄、更具体、避免重复 executed_queries 的 next_query，并把 current_query 写成同一条 next_query；如果已经足够，current_query 保留当前搜索词即可。不要写最终答案。",
@@ -284,7 +284,7 @@
       ],
       "writes": [{ "state": "key_evidence_notes", "mode": "replace" }],
       "config": {
-        "skills": [],
+        "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
         "taskInstruction": "从已下载原文中筛选最重要的 3 到 5 个依据文档。每份原文头部都有 Source URL 原文地址；key_evidence_notes 写成 Markdown 时，每个依据必须用网页 URL/原文地址标识，说明它支持了什么事实、为什么重要、还有什么局限。不要把 doc_001.md 这类本地文件名当作证据来源。只做依据整理，不写面向用户的最终回答。",
@@ -311,7 +311,7 @@
       ],
       "writes": [{ "state": "final_reply", "mode": "replace" }],
       "config": {
-        "skills": [],
+        "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
         "taskInstruction": "根据关键依据笔记和本地原文生成最终回复。先直接回答用户问题，再列出最重要依据；依据来源必须写网页 URL/原文地址和关键信息，不要引用 doc_001.md 这类本地文件名，不要编造原文中不存在的事实。若资料不足，明确说明缺口和已尝试的搜索。",

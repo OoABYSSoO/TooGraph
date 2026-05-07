@@ -713,7 +713,8 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
   }
 
   const skillDefinitionMap = new Map(skillDefinitions.map((definition) => [definition.skillKey, definition]));
-  const attachedSkillKeys = new Set(node.config.skills);
+  const attachedSkillKey = node.config.skillKey.trim();
+  const attachedSkillKeys = new Set(attachedSkillKey ? [attachedSkillKey] : []);
   const currentBindings = normalizeAgentSkillBindings(node.config.skillBindings);
   const currentBindingBySkill = new Map(currentBindings.map((binding) => [binding.skillKey, binding]));
   const removedManagedStateKeys = collectRemovedManagedSkillOutputStateKeys(document, nodeId, currentBindings, attachedSkillKeys);
@@ -724,35 +725,35 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
     node.writes = node.writes.filter((binding) => !removedManagedStateKeys.has(binding.state));
   }
 
-  for (const skillKey of node.config.skills) {
-    const definition = skillDefinitionMap.get(skillKey);
-    const existingBinding = currentBindingBySkill.get(skillKey);
+  if (attachedSkillKey) {
+    const definition = skillDefinitionMap.get(attachedSkillKey);
+    const existingBinding = currentBindingBySkill.get(attachedSkillKey);
     if (!definition?.outputSchema.length) {
       if (existingBinding && Object.keys(existingBinding.outputMapping ?? {}).length > 0) {
         nextSkillBindings.push(existingBinding);
+        processedSkillKeys.add(attachedSkillKey);
       }
-      continue;
-    }
+    } else {
+      const outputMapping = { ...(existingBinding?.outputMapping ?? {}) };
+      for (const field of definition.outputSchema) {
+        const mappedState = outputMapping[field.key];
+        if (mappedState && document.state_schema[mappedState]) {
+          ensureAgentWriteBinding(node, mappedState);
+          continue;
+        }
 
-    const outputMapping = { ...(existingBinding?.outputMapping ?? {}) };
-    for (const field of definition.outputSchema) {
-      const mappedState = outputMapping[field.key];
-      if (mappedState && document.state_schema[mappedState]) {
-        ensureAgentWriteBinding(node, mappedState);
-        continue;
+        const existingStateKey = findExistingSkillOutputState(document, nodeId, attachedSkillKey, field.key);
+        const stateKey = existingStateKey ?? createManagedSkillOutputState(document, nodeId, definition, field);
+        outputMapping[field.key] = stateKey;
+        ensureAgentWriteBinding(node, stateKey);
       }
 
-      const existingStateKey = findExistingSkillOutputState(document, nodeId, skillKey, field.key);
-      const stateKey = existingStateKey ?? createManagedSkillOutputState(document, nodeId, definition, field);
-      outputMapping[field.key] = stateKey;
-      ensureAgentWriteBinding(node, stateKey);
+      nextSkillBindings.push({
+        skillKey: attachedSkillKey,
+        outputMapping,
+      });
+      processedSkillKeys.add(attachedSkillKey);
     }
-
-    nextSkillBindings.push({
-      skillKey,
-      outputMapping,
-    });
-    processedSkillKeys.add(skillKey);
   }
 
   for (const binding of currentBindings) {

@@ -108,7 +108,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "question"}],
                 "writes": [{"state": "answer"}],
-                "config": {"skills": ["custom"]},
+                "config": {"skillKey": "custom"},
             }
         )
         finalized: dict[str, object] = {}
@@ -161,7 +161,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "kb"}, {"state": "question"}],
                 "writes": [{"state": "answer"}],
-                "config": {"skills": ["custom_retrieval"]},
+                "config": {"skillKey": "custom_retrieval"},
             }
         )
 
@@ -204,7 +204,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "allowed_skills"}, {"state": "question"}],
                 "writes": [{"state": "answer"}],
-                "config": {"skills": ["web_search"]},
+                "config": {"skillKey": "web_search"},
             }
         )
         invoked: list[str] = []
@@ -263,7 +263,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "reads": [{"state": "question"}],
                 "writes": [{"state": "answer"}],
                 "config": {
-                    "skills": ["web_search"],
+                    "skillKey": "web_search",
                     "skillBindings": [{"skillKey": "web_search"}],
                 },
             }
@@ -330,7 +330,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "allowed_skills"}, {"state": "query"}],
                 "writes": [{"state": "answer"}],
-                "config": {"skills": []},
+                "config": {"skillKey": ""},
             }
         )
         captured_inputs: list[dict[str, object]] = []
@@ -397,7 +397,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "allowed_skills"}],
                 "writes": [{"state": "answer"}],
-                "config": {"skills": []},
+                "config": {"skillKey": ""},
             }
         )
         invoked: list[str] = []
@@ -459,7 +459,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "reads": [{"state": "source_text"}],
                 "writes": [{"state": "answer"}],
                 "config": {
-                    "skills": ["summarize_text"],
+                    "skillKey": "summarize_text",
                     "skillBindings": [
                         {
                             "skillKey": "summarize_text",
@@ -529,7 +529,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     {"state": "snapshot", "mode": "replace"},
                 ],
                 "config": {
-                    "skills": ["load_context"],
+                    "skillKey": "load_context",
                     "skillBindings": [
                         {
                             "skillKey": "load_context",
@@ -542,7 +542,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         finalized: dict[str, object] = {}
 
         def generate_agent_response_func(*args, **kwargs):
-            raise AssertionError("skill-only agent nodes must not call the language model")
+            raise AssertionError("skill-only LLM nodes must not call the language model")
 
         result = execute_agent_node(
             state_schema,
@@ -586,7 +586,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "reads": [{"state": "query"}],
                 "writes": [{"state": "search_report"}, {"state": "source_documents"}],
                 "config": {
-                    "skills": ["web_search"],
+                    "skillKey": "web_search",
                     "skillBindings": [
                         {
                             "skillKey": "web_search",
@@ -650,7 +650,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     {"state": "source_documents", "mode": "append"},
                 ],
                 "config": {
-                    "skills": ["web_search"],
+                    "skillKey": "web_search",
                     "skillBindings": [
                         {
                             "skillKey": "web_search",
@@ -707,7 +707,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "reads": [{"state": "name"}],
                 "writes": [{"state": "answer"}],
                 "config": {
-                    "skills": ["web_search"],
+                    "skillKey": "web_search",
                     "taskInstruction": "联网搜索，告知今天的日期和北京天气",
                 },
             }
@@ -754,7 +754,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     "reads": [{"state": "question"}],
                     "writes": [{"state": "answer"}],
                     "config": {
-                        "skills": ["web_search"],
+                        "skillKey": "web_search",
                         "skillBindings": [
                             {
                                 "skillKey": "web_search",
@@ -778,7 +778,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "reads": [{"state": "query"}],
                 "writes": [{"state": "answer"}],
                 "config": {
-                    "skills": ["web_search"],
+                    "skillKey": "web_search",
                     "skillBindings": [
                         {
                             "skillKey": "web_search",
@@ -836,7 +836,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "reads": [{"state": "query"}],
                 "writes": [{"state": "answer"}],
                 "config": {
-                    "skills": ["web_search"],
+                    "skillKey": "web_search",
                     "skillBindings": [
                         {
                             "skillKey": "web_search",
@@ -902,7 +902,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "name"}],
                 "writes": [{"state": "answer"}],
-                "config": {"skills": ["web_search"]},
+                "config": {"skillKey": "web_search"},
             }
         )
 

@@ -136,7 +136,7 @@ def _build_agent_user_prompt(node: NodeSystemAgentNode) -> str:
     instruction_blocks = [
         block
         for skill_key, block in node.config.skill_instruction_blocks.items()
-        if skill_key in node.config.skills and block.content.strip()
+        if skill_key == node.config.skill_key and block.content.strip()
     ]
     if instruction_blocks:
         parts.append("\n== Bound Skill Instructions ==")

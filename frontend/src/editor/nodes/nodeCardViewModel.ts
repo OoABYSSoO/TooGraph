@@ -180,7 +180,7 @@ export function buildNodeCardViewModel(
   return {
     nodeId,
     kind: node.kind,
-    kindLabel: node.kind.toUpperCase(),
+    kindLabel: formatNodeKindLabel(node.kind),
     title: node.name,
     description: node.description?.trim() || "No description yet.",
     inputs,
@@ -193,6 +193,10 @@ export function buildNodeCardViewModel(
     runtimeNote: buildRuntimeNote(node, options),
     body: buildBody(node, stateSchema, inputs, outputs, options),
   };
+}
+
+function formatNodeKindLabel(kind: GraphNode["kind"]): string {
+  return kind === "agent" ? "LLM" : kind.toUpperCase();
 }
 
 function buildBody(
@@ -222,7 +226,7 @@ function buildBody(
       skillInstructionBlocks: node.config.skillInstructionBlocks ?? {},
       modelLabel: resolveAgentModelLabel(node),
       thinkingLabel: resolveThinkingLabel(node),
-      skillLabel: node.config.skills.length > 0 ? `${node.config.skills.length} skill${node.config.skills.length > 1 ? "s" : ""}` : "No skills",
+      skillLabel: node.config.skillKey.trim() || "No skill",
       primaryInput: inputs[0] ?? null,
       primaryOutput: outputs[0] ?? null,
     };
@@ -471,10 +475,9 @@ function listSubgraphCapabilities(node: Extract<GraphNode, { kind: "subgraph" }>
   const capabilities = new Set<string>();
   for (const innerNode of Object.values(node.config.graph.nodes)) {
     if (innerNode.kind === "agent") {
-      for (const skillKey of innerNode.config.skills) {
-        if (skillKey.trim()) {
-          capabilities.add(skillKey.trim());
-        }
+      const skillKey = innerNode.config.skillKey.trim();
+      if (skillKey) {
+        capabilities.add(skillKey);
       }
     }
     if (innerNode.kind === "subgraph") {

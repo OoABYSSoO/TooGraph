@@ -33,7 +33,7 @@ def _preset_payload(preset_id: str = "agent_writer") -> dict[str, object]:
                 "reads": [{"state": "question", "required": True}],
                 "writes": [],
                 "config": {
-                    "skills": [],
+                    "skillKey": "",
                     "taskInstruction": "Answer the question.",
                     "modelSource": "global",
                     "model": "",
@@ -118,7 +118,7 @@ class PresetManagementRouteTests(unittest.TestCase):
                 create_response = client.post("/api/presets", json=_input_preset_payload())
 
                 self.assertEqual(create_response.status_code, 400)
-                self.assertEqual(create_response.json()["detail"], "Only agent nodes can be saved as presets.")
+                self.assertEqual(create_response.json()["detail"], "Only LLM nodes can be saved as presets.")
                 self.assertEqual(client.get("/api/presets?include_disabled=true").json(), [])
 
 

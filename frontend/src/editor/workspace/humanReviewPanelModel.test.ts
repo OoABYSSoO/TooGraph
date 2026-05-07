@@ -62,7 +62,7 @@ function createDocument(): GraphPayload {
         reads: [{ state: "question", required: true }],
         writes: [{ state: "draft", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -82,7 +82,7 @@ function createDocument(): GraphPayload {
         ],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -298,7 +298,7 @@ function createBranchingDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [{ state: "question", required: true }],
         writes: [{ state: "draft", mode: "replace" }],
-        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       score_gate: {
         kind: "condition",
@@ -319,7 +319,7 @@ function createBranchingDocument(): GraphPayload {
           { state: "branch_context", mode: "replace" },
           { state: "pass_only_note", mode: "replace" },
         ],
-        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       branch_writer_retry: {
         kind: "agent",
@@ -331,7 +331,7 @@ function createBranchingDocument(): GraphPayload {
           { state: "branch_context", mode: "replace" },
           { state: "retry_only_note", mode: "replace" },
         ],
-        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       revision_writer: {
         kind: "agent",
@@ -346,7 +346,7 @@ function createBranchingDocument(): GraphPayload {
           { state: "retry_only_note", required: true },
         ],
         writes: [],
-        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       followup_writer: {
         kind: "agent",
@@ -355,7 +355,7 @@ function createBranchingDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [{ state: "approval_note", required: true }],
         writes: [],
-        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
     },
     edges: [
@@ -456,7 +456,7 @@ function createInterruptBeforeDocument(): GraphPayload {
           { state: "manual_feedback", required: true },
         ],
         writes: [],
-        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
     },
     edges: [
@@ -498,7 +498,7 @@ function createLoopWithoutWriterDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [{ state: "loop_note", required: true }],
         writes: [],
-        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       loop_body: {
         kind: "agent",
@@ -507,7 +507,7 @@ function createLoopWithoutWriterDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [{ state: "loop_note", required: true }],
         writes: [],
-        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
     },
     edges: [
@@ -560,7 +560,7 @@ function createSharedUsagePriorityDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [],
         writes: [],
-        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       consumer_one: {
         kind: "agent",
@@ -572,7 +572,7 @@ function createSharedUsagePriorityDocument(): GraphPayload {
           { state: "zeta_shared", required: true },
         ],
         writes: [],
-        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       consumer_two: {
         kind: "agent",
@@ -581,7 +581,7 @@ function createSharedUsagePriorityDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [{ state: "zeta_shared", required: true }],
         writes: [],
-        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
     },
     edges: [
@@ -636,7 +636,7 @@ function createOffWindowJoinDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [],
         writes: [],
-        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       side_writer: {
         kind: "agent",
@@ -645,7 +645,7 @@ function createOffWindowJoinDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [],
         writes: [{ state: "auto_note", mode: "replace" }],
-        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       join: {
         kind: "agent",
@@ -654,7 +654,7 @@ function createOffWindowJoinDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [{ state: "auto_note", required: true }],
         writes: [],
-        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
     },
     edges: [

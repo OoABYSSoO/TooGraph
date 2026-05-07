@@ -20,7 +20,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
             {
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
-                "config": {"skills": ["summarize_text"]},
+                "config": {"skillKey": "summarize_text"},
             }
         )
 
@@ -36,7 +36,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "config": {
-                    "skills": ["summarize_text", "rewrite_text"],
+                    "skillKey": "summarize_text",
                     "skillBindings": [
                         {
                             "skillKey": "summarize_text",
@@ -49,9 +49,18 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
 
         bindings = normalize_agent_skill_bindings(node)
 
-        self.assertEqual([binding.skill_key for binding in bindings], ["summarize_text", "rewrite_text"])
+        self.assertEqual([binding.skill_key for binding in bindings], ["summarize_text"])
         self.assertEqual(bindings[0].output_mapping, {"summary": "summary_text"})
-        self.assertEqual(bindings[1].output_mapping, {})
+
+    def test_legacy_skills_array_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            NodeSystemAgentNode.model_validate(
+                {
+                    "kind": "agent",
+                    "ui": {"position": {"x": 0, "y": 0}},
+                    "config": {"skills": ["summarize_text", "rewrite_text"]},
+                }
+            )
 
     def test_skill_state_inputs_union_with_attached_agent_skills_by_name_only(self) -> None:
         node = NodeSystemAgentNode.model_validate(
@@ -59,7 +68,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "allowed_skills"}],
-                "config": {"skills": ["web_search"]},
+                "config": {"skillKey": "web_search"},
             }
         )
         state_schema = {
@@ -86,7 +95,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "allowed_skills"}],
-                "config": {"skills": ["web_search"]},
+                "config": {"skillKey": "web_search"},
             }
         )
         state_schema = {
@@ -115,7 +124,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "allowed_skills"}, {"state": "raw_json"}],
-                "config": {"skills": []},
+                "config": {"skillKey": ""},
             }
         )
         state_schema = {
@@ -140,6 +149,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "config": {
+                    "skillKey": "summarize_text",
                     "skillBindings": [
                         {
                             "skillKey": "summarize_text",

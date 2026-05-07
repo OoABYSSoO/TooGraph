@@ -23,7 +23,7 @@ def _ready_manifest(skill_key: str) -> dict[str, object]:
         "schemaVersion": "graphite.skill/v1",
         "skillKey": skill_key,
         "name": skill_key.replace("_", " ").title(),
-        "agentInstruction": f"Use {skill_key} only when it is explicitly bound to the agent node.",
+        "agentInstruction": f"Use {skill_key} only when it is explicitly bound to the LLM node.",
         "inputSchema": [
             {"key": "text", "name": "Text", "valueType": "text", "required": True}
         ],
@@ -64,7 +64,7 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertEqual(serialized["name"], "Summarize Text")
         self.assertEqual(
             serialized["agentInstruction"],
-            "Use summarize_text only when it is explicitly bound to the agent node.",
+            "Use summarize_text only when it is explicitly bound to the LLM node.",
         )
         self.assertNotIn("label", serialized)
         self.assertNotIn("compatibility", serialized)

@@ -2,10 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  listAttachableSkillDefinitions,
-  resolveAttachAgentSkillPatch,
-  resolveAttachedSkillBadges,
-  resolveRemoveAgentSkillPatch,
+  listSelectableSkillDefinitions,
+  resolveSelectAgentSkillPatch,
 } from "./skillPickerModel.ts";
 import type { SkillDefinition } from "../../types/skills.ts";
 
@@ -43,7 +41,7 @@ const skillDefinitions: SkillDefinition[] = [
     skillKey: "append_usage_introduction",
     name: "Append Usage Introduction",
     description: "Appends usage instructions to the answer.",
-    agentInstruction: "Use append_usage_introduction only when it is explicitly bound to the agent node.",
+    agentInstruction: "Use append_usage_introduction only when it is explicitly bound to the LLM node.",
     schemaVersion: "graphite.skill/v1",
     inputSchema: [],
     outputSchema: [],
@@ -113,71 +111,41 @@ const unavailableSkillDefinitions: SkillDefinition[] = [
   },
 ];
 
-test("listAttachableSkillDefinitions filters already attached skill keys", () => {
+test("listSelectableSkillDefinitions exposes active healthy LLM node skills", () => {
   assert.deepEqual(
-    listAttachableSkillDefinitions(skillDefinitions, ["web_search"]),
-    [skillDefinitions[1]],
-  );
-});
-
-test("listAttachableSkillDefinitions only exposes active healthy agent runtime skills", () => {
-  assert.deepEqual(
-    listAttachableSkillDefinitions(unavailableSkillDefinitions, []).map((definition) => definition.skillKey),
+    listSelectableSkillDefinitions(unavailableSkillDefinitions).map((definition) => definition.skillKey),
     ["web_search", "desktop_companion_profile"],
   );
 });
 
-test("resolveAttachedSkillBadges preserves attached order and falls back to raw keys", () => {
-  assert.deepEqual(
-    resolveAttachedSkillBadges(["append_usage_introduction", "custom_skill"], skillDefinitions),
-    [
-      {
-        skillKey: "append_usage_introduction",
-        name: "Append Usage Introduction",
-        description: "Appends usage instructions to the answer.",
-      },
-      {
-        skillKey: "custom_skill",
-        name: "custom_skill",
-        description: "",
-      },
-    ],
-  );
-});
-
-test("resolveAttachAgentSkillPatch appends new skills and creates instruction blocks", () => {
-  assert.deepEqual(resolveAttachAgentSkillPatch(["web_search"], "append_usage_introduction", skillDefinitions, {}), {
-    skills: ["web_search", "append_usage_introduction"],
+test("resolveSelectAgentSkillPatch replaces the selected skill and creates one instruction block", () => {
+  assert.deepEqual(resolveSelectAgentSkillPatch("web_search", "append_usage_introduction", skillDefinitions, {}), {
+    skillKey: "append_usage_introduction",
     skillInstructionBlocks: {
       append_usage_introduction: {
         skillKey: "append_usage_introduction",
         title: "Append Usage Introduction skill instruction",
-        content: "Use append_usage_introduction only when it is explicitly bound to the agent node.",
+        content: "Use append_usage_introduction only when it is explicitly bound to the LLM node.",
         source: "skill.agentInstruction",
       },
     },
   });
-  assert.equal(resolveAttachAgentSkillPatch(["web_search"], "web_search", skillDefinitions, {}), null);
+  assert.equal(resolveSelectAgentSkillPatch("web_search", "web_search", skillDefinitions, {}), null);
 });
 
-test("resolveRemoveAgentSkillPatch removes existing skills and instruction blocks", () => {
+test("resolveSelectAgentSkillPatch clears the selected skill and stale instruction blocks", () => {
   assert.deepEqual(
-    resolveRemoveAgentSkillPatch(
-      ["web_search", "append_usage_introduction"],
-      "web_search",
-      {
-        web_search: {
-          skillKey: "web_search",
-          title: "Web Search skill instruction",
-          content: "Decide the search query and execute this bound web search skill. Do not summarize the result.",
-          source: "skill.agentInstruction",
-        },
+    resolveSelectAgentSkillPatch("web_search", "", skillDefinitions, {
+      web_search: {
+        skillKey: "web_search",
+        title: "Web Search skill instruction",
+        content: "Decide the search query and execute this bound web search skill. Do not summarize the result.",
+        source: "skill.agentInstruction",
       },
-    ),
+    }),
     {
-      skills: ["append_usage_introduction"],
+      skillKey: "",
       skillInstructionBlocks: {},
     },
   );
-  assert.equal(resolveRemoveAgentSkillPatch(["web_search"], "append_usage_introduction", {}), null);
 });

@@ -123,7 +123,7 @@ function createTemplate(): TemplateRecord {
         ],
         writes: [{ state: "state_4", mode: "replace" }],
         config: {
-          skills: ["graph_editor"],
+          skillKey: "graph_editor",
           skillBindings: [{ skillKey: "graph_editor", enabled: true }],
           taskInstruction: "",
           modelSource: "global",
@@ -224,7 +224,7 @@ function createAgenticTemplate(): TemplateRecord {
         reads: [],
         writes: [{ state: "state_16", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           skillBindings: [],
           taskInstruction: "",
           modelSource: "global",
@@ -419,7 +419,7 @@ test("buildCompanionChatGraph injects the current message, history, and page con
   assert.equal(graph.metadata.companion_permission_tier, 1);
   assert.equal(graph.metadata.companion_can_execute_actions, false);
   assertAgentNode(graph.nodes.companion_reply_agent);
-  assert.deepEqual(graph.nodes.companion_reply_agent.config.skills, []);
+  assert.equal(graph.nodes.companion_reply_agent.config.skillKey, "");
   assert.deepEqual(graph.nodes.companion_reply_agent.config.skillBindings, []);
 });
 

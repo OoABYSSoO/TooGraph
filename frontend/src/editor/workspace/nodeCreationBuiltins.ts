@@ -38,8 +38,8 @@ export function buildBuiltinNodeCreationEntries(): NodeCreationEntry[] {
     {
       id: "preset-agent-empty",
       family: "agent",
-      label: "Empty Agent Node",
-      description: "Blank agent node.",
+      label: "Empty LLM Node",
+      description: "Blank one-turn LLM node.",
       mode: "preset",
       origin: "builtin",
       presetId: "preset.agent.empty.v0",
@@ -65,13 +65,13 @@ const BUILTIN_EMPTY_AGENT_PRESET: PresetDocument = {
   updatedAt: null,
   status: "active",
   definition: {
-    label: "Empty Agent Node",
-    description: "Blank agent node.",
+    label: "Empty LLM Node",
+    description: "Blank one-turn LLM node.",
     state_schema: {},
     node: {
       kind: "agent",
-      name: "Empty Agent Node",
-      description: "Blank agent node.",
+      name: "Empty LLM Node",
+      description: "Blank one-turn LLM node.",
       ui: {
         position: { x: 0, y: 0 },
         collapsed: false,
@@ -79,7 +79,7 @@ const BUILTIN_EMPTY_AGENT_PRESET: PresetDocument = {
       reads: [],
       writes: [],
       config: {
-        skills: [],
+        skillKey: "",
         taskInstruction: "",
         modelSource: "global",
         model: "",

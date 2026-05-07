@@ -46,7 +46,7 @@ export function buildPresetOverview(presets: PresetDocument[]): PresetOverview {
 
 function buildPresetSearchText(preset: PresetDocument): string {
   const node = preset.definition.node;
-  const skills = node.kind === "agent" ? node.config.skills : [];
+  const skillKeys = node.kind === "agent" && node.config.skillKey.trim() ? [node.config.skillKey.trim()] : [];
   const states = [
     ...Object.keys(preset.definition.state_schema),
     ...node.reads.map((binding) => binding.state),
@@ -62,7 +62,7 @@ function buildPresetSearchText(preset: PresetDocument): string {
     node.kind,
     node.name,
     node.description,
-    ...skills,
+    ...skillKeys,
     ...states,
   ]
     .join(" ")

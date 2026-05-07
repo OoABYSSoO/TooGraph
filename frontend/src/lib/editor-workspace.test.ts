@@ -163,7 +163,7 @@ test("persisted editor document drafts preserve agent thinking level exactly", (
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "Say hi",
           modelSource: "global",
           model: "gpt-5.5",
@@ -219,7 +219,7 @@ test("persisted editor document drafts repair legacy web research answer writer 
         reads: [{ state: "state_1", required: true }],
         writes: [{ state: "state_4", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -235,7 +235,7 @@ test("persisted editor document drafts repair legacy web research answer writer 
         reads: [{ state: "state_4", required: true }],
         writes: [{ state: "state_7", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "严格返回 JSON，字段 final_answer 为 Markdown 字符串。",
           modelSource: "global",
           model: "",
@@ -251,7 +251,7 @@ test("persisted editor document drafts repair legacy web research answer writer 
         reads: [{ state: "state_4", required: true }],
         writes: [{ state: "state_6", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "严格返回 JSON，字段 exhausted_answer 为 Markdown 字符串。",
           modelSource: "global",
           model: "",
