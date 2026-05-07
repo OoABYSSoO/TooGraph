@@ -266,7 +266,10 @@ function formatStatus(status: SubgraphThumbnailStatus) {
 }
 
 .subgraph-mini-map__node--success {
-  border-color: rgba(180, 83, 9, 0.42);
+  border-color: rgba(16, 185, 129, 0.62);
+  box-shadow:
+    0 0 0 2px rgba(16, 185, 129, 0.08),
+    0 8px 18px rgba(16, 185, 129, 0.12);
 }
 
 .subgraph-mini-map__node--failed {
@@ -286,25 +289,34 @@ function formatStatus(status: SubgraphThumbnailStatus) {
 }
 
 .subgraph-mini-map__node--success .subgraph-mini-map__node-status {
-  background: #b45309;
+  background: #10b981;
 }
 
 .subgraph-mini-map__node--failed .subgraph-mini-map__node-status {
   background: #ef4444;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .subgraph-mini-map__node--active {
-    animation: subgraph-mini-map-pulse 1.4s ease-in-out infinite;
-  }
+.subgraph-mini-map__node--active {
+  animation: subgraph-mini-map-node-flash 1.25s ease-in-out infinite;
 }
 
-@keyframes subgraph-mini-map-pulse {
+@keyframes subgraph-mini-map-node-flash {
   0%,
   100% {
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow:
+      0 0 0 2px rgba(16, 185, 129, 0.1),
+      0 8px 18px rgba(16, 185, 129, 0.12);
+    filter: saturate(1);
     transform: translateZ(0);
   }
+
   50% {
+    background: rgba(236, 253, 245, 0.98);
+    box-shadow:
+      0 0 0 4px rgba(16, 185, 129, 0.18),
+      0 12px 26px rgba(16, 185, 129, 0.22);
+    filter: saturate(1.08);
     transform: translateY(-1px);
   }
 }

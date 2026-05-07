@@ -418,7 +418,7 @@ test("EditorCanvas styles runtime feedback with one halo layer and a static node
   assert.match(pausedCardBlock, /0 0 0 1\.5px rgba\(245,\s*158,\s*11,\s*0\.52\)/);
   assert.doesNotMatch(pausedCardBlock, /animation:/);
   assert.doesNotMatch(componentSource, /:global\(\.node-card\.editor-canvas__node--paused-current\)/);
-  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--success\) \{[\s\S]*0 0 0 1\.5px rgba\(180,\s*83,\s*9,\s*0\.34\)/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--success\) \{[\s\S]*0 0 0 1\.5px rgba\(16,\s*185,\s*129,\s*0\.5\)/);
   assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--failed\) \{[\s\S]*0 0 0 1\.5px rgba\(239,\s*68,\s*68,\s*0\.56\)/);
   assert.doesNotMatch(componentSource, /:deep\(\.editor-canvas__node--(?:running|paused|success|failed)\)/);
   assert.doesNotMatch(componentSource, /\.editor-canvas__node-halo--success/);

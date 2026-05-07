@@ -33,5 +33,10 @@ test("OutputNodeBody owns output presentation and forwards parent side effects",
   assert.match(componentSource, /\.node-card__preview \{[\s\S]*flex:\s*1 1 auto;[\s\S]*overflow:\s*auto;/);
   assert.match(componentSource, /\.node-card__preview-markdown :deep\(table\) \{[\s\S]*border-collapse:\s*collapse;/);
   assert.match(componentSource, /\.node-card__preview-markdown :deep\(th\),[\s\S]*\.node-card__preview-markdown :deep\(td\) \{[\s\S]*border:\s*1px solid/);
+  assert.match(componentSource, /\.node-card__preview-markdown :deep\(pre\) \{[\s\S]*overflow-x:\s*auto;/);
+  assert.match(componentSource, /\.node-card__preview-markdown :deep\(pre\[data-language\]::before\) \{[\s\S]*content:\s*attr\(data-language\);/);
+  assert.match(componentSource, /\.node-card__preview-markdown :deep\(blockquote\) \{[\s\S]*border-left:\s*3px solid/);
+  assert.match(componentSource, /\.node-card__preview-markdown :deep\(ol\) \{[\s\S]*padding-left:\s*1\.35rem;/);
+  assert.match(componentSource, /\.node-card__preview-markdown :deep\(a\) \{[\s\S]*color:\s*#1d4ed8;/);
   assert.match(componentSource, /\.node-card__output-persist-card \{[\s\S]*grid-template-columns:\s*auto 56px;/);
 });

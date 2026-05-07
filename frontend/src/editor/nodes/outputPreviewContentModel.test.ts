@@ -31,6 +31,56 @@ test("resolveOutputPreviewContent renders markdown tables as safe table markup",
   assert.doesNotMatch(preview.html, /<p>\| 语言 \| 问候 \|<\/p>/);
 });
 
+test("resolveOutputPreviewContent renders fenced code blocks with language labels and escaped code", () => {
+  const preview = resolveOutputPreviewContent(
+    [
+      "Run this:",
+      "",
+      "```ts",
+      "const value = \"<safe>\";",
+      "console.log(value);",
+      "```",
+      "",
+      "Then continue.",
+    ].join("\n"),
+    "markdown",
+  );
+
+  assert.equal(preview.kind, "markdown");
+  assert.match(preview.html, /<pre data-language="ts"><code class="language-ts">const value = &quot;&lt;safe&gt;&quot;;\nconsole\.log\(value\);<\/code><\/pre>/);
+  assert.match(preview.html, /<p>Run this:<\/p>/);
+  assert.match(preview.html, /<p>Then continue\.<\/p>/);
+  assert.doesNotMatch(preview.html, /<p>```ts<\/p>/);
+  assert.doesNotMatch(preview.html, /<safe>/);
+});
+
+test("resolveOutputPreviewContent renders common markdown reader blocks safely", () => {
+  const preview = resolveOutputPreviewContent(
+    [
+      "#### Details",
+      "",
+      "1. Open [GraphiteUI](https://example.com?a=1&b=2)",
+      "2. Keep `inline <code>` intact",
+      "",
+      "> quoted **text**",
+      "> second line",
+      "",
+      "---",
+      "",
+      "[unsafe](javascript:alert(1))",
+    ].join("\n"),
+    "markdown",
+  );
+
+  assert.equal(preview.kind, "markdown");
+  assert.match(preview.html, /<h4>Details<\/h4>/);
+  assert.match(preview.html, /<ol><li>Open <a href="https:\/\/example\.com\?a=1&amp;b=2" target="_blank" rel="noreferrer noopener">GraphiteUI<\/a><\/li><li>Keep <code>inline &lt;code&gt;<\/code> intact<\/li><\/ol>/);
+  assert.match(preview.html, /<blockquote><p>quoted <strong>text<\/strong><br>second line<\/p><\/blockquote>/);
+  assert.match(preview.html, /<hr>/);
+  assert.match(preview.html, /<p>unsafe \(javascript:alert\(1\)\)<\/p>/);
+  assert.doesNotMatch(preview.html, /href="javascript:/);
+});
+
 test("resolveOutputPreviewContent keeps ordinary previews as plain text", () => {
   const preview = resolveOutputPreviewContent("Connected to answer. Run the graph to preview/export it.", "auto");
 
@@ -147,6 +197,9 @@ test("resolveOutputPreviewContent treats active waiting output as an empty previ
 test("resolveOutputPreviewDisplayMode exposes the effective auto-detected format", () => {
   assert.equal(resolveOutputPreviewDisplayMode('{"answer":"GraphiteUI"}', "auto"), "json");
   assert.equal(resolveOutputPreviewDisplayMode("# Final answer", "auto"), "markdown");
+  assert.equal(resolveOutputPreviewDisplayMode("```python\nprint('hi')\n```", "auto"), "markdown");
+  assert.equal(resolveOutputPreviewDisplayMode("> quoted", "auto"), "markdown");
+  assert.equal(resolveOutputPreviewDisplayMode("1. First\n2. Second", "auto"), "markdown");
   assert.equal(resolveOutputPreviewDisplayMode("| A | B |\n| --- | --- |\n| 1 | 2 |", "auto"), "markdown");
   assert.equal(resolveOutputPreviewDisplayMode("# Final answer", "plain"), "plain");
   assert.equal(resolveOutputPreviewDisplayMode("[]", "documents"), "documents");

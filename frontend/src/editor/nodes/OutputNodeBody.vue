@@ -168,13 +168,20 @@ const { t } = useI18n();
 .node-card__preview-markdown {
   display: grid;
   gap: 0.65rem;
+  white-space: normal;
 }
 
 .node-card__preview-markdown :deep(h1),
 .node-card__preview-markdown :deep(h2),
 .node-card__preview-markdown :deep(h3),
+.node-card__preview-markdown :deep(h4),
+.node-card__preview-markdown :deep(h5),
+.node-card__preview-markdown :deep(h6),
 .node-card__preview-markdown :deep(p),
-.node-card__preview-markdown :deep(ul) {
+.node-card__preview-markdown :deep(ul),
+.node-card__preview-markdown :deep(ol),
+.node-card__preview-markdown :deep(blockquote),
+.node-card__preview-markdown :deep(pre) {
   margin: 0;
 }
 
@@ -193,10 +200,47 @@ const { t } = useI18n();
   line-height: 1.35;
 }
 
-.node-card__preview-markdown :deep(ul) {
+.node-card__preview-markdown :deep(h4),
+.node-card__preview-markdown :deep(h5),
+.node-card__preview-markdown :deep(h6) {
+  font-size: 0.94rem;
+  line-height: 1.35;
+}
+
+.node-card__preview-markdown :deep(ul),
+.node-card__preview-markdown :deep(ol) {
   display: grid;
   gap: 0.35rem;
+}
+
+.node-card__preview-markdown :deep(ul) {
   padding-left: 1.1rem;
+}
+
+.node-card__preview-markdown :deep(ol) {
+  padding-left: 1.35rem;
+}
+
+.node-card__preview-markdown :deep(blockquote) {
+  border-left: 3px solid rgba(37, 99, 235, 0.34);
+  border-radius: 10px;
+  padding: 0.35rem 0.85rem;
+  background: rgba(239, 246, 255, 0.62);
+  color: rgba(30, 64, 175, 0.9);
+}
+
+.node-card__preview-markdown :deep(hr) {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid rgba(154, 52, 18, 0.18);
+}
+
+.node-card__preview-markdown :deep(a) {
+  color: #1d4ed8;
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 
 .node-card__preview-markdown :deep(table) {
@@ -229,6 +273,51 @@ const { t } = useI18n();
   padding: 0.08rem 0.28rem;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.88em;
+}
+
+.node-card__preview-markdown :deep(pre) {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 14px;
+  padding: 2.1rem 1rem 1rem;
+  background: #1f2937;
+  color: #f8fafc;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.84rem;
+  line-height: 1.58;
+  white-space: pre;
+}
+
+.node-card__preview-markdown :deep(pre:not([data-language])) {
+  padding-top: 1rem;
+}
+
+.node-card__preview-markdown :deep(pre[data-language]::before) {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.54rem;
+  right: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 0.08rem 0.45rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(248, 250, 252, 0.8);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.node-card__preview-markdown :deep(pre code) {
+  display: block;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  white-space: pre;
 }
 
 .node-card__output-persist-card {

@@ -163,8 +163,17 @@ test("SubgraphMiniMap mirrors main canvas run highlight colors", () => {
 
   assert.match(miniMapSource, /\.subgraph-mini-map__node--queued,[\s\S]*\.subgraph-mini-map__node--running[\s\S]*border-color:\s*rgba\(16,\s*185,\s*129,\s*0\.58\);/);
   assert.match(miniMapSource, /\.subgraph-mini-map__node--paused \{[\s\S]*border-color:\s*rgba\(245,\s*158,\s*11,\s*0\.58\);/);
-  assert.match(miniMapSource, /\.subgraph-mini-map__node--success \{[\s\S]*border-color:\s*rgba\(180,\s*83,\s*9,\s*0\.42\);/);
+  assert.match(miniMapSource, /\.subgraph-mini-map__node--success \{[\s\S]*border-color:\s*rgba\(16,\s*185,\s*129,\s*0\.62\);/);
+  assert.match(miniMapSource, /\.subgraph-mini-map__node--success \.subgraph-mini-map__node-status \{[\s\S]*background:\s*#10b981;/);
   assert.match(miniMapSource, /\.subgraph-mini-map__node--failed \{[\s\S]*border-color:\s*rgba\(239,\s*68,\s*68,\s*0\.68\);/);
+});
+
+test("SubgraphMiniMap keeps active runtime nodes flashing regardless of reduced-motion preference", () => {
+  const miniMapSource = readFileSync(resolve(currentDirectory, "SubgraphMiniMap.vue"), "utf8").replace(/\r\n/g, "\n");
+
+  assert.match(miniMapSource, /\.subgraph-mini-map__node--active \{[\s\S]*animation:\s*subgraph-mini-map-node-flash 1\.25s ease-in-out infinite;/);
+  assert.match(miniMapSource, /@keyframes subgraph-mini-map-node-flash/);
+  assert.doesNotMatch(miniMapSource, /@media \(prefers-reduced-motion:\s*no-preference\) \{[\s\S]*\.subgraph-mini-map__node--active/);
 });
 
 test("NodeCard keeps state pill geometry but hides the pill chrome visually", () => {

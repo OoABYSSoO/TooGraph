@@ -264,25 +264,39 @@ function normalizePreviewNumber(value: unknown) {
 
 function looksLikeMarkdown(text: string) {
   return (
+    /^\s{0,3}```\S*/m.test(text) ||
     /^\s{0,3}#{1,6}\s+\S/m.test(text) ||
     /^\s*[-*]\s+\S/m.test(text) ||
+    /^\s*\d+[.)]\s+\S/m.test(text) ||
+    /^\s*>\s*\S/m.test(text) ||
+    /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/m.test(text) ||
     /\*\*[^*]+\*\*/.test(text) ||
     /`[^`]+`/.test(text) ||
+    /\[[^\]]+\]\([^\s)]+(?:\)[^\s)]*)?\)/.test(text) ||
     hasMarkdownTable(text)
   );
 }
 
 function renderSafeMarkdown(text: string) {
   const html: string[] = [];
-  let listOpen = false;
+  let listKind: "ul" | "ol" | null = null;
   const lines = text.replace(/\r\n/g, "\n").split("\n");
 
-  const closeList = () => {
-    if (!listOpen) {
+  const closeList = (nextKind?: "ul" | "ol") => {
+    if (!listKind || listKind === nextKind) {
       return;
     }
-    html.push("</ul>");
-    listOpen = false;
+    html.push(`</${listKind}>`);
+    listKind = null;
+  };
+
+  const openList = (kind: "ul" | "ol") => {
+    if (listKind === kind) {
+      return;
+    }
+    closeList();
+    html.push(`<${kind}>`);
+    listKind = kind;
   };
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -290,6 +304,14 @@ function renderSafeMarkdown(text: string) {
     const line = rawLine.trimEnd();
     if (!line.trim()) {
       closeList();
+      continue;
+    }
+
+    const codeBlock = parseMarkdownCodeBlock(lines, index);
+    if (codeBlock) {
+      closeList();
+      html.push(codeBlock.html);
+      index = codeBlock.endIndex;
       continue;
     }
 
@@ -301,7 +323,7 @@ function renderSafeMarkdown(text: string) {
       continue;
     }
 
-    const headingMatch = /^(#{1,3})\s+(.+)$/.exec(line);
+    const headingMatch = /^(#{1,6})\s+(.+)$/.exec(line);
     if (headingMatch) {
       closeList();
       const level = headingMatch[1].length;
@@ -309,13 +331,31 @@ function renderSafeMarkdown(text: string) {
       continue;
     }
 
+    const blockquoteBlock = parseMarkdownBlockquoteBlock(lines, index);
+    if (blockquoteBlock) {
+      closeList();
+      html.push(blockquoteBlock.html);
+      index = blockquoteBlock.endIndex;
+      continue;
+    }
+
+    if (/^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/.test(line)) {
+      closeList();
+      html.push("<hr>");
+      continue;
+    }
+
     const listMatch = /^\s*[-*]\s+(.+)$/.exec(line);
     if (listMatch) {
-      if (!listOpen) {
-        html.push("<ul>");
-        listOpen = true;
-      }
+      openList("ul");
       html.push(`<li>${renderInlineMarkdown(listMatch[1])}</li>`);
+      continue;
+    }
+
+    const orderedListMatch = /^\s*\d+[.)]\s+(.+)$/.exec(line);
+    if (orderedListMatch) {
+      openList("ol");
+      html.push(`<li>${renderInlineMarkdown(orderedListMatch[1])}</li>`);
       continue;
     }
 
@@ -325,6 +365,61 @@ function renderSafeMarkdown(text: string) {
 
   closeList();
   return html.join("");
+}
+
+function parseMarkdownCodeBlock(lines: string[], startIndex: number): { html: string; endIndex: number } | null {
+  const openingMatch = /^\s{0,3}```\s*([^\s`]*)?.*$/.exec(lines[startIndex] ?? "");
+  if (!openingMatch) {
+    return null;
+  }
+
+  const codeLines: string[] = [];
+  let endIndex = startIndex;
+  for (let index = startIndex + 1; index < lines.length; index += 1) {
+    if (/^\s{0,3}```\s*$/.test(lines[index] ?? "")) {
+      endIndex = index;
+      break;
+    }
+    codeLines.push(lines[index] ?? "");
+    endIndex = index;
+  }
+
+  const language = normalizeMarkdownCodeLanguage(openingMatch[1] ?? "");
+  const languageAttributes = language ? ` data-language="${escapeHtml(language)}"` : "";
+  const codeClass = language ? ` class="language-${escapeHtml(language)}"` : "";
+  return {
+    html: `<pre${languageAttributes}><code${codeClass}>${escapeHtml(codeLines.join("\n"))}</code></pre>`,
+    endIndex,
+  };
+}
+
+function normalizeMarkdownCodeLanguage(value: string) {
+  const language = value.trim().replace(/^language-/i, "");
+  return /^[a-zA-Z0-9_+.#-]{1,32}$/.test(language) ? language : "";
+}
+
+function parseMarkdownBlockquoteBlock(lines: string[], startIndex: number): { html: string; endIndex: number } | null {
+  const firstMatch = /^\s*>\s?(.*)$/.exec(lines[startIndex] ?? "");
+  if (!firstMatch) {
+    return null;
+  }
+
+  const quoteLines: string[] = [];
+  let endIndex = startIndex;
+  for (let index = startIndex; index < lines.length; index += 1) {
+    const match = /^\s*>\s?(.*)$/.exec(lines[index] ?? "");
+    if (!match) {
+      break;
+    }
+    quoteLines.push(match[1].trimEnd());
+    endIndex = index;
+  }
+
+  const content = quoteLines.map((line) => renderInlineMarkdown(line)).join("<br>");
+  return {
+    html: `<blockquote><p>${content}</p></blockquote>`,
+    endIndex,
+  };
 }
 
 function hasMarkdownTable(text: string) {
@@ -385,9 +480,34 @@ function normalizeMarkdownTableCells(cells: string[], columnCount: number) {
 }
 
 function renderInlineMarkdown(text: string) {
-  return escapeHtml(text)
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  const codeSpans: string[] = [];
+  const codePlaceholderPrefix = "%%GRAPHITEUI_CODE_SPAN_";
+  const escaped = escapeHtml(text).replace(/`([^`]+)`/g, (_match, code: string) => {
+    const placeholder = `${codePlaceholderPrefix}${codeSpans.length}%%`;
+    codeSpans.push(`<code>${code}</code>`);
+    return placeholder;
+  });
+
+  const linked = escaped.replace(/\[([^\]]+)\]\(([^ \t\r\n]+)\)/g, (_match, label: string, href: string) => {
+    if (!isSafeMarkdownHref(href)) {
+      return `${label} (${href})`;
+    }
+    return `<a href="${href}" target="_blank" rel="noreferrer noopener">${label}</a>`;
+  });
+
+  const formatted = linked.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  return codeSpans.reduce((value, code, index) => value.replace(`${codePlaceholderPrefix}${index}%%`, code), formatted);
+}
+
+function isSafeMarkdownHref(href: string) {
+  const normalized = href.trim().toLowerCase();
+  return (
+    normalized.startsWith("http://") ||
+    normalized.startsWith("https://") ||
+    normalized.startsWith("mailto:") ||
+    normalized.startsWith("#") ||
+    normalized.startsWith("/")
+  );
 }
 
 function escapeHtml(text: string) {
