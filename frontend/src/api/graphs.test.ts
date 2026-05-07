@@ -11,6 +11,7 @@ import {
   importGraphFromPythonSource,
   restoreGraphRevision,
   runGraph,
+  saveGraph,
   saveGraphAsTemplate,
   updateGraphStatus,
   updateTemplateCapabilityDiscoverable,
@@ -139,6 +140,65 @@ test("saveGraphAsTemplate posts graph payload to the template save endpoint", as
   assert.equal(response.template_id, "user_template_1");
 
   globalThis.fetch = originalFetch;
+});
+
+test("saveGraph can attach revision context to the saved graph request", async () => {
+  let requestedUrl = "";
+  let requestBody = "";
+
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    requestedUrl = String(input);
+    requestBody = String(init?.body ?? "");
+    return new Response(
+      JSON.stringify({
+        graph_id: "graph_1",
+        saved: true,
+        revision_id: "grev_1",
+        validation: { valid: true, issues: [] },
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+  }) as typeof fetch;
+
+  const payload: GraphPayload = {
+    graph_id: "graph_1",
+    name: "Revision Context Demo",
+    state_schema: {},
+    nodes: {},
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  try {
+    const response = await saveGraph(payload, {
+      revisionContext: {
+        actor: "buddy",
+        run_id: "run_graph_edit",
+        node_id: "execute_page_operation",
+        reason: "Persist Buddy graph edit playback.",
+      },
+    });
+
+    assert.equal(requestedUrl, "/api/graphs/save");
+    assert.deepEqual(JSON.parse(requestBody), {
+      ...payload,
+      revision_context: {
+        actor: "buddy",
+        run_id: "run_graph_edit",
+        node_id: "execute_page_operation",
+        reason: "Persist Buddy graph edit playback.",
+      },
+    });
+    assert.equal(response.revision_id, "grev_1");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("fetchGraphs and fetchTemplates can request the management catalog including disabled items", async () => {

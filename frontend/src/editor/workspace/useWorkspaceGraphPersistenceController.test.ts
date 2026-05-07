@@ -157,6 +157,7 @@ function createHarness(options: {
       return {
         graph_id: "graph_saved",
         saved: true,
+        revision_id: "grev_saved",
         validation: { valid: true, issues: [] },
       } satisfies GraphSaveResponse;
     },

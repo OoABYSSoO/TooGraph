@@ -25,6 +25,9 @@ test("buildOperationJournalDisplayItems summarizes graph edit playback evidence"
           applied_command_count: 3,
           playback_step_count: 12,
           diff_count: 5,
+          graph_id: "graph_1",
+          revision_id: "grev_1",
+          revision_status: "saved",
         },
       },
       operation_report: {
@@ -64,6 +67,9 @@ test("buildOperationJournalDisplayItems summarizes graph edit playback evidence"
           applied_command_count: 3,
           playback_step_count: 12,
           diff_count: 5,
+          graph_id: "graph_1",
+          revision_id: "grev_1",
+          revision_status: "saved",
         },
       },
       page_snapshots: {
@@ -116,11 +122,81 @@ test("buildOperationJournalDisplayItems summarizes graph edit playback evidence"
     "target: editor.canvas.surface",
     "graph commands: 3/3",
     "graph diff: 5",
+    "graph revision: grev_1",
     "artifacts: 2",
     "retries: 3",
     "request: vop_graph",
   ]);
+  assert.deepEqual(item?.graphRevision, {
+    graphId: "graph_1",
+    revisionId: "grev_1",
+    status: "saved",
+  });
   assert.match(item?.detailText ?? "", /graph_edit_summary/);
   assert.match(item?.detailText ?? "", /runs\/run_graph\/patch\.json/);
   assert.match(item?.detailText ?? "", /retry_chain/);
+});
+
+test("buildOperationJournalDisplayItems uses completion graph revision when the request summary lacks it", () => {
+  const [item] = buildOperationJournalDisplayItems([
+    {
+      id: "opj_completion_revision",
+      operation_request_id: "vop_graph_completion",
+      run_id: "run_parent",
+      stage: "completion",
+      status: "succeeded",
+      summary: "Virtual graph_edit succeeded. request vop_graph_completion.",
+      node_id: "execute_page_operation",
+      subgraph_node_id: "operation_loop",
+      subgraph_path: ["operation_loop"],
+      operation: {
+        kind: "graph_edit",
+        target_id: "editor.canvas.surface",
+        graph_edit_summary: {
+          request_id: "graph-edit-completion",
+          status: "planned",
+          command_count: 2,
+        },
+      },
+      operation_report: {
+        operation_request_id: "vop_graph_completion",
+        status: "succeeded",
+        target_id: "editor.canvas.surface",
+        commands: ["graph_edit editor.graph.playback"],
+        graph_edit_summary: {
+          request_id: "graph-edit-completion",
+          status: "succeeded",
+          command_count: 2,
+          applied_command_count: 2,
+          graph_id: "graph_completion",
+          revision_id: "grev_completion",
+          revision_status: "saved",
+        },
+      },
+      page_snapshots: {},
+      triggered_run: {},
+      artifact_refs: [],
+      retry_chain: [],
+      failure_category: "",
+      error: "",
+      journal: [],
+      activity_sequence: 3,
+      activity_created_at: "2026-05-18T08:40:00Z",
+      recorded_at: "2026-05-18T08:40:01Z",
+      target_id: "editor.canvas.surface",
+      target_label: "Graph canvas",
+      input_text: "",
+    },
+  ]);
+
+  assert.deepEqual(item?.graphRevision, {
+    graphId: "graph_completion",
+    revisionId: "grev_completion",
+    status: "saved",
+  });
+  assert.deepEqual(item?.badges.slice(3, 6), [
+    "graph commands: 2/2",
+    "graph revision: grev_completion",
+    "request: vop_graph_completion",
+  ]);
 });

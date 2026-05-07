@@ -1,4 +1,4 @@
-import type { GraphCatalogStatus, GraphDocument, TemplateRecord, TemplateSource } from "../types/node-system.ts";
+import type { GraphCatalogStatus, GraphDocument, GraphRevisionRecord, TemplateRecord, TemplateSource } from "../types/node-system.ts";
 
 export type GraphLibraryKindFilter = "all" | "graphs" | "templates";
 export type GraphLibraryStatusFilter = "all" | GraphCatalogStatus;
@@ -37,6 +37,19 @@ export type GraphLibraryOverview = {
 export type GraphLibraryColumns = {
   templates: GraphLibraryItem[];
   graphs: GraphLibraryItem[];
+};
+
+export type GraphRevisionHistoryRow = {
+  revisionId: string;
+  reason: string;
+  createdAt: string;
+  actor: string;
+  runId: string;
+  nodeId: string;
+  previousName: string;
+  nextName: string;
+  diffCount: number;
+  restoresToDeletion: boolean;
 };
 
 export function buildGraphLibraryItems(graphs: GraphDocument[], templates: TemplateRecord[]): GraphLibraryItem[] {
@@ -116,9 +129,28 @@ export function buildGraphLibraryOverview(items: GraphLibraryItem[]): GraphLibra
   };
 }
 
+export function buildGraphRevisionHistoryRows(revisions: GraphRevisionRecord[]): GraphRevisionHistoryRow[] {
+  return revisions.map((revision) => ({
+    revisionId: revision.revision_id,
+    reason: revision.reason,
+    createdAt: revision.created_at,
+    actor: revision.actor,
+    runId: revision.run_id,
+    nodeId: revision.node_id,
+    previousName: readGraphName(revision.previous_graph),
+    nextName: readGraphName(revision.next_graph),
+    diffCount: revision.diff.length,
+    restoresToDeletion: revision.previous_graph === null,
+  }));
+}
+
 function readDescription(metadata: Record<string, unknown>): string {
   const description = metadata.description;
   return typeof description === "string" ? description : "";
+}
+
+function readGraphName(graph: GraphDocument | null): string {
+  return graph?.name ?? "";
 }
 
 function buildSearchText(item: GraphLibraryItem): string {

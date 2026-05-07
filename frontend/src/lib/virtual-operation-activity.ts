@@ -36,6 +36,7 @@ export function summarizeVirtualOperationActivity(event: {
       operationKind ? `operation: ${operationKind}` : "",
       resolveTemplateArtifactLabel(operation),
       targetId ? `target: ${targetId}` : "",
+      resolveGraphEditRevisionArtifactLabel(detail, operationReport),
       resolveTriggeredRunArtifactLabel(operationReport, triggeredRunId),
       resolveArtifactRefCountLabel(detail, operationReport),
       resolveRetryCountLabel(detail, operationReport),
@@ -158,6 +159,21 @@ function resolveTriggeredRunId(operationReport: Record<string, unknown>) {
   return normalizeText(operationReport.triggered_run_id ?? operationReport.triggeredRunId);
 }
 
+function resolveGraphEditRevisionArtifactLabel(detail: Record<string, unknown>, operationReport: Record<string, unknown>) {
+  const summary = firstRecord(
+    operationReport.graph_edit_summary,
+    operationReport.graphEditSummary,
+    detail.graph_edit_summary,
+    detail.graphEditSummary,
+  );
+  const revisionId = normalizeText(summary.revision_id ?? summary.revisionId);
+  if (!revisionId) {
+    return "";
+  }
+  const status = normalizeText(summary.revision_status ?? summary.revisionStatus);
+  return `graph revision: ${revisionId}${status && status !== "saved" ? ` ${status}` : ""}`;
+}
+
 function resolveTriggeredRunArtifactLabel(operationReport: Record<string, unknown>, runId: string) {
   if (!runId) {
     return "";
@@ -216,6 +232,16 @@ function normalizeNumber(value: unknown) {
 
 function recordFromUnknown(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function firstRecord(...values: unknown[]) {
+  for (const value of values) {
+    const record = recordFromUnknown(value);
+    if (Object.keys(record).length > 0) {
+      return record;
+    }
+  }
+  return {};
 }
 
 function clampText(value: string, maxLength: number) {

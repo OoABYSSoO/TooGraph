@@ -11,6 +11,13 @@ export type OperationJournalDisplayItem = {
   pathLabel: string;
   badges: string[];
   detailText: string;
+  graphRevision: OperationJournalGraphRevision | null;
+};
+
+export type OperationJournalGraphRevision = {
+  graphId: string;
+  revisionId: string;
+  status: string;
 };
 
 export function buildOperationJournalDisplayItems(entries: OperationJournalEntry[]): OperationJournalDisplayItem[] {
@@ -18,10 +25,11 @@ export function buildOperationJournalDisplayItems(entries: OperationJournalEntry
     const operation = recordFromUnknown(entry.operation);
     const operationReport = recordFromUnknown(entry.operation_report);
     const triggeredRun = recordFromUnknown(entry.triggered_run);
-    const graphEditSummary = firstRecord(operation.graph_edit_summary, operationReport.graph_edit_summary);
+    const graphEditSummary = mergeRecords(operation.graph_edit_summary, operationReport.graph_edit_summary);
     const artifactRefs = firstList(entry.artifact_refs, operationReport.artifact_refs, triggeredRun.artifact_refs);
     const retryChain = firstList(entry.retry_chain, operationReport.retry_chain);
     const retryCount = countRetries(retryChain);
+    const graphRevision = resolveGraphEditRevision(graphEditSummary);
     const operationKind = normalizeText(operation.kind) || "operation";
     const requestId = normalizeText(entry.operation_request_id);
     const targetId = normalizeText(entry.target_id) || normalizeText(operation.target_id ?? operation.targetId);
@@ -34,6 +42,7 @@ export function buildOperationJournalDisplayItems(entries: OperationJournalEntry
       targetId ? `target: ${targetId}` : "",
       graphEditSummaryLabel(graphEditSummary),
       graphEditDiffLabel(graphEditSummary),
+      graphEditRevisionLabel(graphEditSummary),
       artifactRefs.length > 0 ? `artifacts: ${artifactRefs.length}` : "",
       retryCount > 0 ? `retries: ${retryCount}` : "",
       triggeredRunId ? `run: ${triggeredRunId}${triggeredRunStatus ? ` ${triggeredRunStatus}` : ""}` : "",
@@ -60,6 +69,7 @@ export function buildOperationJournalDisplayItems(entries: OperationJournalEntry
         journal: entry.journal ?? [],
         error: normalizeText(entry.error),
       }),
+      graphRevision,
     };
   });
 }
@@ -104,6 +114,28 @@ function graphEditDiffLabel(summary: Record<string, unknown>) {
   return diffCount !== null && diffCount > 0 ? `graph diff: ${diffCount}` : "";
 }
 
+function graphEditRevisionLabel(summary: Record<string, unknown>) {
+  const revisionId = normalizeText(summary.revision_id ?? summary.revisionId);
+  if (!revisionId) {
+    return "";
+  }
+  const status = normalizeText(summary.revision_status ?? summary.revisionStatus);
+  return `graph revision: ${revisionId}${status && status !== "saved" ? ` ${status}` : ""}`;
+}
+
+function resolveGraphEditRevision(summary: Record<string, unknown>): OperationJournalGraphRevision | null {
+  const graphId = normalizeText(summary.graph_id ?? summary.graphId);
+  const revisionId = normalizeText(summary.revision_id ?? summary.revisionId);
+  if (!graphId || !revisionId) {
+    return null;
+  }
+  return {
+    graphId,
+    revisionId,
+    status: normalizeText(summary.revision_status ?? summary.revisionStatus) || "saved",
+  };
+}
+
 function firstList(...values: unknown[]) {
   for (const value of values) {
     if (Array.isArray(value) && value.length > 0) {
@@ -121,6 +153,14 @@ function firstRecord(...values: unknown[]) {
     }
   }
   return {};
+}
+
+function mergeRecords(...values: unknown[]) {
+  const merged: Record<string, unknown> = {};
+  for (const value of values) {
+    Object.assign(merged, recordFromUnknown(value));
+  }
+  return merged;
 }
 
 function recordFromUnknown(value: unknown): Record<string, unknown> {

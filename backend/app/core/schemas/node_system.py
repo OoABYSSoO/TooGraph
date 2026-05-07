@@ -47,6 +47,7 @@ class GraphValidationResponse(BaseModel):
 class GraphSaveResponse(BaseModel):
     graph_id: str
     saved: bool = True
+    revision_id: str
     validation: GraphValidationResponse
 
 

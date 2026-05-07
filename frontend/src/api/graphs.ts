@@ -3,6 +3,7 @@ import type {
   GraphDeleteResponse,
   GraphDocument,
   GraphPayload,
+  GraphRevisionContext,
   GraphRevisionRecord,
   GraphRevisionRestoreResponse,
   GraphRunResponse,
@@ -65,8 +66,17 @@ export async function restoreGraphRevision(graphId: string, revisionId: string):
   return apiPost<GraphRevisionRestoreResponse>(`/api/graphs/${graphId}/revisions/${revisionId}/restore`, null);
 }
 
-export async function saveGraph(payload: GraphPayload): Promise<GraphSaveResponse> {
-  return apiPost("/api/graphs/save", payload);
+export async function saveGraph(
+  payload: GraphPayload | GraphDocument,
+  options: { revisionContext?: GraphRevisionContext } = {},
+): Promise<GraphSaveResponse> {
+  const requestPayload = options.revisionContext
+    ? {
+        ...payload,
+        revision_context: options.revisionContext,
+      }
+    : payload;
+  return apiPost("/api/graphs/save", requestPayload);
 }
 
 export async function updateGraphStatus(graphId: string, status: GraphCatalogStatus): Promise<GraphDocument> {

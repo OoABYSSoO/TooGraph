@@ -696,14 +696,22 @@ test("EditorWorkspaceShell returns graph edit playback plans and applies explici
   assert.match(componentSource, /window\.removeEventListener\("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener\);/);
   assert.match(componentSource, /window\.addEventListener\("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener\);/);
   assert.match(componentSource, /window\.removeEventListener\("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener\);/);
+  assert.match(componentSource, /window\.addEventListener\("toograph:graph-edit-playback-save-request", handleGraphEditPlaybackSaveRequest as EventListener\);/);
+  assert.match(componentSource, /window\.removeEventListener\("toograph:graph-edit-playback-save-request", handleGraphEditPlaybackSaveRequest as EventListener\);/);
   assert.doesNotMatch(componentSource, /toograph:graph-edit-playback-open-node-menu/);
   assert.match(componentSource, /function handleGraphEditPlaybackPlanRequest\(event: Event\)/);
   assert.match(componentSource, /function handleGraphEditPlaybackApplyCommand\(event: Event\)/);
+  assert.match(componentSource, /function handleGraphEditPlaybackSaveRequest\(event: Event\)/);
+  assert.match(componentSource, /detail\.response = saveGraphEditPlaybackRevision\(detail\);/);
+  assert.match(componentSource, /async function saveGraphEditPlaybackRevision\(detail: GraphEditPlaybackSaveRequestDetail\)/);
   assert.match(componentSource, /openNewTab\(null, "replace"\);/);
   assert.match(componentSource, /const plan = buildGraphEditPlaybackPlan\(document, \{ operations: detail\.graphEditIntents \}\);/);
   assert.match(componentSource, /detail\.response = \{[\s\S]*ok: plan\.valid,[\s\S]*graphCommands: plan\.graphCommands,[\s\S]*playbackSteps: plan\.playbackSteps,[\s\S]*issues: plan\.issues,[\s\S]*\};/);
   assert.match(componentSource, /const nextDocument = applyGraphEditCommandToDocument\(document, command\);/);
   assert.match(componentSource, /if \(nextDocument !== document\) \{[\s\S]*markDocumentDirty\(tab\.tabId, nextDocument\);[\s\S]*\}/);
+  assert.match(componentSource, /const saveResponse = await saveGraph\(documentToSave, \{[\s\S]*revisionContext: \{[\s\S]*actor: "buddy",[\s\S]*run_id: detail\.runId \?\? "",[\s\S]*node_id: detail\.nodeId \?\? "",[\s\S]*reason: detail\.reason \?\? `Persist Buddy graph edit playback \(\$\{detail\.requestId\}\)\.`,[\s\S]*\},[\s\S]*\}\);/);
+  assert.match(componentSource, /graphId: saveResponse\.graph_id,/);
+  assert.match(componentSource, /revisionId: saveResponse\.revision_id,/);
 });
 
 test("EditorWorkspaceShell delegates document load tab-state writes to the runtime model", () => {

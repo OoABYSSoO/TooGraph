@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { GraphDocument, TemplateRecord } from "../types/node-system.ts";
+import type { GraphDocument, GraphRevisionRecord, TemplateRecord } from "../types/node-system.ts";
 import {
+  buildGraphRevisionHistoryRows,
   buildGraphLibraryItems,
   buildGraphLibraryOverview,
   filterGraphLibraryItems,
@@ -161,4 +162,64 @@ test("splitGraphLibraryItems separates templates and graphs for the management c
 
   assert.deepEqual(columns.templates.map((item) => item.id), ["official_loop", "paused_loop", "user_summary"]);
   assert.deepEqual(columns.graphs.map((item) => item.id), ["graph_research", "graph_archived"]);
+});
+
+test("buildGraphRevisionHistoryRows exposes rollback context for saved graphs", () => {
+  const revisions: GraphRevisionRecord[] = [
+    {
+      revision_id: "grev_update",
+      graph_id: "graph_research",
+      previous_graph: { ...graphs[0], name: "Research Flow" },
+      next_graph: { ...graphs[0], name: "Research Flow v2" },
+      diff: [{ op: "replace", path: "/name", previous: "Research Flow", next: "Research Flow v2" }],
+      actor: "buddy",
+      run_id: "run_1",
+      node_id: "execute_page_operation",
+      reason: "Rename graph through virtual graph edit playback.",
+      validation: { valid: true, issues: [] },
+      created_at: "2026-05-18T10:00:00Z",
+    },
+    {
+      revision_id: "grev_create",
+      graph_id: "graph_research",
+      previous_graph: null,
+      next_graph: graphs[0],
+      diff: [{ op: "add", path: "", next: graphs[0] }],
+      actor: "user",
+      run_id: "",
+      node_id: "",
+      reason: "Create saved graph.",
+      validation: { valid: true, issues: [] },
+      created_at: "2026-05-18T09:00:00Z",
+    },
+  ];
+
+  assert.deepEqual(
+    buildGraphRevisionHistoryRows(revisions).map((row) => ({
+      revisionId: row.revisionId,
+      previousName: row.previousName,
+      nextName: row.nextName,
+      actor: row.actor,
+      diffCount: row.diffCount,
+      restoresToDeletion: row.restoresToDeletion,
+    })),
+    [
+      {
+        revisionId: "grev_update",
+        previousName: "Research Flow",
+        nextName: "Research Flow v2",
+        actor: "buddy",
+        diffCount: 1,
+        restoresToDeletion: false,
+      },
+      {
+        revisionId: "grev_create",
+        previousName: "",
+        nextName: "Research Flow",
+        actor: "user",
+        diffCount: 1,
+        restoresToDeletion: true,
+      },
+    ],
+  );
 });

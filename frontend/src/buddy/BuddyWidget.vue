@@ -530,6 +530,7 @@ import {
   buildGraphEditPlaybackAuditSummary,
   type GraphEditPlaybackAuditApplyResult,
   type GraphEditPlaybackAuditDiffEntry,
+  type GraphEditPlaybackAuditRevision,
   type GraphEditPlaybackAuditSummary,
 } from "./graphEditPlaybackAudit.ts";
 import {
@@ -757,6 +758,7 @@ const TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY = "__toographVirtualEmptyC
 const TOOGRAPH_GRAPH_EDIT_PLAYBACK_RUNNING_EVENT = "toograph:graph-edit-playback-running";
 const TOOGRAPH_GRAPH_EDIT_PLAYBACK_ENSURE_VISIBLE_EVENT = "toograph:graph-edit-playback-ensure-visible";
 const TOOGRAPH_GRAPH_EDIT_PLAYBACK_APPLY_COMMAND_EVENT = "toograph:graph-edit-playback-apply-command";
+const TOOGRAPH_GRAPH_EDIT_PLAYBACK_SAVE_EVENT = "toograph:graph-edit-playback-save-request";
 const BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_WAIT_MS = 2400;
 const BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_RETRY_MS = 80;
 const BUDDY_GRAPH_EDIT_PLAYBACK_VIEWPORT_SETTLE_MS = 80;
@@ -2503,7 +2505,7 @@ async function executeVirtualOperationCommands(operationPlan: BuddyVirtualOperat
       if (isVirtualOperationInterrupted(token)) {
         break;
       }
-      const commandResult = await executeBuddyVirtualOperationCommand(operation);
+      const commandResult = await executeBuddyVirtualOperationCommand(operationPlan, operation);
       if (commandResult?.graphEditSummary) {
         graphEditSummary = commandResult.graphEditSummary;
       }
@@ -2798,6 +2800,7 @@ function isVirtualOperationInterrupted(token: BuddyVirtualOperationToken | null)
 }
 
 async function executeBuddyVirtualOperationCommand(
+  operationPlan: BuddyVirtualOperationPlan,
   operation: BuddyVirtualOperation,
 ): Promise<{ graphEditSummary: GraphEditPlaybackAuditSummary } | null> {
   switch (operation.kind) {
@@ -2820,7 +2823,7 @@ async function executeBuddyVirtualOperationCommand(
       await executeBuddyVirtualWaitOperation(operation);
       return null;
     case "graph_edit":
-      return { graphEditSummary: await executeBuddyVirtualGraphEditOperation(operation) };
+      return { graphEditSummary: await executeBuddyVirtualGraphEditOperation(operationPlan, operation) };
     case "run_template":
       await executeBuddyVirtualRunTemplateOperation(operation);
       return null;
@@ -2981,7 +2984,17 @@ type GraphEditPlaybackApplyCommandResponse = {
   diff?: GraphEditPlaybackAuditDiffEntry[];
 };
 
-async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOperation): Promise<GraphEditPlaybackAuditSummary> {
+type GraphEditPlaybackSaveResponse = {
+  ok: boolean;
+  graphId: string | null;
+  revisionId: string | null;
+  issues: string[];
+};
+
+async function executeBuddyVirtualGraphEditOperation(
+  operationPlan: BuddyVirtualOperationPlan,
+  operation: BuddyVirtualOperation,
+): Promise<GraphEditPlaybackAuditSummary> {
   if (operation.kind !== "graph_edit") {
     return buildGraphEditPlaybackAuditSummary({
       requestId: "",
@@ -3101,6 +3114,12 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
     setGraphEditPlaybackRunning(false);
   }
   virtualCursorDragging.value = false;
+  const revision = await requestGraphEditPlaybackSave({
+    requestId,
+    runId: operationPlan.runId ?? "",
+    nodeId: operationPlan.nodeId ?? operationPlan.subgraphNodeId ?? "",
+    reason: operationPlan.reason,
+  });
   return buildGraphEditPlaybackAuditSummary({
     requestId,
     planOk: true,
@@ -3109,6 +3128,7 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
     playbackStepCount: response.playbackSteps.length,
     interrupted: isVirtualOperationInterrupted(token),
     applyResults,
+    revision,
   });
 }
 
@@ -3299,6 +3319,65 @@ function dispatchGraphEditPlaybackApplyCommand(
   };
   window.dispatchEvent(new CustomEvent(TOOGRAPH_GRAPH_EDIT_PLAYBACK_APPLY_COMMAND_EVENT, { detail }));
   return detail.response;
+}
+
+async function requestGraphEditPlaybackSave(input: {
+  requestId: string;
+  runId: string;
+  nodeId: string;
+  reason: string;
+}): Promise<GraphEditPlaybackAuditRevision> {
+  if (typeof window === "undefined") {
+    return {
+      status: "failed",
+      graphId: null,
+      revisionId: null,
+      issues: ["Graph edit revision save requires a browser window."],
+    };
+  }
+  const detail: {
+    requestId: string;
+    runId: string;
+    nodeId: string;
+    reason: string;
+    response: GraphEditPlaybackSaveResponse | Promise<GraphEditPlaybackSaveResponse> | null;
+  } = {
+    requestId: input.requestId,
+    runId: input.runId,
+    nodeId: input.nodeId,
+    reason: input.reason,
+    response: null,
+  };
+  window.dispatchEvent(new CustomEvent(TOOGRAPH_GRAPH_EDIT_PLAYBACK_SAVE_EVENT, { detail }));
+  const response = isGraphEditPlaybackSaveResponsePromise(detail.response) ? await detail.response : detail.response;
+  if (!response) {
+    return {
+      status: "failed",
+      graphId: null,
+      revisionId: null,
+      issues: ["Graph edit revision save did not return a response."],
+    };
+  }
+  if (!response.ok) {
+    return {
+      status: "failed",
+      graphId: response.graphId ?? null,
+      revisionId: response.revisionId ?? null,
+      issues: response.issues.length ? response.issues : ["Graph edit revision save failed."],
+    };
+  }
+  return {
+    status: "saved",
+    graphId: response.graphId,
+    revisionId: response.revisionId,
+    issues: response.issues,
+  };
+}
+
+function isGraphEditPlaybackSaveResponsePromise(
+  response: GraphEditPlaybackSaveResponse | Promise<GraphEditPlaybackSaveResponse> | null,
+): response is Promise<GraphEditPlaybackSaveResponse> {
+  return Boolean(response && typeof (response as Promise<GraphEditPlaybackSaveResponse>).then === "function");
 }
 
 async function resolveGraphEditPlaybackStepElementWithRetry(

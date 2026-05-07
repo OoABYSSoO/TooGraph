@@ -128,6 +128,22 @@
                 <div class="run-detail__badges">
                   <span v-for="label in item.badges" :key="`${item.key}-${label}`">{{ label }}</span>
                 </div>
+                <div v-if="item.graphRevision" class="run-detail__operation-actions">
+                  <ElButton
+                    size="small"
+                    :loading="restoringGraphRevisionKey === item.key"
+                    :disabled="Boolean(restoringGraphRevisionKey)"
+                    data-virtual-affordance-role="button"
+                    data-virtual-affordance-zone="runDetail.graphRevision"
+                    data-virtual-affordance-actions="click"
+                    :data-virtual-affordance-id="`runDetail.graphRevision.restore.${item.graphRevision.revisionId}`"
+                    :data-virtual-affordance-label="t('graphLibrary.restoreRevisionAction')"
+                    @click="restoreGraphRevisionFromOperation(item)"
+                  >
+                    <ElIcon aria-hidden="true"><RefreshLeft /></ElIcon>
+                    <span>{{ t("graphLibrary.restoreRevisionAction") }}</span>
+                  </ElButton>
+                </div>
                 <details class="run-detail__operation-detail">
                   <summary>{{ t("common.details") }}</summary>
                   <pre class="run-detail__content run-detail__operation-detail-content">{{ item.detailText || t("common.none") }}</pre>
@@ -291,12 +307,13 @@
 </template>
 
 <script setup lang="ts">
-import { Promotion } from "@element-plus/icons-vue";
-import { ElIcon } from "element-plus";
+import { Promotion, RefreshLeft } from "@element-plus/icons-vue";
+import { ElButton, ElIcon, ElMessage, ElMessageBox } from "element-plus";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 
+import { restoreGraphRevision } from "@/api/graphs";
 import { fetchOperationJournal } from "@/api/operationJournal";
 import { fetchRun } from "@/api/runs";
 import {
@@ -315,7 +332,7 @@ import type { OperationJournalPage } from "@/types/operationJournal";
 import type { RunDetail } from "@/types/run";
 
 import { buildRunAggregatedTimeline, buildRunStatusFacts, listRunOutputArtifacts } from "./runDetailModel.ts";
-import { buildOperationJournalDisplayItems } from "./operationJournalModel.ts";
+import { buildOperationJournalDisplayItems, type OperationJournalDisplayItem } from "./operationJournalModel.ts";
 import ArtifactDocumentPager from "./ArtifactDocumentPager.vue";
 
 const route = useRoute();
@@ -329,6 +346,7 @@ const liveStreamingOutputs = ref<Record<string, LiveStreamingOutput>>({});
 const operationJournal = ref<OperationJournalPage | null>(null);
 const operationJournalLoading = ref(false);
 const operationJournalError = ref<string | null>(null);
+const restoringGraphRevisionKey = ref<string | null>(null);
 const runId = computed(() => String(route.params.runId ?? ""));
 const runDetailRequestTimeoutMs = 10_000;
 const snapshotOptions = computed(() => {
@@ -528,6 +546,36 @@ async function loadOperationJournal(nextRunId = runId.value) {
         activeOperationJournalController = null;
       }
     }
+  }
+}
+
+async function restoreGraphRevisionFromOperation(item: OperationJournalDisplayItem) {
+  if (!item.graphRevision || restoringGraphRevisionKey.value) {
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      t("graphLibrary.restoreRevisionConfirm", { name: item.graphRevision.graphId }),
+      t("graphLibrary.restoreRevisionTitle"),
+      {
+        confirmButtonText: t("graphLibrary.restoreRevisionAction"),
+        cancelButtonText: t("common.cancel"),
+        type: "warning",
+      },
+    );
+  } catch {
+    return;
+  }
+
+  restoringGraphRevisionKey.value = item.key;
+  try {
+    const response = await restoreGraphRevision(item.graphRevision.graphId, item.graphRevision.revisionId);
+    ElMessage.success(t("graphLibrary.revisionRestored", { revisionId: response.restored_revision_id }));
+  } catch (restoreError) {
+    ElMessage.error(restoreError instanceof Error ? restoreError.message : t("common.failedToSave", { error: "" }));
+  } finally {
+    restoringGraphRevisionKey.value = null;
   }
 }
 
@@ -969,6 +1017,27 @@ function statusBadgeClass(status: string) {
 
 .run-detail__operation-card .run-detail__timeline-heading > span {
   width: fit-content;
+}
+
+.run-detail__operation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.run-detail__operation-actions :deep(.el-button) {
+  border-color: rgba(14, 116, 144, 0.28);
+  border-radius: 999px;
+  background: rgba(236, 254, 255, 0.78);
+  color: rgb(14, 116, 144);
+  font-weight: 800;
+}
+
+.run-detail__operation-actions :deep(.el-button span) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .run-detail__journal-count {

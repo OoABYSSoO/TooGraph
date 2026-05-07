@@ -27,7 +27,7 @@ from app.core.storage.graph_store import (
     list_graphs,
     load_graph,
     restore_graph_revision,
-    save_graph,
+    save_graph_with_revision,
 )
 from app.core.storage.run_store import save_run
 
@@ -89,12 +89,12 @@ def save_graph_endpoint(payload: dict[str, Any]) -> GraphSaveResponse:
     if not validation.valid:
         raise HTTPException(status_code=422, detail=validation.model_dump())
 
-    saved_graph = save_graph(
+    saved_graph, revision = save_graph_with_revision(
         graph_payload,
         **_parse_graph_revision_context(payload),
         validation=validation.model_dump(mode="json"),
     )
-    return GraphSaveResponse(graph_id=saved_graph.graph_id, validation=validation)
+    return GraphSaveResponse(graph_id=saved_graph.graph_id, revision_id=revision["revision_id"], validation=validation)
 
 
 @router.get("/{graph_id}")

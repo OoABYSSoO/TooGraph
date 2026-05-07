@@ -74,6 +74,37 @@ test("buildGraphEditPlaybackAuditSummary keeps failed command evidence", () => {
   assert.deepEqual(summary.failed_commands, [{ command_id: "graph-command-2", issues: ["State already exists."] }]);
 });
 
+test("buildGraphEditPlaybackAuditSummary can bind command diffs to a saved graph revision", () => {
+  const summary = buildGraphEditPlaybackAuditSummary({
+    requestId: "graph-edit-revision",
+    planOk: true,
+    planIssues: [],
+    commandCount: 1,
+    playbackStepCount: 4,
+    interrupted: false,
+    applyResults: [
+      {
+        commandId: "graph-command-1",
+        ok: true,
+        applied: true,
+        issues: [],
+        diff: [{ op: "replace", path: "/name", previous: "Draft", next: "Final" }],
+      },
+    ],
+    revision: {
+      status: "saved",
+      graphId: "graph_1",
+      revisionId: "grev_1",
+      issues: [],
+    },
+  });
+
+  assert.equal(summary.graph_id, "graph_1");
+  assert.equal(summary.revision_id, "grev_1");
+  assert.equal(summary.revision_status, "saved");
+  assert.deepEqual(summary.revision_issues, []);
+});
+
 test("buildGraphEditPlaybackAuditSummary marks invalid plans and interruptions", () => {
   assert.equal(
     buildGraphEditPlaybackAuditSummary({

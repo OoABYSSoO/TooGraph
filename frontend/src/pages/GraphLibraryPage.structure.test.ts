@@ -58,6 +58,20 @@ test("GraphLibraryPage exposes a separate capability discovery switch for templa
   assert.match(componentSource, /setTemplateCapabilityDiscoverable\(item, Boolean\(\$event\)\)/);
 });
 
+test("GraphLibraryPage exposes saved graph revision history and restore controls", () => {
+  assert.match(componentSource, /import \{[\s\S]*ElDialog,[\s\S]*ElMessage,[\s\S]*ElMessageBox,[\s\S]*ElSwitch[\s\S]*\} from "element-plus";/);
+  assert.match(componentSource, /fetchGraphRevisions/);
+  assert.match(componentSource, /restoreGraphRevision/);
+  assert.match(componentSource, /buildGraphRevisionHistoryRows/);
+  assert.match(componentSource, /item\.kind === "graph"/);
+  assert.match(componentSource, /@click="openGraphRevisionHistory\(item\)"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`library\.graph\.\$\{item\.id\}\.history`"/);
+  assert.match(componentSource, /<ElDialog[\s\S]*v-model="graphRevisionDialogOpen"/);
+  assert.match(componentSource, /v-for="row in graphRevisionRows"/);
+  assert.match(componentSource, /@click="restoreGraphRevisionFromHistory\(row\)"/);
+  assert.match(componentSource, /data-virtual-affordance-requires-confirmation="true"/);
+});
+
 test("GraphLibraryPage exposes official page-operation affordance ids", () => {
   assert.match(componentSource, /data-virtual-affordance-id="library\.action\.newBlankGraph"/);
   assert.match(componentSource, /data-virtual-affordance-id="library\.action\.importPython"/);

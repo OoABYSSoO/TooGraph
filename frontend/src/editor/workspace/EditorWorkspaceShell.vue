@@ -1227,6 +1227,21 @@ type GraphEditPlaybackApplyCommandDetail = {
   response?: unknown;
 };
 
+type GraphEditPlaybackSaveRequestResponse = {
+  ok: boolean;
+  graphId: string | null;
+  revisionId: string | null;
+  issues: string[];
+};
+
+type GraphEditPlaybackSaveRequestDetail = {
+  requestId: string;
+  runId?: string;
+  nodeId?: string;
+  reason?: string;
+  response?: GraphEditPlaybackSaveRequestResponse | Promise<GraphEditPlaybackSaveRequestResponse> | null;
+};
+
 function handleGraphEditPlaybackPlanRequest(event: Event) {
   const detail = (event as CustomEvent<GraphEditPlaybackPlanRequestDetail>).detail;
   if (!detail || !Array.isArray(detail.graphEditIntents)) {
@@ -1287,6 +1302,83 @@ function handleGraphEditPlaybackApplyCommand(event: Event) {
     issues: [],
     diff,
   };
+}
+
+function handleGraphEditPlaybackSaveRequest(event: Event) {
+  const detail = (event as CustomEvent<GraphEditPlaybackSaveRequestDetail>).detail;
+  if (!detail) {
+    return;
+  }
+  detail.response = saveGraphEditPlaybackRevision(detail);
+}
+
+async function saveGraphEditPlaybackRevision(detail: GraphEditPlaybackSaveRequestDetail): Promise<GraphEditPlaybackSaveRequestResponse> {
+  const requestId = String(detail.requestId ?? "").trim();
+  if (!requestId) {
+    return {
+      ok: false,
+      graphId: null,
+      revisionId: null,
+      issues: ["Graph edit playback save request is missing a request id."],
+    };
+  }
+  const tab = activeTab.value;
+  const document = tab ? documentsByTabId.value[tab.tabId] : null;
+  if (!tab || !document) {
+    return {
+      ok: false,
+      graphId: null,
+      revisionId: null,
+      issues: ["No editable graph tab is open."],
+    };
+  }
+  const graphId = tab.graphId ?? ("graph_id" in document ? document.graph_id : null);
+  if (!graphId) {
+    return {
+      ok: false,
+      graphId: null,
+      revisionId: null,
+      issues: ["Graph edit playback can only persist an already saved graph."],
+    };
+  }
+
+  try {
+    const documentToSave = { ...document, graph_id: graphId };
+    const saveResponse = await saveGraph(documentToSave, {
+      revisionContext: {
+        actor: "buddy",
+        run_id: detail.runId ?? "",
+        node_id: detail.nodeId ?? "",
+        reason: detail.reason ?? `Persist Buddy graph edit playback (${detail.requestId}).`,
+      },
+    });
+    const savedGraph = await fetchGraph(saveResponse.graph_id);
+    registerDocumentForTab(tab.tabId, savedGraph);
+    updateWorkspaceTab(tab.tabId, (currentTab) => ({
+      ...currentTab,
+      kind: "existing",
+      graphId: savedGraph.graph_id,
+      title: savedGraph.name,
+      dirty: false,
+      templateId: null,
+      defaultTemplateId: null,
+      subgraphSource: null,
+    }));
+    await graphStore.loadGraphs();
+    return {
+      ok: true,
+      graphId: saveResponse.graph_id,
+      revisionId: saveResponse.revision_id,
+      issues: [],
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      graphId,
+      revisionId: null,
+      issues: [error instanceof Error ? error.message : "Failed to save graph edit playback revision."],
+    };
+  }
 }
 
 function ensureGraphEditPlaybackTab() {
@@ -1553,6 +1645,7 @@ watch(
 onBeforeUnmount(() => {
   window.removeEventListener("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener);
   window.removeEventListener("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener);
+  window.removeEventListener("toograph:graph-edit-playback-save-request", handleGraphEditPlaybackSaveRequest as EventListener);
   buddyContextStore.clearEditorSnapshot();
   teardownRunLifecycle();
 });
@@ -1560,6 +1653,7 @@ onBeforeUnmount(() => {
 onMounted(() => {
   window.addEventListener("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener);
   window.addEventListener("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener);
+  window.addEventListener("toograph:graph-edit-playback-save-request", handleGraphEditPlaybackSaveRequest as EventListener);
   loadInitialWorkspaceResources();
   updateWorkspace(readPersistedEditorWorkspace());
   ensureTabViewportDrafts();

@@ -9,8 +9,8 @@ const currentDirectory = dirname(currentFilePath);
 const componentSource = readFileSync(resolve(currentDirectory, "RunDetailPage.vue"), "utf8");
 
 test("RunDetailPage exposes a restore editor action when the loaded run can be restored", () => {
-  assert.match(componentSource, /import \{ Promotion \} from "@element-plus\/icons-vue";/);
-  assert.match(componentSource, /import \{ ElIcon \} from "element-plus";/);
+  assert.match(componentSource, /import \{ Promotion, RefreshLeft \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import \{ ElButton, ElIcon, ElMessage, ElMessageBox \} from "element-plus";/);
   assert.match(componentSource, /import \{ formatRunDisplayName, formatRunDisplayTimestamp \} from "@\/lib\/run-display-name";/);
   assert.match(componentSource, /import \{ buildSnapshotScopedRun, canRestoreRunDetail, resolveRunRestoreUrl, resolveRunSnapshot \} from "@\/lib\/run-restore";/);
   assert.match(componentSource, /const canRestore = computed\(\(\) => \(run\.value \? canRestoreRunDetail\(run\.value\) : false\)\);/);
@@ -93,7 +93,10 @@ test("RunDetailPage renders the aggregated parent and subgraph timeline", () => 
 
 test("RunDetailPage exposes operation journal entries from the dedicated journal API", () => {
   assert.match(componentSource, /import \{ fetchOperationJournal \} from "@\/api\/operationJournal";/);
-  assert.match(componentSource, /import \{ buildOperationJournalDisplayItems \} from "\.\/operationJournalModel\.ts";/);
+  assert.match(
+    componentSource,
+    /import \{ buildOperationJournalDisplayItems, type OperationJournalDisplayItem \} from "\.\/operationJournalModel\.ts";/,
+  );
   assert.match(componentSource, /const operationJournal = ref/);
   assert.match(componentSource, /const operationJournalItems = computed\(\(\) => buildOperationJournalDisplayItems\(operationJournal\.value\?\.entries \?\? \[\]\)\);/);
   assert.match(componentSource, /fetchOperationJournal\(\{ runId: normalizedRunId, size: 100 \}, \{ signal: controller\.signal \}\)/);
@@ -101,6 +104,27 @@ test("RunDetailPage exposes operation journal entries from the dedicated journal
   assert.match(componentSource, /v-for="item in operationJournalItems"/);
   assert.match(componentSource, /t\("runDetail\.operationJournal"\)/);
   assert.match(componentSource, /t\("runDetail\.operationJournalTitle"\)/);
+});
+
+test("RunDetailPage exposes graph revision restore actions from operation journal rows", () => {
+  assert.match(componentSource, /import \{ Promotion, RefreshLeft \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import \{ ElButton, ElIcon, ElMessage, ElMessageBox \} from "element-plus";/);
+  assert.match(componentSource, /import \{ restoreGraphRevision \} from "@\/api\/graphs";/);
+  assert.match(
+    componentSource,
+    /import \{ buildOperationJournalDisplayItems, type OperationJournalDisplayItem \} from "\.\/operationJournalModel\.ts";/,
+  );
+  assert.match(componentSource, /const restoringGraphRevisionKey = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /v-if="item\.graphRevision"/);
+  assert.match(componentSource, /class="run-detail__operation-actions"/);
+  assert.match(componentSource, /@click="restoreGraphRevisionFromOperation\(item\)"/);
+  assert.match(componentSource, /:loading="restoringGraphRevisionKey === item\.key"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`runDetail\.graphRevision\.restore\.\$\{item\.graphRevision\.revisionId\}`"/);
+  assert.match(componentSource, /<RefreshLeft \/>/);
+  assert.match(componentSource, /async function restoreGraphRevisionFromOperation\(item: OperationJournalDisplayItem\)/);
+  assert.match(componentSource, /ElMessageBox\.confirm\(/);
+  assert.match(componentSource, /await restoreGraphRevision\(item\.graphRevision\.graphId, item\.graphRevision\.revisionId\)/);
+  assert.match(componentSource, /ElMessage\.success\(t\("graphLibrary\.revisionRestored", \{ revisionId: response\.restored_revision_id \}\)\);/);
 });
 
 test("RunDetailPage uses one immediate route watcher for loading run details", () => {

@@ -193,6 +193,25 @@
                       />
                     </label>
                     <template v-if="item.canManage">
+                      <button
+                        v-if="item.kind === 'graph'"
+                        type="button"
+                        class="graph-library-page__action"
+                        :disabled="isItemActionPending(item) || isGraphRevisionHistoryPending(item)"
+                        :aria-label="t('graphLibrary.historyLabel', { name: item.title })"
+                        :data-virtual-affordance-id="`library.graph.${item.id}.history`"
+                        :data-virtual-affordance-label="t('graphLibrary.historyLabel', { name: item.title })"
+                        data-virtual-affordance-role="button"
+                        data-virtual-affordance-zone="library.catalog"
+                        data-virtual-affordance-actions="click"
+                        @click="openGraphRevisionHistory(item)"
+                      >
+                        {{
+                          isGraphRevisionHistoryPending(item)
+                            ? t("graphLibrary.loadingRevisions")
+                            : t("graphLibrary.history")
+                        }}
+                      </button>
                       <label class="graph-library-page__toggle">
                         <span>
                           {{ item.status === "active" ? t("graphLibrary.enabledStatus") : t("graphLibrary.disabledStatus") }}
@@ -224,6 +243,75 @@
           </div>
         </template>
       </section>
+
+      <ElDialog
+        v-model="graphRevisionDialogOpen"
+        class="graph-library-page__revision-dialog"
+        :title="revisionDialogTitle"
+        width="min(720px, calc(100vw - 32px))"
+        :modal-class="'graph-library-page__revision-dialog-overlay'"
+        destroy-on-close
+      >
+        <section class="graph-library-page__revision-panel">
+          <p class="graph-library-page__revision-body">{{ t("graphLibrary.revisionDialogBody") }}</p>
+          <article v-if="graphRevisionLoading" class="graph-library-page__empty graph-library-page__empty--compact">
+            {{ t("common.loading") }}
+          </article>
+          <article v-else-if="graphRevisionError" class="graph-library-page__notice">
+            {{ t("common.failedToLoad", { error: graphRevisionError }) }}
+          </article>
+          <article v-else-if="graphRevisionRows.length === 0" class="graph-library-page__empty graph-library-page__empty--compact">
+            {{ t("graphLibrary.noRevisions") }}
+          </article>
+          <div v-else class="graph-library-page__revision-list">
+            <article v-for="row in graphRevisionRows" :key="row.revisionId" class="graph-library-page__revision-row">
+              <div class="graph-library-page__revision-main">
+                <div>
+                  <div class="graph-library-page__id">{{ row.revisionId }}</div>
+                  <h3>{{ row.reason || t("graphLibrary.revisionNoReason") }}</h3>
+                  <p>{{ formatRevisionTimestamp(row.createdAt) }}</p>
+                </div>
+                <button
+                  type="button"
+                  class="graph-library-page__action graph-library-page__action--danger"
+                  :disabled="restoreRevisionActionId === row.revisionId"
+                  :data-virtual-affordance-id="`library.graph.${graphRevisionGraphId}.revision.${row.revisionId}.restore`"
+                  :data-virtual-affordance-label="
+                    row.restoresToDeletion
+                      ? t('graphLibrary.restoreRevisionDeletesGraph')
+                      : t('graphLibrary.restoreRevisionAction')
+                  "
+                  data-virtual-affordance-role="button"
+                  data-virtual-affordance-zone="library.revisionHistory"
+                  data-virtual-affordance-actions="click"
+                  data-virtual-affordance-destructive="true"
+                  data-virtual-affordance-requires-confirmation="true"
+                  @click="restoreGraphRevisionFromHistory(row)"
+                >
+                  {{
+                    row.restoresToDeletion
+                      ? t("graphLibrary.restoreRevisionDeletesGraph")
+                      : t("graphLibrary.restoreRevisionAction")
+                  }}
+                </button>
+              </div>
+              <div class="graph-library-page__revision-path">
+                <span>
+                  {{ t("graphLibrary.revisionRestoreTarget", { name: row.previousName || t("graphLibrary.deletedGraph") }) }}
+                </span>
+                <span>
+                  {{ t("graphLibrary.revisionChangedTo", { name: row.nextName || t("graphLibrary.deletedGraph") }) }}
+                </span>
+              </div>
+              <div class="graph-library-page__revision-meta">
+                <span>{{ t("graphLibrary.revisionActor", { actor: row.actor || t("common.none") }) }}</span>
+                <span>{{ t("graphLibrary.revisionDiffCount", { count: row.diffCount }) }}</span>
+                <span v-if="row.runId">{{ t("graphLibrary.revisionRun", { runId: row.runId }) }}</span>
+              </div>
+            </article>
+          </div>
+        </section>
+      </ElDialog>
     </section>
   </AppShell>
 </template>
@@ -231,15 +319,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { ElInput, ElSwitch } from "element-plus";
+import { ElDialog, ElInput, ElMessage, ElMessageBox, ElSwitch } from "element-plus";
 import { useI18n } from "vue-i18n";
 
 import {
   deleteGraph,
   deleteTemplate,
+  fetchGraphRevisions,
   fetchGraphs,
   fetchTemplates,
   importGraphFromPythonSource,
+  restoreGraphRevision,
   updateGraphStatus,
   updateTemplateCapabilityDiscoverable,
   updateTemplateStatus,
@@ -253,13 +343,15 @@ import {
   writePersistedEditorDocumentDraft,
   writePersistedEditorWorkspace,
 } from "@/lib/editor-workspace";
-import type { GraphCatalogStatus, GraphDocument, GraphPayload, TemplateRecord } from "@/types/node-system";
+import type { GraphCatalogStatus, GraphDocument, GraphPayload, GraphRevisionRecord, TemplateRecord } from "@/types/node-system";
 
 import {
+  buildGraphRevisionHistoryRows,
   buildGraphLibraryItems,
   buildGraphLibraryOverview,
   filterGraphLibraryItems,
   splitGraphLibraryItems,
+  type GraphRevisionHistoryRow,
   type GraphLibraryItem,
   type GraphLibraryStatusFilter,
 } from "./graphLibraryPageModel.ts";
@@ -272,9 +364,17 @@ const actionError = ref<string | null>(null);
 const actionItemKey = ref<string | null>(null);
 const confirmingDeleteKey = ref<string | null>(null);
 const pythonGraphImportInput = ref<HTMLInputElement | null>(null);
+const graphRevisionDialogOpen = ref(false);
+const graphRevisionGraphId = ref("");
+const graphRevisionGraphTitle = ref("");
+const graphRevisionLoadingGraphId = ref("");
+const graphRevisionLoading = ref(false);
+const graphRevisionError = ref<string | null>(null);
+const graphRevisions = ref<GraphRevisionRecord[]>([]);
+const restoreRevisionActionId = ref("");
 const query = ref("");
 const statusFilter = ref<GraphLibraryStatusFilter>("all");
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const router = useRouter();
 
 const items = computed(() => buildGraphLibraryItems(graphs.value, templates.value));
@@ -297,6 +397,12 @@ const libraryColumns = computed(() => [
     items: filteredColumns.value.graphs,
   },
 ]);
+const graphRevisionRows = computed(() => buildGraphRevisionHistoryRows(graphRevisions.value));
+const revisionDialogTitle = computed(() =>
+  graphRevisionGraphTitle.value
+    ? t("graphLibrary.revisionDialogTitle", { name: graphRevisionGraphTitle.value })
+    : t("graphLibrary.history"),
+);
 const statusOptions = computed(() =>
   (["all", "active", "disabled"] satisfies GraphLibraryStatusFilter[]).map((value) => ({
     value,
@@ -336,6 +442,10 @@ function capabilityActionKey(item: GraphLibraryItem): string {
 
 function isItemActionPending(item: GraphLibraryItem): boolean {
   return actionItemKey.value === itemKey(item) || actionItemKey.value === capabilityActionKey(item);
+}
+
+function isGraphRevisionHistoryPending(item: GraphLibraryItem): boolean {
+  return graphRevisionLoadingGraphId.value === item.id;
 }
 
 function capabilityDiscoverableToggleLabel(item: GraphLibraryItem): string {
@@ -484,6 +594,95 @@ async function setTemplateCapabilityDiscoverable(item: GraphLibraryItem, capabil
   } finally {
     actionItemKey.value = null;
   }
+}
+
+async function openGraphRevisionHistory(item: GraphLibraryItem) {
+  if (item.kind !== "graph") {
+    return;
+  }
+  graphRevisionDialogOpen.value = true;
+  graphRevisionGraphId.value = item.id;
+  graphRevisionGraphTitle.value = item.title;
+  await loadGraphRevisionHistory(item.id);
+}
+
+async function loadGraphRevisionHistory(graphId = graphRevisionGraphId.value) {
+  if (!graphId) {
+    return;
+  }
+  graphRevisionLoading.value = true;
+  graphRevisionLoadingGraphId.value = graphId;
+  graphRevisionError.value = null;
+  try {
+    graphRevisions.value = await fetchGraphRevisions(graphId);
+  } catch (loadError) {
+    graphRevisionError.value = loadError instanceof Error ? loadError.message : t("common.loading");
+  } finally {
+    graphRevisionLoading.value = false;
+    graphRevisionLoadingGraphId.value = "";
+  }
+}
+
+async function restoreGraphRevisionFromHistory(row: GraphRevisionHistoryRow) {
+  if (!graphRevisionGraphId.value || restoreRevisionActionId.value) {
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(
+      row.restoresToDeletion
+        ? t("graphLibrary.restoreRevisionDeletesConfirm")
+        : t("graphLibrary.restoreRevisionConfirm", { name: row.previousName || t("common.none") }),
+      t("graphLibrary.restoreRevisionTitle"),
+      {
+        confirmButtonText: row.restoresToDeletion
+          ? t("graphLibrary.restoreRevisionDeletesGraph")
+          : t("graphLibrary.restoreRevisionAction"),
+        cancelButtonText: t("common.cancel"),
+        type: "warning",
+      },
+    );
+  } catch {
+    return;
+  }
+
+  restoreRevisionActionId.value = row.revisionId;
+  actionError.value = null;
+  graphRevisionError.value = null;
+  try {
+    const response = await restoreGraphRevision(graphRevisionGraphId.value, row.revisionId);
+    if (response.graph) {
+      replaceGraph(response.graph);
+      graphRevisionGraphTitle.value = response.graph.name;
+      await loadGraphRevisionHistory(response.graph.graph_id);
+    } else {
+      graphs.value = graphs.value.filter((graph) => graph.graph_id !== graphRevisionGraphId.value);
+      graphRevisionDialogOpen.value = false;
+      graphRevisions.value = [];
+      graphRevisionGraphId.value = "";
+      graphRevisionGraphTitle.value = "";
+    }
+    ElMessage.success(t("graphLibrary.revisionRestored", { revisionId: response.restored_revision_id }));
+  } catch (restoreError) {
+    const message = restoreError instanceof Error ? restoreError.message : t("common.failedToSave", { error: "" });
+    actionError.value = message;
+    graphRevisionError.value = message;
+  } finally {
+    restoreRevisionActionId.value = "";
+  }
+}
+
+function formatRevisionTimestamp(createdAt: string): string {
+  const parsed = new Date(createdAt);
+  if (Number.isNaN(parsed.getTime())) {
+    return createdAt || t("common.none");
+  }
+  return new Intl.DateTimeFormat(locale.value, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(parsed);
 }
 
 async function deleteItemFromCatalog(item: GraphLibraryItem) {
@@ -918,6 +1117,88 @@ onMounted(loadCatalog);
   background: rgba(248, 250, 252, 0.72);
 }
 
+:global(.graph-library-page__revision-dialog-overlay.el-overlay) {
+  background: rgba(42, 24, 14, 0.22);
+  backdrop-filter: blur(8px) saturate(0.96);
+}
+
+:global(.graph-library-page__revision-dialog.el-dialog) {
+  display: flex;
+  max-height: calc(100vh - 64px);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--toograph-glass-border);
+  border-radius: 22px;
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens), var(--toograph-glass-bg-strong);
+  background-blend-mode: screen, screen, normal;
+  box-shadow:
+    0 24px 72px rgba(66, 31, 17, 0.16),
+    var(--toograph-glass-highlight),
+    var(--toograph-glass-rim);
+}
+
+:global(.graph-library-page__revision-dialog.el-dialog .el-dialog__body) {
+  overflow: auto;
+  padding-top: 0;
+}
+
+.graph-library-page__revision-panel,
+.graph-library-page__revision-list {
+  display: grid;
+  gap: 12px;
+}
+
+.graph-library-page__revision-body,
+.graph-library-page__revision-row p,
+.graph-library-page__revision-meta,
+.graph-library-page__revision-path {
+  margin: 0;
+  color: rgba(60, 41, 20, 0.72);
+  line-height: 1.55;
+}
+
+.graph-library-page__empty--compact {
+  padding: 16px;
+}
+
+.graph-library-page__revision-row {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255, 252, 247, 0.82);
+}
+
+.graph-library-page__revision-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.graph-library-page__revision-main h3 {
+  margin: 4px 0 4px;
+  color: var(--toograph-text-strong);
+  font-size: 0.98rem;
+}
+
+.graph-library-page__revision-path,
+.graph-library-page__revision-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.86rem;
+}
+
+.graph-library-page__revision-path span,
+.graph-library-page__revision-meta span {
+  border: 1px solid rgba(154, 52, 18, 0.08);
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: rgba(255, 248, 240, 0.68);
+}
+
 @media (max-width: 1280px) {
   .graph-library-page__column-list {
     grid-template-columns: 1fr;
@@ -947,7 +1228,8 @@ onMounted(loadCatalog);
 @media (max-width: 700px) {
   .graph-library-page__hero,
   .graph-library-page__card-heading,
-  .graph-library-page__card-bottom {
+  .graph-library-page__card-bottom,
+  .graph-library-page__revision-main {
     display: grid;
   }
 

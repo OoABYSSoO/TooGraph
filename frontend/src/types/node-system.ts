@@ -193,7 +193,15 @@ export type GraphValidationResponse = {
 export type GraphSaveResponse = {
   graph_id: string;
   saved: boolean;
+  revision_id: string;
   validation: GraphValidationResponse;
+};
+
+export type GraphRevisionContext = {
+  actor?: string;
+  run_id?: string;
+  node_id?: string;
+  reason?: string;
 };
 
 export type GraphRevisionDiffEntry = {

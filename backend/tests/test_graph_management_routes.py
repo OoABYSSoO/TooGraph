@@ -208,8 +208,12 @@ class GraphManagementRouteTests(unittest.TestCase):
                     },
                 }
 
-                self.assertEqual(client.post("/api/graphs/save", json=create_payload).status_code, 200)
-                self.assertEqual(client.post("/api/graphs/save", json=update_payload).status_code, 200)
+                create_response = client.post("/api/graphs/save", json=create_payload)
+                update_response = client.post("/api/graphs/save", json=update_payload)
+                self.assertEqual(create_response.status_code, 200)
+                self.assertTrue(create_response.json()["revision_id"].startswith("grev_"))
+                self.assertEqual(update_response.status_code, 200)
+                self.assertTrue(update_response.json()["revision_id"].startswith("grev_"))
 
                 revisions_response = client.get("/api/graphs/graph_revision_target/revisions")
 
@@ -217,6 +221,8 @@ class GraphManagementRouteTests(unittest.TestCase):
             revisions = revisions_response.json()
             self.assertEqual(len(revisions), 2)
             latest = revisions[0]
+            self.assertEqual(update_response.json()["revision_id"], latest["revision_id"])
+            self.assertEqual(create_response.json()["revision_id"], revisions[1]["revision_id"])
             self.assertTrue(latest["revision_id"].startswith("grev_"))
             self.assertEqual(latest["graph_id"], "graph_revision_target")
             self.assertEqual(latest["actor"], "buddy")

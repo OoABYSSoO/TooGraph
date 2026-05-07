@@ -21,6 +21,26 @@ def save_graph(
     reason: str = "",
     validation: dict[str, Any] | None = None,
 ) -> NodeSystemGraphDocument:
+    graph, _revision = save_graph_with_revision(
+        graph_payload,
+        actor=actor,
+        run_id=run_id,
+        node_id=node_id,
+        reason=reason,
+        validation=validation,
+    )
+    return graph
+
+
+def save_graph_with_revision(
+    graph_payload: NodeSystemGraphPayload,
+    *,
+    actor: str = "user",
+    run_id: str = "",
+    node_id: str = "",
+    reason: str = "",
+    validation: dict[str, Any] | None = None,
+) -> tuple[NodeSystemGraphDocument, dict[str, Any]]:
     GRAPH_DATA_DIR.mkdir(parents=True, exist_ok=True)
     graph_id = graph_payload.graph_id or _generate_graph_id()
     path = _graph_path(graph_id)
@@ -36,7 +56,7 @@ def save_graph(
         }
     )
     write_json_file(path, graph.model_dump(by_alias=True, mode="json"))
-    record_graph_revision(
+    revision = record_graph_revision(
         graph_id=graph_id,
         previous_graph=existing_document.model_dump(by_alias=True, mode="json") if existing_document else None,
         next_graph=graph.model_dump(by_alias=True, mode="json"),
@@ -47,7 +67,7 @@ def save_graph(
         validation=validation,
         storage_dir=_graph_revision_data_dir(),
     )
-    return graph
+    return graph, revision
 
 
 def load_graph(graph_id: str) -> NodeSystemGraphDocument:
