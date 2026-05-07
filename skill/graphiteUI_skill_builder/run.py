@@ -401,7 +401,23 @@ def _validate_package_files(files: dict[str, str | None], *, expected_skill_key:
         warnings.append("SKILL.md should start with YAML frontmatter for agent discovery.")
 
     if manifest:
-        for required_key in ("schemaVersion", "skillKey", "name", "inputSchema", "outputSchema", "runtime"):
+        for legacy_key, replacement_key in {
+            "agentInstruction": "llmInstruction",
+            "agentNodeEligibility": "llmNodeEligibility",
+            "agentNodeBlockers": "llmNodeBlockers",
+        }.items():
+            if legacy_key in manifest:
+                errors.append(f"skill.json field '{legacy_key}' is no longer supported. Use '{replacement_key}'.")
+        for required_key in (
+            "schemaVersion",
+            "skillKey",
+            "name",
+            "description",
+            "llmInstruction",
+            "inputSchema",
+            "outputSchema",
+            "runtime",
+        ):
             if required_key not in manifest:
                 errors.append(f"skill.json is missing required field '{required_key}'.")
         if manifest.get("schemaVersion") != "graphite.skill/v1":

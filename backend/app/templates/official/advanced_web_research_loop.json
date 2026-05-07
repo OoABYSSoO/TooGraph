@@ -199,7 +199,7 @@
             "skillKey": "web_search",
             "title": "联网搜索 skill instruction",
             "content": "你已绑定联网搜索技能，因此本节点需要运行它。根据当前输入生成一个清晰、可检索的 query，并把 query 交给技能执行；不要在本节点整理、评价或总结搜索结果。技能结果会通过绑定 state 透传给下游节点。",
-            "source": "skill.agentInstruction"
+            "source": "skill.llmInstruction"
           }
         },
         "taskInstruction": "本节点只负责运行联网搜索技能。优先把 current_query 原样作为技能 query；如果 current_query 为空，才从用户问题和研究计划中生成一个 query。不要总结、评价或改写搜索结果。",

@@ -291,7 +291,7 @@
     },
     "repair_attempt_count": {
       "name": "修复次数",
-      "description": "测试失败后 Agent 已尝试修复的次数。",
+      "description": "测试失败后 LLM 节点已尝试修复的次数。",
       "type": "number",
       "value": 0,
       "color": "#f97316",
@@ -389,7 +389,7 @@
             "skillKey": "graphiteUI_skill_builder",
             "title": "检查现有 Skill",
             "content": "调用 action=inspect_existing_skills，不要传 skill_key 或 files。只返回现有官方和用户 Skill 摘要。",
-            "source": "skill.agentInstruction"
+            "source": "skill.llmInstruction"
           }
         },
         "taskInstruction": "调用 graphiteUI_skill_builder，action 必须是 inspect_existing_skills。不要回答用户，不要生成 Skill 文件。",
@@ -537,7 +537,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "生成完整 GraphiteUI Skill 包。target_skill_key 写 skill_design.skill_key。generated_skill_files 必须是 JSON 对象，键为相对路径，至少包含 skill.json、SKILL.md、run.py；值为完整 UTF-8 文本内容。skill.json 必须包含 schemaVersion=graphite.skill/v1、skillKey、name、description、agentInstruction、version、kind、mode、scope、permissions、inputSchema、outputSchema、runtime、health、configured、healthy。run.py 必须从 stdin 读取 JSON，向 stdout 打印 JSON 对象。smoke_input 使用 example_io.smoke_input 或 skill_input_example。不要写压缩包，不要写官方目录。",
+        "taskInstruction": "生成完整 GraphiteUI Skill 包。target_skill_key 写 skill_design.skill_key。generated_skill_files 必须是 JSON 对象，键为相对路径，至少包含 skill.json、SKILL.md、run.py；值为完整 UTF-8 文本内容。skill.json 必须包含 schemaVersion=graphite.skill/v1、skillKey、name、description、llmInstruction、version、kind、mode、scope、permissions、inputSchema、outputSchema、runtime、health、configured、healthy。run.py 必须从 stdin 读取 JSON，向 stdout 打印 JSON 对象。smoke_input 使用 example_io.smoke_input 或 skill_input_example。不要写压缩包，不要写官方目录。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "xhigh",
@@ -588,7 +588,7 @@
             "skillKey": "graphiteUI_skill_builder",
             "title": "写入用户 Skill 并测试",
             "content": "调用 action=write_skill_package。skill_key 必须来自 target_skill_key，files 必须原样来自 generated_skill_files，smoke_input 来自 smoke_input。写入目标只能是 backend/data/skills/user/<skill_key>。不要生成压缩包，不要写 official skill 目录。",
-            "source": "skill.agentInstruction"
+            "source": "skill.llmInstruction"
           }
         },
         "taskInstruction": "调用 graphiteUI_skill_builder 写入并测试用户 Skill。action 必须是 write_skill_package；skill_key 使用 target_skill_key；files 使用 generated_skill_files；smoke_input 使用 smoke_input。目标目录必须是 backend/data/skills/user/<skill_key>。不要自己总结测试结果，Builder 输出会映射到图状态。",

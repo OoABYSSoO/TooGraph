@@ -87,7 +87,7 @@ export type AgentSkillInstructionBlock = {
   skillKey: string;
   title: string;
   content: string;
-  source: "skill.agentInstruction" | "node.override";
+  source: "skill.llmInstruction" | "node.override";
 };
 
 export type ConditionNode = {

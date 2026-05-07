@@ -134,8 +134,8 @@ def build_skill_input_system_prompt(
             parts.append(f"  name: {definition.name}")
         if definition.description:
             parts.append(f"  description: {definition.description}")
-        if definition.agent_instruction:
-            parts.append(f"  agentInstruction: {definition.agent_instruction}")
+        if definition.llm_instruction:
+            parts.append(f"  llmInstruction: {definition.llm_instruction}")
         parts.append("  inputSchema:")
         for field in definition.input_schema:
             parts.extend(format_skill_input_field_lines(field))

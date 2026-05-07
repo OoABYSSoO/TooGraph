@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.compiler.validator import validate_graph
 from app.core.schemas.node_system import NodeSystemGraphDocument
 from app.core.schemas.skills import (
-    SkillAgentNodeEligibility,
+    SkillLlmNodeEligibility,
     SkillDefinition,
     SkillIoField,
 )
@@ -19,7 +19,7 @@ from app.core.schemas.skills import (
 def _agent_skill_definition(
     skill_key: str,
     *,
-    eligibility: SkillAgentNodeEligibility = SkillAgentNodeEligibility.READY,
+    eligibility: SkillLlmNodeEligibility = SkillLlmNodeEligibility.READY,
     blockers: list[str] | None = None,
     input_schema: list[SkillIoField] | None = None,
     output_schema: list[SkillIoField] | None = None,
@@ -35,8 +35,8 @@ def _agent_skill_definition(
         runtimeRegistered=True,
         configured=True,
         healthy=True,
-        agentNodeEligibility=eligibility,
-        agentNodeBlockers=blockers or [],
+        llmNodeEligibility=eligibility,
+        llmNodeBlockers=blockers or [],
     )
 
 
@@ -74,7 +74,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
         graph = _graph_with_agent_config({"skillKey": "legacy_skill"})
         definition = _agent_skill_definition(
             "legacy_skill",
-            eligibility=SkillAgentNodeEligibility.NEEDS_MANIFEST,
+            eligibility=SkillLlmNodeEligibility.NEEDS_MANIFEST,
             blockers=["Skill manifest is missing a script runtime entrypoint."],
         )
 
@@ -146,7 +146,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
         )
         definition = _agent_skill_definition(
             "desktop_profile",
-            eligibility=SkillAgentNodeEligibility.NEEDS_MANIFEST,
+            eligibility=SkillLlmNodeEligibility.NEEDS_MANIFEST,
             blockers=["Skill manifest is missing a script runtime entrypoint."],
         )
 

@@ -55,12 +55,12 @@ test("SkillsPage surfaces native Skill taxonomy and readiness metadata", () => {
   assert.match(componentSource, /selectedSkill\.runtime\.entrypoint/);
   assert.match(componentSource, /selectedSkill\.configured/);
   assert.match(componentSource, /selectedSkill\.healthy/);
-  assert.match(componentSource, /selectedSkill\.agentNodeEligibility/);
-  assert.match(componentSource, /selectedSkill\.agentNodeBlockers/);
+  assert.match(componentSource, /selectedSkill\.llmNodeEligibility/);
+  assert.match(componentSource, /selectedSkill\.llmNodeBlockers/);
   assert.match(componentSource, /t\("skills\.runPolicies"\)/);
   assert.match(componentSource, /t\("skills\.permissions"\)/);
-  assert.match(componentSource, /t\("skills\.agentNodeEligibility"\)/);
-  assert.match(componentSource, /t\("skills\.agentNodeBlockers"\)/);
+  assert.match(componentSource, /t\("skills\.llmNodeEligibility"\)/);
+  assert.match(componentSource, /t\("skills\.llmNodeBlockers"\)/);
 });
 
 test("SkillsPage exposes upload, status, and delete management actions with local button styling", () => {

@@ -24,7 +24,7 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
           skillKey: "web_search",
           name: "Web Search",
           description: "Searches the web.",
-          agentInstruction: "Choose the query and run the bound web search skill.",
+          llmInstruction: "Choose the query and run the bound web search skill.",
           schemaVersion: "graphite.skill/v1",
           inputSchema: [
             {
@@ -57,8 +57,8 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
           permissions: ["network"],
           runtime: { type: "python", entrypoint: "run.py" },
           health: { type: "none" },
-          agentNodeEligibility: "ready",
-          agentNodeBlockers: [],
+          llmNodeEligibility: "ready",
+          llmNodeBlockers: [],
           sourceFormat: "skill",
           sourceScope: "installed",
           sourcePath: "/skills/web_search/skill.json",
@@ -87,7 +87,7 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
       skillKey: "web_search",
       name: "Web Search",
       description: "Searches the web.",
-      agentInstruction: "Choose the query and run the bound web search skill.",
+      llmInstruction: "Choose the query and run the bound web search skill.",
       schemaVersion: "graphite.skill/v1",
       inputSchema: [
         {
@@ -120,8 +120,8 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
       permissions: ["network"],
       runtime: { type: "python", entrypoint: "run.py" },
       health: { type: "none" },
-      agentNodeEligibility: "ready",
-      agentNodeBlockers: [],
+      llmNodeEligibility: "ready",
+      llmNodeBlockers: [],
       sourceFormat: "skill",
       sourceScope: "installed",
       sourcePath: "/skills/web_search/skill.json",

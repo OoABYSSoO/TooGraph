@@ -16,7 +16,7 @@ from app.core.schemas.node_system import (
     NodeSystemSubgraphNode,
     ValidationIssue,
 )
-from app.core.schemas.skills import SkillAgentNodeEligibility, SkillCatalogStatus, SkillDefinition
+from app.core.schemas.skills import SkillLlmNodeEligibility, SkillCatalogStatus, SkillDefinition
 from app.skills.definitions import get_skill_catalog_registry
 from app.skills.registry import get_skill_registry
 
@@ -322,8 +322,8 @@ def _validate_agent_node(
             )
             continue
 
-        if definition.agent_node_eligibility != SkillAgentNodeEligibility.READY:
-            blockers = "; ".join(definition.agent_node_blockers) or "No readiness details provided."
+        if definition.llm_node_eligibility != SkillLlmNodeEligibility.READY:
+            blockers = "; ".join(definition.llm_node_blockers) or "No readiness details provided."
             issues.append(
                 ValidationIssue(
                     code="agent_skill_not_agent_node_ready",

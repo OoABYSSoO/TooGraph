@@ -19,7 +19,7 @@
 
 - skill manifest 顶层和 `inputSchema` / `outputSchema` 字段都使用 `name` 表示显示名称，不再使用 `label`。
 - “什么时候选择这个技能”写进 `description`。
-- “绑定到 LLM 节点后应该如何生成调用输入”写进 `agentInstruction`。
+- “绑定到 LLM 节点后应该如何生成调用输入”写进 `llmInstruction`。
 - 一个 LLM 节点最多使用一个显式能力来源：无能力、一个手动选择的 Skill、一个输入 `skill` state，或一个输入 `subgraph` state。多个能力调用必须拆成多个节点和边。
 - 手动复用图仍通过 Subgraph 节点完成；`subgraph` state 主要用于桌宠主循环等模板在运行时动态选择可运行子图能力，不作为普通 LLM 节点卡片下拉项。
 - LLM 节点卡片上的 Skill 选择是单选控件；它使用蓝色视觉强调，以区别模型、思考强度和断点等普通运行控件。
@@ -27,7 +27,7 @@
 - 添加到 LLM 节点的 skill 会在节点提示词编辑区生成可编辑的技能说明胶囊；移除 skill 时对应胶囊会移除。
 - 胶囊内容是节点级覆盖，不会反向写回技能包原始文档。
 - `skillBindings` 只保存技能身份和 `outputMapping`。它不保存 `inputMapping`、静态参数 `config` 或无意义的 `trigger`。
-- 技能输入由 LLM 节点在运行前根据当前输入 state、技能 `description`、`agentInstruction` 和 `inputSchema` 生成。上游 `skill` state 只传“选择了哪个技能”，不传具体技能参数。
+- 技能输入由 LLM 节点在运行前根据当前输入 state、技能 `description`、`llmInstruction` 和 `inputSchema` 生成。上游 `skill` state 只传“选择了哪个技能”，不传具体技能参数。
 - 在 LLM 节点卡片选择带 `outputSchema` 的 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
 - 图运行前不再做旧草稿兼容补齐。提交到运行时的图必须已经符合当前协议。
 - `promptVisible` 是待移除的历史字段。新的上下文边界应由节点 `reads` 决定：LLM 节点只接收自己显式读取的 state。
@@ -84,7 +84,7 @@
 - 主要流程：输入问题 -> 制定研究计划与首轮搜索词 -> 运行 `web_search` -> 阅读本地原文并评估证据 -> 需要补搜时由 condition 分支直接回到搜索节点 -> 证据足够或达到上限后筛选依据 -> 生成 `final_reply`。
 - 循环语义：补搜回边是 `should_continue_search` condition 的原生分支。condition 节点协议固定为 `true / false / exhausted` 三个分支，`loopLimit` 默认 5 且可在节点上设置，达到上限时走 `exhausted` 分支并用已有资料收束，而不是撞 LangGraph 递归限制。
 - 技能语义：搜索节点绑定 `web_search`，技能输入仍由该 LLM 节点运行时生成；模板不使用 `inputMapping` 或静态技能参数。
-- 输出语义：`query`、`source_urls`、`artifact_paths`、`errors` 通过 managed binding state 透传；后续 Agent 读取 `artifact_paths` 对应的本地原文，负责证据筛选和最终总结。
+- 输出语义：`query`、`source_urls`、`artifact_paths`、`errors` 通过 managed binding state 透传；后续 LLM 节点读取 `artifact_paths` 对应的本地原文，负责证据筛选和最终总结。
 - 模型语义：模板默认使用全局模型配置，不写死某个 provider。LLM 节点和桌宠模型下拉的第一项是“全局（实时读取当前全局设定的模型）”，后面才是具体模型 override。若全局本地网关未启动，运行该模板前需要在 Model Providers 页面选择可用模型，或在图中为 LLM 节点设置 override。
 
 ### `create_user_skill`

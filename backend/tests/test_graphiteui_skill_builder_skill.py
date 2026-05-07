@@ -28,7 +28,7 @@ def _manifest(skill_key: str = "custom_echo") -> str:
             "skillKey": skill_key,
             "name": "Custom Echo",
             "description": "Echoes a text input.",
-            "agentInstruction": "Use this skill only when the user needs an echo.",
+            "llmInstruction": "Use this skill only when the user needs an echo.",
             "version": "1.0.0",
             "kind": "atomic",
             "mode": "tool",
@@ -122,6 +122,28 @@ class GraphiteUISkillBuilderSkillTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "failed")
         self.assertIn("official Skill", " ".join(result["errors"]))
+
+    def test_write_skill_package_rejects_legacy_agent_instruction_manifest(self) -> None:
+        builder = _load_builder_module()
+        manifest = json.loads(_manifest())
+        manifest.pop("llmInstruction")
+        manifest["agentInstruction"] = "Old field."
+        broken_files = {
+            **_files(),
+            "skill.json": json.dumps(manifest),
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
+                result = builder.graphiteui_skill_builder(
+                    action="write_skill_package",
+                    skill_key="custom_echo",
+                    files=broken_files,
+                )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("agentInstruction", " ".join(result["errors"]))
+        self.assertIn("llmInstruction", " ".join(result["errors"]))
 
     def test_apply_patch_creates_revision_and_rollback_restores_previous_files(self) -> None:
         builder = _load_builder_module()

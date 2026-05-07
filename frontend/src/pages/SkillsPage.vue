@@ -129,7 +129,7 @@
                 <span>{{ t(`skills.${selectedSkill.status}`) }}</span>
                 <span>{{ selectedSkill.runtimeReady ? t("skills.runtimeReady") : t("skills.runtimePending") }}</span>
                 <span>{{ selectedSkill.runtimeRegistered ? t("skills.runtimeRegistered") : t("skills.runtimeNotRegistered") }}</span>
-                <span>{{ t("skills.agentNodeEligibility") }}: {{ selectedSkill.agentNodeEligibility }}</span>
+                <span>{{ t("skills.llmNodeEligibility") }}: {{ selectedSkill.llmNodeEligibility }}</span>
                 <span v-if="!selectedSkill.configured" class="skills-page__status-warning">{{ t("skills.notConfigured") }}</span>
                 <span v-if="!selectedSkill.healthy" class="skills-page__status-warning">{{ t("skills.unhealthy") }}</span>
                 <span v-if="selectedSkill.canManage">{{ t("skills.manageable") }}</span>
@@ -231,10 +231,10 @@
                 </div>
               </section>
               <section>
-                <h4>{{ t("skills.agentNodeBlockers") }}</h4>
+                <h4>{{ t("skills.llmNodeBlockers") }}</h4>
                 <div class="skills-page__schema-list">
-                  <span v-for="blocker in selectedSkill.agentNodeBlockers" :key="blocker">{{ blocker }}</span>
-                  <span v-if="selectedSkill.agentNodeBlockers.length === 0">{{ t("skills.agentNodeReady") }}</span>
+                  <span v-for="blocker in selectedSkill.llmNodeBlockers" :key="blocker">{{ blocker }}</span>
+                  <span v-if="selectedSkill.llmNodeBlockers.length === 0">{{ t("skills.agentNodeReady") }}</span>
                 </div>
               </section>
             </div>

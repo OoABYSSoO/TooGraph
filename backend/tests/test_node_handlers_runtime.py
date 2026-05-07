@@ -385,6 +385,90 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(result["outputs"], {"answer": "searched"})
 
+    def test_execute_agent_node_infers_skill_output_mapping_from_state_outputs(self) -> None:
+        state_schema = {
+            "query": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "source_urls": NodeSystemStateDefinition.model_validate({"type": "json"}),
+            "artifact_paths": NodeSystemStateDefinition.model_validate({"type": "file"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "searcher",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "query"}],
+                "writes": [{"state": "source_urls"}, {"state": "artifact_paths"}],
+                "config": {"skillKey": "web_search"},
+            }
+        )
+        skill_result = {
+            "status": "succeeded",
+            "source_urls": ["https://example.test/source"],
+            "artifact_paths": ["run/doc_001.md"],
+            "errors": [],
+        }
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {"query": "GraphiteUI latest"},
+            {"state": {}},
+            node_name="searcher",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {"web_search": "web_search"},
+            get_skill_definition_registry_func=lambda *, include_disabled: {
+                "web_search": SkillDefinition(
+                    skillKey="web_search",
+                    name="Web Search",
+                    inputSchema=[SkillIoField(key="query", name="Query", valueType="text", required=True)],
+                    outputSchema=[
+                        SkillIoField(key="source_urls", name="Source URLs", valueType="json"),
+                        SkillIoField(key="artifact_paths", name="Artifact Paths", valueType="file"),
+                        SkillIoField(key="errors", name="Errors", valueType="json"),
+                    ],
+                    runtimeReady=True,
+                    runtimeRegistered=True,
+                )
+            },
+            generate_agent_skill_inputs_func=lambda **kwargs: (
+                {"web_search": {"query": "GraphiteUI latest"}},
+                "planned skill inputs",
+                [],
+                kwargs["runtime_config"],
+            ),
+            invoke_skill_func=lambda skill_func, skill_inputs: skill_result,
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("mapped skill outputs should not be repackaged by the LLM")
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertEqual(
+            result["outputs"],
+            {
+                "source_urls": ["https://example.test/source"],
+                "artifact_paths": ["run/doc_001.md"],
+            },
+        )
+        self.assertEqual(
+            result["skill_outputs"][0]["state_writes"],
+            {
+                "source_urls": ["https://example.test/source"],
+                "artifact_paths": ["run/doc_001.md"],
+            },
+        )
+        self.assertEqual(
+            result["skill_outputs"][0]["output_mapping"],
+            {
+                "source_urls": "source_urls",
+                "artifact_paths": "artifact_paths",
+            },
+        )
+
     def test_execute_agent_node_reports_missing_llm_generated_skill_input_without_invoking_script(self) -> None:
         state_schema = {
             "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
