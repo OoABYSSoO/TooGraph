@@ -6,7 +6,7 @@ export type MeasuredNodeSize = {
   height: number;
 };
 
-export type MinimapNodeRunState = "running" | "success" | "failed" | null;
+export type MinimapNodeRunState = "running" | "paused" | "success" | "failed" | null;
 
 export function buildNodeTransformStyle(position: GraphPosition) {
   return {
@@ -49,6 +49,9 @@ export function resolveNodeRenderedSize(input: {
 export function resolveMinimapRunState(status: string | undefined): MinimapNodeRunState {
   if (status === "running" || status === "resuming") {
     return "running";
+  }
+  if (status === "paused" || status === "awaiting_human") {
+    return "paused";
   }
   if (status === "success" || status === "completed") {
     return "success";

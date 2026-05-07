@@ -7,6 +7,7 @@ const ROOT = resolve(import.meta.dirname, "../..");
 
 const criticalUiFiles = [
   "src/pages/HomePage.vue",
+  "src/pages/GraphLibraryPage.vue",
   "src/pages/PresetsPage.vue",
   "src/pages/RunsPage.vue",
   "src/pages/RunDetailPage.vue",

@@ -42,6 +42,7 @@
           'editor-minimap__node--subgraph': node.kind === 'subgraph',
           'editor-minimap__node--selected': node.selected,
           'editor-minimap__node--running': node.runState === 'running',
+          'editor-minimap__node--paused': node.runState === 'paused',
           'editor-minimap__node--failed': node.runState === 'failed',
           'editor-minimap__node--success': node.runState === 'success',
         }"
@@ -237,12 +238,16 @@ function emitWorldPointFromEvent(event: PointerEvent) {
   stroke: rgba(16, 185, 129, 0.88);
 }
 
+.editor-minimap__node--paused {
+  stroke: rgba(245, 158, 11, 0.88);
+}
+
 .editor-minimap__node--success {
-  stroke: rgba(180, 83, 9, 0.82);
+  stroke: rgba(16, 185, 129, 0.82);
 }
 
 .editor-minimap__node--failed {
-  stroke: rgba(220, 38, 38, 0.86);
+  stroke: rgba(239, 68, 68, 0.86);
 }
 
 .editor-minimap__viewport {

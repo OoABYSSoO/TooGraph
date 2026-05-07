@@ -161,8 +161,11 @@ export type GraphPayload = GraphCorePayload & {
   name: string;
 };
 
+export type GraphCatalogStatus = "active" | "disabled";
+
 export type GraphDocument = GraphPayload & {
   graph_id: string;
+  status?: GraphCatalogStatus;
 };
 
 export type GraphValidationIssue = {
@@ -182,6 +185,11 @@ export type GraphSaveResponse = {
   validation: GraphValidationResponse;
 };
 
+export type GraphDeleteResponse = {
+  graph_id: string;
+  status: "deleted";
+};
+
 export type GraphRunResponse = {
   run_id: string;
   status: string;
@@ -195,6 +203,7 @@ export type TemplateRecord = {
   description: string;
   default_graph_name: string;
   source?: TemplateSource;
+  status?: GraphCatalogStatus;
   state_schema: Record<string, StateDefinition>;
   nodes: Record<string, GraphNode>;
   edges: GraphEdge[];
@@ -206,6 +215,11 @@ export type TemplateSaveResponse = {
   template_id: string;
   saved: boolean;
   template: TemplateRecord;
+};
+
+export type TemplateDeleteResponse = {
+  template_id: string;
+  status: "deleted";
 };
 
 export type PresetDefinition = {

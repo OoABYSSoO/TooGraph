@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from app.core.schemas.node_system import NodeSystemGraphPayload, NodeSystemTemplate
+from app.core.schemas.node_system import NodeSystemCatalogStatus, NodeSystemGraphPayload, NodeSystemTemplate
 from app.core.storage.database import USER_TEMPLATE_DATA_DIR
-from app.core.storage.json_file_utils import write_json_file
+from app.core.storage.json_file_utils import read_json_file, write_json_file
 
 
 TEMPLATES_ROOT = Path(__file__).resolve().parent
@@ -18,7 +17,7 @@ OFFICIAL_TEMPLATE_SOURCE = "official"
 USER_TEMPLATE_SOURCE = "user"
 
 
-def list_template_records() -> list[dict[str, Any]]:
+def list_template_records(include_disabled: bool = False) -> list[dict[str, Any]]:
     official_records = [
         load_template_record_from_path(path, source=OFFICIAL_TEMPLATE_SOURCE)
         for path in sorted(OFFICIAL_TEMPLATES_ROOT.glob(f"*{TEMPLATE_FILE_SUFFIX}"))
@@ -27,7 +26,12 @@ def list_template_records() -> list[dict[str, Any]]:
         load_template_record_from_path(path, source=USER_TEMPLATE_SOURCE)
         for path in sorted(USER_TEMPLATES_ROOT.glob(f"*{TEMPLATE_FILE_SUFFIX}"))
     ]
-    return [*official_records, *user_records]
+    if include_disabled:
+        return [*official_records, *user_records]
+    return [
+        *official_records,
+        *[record for record in user_records if record.get("status") != NodeSystemCatalogStatus.DISABLED.value],
+    ]
 
 
 def load_template_record(template_id: str) -> dict[str, Any]:
@@ -61,9 +65,43 @@ def save_user_template_record(graph_payload: NodeSystemGraphPayload) -> dict[str
 
 
 def load_template_record_from_path(path: Path, *, source: str) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload = read_json_file(path, default={})
     template = NodeSystemTemplate.model_validate(payload)
     return _with_template_source(template.model_dump(by_alias=True, mode="json"), source)
+
+
+def disable_user_template_record(template_id: str) -> dict[str, Any]:
+    return set_user_template_status(template_id, NodeSystemCatalogStatus.DISABLED)
+
+
+def enable_user_template_record(template_id: str) -> dict[str, Any]:
+    return set_user_template_status(template_id, NodeSystemCatalogStatus.ACTIVE)
+
+
+def set_user_template_status(template_id: str, status: NodeSystemCatalogStatus) -> dict[str, Any]:
+    _ensure_user_template_is_manageable(template_id)
+    path = USER_TEMPLATES_ROOT / f"{template_id}{TEMPLATE_FILE_SUFFIX}"
+    payload = read_json_file(path, default=None)
+    if payload is None:
+        raise KeyError(template_id)
+    template = NodeSystemTemplate.model_validate({**payload, "status": status.value})
+    record = template.model_dump(by_alias=True, mode="json")
+    write_json_file(path, record)
+    return _with_template_source(record, USER_TEMPLATE_SOURCE)
+
+
+def delete_user_template_record(template_id: str) -> None:
+    _ensure_user_template_is_manageable(template_id)
+    path = USER_TEMPLATES_ROOT / f"{template_id}{TEMPLATE_FILE_SUFFIX}"
+    if not path.exists():
+        raise KeyError(template_id)
+    path.unlink()
+
+
+def _ensure_user_template_is_manageable(template_id: str) -> None:
+    official_path = OFFICIAL_TEMPLATES_ROOT / f"{template_id}{TEMPLATE_FILE_SUFFIX}"
+    if official_path.exists():
+        raise PermissionError("Official templates are read-only.")
 
 
 def _with_template_source(record: dict[str, Any], source: str) -> dict[str, Any]:

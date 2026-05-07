@@ -228,6 +228,18 @@ test("EditorMinimap mirrors main node type colors in the bottom-right thumbnail"
   assert.match(minimapSource, /\.editor-minimap__node--subgraph \{[\s\S]*fill:\s*rgba\(13,\s*148,\s*136,\s*0\.44\);/);
 });
 
+test("EditorMinimap mirrors main runtime outline colors in the bottom-right thumbnail", () => {
+  assert.match(minimapSource, /'editor-minimap__node--running': node\.runState === 'running'/);
+  assert.match(minimapSource, /'editor-minimap__node--paused': node\.runState === 'paused'/);
+  assert.match(minimapSource, /'editor-minimap__node--success': node\.runState === 'success'/);
+  assert.match(minimapSource, /'editor-minimap__node--failed': node\.runState === 'failed'/);
+  assert.match(minimapSource, /\.editor-minimap__node--running \{[\s\S]*stroke:\s*rgba\(16,\s*185,\s*129,\s*0\.88\);/);
+  assert.match(minimapSource, /\.editor-minimap__node--paused \{[\s\S]*stroke:\s*rgba\(245,\s*158,\s*11,\s*0\.88\);/);
+  assert.match(minimapSource, /\.editor-minimap__node--success \{[\s\S]*stroke:\s*rgba\(16,\s*185,\s*129,\s*0\.82\);/);
+  assert.match(minimapSource, /\.editor-minimap__node--failed \{[\s\S]*stroke:\s*rgba\(239,\s*68,\s*68,\s*0\.86\);/);
+  assert.doesNotMatch(minimapSource, /\.editor-minimap__node--success \{[\s\S]*rgba\(180,\s*83,\s*9/);
+});
+
 test("EditorCanvas delegates external node focus viewport projection to a model", () => {
   const focusNodeViewportModelSource = readFocusNodeViewportModelSource();
 

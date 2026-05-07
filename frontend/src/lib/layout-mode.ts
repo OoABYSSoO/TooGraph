@@ -2,6 +2,7 @@ export type ShellLayoutMode = "standard" | "editor-canvas";
 export type PrimaryNavigationSection =
   | "home"
   | "editor"
+  | "graphLibrary"
   | "companion"
   | "presets"
   | "skills"
@@ -29,6 +30,9 @@ export function resolvePrimaryNavigationSection(pathname: string): PrimaryNaviga
   }
   if (pathname === "/editor" || pathname.startsWith("/editor/")) {
     return "editor";
+  }
+  if (pathname === "/library" || pathname.startsWith("/library/")) {
+    return "graphLibrary";
   }
   if (pathname === "/companion" || pathname.startsWith("/companion/")) {
     return "companion";

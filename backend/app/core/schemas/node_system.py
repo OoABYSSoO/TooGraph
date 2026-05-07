@@ -50,6 +50,11 @@ class GraphSaveResponse(BaseModel):
     validation: GraphValidationResponse
 
 
+class NodeSystemCatalogStatus(str, Enum):
+    ACTIVE = "active"
+    DISABLED = "disabled"
+
+
 class NodeSystemStateType(str, Enum):
     TEXT = "text"
     NUMBER = "number"
@@ -482,6 +487,7 @@ class NodeSystemTemplate(NodeSystemGraphCore):
     label: str = Field(..., min_length=1)
     description: str = ""
     default_graph_name: str = Field(..., min_length=1)
+    status: NodeSystemCatalogStatus = NodeSystemCatalogStatus.ACTIVE
 
     @field_validator("template_id", "label", "default_graph_name")
     @classmethod
@@ -507,6 +513,7 @@ class NodeSystemGraphPayload(NodeSystemGraphCore):
 
 class NodeSystemGraphDocument(NodeSystemGraphPayload):
     graph_id: str = Field(..., min_length=1)
+    status: NodeSystemCatalogStatus = NodeSystemCatalogStatus.ACTIVE
 
 
 NodeSystemSubgraphConfig.model_rebuild()

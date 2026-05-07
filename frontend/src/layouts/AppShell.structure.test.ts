@@ -46,7 +46,7 @@ test("AppShell keeps the sidebar fixed while normal pages scroll in the content 
 
 test("AppShell uses a low-noise ChatGPT-style brand rail with library icons", () => {
   assert.match(componentSource, /import \{[\s\S]*ElIcon[\s\S]*\} from "element-plus";/);
-  assert.match(componentSource, /import \{[\s\S]*House[\s\S]*EditPen[\s\S]*Clock[\s\S]*Setting[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import \{[\s\S]*House[\s\S]*EditPen[\s\S]*Clock[\s\S]*Collection[\s\S]*Setting[\s\S]*\} from "@element-plus\/icons-vue";/);
   assert.doesNotMatch(componentSource, /Fold|Expand/);
   assert.match(componentSource, /<button[\s\S]*class="app-shell__brand-mark"[\s\S]*<img class="app-shell__brand-logo" src="\/logo\.svg" alt="" aria-hidden="true" \/>[\s\S]*<\/button>/);
   assert.match(componentSource, /<h1 class="app-shell__title">GraphiteUI<\/h1>/);
@@ -55,15 +55,23 @@ test("AppShell uses a low-noise ChatGPT-style brand rail with library icons", ()
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><House \/><\/ElIcon>/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><EditPen \/><\/ElIcon>/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Clock \/><\/ElIcon>/);
+  assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Collection \/><\/ElIcon>/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Setting \/><\/ElIcon>/);
   assert.match(componentSource, /\{\{ t\("nav\.home"\) \}\}/);
   assert.match(componentSource, /\{\{ t\("nav\.editor"\) \}\}/);
   assert.match(componentSource, /\{\{ t\("nav\.runs"\) \}\}/);
+  assert.match(componentSource, /\{\{ t\("nav\.graphLibrary"\) \}\}/);
   assert.match(componentSource, /\{\{ t\("nav\.settings"\) \}\}/);
   assert.match(componentSource, /\.app-shell__sidebar \{[\s\S]*background:\s*var\(--graphite-glass-bg\);/);
   assert.match(componentSource, /\.app-shell__sidebar \{[\s\S]*backdrop-filter:\s*blur\(24px\) saturate\(1\.35\);/);
   assert.match(componentSource, /\.app-shell__link \{[\s\S]*border:\s*1px solid transparent;/);
   assert.match(componentSource, /\.app-shell__link\.router-link-active,[\s\S]*\.app-shell__link\.app-shell__link--active \{[\s\S]*box-shadow:\s*inset 3px 0 0 rgba\(154,\s*52,\s*18,\s*0\.7\);/);
+});
+
+test("AppShell exposes graph and template management as a primary sidebar destination", () => {
+  assert.match(componentSource, /import \{[\s\S]*Collection[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /to="\/library"[\s\S]*activeNavigationSection === 'graphLibrary'[\s\S]*t\("nav\.graphLibrary"\)/);
+  assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Collection \/><\/ElIcon>/);
 });
 
 test("AppShell exposes the global language switcher in the sidebar", () => {

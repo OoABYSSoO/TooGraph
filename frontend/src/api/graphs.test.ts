@@ -1,7 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { exportLangGraphPython, importGraphFromPythonSource, runGraph, saveGraphAsTemplate } from "./graphs.ts";
+import {
+  deleteGraph,
+  deleteTemplate,
+  exportLangGraphPython,
+  fetchGraphs,
+  fetchTemplates,
+  importGraphFromPythonSource,
+  runGraph,
+  saveGraphAsTemplate,
+  updateGraphStatus,
+  updateTemplateStatus,
+} from "./graphs.ts";
 import type { GraphPayload } from "@/types/node-system";
 
 const originalFetch = globalThis.fetch;
@@ -125,6 +136,81 @@ test("saveGraphAsTemplate posts graph payload to the template save endpoint", as
   assert.equal(response.template_id, "user_template_1");
 
   globalThis.fetch = originalFetch;
+});
+
+test("fetchGraphs and fetchTemplates can request the management catalog including disabled items", async () => {
+  const requestedUrls: string[] = [];
+
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requestedUrls.push(String(input));
+    return new Response(JSON.stringify([]), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  }) as typeof fetch;
+
+  try {
+    await fetchGraphs();
+    await fetchGraphs({ includeDisabled: true });
+    await fetchTemplates();
+    await fetchTemplates({ includeDisabled: true });
+
+    assert.deepEqual(requestedUrls, [
+      "/api/graphs",
+      "/api/graphs?include_disabled=true",
+      "/api/templates",
+      "/api/templates?include_disabled=true",
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("graph and template management helpers call status and delete endpoints", async () => {
+  const requests: Array<{ url: string; method: string | undefined; body: string | null }> = [];
+
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    requests.push({
+      url: String(input),
+      method: init?.method,
+      body: typeof init?.body === "string" ? init.body : null,
+    });
+    return new Response(
+      JSON.stringify({
+        graph_id: "graph_1",
+        template_id: "template_1",
+        status: "active",
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+  }) as typeof fetch;
+
+  try {
+    await updateGraphStatus("graph_1", "disabled");
+    await updateGraphStatus("graph_1", "active");
+    await deleteGraph("graph_1");
+    await updateTemplateStatus("template_1", "disabled");
+    await updateTemplateStatus("template_1", "active");
+    await deleteTemplate("template_1");
+
+    assert.deepEqual(requests, [
+      { url: "/api/graphs/graph_1/disable", method: "POST", body: "null" },
+      { url: "/api/graphs/graph_1/enable", method: "POST", body: "null" },
+      { url: "/api/graphs/graph_1", method: "DELETE", body: null },
+      { url: "/api/templates/template_1/disable", method: "POST", body: "null" },
+      { url: "/api/templates/template_1/enable", method: "POST", body: "null" },
+      { url: "/api/templates/template_1", method: "DELETE", body: null },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("runGraph surfaces backend validation issue details for failed requests", async () => {

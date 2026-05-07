@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 
 const CompanionPage = () => import("@/pages/CompanionPage.vue");
 const EditorPage = () => import("@/pages/EditorPage.vue");
+const GraphLibraryPage = () => import("@/pages/GraphLibraryPage.vue");
 const HomePage = () => import("@/pages/HomePage.vue");
 const ModelLogsPage = () => import("@/pages/ModelLogsPage.vue");
 const ModelProvidersPage = () => import("@/pages/ModelProvidersPage.vue");
@@ -19,6 +20,7 @@ export const router = createRouter({
     { path: "/editor", component: EditorPage },
     { path: "/editor/new", component: EditorPage },
     { path: "/editor/:graphId", component: EditorPage },
+    { path: "/library", component: GraphLibraryPage },
     { path: "/companion", component: CompanionPage },
     { path: "/presets", component: PresetsPage },
     { path: "/skills", component: SkillsPage },

@@ -13,11 +13,13 @@ test("router resets page scroll on route navigation while preserving browser bac
 
 test("router exposes first-class management pages for presets and skills", () => {
   assert.doesNotMatch(routerSource, /import \w+Page from "@\/pages\//);
+  assert.match(routerSource, /const GraphLibraryPage = \(\) => import\("@\/pages\/GraphLibraryPage\.vue"\);/);
   assert.match(routerSource, /const PresetsPage = \(\) => import\("@\/pages\/PresetsPage\.vue"\);/);
   assert.match(routerSource, /const SkillsPage = \(\) => import\("@\/pages\/SkillsPage\.vue"\);/);
   assert.match(routerSource, /const ModelProvidersPage = \(\) => import\("@\/pages\/ModelProvidersPage\.vue"\);/);
   assert.match(routerSource, /const ModelLogsPage = \(\) => import\("@\/pages\/ModelLogsPage\.vue"\);/);
   assert.match(routerSource, /const CompanionPage = \(\) => import\("@\/pages\/CompanionPage\.vue"\);/);
+  assert.match(routerSource, /\{ path: "\/library", component: GraphLibraryPage \}/);
   assert.match(routerSource, /\{ path: "\/companion", component: CompanionPage \}/);
   assert.match(routerSource, /\{ path: "\/presets", component: PresetsPage \}/);
   assert.match(routerSource, /\{ path: "\/skills", component: SkillsPage \}/);
@@ -28,6 +30,7 @@ test("router exposes first-class management pages for presets and skills", () =>
 test("router lazy-loads page components to keep the production entry chunk small", () => {
   for (const pageName of [
     "EditorPage",
+    "GraphLibraryPage",
     "HomePage",
     "CompanionPage",
     "ModelLogsPage",

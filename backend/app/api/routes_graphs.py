@@ -19,7 +19,7 @@ from app.core.schemas.node_system import (
     NodeSystemGraphDocument,
     NodeSystemGraphPayload,
 )
-from app.core.storage.graph_store import list_graphs, load_graph, save_graph
+from app.core.storage.graph_store import delete_graph, disable_graph, enable_graph, list_graphs, load_graph, save_graph
 from app.core.storage.run_store import save_run
 
 logger = logging.getLogger(__name__)
@@ -52,8 +52,8 @@ def _build_runtime_graph_document(graph_payload: NodeSystemGraphPayload) -> Node
 
 
 @router.get("")
-def list_graphs_endpoint() -> list[NodeSystemGraphDocument]:
-    return list_graphs()
+def list_graphs_endpoint(include_disabled: bool = False) -> list[NodeSystemGraphDocument]:
+    return list_graphs(include_disabled=include_disabled)
 
 
 @router.post("/save", response_model=GraphSaveResponse)
@@ -80,6 +80,31 @@ def get_graph_endpoint(graph_id: str) -> NodeSystemGraphDocument:
         return load_graph(graph_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/{graph_id}/disable", response_model=NodeSystemGraphDocument)
+def disable_graph_endpoint(graph_id: str) -> NodeSystemGraphDocument:
+    try:
+        return disable_graph(graph_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/{graph_id}/enable", response_model=NodeSystemGraphDocument)
+def enable_graph_endpoint(graph_id: str) -> NodeSystemGraphDocument:
+    try:
+        return enable_graph(graph_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.delete("/{graph_id}")
+def delete_graph_endpoint(graph_id: str) -> dict[str, str]:
+    try:
+        delete_graph(graph_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"graph_id": graph_id, "status": "deleted"}
 
 
 @router.post("/validate", response_model=GraphValidationResponse)
