@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "graphiteUI_skill_builder",
+  "name": "GraphiteUI Skill Builder",
+  "description": "构建、校验、测试和修订 GraphiteUI 用户自定义 Skill 包。只写入 backend/data/skills/user，官方 Skill 只读，适合被创建 Skill 的图模板调用。",
+  "agentInstruction": "你已绑定 GraphiteUI Skill Builder。它只负责确定性的 Skill 包操作：检查现有 Skill、校验 skill.json/SKILL.md/run.py、写入用户 Skill 目录、运行 smoke test、创建修订和回滚。不要让它替代需求澄清或方案设计；这些应由 Agent 节点完成。生成或修复 Skill 时，files 必须是完整的相对路径到 UTF-8 文本内容映射，目标只能是 backend/data/skills/user/<skill_key>。如果测试失败，读取 validation_errors、smoke_test、stdout、stderr 和 errors，修改 generated_skill_files 后再次调用。",
+  "version": "1.0.0",
+  "runPolicies": {
+    "default": {
+      "discoverable": true,
+      "autoSelectable": false,
+      "requiresApproval": false
+    },
+    "origins": {
+      "companion": {
+        "discoverable": true,
+        "autoSelectable": false,
+        "requiresApproval": true
+      }
+    }
+  },
+  "kind": "atomic",
+  "mode": "tool",
+  "scope": "workspace",
+  "permissions": ["file_read", "file_write", "subprocess"],
+  "inputSchema": [
+    {
+      "key": "action",
+      "name": "Action",
+      "valueType": "text",
+      "required": true,
+      "description": "One of inspect_existing_skills, validate_skill_package, write_skill_package, apply_skill_patch, run_skill_smoke_test, rollback_skill_revision, or get_skill_revision."
+    },
+    {
+      "key": "skill_key",
+      "name": "Skill Key",
+      "valueType": "text",
+      "required": false,
+      "description": "Target user Skill key. Required for every action except inspect_existing_skills."
+    },
+    {
+      "key": "files",
+      "name": "Files",
+      "valueType": "json",
+      "required": false,
+      "description": "Relative package path to UTF-8 text content mapping, for example {\"skill.json\":\"...\",\"SKILL.md\":\"...\",\"run.py\":\"...\"}."
+    },
+    {
+      "key": "smoke_input",
+      "name": "Smoke Input",
+      "valueType": "json",
+      "required": false,
+      "description": "Example JSON object passed to run.py during smoke testing."
+    },
+    {
+      "key": "revision_id",
+      "name": "Revision ID",
+      "valueType": "text",
+      "required": false,
+      "description": "Revision identifier for rollback_skill_revision or get_skill_revision."
+    }
+  ],
+  "outputSchema": [
+    { "key": "status", "name": "Status", "valueType": "text", "description": "succeeded or failed." },
+    { "key": "skill_key", "name": "Skill Key", "valueType": "text", "description": "Target Skill key." },
+    { "key": "skill_path", "name": "Skill Path", "valueType": "file", "description": "Relative user Skill package directory." },
+    { "key": "final_skill_path", "name": "Final Skill Path", "valueType": "file", "description": "Relative final Skill package directory." },
+    { "key": "changed_paths", "name": "Changed Paths", "valueType": "file", "description": "Files changed by write, patch, or rollback." },
+    { "key": "revision_id", "name": "Revision ID", "valueType": "text", "description": "Previous package revision created before mutation." },
+    { "key": "validation", "name": "Validation", "valueType": "json", "description": "Manifest and package validation report." },
+    { "key": "validation_errors", "name": "Validation Errors", "valueType": "json", "description": "Validation errors that need repair." },
+    { "key": "smoke_test", "name": "Smoke Test", "valueType": "json", "description": "Smoke test execution report." },
+    { "key": "test_status", "name": "Test Status", "valueType": "text", "description": "succeeded or failed for the latest validation/smoke stage." },
+    { "key": "stdout", "name": "Stdout", "valueType": "text", "description": "Smoke test stdout." },
+    { "key": "stderr", "name": "Stderr", "valueType": "text", "description": "Smoke test stderr." },
+    { "key": "skill_catalog", "name": "Skill Catalog", "valueType": "json", "description": "Existing official and user Skill summaries." },
+    { "key": "errors", "name": "Errors", "valueType": "json", "description": "Builder or smoke test errors." },
+    { "key": "warnings", "name": "Warnings", "valueType": "json", "description": "Builder warnings and sandbox limitations." },
+    { "key": "builder_result", "name": "Builder Result", "valueType": "json", "description": "Complete structured result for downstream repair agents." }
+  ],
+  "supportedValueTypes": ["text", "markdown", "json", "file", "skill"],
+  "sideEffects": ["file_read", "file_write", "subprocess"],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 300
+  },
+  "health": { "type": "none" },
+  "configured": true,
+  "healthy": true
+}

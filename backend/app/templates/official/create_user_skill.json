@@ -1,0 +1,808 @@
+{
+  "template_id": "create_user_skill",
+  "label": "创建自定义技能",
+  "description": "通过 GraphiteUI Skill Builder 创建、校验、测试并自动修复用户自定义 Skill 的图模板。",
+  "default_graph_name": "创建自定义技能",
+  "state_schema": {
+    "skill_idea": {
+      "name": "技能想法",
+      "description": "用户对新技能能力、输入输出和使用场景的原始描述。",
+      "type": "markdown",
+      "value": "我想创建一个能处理本地文本并返回结构化摘要的技能。",
+      "color": "#d97706",
+      "promptVisible": true,
+      "binding": null
+    },
+    "existing_skill_catalog": {
+      "name": "现有技能目录",
+      "description": "GraphiteUI Skill Builder 读取到的官方和用户 Skill 摘要。",
+      "type": "json",
+      "value": [],
+      "color": "#64748b",
+      "promptVisible": false,
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "inspect_existing_skills",
+        "fieldKey": "skill_catalog",
+        "managed": true
+      }
+    },
+    "existing_skill_match": {
+      "name": "现有技能匹配",
+      "description": "是否已有技能能满足需求，以及复用或新建的理由。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "promptVisible": true,
+      "binding": null
+    },
+    "clarification_questions": {
+      "name": "澄清问题",
+      "description": "需要用户确认的模糊点，尽量带选项。",
+      "type": "json",
+      "value": [],
+      "color": "#2563eb",
+      "promptVisible": true,
+      "binding": null
+    },
+    "clarification_answers": {
+      "name": "澄清回答",
+      "description": "用户在断点处填写的需求澄清回答；可以选择问题给出的选项，也可以写自己的见解。",
+      "type": "markdown",
+      "value": "",
+      "color": "#1d4ed8",
+      "promptVisible": true,
+      "binding": null
+    },
+    "requirements_draft": {
+      "name": "需求草稿",
+      "description": "澄清前的需求理解草稿。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0891b2",
+      "promptVisible": true,
+      "binding": null
+    },
+    "accepted_requirements": {
+      "name": "确认后的需求",
+      "description": "根据用户澄清回答整理出的可实现需求、边界和验收标准。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0284c7",
+      "promptVisible": true,
+      "binding": null
+    },
+    "example_io": {
+      "name": "示例输入输出",
+      "description": "用于用户确认和后续 smoke test 的示例输入、预期输出和验收说明。",
+      "type": "json",
+      "value": {},
+      "color": "#7c3aed",
+      "promptVisible": true,
+      "binding": null
+    },
+    "example_approval": {
+      "name": "示例确认",
+      "description": "用户在断点处填写 approved 或 revise。",
+      "type": "text",
+      "value": "",
+      "color": "#9333ea",
+      "promptVisible": true,
+      "binding": null
+    },
+    "example_feedback": {
+      "name": "示例修改意见",
+      "description": "用户不认可示例时填写的修改意见。",
+      "type": "markdown",
+      "value": "",
+      "color": "#a855f7",
+      "promptVisible": true,
+      "binding": null
+    },
+    "skill_design": {
+      "name": "技能设计",
+      "description": "正式生成文件前的技能设计，包括 skillKey、权限、schema、文件列表、测试策略和风险。",
+      "type": "json",
+      "value": {},
+      "color": "#4f46e5",
+      "promptVisible": true,
+      "binding": null
+    },
+    "design_approval": {
+      "name": "设计确认",
+      "description": "用户在断点处填写 approved 或 revise。",
+      "type": "text",
+      "value": "",
+      "color": "#6366f1",
+      "promptVisible": true,
+      "binding": null
+    },
+    "design_feedback": {
+      "name": "设计修改意见",
+      "description": "用户不认可设计时填写的修改意见。",
+      "type": "markdown",
+      "value": "",
+      "color": "#818cf8",
+      "promptVisible": true,
+      "binding": null
+    },
+    "target_skill_key": {
+      "name": "目标 Skill Key",
+      "description": "用户自定义 Skill 的 skillKey。",
+      "type": "text",
+      "value": "",
+      "color": "#0f766e",
+      "promptVisible": true,
+      "binding": null
+    },
+    "generated_skill_files": {
+      "name": "生成的 Skill 文件",
+      "description": "完整 Skill 包文件映射，键为相对路径，值为 UTF-8 文本内容。",
+      "type": "json",
+      "value": {},
+      "color": "#16a34a",
+      "promptVisible": true,
+      "binding": null
+    },
+    "smoke_input": {
+      "name": "Smoke Test 输入",
+      "description": "传给 run.py 的示例 JSON 输入。",
+      "type": "json",
+      "value": {},
+      "color": "#22c55e",
+      "promptVisible": true,
+      "binding": null
+    },
+    "builder_result": {
+      "name": "Builder 结果",
+      "description": "GraphiteUI Skill Builder 返回的完整结构化结果。",
+      "type": "json",
+      "value": {},
+      "color": "#475569",
+      "promptVisible": false,
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "write_skill_package",
+        "fieldKey": "builder_result",
+        "managed": true
+      }
+    },
+    "validation_errors": {
+      "name": "校验错误",
+      "description": "Skill 包校验错误。",
+      "type": "json",
+      "value": [],
+      "color": "#dc2626",
+      "promptVisible": true,
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "write_skill_package",
+        "fieldKey": "validation_errors",
+        "managed": true
+      }
+    },
+    "builder_errors": {
+      "name": "Builder 错误",
+      "description": "写入、测试或回滚阶段返回的错误。",
+      "type": "json",
+      "value": [],
+      "color": "#b91c1c",
+      "promptVisible": true,
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "write_skill_package",
+        "fieldKey": "errors",
+        "managed": true
+      }
+    },
+    "builder_warnings": {
+      "name": "Builder 警告",
+      "description": "本地子进程、文档或校验相关警告。",
+      "type": "json",
+      "value": [],
+      "color": "#ca8a04",
+      "promptVisible": true,
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "write_skill_package",
+        "fieldKey": "warnings",
+        "managed": true
+      }
+    },
+    "test_status": {
+      "name": "测试状态",
+      "description": "最近一次 Skill Builder 校验和 smoke test 的状态。",
+      "type": "text",
+      "value": "",
+      "color": "#16a34a",
+      "promptVisible": true,
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "write_skill_package",
+        "fieldKey": "test_status",
+        "managed": true
+      }
+    },
+    "test_stdout": {
+      "name": "测试 Stdout",
+      "description": "最近一次 smoke test 的 stdout。",
+      "type": "text",
+      "value": "",
+      "color": "#15803d",
+      "promptVisible": true,
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "write_skill_package",
+        "fieldKey": "stdout",
+        "managed": true
+      }
+    },
+    "test_stderr": {
+      "name": "测试 Stderr",
+      "description": "最近一次 smoke test 的 stderr。",
+      "type": "text",
+      "value": "",
+      "color": "#dc2626",
+      "promptVisible": true,
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "write_skill_package",
+        "fieldKey": "stderr",
+        "managed": true
+      }
+    },
+    "final_skill_path": {
+      "name": "最终 Skill 路径",
+      "description": "生成或修复后的用户 Skill 包路径。",
+      "type": "file",
+      "value": "",
+      "color": "#0f766e",
+      "promptVisible": true,
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "write_skill_package",
+        "fieldKey": "final_skill_path",
+        "managed": true
+      }
+    },
+    "changed_paths": {
+      "name": "变更文件",
+      "description": "Skill Builder 写入、修复或回滚的文件路径。",
+      "type": "file",
+      "value": [],
+      "color": "#059669",
+      "promptVisible": true,
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "write_skill_package",
+        "fieldKey": "changed_paths",
+        "managed": true
+      }
+    },
+    "repair_attempt_count": {
+      "name": "修复次数",
+      "description": "测试失败后 Agent 已尝试修复的次数。",
+      "type": "number",
+      "value": 0,
+      "color": "#f97316",
+      "promptVisible": false,
+      "binding": null
+    },
+    "repair_plan": {
+      "name": "修复计划",
+      "description": "根据错误分析生成的修复计划。",
+      "type": "markdown",
+      "value": "",
+      "color": "#ea580c",
+      "promptVisible": true,
+      "binding": null
+    },
+    "repair_patch": {
+      "name": "修复补丁",
+      "description": "修复轮次中修改过的文件片段或完整文件说明。",
+      "type": "json",
+      "value": {},
+      "color": "#f59e0b",
+      "promptVisible": true,
+      "binding": null
+    },
+    "repair_notes": {
+      "name": "修复说明",
+      "description": "每轮修复的原因和变更摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#d97706",
+      "promptVisible": true,
+      "binding": null
+    },
+    "failed_repair_decision": {
+      "name": "失败后决定",
+      "description": "自动修复达到上限后，用户填写 continue 或 stop。",
+      "type": "text",
+      "value": "",
+      "color": "#be123c",
+      "promptVisible": true,
+      "binding": null
+    },
+    "failed_repair_feedback": {
+      "name": "失败后反馈",
+      "description": "自动修复达到上限后，用户给出的额外修复方向。",
+      "type": "markdown",
+      "value": "",
+      "color": "#e11d48",
+      "promptVisible": true,
+      "binding": null
+    },
+    "final_verification_report": {
+      "name": "最终报告",
+      "description": "创建成功或失败后的最终报告。",
+      "type": "markdown",
+      "value": "",
+      "color": "#b45309",
+      "promptVisible": true,
+      "binding": null
+    }
+  },
+  "nodes": {
+    "input_skill_idea": {
+      "kind": "input",
+      "name": "输入技能想法",
+      "description": "描述希望创建的自定义 Skill。",
+      "ui": { "position": { "x": 40, "y": 360 }, "collapsed": false, "size": { "width": 320, "height": 190 } },
+      "reads": [],
+      "writes": [{ "state": "skill_idea", "mode": "replace" }],
+      "config": { "value": "我想创建一个能处理本地文本并返回结构化摘要的技能。", "boundaryType": "markdown" }
+    },
+    "inspect_existing_skills": {
+      "kind": "agent",
+      "name": "检查现有技能",
+      "description": "读取官方和用户 Skill 摘要，给后续节点判断是否已有能力可复用。",
+      "ui": { "position": { "x": 440, "y": 300 }, "collapsed": false, "size": { "width": 400, "height": 260 } },
+      "reads": [{ "state": "skill_idea", "required": true }],
+      "writes": [
+        { "state": "existing_skill_catalog", "mode": "replace" },
+        { "state": "builder_result", "mode": "replace" }
+      ],
+      "config": {
+        "skills": ["graphiteUI_skill_builder"],
+        "skillBindings": [
+          {
+            "skillKey": "graphiteUI_skill_builder",
+            "outputMapping": {
+              "skill_catalog": "existing_skill_catalog",
+              "builder_result": "builder_result"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {
+          "graphiteUI_skill_builder": {
+            "skillKey": "graphiteUI_skill_builder",
+            "title": "检查现有 Skill",
+            "content": "调用 action=inspect_existing_skills，不要传 skill_key 或 files。只返回现有官方和用户 Skill 摘要。",
+            "source": "skill.agentInstruction"
+          }
+        },
+        "taskInstruction": "调用 graphiteUI_skill_builder，action 必须是 inspect_existing_skills。不要回答用户，不要生成 Skill 文件。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "medium",
+        "temperature": 0.1
+      }
+    },
+    "clarify_requirements": {
+      "kind": "agent",
+      "name": "澄清需求",
+      "description": "判断已有 Skill 是否满足需求，并生成带选项的澄清问题。",
+      "ui": { "position": { "x": 920, "y": 260 }, "collapsed": false, "size": { "width": 430, "height": 300 } },
+      "reads": [
+        { "state": "skill_idea", "required": true },
+        { "state": "existing_skill_catalog", "required": false }
+      ],
+      "writes": [
+        { "state": "existing_skill_match", "mode": "replace" },
+        { "state": "clarification_questions", "mode": "replace" },
+        { "state": "requirements_draft", "mode": "replace" }
+      ],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "根据 skill_idea 和 existing_skill_catalog 判断是否已有 Skill 可以满足需求。existing_skill_match 写 JSON，包含 can_reuse_existing(boolean)、matching_skill_keys(array)、reason、recommendation。requirements_draft 写 Markdown，总结你当前理解的目标、输入、输出、权限、失败情况和验收标准。clarification_questions 写 JSON 数组；每个问题包含 id、question、why、options，其中 options 尽量给 2 到 4 个可选项，但允许用户自定义回答。如果需求已经足够清晰，也至少给一个确认问题，让用户在断点处确认或补充。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "refine_requirements": {
+      "kind": "agent",
+      "name": "整理确认需求",
+      "description": "把用户在断点处填写的澄清回答整理成可实现需求。",
+      "ui": { "position": { "x": 1420, "y": 260 }, "collapsed": false, "size": { "width": 430, "height": 300 } },
+      "reads": [
+        { "state": "skill_idea", "required": true },
+        { "state": "requirements_draft", "required": true },
+        { "state": "clarification_questions", "required": false },
+        { "state": "clarification_answers", "required": true }
+      ],
+      "writes": [{ "state": "accepted_requirements", "mode": "replace" }],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "根据用户澄清回答整理最终需求。accepted_requirements 写 Markdown，必须包含目标、非目标、输入字段、输出字段、权限和副作用、错误处理、示例验收标准、测试策略。不要生成代码。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "draft_examples": {
+      "kind": "agent",
+      "name": "生成示例输入输出",
+      "description": "根据确认需求生成示例输入、预期输出和 smoke test 输入。",
+      "ui": { "position": { "x": 1920, "y": 260 }, "collapsed": false, "size": { "width": 430, "height": 300 } },
+      "reads": [
+        { "state": "accepted_requirements", "required": true },
+        { "state": "example_feedback", "required": false }
+      ],
+      "writes": [{ "state": "example_io", "mode": "replace" }],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "生成用户可确认的示例输入输出。example_io 必须是 JSON 对象，包含 skill_input_example、expected_output_example、acceptance_checks、edge_cases、smoke_input。若 example_feedback 不为空，优先按反馈修订。不要生成 Skill 文件。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "should_accept_examples": {
+      "kind": "condition",
+      "name": "示例是否确认",
+      "description": "用户确认示例后进入设计，否则带反馈重新生成示例。",
+      "ui": { "position": { "x": 2420, "y": 300 }, "collapsed": false, "size": { "width": 290, "height": 180 } },
+      "reads": [{ "state": "example_approval", "required": true }],
+      "writes": [],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 3,
+        "branchMapping": { "true": "true", "false": "false" },
+        "rule": { "source": "$state.example_approval", "operator": "==", "value": "approved" }
+      }
+    },
+    "design_skill": {
+      "kind": "agent",
+      "name": "设计技能包",
+      "description": "生成正式写文件前的 Skill 设计，等待用户确认。",
+      "ui": { "position": { "x": 2860, "y": 260 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "reads": [
+        { "state": "accepted_requirements", "required": true },
+        { "state": "example_io", "required": true },
+        { "state": "design_feedback", "required": false }
+      ],
+      "writes": [{ "state": "skill_design", "mode": "replace" }],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "设计一个 GraphiteUI Skill 包。skill_design 必须是 JSON 对象，包含 skill_key、name、description、permissions、input_schema、output_schema、runtime、files_to_generate、smoke_test_plan、risks。skill_key 必须适合作为路径名，不能包含 /、\\ 或冒号。只设计，不写文件。若 design_feedback 不为空，优先按反馈修订。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "should_accept_design": {
+      "kind": "condition",
+      "name": "设计是否确认",
+      "description": "用户确认设计后生成文件，否则带反馈重新设计。",
+      "ui": { "position": { "x": 3380, "y": 300 }, "collapsed": false, "size": { "width": 290, "height": 180 } },
+      "reads": [{ "state": "design_approval", "required": true }],
+      "writes": [],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 3,
+        "branchMapping": { "true": "true", "false": "false" },
+        "rule": { "source": "$state.design_approval", "operator": "==", "value": "approved" }
+      }
+    },
+    "generate_skill_files": {
+      "kind": "agent",
+      "name": "生成 Skill 文件",
+      "description": "根据确认设计生成完整 Skill 包文件和 smoke test 输入。",
+      "ui": { "position": { "x": 3820, "y": 240 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "reads": [
+        { "state": "accepted_requirements", "required": true },
+        { "state": "example_io", "required": true },
+        { "state": "skill_design", "required": true }
+      ],
+      "writes": [
+        { "state": "target_skill_key", "mode": "replace" },
+        { "state": "generated_skill_files", "mode": "replace" },
+        { "state": "smoke_input", "mode": "replace" }
+      ],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "生成完整 GraphiteUI Skill 包。target_skill_key 写 skill_design.skill_key。generated_skill_files 必须是 JSON 对象，键为相对路径，至少包含 skill.json、SKILL.md、run.py；值为完整 UTF-8 文本内容。skill.json 必须包含 schemaVersion=graphite.skill/v1、skillKey、name、description、agentInstruction、version、kind、mode、scope、permissions、inputSchema、outputSchema、runtime、health、configured、healthy。run.py 必须从 stdin 读取 JSON，向 stdout 打印 JSON 对象。smoke_input 使用 example_io.smoke_input 或 skill_input_example。不要写压缩包，不要写官方目录。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "xhigh",
+        "temperature": 0.2
+      }
+    },
+    "write_skill_package": {
+      "kind": "agent",
+      "name": "写入并测试 Skill",
+      "description": "调用 GraphiteUI Skill Builder 写入用户 Skill 包并运行 smoke test。",
+      "ui": { "position": { "x": 4360, "y": 240 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "reads": [
+        { "state": "target_skill_key", "required": true },
+        { "state": "generated_skill_files", "required": true },
+        { "state": "smoke_input", "required": false }
+      ],
+      "writes": [
+        { "state": "builder_result", "mode": "replace" },
+        { "state": "test_status", "mode": "replace" },
+        { "state": "validation_errors", "mode": "replace" },
+        { "state": "builder_errors", "mode": "replace" },
+        { "state": "builder_warnings", "mode": "replace" },
+        { "state": "test_stdout", "mode": "replace" },
+        { "state": "test_stderr", "mode": "replace" },
+        { "state": "final_skill_path", "mode": "replace" },
+        { "state": "changed_paths", "mode": "replace" }
+      ],
+      "config": {
+        "skills": ["graphiteUI_skill_builder"],
+        "skillBindings": [
+          {
+            "skillKey": "graphiteUI_skill_builder",
+            "outputMapping": {
+              "builder_result": "builder_result",
+              "test_status": "test_status",
+              "validation_errors": "validation_errors",
+              "errors": "builder_errors",
+              "warnings": "builder_warnings",
+              "stdout": "test_stdout",
+              "stderr": "test_stderr",
+              "final_skill_path": "final_skill_path",
+              "changed_paths": "changed_paths"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {
+          "graphiteUI_skill_builder": {
+            "skillKey": "graphiteUI_skill_builder",
+            "title": "写入用户 Skill 并测试",
+            "content": "调用 action=write_skill_package。skill_key 必须来自 target_skill_key，files 必须原样来自 generated_skill_files，smoke_input 来自 smoke_input。写入目标只能是 backend/data/skills/user/<skill_key>。不要生成压缩包，不要写 official skill 目录。",
+            "source": "skill.agentInstruction"
+          }
+        },
+        "taskInstruction": "调用 graphiteUI_skill_builder 写入并测试用户 Skill。action 必须是 write_skill_package；skill_key 使用 target_skill_key；files 使用 generated_skill_files；smoke_input 使用 smoke_input。目标目录必须是 backend/data/skills/user/<skill_key>。不要自己总结测试结果，Builder 输出会映射到图状态。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "medium",
+        "temperature": 0.1
+      }
+    },
+    "should_repair": {
+      "kind": "condition",
+      "name": "测试是否需要修复",
+      "description": "测试失败时进入最多三轮自动修复，成功时整理完成报告。",
+      "ui": { "position": { "x": 4900, "y": 300 }, "collapsed": false, "size": { "width": 300, "height": 180 } },
+      "reads": [{ "state": "test_status", "required": true }],
+      "writes": [],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 3,
+        "branchMapping": { "true": "true", "false": "false" },
+        "rule": { "source": "$state.test_status", "operator": "!=", "value": "succeeded" }
+      }
+    },
+    "repair_skill_files": {
+      "kind": "agent",
+      "name": "自动修复 Skill",
+      "description": "根据 Builder 错误、stdout/stderr 和 smoke test 结果修复完整文件映射。",
+      "ui": { "position": { "x": 4360, "y": 680 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "reads": [
+        { "state": "target_skill_key", "required": true },
+        { "state": "generated_skill_files", "required": true },
+        { "state": "smoke_input", "required": false },
+        { "state": "builder_result", "required": false },
+        { "state": "validation_errors", "required": false },
+        { "state": "builder_errors", "required": false },
+        { "state": "test_stdout", "required": false },
+        { "state": "test_stderr", "required": false },
+        { "state": "failed_repair_feedback", "required": false },
+        { "state": "repair_attempt_count", "required": false }
+      ],
+      "writes": [
+        { "state": "generated_skill_files", "mode": "replace" },
+        { "state": "repair_plan", "mode": "replace" },
+        { "state": "repair_patch", "mode": "replace" },
+        { "state": "repair_notes", "mode": "replace" },
+        { "state": "repair_attempt_count", "mode": "replace" }
+      ],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "你负责修复生成 Skill。先分析 builder_result、validation_errors、builder_errors、test_stdout、test_stderr 和 failed_repair_feedback。repair_plan 写 Markdown，说明根因和修复步骤。repair_patch 写 JSON，只列出本轮改动的文件和原因。generated_skill_files 必须输出修复后的完整文件映射，而不是 diff。repair_attempt_count 写当前次数加 1。保持 skillKey 不变。优先修复 JSON schema、run.py 语法、stdout JSON、required output 缺失、路径和权限声明问题。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "xhigh",
+        "temperature": 0.2
+      }
+    },
+    "review_failed_repairs": {
+      "kind": "agent",
+      "name": "自动修复失败复核",
+      "description": "达到自动修复上限后整理错误报告，等待用户决定继续或停止。",
+      "ui": { "position": { "x": 5360, "y": 540 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "reads": [
+        { "state": "target_skill_key", "required": true },
+        { "state": "builder_result", "required": false },
+        { "state": "validation_errors", "required": false },
+        { "state": "builder_errors", "required": false },
+        { "state": "repair_notes", "required": false }
+      ],
+      "writes": [{ "state": "final_verification_report", "mode": "replace" }],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "自动修复达到上限。final_verification_report 写 Markdown，包含当前 Skill key、已尝试修复次数、最后错误、可能根因、建议用户选择 continue 或 stop。如果建议继续，给出用户可填写到 failed_repair_feedback 的具体方向。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "should_continue_after_review": {
+      "kind": "condition",
+      "name": "是否继续修复",
+      "description": "人工复核后，用户选择 continue 则再进入修复，否则输出失败报告。",
+      "ui": { "position": { "x": 5860, "y": 580 }, "collapsed": false, "size": { "width": 300, "height": 180 } },
+      "reads": [{ "state": "failed_repair_decision", "required": true }],
+      "writes": [],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 3,
+        "branchMapping": { "true": "true", "false": "false" },
+        "rule": { "source": "$state.failed_repair_decision", "operator": "==", "value": "continue" }
+      }
+    },
+    "summarize_success": {
+      "kind": "agent",
+      "name": "整理完成结果",
+      "description": "Skill 创建和测试成功后输出给用户看的完成报告。",
+      "ui": { "position": { "x": 5360, "y": 160 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "reads": [
+        { "state": "target_skill_key", "required": true },
+        { "state": "final_skill_path", "required": true },
+        { "state": "changed_paths", "required": false },
+        { "state": "builder_warnings", "required": false },
+        { "state": "repair_notes", "required": false }
+      ],
+      "writes": [{ "state": "final_verification_report", "mode": "replace" }],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "生成最终完成报告。必须说明 Skill 已生成到 final_skill_path、变更文件、测试通过、如何在 Agent 节点中使用、仍需用户注意的权限或警告。不要夸大能力。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "medium",
+        "temperature": 0.2
+      }
+    },
+    "summarize_failure": {
+      "kind": "agent",
+      "name": "整理失败结果",
+      "description": "用户停止修复或无法继续时输出失败报告和可恢复信息。",
+      "ui": { "position": { "x": 6300, "y": 540 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "reads": [
+        { "state": "target_skill_key", "required": false },
+        { "state": "final_skill_path", "required": false },
+        { "state": "builder_result", "required": false },
+        { "state": "builder_errors", "required": false },
+        { "state": "validation_errors", "required": false },
+        { "state": "repair_notes", "required": false }
+      ],
+      "writes": [{ "state": "final_verification_report", "mode": "replace" }],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "生成失败报告。说明失败阶段、最后错误、已写入或保留的路径、可以如何修改需求或继续修复。若已有 final_skill_path，要说明它可能是未通过测试的草稿。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "medium",
+        "temperature": 0.2
+      }
+    },
+    "output_final_report": {
+      "kind": "output",
+      "name": "创建结果",
+      "description": "展示 Skill 创建、测试或失败复核结果。",
+      "ui": { "position": { "x": 6840, "y": 260 }, "collapsed": false, "size": { "width": 440, "height": 300 } },
+      "reads": [{ "state": "final_verification_report", "required": true }],
+      "writes": [],
+      "config": { "displayMode": "markdown", "persistEnabled": false, "persistFormat": "md", "fileNameTemplate": "" }
+    }
+  },
+  "edges": [
+    { "source": "repair_skill_files", "target": "write_skill_package" },
+    { "source": "input_skill_idea", "target": "inspect_existing_skills" },
+    { "source": "inspect_existing_skills", "target": "clarify_requirements" },
+    { "source": "clarify_requirements", "target": "refine_requirements" },
+    { "source": "refine_requirements", "target": "draft_examples" },
+    { "source": "draft_examples", "target": "should_accept_examples" },
+    { "source": "design_skill", "target": "should_accept_design" },
+    { "source": "generate_skill_files", "target": "write_skill_package" },
+    { "source": "write_skill_package", "target": "should_repair" },
+    { "source": "review_failed_repairs", "target": "should_continue_after_review" },
+    { "source": "summarize_success", "target": "output_final_report" },
+    { "source": "summarize_failure", "target": "output_final_report" }
+  ],
+  "conditional_edges": [
+    {
+      "source": "should_accept_examples",
+      "branches": {
+        "true": "design_skill",
+        "false": "draft_examples",
+        "exhausted": "design_skill"
+      }
+    },
+    {
+      "source": "should_accept_design",
+      "branches": {
+        "true": "generate_skill_files",
+        "false": "design_skill",
+        "exhausted": "generate_skill_files"
+      }
+    },
+    {
+      "source": "should_repair",
+      "branches": {
+        "true": "repair_skill_files",
+        "false": "summarize_success",
+        "exhausted": "review_failed_repairs"
+      }
+    },
+    {
+      "source": "should_continue_after_review",
+      "branches": {
+        "true": "repair_skill_files",
+        "false": "summarize_failure",
+        "exhausted": "summarize_failure"
+      }
+    }
+  ],
+  "metadata": {
+    "category": "skills",
+    "templateVersion": "2026-05-07",
+    "graphProtocol": "node_system",
+    "maxRepairAttempts": 3,
+    "interrupt_after": ["clarify_requirements", "draft_examples", "design_skill", "review_failed_repairs"],
+    "agent_breakpoint_timing": {
+      "clarify_requirements": "after",
+      "draft_examples": "after",
+      "design_skill": "after",
+      "review_failed_repairs": "after"
+    }
+  }
+}
