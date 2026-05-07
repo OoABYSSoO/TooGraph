@@ -24,6 +24,8 @@ class SkillSourceFormat(str, Enum):
 
 class SkillSourceScope(str, Enum):
     INSTALLED = "installed"
+    OFFICIAL = "official"
+    USER = "user"
 
 
 class SkillKind(str, Enum):

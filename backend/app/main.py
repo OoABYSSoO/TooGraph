@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from app.api.routes_companion import router as companion_router
 from app.api.routes_graphs import router as graphs_router
 from app.api.routes_knowledge import router as knowledge_router
+from app.api.routes_local_executor_policy import router as local_executor_policy_router
 from app.api.routes_memories import router as memories_router
 from app.api.routes_model_logs import router as model_logs_router
 from app.api.routes_presets import router as presets_router
@@ -89,6 +90,7 @@ app.add_middleware(
 app.include_router(companion_router)
 app.include_router(graphs_router)
 app.include_router(knowledge_router)
+app.include_router(local_executor_policy_router)
 app.include_router(memories_router)
 app.include_router(model_logs_router)
 app.include_router(presets_router)

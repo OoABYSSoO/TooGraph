@@ -112,12 +112,16 @@ Imported skill body.
 
 
 def _patch_skill_storage(skills_dir: Path, state_dir: Path):
+    user_skills_dir = state_dir / "user"
     return (
         patch("app.core.storage.skill_store.SKILLS_DIR", skills_dir),
+        patch("app.core.storage.skill_store.USER_SKILLS_DIR", user_skills_dir),
         patch("app.core.storage.skill_store.SKILL_STATE_DATA_DIR", state_dir),
         patch("app.core.storage.skill_store.SKILL_STATE_PATH", state_dir / "registry_states.json"),
         patch("app.skills.definitions.SKILLS_DIR", skills_dir),
+        patch("app.skills.definitions.USER_SKILLS_DIR", user_skills_dir),
         patch("app.skills.registry.SKILLS_DIR", skills_dir),
+        patch("app.skills.registry.USER_SKILLS_DIR", user_skills_dir),
     )
 
 
@@ -134,6 +138,9 @@ def _test_client_with_skill_state(state_dir: Path):
     with ExitStack() as stack:
         stack.enter_context(patch("app.core.storage.skill_store.SKILL_STATE_DATA_DIR", state_dir))
         stack.enter_context(patch("app.core.storage.skill_store.SKILL_STATE_PATH", state_dir / "registry_states.json"))
+        stack.enter_context(patch("app.core.storage.skill_store.USER_SKILLS_DIR", state_dir / "user"))
+        stack.enter_context(patch("app.skills.definitions.USER_SKILLS_DIR", state_dir / "user"))
+        stack.enter_context(patch("app.skills.registry.USER_SKILLS_DIR", state_dir / "user"))
         yield stack.enter_context(TestClient(app))
 
 
@@ -145,13 +152,14 @@ def _skill_zip_bytes() -> bytes:
     return payload.getvalue()
 
 
-def _native_skill_zip_bytes() -> bytes:
+def _native_skill_zip_bytes(skill_key: str = "video_understanding") -> bytes:
     payload = BytesIO()
     with zipfile.ZipFile(payload, "w") as archive:
-        archive.writestr("video_understanding/skill.json", _native_skill_manifest())
-        archive.writestr("video_understanding/SKILL.md", "# Video Understanding\n")
-        archive.writestr("video_understanding/workflow.json", '{"steps":[]}\n')
-        archive.writestr("video_understanding/scripts/probe.py", "print('probe')\n")
+        archive.writestr(f"{skill_key}/skill.json", _native_skill_manifest(skill_key))
+        title = "Video Understanding" if skill_key == "video_understanding" else skill_key
+        archive.writestr(f"{skill_key}/SKILL.md", f"# {title}\n")
+        archive.writestr(f"{skill_key}/workflow.json", '{"steps":[]}\n')
+        archive.writestr(f"{skill_key}/scripts/probe.py", "print('probe')\n")
     return payload.getvalue()
 
 
@@ -180,7 +188,7 @@ def _write_native_skill(
 
 
 class SkillUploadImportRouteTests(unittest.TestCase):
-    def test_default_catalog_only_loads_installed_root_skill_folders(self) -> None:
+    def test_default_catalog_loads_official_skill_folders(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             state_dir = Path(temp_dir) / "data" / "skills"
             with _test_client_with_skill_state(state_dir) as client:
@@ -191,6 +199,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(
                     sorted(catalog_items),
                     [
+                        "local_workspace_executor",
                         "web_search",
                     ],
                 )
@@ -199,7 +208,8 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                     for key, item in catalog_items.items()
                 }
                 self.assertEqual(catalog_items["web_search"]["sourceFormat"], "skill")
-                self.assertEqual(catalog_items["web_search"]["sourceScope"], "installed")
+                self.assertEqual(catalog_items["web_search"]["sourceScope"], "official")
+                self.assertFalse(catalog_items["web_search"]["canManage"])
                 self.assertNotIn("targets", catalog_items["web_search"])
                 self.assertTrue(catalog_items["web_search"]["runPolicies"]["default"]["discoverable"])
                 self.assertTrue(catalog_items["web_search"]["runPolicies"]["origins"]["companion"]["autoSelectable"])
@@ -209,7 +219,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue(source_path["web_search"].endswith("/skill/web_search/skill.json"))
                 self.assertNotIn("compatibility", catalog_items["web_search"])
 
-    def test_native_skill_json_upload_imports_installed_skill_package(self) -> None:
+    def test_native_skill_json_upload_imports_user_skill_package(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             skills_dir = temp_path / "skill"
@@ -224,7 +234,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 payload = response.json()
                 self.assertEqual(payload["skillKey"], "video_understanding")
                 self.assertEqual(payload["sourceFormat"], "skill")
-                self.assertEqual(payload["sourceScope"], "installed")
+                self.assertEqual(payload["sourceScope"], "user")
                 self.assertNotIn("targets", payload)
                 self.assertEqual(
                     payload["runPolicies"]["origins"]["companion"],
@@ -246,9 +256,9 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue(payload["configured"])
                 self.assertTrue(payload["healthy"])
 
-                imported_path = skills_dir / "video_understanding" / "skill.json"
+                imported_path = state_dir / "user" / "video_understanding" / "skill.json"
                 self.assertTrue(imported_path.exists())
-                self.assertTrue((skills_dir / "video_understanding" / "workflow.json").exists())
+                self.assertTrue((state_dir / "user" / "video_understanding" / "workflow.json").exists())
 
                 catalog_response = client.get("/api/skills/catalog?include_disabled=true")
                 self.assertEqual(catalog_response.status_code, 200)
@@ -319,11 +329,11 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(payload["status"], "active")
                 self.assertTrue(payload["canManage"])
                 self.assertNotIn("canImport", payload)
-                self.assertEqual(payload["sourceScope"], "installed")
+                self.assertEqual(payload["sourceScope"], "user")
 
-                imported_path = skills_dir / "uploaded_zip_skill" / "SKILL.md"
+                imported_path = state_dir / "user" / "uploaded_zip_skill" / "SKILL.md"
                 self.assertTrue(imported_path.exists())
-                self.assertTrue((skills_dir / "uploaded_zip_skill" / "helper.py").exists())
+                self.assertTrue((state_dir / "user" / "uploaded_zip_skill" / "helper.py").exists())
 
                 catalog_response = client.get("/api/skills/catalog?include_disabled=true")
                 self.assertEqual(catalog_response.status_code, 200)
@@ -352,8 +362,24 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 payload = response.json()
                 self.assertEqual(payload["skillKey"], "uploaded_folder_skill")
-                self.assertTrue((skills_dir / "uploaded_folder_skill" / "SKILL.md").exists())
-                self.assertTrue((skills_dir / "uploaded_folder_skill" / "helper.py").exists())
+                self.assertEqual(payload["sourceScope"], "user")
+                self.assertTrue((state_dir / "user" / "uploaded_folder_skill" / "SKILL.md").exists())
+                self.assertTrue((state_dir / "user" / "uploaded_folder_skill" / "helper.py").exists())
+
+    def test_upload_import_rejects_skill_key_that_collides_with_official_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            skills_dir = temp_path / "skill"
+            state_dir = temp_path / "data" / "skills"
+            _write_native_skill(skills_dir, "web_search")
+            with _test_client_with_skill_storage(skills_dir, state_dir) as client:
+                response = client.post(
+                    "/api/skills/imports/upload",
+                    files=[("files", ("web_search.zip", _native_skill_zip_bytes("web_search"), "application/zip"))],
+                )
+
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("official Skill", response.json()["detail"])
 
     def test_catalog_ignores_legacy_platform_wrapper_directories(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

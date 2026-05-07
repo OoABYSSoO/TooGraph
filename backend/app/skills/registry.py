@@ -1,9 +1,18 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+from typing import Iterable
 
 from app.core.schemas.skills import SkillCatalogStatus
-from app.core.storage.skill_store import SKILLS_DIR, get_skill_status_map, list_managed_skill_keys
+from app.core.storage.skill_store import (
+    SKILLS_DIR,
+    USER_SKILLS_DIR,
+    get_skill_status_map,
+    list_managed_skill_keys,
+    list_official_skill_keys,
+    list_user_skill_keys,
+)
 from app.skills.runtime import ScriptSkillRunner, build_script_skill_runner, validate_script_runtime_spec
 
 
@@ -12,9 +21,7 @@ SkillFunc = ScriptSkillRunner
 
 def _build_runtime_skill_registry() -> dict[str, SkillFunc]:
     registry: dict[str, SkillFunc] = {}
-    if not SKILLS_DIR.exists():
-        return registry
-    for skill_dir in sorted((path for path in SKILLS_DIR.iterdir() if path.is_dir()), key=lambda path: path.name.lower()):
+    for skill_dir in _iter_skill_dirs([SKILLS_DIR, USER_SKILLS_DIR]):
         manifest = skill_dir / "skill.json"
         if not manifest.is_file():
             continue
@@ -34,6 +41,8 @@ def _build_runtime_skill_registry() -> dict[str, SkillFunc]:
             command=command,
         ):
             continue
+        if skill_key in registry:
+            continue
         registry[skill_key] = build_script_skill_runner(
             skill_key=skill_key,
             skill_dir=skill_dir,
@@ -45,19 +54,32 @@ def _build_runtime_skill_registry() -> dict[str, SkillFunc]:
     return registry
 
 
+def _iter_skill_dirs(roots: Iterable[Path]) -> list[Path]:
+    skill_dirs: list[Path] = []
+    for root in roots:
+        if not root.exists():
+            continue
+        skill_dirs.extend(
+            sorted((path for path in root.iterdir() if path.is_dir()), key=lambda path: path.name.lower())
+        )
+    return skill_dirs
+
+
 def list_runtime_skill_keys() -> set[str]:
     return set(_build_runtime_skill_registry().keys())
 
 
 def get_skill_registry(*, include_disabled: bool = False) -> dict[str, SkillFunc]:
     registry = _build_runtime_skill_registry()
+    official_keys = list_official_skill_keys()
+    user_keys = list_user_skill_keys()
     if include_disabled:
         allowed_keys = list_managed_skill_keys()
         return {key: value for key, value in registry.items() if key in allowed_keys}
-    allowed_keys = list_managed_skill_keys()
     status_map = get_skill_status_map()
     return {
         key: value
         for key, value in registry.items()
-        if key in allowed_keys and status_map.get(key, SkillCatalogStatus.ACTIVE) == SkillCatalogStatus.ACTIVE
+        if key in official_keys
+        or (key in user_keys and status_map.get(key, SkillCatalogStatus.ACTIVE) == SkillCatalogStatus.ACTIVE)
     }

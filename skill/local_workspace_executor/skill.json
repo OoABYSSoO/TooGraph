@@ -1,0 +1,94 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "local_workspace_executor",
+  "name": "本地工作区执行器",
+  "description": "在 GraphiteUI 工作区内执行受策略约束的文件读写、目录操作和本地命令/脚本运行。内置文件写入默认只能写 backend/data，并会阻止受保护路径；遇到越权路径时返回 blocked 和建议加入的最小白名单。",
+  "agentInstruction": "你已绑定本地工作区执行器。只在用户明确需要本地文件读写、生成用户自定义技能、运行脚本或执行本地测试时调用它。优先使用相对路径；如果返回 blocked，把 blocked_path、blocked_operation 和 suggested_policy_update 明确告诉用户，并请求用户确认是否开放新的白名单，不要自行绕过策略。本地子进程不是 OS 级沙箱，执行前必须确认 execute 根目录和脚本来源符合用户意图。",
+  "version": "1.0.0",
+  "runPolicies": {
+    "default": {
+      "discoverable": true,
+      "autoSelectable": false,
+      "requiresApproval": false
+    },
+    "origins": {
+      "companion": {
+        "discoverable": true,
+        "autoSelectable": false,
+        "requiresApproval": true
+      }
+    }
+  },
+  "kind": "atomic",
+  "mode": "tool",
+  "scope": "workspace",
+  "permissions": ["file_read", "file_write", "subprocess"],
+  "inputSchema": [
+    {
+      "key": "action",
+      "name": "Action",
+      "valueType": "text",
+      "required": true,
+      "description": "One of read_file, write_file, list_dir, delete_path, run_command, or run_script."
+    },
+    {
+      "key": "path",
+      "name": "Path",
+      "valueType": "text",
+      "required": false,
+      "description": "Relative file, directory, or script path inside the GraphiteUI workspace."
+    },
+    {
+      "key": "content",
+      "name": "Content",
+      "valueType": "text",
+      "required": false,
+      "description": "UTF-8 text content for write_file."
+    },
+    {
+      "key": "cwd",
+      "name": "Working Directory",
+      "valueType": "text",
+      "required": false,
+      "description": "Relative working directory for run_command or run_script."
+    },
+    {
+      "key": "command",
+      "name": "Command",
+      "valueType": "json",
+      "required": false,
+      "description": "Command array for run_command, for example [\"python\", \"probe.py\"]."
+    },
+    {
+      "key": "timeout_seconds",
+      "name": "Timeout Seconds",
+      "valueType": "number",
+      "required": false,
+      "description": "Command timeout in seconds."
+    }
+  ],
+  "outputSchema": [
+    { "key": "status", "name": "Status", "valueType": "text", "description": "succeeded, failed, or blocked." },
+    { "key": "stdout", "name": "Stdout", "valueType": "text", "description": "Command stdout when applicable." },
+    { "key": "stderr", "name": "Stderr", "valueType": "text", "description": "Command stderr when applicable." },
+    { "key": "exit_code", "name": "Exit Code", "valueType": "number", "description": "Process exit code when applicable." },
+    { "key": "changed_paths", "name": "Changed Paths", "valueType": "json", "description": "Relative paths modified by the operation." },
+    { "key": "read_files", "name": "Read Files", "valueType": "json", "description": "Relative files read by the operation." },
+    { "key": "policy_decisions", "name": "Policy Decisions", "valueType": "json", "description": "Policy checks performed before execution." },
+    { "key": "warnings", "name": "Warnings", "valueType": "json", "description": "Important limitations or execution warnings." },
+    { "key": "blocked_path", "name": "Blocked Path", "valueType": "text", "description": "Path blocked by policy, if any." },
+    { "key": "blocked_operation", "name": "Blocked Operation", "valueType": "text", "description": "Operation blocked by policy, if any." },
+    { "key": "suggested_policy_update", "name": "Suggested Policy Update", "valueType": "json", "description": "Minimal allow-root suggestion for user review." },
+    { "key": "errors", "name": "Errors", "valueType": "json", "description": "Validation or execution errors." }
+  ],
+  "supportedValueTypes": ["text", "markdown", "json", "file"],
+  "sideEffects": ["file_read", "file_write", "subprocess"],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 300
+  },
+  "health": { "type": "none" },
+  "configured": true,
+  "healthy": true
+}

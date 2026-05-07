@@ -12,6 +12,7 @@ from typing import Any
 SUPPORTED_SCRIPT_RUNTIME_TYPES = {"script", "python", "node", "javascript", "command"}
 DEFAULT_SKILL_TIMEOUT_SECONDS = 30.0
 MAX_SKILL_ERROR_CHARS = 4000
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,7 @@ class ScriptSkillRunner:
             "GRAPHITE_SKILL_KEY": self.skill_key,
             "GRAPHITE_SKILL_DIR": str(self.skill_dir),
             "GRAPHITE_SKILL_ENTRYPOINT": str(self.entrypoint_path),
+            "GRAPHITE_REPO_ROOT": str(REPO_ROOT),
         }
         artifact_dir = str(context.get("artifact_dir") or "").strip()
         artifact_relative_dir = str(context.get("artifact_relative_dir") or "").strip()

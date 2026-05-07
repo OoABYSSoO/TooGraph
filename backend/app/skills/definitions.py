@@ -23,7 +23,7 @@ from app.core.schemas.skills import (
     SkillSourceFormat,
     SkillSourceScope,
 )
-from app.core.storage.skill_store import SKILLS_DIR, get_skill_status_map
+from app.core.storage.skill_store import SKILLS_DIR, USER_SKILLS_DIR, get_skill_status_map
 from app.skills.runtime import validate_script_runtime_spec
 from app.skills.registry import get_skill_registry, list_runtime_skill_keys
 
@@ -67,7 +67,11 @@ def list_skill_catalog(*, include_disabled: bool = True) -> list[SkillDefinition
         record = managed_records.get(skill_key)
         if record is None:
             continue
-        status = status_map.get(skill_key, SkillCatalogStatus.ACTIVE)
+        status = (
+            SkillCatalogStatus.ACTIVE
+            if record.source_scope == SkillSourceScope.OFFICIAL
+            else status_map.get(skill_key, SkillCatalogStatus.ACTIVE)
+        )
         if status == SkillCatalogStatus.DELETED:
             continue
         if status == SkillCatalogStatus.DISABLED and not include_disabled:
@@ -84,7 +88,7 @@ def list_skill_catalog(*, include_disabled: bool = True) -> list[SkillDefinition
                     "runtime_ready": runtime_ready,
                     "runtime_registered": runtime_registered,
                     "status": status,
-                    "can_manage": True,
+                    "can_manage": record.source_scope == SkillSourceScope.USER,
                 },
             )
         )
@@ -101,16 +105,36 @@ def get_skill_catalog_registry(*, include_disabled: bool = True) -> dict[str, Sk
 
 def _load_managed_skill_records() -> list[SkillDefinitionRecord]:
     records: list[SkillDefinitionRecord] = []
-    if not SKILLS_DIR.exists():
-        return records
-    for skill_dir in sorted((path for path in SKILLS_DIR.iterdir() if path.is_dir()), key=lambda path: path.name.lower()):
-        manifest = skill_dir / "skill.json"
-        skill_file = skill_dir / "SKILL.md"
-        if manifest.is_file():
-            records.append(_parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED))
-        elif skill_file.is_file():
-            records.append(_parse_skill_file(skill_file, SkillSourceFormat.SKILL, SkillSourceScope.INSTALLED))
+    seen_keys: set[str] = set()
+    for skill_dir in _iter_skill_dirs(SKILLS_DIR):
+        record = _parse_skill_dir(skill_dir, SkillSourceScope.OFFICIAL)
+        if record is None:
+            continue
+        records.append(record)
+        seen_keys.add(record.definition.skill_key)
+    for skill_dir in _iter_skill_dirs(USER_SKILLS_DIR):
+        record = _parse_skill_dir(skill_dir, SkillSourceScope.USER)
+        if record is None or record.definition.skill_key in seen_keys:
+            continue
+        records.append(record)
+        seen_keys.add(record.definition.skill_key)
     return records
+
+
+def _iter_skill_dirs(root: Path) -> list[Path]:
+    if not root.exists():
+        return []
+    return sorted((path for path in root.iterdir() if path.is_dir()), key=lambda path: path.name.lower())
+
+
+def _parse_skill_dir(skill_dir: Path, source_scope: SkillSourceScope) -> SkillDefinitionRecord | None:
+    manifest = skill_dir / "skill.json"
+    skill_file = skill_dir / "SKILL.md"
+    if manifest.is_file():
+        return _parse_native_skill_manifest(manifest, source_scope)
+    if skill_file.is_file():
+        return _parse_skill_file(skill_file, SkillSourceFormat.SKILL, source_scope)
+    return None
 
 
 def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> SkillDefinitionRecord:

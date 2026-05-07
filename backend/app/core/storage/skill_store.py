@@ -14,18 +14,41 @@ from app.core.storage.json_file_utils import read_json_file, write_json_file
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
 SKILLS_DIR = ROOT_DIR / "skill"
+USER_SKILLS_DIR = SKILL_STATE_DATA_DIR / "user"
 SKILL_STATE_PATH = SKILL_STATE_DATA_DIR / "registry_states.json"
 
 
 def skill_directory_for(skill_key: str) -> Path:
+    return USER_SKILLS_DIR / skill_key
+
+
+def official_skill_directory_for(skill_key: str) -> Path:
     return SKILLS_DIR / skill_key
 
 
+def user_skill_directory_for(skill_key: str) -> Path:
+    return USER_SKILLS_DIR / skill_key
+
+
 def list_managed_skill_keys() -> set[str]:
+    return list_official_skill_keys() | list_user_skill_keys()
+
+
+def list_official_skill_keys() -> set[str]:
     keys: set[str] = set()
     if not SKILLS_DIR.exists():
         return keys
     for path in SKILLS_DIR.iterdir():
+        if path.is_dir() and ((path / "skill.json").is_file() or (path / "SKILL.md").is_file()):
+            keys.add(path.name)
+    return keys
+
+
+def list_user_skill_keys() -> set[str]:
+    keys: set[str] = set()
+    if not USER_SKILLS_DIR.exists():
+        return keys
+    for path in USER_SKILLS_DIR.iterdir():
         if path.is_dir() and ((path / "skill.json").is_file() or (path / "SKILL.md").is_file()):
             keys.add(path.name)
     return keys
@@ -56,7 +79,7 @@ def clear_skill_status(skill_key: str) -> None:
 
 
 def delete_skill(skill_key: str) -> None:
-    root = skill_directory_for(skill_key)
+    root = user_skill_directory_for(skill_key)
     if root.is_file():
         root.unlink()
     elif root.is_dir():
@@ -90,6 +113,8 @@ def extract_skill_archive(archive_path: Path, destination: Path) -> Path:
 def import_skill_from_directory(source_root: Path) -> str:
     skill_file = _find_single_skill_manifest(source_root)
     skill_key = _derive_skill_key(skill_file)
+    if official_skill_directory_for(skill_key).exists():
+        raise ValueError(f"Skill key '{skill_key}' is already used by an official Skill.")
     destination = _managed_skill_directory_for(skill_key, skill_file)
     if destination.exists():
         shutil.rmtree(destination)
@@ -139,7 +164,7 @@ def _derive_skill_key(skill_file: Path) -> str:
 
 
 def _managed_skill_directory_for(skill_key: str, skill_file: Path) -> Path:
-    return skill_directory_for(skill_key)
+    return user_skill_directory_for(skill_key)
 
 
 def _validate_skill_key(skill_key: str) -> str:
