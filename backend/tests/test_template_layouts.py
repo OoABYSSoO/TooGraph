@@ -102,6 +102,15 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn("网页 URL", nodes["final_answer"]["config"]["taskInstruction"])
         self.assertIn("不要引用 doc_001.md", nodes["final_answer"]["config"]["taskInstruction"])
         self.assertNotIn("依据只标文件名", nodes["final_answer"]["config"]["taskInstruction"])
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
+            ["output_final"],
+        )
+        self.assertEqual(nodes["output_final"]["reads"], [{"state": "final_reply", "required": True}])
+        self.assertNotIn("output_evidence", nodes)
+        self.assertNotIn("output_documents", nodes)
+        self.assertNotIn({"source": "final_answer", "target": "output_evidence"}, template["edges"])
+        self.assertNotIn({"source": "final_answer", "target": "output_documents"}, template["edges"])
 
     def test_advanced_web_research_loop_is_runtime_compatible(self) -> None:
         template = next(record for record in _official_template_records() if record["template_id"] == "advanced_web_research_loop")

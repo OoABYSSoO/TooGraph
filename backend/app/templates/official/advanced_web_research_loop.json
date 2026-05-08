@@ -328,42 +328,6 @@
         "persistFormat": "md",
         "fileNameTemplate": ""
       }
-    },
-    "output_evidence": {
-      "kind": "output",
-      "name": "关键依据",
-      "description": "展示最终回答采用的依据笔记。",
-      "ui": {
-        "position": { "x": 3260, "y": 360 },
-        "collapsed": false,
-        "size": { "width": 420, "height": 260 }
-      },
-      "reads": [{ "state": "key_evidence_notes", "required": true }],
-      "writes": [],
-      "config": {
-        "displayMode": "markdown",
-        "persistEnabled": false,
-        "persistFormat": "md",
-        "fileNameTemplate": ""
-      }
-    },
-    "output_documents": {
-      "kind": "output",
-      "name": "依据原文",
-      "description": "展示已下载到本地的原文文档。",
-      "ui": {
-        "position": { "x": 3260, "y": 660 },
-        "collapsed": false,
-        "size": { "width": 420, "height": 260 }
-      },
-      "reads": [{ "state": "artifact_paths", "required": false }],
-      "writes": [],
-      "config": {
-        "displayMode": "documents",
-        "persistEnabled": false,
-        "persistFormat": "auto",
-        "fileNameTemplate": ""
-      }
     }
   },
   "edges": [
@@ -372,9 +336,7 @@
     { "source": "run_web_search", "target": "review_evidence" },
     { "source": "review_evidence", "target": "should_continue_search" },
     { "source": "select_evidence", "target": "final_answer" },
-    { "source": "final_answer", "target": "output_final" },
-    { "source": "final_answer", "target": "output_evidence" },
-    { "source": "final_answer", "target": "output_documents" }
+    { "source": "final_answer", "target": "output_final" }
   ],
   "conditional_edges": [
     {

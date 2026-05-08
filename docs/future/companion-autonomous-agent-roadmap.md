@@ -90,7 +90,7 @@ input_question
       exhausted: select_evidence
   -> select_evidence
   -> final_answer 写 final_reply
-  -> output_final / output_evidence / output_documents
+  -> output_final
 ```
 
 设计约束：
@@ -98,6 +98,7 @@ input_question
 - `web_search` 的输入由搜索 LLM 节点运行时决定，不由决策节点或静态 mapping 提前生成。
 - `query`、`source_urls`、`artifact_paths`、`errors` 通过 `skillBindings.outputMapping` 写入 managed binding state。
 - `artifact_paths` 是 `file` state；下游 LLM 节点看到的是本地文档文件名和原文全文。
+- `key_evidence_notes` 和 `artifact_paths` 是内部中间 state，不直接作为模板 output；模板只输出 `final_reply`。
 - 补搜回边必须是 condition 的原生分支，便于 `loopLimit` 生效。
 - `exhausted` 分支表示达到循环上限后用已有证据收束，而不是失败。
 - 证据评估节点不应为了追求完美资料无限补搜。已有约 5 份可读原文并足以回答时，应进入整理阶段，并在最终回复中说明资料局限。
