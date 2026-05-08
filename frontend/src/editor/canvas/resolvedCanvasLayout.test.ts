@@ -150,7 +150,7 @@ test("resolveCanvasLayout keeps condition route handles tied to the current node
           description: "",
           ui: {
             position: { x: 100, y: 100 },
-            size: { width: 720, height: 360 },
+            size: { width: 560, height: 280 },
           },
           reads: [],
           writes: [],
@@ -174,6 +174,9 @@ test("resolveCanvasLayout keeps condition route handles tied to the current node
       "route_gate:branch:true": { offsetX: 554, offsetY: 145 },
       "route_gate:branch:false": { offsetX: 554, offsetY: 199 },
       "route_gate:branch:exhausted": { offsetX: 554, offsetY: 252 },
+    },
+    {
+      route_gate: { width: 720, height: 360 },
     },
   );
 

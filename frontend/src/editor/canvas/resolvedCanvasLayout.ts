@@ -6,6 +6,7 @@ import {
   projectCanvasAnchors,
   projectCanvasEdges,
 } from "./edgeProjection.ts";
+import type { MeasuredNodeSize } from "./canvasNodePresentationModel.ts";
 import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
 import { buildSelfFeedbackFlowPath, buildSequenceFlowPath } from "./flowEdgePath.ts";
 
@@ -17,9 +18,11 @@ export type MeasuredAnchorOffset = {
 export function resolveCanvasLayout(
   document: GraphPayload | GraphDocument,
   measuredAnchorOffsets: Record<string, MeasuredAnchorOffset>,
+  measuredNodeSizes: Record<string, MeasuredNodeSize> = {},
 ): { anchors: ProjectedCanvasAnchor[]; edges: ProjectedCanvasEdge[] } {
-  const anchors = resolveCanvasAnchors(document, projectCanvasAnchors(document), measuredAnchorOffsets);
-  const edges = resolveCanvasEdges(document, projectCanvasEdges(document), anchors);
+  const projectionOptions = { measuredNodeSizes };
+  const anchors = resolveCanvasAnchors(document, projectCanvasAnchors(document, projectionOptions), measuredAnchorOffsets);
+  const edges = resolveCanvasEdges(document, projectCanvasEdges(document, projectionOptions), anchors);
 
   return { anchors, edges };
 }

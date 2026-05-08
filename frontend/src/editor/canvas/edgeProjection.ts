@@ -1,6 +1,7 @@
 import type { GraphDocument, GraphPayload } from "../../types/node-system.ts";
 import { buildAnchorModel } from "../anchors/anchorModel.ts";
 import { placeAnchors } from "../anchors/anchorPlacement.ts";
+import type { MeasuredNodeSize } from "./canvasNodePresentationModel.ts";
 import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
 import { buildSelfFeedbackFlowPath, buildSequenceFlowPath } from "./flowEdgePath.ts";
 import { buildNodeAnchorFrame } from "./nodeAnchorFrame.ts";
@@ -48,6 +49,10 @@ export type ProjectedCanvasAnchorGroups = {
   pointAnchors: ProjectedCanvasAnchor[];
 };
 
+export type ProjectCanvasProjectionOptions = {
+  measuredNodeSizes?: Record<string, MeasuredNodeSize>;
+};
+
 export function groupProjectedCanvasEdges(edges: readonly ProjectedCanvasEdge[]): ProjectedCanvasEdgeGroups {
   return {
     flowRouteEdges: edges.filter((edge) => edge.kind === "flow" || edge.kind === "route"),
@@ -63,8 +68,8 @@ export function groupProjectedCanvasAnchors(anchors: readonly ProjectedCanvasAnc
   };
 }
 
-export function projectCanvasEdges(document: GraphPayload | GraphDocument): ProjectedCanvasEdge[] {
-  const placements = buildNodePlacements(document);
+export function projectCanvasEdges(document: GraphPayload | GraphDocument, options: ProjectCanvasProjectionOptions = {}): ProjectedCanvasEdge[] {
+  const placements = buildNodePlacements(document, options);
   const flowRoutingLookup = buildFlowRoutingLookup(document);
 
   const flowEdges = document.edges
@@ -174,8 +179,8 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument): Proj
   return [...flowEdges, ...routeEdges, ...dataEdges];
 }
 
-export function projectCanvasAnchors(document: GraphPayload | GraphDocument): ProjectedCanvasAnchor[] {
-  const placements = buildNodePlacements(document);
+export function projectCanvasAnchors(document: GraphPayload | GraphDocument, options: ProjectCanvasProjectionOptions = {}): ProjectedCanvasAnchor[] {
+  const placements = buildNodePlacements(document, options);
   return Array.from(placements.entries()).flatMap(([nodeId, placement]) => [
     ...(placement.flowIn
       ? [
@@ -233,11 +238,11 @@ export function projectCanvasAnchors(document: GraphPayload | GraphDocument): Pr
   ]);
 }
 
-function buildNodePlacements(document: GraphPayload | GraphDocument) {
+function buildNodePlacements(document: GraphPayload | GraphDocument, options: ProjectCanvasProjectionOptions = {}) {
   return new Map(
     Object.entries(document.nodes).map(([nodeId, node]) => [
       nodeId,
-      placeAnchors(buildAnchorModel(nodeId, node), buildNodeAnchorFrame(node)),
+      placeAnchors(buildAnchorModel(nodeId, node), buildNodeAnchorFrame(node, { size: options.measuredNodeSizes?.[nodeId] })),
     ]),
   );
 }

@@ -36,10 +36,10 @@ test("buildFlowOutHotspotStyle keeps the right-side hotspot geometry", () => {
 
 test("buildRouteHandleStyle combines hotspot geometry and branch palette variables", () => {
   assert.deepEqual(buildRouteHandleStyle({ x: 100, y: 200, branch: "false" }), {
-    left: "126px",
+    left: "148px",
     top: "200px",
-    width: "60px",
-    height: "94px",
+    width: "44px",
+    height: "56px",
     "--editor-flow-handle-fill": "rgba(254, 242, 242, 0.98)",
     "--editor-flow-handle-border": "rgba(239, 68, 68, 0.24)",
     "--editor-flow-handle-accent": "#dc2626",

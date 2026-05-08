@@ -11,6 +11,12 @@ export type RouteHandlePalette = {
   text: string;
 };
 
+const ROUTE_HANDLE_GEOMETRY = Object.freeze({
+  offsetX: 48,
+  width: 44,
+  height: 56,
+});
+
 export function resolveRouteHandleTone(branch: string | undefined): RouteHandleTone {
   const normalizedBranch = branch?.trim().toLowerCase() ?? "";
   if (normalizedBranch === "true") {
@@ -75,7 +81,10 @@ export function buildFlowOutHotspotStyle(anchor: Pick<ProjectedCanvasAnchor, "x"
 export function buildRouteHandleStyle(anchor: Pick<ProjectedCanvasAnchor, "x" | "y" | "branch">) {
   const palette = resolveRouteHandlePalette(anchor.branch);
   return {
-    ...buildFlowOutHotspotStyle(anchor),
+    left: `${anchor.x + ROUTE_HANDLE_GEOMETRY.offsetX}px`,
+    top: `${anchor.y}px`,
+    width: `${ROUTE_HANDLE_GEOMETRY.width}px`,
+    height: `${ROUTE_HANDLE_GEOMETRY.height}px`,
     "--editor-flow-handle-fill": palette.fill,
     "--editor-flow-handle-border": palette.border,
     "--editor-flow-handle-accent": palette.accent,

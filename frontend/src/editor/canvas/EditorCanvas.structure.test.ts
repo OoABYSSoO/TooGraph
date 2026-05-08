@@ -715,7 +715,7 @@ test("EditorCanvas resolves rendered anchor geometry from measured node slot off
   const canvasNodeMeasurementsSource = readCanvasNodeMeasurementsSource();
 
   assert.match(canvasNodeMeasurementsSource, /const measuredAnchorOffsets = ref<Record<string, MeasuredAnchorOffset>>\(\{\}\);/);
-  assert.match(componentSource, /const resolvedCanvasLayout = computed\(\(\) => resolveCanvasLayout\(props\.document, measuredAnchorOffsets\.value\)\);/);
+  assert.match(componentSource, /const resolvedCanvasLayout = computed\(\(\) => resolveCanvasLayout\(props\.document, measuredAnchorOffsets\.value, measuredNodeSizes\.value\)\);/);
   assert.match(canvasNodeMeasurementsSource, /querySelectorAll\("\[data-anchor-slot-id\]"\)/);
 });
 
