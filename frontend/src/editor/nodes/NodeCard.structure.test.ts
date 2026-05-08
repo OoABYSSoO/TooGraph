@@ -503,7 +503,8 @@ test("NodeCard renders plus input and plus output as virtual agent state port ro
   assert.match(statePortListSource, /v-for="port in ports"/);
   assert.match(componentSource, /const shouldShowAgentCreateInputPort = computed\(\(\) => agentInputPorts\.value\.length === 0\);/);
   assert.match(componentSource, /const isAgentOutputManagedBySkill = computed\(\(\) => props\.node\.kind === "agent" && props\.node\.config\.skillKey\.trim\(\)\.length > 0\);/);
-  assert.match(componentSource, /const isAgentOutputManagedByCapability = computed\(\(\) =>[\s\S]*props\.node\.reads\.some\(\(binding\) => props\.stateSchema\[binding\.state\]\?\.type\?\.trim\(\) === "capability"\)/);
+  assert.match(componentSource, /import \{ isAgentOutputManagedByDynamicCapability \} from "@\/lib\/agent-capability-management";/);
+  assert.match(componentSource, /const isAgentOutputManagedByCapability = computed\(\(\) =>[\s\S]*isAgentOutputManagedByDynamicCapability\(\{[\s\S]*nodeId: props\.nodeId,[\s\S]*node: props\.node,[\s\S]*stateSchema: props\.stateSchema,[\s\S]*\}\)/);
   assert.match(componentSource, /const shouldShowAgentCreateOutputPort = computed\([\s\S]*!isAgentOutputManagedBySkill\.value && !isAgentOutputManagedByCapability\.value && agentOutputPorts\.value\.length === 0/);
   assert.match(componentSource, /const shouldRevealAgentCreateInputPort = computed\(\(\) =>[\s\S]*shouldShowAgentCreateInputPort\.value[\s\S]*props\.selected[\s\S]*props\.hovered[\s\S]*hasFloatingPanelOpen\.value/);
   assert.match(componentSource, /const shouldRevealAgentCreateOutputPort = computed\([\s\S]*!isAgentOutputManagedBySkill\.value[\s\S]*shouldShowAgentCreateOutputPort\.value[\s\S]*props\.selected[\s\S]*props\.hovered[\s\S]*hasFloatingPanelOpen\.value/);

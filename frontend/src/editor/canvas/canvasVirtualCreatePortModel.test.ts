@@ -44,6 +44,19 @@ const document: GraphPayload = {
         managed: true,
       },
     },
+    detached_dynamic_result: {
+      name: "detached_dynamic_result",
+      description: "",
+      type: "result_package",
+      value: {},
+      color: "#7c3aed",
+      binding: {
+        kind: "capability_result",
+        nodeId: "result_package_executor",
+        fieldKey: "result_package",
+        managed: true,
+      },
+    },
   },
   metadata: {},
   nodes: {
@@ -51,6 +64,7 @@ const document: GraphPayload = {
     reading_agent: agentNode("Reader", [], ["answer"]),
     writing_agent: agentNode("Writer", ["answer"], []),
     dynamic_executor: agentNode("Dynamic", ["dynamic_result"], ["selected_capability"]),
+    result_package_executor: agentNode("Result Package", ["detached_dynamic_result"], ["answer"]),
     input: {
       kind: "input",
       name: "Input",
@@ -94,6 +108,15 @@ test("virtual create port model hides output creation for dynamic capability exe
       node: document.nodes.dynamic_executor,
       stateSchema: document.state_schema,
       hoveredNodeId: "dynamic_executor",
+    }),
+    false,
+  );
+  assert.equal(
+    isAgentCreateOutputAnchorVisible({
+      nodeId: "result_package_executor",
+      node: document.nodes.result_package_executor,
+      stateSchema: document.state_schema,
+      selectedNodeId: "result_package_executor",
     }),
     false,
   );

@@ -6,6 +6,7 @@ import {
   VIRTUAL_ANY_OUTPUT_COLOR,
   VIRTUAL_ANY_OUTPUT_STATE_KEY,
 } from "../../lib/virtual-any-input.ts";
+import { isAgentOutputManagedByDynamicCapability } from "../../lib/agent-capability-management.ts";
 import type { GraphDocument, GraphNode, GraphPayload, StateDefinition } from "../../types/node-system.ts";
 import type { PendingStateInputSource } from "./canvasPendingStatePortModel.ts";
 import type { ProjectedCanvasAnchor } from "./edgeProjection.ts";
@@ -27,20 +28,19 @@ export function shouldShowAgentCreateInputPortByDefault(node: GraphNode | undefi
 }
 
 function isDynamicCapabilityExecutorNode(
+  nodeId: string,
   node: GraphNode | undefined,
   stateSchema: Record<string, StateDefinition> | undefined,
 ) {
-  if (!node || node.kind !== "agent" || node.config.skillKey.trim()) {
-    return false;
-  }
-  return node.reads.some((binding) => stateSchema?.[binding.state]?.type?.trim() === "capability");
+  return isAgentOutputManagedByDynamicCapability({ nodeId, node, stateSchema });
 }
 
 export function shouldShowAgentCreateOutputPortByDefault(
   node: GraphNode | undefined,
   stateSchema?: Record<string, StateDefinition>,
+  nodeId = "",
 ) {
-  if (isDynamicCapabilityExecutorNode(node, stateSchema)) {
+  if (isDynamicCapabilityExecutorNode(nodeId, node, stateSchema)) {
     return false;
   }
   return (node?.kind === "agent" || node?.kind === "input") && node.writes.length === 0;
@@ -62,11 +62,11 @@ export function isAgentCreateInputAnchorVisible(input: VirtualCreatePortVisibili
 }
 
 export function isAgentCreateOutputAnchorVisible(input: VirtualCreatePortVisibilityInput) {
-  if (isDynamicCapabilityExecutorNode(input.node, input.stateSchema)) {
+  if (isDynamicCapabilityExecutorNode(input.nodeId, input.node, input.stateSchema)) {
     return false;
   }
   return (
-    shouldShowAgentCreateOutputPortByDefault(input.node, input.stateSchema) ||
+    shouldShowAgentCreateOutputPortByDefault(input.node, input.stateSchema, input.nodeId) ||
     input.selectedNodeId === input.nodeId ||
     input.hoveredNodeId === input.nodeId ||
     input.hoveredPointAnchorNodeId === input.nodeId ||

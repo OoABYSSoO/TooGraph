@@ -436,6 +436,7 @@ import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { AgentNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 import type { SkillDefinition } from "@/types/skills";
 import { buildSkillArtifactFileUrl, uploadSkillArtifactFile } from "@/api/skillArtifacts";
+import { isAgentOutputManagedByDynamicCapability } from "@/lib/agent-capability-management";
 import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_COLOR, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "@/lib/virtual-any-input";
 
 import {
@@ -634,7 +635,11 @@ const agentOutputPorts = computed<NodePortViewModel[]>(() =>
 );
 const isAgentOutputManagedBySkill = computed(() => props.node.kind === "agent" && props.node.config.skillKey.trim().length > 0);
 const isAgentOutputManagedByCapability = computed(() =>
-  props.node.kind === "agent" && props.node.reads.some((binding) => props.stateSchema[binding.state]?.type?.trim() === "capability"),
+  isAgentOutputManagedByDynamicCapability({
+    nodeId: props.nodeId,
+    node: props.node,
+    stateSchema: props.stateSchema,
+  }),
 );
 const shouldShowAgentCreateInputPort = computed(() => agentInputPorts.value.length === 0);
 const shouldShowAgentCreateOutputPort = computed(
