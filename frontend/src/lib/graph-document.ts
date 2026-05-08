@@ -1059,7 +1059,7 @@ function createManagedCapabilityResultState(document: GraphPayload | GraphDocume
   const stateField = buildNextMaterializedVirtualStateField(document, "result_package");
   document.state_schema[stateField.key] = {
     ...stateField.definition,
-    name: "Capability Result",
+    name: "Capability",
     description: "Dynamic capability execution result package.",
     type: "result_package",
     value: {},

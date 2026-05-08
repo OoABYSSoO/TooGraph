@@ -793,6 +793,7 @@ test("connectStateBindingInDocument materializes dynamic capability result packa
   assert.deepEqual(executorNode.reads.map((binding) => binding.state), ["question", "selected_capability"]);
   assert.deepEqual(executorNode.writes.map((binding) => binding.state), ["state_1"]);
   assert.deepEqual(executorNode.config.suspendedFreeWrites, [{ state: "free_answer", mode: "replace" }]);
+  assert.equal(withCapability.state_schema.state_1?.name, "Capability");
   assert.equal(withCapability.state_schema.state_1?.type, "result_package");
   assert.deepEqual(withCapability.state_schema.state_1?.binding, {
     kind: "capability_result",
