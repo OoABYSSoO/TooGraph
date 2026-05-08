@@ -16,6 +16,8 @@ Selection rules:
 - Saved ordinary graphs are not candidates; reusable graph capabilities come from templates.
 - `capability_catalog.py` is shared by the lifecycle scripts and only reads local manifests and template records.
 
+The `found` output is a boolean for downstream branch decisions. It is `true` only when the selected item is still available and selectable, and `false` when the model chooses none or the choice is invalid.
+
 The `capability` output is suitable for a `capability` state:
 
 ```json
@@ -28,4 +30,4 @@ or:
 { "kind": "skill", "key": "web_search", "name": "联网搜索" }
 ```
 
-When the model chooses none or the selected key is not currently available, the Skill returns `{ "kind": "none" }`.
+When the model chooses none or the selected key is not currently available, the Skill returns `found=false` and `{ "kind": "none" }`.

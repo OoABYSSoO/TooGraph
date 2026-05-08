@@ -28,6 +28,20 @@
         "managed": true
       }
     },
+    "existing_capability_found": {
+      "name": "已有能力可用",
+      "description": "能力选择技能是否找到了可复用的启用模板或 Skill；下游节点只用这个布尔值做分支判断。",
+      "type": "boolean",
+      "value": false,
+      "color": "#2563eb",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteui_capability_selector",
+        "nodeId": "select_existing_capability",
+        "fieldKey": "found",
+        "managed": true
+      }
+    },
     "requirement_review": {
       "name": "需求评估",
       "description": "对需求是否清晰、是否已有能力可复用、是否继续创建 Skill 的结构化判断。",
@@ -438,6 +452,10 @@
         {
           "state": "existing_capability",
           "mode": "replace"
+        },
+        {
+          "state": "existing_capability_found",
+          "mode": "replace"
         }
       ],
       "config": {
@@ -446,7 +464,8 @@
           {
             "skillKey": "graphiteui_capability_selector",
             "outputMapping": {
-              "capability": "existing_capability"
+              "capability": "existing_capability",
+              "found": "existing_capability_found"
             }
           }
         ],
@@ -482,7 +501,7 @@
           "required": true
         },
         {
-          "state": "existing_capability",
+          "state": "existing_capability_found",
           "required": false
         }
       ],
@@ -504,7 +523,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "评估用户是否真的需要创建新 Skill。requirement_review 必须写 JSON 对象，包含 needs_clarification(boolean)、existing_capability_summary(string)、unclear_points(array)、questions(array)、reason(string)。如果 existing_capability 不是 none 且可能已经满足需求，应把 needs_clarification 设为 true，并在 questions 中询问用户是否仍要创建新 Skill。creation_decision 必须写 JSON 对象，包含 approved_to_create(boolean)、reason(string)；除非已有能力明显满足且用户没有表达仍要创建，否则默认 approved_to_create 为 true。confirmed_skill_requirement 写 Markdown，概括当前已确认的目标、输入、输出、权限、是否需要 before_llm.py、是否需要 after_llm.py、是否需要第三方依赖和限制。",
+        "taskInstruction": "评估用户是否真的需要创建新 Skill。requirement_review 必须写 JSON 对象，包含 needs_clarification(boolean)、existing_capability_summary(string)、unclear_points(array)、questions(array)、reason(string)。如果 existing_capability_found 为 true，说明已有启用能力可能满足需求，应把 needs_clarification 设为 true，并在 questions 中询问用户是否仍要创建新 Skill；不要读取或执行 capability 对象本身。creation_decision 必须写 JSON 对象，包含 approved_to_create(boolean)、reason(string)；除非已有能力明显满足且用户没有表达仍要创建，否则默认 approved_to_create 为 true。confirmed_skill_requirement 写 Markdown，概括当前已确认的目标、输入、输出、权限、是否需要 before_llm.py、是否需要 after_llm.py、是否需要第三方依赖和限制。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -564,10 +583,6 @@
           "required": true
         },
         {
-          "state": "existing_capability",
-          "required": false
-        },
-        {
           "state": "requirement_review",
           "required": true
         }
@@ -604,10 +619,6 @@
         {
           "state": "skill_request",
           "required": true
-        },
-        {
-          "state": "existing_capability",
-          "required": false
         },
         {
           "state": "clarification_questions",
@@ -1704,7 +1715,7 @@
           "required": true
         },
         {
-          "state": "existing_capability",
+          "state": "existing_capability_found",
           "required": false
         },
         {
@@ -1722,7 +1733,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "用户或需求评估认为无需创建新 Skill 时，final_summary 写 Markdown，说明没有写入任何文件，并列出可以改用的 existing_capability 或后续如果仍要创建需要补充的信息。",
+        "taskInstruction": "用户或需求评估认为无需创建新 Skill 时，final_summary 写 Markdown，说明没有写入任何文件。如果 existing_capability_found 为 true，说明已有启用能力可用；否则说明当前没有找到合适能力。必要时补充后续如果仍要创建需要提供的信息。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",

@@ -99,7 +99,7 @@ def _write_skill(
 
 
 class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
-    def test_manifest_declares_only_capability_output(self) -> None:
+    def test_manifest_declares_capability_and_found_outputs(self) -> None:
         manifest = json.loads((SELECTOR_SKILL_DIR / "skill.json").read_text(encoding="utf-8"))
 
         capability_inputs = [field for field in manifest["inputSchema"] if field["key"] == "capability"]
@@ -125,6 +125,12 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                     "name": "Capability",
                     "valueType": "capability",
                     "description": "单个能力对象，kind 为 subgraph、skill 或 none。",
+                },
+                {
+                    "key": "found",
+                    "name": "Found",
+                    "valueType": "boolean",
+                    "description": "是否找到了可用的图模板或 Skill 能力。",
                 }
             ],
         )
@@ -189,7 +195,8 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                     capability={"kind": "subgraph", "key": "advanced_web_research_loop"},
                 )
 
-        self.assertEqual(set(result), {"capability"})
+        self.assertEqual(set(result), {"capability", "found"})
+        self.assertTrue(result["found"])
         self.assertEqual(result["capability"]["kind"], "subgraph")
         self.assertEqual(result["capability"]["key"], "advanced_web_research_loop")
         self.assertEqual(result["capability"]["name"], "高级联网搜索")
@@ -216,7 +223,8 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                     capability={"kind": "skill", "key": "web_search"},
                 )
 
-        self.assertEqual(set(result), {"capability"})
+        self.assertEqual(set(result), {"capability", "found"})
+        self.assertTrue(result["found"])
         self.assertEqual(result["capability"]["kind"], "skill")
         self.assertEqual(result["capability"]["key"], "web_search")
         self.assertEqual(result["capability"]["name"], "联网搜索")
@@ -246,7 +254,8 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                     capability={"kind": "skill", "key": "web_search"},
                 )
 
-        self.assertEqual(set(result), {"capability"})
+        self.assertEqual(set(result), {"capability", "found"})
+        self.assertFalse(result["found"])
         self.assertEqual(result["capability"], {"kind": "none"})
 
     def test_selector_does_not_match_requirement_without_llm_selected_capability(self) -> None:
@@ -262,7 +271,8 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
             with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": temp_dir}, clear=True):
                 result = selector.graphiteui_capability_selector(requirement="帮我联网搜索资料")
 
-        self.assertEqual(set(result), {"capability"})
+        self.assertEqual(set(result), {"capability", "found"})
+        self.assertFalse(result["found"])
         self.assertEqual(result["capability"], {"kind": "none"})
 
 

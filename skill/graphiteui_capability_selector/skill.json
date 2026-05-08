@@ -48,6 +48,12 @@
       "name": "Capability",
       "valueType": "capability",
       "description": "单个能力对象，kind 为 subgraph、skill 或 none。"
+    },
+    {
+      "key": "found",
+      "name": "Found",
+      "valueType": "boolean",
+      "description": "是否找到了可用的图模板或 Skill 能力。"
     }
   ]
 }

@@ -58,6 +58,7 @@ def normalize_selected_capability(**skill_inputs: Any) -> dict[str, Any]:
         return _none_response()
 
     return {
+        "found": True,
         "capability": {
             "kind": candidate["kind"],
             "key": candidate["key"],
@@ -209,7 +210,7 @@ def _resolve_repo_root() -> Path:
 
 
 def _none_response() -> dict[str, Any]:
-    return {"capability": {"kind": "none"}}
+    return {"found": False, "capability": {"kind": "none"}}
 
 
 def _format_candidate_lines(candidates: list[dict[str, Any]]) -> list[str]:

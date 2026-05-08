@@ -156,6 +156,7 @@ class TemplateLayoutTests(unittest.TestCase):
             ["ask_clarification", "draft_example_io", "review_generated_skill"],
         )
         self.assertEqual(states["existing_capability"]["type"], "json")
+        self.assertEqual(states["existing_capability_found"]["type"], "boolean")
         self.assertEqual(states["generated_skill_key"]["type"], "text")
         self.assertEqual(states["generated_skill_json"]["type"], "json")
         self.assertEqual(states["generated_skill_md"]["type"], "markdown")
@@ -185,9 +186,19 @@ class TemplateLayoutTests(unittest.TestCase):
             [
                 {
                     "skillKey": "graphiteui_capability_selector",
-                    "outputMapping": {"capability": "existing_capability"},
+                    "outputMapping": {
+                        "capability": "existing_capability",
+                        "found": "existing_capability_found",
+                    },
                 }
             ],
+        )
+        for node_id in ["review_requirement", "ask_clarification", "merge_clarification", "finalize_no_create"]:
+            with self.subTest(capability_context_reader=node_id):
+                self.assertNotIn("existing_capability", [read["state"] for read in nodes[node_id]["reads"]])
+        self.assertIn(
+            {"state": "existing_capability_found", "required": False},
+            nodes["review_requirement"]["reads"],
         )
 
         builder_node = nodes["build_skill_files"]
