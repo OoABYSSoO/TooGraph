@@ -20,6 +20,10 @@ export type NodePortViewModel = {
   typeLabel: string;
   stateColor: string;
   virtual?: boolean;
+  managedBySkill?: {
+    skillKey: string;
+    fieldKey: string;
+  };
 };
 
 export type NodeConditionRouteOutputViewModel = {
@@ -168,6 +172,7 @@ export function buildNodeCardViewModel(
           label: getStateLabel(binding.state, stateSchema),
           typeLabel: getStateTypeLabel(binding.state, stateSchema),
           stateColor: stateSchema[binding.state]?.color ?? "#d97706",
+          managedBySkill: resolveManagedSkillOutputPort(nodeId, binding.state, stateSchema),
         }));
 
   const branches =
@@ -503,6 +508,21 @@ function getStateLabel(stateKey: string, stateSchema: Record<string, StateDefini
 function getStateTypeLabel(stateKey: string, stateSchema: Record<string, StateDefinition>) {
   const stateType = stateSchema[stateKey]?.type?.trim() || "text";
   return stateType.replace(/_/g, " ");
+}
+
+function resolveManagedSkillOutputPort(
+  nodeId: string,
+  stateKey: string,
+  stateSchema: Record<string, StateDefinition>,
+): NodePortViewModel["managedBySkill"] {
+  const binding = stateSchema[stateKey]?.binding;
+  if (binding?.kind !== "skill_output" || binding.nodeId !== nodeId || binding.managed === false) {
+    return undefined;
+  }
+  return {
+    skillKey: binding.skillKey,
+    fieldKey: binding.fieldKey,
+  };
 }
 
 function stringifyValue(value: unknown) {

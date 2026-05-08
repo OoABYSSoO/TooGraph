@@ -550,6 +550,87 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
   assert.deepEqual(document.nodes.search_agent.writes, []);
 });
 
+test("updateAgentNodeConfigInDocument suspends free agent outputs while a static skill owns outputs", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Skill Managed Output Graph",
+    state_schema: {
+      free_answer: {
+        name: "Free Answer",
+        description: "LLM-authored answer.",
+        type: "text",
+        value: "",
+        color: "#7c3aed",
+      },
+      free_notes: {
+        name: "Free Notes",
+        description: "LLM-authored notes.",
+        type: "json",
+        value: {},
+        color: "#0f766e",
+      },
+    },
+    nodes: {
+      search_agent: {
+        kind: "agent",
+        name: "Search Agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [
+          { state: "free_answer", mode: "replace" },
+          { state: "free_notes", mode: "append" },
+        ],
+        config: {
+          skillKey: "",
+          skillBindings: [],
+          skillInstructionBlocks: {},
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "high",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const withSkill = updateAgentNodeConfigInDocument(
+    document,
+    "search_agent",
+    (config) => ({ ...config, skillKey: "web_search" }),
+    { skillDefinitions: [webSearchSkill] },
+  );
+  const skillNode = withSkill.nodes.search_agent;
+
+  assert.equal(skillNode.kind, "agent");
+  assert.deepEqual(skillNode.writes.map((binding) => binding.state), ["state_1", "state_2", "state_3", "state_4"]);
+  assert.deepEqual(skillNode.config.suspendedFreeWrites, [
+    { state: "free_answer", mode: "replace" },
+    { state: "free_notes", mode: "append" },
+  ]);
+  assert.equal(withSkill.state_schema.free_answer?.name, "Free Answer");
+
+  const withoutSkill = updateAgentNodeConfigInDocument(
+    withSkill,
+    "search_agent",
+    (config) => ({ ...config, skillKey: "" }),
+    { skillDefinitions: [webSearchSkill] },
+  );
+  const restoredNode = withoutSkill.nodes.search_agent;
+
+  assert.equal(restoredNode.kind, "agent");
+  assert.deepEqual(restoredNode.writes, [
+    { state: "free_answer", mode: "replace" },
+    { state: "free_notes", mode: "append" },
+  ]);
+  assert.deepEqual(restoredNode.config.skillBindings, []);
+  assert.equal(restoredNode.config.suspendedFreeWrites, undefined);
+});
+
 test("updateAgentNodeConfigInDocument does not create static skill input mappings", () => {
   const document: GraphPayload = {
     graph_id: null,

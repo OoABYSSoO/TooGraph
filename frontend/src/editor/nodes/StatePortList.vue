@@ -13,9 +13,10 @@
     >
       <ElPopover
         :visible="
-          isStateEditorOpen(anchorId(port.key)) ||
-          isStateEditorConfirmOpen(anchorId(port.key)) ||
-          isRemovePortStateConfirmOpen(anchorId(port.key))
+          canEditPort(port) &&
+          (isStateEditorOpen(anchorId(port.key)) ||
+            isStateEditorConfirmOpen(anchorId(port.key)) ||
+            isRemovePortStateConfirmOpen(anchorId(port.key)))
         "
         :placement="isStateEditorOpen(anchorId(port.key)) ? editorPlacement : confirmPlacement"
         :width="isStateEditorOpen(anchorId(port.key)) ? 320 : undefined"
@@ -31,23 +32,24 @@
                 ? 'node-card__port-pill--input node-card__port-pill--dock-start'
                 : 'node-card__port-pill--output node-card__port-pill--dock-end',
               {
-                'node-card__port-pill--removable': !port.virtual,
+                'node-card__port-pill--removable': canRemovePort(port),
+                'node-card__port-pill--skill-managed': side === 'output' && Boolean(port.managedBySkill),
                 'node-card__port-pill--revealed': isStateEditorPillRevealed(anchorId(port.key)),
                 'node-card__port-pill--confirm': isStateEditorConfirmOpen(anchorId(port.key)),
-                'node-card__port-pill--reordering': isPortReordering(side, port.key),
-                'node-card__port-pill--reorder-placeholder': isPortReorderPlaceholder(side, port.key),
+                'node-card__port-pill--reordering': canReorderPort(port) && isPortReordering(side, port.key),
+                'node-card__port-pill--reorder-placeholder': canReorderPort(port) && isPortReorderPlaceholder(side, port.key),
               },
             ]"
             :style="{ '--node-card-port-accent': port.stateColor }"
-            data-state-editor-trigger="true"
+            :data-state-editor-trigger="canEditPort(port) ? 'true' : undefined"
             :data-anchor-hitarea="side === 'input' ? 'true' : undefined"
-            :data-port-reorder-node-id="nodeId"
-            :data-port-reorder-side="side"
-            :data-port-reorder-state-key="port.key"
+            :data-port-reorder-node-id="canReorderPort(port) ? nodeId : undefined"
+            :data-port-reorder-side="canReorderPort(port) ? side : undefined"
+            :data-port-reorder-state-key="canReorderPort(port) ? port.key : undefined"
             @pointerenter="emit('pointer-enter', anchorId(port.key))"
             @pointerleave="emit('pointer-leave', anchorId(port.key))"
-            @pointerdown.stop="emit('reorder-pointer-down', side, port.key, $event)"
-            @click.stop="emit('port-click', anchorId(port.key), port.key)"
+            @pointerdown.stop="handlePortPointerDown(port, $event)"
+            @click.stop="handlePortClick(port)"
           >
             <span
               v-if="side === 'input'"
@@ -56,7 +58,7 @@
               aria-hidden="true"
             />
             <button
-              v-if="side === 'output' && !port.virtual"
+              v-if="side === 'output' && !port.virtual && !port.managedBySkill"
               type="button"
               class="node-card__port-pill-remove node-card__port-pill-remove--leading"
               :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(anchorId(port.key)) }"
@@ -67,6 +69,13 @@
               <ElIcon v-if="isRemovePortStateConfirmOpen(anchorId(port.key))"><Check /></ElIcon>
               <ElIcon v-else><Delete /></ElIcon>
             </button>
+            <ElIcon
+              v-if="side === 'output' && port.managedBySkill"
+              class="node-card__port-pill-source-icon"
+              title="Skill managed output"
+            >
+              <Connection />
+            </ElIcon>
             <span
               class="node-card__port-pill-label"
               :class="{ 'node-card__port-pill-label--confirm': isStateEditorConfirmOpen(anchorId(port.key)) }"
@@ -189,7 +198,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import { ElIcon, ElPopover } from "element-plus";
-import { Check, Delete } from "@element-plus/icons-vue";
+import { Check, Connection, Delete } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 import StateEditorPopover from "./StateEditorPopover.vue";
@@ -259,6 +268,32 @@ function anchorId(stateKey: string) {
 
 function anchorSlotId(stateKey: string) {
   return `${props.nodeId}:${anchorSlotKind.value}:${stateKey}`;
+}
+
+function canEditPort(port: NodePortViewModel) {
+  return !port.virtual && !(props.side === "output" && port.managedBySkill);
+}
+
+function canRemovePort(port: NodePortViewModel) {
+  return !port.virtual && !(props.side === "output" && port.managedBySkill);
+}
+
+function canReorderPort(port: NodePortViewModel) {
+  return canEditPort(port);
+}
+
+function handlePortPointerDown(port: NodePortViewModel, pointerEvent: PointerEvent) {
+  if (!canReorderPort(port)) {
+    return;
+  }
+  emit("reorder-pointer-down", props.side, port.key, pointerEvent);
+}
+
+function handlePortClick(port: NodePortViewModel) {
+  if (!canEditPort(port)) {
+    return;
+  }
+  emit("port-click", anchorId(port.key), port.key);
 }
 </script>
 
@@ -362,6 +397,23 @@ function anchorSlotId(stateKey: string) {
 
 .node-card__port-pill--output {
   color: #1f2937;
+}
+
+.node-card__port-pill--skill-managed {
+  cursor: default;
+}
+
+.node-card__port-pill--skill-managed:focus-visible,
+.node-card__port-pill--skill-managed.node-card__port-pill--revealed {
+  border-color: color-mix(in srgb, var(--node-card-port-accent) 22%, transparent);
+  background: color-mix(in srgb, var(--node-card-port-accent) 8%, #fff);
+}
+
+.node-card__port-pill-source-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: color-mix(in srgb, var(--node-card-port-accent) 78%, #1f2937);
 }
 
 .node-card__port-pill--input {

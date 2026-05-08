@@ -725,6 +725,17 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
   }
 
   if (attachedSkillKey) {
+    const suspendedFreeWrites = mergeWriteBindings(
+      normalizeWriteBindings(node.config.suspendedFreeWrites).filter((binding) => document.state_schema[binding.state]),
+      node.writes.filter((binding) => !isManagedSkillOutputStateForNode(document, nodeId, binding.state)),
+    );
+    if (suspendedFreeWrites.length > 0) {
+      node.config.suspendedFreeWrites = suspendedFreeWrites;
+    } else {
+      delete node.config.suspendedFreeWrites;
+    }
+    node.writes = node.writes.filter((binding) => isManagedSkillOutputStateForNode(document, nodeId, binding.state, attachedSkillKey));
+
     const definition = skillDefinitionMap.get(attachedSkillKey);
     const existingBinding = currentBindingBySkill.get(attachedSkillKey);
     if (!definition?.outputSchema.length) {
@@ -753,6 +764,11 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
       });
       processedSkillKeys.add(attachedSkillKey);
     }
+  } else {
+    const restoredFreeWrites = normalizeWriteBindings(node.config.suspendedFreeWrites).filter((binding) => document.state_schema[binding.state]);
+    const currentFreeWrites = node.writes.filter((binding) => !isManagedSkillOutputStateForNode(document, nodeId, binding.state));
+    node.writes = mergeWriteBindings(restoredFreeWrites, currentFreeWrites);
+    delete node.config.suspendedFreeWrites;
   }
 
   for (const binding of currentBindings) {
@@ -763,6 +779,33 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
   }
 
   node.config.skillBindings = nextSkillBindings;
+}
+
+function normalizeWriteBindings(value: AgentNode["config"]["suspendedFreeWrites"]): WriteBinding[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((binding) => ({
+      state: String(binding.state ?? "").trim(),
+      mode: binding.mode === "append" ? "append" as const : "replace" as const,
+    }))
+    .filter((binding) => binding.state);
+}
+
+function mergeWriteBindings(...bindingGroups: WriteBinding[][]): WriteBinding[] {
+  const seen = new Set<string>();
+  const merged: WriteBinding[] = [];
+  for (const bindings of bindingGroups) {
+    for (const binding of bindings) {
+      if (seen.has(binding.state)) {
+        continue;
+      }
+      seen.add(binding.state);
+      merged.push({ ...binding });
+    }
+  }
+  return merged;
 }
 
 function normalizeAgentSkillBindings(value: AgentNode["config"]["skillBindings"]): AgentSkillBinding[] {
@@ -801,6 +844,21 @@ function collectRemovedManagedSkillOutputStateKeys(
     }
   }
   return removedStateKeys;
+}
+
+function isManagedSkillOutputStateForNode(
+  document: GraphPayload | GraphDocument,
+  nodeId: string,
+  stateKey: string,
+  skillKey?: string,
+) {
+  const stateBinding = document.state_schema[stateKey]?.binding;
+  return (
+    stateBinding?.kind === "skill_output" &&
+    stateBinding.nodeId === nodeId &&
+    stateBinding.managed !== false &&
+    (skillKey === undefined || stateBinding.skillKey === skillKey)
+  );
 }
 
 function ensureAgentWriteBinding(node: AgentNode, stateKey: string) {

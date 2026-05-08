@@ -9,6 +9,7 @@ from pydantic import ValidationError
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.schemas.node_system import (
+    NodeSystemAgentConfig,
     NodeSystemConditionConfig,
     NodeSystemGraphDocument,
     NodeSystemInputConfig,
@@ -45,6 +46,20 @@ class NodeSystemSchemaLegacyFieldRejectionTests(unittest.TestCase):
 
         self.assertEqual(config.boundary_type.value, "video")
         self.assertEqual(config.model_dump(by_alias=True)["boundaryType"], "video")
+
+    def test_agent_config_preserves_suspended_free_writes(self) -> None:
+        config = NodeSystemAgentConfig.model_validate(
+            {
+                "skillKey": "web_search",
+                "suspendedFreeWrites": [
+                    {"state": "free_answer", "mode": "replace"},
+                    {"state": "free_notes", "mode": "append"},
+                ],
+            }
+        )
+
+        self.assertEqual([binding.state for binding in config.suspended_free_writes], ["free_answer", "free_notes"])
+        self.assertEqual(config.model_dump(by_alias=True)["suspendedFreeWrites"][1]["mode"].value, "append")
 
     def test_condition_config_rejects_condition_mode(self) -> None:
         with self.assertRaises(ValidationError):

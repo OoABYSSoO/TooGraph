@@ -204,6 +204,53 @@ test("buildNodeCardViewModel derives displayed skill instruction from the select
   });
 });
 
+test("buildNodeCardViewModel marks skill-managed output ports", () => {
+  const node: GraphNode = {
+    kind: "agent",
+    name: "search_helper",
+    description: "Run a selected skill.",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [{ state: "question", required: true }],
+    writes: [{ state: "search_artifacts", mode: "replace" }],
+    config: {
+      skillKey: "web_search",
+      taskInstruction: "准备技能输入。",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "high",
+      temperature: 0.2,
+    },
+  };
+
+  const model = buildNodeCardViewModel("search_helper", node, {
+    ...stateSchema,
+    search_artifacts: {
+      name: "Search Artifacts",
+      description: "Downloaded files.",
+      type: "file",
+      value: [],
+      color: "#2563eb",
+      binding: {
+        kind: "skill_output",
+        skillKey: "web_search",
+        nodeId: "search_helper",
+        fieldKey: "artifact_paths",
+        managed: true,
+      },
+    },
+  });
+
+  assert.deepEqual(model.outputs[0]?.managedBySkill, {
+    skillKey: "web_search",
+    fieldKey: "artifact_paths",
+  });
+  assert.equal(model.body.kind, "agent");
+  assert.deepEqual(model.body.primaryOutput?.managedBySkill, {
+    skillKey: "web_search",
+    fieldKey: "artifact_paths",
+  });
+});
+
 test("buildNodeCardViewModel exposes a virtual plus input for empty non-input nodes", () => {
   const emptyAgent: GraphNode = {
     kind: "agent",
