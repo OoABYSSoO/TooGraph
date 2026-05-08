@@ -123,8 +123,8 @@ test("placeAnchors gives condition nodes a left flow entry and right-side route 
     })),
     [
       { id: "branch:true", branch: "true", x: 1234, y: 365, side: "right" },
-      { id: "branch:false", branch: "false", x: 1234, y: 459, side: "right" },
-      { id: "branch:exhausted", branch: "exhausted", x: 1234, y: 553, side: "right" },
+      { id: "branch:false", branch: "false", x: 1234, y: 425, side: "right" },
+      { id: "branch:exhausted", branch: "exhausted", x: 1234, y: 485, side: "right" },
     ],
   );
 });
@@ -149,15 +149,15 @@ test("placeAnchors keeps condition route exits inside the rendered frame height"
       y: anchor.y,
     })),
     [
-      { branch: "true", x: 1094, y: 365 },
-      { branch: "false", x: 1094, y: 389 },
+      { branch: "true", x: 1094, y: 292 },
+      { branch: "false", x: 1094, y: 352 },
       { branch: "exhausted", x: 1094, y: 412 },
     ],
   );
 });
 
-test("resolveRouteOutputRowGap derives wider branch spacing from row count instead of fixed offsets", () => {
+test("resolveRouteOutputRowGap keeps route handles compact without overlapping", () => {
   assert.equal(resolveRouteOutputRowGap(0, 52), 52);
   assert.equal(resolveRouteOutputRowGap(1, 52), 52);
-  assert.equal(resolveRouteOutputRowGap(3, 52), 94);
+  assert.equal(resolveRouteOutputRowGap(3, 52), 60);
 });

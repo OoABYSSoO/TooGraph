@@ -34,9 +34,9 @@ test("buildFlowOutHotspotStyle keeps the right-side hotspot geometry", () => {
   });
 });
 
-test("buildRouteHandleStyle combines hotspot geometry and branch palette variables", () => {
+test("buildRouteHandleStyle keeps route handles as close to the node as normal flow handles", () => {
   assert.deepEqual(buildRouteHandleStyle({ x: 100, y: 200, branch: "false" }), {
-    left: "148px",
+    left: "126px",
     top: "200px",
     width: "44px",
     height: "56px",

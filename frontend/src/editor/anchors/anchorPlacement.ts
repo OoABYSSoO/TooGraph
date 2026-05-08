@@ -1,5 +1,5 @@
 import type { AnchorDescriptor, NodeAnchorModel } from "./anchorModel.ts";
-import { FLOW_OUT_HOTSPOT_GEOMETRY } from "../flowHandleGeometry.ts";
+import { ROUTE_OUT_HOTSPOT_GEOMETRY } from "../flowHandleGeometry.ts";
 
 export type NodeFrame = {
   x: number;
@@ -48,7 +48,7 @@ export function resolveRouteOutputRowGap(routeOutputCount: number, bodyRowGap: n
   if (routeOutputCount <= 1) {
     return bodyRowGap;
   }
-  return Math.max((bodyRowGap * routeOutputCount) / (routeOutputCount - 1), FLOW_OUT_HOTSPOT_GEOMETRY.height);
+  return Math.max(bodyRowGap, ROUTE_OUT_HOTSPOT_GEOMETRY.centerGap);
 }
 
 function placeRouteOutputs(anchors: AnchorDescriptor[], frame: NodeFrame): PlacedAnchor[] {
@@ -68,9 +68,7 @@ function placeRouteOutputs(anchors: AnchorDescriptor[], frame: NodeFrame): Place
 function placeRouteAnchor(anchor: AnchorDescriptor, frame: NodeFrame & { height: number }, index: number, count: number): PlacedAnchor {
   const topOffset = resolveRouteOutputTopOffset(frame);
   const bottomOffset = resolveRouteOutputBottomOffset(frame, topOffset);
-  const yOffset = count <= 1
-    ? Math.round((topOffset + bottomOffset) / 2)
-    : Math.round(topOffset + ((bottomOffset - topOffset) * index) / (count - 1));
+  const yOffset = resolveRouteOutputYOffset(frame, index, count, topOffset, bottomOffset);
   return {
     id: anchor.id,
     x: resolveX(anchor, frame),
@@ -79,6 +77,27 @@ function placeRouteAnchor(anchor: AnchorDescriptor, frame: NodeFrame & { height:
     ...(anchor.stateKey ? { stateKey: anchor.stateKey } : {}),
     ...(anchor.branch ? { branch: anchor.branch } : {}),
   };
+}
+
+function resolveRouteOutputYOffset(
+  frame: NodeFrame & { height: number },
+  index: number,
+  count: number,
+  topOffset: number,
+  bottomOffset: number,
+) {
+  if (count <= 1) {
+    return Math.round((topOffset + bottomOffset) / 2);
+  }
+
+  const rowGap = resolveRouteOutputRowGap(count, frame.rowGap);
+  const groupHeight = rowGap * (count - 1);
+  const groupCenter = (topOffset + bottomOffset) / 2;
+  const minTop = ROUTE_OUTPUT_EDGE_INSET;
+  const maxTop = Math.max(minTop, frame.height - ROUTE_OUTPUT_EDGE_INSET - groupHeight);
+  const groupTop = clamp(groupCenter - groupHeight / 2, minTop, maxTop);
+
+  return Math.round(groupTop + rowGap * index);
 }
 
 function resolveRouteOutputTopOffset(frame: NodeFrame & { height: number }) {

@@ -1,4 +1,4 @@
-import { FLOW_OUT_HOTSPOT_GEOMETRY } from "../flowHandleGeometry.ts";
+import { FLOW_OUT_HOTSPOT_GEOMETRY, ROUTE_OUT_HOTSPOT_GEOMETRY } from "../flowHandleGeometry.ts";
 import type { ProjectedCanvasAnchor } from "./edgeProjection.ts";
 
 export type RouteHandleTone = "success" | "danger" | "warning" | "neutral";
@@ -10,12 +10,6 @@ export type RouteHandlePalette = {
   glow: string;
   text: string;
 };
-
-const ROUTE_HANDLE_GEOMETRY = Object.freeze({
-  offsetX: 48,
-  width: 44,
-  height: 56,
-});
 
 export function resolveRouteHandleTone(branch: string | undefined): RouteHandleTone {
   const normalizedBranch = branch?.trim().toLowerCase() ?? "";
@@ -81,10 +75,10 @@ export function buildFlowOutHotspotStyle(anchor: Pick<ProjectedCanvasAnchor, "x"
 export function buildRouteHandleStyle(anchor: Pick<ProjectedCanvasAnchor, "x" | "y" | "branch">) {
   const palette = resolveRouteHandlePalette(anchor.branch);
   return {
-    left: `${anchor.x + ROUTE_HANDLE_GEOMETRY.offsetX}px`,
+    left: `${anchor.x + ROUTE_OUT_HOTSPOT_GEOMETRY.offsetX}px`,
     top: `${anchor.y}px`,
-    width: `${ROUTE_HANDLE_GEOMETRY.width}px`,
-    height: `${ROUTE_HANDLE_GEOMETRY.height}px`,
+    width: `${ROUTE_OUT_HOTSPOT_GEOMETRY.width}px`,
+    height: `${ROUTE_OUT_HOTSPOT_GEOMETRY.height}px`,
     "--editor-flow-handle-fill": palette.fill,
     "--editor-flow-handle-border": palette.border,
     "--editor-flow-handle-accent": palette.accent,
