@@ -32,7 +32,7 @@ function resolveCanvasAnchors(
   return anchors.map((anchor) => {
     const node = document.nodes[anchor.nodeId];
     const measured = measuredAnchorOffsets[anchor.id];
-    if (!node || !measured) {
+    if (!node || !measured || anchor.kind === "route-out") {
       return anchor;
     }
 

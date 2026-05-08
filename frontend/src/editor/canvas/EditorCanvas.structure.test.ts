@@ -173,9 +173,7 @@ test("EditorCanvas mounts a right-bottom minimap backed by measured node geometr
   assert.match(componentSource, /const nodeMeasurements = useCanvasNodeMeasurements\(\{[\s\S]*document: \(\) => props\.document,[\s\S]*viewportScale: \(\) => viewport\.viewport\.scale,[\s\S]*\}\);/);
   assert.match(componentSource, /measuredNodeSizes,[\s\S]*nodeElementMap,[\s\S]*registerNodeRef,[\s\S]*scheduleAnchorMeasurement,[\s\S]*teardownNodeMeasurements,/);
   assert.match(canvasNodeMeasurementsSource, /const measuredNodeSizes = ref<Record<string, MeasuredNodeSize>>\(\{\}\);/);
-  assert.match(canvasNodeMeasurementsSource, /import \{ placeAnchors \} from "\.\.\/anchors\/anchorPlacement\.ts";/);
-  assert.match(canvasNodeMeasurementsSource, /import \{ buildNodeAnchorFrame \} from "\.\/nodeAnchorFrame\.ts";/);
-  assert.match(canvasNodeMeasurementsSource, /measuredRoutePlacement\.routeOutputs/);
+  assert.doesNotMatch(canvasNodeMeasurementsSource, /measuredRoutePlacement\.routeOutputs/);
   assert.match(componentSource, /const canvasSize = ref\(\{ width: 0, height: 0 \}\);/);
   assert.match(componentSource, /const minimapNodes = computed\(\(\) =>\s*nodeEntries\.value\.map\(\(\[nodeId, node\]\) =>\s*buildMinimapNodeModel\(\{/);
   assert.match(componentSource, /measuredNodeSizes: measuredNodeSizes\.value,/);

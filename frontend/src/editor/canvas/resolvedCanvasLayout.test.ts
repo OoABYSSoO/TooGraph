@@ -136,3 +136,59 @@ test("resolveCanvasLayout also uses measured flow anchor offsets for card-to-car
     }),
   );
 });
+
+test("resolveCanvasLayout keeps condition route handles tied to the current node size", () => {
+  const layout = resolveCanvasLayout(
+    {
+      graph_id: null,
+      name: "Route resize graph",
+      state_schema: {},
+      nodes: {
+        route_gate: {
+          kind: "condition",
+          name: "route_gate",
+          description: "",
+          ui: {
+            position: { x: 100, y: 100 },
+            size: { width: 720, height: 360 },
+          },
+          reads: [],
+          writes: [],
+          config: {
+            branches: ["true", "false", "exhausted"],
+            loopLimit: 5,
+            branchMapping: { true: "true", false: "false" },
+            rule: {
+              source: "answer",
+              operator: "exists",
+              value: null,
+            },
+          },
+        },
+      },
+      edges: [],
+      conditional_edges: [],
+      metadata: {},
+    },
+    {
+      "route_gate:branch:true": { offsetX: 554, offsetY: 145 },
+      "route_gate:branch:false": { offsetX: 554, offsetY: 199 },
+      "route_gate:branch:exhausted": { offsetX: 554, offsetY: 252 },
+    },
+  );
+
+  const routeHandles = layout.anchors.filter((anchor) => anchor.kind === "route-out");
+
+  assert.deepEqual(
+    routeHandles.map((anchor) => ({
+      branch: anchor.branch,
+      x: anchor.x,
+      y: anchor.y,
+    })),
+    [
+      { branch: "true", x: 814, y: 245 },
+      { branch: "false", x: 814, y: 339 },
+      { branch: "exhausted", x: 814, y: 432 },
+    ],
+  );
+});
