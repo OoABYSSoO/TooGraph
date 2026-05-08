@@ -251,6 +251,58 @@ test("buildNodeCardViewModel marks skill-managed output ports", () => {
   });
 });
 
+test("buildNodeCardViewModel marks dynamic capability input and result package output ports as managed", () => {
+  const node: GraphNode = {
+    kind: "agent",
+    name: "dynamic_executor",
+    description: "Run a selected capability.",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [
+      { state: "question", required: true },
+      { state: "selected_capability", required: true },
+    ],
+    writes: [{ state: "dynamic_result", mode: "replace" }],
+    config: {
+      skillKey: "",
+      taskInstruction: "准备动态能力输入。",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "high",
+      temperature: 0.2,
+    },
+  };
+
+  const model = buildNodeCardViewModel("dynamic_executor", node, {
+    ...stateSchema,
+    selected_capability: {
+      name: "Selected Capability",
+      description: "Chosen runtime capability.",
+      type: "capability",
+      value: { kind: "skill", key: "web_search" },
+      color: "#2563eb",
+    },
+    dynamic_result: {
+      name: "Capability Result",
+      description: "Dynamic capability result package.",
+      type: "result_package",
+      value: {},
+      color: "#10b981",
+      binding: {
+        kind: "capability_result",
+        nodeId: "dynamic_executor",
+        fieldKey: "result_package",
+        managed: true,
+      },
+    },
+  });
+
+  assert.equal(model.inputs[0]?.managedByCapability, undefined);
+  assert.deepEqual(model.inputs[1]?.managedByCapability, { role: "input" });
+  assert.deepEqual(model.outputs[0]?.managedByCapability, { role: "result_package" });
+  assert.equal(model.body.kind, "agent");
+  assert.deepEqual(model.body.primaryOutput?.managedByCapability, { role: "result_package" });
+});
+
 test("buildNodeCardViewModel exposes a virtual plus input for empty non-input nodes", () => {
   const emptyAgent: GraphNode = {
     kind: "agent",

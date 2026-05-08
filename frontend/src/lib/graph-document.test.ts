@@ -4,6 +4,7 @@ import { reactive } from "vue";
 
 import * as graphDocument from "./graph-document.ts";
 import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "./virtual-any-input.ts";
+import { removeStateBindingFromDocument } from "../editor/workspace/statePanelBindings.ts";
 import type { AgentNode, GraphCorePayload, GraphDocument, GraphPayload, TemplateRecord } from "../types/node-system.ts";
 import type { SkillDefinition } from "../types/skills.ts";
 
@@ -20,6 +21,7 @@ const {
   updateAgentNodeConfigInDocument,
   updateAgentBreakpointInDocument,
   updateAgentBreakpointTimingInDocument,
+  connectStateBindingInDocument,
   updateSubgraphNodeGraphInDocument,
 } = graphDocument;
 
@@ -694,6 +696,128 @@ test("updateAgentNodeConfigInDocument does not create static skill input mapping
   const node = nextDocument.nodes.search_agent;
   assert.equal(node.kind, "agent");
   assert.equal("inputMapping" in (node.config.skillBindings?.[0] ?? {}), false);
+});
+
+test("connectStateBindingInDocument materializes dynamic capability result package outputs", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Dynamic Capability Binding Graph",
+    state_schema: {
+      selected_capability: {
+        name: "Selected Capability",
+        description: "Capability selected by an upstream node.",
+        type: "capability",
+        value: { kind: "skill", key: "web_search" },
+        color: "#2563eb",
+      },
+      question: {
+        name: "Question",
+        description: "User request.",
+        type: "text",
+        value: "Search latest news",
+        color: "#d97706",
+      },
+      free_answer: {
+        name: "Free Answer",
+        description: "Previous free LLM output.",
+        type: "markdown",
+        value: "",
+        color: "#7c3aed",
+      },
+    },
+    nodes: {
+      capability_selector: {
+        kind: "agent",
+        name: "Capability Selector",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [{ state: "selected_capability", mode: "replace" }],
+        config: {
+          skillKey: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "high",
+          temperature: 0.2,
+        },
+      },
+      executor: {
+        kind: "agent",
+        name: "Executor",
+        description: "",
+        ui: { position: { x: 360, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [{ state: "free_answer", mode: "replace" }],
+        config: {
+          skillKey: "",
+          skillBindings: [],
+          skillInstructionBlocks: {},
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "high",
+          temperature: 0.2,
+        },
+      },
+      output_result: {
+        kind: "output",
+        name: "Output Result",
+        description: "",
+        ui: { position: { x: 720, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [{ source: "capability_selector", target: "executor" }],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const withCapability = connectStateBindingInDocument(
+    document,
+    "capability_selector",
+    "selected_capability",
+    "executor",
+    "__graphiteui_virtual_any_input__",
+  );
+  const executorNode = withCapability.nodes.executor;
+
+  assert.equal(executorNode.kind, "agent");
+  assert.deepEqual(executorNode.reads.map((binding) => binding.state), ["question", "selected_capability"]);
+  assert.deepEqual(executorNode.writes.map((binding) => binding.state), ["state_1"]);
+  assert.deepEqual(executorNode.config.suspendedFreeWrites, [{ state: "free_answer", mode: "replace" }]);
+  assert.equal(withCapability.state_schema.state_1?.type, "result_package");
+  assert.deepEqual(withCapability.state_schema.state_1?.binding, {
+    kind: "capability_result",
+    nodeId: "executor",
+    fieldKey: "result_package",
+    managed: true,
+  });
+
+  const connectedOutput = cloneGraphDocument(withCapability);
+  connectedOutput.nodes.output_result.reads = [{ state: "state_1", required: true }];
+  connectedOutput.edges = [
+    { source: "capability_selector", target: "executor" },
+    { source: "executor", target: "output_result" },
+  ];
+
+  const withoutCapability = removeStateBindingFromDocument(connectedOutput, "selected_capability", "executor", "read");
+  const restoredNode = withoutCapability.nodes.executor;
+
+  assert.equal(restoredNode.kind, "agent");
+  assert.deepEqual(restoredNode.reads.map((binding) => binding.state), ["question"]);
+  assert.deepEqual(restoredNode.writes, [{ state: "free_answer", mode: "replace" }]);
+  assert.equal(restoredNode.config.suspendedFreeWrites, undefined);
+  assert.equal(withoutCapability.state_schema.state_1, undefined);
+  assert.deepEqual(withoutCapability.nodes.output_result.reads, []);
+  assert.deepEqual(withoutCapability.edges, []);
 });
 
 test("createEmptyDraftGraph creates an empty backend-native payload", () => {

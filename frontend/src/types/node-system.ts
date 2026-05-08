@@ -22,6 +22,11 @@ export type StateDefinition = {
     nodeId: string;
     fieldKey: string;
     managed?: boolean;
+  } | {
+    kind: "capability_result";
+    nodeId: string;
+    fieldKey?: "result_package";
+    managed?: boolean;
   } | null;
 };
 

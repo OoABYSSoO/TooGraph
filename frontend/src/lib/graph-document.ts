@@ -152,6 +152,9 @@ export function reorderNodePortStateInDocument<T extends GraphPayload | GraphDoc
   if (!node) {
     return document;
   }
+  if (isManagedAgentPortState(document, nodeId, side, stateKey)) {
+    return document;
+  }
 
   const bindings = side === "input" ? node.reads : node.writes;
   const sourceIndex = bindings.findIndex((binding) => binding.state === stateKey);
@@ -698,7 +701,82 @@ export function updateAgentNodeConfigInDocument<T extends GraphPayload | GraphDo
 
   nextNode.config = nextConfig;
   reconcileAgentSkillOutputBindings(nextDocument, nodeId, options.skillDefinitions ?? []);
+  reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
   return nextDocument;
+}
+
+export function reconcileAgentCapabilityInputBindingsInDocument<T extends GraphPayload | GraphDocument>(document: T, nodeId: string): T {
+  const node = document.nodes[nodeId];
+  if (!node || node.kind !== "agent") {
+    return document;
+  }
+
+  const beforeNode = JSON.stringify(node);
+  const beforeSchema = JSON.stringify(document.state_schema);
+  const beforeEdges = JSON.stringify(document.edges);
+  const beforeMetadata = JSON.stringify(document.metadata);
+  const nextDocument = cloneGraphDocument(document);
+  reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
+  if (
+    JSON.stringify(nextDocument.nodes[nodeId]) === beforeNode &&
+    JSON.stringify(nextDocument.state_schema) === beforeSchema &&
+    JSON.stringify(nextDocument.edges) === beforeEdges &&
+    JSON.stringify(nextDocument.metadata) === beforeMetadata
+  ) {
+    return document;
+  }
+  return nextDocument;
+}
+
+export function reconcileAgentCapabilityInputBindingsInPlace<T extends GraphPayload | GraphDocument>(document: T, nodeId: string) {
+  const node = document.nodes[nodeId];
+  if (!node || node.kind !== "agent") {
+    return;
+  }
+
+  const shouldManageDynamicCapability = isDynamicCapabilityExecutorNode(document, node);
+  const managedStateKeys = collectManagedCapabilityResultStateKeys(document, nodeId);
+
+  if (!shouldManageDynamicCapability) {
+    if (managedStateKeys.size === 0) {
+      return;
+    }
+    if (managedStateKeys.size > 0) {
+      removeManagedStateKeysFromDocument(document, managedStateKeys);
+    }
+    if (node.config.skillKey.trim()) {
+      return;
+    }
+    const restoredFreeWrites = normalizeWriteBindings(node.config.suspendedFreeWrites).filter((binding) => document.state_schema[binding.state]);
+    const currentFreeWrites = node.writes.filter((binding) => !isManagedCapabilityResultStateForNode(document, nodeId, binding.state));
+    node.writes = mergeWriteBindings(restoredFreeWrites, currentFreeWrites);
+    delete node.config.suspendedFreeWrites;
+    return;
+  }
+
+  const managedWriteKeys = node.writes
+    .map((binding) => binding.state)
+    .filter((stateKey) => isManagedCapabilityResultStateForNode(document, nodeId, stateKey));
+  const keptManagedStateKey = managedWriteKeys[0] ?? findExistingCapabilityResultState(document, nodeId);
+  const staleManagedStateKeys = new Set(
+    [...managedStateKeys].filter((stateKey) => stateKey !== keptManagedStateKey),
+  );
+  if (staleManagedStateKeys.size > 0) {
+    removeManagedStateKeysFromDocument(document, staleManagedStateKeys);
+  }
+
+  const suspendedFreeWrites = mergeWriteBindings(
+    normalizeWriteBindings(node.config.suspendedFreeWrites).filter((binding) => document.state_schema[binding.state]),
+    node.writes.filter((binding) => !isManagedCapabilityResultStateForNode(document, nodeId, binding.state)),
+  );
+  if (suspendedFreeWrites.length > 0) {
+    node.config.suspendedFreeWrites = suspendedFreeWrites;
+  } else {
+    delete node.config.suspendedFreeWrites;
+  }
+
+  const resultStateKey = keptManagedStateKey ?? createManagedCapabilityResultState(document, nodeId);
+  node.writes = [{ state: resultStateKey, mode: "replace" }];
 }
 
 function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocument>(
@@ -721,13 +799,17 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
   const processedSkillKeys = new Set<string>();
 
   if (removedManagedStateKeys.size > 0) {
-    removeManagedSkillOutputStates(document, removedManagedStateKeys);
+    removeManagedStateKeysFromDocument(document, removedManagedStateKeys);
   }
 
   if (attachedSkillKey) {
     const suspendedFreeWrites = mergeWriteBindings(
       normalizeWriteBindings(node.config.suspendedFreeWrites).filter((binding) => document.state_schema[binding.state]),
-      node.writes.filter((binding) => !isManagedSkillOutputStateForNode(document, nodeId, binding.state)),
+      node.writes.filter(
+        (binding) =>
+          !isManagedSkillOutputStateForNode(document, nodeId, binding.state) &&
+          !isManagedCapabilityResultStateForNode(document, nodeId, binding.state),
+      ),
     );
     if (suspendedFreeWrites.length > 0) {
       node.config.suspendedFreeWrites = suspendedFreeWrites;
@@ -846,7 +928,7 @@ function collectRemovedManagedSkillOutputStateKeys(
   return removedStateKeys;
 }
 
-function removeManagedSkillOutputStates(document: GraphPayload | GraphDocument, stateKeys: Set<string>) {
+function removeManagedStateKeysFromDocument(document: GraphPayload | GraphDocument, stateKeys: Set<string>) {
   const touchedNodeIds = new Set<string>();
   for (const stateKey of stateKeys) {
     delete document.state_schema[stateKey];
@@ -912,6 +994,84 @@ function isManagedSkillOutputStateForNode(
     stateBinding.managed !== false &&
     (skillKey === undefined || stateBinding.skillKey === skillKey)
   );
+}
+
+function isDynamicCapabilityExecutorNode(document: GraphPayload | GraphDocument, node: AgentNode) {
+  if (node.config.skillKey.trim()) {
+    return false;
+  }
+  return node.reads.some((binding) => document.state_schema[binding.state]?.type?.trim() === "capability");
+}
+
+function isManagedCapabilityInputState(document: GraphPayload | GraphDocument, nodeId: string, stateKey: string) {
+  const node = document.nodes[nodeId];
+  return node?.kind === "agent" && document.state_schema[stateKey]?.type?.trim() === "capability";
+}
+
+function isManagedCapabilityResultStateForNode(
+  document: GraphPayload | GraphDocument,
+  nodeId: string,
+  stateKey: string,
+) {
+  const stateBinding = document.state_schema[stateKey]?.binding;
+  return (
+    stateBinding?.kind === "capability_result" &&
+    stateBinding.nodeId === nodeId &&
+    stateBinding.managed !== false
+  );
+}
+
+function isManagedAgentPortState(
+  document: GraphPayload | GraphDocument,
+  nodeId: string,
+  side: "input" | "output",
+  stateKey: string,
+) {
+  if (side === "input") {
+    return isManagedCapabilityInputState(document, nodeId, stateKey);
+  }
+  return isManagedSkillOutputStateForNode(document, nodeId, stateKey) || isManagedCapabilityResultStateForNode(document, nodeId, stateKey);
+}
+
+function collectManagedCapabilityResultStateKeys(document: GraphPayload | GraphDocument, nodeId: string) {
+  const stateKeys = new Set<string>();
+  for (const [stateKey, definition] of Object.entries(document.state_schema)) {
+    const binding = definition.binding;
+    if (binding?.kind === "capability_result" && binding.nodeId === nodeId && binding.managed !== false) {
+      stateKeys.add(stateKey);
+    }
+  }
+  return stateKeys;
+}
+
+function findExistingCapabilityResultState(document: GraphPayload | GraphDocument, nodeId: string) {
+  return Object.entries(document.state_schema).find(([, definition]) => {
+    const binding = definition.binding;
+    return (
+      binding?.kind === "capability_result" &&
+      binding.nodeId === nodeId &&
+      binding.managed !== false
+    );
+  })?.[0] ?? null;
+}
+
+function createManagedCapabilityResultState(document: GraphPayload | GraphDocument, nodeId: string) {
+  const stateField = buildNextMaterializedVirtualStateField(document, "result_package");
+  document.state_schema[stateField.key] = {
+    ...stateField.definition,
+    name: "Capability Result",
+    description: "Dynamic capability execution result package.",
+    type: "result_package",
+    value: {},
+    binding: {
+      kind: "capability_result",
+      nodeId,
+      fieldKey: "result_package",
+      managed: true,
+    },
+  };
+  rememberMaterializedStateKeyIndex(document, stateField.key);
+  return stateField.key;
 }
 
 function ensureAgentWriteBinding(node: AgentNode, stateKey: string) {
@@ -1074,6 +1234,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
       return document;
     }
     nextTargetNode.reads = [...nextTargetNode.reads, { state: resolvedSourceStateKey, required: true }];
+    reconcileAgentCapabilityInputBindingsInPlace(nextDocument, targetNodeId);
     addImplicitFlowEdgeForStateConnection(nextDocument, sourceNodeId, targetNodeId);
     return nextDocument;
   }
@@ -1086,6 +1247,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
     if (nextTargetNode.kind === "condition") {
       nextTargetNode.config.rule.source = resolvedSourceStateKey;
     }
+    reconcileAgentCapabilityInputBindingsInPlace(nextDocument, targetNodeId);
     addImplicitFlowEdgeForStateConnection(nextDocument, sourceNodeId, targetNodeId);
     return nextDocument;
   }
@@ -1102,6 +1264,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
   if (nextTargetNode.kind === "condition") {
     nextTargetNode.config.rule.source = resolvedSourceStateKey;
   }
+  reconcileAgentCapabilityInputBindingsInPlace(nextDocument, targetNodeId);
 
   nextDocument.edges = filterReplacedStateInputSourceEdges(nextDocument, {
     sourceNodeId,

@@ -21,7 +21,7 @@
               : 'node-card__port-pill--output node-card__port-pill--dock-end',
             {
               'node-card__port-pill--create': port.virtual,
-              'node-card__port-pill--skill-managed': side === 'output' && Boolean(port.managedBySkill),
+              'node-card__port-pill--skill-managed': isManagedPort,
               'node-card__port-pill--revealed': !port.virtual && isStateEditorPillRevealed(anchorId),
               'node-card__port-pill--confirm': !port.virtual && isStateEditorConfirmOpen(anchorId),
             },
@@ -41,9 +41,9 @@
             aria-hidden="true"
           />
           <ElIcon
-            v-if="side === 'output' && port.managedBySkill"
+            v-if="isManagedPort"
             class="node-card__port-pill-source-icon"
-            title="Skill managed output"
+            :title="port.managedBySkill ? 'Skill managed output' : 'Dynamic capability managed state'"
           >
             <Connection />
           </ElIcon>
@@ -207,7 +207,8 @@ const popoverWidth = computed(() => {
   }
   return props.isStateEditorOpen(anchorId.value) ? 320 : undefined;
 });
-const canEditPort = computed(() => Boolean(props.port && !props.port.virtual && !(props.side === "output" && props.port.managedBySkill)));
+const isManagedPort = computed(() => Boolean(props.port?.managedBySkill || props.port?.managedByCapability));
+const canEditPort = computed(() => Boolean(props.port && !props.port.virtual && !isManagedPort.value));
 
 function handlePortClick() {
   if (!props.port) {
@@ -217,7 +218,7 @@ function handlePortClick() {
     emit("open-create", props.side);
     return;
   }
-  if (props.port.managedBySkill) {
+  if (isManagedPort.value) {
     return;
   }
   emit("port-click", anchorId.value, props.port.key);

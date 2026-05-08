@@ -633,8 +633,13 @@ const agentOutputPorts = computed<NodePortViewModel[]>(() =>
   view.value.body.kind === "agent" || view.value.body.kind === "subgraph" ? view.value.outputs.filter((port) => !port.virtual) : [],
 );
 const isAgentOutputManagedBySkill = computed(() => props.node.kind === "agent" && props.node.config.skillKey.trim().length > 0);
+const isAgentOutputManagedByCapability = computed(() =>
+  props.node.kind === "agent" && props.node.reads.some((binding) => props.stateSchema[binding.state]?.type?.trim() === "capability"),
+);
 const shouldShowAgentCreateInputPort = computed(() => agentInputPorts.value.length === 0);
-const shouldShowAgentCreateOutputPort = computed(() => !isAgentOutputManagedBySkill.value && agentOutputPorts.value.length === 0);
+const shouldShowAgentCreateOutputPort = computed(
+  () => !isAgentOutputManagedBySkill.value && !isAgentOutputManagedByCapability.value && agentOutputPorts.value.length === 0,
+);
 const agentCreateInputAnchorStateKey = computed(() =>
   props.pendingStateInputSource ? CREATE_AGENT_INPUT_STATE_KEY : VIRTUAL_ANY_INPUT_STATE_KEY,
 );

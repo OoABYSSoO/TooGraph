@@ -61,6 +61,26 @@ class NodeSystemSchemaLegacyFieldRejectionTests(unittest.TestCase):
         self.assertEqual([binding.state for binding in config.suspended_free_writes], ["free_answer", "free_notes"])
         self.assertEqual(config.model_dump(by_alias=True)["suspendedFreeWrites"][1]["mode"].value, "append")
 
+    def test_state_definition_accepts_managed_capability_result_binding(self) -> None:
+        definition = NodeSystemStateDefinition.model_validate(
+            {
+                "name": "Capability Result",
+                "type": "result_package",
+                "binding": {
+                    "kind": "capability_result",
+                    "nodeId": "executor",
+                    "fieldKey": "result_package",
+                    "managed": True,
+                },
+            }
+        )
+
+        dumped = definition.model_dump(by_alias=True)
+        self.assertEqual(dumped["binding"]["kind"].value, "capability_result")
+        self.assertEqual(dumped["binding"]["nodeId"], "executor")
+        self.assertEqual(dumped["binding"]["fieldKey"], "result_package")
+        self.assertEqual(dumped["binding"]["skillKey"], "")
+
     def test_condition_config_rejects_condition_mode(self) -> None:
         with self.assertRaises(ValidationError):
             NodeSystemConditionConfig.model_validate(

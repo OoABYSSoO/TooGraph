@@ -33,7 +33,7 @@
                 : 'node-card__port-pill--output node-card__port-pill--dock-end',
               {
                 'node-card__port-pill--removable': canRemovePort(port),
-                'node-card__port-pill--skill-managed': side === 'output' && Boolean(port.managedBySkill),
+                'node-card__port-pill--skill-managed': isManagedPort(port),
                 'node-card__port-pill--revealed': isStateEditorPillRevealed(anchorId(port.key)),
                 'node-card__port-pill--confirm': isStateEditorConfirmOpen(anchorId(port.key)),
                 'node-card__port-pill--reordering': canReorderPort(port) && isPortReordering(side, port.key),
@@ -58,7 +58,7 @@
               aria-hidden="true"
             />
             <button
-              v-if="side === 'output' && !port.virtual && !port.managedBySkill"
+              v-if="side === 'output' && canRemovePort(port)"
               type="button"
               class="node-card__port-pill-remove node-card__port-pill-remove--leading"
               :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(anchorId(port.key)) }"
@@ -70,9 +70,9 @@
               <ElIcon v-else><Delete /></ElIcon>
             </button>
             <ElIcon
-              v-if="side === 'output' && port.managedBySkill"
+              v-if="isManagedPort(port)"
               class="node-card__port-pill-source-icon"
-              title="Skill managed output"
+              :title="port.managedBySkill ? 'Skill managed output' : 'Dynamic capability managed state'"
             >
               <Connection />
             </ElIcon>
@@ -84,7 +84,7 @@
               <ElIcon class="node-card__port-pill-confirm-icon"><Check /></ElIcon>
             </span>
             <button
-              v-if="side === 'input' && !port.virtual"
+              v-if="side === 'input' && canRemovePort(port)"
               type="button"
               class="node-card__port-pill-remove node-card__port-pill-remove--trailing"
               :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(anchorId(port.key)) }"
@@ -271,15 +271,19 @@ function anchorSlotId(stateKey: string) {
 }
 
 function canEditPort(port: NodePortViewModel) {
-  return !port.virtual && !(props.side === "output" && port.managedBySkill);
+  return !port.virtual && !isManagedPort(port);
 }
 
 function canRemovePort(port: NodePortViewModel) {
-  return !port.virtual && !(props.side === "output" && port.managedBySkill);
+  return !port.virtual && !(props.side === "output" && isManagedPort(port));
 }
 
 function canReorderPort(port: NodePortViewModel) {
   return canEditPort(port);
+}
+
+function isManagedPort(port: NodePortViewModel) {
+  return Boolean(port.managedBySkill || port.managedByCapability);
 }
 
 function handlePortPointerDown(port: NodePortViewModel, pointerEvent: PointerEvent) {

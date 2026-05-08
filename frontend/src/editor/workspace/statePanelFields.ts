@@ -1,4 +1,4 @@
-import { cloneGraphDocument } from "../../lib/graph-document.ts";
+import { cloneGraphDocument, reconcileAgentCapabilityInputBindingsInPlace } from "../../lib/graph-document.ts";
 import type { GraphDocument, GraphPayload, StateDefinition } from "../../types/node-system.ts";
 
 export type StateFieldDraft = {
@@ -162,6 +162,13 @@ export function updateStateFieldInDocument<T extends GraphPayload | GraphDocumen
     for (const node of Object.values(nextDocument.nodes)) {
       if (node.kind === "input" && node.writes.some((binding) => binding.state === stateKey)) {
         node.config.value = nextDefinition.value;
+      }
+    }
+  }
+  if (nextDefinition.type !== current.type) {
+    for (const [nodeId, node] of Object.entries(nextDocument.nodes)) {
+      if (node.kind === "agent" && node.reads.some((binding) => binding.state === stateKey)) {
+        reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
       }
     }
   }

@@ -503,7 +503,8 @@ test("NodeCard renders plus input and plus output as virtual agent state port ro
   assert.match(statePortListSource, /v-for="port in ports"/);
   assert.match(componentSource, /const shouldShowAgentCreateInputPort = computed\(\(\) => agentInputPorts\.value\.length === 0\);/);
   assert.match(componentSource, /const isAgentOutputManagedBySkill = computed\(\(\) => props\.node\.kind === "agent" && props\.node\.config\.skillKey\.trim\(\)\.length > 0\);/);
-  assert.match(componentSource, /const shouldShowAgentCreateOutputPort = computed\(\(\) => !isAgentOutputManagedBySkill\.value && agentOutputPorts\.value\.length === 0\);/);
+  assert.match(componentSource, /const isAgentOutputManagedByCapability = computed\(\(\) =>[\s\S]*props\.node\.reads\.some\(\(binding\) => props\.stateSchema\[binding\.state\]\?\.type\?\.trim\(\) === "capability"\)/);
+  assert.match(componentSource, /const shouldShowAgentCreateOutputPort = computed\([\s\S]*!isAgentOutputManagedBySkill\.value && !isAgentOutputManagedByCapability\.value && agentOutputPorts\.value\.length === 0/);
   assert.match(componentSource, /const shouldRevealAgentCreateInputPort = computed\(\(\) =>[\s\S]*shouldShowAgentCreateInputPort\.value[\s\S]*props\.selected[\s\S]*props\.hovered[\s\S]*hasFloatingPanelOpen\.value/);
   assert.match(componentSource, /const shouldRevealAgentCreateOutputPort = computed\([\s\S]*!isAgentOutputManagedBySkill\.value[\s\S]*shouldShowAgentCreateOutputPort\.value[\s\S]*props\.selected[\s\S]*props\.hovered[\s\S]*hasFloatingPanelOpen\.value/);
   assert.match(statePortListSource, /:data-agent-create-port="side"/);
@@ -568,7 +569,7 @@ test("NodeCard hides virtual agent output any behind the plus output row", () =>
   assert.match(statePortListSource, /:data-anchor-slot-id="\`\$\{nodeId\}:state-out:\$\{createAnchorStateKey\}\`"/);
   assert.match(componentSource, /@port-click="handlePortStatePillClick"/);
   assert.match(statePortListSource, /@click\.stop="handlePortClick\(port\)"/);
-  assert.match(statePortListSource, /v-if="side === 'output' && !port\.virtual && !port\.managedBySkill"[\s\S]*node-card__port-pill-remove/);
+  assert.match(statePortListSource, /v-if="side === 'output' && canRemovePort\(port\)"[\s\S]*node-card__port-pill-remove/);
   assert.doesNotMatch(agentOutputPortSection, /node-card__port-pill-create-badge/);
 });
 
