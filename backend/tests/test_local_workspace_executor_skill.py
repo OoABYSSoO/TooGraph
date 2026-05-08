@@ -47,11 +47,11 @@ class LocalWorkspaceExecutorSkillTests(unittest.TestCase):
         self.assertTrue(definition.capability_policy.default.requires_approval)
         self.assertEqual(
             [field.key for field in definition.input_schema],
-            ["action", "path", "content", "args", "cwd", "timeout_seconds"],
+            ["path", "operation", "content"],
         )
         self.assertEqual(
             [field.key for field in definition.output_schema],
-            ["status", "summary", "action", "path", "content", "entries", "stdout", "stderr", "exit_code", "errors"],
+            ["success", "result"],
         )
 
     def test_before_llm_injects_policy_summary(self) -> None:
@@ -60,19 +60,57 @@ class LocalWorkspaceExecutorSkillTests(unittest.TestCase):
 
         context = str(payload.get("context") or "")
         self.assertIn("backend/data", context)
-        self.assertIn("read", context)
         self.assertIn("write", context)
         self.assertIn("execute", context)
 
-    def test_write_and_read_are_allowed_under_backend_data(self) -> None:
+    def test_before_llm_reads_existing_repository_file_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            target = repo_root / "docs" / "note.md"
+            target.parent.mkdir(parents=True)
+            target.write_text("existing context", encoding="utf-8")
+            payload = _run_skill_script(
+                EXECUTOR_BEFORE_LLM_PATH,
+                {
+                    "graph_state": {
+                        "target_path": "docs/note.md",
+                        "operation": "write",
+                    }
+                },
+                repo_root=repo_root,
+            )
+
+        context = str(payload.get("context") or "")
+        self.assertIn("docs/note.md", context)
+        self.assertIn("existing context", context)
+
+    def test_before_llm_reports_missing_path_as_write_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            payload = _run_skill_script(
+                EXECUTOR_BEFORE_LLM_PATH,
+                {
+                    "graph_state": {
+                        "target_path": "backend/data/tmp/new.txt",
+                        "operation": "execute",
+                    }
+                },
+                repo_root=repo_root,
+            )
+
+        context = str(payload.get("context") or "")
+        self.assertIn("backend/data/tmp/new.txt", context)
+        self.assertIn("only write can create it", context)
+
+    def test_write_and_read_use_success_result_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
             (repo_root / "backend" / "data").mkdir(parents=True)
             write_result = _run_skill_script(
                 EXECUTOR_AFTER_LLM_PATH,
                 {
-                    "action": "write",
                     "path": "backend/data/tmp/note.txt",
+                    "operation": "write",
                     "content": "hello workspace",
                 },
                 repo_root=repo_root,
@@ -80,15 +118,15 @@ class LocalWorkspaceExecutorSkillTests(unittest.TestCase):
             read_result = _run_skill_script(
                 EXECUTOR_AFTER_LLM_PATH,
                 {
-                    "action": "read",
                     "path": "backend/data/tmp/note.txt",
+                    "operation": "read",
                 },
                 repo_root=repo_root,
             )
 
-        self.assertEqual(write_result["status"], "succeeded")
-        self.assertEqual(read_result["status"], "succeeded")
-        self.assertEqual(read_result["content"], "hello workspace")
+        self.assertEqual(write_result, {"success": True, "result": "Wrote `backend/data/tmp/note.txt` (15 characters)."})
+        self.assertTrue(read_result["success"])
+        self.assertIn("hello workspace", str(read_result["result"]))
 
     def test_write_outside_backend_data_is_denied(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -97,15 +135,15 @@ class LocalWorkspaceExecutorSkillTests(unittest.TestCase):
             result = _run_skill_script(
                 EXECUTOR_AFTER_LLM_PATH,
                 {
-                    "action": "write",
                     "path": "docs/unsafe.md",
+                    "operation": "write",
                     "content": "nope",
                 },
                 repo_root=repo_root,
             )
 
-        self.assertEqual(result["status"], "failed")
-        self.assertEqual(result["errors"][0]["type"], "permission_denied")
+        self.assertEqual(result["success"], False)
+        self.assertIn("permission_denied", str(result["result"]))
         self.assertFalse((repo_root / "docs" / "unsafe.md").exists())
 
     def test_execute_script_is_allowed_under_backend_data_tmp(self) -> None:
@@ -114,22 +152,21 @@ class LocalWorkspaceExecutorSkillTests(unittest.TestCase):
             script_path = repo_root / "backend" / "data" / "tmp" / "hello.py"
             script_path.parent.mkdir(parents=True)
             script_path.write_text(
-                "import sys\nprint('hello ' + sys.argv[1])\n",
+                "print('hello workspace')\n",
                 encoding="utf-8",
             )
             result = _run_skill_script(
                 EXECUTOR_AFTER_LLM_PATH,
                 {
-                    "action": "execute",
                     "path": "backend/data/tmp/hello.py",
-                    "args": ["GraphiteUI"],
+                    "operation": "execute",
                 },
                 repo_root=repo_root,
             )
 
-        self.assertEqual(result["status"], "succeeded")
-        self.assertEqual(result["exit_code"], 0)
-        self.assertIn("hello GraphiteUI", result["stdout"])
+        self.assertEqual(result["success"], True)
+        self.assertIn("exit code 0", str(result["result"]))
+        self.assertIn("hello workspace", str(result["result"]))
 
     def test_execute_outside_execute_roots_is_denied(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -140,14 +177,14 @@ class LocalWorkspaceExecutorSkillTests(unittest.TestCase):
             result = _run_skill_script(
                 EXECUTOR_AFTER_LLM_PATH,
                 {
-                    "action": "execute",
                     "path": "docs/tool.py",
+                    "operation": "execute",
                 },
                 repo_root=repo_root,
             )
 
-        self.assertEqual(result["status"], "failed")
-        self.assertEqual(result["errors"][0]["type"], "permission_denied")
+        self.assertEqual(result["success"], False)
+        self.assertIn("permission_denied", str(result["result"]))
 
 
 if __name__ == "__main__":

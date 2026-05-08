@@ -74,6 +74,47 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
         self.assertIn("skillKey: web_search", prompt)
         self.assertIn("Current date: 2026-05-08", prompt)
 
+    def test_skill_input_prompt_passes_node_task_instruction_to_before_llm(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skill_dir = Path(temp_dir) / "local_workspace_executor"
+            skill_dir.mkdir()
+            (skill_dir / "before_llm.py").write_text(
+                "import json, sys\n"
+                "payload = json.loads(sys.stdin.read() or '{}')\n"
+                "print(json.dumps({'context': payload.get('task_instruction', '')}))\n",
+                encoding="utf-8",
+            )
+            node = NodeSystemAgentNode.model_validate(
+                {
+                    "kind": "agent",
+                    "ui": {"position": {"x": 0, "y": 0}},
+                    "config": {
+                        "skillKey": "local_workspace_executor",
+                        "taskInstruction": "写入 backend/data/tmp/example.txt。",
+                    },
+                }
+            )
+            prompt = build_skill_input_system_prompt(
+                input_values={},
+                bindings=[
+                    ResolvedAgentSkillBinding(
+                        binding=NodeSystemAgentSkillBinding(skillKey="local_workspace_executor"),
+                        source="node_config",
+                    )
+                ],
+                skill_definitions={
+                    "local_workspace_executor": SkillDefinition(
+                        skillKey="local_workspace_executor",
+                        name="Local Workspace Executor",
+                        inputSchema=[SkillIoField(key="path", name="Path", valueType="text", required=True)],
+                        sourcePath=str(skill_dir / "skill.json"),
+                    )
+                },
+                node=node,
+            )
+
+        self.assertIn("写入 backend/data/tmp/example.txt。", prompt)
+
     def test_capability_selector_prompt_uses_before_llm_context_for_catalog(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             skill_dir = Path(temp_dir) / "graphiteui_capability_selector"

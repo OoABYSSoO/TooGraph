@@ -81,9 +81,9 @@
 
 - 位置：`skill/local_workspace_executor/`
 - 显示名称：`Local Workspace Executor`
-- 作用：提供受控的本地工作区读、列目录、写、追加和执行脚本能力。
-- 生命周期：`before_llm.py` 注入权限摘要；`after_llm.py` 执行具体操作，并返回 `status`、`summary`、`action`、`path`、`content`、`entries`、`stdout`、`stderr`、`exit_code`、`errors`。
-- 默认权限：读取 `backend/data`、`skill`、`docs`、`README.md`、`AGENTS.md`；写入只允许 `backend/data`；执行只允许 `backend/data/tmp` 和 `backend/data/skills/user`；`.git`、`.env`、`backend/data/settings` 永远拒绝。
+- 作用：提供受控的单路径本地工作区操作能力，支持预读上下文、写入一个文件或执行一个脚本。
+- 生命周期：`before_llm.py` 会从图 state 和节点任务描述中提取仓库路径并预读已有文件，供 LLM 生成写入内容或执行参数；`after_llm.py` 执行 `read`、`write` 或 `execute`，并只返回 `success` 与 `result`。
+- 默认权限：预读可读取仓库内普通文件，但 `.git`、`.env`、`backend/data/settings` 永远拒绝；写入只允许 `backend/data`；执行只允许 `backend/data/tmp` 和 `backend/data/skills/user`。
 - 边界：该 Skill 会写本地文件并启动本地进程，必须显式确认。路径白名单只是启动前检查，不是 OS 沙箱。
 
 ## 当前内置图模板

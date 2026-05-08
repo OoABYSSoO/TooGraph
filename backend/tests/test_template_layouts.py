@@ -229,6 +229,20 @@ class TemplateLayoutTests(unittest.TestCase):
                 "write_requirements_txt",
             },
         )
+        for node_id in executor_nodes:
+            with self.subTest(node_id=node_id):
+                self.assertEqual(
+                    nodes[node_id]["config"]["skillBindings"][0]["outputMapping"],
+                    {
+                        "success": f"{node_id}_success",
+                        "result": f"{node_id}_result",
+                    },
+                )
+                self.assertEqual(
+                    [write["state"] for write in nodes[node_id]["writes"]],
+                    [f"{node_id}_success", f"{node_id}_result"],
+                )
+                self.assertIn("operation 必须是 write", nodes[node_id]["config"]["taskInstruction"])
 
         self.assertEqual(
             nodes["need_clarification"]["config"]["rule"],

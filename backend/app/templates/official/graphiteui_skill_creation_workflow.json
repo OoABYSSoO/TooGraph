@@ -16,7 +16,9 @@
       "name": "已有能力",
       "description": "能力选择技能从当前启用模板和 Skill 中选择出的单个可用能力候选；这里作为审查上下文保存，不触发动态执行。",
       "type": "json",
-      "value": { "kind": "none" },
+      "value": {
+        "kind": "none"
+      },
       "color": "#2563eb",
       "binding": {
         "kind": "skill_output",
@@ -312,160 +314,6 @@
       "color": "#0f766e",
       "binding": null
     },
-    "write_skill_json_status": {
-      "name": "写 skill.json 状态",
-      "description": "写入 skill.json 的执行状态。",
-      "type": "text",
-      "value": "",
-      "color": "#16a34a",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
-        "nodeId": "write_skill_json",
-        "fieldKey": "status",
-        "managed": true
-      }
-    },
-    "write_skill_json_summary": {
-      "name": "写 skill.json 摘要",
-      "description": "写入 skill.json 的操作摘要。",
-      "type": "markdown",
-      "value": "",
-      "color": "#16a34a",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
-        "nodeId": "write_skill_json",
-        "fieldKey": "summary",
-        "managed": true
-      }
-    },
-    "write_skill_json_path": {
-      "name": "skill.json 路径",
-      "description": "实际写入的 skill.json 仓库相对路径。",
-      "type": "text",
-      "value": "",
-      "color": "#16a34a",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
-        "nodeId": "write_skill_json",
-        "fieldKey": "path",
-        "managed": true
-      }
-    },
-    "write_skill_json_errors": {
-      "name": "写 skill.json 错误",
-      "description": "写入 skill.json 的结构化错误。",
-      "type": "json",
-      "value": [],
-      "color": "#dc2626",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
-        "nodeId": "write_skill_json",
-        "fieldKey": "errors",
-        "managed": true
-      }
-    },
-    "write_skill_md_status": {
-      "name": "写 SKILL.md 状态",
-      "description": "写入 SKILL.md 的执行状态。",
-      "type": "text",
-      "value": "",
-      "color": "#16a34a",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
-        "nodeId": "write_skill_md",
-        "fieldKey": "status",
-        "managed": true
-      }
-    },
-    "write_skill_md_summary": {
-      "name": "写 SKILL.md 摘要",
-      "description": "写入 SKILL.md 的操作摘要。",
-      "type": "markdown",
-      "value": "",
-      "color": "#16a34a",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
-        "nodeId": "write_skill_md",
-        "fieldKey": "summary",
-        "managed": true
-      }
-    },
-    "write_skill_md_path": {
-      "name": "SKILL.md 路径",
-      "description": "实际写入的 SKILL.md 仓库相对路径。",
-      "type": "text",
-      "value": "",
-      "color": "#16a34a",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
-        "nodeId": "write_skill_md",
-        "fieldKey": "path",
-        "managed": true
-      }
-    },
-    "write_skill_md_errors": {
-      "name": "写 SKILL.md 错误",
-      "description": "写入 SKILL.md 的结构化错误。",
-      "type": "json",
-      "value": [],
-      "color": "#dc2626",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
-        "nodeId": "write_skill_md",
-        "fieldKey": "errors",
-        "managed": true
-      }
-    },
-    "write_before_llm_summary": {
-      "name": "写 before_llm.py 摘要",
-      "description": "写入 before_llm.py 的操作摘要。",
-      "type": "markdown",
-      "value": "",
-      "color": "#16a34a",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
-        "nodeId": "write_before_llm_py",
-        "fieldKey": "summary",
-        "managed": true
-      }
-    },
-    "write_after_llm_summary": {
-      "name": "写 after_llm.py 摘要",
-      "description": "写入 after_llm.py 的操作摘要。",
-      "type": "markdown",
-      "value": "",
-      "color": "#16a34a",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
-        "nodeId": "write_after_llm_py",
-        "fieldKey": "summary",
-        "managed": true
-      }
-    },
-    "write_requirements_summary": {
-      "name": "写 requirements.txt 摘要",
-      "description": "写入 requirements.txt 的操作摘要。",
-      "type": "markdown",
-      "value": "",
-      "color": "#16a34a",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
-        "nodeId": "write_requirements_txt",
-        "fieldKey": "summary",
-        "managed": true
-      }
-    },
     "final_summary": {
       "name": "最终回复",
       "description": "面向用户展示的最终结果、文件路径、测试状态和后续建议。",
@@ -473,6 +321,146 @@
       "value": "",
       "color": "#b45309",
       "binding": null
+    },
+    "write_skill_json_success": {
+      "name": "skill.json 写入成功",
+      "description": "skill.json 写入操作是否成功。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_skill_json",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "write_skill_json_result": {
+      "name": "skill.json 写入结果",
+      "description": "skill.json 写入成功输出或失败报错。",
+      "type": "markdown",
+      "value": "",
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_skill_json",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "write_skill_md_success": {
+      "name": "SKILL.md 写入成功",
+      "description": "SKILL.md 写入操作是否成功。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_skill_md",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "write_skill_md_result": {
+      "name": "SKILL.md 写入结果",
+      "description": "SKILL.md 写入成功输出或失败报错。",
+      "type": "markdown",
+      "value": "",
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_skill_md",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "write_before_llm_py_success": {
+      "name": "before_llm.py 写入成功",
+      "description": "before_llm.py 写入操作是否成功。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_before_llm_py",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "write_before_llm_py_result": {
+      "name": "before_llm.py 写入结果",
+      "description": "before_llm.py 写入成功输出或失败报错。",
+      "type": "markdown",
+      "value": "",
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_before_llm_py",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "write_after_llm_py_success": {
+      "name": "after_llm.py 写入成功",
+      "description": "after_llm.py 写入操作是否成功。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_after_llm_py",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "write_after_llm_py_result": {
+      "name": "after_llm.py 写入结果",
+      "description": "after_llm.py 写入成功输出或失败报错。",
+      "type": "markdown",
+      "value": "",
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_after_llm_py",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "write_requirements_txt_success": {
+      "name": "requirements.txt 写入成功",
+      "description": "requirements.txt 写入操作是否成功。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_requirements_txt",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "write_requirements_txt_result": {
+      "name": "requirements.txt 写入结果",
+      "description": "requirements.txt 写入成功输出或失败报错。",
+      "type": "markdown",
+      "value": "",
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_requirements_txt",
+        "fieldKey": "result",
+        "managed": true
+      }
     }
   },
   "nodes": {
@@ -481,12 +469,23 @@
       "name": "输入需求",
       "description": "提供想创建的 Skill 需求。",
       "ui": {
-        "position": { "x": 40, "y": 520 },
+        "position": {
+          "x": 40,
+          "y": 520
+        },
         "collapsed": false,
-        "size": { "width": 320, "height": 190 }
+        "size": {
+          "width": 320,
+          "height": 190
+        }
       },
       "reads": [],
-      "writes": [{ "state": "skill_request", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "skill_request",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "value": "我想要一个把会议纪要整理成待办清单的 Skill",
         "boundaryType": "text"
@@ -497,12 +496,28 @@
       "name": "检查已有能力",
       "description": "从启用的模板和 Skill 中检查是否已有能力能满足目标需求。",
       "ui": {
-        "position": { "x": 440, "y": 470 },
+        "position": {
+          "x": 440,
+          "y": 470
+        },
         "collapsed": false,
-        "size": { "width": 420, "height": 280 }
+        "size": {
+          "width": 420,
+          "height": 280
+        }
       },
-      "reads": [{ "state": "skill_request", "required": true }],
-      "writes": [{ "state": "existing_capability", "mode": "replace" }],
+      "reads": [
+        {
+          "state": "skill_request",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "existing_capability",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "graphiteui_capability_selector",
         "skillBindings": [
@@ -533,18 +548,39 @@
       "name": "评估需求",
       "description": "判断需求是否清晰，是否需要澄清，以及是否继续创建新 Skill。",
       "ui": {
-        "position": { "x": 940, "y": 430 },
+        "position": {
+          "x": 940,
+          "y": 430
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 320 }
+        "size": {
+          "width": 440,
+          "height": 320
+        }
       },
       "reads": [
-        { "state": "skill_request", "required": true },
-        { "state": "existing_capability", "required": false }
+        {
+          "state": "skill_request",
+          "required": true
+        },
+        {
+          "state": "existing_capability",
+          "required": false
+        }
       ],
       "writes": [
-        { "state": "requirement_review", "mode": "replace" },
-        { "state": "creation_decision", "mode": "replace" },
-        { "state": "confirmed_skill_requirement", "mode": "replace" }
+        {
+          "state": "requirement_review",
+          "mode": "replace"
+        },
+        {
+          "state": "creation_decision",
+          "mode": "replace"
+        },
+        {
+          "state": "confirmed_skill_requirement",
+          "mode": "replace"
+        }
       ],
       "config": {
         "skillKey": "",
@@ -562,14 +598,29 @@
       "name": "是否需要澄清",
       "description": "需求不清晰或已有能力可能已满足时，先让用户确认。",
       "ui": {
-        "position": { "x": 1460, "y": 470 },
+        "position": {
+          "x": 1460,
+          "y": 470
+        },
         "collapsed": false,
-        "size": { "width": 560, "height": 280 }
+        "size": {
+          "width": 560,
+          "height": 280
+        }
       },
-      "reads": [{ "state": "requirement_review", "required": true }],
+      "reads": [
+        {
+          "state": "requirement_review",
+          "required": true
+        }
+      ],
       "writes": [],
       "config": {
-        "branches": ["true", "false", "exhausted"],
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
         "loopLimit": 5,
         "branchMapping": {
           "true": "true",
@@ -587,16 +638,36 @@
       "name": "生成澄清问题",
       "description": "把不清晰的点转成用户容易回答的选择题和少量开放问题。",
       "ui": {
-        "position": { "x": 2100, "y": 170 },
+        "position": {
+          "x": 2100,
+          "y": 170
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 300 }
+        "size": {
+          "width": 440,
+          "height": 300
+        }
       },
       "reads": [
-        { "state": "skill_request", "required": true },
-        { "state": "existing_capability", "required": false },
-        { "state": "requirement_review", "required": true }
+        {
+          "state": "skill_request",
+          "required": true
+        },
+        {
+          "state": "existing_capability",
+          "required": false
+        },
+        {
+          "state": "requirement_review",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "clarification_questions", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "clarification_questions",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -613,19 +684,43 @@
       "name": "合并澄清回答",
       "description": "把用户回答合并成确认后的需求和创建决策。",
       "ui": {
-        "position": { "x": 2600, "y": 170 },
+        "position": {
+          "x": 2600,
+          "y": 170
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 300 }
+        "size": {
+          "width": 440,
+          "height": 300
+        }
       },
       "reads": [
-        { "state": "skill_request", "required": true },
-        { "state": "existing_capability", "required": false },
-        { "state": "clarification_questions", "required": true },
-        { "state": "clarification_answer", "required": true }
+        {
+          "state": "skill_request",
+          "required": true
+        },
+        {
+          "state": "existing_capability",
+          "required": false
+        },
+        {
+          "state": "clarification_questions",
+          "required": true
+        },
+        {
+          "state": "clarification_answer",
+          "required": true
+        }
       ],
       "writes": [
-        { "state": "confirmed_skill_requirement", "mode": "replace" },
-        { "state": "creation_decision", "mode": "replace" }
+        {
+          "state": "confirmed_skill_requirement",
+          "mode": "replace"
+        },
+        {
+          "state": "creation_decision",
+          "mode": "replace"
+        }
       ],
       "config": {
         "skillKey": "",
@@ -643,14 +738,29 @@
       "name": "是否继续创建",
       "description": "如果用户确认不需要创建，则直接收束。",
       "ui": {
-        "position": { "x": 3080, "y": 470 },
+        "position": {
+          "x": 3080,
+          "y": 470
+        },
         "collapsed": false,
-        "size": { "width": 560, "height": 280 }
+        "size": {
+          "width": 560,
+          "height": 280
+        }
       },
-      "reads": [{ "state": "creation_decision", "required": true }],
+      "reads": [
+        {
+          "state": "creation_decision",
+          "required": true
+        }
+      ],
       "writes": [],
       "config": {
-        "branches": ["true", "false", "exhausted"],
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
         "loopLimit": 5,
         "branchMapping": {
           "true": "true",
@@ -668,15 +778,32 @@
       "name": "生成示例输入输出",
       "description": "用确认后的需求生成示例，让用户确认 Skill 行为。",
       "ui": {
-        "position": { "x": 3740, "y": 360 },
+        "position": {
+          "x": 3740,
+          "y": 360
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 320 }
+        "size": {
+          "width": 440,
+          "height": 320
+        }
       },
       "reads": [
-        { "state": "skill_request", "required": true },
-        { "state": "confirmed_skill_requirement", "required": true }
+        {
+          "state": "skill_request",
+          "required": true
+        },
+        {
+          "state": "confirmed_skill_requirement",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "example_io", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "example_io",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -693,18 +820,39 @@
       "name": "判断样例反馈",
       "description": "根据用户反馈判断样例是否通过；不通过则修订需求后回到样例生成。",
       "ui": {
-        "position": { "x": 4260, "y": 360 },
+        "position": {
+          "x": 4260,
+          "y": 360
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 320 }
+        "size": {
+          "width": 440,
+          "height": 320
+        }
       },
       "reads": [
-        { "state": "confirmed_skill_requirement", "required": true },
-        { "state": "example_io", "required": true },
-        { "state": "example_feedback", "required": true }
+        {
+          "state": "confirmed_skill_requirement",
+          "required": true
+        },
+        {
+          "state": "example_io",
+          "required": true
+        },
+        {
+          "state": "example_feedback",
+          "required": true
+        }
       ],
       "writes": [
-        { "state": "example_decision", "mode": "replace" },
-        { "state": "confirmed_skill_requirement", "mode": "replace" }
+        {
+          "state": "example_decision",
+          "mode": "replace"
+        },
+        {
+          "state": "confirmed_skill_requirement",
+          "mode": "replace"
+        }
       ],
       "config": {
         "skillKey": "",
@@ -722,14 +870,29 @@
       "name": "样例是否通过",
       "description": "样例未通过时回到示例生成，最多循环五轮。",
       "ui": {
-        "position": { "x": 4760, "y": 430 },
+        "position": {
+          "x": 4760,
+          "y": 430
+        },
         "collapsed": false,
-        "size": { "width": 560, "height": 280 }
+        "size": {
+          "width": 560,
+          "height": 280
+        }
       },
-      "reads": [{ "state": "example_decision", "required": true }],
+      "reads": [
+        {
+          "state": "example_decision",
+          "required": true
+        }
+      ],
       "writes": [],
       "config": {
-        "branches": ["true", "false", "exhausted"],
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
         "loopLimit": 5,
         "branchMapping": {
           "true": "true",
@@ -747,17 +910,40 @@
       "name": "整理构建上下文",
       "description": "把确认需求和样例整理成 Skill Builder 可直接使用的约束。",
       "ui": {
-        "position": { "x": 5420, "y": 360 },
+        "position": {
+          "x": 5420,
+          "y": 360
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 320 }
+        "size": {
+          "width": 440,
+          "height": 320
+        }
       },
       "reads": [
-        { "state": "skill_request", "required": true },
-        { "state": "confirmed_skill_requirement", "required": true },
-        { "state": "example_io", "required": true },
-        { "state": "example_feedback", "required": true }
+        {
+          "state": "skill_request",
+          "required": true
+        },
+        {
+          "state": "confirmed_skill_requirement",
+          "required": true
+        },
+        {
+          "state": "example_io",
+          "required": true
+        },
+        {
+          "state": "example_feedback",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "builder_context", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "builder_context",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -774,28 +960,79 @@
       "name": "生成 Skill 文件",
       "description": "调用 GraphiteUI Skill Builder 生成 Skill 包必要文件内容。",
       "ui": {
-        "position": { "x": 5940, "y": 360 },
+        "position": {
+          "x": 5940,
+          "y": 360
+        },
         "collapsed": false,
-        "size": { "width": 460, "height": 340 }
+        "size": {
+          "width": 460,
+          "height": 340
+        }
       },
       "reads": [
-        { "state": "skill_request", "required": true },
-        { "state": "confirmed_skill_requirement", "required": true },
-        { "state": "example_io", "required": true },
-        { "state": "builder_context", "required": true },
-        { "state": "script_test_status", "required": false },
-        { "state": "script_test_summary", "required": false },
-        { "state": "script_test_stdout", "required": false },
-        { "state": "script_test_stderr", "required": false },
-        { "state": "script_test_errors", "required": false }
+        {
+          "state": "skill_request",
+          "required": true
+        },
+        {
+          "state": "confirmed_skill_requirement",
+          "required": true
+        },
+        {
+          "state": "example_io",
+          "required": true
+        },
+        {
+          "state": "builder_context",
+          "required": true
+        },
+        {
+          "state": "script_test_status",
+          "required": false
+        },
+        {
+          "state": "script_test_summary",
+          "required": false
+        },
+        {
+          "state": "script_test_stdout",
+          "required": false
+        },
+        {
+          "state": "script_test_stderr",
+          "required": false
+        },
+        {
+          "state": "script_test_errors",
+          "required": false
+        }
       ],
       "writes": [
-        { "state": "generated_skill_key", "mode": "replace" },
-        { "state": "generated_skill_json", "mode": "replace" },
-        { "state": "generated_skill_md", "mode": "replace" },
-        { "state": "generated_before_llm_py", "mode": "replace" },
-        { "state": "generated_after_llm_py", "mode": "replace" },
-        { "state": "generated_requirements_txt", "mode": "replace" }
+        {
+          "state": "generated_skill_key",
+          "mode": "replace"
+        },
+        {
+          "state": "generated_skill_json",
+          "mode": "replace"
+        },
+        {
+          "state": "generated_skill_md",
+          "mode": "replace"
+        },
+        {
+          "state": "generated_before_llm_py",
+          "mode": "replace"
+        },
+        {
+          "state": "generated_after_llm_py",
+          "mode": "replace"
+        },
+        {
+          "state": "generated_requirements_txt",
+          "mode": "replace"
+        }
       ],
       "config": {
         "skillKey": "graphiteUI_skill_builder",
@@ -825,17 +1062,40 @@
       "name": "制定测试策略",
       "description": "判断生成的生命周期脚本是否需要运行 pytest 测试。",
       "ui": {
-        "position": { "x": 6480, "y": 360 },
+        "position": {
+          "x": 6480,
+          "y": 360
+        },
         "collapsed": false,
-        "size": { "width": 420, "height": 300 }
+        "size": {
+          "width": 420,
+          "height": 300
+        }
       },
       "reads": [
-        { "state": "generated_before_llm_py", "required": false },
-        { "state": "generated_after_llm_py", "required": false },
-        { "state": "generated_skill_json", "required": true },
-        { "state": "confirmed_skill_requirement", "required": true }
+        {
+          "state": "generated_before_llm_py",
+          "required": false
+        },
+        {
+          "state": "generated_after_llm_py",
+          "required": false
+        },
+        {
+          "state": "generated_skill_json",
+          "required": true
+        },
+        {
+          "state": "confirmed_skill_requirement",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "test_strategy", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "test_strategy",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -852,14 +1112,29 @@
       "name": "是否需要脚本测试",
       "description": "有 Python 生命周期脚本时进入测试，否则进入写入前审查。",
       "ui": {
-        "position": { "x": 6980, "y": 430 },
+        "position": {
+          "x": 6980,
+          "y": 430
+        },
         "collapsed": false,
-        "size": { "width": 560, "height": 280 }
+        "size": {
+          "width": 560,
+          "height": 280
+        }
       },
-      "reads": [{ "state": "test_strategy", "required": true }],
+      "reads": [
+        {
+          "state": "test_strategy",
+          "required": true
+        }
+      ],
       "writes": [],
       "config": {
-        "branches": ["true", "false", "exhausted"],
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
         "loopLimit": 5,
         "branchMapping": {
           "true": "true",
@@ -877,26 +1152,71 @@
       "name": "测试脚本",
       "description": "调用脚本测试技能编写 pytest 并运行生成的 Python 脚本。",
       "ui": {
-        "position": { "x": 7640, "y": 240 },
+        "position": {
+          "x": 7640,
+          "y": 240
+        },
         "collapsed": false,
-        "size": { "width": 460, "height": 340 }
+        "size": {
+          "width": 460,
+          "height": 340
+        }
       },
       "reads": [
-        { "state": "test_strategy", "required": true },
-        { "state": "generated_before_llm_py", "required": false },
-        { "state": "generated_after_llm_py", "required": false },
-        { "state": "generated_skill_json", "required": true },
-        { "state": "confirmed_skill_requirement", "required": true },
-        { "state": "example_io", "required": true }
+        {
+          "state": "test_strategy",
+          "required": true
+        },
+        {
+          "state": "generated_before_llm_py",
+          "required": false
+        },
+        {
+          "state": "generated_after_llm_py",
+          "required": false
+        },
+        {
+          "state": "generated_skill_json",
+          "required": true
+        },
+        {
+          "state": "confirmed_skill_requirement",
+          "required": true
+        },
+        {
+          "state": "example_io",
+          "required": true
+        }
       ],
       "writes": [
-        { "state": "script_test_status", "mode": "replace" },
-        { "state": "script_test_summary", "mode": "replace" },
-        { "state": "script_test_source", "mode": "replace" },
-        { "state": "script_test_stdout", "mode": "replace" },
-        { "state": "script_test_stderr", "mode": "replace" },
-        { "state": "script_test_exit_code", "mode": "replace" },
-        { "state": "script_test_errors", "mode": "replace" }
+        {
+          "state": "script_test_status",
+          "mode": "replace"
+        },
+        {
+          "state": "script_test_summary",
+          "mode": "replace"
+        },
+        {
+          "state": "script_test_source",
+          "mode": "replace"
+        },
+        {
+          "state": "script_test_stdout",
+          "mode": "replace"
+        },
+        {
+          "state": "script_test_stderr",
+          "mode": "replace"
+        },
+        {
+          "state": "script_test_exit_code",
+          "mode": "replace"
+        },
+        {
+          "state": "script_test_errors",
+          "mode": "replace"
+        }
       ],
       "config": {
         "skillKey": "graphiteUI_script_tester",
@@ -927,14 +1247,29 @@
       "name": "测试是否通过",
       "description": "测试失败时回到修复上下文，最多修复三轮。",
       "ui": {
-        "position": { "x": 8180, "y": 310 },
+        "position": {
+          "x": 8180,
+          "y": 310
+        },
         "collapsed": false,
-        "size": { "width": 560, "height": 280 }
+        "size": {
+          "width": 560,
+          "height": 280
+        }
       },
-      "reads": [{ "state": "script_test_status", "required": true }],
+      "reads": [
+        {
+          "state": "script_test_status",
+          "required": true
+        }
+      ],
       "writes": [],
       "config": {
-        "branches": ["true", "false", "exhausted"],
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
         "loopLimit": 3,
         "branchMapping": {
           "true": "true",
@@ -952,21 +1287,56 @@
       "name": "写入前审查",
       "description": "总结生成的 Skill 文件、测试结果和准备写入的路径，等待用户批准。",
       "ui": {
-        "position": { "x": 8940, "y": 360 },
+        "position": {
+          "x": 8940,
+          "y": 360
+        },
         "collapsed": false,
-        "size": { "width": 460, "height": 340 }
+        "size": {
+          "width": 460,
+          "height": 340
+        }
       },
       "reads": [
-        { "state": "generated_skill_key", "required": true },
-        { "state": "generated_skill_json", "required": true },
-        { "state": "generated_skill_md", "required": true },
-        { "state": "generated_before_llm_py", "required": false },
-        { "state": "generated_after_llm_py", "required": false },
-        { "state": "generated_requirements_txt", "required": false },
-        { "state": "script_test_status", "required": false },
-        { "state": "script_test_summary", "required": false }
+        {
+          "state": "generated_skill_key",
+          "required": true
+        },
+        {
+          "state": "generated_skill_json",
+          "required": true
+        },
+        {
+          "state": "generated_skill_md",
+          "required": true
+        },
+        {
+          "state": "generated_before_llm_py",
+          "required": false
+        },
+        {
+          "state": "generated_after_llm_py",
+          "required": false
+        },
+        {
+          "state": "generated_requirements_txt",
+          "required": false
+        },
+        {
+          "state": "script_test_status",
+          "required": false
+        },
+        {
+          "state": "script_test_summary",
+          "required": false
+        }
       ],
-      "writes": [{ "state": "generation_review", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "generation_review",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -983,15 +1353,32 @@
       "name": "判断写入确认",
       "description": "把用户写入确认转成结构化决策。",
       "ui": {
-        "position": { "x": 9460, "y": 360 },
+        "position": {
+          "x": 9460,
+          "y": 360
+        },
         "collapsed": false,
-        "size": { "width": 420, "height": 280 }
+        "size": {
+          "width": 420,
+          "height": 280
+        }
       },
       "reads": [
-        { "state": "generation_review", "required": true },
-        { "state": "write_approval", "required": true }
+        {
+          "state": "generation_review",
+          "required": true
+        },
+        {
+          "state": "write_approval",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "write_decision", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "write_decision",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -1008,14 +1395,29 @@
       "name": "是否批准写入",
       "description": "用户批准后才调用本地执行器写文件。",
       "ui": {
-        "position": { "x": 9920, "y": 430 },
+        "position": {
+          "x": 9920,
+          "y": 430
+        },
         "collapsed": false,
-        "size": { "width": 560, "height": 280 }
+        "size": {
+          "width": 560,
+          "height": 280
+        }
       },
-      "reads": [{ "state": "write_decision", "required": true }],
+      "reads": [
+        {
+          "state": "write_decision",
+          "required": true
+        }
+      ],
       "writes": [],
       "config": {
-        "branches": ["true", "false", "exhausted"],
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
         "loopLimit": 5,
         "branchMapping": {
           "true": "true",
@@ -1033,19 +1435,35 @@
       "name": "写 skill.json",
       "description": "把生成的 skill.json 写入用户 Skill 目录。",
       "ui": {
-        "position": { "x": 10580, "y": 300 },
+        "position": {
+          "x": 10580,
+          "y": 300
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 300 }
+        "size": {
+          "width": 440,
+          "height": 300
+        }
       },
       "reads": [
-        { "state": "generated_skill_key", "required": true },
-        { "state": "generated_skill_json", "required": true }
+        {
+          "state": "generated_skill_key",
+          "required": true
+        },
+        {
+          "state": "generated_skill_json",
+          "required": true
+        }
       ],
       "writes": [
-        { "state": "write_skill_json_status", "mode": "replace" },
-        { "state": "write_skill_json_summary", "mode": "replace" },
-        { "state": "write_skill_json_path", "mode": "replace" },
-        { "state": "write_skill_json_errors", "mode": "replace" }
+        {
+          "state": "write_skill_json_success",
+          "mode": "replace"
+        },
+        {
+          "state": "write_skill_json_result",
+          "mode": "replace"
+        }
       ],
       "config": {
         "skillKey": "local_workspace_executor",
@@ -1053,15 +1471,13 @@
           {
             "skillKey": "local_workspace_executor",
             "outputMapping": {
-              "status": "write_skill_json_status",
-              "summary": "write_skill_json_summary",
-              "path": "write_skill_json_path",
-              "errors": "write_skill_json_errors"
+              "success": "write_skill_json_success",
+              "result": "write_skill_json_result"
             }
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 skill.json。action 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/skill.json。content 必须是 generated_skill_json 的格式化 JSON 文本，使用 2 空格缩进，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 skill.json。operation 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/skill.json。content 必须是 generated_skill_json 的格式化 JSON 文本，使用 2 空格缩进，不要包 markdown 代码块。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1073,19 +1489,35 @@
       "name": "写 SKILL.md",
       "description": "把生成的 SKILL.md 写入用户 Skill 目录。",
       "ui": {
-        "position": { "x": 11080, "y": 300 },
+        "position": {
+          "x": 11080,
+          "y": 300
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 300 }
+        "size": {
+          "width": 440,
+          "height": 300
+        }
       },
       "reads": [
-        { "state": "generated_skill_key", "required": true },
-        { "state": "generated_skill_md", "required": true }
+        {
+          "state": "generated_skill_key",
+          "required": true
+        },
+        {
+          "state": "generated_skill_md",
+          "required": true
+        }
       ],
       "writes": [
-        { "state": "write_skill_md_status", "mode": "replace" },
-        { "state": "write_skill_md_summary", "mode": "replace" },
-        { "state": "write_skill_md_path", "mode": "replace" },
-        { "state": "write_skill_md_errors", "mode": "replace" }
+        {
+          "state": "write_skill_md_success",
+          "mode": "replace"
+        },
+        {
+          "state": "write_skill_md_result",
+          "mode": "replace"
+        }
       ],
       "config": {
         "skillKey": "local_workspace_executor",
@@ -1093,15 +1525,13 @@
           {
             "skillKey": "local_workspace_executor",
             "outputMapping": {
-              "status": "write_skill_md_status",
-              "summary": "write_skill_md_summary",
-              "path": "write_skill_md_path",
-              "errors": "write_skill_md_errors"
+              "success": "write_skill_md_success",
+              "result": "write_skill_md_result"
             }
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 SKILL.md。action 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/SKILL.md。content 必须是 generated_skill_md 原文，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 SKILL.md。operation 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/SKILL.md。content 必须是 generated_skill_md 原文，不要包 markdown 代码块。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1113,14 +1543,29 @@
       "name": "是否有 before_llm.py",
       "description": "只有生成了 before_llm.py 时才写入。",
       "ui": {
-        "position": { "x": 11580, "y": 360 },
+        "position": {
+          "x": 11580,
+          "y": 360
+        },
         "collapsed": false,
-        "size": { "width": 560, "height": 280 }
+        "size": {
+          "width": 560,
+          "height": 280
+        }
       },
-      "reads": [{ "state": "generated_before_llm_py", "required": false }],
+      "reads": [
+        {
+          "state": "generated_before_llm_py",
+          "required": false
+        }
+      ],
       "writes": [],
       "config": {
-        "branches": ["true", "false", "exhausted"],
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
         "loopLimit": 5,
         "branchMapping": {
           "true": "true",
@@ -1138,27 +1583,49 @@
       "name": "写 before_llm.py",
       "description": "写入可选 before_llm.py。",
       "ui": {
-        "position": { "x": 12220, "y": 180 },
+        "position": {
+          "x": 12220,
+          "y": 180
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 280 }
+        "size": {
+          "width": 440,
+          "height": 280
+        }
       },
       "reads": [
-        { "state": "generated_skill_key", "required": true },
-        { "state": "generated_before_llm_py", "required": true }
+        {
+          "state": "generated_skill_key",
+          "required": true
+        },
+        {
+          "state": "generated_before_llm_py",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "write_before_llm_summary", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "write_before_llm_py_success",
+          "mode": "replace"
+        },
+        {
+          "state": "write_before_llm_py_result",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "local_workspace_executor",
         "skillBindings": [
           {
             "skillKey": "local_workspace_executor",
             "outputMapping": {
-              "summary": "write_before_llm_summary"
+              "success": "write_before_llm_py_success",
+              "result": "write_before_llm_py_result"
             }
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 before_llm.py。action 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/before_llm.py。content 必须是 generated_before_llm_py 原文，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 before_llm.py。operation 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/before_llm.py。content 必须是 generated_before_llm_py 原文，不要包 markdown 代码块。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1170,14 +1637,29 @@
       "name": "是否有 after_llm.py",
       "description": "只有生成了 after_llm.py 时才写入。",
       "ui": {
-        "position": { "x": 12700, "y": 360 },
+        "position": {
+          "x": 12700,
+          "y": 360
+        },
         "collapsed": false,
-        "size": { "width": 560, "height": 280 }
+        "size": {
+          "width": 560,
+          "height": 280
+        }
       },
-      "reads": [{ "state": "generated_after_llm_py", "required": false }],
+      "reads": [
+        {
+          "state": "generated_after_llm_py",
+          "required": false
+        }
+      ],
       "writes": [],
       "config": {
-        "branches": ["true", "false", "exhausted"],
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
         "loopLimit": 5,
         "branchMapping": {
           "true": "true",
@@ -1195,27 +1677,49 @@
       "name": "写 after_llm.py",
       "description": "写入可选 after_llm.py。",
       "ui": {
-        "position": { "x": 13340, "y": 180 },
+        "position": {
+          "x": 13340,
+          "y": 180
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 280 }
+        "size": {
+          "width": 440,
+          "height": 280
+        }
       },
       "reads": [
-        { "state": "generated_skill_key", "required": true },
-        { "state": "generated_after_llm_py", "required": true }
+        {
+          "state": "generated_skill_key",
+          "required": true
+        },
+        {
+          "state": "generated_after_llm_py",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "write_after_llm_summary", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "write_after_llm_py_success",
+          "mode": "replace"
+        },
+        {
+          "state": "write_after_llm_py_result",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "local_workspace_executor",
         "skillBindings": [
           {
             "skillKey": "local_workspace_executor",
             "outputMapping": {
-              "summary": "write_after_llm_summary"
+              "success": "write_after_llm_py_success",
+              "result": "write_after_llm_py_result"
             }
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 after_llm.py。action 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/after_llm.py。content 必须是 generated_after_llm_py 原文，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 after_llm.py。operation 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/after_llm.py。content 必须是 generated_after_llm_py 原文，不要包 markdown 代码块。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1227,14 +1731,29 @@
       "name": "是否有 requirements.txt",
       "description": "只有生成了 requirements.txt 时才写入。",
       "ui": {
-        "position": { "x": 13820, "y": 360 },
+        "position": {
+          "x": 13820,
+          "y": 360
+        },
         "collapsed": false,
-        "size": { "width": 560, "height": 280 }
+        "size": {
+          "width": 560,
+          "height": 280
+        }
       },
-      "reads": [{ "state": "generated_requirements_txt", "required": false }],
+      "reads": [
+        {
+          "state": "generated_requirements_txt",
+          "required": false
+        }
+      ],
       "writes": [],
       "config": {
-        "branches": ["true", "false", "exhausted"],
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
         "loopLimit": 5,
         "branchMapping": {
           "true": "true",
@@ -1252,27 +1771,49 @@
       "name": "写 requirements.txt",
       "description": "写入可选 requirements.txt。",
       "ui": {
-        "position": { "x": 14460, "y": 180 },
+        "position": {
+          "x": 14460,
+          "y": 180
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 280 }
+        "size": {
+          "width": 440,
+          "height": 280
+        }
       },
       "reads": [
-        { "state": "generated_skill_key", "required": true },
-        { "state": "generated_requirements_txt", "required": true }
+        {
+          "state": "generated_skill_key",
+          "required": true
+        },
+        {
+          "state": "generated_requirements_txt",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "write_requirements_summary", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "write_requirements_txt_success",
+          "mode": "replace"
+        },
+        {
+          "state": "write_requirements_txt_result",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "local_workspace_executor",
         "skillBindings": [
           {
             "skillKey": "local_workspace_executor",
             "outputMapping": {
-              "summary": "write_requirements_summary"
+              "success": "write_requirements_txt_success",
+              "result": "write_requirements_txt_result"
             }
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 requirements.txt。action 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/requirements.txt。content 必须是 generated_requirements_txt 原文，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 requirements.txt。operation 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/requirements.txt。content 必须是 generated_requirements_txt 原文，不要包 markdown 代码块。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1284,26 +1825,81 @@
       "name": "整理完成结果",
       "description": "汇总写入结果、测试状态和下一步使用方式。",
       "ui": {
-        "position": { "x": 14960, "y": 360 },
+        "position": {
+          "x": 14960,
+          "y": 360
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 300 }
+        "size": {
+          "width": 440,
+          "height": 300
+        }
       },
       "reads": [
-        { "state": "generated_skill_key", "required": true },
-        { "state": "write_skill_json_summary", "required": false },
-        { "state": "write_skill_md_summary", "required": false },
-        { "state": "write_before_llm_summary", "required": false },
-        { "state": "write_after_llm_summary", "required": false },
-        { "state": "write_requirements_summary", "required": false },
-        { "state": "script_test_status", "required": false },
-        { "state": "script_test_summary", "required": false }
+        {
+          "state": "generated_skill_key",
+          "required": true
+        },
+        {
+          "state": "write_skill_json_success",
+          "required": false
+        },
+        {
+          "state": "write_skill_json_result",
+          "required": false
+        },
+        {
+          "state": "write_skill_md_success",
+          "required": false
+        },
+        {
+          "state": "write_skill_md_result",
+          "required": false
+        },
+        {
+          "state": "write_before_llm_py_success",
+          "required": false
+        },
+        {
+          "state": "write_before_llm_py_result",
+          "required": false
+        },
+        {
+          "state": "write_after_llm_py_success",
+          "required": false
+        },
+        {
+          "state": "write_after_llm_py_result",
+          "required": false
+        },
+        {
+          "state": "write_requirements_txt_success",
+          "required": false
+        },
+        {
+          "state": "write_requirements_txt_result",
+          "required": false
+        },
+        {
+          "state": "script_test_status",
+          "required": false
+        },
+        {
+          "state": "script_test_summary",
+          "required": false
+        }
       ],
-      "writes": [{ "state": "final_summary", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "final_summary",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "汇总最终结果。final_summary 写 Markdown，说明 Skill 已写入 backend/data/skills/user/<generated_skill_key>/，列出写入文件、脚本测试状态、需要用户注意的依赖或权限，以及下一步可以在 Skill 管理页启用/使用。不要声称写入了没有经过执行器确认的文件。",
+        "taskInstruction": "汇总最终结果。final_summary 写 Markdown，说明 Skill 已写入 backend/data/skills/user/<generated_skill_key>/，列出各文件写入的 success/result、脚本测试状态、需要用户注意的依赖或权限，以及下一步可以在 Skill 管理页启用/使用。不要声称写入了 success 为 false 或没有执行器结果确认的文件。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1315,16 +1911,36 @@
       "name": "无需创建",
       "description": "用户确认不创建新 Skill 时给出已有能力或收束说明。",
       "ui": {
-        "position": { "x": 3740, "y": 780 },
+        "position": {
+          "x": 3740,
+          "y": 780
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 280 }
+        "size": {
+          "width": 440,
+          "height": 280
+        }
       },
       "reads": [
-        { "state": "skill_request", "required": true },
-        { "state": "existing_capability", "required": false },
-        { "state": "creation_decision", "required": true }
+        {
+          "state": "skill_request",
+          "required": true
+        },
+        {
+          "state": "existing_capability",
+          "required": false
+        },
+        {
+          "state": "creation_decision",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "final_summary", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "final_summary",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -1341,16 +1957,36 @@
       "name": "未写入收束",
       "description": "生成完成但用户未批准写入时给出可审查结果。",
       "ui": {
-        "position": { "x": 10580, "y": 700 },
+        "position": {
+          "x": 10580,
+          "y": 700
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 280 }
+        "size": {
+          "width": 440,
+          "height": 280
+        }
       },
       "reads": [
-        { "state": "generated_skill_key", "required": true },
-        { "state": "generation_review", "required": true },
-        { "state": "write_decision", "required": true }
+        {
+          "state": "generated_skill_key",
+          "required": true
+        },
+        {
+          "state": "generation_review",
+          "required": true
+        },
+        {
+          "state": "write_decision",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "final_summary", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "final_summary",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -1367,11 +2003,22 @@
       "name": "输出结果",
       "description": "展示最终 Skill 创建结果。",
       "ui": {
-        "position": { "x": 15460, "y": 420 },
+        "position": {
+          "x": 15460,
+          "y": 420
+        },
         "collapsed": false,
-        "size": { "width": 320, "height": 200 }
+        "size": {
+          "width": 320,
+          "height": 200
+        }
       },
-      "reads": [{ "state": "final_summary", "required": true }],
+      "reads": [
+        {
+          "state": "final_summary",
+          "required": true
+        }
+      ],
       "writes": [],
       "config": {
         "displayMode": "markdown",
@@ -1382,27 +2029,90 @@
     }
   },
   "edges": [
-    { "source": "input_skill_request", "target": "select_existing_capability" },
-    { "source": "select_existing_capability", "target": "review_requirement" },
-    { "source": "review_requirement", "target": "need_clarification" },
-    { "source": "ask_clarification", "target": "merge_clarification" },
-    { "source": "merge_clarification", "target": "should_create_skill" },
-    { "source": "draft_example_io", "target": "review_example_feedback" },
-    { "source": "review_example_feedback", "target": "examples_approved" },
-    { "source": "prepare_builder_context", "target": "build_skill_files" },
-    { "source": "build_skill_files", "target": "decide_test_strategy" },
-    { "source": "decide_test_strategy", "target": "needs_script_test" },
-    { "source": "run_script_test", "target": "script_test_passed" },
-    { "source": "review_generated_skill", "target": "review_write_approval" },
-    { "source": "review_write_approval", "target": "write_approved" },
-    { "source": "write_skill_json", "target": "write_skill_md" },
-    { "source": "write_skill_md", "target": "has_before_llm" },
-    { "source": "write_before_llm_py", "target": "has_after_llm" },
-    { "source": "write_after_llm_py", "target": "has_requirements" },
-    { "source": "write_requirements_txt", "target": "finalize_written_skill" },
-    { "source": "finalize_written_skill", "target": "output_final" },
-    { "source": "finalize_no_create", "target": "output_final" },
-    { "source": "finalize_no_write", "target": "output_final" }
+    {
+      "source": "input_skill_request",
+      "target": "select_existing_capability"
+    },
+    {
+      "source": "select_existing_capability",
+      "target": "review_requirement"
+    },
+    {
+      "source": "review_requirement",
+      "target": "need_clarification"
+    },
+    {
+      "source": "ask_clarification",
+      "target": "merge_clarification"
+    },
+    {
+      "source": "merge_clarification",
+      "target": "should_create_skill"
+    },
+    {
+      "source": "draft_example_io",
+      "target": "review_example_feedback"
+    },
+    {
+      "source": "review_example_feedback",
+      "target": "examples_approved"
+    },
+    {
+      "source": "prepare_builder_context",
+      "target": "build_skill_files"
+    },
+    {
+      "source": "build_skill_files",
+      "target": "decide_test_strategy"
+    },
+    {
+      "source": "decide_test_strategy",
+      "target": "needs_script_test"
+    },
+    {
+      "source": "run_script_test",
+      "target": "script_test_passed"
+    },
+    {
+      "source": "review_generated_skill",
+      "target": "review_write_approval"
+    },
+    {
+      "source": "review_write_approval",
+      "target": "write_approved"
+    },
+    {
+      "source": "write_skill_json",
+      "target": "write_skill_md"
+    },
+    {
+      "source": "write_skill_md",
+      "target": "has_before_llm"
+    },
+    {
+      "source": "write_before_llm_py",
+      "target": "has_after_llm"
+    },
+    {
+      "source": "write_after_llm_py",
+      "target": "has_requirements"
+    },
+    {
+      "source": "write_requirements_txt",
+      "target": "finalize_written_skill"
+    },
+    {
+      "source": "finalize_written_skill",
+      "target": "output_final"
+    },
+    {
+      "source": "finalize_no_create",
+      "target": "output_final"
+    },
+    {
+      "source": "finalize_no_write",
+      "target": "output_final"
+    }
   ],
   "conditional_edges": [
     {
@@ -1482,7 +2192,11 @@
     "category": "skill",
     "templateVersion": "2026-05-08",
     "graphProtocol": "node_system",
-    "interrupt_after": ["ask_clarification", "draft_example_io", "review_generated_skill"],
+    "interrupt_after": [
+      "ask_clarification",
+      "draft_example_io",
+      "review_generated_skill"
+    ],
     "agent_breakpoint_timing": {
       "ask_clarification": "after",
       "draft_example_io": "after",
