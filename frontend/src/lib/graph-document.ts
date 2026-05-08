@@ -721,7 +721,7 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
   const processedSkillKeys = new Set<string>();
 
   if (removedManagedStateKeys.size > 0) {
-    node.writes = node.writes.filter((binding) => !removedManagedStateKeys.has(binding.state));
+    removeManagedSkillOutputStates(document, removedManagedStateKeys);
   }
 
   if (attachedSkillKey) {
@@ -844,6 +844,59 @@ function collectRemovedManagedSkillOutputStateKeys(
     }
   }
   return removedStateKeys;
+}
+
+function removeManagedSkillOutputStates(document: GraphPayload | GraphDocument, stateKeys: Set<string>) {
+  const touchedNodeIds = new Set<string>();
+  for (const stateKey of stateKeys) {
+    delete document.state_schema[stateKey];
+  }
+
+  for (const [nodeId, node] of Object.entries(document.nodes)) {
+    const nextReads = node.reads.filter((binding) => !stateKeys.has(binding.state));
+    const nextWrites = node.writes.filter((binding) => !stateKeys.has(binding.state));
+    if (nextReads.length !== node.reads.length || nextWrites.length !== node.writes.length) {
+      touchedNodeIds.add(nodeId);
+      node.reads = nextReads;
+      node.writes = nextWrites;
+    }
+
+    if (node.kind === "condition" && stateKeys.has(node.config.rule.source)) {
+      node.config.rule.source = node.reads[0]?.state ?? "";
+      touchedNodeIds.add(nodeId);
+    }
+
+    if (node.kind === "agent") {
+      const nextSuspendedWrites = normalizeWriteBindings(node.config.suspendedFreeWrites).filter((binding) => !stateKeys.has(binding.state));
+      if (nextSuspendedWrites.length > 0) {
+        node.config.suspendedFreeWrites = nextSuspendedWrites;
+      } else {
+        delete node.config.suspendedFreeWrites;
+      }
+      node.config.skillBindings = normalizeAgentSkillBindings(node.config.skillBindings)
+        .map((binding) => ({
+          skillKey: binding.skillKey,
+          outputMapping: Object.fromEntries(Object.entries(binding.outputMapping ?? {}).filter(([, stateKey]) => !stateKeys.has(stateKey))),
+        }));
+    }
+  }
+
+  document.edges = document.edges.filter((edge) => {
+    if (!touchedNodeIds.has(edge.source) && !touchedNodeIds.has(edge.target)) {
+      return true;
+    }
+    const sourceNode = document.nodes[edge.source];
+    const targetNode = document.nodes[edge.target];
+    if (!sourceNode || !targetNode) {
+      return false;
+    }
+    return hasSharedStateBinding(sourceNode, targetNode);
+  });
+}
+
+function hasSharedStateBinding(sourceNode: GraphNode, targetNode: GraphNode) {
+  const targetReadStates = new Set(targetNode.reads.map((binding) => binding.state));
+  return sourceNode.writes.some((binding) => targetReadStates.has(binding.state));
 }
 
 function isManagedSkillOutputStateForNode(

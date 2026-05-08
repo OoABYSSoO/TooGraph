@@ -592,6 +592,20 @@ test("updateAgentNodeConfigInDocument suspends free agent outputs while a static
           temperature: 0.2,
         },
       },
+      output_artifacts: {
+        kind: "output",
+        name: "Output Artifacts",
+        description: "",
+        ui: { position: { x: 320, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
     },
     edges: [],
     conditional_edges: [],
@@ -614,8 +628,12 @@ test("updateAgentNodeConfigInDocument suspends free agent outputs while a static
   ]);
   assert.equal(withSkill.state_schema.free_answer?.name, "Free Answer");
 
+  const connectedSkillDocument = cloneGraphDocument(withSkill);
+  connectedSkillDocument.nodes.output_artifacts.reads = [{ state: "state_3", required: true }];
+  connectedSkillDocument.edges = [{ source: "search_agent", target: "output_artifacts" }];
+
   const withoutSkill = updateAgentNodeConfigInDocument(
-    withSkill,
+    connectedSkillDocument,
     "search_agent",
     (config) => ({ ...config, skillKey: "" }),
     { skillDefinitions: [webSearchSkill] },
@@ -629,6 +647,9 @@ test("updateAgentNodeConfigInDocument suspends free agent outputs while a static
   ]);
   assert.deepEqual(restoredNode.config.skillBindings, []);
   assert.equal(restoredNode.config.suspendedFreeWrites, undefined);
+  assert.deepEqual(Object.keys(withoutSkill.state_schema).sort(), ["free_answer", "free_notes"]);
+  assert.deepEqual(withoutSkill.nodes.output_artifacts.reads, []);
+  assert.deepEqual(withoutSkill.edges, []);
 });
 
 test("updateAgentNodeConfigInDocument does not create static skill input mappings", () => {
