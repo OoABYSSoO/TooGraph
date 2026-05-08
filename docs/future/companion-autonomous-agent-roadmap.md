@@ -46,7 +46,7 @@
 - LLM 节点卡片已改为单选 Skill 控件；动态 `capability.kind=subgraph` 只服务于模板内运行时能力选择，不作为普通卡片下拉项。
 - LLM 节点提示词区域支持技能说明胶囊；默认胶囊从 skill `llmInstruction` 动态展示，用户编辑后才作为 `node.override` 写入当前节点。
 - 旧内置模板已删除，旧模板运行入口兼容修补已删除。
-- 旧技能包已删除，当前官方 Skill 包包括 `web_search`、`local_workspace_executor` 和 `graphiteui_capability_selector`。
+- 当前官方 Skill 包包括 `web_search` 和 `graphiteui_capability_selector`。
 - `file` / `image` / `audio` / `video` state 已采用路径透传语义，值可以是本地路径字符串或路径数组；`file_list`、`array`、`object` 不再作为 state 类型存在。
 - LLM 节点会读取 `file` state 中的文本类文件，并只把文件名与原文全文放入模型上下文；图片、音频和视频路径走多模态附件处理。
 - `web_search` 不再输出 `context`，只输出 `query`、`source_urls`、`artifact_paths` 和 `errors`。
@@ -427,10 +427,10 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 它应该：
 
-- 在 LLM 节点的技能入参规划提示词中列出本地启用模板，以及启用且对当前 `origin` 可选择的 Skill。
+- 通过 `before_llm.py` 在 LLM 节点的技能入参规划提示词中列出本地启用模板，以及启用且对当前 `origin` 可选择的 Skill。
 - 每个候选项必须提供 `kind`、`key`、名称和简短适用场景说明，让模型基于语义选择。
 - 模型负责根据用户需求选择一个 `capability` 入参；选择原则是优先图模板，其次 Skill，没有合适能力则选 `{ "kind": "none" }`。
-- Skill 脚本只校验模型选择是否仍在本地可用清单中，并规范化名称和描述。
+- `after_llm.py` 只校验模型选择是否仍在本地可用清单中，并规范化名称和描述。
 - 只输出一个 `capability` state 值；没有合适能力时输出 `{ "kind": "none" }`。
 
 它不应该：

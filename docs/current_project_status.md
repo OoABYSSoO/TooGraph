@@ -12,7 +12,7 @@
 - 新版桌宠自主循环模板 `companion_autonomous_loop` 尚未创建和注册。当前桌宠浮窗仍会尝试读取这个模板，因此桌宠对话入口的 UI 已存在，但完整对话循环还不能作为当前可用能力描述。
 - 当前仓库提供一个官方图模板：`advanced_web_research_loop`（高级联网搜索）。它是通用模板，不是桌宠专用自主循环模板。
 - 技能系统已收束为统一技能库，不再区分“桌宠技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
-- 当前官方技能包包括 `web_search`、`local_workspace_executor` 和 `graphiteui_capability_selector`。旧技能包已经删除，后续新能力应按当前统一 Skill 结构专门编写。
+- 当前官方技能包包括 `web_search` 和 `graphiteui_capability_selector`。后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
 
 ## 当前协议
@@ -59,20 +59,12 @@
 - `artifact_paths`：成功保存到本地的来源原文文件路径，类型应绑定为 `file`，值可以是路径字符串或路径数组。
 - `errors`：结构化错误列表。
 
-### `local_workspace_executor`
-
-- 位置：`skill/local_workspace_executor/`
-- 显示名称：`本地工作区执行器`
-- 作用：提供受策略约束的文件读取、文件写入、目录查看、路径删除、命令运行和脚本运行能力。
-- 默认写入范围限制在 `backend/data` 下；默认执行范围限制在 `backend/data/skills/user` 和 `backend/data/tmp` 下。
-- 权限策略由受保护的 `backend/data/settings/security/local_executor_policy.json` 管理。遇到越权路径时，技能返回 `blocked` 状态、阻断原因和建议追加的最小白名单，而不是静默执行。
-- 命令和脚本执行会拒绝 `python -c`、`bash -c`、`node -e` 这类内联执行形式；该技能是 GraphiteUI 层面的权限门禁，不是操作系统级沙箱。
-
 ### `graphiteui_capability_selector`
 
 - 位置：`skill/graphiteui_capability_selector/`
 - 显示名称：`GraphiteUI Capability Selector`
-- 作用：根据 LLM 节点技能入参规划阶段看到的本地可用能力清单，校验并规范化模型选出的单个 `capability`。
+- 作用：根据 LLM 节点技能入参规划阶段看到的本地可用能力清单，让模型选择并校验规范化单个 `capability`。
+- 生命周期：`before_llm.py` 读取当前启用的图模板和可选择 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`，按同一清单做真实性与启用状态校验。
 - 选择对象包括当前启用的图模板和对当前 `origin` 可选择的 Skill；图模板优先于 Skill。
 - 它不执行被选能力，不生成被选能力的运行入参，也不做程序字段匹配；模型基于候选项的名称和描述判断，脚本只做真实性与启用状态校验。
 
@@ -105,7 +97,6 @@
 
 - FastAPI 提供 graphs / runs / templates / presets / settings / skills / knowledge / memories API。
 - 后端 Skill catalog 合并官方 Skill 和用户自定义 Skill。官方 Skill 只读，用户 Skill 可在 Skills 页面启用、停用和删除。
-- 后端提供本地执行器策略读取和白名单追加 API，用于支持 `local_workspace_executor` 的显式权限流。
 - validator 负责 `node_system` graph 结构校验。必填技能输入不再做静态绑定校验，而是在 LLM 节点生成技能输入后由运行时检查。
 - 动态读取 `capability` state 的 LLM 节点必须写唯一 `result_package` state；静态 `skillKey` 与动态 `capability` state 不能混用；没有静态 `skillKey` 的 `skillBindings` 会被视为旧协议并拒绝。
 - LangGraph runtime 是当前运行主链。

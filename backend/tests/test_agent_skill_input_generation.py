@@ -74,76 +74,46 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
         self.assertIn("skillKey: web_search", prompt)
         self.assertIn("Current date: 2026-05-08", prompt)
 
-    def test_capability_selector_prompt_lists_available_templates_and_skills_for_llm_choice(self) -> None:
-        prompt = build_skill_input_system_prompt(
-            input_values={"requirement": "帮我联网搜索资料"},
-            bindings=[
-                ResolvedAgentSkillBinding(
-                    binding=NodeSystemAgentSkillBinding(skillKey="graphiteui_capability_selector"),
-                    source="node_config",
-                )
-            ],
-            skill_definitions={
-                "graphiteui_capability_selector": SkillDefinition(
-                    skillKey="graphiteui_capability_selector",
-                    name="GraphiteUI Capability Selector",
-                    inputSchema=[
-                        SkillIoField(key="requirement", name="Requirement", valueType="text", required=True),
-                        SkillIoField(key="capability", name="Capability", valueType="capability", required=True),
-                    ],
-                    outputSchema=[SkillIoField(key="capability", name="Capability", valueType="capability")],
-                    runtimeReady=True,
-                    runtimeRegistered=True,
-                ),
-                "web_search": SkillDefinition(
-                    skillKey="web_search",
-                    name="联网搜索",
-                    description="当任务需要最新信息、网页证据或公开资料检索时使用。",
-                    inputSchema=[SkillIoField(key="query", name="Query", valueType="text", required=True)],
-                    outputSchema=[SkillIoField(key="source_urls", name="Source URLs", valueType="json")],
-                    capabilityPolicy={
-                        "default": {"selectable": True, "requiresApproval": False},
-                        "origins": {"companion": {"selectable": True, "requiresApproval": False}},
-                    },
-                    llmNodeEligibility="ready",
-                    runtimeReady=True,
-                    runtimeRegistered=True,
-                ),
-                "local_workspace_executor": SkillDefinition(
-                    skillKey="local_workspace_executor",
-                    name="本地工作区执行器",
-                    description="执行受策略约束的本地文件和命令操作。",
-                    outputSchema=[SkillIoField(key="status", name="Status", valueType="text")],
-                    capabilityPolicy={
-                        "default": {"selectable": True, "requiresApproval": False},
-                        "origins": {"companion": {"selectable": False, "requiresApproval": True}},
-                    },
-                    llmNodeEligibility="ready",
-                    runtimeReady=True,
-                    runtimeRegistered=True,
-                ),
-            },
-            list_template_records_func=lambda include_disabled=False: [
-                {
-                    "template_id": "advanced_web_research_loop",
-                    "label": "高级联网搜索",
-                    "description": "多轮搜索、证据评估、补充检索和最终依据整理的联网研究图模板。",
-                    "source": "official",
-                }
-            ],
-        )
+    def test_capability_selector_prompt_uses_before_llm_context_for_catalog(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skill_dir = Path(temp_dir) / "graphiteui_capability_selector"
+            skill_dir.mkdir()
+            (skill_dir / "before_llm.py").write_text(
+                "import json\n"
+                "print(json.dumps({'context': 'Available GraphiteUI capabilities:\\n"
+                "Graph Templates:\\n- kind: subgraph\\n  key: advanced_web_research_loop\\n"
+                "Skills:\\n- kind: skill\\n  key: web_search'}))\n",
+                encoding="utf-8",
+            )
+            prompt = build_skill_input_system_prompt(
+                input_values={"requirement": "帮我联网搜索资料"},
+                bindings=[
+                    ResolvedAgentSkillBinding(
+                        binding=NodeSystemAgentSkillBinding(skillKey="graphiteui_capability_selector"),
+                        source="node_config",
+                    )
+                ],
+                skill_definitions={
+                    "graphiteui_capability_selector": SkillDefinition(
+                        skillKey="graphiteui_capability_selector",
+                        name="GraphiteUI Capability Selector",
+                        inputSchema=[
+                            SkillIoField(key="requirement", name="Requirement", valueType="text", required=True),
+                            SkillIoField(key="capability", name="Capability", valueType="capability", required=True),
+                        ],
+                        outputSchema=[SkillIoField(key="capability", name="Capability", valueType="capability")],
+                        sourcePath=str(skill_dir / "skill.json"),
+                        runtimeReady=True,
+                        runtimeRegistered=True,
+                    )
+                },
+            )
 
-        self.assertIn("== Available Capabilities ==", prompt)
-        self.assertIn("Graph templates are preferred over Skills when both can satisfy the requirement.", prompt)
-        self.assertIn("kind: subgraph", prompt)
+        self.assertIn("== Skill Pre-LLM Context ==", prompt)
+        self.assertIn("Available GraphiteUI capabilities:", prompt)
         self.assertIn("key: advanced_web_research_loop", prompt)
-        self.assertIn("name: 高级联网搜索", prompt)
-        self.assertIn("whenToUse: 多轮搜索、证据评估、补充检索和最终依据整理的联网研究图模板。", prompt)
-        self.assertIn("kind: skill", prompt)
         self.assertIn("key: web_search", prompt)
-        self.assertIn("whenToUse: 当任务需要最新信息、网页证据或公开资料检索时使用。", prompt)
-        self.assertNotIn("local_workspace_executor", prompt)
-        self.assertNotIn("key: graphiteui_capability_selector", prompt)
+        self.assertNotIn("== Available Capabilities ==", prompt)
 
     def test_skill_input_prompt_uses_node_override_as_single_effective_instruction(self) -> None:
         node = NodeSystemAgentNode.model_validate(

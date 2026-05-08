@@ -289,7 +289,7 @@ Skill 能力必须显式声明，不靠 prompt 文本约束安全边界。
 - 读取 `.env`、`.git` 或受保护设置目录。
 - 把密钥写入 state、文档或日志。
 - 把大文件或媒体内容 base64 塞入 state。
-- 绕过 `local_workspace_executor` 的白名单策略。
+- 绕过 GraphiteUI 明确的权限、审批和白名单策略。
 
 ## 与图 state 的关系
 

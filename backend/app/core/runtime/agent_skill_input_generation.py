@@ -12,7 +12,6 @@ from app.core.runtime.skill_bindings import ResolvedAgentSkillBinding
 from app.core.runtime.structured_output import build_skill_input_output_schema, validate_structured_output
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition
 from app.core.schemas.skills import SkillDefinition, SkillIoField
-from app.templates.loader import list_template_records
 from app.core.thinking_levels import resolve_effective_thinking_level
 from app.skills.runtime import (
     has_lifecycle_before_llm,
@@ -21,10 +20,6 @@ from app.skills.runtime import (
 )
 from app.tools.local_llm import _chat_with_local_model_with_meta
 from app.tools.model_provider_client import chat_with_model_ref_with_meta
-
-
-CAPABILITY_SELECTOR_SKILL_KEY = "graphiteui_capability_selector"
-CAPABILITY_SELECTOR_ORIGIN = "companion"
 
 
 def generate_agent_skill_inputs(
@@ -168,7 +163,6 @@ def build_skill_input_system_prompt(
     skill_definitions: dict[str, SkillDefinition],
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
     node: NodeSystemAgentNode | None = None,
-    list_template_records_func: Callable[..., list[dict[str, Any]]] = list_template_records,
 ) -> str:
     resolved_state_schema = state_schema or {}
     parts = [
@@ -217,14 +211,6 @@ def build_skill_input_system_prompt(
     )
     if before_llm_context_lines:
         parts.extend(before_llm_context_lines)
-
-    if any(resolved.binding.skill_key == CAPABILITY_SELECTOR_SKILL_KEY for resolved in bindings):
-        parts.extend(
-            format_capability_selector_catalog_lines(
-                skill_definitions=skill_definitions,
-                list_template_records_func=list_template_records_func,
-            )
-        )
 
     parts.append("\n== Required JSON Shape ==")
     parts.append(json.dumps(example, ensure_ascii=False, indent=2))
@@ -282,86 +268,6 @@ def format_before_llm_context_payload(payload: dict[str, Any]) -> str:
             return value.strip()
     cleaned = {key: value for key, value in payload.items() if key not in {"status"}}
     return json.dumps(cleaned, ensure_ascii=False, indent=2) if cleaned else ""
-
-
-def format_capability_selector_catalog_lines(
-    *,
-    skill_definitions: dict[str, SkillDefinition],
-    list_template_records_func: Callable[..., list[dict[str, Any]]],
-) -> list[str]:
-    lines = [
-        "\n== Available Capabilities ==",
-        "Use this catalog only for the `capability` argument of graphiteui_capability_selector.",
-        "Graph templates are preferred over Skills when both can satisfy the requirement.",
-        "Choose exactly one item by returning {\"kind\":\"subgraph\",\"key\":\"...\"} or {\"kind\":\"skill\",\"key\":\"...\"}.",
-        "If no item fits, return {\"kind\":\"none\"}. Do not invent keys outside this catalog.",
-    ]
-    template_lines = format_available_template_lines(list_template_records_func)
-    skill_lines = format_available_skill_lines(skill_definitions, origin=CAPABILITY_SELECTOR_ORIGIN)
-
-    lines.append("Graph Templates:")
-    lines.extend(template_lines or ["- none"])
-    lines.append("Skills:")
-    lines.extend(skill_lines or ["- none"])
-    return lines
-
-
-def format_available_template_lines(list_template_records_func: Callable[..., list[dict[str, Any]]]) -> list[str]:
-    try:
-        records = list_template_records_func(include_disabled=False)
-    except TypeError:
-        records = list_template_records_func()
-    lines: list[str] = []
-    for record in sorted(records, key=lambda item: str(item.get("template_id") or item.get("templateId") or "")):
-        if str(record.get("status") or "").strip().lower() in {"disabled", "deleted"}:
-            continue
-        template_id = str(record.get("template_id") or record.get("templateId") or "").strip()
-        if not template_id:
-            continue
-        name = str(record.get("label") or record.get("default_graph_name") or template_id).strip()
-        description = str(record.get("description") or "").strip()
-        lines.extend(
-            [
-                "- kind: subgraph",
-                f"  key: {template_id}",
-                f"  name: {name}",
-                f"  whenToUse: {description or name}",
-            ]
-        )
-    return lines
-
-
-def format_available_skill_lines(skill_definitions: dict[str, SkillDefinition], *, origin: str) -> list[str]:
-    lines: list[str] = []
-    for skill_key in sorted(skill_definitions):
-        if skill_key == CAPABILITY_SELECTOR_SKILL_KEY:
-            continue
-        definition = skill_definitions[skill_key]
-        if not is_skill_available_for_capability_selection(definition, origin=origin):
-            continue
-        lines.extend(
-            [
-                "- kind: skill",
-                f"  key: {definition.skill_key}",
-                f"  name: {definition.name or definition.skill_key}",
-                f"  whenToUse: {definition.description or definition.name or definition.skill_key}",
-            ]
-        )
-    return lines
-
-
-def is_skill_available_for_capability_selection(definition: SkillDefinition, *, origin: str) -> bool:
-    status = getattr(definition.status, "value", definition.status)
-    if str(status) != "active":
-        return False
-    if not definition.runtime_ready or not definition.runtime_registered:
-        return False
-    eligibility = getattr(definition.llm_node_eligibility, "value", definition.llm_node_eligibility)
-    if str(eligibility) != "ready":
-        return False
-    origin_policy = definition.capability_policy.origins.get(origin)
-    policy = origin_policy or definition.capability_policy.default
-    return bool(policy.selectable)
 
 
 def build_skill_input_user_prompt(node: NodeSystemAgentNode) -> str:

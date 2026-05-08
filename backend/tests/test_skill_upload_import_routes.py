@@ -186,7 +186,6 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                     sorted(catalog_items),
                     [
                         "graphiteui_capability_selector",
-                        "local_workspace_executor",
                         "web_search",
                     ],
                 )

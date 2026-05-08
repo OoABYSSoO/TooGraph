@@ -2,9 +2,10 @@
   "schemaVersion": "graphite.skill/v1",
   "skillKey": "graphiteui_capability_selector",
   "name": "GraphiteUI Capability Selector",
-  "description": "根据模型从本地可用能力清单中选出的 capability，校验并规范化为单个 GraphiteUI capability state 值。",
-  "llmInstruction": "你已绑定 GraphiteUI Capability Selector。系统提示词会列出当前启用且可选择的图模板和 Skill 清单，每项包含 key、名称和适用场景。你必须根据用户需求从清单中选择一个 capability 入参；优先选择图模板，其次选择 Skill；没有合适能力时选择 {\"kind\":\"none\"}。不要编造清单外能力。",
+  "description": "当图流程需要根据用户需求从当前启用的图模板和 Skill 中选择一个可用能力时选择此技能。",
+  "llmInstruction": "你已绑定 GraphiteUI Capability Selector。Skill Pre-LLM Context 会列出当前启用且可选择的图模板和 Skill 清单，每项包含 key、名称和适用场景。你必须根据用户需求从清单中选择一个 capability 入参；优先选择图模板，其次选择 Skill；没有合适能力时选择 {\"kind\":\"none\"}。不要编造清单外能力。",
   "version": "1.0.0",
+  "timeoutSeconds": 30,
   "capabilityPolicy": {
     "default": {
       "selectable": true,
@@ -48,10 +49,5 @@
       "valueType": "capability",
       "description": "单个能力对象，kind 为 subgraph、skill 或 none。"
     }
-  ],
-  "runtime": {
-    "type": "python",
-    "entrypoint": "run.py",
-    "timeoutSeconds": 30
-  }
+  ]
 }

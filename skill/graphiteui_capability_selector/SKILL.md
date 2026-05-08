@@ -5,7 +5,7 @@ description: Use when a GraphiteUI workflow needs to choose one enabled graph te
 
 # GraphiteUI Capability Selector
 
-The LLM-node skill-input planning prompt lists the local enabled graph templates and selectable Skills. The model chooses one item from that catalog and passes it as the `capability` input. This Skill only validates that choice against the current local catalog and returns exactly one normalized capability object.
+`before_llm.py` lists the local enabled graph templates and selectable Skills in the LLM-node skill-input planning prompt. The model chooses one item from that catalog and passes it as the `capability` input. `after_llm.py` validates that choice against the current local catalog and returns exactly one normalized capability object.
 
 Selection rules:
 
@@ -14,6 +14,7 @@ Selection rules:
 - Skill candidates must be selectable for the requested origin through `capabilityPolicy`.
 - The selector does not call an LLM, run text matching, or invent capabilities.
 - Saved ordinary graphs are not candidates; reusable graph capabilities come from templates.
+- `capability_catalog.py` is shared by the lifecycle scripts and only reads local manifests and template records.
 
 The `capability` output is suitable for a `capability` state:
 
