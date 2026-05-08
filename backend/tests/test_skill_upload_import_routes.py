@@ -188,6 +188,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                         "graphiteUI_script_tester",
                         "graphiteUI_skill_builder",
                         "graphiteui_capability_selector",
+                        "local_workspace_executor",
                         "web_search",
                     ],
                 )
@@ -221,6 +222,15 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue(
                     source_path["graphiteUI_script_tester"].endswith(
                         "/skill/graphiteUI_script_tester/skill.json"
+                    )
+                )
+                self.assertEqual(catalog_items["local_workspace_executor"]["sourceScope"], "official")
+                self.assertFalse(catalog_items["local_workspace_executor"]["canManage"])
+                self.assertTrue(catalog_items["local_workspace_executor"]["runtimeReady"])
+                self.assertTrue(catalog_items["local_workspace_executor"]["runtimeRegistered"])
+                self.assertTrue(
+                    source_path["local_workspace_executor"].endswith(
+                        "/skill/local_workspace_executor/skill.json"
                     )
                 )
                 self.assertNotIn("compatibility", catalog_items["web_search"])

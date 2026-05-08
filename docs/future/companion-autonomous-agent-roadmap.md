@@ -46,7 +46,7 @@
 - LLM 节点卡片已改为单选 Skill 控件；动态 `capability.kind=subgraph` 只服务于模板内运行时能力选择，不作为普通卡片下拉项。
 - LLM 节点提示词区域支持技能说明胶囊；默认胶囊从 skill `llmInstruction` 动态展示，用户编辑后才作为 `node.override` 写入当前节点。
 - 旧内置模板已删除，旧模板运行入口兼容修补已删除。
-- 当前官方 Skill 包包括 `web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder` 和 `graphiteUI_script_tester`。
+- 当前官方 Skill 包包括 `web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。
 - `file` / `image` / `audio` / `video` state 已采用路径透传语义，值可以是本地路径字符串或路径数组；`file_list`、`array`、`object` 不再作为 state 类型存在。
 - LLM 节点会读取 `file` state 中的文本类文件，并只把文件名与原文全文放入模型上下文；图片、音频和视频路径走多模态附件处理。
 - `web_search` 不再输出 `context`，只输出 `query`、`source_urls`、`artifact_paths` 和 `errors`。
@@ -58,7 +58,7 @@
 - `capability.kind=subgraph` 已可由 LLM 节点动态执行：节点先生成目标图模板的公开输入，运行时执行子图并把公开输出封装进同一套 `result_package`。
 - 图运行前不再兼容补齐旧绑定。旧草稿、旧模板和旧技能需要按当前协议重建。
 - 已新增通用 `advanced_web_research_loop` 内置模板，用于验证“搜索技能执行 -> 证据评估 -> condition 控制补搜 -> 依据筛选 -> final_reply”的图式工具循环。它不是桌宠自主循环模板，但可作为联网研究子流程和后续桌宠模板的参考构件。
-- 偏离新职责的旧 `create_user_skill` 内置模板已删除。新的 `graphiteUI_skill_builder` 只产出 Skill 包文件内容，完整用户 Skill 生成流程仍需要补齐确认、写入、调用 `graphiteUI_script_tester` 或同类测试能力、修复和启用节点。
+- 偏离新职责的旧 `create_user_skill` 内置模板已删除。新的 `graphiteUI_skill_builder` 只产出 Skill 包文件内容，完整用户 Skill 生成流程仍需要补齐确认、调用 `local_workspace_executor` 写入、调用 `graphiteUI_script_tester` 或同类测试能力、修复和启用节点。
 - 子图缩略图已能投射内部节点运行状态颜色，并在节点卡片上显示当前内部运行摘要。
 
 尚未完成：
@@ -67,7 +67,7 @@
 - 真实的 `autonomous_decision` 技能。
 - 新版桌宠自主循环模板。
 - 将内部 `agent` kind 迁移为面向用户和协议一致的 LLM 节点语义。
-- 围绕 `graphiteUI_skill_builder` 补齐用户 Skill 生成图流程：从需求澄清、示例确认、文件内容生成，到受控写入、调用 `graphiteUI_script_tester` 或同类测试能力、错误修复和启用。
+- 围绕 `graphiteUI_skill_builder` 补齐用户 Skill 生成图流程：从需求澄清、示例确认、文件内容生成，到调用 `local_workspace_executor` 受控写入、调用 `graphiteUI_script_tester` 或同类测试能力、错误修复和启用。
 - 当前仍残留 `backend/app/companion/commands.py` 中的 `graph_patch.draft` 草案记录 stub。它是历史遗留入口，只能记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、graph revision、undo 或完整审计闭环；下一轮应删除它，或按新的图优先命令流重建。
 - 审批恢复 UI、图补丁预览、GraphCommandBus、graph revision、undo 和完整审计闭环。
 

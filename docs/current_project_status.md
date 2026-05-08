@@ -12,7 +12,7 @@
 - 新版桌宠自主循环模板 `companion_autonomous_loop` 尚未创建和注册。当前桌宠浮窗仍会尝试读取这个模板，因此桌宠对话入口的 UI 已存在，但完整对话循环还不能作为当前可用能力描述。
 - 当前仓库提供一个官方图模板：`advanced_web_research_loop`（高级联网搜索）。它是通用模板，不是桌宠专用自主循环模板。
 - 技能系统已收束为统一技能库，不再区分“桌宠技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
-- 当前官方技能包包括 `web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder` 和 `graphiteUI_script_tester`。后续新能力应按当前统一 Skill 结构专门编写。
+- 当前官方技能包包括 `web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
 
 ## 当前协议
@@ -76,6 +76,15 @@
 - 作用：接收 Python 脚本源码和 LLM 生成的 pytest 用例，在临时目录运行测试并返回结果、输出和错误。
 - 生命周期：`before_llm.py` 只注入 pytest 测试编写规则；`after_llm.py` 写入临时脚本和测试文件，运行 `python -m pytest -q <test_filename>`，再返回 `status`、`summary`、`test_source`、`stdout`、`stderr`、`exit_code`、`errors`。
 - 权限和依赖：声明 `file_write` 与 `subprocess` 权限，并在 `requirements.txt` 中声明 `pytest`。该 Skill 会执行用户提供的 Python 代码，应通过显式确认使用。
+
+### `local_workspace_executor`
+
+- 位置：`skill/local_workspace_executor/`
+- 显示名称：`Local Workspace Executor`
+- 作用：提供受控的本地工作区读、列目录、写、追加和执行脚本能力。
+- 生命周期：`before_llm.py` 注入权限摘要；`after_llm.py` 执行具体操作，并返回 `status`、`summary`、`action`、`path`、`content`、`entries`、`stdout`、`stderr`、`exit_code`、`errors`。
+- 默认权限：读取 `backend/data`、`skill`、`docs`、`README.md`、`AGENTS.md`；写入只允许 `backend/data`；执行只允许 `backend/data/tmp` 和 `backend/data/skills/user`；`.git`、`.env`、`backend/data/settings` 永远拒绝。
+- 边界：该 Skill 会写本地文件并启动本地进程，必须显式确认。路径白名单只是启动前检查，不是 OS 沙箱。
 
 ## 当前内置图模板
 
