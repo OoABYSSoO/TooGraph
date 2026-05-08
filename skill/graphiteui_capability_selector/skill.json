@@ -32,63 +32,14 @@
       "valueType": "text",
       "required": false,
       "description": "能力选择来源，例如 companion；默认 companion。"
-    },
-    {
-      "key": "max_matches",
-      "name": "Max Matches",
-      "valueType": "number",
-      "required": false,
-      "description": "返回候选匹配摘要的最大数量，默认 5。"
     }
   ],
   "outputSchema": [
-    {
-      "key": "status",
-      "name": "Status",
-      "valueType": "text",
-      "description": "succeeded 或 failed。"
-    },
     {
       "key": "capability",
       "name": "Capability",
       "valueType": "capability",
       "description": "单个能力对象，kind 为 subgraph、skill 或 none。"
-    },
-    {
-      "key": "capability_kind",
-      "name": "Capability Kind",
-      "valueType": "text",
-      "description": "选中能力类型：subgraph、skill 或 none。"
-    },
-    {
-      "key": "capability_key",
-      "name": "Capability Key",
-      "valueType": "text",
-      "description": "选中能力的 key。"
-    },
-    {
-      "key": "capability_name",
-      "name": "Capability Name",
-      "valueType": "text",
-      "description": "选中能力的名称。"
-    },
-    {
-      "key": "reason",
-      "name": "Reason",
-      "valueType": "text",
-      "description": "选择或未选择的简短理由。"
-    },
-    {
-      "key": "matches",
-      "name": "Matches",
-      "valueType": "json",
-      "description": "候选能力匹配摘要，供审计和下游判断使用。"
-    },
-    {
-      "key": "errors",
-      "name": "Errors",
-      "valueType": "json",
-      "description": "输入或读取过程中的错误列表。"
     }
   ],
   "runtime": {

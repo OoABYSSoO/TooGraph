@@ -96,6 +96,21 @@ def _write_skill(
 
 
 class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
+    def test_manifest_declares_only_capability_output(self) -> None:
+        manifest = json.loads((SELECTOR_RUN_PATH.parent / "skill.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            manifest["outputSchema"],
+            [
+                {
+                    "key": "capability",
+                    "name": "Capability",
+                    "valueType": "capability",
+                    "description": "单个能力对象，kind 为 subgraph、skill 或 none。",
+                }
+            ],
+        )
+
     def test_selector_prefers_enabled_template_over_matching_skill(self) -> None:
         selector = _load_selector_module()
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -115,12 +130,9 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
             with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
                 result = selector.graphiteui_capability_selector(requirement="帮我联网搜索资料并整理证据")
 
-        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(set(result), {"capability"})
         self.assertEqual(result["capability"]["kind"], "subgraph")
         self.assertEqual(result["capability"]["key"], "advanced_web_research_loop")
-        self.assertEqual(result["capability_kind"], "subgraph")
-        self.assertEqual(result["capability_key"], "advanced_web_research_loop")
-        self.assertEqual(result["matches"][0]["kind"], "subgraph")
 
     def test_selector_returns_selectable_skill_when_no_template_matches(self) -> None:
         selector = _load_selector_module()
@@ -141,7 +153,7 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
             with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
                 result = selector.graphiteui_capability_selector(requirement="需要搜索最新版本信息")
 
-        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(set(result), {"capability"})
         self.assertEqual(result["capability"]["kind"], "skill")
         self.assertEqual(result["capability"]["key"], "web_search")
 
@@ -167,20 +179,17 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
             with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
                 result = selector.graphiteui_capability_selector(requirement="帮我联网搜索资料")
 
-        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(set(result), {"capability"})
         self.assertEqual(result["capability"], {"kind": "none"})
-        self.assertEqual(result["capability_kind"], "none")
-        self.assertEqual(result["capability_key"], "")
 
-    def test_selector_reports_missing_requirement(self) -> None:
+    def test_selector_returns_none_for_missing_requirement(self) -> None:
         selector = _load_selector_module()
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": temp_dir}, clear=True):
                 result = selector.graphiteui_capability_selector(requirement="")
 
-        self.assertEqual(result["status"], "failed")
+        self.assertEqual(set(result), {"capability"})
         self.assertEqual(result["capability"], {"kind": "none"})
-        self.assertIn("requirement", result["errors"][0])
 
 
 if __name__ == "__main__":

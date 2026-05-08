@@ -10,7 +10,6 @@ from typing import Any
 
 SKILL_KEY = "graphiteui_capability_selector"
 DEFAULT_ORIGIN = "companion"
-DEFAULT_MAX_MATCHES = 5
 MIN_SCORE = 6.0
 CHINESE_STOP_BIGRAMS = {
     "一个",
@@ -45,70 +44,28 @@ def graphiteui_capability_selector(**skill_inputs: Any) -> dict[str, Any]:
         or skill_inputs.get("需求")
     )
     origin = _compact_text(skill_inputs.get("origin")) or DEFAULT_ORIGIN
-    max_matches = _parse_positive_int(skill_inputs.get("max_matches"), DEFAULT_MAX_MATCHES)
 
     if not requirement:
-        return _empty_response(
-            status="failed",
-            reason="缺少 requirement，无法选择能力。",
-            errors=["Missing required input: requirement."],
-        )
+        return _none_response()
 
     repo_root = _resolve_repo_root()
-    templates, template_errors = _load_template_candidates(repo_root)
-    skills, skill_errors = _load_skill_candidates(repo_root, origin=origin)
-    errors = [*template_errors, *skill_errors]
+    templates, _template_errors = _load_template_candidates(repo_root)
+    skills, _skill_errors = _load_skill_candidates(repo_root, origin=origin)
 
     template_matches = _score_candidates(requirement, templates)
     skill_matches = _score_candidates(requirement, skills)
 
     selected = _select_best(template_matches, skill_matches)
-    matches = [*_public_matches(template_matches), *_public_matches(skill_matches)]
-    matches = sorted(matches, key=lambda item: (-float(item["score"]), item["kind"], item["key"]))[:max_matches]
-
     if selected is None:
-        return _empty_response(
-            status="succeeded",
-            reason="没有找到启用且可选择的图模板或 Skill 能够明确满足该需求。",
-            matches=matches,
-            errors=errors,
-        )
+        return _none_response()
 
-    matches = _promote_selected_match(matches, selected)
     capability = {
         "kind": selected["kind"],
         "key": selected["key"],
         "name": selected["name"],
         "description": selected["description"],
-        "source": selected["source"],
-        "reason": selected["reason"],
-        "confidence": selected["confidence"],
     }
-    return {
-        "status": "succeeded",
-        "capability": capability,
-        "capability_kind": selected["kind"],
-        "capability_key": selected["key"],
-        "capability_name": selected["name"],
-        "reason": selected["reason"],
-        "matches": matches,
-        "errors": errors,
-    }
-
-
-def _promote_selected_match(matches: list[dict[str, Any]], selected: dict[str, Any]) -> list[dict[str, Any]]:
-    selected_index = next(
-        (
-            index
-            for index, item in enumerate(matches)
-            if item.get("kind") == selected.get("kind") and item.get("key") == selected.get("key")
-        ),
-        -1,
-    )
-    if selected_index <= 0:
-        return matches
-    selected_match = matches[selected_index]
-    return [selected_match, *matches[:selected_index], *matches[selected_index + 1 :]]
+    return {"capability": capability}
 
 
 def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], list[str]]:
@@ -288,24 +245,6 @@ def _select_best(
     return None
 
 
-def _public_matches(matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    public: list[dict[str, Any]] = []
-    for item in matches:
-        public.append(
-            {
-                "kind": item["kind"],
-                "key": item["key"],
-                "name": item["name"],
-                "description": item["description"],
-                "source": item["source"],
-                "score": item["score"],
-                "confidence": item["confidence"],
-                "reason": item["reason"],
-            }
-        )
-    return public
-
-
 def _read_json_object(path: Path) -> tuple[dict[str, Any], str]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -432,14 +371,6 @@ def _compact_text(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
 
 
-def _parse_positive_int(value: Any, fallback: int) -> int:
-    try:
-        parsed = int(float(value))
-    except (TypeError, ValueError):
-        return fallback
-    return parsed if parsed > 0 else fallback
-
-
 def _resolve_repo_root() -> Path:
     configured = os.environ.get("GRAPHITE_REPO_ROOT")
     if configured:
@@ -447,36 +378,18 @@ def _resolve_repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _empty_response(
-    *,
-    status: str,
-    reason: str,
-    matches: list[dict[str, Any]] | None = None,
-    errors: list[str] | None = None,
-) -> dict[str, Any]:
-    return {
-        "status": status,
-        "capability": {"kind": "none"},
-        "capability_kind": "none",
-        "capability_key": "",
-        "capability_name": "",
-        "reason": reason,
-        "matches": matches or [],
-        "errors": errors or [],
-    }
+def _none_response() -> dict[str, Any]:
+    return {"capability": {"kind": "none"}}
 
 
 def main() -> None:
     try:
         payload = json.loads(sys.stdin.read() or "{}")
-    except json.JSONDecodeError as exc:
-        payload = {"requirement": "", "_input_error": str(exc)}
+    except json.JSONDecodeError:
+        payload = {"requirement": ""}
     if not isinstance(payload, dict):
         payload = {"requirement": ""}
     result = graphiteui_capability_selector(**payload)
-    if payload.get("_input_error"):
-        result["status"] = "failed"
-        result.setdefault("errors", []).append(f"Input must be a JSON object: {payload['_input_error']}")
     print(json.dumps(result, ensure_ascii=False))
 
 
