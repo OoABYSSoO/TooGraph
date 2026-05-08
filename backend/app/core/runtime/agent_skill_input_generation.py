@@ -7,7 +7,7 @@ from typing import Any, Callable
 from app.core.model_catalog import get_default_video_model_ref, resolve_runtime_model_name
 from app.core.runtime.agent_multimodal import collect_input_attachments, prepare_model_input_attachments
 from app.core.runtime.agent_prompt import format_graph_state_input_prompt_lines
-from app.core.runtime.agent_response_generation import _resolve_media_runtime_config
+from app.core.runtime.agent_response_generation import _resolve_media_runtime_config, repair_structured_output_with_runtime_model
 from app.core.runtime.skill_bindings import ResolvedAgentSkillBinding
 from app.core.runtime.structured_output import build_skill_input_output_schema, validate_structured_output
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition
@@ -87,7 +87,36 @@ def generate_agent_skill_inputs(
             cleanup_prepared_media_paths(attachment_meta.get("cleanup_paths"))
 
     skill_inputs = parse_skill_input_response(content, [binding.binding.skill_key for binding in bindings])
-    structured_output_validation_errors = validate_structured_output(skill_inputs, structured_output_schema)
+    initial_structured_output_validation_errors = validate_structured_output(skill_inputs, structured_output_schema)
+    structured_output_validation_errors = list(initial_structured_output_validation_errors)
+    repair_attempted = False
+    repair_succeeded = False
+    repair_validation_errors: list[str] = []
+    repair_error = ""
+    repair_meta: dict[str, Any] = {}
+    if initial_structured_output_validation_errors:
+        repair_attempted = True
+        try:
+            repair_content, repair_meta = repair_structured_output_with_runtime_model(
+                runtime_config=runtime_config,
+                structured_output_schema=structured_output_schema,
+                validation_errors=initial_structured_output_validation_errors,
+                raw_model_output=content,
+                chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+                chat_with_model_ref_with_meta_func=chat_with_model_ref_with_meta_func,
+            )
+            repaired_skill_inputs = parse_skill_input_response(
+                repair_content,
+                [binding.binding.skill_key for binding in bindings],
+            )
+            repair_validation_errors = validate_structured_output(repaired_skill_inputs, structured_output_schema)
+            if not repair_validation_errors:
+                content = repair_content
+                skill_inputs = repaired_skill_inputs
+                structured_output_validation_errors = []
+                repair_succeeded = True
+        except Exception as exc:
+            repair_error = str(exc)
     reasoning = str(llm_meta.get("reasoning") or "").strip()
     structured_output_strategy = str(llm_meta.get("structured_output_strategy") or "json_schema")
     updated_runtime_config = {
@@ -102,8 +131,18 @@ def generate_agent_skill_inputs(
         "skill_input_structured_output_strategy": structured_output_strategy,
         "skill_input_structured_output_schema": structured_output_schema,
         "skill_input_structured_output_validation_errors": structured_output_validation_errors,
+        "skill_input_structured_output_initial_validation_errors": initial_structured_output_validation_errors,
+        "skill_input_structured_output_repair_attempted": repair_attempted,
+        "skill_input_structured_output_repair_succeeded": repair_succeeded,
+        "skill_input_structured_output_repair_validation_errors": repair_validation_errors,
+        "skill_input_structured_output_repair_error": repair_error,
+        "skill_input_structured_output_repair_provider_response_id": repair_meta.get("response_id"),
+        "skill_input_structured_output_repair_provider_usage": repair_meta.get("usage"),
+        "skill_input_structured_output_repair_provider_timings": repair_meta.get("timings"),
     }
-    warnings = [*attachment_warnings, *llm_meta.get("warnings", [])]
+    warnings = [*attachment_warnings, *llm_meta.get("warnings", []), *repair_meta.get("warnings", [])]
+    if repair_error:
+        warnings.append(f"Skill input structured output repair failed: {repair_error}")
     if structured_output_validation_errors:
         warnings.append(
             "Skill input structured output validation found mismatches: "

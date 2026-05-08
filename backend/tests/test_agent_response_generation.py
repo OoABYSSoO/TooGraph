@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -125,6 +126,58 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(schema["properties"]["answer"]["type"], "string")
         self.assertEqual(schema["properties"]["confidence"]["type"], "number")
         self.assertEqual(updated_config["structured_output_strategy"], "json_schema")
+
+    def test_repairs_invalid_structured_output_without_original_prompt_context(self) -> None:
+        calls: list[dict[str, object]] = []
+
+        def chat_with_local_model_with_meta_func(**kwargs):
+            calls.append(dict(kwargs))
+            if len(calls) == 1:
+                return ('{"answer": 123}', {"warnings": [], "model": "test-model"})
+            return ('{"answer": "repaired answer"}', {"warnings": [], "model": "test-model"})
+
+        payload, _reasoning, warnings, updated_config = generate_agent_response(
+            _agent_node(writes=[{"state": "answer"}], task_instruction="ORIGINAL TASK"),
+            {"question": "ORIGINAL SECRET INPUT"},
+            {},
+            {
+                "resolved_provider_id": "local",
+                "runtime_model_name": "test-model",
+                "resolved_temperature": 0.2,
+                "resolved_thinking": False,
+                "resolved_thinking_level": "off",
+                "resolved_model_ref": "local/test-model",
+            },
+            state_schema={
+                "answer": NodeSystemStateDefinition(
+                    name="Answer",
+                    description="Final answer.",
+                    type=NodeSystemStateType.TEXT,
+                ),
+            },
+            build_effective_system_prompt_func=lambda *args, **kwargs: "SYSTEM WITH ORIGINAL SECRET INPUT",
+            chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+        )
+
+        self.assertEqual(payload["answer"], "repaired answer")
+        self.assertEqual(warnings, [])
+        self.assertEqual(len(calls), 2)
+        repair_call = calls[1]
+        repair_prompt = f"{repair_call['system_prompt']}\n{repair_call['user_prompt']}"
+        self.assertIn("JSON repair step", str(repair_call["system_prompt"]))
+        self.assertIn("target_schema", str(repair_call["user_prompt"]))
+        self.assertIn("validation_errors", str(repair_call["user_prompt"]))
+        self.assertIn("raw_model_output", str(repair_call["user_prompt"]))
+        repair_payload = json.loads(str(repair_call["user_prompt"]))
+        self.assertEqual(repair_payload["raw_model_output"], '{"answer": 123}')
+        self.assertNotIn("ORIGINAL SECRET INPUT", repair_prompt)
+        self.assertNotIn("ORIGINAL TASK", repair_prompt)
+        self.assertIsNone(repair_call.get("on_delta"))
+        self.assertEqual(repair_call["thinking_level"], "off")
+        self.assertTrue(updated_config["structured_output_repair_attempted"])
+        self.assertTrue(updated_config["structured_output_repair_succeeded"])
+        self.assertEqual(updated_config["structured_output_validation_errors"], [])
+        self.assertIn("$.answer expected string", updated_config["structured_output_initial_validation_errors"][0])
 
     def test_user_prompt_does_not_append_skill_instruction_blocks_for_final_response(self) -> None:
         captured: dict[str, object] = {}

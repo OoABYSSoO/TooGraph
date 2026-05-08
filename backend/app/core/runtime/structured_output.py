@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
@@ -7,6 +8,16 @@ from app.core.schemas.skills import SkillDefinition, SkillIoField
 
 
 STRUCTURED_OUTPUT_SCHEMA_NAME = "graphiteui_structured_output"
+JSON_REPAIR_SYSTEM_PROMPT = "\n".join(
+    [
+        "You are a JSON repair step for GraphiteUI.",
+        "Repair the provided model output so it matches the target JSON schema.",
+        "Do not solve the original task again.",
+        "Do not add new facts.",
+        "Preserve the original semantic content whenever possible.",
+        "Return only the repaired JSON object. Do not add markdown fences or prose.",
+    ]
+)
 
 
 def build_agent_state_output_schema(
@@ -81,6 +92,27 @@ def build_openai_responses_text_format(schema: dict[str, Any]) -> dict[str, Any]
             "strict": False,
         }
     }
+
+
+def build_json_repair_system_prompt() -> str:
+    return JSON_REPAIR_SYSTEM_PROMPT
+
+
+def build_json_repair_user_prompt(
+    *,
+    target_schema: dict[str, Any],
+    validation_errors: list[str],
+    raw_model_output: str,
+) -> str:
+    return json.dumps(
+        {
+            "target_schema": target_schema,
+            "validation_errors": validation_errors,
+            "raw_model_output": raw_model_output,
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
 
 
 def validate_structured_output(value: Any, schema: dict[str, Any]) -> list[str]:

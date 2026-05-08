@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+import json
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -289,6 +290,82 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
         self.assertFalse(schema["properties"]["web_search"]["additionalProperties"])
         self.assertEqual(schema["properties"]["web_search"]["properties"]["query"]["type"], "string")
         self.assertEqual(updated_config["skill_input_structured_output_strategy"], "json_schema")
+
+    def test_repairs_invalid_skill_inputs_without_original_prompt_context(self) -> None:
+        calls: list[dict[str, object]] = []
+
+        def chat_with_local_model_with_meta_func(**kwargs):
+            calls.append(dict(kwargs))
+            if len(calls) == 1:
+                return ('{"web_search": {"query": 7}}', {"warnings": [], "model": "test-model"})
+            return ('{"web_search": {"query": "repaired query"}}', {"warnings": [], "model": "test-model"})
+
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "config": {
+                    "skillKey": "web_search",
+                    "taskInstruction": "ORIGINAL SKILL TASK",
+                },
+            }
+        )
+
+        skill_inputs, _reasoning, warnings, updated_config = generate_agent_skill_inputs(
+            node=node,
+            input_values={"question": "ORIGINAL SECRET INPUT"},
+            bindings=[
+                ResolvedAgentSkillBinding(
+                    binding=NodeSystemAgentSkillBinding(skillKey="web_search"),
+                    source="node_config",
+                )
+            ],
+            skill_definitions={
+                "web_search": SkillDefinition(
+                    skillKey="web_search",
+                    name="Web Search",
+                    inputSchema=[
+                        SkillIoField(
+                            key="query",
+                            name="Query",
+                            valueType="text",
+                            required=True,
+                            description="Search query.",
+                        )
+                    ],
+                )
+            },
+            runtime_config={
+                "resolved_provider_id": "local",
+                "runtime_model_name": "test-model",
+                "resolved_temperature": 0.2,
+                "resolved_thinking": False,
+                "resolved_thinking_level": "off",
+            },
+            chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+        )
+
+        self.assertEqual(skill_inputs, {"web_search": {"query": "repaired query"}})
+        self.assertEqual(warnings, [])
+        self.assertEqual(len(calls), 2)
+        repair_call = calls[1]
+        repair_prompt = f"{repair_call['system_prompt']}\n{repair_call['user_prompt']}"
+        self.assertIn("JSON repair step", str(repair_call["system_prompt"]))
+        self.assertIn("target_schema", str(repair_call["user_prompt"]))
+        self.assertIn("validation_errors", str(repair_call["user_prompt"]))
+        self.assertIn("raw_model_output", str(repair_call["user_prompt"]))
+        repair_payload = json.loads(str(repair_call["user_prompt"]))
+        self.assertEqual(repair_payload["raw_model_output"], '{"web_search": {"query": 7}}')
+        self.assertNotIn("ORIGINAL SECRET INPUT", repair_prompt)
+        self.assertNotIn("ORIGINAL SKILL TASK", repair_prompt)
+        self.assertEqual(repair_call["thinking_level"], "off")
+        self.assertTrue(updated_config["skill_input_structured_output_repair_attempted"])
+        self.assertTrue(updated_config["skill_input_structured_output_repair_succeeded"])
+        self.assertEqual(updated_config["skill_input_structured_output_validation_errors"], [])
+        self.assertIn(
+            "$.web_search.query expected string",
+            updated_config["skill_input_structured_output_initial_validation_errors"][0],
+        )
 
 
 if __name__ == "__main__":

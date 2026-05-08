@@ -7,7 +7,12 @@ from app.core.model_catalog import get_default_video_model_ref, resolve_runtime_
 from app.core.runtime.agent_multimodal import collect_input_attachments, prepare_model_input_attachments
 from app.core.runtime.agent_prompt import build_effective_system_prompt
 from app.core.runtime.llm_output_parser import build_output_key_aliases, parse_llm_json_response
-from app.core.runtime.structured_output import build_agent_state_output_schema, validate_structured_output
+from app.core.runtime.structured_output import (
+    build_agent_state_output_schema,
+    build_json_repair_system_prompt,
+    build_json_repair_user_prompt,
+    validate_structured_output,
+)
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition
 from app.core.thinking_levels import resolve_effective_thinking_level
 from app.tools.local_llm import _chat_with_local_model_with_meta
@@ -94,7 +99,37 @@ def generate_agent_response(
         output_keys,
         output_key_aliases=build_output_key_aliases_func(output_keys, state_schema or {}),
     )
-    structured_output_validation_errors = validate_structured_output(parsed_fields, structured_output_schema)
+    initial_structured_output_validation_errors = validate_structured_output(parsed_fields, structured_output_schema)
+    structured_output_validation_errors = list(initial_structured_output_validation_errors)
+    repair_attempted = False
+    repair_succeeded = False
+    repair_validation_errors: list[str] = []
+    repair_error = ""
+    repair_meta: dict[str, Any] = {}
+    if initial_structured_output_validation_errors:
+        repair_attempted = True
+        try:
+            repair_content, repair_meta = repair_structured_output_with_runtime_model(
+                runtime_config=runtime_config,
+                structured_output_schema=structured_output_schema,
+                validation_errors=initial_structured_output_validation_errors,
+                raw_model_output=content,
+                chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+                chat_with_model_ref_with_meta_func=chat_with_model_ref_with_meta_func,
+            )
+            repair_parsed_fields = parse_llm_json_response_func(
+                repair_content,
+                output_keys,
+                output_key_aliases=build_output_key_aliases_func(output_keys, state_schema or {}),
+            )
+            repair_validation_errors = validate_structured_output(repair_parsed_fields, structured_output_schema)
+            if not repair_validation_errors:
+                content = repair_content
+                parsed_fields = repair_parsed_fields
+                structured_output_validation_errors = []
+                repair_succeeded = True
+        except Exception as exc:
+            repair_error = str(exc)
     response_payload: dict[str, Any] = {"summary": content, **parsed_fields}
     reasoning = str(llm_meta.get("reasoning") or "").strip()
     structured_output_strategy = str(llm_meta.get("structured_output_strategy") or "json_schema")
@@ -122,14 +157,65 @@ def generate_agent_response(
         "structured_output_strategy": structured_output_strategy,
         "structured_output_schema": structured_output_schema,
         "structured_output_validation_errors": structured_output_validation_errors,
+        "structured_output_initial_validation_errors": initial_structured_output_validation_errors,
+        "structured_output_repair_attempted": repair_attempted,
+        "structured_output_repair_succeeded": repair_succeeded,
+        "structured_output_repair_validation_errors": repair_validation_errors,
+        "structured_output_repair_error": repair_error,
+        "structured_output_repair_provider_response_id": repair_meta.get("response_id"),
+        "structured_output_repair_provider_usage": repair_meta.get("usage"),
+        "structured_output_repair_provider_timings": repair_meta.get("timings"),
     }
-    warnings = [*attachment_warnings, *llm_meta.get("warnings", [])]
+    warnings = [*attachment_warnings, *llm_meta.get("warnings", []), *repair_meta.get("warnings", [])]
+    if repair_error:
+        warnings.append(f"Structured output repair failed: {repair_error}")
     if structured_output_validation_errors:
         warnings.append(
             "Structured output validation found mismatches: "
             + "; ".join(structured_output_validation_errors[:5])
         )
     return response_payload, reasoning, warnings, updated_runtime_config
+
+
+def repair_structured_output_with_runtime_model(
+    *,
+    runtime_config: dict[str, Any],
+    structured_output_schema: dict[str, Any],
+    validation_errors: list[str],
+    raw_model_output: str,
+    chat_with_local_model_with_meta_func: Callable[..., tuple[str, dict[str, Any]]],
+    chat_with_model_ref_with_meta_func: Callable[..., tuple[str, dict[str, Any]]],
+) -> tuple[str, dict[str, Any]]:
+    system_prompt = build_json_repair_system_prompt()
+    user_prompt = build_json_repair_user_prompt(
+        target_schema=structured_output_schema,
+        validation_errors=validation_errors,
+        raw_model_output=raw_model_output,
+    )
+    if runtime_config.get("resolved_provider_id") == "local":
+        return chat_with_local_model_with_meta_func(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model=runtime_config["runtime_model_name"],
+            provider_id="local",
+            temperature=0.0,
+            thinking_enabled=False,
+            thinking_level="off",
+            on_delta=None,
+            input_attachments=[],
+            structured_output_schema=structured_output_schema,
+        )
+    return chat_with_model_ref_with_meta_func(
+        model_ref=runtime_config["resolved_model_ref"],
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        temperature=0.0,
+        thinking_enabled=False,
+        thinking_level="off",
+        on_delta=None,
+        input_attachments=[],
+        structured_output_schema=structured_output_schema,
+    )
 
 
 def _cleanup_prepared_media_paths(paths: Any) -> None:
