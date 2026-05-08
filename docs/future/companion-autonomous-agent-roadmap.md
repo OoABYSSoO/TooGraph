@@ -446,12 +446,14 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 旧 `graphiteUI_skill_builder` 曾被删除，因为它把生成、写入、校验、测试、修复、revision 和回滚混在一个 Skill 中，偏离了新的职责边界。
 
-当前新的 `graphiteUI_skill_builder` 已按窄职责重建：读取用户需求和已确认的设计信息，只产出一个 Skill 包必要的文件内容。随着生命周期入口收束，新的 Skill 包优先围绕固定入口组织：
+当前新的 `graphiteUI_skill_builder` 已按窄职责重建：读取用户需求和已确认的设计信息，只产出一个 Skill 包必要的身份和文件内容。随着生命周期入口收束，新的 Skill 包优先围绕固定入口组织：
 
+- `skill_key`
 - `skill.json`
 - `SKILL.md`
 - `before_llm.py`，仅在需要给 LLM 补充上下文时生成
 - `after_llm.py`，仅在需要确定性执行、校验或规范化时生成
+- `requirements.txt`，仅在需要第三方 Python 依赖时生成
 
 它不应该：
 

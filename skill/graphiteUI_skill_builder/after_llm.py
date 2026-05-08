@@ -7,11 +7,17 @@ from typing import Any
 
 
 def graphiteui_skill_builder(**skill_inputs: Any) -> dict[str, Any]:
+    skill_json = _normalize_skill_json(skill_inputs.get("skill_json"))
+    skill_key = _normalize_skill_key(skill_inputs.get("skill_key"), skill_json)
+    if skill_key:
+        skill_json["skillKey"] = skill_key
     return {
-        "skill_json": _normalize_skill_json(skill_inputs.get("skill_json")),
+        "skill_key": skill_key,
+        "skill_json": skill_json,
         "skill_md": _strip_markdown_fence(_as_text(skill_inputs.get("skill_md"))),
         "before_llm_py": _strip_markdown_fence(_as_text(skill_inputs.get("before_llm_py"))),
         "after_llm_py": _strip_markdown_fence(_as_text(skill_inputs.get("after_llm_py"))),
+        "requirements_txt": _strip_markdown_fence(_as_text(skill_inputs.get("requirements_txt"))),
     }
 
 
@@ -26,6 +32,13 @@ def _normalize_skill_json(value: Any) -> dict[str, Any]:
             return {}
         return dict(parsed) if isinstance(parsed, dict) else {}
     return {}
+
+
+def _normalize_skill_key(value: Any, skill_json: dict[str, Any]) -> str:
+    explicit = _strip_markdown_fence(_as_text(value)).strip()
+    if explicit:
+        return explicit
+    return _strip_markdown_fence(_as_text(skill_json.get("skillKey") or skill_json.get("skill_key"))).strip()
 
 
 def _strip_markdown_fence(value: str) -> str:
