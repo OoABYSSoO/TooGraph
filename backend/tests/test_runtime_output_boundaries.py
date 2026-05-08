@@ -47,6 +47,77 @@ class RuntimeOutputBoundariesTests(unittest.TestCase):
         self.assertEqual(body["saved_outputs"], [{"path": "runs/run_1/answer.md"}])
         self.assertEqual(body["final_result"], "# Done")
 
+    def test_execute_output_node_unwraps_single_result_package_output_for_preview_and_persistence(self) -> None:
+        node = NodeSystemOutputNode.model_validate(
+            {
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "dynamic_result"}],
+                "config": {
+                    "displayMode": "auto",
+                    "persistEnabled": True,
+                    "persistFormat": "md",
+                    "fileNameTemplate": "",
+                },
+            }
+        )
+        package = {
+            "kind": "result_package",
+            "sourceType": "subgraph",
+            "sourceKey": "advanced_web_research_loop",
+            "outputs": {
+                "final_reply": {
+                    "name": "最终回复",
+                    "description": "面向用户展示的最终整理结果。",
+                    "type": "markdown",
+                    "value": "# Done",
+                }
+            },
+        }
+
+        with patch(
+            "app.core.runtime.output_boundaries.save_output_value",
+            return_value={"path": "runs/run_1/final_reply.md"},
+        ) as save_output:
+            body = execute_output_node("output_answer", node, {"dynamic_result": package}, {"run_id": "run_1"})
+
+        save_output.assert_called_once_with(
+            run_id="run_1",
+            node_id="output_answer",
+            source_key="dynamic_result.final_reply",
+            value="# Done",
+            persist_format="md",
+            file_name_template="final_reply",
+        )
+        self.assertEqual(body["outputs"], {"dynamic_result": "# Done"})
+        self.assertEqual(body["output_previews"][0]["label"], "最终回复")
+        self.assertEqual(body["output_previews"][0]["source_key"], "dynamic_result.final_reply")
+        self.assertEqual(body["output_previews"][0]["display_mode"], "markdown")
+        self.assertEqual(body["output_previews"][0]["value"], "# Done")
+        self.assertEqual(body["final_result"], "# Done")
+
+    def test_execute_output_node_keeps_multi_output_result_package_wrapped(self) -> None:
+        node = NodeSystemOutputNode.model_validate(
+            {
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "dynamic_result"}],
+                "config": {"displayMode": "auto"},
+            }
+        )
+        package = {
+            "kind": "result_package",
+            "outputs": {
+                "summary": {"type": "markdown", "value": "# Summary"},
+                "sources": {"type": "file", "value": ["runs/run_1/doc.md"]},
+            },
+        }
+
+        body = execute_output_node("output_answer", node, {"dynamic_result": package}, {"run_id": "run_1"})
+
+        self.assertEqual(body["outputs"], {"dynamic_result": package})
+        self.assertEqual(body["output_previews"][0]["source_key"], "dynamic_result")
+        self.assertEqual(body["output_previews"][0]["display_mode"], "auto")
+        self.assertEqual(body["output_previews"][0]["value"], package)
+
     def test_collect_output_boundaries_refreshes_only_active_outputs(self) -> None:
         graph = NodeSystemGraphDocument.model_validate(
             {

@@ -1,4 +1,5 @@
-export type OutputPreviewContentKind = "plain" | "markdown" | "json" | "documents";
+export type OutputPreviewContentKind = "plain" | "markdown" | "json" | "documents" | "package";
+export type OutputPreviewRenderedContentKind = Exclude<OutputPreviewContentKind, "package">;
 
 export type OutputLinkedTextSegment =
   | {
@@ -23,12 +24,25 @@ export type OutputPreviewDocumentReference = {
   error?: string;
 };
 
+export type OutputPreviewPackagePage = {
+  key: string;
+  title: string;
+  description: string;
+  valueType: string;
+  kind: OutputPreviewRenderedContentKind;
+  text: string;
+  html: string;
+  isEmpty: boolean;
+  documentRefs: OutputPreviewDocumentReference[];
+};
+
 export type OutputPreviewContent = {
   kind: OutputPreviewContentKind;
   text: string;
   html: string;
   isEmpty: boolean;
   documentRefs: OutputPreviewDocumentReference[];
+  packagePages?: OutputPreviewPackagePage[];
 };
 
 export const OUTPUT_WAITING_TEXT = "Waiting for output...";
@@ -79,7 +93,17 @@ export function linkifyOutputText(text: string): OutputLinkedTextSegment[] {
 export function resolveOutputPreviewContent(text: string, displayMode: string): OutputPreviewContent {
   const normalizedText = text || "";
   const normalizedDisplayMode = displayMode.trim().toLowerCase();
+  const packageContent = resolveResultPackagePreviewContent(normalizedText);
+  if (packageContent) {
+    return packageContent;
+  }
   const kind = resolveOutputPreviewDisplayMode(normalizedText, normalizedDisplayMode);
+
+  return resolveBasicOutputPreviewContent(normalizedText, kind === "package" ? "json" : kind);
+}
+
+function resolveBasicOutputPreviewContent(text: string, kind: OutputPreviewRenderedContentKind): OutputPreviewContent {
+  const normalizedText = text || "";
 
   if (kind === "markdown") {
     return {
@@ -122,6 +146,14 @@ export function resolveOutputPreviewContent(text: string, displayMode: string): 
 }
 
 export function resolveOutputPreviewDisplayMode(text: string, displayMode: string): OutputPreviewContentKind {
+  const packageMode = resolveResultPackageDisplayMode(text);
+  if (packageMode) {
+    return packageMode;
+  }
+  return resolveBasicOutputPreviewDisplayMode(text, displayMode);
+}
+
+function resolveBasicOutputPreviewDisplayMode(text: string, displayMode: string): OutputPreviewRenderedContentKind {
   if (displayMode === "markdown") {
     return "markdown";
   }
@@ -143,17 +175,148 @@ export function resolveOutputPreviewDisplayMode(text: string, displayMode: strin
   return "plain";
 }
 
-function canParseJson(text: string) {
-  const trimmed = text.trim();
-  if (!trimmed || (!trimmed.startsWith("{") && !trimmed.startsWith("["))) {
-    return false;
+function resolveResultPackageDisplayMode(text: string): OutputPreviewContentKind | null {
+  const packageValue = parseResultPackageText(text);
+  if (!packageValue) {
+    return null;
+  }
+  const pages = buildResultPackagePages(packageValue);
+  if (pages.length === 0) {
+    return null;
+  }
+  return pages.length === 1 ? pages[0].kind : "package";
+}
+
+function resolveResultPackagePreviewContent(text: string): OutputPreviewContent | null {
+  const packageValue = parseResultPackageText(text);
+  if (!packageValue) {
+    return null;
+  }
+  const pages = buildResultPackagePages(packageValue);
+  if (pages.length === 0) {
+    return null;
+  }
+  if (pages.length === 1) {
+    const page = pages[0];
+    return {
+      kind: page.kind,
+      text: page.text,
+      html: page.html,
+      isEmpty: page.isEmpty,
+      documentRefs: page.documentRefs,
+    };
+  }
+  return {
+    kind: "package",
+    text,
+    html: "",
+    isEmpty: false,
+    documentRefs: [],
+    packagePages: pages,
+  };
+}
+
+function parseResultPackageText(text: string): Record<string, unknown> | null {
+  const parsed = parseJsonPreviewValue(text);
+  if (!parsed || !parsed.value || typeof parsed.value !== "object" || Array.isArray(parsed.value)) {
+    return null;
+  }
+  const record = parsed.value as Record<string, unknown>;
+  if (record.kind !== "result_package" || !record.outputs || typeof record.outputs !== "object" || Array.isArray(record.outputs)) {
+    return null;
+  }
+  return record;
+}
+
+function buildResultPackagePages(packageValue: Record<string, unknown>): OutputPreviewPackagePage[] {
+  const outputs = packageValue.outputs as Record<string, unknown>;
+  return Object.entries(outputs)
+    .map(([key, rawOutput]) => buildResultPackagePage(key, rawOutput))
+    .filter((page): page is OutputPreviewPackagePage => page !== null);
+}
+
+function buildResultPackagePage(key: string, rawOutput: unknown): OutputPreviewPackagePage | null {
+  const outputKey = key.trim();
+  if (!outputKey) {
+    return null;
+  }
+  const outputRecord =
+    rawOutput && typeof rawOutput === "object" && !Array.isArray(rawOutput) ? (rawOutput as Record<string, unknown>) : null;
+  const value = outputRecord && Object.prototype.hasOwnProperty.call(outputRecord, "value") ? outputRecord.value : rawOutput;
+  const valueType = outputRecord ? normalizePreviewText(outputRecord.type) : "";
+  const title = (outputRecord ? normalizePreviewText(outputRecord.name) : "") || outputKey;
+  const description = outputRecord ? normalizePreviewText(outputRecord.description) : "";
+  const text = stringifyPreviewValue(value);
+  const kind = resolveResultPackageOutputDisplayMode(valueType, value, text);
+  const content = resolveBasicOutputPreviewContent(text, kind);
+  return {
+    key: outputKey,
+    title,
+    description,
+    valueType: valueType || kind,
+    kind,
+    text: content.text,
+    html: content.html,
+    isEmpty: content.isEmpty,
+    documentRefs: content.documentRefs,
+  };
+}
+
+function resolveResultPackageOutputDisplayMode(
+  valueType: string,
+  value: unknown,
+  text: string,
+): OutputPreviewRenderedContentKind {
+  const normalizedType = valueType.trim().toLowerCase();
+  if (normalizedType === "markdown") {
+    return "markdown";
+  }
+  if (normalizedType === "json" || normalizedType === "capability" || normalizedType === "result_package") {
+    return "json";
+  }
+  if (normalizedType === "file" || normalizedType === "image" || normalizedType === "audio" || normalizedType === "video") {
+    return "documents";
+  }
+  if (normalizedType === "text" || normalizedType === "number" || normalizedType === "boolean") {
+    return "plain";
+  }
+  if (Array.isArray(value) || (value && typeof value === "object")) {
+    return "json";
+  }
+  return resolveBasicOutputPreviewDisplayMode(text, "auto");
+}
+
+function stringifyPreviewValue(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
   }
   try {
-    JSON.parse(trimmed);
-    return true;
+    return JSON.stringify(value, null, 2);
   } catch {
-    return false;
+    return String(value);
   }
+}
+
+function parseJsonPreviewValue(text: string): { value: unknown } | null {
+  const trimmed = text.trim();
+  if (!trimmed || (!trimmed.startsWith("{") && !trimmed.startsWith("["))) {
+    return null;
+  }
+  try {
+    return { value: JSON.parse(trimmed) };
+  } catch {
+    return null;
+  }
+}
+
+function canParseJson(text: string) {
+  return parseJsonPreviewValue(text) !== null;
 }
 
 function formatJsonPreview(text: string) {

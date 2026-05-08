@@ -18,13 +18,18 @@ def execute_output_node(
     state: dict[str, Any],
 ) -> dict[str, Any]:
     binding = node.reads[0]
-    value = input_values.get(binding.state)
+    resolved = resolve_output_preview_value(
+        binding.state,
+        input_values.get(binding.state),
+        configured_display_mode=node.config.display_mode.value,
+    )
+    value = resolved["value"]
     preview = {
         "node_id": node_name,
-        "label": binding.state,
+        "label": resolved["label"],
         "source_kind": "state",
-        "source_key": binding.state,
-        "display_mode": node.config.display_mode.value,
+        "source_key": resolved["source_key"],
+        "display_mode": resolved["display_mode"],
         "persist_enabled": node.config.persist_enabled,
         "persist_format": node.config.persist_format.value,
         "value": value,
@@ -35,10 +40,10 @@ def execute_output_node(
             save_output_value(
                 run_id=str(state.get("run_id", "")),
                 node_id=node_name,
-                source_key=binding.state,
+                source_key=resolved["source_key"],
                 value=value,
                 persist_format=node.config.persist_format.value,
-                file_name_template=node.config.file_name_template or binding.state,
+                file_name_template=node.config.file_name_template or resolved["file_name_template"],
             )
         )
     return {
@@ -47,6 +52,70 @@ def execute_output_node(
         "saved_outputs": saved_outputs,
         "final_result": "" if value is None else str(value),
     }
+
+
+def resolve_output_preview_value(
+    state_key: str,
+    value: Any,
+    *,
+    configured_display_mode: str,
+) -> dict[str, Any]:
+    fallback = {
+        "label": state_key,
+        "source_key": state_key,
+        "display_mode": configured_display_mode,
+        "file_name_template": state_key,
+        "value": value,
+    }
+    if not isinstance(value, dict) or value.get("kind") != "result_package":
+        return fallback
+
+    outputs = value.get("outputs")
+    if not isinstance(outputs, dict) or len(outputs) != 1:
+        return fallback
+
+    output_key, raw_output = next(iter(outputs.items()))
+    output_key_text = str(output_key or "").strip()
+    if not output_key_text:
+        return fallback
+
+    if isinstance(raw_output, dict):
+        output_value = raw_output.get("value")
+        output_name = str(raw_output.get("name") or output_key_text).strip()
+        output_type = str(raw_output.get("type") or "").strip()
+    else:
+        output_value = raw_output
+        output_name = output_key_text
+        output_type = ""
+
+    return {
+        "label": output_name or output_key_text,
+        "source_key": f"{state_key}.{output_key_text}",
+        "display_mode": resolve_result_package_output_display_mode(configured_display_mode, output_type, output_value),
+        "file_name_template": output_key_text,
+        "value": output_value,
+    }
+
+
+def resolve_result_package_output_display_mode(
+    configured_display_mode: str,
+    output_type: str,
+    output_value: Any,
+) -> str:
+    if configured_display_mode != "auto":
+        return configured_display_mode
+    normalized_type = output_type.strip().lower()
+    if normalized_type == "markdown":
+        return "markdown"
+    if normalized_type in {"json", "capability", "result_package"}:
+        return "json"
+    if normalized_type in {"file", "image", "audio", "video"}:
+        return "documents"
+    if normalized_type in {"text", "number", "boolean"}:
+        return "plain"
+    if isinstance(output_value, (dict, list)):
+        return "json"
+    return "auto"
 
 
 def collect_output_boundaries(

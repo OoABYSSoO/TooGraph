@@ -217,6 +217,68 @@ test("resolveOutputPreviewContent treats a single local path as a document refer
   assert.match(preview.text, /1 local source document/);
 });
 
+test("resolveOutputPreviewContent unwraps single-output result packages for direct display", () => {
+  const preview = resolveOutputPreviewContent(
+    JSON.stringify({
+      kind: "result_package",
+      outputs: {
+        final_reply: {
+          name: "最终回复",
+          description: "面向用户展示的最终整理结果。",
+          type: "markdown",
+          value: "# Done",
+        },
+      },
+    }),
+    "auto",
+  );
+
+  assert.equal(preview.kind, "markdown");
+  assert.equal(preview.text, "# Done");
+  assert.match(preview.html, /<h1>Done<\/h1>/);
+  assert.equal(preview.packagePages, undefined);
+});
+
+test("resolveOutputPreviewContent paginates multi-output result packages by output field", () => {
+  const preview = resolveOutputPreviewContent(
+    JSON.stringify({
+      kind: "result_package",
+      outputs: {
+        final_reply: {
+          name: "最终回复",
+          description: "面向用户展示的最终整理结果。",
+          type: "markdown",
+          value: "# Done",
+        },
+        source_documents: {
+          name: "来源文档",
+          description: "联网搜索下载到本地的原文。",
+          type: "file",
+          value: [
+            {
+              title: "Article One",
+              url: "https://example.com/one",
+              local_path: "run_1/search/doc_001.md",
+              char_count: 1200,
+            },
+          ],
+        },
+      },
+    }),
+    "auto",
+  );
+
+  assert.equal(preview.kind, "package");
+  assert.equal(preview.packagePages?.length, 2);
+  assert.equal(preview.packagePages?.[0]?.key, "final_reply");
+  assert.equal(preview.packagePages?.[0]?.title, "最终回复");
+  assert.equal(preview.packagePages?.[0]?.kind, "markdown");
+  assert.match(preview.packagePages?.[0]?.html ?? "", /<h1>Done<\/h1>/);
+  assert.equal(preview.packagePages?.[1]?.key, "source_documents");
+  assert.equal(preview.packagePages?.[1]?.kind, "documents");
+  assert.equal(preview.packagePages?.[1]?.documentRefs[0]?.localPath, "run_1/search/doc_001.md");
+});
+
 test("resolveOutputPreviewContent treats active waiting output as an empty preview state", () => {
   const preview = resolveOutputPreviewContent("Waiting for output...", "auto");
 
@@ -233,4 +295,29 @@ test("resolveOutputPreviewDisplayMode exposes the effective auto-detected format
   assert.equal(resolveOutputPreviewDisplayMode("| A | B |\n| --- | --- |\n| 1 | 2 |", "auto"), "markdown");
   assert.equal(resolveOutputPreviewDisplayMode("# Final answer", "plain"), "plain");
   assert.equal(resolveOutputPreviewDisplayMode("[]", "documents"), "documents");
+  assert.equal(
+    resolveOutputPreviewDisplayMode(
+      JSON.stringify({
+        kind: "result_package",
+        outputs: {
+          a: { type: "markdown", value: "# A" },
+          b: { type: "json", value: { ok: true } },
+        },
+      }),
+      "auto",
+    ),
+    "package",
+  );
+  assert.equal(
+    resolveOutputPreviewDisplayMode(
+      JSON.stringify({
+        kind: "result_package",
+        outputs: {
+          a: { type: "markdown", value: "# A" },
+        },
+      }),
+      "auto",
+    ),
+    "markdown",
+  );
 });

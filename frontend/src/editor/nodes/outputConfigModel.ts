@@ -33,6 +33,8 @@ export function formatOutputDisplayModeLabel(displayMode: string) {
       return "JSON";
     case "documents":
       return "DOCS";
+    case "package":
+      return "PAGES";
     default:
       return "AUTO";
   }

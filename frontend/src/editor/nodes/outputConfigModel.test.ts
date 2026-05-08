@@ -34,6 +34,7 @@ test("output config label helpers preserve view-model labels", () => {
   assert.equal(formatOutputDisplayModeLabel("markdown"), "MD");
   assert.equal(formatOutputDisplayModeLabel("json"), "JSON");
   assert.equal(formatOutputDisplayModeLabel("documents"), "DOCS");
+  assert.equal(formatOutputDisplayModeLabel("package"), "PAGES");
   assert.equal(formatOutputDisplayModeLabel("unexpected"), "AUTO");
 
   assert.equal(formatOutputPersistFormatLabel("auto"), "AUTO");

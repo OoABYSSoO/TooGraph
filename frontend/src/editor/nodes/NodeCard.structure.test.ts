@@ -1179,6 +1179,8 @@ test("NodeCard delegates output preview presentation while keeping Advanced in t
   assert.match(outputNodeBodySource, /node-card__preview--markdown/);
   assert.match(outputNodeBodySource, /v-html="outputPreviewContent\.html"/);
   assert.match(outputNodeBodySource, /node-card__preview--json/);
+  assert.match(outputNodeBodySource, /node-card__preview--package/);
+  assert.match(outputNodeBodySource, /class="node-card__preview-package-tabs"[\s\S]*role="tablist"/);
   assert.match(outputNodeBodySource, /class="node-card__preview"[\s\S]*@pointerdown\.stop[\s\S]*@click\.stop/);
   assert.match(outputNodeBodySource, /<pre v-else class="node-card__preview-text">\s*<OutputLinkedText :text="outputPreviewContent\.text" \/>\s*<\/pre>/);
   assert.match(outputNodeBodySource, /\.node-card__preview,[\s\S]*\.node-card__preview :deep\(\*\) \{[\s\S]*user-select:\s*text;/);

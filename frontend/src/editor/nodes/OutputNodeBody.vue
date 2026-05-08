@@ -36,13 +36,58 @@
           'node-card__preview--markdown': outputPreviewContent.kind === 'markdown',
           'node-card__preview--json': outputPreviewContent.kind === 'json',
           'node-card__preview--documents': outputPreviewContent.kind === 'documents',
+          'node-card__preview--package': outputPreviewContent.kind === 'package',
           'node-card__preview--empty': outputPreviewContent.isEmpty,
         }"
         @pointerdown.stop
         @click.stop
       >
+        <div v-if="outputPreviewContent.kind === 'package'" class="node-card__preview-package">
+          <div class="node-card__preview-package-tabs" role="tablist" aria-label="Result package outputs">
+            <button
+              v-for="(page, index) in packagePages"
+              :key="page.key"
+              type="button"
+              class="node-card__preview-package-tab"
+              :class="{ 'node-card__preview-package-tab--active': activePackagePageIndex === index }"
+              role="tab"
+              :aria-selected="activePackagePageIndex === index"
+              @pointerdown.stop
+              @click.stop="activePackagePageIndex = index"
+            >
+              {{ page.title }}
+            </button>
+          </div>
+          <div
+            v-if="activePackagePage"
+            class="node-card__preview-package-page"
+            :class="{
+              'node-card__preview-package-page--json': activePackagePage.kind === 'json',
+              'node-card__preview-package-page--documents': activePackagePage.kind === 'documents',
+            }"
+            role="tabpanel"
+          >
+            <div class="node-card__preview-package-meta">
+              <span>{{ activePackagePage.valueType.toUpperCase() }}</span>
+              <span>{{ activePackagePage.key }}</span>
+            </div>
+            <p v-if="activePackagePage.description" class="node-card__preview-package-description">
+              {{ activePackagePage.description }}
+            </p>
+            <OutputDocumentPager
+              v-if="activePackagePage.kind === 'documents' && activePackagePage.documentRefs.length > 0"
+              :documents="activePackagePage.documentRefs"
+            />
+            <div
+              v-else-if="activePackagePage.kind === 'markdown'"
+              class="node-card__preview-markdown"
+              v-html="activePackagePage.html"
+            />
+            <pre v-else class="node-card__preview-text"><OutputLinkedText :text="activePackagePage.text" /></pre>
+          </div>
+        </div>
         <OutputDocumentPager
-          v-if="outputPreviewContent.kind === 'documents' && outputPreviewContent.documentRefs.length > 0"
+          v-else-if="outputPreviewContent.kind === 'documents' && outputPreviewContent.documentRefs.length > 0"
           :documents="outputPreviewContent.documentRefs"
         />
         <div
@@ -59,6 +104,7 @@
 <script setup lang="ts">
 import { ElSwitch } from "element-plus";
 import { DocumentChecked } from "@element-plus/icons-vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import type { NodeCardViewModel } from "./nodeCardViewModel";
@@ -68,7 +114,7 @@ import type { OutputPreviewContent } from "./outputPreviewContentModel";
 
 type OutputBodyViewModel = Extract<NodeCardViewModel["body"], { kind: "output" }>;
 
-defineProps<{
+const props = defineProps<{
   body: OutputBodyViewModel;
   outputPreviewContent: OutputPreviewContent;
 }>();
@@ -78,6 +124,28 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const activePackagePageIndex = ref(0);
+const packagePages = computed(() => props.outputPreviewContent.packagePages ?? []);
+const activePackagePage = computed(() => {
+  const index = Math.min(activePackagePageIndex.value, Math.max(packagePages.value.length - 1, 0));
+  return packagePages.value[index] ?? null;
+});
+
+watch(
+  () => props.outputPreviewContent.text,
+  () => {
+    activePackagePageIndex.value = 0;
+  },
+);
+
+watch(
+  () => packagePages.value.length,
+  (length) => {
+    if (activePackagePageIndex.value >= length) {
+      activePackagePageIndex.value = Math.max(length - 1, 0);
+    }
+  },
+);
 </script>
 
 <style scoped>
@@ -167,6 +235,104 @@ const { t } = useI18n();
 }
 
 .node-card__preview--documents .node-card__preview-text {
+  border-left: 3px solid rgba(37, 99, 235, 0.46);
+  padding-left: 12px;
+  color: rgba(30, 64, 175, 0.92);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.84rem;
+  line-height: 1.58;
+}
+
+.node-card__preview--package {
+  display: flex;
+  flex-direction: column;
+}
+
+.node-card__preview-package {
+  display: grid;
+  min-height: 0;
+  gap: 12px;
+}
+
+.node-card__preview-package-tabs {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(154, 52, 18, 0.12);
+  padding-bottom: 8px;
+}
+
+.node-card__preview-package-tab {
+  flex: none;
+  max-width: 180px;
+  overflow: hidden;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(30, 64, 175, 0.78);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 8px 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-card__preview-package-tab--active {
+  border-color: rgba(37, 99, 235, 0.38);
+  background: rgba(219, 234, 254, 0.78);
+  color: rgb(29, 78, 216);
+}
+
+.node-card__preview-package-page {
+  display: grid;
+  min-height: 0;
+  gap: 10px;
+}
+
+.node-card__preview-package-meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.node-card__preview-package-meta span {
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 999px;
+  background: rgba(219, 234, 254, 0.5);
+  color: rgb(29, 78, 216);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-card__preview-package-description {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: rgba(55, 65, 81, 0.78);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+}
+
+.node-card__preview-package-page--json .node-card__preview-text {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.node-card__preview-package-page--documents .node-card__preview-text {
   border-left: 3px solid rgba(37, 99, 235, 0.46);
   padding-left: 12px;
   color: rgba(30, 64, 175, 0.92);
