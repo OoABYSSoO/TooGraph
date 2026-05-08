@@ -2,8 +2,8 @@
   "schemaVersion": "graphite.skill/v1",
   "skillKey": "graphiteui_capability_selector",
   "name": "GraphiteUI Capability Selector",
-  "description": "根据用户需求从启用的 GraphiteUI 能力中选择一个最合适的能力，优先返回图模板，其次返回 Skill；没有合适能力时返回 none。",
-  "llmInstruction": "你已绑定 GraphiteUI Capability Selector。把用户的原始需求作为 requirement 传入；origin 通常填 companion。技能会只从启用且对当前来源可选择的图模板和 Skill 中选一个能力，优先图模板。不要自己编造能力，也不要把返回结果改写成多个能力。",
+  "description": "根据模型从本地可用能力清单中选出的 capability，校验并规范化为单个 GraphiteUI capability state 值。",
+  "llmInstruction": "你已绑定 GraphiteUI Capability Selector。系统提示词会列出当前启用且可选择的图模板和 Skill 清单，每项包含 key、名称和适用场景。你必须根据用户需求从清单中选择一个 capability 入参；优先选择图模板，其次选择 Skill；没有合适能力时选择 {\"kind\":\"none\"}。不要编造清单外能力。",
   "version": "1.0.0",
   "capabilityPolicy": {
     "default": {
@@ -32,6 +32,13 @@
       "valueType": "text",
       "required": false,
       "description": "能力选择来源，例如 companion；默认 companion。"
+    },
+    {
+      "key": "capability",
+      "name": "Capability",
+      "valueType": "capability",
+      "required": true,
+      "description": "LLM 从候选清单中选出的单个能力对象，kind 为 subgraph、skill 或 none。"
     }
   ],
   "outputSchema": [

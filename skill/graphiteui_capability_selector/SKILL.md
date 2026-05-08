@@ -5,14 +5,14 @@ description: Use when a GraphiteUI workflow needs to choose one enabled graph te
 
 # GraphiteUI Capability Selector
 
-This Skill reads the local GraphiteUI capability catalog and returns exactly one capability object.
+The LLM-node skill-input planning prompt lists the local enabled graph templates and selectable Skills. The model chooses one item from that catalog and passes it as the `capability` input. This Skill only validates that choice against the current local catalog and returns exactly one normalized capability object.
 
 Selection rules:
 
-- Only enabled capabilities are considered.
-- Graph templates are preferred over Skills when both match the requirement.
+- Only enabled capabilities are listed for the model.
+- Graph templates are preferred over Skills when both can satisfy the requirement.
 - Skill candidates must be selectable for the requested origin through `capabilityPolicy`.
-- The selector does not call an LLM and does not invent capabilities.
+- The selector does not call an LLM, run text matching, or invent capabilities.
 - Saved ordinary graphs are not candidates; reusable graph capabilities come from templates.
 
 The `capability` output is suitable for a `capability` state:
@@ -27,4 +27,4 @@ or:
 { "kind": "skill", "key": "web_search", "name": "联网搜索" }
 ```
 
-When no candidate is good enough, the Skill returns `{ "kind": "none" }`.
+When the model chooses none or the selected key is not currently available, the Skill returns `{ "kind": "none" }`.

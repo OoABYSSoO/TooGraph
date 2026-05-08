@@ -10,62 +10,55 @@ from typing import Any
 
 SKILL_KEY = "graphiteui_capability_selector"
 DEFAULT_ORIGIN = "companion"
-MIN_SCORE = 6.0
-CHINESE_STOP_BIGRAMS = {
-    "一个",
-    "一下",
-    "帮我",
-    "需要",
-    "希望",
-    "可以",
-    "这个",
-    "那个",
-    "什么",
-}
-WORD_STOPWORDS = {
-    "a",
-    "an",
-    "and",
-    "for",
-    "in",
-    "of",
-    "or",
-    "the",
-    "to",
-    "with",
-}
 
 
 def graphiteui_capability_selector(**skill_inputs: Any) -> dict[str, Any]:
-    requirement = _compact_text(
-        skill_inputs.get("requirement")
-        or skill_inputs.get("user_requirement")
-        or skill_inputs.get("query")
-        or skill_inputs.get("需求")
-    )
     origin = _compact_text(skill_inputs.get("origin")) or DEFAULT_ORIGIN
-
-    if not requirement:
+    selected = _coerce_capability(skill_inputs.get("capability"))
+    if selected["kind"] == "none":
         return _none_response()
 
     repo_root = _resolve_repo_root()
-    templates, _template_errors = _load_template_candidates(repo_root)
-    skills, _skill_errors = _load_skill_candidates(repo_root, origin=origin)
-
-    template_matches = _score_candidates(requirement, templates)
-    skill_matches = _score_candidates(requirement, skills)
-
-    selected = _select_best(template_matches, skill_matches)
-    if selected is None:
+    if selected["kind"] == "subgraph":
+        candidates, _errors = _load_template_candidates(repo_root)
+    elif selected["kind"] == "skill":
+        candidates, _errors = _load_skill_candidates(repo_root, origin=origin)
+    else:
         return _none_response()
 
-    capability = {
-        "kind": selected["kind"],
-        "key": selected["key"],
-        "name": selected["name"],
-        "description": selected["description"],
+    candidate = {item["key"]: item for item in candidates}.get(selected["key"])
+    if candidate is None:
+        return _none_response()
+
+    return {
+        "capability": {
+            "kind": candidate["kind"],
+            "key": candidate["key"],
+            "name": candidate["name"],
+            "description": candidate["description"],
+        }
     }
-    return {"capability": capability}
+
+
+def _coerce_capability(value: Any) -> dict[str, str]:
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return {"kind": "none", "key": ""}
+        try:
+            parsed = json.loads(stripped)
+        except json.JSONDecodeError:
+            return {"kind": "none", "key": ""}
+        return _coerce_capability(parsed)
+    if not isinstance(value, dict):
+        return {"kind": "none", "key": ""}
+    kind = _compact_text(value.get("kind")).lower()
+    if kind not in {"skill", "subgraph"}:
+        return {"kind": "none", "key": ""}
+    key = _compact_text(value.get("key"))
+    if not key:
+        return {"kind": "none", "key": ""}
+    return {"kind": kind, "key": key}
 
 
 def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], list[str]]:
@@ -88,27 +81,13 @@ def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], li
             template_id = _compact_text(payload.get("template_id") or payload.get("templateId") or path.stem)
             if not template_id:
                 continue
-            name = _compact_text(payload.get("label") or payload.get("default_graph_name") or template_id)
-            description = _compact_text(payload.get("description"))
-            search_text = _join_text(
-                template_id,
-                name,
-                description,
-                payload.get("default_graph_name"),
-                _flatten_metadata(payload.get("metadata")),
-                _summarize_state_schema(payload.get("state_schema")),
-                _summarize_nodes(payload.get("nodes")),
-            )
             candidates.append(
                 {
                     "kind": "subgraph",
                     "key": template_id,
-                    "name": name,
-                    "description": description,
+                    "name": _compact_text(payload.get("label") or payload.get("default_graph_name") or template_id),
+                    "description": _compact_text(payload.get("description")),
                     "source": source,
-                    "_title_text": _join_text(template_id, name),
-                    "_description_text": description,
-                    "_search_text": search_text,
                 }
             )
     return candidates, errors
@@ -142,107 +121,18 @@ def _load_skill_candidates(repo_root: Path, *, origin: str) -> tuple[list[dict[s
                 continue
             if not _is_skill_selectable_for_origin(payload.get("capabilityPolicy"), origin):
                 continue
-            ready_error = _skill_readiness_error(skill_dir, payload)
-            if ready_error:
+            if _skill_readiness_error(skill_dir, payload):
                 continue
-            name = _compact_text(payload.get("name") or skill_key)
-            description = _compact_text(payload.get("description"))
-            search_text = _join_text(
-                skill_key,
-                name,
-                description,
-                payload.get("llmInstruction"),
-                payload.get("permissions"),
-                _summarize_io_schema(payload.get("inputSchema")),
-                _summarize_io_schema(payload.get("outputSchema")),
-            )
             candidates.append(
                 {
                     "kind": "skill",
                     "key": skill_key,
-                    "name": name,
-                    "description": description,
+                    "name": _compact_text(payload.get("name") or skill_key),
+                    "description": _compact_text(payload.get("description")),
                     "source": source,
-                    "_title_text": _join_text(skill_key, name),
-                    "_description_text": description,
-                    "_search_text": search_text,
                 }
             )
     return candidates, errors
-
-
-def _score_candidates(requirement: str, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    scored: list[dict[str, Any]] = []
-    requirement_tokens = _tokenize(requirement)
-    requirement_lower = requirement.lower()
-    for candidate in candidates:
-        score, reasons = _score_candidate(requirement_lower, requirement_tokens, candidate)
-        if score < MIN_SCORE:
-            continue
-        confidence = min(1.0, round(score / 48.0, 3))
-        reason = "；".join(reasons[:3]) or "需求关键词与能力描述匹配。"
-        scored.append(
-            {
-                **candidate,
-                "score": round(score, 2),
-                "confidence": confidence,
-                "reason": reason,
-            }
-        )
-    return sorted(scored, key=lambda item: (-float(item["score"]), item["kind"], item["key"]))
-
-
-def _score_candidate(
-    requirement_lower: str,
-    requirement_tokens: set[str],
-    candidate: dict[str, Any],
-) -> tuple[float, list[str]]:
-    title_text = _compact_text(candidate.get("_title_text")).lower()
-    description_text = _compact_text(candidate.get("_description_text")).lower()
-    search_text = _compact_text(candidate.get("_search_text")).lower()
-    key = _compact_text(candidate.get("key")).lower()
-    name = _compact_text(candidate.get("name")).lower()
-    score = 0.0
-    reasons: list[str] = []
-
-    if key and key in requirement_lower:
-        score += 30.0
-        reasons.append(f"需求直接提到 key {key}")
-    if name and (name in requirement_lower or requirement_lower in name):
-        score += 28.0
-        reasons.append(f"需求直接提到 {candidate['name']}")
-    if requirement_lower and requirement_lower in search_text:
-        score += 18.0
-        reasons.append("需求原文与能力说明高度重合")
-
-    title_overlap = requirement_tokens & _tokenize(title_text)
-    description_overlap = requirement_tokens & _tokenize(description_text)
-    search_overlap = requirement_tokens & _tokenize(search_text)
-    if title_overlap:
-        score += len(title_overlap) * 8.0
-        reasons.append("标题关键词与需求匹配")
-    if description_overlap:
-        score += len(description_overlap) * 4.0
-    residual_overlap = search_overlap - title_overlap - description_overlap
-    if residual_overlap:
-        score += len(residual_overlap) * 1.5
-    if description_overlap:
-        reasons.append("描述关键词与需求匹配")
-    elif residual_overlap:
-        reasons.append("结构化信息与需求匹配")
-
-    return score, reasons
-
-
-def _select_best(
-    template_matches: list[dict[str, Any]],
-    skill_matches: list[dict[str, Any]],
-) -> dict[str, Any] | None:
-    if template_matches:
-        return template_matches[0]
-    if skill_matches:
-        return skill_matches[0]
-    return None
 
 
 def _read_json_object(path: Path) -> tuple[dict[str, Any], str]:
@@ -292,81 +182,6 @@ def _skill_readiness_error(skill_dir: Path, payload: dict[str, Any]) -> str:
     return ""
 
 
-def _summarize_io_schema(schema: Any) -> str:
-    if not isinstance(schema, list):
-        return ""
-    parts: list[str] = []
-    for field in schema:
-        if not isinstance(field, dict):
-            continue
-        parts.append(
-            _join_text(
-                field.get("key"),
-                field.get("name"),
-                field.get("valueType"),
-                field.get("description"),
-            )
-        )
-    return " ".join(parts)
-
-
-def _summarize_state_schema(schema: Any) -> str:
-    if not isinstance(schema, dict):
-        return ""
-    parts: list[str] = []
-    for key, value in schema.items():
-        if isinstance(value, dict):
-            parts.append(_join_text(key, value.get("name"), value.get("type"), value.get("description")))
-        else:
-            parts.append(str(key))
-    return " ".join(parts)
-
-
-def _summarize_nodes(nodes: Any) -> str:
-    if not isinstance(nodes, dict):
-        return ""
-    parts: list[str] = []
-    for key, value in nodes.items():
-        if isinstance(value, dict):
-            parts.append(_join_text(key, value.get("name"), value.get("description"), value.get("kind")))
-        else:
-            parts.append(str(key))
-    return " ".join(parts)
-
-
-def _flatten_metadata(value: Any) -> str:
-    if isinstance(value, dict):
-        return " ".join(_flatten_metadata(item) for item in value.values())
-    if isinstance(value, list):
-        return " ".join(_flatten_metadata(item) for item in value)
-    return _compact_text(value)
-
-
-def _tokenize(text: str) -> set[str]:
-    normalized = text.lower()
-    tokens = {item for item in re.findall(r"[a-z0-9_]+", normalized) if item not in WORD_STOPWORDS and len(item) > 1}
-    for chunk in re.findall(r"[\u4e00-\u9fff]+", text):
-        for index in range(0, max(0, len(chunk) - 1)):
-            token = chunk[index : index + 2]
-            if token not in CHINESE_STOP_BIGRAMS:
-                tokens.add(token)
-    return tokens
-
-
-def _join_text(*values: Any) -> str:
-    parts: list[str] = []
-    for value in values:
-        if isinstance(value, str):
-            parts.append(value)
-        elif isinstance(value, list):
-            parts.append(" ".join(_compact_text(item) for item in value))
-        elif isinstance(value, dict):
-            parts.append(_flatten_metadata(value))
-        elif value is not None:
-            parts.append(str(value))
-    return " ".join(part for part in (_compact_text(part) for part in parts) if part)
-
-
 def _compact_text(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
 
@@ -386,11 +201,10 @@ def main() -> None:
     try:
         payload = json.loads(sys.stdin.read() or "{}")
     except json.JSONDecodeError:
-        payload = {"requirement": ""}
+        payload = {}
     if not isinstance(payload, dict):
-        payload = {"requirement": ""}
-    result = graphiteui_capability_selector(**payload)
-    print(json.dumps(result, ensure_ascii=False))
+        payload = {}
+    print(json.dumps(graphiteui_capability_selector(**payload), ensure_ascii=False))
 
 
 if __name__ == "__main__":
