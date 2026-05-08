@@ -53,7 +53,26 @@ skill/<skill_key>/
 
 `before_llm.py` 和 `after_llm.py` 使用固定文件名，不在 `skill.json` 中配置入口。
 
-如果生命周期脚本只使用 Python 标准库，不需要依赖文件。只要使用标准库以外的包，就应该在 Skill 包内放置 `requirements.txt` 并写清版本范围；Node 或其他运行时可以使用对应生态的依赖声明文件。GraphiteUI 不应在技能运行时偷偷安装依赖，依赖安装或环境变更应走显式权限路径。
+如果生命周期脚本只使用 Python 标准库，不需要依赖文件。只要使用标准库以外的包，就应该在 Skill 包内放置 `requirements.txt` 并写清版本范围。GraphiteUI 当前会根据 Python Skill 包内显式的 `requirements.txt` 触发依赖检查和环境创建，不根据提示词临时安装未声明依赖。
+
+## 依赖文件与运行环境
+
+Python Skill 的依赖规则：
+
+- 只使用 Python 标准库：不需要 `requirements.txt`。
+- 使用第三方 Python 包：必须在 Skill 包根目录提供 `requirements.txt`，例如 `pytest>=8,<9`。
+- 不要把 `.venv`、虚拟环境目录、下载缓存或 site-packages 放进 Skill 包。
+
+运行时处理规则：
+
+1. 如果 Skill 没有 `requirements.txt`，生命周期脚本直接使用当前 GraphiteUI 后端 Python 运行。
+2. 如果 Skill 有 `requirements.txt`，GraphiteUI 会先检查当前执行 Python 是否已经满足依赖版本。
+3. 如果当前 Python 已满足依赖，继续使用当前 Python，不额外创建环境。
+4. 如果当前 Python 不满足依赖，GraphiteUI 会在 `backend/data/skills/envs/` 下按 `skillKey + requirements.txt 内容 + Python 版本 + 平台` 的哈希创建或复用虚拟环境。
+5. 创建和安装依赖时优先使用 `uv`；如果当前机器没有 `uv`，再回退到标准库 `venv` 加 `pip`。
+6. 该虚拟环境属于运行时缓存和用户数据，不进入 Git 管理，也不应该被手工移动到官方 `skill/` 目录。
+
+`requirements.txt` 是 Skill 的可迁移运行契约。即使某个依赖已经存在于主项目环境中，也应该在 Skill 自己的依赖文件里声明，这样迁移到其他 GraphiteUI 环境时仍能被检查和安装。
 
 ## `skill.json`
 

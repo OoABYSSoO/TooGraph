@@ -41,7 +41,7 @@
 
 ## 当前技能
 
-官方 Skill 位于 `skill/<skill_key>/`，会进入 Git 管理；用户自定义 Skill 位于 `backend/data/skills/user/<skill_key>/`，属于本地用户数据，不进入 Git 管理。Skill catalog 会同时返回官方和用户 Skill，并通过 `sourceScope` / `canManage` 区分来源与可管理性。Python Skill 只要依赖标准库以外的包，就应该在包内提供 `requirements.txt`；运行时不应偷偷安装依赖。
+官方 Skill 位于 `skill/<skill_key>/`，会进入 Git 管理；用户自定义 Skill 位于 `backend/data/skills/user/<skill_key>/`，属于本地用户数据，不进入 Git 管理。Skill catalog 会同时返回官方和用户 Skill，并通过 `sourceScope` / `canManage` 区分来源与可管理性。Python Skill 只要依赖标准库以外的包，就应该在包内提供 `requirements.txt`；运行时会先检查当前 Python，缺依赖时在 `backend/data/skills/envs/` 下优先用 `uv` 创建或复用托管虚拟环境。
 
 ### `web_search`
 
