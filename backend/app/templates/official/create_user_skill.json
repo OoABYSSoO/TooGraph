@@ -357,7 +357,7 @@
             "skillKey": "graphiteUI_skill_builder",
             "title": "检查现有 Skill",
             "content": "调用 action=inspect_existing_skills，不要传 skill_key 或 files。只返回现有官方和用户 Skill 摘要。",
-            "source": "skill.llmInstruction"
+            "source": "node.override"
           }
         },
         "taskInstruction": "调用 graphiteUI_skill_builder，action 必须是 inspect_existing_skills。不要回答用户，不要生成 Skill 文件。",
@@ -556,7 +556,7 @@
             "skillKey": "graphiteUI_skill_builder",
             "title": "写入用户 Skill 并测试",
             "content": "调用 action=write_skill_package。skill_key 必须来自 target_skill_key，files 必须原样来自 generated_skill_files，smoke_input 来自 smoke_input。写入目标只能是 backend/data/skills/user/<skill_key>。不要生成压缩包，不要写 official skill 目录。",
-            "source": "skill.llmInstruction"
+            "source": "node.override"
           }
         },
         "taskInstruction": "调用 graphiteUI_skill_builder 写入并测试用户 Skill。action 必须是 write_skill_package；skill_key 使用 target_skill_key；files 使用 generated_skill_files；smoke_input 使用 smoke_input。目标目录必须是 backend/data/skills/user/<skill_key>。不要自己总结测试结果，Builder 输出会映射到图状态。",

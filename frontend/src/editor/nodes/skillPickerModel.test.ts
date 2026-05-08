@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 
 import {
   listSelectableSkillDefinitions,
+  resolveDisplayAgentSkillInstructionBlocks,
   resolveSelectAgentSkillPatch,
+  resolveSkillInstructionOverridePatch,
 } from "./skillPickerModel.ts";
 import type { SkillDefinition } from "../../types/skills.ts";
 
@@ -118,17 +120,10 @@ test("listSelectableSkillDefinitions exposes active healthy LLM node skills", ()
   );
 });
 
-test("resolveSelectAgentSkillPatch replaces the selected skill and creates one instruction block", () => {
+test("resolveSelectAgentSkillPatch replaces the selected skill without persisting default instructions", () => {
   assert.deepEqual(resolveSelectAgentSkillPatch("web_search", "append_usage_introduction", skillDefinitions, {}), {
     skillKey: "append_usage_introduction",
-    skillInstructionBlocks: {
-      append_usage_introduction: {
-        skillKey: "append_usage_introduction",
-        title: "Append Usage Introduction skill instruction",
-        content: "Use append_usage_introduction only when it is explicitly bound to the LLM node.",
-        source: "skill.llmInstruction",
-      },
-    },
+    skillInstructionBlocks: {},
   });
   assert.equal(resolveSelectAgentSkillPatch("web_search", "web_search", skillDefinitions, {}), null);
 });
@@ -148,4 +143,49 @@ test("resolveSelectAgentSkillPatch clears the selected skill and stale instructi
       skillInstructionBlocks: {},
     },
   );
+});
+
+test("resolveDisplayAgentSkillInstructionBlocks derives the default capsule from the selected skill", () => {
+  assert.deepEqual(resolveDisplayAgentSkillInstructionBlocks("web_search", skillDefinitions, {}), {
+    web_search: {
+      skillKey: "web_search",
+      title: "Web Search skill instruction",
+      content: "Decide the search query and execute this bound web search skill. Do not summarize the result.",
+      source: "skill.llmInstruction",
+    },
+  });
+});
+
+test("resolveDisplayAgentSkillInstructionBlocks preserves blank node overrides", () => {
+  assert.deepEqual(
+    resolveDisplayAgentSkillInstructionBlocks("web_search", skillDefinitions, {
+      web_search: {
+        skillKey: "web_search",
+        title: "",
+        content: "",
+        source: "node.override",
+      },
+    }),
+    {
+      web_search: {
+        skillKey: "web_search",
+        title: "Web Search skill instruction",
+        content: "",
+        source: "node.override",
+      },
+    },
+  );
+});
+
+test("resolveSkillInstructionOverridePatch persists only user-edited skill instructions", () => {
+  assert.deepEqual(resolveSkillInstructionOverridePatch("web_search", "Use the edited rule.", skillDefinitions, {}), {
+    skillInstructionBlocks: {
+      web_search: {
+        skillKey: "web_search",
+        title: "Web Search skill instruction",
+        content: "Use the edited rule.",
+        source: "node.override",
+      },
+    },
+  });
 });

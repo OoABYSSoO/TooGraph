@@ -480,6 +480,7 @@ import { resolveOutputPreviewContent } from "./outputPreviewContentModel";
 import { usePortReorder } from "./usePortReorder";
 import {
   listSelectableSkillDefinitions,
+  resolveSkillInstructionOverridePatch,
   resolveSelectAgentSkillPatch,
 } from "./skillPickerModel";
 import {
@@ -615,6 +616,7 @@ const agentThinkingOptions = computed<Array<{ value: AgentThinkingControlMode; l
 const view = computed(() =>
   buildNodeCardViewModel(props.nodeId, props.node, props.stateSchema, {
     conditionRouteTargets: props.conditionRouteTargets,
+    skillDefinitions: props.skillDefinitions,
     runtime: {
       latestRunStatus: props.latestRunStatus ?? null,
       outputPreviewText: props.runOutputPreviewText ?? null,
@@ -1111,20 +1113,16 @@ function handleSkillInstructionInput(payload: { skillKey: string; content: strin
     return;
   }
   const currentBlocks = props.node.config.skillInstructionBlocks ?? {};
-  const currentBlock = currentBlocks[payload.skillKey];
-  if (!currentBlock) {
+  const patch = resolveSkillInstructionOverridePatch(
+    payload.skillKey,
+    payload.content,
+    props.skillDefinitions,
+    currentBlocks,
+  );
+  if (!patch) {
     return;
   }
-  emitAgentConfigPatch({
-    skillInstructionBlocks: {
-      ...currentBlocks,
-      [payload.skillKey]: {
-        ...currentBlock,
-        content: payload.content,
-        source: "node.override",
-      },
-    },
-  });
+  emitAgentConfigPatch(patch);
 }
 
 function openPortStateCreate(side: "input" | "output") {

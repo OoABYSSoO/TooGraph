@@ -10,6 +10,8 @@ import {
 } from "../../lib/virtual-any-input.ts";
 import { normalizeInputBoundaryConfigType } from "../../lib/input-boundary.ts";
 import type { GraphNode, StateDefinition } from "../../types/node-system.ts";
+import type { SkillDefinition } from "../../types/skills.ts";
+import { resolveDisplayAgentSkillInstructionBlocks } from "./skillPickerModel.ts";
 
 export type NodePortViewModel = {
   key: string;
@@ -56,6 +58,7 @@ export type SubgraphRuntimeSummaryViewModel = {
 
 export type BuildNodeCardViewModelOptions = {
   conditionRouteTargets?: Record<string, string | null>;
+  skillDefinitions?: SkillDefinition[];
   runtime?: {
     latestRunStatus?: string | null;
     outputPreviewText?: string | null;
@@ -223,7 +226,11 @@ function buildBody(
     return {
       kind: "agent",
       taskInstruction: node.config.taskInstruction?.trim() || "",
-      skillInstructionBlocks: node.config.skillInstructionBlocks ?? {},
+      skillInstructionBlocks: resolveDisplayAgentSkillInstructionBlocks(
+        node.config.skillKey,
+        options.skillDefinitions ?? [],
+        node.config.skillInstructionBlocks ?? {},
+      ),
       modelLabel: resolveAgentModelLabel(node),
       thinkingLabel: resolveThinkingLabel(node),
       skillLabel: node.config.skillKey.trim() || "No skill",

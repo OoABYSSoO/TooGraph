@@ -81,6 +81,55 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(updated_config["provider_id"], "local")
         self.assertEqual(updated_config["provider_thinking_level"], "medium")
 
+    def test_user_prompt_does_not_append_skill_instruction_blocks_for_final_response(self) -> None:
+        captured: dict[str, object] = {}
+
+        def chat_with_local_model_with_meta_func(**kwargs):
+            captured.update(kwargs)
+            return ('{"answer": "done"}', {"warnings": []})
+
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "writer",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "writes": [{"state": "answer"}],
+                "config": {
+                    "skillKey": "web_search",
+                    "taskInstruction": "Summarize the skill result.",
+                    "skillInstructionBlocks": {
+                        "web_search": {
+                            "skillKey": "web_search",
+                            "title": "联网搜索 skill instruction",
+                            "content": "Use this only while invoking the skill.",
+                            "source": "node.override",
+                        }
+                    },
+                },
+            }
+        )
+
+        generate_agent_response(
+            node,
+            {"question": "q"},
+            {"web_search": {"summary": "searched"}},
+            {
+                "resolved_provider_id": "local",
+                "runtime_model_name": "test-model",
+                "resolved_temperature": 0.2,
+                "resolved_thinking": False,
+                "resolved_thinking_level": "off",
+                "resolved_model_ref": "local/test-model",
+            },
+            build_effective_system_prompt_func=lambda *args, **kwargs: "system prompt",
+            chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+            parse_llm_json_response_func=lambda content, output_keys, *, output_key_aliases: {"answer": "done"},
+            build_output_key_aliases_func=lambda output_keys, state_schema: {"answer": ["answer"]},
+        )
+
+        self.assertEqual(captured["user_prompt"], "Summarize the skill result.")
+        self.assertNotIn("Bound Skill Instructions", str(captured["user_prompt"]))
+
     def test_routes_image_upload_inputs_as_model_attachments_from_local_paths(self) -> None:
         captured: dict[str, object] = {}
 

@@ -47,6 +47,7 @@ def generate_agent_skill_inputs(
         bindings=bindings,
         skill_definitions=skill_definitions,
         state_schema=state_schema,
+        node=node,
     )
     user_prompt = build_skill_input_user_prompt(node)
     thinking_level = runtime_config.get("resolved_thinking_level")
@@ -102,6 +103,7 @@ def build_skill_input_system_prompt(
     bindings: list[ResolvedAgentSkillBinding],
     skill_definitions: dict[str, SkillDefinition],
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
+    node: NodeSystemAgentNode | None = None,
 ) -> str:
     resolved_state_schema = state_schema or {}
     parts = [
@@ -131,8 +133,9 @@ def build_skill_input_system_prompt(
             parts.append(f"  name: {definition.name}")
         if definition.description:
             parts.append(f"  description: {definition.description}")
-        if definition.llm_instruction:
-            parts.append(f"  llmInstruction: {definition.llm_instruction}")
+        llm_instruction = resolve_effective_skill_llm_instruction(node, skill_key, definition)
+        if llm_instruction:
+            parts.append(f"  llmInstruction: {llm_instruction}")
         parts.append("  inputSchema:")
         for field in definition.input_schema:
             parts.extend(format_skill_input_field_lines(field))
@@ -148,22 +151,23 @@ def build_skill_input_system_prompt(
 
 
 def build_skill_input_user_prompt(node: NodeSystemAgentNode) -> str:
-    parts = [
+    return (
         node.config.task_instruction
         if node.config.task_instruction
-        else "Generate skill arguments from the graph state and bound skill instructions."
-    ]
-    instruction_blocks = [
-        block
-        for skill_key, block in node.config.skill_instruction_blocks.items()
-        if skill_key == node.config.skill_key and block.content.strip()
-    ]
-    if instruction_blocks:
-        parts.append("\n== Bound Skill Instructions ==")
-        for block in instruction_blocks:
-            title = block.title.strip() or block.skill_key
-            parts.append(f"[{block.skill_key}] {title}\n{block.content.strip()}")
-    return "\n".join(parts).strip()
+        else "Generate skill arguments from the graph state and skill schemas."
+    ).strip()
+
+
+def resolve_effective_skill_llm_instruction(
+    node: NodeSystemAgentNode | None,
+    skill_key: str,
+    definition: SkillDefinition,
+) -> str:
+    if node is not None and node.config.skill_key == skill_key:
+        block = node.config.skill_instruction_blocks.get(skill_key)
+        if block is not None and block.source == "node.override":
+            return block.content.strip()
+    return definition.llm_instruction.strip() if definition.llm_instruction else ""
 
 
 def parse_skill_input_response(content: str, skill_keys: list[str]) -> dict[str, dict[str, Any]]:

@@ -44,7 +44,7 @@
 - `description` 承载选择条件，`llmInstruction` 承载绑定后的使用说明。
 - `state_schema` 增加 `skill`、`result_package` 类型和技能绑定元数据；`promptVisible` 已移除，上下文边界由节点 `reads` 决定。
 - LLM 节点卡片已改为单选 Skill 控件；动态 `subgraph` state 只服务于模板内运行时能力选择，不作为普通卡片下拉项。
-- LLM 节点提示词区域支持技能说明胶囊，胶囊可编辑、可随技能移除。
+- LLM 节点提示词区域支持技能说明胶囊；默认胶囊从 skill `llmInstruction` 动态展示，用户编辑后才作为 `node.override` 写入当前节点。
 - 旧内置模板已删除，旧模板运行入口兼容修补已删除。
 - 旧技能包已删除，当前官方 Skill 包包括 `web_search`、`local_workspace_executor` 和 `graphiteUI_skill_builder`。
 - `file` / `image` / `audio` / `video` state 已采用路径透传语义，值可以是本地路径字符串或路径数组；`file_list`、`array`、`object` 不再作为 state 类型存在。
@@ -324,11 +324,11 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 规则：
 
-- 选择 skill 时，根据 `llmInstruction` 自动生成技能说明胶囊。
+- 选择 skill 时，根据 `llmInstruction` 动态显示技能说明胶囊，默认不把这段说明写入图 JSON。
 - 点击胶囊可以查看和编辑本节点的技能说明。
-- 编辑只影响当前节点，不反向修改 skill 包。
+- 编辑只影响当前节点，会写入 `skillInstructionBlocks.<skillKey>` 并标记为 `node.override`，不反向修改 skill 包。
 - 移除 skill 时自动移除胶囊。
-- 胶囊内容最终会追加到该 LLM 节点的模型提示词中。
+- 运行时只保留一个有效使用说明：未编辑时使用 manifest `llmInstruction`，编辑后使用节点覆盖内容。该说明进入技能入参生成阶段的 system prompt，不再作为重复段落追加到 user prompt。
 
 这比手写隐藏标记块更适合当前产品，因为用户能看到、编辑、移除，并能理解提示词里为什么多出这段技能说明。
 
@@ -481,7 +481,7 @@ backend/data/skills/revisions/<skill_key>/
 
 - 图节点声明 skill。
 - runtime 合并有效 skill。
-- LLM 节点根据 skill `llmInstruction` 和 `inputSchema` 生成入参。
+- LLM 节点根据 skill 有效 `llmInstruction` 和 `inputSchema` 生成入参。
 - runtime 调用 skill。
 - skill 输出进入 state 和 run detail。
 - 后续节点根据结构化结果继续运行。

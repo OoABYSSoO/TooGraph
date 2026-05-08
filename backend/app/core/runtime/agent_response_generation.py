@@ -128,22 +128,11 @@ def _cleanup_prepared_media_paths(paths: Any) -> None:
 
 
 def _build_agent_user_prompt(node: NodeSystemAgentNode) -> str:
-    parts = [
+    return (
         node.config.task_instruction
         if node.config.task_instruction
         else "根据输入和技能结果完成输出。"
-    ]
-    instruction_blocks = [
-        block
-        for skill_key, block in node.config.skill_instruction_blocks.items()
-        if skill_key == node.config.skill_key and block.content.strip()
-    ]
-    if instruction_blocks:
-        parts.append("\n== Bound Skill Instructions ==")
-        for block in instruction_blocks:
-            title = block.title.strip() or block.skill_key
-            parts.append(f"[{block.skill_key}] {title}\n{block.content.strip()}")
-    return "\n".join(parts).strip()
+    ).strip()
 
 
 def _resolve_media_runtime_config(

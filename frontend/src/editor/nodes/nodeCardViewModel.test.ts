@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { buildNodeCardViewModel } from "./nodeCardViewModel.ts";
 import { VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "../../lib/virtual-any-input.ts";
 import type { GraphNode, StateDefinition } from "../../types/node-system.ts";
+import type { SkillDefinition } from "../../types/skills.ts";
 
 const stateSchema: Record<string, StateDefinition> = {
   question: {
@@ -160,6 +161,47 @@ test("buildNodeCardViewModel derives agent body, ports, and labels", () => {
   assert.equal(model.body.primaryInput?.typeLabel, "text");
   assert.deepEqual(model.stateSummary?.reads, ["question"]);
   assert.deepEqual(model.stateSummary?.writes, ["answer"]);
+});
+
+test("buildNodeCardViewModel derives displayed skill instruction from the selected skill definition", () => {
+  const node: GraphNode = {
+    kind: "agent",
+    name: "search_helper",
+    description: "Prepare a search.",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [{ state: "question", required: true }],
+    writes: [{ state: "answer", mode: "replace" }],
+    config: {
+      skillKey: "web_search",
+      skillInstructionBlocks: {},
+      taskInstruction: "生成搜索参数。",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "on",
+      temperature: 0.2,
+    },
+  };
+
+  const model = buildNodeCardViewModel("search_helper", node, stateSchema, {
+    skillDefinitions: [
+      {
+        skillKey: "web_search",
+        name: "Web Search",
+        description: "Search the web.",
+        llmInstruction: "Use the graph state to create a search query.",
+      },
+    ] as SkillDefinition[],
+  });
+
+  assert.equal(model.body.kind, "agent");
+  assert.deepEqual(model.body.skillInstructionBlocks, {
+    web_search: {
+      skillKey: "web_search",
+      title: "Web Search skill instruction",
+      content: "Use the graph state to create a search query.",
+      source: "skill.llmInstruction",
+    },
+  });
 });
 
 test("buildNodeCardViewModel exposes a virtual plus input for empty non-input nodes", () => {

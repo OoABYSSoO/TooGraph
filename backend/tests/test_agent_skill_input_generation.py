@@ -6,9 +6,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.runtime.agent_skill_input_generation import build_skill_input_system_prompt
+from app.core.runtime.agent_skill_input_generation import build_skill_input_system_prompt, build_skill_input_user_prompt
 from app.core.runtime.skill_bindings import ResolvedAgentSkillBinding
-from app.core.schemas.node_system import NodeSystemAgentSkillBinding, NodeSystemStateDefinition, NodeSystemStateType
+from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemAgentSkillBinding, NodeSystemStateDefinition, NodeSystemStateType
 from app.core.schemas.skills import SkillDefinition, SkillIoField
 from app.core.storage.skill_artifact_store import create_uploaded_skill_artifact, resolve_skill_artifact_path
 
@@ -35,6 +35,92 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
 
         self.assertIn("llmInstruction: Generate a query", prompt)
         self.assertNotIn("agentInstruction", prompt)
+
+    def test_skill_input_prompt_uses_node_override_as_single_effective_instruction(self) -> None:
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "config": {
+                    "skillKey": "web_search",
+                    "taskInstruction": "Generate the search arguments.",
+                    "skillInstructionBlocks": {
+                        "web_search": {
+                            "skillKey": "web_search",
+                            "title": "联网搜索 skill instruction",
+                            "content": "Use the user-edited query rule.",
+                            "source": "node.override",
+                        }
+                    },
+                },
+            }
+        )
+
+        system_prompt = build_skill_input_system_prompt(
+            input_values={"question": "latest release"},
+            bindings=[
+                ResolvedAgentSkillBinding(
+                    binding=NodeSystemAgentSkillBinding(skillKey="web_search"),
+                    source="node_config",
+                )
+            ],
+            skill_definitions={
+                "web_search": SkillDefinition(
+                    skillKey="web_search",
+                    name="Web Search",
+                    llmInstruction="Use the manifest query rule.",
+                    inputSchema=[SkillIoField(key="query", name="Query", valueType="text", required=True)],
+                )
+            },
+            node=node,
+        )
+        user_prompt = build_skill_input_user_prompt(node)
+
+        self.assertIn("llmInstruction: Use the user-edited query rule.", system_prompt)
+        self.assertNotIn("Use the manifest query rule.", system_prompt)
+        self.assertEqual(user_prompt, "Generate the search arguments.")
+        self.assertNotIn("Bound Skill Instructions", user_prompt)
+
+    def test_skill_input_prompt_respects_blank_node_override(self) -> None:
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "config": {
+                    "skillKey": "web_search",
+                    "skillInstructionBlocks": {
+                        "web_search": {
+                            "skillKey": "web_search",
+                            "title": "联网搜索 skill instruction",
+                            "content": "   ",
+                            "source": "node.override",
+                        }
+                    },
+                },
+            }
+        )
+
+        system_prompt = build_skill_input_system_prompt(
+            input_values={"question": "latest release"},
+            bindings=[
+                ResolvedAgentSkillBinding(
+                    binding=NodeSystemAgentSkillBinding(skillKey="web_search"),
+                    source="node_config",
+                )
+            ],
+            skill_definitions={
+                "web_search": SkillDefinition(
+                    skillKey="web_search",
+                    name="Web Search",
+                    llmInstruction="Use the manifest query rule.",
+                    inputSchema=[SkillIoField(key="query", name="Query", valueType="text", required=True)],
+                )
+            },
+            node=node,
+        )
+
+        self.assertNotIn("Use the manifest query rule.", system_prompt)
+        self.assertNotIn("llmInstruction:", system_prompt)
 
     def test_skill_input_prompt_does_not_expose_output_mapping_to_llm(self) -> None:
         prompt = build_skill_input_system_prompt(
