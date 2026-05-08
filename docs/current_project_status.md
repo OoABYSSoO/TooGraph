@@ -20,8 +20,8 @@
 - skill manifest 顶层和 `inputSchema` / `outputSchema` 字段都使用 `name` 表示显示名称，不再使用 `label`。
 - “什么时候选择这个技能”写进 `description`。
 - “绑定到 LLM 节点后应该如何生成调用输入”写进 `llmInstruction`。
-- 一个 LLM 节点最多使用一个显式能力来源：无能力、一个手动选择的 Skill、一个输入 `skill` state，或一个输入 `subgraph` state。多个能力调用必须拆成多个节点和边。
-- 手动复用图仍通过 Subgraph 节点完成；`subgraph` state 主要用于桌宠主循环等模板在运行时动态选择可运行子图能力，不作为普通 LLM 节点卡片下拉项。
+- 一个 LLM 节点最多使用一个显式能力来源：无能力、一个手动选择的 Skill，或一个输入 `capability` state。`capability` 是单个互斥对象，`kind` 可为 `skill`、`subgraph` 或 `none`，不能是列表。多个能力调用必须拆成多个节点和边。
+- 手动复用图仍通过 Subgraph 节点完成；`capability.kind=subgraph` 主要用于桌宠主循环等模板在运行时动态选择可运行子图能力，不作为普通 LLM 节点卡片下拉项。
 - LLM 节点卡片上的 Skill 选择是单选控件；它使用蓝色视觉强调，以区别模型、思考强度和断点等普通运行控件。
 - 手动选择的 LLM 节点 Skill 在协议里存为单值 `config.skillKey`。不要使用 `config.skills` 数组；数组会暗示单节点多技能语义，属于旧协议残留。
 - 添加到 LLM 节点的 skill 会在节点提示词编辑区显示可编辑的技能说明胶囊；默认胶囊由 skill `llmInstruction` 动态展示，不写入图 JSON。
@@ -29,7 +29,7 @@
 - 静态手动选择的 Skill 使用 `config.skillKey` 和协议拥有的 `skillBindings.outputMapping`。`outputMapping` 由图协议、前端和运行时维护，只用于确定 skill 输出写入哪个 state 与运行审计；LLM 不看也不修改它。
 - 技能输入由 LLM 节点在运行前根据当前输入 state、技能 `description`、有效 `llmInstruction` 和 `inputSchema` 生成。有效 `llmInstruction` 默认来自 skill manifest；如果当前节点存在 `node.override` 胶囊覆盖，则使用覆盖内容。这个说明只进入技能入参生成阶段的 system prompt，不会再追加到 user prompt。
 - 在 LLM 节点卡片选择带 `outputSchema` 的静态 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
-- 动态能力执行来自输入 `skill` state 或未来的 `subgraph` state，不复用 `skillBindings.outputMapping`，也不会推断普通输出映射。这类节点必须只写一个 `result_package` state。包内 `outputs.<outputKey>` 保存 `{ name, description, type, value }`，不额外捏造 `fieldKey`；下游 LLM 节点会把这些虚拟输出拆开并复用普通 state/file 展开逻辑。
+- 动态能力执行来自输入 `capability` state，不复用 `skillBindings.outputMapping`，也不会推断普通输出映射。这类节点必须只写一个 `result_package` state。包内 `outputs.<outputKey>` 保存 `{ name, description, type, value }`，不额外捏造 `fieldKey`；下游 LLM 节点会把这些虚拟输出拆开并复用普通 state/file 展开逻辑。
 - 图运行前不再做旧草稿兼容补齐。提交到运行时的图必须已经符合当前协议。
 - `promptVisible` 已移除。上下文边界由节点 `reads` 决定：LLM 节点只接收自己显式读取的 state。
 - `state_schema` 支持 `binding` 元数据，用来标记某个 state 是否由技能输出自动绑定。
@@ -113,7 +113,7 @@
 - 后端 Skill catalog 合并官方 Skill 和用户自定义 Skill。官方 Skill 只读，用户 Skill 可在 Skills 页面启用、停用和删除。
 - 后端提供本地执行器策略读取和白名单追加 API，用于支持 `local_workspace_executor` 的显式权限流。
 - validator 负责 `node_system` graph 结构校验。必填技能输入不再做静态绑定校验，而是在 LLM 节点生成技能输入后由运行时检查。
-- 动态读取 `skill` state 的 LLM 节点必须写唯一 `result_package` state；静态 `skillKey` 与动态 `skill` state 不能混用；没有静态 `skillKey` 的 `skillBindings` 会被视为旧协议并拒绝。
+- 动态读取 `capability` state 的 LLM 节点必须写唯一 `result_package` state；静态 `skillKey` 与动态 `capability` state 不能混用；没有静态 `skillKey` 的 `skillBindings` 会被视为旧协议并拒绝。
 - LangGraph runtime 是当前运行主链。
 - 后端不再在 graph run 入口修补旧模板结构；提交什么图，就按当前协议校验和执行什么图。
 - graph run、run detail、SSE 事件、状态快照和 artifact 输出仍是审计与回放的基础。

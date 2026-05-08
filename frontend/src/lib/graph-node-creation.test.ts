@@ -516,7 +516,7 @@ test("applyNodeCreationResult materializes an input virtual output when it spawn
   assert.deepEqual(result.document.edges, [{ source: "empty_input", target: "subgraph_created" }]);
 });
 
-test("applyNodeCreationResult materializes skill virtual outputs with an empty skill list", () => {
+test("applyNodeCreationResult materializes capability virtual outputs with an empty capability object", () => {
   const document: GraphPayload = {
     graph_id: null,
     name: "Creation Graph",
@@ -557,12 +557,12 @@ test("applyNodeCreationResult materializes skill virtual outputs with an empty s
       sourceNodeId: "empty_agent",
       sourceAnchorKind: "state-out",
       sourceStateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
-      sourceValueType: "skill",
+      sourceValueType: "capability",
     },
   });
 
-  assert.equal(result.document.state_schema.state_1?.type, "skill");
-  assert.deepEqual(result.document.state_schema.state_1?.value, []);
+  assert.equal(result.document.state_schema.state_1?.type, "capability");
+  assert.deepEqual(result.document.state_schema.state_1?.value, { kind: "none" });
 });
 
 test("applyNodeCreationResult wires a created input node upstream of an existing concrete state input", () => {

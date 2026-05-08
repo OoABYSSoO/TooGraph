@@ -17,7 +17,7 @@ export type StateFieldType =
   | "video"
   | "file"
   | "knowledge_base"
-  | "skill"
+  | "capability"
   | "result_package";
 
 export type StateColorOption = {
@@ -39,7 +39,7 @@ export const STATE_FIELD_TYPE_OPTIONS: StateFieldType[] = [
   "video",
   "file",
   "knowledge_base",
-  "skill",
+  "capability",
   "result_package",
 ];
 
@@ -274,7 +274,7 @@ export function deleteStateFieldFromDocument<T extends GraphPayload | GraphDocum
 }
 
 export function formatStateValueInput(type: StateFieldType, value: unknown) {
-  if (type === "json" || type === "skill" || type === "result_package") {
+  if (type === "json" || type === "capability" || type === "result_package") {
     return JSON.stringify(value ?? defaultValueForStateType(type), null, 2);
   }
   if (isFileReferenceStateType(type) && (Array.isArray(value) || (value !== null && typeof value === "object"))) {
@@ -297,7 +297,7 @@ export function parseStateValueInput(type: StateFieldType, input: string): unkno
   if (type === "boolean") {
     return input === "true";
   }
-  if (type === "json" || type === "skill" || type === "result_package") {
+  if (type === "json" || type === "capability" || type === "result_package") {
     try {
       return JSON.parse(input || JSON.stringify(defaultValueForStateType(type)));
     } catch {
@@ -318,8 +318,8 @@ export function defaultValueForStateType(type: StateFieldType): unknown {
       return false;
     case "json":
       return {};
-    case "skill":
-      return [];
+    case "capability":
+      return { kind: "none" };
     case "result_package":
       return {};
     default:

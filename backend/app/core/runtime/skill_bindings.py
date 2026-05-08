@@ -13,7 +13,7 @@ from app.core.schemas.node_system import (
 from app.core.schemas.skills import SkillDefinition, SkillIoField
 
 
-BindingSource = Literal["node_config", "skill_state"]
+BindingSource = Literal["node_config", "capability_state"]
 
 
 @dataclass(frozen=True)
@@ -87,18 +87,18 @@ def resolve_agent_skill_bindings(
         bound_keys.add(skill_key)
         return bindings
 
-    for skill_key in iter_skill_state_input_keys(node, input_values=input_values, state_schema=state_schema)[:1]:
+    for skill_key in iter_capability_state_skill_keys(node, input_values=input_values, state_schema=state_schema)[:1]:
         if skill_key in bound_keys:
             continue
         binding = NodeSystemAgentSkillBinding(skillKey=skill_key)
         bindings.append(
-            ResolvedAgentSkillBinding(binding=binding, source="skill_state")
+            ResolvedAgentSkillBinding(binding=binding, source="capability_state")
         )
         bound_keys.add(skill_key)
     return bindings
 
 
-def iter_skill_state_input_keys(
+def iter_capability_state_skill_keys(
     node: NodeSystemAgentNode,
     *,
     input_values: dict[str, Any] | None,
@@ -110,34 +110,34 @@ def iter_skill_state_input_keys(
     skill_keys: list[str] = []
     for read_binding in node.reads:
         definition = state_schema.get(read_binding.state)
-        if definition is None or definition.type != NodeSystemStateType.SKILL:
+        if definition is None or definition.type != NodeSystemStateType.CAPABILITY:
             continue
-        skill_keys.extend(extract_skill_keys(input_values.get(read_binding.state)))
+        skill_key = extract_capability_skill_key(input_values.get(read_binding.state))
+        if skill_key:
+            skill_keys.append(skill_key)
     return skill_keys
 
 
-def extract_skill_keys(value: Any) -> list[str]:
+def extract_capability_skill_key(value: Any) -> str:
     if isinstance(value, str):
         stripped = value.strip()
         if not stripped:
-            return []
+            return ""
         try:
             parsed = json.loads(stripped)
         except json.JSONDecodeError:
-            return [stripped]
-        return extract_skill_keys(parsed)
+            return ""
+        return extract_capability_skill_key(parsed)
 
     if isinstance(value, list):
-        skill_keys: list[str] = []
-        for item in value:
-            skill_keys.extend(extract_skill_keys(item))
-        return skill_keys
+        return ""
 
     if isinstance(value, dict):
-        skill_key = str(value.get("skillKey") or value.get("skill_key") or "").strip()
-        return [skill_key] if skill_key else []
+        if str(value.get("kind") or "").strip().lower() != "skill":
+            return ""
+        return str(value.get("key") or "").strip()
 
-    return []
+    return ""
 
 
 def map_skill_outputs(binding: NodeSystemAgentSkillBinding, skill_result: dict[str, Any]) -> dict[str, Any]:

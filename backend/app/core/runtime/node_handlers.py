@@ -183,7 +183,7 @@ def execute_agent_node(
         duration_ms = int((perf_counter() - started_at) * 1000)
         skill_status, skill_error = _resolve_skill_invocation_status(skill_key, skill_result)
         skill_error_type = _resolve_skill_error_type(skill_result)
-        if resolved_binding.source == "skill_state":
+        if resolved_binding.source == "capability_state":
             state_writes = map_dynamic_skill_result_package(
                 node,
                 state_schema,

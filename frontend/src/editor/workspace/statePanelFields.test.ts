@@ -268,9 +268,13 @@ test("legacy collection and object state types are not exposed", () => {
   assert.equal(stateTypeOptions.includes("file_list"), false);
 });
 
-test("skill state type is available and uses structured skill descriptors", () => {
-  assert.ok(STATE_FIELD_TYPE_OPTIONS.includes("skill"));
-  assert.deepEqual(defaultValueForStateType("skill"), []);
-  assert.equal(formatStateValueInput("skill", [{ skillKey: "web_search" }]), '[\n  {\n    "skillKey": "web_search"\n  }\n]');
-  assert.deepEqual(parseStateValueInput("skill", '[{"skillKey":"file_reader"}]'), [{ skillKey: "file_reader" }]);
+test("capability state type is available and uses a single structured capability", () => {
+  assert.ok(STATE_FIELD_TYPE_OPTIONS.includes("capability"));
+  assert.equal(STATE_FIELD_TYPE_OPTIONS.includes("skill"), false);
+  assert.deepEqual(defaultValueForStateType("capability"), { kind: "none" });
+  assert.equal(formatStateValueInput("capability", { kind: "skill", key: "web_search" }), '{\n  "kind": "skill",\n  "key": "web_search"\n}');
+  assert.deepEqual(parseStateValueInput("capability", '{"kind":"skill","key":"file_reader"}'), {
+    kind: "skill",
+    key: "file_reader",
+  });
 });

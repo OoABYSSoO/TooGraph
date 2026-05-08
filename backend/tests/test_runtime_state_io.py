@@ -28,10 +28,10 @@ class RuntimeStateIoTests(unittest.TestCase):
                     "ready": {"name": "Ready", "type": "boolean", "value": True},
                     "payload": {"name": "Payload", "type": "json", "value": {"items": [1]}},
                     "files": {"name": "Files", "type": "file", "value": ["old.txt"]},
-                    "allowed_skills": {
-                        "name": "Allowed Skills",
-                        "type": "skill",
-                        "value": [{"skillKey": "web_search"}],
+                    "selected_capability": {
+                        "name": "Selected Capability",
+                        "type": "capability",
+                        "value": {"kind": "skill", "key": "web_search"},
                     },
                 },
                 "nodes": {
@@ -49,7 +49,7 @@ class RuntimeStateIoTests(unittest.TestCase):
                             {"state": "ready"},
                             {"state": "payload"},
                             {"state": "files"},
-                            {"state": "allowed_skills"},
+                            {"state": "selected_capability"},
                         ],
                     },
                 },
@@ -65,7 +65,7 @@ class RuntimeStateIoTests(unittest.TestCase):
                 "ready": True,
                 "payload": {"previous": True},
                 "files": ["previous.txt"],
-                "allowed_skills": [{"skillKey": "previous"}],
+                "selected_capability": {"kind": "skill", "key": "previous"},
                 "obsolete": "remove me",
             },
             "state_last_writers": {"question": {"node_id": "input"}},
@@ -83,7 +83,7 @@ class RuntimeStateIoTests(unittest.TestCase):
                 "ready": False,
                 "payload": {},
                 "files": "",
-                "allowed_skills": [],
+                "selected_capability": {"kind": "none"},
             },
         )
         self.assertEqual(state["state_snapshot"]["values"], state["state_values"])

@@ -64,68 +64,121 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
                 }
             )
 
-    def test_static_skill_nodes_ignore_skill_state_inputs_at_runtime(self) -> None:
+    def test_static_skill_nodes_ignore_capability_state_inputs_at_runtime(self) -> None:
         node = NodeSystemAgentNode.model_validate(
             {
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
-                "reads": [{"state": "allowed_skills"}],
+                "reads": [{"state": "selected_capability"}],
                 "config": {"skillKey": "web_search"},
             }
         )
         state_schema = {
-            "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
         }
 
         bindings = normalize_agent_skill_bindings(
             node,
             input_values={
-                "allowed_skills": [
-                    {"skillKey": "file_reader", "name": "File Reader"},
-                    {"skill_key": "web_search"},
-                    "media_fetcher",
-                ]
+                "selected_capability": {
+                    "kind": "skill",
+                    "key": "file_reader",
+                    "name": "File Reader",
+                }
             },
             state_schema=state_schema,
         )
 
         self.assertEqual([binding.skill_key for binding in bindings], ["web_search"])
 
-    def test_skill_state_inputs_resolve_only_for_dynamic_skill_nodes(self) -> None:
+    def test_capability_state_inputs_resolve_only_for_dynamic_capability_nodes(self) -> None:
         node = NodeSystemAgentNode.model_validate(
             {
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
-                "reads": [{"state": "allowed_skills"}],
+                "reads": [{"state": "selected_capability"}],
                 "config": {"skillKey": ""},
             }
         )
         state_schema = {
-            "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
         }
 
         resolved = resolve_agent_skill_bindings(
             node,
             input_values={
-                "allowed_skills": [
-                    {"skillKey": "file_reader", "name": "File Reader"},
-                    {"skill_key": "web_search"},
-                ]
+                "selected_capability": {
+                    "kind": "skill",
+                    "key": "file_reader",
+                    "name": "File Reader",
+                }
             },
             state_schema=state_schema,
         )
 
         self.assertEqual(
             [(item.binding.skill_key, item.source) for item in resolved],
-            [("file_reader", "skill_state")],
+            [("file_reader", "capability_state")],
         )
 
-    def test_dynamic_skill_state_does_not_reuse_legacy_configured_output_mapping(self) -> None:
+    def test_capability_state_inputs_resolve_single_skill_capability(self) -> None:
         node = NodeSystemAgentNode.model_validate(
             {
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
-                "reads": [{"state": "allowed_skills"}],
+                "reads": [{"state": "selected_capability"}],
+                "config": {"skillKey": ""},
+            }
+        )
+        state_schema = {
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
+        }
+
+        resolved = resolve_agent_skill_bindings(
+            node,
+            input_values={
+                "selected_capability": {
+                    "kind": "skill",
+                    "key": "web_search",
+                    "name": "Web Search",
+                    "description": "Search the web.",
+                }
+            },
+            state_schema=state_schema,
+        )
+
+        self.assertEqual(
+            [(item.binding.skill_key, item.source) for item in resolved],
+            [("web_search", "capability_state")],
+        )
+
+    def test_capability_state_inputs_do_not_accept_skill_lists(self) -> None:
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "selected_capability"}],
+                "config": {"skillKey": ""},
+            }
+        )
+        state_schema = {
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
+        }
+
+        resolved = resolve_agent_skill_bindings(
+            node,
+            input_values={"selected_capability": [{"kind": "skill", "key": "web_search"}]},
+            state_schema=state_schema,
+        )
+
+        self.assertEqual(resolved, [])
+
+    def test_dynamic_capability_state_does_not_reuse_legacy_configured_output_mapping(self) -> None:
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "selected_capability"}],
                 "config": {
                     "skillKey": "",
                     "skillBindings": [
@@ -138,37 +191,37 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
             }
         )
         state_schema = {
-            "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
         }
 
         resolved = resolve_agent_skill_bindings(
             node,
-            input_values={"allowed_skills": {"skillKey": "web_search"}},
+            input_values={"selected_capability": {"kind": "skill", "key": "web_search"}},
             state_schema=state_schema,
         )
 
-        self.assertEqual([(item.binding.skill_key, item.source) for item in resolved], [("web_search", "skill_state")])
+        self.assertEqual([(item.binding.skill_key, item.source) for item in resolved], [("web_search", "capability_state")])
         self.assertEqual(resolved[0].binding.output_mapping, {})
 
-    def test_skill_state_inputs_ignore_non_skill_state_values(self) -> None:
+    def test_capability_state_inputs_ignore_non_capability_state_values(self) -> None:
         node = NodeSystemAgentNode.model_validate(
             {
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
-                "reads": [{"state": "allowed_skills"}, {"state": "raw_json"}],
+                "reads": [{"state": "selected_capability"}, {"state": "raw_json"}],
                 "config": {"skillKey": ""},
             }
         )
         state_schema = {
-            "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
             "raw_json": NodeSystemStateDefinition.model_validate({"type": "json"}),
         }
 
         bindings = normalize_agent_skill_bindings(
             node,
             input_values={
-                "allowed_skills": {"skillKey": "web_search"},
-                "raw_json": {"skillKey": "file_reader"},
+                "selected_capability": {"kind": "skill", "key": "web_search"},
+                "raw_json": {"kind": "skill", "key": "file_reader"},
             },
             state_schema=state_schema,
         )

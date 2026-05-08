@@ -66,7 +66,7 @@ class NodeSystemStateType(str, Enum):
     VIDEO = "video"
     FILE = "file"
     KNOWLEDGE_BASE = "knowledge_base"
-    SKILL = "skill"
+    CAPABILITY = "capability"
     RESULT_PACKAGE = "result_package"
 
 

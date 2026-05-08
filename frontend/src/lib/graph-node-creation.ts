@@ -69,8 +69,8 @@ function defaultValueForStateType(type: string): unknown {
       return false;
     case "json":
       return {};
-    case "skill":
-      return [];
+    case "capability":
+      return { kind: "none" };
     default:
       return "";
   }

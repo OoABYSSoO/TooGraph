@@ -54,7 +54,7 @@ const STATE_FIELD_TYPE_VALUES = new Set([
   "video",
   "file",
   "knowledge_base",
-  "skill",
+  "capability",
   "result_package",
 ]);
 
@@ -190,8 +190,8 @@ function defaultMaterializedStateValueForType(type: string): unknown {
       return false;
     case "json":
       return {};
-    case "skill":
-      return [];
+    case "capability":
+      return { kind: "none" };
     case "result_package":
       return {};
     default:

@@ -30,7 +30,7 @@ export function resolveStateDefaultValueEditorConfig(type: StateFieldType): Stat
     return {
       mode: "structured",
       rows: 5,
-      placeholder: type === "skill" ? "[]" : "{}",
+      placeholder: type === "capability" ? "{\"kind\":\"none\"}" : "{}",
     };
   }
 
@@ -44,10 +44,10 @@ export function resolveStateDefaultValueEditorConfig(type: StateFieldType): Stat
 export function parseStructuredStateDraft(type: StateFieldType, draft: string): { ok: true; value: unknown } | { ok: false; error: string } {
   try {
     const parsed = draft.trim() === "" ? defaultValueForStateType(type) : JSON.parse(draft);
-    if (type === "skill" && !Array.isArray(parsed)) {
+    if (type === "capability" && (Array.isArray(parsed) || parsed === null || typeof parsed !== "object")) {
       return {
         ok: false,
-        error: translate("nodeCard.jsonArrayRequired"),
+        error: translate("nodeCard.jsonObjectRequired"),
       };
     }
     return {
@@ -67,5 +67,5 @@ export function stringifyStructuredStateValue(type: StateFieldType, value: unkno
 }
 
 function isStructuredStateType(type: StateFieldType) {
-  return type === "json" || type === "skill";
+  return type === "json" || type === "capability";
 }

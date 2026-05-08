@@ -149,13 +149,13 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
 
         self.assertIn("agent_skill_binding_without_skill_key", [issue.code for issue in validation.issues])
 
-    def test_dynamic_skill_node_requires_single_result_package_output(self) -> None:
+    def test_dynamic_capability_node_requires_single_result_package_output(self) -> None:
         graph = NodeSystemGraphDocument.model_validate(
             {
                 "graph_id": "graph-1",
                 "name": "Graph",
                 "state_schema": {
-                    "selected_skill": {"type": "skill", "value": {"skillKey": "web_search"}},
+                    "selected_capability": {"type": "capability", "value": {"kind": "skill", "key": "web_search"}},
                     "question": {"type": "text", "value": "q"},
                     "answer": {"type": "text", "value": ""},
                 },
@@ -163,7 +163,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
                     "agent": {
                         "kind": "agent",
                         "ui": {"position": {"x": 0, "y": 0}},
-                        "reads": [{"state": "selected_skill"}, {"state": "question"}],
+                        "reads": [{"state": "selected_capability"}, {"state": "question"}],
                         "writes": [{"state": "answer"}],
                         "config": {"skillKey": ""},
                     },
@@ -175,15 +175,15 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
 
         validation = validate_graph(graph)
 
-        self.assertIn("dynamic_skill_output_state_invalid", [issue.code for issue in validation.issues])
+        self.assertIn("dynamic_capability_output_state_invalid", [issue.code for issue in validation.issues])
 
-    def test_static_skill_node_cannot_also_read_dynamic_skill_state(self) -> None:
+    def test_static_skill_node_cannot_also_read_dynamic_capability_state(self) -> None:
         graph = NodeSystemGraphDocument.model_validate(
             {
                 "graph_id": "graph-1",
                 "name": "Graph",
                 "state_schema": {
-                    "selected_skill": {"type": "skill", "value": {"skillKey": "file_reader"}},
+                    "selected_capability": {"type": "capability", "value": {"kind": "skill", "key": "file_reader"}},
                     "question": {"type": "text", "value": "q"},
                     "answer": {"type": "text", "value": ""},
                 },
@@ -191,7 +191,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
                     "agent": {
                         "kind": "agent",
                         "ui": {"position": {"x": 0, "y": 0}},
-                        "reads": [{"state": "selected_skill"}, {"state": "question"}],
+                        "reads": [{"state": "selected_capability"}, {"state": "question"}],
                         "writes": [{"state": "answer"}],
                         "config": {"skillKey": "web_search"},
                     },
@@ -208,7 +208,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
         ):
             validation = validate_graph(graph)
 
-        self.assertIn("agent_static_and_dynamic_skill_mixed", [issue.code for issue in validation.issues])
+        self.assertIn("agent_static_and_dynamic_capability_mixed", [issue.code for issue in validation.issues])
 
 
 if __name__ == "__main__":

@@ -191,9 +191,9 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["skill_outputs"][0]["inputs"], {"kb": "docs", "question": "q"})
         self.assertEqual(result["outputs"], {"answer": "q"})
 
-    def test_execute_agent_node_static_skill_ignores_skill_state_inputs(self) -> None:
+    def test_execute_agent_node_static_skill_ignores_capability_state_inputs(self) -> None:
         state_schema = {
-            "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
             "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
         }
@@ -202,7 +202,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "kind": "agent",
                 "name": "writer",
                 "ui": {"position": {"x": 0, "y": 0}},
-                "reads": [{"state": "allowed_skills"}, {"state": "question"}],
+                "reads": [{"state": "selected_capability"}, {"state": "question"}],
                 "writes": [{"state": "answer"}],
                 "config": {"skillKey": "web_search"},
             }
@@ -217,10 +217,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             state_schema,
             node,
             {
-                "allowed_skills": [
-                    {"skillKey": "file_reader", "name": "File Reader"},
-                    {"skill_key": "web_search"},
-                ],
+                "selected_capability": {"kind": "skill", "key": "file_reader", "name": "File Reader"},
                 "question": "q",
             },
             {"state": {}},
@@ -317,9 +314,9 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["reasoning"], "")
         self.assertEqual(result["outputs"], {"answer": "searched"})
 
-    def test_execute_agent_node_uses_llm_inputs_for_skill_state_selected_skills(self) -> None:
+    def test_execute_agent_node_uses_llm_inputs_for_capability_state_selected_skill(self) -> None:
         state_schema = {
-            "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
             "query": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "dynamic_result": NodeSystemStateDefinition.model_validate({"type": "result_package"}),
         }
@@ -328,7 +325,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "kind": "agent",
                 "name": "tool_executor",
                 "ui": {"position": {"x": 0, "y": 0}},
-                "reads": [{"state": "allowed_skills"}, {"state": "query"}],
+                "reads": [{"state": "selected_capability"}, {"state": "query"}],
                 "writes": [{"state": "dynamic_result"}],
                 "config": {"skillKey": ""},
             }
@@ -339,7 +336,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             state_schema,
             node,
             {
-                "allowed_skills": {"skillKey": "web_search"},
+                "selected_capability": {"kind": "skill", "key": "web_search"},
                 "query": "fallback query",
             },
             {"state": {}},
@@ -382,7 +379,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(captured_inputs, [{"query": "Wuthering Waves latest version", "max_results": "8"}])
-        self.assertEqual(result["skill_outputs"][0]["binding_source"], "skill_state")
+        self.assertEqual(result["skill_outputs"][0]["binding_source"], "capability_state")
         self.assertEqual(result["skill_outputs"][0]["output_mapping"], {})
         self.assertEqual(result["skill_outputs"][0]["output_mapping_details"], [])
         self.assertEqual(
@@ -549,7 +546,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
 
     def test_execute_agent_node_reports_missing_llm_generated_skill_input_without_invoking_script(self) -> None:
         state_schema = {
-            "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
             "dynamic_result": NodeSystemStateDefinition.model_validate({"type": "result_package"}),
         }
         node = NodeSystemAgentNode.model_validate(
@@ -557,7 +554,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "kind": "agent",
                 "name": "tool_executor",
                 "ui": {"position": {"x": 0, "y": 0}},
-                "reads": [{"state": "allowed_skills"}],
+                "reads": [{"state": "selected_capability"}],
                 "writes": [{"state": "dynamic_result"}],
                 "config": {"skillKey": ""},
             }
@@ -567,7 +564,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         result = execute_agent_node(
             state_schema,
             node,
-            {"allowed_skills": {"skillKey": "web_search"}},
+            {"selected_capability": {"kind": "skill", "key": "web_search"}},
             {"state": {}},
             node_name="tool_executor",
             state={"run_id": "run-1"},
@@ -598,7 +595,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
 
         self.assertEqual(invoked, [])
         self.assertEqual(result["selected_skills"], ["web_search"])
-        self.assertEqual(result["skill_outputs"][0]["binding_source"], "skill_state")
+        self.assertEqual(result["skill_outputs"][0]["binding_source"], "capability_state")
         self.assertEqual(result["skill_outputs"][0]["output_mapping"], {})
         self.assertEqual(result["skill_outputs"][0]["output_mapping_details"], [])
         self.assertEqual(result["skill_outputs"][0]["status"], "failed")
