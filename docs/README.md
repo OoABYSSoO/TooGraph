@@ -10,6 +10,10 @@
   - 当前技能和模板状态
   - 近期仍在路线图中的事项
 
+- [structured-output-and-function-calling.md](structured-output-and-function-calling.md)
+  - `demo/` 中 Claude Code、Hermes Agent 和 OpenClaw 的结构化输出实现对比
+  - function calling 的作用原理、边界和对 GraphiteUI 的引入建议
+
 - [future/companion-autonomous-agent-roadmap.md](future/companion-autonomous-agent-roadmap.md)
   - 桌宠、自主工具循环、技能生成和长期协作能力的唯一长期参考
   - 包含 graph-first 运行模型、子图组件、skill manifest 契约、skill state、`result_package` 动态结果包、技能说明胶囊、技能绑定 state、`autonomous_decision`、`graphiteUI_skill_builder` 和 function call 取舍
