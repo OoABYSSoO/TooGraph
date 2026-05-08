@@ -3,7 +3,7 @@ import test from "node:test";
 import { ref } from "vue";
 
 import type { EditorWorkspaceTab } from "@/lib/editor-workspace";
-import type { GraphPayload, GraphRunResponse } from "@/types/node-system";
+import type { GraphDocument, GraphPayload, GraphRunResponse } from "@/types/node-system";
 import type { RunDetail } from "@/types/run";
 
 import type { RunActivityState } from "./runActivityModel.ts";
@@ -35,7 +35,12 @@ function graphDocument(name: string, nodeIds: string[] = ["node_a"]): GraphPaylo
   } as unknown as GraphPayload;
 }
 
-function createRunHarness() {
+function createRunHarness(
+  options: {
+    refreshAgentModels?: () => Promise<void>;
+    runGraph?: (document: GraphPayload | GraphDocument) => Promise<GraphRunResponse>;
+  } = {},
+) {
   const activeTab = ref<EditorWorkspaceTab | null>({
     tabId: "tab_a",
     kind: "new",
@@ -87,6 +92,7 @@ function createRunHarness() {
   const streams: Array<{ tabId: string; runId: string }> = [];
   const polls: Array<{ tabId: string; runId: string; generation: number }> = [];
   const runActivityHints: string[] = [];
+  const runErrorToasts: string[] = [];
   let generation = 7;
 
   const controller = useWorkspaceRunController({
@@ -102,13 +108,16 @@ function createRunHarness() {
     runFailureMessageByTabId,
     activeRunEdgeIdsByTabId,
     runActivityByTabId,
-    refreshAgentModels: async () => {
+    refreshAgentModels: options.refreshAgentModels ?? (async () => {
       documentsByTabId.value = {
         tab_a: graphDocument("After", ["new_node", "output_node"]),
       };
-    },
+    }),
     runGraph: async (document) => {
-      runGraphDocuments.push(document);
+      runGraphDocuments.push(document as GraphPayload);
+      if (options.runGraph) {
+        return options.runGraph(document);
+      }
       return { run_id: "run_started", status: "queued" } satisfies GraphRunResponse;
     },
     resumeRun: async (runId, payload, snapshotId) => {
@@ -145,6 +154,9 @@ function createRunHarness() {
         },
       };
     },
+    showRunErrorToast: (message) => {
+      runErrorToasts.push(message);
+    },
     translate: (key, params) => `${key}:${params?.runId ?? ""}`,
   });
 
@@ -168,6 +180,7 @@ function createRunHarness() {
     streams,
     polls,
     runActivityHints,
+    runErrorToasts,
     controller,
   };
 }
@@ -217,4 +230,22 @@ test("useWorkspaceRunController resumes Human Review runs with the restored snap
   assert.deepEqual(harness.runActivityHints, ["tab_a"]);
   assert.deepEqual(harness.streams, [{ tabId: "tab_a", runId: "run_resumed" }]);
   assert.deepEqual(harness.polls, [{ tabId: "tab_a", runId: "run_resumed", generation: 8 }]);
+});
+
+test("useWorkspaceRunController surfaces run request failures in feedback and a visible toast", async () => {
+  const backendMessage =
+    "POST /api/graphs/run failed with status 422: 节点 generate_skill_json 的输出 state 缺少绑定";
+  const harness = createRunHarness({
+    runGraph: async () => {
+      throw new Error(backendMessage);
+    },
+  });
+
+  await harness.controller.runActiveGraph();
+
+  assert.equal(harness.feedbackByTabId.value.tab_a?.tone, "danger");
+  assert.equal(harness.feedbackByTabId.value.tab_a?.message, backendMessage);
+  assert.deepEqual(harness.runErrorToasts, [backendMessage]);
+  assert.deepEqual(harness.streams, []);
+  assert.deepEqual(harness.polls, []);
 });

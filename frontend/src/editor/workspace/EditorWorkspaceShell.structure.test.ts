@@ -477,6 +477,21 @@ test("EditorWorkspaceShell runs the latest document after async model refresh", 
   assert.doesNotMatch(runControllerSource, /const response = await input\.runGraph\(document\);/);
 });
 
+test("EditorWorkspaceShell surfaces run request errors as a prominent toast", () => {
+  assert.match(
+    componentSource,
+    /useWorkspaceRunController\(\{[\s\S]*setMessageFeedbackForTab,[\s\S]*showRunErrorToast,[\s\S]*translate: \(key, params\) => t\(key, params \?\? \{\}\),[\s\S]*\}\);/,
+  );
+  assert.match(runControllerSource, /input\.showRunErrorToast\(message\);/);
+  assert.match(componentSource, /function showRunErrorToast\(message: string\)/);
+  assert.match(
+    componentSource,
+    /ElMessage\(\{[\s\S]*customClass:\s*"editor-workspace-shell__run-error-toast",[\s\S]*type:\s*"error",[\s\S]*duration:\s*9000,/,
+  );
+  assert.match(componentSource, /:global\(\.editor-workspace-shell__run-error-toast\.el-message\)/);
+  assert.match(componentSource, /:global\(\.editor-workspace-shell__run-error-toast \.el-message__content\) \{[\s\S]*white-space:\s*pre-wrap;/);
+});
+
 test("EditorWorkspaceShell persists graph document drafts across route changes and app restarts", () => {
   const ensureDocumentsSource =
     openControllerSource.match(/function ensureUnsavedTabDocuments\(\) \{[\s\S]*?\n  \}/)?.[0] ?? "";

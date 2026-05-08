@@ -808,6 +808,7 @@ const { runActiveGraph, resumeHumanReviewRun } = useWorkspaceRunController({
   markRunActivityPanelHintForTab,
   setFeedbackForTab,
   setMessageFeedbackForTab,
+  showRunErrorToast,
   translate: (key, params) => t(key, params ?? {}),
 });
 
@@ -941,6 +942,18 @@ function showStateDeleteBlockedToast(message: string) {
     customClass: "editor-workspace-shell__state-delete-toast",
     type: "warning",
     duration: 4200,
+    grouping: true,
+    placement: "top",
+    showClose: true,
+    message,
+  });
+}
+
+function showRunErrorToast(message: string) {
+  ElMessage({
+    customClass: "editor-workspace-shell__run-error-toast",
+    type: "error",
+    duration: 9000,
     grouping: true,
     placement: "top",
     showClose: true,
@@ -1217,6 +1230,25 @@ onMounted(() => {
 :global(.editor-workspace-shell__state-delete-toast .el-message__content) {
   color: #7c2d12;
   font-weight: 700;
+}
+
+:global(.editor-workspace-shell__run-error-toast.el-message) {
+  min-width: min(560px, calc(100vw - 40px));
+  max-width: min(820px, calc(100vw - 40px));
+  align-items: flex-start;
+  border: 1px solid rgba(190, 18, 60, 0.24);
+  border-radius: 16px;
+  background: rgba(255, 241, 242, 0.98);
+  box-shadow: 0 16px 42px rgba(127, 29, 29, 0.18);
+  backdrop-filter: blur(20px) saturate(1.45);
+}
+
+:global(.editor-workspace-shell__run-error-toast .el-message__content) {
+  color: #881337;
+  font-weight: 750;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 @keyframes editor-workspace-shell-locked-toast-float {

@@ -34,6 +34,7 @@ type WorkspaceRunControllerInput = {
     tabId: string,
     feedback: { tone: WorkspaceRunFeedback["tone"]; message: string; activeRunId?: string | null; activeRunStatus?: string | null },
   ) => void;
+  showRunErrorToast: (message: string) => void;
   translate: (key: string, params?: Record<string, unknown>) => string;
 };
 
@@ -96,10 +97,12 @@ export function useWorkspaceRunController(input: WorkspaceRunControllerInput) {
       });
       startQueuedRunPolling(tab.tabId, response.run_id);
     } catch (error) {
+      const message = error instanceof Error ? error.message : input.translate("feedback.runFailed", { runId: "" });
       input.setMessageFeedbackForTab(tab.tabId, {
         tone: "danger",
-        message: error instanceof Error ? error.message : input.translate("feedback.runFailed", { runId: "" }),
+        message,
       });
+      input.showRunErrorToast(message);
     }
   }
 
