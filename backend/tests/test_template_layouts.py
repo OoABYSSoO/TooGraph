@@ -255,21 +255,30 @@ class TemplateLayoutTests(unittest.TestCase):
             nodes["need_clarification"]["config"]["rule"],
             {"source": "$state.requirement_review.needs_clarification", "operator": "==", "value": True},
         )
+        self.assertTrue(nodes)
+        for node_id, node in nodes.items():
+            with self.subTest(node_id=node_id):
+                self.assertIsNone(node["ui"].get("size"))
+
         condition_node_ids = [node_id for node_id, node in nodes.items() if node["kind"] == "condition"]
         self.assertEqual(
-            {node_id: nodes[node_id]["ui"]["size"] for node_id in condition_node_ids},
-            {
-                "need_clarification": {"width": 560, "height": 280},
-                "should_create_skill": {"width": 560, "height": 280},
-                "examples_approved": {"width": 560, "height": 280},
-                "needs_script_test": {"width": 560, "height": 280},
-                "script_test_passed": {"width": 560, "height": 280},
-                "write_approved": {"width": 560, "height": 280},
-                "has_before_llm": {"width": 560, "height": 280},
-                "has_after_llm": {"width": 560, "height": 280},
-                "has_requirements": {"width": 560, "height": 280},
-            },
+            condition_node_ids,
+            [
+                "need_clarification",
+                "should_create_skill",
+                "examples_approved",
+                "needs_script_test",
+                "script_test_passed",
+                "write_approved",
+                "has_before_llm",
+                "has_after_llm",
+                "has_requirements",
+            ],
         )
+        for node_id in condition_node_ids:
+            with self.subTest(condition_node=node_id):
+                self.assertEqual(nodes[node_id]["config"]["branches"], ["true", "false", "exhausted"])
+                self.assertEqual(nodes[node_id]["config"]["branchMapping"], {"true": "true", "false": "false"})
         self.assertEqual(
             nodes["examples_approved"]["config"]["rule"],
             {"source": "$state.example_decision.approved", "operator": "==", "value": True},

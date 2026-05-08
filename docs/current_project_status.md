@@ -104,11 +104,12 @@
 
 - 位置：`backend/app/templates/official/graphiteui_skill_creation_workflow.json`
 - 显示名称：`创建自定义 Skill`
-- 作用：把“用户想创建一个 Skill”的需求拆成可暂停、可审查的图流程：检查已有能力、澄清需求、确认示例输入输出、生成 Skill 文件、测试 Python 生命周期脚本、失败后回到构建节点修复，最后在用户批准后写入用户 Skill 目录。
+- 作用：把“用户想创建一个 Skill”的需求拆成可暂停、可审查的图流程：检查已有能力、澄清需求、确认示例输入输出、生成 Skill 文件、测试脚本或生命周期入口、失败后回到构建节点修复，最后在用户批准后写入用户 Skill 目录。
 - 主要流程：输入需求 -> 调用 `graphiteui_capability_selector` 检查已有能力候选 -> 评估需求 -> 必要时断点询问用户 -> 确认是否继续创建 -> 断点确认示例输入输出 -> 调用 `graphiteUI_skill_builder` 生成 `skill_key`、`skill.json`、`SKILL.md`、`before_llm.py`、`after_llm.py`、`requirements.txt` -> 判断是否需要脚本测试 -> 调用 `graphiteUI_script_tester` -> 测试失败时经 `script_test_passed` 条件分支回到构建节点，最多三轮 -> 写入前断点审查 -> 用户明确批准后调用 `local_workspace_executor` 写入 `backend/data/skills/user/<skill_key>/`。
 - 断点语义：`ask_clarification`、`draft_example_io`、`review_generated_skill` 使用 `interrupt_after` 暂停，分别等待用户补充澄清回答、样例反馈和写入批准。
 - 能力候选语义：模板会把 `graphiteui_capability_selector` 返回的候选能力保存为普通 `json` state 供需求评估读取，而不是保存为 `capability` state。原因是当前协议规定 LLM 节点读取 `capability` state 等价于动态执行该能力；这里只是做“是否已有能力可满足需求”的审查，不应触发执行。
 - 写入语义：模板只写用户自定义 Skill 目录，不写官方 `skill/` 目录；写入动作由 `local_workspace_executor` 完成并需要显式确认。`graphiteUI_skill_builder` 仍然只负责生成文件内容，不负责写入、测试、启用或修改官方 Skill。
+- 视觉和协议约束：该模板只使用编辑器可创建的 `input / LLM / condition / output` 节点，LLM 节点最多绑定一个 Skill，condition 节点只使用固定 `true / false / exhausted` 分支，模板不手写节点尺寸，交给前端默认尺寸和用户后续拖拽调整。
 
 ### `graphiteUI_skill_builder`
 

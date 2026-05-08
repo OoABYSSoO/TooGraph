@@ -403,11 +403,7 @@
           "x": 40,
           "y": 520
         },
-        "collapsed": false,
-        "size": {
-          "width": 320,
-          "height": 190
-        }
+        "collapsed": false
       },
       "reads": [],
       "writes": [
@@ -430,11 +426,7 @@
           "x": 440,
           "y": 470
         },
-        "collapsed": false,
-        "size": {
-          "width": 420,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -482,11 +474,7 @@
           "x": 940,
           "y": 430
         },
-        "collapsed": false,
-        "size": {
-          "width": 440,
-          "height": 320
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -532,11 +520,7 @@
           "x": 1460,
           "y": 470
         },
-        "collapsed": false,
-        "size": {
-          "width": 560,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -572,11 +556,7 @@
           "x": 2100,
           "y": 170
         },
-        "collapsed": false,
-        "size": {
-          "width": 440,
-          "height": 300
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -618,11 +598,7 @@
           "x": 2600,
           "y": 170
         },
-        "collapsed": false,
-        "size": {
-          "width": 440,
-          "height": 300
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -672,11 +648,7 @@
           "x": 3080,
           "y": 470
         },
-        "collapsed": false,
-        "size": {
-          "width": 560,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -712,11 +684,7 @@
           "x": 3740,
           "y": 360
         },
-        "collapsed": false,
-        "size": {
-          "width": 440,
-          "height": 320
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -754,11 +722,7 @@
           "x": 4260,
           "y": 360
         },
-        "collapsed": false,
-        "size": {
-          "width": 440,
-          "height": 320
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -804,11 +768,7 @@
           "x": 4760,
           "y": 430
         },
-        "collapsed": false,
-        "size": {
-          "width": 560,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -844,11 +804,7 @@
           "x": 5420,
           "y": 360
         },
-        "collapsed": false,
-        "size": {
-          "width": 440,
-          "height": 320
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -894,11 +850,7 @@
           "x": 5940,
           "y": 360
         },
-        "collapsed": false,
-        "size": {
-          "width": 460,
-          "height": 340
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -984,11 +936,7 @@
           "x": 6480,
           "y": 360
         },
-        "collapsed": false,
-        "size": {
-          "width": 420,
-          "height": 300
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1034,11 +982,7 @@
           "x": 6980,
           "y": 430
         },
-        "collapsed": false,
-        "size": {
-          "width": 560,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1074,11 +1018,7 @@
           "x": 7640,
           "y": 240
         },
-        "collapsed": false,
-        "size": {
-          "width": 460,
-          "height": 340
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1144,11 +1084,7 @@
           "x": 8180,
           "y": 310
         },
-        "collapsed": false,
-        "size": {
-          "width": 560,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1184,11 +1120,7 @@
           "x": 8940,
           "y": 360
         },
-        "collapsed": false,
-        "size": {
-          "width": 460,
-          "height": 340
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1250,11 +1182,7 @@
           "x": 9460,
           "y": 360
         },
-        "collapsed": false,
-        "size": {
-          "width": 420,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1292,11 +1220,7 @@
           "x": 9920,
           "y": 430
         },
-        "collapsed": false,
-        "size": {
-          "width": 560,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1332,11 +1256,7 @@
           "x": 10580,
           "y": 300
         },
-        "collapsed": false,
-        "size": {
-          "width": 440,
-          "height": 300
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1386,11 +1306,7 @@
           "x": 11080,
           "y": 300
         },
-        "collapsed": false,
-        "size": {
-          "width": 440,
-          "height": 300
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1440,11 +1356,7 @@
           "x": 11580,
           "y": 360
         },
-        "collapsed": false,
-        "size": {
-          "width": 560,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1480,11 +1392,7 @@
           "x": 12220,
           "y": 180
         },
-        "collapsed": false,
-        "size": {
-          "width": 440,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1534,11 +1442,7 @@
           "x": 12700,
           "y": 360
         },
-        "collapsed": false,
-        "size": {
-          "width": 560,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1574,11 +1478,7 @@
           "x": 13340,
           "y": 180
         },
-        "collapsed": false,
-        "size": {
-          "width": 440,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1628,11 +1528,7 @@
           "x": 13820,
           "y": 360
         },
-        "collapsed": false,
-        "size": {
-          "width": 560,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1668,11 +1564,7 @@
           "x": 14460,
           "y": 180
         },
-        "collapsed": false,
-        "size": {
-          "width": 440,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1722,11 +1614,7 @@
           "x": 14960,
           "y": 360
         },
-        "collapsed": false,
-        "size": {
-          "width": 440,
-          "height": 300
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1808,11 +1696,7 @@
           "x": 3740,
           "y": 780
         },
-        "collapsed": false,
-        "size": {
-          "width": 440,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1854,11 +1738,7 @@
           "x": 10580,
           "y": 700
         },
-        "collapsed": false,
-        "size": {
-          "width": 440,
-          "height": 280
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -1900,11 +1780,7 @@
           "x": 15460,
           "y": 420
         },
-        "collapsed": false,
-        "size": {
-          "width": 320,
-          "height": 200
-        }
+        "collapsed": false
       },
       "reads": [
         {
@@ -2083,7 +1959,7 @@
   ],
   "metadata": {
     "category": "skill",
-    "templateVersion": "2026-05-08",
+    "templateVersion": "2026-05-09",
     "graphProtocol": "node_system",
     "interrupt_after": [
       "ask_clarification",
@@ -2095,6 +1971,6 @@
       "draft_example_io": "after",
       "review_generated_skill": "after"
     },
-    "description": "引导用户澄清需求、确认示例、生成并测试 Skill 文件，最后在用户批准后写入 backend/data/skills/user。"
+    "description": "用普通编辑器可创建的 input、LLM、condition、output 节点搭建创建自定义 Skill 的完整流程；节点使用前端默认尺寸，Skill 输出由单 Skill 绑定托管。"
   }
 }
