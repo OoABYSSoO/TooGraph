@@ -6,7 +6,7 @@ export const FLOW_OUT_HOTSPOT_GEOMETRY = Object.freeze({
 
 export const ROUTE_OUT_HOTSPOT_GEOMETRY = Object.freeze({
   offsetX: FLOW_OUT_HOTSPOT_GEOMETRY.offsetX,
-  width: 44,
+  width: FLOW_OUT_HOTSPOT_GEOMETRY.width,
   height: 56,
-  centerGap: 60,
+  centerGap: 56,
 });

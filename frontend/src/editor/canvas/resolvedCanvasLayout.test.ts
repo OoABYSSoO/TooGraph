@@ -189,9 +189,9 @@ test("resolveCanvasLayout keeps condition route handles tied to the current node
       y: anchor.y,
     })),
     [
-      { branch: "true", x: 814, y: 279 },
-      { branch: "false", x: 814, y: 339 },
-      { branch: "exhausted", x: 814, y: 399 },
+      { branch: "true", x: 820, y: 245 },
+      { branch: "false", x: 820, y: 301 },
+      { branch: "exhausted", x: 820, y: 357 },
     ],
   );
 });

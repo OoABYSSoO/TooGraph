@@ -380,8 +380,8 @@ test("projectCanvasEdges exposes branch metadata for condition routes", () => {
   assert.equal(
     routeEdge?.path,
     buildSequenceFlowPath({
-      sourceX: 554,
-      sourceY: 229,
+      sourceX: 560,
+      sourceY: 201,
       targetX: 486,
       targetY: 154,
       sourceNodeX: 0,
@@ -437,9 +437,9 @@ test("projectCanvasAnchors respects persisted condition node size for route hand
       y: anchor.y,
     })),
     [
-      { branch: "true", x: 364, y: 112 },
-      { branch: "false", x: 364, y: 172 },
-      { branch: "exhausted", x: 364, y: 232 },
+      { branch: "true", x: 370, y: 120 },
+      { branch: "false", x: 370, y: 176 },
+      { branch: "exhausted", x: 370, y: 232 },
     ],
   );
 });

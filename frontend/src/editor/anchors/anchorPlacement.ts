@@ -67,8 +67,7 @@ function placeRouteOutputs(anchors: AnchorDescriptor[], frame: NodeFrame): Place
 
 function placeRouteAnchor(anchor: AnchorDescriptor, frame: NodeFrame & { height: number }, index: number, count: number): PlacedAnchor {
   const topOffset = resolveRouteOutputTopOffset(frame);
-  const bottomOffset = resolveRouteOutputBottomOffset(frame, topOffset);
-  const yOffset = resolveRouteOutputYOffset(frame, index, count, topOffset, bottomOffset);
+  const yOffset = resolveRouteOutputYOffset(frame, index, count, topOffset);
   return {
     id: anchor.id,
     x: resolveX(anchor, frame),
@@ -84,18 +83,16 @@ function resolveRouteOutputYOffset(
   index: number,
   count: number,
   topOffset: number,
-  bottomOffset: number,
 ) {
   if (count <= 1) {
-    return Math.round((topOffset + bottomOffset) / 2);
+    return Math.round(topOffset);
   }
 
   const rowGap = resolveRouteOutputRowGap(count, frame.rowGap);
   const groupHeight = rowGap * (count - 1);
-  const groupCenter = (topOffset + bottomOffset) / 2;
   const minTop = ROUTE_OUTPUT_EDGE_INSET;
   const maxTop = Math.max(minTop, frame.height - ROUTE_OUTPUT_EDGE_INSET - groupHeight);
-  const groupTop = clamp(groupCenter - groupHeight / 2, minTop, maxTop);
+  const groupTop = clamp(topOffset, minTop, maxTop);
 
   return Math.round(groupTop + rowGap * index);
 }
@@ -104,10 +101,6 @@ function resolveRouteOutputTopOffset(frame: NodeFrame & { height: number }) {
   const preferredTop = frame.bodyTop + BODY_PORT_ROW_CENTER_OFFSET;
   const maxTop = Math.max(ROUTE_OUTPUT_EDGE_INSET, frame.height - ROUTE_OUTPUT_EDGE_INSET);
   return clamp(preferredTop, ROUTE_OUTPUT_EDGE_INSET, maxTop);
-}
-
-function resolveRouteOutputBottomOffset(frame: NodeFrame & { height: number }, topOffset: number) {
-  return Math.max(topOffset, frame.height - ROUTE_OUTPUT_EDGE_INSET);
 }
 
 function hasFrameHeight(frame: NodeFrame): frame is NodeFrame & { height: number } {
@@ -145,7 +138,7 @@ function resolveX(anchor: AnchorDescriptor, frame: NodeFrame): number {
   }
   if (anchor.side === "right") {
     if (anchor.branch) {
-      return frame.x + frame.width - EDGE_PORT_INSET;
+      return frame.x + frame.width;
     }
     return frame.x + frame.width - (anchor.lane === "body" ? BODY_OUTPUT_PORT_INSET : EDGE_PORT_INSET);
   }
