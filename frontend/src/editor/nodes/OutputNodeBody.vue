@@ -38,6 +38,8 @@
           'node-card__preview--documents': outputPreviewContent.kind === 'documents',
           'node-card__preview--empty': outputPreviewContent.isEmpty,
         }"
+        @pointerdown.stop
+        @click.stop
       >
         <OutputDocumentPager
           v-if="outputPreviewContent.kind === 'documents' && outputPreviewContent.documentRefs.length > 0"
@@ -48,7 +50,7 @@
           class="node-card__preview-markdown"
           v-html="outputPreviewContent.html"
         />
-        <pre v-else class="node-card__preview-text">{{ outputPreviewContent.text }}</pre>
+        <pre v-else class="node-card__preview-text"><OutputLinkedText :text="outputPreviewContent.text" /></pre>
       </div>
     </div>
   </div>
@@ -61,6 +63,7 @@ import { useI18n } from "vue-i18n";
 
 import type { NodeCardViewModel } from "./nodeCardViewModel";
 import OutputDocumentPager from "./OutputDocumentPager.vue";
+import OutputLinkedText from "./OutputLinkedText.vue";
 import type { OutputPreviewContent } from "./outputPreviewContentModel";
 
 type OutputBodyViewModel = Extract<NodeCardViewModel["body"], { kind: "output" }>;
@@ -134,6 +137,13 @@ const { t } = useI18n();
   font-size: 0.95rem;
   line-height: 1.62;
   color: #1f2937;
+}
+
+.node-card__preview,
+.node-card__preview *,
+.node-card__preview :deep(*) {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .node-card__preview--empty {

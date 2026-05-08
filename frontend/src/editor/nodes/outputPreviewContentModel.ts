@@ -1,5 +1,16 @@
 export type OutputPreviewContentKind = "plain" | "markdown" | "json" | "documents";
 
+export type OutputLinkedTextSegment =
+  | {
+      kind: "text";
+      text: string;
+    }
+  | {
+      kind: "link";
+      text: string;
+      href: string;
+    };
+
 export type OutputPreviewDocumentReference = {
   title: string;
   url: string;
@@ -24,6 +35,46 @@ export const OUTPUT_WAITING_TEXT = "Waiting for output...";
 
 const CONNECTED_EMPTY_PREFIX = "Connected to ";
 const UNBOUND_EMPTY_TEXT = "Connect an upstream output to preview/export it.";
+const OUTPUT_URL_PATTERN = /\b(?:https?:\/\/|www\.)[^\s<>"'`*]+/gi;
+
+export function linkifyOutputText(text: string): OutputLinkedTextSegment[] {
+  const segments: OutputLinkedTextSegment[] = [];
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(OUTPUT_URL_PATTERN)) {
+    const startIndex = match.index ?? 0;
+    const rawMatch = match[0] ?? "";
+    if (!rawMatch) {
+      continue;
+    }
+
+    if (startIndex > lastIndex) {
+      appendOutputTextSegment(segments, text.slice(lastIndex, startIndex));
+    }
+
+    const { linkText, suffix } = trimTrailingUrlPunctuation(rawMatch);
+    if (linkText) {
+      segments.push({
+        kind: "link",
+        text: linkText,
+        href: normalizeOutputUrlHref(linkText),
+      });
+    } else {
+      appendOutputTextSegment(segments, rawMatch);
+    }
+    if (suffix) {
+      appendOutputTextSegment(segments, suffix);
+    }
+
+    lastIndex = startIndex + rawMatch.length;
+  }
+
+  if (lastIndex < text.length) {
+    appendOutputTextSegment(segments, text.slice(lastIndex));
+  }
+
+  return segments;
+}
 
 export function resolveOutputPreviewContent(text: string, displayMode: string): OutputPreviewContent {
   const normalizedText = text || "";
@@ -481,7 +532,9 @@ function normalizeMarkdownTableCells(cells: string[], columnCount: number) {
 
 function renderInlineMarkdown(text: string) {
   const codeSpans: string[] = [];
+  const markdownLinks: string[] = [];
   const codePlaceholderPrefix = "%%GRAPHITEUI_CODE_SPAN_";
+  const markdownLinkPlaceholderPrefix = "%%GRAPHITEUI_MARKDOWN_LINK_";
   const escaped = escapeHtml(text).replace(/`([^`]+)`/g, (_match, code: string) => {
     const placeholder = `${codePlaceholderPrefix}${codeSpans.length}%%`;
     codeSpans.push(`<code>${code}</code>`);
@@ -492,11 +545,37 @@ function renderInlineMarkdown(text: string) {
     if (!isSafeMarkdownHref(href)) {
       return `${label} (${href})`;
     }
-    return `<a href="${href}" target="_blank" rel="noreferrer noopener">${label}</a>`;
+    const placeholder = `${markdownLinkPlaceholderPrefix}${markdownLinks.length}%%`;
+    markdownLinks.push(`<a href="${href}" target="_blank" rel="noreferrer noopener">${label}</a>`);
+    return placeholder;
   });
 
-  const formatted = linked.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  return codeSpans.reduce((value, code, index) => value.replace(`${codePlaceholderPrefix}${index}%%`, code), formatted);
+  const autoLinked = renderOutputLinksInEscapedText(linked);
+  const formatted = autoLinked.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  const restoredLinks = markdownLinks.reduce(
+    (value, link, index) => value.replace(`${markdownLinkPlaceholderPrefix}${index}%%`, link),
+    formatted,
+  );
+  return codeSpans.reduce((value, code, index) => value.replace(`${codePlaceholderPrefix}${index}%%`, code), restoredLinks);
+}
+
+function renderOutputLinksInEscapedText(text: string) {
+  return text
+    .split(/(%%GRAPHITEUI_(?:CODE_SPAN|MARKDOWN_LINK)_\d+%%)/g)
+    .map((part) => {
+      if (/^%%GRAPHITEUI_(?:CODE_SPAN|MARKDOWN_LINK)_\d+%%$/.test(part)) {
+        return part;
+      }
+      return linkifyOutputText(part)
+        .map((segment) => {
+          if (segment.kind === "text") {
+            return segment.text;
+          }
+          return `<a href="${segment.href}" target="_blank" rel="noreferrer noopener">${segment.text}</a>`;
+        })
+        .join("");
+    })
+    .join("");
 }
 
 function isSafeMarkdownHref(href: string) {
@@ -517,6 +596,54 @@ function escapeHtml(text: string) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function appendOutputTextSegment(segments: OutputLinkedTextSegment[], text: string) {
+  if (!text) {
+    return;
+  }
+  const previous = segments.at(-1);
+  if (previous?.kind === "text") {
+    previous.text += text;
+    return;
+  }
+  segments.push({ kind: "text", text });
+}
+
+function trimTrailingUrlPunctuation(rawUrl: string) {
+  let linkText = rawUrl;
+  let suffix = "";
+  while (linkText) {
+    const lastCharacter = linkText.at(-1) ?? "";
+    if (/[.,;:!?]/.test(lastCharacter) || shouldTrimClosingUrlPunctuation(linkText, lastCharacter)) {
+      suffix = lastCharacter + suffix;
+      linkText = linkText.slice(0, -1);
+      continue;
+    }
+    break;
+  }
+  return { linkText, suffix };
+}
+
+function shouldTrimClosingUrlPunctuation(text: string, character: string) {
+  const openingCharacterByClosingCharacter: Record<string, string> = {
+    ")": "(",
+    "]": "[",
+    "}": "{",
+  };
+  const openingCharacter = openingCharacterByClosingCharacter[character];
+  if (!openingCharacter) {
+    return false;
+  }
+  return countCharacters(text, character) > countCharacters(text, openingCharacter);
+}
+
+function countCharacters(text: string, character: string) {
+  return Array.from(text).filter((item) => item === character).length;
+}
+
+function normalizeOutputUrlHref(text: string) {
+  return /^www\./i.test(text) ? `https://${text}` : text;
 }
 
 function isOutputPreviewEmpty(text: string) {

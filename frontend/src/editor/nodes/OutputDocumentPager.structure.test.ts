@@ -13,8 +13,12 @@ test("OutputDocumentPager keeps links and pagination clicks inside the node card
 
   assert.match(componentSource, /<section class="node-card__document-pager"[\s\S]*@pointerdown\.stop[\s\S]*@click\.stop/);
   assert.match(anchorBlock, /target="_blank"/);
+  assert.match(anchorBlock, /rel="noreferrer noopener"/);
   assert.match(anchorBlock, /@pointerdown\.stop/);
   assert.match(anchorBlock, /@click\.stop/);
+  assert.match(componentSource, /import OutputLinkedText from "\.\/OutputLinkedText\.vue";/);
+  assert.match(componentSource, /<pre v-else class="node-card__document-pager-content">\s*<OutputLinkedText :text="displayText" \/>\s*<\/pre>/);
+  assert.match(componentSource, /\.node-card__document-pager,[\s\S]*\.node-card__document-pager :deep\(\*\) \{[\s\S]*user-select:\s*text;/);
   assert.match(componentSource, /:aria-label="t\('common\.pagePrevious'\)"[\s\S]*@pointerdown\.stop[\s\S]*@click\.stop="activeIndex -= 1"/);
   assert.match(componentSource, /:aria-label="t\('common\.pageNext'\)"[\s\S]*@pointerdown\.stop[\s\S]*@click\.stop="activeIndex \+= 1"/);
 });

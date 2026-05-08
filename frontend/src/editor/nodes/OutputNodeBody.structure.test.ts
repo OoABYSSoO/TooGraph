@@ -25,12 +25,15 @@ test("OutputNodeBody owns output presentation and forwards parent side effects",
   assert.match(componentSource, /'node-card__preview--json': outputPreviewContent\.kind === 'json'/);
   assert.match(componentSource, /'node-card__preview--empty': outputPreviewContent\.isEmpty/);
   assert.match(componentSource, /import OutputDocumentPager from "\.\/OutputDocumentPager\.vue";/);
+  assert.match(componentSource, /import OutputLinkedText from "\.\/OutputLinkedText\.vue";/);
   assert.match(componentSource, /<OutputDocumentPager[\s\S]*v-if="outputPreviewContent\.kind === 'documents' && outputPreviewContent\.documentRefs\.length > 0"[\s\S]*:documents="outputPreviewContent\.documentRefs"/);
   assert.match(componentSource, /v-else-if="outputPreviewContent\.kind === 'markdown'"[\s\S]*v-html="outputPreviewContent\.html"/);
-  assert.match(componentSource, /<pre v-else class="node-card__preview-text">\{\{ outputPreviewContent\.text \}\}<\/pre>/);
+  assert.match(componentSource, /class="node-card__preview"[\s\S]*@pointerdown\.stop[\s\S]*@click\.stop/);
+  assert.match(componentSource, /<pre v-else class="node-card__preview-text"><OutputLinkedText :text="outputPreviewContent\.text" \/><\/pre>/);
   assert.match(componentSource, /\.node-card__output-body \{[\s\S]*display:\s*flex;[\s\S]*flex:\s*1 1 auto;/);
   assert.match(componentSource, /\.node-card__surface--output \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
   assert.match(componentSource, /\.node-card__preview \{[\s\S]*flex:\s*1 1 auto;[\s\S]*overflow:\s*auto;/);
+  assert.match(componentSource, /\.node-card__preview,[\s\S]*\.node-card__preview :deep\(\*\) \{[\s\S]*user-select:\s*text;/);
   assert.match(componentSource, /\.node-card__preview-markdown :deep\(table\) \{[\s\S]*border-collapse:\s*collapse;/);
   assert.match(componentSource, /\.node-card__preview-markdown :deep\(th\),[\s\S]*\.node-card__preview-markdown :deep\(td\) \{[\s\S]*border:\s*1px solid/);
   assert.match(componentSource, /\.node-card__preview-markdown :deep\(pre\) \{[\s\S]*overflow-x:\s*auto;/);

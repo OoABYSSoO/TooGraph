@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { resolveOutputPreviewContent, resolveOutputPreviewDisplayMode } from "./outputPreviewContentModel.ts";
+import { linkifyOutputText, resolveOutputPreviewContent, resolveOutputPreviewDisplayMode } from "./outputPreviewContentModel.ts";
 
 test("resolveOutputPreviewContent formats auto-detected JSON previews", () => {
   const preview = resolveOutputPreviewContent('{"answer":"GraphiteUI","ok":true}', "auto");
@@ -79,6 +79,36 @@ test("resolveOutputPreviewContent renders common markdown reader blocks safely",
   assert.match(preview.html, /<hr>/);
   assert.match(preview.html, /<p>unsafe \(javascript:alert\(1\)\)<\/p>/);
   assert.doesNotMatch(preview.html, /href="javascript:/);
+});
+
+test("resolveOutputPreviewContent turns bare markdown URLs into safe new-page links", () => {
+  const preview = resolveOutputPreviewContent("Source: https://example.com/a?b=1&c=2. Mirror: www.example.org/path", "markdown");
+
+  assert.equal(preview.kind, "markdown");
+  assert.match(
+    preview.html,
+    /Source: <a href="https:\/\/example\.com\/a\?b=1&amp;c=2" target="_blank" rel="noreferrer noopener">https:\/\/example\.com\/a\?b=1&amp;c=2<\/a>\./,
+  );
+  assert.match(
+    preview.html,
+    /Mirror: <a href="https:\/\/www\.example\.org\/path" target="_blank" rel="noreferrer noopener">www\.example\.org\/path<\/a>/,
+  );
+
+  const emphasizedPreview = resolveOutputPreviewContent("**https://example.com/bold**", "markdown");
+  assert.match(
+    emphasizedPreview.html,
+    /<strong><a href="https:\/\/example\.com\/bold" target="_blank" rel="noreferrer noopener">https:\/\/example\.com\/bold<\/a><\/strong>/,
+  );
+});
+
+test("linkifyOutputText preserves text while exposing plain preview URLs as links", () => {
+  assert.deepEqual(linkifyOutputText('Open https://example.com/a?b=1, then "www.example.org/docs".'), [
+    { kind: "text", text: "Open " },
+    { kind: "link", text: "https://example.com/a?b=1", href: "https://example.com/a?b=1" },
+    { kind: "text", text: ', then "' },
+    { kind: "link", text: "www.example.org/docs", href: "https://www.example.org/docs" },
+    { kind: "text", text: "\"." },
+  ]);
 });
 
 test("resolveOutputPreviewContent keeps ordinary previews as plain text", () => {

@@ -3,7 +3,7 @@
     <div class="node-card__document-pager-head">
       <div class="node-card__document-pager-title">
         <strong>{{ activeDocument?.title || t("common.none") }}</strong>
-        <a v-if="activeDocument?.url" :href="activeDocument.url" target="_blank" rel="noreferrer" @pointerdown.stop @click.stop>{{ activeDocument.url }}</a>
+        <a v-if="activeDocument?.url" :href="activeDocument.url" target="_blank" rel="noreferrer noopener" @pointerdown.stop @click.stop>{{ activeDocument.url }}</a>
       </div>
       <div class="node-card__document-pager-controls">
         <button
@@ -40,9 +40,9 @@
       <audio class="node-card__document-pager-audio" :src="activeArtifactUrl" controls preload="metadata" />
     </div>
     <div v-else-if="activeDocument?.artifactKind === 'file'" class="node-card__document-pager-file">
-      <a :href="activeArtifactUrl" target="_blank" rel="noreferrer" @pointerdown.stop @click.stop>{{ activeDocument.filename || activeDocument.localPath }}</a>
+      <a :href="activeArtifactUrl" target="_blank" rel="noreferrer noopener" @pointerdown.stop @click.stop>{{ activeDocument.filename || activeDocument.localPath }}</a>
     </div>
-    <pre v-else class="node-card__document-pager-content">{{ displayText }}</pre>
+    <pre v-else class="node-card__document-pager-content"><OutputLinkedText :text="displayText" /></pre>
 
     <div v-if="activeDocument" class="node-card__document-pager-meta">
       <span>{{ activeDocument.contentType }}</span>
@@ -61,6 +61,7 @@ import { useI18n } from "vue-i18n";
 
 import { buildSkillArtifactFileUrl, fetchSkillArtifactContent } from "@/api/skillArtifacts";
 
+import OutputLinkedText from "./OutputLinkedText.vue";
 import type { OutputPreviewDocumentReference } from "./outputPreviewContentModel";
 
 const props = defineProps<{
@@ -139,6 +140,13 @@ async function loadActiveDocument() {
   display: grid;
   min-height: 0;
   gap: 10px;
+}
+
+.node-card__document-pager,
+.node-card__document-pager *,
+.node-card__document-pager :deep(*) {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .node-card__document-pager-head {

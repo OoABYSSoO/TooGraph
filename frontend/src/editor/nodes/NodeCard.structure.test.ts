@@ -1175,10 +1175,13 @@ test("NodeCard delegates output preview presentation while keeping Advanced in t
   assert.match(outputSection, /<template #primary-input>/);
   assert.match(outputSection, /<PrimaryStatePort[\s\S]*side="input"[\s\S]*:port="view\.body\.primaryInput"[\s\S]*fallback-label="t\('nodeCard\.unbound'\)"/);
   assert.match(outputNodeBodySource, /<slot name="primary-input" \/>/);
+  assert.match(outputNodeBodySource, /import OutputLinkedText from "\.\/OutputLinkedText\.vue";/);
   assert.match(outputNodeBodySource, /node-card__preview--markdown/);
   assert.match(outputNodeBodySource, /v-html="outputPreviewContent\.html"/);
   assert.match(outputNodeBodySource, /node-card__preview--json/);
-  assert.match(outputNodeBodySource, /<pre v-else class="node-card__preview-text">\{\{ outputPreviewContent\.text \}\}<\/pre>/);
+  assert.match(outputNodeBodySource, /class="node-card__preview"[\s\S]*@pointerdown\.stop[\s\S]*@click\.stop/);
+  assert.match(outputNodeBodySource, /<pre v-else class="node-card__preview-text">\s*<OutputLinkedText :text="outputPreviewContent\.text" \/>\s*<\/pre>/);
+  assert.match(outputNodeBodySource, /\.node-card__preview,[\s\S]*\.node-card__preview :deep\(\*\) \{[\s\S]*user-select:\s*text;/);
   assert.match(outputNodeBodySource, /node-card__preview--empty/);
   assert.doesNotMatch(outputSection, /Connected to \$\{view\.body\.connectedStateLabel/);
   assert.doesNotMatch(outputSection, /<pre v-else class="node-card__preview-text">/);
