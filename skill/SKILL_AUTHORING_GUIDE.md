@@ -46,11 +46,14 @@ backend/data/skills/user/<skill_key>/
 skill/<skill_key>/
   skill.json
   SKILL.md
+  requirements.txt  # 可选，Python 第三方依赖声明
   before_llm.py   # 可选
   after_llm.py    # 可选，确定性执行或校验时使用
 ```
 
 `before_llm.py` 和 `after_llm.py` 使用固定文件名，不在 `skill.json` 中配置入口。
+
+如果生命周期脚本只使用 Python 标准库，不需要依赖文件。只要使用标准库以外的包，就应该在 Skill 包内放置 `requirements.txt` 并写清版本范围；Node 或其他运行时可以使用对应生态的依赖声明文件。GraphiteUI 不应在技能运行时偷偷安装依赖，依赖安装或环境变更应走显式权限路径。
 
 ## `skill.json`
 
@@ -125,6 +128,7 @@ skill/<skill_key>/
 - 这个 Skill 适合什么任务。
 - 输入字段含义。
 - 输出字段含义。
+- 运行脚本需要的依赖文件，例如 `requirements.txt`。
 - 是否会访问网络、读写文件、执行脚本或产生持久 artifact。
 - 使用限制和失败情况。
 - 如果有 `before_llm.py` 或 `after_llm.py`，说明它们分别做什么。

@@ -12,7 +12,7 @@
 - 新版桌宠自主循环模板 `companion_autonomous_loop` 尚未创建和注册。当前桌宠浮窗仍会尝试读取这个模板，因此桌宠对话入口的 UI 已存在，但完整对话循环还不能作为当前可用能力描述。
 - 当前仓库提供一个官方图模板：`advanced_web_research_loop`（高级联网搜索）。它是通用模板，不是桌宠专用自主循环模板。
 - 技能系统已收束为统一技能库，不再区分“桌宠技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
-- 当前官方技能包包括 `web_search`、`graphiteui_capability_selector` 和 `graphiteUI_skill_builder`。后续新能力应按当前统一 Skill 结构专门编写。
+- 当前官方技能包包括 `web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder` 和 `graphiteUI_script_tester`。后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
 
 ## 当前协议
@@ -41,7 +41,7 @@
 
 ## 当前技能
 
-官方 Skill 位于 `skill/<skill_key>/`，会进入 Git 管理；用户自定义 Skill 位于 `backend/data/skills/user/<skill_key>/`，属于本地用户数据，不进入 Git 管理。Skill catalog 会同时返回官方和用户 Skill，并通过 `sourceScope` / `canManage` 区分来源与可管理性。
+官方 Skill 位于 `skill/<skill_key>/`，会进入 Git 管理；用户自定义 Skill 位于 `backend/data/skills/user/<skill_key>/`，属于本地用户数据，不进入 Git 管理。Skill catalog 会同时返回官方和用户 Skill，并通过 `sourceScope` / `canManage` 区分来源与可管理性。Python Skill 只要依赖标准库以外的包，就应该在包内提供 `requirements.txt`；运行时不应偷偷安装依赖。
 
 ### `web_search`
 
@@ -69,6 +69,14 @@
 - 选择对象包括当前启用的图模板和对当前 `origin` 可选择的 Skill；图模板优先于 Skill。
 - 它不执行被选能力，不生成被选能力的运行入参，也不做程序字段匹配；模型基于候选项的名称和描述判断，脚本只做真实性与启用状态校验。
 
+### `graphiteUI_script_tester`
+
+- 位置：`skill/graphiteUI_script_tester/`
+- 显示名称：`GraphiteUI Script Tester`
+- 作用：接收 Python 脚本源码和 LLM 生成的 pytest 用例，在临时目录运行测试并返回结果、输出和错误。
+- 生命周期：`before_llm.py` 只注入 pytest 测试编写规则；`after_llm.py` 写入临时脚本和测试文件，运行 `python -m pytest -q <test_filename>`，再返回 `status`、`summary`、`test_source`、`stdout`、`stderr`、`exit_code`、`errors`。
+- 权限和依赖：声明 `file_write` 与 `subprocess` 权限，并在 `requirements.txt` 中声明 `pytest`。该 Skill 会执行用户提供的 Python 代码，应通过显式确认使用。
+
 ## 当前内置图模板
 
 ### `advanced_web_research_loop`
@@ -82,7 +90,7 @@
 - 输出语义：`query`、`source_urls`、`artifact_paths`、`errors` 通过 managed binding state 透传；后续 LLM 节点读取 `artifact_paths` 对应的本地原文，负责证据筛选和最终总结。模板只公开 `final_reply` 这一个 output 节点，关键依据笔记和原文路径属于内部中间 state，不直接连接 output 节点。
 - 模型语义：模板默认使用全局模型配置，不写死某个 provider。LLM 节点和桌宠模型下拉的第一项是“全局（实时读取当前全局设定的模型）”，后面才是具体模型 override。若全局本地网关未启动，运行该模板前需要在 Model Providers 页面选择可用模型，或在图中为 LLM 节点设置 override。
 
-创建用户自定义 Skill 的旧官方模板已删除。当前由 `graphiteUI_skill_builder` 承担窄职责的 Skill 生成能力：只根据需求产出 `skill.json`、`SKILL.md` 以及必要的 `before_llm.py` / `after_llm.py` 文件内容，写入、测试、修复和回滚不由该 Skill 执行。
+创建用户自定义 Skill 的旧官方模板已删除。当前由 `graphiteUI_skill_builder` 承担窄职责的 Skill 生成能力：只根据需求产出 `skill.json`、`SKILL.md` 以及必要的 `before_llm.py` / `after_llm.py` 文件内容，写入、测试、修复和回滚不由该 Skill 执行；测试环节可由后续图流程调用 `graphiteUI_script_tester` 这类专门能力完成。
 
 ### `graphiteUI_skill_builder`
 
@@ -117,7 +125,7 @@
 - 继续收束 `subgraph` 子图体验：补齐父子图运行详情页的审计聚合、事件定位和从缩略图点击跳转到内部节点。
 - 用新结构手工重建桌宠自主循环模板。
 - 设计并实现真正的 `autonomous_decision` 技能，用于根据技能目录、用户意图和运行策略选择技能，但不直接执行技能。
-- 为 `graphiteUI_skill_builder` 补充后续图流程：用户确认、写入用户 Skill 目录、运行 smoke test、基于错误再次调用 builder 或修复节点，以及最终启用。
+- 为 `graphiteUI_skill_builder` 补充后续图流程：用户确认、写入用户 Skill 目录、调用脚本测试能力、基于错误再次调用 builder 或修复节点，以及最终启用。
 - 完成更完整的图运行展示。
 - 清理或按新命令流重建历史 `graph_patch.draft` stub，并完成图补丁预览、GraphCommandBus、graph revision、undo 和审计闭环。
 - 将人设、记忆、会话摘要等长期状态更新表达为可审计的图模板流程，而不是隐藏产品逻辑。

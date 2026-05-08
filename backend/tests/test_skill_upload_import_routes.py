@@ -185,6 +185,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(
                     sorted(catalog_items),
                     [
+                        "graphiteUI_script_tester",
                         "graphiteUI_skill_builder",
                         "graphiteui_capability_selector",
                         "web_search",
@@ -211,6 +212,15 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue(
                     source_path["graphiteUI_skill_builder"].endswith(
                         "/skill/graphiteUI_skill_builder/skill.json"
+                    )
+                )
+                self.assertEqual(catalog_items["graphiteUI_script_tester"]["sourceScope"], "official")
+                self.assertFalse(catalog_items["graphiteUI_script_tester"]["canManage"])
+                self.assertTrue(catalog_items["graphiteUI_script_tester"]["runtimeReady"])
+                self.assertTrue(catalog_items["graphiteUI_script_tester"]["runtimeRegistered"])
+                self.assertTrue(
+                    source_path["graphiteUI_script_tester"].endswith(
+                        "/skill/graphiteUI_script_tester/skill.json"
                     )
                 )
                 self.assertNotIn("compatibility", catalog_items["web_search"])
