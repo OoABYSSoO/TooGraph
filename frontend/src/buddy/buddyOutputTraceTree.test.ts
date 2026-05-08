@@ -115,3 +115,42 @@ test("buildBuddyOutputTraceTreeRows exposes activity evidence labels", () => {
   assert.deepEqual(rows[1].artifactLabels, ["artifacts: 2", "retries: 5"]);
   assert.equal(rows[1].evidenceRunId, "run_report");
 });
+
+test("buildBuddyOutputTraceTreeRows exposes graph revision restore metadata", () => {
+  const segment: BuddyOutputTraceSegment = {
+    segmentId: "boundary:final",
+    boundaryNodeId: "final",
+    boundaryLabel: "主图输出",
+    outputNodeIds: ["output_final"],
+    status: "completed",
+    startedAtMs: 1000,
+    completedAtMs: 1300,
+    durationMs: 300,
+    records: [
+      {
+        ...baseRecord,
+        kind: "activity",
+        recordId: "record_activity",
+        runtimeKey: "activity:1:main_a",
+        label: "A / Virtual graph edit",
+        nodeId: "main_a",
+        nodeType: "activity",
+        subgraphNodeId: null,
+        artifactLabels: ["graph revision: grev_buddy"],
+        graphRevision: {
+          graphId: "graph_buddy",
+          revisionId: "grev_buddy",
+          status: "saved",
+        },
+      },
+    ],
+  };
+
+  const rows = buildBuddyOutputTraceTreeRows(segment, { rootLabel: "主图开始" });
+
+  assert.deepEqual(rows[1].graphRevision, {
+    graphId: "graph_buddy",
+    revisionId: "grev_buddy",
+    status: "saved",
+  });
+});

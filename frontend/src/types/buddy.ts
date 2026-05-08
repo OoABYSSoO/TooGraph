@@ -101,29 +101,3 @@ export type BuddyCommandResponse<T> = {
   result: T;
   revision: BuddyRevision | null;
 };
-
-export type BuddyGraphPatchOperation = {
-  op: "add" | "remove" | "replace" | "move" | "copy" | "test";
-  path: string;
-  from?: string;
-  value?: unknown;
-};
-
-export type BuddyGraphPatchDraftPayload = {
-  graph_id?: string | null;
-  graph_name?: string | null;
-  summary: string;
-  rationale?: string;
-  patch: BuddyGraphPatchOperation[];
-  preview?: Record<string, unknown> | null;
-};
-
-export type BuddyGraphPatchDraft = {
-  draft_id: string;
-  graph_id: string | null;
-  graph_name: string | null;
-  summary: string;
-  rationale: string;
-  patch: BuddyGraphPatchOperation[];
-  preview: Record<string, unknown> | null;
-};

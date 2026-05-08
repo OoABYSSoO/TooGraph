@@ -1,6 +1,6 @@
 import type { ConditionalEdge, GraphEdge, GraphNode, GraphPayload } from "../types/node-system.ts";
 import type { ActivityEvent, NodeExecutionDetail, RunDetail } from "../types/run.ts";
-import { summarizeVirtualOperationActivity } from "../lib/virtual-operation-activity.ts";
+import { summarizeVirtualOperationActivity, type VirtualOperationGraphRevision } from "../lib/virtual-operation-activity.ts";
 import type { BuddyPublicOutputBinding } from "./buddyPublicOutput.ts";
 
 export type BuddyOutputTraceRecordKind = "node" | "activity";
@@ -38,6 +38,7 @@ export type BuddyOutputTraceRecord = {
   summary?: string;
   artifactLabels?: string[];
   triggeredRunId?: string;
+  graphRevision?: VirtualOperationGraphRevision;
 };
 
 export type BuddyOutputTraceSegment = {
@@ -290,6 +291,7 @@ function applyActivityEvent(
     summary: virtualOperation?.summary || normalizeText(payload.summary),
     artifactLabels: virtualOperation?.artifactLabels ?? [],
     triggeredRunId: virtualOperation?.triggeredRunId,
+    graphRevision: virtualOperation?.graphRevision,
   });
 }
 

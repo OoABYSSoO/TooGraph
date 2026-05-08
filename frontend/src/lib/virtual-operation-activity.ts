@@ -3,6 +3,13 @@ export type VirtualOperationActivitySummary = {
   summary: string;
   artifactLabels: string[];
   triggeredRunId?: string;
+  graphRevision?: VirtualOperationGraphRevision;
+};
+
+export type VirtualOperationGraphRevision = {
+  graphId: string;
+  revisionId: string;
+  status: string;
 };
 
 export function summarizeVirtualOperationActivity(event: {
@@ -19,6 +26,7 @@ export function summarizeVirtualOperationActivity(event: {
   const operationKind = normalizeText(operation.kind);
   const operationReport = recordFromUnknown(detail.operation_report ?? detail.operationReport);
   const triggeredRunId = resolveTriggeredRunId(operationReport);
+  const graphRevision = resolveGraphEditRevision(detail, operationReport);
   const failureCategory = normalizeText(detail.failure_category ?? detail.failureCategory);
   const targetId = normalizeText(operation.target_id ?? operation.targetId ?? detail.target_id ?? detail.targetId);
   const requestId = normalizeText(
@@ -43,6 +51,7 @@ export function summarizeVirtualOperationActivity(event: {
       requestId ? `request: ${requestId}` : "",
     ].filter(Boolean),
     ...(triggeredRunId ? { triggeredRunId } : {}),
+    ...(graphRevision ? { graphRevision } : {}),
   };
 }
 
@@ -172,6 +181,25 @@ function resolveGraphEditRevisionArtifactLabel(detail: Record<string, unknown>, 
   }
   const status = normalizeText(summary.revision_status ?? summary.revisionStatus);
   return `graph revision: ${revisionId}${status && status !== "saved" ? ` ${status}` : ""}`;
+}
+
+function resolveGraphEditRevision(detail: Record<string, unknown>, operationReport: Record<string, unknown>): VirtualOperationGraphRevision | null {
+  const summary = firstRecord(
+    operationReport.graph_edit_summary,
+    operationReport.graphEditSummary,
+    detail.graph_edit_summary,
+    detail.graphEditSummary,
+  );
+  const graphId = normalizeText(summary.graph_id ?? summary.graphId);
+  const revisionId = normalizeText(summary.revision_id ?? summary.revisionId);
+  if (!graphId || !revisionId) {
+    return null;
+  }
+  return {
+    graphId,
+    revisionId,
+    status: normalizeText(summary.revision_status ?? summary.revisionStatus) || "saved",
+  };
 }
 
 function resolveTriggeredRunArtifactLabel(operationReport: Record<string, unknown>, runId: string) {

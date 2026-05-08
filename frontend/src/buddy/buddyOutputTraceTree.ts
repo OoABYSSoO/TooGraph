@@ -4,6 +4,7 @@ import type {
   BuddyOutputTraceSegment,
   BuddyOutputTraceStatus,
 } from "./buddyOutputTrace.ts";
+import type { VirtualOperationGraphRevision } from "../lib/virtual-operation-activity.ts";
 
 export type BuddyOutputTraceTreeRowKind = "root" | "subgraph" | "node" | "activity";
 
@@ -25,6 +26,7 @@ export type BuddyOutputTraceTreeRow = {
   playbackTarget: BuddyOutputTraceTreePlaybackTarget | null;
   artifactLabels: string[];
   evidenceRunId: string | null;
+  graphRevision: VirtualOperationGraphRevision | null;
 };
 
 export function buildBuddyOutputTraceTreeRows(
@@ -46,6 +48,7 @@ export function buildBuddyOutputTraceTreeRows(
       playbackTarget: { kind: "run", nodeId: null },
       artifactLabels: [],
       evidenceRunId: null,
+      graphRevision: null,
     },
   ];
 
@@ -66,6 +69,7 @@ export function buildBuddyOutputTraceTreeRows(
       playbackTarget: isSubgraphHeader ? { kind: "subgraph", nodeId: subgraphHeaderId || record.nodeId } : null,
       artifactLabels: record.artifactLabels ?? [],
       evidenceRunId: normalizeText(record.triggeredRunId) || null,
+      graphRevision: record.graphRevision ?? null,
     });
   }
 

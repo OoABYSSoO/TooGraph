@@ -622,7 +622,7 @@ test("BuddyWidget resumes page operation runs after virtual UI execution", () =>
 });
 
 test("BuddyWidget runs template targets in the background unless follow mode requests visible playback", () => {
-  assert.match(componentSource, /import \{ fetchTemplate, fetchTemplates, runGraph \} from "\.\.\/api\/graphs\.ts";/);
+  assert.match(componentSource, /import \{ fetchTemplate, fetchTemplates, restoreGraphRevision, runGraph \} from "\.\.\/api\/graphs\.ts";/);
   assert.match(componentSource, /import \{ buildBuddyTemplateRunGraph \} from "\.\/buddyTemplateRunGraph\.ts";/);
   assert.match(componentSource, /const BUDDY_VIRTUAL_OPERATION_FOLLOW_STORAGE_KEY = "toograph:buddy-virtual-operation-follow";/);
   assert.match(componentSource, /const virtualOperationFollowEnabled = ref\(readStoredVirtualOperationFollowEnabled\(\)\);/);
@@ -755,7 +755,15 @@ test("BuddyWidget renders output-segment run trace capsules instead of per-messa
   assert.match(componentSource, /class="buddy-widget__run-trace-row-evidence"/);
   assert.match(componentSource, /v-if="row\.evidenceRunId"/);
   assert.match(componentSource, /@click="openTraceEvidenceRun\(row\.evidenceRunId\)"/);
+  assert.match(componentSource, /v-if="row\.graphRevision"/);
+  assert.match(componentSource, /class="buddy-widget__run-trace-row-revision-restore"/);
+  assert.match(componentSource, /@click="restoreTraceGraphRevision\(row\)"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`buddy\.trace\.graphRevision\.restore\.\$\{row\.graphRevision\.revisionId\}`"/);
+  assert.match(componentSource, /import \{ fetchTemplate, fetchTemplates, restoreGraphRevision, runGraph \} from "\.\.\/api\/graphs\.ts";/);
   assert.match(componentSource, /function openTraceEvidenceRun\(runId: string \| null \| undefined\)/);
+  assert.match(componentSource, /async function restoreTraceGraphRevision\(row: BuddyOutputTraceTreeRow\)/);
+  assert.match(componentSource, /await restoreGraphRevision\(row\.graphRevision\.graphId, row\.graphRevision\.revisionId\)/);
+  assert.match(componentSource, /ElMessage\.success\(t\("graphLibrary\.revisionRestored", \{ revisionId: response\.restored_revision_id \}\)\);/);
   assert.match(componentSource, /router\.push\(`\/runs\/\$\{encodeURIComponent\(normalizedRunId\)\}`\)/);
   assert.doesNotMatch(componentSource, /class="buddy-widget__run-trace-open"/);
   assert.match(componentSource, /function openTraceTreeRowPlayback\(runId: string \| null \| undefined, row: BuddyOutputTraceTreeRow\)/);
@@ -816,7 +824,7 @@ test("BuddyWidget groups consecutive visible messages by role label", () => {
 
 test("BuddyWidget stores buddy chat in backend sessions and exposes a compact history dropdown", () => {
   assert.match(componentSource, /import \{[\s\S]*appendBuddyChatMessage,[\s\S]*fetchBuddyChatMessages,[\s\S]*fetchBuddyChatSessions,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
-  assert.match(componentSource, /import \{ Check, Clock, Close, Delete, FullScreen, Plus, Promotion, SemiSelect \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import \{ Check, Clock, Close, Delete, FullScreen, Plus, Promotion, RefreshLeft, SemiSelect \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /import \{ ElIcon, ElOption, ElPopover, ElSelect \} from "element-plus";/);
   assert.match(componentSource, /const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "toograph:buddy-active-session";/);
   assert.match(componentSource, /const chatSessions = ref<BuddyChatSession\[\]>\(\[\]\);/);
@@ -843,7 +851,7 @@ test("BuddyWidget stores buddy chat in backend sessions and exposes a compact hi
 });
 
 test("BuddyWidget uses the top toolbar for new chat and fullscreen expansion", () => {
-  assert.match(componentSource, /import \{ Check, Clock, Close, Delete, FullScreen, Plus, Promotion, SemiSelect \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import \{ Check, Clock, Close, Delete, FullScreen, Plus, Promotion, RefreshLeft, SemiSelect \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /const isPanelFullscreen = ref\(false\);/);
   assert.match(componentSource, /const avatarStyle = computed\(\(\) => \{[\s\S]*left:\s*`\$\{position\.value\.x\}px`,[\s\S]*top:\s*`\$\{position\.value\.y\}px`,/);
   assert.match(componentSource, /const hasCurrentSessionContent = computed\(\(\) => messages\.value\.some\(\(message\) => message\.content\.trim\(\)\)\);/);

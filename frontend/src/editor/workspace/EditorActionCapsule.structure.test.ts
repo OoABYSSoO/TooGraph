@@ -9,7 +9,7 @@ const currentDirectory = dirname(currentFilePath);
 const componentSource = readFileSync(resolve(currentDirectory, "EditorActionCapsule.vue"), "utf8");
 
 test("EditorActionCapsule keeps graph tools compact while preserving Run as the only primary action", () => {
-  assert.match(componentSource, /import \{ CircleCheck, CollectionTag, Download, VideoPlay \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import \{ CircleCheck, Clock, CollectionTag, Download, VideoPlay \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /import \{ ElIcon, ElTooltip \} from "element-plus";/);
   assert.match(
     componentSource,
@@ -28,6 +28,15 @@ test("EditorActionCapsule keeps graph tools compact while preserving Run as the 
   assert.match(componentSource, /isRunActivityPanelOpen: boolean;/);
   assert.match(componentSource, /hasRunActivityHint: boolean;/);
   assert.match(componentSource, /\(event: "toggle-run-activity-panel"\): void;/);
+});
+
+test("EditorActionCapsule exposes saved graph revision history as a compact icon action", () => {
+  assert.match(componentSource, /showRevisionHistory\?: boolean;/);
+  assert.match(componentSource, /\(event: "open-active-graph-revisions"\): void;/);
+  assert.match(
+    componentSource,
+    /v-if="showRevisionHistory"[\s\S]*:content="t\('graphLibrary\.history'\)"[\s\S]*data-virtual-affordance-id="editor\.action\.openGraphRevisionHistory"[\s\S]*@click="\$emit\('open-active-graph-revisions'\)"[\s\S]*<Clock \/>/,
+  );
 });
 
 test("EditorActionCapsule renders non-primary graph actions as icon buttons with tooltips", () => {

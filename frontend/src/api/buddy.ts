@@ -3,8 +3,6 @@ import type {
   BuddyChatSession,
   BuddyCommandRecord,
   BuddyCommandResponse,
-  BuddyGraphPatchDraft,
-  BuddyGraphPatchDraftPayload,
   BuddyMemory,
   BuddyPolicy,
   BuddyProfile,
@@ -144,8 +142,4 @@ export function restoreBuddyRevision(revisionId: string) {
     "User restored a buddy revision from the Buddy page.",
     revisionId,
   );
-}
-
-export function createBuddyGraphPatchDraft(payload: BuddyGraphPatchDraftPayload, changeReason: string) {
-  return executeBuddyCommand<BuddyGraphPatchDraft>("graph_patch.draft", payload, changeReason);
 }

@@ -358,6 +358,22 @@
                         <ElIcon><Promotion /></ElIcon>
                       </button>
                       <button
+                        v-if="row.graphRevision"
+                        type="button"
+                        class="buddy-widget__run-trace-row-revision-restore"
+                        :disabled="Boolean(restoringTraceGraphRevisionRowId)"
+                        :aria-busy="restoringTraceGraphRevisionRowId === row.rowId"
+                        :title="t('graphLibrary.restoreRevisionAction')"
+                        :aria-label="t('graphLibrary.restoreRevisionAction')"
+                        data-virtual-affordance-role="button"
+                        data-virtual-affordance-zone="buddy.trace.graphRevision"
+                        data-virtual-affordance-actions="click"
+                        :data-virtual-affordance-id="`buddy.trace.graphRevision.restore.${row.graphRevision.revisionId}`"
+                        @click="restoreTraceGraphRevision(row)"
+                      >
+                        <ElIcon><RefreshLeft /></ElIcon>
+                      </button>
+                      <button
                         v-if="row.playbackTarget && message.runId"
                         type="button"
                         class="buddy-widget__run-trace-row-open"
@@ -479,8 +495,8 @@
 </template>
 
 <script setup lang="ts">
-import { Check, Clock, Close, Delete, FullScreen, Plus, Promotion, SemiSelect } from "@element-plus/icons-vue";
-import { ElButton, ElInput } from "element-plus";
+import { Check, Clock, Close, Delete, FullScreen, Plus, Promotion, RefreshLeft, SemiSelect } from "@element-plus/icons-vue";
+import { ElButton, ElInput, ElMessage, ElMessageBox } from "element-plus";
 import { ElIcon, ElOption, ElPopover, ElSelect } from "element-plus";
 import { storeToRefs } from "pinia";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
@@ -495,7 +511,7 @@ import {
   fetchBuddyChatSessions,
   fetchBuddyRunTemplateBinding,
 } from "../api/buddy.ts";
-import { fetchTemplate, fetchTemplates, runGraph } from "../api/graphs.ts";
+import { fetchTemplate, fetchTemplates, restoreGraphRevision, runGraph } from "../api/graphs.ts";
 import { fetchRun, resumeRun } from "../api/runs.ts";
 import { fetchSettings } from "../api/settings.ts";
 import SandboxedHtmlFrame from "../components/SandboxedHtmlFrame.vue";
@@ -835,6 +851,7 @@ const debugDragging = ref(false);
 const traceClockNowMs = ref(Date.now());
 const traceDurationDisplayByKey = ref<Record<string, SmoothNumberDisplayState>>({});
 const expandedTraceMessageIds = ref<Set<string>>(new Set());
+const restoringTraceGraphRevisionRowId = ref<string | null>(null);
 const pointerDrag = ref<{
   pointerId: number;
   startX: number;
@@ -3479,11 +3496,27 @@ function resolveAliasedGraphEditPlaybackCommand(command: GraphEditCommand, playb
         ...command,
         nodeId: resolveGraphEditPlaybackNodeAlias(command.nodeId, playbackState),
       };
+    case "move_node":
+      return {
+        ...command,
+        nodeId: resolveGraphEditPlaybackNodeAlias(command.nodeId, playbackState),
+      };
     case "create_state":
       return {
         ...command,
         stateKey: resolveGraphEditPlaybackStateAlias(command.stateKey, playbackState),
         targetNodeId: command.targetNodeId ? resolveGraphEditPlaybackNodeAlias(command.targetNodeId, playbackState) : undefined,
+      };
+    case "update_state":
+      return {
+        ...command,
+        stateKey: resolveGraphEditPlaybackStateAlias(command.stateKey, playbackState),
+      };
+    case "update_input_config":
+    case "update_output_config":
+      return {
+        ...command,
+        nodeId: resolveGraphEditPlaybackNodeAlias(command.nodeId, playbackState),
       };
     case "bind_state":
       return {
@@ -3503,6 +3536,21 @@ function resolveAliasedGraphEditPlaybackCommand(command: GraphEditCommand, playb
         ...command,
         sourceNodeId: resolveGraphEditPlaybackNodeAlias(command.sourceNodeId, playbackState),
         targetNodeId: resolveGraphEditPlaybackNodeAlias(command.targetNodeId, playbackState),
+      };
+    case "select_skill":
+      return {
+        ...command,
+        nodeId: resolveGraphEditPlaybackNodeAlias(command.nodeId, playbackState),
+      };
+    case "delete_node":
+      return {
+        ...command,
+        nodeId: resolveGraphEditPlaybackNodeAlias(command.nodeId, playbackState),
+      };
+    case "restore_node":
+      return {
+        ...command,
+        nodeId: resolveGraphEditPlaybackNodeAlias(command.nodeId, playbackState),
       };
   }
 }
@@ -5507,6 +5555,35 @@ function openTraceEvidenceRun(runId: string | null | undefined) {
   void router.push(`/runs/${encodeURIComponent(normalizedRunId)}`);
 }
 
+async function restoreTraceGraphRevision(row: BuddyOutputTraceTreeRow) {
+  if (!row.graphRevision || restoringTraceGraphRevisionRowId.value) {
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(
+      t("graphLibrary.restoreRevisionConfirm", { name: `${row.graphRevision.graphId} / ${row.graphRevision.revisionId}` }),
+      t("graphLibrary.restoreRevisionTitle"),
+      {
+        confirmButtonText: t("graphLibrary.restoreRevisionAction"),
+        cancelButtonText: t("common.cancel"),
+        type: "warning",
+      },
+    );
+  } catch {
+    return;
+  }
+
+  restoringTraceGraphRevisionRowId.value = row.rowId;
+  try {
+    const response = await restoreGraphRevision(row.graphRevision.graphId, row.graphRevision.revisionId);
+    ElMessage.success(t("graphLibrary.revisionRestored", { revisionId: response.restored_revision_id }));
+  } catch (restoreError) {
+    ElMessage.error(restoreError instanceof Error ? restoreError.message : t("common.failedToSave", { error: "" }));
+  } finally {
+    restoringTraceGraphRevisionRowId.value = null;
+  }
+}
+
 function toggleVirtualOperationFollow() {
   virtualOperationFollowEnabled.value = !virtualOperationFollowEnabled.value;
   persistVirtualOperationFollowEnabled(virtualOperationFollowEnabled.value);
@@ -6889,7 +6966,8 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__run-trace-row-open,
-.buddy-widget__run-trace-row-evidence-open {
+.buddy-widget__run-trace-row-evidence-open,
+.buddy-widget__run-trace-row-revision-restore {
   appearance: none;
   display: grid;
   place-items: center;
@@ -6904,9 +6982,15 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__run-trace-row-open:hover,
-.buddy-widget__run-trace-row-evidence-open:hover {
+.buddy-widget__run-trace-row-evidence-open:hover,
+.buddy-widget__run-trace-row-revision-restore:hover {
   border-color: rgba(154, 52, 18, 0.3);
   background: rgba(255, 247, 237, 0.98);
+}
+
+.buddy-widget__run-trace-row-revision-restore:disabled {
+  cursor: progress;
+  opacity: 0.62;
 }
 
 .buddy-widget__run-trace-title {
@@ -6987,7 +7071,7 @@ function formatErrorMessage(error: unknown): string {
   --buddy-run-trace-depth: 0;
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) repeat(4, auto);
   align-items: center;
   gap: 8px;
   padding-left: calc(var(--buddy-run-trace-depth) * 16px);

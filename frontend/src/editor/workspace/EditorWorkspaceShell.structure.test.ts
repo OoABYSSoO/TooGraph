@@ -86,6 +86,23 @@ test("EditorWorkspaceShell gives subgraph tabs save-back and save-as-normal-grap
   );
 });
 
+test("EditorWorkspaceShell exposes saved graph revision history and restore inside the editor", () => {
+  assert.match(componentSource, /fetchGraphRevisions,[\s\S]*restoreGraphRevision,[\s\S]*saveGraph,/);
+  assert.match(componentSource, /import \{ buildGraphRevisionHistoryRows, type GraphRevisionHistoryRow \} from "@\/lib\/graphRevisionHistoryModel";/);
+  assert.match(componentSource, /:show-revision-history="canOpenActiveGraphRevisionHistory"/);
+  assert.match(componentSource, /@open-active-graph-revisions="openActiveGraphRevisionHistory"/);
+  assert.match(componentSource, /<ElDialog[\s\S]*v-model="editorGraphRevisionDialogOpen"[\s\S]*class="editor-workspace-shell__revision-dialog"/);
+  assert.match(componentSource, /v-for="row in editorGraphRevisionRows"/);
+  assert.match(componentSource, /@click="restoreActiveGraphRevisionFromHistory\(row\)"/);
+  assert.match(componentSource, /const editorGraphRevisionRows = computed\(\(\) => buildGraphRevisionHistoryRows\(editorGraphRevisions\.value\)\);/);
+  assert.match(componentSource, /async function openActiveGraphRevisionHistory\(\)/);
+  assert.match(componentSource, /editorGraphRevisions\.value = await fetchGraphRevisions\(graphId\);/);
+  assert.match(componentSource, /async function restoreActiveGraphRevisionFromHistory\(row: GraphRevisionHistoryRow\)/);
+  assert.match(componentSource, /const response = await restoreGraphRevision\(editorGraphRevisionGraphId\.value, row\.revisionId\);/);
+  assert.match(componentSource, /registerDocumentForTab\(targetTabId, response\.graph\);/);
+  assert.match(componentSource, /await graphStore\.loadGraphs\(\);/);
+});
+
 test("EditorWorkspaceShell shows the subgraph source capsule beside the edge visibility controls", () => {
   assert.match(componentSource, /:source-context-label="subgraphSourceContextLabel\(tab\)"/);
   assert.match(componentSource, /function subgraphSourceContextLabel\(tab: EditorWorkspaceTab\)/);

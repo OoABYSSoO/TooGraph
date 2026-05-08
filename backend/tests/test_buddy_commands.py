@@ -82,7 +82,7 @@ class BuddyCommandRouteTests(unittest.TestCase):
         self.assertTrue(body["command"]["revision_id"].startswith("rev_"))
         self.assertEqual(enabled_memories, [])
 
-    def test_graph_patch_draft_records_approval_command_without_revision(self) -> None:
+    def test_graph_patch_draft_is_rejected_in_favor_of_editor_command_flow(self) -> None:
         patch_payload = {
             "graph_id": "graph_buddy_loop",
             "graph_name": "伙伴对话循环",
@@ -109,47 +109,11 @@ class BuddyCommandRouteTests(unittest.TestCase):
                         },
                     )
                     commands_response = client.get("/api/buddy/commands")
-                    revisions_response = client.get("/api/buddy/revisions")
-
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertEqual(body["command"]["action"], "graph_patch.draft")
-        self.assertEqual(body["command"]["kind"], "buddy.graph_patch_draft")
-        self.assertEqual(body["command"]["status"], "awaiting_approval")
-        self.assertEqual(body["command"]["target_type"], "graph")
-        self.assertEqual(body["command"]["target_id"], "graph_buddy_loop")
-        self.assertEqual(body["command"]["activity_event"]["kind"], "graph_patch_draft")
-        self.assertEqual(
-            body["command"]["activity_event"]["summary"],
-            "Drafted graph patch for 伙伴对话循环 (1 operation).",
-        )
-        self.assertEqual(body["command"]["activity_event"]["detail"]["graph_id"], "graph_buddy_loop")
-        self.assertEqual(body["command"]["activity_event"]["detail"]["operation_count"], 1)
-        self.assertIsNone(body["command"]["revision_id"])
-        self.assertIsNone(body["command"]["run_id"])
-        self.assertIsNone(body["command"]["completed_at"])
-        self.assertIsNone(body["revision"])
-        self.assertEqual(body["result"]["draft_id"], body["command"]["command_id"])
-        self.assertEqual(body["result"]["graph_id"], "graph_buddy_loop")
-        self.assertEqual(body["result"]["patch"], patch_payload["patch"])
-        self.assertEqual(commands_response.status_code, 200)
-        self.assertEqual(commands_response.json()[-1]["status"], "awaiting_approval")
-        self.assertEqual(revisions_response.status_code, 200)
-        self.assertEqual(revisions_response.json(), [])
-
-    def test_graph_patch_draft_rejects_empty_patch(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
-                with TestClient(app) as client:
-                    response = client.post(
-                        "/api/buddy/commands",
-                        json={
-                            "action": "graph_patch.draft",
-                            "payload": {"graph_id": "graph_buddy_loop", "patch": []},
-                        },
-                    )
 
         self.assertEqual(response.status_code, 422)
+        self.assertIn("Unsupported buddy command action", response.json()["detail"])
+        self.assertEqual(commands_response.status_code, 200)
+        self.assertEqual(commands_response.json(), [])
 
     def test_run_template_binding_update_command_records_command_and_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

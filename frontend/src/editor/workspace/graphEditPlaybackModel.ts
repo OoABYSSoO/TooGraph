@@ -2,14 +2,18 @@ import {
   cloneGraphDocument,
   connectConditionRouteInDocument,
   connectFlowNodesInDocument,
+  removeNodeFromDocument,
   updateAgentNodeConfigInDocument,
+  updateInputNodeConfigInDocument,
   updateNodeMetadataInDocument,
+  updateOutputNodeConfigInDocument,
 } from "../../lib/graph-document.ts";
 import { buildFixedConditionConfig } from "../../lib/condition-protocol.ts";
 import { addStateBindingToDocument } from "./statePanelBindings.ts";
 import {
   buildNextDefaultStateField,
   insertStateFieldIntoDocument,
+  updateStateFieldInDocument,
 } from "./statePanelFields.ts";
 import {
   resolveNodeCreationFinalPositionFromGesture,
@@ -19,7 +23,9 @@ import {
 
 import type {
   AgentNode,
+  ConditionalEdge,
   ConditionNode,
+  GraphEdge,
   GraphCorePayload,
   GraphDocument,
   GraphNode,
@@ -40,6 +46,13 @@ export const GRAPH_EDIT_PLAYBACK_CAPABILITY_MANUAL = [
   "- 支持 connect_nodes: 连接两个节点的流程边。",
   "- 支持 connect_route: 连接 condition 节点的 true/false/exhausted 分支路由。",
   "- 支持 update_node: 修改已有节点标题、简介或 Agent 任务说明。",
+  "- 支持 move_node: 移动已有节点到新的画布位置。",
+  "- 支持 update_state: 修改已有 state 的名称、简介、类型、默认值或颜色。",
+  "- 支持 update_input_config: 修改已有 input 节点的边界类型或默认值。",
+  "- 支持 update_output_config: 修改已有 output 节点的展示、持久化和文件名配置。",
+  "- 支持 select_skill: 为已有 Agent 节点选择一个 scalar skillKey，并可同步更新任务说明。",
+  "- 支持 delete_node: 删除已有节点并记录可审计恢复快照。",
+  "- 支持 restore_node: 恢复同一计划中刚删除的节点及其相关连线。",
   "- 执行器会把语义命令编译成可见 UI playback 和可审计 graph commands。",
 ].join("\n");
 
@@ -93,6 +106,12 @@ export type GraphEditUpdateNodeIntent = {
   taskInstruction?: string;
 };
 
+export type GraphEditMoveNodeIntent = {
+  kind: "move_node";
+  nodeRef: string;
+  position: Partial<GraphPosition>;
+};
+
 export type GraphEditCreateStateIntent = {
   kind: "create_state";
   ref: string;
@@ -104,6 +123,32 @@ export type GraphEditCreateStateIntent = {
   color?: string;
   nodeRef?: string;
   bindingMode?: GraphEditStateBindingMode;
+};
+
+export type GraphEditUpdateStateIntent = {
+  kind: "update_state";
+  stateRef: string;
+  name?: string;
+  description?: string;
+  valueType?: string;
+  value?: unknown;
+  color?: string;
+};
+
+export type GraphEditUpdateInputConfigIntent = {
+  kind: "update_input_config";
+  nodeRef: string;
+  boundaryType?: InputNode["config"]["boundaryType"];
+  value?: unknown;
+};
+
+export type GraphEditUpdateOutputConfigIntent = {
+  kind: "update_output_config";
+  nodeRef: string;
+  displayMode?: OutputNode["config"]["displayMode"];
+  persistEnabled?: boolean;
+  persistFormat?: OutputNode["config"]["persistFormat"];
+  fileNameTemplate?: string;
 };
 
 export type GraphEditBindStateIntent = {
@@ -129,13 +174,37 @@ export type GraphEditConnectRouteIntent = {
   targetRef: string;
 };
 
+export type GraphEditSelectSkillIntent = {
+  kind: "select_skill";
+  nodeRef: string;
+  skillKey: string;
+  taskInstruction?: string;
+};
+
+export type GraphEditDeleteNodeIntent = {
+  kind: "delete_node";
+  nodeRef: string;
+};
+
+export type GraphEditRestoreNodeIntent = {
+  kind: "restore_node";
+  nodeRef: string;
+};
+
 export type GraphEditIntent =
   | GraphEditCreateNodeIntent
   | GraphEditUpdateNodeIntent
+  | GraphEditMoveNodeIntent
   | GraphEditCreateStateIntent
+  | GraphEditUpdateStateIntent
+  | GraphEditUpdateInputConfigIntent
+  | GraphEditUpdateOutputConfigIntent
   | GraphEditBindStateIntent
   | GraphEditConnectNodesIntent
-  | GraphEditConnectRouteIntent;
+  | GraphEditConnectRouteIntent
+  | GraphEditSelectSkillIntent
+  | GraphEditDeleteNodeIntent
+  | GraphEditRestoreNodeIntent;
 
 export type GraphEditIntentPackage = {
   operations: GraphEditIntent[];
@@ -170,6 +239,13 @@ export type GraphEditUpdateNodeCommand = GraphEditCommandBase & {
   taskInstruction: string | null;
 };
 
+export type GraphEditMoveNodeCommand = GraphEditCommandBase & {
+  kind: "move_node";
+  nodeRef: string;
+  nodeId: string;
+  position: GraphPosition;
+};
+
 export type GraphEditCreateStateCommand = GraphEditCommandBase & {
   kind: "create_state";
   stateRef: string;
@@ -182,6 +258,38 @@ export type GraphEditCreateStateCommand = GraphEditCommandBase & {
   targetNodeRef?: string;
   targetNodeId?: string;
   bindingMode?: GraphEditStateBindingMode;
+};
+
+export type GraphEditUpdateStateCommand = GraphEditCommandBase & {
+  kind: "update_state";
+  stateRef: string;
+  stateKey: string;
+  name: string | null;
+  description: string | null;
+  valueType: string | null;
+  hasValue: boolean;
+  value?: unknown;
+  color: string | null;
+};
+
+export type GraphEditUpdateInputConfigCommand = GraphEditCommandBase & {
+  kind: "update_input_config";
+  nodeRef: string;
+  nodeId: string;
+  boundaryType: InputNode["config"]["boundaryType"] | null;
+  hasValue: boolean;
+  value?: unknown;
+};
+
+export type GraphEditUpdateOutputConfigCommand = GraphEditCommandBase & {
+  kind: "update_output_config";
+  nodeRef: string;
+  nodeId: string;
+  displayMode: OutputNode["config"]["displayMode"] | null;
+  persistEnabled: boolean | null;
+  persistFormat: OutputNode["config"]["persistFormat"] | null;
+  hasFileNameTemplate: boolean;
+  fileNameTemplate: string;
 };
 
 export type GraphEditBindStateCommand = GraphEditCommandBase & {
@@ -214,13 +322,45 @@ export type GraphEditConnectRouteCommand = GraphEditCommandBase & {
   targetNodeId: string;
 };
 
+export type GraphEditDeletedNodeSnapshot = {
+  nodeId: string;
+  node: GraphNode;
+  edges: GraphEdge[];
+  conditionalEdges: ConditionalEdge[];
+};
+
+export type GraphEditSelectSkillCommand = GraphEditCommandBase & {
+  kind: "select_skill";
+  nodeRef: string;
+  nodeId: string;
+  skillKey: string;
+  taskInstruction: string | null;
+};
+
+export type GraphEditDeleteNodeCommand = GraphEditCommandBase & GraphEditDeletedNodeSnapshot & {
+  kind: "delete_node";
+  nodeRef: string;
+};
+
+export type GraphEditRestoreNodeCommand = GraphEditCommandBase & GraphEditDeletedNodeSnapshot & {
+  kind: "restore_node";
+  nodeRef: string;
+};
+
 export type GraphEditCommand =
   | GraphEditCreateNodeCommand
   | GraphEditUpdateNodeCommand
+  | GraphEditMoveNodeCommand
   | GraphEditCreateStateCommand
+  | GraphEditUpdateStateCommand
+  | GraphEditUpdateInputConfigCommand
+  | GraphEditUpdateOutputConfigCommand
   | GraphEditBindStateCommand
   | GraphEditConnectNodesCommand
-  | GraphEditConnectRouteCommand;
+  | GraphEditConnectRouteCommand
+  | GraphEditSelectSkillCommand
+  | GraphEditDeleteNodeCommand
+  | GraphEditRestoreNodeCommand;
 
 export type GraphEditPlaybackStep = {
   kind:
@@ -279,6 +419,10 @@ type CompilerContext = {
   stateRefs: Record<string, string>;
   nodeIds: Set<string>;
   stateKeys: Set<string>;
+  nodePositions: Record<string, GraphPosition>;
+  nodeSnapshots: Record<string, GraphNode>;
+  deletedNodeIds: Set<string>;
+  deletedNodeSnapshots: Record<string, GraphEditDeletedNodeSnapshot>;
   nextPositionIndex: number;
 };
 
@@ -292,6 +436,10 @@ export function buildGraphEditPlaybackPlan(
     stateRefs: {},
     nodeIds: new Set(Object.keys(document.nodes)),
     stateKeys: new Set(Object.keys(document.state_schema)),
+    nodePositions: Object.fromEntries(Object.entries(document.nodes).map(([nodeId, node]) => [nodeId, { ...node.ui.position }])),
+    nodeSnapshots: Object.fromEntries(Object.entries(document.nodes).map(([nodeId, node]) => [nodeId, cloneGraphNode(node)])),
+    deletedNodeIds: new Set(),
+    deletedNodeSnapshots: {},
     nextPositionIndex: Object.keys(document.nodes).length,
   };
   const issues: string[] = [];
@@ -368,14 +516,28 @@ function compileGraphEditIntent(
       return compileCreateNodeCommand(operation, index, context, issues);
     case "update_node":
       return compileUpdateNodeCommand(operation, index, context, issues);
+    case "move_node":
+      return compileMoveNodeCommand(operation, index, context, issues);
     case "create_state":
       return compileCreateStateCommand(operation, index, context, issues);
+    case "update_state":
+      return compileUpdateStateCommand(operation, index, context, issues);
+    case "update_input_config":
+      return compileUpdateInputConfigCommand(operation, index, context, issues);
+    case "update_output_config":
+      return compileUpdateOutputConfigCommand(operation, index, context, issues);
     case "bind_state":
       return compileBindStateCommand(operation, index, context, issues);
     case "connect_nodes":
       return compileConnectNodesCommand(operation, index, context, issues);
     case "connect_route":
       return compileConnectRouteCommand(operation, index, context, issues);
+    case "select_skill":
+      return compileSelectSkillCommand(operation, index, context, issues);
+    case "delete_node":
+      return compileDeleteNodeCommand(operation, index, context, issues);
+    case "restore_node":
+      return compileRestoreNodeCommand(operation, index, context, issues);
   }
 }
 
@@ -457,7 +619,7 @@ function compileCreateNodeCommand(
         finalPosition: defaultPosition,
         creationSource,
       });
-  return {
+  const command: GraphEditCreateNodeCommand = {
     kind: "create_node",
     commandId: `graph-command-${index + 1}`,
     nodeRef,
@@ -473,6 +635,9 @@ function compileCreateNodeCommand(
     creationSource,
     summary: `Create ${operation.nodeType} node ${title}.`,
   };
+  context.nodePositions[nodeId] = { ...position };
+  context.nodeSnapshots[nodeId] = buildGraphNodeFromCommand(command);
+  return command;
 }
 
 function compileUpdateNodeCommand(
@@ -496,6 +661,44 @@ function compileUpdateNodeCommand(
     description: nullableText(operation.description),
     taskInstruction: nullableText(operation.taskInstruction),
     summary: `Update node ${nodeId}.`,
+  };
+}
+
+function compileMoveNodeCommand(
+  operation: GraphEditMoveNodeIntent,
+  index: number,
+  context: CompilerContext,
+  issues: string[],
+): GraphEditMoveNodeCommand | null {
+  const nodeRef = compactText(operation.nodeRef);
+  const nodeId = resolveNodeRef(context, nodeRef);
+  if (!nodeId) {
+    issues.push(`operations[${index}] move_node references unknown node: ${nodeRef}.`);
+    return null;
+  }
+  const currentPosition = context.nodePositions[nodeId] ?? context.document.nodes[nodeId]?.ui.position ?? { x: 0, y: 0 };
+  const position = {
+    x: typeof operation.position?.x === "number" && Number.isFinite(operation.position.x) ? operation.position.x : currentPosition.x,
+    y: typeof operation.position?.y === "number" && Number.isFinite(operation.position.y) ? operation.position.y : currentPosition.y,
+  };
+  context.nodePositions[nodeId] = { ...position };
+  const snapshot = context.nodeSnapshots[nodeId];
+  if (snapshot) {
+    context.nodeSnapshots[nodeId] = {
+      ...snapshot,
+      ui: {
+        ...snapshot.ui,
+        position,
+      },
+    } as GraphNode;
+  }
+  return {
+    kind: "move_node",
+    commandId: `graph-command-${index + 1}`,
+    nodeRef,
+    nodeId,
+    position,
+    summary: `Move node ${nodeId}.`,
   };
 }
 
@@ -538,6 +741,142 @@ function compileCreateStateCommand(
     targetNodeId: targetNodeId || undefined,
     bindingMode: operation.bindingMode,
     summary: `Create state ${name}.`,
+  };
+}
+
+function compileUpdateStateCommand(
+  operation: GraphEditUpdateStateIntent,
+  index: number,
+  context: CompilerContext,
+  issues: string[],
+): GraphEditUpdateStateCommand | null {
+  const stateRef = compactText(operation.stateRef);
+  const stateKey = resolveStateRef(context, stateRef);
+  if (!stateKey) {
+    issues.push(`operations[${index}] update_state references unknown state: ${stateRef}.`);
+    return null;
+  }
+  const hasValue = Object.prototype.hasOwnProperty.call(operation, "value");
+  return {
+    kind: "update_state",
+    commandId: `graph-command-${index + 1}`,
+    stateRef,
+    stateKey,
+    name: nullableText(operation.name),
+    description: nullableText(operation.description),
+    valueType: nullableText(operation.valueType),
+    hasValue,
+    value: operation.value,
+    color: nullableText(operation.color),
+    summary: `Update state ${stateKey}.`,
+  };
+}
+
+function compileUpdateInputConfigCommand(
+  operation: GraphEditUpdateInputConfigIntent,
+  index: number,
+  context: CompilerContext,
+  issues: string[],
+): GraphEditUpdateInputConfigCommand | null {
+  const nodeRef = compactText(operation.nodeRef);
+  const nodeId = resolveNodeRef(context, nodeRef);
+  if (!nodeId) {
+    issues.push(`operations[${index}] update_input_config references unknown node: ${nodeRef}.`);
+    return null;
+  }
+  const node = resolveNodeSnapshot(context, nodeId);
+  if (node?.kind !== "input") {
+    issues.push(`operations[${index}] update_input_config requires an input node: ${nodeRef}.`);
+    return null;
+  }
+  const hasBoundaryType = Object.prototype.hasOwnProperty.call(operation, "boundaryType");
+  const boundaryType = hasBoundaryType ? normalizeInputBoundaryType(operation.boundaryType) : null;
+  if (hasBoundaryType && !boundaryType) {
+    issues.push(`operations[${index}] update_input_config has unsupported boundaryType: ${String(operation.boundaryType ?? "")}.`);
+    return null;
+  }
+  const hasValue = Object.prototype.hasOwnProperty.call(operation, "value");
+  context.nodeSnapshots[nodeId] = {
+    ...node,
+    config: {
+      ...node.config,
+      ...(boundaryType ? { boundaryType } : {}),
+      ...(hasValue ? { value: operation.value } : {}),
+    },
+  };
+  return {
+    kind: "update_input_config",
+    commandId: `graph-command-${index + 1}`,
+    nodeRef,
+    nodeId,
+    boundaryType,
+    hasValue,
+    value: operation.value,
+    summary: `Update input config for ${nodeId}.`,
+  };
+}
+
+function compileUpdateOutputConfigCommand(
+  operation: GraphEditUpdateOutputConfigIntent,
+  index: number,
+  context: CompilerContext,
+  issues: string[],
+): GraphEditUpdateOutputConfigCommand | null {
+  const nodeRef = compactText(operation.nodeRef);
+  const nodeId = resolveNodeRef(context, nodeRef);
+  if (!nodeId) {
+    issues.push(`operations[${index}] update_output_config references unknown node: ${nodeRef}.`);
+    return null;
+  }
+  const node = resolveNodeSnapshot(context, nodeId);
+  if (node?.kind !== "output") {
+    issues.push(`operations[${index}] update_output_config requires an output node: ${nodeRef}.`);
+    return null;
+  }
+  const hasDisplayMode = Object.prototype.hasOwnProperty.call(operation, "displayMode");
+  const displayMode = hasDisplayMode ? normalizeOutputDisplayMode(operation.displayMode) : null;
+  if (hasDisplayMode && !displayMode) {
+    issues.push(`operations[${index}] update_output_config has unsupported displayMode: ${String(operation.displayMode ?? "")}.`);
+    return null;
+  }
+  const hasPersistEnabled = Object.prototype.hasOwnProperty.call(operation, "persistEnabled");
+  let persistEnabled: boolean | null = null;
+  if (hasPersistEnabled && typeof operation.persistEnabled !== "boolean") {
+    issues.push(`operations[${index}] update_output_config persistEnabled must be boolean.`);
+    return null;
+  }
+  if (hasPersistEnabled) {
+    persistEnabled = operation.persistEnabled === true;
+  }
+  const hasPersistFormat = Object.prototype.hasOwnProperty.call(operation, "persistFormat");
+  const persistFormat = hasPersistFormat ? normalizeOutputPersistFormat(operation.persistFormat) : null;
+  if (hasPersistFormat && !persistFormat) {
+    issues.push(`operations[${index}] update_output_config has unsupported persistFormat: ${String(operation.persistFormat ?? "")}.`);
+    return null;
+  }
+  const hasFileNameTemplate = Object.prototype.hasOwnProperty.call(operation, "fileNameTemplate");
+  const fileNameTemplate = hasFileNameTemplate ? String(operation.fileNameTemplate ?? "") : "";
+  context.nodeSnapshots[nodeId] = {
+    ...node,
+    config: {
+      ...node.config,
+      ...(displayMode ? { displayMode } : {}),
+      ...(persistEnabled !== null ? { persistEnabled } : {}),
+      ...(persistFormat ? { persistFormat } : {}),
+      ...(hasFileNameTemplate ? { fileNameTemplate } : {}),
+    },
+  };
+  return {
+    kind: "update_output_config",
+    commandId: `graph-command-${index + 1}`,
+    nodeRef,
+    nodeId,
+    displayMode,
+    persistEnabled,
+    persistFormat,
+    hasFileNameTemplate,
+    fileNameTemplate,
+    summary: `Update output config for ${nodeId}.`,
   };
 }
 
@@ -647,6 +986,104 @@ function compileConnectRouteCommand(
   };
 }
 
+function compileSelectSkillCommand(
+  operation: GraphEditSelectSkillIntent,
+  index: number,
+  context: CompilerContext,
+  issues: string[],
+): GraphEditSelectSkillCommand | null {
+  const nodeRef = compactText(operation.nodeRef);
+  const nodeId = resolveNodeRef(context, nodeRef);
+  const skillKey = compactText(operation.skillKey);
+  if (!nodeId) {
+    issues.push(`operations[${index}] select_skill references unknown node: ${nodeRef}.`);
+    return null;
+  }
+  const node = resolveNodeSnapshot(context, nodeId);
+  if (node?.kind !== "agent") {
+    issues.push(`operations[${index}] select_skill requires an agent node: ${nodeRef}.`);
+    return null;
+  }
+  if (!skillKey) {
+    issues.push(`operations[${index}] select_skill requires skillKey.`);
+    return null;
+  }
+  const taskInstruction = nullableText(operation.taskInstruction);
+  context.nodeSnapshots[nodeId] = {
+    ...node,
+    config: {
+      ...node.config,
+      skillKey,
+      taskInstruction: taskInstruction ?? node.config.taskInstruction,
+    },
+  };
+  return {
+    kind: "select_skill",
+    commandId: `graph-command-${index + 1}`,
+    nodeRef,
+    nodeId,
+    skillKey,
+    taskInstruction,
+    summary: `Select skill ${skillKey} for ${nodeId}.`,
+  };
+}
+
+function compileDeleteNodeCommand(
+  operation: GraphEditDeleteNodeIntent,
+  index: number,
+  context: CompilerContext,
+  issues: string[],
+): GraphEditDeleteNodeCommand | null {
+  const nodeRef = compactText(operation.nodeRef);
+  const nodeId = resolveNodeRef(context, nodeRef);
+  if (!nodeId) {
+    issues.push(`operations[${index}] delete_node references unknown node: ${nodeRef}.`);
+    return null;
+  }
+  const node = resolveNodeSnapshot(context, nodeId);
+  if (!node) {
+    issues.push(`operations[${index}] delete_node references unknown node: ${nodeRef}.`);
+    return null;
+  }
+  const snapshot = buildDeletedNodeSnapshot(context, nodeId, node);
+  context.deletedNodeIds.add(nodeId);
+  context.deletedNodeSnapshots[nodeId] = snapshot;
+  context.deletedNodeSnapshots[nodeRef] = snapshot;
+  return {
+    kind: "delete_node",
+    commandId: `graph-command-${index + 1}`,
+    nodeRef,
+    ...cloneDeletedNodeSnapshot(snapshot),
+    summary: `Delete node ${nodeId}.`,
+  };
+}
+
+function compileRestoreNodeCommand(
+  operation: GraphEditRestoreNodeIntent,
+  index: number,
+  context: CompilerContext,
+  issues: string[],
+): GraphEditRestoreNodeCommand | null {
+  const nodeRef = compactText(operation.nodeRef);
+  const snapshot = context.deletedNodeSnapshots[nodeRef] ?? context.deletedNodeSnapshots[context.nodeRefs[nodeRef] ?? ""];
+  if (!snapshot || !context.deletedNodeIds.has(snapshot.nodeId)) {
+    issues.push(`operations[${index}] restore_node references a node without a prior delete snapshot: ${nodeRef}.`);
+    return null;
+  }
+  context.deletedNodeIds.delete(snapshot.nodeId);
+  context.nodeIds.add(snapshot.nodeId);
+  context.nodeRefs[nodeRef] = snapshot.nodeId;
+  context.nodeSnapshots[snapshot.nodeId] = cloneGraphNode(snapshot.node);
+  context.nodePositions[snapshot.nodeId] = { ...snapshot.node.ui.position };
+  return {
+    kind: "restore_node",
+    commandId: `graph-command-${index + 1}`,
+    nodeRef,
+    ...cloneDeletedNodeSnapshot(snapshot),
+    summary: `Restore node ${snapshot.nodeId}.`,
+  };
+}
+
 function buildPlaybackStepsForCommands(commands: GraphEditCommand[]): GraphEditPlaybackStep[] {
   const steps: GraphEditPlaybackStep[] = [];
   for (let index = 0; index < commands.length; index += 1) {
@@ -734,8 +1171,40 @@ function buildPlaybackStepsForCommand(command: GraphEditCommand): GraphEditPlayb
       return buildCreateNodePlaybackSteps(command, { includeTextSteps: true, pairedCommand: null });
     case "update_node":
       return nodeTextPlaybackSteps(command);
+    case "move_node":
+      return [
+        {
+          kind: "move_virtual_cursor",
+          target: canvasNodeTarget(command.nodeId),
+          label: command.summary,
+          commandId: command.commandId,
+          nodeId: command.nodeId,
+          position: command.position,
+        },
+        {
+          kind: "apply_graph_command",
+          target: canvasNodeTarget(command.nodeId),
+          label: command.summary,
+          commandId: command.commandId,
+          nodeId: command.nodeId,
+          position: command.position,
+        },
+      ];
     case "create_state":
       return buildCreateStatePlaybackSteps(command, null);
+    case "update_state":
+      return buildUpdateStatePlaybackSteps(command);
+    case "update_input_config":
+    case "update_output_config":
+      return [
+        {
+          kind: "apply_graph_command",
+          target: canvasNodeTarget(command.nodeId),
+          label: command.summary,
+          commandId: command.commandId,
+          nodeId: command.nodeId,
+        },
+      ];
     case "bind_state":
       return [
         ...stateBindingGestureSteps(command),
@@ -769,7 +1238,73 @@ function buildPlaybackStepsForCommand(command: GraphEditCommand): GraphEditPlayb
           branchKey: command.branchKey,
         },
       ];
+    case "select_skill":
+    case "delete_node":
+    case "restore_node":
+      return [
+        {
+          kind: "apply_graph_command",
+          target: canvasNodeTarget(command.nodeId),
+          label: command.summary,
+          commandId: command.commandId,
+          nodeId: command.nodeId,
+        },
+      ];
   }
+}
+
+function buildUpdateStatePlaybackSteps(command: GraphEditUpdateStateCommand): GraphEditPlaybackStep[] {
+  const steps: GraphEditPlaybackStep[] = [
+    {
+      kind: "open_state_panel",
+      target: "editor.statePanel",
+      label: "Open the state panel.",
+      stateKey: command.stateKey,
+    },
+  ];
+  if (command.name) {
+    steps.push({
+      kind: "type_state_field",
+      target: `${command.stateKey}.name`,
+      label: `Type state ${command.stateKey} name.`,
+      value: command.name,
+      stateKey: command.stateKey,
+    });
+  }
+  if (command.description) {
+    steps.push({
+      kind: "type_state_field",
+      target: `${command.stateKey}.description`,
+      label: `Type state ${command.stateKey} description.`,
+      value: command.description,
+      stateKey: command.stateKey,
+    });
+  }
+  if (command.valueType) {
+    steps.push({
+      kind: "type_state_field",
+      target: `${command.stateKey}.type`,
+      label: `Choose state ${command.stateKey} type.`,
+      value: command.valueType,
+      stateKey: command.stateKey,
+    });
+  }
+  steps.push(
+    {
+      kind: "apply_graph_command",
+      target: command.stateKey,
+      label: command.summary,
+      commandId: command.commandId,
+      stateKey: command.stateKey,
+    },
+    {
+      kind: "highlight_state_field",
+      target: command.stateKey,
+      label: `Highlight state ${command.stateKey}.`,
+      stateKey: command.stateKey,
+    },
+  );
+  return steps;
 }
 
 function buildCreateStatePlaybackSteps(command: GraphEditCreateStateCommand, pairedCommand: GraphEditBindStateCommand | null): GraphEditPlaybackStep[] {
@@ -1060,14 +1595,28 @@ function applyGraphEditCommand<T extends GraphPayload | GraphDocument>(document:
       return createNodeInDocument(document, command);
     case "update_node":
       return updateNodeInDocument(document, command);
+    case "move_node":
+      return moveNodeInDocument(document, command);
     case "create_state":
       return createStateInDocument(document, command);
+    case "update_state":
+      return updateStateInDocument(document, command);
+    case "update_input_config":
+      return updateInputConfigInDocument(document, command);
+    case "update_output_config":
+      return updateOutputConfigInDocument(document, command);
     case "bind_state":
       return bindStateInDocument(document, command);
     case "connect_nodes":
       return connectFlowNodesInDocument(document, command.sourceNodeId, command.targetNodeId);
     case "connect_route":
       return connectConditionRouteInDocument(document, command.sourceNodeId, command.branchKey, command.targetNodeId);
+    case "select_skill":
+      return selectSkillInDocument(document, command);
+    case "delete_node":
+      return removeNodeFromDocument(document, command.nodeId);
+    case "restore_node":
+      return restoreNodeInDocument(document, command);
   }
 }
 
@@ -1157,6 +1706,22 @@ function updateNodeInDocument<T extends GraphPayload | GraphDocument>(document: 
   return nextDocument;
 }
 
+function moveNodeInDocument<T extends GraphPayload | GraphDocument>(document: T, command: GraphEditMoveNodeCommand): T {
+  const node = document.nodes[command.nodeId];
+  if (!node) {
+    return document;
+  }
+  if (node.ui.position.x === command.position.x && node.ui.position.y === command.position.y) {
+    return document;
+  }
+  const nextDocument = cloneGraphDocument(document);
+  nextDocument.nodes[command.nodeId].ui = {
+    ...nextDocument.nodes[command.nodeId].ui,
+    position: { ...command.position },
+  };
+  return nextDocument;
+}
+
 function createStateInDocument<T extends GraphPayload | GraphDocument>(document: T, command: GraphEditCreateStateCommand): T {
   if (document.state_schema[command.stateKey]) {
     return document;
@@ -1177,6 +1742,92 @@ function createStateInDocument<T extends GraphPayload | GraphDocument>(document:
     key: command.stateKey,
     definition: field.definition,
   });
+}
+
+function updateStateInDocument<T extends GraphPayload | GraphDocument>(document: T, command: GraphEditUpdateStateCommand): T {
+  return updateStateFieldInDocument(document, command.stateKey, (current) => {
+    const nextDefinition: StateDefinition = {
+      ...current,
+      name: command.name ?? current.name,
+      description: command.description ?? current.description,
+      type: command.valueType ?? current.type,
+      color: command.color ?? current.color,
+    };
+    if (command.hasValue) {
+      nextDefinition.value = command.value;
+    }
+    return nextDefinition;
+  });
+}
+
+function updateInputConfigInDocument<T extends GraphPayload | GraphDocument>(document: T, command: GraphEditUpdateInputConfigCommand): T {
+  return updateInputNodeConfigInDocument(document, command.nodeId, (current) => ({
+    ...current,
+    ...(command.boundaryType ? { boundaryType: command.boundaryType } : {}),
+    ...(command.hasValue ? { value: command.value } : {}),
+  }));
+}
+
+function updateOutputConfigInDocument<T extends GraphPayload | GraphDocument>(document: T, command: GraphEditUpdateOutputConfigCommand): T {
+  return updateOutputNodeConfigInDocument(document, command.nodeId, (current) => ({
+    ...current,
+    ...(command.displayMode ? { displayMode: command.displayMode } : {}),
+    ...(command.persistEnabled !== null ? { persistEnabled: command.persistEnabled } : {}),
+    ...(command.persistFormat ? { persistFormat: command.persistFormat } : {}),
+    ...(command.hasFileNameTemplate ? { fileNameTemplate: command.fileNameTemplate } : {}),
+  }));
+}
+
+function selectSkillInDocument<T extends GraphPayload | GraphDocument>(document: T, command: GraphEditSelectSkillCommand): T {
+  return updateAgentNodeConfigInDocument(document, command.nodeId, (current) => ({
+    ...current,
+    skillKey: command.skillKey,
+    taskInstruction: command.taskInstruction ?? current.taskInstruction,
+  }));
+}
+
+function restoreNodeInDocument<T extends GraphPayload | GraphDocument>(document: T, command: GraphEditRestoreNodeCommand): T {
+  if (document.nodes[command.nodeId]) {
+    return document;
+  }
+  const nextDocument = cloneGraphDocument(document);
+  nextDocument.nodes[command.nodeId] = cloneGraphNode(command.node);
+  for (const edge of command.edges) {
+    if (
+      nextDocument.nodes[edge.source] &&
+      nextDocument.nodes[edge.target] &&
+      !nextDocument.edges.some((candidate) => candidate.source === edge.source && candidate.target === edge.target)
+    ) {
+      nextDocument.edges.push({ ...edge });
+    }
+  }
+  for (const conditionalEdge of command.conditionalEdges) {
+    if (!nextDocument.nodes[conditionalEdge.source]) {
+      continue;
+    }
+    const branches = Object.fromEntries(
+      Object.entries(conditionalEdge.branches).filter(([, targetNodeId]) => Boolean(nextDocument.nodes[targetNodeId])),
+    );
+    if (Object.keys(branches).length === 0) {
+      continue;
+    }
+    const existingIndex = nextDocument.conditional_edges.findIndex((candidate) => candidate.source === conditionalEdge.source);
+    if (existingIndex >= 0) {
+      nextDocument.conditional_edges[existingIndex] = {
+        ...nextDocument.conditional_edges[existingIndex],
+        branches: {
+          ...nextDocument.conditional_edges[existingIndex].branches,
+          ...branches,
+        },
+      };
+    } else {
+      nextDocument.conditional_edges.push({
+        source: conditionalEdge.source,
+        branches,
+      });
+    }
+  }
+  return nextDocument;
 }
 
 function buildGraphNodeFromCommand(command: GraphEditCreateNodeCommand): GraphNode {
@@ -1266,8 +1917,102 @@ function buildGraphNodeFromCreationFields(input: {
   }
 }
 
+function buildDeletedNodeSnapshot(
+  context: CompilerContext,
+  nodeId: string,
+  node: GraphNode,
+): GraphEditDeletedNodeSnapshot {
+  return {
+    nodeId,
+    node: cloneGraphNode(node),
+    edges: context.document.edges
+      .filter((edge) => edge.source === nodeId || edge.target === nodeId)
+      .map((edge) => ({ ...edge })),
+    conditionalEdges: context.document.conditional_edges
+      .map((edge) => {
+        if (edge.source === nodeId) {
+          return {
+            source: edge.source,
+            branches: { ...edge.branches },
+          };
+        }
+        const branches = Object.fromEntries(Object.entries(edge.branches).filter(([, targetNodeId]) => targetNodeId === nodeId));
+        return {
+          source: edge.source,
+          branches,
+        };
+      })
+      .filter((edge) => edge.source === nodeId || Object.keys(edge.branches).length > 0),
+  };
+}
+
+function cloneDeletedNodeSnapshot(snapshot: GraphEditDeletedNodeSnapshot): GraphEditDeletedNodeSnapshot {
+  return {
+    nodeId: snapshot.nodeId,
+    node: cloneGraphNode(snapshot.node),
+    edges: snapshot.edges.map((edge) => ({ ...edge })),
+    conditionalEdges: snapshot.conditionalEdges.map((edge) => ({
+      source: edge.source,
+      branches: { ...edge.branches },
+    })),
+  };
+}
+
+function resolveNodeSnapshot(context: CompilerContext, nodeId: string): GraphNode | null {
+  if (context.deletedNodeIds.has(nodeId)) {
+    return null;
+  }
+  return context.nodeSnapshots[nodeId] ?? (context.document.nodes[nodeId] ? cloneGraphNode(context.document.nodes[nodeId]) : null);
+}
+
+function cloneGraphNode(node: GraphNode): GraphNode {
+  return JSON.parse(JSON.stringify(node)) as GraphNode;
+}
+
+function normalizeInputBoundaryType(value: unknown): InputNode["config"]["boundaryType"] | null {
+  const normalized = compactText(value);
+  if (
+    normalized === "text" ||
+    normalized === "file" ||
+    normalized === "knowledge_base" ||
+    normalized === "image" ||
+    normalized === "audio" ||
+    normalized === "video"
+  ) {
+    return normalized;
+  }
+  return null;
+}
+
+function normalizeOutputDisplayMode(value: unknown): OutputNode["config"]["displayMode"] | null {
+  const normalized = compactText(value);
+  if (
+    normalized === "auto" ||
+    normalized === "plain" ||
+    normalized === "markdown" ||
+    normalized === "html" ||
+    normalized === "json" ||
+    normalized === "documents"
+  ) {
+    return normalized;
+  }
+  return null;
+}
+
+function normalizeOutputPersistFormat(value: unknown): OutputNode["config"]["persistFormat"] | null {
+  const normalized = compactText(value);
+  if (normalized === "auto" || normalized === "txt" || normalized === "md" || normalized === "json") {
+    return normalized;
+  }
+  return null;
+}
+
 function resolveNodeRef(context: CompilerContext, ref: string): string {
-  return context.nodeRefs[ref] ?? (context.document.nodes[ref] ? ref : "");
+  const nodeId = context.nodeRefs[ref] ?? (context.document.nodes[ref] ? ref : "");
+  if (!nodeId || context.deletedNodeIds.has(nodeId)) {
+    return "";
+  }
+  return nodeId;
 }
 
 function resolveStateRef(context: CompilerContext, ref: string): string {

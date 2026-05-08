@@ -300,6 +300,18 @@ function normalizeGraphEditIntent(record: Record<string, unknown>): GraphEditInt
     assignOptionalText(intent, "taskInstruction", record.taskInstruction);
     return intent;
   }
+  if (kind === "move_node") {
+    const nodeRef = normalizeText(record.nodeRef ?? record.node_ref);
+    const position = normalizeGraphEditPosition(record.position);
+    if (!nodeRef || !position) {
+      return null;
+    }
+    return {
+      kind: "move_node",
+      nodeRef,
+      position,
+    };
+  }
   if (kind === "create_state") {
     const ref = normalizeText(record.ref);
     if (!ref) {
@@ -318,6 +330,60 @@ function normalizeGraphEditIntent(record: Record<string, unknown>): GraphEditInt
     }
     return intent;
   }
+  if (kind === "update_state") {
+    const stateRef = normalizeText(record.stateRef ?? record.state_ref);
+    if (!stateRef) {
+      return null;
+    }
+    const intent: GraphEditIntent = {
+      kind: "update_state",
+      stateRef,
+    };
+    assignOptionalText(intent, "name", record.name);
+    assignOptionalText(intent, "description", record.description);
+    assignOptionalText(intent, "valueType", record.valueType ?? record.value_type);
+    assignOptionalText(intent, "color", record.color);
+    if ("value" in record) {
+      intent.value = record.value;
+    }
+    return intent;
+  }
+  if (kind === "update_input_config") {
+    const nodeRef = normalizeText(record.nodeRef ?? record.node_ref);
+    if (!nodeRef) {
+      return null;
+    }
+    const intent: GraphEditIntent = {
+      kind: "update_input_config",
+      nodeRef,
+    };
+    assignOptionalText(intent, "boundaryType", record.boundaryType ?? record.boundary_type);
+    if ("value" in record) {
+      intent.value = record.value;
+    }
+    return intent;
+  }
+  if (kind === "update_output_config") {
+    const nodeRef = normalizeText(record.nodeRef ?? record.node_ref);
+    if (!nodeRef) {
+      return null;
+    }
+    const intent: GraphEditIntent = {
+      kind: "update_output_config",
+      nodeRef,
+    };
+    assignOptionalText(intent, "displayMode", record.displayMode ?? record.display_mode);
+    if (typeof record.persistEnabled === "boolean") {
+      intent.persistEnabled = record.persistEnabled;
+    } else if (typeof record.persist_enabled === "boolean") {
+      intent.persistEnabled = record.persist_enabled;
+    }
+    assignOptionalText(intent, "persistFormat", record.persistFormat ?? record.persist_format);
+    if ("fileNameTemplate" in record || "file_name_template" in record) {
+      intent.fileNameTemplate = String(record.fileNameTemplate ?? record.file_name_template ?? "");
+    }
+    return intent;
+  }
   if (kind === "bind_state") {
     const nodeRef = normalizeText(record.nodeRef ?? record.node_ref);
     const stateRef = normalizeText(record.stateRef ?? record.state_ref);
@@ -333,6 +399,30 @@ function normalizeGraphEditIntent(record: Record<string, unknown>): GraphEditInt
       ...(record.required === true ? { required: true } : {}),
     };
   }
+  if (kind === "select_skill") {
+    const nodeRef = normalizeText(record.nodeRef ?? record.node_ref);
+    const skillKey = normalizeText(record.skillKey ?? record.skill_key);
+    if (!nodeRef || !skillKey) {
+      return null;
+    }
+    const intent: GraphEditIntent = {
+      kind: "select_skill",
+      nodeRef,
+      skillKey,
+    };
+    assignOptionalText(intent, "taskInstruction", record.taskInstruction ?? record.task_instruction);
+    return intent;
+  }
+  if (kind === "delete_node" || kind === "restore_node") {
+    const nodeRef = normalizeText(record.nodeRef ?? record.node_ref);
+    if (!nodeRef) {
+      return null;
+    }
+    return {
+      kind,
+      nodeRef,
+    };
+  }
   if (kind === "connect_nodes") {
     const sourceRef = normalizeText(record.sourceRef ?? record.source_ref);
     const targetRef = normalizeText(record.targetRef ?? record.target_ref);
@@ -342,6 +432,20 @@ function normalizeGraphEditIntent(record: Record<string, unknown>): GraphEditInt
     return {
       kind: "connect_nodes",
       sourceRef,
+      targetRef,
+    };
+  }
+  if (kind === "connect_route") {
+    const sourceRef = normalizeText(record.sourceRef ?? record.source_ref);
+    const branchKey = normalizeText(record.branchKey ?? record.branch_key);
+    const targetRef = normalizeText(record.targetRef ?? record.target_ref);
+    if (!sourceRef || !branchKey || !targetRef) {
+      return null;
+    }
+    return {
+      kind: "connect_route",
+      sourceRef,
+      branchKey,
       targetRef,
     };
   }

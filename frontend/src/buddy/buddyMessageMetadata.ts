@@ -62,7 +62,22 @@ function isBuddyOutputTraceRecord(value: unknown): value is BuddyOutputTraceReco
     (
       value.triggeredRunId === undefined ||
       typeof value.triggeredRunId === "string"
+    ) &&
+    (
+      value.graphRevision === undefined ||
+      isGraphRevisionMetadata(value.graphRevision)
     )
+  );
+}
+
+function isGraphRevisionMetadata(value: unknown) {
+  return (
+    isRecord(value) &&
+    typeof value.graphId === "string" &&
+    value.graphId.trim().length > 0 &&
+    typeof value.revisionId === "string" &&
+    value.revisionId.trim().length > 0 &&
+    (value.status === undefined || typeof value.status === "string")
   );
 }
 

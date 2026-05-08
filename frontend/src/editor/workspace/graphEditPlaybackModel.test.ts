@@ -59,6 +59,57 @@ function documentWithExistingNodes(): GraphPayload {
   };
 }
 
+function documentWithEditableGraph(): GraphPayload {
+  return {
+    ...documentWithExistingNodes(),
+    state_schema: {
+      user_request: {
+        name: "用户请求",
+        description: "原始请求文本。",
+        type: "text",
+        value: "旧请求",
+        color: "#64748b",
+      },
+    },
+    nodes: {
+      ...documentWithExistingNodes().nodes,
+      input_1: {
+        ...documentWithExistingNodes().nodes.input_1!,
+        writes: [{ state: "user_request", mode: "replace" }],
+        config: { value: "旧请求" },
+      },
+      agent_1: {
+        ...documentWithExistingNodes().nodes.agent_1!,
+        reads: [{ state: "user_request", required: true }],
+      },
+    },
+    edges: [{ source: "input_1", target: "agent_1" }],
+  };
+}
+
+function documentWithConfigurableBoundaryNodes(): GraphPayload {
+  return {
+    ...documentWithExistingNodes(),
+    nodes: {
+      ...documentWithExistingNodes().nodes,
+      output_1: {
+        kind: "output",
+        name: "结果",
+        description: "",
+        ui: { position: { x: 520, y: 0 }, collapsed: false },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+  };
+}
+
 test("buildGraphEditPlaybackPlan compiles graph intentions without exposing mouse choreography to the LLM", () => {
   const plan = buildGraphEditPlaybackPlan(emptyDocument(), {
     operations: [
@@ -558,4 +609,132 @@ test("graph edit playback supports updating and connecting existing graph nodes"
   const agent = result.document.nodes.agent_1;
   assert.equal(agent?.kind === "agent" ? agent.config.taskInstruction : "", "读取输入并输出行动建议。");
   assert.deepEqual(result.document.edges, [{ source: "input_1", target: "agent_1" }]);
+});
+
+test("graph edit playback supports movement, state updates, skill selection, delete, and restore commands", () => {
+  const document = documentWithEditableGraph();
+  const plan = buildGraphEditPlaybackPlan(document, {
+    operations: [
+      {
+        kind: "move_node",
+        nodeRef: "agent_1",
+        position: { x: 520, y: 180 },
+      },
+      {
+        kind: "update_state",
+        stateRef: "user_request",
+        name: "规范化请求",
+        description: "可由后续节点直接处理的结构化请求。",
+        valueType: "json",
+        value: { text: "请总结路线图" },
+        color: "#0ea5e9",
+      },
+      {
+        kind: "select_skill",
+        nodeRef: "agent_1",
+        skillKey: "local/file_writer",
+        taskInstruction: "调用选中的 Skill 写入受控文件。",
+      },
+      {
+        kind: "delete_node",
+        nodeRef: "input_1",
+      },
+      {
+        kind: "restore_node",
+        nodeRef: "input_1",
+      },
+    ],
+  });
+
+  assert.equal(plan.valid, true);
+  assert.deepEqual(plan.graphCommands.map((command) => command.kind), [
+    "move_node",
+    "update_state",
+    "select_skill",
+    "delete_node",
+    "restore_node",
+  ]);
+  assert.equal(plan.playbackSteps.some((step) => step.kind === "apply_graph_command" && step.target === "editor.canvas.node.agent_1"), true);
+  assert.equal(plan.playbackSteps.some((step) => step.kind === "type_state_field" && step.target === "user_request.name"), true);
+  assert.equal(plan.playbackSteps.some((step) => step.kind === "highlight_state_field" && step.target === "user_request"), true);
+
+  const result = applyGraphEditPlaybackPlan(document, plan);
+  const agent = result.document.nodes.agent_1;
+
+  assert.equal(result.applied, true);
+  assert.deepEqual(result.appliedCommands.map((command) => command.kind), [
+    "move_node",
+    "update_state",
+    "select_skill",
+    "delete_node",
+    "restore_node",
+  ]);
+  assert.deepEqual(agent?.ui.position, { x: 520, y: 180 });
+  assert.equal(agent?.kind === "agent" ? agent.config.skillKey : "", "local/file_writer");
+  assert.equal(agent?.kind === "agent" ? agent.config.taskInstruction : "", "调用选中的 Skill 写入受控文件。");
+  assert.deepEqual(result.document.state_schema.user_request, {
+    name: "规范化请求",
+    description: "可由后续节点直接处理的结构化请求。",
+    type: "json",
+    value: { text: "请总结路线图" },
+    color: "#0ea5e9",
+  });
+  assert.equal(result.document.nodes.input_1?.kind, "input");
+  assert.deepEqual(result.document.edges, [{ source: "input_1", target: "agent_1" }]);
+});
+
+test("graph edit playback rejects restore commands without a prior delete snapshot", () => {
+  const plan = buildGraphEditPlaybackPlan(documentWithEditableGraph(), {
+    operations: [
+      {
+        kind: "restore_node",
+        nodeRef: "input_1",
+      },
+    ],
+  });
+
+  assert.equal(plan.valid, false);
+  assert.deepEqual(plan.graphCommands, []);
+  assert.match(plan.issues.join("\n"), /restore_node references a node without a prior delete snapshot: input_1/);
+});
+
+test("graph edit playback supports input and output node config updates", () => {
+  const document = documentWithConfigurableBoundaryNodes();
+  const plan = buildGraphEditPlaybackPlan(document, {
+    operations: [
+      {
+        kind: "update_input_config",
+        nodeRef: "input_1",
+        boundaryType: "file",
+        value: "/tmp/request.md",
+      },
+      {
+        kind: "update_output_config",
+        nodeRef: "output_1",
+        displayMode: "markdown",
+        persistEnabled: true,
+        persistFormat: "md",
+        fileNameTemplate: "answer-{{run_id}}.md",
+      },
+    ],
+  });
+
+  assert.equal(plan.valid, true);
+  assert.deepEqual(plan.graphCommands.map((command) => command.kind), ["update_input_config", "update_output_config"]);
+  assert.equal(plan.playbackSteps.some((step) => step.kind === "apply_graph_command" && step.target === "editor.canvas.node.input_1"), true);
+  assert.equal(plan.playbackSteps.some((step) => step.kind === "apply_graph_command" && step.target === "editor.canvas.node.output_1"), true);
+
+  const result = applyGraphEditPlaybackPlan(document, plan);
+
+  assert.equal(result.applied, true);
+  assert.deepEqual(result.document.nodes.input_1?.config, {
+    value: "/tmp/request.md",
+    boundaryType: "file",
+  });
+  assert.deepEqual(result.document.nodes.output_1?.config, {
+    displayMode: "markdown",
+    persistEnabled: true,
+    persistFormat: "md",
+    fileNameTemplate: "answer-{{run_id}}.md",
+  });
 });

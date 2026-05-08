@@ -36,6 +36,21 @@
           <ElIcon aria-hidden="true"><CollectionTag /></ElIcon>
         </button>
       </ElTooltip>
+      <ElTooltip v-if="showRevisionHistory" :content="t('graphLibrary.history')" placement="bottom">
+        <button
+          type="button"
+          class="editor-action-capsule__icon-button"
+          :aria-label="t('graphLibrary.history')"
+          data-virtual-affordance-id="editor.action.openGraphRevisionHistory"
+          :data-virtual-affordance-label="t('graphLibrary.history')"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor.actions"
+          data-virtual-affordance-actions="click"
+          @click="$emit('open-active-graph-revisions')"
+        >
+          <ElIcon aria-hidden="true"><Clock /></ElIcon>
+        </button>
+      </ElTooltip>
       <ElTooltip :content="t('editor.validateGraph')" placement="bottom">
         <button
           type="button"
@@ -109,7 +124,7 @@
 </template>
 
 <script setup lang="ts">
-import { CircleCheck, CollectionTag, Download, VideoPlay } from "@element-plus/icons-vue";
+import { CircleCheck, Clock, CollectionTag, Download, VideoPlay } from "@element-plus/icons-vue";
 import { ElIcon, ElTooltip } from "element-plus";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -122,6 +137,7 @@ const props = defineProps<{
   saveGraphLabel?: string;
   showSaveAsGraph?: boolean;
   saveAsGraphLabel?: string;
+  showRevisionHistory?: boolean;
 }>();
 
 defineEmits<{
@@ -130,6 +146,7 @@ defineEmits<{
   (event: "save-active-graph"): void;
   (event: "save-active-graph-as-new"): void;
   (event: "save-active-graph-as-template"): void;
+  (event: "open-active-graph-revisions"): void;
   (event: "validate-active-graph"): void;
   (event: "export-active-graph"): void;
   (event: "run-active-graph"): void;

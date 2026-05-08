@@ -55,6 +55,37 @@ test("resolveOutputTraceBuddyMessageMetadata restores only valid trace metadata"
       records: [{ ...outputTrace.records[0], artifactLabels: ["artifacts: 2"], triggeredRunId: "run_report" }],
     },
   );
+  assert.deepEqual(
+    resolveOutputTraceBuddyMessageMetadata({
+      kind: "output_trace",
+      outputTrace: {
+        ...outputTrace,
+        records: [
+          {
+            ...outputTrace.records[0],
+            graphRevision: {
+              graphId: "graph_buddy",
+              revisionId: "grev_buddy",
+              status: "saved",
+            },
+          },
+        ],
+      },
+    }),
+    {
+      ...outputTrace,
+      records: [
+        {
+          ...outputTrace.records[0],
+          graphRevision: {
+            graphId: "graph_buddy",
+            revisionId: "grev_buddy",
+            status: "saved",
+          },
+        },
+      ],
+    },
+  );
   assert.equal(resolveOutputTraceBuddyMessageMetadata({ kind: "text", outputTrace }), null);
   assert.equal(resolveOutputTraceBuddyMessageMetadata({ kind: "output_trace", outputTrace: { segmentId: "segment_1" } }), null);
   assert.equal(
@@ -73,6 +104,16 @@ test("resolveOutputTraceBuddyMessageMetadata restores only valid trace metadata"
       outputTrace: {
         ...outputTrace,
         records: [{ ...outputTrace.records[0], triggeredRunId: 123 }],
+      },
+    }),
+    null,
+  );
+  assert.equal(
+    resolveOutputTraceBuddyMessageMetadata({
+      kind: "output_trace",
+      outputTrace: {
+        ...outputTrace,
+        records: [{ ...outputTrace.records[0], graphRevision: { graphId: "graph_buddy", revisionId: 123 } }],
       },
     }),
     null,

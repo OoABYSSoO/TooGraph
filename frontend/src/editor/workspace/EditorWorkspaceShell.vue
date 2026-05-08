@@ -58,11 +58,13 @@
             :save-graph-label="activeTab?.kind === 'subgraph' ? t('editor.saveSubgraph') : t('editor.saveGraph')"
             :show-save-as-graph="activeTab?.kind === 'subgraph'"
             :save-as-graph-label="t('editor.saveAsGraph')"
+            :show-revision-history="canOpenActiveGraphRevisionHistory"
             @toggle-state-panel="toggleActiveStatePanel"
             @toggle-run-activity-panel="toggleActiveRunActivityPanelFromActionCapsule"
             @save-active-graph="saveActiveGraph"
             @save-active-graph-as-new="saveActiveGraphAsNewGraph"
             @save-active-graph-as-template="saveActiveGraphAsTemplate"
+            @open-active-graph-revisions="openActiveGraphRevisionHistory"
             @validate-active-graph="validateActiveGraph"
             @export-active-graph="exportActiveGraph"
             @run-active-graph="runActiveGraph"
@@ -217,6 +219,73 @@
     />
 
     <ElDialog
+      v-model="editorGraphRevisionDialogOpen"
+      class="editor-workspace-shell__revision-dialog"
+      :title="editorGraphRevisionDialogTitle"
+      width="min(720px, calc(100vw - 32px))"
+      :close-on-click-modal="false"
+    >
+      <section class="editor-workspace-shell__revision-panel">
+        <p class="editor-workspace-shell__revision-body">{{ t("graphLibrary.revisionDialogBody") }}</p>
+        <article v-if="editorGraphRevisionLoading" class="editor-workspace-shell__revision-empty">
+          {{ t("graphLibrary.loadingRevisions") }}
+        </article>
+        <article v-else-if="editorGraphRevisionError" class="editor-workspace-shell__revision-notice">
+          {{ t("common.failedToLoad", { error: editorGraphRevisionError }) }}
+        </article>
+        <article v-else-if="editorGraphRevisionRows.length === 0" class="editor-workspace-shell__revision-empty">
+          {{ t("graphLibrary.noRevisions") }}
+        </article>
+        <div v-else class="editor-workspace-shell__revision-list">
+          <article v-for="row in editorGraphRevisionRows" :key="row.revisionId" class="editor-workspace-shell__revision-row">
+            <div class="editor-workspace-shell__revision-main">
+              <div>
+                <div class="editor-workspace-shell__revision-id">{{ row.revisionId }}</div>
+                <h3>{{ row.reason || t("graphLibrary.revisionNoReason") }}</h3>
+                <p>{{ formatEditorRevisionTimestamp(row.createdAt) }}</p>
+              </div>
+              <ElButton
+                size="small"
+                :type="row.restoresToDeletion ? 'danger' : 'primary'"
+                :loading="editorRestoreRevisionActionId === row.revisionId"
+                :disabled="Boolean(editorRestoreRevisionActionId)"
+                :data-virtual-affordance-id="`editor.graph.${editorGraphRevisionGraphId}.revision.${row.revisionId}.restore`"
+                :data-virtual-affordance-label="
+                  row.restoresToDeletion
+                    ? t('graphLibrary.restoreRevisionDeletesGraph')
+                    : t('graphLibrary.restoreRevisionAction')
+                "
+                data-virtual-affordance-role="button"
+                data-virtual-affordance-zone="editor.revisionHistory"
+                data-virtual-affordance-actions="click"
+                @click="restoreActiveGraphRevisionFromHistory(row)"
+              >
+                {{
+                  row.restoresToDeletion
+                    ? t("graphLibrary.restoreRevisionDeletesGraph")
+                    : t("graphLibrary.restoreRevisionAction")
+                }}
+              </ElButton>
+            </div>
+            <div class="editor-workspace-shell__revision-path">
+              <span>
+                {{ t("graphLibrary.revisionRestoreTarget", { name: row.previousName || t("graphLibrary.deletedGraph") }) }}
+              </span>
+              <span>
+                {{ t("graphLibrary.revisionChangedTo", { name: row.nextName || t("graphLibrary.deletedGraph") }) }}
+              </span>
+            </div>
+            <div class="editor-workspace-shell__revision-meta">
+              <span>{{ t("graphLibrary.revisionActor", { actor: row.actor || t("common.none") }) }}</span>
+              <span>{{ t("graphLibrary.revisionDiffCount", { count: row.diffCount }) }}</span>
+              <span v-if="row.runId">{{ t("graphLibrary.revisionRun", { runId: row.runId }) }}</span>
+            </div>
+          </article>
+        </div>
+      </section>
+    </ElDialog>
+
+    <ElDialog
       v-model="graphReplayDebugDialogOpen"
       class="editor-workspace-shell__graph-replay-dialog"
       :title="t('editor.graphReplayDebugTitle')"
@@ -313,7 +382,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ElButton, ElDialog, ElInput, ElMessage } from "element-plus";
+import { ElButton, ElDialog, ElInput, ElMessage, ElMessageBox } from "element-plus";
 import { useI18n } from "vue-i18n";
 
 import { fetchPreset, fetchPresets, savePreset } from "@/api/presets";
@@ -326,7 +395,9 @@ import { resolveBuddyVirtualOperationPlanFromActivityEvent } from "@/buddy/virtu
 import {
   exportLangGraphPython,
   fetchGraph,
+  fetchGraphRevisions,
   importGraphFromPythonSource,
+  restoreGraphRevision,
   runGraph,
   saveGraph,
   saveGraphAsTemplate,
@@ -335,6 +406,7 @@ import {
 import { resolveAgentRuntimeCatalog } from "@/editor/nodes/agentConfigModel";
 import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
 import { clonePlainValue, reconcileAgentSkillOutputBindingsInDocument } from "@/lib/graph-document";
+import { buildGraphRevisionHistoryRows, type GraphRevisionHistoryRow } from "@/lib/graphRevisionHistoryModel";
 import type { NodeFocusRequest } from "@/editor/canvas/useNodeSelectionFocus";
 import type { CreatedStateEdgeEditorRequest, NodeCreationMenuState } from "@/editor/workspace/nodeCreationMenuModel";
 import {
@@ -356,6 +428,7 @@ import type { RunDetail } from "@/types/run";
 import type {
   GraphDocument,
   GraphPayload,
+  GraphRevisionRecord,
   SubgraphNode,
   TemplateRecord,
 } from "@/types/node-system";
@@ -505,6 +578,24 @@ const activeStateCount = computed(() => {
   }
   return Object.keys(document.state_schema ?? {}).length;
 });
+const canOpenActiveGraphRevisionHistory = computed(() => {
+  const tab = activeTab.value;
+  return Boolean(tab?.kind === "existing" && tab.graphId);
+});
+const editorGraphRevisionDialogOpen = ref(false);
+const editorGraphRevisionGraphId = ref("");
+const editorGraphRevisionGraphTitle = ref("");
+const editorGraphRevisionTabId = ref("");
+const editorGraphRevisionLoading = ref(false);
+const editorGraphRevisionError = ref<string | null>(null);
+const editorGraphRevisions = ref<GraphRevisionRecord[]>([]);
+const editorRestoreRevisionActionId = ref("");
+const editorGraphRevisionRows = computed(() => buildGraphRevisionHistoryRows(editorGraphRevisions.value));
+const editorGraphRevisionDialogTitle = computed(() =>
+  editorGraphRevisionGraphTitle.value
+    ? t("graphLibrary.revisionDialogTitle", { name: editorGraphRevisionGraphTitle.value })
+    : t("graphLibrary.history"),
+);
 const graphReplayDebugCanStart = computed(() => {
   const compileResult = graphReplayDebugCompileResult.value;
   return (
@@ -601,6 +692,103 @@ function confirmSaveMetadataDialog() {
       description: saveMetadataDialog.value.description,
     }),
   );
+}
+
+async function openActiveGraphRevisionHistory() {
+  const tab = activeTab.value;
+  const graphId = tab?.kind === "existing" ? tab.graphId?.trim() ?? "" : "";
+  if (!tab || !graphId) {
+    return;
+  }
+  editorGraphRevisionDialogOpen.value = true;
+  editorGraphRevisionGraphId.value = graphId;
+  editorGraphRevisionGraphTitle.value = documentsByTabId.value[tab.tabId]?.name ?? tab.title;
+  editorGraphRevisionTabId.value = tab.tabId;
+  await loadActiveGraphRevisionHistory(graphId);
+}
+
+async function loadActiveGraphRevisionHistory(graphId = editorGraphRevisionGraphId.value) {
+  if (!graphId) {
+    return;
+  }
+  editorGraphRevisionLoading.value = true;
+  editorGraphRevisionError.value = null;
+  try {
+    editorGraphRevisions.value = await fetchGraphRevisions(graphId);
+  } catch (loadError) {
+    editorGraphRevisionError.value = loadError instanceof Error ? loadError.message : t("common.loading");
+  } finally {
+    editorGraphRevisionLoading.value = false;
+  }
+}
+
+async function restoreActiveGraphRevisionFromHistory(row: GraphRevisionHistoryRow) {
+  const targetTabId = editorGraphRevisionTabId.value;
+  if (!editorGraphRevisionGraphId.value || !targetTabId || editorRestoreRevisionActionId.value) {
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(
+      row.restoresToDeletion
+        ? t("graphLibrary.restoreRevisionDeletesConfirm")
+        : t("graphLibrary.restoreRevisionConfirm", { name: row.previousName || t("common.none") }),
+      t("graphLibrary.restoreRevisionTitle"),
+      {
+        confirmButtonText: row.restoresToDeletion
+          ? t("graphLibrary.restoreRevisionDeletesGraph")
+          : t("graphLibrary.restoreRevisionAction"),
+        cancelButtonText: t("common.cancel"),
+        type: "warning",
+      },
+    );
+  } catch {
+    return;
+  }
+
+  editorRestoreRevisionActionId.value = row.revisionId;
+  editorGraphRevisionError.value = null;
+  try {
+    const response = await restoreGraphRevision(editorGraphRevisionGraphId.value, row.revisionId);
+    await graphStore.loadGraphs();
+    if (response.graph) {
+      registerDocumentForTab(targetTabId, response.graph);
+      updateWorkspaceTab(targetTabId, (tab) => ({
+        ...tab,
+        kind: "existing",
+        graphId: response.graph!.graph_id,
+        title: response.graph!.name,
+        dirty: false,
+      }));
+      editorGraphRevisionGraphId.value = response.graph.graph_id;
+      editorGraphRevisionGraphTitle.value = response.graph.name;
+      await loadActiveGraphRevisionHistory(response.graph.graph_id);
+      const restoredTab = workspace.value.tabs.find((tab) => tab.tabId === targetTabId);
+      if (restoredTab && workspace.value.activeTabId === targetTabId) {
+        syncRouteToTab(restoredTab, "replace");
+      }
+    } else {
+      updateWorkspaceTab(targetTabId, (tab) => ({ ...tab, dirty: false }));
+      editorGraphRevisionDialogOpen.value = false;
+      editorGraphRevisions.value = [];
+      editorGraphRevisionGraphId.value = "";
+      editorGraphRevisionGraphTitle.value = "";
+      editorGraphRevisionTabId.value = "";
+      requestCloseTab(targetTabId);
+    }
+    ElMessage.success(t("graphLibrary.revisionRestored", { revisionId: response.restored_revision_id }));
+  } catch (restoreError) {
+    editorGraphRevisionError.value = restoreError instanceof Error ? restoreError.message : t("common.failedToSave", { error: "" });
+  } finally {
+    editorRestoreRevisionActionId.value = "";
+  }
+}
+
+function formatEditorRevisionTimestamp(createdAt: string): string {
+  const parsed = new Date(createdAt);
+  if (Number.isNaN(parsed.getTime())) {
+    return createdAt;
+  }
+  return parsed.toLocaleString();
 }
 
 let closeNodeCreationMenuFromController: ((tabId: string) => void) | null = null;
@@ -2044,6 +2232,97 @@ onMounted(() => {
 
 :global(.editor-workspace-shell__save-metadata-dialog .el-dialog__footer) {
   padding: 14px 24px 22px;
+}
+
+:global(.editor-workspace-shell__revision-dialog.el-dialog) {
+  border: 1px solid rgba(154, 52, 18, 0.18);
+  border-radius: 20px;
+  background:
+    linear-gradient(140deg, rgba(255, 252, 247, 0.98), rgba(255, 247, 237, 0.96)),
+    rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 70px rgba(60, 41, 20, 0.2);
+  overflow: hidden;
+}
+
+:global(.editor-workspace-shell__revision-dialog .el-dialog__header) {
+  padding: 22px 24px 8px;
+}
+
+:global(.editor-workspace-shell__revision-dialog .el-dialog__title) {
+  color: #1f2937;
+  font-size: 1.12rem;
+  font-weight: 850;
+}
+
+:global(.editor-workspace-shell__revision-dialog .el-dialog__body) {
+  padding: 10px 24px 24px;
+}
+
+.editor-workspace-shell__revision-panel,
+.editor-workspace-shell__revision-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.editor-workspace-shell__revision-body,
+.editor-workspace-shell__revision-row p,
+.editor-workspace-shell__revision-meta,
+.editor-workspace-shell__revision-path {
+  margin: 0;
+  color: #6b5a4a;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.editor-workspace-shell__revision-empty,
+.editor-workspace-shell__revision-notice,
+.editor-workspace-shell__revision-row {
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 250, 245, 0.9);
+  padding: 14px;
+}
+
+.editor-workspace-shell__revision-notice {
+  border-color: rgba(190, 18, 60, 0.22);
+  color: #be123c;
+}
+
+.editor-workspace-shell__revision-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.editor-workspace-shell__revision-main h3 {
+  margin: 4px 0;
+  color: #2f241a;
+  font-size: 0.98rem;
+  line-height: 1.3;
+}
+
+.editor-workspace-shell__revision-id {
+  color: #9a3412;
+  font-family: var(--toograph-mono-font, "SFMono-Regular", Consolas, monospace);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.editor-workspace-shell__revision-path,
+.editor-workspace-shell__revision-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.editor-workspace-shell__revision-path span,
+.editor-workspace-shell__revision-meta span {
+  border-radius: 999px;
+  background: rgba(154, 52, 18, 0.08);
+  padding: 4px 8px;
 }
 
 .editor-workspace-shell__save-metadata-body {

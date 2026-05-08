@@ -71,4 +71,9 @@ test("summarizeVirtualOperationActivity includes graph edit revision evidence la
     "graph revision: grev_1",
     "request: vop_graph_edit",
   ]);
+  assert.deepEqual(summary?.graphRevision, {
+    graphId: "graph_1",
+    revisionId: "grev_1",
+    status: "saved",
+  });
 });

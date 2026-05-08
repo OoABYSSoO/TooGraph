@@ -390,6 +390,48 @@ test("reduceBuddyOutputTraceEvent keeps virtual operation evidence labels for Bu
   assert.equal(segment.records[1].triggeredRunId, "run_report");
 });
 
+test("reduceBuddyOutputTraceEvent carries graph revision restore metadata for Buddy capsules", () => {
+  const graph = fiveNodeGraph();
+  const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));
+  let state = createBuddyOutputTraceRuntimeState(plan);
+
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.started", { node_id: "node_a", node_type: "agent" }, 1000);
+  state = reduceBuddyOutputTraceEvent(
+    state,
+    plan,
+    graph,
+    "activity.event",
+    {
+      sequence: 7,
+      kind: "virtual_ui_operation",
+      node_id: "node_a",
+      status: "succeeded",
+      detail: {
+        operation_request_id: "vop_graph_revision_restore",
+        operation: {
+          kind: "graph_edit",
+          target_id: "editor.canvas.surface",
+        },
+        operation_report: {
+          graph_edit_summary: {
+            graph_id: "graph_buddy",
+            revision_id: "grev_buddy",
+            revision_status: "saved",
+          },
+        },
+      },
+    },
+    1600,
+  );
+
+  const [segment] = listBuddyOutputTraceSegmentsForDisplay(state);
+  assert.deepEqual(segment.records[1].graphRevision, {
+    graphId: "graph_buddy",
+    revisionId: "grev_buddy",
+    status: "saved",
+  });
+});
+
 test("buildBuddyOutputTraceStateFromRunDetail rebuilds completed segments from run detail", () => {
   const graph = fiveNodeGraph();
   const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));

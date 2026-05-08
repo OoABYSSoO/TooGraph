@@ -33,7 +33,7 @@
 
 - 扩展 operation journal：基础 JSONL 存储和 `/api/operation-journal` 查询已能按 operation id 关联 request/completion，并记录 run id、节点 id、子图路径、目标 affordance、输入文本、前后页面快照、目标 run 结果、失败原因、artifact refs 和前端 retry chain；运行详情页已能读取 journal 并展示虚拟 UI 操作链路、artifact refs 详情和 retry 计数；长期存储已增加 SQLite 索引和 JSONL 懒迁移/回填边界，JSONL 继续作为兼容导出。
 - 将 Graph Edit Playback 结果、等待事件和前端重试链路补齐到同一 `virtual_ui_operation` journal 链路；请求阶段和 auto-resume 完成/失败阶段已经能通过同一个 operation id 同时进入 run activity 和独立 journal，Graph Edit Playback 已写入 request id、命令数、已应用命令数、失败命令数、播放步骤数和 issues，前端等待重试已写入 retry chain。
-- 在运行详情和 Buddy 胶囊中继续补充 graph edit diff/revision、失败恢复入口和 artifact 链接；运行详情 operation journal 已展示触发 run 的 artifact refs、graph edit diff 计数、持久 graph revision id、retry 计数，并为带 graph id/revision id 的图编辑记录提供同一路径的恢复入口，触发的目标 run id/status 已进入完成态摘要，Buddy 胶囊已内联展示虚拟操作的 artifact 数量、前端 retry 证据标签、持久 graph revision id 和可点击目标 run 入口。
+- 在运行详情和 Buddy 胶囊中继续补充 graph edit diff/revision、失败恢复入口和 artifact 链接；运行详情 operation journal 已展示触发 run 的 artifact refs、graph edit diff 计数、持久 graph revision id、retry 计数，并为带 graph id/revision id 的图编辑记录提供同一路径的恢复入口，触发的目标 run id/status 已进入完成态摘要，Buddy 胶囊已内联展示虚拟操作的 artifact 数量、前端 retry 证据标签、持久 graph revision id、可点击目标 run 入口和 graph revision 恢复入口。
 - 将前端 affordance 失配和重试失败归并到统一 failure category；Skill 预检失败已经覆盖目标不存在、页面快照过期、权限阻止和输入绑定失败，auto-resume 结果已经覆盖目标 run 失败、用户中断和前端执行失败，前端缺失目标已归类为 `target_not_found`，带重试证据的前端执行错误已归类为 `frontend_retry_failed`。
 - 为“跟随/不跟随”模式补齐端到端稳定性测试：Playwright 覆盖了后台模板证据在切换页面、查看运行记录、进入编辑器和拖动伙伴后仍保留，以及跟随开关持久化后不影响已恢复的后台证据。
 
@@ -45,9 +45,9 @@
 
 - 建立 graph revision 存储：保存图、新建图、状态变更和删除图已写入 revision 记录，包含 previous graph、next graph、结构化 diff、actor、run id、节点 id、原因、校验结果和创建时间，并提供 `/api/graphs/{graph_id}/revisions` 查询入口。
 - 将 Graph Edit Playback 编译出的 editor commands 与 graph revision 绑定；每次应用命令前后已生成 command diff，并在回放结束后通过编辑器保存请求写入持久 graph revision；`graph_edit_summary`、operation journal 和运行详情/Buddy 虚拟操作标签已经包含 graph id、revision id、revision status 与 command diff 计数。
-- 接入 undo/redo：graph revision 已提供 restore API，可把保存图恢复到指定 revision 的 previous graph 并记录恢复 revision；图与模板管理页已为已保存图提供修订历史弹窗、恢复前确认和恢复后刷新，运行详情 operation journal 已能从图编辑记录直接恢复对应 graph revision，后续需要把编辑器和 Buddy 历史的用户可见回滚入口接上同一路径。
-- 扩展编辑已有图覆盖面：选择节点、移动节点、重命名、编辑任务说明、修改 input/output/state、选择 Skill、调整连线、删除节点、恢复节点、保存为模板。
-- 替代历史 `graph_patch.draft` stub；图补丁只能作为可审查草案，真正应用必须走编辑器命令、校验、revision 和撤销路径。
+- 接入 undo/redo：graph revision 已提供 restore API，可把保存图恢复到指定 revision 的 previous graph 并记录恢复 revision；图与模板管理页、编辑器动作栏修订历史、运行详情 operation journal 和 Buddy trace/history 胶囊已能从图编辑记录直接恢复对应 graph revision，并在恢复后刷新本地图列表或当前编辑器文档。
+- 扩展编辑已有图覆盖面：Graph Edit Playback 已支持移动节点、节点重命名/简介/Agent 任务说明、修改 input/output config、修改 state、选择 Agent Skill、流程/条件路由连线、删除节点与同计划恢复节点；仍需补齐选择/多选节点 UX、保存为模板。
+- 历史 `graph_patch.draft` stub 已从 Buddy command 与前端 API surface 移除；图修改入口必须走编辑器语义命令、校验、revision 和撤销路径，后台复盘与 Buddy Home 写入提示继续显式禁止该旧 action。
 
 ### 3. 运行结果校验与自我修复
 
