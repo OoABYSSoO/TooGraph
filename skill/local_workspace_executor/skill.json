@@ -5,23 +5,18 @@
   "description": "在 GraphiteUI 工作区内执行受策略约束的文件读写、目录操作和本地命令/脚本运行。内置文件写入默认只能写 backend/data，并会阻止受保护路径；遇到越权路径时返回 blocked 和建议加入的最小白名单。",
   "llmInstruction": "你已绑定本地工作区执行器。只在用户明确需要本地文件读写、生成用户自定义技能、运行脚本或执行本地测试时调用它。优先使用相对路径；如果返回 blocked，把 blocked_path、blocked_operation 和 suggested_policy_update 明确告诉用户，并请求用户确认是否开放新的白名单，不要自行绕过策略。本地子进程不是 OS 级沙箱，执行前必须确认 execute 根目录和脚本来源符合用户意图。",
   "version": "1.0.0",
-  "runPolicies": {
+  "capabilityPolicy": {
     "default": {
-      "discoverable": true,
-      "autoSelectable": false,
+      "selectable": true,
       "requiresApproval": false
     },
     "origins": {
       "companion": {
-        "discoverable": true,
-        "autoSelectable": false,
+        "selectable": false,
         "requiresApproval": true
       }
     }
   },
-  "kind": "atomic",
-  "mode": "tool",
-  "scope": "workspace",
   "permissions": ["file_read", "file_write", "subprocess"],
   "inputSchema": [
     {
@@ -81,8 +76,6 @@
     { "key": "suggested_policy_update", "name": "Suggested Policy Update", "valueType": "json", "description": "Minimal allow-root suggestion for user review." },
     { "key": "errors", "name": "Errors", "valueType": "json", "description": "Validation or execution errors." }
   ],
-  "supportedValueTypes": ["text", "markdown", "json", "file"],
-  "sideEffects": ["file_read", "file_write", "subprocess"],
   "runtime": {
     "type": "python",
     "entrypoint": "run.py",

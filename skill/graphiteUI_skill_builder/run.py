@@ -405,6 +405,12 @@ def _validate_package_files(files: dict[str, str | None], *, expected_skill_key:
             "agentInstruction": "llmInstruction",
             "agentNodeEligibility": "llmNodeEligibility",
             "agentNodeBlockers": "llmNodeBlockers",
+            "runPolicies": "capabilityPolicy",
+            "supportedValueTypes": "outputSchema",
+            "sideEffects": "permissions",
+            "kind": "remove this field",
+            "mode": "remove this field",
+            "scope": "remove this field",
         }.items():
             if legacy_key in manifest:
                 errors.append(f"skill.json field '{legacy_key}' is no longer supported. Use '{replacement_key}'.")
@@ -414,6 +420,7 @@ def _validate_package_files(files: dict[str, str | None], *, expected_skill_key:
             "name",
             "description",
             "llmInstruction",
+            "capabilityPolicy",
             "inputSchema",
             "outputSchema",
             "runtime",
@@ -422,6 +429,7 @@ def _validate_package_files(files: dict[str, str | None], *, expected_skill_key:
                 errors.append(f"skill.json is missing required field '{required_key}'.")
         if manifest.get("schemaVersion") != "graphite.skill/v1":
             errors.append("skill.json schemaVersion must be 'graphite.skill/v1'.")
+        _validate_capability_policy(manifest.get("capabilityPolicy"), errors)
         _validate_io_schema(manifest.get("inputSchema"), "inputSchema", errors)
         _validate_io_schema(manifest.get("outputSchema"), "outputSchema", errors)
         runtime = manifest.get("runtime")
@@ -474,6 +482,32 @@ def _validate_io_schema(value: Any, label: str, errors: list[str]) -> None:
                 errors.append(f"skill.json {label}.{index} is missing required field '{required_key}'.")
 
 
+def _validate_capability_policy(value: Any, errors: list[str]) -> None:
+    if not isinstance(value, dict):
+        errors.append("skill.json capabilityPolicy must be an object.")
+        return
+    default_policy = value.get("default")
+    if default_policy is not None:
+        _validate_capability_policy_entry(default_policy, "capabilityPolicy.default", errors)
+    origins = value.get("origins")
+    if origins is not None:
+        if not isinstance(origins, dict):
+            errors.append("skill.json capabilityPolicy.origins must be an object.")
+        else:
+            for origin, policy in origins.items():
+                _validate_capability_policy_entry(policy, f"capabilityPolicy.origins.{origin}", errors)
+
+
+def _validate_capability_policy_entry(value: Any, label: str, errors: list[str]) -> None:
+    if not isinstance(value, dict):
+        errors.append(f"skill.json {label} must be an object.")
+        return
+    allowed_keys = {"selectable", "requiresApproval"}
+    for key in value:
+        if key not in allowed_keys:
+            errors.append(f"skill.json {label}.{key} is not supported. Use selectable/requiresApproval only.")
+
+
 def _validate_smoke_output(parsed: dict[str, Any], manifest: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     output_schema = manifest.get("outputSchema")
@@ -500,6 +534,7 @@ def _read_skill_summary(repo_root: Path, skill_dir: Path, manifest_path: Path, s
             "name": _compact_text(manifest.get("name")) or skill_key,
             "description": _compact_text(manifest.get("description")),
             "permissions": manifest.get("permissions") if isinstance(manifest.get("permissions"), list) else [],
+            "capabilityPolicy": manifest.get("capabilityPolicy") if isinstance(manifest.get("capabilityPolicy"), dict) else {},
             "inputSchema": manifest.get("inputSchema") if isinstance(manifest.get("inputSchema"), list) else [],
             "outputSchema": manifest.get("outputSchema") if isinstance(manifest.get("outputSchema"), list) else [],
             "source": source,

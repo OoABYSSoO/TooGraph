@@ -22,7 +22,7 @@ from app.main import app
 def _native_skill_manifest(
     skill_key: str = "video_understanding",
     *,
-    run_policies: dict[str, object] | None = None,
+    capability_policy: dict[str, object] | None = None,
     configured: bool = True,
     healthy: bool = True,
     runtime_entrypoint: str | None = None,
@@ -34,24 +34,19 @@ def _native_skill_manifest(
         "description": "Use frame sampling rules to understand a video with image-only model capability.",
         "llmInstruction": "Prepare the skill input from bound graph state and run the skill.",
         "version": "0.1.0",
-        "runPolicies": run_policies
+        "capabilityPolicy": capability_policy
         or {
             "default": {
-                "discoverable": True,
-                "autoSelectable": False,
+                "selectable": True,
                 "requiresApproval": False,
             },
             "origins": {
                 "companion": {
-                    "discoverable": True,
-                    "autoSelectable": True,
+                    "selectable": True,
                     "requiresApproval": True,
                 }
             },
         },
-        "kind": "workflow",
-        "mode": "workflow",
-        "scope": "graph",
         "permissions": ["model_vision", "file_read"],
         "inputSchema": [
             {
@@ -71,8 +66,6 @@ def _native_skill_manifest(
                 "description": "Structured video summary.",
             }
         ],
-        "supportedValueTypes": ["video", "image", "text"],
-        "sideEffects": ["model_call", "file_read"],
         "configured": configured,
         "healthy": healthy,
     }
@@ -92,9 +85,11 @@ name: Uploaded Skill
 description: Imported from an uploaded archive.
 graphite:
   skill_key: {skill_key}
-  supported_value_types:
-    - text
-  side_effects: []
+  capability_policy:
+    default:
+      selectable: true
+      requiresApproval: false
+    origins: {{}}
   input_schema:
     - key: text
       name: Text
@@ -208,13 +203,13 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                     key: item["sourcePath"].replace("\\", "/")
                     for key, item in catalog_items.items()
                 }
-                self.assertEqual(catalog_items["web_search"]["sourceFormat"], "skill")
                 self.assertEqual(catalog_items["web_search"]["sourceScope"], "official")
                 self.assertFalse(catalog_items["web_search"]["canManage"])
                 self.assertNotIn("targets", catalog_items["web_search"])
-                self.assertTrue(catalog_items["web_search"]["runPolicies"]["default"]["discoverable"])
-                self.assertTrue(catalog_items["web_search"]["runPolicies"]["origins"]["companion"]["autoSelectable"])
-                self.assertFalse(catalog_items["web_search"]["runPolicies"]["origins"]["companion"]["requiresApproval"])
+                self.assertNotIn("sourceFormat", catalog_items["web_search"])
+                self.assertTrue(catalog_items["web_search"]["capabilityPolicy"]["default"]["selectable"])
+                self.assertTrue(catalog_items["web_search"]["capabilityPolicy"]["origins"]["companion"]["selectable"])
+                self.assertFalse(catalog_items["web_search"]["capabilityPolicy"]["origins"]["companion"]["requiresApproval"])
                 self.assertTrue(catalog_items["web_search"]["runtimeReady"])
                 self.assertTrue(catalog_items["web_search"]["runtimeRegistered"])
                 self.assertTrue(source_path["web_search"].endswith("/skill/web_search/skill.json"))
@@ -234,21 +229,22 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 payload = response.json()
                 self.assertEqual(payload["skillKey"], "video_understanding")
-                self.assertEqual(payload["sourceFormat"], "skill")
+                self.assertNotIn("sourceFormat", payload)
                 self.assertEqual(payload["sourceScope"], "user")
                 self.assertNotIn("targets", payload)
                 self.assertEqual(
-                    payload["runPolicies"]["origins"]["companion"],
+                    payload["capabilityPolicy"]["origins"]["companion"],
                     {
-                        "discoverable": True,
-                        "autoSelectable": True,
+                        "selectable": True,
                         "requiresApproval": True,
                     },
                 )
-                self.assertEqual(payload["kind"], "workflow")
-                self.assertEqual(payload["mode"], "workflow")
-                self.assertEqual(payload["scope"], "graph")
                 self.assertEqual(payload["permissions"], ["model_vision", "file_read"])
+                self.assertNotIn("kind", payload)
+                self.assertNotIn("mode", payload)
+                self.assertNotIn("scope", payload)
+                self.assertNotIn("supportedValueTypes", payload)
+                self.assertNotIn("sideEffects", payload)
                 self.assertNotIn("compatibility", payload)
                 self.assertFalse(payload["runtimeReady"])
                 self.assertFalse(payload["runtimeRegistered"])
@@ -266,7 +262,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 catalog_items = {item["skillKey"]: item for item in catalog_response.json()}
                 self.assertIn("video_understanding", catalog_items)
                 self.assertNotIn("targets", catalog_items["video_understanding"])
-                self.assertTrue(catalog_items["video_understanding"]["runPolicies"]["default"]["discoverable"])
+                self.assertTrue(catalog_items["video_understanding"]["capabilityPolicy"]["default"]["selectable"])
 
     def test_skill_file_tree_lists_package_files_for_inspection(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

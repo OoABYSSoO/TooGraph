@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.schemas.skills import SkillLlmNodeEligibility, SkillSideEffect, SkillSourceScope
+from app.core.schemas.skills import SkillLlmNodeEligibility, SkillSourceScope
 from app.skills.definitions import _parse_native_skill_manifest
 
 
@@ -36,21 +36,19 @@ def _ready_manifest(skill_key: str) -> dict[str, object]:
 
 
 class SkillManifestContractTests(unittest.TestCase):
-    def test_skill_definition_payload_exposes_run_policies_and_omits_legacy_targets(self) -> None:
+    def test_skill_definition_payload_exposes_capability_policy_and_omits_legacy_targets(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             skill_dir = Path(temp_dir) / "summarize_text"
             skill_dir.mkdir()
             payload = _ready_manifest("summarize_text")
-            payload["runPolicies"] = {
+            payload["capabilityPolicy"] = {
                 "default": {
-                    "discoverable": True,
-                    "autoSelectable": False,
+                    "selectable": True,
                     "requiresApproval": False,
                 },
                 "origins": {
                     "companion": {
-                        "discoverable": True,
-                        "autoSelectable": True,
+                        "selectable": True,
                         "requiresApproval": True,
                     }
                 },
@@ -71,17 +69,15 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertNotIn("compatibility", serialized)
         self.assertNotIn("targets", serialized)
         self.assertEqual(
-            serialized["runPolicies"],
+            serialized["capabilityPolicy"],
             {
                 "default": {
-                    "discoverable": True,
-                    "autoSelectable": False,
+                    "selectable": True,
                     "requiresApproval": False,
                 },
                 "origins": {
                     "companion": {
-                        "discoverable": True,
-                        "autoSelectable": True,
+                        "selectable": True,
                         "requiresApproval": True,
                     }
                 },
@@ -110,9 +106,8 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertEqual(definition.health.type, "none")
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
         self.assertEqual(definition.llm_node_blockers, [])
-        self.assertTrue(definition.run_policies.default.discoverable)
-        self.assertFalse(definition.run_policies.default.auto_selectable)
-        self.assertFalse(definition.run_policies.default.requires_approval)
+        self.assertTrue(definition.capability_policy.default.selectable)
+        self.assertFalse(definition.capability_policy.default.requires_approval)
 
     def test_legacy_targets_field_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -149,6 +144,47 @@ class SkillManifestContractTests(unittest.TestCase):
             (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
 
             with self.assertRaisesRegex(ValueError, "executionTargets.*no longer supported"):
+                _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
+
+    def test_legacy_skill_protocol_fields_are_rejected(self) -> None:
+        legacy_fields = {
+            "runPolicies": "capabilityPolicy",
+            "supportedValueTypes": "outputSchema",
+            "sideEffects": "permissions",
+            "kind": "no longer supported",
+            "mode": "no longer supported",
+            "scope": "no longer supported",
+        }
+        for legacy_field, replacement in legacy_fields.items():
+            with self.subTest(legacy_field=legacy_field):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    skill_dir = Path(temp_dir) / f"legacy_{legacy_field}"
+                    skill_dir.mkdir()
+                    payload = _ready_manifest(f"legacy_{legacy_field}")
+                    payload[legacy_field] = "atomic"
+                    manifest = _write_manifest(skill_dir, payload)
+                    (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
+
+                    with self.assertRaisesRegex(ValueError, f"{legacy_field}.*{replacement}"):
+                        _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
+
+    def test_legacy_capability_policy_keys_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skill_dir = Path(temp_dir) / "legacy_capability_policy"
+            skill_dir.mkdir()
+            payload = _ready_manifest("legacy_capability_policy")
+            payload["capabilityPolicy"] = {
+                "default": {
+                    "selectable": True,
+                    "autoSelectable": True,
+                    "requiresApproval": False,
+                },
+                "origins": {},
+            }
+            manifest = _write_manifest(skill_dir, payload)
+            (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "autoSelectable"):
                 _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
 
     def test_legacy_top_level_label_field_is_rejected(self) -> None:
@@ -195,7 +231,7 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.NEEDS_MANIFEST)
         self.assertIn("Skill manifest is missing a script runtime entrypoint.", definition.llm_node_blockers)
 
-    def test_web_search_manifest_is_ready_with_origin_run_policies_and_network_permissions(self) -> None:
+    def test_web_search_manifest_is_ready_with_origin_capability_policy_and_network_permissions(self) -> None:
         manifest = Path(__file__).resolve().parents[2] / "skill" / "web_search" / "skill.json"
 
         definition = _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED).definition
@@ -203,11 +239,10 @@ class SkillManifestContractTests(unittest.TestCase):
 
         self.assertEqual(definition.skill_key, "web_search")
         self.assertNotIn("targets", serialized)
-        self.assertTrue(definition.run_policies.default.discoverable)
-        self.assertFalse(definition.run_policies.default.auto_selectable)
-        self.assertTrue(definition.run_policies.origins["companion"].discoverable)
-        self.assertTrue(definition.run_policies.origins["companion"].auto_selectable)
-        self.assertFalse(definition.run_policies.origins["companion"].requires_approval)
+        self.assertTrue(definition.capability_policy.default.selectable)
+        self.assertFalse(definition.capability_policy.default.requires_approval)
+        self.assertTrue(definition.capability_policy.origins["companion"].selectable)
+        self.assertFalse(definition.capability_policy.origins["companion"].requires_approval)
         self.assertEqual(definition.runtime.type, "python")
         self.assertEqual(definition.runtime.entrypoint, "run.py")
         self.assertEqual(definition.runtime.timeout_seconds, 300)
@@ -216,9 +251,6 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertEqual([field.key for field in definition.output_schema], ["query", "source_urls", "artifact_paths", "errors"])
         self.assertIn("network", definition.permissions)
         self.assertIn("browser_automation", definition.permissions)
-        self.assertIn(SkillSideEffect.NETWORK, definition.side_effects)
-        self.assertIn(SkillSideEffect.SECRET_READ, definition.side_effects)
-        self.assertIn(SkillSideEffect.BROWSER_AUTOMATION, definition.side_effects)
 
 
 if __name__ == "__main__":

@@ -190,21 +190,15 @@ input_question
   "name": "联网搜索",
   "description": "当任务需要获取最新公开网页信息、新闻、版本内容、引用来源或网页正文时使用。不负责最终总结。",
   "llmInstruction": "你已经绑定了联网搜索技能。请根据任务决定 query，然后运行技能；不要在本节点整理最终结论。",
-  "kind": "atomic",
-  "mode": "tool",
-  "scope": "node",
   "permissions": ["network", "secret_read"],
-  "sideEffects": ["network", "secret_read"],
-  "runPolicies": {
+  "capabilityPolicy": {
     "default": {
-      "discoverable": true,
-      "autoSelectable": false,
+      "selectable": true,
       "requiresApproval": false
     },
     "origins": {
       "companion": {
-        "discoverable": true,
-        "autoSelectable": true,
+        "selectable": true,
         "requiresApproval": false
       }
     }
@@ -218,18 +212,13 @@ input_question
 - `name`：用户可见名称。
 - `description`：能力说明与选择条件。
 - `llmInstruction`：LLM 节点已经绑定该技能后，应该如何使用它。
-- `kind`：能力形态，例如 `atomic`、`workflow`、`control`。
-- `mode`：运行方式，例如 `tool`、`workflow`、`context`。
-- `scope`：影响范围，例如 `node`、`graph`、`workspace`、`global`。
 - `permissions`：执行前需要评估或授权的能力。
-- `sideEffects`：执行后可能产生的副作用。
-- `runPolicies.default`：默认运行来源策略。
-- `runPolicies.origins.<origin>`：特定运行来源策略，例如 `companion`。
-- `discoverable`：自主决策是否能看到这个 skill。
-- `autoSelectable`：自主决策是否能在未被模板显式绑定时选择它。
+- `capabilityPolicy.default`：默认能力选择策略。
+- `capabilityPolicy.origins.<origin>`：特定来源策略，例如 `companion`。
+- `selectable`：能力选择器是否可以看到并返回这个 skill。
 - `requiresApproval`：执行前是否必须请求用户确认。
 
-旧字段 `label`、`targets`、`executionTargets`、`inputMapping`、静态技能参数 `config` 和无意义的 `trigger` 已废弃，出现在当前协议载荷中应被拒绝，而不是悄悄兼容。
+旧字段 `label`、`targets`、`executionTargets`、`inputMapping`、静态技能参数 `config`、无意义的 `trigger`、`runPolicies`、`discoverable`、`autoSelectable`、`supportedValueTypes`、`sideEffects`、`kind`、`mode` 和 `scope` 已废弃，出现在当前协议载荷中应被拒绝，而不是悄悄兼容。
 
 ## Capability State 契约
 
@@ -262,7 +251,7 @@ effective_capability =
 - `capability.kind=subgraph` 只表达“选中的一个可运行子图能力”，主要服务桌宠主循环等动态模板。
 - `capability.kind=none` 表达没有合适能力。
 - 一个 LLM 节点不能同时使用卡片 skill 和输入 capability state；冲突时应作为协议错误处理。
-- 真正执行前仍必须通过 skill registry、运行时注册状态、健康状态、`runPolicies` 和审批检查。
+- 真正执行前仍必须通过 skill registry、运行时注册状态、健康状态、`capabilityPolicy` 和审批检查。
 - 多个能力调用必须拆成多个节点，由图结构显式编排。
 
 ## 绑定技能的语义
@@ -429,7 +418,7 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 它应该：
 
 - 读取用户意图、当前上下文和技能目录摘要。
-- 根据 `description`、`runPolicies`、权限、副作用、健康状态和运行来源筛选候选 skill。
+- 根据 `description`、`capabilityPolicy`、权限、健康状态和运行来源筛选候选 skill。
 - 输出是否需要技能、推荐 skill、审批需求、缺失能力和下一步分支。
 - 在缺少能力时生成 `missing_skill_proposal`。
 

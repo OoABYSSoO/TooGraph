@@ -6,49 +6,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class SkillSideEffect(str, Enum):
-    NONE = "none"
-    NETWORK = "network"
-    KNOWLEDGE_READ = "knowledge_read"
-    MODEL_CALL = "model_call"
-    FILE_READ = "file_read"
-    FILE_WRITE = "file_write"
-    SUBPROCESS = "subprocess"
-    SECRET_READ = "secret_read"
-    BROWSER_AUTOMATION = "browser_automation"
-
-
-class SkillSourceFormat(str, Enum):
-    SKILL = "skill"
-
-
 class SkillSourceScope(str, Enum):
     INSTALLED = "installed"
     OFFICIAL = "official"
     USER = "user"
-
-
-class SkillKind(str, Enum):
-    ATOMIC = "atomic"
-    WORKFLOW = "workflow"
-    TOOL = "tool"
-    CONTEXT = "context"
-    PROFILE = "profile"
-    ADAPTER = "adapter"
-    CONTROL = "control"
-
-
-class SkillMode(str, Enum):
-    TOOL = "tool"
-    WORKFLOW = "workflow"
-    CONTEXT = "context"
-
-
-class SkillScope(str, Enum):
-    NODE = "node"
-    GRAPH = "graph"
-    WORKSPACE = "workspace"
-    GLOBAL = "global"
 
 
 class SkillLlmNodeEligibility(str, Enum):
@@ -88,19 +49,18 @@ class SkillHealthSpec(BaseModel):
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
 
-class SkillRunPolicy(BaseModel):
-    discoverable: bool = True
-    auto_selectable: bool = Field(default=False, alias="autoSelectable")
+class SkillCapabilityPolicy(BaseModel):
+    selectable: bool = True
     requires_approval: bool = Field(default=False, alias="requiresApproval")
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
-class SkillRunPolicies(BaseModel):
-    default: SkillRunPolicy = Field(default_factory=SkillRunPolicy)
-    origins: dict[str, SkillRunPolicy] = Field(default_factory=dict)
+class SkillCapabilityPolicies(BaseModel):
+    default: SkillCapabilityPolicy = Field(default_factory=SkillCapabilityPolicy)
+    origins: dict[str, SkillCapabilityPolicy] = Field(default_factory=dict)
 
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 
 
 class SkillDefinition(BaseModel):
@@ -110,23 +70,20 @@ class SkillDefinition(BaseModel):
     llm_instruction: str = Field(default="", alias="llmInstruction")
     schema_version: str = Field(default="", alias="schemaVersion")
     version: str = ""
-    run_policies: SkillRunPolicies = Field(default_factory=SkillRunPolicies, alias="runPolicies")
-    kind: SkillKind = SkillKind.ATOMIC
-    mode: SkillMode = SkillMode.TOOL
-    scope: SkillScope = SkillScope.NODE
+    capability_policy: SkillCapabilityPolicies = Field(
+        default_factory=SkillCapabilityPolicies,
+        alias="capabilityPolicy",
+    )
     permissions: list[str] = Field(default_factory=list)
     runtime: SkillRuntimeSpec = Field(default_factory=SkillRuntimeSpec)
     health: SkillHealthSpec = Field(default_factory=SkillHealthSpec)
     input_schema: list[SkillIoField] = Field(default_factory=list, alias="inputSchema")
     output_schema: list[SkillIoField] = Field(default_factory=list, alias="outputSchema")
-    supported_value_types: list[str] = Field(default_factory=list, alias="supportedValueTypes")
-    side_effects: list[SkillSideEffect] = Field(default_factory=list, alias="sideEffects")
     llm_node_eligibility: SkillLlmNodeEligibility = Field(
         default=SkillLlmNodeEligibility.NEEDS_MANIFEST,
         alias="llmNodeEligibility",
     )
     llm_node_blockers: list[str] = Field(default_factory=list, alias="llmNodeBlockers")
-    source_format: SkillSourceFormat = Field(default=SkillSourceFormat.SKILL, alias="sourceFormat")
     source_scope: SkillSourceScope = Field(default=SkillSourceScope.INSTALLED, alias="sourceScope")
     source_path: str = Field(default="", alias="sourcePath")
     runtime_ready: bool = Field(default=False, alias="runtimeReady")

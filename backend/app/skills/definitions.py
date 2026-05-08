@@ -1,26 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
 import json
 from pathlib import Path
-from typing import TypeVar
 
 import yaml
 
 from app.core.schemas.skills import (
+    SkillCapabilityPolicies,
     SkillLlmNodeEligibility,
     SkillCatalogStatus,
     SkillDefinition,
     SkillHealthSpec,
     SkillIoField,
-    SkillKind,
-    SkillMode,
-    SkillRunPolicies,
     SkillRuntimeSpec,
-    SkillScope,
-    SkillSideEffect,
-    SkillSourceFormat,
     SkillSourceScope,
 )
 from app.core.storage.skill_store import SKILLS_DIR, USER_SKILLS_DIR, get_skill_status_map
@@ -28,13 +21,9 @@ from app.skills.runtime import validate_script_runtime_spec
 from app.skills.registry import get_skill_registry, list_runtime_skill_keys
 
 
-EnumValue = TypeVar("EnumValue", bound=Enum)
-
-
 @dataclass
 class SkillDefinitionRecord:
     definition: SkillDefinition
-    source_format: SkillSourceFormat
     source_scope: SkillSourceScope
     source_path: str
 
@@ -82,7 +71,6 @@ def list_skill_catalog(*, include_disabled: bool = True) -> list[SkillDefinition
             record.definition.model_copy(
                 deep=True,
                 update={
-                    "source_format": record.source_format,
                     "source_scope": record.source_scope,
                     "source_path": record.source_path,
                     "runtime_ready": runtime_ready,
@@ -133,7 +121,7 @@ def _parse_skill_dir(skill_dir: Path, source_scope: SkillSourceScope) -> SkillDe
     if manifest.is_file():
         return _parse_native_skill_manifest(manifest, source_scope)
     if skill_file.is_file():
-        return _parse_skill_file(skill_file, SkillSourceFormat.SKILL, source_scope)
+        return _parse_skill_file(skill_file, source_scope)
     return None
 
 
@@ -142,6 +130,7 @@ def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> 
     _reject_legacy_targets(payload)
     _reject_legacy_label(payload)
     _reject_legacy_llm_fields(payload)
+    _reject_legacy_skill_protocol_fields(payload)
     skill_key = str(payload.get("skillKey") or payload.get("skill_key") or path.parent.name)
     name = str(payload.get("name") or skill_key)
     definition = SkillDefinition(
@@ -151,17 +140,12 @@ def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> 
         llmInstruction=str(payload.get("llmInstruction") or payload.get("llm_instruction") or "").strip(),
         schemaVersion=str(payload.get("schemaVersion") or payload.get("schema_version") or ""),
         version=str(payload.get("version") or ""),
-        runPolicies=_parse_run_policies(payload.get("runPolicies") or payload.get("run_policies")),
-        kind=_parse_enum(payload.get("kind"), SkillKind, SkillKind.ATOMIC),
-        mode=_parse_enum(payload.get("mode"), SkillMode, SkillMode.TOOL),
-        scope=_parse_enum(payload.get("scope"), SkillScope, SkillScope.NODE),
+        capabilityPolicy=_parse_capability_policy(payload.get("capabilityPolicy") or payload.get("capability_policy")),
         permissions=[str(item) for item in payload.get("permissions", [])],
         runtime=_parse_runtime_spec(payload.get("runtime")),
         health=_parse_health_spec(payload.get("health")),
         inputSchema=_parse_io_fields(payload.get("inputSchema") or payload.get("input_schema") or []),
         outputSchema=_parse_io_fields(payload.get("outputSchema") or payload.get("output_schema") or []),
-        supportedValueTypes=[str(item) for item in payload.get("supportedValueTypes") or payload.get("supported_value_types") or []],
-        sideEffects=[SkillSideEffect(str(item)) for item in payload.get("sideEffects") or payload.get("side_effects") or []],
         configured=bool(payload.get("configured", True)),
         healthy=bool(payload.get("healthy", True)),
     )
@@ -170,13 +154,12 @@ def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> 
     definition.llm_node_blockers = blockers
     return SkillDefinitionRecord(
         definition=definition,
-        source_format=SkillSourceFormat.SKILL,
         source_scope=source_scope,
         source_path=str(path),
     )
 
 
-def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope: SkillSourceScope) -> SkillDefinitionRecord:
+def _parse_skill_file(path: Path, source_scope: SkillSourceScope) -> SkillDefinitionRecord:
     raw = path.read_text(encoding="utf-8")
     frontmatter, body = _split_frontmatter(raw, path)
     payload = yaml.safe_load(frontmatter) or {}
@@ -184,6 +167,7 @@ def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope
     _reject_legacy_targets(graphite)
     _reject_legacy_label(graphite)
     _reject_legacy_llm_fields(graphite)
+    _reject_legacy_skill_protocol_fields(graphite)
 
     skill_key = str(graphite.get("skill_key") or payload.get("name") or path.stem)
     name = str(payload.get("name") or graphite.get("name") or skill_key)
@@ -191,7 +175,6 @@ def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope
 
     input_schema = _parse_io_fields(graphite.get("input_schema", []))
     output_schema = _parse_io_fields(graphite.get("output_schema", []))
-    side_effects = [SkillSideEffect(str(item)) for item in graphite.get("side_effects", [])]
 
     definition = SkillDefinition(
         skillKey=skill_key,
@@ -200,24 +183,18 @@ def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope
         llmInstruction=str(graphite.get("llmInstruction") or graphite.get("llm_instruction") or "").strip(),
         schemaVersion=str(graphite.get("schema_version") or graphite.get("schemaVersion") or ""),
         version=str(graphite.get("version") or payload.get("version") or ""),
-        runPolicies=_parse_run_policies(graphite.get("runPolicies") or graphite.get("run_policies")),
-        kind=_parse_enum(graphite.get("kind"), SkillKind, SkillKind.ATOMIC),
-        mode=_parse_enum(graphite.get("mode"), SkillMode, SkillMode.TOOL),
-        scope=_parse_enum(graphite.get("scope"), SkillScope, SkillScope.NODE),
+        capabilityPolicy=_parse_capability_policy(graphite.get("capabilityPolicy") or graphite.get("capability_policy")),
         permissions=[str(item) for item in graphite.get("permissions", [])],
         runtime=_parse_runtime_spec(graphite.get("runtime")),
         health=_parse_health_spec(graphite.get("health")),
         inputSchema=input_schema,
         outputSchema=output_schema,
-        supportedValueTypes=[str(item) for item in graphite.get("supported_value_types", [])],
-        sideEffects=side_effects,
     )
     eligibility, blockers = _resolve_llm_node_eligibility(definition, path.parent)
     definition.llm_node_eligibility = eligibility
     definition.llm_node_blockers = blockers
     return SkillDefinitionRecord(
         definition=definition,
-        source_format=source_format,
         source_scope=source_scope,
         source_path=str(path),
     )
@@ -257,20 +234,20 @@ def _parse_health_spec(payload: object) -> SkillHealthSpec:
     return SkillHealthSpec(type=str(payload.get("type") or "none"))
 
 
-def _parse_run_policies(payload: object) -> SkillRunPolicies:
+def _parse_capability_policy(payload: object) -> SkillCapabilityPolicies:
     if not isinstance(payload, dict):
-        return SkillRunPolicies()
-    return SkillRunPolicies.model_validate(payload)
+        return SkillCapabilityPolicies()
+    return SkillCapabilityPolicies.model_validate(payload)
 
 
 def _reject_legacy_targets(payload: object) -> None:
     if isinstance(payload, dict) and "targets" in payload:
         raise ValueError(
-            "Skill manifest field 'targets' is no longer supported. Use runPolicies for run-origin policy."
+            "Skill manifest field 'targets' is no longer supported. Use capabilityPolicy for capability selection policy."
         )
     if isinstance(payload, dict) and "executionTargets" in payload:
         raise ValueError(
-            "Skill manifest field 'executionTargets' is no longer supported. Use runPolicies for run-origin policy."
+            "Skill manifest field 'executionTargets' is no longer supported. Use capabilityPolicy for capability selection policy."
         )
 
 
@@ -289,6 +266,27 @@ def _reject_legacy_llm_fields(payload: object) -> None:
         "agent_instruction": "llm_instruction",
         "agentNodeEligibility": "llmNodeEligibility",
         "agentNodeBlockers": "llmNodeBlockers",
+    }
+    for legacy, replacement in legacy_fields.items():
+        if legacy in payload:
+            raise ValueError(
+                f"Skill manifest field '{legacy}' is no longer supported. Use '{replacement}'."
+            )
+
+
+def _reject_legacy_skill_protocol_fields(payload: object) -> None:
+    if not isinstance(payload, dict):
+        return
+    legacy_fields = {
+        "runPolicies": "capabilityPolicy",
+        "run_policies": "capability_policy",
+        "supportedValueTypes": "outputSchema",
+        "supported_value_types": "output_schema",
+        "sideEffects": "permissions",
+        "side_effects": "permissions",
+        "kind": "no longer supported",
+        "mode": "no longer supported",
+        "scope": "no longer supported",
     }
     for legacy, replacement in legacy_fields.items():
         if legacy in payload:
@@ -321,12 +319,6 @@ def _resolve_llm_node_eligibility(definition: SkillDefinition, skill_dir: Path) 
     if blockers:
         return SkillLlmNodeEligibility.NEEDS_MANIFEST, blockers
     return SkillLlmNodeEligibility.READY, []
-
-
-def _parse_enum(value: object, enum_type: type[EnumValue], fallback: EnumValue) -> EnumValue:
-    if value is None or value == "":
-        return fallback
-    return enum_type(str(value))
 
 
 def _split_frontmatter(raw: str, path: Path) -> tuple[str, str]:

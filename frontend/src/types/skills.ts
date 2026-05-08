@@ -17,15 +17,14 @@ export type SkillHealthSpec = {
   type: string;
 };
 
-export type SkillRunPolicy = {
-  discoverable: boolean;
-  autoSelectable: boolean;
+export type SkillCapabilityPolicy = {
+  selectable: boolean;
   requiresApproval: boolean;
 };
 
-export type SkillRunPolicies = {
-  default: SkillRunPolicy;
-  origins: Record<string, SkillRunPolicy>;
+export type SkillCapabilityPolicies = {
+  default: SkillCapabilityPolicy;
+  origins: Record<string, SkillCapabilityPolicy>;
 };
 
 export type SkillDefinition = {
@@ -35,20 +34,14 @@ export type SkillDefinition = {
   llmInstruction: string;
   schemaVersion: string;
   version: string;
-  runPolicies: SkillRunPolicies;
-  kind: string;
-  mode: string;
-  scope: string;
+  capabilityPolicy: SkillCapabilityPolicies;
   permissions: string[];
   runtime: SkillRuntimeSpec;
   health: SkillHealthSpec;
   inputSchema: SkillIoField[];
   outputSchema: SkillIoField[];
-  supportedValueTypes: string[];
-  sideEffects: string[];
   llmNodeEligibility: string;
   llmNodeBlockers: string[];
-  sourceFormat: string;
   sourceScope: string;
   sourcePath: string;
   runtimeReady: boolean;

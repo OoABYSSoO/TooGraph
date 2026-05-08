@@ -46,12 +46,8 @@
           <strong>{{ overview.active }}</strong>
         </article>
         <article class="skills-page__metric">
-          <span>{{ t("skills.discoverableSkills") }}</span>
-          <strong>{{ overview.discoverableSkills }}</strong>
-        </article>
-        <article class="skills-page__metric">
-          <span>{{ t("skills.autoSelectableSkills") }}</span>
-          <strong>{{ overview.autoSelectableSkills }}</strong>
+          <span>{{ t("skills.selectableSkills") }}</span>
+          <strong>{{ overview.selectableSkills }}</strong>
         </article>
         <article class="skills-page__metric">
           <span>{{ t("skills.runtimeReady") }}</span>
@@ -150,28 +146,20 @@
             </div>
 
             <div class="skills-page__source">
-              <span>{{ t("skills.source") }}: {{ selectedSkill.sourceScope }} / {{ selectedSkill.sourceFormat }}</span>
+              <span>{{ t("skills.source") }}: {{ t(`skills.sourceScope.${selectedSkill.sourceScope}`) }}</span>
               <code>{{ selectedSkill.sourcePath }}</code>
             </div>
 
             <div class="skills-page__taxonomy">
               <section>
-                <h4>{{ t("skills.runPolicies") }}</h4>
+                <h4>{{ t("skills.capabilityPolicy") }}</h4>
                 <div class="skills-page__schema-list">
                   <span
-                    v-for="entry in runPolicyOriginEntries(selectedSkill)"
+                    v-for="entry in capabilityPolicyOriginEntries(selectedSkill)"
                     :key="entry.origin"
                   >
-                    {{ formatRunPolicy(entry.origin, entry.policy) }}
+                    {{ formatCapabilityPolicy(entry.origin, entry.policy) }}
                   </span>
-                </div>
-              </section>
-              <section>
-                <h4>{{ t("skills.kind") }}</h4>
-                <div class="skills-page__badges">
-                  <span>{{ selectedSkill.kind }}</span>
-                  <span>{{ selectedSkill.mode }}</span>
-                  <span>{{ selectedSkill.scope }}</span>
                 </div>
               </section>
               <section>
@@ -179,7 +167,6 @@
                 <div class="skills-page__badges">
                   <span>{{ selectedSkill.runtime.type }}</span>
                   <span>{{ selectedSkill.runtime.entrypoint || t("common.none") }}</span>
-                  <span>{{ selectedSkill.health.type }}</span>
                 </div>
               </section>
               <section>
@@ -210,20 +197,6 @@
                 </div>
               </section>
               <section>
-                <h4>{{ t("skills.supportedTypes") }}</h4>
-                <div class="skills-page__badges">
-                  <span v-for="valueType in selectedSkill.supportedValueTypes" :key="valueType">{{ valueType }}</span>
-                  <span v-if="selectedSkill.supportedValueTypes.length === 0">{{ t("common.none") }}</span>
-                </div>
-              </section>
-              <section>
-                <h4>{{ t("skills.sideEffects") }}</h4>
-                <div class="skills-page__badges">
-                  <span v-for="effect in selectedSkill.sideEffects" :key="effect">{{ effect }}</span>
-                  <span v-if="selectedSkill.sideEffects.length === 0">{{ t("skills.noSideEffects") }}</span>
-                </div>
-              </section>
-              <section>
                 <h4>{{ t("skills.permissions") }}</h4>
                 <div class="skills-page__badges">
                   <span v-for="permission in selectedSkill.permissions" :key="permission">{{ permission }}</span>
@@ -236,6 +209,10 @@
                   <span v-for="blocker in selectedSkill.llmNodeBlockers" :key="blocker">{{ blocker }}</span>
                   <span v-if="selectedSkill.llmNodeBlockers.length === 0">{{ t("skills.agentNodeReady") }}</span>
                 </div>
+              </section>
+              <section>
+                <h4>{{ t("skills.llmInstruction") }}</h4>
+                <p class="skills-page__instruction">{{ selectedSkill.llmInstruction || t("common.none") }}</p>
               </section>
             </div>
 
@@ -314,7 +291,7 @@ import {
   buildSkillOverview,
   buildSkillStatusOptions,
   filterSkillsForManagement,
-  listSkillRunPolicies,
+  listSkillCapabilityPolicies,
   type SkillStatusFilter,
 } from "./skillsPageModel.ts";
 
@@ -399,15 +376,14 @@ function enabledToggleLabel(skill: SkillDefinition) {
   return skill.status === "active" ? t("skills.disable") : t("skills.enable");
 }
 
-function runPolicyOriginEntries(skill: SkillDefinition) {
-  return listSkillRunPolicies(skill);
+function capabilityPolicyOriginEntries(skill: SkillDefinition) {
+  return listSkillCapabilityPolicies(skill);
 }
 
-function formatRunPolicy(origin: string, policy: SkillDefinition["runPolicies"]["default"]) {
+function formatCapabilityPolicy(origin: string, policy: SkillDefinition["capabilityPolicy"]["default"]) {
   return [
     origin,
-    policy.discoverable ? t("skills.policyDiscoverable") : t("skills.policyHidden"),
-    policy.autoSelectable ? t("skills.policyAutoSelectable") : t("skills.policyManualOnly"),
+    policy.selectable ? t("skills.policySelectable") : t("skills.policyHidden"),
     policy.requiresApproval ? t("skills.policyRequiresApproval") : t("skills.policyNoApproval"),
   ].join(" · ");
 }
@@ -908,7 +884,7 @@ onMounted(loadSkills);
 
 .skills-page__taxonomy {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 12px;
 }
 
@@ -944,6 +920,14 @@ onMounted(loadSkills);
 
 .skills-page__source code {
   word-break: break-all;
+}
+
+.skills-page__instruction {
+  margin: 0;
+  color: rgba(60, 41, 20, 0.72);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .skills-page__columns {

@@ -30,9 +30,10 @@ def _manifest(skill_key: str = "custom_echo") -> str:
             "description": "Echoes a text input.",
             "llmInstruction": "Use this skill only when the user needs an echo.",
             "version": "1.0.0",
-            "kind": "atomic",
-            "mode": "tool",
-            "scope": "workspace",
+            "capabilityPolicy": {
+                "default": {"selectable": True, "requiresApproval": False},
+                "origins": {"companion": {"selectable": False, "requiresApproval": True}},
+            },
             "permissions": ["file_read"],
             "inputSchema": [
                 {

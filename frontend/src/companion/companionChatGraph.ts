@@ -133,28 +133,27 @@ export function resolveCompanionMode(value: unknown): CompanionMode {
 export function buildCompanionSkillCatalogSnapshot(skills: SkillDefinition[], companionMode: CompanionMode) {
   return skills.map((skill) => {
     const snapshot = cloneJson(skill);
-    const configuredDefaultPolicy = snapshot.runPolicies?.default ?? {};
+    const configuredDefaultPolicy = snapshot.capabilityPolicy?.default ?? {};
     const defaultPolicy = {
       ...configuredDefaultPolicy,
-      discoverable: configuredDefaultPolicy.discoverable ?? true,
-      autoSelectable: configuredDefaultPolicy.autoSelectable ?? false,
+      selectable: configuredDefaultPolicy.selectable ?? true,
       requiresApproval: configuredDefaultPolicy.requiresApproval ?? false,
     };
     const companionPolicy = {
       ...defaultPolicy,
-      ...(snapshot.runPolicies?.origins?.companion ?? {}),
+      ...(snapshot.capabilityPolicy?.origins?.companion ?? {}),
     };
     const companionOriginPolicy =
       companionMode === "approval" || !companionPolicy.requiresApproval
         ? companionPolicy
         : {
             ...companionPolicy,
-            autoSelectable: false,
+            selectable: false,
           };
-    snapshot.runPolicies = {
+    snapshot.capabilityPolicy = {
       default: defaultPolicy,
       origins: {
-        ...(snapshot.runPolicies?.origins ?? {}),
+        ...(snapshot.capabilityPolicy?.origins ?? {}),
         companion: companionOriginPolicy,
       },
     };

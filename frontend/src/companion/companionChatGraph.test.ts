@@ -264,25 +264,19 @@ function createSkillDefinition(overrides: Partial<SkillDefinition> = {}): SkillD
     llmInstruction: "Choose the query and run the bound web search skill.",
     schemaVersion: "graphite.skill/v1",
     version: "1.0.0",
-    runPolicies: {
-      default: { discoverable: true, autoSelectable: false, requiresApproval: false },
+    capabilityPolicy: {
+      default: { selectable: true, requiresApproval: false },
       origins: {
-        companion: { discoverable: true, autoSelectable: true, requiresApproval: false },
+        companion: { selectable: true, requiresApproval: false },
       },
     },
-    kind: "atomic",
-    mode: "tool",
-    scope: "node",
     permissions: ["network", "secret_read"],
     runtime: { type: "python", entrypoint: "run.py", timeoutSeconds: 10 },
     health: { type: "none" },
     inputSchema: [{ key: "query", name: "Query", valueType: "text", required: true, description: "" }],
     outputSchema: [{ key: "citations", name: "Citations", valueType: "json", required: false, description: "" }],
-    supportedValueTypes: ["text", "json", "markdown"],
-    sideEffects: ["network", "secret_read"],
     llmNodeEligibility: "ready",
     llmNodeBlockers: [],
-    sourceFormat: "native",
     sourceScope: "installed",
     sourcePath: "skill/web_search/skill.json",
     runtimeReady: true,
@@ -358,14 +352,13 @@ test("buildCompanionChatGraph keeps no-approval web search auto-selectable in ad
         skillKey: "restricted_media_fetcher",
         name: "Restricted Media Fetcher",
         description: "Fetch authorized media with approval.",
-        runPolicies: {
-          default: { discoverable: true, autoSelectable: false, requiresApproval: true },
+        capabilityPolicy: {
+          default: { selectable: true, requiresApproval: true },
           origins: {
-            companion: { discoverable: true, autoSelectable: true, requiresApproval: true },
+            companion: { selectable: true, requiresApproval: true },
           },
         },
         permissions: ["network", "file_write"],
-        sideEffects: ["network", "file_write"],
       }),
     ],
   });
@@ -373,10 +366,10 @@ test("buildCompanionChatGraph keeps no-approval web search auto-selectable in ad
   const catalog = graph.state_schema.state_7.value as SkillDefinition[];
   assert.equal(graph.name, "桌宠自主工具循环");
   assert.equal(catalog[0].skillKey, "web_search");
-  assert.equal(catalog[0].runPolicies.origins.companion.autoSelectable, true);
-  assert.equal(catalog[0].runPolicies.origins.companion.requiresApproval, false);
-  assert.equal(catalog[1].runPolicies.origins.companion.autoSelectable, false);
-  assert.equal(catalog[1].runPolicies.origins.companion.requiresApproval, true);
+  assert.equal(catalog[0].capabilityPolicy.origins.companion.selectable, true);
+  assert.equal(catalog[0].capabilityPolicy.origins.companion.requiresApproval, false);
+  assert.equal(catalog[1].capabilityPolicy.origins.companion.selectable, false);
+  assert.equal(catalog[1].capabilityPolicy.origins.companion.requiresApproval, true);
   assertInputNode(graph.nodes.input_skill_catalog_snapshot);
   assert.deepEqual(graph.nodes.input_skill_catalog_snapshot.config.value, catalog);
 });
@@ -391,7 +384,7 @@ test("buildCompanionChatGraph keeps companion auto-select policy in approval mod
   });
 
   const catalog = graph.state_schema.state_7.value as SkillDefinition[];
-  assert.equal(catalog[0].runPolicies.origins.companion.autoSelectable, true);
+  assert.equal(catalog[0].capabilityPolicy.origins.companion.selectable, true);
   assert.deepEqual(graph.metadata.interrupt_after, ["request_approval_agent"]);
   assert.deepEqual(graph.metadata.agent_breakpoint_timing, { request_approval_agent: "after" });
 });

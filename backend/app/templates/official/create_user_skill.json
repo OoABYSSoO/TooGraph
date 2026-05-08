@@ -505,7 +505,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "生成完整 GraphiteUI Skill 包。target_skill_key 写 skill_design.skill_key。generated_skill_files 必须是 JSON 对象，键为相对路径，至少包含 skill.json、SKILL.md、run.py；值为完整 UTF-8 文本内容。skill.json 必须包含 schemaVersion=graphite.skill/v1、skillKey、name、description、llmInstruction、version、kind、mode、scope、permissions、inputSchema、outputSchema、runtime、health、configured、healthy。run.py 必须从 stdin 读取 JSON，向 stdout 打印 JSON 对象。smoke_input 使用 example_io.smoke_input 或 skill_input_example。不要写压缩包，不要写官方目录。",
+        "taskInstruction": "生成完整 GraphiteUI Skill 包。target_skill_key 写 skill_design.skill_key。generated_skill_files 必须是 JSON 对象，键为相对路径，至少包含 skill.json、SKILL.md、run.py；值为完整 UTF-8 文本内容。skill.json 必须包含 schemaVersion=graphite.skill/v1、skillKey、name、description、llmInstruction、version、capabilityPolicy、permissions、inputSchema、outputSchema、runtime、health、configured、healthy；capabilityPolicy 使用 default/origins.<origin>，策略字段只能有 selectable 和 requiresApproval。不要写 runPolicies、discoverable、autoSelectable、supportedValueTypes、sideEffects、kind、mode 或 scope。run.py 必须从 stdin 读取 JSON，向 stdout 打印 JSON 对象。smoke_input 使用 example_io.smoke_input 或 skill_input_example。不要写压缩包，不要写官方目录。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "xhigh",

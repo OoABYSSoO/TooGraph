@@ -40,15 +40,14 @@ test("SkillsPage exposes a read-only Skill package file browser", () => {
   assert.match(componentSource, /selectedFilePath/);
 });
 
-test("SkillsPage surfaces native Skill taxonomy and readiness metadata", () => {
-  assert.match(componentSource, /overview\.discoverableSkills/);
-  assert.match(componentSource, /overview\.autoSelectableSkills/);
+test("SkillsPage surfaces useful Skill capability and readiness metadata", () => {
+  assert.match(componentSource, /overview\.selectableSkills/);
   assert.match(componentSource, /overview\.runtimeReady/);
   assert.match(componentSource, /overview\.needsAttention/);
-  assert.match(componentSource, /runPolicyOriginEntries/);
-  assert.match(componentSource, /selectedSkill\.kind/);
-  assert.match(componentSource, /selectedSkill\.mode/);
-  assert.match(componentSource, /selectedSkill\.scope/);
+  assert.match(componentSource, /capabilityPolicyOriginEntries/);
+  assert.doesNotMatch(componentSource, /selectedSkill\.kind/);
+  assert.doesNotMatch(componentSource, /selectedSkill\.mode/);
+  assert.doesNotMatch(componentSource, /selectedSkill\.scope/);
   assert.match(componentSource, /selectedSkill\.permissions/);
   assert.match(componentSource, /selectedSkill\.runtimeReady/);
   assert.match(componentSource, /selectedSkill\.runtime\.type/);
@@ -57,7 +56,7 @@ test("SkillsPage surfaces native Skill taxonomy and readiness metadata", () => {
   assert.match(componentSource, /selectedSkill\.healthy/);
   assert.match(componentSource, /selectedSkill\.llmNodeEligibility/);
   assert.match(componentSource, /selectedSkill\.llmNodeBlockers/);
-  assert.match(componentSource, /t\("skills\.runPolicies"\)/);
+  assert.match(componentSource, /t\("skills\.capabilityPolicy"\)/);
   assert.match(componentSource, /t\("skills\.permissions"\)/);
   assert.match(componentSource, /t\("skills\.llmNodeEligibility"\)/);
   assert.match(componentSource, /t\("skills\.llmNodeBlockers"\)/);
