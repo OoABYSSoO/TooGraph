@@ -154,6 +154,32 @@ class WebSearchSkillTests(unittest.TestCase):
         self.assertEqual(result["artifact_paths"], [])
         self.assertEqual(result["errors"], ["persistent TLS EOF"])
 
+    def test_web_search_http_client_ignores_invalid_socks_all_proxy_when_http_proxy_exists(self) -> None:
+        web_search = _load_web_search_module()
+        with patch.dict(
+            os.environ,
+            {
+                "ALL_PROXY": "socks://127.0.0.1:7897/",
+                "all_proxy": "socks://127.0.0.1:7897/",
+                "HTTPS_PROXY": "http://127.0.0.1:7897",
+            },
+            clear=True,
+        ):
+            kwargs = web_search._http_client_kwargs(timeout_seconds=7.0, follow_redirects=True)
+
+        self.assertEqual(kwargs["timeout"], 7.0)
+        self.assertEqual(kwargs["follow_redirects"], True)
+        self.assertEqual(kwargs["trust_env"], False)
+        self.assertEqual(kwargs["proxy"], "http://127.0.0.1:7897")
+
+    def test_web_search_http_client_disables_env_proxy_when_only_socks_proxy_is_configured(self) -> None:
+        web_search = _load_web_search_module()
+        with patch.dict(os.environ, {"ALL_PROXY": "socks://127.0.0.1:7897/"}, clear=True):
+            kwargs = web_search._http_client_kwargs(timeout_seconds=7.0)
+
+        self.assertEqual(kwargs["trust_env"], False)
+        self.assertNotIn("proxy", kwargs)
+
     def test_web_search_skill_fetches_pages_to_local_artifacts_when_requested(self) -> None:
         web_search = _load_web_search_module()
         server = _start_article_server(

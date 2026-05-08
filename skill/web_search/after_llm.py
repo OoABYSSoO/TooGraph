@@ -21,6 +21,7 @@ DEFAULT_TIMEOUT_SECONDS = 15.0
 DEFAULT_MAX_CHARS_PER_PAGE = 200_000
 DEFAULT_RETRY_ATTEMPTS = 5
 PAGE_FETCH_USER_AGENT = "GraphiteUI/1.0 (+https://github.com/AbyssBadger0/GraphiteUI)"
+HTTP_PROXY_ENV_KEYS = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy")
 
 
 def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
@@ -98,7 +99,7 @@ def _search_with_tavily(
         "include_images": False,
     }
     headers = {"Authorization": f"Bearer {api_key}"}
-    with httpx.Client(timeout=timeout_seconds) as client:
+    with httpx.Client(**_http_client_kwargs(timeout_seconds=timeout_seconds)) as client:
         response = client.post(TAVILY_SEARCH_URL, json=payload, headers=headers)
         response.raise_for_status()
         data = response.json()
@@ -109,7 +110,7 @@ def _search_with_duckduckgo(*, query: str, max_results: int, timeout_seconds: fl
     headers = {
         "User-Agent": "GraphiteUI/1.0 (+https://github.com/AbyssBadger0/GraphiteUI)",
     }
-    with httpx.Client(timeout=timeout_seconds, follow_redirects=True) as client:
+    with httpx.Client(**_http_client_kwargs(timeout_seconds=timeout_seconds, follow_redirects=True)) as client:
         response = client.get(DUCKDUCKGO_SEARCH_URL, params={"q": query}, headers=headers)
         response.raise_for_status()
         html = response.text
@@ -380,7 +381,7 @@ def _load_source_page_text(
     if raw_content:
         return fallback_title, raw_content
     headers = {"User-Agent": PAGE_FETCH_USER_AGENT}
-    with httpx.Client(timeout=timeout_seconds, follow_redirects=True) as client:
+    with httpx.Client(**_http_client_kwargs(timeout_seconds=timeout_seconds, follow_redirects=True)) as client:
         response = client.get(url, headers=headers)
         response.raise_for_status()
         content_type = response.headers.get("Content-Type", "")
@@ -465,6 +466,38 @@ def _final_response(
 
 def _resolve_tavily_api_key(skill_inputs: dict[str, Any]) -> str:
     return _compact_text(skill_inputs.get("api_key")) or _compact_text(os.getenv("TAVILY_API_KEY"))
+
+
+def _http_client_kwargs(*, timeout_seconds: float, follow_redirects: bool = False) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {
+        "timeout": timeout_seconds,
+        "trust_env": False,
+    }
+    if follow_redirects:
+        kwargs["follow_redirects"] = True
+    proxy_url = _resolve_http_proxy_url()
+    if proxy_url:
+        kwargs["proxy"] = proxy_url
+    return kwargs
+
+
+def _resolve_http_proxy_url() -> str:
+    for key in HTTP_PROXY_ENV_KEYS:
+        proxy_url = _normalize_http_proxy_url(os.getenv(key))
+        if proxy_url:
+            return proxy_url
+    return ""
+
+
+def _normalize_http_proxy_url(value: object) -> str:
+    proxy_url = _compact_text(value)
+    if not proxy_url:
+        return ""
+    if "://" not in proxy_url:
+        return f"http://{proxy_url}"
+    if proxy_url.lower().startswith(("http://", "https://")):
+        return proxy_url
+    return ""
 
 
 def _compact_text(value: object) -> str:
