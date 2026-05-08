@@ -49,7 +49,7 @@ function asString(value: unknown): string | null {
 }
 
 async function loadWorkspaceLists() {
-  await Promise.all([graphStore.ensureTemplatesLoaded(), graphStore.ensureGraphsLoaded()]);
+  await Promise.all([graphStore.loadTemplates(), graphStore.loadGraphs()]);
 }
 
 onMounted(async () => {

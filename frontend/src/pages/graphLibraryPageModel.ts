@@ -31,6 +31,11 @@ export type GraphLibraryOverview = {
   disabled: number;
 };
 
+export type GraphLibraryColumns = {
+  templates: GraphLibraryItem[];
+  graphs: GraphLibraryItem[];
+};
+
 export function buildGraphLibraryItems(graphs: GraphDocument[], templates: TemplateRecord[]): GraphLibraryItem[] {
   return [
     ...graphs.map((graph) => ({
@@ -61,6 +66,13 @@ export function buildGraphLibraryItems(graphs: GraphDocument[], templates: Templ
       };
     }),
   ];
+}
+
+export function splitGraphLibraryItems(items: GraphLibraryItem[]): GraphLibraryColumns {
+  return {
+    templates: items.filter((item) => item.kind === "template"),
+    graphs: items.filter((item) => item.kind === "graph"),
+  };
 }
 
 export function filterGraphLibraryItems(items: GraphLibraryItem[], filters: GraphLibraryFilters): GraphLibraryItem[] {
