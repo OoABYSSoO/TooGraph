@@ -1,0 +1,1493 @@
+{
+  "template_id": "graphiteui_skill_creation_workflow",
+  "label": "创建自定义 Skill",
+  "description": "需求澄清、样例确认、Skill 文件生成、脚本测试修复和人工批准写入的自定义 Skill 创作图模板。",
+  "default_graph_name": "创建自定义 Skill",
+  "state_schema": {
+    "skill_request": {
+      "name": "用户需求",
+      "description": "用户想创建的 Skill 能力、输入输出期望和限制。",
+      "type": "text",
+      "value": "我想要一个把会议纪要整理成待办清单的 Skill",
+      "color": "#d97706",
+      "binding": null
+    },
+    "existing_capability": {
+      "name": "已有能力",
+      "description": "能力选择技能从当前启用模板和 Skill 中选择出的单个可用能力候选；这里作为审查上下文保存，不触发动态执行。",
+      "type": "json",
+      "value": { "kind": "none" },
+      "color": "#2563eb",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteui_capability_selector",
+        "nodeId": "select_existing_capability",
+        "fieldKey": "capability",
+        "managed": true
+      }
+    },
+    "requirement_review": {
+      "name": "需求评估",
+      "description": "对需求是否清晰、是否已有能力可复用、是否继续创建 Skill 的结构化判断。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": null
+    },
+    "creation_decision": {
+      "name": "创建决策",
+      "description": "是否继续创建新 Skill 的结构化决策。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": null
+    },
+    "clarification_questions": {
+      "name": "澄清问题",
+      "description": "当需求不够清晰时，面向用户提出的问题和选项。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0891b2",
+      "binding": null
+    },
+    "clarification_answer": {
+      "name": "用户澄清回答",
+      "description": "用户对澄清问题的回答，可以选择选项，也可以自由补充。",
+      "type": "markdown",
+      "value": "",
+      "color": "#d97706",
+      "binding": null
+    },
+    "confirmed_skill_requirement": {
+      "name": "确认后的需求",
+      "description": "经过澄清后确认的 Skill 需求、边界、输入输出和约束。",
+      "type": "markdown",
+      "value": "",
+      "color": "#16a34a",
+      "binding": null
+    },
+    "example_io": {
+      "name": "示例输入输出",
+      "description": "用于给用户确认的示例输入、预期输出和边界示例。",
+      "type": "markdown",
+      "value": "",
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "example_feedback": {
+      "name": "样例反馈",
+      "description": "用户对示例输入输出的认可或修改意见。",
+      "type": "markdown",
+      "value": "",
+      "color": "#d97706",
+      "binding": null
+    },
+    "example_decision": {
+      "name": "样例决策",
+      "description": "样例是否获得用户认可，以及需要修改的点。",
+      "type": "json",
+      "value": {},
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "builder_context": {
+      "name": "构建上下文",
+      "description": "交给 Skill Builder 的最终需求、示例、文件约束和修复上下文。",
+      "type": "markdown",
+      "value": "",
+      "color": "#4f46e5",
+      "binding": null
+    },
+    "generated_skill_key": {
+      "name": "Skill Key",
+      "description": "生成的 Skill 稳定机器标识。",
+      "type": "text",
+      "value": "",
+      "color": "#2563eb",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "build_skill_files",
+        "fieldKey": "skill_key",
+        "managed": true
+      }
+    },
+    "generated_skill_json": {
+      "name": "skill.json",
+      "description": "生成的 Skill manifest JSON 对象。",
+      "type": "json",
+      "value": {},
+      "color": "#2563eb",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "build_skill_files",
+        "fieldKey": "skill_json",
+        "managed": true
+      }
+    },
+    "generated_skill_md": {
+      "name": "SKILL.md",
+      "description": "生成的 Skill 使用说明 Markdown。",
+      "type": "markdown",
+      "value": "",
+      "color": "#2563eb",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "build_skill_files",
+        "fieldKey": "skill_md",
+        "managed": true
+      }
+    },
+    "generated_before_llm_py": {
+      "name": "before_llm.py",
+      "description": "生成的 before_llm.py 源码；不需要时为空字符串。",
+      "type": "text",
+      "value": "",
+      "color": "#2563eb",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "build_skill_files",
+        "fieldKey": "before_llm_py",
+        "managed": true
+      }
+    },
+    "generated_after_llm_py": {
+      "name": "after_llm.py",
+      "description": "生成的 after_llm.py 源码；不需要时为空字符串。",
+      "type": "text",
+      "value": "",
+      "color": "#2563eb",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "build_skill_files",
+        "fieldKey": "after_llm_py",
+        "managed": true
+      }
+    },
+    "generated_requirements_txt": {
+      "name": "requirements.txt",
+      "description": "生成的 requirements.txt 内容；不需要第三方依赖时为空字符串。",
+      "type": "text",
+      "value": "",
+      "color": "#2563eb",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_skill_builder",
+        "nodeId": "build_skill_files",
+        "fieldKey": "requirements_txt",
+        "managed": true
+      }
+    },
+    "test_strategy": {
+      "name": "测试策略",
+      "description": "是否需要测试 Python 生命周期脚本，以及测试哪个脚本。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": null
+    },
+    "script_test_status": {
+      "name": "脚本测试状态",
+      "description": "脚本测试结果：succeeded 或 failed。",
+      "type": "text",
+      "value": "",
+      "color": "#9333ea",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_script_tester",
+        "nodeId": "run_script_test",
+        "fieldKey": "status",
+        "managed": true
+      }
+    },
+    "script_test_summary": {
+      "name": "脚本测试摘要",
+      "description": "脚本测试的命令、结果、退出码和关键错误。",
+      "type": "markdown",
+      "value": "",
+      "color": "#9333ea",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_script_tester",
+        "nodeId": "run_script_test",
+        "fieldKey": "summary",
+        "managed": true
+      }
+    },
+    "script_test_source": {
+      "name": "测试源码",
+      "description": "实际运行的 pytest 测试源码。",
+      "type": "text",
+      "value": "",
+      "color": "#9333ea",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_script_tester",
+        "nodeId": "run_script_test",
+        "fieldKey": "test_source",
+        "managed": true
+      }
+    },
+    "script_test_stdout": {
+      "name": "测试 stdout",
+      "description": "pytest 标准输出。",
+      "type": "text",
+      "value": "",
+      "color": "#9333ea",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_script_tester",
+        "nodeId": "run_script_test",
+        "fieldKey": "stdout",
+        "managed": true
+      }
+    },
+    "script_test_stderr": {
+      "name": "测试 stderr",
+      "description": "pytest 标准错误输出。",
+      "type": "text",
+      "value": "",
+      "color": "#9333ea",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_script_tester",
+        "nodeId": "run_script_test",
+        "fieldKey": "stderr",
+        "managed": true
+      }
+    },
+    "script_test_exit_code": {
+      "name": "测试退出码",
+      "description": "pytest 进程退出码。",
+      "type": "number",
+      "value": 0,
+      "color": "#9333ea",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_script_tester",
+        "nodeId": "run_script_test",
+        "fieldKey": "exit_code",
+        "managed": true
+      }
+    },
+    "script_test_errors": {
+      "name": "测试错误",
+      "description": "脚本测试返回的结构化错误列表。",
+      "type": "json",
+      "value": [],
+      "color": "#dc2626",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteUI_script_tester",
+        "nodeId": "run_script_test",
+        "fieldKey": "errors",
+        "managed": true
+      }
+    },
+    "generation_review": {
+      "name": "生成结果审查",
+      "description": "写入前给用户审查的 Skill 文件摘要、测试结果和目标路径。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0f766e",
+      "binding": null
+    },
+    "write_approval": {
+      "name": "写入确认",
+      "description": "用户对是否写入 backend/data/skills/user/<skill_key>/ 的确认。",
+      "type": "markdown",
+      "value": "",
+      "color": "#d97706",
+      "binding": null
+    },
+    "write_decision": {
+      "name": "写入决策",
+      "description": "是否批准写入文件的结构化判断。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": null
+    },
+    "write_skill_json_status": {
+      "name": "写 skill.json 状态",
+      "description": "写入 skill.json 的执行状态。",
+      "type": "text",
+      "value": "",
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_skill_json",
+        "fieldKey": "status",
+        "managed": true
+      }
+    },
+    "write_skill_json_summary": {
+      "name": "写 skill.json 摘要",
+      "description": "写入 skill.json 的操作摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_skill_json",
+        "fieldKey": "summary",
+        "managed": true
+      }
+    },
+    "write_skill_json_path": {
+      "name": "skill.json 路径",
+      "description": "实际写入的 skill.json 仓库相对路径。",
+      "type": "text",
+      "value": "",
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_skill_json",
+        "fieldKey": "path",
+        "managed": true
+      }
+    },
+    "write_skill_json_errors": {
+      "name": "写 skill.json 错误",
+      "description": "写入 skill.json 的结构化错误。",
+      "type": "json",
+      "value": [],
+      "color": "#dc2626",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_skill_json",
+        "fieldKey": "errors",
+        "managed": true
+      }
+    },
+    "write_skill_md_status": {
+      "name": "写 SKILL.md 状态",
+      "description": "写入 SKILL.md 的执行状态。",
+      "type": "text",
+      "value": "",
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_skill_md",
+        "fieldKey": "status",
+        "managed": true
+      }
+    },
+    "write_skill_md_summary": {
+      "name": "写 SKILL.md 摘要",
+      "description": "写入 SKILL.md 的操作摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_skill_md",
+        "fieldKey": "summary",
+        "managed": true
+      }
+    },
+    "write_skill_md_path": {
+      "name": "SKILL.md 路径",
+      "description": "实际写入的 SKILL.md 仓库相对路径。",
+      "type": "text",
+      "value": "",
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_skill_md",
+        "fieldKey": "path",
+        "managed": true
+      }
+    },
+    "write_skill_md_errors": {
+      "name": "写 SKILL.md 错误",
+      "description": "写入 SKILL.md 的结构化错误。",
+      "type": "json",
+      "value": [],
+      "color": "#dc2626",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_skill_md",
+        "fieldKey": "errors",
+        "managed": true
+      }
+    },
+    "write_before_llm_summary": {
+      "name": "写 before_llm.py 摘要",
+      "description": "写入 before_llm.py 的操作摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_before_llm_py",
+        "fieldKey": "summary",
+        "managed": true
+      }
+    },
+    "write_after_llm_summary": {
+      "name": "写 after_llm.py 摘要",
+      "description": "写入 after_llm.py 的操作摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_after_llm_py",
+        "fieldKey": "summary",
+        "managed": true
+      }
+    },
+    "write_requirements_summary": {
+      "name": "写 requirements.txt 摘要",
+      "description": "写入 requirements.txt 的操作摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "local_workspace_executor",
+        "nodeId": "write_requirements_txt",
+        "fieldKey": "summary",
+        "managed": true
+      }
+    },
+    "final_summary": {
+      "name": "最终回复",
+      "description": "面向用户展示的最终结果、文件路径、测试状态和后续建议。",
+      "type": "markdown",
+      "value": "",
+      "color": "#b45309",
+      "binding": null
+    }
+  },
+  "nodes": {
+    "input_skill_request": {
+      "kind": "input",
+      "name": "输入需求",
+      "description": "提供想创建的 Skill 需求。",
+      "ui": {
+        "position": { "x": 40, "y": 520 },
+        "collapsed": false,
+        "size": { "width": 320, "height": 190 }
+      },
+      "reads": [],
+      "writes": [{ "state": "skill_request", "mode": "replace" }],
+      "config": {
+        "value": "我想要一个把会议纪要整理成待办清单的 Skill",
+        "boundaryType": "text"
+      }
+    },
+    "select_existing_capability": {
+      "kind": "agent",
+      "name": "检查已有能力",
+      "description": "从启用的模板和 Skill 中检查是否已有能力能满足目标需求。",
+      "ui": {
+        "position": { "x": 440, "y": 470 },
+        "collapsed": false,
+        "size": { "width": 420, "height": 280 }
+      },
+      "reads": [{ "state": "skill_request", "required": true }],
+      "writes": [{ "state": "existing_capability", "mode": "replace" }],
+      "config": {
+        "skillKey": "graphiteui_capability_selector",
+        "skillBindings": [
+          {
+            "skillKey": "graphiteui_capability_selector",
+            "outputMapping": {
+              "capability": "existing_capability"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {
+          "graphiteui_capability_selector": {
+            "skillKey": "graphiteui_capability_selector",
+            "title": "能力选择 skill instruction",
+            "content": "你已绑定 GraphiteUI Capability Selector。这里要检查的是用户想创建的目标 Skill 需求是否已经能被现有启用能力满足；不要因为当前流程本身是创建 Skill 的模板就选择 graphiteui_skill_creation_workflow。优先选择真正可直接满足目标需求的图模板，其次选择 Skill；没有合适能力时选择 {\"kind\":\"none\"}。",
+            "source": "node.override"
+          }
+        },
+        "taskInstruction": "根据 skill_request 检查当前启用的能力清单。只选择能直接完成用户目标需求的能力；不要选择本模板自身作为答案。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "review_requirement": {
+      "kind": "agent",
+      "name": "评估需求",
+      "description": "判断需求是否清晰，是否需要澄清，以及是否继续创建新 Skill。",
+      "ui": {
+        "position": { "x": 940, "y": 430 },
+        "collapsed": false,
+        "size": { "width": 440, "height": 320 }
+      },
+      "reads": [
+        { "state": "skill_request", "required": true },
+        { "state": "existing_capability", "required": false }
+      ],
+      "writes": [
+        { "state": "requirement_review", "mode": "replace" },
+        { "state": "creation_decision", "mode": "replace" },
+        { "state": "confirmed_skill_requirement", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "评估用户是否真的需要创建新 Skill。requirement_review 必须写 JSON 对象，包含 needs_clarification(boolean)、existing_capability_summary(string)、unclear_points(array)、questions(array)、reason(string)。如果 existing_capability 不是 none 且可能已经满足需求，应把 needs_clarification 设为 true，并在 questions 中询问用户是否仍要创建新 Skill。creation_decision 必须写 JSON 对象，包含 approved_to_create(boolean)、reason(string)；除非已有能力明显满足且用户没有表达仍要创建，否则默认 approved_to_create 为 true。confirmed_skill_requirement 写 Markdown，概括当前已确认的目标、输入、输出、权限、是否需要 before_llm.py、是否需要 after_llm.py、是否需要第三方依赖和限制。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "need_clarification": {
+      "kind": "condition",
+      "name": "是否需要澄清",
+      "description": "需求不清晰或已有能力可能已满足时，先让用户确认。",
+      "ui": {
+        "position": { "x": 1460, "y": 470 },
+        "collapsed": false,
+        "size": { "width": 300, "height": 180 }
+      },
+      "reads": [{ "state": "requirement_review", "required": true }],
+      "writes": [],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 5,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.requirement_review.needs_clarification",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "ask_clarification": {
+      "kind": "agent",
+      "name": "生成澄清问题",
+      "description": "把不清晰的点转成用户容易回答的选择题和少量开放问题。",
+      "ui": {
+        "position": { "x": 1840, "y": 170 },
+        "collapsed": false,
+        "size": { "width": 440, "height": 300 }
+      },
+      "reads": [
+        { "state": "skill_request", "required": true },
+        { "state": "existing_capability", "required": false },
+        { "state": "requirement_review", "required": true }
+      ],
+      "writes": [{ "state": "clarification_questions", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "根据 requirement_review 生成需要用户回答的澄清问题。优先用带选项的问题，每题给 2 到 4 个选项；允许用户不认可选项并自由补充。问题应覆盖输入格式、输出格式、是否需要确定性脚本、权限范围、失败处理、依赖和是否已有能力已经足够。最后明确请用户在“用户澄清回答”中作答。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "merge_clarification": {
+      "kind": "agent",
+      "name": "合并澄清回答",
+      "description": "把用户回答合并成确认后的需求和创建决策。",
+      "ui": {
+        "position": { "x": 2340, "y": 170 },
+        "collapsed": false,
+        "size": { "width": 440, "height": 300 }
+      },
+      "reads": [
+        { "state": "skill_request", "required": true },
+        { "state": "existing_capability", "required": false },
+        { "state": "clarification_questions", "required": true },
+        { "state": "clarification_answer", "required": true }
+      ],
+      "writes": [
+        { "state": "confirmed_skill_requirement", "mode": "replace" },
+        { "state": "creation_decision", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "根据用户澄清回答更新确认后的需求。confirmed_skill_requirement 写 Markdown，明确目标、输入、输出、权限、是否需要 before_llm.py、是否需要 after_llm.py、是否需要 requirements.txt、边界情况和失败处理。creation_decision 写 JSON 对象，包含 approved_to_create(boolean)、reason(string)。如果用户明确表示已有能力足够或不需要创建新 Skill，则 approved_to_create 为 false；否则为 true。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "should_create_skill": {
+      "kind": "condition",
+      "name": "是否继续创建",
+      "description": "如果用户确认不需要创建，则直接收束。",
+      "ui": {
+        "position": { "x": 2820, "y": 470 },
+        "collapsed": false,
+        "size": { "width": 300, "height": 180 }
+      },
+      "reads": [{ "state": "creation_decision", "required": true }],
+      "writes": [],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 5,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.creation_decision.approved_to_create",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "draft_example_io": {
+      "kind": "agent",
+      "name": "生成示例输入输出",
+      "description": "用确认后的需求生成示例，让用户确认 Skill 行为。",
+      "ui": {
+        "position": { "x": 3220, "y": 360 },
+        "collapsed": false,
+        "size": { "width": 440, "height": 320 }
+      },
+      "reads": [
+        { "state": "skill_request", "required": true },
+        { "state": "confirmed_skill_requirement", "required": true }
+      ],
+      "writes": [{ "state": "example_io", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "根据确认后的需求生成示例输入输出。必须包含至少一个典型输入、一个边界输入、对应的期望输出、输出字段解释，以及需要用户确认的问题。不要开始生成 Skill 文件。最后明确请用户在“样例反馈”中写“认可”或提出修改意见。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "review_example_feedback": {
+      "kind": "agent",
+      "name": "判断样例反馈",
+      "description": "根据用户反馈判断样例是否通过；不通过则修订需求后回到样例生成。",
+      "ui": {
+        "position": { "x": 3740, "y": 360 },
+        "collapsed": false,
+        "size": { "width": 440, "height": 320 }
+      },
+      "reads": [
+        { "state": "confirmed_skill_requirement", "required": true },
+        { "state": "example_io", "required": true },
+        { "state": "example_feedback", "required": true }
+      ],
+      "writes": [
+        { "state": "example_decision", "mode": "replace" },
+        { "state": "confirmed_skill_requirement", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "判断用户是否认可示例输入输出。example_decision 写 JSON 对象，包含 approved(boolean)、reason(string)、requested_changes(array)。如果用户写了“认可”、“可以”、“没问题”或等价表达，approved 为 true。否则 approved 为 false，并把修改意见合并进 confirmed_skill_requirement，方便下一轮重新生成示例。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "examples_approved": {
+      "kind": "condition",
+      "name": "样例是否通过",
+      "description": "样例未通过时回到示例生成，最多循环五轮。",
+      "ui": {
+        "position": { "x": 4240, "y": 430 },
+        "collapsed": false,
+        "size": { "width": 300, "height": 180 }
+      },
+      "reads": [{ "state": "example_decision", "required": true }],
+      "writes": [],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 5,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.example_decision.approved",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "prepare_builder_context": {
+      "kind": "agent",
+      "name": "整理构建上下文",
+      "description": "把确认需求和样例整理成 Skill Builder 可直接使用的约束。",
+      "ui": {
+        "position": { "x": 4640, "y": 360 },
+        "collapsed": false,
+        "size": { "width": 440, "height": 320 }
+      },
+      "reads": [
+        { "state": "skill_request", "required": true },
+        { "state": "confirmed_skill_requirement", "required": true },
+        { "state": "example_io", "required": true },
+        { "state": "example_feedback", "required": true }
+      ],
+      "writes": [{ "state": "builder_context", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "整理给 GraphiteUI Skill Builder 的最终上下文。builder_context 写 Markdown，包含：目标 Skill 名称建议、稳定 skillKey 建议、用户需求、已认可示例输入输出、outputSchema 字段建议、是否需要 before_llm.py、是否需要 after_llm.py、requirements.txt 需求、权限声明、测试重点和禁止事项。强调生成结果只包含 skill_key、skill_json、skill_md、before_llm_py、after_llm_py、requirements_txt。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "build_skill_files": {
+      "kind": "agent",
+      "name": "生成 Skill 文件",
+      "description": "调用 GraphiteUI Skill Builder 生成 Skill 包必要文件内容。",
+      "ui": {
+        "position": { "x": 5160, "y": 360 },
+        "collapsed": false,
+        "size": { "width": 460, "height": 340 }
+      },
+      "reads": [
+        { "state": "skill_request", "required": true },
+        { "state": "confirmed_skill_requirement", "required": true },
+        { "state": "example_io", "required": true },
+        { "state": "builder_context", "required": true },
+        { "state": "script_test_status", "required": false },
+        { "state": "script_test_summary", "required": false },
+        { "state": "script_test_stdout", "required": false },
+        { "state": "script_test_stderr", "required": false },
+        { "state": "script_test_errors", "required": false }
+      ],
+      "writes": [
+        { "state": "generated_skill_key", "mode": "replace" },
+        { "state": "generated_skill_json", "mode": "replace" },
+        { "state": "generated_skill_md", "mode": "replace" },
+        { "state": "generated_before_llm_py", "mode": "replace" },
+        { "state": "generated_after_llm_py", "mode": "replace" },
+        { "state": "generated_requirements_txt", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "graphiteUI_skill_builder",
+        "skillBindings": [
+          {
+            "skillKey": "graphiteUI_skill_builder",
+            "outputMapping": {
+              "skill_key": "generated_skill_key",
+              "skill_json": "generated_skill_json",
+              "skill_md": "generated_skill_md",
+              "before_llm_py": "generated_before_llm_py",
+              "after_llm_py": "generated_after_llm_py",
+              "requirements_txt": "generated_requirements_txt"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "根据 builder_context 生成目标 Skill 的六个输出字段。如果上一轮 script_test_status 为 failed，必须阅读 script_test_summary/stdout/stderr/errors，修复生成的 Python 源码或 manifest 后重新输出完整六个字段。不要写路径，不要生成压缩包，不要输出测试报告或安装步骤。skill_json.skillKey 必须与 generated_skill_key 一致。before_llm.py 和 after_llm.py 不需要时输出空字符串。requirements.txt 不需要第三方依赖时输出空字符串。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "decide_test_strategy": {
+      "kind": "agent",
+      "name": "制定测试策略",
+      "description": "判断生成的生命周期脚本是否需要运行 pytest 测试。",
+      "ui": {
+        "position": { "x": 5700, "y": 360 },
+        "collapsed": false,
+        "size": { "width": 420, "height": 300 }
+      },
+      "reads": [
+        { "state": "generated_before_llm_py", "required": false },
+        { "state": "generated_after_llm_py", "required": false },
+        { "state": "generated_skill_json", "required": true },
+        { "state": "confirmed_skill_requirement", "required": true }
+      ],
+      "writes": [{ "state": "test_strategy", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "判断是否需要测试生成的 Python 脚本。test_strategy 写 JSON 对象，包含 needs_python_test(boolean)、script_filename(string)、script_to_test(\"after_llm.py\"|\"before_llm.py\"|\"\"), reason(string)、test_focus(array)。如果 generated_after_llm_py 非空，优先测试 after_llm.py；否则如果 generated_before_llm_py 非空，测试 before_llm.py；如果两者都为空，needs_python_test 为 false。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "needs_script_test": {
+      "kind": "condition",
+      "name": "是否需要脚本测试",
+      "description": "有 Python 生命周期脚本时进入测试，否则进入写入前审查。",
+      "ui": {
+        "position": { "x": 6200, "y": 430 },
+        "collapsed": false,
+        "size": { "width": 300, "height": 180 }
+      },
+      "reads": [{ "state": "test_strategy", "required": true }],
+      "writes": [],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 5,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.test_strategy.needs_python_test",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "run_script_test": {
+      "kind": "agent",
+      "name": "测试脚本",
+      "description": "调用脚本测试技能编写 pytest 并运行生成的 Python 脚本。",
+      "ui": {
+        "position": { "x": 6600, "y": 240 },
+        "collapsed": false,
+        "size": { "width": 460, "height": 340 }
+      },
+      "reads": [
+        { "state": "test_strategy", "required": true },
+        { "state": "generated_before_llm_py", "required": false },
+        { "state": "generated_after_llm_py", "required": false },
+        { "state": "generated_skill_json", "required": true },
+        { "state": "confirmed_skill_requirement", "required": true },
+        { "state": "example_io", "required": true }
+      ],
+      "writes": [
+        { "state": "script_test_status", "mode": "replace" },
+        { "state": "script_test_summary", "mode": "replace" },
+        { "state": "script_test_source", "mode": "replace" },
+        { "state": "script_test_stdout", "mode": "replace" },
+        { "state": "script_test_stderr", "mode": "replace" },
+        { "state": "script_test_exit_code", "mode": "replace" },
+        { "state": "script_test_errors", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "graphiteUI_script_tester",
+        "skillBindings": [
+          {
+            "skillKey": "graphiteUI_script_tester",
+            "outputMapping": {
+              "status": "script_test_status",
+              "summary": "script_test_summary",
+              "test_source": "script_test_source",
+              "stdout": "script_test_stdout",
+              "stderr": "script_test_stderr",
+              "exit_code": "script_test_exit_code",
+              "errors": "script_test_errors"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "根据 test_strategy 选择要测试的脚本源码：script_to_test 为 after_llm.py 时使用 generated_after_llm_py，为 before_llm.py 时使用 generated_before_llm_py。生成 pytest 测试源码，覆盖已认可示例、字段规范化、错误输入和空输入；不要访问网络，不读取敏感路径，不依赖仓库状态。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "script_test_passed": {
+      "kind": "condition",
+      "name": "测试是否通过",
+      "description": "测试失败时回到修复上下文，最多修复三轮。",
+      "ui": {
+        "position": { "x": 7140, "y": 310 },
+        "collapsed": false,
+        "size": { "width": 300, "height": 180 }
+      },
+      "reads": [{ "state": "script_test_status", "required": true }],
+      "writes": [],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 3,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.script_test_status",
+          "operator": "==",
+          "value": "succeeded"
+        }
+      }
+    },
+    "review_generated_skill": {
+      "kind": "agent",
+      "name": "写入前审查",
+      "description": "总结生成的 Skill 文件、测试结果和准备写入的路径，等待用户批准。",
+      "ui": {
+        "position": { "x": 7640, "y": 360 },
+        "collapsed": false,
+        "size": { "width": 460, "height": 340 }
+      },
+      "reads": [
+        { "state": "generated_skill_key", "required": true },
+        { "state": "generated_skill_json", "required": true },
+        { "state": "generated_skill_md", "required": true },
+        { "state": "generated_before_llm_py", "required": false },
+        { "state": "generated_after_llm_py", "required": false },
+        { "state": "generated_requirements_txt", "required": false },
+        { "state": "script_test_status", "required": false },
+        { "state": "script_test_summary", "required": false }
+      ],
+      "writes": [{ "state": "generation_review", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "写入前给用户审查生成结果。generation_review 写 Markdown，包含 Skill 名称、skillKey、description、outputSchema 摘要、会写入的文件列表、目标目录 backend/data/skills/user/<skillKey>/、脚本测试状态和风险提示。不要执行写入。最后明确请用户在“写入确认”中写“批准写入”或说明不要写入。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "review_write_approval": {
+      "kind": "agent",
+      "name": "判断写入确认",
+      "description": "把用户写入确认转成结构化决策。",
+      "ui": {
+        "position": { "x": 8160, "y": 360 },
+        "collapsed": false,
+        "size": { "width": 420, "height": 280 }
+      },
+      "reads": [
+        { "state": "generation_review", "required": true },
+        { "state": "write_approval", "required": true }
+      ],
+      "writes": [{ "state": "write_decision", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "判断用户是否批准写入文件。write_decision 写 JSON 对象，包含 approved(boolean)、reason(string)。只有用户明确写出“批准写入”、“确认写入”、“可以写入”等等价表达时 approved 为 true；表达犹豫、要求修改、拒绝或为空时 approved 为 false。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "write_approved": {
+      "kind": "condition",
+      "name": "是否批准写入",
+      "description": "用户批准后才调用本地执行器写文件。",
+      "ui": {
+        "position": { "x": 8620, "y": 430 },
+        "collapsed": false,
+        "size": { "width": 300, "height": 180 }
+      },
+      "reads": [{ "state": "write_decision", "required": true }],
+      "writes": [],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 5,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.write_decision.approved",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "write_skill_json": {
+      "kind": "agent",
+      "name": "写 skill.json",
+      "description": "把生成的 skill.json 写入用户 Skill 目录。",
+      "ui": {
+        "position": { "x": 9020, "y": 300 },
+        "collapsed": false,
+        "size": { "width": 440, "height": 300 }
+      },
+      "reads": [
+        { "state": "generated_skill_key", "required": true },
+        { "state": "generated_skill_json", "required": true }
+      ],
+      "writes": [
+        { "state": "write_skill_json_status", "mode": "replace" },
+        { "state": "write_skill_json_summary", "mode": "replace" },
+        { "state": "write_skill_json_path", "mode": "replace" },
+        { "state": "write_skill_json_errors", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "local_workspace_executor",
+        "skillBindings": [
+          {
+            "skillKey": "local_workspace_executor",
+            "outputMapping": {
+              "status": "write_skill_json_status",
+              "summary": "write_skill_json_summary",
+              "path": "write_skill_json_path",
+              "errors": "write_skill_json_errors"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "调用 Local Workspace Executor 写入 skill.json。action 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/skill.json。content 必须是 generated_skill_json 的格式化 JSON 文本，使用 2 空格缩进，不要包 markdown 代码块。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "write_skill_md": {
+      "kind": "agent",
+      "name": "写 SKILL.md",
+      "description": "把生成的 SKILL.md 写入用户 Skill 目录。",
+      "ui": {
+        "position": { "x": 9520, "y": 300 },
+        "collapsed": false,
+        "size": { "width": 440, "height": 300 }
+      },
+      "reads": [
+        { "state": "generated_skill_key", "required": true },
+        { "state": "generated_skill_md", "required": true }
+      ],
+      "writes": [
+        { "state": "write_skill_md_status", "mode": "replace" },
+        { "state": "write_skill_md_summary", "mode": "replace" },
+        { "state": "write_skill_md_path", "mode": "replace" },
+        { "state": "write_skill_md_errors", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "local_workspace_executor",
+        "skillBindings": [
+          {
+            "skillKey": "local_workspace_executor",
+            "outputMapping": {
+              "status": "write_skill_md_status",
+              "summary": "write_skill_md_summary",
+              "path": "write_skill_md_path",
+              "errors": "write_skill_md_errors"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "调用 Local Workspace Executor 写入 SKILL.md。action 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/SKILL.md。content 必须是 generated_skill_md 原文，不要包 markdown 代码块。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "has_before_llm": {
+      "kind": "condition",
+      "name": "是否有 before_llm.py",
+      "description": "只有生成了 before_llm.py 时才写入。",
+      "ui": {
+        "position": { "x": 10020, "y": 360 },
+        "collapsed": false,
+        "size": { "width": 300, "height": 180 }
+      },
+      "reads": [{ "state": "generated_before_llm_py", "required": false }],
+      "writes": [],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 5,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.generated_before_llm_py",
+          "operator": "!=",
+          "value": ""
+        }
+      }
+    },
+    "write_before_llm_py": {
+      "kind": "agent",
+      "name": "写 before_llm.py",
+      "description": "写入可选 before_llm.py。",
+      "ui": {
+        "position": { "x": 10400, "y": 180 },
+        "collapsed": false,
+        "size": { "width": 440, "height": 280 }
+      },
+      "reads": [
+        { "state": "generated_skill_key", "required": true },
+        { "state": "generated_before_llm_py", "required": true }
+      ],
+      "writes": [{ "state": "write_before_llm_summary", "mode": "replace" }],
+      "config": {
+        "skillKey": "local_workspace_executor",
+        "skillBindings": [
+          {
+            "skillKey": "local_workspace_executor",
+            "outputMapping": {
+              "summary": "write_before_llm_summary"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "调用 Local Workspace Executor 写入 before_llm.py。action 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/before_llm.py。content 必须是 generated_before_llm_py 原文，不要包 markdown 代码块。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "has_after_llm": {
+      "kind": "condition",
+      "name": "是否有 after_llm.py",
+      "description": "只有生成了 after_llm.py 时才写入。",
+      "ui": {
+        "position": { "x": 10880, "y": 360 },
+        "collapsed": false,
+        "size": { "width": 300, "height": 180 }
+      },
+      "reads": [{ "state": "generated_after_llm_py", "required": false }],
+      "writes": [],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 5,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.generated_after_llm_py",
+          "operator": "!=",
+          "value": ""
+        }
+      }
+    },
+    "write_after_llm_py": {
+      "kind": "agent",
+      "name": "写 after_llm.py",
+      "description": "写入可选 after_llm.py。",
+      "ui": {
+        "position": { "x": 11260, "y": 180 },
+        "collapsed": false,
+        "size": { "width": 440, "height": 280 }
+      },
+      "reads": [
+        { "state": "generated_skill_key", "required": true },
+        { "state": "generated_after_llm_py", "required": true }
+      ],
+      "writes": [{ "state": "write_after_llm_summary", "mode": "replace" }],
+      "config": {
+        "skillKey": "local_workspace_executor",
+        "skillBindings": [
+          {
+            "skillKey": "local_workspace_executor",
+            "outputMapping": {
+              "summary": "write_after_llm_summary"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "调用 Local Workspace Executor 写入 after_llm.py。action 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/after_llm.py。content 必须是 generated_after_llm_py 原文，不要包 markdown 代码块。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "has_requirements": {
+      "kind": "condition",
+      "name": "是否有 requirements.txt",
+      "description": "只有生成了 requirements.txt 时才写入。",
+      "ui": {
+        "position": { "x": 11740, "y": 360 },
+        "collapsed": false,
+        "size": { "width": 300, "height": 180 }
+      },
+      "reads": [{ "state": "generated_requirements_txt", "required": false }],
+      "writes": [],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 5,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.generated_requirements_txt",
+          "operator": "!=",
+          "value": ""
+        }
+      }
+    },
+    "write_requirements_txt": {
+      "kind": "agent",
+      "name": "写 requirements.txt",
+      "description": "写入可选 requirements.txt。",
+      "ui": {
+        "position": { "x": 12120, "y": 180 },
+        "collapsed": false,
+        "size": { "width": 440, "height": 280 }
+      },
+      "reads": [
+        { "state": "generated_skill_key", "required": true },
+        { "state": "generated_requirements_txt", "required": true }
+      ],
+      "writes": [{ "state": "write_requirements_summary", "mode": "replace" }],
+      "config": {
+        "skillKey": "local_workspace_executor",
+        "skillBindings": [
+          {
+            "skillKey": "local_workspace_executor",
+            "outputMapping": {
+              "summary": "write_requirements_summary"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "调用 Local Workspace Executor 写入 requirements.txt。action 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/requirements.txt。content 必须是 generated_requirements_txt 原文，不要包 markdown 代码块。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "finalize_written_skill": {
+      "kind": "agent",
+      "name": "整理完成结果",
+      "description": "汇总写入结果、测试状态和下一步使用方式。",
+      "ui": {
+        "position": { "x": 12620, "y": 360 },
+        "collapsed": false,
+        "size": { "width": 440, "height": 300 }
+      },
+      "reads": [
+        { "state": "generated_skill_key", "required": true },
+        { "state": "write_skill_json_summary", "required": false },
+        { "state": "write_skill_md_summary", "required": false },
+        { "state": "write_before_llm_summary", "required": false },
+        { "state": "write_after_llm_summary", "required": false },
+        { "state": "write_requirements_summary", "required": false },
+        { "state": "script_test_status", "required": false },
+        { "state": "script_test_summary", "required": false }
+      ],
+      "writes": [{ "state": "final_summary", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "汇总最终结果。final_summary 写 Markdown，说明 Skill 已写入 backend/data/skills/user/<generated_skill_key>/，列出写入文件、脚本测试状态、需要用户注意的依赖或权限，以及下一步可以在 Skill 管理页启用/使用。不要声称写入了没有经过执行器确认的文件。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "finalize_no_create": {
+      "kind": "agent",
+      "name": "无需创建",
+      "description": "用户确认不创建新 Skill 时给出已有能力或收束说明。",
+      "ui": {
+        "position": { "x": 3220, "y": 780 },
+        "collapsed": false,
+        "size": { "width": 440, "height": 280 }
+      },
+      "reads": [
+        { "state": "skill_request", "required": true },
+        { "state": "existing_capability", "required": false },
+        { "state": "creation_decision", "required": true }
+      ],
+      "writes": [{ "state": "final_summary", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "用户或需求评估认为无需创建新 Skill 时，final_summary 写 Markdown，说明没有写入任何文件，并列出可以改用的 existing_capability 或后续如果仍要创建需要补充的信息。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "finalize_no_write": {
+      "kind": "agent",
+      "name": "未写入收束",
+      "description": "生成完成但用户未批准写入时给出可审查结果。",
+      "ui": {
+        "position": { "x": 9020, "y": 700 },
+        "collapsed": false,
+        "size": { "width": 440, "height": 280 }
+      },
+      "reads": [
+        { "state": "generated_skill_key", "required": true },
+        { "state": "generation_review", "required": true },
+        { "state": "write_decision", "required": true }
+      ],
+      "writes": [{ "state": "final_summary", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "用户没有批准写入时，final_summary 写 Markdown，说明没有写入任何文件，保留生成内容已在 state 中可审查，并说明用户可以修改需求或重新运行到写入确认。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "output_final": {
+      "kind": "output",
+      "name": "输出结果",
+      "description": "展示最终 Skill 创建结果。",
+      "ui": {
+        "position": { "x": 13120, "y": 420 },
+        "collapsed": false,
+        "size": { "width": 320, "height": 200 }
+      },
+      "reads": [{ "state": "final_summary", "required": true }],
+      "writes": [],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "md",
+        "fileNameTemplate": ""
+      }
+    }
+  },
+  "edges": [
+    { "source": "input_skill_request", "target": "select_existing_capability" },
+    { "source": "select_existing_capability", "target": "review_requirement" },
+    { "source": "review_requirement", "target": "need_clarification" },
+    { "source": "ask_clarification", "target": "merge_clarification" },
+    { "source": "merge_clarification", "target": "should_create_skill" },
+    { "source": "draft_example_io", "target": "review_example_feedback" },
+    { "source": "review_example_feedback", "target": "examples_approved" },
+    { "source": "prepare_builder_context", "target": "build_skill_files" },
+    { "source": "build_skill_files", "target": "decide_test_strategy" },
+    { "source": "decide_test_strategy", "target": "needs_script_test" },
+    { "source": "run_script_test", "target": "script_test_passed" },
+    { "source": "review_generated_skill", "target": "review_write_approval" },
+    { "source": "review_write_approval", "target": "write_approved" },
+    { "source": "write_skill_json", "target": "write_skill_md" },
+    { "source": "write_skill_md", "target": "has_before_llm" },
+    { "source": "write_before_llm_py", "target": "has_after_llm" },
+    { "source": "write_after_llm_py", "target": "has_requirements" },
+    { "source": "write_requirements_txt", "target": "finalize_written_skill" },
+    { "source": "finalize_written_skill", "target": "output_final" },
+    { "source": "finalize_no_create", "target": "output_final" },
+    { "source": "finalize_no_write", "target": "output_final" }
+  ],
+  "conditional_edges": [
+    {
+      "source": "need_clarification",
+      "branches": {
+        "true": "ask_clarification",
+        "false": "should_create_skill",
+        "exhausted": "should_create_skill"
+      }
+    },
+    {
+      "source": "should_create_skill",
+      "branches": {
+        "true": "draft_example_io",
+        "false": "finalize_no_create",
+        "exhausted": "finalize_no_create"
+      }
+    },
+    {
+      "source": "examples_approved",
+      "branches": {
+        "true": "prepare_builder_context",
+        "false": "draft_example_io",
+        "exhausted": "prepare_builder_context"
+      }
+    },
+    {
+      "source": "needs_script_test",
+      "branches": {
+        "true": "run_script_test",
+        "false": "review_generated_skill",
+        "exhausted": "review_generated_skill"
+      }
+    },
+    {
+      "source": "script_test_passed",
+      "branches": {
+        "true": "review_generated_skill",
+        "false": "build_skill_files",
+        "exhausted": "review_generated_skill"
+      }
+    },
+    {
+      "source": "write_approved",
+      "branches": {
+        "true": "write_skill_json",
+        "false": "finalize_no_write",
+        "exhausted": "finalize_no_write"
+      }
+    },
+    {
+      "source": "has_before_llm",
+      "branches": {
+        "true": "write_before_llm_py",
+        "false": "has_after_llm",
+        "exhausted": "has_after_llm"
+      }
+    },
+    {
+      "source": "has_after_llm",
+      "branches": {
+        "true": "write_after_llm_py",
+        "false": "has_requirements",
+        "exhausted": "has_requirements"
+      }
+    },
+    {
+      "source": "has_requirements",
+      "branches": {
+        "true": "write_requirements_txt",
+        "false": "finalize_written_skill",
+        "exhausted": "finalize_written_skill"
+      }
+    }
+  ],
+  "metadata": {
+    "category": "skill",
+    "templateVersion": "2026-05-08",
+    "graphProtocol": "node_system",
+    "interrupt_after": ["ask_clarification", "draft_example_io", "review_generated_skill"],
+    "agent_breakpoint_timing": {
+      "ask_clarification": "after",
+      "draft_example_io": "after",
+      "review_generated_skill": "after"
+    },
+    "description": "引导用户澄清需求、确认示例、生成并测试 Skill 文件，最后在用户批准后写入 backend/data/skills/user。"
+  }
+}

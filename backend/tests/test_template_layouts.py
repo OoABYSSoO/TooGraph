@@ -24,7 +24,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(
             [record["template_id"] for record in records],
-            ["advanced_web_research_loop"],
+            ["advanced_web_research_loop", "graphiteui_skill_creation_workflow"],
         )
         templates = {record["template_id"]: record for record in records}
         research_template = templates["advanced_web_research_loop"]
@@ -32,6 +32,11 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(research_template["label"], "高级联网搜索")
         self.assertEqual(research_template["default_graph_name"], "高级联网搜索")
         self.assertIn("多轮搜索", research_template["description"])
+        skill_template = templates["graphiteui_skill_creation_workflow"]
+        self.assertEqual(skill_template["source"], "official")
+        self.assertEqual(skill_template["label"], "创建自定义 Skill")
+        self.assertEqual(skill_template["default_graph_name"], "创建自定义 Skill")
+        self.assertIn("需求澄清", skill_template["description"])
 
     def test_advanced_web_research_loop_contract(self) -> None:
         template = next(record for record in _official_template_records() if record["template_id"] == "advanced_web_research_loop")
@@ -134,6 +139,146 @@ class TemplateLayoutTests(unittest.TestCase):
         cycle_tracker = build_langgraph_cycle_tracker(graph, build_execution_edges(graph))
         self.assertTrue(cycle_tracker["has_cycle"])
         self.assertEqual(cycle_tracker["loop_limits_by_source"], {"should_continue_search": 5})
+
+    def test_graphiteui_skill_creation_workflow_contract(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "graphiteui_skill_creation_workflow"
+        )
+        states = template["state_schema"]
+        nodes = template["nodes"]
+
+        self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
+        self.assertEqual(
+            template["metadata"]["interrupt_after"],
+            ["ask_clarification", "draft_example_io", "review_generated_skill"],
+        )
+        self.assertEqual(states["existing_capability"]["type"], "json")
+        self.assertEqual(states["generated_skill_key"]["type"], "text")
+        self.assertEqual(states["generated_skill_json"]["type"], "json")
+        self.assertEqual(states["generated_skill_md"]["type"], "markdown")
+        self.assertEqual(states["generated_before_llm_py"]["type"], "text")
+        self.assertEqual(states["generated_after_llm_py"]["type"], "text")
+        self.assertEqual(states["generated_requirements_txt"]["type"], "text")
+        self.assertEqual(states["script_test_status"]["type"], "text")
+        self.assertEqual(states["final_summary"]["type"], "markdown")
+
+        selector_node = nodes["select_existing_capability"]
+        self.assertEqual(selector_node["kind"], "agent")
+        self.assertEqual(selector_node["config"]["skillKey"], "graphiteui_capability_selector")
+        self.assertEqual(
+            selector_node["config"]["skillBindings"],
+            [
+                {
+                    "skillKey": "graphiteui_capability_selector",
+                    "outputMapping": {"capability": "existing_capability"},
+                }
+            ],
+        )
+
+        builder_node = nodes["build_skill_files"]
+        self.assertEqual(builder_node["kind"], "agent")
+        self.assertEqual(builder_node["config"]["skillKey"], "graphiteUI_skill_builder")
+        self.assertEqual(
+            builder_node["config"]["skillBindings"],
+            [
+                {
+                    "skillKey": "graphiteUI_skill_builder",
+                    "outputMapping": {
+                        "skill_key": "generated_skill_key",
+                        "skill_json": "generated_skill_json",
+                        "skill_md": "generated_skill_md",
+                        "before_llm_py": "generated_before_llm_py",
+                        "after_llm_py": "generated_after_llm_py",
+                        "requirements_txt": "generated_requirements_txt",
+                    },
+                }
+            ],
+        )
+
+        tester_node = nodes["run_script_test"]
+        self.assertEqual(tester_node["kind"], "agent")
+        self.assertEqual(tester_node["config"]["skillKey"], "graphiteUI_script_tester")
+        self.assertEqual(
+            tester_node["config"]["skillBindings"][0]["outputMapping"],
+            {
+                "status": "script_test_status",
+                "summary": "script_test_summary",
+                "test_source": "script_test_source",
+                "stdout": "script_test_stdout",
+                "stderr": "script_test_stderr",
+                "exit_code": "script_test_exit_code",
+                "errors": "script_test_errors",
+            },
+        )
+
+        executor_nodes = {
+            node_id
+            for node_id, node in nodes.items()
+            if node["kind"] == "agent" and node["config"].get("skillKey") == "local_workspace_executor"
+        }
+        self.assertEqual(
+            executor_nodes,
+            {
+                "write_skill_json",
+                "write_skill_md",
+                "write_before_llm_py",
+                "write_after_llm_py",
+                "write_requirements_txt",
+            },
+        )
+
+        self.assertEqual(
+            nodes["need_clarification"]["config"]["rule"],
+            {"source": "$state.requirement_review.needs_clarification", "operator": "==", "value": True},
+        )
+        self.assertEqual(
+            nodes["examples_approved"]["config"]["rule"],
+            {"source": "$state.example_decision.approved", "operator": "==", "value": True},
+        )
+        self.assertEqual(nodes["examples_approved"]["config"]["loopLimit"], 5)
+        self.assertEqual(
+            nodes["script_test_passed"]["config"]["rule"],
+            {"source": "$state.script_test_status", "operator": "==", "value": "succeeded"},
+        )
+        self.assertEqual(nodes["script_test_passed"]["config"]["loopLimit"], 3)
+
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
+            ["output_final"],
+        )
+        self.assertEqual(nodes["output_final"]["reads"], [{"state": "final_summary", "required": True}])
+
+    def test_graphiteui_skill_creation_workflow_is_runtime_compatible(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "graphiteui_skill_creation_workflow"
+        )
+        payload = {
+            key: value
+            for key, value in template.items()
+            if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+        }
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **payload,
+                "graph_id": "test_graphiteui_skill_creation_workflow",
+                "name": template["default_graph_name"],
+            }
+        )
+
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+        cycle_tracker = build_langgraph_cycle_tracker(graph, build_execution_edges(graph))
+        self.assertTrue(cycle_tracker["has_cycle"])
+        self.assertEqual(
+            cycle_tracker["loop_limits_by_source"],
+            {"examples_approved": 5, "script_test_passed": 3},
+        )
 
 
 if __name__ == "__main__":
