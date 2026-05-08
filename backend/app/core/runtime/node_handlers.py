@@ -7,12 +7,18 @@ from app.core.runtime.agent_streaming import build_agent_stream_delta_callback, 
 from app.core.runtime.agent_runtime_config import resolve_agent_runtime_config
 from app.core.runtime.agent_response_generation import generate_agent_response
 from app.core.runtime.agent_skill_input_generation import generate_agent_skill_inputs
+from app.core.runtime.agent_subgraph_input_generation import (
+    SubgraphCapabilityDefinition,
+    SubgraphCapabilityField,
+    generate_agent_subgraph_inputs,
+)
 from app.core.runtime.condition_eval import evaluate_condition_rule, resolve_branch_key
 from app.core.runtime.input_boundary import coerce_input_boundary_value, first_truthy
 from app.core.runtime.reference_resolution import resolve_condition_source
 from app.core.runtime.skill_bindings import (
     ResolvedAgentSkillBinding,
     build_skill_output_mapping_details,
+    iter_capability_state_subgraph_keys,
     map_skill_outputs,
     resolve_agent_skill_output_binding,
     resolve_agent_skill_bindings,
@@ -96,12 +102,17 @@ def execute_agent_node(
     build_agent_stream_delta_callback_func: Callable[..., Any] = build_agent_stream_delta_callback,
     callable_accepts_keyword_func: Callable[..., bool] = callable_accepts_keyword,
     generate_agent_skill_inputs_func: Callable[..., tuple[dict[str, dict[str, Any]], str, list[str], dict[str, Any]]] = generate_agent_skill_inputs,
+    generate_agent_subgraph_inputs_func: Callable[..., tuple[dict[str, dict[str, Any]], str, list[str], dict[str, Any]]] = generate_agent_subgraph_inputs,
     generate_agent_response_func: Callable[..., tuple[dict[str, Any], str, list[str], dict[str, Any]]] = generate_agent_response,
+    resolve_subgraph_capability_definition_func: Callable[..., SubgraphCapabilityDefinition] | None = None,
+    execute_subgraph_capability_func: Callable[..., dict[str, Any]] | None = None,
     finalize_agent_stream_delta_func: Callable[..., None] = finalize_agent_stream_delta,
     first_truthy_func: Callable[..., Any] = first_truthy,
 ) -> dict[str, Any]:
     selected_skills: list[str] = []
+    selected_capabilities: list[dict[str, str]] = []
     skill_outputs: list[dict[str, Any]] = []
+    capability_outputs: list[dict[str, Any]] = []
     skill_context: dict[str, Any] = {}
     registry = get_skill_registry_func(include_disabled=False)
     response_payload: dict[str, Any] = {}
@@ -140,6 +151,7 @@ def execute_agent_node(
         warnings.extend(skill_input_warnings)
 
     mapped_skill_outputs: dict[str, Any] = {}
+    mapped_capability_outputs: dict[str, Any] = {}
     for resolved_binding in resolved_bindings:
         binding = resolved_binding.binding
         skill_key = binding.skill_key
@@ -227,10 +239,102 @@ def execute_agent_node(
             }
         )
 
+    subgraph_keys = (
+        iter_capability_state_subgraph_keys(node, input_values=input_values, state_schema=state_schema)[:1]
+        if not resolved_bindings and not node.config.skill_key
+        else []
+    )
+    subgraph_definitions = [
+        resolve_subgraph_capability_definition_func(subgraph_key)
+        if resolve_subgraph_capability_definition_func is not None
+        else SubgraphCapabilityDefinition(key=subgraph_key)
+        for subgraph_key in subgraph_keys
+    ]
+    generated_subgraph_inputs: dict[str, dict[str, Any]] = {}
+    subgraph_input_reasoning = ""
+    if subgraph_definitions:
+        generated_subgraph_inputs, subgraph_input_reasoning, subgraph_input_warnings, runtime_config = (
+            generate_agent_subgraph_inputs_func(
+                node=node,
+                input_values=input_values,
+                subgraphs=subgraph_definitions,
+                runtime_config=runtime_config,
+                state_schema=state_schema,
+            )
+        )
+        warnings.extend(subgraph_input_warnings)
+
+    for subgraph_definition in subgraph_definitions:
+        subgraph_key = subgraph_definition.key
+        subgraph_inputs = dict(generated_subgraph_inputs.get(subgraph_key) or {})
+        started_at = perf_counter()
+        missing_inputs = missing_required_subgraph_inputs(subgraph_inputs, subgraph_definition.input_schema)
+        if missing_inputs:
+            missing_label = ", ".join(missing_inputs)
+            execution_result = {
+                "source_name": subgraph_definition.name or subgraph_key,
+                "status": "failed",
+                "outputs": {},
+                "duration_ms": 0,
+                "error": f"Missing required input(s) for subgraph '{subgraph_key}': {missing_label}.",
+                "error_type": "missing_required_input",
+                "warnings": [],
+                "subgraph": None,
+            }
+        else:
+            if execute_subgraph_capability_func is None:
+                raise ValueError("Dynamic subgraph execution is not configured.")
+            execution_result = execute_subgraph_capability_func(
+                template_key=subgraph_key,
+                subgraph_inputs=subgraph_inputs,
+                node_name=node_name,
+                state=state,
+            )
+        duration_ms = int(execution_result.get("duration_ms") or int((perf_counter() - started_at) * 1000))
+        status = _compact_text(execution_result.get("status")) or "succeeded"
+        error = _compact_text(execution_result.get("error"))
+        error_type = _compact_text(execution_result.get("error_type"))
+        state_writes = map_dynamic_subgraph_result_package(
+            node,
+            state_schema,
+            subgraph_key=subgraph_key,
+            subgraph_definition=subgraph_definition,
+            subgraph_inputs=subgraph_inputs,
+            execution_result=execution_result,
+            status=status,
+            error=error,
+            error_type=error_type,
+            duration_ms=duration_ms,
+        )
+        if missing_inputs:
+            warnings.append(f"Subgraph '{subgraph_key}' failed before execution: {error or 'Unknown error.'}")
+        elif status == "failed":
+            warnings.append(f"Subgraph '{subgraph_key}' failed: {error or 'Unknown error.'}")
+        warnings.extend(str(warning) for warning in execution_result.get("warnings", []) if str(warning))
+        mapped_capability_outputs.update(state_writes)
+        selected_capabilities.append({"kind": "subgraph", "key": subgraph_key})
+        capability_outputs.append(
+            {
+                "capability_kind": "subgraph",
+                "capability_key": subgraph_key,
+                "binding_source": "capability_state",
+                "input_source": "agent_llm",
+                "inputs": subgraph_inputs,
+                "outputs": execution_result.get("outputs", {}),
+                "state_writes": state_writes,
+                "duration_ms": duration_ms,
+                "status": status,
+                "error": error,
+                "error_type": error_type,
+                "subgraph": execution_result.get("subgraph"),
+            }
+        )
+
+    mapped_capability_and_skill_outputs = {**mapped_skill_outputs, **mapped_capability_outputs}
     output_keys = [binding.state for binding in node.writes]
     write_modes = {binding.state: binding.mode for binding in node.writes}
-    if output_keys and all(state_name in mapped_skill_outputs for state_name in output_keys):
-        output_values = dict(mapped_skill_outputs)
+    if output_keys and all(state_name in mapped_capability_and_skill_outputs for state_name in output_keys):
+        output_values = dict(mapped_capability_and_skill_outputs)
         final_result_value = first_truthy_func(output_values.values())
         finalize_kwargs: dict[str, Any] = {
             "state": state,
@@ -245,8 +349,11 @@ def execute_agent_node(
             "response": response_payload,
             "reasoning": response_reasoning,
             "skill_input_reasoning": skill_input_reasoning,
+            "subgraph_input_reasoning": subgraph_input_reasoning,
             "selected_skills": selected_skills,
+            "selected_capabilities": selected_capabilities,
             "skill_outputs": skill_outputs,
+            "capability_outputs": capability_outputs,
             "runtime_config": runtime_config,
             "warnings": list(dict.fromkeys(warnings)),
             "final_result": "" if final_result_value in (None, "", [], {}) else str(final_result_value),
@@ -275,9 +382,9 @@ def execute_agent_node(
     )
     warnings.extend(response_warnings)
 
-    output_values = dict(mapped_skill_outputs)
+    output_values = dict(mapped_capability_and_skill_outputs)
     for state_name in output_keys:
-        if state_name in mapped_skill_outputs and write_modes.get(state_name) == StateWriteMode.APPEND:
+        if state_name in mapped_capability_and_skill_outputs and write_modes.get(state_name) == StateWriteMode.APPEND:
             continue
         if state_name in response_payload:
             output_values[state_name] = response_payload.get(state_name)
@@ -297,8 +404,11 @@ def execute_agent_node(
         "response": response_payload,
         "reasoning": response_reasoning,
         "skill_input_reasoning": skill_input_reasoning,
+        "subgraph_input_reasoning": subgraph_input_reasoning,
         "selected_skills": selected_skills,
+        "selected_capabilities": selected_capabilities,
         "skill_outputs": skill_outputs,
+        "capability_outputs": capability_outputs,
         "runtime_config": runtime_config,
         "warnings": list(dict.fromkeys(warnings)),
         "final_result": str(first_truthy_func(output_values.values()) or response_payload.get("summary") or ""),
@@ -403,10 +513,106 @@ def build_dynamic_skill_result_package(
     }
 
 
+def map_dynamic_subgraph_result_package(
+    node: NodeSystemAgentNode,
+    state_schema: dict[str, NodeSystemStateDefinition],
+    *,
+    subgraph_key: str,
+    subgraph_definition: SubgraphCapabilityDefinition,
+    subgraph_inputs: dict[str, Any],
+    execution_result: dict[str, Any],
+    status: str,
+    error: str,
+    error_type: str,
+    duration_ms: int,
+) -> dict[str, Any]:
+    output_state_keys = [
+        write.state
+        for write in node.writes
+        if state_schema.get(write.state) is not None
+        and state_schema[write.state].type == NodeSystemStateType.RESULT_PACKAGE
+    ]
+    if len(output_state_keys) != 1:
+        raise ValueError("Dynamic subgraph execution requires exactly one result_package output state.")
+    state_key = output_state_keys[0]
+    return {
+        state_key: build_dynamic_subgraph_result_package(
+            subgraph_key=subgraph_key,
+            subgraph_definition=subgraph_definition,
+            subgraph_inputs=subgraph_inputs,
+            execution_result=execution_result,
+            status=status,
+            error=error,
+            error_type=error_type,
+            duration_ms=duration_ms,
+        )
+    }
+
+
+def build_dynamic_subgraph_result_package(
+    *,
+    subgraph_key: str,
+    subgraph_definition: SubgraphCapabilityDefinition,
+    subgraph_inputs: dict[str, Any],
+    execution_result: dict[str, Any],
+    status: str,
+    error: str,
+    error_type: str,
+    duration_ms: int,
+) -> dict[str, Any]:
+    output_values = dict(execution_result.get("outputs") or {})
+    output_definitions = dict(execution_result.get("output_definitions") or {})
+    output_fields = list(subgraph_definition.output_schema or [])
+    outputs: dict[str, Any] = {}
+    if output_fields:
+        for field in output_fields:
+            outputs[field.key] = {
+                "name": field.name,
+                "description": field.description,
+                "type": field.value_type,
+                "value": output_values.get(field.key),
+            }
+    else:
+        for output_key, value in output_values.items():
+            raw_definition = output_definitions.get(output_key)
+            definition = raw_definition if isinstance(raw_definition, dict) else {}
+            outputs[output_key] = {
+                "name": str(definition.get("name") or output_key),
+                "description": str(definition.get("description") or ""),
+                "type": str(definition.get("type") or ("json" if isinstance(value, (dict, list)) else "text")),
+                "value": value,
+            }
+
+    source_name = _compact_text(execution_result.get("source_name")) or subgraph_definition.name or subgraph_key
+    return {
+        "kind": "result_package",
+        "sourceType": "subgraph",
+        "sourceKey": subgraph_key,
+        "sourceName": source_name,
+        "status": status,
+        "inputs": subgraph_inputs,
+        "outputs": outputs,
+        "durationMs": duration_ms,
+        "error": error,
+        "errorType": error_type,
+    }
+
+
 def missing_required_skill_inputs(skill_inputs: dict[str, Any], input_schema: list[Any] | None) -> list[str]:
     missing: list[str] = []
     for field in input_schema or []:
         if field.required and is_missing_skill_input_value(skill_inputs.get(field.key)):
+            missing.append(field.key)
+    return missing
+
+
+def missing_required_subgraph_inputs(
+    subgraph_inputs: dict[str, Any],
+    input_schema: list[SubgraphCapabilityField] | None,
+) -> list[str]:
+    missing: list[str] = []
+    for field in input_schema or []:
+        if field.required and is_missing_skill_input_value(subgraph_inputs.get(field.key)):
             missing.append(field.key)
     return missing
 

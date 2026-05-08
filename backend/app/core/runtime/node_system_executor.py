@@ -16,6 +16,11 @@ from app.core.runtime.agent_prompt import (
 from app.core.runtime.agent_runtime_config import resolve_agent_runtime_config
 from app.core.runtime.agent_response_generation import generate_agent_response
 from app.core.runtime.agent_skill_input_generation import generate_agent_skill_inputs
+from app.core.runtime.agent_subgraph_input_generation import (
+    SubgraphCapabilityDefinition,
+    SubgraphCapabilityField,
+    generate_agent_subgraph_inputs,
+)
 from app.core.runtime.condition_eval import (
     coerce_condition_text as _coerce_condition_text,
     evaluate_condition_rule as _evaluate_condition_rule,
@@ -88,6 +93,7 @@ from app.core.schemas.node_system import (
     NodeSystemStateDefinition,
 )
 from app.core.storage.run_store import save_run
+from app.templates.loader import load_template_record
 from app.skills.registry import get_skill_registry
 from app.tools.local_llm import (
     _chat_with_local_model_with_meta,
@@ -123,6 +129,8 @@ def _execute_node(
     node: Any,
     input_values: dict[str, Any],
     state: dict[str, Any],
+    *,
+    execute_dynamic_subgraph_func: Any | None = None,
 ) -> dict[str, Any]:
     graph_context = {
         "metadata": state.get("metadata", {}),
@@ -132,7 +140,15 @@ def _execute_node(
     if isinstance(node, NodeSystemInputNode):
         return _execute_input_node(graph.state_schema, node, state)
     if isinstance(node, NodeSystemAgentNode):
-        return _execute_agent_node(graph.state_schema, node, input_values, graph_context, node_name=node_name, state=state)
+        return _execute_agent_node(
+            graph.state_schema,
+            node,
+            input_values,
+            graph_context,
+            node_name=node_name,
+            state=state,
+            execute_dynamic_subgraph_func=execute_dynamic_subgraph_func,
+        )
     if isinstance(node, NodeSystemOutputNode):
         return _execute_output_node(node_name, node, input_values, state)
     if isinstance(node, NodeSystemConditionNode):
@@ -162,6 +178,7 @@ def _execute_agent_node(
     *,
     node_name: str,
     state: dict[str, Any],
+    execute_dynamic_subgraph_func: Any | None = None,
 ) -> dict[str, Any]:
     return _execute_agent_node_impl(
         state_schema,
@@ -176,7 +193,10 @@ def _execute_agent_node(
         build_agent_stream_delta_callback_func=_build_agent_stream_delta_callback,
         callable_accepts_keyword_func=_callable_accepts_keyword,
         generate_agent_skill_inputs_func=_generate_agent_skill_inputs,
+        generate_agent_subgraph_inputs_func=_generate_agent_subgraph_inputs,
         generate_agent_response_func=_generate_agent_response,
+        resolve_subgraph_capability_definition_func=_resolve_subgraph_capability_definition,
+        execute_subgraph_capability_func=execute_dynamic_subgraph_func,
         finalize_agent_stream_delta_func=_finalize_agent_stream_delta,
         first_truthy_func=_first_truthy,
     )
@@ -223,6 +243,76 @@ def _generate_agent_response(
 
 def _generate_agent_skill_inputs(**kwargs: Any) -> tuple[dict[str, dict[str, Any]], str, list[str], dict[str, Any]]:
     return generate_agent_skill_inputs(**kwargs)
+
+
+def _generate_agent_subgraph_inputs(**kwargs: Any) -> tuple[dict[str, dict[str, Any]], str, list[str], dict[str, Any]]:
+    return generate_agent_subgraph_inputs(**kwargs)
+
+
+def _resolve_subgraph_capability_definition(template_key: str) -> SubgraphCapabilityDefinition:
+    template = load_template_record(template_key)
+    return SubgraphCapabilityDefinition(
+        key=template_key,
+        name=str(template.get("label") or template.get("default_graph_name") or template_key),
+        description=str(template.get("description") or ""),
+        input_schema=_template_input_fields(template),
+        output_schema=_template_output_fields(template),
+    )
+
+
+def _template_input_fields(template: dict[str, Any]) -> list[SubgraphCapabilityField]:
+    return [
+        _state_definition_to_subgraph_field(state_key, state_schema=template.get("state_schema") or {}, required=True)
+        for state_key in _template_input_state_keys(template)
+    ]
+
+
+def _template_output_fields(template: dict[str, Any]) -> list[SubgraphCapabilityField]:
+    return [
+        _state_definition_to_subgraph_field(state_key, state_schema=template.get("state_schema") or {}, required=True)
+        for state_key in _template_output_state_keys(template)
+    ]
+
+
+def _template_input_state_keys(template: dict[str, Any]) -> list[str]:
+    keys: list[str] = []
+    nodes = template.get("nodes") if isinstance(template.get("nodes"), dict) else {}
+    for node in nodes.values():
+        if not isinstance(node, dict) or node.get("kind") != "input":
+            continue
+        writes = node.get("writes") if isinstance(node.get("writes"), list) else []
+        if writes and isinstance(writes[0], dict) and writes[0].get("state"):
+            keys.append(str(writes[0]["state"]))
+    return keys
+
+
+def _template_output_state_keys(template: dict[str, Any]) -> list[str]:
+    keys: list[str] = []
+    nodes = template.get("nodes") if isinstance(template.get("nodes"), dict) else {}
+    for node in nodes.values():
+        if not isinstance(node, dict) or node.get("kind") != "output":
+            continue
+        reads = node.get("reads") if isinstance(node.get("reads"), list) else []
+        if reads and isinstance(reads[0], dict) and reads[0].get("state"):
+            keys.append(str(reads[0]["state"]))
+    return keys
+
+
+def _state_definition_to_subgraph_field(
+    state_key: str,
+    *,
+    state_schema: dict[str, Any],
+    required: bool,
+) -> SubgraphCapabilityField:
+    raw_definition = state_schema.get(state_key)
+    definition = raw_definition if isinstance(raw_definition, dict) else {}
+    return SubgraphCapabilityField(
+        key=state_key,
+        name=str(definition.get("name") or state_key),
+        value_type=str(definition.get("type") or "text"),
+        required=required,
+        description=str(definition.get("description") or ""),
+    )
 
 
 def _resolve_agent_runtime_config(node: NodeSystemAgentNode) -> dict[str, Any]:

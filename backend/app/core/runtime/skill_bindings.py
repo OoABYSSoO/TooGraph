@@ -118,7 +118,35 @@ def iter_capability_state_skill_keys(
     return skill_keys
 
 
+def iter_capability_state_subgraph_keys(
+    node: NodeSystemAgentNode,
+    *,
+    input_values: dict[str, Any] | None,
+    state_schema: dict[str, NodeSystemStateDefinition] | None,
+) -> list[str]:
+    if not input_values or not state_schema:
+        return []
+
+    subgraph_keys: list[str] = []
+    for read_binding in node.reads:
+        definition = state_schema.get(read_binding.state)
+        if definition is None or definition.type != NodeSystemStateType.CAPABILITY:
+            continue
+        subgraph_key = extract_capability_subgraph_key(input_values.get(read_binding.state))
+        if subgraph_key:
+            subgraph_keys.append(subgraph_key)
+    return subgraph_keys
+
+
 def extract_capability_skill_key(value: Any) -> str:
+    return _extract_capability_key(value, expected_kind="skill")
+
+
+def extract_capability_subgraph_key(value: Any) -> str:
+    return _extract_capability_key(value, expected_kind="subgraph")
+
+
+def _extract_capability_key(value: Any, *, expected_kind: str) -> str:
     if isinstance(value, str):
         stripped = value.strip()
         if not stripped:
@@ -127,13 +155,13 @@ def extract_capability_skill_key(value: Any) -> str:
             parsed = json.loads(stripped)
         except json.JSONDecodeError:
             return ""
-        return extract_capability_skill_key(parsed)
+        return _extract_capability_key(parsed, expected_kind=expected_kind)
 
     if isinstance(value, list):
         return ""
 
     if isinstance(value, dict):
-        if str(value.get("kind") or "").strip().lower() != "skill":
+        if str(value.get("kind") or "").strip().lower() != expected_kind:
             return ""
         return str(value.get("key") or "").strip()
 
