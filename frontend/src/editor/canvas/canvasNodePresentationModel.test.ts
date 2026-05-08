@@ -33,7 +33,10 @@ test("buildNodeCardSizeStyle uses normalized persisted node size variables", () 
     "--node-card-width": "512px",
     "--node-card-min-height": "340px",
   });
-  assert.equal(buildNodeCardSizeStyle(createNode("agent")), undefined);
+  assert.deepEqual(buildNodeCardSizeStyle(createNode("condition")), {
+    "--node-card-width": "560px",
+    "--node-card-min-height": "280px",
+  });
 });
 
 test("resolveFallbackNodeSize preserves fallback dimensions by node kind", () => {

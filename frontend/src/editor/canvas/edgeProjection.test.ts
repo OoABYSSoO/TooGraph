@@ -381,7 +381,7 @@ test("projectCanvasEdges exposes branch metadata for condition routes", () => {
     routeEdge?.path,
     buildSequenceFlowPath({
       sourceX: 554,
-      sourceY: 239,
+      sourceY: 252,
       targetX: 486,
       targetY: 154,
       sourceNodeX: 0,
@@ -389,6 +389,58 @@ test("projectCanvasEdges exposes branch metadata for condition routes", () => {
       targetNodeX: 480,
       targetNodeY: 120,
     }),
+  );
+});
+
+test("projectCanvasAnchors respects persisted condition node size for route handles", () => {
+  const routeGraph: GraphPayload = {
+    graph_id: null,
+    name: "Sized route graph",
+    state_schema: {},
+    nodes: {
+      route_result: {
+        kind: "condition",
+        name: "route_result",
+        description: "",
+        ui: {
+          position: { x: 10, y: 20 },
+          size: { width: 360, height: 240 },
+        },
+        reads: [],
+        writes: [],
+        config: {
+          branches: ["true", "false", "exhausted"],
+          loopLimit: 5,
+          branchMapping: {
+            true: "true",
+            false: "false",
+          },
+          rule: {
+            source: "answer",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const routeHandles = projectCanvasAnchors(routeGraph).filter((anchor) => anchor.kind === "route-out");
+
+  assert.deepEqual(
+    routeHandles.map((anchor) => ({
+      branch: anchor.branch,
+      x: anchor.x,
+      y: anchor.y,
+    })),
+    [
+      { branch: "true", x: 364, y: 165 },
+      { branch: "false", x: 364, y: 199 },
+      { branch: "exhausted", x: 364, y: 232 },
+    ],
   );
 });
 

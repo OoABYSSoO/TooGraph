@@ -564,7 +564,7 @@
       "ui": {
         "position": { "x": 1460, "y": 470 },
         "collapsed": false,
-        "size": { "width": 300, "height": 180 }
+        "size": { "width": 560, "height": 280 }
       },
       "reads": [{ "state": "requirement_review", "required": true }],
       "writes": [],
@@ -587,7 +587,7 @@
       "name": "生成澄清问题",
       "description": "把不清晰的点转成用户容易回答的选择题和少量开放问题。",
       "ui": {
-        "position": { "x": 1840, "y": 170 },
+        "position": { "x": 2100, "y": 170 },
         "collapsed": false,
         "size": { "width": 440, "height": 300 }
       },
@@ -613,7 +613,7 @@
       "name": "合并澄清回答",
       "description": "把用户回答合并成确认后的需求和创建决策。",
       "ui": {
-        "position": { "x": 2340, "y": 170 },
+        "position": { "x": 2600, "y": 170 },
         "collapsed": false,
         "size": { "width": 440, "height": 300 }
       },
@@ -643,9 +643,9 @@
       "name": "是否继续创建",
       "description": "如果用户确认不需要创建，则直接收束。",
       "ui": {
-        "position": { "x": 2820, "y": 470 },
+        "position": { "x": 3080, "y": 470 },
         "collapsed": false,
-        "size": { "width": 300, "height": 180 }
+        "size": { "width": 560, "height": 280 }
       },
       "reads": [{ "state": "creation_decision", "required": true }],
       "writes": [],
@@ -668,7 +668,7 @@
       "name": "生成示例输入输出",
       "description": "用确认后的需求生成示例，让用户确认 Skill 行为。",
       "ui": {
-        "position": { "x": 3220, "y": 360 },
+        "position": { "x": 3740, "y": 360 },
         "collapsed": false,
         "size": { "width": 440, "height": 320 }
       },
@@ -693,7 +693,7 @@
       "name": "判断样例反馈",
       "description": "根据用户反馈判断样例是否通过；不通过则修订需求后回到样例生成。",
       "ui": {
-        "position": { "x": 3740, "y": 360 },
+        "position": { "x": 4260, "y": 360 },
         "collapsed": false,
         "size": { "width": 440, "height": 320 }
       },
@@ -722,9 +722,9 @@
       "name": "样例是否通过",
       "description": "样例未通过时回到示例生成，最多循环五轮。",
       "ui": {
-        "position": { "x": 4240, "y": 430 },
+        "position": { "x": 4760, "y": 430 },
         "collapsed": false,
-        "size": { "width": 300, "height": 180 }
+        "size": { "width": 560, "height": 280 }
       },
       "reads": [{ "state": "example_decision", "required": true }],
       "writes": [],
@@ -747,7 +747,7 @@
       "name": "整理构建上下文",
       "description": "把确认需求和样例整理成 Skill Builder 可直接使用的约束。",
       "ui": {
-        "position": { "x": 4640, "y": 360 },
+        "position": { "x": 5420, "y": 360 },
         "collapsed": false,
         "size": { "width": 440, "height": 320 }
       },
@@ -774,7 +774,7 @@
       "name": "生成 Skill 文件",
       "description": "调用 GraphiteUI Skill Builder 生成 Skill 包必要文件内容。",
       "ui": {
-        "position": { "x": 5160, "y": 360 },
+        "position": { "x": 5940, "y": 360 },
         "collapsed": false,
         "size": { "width": 460, "height": 340 }
       },
@@ -825,7 +825,7 @@
       "name": "制定测试策略",
       "description": "判断生成的生命周期脚本是否需要运行 pytest 测试。",
       "ui": {
-        "position": { "x": 5700, "y": 360 },
+        "position": { "x": 6480, "y": 360 },
         "collapsed": false,
         "size": { "width": 420, "height": 300 }
       },
@@ -852,9 +852,9 @@
       "name": "是否需要脚本测试",
       "description": "有 Python 生命周期脚本时进入测试，否则进入写入前审查。",
       "ui": {
-        "position": { "x": 6200, "y": 430 },
+        "position": { "x": 6980, "y": 430 },
         "collapsed": false,
-        "size": { "width": 300, "height": 180 }
+        "size": { "width": 560, "height": 280 }
       },
       "reads": [{ "state": "test_strategy", "required": true }],
       "writes": [],
@@ -877,7 +877,7 @@
       "name": "测试脚本",
       "description": "调用脚本测试技能编写 pytest 并运行生成的 Python 脚本。",
       "ui": {
-        "position": { "x": 6600, "y": 240 },
+        "position": { "x": 7640, "y": 240 },
         "collapsed": false,
         "size": { "width": 460, "height": 340 }
       },
@@ -927,9 +927,9 @@
       "name": "测试是否通过",
       "description": "测试失败时回到修复上下文，最多修复三轮。",
       "ui": {
-        "position": { "x": 7140, "y": 310 },
+        "position": { "x": 8180, "y": 310 },
         "collapsed": false,
-        "size": { "width": 300, "height": 180 }
+        "size": { "width": 560, "height": 280 }
       },
       "reads": [{ "state": "script_test_status", "required": true }],
       "writes": [],
@@ -952,7 +952,7 @@
       "name": "写入前审查",
       "description": "总结生成的 Skill 文件、测试结果和准备写入的路径，等待用户批准。",
       "ui": {
-        "position": { "x": 7640, "y": 360 },
+        "position": { "x": 8940, "y": 360 },
         "collapsed": false,
         "size": { "width": 460, "height": 340 }
       },
@@ -983,7 +983,7 @@
       "name": "判断写入确认",
       "description": "把用户写入确认转成结构化决策。",
       "ui": {
-        "position": { "x": 8160, "y": 360 },
+        "position": { "x": 9460, "y": 360 },
         "collapsed": false,
         "size": { "width": 420, "height": 280 }
       },
@@ -1008,9 +1008,9 @@
       "name": "是否批准写入",
       "description": "用户批准后才调用本地执行器写文件。",
       "ui": {
-        "position": { "x": 8620, "y": 430 },
+        "position": { "x": 9920, "y": 430 },
         "collapsed": false,
-        "size": { "width": 300, "height": 180 }
+        "size": { "width": 560, "height": 280 }
       },
       "reads": [{ "state": "write_decision", "required": true }],
       "writes": [],
@@ -1033,7 +1033,7 @@
       "name": "写 skill.json",
       "description": "把生成的 skill.json 写入用户 Skill 目录。",
       "ui": {
-        "position": { "x": 9020, "y": 300 },
+        "position": { "x": 10580, "y": 300 },
         "collapsed": false,
         "size": { "width": 440, "height": 300 }
       },
@@ -1073,7 +1073,7 @@
       "name": "写 SKILL.md",
       "description": "把生成的 SKILL.md 写入用户 Skill 目录。",
       "ui": {
-        "position": { "x": 9520, "y": 300 },
+        "position": { "x": 11080, "y": 300 },
         "collapsed": false,
         "size": { "width": 440, "height": 300 }
       },
@@ -1113,9 +1113,9 @@
       "name": "是否有 before_llm.py",
       "description": "只有生成了 before_llm.py 时才写入。",
       "ui": {
-        "position": { "x": 10020, "y": 360 },
+        "position": { "x": 11580, "y": 360 },
         "collapsed": false,
-        "size": { "width": 300, "height": 180 }
+        "size": { "width": 560, "height": 280 }
       },
       "reads": [{ "state": "generated_before_llm_py", "required": false }],
       "writes": [],
@@ -1138,7 +1138,7 @@
       "name": "写 before_llm.py",
       "description": "写入可选 before_llm.py。",
       "ui": {
-        "position": { "x": 10400, "y": 180 },
+        "position": { "x": 12220, "y": 180 },
         "collapsed": false,
         "size": { "width": 440, "height": 280 }
       },
@@ -1170,9 +1170,9 @@
       "name": "是否有 after_llm.py",
       "description": "只有生成了 after_llm.py 时才写入。",
       "ui": {
-        "position": { "x": 10880, "y": 360 },
+        "position": { "x": 12700, "y": 360 },
         "collapsed": false,
-        "size": { "width": 300, "height": 180 }
+        "size": { "width": 560, "height": 280 }
       },
       "reads": [{ "state": "generated_after_llm_py", "required": false }],
       "writes": [],
@@ -1195,7 +1195,7 @@
       "name": "写 after_llm.py",
       "description": "写入可选 after_llm.py。",
       "ui": {
-        "position": { "x": 11260, "y": 180 },
+        "position": { "x": 13340, "y": 180 },
         "collapsed": false,
         "size": { "width": 440, "height": 280 }
       },
@@ -1227,9 +1227,9 @@
       "name": "是否有 requirements.txt",
       "description": "只有生成了 requirements.txt 时才写入。",
       "ui": {
-        "position": { "x": 11740, "y": 360 },
+        "position": { "x": 13820, "y": 360 },
         "collapsed": false,
-        "size": { "width": 300, "height": 180 }
+        "size": { "width": 560, "height": 280 }
       },
       "reads": [{ "state": "generated_requirements_txt", "required": false }],
       "writes": [],
@@ -1252,7 +1252,7 @@
       "name": "写 requirements.txt",
       "description": "写入可选 requirements.txt。",
       "ui": {
-        "position": { "x": 12120, "y": 180 },
+        "position": { "x": 14460, "y": 180 },
         "collapsed": false,
         "size": { "width": 440, "height": 280 }
       },
@@ -1284,7 +1284,7 @@
       "name": "整理完成结果",
       "description": "汇总写入结果、测试状态和下一步使用方式。",
       "ui": {
-        "position": { "x": 12620, "y": 360 },
+        "position": { "x": 14960, "y": 360 },
         "collapsed": false,
         "size": { "width": 440, "height": 300 }
       },
@@ -1315,7 +1315,7 @@
       "name": "无需创建",
       "description": "用户确认不创建新 Skill 时给出已有能力或收束说明。",
       "ui": {
-        "position": { "x": 3220, "y": 780 },
+        "position": { "x": 3740, "y": 780 },
         "collapsed": false,
         "size": { "width": 440, "height": 280 }
       },
@@ -1341,7 +1341,7 @@
       "name": "未写入收束",
       "description": "生成完成但用户未批准写入时给出可审查结果。",
       "ui": {
-        "position": { "x": 9020, "y": 700 },
+        "position": { "x": 10580, "y": 700 },
         "collapsed": false,
         "size": { "width": 440, "height": 280 }
       },
@@ -1367,7 +1367,7 @@
       "name": "输出结果",
       "description": "展示最终 Skill 创建结果。",
       "ui": {
-        "position": { "x": 13120, "y": 420 },
+        "position": { "x": 15460, "y": 420 },
         "collapsed": false,
         "size": { "width": 320, "height": 200 }
       },

@@ -14,11 +14,8 @@ export function buildNodeTransformStyle(position: GraphPosition) {
   };
 }
 
-export function buildNodeCardSizeStyle(node: Pick<GraphNode, "ui">) {
-  const size = normalizeNodeSize(node.ui.size);
-  if (!size) {
-    return undefined;
-  }
+export function buildNodeCardSizeStyle(node: Pick<GraphNode, "kind" | "ui">) {
+  const size = normalizeNodeSize(node.ui.size) ?? resolveFallbackNodeSize(node);
   return {
     "--node-card-width": `${size.width}px`,
     "--node-card-min-height": `${size.height}px`,

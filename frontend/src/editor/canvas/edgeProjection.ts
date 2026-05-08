@@ -1,8 +1,9 @@
-import type { GraphDocument, GraphNode, GraphPayload } from "../../types/node-system.ts";
+import type { GraphDocument, GraphPayload } from "../../types/node-system.ts";
 import { buildAnchorModel } from "../anchors/anchorModel.ts";
-import { placeAnchors, type NodeFrame } from "../anchors/anchorPlacement.ts";
+import { placeAnchors } from "../anchors/anchorPlacement.ts";
 import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
 import { buildSelfFeedbackFlowPath, buildSequenceFlowPath } from "./flowEdgePath.ts";
+import { buildNodeAnchorFrame } from "./nodeAnchorFrame.ts";
 
 export type ProjectedCanvasEdge = {
   id: string;
@@ -46,9 +47,6 @@ export type ProjectedCanvasAnchorGroups = {
   routeHandles: ProjectedCanvasAnchor[];
   pointAnchors: ProjectedCanvasAnchor[];
 };
-
-const DEFAULT_NODE_WIDTH = 460;
-const CONDITION_NODE_WIDTH = 560;
 
 export function groupProjectedCanvasEdges(edges: readonly ProjectedCanvasEdge[]): ProjectedCanvasEdgeGroups {
   return {
@@ -239,21 +237,9 @@ function buildNodePlacements(document: GraphPayload | GraphDocument) {
   return new Map(
     Object.entries(document.nodes).map(([nodeId, node]) => [
       nodeId,
-      placeAnchors(buildAnchorModel(nodeId, node), buildNodeFrame(node)),
+      placeAnchors(buildAnchorModel(nodeId, node), buildNodeAnchorFrame(node)),
     ]),
   );
-}
-
-function buildNodeFrame(node: GraphNode): NodeFrame {
-  return {
-    x: node.ui.position.x,
-    y: node.ui.position.y,
-    width: node.kind === "condition" ? CONDITION_NODE_WIDTH : DEFAULT_NODE_WIDTH,
-    headerHeight: 68,
-    bodyTop: 116,
-    rowGap: 44,
-    footerTop: node.kind === "condition" ? 192 : 0,
-  };
 }
 
 function buildFlowPath(

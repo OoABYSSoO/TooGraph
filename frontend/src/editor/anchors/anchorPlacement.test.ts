@@ -129,6 +129,33 @@ test("placeAnchors gives condition nodes a left flow entry and right-side route 
   );
 });
 
+test("placeAnchors keeps condition route exits inside the rendered frame height", () => {
+  const model = buildAnchorModel("score_gate", conditionNode);
+  const placement = placeAnchors(model, {
+    x: 780,
+    y: 220,
+    width: 320,
+    height: 220,
+    headerHeight: 68,
+    bodyTop: 116,
+    rowGap: 44,
+    footerTop: 148,
+  });
+
+  assert.deepEqual(
+    placement.routeOutputs.map((anchor) => ({
+      branch: anchor.branch,
+      x: anchor.x,
+      y: anchor.y,
+    })),
+    [
+      { branch: "true", x: 1094, y: 365 },
+      { branch: "false", x: 1094, y: 389 },
+      { branch: "exhausted", x: 1094, y: 412 },
+    ],
+  );
+});
+
 test("resolveRouteOutputRowGap derives wider branch spacing from row count instead of fixed offsets", () => {
   assert.equal(resolveRouteOutputRowGap(0, 52), 52);
   assert.equal(resolveRouteOutputRowGap(1, 52), 52);

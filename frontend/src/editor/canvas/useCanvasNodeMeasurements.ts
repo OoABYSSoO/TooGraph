@@ -1,8 +1,10 @@
 import { ref } from "vue";
 
 import { buildAnchorModel } from "../anchors/anchorModel.ts";
+import { placeAnchors } from "../anchors/anchorPlacement.ts";
 import { resolveFlowAnchorOffset } from "./flowAnchorLayout.ts";
 import type { MeasuredNodeSize } from "./canvasNodePresentationModel.ts";
+import { buildNodeAnchorFrame } from "./nodeAnchorFrame.ts";
 import type { MeasuredAnchorOffset } from "./resolvedCanvasLayout.ts";
 import type { GraphDocument, GraphPayload } from "../../types/node-system.ts";
 
@@ -189,6 +191,30 @@ export function useCanvasNodeMeasurements(input: CanvasNodeMeasurementsInput) {
             height: nodeElement.offsetHeight,
           });
           const anchorId = `${nodeId}:${flowAnchor.id}`;
+          const currentOffset = nextAnchorOffsets[anchorId];
+          if (
+            !currentOffset ||
+            currentOffset.offsetX !== measuredOffset.offsetX ||
+            currentOffset.offsetY !== measuredOffset.offsetY
+          ) {
+            didChange = true;
+          }
+          nextAnchorOffsets[anchorId] = measuredOffset;
+        }
+
+        const measuredRoutePlacement = placeAnchors(
+          anchorModel,
+          buildNodeAnchorFrame(node, {
+            position: { x: 0, y: 0 },
+            size: measuredNodeSize,
+          }),
+        );
+        for (const routeAnchor of measuredRoutePlacement.routeOutputs) {
+          const anchorId = `${nodeId}:${routeAnchor.id}`;
+          const measuredOffset = {
+            offsetX: roundMeasuredOffset(routeAnchor.x),
+            offsetY: roundMeasuredOffset(routeAnchor.y),
+          };
           const currentOffset = nextAnchorOffsets[anchorId];
           if (
             !currentOffset ||

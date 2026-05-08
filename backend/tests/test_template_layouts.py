@@ -78,6 +78,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         condition_node = nodes["should_continue_search"]
         self.assertEqual(condition_node["kind"], "condition")
+        self.assertEqual(condition_node["ui"]["size"], {"width": 560, "height": 280})
         self.assertEqual(condition_node["config"]["branches"], ["true", "false", "exhausted"])
         self.assertEqual(condition_node["config"]["loopLimit"], 5)
         self.assertEqual(condition_node["config"]["rule"]["source"], "$state.evidence_review.needs_more_search")
@@ -232,6 +233,21 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             nodes["need_clarification"]["config"]["rule"],
             {"source": "$state.requirement_review.needs_clarification", "operator": "==", "value": True},
+        )
+        condition_node_ids = [node_id for node_id, node in nodes.items() if node["kind"] == "condition"]
+        self.assertEqual(
+            {node_id: nodes[node_id]["ui"]["size"] for node_id in condition_node_ids},
+            {
+                "need_clarification": {"width": 560, "height": 280},
+                "should_create_skill": {"width": 560, "height": 280},
+                "examples_approved": {"width": 560, "height": 280},
+                "needs_script_test": {"width": 560, "height": 280},
+                "script_test_passed": {"width": 560, "height": 280},
+                "write_approved": {"width": 560, "height": 280},
+                "has_before_llm": {"width": 560, "height": 280},
+                "has_after_llm": {"width": 560, "height": 280},
+                "has_requirements": {"width": 560, "height": 280},
+            },
         )
         self.assertEqual(
             nodes["examples_approved"]["config"]["rule"],

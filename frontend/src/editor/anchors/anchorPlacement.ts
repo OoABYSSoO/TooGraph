@@ -5,6 +5,7 @@ export type NodeFrame = {
   x: number;
   y: number;
   width: number;
+  height?: number;
   headerHeight: number;
   bodyTop: number;
   rowGap: number;
@@ -31,6 +32,7 @@ export type PlacedAnchorSet = {
 const EDGE_PORT_INSET = 6;
 const BODY_OUTPUT_PORT_INSET = 40;
 const BODY_PORT_ROW_CENTER_OFFSET = 29;
+const ROUTE_OUTPUT_EDGE_INSET = 28;
 
 export function placeAnchors(model: NodeAnchorModel, frame: NodeFrame): PlacedAnchorSet {
   return {
@@ -50,11 +52,51 @@ export function resolveRouteOutputRowGap(routeOutputCount: number, bodyRowGap: n
 }
 
 function placeRouteOutputs(anchors: AnchorDescriptor[], frame: NodeFrame): PlacedAnchor[] {
+  if (anchors.length <= 0) {
+    return [];
+  }
+  if (hasFrameHeight(frame)) {
+    return anchors.map((anchor, index) => placeRouteAnchor(anchor, frame, index, anchors.length));
+  }
   const routeFrame = {
     ...frame,
     rowGap: resolveRouteOutputRowGap(anchors.length, frame.rowGap),
   };
   return anchors.map((anchor) => placeAnchor(anchor, routeFrame)).filter(Boolean) as PlacedAnchor[];
+}
+
+function placeRouteAnchor(anchor: AnchorDescriptor, frame: NodeFrame & { height: number }, index: number, count: number): PlacedAnchor {
+  const topOffset = resolveRouteOutputTopOffset(frame);
+  const bottomOffset = resolveRouteOutputBottomOffset(frame, topOffset);
+  const yOffset = count <= 1
+    ? Math.round((topOffset + bottomOffset) / 2)
+    : Math.round(topOffset + ((bottomOffset - topOffset) * index) / (count - 1));
+  return {
+    id: anchor.id,
+    x: resolveX(anchor, frame),
+    y: frame.y + yOffset,
+    side: anchor.side,
+    ...(anchor.stateKey ? { stateKey: anchor.stateKey } : {}),
+    ...(anchor.branch ? { branch: anchor.branch } : {}),
+  };
+}
+
+function resolveRouteOutputTopOffset(frame: NodeFrame & { height: number }) {
+  const preferredTop = frame.bodyTop + BODY_PORT_ROW_CENTER_OFFSET;
+  const maxTop = Math.max(ROUTE_OUTPUT_EDGE_INSET, frame.height - ROUTE_OUTPUT_EDGE_INSET);
+  return clamp(preferredTop, ROUTE_OUTPUT_EDGE_INSET, maxTop);
+}
+
+function resolveRouteOutputBottomOffset(frame: NodeFrame & { height: number }, topOffset: number) {
+  return Math.max(topOffset, frame.height - ROUTE_OUTPUT_EDGE_INSET);
+}
+
+function hasFrameHeight(frame: NodeFrame): frame is NodeFrame & { height: number } {
+  return typeof frame.height === "number" && Number.isFinite(frame.height) && frame.height > 0;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 function placeAnchor(anchor: AnchorDescriptor | null, frame: NodeFrame): PlacedAnchor | null {
