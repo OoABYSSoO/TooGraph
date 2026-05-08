@@ -705,6 +705,29 @@ export function updateAgentNodeConfigInDocument<T extends GraphPayload | GraphDo
   return nextDocument;
 }
 
+export function reconcileAgentSkillOutputBindingsInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  skillDefinitions: SkillDefinition[],
+): T {
+  if (skillDefinitions.length === 0) {
+    return document;
+  }
+
+  const agentNodeIds = Object.entries(document.nodes)
+    .filter(([, node]) => node.kind === "agent")
+    .map(([nodeId]) => nodeId);
+  if (agentNodeIds.length === 0) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  for (const nodeId of agentNodeIds) {
+    reconcileAgentSkillOutputBindings(nextDocument, nodeId, skillDefinitions);
+  }
+
+  return JSON.stringify(nextDocument) === JSON.stringify(document) ? document : nextDocument;
+}
+
 export function reconcileAgentCapabilityInputBindingsInDocument<T extends GraphPayload | GraphDocument>(document: T, nodeId: string): T {
   const node = document.nodes[nodeId];
   if (!node || node.kind !== "agent") {
@@ -792,17 +815,37 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
   const skillDefinitionMap = new Map(skillDefinitions.map((definition) => [definition.skillKey, definition]));
   const attachedSkillKey = node.config.skillKey.trim();
   const attachedSkillKeys = new Set(attachedSkillKey ? [attachedSkillKey] : []);
-  const currentBindings = normalizeAgentSkillBindings(node.config.skillBindings);
-  const currentBindingBySkill = new Map(currentBindings.map((binding) => [binding.skillKey, binding]));
+  let currentBindings = normalizeAgentSkillBindings(node.config.skillBindings);
+  let currentBindingBySkill = new Map(currentBindings.map((binding) => [binding.skillKey, binding]));
   const removedManagedStateKeys = collectRemovedManagedSkillOutputStateKeys(document, nodeId, currentBindings, attachedSkillKeys);
   const nextSkillBindings: AgentSkillBinding[] = [];
   const processedSkillKeys = new Set<string>();
+  const refreshCurrentBindings = () => {
+    currentBindings = normalizeAgentSkillBindings(node.config.skillBindings);
+    currentBindingBySkill = new Map(currentBindings.map((binding) => [binding.skillKey, binding]));
+  };
 
   if (removedManagedStateKeys.size > 0) {
     removeManagedStateKeysFromDocument(document, removedManagedStateKeys);
+    refreshCurrentBindings();
   }
 
   if (attachedSkillKey) {
+    const definition = skillDefinitionMap.get(attachedSkillKey);
+    if (definition) {
+      const activeOutputKeys = new Set(definition.outputSchema.map((field) => field.key));
+      const staleManagedStateKeys = collectStaleManagedSkillOutputStateKeys(
+        document,
+        nodeId,
+        attachedSkillKey,
+        activeOutputKeys,
+      );
+      if (staleManagedStateKeys.size > 0) {
+        removeManagedStateKeysFromDocument(document, staleManagedStateKeys);
+        refreshCurrentBindings();
+      }
+    }
+
     const suspendedFreeWrites = mergeWriteBindings(
       normalizeWriteBindings(node.config.suspendedFreeWrites).filter((binding) => document.state_schema[binding.state]),
       node.writes.filter(
@@ -818,7 +861,6 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
     }
     node.writes = node.writes.filter((binding) => isManagedSkillOutputStateForNode(document, nodeId, binding.state, attachedSkillKey));
 
-    const definition = skillDefinitionMap.get(attachedSkillKey);
     const existingBinding = currentBindingBySkill.get(attachedSkillKey);
     if (!definition?.outputSchema.length) {
       if (existingBinding && Object.keys(existingBinding.outputMapping ?? {}).length > 0) {
@@ -926,6 +968,28 @@ function collectRemovedManagedSkillOutputStateKeys(
     }
   }
   return removedStateKeys;
+}
+
+function collectStaleManagedSkillOutputStateKeys(
+  document: GraphPayload | GraphDocument,
+  nodeId: string,
+  skillKey: string,
+  activeFieldKeys: Set<string>,
+) {
+  const staleStateKeys = new Set<string>();
+  for (const [stateKey, definition] of Object.entries(document.state_schema)) {
+    const binding = definition.binding;
+    if (
+      binding?.kind === "skill_output" &&
+      binding.skillKey === skillKey &&
+      binding.nodeId === nodeId &&
+      binding.managed !== false &&
+      !activeFieldKeys.has(binding.fieldKey)
+    ) {
+      staleStateKeys.add(stateKey);
+    }
+  }
+  return staleStateKeys;
 }
 
 function removeManagedStateKeysFromDocument(document: GraphPayload | GraphDocument, stateKeys: Set<string>) {
