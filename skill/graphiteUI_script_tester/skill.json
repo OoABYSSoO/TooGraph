@@ -2,8 +2,8 @@
   "schemaVersion": "graphite.skill/v1",
   "skillKey": "graphiteUI_script_tester",
   "name": "GraphiteUI Script Tester",
-  "description": "当用户提供 Python 脚本并希望自动编写测试用例、运行测试、查看结果和错误时选择此技能。",
-  "llmInstruction": "你已绑定 GraphiteUI Script Tester。根据当前图 state 中的用户需求和脚本内容，生成用于测试该脚本的输入字段。只生成四个字段：script_filename、script_source、test_filename、test_source。script_source 必须是要被测试的完整 Python 脚本源码；test_source 必须是完整、可直接运行的 pytest 测试源码。测试应该覆盖用户关心的正常路径、边界情况和明显失败模式，保持确定性，不访问网络，不依赖仓库文件，不读取敏感路径。若脚本是命令行脚本，可以在测试中使用 subprocess 调用同一临时目录下的脚本文件。运行结果、stdout、stderr、exit_code 和 errors 由技能运行时返回，不要在模型输出中伪造这些结果。",
+  "description": "当用户提供脚本并希望根据当前系统环境自动编写测试用例、运行测试、查看成功结果或报错时选择此技能。",
+  "llmInstruction": "你已绑定 GraphiteUI Script Tester。根据当前图 state 中的用户需求、脚本内容和 before_llm.py 注入的系统环境上下文，生成一次可运行的测试请求。只生成 files 和 command。files 必须包含被测试脚本、测试用例以及运行测试需要的最小辅助文件；path 必须是临时测试目录内的相对路径，content 必须是完整文件内容。command 必须是参数数组，使用 before_llm.py 标明当前系统可用且允许的命令，例如 python -m pytest、node --test、bash 脚本等。测试应保持确定性，不访问网络，不读取敏感路径，不依赖仓库状态。运行结果由技能运行时返回，不要在模型输出中伪造测试结果。",
   "version": "1.0.0",
   "timeoutSeconds": 45,
   "capabilityPolicy": {
@@ -21,76 +21,32 @@
   "permissions": ["file_write", "subprocess"],
   "inputSchema": [
     {
-      "key": "script_filename",
-      "name": "Script Filename",
-      "valueType": "text",
-      "required": false,
-      "description": "要写入临时目录的脚本文件名，必须是 Python 文件名；缺省时使用 target.py。"
-    },
-    {
-      "key": "script_source",
-      "name": "Script Source",
-      "valueType": "text",
+      "key": "files",
+      "name": "Files",
+      "valueType": "json",
       "required": true,
-      "description": "要被测试的完整 Python 脚本源码。"
+      "description": "要写入临时测试目录的文件数组，每项包含 path 和 content。必须包含被测试脚本和测试用例。"
     },
     {
-      "key": "test_filename",
-      "name": "Test Filename",
-      "valueType": "text",
-      "required": false,
-      "description": "要写入临时目录的测试文件名，缺省时使用 test_target.py。"
-    },
-    {
-      "key": "test_source",
-      "name": "Test Source",
-      "valueType": "text",
+      "key": "command",
+      "name": "Command",
+      "valueType": "json",
       "required": true,
-      "description": "完整 pytest 测试源码，由 LLM 根据脚本和用户需求编写。"
+      "description": "在临时测试目录中运行的命令参数数组，例如 [\"python\", \"-m\", \"pytest\", \"-q\", \"test_target.py\"]。"
     }
   ],
   "outputSchema": [
     {
-      "key": "status",
-      "name": "Status",
-      "valueType": "text",
-      "description": "测试运行状态：succeeded 或 failed。"
+      "key": "success",
+      "name": "Success",
+      "valueType": "boolean",
+      "description": "测试命令是否成功退出。"
     },
     {
-      "key": "summary",
-      "name": "Summary",
+      "key": "result",
+      "name": "Result",
       "valueType": "markdown",
-      "description": "测试运行摘要，包括命令、结果、退出码和关键错误。"
-    },
-    {
-      "key": "test_source",
-      "name": "Test Source",
-      "valueType": "text",
-      "description": "实际运行的 pytest 测试源码。"
-    },
-    {
-      "key": "stdout",
-      "name": "Stdout",
-      "valueType": "text",
-      "description": "pytest 标准输出。"
-    },
-    {
-      "key": "stderr",
-      "name": "Stderr",
-      "valueType": "text",
-      "description": "pytest 标准错误输出。"
-    },
-    {
-      "key": "exit_code",
-      "name": "Exit Code",
-      "valueType": "number",
-      "description": "测试进程退出码；超时按 124 返回。"
-    },
-    {
-      "key": "errors",
-      "name": "Errors",
-      "valueType": "json",
-      "description": "结构化错误列表，成功时为空数组。"
+      "description": "测试输出或报错信息，包括命令、退出码、stdout、stderr 和关键错误。"
     }
   ]
 }

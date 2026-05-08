@@ -162,7 +162,19 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["generated_before_llm_py"]["type"], "text")
         self.assertEqual(states["generated_after_llm_py"]["type"], "text")
         self.assertEqual(states["generated_requirements_txt"]["type"], "text")
-        self.assertEqual(states["script_test_status"]["type"], "text")
+        self.assertEqual(states["script_test_success"]["type"], "boolean")
+        self.assertEqual(states["script_test_result"]["type"], "markdown")
+        self.assertFalse(
+            {
+                "script_test_status",
+                "script_test_summary",
+                "script_test_source",
+                "script_test_stdout",
+                "script_test_stderr",
+                "script_test_exit_code",
+                "script_test_errors",
+            }.intersection(states)
+        )
         self.assertEqual(states["final_summary"]["type"], "markdown")
 
         selector_node = nodes["select_existing_capability"]
@@ -204,13 +216,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             tester_node["config"]["skillBindings"][0]["outputMapping"],
             {
-                "status": "script_test_status",
-                "summary": "script_test_summary",
-                "test_source": "script_test_source",
-                "stdout": "script_test_stdout",
-                "stderr": "script_test_stderr",
-                "exit_code": "script_test_exit_code",
-                "errors": "script_test_errors",
+                "success": "script_test_success",
+                "result": "script_test_result",
             },
         )
 
@@ -270,7 +277,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(nodes["examples_approved"]["config"]["loopLimit"], 5)
         self.assertEqual(
             nodes["script_test_passed"]["config"]["rule"],
-            {"source": "$state.script_test_status", "operator": "==", "value": "succeeded"},
+            {"source": "$state.script_test_success", "operator": "==", "value": True},
         )
         self.assertEqual(nodes["script_test_passed"]["config"]["loopLimit"], 3)
 

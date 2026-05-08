@@ -44,58 +44,94 @@ class GraphiteUiScriptTesterSkillTests(unittest.TestCase):
         self.assertTrue(definition.capability_policy.default.requires_approval)
         self.assertEqual(
             [field.key for field in definition.input_schema],
-            ["script_filename", "script_source", "test_filename", "test_source"],
+            ["files", "command"],
         )
         self.assertEqual(
             [field.key for field in definition.output_schema],
-            ["status", "summary", "test_source", "stdout", "stderr", "exit_code", "errors"],
+            ["success", "result"],
         )
         requirements = (SCRIPT_TESTER_SKILL_DIR / "requirements.txt").read_text(encoding="utf-8")
         self.assertIn("pytest", requirements)
 
-    def test_before_llm_injects_pytest_authoring_guidance(self) -> None:
+    def test_before_llm_injects_system_and_test_authoring_context(self) -> None:
         payload = _run_skill_script(SCRIPT_TESTER_BEFORE_LLM_PATH, {"graph_state": {"script_source": "def add(a, b): return a + b"}})
 
         context = str(payload.get("context") or "")
+        self.assertIn("System context", context)
+        self.assertIn("Python executable", context)
+        self.assertIn("Available test commands", context)
         self.assertIn("pytest", context)
         self.assertIn("deterministic", context)
-        self.assertIn("script_filename", context)
-        self.assertIn("test_source", context)
+        self.assertIn("files", context)
+        self.assertIn("command", context)
 
-    def test_after_llm_runs_generated_pytest_successfully(self) -> None:
+    def test_after_llm_runs_generated_test_command_successfully(self) -> None:
         payload = _run_skill_script(
             SCRIPT_TESTER_AFTER_LLM_PATH,
             {
-                "script_filename": "calculator.py",
-                "script_source": "def add(a, b):\n    return a + b\n",
-                "test_filename": "test_calculator.py",
-                "test_source": "from calculator import add\n\n\ndef test_add():\n    assert add(2, 3) == 5\n",
+                "files": [
+                    {"path": "calculator.py", "content": "def add(a, b):\n    return a + b\n"},
+                    {
+                        "path": "test_calculator.py",
+                        "content": "from calculator import add\n\n\ndef test_add():\n    assert add(2, 3) == 5\n",
+                    },
+                ],
+                "command": ["python", "-m", "pytest", "-q", "test_calculator.py"],
             },
         )
 
-        self.assertEqual(payload["status"], "succeeded")
-        self.assertEqual(payload["exit_code"], 0)
-        self.assertEqual(payload["errors"], [])
-        self.assertIn("1 passed", str(payload["stdout"]).lower())
-        self.assertIn("test_add", str(payload["test_source"]))
+        self.assertIs(payload["success"], True)
+        self.assertIn("1 passed", str(payload["result"]).lower())
+        self.assertIn("python -m pytest -q test_calculator.py", str(payload["result"]))
+
+    def test_after_llm_runs_non_python_allowed_script_tests(self) -> None:
+        payload = _run_skill_script(
+            SCRIPT_TESTER_AFTER_LLM_PATH,
+            {
+                "files": [
+                    {"path": "greet.sh", "content": "printf '%s' hello\n"},
+                    {
+                        "path": "test_greet.sh",
+                        "content": "set -eu\noutput=\"$(sh greet.sh)\"\n[ \"$output\" = \"hello\" ]\n",
+                    },
+                ],
+                "command": ["sh", "test_greet.sh"],
+            },
+        )
+
+        self.assertIs(payload["success"], True)
+        self.assertIn("sh test_greet.sh", str(payload["result"]))
 
     def test_after_llm_returns_failure_details_for_failing_tests(self) -> None:
         payload = _run_skill_script(
             SCRIPT_TESTER_AFTER_LLM_PATH,
             {
-                "script_filename": "calculator.py",
-                "script_source": "def add(a, b):\n    return a - b\n",
-                "test_filename": "test_calculator.py",
-                "test_source": "from calculator import add\n\n\ndef test_add():\n    assert add(2, 3) == 5\n",
+                "files": [
+                    {"path": "calculator.py", "content": "def add(a, b):\n    return a - b\n"},
+                    {
+                        "path": "test_calculator.py",
+                        "content": "from calculator import add\n\n\ndef test_add():\n    assert add(2, 3) == 5\n",
+                    },
+                ],
+                "command": ["python", "-m", "pytest", "-q", "test_calculator.py"],
             },
         )
 
-        self.assertEqual(payload["status"], "failed")
-        self.assertNotEqual(payload["exit_code"], 0)
-        self.assertTrue(payload["errors"])
-        combined_output = f"{payload['stdout']}\n{payload['stderr']}"
-        self.assertIn("test_add", combined_output)
-        self.assertIn("assert", combined_output)
+        self.assertIs(payload["success"], False)
+        self.assertIn("test_add", str(payload["result"]))
+        self.assertIn("assert", str(payload["result"]))
+
+    def test_after_llm_rejects_unsupported_commands(self) -> None:
+        payload = _run_skill_script(
+            SCRIPT_TESTER_AFTER_LLM_PATH,
+            {
+                "files": [{"path": "test_example.py", "content": "def test_ok():\n    assert True\n"}],
+                "command": ["curl", "https://example.com"],
+            },
+        )
+
+        self.assertIs(payload["success"], False)
+        self.assertIn("not allowed", str(payload["result"]))
 
 
 if __name__ == "__main__":

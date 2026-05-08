@@ -192,23 +192,23 @@
       "color": "#9333ea",
       "binding": null
     },
-    "script_test_status": {
-      "name": "脚本测试状态",
-      "description": "脚本测试结果：succeeded 或 failed。",
-      "type": "text",
-      "value": "",
+    "script_test_success": {
+      "name": "脚本测试是否成功",
+      "description": "脚本测试命令是否成功退出。",
+      "type": "boolean",
+      "value": false,
       "color": "#9333ea",
       "binding": {
         "kind": "skill_output",
         "skillKey": "graphiteUI_script_tester",
         "nodeId": "run_script_test",
-        "fieldKey": "status",
+        "fieldKey": "success",
         "managed": true
       }
     },
-    "script_test_summary": {
-      "name": "脚本测试摘要",
-      "description": "脚本测试的命令、结果、退出码和关键错误。",
+    "script_test_result": {
+      "name": "脚本测试结果",
+      "description": "脚本测试输出或报错信息。",
       "type": "markdown",
       "value": "",
       "color": "#9333ea",
@@ -216,77 +216,7 @@
         "kind": "skill_output",
         "skillKey": "graphiteUI_script_tester",
         "nodeId": "run_script_test",
-        "fieldKey": "summary",
-        "managed": true
-      }
-    },
-    "script_test_source": {
-      "name": "测试源码",
-      "description": "实际运行的 pytest 测试源码。",
-      "type": "text",
-      "value": "",
-      "color": "#9333ea",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "graphiteUI_script_tester",
-        "nodeId": "run_script_test",
-        "fieldKey": "test_source",
-        "managed": true
-      }
-    },
-    "script_test_stdout": {
-      "name": "测试 stdout",
-      "description": "pytest 标准输出。",
-      "type": "text",
-      "value": "",
-      "color": "#9333ea",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "graphiteUI_script_tester",
-        "nodeId": "run_script_test",
-        "fieldKey": "stdout",
-        "managed": true
-      }
-    },
-    "script_test_stderr": {
-      "name": "测试 stderr",
-      "description": "pytest 标准错误输出。",
-      "type": "text",
-      "value": "",
-      "color": "#9333ea",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "graphiteUI_script_tester",
-        "nodeId": "run_script_test",
-        "fieldKey": "stderr",
-        "managed": true
-      }
-    },
-    "script_test_exit_code": {
-      "name": "测试退出码",
-      "description": "pytest 进程退出码。",
-      "type": "number",
-      "value": 0,
-      "color": "#9333ea",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "graphiteUI_script_tester",
-        "nodeId": "run_script_test",
-        "fieldKey": "exit_code",
-        "managed": true
-      }
-    },
-    "script_test_errors": {
-      "name": "测试错误",
-      "description": "脚本测试返回的结构化错误列表。",
-      "type": "json",
-      "value": [],
-      "color": "#dc2626",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "graphiteUI_script_tester",
-        "nodeId": "run_script_test",
-        "fieldKey": "errors",
+        "fieldKey": "result",
         "managed": true
       }
     },
@@ -988,23 +918,11 @@
           "required": true
         },
         {
-          "state": "script_test_status",
+          "state": "script_test_success",
           "required": false
         },
         {
-          "state": "script_test_summary",
-          "required": false
-        },
-        {
-          "state": "script_test_stdout",
-          "required": false
-        },
-        {
-          "state": "script_test_stderr",
-          "required": false
-        },
-        {
-          "state": "script_test_errors",
+          "state": "script_test_result",
           "required": false
         }
       ],
@@ -1050,7 +968,7 @@
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "根据 builder_context 生成目标 Skill 的六个输出字段。如果上一轮 script_test_status 为 failed，必须阅读 script_test_summary/stdout/stderr/errors，修复生成的 Python 源码或 manifest 后重新输出完整六个字段。不要写路径，不要生成压缩包，不要输出测试报告或安装步骤。skill_json.skillKey 必须与 generated_skill_key 一致。before_llm.py 和 after_llm.py 不需要时输出空字符串。requirements.txt 不需要第三方依赖时输出空字符串。",
+        "taskInstruction": "根据 builder_context 生成目标 Skill 的六个输出字段。如果上一轮 script_test_success 为 false，必须阅读 script_test_result，修复生成的 Python 源码或 manifest 后重新输出完整六个字段。不要写路径，不要生成压缩包，不要输出测试报告或安装步骤。skill_json.skillKey 必须与 generated_skill_key 一致。before_llm.py 和 after_llm.py 不需要时输出空字符串。requirements.txt 不需要第三方依赖时输出空字符串。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1190,31 +1108,11 @@
       ],
       "writes": [
         {
-          "state": "script_test_status",
+          "state": "script_test_success",
           "mode": "replace"
         },
         {
-          "state": "script_test_summary",
-          "mode": "replace"
-        },
-        {
-          "state": "script_test_source",
-          "mode": "replace"
-        },
-        {
-          "state": "script_test_stdout",
-          "mode": "replace"
-        },
-        {
-          "state": "script_test_stderr",
-          "mode": "replace"
-        },
-        {
-          "state": "script_test_exit_code",
-          "mode": "replace"
-        },
-        {
-          "state": "script_test_errors",
+          "state": "script_test_result",
           "mode": "replace"
         }
       ],
@@ -1224,18 +1122,13 @@
           {
             "skillKey": "graphiteUI_script_tester",
             "outputMapping": {
-              "status": "script_test_status",
-              "summary": "script_test_summary",
-              "test_source": "script_test_source",
-              "stdout": "script_test_stdout",
-              "stderr": "script_test_stderr",
-              "exit_code": "script_test_exit_code",
-              "errors": "script_test_errors"
+              "success": "script_test_success",
+              "result": "script_test_result"
             }
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "根据 test_strategy 选择要测试的脚本源码：script_to_test 为 after_llm.py 时使用 generated_after_llm_py，为 before_llm.py 时使用 generated_before_llm_py。生成 pytest 测试源码，覆盖已认可示例、字段规范化、错误输入和空输入；不要访问网络，不读取敏感路径，不依赖仓库状态。",
+        "taskInstruction": "根据 test_strategy 选择要测试的脚本源码：script_to_test 为 after_llm.py 时使用 generated_after_llm_py，为 before_llm.py 时使用 generated_before_llm_py。生成 GraphiteUI Script Tester 的 files 和 command：files 必须包含被测试脚本、pytest 测试文件以及必要的最小辅助文件；command 必须使用当前系统允许的命令，Python 生命周期脚本优先使用 [\"python\", \"-m\", \"pytest\", \"-q\", \"test_target.py\"]。测试覆盖已认可示例、字段规范化、错误输入和空输入；不要访问网络，不读取敏感路径，不依赖仓库状态。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1259,7 +1152,7 @@
       },
       "reads": [
         {
-          "state": "script_test_status",
+          "state": "script_test_success",
           "required": true
         }
       ],
@@ -1276,9 +1169,9 @@
           "false": "false"
         },
         "rule": {
-          "source": "$state.script_test_status",
+          "source": "$state.script_test_success",
           "operator": "==",
-          "value": "succeeded"
+          "value": true
         }
       }
     },
@@ -1323,11 +1216,11 @@
           "required": false
         },
         {
-          "state": "script_test_status",
+          "state": "script_test_success",
           "required": false
         },
         {
-          "state": "script_test_summary",
+          "state": "script_test_result",
           "required": false
         }
       ],
@@ -1341,7 +1234,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "写入前给用户审查生成结果。generation_review 写 Markdown，包含 Skill 名称、skillKey、description、outputSchema 摘要、会写入的文件列表、目标目录 backend/data/skills/user/<skillKey>/、脚本测试状态和风险提示。不要执行写入。最后明确请用户在“写入确认”中写“批准写入”或说明不要写入。",
+        "taskInstruction": "写入前给用户审查生成结果。generation_review 写 Markdown，包含 Skill 名称、skillKey、description、outputSchema 摘要、会写入的文件列表、目标目录 backend/data/skills/user/<skillKey>/、脚本测试 success/result 和风险提示。不要执行写入。最后明确请用户在“写入确认”中写“批准写入”或说明不要写入。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1881,11 +1774,11 @@
           "required": false
         },
         {
-          "state": "script_test_status",
+          "state": "script_test_success",
           "required": false
         },
         {
-          "state": "script_test_summary",
+          "state": "script_test_result",
           "required": false
         }
       ],
@@ -1899,7 +1792,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "汇总最终结果。final_summary 写 Markdown，说明 Skill 已写入 backend/data/skills/user/<generated_skill_key>/，列出各文件写入的 success/result、脚本测试状态、需要用户注意的依赖或权限，以及下一步可以在 Skill 管理页启用/使用。不要声称写入了 success 为 false 或没有执行器结果确认的文件。",
+        "taskInstruction": "汇总最终结果。final_summary 写 Markdown，说明 Skill 已写入 backend/data/skills/user/<generated_skill_key>/，列出各文件写入的 success/result、脚本测试 success/result、需要用户注意的依赖或权限，以及下一步可以在 Skill 管理页启用/使用。不要声称写入了 success 为 false 或没有执行器结果确认的文件。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",

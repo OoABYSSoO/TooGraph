@@ -73,9 +73,10 @@
 
 - 位置：`skill/graphiteUI_script_tester/`
 - 显示名称：`GraphiteUI Script Tester`
-- 作用：接收 Python 脚本源码和 LLM 生成的 pytest 用例，在临时目录运行测试并返回结果、输出和错误。
-- 生命周期：`before_llm.py` 只注入 pytest 测试编写规则；`after_llm.py` 写入临时脚本和测试文件，运行 `python -m pytest -q <test_filename>`，再返回 `status`、`summary`、`test_source`、`stdout`、`stderr`、`exit_code`、`errors`。
-- 权限和依赖：声明 `file_write` 与 `subprocess` 权限，并在 `requirements.txt` 中声明 `pytest`。该 Skill 会执行用户提供的 Python 代码，应通过显式确认使用。
+- 作用：接收脚本内容和用户测试目标，由 LLM 根据当前系统环境编写测试工作区，然后在临时目录运行一次允许的测试命令。
+- 生命周期：`before_llm.py` 注入当前系统上下文，包括 OS、Python executable/version 和可用 allowlist 命令；LLM 只生成 `files` 与 `command`；`after_llm.py` 写入临时文件、运行命令，并只返回 `success` 与 `result`。
+- 通用性：不再限定 Python/pytest。Python 脚本可使用 `python -m pytest`，JavaScript 脚本可在系统有 Node 时使用 `node --test`，其他脚本只要命令在 allowlist 且当前系统可执行即可。
+- 权限和依赖：声明 `file_write` 与 `subprocess` 权限，并在 `requirements.txt` 中声明 `pytest` 作为 Python 测试常用依赖。该 Skill 会执行用户提供的脚本和测试代码，应通过显式确认使用。
 
 ### `local_workspace_executor`
 

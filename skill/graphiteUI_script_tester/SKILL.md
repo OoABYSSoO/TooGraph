@@ -1,29 +1,22 @@
 ---
 name: graphiteUI_script_tester
-description: Generate pytest tests for a provided Python script, run them in a temporary workspace, and return structured results and errors.
+description: Use when a graph needs to generate deterministic tests for a provided local script and run them with an allowed system command.
 ---
 
 # GraphiteUI Script Tester
 
-Use this skill when the graph has a Python script and the user wants tests written and executed for it.
+Use this skill when the graph has a script or generated script source and needs tests written and executed in a temporary workspace.
 
-The LLM prepares the script and pytest test file. The runtime then writes both files into a temporary directory, runs `python -m pytest -q <test_filename>`, and returns the raw result.
+`before_llm.py` injects current system context, including OS, Python executable/version, and available allowed commands. The LLM uses that context to produce a complete test workspace and one command to run.
 
 Inputs:
 
-- `script_filename`: Python script filename. Defaults to `target.py`.
-- `script_source`: Complete Python source under test.
-- `test_filename`: Pytest filename. Defaults to `test_target.py`.
-- `test_source`: Complete pytest source to run.
+- `files`: JSON array of `{ "path": "...", "content": "..." }`. Include the target script, generated tests, and any minimal helper/config files.
+- `command`: JSON command argument array, such as `["python", "-m", "pytest", "-q", "test_target.py"]` or `["node", "--test", "test.mjs"]`.
 
 Outputs:
 
-- `status`: `succeeded` or `failed`.
-- `summary`: Markdown summary of the run.
-- `test_source`: The test code that was actually executed.
-- `stdout`: Pytest stdout.
-- `stderr`: Pytest stderr.
-- `exit_code`: Test process exit code.
-- `errors`: Structured error list.
+- `success`: Boolean indicating whether the test command exited with code 0.
+- `result`: Markdown result containing command, exit code, duration, stdout, stderr, or validation errors.
 
-The skill is intentionally explicit about execution. It writes only to a temporary directory, but the provided Python code still runs in the local Python process environment without an OS sandbox. Use approval for untrusted scripts.
+The runtime writes only inside a temporary directory, validates file paths, and runs only allowlisted commands. The provided code still executes in the local system environment, so keep approval enabled for untrusted scripts.
