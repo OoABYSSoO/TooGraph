@@ -872,11 +872,15 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
       for (const field of definition.outputSchema) {
         const mappedState = outputMapping[field.key];
         if (mappedState && document.state_schema[mappedState]) {
+          syncManagedSkillOutputStateDefinition(document, mappedState, definition, field);
           ensureAgentWriteBinding(node, mappedState);
           continue;
         }
 
         const existingStateKey = findExistingSkillOutputState(document, nodeId, attachedSkillKey, field.key);
+        if (existingStateKey) {
+          syncManagedSkillOutputStateDefinition(document, existingStateKey, definition, field);
+        }
         const stateKey = existingStateKey ?? createManagedSkillOutputState(document, nodeId, definition, field);
         outputMapping[field.key] = stateKey;
         ensureAgentWriteBinding(node, stateKey);
@@ -1174,7 +1178,7 @@ function createManagedSkillOutputState(
   const fieldName = field.name.trim() || field.key;
   document.state_schema[stateField.key] = {
     ...stateField.definition,
-    name: `${skillName} ${fieldName}`,
+    name: fieldName,
     description: field.description.trim() || `${skillName} output: ${field.key}`,
     type: stateType,
     binding: {
@@ -1187,6 +1191,28 @@ function createManagedSkillOutputState(
   };
   rememberMaterializedStateKeyIndex(document, stateField.key);
   return stateField.key;
+}
+
+function syncManagedSkillOutputStateDefinition(
+  document: GraphPayload | GraphDocument,
+  stateKey: string,
+  skill: SkillDefinition,
+  field: SkillIoField,
+) {
+  const definition = document.state_schema[stateKey];
+  if (!definition) {
+    return;
+  }
+  const nextType = normalizeSkillOutputStateType(field.valueType);
+  const currentType = definition.type?.trim() || nextType;
+  const nextValue = currentType === nextType ? definition.value : defaultMaterializedStateValueForType(nextType);
+  document.state_schema[stateKey] = {
+    ...definition,
+    name: field.name.trim() || field.key,
+    description: field.description.trim() || `${skill.name.trim() || skill.skillKey} output: ${field.key}`,
+    type: nextType,
+    value: nextValue,
+  };
 }
 
 function normalizeSkillOutputStateType(valueType: string) {

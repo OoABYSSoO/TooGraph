@@ -554,14 +554,14 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
       },
     },
   ]);
-  assert.equal(nextDocument.state_schema.state_1?.name, "联网搜索 Query");
+  assert.equal(nextDocument.state_schema.state_1?.name, "Query");
   assert.equal(nextDocument.state_schema.state_1?.description, "Search query.");
   assert.equal(nextDocument.state_schema.state_1?.type, "text");
   assert.equal(nextDocument.state_schema.state_2?.type, "json");
-  assert.equal(nextDocument.state_schema.state_2?.name, "联网搜索 Source URLs");
+  assert.equal(nextDocument.state_schema.state_2?.name, "Source URLs");
   assert.equal(nextDocument.state_schema.state_2?.description, "URLs.");
   assert.equal(nextDocument.state_schema.state_3?.type, "file");
-  assert.equal(nextDocument.state_schema.state_3?.name, "联网搜索 Artifact Paths");
+  assert.equal(nextDocument.state_schema.state_3?.name, "Artifact Paths");
   assert.equal(nextDocument.state_schema.state_3?.description, "Files.");
   assert.equal("promptVisible" in (nextDocument.state_schema.state_1 ?? {}), false);
   assert.equal("promptVisible" in (nextDocument.state_schema.state_2 ?? {}), false);
@@ -829,10 +829,89 @@ test("reconcileAgentSkillOutputBindingsInDocument prunes stale managed outputs f
       },
     },
   ]);
-  assert.equal(nextDocument.state_schema.state_1?.name, "Local Workspace Executor Success");
+  assert.equal(nextDocument.state_schema.state_1?.name, "Success");
   assert.equal(nextDocument.state_schema.state_1?.type, "boolean");
-  assert.equal(nextDocument.state_schema.state_2?.name, "Local Workspace Executor Result");
+  assert.equal(nextDocument.state_schema.state_2?.name, "Result");
   assert.equal(nextDocument.state_schema.state_2?.type, "markdown");
+});
+
+test("reconcileAgentSkillOutputBindingsInDocument shortens existing managed output names", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Long Managed Output Names",
+    state_schema: {
+      executor_success: {
+        name: "Local Workspace Executor Success",
+        description: "Old generated success label.",
+        type: "boolean",
+        value: false,
+        color: "#10b981",
+        binding: {
+          kind: "skill_output",
+          skillKey: "local_workspace_executor",
+          nodeId: "executor",
+          fieldKey: "success",
+          managed: true,
+        },
+      },
+      executor_result: {
+        name: "Local Workspace Executor Result",
+        description: "Old generated result label.",
+        type: "markdown",
+        value: "",
+        color: "#2563eb",
+        binding: {
+          kind: "skill_output",
+          skillKey: "local_workspace_executor",
+          nodeId: "executor",
+          fieldKey: "result",
+          managed: true,
+        },
+      },
+    },
+    nodes: {
+      executor: {
+        kind: "agent",
+        name: "Executor",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [
+          { state: "executor_success", mode: "replace" },
+          { state: "executor_result", mode: "replace" },
+        ],
+        config: {
+          skillKey: "local_workspace_executor",
+          skillBindings: [
+            {
+              skillKey: "local_workspace_executor",
+              outputMapping: {
+                success: "executor_success",
+                result: "executor_result",
+              },
+            },
+          ],
+          skillInstructionBlocks: {},
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "high",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = reconcileAgentSkillOutputBindingsInDocument(document, [localWorkspaceExecutorSkill]);
+
+  assert.notEqual(nextDocument, document);
+  assert.equal(nextDocument.state_schema.executor_success?.name, "Success");
+  assert.equal(nextDocument.state_schema.executor_success?.description, "操作是否成功。");
+  assert.equal(nextDocument.state_schema.executor_result?.name, "Result");
+  assert.equal(nextDocument.state_schema.executor_result?.description, "成功输出或失败报错内容。");
 });
 
 test("connectStateBindingInDocument materializes dynamic capability result package outputs", () => {
