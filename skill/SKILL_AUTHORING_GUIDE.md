@@ -40,7 +40,7 @@ skill/<skill_key>/
 backend/data/skills/user/<skill_key>/
 ```
 
-推荐的新 Skill 包结构：
+标准 Skill 包结构：
 
 ```text
 skill/<skill_key>/
@@ -52,13 +52,11 @@ skill/<skill_key>/
 
 `before_llm.py` 和 `after_llm.py` 使用固定文件名，不在 `skill.json` 中配置入口。
 
-现有未迁移 Skill 仍可能使用 `runtime.entrypoint` 指向脚本入口，这是过渡期兼容路径。新建 Skill 应优先使用固定生命周期文件。
-
 ## `skill.json`
 
 `skill.json` 是机器可读协议。它决定这个 Skill 如何出现在技能目录中、什么时候可被选择、LLM 应该生成什么结构，以及最终会返回什么输出。
 
-推荐结构：
+标准结构：
 
 ```json
 {
@@ -104,7 +102,7 @@ skill/<skill_key>/
 
 字段含义：
 
-- `schemaVersion`：当前使用 `graphite.skill/v1`。
+- `schemaVersion`：固定为 `graphite.skill/v1`。
 - `skillKey`：稳定机器标识，也用于目录名。只能使用安全的相对标识，不要包含 `/`、`\`、`:`。
 - `name`：用户可见名称。
 - `description`：什么时候应该选择这个技能。能力选择器会把它作为适用场景说明。
@@ -330,4 +328,3 @@ skill_result
 - 如果会写文件或下载资源，是否返回本地路径或 artifact 引用，而不是把大内容塞入 state。
 - stdout 是否只输出 JSON 对象。
 - 错误是否结构化返回，方便下游判断和修复。
-- 是否避免旧字段：`targets`、`executionTargets`、`label`、`agentInstruction`、`runPolicies`、`health`、`configured`、`healthy`、`kind`、`mode`、`scope`。
