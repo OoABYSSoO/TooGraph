@@ -79,6 +79,7 @@ def _chat_openai_compatible(
     thinking_level: str,
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
+    structured_output_schema: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_openai.chat_openai_compatible(
         provider_id=provider_id,
@@ -96,6 +97,7 @@ def _chat_openai_compatible(
         post_streaming_json_with_fallback_fn=post_streaming_json_with_fallback,
         on_delta=on_delta,
         input_attachments=input_attachments,
+        structured_output_schema=structured_output_schema,
     )
 
 
@@ -112,6 +114,7 @@ def _chat_anthropic(
     thinking_level: str,
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
+    structured_output_schema: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_anthropic.chat_anthropic(
         provider_id=provider_id,
@@ -143,6 +146,7 @@ def _chat_gemini(
     thinking_level: str,
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
+    structured_output_schema: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_gemini.chat_gemini(
         provider_id=provider_id,
@@ -172,6 +176,7 @@ def _chat_codex_responses(
     thinking_level: str,
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
+    structured_output_schema: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_codex.chat_codex_responses(
         provider_id=provider_id,
@@ -186,6 +191,7 @@ def _chat_codex_responses(
         append_request_log=_append_model_request_log_safely,
         on_delta=on_delta,
         input_attachments=input_attachments,
+        structured_output_schema=structured_output_schema,
     )
 
 
@@ -206,6 +212,7 @@ def chat_with_model_provider(
     auth_scheme: str = "Bearer",
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
+    structured_output_schema: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     normalized_transport = normalize_transport(transport)
     normalized_base_url = _normalize_base_url(base_url)
@@ -231,6 +238,7 @@ def chat_with_model_provider(
                 thinking_level=resolved_thinking_level,
                 on_delta=on_delta,
                 input_attachments=attachments,
+                structured_output_schema=structured_output_schema,
             )
     elif normalized_transport == TRANSPORT_ANTHROPIC_MESSAGES:
         def invoke(attachments: list[dict[str, Any]] | None) -> tuple[str, dict[str, Any]]:
@@ -246,6 +254,7 @@ def chat_with_model_provider(
                 thinking_level=resolved_thinking_level,
                 on_delta=on_delta,
                 input_attachments=attachments,
+                structured_output_schema=structured_output_schema,
             )
     elif normalized_transport == TRANSPORT_GEMINI_GENERATE_CONTENT:
         def invoke(attachments: list[dict[str, Any]] | None) -> tuple[str, dict[str, Any]]:
@@ -261,6 +270,7 @@ def chat_with_model_provider(
                 thinking_level=resolved_thinking_level,
                 on_delta=on_delta,
                 input_attachments=attachments,
+                structured_output_schema=structured_output_schema,
             )
     elif normalized_transport == TRANSPORT_CODEX_RESPONSES:
         def invoke(attachments: list[dict[str, Any]] | None) -> tuple[str, dict[str, Any]]:
@@ -274,6 +284,7 @@ def chat_with_model_provider(
                 thinking_level=resolved_thinking_level,
                 on_delta=on_delta,
                 input_attachments=attachments,
+                structured_output_schema=structured_output_schema,
             )
     else:  # pragma: no cover - guarded by normalize_transport
         raise RuntimeError(f"Unsupported provider transport: {normalized_transport}")
@@ -282,6 +293,12 @@ def chat_with_model_provider(
     stream_fallback_error = str(meta.get("stream_fallback_error") or "").strip()
     if stream_fallback_error:
         warnings.append(f"Streaming request failed; retried once without streaming. {stream_fallback_error}")
+    structured_output_fallback_error = str(meta.get("structured_output_fallback_error") or "").strip()
+    if structured_output_fallback_error:
+        warnings.append(
+            "Provider rejected native JSON Schema response_format; retried without native structured output. "
+            f"{structured_output_fallback_error}"
+        )
     video_fallback_warning = str(meta.pop("_video_fallback_warning", "") or "").strip()
     if video_fallback_warning:
         warnings.append(video_fallback_warning)
@@ -291,6 +308,8 @@ def chat_with_model_provider(
         warnings.append(
             f"Thinking level '{resolved_thinking_level}' was requested for provider '{provider_id}', but GraphiteUI did not find a native thinking field for this provider/model."
         )
+    if structured_output_schema and not meta.get("structured_output_strategy"):
+        meta["structured_output_strategy"] = "prompt_validation"
     meta["warnings"] = warnings
     meta.setdefault("thinking_enabled", False)
     meta.setdefault("thinking_level", resolved_thinking_level)
@@ -336,6 +355,7 @@ def chat_with_model_ref_with_meta(
     thinking_level: str | None = None,
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
+    structured_output_schema: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     provider_id, model_name = model_ref.split("/", 1) if "/" in model_ref else ("local", model_ref)
     provider_id = provider_id.strip() or "local"
@@ -355,6 +375,7 @@ def chat_with_model_ref_with_meta(
             thinking_level=thinking_level,
             on_delta=on_delta,
             input_attachments=input_attachments,
+            structured_output_schema=structured_output_schema,
         )
 
     saved_settings = load_app_settings()
@@ -385,4 +406,5 @@ def chat_with_model_ref_with_meta(
         auth_scheme=str(auth_scheme or ""),
         on_delta=on_delta,
         input_attachments=input_attachments,
+        structured_output_schema=structured_output_schema,
     )

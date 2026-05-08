@@ -6,6 +6,7 @@ from typing import Any, Callable
 import httpx
 
 from app.core.model_provider_templates import TRANSPORT_CODEX_RESPONSES
+from app.core.runtime.structured_output import build_openai_responses_text_format
 from app.core.thinking_levels import build_native_thinking_payload
 from app.tools.model_provider_http import (
     DEFAULT_REQUEST_TIMEOUT_SEC,
@@ -179,6 +180,7 @@ def chat_codex_responses(
     append_request_log: Callable[..., None],
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
+    structured_output_schema: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     request_payload: dict[str, Any] = {
         "model": model,
@@ -187,6 +189,8 @@ def chat_codex_responses(
         "store": False,
         "stream": True,
     }
+    if structured_output_schema:
+        request_payload["text"] = build_openai_responses_text_format(structured_output_schema)
     native_thinking_payload = build_native_thinking_payload(
         provider_id=provider_id,
         transport=TRANSPORT_CODEX_RESPONSES,
@@ -251,4 +255,5 @@ def chat_codex_responses(
         "thinking_enabled": bool(native_thinking_payload),
         "thinking_level": thinking_level,
         "reasoning_format": "responses-reasoning" if native_thinking_payload else None,
+        "structured_output_strategy": "json_schema" if structured_output_schema else None,
     }

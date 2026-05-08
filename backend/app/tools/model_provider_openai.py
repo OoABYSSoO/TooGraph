@@ -4,6 +4,10 @@ import time
 from typing import Any, Callable
 
 from app.core.model_provider_templates import TRANSPORT_OPENAI_COMPATIBLE
+from app.core.runtime.structured_output import (
+    build_openai_json_schema_response_format,
+    should_retry_without_native_structured_output,
+)
 from app.core.thinking_levels import build_native_thinking_payload
 from app.tools.model_provider_http import DEFAULT_REQUEST_TIMEOUT_SEC, build_auth_headers
 from app.tools.model_provider_multimodal import build_openai_user_content
@@ -113,6 +117,7 @@ def chat_openai_compatible(
     post_streaming_json_with_fallback_fn: Callable[..., tuple[dict[str, Any], dict[str, Any], str | None, bool]],
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
+    structured_output_schema: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     request_payload: dict[str, Any] = {
         "model": model,
@@ -125,6 +130,8 @@ def chat_openai_compatible(
     }
     if max_tokens is not None:
         request_payload["max_tokens"] = max_tokens
+    if structured_output_schema:
+        request_payload["response_format"] = build_openai_json_schema_response_format(structured_output_schema)
     native_thinking_payload = build_native_thinking_payload(
         provider_id=provider_id,
         transport=TRANSPORT_OPENAI_COMPATIBLE,
@@ -138,18 +145,37 @@ def chat_openai_compatible(
     fallback_payload = {**request_payload, "stream": False}
     logged_request_payload = request_payload
     stream_fallback_error: str | None = None
+    structured_output_fallback_error: str | None = None
     try:
-        response_payload, logged_request_payload, stream_fallback_error, _used_stream = post_streaming_json_with_fallback_fn(
-            stream_url=f"{base_url}{path}",
-            timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
-            headers=build_auth_headers(api_key=api_key, auth_header=auth_header, auth_scheme=auth_scheme),
-            stream_payload=request_payload,
-            fallback_payload=fallback_payload,
-            parse_stream=coalesce_openai_chat_stream_response,
-            error_label=f"{provider_id} request failed",
-            on_delta=on_delta,
-            extract_stream_delta=extract_openai_chat_stream_delta,
-        )
+        try:
+            response_payload, logged_request_payload, stream_fallback_error, _used_stream = post_streaming_json_with_fallback_fn(
+                stream_url=f"{base_url}{path}",
+                timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
+                headers=build_auth_headers(api_key=api_key, auth_header=auth_header, auth_scheme=auth_scheme),
+                stream_payload=request_payload,
+                fallback_payload=fallback_payload,
+                parse_stream=coalesce_openai_chat_stream_response,
+                error_label=f"{provider_id} request failed",
+                on_delta=on_delta,
+                extract_stream_delta=extract_openai_chat_stream_delta,
+            )
+        except Exception as exc:
+            if not structured_output_schema or not should_retry_without_native_structured_output(exc):
+                raise
+            structured_output_fallback_error = str(exc)
+            retry_payload = dict(request_payload)
+            retry_payload.pop("response_format", None)
+            response_payload, logged_request_payload, stream_fallback_error, _used_stream = post_streaming_json_with_fallback_fn(
+                stream_url=f"{base_url}{path}",
+                timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
+                headers=build_auth_headers(api_key=api_key, auth_header=auth_header, auth_scheme=auth_scheme),
+                stream_payload=retry_payload,
+                fallback_payload={**retry_payload, "stream": False},
+                parse_stream=coalesce_openai_chat_stream_response,
+                error_label=f"{provider_id} request failed",
+                on_delta=on_delta,
+                extract_stream_delta=extract_openai_chat_stream_delta,
+            )
     except Exception as exc:
         append_request_log(
             provider_id=provider_id,
@@ -186,4 +212,10 @@ def chat_openai_compatible(
         "thinking_level": thinking_level,
         "reasoning_format": "reasoning_effort" if native_thinking_payload else None,
         "stream_fallback_error": stream_fallback_error,
+        "structured_output_strategy": (
+            "prompt_validation"
+            if structured_output_fallback_error
+            else ("json_schema" if structured_output_schema else None)
+        ),
+        "structured_output_fallback_error": structured_output_fallback_error,
     }

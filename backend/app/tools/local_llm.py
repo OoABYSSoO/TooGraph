@@ -18,6 +18,10 @@ from app.core.thinking_levels import (
 )
 from app.core.storage.model_log_store import append_model_request_log
 from app.core.storage.settings_store import load_app_settings
+from app.core.runtime.structured_output import (
+    build_openai_json_schema_response_format,
+    should_retry_without_native_structured_output,
+)
 from app.tools.model_provider_client import (
     discover_provider_models,
     post_streaming_json_with_fallback,
@@ -548,6 +552,7 @@ def _chat_with_local_model_with_meta(
     thinking_level: str | None = None,
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
+    structured_output_schema: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     request_payload: dict[str, Any] = {
         "model": model or get_default_text_model(),
@@ -560,6 +565,8 @@ def _chat_with_local_model_with_meta(
     }
     if max_tokens is not None:
         request_payload["max_tokens"] = max_tokens
+    if structured_output_schema:
+        request_payload["response_format"] = build_openai_json_schema_response_format(structured_output_schema)
 
     warnings: list[str] = []
     resolved_thinking_level = normalize_thinking_level(
@@ -585,18 +592,34 @@ def _chat_with_local_model_with_meta(
     logged_request_payload = request_payload
     response_payload: dict[str, Any] = {}
     try:
-        response_payload = (
-            _request_local_chat_completion(request_payload, on_delta=on_delta)
-            if on_delta is not None
-            else _request_local_chat_completion(request_payload)
-        )
+        try:
+            response_payload = (
+                _request_local_chat_completion(request_payload, on_delta=on_delta)
+                if on_delta is not None
+                else _request_local_chat_completion(request_payload)
+            )
+        except Exception as exc:
+            if not structured_output_schema or not should_retry_without_native_structured_output(exc):
+                raise
+            retry_payload = dict(request_payload)
+            retry_payload.pop("response_format", None)
+            logged_request_payload = retry_payload
+            warnings.append(
+                "Provider rejected native JSON Schema response_format; retried without native structured output. "
+                f"{exc}"
+            )
+            response_payload = (
+                _request_local_chat_completion(retry_payload, on_delta=on_delta)
+                if on_delta is not None
+                else _request_local_chat_completion(retry_payload)
+            )
         content, reasoning = _extract_chat_completion_text(response_payload)
         stream_fallback = response_payload.get("_stream_fallback")
         if isinstance(stream_fallback, dict) and stream_fallback.get("error"):
             warnings.append(f"Streaming request failed; retried once without streaming. {stream_fallback['error']}")
 
         if not content and max_tokens is not None:
-            retry_payload = dict(request_payload)
+            retry_payload = dict(logged_request_payload)
             retry_payload.pop("max_tokens", None)
             logged_request_payload = retry_payload
             response_payload = _request_local_chat_completion(retry_payload)
@@ -606,7 +629,7 @@ def _chat_with_local_model_with_meta(
             )
 
         if not content and used_thinking:
-            retry_payload = dict(request_payload)
+            retry_payload = dict(logged_request_payload)
             for key in thinking_request_payload:
                 retry_payload.pop(key, None)
             logged_request_payload = retry_payload
@@ -654,6 +677,7 @@ def _chat_with_local_model_with_meta(
                         thinking_level=thinking_level,
                         on_delta=on_delta,
                         input_attachments=fallback_attachments,
+                        structured_output_schema=structured_output_schema,
                     )
                 except Exception as fallback_exc:
                     if _should_retry_without_media_after_frame_fallback(fallback_exc):
@@ -668,6 +692,7 @@ def _chat_with_local_model_with_meta(
                             thinking_level=thinking_level,
                             on_delta=on_delta,
                             input_attachments=[],
+                            structured_output_schema=structured_output_schema,
                         )
                         fallback_meta = {**fallback_meta, "text_only_retry": True}
                         meta["video_fallback"] = fallback_meta
@@ -721,6 +746,11 @@ def _chat_with_local_model_with_meta(
         "timings": response_payload.get("timings"),
         "response_id": response_payload.get("id"),
         "warnings": warnings,
+        "structured_output_strategy": (
+            "prompt_validation"
+            if structured_output_schema and "response_format" not in logged_request_payload
+            else ("json_schema" if structured_output_schema else None)
+        ),
     }
 
 

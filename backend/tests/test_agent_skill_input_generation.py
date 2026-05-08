@@ -6,7 +6,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.runtime.agent_skill_input_generation import build_skill_input_system_prompt, build_skill_input_user_prompt
+from app.core.runtime.agent_skill_input_generation import (
+    build_skill_input_system_prompt,
+    build_skill_input_user_prompt,
+    generate_agent_skill_inputs,
+)
 from app.core.runtime.skill_bindings import ResolvedAgentSkillBinding
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemAgentSkillBinding, NodeSystemStateDefinition, NodeSystemStateType
 from app.core.schemas.skills import SkillDefinition, SkillIoField
@@ -222,6 +226,69 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
             self.assertNotIn(artifact["local_path"], prompt)
         finally:
             resolve_skill_artifact_path(artifact["local_path"]).unlink(missing_ok=True)
+
+    def test_generate_skill_inputs_passes_structured_output_schema_to_model(self) -> None:
+        captured: dict[str, object] = {}
+
+        def chat_with_local_model_with_meta_func(**kwargs):
+            captured.update(kwargs)
+            return ('{"web_search": {"query": "GraphiteUI structured output"}}', {"warnings": []})
+
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "config": {
+                    "skillKey": "web_search",
+                    "taskInstruction": "Build search arguments.",
+                },
+            }
+        )
+
+        skill_inputs, _reasoning, warnings, updated_config = generate_agent_skill_inputs(
+            node=node,
+            input_values={"question": "How should LLM nodes emit JSON?"},
+            bindings=[
+                ResolvedAgentSkillBinding(
+                    binding=NodeSystemAgentSkillBinding(skillKey="web_search"),
+                    source="node_config",
+                )
+            ],
+            skill_definitions={
+                "web_search": SkillDefinition(
+                    skillKey="web_search",
+                    name="Web Search",
+                    inputSchema=[
+                        SkillIoField(
+                            key="query",
+                            name="Query",
+                            valueType="text",
+                            required=True,
+                            description="Search query.",
+                        )
+                    ],
+                )
+            },
+            runtime_config={
+                "resolved_provider_id": "local",
+                "runtime_model_name": "test-model",
+                "resolved_temperature": 0.2,
+                "resolved_thinking": False,
+                "resolved_thinking_level": "off",
+            },
+            chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+        )
+
+        self.assertEqual(skill_inputs, {"web_search": {"query": "GraphiteUI structured output"}})
+        self.assertEqual(warnings, [])
+        schema = captured["structured_output_schema"]
+        self.assertEqual(schema["type"], "object")
+        self.assertEqual(schema["required"], ["web_search"])
+        self.assertFalse(schema["additionalProperties"])
+        self.assertEqual(schema["properties"]["web_search"]["required"], ["query"])
+        self.assertFalse(schema["properties"]["web_search"]["additionalProperties"])
+        self.assertEqual(schema["properties"]["web_search"]["properties"]["query"]["type"], "string")
+        self.assertEqual(updated_config["skill_input_structured_output_strategy"], "json_schema")
 
 
 if __name__ == "__main__":

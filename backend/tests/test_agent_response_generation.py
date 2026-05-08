@@ -81,6 +81,51 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(updated_config["provider_id"], "local")
         self.assertEqual(updated_config["provider_thinking_level"], "medium")
 
+    def test_passes_structured_output_schema_for_state_outputs(self) -> None:
+        captured: dict[str, object] = {}
+
+        def chat_with_local_model_with_meta_func(**kwargs):
+            captured.update(kwargs)
+            return ('{"answer": "done", "confidence": 0.8}', {"warnings": []})
+
+        payload, _reasoning, warnings, updated_config = generate_agent_response(
+            _agent_node(writes=[{"state": "answer"}, {"state": "confidence"}]),
+            {"question": "q"},
+            {},
+            {
+                "resolved_provider_id": "local",
+                "runtime_model_name": "test-model",
+                "resolved_temperature": 0.2,
+                "resolved_thinking": False,
+                "resolved_thinking_level": "off",
+                "resolved_model_ref": "local/test-model",
+            },
+            state_schema={
+                "answer": NodeSystemStateDefinition(
+                    name="Answer",
+                    description="Final answer.",
+                    type=NodeSystemStateType.TEXT,
+                ),
+                "confidence": NodeSystemStateDefinition(
+                    name="Confidence",
+                    description="Confidence score.",
+                    type=NodeSystemStateType.NUMBER,
+                ),
+            },
+            chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+        )
+
+        self.assertEqual(payload["answer"], "done")
+        self.assertEqual(payload["confidence"], 0.8)
+        self.assertEqual(warnings, [])
+        schema = captured["structured_output_schema"]
+        self.assertEqual(schema["type"], "object")
+        self.assertEqual(schema["required"], ["answer", "confidence"])
+        self.assertFalse(schema["additionalProperties"])
+        self.assertEqual(schema["properties"]["answer"]["type"], "string")
+        self.assertEqual(schema["properties"]["confidence"]["type"], "number")
+        self.assertEqual(updated_config["structured_output_strategy"], "json_schema")
+
     def test_user_prompt_does_not_append_skill_instruction_blocks_for_final_response(self) -> None:
         captured: dict[str, object] = {}
 

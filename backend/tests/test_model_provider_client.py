@@ -253,6 +253,83 @@ class ModelProviderClientTests(unittest.TestCase):
         self.assertEqual(requested["json"]["stream"], True)
         self.assertEqual(requested["json"]["messages"][0], {"role": "system", "content": "sys"})
 
+    def test_chat_openai_compatible_posts_structured_response_format(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        schema = {
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+            "additionalProperties": False,
+        }
+        fake_client, client_patch = self._patched_client(
+            FakeResponse({"id": "chatcmpl_1", "model": "gpt-4.1", "choices": [{"message": {"content": '{"answer":"hello"}'}}]})
+        )
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+            content, meta = chat_with_model_provider(
+                provider_id="openai",
+                transport="openai-compatible",
+                base_url="https://api.openai.com/v1",
+                api_key="sk-openai",
+                model="gpt-4.1",
+                system_prompt="sys",
+                user_prompt="user",
+                temperature=0.2,
+                structured_output_schema=schema,
+            )
+
+        requested = fake_client.post_calls[0]
+        self.assertEqual(content, '{"answer":"hello"}')
+        self.assertEqual(meta["structured_output_strategy"], "json_schema")
+        self.assertEqual(
+            requested["json"]["response_format"],
+            {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "graphiteui_structured_output",
+                    "schema": schema,
+                    "strict": False,
+                },
+            },
+        )
+
+    def test_chat_openai_compatible_retries_without_structured_format_when_unsupported(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        schema = {
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+            "additionalProperties": False,
+        }
+        fake_client, client_patch = self._patched_client(
+            [
+                FakeResponse({"error": "unsupported"}, status_code=400, text="response_format unsupported"),
+                FakeResponse({"error": "unsupported"}, status_code=400, text="json_schema unsupported"),
+                FakeResponse({"id": "chatcmpl_retry", "model": "gpt-4.1", "choices": [{"message": {"content": '{"answer":"hello"}'}}]}),
+            ]
+        )
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+            content, meta = chat_with_model_provider(
+                provider_id="openai",
+                transport="openai-compatible",
+                base_url="https://api.openai.com/v1",
+                api_key="sk-openai",
+                model="gpt-4.1",
+                system_prompt="sys",
+                user_prompt="user",
+                temperature=0.2,
+                structured_output_schema=schema,
+            )
+
+        self.assertEqual(content, '{"answer":"hello"}')
+        self.assertEqual(meta["structured_output_strategy"], "prompt_validation")
+        self.assertEqual(len(fake_client.post_calls), 3)
+        self.assertIn("response_format", fake_client.post_calls[0]["json"])
+        self.assertIn("response_format", fake_client.post_calls[1]["json"])
+        self.assertNotIn("response_format", fake_client.post_calls[2]["json"])
+        self.assertTrue(any("JSON Schema response_format" in warning for warning in meta["warnings"]))
+
     def test_chat_openai_compatible_sends_image_attachments_as_content_parts(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider
 

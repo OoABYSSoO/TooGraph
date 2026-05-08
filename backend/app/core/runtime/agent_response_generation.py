@@ -7,6 +7,7 @@ from app.core.model_catalog import get_default_video_model_ref, resolve_runtime_
 from app.core.runtime.agent_multimodal import collect_input_attachments, prepare_model_input_attachments
 from app.core.runtime.agent_prompt import build_effective_system_prompt
 from app.core.runtime.llm_output_parser import build_output_key_aliases, parse_llm_json_response
+from app.core.runtime.structured_output import build_agent_state_output_schema, validate_structured_output
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition
 from app.core.thinking_levels import resolve_effective_thinking_level
 from app.tools.local_llm import _chat_with_local_model_with_meta
@@ -49,6 +50,7 @@ def generate_agent_response(
         skill_context,
         state_schema=state_schema,
     )
+    structured_output_schema = build_agent_state_output_schema(output_keys, state_schema or {})
     user_prompt = _build_agent_user_prompt(node)
 
     thinking_level = runtime_config.get("resolved_thinking_level")
@@ -67,6 +69,7 @@ def generate_agent_response(
                 thinking_level=thinking_level,
                 on_delta=on_delta,
                 input_attachments=input_attachments,
+                structured_output_schema=structured_output_schema,
             )
         finally:
             _cleanup_prepared_media_paths(attachment_meta.get("cleanup_paths"))
@@ -81,6 +84,7 @@ def generate_agent_response(
                 thinking_level=thinking_level,
                 on_delta=on_delta,
                 input_attachments=input_attachments,
+                structured_output_schema=structured_output_schema,
             )
         finally:
             _cleanup_prepared_media_paths(attachment_meta.get("cleanup_paths"))
@@ -90,8 +94,10 @@ def generate_agent_response(
         output_keys,
         output_key_aliases=build_output_key_aliases_func(output_keys, state_schema or {}),
     )
+    structured_output_validation_errors = validate_structured_output(parsed_fields, structured_output_schema)
     response_payload: dict[str, Any] = {"summary": content, **parsed_fields}
     reasoning = str(llm_meta.get("reasoning") or "").strip()
+    structured_output_strategy = str(llm_meta.get("structured_output_strategy") or "json_schema")
     large_video_fallbacks = attachment_meta.get("large_video_fallbacks", [])
     provider_video_fallback = llm_meta.get("video_fallback")
     if large_video_fallbacks:
@@ -113,8 +119,17 @@ def generate_agent_response(
         "provider_usage": llm_meta.get("usage"),
         "provider_timings": llm_meta.get("timings"),
         "provider_video_fallback": provider_video_fallback,
+        "structured_output_strategy": structured_output_strategy,
+        "structured_output_schema": structured_output_schema,
+        "structured_output_validation_errors": structured_output_validation_errors,
     }
-    return response_payload, reasoning, [*attachment_warnings, *llm_meta.get("warnings", [])], updated_runtime_config
+    warnings = [*attachment_warnings, *llm_meta.get("warnings", [])]
+    if structured_output_validation_errors:
+        warnings.append(
+            "Structured output validation found mismatches: "
+            + "; ".join(structured_output_validation_errors[:5])
+        )
+    return response_payload, reasoning, warnings, updated_runtime_config
 
 
 def _cleanup_prepared_media_paths(paths: Any) -> None:
