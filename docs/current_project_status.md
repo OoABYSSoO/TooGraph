@@ -10,9 +10,9 @@
 - 产品心智已收束为“图才是 Agent，单个节点是 LLM 节点”。当前协议中仍存在 `agent` kind 命名，这是待迁移的内部命名；新设计不应继续把单节点描述为多轮 Agent。
 - 旧的 `companion_agentic_tool_loop`、`companion_chat_loop`、`web_research_loop` 等模板不再随仓库提供，也不再通过后端兼容逻辑修补。
 - 新版桌宠自主循环模板 `companion_autonomous_loop` 尚未创建和注册。当前桌宠浮窗仍会尝试读取这个模板，因此桌宠对话入口的 UI 已存在，但完整对话循环还不能作为当前可用能力描述。
-- 当前仓库提供两个官方图模板：`advanced_web_research_loop`（高级联网搜索）和 `create_user_skill`（创建自定义技能）。它们都是通用模板，不是桌宠专用自主循环模板。
+- 当前仓库提供一个官方图模板：`advanced_web_research_loop`（高级联网搜索）。它是通用模板，不是桌宠专用自主循环模板。
 - 技能系统已收束为统一技能库，不再区分“桌宠技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
-- 当前官方技能包包括 `web_search`、`local_workspace_executor` 和 `graphiteUI_skill_builder`。旧技能包已经删除，后续新能力应按当前统一 Skill 结构专门编写。
+- 当前官方技能包包括 `web_search`、`local_workspace_executor` 和 `graphiteui_capability_selector`。旧技能包已经删除，后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
 
 ## 当前协议
@@ -66,14 +66,13 @@
 - 权限策略由受保护的 `backend/data/settings/security/local_executor_policy.json` 管理。遇到越权路径时，技能返回 `blocked` 状态、阻断原因和建议追加的最小白名单，而不是静默执行。
 - 命令和脚本执行会拒绝 `python -c`、`bash -c`、`node -e` 这类内联执行形式；该技能是 GraphiteUI 层面的权限门禁，不是操作系统级沙箱。
 
-### `graphiteUI_skill_builder`
+### `graphiteui_capability_selector`
 
-- 位置：`skill/graphiteUI_skill_builder/`
-- 显示名称：`GraphiteUI Skill Builder`
-- 作用：构建、校验、测试、修订和回滚 GraphiteUI 用户自定义 Skill 包。
-- 写入范围固定为 `backend/data/skills/user/<skill_key>/`，不会写入或覆盖 `skill/<skill_key>/` 下的官方 Skill。
-- 支持检查现有 Skill、校验 manifest / schema / 运行入口、写入完整 Skill 包、应用补丁、运行 smoke test、读取 revision 和回滚 revision。
-- revision 存放在 `backend/data/skills/revisions/<skill_key>/`，用于让生成和修复过程可回溯。
+- 位置：`skill/graphiteui_capability_selector/`
+- 显示名称：`GraphiteUI Capability Selector`
+- 作用：根据 LLM 节点技能入参规划阶段看到的本地可用能力清单，校验并规范化模型选出的单个 `capability`。
+- 选择对象包括当前启用的图模板和对当前 `origin` 可选择的 Skill；图模板优先于 Skill。
+- 它不执行被选能力，不生成被选能力的运行入参，也不做程序字段匹配；模型基于候选项的名称和描述判断，脚本只做真实性与启用状态校验。
 
 ## 当前内置图模板
 
@@ -88,14 +87,7 @@
 - 输出语义：`query`、`source_urls`、`artifact_paths`、`errors` 通过 managed binding state 透传；后续 LLM 节点读取 `artifact_paths` 对应的本地原文，负责证据筛选和最终总结。
 - 模型语义：模板默认使用全局模型配置，不写死某个 provider。LLM 节点和桌宠模型下拉的第一项是“全局（实时读取当前全局设定的模型）”，后面才是具体模型 override。若全局本地网关未启动，运行该模板前需要在 Model Providers 页面选择可用模型，或在图中为 LLM 节点设置 override。
 
-### `create_user_skill`
-
-- 位置：`backend/app/templates/official/create_user_skill.json`
-- 显示名称：`创建自定义技能`
-- 作用：把用户的技能想法转化为可安装在本地用户目录中的 GraphiteUI Skill 包。
-- 主要流程：检查现有技能是否已满足需求 -> 生成澄清问题并暂停等待用户回答 -> 整理确认后的需求 -> 生成示例输入输出并暂停确认 -> 设计 Skill 包并暂停确认 -> 调用 `graphiteUI_skill_builder` 写入用户 Skill -> 运行 smoke test -> 测试失败时自动修复并重试 -> 输出创建结果。
-- 循环语义：示例确认、设计确认和测试修复都有明确循环上限；修复耗尽后会进入人工复核断点，由用户决定继续还是停止。
-- 权限语义：模板只创建用户自定义 Skill，不直接创建官方 Skill。需要成为官方 Skill 时，应由开发者手动移动到 `skill/<skill_key>/` 并纳入 Git 管理。
+创建用户自定义 Skill 的旧官方模板已删除。后续需要按新的职责重新讨论和重建：Skill 生成能力应只根据需求产出 `run.py`、`skill.json` 和 `SKILL.md` 三个必要文件的内容，写入、测试、修复和回滚不再由旧模板方案代表。
 
 ## 当前前端能力
 
@@ -124,7 +116,7 @@
 - 继续收束 `subgraph` 子图体验：补齐父子图运行详情页的审计聚合、事件定位和从缩略图点击跳转到内部节点。
 - 用新结构手工重建桌宠自主循环模板。
 - 设计并实现真正的 `autonomous_decision` 技能，用于根据技能目录、用户意图和运行策略选择技能，但不直接执行技能。
-- 补齐用户 Skill 创建和管理的产品化体验，例如文件预览、revision 对比、回滚入口和测试运行入口。
+- 按新职责重新设计用户 Skill 生成模板和管理体验，避免把文件生成、写入、测试、修复和回滚继续混在一个偏大的 Skill 中。
 - 完成更完整的图运行展示。
 - 清理或按新命令流重建历史 `graph_patch.draft` stub，并完成图补丁预览、GraphCommandBus、graph revision、undo 和审计闭环。
 - 将人设、记忆、会话摘要等长期状态更新表达为可审计的图模板流程，而不是隐藏产品逻辑。

@@ -185,7 +185,6 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(
                     sorted(catalog_items),
                     [
-                        "graphiteUI_skill_builder",
                         "graphiteui_capability_selector",
                         "local_workspace_executor",
                         "web_search",
