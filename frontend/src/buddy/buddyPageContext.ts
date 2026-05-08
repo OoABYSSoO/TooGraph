@@ -18,6 +18,7 @@ export type BuddyEditorContextSnapshot = {
   activeGraphDirty?: boolean | null;
   document?: GraphPayload | GraphDocument | null;
   focusedNodeId?: string | null;
+  selectedNodeIds?: string[] | null;
   feedback?: BuddyEditorFeedbackSnapshot | null;
 };
 
@@ -72,6 +73,7 @@ function buildEditorContextLines(editor: BuddyEditorContextSnapshot | null): str
     `顺序边: ${document.edges.length}`,
     `条件路由: ${conditionRouteCount}`,
     ...buildStateSummaryLines(document),
+    ...buildSelectedNodeLines(document, editor?.selectedNodeIds ?? []),
     ...buildFocusedNodeLines(document, editor?.focusedNodeId ?? null),
     ...buildFeedbackLines(editor?.feedback ?? null),
   ];
@@ -132,6 +134,18 @@ function countNodesByKind(document: GraphPayload | GraphDocument): Record<GraphN
   }
 
   return counts;
+}
+
+function buildSelectedNodeLines(document: GraphPayload | GraphDocument, selectedNodeIds: string[] | null): string[] {
+  const normalizedNodeIds = [...new Set((selectedNodeIds ?? []).map((nodeId) => nodeId.trim()).filter(Boolean))];
+  if (normalizedNodeIds.length <= 1) {
+    return [];
+  }
+  const labels = normalizedNodeIds.map((nodeId) => {
+    const node = document.nodes[nodeId];
+    return node ? `${node.name || nodeId}(${nodeId})` : `${nodeId}(当前图中未找到)`;
+  });
+  return [`多选节点: ${labels.join(", ")}`];
 }
 
 function buildStateSummaryLines(document: GraphPayload | GraphDocument): string[] {

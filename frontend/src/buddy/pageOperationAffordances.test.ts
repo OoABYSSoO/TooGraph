@@ -162,6 +162,7 @@ test("buildPageOperationBook covers official end-to-end page operation flow targ
       { id: "library.action.newBlankGraph", label: "新建空白图", role: "button", actions: ["click"], enabled: true, visible: true },
       { id: "library.graph.graph_1.open", label: "打开图：日报生成", role: "button", actions: ["click"], enabled: true, visible: true },
       { id: "editor.action.runActiveGraph", label: "运行当前图", role: "button", actions: ["click"], enabled: true, visible: true },
+      { id: "editor.action.saveActiveGraphAsTemplate", label: "保存为模板", role: "button", actions: ["click"], enabled: true, visible: true },
       { id: "editor.canvas.node.agent_1", label: "节点：生成日报", role: "button", actions: ["click"], enabled: true, visible: true },
     ],
   });
@@ -174,6 +175,7 @@ test("buildPageOperationBook covers official end-to-end page operation flow targ
   assert.equal(targets.has("library.action.newBlankGraph"), true);
   assert.equal(targets.has("library.graph.graph_1.open"), true);
   assert.equal(targets.has("editor.action.runActiveGraph"), true);
+  assert.equal(targets.has("editor.action.saveActiveGraphAsTemplate"), true);
   assert.equal(targets.has("editor.canvas.node.agent_1"), true);
   assert.equal(targets.has("editor.graph.playback"), true);
 });

@@ -160,6 +160,8 @@ test("EditorCanvas exposes canvas objects to the virtual page operation book", (
   assert.match(componentSource, /:data-virtual-affordance-label="resolveCanvasVirtualEdgeLabel\(edge\)"/);
   assert.match(componentSource, /:data-virtual-affordance-id="`editor\.canvas\.node\.\$\{nodeId\}`"/);
   assert.match(componentSource, /:data-virtual-affordance-label="resolveCanvasVirtualNodeLabel\(nodeId, node\)"/);
+  assert.match(componentSource, /:data-virtual-affordance-current="selection\.isNodeSelected\(nodeId\) \? 'true' : undefined"/);
+  assert.match(componentSource, /data-virtual-affordance-actions="click,press"/);
   assert.ok(
     Array.from(componentSource.matchAll(/:data-virtual-affordance-id="`editor\.canvas\.anchor\.\$\{anchor\.id\}`"/g)).length >= 3,
     "expected flow, route, and point anchors to expose virtual affordances",
@@ -170,6 +172,17 @@ test("EditorCanvas exposes canvas objects to the virtual page operation book", (
   assert.match(componentSource, /function resolveCanvasVirtualNodeLabel\(nodeId: string, node: GraphNode\)/);
   assert.match(componentSource, /function resolveCanvasVirtualEdgeLabel\(edge: ProjectedCanvasEdge\)/);
   assert.match(componentSource, /function resolveCanvasVirtualAnchorLabel\(anchor: ProjectedCanvasAnchor\)/);
+});
+
+test("EditorCanvas exposes keyboard and multi-selection affordances for nodes", () => {
+  assert.match(componentSource, /selectedNodeIds\?: string\[\];/);
+  assert.match(componentSource, /\(event: "select-nodes", payload: \{ focusedNodeId: string \| null; nodeIds: string\[\] \}\): void;/);
+  assert.match(componentSource, /externalSelectedNodeIds: toRef\(props, "selectedNodeIds"\),/);
+  assert.match(componentSource, /@keydown\.enter\.prevent="handleNodeKeyboardSelect\(nodeId\)"/);
+  assert.match(componentSource, /@keydown\.space\.prevent="handleNodeKeyboardToggle\(nodeId\)"/);
+  assert.match(componentSource, /selection\.toggleNode\(nodeId\);/);
+  assert.match(componentSource, /data-virtual-affordance-id="editor\.canvas\.selection\.clear"/);
+  assert.match(componentSource, /selection\.selectedNodeIds\.value\.length > 1/);
 });
 
 test("EditorCanvas marks destructive virtual operation affordances", () => {
@@ -220,7 +233,7 @@ test("EditorCanvas mounts a right-bottom minimap backed by measured node geometr
   assert.match(componentSource, /const canvasSize = ref\(\{ width: 0, height: 0 \}\);/);
   assert.match(componentSource, /const minimapNodes = computed\(\(\) =>\s*nodeEntries\.value\.map\(\(\[nodeId, node\]\) =>\s*buildMinimapNodeModel\(\{/);
   assert.match(componentSource, /measuredNodeSizes: measuredNodeSizes\.value,/);
-  assert.match(componentSource, /isSelected: selection\.selectedNodeId\.value === nodeId,/);
+  assert.match(componentSource, /isSelected: selection\.isNodeSelected\(nodeId\),/);
   assert.match(componentSource, /runStatus: props\.runNodeStatusByNodeId\?\.\[nodeId\],/);
   assert.match(canvasNodePresentationModelSource, /export function buildMinimapNodeModel/);
   assert.doesNotMatch(componentSource, /const measuredSize = measuredNodeSizes\.value\[nodeId\];/);

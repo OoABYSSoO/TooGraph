@@ -60,6 +60,22 @@
       <div v-if="sourceContextLabel" class="editor-canvas__source-context-pill">
         {{ sourceContextLabel }}
       </div>
+      <div v-if="selection.selectedNodeIds.value.length > 1" class="editor-canvas__selection-pill">
+        <span>{{ selectedNodesSummaryLabel }}</span>
+        <button
+          type="button"
+          class="editor-canvas__selection-clear"
+          :aria-label="t('editor.clearSelection')"
+          data-virtual-affordance-id="editor.canvas.selection.clear"
+          :data-virtual-affordance-label="t('editor.clearSelection')"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.selection"
+          data-virtual-affordance-actions="click"
+          @click.stop="selection.clearSelection()"
+        >
+          <ElIcon aria-hidden="true"><Close /></ElIcon>
+        </button>
+      </div>
     </div>
     <button
       v-if="interactionLocked"
@@ -243,15 +259,20 @@
         :style="nodeStyle(node.ui.position)"
         :data-virtual-affordance-id="`editor.canvas.node.${nodeId}`"
         :data-virtual-affordance-label="resolveCanvasVirtualNodeLabel(nodeId, node)"
+        :data-virtual-affordance-current="selection.isNodeSelected(nodeId) ? 'true' : undefined"
         data-virtual-affordance-role="button"
         data-virtual-affordance-zone="editor-canvas.node"
-        data-virtual-affordance-actions="click"
+        data-virtual-affordance-actions="click,press"
+        :aria-pressed="selection.isNodeSelected(nodeId)"
+        tabindex="0"
         @pointerenter="setHoveredNode(nodeId)"
         @pointerleave="clearHoveredNode(nodeId)"
         @pointerdown.capture="handleLockedNodePointerCapture(nodeId, $event)"
         @pointerdown.stop="handleNodePointerDown(nodeId, $event)"
         @click.capture="handleNodeClickCapture(nodeId, $event)"
         @dblclick.stop="handleNodeDoubleClick(nodeId, $event)"
+        @keydown.enter.prevent="handleNodeKeyboardSelect(nodeId)"
+        @keydown.space.prevent="handleNodeKeyboardToggle(nodeId)"
       >
         <div
           v-if="resolveRunNodePresentationForNode(nodeId)?.haloClass"
@@ -451,7 +472,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, watch } from "vue";
-import { Check, Minus, Plus, RefreshLeft } from "@element-plus/icons-vue";
+import { Check, Close, Minus, Plus, RefreshLeft } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 import EditorMinimap from "./EditorMinimap.vue";
@@ -630,6 +651,7 @@ const props = defineProps<{
   agentModelDisplayLookup: Record<string, string>;
   globalTextModelRef: string;
   selectedNodeId?: string | null;
+  selectedNodeIds?: string[];
   focusRequest?: NodeFocusRequest | null;
   runNodeStatusByNodeId?: Record<string, string>;
   currentRunNodeId?: string | null;
@@ -655,6 +677,7 @@ const emit = defineEmits<{
   (event: "update:node-position", payload: { nodeId: string; position: GraphPosition }): void;
   (event: "update:node-size", payload: { nodeId: string; position: GraphPosition; size: GraphNodeSize }): void;
   (event: "select-node", nodeId: string | null): void;
+  (event: "select-nodes", payload: { focusedNodeId: string | null; nodeIds: string[] }): void;
   (event: "update-node-metadata", payload: { nodeId: string; patch: Partial<Pick<GraphNode, "name" | "description">> }): void;
   (event: "update-input-config", payload: { nodeId: string; patch: Partial<InputNode["config"]> }): void;
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
@@ -740,9 +763,13 @@ const {
 });
 const selection = useNodeSelectionFocus({
   externalSelectedNodeId: toRef(props, "selectedNodeId"),
+  externalSelectedNodeIds: toRef(props, "selectedNodeIds"),
   externalFocusRequest: toRef(props, "focusRequest"),
   onSelectedNodeIdChange(nodeId) {
     emit("select-node", nodeId);
+  },
+  onSelectionChange(change) {
+    emit("select-nodes", change);
   },
   onFocusNode(nodeId) {
     void nextTick().then(() => {
@@ -856,11 +883,12 @@ const minimapNodes = computed(() =>
       nodeId,
       node,
       measuredNodeSizes: measuredNodeSizes.value,
-      isSelected: selection.selectedNodeId.value === nodeId,
+      isSelected: selection.isNodeSelected(nodeId),
       runStatus: props.runNodeStatusByNodeId?.[nodeId],
     }),
   ),
 );
+const selectedNodesSummaryLabel = computed(() => t("editor.selectedNodes", { count: selection.selectedNodeIds.value.length }));
 const minimapEdges = computed(() =>
   buildMinimapEdgeModels({
     edges: projectedEdges.value,
@@ -1638,6 +1666,7 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
     nodeExists: Boolean(node),
     interactionLocked: isGraphEditingLocked(),
     preserveInlineEditorFocus,
+    additiveSelection: !preserveInlineEditorFocus && hasAdditiveNodeSelectionModifier(event),
     graphEditPlaybackRunning: isGraphEditPlaybackRunning.value,
     isVirtualPointerEvent: isVirtualPointerEvent(event),
   });
@@ -1660,6 +1689,10 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
         clearCanvasTransientState();
       }
       selection.selectNode(nodePointerDownAction.selectNodeId);
+      return;
+    case "toggle-selection":
+      applyNodePointerDownSelectionToggleSetup(nodePointerDownAction, event);
+      selection.toggleNode(nodePointerDownAction.toggleNodeId);
       return;
     case "start-drag":
       break;
@@ -1700,6 +1733,34 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
   });
 }
 
+function hasAdditiveNodeSelectionModifier(event: PointerEvent | KeyboardEvent) {
+  return event.shiftKey || event.ctrlKey || event.metaKey;
+}
+
+function applyNodePointerDownSelectionToggleSetup(
+  action: Extract<CanvasNodePointerDownAction, { type: "toggle-selection" }>,
+  event: PointerEvent,
+) {
+  if (action.focusCanvas) {
+    canvasRef.value?.focus();
+  }
+  if (action.preventDefault) {
+    event.preventDefault();
+  }
+  if (action.clearCanvasTransientState) {
+    clearCanvasTransientState();
+  }
+  if (action.clearPendingConnection) {
+    clearPendingConnection();
+  }
+  if (action.cancelScheduledDragFrame) {
+    cancelScheduledDragFrame();
+  }
+  if (action.clearSelectedEdge) {
+    selectedEdgeId.value = null;
+  }
+}
+
 function applyNodePointerDownDragSetup(
   action: Extract<CanvasNodePointerDownAction, { type: "start-drag" }>,
   event: PointerEvent,
@@ -1729,6 +1790,28 @@ function applyNodePointerDownDragSetup(
   }
   selection.selectNode(action.selectNodeId);
   return captureElement;
+}
+
+function handleNodeKeyboardSelect(nodeId: string) {
+  if (!props.document.nodes[nodeId] || isGraphEditingLocked()) {
+    return;
+  }
+  clearCanvasTransientState();
+  clearPendingConnection();
+  cancelScheduledDragFrame();
+  selectedEdgeId.value = null;
+  selection.selectNode(nodeId);
+}
+
+function handleNodeKeyboardToggle(nodeId: string) {
+  if (!props.document.nodes[nodeId] || isGraphEditingLocked()) {
+    return;
+  }
+  clearCanvasTransientState();
+  clearPendingConnection();
+  cancelScheduledDragFrame();
+  selectedEdgeId.value = null;
+  selection.toggleNode(nodeId);
 }
 
 function handleNodeResizePointerDown(nodeId: string, handle: NodeResizeHandle, event: PointerEvent) {
@@ -2225,6 +2308,9 @@ function isHumanReviewNode(nodeId: string) {
 }
 
 function isNodeVisuallySelected(nodeId: string) {
+  if (selection.isNodeSelected(nodeId)) {
+    return true;
+  }
   return isCanvasNodeVisuallySelected({
     nodeId,
     selectedNodeId: selection.selectedNodeId.value,
@@ -2474,6 +2560,52 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
     var(--toograph-glass-highlight),
     var(--toograph-glass-rim);
   backdrop-filter: blur(18px) saturate(1.35);
+}
+
+.editor-canvas__selection-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  max-width: clamp(160px, calc(100vw - 600px), 360px);
+  border: 1px solid rgba(13, 148, 136, 0.2);
+  border-radius: 999px;
+  background: rgba(240, 253, 250, 0.92);
+  padding: 6px 7px 6px 12px;
+  color: rgba(17, 94, 89, 0.94);
+  font-size: 0.8rem;
+  font-weight: 850;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow:
+    0 8px 20px rgba(31, 28, 24, 0.045),
+    var(--toograph-glass-highlight),
+    var(--toograph-glass-rim);
+  backdrop-filter: blur(18px) saturate(1.35);
+}
+
+.editor-canvas__selection-pill span {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+.editor-canvas__selection-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.1);
+  color: rgba(15, 118, 110, 0.92);
+  cursor: pointer;
+}
+
+.editor-canvas__selection-clear:hover {
+  background: rgba(15, 118, 110, 0.18);
 }
 
 .editor-canvas__edge-view-toolbar::before {

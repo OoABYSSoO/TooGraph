@@ -102,6 +102,7 @@
                 :agent-model-display-lookup="agentRuntimeCatalog.modelDisplayLookup"
                 :global-text-model-ref="agentRuntimeCatalog.globalTextModelRef"
                 :selected-node-id="focusedNodeIdByTabId[tab.tabId] ?? null"
+                :selected-node-ids="selectedNodeIdsByTabId[tab.tabId] ?? []"
                 :focus-request="focusRequestByTabId[tab.tabId] ?? null"
                 :run-node-status-by-node-id="runNodeStatusByTabId[tab.tabId] ?? undefined"
                 :run-node-timing-by-node-id="runNodeTimingByTabId[tab.tabId] ?? undefined"
@@ -115,7 +116,7 @@
                 :initial-viewport="viewportByTabId[tab.tabId] ?? null"
                 :state-editor-request="dataEdgeStateEditorRequestByTabId[tab.tabId] ?? null"
                 :source-context-label="subgraphSourceContextLabel(tab)"
-                @select-node="focusNodeForTab(tab.tabId, $event)"
+                @select-nodes="selectNodesForTab(tab.tabId, $event)"
                 @update-node-metadata="updateNodeMetadataForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-input-config="updateInputConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-input-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
@@ -520,6 +521,7 @@ const handledRouteSignature = ref<string | null>(null);
 const statePanelOpenByTabId = ref<Record<string, boolean>>({});
 const sidePanelModeByTabId = ref<Record<string, WorkspaceSidePanelMode>>({});
 const focusedNodeIdByTabId = ref<Record<string, string | null>>({});
+const selectedNodeIdsByTabId = ref<Record<string, string[]>>({});
 const focusRequestByTabId = ref<Record<string, NodeFocusRequest | null>>({});
 const viewportByTabId = ref<Record<string, CanvasViewport>>({});
 const dataEdgeStateEditorRequestByTabId = ref<Record<string, DataEdgeStateEditorRequest | null>>({});
@@ -837,6 +839,7 @@ const {
   toggleStatePanel,
   openHumanReviewPanelForTab,
   focusNodeForTab,
+  selectNodesForTab,
   requestNodeFocusForTab,
   toggleActiveStatePanel,
   toggleActiveRunActivityPanel,
@@ -848,6 +851,7 @@ const {
   sidePanelModeByTabId,
   latestRunDetailByTabId,
   focusedNodeIdByTabId,
+  selectedNodeIdsByTabId,
   focusRequestByTabId,
   closeNodeCreationMenu,
   showGraphLockedEditToast,
@@ -913,6 +917,7 @@ const activeBuddyEditorSnapshot = computed(() => {
     activeGraphDirty: tab.dirty,
     document: documentsByTabId.value[tab.tabId] ?? null,
     focusedNodeId: focusedNodeIdByTabId.value[tab.tabId] ?? null,
+    selectedNodeIds: selectedNodeIdsByTabId.value[tab.tabId] ?? [],
     feedback: feedbackForTab(tab.tabId),
   };
 });

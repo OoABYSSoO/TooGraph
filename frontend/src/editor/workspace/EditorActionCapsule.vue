@@ -31,6 +31,11 @@
           type="button"
           class="editor-action-capsule__icon-button editor-action-capsule__icon-button--save-template"
           :aria-label="t('editor.saveAsTemplate')"
+          data-virtual-affordance-id="editor.action.saveActiveGraphAsTemplate"
+          :data-virtual-affordance-label="t('editor.saveAsTemplate')"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor.actions"
+          data-virtual-affordance-actions="click"
           @click="$emit('save-active-graph-as-template')"
         >
           <ElIcon aria-hidden="true"><CollectionTag /></ElIcon>

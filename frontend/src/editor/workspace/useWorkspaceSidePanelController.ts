@@ -23,6 +23,7 @@ type WorkspaceSidePanelControllerInput = {
   sidePanelModeByTabId: Ref<Record<string, WorkspaceSidePanelMode>>;
   latestRunDetailByTabId: Ref<Record<string, RunDetail | null>>;
   focusedNodeIdByTabId: Ref<Record<string, string | null>>;
+  selectedNodeIdsByTabId: Ref<Record<string, string[]>>;
   focusRequestByTabId: Ref<Record<string, NodeFocusRequest | null>>;
   closeNodeCreationMenu: (tabId: string) => void;
   showGraphLockedEditToast: () => void;
@@ -65,6 +66,16 @@ export function useWorkspaceSidePanelController(input: WorkspaceSidePanelControl
 
   function focusNodeForTab(tabId: string, nodeId: string | null) {
     input.focusedNodeIdByTabId.value = setTabScopedRecordEntry(input.focusedNodeIdByTabId.value, tabId, nodeId);
+    input.selectedNodeIdsByTabId.value = setTabScopedRecordEntry(input.selectedNodeIdsByTabId.value, tabId, nodeId ? [nodeId] : []);
+  }
+
+  function selectNodesForTab(tabId: string, selection: { focusedNodeId: string | null; nodeIds: string[] }) {
+    input.focusedNodeIdByTabId.value = setTabScopedRecordEntry(input.focusedNodeIdByTabId.value, tabId, selection.focusedNodeId);
+    input.selectedNodeIdsByTabId.value = setTabScopedRecordEntry(
+      input.selectedNodeIdsByTabId.value,
+      tabId,
+      normalizeSelectedNodeIds(selection.nodeIds),
+    );
   }
 
   function requestNodeFocusForTab(tabId: string, nodeId: string | null) {
@@ -186,6 +197,7 @@ export function useWorkspaceSidePanelController(input: WorkspaceSidePanelControl
     openHumanReviewPanelForTab,
     openRunActivityPanelForTab,
     focusNodeForTab,
+    selectNodesForTab,
     requestNodeFocusForTab,
     toggleActiveStatePanel,
     toggleActiveRunActivityPanel,
@@ -193,4 +205,15 @@ export function useWorkspaceSidePanelController(input: WorkspaceSidePanelControl
     sidePanelLayerStyle,
     sidePanelOpenWidth,
   };
+}
+
+function normalizeSelectedNodeIds(nodeIds: string[]) {
+  const normalized: string[] = [];
+  for (const nodeId of nodeIds) {
+    const compactNodeId = nodeId.trim();
+    if (compactNodeId && !normalized.includes(compactNodeId)) {
+      normalized.push(compactNodeId);
+    }
+  }
+  return normalized;
 }

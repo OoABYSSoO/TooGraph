@@ -18,6 +18,7 @@ function createSidePanelHarness(activeTabId: string | null = "tab_a") {
   const sidePanelModeByTabId = ref<Record<string, WorkspaceSidePanelMode>>({});
   const latestRunDetailByTabId = ref<Record<string, RunDetail | null>>({});
   const focusedNodeIdByTabId = ref<Record<string, string | null>>({});
+  const selectedNodeIdsByTabId = ref<Record<string, string[]>>({});
   const focusRequestByTabId = ref<Record<string, NodeFocusRequest | null>>({});
   const closedMenuTabIds: string[] = [];
   let lockedToastCount = 0;
@@ -28,6 +29,7 @@ function createSidePanelHarness(activeTabId: string | null = "tab_a") {
     sidePanelModeByTabId,
     latestRunDetailByTabId,
     focusedNodeIdByTabId,
+    selectedNodeIdsByTabId,
     focusRequestByTabId,
     closeNodeCreationMenu: (tabId) => closedMenuTabIds.push(tabId),
     showGraphLockedEditToast: () => {
@@ -41,6 +43,7 @@ function createSidePanelHarness(activeTabId: string | null = "tab_a") {
     sidePanelModeByTabId,
     latestRunDetailByTabId,
     focusedNodeIdByTabId,
+    selectedNodeIdsByTabId,
     focusRequestByTabId,
     closedMenuTabIds,
     lockedToastCount: () => lockedToastCount,
@@ -117,6 +120,24 @@ test("useWorkspaceSidePanelController keeps node focus request sequences tab-sco
     nodeId: "node_c",
     sequence: 1,
   });
+  assert.deepEqual(harness.selectedNodeIdsByTabId.value.tab_a, ["node_c"]);
+});
+
+test("useWorkspaceSidePanelController stores multi-node canvas selection tab-scoped", () => {
+  const harness = createSidePanelHarness();
+
+  harness.controller.selectNodesForTab("tab_a", {
+    focusedNodeId: "node_b",
+    nodeIds: ["node_a", "node_b", "node_a", ""],
+  });
+
+  assert.equal(harness.focusedNodeIdByTabId.value.tab_a, "node_b");
+  assert.deepEqual(harness.selectedNodeIdsByTabId.value.tab_a, ["node_a", "node_b"]);
+
+  harness.controller.focusNodeForTab("tab_a", null);
+
+  assert.equal(harness.focusedNodeIdByTabId.value.tab_a, null);
+  assert.deepEqual(harness.selectedNodeIdsByTabId.value.tab_a, []);
 });
 
 test("useWorkspaceSidePanelController toggles the active side panel without changing other tabs", () => {

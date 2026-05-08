@@ -46,7 +46,7 @@
 - 建立 graph revision 存储：保存图、新建图、状态变更和删除图已写入 revision 记录，包含 previous graph、next graph、结构化 diff、actor、run id、节点 id、原因、校验结果和创建时间，并提供 `/api/graphs/{graph_id}/revisions` 查询入口。
 - 将 Graph Edit Playback 编译出的 editor commands 与 graph revision 绑定；每次应用命令前后已生成 command diff，并在回放结束后通过编辑器保存请求写入持久 graph revision；`graph_edit_summary`、operation journal 和运行详情/Buddy 虚拟操作标签已经包含 graph id、revision id、revision status 与 command diff 计数。
 - 接入 undo/redo：graph revision 已提供 restore API，可把保存图恢复到指定 revision 的 previous graph 并记录恢复 revision；图与模板管理页、编辑器动作栏修订历史、运行详情 operation journal 和 Buddy trace/history 胶囊已能从图编辑记录直接恢复对应 graph revision，并在恢复后刷新本地图列表或当前编辑器文档。
-- 扩展编辑已有图覆盖面：Graph Edit Playback 已支持移动节点、节点重命名/简介/Agent 任务说明、修改 input/output config、修改 state、选择 Agent Skill、流程/条件路由连线、删除节点与同计划恢复节点；仍需补齐选择/多选节点 UX、保存为模板。
+- 扩展编辑已有图覆盖面：Graph Edit Playback 已支持移动节点、节点重命名/简介/Agent 任务说明、修改 input/output config、修改 state、选择 Agent Skill、流程/条件路由连线、删除节点与同计划恢复节点；Buddy 页面操作已能发现并点击编辑器“保存为模板”动作；编辑器节点选择已支持单选、多选切换、键盘选择、当前选择 affordance 和多选清除入口。
 - 历史 `graph_patch.draft` stub 已从 Buddy command 与前端 API surface 移除；图修改入口必须走编辑器语义命令、校验、revision 和撤销路径，后台复盘与 Buddy Home 写入提示继续显式禁止该旧 action。
 
 ### 3. 运行结果校验与自我修复

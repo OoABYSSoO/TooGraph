@@ -1,6 +1,6 @@
 import { watch, type Ref } from "vue";
 
-import { useSelection } from "./useSelection.ts";
+import { useSelection, type SelectionChange } from "./useSelection.ts";
 
 export type NodeFocusRequest = {
   nodeId: string;
@@ -9,15 +9,19 @@ export type NodeFocusRequest = {
 
 type UseNodeSelectionFocusOptions = {
   externalSelectedNodeId?: Ref<string | null | undefined>;
+  externalSelectedNodeIds?: Ref<string[] | readonly string[] | null | undefined>;
   externalFocusRequest?: Ref<NodeFocusRequest | null | undefined>;
   onSelectedNodeIdChange?: (nodeId: string | null) => void;
+  onSelectionChange?: (change: SelectionChange) => void;
   onFocusNode?: (nodeId: string) => void;
 };
 
 export function useNodeSelectionFocus(options: UseNodeSelectionFocusOptions = {}) {
   const selection = useSelection({
     externalSelectedNodeId: options.externalSelectedNodeId,
+    externalSelectedNodeIds: options.externalSelectedNodeIds,
     onSelectedNodeIdChange: options.onSelectedNodeIdChange,
+    onSelectionChange: options.onSelectionChange,
   });
 
   watch(

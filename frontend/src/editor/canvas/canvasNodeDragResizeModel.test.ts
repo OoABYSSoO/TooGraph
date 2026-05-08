@@ -101,6 +101,25 @@ test("resolveNodePointerDownAction resolves node drag pointer-down routing", () 
       ...setupPolicy,
     },
   );
+  assert.deepEqual(
+    resolveNodePointerDownAction({
+      nodeId: "node-a",
+      nodeExists: true,
+      interactionLocked: false,
+      preserveInlineEditorFocus: false,
+      additiveSelection: true,
+    }),
+    {
+      type: "toggle-selection",
+      preventDefault: true,
+      focusCanvas: true,
+      clearCanvasTransientState: true,
+      clearPendingConnection: true,
+      cancelScheduledDragFrame: true,
+      clearSelectedEdge: true,
+      toggleNodeId: "node-a",
+    },
+  );
 });
 
 test("resolveNodeResizePointerDownAction resolves resize pointer-down routing", () => {

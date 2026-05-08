@@ -42,6 +42,16 @@ type CanvasNodePointerDownDragSetupPolicy = {
   selectNodeId: string;
 };
 
+type CanvasNodePointerDownSelectionTogglePolicy = {
+  focusCanvas: true;
+  preventDefault: true;
+  clearCanvasTransientState: true;
+  clearPendingConnection: true;
+  cancelScheduledDragFrame: true;
+  clearSelectedEdge: true;
+  toggleNodeId: string;
+};
+
 type CanvasNodeResizePointerDownSetupPolicy = {
   focusCanvas: true;
   setPointerCapture: true;
@@ -62,6 +72,7 @@ export type CanvasNodePointerDownAction =
       clearCanvasTransientState: true;
       selectNodeId: string;
     }
+  | ({ type: "toggle-selection" } & CanvasNodePointerDownSelectionTogglePolicy)
   | ({ type: "start-drag" } & CanvasNodePointerDownDragSetupPolicy);
 
 export type CanvasNodeResizePointerDownAction =
@@ -88,6 +99,7 @@ export function resolveNodePointerDownAction(input: {
   nodeExists: boolean;
   interactionLocked: boolean;
   preserveInlineEditorFocus: boolean;
+  additiveSelection?: boolean;
   graphEditPlaybackRunning?: boolean;
   isVirtualPointerEvent?: boolean;
 }): CanvasNodePointerDownAction {
@@ -106,6 +118,19 @@ export function resolveNodePointerDownAction(input: {
       focusCanvas: true,
       clearCanvasTransientState: true,
       selectNodeId: input.nodeId,
+    };
+  }
+
+  if (input.additiveSelection) {
+    return {
+      type: "toggle-selection",
+      focusCanvas: true,
+      preventDefault: true,
+      clearCanvasTransientState: true,
+      clearPendingConnection: true,
+      cancelScheduledDragFrame: true,
+      clearSelectedEdge: true,
+      toggleNodeId: input.nodeId,
     };
   }
 
