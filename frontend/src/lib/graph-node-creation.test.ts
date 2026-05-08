@@ -209,7 +209,7 @@ test("applyNodeCreationResult auto-binds state outputs into a created output nod
   assert.deepEqual(result.document.edges, [{ source: "input_question", target: "output_created" }]);
 });
 
-test("applyNodeCreationResult auto-creates a read binding for blank agent presets when spawned from a state output", () => {
+test("applyNodeCreationResult only adds a read binding for blank agent presets spawned from a regular state output", () => {
   const document: GraphPayload = {
     graph_id: null,
     name: "Creation Graph",
@@ -292,9 +292,8 @@ test("applyNodeCreationResult auto-creates a read binding for blank agent preset
   });
 
   assert.deepEqual(result.document.nodes.agent_created.reads, [{ state: "answer", required: true }]);
-  assert.deepEqual(result.document.nodes.agent_created.writes, [{ state: "state_1", mode: "replace" }]);
-  assert.equal(result.document.state_schema.state_1?.type, "markdown");
-  assert.equal(result.document.metadata.graphiteui_state_key_counter, 1);
+  assert.deepEqual(result.document.nodes.agent_created.writes, []);
+  assert.equal(result.document.metadata.graphiteui_state_key_counter, undefined);
   assert.deepEqual(result.document.edges, [{ source: "answer_source", target: "agent_created" }]);
 });
 

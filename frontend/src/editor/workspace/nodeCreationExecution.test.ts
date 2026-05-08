@@ -108,7 +108,7 @@ function createSubgraphTemplate(): TemplateRecord {
   };
 }
 
-test("createNodeFromCreationEntry builds the builtin empty agent preset and auto-wires state + flow", () => {
+test("createNodeFromCreationEntry builds the builtin empty agent preset and auto-wires input state + flow", () => {
   const document = createBaseDocument();
   const entry: NodeCreationEntry = {
     id: "preset-agent-empty",
@@ -138,9 +138,8 @@ test("createNodeFromCreationEntry builds the builtin empty agent preset and auto
   assert.equal(result.document.nodes.agent_created.kind, "agent");
   assert.equal(result.document.nodes.agent_created.kind === "agent" ? result.document.nodes.agent_created.config.thinkingMode : null, "high");
   assert.deepEqual(result.document.nodes.agent_created.reads, [{ state: "question", required: true }]);
-  assert.deepEqual(result.document.nodes.agent_created.writes, [{ state: "state_1", mode: "replace" }]);
-  assert.equal(result.document.state_schema.state_1?.type, "markdown");
-  assert.equal(result.document.metadata.graphiteui_state_key_counter, 1);
+  assert.deepEqual(result.document.nodes.agent_created.writes, []);
+  assert.equal(result.document.metadata.graphiteui_state_key_counter, undefined);
   assert.deepEqual(result.document.edges, [{ source: "input_question", target: "agent_created" }]);
 });
 

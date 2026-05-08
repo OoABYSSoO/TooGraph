@@ -311,18 +311,6 @@ function bindCreatedStateToNode(node: GraphNode, stateKey: string) {
   }
 }
 
-function ensureCreatedAgentDefaultOutputState<T extends GraphPayload | GraphDocument>(document: T, nodeId: string) {
-  const node = document.nodes[nodeId];
-  if (!node || node.kind !== "agent" || node.config.skillKey.trim() || node.writes.length > 0) {
-    return;
-  }
-
-  const stateField = buildNextVirtualStateField(document, "markdown");
-  document.state_schema[stateField.key] = stateField.definition;
-  rememberDefaultStateKeyIndex(document, stateField.key);
-  node.writes = [{ state: stateField.key, mode: "replace" }];
-}
-
 function bindCreatedStateToSourceNode(node: GraphNode | undefined, stateKey: string) {
   if (!node) {
     return;
@@ -528,7 +516,6 @@ export function applyNodeCreationResult<T extends GraphPayload | GraphDocument>(
     bindCreatedStateToNode(nextDocument.nodes[input.createdNodeId], sourceStateKey);
     if (nextDocument.nodes[input.createdNodeId]?.kind === "agent") {
       reconcileAgentCapabilityInputBindingsInPlace(nextDocument, input.createdNodeId);
-      ensureCreatedAgentDefaultOutputState(nextDocument, input.createdNodeId);
     }
     applyStateNameToCreatedOutputNode(nextDocument.nodes[input.createdNodeId], sourceStateKey, nextDocument.state_schema);
   }
