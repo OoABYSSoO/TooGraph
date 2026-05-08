@@ -831,6 +831,7 @@ function isAgentCreateOutputAnchorVisible(nodeId: string) {
   return resolveAgentCreateOutputAnchorVisible({
     nodeId,
     node: props.document.nodes[nodeId],
+    stateSchema: props.document.state_schema,
     selectedNodeId: selection.selectedNodeId.value,
     hoveredNodeId: hoveredNodeId.value,
     hoveredPointAnchorNodeId: hoveredPointAnchorNodeId.value,

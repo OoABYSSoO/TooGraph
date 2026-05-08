@@ -6,7 +6,7 @@ import {
   VIRTUAL_ANY_OUTPUT_COLOR,
   VIRTUAL_ANY_OUTPUT_STATE_KEY,
 } from "../../lib/virtual-any-input.ts";
-import type { GraphDocument, GraphNode, GraphPayload } from "../../types/node-system.ts";
+import type { GraphDocument, GraphNode, GraphPayload, StateDefinition } from "../../types/node-system.ts";
 import type { PendingStateInputSource } from "./canvasPendingStatePortModel.ts";
 import type { ProjectedCanvasAnchor } from "./edgeProjection.ts";
 import type { MeasuredAnchorOffset } from "./resolvedCanvasLayout.ts";
@@ -19,13 +19,30 @@ type VirtualCreatePortVisibilityInput = {
   hoveredPointAnchorNodeId?: string | null;
   activeConnectionHoverNodeId?: string | null;
   pendingConnection?: PendingGraphConnection | null;
+  stateSchema?: Record<string, StateDefinition>;
 };
 
 export function shouldShowAgentCreateInputPortByDefault(node: GraphNode | undefined) {
   return node?.kind === "agent" && node.reads.length === 0;
 }
 
-export function shouldShowAgentCreateOutputPortByDefault(node: GraphNode | undefined) {
+function isDynamicCapabilityExecutorNode(
+  node: GraphNode | undefined,
+  stateSchema: Record<string, StateDefinition> | undefined,
+) {
+  if (!node || node.kind !== "agent" || node.config.skillKey.trim()) {
+    return false;
+  }
+  return node.reads.some((binding) => stateSchema?.[binding.state]?.type?.trim() === "capability");
+}
+
+export function shouldShowAgentCreateOutputPortByDefault(
+  node: GraphNode | undefined,
+  stateSchema?: Record<string, StateDefinition>,
+) {
+  if (isDynamicCapabilityExecutorNode(node, stateSchema)) {
+    return false;
+  }
   return (node?.kind === "agent" || node?.kind === "input") && node.writes.length === 0;
 }
 
@@ -45,8 +62,11 @@ export function isAgentCreateInputAnchorVisible(input: VirtualCreatePortVisibili
 }
 
 export function isAgentCreateOutputAnchorVisible(input: VirtualCreatePortVisibilityInput) {
+  if (isDynamicCapabilityExecutorNode(input.node, input.stateSchema)) {
+    return false;
+  }
   return (
-    shouldShowAgentCreateOutputPortByDefault(input.node) ||
+    shouldShowAgentCreateOutputPortByDefault(input.node, input.stateSchema) ||
     input.selectedNodeId === input.nodeId ||
     input.hoveredNodeId === input.nodeId ||
     input.hoveredPointAnchorNodeId === input.nodeId ||

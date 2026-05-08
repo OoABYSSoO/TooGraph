@@ -292,7 +292,105 @@ test("applyNodeCreationResult auto-creates a read binding for blank agent preset
   });
 
   assert.deepEqual(result.document.nodes.agent_created.reads, [{ state: "answer", required: true }]);
+  assert.deepEqual(result.document.nodes.agent_created.writes, [{ state: "state_1", mode: "replace" }]);
+  assert.equal(result.document.state_schema.state_1?.type, "markdown");
+  assert.equal(result.document.metadata.graphiteui_state_key_counter, 1);
   assert.deepEqual(result.document.edges, [{ source: "answer_source", target: "agent_created" }]);
+});
+
+test("applyNodeCreationResult uses a locked result package when a new agent is spawned from a capability state", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Creation Graph",
+    state_schema: {
+      selected_capability: {
+        name: "selected_capability",
+        description: "",
+        type: "capability",
+        value: { kind: "none" },
+        color: "#2563eb",
+      },
+    },
+    nodes: {
+      selector: {
+        kind: "agent",
+        name: "selector",
+        description: "",
+        ui: { position: { x: 0, y: 0 }, collapsed: false },
+        reads: [],
+        writes: [{ state: "selected_capability", mode: "replace" }],
+        config: {
+          skillKey: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const preset: PresetDocument = {
+    presetId: "preset.agent.empty.v0",
+    sourcePresetId: null,
+    createdAt: null,
+    updatedAt: null,
+    status: "active",
+    definition: {
+      label: "Empty LLM Node",
+      description: "Blank one-turn LLM node.",
+      state_schema: {},
+      node: {
+        kind: "agent",
+        name: "Empty LLM Node",
+        description: "Blank one-turn LLM node.",
+        ui: { position: { x: 0, y: 0 }, collapsed: false },
+        reads: [],
+        writes: [],
+        config: {
+          skillKey: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+  };
+
+  const createdAgent = buildNodeFromPreset(preset, {
+    id: "capability_executor",
+    position: { x: 240, y: 60 },
+  });
+  const result = applyNodeCreationResult(document, {
+    createdNodeId: createdAgent.id,
+    createdNode: createdAgent.node,
+    mergedStateSchema: createdAgent.state_schema,
+    context: {
+      position: { x: 240, y: 60 },
+      sourceNodeId: "selector",
+      sourceAnchorKind: "state-out",
+      sourceStateKey: "selected_capability",
+      sourceValueType: "capability",
+    },
+  });
+
+  const createdWrite = result.document.nodes.capability_executor.writes[0];
+  assert.deepEqual(result.document.nodes.capability_executor.reads, [{ state: "selected_capability", required: true }]);
+  assert.equal(createdWrite?.state, "state_1");
+  assert.equal(result.document.state_schema[createdWrite.state]?.type, "result_package");
+  assert.deepEqual(result.document.state_schema[createdWrite.state]?.binding, {
+    kind: "capability_result",
+    nodeId: "capability_executor",
+    fieldKey: "result_package",
+    managed: true,
+  });
+  assert.deepEqual(result.document.edges, [{ source: "selector", target: "capability_executor" }]);
 });
 
 test("applyNodeCreationResult materializes a virtual agent any output when it spawns a target node", () => {

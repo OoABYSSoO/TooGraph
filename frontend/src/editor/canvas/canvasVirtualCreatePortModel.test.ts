@@ -23,12 +23,34 @@ import {
 
 const document: GraphPayload = {
   name: "Virtual ports",
-  state_schema: {},
+  state_schema: {
+    selected_capability: {
+      name: "selected_capability",
+      description: "",
+      type: "capability",
+      value: { kind: "none" },
+      color: "#2563eb",
+    },
+    dynamic_result: {
+      name: "dynamic_result",
+      description: "",
+      type: "result_package",
+      value: {},
+      color: "#7c3aed",
+      binding: {
+        kind: "capability_result",
+        nodeId: "dynamic_executor",
+        fieldKey: "result_package",
+        managed: true,
+      },
+    },
+  },
   metadata: {},
   nodes: {
     empty_agent: agentNode("Empty", [], []),
     reading_agent: agentNode("Reader", [], ["answer"]),
     writing_agent: agentNode("Writer", ["answer"], []),
+    dynamic_executor: agentNode("Dynamic", ["dynamic_result"], ["selected_capability"]),
     input: {
       kind: "input",
       name: "Input",
@@ -50,6 +72,31 @@ test("virtual create port model resolves default visibility by node shape", () =
   assert.equal(shouldShowAgentCreateOutputPortByDefault(document.nodes.empty_agent), true);
   assert.equal(shouldShowAgentCreateOutputPortByDefault(document.nodes.writing_agent), false);
   assert.equal(shouldShowAgentCreateOutputPortByDefault(document.nodes.input), false);
+});
+
+test("virtual create port model hides output creation for dynamic capability executors", () => {
+  assert.equal(
+    shouldShowAgentCreateOutputPortByDefault(document.nodes.dynamic_executor, document.state_schema),
+    false,
+  );
+  assert.equal(
+    isAgentCreateOutputAnchorVisible({
+      nodeId: "dynamic_executor",
+      node: document.nodes.dynamic_executor,
+      stateSchema: document.state_schema,
+      selectedNodeId: "dynamic_executor",
+    }),
+    false,
+  );
+  assert.equal(
+    isAgentCreateOutputAnchorVisible({
+      nodeId: "dynamic_executor",
+      node: document.nodes.dynamic_executor,
+      stateSchema: document.state_schema,
+      hoveredNodeId: "dynamic_executor",
+    }),
+    false,
+  );
 });
 
 test("virtual create port model keeps virtual anchors visible while selected, hovered, or dragging from them", () => {

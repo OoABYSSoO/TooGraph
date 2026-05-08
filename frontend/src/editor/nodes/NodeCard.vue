@@ -870,7 +870,10 @@ const hasFloatingPanelOpen = computed(
 );
 const shouldRevealAgentCreateInputPort = computed(() => shouldShowAgentCreateInputPort.value || props.selected || Boolean(props.hovered) || hasFloatingPanelOpen.value);
 const shouldRevealAgentCreateOutputPort = computed(
-  () => !isAgentOutputManagedBySkill.value && (shouldShowAgentCreateOutputPort.value || props.selected || Boolean(props.hovered) || hasFloatingPanelOpen.value),
+  () =>
+    !isAgentOutputManagedBySkill.value &&
+    !isAgentOutputManagedByCapability.value &&
+    (shouldShowAgentCreateOutputPort.value || props.selected || Boolean(props.hovered) || hasFloatingPanelOpen.value),
 );
 
 function isPortCreateOpen(side: "input" | "output") {
@@ -1137,7 +1140,7 @@ function openPortStateCreate(side: "input" | "output") {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  if (side === "output" && isAgentOutputManagedBySkill.value) {
+  if (side === "output" && (isAgentOutputManagedBySkill.value || isAgentOutputManagedByCapability.value)) {
     return;
   }
   clearTopActionTimeout();
