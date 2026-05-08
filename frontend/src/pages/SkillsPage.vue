@@ -49,14 +49,6 @@
           <span>{{ t("skills.selectableSkills") }}</span>
           <strong>{{ overview.selectableSkills }}</strong>
         </article>
-        <article class="skills-page__metric">
-          <span>{{ t("skills.runtimeReady") }}</span>
-          <strong>{{ overview.runtimeReady }}</strong>
-        </article>
-        <article class="skills-page__metric">
-          <span>{{ t("skills.needsAttention") }}</span>
-          <strong>{{ overview.needsAttention }}</strong>
-        </article>
       </section>
 
       <section class="skills-page__toolbar" :aria-label="t('skills.filterLabel')">
@@ -121,13 +113,6 @@
                 <h3>{{ selectedSkill.name }}</h3>
                 <p>{{ selectedSkill.description }}</p>
               </div>
-              <div class="skills-page__status">
-                <span>{{ t(`skills.${selectedSkill.status}`) }}</span>
-                <span>{{ selectedSkill.runtimeReady ? t("skills.runtimeReady") : t("skills.runtimePending") }}</span>
-                <span>{{ selectedSkill.runtimeRegistered ? t("skills.runtimeRegistered") : t("skills.runtimeNotRegistered") }}</span>
-                <span>{{ t("skills.llmNodeEligibility") }}: {{ selectedSkill.llmNodeEligibility }}</span>
-                <span v-if="selectedSkill.canManage">{{ t("skills.manageable") }}</span>
-              </div>
             </header>
 
             <div class="skills-page__actions" :aria-label="t('skills.actions')">
@@ -158,13 +143,6 @@
                   >
                     {{ formatCapabilityPolicy(entry.origin, entry.policy) }}
                   </span>
-                </div>
-              </section>
-              <section>
-                <h4>{{ t("skills.runtime") }}</h4>
-                <div class="skills-page__badges">
-                  <span>{{ selectedSkill.runtime.type }}</span>
-                  <span>{{ selectedSkill.runtime.entrypoint || t("common.none") }}</span>
                 </div>
               </section>
               <section>
@@ -199,13 +177,6 @@
                 <div class="skills-page__badges">
                   <span v-for="permission in selectedSkill.permissions" :key="permission">{{ permission }}</span>
                   <span v-if="selectedSkill.permissions.length === 0">{{ t("common.none") }}</span>
-                </div>
-              </section>
-              <section>
-                <h4>{{ t("skills.llmNodeBlockers") }}</h4>
-                <div class="skills-page__schema-list">
-                  <span v-for="blocker in selectedSkill.llmNodeBlockers" :key="blocker">{{ blocker }}</span>
-                  <span v-if="selectedSkill.llmNodeBlockers.length === 0">{{ t("skills.agentNodeReady") }}</span>
                 </div>
               </section>
               <section>
@@ -845,7 +816,7 @@ onMounted(loadSkills);
 
 .skills-page__detail-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.8fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
 }
 
@@ -867,7 +838,6 @@ onMounted(loadSkills);
   font-size: 0.86rem;
 }
 
-.skills-page__status,
 .skills-page__actions,
 .skills-page__badges {
   display: flex;
@@ -886,7 +856,6 @@ onMounted(loadSkills);
   gap: 12px;
 }
 
-.skills-page__status span,
 .skills-page__badges span,
 .skills-page__schema-list span,
 .skills-page__file-pill {
@@ -901,12 +870,6 @@ onMounted(loadSkills);
   font-size: 0.82rem;
   overflow-wrap: anywhere;
   white-space: normal;
-}
-
-.skills-page__status .skills-page__status-warning {
-  border-color: rgba(185, 28, 28, 0.16);
-  background: rgba(255, 245, 242, 0.96);
-  color: rgb(153, 27, 27);
 }
 
 .skills-page__source {

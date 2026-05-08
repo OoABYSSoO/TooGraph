@@ -1,6 +1,6 @@
 import type { SkillCapabilityPolicy, SkillDefinition } from "../types/skills.ts";
 
-export type SkillStatusFilter = "all" | "active" | "selectable" | "runtime" | "attention";
+export type SkillStatusFilter = "all" | "active" | "selectable";
 
 export type SkillManagementFilters = {
   query: string;
@@ -11,13 +11,10 @@ export type SkillOverview = {
   total: number;
   active: number;
   selectableSkills: number;
-  runtimeReady: number;
-  runtimeRegistered: number;
-  needsAttention: number;
 };
 
 export function buildSkillStatusOptions(): SkillStatusFilter[] {
-  return ["all", "active", "selectable", "runtime", "attention"];
+  return ["all", "active", "selectable"];
 }
 
 export function filterSkillsForManagement(
@@ -42,9 +39,6 @@ export function buildSkillOverview(skills: SkillDefinition[]): SkillOverview {
     total: skills.length,
     active: skills.filter((skill) => skill.status === "active").length,
     selectableSkills: skills.filter((skill) => skillIsSelectable(skill)).length,
-    runtimeReady: skills.filter((skill) => skill.runtimeReady).length,
-    runtimeRegistered: skills.filter((skill) => skill.runtimeRegistered).length,
-    needsAttention: skills.filter((skill) => skillNeedsAttention(skill)).length,
   };
 }
 
@@ -52,20 +46,10 @@ function matchesSkillStatus(skill: SkillDefinition, filter: SkillStatusFilter): 
   if (filter === "active") {
     return skill.status === "active";
   }
-  if (filter === "runtime") {
-    return skill.runtimeReady;
-  }
   if (filter === "selectable") {
     return skillIsSelectable(skill);
   }
-  if (filter === "attention") {
-    return skillNeedsAttention(skill);
-  }
   return true;
-}
-
-function skillNeedsAttention(skill: SkillDefinition): boolean {
-  return skill.status !== "active" || skill.llmNodeEligibility !== "ready";
 }
 
 export function listSkillCapabilityPolicies(skill: SkillDefinition): Array<{ origin: string; policy: SkillCapabilityPolicy }> {
@@ -86,10 +70,6 @@ function buildSkillSearchText(skill: SkillDefinition): string {
     skill.description,
     skill.llmInstruction,
     skill.version,
-    `${skill.runtime.entrypoint} ${skill.runtime.type} runtime`,
-    `${skill.runtime.type} runtime`,
-    skill.runtime.entrypoint,
-    skill.llmNodeEligibility,
     skill.sourceScope,
     skill.sourcePath,
     skill.status,
@@ -101,7 +81,6 @@ function buildSkillSearchText(skill: SkillDefinition): string {
       ].join(" "),
     ),
     ...skill.permissions,
-    ...skill.llmNodeBlockers,
     ...skill.inputSchema.map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
     ...skill.outputSchema.map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
   ]
