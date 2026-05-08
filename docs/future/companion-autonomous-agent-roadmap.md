@@ -191,6 +191,13 @@ input_question
   "description": "当任务需要获取最新公开网页信息、新闻、版本内容、引用来源或网页正文时使用。不负责最终总结。",
   "llmInstruction": "你已经绑定了联网搜索技能。请根据任务决定 query，然后运行技能；不要在本节点整理最终结论。",
   "permissions": ["network", "secret_read"],
+  "inputSchema": [
+    { "key": "query", "name": "Query", "valueType": "text", "required": true }
+  ],
+  "outputSchema": [
+    { "key": "source_urls", "name": "Source URLs", "valueType": "json" }
+  ],
+  "runtime": { "type": "python", "entrypoint": "run.py" },
   "capabilityPolicy": {
     "default": {
       "selectable": true,
@@ -213,12 +220,14 @@ input_question
 - `description`：能力说明与选择条件。
 - `llmInstruction`：LLM 节点已经绑定该技能后，应该如何使用它。
 - `permissions`：执行前需要评估或授权的能力。
+- `inputSchema` / `outputSchema`：技能入参和结构化输出契约。
+- `runtime`：技能脚本入口和执行参数。
 - `capabilityPolicy.default`：默认能力选择策略。
 - `capabilityPolicy.origins.<origin>`：特定来源策略，例如 `companion`。
 - `selectable`：能力选择器是否可以看到并返回这个 skill。
 - `requiresApproval`：执行前是否必须请求用户确认。
 
-旧字段 `label`、`targets`、`executionTargets`、`inputMapping`、静态技能参数 `config`、无意义的 `trigger`、`runPolicies`、`discoverable`、`autoSelectable`、`supportedValueTypes`、`sideEffects`、`kind`、`mode` 和 `scope` 已废弃，出现在当前协议载荷中应被拒绝，而不是悄悄兼容。
+旧字段 `label`、`targets`、`executionTargets`、`inputMapping`、静态技能参数 `config`、无意义的 `trigger`、`runPolicies`、`discoverable`、`autoSelectable`、`supportedValueTypes`、`sideEffects`、`health`、`configured`、`healthy`、`kind`、`mode` 和 `scope` 已废弃，出现在当前协议载荷中应被拒绝，而不是悄悄兼容。
 
 ## Capability State 契约
 
@@ -251,7 +260,7 @@ effective_capability =
 - `capability.kind=subgraph` 只表达“选中的一个可运行子图能力”，主要服务桌宠主循环等动态模板。
 - `capability.kind=none` 表达没有合适能力。
 - 一个 LLM 节点不能同时使用卡片 skill 和输入 capability state；冲突时应作为协议错误处理。
-- 真正执行前仍必须通过 skill registry、运行时注册状态、健康状态、`capabilityPolicy` 和审批检查。
+- 真正执行前仍必须通过 skill registry、启用状态、运行时注册状态、`capabilityPolicy` 和审批检查。
 - 多个能力调用必须拆成多个节点，由图结构显式编排。
 
 ## 绑定技能的语义
@@ -411,16 +420,17 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 这种封包/拆包方式让动态能力和静态绑定在下游拥有同一套阅读逻辑：差别只在于动态结果缺少静态 state key，但不缺少输出名称、描述、类型和值。
 
-## `autonomous_decision`
+## `graphiteui_capability_selector`
 
-`autonomous_decision` 是未来要实现的 control skill。它负责“决策”，不负责“执行”。
+`graphiteui_capability_selector` 是当前的能力选择 Skill。它负责“从启用能力中选择一个最合适的能力”，不负责“执行”。
 
 它应该：
 
-- 读取用户意图、当前上下文和技能目录摘要。
-- 根据 `description`、`capabilityPolicy`、权限、健康状态和运行来源筛选候选 skill。
-- 输出是否需要技能、推荐 skill、审批需求、缺失能力和下一步分支。
-- 在缺少能力时生成 `missing_skill_proposal`。
+- 读取用户需求、官方/用户模板目录和官方/用户 Skill 目录。
+- 只考虑启用的模板，以及启用且对当前 `origin` 可选择的 Skill。
+- 优先返回图模板，其次返回 Skill。
+- 输出单个 `capability` 对象；没有合适能力时输出 `{ "kind": "none" }`。
+- 返回候选匹配摘要，供运行记录和下游节点审计。
 
 它不应该：
 

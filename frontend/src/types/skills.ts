@@ -13,10 +13,6 @@ export type SkillRuntimeSpec = {
   timeoutSeconds?: number;
 };
 
-export type SkillHealthSpec = {
-  type: string;
-};
-
 export type SkillCapabilityPolicy = {
   selectable: boolean;
   requiresApproval: boolean;
@@ -37,7 +33,6 @@ export type SkillDefinition = {
   capabilityPolicy: SkillCapabilityPolicies;
   permissions: string[];
   runtime: SkillRuntimeSpec;
-  health: SkillHealthSpec;
   inputSchema: SkillIoField[];
   outputSchema: SkillIoField[];
   llmNodeEligibility: string;
@@ -46,8 +41,6 @@ export type SkillDefinition = {
   sourcePath: string;
   runtimeReady: boolean;
   runtimeRegistered: boolean;
-  configured: boolean;
-  healthy: boolean;
   status: string;
   canManage: boolean;
 };

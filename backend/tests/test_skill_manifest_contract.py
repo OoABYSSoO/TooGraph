@@ -31,7 +31,6 @@ def _ready_manifest(skill_key: str) -> dict[str, object]:
             {"key": "result", "name": "Result", "valueType": "text"}
         ],
         "runtime": {"type": "python", "entrypoint": "run.py"},
-        "health": {"type": "none"},
     }
 
 
@@ -68,6 +67,9 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertNotIn("label", serialized)
         self.assertNotIn("compatibility", serialized)
         self.assertNotIn("targets", serialized)
+        self.assertNotIn("health", serialized)
+        self.assertNotIn("configured", serialized)
+        self.assertNotIn("healthy", serialized)
         self.assertEqual(
             serialized["capabilityPolicy"],
             {
@@ -84,7 +86,7 @@ class SkillManifestContractTests(unittest.TestCase):
             },
         )
 
-    def test_native_manifest_exposes_runtime_health_and_ready_eligibility(self) -> None:
+    def test_native_manifest_exposes_runtime_and_ready_eligibility(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             skill_dir = Path(temp_dir) / "normalize_storyboard_shots"
             skill_dir.mkdir()
@@ -103,11 +105,24 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertEqual(definition.schema_version, "graphite.skill/v1")
         self.assertEqual(definition.runtime.type, "python")
         self.assertEqual(definition.runtime.entrypoint, "run.py")
-        self.assertEqual(definition.health.type, "none")
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
         self.assertEqual(definition.llm_node_blockers, [])
         self.assertTrue(definition.capability_policy.default.selectable)
         self.assertFalse(definition.capability_policy.default.requires_approval)
+
+    def test_static_health_fields_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skill_dir = Path(temp_dir) / "static_health"
+            skill_dir.mkdir()
+            payload = _ready_manifest("static_health")
+            payload["health"] = {"type": "none"}
+            payload["configured"] = True
+            payload["healthy"] = True
+            manifest = _write_manifest(skill_dir, payload)
+            (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "health.*no longer supported"):
+                _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
 
     def test_legacy_targets_field_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -23,8 +23,6 @@ def _native_skill_manifest(
     skill_key: str = "video_understanding",
     *,
     capability_policy: dict[str, object] | None = None,
-    configured: bool = True,
-    healthy: bool = True,
     runtime_entrypoint: str | None = None,
 ) -> str:
     manifest = {
@@ -66,12 +64,9 @@ def _native_skill_manifest(
                 "description": "Structured video summary.",
             }
         ],
-        "configured": configured,
-        "healthy": healthy,
     }
     if runtime_entrypoint is not None:
         manifest["runtime"] = {"type": "python", "entrypoint": runtime_entrypoint}
-        manifest["health"] = {"type": "none"}
     return json.dumps(
         manifest,
         ensure_ascii=False,
@@ -162,8 +157,6 @@ def _write_native_skill(
     skills_dir: Path,
     skill_key: str,
     *,
-    configured: bool = True,
-    healthy: bool = True,
     runtime: bool = True,
 ) -> None:
     skill_dir = skills_dir / skill_key
@@ -171,8 +164,6 @@ def _write_native_skill(
     (skill_dir / "skill.json").write_text(
         _native_skill_manifest(
             skill_key,
-            configured=configured,
-            healthy=healthy,
             runtime_entrypoint="run.py" if runtime else None,
         ),
         encoding="utf-8",
@@ -195,6 +186,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                     sorted(catalog_items),
                     [
                         "graphiteUI_skill_builder",
+                        "graphiteui_capability_selector",
                         "local_workspace_executor",
                         "web_search",
                     ],
@@ -246,12 +238,13 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertNotIn("supportedValueTypes", payload)
                 self.assertNotIn("sideEffects", payload)
                 self.assertNotIn("compatibility", payload)
+                self.assertNotIn("health", payload)
+                self.assertNotIn("configured", payload)
+                self.assertNotIn("healthy", payload)
                 self.assertFalse(payload["runtimeReady"])
                 self.assertFalse(payload["runtimeRegistered"])
                 self.assertEqual(payload["llmNodeEligibility"], "needs_manifest")
                 self.assertIn("Skill manifest is missing a script runtime entrypoint.", payload["llmNodeBlockers"])
-                self.assertTrue(payload["configured"])
-                self.assertTrue(payload["healthy"])
 
                 imported_path = state_dir / "user" / "video_understanding" / "skill.json"
                 self.assertTrue(imported_path.exists())
@@ -405,8 +398,6 @@ class SkillUploadImportRouteTests(unittest.TestCase):
             state_dir = temp_path / "data" / "skills"
             _write_native_skill(skills_dir, "web_search")
             _write_native_skill(skills_dir, "extract_json_fields", runtime=False)
-            _write_native_skill(skills_dir, "summarize_text", configured=False)
-            _write_native_skill(skills_dir, "translate_text", healthy=False)
 
             with _test_client_with_skill_storage(skills_dir, state_dir) as client:
                 response = client.get("/api/skills/definitions")
@@ -420,8 +411,6 @@ class SkillUploadImportRouteTests(unittest.TestCase):
             skills_dir = temp_path / "skill"
             state_dir = temp_path / "data" / "skills"
             _write_native_skill(skills_dir, "rewrite_text", runtime=False)
-            _write_native_skill(skills_dir, "summarize_text", configured=False)
-            _write_native_skill(skills_dir, "translate_text", healthy=False)
 
             graph = NodeSystemGraphPayload.model_validate(
                 {
@@ -440,29 +429,11 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                                 "taskInstruction": "",
                             },
                         },
-                        "agent_summarize": {
-                            "kind": "agent",
-                            "name": "Agent",
-                            "description": "",
-                            "ui": {"position": {"x": 220, "y": 0}, "collapsed": False},
-                            "reads": [],
-                            "writes": [],
-                            "config": {"skillKey": "summarize_text", "taskInstruction": ""},
-                        },
-                        "agent_translate": {
-                            "kind": "agent",
-                            "name": "Agent",
-                            "description": "",
-                            "ui": {"position": {"x": 440, "y": 0}, "collapsed": False},
-                            "reads": [],
-                            "writes": [],
-                            "config": {"skillKey": "translate_text", "taskInstruction": ""},
-                        },
                         "agent_video": {
                             "kind": "agent",
                             "name": "Agent",
                             "description": "",
-                            "ui": {"position": {"x": 660, "y": 0}, "collapsed": False},
+                            "ui": {"position": {"x": 220, "y": 0}, "collapsed": False},
                             "reads": [],
                             "writes": [],
                             "config": {"skillKey": "video_understanding", "taskInstruction": ""},
@@ -482,8 +453,6 @@ class SkillUploadImportRouteTests(unittest.TestCase):
             self.assertFalse(validation.valid)
             issue_codes = [issue.code for issue in validation.issues]
             self.assertIn("agent_skill_not_agent_node_ready", issue_codes)
-            self.assertIn("agent_skill_not_configured", issue_codes)
-            self.assertIn("agent_skill_unhealthy", issue_codes)
             self.assertIn("agent_skill_not_runtime_registered", issue_codes)
 
 

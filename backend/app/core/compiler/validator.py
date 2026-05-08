@@ -390,24 +390,6 @@ def _validate_agent_node(
                 )
             )
 
-        if not definition.configured:
-            issues.append(
-                ValidationIssue(
-                    code="agent_skill_not_configured",
-                    message=f"LLM node '{node_name}' attaches skill '{skill_key}', but the skill is not configured.",
-                    path=skill_path,
-                )
-            )
-
-        if not definition.healthy:
-            issues.append(
-                ValidationIssue(
-                    code="agent_skill_unhealthy",
-                    message=f"LLM node '{node_name}' attaches skill '{skill_key}', but the skill health check is failing.",
-                    path=skill_path,
-                )
-            )
-
         if skill_key not in runtime_skill_keys or not definition.runtime_registered:
             issues.append(
                 ValidationIssue(

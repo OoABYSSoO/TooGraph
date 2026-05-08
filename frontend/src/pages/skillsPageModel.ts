@@ -65,7 +65,7 @@ function matchesSkillStatus(skill: SkillDefinition, filter: SkillStatusFilter): 
 }
 
 function skillNeedsAttention(skill: SkillDefinition): boolean {
-  return skill.status !== "active" || !skill.configured || !skill.healthy || skill.llmNodeEligibility !== "ready";
+  return skill.status !== "active" || skill.llmNodeEligibility !== "ready";
 }
 
 export function listSkillCapabilityPolicies(skill: SkillDefinition): Array<{ origin: string; policy: SkillCapabilityPolicy }> {
@@ -89,7 +89,6 @@ function buildSkillSearchText(skill: SkillDefinition): string {
     `${skill.runtime.entrypoint} ${skill.runtime.type} runtime`,
     `${skill.runtime.type} runtime`,
     skill.runtime.entrypoint,
-    skill.health.type,
     skill.llmNodeEligibility,
     skill.sourceScope,
     skill.sourcePath,

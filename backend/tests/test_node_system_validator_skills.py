@@ -33,8 +33,6 @@ def _agent_skill_definition(
         outputSchema=output_schema or [SkillIoField(key="summary", name="Summary", valueType="text")],
         runtimeReady=True,
         runtimeRegistered=True,
-        configured=True,
-        healthy=True,
         llmNodeEligibility=eligibility,
         llmNodeBlockers=blockers or [],
     )

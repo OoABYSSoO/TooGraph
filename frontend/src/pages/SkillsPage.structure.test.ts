@@ -52,8 +52,8 @@ test("SkillsPage surfaces useful Skill capability and readiness metadata", () =>
   assert.match(componentSource, /selectedSkill\.runtimeReady/);
   assert.match(componentSource, /selectedSkill\.runtime\.type/);
   assert.match(componentSource, /selectedSkill\.runtime\.entrypoint/);
-  assert.match(componentSource, /selectedSkill\.configured/);
-  assert.match(componentSource, /selectedSkill\.healthy/);
+  assert.doesNotMatch(componentSource, /selectedSkill\.configured/);
+  assert.doesNotMatch(componentSource, /selectedSkill\.healthy/);
   assert.match(componentSource, /selectedSkill\.llmNodeEligibility/);
   assert.match(componentSource, /selectedSkill\.llmNodeBlockers/);
   assert.match(componentSource, /t\("skills\.capabilityPolicy"\)/);

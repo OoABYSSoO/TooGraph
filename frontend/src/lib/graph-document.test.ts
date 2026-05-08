@@ -36,7 +36,6 @@ const webSearchSkill: SkillDefinition = {
   },
   permissions: ["network"],
   runtime: { type: "python", entrypoint: "run.py" },
-  health: { type: "none" },
   inputSchema: [{ key: "query", name: "Query", valueType: "text", required: true, description: "" }],
   outputSchema: [
     { key: "query", name: "Query", valueType: "text", required: false, description: "Search query." },
@@ -50,8 +49,6 @@ const webSearchSkill: SkillDefinition = {
   sourcePath: "/skills/web_search/skill.json",
   runtimeReady: true,
   runtimeRegistered: true,
-  configured: true,
-  healthy: true,
   status: "active",
   canManage: true,
 };

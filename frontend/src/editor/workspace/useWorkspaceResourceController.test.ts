@@ -91,7 +91,6 @@ function createSkillDefinition(): SkillDefinition {
     },
     permissions: [],
     runtime: { type: "python", entrypoint: "run.py" },
-    health: { type: "none" },
     inputSchema: [],
     outputSchema: [],
     llmNodeEligibility: "ready",
@@ -100,8 +99,6 @@ function createSkillDefinition(): SkillDefinition {
     sourcePath: "",
     runtimeReady: true,
     runtimeRegistered: true,
-    configured: true,
-    healthy: true,
     status: "active",
     canManage: true,
   };

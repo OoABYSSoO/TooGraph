@@ -11,7 +11,6 @@ from app.core.schemas.skills import (
     SkillLlmNodeEligibility,
     SkillCatalogStatus,
     SkillDefinition,
-    SkillHealthSpec,
     SkillIoField,
     SkillRuntimeSpec,
     SkillSourceScope,
@@ -39,8 +38,6 @@ def is_llm_attachable_skill(definition: SkillDefinition) -> bool:
         and definition.llm_node_eligibility == SkillLlmNodeEligibility.READY
         and definition.runtime_ready
         and definition.runtime_registered
-        and definition.configured
-        and definition.healthy
     )
 
 
@@ -143,11 +140,8 @@ def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> 
         capabilityPolicy=_parse_capability_policy(payload.get("capabilityPolicy") or payload.get("capability_policy")),
         permissions=[str(item) for item in payload.get("permissions", [])],
         runtime=_parse_runtime_spec(payload.get("runtime")),
-        health=_parse_health_spec(payload.get("health")),
         inputSchema=_parse_io_fields(payload.get("inputSchema") or payload.get("input_schema") or []),
         outputSchema=_parse_io_fields(payload.get("outputSchema") or payload.get("output_schema") or []),
-        configured=bool(payload.get("configured", True)),
-        healthy=bool(payload.get("healthy", True)),
     )
     eligibility, blockers = _resolve_llm_node_eligibility(definition, path.parent)
     definition.llm_node_eligibility = eligibility
@@ -186,7 +180,6 @@ def _parse_skill_file(path: Path, source_scope: SkillSourceScope) -> SkillDefini
         capabilityPolicy=_parse_capability_policy(graphite.get("capabilityPolicy") or graphite.get("capability_policy")),
         permissions=[str(item) for item in graphite.get("permissions", [])],
         runtime=_parse_runtime_spec(graphite.get("runtime")),
-        health=_parse_health_spec(graphite.get("health")),
         inputSchema=input_schema,
         outputSchema=output_schema,
     )
@@ -226,12 +219,6 @@ def _parse_runtime_spec(payload: object) -> SkillRuntimeSpec:
         command=[str(item) for item in payload.get("command") or []],
         timeoutSeconds=_parse_float(payload.get("timeoutSeconds") or payload.get("timeout_seconds"), 30.0),
     )
-
-
-def _parse_health_spec(payload: object) -> SkillHealthSpec:
-    if not isinstance(payload, dict):
-        return SkillHealthSpec(type="none")
-    return SkillHealthSpec(type=str(payload.get("type") or "none"))
 
 
 def _parse_capability_policy(payload: object) -> SkillCapabilityPolicies:
@@ -284,6 +271,9 @@ def _reject_legacy_skill_protocol_fields(payload: object) -> None:
         "supported_value_types": "output_schema",
         "sideEffects": "permissions",
         "side_effects": "permissions",
+        "health": "capabilityPolicy, status and runtime readiness",
+        "configured": "capabilityPolicy, status and runtime readiness",
+        "healthy": "capabilityPolicy, status and runtime readiness",
         "kind": "no longer supported",
         "mode": "no longer supported",
         "scope": "no longer supported",

@@ -43,12 +43,6 @@ class SkillRuntimeSpec(BaseModel):
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
 
-class SkillHealthSpec(BaseModel):
-    type: str = "none"
-
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
-
-
 class SkillCapabilityPolicy(BaseModel):
     selectable: bool = True
     requires_approval: bool = Field(default=False, alias="requiresApproval")
@@ -76,7 +70,6 @@ class SkillDefinition(BaseModel):
     )
     permissions: list[str] = Field(default_factory=list)
     runtime: SkillRuntimeSpec = Field(default_factory=SkillRuntimeSpec)
-    health: SkillHealthSpec = Field(default_factory=SkillHealthSpec)
     input_schema: list[SkillIoField] = Field(default_factory=list, alias="inputSchema")
     output_schema: list[SkillIoField] = Field(default_factory=list, alias="outputSchema")
     llm_node_eligibility: SkillLlmNodeEligibility = Field(
@@ -88,8 +81,6 @@ class SkillDefinition(BaseModel):
     source_path: str = Field(default="", alias="sourcePath")
     runtime_ready: bool = Field(default=False, alias="runtimeReady")
     runtime_registered: bool = Field(default=False, alias="runtimeRegistered")
-    configured: bool = True
-    healthy: bool = True
     status: SkillCatalogStatus = Field(default=SkillCatalogStatus.ACTIVE)
     can_manage: bool = Field(default=False, alias="canManage")
 

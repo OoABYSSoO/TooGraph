@@ -80,8 +80,5 @@
     "type": "python",
     "entrypoint": "run.py",
     "timeoutSeconds": 300
-  },
-  "health": { "type": "none" },
-  "configured": true,
-  "healthy": true
+  }
 }

@@ -126,8 +126,6 @@
                 <span>{{ selectedSkill.runtimeReady ? t("skills.runtimeReady") : t("skills.runtimePending") }}</span>
                 <span>{{ selectedSkill.runtimeRegistered ? t("skills.runtimeRegistered") : t("skills.runtimeNotRegistered") }}</span>
                 <span>{{ t("skills.llmNodeEligibility") }}: {{ selectedSkill.llmNodeEligibility }}</span>
-                <span v-if="!selectedSkill.configured" class="skills-page__status-warning">{{ t("skills.notConfigured") }}</span>
-                <span v-if="!selectedSkill.healthy" class="skills-page__status-warning">{{ t("skills.unhealthy") }}</span>
                 <span v-if="selectedSkill.canManage">{{ t("skills.manageable") }}</span>
               </div>
             </header>

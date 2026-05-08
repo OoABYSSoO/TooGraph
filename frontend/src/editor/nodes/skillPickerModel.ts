@@ -12,9 +12,7 @@ export function isAgentAttachableSkillDefinition(definition: SkillDefinition) {
     definition.status === "active" &&
     definition.llmNodeEligibility === "ready" &&
     definition.runtimeReady &&
-    definition.runtimeRegistered &&
-    definition.configured &&
-    definition.healthy
+    definition.runtimeRegistered
   );
 }
 

@@ -61,9 +61,6 @@ def _manifest(skill_key: str = "custom_echo") -> str:
                 },
             ],
             "runtime": {"type": "python", "entrypoint": "run.py", "timeoutSeconds": 10},
-            "health": {"type": "none"},
-            "configured": True,
-            "healthy": True,
         },
         ensure_ascii=False,
     )
