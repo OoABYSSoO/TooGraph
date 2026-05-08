@@ -14,9 +14,9 @@
   - `demo/` 中 Claude Code、Hermes Agent 和 OpenClaw 的结构化输出实现对比
   - function calling 的作用原理、边界和对 GraphiteUI 的引入建议
 
-- [skill-authoring-guide.md](skill-authoring-guide.md)
-  - 当前 Skill 包结构、生命周期入口和权限边界
-  - 手工创建 Skill 与后续 Skill Builder 模板的方针文档
+- [../skill/SKILL_AUTHORING_GUIDE.md](../skill/SKILL_AUTHORING_GUIDE.md)
+  - 官方 Skill 根目录下的 Skill 包结构、生命周期入口和权限边界
+  - 手工创建 Skill 与后续技能生成能力都应读取的协议说明
 
 - [future/companion-autonomous-agent-roadmap.md](future/companion-autonomous-agent-roadmap.md)
   - 桌宠、自主工具循环、技能生成和长期协作能力的唯一长期参考

@@ -3,7 +3,7 @@
 本文说明 GraphiteUI 当前 Skill 包的结构、运行意义和编写约束。它同时面向两类读者：
 
 - 想手工创建或维护 Skill 的用户。
-- 后续 `graphiteUI_skill_builder` 模板或技能生成能力，用来判断应该生成哪些文件、哪些内容不该生成。
+- 后续技能生成能力，用来判断应该生成哪些文件、哪些内容不该生成。
 
 ## 核心心智
 
@@ -331,17 +331,3 @@ skill_result
 - stdout 是否只输出 JSON 对象。
 - 错误是否结构化返回，方便下游判断和修复。
 - 是否避免旧字段：`targets`、`executionTargets`、`label`、`agentInstruction`、`runPolicies`、`health`、`configured`、`healthy`、`kind`、`mode`、`scope`。
-
-## 给 Skill Builder 模板的方针
-
-后续生成 Skill 的模板应遵守：
-
-1. 先由图模板澄清需求、确认示例输入输出和权限边界。
-2. Skill Builder 只负责产出 Skill 包文件内容，不负责写入、测试、安装、启用、回滚。
-3. 生成内容至少包含 `skill.json` 和 `SKILL.md`。
-4. 只有需要 LLM 前置上下文时才生成 `before_llm.py`。
-5. 只有需要确定性执行、校验或规范化时才生成 `after_llm.py`。
-6. 写入用户目录、运行 smoke test、读取错误并再次修复，应由后续图节点和受控能力完成。
-7. 每次修复都应重新生成完整文件内容，而不是让 Skill Builder 输出不透明补丁。
-
-这个边界可以防止 Skill Builder 再次膨胀成安装器、测试器、修复器和权限执行器的混合体。

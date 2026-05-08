@@ -295,7 +295,7 @@ GraphiteUI/
 
 - `README.md`：项目入口、启动方式、当前能力和未来方向。
 - `docs/current_project_status.md`：当前状态快照。
-- `docs/skill-authoring-guide.md`：Skill 包结构、生命周期入口、权限边界和 Skill Builder 生成方针。
+- `skill/SKILL_AUTHORING_GUIDE.md`：官方 Skill 根目录下的 Skill 包结构、生命周期入口、权限边界和新建 Skill 注意事项。
 - `docs/future/`：仍未完成的长期设想。
 - `knowledge/GraphiteUI-official/`：可导入的项目官方知识库源文档。
 - `AGENTS.md`：协作代理工作约定。
