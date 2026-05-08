@@ -185,6 +185,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(
                     sorted(catalog_items),
                     [
+                        "graphiteUI_skill_builder",
                         "graphiteui_capability_selector",
                         "web_search",
                     ],
@@ -203,6 +204,15 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue(catalog_items["web_search"]["runtimeReady"])
                 self.assertTrue(catalog_items["web_search"]["runtimeRegistered"])
                 self.assertTrue(source_path["web_search"].endswith("/skill/web_search/skill.json"))
+                self.assertEqual(catalog_items["graphiteUI_skill_builder"]["sourceScope"], "official")
+                self.assertFalse(catalog_items["graphiteUI_skill_builder"]["canManage"])
+                self.assertTrue(catalog_items["graphiteUI_skill_builder"]["runtimeReady"])
+                self.assertTrue(catalog_items["graphiteUI_skill_builder"]["runtimeRegistered"])
+                self.assertTrue(
+                    source_path["graphiteUI_skill_builder"].endswith(
+                        "/skill/graphiteUI_skill_builder/skill.json"
+                    )
+                )
                 self.assertNotIn("compatibility", catalog_items["web_search"])
 
     def test_native_skill_json_upload_imports_user_skill_package(self) -> None:
