@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
@@ -28,7 +27,6 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
     query = _compact_text(skill_inputs.get("query"))
     if not query:
         return _final_response(query="", source_urls=[], artifact_paths=[], errors=["Search query is required."])
-    query = _enrich_time_sensitive_web_search_query(query)
 
     api_key = _resolve_tavily_api_key(skill_inputs)
 
@@ -467,50 +465,6 @@ def _final_response(
 
 def _resolve_tavily_api_key(skill_inputs: dict[str, Any]) -> str:
     return _compact_text(skill_inputs.get("api_key")) or _compact_text(os.getenv("TAVILY_API_KEY"))
-
-
-def _enrich_time_sensitive_web_search_query(query: str, *, now: datetime | None = None) -> str:
-    normalized_query = _compact_text(query)
-    if not normalized_query:
-        return ""
-    current_time = now.astimezone() if now is not None else datetime.now().astimezone()
-    current_date = current_time.date().isoformat()
-    if current_date in normalized_query:
-        return normalized_query
-    if not _looks_time_sensitive_query(normalized_query):
-        return normalized_query
-    return f"{normalized_query} {current_date}"
-
-
-def _looks_time_sensitive_query(query: str) -> bool:
-    query_lower = query.lower()
-    time_sensitive_terms = (
-        "今天",
-        "今日",
-        "现在",
-        "当前",
-        "最新",
-        "最近",
-        "近期",
-        "发布日期",
-        "发布时间",
-        "价格",
-        "新闻",
-        "版本",
-        "更新",
-        "today",
-        "current",
-        "latest",
-        "recent",
-        "release date",
-        "released",
-        "price",
-        "pricing",
-        "news",
-        "version",
-        "update",
-    )
-    return any(term in query_lower for term in time_sensitive_terms)
 
 
 def _compact_text(value: object) -> str:

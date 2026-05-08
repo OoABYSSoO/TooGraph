@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import unittest
 import json
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -40,6 +41,38 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
 
         self.assertIn("llmInstruction: Generate a query", prompt)
         self.assertNotIn("agentInstruction", prompt)
+
+    def test_skill_input_prompt_includes_before_llm_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skill_dir = Path(temp_dir) / "web_search"
+            skill_dir.mkdir()
+            (skill_dir / "before_llm.py").write_text(
+                "import json\n"
+                "print(json.dumps({'context': 'Current date: 2026-05-08'}))\n",
+                encoding="utf-8",
+            )
+            prompt = build_skill_input_system_prompt(
+                input_values={"question": "最新模型发布日期"},
+                bindings=[
+                    ResolvedAgentSkillBinding(
+                        binding=NodeSystemAgentSkillBinding(skillKey="web_search"),
+                        source="node_config",
+                    )
+                ],
+                skill_definitions={
+                    "web_search": SkillDefinition(
+                        skillKey="web_search",
+                        name="Web Search",
+                        llmInstruction="Generate a query.",
+                        inputSchema=[SkillIoField(key="query", name="Query", valueType="text", required=True)],
+                        sourcePath=str(skill_dir / "skill.json"),
+                    )
+                },
+            )
+
+        self.assertIn("== Skill Pre-LLM Context ==", prompt)
+        self.assertIn("skillKey: web_search", prompt)
+        self.assertIn("Current date: 2026-05-08", prompt)
 
     def test_capability_selector_prompt_lists_available_templates_and_skills_for_llm_choice(self) -> None:
         prompt = build_skill_input_system_prompt(

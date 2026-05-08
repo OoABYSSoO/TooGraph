@@ -13,6 +13,8 @@ SUPPORTED_SCRIPT_RUNTIME_TYPES = {"script", "python", "node", "javascript", "com
 DEFAULT_SKILL_TIMEOUT_SECONDS = 30.0
 MAX_SKILL_ERROR_CHARS = 4000
 REPO_ROOT = Path(__file__).resolve().parents[3]
+BEFORE_LLM_ENTRYPOINT = "before_llm.py"
+AFTER_LLM_ENTRYPOINT = "after_llm.py"
 
 
 @dataclass(frozen=True)
@@ -118,6 +120,54 @@ def build_script_skill_runner(
         command=tuple(str(item) for item in command or ()),
         timeout_seconds=_parse_timeout_seconds(timeout_seconds),
     )
+
+
+def build_lifecycle_after_llm_runner(
+    *,
+    skill_key: str,
+    skill_dir: Path,
+    timeout_seconds: float | int | None = None,
+) -> ScriptSkillRunner:
+    return build_script_skill_runner(
+        skill_key=skill_key,
+        skill_dir=skill_dir,
+        runtime_type="python",
+        entrypoint=AFTER_LLM_ENTRYPOINT,
+        timeout_seconds=timeout_seconds,
+    )
+
+
+def invoke_lifecycle_before_llm(
+    *,
+    skill_key: str,
+    skill_dir: Path,
+    payload: dict[str, Any] | None = None,
+    timeout_seconds: float | int | None = None,
+) -> dict[str, Any]:
+    runner = build_script_skill_runner(
+        skill_key=skill_key,
+        skill_dir=skill_dir,
+        runtime_type="python",
+        entrypoint=BEFORE_LLM_ENTRYPOINT,
+        timeout_seconds=timeout_seconds,
+    )
+    return runner.invoke(payload or {})
+
+
+def has_lifecycle_before_llm(skill_dir: Path) -> bool:
+    return (skill_dir / BEFORE_LLM_ENTRYPOINT).is_file()
+
+
+def has_lifecycle_after_llm(skill_dir: Path) -> bool:
+    return (skill_dir / AFTER_LLM_ENTRYPOINT).is_file()
+
+
+def resolve_skill_dir_from_source_path(source_path: str) -> Path | None:
+    normalized = str(source_path or "").strip()
+    if not normalized:
+        return None
+    path = Path(normalized)
+    return path.parent if path.name else path
 
 
 def validate_script_runtime_spec(

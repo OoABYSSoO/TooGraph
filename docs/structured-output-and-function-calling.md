@@ -534,7 +534,7 @@ function calling 不是模型真的在运行函数。它是一种“模型声明
 2. 把 `arguments` 解析成 JSON。
 3. 按 `web_search.inputSchema` 校验。
 4. 检查网络权限或审批策略。
-5. 调用本地 `run.py` 或对应 runtime。
+5. 调用本地固定生命周期入口，例如 `after_llm.py` 或仍未迁移的脚本 runtime。
 6. 把结果写入工具结果消息、state、artifact 和 run detail。
 
 function calling 的作用不是替代权限系统，而是提升模型输出“调用哪个工具、用什么参数”的结构稳定性。

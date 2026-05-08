@@ -14,6 +14,11 @@ from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDef
 from app.core.schemas.skills import SkillDefinition, SkillIoField
 from app.templates.loader import list_template_records
 from app.core.thinking_levels import resolve_effective_thinking_level
+from app.skills.runtime import (
+    has_lifecycle_before_llm,
+    invoke_lifecycle_before_llm,
+    resolve_skill_dir_from_source_path,
+)
 from app.tools.local_llm import _chat_with_local_model_with_meta
 from app.tools.model_provider_client import chat_with_model_ref_with_meta
 
@@ -205,6 +210,14 @@ def build_skill_input_system_prompt(
             if field.required
         }
 
+    before_llm_context_lines = format_skill_before_llm_context_lines(
+        input_values=input_values,
+        bindings=bindings,
+        skill_definitions=skill_definitions,
+    )
+    if before_llm_context_lines:
+        parts.extend(before_llm_context_lines)
+
     if any(resolved.binding.skill_key == CAPABILITY_SELECTOR_SKILL_KEY for resolved in bindings):
         parts.extend(
             format_capability_selector_catalog_lines(
@@ -216,6 +229,59 @@ def build_skill_input_system_prompt(
     parts.append("\n== Required JSON Shape ==")
     parts.append(json.dumps(example, ensure_ascii=False, indent=2))
     return "\n".join(parts)
+
+
+def format_skill_before_llm_context_lines(
+    *,
+    input_values: dict[str, Any],
+    bindings: list[ResolvedAgentSkillBinding],
+    skill_definitions: dict[str, SkillDefinition],
+) -> list[str]:
+    entries: list[tuple[str, str]] = []
+    for resolved_binding in bindings:
+        skill_key = resolved_binding.binding.skill_key
+        definition = skill_definitions.get(skill_key)
+        if definition is None:
+            continue
+        skill_dir = resolve_skill_dir_from_source_path(definition.source_path)
+        if skill_dir is None or not has_lifecycle_before_llm(skill_dir):
+            continue
+        payload = {
+            "skill_key": skill_key,
+            "graph_state": input_values,
+        }
+        context_payload = invoke_lifecycle_before_llm(
+            skill_key=skill_key,
+            skill_dir=skill_dir,
+            payload=payload,
+            timeout_seconds=definition.runtime.timeout_seconds,
+        )
+        context_text = format_before_llm_context_payload(context_payload)
+        if context_text:
+            entries.append((skill_key, context_text))
+
+    if not entries:
+        return []
+
+    lines = ["\n== Skill Pre-LLM Context =="]
+    for skill_key, context_text in entries:
+        lines.append(f"- skillKey: {skill_key}")
+        lines.append("  context:")
+        lines.extend(f"    {line}" for line in context_text.splitlines())
+    return lines
+
+
+def format_before_llm_context_payload(payload: dict[str, Any]) -> str:
+    if not isinstance(payload, dict):
+        return ""
+    if str(payload.get("status") or "").strip().lower() == "failed":
+        return ""
+    for key in ("context", "prompt", "message"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    cleaned = {key: value for key, value in payload.items() if key not in {"status"}}
+    return json.dumps(cleaned, ensure_ascii=False, indent=2) if cleaned else ""
 
 
 def format_capability_selector_catalog_lines(

@@ -13,7 +13,13 @@ from app.core.storage.skill_store import (
     list_official_skill_keys,
     list_user_skill_keys,
 )
-from app.skills.runtime import ScriptSkillRunner, build_script_skill_runner, validate_script_runtime_spec
+from app.skills.runtime import (
+    ScriptSkillRunner,
+    build_lifecycle_after_llm_runner,
+    build_script_skill_runner,
+    has_lifecycle_after_llm,
+    validate_script_runtime_spec,
+)
 
 
 SkillFunc = ScriptSkillRunner
@@ -34,6 +40,21 @@ def _build_runtime_skill_registry() -> dict[str, SkillFunc]:
         runtime_type = str(runtime.get("type") or "none")
         entrypoint = str(runtime.get("entrypoint") or "")
         command = [str(item) for item in runtime.get("command") or []]
+        timeout_seconds = (
+            runtime.get("timeoutSeconds")
+            or runtime.get("timeout_seconds")
+            or payload.get("timeoutSeconds")
+            or payload.get("timeout_seconds")
+        )
+        if has_lifecycle_after_llm(skill_dir):
+            if skill_key in registry:
+                continue
+            registry[skill_key] = build_lifecycle_after_llm_runner(
+                skill_key=skill_key,
+                skill_dir=skill_dir,
+                timeout_seconds=timeout_seconds,
+            )
+            continue
         if validate_script_runtime_spec(
             skill_dir=skill_dir,
             runtime_type=runtime_type,
@@ -49,7 +70,7 @@ def _build_runtime_skill_registry() -> dict[str, SkillFunc]:
             runtime_type=runtime_type,
             entrypoint=entrypoint,
             command=command,
-            timeout_seconds=runtime.get("timeoutSeconds") or runtime.get("timeout_seconds"),
+            timeout_seconds=timeout_seconds,
         )
     return registry
 

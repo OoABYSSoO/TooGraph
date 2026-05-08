@@ -188,7 +188,7 @@
           "web_search": {
             "skillKey": "web_search",
             "title": "联网搜索 skill instruction",
-            "content": "你已绑定联网搜索技能，因此本节点需要运行它。根据当前输入生成一个清晰、可检索的 query，并把 query 交给技能执行；不要在本节点整理、评价或总结搜索结果。技能结果会通过绑定 state 透传给下游节点。",
+            "content": "你已绑定联网搜索技能，因此本节点需要运行它。根据当前输入生成一个清晰、可检索的 query，并把 query 交给技能执行；如果问题具有时效性，应结合 Skill Pre-LLM Context 中的当前日期生成查询词；不要在本节点整理、评价或总结搜索结果。技能结果会通过绑定 state 透传给下游节点。",
             "source": "node.override"
           }
         },

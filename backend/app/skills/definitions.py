@@ -16,7 +16,7 @@ from app.core.schemas.skills import (
     SkillSourceScope,
 )
 from app.core.storage.skill_store import SKILLS_DIR, USER_SKILLS_DIR, get_skill_status_map
-from app.skills.runtime import validate_script_runtime_spec
+from app.skills.runtime import has_lifecycle_after_llm, validate_script_runtime_spec
 from app.skills.registry import get_skill_registry, list_runtime_skill_keys
 
 
@@ -295,14 +295,15 @@ def _parse_float(value: object, fallback: float) -> float:
 
 def _resolve_llm_node_eligibility(definition: SkillDefinition, skill_dir: Path) -> tuple[SkillLlmNodeEligibility, list[str]]:
     blockers: list[str] = []
-    blockers.extend(
-        validate_script_runtime_spec(
-            skill_dir=skill_dir,
-            runtime_type=definition.runtime.type,
-            entrypoint=definition.runtime.entrypoint,
-            command=definition.runtime.command,
+    if not has_lifecycle_after_llm(skill_dir):
+        blockers.extend(
+            validate_script_runtime_spec(
+                skill_dir=skill_dir,
+                runtime_type=definition.runtime.type,
+                entrypoint=definition.runtime.entrypoint,
+                command=definition.runtime.command,
+            )
         )
-    )
     if not definition.output_schema:
         blockers.append("Skill manifest is missing outputSchema.")
 

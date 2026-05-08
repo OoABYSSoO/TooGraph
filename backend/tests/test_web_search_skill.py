@@ -6,7 +6,6 @@ import tempfile
 import threading
 import unittest
 import importlib.util
-from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
@@ -16,11 +15,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.skills.registry import get_skill_registry
 
 
-WEB_SEARCH_RUN_PATH = Path(__file__).resolve().parents[2] / "skill" / "web_search" / "run.py"
+WEB_SEARCH_AFTER_LLM_PATH = Path(__file__).resolve().parents[2] / "skill" / "web_search" / "after_llm.py"
 
 
 def _load_web_search_module():
-    spec = importlib.util.spec_from_file_location("graphiteui_web_search_skill_test", WEB_SEARCH_RUN_PATH)
+    spec = importlib.util.spec_from_file_location("graphiteui_web_search_skill_test", WEB_SEARCH_AFTER_LLM_PATH)
     if spec is None or spec.loader is None:
         raise AssertionError("Could not load web_search skill script.")
     module = importlib.util.module_from_spec(spec)
@@ -29,15 +28,22 @@ def _load_web_search_module():
 
 
 class WebSearchSkillTests(unittest.TestCase):
-    def test_web_search_skill_owns_time_sensitive_query_date_anchor(self) -> None:
+    def test_web_search_skill_does_not_mutate_llm_generated_query_with_current_date(self) -> None:
         web_search = _load_web_search_module()
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.object(web_search, "_search_with_duckduckgo") as duckduckgo_search,
+        ):
+            duckduckgo_search.return_value = {"results": []}
 
-        query = web_search._enrich_time_sensitive_web_search_query(
-            "最新模型发布日期",
-            now=datetime(2026, 5, 1, 13, 28, 44, tzinfo=timezone.utc),
+            result = web_search.web_search_skill(query="最新模型发布日期")
+
+        duckduckgo_search.assert_called_once_with(
+            query="最新模型发布日期",
+            max_results=20,
+            timeout_seconds=15.0,
         )
-
-        self.assertEqual(query, "最新模型发布日期 2026-05-01")
+        self.assertEqual(result["query"], "最新模型发布日期")
 
     def test_web_search_skill_normalizes_tavily_results_when_api_key_is_configured(self) -> None:
         web_search = _load_web_search_module()

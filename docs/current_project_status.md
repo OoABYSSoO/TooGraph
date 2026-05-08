@@ -28,6 +28,7 @@
 - 用户编辑胶囊后才会把该节点的覆盖说明写入 `skillInstructionBlocks`，并标记为 `node.override`；移除 skill 时对应覆盖会移除，且不会反向写回技能包原始文档。
 - 静态手动选择的 Skill 使用 `config.skillKey` 和协议拥有的 `skillBindings.outputMapping`。`outputMapping` 由图协议、前端和运行时维护，只用于确定 skill 输出写入哪个 state 与运行审计；LLM 不看也不修改它。
 - 技能输入由 LLM 节点在运行前根据当前输入 state、技能 `description`、有效 `llmInstruction` 和 `inputSchema` 生成。有效 `llmInstruction` 默认来自 skill manifest；如果当前节点存在 `node.override` 胶囊覆盖，则使用覆盖内容。这个说明只进入技能入参生成阶段的 system prompt，不会再追加到 user prompt。
+- Skill 生命周期脚本使用固定文件名而不是在 manifest 中配置入口。存在 `before_llm.py` 时，运行时会在技能入参规划前执行它，并把返回的上下文注入 LLM 提示词；存在 `after_llm.py` 时，运行时会在 LLM 生成结构化技能参数后执行它，并把它返回的 JSON 当作技能结果。写入 state 仍由 GraphiteUI runtime 根据 `outputSchema` 和 `skillBindings.outputMapping` 完成，脚本不直接绑定 state。
 - 在 LLM 节点卡片选择带 `outputSchema` 的静态 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
 - 动态能力执行来自输入 `capability` state，不复用 `skillBindings.outputMapping`，也不会推断普通输出映射。这类节点必须只写一个 `result_package` state。包内 `outputs.<outputKey>` 保存 `{ name, description, type, value }`，不额外捏造 `fieldKey`；下游 LLM 节点会把这些虚拟输出拆开并复用普通 state/file 展开逻辑。
 - 图运行前不再做旧草稿兼容补齐。提交到运行时的图必须已经符合当前协议。
@@ -46,6 +47,7 @@
 - 位置：`skill/web_search/`
 - 显示名称：`联网搜索`
 - 作用：执行联网搜索、返回来源链接、本地原文文件路径和结构化错误信息。
+- 生命周期：`before_llm.py` 只补充当前日期；`after_llm.py` 接收 LLM 生成的 `query`，执行搜索和原文下载。旧的程序侧“识别时效查询并自动给 query 拼日期”逻辑已移除，是否把日期写入 query 由 LLM 根据上下文判断。
 - 桌宠来源默认可自主使用且无需确认，前提仍是它被图模板显式绑定或由图状态传入，并通过 registry、运行策略和运行时就绪检查。
 - 它只负责搜索和资料获取，不负责最终总结。搜索词由绑定它的 LLM 节点根据任务决定；整理和总结应交给后续 LLM 节点。
 - 搜索源请求默认最多尝试 5 次，用于缓解 DuckDuckGo fallback 或外部搜索 API 的瞬时 TLS、连接中断和网关抖动。
@@ -87,7 +89,7 @@
 - 输出语义：`query`、`source_urls`、`artifact_paths`、`errors` 通过 managed binding state 透传；后续 LLM 节点读取 `artifact_paths` 对应的本地原文，负责证据筛选和最终总结。
 - 模型语义：模板默认使用全局模型配置，不写死某个 provider。LLM 节点和桌宠模型下拉的第一项是“全局（实时读取当前全局设定的模型）”，后面才是具体模型 override。若全局本地网关未启动，运行该模板前需要在 Model Providers 页面选择可用模型，或在图中为 LLM 节点设置 override。
 
-创建用户自定义 Skill 的旧官方模板已删除。后续需要按新的职责重新讨论和重建：Skill 生成能力应只根据需求产出 `run.py`、`skill.json` 和 `SKILL.md` 三个必要文件的内容，写入、测试、修复和回滚不再由旧模板方案代表。
+创建用户自定义 Skill 的旧官方模板已删除。后续需要按新的职责重新讨论和重建：Skill 生成能力应只根据需求产出 `skill.json`、`SKILL.md` 以及必要的 `before_llm.py` / `after_llm.py` 文件内容，写入、测试、修复和回滚不再由旧模板方案代表。
 
 ## 当前前端能力
 

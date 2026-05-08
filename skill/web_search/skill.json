@@ -3,8 +3,9 @@
   "skillKey": "web_search",
   "name": "联网搜索",
   "description": "当用户需要最新信息、新闻、版本内容、价格、外部事实核验、网页证据或公开资料检索时选择此技能。此技能会搜索更多候选结果，优先快速下载网页正文，失败时用 Playwright 浏览器渲染兜底，尽量补够可读取的本地原文文档，并把原文地址写入本地文档头部，同时返回成功落地文档对应的来源网址、本地原文文件路径和失败原因，不负责最终总结。",
-  "llmInstruction": "你已绑定联网搜索技能，因此本节点需要运行它。根据当前输入生成一个清晰、可检索的 query，并把 query 交给技能执行；不要在本节点整理、评价或总结搜索结果。技能结果会通过绑定 state 透传给下游节点。",
-  "version": "1.0.1",
+  "llmInstruction": "你已绑定联网搜索技能，因此本节点需要运行它。根据当前输入生成一个清晰、可检索的 query，并把 query 交给技能执行；如果问题具有时效性，应结合 Skill Pre-LLM Context 中的当前日期生成查询词；不要在本节点整理、评价或总结搜索结果。技能结果会通过绑定 state 透传给下游节点。",
+  "version": "1.1.0",
+  "timeoutSeconds": 300,
   "capabilityPolicy": {
     "default": {
       "selectable": true,
@@ -52,10 +53,5 @@
       "valueType": "json",
       "description": "Final URL-specific error list collected during search or page fetch."
     }
-  ],
-  "runtime": {
-    "type": "python",
-    "entrypoint": "run.py",
-    "timeoutSeconds": 300
-  }
+  ]
 }
