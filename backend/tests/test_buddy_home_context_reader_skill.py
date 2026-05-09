@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -57,14 +58,35 @@ class BuddyHomeContextReaderSkillTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
             buddy_root = repo_root / "buddy_home"
-            _write_json(
-                buddy_root / "profile.json",
-                {
-                    "name": "GraphiteUI Buddy",
-                    "persona": "全局伙伴",
-                    "tone": "简短直接",
-                    "ignored": None,
-                },
+            (buddy_root).mkdir(parents=True, exist_ok=True)
+            (buddy_root / "SOUL.md").write_text(
+                """---
+name: GraphiteUI Buddy
+display_name: Buddy
+language: zh-CN
+tone: 简短直接
+response_style: 先给结论
+---
+
+# SOUL.md - GraphiteUI Buddy
+
+## Persona
+
+全局伙伴。
+""",
+                encoding="utf-8",
+            )
+            (buddy_root / "USER.md").write_text(
+                "# USER.md - About Your Human\n\n用户喜欢先给结论。\n",
+                encoding="utf-8",
+            )
+            (buddy_root / "AGENTS.md").write_text(
+                "# AGENTS.md - Buddy Workspace\n\n所有副作用都通过图模板和技能执行。\n",
+                encoding="utf-8",
+            )
+            (buddy_root / "MEMORY.md").write_text(
+                "# MEMORY.md - Long-Term Memory\n\n- 用户喜欢先给结论。\n",
+                encoding="utf-8",
             )
             _write_json(
                 buddy_root / "policy.json",
@@ -73,35 +95,36 @@ class BuddyHomeContextReaderSkillTests(unittest.TestCase):
                     "behavior_boundaries": ["不能越权"],
                 },
             )
-            _write_json(
-                buddy_root / "memories.json",
-                [
+            from app.buddy import store
+
+            with patch.object(store, "BUDDY_HOME_DIR", buddy_root):
+                memory = store.create_memory(
                     {
-                        "id": "mem_keep",
                         "type": "preference",
                         "title": "表达偏好",
                         "content": "用户喜欢先给结论。",
                         "confidence": 0.9,
-                        "enabled": True,
-                        "deleted": False,
-                        "updated_at": "2026-05-09T00:00:00Z",
                     },
+                    changed_by="test",
+                    change_reason="seed",
+                )
+                store.update_memory(memory["id"], {"updated_at": "2026-05-09T00:00:00Z"}, changed_by="test", change_reason="stamp")
+                deleted = store.create_memory(
                     {
-                        "id": "mem_deleted",
                         "title": "旧记忆",
                         "content": "不应出现",
                         "enabled": False,
                         "deleted": True,
                     },
-                ],
-            )
-            _write_json(
-                buddy_root / "session_summary.json",
-                {
-                    "content": "正在设计 Buddy 主循环。",
-                    "updated_at": "2026-05-09T00:00:00Z",
-                },
-            )
+                    changed_by="test",
+                    change_reason="seed",
+                )
+                store.delete_memory(deleted["id"], changed_by="test", change_reason="delete")
+                store.save_session_summary(
+                    {"content": "正在设计 Buddy 主循环。"},
+                    changed_by="test",
+                    change_reason="seed",
+                )
 
             result = _run_skill_script(READER_AFTER_LLM_PATH, {}, repo_root=repo_root)
 
@@ -111,17 +134,14 @@ class BuddyHomeContextReaderSkillTests(unittest.TestCase):
         self.assertEqual(context_pack["profile"]["name"], "GraphiteUI Buddy")
         self.assertEqual(context_pack["policy"]["graph_permission_mode"], "advisory")
         self.assertEqual(context_pack["session_summary"]["content"], "正在设计 Buddy 主循环。")
+        self.assertIn("所有副作用都通过图模板和技能执行", context_pack["home_instructions"])
+        self.assertIn("用户喜欢先给结论", context_pack["user_profile"])
+        self.assertIn("Long-Term Memory", context_pack["memory_markdown"])
         self.assertEqual(len(context_pack["memories"]), 1)
-        self.assertEqual(context_pack["memories"][0]["id"], "mem_keep")
         self.assertIn("用户喜欢先给结论。", context_pack["memories"][0]["content"])
-        self.assertEqual(
-            context_pack["meta"],
-            {
-                "memory_count": 2,
-                "included_memory_count": 1,
-                "warnings": [],
-            },
-        )
+        self.assertEqual(context_pack["meta"]["memory_count"], 2)
+        self.assertEqual(context_pack["meta"]["included_memory_count"], 1)
+        self.assertEqual(context_pack["meta"]["warnings"], [])
 
     def test_reader_uses_defaults_when_buddy_home_files_are_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -133,8 +153,12 @@ class BuddyHomeContextReaderSkillTests(unittest.TestCase):
             self.assertEqual(context_pack["policy"]["graph_permission_mode"], "advisory")
             self.assertEqual(context_pack["memories"], [])
             self.assertEqual(context_pack["session_summary"]["content"], "当前对话尚未形成摘要。")
-            self.assertTrue((repo_root / "buddy_home" / "profile.json").is_file())
-            self.assertTrue((repo_root / "buddy_home" / "manifest.json").is_file())
+            self.assertTrue((repo_root / "buddy_home" / "SOUL.md").is_file())
+            self.assertTrue((repo_root / "buddy_home" / "AGENTS.md").is_file())
+            self.assertTrue((repo_root / "buddy_home" / "USER.md").is_file())
+            self.assertTrue((repo_root / "buddy_home" / "MEMORY.md").is_file())
+            self.assertTrue((repo_root / "buddy_home" / "buddy.db").is_file())
+            self.assertFalse((repo_root / "buddy_home" / "TOOLS.md").exists())
 
 
 if __name__ == "__main__":

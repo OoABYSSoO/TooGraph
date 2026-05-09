@@ -29,25 +29,37 @@ class BuddyStoreTests(unittest.TestCase):
 
             self.assertEqual(profile["name"], "GraphiteUI Buddy")
             expected_files = [
-                "manifest.json",
-                "profile.json",
+                "AGENTS.md",
+                "SOUL.md",
+                "USER.md",
+                "MEMORY.md",
                 "policy.json",
-                "memories.json",
-                "session_summary.json",
-                "revisions.json",
-                "commands.json",
-                "usage/capabilities.json",
-                "evolution/review_queue.jsonl",
-                "evolution/decisions.jsonl",
+                "buddy.db",
             ]
             for relative_path in expected_files:
                 self.assertTrue((buddy_home / relative_path).exists(), relative_path)
 
-            manifest = json.loads((buddy_home / "manifest.json").read_text(encoding="utf-8"))
-            self.assertEqual(manifest["home"], "buddy_home")
-            self.assertIn("profile.json", manifest["files"])
-            summary = json.loads((buddy_home / "session_summary.json").read_text(encoding="utf-8"))
-            self.assertTrue(summary["content"])
+            self.assertTrue((buddy_home / "reports").is_dir())
+            for obsolete_path in [
+                "manifest.json",
+                "profile.json",
+                "memories.json",
+                "session_summary.json",
+                "commands.json",
+                "revisions.json",
+                "TOOLS.md",
+            ]:
+                self.assertFalse((buddy_home / obsolete_path).exists(), obsolete_path)
+
+            soul = (buddy_home / "SOUL.md").read_text(encoding="utf-8")
+            agents = (buddy_home / "AGENTS.md").read_text(encoding="utf-8")
+            user = (buddy_home / "USER.md").read_text(encoding="utf-8")
+            memory = (buddy_home / "MEMORY.md").read_text(encoding="utf-8")
+            self.assertIn("# SOUL.md - GraphiteUI Buddy", soul)
+            self.assertIn("图模板", agents)
+            self.assertIn("# USER.md - About Your Human", user)
+            self.assertIn("# MEMORY.md - Long-Term Memory", memory)
+            self.assertTrue(json.loads((buddy_home / "policy.json").read_text(encoding="utf-8"))["behavior_boundaries"])
 
     def test_profile_update_creates_revision_with_previous_and_next_values(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

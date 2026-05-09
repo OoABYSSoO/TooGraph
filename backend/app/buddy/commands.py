@@ -5,16 +5,14 @@ from typing import Any
 from uuid import uuid4
 
 from app.buddy import store
-from app.core.storage.json_file_utils import read_json_file, utc_now_iso, write_json_file
+from app.core.storage.json_file_utils import utc_now_iso
 
 
-COMMANDS_PATH = "commands.json"
 COMMAND_CHANGED_BY = "buddy_command"
 
 
 def list_commands() -> list[dict[str, Any]]:
-    value = read_json_file(store.buddy_home_path(COMMANDS_PATH), default=[])
-    return value if isinstance(value, list) else []
+    return store.list_command_records()
 
 
 def execute_command(payload: dict[str, Any]) -> dict[str, Any]:
@@ -138,9 +136,7 @@ def _latest_new_revision(previous_revision_ids: set[str]) -> dict[str, Any] | No
 
 
 def _append_command(command: dict[str, Any]) -> None:
-    commands = list_commands()
-    commands.append(command)
-    write_json_file(store.buddy_home_path(COMMANDS_PATH), commands)
+    store.append_command_record(command)
 
 
 def _required_target_id(value: str | None, action: str) -> str:
