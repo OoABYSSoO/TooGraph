@@ -330,6 +330,12 @@ export function resolveBuddyRunActivityFromRunEvent(
   if (eventType !== "node.started") {
     return null;
   }
+  if (normalizeRunEventText(payload.node_type).toLowerCase() === "subgraph") {
+    return {
+      labelKey: "buddy.activity.running",
+      params: { node: labels.node },
+    };
+  }
 
   return {
     labelKey: `buddy.activity.${resolveBuddyActivityPhase(nodeId, subgraphNodeId)}`,

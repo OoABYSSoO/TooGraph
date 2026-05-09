@@ -98,22 +98,13 @@
             <span class="buddy-widget__message-label">
               {{ message.role === "user" ? t("buddy.user") : t("buddy.name") }}
             </span>
-            <div
-              v-if="message.role === 'assistant' && message.content"
-              class="buddy-widget__message-bubble buddy-widget__message-markdown"
-              v-html="renderBuddyMarkdown(message.content)"
-            />
-            <p
-              v-else
-              class="buddy-widget__message-bubble"
-              :class="{ 'buddy-widget__message-activity': !message.content && message.activityText }"
-            >
-              {{ message.content || message.activityText || t("buddy.streaming") }}
-            </p>
             <section
-              v-if="message.id === activeTraceMessageId && runTraceEntries.length > 0"
+              v-if="shouldShowRunTraceForMessage(message)"
               class="buddy-widget__run-trace"
-              :class="{ 'buddy-widget__run-trace--expanded': isRunTraceExpanded }"
+              :class="{
+                'buddy-widget__run-trace--expanded': isRunTraceExpanded,
+                'buddy-widget__run-trace--finished': runTraceFinishedAtMs !== null,
+              }"
             >
               <button
                 type="button"
@@ -122,10 +113,10 @@
                 :aria-expanded="isRunTraceExpanded"
                 @click="isRunTraceExpanded = !isRunTraceExpanded"
               >
-                <span>{{ t("buddy.runTraceLabel") }}</span>
+                <span>{{ runTraceHeaderText }}</span>
                 <ElIcon><ArrowDown /></ElIcon>
               </button>
-              <div class="buddy-widget__run-trace-body">
+              <div v-if="shouldShowRunTraceBody" class="buddy-widget__run-trace-body">
                 <div
                   v-for="entry in runTraceEntries"
                   :key="entry.replaceKey"
@@ -145,6 +136,21 @@
                 </div>
               </div>
             </section>
+            <div
+              v-if="message.role === 'assistant' && message.content"
+              class="buddy-widget__message-bubble buddy-widget__message-markdown"
+              v-html="renderBuddyMarkdown(message.content)"
+            />
+            <p
+              v-else-if="shouldShowAssistantActivityBubble(message)"
+              class="buddy-widget__message-bubble"
+              :class="{ 'buddy-widget__message-activity': !message.content && message.activityText }"
+            >
+              {{ message.activityText || t("buddy.streaming") }}
+            </p>
+            <p v-else-if="message.role === 'user'" class="buddy-widget__message-bubble">
+              {{ message.content }}
+            </p>
           </article>
           <p v-if="errorMessage" class="buddy-widget__error">{{ errorMessage }}</p>
           <p v-if="queuedTurns.length > 0" class="buddy-widget__queue">
@@ -283,6 +289,8 @@ const tapNonce = ref(0);
 const activeRunId = ref<string | null>(null);
 const activeTraceMessageId = ref<string | null>(null);
 const isRunTraceExpanded = ref(false);
+const runTraceStartedAtMs = ref<number | null>(null);
+const runTraceFinishedAtMs = ref<number | null>(null);
 const messageListElement = ref<HTMLElement | null>(null);
 const pointerDrag = ref<{
   pointerId: number;
@@ -323,6 +331,17 @@ const latestActivityText = computed(() => {
     .reverse()
     .find((message) => message.role === "assistant" && !message.content.trim() && message.activityText?.trim());
   return latestPendingMessage?.activityText?.trim() ?? "";
+});
+const shouldShowRunTraceBody = computed(() => runTraceFinishedAtMs.value === null || isRunTraceExpanded.value);
+const runTraceHeaderText = computed(() => {
+  const startedAt = runTraceStartedAtMs.value;
+  const finishedAt = runTraceFinishedAtMs.value;
+  if (startedAt !== null && finishedAt !== null) {
+    return t("buddy.runTraceElapsed", {
+      duration: formatRunTraceDuration(Math.max(1, Math.round(finishedAt - startedAt))),
+    });
+  }
+  return t("buddy.runTraceLabel");
 });
 const bubbleText = computed(() => {
   if (mood.value === "thinking" && latestActivityText.value) {
@@ -500,13 +519,7 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
   resetRunTraceForMessage(assistantMessage.id);
   mood.value = "thinking";
   setAssistantActivityText(assistantMessage.id, t("buddy.activity.preparing"));
-  appendRunTraceEntry("local.started", {
-    labelKey: "buddy.activity.preparing",
-    params: {},
-    preview: "",
-    tone: "info",
-    replaceKey: "local:preparing",
-  });
+  appendLocalRunTraceStart("local:preparing", "buddy.activity.preparing");
   await scrollMessagesToBottom();
 
   try {
@@ -523,15 +536,11 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
       buddyModel: buddyModelRef.value,
       skillCatalog,
     });
+    completeLocalRunTrace("local:preparing", "buddy.activity.prepared");
     setAssistantActivityText(assistantMessage.id, t("buddy.activity.starting"));
-    appendRunTraceEntry("local.started", {
-      labelKey: "buddy.activity.starting",
-      params: {},
-      preview: "",
-      tone: "info",
-      replaceKey: "local:starting",
-    });
+    appendLocalRunTraceStart("local:starting", "buddy.activity.starting");
     const run = await runGraph(graph);
+    completeLocalRunTrace("local:starting", "buddy.activity.started");
     activeRunId.value = run.run_id;
     startRunEventStream(run.run_id, assistantMessage.id, graph);
     const runDetail = await pollRunUntilFinished(run.run_id, activeAbortController.signal);
@@ -551,7 +560,7 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
     mood.value = "error";
     const message = error instanceof Error ? error.message : t("buddy.runFailed");
     errorMessage.value = message;
-    appendRunTraceEntry("local.failed", {
+    appendRunTraceEntry("node.failed", {
       labelKey: "buddy.activity.failed",
       params: { node: t("buddy.name") },
       preview: message,
@@ -560,6 +569,7 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
     });
     updateAssistantMessage(assistantMessage.id, t("buddy.errorReply", { error: message }), { includeInContext: false });
   } finally {
+    markRunTraceFinished();
     closeEventSource();
     activeRunId.value = null;
     activeAbortController = null;
@@ -570,11 +580,35 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
   }
 }
 
+function appendLocalRunTraceStart(replaceKey: string, labelKey: string) {
+  appendRunTraceEntry("node.started", {
+    labelKey,
+    params: {},
+    preview: "",
+    tone: "info",
+    replaceKey,
+    timingKey: replaceKey,
+  });
+}
+
+function completeLocalRunTrace(replaceKey: string, labelKey: string) {
+  appendRunTraceEntry("node.completed", {
+    labelKey,
+    params: {},
+    preview: "",
+    tone: "success",
+    replaceKey,
+    timingKey: replaceKey,
+  });
+}
+
 function clearMessages() {
   queuedTurns.value = [];
   runTraceEntries.value = [];
   activeTraceMessageId.value = null;
   isRunTraceExpanded.value = false;
+  runTraceStartedAtMs.value = null;
+  runTraceFinishedAtMs.value = null;
   runTraceStartedAtByKey.clear();
   clearSpeakingIdleTimer();
   closeEventSource();
@@ -703,8 +737,26 @@ function closeEventSource() {
 function resetRunTraceForMessage(messageId: string) {
   activeTraceMessageId.value = messageId;
   runTraceEntries.value = [];
-  isRunTraceExpanded.value = false;
+  isRunTraceExpanded.value = true;
+  runTraceStartedAtMs.value = nowRunTraceMs();
+  runTraceFinishedAtMs.value = null;
   runTraceStartedAtByKey.clear();
+}
+
+function markRunTraceFinished() {
+  if (!activeTraceMessageId.value || runTraceFinishedAtMs.value !== null) {
+    return;
+  }
+  runTraceFinishedAtMs.value = nowRunTraceMs();
+  isRunTraceExpanded.value = false;
+}
+
+function shouldShowRunTraceForMessage(message: BuddyMessage) {
+  return message.id === activeTraceMessageId.value && runTraceEntries.value.length > 0;
+}
+
+function shouldShowAssistantActivityBubble(message: BuddyMessage) {
+  return message.role === "assistant" && !message.content.trim() && !shouldShowRunTraceForMessage(message);
 }
 
 function appendRunTraceEntry(eventType: string, traceEntry: BuddyRunTraceEntry) {
@@ -1299,11 +1351,16 @@ function isPersistedMessage(value: unknown): value is BuddyChatMessage {
 }
 
 .buddy-widget__run-trace-toggle .el-icon {
+  transform: rotate(-90deg);
   transition: transform 160ms ease;
 }
 
 .buddy-widget__run-trace--expanded .buddy-widget__run-trace-toggle .el-icon {
-  transform: rotate(180deg);
+  transform: rotate(0deg);
+}
+
+.buddy-widget__run-trace--finished:not(.buddy-widget__run-trace--expanded) .buddy-widget__run-trace-toggle {
+  border-bottom: 0;
 }
 
 .buddy-widget__run-trace-body {

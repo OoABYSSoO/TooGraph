@@ -114,7 +114,8 @@ test("BuddyWidget keeps runtime error replies out of model context and persisted
 test("BuddyWidget shows live run activity while the assistant reply is still empty", () => {
   assert.match(componentSource, /resolveBuddyRunActivityFromRunEvent/);
   assert.match(componentSource, /activityText/);
-  assert.match(componentSource, /message\.content \|\| message\.activityText \|\| t\("buddy\.streaming"\)/);
+  assert.match(componentSource, /shouldShowAssistantActivityBubble\(message\)/);
+  assert.match(componentSource, /message\.activityText \|\| t\("buddy\.streaming"\)/);
   assert.match(componentSource, /setAssistantActivityText\(assistantMessage\.id, t\("buddy\.activity\.preparing"\)\);/);
   assert.match(componentSource, /setAssistantActivityFromRunEvent\(assistantMessageId, eventType, payload, graph\);/);
   assert.match(componentSource, /if \(mood\.value === "thinking" && latestActivityText\.value\) \{/);
@@ -138,6 +139,18 @@ test("BuddyWidget records and displays per-stage run trace durations", () => {
   assert.match(componentSource, /durationMs: Math\.max\(1, Math\.round\(nowRunTraceMs\(\) - startedAt\)\),/);
   assert.match(componentSource, /class="buddy-widget__run-trace-duration"/);
   assert.match(componentSource, /formatRunTraceDuration\(entry\.durationMs\)/);
+});
+
+test("BuddyWidget keeps the run trace above the formal reply and collapses to elapsed summary", () => {
+  assert.match(componentSource, /const runTraceStartedAtMs = ref<number \| null>\(null\);/);
+  assert.match(componentSource, /const runTraceFinishedAtMs = ref<number \| null>\(null\);/);
+  assert.match(componentSource, /const runTraceHeaderText = computed/);
+  assert.match(componentSource, /markRunTraceFinished\(\);/);
+  assert.match(componentSource, /v-if="shouldShowRunTraceForMessage\(message\)"/);
+  assert.match(componentSource, /v-if="shouldShowRunTraceBody"/);
+  assert.match(componentSource, /v-if="message\.role === 'assistant' && message\.content"/);
+  assert.match(componentSource, /shouldShowAssistantActivityBubble\(message\)/);
+  assert.doesNotMatch(componentSource, /message\.content \|\| message\.activityText \|\| t\("buddy\.streaming"\)/);
 });
 
 test("BuddyWidget leaves buddy self config loading and memory curation to the chat graph template", () => {

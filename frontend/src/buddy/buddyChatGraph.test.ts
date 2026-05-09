@@ -829,6 +829,24 @@ test("resolveBuddyRunActivityFromRunEvent describes inner buddy subgraph activit
   });
 });
 
+test("resolveBuddyRunActivityFromRunEvent names subgraph containers without duplicating inner phases", () => {
+  const activity = resolveBuddyRunActivityFromRunEvent(
+    "node.started",
+    {
+      node_id: "intake_request",
+      node_type: "subgraph",
+    },
+    createActivityGraph(),
+  );
+
+  assert.deepEqual(activity, {
+    labelKey: "buddy.activity.running",
+    params: {
+      node: "理解请求",
+    },
+  });
+});
+
 test("resolveBuddyRunActivityFromRunEvent reports capability selection and node failures", () => {
   const graph = createActivityGraph();
 
