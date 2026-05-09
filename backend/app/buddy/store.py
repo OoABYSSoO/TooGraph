@@ -1,41 +1,36 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from app.core.storage.database import DATA_DIR
+from app.buddy.home import (
+    DEFAULT_POLICY,
+    DEFAULT_PROFILE,
+    DEFAULT_SESSION_SUMMARY,
+    MEMORIES_PATH,
+    POLICY_PATH,
+    PROFILE_PATH,
+    REVISIONS_PATH,
+    SESSION_SUMMARY_PATH,
+    ensure_buddy_home,
+    get_default_buddy_home_dir,
+)
 from app.core.storage.json_file_utils import read_json_file, utc_now_iso, write_json_file
 
 
-BUDDY_DATA_DIR = DATA_DIR / "buddy"
-PROFILE_PATH = "profile.json"
-POLICY_PATH = "policy.json"
-MEMORIES_PATH = "memories.json"
-SESSION_SUMMARY_PATH = "session_summary.json"
-REVISIONS_PATH = "revisions.json"
+BUDDY_HOME_DIR = get_default_buddy_home_dir()
 
-DEFAULT_PROFILE = {
-    "name": "GraphiteUI Buddy",
-    "persona": "GraphiteUI 的全局主伙伴 Agent。",
-    "tone": "简短、直接、友好。",
-    "response_style": "默认先给结论，再给必要理由。",
-    "display_preferences": {},
-}
 
-DEFAULT_POLICY = {
-    "graph_permission_mode": "advisory",
-    "behavior_boundaries": [
-        "不能越过当前图操作档位。",
-        "不能声称已经执行未执行的图操作。",
-    ],
-    "communication_preferences": [],
-}
+def initialize_buddy_home() -> None:
+    ensure_buddy_home(BUDDY_HOME_DIR)
 
-DEFAULT_SESSION_SUMMARY = {
-    "content": "当前对话尚未形成摘要。",
-    "updated_at": "",
-}
+
+def buddy_home_path(file_name: str) -> Path:
+    initialize_buddy_home()
+    return BUDDY_HOME_DIR / file_name
+
 
 def load_profile() -> dict[str, Any]:
     return _read_dict(PROFILE_PATH, DEFAULT_PROFILE)
@@ -188,17 +183,17 @@ def _write_with_revision(
 
 
 def _read_dict(file_name: str, default: dict[str, Any]) -> dict[str, Any]:
-    value = read_json_file(BUDDY_DATA_DIR / file_name, default=deepcopy(default))
+    value = read_json_file(buddy_home_path(file_name), default=deepcopy(default))
     return value if isinstance(value, dict) else deepcopy(default)
 
 
 def _read_list(file_name: str) -> list[dict[str, Any]]:
-    value = read_json_file(BUDDY_DATA_DIR / file_name, default=[])
+    value = read_json_file(buddy_home_path(file_name), default=[])
     return value if isinstance(value, list) else []
 
 
 def _write_json(file_name: str, payload: Any) -> None:
-    write_json_file(BUDDY_DATA_DIR / file_name, payload)
+    write_json_file(buddy_home_path(file_name), payload)
 
 
 def _find_memory_index(memories: list[dict[str, Any]], memory_id: str) -> int:

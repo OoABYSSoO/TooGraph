@@ -20,11 +20,12 @@ class RunStartupRecoveryTests(unittest.TestCase):
 
         with (
             patch("app.main.initialize_storage", lambda: calls.append("initialize_storage")),
+            patch("app.main.initialize_buddy_home", lambda: calls.append("initialize_buddy_home")),
             patch("app.main.mark_interrupted_active_runs", lambda: calls.append("mark_interrupted_active_runs")),
         ):
             startup()
 
-        self.assertEqual(calls, ["initialize_storage", "mark_interrupted_active_runs"])
+        self.assertEqual(calls, ["initialize_storage", "initialize_buddy_home", "mark_interrupted_active_runs"])
 
     def test_mark_interrupted_active_runs_fails_active_runs_and_current_node(self) -> None:
         active_run = {

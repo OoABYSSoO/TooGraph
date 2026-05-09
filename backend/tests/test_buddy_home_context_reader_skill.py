@@ -56,7 +56,7 @@ class BuddyHomeContextReaderSkillTests(unittest.TestCase):
     def test_reader_returns_compact_buddy_home_context_pack(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
-            buddy_root = repo_root / "backend" / "data" / "buddy"
+            buddy_root = repo_root / "buddy_home"
             _write_json(
                 buddy_root / "profile.json",
                 {
@@ -125,13 +125,16 @@ class BuddyHomeContextReaderSkillTests(unittest.TestCase):
 
     def test_reader_uses_defaults_when_buddy_home_files_are_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            result = _run_skill_script(READER_AFTER_LLM_PATH, {}, repo_root=Path(temp_dir))
+            repo_root = Path(temp_dir)
+            result = _run_skill_script(READER_AFTER_LLM_PATH, {}, repo_root=repo_root)
 
-        context_pack = result["context_pack"]
-        self.assertEqual(context_pack["profile"]["name"], "GraphiteUI Buddy")
-        self.assertEqual(context_pack["policy"]["graph_permission_mode"], "advisory")
-        self.assertEqual(context_pack["memories"], [])
-        self.assertEqual(context_pack["session_summary"]["content"], "当前对话尚未形成摘要。")
+            context_pack = result["context_pack"]
+            self.assertEqual(context_pack["profile"]["name"], "GraphiteUI Buddy")
+            self.assertEqual(context_pack["policy"]["graph_permission_mode"], "advisory")
+            self.assertEqual(context_pack["memories"], [])
+            self.assertEqual(context_pack["session_summary"]["content"], "当前对话尚未形成摘要。")
+            self.assertTrue((repo_root / "buddy_home" / "profile.json").is_file())
+            self.assertTrue((repo_root / "buddy_home" / "manifest.json").is_file())
 
 
 if __name__ == "__main__":

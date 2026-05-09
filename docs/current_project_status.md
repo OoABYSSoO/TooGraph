@@ -14,7 +14,7 @@
 - 技能系统已收束为统一技能库，不再区分“伙伴技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
 - 当前官方技能包包括 `buddy_home_context_reader`、`web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
-- `backend/data/buddy/` 是伙伴长期资料的目标收束目录。除图模板本体外，伙伴人设、策略、记忆、会话摘要、修订记录、命令记录、未来的自我复盘和能力使用统计都应围绕这个 Buddy Home 组织。
+- 根目录 `buddy_home/` 是伙伴长期资料的目标收束目录。它由程序在启动或读取时按默认内容自动补齐，属于本地用户数据，不进入 Git 管理。除图模板本体外，伙伴人设、策略、记忆、会话摘要、修订记录、命令记录、未来的自我复盘和能力使用统计都应围绕这个 Buddy Home 组织。
 
 ## 当前协议
 
@@ -75,10 +75,10 @@
 
 - 位置：`skill/buddy_home_context_reader/`
 - 显示名称：`Buddy Home Context Reader`
-- 作用：只读 `backend/data/buddy/`，把伙伴人设、策略、启用记忆和会话摘要整理成一个 `context_pack`。
+- 作用：只读根目录 `buddy_home/`，把伙伴人设、策略、启用记忆和会话摘要整理成一个 `context_pack`；如果目录或默认文件缺失，会先由程序补齐默认资料再读取。
 - 输出克制：无输入，只输出一个 `context_pack` JSON 字段。
 - 能力选择：该 Skill 是伙伴主循环的显式支撑能力，不作为 `graphiteui_capability_selector` 的动态候选；模板应在 `buddy_context_pack` 这类上下文装配节点中手动绑定它。
-- 权限：只声明 `file_read`，不写 Buddy Home，不修改 revision，不记录命令。
+- 权限：只声明 `file_read`，它读取 Buddy Home 长期资料，但不修改 profile、policy、memories、session summary、revision 或 command。
 
 ### `graphiteUI_script_tester`
 
@@ -148,7 +148,7 @@
 - LangGraph runtime 是当前运行主链。
 - 后端不再在 graph run 入口修补旧模板结构；提交什么图，就按当前协议校验和执行什么图。
 - graph run、run detail、SSE 事件、状态快照和 artifact 输出仍是审计与回放的基础。
-- `backend/app/buddy/store.py` 已提供 profile、policy、memories、session summary 和 revisions 的基础文件存取；`backend/app/buddy/commands.py` 已有命令记录入口。它们是 Buddy Home 的初始基础，但 evolution、usage 和完整写回图流程仍未补齐。
+- `backend/app/buddy/home.py` 负责根目录 `buddy_home/` 的默认文件生成；`backend/app/buddy/store.py` 已提供 profile、policy、memories、session summary 和 revisions 的基础文件存取；`backend/app/buddy/commands.py` 已有命令记录入口。当前已生成 evolution 与 usage 的基础文件结构，但完整写回图流程仍未补齐。
 - `backend/app/buddy/commands.py` 仍保留 `graph_patch.draft` 草案记录 stub。这是历史遗留入口，只记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、图 revision、undo 或完整审计闭环。
 
 ## 当前仍在路线图中

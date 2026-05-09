@@ -13,7 +13,7 @@ COMMAND_CHANGED_BY = "buddy_command"
 
 
 def list_commands() -> list[dict[str, Any]]:
-    value = read_json_file(store.BUDDY_DATA_DIR / COMMANDS_PATH, default=[])
+    value = read_json_file(store.buddy_home_path(COMMANDS_PATH), default=[])
     return value if isinstance(value, list) else []
 
 
@@ -140,7 +140,7 @@ def _latest_new_revision(previous_revision_ids: set[str]) -> dict[str, Any] | No
 def _append_command(command: dict[str, Any]) -> None:
     commands = list_commands()
     commands.append(command)
-    write_json_file(store.BUDDY_DATA_DIR / COMMANDS_PATH, commands)
+    write_json_file(store.buddy_home_path(COMMANDS_PATH), commands)
 
 
 def _required_target_id(value: str | None, action: str) -> str:
