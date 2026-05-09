@@ -2,13 +2,22 @@
   <div class="buddy-widget" aria-live="polite">
     <div
       class="buddy-widget__anchor"
-      :class="`buddy-widget__anchor--${panelPlacement}`"
+      :class="[
+        `buddy-widget__anchor--${panelPlacement}`,
+        { 'buddy-widget__anchor--fullscreen': isPanelFullscreen },
+      ]"
       :style="anchorStyle"
     >
+      <div
+        v-if="isPanelOpen && isPanelFullscreen"
+        class="buddy-widget__backdrop"
+        aria-hidden="true"
+        @click="isPanelFullscreen = false"
+      />
       <section
         v-if="isPanelOpen"
         class="buddy-widget__panel"
-        :class="{ 'buddy-widget__panel--sessions-open': isSessionPanelOpen }"
+        :class="{ 'buddy-widget__panel--fullscreen': isPanelFullscreen }"
         :aria-label="t('buddy.panelLabel')"
       >
         <header class="buddy-widget__header">
@@ -17,25 +26,93 @@
             <h2>{{ t("buddy.title") }}</h2>
           </div>
           <div class="buddy-widget__header-actions">
+            <div class="buddy-widget__history-control">
+              <button
+                type="button"
+                class="buddy-widget__icon-button"
+                :class="{ 'buddy-widget__icon-button--active': isSessionPanelOpen }"
+                :title="t('buddy.history')"
+                :aria-label="t('buddy.history')"
+                @click="isSessionPanelOpen = !isSessionPanelOpen"
+              >
+                <ElIcon><Clock /></ElIcon>
+              </button>
+              <aside
+                v-if="isSessionPanelOpen"
+                class="buddy-widget__sessions-panel"
+                :aria-label="t('buddy.history')"
+              >
+                <div class="buddy-widget__sessions-header">
+                  <strong>{{ t("buddy.history") }}</strong>
+                  <button
+                    type="button"
+                    class="buddy-widget__session-new"
+                    :disabled="isSessionSwitchLocked"
+                    :title="t('buddy.newSession')"
+                    :aria-label="t('buddy.newSession')"
+                    @click="createNewSession"
+                  >
+                    <ElIcon><Plus /></ElIcon>
+                    <span>{{ t("buddy.newSession") }}</span>
+                  </button>
+                </div>
+                <p v-if="isSessionLoading" class="buddy-widget__sessions-status">
+                  {{ t("buddy.historyLoading") }}
+                </p>
+                <p v-else-if="chatSessions.length === 0" class="buddy-widget__sessions-status">
+                  {{ t("buddy.historyEmpty") }}
+                </p>
+                <div v-else class="buddy-widget__session-list">
+                  <div
+                    v-for="session in chatSessions"
+                    :key="session.session_id"
+                    class="buddy-widget__session-row"
+                    :class="{ 'buddy-widget__session-row--active': session.session_id === activeSessionId }"
+                  >
+                    <button
+                      type="button"
+                      class="buddy-widget__session-item"
+                      :disabled="isSessionSwitchLocked && session.session_id !== activeSessionId"
+                      @click="selectChatSession(session.session_id)"
+                    >
+                      <span>{{ session.title || t("buddy.untitledSession") }}</span>
+                      <small>{{ session.last_message_preview || t("buddy.emptySession") }}</small>
+                    </button>
+                    <button
+                      type="button"
+                      class="buddy-widget__session-delete"
+                      :disabled="isSessionSwitchLocked"
+                      :title="t('buddy.deleteSession')"
+                      :aria-label="t('buddy.deleteSession')"
+                      @click.stop="deleteSession(session.session_id)"
+                    >
+                      <ElIcon><Delete /></ElIcon>
+                    </button>
+                  </div>
+                </div>
+              </aside>
+            </div>
             <button
               type="button"
               class="buddy-widget__icon-button"
-              :class="{ 'buddy-widget__icon-button--active': isSessionPanelOpen }"
-              :title="t('buddy.history')"
-              :aria-label="t('buddy.history')"
-              @click="isSessionPanelOpen = !isSessionPanelOpen"
+              :title="t('buddy.newSession')"
+              :aria-label="t('buddy.newSession')"
+              :disabled="isSessionSwitchLocked"
+              @click="createNewSession"
             >
-              <ElIcon><Clock /></ElIcon>
+              <ElIcon><Plus /></ElIcon>
             </button>
             <button
               type="button"
               class="buddy-widget__icon-button"
-              :title="t('buddy.clear')"
-              :aria-label="t('buddy.clear')"
-              :disabled="isSessionSwitchLocked"
-              @click="clearMessages"
+              :title="isPanelFullscreen ? t('buddy.exitFullscreen') : t('buddy.fullscreen')"
+              :aria-label="isPanelFullscreen ? t('buddy.exitFullscreen') : t('buddy.fullscreen')"
+              @click="isPanelFullscreen = !isPanelFullscreen"
             >
-              <ElIcon><Delete /></ElIcon>
+              <ElIcon>
+                <ScaleToOriginal v-if="isPanelFullscreen" />
+                <FullScreen v-else />
+              </ElIcon>
             </button>
             <button
               type="button"
@@ -96,61 +173,6 @@
             </div>
           </div>
         </header>
-
-        <aside
-          v-if="isSessionPanelOpen"
-          class="buddy-widget__sessions-panel"
-          :aria-label="t('buddy.history')"
-        >
-          <div class="buddy-widget__sessions-header">
-            <strong>{{ t("buddy.history") }}</strong>
-            <button
-              type="button"
-              class="buddy-widget__session-new"
-              :disabled="isSessionSwitchLocked"
-              :title="t('buddy.newSession')"
-              :aria-label="t('buddy.newSession')"
-              @click="createNewSession"
-            >
-              <ElIcon><Plus /></ElIcon>
-              <span>{{ t("buddy.newSession") }}</span>
-            </button>
-          </div>
-          <p v-if="isSessionLoading" class="buddy-widget__sessions-status">
-            {{ t("buddy.historyLoading") }}
-          </p>
-          <p v-else-if="chatSessions.length === 0" class="buddy-widget__sessions-status">
-            {{ t("buddy.historyEmpty") }}
-          </p>
-          <div v-else class="buddy-widget__session-list">
-            <div
-              v-for="session in chatSessions"
-              :key="session.session_id"
-              class="buddy-widget__session-row"
-              :class="{ 'buddy-widget__session-row--active': session.session_id === activeSessionId }"
-            >
-              <button
-                type="button"
-                class="buddy-widget__session-item"
-                :disabled="isSessionSwitchLocked && session.session_id !== activeSessionId"
-                @click="activateChatSession(session.session_id)"
-              >
-                <span>{{ session.title || t("buddy.untitledSession") }}</span>
-                <small>{{ session.last_message_preview || t("buddy.emptySession") }}</small>
-              </button>
-              <button
-                type="button"
-                class="buddy-widget__session-delete"
-                :disabled="isSessionSwitchLocked"
-                :title="t('buddy.deleteSession')"
-                :aria-label="t('buddy.deleteSession')"
-                @click.stop="deleteSession(session.session_id)"
-              >
-                <ElIcon><Delete /></ElIcon>
-              </button>
-            </div>
-          </div>
-        </aside>
 
         <div ref="messageListElement" class="buddy-widget__messages">
           <p v-if="messages.length === 0" class="buddy-widget__empty">
@@ -264,7 +286,7 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowDown, Clock, Close, Delete, Plus, Promotion } from "@element-plus/icons-vue";
+import { ArrowDown, Clock, Close, Delete, FullScreen, Plus, Promotion, ScaleToOriginal } from "@element-plus/icons-vue";
 import { ElIcon, ElOption, ElSelect } from "element-plus";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -363,6 +385,7 @@ const chatSessions = ref<BuddyChatSession[]>([]);
 const activeSessionId = ref<string | null>(null);
 const isSessionPanelOpen = ref(false);
 const isSessionLoading = ref(false);
+const isPanelFullscreen = ref(false);
 const queuedTurns = ref<BuddyQueuedTurn[]>([]);
 const runTraceEntries = ref<BuddyRunTraceEntry[]>([]);
 const errorMessage = ref("");
@@ -412,7 +435,7 @@ const buddyModelPlaceholder = computed(() =>
   buddyModelLoadError.value ? t("buddy.modelLoadFailed") : t("buddy.modelLoading"),
 );
 const anchorStyle = computed(() => ({
-  transform: `translate3d(${position.value.x}px, ${position.value.y}px, 0)`,
+  transform: isPanelFullscreen.value ? "none" : `translate3d(${position.value.x}px, ${position.value.y}px, 0)`,
 }));
 const panelPlacement = computed(() => (position.value.x > viewport.value.width / 2 ? "left" : "right"));
 const latestActivityText = computed(() => {
@@ -489,6 +512,10 @@ function handleAvatarClick() {
   }
   tapNonce.value += 1;
   isPanelOpen.value = !isPanelOpen.value;
+  if (!isPanelOpen.value) {
+    isSessionPanelOpen.value = false;
+    isPanelFullscreen.value = false;
+  }
   if (isPanelOpen.value) {
     void scrollMessagesToBottom();
   }
@@ -784,9 +811,15 @@ async function createNewSession() {
     const session = await createBuddyChatSession();
     chatSessions.value = [session, ...chatSessions.value.filter((item) => item.session_id !== session.session_id)];
     await activateChatSession(session.session_id);
+    isSessionPanelOpen.value = false;
   } catch (error) {
     errorMessage.value = t("buddy.historyCreateFailed", { error: formatErrorMessage(error) });
   }
+}
+
+async function selectChatSession(sessionId: string) {
+  await activateChatSession(sessionId);
+  isSessionPanelOpen.value = false;
 }
 
 async function activateChatSession(sessionId: string, options: { skipInitializationWait?: boolean } = {}) {
@@ -1280,6 +1313,24 @@ function formatErrorMessage(error: unknown): string {
   transition: transform 120ms ease;
 }
 
+.buddy-widget__anchor--fullscreen {
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 4510;
+}
+
+.buddy-widget__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: auto;
+  background:
+    radial-gradient(circle at 20% 16%, rgba(255, 255, 255, 0.42), transparent 34%),
+    linear-gradient(135deg, rgba(45, 32, 21, 0.16), rgba(154, 52, 18, 0.08));
+  backdrop-filter: blur(18px) saturate(1.22);
+}
+
 .buddy-widget__avatar {
   appearance: none;
   position: relative;
@@ -1350,20 +1401,33 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__panel {
   bottom: calc(100% + 12px);
-  width: min(360px, calc(100vw - 32px));
-  max-height: min(560px, calc(100vh - 132px));
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(640px, calc(100vh - 132px));
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
-  border: 1px solid rgba(154, 52, 18, 0.16);
+  border: 1px solid var(--graphite-glass-border);
   border-radius: 8px;
-  background: rgba(255, 252, 247, 0.94);
-  box-shadow: var(--graphite-glass-highlight), 0 24px 64px rgba(61, 43, 24, 0.18);
-  backdrop-filter: blur(18px) saturate(1.2);
+  background: var(--graphite-glass-specular), var(--graphite-glass-lens), rgba(255, 252, 247, 0.88);
+  box-shadow: var(--graphite-glass-shadow), var(--graphite-glass-highlight), var(--graphite-glass-rim);
+  backdrop-filter: blur(28px) saturate(1.55) contrast(1.02);
 }
 
-.buddy-widget__panel--sessions-open {
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+.buddy-widget__panel--fullscreen {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  width: min(880px, calc(100vw - 48px));
+  height: min(760px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+.buddy-widget__anchor--fullscreen .buddy-widget__avatar {
+  display: none;
 }
 
 .buddy-widget__anchor--left .buddy-widget__panel {
@@ -1372,6 +1436,13 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__anchor--right .buddy-widget__panel {
   left: 0;
+}
+
+.buddy-widget__anchor--fullscreen .buddy-widget__panel {
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
 }
 
 .buddy-widget__header {
@@ -1405,6 +1476,7 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__header-actions {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
@@ -1510,12 +1582,32 @@ function formatErrorMessage(error: unknown): string {
   transform: none;
 }
 
+.buddy-widget__history-control {
+  position: relative;
+}
+
 .buddy-widget__sessions-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 5;
+  width: min(330px, calc(100vw - 56px));
   display: grid;
   gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(154, 52, 18, 0.1);
-  background: rgba(255, 252, 247, 0.72);
+  padding: 10px;
+  border: 1px solid var(--graphite-glass-border);
+  border-radius: 8px;
+  background: var(--graphite-glass-specular), var(--graphite-glass-lens), rgba(255, 252, 247, 0.94);
+  box-shadow: var(--graphite-glass-highlight), 0 16px 38px rgba(61, 43, 24, 0.16);
+  backdrop-filter: blur(24px) saturate(1.45) contrast(1.02);
+}
+
+.buddy-widget__anchor--left .buddy-widget__sessions-panel {
+  right: 0;
+}
+
+.buddy-widget__anchor--right .buddy-widget__sessions-panel {
+  right: 0;
 }
 
 .buddy-widget__sessions-header {
@@ -1631,10 +1723,14 @@ function formatErrorMessage(error: unknown): string {
   display: grid;
   align-content: start;
   gap: 10px;
-  min-height: 190px;
-  max-height: 360px;
+  min-height: 240px;
+  max-height: 430px;
   overflow: auto;
   padding: 14px;
+}
+
+.buddy-widget__panel--fullscreen .buddy-widget__messages {
+  max-height: none;
 }
 
 .buddy-widget__empty,
@@ -1954,11 +2050,21 @@ function formatErrorMessage(error: unknown): string {
 @media (max-width: 560px) {
   .buddy-widget__panel {
     width: calc(100vw - 32px);
-    max-height: min(520px, calc(100vh - 120px));
+    max-height: min(600px, calc(100vh - 120px));
+  }
+
+  .buddy-widget__panel--fullscreen {
+    width: calc(100vw - 24px);
+    height: calc(100vh - 24px);
+    max-height: calc(100vh - 24px);
   }
 
   .buddy-widget__messages {
-    max-height: 320px;
+    max-height: 390px;
+  }
+
+  .buddy-widget__panel--fullscreen .buddy-widget__messages {
+    max-height: none;
   }
 }
 

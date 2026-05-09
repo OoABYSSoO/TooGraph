@@ -157,18 +157,31 @@ test("BuddyWidget keeps the run trace above the formal reply and collapses to el
   assert.doesNotMatch(componentSource, /message\.content \|\| message\.activityText \|\| t\("buddy\.streaming"\)/);
 });
 
-test("BuddyWidget stores buddy chat in backend sessions and exposes an in-panel history list", () => {
+test("BuddyWidget stores buddy chat in backend sessions and exposes a compact history dropdown", () => {
   assert.match(componentSource, /import \{[\s\S]*appendBuddyChatMessage,[\s\S]*fetchBuddyChatMessages,[\s\S]*fetchBuddyChatSessions,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
   assert.match(componentSource, /const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "graphiteui:buddy-active-session";/);
   assert.match(componentSource, /const chatSessions = ref<BuddyChatSession\[\]>\(\[\]\);/);
   assert.match(componentSource, /const activeSessionId = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /class="buddy-widget__history-control"/);
   assert.match(componentSource, /class="buddy-widget__sessions-panel"/);
   assert.match(componentSource, /v-for="session in chatSessions"/);
-  assert.match(componentSource, /@click="activateChatSession\(session\.session_id\)"/);
+  assert.match(componentSource, /@click="selectChatSession\(session\.session_id\)"/);
   assert.match(componentSource, /@click\.stop="deleteSession\(session\.session_id\)"/);
   assert.match(componentSource, /chatSessionInitializationPromise = initializeBuddyChatSessions\(\)\.finally/);
   assert.match(componentSource, /async function migrateLegacyBuddyHistory\(\)/);
+  assert.match(componentSource, /\.buddy-widget__sessions-panel\s*\{[\s\S]*position:\s*absolute;[\s\S]*width:\s*min\(330px,/);
   assert.doesNotMatch(componentSource, /watch\(\s*messages,/);
+});
+
+test("BuddyWidget uses the top toolbar for new chat and fullscreen expansion", () => {
+  assert.match(componentSource, /import \{ ArrowDown, Clock, Close, Delete, FullScreen, Plus, Promotion, ScaleToOriginal \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /const isPanelFullscreen = ref\(false\);/);
+  assert.match(componentSource, /:title="t\('buddy\.newSession'\)"[\s\S]*@click="createNewSession"[\s\S]*<ElIcon><Plus \/><\/ElIcon>/);
+  assert.match(componentSource, /:title="isPanelFullscreen \? t\('buddy\.exitFullscreen'\) : t\('buddy\.fullscreen'\)"/);
+  assert.match(componentSource, /<ScaleToOriginal v-if="isPanelFullscreen" \/>/);
+  assert.match(componentSource, /<FullScreen v-else \/>/);
+  assert.match(componentSource, /class="buddy-widget__backdrop"/);
+  assert.match(componentSource, /\.buddy-widget__panel--fullscreen\s*\{[\s\S]*width:\s*min\(880px,/);
 });
 
 test("BuddyWidget leaves buddy self config loading and memory curation to the chat graph template", () => {
