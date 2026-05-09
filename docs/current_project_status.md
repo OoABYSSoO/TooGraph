@@ -14,6 +14,7 @@
 - 技能系统已收束为统一技能库，不再区分“伙伴技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
 - 当前官方技能包包括 `web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
+- `backend/data/buddy/` 是伙伴长期资料的目标收束目录。除图模板本体外，伙伴人设、策略、记忆、会话摘要、修订记录、命令记录、未来的自我复盘和能力使用统计都应围绕这个 Buddy Home 组织。
 
 ## 当前协议
 
@@ -22,6 +23,7 @@
 - “绑定到 LLM 节点后应该如何生成调用输入”写进 `llmInstruction`。
 - 一个 LLM 节点最多使用一个显式能力来源：无能力、一个手动选择的 Skill，或一个输入 `capability` state。`capability` 是单个互斥对象，`kind` 可为 `skill`、`subgraph` 或 `none`，不能是列表。多个能力调用必须拆成多个节点和边。
 - 手动复用图仍通过 Subgraph 节点完成；`capability.kind=subgraph` 主要用于伙伴主循环等模板在运行时动态选择可运行子图能力，不作为普通 LLM 节点卡片下拉项。
+- 复杂模板应优先用子图提升可读性。伙伴自主循环尤其应把上下文装配、需求理解、能力循环、最终回复和自我复盘拆为可审计子图，而不是在顶层模板堆叠大量细碎节点。
 - LLM 节点卡片上的 Skill 选择是单选控件；它使用蓝色视觉强调，以区别模型、思考强度和断点等普通运行控件。
 - 手动选择的 LLM 节点 Skill 在协议里存为单值 `config.skillKey`。不要使用 `config.skills` 数组；数组会暗示单节点多技能语义，属于旧协议残留。
 - 添加到 LLM 节点的 skill 会在节点提示词编辑区显示可编辑的技能说明胶囊；默认胶囊由 skill `llmInstruction` 动态展示，不写入图 JSON。
@@ -137,13 +139,15 @@
 - LangGraph runtime 是当前运行主链。
 - 后端不再在 graph run 入口修补旧模板结构；提交什么图，就按当前协议校验和执行什么图。
 - graph run、run detail、SSE 事件、状态快照和 artifact 输出仍是审计与回放的基础。
+- `backend/app/buddy/store.py` 已提供 profile、policy、memories、session summary 和 revisions 的基础文件存取；`backend/app/buddy/commands.py` 已有命令记录入口。它们是 Buddy Home 的初始基础，但 evolution、usage 和完整写回图流程仍未补齐。
 - `backend/app/buddy/commands.py` 仍保留 `graph_patch.draft` 草案记录 stub。这是历史遗留入口，只记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、图 revision、undo 或完整审计闭环。
 
 ## 当前仍在路线图中
 
 - 继续收束 `subgraph` 子图体验：补齐父子图运行详情页的审计聚合、事件定位和从缩略图点击跳转到内部节点。
 - 用新结构手工重建伙伴自主循环模板。
+- 将伙伴自主循环中的上下文装配、能力循环、最终回复和自我复盘整理为子图，降低顶层模板复杂度。
 - 在伙伴自主循环模板中复用 `graphiteui_capability_selector`，把“选择能力”和“执行能力”明确拆成两个图节点。
 - 完成更完整的图运行展示。
 - 清理或按新命令流重建历史 `graph_patch.draft` stub，并完成图补丁预览、GraphCommandBus、graph revision、undo 和审计闭环。
-- 将人设、记忆、会话摘要等长期状态更新表达为可审计的图模板流程，而不是隐藏产品逻辑。
+- 将人设、记忆、会话摘要、自我复盘和能力使用统计等长期状态更新表达为可审计的图模板流程，而不是隐藏产品逻辑。
