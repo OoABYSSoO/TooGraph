@@ -33,7 +33,7 @@
                 :class="{ 'buddy-widget__icon-button--active': isSessionPanelOpen }"
                 :title="t('buddy.history')"
                 :aria-label="t('buddy.history')"
-                @click="isSessionPanelOpen = !isSessionPanelOpen"
+                @click="toggleSessionPanel"
               >
                 <ElIcon><Clock /></ElIcon>
               </button>
@@ -44,17 +44,6 @@
               >
                 <div class="buddy-widget__sessions-header">
                   <strong>{{ t("buddy.history") }}</strong>
-                  <button
-                    type="button"
-                    class="buddy-widget__session-new"
-                    :disabled="isSessionSwitchLocked"
-                    :title="t('buddy.newSession')"
-                    :aria-label="t('buddy.newSession')"
-                    @click="createNewSession"
-                  >
-                    <ElIcon><Plus /></ElIcon>
-                    <span>{{ t("buddy.newSession") }}</span>
-                  </button>
                 </div>
                 <p v-if="isSessionLoading" class="buddy-widget__sessions-status">
                   {{ t("buddy.historyLoading") }}
@@ -78,16 +67,32 @@
                       <span>{{ session.title || t("buddy.untitledSession") }}</span>
                       <small>{{ session.last_message_preview || t("buddy.emptySession") }}</small>
                     </button>
-                    <button
-                      type="button"
-                      class="buddy-widget__session-delete"
-                      :disabled="isSessionSwitchLocked"
-                      :title="t('buddy.deleteSession')"
-                      :aria-label="t('buddy.deleteSession')"
-                      @click.stop="deleteSession(session.session_id)"
+                    <ElPopover
+                      :visible="isSessionDeleteConfirmOpen(session.session_id)"
+                      placement="left"
+                      :show-arrow="false"
+                      popper-class="buddy-widget__confirm-popover buddy-widget__confirm-popover--delete"
                     >
-                      <ElIcon><Delete /></ElIcon>
-                    </button>
+                      <template #reference>
+                        <button
+                          type="button"
+                          data-session-delete-surface="true"
+                          class="buddy-widget__session-delete"
+                          :class="{ 'buddy-widget__session-delete--confirm': isSessionDeleteConfirmOpen(session.session_id) }"
+                          :disabled="isSessionSwitchLocked"
+                          :title="isSessionDeleteConfirmOpen(session.session_id) ? t('buddy.confirmDeleteSession') : t('buddy.deleteSession')"
+                          :aria-label="isSessionDeleteConfirmOpen(session.session_id) ? t('buddy.confirmDeleteSession') : t('buddy.deleteSession')"
+                          @pointerdown.stop
+                          @click.stop="handleSessionDeleteActionClick(session.session_id)"
+                        >
+                          <ElIcon v-if="isSessionDeleteConfirmOpen(session.session_id)" aria-hidden="true"><Check /></ElIcon>
+                          <ElIcon v-else aria-hidden="true"><Delete /></ElIcon>
+                        </button>
+                      </template>
+                      <div class="buddy-widget__confirm-hint buddy-widget__confirm-hint--delete">
+                        {{ t("buddy.deleteSessionQuestion") }}
+                      </div>
+                    </ElPopover>
                   </div>
                 </div>
               </aside>
@@ -107,10 +112,10 @@
               class="buddy-widget__icon-button"
               :title="isPanelFullscreen ? t('buddy.exitFullscreen') : t('buddy.fullscreen')"
               :aria-label="isPanelFullscreen ? t('buddy.exitFullscreen') : t('buddy.fullscreen')"
-              @click="isPanelFullscreen = !isPanelFullscreen"
+              @click="togglePanelFullscreen"
             >
               <ElIcon>
-                <ScaleToOriginal v-if="isPanelFullscreen" />
+                <SemiSelect v-if="isPanelFullscreen" />
                 <FullScreen v-else />
               </ElIcon>
             </button>
@@ -119,7 +124,7 @@
               class="buddy-widget__icon-button"
               :title="t('common.close')"
               :aria-label="t('common.close')"
-              @click="isPanelOpen = false"
+              @click="closePanel"
             >
               <ElIcon><Close /></ElIcon>
             </button>
@@ -286,8 +291,8 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowDown, Clock, Close, Delete, FullScreen, Plus, Promotion, ScaleToOriginal } from "@element-plus/icons-vue";
-import { ElIcon, ElOption, ElSelect } from "element-plus";
+import { ArrowDown, Check, Clock, Close, Delete, FullScreen, Plus, Promotion, SemiSelect } from "@element-plus/icons-vue";
+import { ElIcon, ElOption, ElPopover, ElSelect } from "element-plus";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
@@ -385,6 +390,8 @@ const chatSessions = ref<BuddyChatSession[]>([]);
 const activeSessionId = ref<string | null>(null);
 const isSessionPanelOpen = ref(false);
 const isSessionLoading = ref(false);
+const activeSessionDeleteId = ref<string | null>(null);
+const sessionDeleteConfirmTimeoutRef = ref<number | null>(null);
 const isPanelFullscreen = ref(false);
 const queuedTurns = ref<BuddyQueuedTurn[]>([]);
 const runTraceEntries = ref<BuddyRunTraceEntry[]>([]);
@@ -484,6 +491,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("pointermove", handlePointerMove);
   window.removeEventListener("pointerup", handlePointerUp);
   queuedTurns.value = [];
+  clearSessionDeleteConfirmTimeout();
   clearSpeakingIdleTimer();
   closeEventSource();
   activeAbortController?.abort();
@@ -519,6 +527,24 @@ function handleAvatarClick() {
   if (isPanelOpen.value) {
     void scrollMessagesToBottom();
   }
+}
+
+function closePanel() {
+  isPanelOpen.value = false;
+  isSessionPanelOpen.value = false;
+  isPanelFullscreen.value = false;
+  clearSessionDeleteConfirmState();
+}
+
+function togglePanelFullscreen() {
+  isPanelFullscreen.value = !isPanelFullscreen.value;
+  isSessionPanelOpen.value = false;
+  clearSessionDeleteConfirmState();
+}
+
+function toggleSessionPanel() {
+  isSessionPanelOpen.value = !isSessionPanelOpen.value;
+  clearSessionDeleteConfirmState();
 }
 
 function handleBuddyModelSelectVisibleChange(visible: boolean) {
@@ -812,6 +838,7 @@ async function createNewSession() {
     chatSessions.value = [session, ...chatSessions.value.filter((item) => item.session_id !== session.session_id)];
     await activateChatSession(session.session_id);
     isSessionPanelOpen.value = false;
+    clearSessionDeleteConfirmState();
   } catch (error) {
     errorMessage.value = t("buddy.historyCreateFailed", { error: formatErrorMessage(error) });
   }
@@ -820,6 +847,7 @@ async function createNewSession() {
 async function selectChatSession(sessionId: string) {
   await activateChatSession(sessionId);
   isSessionPanelOpen.value = false;
+  clearSessionDeleteConfirmState();
 }
 
 async function activateChatSession(sessionId: string, options: { skipInitializationWait?: boolean } = {}) {
@@ -849,6 +877,7 @@ async function deleteSession(sessionId: string) {
   if (isSessionSwitchLocked.value) {
     return;
   }
+  clearSessionDeleteConfirmState();
   await waitForChatSessionInitialization();
   errorMessage.value = "";
   try {
@@ -869,6 +898,44 @@ async function deleteSession(sessionId: string) {
   } catch (error) {
     errorMessage.value = t("buddy.historyDeleteFailed", { error: formatErrorMessage(error) });
   }
+}
+
+function isSessionDeleteConfirmOpen(sessionId: string) {
+  return activeSessionDeleteId.value === sessionId;
+}
+
+function clearSessionDeleteConfirmTimeout() {
+  if (sessionDeleteConfirmTimeoutRef.value !== null) {
+    window.clearTimeout(sessionDeleteConfirmTimeoutRef.value);
+    sessionDeleteConfirmTimeoutRef.value = null;
+  }
+}
+
+function clearSessionDeleteConfirmState() {
+  clearSessionDeleteConfirmTimeout();
+  activeSessionDeleteId.value = null;
+}
+
+function startSessionDeleteConfirmWindow(sessionId: string) {
+  clearSessionDeleteConfirmTimeout();
+  activeSessionDeleteId.value = sessionId;
+  sessionDeleteConfirmTimeoutRef.value = window.setTimeout(() => {
+    sessionDeleteConfirmTimeoutRef.value = null;
+    if (activeSessionDeleteId.value === sessionId) {
+      activeSessionDeleteId.value = null;
+    }
+  }, 2000);
+}
+
+function handleSessionDeleteActionClick(sessionId: string) {
+  if (isSessionSwitchLocked.value) {
+    return;
+  }
+  if (activeSessionDeleteId.value === sessionId) {
+    void deleteSession(sessionId);
+    return;
+  }
+  startSessionDeleteConfirmWindow(sessionId);
 }
 
 async function persistBuddyMessage(
@@ -1386,7 +1453,6 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__send:focus-visible,
 .buddy-widget__input:focus-visible,
 .buddy-widget__run-trace-toggle:focus-visible,
-.buddy-widget__session-new:focus-visible,
 .buddy-widget__session-item:focus-visible,
 .buddy-widget__session-delete:focus-visible {
   outline: none;
@@ -1419,15 +1485,18 @@ function formatErrorMessage(error: unknown): string {
   left: 50%;
   right: auto;
   bottom: auto;
-  width: min(880px, calc(100vw - 48px));
-  height: min(760px, calc(100vh - 48px));
+  width: min(1000px, calc(100vw - 48px));
+  height: min(820px, calc(100vh - 40px));
   max-height: calc(100vh - 48px);
   transform: translate(-50%, -50%);
   z-index: 1;
 }
 
 .buddy-widget__anchor--fullscreen .buddy-widget__avatar {
-  display: none;
+  position: fixed;
+  right: 24px;
+  bottom: 22px;
+  z-index: 2;
 }
 
 .buddy-widget__anchor--left .buddy-widget__panel {
@@ -1613,7 +1682,7 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__sessions-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
 }
 
@@ -1623,7 +1692,6 @@ function formatErrorMessage(error: unknown): string {
   line-height: 1.2;
 }
 
-.buddy-widget__session-new,
 .buddy-widget__session-delete,
 .buddy-widget__session-item {
   appearance: none;
@@ -1631,26 +1699,11 @@ function formatErrorMessage(error: unknown): string {
   font: inherit;
 }
 
-.buddy-widget__session-new {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 28px;
-  padding: 0 8px;
-  border: 1px solid rgba(37, 99, 235, 0.14);
-  border-radius: 8px;
-  background: rgba(37, 99, 235, 0.08);
-  color: #1d4ed8;
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
 .buddy-widget__session-list {
   display: grid;
   gap: 6px;
-  max-height: 148px;
-  overflow: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 .buddy-widget__session-row {
@@ -1708,7 +1761,14 @@ function formatErrorMessage(error: unknown): string {
   cursor: pointer;
 }
 
-.buddy-widget__session-new:disabled,
+.buddy-widget__session-delete--confirm,
+.buddy-widget__session-delete--confirm:hover,
+.buddy-widget__session-delete--confirm:focus-visible {
+  border-color: rgba(185, 28, 28, 0.18);
+  background: rgb(185, 28, 28);
+  color: #fff;
+}
+
 .buddy-widget__session-item:disabled,
 .buddy-widget__session-delete:disabled {
   cursor: not-allowed;
@@ -1717,6 +1777,36 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__sessions-status {
   margin: 0;
+}
+
+.buddy-widget__confirm-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  padding: 6px 12px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  box-shadow: 0 14px 32px rgba(60, 41, 20, 0.14);
+}
+
+.buddy-widget__confirm-hint--delete {
+  border-color: rgba(185, 28, 28, 0.16);
+  background: rgba(255, 248, 248, 0.98);
+  color: rgb(153, 27, 27);
+}
+
+:deep(.buddy-widget__confirm-popover.el-popper) {
+  border: none;
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .buddy-widget__messages {
