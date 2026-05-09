@@ -481,47 +481,127 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 
 ## 新版伙伴自主循环模板
 
-当前仓库尚未创建或注册 `buddy_autonomous_loop`。伙伴浮窗 UI 已经存在，并会尝试读取这个模板；在模板按新协议重建前，伙伴对话循环不能作为当前可用能力。下一轮工作的起点应是创建并接入这个模板，而不是增强旧 `buddy_chat_loop` 或恢复旧兼容入口。
+当前仓库尚未创建或注册 `buddy_autonomous_loop`。伙伴浮窗 UI 已经存在，并会尝试读取这个模板；在模板按新协议重建前，伙伴对话循环不能作为当前可用能力。下一轮工作的起点应是按完整目标创建并接入这个模板，而不是增强旧 `buddy_chat_loop`、恢复旧兼容入口，或先做一套之后还需要迁移的临时简化版。
 
-待手工重建的目标模板应包含：
+`buddy_autonomous_loop` 的目标不是复刻 Claude Code 或 Hermes Agent 代码里的多工具循环，而是把它们已经验证有效的循环能力翻译为 GraphiteUI 的图协议：
 
-- `user_message`
-- `conversation_history`
-- `page_context`
-- `buddy_profile`
-- `buddy_policy`
-- `buddy_memory_context`
-- `skill_catalog_snapshot`
-- `intent_plan`
-- `decision`
-- `allowed_skills`
-- `tool_result`
-- `tool_assessment`
-- `missing_skill_proposal`
-- `approval_prompt`
-- `approval_granted`
-- `final_reply`
-- `buddy_session_summary`
-- 必要的绑定输出 state，例如 `query`、`source_urls`、`artifact_paths`、`errors`；其中 `artifact_paths` 应使用 `file`，值可以是路径或路径数组。
+- Claude Code 的可取之处是清晰的“模型判断 -> 工具执行 -> 工具结果进入下一轮 -> 再判断”循环、工具结果预算、stop hook、上下文压缩、只读工具并发和动态工具刷新。
+- Hermes Agent 的可取之处是迭代预算、provider fallback、无效工具名修复、无效 JSON 自我纠错、危险操作审批、tool guardrail、会话持久化和结束原因诊断。
+- GraphiteUI 不应把这些能力做成隐藏在伙伴代码里的第二套 agent loop。图负责循环，LLM 节点只做一次模型运行、一次结构化判断或一次能力调用准备。
+- 每轮能力调用仍保持单能力语义：选择一个 `capability`，执行一个 skill 或 subgraph，得到一个 `result_package`，再由后续节点评估是否继续。
+
+完整目标流程：
+
+```text
+用户消息、页面上下文、历史、伙伴资料、策略、记忆上下文、会话摘要
+  -> 理解需求和风险
+  -> 必要时澄清
+  -> 选择一个可用能力
+  -> 必要时请求审批
+  -> 执行 skill 或动态 subgraph
+  -> 得到 result_package
+  -> 评估结果是否足够
+  -> 需要时继续选择下一个能力
+  -> 生成最终回复
+  -> 可选地通过显式能力写回记忆、资料或会话摘要
+  -> output 只展示最终回复
+```
+
+目标模板应包含的公开输入 state：
+
+- `user_message`：当前用户消息。
+- `conversation_history`：进入上下文的近期对话。
+- `page_context`：当前页面或编辑器上下文。
+- `buddy_profile`：伙伴名称、语气、响应风格和人设资料。
+- `buddy_policy`：用户配置的边界、偏好和权限策略，只作为上下文与决策依据，不能提升运行权限。
+- `buddy_memory_context`：召回的长期记忆摘要。
+- `buddy_session_summary`：当前会话摘要。
+
+目标模板应包含的核心内部 state：
+
+- `request_understanding`：需求理解、任务类型、是否需要能力、是否需要澄清、风险等级和原因。
+- `clarification_prompt`：需要向用户补充询问的问题。
+- `clarification_answer`：用户在断点恢复时写入的澄清回答。
+- `selected_capability`：`capability` 类型，来自 `graphiteui_capability_selector`。
+- `capability_found`：是否找到了启用且可选择的能力。
+- `capability_approval_request`：能力执行前需要用户确认的摘要。
+- `capability_approval_decision`：用户审批结果。
+- `capability_result`：`result_package` 类型，动态能力执行唯一输出。
+- `capability_review`：对结果包的评估，包括是否足够、是否继续、失败是否可恢复、下一轮需求。
+- `loop_state`：循环轮次、退出原因和已用能力摘要。
+- `memory_update_plan`：是否需要写回记忆、会话摘要或用户资料。
+- `final_reply`：唯一用户可见最终回复。
 
 推荐节点职责：
 
-- `intent_agent`：理解意图和任务边界。
-- `decision_agent`：调用未来的 `autonomous_decision`，只决定技能。
-- `tool_execution_agent`：根据传入 skill 的说明决定技能输入并运行技能。
-- `tool_assessment_agent`：判断结果是否足够、是否需要下一轮工具调用。
-- `reply_agent`：生成 `final_reply`。
-- `memory_update_agent` 或后处理段：在模板内显式整理人设、记忆和会话摘要。
-- `output`：展示最终回复和 artifact。
+- `understand_request`：读取用户消息、历史、页面上下文、伙伴资料、策略、记忆和会话摘要，写 `request_understanding`。它不执行能力。
+- `need_clarification`：condition。需要澄清时进入 `ask_clarification`，否则进入能力选择。
+- `ask_clarification`：写 `clarification_prompt` 并设置 `interrupt_after`。伙伴页面应把用户下一条输入作为 `clarification_answer` 恢复运行，而不是开启新一轮。
+- `merge_clarification`：把澄清回答合入 `request_understanding` 或写新的确认需求摘要。
+- `select_capability`：静态绑定 `graphiteui_capability_selector`，根据需求选择一个启用的图模板或 Skill。图模板优先，找不到则输出 `{ "kind": "none" }` 和 `capability_found=false`。
+- `capability_found`：condition。未找到能力时进入直接回复或缺失能力说明；找到能力时进入审批检查。
+- `review_capability_permission`：根据 `selected_capability`、`buddy_policy`、skill/template 的 capability policy 与 permissions 写审批请求或免审批结论。prompt 不能直接授予权限，只能生成审查说明。
+- `request_capability_approval`：需要人工确认时写 `capability_approval_request` 并设置 `interrupt_after`。恢复 payload 写入 `capability_approval_decision`。
+- `execute_capability`：读取 `selected_capability`。该节点只负责生成目标能力的公开输入；runtime 执行 skill 或动态 subgraph，并只写一个 `capability_result`。
+- `review_capability_result`：读取拆包后的 `capability_result`，判断是否已经足够、是否需要继续另一个能力、是否需要向用户解释失败或请求更多信息。
+- `continue_capability_loop`：condition。需要继续时回到 `select_capability`，达到 `loopLimit` 时进入最终回复。循环上限是正式行为，不是错误；达到上限时必须用已有信息收束。
+- `draft_final_reply`：只生成 `final_reply`，不再执行能力或写长期状态。
+- `decide_memory_update`：判断是否需要写回伙伴记忆、资料或会话摘要。这个判断必须显式可见。
+- `review_memory_update`：需要写入长期数据时设置断点，展示拟写入内容和理由。
+- `write_memory_update`：通过受控 Skill 或后续正式命令流执行写回。不能由 output 节点或伙伴前端直接静默写。
+- `output_final`：只展示 `final_reply`，不连接中间能力结果、审查 JSON 或内部草稿。
 
 退出条件：
 
-- 已能回答。
-- 用户拒绝授权。
-- 缺少 skill 且用户不想创建。
-- 工具失败且无法恢复。
-- 达到循环上限。
-- 风险超过当前权限档。
+- 已能回答，进入 `draft_final_reply`。
+- 用户拒绝澄清、拒绝授权或取消本轮运行。
+- `capability_found=false` 且当前需求可以直接解释或建议下一步。
+- 工具或子图失败，且 `review_capability_result` 判断不可恢复。
+- 达到 `continue_capability_loop.loopLimit`，用已有信息收束并说明限制。
+- 风险超过当前策略或权限边界，生成拒绝或降级回复。
+
+## 伙伴页面断点交互
+
+伙伴页面和伙伴浮窗不应发明第二套断点协议。标准状态仍是 graph run 的 `awaiting_human`，恢复仍走 `/api/runs/{run_id}/resume`，展示模型应复用编辑器 Human Review 的 state 分组、必填校验、子图 scope path 和 resume payload 构造逻辑。
+
+伙伴浮窗运行到 `awaiting_human` 时：
+
+- 不能把本轮当作完成，也不能继续消费后续队列消息。
+- 当前 assistant 消息应变成“等待你确认/补充”的暂停卡片，而不是普通最终回复。
+- 输入框默认切换为“回复当前断点”。用户输入会作为 resume payload 写入断点所需 state。
+- 如果用户确实要开始新问题，必须有明确操作，例如“取消本次运行并作为新问题发送”，避免把新问题误塞进旧断点。
+- 面板应显示暂停节点名称、暂停原因、需要补充的字段、当前产生的内容和相关上下文。
+- 对权限、写文件、执行脚本、联网、图编辑、记忆写入等操作，卡片必须展示能力名称、权限类型、拟执行摘要、影响路径或目标对象，并提供继续、拒绝和查看详情。
+- 对澄清类断点，卡片展示问题和可编辑回答；恢复后图继续运行，而不是让伙伴前端自己总结。
+- 对子图内部断点，卡片显示路径，例如 `伙伴主循环 / 创建自定义 Skill / review_generated_skill`，并展示内部节点需要的 state。
+
+伙伴页面应增加“运行与确认”视图：
+
+- 展示当前 `origin=buddy` 且状态为 `awaiting_human`、`running`、`failed` 的最近 run。
+- 允许恢复暂停 run、拒绝或取消当前 run、打开完整运行详情。
+- 页面刷新后可以找回未处理的暂停 run。
+- 断点详情使用与编辑器 Human Review 一致的数据模型，但布局应更适合聊天场景：默认只展示必填与当前节点产物，其他 state 折叠。
+
+动态子图断点是完整伙伴循环的前置要求。静态 Subgraph 节点已经有 `pending_subgraph_breakpoint` 暂停/恢复路径；动态 `capability.kind=subgraph` 也必须具备同等语义：
+
+- 动态子图内部遇到 `interrupt_after` 时，父级 Buddy run 必须进入 `awaiting_human`。
+- 父 run 元数据必须记录子图节点、内部节点、scope path、内部 state、内部 node executions 和 checkpoint metadata。
+- 恢复时仍通过父 run 的 resume API，把 resume payload 转交给内部子图 checkpoint。
+- 动态子图完成后，仍按现有 `result_package.outputs.<outputKey> = { name, description, type, value }` 封包，不额外添加 `fieldKey`。
+
+## 完整实现顺序
+
+实现顺序应按依赖推进，避免先做简化版后迁移：
+
+1. 将伙伴运行来源收束为统一 `origin=buddy`，停止扩展 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧标记。
+2. 补齐动态 `capability.kind=subgraph` 的断点传播、父级暂停和恢复。
+3. 补齐动态能力审批路径：需要确认的能力必须进入标准 `awaiting_human`，不能只靠 prompt 文字提醒。
+4. 创建官方 `buddy_autonomous_loop` 模板，按本文完整节点职责和 state 契约搭建。
+5. 改造伙伴浮窗，使它能展示暂停卡片、恢复断点、拒绝或取消运行，并在暂停期间阻塞队列。
+6. 改造伙伴页面，增加“运行与确认”视图，复用 Human Review 数据模型。
+7. 将记忆、资料、会话摘要写回做成模板中的显式分支和受控能力，移除隐藏产品逻辑。
+8. 完善审计展示：记录每次能力选择、选择原因、审批状态、执行结果包、循环继续原因和退出原因。
+9. 补充测试覆盖：模板校验、动态子图断点、伙伴暂停恢复、权限拒绝、循环上限、刷新后恢复和 output 只展示最终回复。
 
 ## 非目标
 
