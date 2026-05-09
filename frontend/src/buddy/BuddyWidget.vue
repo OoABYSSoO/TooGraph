@@ -1224,7 +1224,7 @@ function closeEventSource() {
 function resetRunTraceForMessage(messageId: string) {
   activeTraceMessageId.value = messageId;
   runTraceEntries.value = [];
-  isRunTraceExpanded.value = true;
+  isRunTraceExpanded.value = false;
   runTraceStartedAtMs.value = nowRunTraceMs();
   runTraceFinishedAtMs.value = null;
   runTraceStartedAtByKey.clear();
@@ -2183,6 +2183,8 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__run-trace-dot {
   --buddy-run-trace-pulse-color: rgba(154, 52, 18, 0.24);
+  --buddy-run-trace-ring-color: rgba(154, 52, 18, 0.22);
+  position: relative;
   width: 7px;
   height: 7px;
   margin-top: 4px;
@@ -2192,13 +2194,23 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__run-trace-entry--info .buddy-widget__run-trace-dot,
 .buddy-widget__run-trace-entry--stream .buddy-widget__run-trace-dot {
+  --buddy-run-trace-pulse-color: rgba(22, 163, 74, 0.24);
+  --buddy-run-trace-ring-color: rgba(22, 163, 74, 0.34);
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
   animation: buddy-widget-run-trace-dot-pulse 1.08s ease-in-out infinite;
 }
 
-.buddy-widget__run-trace-entry--stream .buddy-widget__run-trace-dot {
-  --buddy-run-trace-pulse-color: rgba(37, 99, 235, 0.24);
-  background: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+.buddy-widget__run-trace-entry--info .buddy-widget__run-trace-dot::after,
+.buddy-widget__run-trace-entry--stream .buddy-widget__run-trace-dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 1px solid var(--buddy-run-trace-ring-color);
+  border-radius: inherit;
+  transform: scale(0.72);
+  opacity: 0.82;
+  animation: buddy-widget-run-trace-ring-pulse 1.08s ease-out infinite;
 }
 
 .buddy-widget__run-trace-entry--success .buddy-widget__run-trace-dot {
@@ -2249,7 +2261,18 @@ function formatErrorMessage(error: unknown): string {
   50% {
     opacity: 1;
     transform: scale(1);
-    box-shadow: 0 0 0 5px rgba(37, 99, 235, 0);
+    box-shadow: 0 0 0 5px rgba(22, 163, 74, 0);
+  }
+}
+
+@keyframes buddy-widget-run-trace-ring-pulse {
+  0% {
+    opacity: 0.82;
+    transform: scale(0.72);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.65);
   }
 }
 

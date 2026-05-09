@@ -14,6 +14,12 @@ function extractCssBlock(selector: string) {
   return match?.[1] ?? "";
 }
 
+function extractFunctionBlock(name: string) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = componentSource.match(new RegExp(`function ${escapedName}\\([^)]*\\) \\{([\\s\\S]*?)\\n\\}`));
+  return match?.[1] ?? "";
+}
+
 test("BuddyWidget renders the mascot without a circular avatar frame and keeps a contour shadow", () => {
   const avatarBlock = extractCssBlock(".buddy-widget__avatar");
 
@@ -171,9 +177,12 @@ test("BuddyWidget records and displays per-stage run trace durations", () => {
 });
 
 test("BuddyWidget pulses the run trace dot for currently running steps only", () => {
+  assert.match(componentSource, /\.buddy-widget__run-trace-dot\s*\{[\s\S]*position:\s*relative;/);
   assert.match(componentSource, /\.buddy-widget__run-trace-entry--info \.buddy-widget__run-trace-dot,[\s\S]*\.buddy-widget__run-trace-entry--stream \.buddy-widget__run-trace-dot\s*\{[\s\S]*animation:\s*buddy-widget-run-trace-dot-pulse 1\.08s ease-in-out infinite;/);
-  assert.match(componentSource, /\.buddy-widget__run-trace-entry--stream \.buddy-widget__run-trace-dot\s*\{[\s\S]*--buddy-run-trace-pulse-color:\s*rgba\(37,\s*99,\s*235,\s*0\.24\);/);
-  assert.match(componentSource, /@keyframes buddy-widget-run-trace-dot-pulse[\s\S]*box-shadow:\s*0 0 0 0 var\(--buddy-run-trace-pulse-color\);[\s\S]*box-shadow:\s*0 0 0 5px rgba\(37,\s*99,\s*235,\s*0\);/);
+  assert.match(componentSource, /\.buddy-widget__run-trace-entry--info \.buddy-widget__run-trace-dot::after,[\s\S]*\.buddy-widget__run-trace-entry--stream \.buddy-widget__run-trace-dot::after\s*\{[\s\S]*animation:\s*buddy-widget-run-trace-ring-pulse 1\.08s ease-out infinite;/);
+  assert.match(componentSource, /\.buddy-widget__run-trace-entry--info \.buddy-widget__run-trace-dot,[\s\S]*\.buddy-widget__run-trace-entry--stream \.buddy-widget__run-trace-dot\s*\{[\s\S]*--buddy-run-trace-pulse-color:\s*rgba\(22,\s*163,\s*74,\s*0\.24\);[\s\S]*background:\s*#16a34a;/);
+  assert.match(componentSource, /@keyframes buddy-widget-run-trace-dot-pulse[\s\S]*box-shadow:\s*0 0 0 0 var\(--buddy-run-trace-pulse-color\);[\s\S]*box-shadow:\s*0 0 0 5px rgba\(22,\s*163,\s*74,\s*0\);/);
+  assert.match(componentSource, /@keyframes buddy-widget-run-trace-ring-pulse[\s\S]*transform:\s*scale\(0\.72\);[\s\S]*transform:\s*scale\(1\.65\);/);
   assert.doesNotMatch(extractCssBlock(".buddy-widget__run-trace-entry--success .buddy-widget__run-trace-dot"), /animation:/);
   assert.doesNotMatch(extractCssBlock(".buddy-widget__run-trace-entry--error .buddy-widget__run-trace-dot"), /animation:/);
 });
@@ -189,6 +198,12 @@ test("BuddyWidget keeps the run trace above the formal reply and collapses to el
   assert.match(componentSource, /v-if="message\.role === 'assistant' && message\.content"/);
   assert.match(componentSource, /shouldShowAssistantActivityBubble\(message\)/);
   assert.doesNotMatch(componentSource, /message\.content \|\| message\.activityText \|\| t\("buddy\.streaming"\)/);
+});
+
+test("BuddyWidget starts each visible run trace collapsed to one active line", () => {
+  assert.match(extractFunctionBlock("resetRunTraceForMessage"), /isRunTraceExpanded\.value = false;/);
+  assert.match(componentSource, /const visibleRunTraceEntries = computed\(\(\) => \{[\s\S]*return runTraceEntries\.value\.slice\(-1\);[\s\S]*\}\);/);
+  assert.match(componentSource, /\.buddy-widget__run-trace-body[\s\S]*max-height:\s*calc\(1 \* 1\.45em \+ 14px\);[\s\S]*overflow:\s*hidden;/);
 });
 
 test("BuddyWidget stores buddy chat in backend sessions and exposes a compact history dropdown", () => {
