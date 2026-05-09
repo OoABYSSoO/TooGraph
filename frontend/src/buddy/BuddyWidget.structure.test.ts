@@ -42,7 +42,23 @@ test("BuddyWidget renders the animated inline mascot component", () => {
   assert.match(componentSource, /:mood="mood"/);
   assert.match(componentSource, /:dragging="isDragging"/);
   assert.match(componentSource, /:tap-nonce="tapNonce"/);
+  assert.match(componentSource, /:look-x="mascotLook\.x"/);
+  assert.match(componentSource, /:look-y="mascotLook\.y"/);
   assert.doesNotMatch(componentSource, /<img src="\/mascot\.svg"/);
+});
+
+test("BuddyWidget tracks the pointer direction for the mascot eyes with animation-frame throttling", () => {
+  assert.match(componentSource, /ref="avatarElement"/);
+  assert.match(componentSource, /const avatarElement = ref<HTMLElement \| null>\(null\);/);
+  assert.match(componentSource, /const mascotLook = ref\(\{ x: 0, y: 0 \}\);/);
+  assert.match(componentSource, /let mascotLookFrameId: number \| null = null;/);
+  assert.match(componentSource, /window\.addEventListener\("pointermove", handleMascotLookPointerMove, \{ passive: true \}\);/);
+  assert.match(componentSource, /window\.removeEventListener\("pointermove", handleMascotLookPointerMove\);/);
+  assert.match(componentSource, /window\.requestAnimationFrame\(\(\) => \{/);
+  assert.match(componentSource, /getBoundingClientRect\(\)/);
+  assert.match(componentSource, /Math\.hypot\(deltaX, deltaY\)/);
+  assert.match(componentSource, /mascotLook\.value = \{ x: deltaX \/ distance, y: deltaY \/ distance \};/);
+  assert.match(componentSource, /cancelMascotLookFrame\(\);/);
 });
 
 test("BuddyWidget tracks dragging and click pulses for mascot animation", () => {

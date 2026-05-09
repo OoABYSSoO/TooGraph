@@ -1,5 +1,5 @@
 <template>
-  <span class="buddy-mascot" :class="mascotClasses" aria-hidden="true">
+  <span class="buddy-mascot" :class="mascotClasses" :style="eyeLookStyle" aria-hidden="true">
     <svg
       class="buddy-mascot__svg"
       xmlns="http://www.w3.org/2000/svg"
@@ -54,8 +54,12 @@
             fill="url(#buddyMascotBlack)"
             d="M-55-61 C-25-66 25-66 55-61 C90-61 130-43 168-4 C196 22 214 66 218 116 C226 208 145 264 0 264 C-145 264-226 208-218 116 C-214 66-196 22-168-4 C-130-43-90-61-55-61Z"
           />
-          <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--left" cx="-80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
-          <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--right" cx="80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
+          <g class="buddy-mascot__look-eye buddy-mascot__look-eye--left">
+            <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--left" cx="-80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
+          </g>
+          <g class="buddy-mascot__look-eye buddy-mascot__look-eye--right">
+            <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--right" cx="80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
+          </g>
           <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--left" d="M-104 52 L-64 82 L-104 112" />
           <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--right" d="M104 52 L64 82 L104 112" />
         </g>
@@ -82,11 +86,15 @@ const props = withDefaults(
     mood?: BuddyMascotMood;
     dragging?: boolean;
     tapNonce?: number;
+    lookX?: number;
+    lookY?: number;
   }>(),
   {
     mood: "idle",
     dragging: false,
     tapNonce: 0,
+    lookX: 0,
+    lookY: 0,
   },
 );
 
@@ -99,6 +107,14 @@ const mascotClasses = computed(() => ({
   "buddy-mascot--dragging": props.dragging,
   "buddy-mascot--tap": tapAnimating.value && !props.dragging,
 }));
+const eyeLookStyle = computed<Record<string, string>>(() => {
+  const x = clampLookAxis(props.lookX) * 8;
+  const y = clampLookAxis(props.lookY) * 5;
+  return {
+    "--buddy-mascot-look-x": `${x.toFixed(2)}px`,
+    "--buddy-mascot-look-y": `${y.toFixed(2)}px`,
+  };
+});
 
 watch(() => props.tapNonce, triggerTapAnimation);
 
@@ -135,6 +151,13 @@ function clearTapTimeout() {
   window.clearTimeout(tapTimeoutId);
   tapTimeoutId = null;
 }
+
+function clampLookAxis(value: number | undefined) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(-1, Math.min(1, value ?? 0));
+}
 </script>
 
 <style scoped>
@@ -158,6 +181,7 @@ function clearTapTimeout() {
 .buddy-mascot__sparkle,
 .buddy-mascot__left-ear,
 .buddy-mascot__right-ear,
+.buddy-mascot__look-eye,
 .buddy-mascot__resting-eye,
 .buddy-mascot__drag-eye {
   transform-box: fill-box;
@@ -183,6 +207,11 @@ function clearTapTimeout() {
 
 .buddy-mascot__right-ear {
   transform-origin: 22% 82%;
+}
+
+.buddy-mascot__look-eye {
+  transform: translate(var(--buddy-mascot-look-x, 0px), var(--buddy-mascot-look-y, 0px));
+  transition: transform 90ms ease-out;
 }
 
 .buddy-mascot__resting-eye {
@@ -288,6 +317,10 @@ function clearTapTimeout() {
 
 .buddy-mascot--dragging .buddy-mascot__right-ear {
   animation: buddy-mascot-ear-drag-right 360ms ease-in-out infinite;
+}
+
+.buddy-mascot--dragging .buddy-mascot__look-eye {
+  transform: translate(0px, 0px);
 }
 
 .buddy-mascot--dragging .buddy-mascot__resting-eye {

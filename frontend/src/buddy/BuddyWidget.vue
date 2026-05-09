@@ -278,6 +278,7 @@
       </div>
 
       <button
+        ref="avatarElement"
         type="button"
         class="buddy-widget__avatar"
         :style="avatarStyle"
@@ -287,7 +288,13 @@
         @click="handleAvatarClick"
         @dblclick.stop="handleAvatarDoubleClick"
       >
-        <BuddyMascot :mood="mood" :dragging="isDragging" :tap-nonce="tapNonce" />
+        <BuddyMascot
+          :mood="mood"
+          :dragging="isDragging"
+          :tap-nonce="tapNonce"
+          :look-x="mascotLook.x"
+          :look-y="mascotLook.y"
+        />
       </button>
     </div>
   </div>
@@ -411,6 +418,8 @@ const activeTraceMessageId = ref<string | null>(null);
 const isRunTraceExpanded = ref(false);
 const runTraceStartedAtMs = ref<number | null>(null);
 const runTraceFinishedAtMs = ref<number | null>(null);
+const avatarElement = ref<HTMLElement | null>(null);
+const mascotLook = ref({ x: 0, y: 0 });
 const messageListElement = ref<HTMLElement | null>(null);
 const pointerDrag = ref<{
   pointerId: number;
@@ -426,6 +435,8 @@ let activeAbortController: AbortController | null = null;
 let isDrainingBuddyQueue = false;
 let avatarSingleClickTimerId: number | null = null;
 let speakingIdleTimerId: number | null = null;
+let mascotLookFrameId: number | null = null;
+let pendingMascotLookPointer: { x: number; y: number } | null = null;
 let chatSessionInitializationPromise: Promise<void> | null = null;
 const backgroundReviewAbortControllers = new Set<AbortController>();
 const runTraceStartedAtByKey = new Map<string, number>();
@@ -512,16 +523,19 @@ onMounted(() => {
   hydrateBuddyModel();
   void loadBuddyModelOptions();
   window.addEventListener("resize", handleResize);
+  window.addEventListener("pointermove", handleMascotLookPointerMove, { passive: true });
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("resize", handleResize);
+  window.removeEventListener("pointermove", handleMascotLookPointerMove);
   window.removeEventListener("pointermove", handlePointerMove);
   window.removeEventListener("pointerup", handlePointerUp);
   queuedTurns.value = [];
   clearSessionDeleteConfirmTimeout();
   clearAvatarSingleClickTimer();
   clearSpeakingIdleTimer();
+  cancelMascotLookFrame();
   closeEventSource();
   activeAbortController?.abort();
   abortBackgroundReviewRuns();
@@ -648,6 +662,45 @@ function handlePointerUp(event: PointerEvent) {
   pointerDrag.value = null;
   window.removeEventListener("pointermove", handlePointerMove);
   window.removeEventListener("pointerup", handlePointerUp);
+}
+
+function handleMascotLookPointerMove(event: PointerEvent) {
+  pendingMascotLookPointer = { x: event.clientX, y: event.clientY };
+  if (mascotLookFrameId !== null) {
+    return;
+  }
+  mascotLookFrameId = window.requestAnimationFrame(() => {
+    mascotLookFrameId = null;
+    updateMascotLookFromPointer();
+  });
+}
+
+function updateMascotLookFromPointer() {
+  const pointer = pendingMascotLookPointer;
+  const element = avatarElement.value;
+  if (!pointer || !element) {
+    return;
+  }
+
+  const bounds = element.getBoundingClientRect();
+  const centerX = bounds.left + bounds.width / 2;
+  const centerY = bounds.top + bounds.height / 2;
+  const deltaX = pointer.x - centerX;
+  const deltaY = pointer.y - centerY;
+  const distance = Math.hypot(deltaX, deltaY);
+  if (distance < 1) {
+    mascotLook.value = { x: 0, y: 0 };
+    return;
+  }
+  mascotLook.value = { x: deltaX / distance, y: deltaY / distance };
+}
+
+function cancelMascotLookFrame() {
+  if (mascotLookFrameId === null) {
+    return;
+  }
+  window.cancelAnimationFrame(mascotLookFrameId);
+  mascotLookFrameId = null;
 }
 
 async function sendMessage() {

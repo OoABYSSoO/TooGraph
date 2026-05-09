@@ -72,9 +72,28 @@ test("BuddyMascot supports idle, thinking, speaking, dragging, and tap animation
   assert.match(componentSource, /watch\(\(\) => props\.tapNonce/);
 });
 
+test("BuddyMascot moves eye wrapper layers toward the pointer without replacing blink transforms", () => {
+  assert.match(componentSource, /lookX\?: number;/);
+  assert.match(componentSource, /lookY\?: number;/);
+  assert.match(componentSource, /:style="eyeLookStyle"/);
+  assert.match(componentSource, /class="buddy-mascot__look-eye buddy-mascot__look-eye--left"/);
+  assert.match(componentSource, /class="buddy-mascot__look-eye buddy-mascot__look-eye--right"/);
+  assert.match(componentSource, /--buddy-mascot-look-x/);
+  assert.match(componentSource, /--buddy-mascot-look-y/);
+  assert.match(
+    componentSource,
+    /\.buddy-mascot__look-eye\s*\{[\s\S]*transform:\s*translate\(var\(--buddy-mascot-look-x,\s*0px\),\s*var\(--buddy-mascot-look-y,\s*0px\)\);/,
+  );
+  assert.match(
+    componentSource,
+    /@keyframes buddy-mascot-blink[\s\S]*transform:\s*scaleY\(1\);[\s\S]*transform:\s*scaleY\(0\.08\);/,
+  );
+});
+
 test("BuddyMascot changes the eyes into chevrons while dragging", () => {
   assert.match(componentSource, /d="M-104 52 L-64 82 L-104 112"/);
   assert.match(componentSource, /d="M104 52 L64 82 L104 112"/);
+  assert.match(componentSource, /\.buddy-mascot--dragging[\s\S]*\.buddy-mascot__look-eye[\s\S]*transform:\s*translate\(0px,\s*0px\);/);
   assert.match(componentSource, /\.buddy-mascot--dragging[\s\S]*\.buddy-mascot__resting-eye[\s\S]*opacity:\s*0;/);
   assert.match(componentSource, /\.buddy-mascot--dragging[\s\S]*\.buddy-mascot__drag-eye[\s\S]*opacity:\s*1;/);
 });
