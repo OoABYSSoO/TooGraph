@@ -683,6 +683,37 @@ test("resolveBuddyRunTraceFromRunEvent summarizes streaming output from non-outp
       preview: "正在识别：这是一个简单问候，不需要调用能力",
       tone: "stream",
       replaceKey: "stream:intake_request:understand_request",
+      timingKey: "stage:intake_request:understand_request",
+    },
+  );
+});
+
+test("resolveBuddyRunTraceFromRunEvent keeps backend stage duration on completed nodes", () => {
+  const graph = createActivityGraph();
+
+  assert.deepEqual(
+    resolveBuddyRunTraceFromRunEvent(
+      "node.completed",
+      {
+        node_id: "understand_request",
+        node_type: "agent",
+        subgraph_node_id: "intake_request",
+        status: "success",
+        duration_ms: 1534,
+      },
+      graph,
+    ),
+    {
+      labelKey: "buddy.activity.completed",
+      params: {
+        node: "识别意图",
+        stage: "理解请求",
+      },
+      preview: "",
+      tone: "success",
+      replaceKey: "node.completed:intake_request:understand_request",
+      timingKey: "stage:intake_request:understand_request",
+      durationMs: 1534,
     },
   );
 });

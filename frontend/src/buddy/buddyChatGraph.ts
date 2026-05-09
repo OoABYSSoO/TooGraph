@@ -66,6 +66,8 @@ export type BuddyRunTraceEntry = {
   preview: string;
   tone: "info" | "stream" | "success" | "error";
   replaceKey: string;
+  timingKey?: string;
+  durationMs?: number;
 };
 
 export type BuildBuddyChatGraphInput = {
@@ -239,6 +241,8 @@ export function resolveBuddyRunTraceFromRunEvent(
 
   const labels = resolveBuddyRunNodeLabels(graph, nodeId, subgraphNodeId);
   const params = buildBuddyActivityParams(labels);
+  const timingKey = buildBuddyTraceTimingKey(nodeId, subgraphNodeId);
+  const durationMs = resolveBuddyTraceDurationMs(payload);
   if (eventType === "node.output.delta") {
     const preview = resolveBuddyRunEventOutputPreview(payload);
     return preview
@@ -248,6 +252,7 @@ export function resolveBuddyRunTraceFromRunEvent(
           preview,
           tone: "stream",
           replaceKey: buildBuddyTraceReplaceKey("stream", nodeId, subgraphNodeId),
+          timingKey,
         }
       : null;
   }
@@ -261,6 +266,8 @@ export function resolveBuddyRunTraceFromRunEvent(
           preview,
           tone: "success",
           replaceKey: buildBuddyTraceReplaceKey("completed", nodeId, subgraphNodeId),
+          timingKey,
+          ...(durationMs !== undefined ? { durationMs } : {}),
         }
       : null;
   }
@@ -270,10 +277,13 @@ export function resolveBuddyRunTraceFromRunEvent(
     return null;
   }
   return {
-    ...activity,
+    labelKey: activity.labelKey,
+    params,
     preview: "",
     tone: eventType === "node.failed" ? "error" : eventType === "node.completed" ? "success" : "info",
     replaceKey: buildBuddyTraceReplaceKey(eventType, nodeId, subgraphNodeId),
+    timingKey,
+    ...(durationMs !== undefined ? { durationMs } : {}),
   };
 }
 
@@ -506,6 +516,16 @@ function clampBuddyTracePreview(value: string) {
 
 function buildBuddyTraceReplaceKey(kind: string, nodeId: string, subgraphNodeId: string) {
   return `${kind}:${subgraphNodeId ? `${subgraphNodeId}:` : ""}${nodeId}`;
+}
+
+function buildBuddyTraceTimingKey(nodeId: string, subgraphNodeId: string) {
+  return buildBuddyTraceReplaceKey("stage", nodeId, subgraphNodeId);
+}
+
+function resolveBuddyTraceDurationMs(payload: Record<string, unknown>) {
+  const rawValue = payload.duration_ms ?? payload.durationMs;
+  const durationMs = typeof rawValue === "number" ? rawValue : typeof rawValue === "string" ? Number(rawValue) : NaN;
+  return Number.isFinite(durationMs) && durationMs > 0 ? Math.round(durationMs) : undefined;
 }
 
 function resolveBuddyActivityPhase(nodeId: string, subgraphNodeId: string) {

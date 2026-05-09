@@ -126,8 +126,18 @@ test("BuddyWidget renders assistant replies as safe markdown and keeps a compact
   assert.match(componentSource, /class="buddy-widget__run-trace"/);
   assert.match(componentSource, /const runTraceEntries = ref<BuddyRunTraceEntry\[\]>\(\[\]\);/);
   assert.match(componentSource, /resolveBuddyRunTraceFromRunEvent/);
-  assert.match(componentSource, /appendRunTraceEntry\(traceEntry\);/);
+  assert.match(componentSource, /appendRunTraceEntry\(eventType, traceEntry\);/);
   assert.match(componentSource, /\.buddy-widget__run-trace-body[\s\S]*max-height:\s*calc\(3 \* 1\.45em \+ 18px\);/);
+});
+
+test("BuddyWidget records and displays per-stage run trace durations", () => {
+  assert.match(componentSource, /import \{ formatRunDuration \} from "\.\.\/lib\/run-display-name\.ts";/);
+  assert.match(componentSource, /const runTraceStartedAtByKey = new Map<string, number>\(\);/);
+  assert.match(componentSource, /function appendRunTraceEntry\(eventType: string, traceEntry: BuddyRunTraceEntry\)/);
+  assert.match(componentSource, /runTraceStartedAtByKey\.set\(traceEntry\.timingKey, nowRunTraceMs\(\)\);/);
+  assert.match(componentSource, /durationMs: Math\.max\(1, Math\.round\(nowRunTraceMs\(\) - startedAt\)\),/);
+  assert.match(componentSource, /class="buddy-widget__run-trace-duration"/);
+  assert.match(componentSource, /formatRunTraceDuration\(entry\.durationMs\)/);
 });
 
 test("BuddyWidget leaves buddy self config loading and memory curation to the chat graph template", () => {
