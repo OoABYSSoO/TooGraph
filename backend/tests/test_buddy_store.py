@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 import json
+import sqlite3
 from pathlib import Path
 from unittest.mock import patch
 
@@ -137,6 +138,102 @@ class BuddyStoreTests(unittest.TestCase):
         self.assertTrue(deleted["deleted"])
         self.assertEqual(visible_after_delete, [])
         self.assertEqual(all_after_delete[0]["session_id"], session["session_id"])
+
+    def test_chat_messages_order_by_client_order_when_replies_are_persisted_later(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+                session = store.create_chat_session({}, changed_by="user", change_reason="测试创建会话")
+                store.append_chat_message(
+                    session["session_id"],
+                    {"role": "user", "content": "第一句", "client_order": 0},
+                    changed_by="user",
+                    change_reason="测试追加用户消息",
+                )
+                store.append_chat_message(
+                    session["session_id"],
+                    {"role": "user", "content": "第二句", "client_order": 2},
+                    changed_by="user",
+                    change_reason="测试追加用户消息",
+                )
+                store.append_chat_message(
+                    session["session_id"],
+                    {"role": "assistant", "content": "第一句回复", "client_order": 1},
+                    changed_by="buddy",
+                    change_reason="测试追加伙伴消息",
+                )
+
+                messages = store.list_chat_messages(session["session_id"])
+
+        self.assertEqual(
+            [(message["role"], message["content"], message["client_order"]) for message in messages],
+            [
+                ("user", "第一句", 0),
+                ("assistant", "第一句回复", 1),
+                ("user", "第二句", 2),
+            ],
+        )
+
+    def test_buddy_database_migrates_legacy_messages_before_client_order_index(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home = Path(temp_dir) / "buddy_home"
+            buddy_home.mkdir()
+            db_path = buddy_home / "buddy.db"
+            with sqlite3.connect(db_path) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE buddy_sessions (
+                        session_id TEXT PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        archived INTEGER NOT NULL DEFAULT 0,
+                        deleted INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    );
+
+                    CREATE TABLE buddy_messages (
+                        message_id TEXT PRIMARY KEY,
+                        session_id TEXT NOT NULL,
+                        role TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        include_in_context INTEGER NOT NULL DEFAULT 1,
+                        run_id TEXT,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        FOREIGN KEY(session_id) REFERENCES buddy_sessions(session_id)
+                    );
+                    """
+                )
+                connection.execute(
+                    """
+                    INSERT INTO buddy_sessions
+                        (session_id, title, archived, deleted, created_at, updated_at)
+                    VALUES (?, ?, 0, 0, ?, ?)
+                    """,
+                    ("session_1", "旧会话", "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z"),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO buddy_messages
+                        (message_id, session_id, role, content, include_in_context, run_id, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, 1, NULL, ?, ?)
+                    """,
+                    (
+                        "msg_1",
+                        "session_1",
+                        "user",
+                        "旧消息",
+                        "2026-01-01T00:00:01Z",
+                        "2026-01-01T00:00:01Z",
+                    ),
+                )
+                connection.commit()
+
+            with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
+                store.initialize_buddy_home()
+                messages = store.list_chat_messages("session_1")
+
+        self.assertEqual(messages[0]["client_order"], 0)
+        self.assertEqual(messages[0]["content"], "旧消息")
 
 
 if __name__ == "__main__":

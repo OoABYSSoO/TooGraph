@@ -204,6 +204,7 @@ def ensure_buddy_database(home_dir: Path) -> Path:
                 session_id TEXT NOT NULL,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
+                client_order REAL,
                 include_in_context INTEGER NOT NULL DEFAULT 1,
                 run_id TEXT,
                 created_at TEXT NOT NULL,
@@ -224,10 +225,54 @@ def ensure_buddy_database(home_dir: Path) -> Path:
                 ON buddy_messages (session_id, created_at);
             """
         )
+        _migrate_buddy_database(connection)
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_buddy_messages_client_order
+                ON buddy_messages (session_id, client_order)
+            """
+        )
         connection.commit()
     finally:
         connection.close()
     return db_path
+
+
+def _migrate_buddy_database(connection: sqlite3.Connection) -> None:
+    _ensure_column(connection, "buddy_messages", "client_order", "client_order REAL")
+    _backfill_message_client_order(connection)
+
+
+def _ensure_column(connection: sqlite3.Connection, table_name: str, column_name: str, column_definition: str) -> bool:
+    rows = connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+    if any(str(row[1]) == column_name for row in rows):
+        return False
+    connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_definition}")
+    return True
+
+
+def _backfill_message_client_order(connection: sqlite3.Connection) -> None:
+    rows = connection.execute(
+        """
+        SELECT rowid, session_id
+        FROM buddy_messages
+        WHERE client_order IS NULL
+        ORDER BY session_id ASC, created_at ASC, rowid ASC
+        """
+    ).fetchall()
+    next_order_by_session: dict[str, float] = {}
+    for row in rows:
+        session_id = str(row[1] or "")
+        if session_id not in next_order_by_session:
+            max_row = connection.execute(
+                "SELECT MAX(client_order) FROM buddy_messages WHERE session_id = ? AND client_order IS NOT NULL",
+                (session_id,),
+            ).fetchone()
+            max_order = float(max_row[0]) if max_row and max_row[0] is not None else -1.0
+            next_order_by_session[session_id] = max_order + 1.0
+        client_order = next_order_by_session[session_id]
+        connection.execute("UPDATE buddy_messages SET client_order = ? WHERE rowid = ?", (client_order, row[0]))
+        next_order_by_session[session_id] = client_order + 1.0
 
 
 def open_buddy_database(home_dir: Path) -> sqlite3.Connection:

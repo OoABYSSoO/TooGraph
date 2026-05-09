@@ -183,9 +183,9 @@
           <p v-if="messages.length === 0" class="buddy-widget__empty">
             {{ t("buddy.empty") }}
           </p>
+          <template v-for="message in messages" :key="message.id">
           <article
-            v-for="message in messages"
-            :key="message.id"
+            v-if="shouldRenderMessage(message)"
             class="buddy-widget__message"
             :class="`buddy-widget__message--${message.role}`"
           >
@@ -246,6 +246,7 @@
               {{ message.content }}
             </p>
           </article>
+          </template>
           <p v-if="errorMessage" class="buddy-widget__error">{{ errorMessage }}</p>
           <p v-if="queuedTurns.length > 0" class="buddy-widget__queue">
             {{ t("buddy.queueStatus", { count: queuedTurns.length }) }}
@@ -350,6 +351,7 @@ import {
 
 type BuddyMessage = BuddyChatMessage & {
   id: string;
+  clientOrder?: number | null;
   activityText?: string;
 };
 
@@ -357,6 +359,7 @@ type BuddyMessagePatch = Partial<Pick<BuddyMessage, "content" | "includeInContex
 
 type BuddyQueuedTurn = {
   userMessageId: string;
+  assistantMessageId: string;
   userMessage: string;
   sessionId: string;
   history: BuddyChatMessage[];
@@ -423,6 +426,7 @@ let speakingIdleTimerId: number | null = null;
 let chatSessionInitializationPromise: Promise<void> | null = null;
 const backgroundReviewAbortControllers = new Set<AbortController>();
 const runTraceStartedAtByKey = new Map<string, number>();
+let nextBuddyMessageClientOrder = 0;
 
 const isDragging = computed(() => Boolean(pointerDrag.value?.moved));
 const isSessionSwitchLocked = computed(
@@ -627,12 +631,14 @@ async function sendMessage() {
   }
   draft.value = "";
 
-  const userEntry = createMessage("user", userMessage);
-  messages.value.push(userEntry);
+  const userEntry = createMessage("user", userMessage, undefined, allocateBuddyMessageClientOrder());
+  const assistantEntry = createMessage("assistant", "", undefined, allocateBuddyMessageClientOrder());
+  messages.value.push(userEntry, assistantEntry);
   const history = buildHistoryBeforeMessage(userEntry.id);
   void persistBuddyMessage(sessionId, userEntry);
   queuedTurns.value.push({
     userMessageId: userEntry.id,
+    assistantMessageId: assistantEntry.id,
     userMessage,
     sessionId,
     history,
@@ -666,7 +672,7 @@ async function drainBuddyQueue() {
 async function processQueuedTurn(turn: BuddyQueuedTurn) {
   clearSpeakingIdleTimer();
   const history = turn.history;
-  const assistantMessage = appendAssistantMessageForTurn(turn.userMessageId);
+  const assistantMessage = ensureAssistantMessageForTurn(turn);
   resetRunTraceForMessage(assistantMessage.id);
   mood.value = "thinking";
   setAssistantActivityText(assistantMessage.id, t("buddy.activity.preparing"));
@@ -822,6 +828,7 @@ async function clearMessages() {
   activeRunId.value = null;
   const sessionId = activeSessionId.value;
   messages.value = [];
+  nextBuddyMessageClientOrder = 0;
   errorMessage.value = "";
   mood.value = "idle";
   window.localStorage.removeItem(BUDDY_HISTORY_STORAGE_KEY);
@@ -922,6 +929,7 @@ async function activateChatSession(sessionId: string, options: { skipInitializat
     activeSessionId.value = sessionId;
     window.localStorage.setItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY, sessionId);
     messages.value = records.map(messageRecordToBuddyMessage);
+    resetNextBuddyMessageClientOrder();
     resetVisibleRunTrace();
     await scrollMessagesToBottom();
   } catch (error) {
@@ -1009,6 +1017,7 @@ async function persistBuddyMessage(
       message_id: message.id,
       role: message.role,
       content: message.content,
+      client_order: message.clientOrder ?? null,
       include_in_context: options.includeInContext ?? message.includeInContext !== false,
       run_id: options.runId ?? null,
     });
@@ -1022,18 +1031,21 @@ async function migrateLegacyBuddyHistory() {
   const legacyMessages = readLegacyBuddyMessages();
   if (legacyMessages.length === 0) {
     messages.value = [];
+    nextBuddyMessageClientOrder = 0;
     return;
   }
   const firstUserMessage = legacyMessages.find((message) => message.role === "user" && message.content.trim());
   const session = await createBuddyChatSession({ title: firstUserMessage?.content.trim() || undefined });
   activeSessionId.value = session.session_id;
   messages.value = legacyMessages;
+  resetNextBuddyMessageClientOrder();
   window.localStorage.setItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY, session.session_id);
   for (const message of legacyMessages) {
     await appendBuddyChatMessage(session.session_id, {
       message_id: message.id,
       role: message.role,
       content: message.content,
+      client_order: message.clientOrder ?? null,
       include_in_context: message.includeInContext !== false,
     });
   }
@@ -1075,8 +1087,8 @@ function readLegacyBuddyMessages(): BuddyMessage[] {
     return parsed
       .filter(isPersistedMessage)
       .slice(-24)
-      .map((message) => ({
-        ...createMessage(message.role, message.content),
+      .map((message, index) => ({
+        ...createMessage(message.role, message.content, undefined, index),
         includeInContext: message.includeInContext,
       }));
   } catch {
@@ -1196,8 +1208,22 @@ function shouldShowRunTraceForMessage(message: BuddyMessage) {
   return message.id === activeTraceMessageId.value && runTraceEntries.value.length > 0;
 }
 
+function shouldRenderMessage(message: BuddyMessage) {
+  return (
+    message.role === "user" ||
+    Boolean(message.content.trim()) ||
+    Boolean(message.activityText?.trim()) ||
+    shouldShowRunTraceForMessage(message)
+  );
+}
+
 function shouldShowAssistantActivityBubble(message: BuddyMessage) {
-  return message.role === "assistant" && !message.content.trim() && !shouldShowRunTraceForMessage(message);
+  return (
+    message.role === "assistant" &&
+    !message.content.trim() &&
+    Boolean(message.activityText?.trim()) &&
+    !shouldShowRunTraceForMessage(message)
+  );
 }
 
 function appendRunTraceEntry(eventType: string, traceEntry: BuddyRunTraceEntry) {
@@ -1301,9 +1327,20 @@ function buildHistoryBeforeMessage(messageId: string): BuddyChatMessage[] {
   return previousMessages.filter(isContextMessage).map(({ role, content }) => ({ role, content }));
 }
 
-function appendAssistantMessageForTurn(userMessageId: string): BuddyMessage {
-  const assistantMessage = createMessage("assistant", "");
-  const userMessageIndex = messages.value.findIndex((message) => message.id === userMessageId);
+function ensureAssistantMessageForTurn(turn: BuddyQueuedTurn): BuddyMessage {
+  const existingMessage = messages.value.find(
+    (message) => message.id === turn.assistantMessageId && message.role === "assistant",
+  );
+  if (existingMessage) {
+    return existingMessage;
+  }
+  const assistantMessage = createMessage(
+    "assistant",
+    "",
+    turn.assistantMessageId,
+    allocateBuddyMessageClientOrder(),
+  );
+  const userMessageIndex = messages.value.findIndex((message) => message.id === turn.userMessageId);
   if (userMessageIndex >= 0 && userMessageIndex < messages.value.length - 1) {
     messages.value.splice(userMessageIndex + 1, 0, assistantMessage);
     return assistantMessage;
@@ -1347,11 +1384,17 @@ function buildPageContext() {
   });
 }
 
-function createMessage(role: BuddyChatMessage["role"], content: string): BuddyMessage {
+function createMessage(
+  role: BuddyChatMessage["role"],
+  content: string,
+  id?: string,
+  clientOrder: number | null = null,
+): BuddyMessage {
   return {
-    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    id: id ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     role,
     content,
+    clientOrder,
     activityText: "",
   };
 }
@@ -1361,9 +1404,25 @@ function messageRecordToBuddyMessage(record: BuddyChatMessageRecord): BuddyMessa
     id: record.message_id,
     role: record.role,
     content: record.content,
+    clientOrder: record.client_order,
     includeInContext: record.include_in_context,
     activityText: "",
   };
+}
+
+function allocateBuddyMessageClientOrder() {
+  const clientOrder = nextBuddyMessageClientOrder;
+  nextBuddyMessageClientOrder += 1;
+  return clientOrder;
+}
+
+function resetNextBuddyMessageClientOrder() {
+  const maxClientOrder = messages.value.reduce((maxOrder, message, index) => {
+    const order =
+      typeof message.clientOrder === "number" && Number.isFinite(message.clientOrder) ? message.clientOrder : index;
+    return Math.max(maxOrder, order);
+  }, -1);
+  nextBuddyMessageClientOrder = Math.floor(maxClientOrder) + 1;
 }
 
 function buildBuddyModelOptions(settings: SettingsPayload): BuddyModelOption[] {
@@ -1459,6 +1518,7 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__avatar {
   appearance: none;
   position: relative;
+  z-index: 4;
   width: 96px;
   height: 96px;
   padding: 0;
@@ -1525,11 +1585,12 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__panel {
   bottom: calc(100% + 12px);
+  z-index: 1;
   width: min(420px, calc(100vw - 32px));
   max-height: min(640px, calc(100vh - 132px));
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid var(--graphite-glass-border);
   border-radius: 8px;
   background: var(--graphite-glass-specular), var(--graphite-glass-lens), rgba(255, 252, 247, 0.88);
@@ -1717,8 +1778,11 @@ function formatErrorMessage(error: unknown): string {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  z-index: 5;
+  z-index: 3;
   width: min(330px, calc(100vw - 56px));
+  max-height: min(520px, calc(100vh - 132px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: grid;
   gap: 8px;
   padding: 10px;

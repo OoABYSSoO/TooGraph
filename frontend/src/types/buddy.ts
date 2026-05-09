@@ -47,6 +47,7 @@ export type BuddyChatMessageRecord = {
   session_id: string;
   role: "user" | "assistant";
   content: string;
+  client_order: number | null;
   include_in_context: boolean;
   run_id: string | null;
   created_at: string;

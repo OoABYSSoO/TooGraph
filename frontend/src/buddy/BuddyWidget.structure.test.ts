@@ -99,9 +99,17 @@ test("BuddyWidget keeps the composer enabled and queues sends while a reply is r
   assert.match(componentSource, /class="buddy-widget__send"[\s\S]*:disabled="!draft\.trim\(\)"/);
   assert.doesNotMatch(componentSource, /if \(!userMessage \|\| isBusy\.value\)/);
   assert.match(componentSource, /const queuedTurns = ref<BuddyQueuedTurn\[\]>\(\[\]\);/);
-  assert.match(componentSource, /queuedTurns\.value\.push\(\{[\s\S]*userMessageId:[\s\S]*userMessage:/);
+  assert.match(componentSource, /const assistantEntry = createMessage\("assistant", "", undefined, allocateBuddyMessageClientOrder\(\)\);/);
+  assert.match(componentSource, /messages\.value\.push\(userEntry, assistantEntry\);/);
+  assert.match(componentSource, /queuedTurns\.value\.push\(\{[\s\S]*userMessageId:[\s\S]*assistantMessageId:[\s\S]*userMessage:/);
+  assert.match(componentSource, /client_order: message\.clientOrder \?\? null/);
+  assert.match(componentSource, /function resetNextBuddyMessageClientOrder\(\)/);
   assert.match(componentSource, /void drainBuddyQueue\(\);/);
   assert.match(componentSource, /while \(queuedTurns\.value\.length > 0\)/);
+  assert.match(componentSource, /const assistantMessage = ensureAssistantMessageForTurn\(turn\);/);
+  assert.match(componentSource, /function ensureAssistantMessageForTurn\(turn: BuddyQueuedTurn\): BuddyMessage/);
+  assert.match(componentSource, /function shouldRenderMessage\(message: BuddyMessage\)/);
+  assert.match(componentSource, /message\.role === "assistant"[\s\S]*!message\.content\.trim\(\)[\s\S]*Boolean\(message\.activityText\?\.trim\(\)\)/);
 });
 
 test("BuddyWidget keeps runtime error replies out of model context and persisted history", () => {
@@ -178,7 +186,9 @@ test("BuddyWidget stores buddy chat in backend sessions and exposes a compact hi
   assert.match(componentSource, /function handleSessionDeleteActionClick\(sessionId: string\)/);
   assert.match(componentSource, /chatSessionInitializationPromise = initializeBuddyChatSessions\(\)\.finally/);
   assert.match(componentSource, /async function migrateLegacyBuddyHistory\(\)/);
-  assert.match(componentSource, /\.buddy-widget__sessions-panel\s*\{[\s\S]*position:\s*absolute;[\s\S]*width:\s*min\(330px,/);
+  assert.match(componentSource, /\.buddy-widget__panel\s*\{[\s\S]*overflow:\s*visible;/);
+  assert.match(componentSource, /\.buddy-widget__avatar\s*\{[\s\S]*z-index:\s*4;/);
+  assert.match(componentSource, /\.buddy-widget__sessions-panel\s*\{[\s\S]*position:\s*absolute;[\s\S]*z-index:\s*3;[\s\S]*width:\s*min\(330px,[\s\S]*max-height:\s*min\(520px,[\s\S]*overflow-y:\s*auto;/);
   assert.match(componentSource, /\.buddy-widget__session-list\s*\{[\s\S]*max-height:\s*none;[\s\S]*overflow:\s*visible;/);
   assert.doesNotMatch(componentSource, /watch\(\s*messages,/);
 });

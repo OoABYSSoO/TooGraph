@@ -102,6 +102,7 @@ export function appendBuddyChatMessage(
     message_id?: string | null;
     role: "user" | "assistant";
     content: string;
+    client_order?: number | null;
     include_in_context?: boolean;
     run_id?: string | null;
   },

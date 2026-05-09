@@ -318,10 +318,10 @@ def delete_chat_session(session_id: str, *, changed_by: str, change_reason: str)
 def list_chat_messages(session_id: str, *, limit: int | None = None) -> list[dict[str, Any]]:
     get_chat_session(session_id)
     query = """
-        SELECT message_id, session_id, role, content, include_in_context, run_id, created_at, updated_at
+        SELECT message_id, session_id, role, content, client_order, include_in_context, run_id, created_at, updated_at
         FROM buddy_messages
         WHERE session_id = ?
-        ORDER BY created_at ASC, rowid ASC
+        ORDER BY client_order IS NULL ASC, client_order ASC, created_at ASC, rowid ASC
     """
     params: list[Any] = [session_id]
     if limit is not None:
@@ -348,28 +348,33 @@ def append_chat_message(
     if not content.strip():
         raise ValueError("Message content cannot be empty.")
     now = utc_now_iso()
+    client_order = _coerce_chat_message_client_order(payload.get("client_order"))
     message = {
         "message_id": str(payload.get("message_id") or f"msg_{uuid4().hex[:12]}"),
         "session_id": session_id,
         "role": role,
         "content": content,
+        "client_order": client_order,
         "include_in_context": bool(payload.get("include_in_context", True)),
         "run_id": payload.get("run_id") if payload.get("run_id") is None else str(payload.get("run_id")),
         "created_at": now,
         "updated_at": now,
     }
     with _connection() as connection:
+        if message["client_order"] is None:
+            message["client_order"] = _next_chat_message_client_order(connection, session_id)
         connection.execute(
             """
             INSERT INTO buddy_messages
-                (message_id, session_id, role, content, include_in_context, run_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (message_id, session_id, role, content, client_order, include_in_context, run_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 message["message_id"],
                 message["session_id"],
                 message["role"],
                 message["content"],
+                message["client_order"],
                 int(message["include_in_context"]),
                 message["run_id"],
                 message["created_at"],
@@ -653,7 +658,7 @@ def _get_chat_message(message_id: str) -> dict[str, Any]:
     with _connection() as connection:
         row = connection.execute(
             """
-            SELECT message_id, session_id, role, content, include_in_context, run_id, created_at, updated_at
+            SELECT message_id, session_id, role, content, client_order, include_in_context, run_id, created_at, updated_at
             FROM buddy_messages
             WHERE message_id = ?
             """,
@@ -685,7 +690,7 @@ def _chat_session_stats(connection: Any, session_id: str) -> dict[str, Any]:
         SELECT content, created_at
         FROM buddy_messages
         WHERE session_id = ?
-        ORDER BY created_at DESC, rowid DESC
+        ORDER BY client_order IS NULL ASC, client_order DESC, created_at DESC, rowid DESC
         LIMIT 1
         """,
         (session_id,),
@@ -708,11 +713,31 @@ def _chat_message_from_row(row: Any) -> dict[str, Any]:
         "session_id": str(row["session_id"] or ""),
         "role": str(row["role"] or ""),
         "content": str(row["content"] or ""),
+        "client_order": row["client_order"],
         "include_in_context": bool(row["include_in_context"]),
         "run_id": row["run_id"],
         "created_at": str(row["created_at"] or ""),
         "updated_at": str(row["updated_at"] or ""),
     }
+
+
+def _coerce_chat_message_client_order(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _next_chat_message_client_order(connection: Any, session_id: str) -> float:
+    row = connection.execute(
+        "SELECT MAX(client_order) AS max_order FROM buddy_messages WHERE session_id = ?",
+        (session_id,),
+    ).fetchone()
+    if not row or row["max_order"] is None:
+        return 0.0
+    return float(row["max_order"]) + 1.0
 
 
 def _derive_chat_session_title(content: str) -> str:

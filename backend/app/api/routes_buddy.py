@@ -61,6 +61,7 @@ class BuddyChatMessagePayload(BaseModel):
     message_id: str | None = None
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1)
+    client_order: float | None = None
     include_in_context: bool = True
     run_id: str | None = None
     change_reason: str = "用户追加伙伴历史消息。"
