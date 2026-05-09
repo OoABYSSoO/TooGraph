@@ -11,6 +11,7 @@ import {
   BUDDY_REPLY_STATE_KEY,
   buildBuddyChatGraph,
   formatBuddyHistory,
+  resolveBuddyRunActivityFromRunEvent,
   resolveBuddyMode,
   resolveBuddyReplyText,
 } from "./buddyChatGraph.ts";
@@ -286,6 +287,86 @@ function createSkillDefinition(overrides: Partial<SkillDefinition> = {}): SkillD
   };
 }
 
+function createActivityGraph() {
+  const graph = buildBuddyChatGraph(createAgenticTemplate(), {
+    userMessage: "你好",
+    history: [],
+    pageContext: "当前路径: /",
+    buddyMode: "advisory",
+  });
+  graph.state_schema.state_10 = { name: "request_understanding", description: "", type: "json", value: {}, color: "#16a34a" };
+  graph.state_schema.state_27 = { name: "final_reply", description: "", type: "markdown", value: "", color: "#4f46e5" };
+  graph.nodes.intake_request = {
+    kind: "subgraph",
+    name: "理解请求",
+    description: "",
+    ui: { position: { x: 360, y: 120 }, collapsed: false },
+    reads: [],
+    writes: [],
+    config: {
+      graph: {
+        state_schema: graph.state_schema,
+        nodes: {
+          understand_request: {
+            kind: "agent",
+            name: "识别意图",
+            description: "",
+            ui: { position: { x: 0, y: 0 }, collapsed: false },
+            reads: [],
+            writes: [{ state: "state_10", mode: "replace" }],
+            config: {
+              skillKey: "",
+              taskInstruction: "",
+              modelSource: "global",
+              model: "",
+              thinkingMode: "medium",
+              temperature: 0.2,
+            },
+          },
+        },
+        edges: [],
+        conditional_edges: [],
+        metadata: {},
+      },
+    },
+  };
+  graph.nodes.run_capability_cycle = {
+    kind: "subgraph",
+    name: "能力循环",
+    description: "",
+    ui: { position: { x: 680, y: 120 }, collapsed: false },
+    reads: [],
+    writes: [],
+    config: {
+      graph: {
+        state_schema: graph.state_schema,
+        nodes: {
+          select_capability: {
+            kind: "agent",
+            name: "选择能力",
+            description: "",
+            ui: { position: { x: 0, y: 0 }, collapsed: false },
+            reads: [],
+            writes: [],
+            config: {
+              skillKey: "graphiteui_capability_selector",
+              taskInstruction: "",
+              modelSource: "global",
+              model: "",
+              thinkingMode: "medium",
+              temperature: 0.2,
+            },
+          },
+        },
+        edges: [],
+        conditional_edges: [],
+        metadata: {},
+      },
+    },
+  };
+  return graph;
+}
+
 function assertInputNode(node: TemplateRecord["nodes"][string]): asserts node is InputNode {
   assert.equal(node.kind, "input");
 }
@@ -481,4 +562,79 @@ test("resolveBuddyReplyText prefers the buddy reply state over fallback text", (
   } as unknown as RunDetail;
 
   assert.equal(resolveBuddyReplyText(run), "我看到了。");
+});
+
+test("resolveBuddyRunActivityFromRunEvent describes inner buddy subgraph activity", () => {
+  const activity = resolveBuddyRunActivityFromRunEvent(
+    "node.started",
+    {
+      node_id: "understand_request",
+      node_type: "agent",
+      subgraph_node_id: "intake_request",
+      subgraph_path: ["intake_request"],
+    },
+    createActivityGraph(),
+  );
+
+  assert.deepEqual(activity, {
+    labelKey: "buddy.activity.understanding",
+    params: {
+      node: "识别意图",
+      stage: "理解请求",
+    },
+  });
+});
+
+test("resolveBuddyRunActivityFromRunEvent reports capability selection and node failures", () => {
+  const graph = createActivityGraph();
+
+  assert.deepEqual(
+    resolveBuddyRunActivityFromRunEvent(
+      "node.started",
+      {
+        node_id: "select_capability",
+        node_type: "agent",
+        subgraph_node_id: "run_capability_cycle",
+        subgraph_path: ["run_capability_cycle"],
+      },
+      graph,
+    ),
+    {
+      labelKey: "buddy.activity.selectingCapability",
+      params: {
+        node: "选择能力",
+        stage: "能力循环",
+      },
+    },
+  );
+  assert.deepEqual(
+    resolveBuddyRunActivityFromRunEvent(
+      "node.failed",
+      {
+        node_id: "understand_request",
+        node_type: "agent",
+        subgraph_node_id: "intake_request",
+      },
+      graph,
+    ),
+    {
+      labelKey: "buddy.activity.failed",
+      params: {
+        node: "识别意图",
+      },
+    },
+  );
+  assert.equal(
+    resolveBuddyRunActivityFromRunEvent(
+      "state.updated",
+      {
+        node_id: "understand_request",
+        node_type: "agent",
+        state_key: "state_10",
+        subgraph_node_id: "intake_request",
+      },
+      graph,
+    ),
+    null,
+  );
 });

@@ -1,4 +1,4 @@
-import type { AgentNode, GraphPayload, InputNode, TemplateRecord } from "../types/node-system.ts";
+import type { AgentNode, GraphNode, GraphPayload, InputNode, TemplateRecord } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
 import type { SkillDefinition } from "../types/skills.ts";
 import { GLOBAL_RUNTIME_MODEL_OPTION_VALUE } from "../lib/runtimeModelCatalog.ts";
@@ -52,6 +52,11 @@ export type BuddyChatMessage = {
   role: BuddyChatRole;
   content: string;
   includeInContext?: boolean;
+};
+
+export type BuddyRunActivityMessage = {
+  labelKey: string;
+  params: Record<string, string>;
 };
 
 export type BuildBuddyChatGraphInput = {
@@ -197,6 +202,41 @@ export function resolveBuddyReplyFromRunEvent(payload: Record<string, unknown>):
   return "";
 }
 
+export function resolveBuddyRunActivityFromRunEvent(
+  eventType: string,
+  payload: Record<string, unknown>,
+  graph: GraphPayload | null | undefined,
+): BuddyRunActivityMessage | null {
+  const nodeId = normalizeRunEventText(payload.node_id);
+  const subgraphNodeId = normalizeRunEventText(payload.subgraph_node_id);
+
+  if (!nodeId) {
+    return null;
+  }
+
+  const labels = resolveBuddyRunNodeLabels(graph, nodeId, subgraphNodeId);
+  if (eventType === "node.failed") {
+    return {
+      labelKey: "buddy.activity.failed",
+      params: { node: labels.node },
+    };
+  }
+  if (eventType === "node.completed") {
+    return {
+      labelKey: "buddy.activity.completed",
+      params: { node: labels.node },
+    };
+  }
+  if (eventType !== "node.started") {
+    return null;
+  }
+
+  return {
+    labelKey: `buddy.activity.${resolveBuddyActivityPhase(nodeId, subgraphNodeId)}`,
+    params: buildBuddyActivityParams(labels),
+  };
+}
+
 function setStateValueByName(graph: GraphPayload, stateName: string, value: unknown) {
   const stateKey = findStateKeyByName(graph, stateName);
   if (!stateKey) {
@@ -309,6 +349,74 @@ function addUniqueMetadataNodeId(value: unknown, nodeId: string) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function resolveBuddyActivityPhase(nodeId: string, subgraphNodeId: string) {
+  const phase = BUDDY_ACTIVITY_PHASE_BY_NODE_ID[nodeId] ?? BUDDY_ACTIVITY_PHASE_BY_NODE_ID[subgraphNodeId];
+  return phase ?? "running";
+}
+
+const BUDDY_ACTIVITY_PHASE_BY_NODE_ID: Record<string, string> = {
+  pack_context: "readingContext",
+  read_buddy_home: "readingContext",
+  assemble_buddy_context: "readingContext",
+  intake_request: "understanding",
+  understand_request: "understanding",
+  need_clarification: "checkingClarification",
+  ask_clarification: "askingClarification",
+  merge_clarification: "understanding",
+  run_capability_cycle: "selectingCapability",
+  select_capability: "selectingCapability",
+  capability_found_condition: "selectingCapability",
+  review_missing_capability: "reviewingCapability",
+  review_capability_permission: "checkingPermission",
+  needs_capability_approval: "checkingPermission",
+  request_capability_approval: "awaitingApproval",
+  review_approval_decision: "checkingPermission",
+  approval_granted: "checkingPermission",
+  review_denied_capability: "reviewingCapability",
+  execute_capability: "executingCapability",
+  review_capability_result: "reviewingCapability",
+  continue_capability_loop: "reviewingCapability",
+  finalize_capability_cycle: "reviewingCapability",
+  draft_final_response: "draftingReply",
+  draft_final_reply: "draftingReply",
+  review_buddy_memory: "reviewingMemory",
+  decide_memory_update: "reviewingMemory",
+};
+
+function buildBuddyActivityParams(labels: { node: string; stage: string }) {
+  const params: Record<string, string> = { node: labels.node };
+  if (labels.stage && labels.stage !== labels.node) {
+    params.stage = labels.stage;
+  }
+  return params;
+}
+
+function resolveBuddyRunNodeLabels(graph: GraphPayload | null | undefined, nodeId: string, subgraphNodeId: string) {
+  const rootNode = subgraphNodeId ? graph?.nodes[subgraphNodeId] : graph?.nodes[nodeId];
+  const innerNode = subgraphNodeId && rootNode?.kind === "subgraph" ? rootNode.config.graph.nodes[nodeId] : null;
+  return {
+    node: resolveBuddyNodeLabel(innerNode ?? rootNode, nodeId),
+    stage: subgraphNodeId ? resolveBuddyNodeLabel(rootNode, subgraphNodeId) : "",
+  };
+}
+
+function resolveBuddyNodeLabel(node: GraphNode | null | undefined, fallback: string) {
+  const label = node?.name?.trim() || node?.description?.trim();
+  return label || humanizeBuddyRuntimeKey(fallback);
+}
+
+function humanizeBuddyRuntimeKey(value: string) {
+  return value
+    .trim()
+    .replace(/^state_/, "State ")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function normalizeRunEventText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function findStateKeyByName(graph: GraphPayload, stateName: string) {
