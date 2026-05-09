@@ -10,6 +10,11 @@ from app.core.runtime.state import create_initial_run_state, set_run_status, utc
 from app.core.runtime.state_io import initialize_graph_state
 from app.core.schemas.node_system import NodeSystemGraphDocument
 
+PRESERVED_RUNTIME_METADATA_KEYS = {
+    "pending_subgraph_breakpoint",
+    "pending_subgraph_resume_payload",
+}
+
 
 def replace_reducer(_current: Any, update: Any) -> Any:
     return update
@@ -97,7 +102,15 @@ def prepare_langgraph_runtime_state(
         }
     else:
         state["node_status_map"] = {node_name: "idle" for node_name in graph.nodes}
-    state["metadata"] = dict(graph.metadata)
+    previous_metadata = dict(state.get("metadata") or {})
+    state["metadata"] = {
+        **dict(graph.metadata),
+        **{
+            key: previous_metadata[key]
+            for key in PRESERVED_RUNTIME_METADATA_KEYS
+            if key in previous_metadata
+        },
+    }
     state["metadata"]["resolved_runtime_backend"] = "langgraph"
     initialize_graph_state_func(graph, state, preserve_existing_values=resume_from_checkpoint)
     mark_input_boundaries_success_func(graph, state)

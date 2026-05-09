@@ -22,6 +22,7 @@ export type HumanReviewRow = {
 };
 
 export type HumanReviewPanelModel = {
+  scopePath: string[];
   producedRows: HumanReviewRow[];
   requiredNow: HumanReviewRow[];
   contextRows: HumanReviewRow[];
@@ -77,18 +78,21 @@ export function buildHumanReviewPanelModel(
   run: RunDetail | null,
   document: GraphPayload | GraphDocument,
 ): HumanReviewPanelModel {
-  const values = resolveHumanReviewStateValues(run);
-  const currentNodeId = run?.current_node_id ?? null;
-  const currentExecution = resolveCurrentNodeExecution(run, currentNodeId);
-  const windowNodeIds = collectBreakpointWindowNodeIds(document, currentNodeId);
+  const scope = resolveHumanReviewScope(run, document);
+  const scopedRun = scope.run;
+  const scopedDocument = scope.document;
+  const values = resolveHumanReviewStateValues(scopedRun);
+  const currentNodeId = scopedRun?.current_node_id ?? null;
+  const currentExecution = resolveCurrentNodeExecution(scopedRun, currentNodeId);
+  const windowNodeIds = collectBreakpointWindowNodeIds(scopedDocument, currentNodeId);
   const orderedWindowNodeIds = Array.from(windowNodeIds);
-  const predecessors = resolveGraphPredecessors(document);
-  const successors = resolveGraphSuccessors(document);
-  const graphAvailability = resolveGraphStateAvailability(document, predecessors);
-  const conditionalDescendantNodeIds = resolveConditionalDescendantNodeIds(document, successors);
-  const breakpointStateKeys = resolveBreakpointStateKeys(document, currentNodeId, graphAvailability);
+  const predecessors = resolveGraphPredecessors(scopedDocument);
+  const successors = resolveGraphSuccessors(scopedDocument);
+  const graphAvailability = resolveGraphStateAvailability(scopedDocument, predecessors);
+  const conditionalDescendantNodeIds = resolveConditionalDescendantNodeIds(scopedDocument, successors);
+  const breakpointStateKeys = resolveBreakpointStateKeys(scopedDocument, currentNodeId, graphAvailability);
   const availableStatesBeforeNode = resolveWindowStateAvailability(
-    document,
+    scopedDocument,
     predecessors,
     windowNodeIds,
     currentNodeId,
@@ -101,7 +105,7 @@ export function buildHumanReviewPanelModel(
   const requiredMetadataByKey = new Map<string, RequiredStateMetadata>();
 
   for (const [consumerOrder, nodeId] of orderedWindowNodeIds.entries()) {
-    const node = document.nodes[nodeId];
+    const node = scopedDocument.nodes[nodeId];
     if (!node) {
       continue;
     }
@@ -130,15 +134,15 @@ export function buildHumanReviewPanelModel(
   }
 
   const producedStateKeys = resolveCurrentNodeProducedStateKeys(
-    run,
-    document,
+    scopedRun,
+    scopedDocument,
     currentNodeId,
     currentExecution,
     values,
   );
   const contextStateKeys = resolveCurrentNodeContextStateKeys(
-    run,
-    document,
+    scopedRun,
+    scopedDocument,
     currentNodeId,
     currentExecution,
     values,
@@ -152,11 +156,11 @@ export function buildHumanReviewPanelModel(
         ...contextStateKeys,
       ]),
     ),
-    document,
+    scopedDocument,
   );
 
   const allRows = rowKeys.map((key) => {
-    const definition = document.state_schema[key];
+    const definition = scopedDocument.state_schema[key];
     const type = resolveHumanReviewStateType(definition?.type);
     const value = Object.prototype.hasOwnProperty.call(values, key) ? values[key] : definition?.value ?? "";
     return {
@@ -208,6 +212,7 @@ export function buildHumanReviewPanelModel(
   const firstBlockingRequiredKey = requiredNow.find(draftValueIsBlocking)?.key ?? null;
 
   return {
+    scopePath: scope.scopePath,
     producedRows,
     requiredNow,
     contextRows,
@@ -218,6 +223,73 @@ export function buildHumanReviewPanelModel(
     firstBlockingRequiredKey,
     summaryText: resolveSummaryText(requiredNow.length),
   };
+}
+
+function resolveHumanReviewScope(run: RunDetail | null, document: GraphPayload | GraphDocument) {
+  const pending = readPendingSubgraphBreakpoint(run);
+  if (!run || !pending) {
+    return { run, document, scopePath: [] };
+  }
+  const subgraphNodeId = stringFromUnknown(pending.subgraph_node_id);
+  const innerNodeId = stringFromUnknown(pending.inner_node_id);
+  if (!subgraphNodeId || !innerNodeId) {
+    return { run, document, scopePath: [] };
+  }
+  const subgraphNode = document.nodes[subgraphNodeId];
+  if (!subgraphNode || subgraphNode.kind !== "subgraph") {
+    return { run, document, scopePath: [] };
+  }
+  const subgraphDocument: GraphPayload = {
+    ...subgraphNode.config.graph,
+    graph_id: null,
+    name: subgraphNode.name?.trim() || subgraphNodeId,
+  };
+  const stateValues = recordFromUnknown(pending.state_values);
+  const nodeStatusMap = stringRecordFromUnknown(pending.node_status_map);
+  const nodeExecutions = Array.isArray(pending.node_executions) ? pending.node_executions : [];
+  const scopedRun: RunDetail = {
+    ...run,
+    current_node_id: innerNodeId,
+    node_status_map: nodeStatusMap,
+    node_executions: nodeExecutions as RunDetail["node_executions"],
+    artifacts: {
+      ...run.artifacts,
+      state_values: stateValues,
+    },
+    state_snapshot: {
+      ...run.state_snapshot,
+      values: stateValues,
+    },
+  };
+  const innerNode = subgraphDocument.nodes[innerNodeId];
+  return {
+    run: scopedRun,
+    document: subgraphDocument,
+    scopePath: [
+      subgraphNode.name?.trim() || subgraphNodeId,
+      innerNode?.name?.trim() || stringFromUnknown(pending.inner_node_name) || innerNodeId,
+    ],
+  };
+}
+
+function readPendingSubgraphBreakpoint(run: RunDetail | null) {
+  const pending = run?.metadata?.pending_subgraph_breakpoint;
+  return pending && typeof pending === "object" && !Array.isArray(pending)
+    ? pending as Record<string, unknown>
+    : null;
+}
+
+function recordFromUnknown(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? { ...(value as Record<string, unknown>) } : {};
+}
+
+function stringRecordFromUnknown(value: unknown): Record<string, string> {
+  const record = recordFromUnknown(value);
+  return Object.fromEntries(Object.entries(record).map(([key, item]) => [key, String(item ?? "")]));
+}
+
+function stringFromUnknown(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function resolveCurrentNodeExecution(run: RunDetail | null, currentNodeId: string | null) {

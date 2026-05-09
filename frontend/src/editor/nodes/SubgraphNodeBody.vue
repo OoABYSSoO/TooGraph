@@ -137,6 +137,9 @@ const runtimeSummaryText = computed(() => {
   }
   const progress = `${summary.completedCount}/${summary.totalCount}`;
   if (summary.currentNodeLabel) {
+    if (summary.tone === "paused") {
+      return `Paused ${progress} - ${summary.currentNodeLabel}`;
+    }
     return `Running ${progress} - ${summary.currentNodeLabel}`;
   }
   if (summary.failedCount > 0) {

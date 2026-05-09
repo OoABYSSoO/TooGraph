@@ -220,6 +220,130 @@ test("buildHumanReviewPanelModel promotes downstream missing inputs into require
   assert.equal(panel.firstBlockingRequiredKey, "manual_feedback");
 });
 
+test("buildHumanReviewPanelModel renders an inner subgraph breakpoint against the embedded graph", () => {
+  const document: GraphPayload = {
+    graph_id: "parent_graph",
+    name: "Parent Graph",
+    state_schema: {
+      question: { name: "Question", description: "", type: "text", value: "", color: "#d97706" },
+      answer: { name: "Answer", description: "", type: "text", value: "", color: "#2563eb" },
+    },
+    nodes: {
+      nested_research: {
+        kind: "subgraph",
+        name: "Nested Research",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [{ state: "answer", mode: "replace" }],
+        config: {
+          graph: {
+            state_schema: {
+              internal_question: {
+                name: "Internal Question",
+                description: "Question inside the subgraph",
+                type: "text",
+                value: "",
+                color: "#10b981",
+              },
+              manual_feedback: {
+                name: "Manual Feedback",
+                description: "Review note",
+                type: "text",
+                value: "",
+                color: "#7c3aed",
+              },
+            },
+            nodes: {
+              inner_input: {
+                kind: "input",
+                name: "Inner Input",
+                description: "",
+                ui: { position: { x: 0, y: 0 } },
+                reads: [],
+                writes: [{ state: "internal_question", mode: "replace" }],
+                config: { value: "" },
+              },
+              inner_review: {
+                kind: "agent",
+                name: "Inner Review",
+                description: "",
+                ui: { position: { x: 240, y: 0 } },
+                reads: [
+                  { state: "internal_question", required: true },
+                  { state: "manual_feedback", required: true },
+                ],
+                writes: [],
+                config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+              },
+            },
+            edges: [{ source: "inner_input", target: "inner_review" }],
+            conditional_edges: [],
+            metadata: { interrupt_after: ["inner_input"] },
+          },
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+  const run: RunDetail = {
+    ...createRun(),
+    current_node_id: "nested_research",
+    node_status_map: { nested_research: "paused" },
+    subgraph_status_map: { nested_research: { inner_input: "paused", inner_review: "idle" } },
+    metadata: {
+      pending_subgraph_breakpoint: {
+        subgraph_node_id: "nested_research",
+        inner_node_id: "inner_input",
+        subgraph_path: ["nested_research"],
+        state_values: {
+          internal_question: "What is GraphiteUI?",
+          manual_feedback: "",
+        },
+        node_status_map: {
+          inner_input: "paused",
+          inner_review: "idle",
+        },
+        node_executions: [
+          {
+            node_id: "inner_input",
+            node_type: "input",
+            status: "success",
+            duration_ms: 1,
+            input_summary: "",
+            output_summary: "",
+            artifacts: {
+              inputs: {},
+              outputs: {},
+              family: "input",
+              state_reads: [],
+              state_writes: [
+                {
+                  state_key: "internal_question",
+                  output_key: "internal_question",
+                  mode: "replace",
+                  value: "What is GraphiteUI?",
+                  changed: true,
+                },
+              ],
+            },
+            warnings: [],
+            errors: [],
+          },
+        ],
+      },
+    },
+  };
+
+  const panel = buildHumanReviewPanelModel(run, document);
+
+  assert.deepEqual(panel.scopePath, ["Nested Research", "Inner Input"]);
+  assert.deepEqual(panel.producedRows.map((row) => row.key), ["internal_question"]);
+  assert.deepEqual(panel.requiredNow.map((row) => row.key), ["manual_feedback"]);
+});
+
 test("buildHumanReviewPanelModel does not block continue when required fields already have values", () => {
   const run = createBranchingRun();
   run.artifacts = {

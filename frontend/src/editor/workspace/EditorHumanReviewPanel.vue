@@ -35,6 +35,20 @@
 
       <p class="editor-human-review-panel__summary">{{ panelModel.summaryText }}</p>
       <p v-if="resumeGuardMessage" class="editor-human-review-panel__guard">{{ resumeGuardMessage }}</p>
+      <nav
+        v-if="panelModel.scopePath.length > 0"
+        class="editor-human-review-panel__scope"
+        :aria-label="t('humanReview.scopePath')"
+      >
+        <template v-for="(item, index) in panelModel.scopePath" :key="`${item}-${index}`">
+          <span class="editor-human-review-panel__scope-item">{{ item }}</span>
+          <span
+            v-if="index < panelModel.scopePath.length - 1"
+            class="editor-human-review-panel__scope-separator"
+            aria-hidden="true"
+          >/</span>
+        </template>
+      </nav>
 
       <section v-if="panelModel.producedRows.length > 0" class="editor-human-review-panel__produced-section">
         <div class="editor-human-review-panel__section-title">{{ t("humanReview.producedTitle") }}</div>
@@ -334,6 +348,25 @@ function handleResumeClick() {
 
 .editor-human-review-panel__guard {
   color: #b45309;
+}
+
+.editor-human-review-panel__scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  border: 1px solid rgba(13, 148, 136, 0.18);
+  border-radius: 14px;
+  background: rgba(240, 253, 250, 0.58);
+  color: rgba(15, 76, 71, 0.82);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.editor-human-review-panel__scope-separator {
+  color: rgba(15, 118, 110, 0.42);
 }
 
 .editor-human-review-panel__produced-section,

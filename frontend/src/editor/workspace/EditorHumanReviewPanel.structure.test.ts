@@ -31,6 +31,8 @@ test("EditorHumanReviewPanel renders an action-first breakpoint task panel", () 
   assert.match(componentSource, /@click="\$emit\('focus-node', currentFocusNodeId\)"/);
   assert.match(componentSource, /class="editor-human-review-panel__summary"/);
   assert.match(componentSource, /\{\{ panelModel\.summaryText \}\}/);
+  assert.match(componentSource, /class="editor-human-review-panel__scope"/);
+  assert.match(componentSource, /v-for="\(item, index\) in panelModel\.scopePath"/);
   assert.match(componentSource, /class="editor-human-review-panel__produced-section"/);
   assert.match(componentSource, /v-for="row in panelModel\.producedRows"/);
   assert.match(componentSource, /class="editor-human-review-panel__required-section"/);
@@ -46,8 +48,13 @@ test("EditorHumanReviewPanel renders an action-first breakpoint task panel", () 
   );
   assertSourceOrder(
     /class="editor-human-review-panel__summary"/,
+    /class="editor-human-review-panel__scope"/,
+    "Summary should appear before scope path in source order",
+  );
+  assertSourceOrder(
+    /class="editor-human-review-panel__scope"/,
     /class="editor-human-review-panel__produced-section"/,
-    "Summary should appear before produced section in source order",
+    "Scope path should appear before produced section in source order",
   );
   assertSourceOrder(
     /class="editor-human-review-panel__produced-section"/,

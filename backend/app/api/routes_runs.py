@@ -165,7 +165,11 @@ def resume_run_endpoint(
     resumed_run["graph_id"] = graph.graph_id
     resumed_run["graph_name"] = graph.name
     resumed_run["runtime_backend"] = "langgraph"
+    previous_metadata = dict(resumed_run.get("metadata") or {})
     resumed_run["metadata"] = dict(graph.metadata)
+    if "pending_subgraph_breakpoint" in previous_metadata:
+        resumed_run["metadata"]["pending_subgraph_breakpoint"] = copy.deepcopy(previous_metadata["pending_subgraph_breakpoint"])
+        resumed_run["metadata"]["pending_subgraph_resume_payload"] = copy.deepcopy(payload.get("resume") if payload else {})
     resumed_run["metadata"]["resolved_runtime_backend"] = "langgraph"
     resumed_run["checkpoint_metadata"] = {
         "available": bool(checkpoint_metadata.get("checkpoint_id")),
@@ -182,7 +186,8 @@ def resume_run_endpoint(
     touch_run_lifecycle(resumed_run)
     save_run(resumed_run)
 
-    background_tasks.add_task(_resume_run_worker, graph, resumed_run, payload.get("resume") if payload else None)
+    parent_resume_payload = None if "pending_subgraph_breakpoint" in resumed_run["metadata"] else (payload.get("resume") if payload else None)
+    background_tasks.add_task(_resume_run_worker, graph, resumed_run, parent_resume_payload)
     return {"run_id": resumed_run["run_id"], "status": resumed_run["status"]}
 
 
