@@ -105,10 +105,12 @@ test("BuddyWidget keeps the composer enabled and queues sends while a reply is r
 });
 
 test("BuddyWidget keeps runtime error replies out of model context and persisted history", () => {
-  assert.match(componentSource, /const history = buildHistoryBeforeMessage\(turn\.userMessageId\);/);
+  assert.match(componentSource, /const history = buildHistoryBeforeMessage\(userEntry\.id\);/);
+  assert.match(componentSource, /const history = turn\.history;/);
   assert.match(componentSource, /return previousMessages\.filter\(isContextMessage\)\.map\(\(\{ role, content \}\) => \(\{ role, content \}\)\);/);
-  assert.match(componentSource, /nextMessages[\s\S]*\.filter\(isPersistableMessageForStorage\)[\s\S]*\.slice\(-24\)[\s\S]*\.map\(\(\{ role, content, includeInContext \}\) => \(\{ role, content, includeInContext \}\)\)/);
+  assert.match(componentSource, /appendBuddyChatMessage\(sessionId,[\s\S]*include_in_context: options\.includeInContext \?\? message\.includeInContext !== false,[\s\S]*\)/);
   assert.match(componentSource, /updateAssistantMessage\(assistantMessage\.id, t\("buddy\.errorReply", \{ error: message \}\), \{ includeInContext: false \}\);/);
+  assert.match(componentSource, /persistBuddyMessage\(turn\.sessionId,[\s\S]*includeInContext: false,[\s\S]*\);/);
 });
 
 test("BuddyWidget shows live run activity while the assistant reply is still empty", () => {
@@ -153,6 +155,20 @@ test("BuddyWidget keeps the run trace above the formal reply and collapses to el
   assert.match(componentSource, /v-if="message\.role === 'assistant' && message\.content"/);
   assert.match(componentSource, /shouldShowAssistantActivityBubble\(message\)/);
   assert.doesNotMatch(componentSource, /message\.content \|\| message\.activityText \|\| t\("buddy\.streaming"\)/);
+});
+
+test("BuddyWidget stores buddy chat in backend sessions and exposes an in-panel history list", () => {
+  assert.match(componentSource, /import \{[\s\S]*appendBuddyChatMessage,[\s\S]*fetchBuddyChatMessages,[\s\S]*fetchBuddyChatSessions,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
+  assert.match(componentSource, /const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "graphiteui:buddy-active-session";/);
+  assert.match(componentSource, /const chatSessions = ref<BuddyChatSession\[\]>\(\[\]\);/);
+  assert.match(componentSource, /const activeSessionId = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /class="buddy-widget__sessions-panel"/);
+  assert.match(componentSource, /v-for="session in chatSessions"/);
+  assert.match(componentSource, /@click="activateChatSession\(session\.session_id\)"/);
+  assert.match(componentSource, /@click\.stop="deleteSession\(session\.session_id\)"/);
+  assert.match(componentSource, /chatSessionInitializationPromise = initializeBuddyChatSessions\(\)\.finally/);
+  assert.match(componentSource, /async function migrateLegacyBuddyHistory\(\)/);
+  assert.doesNotMatch(componentSource, /watch\(\s*messages,/);
 });
 
 test("BuddyWidget leaves buddy self config loading and memory curation to the chat graph template", () => {

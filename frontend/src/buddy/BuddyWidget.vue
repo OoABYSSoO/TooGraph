@@ -8,6 +8,7 @@
       <section
         v-if="isPanelOpen"
         class="buddy-widget__panel"
+        :class="{ 'buddy-widget__panel--sessions-open': isSessionPanelOpen }"
         :aria-label="t('buddy.panelLabel')"
       >
         <header class="buddy-widget__header">
@@ -19,8 +20,19 @@
             <button
               type="button"
               class="buddy-widget__icon-button"
+              :class="{ 'buddy-widget__icon-button--active': isSessionPanelOpen }"
+              :title="t('buddy.history')"
+              :aria-label="t('buddy.history')"
+              @click="isSessionPanelOpen = !isSessionPanelOpen"
+            >
+              <ElIcon><Clock /></ElIcon>
+            </button>
+            <button
+              type="button"
+              class="buddy-widget__icon-button"
               :title="t('buddy.clear')"
               :aria-label="t('buddy.clear')"
+              :disabled="isSessionSwitchLocked"
               @click="clearMessages"
             >
               <ElIcon><Delete /></ElIcon>
@@ -84,6 +96,61 @@
             </div>
           </div>
         </header>
+
+        <aside
+          v-if="isSessionPanelOpen"
+          class="buddy-widget__sessions-panel"
+          :aria-label="t('buddy.history')"
+        >
+          <div class="buddy-widget__sessions-header">
+            <strong>{{ t("buddy.history") }}</strong>
+            <button
+              type="button"
+              class="buddy-widget__session-new"
+              :disabled="isSessionSwitchLocked"
+              :title="t('buddy.newSession')"
+              :aria-label="t('buddy.newSession')"
+              @click="createNewSession"
+            >
+              <ElIcon><Plus /></ElIcon>
+              <span>{{ t("buddy.newSession") }}</span>
+            </button>
+          </div>
+          <p v-if="isSessionLoading" class="buddy-widget__sessions-status">
+            {{ t("buddy.historyLoading") }}
+          </p>
+          <p v-else-if="chatSessions.length === 0" class="buddy-widget__sessions-status">
+            {{ t("buddy.historyEmpty") }}
+          </p>
+          <div v-else class="buddy-widget__session-list">
+            <div
+              v-for="session in chatSessions"
+              :key="session.session_id"
+              class="buddy-widget__session-row"
+              :class="{ 'buddy-widget__session-row--active': session.session_id === activeSessionId }"
+            >
+              <button
+                type="button"
+                class="buddy-widget__session-item"
+                :disabled="isSessionSwitchLocked && session.session_id !== activeSessionId"
+                @click="activateChatSession(session.session_id)"
+              >
+                <span>{{ session.title || t("buddy.untitledSession") }}</span>
+                <small>{{ session.last_message_preview || t("buddy.emptySession") }}</small>
+              </button>
+              <button
+                type="button"
+                class="buddy-widget__session-delete"
+                :disabled="isSessionSwitchLocked"
+                :title="t('buddy.deleteSession')"
+                :aria-label="t('buddy.deleteSession')"
+                @click.stop="deleteSession(session.session_id)"
+              >
+                <ElIcon><Delete /></ElIcon>
+              </button>
+            </div>
+          </div>
+        </aside>
 
         <div ref="messageListElement" class="buddy-widget__messages">
           <p v-if="messages.length === 0" class="buddy-widget__empty">
@@ -197,12 +264,19 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowDown, Close, Delete, Promotion } from "@element-plus/icons-vue";
+import { ArrowDown, Clock, Close, Delete, Plus, Promotion } from "@element-plus/icons-vue";
 import { ElIcon, ElOption, ElSelect } from "element-plus";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
+import {
+  appendBuddyChatMessage,
+  createBuddyChatSession,
+  deleteBuddyChatSession,
+  fetchBuddyChatMessages,
+  fetchBuddyChatSessions,
+} from "../api/buddy.ts";
 import { fetchTemplate, runGraph } from "../api/graphs.ts";
 import { fetchRun } from "../api/runs.ts";
 import { fetchSettings } from "../api/settings.ts";
@@ -212,6 +286,7 @@ import { formatRunDuration } from "../lib/run-display-name.ts";
 import { buildRuntimeModelOptions } from "../lib/runtimeModelCatalog.ts";
 import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
 import { useBuddyContextStore } from "../stores/buddyContext.ts";
+import type { BuddyChatMessageRecord, BuddyChatSession } from "../types/buddy.ts";
 import type { GraphPayload } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
 import type { SettingsPayload } from "../types/settings.ts";
@@ -253,6 +328,8 @@ type BuddyMessagePatch = Partial<Pick<BuddyMessage, "content" | "includeInContex
 type BuddyQueuedTurn = {
   userMessageId: string;
   userMessage: string;
+  sessionId: string;
+  history: BuddyChatMessage[];
 };
 
 type BuddyMood = "idle" | "thinking" | "speaking" | "error";
@@ -262,6 +339,7 @@ type BuddyModelOption = {
 };
 
 const BUDDY_HISTORY_STORAGE_KEY = "graphiteui:buddy-history";
+const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "graphiteui:buddy-active-session";
 const BUDDY_MODEL_STORAGE_KEY = "graphiteui:buddy-model";
 const DRAG_THRESHOLD_PX = 4;
 const RUN_POLL_INTERVAL_MS = 700;
@@ -281,6 +359,10 @@ const buddyModelRef = ref("");
 const buddyModelOptions = ref<BuddyModelOption[]>([]);
 const buddyModelLoadError = ref("");
 const messages = ref<BuddyMessage[]>([]);
+const chatSessions = ref<BuddyChatSession[]>([]);
+const activeSessionId = ref<string | null>(null);
+const isSessionPanelOpen = ref(false);
+const isSessionLoading = ref(false);
 const queuedTurns = ref<BuddyQueuedTurn[]>([]);
 const runTraceEntries = ref<BuddyRunTraceEntry[]>([]);
 const errorMessage = ref("");
@@ -305,9 +387,16 @@ let eventSource: EventSource | null = null;
 let activeAbortController: AbortController | null = null;
 let isDrainingBuddyQueue = false;
 let speakingIdleTimerId: number | null = null;
+let chatSessionInitializationPromise: Promise<void> | null = null;
 const runTraceStartedAtByKey = new Map<string, number>();
 
 const isDragging = computed(() => Boolean(pointerDrag.value?.moved));
+const isSessionSwitchLocked = computed(
+  () =>
+    queuedTurns.value.length > 0 ||
+    activeRunId.value !== null ||
+    (activeTraceMessageId.value !== null && runTraceFinishedAtMs.value === null),
+);
 const buddyModeLabel = computed(() => {
   const option = BUDDY_MODE_OPTIONS.find((candidate) => candidate.value === buddyMode.value);
   return option ? `${t(option.labelKey)} - ${t(option.descriptionKey)}` : t("buddy.modes.advisory");
@@ -359,7 +448,9 @@ const bubbleText = computed(() => {
 
 onMounted(() => {
   hydratePosition();
-  hydrateMessages();
+  chatSessionInitializationPromise = initializeBuddyChatSessions().finally(() => {
+    chatSessionInitializationPromise = null;
+  });
   hydrateBuddyModel();
   void loadBuddyModelOptions();
   window.addEventListener("resize", handleResize);
@@ -374,22 +465,6 @@ onBeforeUnmount(() => {
   closeEventSource();
   activeAbortController?.abort();
 });
-
-watch(
-  messages,
-  (nextMessages) => {
-    window.localStorage.setItem(
-      BUDDY_HISTORY_STORAGE_KEY,
-      JSON.stringify(
-        nextMessages
-          .filter(isPersistableMessageForStorage)
-          .slice(-24)
-          .map(({ role, content, includeInContext }) => ({ role, content, includeInContext })),
-      ),
-    );
-  },
-  { deep: true },
-);
 
 watch(buddyMode, (nextMode) => {
   const safeMode = resolveBuddyMode(nextMode);
@@ -478,13 +553,22 @@ async function sendMessage() {
 
   errorMessage.value = "";
   isPanelOpen.value = true;
+  await waitForChatSessionInitialization();
+  const sessionId = await ensureActiveChatSession();
+  if (!sessionId) {
+    return;
+  }
   draft.value = "";
 
   const userEntry = createMessage("user", userMessage);
   messages.value.push(userEntry);
+  const history = buildHistoryBeforeMessage(userEntry.id);
+  void persistBuddyMessage(sessionId, userEntry);
   queuedTurns.value.push({
     userMessageId: userEntry.id,
     userMessage,
+    sessionId,
+    history,
   });
   void drainBuddyQueue();
   await scrollMessagesToBottom();
@@ -514,7 +598,7 @@ async function drainBuddyQueue() {
 
 async function processQueuedTurn(turn: BuddyQueuedTurn) {
   clearSpeakingIdleTimer();
-  const history = buildHistoryBeforeMessage(turn.userMessageId);
+  const history = turn.history;
   const assistantMessage = appendAssistantMessageForTurn(turn.userMessageId);
   resetRunTraceForMessage(assistantMessage.id);
   mood.value = "thinking";
@@ -545,7 +629,14 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
     startRunEventStream(run.run_id, assistantMessage.id, graph);
     const runDetail = await pollRunUntilFinished(run.run_id, activeAbortController.signal);
     const finalReply = resolveBuddyReplyText(runDetail);
-    updateAssistantMessage(assistantMessage.id, finalReply || t("buddy.emptyReply"));
+    const includeReplyInContext = runDetail.status !== "failed";
+    updateAssistantMessage(assistantMessage.id, finalReply || t("buddy.emptyReply"), {
+      includeInContext: includeReplyInContext,
+    });
+    void persistBuddyMessage(turn.sessionId, messages.value.find((message) => message.id === assistantMessage.id), {
+      runId: run.run_id,
+      includeInContext: includeReplyInContext,
+    });
     mood.value = runDetail.status === "failed" ? "error" : "speaking";
     if (runDetail.status === "completed") {
       buddyContextStore.notifyBuddyDataChanged();
@@ -568,6 +659,9 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
       replaceKey: "local:error",
     });
     updateAssistantMessage(assistantMessage.id, t("buddy.errorReply", { error: message }), { includeInContext: false });
+    void persistBuddyMessage(turn.sessionId, messages.value.find((entry) => entry.id === assistantMessage.id), {
+      includeInContext: false,
+    });
   } finally {
     markRunTraceFinished();
     closeEventSource();
@@ -602,7 +696,7 @@ function completeLocalRunTrace(replaceKey: string, labelKey: string) {
   });
 }
 
-function clearMessages() {
+async function clearMessages() {
   queuedTurns.value = [];
   runTraceEntries.value = [];
   activeTraceMessageId.value = null;
@@ -615,10 +709,193 @@ function clearMessages() {
   activeAbortController?.abort();
   activeAbortController = null;
   activeRunId.value = null;
+  const sessionId = activeSessionId.value;
   messages.value = [];
   errorMessage.value = "";
   mood.value = "idle";
   window.localStorage.removeItem(BUDDY_HISTORY_STORAGE_KEY);
+  if (!sessionId) {
+    window.localStorage.removeItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY);
+    return;
+  }
+  try {
+    await deleteBuddyChatSession(sessionId);
+    chatSessions.value = chatSessions.value.filter((session) => session.session_id !== sessionId);
+    const nextSession = chatSessions.value[0];
+    if (nextSession) {
+      await activateChatSession(nextSession.session_id);
+    } else {
+      activeSessionId.value = null;
+      window.localStorage.removeItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY);
+    }
+    await loadChatSessions();
+  } catch (error) {
+    errorMessage.value = t("buddy.historyDeleteFailed", { error: formatErrorMessage(error) });
+  }
+}
+
+async function initializeBuddyChatSessions() {
+  isSessionLoading.value = true;
+  try {
+    await loadChatSessions();
+    const storedSessionId = window.localStorage.getItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY)?.trim();
+    const targetSession =
+      chatSessions.value.find((session) => session.session_id === storedSessionId) ?? chatSessions.value[0] ?? null;
+    if (targetSession) {
+      await activateChatSession(targetSession.session_id, { skipInitializationWait: true });
+      return;
+    }
+    await migrateLegacyBuddyHistory();
+  } catch (error) {
+    errorMessage.value = t("buddy.historyLoadFailed", { error: formatErrorMessage(error) });
+    messages.value = readLegacyBuddyMessages();
+  } finally {
+    isSessionLoading.value = false;
+  }
+}
+
+async function loadChatSessions() {
+  chatSessions.value = await fetchBuddyChatSessions();
+}
+
+async function ensureActiveChatSession(): Promise<string | null> {
+  if (activeSessionId.value) {
+    return activeSessionId.value;
+  }
+  try {
+    const session = await createBuddyChatSession();
+    chatSessions.value = [session, ...chatSessions.value.filter((item) => item.session_id !== session.session_id)];
+    activeSessionId.value = session.session_id;
+    window.localStorage.setItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY, session.session_id);
+    return session.session_id;
+  } catch (error) {
+    errorMessage.value = t("buddy.historyCreateFailed", { error: formatErrorMessage(error) });
+    return null;
+  }
+}
+
+async function createNewSession() {
+  if (isSessionSwitchLocked.value) {
+    return;
+  }
+  await waitForChatSessionInitialization();
+  errorMessage.value = "";
+  try {
+    const session = await createBuddyChatSession();
+    chatSessions.value = [session, ...chatSessions.value.filter((item) => item.session_id !== session.session_id)];
+    await activateChatSession(session.session_id);
+  } catch (error) {
+    errorMessage.value = t("buddy.historyCreateFailed", { error: formatErrorMessage(error) });
+  }
+}
+
+async function activateChatSession(sessionId: string, options: { skipInitializationWait?: boolean } = {}) {
+  if (isSessionSwitchLocked.value && sessionId !== activeSessionId.value) {
+    return;
+  }
+  if (!options.skipInitializationWait) {
+    await waitForChatSessionInitialization();
+  }
+  isSessionLoading.value = true;
+  errorMessage.value = "";
+  try {
+    const records = await fetchBuddyChatMessages(sessionId);
+    activeSessionId.value = sessionId;
+    window.localStorage.setItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY, sessionId);
+    messages.value = records.map(messageRecordToBuddyMessage);
+    resetVisibleRunTrace();
+    await scrollMessagesToBottom();
+  } catch (error) {
+    errorMessage.value = t("buddy.historyLoadFailed", { error: formatErrorMessage(error) });
+  } finally {
+    isSessionLoading.value = false;
+  }
+}
+
+async function deleteSession(sessionId: string) {
+  if (isSessionSwitchLocked.value) {
+    return;
+  }
+  await waitForChatSessionInitialization();
+  errorMessage.value = "";
+  try {
+    await deleteBuddyChatSession(sessionId);
+    chatSessions.value = chatSessions.value.filter((session) => session.session_id !== sessionId);
+    if (sessionId === activeSessionId.value) {
+      const nextSession = chatSessions.value[0];
+      if (nextSession) {
+        await activateChatSession(nextSession.session_id);
+      } else {
+        activeSessionId.value = null;
+        messages.value = [];
+        resetVisibleRunTrace();
+        window.localStorage.removeItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY);
+      }
+    }
+    await loadChatSessions();
+  } catch (error) {
+    errorMessage.value = t("buddy.historyDeleteFailed", { error: formatErrorMessage(error) });
+  }
+}
+
+async function persistBuddyMessage(
+  sessionId: string,
+  message: BuddyMessage | undefined,
+  options: { runId?: string | null; includeInContext?: boolean } = {},
+) {
+  if (!message || !message.content.trim()) {
+    return;
+  }
+  try {
+    await appendBuddyChatMessage(sessionId, {
+      message_id: message.id,
+      role: message.role,
+      content: message.content,
+      include_in_context: options.includeInContext ?? message.includeInContext !== false,
+      run_id: options.runId ?? null,
+    });
+    await loadChatSessions();
+  } catch (error) {
+    errorMessage.value = t("buddy.historySaveFailed", { error: formatErrorMessage(error) });
+  }
+}
+
+async function migrateLegacyBuddyHistory() {
+  const legacyMessages = readLegacyBuddyMessages();
+  if (legacyMessages.length === 0) {
+    messages.value = [];
+    return;
+  }
+  const firstUserMessage = legacyMessages.find((message) => message.role === "user" && message.content.trim());
+  const session = await createBuddyChatSession({ title: firstUserMessage?.content.trim() || undefined });
+  activeSessionId.value = session.session_id;
+  messages.value = legacyMessages;
+  window.localStorage.setItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY, session.session_id);
+  for (const message of legacyMessages) {
+    await appendBuddyChatMessage(session.session_id, {
+      message_id: message.id,
+      role: message.role,
+      content: message.content,
+      include_in_context: message.includeInContext !== false,
+    });
+  }
+  window.localStorage.removeItem(BUDDY_HISTORY_STORAGE_KEY);
+  await loadChatSessions();
+}
+
+function resetVisibleRunTrace() {
+  runTraceEntries.value = [];
+  activeTraceMessageId.value = null;
+  isRunTraceExpanded.value = false;
+  runTraceStartedAtMs.value = null;
+  runTraceFinishedAtMs.value = null;
+  runTraceStartedAtByKey.clear();
+}
+
+async function waitForChatSessionInitialization() {
+  if (chatSessionInitializationPromise) {
+    await chatSessionInitializationPromise;
+  }
 }
 
 function hydratePosition() {
@@ -631,18 +908,21 @@ function hydratePosition() {
   );
 }
 
-function hydrateMessages() {
+function readLegacyBuddyMessages(): BuddyMessage[] {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(BUDDY_HISTORY_STORAGE_KEY) ?? "[]") as unknown;
     if (!Array.isArray(parsed)) {
-      return;
+      return [];
     }
-    messages.value = parsed
+    return parsed
       .filter(isPersistedMessage)
       .slice(-24)
-      .map((message) => createMessage(message.role, message.content));
+      .map((message) => ({
+        ...createMessage(message.role, message.content),
+        includeInContext: message.includeInContext,
+      }));
   } catch {
-    messages.value = [];
+    return [];
   }
 }
 
@@ -918,15 +1198,21 @@ function createMessage(role: BuddyChatMessage["role"], content: string): BuddyMe
   };
 }
 
+function messageRecordToBuddyMessage(record: BuddyChatMessageRecord): BuddyMessage {
+  return {
+    id: record.message_id,
+    role: record.role,
+    content: record.content,
+    includeInContext: record.include_in_context,
+    activityText: "",
+  };
+}
+
 function buildBuddyModelOptions(settings: SettingsPayload): BuddyModelOption[] {
   return buildRuntimeModelOptions(settings);
 }
 
 function isContextMessage(message: BuddyMessage): boolean {
-  return message.includeInContext !== false;
-}
-
-function isPersistableMessageForStorage(message: BuddyMessage): boolean {
   return message.includeInContext !== false;
 }
 
@@ -968,6 +1254,10 @@ function isPersistedMessage(value: unknown): value is BuddyChatMessage {
     ((value as BuddyChatMessage).includeInContext === undefined ||
       typeof (value as BuddyChatMessage).includeInContext === "boolean")
   );
+}
+
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 </script>
 
@@ -1044,7 +1334,10 @@ function isPersistedMessage(value: unknown): value is BuddyChatMessage {
 .buddy-widget__icon-button:focus-visible,
 .buddy-widget__send:focus-visible,
 .buddy-widget__input:focus-visible,
-.buddy-widget__run-trace-toggle:focus-visible {
+.buddy-widget__run-trace-toggle:focus-visible,
+.buddy-widget__session-new:focus-visible,
+.buddy-widget__session-item:focus-visible,
+.buddy-widget__session-delete:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3);
 }
@@ -1067,6 +1360,10 @@ function isPersistedMessage(value: unknown): value is BuddyChatMessage {
   background: rgba(255, 252, 247, 0.94);
   box-shadow: var(--graphite-glass-highlight), 0 24px 64px rgba(61, 43, 24, 0.18);
   backdrop-filter: blur(18px) saturate(1.2);
+}
+
+.buddy-widget__panel--sessions-open {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
 .buddy-widget__anchor--left .buddy-widget__panel {
@@ -1199,6 +1496,135 @@ function isPersistedMessage(value: unknown): value is BuddyChatMessage {
   border-color: rgba(154, 52, 18, 0.24);
   background: rgba(255, 248, 240, 0.92);
   transform: translateY(-1px);
+}
+
+.buddy-widget__icon-button--active {
+  border-color: rgba(37, 99, 235, 0.22);
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+}
+
+.buddy-widget__icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
+  transform: none;
+}
+
+.buddy-widget__sessions-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(154, 52, 18, 0.1);
+  background: rgba(255, 252, 247, 0.72);
+}
+
+.buddy-widget__sessions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.buddy-widget__sessions-header strong {
+  color: var(--graphite-text-strong);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.buddy-widget__session-new,
+.buddy-widget__session-delete,
+.buddy-widget__session-item {
+  appearance: none;
+  border: 0;
+  font: inherit;
+}
+
+.buddy-widget__session-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.buddy-widget__session-list {
+  display: grid;
+  gap: 6px;
+  max-height: 148px;
+  overflow: auto;
+}
+
+.buddy-widget__session-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 5px;
+  align-items: stretch;
+}
+
+.buddy-widget__session-item {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--graphite-text-strong);
+  text-align: left;
+  cursor: pointer;
+}
+
+.buddy-widget__session-item span,
+.buddy-widget__session-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buddy-widget__session-item span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.buddy-widget__session-item small,
+.buddy-widget__sessions-status {
+  color: var(--graphite-text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.buddy-widget__session-row--active .buddy-widget__session-item {
+  border-color: rgba(37, 99, 235, 0.2);
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.buddy-widget__session-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+  color: rgba(154, 52, 18, 0.76);
+  cursor: pointer;
+}
+
+.buddy-widget__session-new:disabled,
+.buddy-widget__session-item:disabled,
+.buddy-widget__session-delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
+}
+
+.buddy-widget__sessions-status {
+  margin: 0;
 }
 
 .buddy-widget__messages {
