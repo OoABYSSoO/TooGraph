@@ -1,5 +1,10 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+
+export const frontendBuildManifestFilename = ".graphiteui-build-manifest.json";
+
+const manifestVersion = 1;
 
 const frontendInputFiles = [
   "index.html",
@@ -24,7 +29,23 @@ function isForceBuildEnabled(env) {
   return value === "1" || value === "true" || value === "yes" || value === "on";
 }
 
-function collectInputs(directory, inputs) {
+function toManifestPath(frontendDir, filePath) {
+  return relative(frontendDir, filePath).replaceAll("\\", "/");
+}
+
+function addInputFile(filePath, inputs) {
+  let stats;
+  try {
+    stats = statSync(filePath);
+  } catch {
+    return;
+  }
+  if (stats.isFile()) {
+    inputs.push(filePath);
+  }
+}
+
+function collectInputFiles(directory, inputs) {
   if (!existsSync(directory)) {
     return;
   }
@@ -40,8 +61,7 @@ function collectInputs(directory, inputs) {
     const entryPath = join(directory, entry.name);
     if (entry.isDirectory()) {
       if (!skippedDirectories.has(entry.name)) {
-        inputs.push(entryPath);
-        collectInputs(entryPath, inputs);
+        collectInputFiles(entryPath, inputs);
       }
       continue;
     }
@@ -51,44 +71,82 @@ function collectInputs(directory, inputs) {
   }
 }
 
-function listFrontendInputs(frontendDir) {
+function listFrontendInputFiles(frontendDir) {
   const inputs = [];
   for (const file of frontendInputFiles) {
-    const filePath = resolve(frontendDir, file);
-    if (existsSync(filePath)) {
-      inputs.push(filePath);
-    }
+    addInputFile(resolve(frontendDir, file), inputs);
   }
 
   for (const directory of frontendInputDirectories) {
-    const directoryPath = resolve(frontendDir, directory);
-    if (existsSync(directoryPath)) {
-      inputs.push(directoryPath);
-      collectInputs(directoryPath, inputs);
-    }
+    collectInputFiles(resolve(frontendDir, directory), inputs);
   }
 
-  return inputs;
+  return inputs.sort((left, right) => toManifestPath(frontendDir, left).localeCompare(toManifestPath(frontendDir, right)));
 }
 
-function findNewestInput(frontendDir) {
-  let newestInputPath = null;
-  let newestInputMtimeMs = 0;
+function hashBytes(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
 
-  for (const filePath of listFrontendInputs(frontendDir)) {
-    let stats;
-    try {
-      stats = statSync(filePath);
-    } catch {
-      continue;
-    }
-    if (stats.mtimeMs > newestInputMtimeMs) {
-      newestInputPath = filePath;
-      newestInputMtimeMs = stats.mtimeMs;
-    }
+export function createFrontendBuildManifest({ frontendDir } = {}) {
+  if (!frontendDir) {
+    throw new Error("frontendDir is required");
   }
 
-  return { newestInputPath, newestInputMtimeMs };
+  const aggregateHash = createHash("sha256");
+  const inputs = [];
+
+  for (const filePath of listFrontendInputFiles(frontendDir)) {
+    const contents = readFileSync(filePath);
+    const inputPath = toManifestPath(frontendDir, filePath);
+    const inputHash = hashBytes(contents);
+    aggregateHash.update(inputPath);
+    aggregateHash.update("\0");
+    aggregateHash.update(inputHash);
+    aggregateHash.update("\0");
+    inputs.push({
+      path: inputPath,
+      hash: inputHash,
+      bytes: contents.byteLength,
+    });
+  }
+
+  return {
+    version: manifestVersion,
+    inputHash: aggregateHash.digest("hex"),
+    inputs,
+  };
+}
+
+export function writeFrontendBuildManifest({ frontendDir, distDir } = {}) {
+  if (!distDir) {
+    throw new Error("distDir is required");
+  }
+
+  const manifest = {
+    ...createFrontendBuildManifest({ frontendDir }),
+    generatedAt: new Date().toISOString(),
+  };
+  mkdirSync(distDir, { recursive: true });
+  writeFileSync(resolve(distDir, frontendBuildManifestFilename), `${JSON.stringify(manifest, null, 2)}\n`);
+  return manifest;
+}
+
+function readFrontendBuildManifest(distDir) {
+  const manifestPath = resolve(distDir, frontendBuildManifestFilename);
+  if (!existsSync(manifestPath)) {
+    return { status: "missing", manifestPath };
+  }
+
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    if (manifest?.version !== manifestVersion || typeof manifest.inputHash !== "string") {
+      return { status: "invalid", manifestPath };
+    }
+    return { status: "ok", manifest, manifestPath };
+  } catch {
+    return { status: "invalid", manifestPath };
+  }
 }
 
 export function resolveFrontendBuildPlan({ frontendDir, distDir, env = process.env } = {}) {
@@ -108,16 +166,33 @@ export function resolveFrontendBuildPlan({ frontendDir, distDir, env = process.e
     return { shouldBuild: true, reason: "missing_dist", distEntryPath };
   }
 
-  const distMtimeMs = statSync(distEntryPath).mtimeMs;
-  const { newestInputPath, newestInputMtimeMs } = findNewestInput(frontendDir);
-  if (newestInputPath && newestInputMtimeMs > distMtimeMs) {
+  const storedManifest = readFrontendBuildManifest(distDir);
+  if (storedManifest.status === "missing") {
+    return {
+      shouldBuild: true,
+      reason: "missing_manifest",
+      distEntryPath,
+      manifestPath: storedManifest.manifestPath,
+    };
+  }
+  if (storedManifest.status === "invalid") {
+    return {
+      shouldBuild: true,
+      reason: "invalid_manifest",
+      distEntryPath,
+      manifestPath: storedManifest.manifestPath,
+    };
+  }
+
+  const currentManifest = createFrontendBuildManifest({ frontendDir });
+  if (currentManifest.inputHash !== storedManifest.manifest.inputHash) {
     return {
       shouldBuild: true,
       reason: "source_changed",
       distEntryPath,
-      distMtimeMs,
-      newestInputPath,
-      newestInputMtimeMs,
+      manifestPath: storedManifest.manifestPath,
+      currentInputHash: currentManifest.inputHash,
+      manifestInputHash: storedManifest.manifest.inputHash,
     };
   }
 
@@ -125,8 +200,7 @@ export function resolveFrontendBuildPlan({ frontendDir, distDir, env = process.e
     shouldBuild: false,
     reason: "up_to_date",
     distEntryPath,
-    distMtimeMs,
-    newestInputPath,
-    newestInputMtimeMs,
+    manifestPath: storedManifest.manifestPath,
+    currentInputHash: currentManifest.inputHash,
   };
 }

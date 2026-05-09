@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createPortReleasePlan } from "./dev-port-ownership.mjs";
-import { resolveFrontendBuildPlan } from "./frontend-build-plan.mjs";
+import { resolveFrontendBuildPlan, writeFrontendBuildManifest } from "./frontend-build-plan.mjs";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const backendDir = resolve(rootDir, "backend");
@@ -538,8 +538,12 @@ async function buildFrontend() {
     console.log("Building frontend... (forced by GRAPHITEUI_FORCE_FRONTEND_BUILD)");
   } else if (buildPlan.reason === "missing_dist") {
     console.log("Building frontend... (frontend/dist/index.html was not found)");
+  } else if (buildPlan.reason === "missing_manifest") {
+    console.log("Building frontend... (frontend build manifest was not found)");
+  } else if (buildPlan.reason === "invalid_manifest") {
+    console.log("Building frontend... (frontend build manifest is invalid)");
   } else if (buildPlan.reason === "source_changed") {
-    console.log(`Building frontend... (${buildPlan.newestInputPath} is newer than frontend/dist/index.html)`);
+    console.log("Building frontend... (frontend input hash changed)");
   } else {
     console.log("Building frontend...");
   }
@@ -548,6 +552,11 @@ async function buildFrontend() {
     env: process.env,
     label: "Frontend build",
   });
+  writeFrontendBuildManifest({
+    frontendDir,
+    distDir: frontendDistDir,
+  });
+  console.log("Frontend build manifest updated.");
 }
 
 async function main() {
