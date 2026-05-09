@@ -170,6 +170,14 @@ test("BuddyWidget records and displays per-stage run trace durations", () => {
   assert.match(componentSource, /formatRunTraceDuration\(entry\.durationMs\)/);
 });
 
+test("BuddyWidget pulses the run trace dot for currently running steps only", () => {
+  assert.match(componentSource, /\.buddy-widget__run-trace-entry--info \.buddy-widget__run-trace-dot,[\s\S]*\.buddy-widget__run-trace-entry--stream \.buddy-widget__run-trace-dot\s*\{[\s\S]*animation:\s*buddy-widget-run-trace-dot-pulse 1\.08s ease-in-out infinite;/);
+  assert.match(componentSource, /\.buddy-widget__run-trace-entry--stream \.buddy-widget__run-trace-dot\s*\{[\s\S]*--buddy-run-trace-pulse-color:\s*rgba\(37,\s*99,\s*235,\s*0\.24\);/);
+  assert.match(componentSource, /@keyframes buddy-widget-run-trace-dot-pulse[\s\S]*box-shadow:\s*0 0 0 0 var\(--buddy-run-trace-pulse-color\);[\s\S]*box-shadow:\s*0 0 0 5px rgba\(37,\s*99,\s*235,\s*0\);/);
+  assert.doesNotMatch(extractCssBlock(".buddy-widget__run-trace-entry--success .buddy-widget__run-trace-dot"), /animation:/);
+  assert.doesNotMatch(extractCssBlock(".buddy-widget__run-trace-entry--error .buddy-widget__run-trace-dot"), /animation:/);
+});
+
 test("BuddyWidget keeps the run trace above the formal reply and collapses to elapsed summary", () => {
   assert.match(componentSource, /const runTraceStartedAtMs = ref<number \| null>\(null\);/);
   assert.match(componentSource, /const runTraceFinishedAtMs = ref<number \| null>\(null\);/);

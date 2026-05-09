@@ -2182,6 +2182,7 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__run-trace-dot {
+  --buddy-run-trace-pulse-color: rgba(154, 52, 18, 0.24);
   width: 7px;
   height: 7px;
   margin-top: 4px;
@@ -2189,7 +2190,13 @@ function formatErrorMessage(error: unknown): string {
   background: rgba(154, 52, 18, 0.28);
 }
 
+.buddy-widget__run-trace-entry--info .buddy-widget__run-trace-dot,
 .buddy-widget__run-trace-entry--stream .buddy-widget__run-trace-dot {
+  animation: buddy-widget-run-trace-dot-pulse 1.08s ease-in-out infinite;
+}
+
+.buddy-widget__run-trace-entry--stream .buddy-widget__run-trace-dot {
+  --buddy-run-trace-pulse-color: rgba(37, 99, 235, 0.24);
   background: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
@@ -2230,6 +2237,20 @@ function formatErrorMessage(error: unknown): string {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   white-space: pre-wrap;
+}
+
+@keyframes buddy-widget-run-trace-dot-pulse {
+  0%,
+  100% {
+    opacity: 0.62;
+    transform: scale(0.82);
+    box-shadow: 0 0 0 0 var(--buddy-run-trace-pulse-color);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 5px rgba(37, 99, 235, 0);
+  }
 }
 
 .buddy-widget__run-trace--expanded .buddy-widget__run-trace-preview {
