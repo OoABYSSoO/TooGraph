@@ -24,11 +24,9 @@ EDITOR_ONLY_METADATA_KEYS = {"graphiteui_state_key_counter"}
 def generate_langgraph_python_source(graph: NodeSystemGraphPayload) -> str:
     payload = _build_export_graph_payload(graph)
     editor_payload = _build_editor_graph_payload(graph)
-    interrupt_before = _normalize_interrupt_config(graph.metadata.get("interrupt_before") or graph.metadata.get("interruptBefore"))
-    interrupt_after = _normalize_interrupt_config(graph.metadata.get("interrupt_after") or graph.metadata.get("interruptAfter"))
+    interrupt_after = _normalize_interrupt_config(graph.metadata.get("interrupt_after"))
     payload_literal = pformat(payload, sort_dicts=False, width=100)
     editor_payload_literal = pformat(editor_payload, sort_dicts=False, width=100)
-    interrupt_before_literal = pformat(interrupt_before, sort_dicts=False, width=100)
     interrupt_after_literal = pformat(interrupt_after, sort_dicts=False, width=100)
 
     return f"""from __future__ import annotations
@@ -48,7 +46,6 @@ from app.core.schemas.node_system import NodeSystemGraphPayload
 GRAPHITEUI_EXPORT_VERSION = 1
 GRAPH_PAYLOAD = {payload_literal}
 GRAPHITEUI_EDITOR_GRAPH = {editor_payload_literal}
-INTERRUPT_BEFORE_CONFIG = {interrupt_before_literal}
 INTERRUPT_AFTER_CONFIG = {interrupt_after_literal}
 
 
@@ -72,7 +69,6 @@ def _inflate_graph_payload(payload: dict[str, Any]) -> dict[str, Any]:
 GRAPH = NodeSystemGraphPayload.model_validate(_inflate_graph_payload(GRAPH_PAYLOAD))
 BUILD_PLAN = compile_graph_to_langgraph_plan(GRAPH)
 RUNTIME_NODES = list(BUILD_PLAN.runtime_nodes)
-INTERRUPT_BEFORE = [node_name for node_name in INTERRUPT_BEFORE_CONFIG if node_name in RUNTIME_NODES]
 INTERRUPT_AFTER = [node_name for node_name in INTERRUPT_AFTER_CONFIG if node_name in RUNTIME_NODES]
 
 
@@ -203,7 +199,6 @@ def build_graph():
         workflow.add_edge(node_name, END)
 
     return workflow.compile(
-        interrupt_before=INTERRUPT_BEFORE or None,
         interrupt_after=INTERRUPT_AFTER or None,
     )
 

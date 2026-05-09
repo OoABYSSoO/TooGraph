@@ -1977,11 +1977,6 @@
       "draft_example_io",
       "review_generated_skill"
     ],
-    "agent_breakpoint_timing": {
-      "ask_clarification": "after",
-      "draft_example_io": "after",
-      "review_generated_skill": "after"
-    },
     "description": "用普通编辑器可创建的 input、LLM、condition、output 节点搭建创建自定义 Skill 的完整流程；节点使用前端默认尺寸，Skill 输出由单 Skill 绑定托管。"
   }
 }

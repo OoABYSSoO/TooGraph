@@ -240,7 +240,6 @@
           :agent-model-display-lookup="agentModelDisplayLookup"
           :global-text-model-ref="globalTextModelRef"
           :agent-breakpoint-enabled="isAgentBreakpointEnabledInDocument(document, nodeId)"
-          :agent-breakpoint-timing="resolveAgentBreakpointTimingInDocument(document, nodeId)"
           :condition-route-targets="conditionRouteTargetsByNodeId[nodeId] ?? undefined"
           :latest-run-status="latestRunStatus ?? null"
           :run-output-preview-text="runOutputPreviewByNodeId?.[nodeId]?.text ?? null"
@@ -262,7 +261,6 @@
           @reorder-port-state="emit('reorder-port-state', $event)"
           @update-agent-config="emit('update-agent-config', $event)"
           @toggle-agent-breakpoint="emit('toggle-agent-breakpoint', $event)"
-          @update-agent-breakpoint-timing="emit('update-agent-breakpoint-timing', $event)"
           @update-condition-config="emit('update-condition-config', $event)"
           @update-condition-branch="emit('update-condition-branch', $event)"
           @add-condition-branch="emit('add-condition-branch', $event)"
@@ -516,7 +514,7 @@ import { resolveFocusedNodeViewportAction } from "@/editor/canvas/focusNodeViewp
 import { resolveMinimapCenterViewAction } from "./minimapModel";
 import { useNodeSelectionFocus, type NodeFocusRequest } from "./useNodeSelectionFocus";
 import { useViewport } from "./useViewport";
-import { isAgentBreakpointEnabledInDocument, resolveAgentBreakpointTimingInDocument } from "@/lib/graph-document";
+import { isAgentBreakpointEnabledInDocument } from "@/lib/graph-document";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { SkillDefinition } from "@/types/skills";
 import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphNodeSize, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
@@ -563,7 +561,6 @@ const emit = defineEmits<{
   (event: "reorder-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string; targetIndex: number }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
   (event: "toggle-agent-breakpoint", payload: { nodeId: string; enabled: boolean }): void;
-  (event: "update-agent-breakpoint-timing", payload: { nodeId: string; timing: "before" | "after" }): void;
   (event: "update-condition-config", payload: { nodeId: string; patch: Partial<ConditionNode["config"]> }): void;
   (event: "update-condition-branch", payload: { nodeId: string; currentKey: string; nextKey: string; mappingKeys: string[] }): void;
   (event: "add-condition-branch", payload: { nodeId: string }): void;

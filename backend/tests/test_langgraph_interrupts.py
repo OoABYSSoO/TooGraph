@@ -28,7 +28,7 @@ class LangGraphInterruptsTests(unittest.TestCase):
         self.assertEqual(source_node_from_after_breakpoint(wrapped), "draft")
         self.assertEqual(source_node_from_after_breakpoint("draft"), "draft")
 
-    def test_resolve_interrupt_configuration_supports_snake_and_camel_metadata(self) -> None:
+    def test_resolve_interrupt_configuration_uses_only_interrupt_after_metadata(self) -> None:
         graph = NodeSystemGraphDocument.model_validate(
             {
                 "graph_id": "graph",
@@ -39,14 +39,14 @@ class LangGraphInterruptsTests(unittest.TestCase):
                 "conditional_edges": [],
                 "metadata": {
                     "interrupt_before": ["draft", "missing"],
-                    "interruptAfter": "review",
+                    "interruptAfter": "legacy_review",
+                    "interrupt_after": ["review", "missing"],
                 },
             }
         )
 
-        interrupt_before, interrupt_after = resolve_interrupt_configuration(graph, allowed_nodes={"draft", "review"})
+        interrupt_after = resolve_interrupt_configuration(graph, allowed_nodes={"draft", "review"})
 
-        self.assertEqual(interrupt_before, ["draft"])
         self.assertEqual(interrupt_after, ["review"])
 
     def test_waiting_detection_and_interrupt_serialization(self) -> None:

@@ -267,10 +267,6 @@ function applyCompanionModePolicy(graph: GraphPayload, companionMode: CompanionM
   }
   const approvalNodeId = graph.nodes.request_approval_agent ? "request_approval_agent" : "companion_reply_agent";
   graph.metadata.interrupt_after = addUniqueMetadataNodeId(graph.metadata.interrupt_after, approvalNodeId);
-  graph.metadata.agent_breakpoint_timing = {
-    ...(isRecord(graph.metadata.agent_breakpoint_timing) ? graph.metadata.agent_breakpoint_timing : {}),
-    [approvalNodeId]: "after",
-  };
 }
 
 function applyCompanionModelOverride(graph: GraphPayload, value: unknown) {

@@ -25,7 +25,7 @@ def resolve_interrupt_configuration(
     graph: NodeSystemGraphDocument,
     *,
     allowed_nodes: set[str] | None = None,
-) -> tuple[list[str] | None, list[str] | None]:
+) -> list[str] | None:
     metadata = dict(graph.metadata or {})
 
     def _normalize(value: Any) -> list[str] | None:
@@ -40,13 +40,8 @@ def resolve_interrupt_configuration(
         normalized = [item for item in items if item and (allowed_nodes is None or item in allowed_nodes)]
         return normalized or None
 
-    interrupt_before = _normalize(metadata.get("interrupt_before"))
-    if interrupt_before is None:
-        interrupt_before = _normalize(metadata.get("interruptBefore"))
     interrupt_after = _normalize(metadata.get("interrupt_after"))
-    if interrupt_after is None:
-        interrupt_after = _normalize(metadata.get("interruptAfter"))
-    return interrupt_before, interrupt_after
+    return interrupt_after
 
 
 def is_waiting_for_human(snapshot: Any) -> bool:

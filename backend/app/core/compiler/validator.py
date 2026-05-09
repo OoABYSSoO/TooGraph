@@ -21,6 +21,14 @@ from app.core.schemas.skills import SkillLlmNodeEligibility, SkillCatalogStatus,
 from app.skills.definitions import get_skill_catalog_registry
 from app.skills.registry import get_skill_registry
 
+LEGACY_BREAKPOINT_METADATA_KEYS = (
+    "interrupt_before",
+    "interruptBefore",
+    "interruptAfter",
+    "agent_breakpoint_timing",
+)
+
+
 def validate_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
     issues: list[ValidationIssue] = []
     runtime_skill_keys = set(get_skill_registry().keys())
@@ -29,6 +37,8 @@ def validate_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
     nodes_by_name = graph.nodes
     state_schema = graph.state_schema
     edge_counts = Counter((edge.source, edge.target) for edge in graph.edges)
+
+    issues.extend(_validate_graph_metadata(graph, "metadata"))
 
     for edge_key, count in edge_counts.items():
         if count <= 1:
@@ -147,6 +157,28 @@ def _prefix_issues(issues: list[ValidationIssue], path_prefix: str) -> list[Vali
     ]
 
 
+def _validate_graph_metadata(graph: object, path_prefix: str) -> list[ValidationIssue]:
+    metadata = getattr(graph, "metadata", {})
+    if not isinstance(metadata, dict):
+        return []
+
+    issues: list[ValidationIssue] = []
+    for key in LEGACY_BREAKPOINT_METADATA_KEYS:
+        if key not in metadata:
+            continue
+        issues.append(
+            ValidationIssue(
+                code="legacy_breakpoint_metadata_not_supported",
+                message=(
+                    f"Graph metadata '{key}' is no longer supported. "
+                    "Use metadata.interrupt_after for node breakpoints."
+                ),
+                path=f"{path_prefix}.{key}",
+            )
+        )
+    return issues
+
+
 def _validate_embedded_graph(
     graph: object,
     *,
@@ -155,6 +187,7 @@ def _validate_embedded_graph(
     path_prefix: str,
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
+    issues.extend(_validate_graph_metadata(graph, f"{path_prefix}.metadata"))
     for node_name, node in getattr(graph, "nodes", {}).items():
         issues.extend(_prefix_issues(_validate_node_shape(node_name, node), f"{path_prefix}.nodes.{node_name}"))
         if isinstance(node, NodeSystemAgentNode):

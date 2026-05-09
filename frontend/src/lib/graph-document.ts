@@ -30,8 +30,6 @@ import type {
 } from "../types/node-system.ts";
 import type { SkillDefinition, SkillIoField } from "../types/skills.ts";
 
-export type AgentBreakpointTiming = "before" | "after";
-
 const STATE_KEY_COUNTER_METADATA_KEY = "graphiteui_state_key_counter";
 const DEFAULT_MATERIALIZED_STATE_COLORS = [
   "#d97706",
@@ -323,43 +321,8 @@ function normalizeInterruptNodeList(value: unknown): string[] {
   return [];
 }
 
-function resolveInterruptBeforeNodeIds(metadata: Record<string, unknown>) {
-  const snakeNodeIds = normalizeInterruptNodeList(metadata.interrupt_before);
-  return snakeNodeIds.concat(
-    normalizeInterruptNodeList(metadata.interruptBefore).filter((nodeId) => !snakeNodeIds.includes(nodeId)),
-  );
-}
-
 function resolveInterruptAfterNodeIds(metadata: Record<string, unknown>) {
-  const snakeNodeIds = normalizeInterruptNodeList(metadata.interrupt_after);
-  return snakeNodeIds.concat(
-    normalizeInterruptNodeList(metadata.interruptAfter).filter((nodeId) => !snakeNodeIds.includes(nodeId)),
-  );
-}
-
-function isAgentBreakpointTiming(value: unknown): value is AgentBreakpointTiming {
-  return value === "before" || value === "after";
-}
-
-function normalizeAgentBreakpointTiming(value: unknown): AgentBreakpointTiming {
-  return value === "before" ? "before" : "after";
-}
-
-function resolveAgentBreakpointTimingPreferences(metadata: Record<string, unknown>) {
-  const rawPreferences = metadata.agent_breakpoint_timing;
-  if (!rawPreferences || typeof rawPreferences !== "object" || Array.isArray(rawPreferences)) {
-    return {};
-  }
-
-  const preferences: Record<string, AgentBreakpointTiming> = {};
-  for (const [nodeId, timing] of Object.entries(rawPreferences)) {
-    const trimmedNodeId = nodeId.trim();
-    if (!trimmedNodeId || !isAgentBreakpointTiming(timing)) {
-      continue;
-    }
-    preferences[trimmedNodeId] = timing;
-  }
-  return preferences;
+  return normalizeInterruptNodeList(metadata.interrupt_after);
 }
 
 function updateListMembership(list: string[], nodeId: string, included: boolean) {
@@ -372,94 +335,47 @@ export function isAgentBreakpointEnabledInDocument(document: GraphPayload | Grap
   if (!node || node.kind !== "agent") {
     return false;
   }
-  return resolveInterruptBeforeNodeIds(document.metadata).includes(nodeId) || resolveInterruptAfterNodeIds(document.metadata).includes(nodeId);
-}
-
-export function resolveAgentBreakpointTimingInDocument(document: GraphPayload | GraphDocument, nodeId: string): AgentBreakpointTiming {
-  const node = document.nodes[nodeId];
-  if (!node || node.kind !== "agent") {
-    return "after";
-  }
-  if (resolveInterruptBeforeNodeIds(document.metadata).includes(nodeId)) {
-    return "before";
-  }
-  if (resolveInterruptAfterNodeIds(document.metadata).includes(nodeId)) {
-    return "after";
-  }
-  return resolveAgentBreakpointTimingPreferences(document.metadata)[nodeId] ?? "after";
+  return resolveInterruptAfterNodeIds(document.metadata).includes(nodeId);
 }
 
 export function updateAgentBreakpointInDocument<T extends GraphPayload | GraphDocument>(
   document: T,
   nodeId: string,
   enabled: boolean,
-  timing: AgentBreakpointTiming = resolveAgentBreakpointTimingInDocument(document, nodeId),
 ): T {
   const node = document.nodes[nodeId];
   if (!node || node.kind !== "agent") {
     return document;
   }
 
-  const normalizedTiming = normalizeAgentBreakpointTiming(timing);
   return updateAgentBreakpointMetadata(document, nodeId, {
     enabled,
-    timing: normalizedTiming,
-  });
-}
-
-export function updateAgentBreakpointTimingInDocument<T extends GraphPayload | GraphDocument>(
-  document: T,
-  nodeId: string,
-  timing: AgentBreakpointTiming,
-): T {
-  const node = document.nodes[nodeId];
-  if (!node || node.kind !== "agent") {
-    return document;
-  }
-
-  return updateAgentBreakpointMetadata(document, nodeId, {
-    enabled: isAgentBreakpointEnabledInDocument(document, nodeId),
-    timing: normalizeAgentBreakpointTiming(timing),
   });
 }
 
 function updateAgentBreakpointMetadata<T extends GraphPayload | GraphDocument>(
   document: T,
   nodeId: string,
-  options: { enabled: boolean; timing: AgentBreakpointTiming },
+  options: { enabled: boolean },
 ): T {
-  const currentBeforeNodeIds = resolveInterruptBeforeNodeIds(document.metadata);
   const currentAfterNodeIds = resolveInterruptAfterNodeIds(document.metadata);
-  const preferences = {
-    ...resolveAgentBreakpointTimingPreferences(document.metadata),
-    [nodeId]: options.timing,
-  };
-  const nextBeforeNodeIds = updateListMembership(
-    currentBeforeNodeIds.filter((candidateId) => candidateId !== nodeId),
-    nodeId,
-    options.enabled && options.timing === "before",
-  );
   const nextAfterNodeIds = updateListMembership(
     currentAfterNodeIds.filter((candidateId) => candidateId !== nodeId),
     nodeId,
-    options.enabled && options.timing === "after",
+    options.enabled,
   );
 
   const nextDocument = cloneGraphDocument(document);
   const nextMetadata = { ...nextDocument.metadata };
   delete nextMetadata.interruptBefore;
   delete nextMetadata.interruptAfter;
-  if (nextBeforeNodeIds.length > 0) {
-    nextMetadata.interrupt_before = nextBeforeNodeIds;
-  } else {
-    delete nextMetadata.interrupt_before;
-  }
+  delete nextMetadata.interrupt_before;
+  delete nextMetadata.agent_breakpoint_timing;
   if (nextAfterNodeIds.length > 0) {
     nextMetadata.interrupt_after = nextAfterNodeIds;
   } else {
     delete nextMetadata.interrupt_after;
   }
-  nextMetadata.agent_breakpoint_timing = preferences;
 
   if (JSON.stringify(nextMetadata) === JSON.stringify(nextDocument.metadata)) {
     return document;

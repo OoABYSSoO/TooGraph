@@ -28,8 +28,8 @@ test("NodeCardTopActions owns advanced agent and output controls while emitting 
   assert.match(componentSource, /v-else-if="bodyKind === 'output'"/);
   assert.match(componentSource, /:model-value="agentTemperatureInput"/);
   assert.match(componentSource, /@update:model-value="emit\('update:agent-temperature', \$event\)"/);
-  assert.match(componentSource, /:model-value="agentBreakpointTimingValue"/);
-  assert.match(componentSource, /@update:model-value="emit\('update:agent-breakpoint-timing', \$event\)"/);
+  assert.doesNotMatch(componentSource, /agentBreakpointTimingValue/);
+  assert.doesNotMatch(componentSource, /update:agent-breakpoint-timing/);
   assert.match(componentSource, /v-for="option in outputDisplayModeOptions"/);
   assert.match(componentSource, /@click\.stop="emit\('update:output-display-mode', option\.value\)"/);
   assert.match(componentSource, /v-for="option in outputPersistFormatOptions"/);

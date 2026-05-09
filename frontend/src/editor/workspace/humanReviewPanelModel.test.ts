@@ -428,10 +428,10 @@ test("buildHumanReviewPanelModel ignores optional downstream reads", () => {
   assert.equal(panel.requiredNow.some((row) => row.key === "optional_note"), false);
 });
 
-function createInterruptBeforeDocument(): GraphPayload {
+function createPreNodeReviewDocument(): GraphPayload {
   return {
     graph_id: null,
-    name: "Before Breakpoint",
+    name: "Pre Node Review",
     state_schema: {
       question: { name: "question", description: "User question", type: "text", value: "", color: "#d97706" },
       manual_feedback: { name: "manual_feedback", description: "Human feedback", type: "text", value: "", color: "#7c3aed" },
@@ -458,22 +458,32 @@ function createInterruptBeforeDocument(): GraphPayload {
         writes: [],
         config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
+      review_entry: {
+        kind: "agent",
+        name: "review_entry",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+      },
     },
     edges: [
-      { source: "input_question", target: "review_writer" },
+      { source: "input_question", target: "review_entry" },
+      { source: "review_entry", target: "review_writer" },
     ],
     conditional_edges: [],
     metadata: {
-      interrupt_before: ["review_writer"],
+      interrupt_after: ["review_entry"],
     },
   };
 }
 
-function createInterruptBeforeRun(): RunDetail {
+function createPreNodeReviewRun(): RunDetail {
   return {
     ...createRun(),
-    current_node_id: "review_writer",
-    node_status_map: { review_writer: "paused" },
+    current_node_id: "review_entry",
+    node_status_map: { review_entry: "paused" },
     artifacts: {
       state_values: {
         question: "What is GraphiteUI?",
@@ -516,7 +526,7 @@ function createLoopWithoutWriterDocument(): GraphPayload {
     ],
     conditional_edges: [],
     metadata: {
-      interrupt_before: ["loop_entry"],
+      interrupt_after: ["loop_entry"],
     },
   };
 }
@@ -681,8 +691,8 @@ function createOffWindowJoinRun(): RunDetail {
   };
 }
 
-test("buildHumanReviewPanelModel keeps input-backed current reads out of requiredNow before the breakpoint window", () => {
-  const panel = buildHumanReviewPanelModel(createInterruptBeforeRun(), createInterruptBeforeDocument());
+test("buildHumanReviewPanelModel uses an after breakpoint on a predecessor to review before the next node", () => {
+  const panel = buildHumanReviewPanelModel(createPreNodeReviewRun(), createPreNodeReviewDocument());
 
   assert.deepEqual(
     panel.requiredNow.map((row) => row.key),

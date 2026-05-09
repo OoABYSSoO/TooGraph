@@ -68,6 +68,18 @@ def _graph_with_agent_config(config: dict) -> NodeSystemGraphDocument:
 
 
 class NodeSystemValidatorSkillTests(unittest.TestCase):
+    def test_legacy_breakpoint_metadata_is_rejected(self) -> None:
+        graph = _graph_with_agent_config({"skillKey": ""})
+        graph.metadata = {
+            "interrupt_before": ["agent"],
+            "interruptAfter": ["agent"],
+            "agent_breakpoint_timing": {"agent": "before"},
+        }
+
+        validation = validate_graph(graph)
+
+        self.assertIn("legacy_breakpoint_metadata_not_supported", [issue.code for issue in validation.issues])
+
     def test_needs_manifest_skill_is_rejected_for_agent_nodes(self) -> None:
         graph = _graph_with_agent_config({"skillKey": "legacy_skill"})
         definition = _agent_skill_definition(

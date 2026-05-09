@@ -27,7 +27,6 @@
       :action-popover-style="actionPopoverStyle"
       :confirm-popover-style="confirmPopoverStyle"
       :agent-temperature-input="agentTemperatureInput"
-      :agent-breakpoint-timing-value="agentBreakpointTimingValue"
       :output-display-mode-options="outputDisplayModeOptions"
       :output-persist-format-options="outputPersistFormatOptions"
       :output-file-name-template="view.body.kind === 'output' ? view.body.fileNameTemplate : ''"
@@ -40,7 +39,6 @@
       @edit-subgraph-action="handleEditSubgraphActionClick"
       @human-review="handleHumanReviewActionClick"
       @update:agent-temperature="handleAgentTemperatureInputValue"
-      @update:agent-breakpoint-timing="handleAgentBreakpointTimingSelect"
       @update:output-display-mode="updateOutputDisplayMode"
       @update:output-persist-format="updateOutputPersistFormat"
       @update:output-file-name="handleOutputFileNameInputValue"
@@ -532,7 +530,6 @@ const props = defineProps<{
   agentModelDisplayLookup: Record<string, string>;
   globalTextModelRef: string;
   agentBreakpointEnabled?: boolean;
-  agentBreakpointTiming?: "before" | "after";
   conditionRouteTargets?: Record<string, string | null>;
   latestRunStatus?: string | null;
   runOutputPreviewText?: string | null;
@@ -558,7 +555,6 @@ const emit = defineEmits<{
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
   (event: "toggle-agent-breakpoint", payload: { nodeId: string; enabled: boolean }): void;
-  (event: "update-agent-breakpoint-timing", payload: { nodeId: string; timing: "before" | "after" }): void;
   (event: "update-condition-config", payload: { nodeId: string; patch: Partial<ConditionNode["config"]> }): void;
   (event: "update-condition-branch", payload: { nodeId: string; currentKey: string; nextKey: string; mappingKeys: string[] }): void;
   (event: "add-condition-branch", payload: { nodeId: string }): void;
@@ -834,7 +830,6 @@ const agentThinkingModeValue = computed<AgentThinkingControlMode>(() =>
   props.node.kind === "agent" ? normalizeAgentThinkingMode(props.node.config.thinkingMode) : "off",
 );
 const agentThinkingEnabled = computed(() => props.node.kind === "agent" ? agentThinkingModeValue.value !== "off" : true);
-const agentBreakpointTimingValue = computed(() => props.agentBreakpointTiming ?? "after");
 const agentModelOptions = computed(() =>
   buildAgentModelSelectOptions(trimmedGlobalTextModelRef.value, props.availableAgentModelRefs, props.agentModelDisplayLookup),
 );
@@ -1603,16 +1598,6 @@ function handleAgentBreakpointToggleValue(value: string | number | boolean) {
     return;
   }
   emit("toggle-agent-breakpoint", { nodeId: props.nodeId, enabled: value });
-}
-
-function handleAgentBreakpointTimingSelect(nextValue: string | number | boolean | undefined) {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
-  if (nextValue !== "before" && nextValue !== "after") {
-    return;
-  }
-  emit("update-agent-breakpoint-timing", { nodeId: props.nodeId, timing: nextValue });
 }
 
 function handleAgentTemperatureInputValue(value: string | number) {

@@ -383,7 +383,7 @@ test("buildCompanionChatGraph keeps companion auto-select policy in approval mod
   const catalog = graph.state_schema.state_7.value as SkillDefinition[];
   assert.equal(catalog[0].capabilityPolicy.origins.companion.selectable, true);
   assert.deepEqual(graph.metadata.interrupt_after, ["request_approval_agent"]);
-  assert.deepEqual(graph.metadata.agent_breakpoint_timing, { request_approval_agent: "after" });
+  assert.equal(graph.metadata.agent_breakpoint_timing, undefined);
 });
 
 test("buildCompanionChatGraph injects the current message, history, and page context", () => {
@@ -427,7 +427,7 @@ test("buildCompanionChatGraph marks approval mode with a reply breakpoint", () =
   assert.equal(graph.metadata.companion_can_execute_actions, false);
   assert.equal(graph.metadata.companion_requires_approval, true);
   assert.deepEqual(graph.metadata.interrupt_after, ["companion_reply_agent"]);
-  assert.deepEqual(graph.metadata.agent_breakpoint_timing, { companion_reply_agent: "after" });
+  assert.equal(graph.metadata.agent_breakpoint_timing, undefined);
 });
 
 test("buildCompanionChatGraph overrides template agent models with the companion model", () => {

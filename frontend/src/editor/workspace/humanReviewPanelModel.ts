@@ -1,10 +1,7 @@
 import type { GraphDocument, GraphPayload } from "@/types/node-system";
 import type { RunDetail } from "@/types/run";
 import { translate } from "../../i18n/index.ts";
-import {
-  isAgentBreakpointEnabledInDocument,
-  resolveAgentBreakpointTimingInDocument,
-} from "../../lib/graph-document.ts";
+import { isAgentBreakpointEnabledInDocument } from "../../lib/graph-document.ts";
 
 import {
   formatStateValueInput,
@@ -233,11 +230,7 @@ function collectBreakpointWindowNodeIds(document: GraphPayload | GraphDocument, 
   }
   const successors = resolveGraphSuccessors(document);
   const breakpointNodeIds = resolveBreakpointNodeIds(document);
-  const currentTiming = resolveAgentBreakpointTimingInDocument(document, currentNodeId);
-  const queue =
-    currentTiming === "before"
-      ? [currentNodeId]
-      : [...(successors.get(currentNodeId) ?? [])];
+  const queue = [...(successors.get(currentNodeId) ?? [])];
   const result = new Set<string>();
 
   while (queue.length > 0) {
@@ -247,10 +240,6 @@ function collectBreakpointWindowNodeIds(document: GraphPayload | GraphDocument, 
     }
     const isDownstreamBreakpoint = nodeId !== currentNodeId && breakpointNodeIds.has(nodeId);
     if (isDownstreamBreakpoint) {
-      const breakpointTiming = resolveAgentBreakpointTimingInDocument(document, nodeId);
-      if (breakpointTiming === "before") {
-        continue;
-      }
       result.add(nodeId);
       continue;
     }
@@ -359,9 +348,7 @@ function resolveBreakpointStateKeys(
   if (!currentNodeId) {
     return new Set<string>();
   }
-  return resolveAgentBreakpointTimingInDocument(document, currentNodeId) === "before"
-    ? new Set(availability.before.get(currentNodeId) ?? [])
-    : new Set(availability.after.get(currentNodeId) ?? []);
+  return new Set(availability.after.get(currentNodeId) ?? []);
 }
 
 function resolveConditionalDescendantNodeIds(

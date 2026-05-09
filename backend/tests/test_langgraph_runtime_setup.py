@@ -90,15 +90,14 @@ class LangGraphRuntimeSetupTest(unittest.TestCase):
             },
         )
 
-    def test_build_compiled_interrupt_before_merges_before_and_after_nodes(self) -> None:
+    def test_build_compiled_interrupt_before_uses_after_breakpoint_nodes(self) -> None:
         self.assertEqual(
             build_compiled_interrupt_before(
-                ["agent_answer"],
                 {"input_answer": "after::input_answer"},
             ),
-            ["after::input_answer", "agent_answer"],
+            ["after::input_answer"],
         )
-        self.assertIsNone(build_compiled_interrupt_before(None, {}))
+        self.assertIsNone(build_compiled_interrupt_before({}))
 
     def test_build_langgraph_execution_edge_indexes_groups_edges_and_conditionals(self) -> None:
         regular_edge = SimpleNamespace(id="edge-1", source="input_answer", target="agent_answer", kind="regular", branch=None)

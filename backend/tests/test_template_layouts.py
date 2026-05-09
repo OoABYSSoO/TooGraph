@@ -155,6 +155,7 @@ class TemplateLayoutTests(unittest.TestCase):
             template["metadata"]["interrupt_after"],
             ["ask_clarification", "draft_example_io", "review_generated_skill"],
         )
+        self.assertNotIn("agent_breakpoint_timing", template["metadata"])
         self.assertEqual(states["existing_capability"]["type"], "json")
         self.assertEqual(states["existing_capability_found"]["type"], "boolean")
         self.assertEqual(states["generated_skill_key"]["type"], "text")

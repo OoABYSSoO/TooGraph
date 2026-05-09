@@ -118,7 +118,6 @@
                 @disconnect-data-edge="disconnectDataEdgeForTab(tab.tabId, $event.sourceNodeId, $event.targetNodeId, $event.stateKey, $event.mode)"
                 @update-agent-config="updateAgentConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @toggle-agent-breakpoint="toggleAgentBreakpointForTab(tab.tabId, $event.nodeId, $event.enabled)"
-                @update-agent-breakpoint-timing="updateAgentBreakpointTimingForTab(tab.tabId, $event.nodeId, $event.timing)"
                 @update-condition-config="updateConditionConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-condition-branch="updateConditionBranchForTab(tab.tabId, $event.nodeId, $event.currentKey, $event.nextKey, $event.mappingKeys)"
                 @add-condition-branch="addConditionBranchForTab(tab.tabId, $event.nodeId)"
@@ -846,7 +845,6 @@ const {
   updateNodeMetadataForTab,
   updateAgentConfigForTab,
   toggleAgentBreakpointForTab,
-  updateAgentBreakpointTimingForTab,
   updateConditionConfigForTab,
   updateConditionBranchForTab,
   addConditionBranchForTab,

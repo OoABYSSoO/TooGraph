@@ -13,7 +13,6 @@ import {
   removeNodeFromDocument,
   reorderNodePortStateInDocument,
   updateAgentBreakpointInDocument,
-  updateAgentBreakpointTimingInDocument,
   updateAgentNodeConfigInDocument,
   updateConditionBranchInDocument,
   updateConditionNodeConfigInDocument,
@@ -383,12 +382,6 @@ export function useWorkspaceGraphMutationActions(input: WorkspaceGraphMutationAc
     });
   }
 
-  function updateAgentBreakpointTimingForTab(tabId: string, nodeId: string, timing: "before" | "after") {
-    commitDocumentMutationForTab(tabId, (document) => updateAgentBreakpointTimingInDocument(document, nodeId, timing), {
-      focusNodeId: nodeId,
-    });
-  }
-
   function updateConditionConfigForTab(tabId: string, nodeId: string, patch: Partial<ConditionNode["config"]>) {
     commitDocumentMutationForTab(
       tabId,
@@ -516,7 +509,6 @@ export function useWorkspaceGraphMutationActions(input: WorkspaceGraphMutationAc
     updateNodeMetadataForTab,
     updateAgentConfigForTab,
     toggleAgentBreakpointForTab,
-    updateAgentBreakpointTimingForTab,
     updateConditionConfigForTab,
     updateConditionBranchForTab,
     addConditionBranchForTab,

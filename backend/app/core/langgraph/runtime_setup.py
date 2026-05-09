@@ -36,10 +36,9 @@ def build_after_breakpoint_node_map(
 
 
 def build_compiled_interrupt_before(
-    interrupt_before: list[str] | None,
     after_breakpoint_nodes: dict[str, str],
 ) -> list[str] | None:
-    compiled_interrupt_before = sorted(set(interrupt_before or []) | set(after_breakpoint_nodes.values()))
+    compiled_interrupt_before = sorted(set(after_breakpoint_nodes.values()))
     return compiled_interrupt_before or None
 
 

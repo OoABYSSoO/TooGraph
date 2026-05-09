@@ -144,7 +144,7 @@ def execute_node_system_graph_langgraph(
             ),
         )
 
-    interrupt_before, interrupt_after = _resolve_interrupt_configuration(graph, allowed_nodes=set(build_plan.runtime_nodes))
+    interrupt_after = _resolve_interrupt_configuration(graph, allowed_nodes=set(build_plan.runtime_nodes))
     after_breakpoint_nodes = _build_after_breakpoint_node_map(
         interrupt_after,
         runtime_nodes=set(build_plan.runtime_nodes),
@@ -181,7 +181,7 @@ def execute_node_system_graph_langgraph(
     for node_name in build_plan.requirements.runtime_terminal_nodes:
         workflow.add_edge(after_breakpoint_nodes.get(node_name, node_name), END)
 
-    compiled_interrupt_before = _build_compiled_interrupt_before(interrupt_before, after_breakpoint_nodes)
+    compiled_interrupt_before = _build_compiled_interrupt_before(after_breakpoint_nodes)
     compiled = workflow.compile(
         checkpointer=checkpoint_saver,
         interrupt_before=compiled_interrupt_before,

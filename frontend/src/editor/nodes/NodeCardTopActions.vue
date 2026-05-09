@@ -42,18 +42,6 @@
               @update:model-value="emit('update:agent-temperature', $event)"
             />
           </label>
-          <label class="node-card__control-row">
-            <span class="node-card__control-label">{{ t("nodeCard.breakpoint") }}</span>
-            <ElSelect
-              class="node-card__breakpoint-timing-select graphite-select"
-              :model-value="agentBreakpointTimingValue"
-              popper-class="graphite-select-popper node-card__breakpoint-timing-popper"
-              @update:model-value="emit('update:agent-breakpoint-timing', $event)"
-            >
-              <ElOption :label="t('nodeCard.runAfter')" value="after" />
-              <ElOption :label="t('nodeCard.runBefore')" value="before" />
-            </ElSelect>
-          </label>
         </div>
         <div v-else-if="bodyKind === 'output'" class="node-card__advanced-popover-content">
           <div class="node-card__control-row">
@@ -169,7 +157,7 @@
 
 <script setup lang="ts">
 import type { CSSProperties } from "vue";
-import { ElButton, ElIcon, ElInput, ElOption, ElPopover, ElSelect } from "element-plus";
+import { ElButton, ElIcon, ElInput, ElPopover } from "element-plus";
 import { Check, CollectionTag, Delete, EditPen, Operation } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
@@ -197,7 +185,6 @@ defineProps<{
   actionPopoverStyle: CSSProperties;
   confirmPopoverStyle: CSSProperties;
   agentTemperatureInput: string;
-  agentBreakpointTimingValue: "before" | "after";
   outputDisplayModeOptions: OutputDisplayModeOption[];
   outputPersistFormatOptions: OutputPersistFormatOption[];
   outputFileNameTemplate: string;
@@ -213,7 +200,6 @@ const emit = defineEmits<{
   (event: "edit-subgraph-action"): void;
   (event: "human-review"): void;
   (event: "update:agent-temperature", value: string | number): void;
-  (event: "update:agent-breakpoint-timing", value: string | number | boolean | undefined): void;
   (event: "update:output-display-mode", value: OutputNode["config"]["displayMode"]): void;
   (event: "update:output-persist-format", value: OutputNode["config"]["persistFormat"]): void;
   (event: "update:output-file-name", value: string | number): void;
@@ -410,19 +396,6 @@ const { t } = useI18n();
   color: rgba(154, 52, 18, 0.96);
 }
 
-.node-card__breakpoint-timing-select {
-  --el-color-primary: #c96b1f;
-  --el-border-radius-base: 12px;
-}
-
-.node-card__breakpoint-timing-select :deep(.el-select__wrapper) {
-  min-height: 34px;
-  border-radius: 12px;
-  border: 1px solid rgba(154, 52, 18, 0.14);
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
-}
-
 .node-card__confirm-hint {
   display: inline-flex;
   align-items: center;
@@ -492,9 +465,4 @@ const { t } = useI18n();
   box-shadow: none;
 }
 
-:deep(.node-card__breakpoint-timing-popper.el-popper) {
-  border: 1px solid rgba(154, 52, 18, 0.16);
-  border-radius: 14px;
-  background: rgba(255, 250, 241, 0.98);
-}
 </style>

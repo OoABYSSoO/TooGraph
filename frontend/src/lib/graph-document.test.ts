@@ -18,10 +18,8 @@ const {
   reconcileAgentSkillOutputBindingsInDocument,
   reorderNodePortStateInDocument,
   resolveEditorSeedTemplate,
-  resolveAgentBreakpointTimingInDocument,
   updateAgentNodeConfigInDocument,
   updateAgentBreakpointInDocument,
-  updateAgentBreakpointTimingInDocument,
   connectStateBindingInDocument,
   updateSubgraphNodeGraphInDocument,
 } = graphDocument;
@@ -1148,7 +1146,7 @@ test("pruneUnreferencedStateSchemaInDocument removes states that no node still r
   assert.equal(document.state_schema.orphaned.name, "orphaned");
 });
 
-test("updateAgentBreakpointInDocument stores agent breakpoints with a default after-run timing", () => {
+test("updateAgentBreakpointInDocument stores agent breakpoints as interrupt_after only", () => {
   const document: GraphPayload = {
     graph_id: null,
     name: "Breakpoint graph",
@@ -1186,8 +1184,10 @@ test("updateAgentBreakpointInDocument stores agent breakpoints with a default af
     edges: [],
     conditional_edges: [],
     metadata: {
-      interruptBefore: ["legacy_before"],
-      interruptAfter: ["legacy_after"],
+      interrupt_before: ["legacy_before"],
+      interruptAfter: ["legacy_camel_after"],
+      interrupt_after: ["legacy_after"],
+      agent_breakpoint_timing: { legacy_before: "before" },
     },
   };
 
@@ -1195,65 +1195,18 @@ test("updateAgentBreakpointInDocument stores agent breakpoints with a default af
 
   assert.notEqual(enabled, document);
   assert.deepEqual(enabled.metadata.interrupt_after, ["legacy_after", "answer_helper"]);
-  assert.deepEqual(enabled.metadata.interrupt_before, ["legacy_before"]);
-  assert.deepEqual(enabled.metadata.agent_breakpoint_timing, { answer_helper: "after" });
+  assert.equal(enabled.metadata.interrupt_before, undefined);
   assert.equal(enabled.metadata.interruptAfter, undefined);
   assert.equal(enabled.metadata.interruptBefore, undefined);
+  assert.equal(enabled.metadata.agent_breakpoint_timing, undefined);
   assert.equal(isAgentBreakpointEnabledInDocument(enabled, "answer_helper"), true);
-  assert.equal(resolveAgentBreakpointTimingInDocument(enabled, "answer_helper"), "after");
   assert.equal(isAgentBreakpointEnabledInDocument(enabled, "input_question"), false);
 
   const disabled = updateAgentBreakpointInDocument(enabled, "answer_helper", false);
 
   assert.deepEqual(disabled.metadata.interrupt_after, ["legacy_after"]);
-  assert.deepEqual(disabled.metadata.agent_breakpoint_timing, { answer_helper: "after" });
+  assert.equal(disabled.metadata.agent_breakpoint_timing, undefined);
   assert.equal(isAgentBreakpointEnabledInDocument(disabled, "answer_helper"), false);
-});
-
-test("updateAgentBreakpointTimingInDocument moves enabled agent breakpoints between before and after timing", () => {
-  const baseDocument: GraphPayload = {
-    graph_id: null,
-    name: "Breakpoint timing graph",
-    state_schema: {
-      question: { name: "question", description: "", type: "text", value: "", color: "#d97706" },
-      answer: { name: "answer", description: "", type: "text", value: "", color: "#7c3aed" },
-    },
-    nodes: {
-      answer_helper: {
-        kind: "agent",
-        name: "answer_helper",
-        description: "",
-        ui: { position: { x: 120, y: 0 } },
-        reads: [{ state: "question", required: true }],
-        writes: [{ state: "answer", mode: "replace" }],
-        config: {
-          skillKey: "",
-          taskInstruction: "",
-          modelSource: "global",
-          model: "",
-          thinkingMode: "on",
-          temperature: 0.2,
-        },
-      },
-    },
-    edges: [],
-    conditional_edges: [],
-    metadata: {},
-  };
-  const document = updateAgentBreakpointInDocument(baseDocument, "answer_helper", true);
-
-  const before = updateAgentBreakpointTimingInDocument(document, "answer_helper", "before");
-
-  assert.deepEqual(before.metadata.interrupt_before, ["answer_helper"]);
-  assert.equal(before.metadata.interrupt_after, undefined);
-  assert.deepEqual(before.metadata.agent_breakpoint_timing, { answer_helper: "before" });
-  assert.equal(resolveAgentBreakpointTimingInDocument(before, "answer_helper"), "before");
-
-  const after = updateAgentBreakpointTimingInDocument(before, "answer_helper", "after");
-
-  assert.equal(after.metadata.interrupt_before, undefined);
-  assert.deepEqual(after.metadata.interrupt_after, ["answer_helper"]);
-  assert.deepEqual(after.metadata.agent_breakpoint_timing, { answer_helper: "after" });
 });
 
 test("connectStateBindingInDocument rewires a target read binding to the source state", () => {
