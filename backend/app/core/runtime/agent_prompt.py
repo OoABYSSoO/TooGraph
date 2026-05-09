@@ -12,6 +12,7 @@ from app.core.storage.skill_artifact_store import read_skill_artifact_file_metad
 RESULT_PACKAGE_INPUT_PROMPT_CHAR_LIMIT = 1200
 RESULT_PACKAGE_OUTPUT_PROMPT_CHAR_LIMIT = 1600
 RESULT_PACKAGE_ARTIFACT_TEXT_CHAR_LIMIT = 1600
+FILE_STATE_PROMPT_TEXT_CHAR_LIMIT = 4000
 RESULT_PACKAGE_MAX_ARTIFACT_REFS = 20
 ARTIFACT_REF_KEYS = (
     "title",
@@ -110,6 +111,7 @@ def format_graph_state_input_prompt_lines(
                 value,
                 allow_text=definition.type == NodeSystemStateType.FILE,
                 declared_state_type=definition.type,
+                max_text_chars=FILE_STATE_PROMPT_TEXT_CHAR_LIMIT,
             )
         )
         return lines

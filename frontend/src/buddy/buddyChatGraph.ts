@@ -13,6 +13,9 @@ export const BUDDY_MEMORY_CONTEXT_STATE_KEY = "state_8";
 export const BUDDY_SESSION_SUMMARY_STATE_KEY = "state_9";
 export const BUDDY_AGENTIC_REPLY_STATE_KEYS = ["state_27", "state_25", "state_26", "state_16", "state_18"];
 export const MAX_BUDDY_HISTORY_MESSAGES = 12;
+export const MAX_BUDDY_HISTORY_CONTEXT_CHARS = 4000;
+const MAX_BUDDY_HISTORY_OMITTED_PREVIEWS = 5;
+const MAX_BUDDY_HISTORY_OMITTED_PREVIEW_CHARS = 48;
 export const DEFAULT_BUDDY_MODE = "ask_first";
 
 export type BuddyChatRole = "user" | "assistant";
@@ -81,7 +84,11 @@ export type BuildBuddyReviewGraphInput = {
   buddyModel?: unknown;
 };
 
-export function formatBuddyHistory(messages: BuddyChatMessage[], maxMessages = MAX_BUDDY_HISTORY_MESSAGES) {
+export function formatBuddyHistory(
+  messages: BuddyChatMessage[],
+  maxMessages = MAX_BUDDY_HISTORY_MESSAGES,
+  maxChars = MAX_BUDDY_HISTORY_CONTEXT_CHARS,
+) {
   const entries = messages
     .map((message) => ({
       role: message.role,
@@ -89,14 +96,63 @@ export function formatBuddyHistory(messages: BuddyChatMessage[], maxMessages = M
       includeInContext: message.includeInContext,
     }))
     .filter((message) => message.includeInContext !== false)
-    .filter((message) => message.content.length > 0)
-    .slice(-maxMessages);
+    .filter((message) => message.content.length > 0);
 
   if (entries.length === 0) {
     return "暂无历史对话。";
   }
 
-  return entries.map((message) => `${message.role === "user" ? "用户" : "伙伴"}: ${message.content}`).join("\n");
+  const limitedEntries = entries.slice(-Math.max(1, maxMessages));
+  const omittedEntries = entries.slice(0, entries.length - limitedEntries.length);
+  const keptLines: string[] = [];
+  const omittedByBudget: typeof entries = [];
+  let usedChars = 0;
+  const normalizedMaxChars = Math.max(80, maxChars);
+
+  for (let index = limitedEntries.length - 1; index >= 0; index -= 1) {
+    const entry = limitedEntries[index];
+    const line = formatBuddyHistoryLine(entry);
+    const separatorChars = keptLines.length > 0 ? 1 : 0;
+    if (usedChars + separatorChars + line.length <= normalizedMaxChars || keptLines.length === 0) {
+      const availableChars = Math.max(1, normalizedMaxChars - usedChars - separatorChars);
+      keptLines.unshift(line.length <= availableChars ? line : truncateText(line, availableChars));
+      usedChars += separatorChars + Math.min(line.length, availableChars);
+    } else {
+      omittedByBudget.unshift(entry);
+    }
+  }
+
+  const omitted = [...omittedEntries, ...omittedByBudget];
+  if (omitted.length === 0) {
+    return keptLines.join("\n");
+  }
+  return [...keptLines, "", ...formatBuddyHistoryOmittedLines(omitted)].join("\n");
+}
+
+function formatBuddyHistoryLine(message: Pick<BuddyChatMessage, "role" | "content">) {
+  return `${message.role === "user" ? "用户" : "伙伴"}: ${message.content}`;
+}
+
+function formatBuddyHistoryOmittedLines(messages: Array<Pick<BuddyChatMessage, "role" | "content">>) {
+  const previewMessages = messages.slice(-MAX_BUDDY_HISTORY_OMITTED_PREVIEWS);
+  return [
+    "省略的历史对话:",
+    `omitted_count: ${messages.length}`,
+    ...previewMessages.map((message) => `- ${formatBuddyHistoryLine({
+      role: message.role,
+      content: truncateText(message.content, MAX_BUDDY_HISTORY_OMITTED_PREVIEW_CHARS),
+    })}`),
+  ];
+}
+
+function truncateText(value: string, maxChars: number) {
+  if (value.length <= maxChars) {
+    return value;
+  }
+  if (maxChars <= 3) {
+    return value.slice(0, maxChars);
+  }
+  return `${value.slice(0, maxChars - 3)}...`;
 }
 
 export function buildBuddyChatGraph(

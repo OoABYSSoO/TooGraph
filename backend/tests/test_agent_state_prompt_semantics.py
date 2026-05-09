@@ -229,6 +229,34 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertNotIn("This file was not selected.", prompt)
         self.assertNotIn(str(folder), prompt)
 
+    def test_auto_prompt_budgets_large_file_state_text_and_keeps_omission_marker(self) -> None:
+        large_artifact = create_uploaded_skill_artifact(
+            file_name="large-context.md",
+            content_type="text/markdown",
+            payload=("FILE-START " + ("context " * 900) + "FILE-END").encode("utf-8"),
+        )
+        try:
+            prompt = build_auto_system_prompt(
+                ["answer"],
+                {"buddy_context": large_artifact["local_path"]},
+                {},
+                state_schema={
+                    "buddy_context": NodeSystemStateDefinition(
+                        name="Buddy context",
+                        type=NodeSystemStateType.FILE,
+                    ),
+                    "answer": NodeSystemStateDefinition(type=NodeSystemStateType.MARKDOWN),
+                },
+            )
+
+            self.assertIn("原文摘要：", prompt)
+            self.assertIn("原文省略：", prompt)
+            self.assertIn("FILE-START", prompt)
+            self.assertNotIn("FILE-END", prompt)
+            self.assertNotIn(large_artifact["local_path"], prompt)
+        finally:
+            resolve_skill_artifact_path(large_artifact["local_path"]).unlink(missing_ok=True)
+
     def test_auto_prompt_expands_result_package_outputs_as_virtual_states(self) -> None:
         artifact = create_uploaded_skill_artifact(
             file_name="search-source.md",

@@ -83,11 +83,11 @@
 
 - 建立记忆分层：semantic facts、procedural preferences、episodic summaries、capability stats、safety/policy references。
 - 建立作用域：user、project、buddy、template、graph、skill、knowledge collection。跨作用域召回必须显式且可审计。
-- 建立主存储：`memories`、`memory_revisions`、`memory_events`、`memories_fts`；后续 Hybrid RAG 阶段再接 embedding 表。
-- 每条记忆至少包含 summary、content、confidence、importance、evidence、artifact refs、source run/node/skill/template、status、scope 和 supersedes 信息。
-- 支持候选记忆：创建、应用、拒绝、归档、替代、降权、冲突提示和 revision 恢复。
-- 实现预算化召回：scope/layer/type/status 过滤、top_k、max_chars、相关性排序、冲突提示和引用来源。
-- 新增或等价实现 `memory_recall` 与 `memory_candidate_writer` 能力。前者只读召回并输出 `memory_context`，后者只生成候选和证据，不能直接改长期记忆。
+- 建立主存储：平台 SQLite 存储已建立 `memories`、`memory_revisions`、`memory_events`、`memories_fts`，`backend/app/memory/store.py` 提供 create/update/list/recall/revision/event 基础 API；后续 Hybrid RAG 阶段再接 embedding 表。
+- 每条记忆至少包含 summary、content、confidence、importance、evidence、artifact refs、source run/node/skill/template、status、scope 和 supersedes 信息；平台 store 已按这些字段归一化和持久化，Buddy Home 旧投影仍待迁移到该 store。
+- 支持候选记忆：`memory_candidate_writer` 已能创建带证据和来源的 `candidate` 状态平台记忆并记录 revision/event；平台 API 已支持候选应用、拒绝、归档、降权、revision/event 查询和 revision 恢复；替代、冲突提示和前端 review UI 仍待接入。
+- 实现预算化召回：平台 store 已支持 scope/layer/type/status 过滤、FTS 查询、importance/更新时间排序、top_k、max_chars 和 omitted 列表；冲突提示、候选状态联动和前端展示仍待接入模板/Skill 层。
+- 新增或等价实现 `memory_recall` 与 `memory_candidate_writer` 能力：官方 Skill 已提供只读预算化 `memory_context` 召回，以及仅写入 `candidate` 记录的候选记忆生成。
 - 前端和运行详情展示召回命中、候选、应用/拒绝、冲突、revision 和来源 run。
 - Buddy Home 文件继续作为用户可编辑投影；底层 Store、command 和 revision 是审计与恢复来源。
 
@@ -100,7 +100,7 @@
 - 为每个 LLM 节点建立上下文装配报告：agent 节点运行记录已在 `node_executions[].artifacts.context_assembly_report` 中记录 LLM phase、读取的 state、文件、result outputs、记忆文件、知识库 chunk、Skill result 以及对应字符数/token 估算。
 - 为 `result_package` 定义默认渲染策略：公开 output 可摘要展示，原始值保存在 artifacts 或可按需展开的 state 中。
 - 大 artifact 只传路径、摘要、mime、大小、来源和关键引用；`result_package` prompt 的紧凑 artifact refs 已白名单保留 summary/url/content_type/size/char_count 等元数据并丢弃 raw/html/任意大字段，context assembly report 的文件记录也包含 size_bytes；base64、完整日志、大媒体和大量网页正文不进入下游长期上下文。
-- 历史对话、Buddy Home、运行记录和子图结果都要按预算裁剪，并保留 omitted list。
+- 历史对话、Buddy Home、运行记录和子图结果都要按预算裁剪，并保留 omitted list：Buddy 历史输入已按消息数和字符预算保留最近上下文并输出 `omitted_count`/预览列表，普通 file state/Buddy Home 文本和 result_package 文件输出都带 `原文省略` 标记，目标 run validation 与子图 result_package 继续使用紧凑摘要和 refs。
 - 建立只读 fanout 的并行上下文装配：记忆召回、知识库检索、页面上下文压缩、能力候选读取可以并行，合并节点负责预算和冲突处理。
 
 ### Skill 与模板自我演进

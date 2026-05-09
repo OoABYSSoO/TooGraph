@@ -90,6 +90,54 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_doc_id
             ON knowledge_chunks (kb_id, doc_id);
+
+        CREATE TABLE IF NOT EXISTS memories (
+            id TEXT PRIMARY KEY,
+            scope TEXT NOT NULL DEFAULT 'user',
+            layer TEXT NOT NULL DEFAULT 'semantic',
+            type TEXT NOT NULL DEFAULT 'fact',
+            summary TEXT NOT NULL,
+            content TEXT NOT NULL DEFAULT '',
+            confidence REAL NOT NULL DEFAULT 1,
+            importance REAL NOT NULL DEFAULT 0.5,
+            evidence_json TEXT NOT NULL DEFAULT '[]',
+            artifact_refs_json TEXT NOT NULL DEFAULT '[]',
+            source_json TEXT NOT NULL DEFAULT '{}',
+            status TEXT NOT NULL DEFAULT 'active',
+            supersedes_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS memory_revisions (
+            revision_id TEXT PRIMARY KEY,
+            memory_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            previous_json TEXT NOT NULL DEFAULT '{}',
+            next_json TEXT NOT NULL DEFAULT '{}',
+            actor TEXT NOT NULL DEFAULT '',
+            reason TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS memory_events (
+            event_id TEXT PRIMARY KEY,
+            memory_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            actor TEXT NOT NULL DEFAULT '',
+            reason TEXT NOT NULL DEFAULT '',
+            payload_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_memories_scope_layer_type_status
+            ON memories (scope, layer, type, status);
+
+        CREATE INDEX IF NOT EXISTS idx_memory_revisions_memory_id
+            ON memory_revisions (memory_id, created_at);
+
+        CREATE INDEX IF NOT EXISTS idx_memory_events_memory_id
+            ON memory_events (memory_id, created_at);
         """
     )
     connection.execute(
@@ -102,6 +150,21 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
             title,
             section,
             url,
+            content,
+            tokenize='porter unicode61 remove_diacritics 2'
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts
+        USING fts5(
+            memory_id UNINDEXED,
+            scope UNINDEXED,
+            layer UNINDEXED,
+            type UNINDEXED,
+            status UNINDEXED,
+            summary,
             content,
             tokenize='porter unicode61 remove_diacritics 2'
         )

@@ -461,6 +461,26 @@ test("formatBuddyHistory keeps a compact readable transcript", () => {
   );
 });
 
+test("formatBuddyHistory budgets long history and keeps compact omitted entries", () => {
+  const history = formatBuddyHistory(
+    [
+      { role: "user", content: "old user detail " + "A".repeat(80) },
+      { role: "assistant", content: "old assistant detail " + "B".repeat(80) },
+      { role: "user", content: "recent user detail " + "C".repeat(30) },
+      { role: "assistant", content: "recent assistant detail " + "D".repeat(30) },
+    ],
+    12,
+    120,
+  );
+
+  assert.match(history, /省略的历史对话/);
+  assert.match(history, /omitted_count: 2/);
+  assert.match(history, /用户: old user detail/);
+  assert.doesNotMatch(history, /A{40}/);
+  assert.match(history, /用户: recent user detail/);
+  assert.match(history, /伙伴: recent assistant detail/);
+});
+
 test("formatBuddyHistory ignores messages marked outside the model context", () => {
   assert.equal(
     formatBuddyHistory([
