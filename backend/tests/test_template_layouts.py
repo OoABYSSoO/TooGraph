@@ -24,7 +24,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(
             [record["template_id"] for record in records],
-            ["advanced_web_research_loop", "graphiteui_skill_creation_workflow"],
+            ["advanced_web_research_loop", "buddy_autonomous_loop", "graphiteui_skill_creation_workflow"],
         )
         templates = {record["template_id"]: record for record in records}
         research_template = templates["advanced_web_research_loop"]
@@ -37,6 +37,12 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(skill_template["label"], "创建自定义 Skill")
         self.assertEqual(skill_template["default_graph_name"], "创建自定义 Skill")
         self.assertIn("需求澄清", skill_template["description"])
+
+        buddy_template = templates["buddy_autonomous_loop"]
+        self.assertEqual(buddy_template["source"], "official")
+        self.assertEqual(buddy_template["label"], "伙伴自主循环")
+        self.assertEqual(buddy_template["default_graph_name"], "伙伴自主循环")
+        self.assertIn("Buddy Home", buddy_template["description"])
 
     def test_advanced_web_research_loop_contract(self) -> None:
         template = next(record for record in _official_template_records() if record["template_id"] == "advanced_web_research_loop")
@@ -337,6 +343,106 @@ class TemplateLayoutTests(unittest.TestCase):
             cycle_tracker["loop_limits_by_source"],
             {"examples_approved": 5, "script_test_passed": 3},
         )
+
+    def test_buddy_autonomous_loop_contract(self) -> None:
+        template = next(record for record in _official_template_records() if record["template_id"] == "buddy_autonomous_loop")
+        states = template["state_schema"]
+        nodes = template["nodes"]
+
+        self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
+        self.assertEqual(template["metadata"]["origin"], "buddy")
+        self.assertEqual(states["buddy_context"]["type"], "json")
+        self.assertEqual(states["selected_capability"]["type"], "capability")
+        self.assertEqual(states["capability_found"]["type"], "boolean")
+        self.assertEqual(states["capability_result"]["type"], "result_package")
+        self.assertEqual(states["final_reply"]["type"], "markdown")
+
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "subgraph"],
+            [
+                "pack_context",
+                "intake_request",
+                "run_capability_cycle",
+                "draft_final_response",
+                "review_buddy_memory",
+            ],
+        )
+        self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "output"], ["output_final"])
+        self.assertEqual(nodes["output_final"]["reads"], [{"state": "final_reply", "required": True}])
+        for node_id, node in nodes.items():
+            with self.subTest(top_level_node=node_id):
+                self.assertIsNone(node["ui"].get("size"))
+
+        pack_graph = nodes["pack_context"]["config"]["graph"]
+        self.assertEqual(pack_graph["nodes"]["read_buddy_home"]["config"]["skillKey"], "buddy_home_context_reader")
+        self.assertEqual(
+            pack_graph["nodes"]["read_buddy_home"]["config"]["skillBindings"],
+            [
+                {
+                    "skillKey": "buddy_home_context_reader",
+                    "outputMapping": {"context_pack": "home_context_pack"},
+                }
+            ],
+        )
+
+        intake_graph = nodes["intake_request"]["config"]["graph"]
+        self.assertEqual(intake_graph["metadata"]["interrupt_after"], ["ask_clarification"])
+        self.assertEqual(
+            intake_graph["nodes"]["need_clarification"]["config"]["rule"],
+            {"source": "$state.request_understanding.needs_clarification", "operator": "==", "value": True},
+        )
+
+        cycle_graph = nodes["run_capability_cycle"]["config"]["graph"]
+        self.assertEqual(cycle_graph["metadata"]["interrupt_after"], ["request_capability_approval"])
+        selector_node = cycle_graph["nodes"]["select_capability"]
+        self.assertEqual(selector_node["config"]["skillKey"], "graphiteui_capability_selector")
+        self.assertEqual(
+            selector_node["config"]["skillBindings"],
+            [
+                {
+                    "skillKey": "graphiteui_capability_selector",
+                    "outputMapping": {
+                        "capability": "selected_capability",
+                        "found": "capability_found",
+                    },
+                }
+            ],
+        )
+        execute_node = cycle_graph["nodes"]["execute_capability"]
+        self.assertEqual(execute_node["config"]["skillKey"], "")
+        self.assertIn({"state": "selected_capability", "required": True}, execute_node["reads"])
+        self.assertEqual(execute_node["writes"], [{"state": "capability_result", "mode": "replace"}])
+        self.assertEqual(cycle_graph["state_schema"]["capability_result"]["type"], "result_package")
+        self.assertEqual(cycle_graph["nodes"]["continue_capability_loop"]["config"]["loopLimit"], 3)
+
+        draft_graph = nodes["draft_final_response"]["config"]["graph"]
+        self.assertEqual([node_id for node_id, node in draft_graph["nodes"].items() if node["kind"] == "output"], ["output_final_reply"])
+        self.assertEqual(draft_graph["nodes"]["output_final_reply"]["reads"], [{"state": "final_reply", "required": True}])
+
+        review_graph = nodes["review_buddy_memory"]["config"]["graph"]
+        self.assertEqual(
+            [node_id for node_id, node in review_graph["nodes"].items() if node["kind"] == "output"],
+            ["output_memory_update_plan", "output_buddy_evolution_plan"],
+        )
+
+    def test_buddy_autonomous_loop_is_runtime_compatible(self) -> None:
+        template = next(record for record in _official_template_records() if record["template_id"] == "buddy_autonomous_loop")
+        payload = {
+            key: value
+            for key, value in template.items()
+            if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+        }
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **payload,
+                "graph_id": "test_buddy_autonomous_loop",
+                "name": template["default_graph_name"],
+            }
+        )
+
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
 
 
 if __name__ == "__main__":

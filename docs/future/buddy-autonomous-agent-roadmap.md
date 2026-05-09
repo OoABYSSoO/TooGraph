@@ -559,7 +559,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 
 ## 新版伙伴自主循环模板
 
-当前仓库尚未创建或注册 `buddy_autonomous_loop`。伙伴浮窗 UI 已经存在，并会尝试读取这个模板；在模板按新协议重建前，伙伴对话循环不能作为当前可用能力。下一轮工作的起点应是按完整目标创建并接入这个模板，而不是增强旧 `buddy_chat_loop`、恢复旧兼容入口，或先做一套之后还需要迁移的临时简化版。
+当前仓库已创建并注册官方 `buddy_autonomous_loop` 模板。它已经按完整目标把上下文装配、请求理解、能力循环、最终回复和自我复盘整理为子图，且 output 只展示最终回复。后续路线图不应再重建另一套伙伴循环，而应在这个模板和统一图协议上继续补齐暂停交互、审批体验、Buddy Home 写回和审计展示。
 
 `buddy_autonomous_loop` 的目标不是复刻 Claude Code 或 Hermes Agent 代码里的多工具循环，而是把它们已经验证有效的循环能力翻译为 GraphiteUI 的图协议：
 
@@ -581,28 +581,25 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
   -> output 只展示最终回复
 ```
 
-目标模板应包含的公开输入 state：
+当前模板包含的公开输入 state：
 
 - `user_message`：当前用户消息。
 - `conversation_history`：进入上下文的近期对话。
 - `page_context`：当前页面或编辑器上下文。
-- `buddy_profile`：来自 Buddy Home 的伙伴名称、语气、响应风格和人设资料。
-- `buddy_policy`：来自 Buddy Home 的边界、偏好和审批策略，只作为上下文与决策依据，不能提升运行权限。
-- `buddy_memory_context`：从 Buddy Home 召回的长期记忆摘要。
-- `buddy_session_summary`：Buddy Home 中的当前会话摘要。
+- `buddy_mode`：伙伴运行模式。Buddy Home 资料不作为多个公开输入 state 传入，而是在 `pack_context` 子图中由 `buddy_home_context_reader` 显式读取并整理为 `buddy_context`。
 
-目标模板应包含的核心内部 state：
+当前模板包含的核心内部 state：
 
+- `buddy_context`：来自 Buddy Home、页面上下文和对话历史的有边界上下文包。
 - `request_understanding`：需求理解、任务类型、是否需要能力、是否需要澄清、风险等级和原因。
 - `clarification_prompt`：需要向用户补充询问的问题。
 - `clarification_answer`：用户在断点恢复时写入的澄清回答。
 - `selected_capability`：`capability` 类型，来自 `graphiteui_capability_selector`。
 - `capability_found`：是否找到了启用且可选择的能力。
-- `capability_approval_request`：能力执行前需要用户确认的摘要。
-- `capability_approval_decision`：用户审批结果。
+- `approval_prompt`：能力执行前需要用户确认的摘要。
+- `approval_decision`：用户审批结果，存在于能力循环子图内部。
 - `capability_result`：`result_package` 类型，动态能力执行唯一输出。
 - `capability_review`：对结果包的评估，包括是否足够、是否继续、失败是否可恢复、下一轮需求。
-- `loop_state`：循环轮次、退出原因和已用能力摘要。
 - `memory_update_plan`：是否需要写回记忆、会话摘要或用户资料。
 - `buddy_evolution_plan`：是否需要写入自我复盘、能力使用统计、改进建议或待审查队列。
 - `final_reply`：唯一用户可见最终回复。
@@ -615,8 +612,8 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 - `merge_clarification`：把澄清回答合入 `request_understanding` 或写新的确认需求摘要。
 - `select_capability`：静态绑定 `graphiteui_capability_selector`，根据需求选择一个启用的图模板或 Skill。图模板优先，找不到则输出 `{ "kind": "none" }` 和 `capability_found=false`。
 - `capability_found`：condition。未找到能力时进入直接回复或缺失能力说明；找到能力时进入审批检查。
-- `review_capability_permission`：根据 `selected_capability`、`buddy_policy`、skill/template 的 capability policy 与 permissions 写审批请求或免审批结论。prompt 不能直接授予权限，只能生成审查说明。
-- `request_capability_approval`：需要人工确认时写 `capability_approval_request` 并设置 `interrupt_after`。恢复 payload 写入 `capability_approval_decision`。
+- `review_capability_permission`：根据请求风险、伙伴模式和 Buddy Home policy 写审批请求或免审批结论。它不能直接读取 `capability` state；当前协议规定读取 `capability` state 的 LLM 节点就是动态能力执行节点。
+- `request_capability_approval`：需要人工确认时写 `approval_prompt` 并设置 `interrupt_after`。恢复 payload 写入 `approval_decision`。
 - `execute_capability`：读取 `selected_capability`。该节点只负责生成目标能力的公开输入；runtime 执行 skill 或动态 subgraph，并只写一个 `capability_result`。
 - `review_capability_result`：读取拆包后的 `capability_result`，判断是否已经足够、是否需要继续另一个能力、是否需要向用户解释失败或请求更多信息。
 - `continue_capability_loop`：condition。需要继续时回到 `select_capability`，达到 `loopLimit` 时进入最终回复。循环上限是正式行为，不是错误；达到上限时必须用已有信息收束。
@@ -673,7 +670,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 2. 补齐动态 `capability.kind=subgraph` 的断点传播、父级暂停和恢复。
 3. 补齐动态能力审批路径：需要确认的能力必须进入标准 `awaiting_human`，不能只靠 prompt 文字提醒。
 4. 将根目录 `buddy_home/` 收束为正式 Buddy Home，使用 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json`、`buddy.db` 和 `reports/`，并把 revision/command 审计路径落到 `buddy.db`。
-5. 创建官方 `buddy_autonomous_loop` 模板，按本文完整节点职责和 state 契约搭建，并把上下文装配、需求理解、能力循环、最终回复和自我复盘整理为子图。
+5. 已完成：创建官方 `buddy_autonomous_loop` 模板，按本文完整节点职责和 state 契约搭建，并把上下文装配、需求理解、能力循环、最终回复和自我复盘整理为子图。
 6. 改造伙伴浮窗，使它能展示暂停卡片、恢复断点、拒绝或取消运行，并在暂停期间阻塞队列。
 7. 改造伙伴页面，增加“运行与确认”和 Buddy Home 管理视图，复用 Human Review 与 revision 数据模型。
 8. 将记忆、资料、会话摘要、进化记录和能力使用统计写回做成模板中的显式分支和受控能力，移除隐藏产品逻辑。

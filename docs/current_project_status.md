@@ -9,8 +9,8 @@
 - 伙伴不是独立运行时。伙伴本质也是按图模板发起一次 graph run，并通过运行来源、状态和技能目录表达上下文。
 - 产品心智已收束为“图才是 Agent，单个节点是 LLM 节点”。当前协议中仍存在 `agent` kind 命名，这是待迁移的内部命名；新设计不应继续把单节点描述为多轮 Agent。
 - 旧的 `buddy_agentic_tool_loop`、`buddy_chat_loop`、`web_research_loop` 等模板不再随仓库提供，也不再通过后端兼容逻辑修补。
-- 新版伙伴自主循环模板 `buddy_autonomous_loop` 尚未创建和注册。当前伙伴浮窗仍会尝试读取这个模板，因此伙伴对话入口的 UI 已存在，但完整对话循环还不能作为当前可用能力描述。
-- 当前仓库提供两个官方图模板：`advanced_web_research_loop`（高级联网搜索）和 `graphiteui_skill_creation_workflow`（创建自定义 Skill）。它们都是通用模板，不是伙伴专用自主循环模板。
+- 新版伙伴自主循环模板 `buddy_autonomous_loop` 已创建为官方图模板。它通过子图串联 Buddy Home 上下文装配、请求理解、能力选择与动态执行、最终回复和记忆/成长复盘，output 只展示 `final_reply`。
+- 当前仓库提供三个官方图模板：`advanced_web_research_loop`（高级联网搜索）、`buddy_autonomous_loop`（伙伴自主循环）和 `graphiteui_skill_creation_workflow`（创建自定义 Skill）。
 - 技能系统已收束为统一技能库，不再区分“伙伴技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
 - 当前官方技能包包括 `buddy_home_context_reader`、`web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
@@ -111,6 +111,16 @@
 - 输出语义：`query`、`source_urls`、`artifact_paths`、`errors` 通过 managed binding state 透传；后续 LLM 节点读取 `artifact_paths` 对应的本地原文，负责证据筛选和最终总结。模板只公开 `final_reply` 这一个 output 节点，关键依据笔记和原文路径属于内部中间 state，不直接连接 output 节点。
 - 模型语义：模板默认使用全局模型配置，不写死某个 provider。LLM 节点和伙伴模型下拉的第一项是“全局（实时读取当前全局设定的模型）”，后面才是具体模型 override。若全局本地网关未启动，运行该模板前需要在 Model Providers 页面选择可用模型，或在图中为 LLM 节点设置 override。
 
+### `buddy_autonomous_loop`
+
+- 位置：`backend/app/templates/official/buddy_autonomous_loop.json`
+- 显示名称：`伙伴自主循环`
+- 作用：作为伙伴浮窗和伙伴页面的默认图循环，把本轮用户消息、对话历史、页面上下文和 Buddy Home 长期资料转成一次可审计 graph run。
+- 主要流程：输入用户消息、历史、页面上下文和伙伴模式 -> `pack_context` 子图读取 `buddy_home_context_reader` 并整理 `buddy_context` -> `intake_request` 子图理解请求，必要时在 `ask_clarification` 断点等待用户澄清 -> `run_capability_cycle` 子图调用 `graphiteui_capability_selector` 选择一个启用能力，必要时在 `request_capability_approval` 断点等待批准，再由动态能力执行节点写唯一 `capability_result` 结果包 -> `draft_final_response` 子图只写 `final_reply` -> `review_buddy_memory` 子图产出记忆与伙伴成长计划 -> `output_final` 只展示 `final_reply`。
+- 动态能力语义：只有 `execute_capability` 读取 `selected_capability` 这个 `capability` state，并且它只写一个 `result_package` state。其他复盘节点不能读取 `capability` state，否则会被运行协议视为动态能力执行节点。
+- 断点语义：澄清和能力审批都使用子图内部 `interrupt_after`。父级 Buddy run 需要通过标准暂停/恢复路径展示子图 scope，而不是由伙伴前端额外发明确认协议。
+- 边界：当前模板已经表达完整循环主干，但长期记忆写回、Buddy Home 修改、图补丁应用和更完整的伙伴页面暂停交互仍应作为后续显式模板/命令流补齐，不能隐藏在 output 节点或前端逻辑里。
+
 ### `graphiteui_skill_creation_workflow`
 
 - 位置：`backend/app/templates/official/graphiteui_skill_creation_workflow.json`
@@ -137,7 +147,7 @@
 - subgraph 节点把一个 graph 模板复制为当前父图内的独立实例。模板分为 Git 管理的官方模板和 `backend/data/templates/user/` 下的用户自定义模板；前端“保存为模板”只会创建用户自定义模板。节点卡片先展示公开输入/输出胶囊，再展示紧凑的内部 DAG 缩略图、内部能力摘要和子图内部运行状态；DAG 缩略图按行优先顺序展示实际内部执行/判断节点，隐藏 `input` / `output` 边界节点，宽度未知时默认三列，并会根据节点卡片当前宽度在 `1` 到可见节点总数之间自适应列数。缩略图会展示普通连线和条件分支连线，连线路径复用主图 sequence-flow 回流线逻辑并使用缩略图尺寸参数；只有目标节点明确落到下一行时才走下方换行路径，轻微纵向偏移仍保持回流路径。节点位置和连线路径来自同一个响应式布局计算，不再照搬大画布坐标导致横向裁切或因卡片尺寸变化造成连线错位。运行时会把子图内部节点状态投射到缩略图颜色、闪烁高亮与当前节点提示上；主图和缩略图的已完成节点都使用绿色包框。双击节点会打开当前实例的工作区页签，页签内复用正式画布编辑器。子图页签的保存会回写父图中该节点的 `config.graph`，并按内部 `input` / `output` 边界重新同步父图公开 state 端口；也可以另存为普通图。画布左上工具区会显示来源胶囊，例如“来自：Untitled Graph / 节点：高级联网搜索 Subgraph”。
 - output 节点负责展示、预览、导出或链接图运行产物，不拥有隐藏持久化策略；Markdown 预览支持安全渲染标题、列表、引用、分割线、表格、链接、inline code 和带语言标签的浅色代码围栏，并保留代码块缩进与横向滚动。
 - Skills 页面围绕统一 skill catalog 展示、导入、启用、禁用和删除技能。
-- 伙伴浮窗支持模型选择和对话入口，但当前没有可运行的内置伙伴自主循环模板；需要先用新协议创建并注册 `buddy_autonomous_loop`，再接入完整自主循环。
+- 伙伴浮窗支持模型选择和对话入口，并会以 `buddy_autonomous_loop` 作为伙伴运行模板。后续重点是把暂停卡片、恢复断点、拒绝或取消运行、运行与确认视图，以及 Buddy Home 写回流程接入完整交互。
 
 ## 当前后端能力
 
@@ -154,9 +164,7 @@
 ## 当前仍在路线图中
 
 - 继续收束 `subgraph` 子图体验：补齐父子图运行详情页的审计聚合、事件定位和从缩略图点击跳转到内部节点。
-- 用新结构手工重建伙伴自主循环模板。
-- 将伙伴自主循环中的上下文装配、能力循环、最终回复和自我复盘整理为子图，降低顶层模板复杂度。
-- 在伙伴自主循环模板中复用 `graphiteui_capability_selector`，把“选择能力”和“执行能力”明确拆成两个图节点。
 - 完成更完整的图运行展示。
+- 补齐伙伴浮窗和伙伴页面的标准断点展示、恢复、拒绝、取消和刷新后找回能力。
 - 清理或按新命令流重建历史 `graph_patch.draft` stub，并完成图补丁预览、GraphCommandBus、graph revision、undo 和审计闭环。
 - 将人设、记忆、会话摘要、自我复盘和能力使用统计等长期状态更新表达为可审计的图模板流程，而不是隐藏产品逻辑。
