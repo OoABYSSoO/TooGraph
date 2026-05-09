@@ -11,6 +11,7 @@ import {
   BUDDY_REPLY_STATE_KEY,
   buildBuddyChatGraph,
   formatBuddyHistory,
+  resolveBuddyReplyFromRunEvent,
   resolveBuddyRunActivityFromRunEvent,
   resolveBuddyMode,
   resolveBuddyReplyText,
@@ -562,6 +563,67 @@ test("resolveBuddyReplyText prefers the buddy reply state over fallback text", (
   } as unknown as RunDetail;
 
   assert.equal(resolveBuddyReplyText(run), "我看到了。");
+});
+
+test("resolveBuddyReplyFromRunEvent recognizes reply states by graph state name", () => {
+  const graph = buildBuddyChatGraph(
+    {
+      ...createAgenticTemplate(),
+      state_schema: {
+        user_message: { name: "user_message", description: "", type: "text", value: "", color: "#9a3412" },
+        final_reply: { name: "final_reply", description: "", type: "markdown", value: "", color: "#4f46e5" },
+      },
+    },
+    {
+      userMessage: "你好",
+      history: [],
+      pageContext: "当前路径: /",
+      buddyMode: "advisory",
+    },
+  );
+
+  assert.equal(
+    resolveBuddyReplyFromRunEvent(
+      {
+        event: "state.updated",
+        state_key: "final_reply",
+        value: "你好，我是 Buddy。",
+      },
+      graph,
+    ),
+    "你好，我是 Buddy。",
+  );
+});
+
+test("resolveBuddyReplyFromRunEvent reads completed output values for named reply states", () => {
+  const graph = buildBuddyChatGraph(
+    {
+      ...createAgenticTemplate(),
+      state_schema: {
+        final_reply: { name: "final_reply", description: "", type: "markdown", value: "", color: "#4f46e5" },
+      },
+    },
+    {
+      userMessage: "你好",
+      history: [],
+      pageContext: "当前路径: /",
+      buddyMode: "advisory",
+    },
+  );
+
+  assert.equal(
+    resolveBuddyReplyFromRunEvent(
+      {
+        event: "node.output.completed",
+        output_keys: ["final_reply"],
+        output_values: {
+          final_reply: "已经组织好的回复。",
+        },
+      },
+      graph,
+    ),
+    "已经组织好的回复。",
+  );
 });
 
 test("resolveBuddyRunActivityFromRunEvent describes inner buddy subgraph activity", () => {

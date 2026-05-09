@@ -577,7 +577,7 @@ function startRunEventStream(runId: string, assistantMessageId: string, graph: G
     if (!payload) {
       return;
     }
-    const nextText = resolveBuddyReplyFromRunEvent(payload);
+    const nextText = resolveBuddyReplyFromRunEvent(payload, graph);
     if (!nextText) {
       setAssistantActivityFromRunEvent(assistantMessageId, eventType, payload, graph);
       return;

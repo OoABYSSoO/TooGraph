@@ -186,17 +186,28 @@ export function resolveBuddyReplyText(run: RunDetail): string {
   return "";
 }
 
-export function resolveBuddyReplyFromRunEvent(payload: Record<string, unknown>): string {
+export function resolveBuddyReplyFromRunEvent(payload: Record<string, unknown>, graphSnapshot?: Record<string, unknown> | null): string {
+  const replyStateKeys = resolveBuddyReplyStateKeys(graphSnapshot);
   const stateKey = typeof payload.state_key === "string" ? payload.state_key.trim() : "";
-  if (isBuddyReplyStateKey(stateKey)) {
+  if (replyStateKeys.includes(stateKey)) {
     return stringifyBuddyReplyCandidate(payload.value ?? payload.text);
+  }
+
+  const outputValues = isRecord(payload.output_values) ? payload.output_values : null;
+  if (outputValues) {
+    for (const replyStateKey of replyStateKeys) {
+      if (replyStateKey in outputValues) {
+        return stringifyBuddyReplyCandidate(outputValues[replyStateKey]);
+      }
+    }
   }
 
   const outputKeys = Array.isArray(payload.output_keys)
     ? payload.output_keys.map((key) => String(key)).filter(Boolean)
     : [];
-  if (outputKeys.some(isBuddyReplyStateKey)) {
-    return stringifyBuddyReplyCandidate(payload.text ?? payload.value);
+  const matchedOutputKey = outputKeys.find((key) => replyStateKeys.includes(key));
+  if (matchedOutputKey && payload.value !== undefined) {
+    return stringifyBuddyReplyCandidate(payload.value);
   }
 
   return "";
