@@ -48,7 +48,7 @@
 - LLM 节点卡片已改为单选 Skill 控件；动态 `capability.kind=subgraph` 只服务于模板内运行时能力选择，不作为普通卡片下拉项。
 - LLM 节点提示词区域支持技能说明胶囊；默认胶囊从 skill `llmInstruction` 动态展示，用户编辑后才作为 `node.override` 写入当前节点。
 - 旧内置模板已删除，旧模板运行入口兼容修补已删除。
-- 当前官方 Skill 包包括 `web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。
+- 当前官方 Skill 包包括 `buddy_home_context_reader`、`web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。
 - `file` / `image` / `audio` / `video` state 已采用路径透传语义，值可以是本地路径字符串或路径数组；`file_list`、`array`、`object` 不再作为 state 类型存在。
 - LLM 节点会读取 `file` state 中的文本类文件，并只把文件名与原文全文放入模型上下文；图片、音频和视频路径走多模态附件处理。
 - `web_search` 不再输出 `context`，只输出 `query`、`source_urls`、`artifact_paths` 和 `errors`。
@@ -63,6 +63,7 @@
 - 偏离新职责的旧 `create_user_skill` 内置模板已删除。新的 `graphiteUI_skill_builder` 只产出 Skill 包文件内容，完整用户 Skill 生成流程仍需要补齐确认、调用 `local_workspace_executor` 写入、调用 `graphiteUI_script_tester` 或同类测试能力、修复和启用节点。
 - 子图缩略图已能投射内部节点运行状态颜色，并在节点卡片上显示当前内部运行摘要。
 - 后端已有 `backend/data/buddy/` 资料目录和 profile、policy、memory、session summary、revision、command 等基础存取接口；它们应继续收束为 Buddy Home，而不是扩散到多个无关数据位置。
+- 已新增只读 `buddy_home_context_reader` Skill，作为 `buddy_context_pack` 子图的 P0 支撑能力。它无输入，只输出一个 `context_pack`，并且不作为动态能力候选。
 
 尚未完成：
 
@@ -488,6 +489,20 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 - 下游节点读取 `result_package` 时，prompt 组装器会把 `outputs` 拆成虚拟 state。`type=file` 的值继续走本地 artifact 展开逻辑，所以联网搜索下载的原文可以和静态绑定时一样进入上下文。
 
 这种封包/拆包方式让动态能力和静态绑定在下游拥有同一套阅读逻辑：差别只在于动态结果缺少静态 state key，但不缺少输出名称、描述、类型和值。
+
+## `buddy_home_context_reader`
+
+`buddy_home_context_reader` 是伙伴主循环的只读上下文装配 Skill。它读取 `backend/data/buddy/` 中的 profile、policy、memories 和 session summary，并输出一个克制的 `context_pack`。
+
+契约：
+
+- 输入：无。
+- 输出：`context_pack` 一个 JSON 字段。
+- 权限：`file_read`。
+- 动态选择：`capabilityPolicy.default.selectable=false`，不进入 `graphiteui_capability_selector` 候选清单。
+- 边界：不写 Buddy Home，不修改 revision，不记录 command，不提升权限。
+
+该 Skill 应由 `buddy_context_pack` 子图显式绑定。后续 Buddy Home 写回应由单独的写入 Skill 完成，不能扩展这个只读 Skill。
 
 ## `graphiteui_capability_selector`
 

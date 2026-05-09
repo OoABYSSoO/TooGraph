@@ -12,7 +12,7 @@
 - 新版伙伴自主循环模板 `buddy_autonomous_loop` 尚未创建和注册。当前伙伴浮窗仍会尝试读取这个模板，因此伙伴对话入口的 UI 已存在，但完整对话循环还不能作为当前可用能力描述。
 - 当前仓库提供两个官方图模板：`advanced_web_research_loop`（高级联网搜索）和 `graphiteui_skill_creation_workflow`（创建自定义 Skill）。它们都是通用模板，不是伙伴专用自主循环模板。
 - 技能系统已收束为统一技能库，不再区分“伙伴技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
-- 当前官方技能包包括 `web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。后续新能力应按当前统一 Skill 结构专门编写。
+- 当前官方技能包包括 `buddy_home_context_reader`、`web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
 - `backend/data/buddy/` 是伙伴长期资料的目标收束目录。除图模板本体外，伙伴人设、策略、记忆、会话摘要、修订记录、命令记录、未来的自我复盘和能力使用统计都应围绕这个 Buddy Home 组织。
 
@@ -70,6 +70,15 @@
 - 生命周期：`before_llm.py` 读取当前启用的图模板和可选择 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`，按同一清单做真实性与启用状态校验。
 - 选择对象包括当前启用的图模板和对当前 `origin` 可选择的 Skill；图模板优先于 Skill。
 - 它不执行被选能力，不生成被选能力的运行入参，也不做程序字段匹配；模型基于候选项的名称和描述判断，脚本只做真实性与启用状态校验。
+
+### `buddy_home_context_reader`
+
+- 位置：`skill/buddy_home_context_reader/`
+- 显示名称：`Buddy Home Context Reader`
+- 作用：只读 `backend/data/buddy/`，把伙伴人设、策略、启用记忆和会话摘要整理成一个 `context_pack`。
+- 输出克制：无输入，只输出一个 `context_pack` JSON 字段。
+- 能力选择：该 Skill 是伙伴主循环的显式支撑能力，不作为 `graphiteui_capability_selector` 的动态候选；模板应在 `buddy_context_pack` 这类上下文装配节点中手动绑定它。
+- 权限：只声明 `file_read`，不写 Buddy Home，不修改 revision，不记录命令。
 
 ### `graphiteUI_script_tester`
 
