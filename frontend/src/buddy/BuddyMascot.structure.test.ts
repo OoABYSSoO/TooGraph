@@ -36,7 +36,7 @@ const elevatedSparklePath =
 test("BuddyMascot renders the mascot as inline SVG animation parts", () => {
   assert.match(componentSource, /<svg[\s\S]*class="buddy-mascot__svg"/);
   assert.match(componentSource, /class="buddy-mascot__body"/);
-  assert.match(componentSource, /class="buddy-mascot__tail"/);
+  assert.match(componentSource, /class="buddy-mascot__tail buddy-mascot__tail-rig"/);
   assert.match(componentSource, /class="buddy-mascot__sparkle"/);
   assert.match(componentSource, /class="buddy-mascot__left-ear"/);
   assert.match(componentSource, /class="buddy-mascot__right-ear"/);
@@ -62,14 +62,33 @@ test("BuddyMascot keeps the sparkle above the head without entering the head lay
 
 test("BuddyMascot supports idle, thinking, speaking, dragging, and tap animations", () => {
   assert.match(componentSource, /type BuddyMascotMood = "idle" \| "thinking" \| "speaking" \| "error";/);
+  assert.match(componentSource, /type BuddyMascotMotion = "idle" \| "roam" \| "hop" \| "spin";/);
+  assert.match(componentSource, /type BuddyMascotFacing = "front" \| "left" \| "right";/);
   assert.match(componentSource, /dragging\?: boolean;/);
   assert.match(componentSource, /tapNonce\?: number;/);
+  assert.match(componentSource, /motion\?: BuddyMascotMotion;/);
+  assert.match(componentSource, /facing\?: BuddyMascotFacing;/);
   assert.match(componentSource, /buddy-mascot--idle/);
   assert.match(componentSource, /buddy-mascot--thinking/);
   assert.match(componentSource, /buddy-mascot--speaking/);
+  assert.match(componentSource, /`buddy-mascot--motion-\$\{effectiveMotion\.value\}`/);
+  assert.match(componentSource, /`buddy-mascot--facing-\$\{props\.facing\}`/);
   assert.match(componentSource, /buddy-mascot--dragging/);
   assert.match(componentSource, /buddy-mascot--tap/);
   assert.match(componentSource, /watch\(\(\) => props\.tapNonce/);
+});
+
+test("BuddyMascot exposes a tail rig and body turn layer for pseudo-3D movement", () => {
+  assert.match(componentSource, /class="buddy-mascot__tail buddy-mascot__tail-rig"/);
+  assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--right"/);
+  assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--left"/);
+  assert.match(componentSource, /class="buddy-mascot__body-turn"/);
+  assert.match(componentSource, /\.buddy-mascot--facing-left[\s\S]*\.buddy-mascot__tail-pose--left[\s\S]*opacity:\s*1;/);
+  assert.match(componentSource, /\.buddy-mascot--facing-right[\s\S]*\.buddy-mascot__tail-pose--right[\s\S]*opacity:\s*1;/);
+  assert.match(componentSource, /\.buddy-mascot--motion-roam[\s\S]*\.buddy-mascot__body-turn[\s\S]*animation:\s*buddy-mascot-roam-hop/);
+  assert.match(componentSource, /\.buddy-mascot--motion-spin[\s\S]*\.buddy-mascot__body-turn[\s\S]*animation:\s*buddy-mascot-spin-turn/);
+  assert.match(componentSource, /@keyframes buddy-mascot-tail-spin-right/);
+  assert.match(componentSource, /@keyframes buddy-mascot-tail-spin-left/);
 });
 
 test("BuddyMascot moves eye wrapper layers toward the pointer without replacing blink transforms", () => {

@@ -28,40 +28,43 @@
       </defs>
 
       <g class="buddy-mascot__stage" filter="url(#buddyMascotSoftness)">
-        <path
-          class="buddy-mascot__tail"
-          fill="none"
-          stroke="url(#buddyMascotBlack)"
-          stroke-width="38"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          d="M206 154 C240 154 268 136 282 108"
-        />
+        <g class="buddy-mascot__tail buddy-mascot__tail-rig">
+          <path
+            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--right"
+            d="M206 154 C240 154 268 136 282 108"
+          />
+          <path
+            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--left"
+            d="M-206 154 C-240 154-268 136-282 108"
+          />
+        </g>
 
-        <g class="buddy-mascot__body">
-          <path
-            class="buddy-mascot__left-ear"
-            fill="url(#buddyMascotBlack)"
-            d="M-146-143 C-114-132-82-101-55-61 C-60-24-84 25-124 63 C-158 95-190 53-168-4 C-174-52-164-106-146-143Z"
-          />
-          <path
-            class="buddy-mascot__right-ear"
-            fill="url(#buddyMascotBlack)"
-            d="M146-143 C114-132 82-101 55-61 C60-24 84 25 124 63 C158 95 190 53 168-4 C174-52 164-106 146-143Z"
-          />
-          <path
-            class="buddy-mascot__head"
-            fill="url(#buddyMascotBlack)"
-            d="M-55-61 C-25-66 25-66 55-61 C90-61 130-43 168-4 C196 22 214 66 218 116 C226 208 145 264 0 264 C-145 264-226 208-218 116 C-214 66-196 22-168-4 C-130-43-90-61-55-61Z"
-          />
-          <g class="buddy-mascot__look-eye buddy-mascot__look-eye--left">
-            <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--left" cx="-80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
+        <g class="buddy-mascot__body-turn">
+          <g class="buddy-mascot__body">
+            <path
+              class="buddy-mascot__left-ear"
+              fill="url(#buddyMascotBlack)"
+              d="M-146-143 C-114-132-82-101-55-61 C-60-24-84 25-124 63 C-158 95-190 53-168-4 C-174-52-164-106-146-143Z"
+            />
+            <path
+              class="buddy-mascot__right-ear"
+              fill="url(#buddyMascotBlack)"
+              d="M146-143 C114-132 82-101 55-61 C60-24 84 25 124 63 C158 95 190 53 168-4 C174-52 164-106 146-143Z"
+            />
+            <path
+              class="buddy-mascot__head"
+              fill="url(#buddyMascotBlack)"
+              d="M-55-61 C-25-66 25-66 55-61 C90-61 130-43 168-4 C196 22 214 66 218 116 C226 208 145 264 0 264 C-145 264-226 208-218 116 C-214 66-196 22-168-4 C-130-43-90-61-55-61Z"
+            />
+            <g class="buddy-mascot__look-eye buddy-mascot__look-eye--left">
+              <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--left" cx="-80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
+            </g>
+            <g class="buddy-mascot__look-eye buddy-mascot__look-eye--right">
+              <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--right" cx="80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
+            </g>
+            <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--left" d="M-104 52 L-64 82 L-104 112" />
+            <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--right" d="M104 52 L64 82 L104 112" />
           </g>
-          <g class="buddy-mascot__look-eye buddy-mascot__look-eye--right">
-            <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--right" cx="80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
-          </g>
-          <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--left" d="M-104 52 L-64 82 L-104 112" />
-          <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--right" d="M104 52 L64 82 L104 112" />
         </g>
 
         <g class="buddy-mascot__sparkle-wrap">
@@ -80,10 +83,14 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 
 type BuddyMascotMood = "idle" | "thinking" | "speaking" | "error";
+type BuddyMascotMotion = "idle" | "roam" | "hop" | "spin";
+type BuddyMascotFacing = "front" | "left" | "right";
 
 const props = withDefaults(
   defineProps<{
     mood?: BuddyMascotMood;
+    motion?: BuddyMascotMotion;
+    facing?: BuddyMascotFacing;
     dragging?: boolean;
     tapNonce?: number;
     lookX?: number;
@@ -91,6 +98,8 @@ const props = withDefaults(
   }>(),
   {
     mood: "idle",
+    motion: "idle",
+    facing: "front",
     dragging: false,
     tapNonce: 0,
     lookX: 0,
@@ -102,8 +111,11 @@ const tapAnimating = ref(false);
 let tapTimeoutId: number | null = null;
 
 const effectiveMood = computed(() => (props.dragging ? "idle" : props.mood));
+const effectiveMotion = computed(() => (props.dragging || props.mood !== "idle" ? "idle" : props.motion));
 const mascotClasses = computed(() => ({
   [`buddy-mascot--${effectiveMood.value}`]: true,
+  [`buddy-mascot--motion-${effectiveMotion.value}`]: true,
+  [`buddy-mascot--facing-${props.facing}`]: true,
   "buddy-mascot--dragging": props.dragging,
   "buddy-mascot--tap": tapAnimating.value && !props.dragging,
 }));
@@ -176,7 +188,9 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot__body,
+.buddy-mascot__body-turn,
 .buddy-mascot__tail,
+.buddy-mascot__tail-pose,
 .buddy-mascot__sparkle-wrap,
 .buddy-mascot__sparkle,
 .buddy-mascot__left-ear,
@@ -192,8 +206,27 @@ function clampLookAxis(value: number | undefined) {
   transform-origin: 50% 70%;
 }
 
+.buddy-mascot__body-turn {
+  transform-origin: 50% 72%;
+  transition: transform 180ms ease;
+}
+
 .buddy-mascot__tail {
   transform-origin: 4% 90%;
+}
+
+.buddy-mascot__tail-pose {
+  fill: none;
+  stroke: url(#buddyMascotBlack);
+  stroke-width: 38;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.buddy-mascot__tail-pose--right {
+  opacity: 1;
 }
 
 .buddy-mascot__sparkle-wrap,
@@ -207,6 +240,30 @@ function clampLookAxis(value: number | undefined) {
 
 .buddy-mascot__right-ear {
   transform-origin: 22% 82%;
+}
+
+.buddy-mascot--facing-left .buddy-mascot__body-turn {
+  transform: scaleX(0.92) rotate(-2deg);
+}
+
+.buddy-mascot--facing-right .buddy-mascot__body-turn {
+  transform: scaleX(0.92) rotate(2deg);
+}
+
+.buddy-mascot--facing-left .buddy-mascot__tail-pose--right {
+  opacity: 0;
+}
+
+.buddy-mascot--facing-left .buddy-mascot__tail-pose--left {
+  opacity: 1;
+}
+
+.buddy-mascot--facing-right .buddy-mascot__tail-pose--left {
+  opacity: 0;
+}
+
+.buddy-mascot--facing-right .buddy-mascot__tail-pose--right {
+  opacity: 1;
 }
 
 .buddy-mascot__look-eye {
@@ -347,6 +404,26 @@ function clampLookAxis(value: number | undefined) {
   animation: buddy-mascot-ear-tap-right 520ms ease-out both;
 }
 
+.buddy-mascot--motion-roam .buddy-mascot__body-turn {
+  animation: buddy-mascot-roam-hop 980ms cubic-bezier(0.22, 1.25, 0.36, 1) both;
+}
+
+.buddy-mascot--motion-hop .buddy-mascot__body-turn {
+  animation: buddy-mascot-roam-hop 760ms cubic-bezier(0.22, 1.25, 0.36, 1) both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__body-turn {
+  animation: buddy-mascot-spin-turn 980ms cubic-bezier(0.2, 1.18, 0.3, 1) both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__tail-pose--right {
+  animation: buddy-mascot-tail-spin-right 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__tail-pose--left {
+  animation: buddy-mascot-tail-spin-left 980ms ease-in-out both;
+}
+
 @keyframes buddy-mascot-idle-body {
   0%,
   100% {
@@ -354,6 +431,74 @@ function clampLookAxis(value: number | undefined) {
   }
   50% {
     transform: translateY(-4px) rotate(-1deg);
+  }
+}
+
+@keyframes buddy-mascot-roam-hop {
+  0% {
+    transform: translateY(0) scaleX(1) scaleY(1);
+  }
+  18% {
+    transform: translateY(10px) scaleX(1.08) scaleY(0.9);
+  }
+  48% {
+    transform: translateY(-18px) scaleX(0.88) scaleY(1.12);
+  }
+  78% {
+    transform: translateY(4px) scaleX(1.04) scaleY(0.96);
+  }
+  100% {
+    transform: translateY(0) scaleX(1) scaleY(1);
+  }
+}
+
+@keyframes buddy-mascot-spin-turn {
+  0% {
+    transform: translateY(0) scaleX(1) scaleY(1) rotate(0deg);
+  }
+  18% {
+    transform: translateY(10px) scaleX(1.1) scaleY(0.88) rotate(0deg);
+  }
+  42% {
+    transform: translateY(-24px) scaleX(0.18) scaleY(1.14) rotate(-5deg);
+  }
+  58% {
+    transform: translateY(-24px) scaleX(-0.18) scaleY(1.14) rotate(5deg);
+  }
+  82% {
+    transform: translateY(6px) scaleX(1.08) scaleY(0.92) rotate(0deg);
+  }
+  100% {
+    transform: translateY(0) scaleX(1) scaleY(1) rotate(0deg);
+  }
+}
+
+@keyframes buddy-mascot-tail-spin-right {
+  0%,
+  28% {
+    opacity: 1;
+  }
+  44%,
+  70% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes buddy-mascot-tail-spin-left {
+  0%,
+  30% {
+    opacity: 0;
+  }
+  46%,
+  66% {
+    opacity: 1;
+  }
+  84%,
+  100% {
+    opacity: 0;
   }
 }
 

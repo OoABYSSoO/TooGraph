@@ -4,7 +4,10 @@
       class="buddy-widget__anchor"
       :class="[
         `buddy-widget__anchor--${panelPlacement}`,
-        { 'buddy-widget__anchor--fullscreen': isPanelFullscreen },
+        {
+          'buddy-widget__anchor--fullscreen': isPanelFullscreen,
+          'buddy-widget__anchor--roaming': mascotMotion === 'roam',
+        },
       ]"
       :style="anchorStyle"
     >
@@ -281,6 +284,10 @@
         ref="avatarElement"
         type="button"
         class="buddy-widget__avatar"
+        :class="{
+          'buddy-widget__avatar--roaming': mascotMotion === 'roam',
+          'buddy-widget__avatar--spinning': mascotMotion === 'spin',
+        }"
         :style="avatarStyle"
         :title="t('buddy.dragHint')"
         :aria-label="t('buddy.open')"
@@ -290,6 +297,8 @@
       >
         <BuddyMascot
           :mood="mood"
+          :motion="mascotMotion"
+          :facing="mascotFacing"
           :dragging="isDragging"
           :tap-nonce="tapNonce"
           :look-x="mascotLook.x"
@@ -374,6 +383,8 @@ type BuddyQueuedTurn = {
 };
 
 type BuddyMood = "idle" | "thinking" | "speaking" | "error";
+type BuddyMascotMotion = "idle" | "roam" | "hop" | "spin";
+type BuddyMascotFacing = "front" | "left" | "right";
 type BuddyModelOption = {
   value: string;
   label: string;
@@ -387,6 +398,12 @@ const AVATAR_SINGLE_CLICK_DELAY_MS = 220;
 const RUN_POLL_INTERVAL_MS = 700;
 const RUN_POLL_TIMEOUT_MS = 240000;
 const RUN_TRACE_MAX_ENTRIES = 24;
+const BUDDY_ROAM_MIN_DELAY_MS = 8000;
+const BUDDY_ROAM_MAX_DELAY_MS = 18000;
+const BUDDY_ROAM_MOVE_DURATION_MS = 980;
+const BUDDY_ROAM_SPIN_DURATION_MS = 980;
+const BUDDY_ROAM_SPIN_CHANCE = 0.22;
+const BUDDY_ROAM_MIN_DISTANCE_PX = 132;
 
 const { t } = useI18n();
 const route = useRoute();
@@ -420,6 +437,8 @@ const runTraceStartedAtMs = ref<number | null>(null);
 const runTraceFinishedAtMs = ref<number | null>(null);
 const avatarElement = ref<HTMLElement | null>(null);
 const mascotLook = ref({ x: 0, y: 0 });
+const mascotMotion = ref<BuddyMascotMotion>("idle");
+const mascotFacing = ref<BuddyMascotFacing>("front");
 const messageListElement = ref<HTMLElement | null>(null);
 const pointerDrag = ref<{
   pointerId: number;
@@ -436,6 +455,8 @@ let isDrainingBuddyQueue = false;
 let avatarSingleClickTimerId: number | null = null;
 let speakingIdleTimerId: number | null = null;
 let mascotLookFrameId: number | null = null;
+let buddyRoamTimerId: number | null = null;
+let buddyRoamMotionTimerId: number | null = null;
 let pendingMascotLookPointer: { x: number; y: number } | null = null;
 let chatSessionInitializationPromise: Promise<void> | null = null;
 const backgroundReviewAbortControllers = new Set<AbortController>();
@@ -443,6 +464,13 @@ const runTraceStartedAtByKey = new Map<string, number>();
 let nextBuddyMessageClientOrder = 0;
 
 const isDragging = computed(() => Boolean(pointerDrag.value?.moved));
+const canBuddyRoam = computed(() =>
+  !isPanelOpen.value &&
+  mood.value === "idle" &&
+  !isDragging.value &&
+  queuedTurns.value.length === 0 &&
+  activeRunId.value === null,
+);
 const isSessionSwitchLocked = computed(
   () =>
     queuedTurns.value.length > 0 ||
@@ -524,6 +552,7 @@ onMounted(() => {
   void loadBuddyModelOptions();
   window.addEventListener("resize", handleResize);
   window.addEventListener("pointermove", handleMascotLookPointerMove, { passive: true });
+  scheduleBuddyRoam();
 });
 
 onBeforeUnmount(() => {
@@ -535,6 +564,7 @@ onBeforeUnmount(() => {
   clearSessionDeleteConfirmTimeout();
   clearAvatarSingleClickTimer();
   clearSpeakingIdleTimer();
+  cancelBuddyRoamTimers();
   cancelMascotLookFrame();
   closeEventSource();
   activeAbortController?.abort();
@@ -555,6 +585,14 @@ watch(buddyModelRef, (nextModel) => {
     return;
   }
   window.localStorage.removeItem(BUDDY_MODEL_STORAGE_KEY);
+});
+
+watch(canBuddyRoam, (canRoam) => {
+  if (canRoam) {
+    scheduleBuddyRoam();
+    return;
+  }
+  cancelBuddyRoamTimers();
 });
 
 function handleAvatarClick() {
@@ -620,6 +658,7 @@ function handleBuddyModelSelectVisibleChange(visible: boolean) {
 }
 
 function handlePointerDown(event: PointerEvent) {
+  cancelBuddyRoamTimers();
   pointerDrag.value = {
     pointerId: event.pointerId,
     startX: event.clientX,
@@ -703,12 +742,114 @@ function cancelMascotLookFrame() {
   mascotLookFrameId = null;
 }
 
+function scheduleBuddyRoam() {
+  if (!canBuddyRoam.value || buddyRoamTimerId !== null || mascotMotion.value !== "idle") {
+    return;
+  }
+  buddyRoamTimerId = window.setTimeout(
+    runBuddyIdleRoam,
+    randomBetween(BUDDY_ROAM_MIN_DELAY_MS, BUDDY_ROAM_MAX_DELAY_MS),
+  );
+}
+
+function runBuddyIdleRoam() {
+  buddyRoamTimerId = null;
+  if (!canBuddyRoam.value) {
+    return;
+  }
+  if (Math.random() < BUDDY_ROAM_SPIN_CHANCE) {
+    runBuddyIdleSpin();
+    return;
+  }
+  runBuddyIdleHop();
+}
+
+function runBuddyIdleSpin() {
+  if (!canBuddyRoam.value) {
+    return;
+  }
+  mascotFacing.value = Math.random() > 0.5 ? "left" : "right";
+  mascotMotion.value = "spin";
+  buddyRoamMotionTimerId = window.setTimeout(() => {
+    mascotMotion.value = "idle";
+    mascotFacing.value = "front";
+    buddyRoamMotionTimerId = null;
+    scheduleBuddyRoam();
+  }, BUDDY_ROAM_SPIN_DURATION_MS);
+}
+
+function runBuddyIdleHop() {
+  if (!canBuddyRoam.value) {
+    return;
+  }
+  const targetPosition = resolveBuddyRoamTargetPosition();
+  const deltaX = targetPosition.x - position.value.x;
+  mascotFacing.value = deltaX < 0 ? "left" : deltaX > 0 ? "right" : "front";
+  mascotMotion.value = "roam";
+  position.value = targetPosition;
+  buddyRoamMotionTimerId = window.setTimeout(() => {
+    mascotMotion.value = "idle";
+    mascotFacing.value = "front";
+    buddyRoamMotionTimerId = null;
+    scheduleBuddyRoam();
+  }, BUDDY_ROAM_MOVE_DURATION_MS);
+}
+
+function resolveBuddyRoamTargetPosition(): BuddyPosition {
+  const maxX = Math.max(DEFAULT_BUDDY_MARGIN, viewport.value.width - DEFAULT_BUDDY_SIZE.width - DEFAULT_BUDDY_MARGIN);
+  const maxY = Math.max(DEFAULT_BUDDY_MARGIN, viewport.value.height - DEFAULT_BUDDY_SIZE.height - DEFAULT_BUDDY_MARGIN);
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const candidate = clampBuddyPosition(
+      {
+        x: randomBetween(DEFAULT_BUDDY_MARGIN, maxX),
+        y: randomBetween(DEFAULT_BUDDY_MARGIN, maxY),
+      },
+      viewport.value,
+      DEFAULT_BUDDY_SIZE,
+      DEFAULT_BUDDY_MARGIN,
+    );
+    if (Math.hypot(candidate.x - position.value.x, candidate.y - position.value.y) >= BUDDY_ROAM_MIN_DISTANCE_PX) {
+      return candidate;
+    }
+  }
+  return clampBuddyPosition(
+    {
+      x: position.value.x > viewport.value.width / 2 ? DEFAULT_BUDDY_MARGIN : maxX,
+      y: randomBetween(DEFAULT_BUDDY_MARGIN, maxY),
+    },
+    viewport.value,
+    DEFAULT_BUDDY_SIZE,
+    DEFAULT_BUDDY_MARGIN,
+  );
+}
+
+function cancelBuddyRoamTimers() {
+  if (buddyRoamTimerId !== null) {
+    window.clearTimeout(buddyRoamTimerId);
+    buddyRoamTimerId = null;
+  }
+  if (buddyRoamMotionTimerId !== null) {
+    window.clearTimeout(buddyRoamMotionTimerId);
+    buddyRoamMotionTimerId = null;
+  }
+  mascotMotion.value = "idle";
+  mascotFacing.value = "front";
+}
+
+function randomBetween(min: number, max: number) {
+  if (max <= min) {
+    return min;
+  }
+  return min + Math.random() * (max - min);
+}
+
 async function sendMessage() {
   const userMessage = draft.value.trim();
   if (!userMessage) {
     return;
   }
 
+  cancelBuddyRoamTimers();
   errorMessage.value = "";
   isPanelOpen.value = true;
   await waitForChatSessionInitialization();
@@ -1592,6 +1733,10 @@ function formatErrorMessage(error: unknown): string {
   transition: transform 120ms ease;
 }
 
+.buddy-widget__anchor--roaming {
+  transition: transform 980ms cubic-bezier(0.2, 1.05, 0.32, 1);
+}
+
 .buddy-widget__anchor--fullscreen {
   inset: 0;
   width: 100vw;
@@ -1649,6 +1794,14 @@ function formatErrorMessage(error: unknown): string {
     drop-shadow(0 0 4px rgba(255, 255, 255, 0.98));
 }
 
+.buddy-widget__avatar--roaming {
+  animation: buddy-widget-avatar-hop-path 980ms cubic-bezier(0.2, 1.05, 0.32, 1) both;
+}
+
+.buddy-widget__avatar--spinning {
+  animation: buddy-widget-avatar-spin-pop 980ms cubic-bezier(0.2, 1.18, 0.3, 1) both;
+}
+
 .buddy-widget__avatar:active {
   cursor: grabbing;
   transform: translateY(0) scale(0.98);
@@ -1670,6 +1823,32 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__session-delete:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3);
+}
+
+@keyframes buddy-widget-avatar-hop-path {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  34% {
+    transform: translateY(-18px) scaleX(0.94) scaleY(1.06);
+  }
+  66% {
+    transform: translateY(-6px) scaleX(1.03) scaleY(0.97);
+  }
+}
+
+@keyframes buddy-widget-avatar-spin-pop {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  28% {
+    transform: translateY(-20px) scaleX(0.92) scaleY(1.08);
+  }
+  72% {
+    transform: translateY(4px) scaleX(1.06) scaleY(0.94);
+  }
 }
 
 .buddy-widget__panel,

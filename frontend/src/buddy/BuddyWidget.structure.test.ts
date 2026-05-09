@@ -40,11 +40,46 @@ test("BuddyWidget renders the animated inline mascot component", () => {
   assert.match(componentSource, /import BuddyMascot from "\.\/BuddyMascot\.vue";/);
   assert.match(componentSource, /<BuddyMascot/);
   assert.match(componentSource, /:mood="mood"/);
+  assert.match(componentSource, /:motion="mascotMotion"/);
+  assert.match(componentSource, /:facing="mascotFacing"/);
   assert.match(componentSource, /:dragging="isDragging"/);
   assert.match(componentSource, /:tap-nonce="tapNonce"/);
   assert.match(componentSource, /:look-x="mascotLook\.x"/);
   assert.match(componentSource, /:look-y="mascotLook\.y"/);
   assert.doesNotMatch(componentSource, /<img src="\/mascot\.svg"/);
+});
+
+test("BuddyWidget lets the idle mascot roam only while the panel is closed and the buddy is idle", () => {
+  assert.match(componentSource, /type BuddyMascotMotion = "idle" \| "roam" \| "hop" \| "spin";/);
+  assert.match(componentSource, /type BuddyMascotFacing = "front" \| "left" \| "right";/);
+  assert.match(componentSource, /const BUDDY_ROAM_MIN_DELAY_MS = 8000;/);
+  assert.match(componentSource, /const BUDDY_ROAM_MAX_DELAY_MS = 18000;/);
+  assert.match(componentSource, /const BUDDY_ROAM_MOVE_DURATION_MS = 980;/);
+  assert.match(componentSource, /const mascotMotion = ref<BuddyMascotMotion>\("idle"\);/);
+  assert.match(componentSource, /const mascotFacing = ref<BuddyMascotFacing>\("front"\);/);
+  assert.match(componentSource, /const canBuddyRoam = computed\(\(\) =>/);
+  assert.match(componentSource, /!isPanelOpen\.value/);
+  assert.match(componentSource, /mood\.value === "idle"/);
+  assert.match(componentSource, /!isDragging\.value/);
+  assert.match(componentSource, /watch\(canBuddyRoam/);
+  assert.match(componentSource, /scheduleBuddyRoam\(\);/);
+  assert.match(componentSource, /cancelBuddyRoamTimers\(\);/);
+});
+
+test("BuddyWidget schedules random hop movement and occasional spin without persisting roam positions", () => {
+  assert.match(componentSource, /let buddyRoamTimerId: number \| null = null;/);
+  assert.match(componentSource, /let buddyRoamMotionTimerId: number \| null = null;/);
+  assert.match(componentSource, /function scheduleBuddyRoam\(\)/);
+  assert.match(componentSource, /randomBetween\(BUDDY_ROAM_MIN_DELAY_MS, BUDDY_ROAM_MAX_DELAY_MS\)/);
+  assert.match(componentSource, /function runBuddyIdleRoam\(\)/);
+  assert.match(componentSource, /Math\.random\(\) < BUDDY_ROAM_SPIN_CHANCE/);
+  assert.match(componentSource, /function runBuddyIdleSpin\(\)/);
+  assert.match(componentSource, /function runBuddyIdleHop\(\)/);
+  assert.match(componentSource, /resolveBuddyRoamTargetPosition\(\)/);
+  assert.match(componentSource, /mascotMotion\.value = "roam";/);
+  assert.match(componentSource, /mascotMotion\.value = "spin";/);
+  assert.match(componentSource, /persistPosition\(\);/);
+  assert.doesNotMatch(extractFunctionBlock("runBuddyIdleHop"), /persistPosition\(\);/);
 });
 
 test("BuddyWidget tracks the pointer direction for the mascot eyes with animation-frame throttling", () => {
