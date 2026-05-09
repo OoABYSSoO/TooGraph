@@ -80,6 +80,8 @@ test("BuddyMascot moves eye wrapper layers toward the pointer without replacing 
   assert.match(componentSource, /class="buddy-mascot__look-eye buddy-mascot__look-eye--right"/);
   assert.match(componentSource, /--buddy-mascot-look-x/);
   assert.match(componentSource, /--buddy-mascot-look-y/);
+  assert.match(componentSource, /const x = clampLookAxis\(props\.lookX\) \* 11;/);
+  assert.match(componentSource, /const y = clampLookAxis\(props\.lookY\) \* 7;/);
   assert.match(
     componentSource,
     /\.buddy-mascot__look-eye\s*\{[\s\S]*transform:\s*translate\(var\(--buddy-mascot-look-x,\s*0px\),\s*var\(--buddy-mascot-look-y,\s*0px\)\);/,

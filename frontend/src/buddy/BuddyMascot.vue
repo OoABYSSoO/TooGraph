@@ -108,8 +108,8 @@ const mascotClasses = computed(() => ({
   "buddy-mascot--tap": tapAnimating.value && !props.dragging,
 }));
 const eyeLookStyle = computed<Record<string, string>>(() => {
-  const x = clampLookAxis(props.lookX) * 8;
-  const y = clampLookAxis(props.lookY) * 5;
+  const x = clampLookAxis(props.lookX) * 11;
+  const y = clampLookAxis(props.lookY) * 7;
   return {
     "--buddy-mascot-look-x": `${x.toFixed(2)}px`,
     "--buddy-mascot-look-y": `${y.toFixed(2)}px`,
