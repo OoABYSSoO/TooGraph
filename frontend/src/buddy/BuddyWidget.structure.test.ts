@@ -151,9 +151,12 @@ test("BuddyWidget renders assistant replies as safe markdown and keeps a compact
   assert.match(componentSource, /v-html="renderBuddyMarkdown\(message\.content\)"/);
   assert.match(componentSource, /class="buddy-widget__run-trace"/);
   assert.match(componentSource, /const runTraceEntries = ref<BuddyRunTraceEntry\[\]>\(\[\]\);/);
+  assert.match(componentSource, /const visibleRunTraceEntries = computed\(\(\) =>/);
   assert.match(componentSource, /resolveBuddyRunTraceFromRunEvent/);
   assert.match(componentSource, /appendRunTraceEntry\(eventType, traceEntry\);/);
-  assert.match(componentSource, /\.buddy-widget__run-trace-body[\s\S]*max-height:\s*calc\(3 \* 1\.45em \+ 18px\);/);
+  assert.match(componentSource, /v-for="entry in visibleRunTraceEntries"/);
+  assert.match(componentSource, /\.buddy-widget__run-trace-body[\s\S]*max-height:\s*calc\(1 \* 1\.45em \+ 14px\);[\s\S]*overflow:\s*hidden;/);
+  assert.match(componentSource, /\.buddy-widget__run-trace--expanded \.buddy-widget__run-trace-body[\s\S]*max-height:\s*180px;[\s\S]*overflow:\s*auto;/);
 });
 
 test("BuddyWidget records and displays per-stage run trace durations", () => {

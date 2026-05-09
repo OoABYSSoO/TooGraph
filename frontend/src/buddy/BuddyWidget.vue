@@ -212,7 +212,7 @@
               </button>
               <div v-if="shouldShowRunTraceBody" class="buddy-widget__run-trace-body">
                 <div
-                  v-for="entry in runTraceEntries"
+                  v-for="entry in visibleRunTraceEntries"
                   :key="entry.replaceKey"
                   class="buddy-widget__run-trace-entry"
                   :class="`buddy-widget__run-trace-entry--${entry.tone}`"
@@ -474,6 +474,12 @@ const latestActivityText = computed(() => {
   return latestPendingMessage?.activityText?.trim() ?? "";
 });
 const shouldShowRunTraceBody = computed(() => runTraceFinishedAtMs.value === null || isRunTraceExpanded.value);
+const visibleRunTraceEntries = computed(() => {
+  if (isRunTraceExpanded.value || runTraceEntries.value.length <= 1) {
+    return runTraceEntries.value;
+  }
+  return runTraceEntries.value.slice(-1);
+});
 const runTraceHeaderText = computed(() => {
   const startedAt = runTraceStartedAtMs.value;
   const finishedAt = runTraceFinishedAtMs.value;
@@ -2151,13 +2157,14 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__run-trace-body {
-  max-height: calc(3 * 1.45em + 18px);
-  overflow: auto;
+  max-height: calc(1 * 1.45em + 14px);
+  overflow: hidden;
   padding: 7px 8px;
 }
 
 .buddy-widget__run-trace--expanded .buddy-widget__run-trace-body {
   max-height: 180px;
+  overflow: auto;
 }
 
 .buddy-widget__run-trace-entry {
