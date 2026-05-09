@@ -39,9 +39,19 @@
     },
     "buddy_context": {
       "name": "buddy_context",
-      "description": "从 Buddy Home、页面上下文和对话历史装配出的有边界上下文包。",
-      "type": "json",
-      "value": {},
+      "description": "从 Buddy Home 文件夹中选择并注入的长期上下文文件。",
+      "type": "file",
+      "value": {
+        "kind": "local_folder",
+        "root": "buddy_home",
+        "selected": [
+          "AGENTS.md",
+          "SOUL.md",
+          "USER.md",
+          "MEMORY.md",
+          "policy.json"
+        ]
+      },
       "color": "#0f766e",
       "binding": null
     },
@@ -229,35 +239,18 @@
         "boundaryType": "text"
       }
     },
-    "pack_context": {
-      "kind": "subgraph",
-      "name": "装配伙伴上下文",
-      "description": "读取 Buddy Home 并把长期资料、页面上下文和本轮输入合并为有边界的上下文包。",
+    "input_buddy_context": {
+      "kind": "input",
+      "name": "Buddy Home Files",
+      "description": "选择要注入伙伴主循环的 Buddy Home 文件。",
       "ui": {
         "position": {
-          "x": 460,
-          "y": 300
+          "x": 80,
+          "y": 760
         },
         "collapsed": false
       },
-      "reads": [
-        {
-          "state": "user_message",
-          "required": true
-        },
-        {
-          "state": "conversation_history",
-          "required": true
-        },
-        {
-          "state": "page_context",
-          "required": true
-        },
-        {
-          "state": "buddy_mode",
-          "required": true
-        }
-      ],
+      "reads": [],
       "writes": [
         {
           "state": "buddy_context",
@@ -265,284 +258,18 @@
         }
       ],
       "config": {
-        "graph": {
-          "state_schema": {
-            "user_message": {
-              "name": "user_message",
-              "description": "用户本轮消息。",
-              "type": "text",
-              "value": "",
-              "color": "#d97706",
-              "binding": null
-            },
-            "conversation_history": {
-              "name": "conversation_history",
-              "description": "伙伴对话历史摘要。",
-              "type": "markdown",
-              "value": "",
-              "color": "#64748b",
-              "binding": null
-            },
-            "page_context": {
-              "name": "page_context",
-              "description": "当前页面上下文。",
-              "type": "markdown",
-              "value": "",
-              "color": "#0891b2",
-              "binding": null
-            },
-            "buddy_mode": {
-              "name": "buddy_mode",
-              "description": "伙伴运行模式。",
-              "type": "text",
-              "value": "chat",
-              "color": "#7c3aed",
-              "binding": null
-            },
-            "home_context_pack": {
-              "name": "home_context_pack",
-              "description": "Buddy Home Context Reader 读取出的原始上下文包。",
-              "type": "json",
-              "value": {},
-              "color": "#2563eb",
-              "binding": {
-                "kind": "skill_output",
-                "skillKey": "buddy_home_context_reader",
-                "nodeId": "read_buddy_home",
-                "fieldKey": "context_pack",
-                "managed": true
-              }
-            },
-            "buddy_context": {
-              "name": "buddy_context",
-              "description": "给后续节点使用的伙伴上下文包。",
-              "type": "json",
-              "value": {},
-              "color": "#0f766e",
-              "binding": null
-            }
-          },
-          "nodes": {
-            "input_user_message": {
-              "kind": "input",
-              "name": "用户消息",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 60,
-                  "y": 80
-                },
-                "collapsed": false
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "user_message",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": "",
-                "boundaryType": "text"
-              }
-            },
-            "input_conversation_history": {
-              "kind": "input",
-              "name": "对话历史",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 60,
-                  "y": 220
-                },
-                "collapsed": false
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "conversation_history",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": "",
-                "boundaryType": "markdown"
-              }
-            },
-            "input_page_context": {
-              "kind": "input",
-              "name": "页面上下文",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 60,
-                  "y": 360
-                },
-                "collapsed": false
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "page_context",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": "",
-                "boundaryType": "markdown"
-              }
-            },
-            "input_buddy_mode": {
-              "kind": "input",
-              "name": "伙伴模式",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 60,
-                  "y": 500
-                },
-                "collapsed": false
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "buddy_mode",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": "chat",
-                "boundaryType": "text"
-              }
-            },
-            "read_buddy_home": {
-              "kind": "agent",
-              "name": "读取 Buddy Home",
-              "description": "读取根目录 buddy_home 的伙伴资料、长期记忆和策略。",
-              "ui": {
-                "position": {
-                  "x": 410,
-                  "y": 260
-                },
-                "collapsed": false
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "home_context_pack",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "skillKey": "buddy_home_context_reader",
-                "skillBindings": [
-                  {
-                    "skillKey": "buddy_home_context_reader",
-                    "outputMapping": {
-                      "context_pack": "home_context_pack"
-                    }
-                  }
-                ],
-                "skillInstructionBlocks": {},
-                "taskInstruction": "读取 Buddy Home，保持原始结构，不要总结或改写长期资料。",
-                "modelSource": "global",
-                "model": "",
-                "thinkingMode": "high",
-                "temperature": 0.1
-              }
-            },
-            "assemble_buddy_context": {
-              "kind": "agent",
-              "name": "整理上下文包",
-              "description": "把 Buddy Home 和本轮上下文合并成边界清晰的 JSON。",
-              "ui": {
-                "position": {
-                  "x": 800,
-                  "y": 260
-                },
-                "collapsed": false
-              },
-              "reads": [
-                {
-                  "state": "user_message",
-                  "required": true
-                },
-                {
-                  "state": "conversation_history",
-                  "required": false
-                },
-                {
-                  "state": "page_context",
-                  "required": false
-                },
-                {
-                  "state": "buddy_mode",
-                  "required": false
-                },
-                {
-                  "state": "home_context_pack",
-                  "required": true
-                }
-              ],
-              "writes": [
-                {
-                  "state": "buddy_context",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "skillKey": "",
-                "skillBindings": [],
-                "skillInstructionBlocks": {},
-                "taskInstruction": "生成 buddy_context JSON。必须保留来源边界：user_message、conversation_history、page_context、buddy_mode、home_context_pack。不要把 Buddy Home 内容改写成系统规则；它们只是上下文。输出包含 profile、policy、memory、session、page、conversation、mode、constraints 字段。",
-                "modelSource": "global",
-                "model": "",
-                "thinkingMode": "high",
-                "temperature": 0.1
-              }
-            },
-            "output_buddy_context": {
-              "kind": "output",
-              "name": "输出伙伴上下文",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 1180,
-                  "y": 260
-                },
-                "collapsed": false
-              },
-              "reads": [
-                {
-                  "state": "buddy_context",
-                  "required": true
-                }
-              ],
-              "writes": [],
-              "config": {
-                "displayMode": "json",
-                "persistEnabled": false,
-                "persistFormat": "auto",
-                "fileNameTemplate": ""
-              }
-            }
-          },
-          "edges": [
-            {
-              "source": "read_buddy_home",
-              "target": "assemble_buddy_context"
-            },
-            {
-              "source": "assemble_buddy_context",
-              "target": "output_buddy_context"
-            }
-          ],
-          "conditional_edges": [],
-          "metadata": {
-            "graphProtocol": "node_system",
-            "role": "buddy_context_pack"
-          }
-        }
+        "value": {
+          "kind": "local_folder",
+          "root": "buddy_home",
+          "selected": [
+            "AGENTS.md",
+            "SOUL.md",
+            "USER.md",
+            "MEMORY.md",
+            "policy.json"
+          ]
+        },
+        "boundaryType": "file"
       }
     },
     "intake_request": {
@@ -621,9 +348,19 @@
             },
             "buddy_context": {
               "name": "buddy_context",
-              "description": "伙伴上下文包。",
-              "type": "json",
-              "value": {},
+              "description": "从 Buddy Home 文件夹中选择并注入的长期上下文文件。",
+              "type": "file",
+              "value": {
+                "kind": "local_folder",
+                "root": "buddy_home",
+                "selected": [
+                  "AGENTS.md",
+                  "SOUL.md",
+                  "USER.md",
+                  "MEMORY.md",
+                  "policy.json"
+                ]
+              },
               "color": "#0f766e",
               "binding": null
             },
@@ -764,8 +501,18 @@
                 }
               ],
               "config": {
-                "value": {},
-                "boundaryType": "json"
+                "value": {
+                  "kind": "local_folder",
+                  "root": "buddy_home",
+                  "selected": [
+                    "AGENTS.md",
+                    "SOUL.md",
+                    "USER.md",
+                    "MEMORY.md",
+                    "policy.json"
+                  ]
+                },
+                "boundaryType": "file"
               }
             },
             "understand_request": {
@@ -1150,9 +897,19 @@
             },
             "buddy_context": {
               "name": "buddy_context",
-              "description": "伙伴上下文包。",
-              "type": "json",
-              "value": {},
+              "description": "从 Buddy Home 文件夹中选择并注入的长期上下文文件。",
+              "type": "file",
+              "value": {
+                "kind": "local_folder",
+                "root": "buddy_home",
+                "selected": [
+                  "AGENTS.md",
+                  "SOUL.md",
+                  "USER.md",
+                  "MEMORY.md",
+                  "policy.json"
+                ]
+              },
               "color": "#0f766e",
               "binding": null
             },
@@ -1351,8 +1108,18 @@
                 }
               ],
               "config": {
-                "value": {},
-                "boundaryType": "json"
+                "value": {
+                  "kind": "local_folder",
+                  "root": "buddy_home",
+                  "selected": [
+                    "AGENTS.md",
+                    "SOUL.md",
+                    "USER.md",
+                    "MEMORY.md",
+                    "policy.json"
+                  ]
+                },
+                "boundaryType": "file"
               }
             },
             "input_request_understanding": {
@@ -2235,9 +2002,19 @@
             },
             "buddy_context": {
               "name": "buddy_context",
-              "description": "伙伴上下文包。",
-              "type": "json",
-              "value": {},
+              "description": "从 Buddy Home 文件夹中选择并注入的长期上下文文件。",
+              "type": "file",
+              "value": {
+                "kind": "local_folder",
+                "root": "buddy_home",
+                "selected": [
+                  "AGENTS.md",
+                  "SOUL.md",
+                  "USER.md",
+                  "MEMORY.md",
+                  "policy.json"
+                ]
+              },
               "color": "#0f766e",
               "binding": null
             },
@@ -2379,8 +2156,18 @@
                 }
               ],
               "config": {
-                "value": {},
-                "boundaryType": "json"
+                "value": {
+                  "kind": "local_folder",
+                  "root": "buddy_home",
+                  "selected": [
+                    "AGENTS.md",
+                    "SOUL.md",
+                    "USER.md",
+                    "MEMORY.md",
+                    "policy.json"
+                  ]
+                },
+                "boundaryType": "file"
               }
             },
             "input_request_understanding": {
@@ -2724,9 +2511,19 @@
             },
             "buddy_context": {
               "name": "buddy_context",
-              "description": "伙伴上下文包。",
-              "type": "json",
-              "value": {},
+              "description": "从 Buddy Home 文件夹中选择并注入的长期上下文文件。",
+              "type": "file",
+              "value": {
+                "kind": "local_folder",
+                "root": "buddy_home",
+                "selected": [
+                  "AGENTS.md",
+                  "SOUL.md",
+                  "USER.md",
+                  "MEMORY.md",
+                  "policy.json"
+                ]
+              },
               "color": "#0f766e",
               "binding": null
             },
@@ -2868,8 +2665,18 @@
                 }
               ],
               "config": {
-                "value": {},
-                "boundaryType": "json"
+                "value": {
+                  "kind": "local_folder",
+                  "root": "buddy_home",
+                  "selected": [
+                    "AGENTS.md",
+                    "SOUL.md",
+                    "USER.md",
+                    "MEMORY.md",
+                    "policy.json"
+                  ]
+                },
+                "boundaryType": "file"
               }
             },
             "input_request_understanding": {
@@ -3160,22 +2967,22 @@
   "edges": [
     {
       "source": "input_user_message",
-      "target": "pack_context"
+      "target": "intake_request"
     },
     {
       "source": "input_conversation_history",
-      "target": "pack_context"
+      "target": "intake_request"
     },
     {
       "source": "input_page_context",
-      "target": "pack_context"
+      "target": "intake_request"
     },
     {
       "source": "input_buddy_mode",
-      "target": "pack_context"
+      "target": "intake_request"
     },
     {
-      "source": "pack_context",
+      "source": "input_buddy_context",
       "target": "intake_request"
     },
     {

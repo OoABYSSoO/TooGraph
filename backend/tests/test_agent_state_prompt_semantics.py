@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import os
+import tempfile
 import unittest
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -188,6 +191,42 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         finally:
             for relative_path in artifact_paths:
                 resolve_skill_artifact_path(relative_path).unlink(missing_ok=True)
+
+    def test_auto_prompt_expands_selected_local_folder_files_to_full_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            folder = workspace / "buddy_home"
+            folder.mkdir()
+            (folder / "SOUL.md").write_text("Buddy identity line.", encoding="utf-8")
+            (folder / "MEMORY.md").write_text("Durable memory line.", encoding="utf-8")
+            (folder / "ignored.md").write_text("This file was not selected.", encoding="utf-8")
+
+            with patch.dict(os.environ, {"GRAPHITEUI_LOCAL_INPUT_READ_ROOTS": str(workspace)}):
+                prompt = build_auto_system_prompt(
+                    ["answer"],
+                    {
+                        "buddy_context": {
+                            "kind": "local_folder",
+                            "root": str(folder),
+                            "selected": ["SOUL.md", "MEMORY.md"],
+                        }
+                    },
+                    {},
+                    state_schema={
+                        "buddy_context": NodeSystemStateDefinition(
+                            name="Buddy context",
+                            type=NodeSystemStateType.FILE,
+                        ),
+                        "answer": NodeSystemStateDefinition(type=NodeSystemStateType.MARKDOWN),
+                    },
+                )
+
+        self.assertIn("文件名：SOUL.md", prompt)
+        self.assertIn("Buddy identity line.", prompt)
+        self.assertIn("文件名：MEMORY.md", prompt)
+        self.assertIn("Durable memory line.", prompt)
+        self.assertNotIn("This file was not selected.", prompt)
+        self.assertNotIn(str(folder), prompt)
 
     def test_auto_prompt_expands_result_package_outputs_as_virtual_states(self) -> None:
         artifact = create_uploaded_skill_artifact(

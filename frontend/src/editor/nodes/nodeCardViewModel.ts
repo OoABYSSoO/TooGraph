@@ -99,7 +99,7 @@ export type NodeCardViewModel = {
     | {
         kind: "input";
         valueText: string;
-        editorMode: "text" | "knowledge_base" | "asset" | "readonly";
+        editorMode: "text" | "knowledge_base" | "asset" | "folder" | "readonly";
         assetType: UploadedAssetType | null;
         primaryOutput: NodePortViewModel | null;
       }
@@ -634,6 +634,13 @@ function resolveInputEditorModel(node: Extract<GraphNode, { kind: "input" }>, st
     };
   }
 
+  if (primaryOutputType === "file" && isLocalFolderInputValue(primaryOutputValue)) {
+    return {
+      editorMode: "folder" as const,
+      assetType: null,
+    };
+  }
+
   if (isUploadedAssetStateType(primaryOutputType)) {
     return {
       editorMode: "asset" as const,
@@ -652,6 +659,19 @@ function resolveInputEditorModel(node: Extract<GraphNode, { kind: "input" }>, st
     editorMode: "readonly" as const,
     assetType: null,
   };
+}
+
+function isLocalFolderInputValue(value: unknown): boolean {
+  const parsed = typeof value === "string" ? parseJson(value) : value;
+  return Boolean(parsed && typeof parsed === "object" && !Array.isArray(parsed) && (parsed as { kind?: unknown }).kind === "local_folder");
+}
+
+function parseJson(value: string) {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 function resolveInputStateValue(

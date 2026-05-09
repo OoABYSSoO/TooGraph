@@ -10,8 +10,8 @@ const currentDirectory = dirname(currentFilePath);
 test("InputNodeBody owns input presentation and forwards parent side effects", () => {
   const componentSource = readFileSync(resolve(currentDirectory, "InputNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 
-  assert.match(componentSource, /defineProps<\{[\s\S]*body: InputBodyViewModel;[\s\S]*inputBoundarySelection: "text" \| "file" \| "knowledge_base";[\s\S]*inputTypeOptions: InputTypeOption\[\];[\s\S]*inputAssetEnvelope: UploadedAssetEnvelope \| null;[\s\S]*inputKnowledgeBaseOptions: InputKnowledgeBaseOption\[\];[\s\S]*inputValueText: string;[\s\S]*\}>/);
-  assert.match(componentSource, /defineEmits<\{[\s\S]*\(event: "update:boundary-selection", value: string \| number \| boolean\): void;[\s\S]*\(event: "update:knowledge-base", value: string \| number \| boolean \| undefined\): void;[\s\S]*\(event: "asset-file-change", inputEvent: Event\): void;[\s\S]*\(event: "asset-drop", dragEvent: DragEvent\): void;[\s\S]*\(event: "clear-asset"\): void;[\s\S]*\(event: "input-value", inputEvent: Event\): void;[\s\S]*\}>/);
+  assert.match(componentSource, /defineProps<\{[\s\S]*body: InputBodyViewModel;[\s\S]*inputBoundarySelection: "text" \| "file" \| "folder" \| "knowledge_base";[\s\S]*inputTypeOptions: InputTypeOption\[\];[\s\S]*inputAssetEnvelope: UploadedAssetEnvelope \| null;[\s\S]*localFolderRoot: string;[\s\S]*localFolderEntries: LocalFolderTreeEntry\[\];[\s\S]*inputKnowledgeBaseOptions: InputKnowledgeBaseOption\[\];[\s\S]*inputValueText: string;[\s\S]*\}>/);
+  assert.match(componentSource, /defineEmits<\{[\s\S]*\(event: "update:boundary-selection", value: string \| number \| boolean\): void;[\s\S]*\(event: "update:knowledge-base", value: string \| number \| boolean \| undefined\): void;[\s\S]*\(event: "local-folder-root-input", value: string\): void;[\s\S]*\(event: "local-folder-refresh"\): void;[\s\S]*\(event: "local-folder-selection-toggle", path: string, selected: boolean\): void;[\s\S]*\(event: "local-folder-select-all"\): void;[\s\S]*\(event: "local-folder-clear"\): void;[\s\S]*\(event: "asset-file-change", inputEvent: Event\): void;[\s\S]*\(event: "asset-drop", dragEvent: DragEvent\): void;[\s\S]*\(event: "clear-asset"\): void;[\s\S]*\(event: "input-value", inputEvent: Event\): void;[\s\S]*\}>/);
   assert.match(componentSource, /<div class="node-card__input-body">/);
   assert.match(componentSource, /<div class="node-card__port-row node-card__port-row--single node-card__port-row--input-boundary">/);
   assert.match(componentSource, /<ElSegmented[\s\S]*class="node-card__input-boundary-toggle"[\s\S]*:model-value="inputBoundarySelection"[\s\S]*:options="inputTypeOptions"[\s\S]*@update:model-value="emit\('update:boundary-selection', \$event\)"/);
@@ -19,6 +19,12 @@ test("InputNodeBody owns input presentation and forwards parent side effects", (
   assert.match(componentSource, /<slot name="primary-output" \/>/);
   assert.match(componentSource, /v-if="showKnowledgeBaseInput"[\s\S]*class="node-card__surface node-card__input-picker"[\s\S]*<ElSelect[\s\S]*:model-value="inputKnowledgeBaseValue \|\| undefined"[\s\S]*@update:model-value="emit\('update:knowledge-base', \$event\)"/);
   assert.match(componentSource, /<ElOption v-for="option in inputKnowledgeBaseOptions"/);
+  assert.match(componentSource, /v-else-if="showLocalFolderInput"[\s\S]*class="node-card__surface node-card__local-folder"/);
+  assert.match(componentSource, /:value="localFolderRoot"[\s\S]*@input="emit\('local-folder-root-input',/);
+  assert.match(componentSource, /@click\.stop="emit\('local-folder-refresh'\)"/);
+  assert.match(componentSource, /v-for="entry in localFolderEntries"[\s\S]*@change="emit\('local-folder-selection-toggle', entry\.path,/);
+  assert.match(componentSource, /@click\.stop="emit\('local-folder-select-all'\)"/);
+  assert.match(componentSource, /@click\.stop="emit\('local-folder-clear'\)"/);
   assert.match(componentSource, /<label[\s\S]*class="node-card__asset-dropzone"[\s\S]*@click\.stop="handleAssetUploadSurfaceClick"[\s\S]*@drop\.prevent="emit\('asset-drop', \$event\)"[\s\S]*<input[\s\S]*ref="inputAssetInputRef"[\s\S]*class="node-card__asset-native-input"[\s\S]*type="file"[\s\S]*@change="emit\('asset-file-change', \$event\)"/);
   assert.match(componentSource, /<label[\s\S]*class="node-card__asset-action"[\s\S]*@click\.stop="handleAssetUploadSurfaceClick"[\s\S]*<input[\s\S]*ref="inputAssetInputRef"[\s\S]*class="node-card__asset-native-input node-card__asset-native-input--action"[\s\S]*type="file"[\s\S]*@change="emit\('asset-file-change', \$event\)"[\s\S]*Replace[\s\S]*<\/label>/);
   assert.doesNotMatch(componentSource, /class="node-card__asset-native-input"[\s\S]{0,260}@click\.stop/);
