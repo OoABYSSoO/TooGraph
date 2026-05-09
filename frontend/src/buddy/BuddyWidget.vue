@@ -285,6 +285,7 @@
         :aria-label="t('buddy.open')"
         @pointerdown="handlePointerDown"
         @click="handleAvatarClick"
+        @dblclick.stop="handleAvatarDoubleClick"
       >
         <BuddyMascot :mood="mood" :dragging="isDragging" :tap-nonce="tapNonce" />
       </button>
@@ -375,6 +376,7 @@ const BUDDY_HISTORY_STORAGE_KEY = "graphiteui:buddy-history";
 const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "graphiteui:buddy-active-session";
 const BUDDY_MODEL_STORAGE_KEY = "graphiteui:buddy-model";
 const DRAG_THRESHOLD_PX = 4;
+const AVATAR_SINGLE_CLICK_DELAY_MS = 220;
 const RUN_POLL_INTERVAL_MS = 700;
 const RUN_POLL_TIMEOUT_MS = 240000;
 const RUN_TRACE_MAX_ENTRIES = 24;
@@ -422,6 +424,7 @@ let suppressNextClick = false;
 let eventSource: EventSource | null = null;
 let activeAbortController: AbortController | null = null;
 let isDrainingBuddyQueue = false;
+let avatarSingleClickTimerId: number | null = null;
 let speakingIdleTimerId: number | null = null;
 let chatSessionInitializationPromise: Promise<void> | null = null;
 const backgroundReviewAbortControllers = new Set<AbortController>();
@@ -509,6 +512,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("pointerup", handlePointerUp);
   queuedTurns.value = [];
   clearSessionDeleteConfirmTimeout();
+  clearAvatarSingleClickTimer();
   clearSpeakingIdleTimer();
   closeEventSource();
   activeAbortController?.abort();
@@ -536,6 +540,28 @@ function handleAvatarClick() {
     suppressNextClick = false;
     return;
   }
+  clearAvatarSingleClickTimer();
+  avatarSingleClickTimerId = window.setTimeout(() => {
+    avatarSingleClickTimerId = null;
+    performAvatarSingleClick();
+  }, AVATAR_SINGLE_CLICK_DELAY_MS);
+}
+
+function handleAvatarDoubleClick() {
+  clearAvatarSingleClickTimer();
+  if (suppressNextClick) {
+    suppressNextClick = false;
+    return;
+  }
+  tapNonce.value += 1;
+  isPanelOpen.value = true;
+  isPanelFullscreen.value = true;
+  isSessionPanelOpen.value = false;
+  clearSessionDeleteConfirmState();
+  void scrollMessagesToBottom();
+}
+
+function performAvatarSingleClick() {
   tapNonce.value += 1;
   isPanelOpen.value = !isPanelOpen.value;
   if (!isPanelOpen.value) {
@@ -1365,6 +1391,14 @@ function clearSpeakingIdleTimer() {
   }
   window.clearTimeout(speakingIdleTimerId);
   speakingIdleTimerId = null;
+}
+
+function clearAvatarSingleClickTimer() {
+  if (avatarSingleClickTimerId === null) {
+    return;
+  }
+  window.clearTimeout(avatarSingleClickTimerId);
+  avatarSingleClickTimerId = null;
 }
 
 async function scrollMessagesToBottom() {

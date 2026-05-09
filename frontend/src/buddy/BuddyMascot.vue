@@ -227,47 +227,51 @@ function clearTapTimeout() {
 }
 
 .buddy-mascot--thinking .buddy-mascot__body {
-  animation: buddy-mascot-thinking-body 1.15s ease-in-out infinite;
+  animation: buddy-mascot-thinking-body 860ms ease-in-out infinite;
 }
 
 .buddy-mascot--thinking .buddy-mascot__tail {
-  animation: buddy-mascot-tail-thinking 920ms ease-in-out infinite;
+  animation: buddy-mascot-tail-thinking 760ms ease-in-out infinite;
+}
+
+.buddy-mascot--thinking .buddy-mascot__sparkle-wrap {
+  animation: buddy-mascot-thinking-orbit 1.6s ease-in-out infinite;
 }
 
 .buddy-mascot--thinking .buddy-mascot__sparkle {
-  animation: buddy-mascot-star-flip 1.22s ease-in-out infinite;
+  animation: buddy-mascot-star-flip 860ms ease-in-out infinite;
 }
 
 .buddy-mascot--thinking .buddy-mascot__left-ear {
-  transform: rotate(-7deg) translateY(3px);
+  animation: buddy-mascot-ear-think-left 860ms ease-in-out infinite;
 }
 
 .buddy-mascot--thinking .buddy-mascot__right-ear {
-  transform: rotate(7deg) translateY(3px);
+  animation: buddy-mascot-ear-think-right 860ms ease-in-out infinite;
 }
 
 .buddy-mascot--speaking .buddy-mascot__body {
-  animation: buddy-mascot-speaking-body 640ms ease-in-out infinite;
+  animation: buddy-mascot-speaking-body 460ms ease-in-out infinite;
 }
 
 .buddy-mascot--speaking .buddy-mascot__tail {
-  animation: buddy-mascot-tail-speaking 560ms ease-in-out infinite;
+  animation: buddy-mascot-tail-speaking 430ms ease-in-out infinite;
 }
 
 .buddy-mascot--speaking .buddy-mascot__sparkle {
-  animation: buddy-mascot-star-pulse 640ms ease-in-out infinite;
+  animation: buddy-mascot-star-pulse 520ms ease-in-out infinite;
 }
 
 .buddy-mascot--speaking .buddy-mascot__left-ear {
-  animation: buddy-mascot-ear-speak-left 680ms ease-in-out infinite;
+  animation: buddy-mascot-ear-speak-left 520ms ease-in-out infinite;
 }
 
 .buddy-mascot--speaking .buddy-mascot__right-ear {
-  animation: buddy-mascot-ear-speak-right 680ms ease-in-out infinite;
+  animation: buddy-mascot-ear-speak-right 520ms ease-in-out infinite;
 }
 
 .buddy-mascot--speaking .buddy-mascot__resting-eye {
-  animation: buddy-mascot-speaking-eye 640ms ease-in-out infinite;
+  animation: buddy-mascot-speaking-eye 520ms ease-in-out infinite;
 }
 
 .buddy-mascot--error {
@@ -387,42 +391,81 @@ function clearTapTimeout() {
 @keyframes buddy-mascot-thinking-body {
   0%,
   100% {
-    transform: translateY(0) rotate(-1deg);
+    transform: translateY(0) rotate(-2deg);
   }
-  50% {
-    transform: translateY(-2px) rotate(1.5deg);
+  35% {
+    transform: translateY(-7px) rotate(3deg);
+  }
+  72% {
+    transform: translateY(2px) rotate(-3deg);
   }
 }
 
 @keyframes buddy-mascot-tail-thinking {
   0%,
   100% {
-    transform: rotate(4deg);
+    transform: rotate(-8deg);
   }
   50% {
-    transform: rotate(12deg);
+    transform: rotate(24deg);
+  }
+}
+
+@keyframes buddy-mascot-thinking-orbit {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-8deg);
+  }
+  42% {
+    transform: translate(10px, -7px) rotate(10deg);
+  }
+  72% {
+    transform: translate(-7px, 4px) rotate(-14deg);
   }
 }
 
 @keyframes buddy-mascot-star-flip {
   0%,
   100% {
-    transform: scaleX(1);
+    transform: scaleX(1) rotate(0deg);
     filter: brightness(1);
   }
   50% {
-    transform: scaleX(0.18);
-    filter: brightness(1.22);
+    transform: scaleX(0.12) rotate(18deg);
+    filter: brightness(1.35);
+  }
+}
+
+@keyframes buddy-mascot-ear-think-left {
+  0%,
+  100% {
+    transform: rotate(-9deg) translateY(4px);
+  }
+  50% {
+    transform: rotate(-16deg) translateY(0);
+  }
+}
+
+@keyframes buddy-mascot-ear-think-right {
+  0%,
+  100% {
+    transform: rotate(9deg) translateY(4px);
+  }
+  50% {
+    transform: rotate(16deg) translateY(0);
   }
 }
 
 @keyframes buddy-mascot-speaking-body {
   0%,
   100% {
-    transform: translateY(0) scale(1);
+    transform: translateY(0) scaleX(1) scaleY(1);
   }
-  50% {
-    transform: translateY(-5px) scale(1.035);
+  28% {
+    transform: translateY(2px) scaleX(1.06) scaleY(0.95);
+  }
+  62% {
+    transform: translateY(-6px) scaleX(0.96) scaleY(1.05);
   }
 }
 
@@ -441,13 +484,13 @@ function clearTapTimeout() {
 @keyframes buddy-mascot-tail-speaking {
   0%,
   100% {
-    transform: rotate(-3deg);
+    transform: rotate(-12deg);
   }
   38% {
-    transform: rotate(18deg);
+    transform: rotate(28deg);
   }
   72% {
-    transform: rotate(5deg);
+    transform: rotate(2deg);
   }
 }
 

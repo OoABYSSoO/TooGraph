@@ -45,6 +45,21 @@ test("BuddyWidget tracks dragging and click pulses for mascot animation", () => 
   assert.match(componentSource, /tapNonce\.value \+= 1;/);
 });
 
+test("BuddyWidget opens fullscreen chat from a mascot double click without firing the single-click toggle", () => {
+  assert.match(componentSource, /@dblclick\.stop="handleAvatarDoubleClick"/);
+  assert.match(componentSource, /const AVATAR_SINGLE_CLICK_DELAY_MS = 220;/);
+  assert.match(componentSource, /let avatarSingleClickTimerId: number \| null = null;/);
+  assert.match(
+    componentSource,
+    /function handleAvatarClick\(\)[\s\S]*clearAvatarSingleClickTimer\(\);[\s\S]*avatarSingleClickTimerId = window\.setTimeout\(\(\) => \{[\s\S]*performAvatarSingleClick\(\);[\s\S]*\}, AVATAR_SINGLE_CLICK_DELAY_MS\);/,
+  );
+  assert.match(
+    componentSource,
+    /function handleAvatarDoubleClick\(\)[\s\S]*clearAvatarSingleClickTimer\(\);[\s\S]*isPanelOpen\.value = true;[\s\S]*isPanelFullscreen\.value = true;[\s\S]*void scrollMessagesToBottom\(\);/,
+  );
+  assert.match(componentSource, /onBeforeUnmount\(\(\) => \{[\s\S]*clearAvatarSingleClickTimer\(\);/);
+});
+
 test("BuddyWidget keeps buddy transitions enabled even when reduced motion is enabled", () => {
   assert.doesNotMatch(componentSource, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(componentSource, /animation:\s*none/);
