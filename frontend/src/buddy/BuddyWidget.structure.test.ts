@@ -146,6 +146,7 @@ test("BuddyWidget keeps the run trace above the formal reply and collapses to el
   assert.match(componentSource, /const runTraceFinishedAtMs = ref<number \| null>\(null\);/);
   assert.match(componentSource, /const runTraceHeaderText = computed/);
   assert.match(componentSource, /markRunTraceFinished\(\);/);
+  assert.match(componentSource, /if \(!hasAssistantMessageContent\(assistantMessageId\)\) \{[\s\S]*markRunTraceFinished\(\);[\s\S]*\}/);
   assert.match(componentSource, /v-if="shouldShowRunTraceForMessage\(message\)"/);
   assert.match(componentSource, /v-if="shouldShowRunTraceBody"/);
   assert.match(componentSource, /v-if="message\.role === 'assistant' && message\.content"/);

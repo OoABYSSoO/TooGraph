@@ -703,6 +703,9 @@ function startRunEventStream(runId: string, assistantMessageId: string, graph: G
       return;
     }
     mood.value = "speaking";
+    if (!hasAssistantMessageContent(assistantMessageId)) {
+      markRunTraceFinished();
+    }
     updateAssistantMessage(assistantMessageId, nextText);
     void scrollMessagesToBottom();
   };
@@ -816,6 +819,10 @@ function updateAssistantMessage(messageId: string, content: string, patch: Buddy
     target.activityText = "";
   }
   Object.assign(target, patch);
+}
+
+function hasAssistantMessageContent(messageId: string) {
+  return Boolean(messages.value.find((message) => message.id === messageId)?.content.trim());
 }
 
 function setAssistantActivityText(messageId: string, activityText: string) {
