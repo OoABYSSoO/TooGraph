@@ -102,7 +102,7 @@
               class="buddy-widget__icon-button"
               :title="t('buddy.newSession')"
               :aria-label="t('buddy.newSession')"
-              :disabled="isSessionSwitchLocked"
+              :disabled="!canCreateNewSession"
               @click="createNewSession"
             >
               <ElIcon><Plus /></ElIcon>
@@ -438,6 +438,8 @@ const isSessionSwitchLocked = computed(
     activeRunId.value !== null ||
     (activeTraceMessageId.value !== null && runTraceFinishedAtMs.value === null),
 );
+const hasCurrentSessionContent = computed(() => messages.value.some((message) => message.content.trim()));
+const canCreateNewSession = computed(() => !isSessionSwitchLocked.value && hasCurrentSessionContent.value);
 const buddyModeLabel = computed(() => {
   const option = BUDDY_MODE_OPTIONS.find((candidate) => candidate.value === buddyMode.value);
   return option ? `${t(option.labelKey)} - ${t(option.descriptionKey)}` : t("buddy.modes.advisory");
@@ -919,7 +921,7 @@ async function ensureActiveChatSession(): Promise<string | null> {
 }
 
 async function createNewSession() {
-  if (isSessionSwitchLocked.value) {
+  if (!canCreateNewSession.value) {
     return;
   }
   await waitForChatSessionInitialization();
