@@ -3,7 +3,7 @@ name: web_search
 description: Search the public web and return successful source URLs, local readable page artifacts, and URL-specific errors for downstream graph nodes.
 ---
 
-Use this skill when a workflow or companion agent needs current public web information, recent news, version details, price checks, external fact verification, or cited web evidence. It prefers Tavily when `TAVILY_API_KEY` is configured and falls back to DuckDuckGo HTML search when no key is available.
+Use this skill when a workflow or buddy agent needs current public web information, recent news, version details, price checks, external fact verification, or cited web evidence. It prefers Tavily when `TAVILY_API_KEY` is configured and falls back to DuckDuckGo HTML search when no key is available.
 
 The skill asks the search provider for extra candidates, then keeps fetching candidates until it saves the target number of readable local documents or runs out of candidates. It first uses a fast HTTP fetch; if that fails or produces no readable text, it uses Playwright browser rendering as a fallback.
 

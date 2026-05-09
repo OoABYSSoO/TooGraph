@@ -15,9 +15,9 @@ test("App wires application and Element Plus locales through the root provider",
   assert.match(appSource, /resolveElementPlusLocale/);
 });
 
-test("App mounts the companion pet at the application root", () => {
-  assert.match(appSource, /import CompanionPet from "\.\/companion\/CompanionPet\.vue";/);
-  assert.match(appSource, /<CompanionPet \/>/);
+test("App mounts the buddy widget at the application root", () => {
+  assert.match(appSource, /import BuddyWidget from "\.\/buddy\/BuddyWidget\.vue";/);
+  assert.match(appSource, /<BuddyWidget \/>/);
 });
 
 test("main registers vue-i18n before mounting the app", () => {

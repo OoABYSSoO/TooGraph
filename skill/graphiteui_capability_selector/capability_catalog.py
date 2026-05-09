@@ -8,7 +8,7 @@ from typing import Any
 
 
 SKILL_KEY = "graphiteui_capability_selector"
-DEFAULT_ORIGIN = "companion"
+DEFAULT_ORIGIN = "buddy"
 
 
 def build_capability_catalog_context(*, origin: str = DEFAULT_ORIGIN) -> str:

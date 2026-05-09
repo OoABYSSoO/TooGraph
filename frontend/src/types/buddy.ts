@@ -1,4 +1,4 @@
-export type CompanionProfile = {
+export type BuddyProfile = {
   name: string;
   persona: string;
   tone: string;
@@ -6,13 +6,13 @@ export type CompanionProfile = {
   display_preferences: Record<string, unknown>;
 };
 
-export type CompanionPolicy = {
+export type BuddyPolicy = {
   graph_permission_mode: "advisory";
   behavior_boundaries: string[];
   communication_preferences: string[];
 };
 
-export type CompanionMemory = {
+export type BuddyMemory = {
   id: string;
   type: string;
   title: string;
@@ -25,12 +25,12 @@ export type CompanionMemory = {
   updated_at: string;
 };
 
-export type CompanionSessionSummary = {
+export type BuddySessionSummary = {
   content: string;
   updated_at: string;
 };
 
-export type CompanionRevision = {
+export type BuddyRevision = {
   revision_id: string;
   target_type: string;
   target_id: string;
@@ -42,7 +42,7 @@ export type CompanionRevision = {
   created_at: string;
 };
 
-export type CompanionCommandRecord = {
+export type BuddyCommandRecord = {
   command_id: string;
   kind: string;
   action: string;
@@ -57,34 +57,34 @@ export type CompanionCommandRecord = {
   completed_at: string | null;
 };
 
-export type CompanionCommandResponse<T> = {
-  command: CompanionCommandRecord;
+export type BuddyCommandResponse<T> = {
+  command: BuddyCommandRecord;
   result: T;
-  revision: CompanionRevision | null;
+  revision: BuddyRevision | null;
 };
 
-export type CompanionGraphPatchOperation = {
+export type BuddyGraphPatchOperation = {
   op: "add" | "remove" | "replace" | "move" | "copy" | "test";
   path: string;
   from?: string;
   value?: unknown;
 };
 
-export type CompanionGraphPatchDraftPayload = {
+export type BuddyGraphPatchDraftPayload = {
   graph_id?: string | null;
   graph_name?: string | null;
   summary: string;
   rationale?: string;
-  patch: CompanionGraphPatchOperation[];
+  patch: BuddyGraphPatchOperation[];
   preview?: Record<string, unknown> | null;
 };
 
-export type CompanionGraphPatchDraft = {
+export type BuddyGraphPatchDraft = {
   draft_id: string;
   graph_id: string | null;
   graph_name: string | null;
   summary: string;
   rationale: string;
-  patch: CompanionGraphPatchOperation[];
+  patch: BuddyGraphPatchOperation[];
   preview: Record<string, unknown> | null;
 };

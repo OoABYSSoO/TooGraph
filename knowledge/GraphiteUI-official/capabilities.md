@@ -31,5 +31,5 @@ GraphiteUI 当前适合做这些事情：
 - 人类在环审计、多断点恢复和批量输入体验
 - LangGraph Python 源码预览、下载和导入校验体验完善
 - 更强的知识库管理和检索增强
-- 更完整的 Agent / Companion Skill 权限、健康检查和配置体验
-- 桌宠 Agent 与自动编排图协作层
+- 更完整的 Agent / 伙伴 Skill 权限、健康检查和配置体验
+- 伙伴 Agent 与自动编排图协作层

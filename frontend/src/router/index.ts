@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 
-const CompanionPage = () => import("@/pages/CompanionPage.vue");
+const BuddyPage = () => import("@/pages/BuddyPage.vue");
 const EditorPage = () => import("@/pages/EditorPage.vue");
 const GraphLibraryPage = () => import("@/pages/GraphLibraryPage.vue");
 const HomePage = () => import("@/pages/HomePage.vue");
@@ -21,7 +21,7 @@ export const router = createRouter({
     { path: "/editor/new", component: EditorPage },
     { path: "/editor/:graphId", component: EditorPage },
     { path: "/library", component: GraphLibraryPage },
-    { path: "/companion", component: CompanionPage },
+    { path: "/buddy", component: BuddyPage },
     { path: "/presets", component: PresetsPage },
     { path: "/skills", component: SkillsPage },
     { path: "/models", component: ModelProvidersPage },

@@ -1,69 +1,69 @@
 <template>
-  <span class="companion-mascot" :class="mascotClasses" aria-hidden="true">
+  <span class="buddy-mascot" :class="mascotClasses" aria-hidden="true">
     <svg
-      class="companion-mascot__svg"
+      class="buddy-mascot__svg"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="-260 -180 640 560"
       focusable="false"
     >
       <defs>
-        <radialGradient id="companionMascotSparkleGold" cx="0" cy="-136" r="56" gradientUnits="userSpaceOnUse">
+        <radialGradient id="buddyMascotSparkleGold" cx="0" cy="-136" r="56" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stop-color="#f2c968" />
           <stop offset="62%" stop-color="#dfad50" />
           <stop offset="100%" stop-color="#c89136" />
         </radialGradient>
-        <linearGradient id="companionMascotEyeGold" x1="-104" y1="32" x2="104" y2="136" gradientUnits="userSpaceOnUse">
+        <linearGradient id="buddyMascotEyeGold" x1="-104" y1="32" x2="104" y2="136" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stop-color="#efbd61" />
           <stop offset="52%" stop-color="#d8a650" />
           <stop offset="100%" stop-color="#cf963d" />
         </linearGradient>
-        <radialGradient id="companionMascotBlack" cx="-44" cy="-132" r="360" gradientUnits="userSpaceOnUse">
+        <radialGradient id="buddyMascotBlack" cx="-44" cy="-132" r="360" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stop-color="#282928" />
           <stop offset="44%" stop-color="#222222" />
           <stop offset="100%" stop-color="#171818" />
         </radialGradient>
-        <filter id="companionMascotSoftness" x="-280" y="-210" width="700" height="640" filterUnits="userSpaceOnUse">
+        <filter id="buddyMascotSoftness" x="-280" y="-210" width="700" height="640" filterUnits="userSpaceOnUse">
           <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.12" />
         </filter>
       </defs>
 
-      <g class="companion-mascot__stage" filter="url(#companionMascotSoftness)">
+      <g class="buddy-mascot__stage" filter="url(#buddyMascotSoftness)">
         <path
-          class="companion-mascot__tail"
+          class="buddy-mascot__tail"
           fill="none"
-          stroke="url(#companionMascotBlack)"
+          stroke="url(#buddyMascotBlack)"
           stroke-width="38"
           stroke-linecap="round"
           stroke-linejoin="round"
           d="M206 154 C240 154 268 136 282 108"
         />
 
-        <g class="companion-mascot__body">
+        <g class="buddy-mascot__body">
           <path
-            class="companion-mascot__left-ear"
-            fill="url(#companionMascotBlack)"
+            class="buddy-mascot__left-ear"
+            fill="url(#buddyMascotBlack)"
             d="M-146-143 C-114-132-82-101-55-61 C-60-24-84 25-124 63 C-158 95-190 53-168-4 C-174-52-164-106-146-143Z"
           />
           <path
-            class="companion-mascot__right-ear"
-            fill="url(#companionMascotBlack)"
+            class="buddy-mascot__right-ear"
+            fill="url(#buddyMascotBlack)"
             d="M146-143 C114-132 82-101 55-61 C60-24 84 25 124 63 C158 95 190 53 168-4 C174-52 164-106 146-143Z"
           />
           <path
-            class="companion-mascot__head"
-            fill="url(#companionMascotBlack)"
+            class="buddy-mascot__head"
+            fill="url(#buddyMascotBlack)"
             d="M-55-61 C-25-66 25-66 55-61 C90-61 130-43 168-4 C196 22 214 66 218 116 C226 208 145 264 0 264 C-145 264-226 208-218 116 C-214 66-196 22-168-4 C-130-43-90-61-55-61Z"
           />
-          <ellipse class="companion-mascot__resting-eye companion-mascot__resting-eye--left" cx="-80" cy="82" rx="24" ry="52" fill="url(#companionMascotEyeGold)" />
-          <ellipse class="companion-mascot__resting-eye companion-mascot__resting-eye--right" cx="80" cy="82" rx="24" ry="52" fill="url(#companionMascotEyeGold)" />
-          <path class="companion-mascot__drag-eye companion-mascot__drag-eye--left" d="M-104 52 L-64 82 L-104 112" />
-          <path class="companion-mascot__drag-eye companion-mascot__drag-eye--right" d="M104 52 L64 82 L104 112" />
+          <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--left" cx="-80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
+          <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--right" cx="80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
+          <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--left" d="M-104 52 L-64 82 L-104 112" />
+          <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--right" d="M104 52 L64 82 L104 112" />
         </g>
 
-        <g class="companion-mascot__sparkle-wrap">
+        <g class="buddy-mascot__sparkle-wrap">
           <path
-            class="companion-mascot__sparkle"
-            fill="url(#companionMascotSparkleGold)"
+            class="buddy-mascot__sparkle"
+            fill="url(#buddyMascotSparkleGold)"
             d="M0-180 C5-154 18-141 44-136 C18-131 5-118 0-92 C-5-118 -18-131 -44-136 C-18-141 -5-154 0-180Z"
           />
         </g>
@@ -75,11 +75,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 
-type CompanionMascotMood = "idle" | "thinking" | "speaking" | "error";
+type BuddyMascotMood = "idle" | "thinking" | "speaking" | "error";
 
 const props = withDefaults(
   defineProps<{
-    mood?: CompanionMascotMood;
+    mood?: BuddyMascotMood;
     dragging?: boolean;
     tapNonce?: number;
   }>(),
@@ -95,9 +95,9 @@ let tapTimeoutId: number | null = null;
 
 const effectiveMood = computed(() => (props.dragging ? "idle" : props.mood));
 const mascotClasses = computed(() => ({
-  [`companion-mascot--${effectiveMood.value}`]: true,
-  "companion-mascot--dragging": props.dragging,
-  "companion-mascot--tap": tapAnimating.value && !props.dragging,
+  [`buddy-mascot--${effectiveMood.value}`]: true,
+  "buddy-mascot--dragging": props.dragging,
+  "buddy-mascot--tap": tapAnimating.value && !props.dragging,
 }));
 
 watch(() => props.tapNonce, triggerTapAnimation);
@@ -138,183 +138,183 @@ function clearTapTimeout() {
 </script>
 
 <style scoped>
-.companion-mascot {
+.buddy-mascot {
   display: block;
   width: 100%;
   height: 100%;
   pointer-events: none;
 }
 
-.companion-mascot__svg {
+.buddy-mascot__svg {
   display: block;
   width: 100%;
   height: 100%;
   overflow: visible;
 }
 
-.companion-mascot__body,
-.companion-mascot__tail,
-.companion-mascot__sparkle-wrap,
-.companion-mascot__sparkle,
-.companion-mascot__left-ear,
-.companion-mascot__right-ear,
-.companion-mascot__resting-eye,
-.companion-mascot__drag-eye {
+.buddy-mascot__body,
+.buddy-mascot__tail,
+.buddy-mascot__sparkle-wrap,
+.buddy-mascot__sparkle,
+.buddy-mascot__left-ear,
+.buddy-mascot__right-ear,
+.buddy-mascot__resting-eye,
+.buddy-mascot__drag-eye {
   transform-box: fill-box;
   transform-origin: center;
 }
 
-.companion-mascot__body {
+.buddy-mascot__body {
   transform-origin: 50% 70%;
 }
 
-.companion-mascot__tail {
+.buddy-mascot__tail {
   transform-origin: 4% 90%;
 }
 
-.companion-mascot__sparkle-wrap,
-.companion-mascot__sparkle {
+.buddy-mascot__sparkle-wrap,
+.buddy-mascot__sparkle {
   transform-origin: 50% 50%;
 }
 
-.companion-mascot__left-ear {
+.buddy-mascot__left-ear {
   transform-origin: 78% 82%;
 }
 
-.companion-mascot__right-ear {
+.buddy-mascot__right-ear {
   transform-origin: 22% 82%;
 }
 
-.companion-mascot__resting-eye {
+.buddy-mascot__resting-eye {
   opacity: 1;
   transform-origin: 50% 50%;
   transition: opacity 120ms ease;
 }
 
-.companion-mascot__drag-eye {
+.buddy-mascot__drag-eye {
   opacity: 0;
   fill: none;
-  stroke: url(#companionMascotEyeGold);
+  stroke: url(#buddyMascotEyeGold);
   stroke-width: 18;
   stroke-linecap: round;
   stroke-linejoin: round;
   transition: opacity 120ms ease;
 }
 
-.companion-mascot--idle .companion-mascot__body {
-  animation: companion-mascot-idle-body 4.8s ease-in-out infinite;
+.buddy-mascot--idle .buddy-mascot__body {
+  animation: buddy-mascot-idle-body 4.8s ease-in-out infinite;
 }
 
-.companion-mascot--idle .companion-mascot__tail {
-  animation: companion-mascot-tail-sway 3.2s ease-in-out infinite;
+.buddy-mascot--idle .buddy-mascot__tail {
+  animation: buddy-mascot-tail-sway 3.2s ease-in-out infinite;
 }
 
-.companion-mascot--idle .companion-mascot__sparkle-wrap {
-  animation: companion-mascot-star-sway 3.6s ease-in-out infinite;
+.buddy-mascot--idle .buddy-mascot__sparkle-wrap {
+  animation: buddy-mascot-star-sway 3.6s ease-in-out infinite;
 }
 
-.companion-mascot--idle .companion-mascot__left-ear {
-  animation: companion-mascot-ear-idle-left 4.2s ease-in-out infinite;
+.buddy-mascot--idle .buddy-mascot__left-ear {
+  animation: buddy-mascot-ear-idle-left 4.2s ease-in-out infinite;
 }
 
-.companion-mascot--idle .companion-mascot__right-ear {
-  animation: companion-mascot-ear-idle-right 4.2s ease-in-out infinite;
+.buddy-mascot--idle .buddy-mascot__right-ear {
+  animation: buddy-mascot-ear-idle-right 4.2s ease-in-out infinite;
   animation-delay: 160ms;
 }
 
-.companion-mascot--idle .companion-mascot__resting-eye {
-  animation: companion-mascot-blink 7.2s ease-in-out infinite;
+.buddy-mascot--idle .buddy-mascot__resting-eye {
+  animation: buddy-mascot-blink 7.2s ease-in-out infinite;
 }
 
-.companion-mascot--thinking .companion-mascot__body {
-  animation: companion-mascot-thinking-body 1.15s ease-in-out infinite;
+.buddy-mascot--thinking .buddy-mascot__body {
+  animation: buddy-mascot-thinking-body 1.15s ease-in-out infinite;
 }
 
-.companion-mascot--thinking .companion-mascot__tail {
-  animation: companion-mascot-tail-thinking 920ms ease-in-out infinite;
+.buddy-mascot--thinking .buddy-mascot__tail {
+  animation: buddy-mascot-tail-thinking 920ms ease-in-out infinite;
 }
 
-.companion-mascot--thinking .companion-mascot__sparkle {
-  animation: companion-mascot-star-flip 1.22s ease-in-out infinite;
+.buddy-mascot--thinking .buddy-mascot__sparkle {
+  animation: buddy-mascot-star-flip 1.22s ease-in-out infinite;
 }
 
-.companion-mascot--thinking .companion-mascot__left-ear {
+.buddy-mascot--thinking .buddy-mascot__left-ear {
   transform: rotate(-7deg) translateY(3px);
 }
 
-.companion-mascot--thinking .companion-mascot__right-ear {
+.buddy-mascot--thinking .buddy-mascot__right-ear {
   transform: rotate(7deg) translateY(3px);
 }
 
-.companion-mascot--speaking .companion-mascot__body {
-  animation: companion-mascot-speaking-body 640ms ease-in-out infinite;
+.buddy-mascot--speaking .buddy-mascot__body {
+  animation: buddy-mascot-speaking-body 640ms ease-in-out infinite;
 }
 
-.companion-mascot--speaking .companion-mascot__tail {
-  animation: companion-mascot-tail-speaking 560ms ease-in-out infinite;
+.buddy-mascot--speaking .buddy-mascot__tail {
+  animation: buddy-mascot-tail-speaking 560ms ease-in-out infinite;
 }
 
-.companion-mascot--speaking .companion-mascot__sparkle {
-  animation: companion-mascot-star-pulse 640ms ease-in-out infinite;
+.buddy-mascot--speaking .buddy-mascot__sparkle {
+  animation: buddy-mascot-star-pulse 640ms ease-in-out infinite;
 }
 
-.companion-mascot--speaking .companion-mascot__left-ear {
-  animation: companion-mascot-ear-speak-left 680ms ease-in-out infinite;
+.buddy-mascot--speaking .buddy-mascot__left-ear {
+  animation: buddy-mascot-ear-speak-left 680ms ease-in-out infinite;
 }
 
-.companion-mascot--speaking .companion-mascot__right-ear {
-  animation: companion-mascot-ear-speak-right 680ms ease-in-out infinite;
+.buddy-mascot--speaking .buddy-mascot__right-ear {
+  animation: buddy-mascot-ear-speak-right 680ms ease-in-out infinite;
 }
 
-.companion-mascot--speaking .companion-mascot__resting-eye {
-  animation: companion-mascot-speaking-eye 640ms ease-in-out infinite;
+.buddy-mascot--speaking .buddy-mascot__resting-eye {
+  animation: buddy-mascot-speaking-eye 640ms ease-in-out infinite;
 }
 
-.companion-mascot--error {
+.buddy-mascot--error {
   filter: saturate(0.85);
 }
 
-.companion-mascot--dragging .companion-mascot__body {
-  animation: companion-mascot-drag-body 720ms ease-in-out infinite;
+.buddy-mascot--dragging .buddy-mascot__body {
+  animation: buddy-mascot-drag-body 720ms ease-in-out infinite;
 }
 
-.companion-mascot--dragging .companion-mascot__tail {
-  animation: companion-mascot-tail-drag 420ms ease-in-out infinite;
+.buddy-mascot--dragging .buddy-mascot__tail {
+  animation: buddy-mascot-tail-drag 420ms ease-in-out infinite;
 }
 
-.companion-mascot--dragging .companion-mascot__left-ear {
-  animation: companion-mascot-ear-drag-left 360ms ease-in-out infinite;
+.buddy-mascot--dragging .buddy-mascot__left-ear {
+  animation: buddy-mascot-ear-drag-left 360ms ease-in-out infinite;
 }
 
-.companion-mascot--dragging .companion-mascot__right-ear {
-  animation: companion-mascot-ear-drag-right 360ms ease-in-out infinite;
+.buddy-mascot--dragging .buddy-mascot__right-ear {
+  animation: buddy-mascot-ear-drag-right 360ms ease-in-out infinite;
 }
 
-.companion-mascot--dragging .companion-mascot__resting-eye {
+.buddy-mascot--dragging .buddy-mascot__resting-eye {
   opacity: 0;
 }
 
-.companion-mascot--dragging .companion-mascot__drag-eye {
+.buddy-mascot--dragging .buddy-mascot__drag-eye {
   opacity: 1;
 }
 
-.companion-mascot--tap .companion-mascot__body {
-  animation: companion-mascot-tap-body 520ms cubic-bezier(0.2, 1.5, 0.32, 1) both;
+.buddy-mascot--tap .buddy-mascot__body {
+  animation: buddy-mascot-tap-body 520ms cubic-bezier(0.2, 1.5, 0.32, 1) both;
 }
 
-.companion-mascot--tap .companion-mascot__sparkle {
-  animation: companion-mascot-star-tap 520ms ease-out both;
+.buddy-mascot--tap .buddy-mascot__sparkle {
+  animation: buddy-mascot-star-tap 520ms ease-out both;
 }
 
-.companion-mascot--tap .companion-mascot__left-ear {
-  animation: companion-mascot-ear-tap-left 520ms ease-out both;
+.buddy-mascot--tap .buddy-mascot__left-ear {
+  animation: buddy-mascot-ear-tap-left 520ms ease-out both;
 }
 
-.companion-mascot--tap .companion-mascot__right-ear {
-  animation: companion-mascot-ear-tap-right 520ms ease-out both;
+.buddy-mascot--tap .buddy-mascot__right-ear {
+  animation: buddy-mascot-ear-tap-right 520ms ease-out both;
 }
 
-@keyframes companion-mascot-idle-body {
+@keyframes buddy-mascot-idle-body {
   0%,
   100% {
     transform: translateY(0) rotate(0deg);
@@ -324,7 +324,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-tail-sway {
+@keyframes buddy-mascot-tail-sway {
   0%,
   100% {
     transform: rotate(-7deg);
@@ -334,7 +334,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-star-sway {
+@keyframes buddy-mascot-star-sway {
   0%,
   100% {
     transform: translateY(0) rotate(-4deg);
@@ -344,7 +344,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-ear-idle-left {
+@keyframes buddy-mascot-ear-idle-left {
   0%,
   82%,
   100% {
@@ -358,7 +358,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-ear-idle-right {
+@keyframes buddy-mascot-ear-idle-right {
   0%,
   82%,
   100% {
@@ -372,7 +372,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-blink {
+@keyframes buddy-mascot-blink {
   0%,
   90%,
   94%,
@@ -384,7 +384,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-thinking-body {
+@keyframes buddy-mascot-thinking-body {
   0%,
   100% {
     transform: translateY(0) rotate(-1deg);
@@ -394,7 +394,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-tail-thinking {
+@keyframes buddy-mascot-tail-thinking {
   0%,
   100% {
     transform: rotate(4deg);
@@ -404,7 +404,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-star-flip {
+@keyframes buddy-mascot-star-flip {
   0%,
   100% {
     transform: scaleX(1);
@@ -416,7 +416,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-speaking-body {
+@keyframes buddy-mascot-speaking-body {
   0%,
   100% {
     transform: translateY(0) scale(1);
@@ -426,7 +426,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-star-pulse {
+@keyframes buddy-mascot-star-pulse {
   0%,
   100% {
     transform: scale(1);
@@ -438,7 +438,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-tail-speaking {
+@keyframes buddy-mascot-tail-speaking {
   0%,
   100% {
     transform: rotate(-3deg);
@@ -451,7 +451,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-ear-speak-left {
+@keyframes buddy-mascot-ear-speak-left {
   0%,
   100% {
     transform: rotate(-2deg);
@@ -461,7 +461,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-ear-speak-right {
+@keyframes buddy-mascot-ear-speak-right {
   0%,
   100% {
     transform: rotate(2deg);
@@ -471,7 +471,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-speaking-eye {
+@keyframes buddy-mascot-speaking-eye {
   0%,
   100% {
     transform: scaleY(1);
@@ -481,7 +481,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-tail-drag {
+@keyframes buddy-mascot-tail-drag {
   0%,
   100% {
     transform: rotate(18deg);
@@ -491,7 +491,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-drag-body {
+@keyframes buddy-mascot-drag-body {
   0%,
   100% {
     transform: translateY(1px) scaleX(0.96) scaleY(1.04) rotate(-5deg);
@@ -501,7 +501,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-ear-drag-left {
+@keyframes buddy-mascot-ear-drag-left {
   0%,
   100% {
     transform: rotate(-18deg) translateY(8px);
@@ -511,7 +511,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-ear-drag-right {
+@keyframes buddy-mascot-ear-drag-right {
   0%,
   100% {
     transform: rotate(18deg) translateY(8px);
@@ -521,7 +521,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-tap-body {
+@keyframes buddy-mascot-tap-body {
   0% {
     transform: translateY(0) scale(1);
   }
@@ -533,7 +533,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-star-tap {
+@keyframes buddy-mascot-star-tap {
   0% {
     transform: scale(1) rotate(0deg);
     filter: brightness(1);
@@ -548,7 +548,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-ear-tap-left {
+@keyframes buddy-mascot-ear-tap-left {
   0%,
   100% {
     transform: rotate(0deg);
@@ -558,7 +558,7 @@ function clearTapTimeout() {
   }
 }
 
-@keyframes companion-mascot-ear-tap-right {
+@keyframes buddy-mascot-ear-tap-right {
   0%,
   100% {
     transform: rotate(0deg);

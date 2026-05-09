@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from app.api.routes_companion import router as companion_router
+from app.api.routes_buddy import router as buddy_router
 from app.api.routes_graphs import router as graphs_router
 from app.api.routes_knowledge import router as knowledge_router
 from app.api.routes_memories import router as memories_router
@@ -86,7 +86,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(companion_router)
+app.include_router(buddy_router)
 app.include_router(graphs_router)
 app.include_router(knowledge_router)
 app.include_router(memories_router)

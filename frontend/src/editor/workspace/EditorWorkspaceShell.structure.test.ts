@@ -39,15 +39,15 @@ test("EditorWorkspaceShell renders workspace panes without reka-ui tab primitive
   assert.match(componentSource, /editor-workspace-shell__editor--active/);
 });
 
-test("EditorWorkspaceShell publishes the active editor snapshot for advisory companion context", () => {
-  assert.match(componentSource, /import \{ useCompanionContextStore \} from "@\/stores\/companionContext";/);
-  assert.match(componentSource, /const companionContextStore = useCompanionContextStore\(\);/);
-  assert.match(componentSource, /const activeCompanionEditorSnapshot = computed\(\(\) => \{/);
+test("EditorWorkspaceShell publishes the active editor snapshot for advisory buddy context", () => {
+  assert.match(componentSource, /import \{ useBuddyContextStore \} from "@\/stores\/buddyContext";/);
+  assert.match(componentSource, /const buddyContextStore = useBuddyContextStore\(\);/);
+  assert.match(componentSource, /const activeBuddyEditorSnapshot = computed\(\(\) => \{/);
   assert.match(componentSource, /document: documentsByTabId\.value\[tab\.tabId\] \?\? null,/);
   assert.match(componentSource, /focusedNodeId: focusedNodeIdByTabId\.value\[tab\.tabId\] \?\? null,/);
   assert.match(componentSource, /feedback: feedbackForTab\(tab\.tabId\),/);
-  assert.match(componentSource, /watch\([\s\S]*activeCompanionEditorSnapshot,[\s\S]*companionContextStore\.setEditorSnapshot\(snapshot\),[\s\S]*\{ immediate: true, deep: true \},[\s\S]*\);/);
-  assert.match(componentSource, /onBeforeUnmount\(\(\) => \{[\s\S]*companionContextStore\.clearEditorSnapshot\(\);/);
+  assert.match(componentSource, /watch\([\s\S]*activeBuddyEditorSnapshot,[\s\S]*buddyContextStore\.setEditorSnapshot\(snapshot\),[\s\S]*\{ immediate: true, deep: true \},[\s\S]*\);/);
+  assert.match(componentSource, /onBeforeUnmount\(\(\) => \{[\s\S]*buddyContextStore\.clearEditorSnapshot\(\);/);
 });
 
 test("EditorWorkspaceShell wires canvas node-creation intents into a dedicated creation menu component", () => {

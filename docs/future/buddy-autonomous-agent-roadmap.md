@@ -1,10 +1,10 @@
-# 桌宠自主 Agent 路线图
+# 伙伴自主 Agent 路线图
 
-本文是 GraphiteUI 桌宠、自主工具循环、技能生成和长期协作能力的唯一长期参考文档。若旧文档、临时计划或实现草稿与本文冲突，以本文为准。
+本文是 GraphiteUI 伙伴、自主工具循环、技能生成和长期协作能力的唯一长期参考文档。若旧文档、临时计划或实现草稿与本文冲突，以本文为准。
 
 ## 目标
 
-桌宠不是脱离图系统的特殊 Agent。桌宠收到消息后，应当通过一个图模板完成：
+伙伴不是脱离图系统的特殊 Agent。伙伴收到消息后，应当通过一个图模板完成：
 
 ```text
 输入消息和上下文
@@ -29,7 +29,7 @@
 - 图才是 Agent：单个节点不应承担多轮自主体语义；LLM 节点只做一次模型运行、一次结构化输出或一次能力调用准备。
 - LLM 单能力：一个 LLM 节点最多使用一个能力来源。多个技能或子图调用必须拆成多个节点与边，由图负责编排。
 - 单值技能配置：手动选择的 LLM 节点技能只能存为 `config.skillKey` 单个字符串；`config.skills` 数组是旧协议残留，不应继续使用。
-- 技能统一：不存在“桌宠专用技能”和“LLM 节点专用技能”两套能力库。
+- 技能统一：不存在“伙伴专用技能”和“LLM 节点专用技能”两套能力库。
 - 能力显式：联网、文件读写、媒体下载、图编辑、记忆写入、模型调用和技能生成都必须体现为 skill、模板、命令或运行时原语。
 - 权限显式：安装 skill 不等于授权任意使用。高风险副作用必须有清晰审批路径。
 - 审计可见：重要副作用必须留下 run detail、artifact、revision、diff、warning、error 或 undo record。
@@ -57,7 +57,7 @@
 - 动态 `capability` state 执行结果已收束为唯一 `result_package` 输出：运行时封包，下游 prompt 组装时拆包，复用普通 state 和 artifact 展开逻辑。
 - `capability.kind=subgraph` 已可由 LLM 节点动态执行：节点先生成目标图模板的公开输入，运行时执行子图并把公开输出封装进同一套 `result_package`。
 - 图运行前不再兼容补齐旧绑定。旧草稿、旧模板和旧技能需要按当前协议重建。
-- 已新增通用 `advanced_web_research_loop` 内置模板，用于验证“搜索技能执行 -> 证据评估 -> condition 控制补搜 -> 依据筛选 -> final_reply”的图式工具循环。它不是桌宠自主循环模板，但可作为联网研究子流程和后续桌宠模板的参考构件。
+- 已新增通用 `advanced_web_research_loop` 内置模板，用于验证“搜索技能执行 -> 证据评估 -> condition 控制补搜 -> 依据筛选 -> final_reply”的图式工具循环。它不是伙伴自主循环模板，但可作为联网研究子流程和后续伙伴模板的参考构件。
 - 偏离新职责的旧 `create_user_skill` 内置模板已删除。新的 `graphiteUI_skill_builder` 只产出 Skill 包文件内容，完整用户 Skill 生成流程仍需要补齐确认、调用 `local_workspace_executor` 写入、调用 `graphiteUI_script_tester` 或同类测试能力、修复和启用节点。
 - 子图缩略图已能投射内部节点运行状态颜色，并在节点卡片上显示当前内部运行摘要。
 
@@ -65,10 +65,10 @@
 
 - 子图运行审计聚合、事件定位、从缩略图点击跳转到内部节点，以及更完整的嵌套可视化能力。
 - 真实的 `autonomous_decision` 技能。
-- 新版桌宠自主循环模板。
+- 新版伙伴自主循环模板。
 - 将内部 `agent` kind 迁移为面向用户和协议一致的 LLM 节点语义。
 - 围绕 `graphiteUI_skill_builder` 补齐用户 Skill 生成图流程：从需求澄清、示例确认、文件内容生成，到调用 `local_workspace_executor` 受控写入、调用 `graphiteUI_script_tester` 或同类测试能力、错误修复和启用。
-- 当前仍残留 `backend/app/companion/commands.py` 中的 `graph_patch.draft` 草案记录 stub。它是历史遗留入口，只能记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、graph revision、undo 或完整审计闭环；下一轮应删除它，或按新的图优先命令流重建。
+- 当前仍残留 `backend/app/buddy/commands.py` 中的 `graph_patch.draft` 草案记录 stub。它是历史遗留入口，只能记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、graph revision、undo 或完整审计闭环；下一轮应删除它，或按新的图优先命令流重建。
 - 审批恢复 UI、图补丁预览、GraphCommandBus、graph revision、undo 和完整审计闭环。
 
 ## 当前可参考模板
@@ -103,7 +103,7 @@ input_question
 - `exhausted` 分支表示达到循环上限后用已有证据收束，而不是失败。
 - 证据评估节点不应为了追求完美资料无限补搜。已有约 5 份可读原文并足以回答时，应进入整理阶段，并在最终回复中说明资料局限。
 
-该模板证明当前节点系统已经能表达一个“万能循环”的核心局部：工具执行、结果评估、必要时再调用工具、最后整理回复。桌宠自主循环还需要在它前面补上意图判断、技能目录检索和 `autonomous_decision`，并在它后面补上可选的人设/记忆/会话摘要写回。
+该模板证明当前节点系统已经能表达一个“万能循环”的核心局部：工具执行、结果评估、必要时再调用工具、最后整理回复。伙伴自主循环还需要在它前面补上意图判断、技能目录检索和 `autonomous_decision`，并在它后面补上可选的人设/记忆/会话摘要写回。
 
 ## 子图组件
 
@@ -169,15 +169,15 @@ input_question
 
 只有一种真实执行底座：graph run。
 
-桌宠运行时不是第二套 `companion_run`，LLM 节点运行时也不是另一套 `graph_run`。桌宠只是用 `origin=companion` 这类运行来源元数据启动图模板。运行来源用于策略判断、审计和 UI 展示，不用于创造第二套执行协议。
+伙伴运行时不是第二套 `buddy_run`，LLM 节点运行时也不是另一套 `graph_run`。伙伴只是用 `origin=buddy` 这类运行来源元数据启动图模板。运行来源用于策略判断、审计和 UI 展示，不用于创造第二套执行协议。
 
-当前代码里仍有待迁移的旧标记：前端桌宠构图代码会写入 `companion_run`、`companion_permission_tier`、`companion_graph_patch_drafts_enabled` 等元数据。这些字段只代表历史遗留状态，不是目标协议；新一轮实现应迁移到统一的运行来源元数据，例如 `origin=companion`，并避免继续扩展第二套桌宠运行协议。
+当前代码里仍有待迁移的旧标记：前端伙伴构图代码会写入 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等元数据。这些字段只代表历史遗留状态，不是目标协议；新一轮实现应迁移到统一的运行来源元数据，例如 `origin=buddy`，并避免继续扩展第二套伙伴运行协议。
 
 因此：
 
 - 不需要 `executionTargets`。
 - 不需要 skill `targets`。
-- 不需要 Companion Skill / Agent Skill 两套能力库。
+- 不需要 伙伴 Skill / Agent Skill 两套能力库。
 - 模板显式绑定某个 skill，或上游 state 传入某个 skill，都表示下游 LLM 节点需要使用这个 skill。
 
 ## Skill Manifest 契约
@@ -205,7 +205,7 @@ input_question
       "requiresApproval": false
     },
     "origins": {
-      "companion": {
+      "buddy": {
         "selectable": true,
         "requiresApproval": false
       }
@@ -225,7 +225,7 @@ input_question
 - `before_llm.py`：可选固定入口，在 LLM 生成技能参数前补充上下文，例如当前日期或候选能力清单。
 - `after_llm.py`：可选固定入口，在 LLM 生成技能参数后执行、校验或规范化结果；技能脚本不直接写 state。
 - `capabilityPolicy.default`：默认能力选择策略。
-- `capabilityPolicy.origins.<origin>`：特定来源策略，例如 `companion`。
+- `capabilityPolicy.origins.<origin>`：特定来源策略，例如 `buddy`。
 - `selectable`：能力选择器是否可以看到并返回这个 skill。
 - `requiresApproval`：执行前是否必须请求用户确认。
 
@@ -259,7 +259,7 @@ effective_capability =
 
 - LLM 节点卡片只能手动选择一个 skill。
 - `capability.kind=skill` 只表达“选中的一个技能”，不等于安装、启用或授权。
-- `capability.kind=subgraph` 只表达“选中的一个可运行子图能力”，主要服务桌宠主循环等动态模板。
+- `capability.kind=subgraph` 只表达“选中的一个可运行子图能力”，主要服务伙伴主循环等动态模板。
 - `capability.kind=none` 表达没有合适能力。
 - 一个 LLM 节点不能同时使用卡片 skill 和输入 capability state；冲突时应作为协议错误处理。
 - 真正执行前仍必须通过 skill registry、启用状态、运行时注册状态、`capabilityPolicy` 和审批检查。
@@ -479,18 +479,18 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 function call 未来可以作为某些模型的适配层，但不能绕过 GraphiteUI 的 skill registry、权限检查、审批路径和审计记录。不支持 function call 的本地模型也必须能通过结构化 JSON 输出参与同一套图循环。
 
-## 新版桌宠自主循环模板
+## 新版伙伴自主循环模板
 
-当前仓库尚未创建或注册 `companion_autonomous_loop`。桌宠浮窗 UI 已经存在，并会尝试读取这个模板；在模板按新协议重建前，桌宠对话循环不能作为当前可用能力。下一轮工作的起点应是创建并接入这个模板，而不是增强旧 `companion_chat_loop` 或恢复旧兼容入口。
+当前仓库尚未创建或注册 `buddy_autonomous_loop`。伙伴浮窗 UI 已经存在，并会尝试读取这个模板；在模板按新协议重建前，伙伴对话循环不能作为当前可用能力。下一轮工作的起点应是创建并接入这个模板，而不是增强旧 `buddy_chat_loop` 或恢复旧兼容入口。
 
 待手工重建的目标模板应包含：
 
 - `user_message`
 - `conversation_history`
 - `page_context`
-- `companion_profile`
-- `companion_policy`
-- `companion_memory_context`
+- `buddy_profile`
+- `buddy_policy`
+- `buddy_memory_context`
 - `skill_catalog_snapshot`
 - `intent_plan`
 - `decision`
@@ -501,7 +501,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 - `approval_prompt`
 - `approval_granted`
 - `final_reply`
-- `companion_session_summary`
+- `buddy_session_summary`
 - 必要的绑定输出 state，例如 `query`、`source_urls`、`artifact_paths`、`errors`；其中 `artifact_paths` 应使用 `file`，值可以是路径或路径数组。
 
 推荐节点职责：
@@ -529,14 +529,14 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 
 - 让 prompt 直接决定权限。
 - 让 function call 绕过 GraphiteUI skill registry。
-- 让桌宠静默安装、启用或运行新 skill。
-- 让桌宠直接改 DOM 或模拟用户点击。
+- 让伙伴静默安装、启用或运行新 skill。
+- 让伙伴直接改 DOM 或模拟用户点击。
 - 建立第二套独立于 GraphiteUI skill 系统的插件系统。
 - 把临时日志、原始报错、大媒体、base64、下载全文或可从当前图重新读取的信息写入长期记忆。
 
 ## 文档维护规则
 
-- 本文是桌宠自主 Agent 方向的唯一长期参考。
+- 本文是伙伴自主 Agent 方向的唯一长期参考。
 - 当前状态快照写入 `docs/current_project_status.md`。
 - 阶段性计划完成后，不保留独立计划文档；把仍然有效的结论折回本文。
 - 被本文覆盖的旧路线文档应删除。

@@ -64,8 +64,8 @@ const unavailableSkillDefinitions: SkillDefinition[] = [
   skillDefinitions[0],
   {
     ...skillDefinitions[1],
-    skillKey: "desktop_companion_profile",
-    name: "Desktop Companion Profile",
+    skillKey: "desktop_buddy_profile",
+    name: "Desktop Buddy Profile",
   },
   {
     ...skillDefinitions[1],
@@ -91,7 +91,7 @@ const unavailableSkillDefinitions: SkillDefinition[] = [
 test("listSelectableSkillDefinitions exposes active runtime-ready LLM node skills", () => {
   assert.deepEqual(
     listSelectableSkillDefinitions(unavailableSkillDefinitions).map((definition) => definition.skillKey),
-    ["web_search", "desktop_companion_profile"],
+    ["web_search", "desktop_buddy_profile"],
   );
 });
 

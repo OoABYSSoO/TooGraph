@@ -45,7 +45,7 @@ const skills: SkillDefinition[] = [
     capabilityPolicy: {
       default: { selectable: true, requiresApproval: false },
       origins: {
-        companion: { selectable: true, requiresApproval: true },
+        buddy: { selectable: true, requiresApproval: true },
       },
     },
     permissions: ["network", "model_vision"],
@@ -57,9 +57,9 @@ const skills: SkillDefinition[] = [
     canManage: true,
   },
   {
-    skillKey: "desktop_companion_profile",
-    name: "Desktop Companion Profile",
-    description: "A companion context profile.",
+    skillKey: "desktop_buddy_profile",
+    name: "Desktop Buddy Profile",
+    description: "A buddy context profile.",
     llmInstruction: "",
     schemaVersion: "graphite.skill/v1",
     inputSchema: [],
@@ -71,12 +71,12 @@ const skills: SkillDefinition[] = [
     capabilityPolicy: {
       default: { selectable: false, requiresApproval: true },
       origins: {
-        companion: { selectable: false, requiresApproval: true },
+        buddy: { selectable: false, requiresApproval: true },
       },
     },
     permissions: ["profile_context"],
     sourceScope: "installed",
-    sourcePath: "/skills/desktop_companion_profile/skill.json",
+    sourcePath: "/skills/desktop_buddy_profile/skill.json",
     runtimeReady: false,
     runtimeRegistered: false,
     status: "active",
@@ -95,11 +95,11 @@ test("filterSkillsForManagement searches capability policy and permission fields
   );
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "profile", status: "all" }).map((skill) => skill.skillKey),
-    ["desktop_companion_profile"],
+    ["desktop_buddy_profile"],
   );
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "requires approval", status: "all" }).map((skill) => skill.skillKey),
-    ["draft_search", "desktop_companion_profile"],
+    ["draft_search", "desktop_buddy_profile"],
   );
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "selectable capability", status: "all" }).map((skill) => skill.skillKey),
@@ -107,10 +107,10 @@ test("filterSkillsForManagement searches capability policy and permission fields
   );
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "profile_context", status: "all" }).map((skill) => skill.skillKey),
-    ["desktop_companion_profile"],
+    ["desktop_buddy_profile"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(skills, { query: "companion selectable capability requires approval", status: "all" }).map((skill) => skill.skillKey),
+    filterSkillsForManagement(skills, { query: "buddy selectable capability requires approval", status: "all" }).map((skill) => skill.skillKey),
     ["draft_search"],
   );
   assert.deepEqual(
@@ -130,22 +130,22 @@ test("filterSkillsForManagement filters by user-facing status and capability pol
   );
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "", status: "active" }).map((skill) => skill.skillKey),
-    ["rewrite_text", "draft_search", "desktop_companion_profile"],
+    ["rewrite_text", "draft_search", "desktop_buddy_profile"],
   );
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "", status: "all" }).map((skill) => skill.skillKey),
-    ["rewrite_text", "draft_search", "desktop_companion_profile"],
+    ["rewrite_text", "draft_search", "desktop_buddy_profile"],
   );
 });
 
 test("filterSkillsForManagement ignores removed runtime and attention filters", () => {
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "", status: "runtime" as never }).map((skill) => skill.skillKey),
-    ["rewrite_text", "draft_search", "desktop_companion_profile"],
+    ["rewrite_text", "draft_search", "desktop_buddy_profile"],
   );
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "", status: "attention" as never }).map((skill) => skill.skillKey),
-    ["rewrite_text", "draft_search", "desktop_companion_profile"],
+    ["rewrite_text", "draft_search", "desktop_buddy_profile"],
   );
 });
 

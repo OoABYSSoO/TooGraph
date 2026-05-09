@@ -18,8 +18,8 @@
   - 官方 Skill 根目录下的 Skill 包结构、生命周期入口和权限边界
   - 手工创建 Skill 与后续技能生成能力都应读取的协议说明
 
-- [future/companion-autonomous-agent-roadmap.md](future/companion-autonomous-agent-roadmap.md)
-  - 桌宠、自主工具循环、技能生成和长期协作能力的唯一长期参考
+- [future/buddy-autonomous-agent-roadmap.md](future/buddy-autonomous-agent-roadmap.md)
+  - 伙伴、自主工具循环、技能生成和长期协作能力的唯一长期参考
   - 包含 graph-first 运行模型、子图组件、skill manifest 契约、`capability` state、`result_package` 动态结果包、技能说明胶囊、技能绑定 state、`autonomous_decision`、能力选择、Skill 生成能力和 function call 取舍
 
 ## 已清理
@@ -28,14 +28,14 @@
 - 已完成的 agent-only LangGraph runtime 规划文档
 - 已完成或偏离当前 `skill/<skill_key>` 目录主线的旧 skill 重构文档
 - 阶段性的外部 Agent 框架对标和 LangGraph 高级能力基线分析
-- 被新版桌宠自主 Agent 路线图合并和替代的旧权限、记忆和技能分类文档
+- 被新版伙伴自主 Agent 路线图合并和替代的旧权限、记忆和技能分类文档
 - 旧内置模板和旧技能包的说明
 
 ## 维护原则
 
 - README 是项目文档主入口。
 - 当前状态写在 `docs/current_project_status.md`。
-- 桌宠自主 Agent 方向只维护 `docs/future/companion-autonomous-agent-roadmap.md` 这一份长期参考。
+- 伙伴自主 Agent 方向只维护 `docs/future/buddy-autonomous-agent-roadmap.md` 这一份长期参考。
 - 阶段结束后，临时计划应删除或折叠进当前状态文档。
 - 文档不能把已经拒绝或删除的实现路线写成当前方案。
 - 如果旧文档和 `AGENTS.md` 中的图优先、skill 自包含、显式权限、artifact 输出、审计和记忆卫生准则冲突，以 `AGENTS.md` 为准，并尽快修正文档。

@@ -1,13 +1,13 @@
 import { defineStore } from "pinia";
 import { markRaw, ref } from "vue";
 
-import type { CompanionEditorContextSnapshot } from "../companion/companionPageContext.ts";
+import type { BuddyEditorContextSnapshot } from "../buddy/buddyPageContext.ts";
 
-export const useCompanionContextStore = defineStore("companionContext", () => {
-  const editorSnapshot = ref<CompanionEditorContextSnapshot | null>(null);
+export const useBuddyContextStore = defineStore("buddyContext", () => {
+  const editorSnapshot = ref<BuddyEditorContextSnapshot | null>(null);
   const dataRefreshNonce = ref(0);
 
-  function setEditorSnapshot(nextSnapshot: CompanionEditorContextSnapshot | null) {
+  function setEditorSnapshot(nextSnapshot: BuddyEditorContextSnapshot | null) {
     editorSnapshot.value = nextSnapshot
       ? {
           ...nextSnapshot,
@@ -20,7 +20,7 @@ export const useCompanionContextStore = defineStore("companionContext", () => {
     editorSnapshot.value = null;
   }
 
-  function notifyCompanionDataChanged() {
+  function notifyBuddyDataChanged() {
     dataRefreshNonce.value += 1;
   }
 
@@ -29,6 +29,6 @@ export const useCompanionContextStore = defineStore("companionContext", () => {
     dataRefreshNonce,
     setEditorSnapshot,
     clearEditorSnapshot,
-    notifyCompanionDataChanged,
+    notifyBuddyDataChanged,
   };
 });

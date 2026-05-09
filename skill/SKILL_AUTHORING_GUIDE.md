@@ -95,7 +95,7 @@ Python Skill 的依赖规则：
       "requiresApproval": false
     },
     "origins": {
-      "companion": {
+      "buddy": {
         "selectable": true,
         "requiresApproval": false
       }

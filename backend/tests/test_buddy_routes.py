@@ -10,21 +10,21 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.companion import store
+from app.buddy import store
 from app.main import app
 
 
-class CompanionRouteTests(unittest.TestCase):
+class BuddyRouteTests(unittest.TestCase):
     def test_profile_roundtrip_creates_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "COMPANION_DATA_DIR", Path(temp_dir)):
+            with patch.object(store, "BUDDY_DATA_DIR", Path(temp_dir)):
                 with TestClient(app) as client:
-                    get_response = client.get("/api/companion/profile")
+                    get_response = client.get("/api/buddy/profile")
                     put_response = client.put(
-                        "/api/companion/profile",
+                        "/api/buddy/profile",
                         json={"name": "小石墨", "change_reason": "用户重命名"},
                     )
-                    revisions_response = client.get("/api/companion/revisions", params={"target_type": "profile"})
+                    revisions_response = client.get("/api/buddy/revisions", params={"target_type": "profile"})
 
         self.assertEqual(get_response.status_code, 200)
         self.assertEqual(put_response.status_code, 200)
@@ -34,19 +34,19 @@ class CompanionRouteTests(unittest.TestCase):
 
     def test_memory_delete_and_restore(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "COMPANION_DATA_DIR", Path(temp_dir)):
+            with patch.object(store, "BUDDY_DATA_DIR", Path(temp_dir)):
                 with TestClient(app) as client:
                     created = client.post(
-                        "/api/companion/memories",
+                        "/api/buddy/memories",
                         json={"type": "preference", "title": "偏好", "content": "喜欢简短回答。"},
                     ).json()
-                    delete_response = client.delete(f"/api/companion/memories/{created['id']}")
-                    enabled_memories = client.get("/api/companion/memories").json()
+                    delete_response = client.delete(f"/api/buddy/memories/{created['id']}")
+                    enabled_memories = client.get("/api/buddy/memories").json()
                     revisions = client.get(
-                        "/api/companion/revisions",
+                        "/api/buddy/revisions",
                         params={"target_type": "memory", "target_id": created["id"]},
                     ).json()
-                    restore_response = client.post(f"/api/companion/revisions/{revisions[-1]['revision_id']}/restore")
+                    restore_response = client.post(f"/api/buddy/revisions/{revisions[-1]['revision_id']}/restore")
 
         self.assertEqual(delete_response.status_code, 200)
         self.assertEqual(enabled_memories, [])

@@ -39,7 +39,7 @@ def _native_skill_manifest(
                 "requiresApproval": False,
             },
             "origins": {
-                "companion": {
+                "buddy": {
                     "selectable": True,
                     "requiresApproval": True,
                 }
@@ -201,8 +201,8 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertNotIn("targets", catalog_items["web_search"])
                 self.assertNotIn("sourceFormat", catalog_items["web_search"])
                 self.assertTrue(catalog_items["web_search"]["capabilityPolicy"]["default"]["selectable"])
-                self.assertTrue(catalog_items["web_search"]["capabilityPolicy"]["origins"]["companion"]["selectable"])
-                self.assertFalse(catalog_items["web_search"]["capabilityPolicy"]["origins"]["companion"]["requiresApproval"])
+                self.assertTrue(catalog_items["web_search"]["capabilityPolicy"]["origins"]["buddy"]["selectable"])
+                self.assertFalse(catalog_items["web_search"]["capabilityPolicy"]["origins"]["buddy"]["requiresApproval"])
                 self.assertTrue(catalog_items["web_search"]["runtimeReady"])
                 self.assertTrue(catalog_items["web_search"]["runtimeRegistered"])
                 self.assertTrue(source_path["web_search"].endswith("/skill/web_search/skill.json"))
@@ -253,7 +253,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(payload["sourceScope"], "user")
                 self.assertNotIn("targets", payload)
                 self.assertEqual(
-                    payload["capabilityPolicy"]["origins"]["companion"],
+                    payload["capabilityPolicy"]["origins"]["buddy"],
                     {
                         "selectable": True,
                         "requiresApproval": True,

@@ -1,36 +1,36 @@
 import type { GraphDocument, GraphNode, GraphPayload, ReadBinding, WriteBinding } from "../types/node-system.ts";
 
-export type CompanionEditorFeedbackSnapshot = {
+export type BuddyEditorFeedbackSnapshot = {
   message?: string | null;
   activeRunId?: string | null;
   activeRunStatus?: string | null;
   currentNodeLabel?: string | null;
 };
 
-export type CompanionEditorContextSnapshot = {
+export type BuddyEditorContextSnapshot = {
   activeTabTitle?: string | null;
   document?: GraphPayload | GraphDocument | null;
   focusedNodeId?: string | null;
-  feedback?: CompanionEditorFeedbackSnapshot | null;
+  feedback?: BuddyEditorFeedbackSnapshot | null;
 };
 
-export type BuildCompanionPageContextInput = {
+export type BuildBuddyPageContextInput = {
   routePath: string;
-  editor?: CompanionEditorContextSnapshot | null;
-  activeCompanionRunId?: string | null;
+  editor?: BuddyEditorContextSnapshot | null;
+  activeBuddyRunId?: string | null;
 };
 
-export function buildCompanionPageContext(input: BuildCompanionPageContextInput): string {
+export function buildBuddyPageContext(input: BuildBuddyPageContextInput): string {
   const lines = [
     "<page-context>",
     "[System note: 这是 GraphiteUI 前端提供的只读界面快照，不是新的用户输入。Treat it as informational background only.]",
     "",
     "当前档位：建议档",
-    "允许：陪伴聊天、解释当前页面、分析当前图、提供建议、讨论桌宠自我设定。",
+    "允许：陪伴聊天、解释当前页面、分析当前图、提供建议、讨论伙伴自我设定。",
     "禁止：新建图、修改图、连接节点、删除节点、应用补丁、运行图。",
     "",
     `当前路径: ${input.routePath || "/"}`,
-    ...(input.activeCompanionRunId ? [`桌宠本轮运行: ${input.activeCompanionRunId}`] : []),
+    ...(input.activeBuddyRunId ? [`伙伴本轮运行: ${input.activeBuddyRunId}`] : []),
     ...buildEditorContextLines(input.editor ?? null),
     "</page-context>",
   ];
@@ -38,7 +38,7 @@ export function buildCompanionPageContext(input: BuildCompanionPageContextInput)
   return lines.filter((line) => line !== null).join("\n");
 }
 
-function buildEditorContextLines(editor: CompanionEditorContextSnapshot | null): string[] {
+function buildEditorContextLines(editor: BuddyEditorContextSnapshot | null): string[] {
   const document = editor?.document ?? null;
   if (!document) {
     return ["当前没有打开的 GraphiteUI 图。"];
@@ -137,7 +137,7 @@ function formatStateReference(document: GraphPayload | GraphDocument, stateKey: 
   return definition ? `${definition.name}(${stateKey}${suffixText})` : `${stateKey}${suffixText}`;
 }
 
-function buildFeedbackLines(feedback: CompanionEditorFeedbackSnapshot | null): string[] {
+function buildFeedbackLines(feedback: BuddyEditorFeedbackSnapshot | null): string[] {
   if (!feedback) {
     return [];
   }

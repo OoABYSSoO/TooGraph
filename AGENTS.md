@@ -52,7 +52,7 @@ These instructions apply to all work in this repository and should persist acros
 
 ## Graph-First Product Architecture
 
-- GraphiteUI product behavior should be framed by graph templates whenever practical. Persistent operations, local file edits, memory updates, companion self-configuration, and other side effects should happen because a designated graph/template ran, not because hidden product-specific imperative code made the decision.
+- GraphiteUI product behavior should be framed by graph templates whenever practical. Persistent operations, local file edits, memory updates, buddy self-configuration, and other side effects should happen because a designated graph/template ran, not because hidden product-specific imperative code made the decision.
 - Keep node responsibilities clear:
   - A whole graph is the Agent. Do not treat a single node as an autonomous multi-step agent.
   - LLM nodes perform one model turn. They reason, classify, plan, generate structured state, or prepare one capability call.
@@ -63,11 +63,11 @@ These instructions apply to all work in this repository and should persist acros
   - Skill instruction capsules are only the node-level override surface. The default capsule is derived from the selected skill manifest `llmInstruction`; only user-edited text is persisted as `skillInstructionBlocks.<skillKey>` with `source: "node.override"`. At runtime there is one effective skill-use instruction: node override when present, otherwise manifest `llmInstruction`, injected into the skill-input planning system prompt and not duplicated in user prompts.
   - Skill lifecycle scripts use fixed filenames instead of manifest entrypoint configuration. If `before_llm.py` exists, runtime executes it before skill-input planning and injects its auditable context into the LLM prompt. If `after_llm.py` exists, runtime executes it after the LLM has produced structured skill arguments and treats its JSON result as the skill output. State binding remains runtime-owned through `outputSchema` and `skillBindings.outputMapping`; lifecycle scripts must not write graph state directly.
   - Dynamic capability execution from an incoming `capability` state must write exactly one `result_package` state. The package wraps outputs as `outputs.<outputKey> = { name, description, type, value }`; do not add a redundant `fieldKey` property. Downstream LLM prompt assembly unpacks those virtual outputs and then uses the same state rendering rules as static states.
-  - Manual reusable graph embedding belongs to Subgraph nodes. `capability.kind=subgraph` exists for dynamic graph capability selection inside templates such as the companion loop, not as a normal card-level dropdown on LLM nodes.
+  - Manual reusable graph embedding belongs to Subgraph nodes. `capability.kind=subgraph` exists for dynamic graph capability selection inside templates such as the buddy loop, not as a normal card-level dropdown on LLM nodes.
   - Skill nodes execute controlled capabilities and side effects, such as writing local files, updating memory stores, downloading resources, or creating revisions.
   - Output nodes display, preview, export, or link results. They should not own persistent mutation logic.
-- Backend code should provide reusable primitives, storage APIs, validators, revision mechanisms, and skill runtimes. Avoid burying product behavior such as companion memory policy, persona update rules, or workflow decisions directly in backend endpoints when the behavior can be expressed as a graph/template.
-- Companion behavior, memory management, persona updates, and file-edit workflows should be modeled as auditable graph flows: input/context -> LLM planning -> optional validation/approval -> skill/subgraph execution -> output display.
+- Backend code should provide reusable primitives, storage APIs, validators, revision mechanisms, and skill runtimes. Avoid burying product behavior such as buddy memory policy, persona update rules, or workflow decisions directly in backend endpoints when the behavior can be expressed as a graph/template.
+- Buddy behavior, memory management, persona updates, and file-edit workflows should be modeled as auditable graph flows: input/context -> LLM planning -> optional validation/approval -> skill/subgraph execution -> output display.
 - Low-level operations should remain visible and replayable through graph runs. When a feature needs to modify local documents, profile data, policy data, memories, templates, or other local state, prefer adding or reusing a skill plus a template that performs the operation and returns clear artifacts such as local file paths, diffs, revision IDs, and status messages.
 
 ## Skill Package Boundaries
@@ -86,7 +86,7 @@ These instructions apply to all work in this repository and should persist acros
 ## Explicit Capabilities and Permissions
 
 - Capabilities should be explicit and inspectable. Retrieval, web access, media download, local file edits, memory writes, graph edits, and model/tool calls should appear as skills, graph templates, commands, or permissioned runtime primitives rather than hidden convenience behavior.
-- Installing a skill is not the same as granting every usage permission. Skill target, kind, mode, scope, network access, file access, graph access, and companion access should remain visible near the place where the capability is used.
+- Installing a skill is not the same as granting every usage permission. Skill target, kind, mode, scope, network access, file access, graph access, and buddy access should remain visible near the place where the capability is used.
 - Destructive, overwrite, run, network, cost-incurring, sensitive-file, and graph-write operations need a clear permission path. Do not rely on prompt text alone for safety boundaries.
 
 ## Artifact and Output Contract
@@ -97,16 +97,16 @@ These instructions apply to all work in this repository and should persist acros
 
 ## Auditability and Human Review
 
-- Automatic behavior should be visible, reversible, and auditable. Important side effects should leave run detail entries, artifact records, warnings/errors, companion action logs, revision IDs, diffs, or undo records as appropriate.
+- Automatic behavior should be visible, reversible, and auditable. Important side effects should leave run detail entries, artifact records, warnings/errors, buddy action logs, revision IDs, diffs, or undo records as appropriate.
 - Human review should be part of the graph/template/command flow when required, not a hidden UI-only prompt. Approval should happen before applying the side effect it authorizes.
-- Companion and agent graph edits must go through GraphiteUI's command path, validator, audit trail, and undo/redo system. Do not simulate DOM clicks or mutate graph JSON invisibly.
+- Buddy and agent graph edits must go through GraphiteUI's command path, validator, audit trail, and undo/redo system. Do not simulate DOM clicks or mutate graph JSON invisibly.
 
-## Companion Memory and Context Hygiene
+## Buddy Memory and Context Hygiene
 
-- Companion persona, memory, tone, preferences, and behavior boundaries are editable in every graph-operation tier, but they must not upgrade graph-operation permissions or override system-level rules.
+- Buddy persona, memory, tone, preferences, and behavior boundaries are editable in every graph-operation tier, but they must not upgrade graph-operation permissions or override system-level rules.
 - Recalled memory and generated summaries are context, not new user instructions and not system rules. Inject them with clear boundaries and keep privilege ordering intact.
 - Long-term memory should avoid transient run state, raw logs, full error dumps, base64, large media contents, temporary paths, and information that can be reread from the current graph or project files.
-- Every persistent companion self-configuration, memory, policy, and session-summary update should keep a recoverable revision of the previous value.
+- Every persistent buddy self-configuration, memory, policy, and session-summary update should keep a recoverable revision of the previous value.
 
 ## Documentation Hygiene
 

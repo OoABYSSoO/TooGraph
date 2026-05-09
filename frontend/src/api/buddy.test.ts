@@ -2,16 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  createCompanionMemory,
-  createCompanionGraphPatchDraft,
-  fetchCompanionProfile,
-  restoreCompanionRevision,
-  updateCompanionProfile,
-} from "./companion.ts";
+  createBuddyMemory,
+  createBuddyGraphPatchDraft,
+  fetchBuddyProfile,
+  restoreBuddyRevision,
+  updateBuddyProfile,
+} from "./buddy.ts";
 
 const originalFetch = globalThis.fetch;
 
-test("companion API reads profile and sends profile writes through command flow", async () => {
+test("buddy API reads profile and sends profile writes through command flow", async () => {
   const requests: Array<{ url: string; body: unknown }> = [];
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     requests.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
@@ -22,11 +22,11 @@ test("companion API reads profile and sends profile writes through command flow"
     });
   }) as typeof fetch;
 
-  await fetchCompanionProfile();
-  await updateCompanionProfile({ name: "Tutu" }, "Manual profile update.");
+  await fetchBuddyProfile();
+  await updateBuddyProfile({ name: "Tutu" }, "Manual profile update.");
 
-  assert.equal(requests[0].url, "/api/companion/profile");
-  assert.equal(requests[1].url, "/api/companion/commands");
+  assert.equal(requests[0].url, "/api/buddy/profile");
+  assert.equal(requests[1].url, "/api/buddy/commands");
   assert.deepEqual(requests[1].body, {
     action: "profile.update",
     payload: { name: "Tutu" },
@@ -35,7 +35,7 @@ test("companion API reads profile and sends profile writes through command flow"
   globalThis.fetch = originalFetch;
 });
 
-test("companion API creates graph patch drafts through approval command flow", async () => {
+test("buddy API creates graph patch drafts through approval command flow", async () => {
   const requests: Array<{ url: string; body: unknown }> = [];
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     requests.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
@@ -45,54 +45,54 @@ test("companion API creates graph patch drafts through approval command flow", a
     });
   }) as typeof fetch;
 
-  await createCompanionGraphPatchDraft(
+  await createBuddyGraphPatchDraft(
     {
-      graph_id: "graph_pet_loop",
-      graph_name: "桌宠对话循环",
+      graph_id: "graph_buddy_loop",
+      graph_name: "伙伴对话循环",
       summary: "增加记忆写入确认节点。",
-      rationale: "让桌宠先提出图修改建议，再由用户审批。",
+      rationale: "让伙伴先提出图修改建议，再由用户审批。",
       patch: [{ op: "add", path: "/nodes/confirm_memory_write", value: { type: "approval" } }],
     },
-    "Companion suggested a graph patch.",
+    "Buddy suggested a graph patch.",
   );
 
-  assert.equal(requests[0].url, "/api/companion/commands");
+  assert.equal(requests[0].url, "/api/buddy/commands");
   assert.deepEqual(requests[0].body, {
     action: "graph_patch.draft",
     payload: {
-      graph_id: "graph_pet_loop",
-      graph_name: "桌宠对话循环",
+      graph_id: "graph_buddy_loop",
+      graph_name: "伙伴对话循环",
       summary: "增加记忆写入确认节点。",
-      rationale: "让桌宠先提出图修改建议，再由用户审批。",
+      rationale: "让伙伴先提出图修改建议，再由用户审批。",
       patch: [{ op: "add", path: "/nodes/confirm_memory_write", value: { type: "approval" } }],
     },
-    change_reason: "Companion suggested a graph patch.",
+    change_reason: "Buddy suggested a graph patch.",
   });
   globalThis.fetch = originalFetch;
 });
 
-test("companion API creates memories and restores revisions through command flow", async () => {
+test("buddy API creates memories and restores revisions through command flow", async () => {
   const requests: Array<{ url: string; body: unknown }> = [];
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     requests.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
     return new Response(JSON.stringify({ result: { ok: true } }), { status: 200, headers: { "Content-Type": "application/json" } });
   }) as typeof fetch;
 
-  await createCompanionMemory({ type: "preference", title: "Reply style", content: "Keep replies short." });
-  await restoreCompanionRevision("rev_1");
+  await createBuddyMemory({ type: "preference", title: "Reply style", content: "Keep replies short." });
+  await restoreBuddyRevision("rev_1");
 
-  assert.equal(requests[0].url, "/api/companion/commands");
+  assert.equal(requests[0].url, "/api/buddy/commands");
   assert.deepEqual(requests[0].body, {
     action: "memory.create",
     payload: { type: "preference", title: "Reply style", content: "Keep replies short." },
-    change_reason: "User created companion memory from the Companion page.",
+    change_reason: "User created buddy memory from the Buddy page.",
   });
-  assert.equal(requests[1].url, "/api/companion/commands");
+  assert.equal(requests[1].url, "/api/buddy/commands");
   assert.deepEqual(requests[1].body, {
     action: "revision.restore",
     target_id: "rev_1",
     payload: {},
-    change_reason: "User restored a companion revision from the Companion page.",
+    change_reason: "User restored a buddy revision from the Buddy page.",
   });
   globalThis.fetch = originalFetch;
 });

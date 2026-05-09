@@ -66,13 +66,13 @@
           <span class="app-shell__link-label">{{ t("nav.graphLibrary") }}</span>
         </RouterLink>
         <RouterLink
-          to="/companion"
+          to="/buddy"
           class="app-shell__link"
-          :class="{ 'app-shell__link--active': activeNavigationSection === 'companion' }"
-          :title="t('nav.companion')"
+          :class="{ 'app-shell__link--active': activeNavigationSection === 'buddy' }"
+          :title="t('nav.buddy')"
         >
           <ElIcon class="app-shell__link-icon"><ChatDotRound /></ElIcon>
-          <span class="app-shell__link-label">{{ t("nav.companion") }}</span>
+          <span class="app-shell__link-label">{{ t("nav.buddy") }}</span>
         </RouterLink>
         <RouterLink
           to="/presets"
