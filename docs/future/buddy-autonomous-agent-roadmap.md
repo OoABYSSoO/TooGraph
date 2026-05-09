@@ -272,7 +272,9 @@ buddy_home_files_input
   -> buddy_request_intake
   -> buddy_capability_cycle
   -> buddy_final_response
-  -> buddy_self_review
+
+后台:
+buddy_self_review(读取主运行快照)
 ```
 
 推荐子图边界：
@@ -281,9 +283,9 @@ buddy_home_files_input
 - `buddy_request_intake`：理解需求、判断风险、决定是否需要澄清，并在需要时通过标准断点等待用户补充。
 - `buddy_capability_cycle`：选择一个启用能力、检查审批、执行 skill 或动态 subgraph、评估 `result_package`，必要时按 condition 回到能力选择。它是工具循环核心，但每轮仍保持单能力语义。
 - `buddy_final_response`：只根据当前 state 和能力结果生成 `final_reply`，不再执行能力或写 Buddy Home。
-- `buddy_self_review`：在最终回复后复盘本轮是否需要更新记忆、会话摘要、人设、能力使用统计或进化队列。它可以提出改动、写入低风险资料或触发人工确认，但必须留下 revision、command 和 run detail。
+- `buddy_self_review`：在最终回复后由独立后台 graph run 复盘本轮是否需要更新记忆、会话摘要、人设、能力使用统计或进化队列。它可以提出改动、写入低风险资料或触发人工确认，但不能阻塞下一轮可见回复，且必须留下 revision、command 和 run detail。
 
-这些子图可以先作为官方模板中的内部子图实例存在。等某个能力段稳定后，再保存为独立官方图模板供其他图复用。无论是否独立成模板，子图都必须暴露清晰输入输出、能力摘要、断点路径和审计信息。
+这些子图可以先作为官方模板中的内部子图实例存在。等某个能力段稳定后，再保存为独立官方图模板供其他图复用。`buddy_self_review` 已经拆为内部后台模板，普通能力选择和模板列表不展示它。无论是否独立成模板，子图都必须暴露清晰输入输出、能力摘要、断点路径和审计信息。
 
 ## Skill Manifest 契约
 
@@ -600,7 +602,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 
 ## 新版伙伴自主循环模板
 
-当前仓库已创建并注册官方 `buddy_autonomous_loop` 模板。它已经按完整目标把上下文装配、请求理解、按需能力循环、最终回复和自我复盘整理为子图，且 output 只展示最终回复。后续路线图不应再重建另一套伙伴循环，而应在这个模板和统一图协议上继续补齐暂停交互、审批体验、Buddy Home 写回和审计展示。
+当前仓库已创建并注册官方 `buddy_autonomous_loop` 模板。它已经按完整目标把上下文装配、请求理解、按需能力循环和最终回复整理为子图，且 output 只展示最终回复；自我复盘已拆到内部 `buddy_self_review` 后台模板。后续路线图不应再重建另一套伙伴循环，而应在这两个模板和统一图协议上继续补齐暂停交互、审批体验、Buddy Home 写回和审计展示。
 
 `buddy_autonomous_loop` 的目标不是复刻 Claude Code 或 Hermes Agent 代码里的多工具循环，而是把它们已经验证有效的循环能力翻译为 GraphiteUI 的图协议：
 
@@ -608,7 +610,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 - Hermes Agent 的可取之处是迭代预算、provider fallback、无效工具名修复、无效 JSON 自我纠错、危险操作审批、tool guardrail、会话持久化和结束原因诊断。
 - GraphiteUI 不应把这些能力做成隐藏在伙伴代码里的第二套 agent loop。图负责循环，LLM 节点只做一次模型运行、一次结构化判断或一次能力调用准备。
 - 每轮能力调用仍保持单能力语义：选择一个 `capability`，执行一个 skill 或 subgraph，得到一个 `result_package`，再由后续节点评估是否继续。
-- 顶层模板应优先用子图表达稳定能力段，例如上下文装配、需求理解、能力循环、最终回复和自我复盘。这样顶层图保留可读主干，细节仍可双击进入子图审查和编辑。
+- 顶层模板应优先用子图表达稳定能力段，例如上下文装配、需求理解、能力循环和最终回复。自我复盘属于回复后的后台模板，这样顶层图保留可读主干，细节仍可双击进入子图审查和编辑。
 
 完整目标流程：
 
@@ -619,7 +621,8 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
   -> needs_capability
   -> 需要能力时进入 buddy_capability_cycle，否则直接进入 buddy_final_response
   -> buddy_final_response
-  -> output 只展示最终回复，同时 buddy_self_review 在回复后复盘
+  -> output 只展示最终回复
+  -> 前端用主运行快照启动后台 buddy_self_review
 ```
 
 当前模板包含的公开输入 state：
@@ -712,7 +715,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 2. 补齐动态 `capability.kind=subgraph` 的断点传播、父级暂停和恢复。
 3. 补齐动态能力审批路径：需要确认的能力必须进入标准 `awaiting_human`，不能只靠 prompt 文字提醒。
 4. 将根目录 `buddy_home/` 收束为正式 Buddy Home，使用 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json`、`buddy.db` 和 `reports/`，并把 revision/command 审计路径落到 `buddy.db`。
-5. 已完成：创建官方 `buddy_autonomous_loop` 模板，按本文完整节点职责和 state 契约搭建，并把上下文装配、需求理解、按需能力循环、最终回复和自我复盘整理为子图。
+5. 已完成：创建官方 `buddy_autonomous_loop` 模板，按本文完整节点职责和 state 契约搭建，并把上下文装配、需求理解、按需能力循环和最终回复整理为子图；自我复盘已拆为内部后台 `buddy_self_review` 模板。
 6. 改造伙伴浮窗，使它能展示暂停卡片、恢复断点、拒绝或取消运行，并在暂停期间阻塞队列。
 7. 改造伙伴页面，增加“运行与确认”和 Buddy Home 管理视图，复用 Human Review 与 revision 数据模型。
 8. 将记忆、资料、会话摘要、进化记录和能力使用统计写回做成模板中的显式分支和受控能力，移除隐藏产品逻辑。

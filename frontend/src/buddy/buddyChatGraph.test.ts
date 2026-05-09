@@ -5,11 +5,13 @@ import type { RunDetail } from "../types/run.ts";
 import type { AgentNode, InputNode, TemplateRecord } from "../types/node-system.ts";
 
 import {
+  BUDDY_REVIEW_TEMPLATE_ID,
   BUDDY_TEMPLATE_ID,
   BUDDY_MODE_OPTIONS,
   BUDDY_MODE_STATE_KEY,
   BUDDY_REPLY_STATE_KEY,
   buildBuddyChatGraph,
+  buildBuddyReviewGraph,
   formatBuddyHistory,
   resolveBuddyReplyFromRunEvent,
   resolveBuddyRunActivityFromRunEvent,
@@ -259,6 +261,77 @@ function createAgenticTemplate(): TemplateRecord {
   };
 }
 
+function createReviewTemplate(): TemplateRecord {
+  return {
+    template_id: "buddy_self_review",
+    label: "伙伴后台复盘",
+    description: "Review buddy turns after the visible reply.",
+    default_graph_name: "伙伴后台复盘",
+    status: "active",
+    state_schema: {
+      user_message: { name: "user_message", description: "", type: "text", value: "", color: "#d97706" },
+      conversation_history: { name: "conversation_history", description: "", type: "markdown", value: "", color: "#64748b" },
+      page_context: { name: "page_context", description: "", type: "markdown", value: "", color: "#0891b2" },
+      buddy_context: { name: "buddy_context", description: "", type: "file", value: "", color: "#0f766e" },
+      request_understanding: { name: "request_understanding", description: "", type: "json", value: {}, color: "#16a34a" },
+      capability_result: { name: "capability_result", description: "", type: "result_package", value: {}, color: "#0284c7" },
+      capability_review: { name: "capability_review", description: "", type: "json", value: {}, color: "#0f766e" },
+      final_reply: { name: "final_reply", description: "", type: "markdown", value: "", color: "#16a34a" },
+      memory_update_plan: { name: "memory_update_plan", description: "", type: "json", value: {}, color: "#22c55e" },
+      buddy_evolution_plan: { name: "buddy_evolution_plan", description: "", type: "json", value: {}, color: "#a855f7" },
+    },
+    nodes: {
+      input_user_message: {
+        kind: "input",
+        name: "用户消息",
+        description: "",
+        ui: { position: { x: 80, y: 80 }, collapsed: false },
+        reads: [],
+        writes: [{ state: "user_message", mode: "replace" }],
+        config: { value: "" },
+      },
+      input_final_reply: {
+        kind: "input",
+        name: "最终回复",
+        description: "",
+        ui: { position: { x: 80, y: 280 }, collapsed: false },
+        reads: [],
+        writes: [{ state: "final_reply", mode: "replace" }],
+        config: { value: "" },
+      },
+      decide_memory_update: {
+        kind: "agent",
+        name: "判断记忆更新",
+        description: "",
+        ui: { position: { x: 640, y: 160 }, collapsed: false },
+        reads: [
+          { state: "user_message", required: true },
+          { state: "final_reply", required: true },
+        ],
+        writes: [
+          { state: "memory_update_plan", mode: "replace" },
+          { state: "buddy_evolution_plan", mode: "replace" },
+        ],
+        config: {
+          skillKey: "",
+          skillBindings: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "medium",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [
+      { source: "input_user_message", target: "decide_memory_update" },
+      { source: "input_final_reply", target: "decide_memory_update" },
+    ],
+    conditional_edges: [],
+    metadata: { internal: true },
+  };
+}
+
 function createSkillDefinition(overrides: Partial<SkillDefinition> = {}): SkillDefinition {
   return {
     skillKey: "web_search",
@@ -418,6 +491,71 @@ test("resolveBuddyMode accepts approval and falls back from unavailable tiers", 
 
 test("buddy widget defaults to the autonomous loop template id", () => {
   assert.equal(BUDDY_TEMPLATE_ID, "buddy_autonomous_loop");
+});
+
+test("buddy review uses a separate internal template id", () => {
+  assert.equal(BUDDY_REVIEW_TEMPLATE_ID, "buddy_self_review");
+});
+
+test("buildBuddyReviewGraph hydrates an internal background review run from the visible chat run", () => {
+  const graph = buildBuddyReviewGraph(createReviewTemplate(), {
+    mainRun: {
+      run_id: "run_visible_1",
+      graph_id: null,
+      graph_name: "伙伴自主循环",
+      status: "completed",
+      runtime_backend: "langgraph",
+      lifecycle: { updated_at: "", resume_count: 0 },
+      checkpoint_metadata: { available: false },
+      revision_round: 1,
+      started_at: "",
+      metadata: {},
+      selected_skills: [],
+      skill_outputs: [],
+      evaluation_result: {},
+      memory_summary: "",
+      final_result: "",
+      node_status_map: {},
+      node_executions: [],
+      warnings: [],
+      errors: [],
+      output_previews: [],
+      artifacts: {
+        state_values: {
+          final_reply: "你好，我在。",
+        },
+      },
+      state_snapshot: {
+        values: {
+          user_message: "你好",
+          final_reply: "你好，我在。",
+        },
+        last_writers: {},
+      },
+      graph_snapshot: {
+        state_schema: {
+          user_message: { name: "user_message" },
+          final_reply: { name: "final_reply" },
+        },
+      },
+    } as RunDetail,
+    buddyModel: "openai/gpt-4.1",
+  });
+
+  assert.equal(graph.graph_id, null);
+  assert.equal(graph.name, "伙伴后台复盘");
+  assert.equal(graph.metadata.buddy_review_run, true);
+  assert.equal(graph.metadata.buddy_parent_run_id, "run_visible_1");
+  assert.equal(graph.metadata.internal, true);
+  assert.equal(graph.state_schema.user_message.value, "你好");
+  assert.equal(graph.state_schema.final_reply.value, "你好，我在。");
+  assertInputNode(graph.nodes.input_user_message);
+  assertInputNode(graph.nodes.input_final_reply);
+  assert.equal(graph.nodes.input_user_message.config.value, "你好");
+  assert.equal(graph.nodes.input_final_reply.config.value, "你好，我在。");
+  assertAgentNode(graph.nodes.decide_memory_update);
+  assert.equal(graph.nodes.decide_memory_update.config.modelSource, "override");
+  assert.equal(graph.nodes.decide_memory_update.config.model, "openai/gpt-4.1");
 });
 
 test("buildBuddyChatGraph keeps no-approval web search auto-selectable in advisory mode", () => {

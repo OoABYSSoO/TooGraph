@@ -109,6 +109,8 @@ def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], li
             template_id = _compact_text(payload.get("template_id") or payload.get("templateId") or path.stem)
             if not template_id:
                 continue
+            if _is_template_hidden_from_capability_selector(payload):
+                continue
             candidates.append(
                 {
                     "kind": "subgraph",
@@ -187,6 +189,13 @@ def _is_skill_selectable_for_origin(policy_payload: Any, origin: str) -> bool:
     origin_policy = origins.get(origin) if isinstance(origins.get(origin), dict) else {}
     selectable = origin_policy.get("selectable", default_policy.get("selectable", True))
     return bool(selectable)
+
+
+def _is_template_hidden_from_capability_selector(payload: dict[str, Any]) -> bool:
+    if _compact_text(payload.get("status")).lower() in {"disabled", "deleted"}:
+        return True
+    metadata = payload.get("metadata")
+    return isinstance(metadata, dict) and metadata.get("internal") is True
 
 
 def _skill_readiness_error(skill_dir: Path, payload: dict[str, Any]) -> str:

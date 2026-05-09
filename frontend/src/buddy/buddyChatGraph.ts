@@ -5,6 +5,7 @@ import { GLOBAL_RUNTIME_MODEL_OPTION_VALUE } from "../lib/runtimeModelCatalog.ts
 import { routeStreamingJsonStateText } from "../lib/streamingJsonStateRouter.ts";
 
 export const BUDDY_TEMPLATE_ID = "buddy_autonomous_loop";
+export const BUDDY_REVIEW_TEMPLATE_ID = "buddy_self_review";
 export const BUDDY_USER_MESSAGE_STATE_KEY = "state_1";
 export const BUDDY_HISTORY_STATE_KEY = "state_2";
 export const BUDDY_PAGE_CONTEXT_STATE_KEY = "state_3";
@@ -79,6 +80,11 @@ export type BuildBuddyChatGraphInput = {
   skillCatalog?: SkillDefinition[];
 };
 
+export type BuildBuddyReviewGraphInput = {
+  mainRun: RunDetail;
+  buddyModel?: unknown;
+};
+
 export function formatBuddyHistory(messages: BuddyChatMessage[], maxMessages = MAX_BUDDY_HISTORY_MESSAGES) {
   const entries = messages
     .map((message) => ({
@@ -137,6 +143,46 @@ export function buildBuddyChatGraph(template: TemplateRecord, input: BuildBuddyC
   syncInputNodeValueByName(graph, "skill_catalog_snapshot", skillCatalogSnapshot);
   if (buddyMode !== "unrestricted") {
     enforceAdvisoryBuddyGraph(graph);
+  }
+
+  return graph;
+}
+
+export function buildBuddyReviewGraph(template: TemplateRecord, input: BuildBuddyReviewGraphInput): GraphPayload {
+  const graph: GraphPayload = {
+    graph_id: null,
+    name: template.default_graph_name,
+    state_schema: cloneJson(template.state_schema),
+    nodes: cloneJson(template.nodes),
+    edges: cloneJson(template.edges),
+    conditional_edges: cloneJson(template.conditional_edges),
+    metadata: {
+      ...cloneJson(template.metadata),
+      buddy_template_id: template.template_id,
+      buddy_review_run: true,
+      buddy_parent_run_id: input.mainRun.run_id,
+      internal: true,
+    },
+  };
+  applyBuddyModelOverride(graph, input.buddyModel);
+
+  const stateValues: Record<string, unknown> = {
+    user_message: resolveRunStateValueByName(input.mainRun, "user_message", ""),
+    conversation_history: resolveRunStateValueByName(input.mainRun, "conversation_history", ""),
+    page_context: resolveRunStateValueByName(input.mainRun, "page_context", ""),
+    buddy_mode: resolveRunStateValueByName(input.mainRun, "buddy_mode", DEFAULT_BUDDY_MODE),
+    buddy_context: resolveRunStateValueByName(input.mainRun, "buddy_context", ""),
+    request_understanding: resolveRunStateValueByName(input.mainRun, "request_understanding", {}),
+    capability_result: resolveRunStateValueByName(input.mainRun, "capability_result", {}),
+    capability_review: resolveRunStateValueByName(input.mainRun, "capability_review", {}),
+    final_reply: resolveRunStateValueByName(input.mainRun, "final_reply", resolveBuddyReplyText(input.mainRun)),
+    memory_update_plan: {},
+    buddy_evolution_plan: {},
+  };
+
+  for (const [stateName, value] of Object.entries(stateValues)) {
+    setStateValueByName(graph, stateName, value);
+    syncInputNodeValueByName(graph, stateName, value);
   }
 
   return graph;
@@ -422,28 +468,28 @@ function applyBuddyModelOverride(graph: GraphPayload, value: unknown) {
   const model = typeof value === "string" ? value.trim() : "";
   if (!model || model === GLOBAL_RUNTIME_MODEL_OPTION_VALUE) {
     delete graph.metadata.buddy_model_ref;
-    for (const node of Object.values(graph.nodes)) {
-      if (node.kind !== "agent") {
-        continue;
-      }
-      node.config = {
-        ...node.config,
-        modelSource: "global",
-        model: "",
-      };
-    }
+    applyBuddyModelOverrideToNodes(graph.nodes, { modelSource: "global", model: "" });
     return;
   }
   graph.metadata.buddy_model_ref = model;
-  for (const node of Object.values(graph.nodes)) {
-    if (node.kind !== "agent") {
+  applyBuddyModelOverrideToNodes(graph.nodes, { modelSource: "override", model });
+}
+
+function applyBuddyModelOverrideToNodes(
+  nodes: Record<string, GraphNode>,
+  patch: { modelSource: "global" | "override"; model: string },
+) {
+  for (const node of Object.values(nodes)) {
+    if (node.kind === "agent") {
+      node.config = {
+        ...node.config,
+        ...patch,
+      };
       continue;
     }
-    node.config = {
-      ...node.config,
-      modelSource: "override",
-      model,
-    };
+    if (node.kind === "subgraph") {
+      applyBuddyModelOverrideToNodes(node.config.graph.nodes, patch);
+    }
   }
 }
 
@@ -621,6 +667,29 @@ function normalizeRunEventText(value: unknown) {
 
 function findStateKeyByName(graph: GraphPayload, stateName: string) {
   return Object.entries(graph.state_schema).find(([, definition]) => definition.name === stateName)?.[0] ?? null;
+}
+
+function resolveRunStateValueByName(run: RunDetail, stateName: string, fallback: unknown) {
+  const stateKey = findRunStateKeyByName(run, stateName) ?? stateName;
+  if (stateKey in run.state_snapshot.values) {
+    return run.state_snapshot.values[stateKey];
+  }
+  if (run.artifacts?.state_values && stateKey in run.artifacts.state_values) {
+    return run.artifacts.state_values[stateKey];
+  }
+  return fallback;
+}
+
+function findRunStateKeyByName(run: RunDetail, stateName: string) {
+  const stateSchema = isRecord(run.graph_snapshot?.state_schema) ? run.graph_snapshot.state_schema : null;
+  if (!stateSchema) {
+    return null;
+  }
+  return (
+    Object.entries(stateSchema).find(
+      ([, definition]) => isRecord(definition) && String(definition.name ?? "").trim() === stateName,
+    )?.[0] ?? null
+  );
 }
 
 function resolveBuddyReplyStateKeys(graphSnapshot: Record<string, unknown> | null | undefined) {

@@ -26,6 +26,7 @@ def list_template_records(include_disabled: bool = False) -> list[dict[str, Any]
         load_template_record_from_path(path, source=USER_TEMPLATE_SOURCE)
         for path in sorted(USER_TEMPLATES_ROOT.glob(f"*{TEMPLATE_FILE_SUFFIX}"))
     ]
+    official_records = [record for record in official_records if not _is_internal_template(record)]
     if include_disabled:
         return [*official_records, *user_records]
     return [
@@ -106,6 +107,11 @@ def _ensure_user_template_is_manageable(template_id: str) -> None:
 
 def _with_template_source(record: dict[str, Any], source: str) -> dict[str, Any]:
     return {**record, "source": source}
+
+
+def _is_internal_template(record: dict[str, Any]) -> bool:
+    metadata = record.get("metadata")
+    return isinstance(metadata, dict) and metadata.get("internal") is True
 
 
 def _generate_user_template_id() -> str:

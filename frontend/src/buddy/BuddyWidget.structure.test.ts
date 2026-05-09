@@ -209,3 +209,17 @@ test("BuddyWidget leaves buddy self config loading and memory curation to the ch
   assert.doesNotMatch(componentSource, /function formatPolicyForPrompt/);
   assert.doesNotMatch(componentSource, /function formatMemoriesForPrompt/);
 });
+
+test("BuddyWidget starts self-review as a separate background run after the visible reply", () => {
+  assert.match(componentSource, /BUDDY_REVIEW_TEMPLATE_ID/);
+  assert.match(componentSource, /buildBuddyReviewGraph/);
+  assert.match(componentSource, /void startBuddySelfReviewRun\(runDetail\);/);
+  assert.match(componentSource, /async function startBuddySelfReviewRun\(mainRun: RunDetail\)/);
+  assert.match(componentSource, /fetchTemplate\(BUDDY_REVIEW_TEMPLATE_ID\)/);
+  assert.match(componentSource, /const graph = buildBuddyReviewGraph\(template,\s*\{[\s\S]*mainRun,[\s\S]*buddyModel: buddyModelRef\.value,[\s\S]*\}\);/);
+  assert.match(componentSource, /const reviewRun = await runGraph\(graph\);/);
+  assert.match(componentSource, /void pollBuddySelfReviewRun\(reviewRun\.run_id\);/);
+  assert.match(componentSource, /const backgroundReviewAbortControllers = new Set<AbortController>\(\);/);
+  assert.match(componentSource, /abortBackgroundReviewRuns\(\);/);
+  assert.doesNotMatch(componentSource, /activeRunId\.value = reviewRun\.run_id/);
+});

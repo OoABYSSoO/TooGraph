@@ -322,10 +322,12 @@ import type { SettingsPayload } from "../types/settings.ts";
 import BuddyMascot from "./BuddyMascot.vue";
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
 import {
+  BUDDY_REVIEW_TEMPLATE_ID,
   BUDDY_TEMPLATE_ID,
   BUDDY_MODE_OPTIONS,
   DEFAULT_BUDDY_MODE,
   buildBuddyChatGraph,
+  buildBuddyReviewGraph,
   resolveBuddyMode,
   resolveBuddyRunActivityFromRunEvent,
   resolveBuddyRunTraceFromRunEvent,
@@ -419,6 +421,7 @@ let activeAbortController: AbortController | null = null;
 let isDrainingBuddyQueue = false;
 let speakingIdleTimerId: number | null = null;
 let chatSessionInitializationPromise: Promise<void> | null = null;
+const backgroundReviewAbortControllers = new Set<AbortController>();
 const runTraceStartedAtByKey = new Map<string, number>();
 
 const isDragging = computed(() => Boolean(pointerDrag.value?.moved));
@@ -505,6 +508,7 @@ onBeforeUnmount(() => {
   clearSpeakingIdleTimer();
   closeEventSource();
   activeAbortController?.abort();
+  abortBackgroundReviewRuns();
 });
 
 watch(buddyMode, (nextMode) => {
@@ -700,6 +704,7 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
       runId: run.run_id,
       includeInContext: includeReplyInContext,
     });
+    void startBuddySelfReviewRun(runDetail);
     mood.value = runDetail.status === "failed" ? "error" : "speaking";
     if (runDetail.status === "completed") {
       buddyContextStore.notifyBuddyDataChanged();
@@ -735,6 +740,49 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
     }
     await scrollMessagesToBottom();
   }
+}
+
+async function startBuddySelfReviewRun(mainRun: RunDetail) {
+  if (mainRun.status !== "completed") {
+    return;
+  }
+  try {
+    const template = await fetchTemplate(BUDDY_REVIEW_TEMPLATE_ID);
+    const graph = buildBuddyReviewGraph(template, {
+      mainRun,
+      buddyModel: buddyModelRef.value,
+    });
+    const reviewRun = await runGraph(graph);
+    void pollBuddySelfReviewRun(reviewRun.run_id);
+  } catch (error) {
+    console.warn("[Buddy] Background self-review failed to start.", error);
+  }
+}
+
+async function pollBuddySelfReviewRun(runId: string) {
+  const controller = new AbortController();
+  backgroundReviewAbortControllers.add(controller);
+  try {
+    const run = await pollRunUntilFinished(runId, controller.signal);
+    if (run.status === "completed") {
+      buddyContextStore.notifyBuddyDataChanged();
+    } else if (run.status === "failed") {
+      console.warn("[Buddy] Background self-review failed.", run.errors);
+    }
+  } catch (error) {
+    if (!(error instanceof DOMException && error.name === "AbortError")) {
+      console.warn("[Buddy] Background self-review polling failed.", error);
+    }
+  } finally {
+    backgroundReviewAbortControllers.delete(controller);
+  }
+}
+
+function abortBackgroundReviewRuns() {
+  for (const controller of backgroundReviewAbortControllers) {
+    controller.abort();
+  }
+  backgroundReviewAbortControllers.clear();
 }
 
 function appendLocalRunTraceStart(replaceKey: string, labelKey: string) {

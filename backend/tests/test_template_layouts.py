@@ -11,7 +11,7 @@ from app.core.langgraph import get_langgraph_runtime_unsupported_reasons
 from app.core.langgraph.cycle_tracker import build_langgraph_cycle_tracker
 from app.core.runtime.execution_graph import build_execution_edges
 from app.core.schemas.node_system import NodeSystemGraphPayload
-from app.templates.loader import list_template_records
+from app.templates.loader import list_template_records, load_template_record
 
 
 def _official_template_records() -> list[dict]:
@@ -363,7 +363,6 @@ class TemplateLayoutTests(unittest.TestCase):
                 "intake_request",
                 "run_capability_cycle",
                 "draft_final_response",
-                "review_buddy_memory",
             ],
         )
         self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "output"], ["output_final"])
@@ -375,8 +374,8 @@ class TemplateLayoutTests(unittest.TestCase):
             {"source": "$state.request_understanding.requires_capability", "operator": "==", "value": True},
         )
         self.assertIn({"source": "draft_final_response", "target": "output_final"}, template["edges"])
-        self.assertIn({"source": "draft_final_response", "target": "review_buddy_memory"}, template["edges"])
-        self.assertNotIn({"source": "review_buddy_memory", "target": "output_final"}, template["edges"])
+        self.assertNotIn({"source": "draft_final_response", "target": "review_buddy_memory"}, template["edges"])
+        self.assertNotIn("review_buddy_memory", nodes)
         self.assertEqual(
             template["conditional_edges"],
             [
@@ -439,11 +438,39 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual([node_id for node_id, node in draft_graph["nodes"].items() if node["kind"] == "output"], ["output_final_reply"])
         self.assertEqual(draft_graph["nodes"]["output_final_reply"]["reads"], [{"state": "final_reply", "required": True}])
 
-        review_graph = nodes["review_buddy_memory"]["config"]["graph"]
+    def test_buddy_self_review_template_contract(self) -> None:
+        template = load_template_record("buddy_self_review")
+        states = template["state_schema"]
+        nodes = template["nodes"]
+
+        self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
+        self.assertEqual(template["metadata"]["origin"], "buddy")
+        self.assertIs(template["metadata"]["internal"], True)
+        self.assertEqual(states["final_reply"]["type"], "markdown")
+        self.assertEqual(states["memory_update_plan"]["type"], "json")
+        self.assertEqual(states["buddy_evolution_plan"]["type"], "json")
+        self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "subgraph"], ["review_buddy_memory"])
         self.assertEqual(
-            [node_id for node_id, node in review_graph["nodes"].items() if node["kind"] == "output"],
+            [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
             ["output_memory_update_plan", "output_buddy_evolution_plan"],
         )
+        self.assertIn({"source": "review_buddy_memory", "target": "output_memory_update_plan"}, template["edges"])
+        self.assertIn({"source": "review_buddy_memory", "target": "output_buddy_evolution_plan"}, template["edges"])
+
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **{
+                    key: value
+                    for key, value in template.items()
+                    if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+                },
+                "graph_id": "test_buddy_self_review",
+                "name": template["default_graph_name"],
+            }
+        )
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
 
     def test_buddy_autonomous_loop_is_runtime_compatible(self) -> None:
         template = next(record for record in _official_template_records() if record["template_id"] == "buddy_autonomous_loop")
