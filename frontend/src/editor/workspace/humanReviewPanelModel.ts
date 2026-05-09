@@ -22,7 +22,9 @@ export type HumanReviewRow = {
 };
 
 export type HumanReviewPanelModel = {
+  producedRows: HumanReviewRow[];
   requiredNow: HumanReviewRow[];
+  contextRows: HumanReviewRow[];
   otherRows: HumanReviewRow[];
   allRows: HumanReviewRow[];
   requiredCount: number;
@@ -77,6 +79,7 @@ export function buildHumanReviewPanelModel(
 ): HumanReviewPanelModel {
   const values = resolveHumanReviewStateValues(run);
   const currentNodeId = run?.current_node_id ?? null;
+  const currentExecution = resolveCurrentNodeExecution(run, currentNodeId);
   const windowNodeIds = collectBreakpointWindowNodeIds(document, currentNodeId);
   const orderedWindowNodeIds = Array.from(windowNodeIds);
   const predecessors = resolveGraphPredecessors(document);
@@ -126,11 +129,27 @@ export function buildHumanReviewPanelModel(
     }
   }
 
+  const producedStateKeys = resolveCurrentNodeProducedStateKeys(
+    run,
+    document,
+    currentNodeId,
+    currentExecution,
+    values,
+  );
+  const contextStateKeys = resolveCurrentNodeContextStateKeys(
+    run,
+    document,
+    currentNodeId,
+    currentExecution,
+    values,
+  );
   const rowKeys = sortHumanReviewStateKeys(
     Array.from(
       new Set([
         ...Object.keys(values),
         ...requiredCandidateKeys,
+        ...producedStateKeys,
+        ...contextStateKeys,
       ]),
     ),
     document,
@@ -174,11 +193,24 @@ export function buildHumanReviewPanelModel(
       }
       return left.key.localeCompare(right.key);
     });
-  const otherRows = allRows.filter((row) => !requiredKeys.has(row.key));
+  const producedRows = producedStateKeys
+    .map((key) => rowByKey.get(key))
+    .filter((row): row is HumanReviewRow => row !== undefined);
+  const producedKeySet = new Set(producedRows.map((row) => row.key));
+  const contextRows = contextStateKeys
+    .filter((key) => !requiredKeys.has(key) && !producedKeySet.has(key))
+    .map((key) => rowByKey.get(key))
+    .filter((row): row is HumanReviewRow => row !== undefined);
+  const contextKeySet = new Set(contextRows.map((row) => row.key));
+  const otherRows = allRows.filter(
+    (row) => !requiredKeys.has(row.key) && !producedKeySet.has(row.key) && !contextKeySet.has(row.key),
+  );
   const firstBlockingRequiredKey = requiredNow.find(draftValueIsBlocking)?.key ?? null;
 
   return {
+    producedRows,
     requiredNow,
+    contextRows,
     otherRows,
     allRows,
     requiredCount: requiredNow.length,
@@ -186,6 +218,78 @@ export function buildHumanReviewPanelModel(
     firstBlockingRequiredKey,
     summaryText: resolveSummaryText(requiredNow.length),
   };
+}
+
+function resolveCurrentNodeExecution(run: RunDetail | null, currentNodeId: string | null) {
+  if (!run || !currentNodeId) {
+    return null;
+  }
+  return [...(run.node_executions ?? [])].reverse().find((execution) => execution.node_id === currentNodeId) ?? null;
+}
+
+function resolveCurrentNodeProducedStateKeys(
+  run: RunDetail | null,
+  document: GraphPayload | GraphDocument,
+  currentNodeId: string | null,
+  execution: ReturnType<typeof resolveCurrentNodeExecution>,
+  values: Record<string, unknown>,
+) {
+  const writeKeys =
+    execution?.artifacts?.state_writes
+      ?.map((write) => write.state_key)
+      .filter((key) => hasHumanReviewStateKey(document, values, key)) ?? [];
+  if (writeKeys.length > 0) {
+    return uniqueStateKeys(writeKeys);
+  }
+
+  const node = currentNodeId ? document.nodes[currentNodeId] : null;
+  if (!run || !node) {
+    return [];
+  }
+  return uniqueStateKeys(
+    node.writes
+      .map((write) => write.state)
+      .filter((key) => Object.prototype.hasOwnProperty.call(values, key)),
+  );
+}
+
+function resolveCurrentNodeContextStateKeys(
+  run: RunDetail | null,
+  document: GraphPayload | GraphDocument,
+  currentNodeId: string | null,
+  execution: ReturnType<typeof resolveCurrentNodeExecution>,
+  values: Record<string, unknown>,
+) {
+  const readKeys =
+    execution?.artifacts?.state_reads
+      ?.map((read) => read.state_key)
+      .filter((key) => hasHumanReviewStateKey(document, values, key)) ?? [];
+  if (readKeys.length > 0) {
+    return uniqueStateKeys(readKeys);
+  }
+
+  const node = currentNodeId ? document.nodes[currentNodeId] : null;
+  if (!run || !node) {
+    return [];
+  }
+  return uniqueStateKeys(
+    node.reads
+      .map((read) => read.state)
+      .filter((key) => Object.prototype.hasOwnProperty.call(values, key)),
+  );
+}
+
+function hasHumanReviewStateKey(
+  document: GraphPayload | GraphDocument,
+  values: Record<string, unknown>,
+  key: string,
+) {
+  return Object.prototype.hasOwnProperty.call(document.state_schema, key)
+    || Object.prototype.hasOwnProperty.call(values, key);
+}
+
+function uniqueStateKeys(keys: string[]) {
+  return Array.from(new Set(keys));
 }
 
 function resolveGraphSuccessors(document: GraphPayload | GraphDocument) {

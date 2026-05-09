@@ -36,11 +36,40 @@
       <p class="editor-human-review-panel__summary">{{ panelModel.summaryText }}</p>
       <p v-if="resumeGuardMessage" class="editor-human-review-panel__guard">{{ resumeGuardMessage }}</p>
 
-      <div v-if="panelModel.requiredNow.length === 0" class="editor-human-review-panel__empty">
+      <section v-if="panelModel.producedRows.length > 0" class="editor-human-review-panel__produced-section">
+        <div class="editor-human-review-panel__section-title">{{ t("humanReview.producedTitle") }}</div>
+        <article
+          v-for="row in panelModel.producedRows"
+          :key="row.key"
+          class="editor-human-review-panel__state-card editor-human-review-panel__state-card--produced"
+          :style="{ '--human-review-accent': row.color }"
+        >
+          <div class="editor-human-review-panel__state-head">
+            <span class="editor-human-review-panel__state-dot" aria-hidden="true" />
+            <div>
+              <div class="editor-human-review-panel__state-label">{{ row.label }}</div>
+              <div class="editor-human-review-panel__state-meta">{{ row.key }}</div>
+            </div>
+          </div>
+          <p v-if="row.description" class="editor-human-review-panel__state-description">{{ row.description }}</p>
+          <textarea
+            class="editor-human-review-panel__textarea"
+            rows="4"
+            :value="draftFor(row.key)"
+            @input="updateDraft(row.key, ($event.target as HTMLTextAreaElement).value)"
+          />
+        </article>
+      </section>
+
+      <div
+        v-if="panelModel.producedRows.length === 0 && panelModel.requiredNow.length === 0"
+        class="editor-human-review-panel__empty"
+      >
         {{ t("humanReview.empty") }}
       </div>
 
-      <section v-else class="editor-human-review-panel__required-section">
+      <section v-if="panelModel.requiredNow.length > 0" class="editor-human-review-panel__required-section">
+        <div class="editor-human-review-panel__section-title">{{ t("humanReview.requiredTitle") }}</div>
         <article
           v-for="row in panelModel.requiredNow"
           :key="row.key"
@@ -68,6 +97,31 @@
         </article>
       </section>
 
+      <section v-if="panelModel.contextRows.length > 0" class="editor-human-review-panel__context-section">
+        <div class="editor-human-review-panel__section-title">{{ t("humanReview.contextTitle") }}</div>
+        <article
+          v-for="row in panelModel.contextRows"
+          :key="row.key"
+          class="editor-human-review-panel__state-card editor-human-review-panel__state-card--context"
+          :style="{ '--human-review-accent': row.color }"
+        >
+          <div class="editor-human-review-panel__state-head">
+            <span class="editor-human-review-panel__state-dot" aria-hidden="true" />
+            <div>
+              <div class="editor-human-review-panel__state-label">{{ row.label }}</div>
+              <div class="editor-human-review-panel__state-meta">{{ row.key }}</div>
+            </div>
+          </div>
+          <p v-if="row.description" class="editor-human-review-panel__state-description">{{ row.description }}</p>
+          <textarea
+            class="editor-human-review-panel__textarea editor-human-review-panel__textarea--readonly"
+            rows="3"
+            readonly
+            :value="draftFor(row.key)"
+          />
+        </article>
+      </section>
+
       <section class="editor-human-review-panel__other-section">
         <button
           type="button"
@@ -75,7 +129,7 @@
           :disabled="panelModel.otherRows.length === 0"
           @click="otherRowsExpanded = !otherRowsExpanded"
         >
-          {{ t("common.otherState", { count: panelModel.otherRows.length }) }}
+          {{ t("humanReview.advancedTitle", { count: panelModel.otherRows.length }) }}
         </button>
         <div v-if="otherRowsExpanded && panelModel.otherRows.length > 0" class="editor-human-review-panel__other-list">
           <article
@@ -282,7 +336,9 @@ function handleResumeClick() {
   color: #b45309;
 }
 
+.editor-human-review-panel__produced-section,
 .editor-human-review-panel__required-section,
+.editor-human-review-panel__context-section,
 .editor-human-review-panel__other-list {
   display: grid;
   gap: 10px;
@@ -398,9 +454,28 @@ function handleResumeClick() {
   padding: 12px;
 }
 
+.editor-human-review-panel__state-card--produced {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: rgba(248, 251, 255, 0.94);
+}
+
 .editor-human-review-panel__state-card--required {
   border-color: rgba(217, 119, 6, 0.22);
   background: rgba(255, 250, 241, 0.94);
+}
+
+.editor-human-review-panel__state-card--context {
+  border-color: rgba(15, 118, 110, 0.14);
+  background: rgba(250, 253, 252, 0.9);
+}
+
+.editor-human-review-panel__section-title {
+  padding: 0 4px;
+  color: rgba(74, 60, 45, 0.68);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .editor-human-review-panel__state-head {
@@ -466,6 +541,13 @@ function handleResumeClick() {
   line-height: 1.45;
   padding: 10px;
   resize: vertical;
+}
+
+.editor-human-review-panel__textarea--readonly {
+  background: rgba(255, 252, 247, 0.58);
+  color: rgba(31, 41, 51, 0.78);
+  cursor: default;
+  resize: none;
 }
 
 .editor-human-review-panel__empty {

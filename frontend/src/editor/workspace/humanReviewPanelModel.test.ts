@@ -119,7 +119,35 @@ function createRun(): RunDetail {
     memory_summary: "",
     final_result: "",
     node_status_map: { draft_writer: "paused" },
-    node_executions: [],
+    node_executions: [
+      {
+        node_id: "draft_writer",
+        node_type: "agent",
+        status: "success",
+        started_at: "",
+        finished_at: "",
+        duration_ms: 12,
+        input_summary: "",
+        output_summary: "",
+        artifacts: {
+          inputs: {},
+          outputs: {},
+          family: "agent",
+          state_reads: [{ state_key: "question", input_key: "question", value: "What is GraphiteUI?" }],
+          state_writes: [
+            {
+              state_key: "draft",
+              output_key: "draft",
+              mode: "replace",
+              value: "GraphiteUI is a visual graph editor.",
+              changed: true,
+            },
+          ],
+        },
+        warnings: [],
+        errors: [],
+      },
+    ],
     warnings: [],
     errors: [],
     output_previews: [],
@@ -175,8 +203,16 @@ test("buildHumanReviewPanelModel promotes downstream missing inputs into require
     ["manual_feedback", "score"],
   );
   assert.deepEqual(
+    panel.producedRows.map((row) => row.key),
+    ["draft"],
+  );
+  assert.deepEqual(
+    panel.contextRows.map((row) => row.key),
+    ["question"],
+  );
+  assert.deepEqual(
     panel.otherRows.map((row) => row.key),
-    ["question", "draft"],
+    [],
   );
   assert.equal(panel.requiredCount, 2);
   assert.equal(panel.summaryText, "到下一个断点前，需人工填写 2 项输入");

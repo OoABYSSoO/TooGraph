@@ -31,8 +31,12 @@ test("EditorHumanReviewPanel renders an action-first breakpoint task panel", () 
   assert.match(componentSource, /@click="\$emit\('focus-node', currentFocusNodeId\)"/);
   assert.match(componentSource, /class="editor-human-review-panel__summary"/);
   assert.match(componentSource, /\{\{ panelModel\.summaryText \}\}/);
+  assert.match(componentSource, /class="editor-human-review-panel__produced-section"/);
+  assert.match(componentSource, /v-for="row in panelModel\.producedRows"/);
   assert.match(componentSource, /class="editor-human-review-panel__required-section"/);
   assert.match(componentSource, /v-for="row in panelModel\.requiredNow"/);
+  assert.match(componentSource, /class="editor-human-review-panel__context-section"/);
+  assert.match(componentSource, /v-for="row in panelModel\.contextRows"/);
   assert.match(componentSource, /class="editor-human-review-panel__other-toggle"/);
   assert.match(componentSource, /v-if="otherRowsExpanded && panelModel\.otherRows\.length > 0"/);
   assertSourceOrder(
@@ -42,13 +46,23 @@ test("EditorHumanReviewPanel renders an action-first breakpoint task panel", () 
   );
   assertSourceOrder(
     /class="editor-human-review-panel__summary"/,
+    /class="editor-human-review-panel__produced-section"/,
+    "Summary should appear before produced section in source order",
+  );
+  assertSourceOrder(
+    /class="editor-human-review-panel__produced-section"/,
     /class="editor-human-review-panel__required-section"/,
-    "Summary should appear before required section in source order",
+    "Produced section should appear before required section in source order",
   );
   assertSourceOrder(
     /class="editor-human-review-panel__required-section"/,
+    /class="editor-human-review-panel__context-section"/,
+    "Required section should appear before context section in source order",
+  );
+  assertSourceOrder(
+    /class="editor-human-review-panel__context-section"/,
     /class="editor-human-review-panel__other-toggle"/,
-    "Required section should appear before the other toggle in source order",
+    "Context section should appear before the other toggle in source order",
   );
   assert.doesNotMatch(componentSource, /editor-human-review-panel__run-card/);
   assert.doesNotMatch(componentSource, /Paused Run/);
