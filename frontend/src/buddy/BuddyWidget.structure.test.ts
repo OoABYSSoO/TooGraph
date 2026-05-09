@@ -135,6 +135,7 @@ test("BuddyWidget records and displays per-stage run trace durations", () => {
   assert.match(componentSource, /import \{ formatRunDuration \} from "\.\.\/lib\/run-display-name\.ts";/);
   assert.match(componentSource, /const runTraceStartedAtByKey = new Map<string, number>\(\);/);
   assert.match(componentSource, /function appendRunTraceEntry\(eventType: string, traceEntry: BuddyRunTraceEntry\)/);
+  assert.match(componentSource, /mergeRunTraceEntry\(runTraceEntries\.value\[existingIndex\], timedTraceEntry\)/);
   assert.match(componentSource, /runTraceStartedAtByKey\.set\(traceEntry\.timingKey, nowRunTraceMs\(\)\);/);
   assert.match(componentSource, /durationMs: Math\.max\(1, Math\.round\(nowRunTraceMs\(\) - startedAt\)\),/);
   assert.match(componentSource, /class="buddy-widget__run-trace-duration"/);

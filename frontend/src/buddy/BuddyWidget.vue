@@ -766,13 +766,23 @@ function appendRunTraceEntry(eventType: string, traceEntry: BuddyRunTraceEntry) 
   const timedTraceEntry = applyRunTraceTiming(eventType, traceEntry);
   const existingIndex = runTraceEntries.value.findIndex((entry) => entry.replaceKey === timedTraceEntry.replaceKey);
   if (existingIndex >= 0) {
-    runTraceEntries.value.splice(existingIndex, 1, timedTraceEntry);
+    runTraceEntries.value.splice(existingIndex, 1, mergeRunTraceEntry(runTraceEntries.value[existingIndex], timedTraceEntry));
   } else {
     runTraceEntries.value.push(timedTraceEntry);
   }
   if (runTraceEntries.value.length > RUN_TRACE_MAX_ENTRIES) {
     runTraceEntries.value.splice(0, runTraceEntries.value.length - RUN_TRACE_MAX_ENTRIES);
   }
+}
+
+function mergeRunTraceEntry(existingEntry: BuddyRunTraceEntry, nextEntry: BuddyRunTraceEntry): BuddyRunTraceEntry {
+  if (nextEntry.preview || !existingEntry.preview) {
+    return nextEntry;
+  }
+  return {
+    ...nextEntry,
+    preview: existingEntry.preview,
+  };
 }
 
 function applyRunTraceTiming(eventType: string, traceEntry: BuddyRunTraceEntry): BuddyRunTraceEntry {
