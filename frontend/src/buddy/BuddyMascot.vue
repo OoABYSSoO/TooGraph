@@ -226,10 +226,6 @@ function clearTapTimeout() {
   animation: buddy-mascot-blink 7.2s ease-in-out infinite;
 }
 
-.buddy-mascot--thinking .buddy-mascot__body {
-  animation: buddy-mascot-thinking-body 860ms ease-in-out infinite;
-}
-
 .buddy-mascot--thinking .buddy-mascot__tail {
   animation: buddy-mascot-tail-thinking 760ms ease-in-out infinite;
 }
@@ -385,19 +381,6 @@ function clearTapTimeout() {
   }
   92% {
     transform: scaleY(0.08);
-  }
-}
-
-@keyframes buddy-mascot-thinking-body {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-2deg);
-  }
-  35% {
-    transform: translateY(-7px) rotate(3deg);
-  }
-  72% {
-    transform: translateY(2px) rotate(-3deg);
   }
 }
 

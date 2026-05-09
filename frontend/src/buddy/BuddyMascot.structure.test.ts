@@ -20,6 +20,12 @@ function normalizePathData(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
+function extractCssBlock(source: string, selector: string) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = source.match(new RegExp(`${escapedSelector}\\s*\\{([\\s\\S]*?)\\n\\}`));
+  return match?.[1] ?? "";
+}
+
 const teardropLeftEarPath = "M-146-143 C-114-132-82-101-55-61 C-60-24-84 25-124 63 C-158 95-190 53-168-4 C-174-52-164-106-146-143Z";
 const teardropRightEarPath = "M146-143 C114-132 82-101 55-61 C60-24 84 25 124 63 C158 95 190 53 168-4 C174-52 164-106 146-143Z";
 const separatedHeadPath =
@@ -88,13 +94,18 @@ test("BuddyMascot keeps the tail animated while thinking and speaking", () => {
   assert.match(componentSource, /@keyframes buddy-mascot-tail-speaking[\s\S]*rotate\(-12deg\)[\s\S]*rotate\(28deg\)/);
 });
 
-test("BuddyMascot makes thinking and speaking body motion visibly distinct", () => {
-  assert.match(componentSource, /\.buddy-mascot--thinking[\s\S]*\.buddy-mascot__body[\s\S]*animation:\s*buddy-mascot-thinking-body 860ms ease-in-out infinite;/);
+test("BuddyMascot keeps the thinking body steady while ears, tail, and sparkle move", () => {
+  assert.equal(extractCssBlock(componentSource, ".buddy-mascot--thinking .buddy-mascot__body").trim(), "");
   assert.match(componentSource, /\.buddy-mascot--thinking[\s\S]*\.buddy-mascot__sparkle-wrap[\s\S]*animation:\s*buddy-mascot-thinking-orbit 1\.6s ease-in-out infinite;/);
-  assert.match(componentSource, /\.buddy-mascot--speaking[\s\S]*\.buddy-mascot__body[\s\S]*animation:\s*buddy-mascot-speaking-body 460ms ease-in-out infinite;/);
-  assert.match(componentSource, /@keyframes buddy-mascot-thinking-body[\s\S]*translateY\(-7px\) rotate\(3deg\)[\s\S]*translateY\(2px\) rotate\(-3deg\)/);
-  assert.match(componentSource, /@keyframes buddy-mascot-speaking-body[\s\S]*scaleX\(1\.06\) scaleY\(0\.95\)[\s\S]*scaleX\(0\.96\) scaleY\(1\.05\)/);
+  assert.match(componentSource, /\.buddy-mascot--thinking[\s\S]*\.buddy-mascot__left-ear[\s\S]*animation:\s*buddy-mascot-ear-think-left 860ms ease-in-out infinite;/);
+  assert.match(componentSource, /\.buddy-mascot--thinking[\s\S]*\.buddy-mascot__right-ear[\s\S]*animation:\s*buddy-mascot-ear-think-right 860ms ease-in-out infinite;/);
   assert.match(componentSource, /@keyframes buddy-mascot-thinking-orbit/);
+  assert.doesNotMatch(componentSource, /@keyframes buddy-mascot-thinking-body/);
+});
+
+test("BuddyMascot keeps speaking body motion visibly distinct", () => {
+  assert.match(componentSource, /\.buddy-mascot--speaking[\s\S]*\.buddy-mascot__body[\s\S]*animation:\s*buddy-mascot-speaking-body 460ms ease-in-out infinite;/);
+  assert.match(componentSource, /@keyframes buddy-mascot-speaking-body[\s\S]*scaleX\(1\.06\) scaleY\(0\.95\)[\s\S]*scaleX\(0\.96\) scaleY\(1\.05\)/);
 });
 
 test("BuddyMascot makes idle tail and ear motion visible without changing body scale", () => {
