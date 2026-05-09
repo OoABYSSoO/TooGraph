@@ -365,6 +365,7 @@ const BUDDY_ACTIVITY_PHASE_BY_NODE_ID: Record<string, string> = {
   need_clarification: "checkingClarification",
   ask_clarification: "askingClarification",
   merge_clarification: "understanding",
+  needs_capability: "checkingCapabilityNeed",
   run_capability_cycle: "selectingCapability",
   select_capability: "selectingCapability",
   capability_found_condition: "selectingCapability",

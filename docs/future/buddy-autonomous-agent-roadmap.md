@@ -559,7 +559,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 
 ## 新版伙伴自主循环模板
 
-当前仓库已创建并注册官方 `buddy_autonomous_loop` 模板。它已经按完整目标把上下文装配、请求理解、能力循环、最终回复和自我复盘整理为子图，且 output 只展示最终回复。后续路线图不应再重建另一套伙伴循环，而应在这个模板和统一图协议上继续补齐暂停交互、审批体验、Buddy Home 写回和审计展示。
+当前仓库已创建并注册官方 `buddy_autonomous_loop` 模板。它已经按完整目标把上下文装配、请求理解、按需能力循环、最终回复和自我复盘整理为子图，且 output 只展示最终回复。后续路线图不应再重建另一套伙伴循环，而应在这个模板和统一图协议上继续补齐暂停交互、审批体验、Buddy Home 写回和审计展示。
 
 `buddy_autonomous_loop` 的目标不是复刻 Claude Code 或 Hermes Agent 代码里的多工具循环，而是把它们已经验证有效的循环能力翻译为 GraphiteUI 的图协议：
 
@@ -575,10 +575,10 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 用户消息、页面上下文、历史、Buddy Home
   -> buddy_context_pack
   -> buddy_request_intake
-  -> buddy_capability_cycle
+  -> needs_capability
+  -> 需要能力时进入 buddy_capability_cycle，否则直接进入 buddy_final_response
   -> buddy_final_response
-  -> buddy_self_review
-  -> output 只展示最终回复
+  -> output 只展示最终回复，同时 buddy_self_review 在回复后复盘
 ```
 
 当前模板包含的公开输入 state：
@@ -607,9 +607,10 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 推荐节点职责：
 
 - `understand_request`：读取用户消息、历史、页面上下文、伙伴资料、策略、记忆和会话摘要，写 `request_understanding`。它不执行能力。
-- `need_clarification`：condition。需要澄清时进入 `ask_clarification`，否则进入能力选择。
+- `need_clarification`：condition。需要澄清时进入 `ask_clarification`，否则输出请求理解。
 - `ask_clarification`：写 `clarification_prompt` 并设置 `interrupt_after`。伙伴页面应把用户下一条输入作为 `clarification_answer` 恢复运行，而不是开启新一轮。
 - `merge_clarification`：把澄清回答合入 `request_understanding` 或写新的确认需求摘要。
+- `needs_capability`：顶层 condition。读取 `request_understanding.requires_capability`；简单闲聊、身份询问、页面解释等可直接回答的请求绕过能力循环，避免无意义地选择能力和检查权限。
 - `select_capability`：静态绑定 `graphiteui_capability_selector`，根据需求选择一个启用的图模板或 Skill。图模板优先，找不到则输出 `{ "kind": "none" }` 和 `capability_found=false`。
 - `capability_found`：condition。未找到能力时进入直接回复或缺失能力说明；找到能力时进入审批检查。
 - `review_capability_permission`：根据请求风险、伙伴模式和 Buddy Home policy 写审批请求或免审批结论。它不能直接读取 `capability` state；当前协议规定读取 `capability` state 的 LLM 节点就是动态能力执行节点。
@@ -670,7 +671,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 2. 补齐动态 `capability.kind=subgraph` 的断点传播、父级暂停和恢复。
 3. 补齐动态能力审批路径：需要确认的能力必须进入标准 `awaiting_human`，不能只靠 prompt 文字提醒。
 4. 将根目录 `buddy_home/` 收束为正式 Buddy Home，使用 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json`、`buddy.db` 和 `reports/`，并把 revision/command 审计路径落到 `buddy.db`。
-5. 已完成：创建官方 `buddy_autonomous_loop` 模板，按本文完整节点职责和 state 契约搭建，并把上下文装配、需求理解、能力循环、最终回复和自我复盘整理为子图。
+5. 已完成：创建官方 `buddy_autonomous_loop` 模板，按本文完整节点职责和 state 契约搭建，并把上下文装配、需求理解、按需能力循环、最终回复和自我复盘整理为子图。
 6. 改造伙伴浮窗，使它能展示暂停卡片、恢复断点、拒绝或取消运行，并在暂停期间阻塞队列。
 7. 改造伙伴页面，增加“运行与确认”和 Buddy Home 管理视图，复用 Human Review 与 revision 数据模型。
 8. 将记忆、资料、会话摘要、进化记录和能力使用统计写回做成模板中的显式分支和受控能力，移除隐藏产品逻辑。
