@@ -238,6 +238,9 @@ export function resolveBuddyRunTraceFromRunEvent(
   if (!nodeId) {
     return null;
   }
+  if (shouldSuppressBuddyRunTraceEvent(eventType, payload)) {
+    return null;
+  }
 
   const labels = resolveBuddyRunNodeLabels(graph, nodeId, subgraphNodeId);
   const params = buildBuddyActivityParams(labels);
@@ -281,10 +284,22 @@ export function resolveBuddyRunTraceFromRunEvent(
     params,
     preview: "",
     tone: eventType === "node.failed" ? "error" : eventType === "node.completed" ? "success" : "info",
-    replaceKey: buildBuddyTraceReplaceKey(eventType, nodeId, subgraphNodeId),
+    replaceKey: buildBuddyTraceReplaceKey("node", nodeId, subgraphNodeId),
     timingKey,
     ...(durationMs !== undefined ? { durationMs } : {}),
   };
+}
+
+function shouldSuppressBuddyRunTraceEvent(eventType: string, payload: Record<string, unknown>) {
+  const nodeType = normalizeRunEventText(payload.node_type).toLowerCase();
+
+  if (eventType === "node.output.completed") {
+    return true;
+  }
+  if (nodeType === "input" || nodeType === "output") {
+    return true;
+  }
+  return false;
 }
 
 export function resolveBuddyRunActivityFromRunEvent(

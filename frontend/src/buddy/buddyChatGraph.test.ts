@@ -688,7 +688,35 @@ test("resolveBuddyRunTraceFromRunEvent summarizes streaming output from non-outp
   );
 });
 
-test("resolveBuddyRunTraceFromRunEvent keeps backend stage duration on completed nodes", () => {
+test("resolveBuddyRunTraceFromRunEvent keeps backend stage duration on top-level completed stages", () => {
+  const graph = createActivityGraph();
+
+  assert.deepEqual(
+    resolveBuddyRunTraceFromRunEvent(
+      "node.completed",
+      {
+        node_id: "intake_request",
+        node_type: "subgraph",
+        status: "success",
+        duration_ms: 1534,
+      },
+      graph,
+    ),
+    {
+      labelKey: "buddy.activity.completed",
+      params: {
+        node: "理解请求",
+      },
+      preview: "",
+      tone: "success",
+      replaceKey: "node:intake_request",
+      timingKey: "stage:intake_request",
+      durationMs: 1534,
+    },
+  );
+});
+
+test("resolveBuddyRunTraceFromRunEvent keeps real inner node progress visible", () => {
   const graph = createActivityGraph();
 
   assert.deepEqual(
@@ -711,10 +739,72 @@ test("resolveBuddyRunTraceFromRunEvent keeps backend stage duration on completed
       },
       preview: "",
       tone: "success",
-      replaceKey: "node.completed:intake_request:understand_request",
+      replaceKey: "node:intake_request:understand_request",
       timingKey: "stage:intake_request:understand_request",
       durationMs: 1534,
     },
+  );
+  assert.equal(
+    resolveBuddyRunTraceFromRunEvent(
+      "node.started",
+      {
+        node_id: "understand_request",
+        node_type: "agent",
+        subgraph_node_id: "intake_request",
+      },
+      graph,
+    )?.replaceKey,
+    "node:intake_request:understand_request",
+  );
+});
+
+test("resolveBuddyRunTraceFromRunEvent hides subgraph plumbing from buddy progress", () => {
+  const graph = createActivityGraph();
+
+  assert.equal(
+    resolveBuddyRunTraceFromRunEvent(
+      "node.completed",
+      {
+        node_id: "input_user_message",
+        node_type: "input",
+        subgraph_node_id: "intake_request",
+        status: "success",
+      },
+      graph,
+    ),
+    null,
+  );
+  assert.equal(
+    resolveBuddyRunTraceFromRunEvent(
+      "node.completed",
+      {
+        node_id: "output_final_reply",
+        node_type: "output",
+        subgraph_node_id: "draft_final_response",
+        status: "success",
+      },
+      graph,
+    ),
+    null,
+  );
+  assert.equal(
+    resolveBuddyRunTraceFromRunEvent(
+      "node.output.completed",
+      {
+        node_id: "understand_request",
+        node_type: "agent",
+        subgraph_node_id: "intake_request",
+        output_keys: ["state_10"],
+        stream_state_keys: ["state_10"],
+        output_values: {
+          state_10: {
+            intent: "chat",
+          },
+        },
+      },
+      graph,
+    ),
+    null,
   );
 });
 

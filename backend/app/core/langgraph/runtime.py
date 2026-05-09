@@ -1131,6 +1131,7 @@ def _build_langgraph_route_callable(
                 visited_conditions.add(condition_name)
 
                 condition_node = graph.nodes[condition_name]
+                condition_started_perf = time.perf_counter()
                 state["node_status_map"][condition_name] = "running"
                 _record_subgraph_node_status(state, condition_name, "running")
                 publish_run_event(
@@ -1202,6 +1203,7 @@ def _build_langgraph_route_callable(
 
                 state["node_status_map"][condition_name] = "success"
                 _record_subgraph_node_status(state, condition_name, "success")
+                duration_ms = int((time.perf_counter() - condition_started_perf) * 1000)
                 publish_run_event(
                     str(state.get("run_id") or ""),
                     "node.completed",
@@ -1210,6 +1212,7 @@ def _build_langgraph_route_callable(
                         "node_type": condition_node.kind,
                         "status": "success",
                         "selected_branch": selected_branch,
+                        "duration_ms": duration_ms,
                         **_subgraph_event_context(state),
                     },
                 )
