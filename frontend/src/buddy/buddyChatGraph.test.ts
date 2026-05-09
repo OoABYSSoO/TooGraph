@@ -13,6 +13,7 @@ import {
   formatBuddyHistory,
   resolveBuddyReplyFromRunEvent,
   resolveBuddyRunActivityFromRunEvent,
+  resolveBuddyRunTraceFromRunEvent,
   resolveBuddyMode,
   resolveBuddyReplyText,
 } from "./buddyChatGraph.ts";
@@ -623,6 +624,66 @@ test("resolveBuddyReplyFromRunEvent reads completed output values for named repl
       graph,
     ),
     "已经组织好的回复。",
+  );
+});
+
+test("resolveBuddyReplyFromRunEvent streams partial markdown from a structured reply field", () => {
+  const graph = buildBuddyChatGraph(
+    {
+      ...createAgenticTemplate(),
+      state_schema: {
+        final_reply: { name: "final_reply", description: "", type: "markdown", value: "", color: "#4f46e5" },
+      },
+    },
+    {
+      userMessage: "你好",
+      history: [],
+      pageContext: "当前路径: /",
+      buddyMode: "advisory",
+    },
+  );
+
+  assert.equal(
+    resolveBuddyReplyFromRunEvent(
+      {
+        event: "node.output.delta",
+        node_id: "draft_final_reply",
+        output_keys: ["final_reply"],
+        stream_state_keys: ["final_reply"],
+        text: '{"final_reply":"# 你好\\n我正在',
+      },
+      graph,
+    ),
+    "# 你好\n我正在",
+  );
+});
+
+test("resolveBuddyRunTraceFromRunEvent summarizes streaming output from non-output LLM nodes", () => {
+  const graph = createActivityGraph();
+
+  assert.deepEqual(
+    resolveBuddyRunTraceFromRunEvent(
+      "node.output.delta",
+      {
+        node_id: "understand_request",
+        node_type: "agent",
+        subgraph_node_id: "intake_request",
+        output_keys: ["state_10"],
+        stream_state_keys: ["state_10"],
+        text: '{"state_10":"正在识别：这是一个简单问候，不需要调用能力',
+      },
+      graph,
+    ),
+    {
+      labelKey: "buddy.activity.generatingOutput",
+      params: {
+        node: "识别意图",
+        stage: "理解请求",
+      },
+      preview: "正在识别：这是一个简单问候，不需要调用能力",
+      tone: "stream",
+      replaceKey: "stream:intake_request:understand_request",
+    },
   );
 });
 

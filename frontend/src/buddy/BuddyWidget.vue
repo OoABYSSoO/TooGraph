@@ -98,9 +98,48 @@
             <span class="buddy-widget__message-label">
               {{ message.role === "user" ? t("buddy.user") : t("buddy.name") }}
             </span>
-            <p :class="{ 'buddy-widget__message-activity': !message.content && message.activityText }">
+            <div
+              v-if="message.role === 'assistant' && message.content"
+              class="buddy-widget__message-bubble buddy-widget__message-markdown"
+              v-html="renderBuddyMarkdown(message.content)"
+            />
+            <p
+              v-else
+              class="buddy-widget__message-bubble"
+              :class="{ 'buddy-widget__message-activity': !message.content && message.activityText }"
+            >
               {{ message.content || message.activityText || t("buddy.streaming") }}
             </p>
+            <section
+              v-if="message.id === activeTraceMessageId && runTraceEntries.length > 0"
+              class="buddy-widget__run-trace"
+              :class="{ 'buddy-widget__run-trace--expanded': isRunTraceExpanded }"
+            >
+              <button
+                type="button"
+                class="buddy-widget__run-trace-toggle"
+                :title="isRunTraceExpanded ? t('buddy.runTraceCollapse') : t('buddy.runTraceExpand')"
+                :aria-expanded="isRunTraceExpanded"
+                @click="isRunTraceExpanded = !isRunTraceExpanded"
+              >
+                <span>{{ t("buddy.runTraceLabel") }}</span>
+                <ElIcon><ArrowDown /></ElIcon>
+              </button>
+              <div class="buddy-widget__run-trace-body">
+                <div
+                  v-for="entry in runTraceEntries"
+                  :key="entry.replaceKey"
+                  class="buddy-widget__run-trace-entry"
+                  :class="`buddy-widget__run-trace-entry--${entry.tone}`"
+                >
+                  <span class="buddy-widget__run-trace-dot" aria-hidden="true" />
+                  <p>
+                    <strong>{{ t(entry.labelKey, entry.params) }}</strong>
+                    <span v-if="entry.preview">{{ entry.preview }}</span>
+                  </p>
+                </div>
+              </div>
+            </section>
           </article>
           <p v-if="errorMessage" class="buddy-widget__error">{{ errorMessage }}</p>
           <p v-if="queuedTurns.length > 0" class="buddy-widget__queue">
@@ -147,7 +186,7 @@
 </template>
 
 <script setup lang="ts">
-import { Close, Delete, Promotion } from "@element-plus/icons-vue";
+import { ArrowDown, Close, Delete, Promotion } from "@element-plus/icons-vue";
 import { ElIcon, ElOption, ElSelect } from "element-plus";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -157,6 +196,7 @@ import { fetchTemplate, runGraph } from "../api/graphs.ts";
 import { fetchRun } from "../api/runs.ts";
 import { fetchSettings } from "../api/settings.ts";
 import { fetchSkillCatalog } from "../api/skills.ts";
+import { resolveOutputPreviewContent } from "../editor/nodes/outputPreviewContentModel.ts";
 import { buildRuntimeModelOptions } from "../lib/runtimeModelCatalog.ts";
 import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
 import { useBuddyContextStore } from "../stores/buddyContext.ts";
@@ -173,10 +213,12 @@ import {
   buildBuddyChatGraph,
   resolveBuddyMode,
   resolveBuddyRunActivityFromRunEvent,
+  resolveBuddyRunTraceFromRunEvent,
   resolveBuddyReplyFromRunEvent,
   resolveBuddyReplyText,
   type BuddyChatMessage,
   type BuddyMode,
+  type BuddyRunTraceEntry,
 } from "./buddyChatGraph.ts";
 import {
   BUDDY_POSITION_STORAGE_KEY,
@@ -212,6 +254,7 @@ const BUDDY_MODEL_STORAGE_KEY = "graphiteui:buddy-model";
 const DRAG_THRESHOLD_PX = 4;
 const RUN_POLL_INTERVAL_MS = 700;
 const RUN_POLL_TIMEOUT_MS = 240000;
+const RUN_TRACE_MAX_ENTRIES = 24;
 
 const { t } = useI18n();
 const route = useRoute();
@@ -227,10 +270,13 @@ const buddyModelOptions = ref<BuddyModelOption[]>([]);
 const buddyModelLoadError = ref("");
 const messages = ref<BuddyMessage[]>([]);
 const queuedTurns = ref<BuddyQueuedTurn[]>([]);
+const runTraceEntries = ref<BuddyRunTraceEntry[]>([]);
 const errorMessage = ref("");
 const mood = ref<BuddyMood>("idle");
 const tapNonce = ref(0);
 const activeRunId = ref<string | null>(null);
+const activeTraceMessageId = ref<string | null>(null);
+const isRunTraceExpanded = ref(false);
 const messageListElement = ref<HTMLElement | null>(null);
 const pointerDrag = ref<{
   pointerId: number;
@@ -444,8 +490,16 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
   clearSpeakingIdleTimer();
   const history = buildHistoryBeforeMessage(turn.userMessageId);
   const assistantMessage = appendAssistantMessageForTurn(turn.userMessageId);
+  resetRunTraceForMessage(assistantMessage.id);
   mood.value = "thinking";
   setAssistantActivityText(assistantMessage.id, t("buddy.activity.preparing"));
+  appendRunTraceEntry({
+    labelKey: "buddy.activity.preparing",
+    params: {},
+    preview: "",
+    tone: "info",
+    replaceKey: "local:preparing",
+  });
   await scrollMessagesToBottom();
 
   try {
@@ -463,6 +517,13 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
       skillCatalog,
     });
     setAssistantActivityText(assistantMessage.id, t("buddy.activity.starting"));
+    appendRunTraceEntry({
+      labelKey: "buddy.activity.starting",
+      params: {},
+      preview: "",
+      tone: "info",
+      replaceKey: "local:starting",
+    });
     const run = await runGraph(graph);
     activeRunId.value = run.run_id;
     startRunEventStream(run.run_id, assistantMessage.id, graph);
@@ -483,6 +544,13 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
     mood.value = "error";
     const message = error instanceof Error ? error.message : t("buddy.runFailed");
     errorMessage.value = message;
+    appendRunTraceEntry({
+      labelKey: "buddy.activity.failed",
+      params: { node: t("buddy.name") },
+      preview: message,
+      tone: "error",
+      replaceKey: "local:error",
+    });
     updateAssistantMessage(assistantMessage.id, t("buddy.errorReply", { error: message }), { includeInContext: false });
   } finally {
     closeEventSource();
@@ -497,6 +565,9 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
 
 function clearMessages() {
   queuedTurns.value = [];
+  runTraceEntries.value = [];
+  activeTraceMessageId.value = null;
+  isRunTraceExpanded.value = false;
   clearSpeakingIdleTimer();
   closeEventSource();
   activeAbortController?.abort();
@@ -577,9 +648,16 @@ function startRunEventStream(runId: string, assistantMessageId: string, graph: G
     if (!payload) {
       return;
     }
+    const traceEntry = resolveBuddyRunTraceFromRunEvent(eventType, payload, graph);
+    if (traceEntry) {
+      appendRunTraceEntry(traceEntry);
+    }
     const nextText = resolveBuddyReplyFromRunEvent(payload, graph);
     if (!nextText) {
       setAssistantActivityFromRunEvent(assistantMessageId, eventType, payload, graph);
+      if (traceEntry) {
+        void scrollMessagesToBottom();
+      }
       return;
     }
     mood.value = "speaking";
@@ -612,6 +690,28 @@ async function pollRunUntilFinished(runId: string, signal: AbortSignal): Promise
 function closeEventSource() {
   eventSource?.close();
   eventSource = null;
+}
+
+function resetRunTraceForMessage(messageId: string) {
+  activeTraceMessageId.value = messageId;
+  runTraceEntries.value = [];
+  isRunTraceExpanded.value = false;
+}
+
+function appendRunTraceEntry(traceEntry: BuddyRunTraceEntry) {
+  const existingIndex = runTraceEntries.value.findIndex((entry) => entry.replaceKey === traceEntry.replaceKey);
+  if (existingIndex >= 0) {
+    runTraceEntries.value.splice(existingIndex, 1, traceEntry);
+  } else {
+    runTraceEntries.value.push(traceEntry);
+  }
+  if (runTraceEntries.value.length > RUN_TRACE_MAX_ENTRIES) {
+    runTraceEntries.value.splice(0, runTraceEntries.value.length - RUN_TRACE_MAX_ENTRIES);
+  }
+}
+
+function renderBuddyMarkdown(content: string) {
+  return resolveOutputPreviewContent(content, "markdown").html;
 }
 
 function updateAssistantMessage(messageId: string, content: string, patch: BuddyMessagePatch = {}) {
@@ -834,7 +934,8 @@ function isPersistedMessage(value: unknown): value is BuddyChatMessage {
 .buddy-widget__avatar:focus-visible,
 .buddy-widget__icon-button:focus-visible,
 .buddy-widget__send:focus-visible,
-.buddy-widget__input:focus-visible {
+.buddy-widget__input:focus-visible,
+.buddy-widget__run-trace-toggle:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3);
 }
@@ -1037,7 +1138,7 @@ function isPersistedMessage(value: unknown): value is BuddyChatMessage {
   font-weight: 700;
 }
 
-.buddy-widget__message p {
+.buddy-widget__message-bubble {
   width: fit-content;
   max-width: 100%;
   margin: 0;
@@ -1052,6 +1153,72 @@ function isPersistedMessage(value: unknown): value is BuddyChatMessage {
   overflow-wrap: anywhere;
 }
 
+.buddy-widget__message-markdown {
+  white-space: normal;
+}
+
+.buddy-widget__message-markdown :deep(p),
+.buddy-widget__message-markdown :deep(ul),
+.buddy-widget__message-markdown :deep(ol),
+.buddy-widget__message-markdown :deep(blockquote),
+.buddy-widget__message-markdown :deep(pre) {
+  margin: 0 0 8px;
+}
+
+.buddy-widget__message-markdown :deep(p:last-child),
+.buddy-widget__message-markdown :deep(ul:last-child),
+.buddy-widget__message-markdown :deep(ol:last-child),
+.buddy-widget__message-markdown :deep(blockquote:last-child),
+.buddy-widget__message-markdown :deep(pre:last-child) {
+  margin-bottom: 0;
+}
+
+.buddy-widget__message-markdown :deep(ul),
+.buddy-widget__message-markdown :deep(ol) {
+  padding-left: 18px;
+}
+
+.buddy-widget__message-markdown :deep(a) {
+  color: #2563eb;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.buddy-widget__message-markdown :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.buddy-widget__message-markdown :deep(code) {
+  padding: 1px 4px;
+  border-radius: 5px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  font-family: var(--graphite-font-mono);
+  font-size: 0.92em;
+}
+
+.buddy-widget__message-markdown :deep(pre) {
+  max-width: 100%;
+  overflow: auto;
+  padding: 9px 10px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.buddy-widget__message-markdown :deep(pre code) {
+  padding: 0;
+  background: transparent;
+  color: #1f2937;
+}
+
+.buddy-widget__message-markdown :deep(blockquote) {
+  padding: 6px 10px;
+  border-left: 3px solid rgba(154, 52, 18, 0.22);
+  color: rgba(70, 53, 38, 0.88);
+  background: rgba(255, 248, 240, 0.58);
+}
+
 .buddy-widget__message-activity {
   color: rgba(108, 82, 62, 0.76);
   font-size: 12px;
@@ -1061,9 +1228,112 @@ function isPersistedMessage(value: unknown): value is BuddyChatMessage {
   justify-items: end;
 }
 
-.buddy-widget__message--user p {
+.buddy-widget__message--user .buddy-widget__message-bubble {
   background: rgba(154, 52, 18, 0.08);
   color: var(--graphite-text-strong);
+}
+
+.buddy-widget__run-trace {
+  width: min(100%, 320px);
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 252, 247, 0.72);
+  overflow: hidden;
+}
+
+.buddy-widget__run-trace-toggle {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 9px;
+  border: 0;
+  border-bottom: 1px solid rgba(154, 52, 18, 0.08);
+  background: rgba(255, 248, 240, 0.6);
+  color: rgba(108, 82, 62, 0.9);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.buddy-widget__run-trace-toggle .el-icon {
+  transition: transform 160ms ease;
+}
+
+.buddy-widget__run-trace--expanded .buddy-widget__run-trace-toggle .el-icon {
+  transform: rotate(180deg);
+}
+
+.buddy-widget__run-trace-body {
+  max-height: calc(3 * 1.45em + 18px);
+  overflow: auto;
+  padding: 7px 8px;
+}
+
+.buddy-widget__run-trace--expanded .buddy-widget__run-trace-body {
+  max-height: 180px;
+}
+
+.buddy-widget__run-trace-entry {
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr);
+  gap: 7px;
+  align-items: start;
+  color: rgba(70, 53, 38, 0.78);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.buddy-widget__run-trace-entry + .buddy-widget__run-trace-entry {
+  margin-top: 5px;
+}
+
+.buddy-widget__run-trace-dot {
+  width: 7px;
+  height: 7px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: rgba(154, 52, 18, 0.28);
+}
+
+.buddy-widget__run-trace-entry--stream .buddy-widget__run-trace-dot {
+  background: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.buddy-widget__run-trace-entry--success .buddy-widget__run-trace-dot {
+  background: #16a34a;
+}
+
+.buddy-widget__run-trace-entry--error .buddy-widget__run-trace-dot {
+  background: #dc2626;
+}
+
+.buddy-widget__run-trace-entry p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.buddy-widget__run-trace-entry strong {
+  display: block;
+  color: rgba(45, 32, 21, 0.88);
+  font-weight: 800;
+}
+
+.buddy-widget__run-trace-entry span:not(.buddy-widget__run-trace-dot) {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: pre-wrap;
+}
+
+.buddy-widget__run-trace--expanded .buddy-widget__run-trace-entry span:not(.buddy-widget__run-trace-dot) {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: initial;
 }
 
 .buddy-widget__form {

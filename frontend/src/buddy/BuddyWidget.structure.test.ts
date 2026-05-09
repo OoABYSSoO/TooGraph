@@ -120,6 +120,16 @@ test("BuddyWidget shows live run activity while the assistant reply is still emp
   assert.match(componentSource, /if \(mood\.value === "thinking" && latestActivityText\.value\) \{/);
 });
 
+test("BuddyWidget renders assistant replies as safe markdown and keeps a compact run trace panel", () => {
+  assert.match(componentSource, /import \{ resolveOutputPreviewContent \} from "\.\.\/editor\/nodes\/outputPreviewContentModel\.ts";/);
+  assert.match(componentSource, /v-html="renderBuddyMarkdown\(message\.content\)"/);
+  assert.match(componentSource, /class="buddy-widget__run-trace"/);
+  assert.match(componentSource, /const runTraceEntries = ref<BuddyRunTraceEntry\[\]>\(\[\]\);/);
+  assert.match(componentSource, /resolveBuddyRunTraceFromRunEvent/);
+  assert.match(componentSource, /appendRunTraceEntry\(traceEntry\);/);
+  assert.match(componentSource, /\.buddy-widget__run-trace-body[\s\S]*max-height:\s*calc\(3 \* 1\.45em \+ 18px\);/);
+});
+
 test("BuddyWidget leaves buddy self config loading and memory curation to the chat graph template", () => {
   assert.doesNotMatch(componentSource, new RegExp("fetch" + "BuddyContext"));
   assert.doesNotMatch(componentSource, new RegExp("curate" + "BuddyMemoryTurn"));

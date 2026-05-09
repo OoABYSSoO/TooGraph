@@ -2,6 +2,7 @@ import type { AgentNode, GraphNode, GraphPayload, InputNode, TemplateRecord } fr
 import type { RunDetail } from "../types/run.ts";
 import type { SkillDefinition } from "../types/skills.ts";
 import { GLOBAL_RUNTIME_MODEL_OPTION_VALUE } from "../lib/runtimeModelCatalog.ts";
+import { routeStreamingJsonStateText } from "../lib/streamingJsonStateRouter.ts";
 
 export const BUDDY_TEMPLATE_ID = "buddy_autonomous_loop";
 export const BUDDY_USER_MESSAGE_STATE_KEY = "state_1";
@@ -57,6 +58,14 @@ export type BuddyChatMessage = {
 export type BuddyRunActivityMessage = {
   labelKey: string;
   params: Record<string, string>;
+};
+
+export type BuddyRunTraceEntry = {
+  labelKey: string;
+  params: Record<string, string>;
+  preview: string;
+  tone: "info" | "stream" | "success" | "error";
+  replaceKey: string;
 };
 
 export type BuildBuddyChatGraphInput = {
@@ -193,6 +202,13 @@ export function resolveBuddyReplyFromRunEvent(payload: Record<string, unknown>, 
     return stringifyBuddyReplyCandidate(payload.value ?? payload.text);
   }
 
+  const outputKeys = listBuddyRunEventOutputKeys(payload);
+  const streamStateKeys = listBuddyRunEventOutputKeys({ output_keys: payload.stream_state_keys }, outputKeys);
+  const streamedReply = resolveBuddyStreamingReplyText(payload, replyStateKeys, streamStateKeys);
+  if (streamedReply) {
+    return streamedReply;
+  }
+
   const outputValues = isRecord(payload.output_values) ? payload.output_values : null;
   if (outputValues) {
     for (const replyStateKey of replyStateKeys) {
@@ -202,15 +218,63 @@ export function resolveBuddyReplyFromRunEvent(payload: Record<string, unknown>, 
     }
   }
 
-  const outputKeys = Array.isArray(payload.output_keys)
-    ? payload.output_keys.map((key) => String(key)).filter(Boolean)
-    : [];
   const matchedOutputKey = outputKeys.find((key) => replyStateKeys.includes(key));
   if (matchedOutputKey && payload.value !== undefined) {
     return stringifyBuddyReplyCandidate(payload.value);
   }
 
   return "";
+}
+
+export function resolveBuddyRunTraceFromRunEvent(
+  eventType: string,
+  payload: Record<string, unknown>,
+  graph: GraphPayload | null | undefined,
+): BuddyRunTraceEntry | null {
+  const nodeId = normalizeRunEventText(payload.node_id);
+  const subgraphNodeId = normalizeRunEventText(payload.subgraph_node_id);
+  if (!nodeId) {
+    return null;
+  }
+
+  const labels = resolveBuddyRunNodeLabels(graph, nodeId, subgraphNodeId);
+  const params = buildBuddyActivityParams(labels);
+  if (eventType === "node.output.delta") {
+    const preview = resolveBuddyRunEventOutputPreview(payload);
+    return preview
+      ? {
+          labelKey: "buddy.activity.generatingOutput",
+          params,
+          preview,
+          tone: "stream",
+          replaceKey: buildBuddyTraceReplaceKey("stream", nodeId, subgraphNodeId),
+        }
+      : null;
+  }
+
+  if (eventType === "node.output.completed") {
+    const preview = resolveBuddyRunEventOutputPreview(payload);
+    return preview
+      ? {
+          labelKey: "buddy.activity.completed",
+          params,
+          preview,
+          tone: "success",
+          replaceKey: buildBuddyTraceReplaceKey("completed", nodeId, subgraphNodeId),
+        }
+      : null;
+  }
+
+  const activity = resolveBuddyRunActivityFromRunEvent(eventType, payload, graph);
+  if (!activity) {
+    return null;
+  }
+  return {
+    ...activity,
+    preview: "",
+    tone: eventType === "node.failed" ? "error" : eventType === "node.completed" ? "success" : "info",
+    replaceKey: buildBuddyTraceReplaceKey(eventType, nodeId, subgraphNodeId),
+  };
 }
 
 export function resolveBuddyRunActivityFromRunEvent(
@@ -360,6 +424,88 @@ function addUniqueMetadataNodeId(value: unknown, nodeId: string) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function listBuddyRunEventOutputKeys(payload: Record<string, unknown>, fallback: string[] = []) {
+  return Array.isArray(payload.output_keys) ? payload.output_keys.map((key) => String(key)).filter(Boolean) : fallback;
+}
+
+function resolveBuddyStreamingReplyText(payload: Record<string, unknown>, replyStateKeys: string[], streamStateKeys: string[]) {
+  const text = typeof payload.text === "string" ? payload.text : "";
+  if (!text || streamStateKeys.every((key) => !replyStateKeys.includes(key))) {
+    return "";
+  }
+  const routed = routeStreamingJsonStateText(text, replyStateKeys);
+  for (const replyStateKey of replyStateKeys) {
+    const routedText = routed[replyStateKey]?.text?.trim();
+    if (routedText) {
+      return routedText;
+    }
+  }
+  if (streamStateKeys.length === 1 && replyStateKeys.includes(streamStateKeys[0]) && !text.trimStart().startsWith("{")) {
+    return stringifyBuddyReplyCandidate(text);
+  }
+  return "";
+}
+
+function resolveBuddyRunEventOutputPreview(payload: Record<string, unknown>) {
+  const outputValues = isRecord(payload.output_values) ? payload.output_values : null;
+  if (outputValues) {
+    const outputKeys = listBuddyRunEventOutputKeys(payload, Object.keys(outputValues));
+    for (const outputKey of outputKeys) {
+      if (outputKey in outputValues) {
+        const preview = stringifyBuddyTraceValue(outputValues[outputKey]);
+        if (preview) {
+          return preview;
+        }
+      }
+    }
+    for (const value of Object.values(outputValues)) {
+      const preview = stringifyBuddyTraceValue(value);
+      if (preview) {
+        return preview;
+      }
+    }
+  }
+
+  const text = typeof payload.text === "string" ? payload.text : "";
+  if (!text) {
+    return "";
+  }
+  const outputKeys = listBuddyRunEventOutputKeys(payload);
+  const streamStateKeys = listBuddyRunEventOutputKeys({ output_keys: payload.stream_state_keys }, outputKeys);
+  if (streamStateKeys.length > 0) {
+    const routed = routeStreamingJsonStateText(text, streamStateKeys);
+    for (const stateKey of streamStateKeys) {
+      const route = routed[stateKey];
+      if (route?.text?.trim()) {
+        return clampBuddyTracePreview(route.text);
+      }
+    }
+    if (streamStateKeys.length === 1 && !text.trimStart().startsWith("{")) {
+      return clampBuddyTracePreview(text);
+    }
+  }
+  return "";
+}
+
+function stringifyBuddyTraceValue(value: unknown) {
+  const text = stringifyBuddyReplyCandidate(value);
+  return clampBuddyTracePreview(text);
+}
+
+function clampBuddyTracePreview(value: string) {
+  const lines = value
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const preview = (lines.length > 0 ? lines.slice(0, 3).join("\n") : value.trim()).slice(0, 240).trim();
+  return preview.length === 240 ? `${preview.slice(0, 239)}…` : preview;
+}
+
+function buildBuddyTraceReplaceKey(kind: string, nodeId: string, subgraphNodeId: string) {
+  return `${kind}:${subgraphNodeId ? `${subgraphNodeId}:` : ""}${nodeId}`;
 }
 
 function resolveBuddyActivityPhase(nodeId: string, subgraphNodeId: string) {
