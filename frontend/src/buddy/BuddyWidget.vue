@@ -279,6 +279,7 @@
       <button
         type="button"
         class="buddy-widget__avatar"
+        :style="avatarStyle"
         :title="t('buddy.dragHint')"
         :aria-label="t('buddy.open')"
         @pointerdown="handlePointerDown"
@@ -444,6 +445,15 @@ const buddyModelPlaceholder = computed(() =>
 const anchorStyle = computed(() => ({
   transform: isPanelFullscreen.value ? "none" : `translate3d(${position.value.x}px, ${position.value.y}px, 0)`,
 }));
+const avatarStyle = computed(() => {
+  if (!isPanelFullscreen.value) {
+    return {};
+  }
+  return {
+    left: `${position.value.x}px`,
+    top: `${position.value.y}px`,
+  };
+});
 const panelPlacement = computed(() => (position.value.x > viewport.value.width / 2 ? "left" : "right"));
 const latestActivityText = computed(() => {
   const latestPendingMessage = [...messages.value]
@@ -1485,18 +1495,18 @@ function formatErrorMessage(error: unknown): string {
   left: 50%;
   right: auto;
   bottom: auto;
-  width: min(1000px, calc(100vw - 48px));
-  height: min(820px, calc(100vh - 40px));
-  max-height: calc(100vh - 48px);
+  width: min(1440px, calc(100vw - 96px));
+  height: min(920px, calc(100vh - 80px));
+  max-height: calc(100vh - 80px);
   transform: translate(-50%, -50%);
   z-index: 1;
 }
 
 .buddy-widget__anchor--fullscreen .buddy-widget__avatar {
   position: fixed;
-  right: 24px;
-  bottom: 22px;
-  z-index: 2;
+  right: auto;
+  bottom: auto;
+  z-index: 4;
 }
 
 .buddy-widget__anchor--left .buddy-widget__panel {
@@ -2144,9 +2154,9 @@ function formatErrorMessage(error: unknown): string {
   }
 
   .buddy-widget__panel--fullscreen {
-    width: calc(100vw - 24px);
-    height: calc(100vh - 24px);
-    max-height: calc(100vh - 24px);
+    width: calc(100vw - 18px);
+    height: calc(100vh - 18px);
+    max-height: calc(100vh - 18px);
   }
 
   .buddy-widget__messages {

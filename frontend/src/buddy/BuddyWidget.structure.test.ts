@@ -186,6 +186,7 @@ test("BuddyWidget stores buddy chat in backend sessions and exposes a compact hi
 test("BuddyWidget uses the top toolbar for new chat and fullscreen expansion", () => {
   assert.match(componentSource, /import \{ ArrowDown, Check, Clock, Close, Delete, FullScreen, Plus, Promotion, SemiSelect \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /const isPanelFullscreen = ref\(false\);/);
+  assert.match(componentSource, /const avatarStyle = computed\(\(\) => \{[\s\S]*left:\s*`\$\{position\.value\.x\}px`,[\s\S]*top:\s*`\$\{position\.value\.y\}px`,/);
   assert.match(componentSource, /:title="t\('buddy\.newSession'\)"[\s\S]*@click="createNewSession"[\s\S]*<ElIcon><Plus \/><\/ElIcon>/);
   assert.match(componentSource, /:title="isPanelFullscreen \? t\('buddy\.exitFullscreen'\) : t\('buddy\.fullscreen'\)"/);
   assert.match(componentSource, /@click="togglePanelFullscreen"/);
@@ -193,8 +194,8 @@ test("BuddyWidget uses the top toolbar for new chat and fullscreen expansion", (
   assert.match(componentSource, /<FullScreen v-else \/>/);
   assert.match(componentSource, /@click="closePanel"/);
   assert.match(componentSource, /class="buddy-widget__backdrop"/);
-  assert.match(componentSource, /\.buddy-widget__panel--fullscreen\s*\{[\s\S]*width:\s*min\(1000px,/);
-  assert.match(componentSource, /\.buddy-widget__anchor--fullscreen \.buddy-widget__avatar\s*\{[\s\S]*position:\s*fixed;[\s\S]*bottom:\s*22px;/);
+  assert.match(componentSource, /\.buddy-widget__panel--fullscreen\s*\{[\s\S]*width:\s*min\(1440px,/);
+  assert.match(componentSource, /\.buddy-widget__anchor--fullscreen \.buddy-widget__avatar\s*\{[\s\S]*position:\s*fixed;[\s\S]*right:\s*auto;[\s\S]*z-index:\s*4;/);
   assert.doesNotMatch(componentSource, /\.buddy-widget__anchor--fullscreen \.buddy-widget__avatar\s*\{[\s\S]*display:\s*none;/);
 });
 
