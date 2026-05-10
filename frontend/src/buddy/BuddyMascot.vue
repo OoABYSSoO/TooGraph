@@ -30,90 +30,19 @@
       <g class="buddy-mascot__stage" filter="url(#buddyMascotSoftness)">
         <g class="buddy-mascot__tail buddy-mascot__tail-rig">
           <path
-            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--right"
-            d="M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62"
+            class="buddy-mascot__tail-pose"
+            :d="tailBasePath"
           >
             <animate
+              v-if="tailSwingAnimation"
+              :key="tailSwingAnimation.key"
               attributeName="d"
-              dur="3.6s"
-              repeatCount="indefinite"
+              :dur="`${TAIL_SWITCH_DURATION_MS}ms`"
+              fill="freeze"
               calcMode="spline"
               keyTimes="0;0.25;0.5;0.75;1"
               keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
-              values="M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62;M0 176 C62 198 124 178 178 150 C222 126 254 86 274 68 C278 64 280 62 282 62;M0 176 C70 180 138 148 196 116 C236 94 264 74 278 64 C280 62 282 62 282 62;M0 176 C64 184 122 198 170 162 C214 132 246 88 272 66 C276 62 280 60 282 62;M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62"
-            />
-          </path>
-          <path
-            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-right"
-            d="M0 176 C36 204 72 166 100 146 C130 124 158 82 156 62 C156 56 154 52 152 54"
-          >
-            <animate
-              attributeName="d"
-              dur="3.9s"
-              begin="-0.3s"
-              repeatCount="indefinite"
-              calcMode="spline"
-              keyTimes="0;0.25;0.5;0.75;1"
-              keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
-              values="M0 176 C36 204 72 166 100 146 C130 124 158 82 156 62 C156 56 154 52 152 54;M0 176 C42 190 84 166 116 134 C144 106 166 76 156 58 C154 54 152 52 152 54;M0 176 C48 174 88 146 120 116 C140 96 152 72 154 58 C154 54 153 52 152 54;M0 176 C28 182 84 174 118 136 C148 104 168 78 158 58 C156 54 154 52 152 54;M0 176 C36 204 72 166 100 146 C130 124 158 82 156 62 C156 56 154 52 152 54"
-            />
-          </path>
-          <path
-            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-center"
-            d="M0 176 C-24 164 20 138 -2 108 C-20 82 -12 58 0 48 C8 54 12 62 8 72"
-          >
-            <animate
-              attributeName="d"
-              dur="4.2s"
-              begin="-0.6s"
-              repeatCount="indefinite"
-              calcMode="spline"
-              keyTimes="0;0.25;0.5;0.75;1"
-              keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
-              values="M0 176 C-24 164 20 138 -2 108 C-20 82 -12 58 0 48 C8 54 12 62 8 72;M0 176 C-8 158 -8 124 -2 92 C0 70 4 54 8 46 C10 50 12 58 8 72;M0 176 C0 154 0 116 0 84 C0 62 0 50 2 44 C6 50 8 60 8 72;M0 176 C8 158 8 124 2 92 C0 70 -4 54 -8 46 C-10 50 -12 58 -8 72;M0 176 C24 164 -20 138 2 108 C20 82 12 58 0 48 C-8 54 -12 62 -8 72"
-            />
-          </path>
-          <path
-            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-left"
-            d="M0 176 C-36 204 -72 166 -100 146 C-130 124 -158 82 -156 62 C-156 56 -154 52 -152 54"
-          >
-            <animate
-              attributeName="d"
-              dur="3.9s"
-              begin="-0.3s"
-              repeatCount="indefinite"
-              calcMode="spline"
-              keyTimes="0;0.25;0.5;0.75;1"
-              keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
-              values="M0 176 C-36 204 -72 166 -100 146 C-130 124 -158 82 -156 62 C-156 56 -154 52 -152 54;M0 176 C-42 190 -84 166 -116 134 C-144 106 -166 76 -156 58 C-154 54 -152 52 -152 54;M0 176 C-48 174 -88 146 -120 116 C-140 96 -152 72 -154 58 C-154 54 -153 52 -152 54;M0 176 C-28 182 -84 174 -118 136 C-148 104 -168 78 -158 58 C-156 54 -154 52 -152 54;M0 176 C-36 204 -72 166 -100 146 C-130 124 -158 82 -156 62 C-156 56 -154 52 -152 54"
-            />
-          </path>
-          <path
-            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--left"
-            d="M0 176 C-54 214 -104 166 -154 160 C-212 152 -240 112 -260 82 C-270 66 -278 60 -282 62"
-          >
-            <animate
-              attributeName="d"
-              dur="3.6s"
-              repeatCount="indefinite"
-              calcMode="spline"
-              keyTimes="0;0.25;0.5;0.75;1"
-              keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
-              values="M0 176 C-54 214 -104 166 -154 160 C-212 152 -240 112 -260 82 C-270 66 -278 60 -282 62;M0 176 C-62 198 -124 178 -178 150 C-222 126 -254 86 -274 68 C-278 64 -280 62 -282 62;M0 176 C-70 180 -138 148 -196 116 C-236 94 -264 74 -278 64 C-280 62 -282 62 -282 62;M0 176 C-64 184 -122 198 -170 162 C-214 132 -246 88 -272 66 C-276 62 -280 60 -282 62;M0 176 C-54 214 -104 166 -154 160 C-212 152 -240 112 -260 82 C-270 66 -278 60 -282 62"
-            />
-          </path>
-          <path
-            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--front-swing"
-            d="M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62"
-          >
-            <animate
-              attributeName="d"
-              dur="7.2s"
-              repeatCount="indefinite"
-              calcMode="spline"
-              keyTimes="0;0.125;0.25;0.375;0.5;0.625;0.75;0.875;1"
-              keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
-              values="M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62;M0 176 C36 204 72 166 100 146 C130 124 158 82 156 62 C156 56 154 52 152 54;M0 176 C-24 164 20 138 -2 108 C-20 82 -12 58 0 48 C8 54 12 62 8 72;M0 176 C-36 204 -72 166 -100 146 C-130 124 -158 82 -156 62 C-156 56 -154 52 -152 54;M0 176 C-54 214 -104 166 -154 160 C-212 152 -240 112 -260 82 C-270 66 -278 60 -282 62;M0 176 C-36 204 -72 166 -100 146 C-130 124 -158 82 -156 62 C-156 56 -154 52 -152 54;M0 176 C-24 164 20 138 -2 108 C-20 82 -12 58 0 48 C8 54 12 62 8 72;M0 176 C36 204 72 166 100 146 C130 124 158 82 156 62 C156 56 154 52 152 54;M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62"
+              :values="tailSwingAnimation.values"
             />
           </path>
         </g>
@@ -164,6 +93,36 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 type BuddyMascotMood = "idle" | "thinking" | "speaking" | "error";
 type BuddyMascotMotion = "idle" | "roam" | "hop";
 type BuddyMascotFacing = "front" | "left" | "right";
+type TailSide = "left" | "right";
+
+const TAIL_SWITCH_DURATION_MS = 1200;
+const TAIL_IDLE_MIN_DWELL_MS = 5200;
+const TAIL_IDLE_MAX_DWELL_MS = 9000;
+
+const TAIL_POSE_PATHS = {
+  right: "M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62",
+  backRight: "M0 176 C36 204 72 166 100 146 C130 124 158 82 156 62 C156 56 154 52 152 54",
+  backCenter: "M0 176 C-24 164 20 138 -2 108 C-20 82 -12 58 0 48 C8 54 12 62 8 72",
+  backLeft: "M0 176 C-36 204 -72 166 -100 146 C-130 124 -158 82 -156 62 C-156 56 -154 52 -152 54",
+  left: "M0 176 C-54 214 -104 166 -154 160 C-212 152 -240 112 -260 82 C-270 66 -278 60 -282 62",
+} as const;
+
+const TAIL_TRANSITION_PATHS = {
+  rightToLeft: [
+    TAIL_POSE_PATHS.right,
+    TAIL_POSE_PATHS.backRight,
+    TAIL_POSE_PATHS.backCenter,
+    TAIL_POSE_PATHS.backLeft,
+    TAIL_POSE_PATHS.left,
+  ],
+  leftToRight: [
+    TAIL_POSE_PATHS.left,
+    TAIL_POSE_PATHS.backLeft,
+    TAIL_POSE_PATHS.backCenter,
+    TAIL_POSE_PATHS.backRight,
+    TAIL_POSE_PATHS.right,
+  ],
+} as const;
 
 const props = withDefaults(
   defineProps<{
@@ -187,7 +146,13 @@ const props = withDefaults(
 );
 
 const tapAnimating = ref(false);
+const tailBasePath = ref<string>(TAIL_POSE_PATHS.right);
+const tailSide = ref<TailSide>("right");
+const tailSwingAnimation = ref<{ key: number; values: string } | null>(null);
 let tapTimeoutId: number | null = null;
+let tailDwellTimerId: number | null = null;
+let tailTransitionTimerId: number | null = null;
+let tailAnimationKey = 0;
 
 const effectiveMood = computed(() => (props.dragging ? "idle" : props.mood));
 const effectiveMotion = computed(() => (props.dragging || props.mood !== "idle" ? "idle" : props.motion));
@@ -209,9 +174,11 @@ const eyeLookStyle = computed<Record<string, string>>(() => {
 });
 
 watch(() => props.tapNonce, triggerTapAnimation);
+watch([effectiveMood, () => props.facing, () => props.dragging], syncTailTarget, { immediate: true });
 
 onBeforeUnmount(() => {
   clearTapTimeout();
+  clearTailTimers();
 });
 
 function triggerTapAnimation(nextNonce: number, previousNonce: number | undefined) {
@@ -242,6 +209,115 @@ function clearTapTimeout() {
   }
   window.clearTimeout(tapTimeoutId);
   tapTimeoutId = null;
+}
+
+function syncTailTarget() {
+  clearTailDwellTimer();
+  const targetSide = resolveTailSideForFacing(props.facing);
+
+  if (props.facing !== "front") {
+    transitionTailTo(targetSide);
+    return;
+  }
+
+  if (effectiveMood.value === "idle" && !props.dragging) {
+    scheduleIdleTailSideSwitch();
+  }
+}
+
+function scheduleIdleTailSideSwitch() {
+  clearTailDwellTimer();
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  tailDwellTimerId = window.setTimeout(() => {
+    tailDwellTimerId = null;
+    if (props.facing !== "front" || effectiveMood.value !== "idle" || props.dragging) {
+      return;
+    }
+    transitionTailTo(tailSide.value === "right" ? "left" : "right");
+  }, randomBetween(TAIL_IDLE_MIN_DWELL_MS, TAIL_IDLE_MAX_DWELL_MS));
+}
+
+function transitionTailTo(targetSide: TailSide) {
+  clearTailDwellTimer();
+  clearTailTransitionTimer();
+
+  if (targetSide === tailSide.value) {
+    tailSwingAnimation.value = null;
+    tailBasePath.value = TAIL_POSE_PATHS[targetSide];
+    if (props.facing === "front" && effectiveMood.value === "idle" && !props.dragging) {
+      scheduleIdleTailSideSwitch();
+    }
+    return;
+  }
+
+  tailAnimationKey += 1;
+  tailSwingAnimation.value = {
+    key: tailAnimationKey,
+    values: buildTailTransitionValues(tailSide.value, targetSide),
+  };
+
+  if (typeof window === "undefined") {
+    tailSwingAnimation.value = null;
+    tailBasePath.value = TAIL_POSE_PATHS[targetSide];
+    tailSide.value = targetSide;
+    return;
+  }
+
+  tailTransitionTimerId = window.setTimeout(() => {
+    tailTransitionTimerId = null;
+    tailBasePath.value = TAIL_POSE_PATHS[targetSide];
+    tailSide.value = targetSide;
+    tailSwingAnimation.value = null;
+    syncTailTarget();
+  }, TAIL_SWITCH_DURATION_MS);
+}
+
+function resolveTailSideForFacing(facing: BuddyMascotFacing): TailSide {
+  if (facing === "left") {
+    return "right";
+  }
+  if (facing === "right") {
+    return "left";
+  }
+  return tailSide.value;
+}
+
+function buildTailTransitionValues(fromSide: TailSide, toSide: TailSide) {
+  if (fromSide === toSide) {
+    return TAIL_POSE_PATHS[toSide];
+  }
+  const paths = fromSide === "right" ? TAIL_TRANSITION_PATHS.rightToLeft : TAIL_TRANSITION_PATHS.leftToRight;
+  return paths.join(";");
+}
+
+function clearTailTimers() {
+  clearTailDwellTimer();
+  clearTailTransitionTimer();
+}
+
+function clearTailDwellTimer() {
+  if (tailDwellTimerId === null || typeof window === "undefined") {
+    tailDwellTimerId = null;
+    return;
+  }
+  window.clearTimeout(tailDwellTimerId);
+  tailDwellTimerId = null;
+}
+
+function clearTailTransitionTimer() {
+  if (tailTransitionTimerId === null || typeof window === "undefined") {
+    tailTransitionTimerId = null;
+    return;
+  }
+  window.clearTimeout(tailTransitionTimerId);
+  tailTransitionTimerId = null;
+}
+
+function randomBetween(min: number, max: number) {
+  return Math.round(min + Math.random() * (max - min));
 }
 
 function clampLookAxis(value: number | undefined) {
@@ -311,15 +387,11 @@ function clampLookAxis(value: number | undefined) {
   stroke-width: 38;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: 0;
+  opacity: 1;
   transform-origin: 50% 78%;
   transition:
     opacity 160ms ease,
     transform 420ms ease;
-}
-
-.buddy-mascot__tail-pose--right {
-  opacity: 1;
 }
 
 .buddy-mascot__sparkle-wrap,
@@ -369,30 +441,6 @@ function clampLookAxis(value: number | undefined) {
   --buddy-mascot-right-ear-y: 4px;
   --buddy-mascot-right-ear-scale: 0.96;
   --buddy-mascot-right-ear-rotate: -4deg;
-}
-
-.buddy-mascot--facing-left .buddy-mascot__tail-pose--right {
-  opacity: 1;
-}
-
-.buddy-mascot--facing-left .buddy-mascot__tail-pose--left {
-  opacity: 0;
-}
-
-.buddy-mascot--facing-right .buddy-mascot__tail-pose--left {
-  opacity: 1;
-}
-
-.buddy-mascot--facing-right .buddy-mascot__tail-pose--right {
-  opacity: 0;
-}
-
-.buddy-mascot--idle.buddy-mascot--facing-front .buddy-mascot__tail-pose {
-  opacity: 0;
-}
-
-.buddy-mascot--idle.buddy-mascot--facing-front .buddy-mascot__tail-pose--front-swing {
-  opacity: 1;
 }
 
 .buddy-mascot__look-eye {
