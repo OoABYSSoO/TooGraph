@@ -88,7 +88,7 @@
 - 支持候选记忆：`memory_candidate_writer` 已能创建带证据和来源的 `candidate` 状态平台记忆并记录 revision/event，并返回相近 active 记忆的冲突提示；平台 API 已支持候选应用、拒绝、归档、替代、降权、revision/event 查询和 revision 恢复；Buddy 记忆页已提供平台候选审查表和应用/替代/拒绝/归档入口。
 - 实现预算化召回：平台 store 已支持 scope/layer/type/status 过滤、FTS 查询、importance/更新时间排序、top_k、max_chars 和 omitted 列表；候选写入 Skill 已接入 active 记忆冲突提示，Buddy 记忆页已展示候选、来源 run、替代关系和候选审查动作。
 - 新增或等价实现 `memory_recall` 与 `memory_candidate_writer` 能力：官方 Skill 已提供只读预算化 `memory_context` 召回，以及仅写入 `candidate` 记录的候选记忆生成。
-- 前端和运行详情展示召回命中、候选、应用/拒绝、冲突、revision 和来源 run；Buddy 记忆页已展示平台候选、来源 run、替代关系并提供应用/替代/拒绝/归档动作，运行详情时间线已汇总 `memory_recall` 与 `memory_candidate_write` 活动的命中、候选、跳过、冲突和记忆 ID；更细的 memory_context 展开视图仍待补齐。
+- 前端和运行详情展示召回命中、候选、应用/拒绝、冲突、revision 和来源 run；Buddy 记忆页已展示平台候选、来源 run、替代关系并提供应用/替代/拒绝/归档动作，运行详情时间线已汇总 `memory_recall` 与 `memory_candidate_write` 活动的命中、候选、跳过、冲突和记忆 ID；运行详情已新增 `memory_context` 展开视图，按查询、过滤条件、预算统计、纳入记忆、预算外省略项、证据、来源和原始上下文展示召回结果。
 - Buddy Home 文件继续作为用户可编辑投影；底层 Store、command 和 revision 是审计与恢复来源。
 
 ### 上下文预算和大结果处理
@@ -124,9 +124,9 @@
 
 待做：
 
-- 增加 embedding 存储、content hash、provider/model 记录和知识库级 rebuild API。
-- 实现关键词 + 向量 + metadata filter 的混合召回，并支持 rerank。
-- 输出 `knowledge_context`，包含 citation id、chunk id、标题、section、score、source path/url 和摘要。
+- 增加 embedding 存储、content hash、provider/model 记录和知识库级 rebuild API：已新增 `knowledge_chunk_embeddings`、chunk `content_hash`、知识库 embedding provider/model/dimension/count 元数据和 `/api/knowledge/bases/{knowledge_base}/rebuild`；当前默认使用确定性的本地 `local-hash` 向量，后续可接入外部 embedding provider。
+- 实现关键词 + 向量 + metadata filter 的混合召回，并支持 rerank：已在 `search_knowledge` 中合并 FTS/LIKE 与本地向量候选，支持 `source_path_prefix`、`source_kind`、`section` 过滤，并按关键词分数与向量相似度重排。
+- 输出 `knowledge_context`，包含 citation id、chunk id、标题、section、score、source path/url 和摘要：运行时知识库上下文已在 `results` 与 `citations` 中输出 citation id、chunk id、metadata 与 retrieval 评分信息。
 - 区分 `knowledge_context` 与 `memory_context`：Knowledge 是外部资料，Memory 是历史经验和偏好。
 - 在业务模板中显式声明需要的知识库、召回字段和引用输出。
 - 为检索质量建立评测：命中率、引用准确性、遗漏关键条件、过度引用、chunk 质量和上下文预算。

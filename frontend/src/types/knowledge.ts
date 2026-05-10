@@ -9,4 +9,9 @@ export type KnowledgeBaseRecord = {
   documentCount: number;
   chunkCount: number;
   importedAt: string;
+  embeddingProvider: string;
+  embeddingModel: string;
+  embeddingDimension: number;
+  embeddingCount: number;
+  embeddingUpdatedAt: string;
 };

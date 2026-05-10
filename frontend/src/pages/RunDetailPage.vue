@@ -172,7 +172,7 @@
             </p>
           </article>
 
-          <article class="run-detail__panel">
+          <article class="run-detail__panel" :class="{ 'run-detail__panel--wide': memoryContextCards.length > 0 }">
             <div class="run-detail__panel-heading">
               <div>
                 <span class="run-detail__section-kicker">{{ t("runDetail.context") }}</span>
@@ -184,6 +184,57 @@
                 <span>{{ t("runDetail.memory") }}</span>
                 <strong class="run-detail__content">{{ viewedRun?.memory_summary || t("common.none") }}</strong>
               </div>
+            </div>
+            <div v-if="memoryContextCards.length > 0" class="run-detail__memory-context-list">
+              <section v-for="card in memoryContextCards" :key="card.key" class="run-detail__memory-card">
+                <div class="run-detail__timeline-heading">
+                  <div class="run-detail__timeline-title">
+                    <strong>{{ t("runDetail.memoryContext") }}</strong>
+                    <small>{{ card.query || t("runDetail.memoryContextNoQuery") }}</small>
+                  </div>
+                  <span>{{ t("runDetail.memoryContextCaptured") }}</span>
+                </div>
+                <div class="run-detail__badges">
+                  <span v-for="label in card.filterLabels" :key="`${card.key}-filter-${label}`">{{ label }}</span>
+                  <span v-for="label in card.statLabels" :key="`${card.key}-stat-${label}`">{{ label }}</span>
+                </div>
+                <div class="run-detail__memory-columns">
+                  <section class="run-detail__memory-section">
+                    <span class="run-detail__meta-title">{{ t("runDetail.memoryContextIncluded") }}</span>
+                    <p v-if="card.memories.length === 0" class="run-detail__muted">{{ t("common.none") }}</p>
+                    <article v-for="memory in card.memories" v-else :key="memory.key" class="run-detail__memory-item">
+                      <div class="run-detail__memory-title">
+                        <strong>{{ memory.title }}</strong>
+                        <small v-if="memory.id">{{ memory.id }}</small>
+                      </div>
+                      <p v-if="memory.content" class="run-detail__memory-content">{{ memory.content }}</p>
+                      <div class="run-detail__badges">
+                        <span v-for="label in memory.metaLabels" :key="`${memory.key}-meta-${label}`">{{ label }}</span>
+                      </div>
+                      <div v-if="memory.evidenceLabels.length > 0" class="run-detail__badges">
+                        <span v-for="label in memory.evidenceLabels" :key="`${memory.key}-evidence-${label}`">{{ label }}</span>
+                      </div>
+                    </article>
+                  </section>
+                  <section class="run-detail__memory-section">
+                    <span class="run-detail__meta-title">{{ t("runDetail.memoryContextOmitted") }}</span>
+                    <p v-if="card.omitted.length === 0" class="run-detail__muted">{{ t("common.none") }}</p>
+                    <article v-for="memory in card.omitted" v-else :key="memory.key" class="run-detail__memory-item">
+                      <div class="run-detail__memory-title">
+                        <strong>{{ memory.title }}</strong>
+                        <small v-if="memory.id">{{ memory.id }}</small>
+                      </div>
+                      <div class="run-detail__badges">
+                        <span v-for="label in memory.metaLabels" :key="`${memory.key}-meta-${label}`">{{ label }}</span>
+                      </div>
+                    </article>
+                  </section>
+                </div>
+                <details class="run-detail__operation-detail">
+                  <summary>{{ t("runDetail.memoryContextRaw") }}</summary>
+                  <pre class="run-detail__content run-detail__operation-detail-content">{{ card.detailText || t("common.none") }}</pre>
+                </details>
+              </section>
             </div>
           </article>
         </section>
@@ -331,7 +382,7 @@ import { buildSnapshotScopedRun, canRestoreRunDetail, resolveRunRestoreUrl, reso
 import type { OperationJournalPage } from "@/types/operationJournal";
 import type { RunDetail } from "@/types/run";
 
-import { buildRunAggregatedTimeline, buildRunStatusFacts, listRunOutputArtifacts } from "./runDetailModel.ts";
+import { buildRunAggregatedTimeline, buildRunMemoryContextCards, buildRunStatusFacts, listRunOutputArtifacts } from "./runDetailModel.ts";
 import { buildOperationJournalDisplayItems, type OperationJournalDisplayItem } from "./operationJournalModel.ts";
 import ArtifactDocumentPager from "./ArtifactDocumentPager.vue";
 
@@ -380,6 +431,7 @@ const cycleVisualization = computed(() =>
   viewedRun.value ? buildCycleVisualization(viewedRun.value) : { hasCycle: false, summary: null, backEdges: [], iterations: [] },
 );
 const outputArtifacts = computed(() => (viewedRun.value ? listRunOutputArtifacts(viewedRun.value) : []));
+const memoryContextCards = computed(() => (viewedRun.value ? buildRunMemoryContextCards(viewedRun.value) : []));
 const aggregatedTimeline = computed(() => (viewedRun.value ? buildRunAggregatedTimeline(viewedRun.value) : []));
 const operationJournalItems = computed(() => buildOperationJournalDisplayItems(operationJournal.value?.entries ?? []));
 const operationJournalVisible = computed(() =>
@@ -781,6 +833,10 @@ function statusBadgeClass(status: string) {
   background: rgba(246, 253, 255, 0.9);
 }
 
+.run-detail__panel--wide {
+  grid-column: 1 / -1;
+}
+
 .run-detail__eyebrow,
 .run-detail__section-kicker {
   font-size: 0.72rem;
@@ -1052,6 +1108,82 @@ function statusBadgeClass(status: string) {
   font-weight: 800;
 }
 
+.run-detail__memory-context-list,
+.run-detail__memory-card,
+.run-detail__memory-section {
+  display: grid;
+  gap: 12px;
+}
+
+.run-detail__memory-card {
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.run-detail__memory-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.run-detail__memory-section {
+  align-content: start;
+  min-width: 0;
+}
+
+.run-detail__memory-item {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255, 252, 247, 0.7);
+}
+
+.run-detail__memory-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.run-detail__memory-title strong {
+  min-width: 0;
+  color: var(--toograph-text-strong);
+  overflow-wrap: anywhere;
+}
+
+.run-detail__memory-title small {
+  flex: none;
+  max-width: 42%;
+  overflow-wrap: anywhere;
+  color: rgba(60, 41, 20, 0.58);
+  font-family: var(--toograph-font-mono);
+  font-size: 0.76rem;
+}
+
+.run-detail__memory-content {
+  margin: 8px 0 0;
+  color: rgba(60, 41, 20, 0.72);
+  line-height: 1.58;
+  overflow-wrap: anywhere;
+}
+
+.run-detail__memory-card .run-detail__badges span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.run-detail__memory-card .run-detail__operation-detail-content {
+  max-width: 100%;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
 .run-detail__live-heading {
   display: flex;
   align-items: center;
@@ -1205,6 +1337,10 @@ function statusBadgeClass(status: string) {
   .run-detail__grid {
     grid-template-columns: 1fr;
   }
+
+  .run-detail__memory-columns {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1218,6 +1354,14 @@ function statusBadgeClass(status: string) {
 
   .run-detail__status-console {
     grid-template-columns: 1fr;
+  }
+
+  .run-detail__memory-title {
+    display: grid;
+  }
+
+  .run-detail__memory-title small {
+    max-width: none;
   }
 }
 </style>

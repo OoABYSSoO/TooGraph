@@ -51,6 +51,25 @@ export type RunAggregatedTimelineItem = {
   detailText: string;
 };
 
+export type RunMemoryContextItem = {
+  key: string;
+  id: string;
+  title: string;
+  content: string;
+  metaLabels: string[];
+  evidenceLabels: string[];
+};
+
+export type RunMemoryContextCard = {
+  key: string;
+  query: string;
+  filterLabels: string[];
+  statLabels: string[];
+  memories: RunMemoryContextItem[];
+  omitted: RunMemoryContextItem[];
+  detailText: string;
+};
+
 export function formatRunArtifactValue(value: unknown) {
   if (value === null || value === undefined) {
     return "";
@@ -102,6 +121,159 @@ export function listRunOutputArtifacts(run: RunDetail): RunOutputArtifactCard[] 
     fileName: output.saved_file?.file_name ?? null,
     documentRefs: normalizeArtifactDocumentReferences(output.value),
   }));
+}
+
+export function buildRunMemoryContextCards(run: RunDetail): RunMemoryContextCard[] {
+  const candidates: Array<{ sourceKey: string; value: Record<string, unknown> }> = [];
+  collectMemoryContextCandidates(run.state_snapshot?.values, candidates);
+  collectMemoryContextCandidates(run.artifacts.state_values, candidates);
+
+  const seen = new Set<string>();
+  const cards: RunMemoryContextCard[] = [];
+  for (const candidate of candidates) {
+    const signature = formatRunArtifactValue(candidate.value);
+    if (seen.has(signature)) {
+      continue;
+    }
+    seen.add(signature);
+    cards.push(buildMemoryContextCard(candidate.value, candidate.sourceKey));
+  }
+  return cards;
+}
+
+function collectMemoryContextCandidates(
+  values: Record<string, unknown> | undefined,
+  candidates: Array<{ sourceKey: string; value: Record<string, unknown> }>,
+) {
+  for (const [stateKey, stateValue] of Object.entries(recordFromUnknown(values))) {
+    const memoryContext = resolveMemoryContextRecord(stateValue);
+    if (memoryContext) {
+      candidates.push({ sourceKey: stateKey, value: memoryContext });
+    }
+  }
+}
+
+function resolveMemoryContextRecord(value: unknown): Record<string, unknown> | null {
+  const record = recordFromUnknown(value);
+  if (isMemoryContextRecord(record)) {
+    return record;
+  }
+  const nested = recordFromUnknown(record.memory_context);
+  if (isMemoryContextRecord(nested)) {
+    return nested;
+  }
+  const outputRecord = recordFromUnknown(record.value);
+  if (isMemoryContextRecord(outputRecord)) {
+    return outputRecord;
+  }
+  const outputs = recordFromUnknown(record.outputs);
+  const packagedOutput = recordFromUnknown(recordFromUnknown(outputs.memory_context).value);
+  if (isMemoryContextRecord(packagedOutput)) {
+    return packagedOutput;
+  }
+  return null;
+}
+
+function isMemoryContextRecord(record: Record<string, unknown>) {
+  return normalizeText(record.kind) === "memory_context" || Array.isArray(record.memories) || Array.isArray(record.omitted);
+}
+
+function buildMemoryContextCard(context: Record<string, unknown>, sourceKey: string): RunMemoryContextCard {
+  const safeSourceKey = normalizeText(sourceKey) || "memory_context";
+  const memories = Array.isArray(context.memories) ? context.memories.map((memory, index) =>
+    buildMemoryContextItem(memory, `memory_context:${safeSourceKey}`, index),
+  ) : [];
+  const omitted = Array.isArray(context.omitted) ? context.omitted.map((memory, index) =>
+    buildMemoryContextItem(memory, `memory_context:${safeSourceKey}:omitted`, index),
+  ) : [];
+  return {
+    key: `memory_context:${safeSourceKey}`,
+    query: normalizeText(context.query),
+    filterLabels: buildMemoryContextFilterLabels(context),
+    statLabels: buildMemoryContextStatLabels(context, memories.length, omitted.length),
+    memories,
+    omitted,
+    detailText: formatRunArtifactValue(context),
+  };
+}
+
+function buildMemoryContextFilterLabels(context: Record<string, unknown>) {
+  const filters = recordFromUnknown(context.filters);
+  return [
+    ["scope", filters.scope ?? context.scope],
+    ["layer", filters.layer ?? context.layer],
+    ["type", filters.type ?? filters.memory_type ?? context.type],
+    ["status", filters.status ?? context.status],
+  ].flatMap(([label, value]) => {
+    const text = normalizeText(value);
+    return text ? [`${label}: ${text}`] : [];
+  });
+}
+
+function buildMemoryContextStatLabels(context: Record<string, unknown>, memoryCount: number, omittedCount: number) {
+  const included = normalizeMetricNumber(context.included_count) ?? memoryCount;
+  const omitted = normalizeMetricNumber(context.omitted_count) ?? omittedCount;
+  const total = normalizeMetricNumber(context.total_count);
+  const usedChars = normalizeMetricNumber(context.used_chars);
+  const maxChars = normalizeMetricNumber(context.max_chars);
+  return [
+    `included: ${formatMetricNumber(included)}`,
+    `omitted: ${formatMetricNumber(omitted)}`,
+    total !== null ? `total: ${formatMetricNumber(total)}` : "",
+    usedChars !== null && maxChars !== null ? `budget: ${formatMetricNumber(usedChars)}/${formatMetricNumber(maxChars)} chars` : "",
+  ].filter(Boolean);
+}
+
+function buildMemoryContextItem(value: unknown, keyPrefix: string, index: number): RunMemoryContextItem {
+  const record = recordFromUnknown(value);
+  const id = normalizeText(record.id);
+  const title = normalizeText(record.summary) || id || `Memory ${index + 1}`;
+  const content = normalizeText(record.content);
+  return {
+    key: `${keyPrefix}:${id || "memory"}:${index}`,
+    id,
+    title,
+    content,
+    metaLabels: buildMemoryContextItemMetaLabels(record),
+    evidenceLabels: buildEvidenceLabels(record.evidence),
+  };
+}
+
+function buildMemoryContextItemMetaLabels(record: Record<string, unknown>) {
+  const baseLabels = [
+    normalizeText(record.scope),
+    normalizeText(record.layer),
+    normalizeText(record.type ?? record.memory_type),
+    normalizeText(record.status),
+  ].filter(Boolean);
+  const confidence = normalizeMetricNumber(record.confidence);
+  const importance = normalizeMetricNumber(record.importance);
+  const source = buildMemorySourceLabel(record.source);
+  const charCount = normalizeMetricNumber(record.char_count);
+  return [
+    ...baseLabels,
+    confidence !== null ? `confidence: ${formatMetricNumber(confidence)}` : "",
+    importance !== null ? `importance: ${formatMetricNumber(importance)}` : "",
+    source ? `source: ${source}` : "",
+    charCount !== null ? `chars: ${formatMetricNumber(charCount)}` : "",
+  ].filter(Boolean);
+}
+
+function buildMemorySourceLabel(value: unknown) {
+  const source = recordFromUnknown(value);
+  return uniqueNonEmpty([
+    normalizeText(source.run_id),
+    normalizeText(source.node_id),
+    normalizeText(source.skill_key),
+    normalizeText(source.template_id),
+  ]).join(" / ");
+}
+
+function buildEvidenceLabels(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return uniqueNonEmpty(value.map((item) => typeof item === "string" ? item : formatRunArtifactValue(item)));
 }
 
 export function normalizeArtifactDocumentReferences(value: unknown): ArtifactDocumentReference[] {
@@ -207,6 +379,24 @@ function normalizeText(value: unknown) {
 
 function normalizeNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function normalizeMetricNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function formatMetricNumber(value: number) {
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+  return String(Number(value.toFixed(2)));
 }
 
 export function buildRunStatusFacts(run: RunDetail): RunStatusFact[] {

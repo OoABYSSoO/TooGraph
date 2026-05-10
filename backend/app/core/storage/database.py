@@ -78,8 +78,22 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
             url TEXT NOT NULL DEFAULT '',
             summary TEXT NOT NULL DEFAULT '',
             content TEXT NOT NULL,
+            content_hash TEXT NOT NULL DEFAULT '',
             metadata_json TEXT NOT NULL DEFAULT '{}',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS knowledge_chunk_embeddings (
+            chunk_id TEXT NOT NULL,
+            kb_id TEXT NOT NULL,
+            embedding_provider TEXT NOT NULL,
+            embedding_model TEXT NOT NULL,
+            embedding_dimension INTEGER NOT NULL,
+            content_hash TEXT NOT NULL,
+            embedding_json TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (chunk_id, embedding_provider, embedding_model)
         );
 
         CREATE INDEX IF NOT EXISTS idx_knowledge_documents_kb_id
@@ -90,6 +104,12 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_doc_id
             ON knowledge_chunks (kb_id, doc_id);
+
+        CREATE INDEX IF NOT EXISTS idx_knowledge_chunk_embeddings_kb_id
+            ON knowledge_chunk_embeddings (kb_id, embedding_provider, embedding_model);
+
+        CREATE INDEX IF NOT EXISTS idx_knowledge_chunk_embeddings_content_hash
+            ON knowledge_chunk_embeddings (kb_id, content_hash);
 
         CREATE TABLE IF NOT EXISTS memories (
             id TEXT PRIMARY KEY,
@@ -140,6 +160,12 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
             ON memory_events (memory_id, created_at);
         """
     )
+    _ensure_column(connection, "knowledge_bases", "embedding_provider", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(connection, "knowledge_bases", "embedding_model", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(connection, "knowledge_bases", "embedding_dimension", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(connection, "knowledge_bases", "embedding_count", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(connection, "knowledge_bases", "embedding_updated_at", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(connection, "knowledge_chunks", "content_hash", "TEXT NOT NULL DEFAULT ''")
     connection.execute(
         """
         CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_chunks_fts
@@ -171,3 +197,9 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         """
     )
     connection.commit()
+
+
+def _ensure_column(connection: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+    columns = {str(row["name"]) for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in columns:
+        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")

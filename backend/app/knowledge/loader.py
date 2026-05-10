@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import sqlite3
 import tempfile
@@ -26,6 +27,9 @@ DOWNLOAD_ROOT = KNOWLEDGE_ROOT / "_downloads"
 TOOGRAPH_REPO_BLOB_BASE = "https://github.com/OoABYSSoO/TooGraph/blob/main/"
 TOOGRAPH_KNOWLEDGE_BASE_ID = "toograph-official"
 DEFAULT_KNOWLEDGE_BASE = TOOGRAPH_KNOWLEDGE_BASE_ID
+DEFAULT_EMBEDDING_PROVIDER = "local-hash"
+DEFAULT_EMBEDDING_MODEL = "hashing-v1"
+DEFAULT_EMBEDDING_DIMENSION = 384
 HTTP_USER_AGENT = "TooGraph-KB-Importer/1.0"
 PYTHON_DOCS_DOWNLOAD_URL = "https://docs.python.org/3/download.html"
 PYTHON_DOCS_BASE_URL = "https://docs.python.org/3/"
@@ -67,11 +71,22 @@ class KnowledgeDocument:
     metadata: dict[str, object]
 
 
+@dataclass(slots=True)
+class RankedKnowledgeRow:
+    row: sqlite3.Row
+    keyword_score: float
+    vector_score: float
+
+
 def list_knowledge_bases() -> list[dict[str, object]]:
     with get_connection() as connection:
         rows = connection.execute(
             """
-            SELECT kb_id, label, description, source_kind, source_url, version, document_count, chunk_count, imported_at
+            SELECT
+                kb_id, label, description, source_kind, source_url, version,
+                document_count, chunk_count, imported_at,
+                embedding_provider, embedding_model, embedding_dimension,
+                embedding_count, embedding_updated_at
             FROM knowledge_bases
             ORDER BY CASE WHEN kb_id = ? THEN 0 ELSE 1 END, updated_at DESC, kb_id ASC
             """
@@ -91,6 +106,11 @@ def list_knowledge_bases() -> list[dict[str, object]]:
             "documentCount": row["document_count"],
             "chunkCount": row["chunk_count"],
             "importedAt": row["imported_at"],
+            "embeddingProvider": row["embedding_provider"],
+            "embeddingModel": row["embedding_model"],
+            "embeddingDimension": row["embedding_dimension"],
+            "embeddingCount": row["embedding_count"],
+            "embeddingUpdatedAt": row["embedding_updated_at"],
         }
         for row in rows
     ]
@@ -123,10 +143,17 @@ def load_knowledge_documents(knowledge_base: str | None = None) -> list[dict[str
     ]
 
 
-def search_knowledge(query: str, *, knowledge_base: str | None = None, limit: int = 3) -> list[dict[str, object]]:
+def search_knowledge(
+    query: str,
+    *,
+    knowledge_base: str | None = None,
+    limit: int = 3,
+    metadata_filter: dict[str, object] | None = None,
+) -> list[dict[str, object]]:
     kb_id = _resolve_knowledge_base_id(knowledge_base)
     normalized_limit = max(1, min(int(limit or 3), 8))
     normalized_query = query.strip()
+    normalized_filter = _normalize_metadata_filter(metadata_filter)
 
     with get_connection() as connection:
         kb_row = connection.execute(
@@ -137,35 +164,146 @@ def search_knowledge(query: str, *, knowledge_base: str | None = None, limit: in
             raise ValueError(f"Unknown knowledge base '{kb_id}'.")
 
         if normalized_query:
-            ranked_rows = _search_ranked_rows(connection, kb_id, normalized_query, normalized_limit)
+            ranked_rows = _search_ranked_rows(
+                connection,
+                kb_id,
+                normalized_query,
+                normalized_limit,
+                metadata_filter=normalized_filter,
+            )
         else:
-            ranked_rows = connection.execute(
+            rows = connection.execute(
                 """
-                SELECT chunk_id, title, section, url, summary, content, metadata_json
+                SELECT chunk_id, doc_id, title, section, url, summary, content, metadata_json
                 FROM knowledge_chunks
                 WHERE kb_id = ?
                 ORDER BY doc_id ASC, ordinal ASC
                 LIMIT ?
                 """,
-                (kb_id, normalized_limit),
+                (kb_id, normalized_limit * 4),
             ).fetchall()
+            ranked_rows = [
+                RankedKnowledgeRow(row=row, keyword_score=0.0, vector_score=0.0)
+                for row in _filter_rows_by_metadata(rows, normalized_filter)[:normalized_limit]
+            ]
 
     return [
         {
+            "citation_id": f"kb:{kb_id}:{index}",
             "title": row["title"],
             "section": row["section"],
             "source": row["url"],
             "url": row["url"],
             "summary": row["summary"],
             "content": row["content"],
-            "score": float(row["score"]) if "score" in row.keys() and row["score"] is not None else 0.0,
+            "score": round(ranked.keyword_score + ranked.vector_score * 12, 6),
             "kb_id": kb_id,
             "kb_label": kb_row["label"],
             "chunk_id": row["chunk_id"],
             "metadata": json.loads(row["metadata_json"] or "{}"),
+            "retrieval": {
+                "mode": "hybrid" if ranked.vector_score > 0 else "keyword",
+                "keyword_score": round(ranked.keyword_score, 6),
+                "vector_score": round(ranked.vector_score, 6),
+            },
         }
-        for row in ranked_rows
+        for index, ranked in enumerate(ranked_rows, start=1)
+        for row in [ranked.row]
     ]
+
+
+def rebuild_knowledge_base_embeddings(
+    knowledge_base: str | None = None,
+    *,
+    provider: str = DEFAULT_EMBEDDING_PROVIDER,
+    model: str = DEFAULT_EMBEDDING_MODEL,
+    dimension: int = DEFAULT_EMBEDDING_DIMENSION,
+) -> dict[str, object]:
+    kb_id = _resolve_knowledge_base_id(knowledge_base)
+    normalized_provider = _normalize_embedding_label(provider, DEFAULT_EMBEDDING_PROVIDER)
+    normalized_model = _normalize_embedding_label(model, DEFAULT_EMBEDDING_MODEL)
+    normalized_dimension = max(16, min(int(dimension or DEFAULT_EMBEDDING_DIMENSION), 2048))
+    updated_at = _utc_now_iso()
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT chunk_id, kb_id, doc_id, title, section, url, summary, content, metadata_json, content_hash
+            FROM knowledge_chunks
+            WHERE kb_id = ?
+            ORDER BY doc_id ASC, ordinal ASC
+            """,
+            (kb_id,),
+        ).fetchall()
+        if not rows:
+            kb_row = connection.execute("SELECT kb_id FROM knowledge_bases WHERE kb_id = ?", (kb_id,)).fetchone()
+            if kb_row is None:
+                raise ValueError(f"Unknown knowledge base '{kb_id}'.")
+
+        connection.execute(
+            """
+            DELETE FROM knowledge_chunk_embeddings
+            WHERE kb_id = ? AND embedding_provider = ? AND embedding_model = ?
+            """,
+            (kb_id, normalized_provider, normalized_model),
+        )
+
+        for row in rows:
+            content_hash = _chunk_content_hash(row)
+            embedding = _build_local_hash_embedding(_embedding_source_text(row), dimension=normalized_dimension)
+            connection.execute(
+                """
+                UPDATE knowledge_chunks
+                SET content_hash = ?
+                WHERE chunk_id = ?
+                """,
+                (content_hash, row["chunk_id"]),
+            )
+            connection.execute(
+                """
+                INSERT INTO knowledge_chunk_embeddings (
+                    chunk_id, kb_id, embedding_provider, embedding_model, embedding_dimension,
+                    content_hash, embedding_json, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["chunk_id"],
+                    kb_id,
+                    normalized_provider,
+                    normalized_model,
+                    normalized_dimension,
+                    content_hash,
+                    json.dumps(embedding, separators=(",", ":")),
+                    updated_at,
+                    updated_at,
+                ),
+            )
+
+        connection.execute(
+            """
+            UPDATE knowledge_bases
+            SET embedding_provider = ?,
+                embedding_model = ?,
+                embedding_dimension = ?,
+                embedding_count = ?,
+                embedding_updated_at = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE kb_id = ?
+            """,
+            (normalized_provider, normalized_model, normalized_dimension, len(rows), updated_at, kb_id),
+        )
+        connection.commit()
+
+    return {
+        "kb_id": kb_id,
+        "provider": normalized_provider,
+        "model": normalized_model,
+        "dimension": normalized_dimension,
+        "chunkCount": len(rows),
+        "embeddingCount": len(rows),
+        "embeddingUpdatedAt": updated_at,
+    }
 
 
 def import_official_knowledge_bases() -> list[dict[str, object]]:
@@ -286,7 +424,14 @@ def _resolve_knowledge_base_id(knowledge_base: str | None) -> str:
     raise ValueError("No knowledge bases are currently imported.")
 
 
-def _search_ranked_rows(connection: sqlite3.Connection, kb_id: str, query: str, limit: int) -> list[sqlite3.Row]:
+def _search_ranked_rows(
+    connection: sqlite3.Connection,
+    kb_id: str,
+    query: str,
+    limit: int,
+    *,
+    metadata_filter: dict[str, str],
+) -> list[RankedKnowledgeRow]:
     candidate_limit = max(limit * 6, 12)
     fts_query = _build_fts_query(query)
     ranked_rows: list[sqlite3.Row] = []
@@ -316,6 +461,7 @@ def _search_ranked_rows(connection: sqlite3.Connection, kb_id: str, query: str, 
             ).fetchall()
         except sqlite3.OperationalError:
             ranked_rows = []
+    ranked_rows = _filter_rows_by_metadata(ranked_rows, metadata_filter)
 
     query_like = f"%{query.lower()}%"
     fallback_rows = connection.execute(
@@ -333,27 +479,109 @@ def _search_ranked_rows(connection: sqlite3.Connection, kb_id: str, query: str, 
         """,
         (kb_id, query_like, query_like, query_like, query_like, candidate_limit),
     ).fetchall()
+    fallback_rows = _filter_rows_by_metadata(fallback_rows, metadata_filter)
 
-    combined_rows = {row["chunk_id"]: row for row in [*ranked_rows, *fallback_rows]}
+    vector_rows, vector_scores = _search_vector_candidate_rows(
+        connection,
+        kb_id,
+        query,
+        candidate_limit,
+        metadata_filter=metadata_filter,
+    )
+    combined_rows = {row["chunk_id"]: row for row in [*ranked_rows, *fallback_rows, *vector_rows]}
     query_lower = query.lower()
     search_terms = _extract_search_terms(query_lower)
+    keyword_scores = {
+        chunk_id: _score_chunk_row(row, query_lower, search_terms)
+        for chunk_id, row in combined_rows.items()
+    }
 
     reranked = sorted(
         combined_rows.values(),
-        key=lambda row: _score_chunk_row(row, query_lower, search_terms),
+        key=lambda row: keyword_scores.get(row["chunk_id"], 0.0) + vector_scores.get(row["chunk_id"], 0.0) * 12,
         reverse=True,
     )
-    unique_rows: list[sqlite3.Row] = []
+    unique_rows: list[RankedKnowledgeRow] = []
     seen_doc_ids: set[str] = set()
     for row in reranked:
         doc_id = str(row["doc_id"] or row["url"] or row["chunk_id"])
         if doc_id in seen_doc_ids:
             continue
-        unique_rows.append(row)
+        unique_rows.append(
+            RankedKnowledgeRow(
+                row=row,
+                keyword_score=keyword_scores.get(row["chunk_id"], 0.0),
+                vector_score=vector_scores.get(row["chunk_id"], 0.0),
+            )
+        )
         seen_doc_ids.add(doc_id)
         if len(unique_rows) >= limit:
             break
     return unique_rows
+
+
+def _search_vector_candidate_rows(
+    connection: sqlite3.Connection,
+    kb_id: str,
+    query: str,
+    limit: int,
+    *,
+    metadata_filter: dict[str, str],
+) -> tuple[list[sqlite3.Row], dict[str, float]]:
+    embedding_config = _resolve_embedding_config(connection, kb_id)
+    if not embedding_config:
+        return [], {}
+    provider, model, dimension = embedding_config
+    query_embedding = _build_local_hash_embedding(query, dimension=dimension)
+    if not query_embedding:
+        return [], {}
+    rows = connection.execute(
+        """
+        SELECT
+            c.chunk_id,
+            c.doc_id,
+            c.title,
+            c.section,
+            c.url,
+            c.summary,
+            c.content,
+            c.metadata_json,
+            e.embedding_json
+        FROM knowledge_chunk_embeddings e
+        JOIN knowledge_chunks c ON c.chunk_id = e.chunk_id
+        WHERE e.kb_id = ?
+          AND e.embedding_provider = ?
+          AND e.embedding_model = ?
+        """,
+        (kb_id, provider, model),
+    ).fetchall()
+    scored: list[tuple[sqlite3.Row, float]] = []
+    for row in _filter_rows_by_metadata(rows, metadata_filter):
+        score = _cosine_similarity(query_embedding, _parse_embedding_json(row["embedding_json"]))
+        if score > 0:
+            scored.append((row, score))
+    scored.sort(key=lambda item: item[1], reverse=True)
+    top_rows = scored[:limit]
+    return [row for row, _score in top_rows], {row["chunk_id"]: score for row, score in top_rows}
+
+
+def _resolve_embedding_config(connection: sqlite3.Connection, kb_id: str) -> tuple[str, str, int] | None:
+    row = connection.execute(
+        """
+        SELECT embedding_provider, embedding_model, embedding_dimension, embedding_count
+        FROM knowledge_bases
+        WHERE kb_id = ?
+        """,
+        (kb_id,),
+    ).fetchone()
+    if row is None or int(row["embedding_count"] or 0) <= 0:
+        return None
+    provider = str(row["embedding_provider"] or "").strip()
+    model = str(row["embedding_model"] or "").strip()
+    dimension = int(row["embedding_dimension"] or 0)
+    if not provider or not model or dimension <= 0:
+        return None
+    return provider, model, dimension
 
 
 def _score_chunk_row(row: sqlite3.Row, query_lower: str, search_terms: list[str]) -> float:
@@ -432,6 +660,100 @@ def _score_project_specific_boosts(*, title: str, section: str, query_lower: str
     return score
 
 
+def _normalize_metadata_filter(value: dict[str, object] | None) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    supported_keys = {"source_path_prefix", "source_kind", "section"}
+    normalized: dict[str, str] = {}
+    for key in supported_keys:
+        text = str(value.get(key) or "").strip()
+        if text:
+            normalized[key] = text
+    return normalized
+
+
+def _filter_rows_by_metadata(rows: list[sqlite3.Row], metadata_filter: dict[str, str]) -> list[sqlite3.Row]:
+    if not metadata_filter:
+        return rows
+    return [row for row in rows if _row_matches_metadata_filter(row, metadata_filter)]
+
+
+def _row_matches_metadata_filter(row: sqlite3.Row, metadata_filter: dict[str, str]) -> bool:
+    metadata = json.loads(row["metadata_json"] or "{}")
+    source_path = str(metadata.get("source_path") or "").strip()
+    source_kind = str(metadata.get("source_kind") or "").strip()
+    section = str(row["section"] or "").strip()
+    source_path_prefix = metadata_filter.get("source_path_prefix", "")
+    if source_path_prefix and not source_path.startswith(source_path_prefix):
+        return False
+    if metadata_filter.get("source_kind") and source_kind != metadata_filter["source_kind"]:
+        return False
+    if metadata_filter.get("section") and metadata_filter["section"].lower() not in section.lower():
+        return False
+    return True
+
+
+def _normalize_embedding_label(value: str, fallback: str) -> str:
+    normalized = str(value or "").strip().lower()
+    if not normalized:
+        return fallback
+    return "".join(char if char.isalnum() or char in {"_", "-", "."} else "-" for char in normalized)[:80] or fallback
+
+
+def _embedding_source_text(row: sqlite3.Row) -> str:
+    return "\n".join(
+        [
+            str(row["title"] or ""),
+            str(row["section"] or ""),
+            str(row["summary"] or ""),
+            str(row["content"] or ""),
+        ]
+    )
+
+
+def _chunk_content_hash(row: sqlite3.Row) -> str:
+    return hashlib.sha256(str(row["content"] or "").encode("utf-8")).hexdigest()
+
+
+def _build_local_hash_embedding(text: str, *, dimension: int) -> list[float]:
+    terms = _extract_search_terms(str(text or "").lower())
+    if not terms or dimension <= 0:
+        return []
+    vector = [0.0] * dimension
+    for term in terms:
+        digest = hashlib.sha256(term.encode("utf-8")).digest()
+        index = int.from_bytes(digest[:4], "big") % dimension
+        sign = -1.0 if digest[4] % 2 else 1.0
+        weight = 1.0 + min(len(term), 24) / 24
+        vector[index] += sign * weight
+    norm = math.sqrt(sum(value * value for value in vector))
+    if norm <= 0:
+        return []
+    return [round(value / norm, 6) for value in vector]
+
+
+def _parse_embedding_json(value: str) -> list[float]:
+    try:
+        payload = json.loads(value or "[]")
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(payload, list):
+        return []
+    parsed: list[float] = []
+    for item in payload:
+        try:
+            parsed.append(float(item))
+        except (TypeError, ValueError):
+            parsed.append(0.0)
+    return parsed
+
+
+def _cosine_similarity(left: list[float], right: list[float]) -> float:
+    if not left or not right or len(left) != len(right):
+        return 0.0
+    return max(0.0, sum(left_item * right_item for left_item, right_item in zip(left, right)))
+
+
 def _replace_knowledge_base(record: KnowledgeBaseRecord, documents: list[KnowledgeDocument]) -> dict[str, object]:
     KNOWLEDGE_ROOT.mkdir(parents=True, exist_ok=True)
     kb_dir = KNOWLEDGE_ROOT / record.kb_id
@@ -441,6 +763,7 @@ def _replace_knowledge_base(record: KnowledgeBaseRecord, documents: list[Knowled
 
     with get_connection() as connection:
         connection.execute("DELETE FROM knowledge_chunks_fts WHERE kb_id = ?", (record.kb_id,))
+        connection.execute("DELETE FROM knowledge_chunk_embeddings WHERE kb_id = ?", (record.kb_id,))
         connection.execute("DELETE FROM knowledge_chunks WHERE kb_id = ?", (record.kb_id,))
         connection.execute("DELETE FROM knowledge_documents WHERE kb_id = ?", (record.kb_id,))
 
@@ -469,9 +792,9 @@ def _replace_knowledge_base(record: KnowledgeBaseRecord, documents: list[Knowled
             connection.execute(
                 """
                 INSERT INTO knowledge_chunks (
-                    chunk_id, kb_id, doc_id, ordinal, title, section, url, summary, content, metadata_json
+                    chunk_id, kb_id, doc_id, ordinal, title, section, url, summary, content, content_hash, metadata_json
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     chunk["chunk_id"],
@@ -483,6 +806,7 @@ def _replace_knowledge_base(record: KnowledgeBaseRecord, documents: list[Knowled
                     chunk["url"],
                     chunk["summary"],
                     chunk["content"],
+                    hashlib.sha256(str(chunk["content"]).encode("utf-8")).hexdigest(),
                     json.dumps(chunk["metadata"], ensure_ascii=False),
                 ),
             )
@@ -519,6 +843,11 @@ def _replace_knowledge_base(record: KnowledgeBaseRecord, documents: list[Knowled
                 chunk_count = excluded.chunk_count,
                 imported_at = excluded.imported_at,
                 payload_json = excluded.payload_json,
+                embedding_provider = '',
+                embedding_model = '',
+                embedding_dimension = 0,
+                embedding_count = 0,
+                embedding_updated_at = '',
                 updated_at = CURRENT_TIMESTAMP
             """,
             (

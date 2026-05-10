@@ -23,6 +23,11 @@ test("fetchKnowledgeBases requests the knowledge bases endpoint", async () => {
           documentCount: 9,
           chunkCount: 16,
           importedAt: "2026-04-13T15:58:47.035074+00:00",
+          embeddingProvider: "local-hash",
+          embeddingModel: "hashing-v1",
+          embeddingDimension: 384,
+          embeddingCount: 16,
+          embeddingUpdatedAt: "2026-04-13T16:00:00.000000+00:00",
         },
       ]),
       {
@@ -49,6 +54,11 @@ test("fetchKnowledgeBases requests the knowledge bases endpoint", async () => {
       documentCount: 9,
       chunkCount: 16,
       importedAt: "2026-04-13T15:58:47.035074+00:00",
+      embeddingProvider: "local-hash",
+      embeddingModel: "hashing-v1",
+      embeddingDimension: 384,
+      embeddingCount: 16,
+      embeddingUpdatedAt: "2026-04-13T16:00:00.000000+00:00",
     },
   ]);
 

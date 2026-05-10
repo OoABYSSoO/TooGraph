@@ -18,18 +18,24 @@ def retrieve_knowledge_base_context(
     results = search_knowledge(normalized_query, knowledge_base=resolved_knowledge_base, limit=normalized_limit)
     formatted_results = [
         {
+            "citation_id": item.get("citation_id", f"kb:{resolved_knowledge_base}:{index}"),
+            "chunk_id": item.get("chunk_id", ""),
             "title": item["title"],
             "section": item.get("section", ""),
             "summary": item["summary"],
             "source": item["source"],
             "url": item.get("url") or item["source"],
             "score": item.get("score", 0.0),
+            "metadata": item.get("metadata", {}),
+            "retrieval": item.get("retrieval", {}),
         }
-        for item in results
+        for index, item in enumerate(results, start=1)
     ]
     citations = [
         {
+            "citation_id": item.get("citation_id", f"kb:{resolved_knowledge_base}:{index}"),
             "index": index,
+            "chunk_id": item.get("chunk_id", ""),
             "title": item["title"],
             "section": item.get("section", ""),
             "source": item["source"],

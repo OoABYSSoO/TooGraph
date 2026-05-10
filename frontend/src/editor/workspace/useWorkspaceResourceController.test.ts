@@ -51,6 +51,11 @@ function createKnowledgeBase(): KnowledgeBaseRecord {
     documentCount: 0,
     chunkCount: 0,
     importedAt: "",
+    embeddingProvider: "",
+    embeddingModel: "",
+    embeddingDimension: 0,
+    embeddingCount: 0,
+    embeddingUpdatedAt: "",
   };
 }
 

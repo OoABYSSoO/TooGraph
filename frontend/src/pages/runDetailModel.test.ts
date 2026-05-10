@@ -5,6 +5,7 @@ import type { NodeExecutionDetail, RunDetail } from "../types/run.ts";
 
 import {
   buildRunAggregatedTimeline,
+  buildRunMemoryContextCards,
   buildRunStatusFacts,
   formatRunArtifactValue,
   listRunOutputArtifacts,
@@ -182,6 +183,94 @@ test("listRunOutputArtifacts maps exported outputs into renderable cards", () =>
       documentRefs: [],
     },
   ]);
+});
+
+test("buildRunMemoryContextCards expands saved memory_context into auditable cards", () => {
+  const cards = buildRunMemoryContextCards(
+    createRunDetail({
+      state_snapshot: {
+        values: {
+          memory_context: {
+            kind: "memory_context",
+            query: "verification evidence",
+            filters: {
+              scope: "project",
+              layer: "procedural",
+              type: "preference",
+              status: "active",
+            },
+            max_chars: 4000,
+            used_chars: 241,
+            total_count: 3,
+            included_count: 2,
+            omitted_count: 1,
+            memories: [
+              {
+                id: "mem_1",
+                scope: "project",
+                layer: "procedural",
+                type: "preference",
+                status: "active",
+                summary: "Verify before reporting",
+                content: "Run the relevant test command before claiming a fix.",
+                confidence: 0.92,
+                importance: 0.84,
+                evidence: ["User requires evidence before completion."],
+                source: {
+                  run_id: "run_previous",
+                  node_id: "recall_memory_context",
+                },
+                char_count: 86,
+              },
+            ],
+            omitted: [
+              {
+                id: "mem_3",
+                scope: "project",
+                layer: "episodic",
+                type: "summary",
+                summary: "Long prior debugging trace",
+                char_count: 6200,
+              },
+            ],
+          },
+        },
+        last_writers: {},
+      },
+    }),
+  );
+
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.query, "verification evidence");
+  assert.deepEqual(cards[0]?.filterLabels, ["scope: project", "layer: procedural", "type: preference", "status: active"]);
+  assert.deepEqual(cards[0]?.statLabels, ["included: 2", "omitted: 1", "total: 3", "budget: 241/4000 chars"]);
+  assert.deepEqual(cards[0]?.memories[0], {
+    key: "memory_context:memory_context:mem_1:0",
+    id: "mem_1",
+    title: "Verify before reporting",
+    content: "Run the relevant test command before claiming a fix.",
+    metaLabels: [
+      "project",
+      "procedural",
+      "preference",
+      "active",
+      "confidence: 0.92",
+      "importance: 0.84",
+      "source: run_previous / recall_memory_context",
+      "chars: 86",
+    ],
+    evidenceLabels: ["User requires evidence before completion."],
+  });
+  assert.deepEqual(cards[0]?.omitted[0], {
+    key: "memory_context:memory_context:omitted:mem_3:0",
+    id: "mem_3",
+    title: "Long prior debugging trace",
+    content: "",
+    metaLabels: ["project", "episodic", "summary", "chars: 6200"],
+    evidenceLabels: [],
+  });
+  assert.match(cards[0]?.detailText ?? "", /verification evidence/);
+  assert.match(cards[0]?.detailText ?? "", /mem_3/);
 });
 
 test("buildRunAggregatedTimeline interleaves parent nodes, subgraph nodes, and activity events", () => {
