@@ -244,7 +244,7 @@ test("BuddyMascot swings the single tail through back poses when changing sides"
 });
 
 test("BuddyMascot keeps tail curve breathing after large side transitions", () => {
-  assert.match(componentSource, /const TAIL_CURVE_MICRO_DURATION_MS = 1800;/);
+  assert.match(componentSource, /const TAIL_CURVE_MICRO_DURATION_MS = 6800;/);
   assert.match(componentSource, /const TAIL_CURVE_MICRO_PATHS = \{[\s\S]*right:\s*\[[\s\S]*TAIL_POSE_PATHS\.right,[\s\S]*left:\s*\[[\s\S]*TAIL_POSE_PATHS\.left,/);
   assert.match(componentSource, /"M0 176 C72 234 98 142 158 154 C222 166 230 96 260 80 C274 64 286 54 292 58"/);
   assert.match(componentSource, /"M0 176 C70 148 124 122 174 104 C218 86 252 70 286 58 C288 58 290 58 292 58"/);
