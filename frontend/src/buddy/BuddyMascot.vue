@@ -31,11 +31,23 @@
         <g class="buddy-mascot__tail buddy-mascot__tail-rig">
           <path
             class="buddy-mascot__tail-pose buddy-mascot__tail-pose--right"
-            d="M206 154 C240 154 268 136 282 108"
+            d="M0 194 C74 196 142 174 206 142 C244 122 270 94 282 62"
+          />
+          <path
+            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-right"
+            d="M0 194 C42 188 86 162 122 128 C152 100 164 74 152 54"
+          />
+          <path
+            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-center"
+            d="M0 194 C-12 156 -12 116 0 78 C12 116 12 156 0 194"
+          />
+          <path
+            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-left"
+            d="M0 194 C-42 188 -86 162 -122 128 C-152 100 -164 74 -152 54"
           />
           <path
             class="buddy-mascot__tail-pose buddy-mascot__tail-pose--left"
-            d="M-206 154 C-240 154-268 136-282 108"
+            d="M0 194 C-74 196 -142 174 -206 142 C-244 122 -270 94 -282 62"
           />
         </g>
 
@@ -212,7 +224,7 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot__tail {
-  transform-origin: 4% 90%;
+  transform-origin: 50% 100%;
 }
 
 .buddy-mascot__tail-pose {
@@ -420,6 +432,18 @@ function clampLookAxis(value: number | undefined) {
   animation: buddy-mascot-tail-spin-right 980ms ease-in-out both;
 }
 
+.buddy-mascot--motion-spin .buddy-mascot__tail-pose--back-right {
+  animation: buddy-mascot-tail-spin-back-right 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__tail-pose--back-center {
+  animation: buddy-mascot-tail-spin-back-center 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__tail-pose--back-left {
+  animation: buddy-mascot-tail-spin-back-left 980ms ease-in-out both;
+}
+
 .buddy-mascot--motion-spin .buddy-mascot__tail-pose--left {
   animation: buddy-mascot-tail-spin-left 980ms ease-in-out both;
 }
@@ -475,28 +499,96 @@ function clampLookAxis(value: number | undefined) {
 
 @keyframes buddy-mascot-tail-spin-right {
   0%,
-  28% {
+  12% {
     opacity: 1;
   }
-  44%,
-  70% {
+  24%,
+  88% {
     opacity: 0;
   }
+  96%,
   100% {
     opacity: 1;
   }
 }
 
-@keyframes buddy-mascot-tail-spin-left {
+@keyframes buddy-mascot-tail-spin-back-right {
   0%,
-  30% {
+  10% {
     opacity: 0;
   }
-  46%,
-  66% {
+  18%,
+  30% {
+    opacity: 1;
+  }
+  38%,
+  82% {
+    opacity: 0;
+  }
+  90%,
+  96% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes buddy-mascot-tail-spin-back-center {
+  0%,
+  22% {
+    opacity: 0;
+  }
+  30%,
+  40% {
+    opacity: 1;
+  }
+  48%,
+  68% {
+    opacity: 0;
+  }
+  76%,
+  86% {
+    opacity: 1;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes buddy-mascot-tail-spin-back-left {
+  0%,
+  36% {
+    opacity: 0;
+  }
+  44%,
+  54% {
+    opacity: 1;
+  }
+  62% {
+    opacity: 0;
+  }
+  66%,
+  76% {
     opacity: 1;
   }
   84%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes buddy-mascot-tail-spin-left {
+  0%,
+  50% {
+    opacity: 0;
+  }
+  56%,
+  66% {
+    opacity: 1;
+  }
+  76%,
   100% {
     opacity: 0;
   }

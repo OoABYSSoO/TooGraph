@@ -81,6 +81,9 @@ test("BuddyMascot supports idle, thinking, speaking, dragging, and tap animation
 test("BuddyMascot exposes a tail rig and body turn layer for pseudo-3D movement", () => {
   assert.match(componentSource, /class="buddy-mascot__tail buddy-mascot__tail-rig"/);
   assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--right"/);
+  assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-right"/);
+  assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-center"/);
+  assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-left"/);
   assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--left"/);
   assert.match(componentSource, /class="buddy-mascot__body-turn"/);
   assert.match(componentSource, /\.buddy-mascot--facing-left[\s\S]*\.buddy-mascot__tail-pose--left[\s\S]*opacity:\s*1;/);
@@ -88,7 +91,25 @@ test("BuddyMascot exposes a tail rig and body turn layer for pseudo-3D movement"
   assert.match(componentSource, /\.buddy-mascot--motion-roam[\s\S]*\.buddy-mascot__body-turn[\s\S]*animation:\s*buddy-mascot-roam-hop/);
   assert.match(componentSource, /\.buddy-mascot--motion-spin[\s\S]*\.buddy-mascot__body-turn[\s\S]*animation:\s*buddy-mascot-spin-turn/);
   assert.match(componentSource, /@keyframes buddy-mascot-tail-spin-right/);
+  assert.match(componentSource, /@keyframes buddy-mascot-tail-spin-back-right/);
+  assert.match(componentSource, /@keyframes buddy-mascot-tail-spin-back-center/);
+  assert.match(componentSource, /@keyframes buddy-mascot-tail-spin-back-left/);
   assert.match(componentSource, /@keyframes buddy-mascot-tail-spin-left/);
+});
+
+test("BuddyMascot draws every tail pose from the same hidden lower-body root", () => {
+  const tailPoseMarkers = [
+    'class="buddy-mascot__tail-pose buddy-mascot__tail-pose--right"',
+    'class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-right"',
+    'class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-center"',
+    'class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-left"',
+    'class="buddy-mascot__tail-pose buddy-mascot__tail-pose--left"',
+  ];
+
+  for (const marker of tailPoseMarkers) {
+    assert.match(extractPathData(componentSource, marker), /^M0 194 C/);
+  }
+  assert.match(componentSource, /class="buddy-mascot__tail buddy-mascot__tail-rig"[\s\S]*class="buddy-mascot__body-turn"/);
 });
 
 test("BuddyMascot moves eye wrapper layers toward the pointer without replacing blink transforms", () => {
