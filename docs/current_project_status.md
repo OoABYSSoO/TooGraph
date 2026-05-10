@@ -12,7 +12,7 @@
 - 新版伙伴自主循环模板 `buddy_autonomous_loop` 已创建为官方图模板。它通过 Input 节点以本地文件夹方式注入 Buddy Home 选中文件，再通过子图串联请求理解、按需能力选择与动态执行、最终回复；简单闲聊或可直接回答的请求会绕过能力循环，output 只展示 `final_reply`。回复完成后，伙伴前端会另起内部 `buddy_self_review` 后台模板复盘本轮记忆与成长计划，不阻塞下一轮对话。
 - 当前普通模板列表提供三个可见官方图模板：`advanced_web_research_loop`（高级联网搜索）、`buddy_autonomous_loop`（伙伴自主循环）和 `graphiteui_skill_creation_workflow`（创建自定义 Skill）。仓库还包含内部后台模板 `buddy_self_review`，它不进入普通模板列表和能力选择候选。
 - 技能系统已收束为统一技能库，不再区分“伙伴技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
-- 当前官方技能包包括 `buddy_home_context_reader`、`web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。后续新能力应按当前统一 Skill 结构专门编写。
+- 当前官方技能包包括 `web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
 - 根目录 `buddy_home/` 是伙伴长期资料的目标收束目录。它由程序在启动或读取时按默认内容自动补齐，属于本地用户数据，不进入 Git 管理。正式结构收束为 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json`、`buddy.db` 和 `reports/`；不维护长期 `TOOLS.md`，当前能力来自启用的 Skill、启用的图模板和能力选择 Skill。
 
@@ -70,15 +70,6 @@
 - 生命周期：`before_llm.py` 读取当前启用的图模板和可选择 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`，按同一清单做真实性与启用状态校验。
 - 选择对象包括当前启用的图模板和对当前 `origin` 可选择的 Skill；图模板优先于 Skill。
 - 它不执行被选能力，不生成被选能力的运行入参，也不做程序字段匹配；模型基于候选项的名称和描述判断，脚本只做真实性与启用状态校验。
-
-### `buddy_home_context_reader`
-
-- 位置：`skill/buddy_home_context_reader/`
-- 显示名称：`Buddy Home Context Reader`
-- 作用：只读根目录 `buddy_home/`，把 `SOUL.md` 人设、`USER.md` 用户画像、`MEMORY.md` 可读记忆、`policy.json`、`buddy.db` 中的结构化记忆和会话摘要整理成一个 `context_pack`；如果目录或默认文件缺失，会先由程序补齐默认资料再读取。
-- 输出克制：无输入，只输出一个 `context_pack` JSON 字段。
-- 能力选择：该 Skill 不作为 `graphiteui_capability_selector` 的动态候选。当前伙伴主循环已改为 Input 文件夹注入 Buddy Home 选中文件，不再用它触发一次无参数 Skill 调用。
-- 权限：只声明 `file_read`，它读取 Buddy Home 长期资料，但不修改 SOUL、USER、MEMORY、policy、数据库记录、revision、command 或 reports。
 
 ### `graphiteUI_script_tester`
 
