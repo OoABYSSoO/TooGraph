@@ -1,4 +1,30 @@
-# GraphiteUI
+<p align="center">
+  <img src="frontend/public/logo.svg" alt="GraphiteUI logo" width="128" />
+</p>
+
+<h1 align="center">GraphiteUI</h1>
+
+<p align="center">
+  面向 Agent 工作流的可视化编排、运行观察与伙伴协作工作台。
+</p>
+
+<p align="center">
+  <a href="https://github.com/AbyssBadger0/GraphiteUI/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-c89136"></a>
+  <img alt="Vue 3" src="https://img.shields.io/badge/Vue-3-42b883?logo=vue.js&logoColor=white">
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white">
+  <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-runtime-222222">
+  <img alt="Node.js" src="https://img.shields.io/badge/Node.js-20.9%2B-5fa04e?logo=node.js&logoColor=white">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.11%2B-3776ab?logo=python&logoColor=white">
+</p>
+
+<p align="center">
+  <a href="#快速开始">快速开始</a>
+  · <a href="#核心能力">核心能力</a>
+  · <a href="#模型-provider">模型 Provider</a>
+  · <a href="#skills-与知识库">Skills</a>
+  · <a href="#图模板">图模板</a>
+  · <a href="#未来方向">Roadmap</a>
+</p>
 
 GraphiteUI 是一个面向 Agent 工作流的可视化编排与运行工作台。它把 graph、state、节点、数据流、顺序流、条件分支、运行记录和人工确认统一到一套可保存、可校验、可运行的 `node_system` 协议里。
 
@@ -316,10 +342,14 @@ GraphiteUI/
 - 扩展 memory 的写入、召回、展示和调试能力。
 - 增加端到端 UI 测试，覆盖编辑器、运行记录、断点暂停和多语言切换。
 - 梳理桌面端、Docker 或单机部署流程，降低非开发环境的启动成本。
-- 完成项目 logo、应用图标和品牌资产。
+- 继续完善应用图标、桌面端图标和品牌资产。
 - 推进可见、可撤销、可审计的自动编排能力，让 Agent 可以在授权下辅助创建和调整 graph。
 
 ### 伙伴 Agent 与自动编排图
+
+<p align="center">
+  <img src="frontend/public/mascot.svg" alt="GraphiteUI Buddy mascot" width="220" />
+</p>
 
 GraphiteUI 的长期方向不只是提供一个可视化画布，而是提供一个可见、可控、可验证的 Agent 协作层。这里的 Agent 是由一整张 graph 表达出来的运行体，而不是某一个单独节点；单个 LLM 节点只承担一次模型判断、一次结构化输出或一次能力调用准备。
 
