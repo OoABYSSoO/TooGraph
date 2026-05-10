@@ -244,9 +244,44 @@ Ran python -m pytest -q, exit 0
 
 这层能力是“看起来没卡住”的关键体验补丁，也是伙伴长期自主工具循环的审计基础。它不改变图协议中的 state 传递语义；它只补充运行过程的可观察性。
 
+## 可追踪资产与本地设置分离
+
+GraphiteUI 的可复用资产应从本地运行偏好中分离出来。资产文件回答“这个东西是什么”，本地设置文件回答“当前环境怎么使用它”。Skill、图模板和节点预设应采用同一套目录心智：
+
+```text
+skill/
+  settings.local.json
+  official/
+    <skill_key>/skill.json
+  user/
+    <skill_key>/skill.json
+
+graph_template/
+  settings.local.json
+  official/
+    <template_id>/template.json
+  user/
+    <template_id>/template.json
+
+node_preset/
+  settings.local.json
+  official/
+    <preset_id>/preset.json
+  user/
+    <preset_id>/preset.json
+```
+
+`official/` 放 GraphiteUI 自带资产，默认只读并进入 Git 管理。`user/` 放用户自定义资产，也可以进入 Git 管理，适合沉淀为项目或团队能力。根目录 `settings.local.json` 由程序自动生成和维护，不进入 Git 管理，记录启用/禁用、可选择、需确认、隐藏、排序、本地默认选择和来源策略等当前环境偏好。
+
+加载 catalog 时，程序应扫描 `official/` 和 `user/`，读取对应根目录的 `settings.local.json`，自动补齐缺失文件、缺失资产条目和缺失字段。多余条目不应自动删除，避免切分支、暂时移动资产或合并团队目录时丢失本地偏好；可以另做“清理无效本地设置”的显式按钮。
+
+对 Skill 而言，`skill.json` 应只保留能力包定义，例如 `name`、`description`、`llmInstruction`、`version`、`permissions`、`runtime`、`inputSchema`、`outputSchema` 和生命周期脚本文件。`enabled`、`hidden`、`selectable`、`requiresApproval`、`capabilityPolicy`、`targets` 和 `executionTargets` 都属于本地使用策略或旧协议，不应继续写进新 Skill 包定义。`requiresApproval` 的默认本地值可以由程序根据 `permissions` 推导；用户在界面里改动时只写 `skill/settings.local.json`，不反向修改 `skill.json`。
+
+这条规则同样适用于图模板和节点预设：模板或预设 JSON 描述结构本体，本地 settings 描述当前是否启用、是否进入能力候选、是否需要确认和界面偏好。GraphiteUI 前端展示的是“资产定义 + 本地设置 + 运行时元数据”合并后的 catalog item，但详情页应清楚标明来源、资产文件路径和本地设置来源。
+
 ## Buddy Home
 
-根目录 `buddy_home/` 是伙伴的长期本地资料目录。它属于用户数据，不进入 Git 管理；官方图模板、官方 Skill 和代码仍放在各自的 Git 管理位置。程序会在启动或读取 Buddy Home 时自动生成缺失的默认文件；已有文件不会被默认内容覆盖。伙伴可以读取和维护 Buddy Home，但必须通过图模板、受控 skill、命令记录和 revision 路径执行，不能由前端或后端隐藏逻辑静默改写。
+根目录 `buddy_home/` 是伙伴的长期本地资料目录。它属于用户数据，不进入 Git 管理；Skill、图模板、节点预设和代码仍放在各自的资产目录中。程序会在启动或读取 Buddy Home 时自动生成缺失的默认文件；已有文件不会被默认内容覆盖。伙伴可以读取和维护 Buddy Home，但必须通过图模板、受控 skill、命令记录和 revision 路径执行，不能由前端或后端隐藏逻辑静默改写。
 
 目标结构：
 
@@ -273,11 +308,11 @@ buddy_home/
 
 边界规则：
 
-- 图模板本体不放进 Buddy Home。官方模板仍在 `backend/app/templates/official/`，用户自定义模板仍在 `backend/data/templates/user/`。
-- 用户自定义 Skill 不放进 Buddy Home。它仍在 `backend/data/skills/user/`；Buddy Home 可以记录候选、草案、使用统计或改进建议。
+- 图模板本体不放进 Buddy Home。目标结构中，官方模板位于 `graph_template/official/`，用户自定义模板位于 `graph_template/user/`，本地启用和候选策略位于 `graph_template/settings.local.json`。
+- 用户自定义 Skill 不放进 Buddy Home。目标结构中，官方 Skill 位于 `skill/official/`，用户自定义 Skill 位于 `skill/user/`，本地启用、可选择和确认策略位于 `skill/settings.local.json`。Buddy Home 可以记录候选、草案、使用统计或改进建议。
 - 不维护长期 `TOOLS.md`。当前可用能力由启用的 Skill、启用的图模板和 `graphiteui_capability_selector` 读取，避免静态能力文件过期。
 - 自然为空的结构化记录放进 `buddy.db`；自然为空的人类可读复盘放进 `reports/`。
-- Buddy Home 内的资料可以影响伙伴如何选择、解释和组织行动，但不能绕过 capability policy、local executor policy、图断点、人类审批或后端校验。
+- Buddy Home 内的资料可以影响伙伴如何选择、解释和组织行动，但不能绕过本地能力设置、local executor policy、图断点、人类审批或后端校验。
 - `policy.json` 可以由伙伴提出修改，但涉及权限、审批级别或危险操作偏好的变化必须走显式确认与 revision。
 
 ## 伙伴循环子图化
@@ -322,19 +357,7 @@ buddy_self_review(读取主运行快照)
   ],
   "outputSchema": [
     { "key": "source_urls", "name": "Source URLs", "valueType": "json" }
-  ],
-  "capabilityPolicy": {
-    "default": {
-      "selectable": true,
-      "requiresApproval": false
-    },
-    "origins": {
-      "buddy": {
-        "selectable": true,
-        "requiresApproval": false
-      }
-    }
-  }
+  ]
 }
 ```
 
@@ -344,16 +367,14 @@ buddy_self_review(读取主运行快照)
 - `name`：用户可见名称。
 - `description`：能力说明与选择条件。
 - `llmInstruction`：LLM 节点已经绑定该技能后，应该如何使用它。
-- `permissions`：执行前需要评估或授权的能力。
+- `permissions`：执行前需要评估或授权的客观能力需求，例如联网、文件写入、命令执行、图编辑或记忆写入。
 - `inputSchema` / `outputSchema`：技能入参和结构化输出契约。
 - `before_llm.py`：可选固定入口，在 LLM 生成技能参数前补充上下文，例如当前日期或候选能力清单。
 - `after_llm.py`：可选固定入口，在 LLM 生成技能参数后执行、校验或规范化结果；技能脚本不直接写 state。
-- `capabilityPolicy.default`：默认能力选择策略。
-- `capabilityPolicy.origins.<origin>`：特定来源策略，例如 `buddy`。
-- `selectable`：能力选择器是否可以看到并返回这个 skill。
-- `requiresApproval`：执行前是否必须请求用户确认。
 
-旧字段 `label`、`targets`、`executionTargets`、`inputMapping`、静态技能参数 `config`、无意义的 `trigger`、`runPolicies`、`discoverable`、`autoSelectable`、`supportedValueTypes`、`sideEffects`、`health`、`configured`、`healthy`、`kind`、`mode` 和 `scope` 已废弃，出现在当前协议载荷中应被拒绝，而不是悄悄兼容。
+本地使用策略不写入 `skill.json`。`enabled`、`hidden`、`selectable`、`requiresApproval`、`capabilityPolicy.default` 和 `capabilityPolicy.origins.<origin>` 应统一进入 `skill/settings.local.json`，由程序自动创建、补齐和维护。
+
+旧字段 `label`、`targets`、`executionTargets`、`inputMapping`、静态技能参数 `config`、无意义的 `trigger`、`runPolicies`、`discoverable`、`autoSelectable`、`supportedValueTypes`、`sideEffects`、`health`、`configured`、`healthy`、`kind`、`mode` 和 `scope` 已废弃，出现在当前协议载荷中应被拒绝，而不是悄悄兼容。历史 `capabilityPolicy` 字段也应从新 Skill 包定义中迁出，作为本地 settings registry 的数据处理。
 
 ## Capability State 契约
 
@@ -386,7 +407,7 @@ effective_capability =
 - `capability.kind=subgraph` 只表达“选中的一个可运行子图能力”，主要服务伙伴主循环等动态模板。
 - `capability.kind=none` 表达没有合适能力。
 - 一个 LLM 节点不能同时使用卡片 skill 和输入 capability state；冲突时应作为协议错误处理。
-- 真正执行前仍必须通过 skill registry、启用状态、运行时注册状态、`capabilityPolicy` 和审批检查。
+- 真正执行前仍必须通过 skill registry、本地 settings 启用状态、运行时注册状态、可选择策略和审批检查。
 - 多个能力调用必须拆成多个节点，由图结构显式编排。
 
 ## 绑定技能的语义
@@ -581,9 +602,9 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 它不应该：
 
-- 直接写入 `backend/data/skills/user/<skill_key>/`。
+- 直接写入 `skill/user/<skill_key>/`。
 - 直接运行 smoke test、修复文件或回滚 revision。
-- 检查或修改官方 `skill/<skill_key>/`。
+- 检查或修改官方 `skill/official/<skill_key>/`。
 - 代替图模板中的用户确认、示例确认、设计确认和权限确认。
 
 写入、测试、错误修复和最终安装应由后续图节点通过明确的受控能力完成，而不是重新塞回这个生成 Skill。当前 `graphiteui_skill_creation_workflow` 已经把这条流程表达为官方模板；后续应继续打磨运行验证、审批体验、失败回环和启用流程，而不是把职责重新扩大到单个 Skill 内部。

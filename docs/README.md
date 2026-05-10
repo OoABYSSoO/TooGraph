@@ -15,18 +15,19 @@
   - function calling 的作用原理、边界和对 GraphiteUI 的引入建议
 
 - [../skill/SKILL_AUTHORING_GUIDE.md](../skill/SKILL_AUTHORING_GUIDE.md)
-  - 官方 Skill 根目录下的 Skill 包结构、生命周期入口和权限边界
+  - Skill 包结构、生命周期入口和权限边界
   - 手工创建 Skill 与后续技能生成能力都应读取的协议说明
+  - 记录 Skill 包定义与 `skill/settings.local.json` 本地使用设定分离的目标结构
 
 - [future/buddy-autonomous-agent-roadmap.md](future/buddy-autonomous-agent-roadmap.md)
   - 伙伴、自主工具循环、技能生成和长期协作能力的唯一长期参考
-  - 包含 graph-first 运行模型、Buddy Home、伙伴循环子图化、子图组件、skill manifest 契约、`capability` state、`result_package` 动态结果包、技能说明胶囊、技能绑定 state、能力选择、Skill 生成能力、伙伴断点交互、活动事件和 function call 取舍
+  - 包含 graph-first 运行模型、可追踪资产与本地设置分离、Buddy Home、伙伴循环子图化、子图组件、skill manifest 契约、`capability` state、`result_package` 动态结果包、技能说明胶囊、技能绑定 state、能力选择、Skill 生成能力、伙伴断点交互、活动事件和 function call 取舍
 
 ## 已清理
 
 - 迁移闭环记录：`task_plan.md`、`findings.md`、`progress.md`
 - 已完成的 agent-only LangGraph runtime 规划文档
-- 已完成或偏离当前 `skill/<skill_key>` 目录主线的旧 skill 重构文档
+- 已完成或偏离当前 `skill/official` / `skill/user` 资产目录主线的旧 skill 重构文档
 - 阶段性的外部 Agent 框架对标和 LangGraph 高级能力基线分析
 - 被新版伙伴自主 Agent 路线图合并和替代的旧权限、记忆和技能分类文档
 - 旧内置模板和旧技能包的说明
