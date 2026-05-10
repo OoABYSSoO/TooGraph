@@ -102,6 +102,20 @@
               values="M0 176 C-54 214 -104 166 -154 160 C-212 152 -240 112 -260 82 C-270 66 -278 60 -282 62;M0 176 C-62 198 -124 178 -178 150 C-222 126 -254 86 -274 68 C-278 64 -280 62 -282 62;M0 176 C-70 180 -138 148 -196 116 C-236 94 -264 74 -278 64 C-280 62 -282 62 -282 62;M0 176 C-64 184 -122 198 -170 162 C-214 132 -246 88 -272 66 C-276 62 -280 60 -282 62;M0 176 C-54 214 -104 166 -154 160 C-212 152 -240 112 -260 82 C-270 66 -278 60 -282 62"
             />
           </path>
+          <path
+            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--front-swing"
+            d="M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62"
+          >
+            <animate
+              attributeName="d"
+              dur="7.2s"
+              repeatCount="indefinite"
+              calcMode="spline"
+              keyTimes="0;0.125;0.25;0.375;0.5;0.625;0.75;0.875;1"
+              keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
+              values="M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62;M0 176 C36 204 72 166 100 146 C130 124 158 82 156 62 C156 56 154 52 152 54;M0 176 C-24 164 20 138 -2 108 C-20 82 -12 58 0 48 C8 54 12 62 8 72;M0 176 C-36 204 -72 166 -100 146 C-130 124 -158 82 -156 62 C-156 56 -154 52 -152 54;M0 176 C-54 214 -104 166 -154 160 C-212 152 -240 112 -260 82 C-270 66 -278 60 -282 62;M0 176 C-36 204 -72 166 -100 146 C-130 124 -158 82 -156 62 C-156 56 -154 52 -152 54;M0 176 C-24 164 20 138 -2 108 C-20 82 -12 58 0 48 C8 54 12 62 8 72;M0 176 C36 204 72 166 100 146 C130 124 158 82 156 62 C156 56 154 52 152 54;M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62"
+            />
+          </path>
         </g>
 
         <g class="buddy-mascot__body-turn">
@@ -373,24 +387,12 @@ function clampLookAxis(value: number | undefined) {
   opacity: 0;
 }
 
-.buddy-mascot--idle.buddy-mascot--facing-front .buddy-mascot__tail-pose--right {
-  animation: buddy-mascot-front-tail-right 9.6s ease-in-out infinite;
+.buddy-mascot--idle.buddy-mascot--facing-front .buddy-mascot__tail-pose {
+  opacity: 0;
 }
 
-.buddy-mascot--idle.buddy-mascot--facing-front .buddy-mascot__tail-pose--back-right {
-  animation: buddy-mascot-front-tail-back-right 9.6s ease-in-out infinite;
-}
-
-.buddy-mascot--idle.buddy-mascot--facing-front .buddy-mascot__tail-pose--back-center {
-  animation: buddy-mascot-front-tail-back-center 9.6s ease-in-out infinite;
-}
-
-.buddy-mascot--idle.buddy-mascot--facing-front .buddy-mascot__tail-pose--back-left {
-  animation: buddy-mascot-front-tail-back-left 9.6s ease-in-out infinite;
-}
-
-.buddy-mascot--idle.buddy-mascot--facing-front .buddy-mascot__tail-pose--left {
-  animation: buddy-mascot-front-tail-left 9.6s ease-in-out infinite;
+.buddy-mascot--idle.buddy-mascot--facing-front .buddy-mascot__tail-pose--front-swing {
+  opacity: 1;
 }
 
 .buddy-mascot__look-eye {
@@ -551,90 +553,6 @@ function clampLookAxis(value: number | undefined) {
   }
   50% {
     transform: rotate(7deg);
-  }
-}
-
-@keyframes buddy-mascot-front-tail-right {
-  0%,
-  14%,
-  98%,
-  100% {
-    opacity: 1;
-    transform: rotate(0deg);
-  }
-  24%,
-  88% {
-    opacity: 0;
-    transform: rotate(-7deg);
-  }
-}
-
-@keyframes buddy-mascot-front-tail-back-right {
-  0%,
-  12%,
-  34%,
-  82%,
-  100% {
-    opacity: 0;
-    transform: rotate(-8deg);
-  }
-  20%,
-  28%,
-  92%,
-  96% {
-    opacity: 1;
-    transform: rotate(-3deg);
-  }
-}
-
-@keyframes buddy-mascot-front-tail-back-center {
-  0%,
-  28%,
-  52%,
-  66%,
-  100% {
-    opacity: 0;
-    transform: rotate(0deg);
-  }
-  38%,
-  44%,
-  82%,
-  88% {
-    opacity: 1;
-    transform: rotate(0deg);
-  }
-}
-
-@keyframes buddy-mascot-front-tail-back-left {
-  0%,
-  42%,
-  64%,
-  78%,
-  100% {
-    opacity: 0;
-    transform: rotate(8deg);
-  }
-  52%,
-  60%,
-  72%,
-  76% {
-    opacity: 1;
-    transform: rotate(3deg);
-  }
-}
-
-@keyframes buddy-mascot-front-tail-left {
-  0%,
-  54%,
-  92%,
-  100% {
-    opacity: 0;
-    transform: rotate(7deg);
-  }
-  66%,
-  84% {
-    opacity: 1;
-    transform: rotate(0deg);
   }
 }
 
