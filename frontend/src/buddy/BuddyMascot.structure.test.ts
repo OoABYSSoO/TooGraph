@@ -115,8 +115,15 @@ test("BuddyMascot exposes tail poses and directional part offsets without body m
   assert.match(componentSource, /\.buddy-mascot--facing-right\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*110px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*70px;[\s\S]*--buddy-mascot-left-ear-x:\s*-12px;[\s\S]*--buddy-mascot-right-ear-x:\s*-18px;/);
   assert.match(componentSource, /\.buddy-mascot--facing-left[\s\S]*\.buddy-mascot__tail-pose--right[\s\S]*opacity:\s*1;/);
   assert.match(componentSource, /\.buddy-mascot--facing-right[\s\S]*\.buddy-mascot__tail-pose--left[\s\S]*opacity:\s*1;/);
+  assert.match(componentSource, /\.buddy-mascot--idle\.buddy-mascot--facing-front[\s\S]*\.buddy-mascot__tail-pose--right[\s\S]*animation:\s*buddy-mascot-front-tail-right/);
+  assert.match(componentSource, /\.buddy-mascot--idle\.buddy-mascot--facing-front[\s\S]*\.buddy-mascot__tail-pose--back-center[\s\S]*animation:\s*buddy-mascot-front-tail-back-center/);
+  assert.match(componentSource, /\.buddy-mascot--idle\.buddy-mascot--facing-front[\s\S]*\.buddy-mascot__tail-pose--left[\s\S]*animation:\s*buddy-mascot-front-tail-left/);
+  assert.match(componentSource, /@keyframes buddy-mascot-front-tail-right[\s\S]*transform:\s*rotate\(0deg\);[\s\S]*transform:\s*rotate\(-7deg\);/);
+  assert.match(componentSource, /@keyframes buddy-mascot-front-tail-left[\s\S]*transform:\s*rotate\(7deg\);[\s\S]*transform:\s*rotate\(0deg\);/);
   assert.doesNotMatch(componentSource, /\.buddy-mascot--facing-left \.buddy-mascot__body-turn/);
   assert.doesNotMatch(componentSource, /\.buddy-mascot--facing-right \.buddy-mascot__body-turn/);
+  assert.doesNotMatch(componentSource, /\.buddy-mascot--idle\.buddy-mascot--facing-left[\s\S]*buddy-mascot-front-tail/);
+  assert.doesNotMatch(componentSource, /\.buddy-mascot--idle\.buddy-mascot--facing-right[\s\S]*buddy-mascot-front-tail/);
   assert.doesNotMatch(componentSource, /scaleX\(0\.92\) rotate/);
 });
 
@@ -268,7 +275,7 @@ test("BuddyMascot keeps the body stable except for small speaking and tap hops",
 });
 
 test("BuddyMascot keeps idle tail sway slower than thinking with the same amplitude", () => {
-  assert.match(componentSource, /\.buddy-mascot--idle[\s\S]*\.buddy-mascot__tail[\s\S]*animation:\s*buddy-mascot-tail-sway 2\.4s ease-in-out infinite;/);
+  assert.match(componentSource, /\.buddy-mascot--idle[\s\S]*\.buddy-mascot__tail[\s\S]*animation:\s*buddy-mascot-tail-sway 1\.8s ease-in-out infinite;/);
   assert.match(componentSource, /\.buddy-mascot--idle[\s\S]*\.buddy-mascot__left-ear[\s\S]*animation:\s*buddy-mascot-ear-idle-left 4\.2s ease-in-out infinite;/);
   assert.match(componentSource, /\.buddy-mascot--idle[\s\S]*\.buddy-mascot__right-ear[\s\S]*animation:\s*buddy-mascot-ear-idle-right 4\.2s ease-in-out infinite;/);
   assert.match(componentSource, /\.buddy-mascot--thinking[\s\S]*\.buddy-mascot__tail[\s\S]*animation:\s*buddy-mascot-tail-thinking 1\.45s ease-in-out infinite;/);

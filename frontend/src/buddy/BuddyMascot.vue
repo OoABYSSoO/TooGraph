@@ -298,7 +298,10 @@ function clampLookAxis(value: number | undefined) {
   stroke-linecap: round;
   stroke-linejoin: round;
   opacity: 0;
-  transition: opacity 160ms ease;
+  transform-origin: 50% 78%;
+  transition:
+    opacity 160ms ease,
+    transform 420ms ease;
 }
 
 .buddy-mascot__tail-pose--right {
@@ -370,6 +373,26 @@ function clampLookAxis(value: number | undefined) {
   opacity: 0;
 }
 
+.buddy-mascot--idle.buddy-mascot--facing-front .buddy-mascot__tail-pose--right {
+  animation: buddy-mascot-front-tail-right 9.6s ease-in-out infinite;
+}
+
+.buddy-mascot--idle.buddy-mascot--facing-front .buddy-mascot__tail-pose--back-right {
+  animation: buddy-mascot-front-tail-back-right 9.6s ease-in-out infinite;
+}
+
+.buddy-mascot--idle.buddy-mascot--facing-front .buddy-mascot__tail-pose--back-center {
+  animation: buddy-mascot-front-tail-back-center 9.6s ease-in-out infinite;
+}
+
+.buddy-mascot--idle.buddy-mascot--facing-front .buddy-mascot__tail-pose--back-left {
+  animation: buddy-mascot-front-tail-back-left 9.6s ease-in-out infinite;
+}
+
+.buddy-mascot--idle.buddy-mascot--facing-front .buddy-mascot__tail-pose--left {
+  animation: buddy-mascot-front-tail-left 9.6s ease-in-out infinite;
+}
+
 .buddy-mascot__look-eye {
   transition: transform 90ms ease-out;
 }
@@ -405,7 +428,7 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--idle .buddy-mascot__tail {
-  animation: buddy-mascot-tail-sway 2.4s ease-in-out infinite;
+  animation: buddy-mascot-tail-sway 1.8s ease-in-out infinite;
 }
 
 .buddy-mascot--idle .buddy-mascot__sparkle-wrap {
@@ -528,6 +551,90 @@ function clampLookAxis(value: number | undefined) {
   }
   50% {
     transform: rotate(7deg);
+  }
+}
+
+@keyframes buddy-mascot-front-tail-right {
+  0%,
+  14%,
+  98%,
+  100% {
+    opacity: 1;
+    transform: rotate(0deg);
+  }
+  24%,
+  88% {
+    opacity: 0;
+    transform: rotate(-7deg);
+  }
+}
+
+@keyframes buddy-mascot-front-tail-back-right {
+  0%,
+  12%,
+  34%,
+  82%,
+  100% {
+    opacity: 0;
+    transform: rotate(-8deg);
+  }
+  20%,
+  28%,
+  92%,
+  96% {
+    opacity: 1;
+    transform: rotate(-3deg);
+  }
+}
+
+@keyframes buddy-mascot-front-tail-back-center {
+  0%,
+  28%,
+  52%,
+  66%,
+  100% {
+    opacity: 0;
+    transform: rotate(0deg);
+  }
+  38%,
+  44%,
+  82%,
+  88% {
+    opacity: 1;
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes buddy-mascot-front-tail-back-left {
+  0%,
+  42%,
+  64%,
+  78%,
+  100% {
+    opacity: 0;
+    transform: rotate(8deg);
+  }
+  52%,
+  60%,
+  72%,
+  76% {
+    opacity: 1;
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes buddy-mascot-front-tail-left {
+  0%,
+  54%,
+  92%,
+  100% {
+    opacity: 0;
+    transform: rotate(7deg);
+  }
+  66%,
+  84% {
+    opacity: 1;
+    transform: rotate(0deg);
   }
 }
 
