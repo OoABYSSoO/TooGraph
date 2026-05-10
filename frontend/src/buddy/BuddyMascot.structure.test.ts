@@ -26,6 +26,17 @@ function extractCssBlock(source: string, selector: string) {
   return match?.[1] ?? "";
 }
 
+function extractTailPoseBlock(source: string, poseClass: string) {
+  const marker = `class="buddy-mascot__tail-pose buddy-mascot__tail-pose--${poseClass}"`;
+  const markerIndex = source.indexOf(marker);
+  assert.notEqual(markerIndex, -1, `Missing tail pose marker: ${poseClass}`);
+  const pathStartIndex = source.lastIndexOf("<path", markerIndex);
+  assert.notEqual(pathStartIndex, -1, `Missing path start for tail pose: ${poseClass}`);
+  const pathEndIndex = source.indexOf("</path>", markerIndex);
+  assert.notEqual(pathEndIndex, -1, `Missing path end for tail pose: ${poseClass}`);
+  return source.slice(pathStartIndex, pathEndIndex + "</path>".length);
+}
+
 const teardropLeftEarPath = "M-146-143 C-114-132-82-101-55-61 C-60-24-84 25-124 63 C-158 95-190 53-168-4 C-174-52-164-106-146-143Z";
 const teardropRightEarPath = "M146-143 C114-132 82-101 55-61 C60-24 84 25 124 63 C158 95 190 53 168-4 C174-52 164-106 146-143Z";
 const separatedHeadPath =
@@ -110,6 +121,26 @@ test("BuddyMascot draws every tail pose from the same hidden lower-body root", (
     assert.match(extractPathData(componentSource, marker), /^M0 194 C/);
   }
   assert.match(componentSource, /class="buddy-mascot__tail buddy-mascot__tail-rig"[\s\S]*class="buddy-mascot__body-turn"/);
+});
+
+test("BuddyMascot softens each tail pose with path morphing between five curve shapes", () => {
+  const tailPoseClasses = ["right", "back-right", "back-center", "back-left", "left"];
+
+  for (const poseClass of tailPoseClasses) {
+    const pathBlock = extractTailPoseBlock(componentSource, poseClass);
+    assert.match(pathBlock, /<animate\b/);
+    assert.match(pathBlock, /attributeName="d"/);
+    assert.match(pathBlock, /repeatCount="indefinite"/);
+    assert.match(pathBlock, /calcMode="spline"/);
+    assert.match(pathBlock, /keyTimes="0;0\.25;0\.5;0\.75;1"/);
+    assert.match(pathBlock, /keySplines="[^"]+"/);
+
+    const valuesMatch = pathBlock.match(/values="([^"]+)"/);
+    assert.ok(valuesMatch, `Missing morph values for tail pose: ${poseClass}`);
+    const morphPaths = valuesMatch[1].split(";").map((value) => normalizePathData(value));
+    assert.equal(morphPaths.length, 5);
+    assert.ok(morphPaths.every((value) => value.startsWith("M0 194 C")));
+  }
 });
 
 test("BuddyMascot moves eye wrapper layers toward the pointer without replacing blink transforms", () => {
