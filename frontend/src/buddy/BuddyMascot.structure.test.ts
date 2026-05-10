@@ -112,7 +112,7 @@ test("BuddyMascot exposes tail poses and directional part offsets without body m
   assert.match(componentSource, /\.buddy-mascot--facing-left\s*\{[\s\S]*--buddy-mascot-tail-root-x:\s*12px;[\s\S]*--buddy-mascot-left-eye-facing-x:\s*-70px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*-110px;[\s\S]*--buddy-mascot-left-ear-x:\s*18px;[\s\S]*--buddy-mascot-right-ear-x:\s*12px;/);
   assert.match(componentSource, /\.buddy-mascot--facing-right\s*\{[\s\S]*--buddy-mascot-tail-root-x:\s*-12px;[\s\S]*--buddy-mascot-left-eye-facing-x:\s*110px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*70px;[\s\S]*--buddy-mascot-left-ear-x:\s*-12px;[\s\S]*--buddy-mascot-right-ear-x:\s*-18px;/);
   assert.match(componentSource, /function resolveTailSideForFacing\(facing: BuddyMascotFacing\): TailSide/);
-  assert.match(componentSource, /if \(facing === "left"\) \{[\s\S]*return "right";[\s\S]*if \(facing === "right"\) \{[\s\S]*return "left";/);
+  assert.match(componentSource, /if \(facing === "left"\) \{[\s\S]*return "left";[\s\S]*if \(facing === "right"\) \{[\s\S]*return "right";/);
   assert.match(componentSource, /\.buddy-mascot__tail-pose\s*\{[\s\S]*opacity:\s*1;/);
   assert.doesNotMatch(componentSource, /\.buddy-mascot--facing-left \.buddy-mascot__body-turn/);
   assert.doesNotMatch(componentSource, /\.buddy-mascot--facing-right \.buddy-mascot__body-turn/);
@@ -150,7 +150,7 @@ test("BuddyMascot changes tail side after a random idle dwell instead of continu
 });
 
 test("BuddyMascot accelerates tail correction when facing changes without snapping", () => {
-  assert.match(componentSource, /const TAIL_FACING_SWITCH_DURATION_MS = 500;/);
+  assert.match(componentSource, /const TAIL_FACING_SWITCH_DURATION_MS = 320;/);
   assert.match(componentSource, /:dur="`\$\{tailSwingAnimation\.durationMs\}ms`"/);
   assert.match(componentSource, /:keyTimes="tailSwingAnimation\.keyTimes"/);
   assert.match(componentSource, /:keySplines="tailSwingAnimation\.keySplines"/);
@@ -174,8 +174,10 @@ test("BuddyMascot accelerates tail correction when facing changes without snappi
 
 test("BuddyMascot settles the front tail side from the previous lateral facing", () => {
   assert.match(componentSource, /const enteredFrontFromLateral = props\.facing === "front" && isLateralFacing\(previousFacing\);/);
-  assert.match(componentSource, /const targetSide = enteredFrontFromLateral\s*\?\s*resolveTailSideForFacing\(previousFacing\)\s*:\s*resolveTailSideForFacing\(props\.facing\);/);
+  assert.match(componentSource, /const targetSide = enteredFrontFromLateral\s*\?\s*resolveFrontTailSideFromPreviousFacing\(previousFacing\)\s*:\s*resolveTailSideForFacing\(props\.facing\);/);
   assert.match(componentSource, /if \(enteredFrontFromLateral\) \{[\s\S]*transitionTailTo\(targetSide, TAIL_FACING_SWITCH_DURATION_MS, true\);[\s\S]*return;[\s\S]*\}/);
+  assert.match(componentSource, /function resolveFrontTailSideFromPreviousFacing\(facing: BuddyMascotFacing\): TailSide/);
+  assert.match(componentSource, /if \(facing === "left"\) \{[\s\S]*return "right";[\s\S]*if \(facing === "right"\) \{[\s\S]*return "left";/);
   assert.match(componentSource, /function isLateralFacing\(facing: BuddyMascotFacing\)/);
   assert.match(componentSource, /return facing === "left" \|\| facing === "right";/);
 });
@@ -216,6 +218,21 @@ test("BuddyMascot swings the single tail through back poses when changing sides"
   assert.match(componentSource, /const TAIL_TRANSITION_PATHS = \{[\s\S]*rightToLeft:\s*\[[\s\S]*TAIL_POSE_PATHS\.right,[\s\S]*TAIL_POSE_PATHS\.backRight,[\s\S]*TAIL_POSE_PATHS\.backCenter,[\s\S]*TAIL_POSE_PATHS\.backLeft,[\s\S]*TAIL_POSE_PATHS\.left,[\s\S]*\]/);
   assert.match(componentSource, /leftToRight:\s*\[[\s\S]*TAIL_POSE_PATHS\.left,[\s\S]*TAIL_POSE_PATHS\.backLeft,[\s\S]*TAIL_POSE_PATHS\.backCenter,[\s\S]*TAIL_POSE_PATHS\.backRight,[\s\S]*TAIL_POSE_PATHS\.right,[\s\S]*\]/);
   assert.match(componentSource, /function buildTailTransitionValues\(fromSide: TailSide, toSide: TailSide\)[\s\S]*return paths\.join\(";"\);/);
+});
+
+test("BuddyMascot keeps tail curve breathing after large side transitions", () => {
+  assert.match(componentSource, /const TAIL_CURVE_MICRO_DURATION_MS = 2600;/);
+  assert.match(componentSource, /const TAIL_CURVE_MICRO_PATHS = \{[\s\S]*right:\s*\[[\s\S]*TAIL_POSE_PATHS\.right,[\s\S]*left:\s*\[[\s\S]*TAIL_POSE_PATHS\.left,/);
+  assert.match(componentSource, /const tailCurveAnimationValues = computed\(\(\) => buildTailCurveMicroValues\(tailSide\.value\)\);/);
+  assert.match(componentSource, /v-if="!tailSwingAnimation"/);
+  assert.match(componentSource, /:key="`tail-curve-\$\{tailSide\}`"/);
+  assert.match(componentSource, /repeatCount="indefinite"/);
+  assert.match(componentSource, /:dur="`\$\{TAIL_CURVE_MICRO_DURATION_MS\}ms`"/);
+  assert.match(componentSource, /:values="tailCurveAnimationValues"/);
+  assert.match(componentSource, /keyTimes="0;0\.34;0\.68;1"/);
+  assert.match(componentSource, /keySplines="0\.42 0 0\.58 1;0\.42 0 0\.58 1;0\.42 0 0\.58 1"/);
+  assert.match(componentSource, /function buildTailCurveMicroValues\(side: TailSide\)/);
+  assert.match(componentSource, /return \[\.\.\.TAIL_CURVE_MICRO_PATHS\[side\], TAIL_CURVE_MICRO_PATHS\[side\]\[0\]\]\.join\(";"\);/);
 });
 
 test("BuddyMascot moves eye wrapper layers toward the pointer without replacing blink transforms", () => {
@@ -286,20 +303,20 @@ test("BuddyMascot keeps the thinking body steady while ears, tail, and sparkle m
   assert.doesNotMatch(componentSource, /@keyframes buddy-mascot-thinking-body/);
 });
 
-test("BuddyMascot keeps the body stable except for small speaking and tap hops", () => {
+test("BuddyMascot keeps the body stable except for small speaking, tap, and drag motion", () => {
   assert.equal(extractCssBlock(componentSource, ".buddy-mascot--idle .buddy-mascot__body").trim(), "");
-  assert.equal(extractCssBlock(componentSource, ".buddy-mascot--dragging .buddy-mascot__body").trim(), "");
   assert.equal(extractCssBlock(componentSource, ".buddy-mascot--motion-roam .buddy-mascot__body-turn").trim(), "");
   assert.equal(extractCssBlock(componentSource, ".buddy-mascot--motion-hop .buddy-mascot__body-turn").trim(), "");
   assert.doesNotMatch(componentSource, /@keyframes buddy-mascot-idle-body/);
-  assert.doesNotMatch(componentSource, /@keyframes buddy-mascot-drag-body/);
   assert.doesNotMatch(componentSource, /@keyframes buddy-mascot-roam-hop/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--speaking .buddy-mascot__body-turn"), /animation:\s*buddy-mascot-speaking-hop 1\.04s ease-in-out infinite;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--speaking .buddy-mascot__body"), /animation:\s*buddy-mascot-speaking-body-squash 1\.04s ease-in-out infinite;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--dragging .buddy-mascot__body-turn"), /animation:\s*buddy-mascot-drag-body-wobble 860ms ease-in-out infinite;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--tap .buddy-mascot__body-turn"), /animation:\s*buddy-mascot-tap-hop 520ms ease-out both;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--tap .buddy-mascot__body"), /animation:\s*buddy-mascot-tap-body-squash 520ms ease-out both;/);
   assert.match(componentSource, /@keyframes buddy-mascot-speaking-hop[\s\S]*translateY\(-5px\)/);
   assert.match(componentSource, /@keyframes buddy-mascot-speaking-body-squash[\s\S]*scale\(1\.025,\s*0\.975\)[\s\S]*scale\(0\.982,\s*1\.025\)/);
+  assert.match(componentSource, /@keyframes buddy-mascot-drag-body-wobble[\s\S]*rotate\(-3deg\)[\s\S]*rotate\(3deg\)/);
   assert.match(componentSource, /@keyframes buddy-mascot-tap-hop[\s\S]*translateY\(-10px\)/);
   assert.match(componentSource, /@keyframes buddy-mascot-tap-body-squash[\s\S]*scale\(1\.04,\s*0\.96\)[\s\S]*scale\(0\.97,\s*1\.04\)/);
 });
@@ -315,12 +332,13 @@ test("BuddyMascot keeps idle tail sway slower than thinking with the same amplit
   assert.match(componentSource, /@keyframes buddy-mascot-ear-idle-right[\s\S]*rotate\(8deg\)/);
 });
 
-test("BuddyMascot gives dragging a subtle tail and ear response without body wobble", () => {
+test("BuddyMascot gives dragging a subtle tail, ear, and body response", () => {
   assert.match(componentSource, /\.buddy-mascot--dragging[\s\S]*\.buddy-mascot__tail[\s\S]*animation:\s*buddy-mascot-tail-drag 1\.2s ease-in-out infinite;/);
+  assert.match(componentSource, /\.buddy-mascot--dragging[\s\S]*\.buddy-mascot__body-turn[\s\S]*animation:\s*buddy-mascot-drag-body-wobble 860ms ease-in-out infinite;/);
   assert.match(componentSource, /\.buddy-mascot--dragging[\s\S]*\.buddy-mascot__left-ear[\s\S]*animation:\s*buddy-mascot-ear-drag-left 360ms ease-in-out infinite;/);
   assert.match(componentSource, /\.buddy-mascot--dragging[\s\S]*\.buddy-mascot__right-ear[\s\S]*animation:\s*buddy-mascot-ear-drag-right 360ms ease-in-out infinite;/);
   assert.match(componentSource, /@keyframes buddy-mascot-tail-drag[\s\S]*rotate\(4deg\)[\s\S]*rotate\(-4deg\)/);
-  assert.doesNotMatch(componentSource, /@keyframes buddy-mascot-drag-body/);
+  assert.match(componentSource, /@keyframes buddy-mascot-drag-body-wobble[\s\S]*rotate\(-3deg\)[\s\S]*rotate\(3deg\)/);
 });
 
 test("BuddyMascot blinks occasionally while idle", () => {

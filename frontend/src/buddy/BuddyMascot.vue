@@ -47,6 +47,18 @@
                 :keySplines="tailSwingAnimation.keySplines"
                 :values="tailSwingAnimation.values"
               />
+              <animate
+                v-if="!tailSwingAnimation"
+                :key="`tail-curve-${tailSide}`"
+                attributeName="d"
+                begin="0s"
+                :dur="`${TAIL_CURVE_MICRO_DURATION_MS}ms`"
+                repeatCount="indefinite"
+                calcMode="spline"
+                keyTimes="0;0.34;0.68;1"
+                keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
+                :values="tailCurveAnimationValues"
+              />
             </path>
           </g>
         </g>
@@ -102,7 +114,8 @@ type TailPose = (typeof TAIL_POSE_ORDER)[number];
 
 const TAIL_POSE_ORDER = ["right", "backRight", "backCenter", "backLeft", "left"] as const;
 const TAIL_IDLE_SWITCH_DURATION_MS = 1000;
-const TAIL_FACING_SWITCH_DURATION_MS = 500;
+const TAIL_FACING_SWITCH_DURATION_MS = 320;
+const TAIL_CURVE_MICRO_DURATION_MS = 2600;
 const TAIL_IDLE_MIN_DWELL_MS = 5200;
 const TAIL_IDLE_MAX_DWELL_MS = 9000;
 const TAIL_KEY_SPLINE = "0.42 0 0.58 1";
@@ -129,6 +142,19 @@ const TAIL_TRANSITION_PATHS = {
     TAIL_POSE_PATHS.backCenter,
     TAIL_POSE_PATHS.backRight,
     TAIL_POSE_PATHS.right,
+  ],
+} as const;
+
+const TAIL_CURVE_MICRO_PATHS = {
+  right: [
+    TAIL_POSE_PATHS.right,
+    "M0 176 C62 210 96 174 150 160 C206 154 236 114 260 82 C270 66 278 60 282 62",
+    "M0 176 C44 216 112 168 154 160 C212 152 236 106 260 82 C270 66 278 60 282 62",
+  ],
+  left: [
+    TAIL_POSE_PATHS.left,
+    "M0 176 C-62 210 -96 174 -150 160 C-206 154 -236 114 -260 82 C-270 66 -278 60 -282 62",
+    "M0 176 C-44 216 -112 168 -154 160 C-212 152 -236 106 -260 82 C-270 66 -278 60 -282 62",
   ],
 } as const;
 
@@ -185,6 +211,7 @@ const eyeLookStyle = computed<Record<string, string>>(() => {
     "--buddy-mascot-look-y": `${y.toFixed(2)}px`,
   };
 });
+const tailCurveAnimationValues = computed(() => buildTailCurveMicroValues(tailSide.value));
 
 watch(() => props.tapNonce, triggerTapAnimation);
 watch([effectiveMood, () => props.facing, () => props.dragging], syncTailTarget, { immediate: true });
@@ -228,7 +255,7 @@ function syncTailTarget() {
   clearTailDwellTimer();
   const enteredFrontFromLateral = props.facing === "front" && isLateralFacing(previousFacing);
   const targetSide = enteredFrontFromLateral
-    ? resolveTailSideForFacing(previousFacing)
+    ? resolveFrontTailSideFromPreviousFacing(previousFacing)
     : resolveTailSideForFacing(props.facing);
   const crossedLateralFacing = isOppositeSideFacing(previousFacing, props.facing);
   previousFacing = props.facing;
@@ -315,6 +342,16 @@ function transitionTailTo(targetSide: TailSide, durationMs = TAIL_IDLE_SWITCH_DU
 
 function resolveTailSideForFacing(facing: BuddyMascotFacing): TailSide {
   if (facing === "left") {
+    return "left";
+  }
+  if (facing === "right") {
+    return "right";
+  }
+  return tailSide.value;
+}
+
+function resolveFrontTailSideFromPreviousFacing(facing: BuddyMascotFacing): TailSide {
+  if (facing === "left") {
     return "right";
   }
   if (facing === "right") {
@@ -372,6 +409,10 @@ function buildTailTransitionPoseRoute(fromPose: TailPose, toSide: TailSide) {
 
 function buildTailPoseValues(route: TailPose[]) {
   return route.map((pose) => TAIL_POSE_PATHS[pose]).join(";");
+}
+
+function buildTailCurveMicroValues(side: TailSide) {
+  return [...TAIL_CURVE_MICRO_PATHS[side], TAIL_CURVE_MICRO_PATHS[side][0]].join(";");
 }
 
 function buildTailKeyTimes(poseCount: number) {
@@ -664,6 +705,10 @@ function clampLookAxis(value: number | undefined) {
   animation: buddy-mascot-tail-drag 1.2s ease-in-out infinite;
 }
 
+.buddy-mascot--dragging .buddy-mascot__body-turn {
+  animation: buddy-mascot-drag-body-wobble 860ms ease-in-out infinite;
+}
+
 .buddy-mascot--dragging .buddy-mascot__left-ear {
   animation: buddy-mascot-ear-drag-left 360ms ease-in-out infinite;
 }
@@ -938,6 +983,16 @@ function clampLookAxis(value: number | undefined) {
   }
   50% {
     transform: rotate(-4deg);
+  }
+}
+
+@keyframes buddy-mascot-drag-body-wobble {
+  0%,
+  100% {
+    transform: rotate(-3deg) translateY(0);
+  }
+  50% {
+    transform: rotate(3deg) translateY(-2px);
   }
 }
 
