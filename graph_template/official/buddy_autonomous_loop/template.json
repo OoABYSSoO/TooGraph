@@ -3,7 +3,6 @@
   "label": "伙伴自主循环",
   "description": "读取 Buddy Home，理解用户请求，选择并执行启用的图模板或 Skill，必要时请求澄清或审批，最后只输出伙伴回复的官方循环模板。",
   "default_graph_name": "伙伴自主循环",
-  "status": "active",
   "state_schema": {
     "user_message": {
       "name": "user_message",

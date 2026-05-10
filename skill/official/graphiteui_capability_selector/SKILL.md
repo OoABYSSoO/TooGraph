@@ -11,7 +11,7 @@ Selection rules:
 
 - Only enabled capabilities are listed for the model.
 - Graph templates are preferred over Skills when both can satisfy the requirement.
-- Skill candidates must be selectable for the requested origin through `capabilityPolicy`.
+- Skill candidates must be selectable for the requested origin through `skill/settings.local.json`.
 - The selector does not call an LLM, run text matching, or invent capabilities.
 - Saved ordinary graphs are not candidates; reusable graph capabilities come from templates.
 - `capability_catalog.py` is shared by the lifecycle scripts and only reads local manifests and template records.

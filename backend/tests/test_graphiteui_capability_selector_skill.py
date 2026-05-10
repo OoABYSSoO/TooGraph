@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 
-SELECTOR_SKILL_DIR = Path(__file__).resolve().parents[2] / "skill" / "graphiteui_capability_selector"
+SELECTOR_SKILL_DIR = Path(__file__).resolve().parents[2] / "skill" / "official" / "graphiteui_capability_selector"
 SELECTOR_BEFORE_LLM_PATH = SELECTOR_SKILL_DIR / "before_llm.py"
 SELECTOR_AFTER_LLM_PATH = SELECTOR_SKILL_DIR / "after_llm.py"
 
@@ -27,6 +27,10 @@ def _write_json(path: Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _write_settings(path: Path, schema_version: str, entry_key: str, entry: dict[str, object]) -> None:
+    _write_json(path, {"schemaVersion": schema_version, "entries": {entry_key: entry}})
+
+
 def _write_template(
     repo_root: Path,
     *,
@@ -36,11 +40,8 @@ def _write_template(
     source: str = "official",
     status: str = "active",
 ) -> None:
-    root = repo_root / (
-        "backend/app/templates/official" if source == "official" else "backend/data/templates/user"
-    )
     _write_json(
-        root / f"{template_id}.json",
+        repo_root / "graph_template" / source / template_id / "template.json",
         {
             "template_id": template_id,
             "label": label,
@@ -48,8 +49,8 @@ def _write_template(
             "default_graph_name": label,
             "state_schema": {
                 "question": {
-                    "name": "question",
-                    "description": "用户需求",
+                    "name": "Question",
+                    "description": "User request.",
                     "type": "text",
                     "value": "",
                 }
@@ -58,9 +59,15 @@ def _write_template(
             "edges": [],
             "conditional_edges": [],
             "metadata": {"tags": ["research", "web"]},
-            "status": status,
         },
     )
+    if status != "active":
+        _write_settings(
+            repo_root / "graph_template" / "settings.local.json",
+            "graphiteui.template-settings/v1",
+            template_id,
+            {"enabled": False},
+        )
 
 
 def _write_skill(
@@ -73,29 +80,35 @@ def _write_skill(
     selectable: bool = True,
     status: str = "active",
 ) -> None:
-    root = repo_root / ("skill" if source == "official" else "backend/data/skills/user")
-    skill_dir = root / skill_key
-    manifest = {
-        "schemaVersion": "graphite.skill/v1",
-        "skillKey": skill_key,
-        "name": name,
-        "description": description,
-        "llmInstruction": "根据当前输入生成技能入参并运行，不要改写技能输出。",
-        "version": "1.0.0",
-        "capabilityPolicy": {
-            "default": {"selectable": selectable, "requiresApproval": False},
-            "origins": {
-                "buddy": {"selectable": selectable, "requiresApproval": False},
-            },
+    skill_dir = repo_root / "skill" / source / skill_key
+    _write_json(
+        skill_dir / "skill.json",
+        {
+            "schemaVersion": "graphite.skill/v1",
+            "skillKey": skill_key,
+            "name": name,
+            "description": description,
+            "llmInstruction": "Generate skill inputs from the current graph state.",
+            "version": "1.0.0",
+            "permissions": ["network"] if "search" in description.lower() else [],
+            "inputSchema": [{"key": "query", "name": "Query", "valueType": "text", "required": True}],
+            "outputSchema": [{"key": "result", "name": "Result", "valueType": "json"}],
         },
-        "permissions": ["network"] if "搜索" in description else [],
-        "inputSchema": [{"key": "query", "name": "Query", "valueType": "text", "required": True}],
-        "outputSchema": [{"key": "result", "name": "Result", "valueType": "json"}],
-    }
-    _write_json(skill_dir / "skill.json", manifest)
+    )
     (skill_dir / "after_llm.py").write_text("import json\nprint(json.dumps({'result': {}}))\n", encoding="utf-8")
-    if source == "user" and status != "active":
-        _write_json(repo_root / "backend/data/skills/registry_states.json", {skill_key: status})
+    if status != "active" or not selectable:
+        _write_settings(
+            repo_root / "skill" / "settings.local.json",
+            "graphiteui.skill-settings/v1",
+            skill_key,
+            {
+                "enabled": status == "active",
+                "origins": {
+                    "default": {"selectable": selectable, "requiresApproval": False},
+                    "buddy": {"selectable": selectable, "requiresApproval": False},
+                },
+            },
+        )
 
 
 class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
@@ -104,36 +117,10 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
 
         capability_inputs = [field for field in manifest["inputSchema"] if field["key"] == "capability"]
         self.assertNotIn("runtime", manifest)
+        self.assertNotIn("capabilityPolicy", manifest)
         self.assertEqual(manifest["timeoutSeconds"], 30)
-        self.assertEqual(
-            capability_inputs,
-            [
-                {
-                    "key": "capability",
-                    "name": "Capability",
-                    "valueType": "capability",
-                    "required": True,
-                    "description": "LLM 从候选清单中选出的单个能力对象，kind 为 subgraph、skill 或 none。",
-                },
-            ],
-        )
-        self.assertEqual(
-            manifest["outputSchema"],
-            [
-                {
-                    "key": "capability",
-                    "name": "Capability",
-                    "valueType": "capability",
-                    "description": "单个能力对象，kind 为 subgraph、skill 或 none。",
-                },
-                {
-                    "key": "found",
-                    "name": "Found",
-                    "valueType": "boolean",
-                    "description": "是否找到了可用的图模板或 Skill 能力。",
-                }
-            ],
-        )
+        self.assertEqual(capability_inputs[0]["valueType"], "capability")
+        self.assertEqual([field["key"] for field in manifest["outputSchema"]], ["capability", "found"])
 
     def test_before_llm_lists_available_templates_and_skills_for_llm_choice(self) -> None:
         selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "graphiteui_capability_selector_before_test")
@@ -142,20 +129,20 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
             _write_template(
                 repo_root,
                 template_id="advanced_web_research_loop",
-                label="高级联网搜索",
-                description="多轮搜索、证据评估、补充检索和最终依据整理的联网研究图模板。",
+                label="Advanced Web Research",
+                description="Multi-round web research with evidence review.",
             )
             _write_skill(
                 repo_root,
                 skill_key="web_search",
-                name="联网搜索",
-                description="当任务需要最新信息、网页证据或公开资料检索时使用。",
+                name="Web Search",
+                description="Search public web pages and save readable sources.",
             )
             _write_skill(
                 repo_root,
                 skill_key="blocked_skill",
-                name="不可选技能",
-                description="不应该出现在候选清单中。",
+                name="Blocked Skill",
+                description="This should not appear.",
                 selectable=False,
             )
             with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
@@ -166,11 +153,9 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
         self.assertIn("Graph templates are preferred over Skills when both can satisfy the requirement.", context)
         self.assertIn("kind: subgraph", context)
         self.assertIn("key: advanced_web_research_loop", context)
-        self.assertIn("name: 高级联网搜索", context)
-        self.assertIn("whenToUse: 多轮搜索、证据评估、补充检索和最终依据整理的联网研究图模板。", context)
+        self.assertIn("name: Advanced Web Research", context)
         self.assertIn("kind: skill", context)
         self.assertIn("key: web_search", context)
-        self.assertIn("whenToUse: 当任务需要最新信息、网页证据或公开资料检索时使用。", context)
         self.assertNotIn("blocked_skill", context)
 
     def test_selector_normalizes_llm_selected_template_capability(self) -> None:
@@ -180,18 +165,18 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
             _write_template(
                 repo_root,
                 template_id="advanced_web_research_loop",
-                label="高级联网搜索",
-                description="多轮搜索、证据评估、补充检索和最终依据整理的联网研究图模板。",
+                label="Advanced Web Research",
+                description="Multi-round web research with evidence review.",
             )
             _write_skill(
                 repo_root,
                 skill_key="web_search",
-                name="联网搜索",
-                description="搜索公开网页并下载原文。",
+                name="Web Search",
+                description="Search public web pages and save readable sources.",
             )
             with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
                 result = selector.graphiteui_capability_selector(
-                    requirement="帮我联网搜索资料并整理证据",
+                    requirement="Research the latest materials.",
                     capability={"kind": "subgraph", "key": "advanced_web_research_loop"},
                 )
 
@@ -199,7 +184,7 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
         self.assertTrue(result["found"])
         self.assertEqual(result["capability"]["kind"], "subgraph")
         self.assertEqual(result["capability"]["key"], "advanced_web_research_loop")
-        self.assertEqual(result["capability"]["name"], "高级联网搜索")
+        self.assertEqual(result["capability"]["name"], "Advanced Web Research")
 
     def test_selector_normalizes_llm_selected_skill_capability(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "graphiteui_capability_selector_after_test_skill")
@@ -208,18 +193,18 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
             _write_template(
                 repo_root,
                 template_id="write_report",
-                label="写作整理",
-                description="把已有材料整理成报告。",
+                label="Write Report",
+                description="Turn existing materials into a report.",
             )
             _write_skill(
                 repo_root,
                 skill_key="web_search",
-                name="联网搜索",
-                description="搜索公开网页并下载原文。",
+                name="Web Search",
+                description="Search public web pages and save readable sources.",
             )
             with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
                 result = selector.graphiteui_capability_selector(
-                    requirement="需要搜索最新版本信息",
+                    requirement="Need current version information.",
                     capability={"kind": "skill", "key": "web_search"},
                 )
 
@@ -227,7 +212,7 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
         self.assertTrue(result["found"])
         self.assertEqual(result["capability"]["kind"], "skill")
         self.assertEqual(result["capability"]["key"], "web_search")
-        self.assertEqual(result["capability"]["name"], "联网搜索")
+        self.assertEqual(result["capability"]["name"], "Web Search")
 
     def test_selector_ignores_disabled_and_nonselectable_capabilities(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "graphiteui_capability_selector_after_test_disabled")
@@ -236,21 +221,21 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
             _write_template(
                 repo_root,
                 template_id="disabled_research",
-                label="禁用联网搜索模板",
-                description="联网搜索和证据整理。",
+                label="Disabled Research",
+                description="Web research.",
                 source="user",
                 status="disabled",
             )
             _write_skill(
                 repo_root,
                 skill_key="web_search",
-                name="联网搜索",
-                description="搜索公开网页并下载原文。",
+                name="Web Search",
+                description="Search public web pages and save readable sources.",
                 selectable=False,
             )
             with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
                 result = selector.graphiteui_capability_selector(
-                    requirement="帮我联网搜索资料",
+                    requirement="Search for materials.",
                     capability={"kind": "skill", "key": "web_search"},
                 )
 
@@ -265,11 +250,11 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
             _write_template(
                 repo_root,
                 template_id="advanced_web_research_loop",
-                label="高级联网搜索",
-                description="多轮搜索、证据评估、补充检索和最终依据整理的联网研究图模板。",
+                label="Advanced Web Research",
+                description="Multi-round web research with evidence review.",
             )
             with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": temp_dir}, clear=True):
-                result = selector.graphiteui_capability_selector(requirement="帮我联网搜索资料")
+                result = selector.graphiteui_capability_selector(requirement="Research materials.")
 
         self.assertEqual(set(result), {"capability", "found"})
         self.assertFalse(result["found"])

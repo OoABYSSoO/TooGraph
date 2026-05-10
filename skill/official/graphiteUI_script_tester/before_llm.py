@@ -11,7 +11,7 @@ from typing import Any
 ALLOWED_COMMANDS = ["python", "python3", "node", "npm", "bash", "sh", "pwsh", "powershell", "cmd"]
 MAX_REFERENCED_FILES = 8
 MAX_REFERENCED_FILE_BYTES = 80_000
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 DENIED_PATH_ROOTS = [REPO_ROOT / ".git", REPO_ROOT / "backend" / "data" / "settings"]
 
 

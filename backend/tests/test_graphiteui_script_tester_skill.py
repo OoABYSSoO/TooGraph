@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,7 +15,7 @@ from app.skills.definitions import _parse_native_skill_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_TESTER_SKILL_DIR = REPO_ROOT / "skill" / "graphiteUI_script_tester"
+SCRIPT_TESTER_SKILL_DIR = REPO_ROOT / "skill" / "official" / "graphiteUI_script_tester"
 SCRIPT_TESTER_MANIFEST_PATH = SCRIPT_TESTER_SKILL_DIR / "skill.json"
 SCRIPT_TESTER_BEFORE_LLM_PATH = SCRIPT_TESTER_SKILL_DIR / "before_llm.py"
 SCRIPT_TESTER_AFTER_LLM_PATH = SCRIPT_TESTER_SKILL_DIR / "after_llm.py"
@@ -42,7 +43,7 @@ class GraphiteUiScriptTesterSkillTests(unittest.TestCase):
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
         self.assertEqual(definition.llm_node_blockers, [])
         self.assertEqual(definition.permissions, ["file_write", "subprocess"])
-        self.assertTrue(definition.capability_policy.default.requires_approval)
+        self.assertFalse(definition.capability_policy.default.requires_approval)
         self.assertEqual(
             [field.key for field in definition.input_schema],
             ["files", "command"],
@@ -99,6 +100,8 @@ class GraphiteUiScriptTesterSkillTests(unittest.TestCase):
         self.assertIn("python -m pytest -q test_calculator.py", str(payload["result"]))
 
     def test_after_llm_runs_non_python_allowed_script_tests(self) -> None:
+        if shutil.which("sh") is None:
+            self.skipTest("sh is not available on this machine.")
         payload = _run_skill_script(
             SCRIPT_TESTER_AFTER_LLM_PATH,
             {

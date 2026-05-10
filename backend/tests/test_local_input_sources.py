@@ -46,7 +46,7 @@ class LocalInputSourcesTests(unittest.TestCase):
             source = workspace / "context"
             source.mkdir()
             content = "line\n" * 5000
-            (source / "large.md").write_text(content, encoding="utf-8")
+            (source / "large.md").write_bytes(content.encode("utf-8"))
 
             payload = read_local_input_text_for_prompt(str(source), "large.md", read_roots=[workspace])
 

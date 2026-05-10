@@ -244,7 +244,7 @@
     },
     "write_approval": {
       "name": "写入确认",
-      "description": "用户对是否写入 backend/data/skills/user/<skill_key>/ 的确认。",
+      "description": "用户对是否写入 skill/user/<skill_key>/ 的确认。",
       "type": "markdown",
       "value": "",
       "color": "#d97706",
@@ -1177,7 +1177,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "写入前给用户审查生成结果。generation_review 写 Markdown，包含 Skill 名称、skillKey、description、outputSchema 摘要、会写入的文件列表、目标目录 backend/data/skills/user/<skillKey>/、脚本测试 success/result 和风险提示。不要执行写入。最后明确请用户在“写入确认”中写“批准写入”或说明不要写入。",
+        "taskInstruction": "写入前给用户审查生成结果。generation_review 写 Markdown，包含 Skill 名称、skillKey、description、outputSchema 摘要、会写入的文件列表、目标目录 skill/user/<skillKey>/、脚本测试 success/result 和风险提示。不要执行写入。最后明确请用户在“写入确认”中写“批准写入”或说明不要写入。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1301,7 +1301,7 @@
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 skill.json。operation 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/skill.json。content 必须是 generated_skill_json 的格式化 JSON 文本，使用 2 空格缩进，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 skill.json。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/skill.json。content 必须是 generated_skill_json 的格式化 JSON 文本，使用 2 空格缩进，不要包 markdown 代码块。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1351,7 +1351,7 @@
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 SKILL.md。operation 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/SKILL.md。content 必须是 generated_skill_md 原文，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 SKILL.md。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/SKILL.md。content 必须是 generated_skill_md 原文，不要包 markdown 代码块。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1437,7 +1437,7 @@
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 before_llm.py。operation 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/before_llm.py。content 必须是 generated_before_llm_py 原文，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 before_llm.py。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/before_llm.py。content 必须是 generated_before_llm_py 原文，不要包 markdown 代码块。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1523,7 +1523,7 @@
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 after_llm.py。operation 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/after_llm.py。content 必须是 generated_after_llm_py 原文，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 after_llm.py。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/after_llm.py。content 必须是 generated_after_llm_py 原文，不要包 markdown 代码块。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1609,7 +1609,7 @@
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 requirements.txt。operation 必须是 write。path 必须是 backend/data/skills/user/<generated_skill_key>/requirements.txt。content 必须是 generated_requirements_txt 原文，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 requirements.txt。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/requirements.txt。content 必须是 generated_requirements_txt 原文，不要包 markdown 代码块。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1691,7 +1691,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "汇总最终结果。final_summary 写 Markdown，说明 Skill 已写入 backend/data/skills/user/<generated_skill_key>/，列出各文件写入的 success/result、脚本测试 success/result、需要用户注意的依赖或权限，以及下一步可以在 Skill 管理页启用/使用。不要声称写入了 success 为 false 或没有执行器结果确认的文件。",
+        "taskInstruction": "汇总最终结果。final_summary 写 Markdown，说明 Skill 已写入 skill/user/<generated_skill_key>/，列出各文件写入的 success/result、脚本测试 success/result、需要用户注意的依赖或权限，以及下一步可以在 Skill 管理页启用/使用。不要声称写入了 success 为 false 或没有执行器结果确认的文件。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",

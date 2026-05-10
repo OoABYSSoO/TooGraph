@@ -152,16 +152,18 @@
                       <span>{{ t("skills.policySelectable") }}</span>
                       <ElSwitch
                         :model-value="entry.policy.selectable"
-                        disabled
+                        :disabled="policyActionKey === policyActionEntryKey(selectedSkill.skillKey, entry.origin, 'selectable')"
                         :aria-label="capabilityPolicySwitchLabel(entry.origin, 'selectable')"
+                        @change="setSkillCapabilityPolicy(selectedSkill, entry.origin, 'selectable', Boolean($event))"
                       />
                     </label>
                     <label class="skills-page__policy-control">
                       <span>{{ t("skills.policyRequiresApproval") }}</span>
                       <ElSwitch
                         :model-value="entry.policy.requiresApproval"
-                        disabled
+                        :disabled="policyActionKey === policyActionEntryKey(selectedSkill.skillKey, entry.origin, 'requiresApproval')"
                         :aria-label="capabilityPolicySwitchLabel(entry.origin, 'requiresApproval')"
+                        @change="setSkillCapabilityPolicy(selectedSkill, entry.origin, 'requiresApproval', Boolean($event))"
                       />
                     </label>
                   </div>
@@ -273,6 +275,7 @@ import {
   fetchSkillFileContent,
   fetchSkillFiles,
   importSkillUpload,
+  updateSkillCapabilityPolicy,
   updateSkillStatus,
 } from "@/api/skills";
 import AppShell from "@/layouts/AppShell.vue";
@@ -295,6 +298,7 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const actionError = ref<string | null>(null);
 const actionSkillKey = ref<string | null>(null);
+const policyActionKey = ref<string | null>(null);
 const confirmingSkillDeleteKey = ref<string | null>(null);
 const importMode = ref<"archive" | "folder" | null>(null);
 const skillArchiveInput = ref<HTMLInputElement | null>(null);
@@ -375,6 +379,10 @@ function capabilityPolicySwitchLabel(origin: string, policy: "selectable" | "req
   return t(policy === "selectable" ? "skills.policySelectableSwitchLabel" : "skills.policyApprovalSwitchLabel", { origin });
 }
 
+function policyActionEntryKey(skillKey: string, origin: string, policy: "selectable" | "requiresApproval") {
+  return `${skillKey}:${origin}:${policy}`;
+}
+
 async function importUploadedSkill(event: Event, mode: "archive" | "folder") {
   const input = event.target as HTMLInputElement;
   const files = Array.from(input.files ?? []);
@@ -410,6 +418,42 @@ async function setSkillStatus(skill: SkillDefinition, status: SkillDefinition["s
     actionError.value = updateError instanceof Error ? updateError.message : t("common.loading");
   } finally {
     actionSkillKey.value = null;
+  }
+}
+
+async function setSkillCapabilityPolicy(
+  skill: SkillDefinition,
+  origin: string,
+  policy: "selectable" | "requiresApproval",
+  enabled: boolean,
+) {
+  const actionKey = policyActionEntryKey(skill.skillKey, origin, policy);
+  policyActionKey.value = actionKey;
+  actionError.value = null;
+  confirmingSkillDeleteKey.value = null;
+  const capabilityPolicy: SkillDefinition["capabilityPolicy"] = {
+    default: { ...skill.capabilityPolicy.default },
+    origins: Object.fromEntries(
+      Object.entries(skill.capabilityPolicy.origins).map(([entryOrigin, entryPolicy]) => [
+        entryOrigin,
+        { ...entryPolicy },
+      ]),
+    ),
+  };
+  if (origin === "default") {
+    capabilityPolicy.default[policy] = enabled;
+  } else {
+    capabilityPolicy.origins[origin] = {
+      ...(capabilityPolicy.origins[origin] ?? capabilityPolicy.default),
+      [policy]: enabled,
+    };
+  }
+  try {
+    replaceSkill(await updateSkillCapabilityPolicy(skill.skillKey, capabilityPolicy));
+  } catch (updateError) {
+    actionError.value = updateError instanceof Error ? updateError.message : t("common.loading");
+  } finally {
+    policyActionKey.value = null;
   }
 }
 

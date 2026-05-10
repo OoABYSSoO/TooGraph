@@ -13,8 +13,8 @@ MAX_READ_CHARS = 200_000
 MAX_OUTPUT_CHARS = 200_000
 DEFAULT_TIMEOUT_SECONDS = 30
 READ_ROOTS: list[str] | None = None
-WRITE_ROOTS = ["backend/data"]
-EXECUTE_ROOTS = ["backend/data/tmp", "backend/data/skills/user"]
+WRITE_ROOTS = ["backend/data", "skill/user", "graph_template/user", "node_preset/user"]
+EXECUTE_ROOTS = ["backend/data/tmp", "skill/user"]
 DENIED_ROOTS = [".git", ".env", "backend/data/settings"]
 EXECUTE_EXTENSIONS = {".py", ".js", ".mjs", ".sh", ".bat", ".ps1"}
 
@@ -179,7 +179,7 @@ def _repo_root() -> Path:
     configured = os.environ.get("GRAPHITE_REPO_ROOT")
     if configured:
         return Path(configured).resolve()
-    return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[3]
 
 
 def _display_path(repo_root: Path, path: Path) -> str:

@@ -353,7 +353,7 @@ function createSkillDefinition(overrides: Partial<SkillDefinition> = {}): SkillD
     llmNodeEligibility: "ready",
     llmNodeBlockers: [],
     sourceScope: "installed",
-    sourcePath: "skill/web_search/skill.json",
+    sourcePath: "skill/official/web_search/skill.json",
     runtimeReady: true,
     runtimeRegistered: true,
     status: "active",

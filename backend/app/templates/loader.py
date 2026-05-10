@@ -1,47 +1,58 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from app.core.schemas.node_system import NodeSystemCatalogStatus, NodeSystemGraphPayload, NodeSystemTemplate
-from app.core.storage.database import USER_TEMPLATE_DATA_DIR
 from app.core.storage.json_file_utils import read_json_file, write_json_file
 
 
-TEMPLATES_ROOT = Path(__file__).resolve().parent
-OFFICIAL_TEMPLATES_ROOT = TEMPLATES_ROOT / "official"
-USER_TEMPLATES_ROOT = USER_TEMPLATE_DATA_DIR
-TEMPLATE_FILE_SUFFIX = ".json"
+ROOT_DIR = Path(__file__).resolve().parents[3]
+GRAPH_TEMPLATE_ROOT = ROOT_DIR / "graph_template"
+OFFICIAL_TEMPLATES_ROOT = GRAPH_TEMPLATE_ROOT / "official"
+USER_TEMPLATES_ROOT = GRAPH_TEMPLATE_ROOT / "user"
+TEMPLATE_SETTINGS_PATH = GRAPH_TEMPLATE_ROOT / "settings.local.json"
+TEMPLATE_FILE_NAME = "template.json"
 OFFICIAL_TEMPLATE_SOURCE = "official"
 USER_TEMPLATE_SOURCE = "user"
+TEMPLATE_SETTINGS_SCHEMA_VERSION = "graphiteui.template-settings/v1"
 
 
 def list_template_records(include_disabled: bool = False) -> list[dict[str, Any]]:
     official_records = [
         load_template_record_from_path(path, source=OFFICIAL_TEMPLATE_SOURCE)
-        for path in sorted(OFFICIAL_TEMPLATES_ROOT.glob(f"*{TEMPLATE_FILE_SUFFIX}"))
+        for path in _iter_template_paths(OFFICIAL_TEMPLATES_ROOT)
     ]
     user_records = [
         load_template_record_from_path(path, source=USER_TEMPLATE_SOURCE)
-        for path in sorted(USER_TEMPLATES_ROOT.glob(f"*{TEMPLATE_FILE_SUFFIX}"))
+        for path in _iter_template_paths(USER_TEMPLATES_ROOT)
     ]
-    official_records = [record for record in official_records if not _is_internal_template(record)]
+    settings_entries = ensure_template_settings(
+        {record["template_id"]: True for record in [*official_records, *user_records]}
+    )
+    records = [
+        _with_template_status(record, settings_entries.get(record["template_id"]))
+        for record in [*official_records, *user_records]
+    ]
+    records = [record for record in records if not _is_internal_template(record)]
     if include_disabled:
-        return [*official_records, *user_records]
-    return [
-        *official_records,
-        *[record for record in user_records if record.get("status") != NodeSystemCatalogStatus.DISABLED.value],
-    ]
+        return records
+    return [record for record in records if record.get("status") != NodeSystemCatalogStatus.DISABLED.value]
 
 
 def load_template_record(template_id: str) -> dict[str, Any]:
-    official_path = OFFICIAL_TEMPLATES_ROOT / f"{template_id}{TEMPLATE_FILE_SUFFIX}"
+    official_path = _template_path(OFFICIAL_TEMPLATES_ROOT, template_id)
     if official_path.exists():
-        return load_template_record_from_path(official_path, source=OFFICIAL_TEMPLATE_SOURCE)
-    user_path = USER_TEMPLATES_ROOT / f"{template_id}{TEMPLATE_FILE_SUFFIX}"
+        record = load_template_record_from_path(official_path, source=OFFICIAL_TEMPLATE_SOURCE)
+        settings_entries = ensure_template_settings({record["template_id"]: True})
+        return _with_template_status(record, settings_entries.get(record["template_id"]))
+    user_path = _template_path(USER_TEMPLATES_ROOT, template_id)
     if user_path.exists():
-        return load_template_record_from_path(user_path, source=USER_TEMPLATE_SOURCE)
+        record = load_template_record_from_path(user_path, source=USER_TEMPLATE_SOURCE)
+        settings_entries = ensure_template_settings({record["template_id"]: True})
+        return _with_template_status(record, settings_entries.get(record["template_id"]))
     raise KeyError(template_id)
 
 
@@ -59,16 +70,21 @@ def save_user_template_record(graph_payload: NodeSystemGraphPayload) -> dict[str
             "conditional_edges": graph_payload.conditional_edges,
             "metadata": graph_payload.metadata,
         }
-    ).model_dump(by_alias=True, mode="json")
-    USER_TEMPLATES_ROOT.mkdir(parents=True, exist_ok=True)
-    write_json_file(USER_TEMPLATES_ROOT / f"{template_id}{TEMPLATE_FILE_SUFFIX}", record)
-    return _with_template_source(record, USER_TEMPLATE_SOURCE)
+    ).model_dump(by_alias=True, mode="json", exclude={"status"})
+    path = _template_path(USER_TEMPLATES_ROOT, template_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_json_file(path, record)
+    set_template_enabled(template_id, True)
+    return _with_template_status(_with_template_source(record, USER_TEMPLATE_SOURCE), {"enabled": True})
 
 
 def load_template_record_from_path(path: Path, *, source: str) -> dict[str, Any]:
     payload = read_json_file(path, default={})
     template = NodeSystemTemplate.model_validate(payload)
-    return _with_template_source(template.model_dump(by_alias=True, mode="json"), source)
+    return _with_template_source(
+        template.model_dump(by_alias=True, mode="json", exclude={"status"}),
+        source,
+    )
 
 
 def disable_user_template_record(template_id: str) -> dict[str, Any]:
@@ -81,32 +97,104 @@ def enable_user_template_record(template_id: str) -> dict[str, Any]:
 
 def set_user_template_status(template_id: str, status: NodeSystemCatalogStatus) -> dict[str, Any]:
     _ensure_user_template_is_manageable(template_id)
-    path = USER_TEMPLATES_ROOT / f"{template_id}{TEMPLATE_FILE_SUFFIX}"
-    payload = read_json_file(path, default=None)
-    if payload is None:
+    path = _template_path(USER_TEMPLATES_ROOT, template_id)
+    if not path.exists():
         raise KeyError(template_id)
-    template = NodeSystemTemplate.model_validate({**payload, "status": status.value})
-    record = template.model_dump(by_alias=True, mode="json")
-    write_json_file(path, record)
-    return _with_template_source(record, USER_TEMPLATE_SOURCE)
+    set_template_enabled(template_id, status == NodeSystemCatalogStatus.ACTIVE)
+    record = load_template_record_from_path(path, source=USER_TEMPLATE_SOURCE)
+    return _with_template_status(record, {"enabled": status == NodeSystemCatalogStatus.ACTIVE})
 
 
 def delete_user_template_record(template_id: str) -> None:
     _ensure_user_template_is_manageable(template_id)
-    path = USER_TEMPLATES_ROOT / f"{template_id}{TEMPLATE_FILE_SUFFIX}"
+    path = _template_path(USER_TEMPLATES_ROOT, template_id)
     if not path.exists():
         raise KeyError(template_id)
-    path.unlink()
+    shutil.rmtree(path.parent)
+    remove_template_settings_entry(template_id)
+
+
+def ensure_template_settings(default_enabled: dict[str, bool]) -> dict[str, dict]:
+    payload, changed = _read_template_settings_payload()
+    entries = payload["entries"]
+    for template_id, enabled in default_enabled.items():
+        entry = entries.get(template_id)
+        if not isinstance(entry, dict):
+            entries[template_id] = {"enabled": bool(enabled)}
+            changed = True
+        elif not isinstance(entry.get("enabled"), bool):
+            entry["enabled"] = bool(entry.get("enabled", enabled))
+            changed = True
+    if changed or not TEMPLATE_SETTINGS_PATH.exists():
+        write_json_file(TEMPLATE_SETTINGS_PATH, payload)
+    return entries
+
+
+def set_template_enabled(template_id: str, enabled: bool) -> None:
+    payload, changed = _read_template_settings_payload()
+    entry = payload["entries"].get(template_id)
+    if not isinstance(entry, dict):
+        entry = {}
+        changed = True
+    entry["enabled"] = bool(enabled)
+    payload["entries"][template_id] = entry
+    write_json_file(TEMPLATE_SETTINGS_PATH, payload)
+
+
+def remove_template_settings_entry(template_id: str) -> None:
+    payload, changed = _read_template_settings_payload()
+    if template_id in payload["entries"]:
+        payload["entries"].pop(template_id, None)
+        changed = True
+    if changed:
+        write_json_file(TEMPLATE_SETTINGS_PATH, payload)
+
+
+def _iter_template_paths(root: Path) -> list[Path]:
+    if not root.exists():
+        return []
+    return sorted(
+        (path / TEMPLATE_FILE_NAME for path in root.iterdir() if (path / TEMPLATE_FILE_NAME).is_file()),
+        key=lambda path: path.parent.name.lower(),
+    )
+
+
+def _template_path(root: Path, template_id: str) -> Path:
+    _validate_template_id(template_id)
+    return root / template_id / TEMPLATE_FILE_NAME
 
 
 def _ensure_user_template_is_manageable(template_id: str) -> None:
-    official_path = OFFICIAL_TEMPLATES_ROOT / f"{template_id}{TEMPLATE_FILE_SUFFIX}"
+    official_path = _template_path(OFFICIAL_TEMPLATES_ROOT, template_id)
     if official_path.exists():
         raise PermissionError("Official templates are read-only.")
 
 
 def _with_template_source(record: dict[str, Any], source: str) -> dict[str, Any]:
     return {**record, "source": source}
+
+
+def _with_template_status(record: dict[str, Any], settings_entry: object) -> dict[str, Any]:
+    enabled = True
+    if isinstance(settings_entry, dict):
+        enabled = settings_entry.get("enabled", True) is not False
+    status = NodeSystemCatalogStatus.ACTIVE if enabled else NodeSystemCatalogStatus.DISABLED
+    return {**record, "status": status.value}
+
+
+def _read_template_settings_payload() -> tuple[dict[str, object], bool]:
+    raw_payload = read_json_file(TEMPLATE_SETTINGS_PATH, default=None)
+    changed = raw_payload is None
+    payload = raw_payload if isinstance(raw_payload, dict) else {}
+    if payload.get("schemaVersion") != TEMPLATE_SETTINGS_SCHEMA_VERSION:
+        payload = {**payload, "schemaVersion": TEMPLATE_SETTINGS_SCHEMA_VERSION}
+        changed = True
+    entries = payload.get("entries")
+    if not isinstance(entries, dict):
+        entries = {}
+        changed = True
+    payload["entries"] = entries
+    return payload, changed
 
 
 def _is_internal_template(record: dict[str, Any]) -> bool:
@@ -116,3 +204,8 @@ def _is_internal_template(record: dict[str, Any]) -> bool:
 
 def _generate_user_template_id() -> str:
     return f"user_template_{uuid4().hex[:10]}"
+
+
+def _validate_template_id(template_id: str) -> None:
+    if not template_id or template_id in {".", ".."} or "/" in template_id or "\\" in template_id:
+        raise KeyError(template_id)

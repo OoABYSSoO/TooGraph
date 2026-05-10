@@ -27,8 +27,8 @@ def local_workspace_executor_before_llm(**payload: Any) -> dict[str, str]:
         "- Generate skill input fields: path, operation, and content only when operation is write.",
         "- operation must be one of: read, write, execute.",
         "- read is a pre-LLM context aid: existing repository files below are read before planning, including non-artifact files.",
-        "- write creates or overwrites one text file and is limited to backend/data.",
-        "- execute runs one script file and is limited to backend/data/tmp or backend/data/skills/user.",
+        "- write creates or overwrites one text file and is limited to backend/data, skill/user, graph_template/user, or node_preset/user.",
+        "- execute runs one script file and is limited to backend/data/tmp or skill/user.",
         "- denied roots always fail: .git, .env, backend/data/settings.",
         "- If a target path does not exist, only write can create it; read or execute will fail.",
     ]
@@ -158,7 +158,7 @@ def _repo_root() -> Path:
     configured = os.environ.get("GRAPHITE_REPO_ROOT")
     if configured:
         return Path(configured).resolve()
-    return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[3]
 
 
 def _display_path(repo_root: Path, path: Path) -> str:

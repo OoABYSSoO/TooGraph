@@ -15,7 +15,7 @@ from app.skills.definitions import _parse_native_skill_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EXECUTOR_SKILL_DIR = REPO_ROOT / "skill" / "local_workspace_executor"
+EXECUTOR_SKILL_DIR = REPO_ROOT / "skill" / "official" / "local_workspace_executor"
 EXECUTOR_MANIFEST_PATH = EXECUTOR_SKILL_DIR / "skill.json"
 EXECUTOR_BEFORE_LLM_PATH = EXECUTOR_SKILL_DIR / "before_llm.py"
 EXECUTOR_AFTER_LLM_PATH = EXECUTOR_SKILL_DIR / "after_llm.py"
@@ -44,7 +44,7 @@ class LocalWorkspaceExecutorSkillTests(unittest.TestCase):
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
         self.assertEqual(definition.llm_node_blockers, [])
         self.assertEqual(definition.permissions, ["file_read", "file_write", "subprocess"])
-        self.assertTrue(definition.capability_policy.default.requires_approval)
+        self.assertFalse(definition.capability_policy.default.requires_approval)
         self.assertEqual(
             [field.key for field in definition.input_schema],
             ["path", "operation", "content"],

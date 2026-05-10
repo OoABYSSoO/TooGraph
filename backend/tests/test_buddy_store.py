@@ -5,6 +5,7 @@ import tempfile
 import unittest
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
@@ -178,7 +179,7 @@ class BuddyStoreTests(unittest.TestCase):
             buddy_home = Path(temp_dir) / "buddy_home"
             buddy_home.mkdir()
             db_path = buddy_home / "buddy.db"
-            with sqlite3.connect(db_path) as connection:
+            with closing(sqlite3.connect(db_path)) as connection:
                 connection.executescript(
                     """
                     CREATE TABLE buddy_sessions (

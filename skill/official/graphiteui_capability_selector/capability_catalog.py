@@ -92,22 +92,23 @@ def _coerce_capability(value: Any) -> dict[str, str]:
 def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], list[str]]:
     candidates: list[dict[str, Any]] = []
     errors: list[str] = []
+    settings_entries = _load_asset_settings(repo_root / "graph_template" / "settings.local.json")
     roots = [
-        ("official", repo_root / "backend" / "app" / "templates" / "official"),
-        ("user", repo_root / "backend" / "data" / "templates" / "user"),
+        ("official", repo_root / "graph_template" / "official"),
+        ("user", repo_root / "graph_template" / "user"),
     ]
     for source, root in roots:
         if not root.exists():
             continue
-        for path in sorted(root.glob("*.json"), key=lambda item: item.name.lower()):
+        for path in sorted(root.glob(f"*/template.json"), key=lambda item: item.parent.name.lower()):
             payload, error = _read_json_object(path)
             if error:
                 errors.append(error)
                 continue
-            if source == "user" and _compact_text(payload.get("status")).lower() in {"disabled", "deleted"}:
-                continue
-            template_id = _compact_text(payload.get("template_id") or payload.get("templateId") or path.stem)
+            template_id = _compact_text(payload.get("template_id") or payload.get("templateId") or path.parent.name)
             if not template_id:
+                continue
+            if not _is_asset_enabled(settings_entries.get(template_id)):
                 continue
             if _is_template_hidden_from_capability_selector(payload):
                 continue
@@ -126,11 +127,11 @@ def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], li
 def _load_skill_candidates(repo_root: Path, *, origin: str) -> tuple[list[dict[str, Any]], list[str]]:
     candidates: list[dict[str, Any]] = []
     errors: list[str] = []
-    status_map = _load_user_skill_status_map(repo_root)
+    settings_entries = _load_asset_settings(repo_root / "skill" / "settings.local.json")
     seen_keys: set[str] = set()
     roots = [
-        ("official", repo_root / "skill"),
-        ("user", repo_root / "backend" / "data" / "skills" / "user"),
+        ("official", repo_root / "skill" / "official"),
+        ("user", repo_root / "skill" / "user"),
     ]
     for source, root in roots:
         if not root.exists():
@@ -147,9 +148,10 @@ def _load_skill_candidates(repo_root: Path, *, origin: str) -> tuple[list[dict[s
             if not skill_key or skill_key in seen_keys or skill_key == SKILL_KEY:
                 continue
             seen_keys.add(skill_key)
-            if source == "user" and status_map.get(skill_key, "active") != "active":
+            settings_entry = settings_entries.get(skill_key)
+            if not _is_asset_enabled(settings_entry):
                 continue
-            if not _is_skill_selectable_for_origin(payload.get("capabilityPolicy"), origin):
+            if not _is_skill_selectable_for_origin(settings_entry, origin):
                 continue
             if _skill_readiness_error(skill_dir, payload):
                 continue
@@ -175,17 +177,23 @@ def _read_json_object(path: Path) -> tuple[dict[str, Any], str]:
     return payload, ""
 
 
-def _load_user_skill_status_map(repo_root: Path) -> dict[str, str]:
-    path = repo_root / "backend" / "data" / "skills" / "registry_states.json"
+def _load_asset_settings(path: Path) -> dict[str, Any]:
     payload, _error = _read_json_object(path)
-    return {str(key): _compact_text(value).lower() for key, value in payload.items()}
+    entries = payload.get("entries")
+    return entries if isinstance(entries, dict) else {}
 
 
-def _is_skill_selectable_for_origin(policy_payload: Any, origin: str) -> bool:
-    if not isinstance(policy_payload, dict):
+def _is_asset_enabled(settings_entry: Any) -> bool:
+    if not isinstance(settings_entry, dict):
         return True
-    default_policy = policy_payload.get("default") if isinstance(policy_payload.get("default"), dict) else {}
-    origins = policy_payload.get("origins") if isinstance(policy_payload.get("origins"), dict) else {}
+    return settings_entry.get("enabled", True) is not False
+
+
+def _is_skill_selectable_for_origin(settings_entry: Any, origin: str) -> bool:
+    if not isinstance(settings_entry, dict):
+        return True
+    origins = settings_entry.get("origins") if isinstance(settings_entry.get("origins"), dict) else {}
+    default_policy = origins.get("default") if isinstance(origins.get("default"), dict) else {}
     origin_policy = origins.get(origin) if isinstance(origins.get(origin), dict) else {}
     selectable = origin_policy.get("selectable", default_policy.get("selectable", True))
     return bool(selectable)
@@ -215,7 +223,7 @@ def _resolve_repo_root() -> Path:
     configured = os.environ.get("GRAPHITE_REPO_ROOT")
     if configured:
         return Path(configured).expanduser().resolve()
-    return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[3]
 
 
 def _none_response() -> dict[str, Any]:

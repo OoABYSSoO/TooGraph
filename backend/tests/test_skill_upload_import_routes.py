@@ -22,7 +22,6 @@ from app.main import app
 def _native_skill_manifest(
     skill_key: str = "video_understanding",
     *,
-    capability_policy: dict[str, object] | None = None,
     runtime_entrypoint: str | None = None,
 ) -> str:
     manifest = {
@@ -32,19 +31,6 @@ def _native_skill_manifest(
         "description": "Use frame sampling rules to understand a video with image-only model capability.",
         "llmInstruction": "Prepare the skill input from bound graph state and run the skill.",
         "version": "0.1.0",
-        "capabilityPolicy": capability_policy
-        or {
-            "default": {
-                "selectable": True,
-                "requiresApproval": False,
-            },
-            "origins": {
-                "buddy": {
-                    "selectable": True,
-                    "requiresApproval": True,
-                }
-            },
-        },
         "permissions": ["model_vision", "file_read"],
         "inputSchema": [
             {
@@ -80,11 +66,6 @@ name: Uploaded Skill
 description: Imported from an uploaded archive.
 graphite:
   skill_key: {skill_key}
-  capability_policy:
-    default:
-      selectable: true
-      requiresApproval: false
-    origins: {{}}
   input_schema:
     - key: text
       name: Text
@@ -102,15 +83,22 @@ Imported skill body.
 
 
 def _patch_skill_storage(skills_dir: Path, state_dir: Path):
-    user_skills_dir = state_dir / "user"
+    official_skills_dir = skills_dir / "official"
+    user_skills_dir = skills_dir / "user"
+    settings_path = skills_dir / "settings.local.json"
     return (
-        patch("app.core.storage.skill_store.SKILLS_DIR", skills_dir),
+        patch("app.core.storage.skill_store.SKILLS_ROOT", skills_dir, create=True),
+        patch("app.core.storage.skill_store.OFFICIAL_SKILLS_DIR", official_skills_dir, create=True),
+        patch("app.core.storage.skill_store.SKILLS_DIR", official_skills_dir, create=True),
         patch("app.core.storage.skill_store.USER_SKILLS_DIR", user_skills_dir),
         patch("app.core.storage.skill_store.SKILL_STATE_DATA_DIR", state_dir),
-        patch("app.core.storage.skill_store.SKILL_STATE_PATH", state_dir / "registry_states.json"),
-        patch("app.skills.definitions.SKILLS_DIR", skills_dir),
+        patch("app.core.storage.skill_store.SKILL_SETTINGS_PATH", settings_path, create=True),
+        patch("app.core.storage.skill_store.SKILL_STATE_PATH", settings_path),
+        patch("app.skills.definitions.OFFICIAL_SKILLS_DIR", official_skills_dir, create=True),
+        patch("app.skills.definitions.SKILLS_DIR", official_skills_dir, create=True),
         patch("app.skills.definitions.USER_SKILLS_DIR", user_skills_dir),
-        patch("app.skills.registry.SKILLS_DIR", skills_dir),
+        patch("app.skills.registry.OFFICIAL_SKILLS_DIR", official_skills_dir, create=True),
+        patch("app.skills.registry.SKILLS_DIR", official_skills_dir, create=True),
         patch("app.skills.registry.USER_SKILLS_DIR", user_skills_dir),
     )
 
@@ -127,7 +115,8 @@ def _test_client_with_skill_storage(skills_dir: Path, state_dir: Path):
 def _test_client_with_skill_state(state_dir: Path):
     with ExitStack() as stack:
         stack.enter_context(patch("app.core.storage.skill_store.SKILL_STATE_DATA_DIR", state_dir))
-        stack.enter_context(patch("app.core.storage.skill_store.SKILL_STATE_PATH", state_dir / "registry_states.json"))
+        stack.enter_context(patch("app.core.storage.skill_store.SKILL_SETTINGS_PATH", state_dir / "settings.local.json", create=True))
+        stack.enter_context(patch("app.core.storage.skill_store.SKILL_STATE_PATH", state_dir / "settings.local.json"))
         stack.enter_context(patch("app.core.storage.skill_store.USER_SKILLS_DIR", state_dir / "user"))
         stack.enter_context(patch("app.skills.definitions.USER_SKILLS_DIR", state_dir / "user"))
         stack.enter_context(patch("app.skills.registry.USER_SKILLS_DIR", state_dir / "user"))
@@ -159,7 +148,7 @@ def _write_native_skill(
     *,
     runtime: bool = True,
 ) -> None:
-    skill_dir = skills_dir / skill_key
+    skill_dir = skills_dir / "official" / skill_key
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "skill.json").write_text(
         _native_skill_manifest(
@@ -205,14 +194,14 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertFalse(catalog_items["web_search"]["capabilityPolicy"]["origins"]["buddy"]["requiresApproval"])
                 self.assertTrue(catalog_items["web_search"]["runtimeReady"])
                 self.assertTrue(catalog_items["web_search"]["runtimeRegistered"])
-                self.assertTrue(source_path["web_search"].endswith("/skill/web_search/skill.json"))
+                self.assertTrue(source_path["web_search"].endswith("/skill/official/web_search/skill.json"))
                 self.assertEqual(catalog_items["graphiteUI_skill_builder"]["sourceScope"], "official")
                 self.assertFalse(catalog_items["graphiteUI_skill_builder"]["canManage"])
                 self.assertTrue(catalog_items["graphiteUI_skill_builder"]["runtimeReady"])
                 self.assertTrue(catalog_items["graphiteUI_skill_builder"]["runtimeRegistered"])
                 self.assertTrue(
                     source_path["graphiteUI_skill_builder"].endswith(
-                        "/skill/graphiteUI_skill_builder/skill.json"
+                        "/skill/official/graphiteUI_skill_builder/skill.json"
                     )
                 )
                 self.assertEqual(catalog_items["graphiteUI_script_tester"]["sourceScope"], "official")
@@ -221,7 +210,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue(catalog_items["graphiteUI_script_tester"]["runtimeRegistered"])
                 self.assertTrue(
                     source_path["graphiteUI_script_tester"].endswith(
-                        "/skill/graphiteUI_script_tester/skill.json"
+                        "/skill/official/graphiteUI_script_tester/skill.json"
                     )
                 )
                 self.assertEqual(catalog_items["local_workspace_executor"]["sourceScope"], "official")
@@ -230,10 +219,17 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue(catalog_items["local_workspace_executor"]["runtimeRegistered"])
                 self.assertTrue(
                     source_path["local_workspace_executor"].endswith(
-                        "/skill/local_workspace_executor/skill.json"
+                        "/skill/official/local_workspace_executor/skill.json"
                     )
                 )
                 self.assertNotIn("compatibility", catalog_items["web_search"])
+
+                settings_path = state_dir / "settings.local.json"
+                self.assertTrue(settings_path.exists())
+                settings_payload = json.loads(settings_path.read_text(encoding="utf-8"))
+                self.assertEqual(settings_payload["schemaVersion"], "graphiteui.skill-settings/v1")
+                self.assertIn("web_search", settings_payload["entries"])
+                self.assertTrue(settings_payload["entries"]["web_search"]["enabled"])
 
     def test_native_skill_json_upload_imports_user_skill_package(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -252,13 +248,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertNotIn("sourceFormat", payload)
                 self.assertEqual(payload["sourceScope"], "user")
                 self.assertNotIn("targets", payload)
-                self.assertEqual(
-                    payload["capabilityPolicy"]["origins"]["buddy"],
-                    {
-                        "selectable": True,
-                        "requiresApproval": True,
-                    },
-                )
+                self.assertEqual(payload["capabilityPolicy"]["origins"]["buddy"]["requiresApproval"], False)
                 self.assertEqual(payload["permissions"], ["model_vision", "file_read"])
                 self.assertNotIn("kind", payload)
                 self.assertNotIn("mode", payload)
@@ -274,9 +264,15 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(payload["llmNodeEligibility"], "needs_manifest")
                 self.assertIn("Skill manifest is missing a script runtime entrypoint.", payload["llmNodeBlockers"])
 
-                imported_path = state_dir / "user" / "video_understanding" / "skill.json"
+                imported_path = skills_dir / "user" / "video_understanding" / "skill.json"
                 self.assertTrue(imported_path.exists())
-                self.assertTrue((state_dir / "user" / "video_understanding" / "workflow.json").exists())
+                self.assertTrue((skills_dir / "user" / "video_understanding" / "workflow.json").exists())
+                self.assertNotIn("capabilityPolicy", json.loads(imported_path.read_text(encoding="utf-8")))
+
+                settings_payload = json.loads((skills_dir / "settings.local.json").read_text(encoding="utf-8"))
+                self.assertEqual(settings_payload["schemaVersion"], "graphiteui.skill-settings/v1")
+                self.assertTrue(settings_payload["entries"]["video_understanding"]["enabled"])
+                self.assertTrue(settings_payload["entries"]["video_understanding"]["origins"]["default"]["selectable"])
 
                 catalog_response = client.get("/api/skills/catalog?include_disabled=true")
                 self.assertEqual(catalog_response.status_code, 200)
@@ -310,6 +306,41 @@ class SkillUploadImportRouteTests(unittest.TestCase):
         self.assertEqual(root_children["scripts"]["type"], "directory")
         self.assertEqual(root_children["scripts"]["children"][0]["path"], "scripts/probe.py")
         self.assertTrue(root_children["scripts"]["children"][0]["previewable"])
+
+    def test_skill_policy_updates_write_local_settings_without_touching_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            skills_dir = temp_path / "skill"
+            state_dir = temp_path / "data" / "skills"
+            with _test_client_with_skill_storage(skills_dir, state_dir) as client:
+                import_response = client.post(
+                    "/api/skills/imports/upload",
+                    files=[("files", ("video_understanding.zip", _native_skill_zip_bytes(), "application/zip"))],
+                )
+                self.assertEqual(import_response.status_code, 200)
+
+                response = client.patch(
+                    "/api/skills/video_understanding/settings",
+                    json={
+                        "capabilityPolicy": {
+                            "default": {"selectable": True, "requiresApproval": False},
+                            "origins": {
+                                "buddy": {"selectable": False, "requiresApproval": True},
+                            },
+                        }
+                    },
+                )
+
+                self.assertEqual(response.status_code, 200)
+                payload = response.json()
+                self.assertFalse(payload["capabilityPolicy"]["origins"]["buddy"]["selectable"])
+                self.assertTrue(payload["capabilityPolicy"]["origins"]["buddy"]["requiresApproval"])
+
+                manifest_payload = json.loads((skills_dir / "user" / "video_understanding" / "skill.json").read_text(encoding="utf-8"))
+                self.assertNotIn("capabilityPolicy", manifest_payload)
+                settings_payload = json.loads((skills_dir / "settings.local.json").read_text(encoding="utf-8"))
+                self.assertFalse(settings_payload["entries"]["video_understanding"]["origins"]["buddy"]["selectable"])
+                self.assertTrue(settings_payload["entries"]["video_understanding"]["origins"]["buddy"]["requiresApproval"])
 
     def test_skill_file_content_reads_text_and_blocks_path_traversal(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -349,9 +380,9 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertNotIn("canImport", payload)
                 self.assertEqual(payload["sourceScope"], "user")
 
-                imported_path = state_dir / "user" / "uploaded_zip_skill" / "SKILL.md"
+                imported_path = skills_dir / "user" / "uploaded_zip_skill" / "SKILL.md"
                 self.assertTrue(imported_path.exists())
-                self.assertTrue((state_dir / "user" / "uploaded_zip_skill" / "helper.py").exists())
+                self.assertTrue((skills_dir / "user" / "uploaded_zip_skill" / "helper.py").exists())
 
                 catalog_response = client.get("/api/skills/catalog?include_disabled=true")
                 self.assertEqual(catalog_response.status_code, 200)
@@ -381,8 +412,8 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 payload = response.json()
                 self.assertEqual(payload["skillKey"], "uploaded_folder_skill")
                 self.assertEqual(payload["sourceScope"], "user")
-                self.assertTrue((state_dir / "user" / "uploaded_folder_skill" / "SKILL.md").exists())
-                self.assertTrue((state_dir / "user" / "uploaded_folder_skill" / "helper.py").exists())
+                self.assertTrue((skills_dir / "user" / "uploaded_folder_skill" / "SKILL.md").exists())
+                self.assertTrue((skills_dir / "user" / "uploaded_folder_skill" / "helper.py").exists())
 
     def test_upload_import_rejects_skill_key_that_collides_with_official_skill(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -404,10 +435,10 @@ class SkillUploadImportRouteTests(unittest.TestCase):
             temp_path = Path(temp_dir)
             skills_dir = temp_path / "skill"
             state_dir = temp_path / "data" / "skills"
-            legacy_platform_skill_dir = skills_dir / "openclaw" / "tavily-search"
+            legacy_platform_skill_dir = skills_dir / "official" / "openclaw" / "tavily-search"
             legacy_platform_skill_dir.mkdir(parents=True)
             (legacy_platform_skill_dir / "SKILL.md").write_text(_skill_markdown("tavily-search"), encoding="utf-8")
-            direct_skill_dir = skills_dir / "direct-skill"
+            direct_skill_dir = skills_dir / "official" / "direct-skill"
             direct_skill_dir.mkdir(parents=True)
             (direct_skill_dir / "SKILL.md").write_text(_skill_markdown("direct-skill"), encoding="utf-8")
 

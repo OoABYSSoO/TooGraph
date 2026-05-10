@@ -8,6 +8,7 @@ import {
   fetchSkillFiles,
   fetchSkillDefinitions,
   importSkillUpload,
+  updateSkillCapabilityPolicy,
   updateSkillStatus,
 } from "./skills.ts";
 
@@ -227,6 +228,56 @@ test("skill management helpers call status and delete endpoints", async () => {
       { url: "/api/skills/rewrite_text/disable", method: "POST", body: "null" },
       { url: "/api/skills/rewrite_text/enable", method: "POST", body: "null" },
       { url: "/api/skills/rewrite_text", method: "DELETE", body: null },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("updateSkillCapabilityPolicy patches local skill settings", async () => {
+  const requests: Array<{ url: string; method: string | undefined; body: string | null }> = [];
+
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    requests.push({
+      url: String(input),
+      method: init?.method,
+      body: typeof init?.body === "string" ? init.body : null,
+    });
+    return new Response(
+      JSON.stringify({
+        skillKey: "web_search",
+        status: "active",
+        capabilityPolicy: {
+          default: { selectable: true, requiresApproval: false },
+          origins: { buddy: { selectable: false, requiresApproval: true } },
+        },
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+  }) as typeof fetch;
+
+  try {
+    await updateSkillCapabilityPolicy("web_search", {
+      default: { selectable: true, requiresApproval: false },
+      origins: { buddy: { selectable: false, requiresApproval: true } },
+    });
+
+    assert.deepEqual(requests, [
+      {
+        url: "/api/skills/web_search/settings",
+        method: "PATCH",
+        body: JSON.stringify({
+          capabilityPolicy: {
+            default: { selectable: true, requiresApproval: false },
+            origins: { buddy: { selectable: false, requiresApproval: true } },
+          },
+        }),
+      },
     ]);
   } finally {
     globalThis.fetch = originalFetch;

@@ -5,13 +5,14 @@ import tempfile
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
-from app.core.schemas.skills import SkillDefinition, SkillFileContentResponse, SkillFileTreeResponse
+from app.core.schemas.skills import SkillDefinition, SkillFileContentResponse, SkillFileTreeResponse, SkillSettingsUpdate
 from app.core.storage.skill_store import (
     delete_skill,
     disable_skill,
     enable_skill,
     extract_skill_archive,
     import_skill_from_directory,
+    set_skill_capability_policy,
 )
 from app.skills.definitions import (
     get_skill_catalog_registry,
@@ -81,6 +82,15 @@ def enable_skill_endpoint(skill_key: str) -> SkillDefinition:
     if not definition.can_manage:
         raise HTTPException(status_code=400, detail="Import the skill into GraphiteUI before managing it.")
     enable_skill(skill_key)
+    return get_skill_catalog_registry(include_disabled=True)[skill_key]
+
+
+@router.patch("/{skill_key}/settings", response_model=SkillDefinition)
+def update_skill_settings_endpoint(skill_key: str, payload: SkillSettingsUpdate) -> SkillDefinition:
+    definition = get_skill_catalog_registry(include_disabled=True).get(skill_key)
+    if definition is None:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_key}' does not exist.")
+    set_skill_capability_policy(skill_key, payload.capability_policy)
     return get_skill_catalog_registry(include_disabled=True)[skill_key]
 
 

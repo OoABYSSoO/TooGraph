@@ -3,7 +3,6 @@
   "label": "伙伴后台复盘",
   "description": "在伙伴回复完成后后台复盘本轮对话，产出记忆与成长计划；这是内部模板，不进入能力选择清单。",
   "default_graph_name": "伙伴后台复盘",
-  "status": "active",
   "state_schema": {
     "user_message": {
       "name": "user_message",

@@ -36,13 +36,13 @@ Supported operations:
 
 - `read`: reads one UTF-8 text file and returns its content in `result`.
 - `write`: creates or overwrites one UTF-8 text file under `backend/data`.
-- `execute`: runs one script under `backend/data/tmp` or `backend/data/skills/user`.
+- `execute`: runs one script under `backend/data/tmp` or `skill/user`.
 
 Default policy:
 
 - Read roots: any path inside the GraphiteUI repository except denied roots.
 - Write roots: `backend/data`.
-- Execute roots: `backend/data/tmp`, `backend/data/skills/user`.
+- Execute roots: `backend/data/tmp`, `skill/user`.
 - Execute extensions: `.py`, `.js`, `.mjs`, `.sh`, `.bat`, `.ps1`.
 
 Execution is not an OS sandbox. It is constrained by path policy before launch, but the launched script still runs as a local process, so this skill requires approval.

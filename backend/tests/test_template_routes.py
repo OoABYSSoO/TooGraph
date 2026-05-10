@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+import json
 
 from fastapi.testclient import TestClient
 
@@ -44,18 +45,23 @@ class TemplateRouteTests(unittest.TestCase):
             user_dir = root / "user"
             official_dir.mkdir()
             user_dir.mkdir()
-            (official_dir / "advanced_web_research_loop.json").write_text(
-                __import__("json").dumps(_template_payload("advanced_web_research_loop", "Advanced Web Research")),
+            official_template_dir = official_dir / "advanced_web_research_loop"
+            user_template_dir = user_dir / "custom_research"
+            official_template_dir.mkdir()
+            user_template_dir.mkdir()
+            (official_template_dir / "template.json").write_text(
+                json.dumps(_template_payload("advanced_web_research_loop", "Advanced Web Research")),
                 encoding="utf-8",
             )
-            (user_dir / "custom_research.json").write_text(
-                __import__("json").dumps(_template_payload("custom_research", "Custom Research")),
+            (user_template_dir / "template.json").write_text(
+                json.dumps(_template_payload("custom_research", "Custom Research")),
                 encoding="utf-8",
             )
 
             with (
                 patch("app.templates.loader.OFFICIAL_TEMPLATES_ROOT", official_dir),
                 patch("app.templates.loader.USER_TEMPLATES_ROOT", user_dir),
+                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.local.json", create=True),
                 TestClient(app) as client,
             ):
                 response = client.get("/api/templates")
@@ -65,7 +71,7 @@ class TemplateRouteTests(unittest.TestCase):
             self.assertEqual([template["template_id"] for template in templates], ["advanced_web_research_loop", "custom_research"])
             self.assertEqual([template["source"] for template in templates], ["official", "user"])
 
-    def test_save_template_writes_user_template_under_backend_data(self) -> None:
+    def test_save_template_writes_user_template_under_graph_template_user_folder(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             official_dir = root / "official"
@@ -75,6 +81,7 @@ class TemplateRouteTests(unittest.TestCase):
             with (
                 patch("app.templates.loader.OFFICIAL_TEMPLATES_ROOT", official_dir),
                 patch("app.templates.loader.USER_TEMPLATES_ROOT", user_dir),
+                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.local.json", create=True),
                 TestClient(app) as client,
             ):
                 save_response = client.post("/api/templates/save", json=_graph_payload())
@@ -86,8 +93,11 @@ class TemplateRouteTests(unittest.TestCase):
             self.assertEqual(saved_payload["template"]["source"], "user")
             self.assertEqual(saved_payload["template"]["label"], "Reusable Flow")
             self.assertEqual(saved_payload["template"]["default_graph_name"], "Reusable Flow")
-            saved_path = user_dir / f"{saved_payload['template_id']}.json"
+            saved_path = user_dir / saved_payload["template_id"] / "template.json"
             self.assertTrue(saved_path.exists())
+            self.assertNotIn("status", json.loads(saved_path.read_text(encoding="utf-8")))
+            settings_payload = json.loads((root / "settings.local.json").read_text(encoding="utf-8"))
+            self.assertTrue(settings_payload["entries"][saved_payload["template_id"]]["enabled"])
             self.assertEqual(list_response.json(), [saved_payload["template"]])
 
     def test_user_templates_can_be_disabled_enabled_listed_and_deleted(self) -> None:
@@ -100,6 +110,7 @@ class TemplateRouteTests(unittest.TestCase):
             with (
                 patch("app.templates.loader.OFFICIAL_TEMPLATES_ROOT", official_dir),
                 patch("app.templates.loader.USER_TEMPLATES_ROOT", user_dir),
+                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.local.json", create=True),
                 TestClient(app) as client,
             ):
                 save_response = client.post("/api/templates/save", json=_graph_payload("Managed Template"))
@@ -113,6 +124,10 @@ class TemplateRouteTests(unittest.TestCase):
                 disabled_response = client.post(f"/api/templates/{template_id}/disable")
                 self.assertEqual(disabled_response.status_code, 200)
                 self.assertEqual(disabled_response.json()["status"], "disabled")
+                saved_path = user_dir / template_id / "template.json"
+                self.assertNotIn("status", json.loads(saved_path.read_text(encoding="utf-8")))
+                settings_payload = json.loads((root / "settings.local.json").read_text(encoding="utf-8"))
+                self.assertFalse(settings_payload["entries"][template_id]["enabled"])
 
                 active_only_response = client.get("/api/templates")
                 self.assertEqual(active_only_response.status_code, 200)
@@ -141,14 +156,17 @@ class TemplateRouteTests(unittest.TestCase):
             user_dir = root / "user"
             official_dir.mkdir()
             user_dir.mkdir()
-            (official_dir / "official_loop.json").write_text(
-                __import__("json").dumps(_template_payload("official_loop", "Official Loop")),
+            official_template_dir = official_dir / "official_loop"
+            official_template_dir.mkdir()
+            (official_template_dir / "template.json").write_text(
+                json.dumps(_template_payload("official_loop", "Official Loop")),
                 encoding="utf-8",
             )
 
             with (
                 patch("app.templates.loader.OFFICIAL_TEMPLATES_ROOT", official_dir),
                 patch("app.templates.loader.USER_TEMPLATES_ROOT", user_dir),
+                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.local.json", create=True),
                 TestClient(app) as client,
             ):
                 disable_response = client.post("/api/templates/official_loop/disable")

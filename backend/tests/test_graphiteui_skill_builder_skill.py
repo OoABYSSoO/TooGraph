@@ -13,7 +13,7 @@ from app.skills.definitions import _parse_native_skill_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-BUILDER_SKILL_DIR = REPO_ROOT / "skill" / "graphiteUI_skill_builder"
+BUILDER_SKILL_DIR = REPO_ROOT / "skill" / "official" / "graphiteUI_skill_builder"
 BUILDER_MANIFEST_PATH = BUILDER_SKILL_DIR / "skill.json"
 BUILDER_BEFORE_LLM_PATH = BUILDER_SKILL_DIR / "before_llm.py"
 BUILDER_AFTER_LLM_PATH = BUILDER_SKILL_DIR / "after_llm.py"

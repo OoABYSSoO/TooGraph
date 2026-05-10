@@ -6,18 +6,6 @@
   "llmInstruction": "你已绑定 GraphiteUI Capability Selector。Skill Pre-LLM Context 会列出当前启用且可选择的图模板和 Skill 清单，每项包含 key、名称和适用场景。你必须根据用户需求从清单中选择一个 capability 入参；优先选择图模板，其次选择 Skill；没有合适能力时选择 {\"kind\":\"none\"}。不要编造清单外能力。",
   "version": "1.0.0",
   "timeoutSeconds": 30,
-  "capabilityPolicy": {
-    "default": {
-      "selectable": true,
-      "requiresApproval": false
-    },
-    "origins": {
-      "buddy": {
-        "selectable": true,
-        "requiresApproval": false
-      }
-    }
-  },
   "permissions": ["file_read"],
   "inputSchema": [
     {

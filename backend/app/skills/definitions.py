@@ -7,7 +7,6 @@ from pathlib import Path
 import yaml
 
 from app.core.schemas.skills import (
-    SkillCapabilityPolicies,
     SkillLlmNodeEligibility,
     SkillCatalogStatus,
     SkillDefinition,
@@ -15,7 +14,13 @@ from app.core.schemas.skills import (
     SkillRuntimeSpec,
     SkillSourceScope,
 )
-from app.core.storage.skill_store import SKILLS_DIR, USER_SKILLS_DIR, get_skill_status_map
+from app.core.storage.skill_store import (
+    OFFICIAL_SKILLS_DIR,
+    USER_SKILLS_DIR,
+    build_default_skill_capability_policy,
+    ensure_skill_settings,
+    get_skill_capability_policy_from_entry,
+)
 from app.skills.runtime import has_lifecycle_after_llm, validate_script_runtime_spec
 from app.skills.registry import get_skill_registry, list_runtime_skill_keys
 
@@ -44,8 +49,12 @@ def is_llm_attachable_skill(definition: SkillDefinition) -> bool:
 def list_skill_catalog(*, include_disabled: bool = True) -> list[SkillDefinition]:
     registry_keys = set(get_skill_registry(include_disabled=include_disabled).keys())
     runtime_supported_keys = list_runtime_skill_keys()
-    status_map = get_skill_status_map()
     managed_records = {record.definition.skill_key: record for record in _load_managed_skill_records()}
+    default_policies = {
+        skill_key: build_default_skill_capability_policy(record.definition.permissions)
+        for skill_key, record in managed_records.items()
+    }
+    settings_entries = ensure_skill_settings(default_policies)
     skill_keys = sorted(managed_records)
 
     catalog: list[SkillDefinition] = []
@@ -53,17 +62,20 @@ def list_skill_catalog(*, include_disabled: bool = True) -> list[SkillDefinition
         record = managed_records.get(skill_key)
         if record is None:
             continue
-        status = (
-            SkillCatalogStatus.ACTIVE
-            if record.source_scope == SkillSourceScope.OFFICIAL
-            else status_map.get(skill_key, SkillCatalogStatus.ACTIVE)
-        )
+        settings_entry = settings_entries.get(skill_key)
+        status = SkillCatalogStatus.ACTIVE
+        if isinstance(settings_entry, dict) and settings_entry.get("enabled") is False:
+            status = SkillCatalogStatus.DISABLED
         if status == SkillCatalogStatus.DELETED:
             continue
         if status == SkillCatalogStatus.DISABLED and not include_disabled:
             continue
         runtime_registered = record.definition.skill_key in registry_keys and status == SkillCatalogStatus.ACTIVE
         runtime_ready = record.definition.skill_key in runtime_supported_keys
+        capability_policy = get_skill_capability_policy_from_entry(
+            settings_entry,
+            default_policies[skill_key],
+        )
         catalog.append(
             record.definition.model_copy(
                 deep=True,
@@ -74,6 +86,7 @@ def list_skill_catalog(*, include_disabled: bool = True) -> list[SkillDefinition
                     "runtime_registered": runtime_registered,
                     "status": status,
                     "can_manage": record.source_scope == SkillSourceScope.USER,
+                    "capability_policy": capability_policy,
                 },
             )
         )
@@ -91,7 +104,7 @@ def get_skill_catalog_registry(*, include_disabled: bool = True) -> dict[str, Sk
 def _load_managed_skill_records() -> list[SkillDefinitionRecord]:
     records: list[SkillDefinitionRecord] = []
     seen_keys: set[str] = set()
-    for skill_dir in _iter_skill_dirs(SKILLS_DIR):
+    for skill_dir in _iter_skill_dirs(OFFICIAL_SKILLS_DIR):
         record = _parse_skill_dir(skill_dir, SkillSourceScope.OFFICIAL)
         if record is None:
             continue
@@ -137,7 +150,6 @@ def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> 
         llmInstruction=str(payload.get("llmInstruction") or payload.get("llm_instruction") or "").strip(),
         schemaVersion=str(payload.get("schemaVersion") or payload.get("schema_version") or ""),
         version=str(payload.get("version") or ""),
-        capabilityPolicy=_parse_capability_policy(payload.get("capabilityPolicy") or payload.get("capability_policy")),
         permissions=[str(item) for item in payload.get("permissions", [])],
         runtime=_parse_runtime_spec(payload.get("runtime")),
         inputSchema=_parse_io_fields(payload.get("inputSchema") or payload.get("input_schema") or []),
@@ -177,7 +189,6 @@ def _parse_skill_file(path: Path, source_scope: SkillSourceScope) -> SkillDefini
         llmInstruction=str(graphite.get("llmInstruction") or graphite.get("llm_instruction") or "").strip(),
         schemaVersion=str(graphite.get("schema_version") or graphite.get("schemaVersion") or ""),
         version=str(graphite.get("version") or payload.get("version") or ""),
-        capabilityPolicy=_parse_capability_policy(graphite.get("capabilityPolicy") or graphite.get("capability_policy")),
         permissions=[str(item) for item in graphite.get("permissions", [])],
         runtime=_parse_runtime_spec(graphite.get("runtime")),
         inputSchema=input_schema,
@@ -221,20 +232,14 @@ def _parse_runtime_spec(payload: object) -> SkillRuntimeSpec:
     )
 
 
-def _parse_capability_policy(payload: object) -> SkillCapabilityPolicies:
-    if not isinstance(payload, dict):
-        return SkillCapabilityPolicies()
-    return SkillCapabilityPolicies.model_validate(payload)
-
-
 def _reject_legacy_targets(payload: object) -> None:
     if isinstance(payload, dict) and "targets" in payload:
         raise ValueError(
-            "Skill manifest field 'targets' is no longer supported. Use capabilityPolicy for capability selection policy."
+            "Skill manifest field 'targets' is no longer supported. Use skill/settings.local.json for local usage policy."
         )
     if isinstance(payload, dict) and "executionTargets" in payload:
         raise ValueError(
-            "Skill manifest field 'executionTargets' is no longer supported. Use capabilityPolicy for capability selection policy."
+            "Skill manifest field 'executionTargets' is no longer supported. Use skill/settings.local.json for local usage policy."
         )
 
 
@@ -265,15 +270,17 @@ def _reject_legacy_skill_protocol_fields(payload: object) -> None:
     if not isinstance(payload, dict):
         return
     legacy_fields = {
-        "runPolicies": "capabilityPolicy",
-        "run_policies": "capability_policy",
+        "capabilityPolicy": "skill/settings.local.json",
+        "capability_policy": "skill/settings.local.json",
+        "runPolicies": "skill/settings.local.json",
+        "run_policies": "skill/settings.local.json",
         "supportedValueTypes": "outputSchema",
         "supported_value_types": "output_schema",
         "sideEffects": "permissions",
         "side_effects": "permissions",
-        "health": "capabilityPolicy, status and runtime readiness",
-        "configured": "capabilityPolicy, status and runtime readiness",
-        "healthy": "capabilityPolicy, status and runtime readiness",
+        "health": "skill/settings.local.json and runtime readiness",
+        "configured": "skill/settings.local.json and runtime readiness",
+        "healthy": "skill/settings.local.json and runtime readiness",
         "kind": "no longer supported",
         "mode": "no longer supported",
         "scope": "no longer supported",

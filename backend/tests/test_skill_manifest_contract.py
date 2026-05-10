@@ -35,23 +35,11 @@ def _ready_manifest(skill_key: str) -> dict[str, object]:
 
 
 class SkillManifestContractTests(unittest.TestCase):
-    def test_skill_definition_payload_exposes_capability_policy_and_omits_legacy_targets(self) -> None:
+    def test_skill_definition_payload_uses_default_local_policy_shape_and_omits_legacy_targets(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             skill_dir = Path(temp_dir) / "summarize_text"
             skill_dir.mkdir()
             payload = _ready_manifest("summarize_text")
-            payload["capabilityPolicy"] = {
-                "default": {
-                    "selectable": True,
-                    "requiresApproval": False,
-                },
-                "origins": {
-                    "buddy": {
-                        "selectable": True,
-                        "requiresApproval": True,
-                    }
-                },
-            }
             manifest = _write_manifest(skill_dir, payload)
             (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
 
@@ -77,14 +65,27 @@ class SkillManifestContractTests(unittest.TestCase):
                     "selectable": True,
                     "requiresApproval": False,
                 },
-                "origins": {
-                    "buddy": {
-                        "selectable": True,
-                        "requiresApproval": True,
-                    }
-                },
+                "origins": {},
             },
         )
+
+    def test_top_level_capability_policy_field_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skill_dir = Path(temp_dir) / "legacy_capability_policy"
+            skill_dir.mkdir()
+            payload = _ready_manifest("legacy_capability_policy")
+            payload["capabilityPolicy"] = {
+                "default": {
+                    "selectable": True,
+                    "requiresApproval": False,
+                },
+                "origins": {},
+            }
+            manifest = _write_manifest(skill_dir, payload)
+            (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "capabilityPolicy.*settings.local.json"):
+                _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
 
     def test_native_manifest_exposes_runtime_and_ready_eligibility(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -163,7 +164,7 @@ class SkillManifestContractTests(unittest.TestCase):
 
     def test_legacy_skill_protocol_fields_are_rejected(self) -> None:
         legacy_fields = {
-            "runPolicies": "capabilityPolicy",
+            "runPolicies": "skill/settings.local.json",
             "supportedValueTypes": "outputSchema",
             "sideEffects": "permissions",
             "kind": "no longer supported",
@@ -182,25 +183,6 @@ class SkillManifestContractTests(unittest.TestCase):
 
                     with self.assertRaisesRegex(ValueError, f"{legacy_field}.*{replacement}"):
                         _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
-
-    def test_legacy_capability_policy_keys_are_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            skill_dir = Path(temp_dir) / "legacy_capability_policy"
-            skill_dir.mkdir()
-            payload = _ready_manifest("legacy_capability_policy")
-            payload["capabilityPolicy"] = {
-                "default": {
-                    "selectable": True,
-                    "autoSelectable": True,
-                    "requiresApproval": False,
-                },
-                "origins": {},
-            }
-            manifest = _write_manifest(skill_dir, payload)
-            (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
-
-            with self.assertRaisesRegex(ValueError, "autoSelectable"):
-                _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
 
     def test_legacy_top_level_label_field_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -246,18 +228,18 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.NEEDS_MANIFEST)
         self.assertIn("Skill manifest is missing a script runtime entrypoint.", definition.llm_node_blockers)
 
-    def test_web_search_manifest_is_ready_with_origin_capability_policy_and_network_permissions(self) -> None:
-        manifest = Path(__file__).resolve().parents[2] / "skill" / "web_search" / "skill.json"
+    def test_web_search_manifest_is_ready_without_local_policy_fields_and_with_network_permissions(self) -> None:
+        manifest = Path(__file__).resolve().parents[2] / "skill" / "official" / "web_search" / "skill.json"
 
         definition = _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED).definition
         serialized = definition.model_dump(by_alias=True)
 
         self.assertEqual(definition.skill_key, "web_search")
+        self.assertNotIn("enabled", serialized)
         self.assertNotIn("targets", serialized)
         self.assertTrue(definition.capability_policy.default.selectable)
         self.assertFalse(definition.capability_policy.default.requires_approval)
-        self.assertTrue(definition.capability_policy.origins["buddy"].selectable)
-        self.assertFalse(definition.capability_policy.origins["buddy"].requires_approval)
+        self.assertEqual(definition.capability_policy.origins, {})
         self.assertEqual(definition.runtime.type, "none")
         self.assertEqual(definition.runtime.entrypoint, "")
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
