@@ -485,6 +485,7 @@ def test_langgraph_runtime_pauses_parent_when_dynamic_subgraph_hits_inner_breakp
     assert pending["inner_node_id"] == "inner_agent"
     assert pending["subgraph_path"] == ["run_selected_subgraph"]
     assert pending["state_values"]["final_reply"] == "dynamic pause input"
+    assert pending["graph_snapshot"]["nodes"]["inner_agent"]["kind"] == "agent"
 
 
 def test_langgraph_runtime_resumes_parent_after_dynamic_subgraph_breakpoint(monkeypatch) -> None:

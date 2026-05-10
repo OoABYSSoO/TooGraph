@@ -66,4 +66,5 @@ def sync_checkpoint_metadata(
         checkpoint_metadata["checkpoint_id"] = None
         return
     checkpoint_metadata["available"] = True
-    checkpoint_metadata["checkpoint_id"] = checkpoint_tuple.config.get("configurable", {}).get("checkpoint_id")
+    checkpoint_payload = getattr(checkpoint_tuple, "checkpoint", {}) or {}
+    checkpoint_metadata["checkpoint_id"] = checkpoint_payload.get("id") or checkpoint_tuple.config.get("configurable", {}).get("checkpoint_id")

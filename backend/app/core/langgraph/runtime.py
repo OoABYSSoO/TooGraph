@@ -198,12 +198,12 @@ def execute_node_system_graph_langgraph(
             if checkpoint_saver.get_tuple(checkpoint_lookup_config) is None:
                 raise ValueError("No LangGraph checkpoint is available for this run.")
             snapshot = compiled.get_state(runtime_config)
-            resume_runtime_config: dict[str, Any] = checkpoint_lookup_config
+            resume_runtime_config: dict[str, Any] = dict(getattr(snapshot, "config", None) or runtime_config)
             if _snapshot_has_interrupt_payload(snapshot):
                 result_state = compiled.invoke(Command(resume=resume_command), config=resume_runtime_config)
             else:
                 if isinstance(resume_command, dict) and resume_command:
-                    resume_runtime_config = compiled.update_state(checkpoint_lookup_config, resume_command)
+                    resume_runtime_config = compiled.update_state(resume_runtime_config, resume_command)
                 result_state = compiled.invoke(None, config=resume_runtime_config)
         else:
             result_state = compiled.invoke(dict(state.get("state_values", {})), config=runtime_config)
@@ -783,6 +783,7 @@ def _build_pending_dynamic_subgraph_breakpoint(
         "node_status_map": dict(subgraph_state.get("node_status_map", {})),
         "node_executions": list(subgraph_state.get("node_executions", [])),
         "checkpoint_metadata": copy.deepcopy(subgraph_state.get("checkpoint_metadata", {})),
+        "graph_snapshot": subgraph_document.model_dump(by_alias=True, mode="json"),
     }
 
 

@@ -236,14 +236,20 @@ function resolveHumanReviewScope(run: RunDetail | null, document: GraphPayload |
     return { run, document, scopePath: [] };
   }
   const subgraphNode = document.nodes[subgraphNodeId];
-  if (!subgraphNode || subgraphNode.kind !== "subgraph") {
+  const pendingSubgraphName = stringFromUnknown(pending.subgraph_node_name)
+    || stringFromUnknown(pending.capability_key)
+    || subgraphNode?.name?.trim()
+    || subgraphNodeId;
+  const subgraphDocument = subgraphNode?.kind === "subgraph"
+    ? {
+        ...subgraphNode.config.graph,
+        graph_id: null,
+        name: subgraphNode.name?.trim() || subgraphNodeId,
+      }
+    : graphPayloadFromUnknown(pending.graph_snapshot, pendingSubgraphName);
+  if (!subgraphDocument) {
     return { run, document, scopePath: [] };
   }
-  const subgraphDocument: GraphPayload = {
-    ...subgraphNode.config.graph,
-    graph_id: null,
-    name: subgraphNode.name?.trim() || subgraphNodeId,
-  };
   const stateValues = recordFromUnknown(pending.state_values);
   const nodeStatusMap = stringRecordFromUnknown(pending.node_status_map);
   const nodeExecutions = Array.isArray(pending.node_executions) ? pending.node_executions : [];
@@ -266,7 +272,7 @@ function resolveHumanReviewScope(run: RunDetail | null, document: GraphPayload |
     run: scopedRun,
     document: subgraphDocument,
     scopePath: [
-      subgraphNode.name?.trim() || subgraphNodeId,
+      subgraphDocument.name?.trim() || pendingSubgraphName,
       innerNode?.name?.trim() || stringFromUnknown(pending.inner_node_name) || innerNodeId,
     ],
   };
@@ -277,6 +283,26 @@ function readPendingSubgraphBreakpoint(run: RunDetail | null) {
   return pending && typeof pending === "object" && !Array.isArray(pending)
     ? pending as Record<string, unknown>
     : null;
+}
+
+function graphPayloadFromUnknown(value: unknown, fallbackName: string): GraphPayload | null {
+  const record = recordFromUnknown(value);
+  const stateSchema = recordFromUnknown(record.state_schema);
+  const nodes = recordFromUnknown(record.nodes);
+  if (Object.keys(stateSchema).length === 0 || Object.keys(nodes).length === 0) {
+    return null;
+  }
+  return {
+    graph_id: stringFromUnknown(record.graph_id) || null,
+    name: stringFromUnknown(record.name) || fallbackName,
+    state_schema: stateSchema as GraphPayload["state_schema"],
+    nodes: nodes as GraphPayload["nodes"],
+    edges: Array.isArray(record.edges) ? record.edges as GraphPayload["edges"] : [],
+    conditional_edges: Array.isArray(record.conditional_edges)
+      ? record.conditional_edges as GraphPayload["conditional_edges"]
+      : [],
+    metadata: recordFromUnknown(record.metadata),
+  };
 }
 
 function recordFromUnknown(value: unknown): Record<string, unknown> {
