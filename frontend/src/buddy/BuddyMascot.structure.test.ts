@@ -46,6 +46,8 @@ const elevatedSparklePath =
 
 test("BuddyMascot renders the mascot as inline SVG animation parts", () => {
   assert.match(componentSource, /<svg[\s\S]*class="buddy-mascot__svg"/);
+  assert.match(componentSource, /viewBox="-320 -180 640 560"/);
+  assert.match(componentSource, /id="buddyMascotSoftness" x="-340" y="-210" width="680" height="640"/);
   assert.match(componentSource, /class="buddy-mascot__body"/);
   assert.match(componentSource, /class="buddy-mascot__tail buddy-mascot__tail-rig"/);
   assert.match(componentSource, /class="buddy-mascot__sparkle"/);
@@ -97,8 +99,8 @@ test("BuddyMascot exposes tail poses and directional part offsets without body m
   assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-left"/);
   assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--left"/);
   assert.match(componentSource, /class="buddy-mascot__body-turn"/);
-  assert.match(componentSource, /\.buddy-mascot--facing-left\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*-24px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*-120px;[\s\S]*--buddy-mascot-left-ear-x:\s*18px;[\s\S]*--buddy-mascot-right-ear-x:\s*12px;/);
-  assert.match(componentSource, /\.buddy-mascot--facing-right\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*120px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*24px;[\s\S]*--buddy-mascot-left-ear-x:\s*-12px;[\s\S]*--buddy-mascot-right-ear-x:\s*-18px;/);
+  assert.match(componentSource, /\.buddy-mascot--facing-left\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*-38px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*-114px;[\s\S]*--buddy-mascot-left-ear-x:\s*18px;[\s\S]*--buddy-mascot-right-ear-x:\s*12px;/);
+  assert.match(componentSource, /\.buddy-mascot--facing-right\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*114px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*38px;[\s\S]*--buddy-mascot-left-ear-x:\s*-12px;[\s\S]*--buddy-mascot-right-ear-x:\s*-18px;/);
   assert.match(componentSource, /\.buddy-mascot--facing-left[\s\S]*\.buddy-mascot__tail-pose--right[\s\S]*opacity:\s*1;/);
   assert.match(componentSource, /\.buddy-mascot--facing-right[\s\S]*\.buddy-mascot__tail-pose--left[\s\S]*opacity:\s*1;/);
   assert.doesNotMatch(componentSource, /\.buddy-mascot--facing-left \.buddy-mascot__body-turn/);

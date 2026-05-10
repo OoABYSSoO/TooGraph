@@ -3,7 +3,7 @@
     <svg
       class="buddy-mascot__svg"
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="-260 -180 640 560"
+      viewBox="-320 -180 640 560"
       focusable="false"
     >
       <defs>
@@ -22,7 +22,7 @@
           <stop offset="44%" stop-color="#222222" />
           <stop offset="100%" stop-color="#171818" />
         </radialGradient>
-        <filter id="buddyMascotSoftness" x="-280" y="-210" width="700" height="640" filterUnits="userSpaceOnUse">
+        <filter id="buddyMascotSoftness" x="-340" y="-210" width="680" height="640" filterUnits="userSpaceOnUse">
           <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.12" />
         </filter>
       </defs>
@@ -327,8 +327,8 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--facing-left {
-  --buddy-mascot-left-eye-facing-x: -24px;
-  --buddy-mascot-right-eye-facing-x: -120px;
+  --buddy-mascot-left-eye-facing-x: -38px;
+  --buddy-mascot-right-eye-facing-x: -114px;
   --buddy-mascot-eye-facing-y: 1px;
   --buddy-mascot-left-ear-x: 18px;
   --buddy-mascot-left-ear-y: 4px;
@@ -341,8 +341,8 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--facing-right {
-  --buddy-mascot-left-eye-facing-x: 120px;
-  --buddy-mascot-right-eye-facing-x: 24px;
+  --buddy-mascot-left-eye-facing-x: 114px;
+  --buddy-mascot-right-eye-facing-x: 38px;
   --buddy-mascot-eye-facing-y: 1px;
   --buddy-mascot-left-ear-x: -12px;
   --buddy-mascot-left-ear-y: 0px;
