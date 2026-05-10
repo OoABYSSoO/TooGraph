@@ -10,7 +10,7 @@
 - 产品心智已收束为“图才是 Agent，单个节点是 LLM 节点”。当前协议中仍存在 `agent` kind 命名，这是待迁移的内部命名；新设计不应继续把单节点描述为多轮 Agent。
 - 旧的 `buddy_agentic_tool_loop`、`buddy_chat_loop`、`web_research_loop` 等模板不再随仓库提供，也不再通过后端兼容逻辑修补。
 - 新版伙伴自主循环模板 `buddy_autonomous_loop` 已创建为官方图模板。它通过 Input 节点以本地文件夹方式注入 Buddy Home 选中文件，再通过子图串联请求理解、按需能力选择与动态执行、最终回复；简单闲聊或可直接回答的请求会绕过能力循环，output 只展示 `final_reply`。回复完成后，伙伴前端会另起内部 `buddy_self_review` 后台模板复盘本轮记忆与成长计划，不阻塞下一轮对话。
-- 当前仓库提供三个官方图模板：`advanced_web_research_loop`（高级联网搜索）、`buddy_autonomous_loop`（伙伴自主循环）和 `graphiteui_skill_creation_workflow`（创建自定义 Skill）。
+- 当前普通模板列表提供三个可见官方图模板：`advanced_web_research_loop`（高级联网搜索）、`buddy_autonomous_loop`（伙伴自主循环）和 `graphiteui_skill_creation_workflow`（创建自定义 Skill）。仓库还包含内部后台模板 `buddy_self_review`，它不进入普通模板列表和能力选择候选。
 - 技能系统已收束为统一技能库，不再区分“伙伴技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
 - 当前官方技能包包括 `buddy_home_context_reader`、`web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
@@ -155,7 +155,7 @@
 - subgraph 节点把一个 graph 模板复制为当前父图内的独立实例。模板分为 Git 管理的官方模板和 `backend/data/templates/user/` 下的用户自定义模板；前端“保存为模板”只会创建用户自定义模板。节点卡片先展示公开输入/输出胶囊，再展示紧凑的内部 DAG 缩略图、内部能力摘要和子图内部运行状态；DAG 缩略图按行优先顺序展示实际内部执行/判断节点，隐藏 `input` / `output` 边界节点，宽度未知时默认三列，并会根据节点卡片当前宽度在 `1` 到可见节点总数之间自适应列数。缩略图会展示普通连线和条件分支连线，连线路径复用主图 sequence-flow 回流线逻辑并使用缩略图尺寸参数；只有目标节点明确落到下一行时才走下方换行路径，轻微纵向偏移仍保持回流路径。节点位置和连线路径来自同一个响应式布局计算，不再照搬大画布坐标导致横向裁切或因卡片尺寸变化造成连线错位。运行时会把子图内部节点状态投射到缩略图颜色、闪烁高亮与当前节点提示上；主图和缩略图的已完成节点都使用绿色包框。双击节点会打开当前实例的工作区页签，页签内复用正式画布编辑器。子图页签的保存会回写父图中该节点的 `config.graph`，并按内部 `input` / `output` 边界重新同步父图公开 state 端口；也可以另存为普通图。画布左上工具区会显示来源胶囊，例如“来自：Untitled Graph / 节点：高级联网搜索 Subgraph”。
 - output 节点负责展示、预览、导出或链接图运行产物，不拥有隐藏持久化策略；Markdown 预览支持安全渲染标题、列表、引用、分割线、表格、链接、inline code 和带语言标签的浅色代码围栏，并保留代码块缩进与横向滚动。
 - Skills 页面围绕统一 skill catalog 展示、导入、启用、禁用和删除技能。
-- 伙伴浮窗支持模型选择和对话入口，并会以 `buddy_autonomous_loop` 作为可见伙伴运行模板。主运行完成回复后，前端会把同一次运行的 state 快照灌入内部 `buddy_self_review` 模板并作为后台 run 启动；后台复盘不占用 `activeRunId`，不锁定下一轮输入。后续重点是把暂停卡片、恢复断点、拒绝或取消运行、运行与确认视图，以及 Buddy Home 写回流程接入完整交互。
+- 伙伴浮窗支持模型选择、对话入口、后端持久化历史会话、新建会话、历史下拉、删除确认、全屏展开、markdown 回复、运行过程一行折叠摘要、节点级流式输出预览和每步耗时，并会以 `buddy_autonomous_loop` 作为可见伙伴运行模板。主运行完成回复后，前端会把同一次运行的 state 快照灌入内部 `buddy_self_review` 模板并作为后台 run 启动；后台复盘不占用 `activeRunId`，不锁定下一轮输入。后续重点是把暂停卡片、恢复断点、拒绝或取消运行、运行与确认视图，以及 Buddy Home 写回流程接入完整交互。
 
 ## 当前后端能力
 
@@ -166,13 +166,17 @@
 - LangGraph runtime 是当前运行主链。
 - 后端不再在 graph run 入口修补旧模板结构；提交什么图，就按当前协议校验和执行什么图。
 - graph run、run detail、SSE 事件、状态快照和 artifact 输出仍是审计与回放的基础。
-- `backend/app/buddy/home.py` 负责根目录 `buddy_home/` 的默认文件生成；`backend/app/buddy/store.py` 已提供基于 `SOUL.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memories、session summary、revisions 与 command 记录存取；`backend/app/buddy/commands.py` 已有命令记录入口。完整 Buddy Home 写回图流程仍未补齐。
+- `backend/app/buddy/home.py` 负责根目录 `buddy_home/` 的默认文件生成；`backend/app/buddy/store.py` 已提供基于 `SOUL.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memories、session summary、revisions、command 记录、`buddy_sessions` 和 `buddy_messages` 存取；`backend/app/buddy/commands.py` 已有命令记录入口。完整 Buddy Home 写回图流程仍未补齐。
 - `backend/app/buddy/commands.py` 仍保留 `graph_patch.draft` 草案记录 stub。这是历史遗留入口，只记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、图 revision、undo 或完整审计闭环。
 
 ## 当前仍在路线图中
 
+- 伙伴运行来源收束：官方模板已经使用 `metadata.origin=buddy`，但前端伙伴启动侧仍有 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧标记，需要清理或迁移为明确策略字段。
 - 继续收束 `subgraph` 子图体验：补齐父子图运行详情页的审计聚合、事件定位和从缩略图点击跳转到内部节点。
-- 完成更完整的图运行展示。
-- 补齐伙伴浮窗和伙伴页面的标准断点展示、恢复、拒绝、取消和刷新后找回能力。
+- 补齐动态 `capability.kind=subgraph` 的断点传播、父级暂停和恢复。
+- 补齐伙伴浮窗和伙伴页面的标准断点展示、恢复、拒绝、取消、暂停期间队列阻塞和刷新后找回能力。
+- 补齐动态能力审批：需要确认的联网、文件写入、脚本执行、图编辑、记忆写入和高风险子图运行应进入标准 `awaiting_human`，而不是只靠提示词提醒。
+- 实现统一 `activity_events`，让伙伴浮窗和运行详情页能展示文件探索、命令执行、写入行数、脚本测试等低层操作摘要。
 - 清理或按新命令流重建历史 `graph_patch.draft` stub，并完成图补丁预览、GraphCommandBus、graph revision、undo 和审计闭环。
-- 将人设、记忆、会话摘要、自我复盘和能力使用统计等长期状态更新表达为可审计的图模板流程，而不是隐藏产品逻辑。
+- 将人设、记忆、会话摘要、自我复盘报告和能力使用统计等长期状态更新表达为可审计的图模板流程，而不是隐藏产品逻辑。
+- 将内部 `agent` kind 迁移为面向用户和协议一致的 LLM 节点语义。

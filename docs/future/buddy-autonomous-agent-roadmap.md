@@ -39,6 +39,8 @@
 
 ## 当前状态
 
+本节记录截至当前仓库实现仍然成立的事实，避免后续继续按旧计划重建已经落地的能力。
+
 已经完成：
 
 - 技能系统去掉旧 `targets` / `executionTargets` 分流。
@@ -60,23 +62,39 @@
 - `capability.kind=subgraph` 已可由 LLM 节点动态执行：节点先生成目标图模板的公开输入，运行时执行子图并把公开输出封装进同一套 `result_package`。
 - 图运行前不再兼容补齐旧绑定。旧草稿、旧模板和旧技能需要按当前协议重建。
 - 已新增通用 `advanced_web_research_loop` 内置模板，用于验证“搜索技能执行 -> 证据评估 -> condition 控制补搜 -> 依据筛选 -> final_reply”的图式工具循环。它不是伙伴自主循环模板，但可作为联网研究子流程和后续伙伴模板的参考构件。
-- 偏离新职责的旧 `create_user_skill` 内置模板已删除。新的 `graphiteUI_skill_builder` 只产出 Skill 包文件内容，完整用户 Skill 生成流程仍需要补齐确认、调用 `local_workspace_executor` 写入、调用 `graphiteUI_script_tester` 或同类测试能力、修复和启用节点。
+- 偏离新职责的旧 `create_user_skill` 内置模板已删除。新的 `graphiteUI_skill_builder` 只产出 Skill 包文件内容；完整用户 Skill 生成流程已由官方 `graphiteui_skill_creation_workflow` 模板表达，写入、测试、错误修复和启用仍通过图节点和受控 Skill 分步完成。
 - 子图缩略图已能投射内部节点运行状态颜色，并在节点卡片上显示当前内部运行摘要。
 - 后端已有根目录 `buddy_home/` 的默认生成逻辑，以及基于 `SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memory、session summary、revision、command 等基础存取接口；它们应继续收束为 Buddy Home，而不是扩散到多个无关数据位置。
 - 已新增只读 `buddy_home_context_reader` Skill，但当前伙伴主循环已改为通过 Input 文件夹模式直接注入 Buddy Home 选中文件。它仍不作为动态能力候选，后续只有在确实需要读取 `buddy.db` 结构化摘要时才应作为显式支撑能力使用。
+- 官方 `buddy_autonomous_loop` 模板已创建并注册。它使用 Buddy Home 文件夹输入、请求理解子图、按需能力循环子图、最终回复子图和唯一 `final_reply` output；简单闲聊或可直接回答的请求会绕过能力循环。
+- 官方 `buddy_self_review` 模板已作为内部后台模板落地。伙伴可见回复完成后，前端会用主运行快照启动该后台 run；它只产出记忆更新计划和伙伴成长计划，不阻塞下一轮对话，也不直接写 Buddy Home。
+- 官方 `graphiteui_skill_creation_workflow` 模板已创建。它保留需求澄清、样例确认、Skill 文件生成、脚本测试、失败回环修复、写入前审查和用户 Skill 目录写入这些流程边界，并避免使用普通编辑器创建不出来的节点。
+- 伙伴浮窗已有可见运行过程面板、节点级流式输出预览、每步耗时、完成后折叠摘要、正式回复 markdown 流式展示和后台复盘解耦。
+- 伙伴历史会话已落到 Buddy Home 的 `buddy.db`：后端维护 `buddy_sessions` / `buddy_messages`，前端浮窗提供紧凑历史下拉、新建会话、删除确认和全屏展开。
 
-尚未完成：
+部分完成但仍有技术债：
 
-- 子图运行审计聚合、事件定位、从缩略图点击跳转到内部节点，以及更完整的嵌套可视化能力。
-- 工具级活动摘要事件。当前伙伴浮窗只能显示节点级运行过程和流式输出预览，还不能稳定显示类似 `Explored 7 files`、`ran 1 command`、`Editing store.py +132 -9` 的低层操作摘要。
-- 真实的 `autonomous_decision` 技能。
-- 新版伙伴自主循环模板。
-- Buddy Home 已具备基础目录结构和默认文件；能力使用统计、结构化检索索引和自我复盘报告的写回图流程尚未成形。
-- 伙伴主循环中的上下文装配、能力循环、最终回复和自我复盘等稳定能力段尚未整理为可复用子图。
-- 将内部 `agent` kind 迁移为面向用户和协议一致的 LLM 节点语义。
-- 围绕 `graphiteUI_skill_builder` 补齐用户 Skill 生成图流程：从需求澄清、示例确认、文件内容生成，到调用 `local_workspace_executor` 受控写入、调用 `graphiteUI_script_tester` 或同类测试能力、错误修复和启用。
+- 子图能力已经可运行、可编辑并可在缩略图中显示内部状态，但父子图运行详情聚合、事件定位、从缩略图点击跳转到内部节点和更完整的嵌套可视化仍未完成。
+- `graphiteui_capability_selector` 已承担“从启用模板和启用 Skill 中选择单个能力”的职责。旧的独立自主决策 Skill 目标不再保留；后续要增强的是该选择器的候选描述、审批联动和审计记录。
+- Buddy Home 已有默认目录、默认文件、会话历史、记忆、summary、revision 和 command 存储基础，但能力使用统计、结构化检索索引、自我复盘报告和长期资料写回图流程尚未成形。
+- 伙伴主循环的上下文装配、需求理解、能力循环、最终回复和后台复盘已经作为官方模板内部子图或后台模板落地；稳定后是否拆成独立官方可复用模板仍待决定。
+- 前端伙伴构图代码仍残留 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧元数据。官方模板已使用 `metadata.origin=buddy`，但启动侧还未完全收束到统一来源语义。
+- 标准 graph run 已支持 `awaiting_human`、resume API、编辑器 Human Review 和静态子图断点恢复；伙伴浮窗和伙伴页面还没有完整复用这套暂停/恢复/拒绝/取消交互。
+- 伙伴浮窗已经显示节点级运行过程，但还没有统一的低层 `activity_events`。类似 `Explored 7 files`、`ran 1 command`、`Editing store.py +132 -9` 的程序化操作摘要仍是待实现能力。
+- 内部协议仍使用 `agent` kind 表示 LLM 节点。用户界面和文档心智已改成 LLM 节点，但协议命名迁移仍未完成。
 - 当前仍残留 `backend/app/buddy/commands.py` 中的 `graph_patch.draft` 草案记录 stub。它是历史遗留入口，只能记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、graph revision、undo 或完整审计闭环；下一轮应删除它，或按新的图优先命令流重建。
-- 审批恢复 UI、图补丁预览、GraphCommandBus、graph revision、undo 和完整审计闭环。
+
+接下来要做：
+
+1. 收束伙伴运行来源：让伙伴启动图时只依赖统一 `metadata.origin=buddy` 和必要的策略字段，停止扩展 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 这类旧标记。
+2. 补齐伙伴断点交互：在伙伴浮窗和伙伴页面中展示标准暂停卡片，支持澄清、审批、拒绝、取消、恢复、刷新后找回和暂停期间队列阻塞。
+3. 补齐动态子图断点传播：`capability.kind=subgraph` 内部遇到 `interrupt_after` 时，父级 run 必须进入 `awaiting_human`，恢复仍走父 run 的标准 resume API。
+4. 补齐动态能力审批路径：需要确认的联网、文件写入、脚本执行、图编辑、记忆写入和高风险子图运行必须通过标准断点，而不是只靠提示词或前端提醒。
+5. 建立 Buddy Home 写回流程：把长期记忆、会话摘要、用户画像、人设调整、能力使用统计和自我复盘报告写回做成显式模板/受控 Skill/命令记录/revision 流程。
+6. 重建图编辑命令流：删除或重建 `graph_patch.draft` stub，补齐图补丁预览、GraphCommandBus、graph revision、undo/redo 和完整审计闭环。
+7. 实现统一 `activity_events`：由运行时、技能和文件/命令原语程序化记录低层操作摘要，并让伙伴浮窗和运行详情页复用同一渲染器。
+8. 迁移内部 `agent` kind 命名：在不引入第二套图协议的前提下，把用户可见和协议命名逐步收束为 LLM 节点语义。
+9. 补充测试覆盖：动态子图断点、伙伴暂停恢复、权限拒绝、循环上限、刷新后恢复、Buddy Home 写回、活动事件、图补丁审计和 output 只展示最终回复。
 
 ## 当前可参考模板
 
@@ -110,7 +128,7 @@ input_question
 - `exhausted` 分支表示达到循环上限后用已有证据收束，而不是失败。
 - 证据评估节点不应为了追求完美资料无限补搜。已有约 5 份可读原文并足以回答时，应进入整理阶段，并在最终回复中说明资料局限。
 
-该模板证明当前节点系统已经能表达一个“万能循环”的核心局部：工具执行、结果评估、必要时再调用工具、最后整理回复。伙伴自主循环还需要在它前面补上意图判断、技能目录检索和 `autonomous_decision`，并在它后面补上可选的人设/记忆/会话摘要写回。
+该模板证明当前节点系统已经能表达一个“万能循环”的核心局部：工具执行、结果评估、必要时再调用工具、最后整理回复。当前 `buddy_autonomous_loop` 已经在它前面补上请求理解和能力选择，在它后面补上最终回复与后台复盘入口；后续重点不是重建主循环，而是补齐审批、暂停恢复、Buddy Home 写回和低层活动审计。
 
 ## 子图组件
 
@@ -583,7 +601,7 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 - 检查或修改官方 `skill/<skill_key>/`。
 - 代替图模板中的用户确认、示例确认、设计确认和权限确认。
 
-写入、测试、错误修复和最终安装应由后续图节点通过明确的受控能力完成，而不是重新塞回这个生成 Skill。仍待补齐的是围绕该 Skill 的完整图流程，而不是把职责重新扩大到单个 Skill 内部。
+写入、测试、错误修复和最终安装应由后续图节点通过明确的受控能力完成，而不是重新塞回这个生成 Skill。当前 `graphiteui_skill_creation_workflow` 已经把这条流程表达为官方模板；后续应继续打磨运行验证、审批体验、失败回环和启用流程，而不是把职责重新扩大到单个 Skill 内部。
 
 ## Function Call 的位置
 
@@ -707,20 +725,19 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 - 恢复时仍通过父 run 的 resume API，把 resume payload 转交给内部子图 checkpoint。
 - 动态子图完成后，仍按现有 `result_package.outputs.<outputKey> = { name, description, type, value }` 封包，不额外添加 `fieldKey`。
 
-## 完整实现顺序
+## 当前实现顺序
 
-实现顺序应按依赖推进，避免先做简化版后迁移：
+当前不再需要重建伙伴主循环模板。后续应在已有 `buddy_autonomous_loop`、`buddy_self_review`、统一 Skill 运行时和 graph run 协议上继续补齐能力，优先级如下：
 
-1. 将伙伴运行来源收束为统一 `origin=buddy`，停止扩展 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧标记。
-2. 补齐动态 `capability.kind=subgraph` 的断点传播、父级暂停和恢复。
-3. 补齐动态能力审批路径：需要确认的能力必须进入标准 `awaiting_human`，不能只靠 prompt 文字提醒。
-4. 将根目录 `buddy_home/` 收束为正式 Buddy Home，使用 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json`、`buddy.db` 和 `reports/`，并把 revision/command 审计路径落到 `buddy.db`。
-5. 已完成：创建官方 `buddy_autonomous_loop` 模板，按本文完整节点职责和 state 契约搭建，并把上下文装配、需求理解、按需能力循环和最终回复整理为子图；自我复盘已拆为内部后台 `buddy_self_review` 模板。
-6. 改造伙伴浮窗，使它能展示暂停卡片、恢复断点、拒绝或取消运行，并在暂停期间阻塞队列。
-7. 改造伙伴页面，增加“运行与确认”和 Buddy Home 管理视图，复用 Human Review 与 revision 数据模型。
-8. 将记忆、资料、会话摘要、进化记录和能力使用统计写回做成模板中的显式分支和受控能力，移除隐藏产品逻辑。
-9. 完善审计展示：记录每次能力选择、选择原因、审批状态、执行结果包、循环继续原因、退出原因、Buddy Home 写入和自我复盘结论。
-10. 补充测试覆盖：模板校验、动态子图断点、伙伴暂停恢复、权限拒绝、循环上限、刷新后恢复、Buddy Home 写回和 output 只展示最终回复。
+1. 伙伴运行来源收束：清理启动侧旧元数据，让伙伴图运行统一以 `metadata.origin=buddy` 和显式策略字段表达来源、权限和审计语义。
+2. 动态子图断点传播：补齐 `capability.kind=subgraph` 内部断点的父级暂停、scope path、checkpoint metadata 和 resume 转发。
+3. 伙伴暂停交互：在伙伴浮窗与伙伴页面中复用标准 `awaiting_human` / `/api/runs/{run_id}/resume`，支持澄清、审批、拒绝、取消、刷新找回和队列阻塞。
+4. 动态能力审批：让高风险 Skill 和动态子图执行前进入标准断点确认，审批结果写回 state 并进入 run detail。
+5. Buddy Home 写回：把记忆、用户资料、会话摘要、能力使用统计、报告和策略建议写成显式图流程，通过受控 Skill、command、revision 和审批路径落地。
+6. 图编辑命令流：清理或重建 `graph_patch.draft` stub，补齐 GraphCommandBus、图补丁预览、graph revision、undo/redo 和完整审计。
+7. 低层活动事件：实现统一 `activity_events`，让文件读取、搜索、命令执行、脚本测试、写入、下载、图编辑和 Skill/subgraph 执行都能产生程序化摘要。
+8. 命名收束：将内部 `agent` kind 逐步迁移为 LLM 节点语义，避免新文档、新模板和新 UI 继续使用单节点 Agent 心智。
+9. 测试补齐：覆盖动态子图断点、伙伴暂停恢复、权限拒绝、循环上限、刷新恢复、Buddy Home 写回、活动事件、图补丁审计和最终回复唯一 output。
 
 ## 非目标
 
