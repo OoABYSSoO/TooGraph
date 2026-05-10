@@ -55,8 +55,8 @@
                 :dur="`${TAIL_CURVE_MICRO_DURATION_MS}ms`"
                 repeatCount="indefinite"
                 calcMode="spline"
-                keyTimes="0;0.34;0.68;1"
-                keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
+                keyTimes="0;0.125;0.25;0.375;0.5;0.625;0.75;0.875;1"
+                keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
                 :values="tailCurveAnimationValues"
               />
             </path>
@@ -115,7 +115,7 @@ type TailPose = (typeof TAIL_POSE_ORDER)[number];
 const TAIL_POSE_ORDER = ["right", "backRight", "backCenter", "backLeft", "left"] as const;
 const TAIL_IDLE_SWITCH_DURATION_MS = 1000;
 const TAIL_FACING_SWITCH_DURATION_MS = 320;
-const TAIL_CURVE_MICRO_DURATION_MS = 2600;
+const TAIL_CURVE_MICRO_DURATION_MS = 1800;
 const TAIL_IDLE_MIN_DWELL_MS = 5200;
 const TAIL_IDLE_MAX_DWELL_MS = 9000;
 const TAIL_KEY_SPLINE = "0.42 0 0.58 1";
@@ -148,13 +148,19 @@ const TAIL_TRANSITION_PATHS = {
 const TAIL_CURVE_MICRO_PATHS = {
   right: [
     TAIL_POSE_PATHS.right,
-    "M0 176 C62 210 96 174 150 160 C206 154 236 114 260 82 C270 66 278 60 282 62",
-    "M0 176 C44 216 112 168 154 160 C212 152 236 106 260 82 C270 66 278 60 282 62",
+    "M0 176 C72 234 98 142 158 154 C222 166 230 96 260 80 C274 64 286 54 292 58",
+    "M0 176 C56 202 112 184 160 160 C206 138 236 112 260 84 C272 70 280 66 286 68",
+    "M0 176 C70 148 124 122 174 104 C218 86 252 70 286 58 C288 58 290 58 292 58",
+    "M0 176 C34 214 124 190 154 164 C196 130 244 122 260 86 C270 72 272 58 278 54",
+    "M0 176 C24 118 122 222 164 162 C206 102 244 122 260 86 C270 72 272 58 278 54",
   ],
   left: [
     TAIL_POSE_PATHS.left,
-    "M0 176 C-62 210 -96 174 -150 160 C-206 154 -236 114 -260 82 C-270 66 -278 60 -282 62",
-    "M0 176 C-44 216 -112 168 -154 160 C-212 152 -236 106 -260 82 C-270 66 -278 60 -282 62",
+    "M0 176 C-72 234 -98 142 -158 154 C-222 166 -230 96 -260 80 C-274 64 -286 54 -292 58",
+    "M0 176 C-56 202 -112 184 -160 160 C-206 138 -236 112 -260 84 C-272 70 -280 66 -286 68",
+    "M0 176 C-70 148 -124 122 -174 104 C-218 86 -252 70 -286 58 C-288 58 -290 58 -292 58",
+    "M0 176 C-34 214 -124 190 -154 164 C-196 130 -244 122 -260 86 C-270 72 -272 58 -278 54",
+    "M0 176 C-24 118 -122 222 -164 162 C-206 102 -244 122 -260 86 C-270 72 -272 58 -278 54",
   ],
 } as const;
 
@@ -342,10 +348,10 @@ function transitionTailTo(targetSide: TailSide, durationMs = TAIL_IDLE_SWITCH_DU
 
 function resolveTailSideForFacing(facing: BuddyMascotFacing): TailSide {
   if (facing === "left") {
-    return "left";
+    return "right";
   }
   if (facing === "right") {
-    return "right";
+    return "left";
   }
   return tailSide.value;
 }
@@ -412,7 +418,8 @@ function buildTailPoseValues(route: TailPose[]) {
 }
 
 function buildTailCurveMicroValues(side: TailSide) {
-  return [...TAIL_CURVE_MICRO_PATHS[side], TAIL_CURVE_MICRO_PATHS[side][0]].join(";");
+  const route = TAIL_CURVE_MICRO_PATHS[side];
+  return [route[0], route[1], route[2], route[3], route[4], route[3], route[2], route[1], route[0]].join(";");
 }
 
 function buildTailKeyTimes(poseCount: number) {
