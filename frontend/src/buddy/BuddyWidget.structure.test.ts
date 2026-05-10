@@ -379,3 +379,24 @@ test("BuddyWidget starts self-review as a separate background run after the visi
   assert.match(componentSource, /abortBackgroundReviewRuns\(\);/);
   assert.doesNotMatch(componentSource, /activeRunId\.value = reviewRun\.run_id/);
 });
+
+test("BuddyWidget treats awaiting-human graph runs as resumable pause cards", () => {
+  assert.match(componentSource, /import \{ fetchRun, resumeRun \} from "\.\.\/api\/runs\.ts";/);
+  assert.match(componentSource, /buildHumanReviewPanelModel/);
+  assert.match(componentSource, /buildHumanReviewResumePayload/);
+  assert.match(componentSource, /const pausedBuddyRun = ref<RunDetail \| null>\(null\);/);
+  assert.match(componentSource, /const pausedBuddyAssistantMessageId = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /v-if="shouldShowPausedRunCard\(message\)"/);
+  assert.match(componentSource, /class="buddy-widget__pause-card"/);
+  assert.match(componentSource, /resumePausedBuddyRun/);
+  assert.match(componentSource, /runDetail\.status === "awaiting_human"/);
+  assert.match(componentSource, /if \(pausedBuddyRun\.value\) \{[\s\S]*break;/);
+  assert.doesNotMatch(componentSource, /void startBuddySelfReviewRun\(runDetail\);[\s\S]*runDetail\.status === "awaiting_human"/);
+});
+
+test("BuddyWidget sends composer text to the active pause instead of queueing a new turn", () => {
+  assert.match(componentSource, /if \(pausedBuddyRun\.value\) \{[\s\S]*await resumePausedBuddyRun\(userMessage\);[\s\S]*return;/);
+  assert.match(componentSource, /buildBuddyResumePayloadFromText/);
+  assert.match(componentSource, /appendRunTraceEntry\("node\.started",[\s\S]*buddy\.activity\.resuming/);
+  assert.match(componentSource, /appendRunTraceEntry\("node\.completed",[\s\S]*buddy\.activity\.resumed/);
+});

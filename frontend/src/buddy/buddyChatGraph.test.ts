@@ -626,9 +626,12 @@ test("buildBuddyChatGraph injects the current message, history, and page context
   assertInputNode(graph.nodes.input_buddy_mode);
   assert.equal(graph.nodes.input_user_message.config.value, "帮我看当前页面");
   assert.equal(graph.nodes.input_buddy_mode.config.value, "advisory");
+  assert.equal(graph.metadata.origin, "buddy");
   assert.equal(graph.metadata.buddy_mode, "advisory");
-  assert.equal(graph.metadata.buddy_permission_tier, 1);
   assert.equal(graph.metadata.buddy_can_execute_actions, false);
+  assert.equal(graph.metadata.buddy_run, undefined);
+  assert.equal(graph.metadata.buddy_permission_tier, undefined);
+  assert.equal(graph.metadata.buddy_graph_patch_drafts_enabled, undefined);
   assertAgentNode(graph.nodes.buddy_reply_agent);
   assert.equal(graph.nodes.buddy_reply_agent.config.skillKey, "");
   assert.deepEqual(graph.nodes.buddy_reply_agent.config.skillBindings, []);
@@ -643,10 +646,13 @@ test("buildBuddyChatGraph marks approval mode with a reply breakpoint", () => {
   });
 
   assert.equal(graph.state_schema[BUDDY_MODE_STATE_KEY].value, "approval");
+  assert.equal(graph.metadata.origin, "buddy");
   assert.equal(graph.metadata.buddy_mode, "approval");
-  assert.equal(graph.metadata.buddy_permission_tier, 2);
   assert.equal(graph.metadata.buddy_can_execute_actions, false);
   assert.equal(graph.metadata.buddy_requires_approval, true);
+  assert.equal(graph.metadata.buddy_run, undefined);
+  assert.equal(graph.metadata.buddy_permission_tier, undefined);
+  assert.equal(graph.metadata.buddy_graph_patch_drafts_enabled, undefined);
   assert.deepEqual(graph.metadata.interrupt_after, ["buddy_reply_agent"]);
   assert.equal(graph.metadata.agent_breakpoint_timing, undefined);
 });

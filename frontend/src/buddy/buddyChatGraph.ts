@@ -114,8 +114,8 @@ export function buildBuddyChatGraph(template: TemplateRecord, input: BuildBuddyC
     conditional_edges: cloneJson(template.conditional_edges),
     metadata: {
       ...cloneJson(template.metadata),
+      origin: "buddy",
       buddy_template_id: template.template_id,
-      buddy_run: true,
       buddy_mode: buddyMode,
       buddy_can_execute_actions: false,
     },
@@ -453,10 +453,8 @@ function enforceAdvisoryBuddyGraph(graph: GraphPayload) {
 }
 
 function applyBuddyModePolicy(graph: GraphPayload, buddyMode: BuddyMode) {
-  graph.metadata.buddy_permission_tier = buddyMode === "approval" ? 2 : 1;
   graph.metadata.buddy_can_execute_actions = false;
   graph.metadata.buddy_requires_approval = buddyMode === "approval";
-  graph.metadata.buddy_graph_patch_drafts_enabled = buddyMode === "approval";
   if (buddyMode !== "approval") {
     return;
   }

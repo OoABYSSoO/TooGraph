@@ -254,21 +254,78 @@
                 </div>
               </div>
             </section>
-            <div
-              v-if="message.role === 'assistant' && message.content"
-              class="buddy-widget__message-bubble buddy-widget__message-markdown"
-              v-html="renderBuddyMarkdown(message.content)"
-            />
-            <p
-              v-else-if="shouldShowAssistantActivityBubble(message)"
-              class="buddy-widget__message-bubble"
-              :class="{ 'buddy-widget__message-activity': !message.content && message.activityText }"
-            >
-              {{ message.activityText || t("buddy.streaming") }}
-            </p>
-            <p v-else-if="message.role === 'user'" class="buddy-widget__message-bubble">
-              {{ message.content }}
-            </p>
+            <section v-if="shouldShowPausedRunCard(message)" class="buddy-widget__pause-card">
+              <div class="buddy-widget__pause-header">
+                <div>
+                  <strong>{{ t("buddy.pause.title") }}</strong>
+                  <small v-if="pausedBuddyScopeText">{{ pausedBuddyScopeText }}</small>
+                </div>
+                <span>{{ t("status.awaitingHuman") }}</span>
+              </div>
+              <p class="buddy-widget__pause-summary">
+                {{ pausedBuddyReviewModel?.summaryText || t("buddy.pause.body") }}
+              </p>
+              <div v-if="pausedBuddyRequiredRows.length > 0" class="buddy-widget__pause-section">
+                <strong>{{ t("buddy.pause.requiredTitle") }}</strong>
+                <label
+                  v-for="row in pausedBuddyRequiredRows"
+                  :key="row.key"
+                  class="buddy-widget__pause-row buddy-widget__pause-row--editable"
+                >
+                  <span>{{ row.label }}</span>
+                  <small v-if="row.description">{{ row.description }}</small>
+                  <ElInput
+                    :model-value="resolvePausedBuddyDraft(row)"
+                    class="buddy-widget__pause-input"
+                    type="textarea"
+                    :autosize="{ minRows: 2, maxRows: 5 }"
+                    @update:model-value="setPausedBuddyDraft(row.key, $event)"
+                  />
+                </label>
+              </div>
+              <div v-if="pausedBuddyProducedRows.length > 0" class="buddy-widget__pause-section">
+                <strong>{{ t("buddy.pause.producedTitle") }}</strong>
+                <div v-for="row in pausedBuddyProducedRows" :key="row.key" class="buddy-widget__pause-row">
+                  <span>{{ row.label }}</span>
+                  <small v-if="row.description">{{ row.description }}</small>
+                  <pre>{{ row.draft || t("buddy.pause.emptyValue") }}</pre>
+                </div>
+              </div>
+              <p
+                v-if="pausedBuddyRequiredRows.length === 0 && pausedBuddyProducedRows.length === 0"
+                class="buddy-widget__pause-summary"
+              >
+                {{ t("buddy.pause.empty") }}
+              </p>
+              <div class="buddy-widget__pause-actions">
+                <ElButton
+                  size="small"
+                  type="primary"
+                  :loading="pausedBuddyResumeBusy"
+                  :disabled="isPausedBuddyResumeBlocked"
+                  @click="resumePausedBuddyRun()"
+                >
+                  {{ t("buddy.pause.continue") }}
+                </ElButton>
+              </div>
+            </section>
+            <template v-else>
+              <div
+                v-if="message.role === 'assistant' && message.content"
+                class="buddy-widget__message-bubble buddy-widget__message-markdown"
+                v-html="renderBuddyMarkdown(message.content)"
+              />
+              <p
+                v-else-if="shouldShowAssistantActivityBubble(message)"
+                class="buddy-widget__message-bubble"
+                :class="{ 'buddy-widget__message-activity': !message.content && message.activityText }"
+              >
+                {{ message.activityText || t("buddy.streaming") }}
+              </p>
+              <p v-else-if="message.role === 'user'" class="buddy-widget__message-bubble">
+                {{ message.content }}
+              </p>
+            </template>
           </article>
           </template>
           <p v-if="errorMessage" class="buddy-widget__error">{{ errorMessage }}</p>
@@ -332,6 +389,7 @@
 
 <script setup lang="ts">
 import { ArrowDown, Check, Clock, Close, Delete, FullScreen, Plus, Promotion, SemiSelect } from "@element-plus/icons-vue";
+import { ElButton, ElInput } from "element-plus";
 import { ElIcon, ElOption, ElPopover, ElSelect } from "element-plus";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -345,10 +403,16 @@ import {
   fetchBuddyChatSessions,
 } from "../api/buddy.ts";
 import { fetchTemplate, runGraph } from "../api/graphs.ts";
-import { fetchRun } from "../api/runs.ts";
+import { fetchRun, resumeRun } from "../api/runs.ts";
 import { fetchSettings } from "../api/settings.ts";
 import { fetchSkillCatalog } from "../api/skills.ts";
 import { resolveOutputPreviewContent } from "../editor/nodes/outputPreviewContentModel.ts";
+import {
+  buildHumanReviewPanelModel,
+  buildHumanReviewResumePayload,
+  type HumanReviewPanelModel,
+  type HumanReviewRow,
+} from "../editor/workspace/humanReviewPanelModel.ts";
 import { formatRunDuration } from "../lib/run-display-name.ts";
 import { buildRuntimeModelOptions } from "../lib/runtimeModelCatalog.ts";
 import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
@@ -494,6 +558,10 @@ const activeTraceMessageId = ref<string | null>(null);
 const isRunTraceExpanded = ref(false);
 const runTraceStartedAtMs = ref<number | null>(null);
 const runTraceFinishedAtMs = ref<number | null>(null);
+const pausedBuddyRun = ref<RunDetail | null>(null);
+const pausedBuddyAssistantMessageId = ref<string | null>(null);
+const pausedBuddyDraftsByKey = ref<Record<string, string>>({});
+const pausedBuddyResumeBusy = ref(false);
 const avatarElement = ref<HTMLElement | null>(null);
 const mascotLook = ref({ x: 0, y: 0 });
 const mascotMotion = ref<BuddyMascotMotion>("idle");
@@ -595,6 +663,19 @@ const runTraceHeaderText = computed(() => {
   }
   return t("buddy.runTraceLabel");
 });
+const pausedBuddyReviewModel = computed<HumanReviewPanelModel | null>(() => {
+  const run = pausedBuddyRun.value;
+  if (!run) {
+    return null;
+  }
+  return buildHumanReviewPanelModel(run, run.graph_snapshot as unknown as GraphPayload);
+});
+const pausedBuddyRequiredRows = computed(() => pausedBuddyReviewModel.value?.requiredNow ?? []);
+const pausedBuddyProducedRows = computed(() => pausedBuddyReviewModel.value?.producedRows ?? []);
+const pausedBuddyScopeText = computed(() => pausedBuddyReviewModel.value?.scopePath.join(" / ") ?? "");
+const isPausedBuddyResumeBlocked = computed(() =>
+  pausedBuddyRequiredRows.value.some((row) => !resolvePausedBuddyDraft(row).trim()),
+);
 const bubbleText = computed(() => {
   if (mood.value === "thinking" && latestActivityText.value) {
     return latestActivityText.value;
@@ -1057,7 +1138,20 @@ async function sendMessage() {
   if (!sessionId) {
     return;
   }
+  if (pausedBuddyRun.value && pausedBuddyResumeBusy.value) {
+    return;
+  }
   draft.value = "";
+
+  if (pausedBuddyRun.value) {
+    const userEntry = createMessage("user", userMessage, undefined, allocateBuddyMessageClientOrder());
+    messages.value.push(userEntry);
+    movePausedBuddyAssistantAfterMessage(userEntry.id);
+    void persistBuddyMessage(sessionId, userEntry);
+    await resumePausedBuddyRun(userMessage);
+    await scrollMessagesToBottom();
+    return;
+  }
 
   const userEntry = createMessage("user", userMessage, undefined, allocateBuddyMessageClientOrder());
   const assistantEntry = createMessage("assistant", "", undefined, allocateBuddyMessageClientOrder());
@@ -1088,6 +1182,9 @@ async function drainBuddyQueue() {
         continue;
       }
       await processQueuedTurn(nextTurn);
+      if (pausedBuddyRun.value) {
+        break;
+      }
     }
   } finally {
     isDrainingBuddyQueue = false;
@@ -1101,6 +1198,7 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
   clearSpeakingIdleTimer();
   const history = turn.history;
   const assistantMessage = ensureAssistantMessageForTurn(turn);
+  let keepRunPaused = false;
   resetRunTraceForMessage(assistantMessage.id);
   mood.value = "thinking";
   setAssistantActivityText(assistantMessage.id, t("buddy.activity.preparing"));
@@ -1129,23 +1227,12 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
     activeRunId.value = run.run_id;
     startRunEventStream(run.run_id, assistantMessage.id, graph);
     const runDetail = await pollRunUntilFinished(run.run_id, activeAbortController.signal);
-    const finalReply = resolveBuddyReplyText(runDetail);
-    const includeReplyInContext = runDetail.status !== "failed";
-    updateAssistantMessage(assistantMessage.id, finalReply || t("buddy.emptyReply"), {
-      includeInContext: includeReplyInContext,
-    });
-    void persistBuddyMessage(turn.sessionId, messages.value.find((message) => message.id === assistantMessage.id), {
-      runId: run.run_id,
-      includeInContext: includeReplyInContext,
-    });
-    void startBuddySelfReviewRun(runDetail);
-    mood.value = runDetail.status === "failed" ? "error" : "speaking";
-    if (runDetail.status === "completed") {
-      buddyContextStore.notifyBuddyDataChanged();
+    if (runDetail.status === "awaiting_human") {
+      keepRunPaused = true;
+      handleBuddyRunAwaitingHuman(runDetail, assistantMessage.id);
+      return;
     }
-    if (runDetail.status === "failed") {
-      errorMessage.value = runDetail.errors?.[0] ?? t("buddy.runFailed");
-    }
+    finishBuddyVisibleRun(runDetail, assistantMessage.id, turn.sessionId, run.run_id);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return;
@@ -1165,14 +1252,126 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
       includeInContext: false,
     });
   } finally {
-    markRunTraceFinished();
     closeEventSource();
-    activeRunId.value = null;
-    activeAbortController = null;
-    if (mood.value === "speaking" && queuedTurns.value.length === 0) {
-      scheduleSpeakingIdle();
+    if (!keepRunPaused) {
+      markRunTraceFinished();
+      activeRunId.value = null;
     }
+    activeAbortController = null;
+    scheduleBuddySpeakingIdleIfNeeded();
     await scrollMessagesToBottom();
+  }
+}
+
+async function resumePausedBuddyRun(text?: string) {
+  const run = pausedBuddyRun.value;
+  const assistantMessageId = pausedBuddyAssistantMessageId.value;
+  const sessionId = activeSessionId.value;
+  if (!run || !assistantMessageId || !sessionId || pausedBuddyResumeBusy.value) {
+    return;
+  }
+
+  clearSpeakingIdleTimer();
+  errorMessage.value = "";
+  mood.value = "thinking";
+  pausedBuddyResumeBusy.value = true;
+  appendRunTraceEntry("node.started", {
+    labelKey: "buddy.activity.resuming",
+    params: {},
+    preview: "",
+    tone: "info",
+    replaceKey: "local:resuming",
+    timingKey: "local:resuming",
+  });
+  setAssistantActivityText(assistantMessageId, t("buddy.activity.resuming"));
+
+  try {
+    const resumePayload = text?.trim()
+      ? buildBuddyResumePayloadFromText(text)
+      : buildBuddyResumePayloadFromDrafts();
+    activeAbortController = new AbortController();
+    const response = await resumeRun(run.run_id, resumePayload);
+    activeRunId.value = response.run_id;
+    appendRunTraceEntry("node.completed", {
+      labelKey: "buddy.activity.resumed",
+      params: {},
+      preview: "",
+      tone: "success",
+      replaceKey: "local:resuming",
+      timingKey: "local:resuming",
+    });
+    pausedBuddyRun.value = null;
+    pausedBuddyAssistantMessageId.value = null;
+    pausedBuddyDraftsByKey.value = {};
+    startRunEventStream(response.run_id, assistantMessageId, run.graph_snapshot as unknown as GraphPayload);
+    const resumedRunDetail = await pollRunUntilFinished(response.run_id, activeAbortController.signal);
+    if (resumedRunDetail.status === "awaiting_human") {
+      handleBuddyRunAwaitingHuman(resumedRunDetail, assistantMessageId);
+      return;
+    }
+    finishBuddyVisibleRun(resumedRunDetail, assistantMessageId, sessionId, response.run_id);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return;
+    }
+    mood.value = "error";
+    const message = error instanceof Error ? error.message : t("buddy.runFailed");
+    errorMessage.value = message;
+    appendRunTraceEntry("node.failed", {
+      labelKey: "buddy.activity.failed",
+      params: { node: t("buddy.name") },
+      preview: message,
+      tone: "error",
+      replaceKey: "local:resuming",
+      timingKey: "local:resuming",
+    });
+  } finally {
+    pausedBuddyResumeBusy.value = false;
+    closeEventSource();
+    if (!pausedBuddyRun.value) {
+      markRunTraceFinished();
+      activeRunId.value = null;
+    }
+    activeAbortController = null;
+    scheduleBuddySpeakingIdleIfNeeded();
+    await scrollMessagesToBottom();
+  }
+}
+
+function handleBuddyRunAwaitingHuman(run: RunDetail, assistantMessageId: string) {
+  pausedBuddyRun.value = run;
+  pausedBuddyAssistantMessageId.value = assistantMessageId;
+  pausedBuddyDraftsByKey.value = buildPausedBuddyDraftsByKey(run);
+  activeRunId.value = run.run_id;
+  mood.value = "thinking";
+  setAssistantActivityText(assistantMessageId, t("buddy.pause.activity"));
+  appendRunTraceEntry("node.completed", {
+    labelKey: "buddy.activity.awaitingApproval",
+    params: {},
+    preview: "",
+    tone: "info",
+    replaceKey: "local:awaiting-human",
+    timingKey: "local:awaiting-human",
+  });
+}
+
+function finishBuddyVisibleRun(runDetail: RunDetail, assistantMessageId: string, sessionId: string, runId: string) {
+  const finalReply = resolveBuddyReplyText(runDetail);
+  const includeReplyInContext = runDetail.status !== "failed";
+  updateAssistantMessage(assistantMessageId, finalReply || t("buddy.emptyReply"), {
+    includeInContext: includeReplyInContext,
+  });
+  void persistBuddyMessage(sessionId, messages.value.find((message) => message.id === assistantMessageId), {
+    runId,
+    includeInContext: includeReplyInContext,
+  });
+  void startBuddySelfReviewRun(runDetail);
+  mood.value = runDetail.status === "failed" ? "error" : "speaking";
+  if (runDetail.status === "completed") {
+    buddyContextStore.notifyBuddyDataChanged();
+  }
+  if (runDetail.status === "failed") {
+    errorMessage.value = runDetail.errors?.[0] ?? t("buddy.runFailed");
   }
 }
 
@@ -1254,6 +1453,7 @@ async function clearMessages() {
   activeAbortController?.abort();
   activeAbortController = null;
   activeRunId.value = null;
+  resetPausedBuddyPause();
   const sessionId = activeSessionId.value;
   messages.value = [];
   nextBuddyMessageClientOrder = 0;
@@ -1488,6 +1688,14 @@ function resetVisibleRunTrace() {
   runTraceStartedAtMs.value = null;
   runTraceFinishedAtMs.value = null;
   runTraceStartedAtByKey.clear();
+  resetPausedBuddyPause();
+}
+
+function resetPausedBuddyPause() {
+  pausedBuddyRun.value = null;
+  pausedBuddyAssistantMessageId.value = null;
+  pausedBuddyDraftsByKey.value = {};
+  pausedBuddyResumeBusy.value = false;
 }
 
 async function waitForChatSessionInitialization() {
@@ -1641,7 +1849,8 @@ function shouldRenderMessage(message: BuddyMessage) {
     message.role === "user" ||
     Boolean(message.content.trim()) ||
     Boolean(message.activityText?.trim()) ||
-    shouldShowRunTraceForMessage(message)
+    shouldShowRunTraceForMessage(message) ||
+    shouldShowPausedRunCard(message)
   );
 }
 
@@ -1650,7 +1859,16 @@ function shouldShowAssistantActivityBubble(message: BuddyMessage) {
     message.role === "assistant" &&
     !message.content.trim() &&
     Boolean(message.activityText?.trim()) &&
-    !shouldShowRunTraceForMessage(message)
+    !shouldShowRunTraceForMessage(message) &&
+    !shouldShowPausedRunCard(message)
+  );
+}
+
+function shouldShowPausedRunCard(message: BuddyMessage) {
+  return (
+    message.role === "assistant" &&
+    pausedBuddyRun.value?.status === "awaiting_human" &&
+    pausedBuddyAssistantMessageId.value === message.id
   );
 }
 
@@ -1749,6 +1967,78 @@ function setAssistantActivityFromRunEvent(
   setAssistantActivityText(assistantMessageId, t(activity.labelKey, activity.params));
 }
 
+function movePausedBuddyAssistantAfterMessage(messageId: string) {
+  const assistantMessageId = pausedBuddyAssistantMessageId.value;
+  if (!assistantMessageId) {
+    return;
+  }
+  const assistantIndex = messages.value.findIndex((message) => message.id === assistantMessageId);
+  if (assistantIndex < 0) {
+    return;
+  }
+  const [assistantMessage] = messages.value.splice(assistantIndex, 1);
+  const anchorIndex = messages.value.findIndex((message) => message.id === messageId);
+  assistantMessage.clientOrder = allocateBuddyMessageClientOrder();
+  messages.value.splice(anchorIndex >= 0 ? anchorIndex + 1 : messages.value.length, 0, assistantMessage);
+}
+
+function buildPausedBuddyDraftsByKey(run: RunDetail) {
+  const model = buildHumanReviewPanelModel(run, run.graph_snapshot as unknown as GraphPayload);
+  return Object.fromEntries(model.allRows.map((row) => [row.key, row.draft]));
+}
+
+function resolvePausedBuddyDraft(row: HumanReviewRow) {
+  return pausedBuddyDraftsByKey.value[row.key] ?? row.draft;
+}
+
+function setPausedBuddyDraft(key: string, value: string | number) {
+  pausedBuddyDraftsByKey.value = {
+    ...pausedBuddyDraftsByKey.value,
+    [key]: String(value ?? ""),
+  };
+}
+
+function buildBuddyResumePayloadFromDrafts() {
+  const model = pausedBuddyReviewModel.value;
+  if (!model) {
+    return {};
+  }
+  return buildHumanReviewResumePayload(model.allRows, pausedBuddyDraftsByKey.value);
+}
+
+function buildBuddyResumePayloadFromText(text: string) {
+  const model = pausedBuddyReviewModel.value;
+  if (!model) {
+    return {};
+  }
+  const targetRow = chooseBuddyResumeTextRow(model);
+  if (!targetRow) {
+    return buildBuddyResumePayloadFromDrafts();
+  }
+  const draftsByKey = {
+    ...pausedBuddyDraftsByKey.value,
+    [targetRow.key]: text.trim(),
+  };
+  return buildHumanReviewResumePayload(model.allRows, draftsByKey);
+}
+
+function chooseBuddyResumeTextRow(model: HumanReviewPanelModel): HumanReviewRow | null {
+  const emptyRequired = model.requiredNow.find((row) => !resolvePausedBuddyDraft(row).trim());
+  if (emptyRequired) {
+    return emptyRequired;
+  }
+  const firstRequired = model.requiredNow[0];
+  if (firstRequired) {
+    return firstRequired;
+  }
+  return (
+    model.allRows.find((row) => {
+      const normalizedName = `${row.key} ${row.label}`.toLowerCase();
+      return normalizedName.includes("approval") || normalizedName.includes("decision") || normalizedName.includes("answer");
+    }) ?? null
+  );
+}
+
 function buildHistoryBeforeMessage(messageId: string): BuddyChatMessage[] {
   const messageIndex = messages.value.findIndex((message) => message.id === messageId);
   const previousMessages = messageIndex >= 0 ? messages.value.slice(0, messageIndex) : messages.value;
@@ -1775,6 +2065,12 @@ function ensureAssistantMessageForTurn(turn: BuddyQueuedTurn): BuddyMessage {
   }
   messages.value.push(assistantMessage);
   return assistantMessage;
+}
+
+function scheduleBuddySpeakingIdleIfNeeded() {
+  if (mood.value === "speaking" && queuedTurns.value.length === 0) {
+    scheduleSpeakingIdle();
+  }
 }
 
 function scheduleSpeakingIdle() {
@@ -2528,6 +2824,111 @@ function formatErrorMessage(error: unknown): string {
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.buddy-widget__pause-card {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 360px);
+  padding: 12px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 251, 235, 0.82);
+  color: var(--graphite-text);
+  box-shadow: 0 12px 28px rgba(154, 52, 18, 0.09);
+}
+
+.buddy-widget__pause-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.buddy-widget__pause-header div,
+.buddy-widget__pause-section,
+.buddy-widget__pause-row {
+  display: grid;
+  gap: 4px;
+}
+
+.buddy-widget__pause-header strong,
+.buddy-widget__pause-section > strong,
+.buddy-widget__pause-row > span {
+  color: var(--graphite-text-strong);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.buddy-widget__pause-header small,
+.buddy-widget__pause-row small {
+  color: rgba(108, 82, 62, 0.72);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.buddy-widget__pause-header > span {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.14);
+  color: rgb(146, 64, 14);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.buddy-widget__pause-summary {
+  margin: 0;
+  color: rgba(70, 53, 38, 0.82);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.buddy-widget__pause-section {
+  padding-top: 2px;
+}
+
+.buddy-widget__pause-row {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.buddy-widget__pause-row pre {
+  max-height: 112px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: rgba(70, 53, 38, 0.82);
+  font-family: var(--graphite-font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.buddy-widget__pause-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.buddy-widget__pause-input :deep(.el-textarea__inner) {
+  min-height: 56px !important;
+  border-color: rgba(154, 52, 18, 0.15);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--graphite-text);
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow: none;
+}
+
+.buddy-widget__pause-input :deep(.el-textarea__inner:focus) {
+  border-color: rgba(37, 99, 235, 0.45);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
 .buddy-widget__message-markdown {
