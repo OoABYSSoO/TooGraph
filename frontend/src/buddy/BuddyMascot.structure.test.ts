@@ -124,18 +124,22 @@ test("BuddyMascot exposes tail poses and directional part offsets without body m
 
 test("BuddyMascot changes tail side after a random idle dwell instead of continuously swinging", () => {
   assert.match(componentSource, /type TailSide = "left" \| "right";/);
-  assert.match(componentSource, /const TAIL_SWITCH_DURATION_MS = 1200;/);
+  assert.match(componentSource, /const TAIL_SWITCH_DURATION_MS = 3600;/);
   assert.match(componentSource, /const TAIL_IDLE_MIN_DWELL_MS = 5200;/);
   assert.match(componentSource, /const TAIL_IDLE_MAX_DWELL_MS = 9000;/);
+  assert.match(componentSource, /import \{ computed, nextTick, onBeforeUnmount, ref, watch \} from "vue";/);
+  assert.match(componentSource, /ref="tailAnimateElement"/);
   assert.match(componentSource, /const tailBasePath = ref<string>\(TAIL_POSE_PATHS\.right\);/);
   assert.match(componentSource, /const tailSide = ref<TailSide>\("right"\);/);
   assert.match(componentSource, /const tailSwingAnimation = ref<\{ key: number; values: string \} \| null>\(null\);/);
+  assert.match(componentSource, /const tailAnimateElement = ref<SVGAnimationElement \| null>\(null\);/);
   assert.match(componentSource, /watch\(\[effectiveMood, \(\) => props\.facing, \(\) => props\.dragging\], syncTailTarget, \{ immediate: true \}\);/);
   assert.match(componentSource, /function scheduleIdleTailSideSwitch\(\)/);
   assert.match(componentSource, /randomBetween\(TAIL_IDLE_MIN_DWELL_MS, TAIL_IDLE_MAX_DWELL_MS\)/);
   assert.match(componentSource, /tailSide\.value === "right" \? "left" : "right"/);
   assert.match(componentSource, /function transitionTailTo\(targetSide: TailSide\)/);
   assert.match(componentSource, /tailSwingAnimation\.value = \{[\s\S]*key: tailAnimationKey,[\s\S]*values: buildTailTransitionValues\(tailSide\.value, targetSide\),[\s\S]*\};/);
+  assert.match(componentSource, /void nextTick\(\(\) => \{[\s\S]*tailAnimateElement\.value\?\.beginElement\(\);[\s\S]*\}\);/);
   assert.match(componentSource, /tailTransitionTimerId = window\.setTimeout\(\(\) => \{[\s\S]*tailBasePath\.value = TAIL_POSE_PATHS\[targetSide\];[\s\S]*tailSide\.value = targetSide;/);
   assert.match(componentSource, /function buildTailTransitionValues\(fromSide: TailSide, toSide: TailSide\)/);
   assert.match(componentSource, /TAIL_TRANSITION_PATHS\.rightToLeft/);

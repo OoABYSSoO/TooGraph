@@ -34,9 +34,11 @@
             :d="tailBasePath"
           >
             <animate
+              ref="tailAnimateElement"
               v-if="tailSwingAnimation"
               :key="tailSwingAnimation.key"
               attributeName="d"
+              begin="indefinite"
               :dur="`${TAIL_SWITCH_DURATION_MS}ms`"
               fill="freeze"
               calcMode="spline"
@@ -88,14 +90,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 
 type BuddyMascotMood = "idle" | "thinking" | "speaking" | "error";
 type BuddyMascotMotion = "idle" | "roam" | "hop";
 type BuddyMascotFacing = "front" | "left" | "right";
 type TailSide = "left" | "right";
 
-const TAIL_SWITCH_DURATION_MS = 1200;
+const TAIL_SWITCH_DURATION_MS = 3600;
 const TAIL_IDLE_MIN_DWELL_MS = 5200;
 const TAIL_IDLE_MAX_DWELL_MS = 9000;
 
@@ -149,6 +151,7 @@ const tapAnimating = ref(false);
 const tailBasePath = ref<string>(TAIL_POSE_PATHS.right);
 const tailSide = ref<TailSide>("right");
 const tailSwingAnimation = ref<{ key: number; values: string } | null>(null);
+const tailAnimateElement = ref<SVGAnimationElement | null>(null);
 let tapTimeoutId: number | null = null;
 let tailDwellTimerId: number | null = null;
 let tailTransitionTimerId: number | null = null;
@@ -258,6 +261,9 @@ function transitionTailTo(targetSide: TailSide) {
     key: tailAnimationKey,
     values: buildTailTransitionValues(tailSide.value, targetSide),
   };
+  void nextTick(() => {
+    tailAnimateElement.value?.beginElement();
+  });
 
   if (typeof window === "undefined") {
     tailSwingAnimation.value = null;
