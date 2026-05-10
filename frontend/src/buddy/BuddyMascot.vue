@@ -165,6 +165,7 @@ let tailAnimationKey = 0;
 let tailTransitionStartedAtMs = 0;
 let tailTransitionFromPose: TailPose = "right";
 let tailTransitionTargetSide: TailSide | null = null;
+let previousFacing: BuddyMascotFacing = props.facing;
 
 const effectiveMood = computed(() => (props.dragging ? "idle" : props.mood));
 const effectiveMotion = computed(() => (props.dragging || props.mood !== "idle" ? "idle" : props.motion));
@@ -225,10 +226,20 @@ function clearTapTimeout() {
 
 function syncTailTarget() {
   clearTailDwellTimer();
-  const targetSide = resolveTailSideForFacing(props.facing);
+  const enteredFrontFromLateral = props.facing === "front" && isLateralFacing(previousFacing);
+  const targetSide = enteredFrontFromLateral
+    ? resolveTailSideForFacing(previousFacing)
+    : resolveTailSideForFacing(props.facing);
+  const crossedLateralFacing = isOppositeSideFacing(previousFacing, props.facing);
+  previousFacing = props.facing;
 
   if (props.facing !== "front") {
-    transitionTailTo(targetSide, TAIL_FACING_SWITCH_DURATION_MS);
+    transitionTailTo(targetSide, TAIL_FACING_SWITCH_DURATION_MS, crossedLateralFacing);
+    return;
+  }
+
+  if (enteredFrontFromLateral) {
+    transitionTailTo(targetSide, TAIL_FACING_SWITCH_DURATION_MS, true);
     return;
   }
 
@@ -252,12 +263,12 @@ function scheduleIdleTailSideSwitch() {
   }, randomBetween(TAIL_IDLE_MIN_DWELL_MS, TAIL_IDLE_MAX_DWELL_MS));
 }
 
-function transitionTailTo(targetSide: TailSide, durationMs = TAIL_IDLE_SWITCH_DURATION_MS) {
+function transitionTailTo(targetSide: TailSide, durationMs = TAIL_IDLE_SWITCH_DURATION_MS, forceSwitch = false) {
   clearTailDwellTimer();
   const startPose = tailSwingAnimation.value ? estimateCurrentTailPose() : poseFromSide(tailSide.value);
   clearTailTransitionTimer();
 
-  if (targetSide === tailSide.value && startPose === poseFromSide(targetSide)) {
+  if (!forceSwitch && targetSide === tailSide.value && startPose === poseFromSide(targetSide)) {
     tailSwingAnimation.value = null;
     tailBasePath.value = TAIL_POSE_PATHS[targetSide];
     tailTransitionTargetSide = null;
@@ -310,6 +321,18 @@ function resolveTailSideForFacing(facing: BuddyMascotFacing): TailSide {
     return "left";
   }
   return tailSide.value;
+}
+
+function isOppositeSideFacing(previous: BuddyMascotFacing, next: BuddyMascotFacing) {
+  return (
+    previous === "left" && next === "right"
+  ) || (
+    previous === "right" && next === "left"
+  );
+}
+
+function isLateralFacing(facing: BuddyMascotFacing) {
+  return facing === "left" || facing === "right";
 }
 
 function buildTailTransitionValues(fromSide: TailSide, toSide: TailSide) {
@@ -501,7 +524,7 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--facing-left {
-  --buddy-mascot-tail-root-x: 6px;
+  --buddy-mascot-tail-root-x: 12px;
   --buddy-mascot-left-eye-facing-x: -70px;
   --buddy-mascot-right-eye-facing-x: -110px;
   --buddy-mascot-eye-facing-y: 1px;
@@ -516,7 +539,7 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--facing-right {
-  --buddy-mascot-tail-root-x: -6px;
+  --buddy-mascot-tail-root-x: -12px;
   --buddy-mascot-left-eye-facing-x: 110px;
   --buddy-mascot-right-eye-facing-x: 70px;
   --buddy-mascot-eye-facing-y: 1px;
