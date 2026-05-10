@@ -124,7 +124,7 @@ test("BuddyMascot exposes tail poses and directional part offsets without body m
 
 test("BuddyMascot changes tail side after a random idle dwell instead of continuously swinging", () => {
   assert.match(componentSource, /type TailSide = "left" \| "right";/);
-  assert.match(componentSource, /const TAIL_IDLE_SWITCH_DURATION_MS = 3600;/);
+  assert.match(componentSource, /const TAIL_IDLE_SWITCH_DURATION_MS = 1000;/);
   assert.match(componentSource, /const TAIL_IDLE_MIN_DWELL_MS = 5200;/);
   assert.match(componentSource, /const TAIL_IDLE_MAX_DWELL_MS = 9000;/);
   assert.match(componentSource, /import \{ computed, nextTick, onBeforeUnmount, ref, watch \} from "vue";/);
@@ -147,7 +147,7 @@ test("BuddyMascot changes tail side after a random idle dwell instead of continu
 });
 
 test("BuddyMascot accelerates tail correction when facing changes without snapping", () => {
-  assert.match(componentSource, /const TAIL_FACING_SWITCH_DURATION_MS = 720;/);
+  assert.match(componentSource, /const TAIL_FACING_SWITCH_DURATION_MS = 500;/);
   assert.match(componentSource, /:dur="`\$\{tailSwingAnimation\.durationMs\}ms`"/);
   assert.match(componentSource, /:keyTimes="tailSwingAnimation\.keyTimes"/);
   assert.match(componentSource, /:keySplines="tailSwingAnimation\.keySplines"/);

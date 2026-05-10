@@ -99,8 +99,8 @@ type TailSide = "left" | "right";
 type TailPose = (typeof TAIL_POSE_ORDER)[number];
 
 const TAIL_POSE_ORDER = ["right", "backRight", "backCenter", "backLeft", "left"] as const;
-const TAIL_IDLE_SWITCH_DURATION_MS = 3600;
-const TAIL_FACING_SWITCH_DURATION_MS = 720;
+const TAIL_IDLE_SWITCH_DURATION_MS = 1000;
+const TAIL_FACING_SWITCH_DURATION_MS = 500;
 const TAIL_IDLE_MIN_DWELL_MS = 5200;
 const TAIL_IDLE_MAX_DWELL_MS = 9000;
 const TAIL_KEY_SPLINE = "0.42 0 0.58 1";
