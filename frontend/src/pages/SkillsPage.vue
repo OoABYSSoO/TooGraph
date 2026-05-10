@@ -136,13 +136,35 @@
             <div class="skills-page__taxonomy">
               <section>
                 <h4>{{ t("skills.capabilityPolicy") }}</h4>
-                <div class="skills-page__schema-list">
-                  <span
+                <div class="skills-page__policy-grid">
+                  <div
                     v-for="entry in capabilityPolicyOriginEntries(selectedSkill)"
                     :key="entry.origin"
+                    class="skills-page__policy-row"
                   >
-                    {{ formatCapabilityPolicy(entry.origin, entry.policy) }}
-                  </span>
+                    <div class="skills-page__policy-origin">
+                      <span>{{ entry.origin }}</span>
+                      <small>
+                        {{ entry.origin === "default" ? t("skills.policyDefaultOrigin") : t("skills.policyNamedOrigin", { origin: entry.origin }) }}
+                      </small>
+                    </div>
+                    <label class="skills-page__policy-control">
+                      <span>{{ t("skills.policySelectable") }}</span>
+                      <ElSwitch
+                        :model-value="entry.policy.selectable"
+                        disabled
+                        :aria-label="capabilityPolicySwitchLabel(entry.origin, 'selectable')"
+                      />
+                    </label>
+                    <label class="skills-page__policy-control">
+                      <span>{{ t("skills.policyRequiresApproval") }}</span>
+                      <ElSwitch
+                        :model-value="entry.policy.requiresApproval"
+                        disabled
+                        :aria-label="capabilityPolicySwitchLabel(entry.origin, 'requiresApproval')"
+                      />
+                    </label>
+                  </div>
                 </div>
               </section>
               <section>
@@ -349,12 +371,8 @@ function capabilityPolicyOriginEntries(skill: SkillDefinition) {
   return listSkillCapabilityPolicies(skill);
 }
 
-function formatCapabilityPolicy(origin: string, policy: SkillDefinition["capabilityPolicy"]["default"]) {
-  return [
-    origin,
-    policy.selectable ? t("skills.policySelectable") : t("skills.policyHidden"),
-    policy.requiresApproval ? t("skills.policyRequiresApproval") : t("skills.policyNoApproval"),
-  ].join(" · ");
+function capabilityPolicySwitchLabel(origin: string, policy: "selectable" | "requiresApproval") {
+  return t(policy === "selectable" ? "skills.policySelectableSwitchLabel" : "skills.policyApprovalSwitchLabel", { origin });
 }
 
 async function importUploadedSkill(event: Event, mode: "archive" | "folder") {
@@ -856,6 +874,50 @@ onMounted(loadSkills);
   gap: 12px;
 }
 
+.skills-page__policy-grid {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.skills-page__policy-row {
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) repeat(2, minmax(118px, auto));
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(154, 52, 18, 0.08);
+  border-radius: 14px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.38);
+}
+
+.skills-page__policy-origin {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.skills-page__policy-origin span {
+  color: var(--graphite-text-strong);
+  font-family: var(--graphite-font-mono);
+  font-size: 0.84rem;
+}
+
+.skills-page__policy-origin small,
+.skills-page__policy-control span {
+  color: rgba(60, 41, 20, 0.62);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.skills-page__policy-control {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  min-width: 0;
+}
+
 .skills-page__badges span,
 .skills-page__schema-list span,
 .skills-page__file-pill {
@@ -1069,6 +1131,17 @@ onMounted(loadSkills);
   .skills-page__taxonomy,
   .skills-page__columns {
     grid-template-columns: 1fr;
+  }
+
+  .skills-page__policy-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .skills-page__policy-control {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    justify-items: stretch;
   }
 
   .skills-page__detail,

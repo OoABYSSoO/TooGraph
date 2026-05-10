@@ -68,6 +68,17 @@ test("SkillsPage surfaces Skill capability metadata without internal runtime sta
   assert.doesNotMatch(componentSource, /t\("skills\.llmNodeBlockers"\)/);
 });
 
+test("SkillsPage renders capability policy booleans as read-only Element Plus switches", () => {
+  assert.match(componentSource, /class="skills-page__policy-grid"/);
+  assert.match(componentSource, /class="skills-page__policy-row"/);
+  assert.match(componentSource, /class="skills-page__policy-control"/);
+  assert.match(componentSource, /<ElSwitch[\s\S]*:model-value="entry\.policy\.selectable"[\s\S]*disabled/);
+  assert.match(componentSource, /<ElSwitch[\s\S]*:model-value="entry\.policy\.requiresApproval"[\s\S]*disabled/);
+  assert.match(componentSource, /capabilityPolicySwitchLabel\(entry\.origin, ['"]selectable['"]\)/);
+  assert.match(componentSource, /capabilityPolicySwitchLabel\(entry\.origin, ['"]requiresApproval['"]\)/);
+  assert.doesNotMatch(componentSource, /formatCapabilityPolicy/);
+});
+
 test("SkillsPage exposes upload, status, and delete management actions with local button styling", () => {
   assert.match(componentSource, /const confirmingSkillDeleteKey = ref<string \| null>\(null\);/);
   assert.match(componentSource, /async function setSkillEnabled/);
