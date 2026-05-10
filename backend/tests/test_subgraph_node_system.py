@@ -126,6 +126,35 @@ def _dynamic_passthrough_template() -> dict:
     }
 
 
+def _dynamic_breakpoint_template() -> dict:
+    template = _dynamic_passthrough_template()
+    template["template_id"] = "dynamic_breakpoint_subgraph"
+    template["label"] = "Dynamic Breakpoint Subgraph"
+    template["default_graph_name"] = "Dynamic Breakpoint Subgraph"
+    template["nodes"]["inner_agent"] = {
+        "kind": "agent",
+        "name": "Inner Agent",
+        "description": "",
+        "ui": {"position": {"x": 120, "y": 0}},
+        "reads": [{"state": "final_reply", "required": True}],
+        "writes": [{"state": "final_reply", "mode": "replace"}],
+        "config": {
+            "skillKey": "",
+            "taskInstruction": "",
+            "modelSource": "global",
+            "model": "",
+            "thinkingMode": "on",
+            "temperature": 0.2,
+        },
+    }
+    template["edges"] = [
+        {"source": "inner_input", "target": "inner_agent"},
+        {"source": "inner_agent", "target": "inner_output"},
+    ]
+    template["metadata"] = {"interrupt_after": ["inner_agent"]}
+    return template
+
+
 def _parent_graph_payload(*, subgraph_reads: list[dict], subgraph_writes: list[dict]) -> dict:
     return {
         "graph_id": "graph_subgraph_runtime",
@@ -367,6 +396,192 @@ def test_langgraph_runtime_publishes_subgraph_event_context(monkeypatch) -> None
     ]
     assert inner_status_events
     assert inner_status_events[0]["subgraph_path"] == ["nested_research"]
+
+
+def test_langgraph_runtime_pauses_parent_when_dynamic_subgraph_hits_inner_breakpoint(monkeypatch) -> None:
+    import app.core.langgraph.runtime as runtime_module
+    import app.core.runtime.node_system_executor as executor_module
+
+    original_execute_node = runtime_module._execute_node
+
+    def execute_node_without_llm(graph, node_name, node, input_values, state, **kwargs):
+        if node_name == "inner_agent":
+            return {
+                "outputs": {"final_reply": input_values["final_reply"]},
+                "final_result": input_values["final_reply"],
+            }
+        return original_execute_node(graph, node_name, node, input_values, state, **kwargs)
+
+    template = _dynamic_breakpoint_template()
+    monkeypatch.setattr(runtime_module, "save_run", lambda _state: None)
+    monkeypatch.setattr(runtime_module, "_execute_node", execute_node_without_llm)
+    monkeypatch.setattr(runtime_module, "load_template_record", lambda template_key: template)
+    monkeypatch.setattr(executor_module, "load_template_record", lambda template_key: template)
+    monkeypatch.setattr(
+        executor_module,
+        "_generate_agent_subgraph_inputs",
+        lambda **kwargs: (
+            {"dynamic_breakpoint_subgraph": {"final_reply": "dynamic pause input"}},
+            "planned subgraph inputs",
+            [],
+            kwargs["runtime_config"],
+        ),
+    )
+
+    graph = NodeSystemGraphDocument.model_validate(
+        {
+            "graph_id": "graph_dynamic_subgraph_breakpoint",
+            "name": "Dynamic Subgraph Breakpoint",
+            "state_schema": {
+                "selected_capability": {"type": "capability", "value": {"kind": "subgraph", "key": "dynamic_breakpoint_subgraph"}},
+                "requirement": {"type": "text", "value": "run a pausing subgraph"},
+                "dynamic_result": {"type": "result_package"},
+            },
+            "nodes": {
+                "capability_input": {
+                    "kind": "input",
+                    "ui": {"position": {"x": 0, "y": 0}},
+                    "writes": [{"state": "selected_capability"}],
+                    "config": {"value": {"kind": "subgraph", "key": "dynamic_breakpoint_subgraph"}},
+                },
+                "requirement_input": {
+                    "kind": "input",
+                    "ui": {"position": {"x": 0, "y": 180}},
+                    "writes": [{"state": "requirement"}],
+                    "config": {"value": "run a pausing subgraph"},
+                },
+                "run_selected_subgraph": {
+                    "kind": "agent",
+                    "ui": {"position": {"x": 320, "y": 80}},
+                    "reads": [{"state": "selected_capability"}, {"state": "requirement"}],
+                    "writes": [{"state": "dynamic_result"}],
+                    "config": {"skillKey": ""},
+                },
+                "result_output": {
+                    "kind": "output",
+                    "ui": {"position": {"x": 640, "y": 80}},
+                    "reads": [{"state": "dynamic_result"}],
+                },
+            },
+            "edges": [
+                {"source": "capability_input", "target": "run_selected_subgraph"},
+                {"source": "requirement_input", "target": "run_selected_subgraph"},
+                {"source": "run_selected_subgraph", "target": "result_output"},
+            ],
+            "conditional_edges": [],
+        }
+    )
+
+    result = execute_node_system_graph_langgraph(graph)
+
+    assert result["status"] == "awaiting_human"
+    assert result["current_node_id"] == "run_selected_subgraph"
+    assert result["node_status_map"]["run_selected_subgraph"] == "paused"
+    assert result["subgraph_status_map"]["run_selected_subgraph"]["inner_agent"] == "paused"
+    pending = result["metadata"]["pending_subgraph_breakpoint"]
+    assert pending["subgraph_node_id"] == "run_selected_subgraph"
+    assert pending["capability_kind"] == "subgraph"
+    assert pending["capability_key"] == "dynamic_breakpoint_subgraph"
+    assert pending["inner_node_id"] == "inner_agent"
+    assert pending["subgraph_path"] == ["run_selected_subgraph"]
+    assert pending["state_values"]["final_reply"] == "dynamic pause input"
+
+
+def test_langgraph_runtime_resumes_parent_after_dynamic_subgraph_breakpoint(monkeypatch) -> None:
+    import app.core.langgraph.runtime as runtime_module
+    import app.core.runtime.node_system_executor as executor_module
+
+    original_execute_node = runtime_module._execute_node
+    planned_inputs_calls = 0
+
+    def execute_node_without_llm(graph, node_name, node, input_values, state, **kwargs):
+        if node_name == "inner_agent":
+            return {
+                "outputs": {"final_reply": input_values["final_reply"]},
+                "final_result": input_values["final_reply"],
+            }
+        return original_execute_node(graph, node_name, node, input_values, state, **kwargs)
+
+    def generate_subgraph_inputs(**kwargs):
+        nonlocal planned_inputs_calls
+        planned_inputs_calls += 1
+        return (
+            {"dynamic_breakpoint_subgraph": {"final_reply": "dynamic pause input"}},
+            "planned subgraph inputs",
+            [],
+            kwargs["runtime_config"],
+        )
+
+    template = _dynamic_breakpoint_template()
+    monkeypatch.setattr(runtime_module, "save_run", lambda _state: None)
+    monkeypatch.setattr(runtime_module, "_execute_node", execute_node_without_llm)
+    monkeypatch.setattr(runtime_module, "load_template_record", lambda template_key: template)
+    monkeypatch.setattr(executor_module, "load_template_record", lambda template_key: template)
+    monkeypatch.setattr(executor_module, "_generate_agent_subgraph_inputs", generate_subgraph_inputs)
+
+    graph = NodeSystemGraphDocument.model_validate(
+        {
+            "graph_id": "graph_dynamic_subgraph_breakpoint_resume",
+            "name": "Dynamic Subgraph Breakpoint Resume",
+            "state_schema": {
+                "selected_capability": {"type": "capability", "value": {"kind": "subgraph", "key": "dynamic_breakpoint_subgraph"}},
+                "requirement": {"type": "text", "value": "resume a pausing subgraph"},
+                "dynamic_result": {"type": "result_package"},
+            },
+            "nodes": {
+                "capability_input": {
+                    "kind": "input",
+                    "ui": {"position": {"x": 0, "y": 0}},
+                    "writes": [{"state": "selected_capability"}],
+                    "config": {"value": {"kind": "subgraph", "key": "dynamic_breakpoint_subgraph"}},
+                },
+                "requirement_input": {
+                    "kind": "input",
+                    "ui": {"position": {"x": 0, "y": 180}},
+                    "writes": [{"state": "requirement"}],
+                    "config": {"value": "resume a pausing subgraph"},
+                },
+                "run_selected_subgraph": {
+                    "kind": "agent",
+                    "ui": {"position": {"x": 320, "y": 80}},
+                    "reads": [{"state": "selected_capability"}, {"state": "requirement"}],
+                    "writes": [{"state": "dynamic_result"}],
+                    "config": {"skillKey": ""},
+                },
+                "result_output": {
+                    "kind": "output",
+                    "ui": {"position": {"x": 640, "y": 80}},
+                    "reads": [{"state": "dynamic_result"}],
+                },
+            },
+            "edges": [
+                {"source": "capability_input", "target": "run_selected_subgraph"},
+                {"source": "requirement_input", "target": "run_selected_subgraph"},
+                {"source": "run_selected_subgraph", "target": "result_output"},
+            ],
+            "conditional_edges": [],
+        }
+    )
+    paused = execute_node_system_graph_langgraph(graph)
+    assert paused["status"] == "awaiting_human"
+    paused["metadata"]["pending_subgraph_resume_payload"] = {}
+
+    resumed = execute_node_system_graph_langgraph(
+        graph,
+        paused,
+        resume_from_checkpoint=True,
+        resume_command=None,
+    )
+
+    assert resumed["status"] == "completed"
+    assert planned_inputs_calls == 1
+    assert "pending_subgraph_breakpoint" not in resumed["metadata"]
+    package = resumed["state_values"]["dynamic_result"]
+    assert package["kind"] == "result_package"
+    assert package["sourceType"] == "subgraph"
+    assert package["sourceKey"] == "dynamic_breakpoint_subgraph"
+    assert package["inputs"] == {"final_reply": "dynamic pause input"}
+    assert package["outputs"]["final_reply"]["value"] == "dynamic pause input"
 
 
 def test_langgraph_runtime_runs_dynamic_subgraph_capability_and_packages_outputs(monkeypatch) -> None:

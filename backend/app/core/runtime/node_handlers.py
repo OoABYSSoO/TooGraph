@@ -87,6 +87,24 @@ def execute_condition_node(
     }
 
 
+def _pending_dynamic_subgraph_breakpoint(
+    state: dict[str, Any],
+    node_name: str,
+    subgraph_keys: list[str],
+) -> dict[str, Any] | None:
+    pending = state.get("metadata", {}).get("pending_subgraph_breakpoint")
+    if not isinstance(pending, dict):
+        return None
+    if str(pending.get("subgraph_node_id") or "") != node_name:
+        return None
+    if str(pending.get("capability_kind") or "") != "subgraph":
+        return None
+    pending_key = str(pending.get("capability_key") or "").strip()
+    if not pending_key or pending_key not in subgraph_keys:
+        return None
+    return pending
+
+
 def execute_agent_node(
     state_schema: dict[str, NodeSystemStateDefinition],
     node: NodeSystemAgentNode,
@@ -252,7 +270,12 @@ def execute_agent_node(
     ]
     generated_subgraph_inputs: dict[str, dict[str, Any]] = {}
     subgraph_input_reasoning = ""
-    if subgraph_definitions:
+    pending_dynamic_subgraph = _pending_dynamic_subgraph_breakpoint(state, node_name, subgraph_keys)
+    if pending_dynamic_subgraph:
+        pending_key = str(pending_dynamic_subgraph.get("capability_key") or "").strip()
+        generated_subgraph_inputs[pending_key] = dict(pending_dynamic_subgraph.get("subgraph_inputs") or {})
+        subgraph_input_reasoning = "Resuming pending dynamic subgraph breakpoint."
+    elif subgraph_definitions:
         generated_subgraph_inputs, subgraph_input_reasoning, subgraph_input_warnings, runtime_config = (
             generate_agent_subgraph_inputs_func(
                 node=node,
@@ -291,6 +314,23 @@ def execute_agent_node(
                 state=state,
             )
         duration_ms = int(execution_result.get("duration_ms") or int((perf_counter() - started_at) * 1000))
+        if execution_result.get("awaiting_human"):
+            warnings.extend(str(warning) for warning in execution_result.get("warnings", []) if str(warning))
+            return {
+                "outputs": {},
+                "awaiting_human": True,
+                "pending_subgraph_breakpoint": execution_result.get("pending_subgraph_breakpoint"),
+                "subgraph": execution_result.get("subgraph"),
+                "skill_input_reasoning": skill_input_reasoning,
+                "subgraph_input_reasoning": subgraph_input_reasoning,
+                "selected_skills": selected_skills,
+                "selected_capabilities": [{"kind": "subgraph", "key": subgraph_key}],
+                "skill_outputs": skill_outputs,
+                "capability_outputs": [],
+                "runtime_config": runtime_config,
+                "warnings": list(dict.fromkeys(warnings)),
+                "final_result": "",
+            }
         status = _compact_text(execution_result.get("status")) or "succeeded"
         error = _compact_text(execution_result.get("error"))
         error_type = _compact_text(execution_result.get("error_type"))
