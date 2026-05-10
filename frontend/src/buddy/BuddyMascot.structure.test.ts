@@ -200,11 +200,11 @@ test("BuddyMascot keeps speaking body motion visibly distinct", () => {
   assert.match(componentSource, /@keyframes buddy-mascot-speaking-body[\s\S]*scaleX\(1\.06\) scaleY\(0\.95\)[\s\S]*scaleX\(0\.96\) scaleY\(1\.05\)/);
 });
 
-test("BuddyMascot makes idle tail and ear motion visible without changing body scale", () => {
-  assert.match(componentSource, /\.buddy-mascot--idle[\s\S]*\.buddy-mascot__tail[\s\S]*animation:\s*buddy-mascot-tail-sway 3\.2s ease-in-out infinite;/);
+test("BuddyMascot makes idle tail motion subtle so path morphing carries the expression", () => {
+  assert.match(componentSource, /\.buddy-mascot--idle[\s\S]*\.buddy-mascot__tail[\s\S]*animation:\s*buddy-mascot-tail-sway 5\.6s ease-in-out infinite;/);
   assert.match(componentSource, /\.buddy-mascot--idle[\s\S]*\.buddy-mascot__left-ear[\s\S]*animation:\s*buddy-mascot-ear-idle-left 4\.2s ease-in-out infinite;/);
   assert.match(componentSource, /\.buddy-mascot--idle[\s\S]*\.buddy-mascot__right-ear[\s\S]*animation:\s*buddy-mascot-ear-idle-right 4\.2s ease-in-out infinite;/);
-  assert.match(componentSource, /@keyframes buddy-mascot-tail-sway[\s\S]*rotate\(-7deg\)[\s\S]*rotate\(15deg\)/);
+  assert.match(componentSource, /@keyframes buddy-mascot-tail-sway[\s\S]*rotate\(-2deg\)[\s\S]*rotate\(4deg\)/);
   assert.match(componentSource, /@keyframes buddy-mascot-ear-idle-left[\s\S]*rotate\(-8deg\)/);
   assert.match(componentSource, /@keyframes buddy-mascot-ear-idle-right[\s\S]*rotate\(8deg\)/);
 });
