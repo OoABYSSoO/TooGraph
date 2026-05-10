@@ -481,6 +481,34 @@ function clampLookAxis(value: number | undefined) {
   animation: buddy-mascot-spin-turn 980ms cubic-bezier(0.2, 1.18, 0.3, 1) both;
 }
 
+.buddy-mascot--motion-spin .buddy-mascot__left-ear {
+  animation: buddy-mascot-ear-spin-left 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__right-ear {
+  animation: buddy-mascot-ear-spin-right 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__look-eye--left {
+  animation: buddy-mascot-look-spin-left 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__look-eye--right {
+  animation: buddy-mascot-look-spin-right 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__resting-eye--left {
+  animation: buddy-mascot-eye-spin-left 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__resting-eye--right {
+  animation: buddy-mascot-eye-spin-right 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__sparkle-wrap {
+  animation: buddy-mascot-star-spin-orbit 980ms ease-in-out both;
+}
+
 .buddy-mascot--motion-spin .buddy-mascot__tail-pose--right {
   animation: buddy-mascot-tail-spin-right 980ms ease-in-out both;
 }
@@ -533,20 +561,160 @@ function clampLookAxis(value: number | undefined) {
   0% {
     transform: translateY(0) scaleX(1) scaleY(1) rotate(0deg);
   }
-  18% {
+  14% {
     transform: translateY(10px) scaleX(1.1) scaleY(0.88) rotate(0deg);
   }
-  42% {
-    transform: translateY(-24px) scaleX(0.18) scaleY(1.14) rotate(-5deg);
+  32% {
+    transform: translateY(-24px) scaleX(0.78) scaleY(1.12) rotate(-4deg);
   }
-  58% {
-    transform: translateY(-24px) scaleX(-0.18) scaleY(1.14) rotate(5deg);
+  48% {
+    transform: translateY(-34px) scaleX(0.48) scaleY(1.14) rotate(0deg);
   }
-  82% {
-    transform: translateY(6px) scaleX(1.08) scaleY(0.92) rotate(0deg);
+  64% {
+    transform: translateY(-24px) scaleX(0.78) scaleY(1.12) rotate(4deg);
+  }
+  84% {
+    transform: translateY(7px) scaleX(1.08) scaleY(0.9) rotate(0deg);
   }
   100% {
     transform: translateY(0) scaleX(1) scaleY(1) rotate(0deg);
+  }
+}
+
+@keyframes buddy-mascot-ear-spin-left {
+  0%,
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  28% {
+    opacity: 0.86;
+    transform: translate(-8px, 5px) scale(0.82) rotate(-9deg);
+  }
+  48% {
+    opacity: 0.58;
+    transform: translate(-13px, 9px) scale(0.72) rotate(-15deg);
+  }
+  66% {
+    opacity: 1;
+    transform: translate(9px, -2px) scale(1.08) rotate(5deg);
+  }
+  84% {
+    transform: translate(3px, 3px) scale(1.02) rotate(3deg);
+  }
+}
+
+@keyframes buddy-mascot-ear-spin-right {
+  0%,
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  28% {
+    opacity: 1;
+    transform: translate(-9px, -2px) scale(1.08) rotate(-5deg);
+  }
+  48% {
+    opacity: 0.58;
+    transform: translate(13px, 9px) scale(0.72) rotate(15deg);
+  }
+  66% {
+    opacity: 0.86;
+    transform: translate(8px, 5px) scale(0.82) rotate(9deg);
+  }
+  84% {
+    transform: translate(-3px, 3px) scale(1.02) rotate(-3deg);
+  }
+}
+
+@keyframes buddy-mascot-look-spin-left {
+  0%,
+  100% {
+    transform: translate(var(--buddy-mascot-look-x, 0px), var(--buddy-mascot-look-y, 0px));
+  }
+  30% {
+    transform: translate(calc(var(--buddy-mascot-look-x, 0px) - 22px), calc(var(--buddy-mascot-look-y, 0px) + 2px)) scaleX(0.64);
+  }
+  48% {
+    transform: translate(calc(var(--buddy-mascot-look-x, 0px) - 14px), calc(var(--buddy-mascot-look-y, 0px) + 3px)) scaleX(0.22);
+  }
+  66% {
+    transform: translate(calc(var(--buddy-mascot-look-x, 0px) + 18px), calc(var(--buddy-mascot-look-y, 0px) + 1px)) scaleX(1.08);
+  }
+}
+
+@keyframes buddy-mascot-look-spin-right {
+  0%,
+  100% {
+    transform: translate(var(--buddy-mascot-look-x, 0px), var(--buddy-mascot-look-y, 0px));
+  }
+  30% {
+    transform: translate(calc(var(--buddy-mascot-look-x, 0px) - 18px), calc(var(--buddy-mascot-look-y, 0px) + 1px)) scaleX(1.08);
+  }
+  48% {
+    transform: translate(calc(var(--buddy-mascot-look-x, 0px) + 14px), calc(var(--buddy-mascot-look-y, 0px) + 3px)) scaleX(0.22);
+  }
+  66% {
+    transform: translate(calc(var(--buddy-mascot-look-x, 0px) + 22px), calc(var(--buddy-mascot-look-y, 0px) + 2px)) scaleX(0.64);
+  }
+}
+
+@keyframes buddy-mascot-eye-spin-left {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scaleX(1) scaleY(1);
+  }
+  30% {
+    opacity: 0.62;
+    transform: scaleX(0.42) scaleY(1.04);
+  }
+  48% {
+    opacity: 0;
+    transform: scaleX(0.12) scaleY(1.08);
+  }
+  66% {
+    opacity: 1;
+    transform: scaleX(1.08) scaleY(0.98);
+  }
+}
+
+@keyframes buddy-mascot-eye-spin-right {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scaleX(1) scaleY(1);
+  }
+  30% {
+    opacity: 1;
+    transform: scaleX(1.08) scaleY(0.98);
+  }
+  48% {
+    opacity: 0;
+    transform: scaleX(0.12) scaleY(1.08);
+  }
+  66% {
+    opacity: 0.62;
+    transform: scaleX(0.42) scaleY(1.04);
+  }
+}
+
+@keyframes buddy-mascot-star-spin-orbit {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  28% {
+    transform: translate(-18px, -7px) scale(1.08) rotate(-10deg);
+  }
+  48% {
+    transform: translate(0, -14px) scale(0.72) rotate(8deg);
+  }
+  66% {
+    transform: translate(20px, -8px) scale(0.82) rotate(12deg);
+  }
+  84% {
+    transform: translate(8px, 2px) scale(1.04) rotate(4deg);
   }
 }
 

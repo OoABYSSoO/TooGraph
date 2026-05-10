@@ -179,6 +179,27 @@ test("BuddyMascot gives the star idle sway and thinking pseudo-3D spin", () => {
   assert.match(componentSource, /filter:\s*brightness\(1\.35\)/);
 });
 
+test("BuddyMascot spin treats the body as a soft volume instead of a paper flip", () => {
+  assert.doesNotMatch(componentSource, /@keyframes buddy-mascot-spin-turn[\s\S]*scaleX\(-/);
+  assert.match(componentSource, /@keyframes buddy-mascot-spin-turn[\s\S]*translateY\(10px\) scaleX\(1\.1\) scaleY\(0\.88\)/);
+  assert.match(componentSource, /@keyframes buddy-mascot-spin-turn[\s\S]*translateY\(-34px\) scaleX\(0\.48\) scaleY\(1\.14\)/);
+  assert.match(componentSource, /@keyframes buddy-mascot-spin-turn[\s\S]*translateY\(7px\) scaleX\(1\.08\) scaleY\(0\.9\)/);
+});
+
+test("BuddyMascot spin moves ears, eyes, and sparkle as separate pseudo-3D layers", () => {
+  assert.match(componentSource, /\.buddy-mascot--motion-spin[\s\S]*\.buddy-mascot__left-ear[\s\S]*animation:\s*buddy-mascot-ear-spin-left 980ms ease-in-out both;/);
+  assert.match(componentSource, /\.buddy-mascot--motion-spin[\s\S]*\.buddy-mascot__right-ear[\s\S]*animation:\s*buddy-mascot-ear-spin-right 980ms ease-in-out both;/);
+  assert.match(componentSource, /\.buddy-mascot--motion-spin[\s\S]*\.buddy-mascot__look-eye--left[\s\S]*animation:\s*buddy-mascot-look-spin-left 980ms ease-in-out both;/);
+  assert.match(componentSource, /\.buddy-mascot--motion-spin[\s\S]*\.buddy-mascot__look-eye--right[\s\S]*animation:\s*buddy-mascot-look-spin-right 980ms ease-in-out both;/);
+  assert.match(componentSource, /\.buddy-mascot--motion-spin[\s\S]*\.buddy-mascot__resting-eye--left[\s\S]*animation:\s*buddy-mascot-eye-spin-left 980ms ease-in-out both;/);
+  assert.match(componentSource, /\.buddy-mascot--motion-spin[\s\S]*\.buddy-mascot__resting-eye--right[\s\S]*animation:\s*buddy-mascot-eye-spin-right 980ms ease-in-out both;/);
+  assert.match(componentSource, /\.buddy-mascot--motion-spin[\s\S]*\.buddy-mascot__sparkle-wrap[\s\S]*animation:\s*buddy-mascot-star-spin-orbit 980ms ease-in-out both;/);
+  assert.match(componentSource, /@keyframes buddy-mascot-ear-spin-left[\s\S]*scale\(0\.72\)[\s\S]*scale\(1\.08\)/);
+  assert.match(componentSource, /@keyframes buddy-mascot-look-spin-left[\s\S]*translate\(calc\(var\(--buddy-mascot-look-x,\s*0px\) - 22px\)/);
+  assert.match(componentSource, /@keyframes buddy-mascot-eye-spin-right[\s\S]*opacity:\s*0;/);
+  assert.match(componentSource, /@keyframes buddy-mascot-star-spin-orbit[\s\S]*translate\(20px,\s*-8px\) scale\(0\.82\)/);
+});
+
 test("BuddyMascot keeps the tail animated while thinking and speaking", () => {
   assert.match(componentSource, /\.buddy-mascot--thinking[\s\S]*\.buddy-mascot__tail[\s\S]*animation:\s*buddy-mascot-tail-thinking 760ms ease-in-out infinite;/);
   assert.match(componentSource, /\.buddy-mascot--speaking[\s\S]*\.buddy-mascot__tail[\s\S]*animation:\s*buddy-mascot-tail-speaking 430ms ease-in-out infinite;/);
