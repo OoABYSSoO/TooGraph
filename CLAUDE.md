@@ -28,7 +28,7 @@ Keep this file aligned with those sources and with the actual codebase.
 The standard restart command for this repository is:
 
 ```bash
-npm run dev
+npm start
 ```
 
 This resolves to:
@@ -42,7 +42,7 @@ Use it as the default startup and restart flow on Windows, macOS, Linux, and WSL
 Windows PowerShell note:
 
 ```powershell
-npm.cmd run dev
+npm.cmd start
 ```
 
 Use that form if execution policy blocks `npm.ps1`.
@@ -55,11 +55,10 @@ For Bash-oriented environments, the repository also keeps this wrapper:
 
 Both startup paths should:
 
-- release occupied frontend and backend ports before starting
-- start the frontend on `3477`
-- start the backend on `8765`
+- release occupied GraphiteUI ports before starting
+- serve the UI and API from the single public port `3477` by default
 - wait for readiness checks
-- write logs to `.dev_frontend.log` and `.dev_backend.log`
+- write server logs to `.graphiteui_server.log`
 
 ### Dependency Install
 
@@ -75,31 +74,29 @@ Install backend dependencies with Python 3.11+:
 python -m pip install -r backend/requirements.txt
 ```
 
-If the system Python command is `python3`, use that instead. If Python is installed outside `PATH`, set `PYTHON` before running `npm run dev`.
+If the system Python command is `python3`, use that instead. If Python is installed outside `PATH`, set `PYTHON` before running `npm start`.
 
 ### Makefile Commands
 
 ```bash
 make frontend-install
-make frontend-dev
+make start
 make frontend-build
 make backend-install
-make backend-dev
-make backend-health
+make health
 ```
 
 ### Frontend npm Scripts
 
 Run these from `frontend/`:
 
-- `npm run dev` - Vite dev server on `127.0.0.1:3477`
 - `npm run build` - `vue-tsc --noEmit && vite build`
 - `npm run preview` - Vite preview server on `127.0.0.1:3477`
 
 ### Health Check
 
 ```bash
-curl http://127.0.0.1:8765/health
+curl http://127.0.0.1:3477/health
 ```
 
 Expected response:
