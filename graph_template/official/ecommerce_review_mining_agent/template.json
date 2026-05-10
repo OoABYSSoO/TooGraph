@@ -1,0 +1,773 @@
+{
+  "template_id": "ecommerce_review_mining_agent",
+  "label": "电商评论洞察挖掘助手",
+  "description": "批量分析商品评论、竞品评论和店铺反馈，提炼好评点、差评点、用户画像、购买动机、卖点、风险点，并生成详情页文案、短视频脚本和小红书种草笔记。",
+  "default_graph_name": "电商评论洞察挖掘助手",
+  "state_schema": {
+    "product_context": {
+      "name": "商品背景",
+      "description": "商品类型、价格带、渠道、目标人群和营销约束。",
+      "type": "markdown",
+      "value": "",
+      "color": "#2563eb",
+      "binding": null
+    },
+    "raw_reviews": {
+      "name": "商品评论",
+      "description": "自家商品评论，支持 CSV/JSON/粘贴文本。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0f766e",
+      "binding": null
+    },
+    "competitor_reviews": {
+      "name": "竞品评论",
+      "description": "竞品评论、问答、差评和社媒反馈。",
+      "type": "markdown",
+      "value": "",
+      "color": "#dc2626",
+      "binding": null
+    },
+    "store_feedback": {
+      "name": "店铺反馈",
+      "description": "客服记录、退货原因、私域反馈或运营观察。",
+      "type": "markdown",
+      "value": "",
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "target_platforms": {
+      "name": "目标平台",
+      "description": "详情页、短视频、小红书、直播间或站外广告。",
+      "type": "text",
+      "value": "详情页、短视频、小红书",
+      "color": "#0891b2",
+      "binding": null
+    },
+    "marketing_goal": {
+      "name": "营销目标",
+      "description": "本次挖掘要支持的转化目标。",
+      "type": "text",
+      "value": "提炼可验证卖点、风险提示和多平台素材。",
+      "color": "#d97706",
+      "binding": null
+    },
+    "compliance_notes": {
+      "name": "合规说明",
+      "description": "平台限制、禁用词、功效表述边界和人工审核要求。",
+      "type": "markdown",
+      "value": "",
+      "color": "#be123c",
+      "binding": null
+    },
+    "review_memory_request": {
+      "name": "评论洞察记忆召回请求",
+      "description": "面向 memory_recall Skill 的只读召回参数。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": null
+    },
+    "memory_recall_success": {
+      "name": "记忆召回成功",
+      "description": "memory_recall 是否成功。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_review_memory",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "memory_context": {
+      "name": "评论洞察记忆上下文",
+      "description": "召回的商品定位、历史卖点、禁用词和合规经验。",
+      "type": "json",
+      "value": {},
+      "color": "#7c3aed",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_review_memory",
+        "fieldKey": "memory_context",
+        "managed": true
+      }
+    },
+    "recalled_memories": {
+      "name": "纳入记忆",
+      "description": "本轮纳入上下文的评论洞察记忆。",
+      "type": "json",
+      "value": [],
+      "color": "#8b5cf6",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_review_memory",
+        "fieldKey": "recalled_memories",
+        "managed": true
+      }
+    },
+    "omitted_memories": {
+      "name": "省略记忆",
+      "description": "因预算、过滤或状态不符未纳入的记忆摘要。",
+      "type": "json",
+      "value": [],
+      "color": "#a855f7",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_review_memory",
+        "fieldKey": "omitted_memories",
+        "managed": true
+      }
+    },
+    "memory_recall_result": {
+      "name": "记忆召回摘要",
+      "description": "memory_recall 返回的召回摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#6d28d9",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_review_memory",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "review_source_map": {
+      "name": "评论证据索引",
+      "description": "评论来源、商品归属、原文片段和引用编号。",
+      "type": "json",
+      "value": {},
+      "color": "#0e7490",
+      "binding": null
+    },
+    "clean_reviews": {
+      "name": "清洗评论",
+      "description": "去重、去噪、区分自家/竞品后的评论记录。",
+      "type": "json",
+      "value": [],
+      "color": "#0f766e",
+      "binding": null
+    },
+    "positive_review_clusters": {
+      "name": "好评点聚类",
+      "description": "好评主题、代表评论、频次估计和证据。",
+      "type": "json",
+      "value": {},
+      "color": "#16a34a",
+      "binding": null
+    },
+    "negative_review_clusters": {
+      "name": "差评点聚类",
+      "description": "差评主题、代表评论、风险和证据。",
+      "type": "json",
+      "value": {},
+      "color": "#dc2626",
+      "binding": null
+    },
+    "user_persona": {
+      "name": "用户画像",
+      "description": "从评论推断的用户分群、场景和需求。",
+      "type": "markdown",
+      "value": "",
+      "color": "#4f46e5",
+      "binding": null
+    },
+    "purchase_motivation": {
+      "name": "购买动机",
+      "description": "购买触发、决策因素、阻碍和证据。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0891b2",
+      "binding": null
+    },
+    "selling_points": {
+      "name": "卖点提炼",
+      "description": "带评论证据的卖点、表达方式和适用平台。",
+      "type": "markdown",
+      "value": "",
+      "color": "#65a30d",
+      "binding": null
+    },
+    "risk_points": {
+      "name": "风险点提炼",
+      "description": "差评、退货、误解、合规和售后风险。",
+      "type": "markdown",
+      "value": "",
+      "color": "#be123c",
+      "binding": null
+    },
+    "product_copy": {
+      "name": "详情页文案",
+      "description": "基于证据和合规边界生成的详情页文案。",
+      "type": "markdown",
+      "value": "",
+      "color": "#b45309",
+      "binding": null
+    },
+    "short_video_scripts": {
+      "name": "短视频脚本",
+      "description": "面向短视频的脚本和分镜建议。",
+      "type": "markdown",
+      "value": "",
+      "color": "#ea580c",
+      "binding": null
+    },
+    "xiaohongshu_notes": {
+      "name": "小红书笔记",
+      "description": "面向小红书种草的笔记草稿。",
+      "type": "markdown",
+      "value": "",
+      "color": "#e11d48",
+      "binding": null
+    },
+    "review_memory_plan": {
+      "name": "评论洞察候选记忆计划",
+      "description": "需要写入候选记忆的稳定卖点、风险和合规经验。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": null
+    },
+    "candidate_write_success": {
+      "name": "候选记忆写入成功",
+      "description": "memory_candidate_writer 是否成功写入候选。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_review_memory_candidates",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "candidate_memories": {
+      "name": "候选记忆",
+      "description": "写入平台 store 的 candidate 状态记忆。",
+      "type": "json",
+      "value": [],
+      "color": "#7c3aed",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_review_memory_candidates",
+        "fieldKey": "candidate_memories",
+        "managed": true
+      }
+    },
+    "skipped_candidates": {
+      "name": "跳过候选",
+      "description": "因证据不足或格式无效跳过的候选。",
+      "type": "json",
+      "value": [],
+      "color": "#dc2626",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_review_memory_candidates",
+        "fieldKey": "skipped_candidates",
+        "managed": true
+      }
+    },
+    "candidate_write_result": {
+      "name": "候选记忆写入摘要",
+      "description": "memory_candidate_writer 返回的写入摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#6d28d9",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_review_memory_candidates",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "final_review_mining_package": {
+      "name": "最终评论洞察包",
+      "description": "面向用户展示和导出的完整评论洞察包。",
+      "type": "markdown",
+      "value": "",
+      "color": "#b45309",
+      "binding": null
+    }
+  },
+  "nodes": {
+    "input_product_context": {
+      "kind": "input",
+      "name": "输入商品背景",
+      "description": "填写商品背景和营销约束。",
+      "ui": { "position": { "x": 40, "y": 40 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "reads": [],
+      "writes": [{ "state": "product_context", "mode": "replace" }],
+      "config": { "value": "", "boundaryType": "text" }
+    },
+    "input_raw_reviews": {
+      "kind": "input",
+      "name": "输入商品评论",
+      "description": "粘贴 CSV/JSON/文本评论。",
+      "ui": { "position": { "x": 40, "y": 260 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "reads": [],
+      "writes": [{ "state": "raw_reviews", "mode": "replace" }],
+      "config": { "value": "", "boundaryType": "text" }
+    },
+    "input_competitor_reviews": {
+      "kind": "input",
+      "name": "输入竞品评论",
+      "description": "粘贴竞品评论和问答。",
+      "ui": { "position": { "x": 40, "y": 480 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "reads": [],
+      "writes": [{ "state": "competitor_reviews", "mode": "replace" }],
+      "config": { "value": "", "boundaryType": "text" }
+    },
+    "input_store_feedback": {
+      "kind": "input",
+      "name": "输入店铺反馈",
+      "description": "粘贴客服、售后或运营反馈。",
+      "ui": { "position": { "x": 40, "y": 700 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "reads": [],
+      "writes": [{ "state": "store_feedback", "mode": "replace" }],
+      "config": { "value": "", "boundaryType": "text" }
+    },
+    "input_target_platforms": {
+      "kind": "input",
+      "name": "输入目标平台",
+      "description": "填写详情页、短视频、小红书等平台。",
+      "ui": { "position": { "x": 40, "y": 920 }, "collapsed": false, "size": { "width": 340, "height": 160 } },
+      "reads": [],
+      "writes": [{ "state": "target_platforms", "mode": "replace" }],
+      "config": { "value": "详情页、短视频、小红书", "boundaryType": "text" }
+    },
+    "input_marketing_goal": {
+      "kind": "input",
+      "name": "输入营销目标",
+      "description": "填写本次营销目标。",
+      "ui": { "position": { "x": 40, "y": 1120 }, "collapsed": false, "size": { "width": 340, "height": 160 } },
+      "reads": [],
+      "writes": [{ "state": "marketing_goal", "mode": "replace" }],
+      "config": { "value": "提炼可验证卖点、风险提示和多平台素材。", "boundaryType": "text" }
+    },
+    "input_compliance_notes": {
+      "kind": "input",
+      "name": "输入合规说明",
+      "description": "填写平台限制和禁用表达。",
+      "ui": { "position": { "x": 40, "y": 1320 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "reads": [],
+      "writes": [{ "state": "compliance_notes", "mode": "replace" }],
+      "config": { "value": "", "boundaryType": "text" }
+    },
+    "prepare_review_memory_request": {
+      "kind": "agent",
+      "name": "准备评论洞察记忆召回",
+      "description": "生成只读记忆召回请求。",
+      "ui": { "position": { "x": 520, "y": 180 }, "collapsed": false, "size": { "width": 420, "height": 280 } },
+      "reads": [
+        { "state": "product_context", "required": true },
+        { "state": "target_platforms", "required": true },
+        { "state": "marketing_goal", "required": true },
+        { "state": "compliance_notes", "required": false }
+      ],
+      "writes": [{ "state": "review_memory_request", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "生成 review_memory_request JSON，只召回商品定位、历史卖点、禁用词、合规经验和评论洞察偏好。字段包含 query、scope、layer、memory_type、status、top_k、max_chars。scope 默认 user，layer 优先 procedural，status 默认 active，top_k 不超过 8，max_chars 不超过 3000。不要生成营销文案。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "recall_review_memory": {
+      "kind": "agent",
+      "name": "召回评论洞察记忆",
+      "description": "运行 memory_recall Skill，只透传召回结果。",
+      "ui": { "position": { "x": 1060, "y": 180 }, "collapsed": false, "size": { "width": 420, "height": 300 } },
+      "reads": [{ "state": "review_memory_request", "required": true }],
+      "writes": [
+        { "state": "memory_recall_success", "mode": "replace" },
+        { "state": "memory_context", "mode": "replace" },
+        { "state": "recalled_memories", "mode": "replace" },
+        { "state": "omitted_memories", "mode": "replace" },
+        { "state": "memory_recall_result", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "memory_recall",
+        "skillBindings": [
+          {
+            "skillKey": "memory_recall",
+            "outputMapping": {
+              "success": "memory_recall_success",
+              "memory_context": "memory_context",
+              "recalled_memories": "recalled_memories",
+              "omitted_memories": "omitted_memories",
+              "result": "memory_recall_result"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {
+          "memory_recall": {
+            "skillKey": "memory_recall",
+            "title": "评论洞察记忆召回 skill instruction",
+            "content": "你已绑定记忆召回技能。根据 review_memory_request 生成只读召回参数；不要改写记忆，不要写入记忆。技能结果会写入 memory_context、recalled_memories、omitted_memories 和 result。",
+            "source": "node.override"
+          }
+        },
+        "taskInstruction": "本节点只负责运行 memory_recall。缺失字段时使用 scope=user、status=active、top_k=8、max_chars=3000。不要输出营销文案。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "clean_and_index_reviews": {
+      "kind": "agent",
+      "name": "清洗并索引评论",
+      "description": "去噪、去重、区分自家和竞品评论。",
+      "ui": { "position": { "x": 520, "y": 600 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "reads": [
+        { "state": "product_context", "required": true },
+        { "state": "raw_reviews", "required": true },
+        { "state": "competitor_reviews", "required": false },
+        { "state": "store_feedback", "required": false }
+      ],
+      "writes": [
+        { "state": "review_source_map", "mode": "replace" },
+        { "state": "clean_reviews", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "review_source_map 写成 JSON，包含 source、review_id、product_side(own/competitor/store)、quote、rating、date_if_any、evidence_id。clean_reviews 写成 JSON 数组，去重、去广告、去无意义短评，并保留 evidence_id。不要把少量评论包装成统计结论。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "cluster_positive_reviews": {
+      "kind": "agent",
+      "name": "聚类好评点",
+      "description": "提炼好评主题和证据。",
+      "ui": { "position": { "x": 1060, "y": 600 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "reads": [{ "state": "clean_reviews", "required": true }],
+      "writes": [{ "state": "positive_review_clusters", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "positive_review_clusters 写成 JSON，包含 clusters 数组。每个 cluster 包含 theme、evidence_ids、representative_quotes、own_vs_competitor、frequency_hint、confidence、marketing_angle。frequency_hint 只能是定性估计。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "cluster_negative_reviews": {
+      "kind": "agent",
+      "name": "聚类差评点",
+      "description": "提炼差评、退货、误解和售后风险。",
+      "ui": { "position": { "x": 1600, "y": 600 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "reads": [{ "state": "clean_reviews", "required": true }],
+      "writes": [{ "state": "negative_review_clusters", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "negative_review_clusters 写成 JSON，包含 clusters 数组。每个 cluster 包含 theme、evidence_ids、representative_quotes、risk_type、own_vs_competitor、severity_hint、confidence、mitigation。不得弱化真实差评风险。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "infer_persona_and_motivation": {
+      "kind": "agent",
+      "name": "推断用户画像和购买动机",
+      "description": "基于评论聚类形成用户画像和购买动机。",
+      "ui": { "position": { "x": 520, "y": 1040 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "reads": [
+        { "state": "positive_review_clusters", "required": true },
+        { "state": "negative_review_clusters", "required": true },
+        { "state": "product_context", "required": true }
+      ],
+      "writes": [
+        { "state": "user_persona", "mode": "replace" },
+        { "state": "purchase_motivation", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "user_persona 和 purchase_motivation 都写成 Markdown，必须标注 evidence ids、适用场景、推断边界和不确定项。不要把评论里的少数观点写成全体用户画像。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.25
+      }
+    },
+    "extract_selling_and_risk_points": {
+      "kind": "agent",
+      "name": "提炼卖点和风险点",
+      "description": "生成证据支持的卖点和风险点。",
+      "ui": { "position": { "x": 1060, "y": 1040 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "reads": [
+        { "state": "positive_review_clusters", "required": true },
+        { "state": "negative_review_clusters", "required": true },
+        { "state": "user_persona", "required": true },
+        { "state": "purchase_motivation", "required": true },
+        { "state": "compliance_notes", "required": false },
+        { "state": "memory_context", "required": false }
+      ],
+      "writes": [
+        { "state": "selling_points", "mode": "replace" },
+        { "state": "risk_points", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "selling_points 和 risk_points 都写成 Markdown。每个卖点必须包含 evidence ids、适用平台、可用表达、禁用夸张表达；每个风险必须包含 evidence ids、严重度、缓解建议和售后/合规提示。必须包含 evidence，不得生成无来源功效承诺。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.25
+      }
+    },
+    "draft_marketing_artifacts": {
+      "kind": "agent",
+      "name": "生成营销素材",
+      "description": "生成详情页文案、短视频脚本和小红书笔记。",
+      "ui": { "position": { "x": 1600, "y": 1040 }, "collapsed": false, "size": { "width": 460, "height": 360 } },
+      "reads": [
+        { "state": "selling_points", "required": true },
+        { "state": "risk_points", "required": true },
+        { "state": "user_persona", "required": true },
+        { "state": "purchase_motivation", "required": true },
+        { "state": "target_platforms", "required": true },
+        { "state": "marketing_goal", "required": true },
+        { "state": "compliance_notes", "required": false }
+      ],
+      "writes": [
+        { "state": "product_copy", "mode": "replace" },
+        { "state": "short_video_scripts", "mode": "replace" },
+        { "state": "xiaohongshu_notes", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "product_copy、short_video_scripts、xiaohongshu_notes 均写成 Markdown。必须遵守合规说明，保留证据边界，避免绝对化、医疗功效、虚假稀缺、夸大收益和竞品贬损。每段文案后标注使用的卖点/risk/evidence。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.35
+      }
+    },
+    "prepare_review_memory_plan": {
+      "kind": "agent",
+      "name": "准备评论洞察候选记忆",
+      "description": "只生成 candidate 状态候选记忆。",
+      "ui": { "position": { "x": 520, "y": 1500 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "reads": [
+        { "state": "selling_points", "required": true },
+        { "state": "risk_points", "required": true },
+        { "state": "user_persona", "required": true },
+        { "state": "purchase_motivation", "required": true }
+      ],
+      "writes": [{ "state": "review_memory_plan", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "review_memory_plan 写成 JSON，包含 candidates 数组。只把有证据的稳定卖点、风险、用户场景、合规经验写成 candidate 状态候选：scope=user、layer=procedural、type=preference 或 fact，summary、content、confidence、importance、evidence、artifact_refs。不得写入敏感用户信息、未验证功效或无来源判断。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "write_review_memory_candidates": {
+      "kind": "agent",
+      "name": "写入评论洞察候选记忆",
+      "description": "运行 memory_candidate_writer，只写入 candidate 状态记忆。",
+      "ui": { "position": { "x": 1060, "y": 1500 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "reads": [{ "state": "review_memory_plan", "required": true }],
+      "writes": [
+        { "state": "candidate_write_success", "mode": "replace" },
+        { "state": "candidate_memories", "mode": "replace" },
+        { "state": "skipped_candidates", "mode": "replace" },
+        { "state": "candidate_write_result", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "memory_candidate_writer",
+        "skillBindings": [
+          {
+            "skillKey": "memory_candidate_writer",
+            "outputMapping": {
+              "success": "candidate_write_success",
+              "candidate_memories": "candidate_memories",
+              "skipped_candidates": "skipped_candidates",
+              "result": "candidate_write_result"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {
+          "memory_candidate_writer": {
+            "skillKey": "memory_candidate_writer",
+            "title": "评论洞察候选记忆写入 skill instruction",
+            "content": "你已绑定候选记忆写入技能。只把 review_memory_plan 中证据充足的候选写入 candidate 状态；不要应用为 active，不要覆盖既有记忆，不要写入未验证功效、敏感用户信息或无来源判断。技能结果会写入 candidate_memories、skipped_candidates 和 result。",
+            "source": "node.override"
+          }
+        },
+        "taskInstruction": "本节点只负责运行 memory_candidate_writer。将 review_memory_plan 中证据充足的 candidates 交给技能；不要总结评论洞察包，不要改写候选。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "build_final_review_mining_package": {
+      "kind": "agent",
+      "name": "生成最终评论洞察包",
+      "description": "汇总评论聚类、画像、动机、卖点、风险和文案。",
+      "ui": { "position": { "x": 1600, "y": 1500 }, "collapsed": false, "size": { "width": 460, "height": 360 } },
+      "reads": [
+        { "state": "positive_review_clusters", "required": true },
+        { "state": "negative_review_clusters", "required": true },
+        { "state": "user_persona", "required": true },
+        { "state": "purchase_motivation", "required": true },
+        { "state": "selling_points", "required": true },
+        { "state": "risk_points", "required": true },
+        { "state": "product_copy", "required": true },
+        { "state": "short_video_scripts", "required": true },
+        { "state": "xiaohongshu_notes", "required": true },
+        { "state": "candidate_write_result", "required": false },
+        { "state": "candidate_memories", "required": false }
+      ],
+      "writes": [{ "state": "final_review_mining_package", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "final_review_mining_package 写成 Markdown，包含：1. 数据来源和限制；2. 好评点聚类；3. 差评点聚类；4. 用户画像；5. 购买动机；6. 卖点和证据；7. 风险点；8. 详情页文案；9. 短视频脚本；10. 小红书笔记；11. 候选记忆状态；12. 人工合规检查清单。必须保留证据、不确定项和合规提示。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.25
+      }
+    },
+    "output_final_review_mining_package": {
+      "kind": "output",
+      "name": "输出最终评论洞察包",
+      "description": "展示和导出最终评论洞察包。",
+      "ui": { "position": { "x": 2140, "y": 1500 }, "collapsed": false, "size": { "width": 360, "height": 220 } },
+      "reads": [{ "state": "final_review_mining_package", "required": true }],
+      "writes": [],
+      "config": {
+        "format": "markdown",
+        "fileNameTemplate": "final_review_mining_package.md"
+      }
+    }
+  },
+  "edges": [
+    { "source": "input_product_context", "target": "prepare_review_memory_request" },
+    { "source": "input_target_platforms", "target": "prepare_review_memory_request" },
+    { "source": "input_marketing_goal", "target": "prepare_review_memory_request" },
+    { "source": "input_compliance_notes", "target": "prepare_review_memory_request" },
+    { "source": "prepare_review_memory_request", "target": "recall_review_memory" },
+    { "source": "input_product_context", "target": "clean_and_index_reviews" },
+    { "source": "input_raw_reviews", "target": "clean_and_index_reviews" },
+    { "source": "input_competitor_reviews", "target": "clean_and_index_reviews" },
+    { "source": "input_store_feedback", "target": "clean_and_index_reviews" },
+    { "source": "clean_and_index_reviews", "target": "cluster_positive_reviews" },
+    { "source": "clean_and_index_reviews", "target": "cluster_negative_reviews" },
+    { "source": "cluster_positive_reviews", "target": "infer_persona_and_motivation" },
+    { "source": "cluster_negative_reviews", "target": "infer_persona_and_motivation" },
+    { "source": "infer_persona_and_motivation", "target": "extract_selling_and_risk_points" },
+    { "source": "cluster_positive_reviews", "target": "extract_selling_and_risk_points" },
+    { "source": "cluster_negative_reviews", "target": "extract_selling_and_risk_points" },
+    { "source": "recall_review_memory", "target": "extract_selling_and_risk_points" },
+    { "source": "extract_selling_and_risk_points", "target": "draft_marketing_artifacts" },
+    { "source": "infer_persona_and_motivation", "target": "draft_marketing_artifacts" },
+    { "source": "input_target_platforms", "target": "draft_marketing_artifacts" },
+    { "source": "input_compliance_notes", "target": "draft_marketing_artifacts" },
+    { "source": "extract_selling_and_risk_points", "target": "prepare_review_memory_plan" },
+    { "source": "infer_persona_and_motivation", "target": "prepare_review_memory_plan" },
+    { "source": "prepare_review_memory_plan", "target": "write_review_memory_candidates" },
+    { "source": "cluster_positive_reviews", "target": "build_final_review_mining_package" },
+    { "source": "cluster_negative_reviews", "target": "build_final_review_mining_package" },
+    { "source": "infer_persona_and_motivation", "target": "build_final_review_mining_package" },
+    { "source": "extract_selling_and_risk_points", "target": "build_final_review_mining_package" },
+    { "source": "draft_marketing_artifacts", "target": "build_final_review_mining_package" },
+    { "source": "write_review_memory_candidates", "target": "build_final_review_mining_package" },
+    { "source": "build_final_review_mining_package", "target": "output_final_review_mining_package" }
+  ],
+  "metadata": {
+    "category": "business",
+    "graphProtocol": "node_system",
+    "templateVersion": "0.1.0",
+    "capabilityDiscoverableDefault": true,
+    "gallery": {
+      "headline": "把商品和竞品评论转成证据支持的卖点、风险和多平台文案。",
+      "targetUsers": ["电商运营", "品牌方", "内容营销团队", "客服和售后团队", "商品经理"],
+      "demoPitch": "不是简单总结好差评，而是把评论证据、正负向聚类、卖点风险、详情页文案和短视频/小红书素材串成可复跑工作流。"
+    },
+    "mockMode": {
+      "input": "examples/mock_ecommerce_review_input.json",
+      "description": "使用随包 mock 商品评论和竞品评论，无需外部电商平台账号即可演示。"
+    },
+    "inputSchema": [
+      { "key": "product_context", "label": "商品背景", "type": "markdown", "required": true },
+      { "key": "raw_reviews", "label": "商品评论", "type": "markdown", "required": true },
+      { "key": "competitor_reviews", "label": "竞品评论", "type": "markdown", "required": false },
+      { "key": "store_feedback", "label": "店铺反馈", "type": "markdown", "required": false },
+      { "key": "target_platforms", "label": "目标平台", "type": "text", "required": true },
+      { "key": "marketing_goal", "label": "营销目标", "type": "text", "required": true },
+      { "key": "compliance_notes", "label": "合规说明", "type": "markdown", "required": false }
+    ],
+    "requiredSkills": ["memory_recall", "memory_candidate_writer"],
+    "requiredPermissions": ["memory_read", "memory_candidate_write"],
+    "artifactContract": [
+      { "path": "positive_review_clusters.json", "state": "positive_review_clusters", "type": "json", "description": "好评点聚类。" },
+      { "path": "negative_review_clusters.json", "state": "negative_review_clusters", "type": "json", "description": "差评点聚类。" },
+      { "path": "user_persona.md", "state": "user_persona", "type": "markdown", "description": "用户画像。" },
+      { "path": "purchase_motivation.md", "state": "purchase_motivation", "type": "markdown", "description": "购买动机。" },
+      { "path": "selling_points.md", "state": "selling_points", "type": "markdown", "description": "卖点提炼。" },
+      { "path": "risk_points.md", "state": "risk_points", "type": "markdown", "description": "风险点提炼。" },
+      { "path": "product_copy.md", "state": "product_copy", "type": "markdown", "description": "详情页文案。" },
+      { "path": "short_video_scripts.md", "state": "short_video_scripts", "type": "markdown", "description": "短视频脚本。" },
+      { "path": "xiaohongshu_notes.md", "state": "xiaohongshu_notes", "type": "markdown", "description": "小红书笔记。" },
+      { "path": "final_review_mining_package.md", "state": "final_review_mining_package", "type": "markdown", "description": "最终评论洞察包。" }
+    ],
+    "outputContract": [
+      { "key": "final_review_mining_package", "label": "最终评论洞察包", "role": "primary", "type": "markdown", "required": true, "passThrough": true },
+      { "key": "positive_review_clusters", "label": "好评点聚类", "role": "artifact", "type": "json", "required": true },
+      { "key": "negative_review_clusters", "label": "差评点聚类", "role": "artifact", "type": "json", "required": true },
+      { "key": "user_persona", "label": "用户画像", "role": "artifact", "type": "markdown", "required": true },
+      { "key": "purchase_motivation", "label": "购买动机", "role": "artifact", "type": "markdown", "required": true },
+      { "key": "selling_points", "label": "卖点提炼", "role": "artifact", "type": "markdown", "required": true },
+      { "key": "risk_points", "label": "风险点提炼", "role": "artifact", "type": "markdown", "required": true },
+      { "key": "product_copy", "label": "详情页文案", "role": "artifact", "type": "markdown", "required": true },
+      { "key": "short_video_scripts", "label": "短视频脚本", "role": "artifact", "type": "markdown", "required": true },
+      { "key": "xiaohongshu_notes", "label": "小红书笔记", "role": "artifact", "type": "markdown", "required": true },
+      { "key": "candidate_memories", "label": "评论洞察候选记忆", "role": "memory_candidates", "type": "json", "required": false }
+    ],
+    "evalCases": "eval_cases.json",
+    "safetyNotes": [
+      "不得把少量评论包装成统计结论。",
+      "不得生成无来源功效承诺、绝对化宣传、虚假稀缺或竞品贬损。",
+      "详情页、短视频和小红书素材投放前必须人工合规审核。",
+      "评论洞察只写 candidate 状态候选，不能自动应用为 active。"
+    ]
+  }
+}

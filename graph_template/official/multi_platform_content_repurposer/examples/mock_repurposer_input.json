@@ -1,0 +1,7 @@
+{
+  "source_content_path": "mock_data/sample_source_content.md",
+  "target_platforms": "微信公众号、小红书、知乎、B站、抖音、X、YouTube",
+  "historical_samples": "我常用短句，先给判断，再给例子。标题不喜欢夸张感叹号，也不喜欢万能三段式。",
+  "content_goal": "把产品更新转成多平台发布内容，让读者理解新功能解决了什么具体问题，并愿意试用。",
+  "human_feedback": ""
+}

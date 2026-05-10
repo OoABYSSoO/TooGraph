@@ -1,0 +1,1259 @@
+{
+  "template_id": "multi_platform_content_repurposer",
+  "label": "一文多发内容改写助手",
+  "description": "把原始文章、README 或脚本改写成公众号、小红书、知乎、B站、抖音、X 和 YouTube 等多平台内容包，并沉淀可审查的风格候选记忆。",
+  "default_graph_name": "一文多发内容改写助手",
+  "state_schema": {
+    "source_content": {
+      "name": "原始内容",
+      "description": "原始文章、README、视频脚本、发布草稿或 mock 内容。",
+      "type": "markdown",
+      "value": "",
+      "color": "#2563eb",
+      "binding": null
+    },
+    "target_platforms": {
+      "name": "目标平台",
+      "description": "需要生成的平台列表。",
+      "type": "text",
+      "value": "微信公众号、小红书、知乎、B站、抖音、X、YouTube",
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "historical_samples": {
+      "name": "历史样本",
+      "description": "用户历史文章、社媒贴、口播脚本或风格样本。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0f766e",
+      "binding": null
+    },
+    "content_goal": {
+      "name": "传播目标",
+      "description": "本次内容想让读者理解、相信或行动的目标。",
+      "type": "text",
+      "value": "把一个产品更新转成多平台发布内容，降低 AI 味，保留技术细节。",
+      "color": "#d97706",
+      "binding": null
+    },
+    "human_feedback": {
+      "name": "人工反馈",
+      "description": "可选修改反馈；轻量模式为空，后续轮次可粘贴用户意见。",
+      "type": "markdown",
+      "value": "",
+      "color": "#dc2626",
+      "binding": null
+    },
+    "memory_request": {
+      "name": "风格记忆召回请求",
+      "description": "面向 memory_recall Skill 的只读召回参数。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": null
+    },
+    "memory_recall_success": {
+      "name": "记忆召回成功",
+      "description": "memory_recall 是否成功。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_style_memory",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "memory_context": {
+      "name": "风格记忆上下文",
+      "description": "预算化召回结果，用于风格画像和禁用表达参考。",
+      "type": "json",
+      "value": {},
+      "color": "#7c3aed",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_style_memory",
+        "fieldKey": "memory_context",
+        "managed": true
+      }
+    },
+    "recalled_memories": {
+      "name": "纳入记忆",
+      "description": "本轮纳入上下文的记忆记录。",
+      "type": "json",
+      "value": [],
+      "color": "#8b5cf6",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_style_memory",
+        "fieldKey": "recalled_memories",
+        "managed": true
+      }
+    },
+    "omitted_memories": {
+      "name": "省略记忆",
+      "description": "因预算或过滤未纳入的记忆摘要。",
+      "type": "json",
+      "value": [],
+      "color": "#a855f7",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_style_memory",
+        "fieldKey": "omitted_memories",
+        "managed": true
+      }
+    },
+    "memory_recall_result": {
+      "name": "记忆召回摘要",
+      "description": "memory_recall 返回的召回摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#6d28d9",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_style_memory",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "core_message": {
+      "name": "核心观点",
+      "description": "从原始内容提取的观点、事实、例子、受众和禁改项。",
+      "type": "json",
+      "value": {},
+      "color": "#0e7490",
+      "binding": null
+    },
+    "style_profile": {
+      "name": "用户风格画像",
+      "description": "基于历史样本和记忆召回生成的风格画像。",
+      "type": "json",
+      "value": {},
+      "color": "#4f46e5",
+      "binding": null
+    },
+    "platform_strategy": {
+      "name": "平台策略",
+      "description": "各平台目标、结构、语气、长度和禁用点。",
+      "type": "json",
+      "value": {},
+      "color": "#0891b2",
+      "binding": null
+    },
+    "draft_outputs": {
+      "name": "平台初稿",
+      "description": "各平台第一版内容。",
+      "type": "json",
+      "value": {},
+      "color": "#15803d",
+      "binding": null
+    },
+    "ai_tone_report": {
+      "name": "AI 味检测",
+      "description": "空泛总结、排比、总结腔、缺少例子和缺少个人判断等问题。",
+      "type": "json",
+      "value": {},
+      "color": "#dc2626",
+      "binding": null
+    },
+    "style_rewrite_outputs": {
+      "name": "风格重写稿",
+      "description": "结合风格画像、AI 味检测和人工反馈后的平台稿件。",
+      "type": "json",
+      "value": {},
+      "color": "#16a34a",
+      "binding": null
+    },
+    "style_consistency_score": {
+      "name": "风格一致性评分",
+      "description": "各平台稿件的保真、风格、AI 味和平台适配评分。",
+      "type": "json",
+      "value": {},
+      "color": "#65a30d",
+      "binding": null
+    },
+    "publishing_plan": {
+      "name": "发布计划",
+      "description": "发布时间、标题、封面提示词、CTA 和复用注意事项。",
+      "type": "json",
+      "value": {},
+      "color": "#ea580c",
+      "binding": null
+    },
+    "candidate_plan": {
+      "name": "风格候选记忆计划",
+      "description": "需要写入候选记忆的风格偏好、证据和作用域建议。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": null
+    },
+    "candidate_write_success": {
+      "name": "候选记忆写入成功",
+      "description": "memory_candidate_writer 是否成功写入候选。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_style_memory_candidates",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "candidate_memories": {
+      "name": "候选记忆",
+      "description": "写入平台 store 的 candidate 状态记忆。",
+      "type": "json",
+      "value": [],
+      "color": "#7c3aed",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_style_memory_candidates",
+        "fieldKey": "candidate_memories",
+        "managed": true
+      }
+    },
+    "skipped_candidates": {
+      "name": "跳过候选",
+      "description": "因证据不足或格式无效跳过的候选。",
+      "type": "json",
+      "value": [],
+      "color": "#dc2626",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_style_memory_candidates",
+        "fieldKey": "skipped_candidates",
+        "managed": true
+      }
+    },
+    "candidate_write_result": {
+      "name": "候选记忆写入摘要",
+      "description": "memory_candidate_writer 返回的写入摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#6d28d9",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_style_memory_candidates",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "final_distribution_pack": {
+      "name": "最终多平台内容包",
+      "description": "面向用户展示和导出的完整多平台内容包。",
+      "type": "markdown",
+      "value": "",
+      "color": "#b45309",
+      "binding": null
+    }
+  },
+  "nodes": {
+    "input_source_content": {
+      "kind": "input",
+      "name": "输入原始内容",
+      "description": "粘贴原始文章、README、脚本或 mock 内容。",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 40
+        },
+        "collapsed": false,
+        "size": {
+          "width": 340,
+          "height": 180
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "source_content",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
+    },
+    "input_platforms": {
+      "kind": "input",
+      "name": "输入目标平台",
+      "description": "填写需要生成的平台。",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 280
+        },
+        "collapsed": false,
+        "size": {
+          "width": 340,
+          "height": 180
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "target_platforms",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "微信公众号、小红书、知乎、B站、抖音、X、YouTube",
+        "boundaryType": "text"
+      }
+    },
+    "input_historical_samples": {
+      "kind": "input",
+      "name": "输入历史样本",
+      "description": "粘贴历史文章或风格样本。",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 520
+        },
+        "collapsed": false,
+        "size": {
+          "width": 340,
+          "height": 180
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "historical_samples",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
+    },
+    "input_content_goal": {
+      "kind": "input",
+      "name": "输入传播目标",
+      "description": "填写本次内容的目标。",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 760
+        },
+        "collapsed": false,
+        "size": {
+          "width": 340,
+          "height": 180
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "content_goal",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "把一个产品更新转成多平台发布内容，降低 AI 味，保留技术细节。",
+        "boundaryType": "text"
+      }
+    },
+    "input_human_feedback": {
+      "kind": "input",
+      "name": "输入人工反馈",
+      "description": "可选，粘贴上一轮反馈或修改要求。",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 1000
+        },
+        "collapsed": false,
+        "size": {
+          "width": 340,
+          "height": 180
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "human_feedback",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
+    },
+    "prepare_style_memory_request": {
+      "kind": "agent",
+      "name": "准备风格记忆召回",
+      "description": "把目标平台和样本转成只读记忆召回请求。",
+      "ui": {
+        "position": {
+          "x": 520,
+          "y": 360
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 280
+        }
+      },
+      "reads": [
+        {
+          "state": "target_platforms",
+          "required": true
+        },
+        {
+          "state": "historical_samples",
+          "required": false
+        },
+        {
+          "state": "content_goal",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "memory_request",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "生成 memory_request JSON，只召回用户写作风格、平台偏好、禁用表达和历史反馈。字段包含 query、scope、layer、memory_type、status、top_k、max_chars。scope 默认 user，layer 优先 procedural，status 默认 active，top_k 不超过 8，max_chars 不超过 3000。不要生成平台稿件。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "recall_style_memory": {
+      "kind": "agent",
+      "name": "召回风格记忆",
+      "description": "运行 memory_recall Skill，只透传召回结果。",
+      "ui": {
+        "position": {
+          "x": 1060,
+          "y": 360
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "memory_request",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "memory_recall_success",
+          "mode": "replace"
+        },
+        {
+          "state": "memory_context",
+          "mode": "replace"
+        },
+        {
+          "state": "recalled_memories",
+          "mode": "replace"
+        },
+        {
+          "state": "omitted_memories",
+          "mode": "replace"
+        },
+        {
+          "state": "memory_recall_result",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "memory_recall",
+        "skillBindings": [
+          {
+            "skillKey": "memory_recall",
+            "outputMapping": {
+              "success": "memory_recall_success",
+              "memory_context": "memory_context",
+              "recalled_memories": "recalled_memories",
+              "omitted_memories": "omitted_memories",
+              "result": "memory_recall_result"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {
+          "memory_recall": {
+            "skillKey": "memory_recall",
+            "title": "记忆召回 skill instruction",
+            "content": "你已绑定记忆召回技能。根据 memory_request 生成只读召回参数；不要改写记忆，不要写入记忆。技能结果会写入 memory_context、recalled_memories、omitted_memories 和 result。",
+            "source": "node.override"
+          }
+        },
+        "taskInstruction": "本节点只负责运行 memory_recall。缺失字段时使用 scope=user、status=active、top_k=8、max_chars=3000。不要输出内容稿件。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "extract_core_message": {
+      "kind": "agent",
+      "name": "提取核心观点",
+      "description": "提取原文事实、观点、例子、受众和禁改项。",
+      "ui": {
+        "position": {
+          "x": 1600,
+          "y": 300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "source_content",
+          "required": true
+        },
+        {
+          "state": "content_goal",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "core_message",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "core_message 写成 JSON，包含 thesis、must_keep_facts、examples、audience、forbidden_changes、claims_needing_care、source_tone、desired_reader_action。不要开始改写。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "build_style_profile": {
+      "kind": "agent",
+      "name": "生成用户风格画像",
+      "description": "结合历史样本和召回记忆形成风格画像。",
+      "ui": {
+        "position": {
+          "x": 2140,
+          "y": 300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "historical_samples",
+          "required": false
+        },
+        {
+          "state": "memory_context",
+          "required": false
+        },
+        {
+          "state": "core_message",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "style_profile",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "style_profile 写成 JSON，包含 voice、sentence_patterns、paragraph_length、example_style、title_style、personal_judgment_pattern、phrases_to_use、phrases_to_avoid、evidence。记忆和样本冲突时优先样本，并记录 conflict_notes。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "plan_platform_strategy": {
+      "kind": "agent",
+      "name": "规划平台策略",
+      "description": "为每个平台制定结构、语气、长度和改写重点。",
+      "ui": {
+        "position": {
+          "x": 2680,
+          "y": 300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "target_platforms",
+          "required": true
+        },
+        {
+          "state": "core_message",
+          "required": true
+        },
+        {
+          "state": "style_profile",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "platform_strategy",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "platform_strategy 写成 JSON，对每个平台输出 platform、goal、hook、structure、length_target、tone_rules、must_keep、must_avoid、cta。策略必须说明如何保留 core_message，同时适配平台。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "draft_platform_outputs": {
+      "kind": "agent",
+      "name": "生成平台初稿",
+      "description": "按平台策略生成第一版内容。",
+      "ui": {
+        "position": {
+          "x": 3220,
+          "y": 300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "core_message",
+          "required": true
+        },
+        {
+          "state": "platform_strategy",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "draft_outputs",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "draft_outputs 写成 JSON，以平台名为 key。每个平台包含 title、body、caption_or_script、hashtags、cta、assumptions。不要丢失 must_keep_facts，不要把技术细节改成空泛宣传。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "detect_ai_tone": {
+      "kind": "agent",
+      "name": "检测 AI 味",
+      "description": "标记空泛、排比、总结腔和缺少具体判断的问题。",
+      "ui": {
+        "position": {
+          "x": 3760,
+          "y": 300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "draft_outputs",
+          "required": true
+        },
+        {
+          "state": "style_profile",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "ai_tone_report",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "ai_tone_report 写成 JSON，以平台名为 key，每项包含 score_before、generic_phrases、over_structured_sections、missing_examples、missing_personal_judgment、style_mismatches、rewrite_instructions。必须指出具体 AI 味句子或段落。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "rewrite_in_user_style": {
+      "kind": "agent",
+      "name": "按风格重写",
+      "description": "根据 AI 味报告、用户风格和人工反馈生成最终稿件。",
+      "ui": {
+        "position": {
+          "x": 4300,
+          "y": 300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "draft_outputs",
+          "required": true
+        },
+        {
+          "state": "ai_tone_report",
+          "required": true
+        },
+        {
+          "state": "style_profile",
+          "required": true
+        },
+        {
+          "state": "human_feedback",
+          "required": false
+        }
+      ],
+      "writes": [
+        {
+          "state": "style_rewrite_outputs",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "style_rewrite_outputs 写成 JSON，以平台名为 key，包含 title、body、caption_or_script、hashtags、cta、changes_applied、remaining_risks。必须按 rewrite_instructions 降低 AI 味，并保留 core_message 中的关键事实。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "score_and_plan_publish": {
+      "kind": "agent",
+      "name": "评分与发布计划",
+      "description": "评估风格一致性、平台适配和发布安排。",
+      "ui": {
+        "position": {
+          "x": 4840,
+          "y": 300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "style_rewrite_outputs",
+          "required": true
+        },
+        {
+          "state": "style_profile",
+          "required": true
+        },
+        {
+          "state": "platform_strategy",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "style_consistency_score",
+          "mode": "replace"
+        },
+        {
+          "state": "publishing_plan",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "style_consistency_score 写成 JSON，以平台名为 key，包含 factual_preservation、style_fit、ai_tone_after、platform_fit、issues。publishing_plan 写成 JSON，包含 recommended_order、best_titles、cover_prompts、reuse_notes、manual_review_items。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "prepare_style_memory_candidate": {
+      "kind": "agent",
+      "name": "准备风格候选记忆",
+      "description": "只生成可审查候选记忆计划，不直接写 active 记忆。",
+      "ui": {
+        "position": {
+          "x": 5380,
+          "y": 300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "historical_samples",
+          "required": false
+        },
+        {
+          "state": "human_feedback",
+          "required": false
+        },
+        {
+          "state": "style_profile",
+          "required": true
+        },
+        {
+          "state": "ai_tone_report",
+          "required": true
+        },
+        {
+          "state": "style_consistency_score",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "candidate_plan",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "candidate_plan 写成 JSON，包含 candidates 数组。只把有证据的稳定偏好写成 candidate 状态候选：scope=user、layer=procedural、type=preference，summary、content、confidence、importance、evidence、artifact_refs。不得写入秘密、临时路径、无来源判断或权限扩大建议；没有足够证据时 candidates 为空。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "write_style_memory_candidates": {
+      "kind": "agent",
+      "name": "写入候选记忆",
+      "description": "运行 memory_candidate_writer，只写入 candidate 状态记忆。",
+      "ui": {
+        "position": {
+          "x": 5920,
+          "y": 300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "candidate_plan",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "candidate_write_success",
+          "mode": "replace"
+        },
+        {
+          "state": "candidate_memories",
+          "mode": "replace"
+        },
+        {
+          "state": "skipped_candidates",
+          "mode": "replace"
+        },
+        {
+          "state": "candidate_write_result",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "memory_candidate_writer",
+        "skillBindings": [
+          {
+            "skillKey": "memory_candidate_writer",
+            "outputMapping": {
+              "success": "candidate_write_success",
+              "candidate_memories": "candidate_memories",
+              "skipped_candidates": "skipped_candidates",
+              "result": "candidate_write_result"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {
+          "memory_candidate_writer": {
+            "skillKey": "memory_candidate_writer",
+            "title": "候选记忆写入 skill instruction",
+            "content": "你已绑定候选记忆写入器。只根据 candidate_plan 生成 candidates，并且只允许写入 candidate 状态记忆；不要应用为 active，不要写 Buddy Home，不要扩大权限。",
+            "source": "node.override"
+          }
+        },
+        "taskInstruction": "本节点只负责运行 memory_candidate_writer。将 candidate_plan 中证据充足的 candidates 交给技能；不要总结内容包，不要改写候选。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "build_final_pack": {
+      "kind": "agent",
+      "name": "组装最终内容包",
+      "description": "合并重写稿、评分、发布计划和候选记忆摘要。",
+      "ui": {
+        "position": {
+          "x": 6460,
+          "y": 300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "style_rewrite_outputs",
+          "required": true
+        },
+        {
+          "state": "style_consistency_score",
+          "required": true
+        },
+        {
+          "state": "publishing_plan",
+          "required": true
+        },
+        {
+          "state": "candidate_write_result",
+          "required": false
+        },
+        {
+          "state": "skipped_candidates",
+          "required": false
+        }
+      ],
+      "writes": [
+        {
+          "state": "final_distribution_pack",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "final_distribution_pack 写成 Markdown，包含核心观点摘要、各平台最终稿、发布计划、风格一致性评分、AI 味降低说明、需要人工复核的问题、候选记忆写入摘要。不要隐藏 skipped_candidates；说明候选记忆仍需用户审查后才能成为 active 记忆。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "output_final_distribution_pack": {
+      "kind": "output",
+      "name": "导出多平台内容包",
+      "description": "展示并持久化最终多平台内容包。",
+      "ui": {
+        "position": {
+          "x": 7000,
+          "y": 300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 260
+        }
+      },
+      "reads": [
+        {
+          "state": "final_distribution_pack",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": true,
+        "persistFormat": "md",
+        "fileNameTemplate": "final_distribution_pack.md"
+      }
+    }
+  },
+  "edges": [
+    {
+      "source": "input_source_content",
+      "target": "prepare_style_memory_request"
+    },
+    {
+      "source": "input_platforms",
+      "target": "prepare_style_memory_request"
+    },
+    {
+      "source": "input_historical_samples",
+      "target": "prepare_style_memory_request"
+    },
+    {
+      "source": "input_content_goal",
+      "target": "prepare_style_memory_request"
+    },
+    {
+      "source": "input_human_feedback",
+      "target": "prepare_style_memory_request"
+    },
+    {
+      "source": "prepare_style_memory_request",
+      "target": "recall_style_memory"
+    },
+    {
+      "source": "recall_style_memory",
+      "target": "extract_core_message"
+    },
+    {
+      "source": "extract_core_message",
+      "target": "build_style_profile"
+    },
+    {
+      "source": "build_style_profile",
+      "target": "plan_platform_strategy"
+    },
+    {
+      "source": "plan_platform_strategy",
+      "target": "draft_platform_outputs"
+    },
+    {
+      "source": "draft_platform_outputs",
+      "target": "detect_ai_tone"
+    },
+    {
+      "source": "detect_ai_tone",
+      "target": "rewrite_in_user_style"
+    },
+    {
+      "source": "rewrite_in_user_style",
+      "target": "score_and_plan_publish"
+    },
+    {
+      "source": "score_and_plan_publish",
+      "target": "prepare_style_memory_candidate"
+    },
+    {
+      "source": "prepare_style_memory_candidate",
+      "target": "write_style_memory_candidates"
+    },
+    {
+      "source": "write_style_memory_candidates",
+      "target": "build_final_pack"
+    },
+    {
+      "source": "build_final_pack",
+      "target": "output_final_distribution_pack"
+    }
+  ],
+  "conditional_edges": [],
+  "metadata": {
+    "category": "business",
+    "templateVersion": "2026-05-18",
+    "graphProtocol": "node_system",
+    "capabilityDiscoverableDefault": true,
+    "gallery": {
+      "targetUsers": [
+        "内容创作者",
+        "技术博主",
+        "独立开发者",
+        "开源项目作者",
+        "自媒体团队"
+      ],
+      "valueProposition": "把一篇源内容转成多平台内容包，同时保留核心观点、降低 AI 味并沉淀可审查风格偏好。",
+      "mockRun": "mock_data/sample_source_content.md"
+    },
+    "inputSchema": [
+      {
+        "key": "source_content",
+        "type": "markdown",
+        "required": true,
+        "description": "原始文章、README 或脚本。"
+      },
+      {
+        "key": "target_platforms",
+        "type": "text",
+        "required": true,
+        "description": "目标平台列表。"
+      },
+      {
+        "key": "historical_samples",
+        "type": "markdown",
+        "required": false,
+        "description": "历史样本或风格参考。"
+      },
+      {
+        "key": "content_goal",
+        "type": "text",
+        "required": true,
+        "description": "传播目标。"
+      },
+      {
+        "key": "human_feedback",
+        "type": "markdown",
+        "required": false,
+        "description": "可选人工反馈。"
+      }
+    ],
+    "requiredSkills": [
+      "memory_recall",
+      "memory_candidate_writer"
+    ],
+    "requiredPermissions": [
+      "memory_read",
+      "memory_candidate_write"
+    ],
+    "mockMode": {
+      "supported": true,
+      "input": "examples/mock_repurposer_input.json"
+    },
+    "artifactContract": [
+      {
+        "path": "core_message.json",
+        "state": "core_message",
+        "type": "json"
+      },
+      {
+        "path": "style_profile.json",
+        "state": "style_profile",
+        "type": "json"
+      },
+      {
+        "path": "ai_tone_report.json",
+        "state": "ai_tone_report",
+        "type": "json"
+      },
+      {
+        "path": "platform_outputs.json",
+        "state": "style_rewrite_outputs",
+        "type": "json"
+      },
+      {
+        "path": "publishing_plan.json",
+        "state": "publishing_plan",
+        "type": "json"
+      },
+      {
+        "path": "final_distribution_pack.md",
+        "state": "final_distribution_pack",
+        "type": "markdown"
+      }
+    ],
+    "outputContract": [
+      {
+        "key": "final_distribution_pack",
+        "name": "最终多平台内容包",
+        "description": "可直接展示给用户的 Markdown 内容包。",
+        "type": "markdown",
+        "role": "final_response",
+        "passThrough": true,
+        "required": true
+      },
+      {
+        "key": "style_rewrite_outputs",
+        "name": "平台最终稿",
+        "description": "各平台最终稿件的结构化 JSON。",
+        "type": "json",
+        "role": "artifact",
+        "passThrough": false,
+        "required": true
+      },
+      {
+        "key": "candidate_memories",
+        "name": "候选风格记忆",
+        "description": "需要用户审查的 candidate 状态记忆记录。",
+        "type": "json",
+        "role": "artifact",
+        "passThrough": false,
+        "required": false
+      },
+      {
+        "key": "ai_tone_report",
+        "name": "AI 味检测",
+        "description": "AI 味问题、改写指令和前后评分。",
+        "type": "json",
+        "role": "evidence",
+        "passThrough": false,
+        "required": true
+      }
+    ],
+    "evalCases": [
+      {
+        "caseId": "repurposer-mock-product-update",
+        "input": "examples/mock_repurposer_input.json",
+        "checks": [
+          "core_message_preserved",
+          "all_target_platforms_present",
+          "ai_tone_report_present",
+          "style_memory_candidates_are_candidate_only",
+          "final_pack_contains_manual_review_notes"
+        ]
+      }
+    ],
+    "safetyNotes": [
+      "候选风格记忆只能写入 candidate 状态，不能直接应用为 active。",
+      "改写不得丢失源内容中的关键事实、限制和不确定项。",
+      "人工反馈通过普通输入进入下一轮，不使用用户可见断点。"
+    ]
+  }
+}

@@ -108,7 +108,12 @@ class TemplateLayoutTests(unittest.TestCase):
                 "ai_news_digest_to_wechat_article",
                 "buddy_autonomous_loop",
                 "buddy_capability_loop",
+                "ecommerce_review_mining_agent",
+                "game_creative_factory",
+                "job_application_interview_coach",
+                "multi_platform_content_repurposer",
                 "policy_navigator_agent",
+                "product_competitor_research_agent",
                 "toograph_graph_template_creation_workflow",
                 "toograph_page_operation_workflow",
                 "toograph_skill_creation_workflow",
@@ -167,6 +172,41 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(news_template["default_graph_name"], "AI 新闻公众号助手")
         self.assertIn("公众号文章", news_template["description"])
         self.assertIs(news_template["capabilityDiscoverable"], True)
+
+        repurposer_template = templates["multi_platform_content_repurposer"]
+        self.assertEqual(repurposer_template["source"], "official")
+        self.assertEqual(repurposer_template["label"], "一文多发内容改写助手")
+        self.assertEqual(repurposer_template["default_graph_name"], "一文多发内容改写助手")
+        self.assertIn("多平台内容包", repurposer_template["description"])
+        self.assertIs(repurposer_template["capabilityDiscoverable"], True)
+
+        game_template = templates["game_creative_factory"]
+        self.assertEqual(game_template["source"], "official")
+        self.assertEqual(game_template["label"], "游戏广告创意工厂")
+        self.assertEqual(game_template["default_graph_name"], "游戏广告创意工厂")
+        self.assertIn("Creative Brief", game_template["description"])
+        self.assertIs(game_template["capabilityDiscoverable"], True)
+
+        ecommerce_template = templates["ecommerce_review_mining_agent"]
+        self.assertEqual(ecommerce_template["source"], "official")
+        self.assertEqual(ecommerce_template["label"], "电商评论洞察挖掘助手")
+        self.assertEqual(ecommerce_template["default_graph_name"], "电商评论洞察挖掘助手")
+        self.assertIn("详情页文案", ecommerce_template["description"])
+        self.assertIs(ecommerce_template["capabilityDiscoverable"], True)
+
+        job_template = templates["job_application_interview_coach"]
+        self.assertEqual(job_template["source"], "official")
+        self.assertEqual(job_template["label"], "求职简历与面试教练")
+        self.assertEqual(job_template["default_graph_name"], "求职简历与面试教练")
+        self.assertIn("岗位匹配报告", job_template["description"])
+        self.assertIs(job_template["capabilityDiscoverable"], True)
+
+        product_template = templates["product_competitor_research_agent"]
+        self.assertEqual(product_template["source"], "official")
+        self.assertEqual(product_template["label"], "产品竞品研究助手")
+        self.assertEqual(product_template["default_graph_name"], "产品竞品研究助手")
+        self.assertIn("PRD 草稿", product_template["description"])
+        self.assertIs(product_template["capabilityDiscoverable"], True)
 
     def test_official_templates_do_not_embed_breakpoint_metadata(self) -> None:
         for template in _official_template_records():
@@ -595,6 +635,720 @@ class TemplateLayoutTests(unittest.TestCase):
             {
                 **payload,
                 "graph_id": "test_ai_news_digest_to_wechat_article",
+                "name": template["default_graph_name"],
+            }
+        )
+
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+    def test_multi_platform_content_repurposer_contract(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "multi_platform_content_repurposer"
+        )
+        states = template["state_schema"]
+        nodes = template["nodes"]
+        metadata = template["metadata"]
+
+        self.assertEqual(metadata["graphProtocol"], "node_system")
+        self.assertEqual(metadata["category"], "business")
+        self.assertEqual(metadata["requiredSkills"], ["memory_recall", "memory_candidate_writer"])
+        self.assertEqual(metadata["requiredPermissions"], ["memory_read", "memory_candidate_write"])
+        self.assertEqual(metadata["mockMode"]["input"], "examples/mock_repurposer_input.json")
+        self.assertEqual(
+            [item["key"] for item in metadata["inputSchema"]],
+            ["source_content", "target_platforms", "historical_samples", "content_goal", "human_feedback"],
+        )
+        self.assertEqual(
+            [item["key"] for item in metadata["outputContract"]],
+            ["final_distribution_pack", "style_rewrite_outputs", "candidate_memories", "ai_tone_report"],
+        )
+        self.assertTrue(metadata["outputContract"][0]["passThrough"])
+        self.assertEqual(
+            {item["path"]: item["state"] for item in metadata["artifactContract"]},
+            {
+                "core_message.json": "core_message",
+                "style_profile.json": "style_profile",
+                "ai_tone_report.json": "ai_tone_report",
+                "platform_outputs.json": "style_rewrite_outputs",
+                "publishing_plan.json": "publishing_plan",
+                "final_distribution_pack.md": "final_distribution_pack",
+            },
+        )
+
+        self.assertEqual(states["source_content"]["type"], "markdown")
+        self.assertEqual(states["memory_context"]["type"], "json")
+        self.assertEqual(states["core_message"]["type"], "json")
+        self.assertEqual(states["style_profile"]["type"], "json")
+        self.assertEqual(states["draft_outputs"]["type"], "json")
+        self.assertEqual(states["ai_tone_report"]["type"], "json")
+        self.assertEqual(states["style_rewrite_outputs"]["type"], "json")
+        self.assertEqual(states["candidate_plan"]["type"], "json")
+        self.assertEqual(states["candidate_memories"]["type"], "json")
+        self.assertEqual(states["final_distribution_pack"]["type"], "markdown")
+        self.assertFalse(any("promptVisible" in definition for definition in states.values()))
+
+        recall_node = nodes["recall_style_memory"]
+        self.assertEqual(recall_node["config"]["skillKey"], "memory_recall")
+        self.assertEqual(
+            recall_node["config"]["skillBindings"][0]["outputMapping"],
+            {
+                "success": "memory_recall_success",
+                "memory_context": "memory_context",
+                "recalled_memories": "recalled_memories",
+                "omitted_memories": "omitted_memories",
+                "result": "memory_recall_result",
+            },
+        )
+        writer_node = nodes["write_style_memory_candidates"]
+        self.assertEqual(writer_node["config"]["skillKey"], "memory_candidate_writer")
+        self.assertEqual(
+            writer_node["config"]["skillBindings"][0]["outputMapping"],
+            {
+                "success": "candidate_write_success",
+                "candidate_memories": "candidate_memories",
+                "skipped_candidates": "skipped_candidates",
+                "result": "candidate_write_result",
+            },
+        )
+        self.assertIn("candidate 状态", nodes["prepare_style_memory_candidate"]["config"]["taskInstruction"])
+        self.assertIn("不要应用为 active", writer_node["config"]["skillInstructionBlocks"]["memory_candidate_writer"]["content"])
+        self.assertIn("AI 味", nodes["detect_ai_tone"]["config"]["taskInstruction"])
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
+            ["output_final_distribution_pack"],
+        )
+        self.assertEqual(
+            _read_contracts(nodes["output_final_distribution_pack"]["reads"]),
+            [{"state": "final_distribution_pack", "required": True}],
+        )
+        self.assertEqual(nodes["output_final_distribution_pack"]["config"]["fileNameTemplate"], "final_distribution_pack.md")
+
+        template_dir = Path(__file__).resolve().parents[2] / "graph_template" / "official" / "multi_platform_content_repurposer"
+        self.assertTrue((template_dir / "README.md").is_file())
+        self.assertTrue((template_dir / "examples" / "mock_repurposer_input.json").is_file())
+        self.assertTrue((template_dir / "mock_data" / "sample_source_content.md").is_file())
+        self.assertTrue((template_dir / "artifacts" / "sample_final_distribution_pack.md").is_file())
+        self.assertTrue((template_dir / "eval_cases.json").is_file())
+
+    def test_multi_platform_content_repurposer_is_runtime_compatible(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "multi_platform_content_repurposer"
+        )
+        payload = {
+            key: value
+            for key, value in template.items()
+            if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+        }
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **payload,
+                "graph_id": "test_multi_platform_content_repurposer",
+                "name": template["default_graph_name"],
+            }
+        )
+
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+    def test_job_application_interview_coach_contract(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "job_application_interview_coach"
+        )
+        states = template["state_schema"]
+        nodes = template["nodes"]
+        metadata = template["metadata"]
+
+        self.assertEqual(metadata["graphProtocol"], "node_system")
+        self.assertEqual(metadata["category"], "business")
+        self.assertEqual(metadata["requiredSkills"], ["memory_recall", "memory_candidate_writer"])
+        self.assertEqual(metadata["requiredPermissions"], ["memory_read", "memory_candidate_write"])
+        self.assertEqual(metadata["mockMode"]["input"], "examples/mock_job_application_input.json")
+        self.assertEqual(
+            [item["key"] for item in metadata["inputSchema"]],
+            [
+                "candidate_profile",
+                "resume",
+                "project_experiences",
+                "job_description",
+                "target_city",
+                "salary_expectation",
+                "interview_transcript",
+            ],
+        )
+        self.assertEqual(
+            [item["key"] for item in metadata["outputContract"]],
+            [
+                "final_application_package",
+                "matching_report",
+                "rewritten_resume",
+                "project_story_library",
+                "interview_questions",
+                "learning_plan",
+                "candidate_memories",
+            ],
+        )
+        self.assertTrue(metadata["outputContract"][0]["passThrough"])
+        self.assertEqual(
+            {item["path"]: item["state"] for item in metadata["artifactContract"]},
+            {
+                "jd_requirement_matrix.json": "jd_requirements",
+                "matching_report.md": "matching_report",
+                "gap_analysis.md": "gap_analysis",
+                "rewritten_resume.md": "rewritten_resume",
+                "project_story_library.json": "project_story_library",
+                "interview_questions.json": "interview_questions",
+                "mock_interview_feedback.md": "mock_interview_feedback",
+                "learning_plan.md": "learning_plan",
+                "salary_strategy.md": "salary_strategy",
+                "final_application_package.md": "final_application_package",
+            },
+        )
+
+        for state_name in [
+            "candidate_profile",
+            "resume",
+            "project_experiences",
+            "job_description",
+            "target_city",
+            "salary_expectation",
+            "memory_request",
+            "candidate_memory_plan",
+            "candidate_memories",
+            "final_application_package",
+        ]:
+            self.assertIn(state_name, states)
+        self.assertEqual(states["jd_requirements"]["type"], "json")
+        self.assertEqual(states["experience_match_map"]["type"], "json")
+        self.assertEqual(states["project_story_library"]["type"], "json")
+        self.assertEqual(states["interview_questions"]["type"], "json")
+        self.assertEqual(states["final_application_package"]["type"], "markdown")
+        self.assertFalse(any("promptVisible" in definition for definition in states.values()))
+
+        recall_node = nodes["recall_candidate_memory"]
+        self.assertEqual(recall_node["config"]["skillKey"], "memory_recall")
+        self.assertEqual(
+            recall_node["config"]["skillBindings"][0]["outputMapping"],
+            {
+                "success": "memory_recall_success",
+                "memory_context": "memory_context",
+                "recalled_memories": "recalled_memories",
+                "omitted_memories": "omitted_memories",
+                "result": "memory_recall_result",
+            },
+        )
+        writer_node = nodes["write_candidate_memory_candidates"]
+        self.assertEqual(writer_node["config"]["skillKey"], "memory_candidate_writer")
+        self.assertEqual(
+            writer_node["config"]["skillBindings"][0]["outputMapping"],
+            {
+                "success": "candidate_write_success",
+                "candidate_memories": "candidate_memories",
+                "skipped_candidates": "skipped_candidates",
+                "result": "candidate_write_result",
+            },
+        )
+        self.assertIn("candidate 状态", nodes["prepare_candidate_memory_plan"]["config"]["taskInstruction"])
+        self.assertIn("不要应用为 active", writer_node["config"]["skillInstructionBlocks"]["memory_candidate_writer"]["content"])
+        self.assertIn("不承诺录用", nodes["build_gap_analysis"]["config"]["taskInstruction"])
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
+            ["output_final_application_package"],
+        )
+        self.assertEqual(
+            _read_contracts(nodes["output_final_application_package"]["reads"]),
+            [{"state": "final_application_package", "required": True}],
+        )
+        self.assertEqual(nodes["output_final_application_package"]["config"]["fileNameTemplate"], "final_application_package.md")
+
+        template_dir = Path(__file__).resolve().parents[2] / "graph_template" / "official" / "job_application_interview_coach"
+        self.assertTrue((template_dir / "README.md").is_file())
+        self.assertTrue((template_dir / "examples" / "mock_job_application_input.json").is_file())
+        self.assertTrue((template_dir / "mock_data" / "sample_resume.md").is_file())
+        self.assertTrue((template_dir / "mock_data" / "sample_job_description.md").is_file())
+        self.assertTrue((template_dir / "artifacts" / "sample_final_application_package.md").is_file())
+        self.assertTrue((template_dir / "eval_cases.json").is_file())
+
+    def test_job_application_interview_coach_is_runtime_compatible(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "job_application_interview_coach"
+        )
+        payload = {
+            key: value
+            for key, value in template.items()
+            if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+        }
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **payload,
+                "graph_id": "test_job_application_interview_coach",
+                "name": template["default_graph_name"],
+            }
+        )
+
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+    def test_game_creative_factory_contract(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "game_creative_factory"
+        )
+        states = template["state_schema"]
+        nodes = template["nodes"]
+        metadata = template["metadata"]
+
+        self.assertEqual(metadata["graphProtocol"], "node_system")
+        self.assertEqual(metadata["category"], "business")
+        self.assertEqual(metadata["requiredSkills"], ["memory_recall", "memory_candidate_writer"])
+        self.assertEqual(metadata["requiredPermissions"], ["memory_read", "memory_candidate_write"])
+        self.assertEqual(metadata["mockMode"]["input"], "examples/mock_game_creative_input.json")
+        self.assertEqual(
+            [item["key"] for item in metadata["inputSchema"]],
+            [
+                "game_genre",
+                "game_brief",
+                "target_audience",
+                "creative_goal",
+                "market_notes",
+                "competitor_ad_notes",
+                "material_analysis",
+                "platform_constraints",
+                "revision_feedback",
+            ],
+        )
+        self.assertEqual(
+            [item["key"] for item in metadata["outputContract"]],
+            [
+                "final_summary",
+                "creative_brief",
+                "pattern_summary",
+                "script_variants",
+                "storyboard_packages",
+                "video_prompt_packages",
+                "review_results",
+                "best_variant",
+                "image_generation_todo",
+                "video_generation_todo",
+                "candidate_memories",
+            ],
+        )
+        self.assertTrue(metadata["outputContract"][0]["passThrough"])
+        self.assertEqual(
+            {item["path"]: item["state"] for item in metadata["artifactContract"]},
+            {
+                "creative_brief.md": "creative_brief",
+                "pattern_summary.md": "pattern_summary",
+                "news_context.md": "news_context",
+                "script_variants.json": "script_variants",
+                "storyboards_showcase.md": "storyboard_packages",
+                "video_prompts_showcase.md": "video_prompt_packages",
+                "review_results.json": "review_results",
+                "best_variant.json": "best_variant",
+                "todo_image_generation.md": "image_generation_todo",
+                "todo_video_generation.md": "video_generation_todo",
+                "final_summary.md": "final_summary",
+            },
+        )
+
+        for state_name in [
+            "game_genre",
+            "game_brief",
+            "market_notes",
+            "competitor_ad_notes",
+            "material_analysis",
+            "creative_memory_request",
+            "clean_news_items",
+            "ad_items",
+            "video_analysis_results",
+            "creative_brief",
+            "script_variants",
+            "review_results",
+            "best_variant",
+            "final_summary",
+        ]:
+            self.assertIn(state_name, states)
+        self.assertEqual(states["script_variants"]["type"], "json")
+        self.assertEqual(states["review_results"]["type"], "json")
+        self.assertEqual(states["best_variant"]["type"], "json")
+        self.assertEqual(states["storyboard_packages"]["type"], "markdown")
+        self.assertEqual(states["video_prompt_packages"]["type"], "markdown")
+        self.assertEqual(states["final_summary"]["type"], "markdown")
+        self.assertFalse(any("promptVisible" in definition for definition in states.values()))
+
+        recall_node = nodes["recall_creative_memory"]
+        self.assertEqual(recall_node["config"]["skillKey"], "memory_recall")
+        self.assertEqual(
+            recall_node["config"]["skillBindings"][0]["outputMapping"],
+            {
+                "success": "memory_recall_success",
+                "memory_context": "memory_context",
+                "recalled_memories": "recalled_memories",
+                "omitted_memories": "omitted_memories",
+                "result": "memory_recall_result",
+            },
+        )
+        writer_node = nodes["write_creative_memory_candidates"]
+        self.assertEqual(writer_node["config"]["skillKey"], "memory_candidate_writer")
+        self.assertEqual(
+            writer_node["config"]["skillBindings"][0]["outputMapping"],
+            {
+                "success": "candidate_write_success",
+                "candidate_memories": "candidate_memories",
+                "skipped_candidates": "skipped_candidates",
+                "result": "candidate_write_result",
+            },
+        )
+        self.assertIn("game_genre", nodes["build_creative_brief"]["config"]["taskInstruction"])
+        self.assertIn("平台合规风险", nodes["review_creatives"]["config"]["taskInstruction"])
+        self.assertIn("candidate 状态", nodes["prepare_creative_memory_plan"]["config"]["taskInstruction"])
+        self.assertIn("不要应用为 active", writer_node["config"]["skillInstructionBlocks"]["memory_candidate_writer"]["content"])
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
+            ["output_final_summary"],
+        )
+        self.assertEqual(
+            _read_contracts(nodes["output_final_summary"]["reads"]),
+            [{"state": "final_summary", "required": True}],
+        )
+        self.assertEqual(nodes["output_final_summary"]["config"]["fileNameTemplate"], "final_summary.md")
+
+        template_dir = Path(__file__).resolve().parents[2] / "graph_template" / "official" / "game_creative_factory"
+        self.assertTrue((template_dir / "README.md").is_file())
+        self.assertTrue((template_dir / "examples" / "mock_game_creative_input.json").is_file())
+        self.assertTrue((template_dir / "mock_data" / "sample_competitor_ads.md").is_file())
+        self.assertTrue((template_dir / "mock_data" / "sample_material_analysis.md").is_file())
+        self.assertTrue((template_dir / "artifacts" / "sample_final_summary.md").is_file())
+        self.assertTrue((template_dir / "eval_cases.json").is_file())
+
+    def test_game_creative_factory_is_runtime_compatible(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "game_creative_factory"
+        )
+        payload = {
+            key: value
+            for key, value in template.items()
+            if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+        }
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **payload,
+                "graph_id": "test_game_creative_factory",
+                "name": template["default_graph_name"],
+            }
+        )
+
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+    def test_product_competitor_research_agent_contract(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "product_competitor_research_agent"
+        )
+        states = template["state_schema"]
+        nodes = template["nodes"]
+        metadata = template["metadata"]
+
+        self.assertEqual(metadata["graphProtocol"], "node_system")
+        self.assertEqual(metadata["category"], "business")
+        self.assertEqual(metadata["requiredSkills"], ["memory_recall", "memory_candidate_writer"])
+        self.assertEqual(metadata["requiredPermissions"], ["memory_read", "memory_candidate_write"])
+        self.assertEqual(metadata["mockMode"]["input"], "examples/mock_product_research_input.json")
+        self.assertEqual(
+            [item["key"] for item in metadata["inputSchema"]],
+            [
+                "product_idea",
+                "competitor_sources",
+                "user_reviews",
+                "interview_notes",
+                "target_market",
+                "research_goal",
+                "existing_knowledge_notes",
+            ],
+        )
+        self.assertEqual(
+            [item["key"] for item in metadata["outputContract"]],
+            [
+                "final_research_package",
+                "competitor_profiles",
+                "feature_matrix",
+                "user_review_clusters",
+                "pain_points",
+                "opportunity_report",
+                "mvp_plan",
+                "prd_draft",
+                "validation_plan",
+                "candidate_memories",
+            ],
+        )
+        self.assertTrue(metadata["outputContract"][0]["passThrough"])
+        self.assertEqual(
+            {item["path"]: item["state"] for item in metadata["artifactContract"]},
+            {
+                "competitor_profiles.json": "competitor_profiles",
+                "feature_matrix.csv": "feature_matrix",
+                "review_clusters.json": "user_review_clusters",
+                "pain_points.md": "pain_points",
+                "opportunity_report.md": "opportunity_report",
+                "mvp_plan.md": "mvp_plan",
+                "prd_draft.md": "prd_draft",
+                "validation_plan.md": "validation_plan",
+                "final_research_package.md": "final_research_package",
+            },
+        )
+
+        for state_name in [
+            "product_idea",
+            "competitor_sources",
+            "user_reviews",
+            "interview_notes",
+            "competitor_profiles",
+            "feature_matrix",
+            "user_review_clusters",
+            "pain_points",
+            "opportunity_report",
+            "mvp_plan",
+            "prd_draft",
+            "validation_plan",
+            "final_research_package",
+        ]:
+            self.assertIn(state_name, states)
+        self.assertEqual(states["competitor_profiles"]["type"], "json")
+        self.assertEqual(states["feature_matrix"]["type"], "markdown")
+        self.assertEqual(states["user_review_clusters"]["type"], "json")
+        self.assertEqual(states["opportunity_report"]["type"], "markdown")
+        self.assertEqual(states["final_research_package"]["type"], "markdown")
+        self.assertFalse(any("promptVisible" in definition for definition in states.values()))
+
+        recall_node = nodes["recall_product_memory"]
+        self.assertEqual(recall_node["config"]["skillKey"], "memory_recall")
+        self.assertEqual(
+            recall_node["config"]["skillBindings"][0]["outputMapping"],
+            {
+                "success": "memory_recall_success",
+                "memory_context": "memory_context",
+                "recalled_memories": "recalled_memories",
+                "omitted_memories": "omitted_memories",
+                "result": "memory_recall_result",
+            },
+        )
+        writer_node = nodes["write_product_memory_candidates"]
+        self.assertEqual(writer_node["config"]["skillKey"], "memory_candidate_writer")
+        self.assertEqual(
+            writer_node["config"]["skillBindings"][0]["outputMapping"],
+            {
+                "success": "candidate_write_success",
+                "candidate_memories": "candidate_memories",
+                "skipped_candidates": "skipped_candidates",
+                "result": "candidate_write_result",
+            },
+        )
+        self.assertIn("evidence", nodes["build_feature_matrix"]["config"]["taskInstruction"])
+        self.assertIn("假设", nodes["draft_prd"]["config"]["taskInstruction"])
+        self.assertIn("candidate 状态", nodes["prepare_product_memory_plan"]["config"]["taskInstruction"])
+        self.assertIn("不要应用为 active", writer_node["config"]["skillInstructionBlocks"]["memory_candidate_writer"]["content"])
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
+            ["output_final_research_package"],
+        )
+        self.assertEqual(
+            _read_contracts(nodes["output_final_research_package"]["reads"]),
+            [{"state": "final_research_package", "required": True}],
+        )
+        self.assertEqual(nodes["output_final_research_package"]["config"]["fileNameTemplate"], "final_research_package.md")
+
+        template_dir = Path(__file__).resolve().parents[2] / "graph_template" / "official" / "product_competitor_research_agent"
+        self.assertTrue((template_dir / "README.md").is_file())
+        self.assertTrue((template_dir / "examples" / "mock_product_research_input.json").is_file())
+        self.assertTrue((template_dir / "mock_data" / "sample_competitor_sources.md").is_file())
+        self.assertTrue((template_dir / "mock_data" / "sample_user_reviews.md").is_file())
+        self.assertTrue((template_dir / "artifacts" / "sample_final_research_package.md").is_file())
+        self.assertTrue((template_dir / "eval_cases.json").is_file())
+
+    def test_product_competitor_research_agent_is_runtime_compatible(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "product_competitor_research_agent"
+        )
+        payload = {
+            key: value
+            for key, value in template.items()
+            if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+        }
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **payload,
+                "graph_id": "test_product_competitor_research_agent",
+                "name": template["default_graph_name"],
+            }
+        )
+
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+    def test_ecommerce_review_mining_agent_contract(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "ecommerce_review_mining_agent"
+        )
+        states = template["state_schema"]
+        nodes = template["nodes"]
+        metadata = template["metadata"]
+
+        self.assertEqual(metadata["graphProtocol"], "node_system")
+        self.assertEqual(metadata["category"], "business")
+        self.assertEqual(metadata["requiredSkills"], ["memory_recall", "memory_candidate_writer"])
+        self.assertEqual(metadata["requiredPermissions"], ["memory_read", "memory_candidate_write"])
+        self.assertEqual(metadata["mockMode"]["input"], "examples/mock_ecommerce_review_input.json")
+        self.assertEqual(
+            [item["key"] for item in metadata["inputSchema"]],
+            [
+                "product_context",
+                "raw_reviews",
+                "competitor_reviews",
+                "store_feedback",
+                "target_platforms",
+                "marketing_goal",
+                "compliance_notes",
+            ],
+        )
+        self.assertEqual(
+            [item["key"] for item in metadata["outputContract"]],
+            [
+                "final_review_mining_package",
+                "positive_review_clusters",
+                "negative_review_clusters",
+                "user_persona",
+                "purchase_motivation",
+                "selling_points",
+                "risk_points",
+                "product_copy",
+                "short_video_scripts",
+                "xiaohongshu_notes",
+                "candidate_memories",
+            ],
+        )
+        self.assertTrue(metadata["outputContract"][0]["passThrough"])
+        self.assertEqual(
+            {item["path"]: item["state"] for item in metadata["artifactContract"]},
+            {
+                "positive_review_clusters.json": "positive_review_clusters",
+                "negative_review_clusters.json": "negative_review_clusters",
+                "user_persona.md": "user_persona",
+                "purchase_motivation.md": "purchase_motivation",
+                "selling_points.md": "selling_points",
+                "risk_points.md": "risk_points",
+                "product_copy.md": "product_copy",
+                "short_video_scripts.md": "short_video_scripts",
+                "xiaohongshu_notes.md": "xiaohongshu_notes",
+                "final_review_mining_package.md": "final_review_mining_package",
+            },
+        )
+
+        for state_name in [
+            "product_context",
+            "raw_reviews",
+            "competitor_reviews",
+            "clean_reviews",
+            "positive_review_clusters",
+            "negative_review_clusters",
+            "user_persona",
+            "purchase_motivation",
+            "selling_points",
+            "risk_points",
+            "product_copy",
+            "short_video_scripts",
+            "xiaohongshu_notes",
+            "final_review_mining_package",
+        ]:
+            self.assertIn(state_name, states)
+        self.assertEqual(states["clean_reviews"]["type"], "json")
+        self.assertEqual(states["positive_review_clusters"]["type"], "json")
+        self.assertEqual(states["negative_review_clusters"]["type"], "json")
+        self.assertEqual(states["selling_points"]["type"], "markdown")
+        self.assertEqual(states["final_review_mining_package"]["type"], "markdown")
+        self.assertFalse(any("promptVisible" in definition for definition in states.values()))
+
+        recall_node = nodes["recall_review_memory"]
+        self.assertEqual(recall_node["config"]["skillKey"], "memory_recall")
+        self.assertEqual(
+            recall_node["config"]["skillBindings"][0]["outputMapping"],
+            {
+                "success": "memory_recall_success",
+                "memory_context": "memory_context",
+                "recalled_memories": "recalled_memories",
+                "omitted_memories": "omitted_memories",
+                "result": "memory_recall_result",
+            },
+        )
+        writer_node = nodes["write_review_memory_candidates"]
+        self.assertEqual(writer_node["config"]["skillKey"], "memory_candidate_writer")
+        self.assertEqual(
+            writer_node["config"]["skillBindings"][0]["outputMapping"],
+            {
+                "success": "candidate_write_success",
+                "candidate_memories": "candidate_memories",
+                "skipped_candidates": "skipped_candidates",
+                "result": "candidate_write_result",
+            },
+        )
+        self.assertIn("evidence", nodes["extract_selling_and_risk_points"]["config"]["taskInstruction"])
+        self.assertIn("合规", nodes["draft_marketing_artifacts"]["config"]["taskInstruction"])
+        self.assertIn("candidate 状态", nodes["prepare_review_memory_plan"]["config"]["taskInstruction"])
+        self.assertIn("不要应用为 active", writer_node["config"]["skillInstructionBlocks"]["memory_candidate_writer"]["content"])
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
+            ["output_final_review_mining_package"],
+        )
+        self.assertEqual(
+            _read_contracts(nodes["output_final_review_mining_package"]["reads"]),
+            [{"state": "final_review_mining_package", "required": True}],
+        )
+        self.assertEqual(nodes["output_final_review_mining_package"]["config"]["fileNameTemplate"], "final_review_mining_package.md")
+
+        template_dir = Path(__file__).resolve().parents[2] / "graph_template" / "official" / "ecommerce_review_mining_agent"
+        self.assertTrue((template_dir / "README.md").is_file())
+        self.assertTrue((template_dir / "examples" / "mock_ecommerce_review_input.json").is_file())
+        self.assertTrue((template_dir / "mock_data" / "sample_reviews.csv").is_file())
+        self.assertTrue((template_dir / "mock_data" / "sample_competitor_reviews.md").is_file())
+        self.assertTrue((template_dir / "artifacts" / "sample_final_review_mining_package.md").is_file())
+        self.assertTrue((template_dir / "eval_cases.json").is_file())
+
+    def test_ecommerce_review_mining_agent_is_runtime_compatible(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "ecommerce_review_mining_agent"
+        )
+        payload = {
+            key: value
+            for key, value in template.items()
+            if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+        }
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **payload,
+                "graph_id": "test_ecommerce_review_mining_agent",
                 "name": template["default_graph_name"],
             }
         )

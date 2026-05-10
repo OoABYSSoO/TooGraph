@@ -1,0 +1,9 @@
+{
+  "product_context": "一款 500ml 便携保温杯，主打轻量、防漏、通勤和办公室场景，价格带 99-129 元。",
+  "raw_reviews": "见 mock_data/sample_reviews.csv",
+  "competitor_reviews": "见 mock_data/sample_competitor_reviews.md",
+  "store_feedback": "客服反馈：用户最常问是否漏水、是否能放进车载杯架、杯盖是否好清洗。退货原因集中在颜色与图片略有色差、杯盖拆洗不熟悉。",
+  "target_platforms": "详情页、短视频、小红书",
+  "marketing_goal": "提炼真实评论支持的卖点和风险提示，生成可人工审核的素材草稿。",
+  "compliance_notes": "避免绝对化用语，例如“永不漏水”“全网第一”。不要贬损竞品，不要承诺医疗或保健效果。"
+}

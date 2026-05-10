@@ -1,0 +1,11 @@
+{
+  "game_genre": "策略 RPG",
+  "game_brief": "一款末日题材策略 RPG，核心卖点是小队编成、基地建设、天气灾害和关键抉择影响剧情。首轮广告要验证“资源紧张下的生存抉择”和“角色牺牲带来的情绪冲击”。",
+  "target_audience": "25-40 岁策略和剧情向手游玩家，偏好高压决策、基地养成和角色羁绊。",
+  "creative_goal": "生成 4 个 30 秒短视频广告脚本，并挑选一个优先制作版本。",
+  "market_notes": "近期同类末日生存题材素材强调资源稀缺、天气灾害和营地防守。玩家评论常关注是否有真实策略深度，而不是只看战力数值。",
+  "competitor_ad_notes": "见 mock_data/sample_competitor_ads.md",
+  "material_analysis": "见 mock_data/sample_material_analysis.md",
+  "platform_constraints": "目标平台：TikTok、巨量、YouTube Shorts。时长 20-35 秒，避免血腥特写、误导性抽卡概率和夸大收益。需要保留游戏实机 UI 或明确标注概念镜头。",
+  "revision_feedback": ""
+}

@@ -766,6 +766,7 @@ onMounted(loadCatalog);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: rgba(154, 52, 18, 0.78);
+  overflow-wrap: anywhere;
 }
 
 .graph-library-page__title {
@@ -985,7 +986,7 @@ onMounted(loadCatalog);
 }
 
 .graph-library-page__column-list {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   gap: 12px;
 }
 
@@ -1008,6 +1009,7 @@ onMounted(loadCatalog);
 }
 
 .graph-library-page__card-open {
+  box-sizing: border-box;
   display: grid;
   gap: 14px;
   width: 100%;
@@ -1203,12 +1205,6 @@ onMounted(loadCatalog);
   border-radius: 999px;
   padding: 4px 9px;
   background: rgba(255, 248, 240, 0.68);
-}
-
-@media (max-width: 1280px) {
-  .graph-library-page__column-list {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 1180px) {

@@ -1,0 +1,35 @@
+[
+  {
+    "case_id": "product_research_light_mock",
+    "name": "轻量 mock 产品竞品研究",
+    "description": "使用示例竞品资料、用户评论和访谈材料，检查输出是否带证据链并形成 MVP/PRD。",
+    "input": "examples/mock_product_research_input.json",
+    "checks": [
+      {
+        "kind": "schema",
+        "target": "competitor_profiles.json",
+        "expectation": "每个竞品必须包含定位、功能、优劣势、证据 id 和 unknowns。"
+      },
+      {
+        "kind": "artifact",
+        "target": "feature_matrix.csv",
+        "expectation": "功能矩阵每个判断必须包含 evidence id 或 evidence_missing。"
+      },
+      {
+        "kind": "rule",
+        "target": "opportunity_report.md",
+        "expectation": "机会点必须区分证据、推断和假设，不能把少量评论包装成统计结论。"
+      },
+      {
+        "kind": "rule",
+        "target": "prd_draft.md",
+        "expectation": "PRD 必须包含 goals、non-goals、acceptance criteria、open questions 和 risks。"
+      },
+      {
+        "kind": "artifact",
+        "target": "validation_plan.md",
+        "expectation": "验证计划必须包含 success_metrics、failure_thresholds 和 decision_rules。"
+      }
+    ]
+  }
+]

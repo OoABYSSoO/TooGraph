@@ -1,0 +1,35 @@
+[
+  {
+    "case_id": "game_creative_light_mock",
+    "name": "轻量 mock 游戏广告创意包",
+    "description": "使用示例游戏简报、竞品素材分析和上传素材分析，检查输出是否形成可执行创意包。",
+    "input": "examples/mock_game_creative_input.json",
+    "checks": [
+      {
+        "kind": "rule",
+        "target": "creative_brief.md",
+        "expectation": "必须显式使用 game_genre，并说明该类型如何影响创意策略。"
+      },
+      {
+        "kind": "artifact",
+        "target": "pattern_summary.md",
+        "expectation": "必须总结竞品广告模式，并区分可复用模式、过度使用套路和平台合规风险。"
+      },
+      {
+        "kind": "schema",
+        "target": "script_variants.json",
+        "expectation": "至少包含 4 个结构上差异化的脚本变体，且每个变体有 hook、beats、CTA、asset_needs 和 risk_notes。"
+      },
+      {
+        "kind": "rule",
+        "target": "review_results.json",
+        "expectation": "审核评分必须包含平台合规风险、素材可得性和迭代优先级。"
+      },
+      {
+        "kind": "artifact",
+        "target": "todo_video_generation.md",
+        "expectation": "视频任务必须可执行，包含镜头、时长、素材、检查点和失败回退。"
+      }
+    ]
+  }
+]

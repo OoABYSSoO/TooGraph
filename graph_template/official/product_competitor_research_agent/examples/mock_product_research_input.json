@@ -1,0 +1,9 @@
+{
+  "product_idea": "面向小团队的 AI 工作流模板市场，帮助运营、内容和产品团队把常见任务沉淀成可复跑模板。",
+  "competitor_sources": "见 mock_data/sample_competitor_sources.md",
+  "user_reviews": "见 mock_data/sample_user_reviews.md",
+  "interview_notes": "3 位运营负责人反馈：最难不是生成内容，而是复用流程、追踪结果、知道失败原因，并把好模板交给同事使用。",
+  "target_market": "10-100 人的内容、运营和产品团队，已有 AI 工具使用经验，但缺少流程化资产管理。",
+  "research_goal": "找到模板市场的差异化 MVP 方向，输出证据链、MVP 和 PRD 草稿。",
+  "existing_knowledge_notes": "团队已有图运行记录、模板 Gallery、技能权限和记忆候选能力。短期不做企业 SSO 和复杂计费。"
+}

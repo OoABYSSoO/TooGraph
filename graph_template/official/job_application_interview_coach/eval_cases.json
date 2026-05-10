@@ -1,0 +1,35 @@
+[
+  {
+    "case_id": "job_application_light_mock",
+    "name": "轻量 mock 求职准备包",
+    "description": "使用示例简历和单个目标 JD，检查输出是否包含匹配、差距、简历改写、故事库、题库和学习计划。",
+    "input": "examples/mock_job_application_input.json",
+    "checks": [
+      {
+        "kind": "schema",
+        "target": "jd_requirement_matrix.json",
+        "expectation": "必须包含 must_have_requirements、responsibilities、evidence_quotes 和 uncertainties。"
+      },
+      {
+        "kind": "artifact",
+        "target": "rewritten_resume.md",
+        "expectation": "简历 bullet 必须具体可验证，不得编造不存在的项目、学历、证书或指标。"
+      },
+      {
+        "kind": "rule",
+        "target": "project_story_library.json",
+        "expectation": "项目故事应包含 STAR 或 CAR 结构，并标注 likely_followups 和 evidence_needed。"
+      },
+      {
+        "kind": "rule",
+        "target": "final_application_package.md",
+        "expectation": "必须包含不承诺录用、薪资不确定和人工确认提示。"
+      },
+      {
+        "kind": "memory",
+        "target": "candidate_memories",
+        "expectation": "候选人长期画像只能写入 candidate 状态，不能直接应用为 active。"
+      }
+    ]
+  }
+]

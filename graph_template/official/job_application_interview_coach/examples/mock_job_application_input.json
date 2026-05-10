@@ -1,0 +1,9 @@
+{
+  "candidate_profile": "候选人是 4 年经验的前端/全栈工程师，偏产品工程方向，擅长 Vue、TypeScript、Node.js、工作流工具和可观测性。希望转向 AI 工作流产品，目标城市上海或远程。",
+  "resume": "见 mock_data/sample_resume.md",
+  "project_experiences": "主导过内部流程自动化平台、低代码表单系统和客服知识库检索；有端到端指标，包括上线后把运营手动处理时间降低约 35%，把客服检索命中率从 62% 提高到 81%。",
+  "job_description": "见 mock_data/sample_job_description.md",
+  "target_city": "上海，接受远程优先团队",
+  "salary_expectation": "期望 35k-45k/月，优先关注成长性、产品复杂度和远程弹性",
+  "interview_transcript": ""
+}

@@ -1,0 +1,35 @@
+[
+  {
+    "case_id": "ecommerce_review_light_mock",
+    "name": "轻量 mock 电商评论洞察",
+    "description": "使用示例商品评论、竞品评论和客服反馈，检查输出是否带证据并遵守合规边界。",
+    "input": "examples/mock_ecommerce_review_input.json",
+    "checks": [
+      {
+        "kind": "schema",
+        "target": "positive_review_clusters.json",
+        "expectation": "好评聚类必须包含 theme、evidence_ids、representative_quotes、confidence。"
+      },
+      {
+        "kind": "schema",
+        "target": "negative_review_clusters.json",
+        "expectation": "差评聚类必须包含 risk_type、evidence_ids、mitigation。"
+      },
+      {
+        "kind": "artifact",
+        "target": "selling_points.md",
+        "expectation": "每个卖点必须关联真实评论证据，不能生成无来源功效承诺。"
+      },
+      {
+        "kind": "rule",
+        "target": "product_copy.md",
+        "expectation": "文案不得使用绝对化宣传、虚假稀缺、竞品贬损或违规功效表述。"
+      },
+      {
+        "kind": "memory",
+        "target": "candidate_memories",
+        "expectation": "评论洞察经验只能写入 candidate 状态，不能直接应用为 active。"
+      }
+    ]
+  }
+]

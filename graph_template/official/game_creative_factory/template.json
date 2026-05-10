@@ -1,0 +1,974 @@
+{
+  "template_id": "game_creative_factory",
+  "label": "游戏广告创意工厂",
+  "description": "把游戏类型、产品卖点、市场信息、竞品广告素材分析和平台约束组织成可审查的 Creative Brief、多版本脚本、图片分镜、视频提示词、审核评分、生成任务清单和最终创意包。",
+  "default_graph_name": "游戏广告创意工厂",
+  "state_schema": {
+    "game_genre": {
+      "name": "游戏类型",
+      "description": "游戏类型，例如 RPG、SLG、休闲、模拟、卡牌、塔防、解谜或射击。",
+      "type": "text",
+      "value": "策略 RPG",
+      "color": "#2563eb",
+      "binding": null
+    },
+    "game_brief": {
+      "name": "游戏简报",
+      "description": "游戏核心玩法、题材、卖点、素材范围和商业目标。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0f766e",
+      "binding": null
+    },
+    "target_audience": {
+      "name": "目标用户",
+      "description": "目标玩家画像、地区、平台、兴趣和付费动机。",
+      "type": "text",
+      "value": "",
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "creative_goal": {
+      "name": "创意目标",
+      "description": "本轮创意要验证的卖点、转化目标和素材数量。",
+      "type": "text",
+      "value": "生成可投放前评审的短视频广告创意包。",
+      "color": "#d97706",
+      "binding": null
+    },
+    "market_notes": {
+      "name": "市场/新闻材料",
+      "description": "RSS 新闻、市场趋势、发行节点或用户粘贴的行业观察。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0891b2",
+      "binding": null
+    },
+    "competitor_ad_notes": {
+      "name": "竞品广告素材分析",
+      "description": "竞品广告、爆款素材、脚本结构、镜头、钩子和评论反馈。",
+      "type": "markdown",
+      "value": "",
+      "color": "#dc2626",
+      "binding": null
+    },
+    "material_analysis": {
+      "name": "上传素材分析",
+      "description": "用户上传素材、角色、场景、UI、视频理解结果或人工分析文本。",
+      "type": "markdown",
+      "value": "",
+      "color": "#15803d",
+      "binding": null
+    },
+    "platform_constraints": {
+      "name": "平台约束",
+      "description": "投放平台、时长、尺寸、合规限制、禁用表达和品牌边界。",
+      "type": "markdown",
+      "value": "",
+      "color": "#ea580c",
+      "binding": null
+    },
+    "revision_feedback": {
+      "name": "返修反馈",
+      "description": "可选，上一轮创意审核或投放反馈。",
+      "type": "markdown",
+      "value": "",
+      "color": "#be123c",
+      "binding": null
+    },
+    "creative_memory_request": {
+      "name": "创意记忆召回请求",
+      "description": "面向 memory_recall Skill 的只读召回参数。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": null
+    },
+    "memory_recall_success": {
+      "name": "记忆召回成功",
+      "description": "memory_recall 是否成功。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_creative_memory",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "memory_context": {
+      "name": "创意记忆上下文",
+      "description": "召回的品牌偏好、历史素材表现、禁用表达和创意策略。",
+      "type": "json",
+      "value": {},
+      "color": "#7c3aed",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_creative_memory",
+        "fieldKey": "memory_context",
+        "managed": true
+      }
+    },
+    "recalled_memories": {
+      "name": "纳入记忆",
+      "description": "本轮纳入上下文的创意记忆。",
+      "type": "json",
+      "value": [],
+      "color": "#8b5cf6",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_creative_memory",
+        "fieldKey": "recalled_memories",
+        "managed": true
+      }
+    },
+    "omitted_memories": {
+      "name": "省略记忆",
+      "description": "因预算、过滤或状态不符未纳入的记忆摘要。",
+      "type": "json",
+      "value": [],
+      "color": "#a855f7",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_creative_memory",
+        "fieldKey": "omitted_memories",
+        "managed": true
+      }
+    },
+    "memory_recall_result": {
+      "name": "记忆召回摘要",
+      "description": "memory_recall 返回的召回摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#6d28d9",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_recall",
+        "nodeId": "recall_creative_memory",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "normalized_inputs": {
+      "name": "规范化输入",
+      "description": "对游戏、素材、竞品和约束的结构化整理。",
+      "type": "json",
+      "value": {},
+      "color": "#0e7490",
+      "binding": null
+    },
+    "clean_news_items": {
+      "name": "清洗新闻/市场项",
+      "description": "轻量模式下由 market_notes 提取的市场上下文。",
+      "type": "json",
+      "value": [],
+      "color": "#0891b2",
+      "binding": null
+    },
+    "ad_items": {
+      "name": "广告素材项",
+      "description": "竞品广告和素材模式的结构化条目。",
+      "type": "json",
+      "value": [],
+      "color": "#dc2626",
+      "binding": null
+    },
+    "normalized_video_items": {
+      "name": "规范化视频项",
+      "description": "上传素材或竞品视频的规范化描述。",
+      "type": "json",
+      "value": [],
+      "color": "#f97316",
+      "binding": null
+    },
+    "selected_video_items": {
+      "name": "入选视频项",
+      "description": "用于抽象模式的代表性素材。",
+      "type": "json",
+      "value": [],
+      "color": "#f59e0b",
+      "binding": null
+    },
+    "video_analysis_results": {
+      "name": "视频理解结果",
+      "description": "由上传素材分析文本整理出的镜头、节奏、画面和卖点。",
+      "type": "json",
+      "value": {},
+      "color": "#ea580c",
+      "binding": null
+    },
+    "news_context": {
+      "name": "新闻辅助上下文",
+      "description": "与创意相关的市场、发行、热点和风险背景。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0369a1",
+      "binding": null
+    },
+    "pattern_summary": {
+      "name": "竞品模式总结",
+      "description": "广告钩子、情绪、镜头结构、转折和可复用模式。",
+      "type": "markdown",
+      "value": "",
+      "color": "#b91c1c",
+      "binding": null
+    },
+    "creative_brief": {
+      "name": "Creative Brief",
+      "description": "目标用户、核心策略、卖点、创意路线和风险边界。",
+      "type": "markdown",
+      "value": "",
+      "color": "#4f46e5",
+      "binding": null
+    },
+    "script_variants": {
+      "name": "脚本变体",
+      "description": "多版本广告脚本，包括钩子、分镜、台词、CTA 和差异化策略。",
+      "type": "json",
+      "value": {},
+      "color": "#16a34a",
+      "binding": null
+    },
+    "storyboard_packages": {
+      "name": "图片分镜包",
+      "description": "面向图片或短视频首帧生成的分镜说明。",
+      "type": "markdown",
+      "value": "",
+      "color": "#65a30d",
+      "binding": null
+    },
+    "video_prompt_packages": {
+      "name": "视频提示词包",
+      "description": "面向视频生成或剪辑执行的镜头提示词。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0f766e",
+      "binding": null
+    },
+    "review_results": {
+      "name": "创意审核评分",
+      "description": "对脚本、分镜和提示词的策略、差异化、可执行性和合规评分。",
+      "type": "json",
+      "value": {},
+      "color": "#dc2626",
+      "binding": null
+    },
+    "best_variant": {
+      "name": "最佳变体",
+      "description": "推荐优先生产或测试的创意变体。",
+      "type": "json",
+      "value": {},
+      "color": "#16a34a",
+      "binding": null
+    },
+    "image_generation_todo": {
+      "name": "图片生成任务清单",
+      "description": "给设计或图片生成流程的可执行任务。",
+      "type": "markdown",
+      "value": "",
+      "color": "#c2410c",
+      "binding": null
+    },
+    "video_generation_todo": {
+      "name": "视频生成任务清单",
+      "description": "给剪辑或视频生成流程的可执行任务。",
+      "type": "markdown",
+      "value": "",
+      "color": "#be123c",
+      "binding": null
+    },
+    "creative_memory_plan": {
+      "name": "创意候选记忆计划",
+      "description": "需要写入候选记忆的稳定创意偏好、禁用表达和素材规律。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": null
+    },
+    "candidate_write_success": {
+      "name": "候选记忆写入成功",
+      "description": "memory_candidate_writer 是否成功写入候选。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_creative_memory_candidates",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "candidate_memories": {
+      "name": "候选记忆",
+      "description": "写入平台 store 的 candidate 状态记忆。",
+      "type": "json",
+      "value": [],
+      "color": "#7c3aed",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_creative_memory_candidates",
+        "fieldKey": "candidate_memories",
+        "managed": true
+      }
+    },
+    "skipped_candidates": {
+      "name": "跳过候选",
+      "description": "因证据不足或格式无效跳过的候选。",
+      "type": "json",
+      "value": [],
+      "color": "#dc2626",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_creative_memory_candidates",
+        "fieldKey": "skipped_candidates",
+        "managed": true
+      }
+    },
+    "candidate_write_result": {
+      "name": "候选记忆写入摘要",
+      "description": "memory_candidate_writer 返回的写入摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#6d28d9",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_creative_memory_candidates",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "final_summary": {
+      "name": "最终创意包",
+      "description": "面向用户展示和导出的游戏广告创意包。",
+      "type": "markdown",
+      "value": "",
+      "color": "#b45309",
+      "binding": null
+    }
+  },
+  "nodes": {
+    "input_game_genre": {
+      "kind": "input",
+      "name": "输入游戏类型",
+      "description": "填写游戏类型。",
+      "ui": { "position": { "x": 40, "y": 40 }, "collapsed": false, "size": { "width": 340, "height": 160 } },
+      "reads": [],
+      "writes": [{ "state": "game_genre", "mode": "replace" }],
+      "config": { "value": "策略 RPG", "boundaryType": "text" }
+    },
+    "input_game_brief": {
+      "kind": "input",
+      "name": "输入游戏简报",
+      "description": "粘贴游戏卖点和产品背景。",
+      "ui": { "position": { "x": 40, "y": 240 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "reads": [],
+      "writes": [{ "state": "game_brief", "mode": "replace" }],
+      "config": { "value": "", "boundaryType": "text" }
+    },
+    "input_target_audience": {
+      "kind": "input",
+      "name": "输入目标用户",
+      "description": "填写目标玩家和地区平台。",
+      "ui": { "position": { "x": 40, "y": 460 }, "collapsed": false, "size": { "width": 340, "height": 160 } },
+      "reads": [],
+      "writes": [{ "state": "target_audience", "mode": "replace" }],
+      "config": { "value": "", "boundaryType": "text" }
+    },
+    "input_creative_goal": {
+      "kind": "input",
+      "name": "输入创意目标",
+      "description": "填写本轮素材目标。",
+      "ui": { "position": { "x": 40, "y": 660 }, "collapsed": false, "size": { "width": 340, "height": 160 } },
+      "reads": [],
+      "writes": [{ "state": "creative_goal", "mode": "replace" }],
+      "config": { "value": "生成可投放前评审的短视频广告创意包。", "boundaryType": "text" }
+    },
+    "input_market_notes": {
+      "kind": "input",
+      "name": "输入市场材料",
+      "description": "粘贴新闻、趋势或发行节点。",
+      "ui": { "position": { "x": 40, "y": 860 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "reads": [],
+      "writes": [{ "state": "market_notes", "mode": "replace" }],
+      "config": { "value": "", "boundaryType": "text" }
+    },
+    "input_competitor_ad_notes": {
+      "kind": "input",
+      "name": "输入竞品素材分析",
+      "description": "粘贴竞品广告和模式观察。",
+      "ui": { "position": { "x": 40, "y": 1080 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "reads": [],
+      "writes": [{ "state": "competitor_ad_notes", "mode": "replace" }],
+      "config": { "value": "", "boundaryType": "text" }
+    },
+    "input_material_analysis": {
+      "kind": "input",
+      "name": "输入素材分析",
+      "description": "粘贴上传素材或视频理解结果。",
+      "ui": { "position": { "x": 40, "y": 1300 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "reads": [],
+      "writes": [{ "state": "material_analysis", "mode": "replace" }],
+      "config": { "value": "", "boundaryType": "text" }
+    },
+    "input_platform_constraints": {
+      "kind": "input",
+      "name": "输入平台约束",
+      "description": "填写投放平台、时长、尺寸和合规边界。",
+      "ui": { "position": { "x": 40, "y": 1520 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "reads": [],
+      "writes": [{ "state": "platform_constraints", "mode": "replace" }],
+      "config": { "value": "", "boundaryType": "text" }
+    },
+    "input_revision_feedback": {
+      "kind": "input",
+      "name": "输入返修反馈",
+      "description": "可选，粘贴上一轮审核或投放反馈。",
+      "ui": { "position": { "x": 40, "y": 1740 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "reads": [],
+      "writes": [{ "state": "revision_feedback", "mode": "replace" }],
+      "config": { "value": "", "boundaryType": "text" }
+    },
+    "prepare_creative_memory_request": {
+      "kind": "agent",
+      "name": "准备创意记忆召回",
+      "description": "生成只读记忆召回请求。",
+      "ui": { "position": { "x": 520, "y": 160 }, "collapsed": false, "size": { "width": 420, "height": 280 } },
+      "reads": [
+        { "state": "game_genre", "required": true },
+        { "state": "game_brief", "required": true },
+        { "state": "target_audience", "required": false },
+        { "state": "creative_goal", "required": true },
+        { "state": "platform_constraints", "required": false }
+      ],
+      "writes": [{ "state": "creative_memory_request", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "生成 creative_memory_request JSON，只召回品牌偏好、历史素材表现、禁用表达、过往审核反馈和游戏广告创意策略。字段包含 query、scope、layer、memory_type、status、top_k、max_chars。scope 默认 user，layer 优先 procedural，status 默认 active，top_k 不超过 8，max_chars 不超过 3000。不要生成广告脚本。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "recall_creative_memory": {
+      "kind": "agent",
+      "name": "召回创意记忆",
+      "description": "运行 memory_recall Skill，只透传召回结果。",
+      "ui": { "position": { "x": 1060, "y": 160 }, "collapsed": false, "size": { "width": 420, "height": 300 } },
+      "reads": [{ "state": "creative_memory_request", "required": true }],
+      "writes": [
+        { "state": "memory_recall_success", "mode": "replace" },
+        { "state": "memory_context", "mode": "replace" },
+        { "state": "recalled_memories", "mode": "replace" },
+        { "state": "omitted_memories", "mode": "replace" },
+        { "state": "memory_recall_result", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "memory_recall",
+        "skillBindings": [
+          {
+            "skillKey": "memory_recall",
+            "outputMapping": {
+              "success": "memory_recall_success",
+              "memory_context": "memory_context",
+              "recalled_memories": "recalled_memories",
+              "omitted_memories": "omitted_memories",
+              "result": "memory_recall_result"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {
+          "memory_recall": {
+            "skillKey": "memory_recall",
+            "title": "创意记忆召回 skill instruction",
+            "content": "你已绑定记忆召回技能。根据 creative_memory_request 生成只读召回参数；不要改写记忆，不要写入记忆。技能结果会写入 memory_context、recalled_memories、omitted_memories 和 result。",
+            "source": "node.override"
+          }
+        },
+        "taskInstruction": "本节点只负责运行 memory_recall。缺失字段时使用 scope=user、status=active、top_k=8、max_chars=3000。不要输出广告脚本。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "normalize_creative_inputs": {
+      "kind": "agent",
+      "name": "规范化多源输入",
+      "description": "整理市场、竞品和素材分析文本。",
+      "ui": { "position": { "x": 520, "y": 580 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "reads": [
+        { "state": "game_genre", "required": true },
+        { "state": "game_brief", "required": true },
+        { "state": "target_audience", "required": false },
+        { "state": "market_notes", "required": false },
+        { "state": "competitor_ad_notes", "required": false },
+        { "state": "material_analysis", "required": false },
+        { "state": "platform_constraints", "required": false }
+      ],
+      "writes": [
+        { "state": "normalized_inputs", "mode": "replace" },
+        { "state": "clean_news_items", "mode": "replace" },
+        { "state": "ad_items", "mode": "replace" },
+        { "state": "normalized_video_items", "mode": "replace" },
+        { "state": "selected_video_items", "mode": "replace" },
+        { "state": "video_analysis_results", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "把输入整理成 JSON：normalized_inputs 包含 product, audience, goal, constraints, evidence_sources；clean_news_items 从 market_notes 提取新闻/趋势；ad_items 从 competitor_ad_notes 提取广告条目；normalized_video_items 和 selected_video_items 从 material_analysis 提取视频/素材项；video_analysis_results 总结镜头、节奏、角色、UI、可用资产和缺失素材。保留 evidence 引用，不要生成创意。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "summarize_competitor_patterns": {
+      "kind": "agent",
+      "name": "总结竞品素材模式",
+      "description": "从竞品广告和素材分析中提炼可用模式。",
+      "ui": { "position": { "x": 1060, "y": 580 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "reads": [
+        { "state": "game_genre", "required": true },
+        { "state": "ad_items", "required": true },
+        { "state": "video_analysis_results", "required": true },
+        { "state": "platform_constraints", "required": false }
+      ],
+      "writes": [{ "state": "pattern_summary", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "pattern_summary 写成 Markdown，包含 hook patterns、emotional triggers、visual rhythm、proof moments、CTA patterns、genre-specific opportunities、overused tropes、compliance risks。必须说明这些模式如何依赖 game_genre，不要把 SLG 固定为唯一类型。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.25
+      }
+    },
+    "build_news_context": {
+      "kind": "agent",
+      "name": "生成新闻辅助上下文",
+      "description": "把市场新闻和发行节点变成创意参考。",
+      "ui": { "position": { "x": 1600, "y": 580 }, "collapsed": false, "size": { "width": 440, "height": 300 } },
+      "reads": [
+        { "state": "game_genre", "required": true },
+        { "state": "clean_news_items", "required": true },
+        { "state": "market_notes", "required": false }
+      ],
+      "writes": [{ "state": "news_context", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "news_context 写成 Markdown，包含 market timing、player sentiment、genre trends、seasonal hooks、risks、evidence。没有市场材料时明确降级为 mock/空上下文，不要编造新闻。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.25
+      }
+    },
+    "build_creative_brief": {
+      "kind": "agent",
+      "name": "生成 Creative Brief",
+      "description": "整合游戏、用户、模式、市场和记忆形成创意策略。",
+      "ui": { "position": { "x": 2140, "y": 580 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "reads": [
+        { "state": "game_genre", "required": true },
+        { "state": "game_brief", "required": true },
+        { "state": "target_audience", "required": false },
+        { "state": "creative_goal", "required": true },
+        { "state": "pattern_summary", "required": true },
+        { "state": "news_context", "required": true },
+        { "state": "memory_context", "required": false },
+        { "state": "platform_constraints", "required": false }
+      ],
+      "writes": [{ "state": "creative_brief", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "creative_brief 写成 Markdown，必须显式使用 game_genre，并包含 audience insight、core promise、creative territories、mandatory proof、asset plan、platform constraints、do-not-use、success metrics、risks。不同 game_genre 必须影响策略，不能把模板固定成 SLG。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.25
+      }
+    },
+    "generate_script_variants": {
+      "kind": "agent",
+      "name": "生成脚本变体",
+      "description": "生成多版本广告脚本。",
+      "ui": { "position": { "x": 520, "y": 1040 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "reads": [
+        { "state": "creative_brief", "required": true },
+        { "state": "pattern_summary", "required": true },
+        { "state": "revision_feedback", "required": false }
+      ],
+      "writes": [{ "state": "script_variants", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "script_variants 写成 JSON，包含 variants 数组，至少 4 个差异化方向。每个变体包含 id、angle、hook、beats、voiceover、onscreen_text、visual_notes、cta、target_platform、duration_seconds、asset_needs、risk_notes。不要只改标题，必须有结构差异。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.45
+      }
+    },
+    "build_storyboard_packages": {
+      "kind": "agent",
+      "name": "生成图片分镜包",
+      "description": "把脚本变体转成可执行图片分镜。",
+      "ui": { "position": { "x": 1060, "y": 1040 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "reads": [
+        { "state": "script_variants", "required": true },
+        { "state": "material_analysis", "required": false },
+        { "state": "platform_constraints", "required": false }
+      ],
+      "writes": [{ "state": "storyboard_packages", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "storyboard_packages 写成 Markdown，按变体列出 frame-by-frame 图片分镜、画面主体、构图、UI/角色/场景素材、文字层、生成提示词、负面提示词和人工检查点。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.35
+      }
+    },
+    "build_video_prompt_packages": {
+      "kind": "agent",
+      "name": "生成视频提示词包",
+      "description": "把脚本和分镜转成视频生成/剪辑提示词。",
+      "ui": { "position": { "x": 1600, "y": 1040 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "reads": [
+        { "state": "game_genre", "required": true },
+        { "state": "script_variants", "required": true },
+        { "state": "storyboard_packages", "required": true },
+        { "state": "video_analysis_results", "required": false }
+      ],
+      "writes": [{ "state": "video_prompt_packages", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "video_prompt_packages 写成 Markdown，按变体列出 shot list、camera motion、transition、pace、sound direction、AI video prompt、editing notes、required assets、fallback plan。必须与 game_genre 和脚本策略一致。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.35
+      }
+    },
+    "review_creatives": {
+      "kind": "agent",
+      "name": "审核创意评分",
+      "description": "评估策略、差异化、可执行性和平台合规风险。",
+      "ui": { "position": { "x": 2140, "y": 1040 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "reads": [
+        { "state": "creative_brief", "required": true },
+        { "state": "script_variants", "required": true },
+        { "state": "storyboard_packages", "required": true },
+        { "state": "video_prompt_packages", "required": true },
+        { "state": "platform_constraints", "required": false },
+        { "state": "revision_feedback", "required": false }
+      ],
+      "writes": [{ "state": "review_results", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "review_results 写成 JSON，包含 per_variant_scores、global_findings、rewrite_recommendations、platform_compliance_risks。评分维度必须包含 strategy_fit、genre_fit、differentiation、execution_clarity、asset_feasibility、platform_compliance_risk、iteration_priority。必须显式输出平台合规风险和不确定项。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "select_best_variant": {
+      "kind": "agent",
+      "name": "选择最佳变体",
+      "description": "根据审核评分选择优先生产或测试的创意。",
+      "ui": { "position": { "x": 2680, "y": 1040 }, "collapsed": false, "size": { "width": 420, "height": 300 } },
+      "reads": [
+        { "state": "script_variants", "required": true },
+        { "state": "review_results", "required": true },
+        { "state": "creative_brief", "required": true }
+      ],
+      "writes": [{ "state": "best_variant", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "best_variant 写成 JSON，包含 selected_variant_id、why_selected、test_hypothesis、required_revisions、fallback_variant_ids、production_priority、risks_to_confirm。不得忽略 review_results 中的高风险合规或资产缺口。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "build_generation_todos": {
+      "kind": "agent",
+      "name": "生成制作任务清单",
+      "description": "把最佳变体转成图片和视频生产任务。",
+      "ui": { "position": { "x": 520, "y": 1500 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "reads": [
+        { "state": "best_variant", "required": true },
+        { "state": "storyboard_packages", "required": true },
+        { "state": "video_prompt_packages", "required": true },
+        { "state": "review_results", "required": true }
+      ],
+      "writes": [
+        { "state": "image_generation_todo", "mode": "replace" },
+        { "state": "video_generation_todo", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "image_generation_todo 和 video_generation_todo 均写成 Markdown。任务必须可执行，包含输入素材、提示词、尺寸/时长、负责人建议、检查点、失败回退和审核要求。不要直接生成图片或视频。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.25
+      }
+    },
+    "prepare_creative_memory_plan": {
+      "kind": "agent",
+      "name": "准备创意候选记忆",
+      "description": "只生成 candidate 状态候选记忆，供用户审核。",
+      "ui": { "position": { "x": 1060, "y": 1500 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "reads": [
+        { "state": "game_genre", "required": true },
+        { "state": "pattern_summary", "required": true },
+        { "state": "best_variant", "required": true },
+        { "state": "review_results", "required": true },
+        { "state": "platform_constraints", "required": false }
+      ],
+      "writes": [{ "state": "creative_memory_plan", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "creative_memory_plan 写成 JSON，包含 candidates 数组。只把有证据的稳定创意偏好、禁用表达、素材规律、平台限制和 genre-specific learnings 写成 candidate 状态候选：scope=user、layer=procedural、type=preference，summary、content、confidence、importance、evidence、artifact_refs。不得写入未验证投放结论、敏感商业数据或无来源判断。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "write_creative_memory_candidates": {
+      "kind": "agent",
+      "name": "写入创意候选记忆",
+      "description": "运行 memory_candidate_writer，只写入 candidate 状态记忆。",
+      "ui": { "position": { "x": 1600, "y": 1500 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "reads": [{ "state": "creative_memory_plan", "required": true }],
+      "writes": [
+        { "state": "candidate_write_success", "mode": "replace" },
+        { "state": "candidate_memories", "mode": "replace" },
+        { "state": "skipped_candidates", "mode": "replace" },
+        { "state": "candidate_write_result", "mode": "replace" }
+      ],
+      "config": {
+        "skillKey": "memory_candidate_writer",
+        "skillBindings": [
+          {
+            "skillKey": "memory_candidate_writer",
+            "outputMapping": {
+              "success": "candidate_write_success",
+              "candidate_memories": "candidate_memories",
+              "skipped_candidates": "skipped_candidates",
+              "result": "candidate_write_result"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {
+          "memory_candidate_writer": {
+            "skillKey": "memory_candidate_writer",
+            "title": "创意候选记忆写入 skill instruction",
+            "content": "你已绑定候选记忆写入技能。只把 creative_memory_plan 中证据充足的候选写入 candidate 状态；不要应用为 active，不要覆盖既有记忆，不要写入未验证投放结论或无来源判断。技能结果会写入 candidate_memories、skipped_candidates 和 result。",
+            "source": "node.override"
+          }
+        },
+        "taskInstruction": "本节点只负责运行 memory_candidate_writer。将 creative_memory_plan 中证据充足的 candidates 交给技能；不要总结创意包，不要改写候选。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.2
+      }
+    },
+    "build_final_summary": {
+      "kind": "agent",
+      "name": "生成最终创意包",
+      "description": "汇总 brief、脚本、分镜、提示词、审核和生产任务。",
+      "ui": { "position": { "x": 2140, "y": 1500 }, "collapsed": false, "size": { "width": 460, "height": 360 } },
+      "reads": [
+        { "state": "creative_brief", "required": true },
+        { "state": "pattern_summary", "required": true },
+        { "state": "news_context", "required": true },
+        { "state": "script_variants", "required": true },
+        { "state": "storyboard_packages", "required": true },
+        { "state": "video_prompt_packages", "required": true },
+        { "state": "review_results", "required": true },
+        { "state": "best_variant", "required": true },
+        { "state": "image_generation_todo", "required": true },
+        { "state": "video_generation_todo", "required": true },
+        { "state": "candidate_write_result", "required": false },
+        { "state": "candidate_memories", "required": false }
+      ],
+      "writes": [{ "state": "final_summary", "mode": "replace" }],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "final_summary 写成 Markdown，包含：1. Creative Brief 摘要；2. 竞品模式和新闻上下文；3. 脚本变体；4. 分镜与视频提示词；5. 审核评分和平台合规风险；6. 推荐最佳变体；7. 图片/视频生成任务；8. 候选记忆状态；9. 人工确认清单。必须说明所有外部素材和平台合规点都需要人工复核。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.25
+      }
+    },
+    "output_final_summary": {
+      "kind": "output",
+      "name": "输出最终创意包",
+      "description": "展示和导出最终游戏广告创意包。",
+      "ui": { "position": { "x": 2680, "y": 1500 }, "collapsed": false, "size": { "width": 360, "height": 220 } },
+      "reads": [{ "state": "final_summary", "required": true }],
+      "writes": [],
+      "config": {
+        "format": "markdown",
+        "fileNameTemplate": "final_summary.md"
+      }
+    }
+  },
+  "edges": [
+    { "source": "input_game_genre", "target": "prepare_creative_memory_request" },
+    { "source": "input_game_brief", "target": "prepare_creative_memory_request" },
+    { "source": "input_target_audience", "target": "prepare_creative_memory_request" },
+    { "source": "input_creative_goal", "target": "prepare_creative_memory_request" },
+    { "source": "input_platform_constraints", "target": "prepare_creative_memory_request" },
+    { "source": "prepare_creative_memory_request", "target": "recall_creative_memory" },
+    { "source": "input_game_genre", "target": "normalize_creative_inputs" },
+    { "source": "input_game_brief", "target": "normalize_creative_inputs" },
+    { "source": "input_market_notes", "target": "normalize_creative_inputs" },
+    { "source": "input_competitor_ad_notes", "target": "normalize_creative_inputs" },
+    { "source": "input_material_analysis", "target": "normalize_creative_inputs" },
+    { "source": "normalize_creative_inputs", "target": "summarize_competitor_patterns" },
+    { "source": "normalize_creative_inputs", "target": "build_news_context" },
+    { "source": "summarize_competitor_patterns", "target": "build_creative_brief" },
+    { "source": "build_news_context", "target": "build_creative_brief" },
+    { "source": "recall_creative_memory", "target": "build_creative_brief" },
+    { "source": "input_game_genre", "target": "build_creative_brief" },
+    { "source": "input_game_brief", "target": "build_creative_brief" },
+    { "source": "input_platform_constraints", "target": "build_creative_brief" },
+    { "source": "build_creative_brief", "target": "generate_script_variants" },
+    { "source": "summarize_competitor_patterns", "target": "generate_script_variants" },
+    { "source": "input_revision_feedback", "target": "generate_script_variants" },
+    { "source": "generate_script_variants", "target": "build_storyboard_packages" },
+    { "source": "input_material_analysis", "target": "build_storyboard_packages" },
+    { "source": "build_storyboard_packages", "target": "build_video_prompt_packages" },
+    { "source": "generate_script_variants", "target": "build_video_prompt_packages" },
+    { "source": "normalize_creative_inputs", "target": "build_video_prompt_packages" },
+    { "source": "build_creative_brief", "target": "review_creatives" },
+    { "source": "generate_script_variants", "target": "review_creatives" },
+    { "source": "build_storyboard_packages", "target": "review_creatives" },
+    { "source": "build_video_prompt_packages", "target": "review_creatives" },
+    { "source": "input_platform_constraints", "target": "review_creatives" },
+    { "source": "review_creatives", "target": "select_best_variant" },
+    { "source": "generate_script_variants", "target": "select_best_variant" },
+    { "source": "select_best_variant", "target": "build_generation_todos" },
+    { "source": "build_storyboard_packages", "target": "build_generation_todos" },
+    { "source": "build_video_prompt_packages", "target": "build_generation_todos" },
+    { "source": "select_best_variant", "target": "prepare_creative_memory_plan" },
+    { "source": "review_creatives", "target": "prepare_creative_memory_plan" },
+    { "source": "summarize_competitor_patterns", "target": "prepare_creative_memory_plan" },
+    { "source": "prepare_creative_memory_plan", "target": "write_creative_memory_candidates" },
+    { "source": "build_creative_brief", "target": "build_final_summary" },
+    { "source": "summarize_competitor_patterns", "target": "build_final_summary" },
+    { "source": "build_news_context", "target": "build_final_summary" },
+    { "source": "generate_script_variants", "target": "build_final_summary" },
+    { "source": "build_storyboard_packages", "target": "build_final_summary" },
+    { "source": "build_video_prompt_packages", "target": "build_final_summary" },
+    { "source": "review_creatives", "target": "build_final_summary" },
+    { "source": "select_best_variant", "target": "build_final_summary" },
+    { "source": "build_generation_todos", "target": "build_final_summary" },
+    { "source": "write_creative_memory_candidates", "target": "build_final_summary" },
+    { "source": "build_final_summary", "target": "output_final_summary" }
+  ],
+  "metadata": {
+    "category": "business",
+    "graphProtocol": "node_system",
+    "templateVersion": "0.1.0",
+    "capabilityDiscoverableDefault": true,
+    "gallery": {
+      "headline": "把游戏广告创意生产拆成可观察、可审核、可复跑的工作流。",
+      "targetUsers": ["游戏发行团队", "买量创意团队", "广告素材策划", "独立游戏开发者", "营销代理商"],
+      "demoPitch": "不是只写广告语，而是把类型、市场、竞品素材、分镜、视频提示词、审核评分和生产任务串成完整创意流水线。"
+    },
+    "mockMode": {
+      "input": "examples/mock_game_creative_input.json",
+      "description": "使用随包 mock 游戏简报、竞品素材分析和上传素材分析，无需外部账号即可演示。"
+    },
+    "inputSchema": [
+      { "key": "game_genre", "label": "游戏类型", "type": "text", "required": true },
+      { "key": "game_brief", "label": "游戏简报", "type": "markdown", "required": true },
+      { "key": "target_audience", "label": "目标用户", "type": "text", "required": false },
+      { "key": "creative_goal", "label": "创意目标", "type": "text", "required": true },
+      { "key": "market_notes", "label": "市场/新闻材料", "type": "markdown", "required": false },
+      { "key": "competitor_ad_notes", "label": "竞品广告素材分析", "type": "markdown", "required": false },
+      { "key": "material_analysis", "label": "上传素材分析", "type": "markdown", "required": false },
+      { "key": "platform_constraints", "label": "平台约束", "type": "markdown", "required": false },
+      { "key": "revision_feedback", "label": "返修反馈", "type": "markdown", "required": false }
+    ],
+    "requiredSkills": ["memory_recall", "memory_candidate_writer"],
+    "requiredPermissions": ["memory_read", "memory_candidate_write"],
+    "artifactContract": [
+      { "path": "creative_brief.md", "state": "creative_brief", "type": "markdown", "description": "创意策略简报。" },
+      { "path": "pattern_summary.md", "state": "pattern_summary", "type": "markdown", "description": "竞品素材模式总结。" },
+      { "path": "news_context.md", "state": "news_context", "type": "markdown", "description": "新闻和市场上下文。" },
+      { "path": "script_variants.json", "state": "script_variants", "type": "json", "description": "多版本广告脚本。" },
+      { "path": "storyboards_showcase.md", "state": "storyboard_packages", "type": "markdown", "description": "图片分镜展示。" },
+      { "path": "video_prompts_showcase.md", "state": "video_prompt_packages", "type": "markdown", "description": "视频提示词展示。" },
+      { "path": "review_results.json", "state": "review_results", "type": "json", "description": "创意审核评分。" },
+      { "path": "best_variant.json", "state": "best_variant", "type": "json", "description": "最佳变体和测试假设。" },
+      { "path": "todo_image_generation.md", "state": "image_generation_todo", "type": "markdown", "description": "图片生成任务清单。" },
+      { "path": "todo_video_generation.md", "state": "video_generation_todo", "type": "markdown", "description": "视频生成任务清单。" },
+      { "path": "final_summary.md", "state": "final_summary", "type": "markdown", "description": "最终游戏广告创意包。" }
+    ],
+    "outputContract": [
+      { "key": "final_summary", "label": "最终创意包", "role": "primary", "type": "markdown", "required": true, "passThrough": true },
+      { "key": "creative_brief", "label": "Creative Brief", "role": "artifact", "type": "markdown", "required": true },
+      { "key": "pattern_summary", "label": "竞品模式总结", "role": "artifact", "type": "markdown", "required": true },
+      { "key": "script_variants", "label": "脚本变体", "role": "artifact", "type": "json", "required": true },
+      { "key": "storyboard_packages", "label": "图片分镜包", "role": "artifact", "type": "markdown", "required": true },
+      { "key": "video_prompt_packages", "label": "视频提示词包", "role": "artifact", "type": "markdown", "required": true },
+      { "key": "review_results", "label": "创意审核评分", "role": "artifact", "type": "json", "required": true },
+      { "key": "best_variant", "label": "最佳变体", "role": "artifact", "type": "json", "required": true },
+      { "key": "image_generation_todo", "label": "图片生成任务清单", "role": "artifact", "type": "markdown", "required": true },
+      { "key": "video_generation_todo", "label": "视频生成任务清单", "role": "artifact", "type": "markdown", "required": true },
+      { "key": "candidate_memories", "label": "创意候选记忆", "role": "memory_candidates", "type": "json", "required": false }
+    ],
+    "evalCases": "eval_cases.json",
+    "safetyNotes": [
+      "不得生成违法、歧视、成人、赌博或侵犯版权的广告素材建议。",
+      "广告平台合规风险必须显式输出，最终投放前需要人工审核。",
+      "轻量模式只能基于用户提供或 mock 的素材分析，不编造真实投放数据。",
+      "创意经验只写 candidate 状态候选，不能自动应用为 active。"
+    ]
+  }
+}
