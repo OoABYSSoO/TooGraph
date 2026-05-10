@@ -118,7 +118,7 @@ test("BuddyMascot draws every tail pose from the same hidden lower-body root", (
   ];
 
   for (const marker of tailPoseMarkers) {
-    assert.match(extractPathData(componentSource, marker), /^M0 194 C/);
+    assert.match(extractPathData(componentSource, marker), /^M0 176 C/);
   }
   assert.match(componentSource, /class="buddy-mascot__tail buddy-mascot__tail-rig"[\s\S]*class="buddy-mascot__body-turn"/);
 });
@@ -139,7 +139,7 @@ test("BuddyMascot softens each tail pose with path morphing between five curve s
     assert.ok(valuesMatch, `Missing morph values for tail pose: ${poseClass}`);
     const morphPaths = valuesMatch[1].split(";").map((value) => normalizePathData(value));
     assert.equal(morphPaths.length, 5);
-    assert.ok(morphPaths.every((value) => value.startsWith("M0 194 C")));
+    assert.ok(morphPaths.every((value) => value.startsWith("M0 176 C")));
   }
 });
 
