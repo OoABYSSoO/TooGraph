@@ -146,7 +146,7 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
         self.assertNotIn("capabilityPolicy", manifest)
         self.assertEqual(manifest["timeoutSeconds"], 30)
         self.assertEqual(capability_inputs[0]["valueType"], "capability")
-        self.assertEqual([field["key"] for field in manifest["outputSchema"]], ["capability", "found", "requires_approval"])
+        self.assertEqual([field["key"] for field in manifest["outputSchema"]], ["capability", "found"])
 
     def test_before_llm_lists_available_templates_and_skills_for_llm_choice(self) -> None:
         selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "graphiteui_capability_selector_before_test")
@@ -182,6 +182,7 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
         self.assertIn("name: Advanced Web Research", context)
         self.assertIn("kind: skill", context)
         self.assertIn("key: web_search", context)
+        self.assertNotIn("requiresApproval", context)
         self.assertNotIn("blocked_skill", context)
 
     def test_selector_normalizes_llm_selected_template_capability(self) -> None:
@@ -206,12 +207,12 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                     capability={"kind": "subgraph", "key": "advanced_web_research_loop"},
                 )
 
-        self.assertEqual(set(result), {"capability", "found", "requires_approval"})
+        self.assertEqual(set(result), {"capability", "found"})
         self.assertTrue(result["found"])
-        self.assertFalse(result["requires_approval"])
         self.assertEqual(result["capability"]["kind"], "subgraph")
         self.assertEqual(result["capability"]["key"], "advanced_web_research_loop")
         self.assertEqual(result["capability"]["name"], "Advanced Web Research")
+        self.assertNotIn("requiresApproval", result["capability"])
 
     def test_selector_normalizes_llm_selected_skill_capability(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "graphiteui_capability_selector_after_test_skill")
@@ -235,12 +236,12 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                     capability={"kind": "skill", "key": "web_search"},
                 )
 
-        self.assertEqual(set(result), {"capability", "found", "requires_approval"})
+        self.assertEqual(set(result), {"capability", "found"})
         self.assertTrue(result["found"])
-        self.assertFalse(result["requires_approval"])
         self.assertEqual(result["capability"]["kind"], "skill")
         self.assertEqual(result["capability"]["key"], "web_search")
         self.assertEqual(result["capability"]["name"], "Web Search")
+        self.assertNotIn("requiresApproval", result["capability"])
 
     def test_selector_ignores_disabled_capabilities_but_not_legacy_selectable_policy(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "graphiteui_capability_selector_after_test_disabled")
@@ -271,14 +272,13 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                     capability={"kind": "skill", "key": "web_search"},
                 )
 
-        self.assertEqual(set(disabled_result), {"capability", "found", "requires_approval"})
+        self.assertEqual(set(disabled_result), {"capability", "found"})
         self.assertFalse(disabled_result["found"])
-        self.assertFalse(disabled_result["requires_approval"])
         self.assertEqual(disabled_result["capability"], {"kind": "none"})
         self.assertTrue(enabled_legacy_result["found"])
         self.assertEqual(enabled_legacy_result["capability"]["key"], "web_search")
 
-    def test_selector_marks_only_write_or_script_capabilities_as_requiring_approval(self) -> None:
+    def test_selector_preserves_permissions_without_approval_flags(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "graphiteui_capability_selector_after_test_permissions")
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
@@ -330,17 +330,13 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                 )
 
         self.assertEqual(web_skill["capability"]["permissions"], ["network", "browser_automation"])
-        self.assertFalse(web_skill["capability"]["requiresApproval"])
-        self.assertFalse(web_skill["requires_approval"])
+        self.assertNotIn("requiresApproval", web_skill["capability"])
         self.assertEqual(write_skill["capability"]["permissions"], ["file_read", "file_write", "subprocess"])
-        self.assertTrue(write_skill["capability"]["requiresApproval"])
-        self.assertTrue(write_skill["requires_approval"])
+        self.assertNotIn("requiresApproval", write_skill["capability"])
         self.assertEqual(web_template["capability"]["permissions"], ["network", "browser_automation"])
-        self.assertFalse(web_template["capability"]["requiresApproval"])
-        self.assertFalse(web_template["requires_approval"])
+        self.assertNotIn("requiresApproval", web_template["capability"])
         self.assertEqual(write_template["capability"]["permissions"], ["file_read", "file_write", "subprocess"])
-        self.assertTrue(write_template["capability"]["requiresApproval"])
-        self.assertTrue(write_template["requires_approval"])
+        self.assertNotIn("requiresApproval", write_template["capability"])
 
     def test_selector_does_not_match_requirement_without_llm_selected_capability(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "graphiteui_capability_selector_after_test_none")
@@ -355,9 +351,8 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
             with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": temp_dir}, clear=True):
                 result = selector.graphiteui_capability_selector(requirement="Research materials.")
 
-        self.assertEqual(set(result), {"capability", "found", "requires_approval"})
+        self.assertEqual(set(result), {"capability", "found"})
         self.assertFalse(result["found"])
-        self.assertFalse(result["requires_approval"])
         self.assertEqual(result["capability"], {"kind": "none"})
 
 

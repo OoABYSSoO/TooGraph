@@ -67,14 +67,14 @@
 - 后端已有根目录 `buddy_home/` 的默认生成逻辑，以及基于 `SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memory、session summary、revision、command 等基础存取接口；它们应继续收束为 Buddy Home，而不是扩散到多个无关数据位置。
 - 官方 `buddy_autonomous_loop` 模板已创建并注册。它使用 Buddy Home 文件夹输入、请求理解子图、按需能力循环子图、最终回复子图和唯一 `final_reply` output；简单闲聊或可直接回答的请求会绕过能力循环。
 - 官方 `buddy_self_review` 模板已作为内部后台模板落地。伙伴可见回复完成后，前端会用主运行快照启动该后台 run；它只产出记忆更新计划和伙伴成长计划，不阻塞下一轮对话，也不直接写 Buddy Home。
-- 官方 `graphiteui_skill_creation_workflow` 模板已创建。它保留需求澄清、样例确认、Skill 文件生成、脚本测试、失败回环修复、写入前审查和用户 Skill 目录写入这些流程边界，并避免使用普通编辑器创建不出来的节点。
+- 官方 `graphiteui_skill_creation_workflow` 模板已创建。它保留需求澄清、样例确认、Skill 文件生成、脚本测试、失败回环修复、生成方案审查和用户 Skill 目录写入这些流程边界；低层写入确认由运行时的 `需确认` / `完全访问` 模式处理，并避免使用普通编辑器创建不出来的节点。
 - 伙伴浮窗已有可见运行过程面板、节点级流式输出预览、每步耗时、完成后折叠摘要、正式回复 markdown 流式展示和后台复盘解耦。
 - 伙伴历史会话已落到 Buddy Home 的 `buddy.db`：后端维护 `buddy_sessions` / `buddy_messages`，前端浮窗提供紧凑历史下拉、新建会话、删除确认和全屏展开。
 
 部分完成但仍有技术债：
 
 - 子图能力已经可运行、可编辑并可在缩略图中显示内部状态，但父子图运行详情聚合、事件定位、从缩略图点击跳转到内部节点和更完整的嵌套可视化仍未完成。
-- `graphiteui_capability_selector` 已承担“从启用模板和启用 Skill 中选择单个能力”的职责。旧的独立自主决策 Skill 目标不再保留；后续要增强的是该选择器的候选描述、审批联动和审计记录。
+- `graphiteui_capability_selector` 已承担“从启用模板和启用 Skill 中选择单个能力”的职责。旧的独立自主决策 Skill 目标不再保留；后续要增强的是该选择器的候选描述、能力缺口输出、能力轨迹和审计记录。
 - Buddy Home 已有默认目录、默认文件、会话历史、记忆、summary、revision 和 command 存储基础，但能力使用统计、结构化检索索引、自我复盘报告和长期资料写回图流程尚未成形。
 - 伙伴主循环的上下文装配、需求理解、能力循环、最终回复和后台复盘已经作为官方模板内部子图或后台模板落地；稳定后是否拆成独立官方可复用模板仍待决定。
 - 前端伙伴构图代码仍残留 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧元数据。官方模板已使用 `metadata.origin=buddy`，但启动侧还未完全收束到统一来源语义。
@@ -664,8 +664,8 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 - `clarification_answer`：用户在断点恢复时写入的澄清回答。
 - `selected_capability`：`capability` 类型，来自 `graphiteui_capability_selector`。
 - `capability_found`：是否找到了启用的能力。
-- `approval_prompt`：能力执行前需要用户确认的摘要。
-- `approval_decision`：用户审批结果，存在于能力循环子图内部。
+- `capability_gap`：找不到合适能力时的结构化缺口，包含缺口类型、原因、建议资产形态、构建需求，以及是否应向用户询问构建能力。
+- `capability_trace`：多轮能力循环的步骤摘要列表，用于最终回复和后续自我复盘，避免只保留最后一次 `capability_result`。
 - `capability_result`：`result_package` 类型，动态能力执行唯一输出。
 - `capability_review`：对结果包的评估，包括是否足够、是否继续、失败是否可恢复、下一轮需求。
 - `memory_update_plan`：是否需要写回记忆、会话摘要或用户资料。
@@ -681,8 +681,8 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 - `needs_capability`：顶层 condition。读取 `request_understanding.requires_capability`；简单闲聊、身份询问、页面解释等可直接回答的请求绕过能力循环，避免无意义地选择能力和检查权限。
 - `select_capability`：静态绑定 `graphiteui_capability_selector`，根据需求选择一个启用的图模板或 Skill。图模板优先，找不到则输出 `{ "kind": "none" }` 和 `capability_found=false`。
 - `capability_found`：condition。未找到能力时进入直接回复或缺失能力说明；找到能力时进入审批检查。
-- `review_capability_permission`：根据 `capability_requires_approval` 和伙伴模式写审批请求或免审批结论。它不能直接读取 `capability` state；当前协议规定读取 `capability` state 的 LLM 节点就是动态能力执行节点。`capability_requires_approval` 只代表写文件、删改文件或执行任意脚本/命令风险。
-- `request_capability_approval`：需要人工确认时写 `approval_prompt` 并设置 `interrupt_after`。恢复 payload 写入 `approval_decision`。
+- `review_missing_capability`：当选择器返回 `{ "kind": "none" }` 时，写 `capability_review` 与 `capability_gap`。普通任务缺能力时只向用户提出是否构建；只有用户明确要求创建能力或请求本身就是构建能力时，才标记可进入构建流程。
+- 能力循环不再包含模板内的低层审批节点。写文件、删改文件或执行脚本由运行时根据当前图或 Buddy 的 `需确认` / `完全访问` 模式暂停或自动继续；LLM 节点只负责开放性确认、方案审查和最终解释。
 - `execute_capability`：读取 `selected_capability`。该节点只负责生成目标能力的公开输入；runtime 执行 skill 或动态 subgraph，并只写一个 `capability_result`。
 - `review_capability_result`：读取拆包后的 `capability_result`，判断是否已经足够、是否需要继续另一个能力、是否需要向用户解释失败或请求更多信息。
 - `continue_capability_loop`：condition。需要继续时回到 `select_capability`，达到 `loopLimit` 时进入最终回复。循环上限是正式行为，不是错误；达到上限时必须用已有信息收束。

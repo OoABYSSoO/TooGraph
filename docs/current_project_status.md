@@ -78,7 +78,7 @@
 - 作用：接收脚本内容和用户测试目标，由 LLM 根据当前系统环境编写测试工作区，然后在临时目录运行一次允许的测试命令。
 - 生命周期：`before_llm.py` 注入当前系统上下文，包括 OS、Python executable/version 和可用 allowlist 命令；如果输入 state 的字符串值是可读取的本地文件路径，还会把该文件文本追加到上下文；LLM 只生成 `files` 与 `command`；`after_llm.py` 写入临时文件、运行命令，并只返回 `success` 与 `result`。
 - 通用性：不再限定 Python/pytest。Python 脚本可使用 `python -m pytest`，JavaScript 脚本可在系统有 Node 时使用 `node --test`，其他脚本只要命令在 allowlist 且当前系统可执行即可。
-- 权限和依赖：声明 `file_write` 与 `subprocess` 权限，并在 `requirements.txt` 中声明 `pytest` 作为 Python 测试常用依赖。该 Skill 会执行用户提供的脚本和测试代码，应通过显式确认使用。
+- 权限和依赖：声明 `file_write` 与 `subprocess` 权限，并在 `requirements.txt` 中声明 `pytest` 作为 Python 测试常用依赖。该 Skill 会执行用户提供的脚本和测试代码，是否暂停确认由当前图或 Buddy 的 `需确认` / `完全访问` 模式决定。
 
 ### `local_workspace_executor`
 
@@ -87,7 +87,7 @@
 - 作用：提供受控的单路径本地工作区操作能力，支持预读上下文、写入一个文件或执行一个脚本。
 - 生命周期：`before_llm.py` 会从图 state 和节点任务描述中提取仓库路径并预读已有文件，供 LLM 生成写入内容或执行参数；`after_llm.py` 执行 `read`、`write` 或 `execute`，并只返回 `success` 与 `result`。
 - 默认权限：预读可读取仓库内普通文件，但 `.git`、`.env`、`backend/data/settings` 永远拒绝；写入只允许 `backend/data`、`skill/user`、`graph_template/user` 和 `node_preset/user`；执行只允许 `backend/data/tmp` 和 `skill/user`。
-- 边界：该 Skill 会写本地文件并启动本地进程，必须显式确认。路径白名单只是启动前检查，不是 OS 沙箱。
+- 边界：该 Skill 会写本地文件并启动本地进程，是否暂停确认由当前图或 Buddy 的 `需确认` / `完全访问` 模式决定。路径白名单只是启动前检查，不是 OS 沙箱。
 
 ## 当前内置图模板
 
@@ -107,7 +107,7 @@
 - 位置：`graph_template/official/buddy_autonomous_loop/template.json`
 - 显示名称：`伙伴自主循环`
 - 作用：作为伙伴浮窗和伙伴页面的默认图循环，把本轮用户消息、对话历史、页面上下文和 Buddy Home 长期资料转成一次可审计 graph run。
-- 主要流程：输入用户消息、历史、页面上下文、伙伴模式和 Buddy Home 选中文件 -> `intake_request` 子图理解请求，必要时在 `ask_clarification` 断点等待用户澄清 -> `needs_capability` 判断是否需要启用能力；不需要时直接进入 `draft_final_response`，需要时进入 `run_capability_cycle` 调用 `graphiteui_capability_selector`、必要时在 `request_capability_approval` 断点等待批准，再由动态能力执行节点写唯一 `capability_result` 结果包 -> `draft_final_response` 子图只写 `final_reply` -> `output_final` 展示 `final_reply` 并结束可见主运行。
+- 主要流程：输入用户消息、历史、页面上下文、伙伴模式和 Buddy Home 选中文件 -> `intake_request` 子图理解请求，必要时在 `ask_clarification` 断点等待用户澄清 -> `needs_capability` 判断是否需要启用能力；不需要时直接进入 `draft_final_response`，需要时进入 `run_capability_cycle` 调用 `graphiteui_capability_selector`，找到能力后由动态能力执行节点写唯一 `capability_result` 结果包，找不到能力时写 `capability_gap` 并在最终回复中询问是否构建该能力；多轮能力调用摘要写入 `capability_trace` -> `draft_final_response` 子图只写 `final_reply` -> `output_final` 展示 `final_reply` 并结束可见主运行。写文件、删改文件或执行脚本的确认不在模板内由 LLM 判断，而由运行时根据 `需确认` / `完全访问` 模式处理。
 - 动态能力语义：只有 `execute_capability` 读取 `selected_capability` 这个 `capability` state，并且它只写一个 `result_package` state。其他复盘节点不能读取 `capability` state，否则会被运行协议视为动态能力执行节点。
 - 断点语义：澄清和能力审批都使用子图内部 `interrupt_after`。父级 Buddy run 需要通过标准暂停/恢复路径展示子图 scope，而不是由伙伴前端额外发明确认协议。
 - 边界：当前模板已经表达完整可见回复主干，但长期记忆写回、Buddy Home 修改、图补丁应用和更完整的伙伴页面暂停交互仍应作为后续显式模板/命令流补齐，不能隐藏在 output 节点或前端逻辑里。
@@ -128,7 +128,7 @@
 - 主要流程：输入需求 -> 调用 `graphiteui_capability_selector` 检查已有能力候选 -> 评估需求 -> 必要时断点询问用户 -> 确认是否继续创建 -> 断点确认示例输入输出 -> 调用 `graphiteUI_skill_builder` 生成 `skill_key`、`skill.json`、`SKILL.md`、`before_llm.py`、`after_llm.py`、`requirements.txt` -> 判断是否需要脚本测试 -> 调用 `graphiteUI_script_tester` -> 测试失败时经 `script_test_passed` 条件分支回到构建节点，最多三轮 -> 写入前断点审查 -> 用户明确批准后调用 `local_workspace_executor` 写入 `skill/user/<skill_key>/`。
 - 断点语义：`ask_clarification`、`draft_example_io`、`review_generated_skill` 使用 `interrupt_after` 暂停，分别等待用户补充澄清回答、样例反馈和写入批准。
 - 能力候选语义：模板会把 `graphiteui_capability_selector` 返回的候选能力保存为普通 `json` state 供需求评估读取，而不是保存为 `capability` state。原因是当前协议规定 LLM 节点读取 `capability` state 等价于动态执行该能力；这里只是做“是否已有能力可满足需求”的审查，不应触发执行。
-- 写入语义：模板只写用户自定义 Skill 目录，不写官方 `skill/` 目录；写入动作由 `local_workspace_executor` 完成并需要显式确认。`graphiteUI_skill_builder` 仍然只负责生成文件内容，不负责写入、测试、启用或修改官方 Skill。
+- 写入语义：模板只写用户自定义 Skill 目录，不写官方 `skill/` 目录；写入动作由 `local_workspace_executor` 完成，是否暂停确认由运行时的 `需确认` / `完全访问` 模式决定。`review_generated_skill` 只做生成方案审查，不再承担低层文件写入审批。`graphiteUI_skill_builder` 仍然只负责生成文件内容，不负责写入、测试、启用或修改官方 Skill。
 - 视觉和协议约束：该模板只使用编辑器可创建的 `input / LLM / condition / output` 节点，LLM 节点最多绑定一个 Skill，condition 节点只使用固定 `true / false / exhausted` 分支，模板不手写节点尺寸，交给前端默认尺寸和用户后续拖拽调整。
 
 ### `graphiteUI_skill_builder`

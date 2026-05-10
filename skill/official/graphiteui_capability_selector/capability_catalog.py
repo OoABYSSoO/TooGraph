@@ -9,15 +9,6 @@ from typing import Any
 
 SKILL_KEY = "graphiteui_capability_selector"
 DEFAULT_ORIGIN = "buddy"
-WRITE_OR_SCRIPT_PERMISSIONS = {
-    "command_execute",
-    "file_delete",
-    "file_write",
-    "local_file_write",
-    "script_execute",
-    "shell",
-    "subprocess",
-}
 
 
 def build_capability_catalog_context(*, origin: str = DEFAULT_ORIGIN) -> str:
@@ -66,17 +57,14 @@ def normalize_selected_capability(**skill_inputs: Any) -> dict[str, Any]:
     if candidate is None:
         return _none_response()
 
-    requires_approval = bool(candidate.get("requiresApproval", False))
     return {
         "found": True,
-        "requires_approval": requires_approval,
         "capability": {
             "kind": candidate["kind"],
             "key": candidate["key"],
             "name": candidate["name"],
             "description": candidate["description"],
             "permissions": list(candidate.get("permissions") or []),
-            "requiresApproval": requires_approval,
         }
     }
 
@@ -135,7 +123,6 @@ def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], li
                     "description": _compact_text(payload.get("description")),
                     "source": source,
                     "permissions": permissions,
-                    "requiresApproval": _requires_approval_for_permissions(permissions),
                 }
             )
     return candidates, errors
@@ -179,7 +166,6 @@ def _load_skill_candidates(repo_root: Path, *, origin: str) -> tuple[list[dict[s
                     "description": _compact_text(payload.get("description")),
                     "source": source,
                     "permissions": permissions,
-                    "requiresApproval": _requires_approval_for_permissions(permissions),
                 }
             )
     return candidates, errors
@@ -293,12 +279,8 @@ def _unique_permissions(values: Any) -> list[str]:
     return result
 
 
-def _requires_approval_for_permissions(permissions: list[str]) -> bool:
-    return bool(set(permissions) & WRITE_OR_SCRIPT_PERMISSIONS)
-
-
 def _none_response() -> dict[str, Any]:
-    return {"found": False, "requires_approval": False, "capability": {"kind": "none"}}
+    return {"found": False, "capability": {"kind": "none"}}
 
 
 def _format_candidate_lines(candidates: list[dict[str, Any]]) -> list[str]:
@@ -310,7 +292,6 @@ def _format_candidate_lines(candidates: list[dict[str, Any]]) -> list[str]:
                 f"  key: {candidate['key']}",
                 f"  name: {candidate['name']}",
                 f"  whenToUse: {candidate['description'] or candidate['name']}",
-                f"  requiresApproval: {str(bool(candidate.get('requiresApproval'))).lower()}",
                 f"  permissions: {', '.join(candidate.get('permissions') or []) or 'none'}",
             ]
         )

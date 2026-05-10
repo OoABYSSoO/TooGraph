@@ -164,6 +164,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertNotIn("agent_breakpoint_timing", template["metadata"])
         self.assertEqual(states["existing_capability"]["type"], "json")
         self.assertEqual(states["existing_capability_found"]["type"], "boolean")
+        self.assertEqual(states["capability_gap"]["type"], "json")
         self.assertEqual(states["generated_skill_key"]["type"], "text")
         self.assertEqual(states["generated_skill_json"]["type"], "json")
         self.assertEqual(states["generated_skill_md"]["type"], "markdown")
@@ -184,6 +185,8 @@ class TemplateLayoutTests(unittest.TestCase):
             }.intersection(states)
         )
         self.assertEqual(states["final_summary"]["type"], "markdown")
+        self.assertNotIn("write_approval", states)
+        self.assertNotIn("write_decision", states)
 
         selector_node = nodes["select_existing_capability"]
         self.assertEqual(selector_node["kind"], "agent")
@@ -268,6 +271,15 @@ class TemplateLayoutTests(unittest.TestCase):
                     [f"{node_id}_success", f"{node_id}_result"],
                 )
                 self.assertIn("operation 必须是 write", nodes[node_id]["config"]["taskInstruction"])
+                self.assertIn("需确认", nodes[node_id]["config"]["taskInstruction"])
+
+        review_node = nodes["review_generated_skill"]
+        self.assertNotIn("批准写入", review_node["config"]["taskInstruction"])
+        self.assertIn("运行时权限", review_node["config"]["taskInstruction"])
+        self.assertIn({"source": "review_generated_skill", "target": "write_skill_json"}, template["edges"])
+        self.assertNotIn("review_write_approval", nodes)
+        self.assertNotIn("write_approved", nodes)
+        self.assertNotIn("finalize_no_write", nodes)
 
         self.assertEqual(
             nodes["need_clarification"]["config"]["rule"],
@@ -287,7 +299,6 @@ class TemplateLayoutTests(unittest.TestCase):
                 "examples_approved",
                 "needs_script_test",
                 "script_test_passed",
-                "write_approved",
                 "has_before_llm",
                 "has_after_llm",
                 "has_requirements",
@@ -355,7 +366,11 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["selected_capability"]["type"], "capability")
         self.assertEqual(states["capability_found"]["type"], "boolean")
         self.assertEqual(states["capability_result"]["type"], "result_package")
+        self.assertEqual(states["capability_gap"]["type"], "json")
+        self.assertEqual(states["capability_trace"]["type"], "json")
         self.assertEqual(states["final_reply"]["type"], "markdown")
+        self.assertNotIn("approval_prompt", states)
+        self.assertNotIn("capability_requires_approval", states)
 
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "subgraph"],
@@ -412,7 +427,7 @@ class TemplateLayoutTests(unittest.TestCase):
         )
 
         cycle_graph = nodes["run_capability_cycle"]["config"]["graph"]
-        self.assertEqual(cycle_graph["metadata"]["interrupt_after"], ["request_capability_approval"])
+        self.assertEqual(cycle_graph["metadata"].get("interrupt_after", []), [])
         selector_node = cycle_graph["nodes"]["select_capability"]
         self.assertEqual(selector_node["config"]["skillKey"], "graphiteui_capability_selector")
         self.assertEqual(
@@ -423,25 +438,44 @@ class TemplateLayoutTests(unittest.TestCase):
                     "outputMapping": {
                         "capability": "selected_capability",
                         "found": "capability_found",
-                        "requires_approval": "capability_requires_approval",
                     },
                 }
             ],
         )
+        for removed_node_id in [
+            "review_capability_permission",
+            "needs_capability_approval",
+            "request_capability_approval",
+            "review_approval_decision",
+            "approval_granted",
+            "review_denied_capability",
+        ]:
+            self.assertNotIn(removed_node_id, cycle_graph["nodes"])
         execute_node = cycle_graph["nodes"]["execute_capability"]
         self.assertEqual(execute_node["config"]["skillKey"], "")
         self.assertIn({"state": "selected_capability", "required": True}, execute_node["reads"])
         self.assertEqual(execute_node["writes"], [{"state": "capability_result", "mode": "replace"}])
         self.assertEqual(cycle_graph["state_schema"]["capability_result"]["type"], "result_package")
+        self.assertEqual(cycle_graph["state_schema"]["capability_gap"]["type"], "json")
+        self.assertEqual(cycle_graph["state_schema"]["capability_trace"]["type"], "json")
+        missing_node = cycle_graph["nodes"]["review_missing_capability"]
+        self.assertIn({"state": "capability_gap", "mode": "replace"}, missing_node["writes"])
+        self.assertIn("should_offer_build", missing_node["config"]["taskInstruction"])
+        review_node = cycle_graph["nodes"]["review_capability_result"]
+        self.assertIn({"state": "capability_trace", "mode": "append"}, review_node["writes"])
         self.assertEqual(cycle_graph["nodes"]["continue_capability_loop"]["config"]["loopLimit"], 3)
-        permission_node = cycle_graph["nodes"]["review_capability_permission"]
-        self.assertIn({"state": "capability_requires_approval", "required": True}, permission_node["reads"])
-        self.assertNotIn({"state": "selected_capability", "required": True}, permission_node["reads"])
-        self.assertIn("capability_requires_approval", permission_node["config"]["taskInstruction"])
-        self.assertIn("buddy_mode is ask_first", permission_node["config"]["taskInstruction"])
-        self.assertIn("buddy_mode is full_access", permission_node["config"]["taskInstruction"])
-        self.assertNotIn("network", permission_node["config"]["taskInstruction"].lower())
-        self.assertNotIn("cost", permission_node["config"]["taskInstruction"].lower())
+        self.assertEqual(
+            cycle_graph["conditional_edges"][0],
+            {
+                "source": "capability_found_condition",
+                "branches": {
+                    "true": "execute_capability",
+                    "false": "review_missing_capability",
+                    "exhausted": "review_missing_capability",
+                },
+            },
+        )
+        self.assertNotIn("output_approval_prompt", cycle_graph["nodes"])
 
         draft_graph = nodes["draft_final_response"]["config"]["graph"]
         self.assertEqual([node_id for node_id, node in draft_graph["nodes"].items() if node["kind"] == "output"], ["output_final_reply"])

@@ -112,12 +112,20 @@
       "color": "#0f766e",
       "binding": null
     },
-    "approval_prompt": {
-      "name": "approval_prompt",
-      "description": "需要用户批准时展示给用户的确认内容。",
-      "type": "markdown",
-      "value": "",
-      "color": "#b45309",
+    "capability_gap": {
+      "name": "capability_gap",
+      "description": "找不到能力时的结构化能力缺口，供最终回复或能力构建模板使用。",
+      "type": "json",
+      "value": {},
+      "color": "#dc2626",
+      "binding": null
+    },
+    "capability_trace": {
+      "name": "capability_trace",
+      "description": "本轮能力循环的步骤摘要列表，保留多轮能力调用轨迹。",
+      "type": "json",
+      "value": [],
+      "color": "#4f46e5",
       "binding": null
     },
     "final_reply": {
@@ -127,20 +135,6 @@
       "value": "",
       "color": "#16a34a",
       "binding": null
-    },
-    "capability_requires_approval": {
-      "name": "capability_requires_approval",
-      "description": "Whether the selected capability may write/delete files or execute arbitrary scripts or commands.",
-      "type": "boolean",
-      "value": false,
-      "color": "#ea580c",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "graphiteui_capability_selector",
-        "nodeId": "select_capability",
-        "fieldKey": "requires_approval",
-        "managed": true
-      }
     }
   },
   "nodes": {
@@ -801,7 +795,7 @@
     "run_capability_cycle": {
       "kind": "subgraph",
       "name": "能力循环",
-      "description": "选择一个启用能力，必要时请求批准，执行后把结果打包。",
+      "description": "选择一个启用能力，执行后把结果和能力缺口打包；低层写文件或脚本审批由运行时处理。",
       "ui": {
         "position": {
           "x": 1600,
@@ -853,7 +847,11 @@
           "mode": "replace"
         },
         {
-          "state": "approval_prompt",
+          "state": "capability_gap",
+          "mode": "replace"
+        },
+        {
+          "state": "capability_trace",
           "mode": "replace"
         }
       ],
@@ -968,43 +966,21 @@
               "color": "#0f766e",
               "binding": null
             },
-            "approval_review": {
-              "name": "approval_review",
-              "description": "是否需要或已经获得用户批准的结构化判断。",
+            "capability_gap": {
+              "name": "capability_gap",
+              "description": "找不到能力时的结构化能力缺口。",
               "type": "json",
               "value": {},
-              "color": "#b45309",
+              "color": "#dc2626",
               "binding": null
             },
-            "approval_prompt": {
-              "name": "approval_prompt",
-              "description": "给用户确认的审批文本。",
-              "type": "markdown",
-              "value": "",
-              "color": "#b45309",
+            "capability_trace": {
+              "name": "capability_trace",
+              "description": "能力循环步骤摘要列表。",
+              "type": "json",
+              "value": [],
+              "color": "#4f46e5",
               "binding": null
-            },
-            "approval_decision": {
-              "name": "approval_decision",
-              "description": "用户对能力执行审批的回答。",
-              "type": "markdown",
-              "value": "",
-              "color": "#d97706",
-              "binding": null
-            },
-            "capability_requires_approval": {
-              "name": "capability_requires_approval",
-              "description": "Whether the selected capability may write/delete files or execute arbitrary scripts or commands.",
-              "type": "boolean",
-              "value": false,
-              "color": "#ea580c",
-              "binding": {
-                "kind": "skill_output",
-                "skillKey": "graphiteui_capability_selector",
-                "nodeId": "select_capability",
-                "fieldKey": "requires_approval",
-                "managed": true
-              }
             }
           },
           "nodes": {
@@ -1198,8 +1174,7 @@
                     "skillKey": "graphiteui_capability_selector",
                     "outputMapping": {
                       "capability": "selected_capability",
-                      "found": "capability_found",
-                      "requires_approval": "capability_requires_approval"
+                      "found": "capability_found"
                     }
                   }
                 ],
@@ -1257,7 +1232,7 @@
             "review_missing_capability": {
               "kind": "agent",
               "name": "无匹配能力复盘",
-              "description": "没有能力可用时给出结构化原因。",
+              "description": "没有能力可用时给出结构化能力缺口和构建建议。",
               "ui": {
                 "position": {
                   "x": 1180,
@@ -1279,55 +1254,9 @@
                 {
                   "state": "capability_review",
                   "mode": "replace"
-                }
-              ],
-              "config": {
-                "skillKey": "",
-                "skillBindings": [],
-                "skillInstructionBlocks": {},
-                "taskInstruction": "输出 capability_review JSON，说明 found=false、reason、direct_response_strategy，并把 needs_another_capability 设为 false。",
-                "modelSource": "global",
-                "model": "",
-                "thinkingMode": "high",
-                "temperature": 0.1
-              }
-            },
-            "review_capability_permission": {
-              "kind": "agent",
-              "name": "检查权限",
-              "description": "判断所选能力是否需要用户批准。",
-              "ui": {
-                "position": {
-                  "x": 1180,
-                  "y": 220
-                },
-                "collapsed": false
-              },
-              "reads": [
-                {
-                  "state": "buddy_mode",
-                  "required": true
                 },
                 {
-                  "state": "buddy_context",
-                  "required": true
-                },
-                {
-                  "state": "request_understanding",
-                  "required": true
-                },
-                {
-                  "state": "capability_requires_approval",
-                  "required": true
-                }
-              ],
-              "writes": [
-                {
-                  "state": "approval_review",
-                  "mode": "replace"
-                },
-                {
-                  "state": "approval_prompt",
+                  "state": "capability_gap",
                   "mode": "replace"
                 }
               ],
@@ -1335,185 +1264,7 @@
                 "skillKey": "",
                 "skillBindings": [],
                 "skillInstructionBlocks": {},
-                "taskInstruction": "Output approval_review JSON and approval_prompt Markdown. approval_review must include requires_approval(boolean), approved(boolean), reason, and risk_summary. Set requires_approval=true and approved=false only when buddy_mode is ask_first and capability_requires_approval is true. capability_requires_approval means the selected capability may write/delete files or execute arbitrary scripts or commands. When buddy_mode is full_access, set requires_approval=false and approved=true. Normal Skill calls, reads, searches, page access, and LLM calls do not require approval by themselves. Keep approval_prompt short and describe the capability, reason, input summary, and the file-write or script risk that needs confirmation.",
-                "modelSource": "global",
-                "model": "",
-                "thinkingMode": "high",
-                "temperature": 0.1
-              }
-            },
-            "needs_capability_approval": {
-              "kind": "condition",
-              "name": "需要批准?",
-              "description": "需要批准则暂停等待用户确认。",
-              "ui": {
-                "position": {
-                  "x": 1550,
-                  "y": 220
-                },
-                "collapsed": false
-              },
-              "reads": [
-                {
-                  "state": "approval_review",
-                  "required": true
-                }
-              ],
-              "writes": [],
-              "config": {
-                "branches": [
-                  "true",
-                  "false",
-                  "exhausted"
-                ],
-                "loopLimit": 3,
-                "branchMapping": {
-                  "true": "true",
-                  "false": "false"
-                },
-                "rule": {
-                  "source": "$state.approval_review.requires_approval",
-                  "operator": "==",
-                  "value": true
-                }
-              }
-            },
-            "request_capability_approval": {
-              "kind": "agent",
-              "name": "请求用户批准",
-              "description": "把审批请求展示给用户，并在断点处等待回答。",
-              "ui": {
-                "position": {
-                  "x": 1910,
-                  "y": 80
-                },
-                "collapsed": false
-              },
-              "reads": [
-                {
-                  "state": "approval_prompt",
-                  "required": true
-                }
-              ],
-              "writes": [
-                {
-                  "state": "approval_prompt",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "skillKey": "",
-                "skillBindings": [],
-                "skillInstructionBlocks": {},
-                "taskInstruction": "保持 approval_prompt 的核心信息，整理成用户可直接批准或拒绝的确认消息。不要执行能力。",
-                "modelSource": "global",
-                "model": "",
-                "thinkingMode": "high",
-                "temperature": 0.1
-              }
-            },
-            "review_approval_decision": {
-              "kind": "agent",
-              "name": "解析批准回答",
-              "description": "读取用户审批回答并更新审批状态。",
-              "ui": {
-                "position": {
-                  "x": 2280,
-                  "y": 80
-                },
-                "collapsed": false
-              },
-              "reads": [
-                {
-                  "state": "approval_prompt",
-                  "required": true
-                },
-                {
-                  "state": "approval_decision",
-                  "required": true
-                }
-              ],
-              "writes": [
-                {
-                  "state": "approval_review",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "skillKey": "",
-                "skillBindings": [],
-                "skillInstructionBlocks": {},
-                "taskInstruction": "根据 approval_decision 输出 approval_review JSON。字段包含 requires_approval(true)、approved(boolean)、reason、user_decision。只有用户明确同意时 approved=true。",
-                "modelSource": "global",
-                "model": "",
-                "thinkingMode": "high",
-                "temperature": 0.1
-              }
-            },
-            "approval_granted": {
-              "kind": "condition",
-              "name": "批准通过?",
-              "description": "拒绝时不执行能力。",
-              "ui": {
-                "position": {
-                  "x": 2650,
-                  "y": 160
-                },
-                "collapsed": false
-              },
-              "reads": [
-                {
-                  "state": "approval_review",
-                  "required": true
-                }
-              ],
-              "writes": [],
-              "config": {
-                "branches": [
-                  "true",
-                  "false",
-                  "exhausted"
-                ],
-                "loopLimit": 3,
-                "branchMapping": {
-                  "true": "true",
-                  "false": "false"
-                },
-                "rule": {
-                  "source": "$state.approval_review.approved",
-                  "operator": "==",
-                  "value": true
-                }
-              }
-            },
-            "review_denied_capability": {
-              "kind": "agent",
-              "name": "拒绝执行复盘",
-              "description": "用户拒绝后记录原因。",
-              "ui": {
-                "position": {
-                  "x": 3000,
-                  "y": 330
-                },
-                "collapsed": false
-              },
-              "reads": [
-                {
-                  "state": "approval_review",
-                  "required": true
-                }
-              ],
-              "writes": [
-                {
-                  "state": "capability_review",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "skillKey": "",
-                "skillBindings": [],
-                "skillInstructionBlocks": {},
-                "taskInstruction": "输出 capability_review JSON，标记 executed=false、denied=true、reason，并把 needs_another_capability 设为 false。",
+                "taskInstruction": "输出 capability_review JSON 和 capability_gap JSON。capability_review 说明 found=false、reason、direct_response_strategy，并把 needs_another_capability 设为 false。capability_gap 必须包含 gap_detected(true)、gap_type(skill|graph_template|unknown)、reason、missing_capability、suggested_asset_type(skill|graph_template|none)、build_requirement、should_offer_build(boolean)、should_route_to_builder(boolean)。只有用户明确要求创建、补齐、以后具备某能力，或 request_understanding 表明目标就是构建能力时，should_route_to_builder 才为 true；普通任务缺能力时只 should_offer_build=true，交由最终回复询问用户。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "high",
@@ -1551,10 +1302,6 @@
                 {
                   "state": "request_understanding",
                   "required": true
-                },
-                {
-                  "state": "approval_review",
-                  "required": false
                 }
               ],
               "writes": [
@@ -1603,13 +1350,17 @@
                 {
                   "state": "capability_review",
                   "mode": "replace"
+                },
+                {
+                  "state": "capability_trace",
+                  "mode": "append"
                 }
               ],
               "config": {
                 "skillKey": "",
                 "skillBindings": [],
                 "skillInstructionBlocks": {},
-                "taskInstruction": "输出 capability_review JSON。字段包含 executed(true)、success(boolean)、summary、missing_information、needs_another_capability(boolean)、next_requirement、final_response_strategy。只有确实需要另一个不同能力时才把 needs_another_capability 设为 true。",
+                "taskInstruction": "输出 capability_review JSON，并向 capability_trace append 一个本轮能力调用摘要。capability_review 字段包含 executed(true)、success(boolean)、summary、missing_information、needs_another_capability(boolean)、next_requirement、final_response_strategy。capability_trace 条目包含 capability、success、summary、next_requirement、timestamp_note；只记录摘要，不复制大段结果。只有确实需要另一个不同能力时才把 needs_another_capability 设为 true。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "high",
@@ -1677,11 +1428,11 @@
                   "required": true
                 },
                 {
-                  "state": "approval_review",
+                  "state": "capability_gap",
                   "required": false
                 },
                 {
-                  "state": "approval_prompt",
+                  "state": "capability_trace",
                   "required": false
                 }
               ],
@@ -1695,7 +1446,7 @@
                 "skillKey": "",
                 "skillBindings": [],
                 "skillInstructionBlocks": {},
-                "taskInstruction": "整理 capability_review JSON，保留上游判断，并补充 final_status、user_visible_summary、needs_another_capability(false)。不要读取或执行能力，不要修改 capability_result。",
+                "taskInstruction": "整理 capability_review JSON，保留上游判断，并补充 final_status、user_visible_summary、needs_another_capability(false)。如果存在 capability_gap，保留缺口摘要和 should_offer_build/should_route_to_builder 判断；如果存在 capability_trace，保留简短轨迹摘要。不要读取或执行能力，不要修改 capability_result。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "high",
@@ -1802,30 +1553,45 @@
                 "fileNameTemplate": ""
               }
             },
-            "output_approval_prompt": {
+            "output_capability_gap": {
               "kind": "output",
-              "name": "输出审批提示",
-              "description": "",
+              "name": "输出能力缺口",
+              "description": "输出找不到能力时的结构化缺口。",
               "ui": {
                 "position": {
-                  "x": 5800,
-                  "y": 220
+                  "x": 4660,
+                  "y": 620
                 },
                 "collapsed": false
               },
               "reads": [
                 {
-                  "state": "approval_prompt",
+                  "state": "capability_gap",
                   "required": false
                 }
               ],
               "writes": [],
-              "config": {
-                "displayMode": "markdown",
-                "persistEnabled": false,
-                "persistFormat": "auto",
-                "fileNameTemplate": ""
-              }
+              "config": {}
+            },
+            "output_capability_trace": {
+              "kind": "output",
+              "name": "输出能力轨迹",
+              "description": "输出能力循环的步骤摘要列表。",
+              "ui": {
+                "position": {
+                  "x": 4660,
+                  "y": 760
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "capability_trace",
+                  "required": false
+                }
+              ],
+              "writes": [],
+              "config": {}
             }
           },
           "edges": [
@@ -1843,22 +1609,6 @@
             },
             {
               "source": "review_missing_capability",
-              "target": "finalize_capability_cycle"
-            },
-            {
-              "source": "review_capability_permission",
-              "target": "needs_capability_approval"
-            },
-            {
-              "source": "request_capability_approval",
-              "target": "review_approval_decision"
-            },
-            {
-              "source": "review_approval_decision",
-              "target": "approval_granted"
-            },
-            {
-              "source": "review_denied_capability",
               "target": "finalize_capability_cycle"
             },
             {
@@ -1887,32 +1637,20 @@
             },
             {
               "source": "finalize_capability_cycle",
-              "target": "output_approval_prompt"
+              "target": "output_capability_gap"
+            },
+            {
+              "source": "finalize_capability_cycle",
+              "target": "output_capability_trace"
             }
           ],
           "conditional_edges": [
             {
               "source": "capability_found_condition",
               "branches": {
-                "true": "review_capability_permission",
+                "true": "execute_capability",
                 "false": "review_missing_capability",
                 "exhausted": "review_missing_capability"
-              }
-            },
-            {
-              "source": "needs_capability_approval",
-              "branches": {
-                "true": "request_capability_approval",
-                "false": "execute_capability",
-                "exhausted": "request_capability_approval"
-              }
-            },
-            {
-              "source": "approval_granted",
-              "branches": {
-                "true": "execute_capability",
-                "false": "review_denied_capability",
-                "exhausted": "review_denied_capability"
               }
             },
             {
@@ -1927,9 +1665,7 @@
           "metadata": {
             "graphProtocol": "node_system",
             "role": "buddy_capability_cycle",
-            "interrupt_after": [
-              "request_capability_approval"
-            ]
+            "interrupt_after": []
           }
         }
       }
@@ -1979,7 +1715,11 @@
           "required": true
         },
         {
-          "state": "approval_prompt",
+          "state": "capability_gap",
+          "required": true
+        },
+        {
+          "state": "capability_trace",
           "required": true
         }
       ],
@@ -2066,12 +1806,20 @@
               "color": "#0f766e",
               "binding": null
             },
-            "approval_prompt": {
-              "name": "approval_prompt",
-              "description": "审批提示。",
-              "type": "markdown",
-              "value": "",
-              "color": "#b45309",
+            "capability_gap": {
+              "name": "capability_gap",
+              "description": "找不到能力时的结构化能力缺口。",
+              "type": "json",
+              "value": {},
+              "color": "#dc2626",
+              "binding": null
+            },
+            "capability_trace": {
+              "name": "capability_trace",
+              "description": "能力循环步骤摘要列表。",
+              "type": "json",
+              "value": [],
+              "color": "#4f46e5",
               "binding": null
             },
             "final_reply": {
@@ -2278,29 +2026,6 @@
                 "boundaryType": "json"
               }
             },
-            "input_approval_prompt": {
-              "kind": "input",
-              "name": "审批提示",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 40,
-                  "y": 1020
-                },
-                "collapsed": false
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "approval_prompt",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": "",
-                "boundaryType": "markdown"
-              }
-            },
             "draft_final_reply": {
               "kind": "agent",
               "name": "撰写最终回复",
@@ -2346,7 +2071,11 @@
                   "required": true
                 },
                 {
-                  "state": "approval_prompt",
+                  "state": "capability_gap",
+                  "required": false
+                },
+                {
+                  "state": "capability_trace",
                   "required": false
                 }
               ],
@@ -2360,7 +2089,7 @@
                 "skillKey": "",
                 "skillBindings": [],
                 "skillInstructionBlocks": {},
-                "taskInstruction": "撰写 final_reply Markdown。只输出给用户看的最终回复，不输出调试 JSON。若能力未找到、被拒绝或失败，清楚说明当前能做什么和缺少什么。若 capability_result 是结果包，读取拆包后的内容，不要暴露内部字段名，除非网址、文件路径或错误是用户需要的证据。",
+                "taskInstruction": "撰写 final_reply Markdown。只输出给用户看的最终回复，不输出调试 JSON。若能力未找到或失败，清楚说明当前能做什么和缺少什么；如果 capability_gap.should_offer_build 为 true，询问用户是否要创建对应能力；如果 should_route_to_builder 为 true，说明可以进入能力构建流程但不要假装已经创建。若 capability_result 是结果包，读取拆包后的内容，不要暴露内部字段名，除非网址、文件路径或错误是用户需要的证据。可以用 capability_trace 汇总多轮能力调用，但不要复制大段中间结果。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "high",
@@ -2390,6 +2119,52 @@
                 "persistEnabled": false,
                 "persistFormat": "md",
                 "fileNameTemplate": ""
+              }
+            },
+            "input_capability_gap": {
+              "kind": "input",
+              "name": "输入能力缺口",
+              "description": "能力循环在找不到能力时生成的结构化缺口。",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 1120
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "capability_gap",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": {},
+                "boundaryType": "json"
+              }
+            },
+            "input_capability_trace": {
+              "kind": "input",
+              "name": "输入能力轨迹",
+              "description": "能力循环中的能力调用摘要列表。",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 1260
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "capability_trace",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": [],
+                "boundaryType": "json"
               }
             }
           },
@@ -2427,12 +2202,16 @@
               "target": "draft_final_reply"
             },
             {
-              "source": "input_approval_prompt",
+              "source": "draft_final_reply",
+              "target": "output_final_reply"
+            },
+            {
+              "source": "input_capability_gap",
               "target": "draft_final_reply"
             },
             {
-              "source": "draft_final_reply",
-              "target": "output_final_reply"
+              "source": "input_capability_trace",
+              "target": "draft_final_reply"
             }
           ],
           "conditional_edges": [],

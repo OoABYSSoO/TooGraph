@@ -1,7 +1,7 @@
 {
   "template_id": "graphiteui_skill_creation_workflow",
   "label": "创建自定义 Skill",
-  "description": "需求澄清、样例确认、Skill 文件生成、脚本测试修复和人工批准写入的自定义 Skill 创作图模板。",
+  "description": "需求澄清、样例确认、Skill 文件生成、脚本测试修复、生成方案审查和运行时权限控制写入的自定义 Skill 创作图模板。",
   "default_graph_name": "创建自定义 Skill",
   "state_schema": {
     "skill_request": {
@@ -10,6 +10,14 @@
       "type": "text",
       "value": "我想要一个把会议纪要整理成待办清单的 Skill",
       "color": "#d97706",
+      "binding": null
+    },
+    "capability_gap": {
+      "name": "capability_gap",
+      "description": "可选的能力缺口上下文，通常来自 Buddy 主循环在找不到合适能力时生成的结构化 gap。",
+      "type": "json",
+      "value": {},
+      "color": "#dc2626",
       "binding": null
     },
     "existing_capability": {
@@ -239,22 +247,6 @@
       "description": "写入前给用户审查的 Skill 文件摘要、测试结果和目标路径。",
       "type": "markdown",
       "value": "",
-      "color": "#0f766e",
-      "binding": null
-    },
-    "write_approval": {
-      "name": "写入确认",
-      "description": "用户对是否写入 skill/user/<skill_key>/ 的确认。",
-      "type": "markdown",
-      "value": "",
-      "color": "#d97706",
-      "binding": null
-    },
-    "write_decision": {
-      "name": "写入决策",
-      "description": "是否批准写入文件的结构化判断。",
-      "type": "json",
-      "value": {},
       "color": "#0f766e",
       "binding": null
     },
@@ -503,6 +495,10 @@
         {
           "state": "existing_capability_found",
           "required": false
+        },
+        {
+          "state": "capability_gap",
+          "required": false
         }
       ],
       "writes": [
@@ -523,7 +519,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "评估用户是否真的需要创建新 Skill。requirement_review 必须写 JSON 对象，包含 needs_clarification(boolean)、existing_capability_summary(string)、unclear_points(array)、questions(array)、reason(string)。如果 existing_capability_found 为 true，说明已有启用能力可能满足需求，应把 needs_clarification 设为 true，并在 questions 中询问用户是否仍要创建新 Skill；不要读取或执行 capability 对象本身。creation_decision 必须写 JSON 对象，包含 approved_to_create(boolean)、reason(string)；除非已有能力明显满足且用户没有表达仍要创建，否则默认 approved_to_create 为 true。confirmed_skill_requirement 写 Markdown，概括当前已确认的目标、输入、输出、权限、是否需要 before_llm.py、是否需要 after_llm.py、是否需要第三方依赖和限制。",
+        "taskInstruction": "评估用户是否真的需要创建新 Skill。capability_gap 是可选的上游能力缺口上下文；如果它存在，应把缺口类型、缺口原因、建议能力形态纳入判断。requirement_review 必须写 JSON 对象，包含 needs_clarification(boolean)、existing_capability_summary(string)、capability_gap_summary(string)、unclear_points(array)、questions(array)、reason(string)。如果 existing_capability_found 为 true，说明已有启用能力可能满足需求，应把 needs_clarification 设为 true，并在 questions 中询问用户是否仍要创建新 Skill；不要读取或执行 capability 对象本身。creation_decision 必须写 JSON 对象，包含 approved_to_create(boolean)、reason(string)；除非已有能力明显满足且用户没有表达仍要创建，否则默认 approved_to_create 为 true。confirmed_skill_requirement 写 Markdown，概括当前已确认的目标、输入、输出、权限、是否需要 before_llm.py、是否需要 after_llm.py、是否需要第三方依赖和限制。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -833,6 +829,10 @@
         {
           "state": "example_feedback",
           "required": true
+        },
+        {
+          "state": "capability_gap",
+          "required": false
         }
       ],
       "writes": [
@@ -845,7 +845,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "整理给 GraphiteUI Skill Builder 的最终上下文。builder_context 写 Markdown，包含：目标 Skill 名称建议、稳定 skillKey 建议、用户需求、已认可示例输入输出、outputSchema 字段建议、是否需要 before_llm.py、是否需要 after_llm.py、requirements.txt 需求、权限声明、测试重点和禁止事项。强调生成结果只包含 skill_key、skill_json、skill_md、before_llm_py、after_llm_py、requirements_txt。",
+        "taskInstruction": "整理给 GraphiteUI Skill Builder 的最终上下文。builder_context 写 Markdown，包含：目标 Skill 名称建议、稳定 skillKey 建议、用户需求、上游 capability_gap 摘要、已认可示例输入输出、outputSchema 字段建议、是否需要 before_llm.py、是否需要 after_llm.py、requirements.txt 需求、权限声明、测试重点和禁止事项。强调生成结果只包含 skill_key、skill_json、skill_md、before_llm_py、after_llm_py、requirements_txt。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -987,7 +987,7 @@
     "needs_script_test": {
       "kind": "condition",
       "name": "是否需要脚本测试",
-      "description": "有 Python 生命周期脚本时进入测试，否则进入写入前审查。",
+      "description": "有 Python 生命周期脚本时进入测试，否则进入生成方案审查。",
       "ui": {
         "position": {
           "x": 6980,
@@ -1124,8 +1124,8 @@
     },
     "review_generated_skill": {
       "kind": "agent",
-      "name": "写入前审查",
-      "description": "总结生成的 Skill 文件、测试结果和准备写入的路径，等待用户批准。",
+      "name": "生成方案审查",
+      "description": "总结生成的 Skill 文件、测试结果和准备写入的路径，作为断点供用户审查。",
       "ui": {
         "position": {
           "x": 8940,
@@ -1177,85 +1177,11 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "写入前给用户审查生成结果。generation_review 写 Markdown，包含 Skill 名称、skillKey、description、outputSchema 摘要、会写入的文件列表、目标目录 skill/user/<skillKey>/、脚本测试 success/result 和风险提示。不要执行写入。最后明确请用户在“写入确认”中写“批准写入”或说明不要写入。",
+        "taskInstruction": "给用户审查生成结果。generation_review 写 Markdown，包含 Skill 名称、skillKey、description、outputSchema 摘要、会写入的文件列表、目标目录 skill/user/<skillKey>/、脚本测试 success/result、权限声明和风险提示。不要执行写入，不要把这里当成低层文件操作审批；真正的写文件或脚本执行由运行时权限模式处理，需确认 模式会在受控执行器实际写入前暂停，完全访问 模式会自动继续。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
         "temperature": 0.2
-      }
-    },
-    "review_write_approval": {
-      "kind": "agent",
-      "name": "判断写入确认",
-      "description": "把用户写入确认转成结构化决策。",
-      "ui": {
-        "position": {
-          "x": 9460,
-          "y": 360
-        },
-        "collapsed": false
-      },
-      "reads": [
-        {
-          "state": "generation_review",
-          "required": true
-        },
-        {
-          "state": "write_approval",
-          "required": true
-        }
-      ],
-      "writes": [
-        {
-          "state": "write_decision",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
-        "taskInstruction": "判断用户是否批准写入文件。write_decision 写 JSON 对象，包含 approved(boolean)、reason(string)。只有用户明确写出“批准写入”、“确认写入”、“可以写入”等等价表达时 approved 为 true；表达犹豫、要求修改、拒绝或为空时 approved 为 false。",
-        "modelSource": "global",
-        "model": "",
-        "thinkingMode": "high",
-        "temperature": 0.1
-      }
-    },
-    "write_approved": {
-      "kind": "condition",
-      "name": "是否批准写入",
-      "description": "用户批准后才调用本地执行器写文件。",
-      "ui": {
-        "position": {
-          "x": 9920,
-          "y": 430
-        },
-        "collapsed": false
-      },
-      "reads": [
-        {
-          "state": "write_decision",
-          "required": true
-        }
-      ],
-      "writes": [],
-      "config": {
-        "branches": [
-          "true",
-          "false",
-          "exhausted"
-        ],
-        "loopLimit": 5,
-        "branchMapping": {
-          "true": "true",
-          "false": "false"
-        },
-        "rule": {
-          "source": "$state.write_decision.approved",
-          "operator": "==",
-          "value": true
-        }
       }
     },
     "write_skill_json": {
@@ -1301,7 +1227,7 @@
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 skill.json。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/skill.json。content 必须是 generated_skill_json 的格式化 JSON 文本，使用 2 空格缩进，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 skill.json。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/skill.json。content 必须是 generated_skill_json 的格式化 JSON 文本，使用 2 空格缩进，不要包 markdown 代码块。写文件动作本身不在本模板中做大模型审批；运行时会根据当前图或 Buddy 的 需确认/完全访问 模式决定是否暂停确认。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1351,7 +1277,7 @@
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 SKILL.md。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/SKILL.md。content 必须是 generated_skill_md 原文，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 SKILL.md。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/SKILL.md。content 必须是 generated_skill_md 原文，不要包 markdown 代码块。写文件动作本身不在本模板中做大模型审批；运行时会根据当前图或 Buddy 的 需确认/完全访问 模式决定是否暂停确认。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1437,7 +1363,7 @@
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 before_llm.py。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/before_llm.py。content 必须是 generated_before_llm_py 原文，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 before_llm.py。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/before_llm.py。content 必须是 generated_before_llm_py 原文，不要包 markdown 代码块。写文件动作本身不在本模板中做大模型审批；运行时会根据当前图或 Buddy 的 需确认/完全访问 模式决定是否暂停确认。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1523,7 +1449,7 @@
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 after_llm.py。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/after_llm.py。content 必须是 generated_after_llm_py 原文，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 after_llm.py。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/after_llm.py。content 必须是 generated_after_llm_py 原文，不要包 markdown 代码块。写文件动作本身不在本模板中做大模型审批；运行时会根据当前图或 Buddy 的 需确认/完全访问 模式决定是否暂停确认。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1609,7 +1535,7 @@
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "调用 Local Workspace Executor 写入 requirements.txt。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/requirements.txt。content 必须是 generated_requirements_txt 原文，不要包 markdown 代码块。",
+        "taskInstruction": "调用 Local Workspace Executor 写入 requirements.txt。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/requirements.txt。content 必须是 generated_requirements_txt 原文，不要包 markdown 代码块。写文件动作本身不在本模板中做大模型审批；运行时会根据当前图或 Buddy 的 需确认/完全访问 模式决定是否暂停确认。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1691,7 +1617,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "汇总最终结果。final_summary 写 Markdown，说明 Skill 已写入 skill/user/<generated_skill_key>/，列出各文件写入的 success/result、脚本测试 success/result、需要用户注意的依赖或权限，以及下一步可以在 Skill 管理页启用/使用。不要声称写入了 success 为 false 或没有执行器结果确认的文件。",
+        "taskInstruction": "汇总最终结果。final_summary 写 Markdown，说明 Skill 已写入 skill/user/<generated_skill_key>/，列出各文件写入的 success/result、脚本测试 success/result、需要用户注意的依赖或权限，以及下一步可以在 Skill 管理页启用/使用。不要声称写入了 success 为 false 或没有执行器结果确认的文件；如果运行时在需确认模式下曾暂停，说明写入是在用户恢复后完成的。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1740,48 +1666,6 @@
         "temperature": 0.2
       }
     },
-    "finalize_no_write": {
-      "kind": "agent",
-      "name": "未写入收束",
-      "description": "生成完成但用户未批准写入时给出可审查结果。",
-      "ui": {
-        "position": {
-          "x": 10580,
-          "y": 700
-        },
-        "collapsed": false
-      },
-      "reads": [
-        {
-          "state": "generated_skill_key",
-          "required": true
-        },
-        {
-          "state": "generation_review",
-          "required": true
-        },
-        {
-          "state": "write_decision",
-          "required": true
-        }
-      ],
-      "writes": [
-        {
-          "state": "final_summary",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
-        "taskInstruction": "用户没有批准写入时，final_summary 写 Markdown，说明没有写入任何文件，保留生成内容已在 state 中可审查，并说明用户可以修改需求或重新运行到写入确认。",
-        "modelSource": "global",
-        "model": "",
-        "thinkingMode": "high",
-        "temperature": 0.2
-      }
-    },
     "output_final": {
       "kind": "output",
       "name": "输出结果",
@@ -1806,12 +1690,39 @@
         "persistFormat": "md",
         "fileNameTemplate": ""
       }
+    },
+    "input_capability_gap": {
+      "kind": "input",
+      "name": "能力缺口上下文",
+      "description": "可选提供来自 Buddy 或其他图流程的能力缺口 JSON。",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 760
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "capability_gap",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": {},
+        "boundaryType": "json"
+      }
     }
   },
   "edges": [
     {
       "source": "input_skill_request",
       "target": "select_existing_capability"
+    },
+    {
+      "source": "input_capability_gap",
+      "target": "review_requirement"
     },
     {
       "source": "select_existing_capability",
@@ -1854,14 +1765,6 @@
       "target": "script_test_passed"
     },
     {
-      "source": "review_generated_skill",
-      "target": "review_write_approval"
-    },
-    {
-      "source": "review_write_approval",
-      "target": "write_approved"
-    },
-    {
       "source": "write_skill_json",
       "target": "write_skill_md"
     },
@@ -1890,8 +1793,8 @@
       "target": "output_final"
     },
     {
-      "source": "finalize_no_write",
-      "target": "output_final"
+      "source": "review_generated_skill",
+      "target": "write_skill_json"
     }
   ],
   "conditional_edges": [
@@ -1933,14 +1836,6 @@
         "true": "review_generated_skill",
         "false": "build_skill_files",
         "exhausted": "review_generated_skill"
-      }
-    },
-    {
-      "source": "write_approved",
-      "branches": {
-        "true": "write_skill_json",
-        "false": "finalize_no_write",
-        "exhausted": "finalize_no_write"
       }
     },
     {

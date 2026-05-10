@@ -2,8 +2,8 @@
   "schemaVersion": "graphite.skill/v1",
   "skillKey": "graphiteUI_skill_builder",
   "name": "GraphiteUI Skill Builder",
-  "description": "当用户已经确认自定义 Skill 的需求，需要生成一个 GraphiteUI Skill 包身份和必要文件内容时选择此技能。",
-  "llmInstruction": "你已绑定 GraphiteUI Skill Builder。根据当前图 state 中的用户需求、已确认设计、示例输入输出和约束，生成一个 GraphiteUI Skill 包的身份和文件内容。只生成六个字段：skill_key、skill_json、skill_md、before_llm_py、after_llm_py、requirements_txt。skill_key 必须是目标 Skill 的稳定机器标识，也必须与 skill_json.skillKey 一致；skill_json 必须是 skill.json 的 JSON 对象；skill_md 必须是 SKILL.md 的完整 Markdown 内容；before_llm_py 仅在目标 Skill 需要在 LLM 生成入参前补充上下文时填写完整 Python 源码，否则填写空字符串；after_llm_py 仅在目标 Skill 需要确定性执行、校验或规范化时填写完整 Python 源码，否则填写空字符串；requirements_txt 仅在目标 Skill 使用第三方 Python 依赖时填写 requirements.txt 内容，否则填写空字符串。不要输出压缩包、文件路径、测试报告、写入命令、模板图、安装步骤或除这六个字段以外的内容。不要让生成的 Skill 直接写 GraphiteUI state；state 绑定由 GraphiteUI runtime 根据 outputSchema 和 outputMapping 负责。skill_json 不得包含 enabled、hidden、selectable、requiresApproval、capabilityPolicy、targets、executionTargets、runPolicies 等本地使用设置；Skill 是否启用只由程序生成的 skill/settings.json 中的 enabled 管理；审批由图或 Buddy 的 需确认/完全访问 模式管理。",
+  "description": "当用户已经确认自定义 Skill 的需求，需要生成一个 GraphiteUI Skill 包身份和必要文件内容时使用此技能。",
+  "llmInstruction": "你已绑定 GraphiteUI Skill Builder。根据当前图 state 中的用户需求、上游 capability_gap、已确认设计、示例输入输出和约束，生成一个 GraphiteUI Skill 包的身份和文件内容。只生成六个字段：skill_key、skill_json、skill_md、before_llm_py、after_llm_py、requirements_txt。skill_key 必须是目标 Skill 的稳定机器标识，也必须与 skill_json.skillKey 一致；skill_json 必须是 skill.json 的 JSON 对象；skill_md 必须是 SKILL.md 的完整 Markdown 内容；before_llm_py 仅在目标 Skill 需要在 LLM 生成入参前补充上下文时填写完整 Python 源码，否则填写空字符串；after_llm_py 仅在目标 Skill 需要确定性执行、校验或规范化时填写完整 Python 源码，否则填写空字符串；requirements_txt 仅在目标 Skill 使用第三方 Python 依赖时填写 requirements.txt 内容，否则填写空字符串。不要输出压缩包、文件路径、测试报告、写入命令、模板图、安装步骤或除这六个字段以外的内容。不要让生成的 Skill 直接写 GraphiteUI state；state 绑定由 GraphiteUI runtime 根据 outputSchema 和 outputMapping 负责。skill_json 不得包含 enabled、hidden、selectable、requiresApproval、capabilityPolicy、targets、executionTargets、runPolicies 等本地使用设置；Skill 是否启用只由程序生成的 skill/settings.json 中的 enabled 管理。运行 Skill 本身不需要审批；写文件、删改文件或执行脚本由运行时的 需确认/完全访问 模式处理。",
   "version": "1.0.0",
   "timeoutSeconds": 30,
   "permissions": [
