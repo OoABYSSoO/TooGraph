@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/AbyssBadger0/GraphiteUI/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-c89136"></a>
+  <a href="https://github.com/OoABYSSoO/GraphiteUI/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-c89136"></a>
   <img alt="Vue 3" src="https://img.shields.io/badge/Vue-3-42b883?logo=vue.js&logoColor=white">
   <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white">
   <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-runtime-222222">
@@ -122,7 +122,7 @@ python --version
 ### 安装依赖
 
 ```bash
-git clone https://github.com/AbyssBadger0/GraphiteUI.git
+git clone https://github.com/OoABYSSoO/GraphiteUI.git
 cd GraphiteUI
 npm --prefix frontend install
 python -m pip install -r backend/requirements.txt

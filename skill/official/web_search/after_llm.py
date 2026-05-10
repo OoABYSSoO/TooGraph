@@ -20,7 +20,7 @@ DEFAULT_INCLUDE_RAW_CONTENT = False
 DEFAULT_TIMEOUT_SECONDS = 15.0
 DEFAULT_MAX_CHARS_PER_PAGE = 200_000
 DEFAULT_RETRY_ATTEMPTS = 5
-PAGE_FETCH_USER_AGENT = "GraphiteUI/1.0 (+https://github.com/AbyssBadger0/GraphiteUI)"
+PAGE_FETCH_USER_AGENT = "GraphiteUI/1.0 (+https://github.com/OoABYSSoO/GraphiteUI)"
 HTTP_PROXY_ENV_KEYS = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy")
 
 
@@ -108,7 +108,7 @@ def _search_with_tavily(
 
 def _search_with_duckduckgo(*, query: str, max_results: int, timeout_seconds: float) -> dict[str, Any]:
     headers = {
-        "User-Agent": "GraphiteUI/1.0 (+https://github.com/AbyssBadger0/GraphiteUI)",
+        "User-Agent": "GraphiteUI/1.0 (+https://github.com/OoABYSSoO/GraphiteUI)",
     }
     with httpx.Client(**_http_client_kwargs(timeout_seconds=timeout_seconds, follow_redirects=True)) as client:
         response = client.get(DUCKDUCKGO_SEARCH_URL, params={"q": query}, headers=headers)

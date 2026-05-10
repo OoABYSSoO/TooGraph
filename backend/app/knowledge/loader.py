@@ -23,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 KNOWLEDGE_ROOT = BACKEND_DIR / "data" / "kb"
 DOWNLOAD_ROOT = KNOWLEDGE_ROOT / "_downloads"
-GRAPHITEUI_REPO_BLOB_BASE = "https://github.com/AbyssBadger0/GraphiteUI/blob/main/"
+GRAPHITEUI_REPO_BLOB_BASE = "https://github.com/OoABYSSoO/GraphiteUI/blob/main/"
 GRAPHITEUI_KNOWLEDGE_BASE_ID = "graphiteui-official"
 DEFAULT_KNOWLEDGE_BASE = GRAPHITEUI_KNOWLEDGE_BASE_ID
 HTTP_USER_AGENT = "GraphiteUI-KB-Importer/1.0"
@@ -187,7 +187,7 @@ def import_graphiteui_project_knowledge_base() -> dict[str, object]:
         label="GraphiteUI Project Docs",
         description="Project-specific GraphiteUI documentation and current implementation notes.",
         source_kind="graphiteui_project_docs",
-        source_url="https://github.com/AbyssBadger0/GraphiteUI",
+        source_url="https://github.com/OoABYSSoO/GraphiteUI",
         version="v1",
         payload={
             "source_files": [str(path.relative_to(REPO_ROOT)) for path in GRAPHITEUI_PROJECT_DOC_FILES if path.exists()],
