@@ -327,8 +327,8 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--facing-left {
-  --buddy-mascot-left-eye-facing-x: -38px;
-  --buddy-mascot-right-eye-facing-x: -114px;
+  --buddy-mascot-left-eye-facing-x: -80px;
+  --buddy-mascot-right-eye-facing-x: -120px;
   --buddy-mascot-eye-facing-y: 1px;
   --buddy-mascot-left-ear-x: 18px;
   --buddy-mascot-left-ear-y: 4px;
@@ -341,8 +341,8 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--facing-right {
-  --buddy-mascot-left-eye-facing-x: 114px;
-  --buddy-mascot-right-eye-facing-x: 38px;
+  --buddy-mascot-left-eye-facing-x: 120px;
+  --buddy-mascot-right-eye-facing-x: 80px;
   --buddy-mascot-eye-facing-y: 1px;
   --buddy-mascot-left-ear-x: -12px;
   --buddy-mascot-left-ear-y: 0px;

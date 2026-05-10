@@ -26,6 +26,18 @@ function extractCssBlock(source: string, selector: string) {
   return match?.[1] ?? "";
 }
 
+function extractEyeCx(source: string, eyeClass: string) {
+  const match = source.match(new RegExp(`class="${eyeClass}"[^>]*cx="(-?\\d+)"`));
+  assert.ok(match, `Missing eye center for ${eyeClass}`);
+  return Number.parseInt(match[1], 10);
+}
+
+function extractCssPxVariable(block: string, variableName: string) {
+  const match = block.match(new RegExp(`${variableName}:\\s*(-?\\d+)px;`));
+  assert.ok(match, `Missing CSS variable ${variableName}`);
+  return Number.parseInt(match[1], 10);
+}
+
 function extractTailPoseBlock(source: string, poseClass: string) {
   const marker = `class="buddy-mascot__tail-pose buddy-mascot__tail-pose--${poseClass}"`;
   const markerIndex = source.indexOf(marker);
@@ -99,13 +111,37 @@ test("BuddyMascot exposes tail poses and directional part offsets without body m
   assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-left"/);
   assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--left"/);
   assert.match(componentSource, /class="buddy-mascot__body-turn"/);
-  assert.match(componentSource, /\.buddy-mascot--facing-left\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*-38px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*-114px;[\s\S]*--buddy-mascot-left-ear-x:\s*18px;[\s\S]*--buddy-mascot-right-ear-x:\s*12px;/);
-  assert.match(componentSource, /\.buddy-mascot--facing-right\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*114px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*38px;[\s\S]*--buddy-mascot-left-ear-x:\s*-12px;[\s\S]*--buddy-mascot-right-ear-x:\s*-18px;/);
+  assert.match(componentSource, /\.buddy-mascot--facing-left\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*-80px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*-120px;[\s\S]*--buddy-mascot-left-ear-x:\s*18px;[\s\S]*--buddy-mascot-right-ear-x:\s*12px;/);
+  assert.match(componentSource, /\.buddy-mascot--facing-right\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*120px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*80px;[\s\S]*--buddy-mascot-left-ear-x:\s*-12px;[\s\S]*--buddy-mascot-right-ear-x:\s*-18px;/);
   assert.match(componentSource, /\.buddy-mascot--facing-left[\s\S]*\.buddy-mascot__tail-pose--right[\s\S]*opacity:\s*1;/);
   assert.match(componentSource, /\.buddy-mascot--facing-right[\s\S]*\.buddy-mascot__tail-pose--left[\s\S]*opacity:\s*1;/);
   assert.doesNotMatch(componentSource, /\.buddy-mascot--facing-left \.buddy-mascot__body-turn/);
   assert.doesNotMatch(componentSource, /\.buddy-mascot--facing-right \.buddy-mascot__body-turn/);
   assert.doesNotMatch(componentSource, /scaleX\(0\.92\) rotate/);
+});
+
+test("BuddyMascot keeps directional eyes readable while shifting them toward the facing side", () => {
+  const frontLeftCx = extractEyeCx(componentSource, "buddy-mascot__resting-eye buddy-mascot__resting-eye--left");
+  const frontRightCx = extractEyeCx(componentSource, "buddy-mascot__resting-eye buddy-mascot__resting-eye--right");
+  const frontCenter = (frontLeftCx + frontRightCx) / 2;
+  const frontDistance = Math.abs(frontRightCx - frontLeftCx);
+  const leftBlock = extractCssBlock(componentSource, ".buddy-mascot--facing-left");
+  const rightBlock = extractCssBlock(componentSource, ".buddy-mascot--facing-right");
+
+  const facingLeftEyeCenters = [
+    frontLeftCx + extractCssPxVariable(leftBlock, "--buddy-mascot-left-eye-facing-x"),
+    frontRightCx + extractCssPxVariable(leftBlock, "--buddy-mascot-right-eye-facing-x"),
+  ];
+  const facingRightEyeCenters = [
+    frontLeftCx + extractCssPxVariable(rightBlock, "--buddy-mascot-left-eye-facing-x"),
+    frontRightCx + extractCssPxVariable(rightBlock, "--buddy-mascot-right-eye-facing-x"),
+  ];
+
+  assert.equal(frontDistance, 160);
+  assert.equal(Math.abs(facingLeftEyeCenters[1] - facingLeftEyeCenters[0]), 120);
+  assert.equal(Math.abs(facingRightEyeCenters[1] - facingRightEyeCenters[0]), 120);
+  assert.ok((facingLeftEyeCenters[0] + facingLeftEyeCenters[1]) / 2 < frontCenter);
+  assert.ok((facingRightEyeCenters[0] + facingRightEyeCenters[1]) / 2 > frontCenter);
 });
 
 test("BuddyMascot draws every tail pose from the same hidden lower-body root", () => {
