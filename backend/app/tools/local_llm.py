@@ -37,14 +37,6 @@ from app.tools.video_frame_fallback import (
 )
 
 
-def _env_first(*keys: str, default: str) -> str:
-    for key in keys:
-        value = os.environ.get(key)
-        if value:
-            return value
-    return default
-
-
 def _parse_float_env(name: str, default: float) -> float:
     raw = os.environ.get(name)
     if raw is None:
@@ -55,20 +47,12 @@ def _parse_float_env(name: str, default: float) -> float:
         return default
 
 
-LOCAL_LLM_BASE_URL = _env_first(
-    "LOCAL_BASE_URL",
-    "OPENAI_BASE_URL",
-    "LOCAL_LLM_BASE_URL",
-    default="http://127.0.0.1:8888/v1",
-).rstrip("/")
-LOCAL_LLM_API_KEY = _env_first("LOCAL_API_KEY", "OPENAI_API_KEY", "LITELLM_MASTER_KEY", "LOCAL_LLM_API_KEY", default="sk-local")
 LOCAL_LLM_REQUEST_TIMEOUT_SEC = _parse_float_env("LOCAL_LLM_REQUEST_TIMEOUT_SEC", 180.0)
 ROOT_DIR = Path(__file__).resolve().parents[3]
 LOCAL_ONBOARDING_GUIDE_PATH = ROOT_DIR / "knowledge" / "GraphiteUI-official" / "getting-started.md"
 DEFAULT_AGENT_TEMPERATURE = 0.2
 DEFAULT_AGENT_THINKING_LEVEL = THINKING_LEVEL_HIGH
 DEFAULT_AGENT_THINKING_ENABLED = True
-DEFAULT_LOCAL_MODEL_ALIAS = "lm-local"
 LOCAL_RUNTIME_CONFIG_CACHE_TTL_SEC = 5.0
 _LOCAL_RUNTIME_CONFIG_CACHE: tuple[float, dict[str, Any] | None] | None = None
 _LOCAL_MODEL_DISCOVERY_CACHE: tuple[float, list[str]] | None = None
@@ -131,13 +115,13 @@ def _get_saved_local_provider_config() -> dict[str, Any]:
 def get_local_llm_base_url() -> str:
     provider = _get_saved_local_provider_config()
     saved_base_url = str(provider.get("base_url") or "").strip().rstrip("/")
-    return saved_base_url or LOCAL_LLM_BASE_URL
+    return saved_base_url
 
 
 def get_local_llm_api_key() -> str:
     provider = _get_saved_local_provider_config()
     saved_api_key = str(provider.get("api_key") or "").strip()
-    return saved_api_key or LOCAL_LLM_API_KEY
+    return saved_api_key
 
 
 def get_saved_local_provider_model_names() -> list[str]:
@@ -186,6 +170,10 @@ def get_local_gateway_runtime_config(*, force_refresh: bool = False) -> dict[str
     global _LOCAL_RUNTIME_CONFIG_CACHE
 
     now = time.monotonic()
+    gateway_base_url = _get_gateway_base_url()
+    if not gateway_base_url:
+        _LOCAL_RUNTIME_CONFIG_CACHE = (now, None)
+        return None
     if not force_refresh and _LOCAL_RUNTIME_CONFIG_CACHE is None:
         return None
     if (
@@ -198,7 +186,7 @@ def get_local_gateway_runtime_config(*, force_refresh: bool = False) -> dict[str
     runtime_config: dict[str, Any] | None = None
     try:
         with httpx.Client(timeout=LOCAL_RUNTIME_CONFIG_TIMEOUT_SEC, trust_env=False) as client:
-            response = client.get(f"{_get_gateway_base_url()}/runtime-config")
+            response = client.get(f"{gateway_base_url}/runtime-config")
             response.raise_for_status()
             payload = response.json()
             if isinstance(payload, dict):
@@ -228,20 +216,10 @@ def get_local_route_model_names(
         if deduped:
             return deduped
 
-    configured_model = _env_first(
-        "LOCAL_TEXT_MODEL",
-        "TEXT_MODEL",
-        "LOCAL_MODEL_NAME",
-        "UPSTREAM_MODEL_NAME",
-        "LOCAL_LLM_MODEL",
-        default="",
-    ).strip()
-    if configured_model:
-        return [configured_model]
     saved_models = get_saved_local_provider_model_names()
     if saved_models:
         return saved_models
-    return [DEFAULT_LOCAL_MODEL_ALIAS]
+    return []
 
 
 def get_current_local_model_names(*, force_refresh: bool = False) -> list[str]:
@@ -250,9 +228,14 @@ def get_current_local_model_names(*, force_refresh: bool = False) -> list[str]:
     if not force_refresh:
         return list(_LOCAL_MODEL_DISCOVERY_CACHE[1]) if _LOCAL_MODEL_DISCOVERY_CACHE is not None else []
 
+    base_url = get_local_llm_base_url()
+    if not base_url:
+        _LOCAL_MODEL_DISCOVERY_CACHE = (time.monotonic(), [])
+        return []
+
     try:
         models = discover_openai_compatible_models(
-            base_url=get_local_llm_base_url(),
+            base_url=base_url,
             api_key=get_local_llm_api_key(),
             timeout_sec=2.0,
         )
@@ -262,20 +245,23 @@ def get_current_local_model_names(*, force_refresh: bool = False) -> list[str]:
     return list(models)
 
 
-def _extract_model_name_from_ref(model_ref: str | None) -> str:
+def _extract_local_model_name_from_ref(model_ref: str | None) -> str:
     trimmed = str(model_ref or "").strip()
     if not trimmed:
         return ""
-    return trimmed.split("/")[-1].strip()
+    if "/" not in trimmed:
+        return trimmed
+    provider_id, model_id = trimmed.split("/", 1)
+    return model_id.strip() if provider_id.strip() == "local" else ""
 
 
 def get_default_text_model(*, force_refresh: bool = False) -> str:
     saved_settings = load_app_settings()
-    saved_model_name = _extract_model_name_from_ref(saved_settings.get("text_model_ref"))
+    saved_model_name = _extract_local_model_name_from_ref(saved_settings.get("text_model_ref"))
     aliases = get_local_route_model_names(force_refresh=force_refresh)
     if saved_model_name and (not aliases or saved_model_name in aliases):
         return saved_model_name
-    return aliases[0] if aliases else DEFAULT_LOCAL_MODEL_ALIAS
+    return aliases[0] if aliases else ""
 
 
 def get_default_agent_temperature() -> float:
@@ -500,6 +486,9 @@ def _request_local_chat_completion(
     *,
     on_delta: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
+    base_url = get_local_llm_base_url()
+    if not base_url:
+        raise RuntimeError("Local model provider is not configured. Configure it in the Model Providers page.")
     headers = {
         "Authorization": f"Bearer {get_local_llm_api_key()}",
         "Content-Type": "application/json",
@@ -511,7 +500,7 @@ def _request_local_chat_completion(
 
     try:
         payload, sent_payload, stream_fallback_error, _used_stream = post_streaming_json_with_fallback(
-            stream_url=f"{get_local_llm_base_url()}/chat/completions",
+            stream_url=f"{base_url}/chat/completions",
             timeout_sec=LOCAL_LLM_REQUEST_TIMEOUT_SEC,
             headers=headers,
             stream_payload=stream_payload,

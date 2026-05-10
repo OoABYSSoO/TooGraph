@@ -8,7 +8,7 @@ GraphiteUI is a visual node-based editor and runtime workspace for LangGraph-sty
 
 `node_system` is the only formal graph protocol in active use. `state_schema` is the single source of truth for graph data, while nodes declare what state they read and write.
 
-The current mainline is the Vue frontend plus the FastAPI backend. Old migration planning context should not be treated as the current implementation.
+The current mainline is the Vue frontend plus the FastAPI backend. Treat current repository files as the implementation source of truth.
 
 ## Current Source Of Truth
 
@@ -223,24 +223,11 @@ Some directories are created on demand. Indexed knowledge base content lives in 
 
 Settings and runtime defaults are built from the backend model catalog and tool registry.
 
-For local or private model setup, use an OpenAI-compatible custom provider:
+For local or private model setup, start the OpenAI-compatible gateway you want to use, then configure it in GraphiteUI:
 
-```bash
-LOCAL_BASE_URL=http://127.0.0.1:8000/v1
-LOCAL_API_KEY=<optional api key>
-LOCAL_TEXT_MODEL=<model name exposed by your gateway>
-```
+- GraphiteUI -> Model Providers -> Local / Custom OpenAI-compatible
 
-Legacy local runtime scripts in `scripts/lm_core0.py`, `scripts/lm-server`, and `scripts/download_Gemma_gguf.py` are migration wrappers only and should not regain in-repo runtime behavior.
-
-Relevant environment variables include:
-
-- `LOCAL_BASE_URL`
-- `LOCAL_API_KEY`
-- `LOCAL_TEXT_MODEL`
-- `OPENAI_BASE_URL`
-- `OPENAI_API_KEY`
-- `TEXT_MODEL`
+Model execution reads saved Model Providers configuration and default model selections from the UI. Startup environment variables do not configure model providers.
 
 ## Graph Execution Pipeline
 
@@ -305,5 +292,5 @@ Current templates in `backend/app/templates/`:
 - Read the existing code path before editing. The project already has clear module boundaries in both frontend and backend.
 - Follow the existing Vue + Pinia + Element Plus patterns on the frontend.
 - Follow the existing FastAPI + Pydantic + storage-layer separation on the backend.
-- Keep edits scoped to the current request. Do not revive stale migration work or broad refactors unless the task clearly needs them.
+- Keep edits scoped to the current request. Do not revive stale planning work or broad refactors unless the task clearly needs them.
 - When updating docs, keep `README.md`, `AGENTS.md`, `CLAUDE.md`, and `docs/current_project_status.md` mutually consistent.

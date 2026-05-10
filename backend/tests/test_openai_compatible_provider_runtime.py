@@ -21,8 +21,12 @@ from app.core.schemas.node_system import (
 
 LOCAL_PROVIDER_ENV_KEYS = (
     "LOCAL_BASE_URL",
+    "LOCAL_API_KEY",
     "OPENAI_BASE_URL",
+    "OPENAI_API_KEY",
+    "LITELLM_MASTER_KEY",
     "LOCAL_LLM_BASE_URL",
+    "LOCAL_LLM_API_KEY",
     "LOCAL_TEXT_MODEL",
     "TEXT_MODEL",
     "LOCAL_MODEL_NAME",
@@ -56,17 +60,50 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
         model_catalog = importlib.import_module("app.core.model_catalog")
         return local_llm, model_catalog
 
-    def test_local_base_url_is_the_primary_custom_provider_env_name(self) -> None:
+    def test_local_provider_ignores_legacy_environment_configuration(self) -> None:
         with self._patched_local_provider_env(
             LOCAL_BASE_URL="http://127.0.0.1:8801/v1",
+            LOCAL_API_KEY="sk-env",
             OPENAI_BASE_URL="http://127.0.0.1:8802/v1",
             LOCAL_LLM_BASE_URL="http://127.0.0.1:8803/v1",
+            LOCAL_TEXT_MODEL="env-model",
         ):
             local_llm, _model_catalog = self._reload_target_modules()
 
-        self.assertEqual(local_llm.LOCAL_LLM_BASE_URL, "http://127.0.0.1:8801/v1")
+            with patch.object(local_llm, "load_app_settings", return_value={}):
+                with patch.object(local_llm, "get_current_local_model_names", return_value=[]):
+                    with patch.object(local_llm, "get_local_gateway_runtime_config", return_value=None):
+                        self.assertEqual(local_llm.get_local_llm_base_url(), "")
+                        self.assertEqual(local_llm.get_local_llm_api_key(), "")
+                        self.assertEqual(local_llm.get_local_route_model_names(force_refresh=False), [])
 
-    def test_build_model_catalog_reports_openai_compatible_custom_provider(self) -> None:
+    def test_local_provider_uses_saved_model_provider_configuration(self) -> None:
+        saved_settings = {
+            "text_model_ref": "local/saved-model",
+            "model_providers": {
+                "local": {
+                    "base_url": "http://127.0.0.1:9999/v1",
+                    "api_key": "sk-saved",
+                    "models": [{"model": "saved-model", "label": "Saved Model"}],
+                }
+            },
+        }
+
+        with self._patched_local_provider_env(
+            LOCAL_BASE_URL="http://127.0.0.1:8801/v1",
+            LOCAL_API_KEY="sk-env",
+            LOCAL_TEXT_MODEL="env-model",
+        ):
+            local_llm, _model_catalog = self._reload_target_modules()
+
+            with patch.object(local_llm, "load_app_settings", return_value=saved_settings):
+                with patch.object(local_llm, "get_current_local_model_names", return_value=[]):
+                    with patch.object(local_llm, "get_local_gateway_runtime_config", return_value=None):
+                        self.assertEqual(local_llm.get_local_llm_base_url(), "http://127.0.0.1:9999/v1")
+                        self.assertEqual(local_llm.get_local_llm_api_key(), "sk-saved")
+                        self.assertEqual(local_llm.get_local_route_model_names(force_refresh=False), ["saved-model"])
+
+    def test_build_model_catalog_reports_unconfigured_local_provider_template_without_saved_settings(self) -> None:
         runtime_config = {
             "display_model_name": "Llama 3.1 8B",
             "cloud": {},
@@ -78,13 +115,11 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
 
             with patch.object(model_catalog, "load_app_settings", return_value={}):
                 with patch.object(model_catalog, "get_local_gateway_runtime_config", return_value=runtime_config):
-                    with patch.object(model_catalog, "get_local_llm_base_url", return_value="http://127.0.0.1:8801/v1"):
-                        with patch.object(model_catalog, "get_local_route_model_names", return_value=["llama-3.1-8b"]) as route_models:
-                            with patch.object(model_catalog, "get_default_text_model", return_value="llama-3.1-8b") as default_text_model:
-                                with patch.object(model_catalog, "get_default_video_model_name", return_value="llava-1.6"):
-                                    catalog = model_catalog.build_model_catalog()
+                    with patch.object(model_catalog, "get_local_route_model_names", return_value=["llama-3.1-8b"]) as route_models:
+                        with patch.object(model_catalog, "get_default_text_model", return_value="llama-3.1-8b") as default_text_model:
+                            catalog = model_catalog.build_model_catalog()
 
-        route_models.assert_called_once_with(force_refresh=False, runtime_config=runtime_config)
+        route_models.assert_not_called()
         default_text_model.assert_not_called()
         local_provider = next(provider for provider in catalog["providers"] if provider["provider_id"] == "local")
 
@@ -94,7 +129,11 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
             "Custom OpenAI-compatible endpoint used by GraphiteUI for local or private model routing.",
         )
         self.assertEqual(local_provider["transport"], "openai-compatible")
-        self.assertEqual(local_provider["base_url"], "http://127.0.0.1:8801/v1")
+        self.assertEqual(local_provider["base_url"], "http://127.0.0.1:8888/v1")
+        self.assertFalse(local_provider["configured"])
+        self.assertFalse(local_provider["enabled"])
+        self.assertEqual(local_provider["models"], [])
+        self.assertEqual(catalog["default_text_model_ref"], "")
         self.assertEqual(local_provider["gateway"], runtime_config)
 
     def test_build_model_catalog_uses_saved_local_provider_and_handles_null_cloud_config(self) -> None:
@@ -135,19 +174,29 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
         self.assertEqual(openrouter_provider["base_url"], "https://openrouter.ai/api/v1")
 
     def test_local_route_models_auto_discover_openai_compatible_models(self) -> None:
-        with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:8888/v1"):
+        saved_settings = {
+            "model_providers": {
+                "local": {
+                    "base_url": "http://127.0.0.1:8888/v1",
+                    "api_key": "sk-saved",
+                }
+            }
+        }
+
+        with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:8801/v1", LOCAL_API_KEY="sk-env"):
             local_llm, _model_catalog = self._reload_target_modules()
 
-            with patch.object(local_llm, "get_local_gateway_runtime_config", return_value=None):
-                with patch.object(
-                    local_llm,
-                    "discover_openai_compatible_models",
-                    return_value=["gemma-4-26b-a4b-it", "huihui-gemma-4-26b-a4b-it-abliterated"],
-                ) as discover:
-                    models = local_llm.get_local_route_model_names(force_refresh=True)
+            with patch.object(local_llm, "load_app_settings", return_value=saved_settings):
+                with patch.object(local_llm, "get_local_gateway_runtime_config", return_value=None):
+                    with patch.object(
+                        local_llm,
+                        "discover_openai_compatible_models",
+                        return_value=["gemma-4-26b-a4b-it", "huihui-gemma-4-26b-a4b-it-abliterated"],
+                    ) as discover:
+                        models = local_llm.get_local_route_model_names(force_refresh=True)
 
         self.assertEqual(models, ["gemma-4-26b-a4b-it", "huihui-gemma-4-26b-a4b-it-abliterated"])
-        discover.assert_called_once_with(base_url="http://127.0.0.1:8888/v1", api_key="sk-local", timeout_sec=2.0)
+        discover.assert_called_once_with(base_url="http://127.0.0.1:8888/v1", api_key="sk-saved", timeout_sec=2.0)
 
     def test_non_forced_runtime_config_does_not_probe_local_gateway(self) -> None:
         with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:8888/v1"):
@@ -155,6 +204,17 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
 
             with patch.object(local_llm.httpx, "Client", side_effect=RuntimeError("network probe")) as client_factory:
                 runtime_config = local_llm.get_local_gateway_runtime_config(force_refresh=False)
+
+        self.assertIsNone(runtime_config)
+        client_factory.assert_not_called()
+
+    def test_forced_runtime_config_without_saved_base_url_does_not_probe_local_gateway(self) -> None:
+        with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:8888/v1"):
+            local_llm, _model_catalog = self._reload_target_modules()
+
+            with patch.object(local_llm, "load_app_settings", return_value={}):
+                with patch.object(local_llm.httpx, "Client", side_effect=RuntimeError("network probe")) as client_factory:
+                    runtime_config = local_llm.get_local_gateway_runtime_config(force_refresh=True)
 
         self.assertIsNone(runtime_config)
         client_factory.assert_not_called()
@@ -168,7 +228,7 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
                     with patch.object(local_llm, "discover_openai_compatible_models", side_effect=AssertionError("network probe")):
                         models = local_llm.get_local_route_model_names(force_refresh=False)
 
-        self.assertEqual(models, ["lm-local"])
+        self.assertEqual(models, [])
 
     def test_local_gateway_thinking_payload_uses_runtime_reasoning_format(self) -> None:
         with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:8888/v1"):
