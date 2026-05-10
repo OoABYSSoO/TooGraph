@@ -39,11 +39,11 @@
               :key="tailSwingAnimation.key"
               attributeName="d"
               begin="indefinite"
-              :dur="`${TAIL_SWITCH_DURATION_MS}ms`"
+              :dur="`${tailSwingAnimation.durationMs}ms`"
               fill="freeze"
               calcMode="spline"
-              keyTimes="0;0.25;0.5;0.75;1"
-              keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
+              :keyTimes="tailSwingAnimation.keyTimes"
+              :keySplines="tailSwingAnimation.keySplines"
               :values="tailSwingAnimation.values"
             />
           </path>
@@ -96,10 +96,14 @@ type BuddyMascotMood = "idle" | "thinking" | "speaking" | "error";
 type BuddyMascotMotion = "idle" | "roam" | "hop";
 type BuddyMascotFacing = "front" | "left" | "right";
 type TailSide = "left" | "right";
+type TailPose = (typeof TAIL_POSE_ORDER)[number];
 
-const TAIL_SWITCH_DURATION_MS = 3600;
+const TAIL_POSE_ORDER = ["right", "backRight", "backCenter", "backLeft", "left"] as const;
+const TAIL_IDLE_SWITCH_DURATION_MS = 3600;
+const TAIL_FACING_SWITCH_DURATION_MS = 720;
 const TAIL_IDLE_MIN_DWELL_MS = 5200;
 const TAIL_IDLE_MAX_DWELL_MS = 9000;
+const TAIL_KEY_SPLINE = "0.42 0 0.58 1";
 
 const TAIL_POSE_PATHS = {
   right: "M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62",
@@ -150,12 +154,15 @@ const props = withDefaults(
 const tapAnimating = ref(false);
 const tailBasePath = ref<string>(TAIL_POSE_PATHS.right);
 const tailSide = ref<TailSide>("right");
-const tailSwingAnimation = ref<{ key: number; values: string } | null>(null);
+const tailSwingAnimation = ref<{ key: number; values: string; durationMs: number; keyTimes: string; keySplines: string } | null>(null);
 const tailAnimateElement = ref<SVGAnimationElement | null>(null);
 let tapTimeoutId: number | null = null;
 let tailDwellTimerId: number | null = null;
 let tailTransitionTimerId: number | null = null;
 let tailAnimationKey = 0;
+let tailTransitionStartedAtMs = 0;
+let tailTransitionFromPose: TailPose = "right";
+let tailTransitionTargetSide: TailSide | null = null;
 
 const effectiveMood = computed(() => (props.dragging ? "idle" : props.mood));
 const effectiveMotion = computed(() => (props.dragging || props.mood !== "idle" ? "idle" : props.motion));
@@ -219,7 +226,7 @@ function syncTailTarget() {
   const targetSide = resolveTailSideForFacing(props.facing);
 
   if (props.facing !== "front") {
-    transitionTailTo(targetSide);
+    transitionTailTo(targetSide, TAIL_FACING_SWITCH_DURATION_MS);
     return;
   }
 
@@ -239,27 +246,37 @@ function scheduleIdleTailSideSwitch() {
     if (props.facing !== "front" || effectiveMood.value !== "idle" || props.dragging) {
       return;
     }
-    transitionTailTo(tailSide.value === "right" ? "left" : "right");
+    transitionTailTo(tailSide.value === "right" ? "left" : "right", TAIL_IDLE_SWITCH_DURATION_MS);
   }, randomBetween(TAIL_IDLE_MIN_DWELL_MS, TAIL_IDLE_MAX_DWELL_MS));
 }
 
-function transitionTailTo(targetSide: TailSide) {
+function transitionTailTo(targetSide: TailSide, durationMs = TAIL_IDLE_SWITCH_DURATION_MS) {
   clearTailDwellTimer();
+  const startPose = tailSwingAnimation.value ? estimateCurrentTailPose() : poseFromSide(tailSide.value);
   clearTailTransitionTimer();
 
-  if (targetSide === tailSide.value) {
+  if (targetSide === tailSide.value && startPose === poseFromSide(targetSide)) {
     tailSwingAnimation.value = null;
     tailBasePath.value = TAIL_POSE_PATHS[targetSide];
+    tailTransitionTargetSide = null;
     if (props.facing === "front" && effectiveMood.value === "idle" && !props.dragging) {
       scheduleIdleTailSideSwitch();
     }
     return;
   }
 
+  const route = buildTailTransitionPoseRoute(startPose, targetSide);
+  tailBasePath.value = TAIL_POSE_PATHS[startPose];
+  tailTransitionStartedAtMs = nowMs();
+  tailTransitionFromPose = startPose;
+  tailTransitionTargetSide = targetSide;
   tailAnimationKey += 1;
   tailSwingAnimation.value = {
     key: tailAnimationKey,
-    values: buildTailTransitionValues(tailSide.value, targetSide),
+    values: buildTailPoseValues(route),
+    durationMs,
+    keyTimes: buildTailKeyTimes(route.length),
+    keySplines: buildTailKeySplines(route.length),
   };
   void nextTick(() => {
     tailAnimateElement.value?.beginElement();
@@ -269,6 +286,7 @@ function transitionTailTo(targetSide: TailSide) {
     tailSwingAnimation.value = null;
     tailBasePath.value = TAIL_POSE_PATHS[targetSide];
     tailSide.value = targetSide;
+    tailTransitionTargetSide = null;
     return;
   }
 
@@ -277,8 +295,9 @@ function transitionTailTo(targetSide: TailSide) {
     tailBasePath.value = TAIL_POSE_PATHS[targetSide];
     tailSide.value = targetSide;
     tailSwingAnimation.value = null;
+    tailTransitionTargetSide = null;
     syncTailTarget();
-  }, TAIL_SWITCH_DURATION_MS);
+  }, durationMs);
 }
 
 function resolveTailSideForFacing(facing: BuddyMascotFacing): TailSide {
@@ -299,9 +318,60 @@ function buildTailTransitionValues(fromSide: TailSide, toSide: TailSide) {
   return paths.join(";");
 }
 
+function estimateCurrentTailPose(): TailPose {
+  if (tailTransitionTargetSide === null || !tailSwingAnimation.value) {
+    return poseFromSide(tailSide.value);
+  }
+  const route = buildTailTransitionPoseRoute(tailTransitionFromPose, tailTransitionTargetSide);
+  const progress = Math.max(
+    0,
+    Math.min(1, (nowMs() - tailTransitionStartedAtMs) / Math.max(1, tailSwingAnimation.value.durationMs)),
+  );
+  const routeIndex = Math.min(route.length - 1, Math.round(progress * (route.length - 1)));
+  return route[routeIndex] ?? poseFromSide(tailSide.value);
+}
+
+function buildTailTransitionPoseRoute(fromPose: TailPose, toSide: TailSide) {
+  const toPose = poseFromSide(toSide);
+  const fromIndex = TAIL_POSE_ORDER.indexOf(fromPose);
+  const toIndex = TAIL_POSE_ORDER.indexOf(toPose);
+  const step = fromIndex <= toIndex ? 1 : -1;
+  const route: TailPose[] = [];
+
+  for (let index = fromIndex; step > 0 ? index <= toIndex : index >= toIndex; index += step) {
+    route.push(TAIL_POSE_ORDER[index]);
+  }
+
+  return route.length > 0 ? route : [toPose];
+}
+
+function buildTailPoseValues(route: TailPose[]) {
+  return route.map((pose) => TAIL_POSE_PATHS[pose]).join(";");
+}
+
+function buildTailKeyTimes(poseCount: number) {
+  if (poseCount <= 1) {
+    return "0";
+  }
+  return Array.from({ length: poseCount }, (_, index) => (index / (poseCount - 1)).toFixed(3).replace(/0+$/, "").replace(/\.$/, "")).join(";");
+}
+
+function buildTailKeySplines(poseCount: number) {
+  return Array.from({ length: Math.max(1, poseCount - 1) }, () => TAIL_KEY_SPLINE).join(";");
+}
+
+function poseFromSide(side: TailSide): TailPose {
+  return side;
+}
+
+function nowMs() {
+  return typeof performance === "undefined" ? Date.now() : performance.now();
+}
+
 function clearTailTimers() {
   clearTailDwellTimer();
   clearTailTransitionTimer();
+  tailTransitionTargetSide = null;
 }
 
 function clearTailDwellTimer() {

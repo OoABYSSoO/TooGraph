@@ -104,7 +104,7 @@ test("BuddyMascot exposes tail poses and directional part offsets without body m
   assert.match(componentSource, /v-if="tailSwingAnimation"/);
   assert.match(componentSource, /:key="tailSwingAnimation\.key"/);
   assert.match(componentSource, /:values="tailSwingAnimation\.values"/);
-  assert.match(componentSource, /:dur="`\$\{TAIL_SWITCH_DURATION_MS\}ms`"/);
+  assert.match(componentSource, /:dur="`\$\{tailSwingAnimation\.durationMs\}ms`"/);
   assert.match(componentSource, /class="buddy-mascot__body-turn"/);
   assert.match(componentSource, /\.buddy-mascot--facing-left\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*-70px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*-110px;[\s\S]*--buddy-mascot-left-ear-x:\s*18px;[\s\S]*--buddy-mascot-right-ear-x:\s*12px;/);
   assert.match(componentSource, /\.buddy-mascot--facing-right\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*110px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*70px;[\s\S]*--buddy-mascot-left-ear-x:\s*-12px;[\s\S]*--buddy-mascot-right-ear-x:\s*-18px;/);
@@ -124,26 +124,45 @@ test("BuddyMascot exposes tail poses and directional part offsets without body m
 
 test("BuddyMascot changes tail side after a random idle dwell instead of continuously swinging", () => {
   assert.match(componentSource, /type TailSide = "left" \| "right";/);
-  assert.match(componentSource, /const TAIL_SWITCH_DURATION_MS = 3600;/);
+  assert.match(componentSource, /const TAIL_IDLE_SWITCH_DURATION_MS = 3600;/);
   assert.match(componentSource, /const TAIL_IDLE_MIN_DWELL_MS = 5200;/);
   assert.match(componentSource, /const TAIL_IDLE_MAX_DWELL_MS = 9000;/);
   assert.match(componentSource, /import \{ computed, nextTick, onBeforeUnmount, ref, watch \} from "vue";/);
   assert.match(componentSource, /ref="tailAnimateElement"/);
   assert.match(componentSource, /const tailBasePath = ref<string>\(TAIL_POSE_PATHS\.right\);/);
   assert.match(componentSource, /const tailSide = ref<TailSide>\("right"\);/);
-  assert.match(componentSource, /const tailSwingAnimation = ref<\{ key: number; values: string \} \| null>\(null\);/);
+  assert.match(componentSource, /const tailSwingAnimation = ref<\{ key: number; values: string; durationMs: number; keyTimes: string; keySplines: string \} \| null>\(null\);/);
   assert.match(componentSource, /const tailAnimateElement = ref<SVGAnimationElement \| null>\(null\);/);
   assert.match(componentSource, /watch\(\[effectiveMood, \(\) => props\.facing, \(\) => props\.dragging\], syncTailTarget, \{ immediate: true \}\);/);
   assert.match(componentSource, /function scheduleIdleTailSideSwitch\(\)/);
   assert.match(componentSource, /randomBetween\(TAIL_IDLE_MIN_DWELL_MS, TAIL_IDLE_MAX_DWELL_MS\)/);
   assert.match(componentSource, /tailSide\.value === "right" \? "left" : "right"/);
-  assert.match(componentSource, /function transitionTailTo\(targetSide: TailSide\)/);
-  assert.match(componentSource, /tailSwingAnimation\.value = \{[\s\S]*key: tailAnimationKey,[\s\S]*values: buildTailTransitionValues\(tailSide\.value, targetSide\),[\s\S]*\};/);
+  assert.match(componentSource, /function transitionTailTo\(targetSide: TailSide, durationMs = TAIL_IDLE_SWITCH_DURATION_MS\)/);
+  assert.match(componentSource, /tailSwingAnimation\.value = \{[\s\S]*key: tailAnimationKey,[\s\S]*values: buildTailPoseValues\(route\),[\s\S]*durationMs,[\s\S]*keyTimes: buildTailKeyTimes\(route\.length\),[\s\S]*keySplines: buildTailKeySplines\(route\.length\),[\s\S]*\};/);
   assert.match(componentSource, /void nextTick\(\(\) => \{[\s\S]*tailAnimateElement\.value\?\.beginElement\(\);[\s\S]*\}\);/);
-  assert.match(componentSource, /tailTransitionTimerId = window\.setTimeout\(\(\) => \{[\s\S]*tailBasePath\.value = TAIL_POSE_PATHS\[targetSide\];[\s\S]*tailSide\.value = targetSide;/);
+  assert.match(componentSource, /tailTransitionTimerId = window\.setTimeout\(\(\) => \{[\s\S]*tailBasePath\.value = TAIL_POSE_PATHS\[targetSide\];[\s\S]*tailSide\.value = targetSide;[\s\S]*\}, durationMs\);/);
   assert.match(componentSource, /function buildTailTransitionValues\(fromSide: TailSide, toSide: TailSide\)/);
   assert.match(componentSource, /TAIL_TRANSITION_PATHS\.rightToLeft/);
   assert.match(componentSource, /TAIL_TRANSITION_PATHS\.leftToRight/);
+});
+
+test("BuddyMascot accelerates tail correction when facing changes without snapping", () => {
+  assert.match(componentSource, /const TAIL_FACING_SWITCH_DURATION_MS = 720;/);
+  assert.match(componentSource, /:dur="`\$\{tailSwingAnimation\.durationMs\}ms`"/);
+  assert.match(componentSource, /:keyTimes="tailSwingAnimation\.keyTimes"/);
+  assert.match(componentSource, /:keySplines="tailSwingAnimation\.keySplines"/);
+  assert.match(componentSource, /if \(props\.facing !== "front"\) \{[\s\S]*transitionTailTo\(targetSide, TAIL_FACING_SWITCH_DURATION_MS\);[\s\S]*return;/);
+  assert.match(componentSource, /transitionTailTo\(tailSide\.value === "right" \? "left" : "right", TAIL_IDLE_SWITCH_DURATION_MS\);/);
+  assert.match(componentSource, /type TailPose = \(typeof TAIL_POSE_ORDER\)\[number\];/);
+  assert.match(componentSource, /const TAIL_POSE_ORDER = \["right", "backRight", "backCenter", "backLeft", "left"\] as const;/);
+  assert.match(componentSource, /const startPose = tailSwingAnimation\.value \? estimateCurrentTailPose\(\) : poseFromSide\(tailSide\.value\);/);
+  assert.match(componentSource, /if \(targetSide === tailSide\.value && startPose === poseFromSide\(targetSide\)\)/);
+  assert.match(componentSource, /tailBasePath\.value = TAIL_POSE_PATHS\[startPose\];/);
+  assert.match(componentSource, /function estimateCurrentTailPose\(\): TailPose/);
+  assert.match(componentSource, /Math\.round\(progress \* \(route\.length - 1\)\)/);
+  assert.match(componentSource, /function buildTailTransitionPoseRoute\(fromPose: TailPose, toSide: TailSide\)/);
+  assert.match(componentSource, /function buildTailKeyTimes\(poseCount: number\)/);
+  assert.match(componentSource, /function buildTailKeySplines\(poseCount: number\)/);
 });
 
 test("BuddyMascot keeps directional eyes readable while shifting them toward the facing side", () => {
