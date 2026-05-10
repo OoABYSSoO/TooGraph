@@ -32,7 +32,7 @@ function createTemplate(): TemplateRecord {
       state_2: { name: "conversation_history", description: "", type: "markdown", value: "", color: "#0f766e" },
       state_3: { name: "page_context", description: "", type: "markdown", value: "", color: "#2563eb" },
       state_4: { name: "buddy_reply", description: "", type: "markdown", value: "", color: "#d97706" },
-      state_5: { name: "buddy_mode", description: "", type: "text", value: "advisory", color: "#7c3aed" },
+      state_5: { name: "buddy_mode", description: "", type: "text", value: "ask_first", color: "#7c3aed" },
       state_6: { name: "buddy_profile", description: "", type: "markdown", value: "", color: "#a855f7" },
       state_7: { name: "buddy_policy", description: "", type: "markdown", value: "", color: "#dc2626" },
       state_8: { name: "buddy_memory_context", description: "", type: "markdown", value: "", color: "#059669" },
@@ -471,22 +471,23 @@ test("formatBuddyHistory ignores messages marked outside the model context", () 
   );
 });
 
-test("buddy mode options expose advisory and approval as selectable", () => {
+test("buddy mode options expose ask-first and full-access tiers", () => {
   assert.deepEqual(
     BUDDY_MODE_OPTIONS.map((option) => ({ value: option.value, disabled: option.disabled })),
     [
-      { value: "advisory", disabled: false },
-      { value: "approval", disabled: false },
-      { value: "unrestricted", disabled: true },
+      { value: "ask_first", disabled: false },
+      { value: "full_access", disabled: false },
     ],
   );
 });
 
-test("resolveBuddyMode accepts approval and falls back from unavailable tiers", () => {
-  assert.equal(resolveBuddyMode("advisory"), "advisory");
-  assert.equal(resolveBuddyMode("approval"), "approval");
-  assert.equal(resolveBuddyMode("unrestricted"), "advisory");
-  assert.equal(resolveBuddyMode("unknown"), "advisory");
+test("resolveBuddyMode accepts current tiers and migrates legacy values", () => {
+  assert.equal(resolveBuddyMode("ask_first"), "ask_first");
+  assert.equal(resolveBuddyMode("full_access"), "full_access");
+  assert.equal(resolveBuddyMode("advisory"), "ask_first");
+  assert.equal(resolveBuddyMode("approval"), "ask_first");
+  assert.equal(resolveBuddyMode("unrestricted"), "full_access");
+  assert.equal(resolveBuddyMode("unknown"), "ask_first");
 });
 
 test("buddy widget defaults to the autonomous loop template id", () => {
@@ -558,12 +559,12 @@ test("buildBuddyReviewGraph hydrates an internal background review run from the 
   assert.equal(graph.nodes.decide_memory_update.config.model, "openai/gpt-4.1");
 });
 
-test("buildBuddyChatGraph keeps no-approval web search auto-selectable in advisory mode", () => {
+test("buildBuddyChatGraph keeps enabled skills visible in ask-first mode", () => {
   const graph = buildBuddyChatGraph(createAgenticTemplate(), {
     userMessage: "帮我搜索最新资料",
     history: [],
     pageContext: "当前路径: /editor",
-    buddyMode: "advisory",
+    buddyMode: "ask_first",
     skillCatalog: [
       createSkillDefinition(),
       createSkillDefinition({
@@ -586,24 +587,26 @@ test("buildBuddyChatGraph keeps no-approval web search auto-selectable in adviso
   assert.equal(catalog[0].skillKey, "web_search");
   assert.equal(catalog[0].capabilityPolicy.origins.buddy.selectable, true);
   assert.equal(catalog[0].capabilityPolicy.origins.buddy.requiresApproval, false);
-  assert.equal(catalog[1].capabilityPolicy.origins.buddy.selectable, false);
+  assert.equal(catalog[1].capabilityPolicy.origins.buddy.selectable, true);
   assert.equal(catalog[1].capabilityPolicy.origins.buddy.requiresApproval, true);
   assertInputNode(graph.nodes.input_skill_catalog_snapshot);
   assert.deepEqual(graph.nodes.input_skill_catalog_snapshot.config.value, catalog);
 });
 
-test("buildBuddyChatGraph keeps buddy auto-select policy in approval mode and uses the approval breakpoint", () => {
+test("buildBuddyChatGraph records ask-first mode without adding a generic approval breakpoint", () => {
   const graph = buildBuddyChatGraph(createAgenticTemplate(), {
     userMessage: "帮我搜索最新资料",
     history: [],
     pageContext: "当前路径: /editor",
-    buddyMode: "approval",
+    buddyMode: "ask_first",
     skillCatalog: [createSkillDefinition()],
   });
 
   const catalog = graph.state_schema.state_7.value as SkillDefinition[];
   assert.equal(catalog[0].capabilityPolicy.origins.buddy.selectable, true);
   assert.deepEqual(graph.metadata.interrupt_after, ["request_approval_agent"]);
+  assert.equal(graph.metadata.buddy_mode, "ask_first");
+  assert.equal(graph.metadata.buddy_requires_approval, true);
   assert.equal(graph.metadata.agent_breakpoint_timing, undefined);
 });
 
@@ -612,7 +615,7 @@ test("buildBuddyChatGraph injects the current message, history, and page context
     userMessage: "帮我看当前页面",
     history: [{ role: "assistant", content: "我在。" }],
     pageContext: "当前路径: /editor",
-    buddyMode: "unrestricted",
+    buddyMode: "full_access",
   });
 
   assert.equal(graph.graph_id, null);
@@ -620,40 +623,40 @@ test("buildBuddyChatGraph injects the current message, history, and page context
   assert.equal(graph.state_schema.state_1.value, "帮我看当前页面");
   assert.equal(graph.state_schema.state_2.value, "伙伴: 我在。");
   assert.equal(graph.state_schema.state_3.value, "当前路径: /editor");
-  assert.equal(graph.state_schema[BUDDY_MODE_STATE_KEY].value, "advisory");
+  assert.equal(graph.state_schema[BUDDY_MODE_STATE_KEY].value, "full_access");
   assert.equal(graph.state_schema[BUDDY_REPLY_STATE_KEY].value, "");
   assertInputNode(graph.nodes.input_user_message);
   assertInputNode(graph.nodes.input_buddy_mode);
   assert.equal(graph.nodes.input_user_message.config.value, "帮我看当前页面");
-  assert.equal(graph.nodes.input_buddy_mode.config.value, "advisory");
+  assert.equal(graph.nodes.input_buddy_mode.config.value, "full_access");
   assert.equal(graph.metadata.origin, "buddy");
-  assert.equal(graph.metadata.buddy_mode, "advisory");
-  assert.equal(graph.metadata.buddy_can_execute_actions, false);
+  assert.equal(graph.metadata.buddy_mode, "full_access");
+  assert.equal(graph.metadata.buddy_can_execute_actions, true);
   assert.equal(graph.metadata.buddy_run, undefined);
   assert.equal(graph.metadata.buddy_permission_tier, undefined);
   assert.equal(graph.metadata.buddy_graph_patch_drafts_enabled, undefined);
   assertAgentNode(graph.nodes.buddy_reply_agent);
-  assert.equal(graph.nodes.buddy_reply_agent.config.skillKey, "");
-  assert.deepEqual(graph.nodes.buddy_reply_agent.config.skillBindings, []);
+  assert.equal(graph.nodes.buddy_reply_agent.config.skillKey, "graph_editor");
+  assert.deepEqual(graph.nodes.buddy_reply_agent.config.skillBindings, [{ skillKey: "graph_editor", enabled: true }]);
 });
 
-test("buildBuddyChatGraph marks approval mode with a reply breakpoint", () => {
+test("buildBuddyChatGraph marks ask-first mode without a blanket reply breakpoint", () => {
   const graph = buildBuddyChatGraph(createTemplate(), {
     userMessage: "请帮我生成一个图修改草案",
     history: [],
     pageContext: "当前路径: /editor",
-    buddyMode: "approval",
+    buddyMode: "ask_first",
   });
 
-  assert.equal(graph.state_schema[BUDDY_MODE_STATE_KEY].value, "approval");
+  assert.equal(graph.state_schema[BUDDY_MODE_STATE_KEY].value, "ask_first");
   assert.equal(graph.metadata.origin, "buddy");
-  assert.equal(graph.metadata.buddy_mode, "approval");
+  assert.equal(graph.metadata.buddy_mode, "ask_first");
   assert.equal(graph.metadata.buddy_can_execute_actions, false);
   assert.equal(graph.metadata.buddy_requires_approval, true);
   assert.equal(graph.metadata.buddy_run, undefined);
   assert.equal(graph.metadata.buddy_permission_tier, undefined);
   assert.equal(graph.metadata.buddy_graph_patch_drafts_enabled, undefined);
-  assert.deepEqual(graph.metadata.interrupt_after, ["buddy_reply_agent"]);
+  assert.equal(graph.metadata.interrupt_after, undefined);
   assert.equal(graph.metadata.agent_breakpoint_timing, undefined);
 });
 

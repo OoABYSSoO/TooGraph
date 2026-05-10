@@ -6,6 +6,36 @@ import sys
 from typing import Any
 
 
+LEGACY_LOCAL_SETTING_FIELDS = {
+    "autoSelectable",
+    "capabilityPolicy",
+    "capability_policy",
+    "configured",
+    "discoverable",
+    "enabled",
+    "executionTargets",
+    "execution_targets",
+    "health",
+    "healthy",
+    "hidden",
+    "kind",
+    "label",
+    "mode",
+    "requiresApproval",
+    "requires_approval",
+    "runPolicies",
+    "run_policies",
+    "scope",
+    "selectable",
+    "sideEffects",
+    "side_effects",
+    "supportedValueTypes",
+    "supported_value_types",
+    "targets",
+    "trigger",
+}
+
+
 def graphiteui_skill_builder(**skill_inputs: Any) -> dict[str, Any]:
     skill_json = _normalize_skill_json(skill_inputs.get("skill_json"))
     skill_key = _normalize_skill_key(skill_inputs.get("skill_key"), skill_json)
@@ -23,15 +53,19 @@ def graphiteui_skill_builder(**skill_inputs: Any) -> dict[str, Any]:
 
 def _normalize_skill_json(value: Any) -> dict[str, Any]:
     if isinstance(value, dict):
-        return dict(value)
+        return _strip_legacy_local_settings(value)
     if isinstance(value, str):
         text = _strip_markdown_fence(value).strip()
         try:
             parsed = json.loads(text)
         except json.JSONDecodeError:
             return {}
-        return dict(parsed) if isinstance(parsed, dict) else {}
+        return _strip_legacy_local_settings(parsed) if isinstance(parsed, dict) else {}
     return {}
+
+
+def _strip_legacy_local_settings(value: dict[str, Any]) -> dict[str, Any]:
+    return {str(key): item for key, item in value.items() if str(key) not in LEGACY_LOCAL_SETTING_FIELDS}
 
 
 def _normalize_skill_key(value: Any, skill_json: dict[str, Any]) -> str:

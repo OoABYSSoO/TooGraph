@@ -26,6 +26,8 @@ Rules:
 - `skill_key` must match `skill_json.skillKey`.
 - The generated Skill must keep GraphiteUI state binding in the runtime, not inside skill scripts.
 - The generated Skill must declare permissions in `skill.json` when it needs network, file access, browser automation, secret access, or subprocess execution.
+- The generated `skill_json` must not include local usage settings. Skill visibility is controlled only by `skill/settings.json` with an `enabled` flag, which the app generates outside the Skill package.
+- The generated Skill must not declare per-Skill approval policy. Approval is controlled by the running graph or Buddy mode: `需确认` asks before file writes/deletes or arbitrary script/command execution; `完全访问` runs those low-level operations automatically.
 - If generated Python lifecycle code imports non-standard-library packages, put those dependencies in `requirements_txt`.
 - Do not generate zip files, paths, smoke-test reports, write commands, graph templates, or installation side effects.
-- Do not include legacy fields such as `health`, `configured`, `healthy`, `targets`, `runPolicies`, `kind`, `mode`, `scope`, or `label`.
+- Do not include legacy fields such as `enabled`, `hidden`, `selectable`, `requiresApproval`, `capabilityPolicy`, `health`, `configured`, `healthy`, `targets`, `executionTargets`, `runPolicies`, `kind`, `mode`, `scope`, or `label`.

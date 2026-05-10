@@ -174,11 +174,13 @@ test("BuddyWidget keeps buddy transitions enabled even when reduced motion is en
   assert.doesNotMatch(componentSource, /transition:\s*none/);
 });
 
-test("BuddyWidget exposes advisory and approval permission tiers", () => {
+test("BuddyWidget exposes ask-first and full-access permission tiers", () => {
   assert.match(componentSource, /<ElSelect[\s\S]*v-model="buddyMode"/);
   assert.match(componentSource, /v-for="option in BUDDY_MODE_OPTIONS"/);
   assert.match(componentSource, /:disabled="option\.disabled"/);
   assert.match(componentSource, /buddyModeLabel/);
+  assert.doesNotMatch(componentSource, /buddyMode\s*=\s*"advisory"/);
+  assert.doesNotMatch(componentSource, /buddyMode\s*=\s*"approval"/);
   assert.doesNotMatch(componentSource, /buddyMode\s*=\s*"unrestricted"/);
 });
 
@@ -196,7 +198,7 @@ test("BuddyWidget lets the buddy runtime choose its own model", () => {
   assert.match(componentSource, /buddyModel:\s*buddyModelRef\.value/);
 });
 
-test("BuddyWidget builds advisory page context from the shared editor snapshot", () => {
+test("BuddyWidget builds page context from the shared editor snapshot", () => {
   assert.match(componentSource, /import \{ buildBuddyPageContext \} from "\.\/buddyPageContext\.ts";/);
   assert.match(componentSource, /import \{ useBuddyContextStore \} from "\.\.\/stores\/buddyContext\.ts";/);
   assert.match(componentSource, /const buddyContextStore = useBuddyContextStore\(\);/);

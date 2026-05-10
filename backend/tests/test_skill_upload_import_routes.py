@@ -85,7 +85,7 @@ Imported skill body.
 def _patch_skill_storage(skills_dir: Path, state_dir: Path):
     official_skills_dir = skills_dir / "official"
     user_skills_dir = skills_dir / "user"
-    settings_path = skills_dir / "settings.local.json"
+    settings_path = skills_dir / "settings.json"
     return (
         patch("app.core.storage.skill_store.SKILLS_ROOT", skills_dir, create=True),
         patch("app.core.storage.skill_store.OFFICIAL_SKILLS_DIR", official_skills_dir, create=True),
@@ -115,8 +115,8 @@ def _test_client_with_skill_storage(skills_dir: Path, state_dir: Path):
 def _test_client_with_skill_state(state_dir: Path):
     with ExitStack() as stack:
         stack.enter_context(patch("app.core.storage.skill_store.SKILL_STATE_DATA_DIR", state_dir))
-        stack.enter_context(patch("app.core.storage.skill_store.SKILL_SETTINGS_PATH", state_dir / "settings.local.json", create=True))
-        stack.enter_context(patch("app.core.storage.skill_store.SKILL_STATE_PATH", state_dir / "settings.local.json"))
+        stack.enter_context(patch("app.core.storage.skill_store.SKILL_SETTINGS_PATH", state_dir / "settings.json", create=True))
+        stack.enter_context(patch("app.core.storage.skill_store.SKILL_STATE_PATH", state_dir / "settings.json"))
         stack.enter_context(patch("app.core.storage.skill_store.USER_SKILLS_DIR", state_dir / "user"))
         stack.enter_context(patch("app.skills.definitions.USER_SKILLS_DIR", state_dir / "user"))
         stack.enter_context(patch("app.skills.registry.USER_SKILLS_DIR", state_dir / "user"))
@@ -190,8 +190,8 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertNotIn("targets", catalog_items["web_search"])
                 self.assertNotIn("sourceFormat", catalog_items["web_search"])
                 self.assertTrue(catalog_items["web_search"]["capabilityPolicy"]["default"]["selectable"])
-                self.assertTrue(catalog_items["web_search"]["capabilityPolicy"]["origins"]["buddy"]["selectable"])
-                self.assertFalse(catalog_items["web_search"]["capabilityPolicy"]["origins"]["buddy"]["requiresApproval"])
+                self.assertFalse(catalog_items["web_search"]["capabilityPolicy"]["default"]["requiresApproval"])
+                self.assertEqual(catalog_items["web_search"]["capabilityPolicy"]["origins"], {})
                 self.assertTrue(catalog_items["web_search"]["runtimeReady"])
                 self.assertTrue(catalog_items["web_search"]["runtimeRegistered"])
                 self.assertTrue(source_path["web_search"].endswith("/skill/official/web_search/skill.json"))
@@ -224,12 +224,29 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 )
                 self.assertNotIn("compatibility", catalog_items["web_search"])
 
-                settings_path = state_dir / "settings.local.json"
+                settings_path = state_dir / "settings.json"
                 self.assertTrue(settings_path.exists())
                 settings_payload = json.loads(settings_path.read_text(encoding="utf-8"))
                 self.assertEqual(settings_payload["schemaVersion"], "graphiteui.skill-settings/v1")
                 self.assertIn("web_search", settings_payload["entries"])
-                self.assertTrue(settings_payload["entries"]["web_search"]["enabled"])
+                self.assertEqual(settings_payload["entries"]["web_search"], {"enabled": True})
+
+    def test_official_skill_visibility_can_be_disabled_in_local_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_dir = Path(temp_dir) / "data" / "skills"
+            with _test_client_with_skill_state(state_dir) as client:
+                disable_response = client.post("/api/skills/web_search/disable")
+                catalog_response = client.get("/api/skills/catalog?include_disabled=true")
+
+                self.assertEqual(disable_response.status_code, 200)
+                self.assertEqual(disable_response.json()["status"], "disabled")
+                self.assertEqual(disable_response.json()["sourceScope"], "official")
+                self.assertFalse(disable_response.json()["canManage"])
+                self.assertEqual(catalog_response.status_code, 200)
+                catalog_items = {item["skillKey"]: item for item in catalog_response.json()}
+                self.assertEqual(catalog_items["web_search"]["status"], "disabled")
+                settings_payload = json.loads((state_dir / "settings.json").read_text(encoding="utf-8"))
+                self.assertEqual(settings_payload["entries"]["web_search"], {"enabled": False})
 
     def test_native_skill_json_upload_imports_user_skill_package(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -248,7 +265,8 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertNotIn("sourceFormat", payload)
                 self.assertEqual(payload["sourceScope"], "user")
                 self.assertNotIn("targets", payload)
-                self.assertEqual(payload["capabilityPolicy"]["origins"]["buddy"]["requiresApproval"], False)
+                self.assertFalse(payload["capabilityPolicy"]["default"]["requiresApproval"])
+                self.assertEqual(payload["capabilityPolicy"]["origins"], {})
                 self.assertEqual(payload["permissions"], ["model_vision", "file_read"])
                 self.assertNotIn("kind", payload)
                 self.assertNotIn("mode", payload)
@@ -269,10 +287,9 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue((skills_dir / "user" / "video_understanding" / "workflow.json").exists())
                 self.assertNotIn("capabilityPolicy", json.loads(imported_path.read_text(encoding="utf-8")))
 
-                settings_payload = json.loads((skills_dir / "settings.local.json").read_text(encoding="utf-8"))
+                settings_payload = json.loads((skills_dir / "settings.json").read_text(encoding="utf-8"))
                 self.assertEqual(settings_payload["schemaVersion"], "graphiteui.skill-settings/v1")
-                self.assertTrue(settings_payload["entries"]["video_understanding"]["enabled"])
-                self.assertTrue(settings_payload["entries"]["video_understanding"]["origins"]["default"]["selectable"])
+                self.assertEqual(settings_payload["entries"]["video_understanding"], {"enabled": True})
 
                 catalog_response = client.get("/api/skills/catalog?include_disabled=true")
                 self.assertEqual(catalog_response.status_code, 200)
@@ -307,7 +324,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
         self.assertEqual(root_children["scripts"]["children"][0]["path"], "scripts/probe.py")
         self.assertTrue(root_children["scripts"]["children"][0]["previewable"])
 
-    def test_skill_policy_updates_write_local_settings_without_touching_manifest(self) -> None:
+    def test_legacy_skill_policy_updates_are_rejected_without_touching_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             skills_dir = temp_path / "skill"
@@ -331,16 +348,13 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                     },
                 )
 
-                self.assertEqual(response.status_code, 200)
-                payload = response.json()
-                self.assertFalse(payload["capabilityPolicy"]["origins"]["buddy"]["selectable"])
-                self.assertTrue(payload["capabilityPolicy"]["origins"]["buddy"]["requiresApproval"])
+                self.assertEqual(response.status_code, 410)
+                self.assertIn("enable or disable", response.json()["detail"])
 
                 manifest_payload = json.loads((skills_dir / "user" / "video_understanding" / "skill.json").read_text(encoding="utf-8"))
                 self.assertNotIn("capabilityPolicy", manifest_payload)
-                settings_payload = json.loads((skills_dir / "settings.local.json").read_text(encoding="utf-8"))
-                self.assertFalse(settings_payload["entries"]["video_understanding"]["origins"]["buddy"]["selectable"])
-                self.assertTrue(settings_payload["entries"]["video_understanding"]["origins"]["buddy"]["requiresApproval"])
+                settings_payload = json.loads((skills_dir / "settings.json").read_text(encoding="utf-8"))
+                self.assertEqual(settings_payload["entries"]["video_understanding"], {"enabled": True})
 
     def test_skill_file_content_reads_text_and_blocks_path_traversal(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

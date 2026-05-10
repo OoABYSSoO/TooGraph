@@ -76,7 +76,7 @@ class PresetManagementRouteTests(unittest.TestCase):
                 patch("app.core.storage.preset_store.OFFICIAL_PRESET_ROOT", official_preset_dir, create=True),
                 patch("app.core.storage.preset_store.USER_PRESET_ROOT", user_preset_dir, create=True),
                 patch("app.core.storage.preset_store.PRESET_DATA_DIR", user_preset_dir),
-                patch("app.core.storage.preset_store.PRESET_SETTINGS_PATH", preset_root / "settings.local.json", create=True),
+                patch("app.core.storage.preset_store.PRESET_SETTINGS_PATH", preset_root / "settings.json", create=True),
                 TestClient(app) as client,
             ):
                 create_response = client.post("/api/presets", json=_preset_payload())
@@ -86,7 +86,7 @@ class PresetManagementRouteTests(unittest.TestCase):
                 saved_path = user_preset_dir / "agent_writer" / "preset.json"
                 self.assertTrue(saved_path.exists())
                 self.assertNotIn("status", json.loads(saved_path.read_text(encoding="utf-8")))
-                settings_payload = json.loads((preset_root / "settings.local.json").read_text(encoding="utf-8"))
+                settings_payload = json.loads((preset_root / "settings.json").read_text(encoding="utf-8"))
                 self.assertTrue(settings_payload["entries"]["agent_writer"]["enabled"])
 
                 listed_response = client.get("/api/presets")
@@ -99,7 +99,7 @@ class PresetManagementRouteTests(unittest.TestCase):
                 self.assertEqual(disabled_response.status_code, 200)
                 self.assertEqual(disabled_response.json()["status"], "disabled")
                 self.assertNotIn("status", json.loads(saved_path.read_text(encoding="utf-8")))
-                settings_payload = json.loads((preset_root / "settings.local.json").read_text(encoding="utf-8"))
+                settings_payload = json.loads((preset_root / "settings.json").read_text(encoding="utf-8"))
                 self.assertFalse(settings_payload["entries"]["agent_writer"]["enabled"])
 
                 active_only_response = client.get("/api/presets")
@@ -133,7 +133,7 @@ class PresetManagementRouteTests(unittest.TestCase):
                 patch("app.core.storage.preset_store.OFFICIAL_PRESET_ROOT", official_preset_dir, create=True),
                 patch("app.core.storage.preset_store.USER_PRESET_ROOT", user_preset_dir, create=True),
                 patch("app.core.storage.preset_store.PRESET_DATA_DIR", user_preset_dir),
-                patch("app.core.storage.preset_store.PRESET_SETTINGS_PATH", preset_root / "settings.local.json", create=True),
+                patch("app.core.storage.preset_store.PRESET_SETTINGS_PATH", preset_root / "settings.json", create=True),
                 TestClient(app) as client,
             ):
                 create_response = client.post("/api/presets", json=_input_preset_payload())
@@ -168,7 +168,7 @@ class PresetManagementRouteTests(unittest.TestCase):
                 patch("app.core.storage.preset_store.OFFICIAL_PRESET_ROOT", official_preset_dir, create=True),
                 patch("app.core.storage.preset_store.USER_PRESET_ROOT", user_preset_dir, create=True),
                 patch("app.core.storage.preset_store.PRESET_DATA_DIR", user_preset_dir),
-                patch("app.core.storage.preset_store.PRESET_SETTINGS_PATH", preset_root / "settings.local.json", create=True),
+                patch("app.core.storage.preset_store.PRESET_SETTINGS_PATH", preset_root / "settings.json", create=True),
                 TestClient(app) as client,
             ):
                 response = client.get("/api/presets?include_disabled=true")

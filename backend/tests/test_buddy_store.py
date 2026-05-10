@@ -19,7 +19,7 @@ class BuddyStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
                 self.assertEqual(store.load_profile()["name"], "GraphiteUI Buddy")
-                self.assertEqual(store.load_policy()["graph_permission_mode"], "advisory")
+                self.assertEqual(store.load_policy()["graph_permission_mode"], "ask_first")
                 self.assertEqual(store.list_memories(), [])
                 self.assertIn("content", store.load_session_summary())
 

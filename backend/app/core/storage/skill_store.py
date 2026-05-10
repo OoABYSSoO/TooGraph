@@ -15,23 +15,12 @@ ROOT_DIR = Path(__file__).resolve().parents[4]
 SKILLS_ROOT = ROOT_DIR / "skill"
 OFFICIAL_SKILLS_DIR = SKILLS_ROOT / "official"
 USER_SKILLS_DIR = SKILLS_ROOT / "user"
-SKILL_SETTINGS_PATH = SKILLS_ROOT / "settings.local.json"
+SKILL_SETTINGS_PATH = SKILLS_ROOT / "settings.json"
 
 SKILLS_DIR = OFFICIAL_SKILLS_DIR
 SKILL_STATE_DATA_DIR = SKILLS_ROOT
 SKILL_STATE_PATH = SKILL_SETTINGS_PATH
 SKILL_SETTINGS_SCHEMA_VERSION = "graphiteui.skill-settings/v1"
-DEFAULT_SKILL_ORIGINS = ("default", "buddy")
-REQUIRES_APPROVAL_PERMISSIONS = {
-    "command_execute",
-    "file_delete",
-    "file_write",
-    "graph_write",
-    "local_file_write",
-    "memory_write",
-    "shell",
-    "subprocess",
-}
 
 
 def skill_directory_for(skill_key: str) -> Path:
@@ -69,20 +58,18 @@ def _list_skill_keys(root: Path) -> set[str]:
 
 
 def build_default_skill_capability_policy(permissions: list[str]) -> SkillCapabilityPolicies:
-    normalized_permissions = {permission.strip() for permission in permissions}
-    requires_approval = bool(normalized_permissions & REQUIRES_APPROVAL_PERMISSIONS)
-    default = SkillCapabilityPolicy(selectable=True, requiresApproval=requires_approval)
+    _ = permissions
     return SkillCapabilityPolicies(
-        default=default,
-        origins={"buddy": default.model_copy(deep=True)},
+        default=SkillCapabilityPolicy(selectable=True, requiresApproval=False),
+        origins={},
     )
 
 
 def ensure_skill_settings(default_policies: dict[str, SkillCapabilityPolicies]) -> dict[str, dict]:
     payload, changed = _read_skill_settings_payload()
     entries = payload["entries"]
-    for skill_key, default_policy in default_policies.items():
-        normalized_entry, entry_changed = _normalize_skill_settings_entry(entries.get(skill_key), default_policy)
+    for skill_key in default_policies:
+        normalized_entry, entry_changed = _normalize_skill_settings_entry(entries.get(skill_key))
         if entry_changed or skill_key not in entries:
             entries[skill_key] = normalized_entry
             changed = True
@@ -92,15 +79,11 @@ def ensure_skill_settings(default_policies: dict[str, SkillCapabilityPolicies]) 
 
 
 def get_skill_capability_policy_from_entry(entry: object, default_policy: SkillCapabilityPolicies) -> SkillCapabilityPolicies:
-    normalized_entry, _changed = _normalize_skill_settings_entry(entry, default_policy)
-    origins = normalized_entry["origins"]
-    default = SkillCapabilityPolicy.model_validate(origins["default"])
-    named_origins = {
-        str(origin): SkillCapabilityPolicy.model_validate(policy)
-        for origin, policy in origins.items()
-        if origin != "default"
-    }
-    return SkillCapabilityPolicies(default=default, origins=named_origins)
+    _ = entry
+    return SkillCapabilityPolicies(
+        default=default_policy.default.model_copy(deep=True),
+        origins={},
+    )
 
 
 def get_skill_status_map() -> dict[str, SkillCatalogStatus]:
@@ -117,18 +100,9 @@ def get_skill_status_map() -> dict[str, SkillCatalogStatus]:
 
 def set_skill_status(skill_key: str, status: SkillCatalogStatus) -> None:
     payload, _changed = _read_skill_settings_payload()
-    default_policy = SkillCapabilityPolicies()
-    entry, _entry_changed = _normalize_skill_settings_entry(payload["entries"].get(skill_key), default_policy)
+    entry, _entry_changed = _normalize_skill_settings_entry(payload["entries"].get(skill_key))
     entry["enabled"] = status == SkillCatalogStatus.ACTIVE
     payload["entries"][skill_key] = entry
-    write_json_file(SKILL_SETTINGS_PATH, payload)
-
-
-def set_skill_capability_policy(skill_key: str, policy: SkillCapabilityPolicies) -> None:
-    payload, _changed = _read_skill_settings_payload()
-    current_entry, _entry_changed = _normalize_skill_settings_entry(payload["entries"].get(skill_key), policy)
-    current_entry["origins"] = _settings_origins_from_policy(policy)
-    payload["entries"][skill_key] = current_entry
     write_json_file(SKILL_SETTINGS_PATH, payload)
 
 
@@ -201,55 +175,15 @@ def _read_skill_settings_payload() -> tuple[dict[str, object], bool]:
     return payload, changed
 
 
-def _normalize_skill_settings_entry(
-    entry: object,
-    default_policy: SkillCapabilityPolicies,
-) -> tuple[dict[str, object], bool]:
+def _normalize_skill_settings_entry(entry: object) -> tuple[dict[str, object], bool]:
     changed = not isinstance(entry, dict)
     payload = dict(entry) if isinstance(entry, dict) else {}
     enabled = payload.get("enabled", True)
     normalized_enabled = enabled if isinstance(enabled, bool) else bool(enabled)
-    if payload.get("enabled") != normalized_enabled:
+    normalized_entry = {"enabled": normalized_enabled}
+    if payload != normalized_entry:
         changed = True
-    raw_origins = payload.get("origins")
-    origins = dict(raw_origins) if isinstance(raw_origins, dict) else {}
-    if not isinstance(raw_origins, dict):
-        changed = True
-    default_origins = _settings_origins_from_policy(default_policy)
-    for origin in DEFAULT_SKILL_ORIGINS:
-        if origin not in origins:
-            origins[origin] = default_origins[origin]
-            changed = True
-    normalized_origins: dict[str, dict] = {}
-    for origin, policy in origins.items():
-        fallback = default_origins.get(str(origin), default_origins["default"])
-        normalized_policy, policy_changed = _normalize_skill_policy(policy, fallback)
-        normalized_origins[str(origin)] = normalized_policy
-        changed = changed or policy_changed
-    return {"enabled": normalized_enabled, "origins": normalized_origins}, changed
-
-
-def _normalize_skill_policy(policy: object, fallback: dict) -> tuple[dict, bool]:
-    try:
-        parsed = SkillCapabilityPolicy.model_validate(policy)
-    except Exception:
-        return fallback, True
-    normalized = parsed.model_dump(by_alias=True, mode="json")
-    return normalized, normalized != policy
-
-
-def _settings_origins_from_policy(policy: SkillCapabilityPolicies) -> dict[str, dict]:
-    default = policy.default.model_dump(by_alias=True, mode="json")
-    origins = {"default": default}
-    origins.update(
-        {
-            origin: item.model_dump(by_alias=True, mode="json")
-            for origin, item in policy.origins.items()
-        }
-    )
-    if "buddy" not in origins:
-        origins["buddy"] = dict(default)
-    return origins
+    return normalized_entry, changed
 
 
 def _find_single_skill_manifest(source_root: Path) -> Path:

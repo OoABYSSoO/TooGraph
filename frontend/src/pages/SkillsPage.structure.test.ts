@@ -22,12 +22,14 @@ test("SkillsPage loads the full skill catalog into a searchable management surfa
   assert.doesNotMatch(componentSource, /skills\.compatibility/);
 });
 
-test("SkillsPage uses a two-column inspector with a compact selectable Skill list", () => {
+test("SkillsPage uses a two-column inspector with a compact enabled Skill list", () => {
   assert.match(componentSource, /class="skills-page__workspace"/);
   assert.match(componentSource, /class="skills-page__selector"/);
   assert.match(componentSource, /class="skills-page__detail"/);
   assert.match(componentSource, /selectedSkillKey/);
   assert.match(componentSource, /<ElSwitch[\s\S]*:model-value="skill\.status === 'active'"/);
+  assert.match(componentSource, /:disabled="actionSkillKey === skill\.skillKey"/);
+  assert.doesNotMatch(componentSource, /!skill\.canManage \|\| actionSkillKey/);
   assert.doesNotMatch(componentSource, /<details[\s\S]*class="skills-page__card"/);
 });
 
@@ -41,11 +43,11 @@ test("SkillsPage exposes a read-only Skill package file browser", () => {
 });
 
 test("SkillsPage surfaces Skill capability metadata without internal runtime status fields", () => {
-  assert.match(componentSource, /overview\.selectableSkills/);
+  assert.match(componentSource, /overview\.visibleSkills/);
   assert.doesNotMatch(componentSource, /overview\.runtimeReady/);
   assert.doesNotMatch(componentSource, /overview\.runtimeRegistered/);
   assert.doesNotMatch(componentSource, /overview\.needsAttention/);
-  assert.match(componentSource, /capabilityPolicyOriginEntries/);
+  assert.doesNotMatch(componentSource, /capabilityPolicyOriginEntries/);
   assert.doesNotMatch(componentSource, /selectedSkill\.kind/);
   assert.doesNotMatch(componentSource, /selectedSkill\.mode/);
   assert.doesNotMatch(componentSource, /selectedSkill\.scope/);
@@ -58,7 +60,7 @@ test("SkillsPage surfaces Skill capability metadata without internal runtime sta
   assert.doesNotMatch(componentSource, /selectedSkill\.healthy/);
   assert.doesNotMatch(componentSource, /selectedSkill\.llmNodeEligibility/);
   assert.doesNotMatch(componentSource, /selectedSkill\.llmNodeBlockers/);
-  assert.match(componentSource, /t\("skills\.capabilityPolicy"\)/);
+  assert.doesNotMatch(componentSource, /t\("skills\.capabilityPolicy"\)/);
   assert.match(componentSource, /t\("skills\.permissions"\)/);
   assert.doesNotMatch(componentSource, /t\("skills\.runtimeReady"\)/);
   assert.doesNotMatch(componentSource, /t\("skills\.runtimeRegistered"\)/);
@@ -68,18 +70,15 @@ test("SkillsPage surfaces Skill capability metadata without internal runtime sta
   assert.doesNotMatch(componentSource, /t\("skills\.llmNodeBlockers"\)/);
 });
 
-test("SkillsPage renders capability policy booleans as editable Element Plus switches", () => {
-  assert.match(componentSource, /class="skills-page__policy-grid"/);
-  assert.match(componentSource, /class="skills-page__policy-row"/);
-  assert.match(componentSource, /class="skills-page__policy-control"/);
-  assert.match(componentSource, /updateSkillCapabilityPolicy/);
-  assert.match(componentSource, /policyActionKey/);
-  assert.match(componentSource, /<ElSwitch[\s\S]*:model-value="entry\.policy\.selectable"[\s\S]*@change="setSkillCapabilityPolicy\(selectedSkill, entry\.origin, 'selectable', Boolean\(\$event\)\)"/);
-  assert.match(componentSource, /<ElSwitch[\s\S]*:model-value="entry\.policy\.requiresApproval"[\s\S]*@change="setSkillCapabilityPolicy\(selectedSkill, entry\.origin, 'requiresApproval', Boolean\(\$event\)\)"/);
-  assert.match(componentSource, /capabilityPolicySwitchLabel\(entry\.origin, ['"]selectable['"]\)/);
-  assert.match(componentSource, /capabilityPolicySwitchLabel\(entry\.origin, ['"]requiresApproval['"]\)/);
-  assert.doesNotMatch(componentSource, /:model-value="entry\.policy\.selectable"[\s\S]*\sdisabled\s/);
-  assert.doesNotMatch(componentSource, /:model-value="entry\.policy\.requiresApproval"[\s\S]*\sdisabled\s/);
+test("SkillsPage avoids legacy per-Skill capability policy controls", () => {
+  assert.doesNotMatch(componentSource, /class="skills-page__policy-grid"/);
+  assert.doesNotMatch(componentSource, /class="skills-page__policy-row"/);
+  assert.doesNotMatch(componentSource, /class="skills-page__policy-control"/);
+  assert.doesNotMatch(componentSource, /updateSkillCapabilityPolicy/);
+  assert.doesNotMatch(componentSource, /policyActionKey/);
+  assert.doesNotMatch(componentSource, /setSkillCapabilityPolicy/);
+  assert.doesNotMatch(componentSource, /capabilityPolicySwitchLabel/);
+  assert.doesNotMatch(componentSource, /requiresApproval/);
   assert.doesNotMatch(componentSource, /formatCapabilityPolicy/);
 });
 

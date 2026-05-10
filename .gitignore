@@ -68,9 +68,9 @@ frontend/*.tsbuildinfo
 
 # Backend local runtime files
 /buddy_home/
-/graph_template/settings.local.json
-/node_preset/settings.local.json
-/skill/settings.local.json
+/graph_template/settings.json
+/node_preset/settings.json
+/skill/settings.json
 backend/.venv/
 backend/*.db
 backend/*.sqlite

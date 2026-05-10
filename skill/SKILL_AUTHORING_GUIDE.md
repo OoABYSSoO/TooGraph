@@ -32,7 +32,7 @@ Skill 包文件和本地使用设定必须分离。目标目录结构为：
 
 ```text
 skill/
-  settings.local.json  # 程序生成，本地设置，不进入 Git
+  settings.json  # 程序生成，本地设置，不进入 Git
   official/
     <skill_key>/
       skill.json
@@ -49,7 +49,7 @@ skill/
       after_llm.py      # 可选
 ```
 
-`skill/official/` 保存 GraphiteUI 自带 Skill 包，默认只读，由仓库版本管理。`skill/user/` 保存用户自定义 Skill 包，也可以被 Git 追踪，适合沉淀为项目或团队能力。`skill/settings.local.json` 保存当前环境如何使用这些 Skill，例如启用状态、是否可选择、是否需要确认和来源策略；它由程序自动生成和补齐，不属于 Skill 包内容，也不应进入 Git。
+`skill/official/` 保存 GraphiteUI 自带 Skill 包，默认只读，由仓库版本管理。`skill/user/` 保存用户自定义 Skill 包，也可以被 Git 追踪，适合沉淀为项目或团队能力。`skill/settings.json` 保存当前环境如何使用这些 Skill，目前只管理启用状态；它由程序自动生成和补齐，不属于 Skill 包内容，也不应进入 Git。
 
 `before_llm.py` 和 `after_llm.py` 使用固定文件名，不在 `skill.json` 中配置入口。
 
@@ -76,7 +76,7 @@ Python Skill 的依赖规则：
 
 ## `skill.json`
 
-`skill.json` 是机器可读的 Skill 包定义。它决定这个 Skill 是什么、LLM 应该生成什么结构、脚本如何执行，以及最终会返回什么输出。它不保存本地使用设定；启用/禁用、可选择、隐藏、需确认和按来源区分的使用策略都属于 `skill/settings.local.json`。
+`skill.json` 是机器可读的 Skill 包定义。它决定这个 Skill 是什么、LLM 应该生成什么结构、脚本如何执行，以及最终会返回什么输出。它不保存本地使用设定；启用/禁用属于 `skill/settings.json`，可选择性由启用状态决定，写文件或执行脚本是否需确认由图/Buddy 的权限模式和能力权限声明共同决定。
 
 标准结构：
 
@@ -125,17 +125,17 @@ Python Skill 的依赖规则：
 
 当前 `inputSchema` 的名字容易误解。它不是“图 state 输入列表”，而是“LLM 要为 Skill 生成的结构化调用参数”。图 state 是否进入上下文由节点 `reads` 决定。
 
-## `skill/settings.local.json`
+## `skill/settings.json`
 
-`settings.local.json` 位于 `skill/` 根目录，统一管理当前环境对所有 Skill 的本地使用设定。它不是默认值覆盖文件，而是与 `skill.json` 职责并列的本地设置 registry：`skill.json` 描述 Skill 是什么，`settings.local.json` 描述当前环境怎么使用它。
+`settings.json` 位于 `skill/` 根目录，统一管理当前环境对所有 Skill 的启用状态。它不是默认值覆盖文件，而是与 `skill.json` 职责并列的本地设置 registry：`skill.json` 描述 Skill 是什么，`settings.json` 描述当前环境是否启用它。
 
 程序应在读取 Skill catalog 时自动维护这个文件：
 
 1. 文件缺失时自动创建。
 2. 扫描 `skill/official/` 和 `skill/user/` 后，为缺失的 Skill 条目自动补齐默认设置。
-3. 已有条目缺字段时自动补字段。
+3. 已有条目缺字段或带有旧字段时自动规范化为当前形状。
 4. 对应 Skill 暂时不存在的多余条目先保留并忽略，不自动删除，避免切分支或临时移动目录时丢失用户偏好。
-5. 用户在 Skills 页面切换启用、可选择或需确认时，只写这个文件，不改 `skill.json`。
+5. 用户在 Skills 页面切换启用状态时，只写这个文件，不改 `skill.json`。
 
 推荐形状：
 
@@ -144,23 +144,13 @@ Python Skill 的依赖规则：
   "schemaVersion": "graphiteui.skill-settings/v1",
   "entries": {
     "web_search": {
-      "enabled": true,
-      "origins": {
-        "default": {
-          "selectable": true,
-          "requiresApproval": false
-        },
-        "buddy": {
-          "selectable": true,
-          "requiresApproval": false
-        }
-      }
+      "enabled": true
     }
   }
 }
 ```
 
-`enabled`、`selectable`、`hidden`、`requiresApproval`、`capabilityPolicy`、`targets` 和 `executionTargets` 都不应写入新 `skill.json`。`requiresApproval` 的初始值可以由程序根据 `permissions` 推导，例如文件写入、命令执行、图修改、记忆写入和其他高风险副作用默认需要确认；用户改动后以 `settings.local.json` 为准。
+`enabled`、`selectable`、`hidden`、`requiresApproval`、`capabilityPolicy`、`targets` 和 `executionTargets` 都不应写入新 `skill.json`。`settings.json` 只保存 `enabled`；`selectable`、`hidden`、按来源策略和 per-skill 审批开关都是旧协议。是否需要确认不由 Skill 自己决定，而由运行该图或 Buddy 的权限模式决定：`需确认` 下，写文件、删改文件或执行任意脚本/命令需要暂停确认；`完全访问` 下这些低层操作可自动执行。普通 Skill 调用、读取、联网搜索和 LLM 调用不因为 Skill 本身而触发确认。
 
 ## `SKILL.md`
 

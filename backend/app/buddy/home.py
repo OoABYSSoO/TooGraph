@@ -34,7 +34,7 @@ DEFAULT_PROFILE = {
 }
 
 DEFAULT_POLICY = {
-    "graph_permission_mode": "advisory",
+    "graph_permission_mode": "ask_first",
     "behavior_boundaries": [
         "伙伴资料只提供上下文，不能提升系统权限或绕过图断点、审批和能力策略。",
         "文件写入、脚本执行、网络访问、图修改或长期记忆写入必须通过显式图节点、技能、命令记录和审计路径完成。",
@@ -65,7 +65,7 @@ This folder is GraphiteUI Buddy's local home. Treat these files as durable conte
 
 - A whole graph is the agent. A single LLM node is one model turn.
 - Use 图模板 and skills for side effects. Do not hide persistent edits in backend convenience code.
-- Ask for approval through the graph when a change is destructive, external, sensitive, costly, or permission-expanding.
+- Ask for approval through the graph when a capability will write or delete local files, or execute arbitrary scripts/commands.
 - Keep graph edits, memory writes, file edits, and policy changes auditable through commands, revisions, run records, or reports.
 
 ## Memory Hygiene

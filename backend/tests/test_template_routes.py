@@ -61,7 +61,7 @@ class TemplateRouteTests(unittest.TestCase):
             with (
                 patch("app.templates.loader.OFFICIAL_TEMPLATES_ROOT", official_dir),
                 patch("app.templates.loader.USER_TEMPLATES_ROOT", user_dir),
-                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.local.json", create=True),
+                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.json", create=True),
                 TestClient(app) as client,
             ):
                 response = client.get("/api/templates")
@@ -81,7 +81,7 @@ class TemplateRouteTests(unittest.TestCase):
             with (
                 patch("app.templates.loader.OFFICIAL_TEMPLATES_ROOT", official_dir),
                 patch("app.templates.loader.USER_TEMPLATES_ROOT", user_dir),
-                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.local.json", create=True),
+                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.json", create=True),
                 TestClient(app) as client,
             ):
                 save_response = client.post("/api/templates/save", json=_graph_payload())
@@ -96,7 +96,7 @@ class TemplateRouteTests(unittest.TestCase):
             saved_path = user_dir / saved_payload["template_id"] / "template.json"
             self.assertTrue(saved_path.exists())
             self.assertNotIn("status", json.loads(saved_path.read_text(encoding="utf-8")))
-            settings_payload = json.loads((root / "settings.local.json").read_text(encoding="utf-8"))
+            settings_payload = json.loads((root / "settings.json").read_text(encoding="utf-8"))
             self.assertTrue(settings_payload["entries"][saved_payload["template_id"]]["enabled"])
             self.assertEqual(list_response.json(), [saved_payload["template"]])
 
@@ -110,7 +110,7 @@ class TemplateRouteTests(unittest.TestCase):
             with (
                 patch("app.templates.loader.OFFICIAL_TEMPLATES_ROOT", official_dir),
                 patch("app.templates.loader.USER_TEMPLATES_ROOT", user_dir),
-                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.local.json", create=True),
+                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.json", create=True),
                 TestClient(app) as client,
             ):
                 save_response = client.post("/api/templates/save", json=_graph_payload("Managed Template"))
@@ -126,7 +126,7 @@ class TemplateRouteTests(unittest.TestCase):
                 self.assertEqual(disabled_response.json()["status"], "disabled")
                 saved_path = user_dir / template_id / "template.json"
                 self.assertNotIn("status", json.loads(saved_path.read_text(encoding="utf-8")))
-                settings_payload = json.loads((root / "settings.local.json").read_text(encoding="utf-8"))
+                settings_payload = json.loads((root / "settings.json").read_text(encoding="utf-8"))
                 self.assertFalse(settings_payload["entries"][template_id]["enabled"])
 
                 active_only_response = client.get("/api/templates")
@@ -166,7 +166,7 @@ class TemplateRouteTests(unittest.TestCase):
             with (
                 patch("app.templates.loader.OFFICIAL_TEMPLATES_ROOT", official_dir),
                 patch("app.templates.loader.USER_TEMPLATES_ROOT", user_dir),
-                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.local.json", create=True),
+                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.json", create=True),
                 TestClient(app) as client,
             ):
                 disable_response = client.post("/api/templates/official_loop/disable")

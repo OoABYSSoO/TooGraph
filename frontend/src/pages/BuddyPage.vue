@@ -68,9 +68,11 @@
                 <h3>{{ t("buddyPage.policy.title") }}</h3>
                 <p>{{ t("buddyPage.policy.body") }}</p>
               </div>
-              <ElTag type="info" effect="plain">{{ t("buddyPage.policy.advisoryOnly") }}</ElTag>
             </div>
             <ElForm label-position="top" class="buddy-page__form">
+              <ElFormItem :label="t('buddyPage.policy.permissionMode')">
+                <ElSegmented v-model="policyDraft.graph_permission_mode" :options="permissionModeOptions" />
+              </ElFormItem>
               <ElFormItem :label="t('buddyPage.policy.boundaries')">
                 <ElInput v-model="policyBoundaryText" type="textarea" :rows="6" />
               </ElFormItem>
@@ -218,6 +220,7 @@ import {
   ElInput,
   ElMessage,
   ElMessageBox,
+  ElSegmented,
   ElTabPane,
   ElTable,
   ElTableColumn,
@@ -298,6 +301,10 @@ const canSaveMemory = computed(() => {
 const orderedRevisions = computed(() => {
   return [...revisions.value].sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at));
 });
+const permissionModeOptions = computed(() => [
+  { label: t("buddy.modes.askFirst"), value: "ask_first" },
+  { label: t("buddy.modes.fullAccess"), value: "full_access" },
+]);
 
 function defaultProfileDraft(): BuddyProfile {
   return {
@@ -311,9 +318,20 @@ function defaultProfileDraft(): BuddyProfile {
 
 function defaultPolicyDraft(): BuddyPolicy {
   return {
-    graph_permission_mode: "advisory",
+    graph_permission_mode: "ask_first",
     behavior_boundaries: [],
     communication_preferences: [],
+  };
+}
+
+function normalizePolicyMode(value: unknown): BuddyPolicy["graph_permission_mode"] {
+  return value === "full_access" ? "full_access" : "ask_first";
+}
+
+function normalizeBuddyPolicy(policy: BuddyPolicy): BuddyPolicy {
+  return {
+    ...policy,
+    graph_permission_mode: normalizePolicyMode((policy as { graph_permission_mode?: unknown }).graph_permission_mode),
   };
 }
 
@@ -395,7 +413,7 @@ async function loadAll(options: LoadAllOptions = {}) {
       fetchBuddyRevisions(),
     ]);
     profileDraft.value = profile;
-    policyDraft.value = policy;
+    policyDraft.value = normalizeBuddyPolicy(policy);
     memories.value = memoryList;
     summaryDraft.value = summary;
     revisions.value = revisionList;
@@ -437,10 +455,7 @@ async function savePolicy() {
     isSavingPolicy.value = true;
     policyDraft.value = acceptCommandResult(
       await updateBuddyPolicy(
-        {
-          ...policyDraft.value,
-          graph_permission_mode: "advisory",
-        },
+        normalizeBuddyPolicy(policyDraft.value),
         t("buddyPage.changeReasons.policy"),
       ),
     );

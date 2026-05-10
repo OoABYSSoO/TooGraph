@@ -1,4 +1,4 @@
-import type { AgentNode, GraphNode, GraphPayload, InputNode, TemplateRecord } from "../types/node-system.ts";
+import type { GraphNode, GraphPayload, InputNode, TemplateRecord } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
 import type { SkillDefinition } from "../types/skills.ts";
 import { GLOBAL_RUNTIME_MODEL_OPTION_VALUE } from "../lib/runtimeModelCatalog.ts";
@@ -17,10 +17,10 @@ export const BUDDY_MEMORY_CONTEXT_STATE_KEY = "state_8";
 export const BUDDY_SESSION_SUMMARY_STATE_KEY = "state_9";
 export const BUDDY_AGENTIC_REPLY_STATE_KEYS = ["state_27", "state_25", "state_26", "state_16", "state_18"];
 export const MAX_BUDDY_HISTORY_MESSAGES = 12;
-export const DEFAULT_BUDDY_MODE = "advisory";
+export const DEFAULT_BUDDY_MODE = "ask_first";
 
 export type BuddyChatRole = "user" | "assistant";
-export type BuddyMode = "advisory" | "approval" | "unrestricted";
+export type BuddyMode = "ask_first" | "full_access";
 
 export type BuddyModeOption = {
   value: BuddyMode;
@@ -31,22 +31,16 @@ export type BuddyModeOption = {
 
 export const BUDDY_MODE_OPTIONS: BuddyModeOption[] = [
   {
-    value: "advisory",
-    labelKey: "buddy.modes.advisory",
-    descriptionKey: "buddy.modeDescriptions.advisory",
+    value: "ask_first",
+    labelKey: "buddy.modes.askFirst",
+    descriptionKey: "buddy.modeDescriptions.askFirst",
     disabled: false,
   },
   {
-    value: "approval",
-    labelKey: "buddy.modes.approval",
-    descriptionKey: "buddy.modeDescriptions.approval",
+    value: "full_access",
+    labelKey: "buddy.modes.fullAccess",
+    descriptionKey: "buddy.modeDescriptions.fullAccess",
     disabled: false,
-  },
-  {
-    value: "unrestricted",
-    labelKey: "buddy.modes.unrestricted",
-    descriptionKey: "buddy.modeDescriptions.unrestricted",
-    disabled: true,
   },
 ];
 
@@ -117,7 +111,7 @@ export function buildBuddyChatGraph(template: TemplateRecord, input: BuildBuddyC
       origin: "buddy",
       buddy_template_id: template.template_id,
       buddy_mode: buddyMode,
-      buddy_can_execute_actions: false,
+      buddy_can_execute_actions: buddyMode === "full_access",
     },
   };
   applyBuddyModePolicy(graph, buddyMode);
@@ -141,10 +135,6 @@ export function buildBuddyChatGraph(template: TemplateRecord, input: BuildBuddyC
   syncInputNodeValueByNameOrKey(graph, "page_context", BUDDY_PAGE_CONTEXT_STATE_KEY, pageContextValue);
   syncInputNodeValueByNameOrKey(graph, "buddy_mode", BUDDY_MODE_STATE_KEY, buddyMode);
   syncInputNodeValueByName(graph, "skill_catalog_snapshot", skillCatalogSnapshot);
-  if (buddyMode !== "unrestricted") {
-    enforceAdvisoryBuddyGraph(graph);
-  }
-
   return graph;
 }
 
@@ -189,38 +179,15 @@ export function buildBuddyReviewGraph(template: TemplateRecord, input: BuildBudd
 }
 
 export function resolveBuddyMode(value: unknown): BuddyMode {
-  return value === "approval" || value === DEFAULT_BUDDY_MODE ? value : DEFAULT_BUDDY_MODE;
+  if (value === "full_access" || value === "unrestricted") {
+    return "full_access";
+  }
+  return DEFAULT_BUDDY_MODE;
 }
 
 export function buildBuddySkillCatalogSnapshot(skills: SkillDefinition[], buddyMode: BuddyMode) {
-  return skills.map((skill) => {
-    const snapshot = cloneJson(skill);
-    const configuredDefaultPolicy = snapshot.capabilityPolicy?.default ?? {};
-    const defaultPolicy = {
-      ...configuredDefaultPolicy,
-      selectable: configuredDefaultPolicy.selectable ?? true,
-      requiresApproval: configuredDefaultPolicy.requiresApproval ?? false,
-    };
-    const buddyPolicy = {
-      ...defaultPolicy,
-      ...(snapshot.capabilityPolicy?.origins?.buddy ?? {}),
-    };
-    const buddyOriginPolicy =
-      buddyMode === "approval" || !buddyPolicy.requiresApproval
-        ? buddyPolicy
-        : {
-            ...buddyPolicy,
-            selectable: false,
-          };
-    snapshot.capabilityPolicy = {
-      default: defaultPolicy,
-      origins: {
-        ...(snapshot.capabilityPolicy?.origins ?? {}),
-        buddy: buddyOriginPolicy,
-      },
-    };
-    return snapshot;
-  });
+  void buddyMode;
+  return skills.map((skill) => cloneJson(skill));
 }
 
 export function resolveBuddyReplyText(run: RunDetail): string {
@@ -439,27 +406,10 @@ function syncInputNodeValue(graph: GraphPayload, stateKey: string, value: unknow
   }
 }
 
-function enforceAdvisoryBuddyGraph(graph: GraphPayload) {
-  const agentNode = graph.nodes.buddy_reply_agent;
-  if (!agentNode || agentNode.kind !== "agent") {
-    return;
-  }
-  const buddyAgent = agentNode as AgentNode;
-  buddyAgent.config = {
-    ...buddyAgent.config,
-    skillKey: "",
-    skillBindings: [],
-  };
-}
-
 function applyBuddyModePolicy(graph: GraphPayload, buddyMode: BuddyMode) {
-  graph.metadata.buddy_can_execute_actions = false;
-  graph.metadata.buddy_requires_approval = buddyMode === "approval";
-  if (buddyMode !== "approval") {
-    return;
-  }
-  const approvalNodeId = graph.nodes.request_approval_agent ? "request_approval_agent" : "buddy_reply_agent";
-  graph.metadata.interrupt_after = addUniqueMetadataNodeId(graph.metadata.interrupt_after, approvalNodeId);
+  graph.metadata.buddy_can_execute_actions = buddyMode === "full_access";
+  graph.metadata.buddy_requires_approval = buddyMode === "ask_first";
+  graph.metadata.graph_permission_mode = buddyMode;
 }
 
 function applyBuddyModelOverride(graph: GraphPayload, value: unknown) {
@@ -489,15 +439,6 @@ function applyBuddyModelOverrideToNodes(
       applyBuddyModelOverrideToNodes(node.config.graph.nodes, patch);
     }
   }
-}
-
-function addUniqueMetadataNodeId(value: unknown, nodeId: string) {
-  const items = Array.isArray(value)
-    ? value.map((item) => String(item).trim()).filter(Boolean)
-    : typeof value === "string" && value.trim()
-      ? [value.trim()]
-      : [];
-  return items.includes(nodeId) ? items : [...items, nodeId];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

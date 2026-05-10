@@ -43,7 +43,7 @@
 
 ## 当前技能
 
-官方 Skill 位于 `skill/official/<skill_key>/`，会进入 Git 管理；用户自定义 Skill 位于 `skill/user/<skill_key>/`，也可以进入 Git 管理。Skill catalog 会同时返回官方和用户 Skill，并通过 `sourceScope` / `canManage` 区分来源与可管理性；当前环境的启用、可选和确认策略只写入被忽略的 `skill/settings.local.json`。Python Skill 只要依赖标准库以外的包，就应该在包内提供 `requirements.txt`；运行时会先检查当前 Python，缺依赖时在 `backend/data/skills/envs/` 下优先用 `uv` 创建或复用托管虚拟环境。
+官方 Skill 位于 `skill/official/<skill_key>/`，会进入 Git 管理；用户自定义 Skill 位于 `skill/user/<skill_key>/`，也可以进入 Git 管理。Skill catalog 会同时返回官方和用户 Skill，并通过 `sourceScope` / `canManage` 区分来源与可管理性；当前环境的启用状态只写入被忽略的 `skill/settings.json`。Python Skill 只要依赖标准库以外的包，就应该在包内提供 `requirements.txt`；运行时会先检查当前 Python，缺依赖时在 `backend/data/skills/envs/` 下优先用 `uv` 创建或复用托管虚拟环境。
 
 ### `web_search`
 
@@ -51,7 +51,7 @@
 - 显示名称：`联网搜索`
 - 作用：执行联网搜索、返回来源链接、本地原文文件路径和结构化错误信息。
 - 生命周期：`before_llm.py` 只补充当前日期；`after_llm.py` 接收 LLM 生成的 `query`，执行搜索和原文下载。旧的程序侧“识别时效查询并自动给 query 拼日期”逻辑已移除，是否把日期写入 query 由 LLM 根据上下文判断。
-- 伙伴来源默认可自主使用且无需确认，前提仍是它被图模板显式绑定或由图状态传入，并通过 registry、运行策略和运行时就绪检查。
+- 启用的 Skill 默认可被图模板或能力选择器调用；运行 Skill 本身不需要确认，只有写文件、删改文件或执行任意脚本/命令会按图/Buddy 的权限模式触发确认。
 - 它只负责搜索和资料获取，不负责最终总结。搜索词由绑定它的 LLM 节点根据任务决定；整理和总结应交给后续 LLM 节点。
 - 搜索源请求默认最多尝试 5 次，用于缓解 DuckDuckGo fallback 或外部搜索 API 的瞬时 TLS、连接中断和网关抖动。
 
@@ -67,8 +67,8 @@
 - 位置：`skill/official/graphiteui_capability_selector/`
 - 显示名称：`GraphiteUI Capability Selector`
 - 作用：根据 LLM 节点技能入参规划阶段看到的本地可用能力清单，让模型选择并校验规范化单个 `capability`。
-- 生命周期：`before_llm.py` 读取当前启用的图模板和可选择 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`，按同一清单做真实性与启用状态校验。
-- 选择对象包括当前启用的图模板和对当前 `origin` 可选择的 Skill；图模板优先于 Skill。
+- 生命周期：`before_llm.py` 读取当前启用的图模板和启用的 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`，按同一清单做真实性与启用状态校验，并输出是否涉及写文件或执行脚本的审批标记。
+- 选择对象包括当前启用的图模板和启用的 Skill；图模板优先于 Skill。
 - 它不执行被选能力，不生成被选能力的运行入参，也不做程序字段匹配；模型基于候选项的名称和描述判断，脚本只做真实性与启用状态校验。
 
 ### `graphiteUI_script_tester`
@@ -166,7 +166,7 @@
 - 继续收束 `subgraph` 子图体验：补齐父子图运行详情页的审计聚合、事件定位和从缩略图点击跳转到内部节点。
 - 补齐动态 `capability.kind=subgraph` 的断点传播、父级暂停和恢复。
 - 补齐伙伴浮窗和伙伴页面的标准断点展示、恢复、拒绝、取消、暂停期间队列阻塞和刷新后找回能力。
-- 补齐动态能力审批：需要确认的联网、文件写入、脚本执行、图编辑、记忆写入和高风险子图运行应进入标准 `awaiting_human`，而不是只靠提示词提醒。
+- 补齐动态能力审批：写文件、删改文件和执行任意脚本/命令应按图或 Buddy 的 `需确认` / `完全访问` 模式进入标准 `awaiting_human`，而不是只靠提示词提醒；普通联网、读取、搜索和运行 Skill 本身不单独触发审批。
 - 实现统一 `activity_events`，让伙伴浮窗和运行详情页能展示文件探索、命令执行、写入行数、脚本测试等低层操作摘要。
 - 清理或按新命令流重建历史 `graph_patch.draft` stub，并完成图补丁预览、GraphCommandBus、graph revision、undo 和审计闭环。
 - 将人设、记忆、会话摘要、自我复盘报告和能力使用统计等长期状态更新表达为可审计的图模板流程，而不是隐藏产品逻辑。

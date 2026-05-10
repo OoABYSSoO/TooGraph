@@ -88,7 +88,7 @@
 1. 收束伙伴运行来源：让伙伴启动图时只依赖统一 `metadata.origin=buddy` 和必要的策略字段，停止扩展 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 这类旧标记。
 2. 补齐伙伴断点交互：在伙伴浮窗和伙伴页面中展示标准暂停卡片，支持澄清、审批、拒绝、取消、恢复、刷新后找回和暂停期间队列阻塞。
 3. 补齐动态子图断点传播：`capability.kind=subgraph` 内部遇到 `interrupt_after` 时，父级 run 必须进入 `awaiting_human`，恢复仍走父 run 的标准 resume API。
-4. 补齐动态能力审批路径：需要确认的联网、文件写入、脚本执行、图编辑、记忆写入和高风险子图运行必须通过标准断点，而不是只靠提示词或前端提醒。
+4. 补齐动态能力审批路径：写文件、删改文件和执行任意脚本/命令必须按图或 Buddy 的 `需确认` / `完全访问` 模式进入标准断点，而不是只靠提示词或前端提醒；普通联网、读取、搜索和运行 Skill 本身不单独触发审批。
 5. 建立 Buddy Home 写回流程：把长期记忆、会话摘要、用户画像、人设调整、能力使用统计和自我复盘报告写回做成显式模板/受控 Skill/命令记录/revision 流程。
 6. 重建图编辑命令流：删除或重建 `graph_patch.draft` stub，补齐图补丁预览、GraphCommandBus、graph revision、undo/redo 和完整审计闭环。
 7. 实现统一 `activity_events`：由运行时、技能和文件/命令原语程序化记录低层操作摘要，并让伙伴浮窗和运行详情页复用同一渲染器。
@@ -250,34 +250,34 @@ GraphiteUI 的可复用资产应从本地运行偏好中分离出来。资产文
 
 ```text
 skill/
-  settings.local.json
+  settings.json
   official/
     <skill_key>/skill.json
   user/
     <skill_key>/skill.json
 
 graph_template/
-  settings.local.json
+  settings.json
   official/
     <template_id>/template.json
   user/
     <template_id>/template.json
 
 node_preset/
-  settings.local.json
+  settings.json
   official/
     <preset_id>/preset.json
   user/
     <preset_id>/preset.json
 ```
 
-`official/` 放 GraphiteUI 自带资产，默认只读并进入 Git 管理。`user/` 放用户自定义资产，也可以进入 Git 管理，适合沉淀为项目或团队能力。根目录 `settings.local.json` 由程序自动生成和维护，不进入 Git 管理，记录启用/禁用、可选择、需确认、隐藏、排序、本地默认选择和来源策略等当前环境偏好。
+`official/` 放 GraphiteUI 自带资产，默认只读并进入 Git 管理。`user/` 放用户自定义资产，也可以进入 Git 管理，适合沉淀为项目或团队能力。根目录 `settings.json` 由程序自动生成和维护，不进入 Git 管理。当前收敛后的本地设置只记录启用/禁用；图或 Buddy 的运行权限另由 `需确认` / `完全访问` 模式控制。
 
-加载 catalog 时，程序应扫描 `official/` 和 `user/`，读取对应根目录的 `settings.local.json`，自动补齐缺失文件、缺失资产条目和缺失字段。多余条目不应自动删除，避免切分支、暂时移动资产或合并团队目录时丢失本地偏好；可以另做“清理无效本地设置”的显式按钮。
+加载 catalog 时，程序应扫描 `official/` 和 `user/`，读取对应根目录的 `settings.json`，自动补齐缺失文件、缺失资产条目和缺失字段。多余条目不应自动删除，避免切分支、暂时移动资产或合并团队目录时丢失本地偏好；可以另做“清理无效本地设置”的显式按钮。
 
-对 Skill 而言，`skill.json` 应只保留能力包定义，例如 `name`、`description`、`llmInstruction`、`version`、`permissions`、`runtime`、`inputSchema`、`outputSchema` 和生命周期脚本文件。`enabled`、`hidden`、`selectable`、`requiresApproval`、`capabilityPolicy`、`targets` 和 `executionTargets` 都属于本地使用策略或旧协议，不应继续写进新 Skill 包定义。`requiresApproval` 的默认本地值可以由程序根据 `permissions` 推导；用户在界面里改动时只写 `skill/settings.local.json`，不反向修改 `skill.json`。
+对 Skill 而言，`skill.json` 应只保留能力包定义，例如 `name`、`description`、`llmInstruction`、`version`、`permissions`、`runtime`、`inputSchema`、`outputSchema` 和生命周期脚本文件。`enabled` 只属于 `skill/settings.json`；`hidden`、`selectable`、`requiresApproval`、`capabilityPolicy`、`targets` 和 `executionTargets` 都是旧协议，不应继续写进新 Skill 包定义。Skill 是否可见由 `enabled` 决定；运行 Skill 本身不需要审批。
 
-这条规则同样适用于图模板和节点预设：模板或预设 JSON 描述结构本体，本地 settings 描述当前是否启用、是否进入能力候选、是否需要确认和界面偏好。GraphiteUI 前端展示的是“资产定义 + 本地设置 + 运行时元数据”合并后的 catalog item，但详情页应清楚标明来源、资产文件路径和本地设置来源。
+这条规则同样适用于图模板和节点预设：模板或预设 JSON 描述结构本体，本地 settings 描述当前是否启用。GraphiteUI 前端展示的是“资产定义 + 本地设置 + 运行时元数据”合并后的 catalog item，但详情页应清楚标明来源、资产文件路径和本地设置来源。
 
 ## Buddy Home
 
@@ -308,8 +308,8 @@ buddy_home/
 
 边界规则：
 
-- 图模板本体不放进 Buddy Home。目标结构中，官方模板位于 `graph_template/official/`，用户自定义模板位于 `graph_template/user/`，本地启用和候选策略位于 `graph_template/settings.local.json`。
-- 用户自定义 Skill 不放进 Buddy Home。目标结构中，官方 Skill 位于 `skill/official/`，用户自定义 Skill 位于 `skill/user/`，本地启用、可选择和确认策略位于 `skill/settings.local.json`。Buddy Home 可以记录候选、草案、使用统计或改进建议。
+- 图模板本体不放进 Buddy Home。目标结构中，官方模板位于 `graph_template/official/`，用户自定义模板位于 `graph_template/user/`，本地启用状态位于 `graph_template/settings.json`。
+- 用户自定义 Skill 不放进 Buddy Home。目标结构中，官方 Skill 位于 `skill/official/`，用户自定义 Skill 位于 `skill/user/`，本地启用状态位于 `skill/settings.json`。Buddy Home 可以记录候选、草案、使用统计或改进建议。
 - 不维护长期 `TOOLS.md`。当前可用能力由启用的 Skill、启用的图模板和 `graphiteui_capability_selector` 读取，避免静态能力文件过期。
 - 自然为空的结构化记录放进 `buddy.db`；自然为空的人类可读复盘放进 `reports/`。
 - Buddy Home 内的资料可以影响伙伴如何选择、解释和组织行动，但不能绕过本地能力设置、local executor policy、图断点、人类审批或后端校验。
@@ -367,12 +367,12 @@ buddy_self_review(读取主运行快照)
 - `name`：用户可见名称。
 - `description`：能力说明与选择条件。
 - `llmInstruction`：LLM 节点已经绑定该技能后，应该如何使用它。
-- `permissions`：执行前需要评估或授权的客观能力需求，例如联网、文件写入、命令执行、图编辑或记忆写入。
+- `permissions`：客观能力需求，例如联网、文件写入、命令执行、图编辑或记忆写入。当前统一审批只拦截写文件、删改文件和执行任意脚本/命令；其他权限用于候选描述、审计和后续策略扩展。
 - `inputSchema` / `outputSchema`：技能入参和结构化输出契约。
 - `before_llm.py`：可选固定入口，在 LLM 生成技能参数前补充上下文，例如当前日期或候选能力清单。
 - `after_llm.py`：可选固定入口，在 LLM 生成技能参数后执行、校验或规范化结果；技能脚本不直接写 state。
 
-本地使用策略不写入 `skill.json`。`enabled`、`hidden`、`selectable`、`requiresApproval`、`capabilityPolicy.default` 和 `capabilityPolicy.origins.<origin>` 应统一进入 `skill/settings.local.json`，由程序自动创建、补齐和维护。
+本地启用状态不写入 `skill.json`。`enabled` 只进入 `skill/settings.json`，由程序自动创建、补齐和维护。`hidden`、`selectable`、`requiresApproval`、`capabilityPolicy.default` 和 `capabilityPolicy.origins.<origin>` 是旧策略字段，不应再出现在新 Skill 包定义或新 settings 中。
 
 旧字段 `label`、`targets`、`executionTargets`、`inputMapping`、静态技能参数 `config`、无意义的 `trigger`、`runPolicies`、`discoverable`、`autoSelectable`、`supportedValueTypes`、`sideEffects`、`health`、`configured`、`healthy`、`kind`、`mode` 和 `scope` 已废弃，出现在当前协议载荷中应被拒绝，而不是悄悄兼容。历史 `capabilityPolicy` 字段也应从新 Skill 包定义中迁出，作为本地 settings registry 的数据处理。
 
@@ -407,7 +407,7 @@ effective_capability =
 - `capability.kind=subgraph` 只表达“选中的一个可运行子图能力”，主要服务伙伴主循环等动态模板。
 - `capability.kind=none` 表达没有合适能力。
 - 一个 LLM 节点不能同时使用卡片 skill 和输入 capability state；冲突时应作为协议错误处理。
-- 真正执行前仍必须通过 skill registry、本地 settings 启用状态、运行时注册状态、可选择策略和审批检查。
+- 真正执行前仍必须通过 skill registry、本地 settings 启用状态、运行时注册状态，以及图/Buddy 对写文件和执行脚本的审批检查。
 - 多个能力调用必须拆成多个节点，由图结构显式编排。
 
 ## 绑定技能的语义
@@ -573,7 +573,7 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 它应该：
 
-- 通过 `before_llm.py` 在 LLM 节点的技能入参规划提示词中列出本地启用模板，以及启用且对当前 `origin` 可选择的 Skill。
+- 通过 `before_llm.py` 在 LLM 节点的技能入参规划提示词中列出本地启用模板和启用的 Skill。
 - 每个候选项必须提供 `kind`、`key`、名称和简短适用场景说明，让模型基于语义选择。
 - 模型负责根据用户需求选择一个 `capability` 入参；选择原则是优先图模板，其次 Skill，没有合适能力则选 `{ "kind": "none" }`。
 - `after_llm.py` 只校验模型选择是否仍在本地可用清单中，并规范化名称和描述。
@@ -663,7 +663,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 - `clarification_prompt`：需要向用户补充询问的问题。
 - `clarification_answer`：用户在断点恢复时写入的澄清回答。
 - `selected_capability`：`capability` 类型，来自 `graphiteui_capability_selector`。
-- `capability_found`：是否找到了启用且可选择的能力。
+- `capability_found`：是否找到了启用的能力。
 - `approval_prompt`：能力执行前需要用户确认的摘要。
 - `approval_decision`：用户审批结果，存在于能力循环子图内部。
 - `capability_result`：`result_package` 类型，动态能力执行唯一输出。
@@ -681,7 +681,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 - `needs_capability`：顶层 condition。读取 `request_understanding.requires_capability`；简单闲聊、身份询问、页面解释等可直接回答的请求绕过能力循环，避免无意义地选择能力和检查权限。
 - `select_capability`：静态绑定 `graphiteui_capability_selector`，根据需求选择一个启用的图模板或 Skill。图模板优先，找不到则输出 `{ "kind": "none" }` 和 `capability_found=false`。
 - `capability_found`：condition。未找到能力时进入直接回复或缺失能力说明；找到能力时进入审批检查。
-- `review_capability_permission`：根据请求风险、伙伴模式和 Buddy Home policy 写审批请求或免审批结论。它不能直接读取 `capability` state；当前协议规定读取 `capability` state 的 LLM 节点就是动态能力执行节点。
+- `review_capability_permission`：根据 `capability_requires_approval` 和伙伴模式写审批请求或免审批结论。它不能直接读取 `capability` state；当前协议规定读取 `capability` state 的 LLM 节点就是动态能力执行节点。`capability_requires_approval` 只代表写文件、删改文件或执行任意脚本/命令风险。
 - `request_capability_approval`：需要人工确认时写 `approval_prompt` 并设置 `interrupt_after`。恢复 payload 写入 `approval_decision`。
 - `execute_capability`：读取 `selected_capability`。该节点只负责生成目标能力的公开输入；runtime 执行 skill 或动态 subgraph，并只写一个 `capability_result`。
 - `review_capability_result`：读取拆包后的 `capability_result`，判断是否已经足够、是否需要继续另一个能力、是否需要向用户解释失败或请求更多信息。
@@ -738,7 +738,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 1. 伙伴运行来源收束：清理启动侧旧元数据，让伙伴图运行统一以 `metadata.origin=buddy` 和显式策略字段表达来源、权限和审计语义。
 2. 动态子图断点传播：补齐 `capability.kind=subgraph` 内部断点的父级暂停、scope path、checkpoint metadata 和 resume 转发。
 3. 伙伴暂停交互：在伙伴浮窗与伙伴页面中复用标准 `awaiting_human` / `/api/runs/{run_id}/resume`，支持澄清、审批、拒绝、取消、刷新找回和队列阻塞。
-4. 动态能力审批：让高风险 Skill 和动态子图执行前进入标准断点确认，审批结果写回 state 并进入 run detail。
+4. 动态能力审批：让涉及写文件、删改文件或执行任意脚本/命令的 Skill 和动态子图按权限模式进入标准断点确认，审批结果写回 state 并进入 run detail。
 5. Buddy Home 写回：把记忆、用户资料、会话摘要、能力使用统计、报告和策略建议写成显式图流程，通过受控 Skill、command、revision 和审批路径落地。
 6. 图编辑命令流：清理或重建 `graph_patch.draft` stub，补齐 GraphCommandBus、图补丁预览、graph revision、undo/redo 和完整审计。
 7. 低层活动事件：实现统一 `activity_events`，让文件读取、搜索、命令执行、脚本测试、写入、下载、图编辑和 Skill/subgraph 执行都能产生程序化摘要。

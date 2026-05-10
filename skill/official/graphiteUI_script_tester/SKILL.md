@@ -19,4 +19,4 @@ Outputs:
 - `success`: Boolean indicating whether the test command exited with code 0.
 - `result`: Markdown result containing command, exit code, duration, stdout, stderr, or validation errors.
 
-The runtime writes only inside a temporary directory, validates file paths, and runs only allowlisted commands. The provided code still executes in the local system environment, so keep approval enabled for untrusted scripts.
+The runtime writes only inside a temporary directory, validates file paths, and runs only allowlisted commands. The provided code still executes in the local system environment. In `需确认` mode, this capability should be approved before running generated or untrusted scripts; in `完全访问` mode, the graph may run it without an extra prompt.

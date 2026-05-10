@@ -423,6 +423,7 @@ class TemplateLayoutTests(unittest.TestCase):
                     "outputMapping": {
                         "capability": "selected_capability",
                         "found": "capability_found",
+                        "requires_approval": "capability_requires_approval",
                     },
                 }
             ],
@@ -433,6 +434,14 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(execute_node["writes"], [{"state": "capability_result", "mode": "replace"}])
         self.assertEqual(cycle_graph["state_schema"]["capability_result"]["type"], "result_package")
         self.assertEqual(cycle_graph["nodes"]["continue_capability_loop"]["config"]["loopLimit"], 3)
+        permission_node = cycle_graph["nodes"]["review_capability_permission"]
+        self.assertIn({"state": "capability_requires_approval", "required": True}, permission_node["reads"])
+        self.assertNotIn({"state": "selected_capability", "required": True}, permission_node["reads"])
+        self.assertIn("capability_requires_approval", permission_node["config"]["taskInstruction"])
+        self.assertIn("buddy_mode is ask_first", permission_node["config"]["taskInstruction"])
+        self.assertIn("buddy_mode is full_access", permission_node["config"]["taskInstruction"])
+        self.assertNotIn("network", permission_node["config"]["taskInstruction"].lower())
+        self.assertNotIn("cost", permission_node["config"]["taskInstruction"].lower())
 
         draft_graph = nodes["draft_final_response"]["config"]["graph"]
         self.assertEqual([node_id for node_id, node in draft_graph["nodes"].items() if node["kind"] == "output"], ["output_final_reply"])

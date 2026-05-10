@@ -615,7 +615,7 @@ const hasCurrentSessionContent = computed(() => messages.value.some((message) =>
 const canCreateNewSession = computed(() => !isSessionSwitchLocked.value && hasCurrentSessionContent.value);
 const buddyModeLabel = computed(() => {
   const option = BUDDY_MODE_OPTIONS.find((candidate) => candidate.value === buddyMode.value);
-  return option ? `${t(option.labelKey)} - ${t(option.descriptionKey)}` : t("buddy.modes.advisory");
+  return option ? `${t(option.labelKey)} - ${t(option.descriptionKey)}` : t("buddy.modes.askFirst");
 });
 const buddyModelLabel = computed(() => {
   const option = buddyModelOptions.value.find((candidate) => candidate.value === buddyModelRef.value);

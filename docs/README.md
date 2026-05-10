@@ -17,7 +17,7 @@
 - [../skill/SKILL_AUTHORING_GUIDE.md](../skill/SKILL_AUTHORING_GUIDE.md)
   - Skill 包结构、生命周期入口和权限边界
   - 手工创建 Skill 与后续技能生成能力都应读取的协议说明
-  - 记录 Skill 包定义与 `skill/settings.local.json` 本地使用设定分离的目标结构
+  - 记录 Skill 包定义与 `skill/settings.json` 本地使用设定分离的目标结构
 
 - [future/buddy-autonomous-agent-roadmap.md](future/buddy-autonomous-agent-roadmap.md)
   - 伙伴、自主工具循环、技能生成和长期协作能力的唯一长期参考

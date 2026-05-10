@@ -58,12 +58,12 @@ def save_profile(payload: dict[str, Any], *, changed_by: str, change_reason: str
 
 
 def load_policy() -> dict[str, Any]:
-    return _read_dict(POLICY_PATH, DEFAULT_POLICY)
+    return _normalize_policy(_read_dict(POLICY_PATH, DEFAULT_POLICY))
 
 
 def save_policy(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
     previous = load_policy()
-    next_value = {**previous, **_clean_dict(payload), "graph_permission_mode": "advisory"}
+    next_value = _normalize_policy({**previous, **_clean_dict(payload)})
     _write_with_revision("policy", "policy", "update", previous, next_value, changed_by, change_reason)
     _write_json(POLICY_PATH, next_value)
     return load_policy()
@@ -431,7 +431,7 @@ def restore_revision(revision_id: str, *, changed_by: str, change_reason: str) -
         (BUDDY_HOME_DIR / SOUL_PATH).write_text(render_profile_markdown(restored), encoding="utf-8")
     elif target_type == "policy":
         current = load_policy()
-        restored["graph_permission_mode"] = "advisory"
+        restored = _normalize_policy(restored)
         _write_with_revision("policy", "policy", "restore", current, restored, changed_by, change_reason)
         _write_json(POLICY_PATH, restored)
     elif target_type == "memory":
@@ -589,6 +589,15 @@ def _sync_memory_markdown() -> None:
 def _read_dict(file_name: str, default: dict[str, Any]) -> dict[str, Any]:
     value = read_json_file(buddy_home_path(file_name), default=deepcopy(default))
     return value if isinstance(value, dict) else deepcopy(default)
+
+
+def _normalize_policy(payload: dict[str, Any]) -> dict[str, Any]:
+    mode = payload.get("graph_permission_mode")
+    if mode == "full_access" or mode == "unrestricted":
+        graph_permission_mode = "full_access"
+    else:
+        graph_permission_mode = "ask_first"
+    return {**deepcopy(DEFAULT_POLICY), **payload, "graph_permission_mode": graph_permission_mode}
 
 
 def _write_json(file_name: str, payload: Any) -> None:

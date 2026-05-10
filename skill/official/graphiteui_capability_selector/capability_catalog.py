@@ -9,6 +9,15 @@ from typing import Any
 
 SKILL_KEY = "graphiteui_capability_selector"
 DEFAULT_ORIGIN = "buddy"
+WRITE_OR_SCRIPT_PERMISSIONS = {
+    "command_execute",
+    "file_delete",
+    "file_write",
+    "local_file_write",
+    "script_execute",
+    "shell",
+    "subprocess",
+}
 
 
 def build_capability_catalog_context(*, origin: str = DEFAULT_ORIGIN) -> str:
@@ -57,13 +66,17 @@ def normalize_selected_capability(**skill_inputs: Any) -> dict[str, Any]:
     if candidate is None:
         return _none_response()
 
+    requires_approval = bool(candidate.get("requiresApproval", False))
     return {
         "found": True,
+        "requires_approval": requires_approval,
         "capability": {
             "kind": candidate["kind"],
             "key": candidate["key"],
             "name": candidate["name"],
             "description": candidate["description"],
+            "permissions": list(candidate.get("permissions") or []),
+            "requiresApproval": requires_approval,
         }
     }
 
@@ -92,7 +105,8 @@ def _coerce_capability(value: Any) -> dict[str, str]:
 def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], list[str]]:
     candidates: list[dict[str, Any]] = []
     errors: list[str] = []
-    settings_entries = _load_asset_settings(repo_root / "graph_template" / "settings.local.json")
+    settings_entries = _load_asset_settings(repo_root / "graph_template" / "settings.json")
+    skill_permissions = _load_skill_permission_map(repo_root)
     roots = [
         ("official", repo_root / "graph_template" / "official"),
         ("user", repo_root / "graph_template" / "user"),
@@ -112,6 +126,7 @@ def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], li
                 continue
             if _is_template_hidden_from_capability_selector(payload):
                 continue
+            permissions = _template_permissions(payload, skill_permissions)
             candidates.append(
                 {
                     "kind": "subgraph",
@@ -119,6 +134,8 @@ def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], li
                     "name": _compact_text(payload.get("label") or payload.get("default_graph_name") or template_id),
                     "description": _compact_text(payload.get("description")),
                     "source": source,
+                    "permissions": permissions,
+                    "requiresApproval": _requires_approval_for_permissions(permissions),
                 }
             )
     return candidates, errors
@@ -127,7 +144,7 @@ def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], li
 def _load_skill_candidates(repo_root: Path, *, origin: str) -> tuple[list[dict[str, Any]], list[str]]:
     candidates: list[dict[str, Any]] = []
     errors: list[str] = []
-    settings_entries = _load_asset_settings(repo_root / "skill" / "settings.local.json")
+    settings_entries = _load_asset_settings(repo_root / "skill" / "settings.json")
     seen_keys: set[str] = set()
     roots = [
         ("official", repo_root / "skill" / "official"),
@@ -151,10 +168,9 @@ def _load_skill_candidates(repo_root: Path, *, origin: str) -> tuple[list[dict[s
             settings_entry = settings_entries.get(skill_key)
             if not _is_asset_enabled(settings_entry):
                 continue
-            if not _is_skill_selectable_for_origin(settings_entry, origin):
-                continue
             if _skill_readiness_error(skill_dir, payload):
                 continue
+            permissions = _normalize_permissions(payload.get("permissions"))
             candidates.append(
                 {
                     "kind": "skill",
@@ -162,6 +178,8 @@ def _load_skill_candidates(repo_root: Path, *, origin: str) -> tuple[list[dict[s
                     "name": _compact_text(payload.get("name") or skill_key),
                     "description": _compact_text(payload.get("description")),
                     "source": source,
+                    "permissions": permissions,
+                    "requiresApproval": _requires_approval_for_permissions(permissions),
                 }
             )
     return candidates, errors
@@ -187,16 +205,6 @@ def _is_asset_enabled(settings_entry: Any) -> bool:
     if not isinstance(settings_entry, dict):
         return True
     return settings_entry.get("enabled", True) is not False
-
-
-def _is_skill_selectable_for_origin(settings_entry: Any, origin: str) -> bool:
-    if not isinstance(settings_entry, dict):
-        return True
-    origins = settings_entry.get("origins") if isinstance(settings_entry.get("origins"), dict) else {}
-    default_policy = origins.get("default") if isinstance(origins.get("default"), dict) else {}
-    origin_policy = origins.get(origin) if isinstance(origins.get(origin), dict) else {}
-    selectable = origin_policy.get("selectable", default_policy.get("selectable", True))
-    return bool(selectable)
 
 
 def _is_template_hidden_from_capability_selector(payload: dict[str, Any]) -> bool:
@@ -226,8 +234,71 @@ def _resolve_repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
+def _load_skill_permission_map(repo_root: Path) -> dict[str, list[str]]:
+    permissions_by_key: dict[str, list[str]] = {}
+    for root in [repo_root / "skill" / "official", repo_root / "skill" / "user"]:
+        if not root.exists():
+            continue
+        for manifest_path in sorted(root.glob("*/skill.json"), key=lambda item: item.parent.name.lower()):
+            payload, error = _read_json_object(manifest_path)
+            if error:
+                continue
+            skill_key = _compact_text(payload.get("skillKey") or payload.get("skill_key") or manifest_path.parent.name)
+            if skill_key and skill_key not in permissions_by_key:
+                permissions_by_key[skill_key] = _normalize_permissions(payload.get("permissions"))
+    return permissions_by_key
+
+
+def _template_permissions(payload: dict[str, Any], skill_permissions: dict[str, list[str]]) -> list[str]:
+    permissions: list[str] = []
+    metadata = payload.get("metadata")
+    if isinstance(metadata, dict):
+        permissions.extend(_normalize_permissions(metadata.get("permissions")))
+    permissions.extend(_permissions_from_nodes(payload.get("nodes"), skill_permissions))
+    return _unique_permissions(permissions)
+
+
+def _permissions_from_nodes(nodes: Any, skill_permissions: dict[str, list[str]]) -> list[str]:
+    if not isinstance(nodes, dict):
+        return []
+    permissions: list[str] = []
+    for node in nodes.values():
+        if not isinstance(node, dict):
+            continue
+        config = node.get("config") if isinstance(node.get("config"), dict) else {}
+        skill_key = _compact_text(config.get("skillKey") or config.get("skill_key"))
+        if skill_key:
+            permissions.extend(skill_permissions.get(skill_key, []))
+        subgraph = config.get("graph")
+        if isinstance(subgraph, dict):
+            permissions.extend(_permissions_from_nodes(subgraph.get("nodes"), skill_permissions))
+    return permissions
+
+
+def _normalize_permissions(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return _unique_permissions(_compact_text(item) for item in value)
+
+
+def _unique_permissions(values: Any) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        permission = _compact_text(value)
+        if not permission or permission in seen:
+            continue
+        seen.add(permission)
+        result.append(permission)
+    return result
+
+
+def _requires_approval_for_permissions(permissions: list[str]) -> bool:
+    return bool(set(permissions) & WRITE_OR_SCRIPT_PERMISSIONS)
+
+
 def _none_response() -> dict[str, Any]:
-    return {"found": False, "capability": {"kind": "none"}}
+    return {"found": False, "requires_approval": False, "capability": {"kind": "none"}}
 
 
 def _format_candidate_lines(candidates: list[dict[str, Any]]) -> list[str]:
@@ -239,6 +310,8 @@ def _format_candidate_lines(candidates: list[dict[str, Any]]) -> list[str]:
                 f"  key: {candidate['key']}",
                 f"  name: {candidate['name']}",
                 f"  whenToUse: {candidate['description'] or candidate['name']}",
+                f"  requiresApproval: {str(bool(candidate.get('requiresApproval'))).lower()}",
+                f"  permissions: {', '.join(candidate.get('permissions') or []) or 'none'}",
             ]
         )
     return lines

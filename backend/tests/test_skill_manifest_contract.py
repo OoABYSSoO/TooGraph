@@ -84,7 +84,7 @@ class SkillManifestContractTests(unittest.TestCase):
             manifest = _write_manifest(skill_dir, payload)
             (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
 
-            with self.assertRaisesRegex(ValueError, "capabilityPolicy.*settings.local.json"):
+            with self.assertRaisesRegex(ValueError, "capabilityPolicy.*settings.json"):
                 _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
 
     def test_native_manifest_exposes_runtime_and_ready_eligibility(self) -> None:
@@ -164,7 +164,7 @@ class SkillManifestContractTests(unittest.TestCase):
 
     def test_legacy_skill_protocol_fields_are_rejected(self) -> None:
         legacy_fields = {
-            "runPolicies": "skill/settings.local.json",
+            "runPolicies": "skill/settings.json",
             "supportedValueTypes": "outputSchema",
             "sideEffects": "permissions",
             "kind": "no longer supported",

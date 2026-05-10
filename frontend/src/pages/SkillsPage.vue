@@ -46,8 +46,8 @@
           <strong>{{ overview.active }}</strong>
         </article>
         <article class="skills-page__metric">
-          <span>{{ t("skills.selectableSkills") }}</span>
-          <strong>{{ overview.selectableSkills }}</strong>
+          <span>{{ t("skills.visibleSkills") }}</span>
+          <strong>{{ overview.visibleSkills }}</strong>
         </article>
       </section>
 
@@ -99,7 +99,7 @@
               </button>
               <ElSwitch
                 :model-value="skill.status === 'active'"
-                :disabled="!skill.canManage || actionSkillKey === skill.skillKey"
+                :disabled="actionSkillKey === skill.skillKey"
                 :aria-label="enabledToggleLabel(skill)"
                 @change="setSkillEnabled(skill, Boolean($event))"
               />
@@ -134,41 +134,6 @@
             </div>
 
             <div class="skills-page__taxonomy">
-              <section>
-                <h4>{{ t("skills.capabilityPolicy") }}</h4>
-                <div class="skills-page__policy-grid">
-                  <div
-                    v-for="entry in capabilityPolicyOriginEntries(selectedSkill)"
-                    :key="entry.origin"
-                    class="skills-page__policy-row"
-                  >
-                    <div class="skills-page__policy-origin">
-                      <span>{{ entry.origin }}</span>
-                      <small>
-                        {{ entry.origin === "default" ? t("skills.policyDefaultOrigin") : t("skills.policyNamedOrigin", { origin: entry.origin }) }}
-                      </small>
-                    </div>
-                    <label class="skills-page__policy-control">
-                      <span>{{ t("skills.policySelectable") }}</span>
-                      <ElSwitch
-                        :model-value="entry.policy.selectable"
-                        :disabled="policyActionKey === policyActionEntryKey(selectedSkill.skillKey, entry.origin, 'selectable')"
-                        :aria-label="capabilityPolicySwitchLabel(entry.origin, 'selectable')"
-                        @change="setSkillCapabilityPolicy(selectedSkill, entry.origin, 'selectable', Boolean($event))"
-                      />
-                    </label>
-                    <label class="skills-page__policy-control">
-                      <span>{{ t("skills.policyRequiresApproval") }}</span>
-                      <ElSwitch
-                        :model-value="entry.policy.requiresApproval"
-                        :disabled="policyActionKey === policyActionEntryKey(selectedSkill.skillKey, entry.origin, 'requiresApproval')"
-                        :aria-label="capabilityPolicySwitchLabel(entry.origin, 'requiresApproval')"
-                        @change="setSkillCapabilityPolicy(selectedSkill, entry.origin, 'requiresApproval', Boolean($event))"
-                      />
-                    </label>
-                  </div>
-                </div>
-              </section>
               <section>
                 <h4>{{ t("skills.version") }}</h4>
                 <div class="skills-page__badges">
@@ -275,7 +240,6 @@ import {
   fetchSkillFileContent,
   fetchSkillFiles,
   importSkillUpload,
-  updateSkillCapabilityPolicy,
   updateSkillStatus,
 } from "@/api/skills";
 import AppShell from "@/layouts/AppShell.vue";
@@ -285,7 +249,6 @@ import {
   buildSkillOverview,
   buildSkillStatusOptions,
   filterSkillsForManagement,
-  listSkillCapabilityPolicies,
   type SkillStatusFilter,
 } from "./skillsPageModel.ts";
 
@@ -298,7 +261,6 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const actionError = ref<string | null>(null);
 const actionSkillKey = ref<string | null>(null);
-const policyActionKey = ref<string | null>(null);
 const confirmingSkillDeleteKey = ref<string | null>(null);
 const importMode = ref<"archive" | "folder" | null>(null);
 const skillArchiveInput = ref<HTMLInputElement | null>(null);
@@ -371,18 +333,6 @@ function enabledToggleLabel(skill: SkillDefinition) {
   return skill.status === "active" ? t("skills.disable") : t("skills.enable");
 }
 
-function capabilityPolicyOriginEntries(skill: SkillDefinition) {
-  return listSkillCapabilityPolicies(skill);
-}
-
-function capabilityPolicySwitchLabel(origin: string, policy: "selectable" | "requiresApproval") {
-  return t(policy === "selectable" ? "skills.policySelectableSwitchLabel" : "skills.policyApprovalSwitchLabel", { origin });
-}
-
-function policyActionEntryKey(skillKey: string, origin: string, policy: "selectable" | "requiresApproval") {
-  return `${skillKey}:${origin}:${policy}`;
-}
-
 async function importUploadedSkill(event: Event, mode: "archive" | "folder") {
   const input = event.target as HTMLInputElement;
   const files = Array.from(input.files ?? []);
@@ -418,42 +368,6 @@ async function setSkillStatus(skill: SkillDefinition, status: SkillDefinition["s
     actionError.value = updateError instanceof Error ? updateError.message : t("common.loading");
   } finally {
     actionSkillKey.value = null;
-  }
-}
-
-async function setSkillCapabilityPolicy(
-  skill: SkillDefinition,
-  origin: string,
-  policy: "selectable" | "requiresApproval",
-  enabled: boolean,
-) {
-  const actionKey = policyActionEntryKey(skill.skillKey, origin, policy);
-  policyActionKey.value = actionKey;
-  actionError.value = null;
-  confirmingSkillDeleteKey.value = null;
-  const capabilityPolicy: SkillDefinition["capabilityPolicy"] = {
-    default: { ...skill.capabilityPolicy.default },
-    origins: Object.fromEntries(
-      Object.entries(skill.capabilityPolicy.origins).map(([entryOrigin, entryPolicy]) => [
-        entryOrigin,
-        { ...entryPolicy },
-      ]),
-    ),
-  };
-  if (origin === "default") {
-    capabilityPolicy.default[policy] = enabled;
-  } else {
-    capabilityPolicy.origins[origin] = {
-      ...(capabilityPolicy.origins[origin] ?? capabilityPolicy.default),
-      [policy]: enabled,
-    };
-  }
-  try {
-    replaceSkill(await updateSkillCapabilityPolicy(skill.skillKey, capabilityPolicy));
-  } catch (updateError) {
-    actionError.value = updateError instanceof Error ? updateError.message : t("common.loading");
-  } finally {
-    policyActionKey.value = null;
   }
 }
 
@@ -918,50 +832,6 @@ onMounted(loadSkills);
   gap: 12px;
 }
 
-.skills-page__policy-grid {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-.skills-page__policy-row {
-  display: grid;
-  grid-template-columns: minmax(92px, 1fr) repeat(2, minmax(118px, auto));
-  gap: 10px;
-  align-items: center;
-  min-width: 0;
-  border: 1px solid rgba(154, 52, 18, 0.08);
-  border-radius: 14px;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.38);
-}
-
-.skills-page__policy-origin {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.skills-page__policy-origin span {
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-mono);
-  font-size: 0.84rem;
-}
-
-.skills-page__policy-origin small,
-.skills-page__policy-control span {
-  color: rgba(60, 41, 20, 0.62);
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-
-.skills-page__policy-control {
-  display: grid;
-  justify-items: end;
-  gap: 6px;
-  min-width: 0;
-}
-
 .skills-page__badges span,
 .skills-page__schema-list span,
 .skills-page__file-pill {
@@ -1175,17 +1045,6 @@ onMounted(loadSkills);
   .skills-page__taxonomy,
   .skills-page__columns {
     grid-template-columns: 1fr;
-  }
-
-  .skills-page__policy-row {
-    grid-template-columns: 1fr;
-    align-items: start;
-  }
-
-  .skills-page__policy-control {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    justify-items: stretch;
   }
 
   .skills-page__detail,

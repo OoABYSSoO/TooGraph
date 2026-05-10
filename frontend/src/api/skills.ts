@@ -1,6 +1,6 @@
-import type { SkillCapabilityPolicies, SkillDefinition, SkillFileContentResponse, SkillFileTreeResponse } from "@/types/skills";
+import type { SkillDefinition, SkillFileContentResponse, SkillFileTreeResponse } from "@/types/skills";
 
-import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm } from "./http.ts";
+import { apiDelete, apiGet, apiPost, apiPostForm } from "./http.ts";
 
 export async function fetchSkillDefinitions(): Promise<SkillDefinition[]> {
   return apiGet<SkillDefinition[]>("/api/skills/definitions");
@@ -33,13 +33,6 @@ export async function importSkillUpload(files: File[], relativePaths: string[] =
 export async function updateSkillStatus(skillKey: string, status: SkillDefinition["status"]): Promise<SkillDefinition> {
   const action = status === "active" ? "enable" : "disable";
   return apiPost<SkillDefinition>(`/api/skills/${skillKey}/${action}`, null);
-}
-
-export async function updateSkillCapabilityPolicy(
-  skillKey: string,
-  capabilityPolicy: SkillCapabilityPolicies,
-): Promise<SkillDefinition> {
-  return apiPatch<SkillDefinition>(`/api/skills/${skillKey}/settings`, { capabilityPolicy });
 }
 
 export async function deleteSkill(skillKey: string): Promise<{ skillKey: string; status: "deleted" }> {

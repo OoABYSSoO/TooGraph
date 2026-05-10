@@ -7,7 +7,7 @@ export type BuddyProfile = {
 };
 
 export type BuddyPolicy = {
-  graph_permission_mode: "advisory";
+  graph_permission_mode: "ask_first" | "full_access";
   behavior_boundaries: string[];
   communication_preferences: string[];
 };

@@ -235,11 +235,11 @@ def _parse_runtime_spec(payload: object) -> SkillRuntimeSpec:
 def _reject_legacy_targets(payload: object) -> None:
     if isinstance(payload, dict) and "targets" in payload:
         raise ValueError(
-            "Skill manifest field 'targets' is no longer supported. Use skill/settings.local.json for local usage policy."
+            "Skill manifest field 'targets' is no longer supported. Skill visibility is controlled by skill/settings.json."
         )
     if isinstance(payload, dict) and "executionTargets" in payload:
         raise ValueError(
-            "Skill manifest field 'executionTargets' is no longer supported. Use skill/settings.local.json for local usage policy."
+            "Skill manifest field 'executionTargets' is no longer supported. Skill visibility is controlled by skill/settings.json."
         )
 
 
@@ -270,17 +270,17 @@ def _reject_legacy_skill_protocol_fields(payload: object) -> None:
     if not isinstance(payload, dict):
         return
     legacy_fields = {
-        "capabilityPolicy": "skill/settings.local.json",
-        "capability_policy": "skill/settings.local.json",
-        "runPolicies": "skill/settings.local.json",
-        "run_policies": "skill/settings.local.json",
+        "capabilityPolicy": "graph or Buddy permission mode; visibility uses skill/settings.json",
+        "capability_policy": "graph or Buddy permission mode; visibility uses skill/settings.json",
+        "runPolicies": "graph or Buddy permission mode; visibility uses skill/settings.json",
+        "run_policies": "graph or Buddy permission mode; visibility uses skill/settings.json",
         "supportedValueTypes": "outputSchema",
         "supported_value_types": "output_schema",
         "sideEffects": "permissions",
         "side_effects": "permissions",
-        "health": "skill/settings.local.json and runtime readiness",
-        "configured": "skill/settings.local.json and runtime readiness",
-        "healthy": "skill/settings.local.json and runtime readiness",
+        "health": "skill/settings.json and runtime readiness",
+        "configured": "skill/settings.json and runtime readiness",
+        "healthy": "skill/settings.json and runtime readiness",
         "kind": "no longer supported",
         "mode": "no longer supported",
         "scope": "no longer supported",

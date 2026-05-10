@@ -30,9 +30,9 @@
     },
     "buddy_mode": {
       "name": "buddy_mode",
-      "description": "伙伴运行模式，例如 chat 或 approval。",
+      "description": "Buddy permission mode: ask_first or full_access.",
       "type": "text",
-      "value": "chat",
+      "value": "ask_first",
       "color": "#7c3aed",
       "binding": null
     },
@@ -127,6 +127,20 @@
       "value": "",
       "color": "#16a34a",
       "binding": null
+    },
+    "capability_requires_approval": {
+      "name": "capability_requires_approval",
+      "description": "Whether the selected capability may write/delete files or execute arbitrary scripts or commands.",
+      "type": "boolean",
+      "value": false,
+      "color": "#ea580c",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteui_capability_selector",
+        "nodeId": "select_capability",
+        "fieldKey": "requires_approval",
+        "managed": true
+      }
     }
   },
   "nodes": {
@@ -872,9 +886,9 @@
             },
             "buddy_mode": {
               "name": "buddy_mode",
-              "description": "伙伴运行模式。",
+              "description": "Buddy permission mode: ask_first or full_access.",
               "type": "text",
-              "value": "chat",
+              "value": "ask_first",
               "color": "#7c3aed",
               "binding": null
             },
@@ -977,6 +991,20 @@
               "value": "",
               "color": "#d97706",
               "binding": null
+            },
+            "capability_requires_approval": {
+              "name": "capability_requires_approval",
+              "description": "Whether the selected capability may write/delete files or execute arbitrary scripts or commands.",
+              "type": "boolean",
+              "value": false,
+              "color": "#ea580c",
+              "binding": {
+                "kind": "skill_output",
+                "skillKey": "graphiteui_capability_selector",
+                "nodeId": "select_capability",
+                "fieldKey": "requires_approval",
+                "managed": true
+              }
             }
           },
           "nodes": {
@@ -1170,7 +1198,8 @@
                     "skillKey": "graphiteui_capability_selector",
                     "outputMapping": {
                       "capability": "selected_capability",
-                      "found": "capability_found"
+                      "found": "capability_found",
+                      "requires_approval": "capability_requires_approval"
                     }
                   }
                 ],
@@ -1286,6 +1315,10 @@
                 {
                   "state": "request_understanding",
                   "required": true
+                },
+                {
+                  "state": "capability_requires_approval",
+                  "required": true
                 }
               ],
               "writes": [
@@ -1302,7 +1335,7 @@
                 "skillKey": "",
                 "skillBindings": [],
                 "skillInstructionBlocks": {},
-                "taskInstruction": "输出 approval_review JSON 和 approval_prompt Markdown。approval_review 必须包含 requires_approval(boolean)、approved(boolean)、reason、risk_summary。若 buddy_mode 为 approval，或当前请求可能写文件、执行脚本、联网、产生费用、修改图或修改长期记忆，则 requires_approval=true 且 approved=false；否则 requires_approval=false 且 approved=true。approval_prompt 用简短清单说明将执行已选择的能力、原因、输入概要和风险。",
+                "taskInstruction": "Output approval_review JSON and approval_prompt Markdown. approval_review must include requires_approval(boolean), approved(boolean), reason, and risk_summary. Set requires_approval=true and approved=false only when buddy_mode is ask_first and capability_requires_approval is true. capability_requires_approval means the selected capability may write/delete files or execute arbitrary scripts or commands. When buddy_mode is full_access, set requires_approval=false and approved=true. Normal Skill calls, reads, searches, page access, and LLM calls do not require approval by themselves. Keep approval_prompt short and describe the capability, reason, input summary, and the file-write or script risk that needs confirmation.",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "high",

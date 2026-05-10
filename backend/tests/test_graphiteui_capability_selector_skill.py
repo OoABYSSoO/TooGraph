@@ -63,7 +63,7 @@ def _write_template(
     )
     if status != "active":
         _write_settings(
-            repo_root / "graph_template" / "settings.local.json",
+            repo_root / "graph_template" / "settings.json",
             "graphiteui.template-settings/v1",
             template_id,
             {"enabled": False},
@@ -79,6 +79,7 @@ def _write_skill(
     source: str = "official",
     selectable: bool = True,
     status: str = "active",
+    permissions: list[str] | None = None,
 ) -> None:
     skill_dir = repo_root / "skill" / source / skill_key
     _write_json(
@@ -90,7 +91,7 @@ def _write_skill(
             "description": description,
             "llmInstruction": "Generate skill inputs from the current graph state.",
             "version": "1.0.0",
-            "permissions": ["network"] if "search" in description.lower() else [],
+            "permissions": permissions if permissions is not None else (["network"] if "search" in description.lower() else []),
             "inputSchema": [{"key": "query", "name": "Query", "valueType": "text", "required": True}],
             "outputSchema": [{"key": "result", "name": "Result", "valueType": "json"}],
         },
@@ -98,7 +99,7 @@ def _write_skill(
     (skill_dir / "after_llm.py").write_text("import json\nprint(json.dumps({'result': {}}))\n", encoding="utf-8")
     if status != "active" or not selectable:
         _write_settings(
-            repo_root / "skill" / "settings.local.json",
+            repo_root / "skill" / "settings.json",
             "graphiteui.skill-settings/v1",
             skill_key,
             {
@@ -111,6 +112,31 @@ def _write_skill(
         )
 
 
+def _add_template_skill_node(repo_root: Path, template_id: str, skill_key: str) -> None:
+    template_path = repo_root / "graph_template" / "official" / template_id / "template.json"
+    payload = json.loads(template_path.read_text(encoding="utf-8"))
+    payload["nodes"] = {
+        "run_skill": {
+            "id": "run_skill",
+            "kind": "agent",
+            "name": "Run Skill",
+            "description": "",
+            "position": {"x": 0, "y": 0},
+            "size": {"width": 320, "height": 220},
+            "reads": [],
+            "writes": [],
+            "config": {
+                "prompt": "",
+                "modelSource": "global",
+                "model": "",
+                "skillKey": skill_key,
+                "skillBindings": [],
+            },
+        }
+    }
+    template_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
     def test_manifest_declares_capability_and_found_outputs(self) -> None:
         manifest = json.loads((SELECTOR_SKILL_DIR / "skill.json").read_text(encoding="utf-8"))
@@ -120,7 +146,7 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
         self.assertNotIn("capabilityPolicy", manifest)
         self.assertEqual(manifest["timeoutSeconds"], 30)
         self.assertEqual(capability_inputs[0]["valueType"], "capability")
-        self.assertEqual([field["key"] for field in manifest["outputSchema"]], ["capability", "found"])
+        self.assertEqual([field["key"] for field in manifest["outputSchema"]], ["capability", "found", "requires_approval"])
 
     def test_before_llm_lists_available_templates_and_skills_for_llm_choice(self) -> None:
         selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "graphiteui_capability_selector_before_test")
@@ -143,7 +169,7 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                 skill_key="blocked_skill",
                 name="Blocked Skill",
                 description="This should not appear.",
-                selectable=False,
+                status="disabled",
             )
             with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
                 result = selector.graphiteui_capability_selector_before_llm(graph_state={})
@@ -180,8 +206,9 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                     capability={"kind": "subgraph", "key": "advanced_web_research_loop"},
                 )
 
-        self.assertEqual(set(result), {"capability", "found"})
+        self.assertEqual(set(result), {"capability", "found", "requires_approval"})
         self.assertTrue(result["found"])
+        self.assertFalse(result["requires_approval"])
         self.assertEqual(result["capability"]["kind"], "subgraph")
         self.assertEqual(result["capability"]["key"], "advanced_web_research_loop")
         self.assertEqual(result["capability"]["name"], "Advanced Web Research")
@@ -208,13 +235,14 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                     capability={"kind": "skill", "key": "web_search"},
                 )
 
-        self.assertEqual(set(result), {"capability", "found"})
+        self.assertEqual(set(result), {"capability", "found", "requires_approval"})
         self.assertTrue(result["found"])
+        self.assertFalse(result["requires_approval"])
         self.assertEqual(result["capability"]["kind"], "skill")
         self.assertEqual(result["capability"]["key"], "web_search")
         self.assertEqual(result["capability"]["name"], "Web Search")
 
-    def test_selector_ignores_disabled_and_nonselectable_capabilities(self) -> None:
+    def test_selector_ignores_disabled_capabilities_but_not_legacy_selectable_policy(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "graphiteui_capability_selector_after_test_disabled")
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
@@ -234,14 +262,85 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                 selectable=False,
             )
             with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
-                result = selector.graphiteui_capability_selector(
+                disabled_result = selector.graphiteui_capability_selector(
+                    requirement="Search for materials.",
+                    capability={"kind": "subgraph", "key": "disabled_research"},
+                )
+                enabled_legacy_result = selector.graphiteui_capability_selector(
                     requirement="Search for materials.",
                     capability={"kind": "skill", "key": "web_search"},
                 )
 
-        self.assertEqual(set(result), {"capability", "found"})
-        self.assertFalse(result["found"])
-        self.assertEqual(result["capability"], {"kind": "none"})
+        self.assertEqual(set(disabled_result), {"capability", "found", "requires_approval"})
+        self.assertFalse(disabled_result["found"])
+        self.assertFalse(disabled_result["requires_approval"])
+        self.assertEqual(disabled_result["capability"], {"kind": "none"})
+        self.assertTrue(enabled_legacy_result["found"])
+        self.assertEqual(enabled_legacy_result["capability"]["key"], "web_search")
+
+    def test_selector_marks_only_write_or_script_capabilities_as_requiring_approval(self) -> None:
+        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "graphiteui_capability_selector_after_test_permissions")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _write_skill(
+                repo_root,
+                skill_key="web_search",
+                name="Web Search",
+                description="Search public web pages.",
+                permissions=["network", "browser_automation"],
+            )
+            _write_skill(
+                repo_root,
+                skill_key="local_workspace_executor",
+                name="Local Workspace Executor",
+                description="Write files or execute local scripts.",
+                permissions=["file_read", "file_write", "subprocess"],
+            )
+            _write_template(
+                repo_root,
+                template_id="advanced_web_research_loop",
+                label="Advanced Web Research",
+                description="Multi-round web research.",
+            )
+            _add_template_skill_node(repo_root, "advanced_web_research_loop", "web_search")
+            _write_template(
+                repo_root,
+                template_id="write_workspace_file",
+                label="Write Workspace File",
+                description="Write a local artifact.",
+            )
+            _add_template_skill_node(repo_root, "write_workspace_file", "local_workspace_executor")
+
+            with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
+                web_skill = selector.graphiteui_capability_selector(
+                    requirement="Need current information.",
+                    capability={"kind": "skill", "key": "web_search"},
+                )
+                write_skill = selector.graphiteui_capability_selector(
+                    requirement="Write a report file.",
+                    capability={"kind": "skill", "key": "local_workspace_executor"},
+                )
+                web_template = selector.graphiteui_capability_selector(
+                    requirement="Research current information.",
+                    capability={"kind": "subgraph", "key": "advanced_web_research_loop"},
+                )
+                write_template = selector.graphiteui_capability_selector(
+                    requirement="Write a workspace file.",
+                    capability={"kind": "subgraph", "key": "write_workspace_file"},
+                )
+
+        self.assertEqual(web_skill["capability"]["permissions"], ["network", "browser_automation"])
+        self.assertFalse(web_skill["capability"]["requiresApproval"])
+        self.assertFalse(web_skill["requires_approval"])
+        self.assertEqual(write_skill["capability"]["permissions"], ["file_read", "file_write", "subprocess"])
+        self.assertTrue(write_skill["capability"]["requiresApproval"])
+        self.assertTrue(write_skill["requires_approval"])
+        self.assertEqual(web_template["capability"]["permissions"], ["network", "browser_automation"])
+        self.assertFalse(web_template["capability"]["requiresApproval"])
+        self.assertFalse(web_template["requires_approval"])
+        self.assertEqual(write_template["capability"]["permissions"], ["file_read", "file_write", "subprocess"])
+        self.assertTrue(write_template["capability"]["requiresApproval"])
+        self.assertTrue(write_template["requires_approval"])
 
     def test_selector_does_not_match_requirement_without_llm_selected_capability(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "graphiteui_capability_selector_after_test_none")
@@ -256,8 +355,9 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
             with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": temp_dir}, clear=True):
                 result = selector.graphiteui_capability_selector(requirement="Research materials.")
 
-        self.assertEqual(set(result), {"capability", "found"})
+        self.assertEqual(set(result), {"capability", "found", "requires_approval"})
         self.assertFalse(result["found"])
+        self.assertFalse(result["requires_approval"])
         self.assertEqual(result["capability"], {"kind": "none"})
 
 

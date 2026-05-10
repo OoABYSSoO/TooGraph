@@ -45,4 +45,4 @@ Default policy:
 - Execute roots: `backend/data/tmp`, `skill/user`.
 - Execute extensions: `.py`, `.js`, `.mjs`, `.sh`, `.bat`, `.ps1`.
 
-Execution is not an OS sandbox. It is constrained by path policy before launch, but the launched script still runs as a local process, so this skill requires approval.
+Execution is not an OS sandbox. It is constrained by path policy before launch, but the launched script still runs as a local process. In `需确认` mode, `write` and `execute` operations must be approved before execution; in `完全访问` mode, the graph may run them without an extra prompt. Plain `read` operations do not require approval by themselves.
