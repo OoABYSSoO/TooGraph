@@ -20,13 +20,13 @@ These instructions apply to all work in this repository and should persist acros
 
 ## Local LLM Runtime
 
-- Standardize local LLM/runtime guidance on an OpenAI-compatible custom provider.
+- Standardize local LLM/runtime guidance on the Model Providers page.
 - Preferred local or private gateway flow:
   - Start the OpenAI-compatible gateway you want to use.
-  - Use the base URL configured in the Model Providers page when one exists; the current local default is `http://127.0.0.1:8888/v1`.
-  - `LOCAL_BASE_URL=<OpenAI-compatible base URL, for example http://127.0.0.1:8888/v1>`
-  - `LOCAL_API_KEY=<optional api key>`
-  - `LOCAL_TEXT_MODEL=<model name exposed by your gateway>`
+  - Configure the `local` / Custom OpenAI-compatible Provider in the Model Providers page; the current local default base URL is `http://127.0.0.1:8888/v1`.
+  - Save or discover the model list in the UI, then choose the default text model there.
+- Saved Model Providers configuration takes precedence over environment variables for base URL and API key in normal product usage; model selection should also be configured in the UI.
+- `LOCAL_BASE_URL`, `LOCAL_API_KEY`, `LOCAL_TEXT_MODEL`, and related old aliases are legacy/headless fallbacks. Do not present them as the normal setup path in user-facing docs, and avoid mixing `LOCAL_TEXT_MODEL` with UI-configured local models.
 - Keep GraphiteUI's own startup guidance on `npm start` and `node scripts/start.mjs`; those commands are not replaced by local runtime instructions.
 
 ## UI Implementation Policy
