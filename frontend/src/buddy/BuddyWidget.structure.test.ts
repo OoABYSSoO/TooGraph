@@ -50,7 +50,7 @@ test("BuddyWidget renders the animated inline mascot component", () => {
 });
 
 test("BuddyWidget lets the idle mascot roam only while the panel is closed and the buddy is idle", () => {
-  assert.match(componentSource, /type BuddyMascotMotion = "idle" \| "roam" \| "hop" \| "spin";/);
+  assert.match(componentSource, /type BuddyMascotMotion = "idle" \| "roam" \| "hop";/);
   assert.match(componentSource, /type BuddyMascotFacing = "front" \| "left" \| "right";/);
   assert.match(componentSource, /const BUDDY_ROAM_MIN_DELAY_MS = 8000;/);
   assert.match(componentSource, /const BUDDY_ROAM_MAX_DELAY_MS = 18000;/);
@@ -66,18 +66,20 @@ test("BuddyWidget lets the idle mascot roam only while the panel is closed and t
   assert.match(componentSource, /cancelBuddyRoamTimers\(\);/);
 });
 
-test("BuddyWidget schedules random hop movement and occasional spin without persisting roam positions", () => {
+test("BuddyWidget schedules random hop movement without jump-turn spin actions", () => {
   assert.match(componentSource, /let buddyRoamTimerId: number \| null = null;/);
   assert.match(componentSource, /let buddyRoamMotionTimerId: number \| null = null;/);
   assert.match(componentSource, /function scheduleBuddyRoam\(\)/);
   assert.match(componentSource, /randomBetween\(BUDDY_ROAM_MIN_DELAY_MS, BUDDY_ROAM_MAX_DELAY_MS\)/);
   assert.match(componentSource, /function runBuddyIdleRoam\(\)/);
-  assert.match(componentSource, /Math\.random\(\) < BUDDY_ROAM_SPIN_CHANCE/);
-  assert.match(componentSource, /function runBuddyIdleSpin\(\)/);
   assert.match(componentSource, /function runBuddyIdleHop\(\)/);
   assert.match(componentSource, /resolveBuddyRoamTargetPosition\(\)/);
   assert.match(componentSource, /mascotMotion\.value = "roam";/);
-  assert.match(componentSource, /mascotMotion\.value = "spin";/);
+  assert.match(componentSource, /'buddy-widget__avatar--hopping': mascotMotion === 'hop'/);
+  assert.doesNotMatch(componentSource, /BUDDY_ROAM_SPIN_CHANCE/);
+  assert.doesNotMatch(componentSource, /BUDDY_ROAM_SPIN_DURATION_MS/);
+  assert.doesNotMatch(componentSource, /function runBuddyIdleSpin\(\)/);
+  assert.doesNotMatch(componentSource, /mascotMotion\.value = "spin";/);
   assert.match(componentSource, /persistPosition\(\);/);
   assert.doesNotMatch(extractFunctionBlock("runBuddyIdleHop"), /persistPosition\(\);/);
 });
@@ -107,8 +109,9 @@ test("BuddyWidget tracks dragging and click pulses for mascot animation", () => 
 test("BuddyWidget exposes a temporary mascot action debug panel on the buddy page", () => {
   assert.match(componentSource, /type BuddyMascotDebugAction =/);
   assert.match(componentSource, /"idle" \| "thinking" \| "speaking" \| "error"/);
-  assert.match(componentSource, /"tap" \| "dragging" \| "hop" \| "roam" \| "spin"/);
+  assert.match(componentSource, /"tap" \| "dragging" \| "hop" \| "roam"/);
   assert.match(componentSource, /"face-left" \| "face-front" \| "face-right"/);
+  assert.doesNotMatch(componentSource, /action: "spin"/);
   assert.match(componentSource, /const BUDDY_DEBUG_ACTION_GROUPS/);
   assert.match(componentSource, /class="buddy-widget__debug-panel"/);
   assert.match(componentSource, /v-if="shouldShowMascotDebugPanel"/);
@@ -131,7 +134,7 @@ test("BuddyWidget debug panel can trigger every mascot animation state without g
   assert.match(componentSource, /case "dragging":[\s\S]*debugDragging\.value = true;/);
   assert.match(componentSource, /playMascotDebugMotion\("hop", 760, "front"\);/);
   assert.match(componentSource, /playMascotDebugMotion\("roam", BUDDY_ROAM_MOVE_DURATION_MS, "right"\);/);
-  assert.match(componentSource, /playMascotDebugMotion\("spin", BUDDY_ROAM_SPIN_DURATION_MS, "front"\);/);
+  assert.doesNotMatch(componentSource, /playMascotDebugMotion\("spin"/);
   assert.doesNotMatch(extractFunctionBlock("triggerMascotDebugAction"), /runGraph\(/);
 });
 

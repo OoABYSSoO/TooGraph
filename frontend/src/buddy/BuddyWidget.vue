@@ -307,7 +307,7 @@
         class="buddy-widget__avatar"
         :class="{
           'buddy-widget__avatar--roaming': mascotMotion === 'roam',
-          'buddy-widget__avatar--spinning': mascotMotion === 'spin',
+          'buddy-widget__avatar--hopping': mascotMotion === 'hop',
         }"
         :style="avatarStyle"
         :title="t('buddy.dragHint')"
@@ -404,9 +404,9 @@ type BuddyQueuedTurn = {
 };
 
 type BuddyMood = "idle" | "thinking" | "speaking" | "error";
-type BuddyMascotMotion = "idle" | "roam" | "hop" | "spin";
+type BuddyMascotMotion = "idle" | "roam" | "hop";
 type BuddyMascotFacing = "front" | "left" | "right";
-type BuddyMascotDebugAction = "idle" | "thinking" | "speaking" | "error" | "tap" | "dragging" | "hop" | "roam" | "spin" | "face-left" | "face-front" | "face-right";
+type BuddyMascotDebugAction = "idle" | "thinking" | "speaking" | "error" | "tap" | "dragging" | "hop" | "roam" | "face-left" | "face-front" | "face-right";
 type BuddyMascotDebugActionGroup = {
   label: string;
   actions: Array<{
@@ -430,8 +430,6 @@ const RUN_TRACE_MAX_ENTRIES = 24;
 const BUDDY_ROAM_MIN_DELAY_MS = 8000;
 const BUDDY_ROAM_MAX_DELAY_MS = 18000;
 const BUDDY_ROAM_MOVE_DURATION_MS = 980;
-const BUDDY_ROAM_SPIN_DURATION_MS = 980;
-const BUDDY_ROAM_SPIN_CHANCE = 0.22;
 const BUDDY_ROAM_MIN_DISTANCE_PX = 132;
 const BUDDY_DEBUG_ACTION_GROUPS: BuddyMascotDebugActionGroup[] = [
   {
@@ -450,7 +448,6 @@ const BUDDY_DEBUG_ACTION_GROUPS: BuddyMascotDebugActionGroup[] = [
       { label: "Drag", action: "dragging" },
       { label: "Hop", action: "hop" },
       { label: "Roam", action: "roam" },
-      { label: "Spin", action: "spin" },
     ],
   },
   {
@@ -821,25 +818,7 @@ function runBuddyIdleRoam() {
   if (!canBuddyRoam.value) {
     return;
   }
-  if (Math.random() < BUDDY_ROAM_SPIN_CHANCE) {
-    runBuddyIdleSpin();
-    return;
-  }
   runBuddyIdleHop();
-}
-
-function runBuddyIdleSpin() {
-  if (!canBuddyRoam.value) {
-    return;
-  }
-  mascotFacing.value = Math.random() > 0.5 ? "left" : "right";
-  mascotMotion.value = "spin";
-  buddyRoamMotionTimerId = window.setTimeout(() => {
-    mascotMotion.value = "idle";
-    mascotFacing.value = "front";
-    buddyRoamMotionTimerId = null;
-    scheduleBuddyRoam();
-  }, BUDDY_ROAM_SPIN_DURATION_MS);
 }
 
 function runBuddyIdleHop() {
@@ -961,9 +940,6 @@ function triggerMascotDebugAction(action: BuddyMascotDebugAction) {
       break;
     case "roam":
       playMascotDebugMotion("roam", BUDDY_ROAM_MOVE_DURATION_MS, "right");
-      break;
-    case "spin":
-      playMascotDebugMotion("spin", BUDDY_ROAM_SPIN_DURATION_MS, "front");
       break;
     case "face-left":
       mood.value = "idle";
@@ -2019,8 +1995,8 @@ function formatErrorMessage(error: unknown): string {
   animation: buddy-widget-avatar-hop-path 980ms cubic-bezier(0.2, 1.05, 0.32, 1) both;
 }
 
-.buddy-widget__avatar--spinning {
-  animation: buddy-widget-avatar-spin-pop 980ms cubic-bezier(0.2, 1.18, 0.3, 1) both;
+.buddy-widget__avatar--hopping {
+  animation: buddy-widget-avatar-hop-path 760ms cubic-bezier(0.2, 1.05, 0.32, 1) both;
 }
 
 .buddy-widget__avatar:active {
@@ -2049,26 +2025,13 @@ function formatErrorMessage(error: unknown): string {
 @keyframes buddy-widget-avatar-hop-path {
   0%,
   100% {
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
   34% {
-    transform: translateY(-18px) scaleX(0.94) scaleY(1.06);
+    transform: translateY(-18px);
   }
   66% {
-    transform: translateY(-6px) scaleX(1.03) scaleY(0.97);
-  }
-}
-
-@keyframes buddy-widget-avatar-spin-pop {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-  28% {
-    transform: translateY(-20px) scaleX(0.92) scaleY(1.08);
-  }
-  72% {
-    transform: translateY(4px) scaleX(1.06) scaleY(0.94);
+    transform: translateY(-6px);
   }
 }
 
