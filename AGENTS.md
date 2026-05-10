@@ -72,6 +72,24 @@ These instructions apply to all work in this repository and should persist acros
 - Buddy behavior, memory management, persona updates, and file-edit workflows should be modeled as auditable graph flows: input/context -> LLM planning -> optional validation/approval -> skill/subgraph execution -> output display.
 - Low-level operations should remain visible and replayable through graph runs. When a feature needs to modify local documents, profile data, policy data, memories, templates, or other local state, prefer adding or reusing a skill plus a template that performs the operation and returns clear artifacts such as local file paths, diffs, revision IDs, and status messages.
 
+## Buddy Autonomous Agent Direction
+
+- Treat `docs/future/buddy-autonomous-agent-roadmap.md` as the durable direction for Buddy autonomy and self-evolution. Treat `docs/current_project_status.md` as the current implementation snapshot. If these conflict, update the snapshot or fold still-valid facts into the roadmap instead of inventing a third source of truth.
+- The `demo/hermes-agent/` project is a capability reference, not an architecture to copy. GraphiteUI should translate Hermes-style abilities into graph templates, explicit Skill calls, state, approvals, run records, revisions, and artifacts.
+- Hermes-style autonomy means more than tool use: multi-step capability loops, memory/session recall, skill creation and improvement, scheduled or triggered runs, delegation, safety guardrails, result budgeting, and self-improvement from execution traces. In GraphiteUI these must be expressed as auditable graph flows rather than a hidden agent loop.
+- Skill in GraphiteUI means a single controlled capability call for one LLM-node turn. A Skill can read context, prepare deterministic data, run a script, search, write one controlled output, or return artifacts. It must not own multi-step autonomy, retry loops, result review, final response generation, long-term memory policy, or follow-up capability selection.
+- Multi-step intelligence belongs to graph templates: LLM node -> condition -> one Skill or dynamic subgraph execution -> `result_package` or mapped Skill outputs -> LLM review -> condition loop, pause, approval, failure handling, or final output.
+- Do not create a monolithic `self_evolve` Skill or Buddy-specific hidden runtime. Buddy self-evolution should be a graph-template pipeline that turns run traces, user corrections, failures, successes, and Buddy Home context into structured improvement candidates, validates or tests them, asks for human review when needed, and only then applies changes through controlled commands or Skills.
+- Existing Buddy templates are the starting point, not throwaway scaffolding:
+  - `buddy_autonomous_loop` is the visible Buddy run path: context input, request intake, capability loop, final response, and a single user-facing `final_reply`.
+  - `buddy_self_review` is the background review path: it should produce memory and evolution plans, not silently mutate Buddy Home or graph assets.
+  - `graphiteui_skill_creation_workflow` is the reference pattern for graph-expressed creation workflows: clarify, confirm examples, generate files, test, review, approve, then write through controlled capability calls.
+- Buddy graph orchestration has two target modes:
+  - Modify the current graph through a draft patch, validator, diff/preview, human approval, GraphCommandBus-style application, graph revision, and undo/redo.
+  - Create a new graph template or reusable subgraph from a user goal, validate it, optionally test-run it, preview it, ask for approval, then save it as a user template that later capability selection can discover.
+- The highest-priority Buddy infrastructure is dynamic subgraph breakpoint propagation, Buddy UI reuse of standard `awaiting_human` resume flows, dynamic capability approval, graph command/revision plumbing, Buddy Home writeback templates, and unified low-level `activity_events`.
+- Buddy self-evolution should prefer narrow, reversible improvements first: memory updates, session summaries, Skill revisions, graph patch drafts, reusable subgraph/template proposals, and policy suggestions. Riskier changes such as graph edits, file writes, script execution, network access, automation creation, or persona/policy changes require explicit approval and recoverable revisions.
+
 ## Skill Package Boundaries
 
 - A skill package should contain all resources needed by that skill: code, prompts, schemas, helper scripts, assets, examples, and local instructions.
