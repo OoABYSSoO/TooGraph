@@ -25,6 +25,7 @@ from app.buddy.home import (
     render_profile_markdown,
 )
 from app.core.storage.json_file_utils import read_json_file, utc_now_iso, write_json_file
+from app.memory import store as platform_memory_store
 
 
 BUDDY_HOME_DIR = get_default_buddy_home_dir()
@@ -54,10 +55,15 @@ DEFAULT_RUN_TEMPLATE_BINDING = {
         "input_buddy_context": "buddy_home_context",
     },
 }
+PLATFORM_BUDDY_MEMORY_SCOPE = "buddy"
+PLATFORM_BUDDY_MEMORY_ID_PREFIX = "buddy_home_"
+PLATFORM_BUDDY_MEMORY_CHANGED_BY = "buddy_home_migration"
+PLATFORM_BUDDY_MEMORY_CHANGE_REASON = "Migrate legacy Buddy Home memory projection into platform memory."
 
 
 def initialize_buddy_home() -> None:
     ensure_buddy_home(BUDDY_HOME_DIR)
+    migrate_buddy_home_memories_to_platform()
 
 
 def buddy_home_path(file_name: str) -> Path:
@@ -108,6 +114,49 @@ def list_memories(*, include_deleted: bool = False) -> list[dict[str, Any]]:
     if include_deleted:
         return memories
     return [memory for memory in memories if memory.get("enabled", True) and not memory.get("deleted", False)]
+
+
+def migrate_buddy_home_memories_to_platform() -> dict[str, Any]:
+    legacy_memories = _read_buddy_memories(include_deleted=True)
+    created: list[dict[str, Any]] = []
+    updated: list[dict[str, Any]] = []
+    skipped: list[str] = []
+    for legacy_memory in legacy_memories:
+        platform_id = _platform_buddy_memory_id(legacy_memory.get("id"))
+        if not platform_id:
+            continue
+        payload = _platform_memory_payload_from_buddy_memory(legacy_memory, platform_id=platform_id)
+        try:
+            existing = platform_memory_store.get_memory(platform_id)
+        except KeyError:
+            created.append(
+                platform_memory_store.create_memory(
+                    payload,
+                    changed_by=PLATFORM_BUDDY_MEMORY_CHANGED_BY,
+                    change_reason=PLATFORM_BUDDY_MEMORY_CHANGE_REASON,
+                )
+            )
+            continue
+        if _platform_memory_payload_matches(existing, payload):
+            skipped.append(platform_id)
+            continue
+        updated.append(
+            platform_memory_store.update_memory(
+                platform_id,
+                payload,
+                changed_by=PLATFORM_BUDDY_MEMORY_CHANGED_BY,
+                change_reason=PLATFORM_BUDDY_MEMORY_CHANGE_REASON,
+            )
+        )
+    return {
+        "total_count": len(legacy_memories),
+        "created_count": len(created),
+        "updated_count": len(updated),
+        "skipped_count": len(skipped),
+        "created": created,
+        "updated": updated,
+        "skipped": skipped,
+    }
 
 
 def create_memory(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
@@ -753,6 +802,86 @@ def _replace_memory(memory_id: str, payload: dict[str, Any]) -> None:
             ),
         )
         connection.commit()
+
+
+def _read_buddy_memories(*, include_deleted: bool) -> list[dict[str, Any]]:
+    return list_memories(include_deleted=include_deleted)
+
+
+def _platform_buddy_memory_id(value: Any) -> str:
+    legacy_id = str(value or "").strip()
+    if not legacy_id:
+        return ""
+    raw_id = f"{PLATFORM_BUDDY_MEMORY_ID_PREFIX}{legacy_id}"
+    return "".join(character if character.isalnum() or character in {"_", "-"} else "_" for character in raw_id)[:80]
+
+
+def _platform_memory_payload_from_buddy_memory(
+    memory: dict[str, Any],
+    *,
+    platform_id: str,
+) -> dict[str, Any]:
+    legacy_type = str(memory.get("type") or "fact").strip() or "fact"
+    legacy_source = memory.get("source") if isinstance(memory.get("source"), dict) else {}
+    legacy_id = str(memory.get("id") or "")
+    return {
+        "id": platform_id,
+        "scope": PLATFORM_BUDDY_MEMORY_SCOPE,
+        "layer": _platform_memory_layer_for_buddy_type(legacy_type),
+        "type": legacy_type,
+        "summary": str(memory.get("title") or "Untitled memory").strip() or "Untitled memory",
+        "content": str(memory.get("content") or "").strip(),
+        "confidence": float(memory.get("confidence") or 1),
+        "importance": 0.65,
+        "evidence": [
+            {
+                "kind": "buddy_home_memory",
+                "buddy_memory_id": legacy_id,
+                "title": str(memory.get("title") or ""),
+                "source": legacy_source,
+            }
+        ],
+        "artifact_refs": [],
+        "source": {
+            "kind": "buddy_home_projection",
+            "buddy_memory_id": legacy_id,
+            "legacy_source": legacy_source,
+            "created_at": str(memory.get("created_at") or ""),
+            "updated_at": str(memory.get("updated_at") or ""),
+        },
+        "status": "archived" if memory.get("deleted") or not memory.get("enabled", True) else "active",
+        "supersedes": [],
+        "created_at": str(memory.get("created_at") or ""),
+    }
+
+
+def _platform_memory_layer_for_buddy_type(memory_type: str) -> str:
+    normalized = str(memory_type or "").strip().lower().replace(" ", "_")
+    if normalized in {"preference", "preferences", "procedure", "procedural", "style", "habit"}:
+        return "procedural"
+    if normalized in {"episode", "episodic", "summary", "session_summary"}:
+        return "episodic"
+    if normalized in {"policy", "safety", "boundary", "boundaries"}:
+        return "safety"
+    return "semantic"
+
+
+def _platform_memory_payload_matches(existing: dict[str, Any], payload: dict[str, Any]) -> bool:
+    comparable_keys = [
+        "scope",
+        "layer",
+        "type",
+        "summary",
+        "content",
+        "confidence",
+        "importance",
+        "evidence",
+        "artifact_refs",
+        "source",
+        "status",
+        "supersedes",
+    ]
+    return all(existing.get(key) == payload.get(key) for key in comparable_keys)
 
 
 def _sync_memory_markdown() -> None:

@@ -5,13 +5,30 @@ import tempfile
 import unittest
 import json
 import sqlite3
-from contextlib import closing
+from contextlib import closing, contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.core.storage import database
 from app.buddy import store
+from app.memory import store as platform_memory_store
+
+
+@contextmanager
+def isolated_platform_memory_database():
+    old_data_dir = database.DATA_DIR
+    old_db_path = database.DB_PATH
+    with tempfile.TemporaryDirectory() as temp_dir:
+        data_dir = Path(temp_dir)
+        database.DATA_DIR = data_dir
+        database.DB_PATH = data_dir / "toograph.db"
+        try:
+            yield
+        finally:
+            database.DATA_DIR = old_data_dir
+            database.DB_PATH = old_db_path
 
 
 class BuddyStoreTests(unittest.TestCase):
@@ -97,6 +114,66 @@ class BuddyStoreTests(unittest.TestCase):
 
         self.assertEqual(restored["target_type"], "memory")
         self.assertEqual(restored["current_value"]["deleted"], False)
+
+    def test_legacy_buddy_home_memories_migrate_to_platform_memory_once(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with isolated_platform_memory_database():
+                with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+                    active = store.create_memory(
+                        {
+                            "type": "preference",
+                            "title": "回答偏好",
+                            "content": "用户喜欢先给结论。",
+                            "confidence": 0.8,
+                            "source": {"kind": "manual", "message_ids": ["msg_1"]},
+                        },
+                        changed_by="memory_curator",
+                        change_reason="旧投影数据",
+                    )
+                    deleted = store.create_memory(
+                        {
+                            "type": "fact",
+                            "title": "过期事实",
+                            "content": "这条旧事实已经不再使用。",
+                        },
+                        changed_by="memory_curator",
+                        change_reason="旧投影数据",
+                    )
+                    store.delete_memory(deleted["id"], changed_by="user", change_reason="用户删除旧记忆")
+
+                    first_result = store.migrate_buddy_home_memories_to_platform()
+                    second_result = store.migrate_buddy_home_memories_to_platform()
+
+                platform_memories = platform_memory_store.list_memories(
+                    scope="buddy",
+                    status=None,
+                    include_inactive=True,
+                )
+                by_source_id = {
+                    memory["source"].get("buddy_memory_id"): memory
+                    for memory in platform_memories
+                    if memory["source"].get("kind") == "buddy_home_projection"
+                }
+                active_platform = by_source_id[active["id"]]
+                deleted_platform = by_source_id[deleted["id"]]
+                revisions = platform_memory_store.list_memory_revisions(active_platform["id"])
+                events = platform_memory_store.list_memory_events(active_platform["id"])
+
+        self.assertEqual(first_result["created_count"], 2)
+        self.assertEqual(second_result["created_count"], 0)
+        self.assertEqual(second_result["skipped_count"], 2)
+        self.assertEqual(active_platform["summary"], "回答偏好")
+        self.assertEqual(active_platform["content"], "用户喜欢先给结论。")
+        self.assertEqual(active_platform["scope"], "buddy")
+        self.assertEqual(active_platform["layer"], "procedural")
+        self.assertEqual(active_platform["status"], "active")
+        self.assertEqual(active_platform["confidence"], 0.8)
+        self.assertEqual(active_platform["source"]["buddy_memory_id"], active["id"])
+        self.assertEqual(active_platform["evidence"][0]["kind"], "buddy_home_memory")
+        self.assertEqual(deleted_platform["status"], "archived")
+        self.assertEqual(len(revisions), 1)
+        self.assertEqual(revisions[0]["action"], "create")
+        self.assertEqual(events[0]["actor"], "buddy_home_migration")
 
     def test_chat_sessions_persist_messages_and_soft_delete(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

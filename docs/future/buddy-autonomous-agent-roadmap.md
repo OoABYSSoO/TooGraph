@@ -84,7 +84,7 @@
 - 建立记忆分层：semantic facts、procedural preferences、episodic summaries、capability stats、safety/policy references。
 - 建立作用域：user、project、buddy、template、graph、skill、knowledge collection。跨作用域召回必须显式且可审计。
 - 建立主存储：平台 SQLite 存储已建立 `memories`、`memory_revisions`、`memory_events`、`memories_fts`，`backend/app/memory/store.py` 提供 create/update/list/recall/revision/event 基础 API；后续 Hybrid RAG 阶段再接 embedding 表。
-- 每条记忆至少包含 summary、content、confidence、importance、evidence、artifact refs、source run/node/skill/template、status、scope 和 supersedes 信息；平台 store 已按这些字段归一化和持久化，Buddy Home 旧投影仍待迁移到该 store。
+- 每条记忆至少包含 summary、content、confidence、importance、evidence、artifact refs、source run/node/skill/template、status、scope 和 supersedes 信息；平台 store 已按这些字段归一化和持久化，Buddy Home 旧 `buddy_memories` 投影已通过启动迁移进入平台记忆 store，使用 `scope=buddy`、`source.kind=buddy_home_projection`、可恢复 revision/event，并把已删除/禁用旧记忆迁移为 archived 平台记忆。
 - 支持候选记忆：`memory_candidate_writer` 已能创建带证据和来源的 `candidate` 状态平台记忆并记录 revision/event，并返回相近 active 记忆的冲突提示；平台 API 已支持候选应用、拒绝、归档、替代、降权、revision/event 查询和 revision 恢复；Buddy 记忆页已提供平台候选审查表和应用/替代/拒绝/归档入口。
 - 实现预算化召回：平台 store 已支持 scope/layer/type/status 过滤、FTS 查询、importance/更新时间排序、top_k、max_chars 和 omitted 列表；候选写入 Skill 已接入 active 记忆冲突提示，Buddy 记忆页已展示候选、来源 run、替代关系和候选审查动作。
 - 新增或等价实现 `memory_recall` 与 `memory_candidate_writer` 能力：官方 Skill 已提供只读预算化 `memory_context` 召回，以及仅写入 `candidate` 记录的候选记忆生成。
@@ -141,7 +141,7 @@
 - 每个 Eval Case 发起独立 graph run，保留 run id、状态、错误、输出、artifacts 和节点失败信息：case result 已能保存关联 graph run id、状态、错误、最终输出、artifacts、节点失败和 human review；`/api/evals/runs/{eval_run_id}/cases/{case_id}/run` 已能从 suite 目标 graph/template 启动独立 LangGraph run，把 case `input_values` 注入 input state 默认值，在 run metadata 中记录 eval/suite/case/target 关联，并在复跑时清空旧输出、artifacts、节点失败和 check results；`/api/evals/runs/{eval_run_id}/cases/{case_id}/collect` 已能从完成的 graph run 抽取 output previews、saved artifacts、errors 和 node failures，生成 final output/artifacts 并触发确定性检查。
 - 支持 schema 检查、artifact 检查、引用检查、规则检查、LLM judge 和人工评审记录：check result 已支持任意 `kind`、状态、score、expected/actual/details/message/reviewer，human review 已作为 case result 的结构化记录保存；确定性的 schema/artifact/citation/rule 执行器与 `/api/evals/runs/{eval_run_id}/cases/{case_id}/evaluate` 已接入，可基于已有 final output/artifacts 生成并持久化 check results；`llm_judge` / `judge` 检查已接入显式 opt-in 的模型评审执行器，支持 check 级 `rubric`、`criteria`、`min_score`、`model_ref`，并把结构化判定、模型元数据和 reviewer=`llm_judge` 写入 check result。
 - 前端或 API 展示 suite 结果、case diff、失败原因和可复跑入口：API 已能创建/列出 suite、case、eval run、case results/check results，并提供单 case run/rerun 与 completed run collection 入口；`/api/evals/runs/{eval_run_id}/cases/run` 和 `/api/evals/runs/{eval_run_id}/cases/collect` 已提供批量运行/采集入口，并返回部分成功与逐 case 错误摘要；`/api/evals/runs/{eval_run_id}/cases/{case_id}/evaluate`、单 case collect、批量 collect 均支持 `run_llm_judge=true` 显式开启 LLM judge；`/evals` 评测中心已接入 suite/run/case/check/artifact 展示、单 case 运行/复跑、批量运行/采集、结果采集、LLM Judge 开关、图运行跳转，以及 expected/final-output/check expected-actual 紧凑对比；更完整的失败对比视图仍待补齐。
-- 覆盖 Buddy 主循环、能力循环、页面操作、Skill 创建、联网搜索和至少一个业务模板。
+- 覆盖 Buddy 主循环、能力循环、页面操作、Skill 创建、联网搜索和至少一个业务模板：官方 `eval_cases.json` 包已覆盖 `buddy_autonomous_loop`、`buddy_capability_loop`、`toograph_page_operation_workflow`、`toograph_skill_creation_workflow`、`advanced_web_research_loop` 和现有业务模板；启动时 `app.evaluator.official_seed` 会把这些包注册为 Eval Suite/Case，并把旧的描述性检查归一化为显式 `llm_judge`，避免不可执行规则被误当成确定性检查通过。
 
 ## 图模板计划
 

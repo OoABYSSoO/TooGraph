@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import closing
 from typing import Any
 from uuid import uuid4
 
@@ -14,7 +15,7 @@ TERMINAL_RESULT_STATUSES = {"passed", "failed", "error", "skipped"}
 def create_eval_suite(payload: dict[str, Any]) -> dict[str, Any]:
     suite = _normalize_eval_suite(payload)
     now = utc_now_iso()
-    with get_connection() as connection:
+    with closing(get_connection()) as connection:
         connection.execute(
             """
             INSERT INTO eval_suites (
@@ -51,7 +52,7 @@ def create_eval_case(suite_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     suite = load_eval_suite(suite_id)
     case = _normalize_eval_case(payload)
     now = utc_now_iso()
-    with get_connection() as connection:
+    with closing(get_connection()) as connection:
         connection.execute(
             """
             INSERT INTO eval_cases (
@@ -90,7 +91,7 @@ def create_eval_run(suite_id: str, *, requested_by: str = "", metadata: dict[str
     cases = list_eval_cases(suite["suite_id"])
     eval_run_id = f"evalrun_{uuid4().hex[:12]}"
     now = utc_now_iso()
-    with get_connection() as connection:
+    with closing(get_connection()) as connection:
         connection.execute(
             """
             INSERT INTO eval_runs (
@@ -141,7 +142,7 @@ def create_eval_run(suite_id: str, *, requested_by: str = "", metadata: dict[str
 
 def list_eval_runs(suite_id: str) -> list[dict[str, Any]]:
     normalized_suite_id = load_eval_suite(suite_id)["suite_id"]
-    with get_connection() as connection:
+    with closing(get_connection()) as connection:
         rows = connection.execute(
             """
             SELECT eval_run_id
@@ -163,7 +164,7 @@ def record_eval_case_result(eval_run_id: str, case_id: str, payload: dict[str, A
     status = _normalize_status(payload.get("status"))
     now = utc_now_iso()
     completed_at = now if status in TERMINAL_RESULT_STATUSES else ""
-    with get_connection() as connection:
+    with closing(get_connection()) as connection:
         connection.execute(
             """
             UPDATE eval_case_results
@@ -226,7 +227,7 @@ def record_eval_case_result(eval_run_id: str, case_id: str, payload: dict[str, A
 
 
 def list_eval_suites() -> list[dict[str, Any]]:
-    with get_connection() as connection:
+    with closing(get_connection()) as connection:
         rows = connection.execute(
             """
             SELECT s.*, COUNT(c.case_id) AS case_count
@@ -241,7 +242,7 @@ def list_eval_suites() -> list[dict[str, Any]]:
 
 def load_eval_suite(suite_id: str) -> dict[str, Any]:
     normalized_suite_id = _normalize_identifier(suite_id)
-    with get_connection() as connection:
+    with closing(get_connection()) as connection:
         row = connection.execute(
             """
             SELECT s.*, COUNT(c.case_id) AS case_count
@@ -259,7 +260,7 @@ def load_eval_suite(suite_id: str) -> dict[str, Any]:
 
 def list_eval_cases(suite_id: str) -> list[dict[str, Any]]:
     normalized_suite_id = _normalize_identifier(suite_id)
-    with get_connection() as connection:
+    with closing(get_connection()) as connection:
         rows = connection.execute(
             """
             SELECT *
@@ -275,7 +276,7 @@ def list_eval_cases(suite_id: str) -> list[dict[str, Any]]:
 def load_eval_case(suite_id: str, case_id: str) -> dict[str, Any]:
     normalized_suite_id = _normalize_identifier(suite_id)
     normalized_case_id = _normalize_identifier(case_id)
-    with get_connection() as connection:
+    with closing(get_connection()) as connection:
         row = connection.execute(
             "SELECT * FROM eval_cases WHERE suite_id = ? AND case_id = ?",
             (normalized_suite_id, normalized_case_id),
@@ -287,7 +288,7 @@ def load_eval_case(suite_id: str, case_id: str) -> dict[str, Any]:
 
 def load_eval_run(eval_run_id: str) -> dict[str, Any]:
     normalized_eval_run_id = _normalize_identifier(eval_run_id)
-    with get_connection() as connection:
+    with closing(get_connection()) as connection:
         row = connection.execute(
             "SELECT * FROM eval_runs WHERE eval_run_id = ?",
             (normalized_eval_run_id,),

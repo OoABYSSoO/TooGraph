@@ -133,6 +133,33 @@ def _completed_eval_graph_run() -> dict[str, object]:
 
 
 class EvaluatorStoreRouteTests(unittest.TestCase):
+    def test_eval_store_closes_read_connections(self) -> None:
+        class FakeConnection:
+            def __init__(self) -> None:
+                self.closed = False
+
+            def __enter__(self) -> "FakeConnection":
+                return self
+
+            def __exit__(self, *_args: object) -> None:
+                return None
+
+            def execute(self, *_args: object) -> "FakeConnection":
+                return self
+
+            def fetchall(self) -> list[object]:
+                return []
+
+            def close(self) -> None:
+                self.closed = True
+
+        fake_connection = FakeConnection()
+
+        with patch("app.evaluator.store.get_connection", return_value=fake_connection):
+            self.assertEqual(store.list_eval_suites(), [])
+
+        self.assertTrue(fake_connection.closed)
+
     def test_eval_route_starts_case_graph_run_from_target_template(self) -> None:
         saved_runs: list[dict[str, object]] = []
 

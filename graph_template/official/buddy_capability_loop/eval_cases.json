@@ -1,0 +1,59 @@
+{
+  "suite": "buddy_capability_loop_core",
+  "name": "Buddy 能力循环核心回归",
+  "description": "覆盖 Buddy 能力选择、单能力执行、能力缺口和审查结果输出。",
+  "cases": [
+    {
+      "case_id": "buddy-capability-loop-single-capability-review",
+      "name": "一次循环只能选择一个显式能力",
+      "description": "已有上下文指向页面操作能力，能力循环应保留单一 capability 对象与可审计 trace。",
+      "inputs": {
+        "user_message": "打开评测中心，帮我运行当前模板的评测。",
+        "conversation_history": [],
+        "page_context": {
+          "route": "/library",
+          "visibleTemplates": [
+            {
+              "templateId": "policy_navigator_agent",
+              "label": "政策导航 Agent"
+            }
+          ]
+        },
+        "buddy_context": {
+          "enabled_capabilities": [
+            "toograph_page_operation_workflow",
+            "advanced_web_research_loop"
+          ]
+        },
+        "request_understanding": {
+          "intent": "page_operation",
+          "needs_page_action": true
+        },
+        "context_brief": "用户在模板库，想进入评测中心并运行模板评测。",
+        "task_plan": "选择页面操作能力，生成可审查的操作请求，执行后输出 trace。"
+      },
+      "expected": {
+        "required": [
+          "capability_review",
+          "capability_trace"
+        ]
+      },
+      "checks": [
+        {
+          "kind": "schema",
+          "name": "capability_review_trace_present",
+          "target": "final_output",
+          "required": [
+            "capability_review",
+            "capability_trace"
+          ]
+        },
+        {
+          "kind": "rule",
+          "key": "single_capability_state",
+          "expectation": "selected_capability 必须是单个互斥对象，kind 只能是 skill、subgraph 或 none；不得输出 capability 列表或同一 LLM 节点连续执行多个能力。"
+        }
+      ]
+    }
+  ]
+}

@@ -74,10 +74,10 @@
               :class="{ 'evals-page__suite-card--active': selectedSuiteId === suite.suite_id }"
               @click="selectedSuiteId = suite.suite_id"
             >
-              <span class="evals-page__suite-id">{{ suite.suite_id }}</span>
               <strong>{{ suite.name || suite.suite_id }}</strong>
               <small>{{ formatEvalTarget(suite) }}</small>
               <span>{{ t("evals.caseCount", { count: suite.case_count }) }}</span>
+              <span class="evals-page__suite-id evals-page__suite-id--compact" :title="suite.suite_id">{{ suite.suite_id }}</span>
             </button>
           </div>
         </aside>
@@ -680,6 +680,14 @@ onMounted(() => {
   color: var(--toograph-text-muted);
   font-family: var(--toograph-font-mono);
   font-size: 0.76rem;
+}
+
+.evals-page__suite-id--compact {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .evals-page__run-picker {

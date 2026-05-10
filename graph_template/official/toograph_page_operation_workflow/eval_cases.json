@@ -1,0 +1,53 @@
+{
+  "suite": "toograph_page_operation_workflow_core",
+  "name": "页面操作工作流核心回归",
+  "description": "覆盖 app-native 页面操作请求、操作报告、运行触发证据和失败边界。",
+  "cases": [
+    {
+      "case_id": "page-operation-run-template-with-audit-report",
+      "name": "运行模板需要操作报告和可审计证据",
+      "description": "用户要求页面操作器运行一个官方模板，输出应保留 operation_report 和最终用户回复。",
+      "inputs": {
+        "user_goal": "打开政策导航 Agent 模板，用 mock 数据运行一次，然后告诉我结果在哪里。",
+        "page_context": {
+          "route": "/library",
+          "visibleTemplates": [
+            {
+              "templateId": "policy_navigator_agent",
+              "label": "政策导航 Agent"
+            }
+          ]
+        },
+        "page_operation_context": {
+          "allowed_operations": [
+            "app.nav.library",
+            "library.template.policy_navigator_agent.open",
+            "editor.action.runActiveGraph"
+          ]
+        }
+      },
+      "expected": {
+        "required": [
+          "final_reply",
+          "operation_report"
+        ]
+      },
+      "checks": [
+        {
+          "kind": "schema",
+          "name": "reply_and_operation_report_present",
+          "target": "final_output",
+          "required": [
+            "final_reply",
+            "operation_report"
+          ]
+        },
+        {
+          "kind": "rule",
+          "key": "operation_report_has_journal",
+          "expectation": "operation_report 应包含目标模板、触发的 run id 或失败分类、operation_journal/commands 证据；不得通过隐藏 DOM 点击或不可撤销 JSON 写入完成页面操作。"
+        }
+      ]
+    }
+  ]
+}

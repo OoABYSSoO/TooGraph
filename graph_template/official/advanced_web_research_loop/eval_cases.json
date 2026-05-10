@@ -1,0 +1,41 @@
+{
+  "suite": "advanced_web_research_loop_core",
+  "name": "联网研究循环核心回归",
+  "description": "覆盖多轮搜索计划、证据评估、引用和最终回答边界。",
+  "cases": [
+    {
+      "case_id": "web-research-summarizes-current-topic-with-citations",
+      "name": "联网研究需要引用和事实边界",
+      "description": "用户询问时效性主题，工作流应通过联网搜索收集证据，并在最终回复中保留引用和不确定性说明。",
+      "inputs": {
+        "user_question": "请核查本周一个重要 AI 产品更新，并说明它对 TooGraph 这类图式 Agent 产品的影响。"
+      },
+      "expected": {
+        "required": [
+          "final_reply"
+        ],
+        "min_citations": 1
+      },
+      "checks": [
+        {
+          "kind": "schema",
+          "name": "final_reply_present",
+          "target": "final_output",
+          "required": [
+            "final_reply"
+          ]
+        },
+        {
+          "kind": "citation",
+          "name": "at_least_one_citation",
+          "min_citations": 1
+        },
+        {
+          "kind": "rule",
+          "key": "time_sensitive_claims_have_boundaries",
+          "expectation": "最终回答必须区分已确认事实、推断和产品建议；不得在缺少来源时编造最新发布时间、价格、模型名称或官方承诺。"
+        }
+      ]
+    }
+  ]
+}
