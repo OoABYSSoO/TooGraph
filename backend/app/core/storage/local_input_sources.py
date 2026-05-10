@@ -131,14 +131,14 @@ def resolve_local_input_root(path: str, *, read_roots: Iterable[str | Path] | No
 
 def is_denied_local_input_path(path: Path, *, read_roots: Iterable[str | Path] | None = None) -> bool:
     resolved = path.resolve()
-    if resolved.name in SKIPPED_DIRECTORY_NAMES:
+    if not _is_under_any_read_root(resolved, read_roots=read_roots):
         return True
-    if any(part in SKIPPED_DIRECTORY_NAMES for part in resolved.parts):
+    if any(part in SKIPPED_DIRECTORY_NAMES for part in _parts_inside_read_root(resolved, read_roots=read_roots)):
         return True
     for denied_root in _denied_roots():
         if _is_relative_to(resolved, denied_root):
             return True
-    return not _is_under_any_read_root(resolved, read_roots=read_roots)
+    return False
 
 
 def content_type_for_path(path: Path) -> str:
@@ -278,6 +278,17 @@ def _denied_roots() -> list[Path]:
 
 def _is_under_any_read_root(path: Path, *, read_roots: Iterable[str | Path] | None) -> bool:
     return any(_is_relative_to(path, root) for root in _read_roots(read_roots))
+
+
+def _parts_inside_read_root(path: Path, *, read_roots: Iterable[str | Path] | None) -> tuple[str, ...]:
+    resolved = path.resolve()
+    for root in _read_roots(read_roots):
+        try:
+            relative = resolved.relative_to(root.resolve())
+        except ValueError:
+            continue
+        return () if str(relative) == "." else relative.parts
+    return resolved.parts
 
 
 def _is_relative_to(path: Path, root: Path) -> bool:

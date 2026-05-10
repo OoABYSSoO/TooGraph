@@ -40,6 +40,18 @@ class LocalInputSourcesTests(unittest.TestCase):
         self.assertEqual(paths["SOUL.md"]["size"], len("identity"))
         self.assertTrue(paths["SOUL.md"]["text_like"])
 
+    def test_list_local_folder_allows_read_root_inside_dot_worktrees_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir) / ".worktrees" / "feature-branch"
+            source = workspace / "buddy_home"
+            source.mkdir(parents=True)
+            (source / "AGENTS.md").write_text("buddy home", encoding="utf-8")
+
+            tree = list_local_folder(str(source), read_roots=[workspace])
+
+        self.assertEqual(tree["kind"], "local_folder_tree")
+        self.assertEqual([entry["path"] for entry in tree["entries"]], ["AGENTS.md"])
+
     def test_read_local_input_text_for_prompt_reads_full_selected_file_without_size_limit(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             workspace = Path(temp_dir)
