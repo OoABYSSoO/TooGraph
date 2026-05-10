@@ -265,6 +265,14 @@
               <p class="buddy-widget__pause-summary">
                 {{ pausedBuddyReviewModel?.summaryText || t("buddy.pause.body") }}
               </p>
+              <div v-if="pausedBuddyProducedRows.length > 0" class="buddy-widget__pause-section">
+                <strong>{{ t("buddy.pause.producedTitle") }}</strong>
+                <div v-for="row in pausedBuddyProducedRows" :key="row.key" class="buddy-widget__pause-row">
+                  <span>{{ row.label }}</span>
+                  <small v-if="row.description">{{ row.description }}</small>
+                  <pre>{{ row.draft || t("buddy.pause.emptyValue") }}</pre>
+                </div>
+              </div>
               <div v-if="pausedBuddyRequiredRows.length > 0" class="buddy-widget__pause-section">
                 <strong>{{ t("buddy.pause.requiredTitle") }}</strong>
                 <label
@@ -282,14 +290,6 @@
                     @update:model-value="setPausedBuddyDraft(row.key, $event)"
                   />
                 </label>
-              </div>
-              <div v-if="pausedBuddyProducedRows.length > 0" class="buddy-widget__pause-section">
-                <strong>{{ t("buddy.pause.producedTitle") }}</strong>
-                <div v-for="row in pausedBuddyProducedRows" :key="row.key" class="buddy-widget__pause-row">
-                  <span>{{ row.label }}</span>
-                  <small v-if="row.description">{{ row.description }}</small>
-                  <pre>{{ row.draft || t("buddy.pause.emptyValue") }}</pre>
-                </div>
               </div>
               <p
                 v-if="pausedBuddyRequiredRows.length === 0 && pausedBuddyProducedRows.length === 0"
@@ -1259,7 +1259,11 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
     }
     activeAbortController = null;
     scheduleBuddySpeakingIdleIfNeeded();
-    await scrollMessagesToBottom();
+    if (keepRunPaused) {
+      await scrollPausedBuddyCardIntoView();
+    } else {
+      await scrollMessagesToBottom();
+    }
   }
 }
 
@@ -1334,7 +1338,11 @@ async function resumePausedBuddyRun(text?: string) {
     }
     activeAbortController = null;
     scheduleBuddySpeakingIdleIfNeeded();
-    await scrollMessagesToBottom();
+    if (pausedBuddyRun.value) {
+      await scrollPausedBuddyCardIntoView();
+    } else {
+      await scrollMessagesToBottom();
+    }
   }
 }
 
@@ -2106,6 +2114,18 @@ async function scrollMessagesToBottom() {
     return;
   }
   element.scrollTop = element.scrollHeight;
+}
+
+async function scrollPausedBuddyCardIntoView() {
+  await nextTick();
+  const listElement = messageListElement.value;
+  const pauseCardElement = listElement?.querySelector<HTMLElement>(".buddy-widget__pause-card");
+  if (!listElement || !pauseCardElement) {
+    return;
+  }
+  const listRect = listElement.getBoundingClientRect();
+  const cardRect = pauseCardElement.getBoundingClientRect();
+  listElement.scrollTop = Math.max(0, listElement.scrollTop + cardRect.top - listRect.top - 12);
 }
 
 function buildPageContext() {

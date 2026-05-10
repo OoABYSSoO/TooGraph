@@ -396,6 +396,24 @@ test("BuddyWidget treats awaiting-human graph runs as resumable pause cards", ()
   assert.doesNotMatch(componentSource, /void startBuddySelfReviewRun\(runDetail\);[\s\S]*runDetail\.status === "awaiting_human"/);
 });
 
+test("BuddyWidget shows pause context before asking for more input", () => {
+  const producedTitleIndex = componentSource.indexOf('t("buddy.pause.producedTitle")');
+  const requiredTitleIndex = componentSource.indexOf('t("buddy.pause.requiredTitle")');
+  const pauseInputIndex = componentSource.indexOf('class="buddy-widget__pause-input"');
+
+  assert.notEqual(producedTitleIndex, -1);
+  assert.notEqual(requiredTitleIndex, -1);
+  assert.ok(producedTitleIndex < requiredTitleIndex);
+  assert.ok(requiredTitleIndex < pauseInputIndex);
+});
+
+test("BuddyWidget scrolls the pause card into view before resuming input", () => {
+  assert.match(componentSource, /function scrollPausedBuddyCardIntoView\(\)/);
+  assert.match(componentSource, /\.buddy-widget__pause-card/);
+  assert.match(componentSource, /if \(keepRunPaused\) \{[\s\S]*await scrollPausedBuddyCardIntoView\(\);[\s\S]*\} else \{[\s\S]*await scrollMessagesToBottom\(\);[\s\S]*\}/);
+  assert.match(componentSource, /if \(pausedBuddyRun\.value\) \{[\s\S]*await scrollPausedBuddyCardIntoView\(\);[\s\S]*\} else \{[\s\S]*await scrollMessagesToBottom\(\);[\s\S]*\}/);
+});
+
 test("BuddyWidget sends composer text to the active pause instead of queueing a new turn", () => {
   assert.match(componentSource, /if \(pausedBuddyRun\.value\) \{[\s\S]*await resumePausedBuddyRun\(userMessage\);[\s\S]*return;/);
   assert.match(componentSource, /buildBuddyResumePayloadFromText/);
