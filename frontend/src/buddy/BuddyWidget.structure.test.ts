@@ -42,7 +42,7 @@ test("BuddyWidget renders the animated inline mascot component", () => {
   assert.match(componentSource, /:mood="mood"/);
   assert.match(componentSource, /:motion="mascotMotion"/);
   assert.match(componentSource, /:facing="mascotFacing"/);
-  assert.match(componentSource, /:dragging="isDragging"/);
+  assert.match(componentSource, /:dragging="isMascotDragging"/);
   assert.match(componentSource, /:tap-nonce="tapNonce"/);
   assert.match(componentSource, /:look-x="mascotLook\.x"/);
   assert.match(componentSource, /:look-y="mascotLook\.y"/);
@@ -60,7 +60,7 @@ test("BuddyWidget lets the idle mascot roam only while the panel is closed and t
   assert.match(componentSource, /const canBuddyRoam = computed\(\(\) =>/);
   assert.match(componentSource, /!isPanelOpen\.value/);
   assert.match(componentSource, /mood\.value === "idle"/);
-  assert.match(componentSource, /!isDragging\.value/);
+  assert.match(componentSource, /!isMascotDragging\.value/);
   assert.match(componentSource, /watch\(canBuddyRoam/);
   assert.match(componentSource, /scheduleBuddyRoam\(\);/);
   assert.match(componentSource, /cancelBuddyRoamTimers\(\);/);
@@ -98,8 +98,41 @@ test("BuddyWidget tracks the pointer direction for the mascot eyes with animatio
 
 test("BuddyWidget tracks dragging and click pulses for mascot animation", () => {
   assert.match(componentSource, /const isDragging = computed\(\(\) => Boolean\(pointerDrag\.value\?\.moved\)\);/);
+  assert.match(componentSource, /const debugDragging = ref\(false\);/);
+  assert.match(componentSource, /const isMascotDragging = computed\(\(\) => isDragging\.value \|\| debugDragging\.value\);/);
   assert.match(componentSource, /const tapNonce = ref\(0\);/);
   assert.match(componentSource, /tapNonce\.value \+= 1;/);
+});
+
+test("BuddyWidget exposes a temporary mascot action debug panel on the buddy page", () => {
+  assert.match(componentSource, /type BuddyMascotDebugAction =/);
+  assert.match(componentSource, /"idle" \| "thinking" \| "speaking" \| "error"/);
+  assert.match(componentSource, /"tap" \| "dragging" \| "hop" \| "roam" \| "spin"/);
+  assert.match(componentSource, /"face-left" \| "face-front" \| "face-right"/);
+  assert.match(componentSource, /const BUDDY_DEBUG_ACTION_GROUPS/);
+  assert.match(componentSource, /class="buddy-widget__debug-panel"/);
+  assert.match(componentSource, /v-if="shouldShowMascotDebugPanel"/);
+  assert.match(componentSource, /v-for="group in BUDDY_DEBUG_ACTION_GROUPS"/);
+  assert.match(componentSource, /v-for="action in group\.actions"/);
+  assert.match(componentSource, /@click="triggerMascotDebugAction\(action\.action\)"/);
+  assert.match(componentSource, /const shouldShowMascotDebugPanel = computed\(\(\) => route\.path === "\/buddy"\);/);
+});
+
+test("BuddyWidget debug panel can trigger every mascot animation state without graph runs", () => {
+  assert.match(componentSource, /let buddyDebugActionTimerId: number \| null = null;/);
+  assert.match(componentSource, /onBeforeUnmount\(\(\) => \{[\s\S]*clearBuddyDebugActionTimer\(\);/);
+  assert.match(componentSource, /function triggerMascotDebugAction\(action: BuddyMascotDebugAction\)/);
+  assert.match(componentSource, /cancelBuddyRoamTimers\(\);/);
+  assert.match(componentSource, /clearSpeakingIdleTimer\(\);/);
+  assert.match(componentSource, /case "thinking":[\s\S]*mood\.value = "thinking";/);
+  assert.match(componentSource, /case "speaking":[\s\S]*mood\.value = "speaking";/);
+  assert.match(componentSource, /case "error":[\s\S]*mood\.value = "error";/);
+  assert.match(componentSource, /case "tap":[\s\S]*tapNonce\.value \+= 1;/);
+  assert.match(componentSource, /case "dragging":[\s\S]*debugDragging\.value = true;/);
+  assert.match(componentSource, /playMascotDebugMotion\("hop", 760, "front"\);/);
+  assert.match(componentSource, /playMascotDebugMotion\("roam", BUDDY_ROAM_MOVE_DURATION_MS, "right"\);/);
+  assert.match(componentSource, /playMascotDebugMotion\("spin", BUDDY_ROAM_SPIN_DURATION_MS, "front"\);/);
+  assert.doesNotMatch(extractFunctionBlock("triggerMascotDebugAction"), /runGraph\(/);
 });
 
 test("BuddyWidget opens fullscreen chat from a mascot double click without firing the single-click toggle", () => {
