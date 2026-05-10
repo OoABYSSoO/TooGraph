@@ -28,25 +28,27 @@
       </defs>
 
       <g class="buddy-mascot__stage" filter="url(#buddyMascotSoftness)">
-        <g class="buddy-mascot__tail buddy-mascot__tail-rig">
-          <path
-            class="buddy-mascot__tail-pose"
-            :d="tailBasePath"
-          >
-            <animate
-              ref="tailAnimateElement"
-              v-if="tailSwingAnimation"
-              :key="tailSwingAnimation.key"
-              attributeName="d"
-              begin="indefinite"
-              :dur="`${tailSwingAnimation.durationMs}ms`"
-              fill="freeze"
-              calcMode="spline"
-              :keyTimes="tailSwingAnimation.keyTimes"
-              :keySplines="tailSwingAnimation.keySplines"
-              :values="tailSwingAnimation.values"
-            />
-          </path>
+        <g class="buddy-mascot__tail-root">
+          <g class="buddy-mascot__tail buddy-mascot__tail-rig">
+            <path
+              class="buddy-mascot__tail-pose"
+              :d="tailBasePath"
+            >
+              <animate
+                ref="tailAnimateElement"
+                v-if="tailSwingAnimation"
+                :key="tailSwingAnimation.key"
+                attributeName="d"
+                begin="indefinite"
+                :dur="`${tailSwingAnimation.durationMs}ms`"
+                fill="freeze"
+                calcMode="spline"
+                :keyTimes="tailSwingAnimation.keyTimes"
+                :keySplines="tailSwingAnimation.keySplines"
+                :values="tailSwingAnimation.values"
+              />
+            </path>
+          </g>
         </g>
 
         <g class="buddy-mascot__body-turn">
@@ -420,6 +422,7 @@ function clampLookAxis(value: number | undefined) {
   --buddy-mascot-right-ear-y: 0px;
   --buddy-mascot-right-ear-scale: 1;
   --buddy-mascot-right-ear-rotate: 0deg;
+  --buddy-mascot-tail-root-x: 0px;
   pointer-events: none;
 }
 
@@ -432,6 +435,7 @@ function clampLookAxis(value: number | undefined) {
 
 .buddy-mascot__body,
 .buddy-mascot__body-turn,
+.buddy-mascot__tail-root,
 .buddy-mascot__tail,
 .buddy-mascot__tail-pose,
 .buddy-mascot__sparkle-wrap,
@@ -455,6 +459,11 @@ function clampLookAxis(value: number | undefined) {
 
 .buddy-mascot__tail {
   transform-origin: 50% 78%;
+}
+
+.buddy-mascot__tail-root {
+  transform: translateX(var(--buddy-mascot-tail-root-x));
+  transition: transform 180ms ease;
 }
 
 .buddy-mascot__tail-pose {
@@ -492,6 +501,7 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--facing-left {
+  --buddy-mascot-tail-root-x: 6px;
   --buddy-mascot-left-eye-facing-x: -70px;
   --buddy-mascot-right-eye-facing-x: -110px;
   --buddy-mascot-eye-facing-y: 1px;
@@ -506,6 +516,7 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--facing-right {
+  --buddy-mascot-tail-root-x: -6px;
   --buddy-mascot-left-eye-facing-x: 110px;
   --buddy-mascot-right-eye-facing-x: 70px;
   --buddy-mascot-eye-facing-y: 1px;
