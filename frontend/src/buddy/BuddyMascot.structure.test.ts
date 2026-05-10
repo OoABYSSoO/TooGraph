@@ -97,10 +97,10 @@ test("BuddyMascot exposes tail poses and directional part offsets without body m
   assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-left"/);
   assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--left"/);
   assert.match(componentSource, /class="buddy-mascot__body-turn"/);
-  assert.match(componentSource, /\.buddy-mascot--facing-left\s*\{[\s\S]*--buddy-mascot-facing-eye-x:\s*-10px;[\s\S]*--buddy-mascot-left-ear-x:\s*-12px;[\s\S]*--buddy-mascot-right-ear-x:\s*-18px;/);
-  assert.match(componentSource, /\.buddy-mascot--facing-right\s*\{[\s\S]*--buddy-mascot-facing-eye-x:\s*10px;[\s\S]*--buddy-mascot-left-ear-x:\s*18px;[\s\S]*--buddy-mascot-right-ear-x:\s*12px;/);
-  assert.match(componentSource, /\.buddy-mascot--facing-left[\s\S]*\.buddy-mascot__tail-pose--left[\s\S]*opacity:\s*1;/);
-  assert.match(componentSource, /\.buddy-mascot--facing-right[\s\S]*\.buddy-mascot__tail-pose--right[\s\S]*opacity:\s*1;/);
+  assert.match(componentSource, /\.buddy-mascot--facing-left\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*-24px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*-120px;[\s\S]*--buddy-mascot-left-ear-x:\s*18px;[\s\S]*--buddy-mascot-right-ear-x:\s*12px;/);
+  assert.match(componentSource, /\.buddy-mascot--facing-right\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*120px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*24px;[\s\S]*--buddy-mascot-left-ear-x:\s*-12px;[\s\S]*--buddy-mascot-right-ear-x:\s*-18px;/);
+  assert.match(componentSource, /\.buddy-mascot--facing-left[\s\S]*\.buddy-mascot__tail-pose--right[\s\S]*opacity:\s*1;/);
+  assert.match(componentSource, /\.buddy-mascot--facing-right[\s\S]*\.buddy-mascot__tail-pose--left[\s\S]*opacity:\s*1;/);
   assert.doesNotMatch(componentSource, /\.buddy-mascot--facing-left \.buddy-mascot__body-turn/);
   assert.doesNotMatch(componentSource, /\.buddy-mascot--facing-right \.buddy-mascot__body-turn/);
   assert.doesNotMatch(componentSource, /scaleX\(0\.92\) rotate/);
@@ -149,13 +149,18 @@ test("BuddyMascot moves eye wrapper layers toward the pointer without replacing 
   assert.match(componentSource, /class="buddy-mascot__look-eye buddy-mascot__look-eye--right"/);
   assert.match(componentSource, /--buddy-mascot-look-x/);
   assert.match(componentSource, /--buddy-mascot-look-y/);
-  assert.match(componentSource, /cx="-62" cy="82"/);
-  assert.match(componentSource, /cx="62" cy="82"/);
-  assert.match(componentSource, /const x = clampLookAxis\(props\.lookX\) \* 12;/);
-  assert.match(componentSource, /const y = clampLookAxis\(props\.lookY\) \* 7;/);
+  assert.match(componentSource, /cx="-80" cy="82"/);
+  assert.match(componentSource, /cx="80" cy="82"/);
+  assert.match(componentSource, /const shouldTrackPointer = props\.facing === "front";/);
+  assert.match(componentSource, /const x = shouldTrackPointer \? clampLookAxis\(props\.lookX\) \* 12 : 0;/);
+  assert.match(componentSource, /const y = shouldTrackPointer \? clampLookAxis\(props\.lookY\) \* 7 : 0;/);
   assert.match(
     componentSource,
-    /\.buddy-mascot__look-eye\s*\{[\s\S]*transform:\s*translate\(\s*calc\(var\(--buddy-mascot-look-x,\s*0px\) \+ var\(--buddy-mascot-facing-eye-x,\s*0px\)\),\s*calc\(var\(--buddy-mascot-look-y,\s*0px\) \+ var\(--buddy-mascot-facing-eye-y,\s*0px\)\)\s*\);/,
+    /\.buddy-mascot__look-eye--left\s*\{[\s\S]*transform:\s*translate\(\s*calc\(var\(--buddy-mascot-look-x,\s*0px\) \+ var\(--buddy-mascot-left-eye-facing-x,\s*0px\)\),\s*calc\(var\(--buddy-mascot-look-y,\s*0px\) \+ var\(--buddy-mascot-eye-facing-y,\s*0px\)\)\s*\);/,
+  );
+  assert.match(
+    componentSource,
+    /\.buddy-mascot__look-eye--right\s*\{[\s\S]*transform:\s*translate\(\s*calc\(var\(--buddy-mascot-look-x,\s*0px\) \+ var\(--buddy-mascot-right-eye-facing-x,\s*0px\)\),\s*calc\(var\(--buddy-mascot-look-y,\s*0px\) \+ var\(--buddy-mascot-eye-facing-y,\s*0px\)\)\s*\);/,
   );
   assert.match(
     componentSource,
