@@ -430,7 +430,11 @@ const RUN_TRACE_MAX_ENTRIES = 24;
 const BUDDY_ROAM_MIN_DELAY_MS = 8000;
 const BUDDY_ROAM_MAX_DELAY_MS = 18000;
 const BUDDY_ROAM_MOVE_DURATION_MS = 980;
-const BUDDY_ROAM_MIN_DISTANCE_PX = 132;
+const BUDDY_ROAM_STEP_PAUSE_MS = 120;
+const BUDDY_ROAM_STEP_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
+const BUDDY_ROAM_TARGET_MIN_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
+const BUDDY_ROAM_TARGET_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 3;
+const BUDDY_ROAM_TARGET_REACHED_DISTANCE_PX = 1;
 const BUDDY_DEBUG_ACTION_GROUPS: BuddyMascotDebugActionGroup[] = [
   {
     label: "状态",
@@ -513,6 +517,9 @@ let speakingIdleTimerId: number | null = null;
 let mascotLookFrameId: number | null = null;
 let buddyRoamTimerId: number | null = null;
 let buddyRoamMotionTimerId: number | null = null;
+let buddyRoamStepTimerId: number | null = null;
+let buddyRoamTargetPosition: BuddyPosition | null = null;
+let buddyRoamSequenceId = 0;
 let buddyDebugActionTimerId: number | null = null;
 let pendingMascotLookPointer: { x: number; y: number } | null = null;
 let chatSessionInitializationPromise: Promise<void> | null = null;
@@ -804,7 +811,7 @@ function cancelMascotLookFrame() {
 }
 
 function scheduleBuddyRoam() {
-  if (!canBuddyRoam.value || buddyRoamTimerId !== null || mascotMotion.value !== "idle") {
+  if (!canBuddyRoam.value || buddyRoamTimerId !== null || buddyRoamTargetPosition !== null || mascotMotion.value !== "idle") {
     return;
   }
   buddyRoamTimerId = window.setTimeout(
@@ -818,47 +825,71 @@ function runBuddyIdleRoam() {
   if (!canBuddyRoam.value) {
     return;
   }
-  runBuddyIdleHop();
+  buddyRoamSequenceId += 1;
+  buddyRoamTargetPosition = resolveBuddyRoamTargetPosition();
+  runBuddyRoamStep(buddyRoamSequenceId);
 }
 
-function runBuddyIdleHop() {
-  if (!canBuddyRoam.value) {
+function runBuddyRoamStep(sequenceId: number) {
+  if (sequenceId !== buddyRoamSequenceId) {
     return;
   }
-  const targetPosition = resolveBuddyRoamTargetPosition();
-  const deltaX = targetPosition.x - position.value.x;
-  mascotFacing.value = deltaX < 0 ? "left" : deltaX > 0 ? "right" : "front";
+  const targetPosition = buddyRoamTargetPosition;
+  if (!canBuddyRoam.value || targetPosition === null) {
+    finishBuddyRoamSequence(false);
+    return;
+  }
+
+  const nextPosition = resolveBuddyRoamStepPosition(position.value, targetPosition);
+  mascotFacing.value = resolveBuddyRoamFacing(nextPosition.x - position.value.x);
   mascotMotion.value = "roam";
-  position.value = targetPosition;
+  position.value = nextPosition;
   buddyRoamMotionTimerId = window.setTimeout(() => {
-    mascotMotion.value = "idle";
-    mascotFacing.value = "front";
+    if (sequenceId !== buddyRoamSequenceId) {
+      return;
+    }
     buddyRoamMotionTimerId = null;
-    scheduleBuddyRoam();
+    mascotMotion.value = "idle";
+    if (!canBuddyRoam.value) {
+      finishBuddyRoamSequence(false);
+      return;
+    }
+    if (isBuddyRoamTargetReached(position.value, targetPosition)) {
+      finishBuddyRoamSequence(true);
+      return;
+    }
+    buddyRoamStepTimerId = window.setTimeout(() => {
+      buddyRoamStepTimerId = null;
+      runBuddyRoamStep(sequenceId);
+    }, BUDDY_ROAM_STEP_PAUSE_MS);
   }, BUDDY_ROAM_MOVE_DURATION_MS);
 }
 
 function resolveBuddyRoamTargetPosition(): BuddyPosition {
-  const maxX = Math.max(DEFAULT_BUDDY_MARGIN, viewport.value.width - DEFAULT_BUDDY_SIZE.width - DEFAULT_BUDDY_MARGIN);
-  const maxY = Math.max(DEFAULT_BUDDY_MARGIN, viewport.value.height - DEFAULT_BUDDY_SIZE.height - DEFAULT_BUDDY_MARGIN);
-  for (let attempt = 0; attempt < 8; attempt += 1) {
+  const currentPosition = position.value;
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const distance = randomBetween(BUDDY_ROAM_TARGET_MIN_DISTANCE_PX, BUDDY_ROAM_TARGET_MAX_DISTANCE_PX);
+    const angle = randomBetween(0, Math.PI * 2);
     const candidate = clampBuddyPosition(
       {
-        x: randomBetween(DEFAULT_BUDDY_MARGIN, maxX),
-        y: randomBetween(DEFAULT_BUDDY_MARGIN, maxY),
+        x: currentPosition.x + Math.cos(angle) * distance,
+        y: currentPosition.y + Math.sin(angle) * distance,
       },
       viewport.value,
       DEFAULT_BUDDY_SIZE,
       DEFAULT_BUDDY_MARGIN,
     );
-    if (Math.hypot(candidate.x - position.value.x, candidate.y - position.value.y) >= BUDDY_ROAM_MIN_DISTANCE_PX) {
+    if (Math.hypot(candidate.x - currentPosition.x, candidate.y - currentPosition.y) >= BUDDY_ROAM_TARGET_MIN_DISTANCE_PX) {
       return candidate;
     }
   }
+
+  const horizontalDirection = currentPosition.x > viewport.value.width / 2 ? -1 : 1;
+  const verticalDirection = currentPosition.y > viewport.value.height / 2 ? -0.35 : 0.35;
   return clampBuddyPosition(
     {
-      x: position.value.x > viewport.value.width / 2 ? DEFAULT_BUDDY_MARGIN : maxX,
-      y: randomBetween(DEFAULT_BUDDY_MARGIN, maxY),
+      x: currentPosition.x + horizontalDirection * BUDDY_ROAM_TARGET_MIN_DISTANCE_PX,
+      y: currentPosition.y + verticalDirection * BUDDY_ROAM_TARGET_MIN_DISTANCE_PX,
     },
     viewport.value,
     DEFAULT_BUDDY_SIZE,
@@ -866,7 +897,47 @@ function resolveBuddyRoamTargetPosition(): BuddyPosition {
   );
 }
 
+function resolveBuddyRoamStepPosition(currentPosition: BuddyPosition, targetPosition: BuddyPosition): BuddyPosition {
+  const deltaX = targetPosition.x - currentPosition.x;
+  const deltaY = targetPosition.y - currentPosition.y;
+  const distance = Math.hypot(deltaX, deltaY);
+  if (distance <= BUDDY_ROAM_STEP_DISTANCE_PX) {
+    return targetPosition;
+  }
+  return clampBuddyPosition(
+    {
+      x: currentPosition.x + (deltaX / distance) * BUDDY_ROAM_STEP_DISTANCE_PX,
+      y: currentPosition.y + (deltaY / distance) * BUDDY_ROAM_STEP_DISTANCE_PX,
+    },
+    viewport.value,
+    DEFAULT_BUDDY_SIZE,
+    DEFAULT_BUDDY_MARGIN,
+  );
+}
+
+function resolveBuddyRoamFacing(deltaX: number): BuddyMascotFacing {
+  if (Math.abs(deltaX) < 2) {
+    return "front";
+  }
+  return deltaX < 0 ? "left" : "right";
+}
+
+function isBuddyRoamTargetReached(currentPosition: BuddyPosition, targetPosition: BuddyPosition) {
+  return Math.hypot(targetPosition.x - currentPosition.x, targetPosition.y - currentPosition.y) <= BUDDY_ROAM_TARGET_REACHED_DISTANCE_PX;
+}
+
+function finishBuddyRoamSequence(shouldPersistPosition: boolean) {
+  buddyRoamTargetPosition = null;
+  mascotMotion.value = "idle";
+  mascotFacing.value = "front";
+  if (shouldPersistPosition) {
+    persistPosition();
+  }
+  scheduleBuddyRoam();
+}
+
 function cancelBuddyRoamTimers() {
+  buddyRoamSequenceId += 1;
   if (buddyRoamTimerId !== null) {
     window.clearTimeout(buddyRoamTimerId);
     buddyRoamTimerId = null;
@@ -875,6 +946,11 @@ function cancelBuddyRoamTimers() {
     window.clearTimeout(buddyRoamMotionTimerId);
     buddyRoamMotionTimerId = null;
   }
+  if (buddyRoamStepTimerId !== null) {
+    window.clearTimeout(buddyRoamStepTimerId);
+    buddyRoamStepTimerId = null;
+  }
+  buddyRoamTargetPosition = null;
   mascotMotion.value = "idle";
   mascotFacing.value = "front";
 }

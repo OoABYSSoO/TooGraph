@@ -55,6 +55,10 @@ test("BuddyWidget lets the idle mascot roam only while the panel is closed and t
   assert.match(componentSource, /const BUDDY_ROAM_MIN_DELAY_MS = 8000;/);
   assert.match(componentSource, /const BUDDY_ROAM_MAX_DELAY_MS = 18000;/);
   assert.match(componentSource, /const BUDDY_ROAM_MOVE_DURATION_MS = 980;/);
+  assert.match(componentSource, /const BUDDY_ROAM_STEP_PAUSE_MS = 120;/);
+  assert.match(componentSource, /const BUDDY_ROAM_STEP_DISTANCE_PX = DEFAULT_BUDDY_SIZE\.width;/);
+  assert.match(componentSource, /const BUDDY_ROAM_TARGET_MIN_DISTANCE_PX = DEFAULT_BUDDY_SIZE\.width;/);
+  assert.match(componentSource, /const BUDDY_ROAM_TARGET_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE\.width \* 3;/);
   assert.match(componentSource, /const mascotMotion = ref<BuddyMascotMotion>\("idle"\);/);
   assert.match(componentSource, /const mascotFacing = ref<BuddyMascotFacing>\("front"\);/);
   assert.match(componentSource, /const canBuddyRoam = computed\(\(\) =>/);
@@ -69,19 +73,30 @@ test("BuddyWidget lets the idle mascot roam only while the panel is closed and t
 test("BuddyWidget schedules random hop movement without jump-turn spin actions", () => {
   assert.match(componentSource, /let buddyRoamTimerId: number \| null = null;/);
   assert.match(componentSource, /let buddyRoamMotionTimerId: number \| null = null;/);
+  assert.match(componentSource, /let buddyRoamStepTimerId: number \| null = null;/);
+  assert.match(componentSource, /let buddyRoamTargetPosition: BuddyPosition \| null = null;/);
+  assert.match(componentSource, /let buddyRoamSequenceId = 0;/);
   assert.match(componentSource, /function scheduleBuddyRoam\(\)/);
   assert.match(componentSource, /randomBetween\(BUDDY_ROAM_MIN_DELAY_MS, BUDDY_ROAM_MAX_DELAY_MS\)/);
   assert.match(componentSource, /function runBuddyIdleRoam\(\)/);
-  assert.match(componentSource, /function runBuddyIdleHop\(\)/);
-  assert.match(componentSource, /resolveBuddyRoamTargetPosition\(\)/);
-  assert.match(componentSource, /mascotMotion\.value = "roam";/);
+  assert.match(componentSource, /buddyRoamTargetPosition = resolveBuddyRoamTargetPosition\(\);/);
+  assert.match(componentSource, /runBuddyRoamStep\(buddyRoamSequenceId\);/);
+  assert.match(componentSource, /function runBuddyRoamStep\(sequenceId: number\)/);
+  assert.match(componentSource, /const nextPosition = resolveBuddyRoamStepPosition\(position\.value, targetPosition\);/);
+  assert.match(componentSource, /mascotFacing\.value = resolveBuddyRoamFacing\(nextPosition\.x - position\.value\.x\);/);
+  assert.match(componentSource, /buddyRoamStepTimerId = window\.setTimeout\(\(\) => \{[\s\S]*runBuddyRoamStep\(sequenceId\);[\s\S]*\}, BUDDY_ROAM_STEP_PAUSE_MS\);/);
+  assert.match(componentSource, /function resolveBuddyRoamStepPosition\(currentPosition: BuddyPosition, targetPosition: BuddyPosition\): BuddyPosition/);
+  assert.match(componentSource, /if \(distance <= BUDDY_ROAM_STEP_DISTANCE_PX\) \{/);
+  assert.match(componentSource, /currentPosition\.x \+ \(deltaX \/ distance\) \* BUDDY_ROAM_STEP_DISTANCE_PX/);
+  assert.match(componentSource, /function resolveBuddyRoamFacing\(deltaX: number\): BuddyMascotFacing/);
+  assert.match(componentSource, /function isBuddyRoamTargetReached\(currentPosition: BuddyPosition, targetPosition: BuddyPosition\)/);
   assert.match(componentSource, /'buddy-widget__avatar--hopping': mascotMotion === 'hop'/);
   assert.doesNotMatch(componentSource, /BUDDY_ROAM_SPIN_CHANCE/);
   assert.doesNotMatch(componentSource, /BUDDY_ROAM_SPIN_DURATION_MS/);
   assert.doesNotMatch(componentSource, /function runBuddyIdleSpin\(\)/);
   assert.doesNotMatch(componentSource, /mascotMotion\.value = "spin";/);
   assert.match(componentSource, /persistPosition\(\);/);
-  assert.doesNotMatch(extractFunctionBlock("runBuddyIdleHop"), /persistPosition\(\);/);
+  assert.doesNotMatch(extractFunctionBlock("runBuddyRoamStep"), /persistPosition\(\);/);
 });
 
 test("BuddyWidget tracks the pointer direction for the mascot eyes with animation-frame throttling", () => {
