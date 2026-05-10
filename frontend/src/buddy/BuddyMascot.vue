@@ -327,8 +327,8 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--facing-left {
-  --buddy-mascot-left-eye-facing-x: -80px;
-  --buddy-mascot-right-eye-facing-x: -120px;
+  --buddy-mascot-left-eye-facing-x: -70px;
+  --buddy-mascot-right-eye-facing-x: -110px;
   --buddy-mascot-eye-facing-y: 1px;
   --buddy-mascot-left-ear-x: 18px;
   --buddy-mascot-left-ear-y: 4px;
@@ -341,8 +341,8 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--facing-right {
-  --buddy-mascot-left-eye-facing-x: 120px;
-  --buddy-mascot-right-eye-facing-x: 80px;
+  --buddy-mascot-left-eye-facing-x: 110px;
+  --buddy-mascot-right-eye-facing-x: 70px;
   --buddy-mascot-eye-facing-y: 1px;
   --buddy-mascot-left-ear-x: -12px;
   --buddy-mascot-left-ear-y: 0px;
@@ -449,6 +449,14 @@ function clampLookAxis(value: number | undefined) {
   animation: buddy-mascot-tail-speaking 1.08s ease-in-out infinite;
 }
 
+.buddy-mascot--speaking .buddy-mascot__body-turn {
+  animation: buddy-mascot-speaking-hop 1.04s ease-in-out infinite;
+}
+
+.buddy-mascot--speaking .buddy-mascot__body {
+  animation: buddy-mascot-speaking-body-squash 1.04s ease-in-out infinite;
+}
+
 .buddy-mascot--speaking .buddy-mascot__sparkle {
   animation: buddy-mascot-star-pulse 520ms ease-in-out infinite;
 }
@@ -495,6 +503,14 @@ function clampLookAxis(value: number | undefined) {
 
 .buddy-mascot--tap .buddy-mascot__sparkle {
   animation: buddy-mascot-star-tap 520ms ease-out both;
+}
+
+.buddy-mascot--tap .buddy-mascot__body-turn {
+  animation: buddy-mascot-tap-hop 520ms ease-out both;
+}
+
+.buddy-mascot--tap .buddy-mascot__body {
+  animation: buddy-mascot-tap-body-squash 520ms ease-out both;
 }
 
 .buddy-mascot--tap .buddy-mascot__left-ear {
@@ -665,6 +681,35 @@ function clampLookAxis(value: number | undefined) {
   }
 }
 
+@keyframes buddy-mascot-speaking-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  34% {
+    transform: translateY(-5px);
+  }
+  62% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes buddy-mascot-speaking-body-squash {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  18% {
+    transform: scale(1.025, 0.975) translateY(2px);
+  }
+  36% {
+    transform: scale(0.982, 1.025) translateY(-2px);
+  }
+  68% {
+    transform: scale(1.01, 0.99);
+  }
+}
+
 @keyframes buddy-mascot-ear-speak-left {
   0%,
   100% {
@@ -753,6 +798,35 @@ function clampLookAxis(value: number | undefined) {
   100% {
     transform: scale(1) rotate(0deg);
     filter: brightness(1);
+  }
+}
+
+@keyframes buddy-mascot-tap-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  34% {
+    transform: translateY(-10px);
+  }
+  62% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes buddy-mascot-tap-body-squash {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  18% {
+    transform: scale(1.04, 0.96) translateY(4px);
+  }
+  38% {
+    transform: scale(0.97, 1.04) translateY(-3px);
+  }
+  68% {
+    transform: scale(1.015, 0.985);
   }
 }
 

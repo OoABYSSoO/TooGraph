@@ -111,8 +111,8 @@ test("BuddyMascot exposes tail poses and directional part offsets without body m
   assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-left"/);
   assert.match(componentSource, /class="buddy-mascot__tail-pose buddy-mascot__tail-pose--left"/);
   assert.match(componentSource, /class="buddy-mascot__body-turn"/);
-  assert.match(componentSource, /\.buddy-mascot--facing-left\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*-80px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*-120px;[\s\S]*--buddy-mascot-left-ear-x:\s*18px;[\s\S]*--buddy-mascot-right-ear-x:\s*12px;/);
-  assert.match(componentSource, /\.buddy-mascot--facing-right\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*120px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*80px;[\s\S]*--buddy-mascot-left-ear-x:\s*-12px;[\s\S]*--buddy-mascot-right-ear-x:\s*-18px;/);
+  assert.match(componentSource, /\.buddy-mascot--facing-left\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*-70px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*-110px;[\s\S]*--buddy-mascot-left-ear-x:\s*18px;[\s\S]*--buddy-mascot-right-ear-x:\s*12px;/);
+  assert.match(componentSource, /\.buddy-mascot--facing-right\s*\{[\s\S]*--buddy-mascot-left-eye-facing-x:\s*110px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*70px;[\s\S]*--buddy-mascot-left-ear-x:\s*-12px;[\s\S]*--buddy-mascot-right-ear-x:\s*-18px;/);
   assert.match(componentSource, /\.buddy-mascot--facing-left[\s\S]*\.buddy-mascot__tail-pose--right[\s\S]*opacity:\s*1;/);
   assert.match(componentSource, /\.buddy-mascot--facing-right[\s\S]*\.buddy-mascot__tail-pose--left[\s\S]*opacity:\s*1;/);
   assert.doesNotMatch(componentSource, /\.buddy-mascot--facing-left \.buddy-mascot__body-turn/);
@@ -140,6 +140,8 @@ test("BuddyMascot keeps directional eyes readable while shifting them toward the
   assert.equal(frontDistance, 160);
   assert.equal(Math.abs(facingLeftEyeCenters[1] - facingLeftEyeCenters[0]), 120);
   assert.equal(Math.abs(facingRightEyeCenters[1] - facingRightEyeCenters[0]), 120);
+  assert.equal((facingLeftEyeCenters[0] + facingLeftEyeCenters[1]) / 2, -90);
+  assert.equal((facingRightEyeCenters[0] + facingRightEyeCenters[1]) / 2, 90);
   assert.ok((facingLeftEyeCenters[0] + facingLeftEyeCenters[1]) / 2 < frontCenter);
   assert.ok((facingRightEyeCenters[0] + facingRightEyeCenters[1]) / 2 > frontCenter);
 });
@@ -247,18 +249,22 @@ test("BuddyMascot keeps the thinking body steady while ears, tail, and sparkle m
   assert.doesNotMatch(componentSource, /@keyframes buddy-mascot-thinking-body/);
 });
 
-test("BuddyMascot keeps the body stable across idle, speaking, dragging, tap, and movement", () => {
-  assert.doesNotMatch(componentSource, /\.buddy-mascot--idle[\s\S]*\.buddy-mascot__body[\s\S]*animation:/);
-  assert.doesNotMatch(componentSource, /\.buddy-mascot--speaking[\s\S]*\.buddy-mascot__body[\s\S]*animation:/);
-  assert.doesNotMatch(componentSource, /\.buddy-mascot--dragging[\s\S]*\.buddy-mascot__body[\s\S]*animation:/);
-  assert.doesNotMatch(componentSource, /\.buddy-mascot--tap[\s\S]*\.buddy-mascot__body[\s\S]*animation:/);
-  assert.doesNotMatch(componentSource, /\.buddy-mascot--motion-roam[\s\S]*\.buddy-mascot__body-turn[\s\S]*animation:/);
-  assert.doesNotMatch(componentSource, /\.buddy-mascot--motion-hop[\s\S]*\.buddy-mascot__body-turn[\s\S]*animation:/);
+test("BuddyMascot keeps the body stable except for small speaking and tap hops", () => {
+  assert.equal(extractCssBlock(componentSource, ".buddy-mascot--idle .buddy-mascot__body").trim(), "");
+  assert.equal(extractCssBlock(componentSource, ".buddy-mascot--dragging .buddy-mascot__body").trim(), "");
+  assert.equal(extractCssBlock(componentSource, ".buddy-mascot--motion-roam .buddy-mascot__body-turn").trim(), "");
+  assert.equal(extractCssBlock(componentSource, ".buddy-mascot--motion-hop .buddy-mascot__body-turn").trim(), "");
   assert.doesNotMatch(componentSource, /@keyframes buddy-mascot-idle-body/);
-  assert.doesNotMatch(componentSource, /@keyframes buddy-mascot-speaking-body/);
   assert.doesNotMatch(componentSource, /@keyframes buddy-mascot-drag-body/);
-  assert.doesNotMatch(componentSource, /@keyframes buddy-mascot-tap-body/);
   assert.doesNotMatch(componentSource, /@keyframes buddy-mascot-roam-hop/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--speaking .buddy-mascot__body-turn"), /animation:\s*buddy-mascot-speaking-hop 1\.04s ease-in-out infinite;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--speaking .buddy-mascot__body"), /animation:\s*buddy-mascot-speaking-body-squash 1\.04s ease-in-out infinite;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--tap .buddy-mascot__body-turn"), /animation:\s*buddy-mascot-tap-hop 520ms ease-out both;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--tap .buddy-mascot__body"), /animation:\s*buddy-mascot-tap-body-squash 520ms ease-out both;/);
+  assert.match(componentSource, /@keyframes buddy-mascot-speaking-hop[\s\S]*translateY\(-5px\)/);
+  assert.match(componentSource, /@keyframes buddy-mascot-speaking-body-squash[\s\S]*scale\(1\.025,\s*0\.975\)[\s\S]*scale\(0\.982,\s*1\.025\)/);
+  assert.match(componentSource, /@keyframes buddy-mascot-tap-hop[\s\S]*translateY\(-10px\)/);
+  assert.match(componentSource, /@keyframes buddy-mascot-tap-body-squash[\s\S]*scale\(1\.04,\s*0\.96\)[\s\S]*scale\(0\.97,\s*1\.04\)/);
 });
 
 test("BuddyMascot makes idle tail motion subtle so path morphing carries the expression", () => {
