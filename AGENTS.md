@@ -87,7 +87,7 @@ These instructions apply to all work in this repository and should persist acros
 - Buddy graph orchestration has two target modes:
   - Modify the current graph through a draft patch, validator, diff/preview, human approval, GraphCommandBus-style application, graph revision, and undo/redo.
   - Create a new graph template or reusable subgraph from a user goal, validate it, optionally test-run it, preview it, ask for approval, then save it as a user template that later capability selection can discover.
-- The highest-priority Buddy infrastructure is dynamic subgraph breakpoint propagation, Buddy UI reuse of standard `awaiting_human` resume flows, dynamic capability approval, graph command/revision plumbing, Buddy Home writeback templates, and unified low-level `activity_events`.
+- The established Buddy baseline now includes dynamic subgraph breakpoint propagation and Buddy floating-window reuse of standard `awaiting_human` pause/resume cards. Pause UIs should show the current produced content and context before asking for supplemental user input. The remaining highest-priority Buddy infrastructure is completing Buddy page/recovery/refusal/cancel flows, dynamic low-level approval for file writes/deletes and script execution, graph command/revision plumbing, Buddy Home writeback templates, and unified low-level `activity_events`.
 - Buddy self-evolution should prefer narrow, reversible improvements first: memory updates, session summaries, Skill revisions, graph patch drafts, reusable subgraph/template proposals, and policy suggestions. Riskier changes such as graph edits, file writes, script execution, network access, automation creation, or persona/policy changes require explicit approval and recoverable revisions.
 
 ## Skill Package Boundaries
