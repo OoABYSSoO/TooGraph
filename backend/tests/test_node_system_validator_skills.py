@@ -95,7 +95,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
             validation = validate_graph(graph)
 
         self.assertIn("agent_skill_not_agent_node_ready", [issue.code for issue in validation.issues])
-        self.assertTrue(any("needs a GraphiteUI LLM-node manifest" in issue.message for issue in validation.issues))
+        self.assertTrue(any("needs a TooGraph LLM-node manifest" in issue.message for issue in validation.issues))
 
     def test_binding_output_mapping_to_unknown_state_is_rejected(self) -> None:
         graph = _graph_with_agent_config(

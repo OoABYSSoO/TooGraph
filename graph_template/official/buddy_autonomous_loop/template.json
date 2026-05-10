@@ -72,7 +72,7 @@
       "color": "#2563eb",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "graphiteui_capability_selector",
+        "skillKey": "toograph_capability_selector",
         "nodeId": "select_capability",
         "fieldKey": "capability",
         "managed": true
@@ -86,7 +86,7 @@
       "color": "#2563eb",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "graphiteui_capability_selector",
+        "skillKey": "toograph_capability_selector",
         "nodeId": "select_capability",
         "fieldKey": "found",
         "managed": true
@@ -926,7 +926,7 @@
               "color": "#2563eb",
               "binding": {
                 "kind": "skill_output",
-                "skillKey": "graphiteui_capability_selector",
+                "skillKey": "toograph_capability_selector",
                 "nodeId": "select_capability",
                 "fieldKey": "capability",
                 "managed": true
@@ -940,7 +940,7 @@
               "color": "#2563eb",
               "binding": {
                 "kind": "skill_output",
-                "skillKey": "graphiteui_capability_selector",
+                "skillKey": "toograph_capability_selector",
                 "nodeId": "select_capability",
                 "fieldKey": "found",
                 "managed": true
@@ -1168,10 +1168,10 @@
                 }
               ],
               "config": {
-                "skillKey": "graphiteui_capability_selector",
+                "skillKey": "toograph_capability_selector",
                 "skillBindings": [
                   {
-                    "skillKey": "graphiteui_capability_selector",
+                    "skillKey": "toograph_capability_selector",
                     "outputMapping": {
                       "capability": "selected_capability",
                       "found": "capability_found"
@@ -1179,8 +1179,8 @@
                   }
                 ],
                 "skillInstructionBlocks": {
-                  "graphiteui_capability_selector": {
-                    "skillKey": "graphiteui_capability_selector",
+                  "toograph_capability_selector": {
+                    "skillKey": "toograph_capability_selector",
                     "title": "能力选择 skill instruction",
                     "content": "根据 request_understanding 和 user_message 从候选清单中选择一个启用能力。优先图模板，其次 Skill；不要选择 buddy_autonomous_loop 自身；如果用户请求可以直接回答或没有合适能力，选择 {\"kind\":\"none\"}。",
                     "source": "node.override"

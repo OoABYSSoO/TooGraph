@@ -6,11 +6,11 @@ PORT ?= 3477
 
 help:
 	@echo "Available commands:"
-	@echo "  make start            Build and start GraphiteUI on one port"
+	@echo "  make start            Build and start TooGraph on one port"
 	@echo "  make frontend-install Install frontend dependencies"
 	@echo "  make frontend-build   Build the frontend"
 	@echo "  make backend-install  Install backend dependencies"
-	@echo "  make health           Check GraphiteUI /health endpoint"
+	@echo "  make health           Check TooGraph /health endpoint"
 	@echo "  make tree             Show top-level project structure"
 
 start:

@@ -103,15 +103,15 @@ function handleOpenChange(open: boolean) {
 
 :global(.editor-close-dialog.el-dialog) {
   overflow: hidden;
-  border: 1px solid var(--graphite-glass-border);
+  border: 1px solid var(--toograph-glass-border);
   border-radius: 26px;
   padding: 0;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--graphite-glass-bg-strong);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens), var(--toograph-glass-bg-strong);
   background-blend-mode: screen, screen, normal;
   box-shadow:
     0 24px 70px rgba(66, 31, 17, 0.16),
-    var(--graphite-glass-highlight),
-    var(--graphite-glass-rim);
+    var(--toograph-glass-highlight),
+    var(--toograph-glass-rim);
   backdrop-filter: blur(30px) saturate(1.55) contrast(1.02);
 }
 
@@ -167,8 +167,8 @@ function handleOpenChange(open: boolean) {
 
 .editor-close-dialog__title {
   margin: 14px 0 8px;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 1.48rem;
   line-height: 1.2;
 }

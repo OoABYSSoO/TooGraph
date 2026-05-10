@@ -77,10 +77,10 @@ test("importGraphFromPythonSource posts Python source and returns an imported gr
     );
   }) as typeof fetch;
 
-  const graph = await importGraphFromPythonSource("GRAPHITEUI_EXPORT_VERSION = 1");
+  const graph = await importGraphFromPythonSource("TOOGRAPH_EXPORT_VERSION = 1");
 
   assert.equal(requestedUrl, "/api/graphs/import/python");
-  assert.deepEqual(JSON.parse(requestBody), { source: "GRAPHITEUI_EXPORT_VERSION = 1" });
+  assert.deepEqual(JSON.parse(requestBody), { source: "TOOGRAPH_EXPORT_VERSION = 1" });
   assert.equal(graph.name, "Imported Graph");
 
   globalThis.fetch = originalFetch;

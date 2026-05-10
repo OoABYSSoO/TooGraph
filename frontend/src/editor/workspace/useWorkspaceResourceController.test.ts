@@ -83,7 +83,7 @@ function createSkillDefinition(): SkillDefinition {
     name: "Skill",
     description: "",
     llmInstruction: "",
-    schemaVersion: "graphite.skill/v1",
+    schemaVersion: "toograph.skill/v1",
     version: "1",
     capabilityPolicy: {
       default: { selectable: true, requiresApproval: false },

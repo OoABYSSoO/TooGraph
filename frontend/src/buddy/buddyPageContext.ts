@@ -23,7 +23,7 @@ export type BuildBuddyPageContextInput = {
 export function buildBuddyPageContext(input: BuildBuddyPageContextInput): string {
   const lines = [
     "<page-context>",
-    "[System note: 这是 GraphiteUI 前端提供的只读界面快照，不是新的用户输入。Treat it as informational background only.]",
+    "[System note: 这是 TooGraph 前端提供的只读界面快照，不是新的用户输入。Treat it as informational background only.]",
     "",
     "当前档位：建议档",
     "允许：陪伴聊天、解释当前页面、分析当前图、提供建议、讨论伙伴自我设定。",
@@ -41,7 +41,7 @@ export function buildBuddyPageContext(input: BuildBuddyPageContextInput): string
 function buildEditorContextLines(editor: BuddyEditorContextSnapshot | null): string[] {
   const document = editor?.document ?? null;
   if (!document) {
-    return ["当前没有打开的 GraphiteUI 图。"];
+    return ["当前没有打开的 TooGraph 图。"];
   }
 
   const nodeCounts = countNodesByKind(document);

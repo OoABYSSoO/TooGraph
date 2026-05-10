@@ -66,11 +66,11 @@ test("EditorActionCapsule renders non-primary graph actions as icon buttons with
 test("EditorActionCapsule styles the state pill state and interactive controls", () => {
   assert.match(
     componentSource,
-    /\.editor-action-capsule\s*\{[\s\S]*position:\s*relative;[\s\S]*isolation:\s*isolate;[\s\S]*overflow:\s*hidden;[\s\S]*background:\s*var\(--graphite-glass-bg\);[\s\S]*padding:\s*8px;[\s\S]*box-shadow:\s*var\(--graphite-glass-shadow\),\s*var\(--graphite-glass-highlight\),\s*var\(--graphite-glass-rim\);[\s\S]*backdrop-filter:\s*blur\(28px\) saturate\(1\.65\) contrast\(1\.02\);[\s\S]*\}/,
+    /\.editor-action-capsule\s*\{[\s\S]*position:\s*relative;[\s\S]*isolation:\s*isolate;[\s\S]*overflow:\s*hidden;[\s\S]*background:\s*var\(--toograph-glass-bg\);[\s\S]*padding:\s*8px;[\s\S]*box-shadow:\s*var\(--toograph-glass-shadow\),\s*var\(--toograph-glass-highlight\),\s*var\(--toograph-glass-rim\);[\s\S]*backdrop-filter:\s*blur\(28px\) saturate\(1\.65\) contrast\(1\.02\);[\s\S]*\}/,
   );
   assert.match(
     componentSource,
-    /\.editor-action-capsule::before\s*\{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\);[\s\S]*mix-blend-mode:\s*screen;[\s\S]*\}/,
+    /\.editor-action-capsule::before\s*\{[\s\S]*background:\s*var\(--toograph-glass-specular\),\s*var\(--toograph-glass-lens\);[\s\S]*mix-blend-mode:\s*screen;[\s\S]*\}/,
   );
   assert.match(
     componentSource,

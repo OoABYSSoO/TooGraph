@@ -44,9 +44,9 @@ test("RunDetailPage keeps restore action on the same row as snapshot selection",
 test("RunDetailPage uses semantic status styling for the primary run badge", () => {
   assert.match(componentSource, /function statusBadgeClass\(status: string\)/);
   assert.match(componentSource, /:class="fact\.tone === 'status' \? statusBadgeClass\(fact\.value\) : undefined"/);
-  assert.match(componentSource, /\.run-detail__badges span \{[\s\S]*background:\s*var\(--graphite-status-bg,/);
-  assert.match(componentSource, /\.run-detail__metric-value\.graphite-status-badge \{[\s\S]*background:\s*var\(--graphite-status-bg,/);
-  assert.match(componentSource, /\.run-detail__content \{[\s\S]*font-family:\s*var\(--graphite-font-mono\);/);
+  assert.match(componentSource, /\.run-detail__badges span \{[\s\S]*background:\s*var\(--toograph-status-bg,/);
+  assert.match(componentSource, /\.run-detail__metric-value\.toograph-status-badge \{[\s\S]*background:\s*var\(--toograph-status-bg,/);
+  assert.match(componentSource, /\.run-detail__content \{[\s\S]*font-family:\s*var\(--toograph-font-mono\);/);
 });
 
 test("RunDetailPage prioritizes status facts and final result before dense diagnostics", () => {

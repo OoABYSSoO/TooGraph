@@ -89,8 +89,8 @@ class RuntimeSkillInvocationTests(unittest.TestCase):
                         "print(json.dumps({",
                         "  'status': 'succeeded',",
                         "  'payload_keys': sorted(payload.keys()),",
-                        "  'artifact_dir': os.environ.get('GRAPHITE_SKILL_ARTIFACT_DIR'),",
-                        "  'artifact_relative_dir': os.environ.get('GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR'),",
+                        "  'artifact_dir': os.environ.get('TOOGRAPH_SKILL_ARTIFACT_DIR'),",
+                        "  'artifact_relative_dir': os.environ.get('TOOGRAPH_SKILL_ARTIFACT_RELATIVE_DIR'),",
                         "}))",
                     ]
                 ),
@@ -132,7 +132,7 @@ class RuntimeSkillInvocationTests(unittest.TestCase):
                         "print(json.dumps({",
                         "  'status': 'succeeded',",
                         "  'python': sys.executable,",
-                        "  'venv': os.environ.get('GRAPHITE_SKILL_VENV', ''),",
+                        "  'venv': os.environ.get('TOOGRAPH_SKILL_VENV', ''),",
                         "}))",
                     ]
                 ),
@@ -157,7 +157,7 @@ class RuntimeSkillInvocationTests(unittest.TestCase):
             temp_path = Path(temp_dir)
             skill_dir = temp_path / "managed_env"
             skill_dir.mkdir()
-            (skill_dir / "requirements.txt").write_text("missing_graphiteui_dependency>=1\n", encoding="utf-8")
+            (skill_dir / "requirements.txt").write_text("missing_toograph_dependency>=1\n", encoding="utf-8")
             (skill_dir / "run.py").write_text(
                 "\n".join(
                     [
@@ -165,8 +165,8 @@ class RuntimeSkillInvocationTests(unittest.TestCase):
                         "import os",
                         "print(json.dumps({",
                         "  'status': 'succeeded',",
-                        "  'venv': os.environ.get('GRAPHITE_SKILL_VENV'),",
-                        "  'requirements': os.environ.get('GRAPHITE_SKILL_REQUIREMENTS'),",
+                        "  'venv': os.environ.get('TOOGRAPH_SKILL_VENV'),",
+                        "  'requirements': os.environ.get('TOOGRAPH_SKILL_REQUIREMENTS'),",
                         "}))",
                     ]
                 ),
@@ -246,7 +246,7 @@ class RuntimeSkillInvocationTests(unittest.TestCase):
                 "\n".join(
                     [
                         "pytest>=8,<10  # already installed test runner",
-                        "missing-graphiteui-dependency>=1; python_version < '0'",
+                        "missing-toograph-dependency>=1; python_version < '0'",
                     ]
                 ),
                 encoding="utf-8",

@@ -108,15 +108,15 @@ test("EditorHumanReviewPanel uses the shared right-side glass inspector surface"
   assert.match(componentSource, /\.editor-human-review-panel \{[^}]*width:\s*100%;/);
   assert.match(componentSource, /\.editor-human-review-panel \{[\s\S]*padding:\s*12px;/);
   assert.match(componentSource, /\.editor-human-review-panel \{[\s\S]*background:\s*transparent;/);
-  assert.match(componentSource, /\.editor-human-review-panel__surface \{[\s\S]*border:\s*1px solid var\(--graphite-glass-border\);/);
+  assert.match(componentSource, /\.editor-human-review-panel__surface \{[\s\S]*border:\s*1px solid var\(--toograph-glass-border\);/);
   assert.match(
     componentSource,
-    /\.editor-human-review-panel__surface \{[\s\S]*border-radius:\s*28px;[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\),\s*var\(--graphite-glass-bg-strong\);/,
+    /\.editor-human-review-panel__surface \{[\s\S]*border-radius:\s*28px;[\s\S]*background:\s*var\(--toograph-glass-specular\),\s*var\(--toograph-glass-lens\),\s*var\(--toograph-glass-bg-strong\);/,
   );
   assert.match(componentSource, /\.editor-human-review-panel__surface \{[\s\S]*background-blend-mode:\s*screen,\s*screen,\s*normal;/);
   assert.match(
     componentSource,
-    /\.editor-human-review-panel__surface \{[\s\S]*box-shadow:\s*var\(--graphite-glass-shadow\),\s*var\(--graphite-glass-highlight\),\s*var\(--graphite-glass-rim\);/,
+    /\.editor-human-review-panel__surface \{[\s\S]*box-shadow:\s*var\(--toograph-glass-shadow\),\s*var\(--toograph-glass-highlight\),\s*var\(--toograph-glass-rim\);/,
   );
   assert.match(componentSource, /\.editor-human-review-panel__surface \{[\s\S]*backdrop-filter:\s*blur\(34px\) saturate\(1\.7\) contrast\(1\.02\);/);
 });

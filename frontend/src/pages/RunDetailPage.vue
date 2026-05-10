@@ -523,7 +523,7 @@ function snapshotStatusLabel(status: string) {
 }
 
 function statusBadgeClass(status: string) {
-  return `graphite-status-badge graphite-status-badge--${status.replaceAll("_", "-")}`;
+  return `toograph-status-badge toograph-status-badge--${status.replaceAll("_", "-")}`;
 }
 </script>
 
@@ -536,10 +536,10 @@ function statusBadgeClass(status: string) {
 .run-detail__hero,
 .run-detail__panel,
 .run-detail__empty {
-  border: 1px solid var(--graphite-border);
+  border: 1px solid var(--toograph-border);
   border-radius: 24px;
-  background: var(--graphite-surface-panel);
-  box-shadow: var(--graphite-shadow-panel);
+  background: var(--toograph-surface-panel);
+  box-shadow: var(--toograph-shadow-panel);
 }
 
 .run-detail__hero,
@@ -608,8 +608,8 @@ function statusBadgeClass(status: string) {
 
 .run-detail__title {
   margin: 8px 0 10px;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 2rem;
 }
 
@@ -699,20 +699,20 @@ function statusBadgeClass(status: string) {
 .run-detail__metric-value {
   min-width: 0;
   overflow: hidden;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-mono);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-mono);
   font-size: 0.95rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.run-detail__metric-value.graphite-status-badge {
+.run-detail__metric-value.toograph-status-badge {
   width: fit-content;
-  border: 1px solid var(--graphite-status-border, transparent);
+  border: 1px solid var(--toograph-status-border, transparent);
   border-radius: 999px;
   padding: 4px 10px;
-  background: var(--graphite-status-bg, rgba(255, 248, 240, 0.92));
-  color: var(--graphite-status-fg, rgb(154, 52, 18));
+  background: var(--toograph-status-bg, rgba(255, 248, 240, 0.92));
+  color: var(--toograph-status-fg, rgb(154, 52, 18));
 }
 
 .run-detail__snapshot-switcher {
@@ -750,8 +750,8 @@ function statusBadgeClass(status: string) {
 
 .run-detail__panel-heading h3 {
   margin: 4px 0 0;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 1.18rem;
 }
 
@@ -763,22 +763,22 @@ function statusBadgeClass(status: string) {
 }
 
 .run-detail__badges span {
-  border: 1px solid var(--graphite-status-border, transparent);
+  border: 1px solid var(--toograph-status-border, transparent);
   border-radius: 999px;
   padding: 4px 10px;
-  background: var(--graphite-status-bg, rgba(255, 248, 240, 0.92));
-  color: var(--graphite-status-fg, rgb(154, 52, 18));
-  font-family: var(--graphite-font-mono);
+  background: var(--toograph-status-bg, rgba(255, 248, 240, 0.92));
+  color: var(--toograph-status-fg, rgb(154, 52, 18));
+  font-family: var(--toograph-font-mono);
   font-size: 0.84rem;
 }
 
 .run-detail__timeline-heading span {
-  border: 1px solid var(--graphite-status-border, transparent);
+  border: 1px solid var(--toograph-status-border, transparent);
   border-radius: 999px;
   padding: 4px 10px;
-  background: var(--graphite-status-bg, rgba(255, 248, 240, 0.92));
-  color: var(--graphite-status-fg, rgb(154, 52, 18));
-  font-family: var(--graphite-font-mono);
+  background: var(--toograph-status-bg, rgba(255, 248, 240, 0.92));
+  color: var(--toograph-status-fg, rgb(154, 52, 18));
+  font-family: var(--toograph-font-mono);
   font-size: 0.84rem;
 }
 
@@ -815,7 +815,7 @@ function statusBadgeClass(status: string) {
 }
 
 .run-detail__live-heading strong {
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
 }
 
 .run-detail__live-heading span {
@@ -824,7 +824,7 @@ function statusBadgeClass(status: string) {
   padding: 4px 10px;
   background: rgba(219, 234, 254, 0.72);
   color: rgb(29, 78, 216);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.78rem;
 }
 
@@ -847,7 +847,7 @@ function statusBadgeClass(status: string) {
   overflow: hidden;
   margin: 0;
   color: rgba(60, 41, 20, 0.78);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.86rem;
   line-height: 1.65;
   white-space: pre-wrap;
@@ -871,7 +871,7 @@ function statusBadgeClass(status: string) {
   border-radius: 16px;
   background: rgba(248, 250, 252, 0.9);
   color: rgba(17, 24, 39, 0.9);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.9rem;
   line-height: 1.7;
   padding: 16px;
@@ -908,7 +908,7 @@ function statusBadgeClass(status: string) {
 .run-detail__timeline-rail {
   width: 5px;
   border-radius: 999px;
-  background: var(--graphite-status-fg, rgb(154, 52, 18));
+  background: var(--toograph-status-fg, rgb(154, 52, 18));
 }
 
 .run-detail__timeline-body {
@@ -916,7 +916,7 @@ function statusBadgeClass(status: string) {
 }
 
 .run-detail__timeline-heading strong {
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
 }
 
 @media (max-width: 1120px) {

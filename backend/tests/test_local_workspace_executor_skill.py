@@ -28,7 +28,7 @@ def _run_skill_script(script_path: Path, payload: dict[str, object], *, repo_roo
         text=True,
         capture_output=True,
         cwd=script_path.parent,
-        env={**os.environ, "GRAPHITE_REPO_ROOT": str(repo_root)},
+        env={**os.environ, "TOOGRAPH_REPO_ROOT": str(repo_root)},
         check=True,
     )
     parsed = json.loads(completed.stdout)

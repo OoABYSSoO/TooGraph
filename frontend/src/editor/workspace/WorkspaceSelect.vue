@@ -1,11 +1,11 @@
 <template>
   <div class="workspace-select" :class="minWidthClassName">
     <ElSelect
-      class="workspace-select__trigger graphite-select"
+      class="workspace-select__trigger toograph-select"
       :model-value="modelValue || undefined"
       :placeholder="placeholder"
       :disabled="disabled"
-      popper-class="graphite-select-popper workspace-select__popper"
+      popper-class="toograph-select-popper workspace-select__popper"
       @update:model-value="handleValueChange"
     >
       <ElOption

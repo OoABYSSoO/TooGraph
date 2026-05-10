@@ -169,28 +169,28 @@ def _parse_skill_file(path: Path, source_scope: SkillSourceScope) -> SkillDefini
     raw = path.read_text(encoding="utf-8")
     frontmatter, body = _split_frontmatter(raw, path)
     payload = yaml.safe_load(frontmatter) or {}
-    graphite = payload.get("graphite") or {}
-    _reject_legacy_targets(graphite)
-    _reject_legacy_label(graphite)
-    _reject_legacy_llm_fields(graphite)
-    _reject_legacy_skill_protocol_fields(graphite)
+    toograph = payload.get("toograph") or {}
+    _reject_legacy_targets(toograph)
+    _reject_legacy_label(toograph)
+    _reject_legacy_llm_fields(toograph)
+    _reject_legacy_skill_protocol_fields(toograph)
 
-    skill_key = str(graphite.get("skill_key") or payload.get("name") or path.stem)
-    name = str(payload.get("name") or graphite.get("name") or skill_key)
+    skill_key = str(toograph.get("skill_key") or payload.get("name") or path.stem)
+    name = str(payload.get("name") or toograph.get("name") or skill_key)
     description = str(payload.get("description") or "").strip()
 
-    input_schema = _parse_io_fields(graphite.get("input_schema", []))
-    output_schema = _parse_io_fields(graphite.get("output_schema", []))
+    input_schema = _parse_io_fields(toograph.get("input_schema", []))
+    output_schema = _parse_io_fields(toograph.get("output_schema", []))
 
     definition = SkillDefinition(
         skillKey=skill_key,
         name=name,
         description=description or body.splitlines()[0].strip() if body.strip() else "",
-        llmInstruction=str(graphite.get("llmInstruction") or graphite.get("llm_instruction") or "").strip(),
-        schemaVersion=str(graphite.get("schema_version") or graphite.get("schemaVersion") or ""),
-        version=str(graphite.get("version") or payload.get("version") or ""),
-        permissions=[str(item) for item in graphite.get("permissions", [])],
-        runtime=_parse_runtime_spec(graphite.get("runtime")),
+        llmInstruction=str(toograph.get("llmInstruction") or toograph.get("llm_instruction") or "").strip(),
+        schemaVersion=str(toograph.get("schema_version") or toograph.get("schemaVersion") or ""),
+        version=str(toograph.get("version") or payload.get("version") or ""),
+        permissions=[str(item) for item in toograph.get("permissions", [])],
+        runtime=_parse_runtime_spec(toograph.get("runtime")),
         inputSchema=input_schema,
         outputSchema=output_schema,
     )

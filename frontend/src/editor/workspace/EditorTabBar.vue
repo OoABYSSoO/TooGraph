@@ -406,7 +406,7 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   --editor-tab-width: 176px;
   --editor-tab-height: 40px;
   --editor-tab-gap: 12px;
-  --editor-tab-bar-paper: var(--graphite-glass-bg);
+  --editor-tab-bar-paper: var(--toograph-glass-bg);
   position: relative;
   display: flex;
   box-sizing: border-box;
@@ -444,15 +444,15 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   width: auto;
   max-width: var(--editor-tab-strip-max-width);
   flex: 1 1 auto;
-  border: 1px solid var(--graphite-glass-border);
+  border: 1px solid var(--toograph-glass-border);
   border-radius: 20px;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--editor-tab-bar-paper);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens), var(--editor-tab-bar-paper);
   background-blend-mode: screen, screen, normal;
   padding: 8px;
   box-shadow:
-    var(--graphite-glass-shadow),
-    var(--graphite-glass-highlight),
-    var(--graphite-glass-rim);
+    var(--toograph-glass-shadow),
+    var(--toograph-glass-highlight),
+    var(--toograph-glass-rim);
   backdrop-filter: blur(28px) saturate(1.65) contrast(1.02);
 }
 
@@ -486,12 +486,12 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   flex: 0 0 auto;
   width: 40px;
   height: 40px;
-  border: 1px solid var(--graphite-glass-border);
+  border: 1px solid var(--toograph-glass-border);
   border-radius: 14px;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--graphite-glass-bg-strong);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens), var(--toograph-glass-bg-strong);
   background-blend-mode: screen, screen, normal;
   color: rgba(111, 52, 22, 0.94);
-  box-shadow: var(--graphite-glass-highlight), var(--graphite-glass-rim);
+  box-shadow: var(--toograph-glass-highlight), var(--toograph-glass-rim);
   backdrop-filter: blur(24px) saturate(1.55) contrast(1.02);
   cursor: pointer;
 }

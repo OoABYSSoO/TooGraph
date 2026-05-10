@@ -76,9 +76,9 @@ test("formatRunArtifactValue keeps strings and pretty prints structured payloads
   assert.equal(formatRunArtifactValue(null), "");
   assert.equal(
     formatRunArtifactValue({
-      answer: "GraphiteUI",
+      answer: "TooGraph",
     }),
-    '{\n  "answer": "GraphiteUI"\n}',
+    '{\n  "answer": "TooGraph"\n}',
   );
 });
 

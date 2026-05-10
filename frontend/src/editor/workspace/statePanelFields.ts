@@ -26,7 +26,7 @@ export type StateColorOption = {
   swatch: string;
 };
 
-const STATE_KEY_COUNTER_METADATA_KEY = "graphiteui_state_key_counter";
+const STATE_KEY_COUNTER_METADATA_KEY = "toograph_state_key_counter";
 
 export const STATE_FIELD_TYPE_OPTIONS: StateFieldType[] = [
   "text",

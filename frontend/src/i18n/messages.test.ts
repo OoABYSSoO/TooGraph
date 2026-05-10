@@ -13,7 +13,7 @@ import {
 test("i18n messages expose all supported product languages with identical key coverage", () => {
   assert.deepEqual(SUPPORTED_LOCALES, ["zh-CN", "zh-TW", "en-US", "ja-JP", "ko-KR", "es-ES", "fr-FR", "de-DE"]);
   assert.equal(DEFAULT_LOCALE, "zh-CN");
-  assert.equal(LOCALE_STORAGE_KEY, "graphiteui:locale");
+  assert.equal(LOCALE_STORAGE_KEY, "toograph:locale");
   assert.deepEqual(
     LANGUAGE_OPTIONS.map((option) => option.locale),
     SUPPORTED_LOCALES,
@@ -28,13 +28,13 @@ test("i18n messages expose all supported product languages with identical key co
 });
 
 test("i18n messages preserve product and technical proper nouns", () => {
-  assert.equal(messages["zh-CN"].app.productName, "GraphiteUI");
-  assert.equal(messages["en-US"].app.productName, "GraphiteUI");
-  assert.equal(messages["ja-JP"].app.productName, "GraphiteUI");
-  assert.equal(messages["ko-KR"].app.productName, "GraphiteUI");
-  assert.equal(messages["es-ES"].app.productName, "GraphiteUI");
-  assert.equal(messages["fr-FR"].app.productName, "GraphiteUI");
-  assert.equal(messages["de-DE"].app.productName, "GraphiteUI");
+  assert.equal(messages["zh-CN"].app.productName, "TooGraph");
+  assert.equal(messages["en-US"].app.productName, "TooGraph");
+  assert.equal(messages["ja-JP"].app.productName, "TooGraph");
+  assert.equal(messages["ko-KR"].app.productName, "TooGraph");
+  assert.equal(messages["es-ES"].app.productName, "TooGraph");
+  assert.equal(messages["fr-FR"].app.productName, "TooGraph");
+  assert.equal(messages["de-DE"].app.productName, "TooGraph");
   assert.match(messages["zh-CN"].common.state, /State/);
   assert.match(messages["en-US"].common.state, /State/);
   assert.match(messages["zh-CN"].settings.openAiCompatibleProvider, /OpenAI/);

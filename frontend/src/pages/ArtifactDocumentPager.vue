@@ -157,7 +157,7 @@ async function loadActiveDocument() {
 
 .artifact-document-pager__title strong {
   overflow: hidden;
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -197,7 +197,7 @@ async function loadActiveDocument() {
 .artifact-document-pager__counter {
   min-width: 54px;
   color: rgba(60, 41, 20, 0.68);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.82rem;
   text-align: center;
 }
@@ -211,7 +211,7 @@ async function loadActiveDocument() {
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.86);
   color: rgba(17, 24, 39, 0.9);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.86rem;
   line-height: 1.68;
   padding: 14px;
@@ -267,7 +267,7 @@ async function loadActiveDocument() {
   border-radius: 999px;
   background: rgba(219, 234, 254, 0.62);
   color: rgb(29, 78, 216);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.78rem;
   padding: 4px 9px;
   text-overflow: ellipsis;

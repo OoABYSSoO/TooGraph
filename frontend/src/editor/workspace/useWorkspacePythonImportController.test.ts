@@ -75,7 +75,7 @@ function createHarness() {
       importedSources.push(source);
       return graphDocument("Imported Flow");
     },
-    isGraphiteUiPythonExportSource: (source) => source.includes("GraphiteUI"),
+    isTooGraphPythonExportSource: (source) => source.includes("TooGraph"),
     setMessageFeedbackForTab: (tabId, nextFeedback) => {
       feedback.push({ tabId, feedback: nextFeedback });
     },
@@ -95,10 +95,10 @@ function createHarness() {
   };
 }
 
-test("useWorkspacePythonImportController imports GraphiteUI Python exports as dirty new tabs", async () => {
+test("useWorkspacePythonImportController imports TooGraph Python exports as dirty new tabs", async () => {
   const harness = createHarness();
   const input = {
-    files: [createFile("flow.py", "# GraphiteUI export")],
+    files: [createFile("flow.py", "# TooGraph export")],
     value: "flow.py",
   };
 
@@ -107,7 +107,7 @@ test("useWorkspacePythonImportController imports GraphiteUI Python exports as di
 
   assert.equal(harness.clicked.count, 1);
   assert.equal(input.value, "");
-  assert.deepEqual(harness.importedSources, ["# GraphiteUI export"]);
+  assert.deepEqual(harness.importedSources, ["# TooGraph export"]);
   assert.equal(harness.workspace.value.tabs.length, 2);
   assert.equal(harness.workspace.value.activeTabId, harness.workspace.value.tabs[1]?.tabId);
   assert.equal(harness.workspace.value.tabs[1]?.title, "Imported Flow");
@@ -130,5 +130,5 @@ test("useWorkspacePythonImportController warns for non-export files unless fallb
   assert.equal(harness.workspace.value.tabs.length, 1);
   assert.equal(harness.feedback.length, 1);
   assert.equal(harness.feedback[0]?.feedback.tone, "warning");
-  assert.equal(harness.feedback[0]?.feedback.message, "plain.py is not a GraphiteUI Python export.");
+  assert.equal(harness.feedback[0]?.feedback.message, "plain.py is not a TooGraph Python export.");
 });

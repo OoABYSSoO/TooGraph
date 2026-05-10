@@ -30,7 +30,7 @@ import type {
 } from "../types/node-system.ts";
 import type { SkillDefinition, SkillIoField } from "../types/skills.ts";
 
-const STATE_KEY_COUNTER_METADATA_KEY = "graphiteui_state_key_counter";
+const STATE_KEY_COUNTER_METADATA_KEY = "toograph_state_key_counter";
 const DEFAULT_MATERIALIZED_STATE_COLORS = [
   "#d97706",
   "#2563eb",

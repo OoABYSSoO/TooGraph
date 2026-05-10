@@ -126,7 +126,7 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
         self.assertEqual(local_provider["label"], "OpenAI-compatible Custom Provider")
         self.assertEqual(
             local_provider["description"],
-            "Custom OpenAI-compatible endpoint used by GraphiteUI for local or private model routing.",
+            "Custom OpenAI-compatible endpoint used by TooGraph for local or private model routing.",
         )
         self.assertEqual(local_provider["transport"], "openai-compatible")
         self.assertEqual(local_provider["base_url"], "http://127.0.0.1:8888/v1")

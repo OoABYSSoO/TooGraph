@@ -13,7 +13,7 @@ from app.skills.definitions import _parse_native_skill_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-BUILDER_SKILL_DIR = REPO_ROOT / "skill" / "official" / "graphiteUI_skill_builder"
+BUILDER_SKILL_DIR = REPO_ROOT / "skill" / "official" / "toograph_skill_builder"
 BUILDER_MANIFEST_PATH = BUILDER_SKILL_DIR / "skill.json"
 BUILDER_BEFORE_LLM_PATH = BUILDER_SKILL_DIR / "before_llm.py"
 BUILDER_AFTER_LLM_PATH = BUILDER_SKILL_DIR / "after_llm.py"
@@ -33,11 +33,11 @@ def _run_skill_script(script_path: Path, payload: dict[str, object]) -> dict[str
     return parsed
 
 
-class GraphiteUiSkillBuilderSkillTests(unittest.TestCase):
+class TooGraphSkillBuilderSkillTests(unittest.TestCase):
     def test_manifest_exposes_only_file_content_outputs(self) -> None:
         definition = _parse_native_skill_manifest(BUILDER_MANIFEST_PATH, SkillSourceScope.OFFICIAL).definition
 
-        self.assertEqual(definition.skill_key, "graphiteUI_skill_builder")
+        self.assertEqual(definition.skill_key, "toograph_skill_builder")
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
         self.assertEqual(definition.llm_node_blockers, [])
         self.assertEqual(definition.permissions, ["file_read"])
@@ -54,7 +54,7 @@ class GraphiteUiSkillBuilderSkillTests(unittest.TestCase):
         payload = _run_skill_script(BUILDER_BEFORE_LLM_PATH, {"graph_state": {"requirement": "Create a skill."}})
 
         context = str(payload.get("context") or "")
-        self.assertIn("GraphiteUI Skill 编写指南", context)
+        self.assertIn("TooGraph Skill 编写指南", context)
         self.assertIn("skill.json", context)
         self.assertIn("SKILL.md", context)
         self.assertIn("requirements.txt", context)
@@ -64,7 +64,7 @@ class GraphiteUiSkillBuilderSkillTests(unittest.TestCase):
 
     def test_after_llm_returns_exactly_the_skill_identity_and_file_content_fields(self) -> None:
         skill_json = {
-            "schemaVersion": "graphite.skill/v1",
+            "schemaVersion": "toograph.skill/v1",
             "skillKey": "tone_rewriter",
             "name": "Tone Rewriter",
             "description": "当用户需要改写文本语气时选择此技能。",
@@ -115,7 +115,7 @@ class GraphiteUiSkillBuilderSkillTests(unittest.TestCase):
             {
                 "skill_key": "safe_generated_skill",
                 "skill_json": {
-                    "schemaVersion": "graphite.skill/v1",
+                    "schemaVersion": "toograph.skill/v1",
                     "skillKey": "safe_generated_skill",
                     "name": "Safe Generated Skill",
                     "description": "Generate safe output.",
@@ -141,7 +141,7 @@ class GraphiteUiSkillBuilderSkillTests(unittest.TestCase):
         self.assertEqual(
             payload["skill_json"],
             {
-                "schemaVersion": "graphite.skill/v1",
+                "schemaVersion": "toograph.skill/v1",
                 "skillKey": "safe_generated_skill",
                 "name": "Safe Generated Skill",
                 "description": "Generate safe output.",

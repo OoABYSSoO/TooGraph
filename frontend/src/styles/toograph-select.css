@@ -1,4 +1,4 @@
-.graphite-select {
+.toograph-select {
   min-width: 0;
   width: 100%;
   --el-color-primary: #c96b1f;
@@ -7,7 +7,7 @@
   --el-text-color-primary: #3c2914;
 }
 
-.graphite-select .el-select__wrapper {
+.toograph-select .el-select__wrapper {
   min-width: 0;
   min-height: 36px;
   border: 1px solid rgba(154, 52, 18, 0.16);
@@ -17,60 +17,60 @@
   padding: 0 12px;
 }
 
-.graphite-select .el-select__wrapper:hover {
+.toograph-select .el-select__wrapper:hover {
   border-color: rgba(154, 52, 18, 0.24);
   background: rgba(255, 252, 247, 0.94);
 }
 
-.graphite-select .el-select__wrapper.is-focused {
+.toograph-select .el-select__wrapper.is-focused {
   border-color: rgba(201, 107, 31, 0.28);
   box-shadow: 0 0 0 3px rgba(201, 107, 31, 0.08);
 }
 
-.graphite-select .el-select__placeholder {
+.toograph-select .el-select__placeholder {
   color: rgba(60, 41, 20, 0.52);
 }
 
-.graphite-select .el-select__selected-item,
-.graphite-select .el-select__input-text,
-.graphite-select .el-select__selection-text {
+.toograph-select .el-select__selected-item,
+.toograph-select .el-select__input-text,
+.toograph-select .el-select__selection-text {
   color: #3c2914;
   font-size: 0.84rem;
 }
 
-.graphite-select .el-select__caret {
+.toograph-select .el-select__caret {
   color: rgba(60, 41, 20, 0.58);
 }
 
-.graphite-select .is-disabled .el-select__wrapper {
+.toograph-select .is-disabled .el-select__wrapper {
   cursor: not-allowed;
   opacity: 0.62;
   background: rgba(250, 243, 231, 0.78);
 }
 
-.graphite-select-popper.el-popper {
+.toograph-select-popper.el-popper {
   border: 1px solid rgba(154, 52, 18, 0.16);
   border-radius: 16px;
   background: rgba(255, 248, 240, 0.98);
   box-shadow: 0 16px 34px rgba(60, 41, 20, 0.12);
 }
 
-.graphite-select-popper .el-select-dropdown__list {
+.toograph-select-popper .el-select-dropdown__list {
   padding: 8px;
 }
 
-.graphite-select-popper .el-select-dropdown__item {
+.toograph-select-popper .el-select-dropdown__item {
   min-height: 36px;
   border-radius: 12px;
   color: #3c2914;
 }
 
-.graphite-select-popper .el-select-dropdown__item.hover,
-.graphite-select-popper .el-select-dropdown__item:hover {
+.toograph-select-popper .el-select-dropdown__item.hover,
+.toograph-select-popper .el-select-dropdown__item:hover {
   background: rgba(154, 52, 18, 0.08);
 }
 
-.graphite-select-popper .el-select-dropdown__item.is-selected {
+.toograph-select-popper .el-select-dropdown__item.is-selected {
   color: #9a3412;
   background: rgba(154, 52, 18, 0.12);
 }

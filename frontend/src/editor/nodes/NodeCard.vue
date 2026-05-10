@@ -1894,7 +1894,7 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   border: 1px solid rgba(var(--node-card-kind-rgb), 0.2);
   border-radius: var(--node-card-radius, 28px);
   overflow: visible;
-  background: var(--graphite-surface-card);
+  background: var(--toograph-surface-card);
   box-shadow: 0 22px 40px rgba(60, 41, 20, 0.08);
   user-select: none;
   display: flex;
@@ -1954,7 +1954,7 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   border: 1px solid rgba(var(--node-card-kind-rgb), 0.18);
   border-radius: 999px;
   padding: 4px 14px;
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.86rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -2033,7 +2033,7 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 
 .node-card__title {
   margin: 0;
-  font-family: var(--graphite-font-display);
+  font-family: var(--toograph-font-display);
   font-size: 1.72rem;
   line-height: 1.15;
   color: #1f2937;

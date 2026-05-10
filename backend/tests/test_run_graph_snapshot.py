@@ -13,7 +13,7 @@ class RunGraphSnapshotTests(unittest.TestCase):
     def test_snapshot_tests_do_not_depend_on_template_fixtures(self) -> None:
         self.assertEqual(
             [record["template_id"] for record in list_template_records()],
-            ["advanced_web_research_loop", "buddy_autonomous_loop", "graphiteui_skill_creation_workflow"],
+            ["advanced_web_research_loop", "buddy_autonomous_loop", "toograph_skill_creation_workflow"],
         )
 
 

@@ -58,5 +58,5 @@ test("PresetsPage uses local short shadows so dense management cards do not stac
   assert.match(componentSource, /--presets-page-card-shadow:/);
   assert.match(componentSource, /box-shadow:\s*var\(--presets-page-panel-shadow\);/);
   assert.match(componentSource, /\.presets-page__metric,\n\.presets-page__card \{[\s\S]*box-shadow:\s*var\(--presets-page-card-shadow\);/);
-  assert.doesNotMatch(componentSource, /box-shadow:\s*var\(--graphite-shadow-panel\);/);
+  assert.doesNotMatch(componentSource, /box-shadow:\s*var\(--toograph-shadow-panel\);/);
 });

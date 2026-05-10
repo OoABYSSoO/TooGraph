@@ -128,5 +128,5 @@ test("SkillsPage uses local short shadows so dense management cards do not stack
   assert.match(componentSource, /--skills-page-card-shadow:/);
   assert.match(componentSource, /box-shadow:\s*var\(--skills-page-panel-shadow\);/);
   assert.match(componentSource, /\.skills-page__metric,\r?\n\.skills-page__selector,\r?\n\.skills-page__detail \{[\s\S]*box-shadow:\s*var\(--skills-page-card-shadow\);/);
-  assert.doesNotMatch(componentSource, /box-shadow:\s*var\(--graphite-shadow-panel\);/);
+  assert.doesNotMatch(componentSource, /box-shadow:\s*var\(--toograph-shadow-panel\);/);
 });

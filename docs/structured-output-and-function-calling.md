@@ -1,6 +1,6 @@
 # 结构化输出与 Function Calling 调研
 
-本文记录 `demo/` 中三个参考项目对 JSON 结构化回复和工具调用的约束方式，并给出 GraphiteUI 是否应引入 function calling 概念的判断。
+本文记录 `demo/` 中三个参考项目对 JSON 结构化回复和工具调用的约束方式，并给出 TooGraph 是否应引入 function calling 概念的判断。
 
 调研对象：
 
@@ -25,13 +25,13 @@
 | --- | --- | --- |
 | `claude-code-source` | 模型级 `json_schema` 输出格式 + Zod/JSON Schema + 结果校验 | LLM 节点写 state 时使用 provider 原生 structured output |
 | `hermes-agent` | OpenAI function calling 工具 schema + 参数解析纠偏 + raw tool call parser | 本地模型和开放模型的工具调用容错、错误回传和自修复 |
-| `openclaw` | 多 provider 工具 schema 归一化 + strict tool schema + TypeBox/Zod/AJV + 文本工具调用兜底解析 | GraphiteUI 的模型适配层和跨 provider schema 标准化 |
+| `openclaw` | 多 provider 工具 schema 归一化 + strict tool schema + TypeBox/Zod/AJV + 文本工具调用兜底解析 | TooGraph 的模型适配层和跨 provider schema 标准化 |
 
-对 GraphiteUI 的结论：
+对 TooGraph 的结论：
 
 - 应该引入 function calling 的概念，但不应把它作为产品主协议。
-- GraphiteUI 的产品主协议仍应是 `node_system`、`state_schema`、Skill、Subgraph 和 graph run。
-- function calling 应作为“某些模型/provider 的调用适配层”，用于增强结构约束，而不是绕过 GraphiteUI 的 skill registry、权限、审批和审计。
+- TooGraph 的产品主协议仍应是 `node_system`、`state_schema`、Skill、Subgraph 和 graph run。
+- function calling 应作为“某些模型/provider 的调用适配层”，用于增强结构约束，而不是绕过 TooGraph 的 skill registry、权限、审批和审计。
 - 对不支持 function calling 或 structured output 的本地模型，应保留 JSON Schema prompt fallback、运行时校验和 repair retry。
 
 ## 约束层级
@@ -82,7 +82,7 @@
 - 工具执行结果。
 - 是否发生 repair retry。
 
-这对 GraphiteUI 尤其重要，因为图运行需要可审计、可回放、可定位。
+这对 TooGraph 尤其重要，因为图运行需要可审计、可回放、可定位。
 
 ## Claude Code 的实际做法
 
@@ -197,7 +197,7 @@ MCP 的 `outputSchema` 还要求 root 是 object。如果 Zod union 生成了 ro
 
 ### Claude Code 的启发
 
-GraphiteUI 可以直接借鉴这条分层：
+TooGraph 可以直接借鉴这条分层：
 
 ```text
 state_schema / skill schema
@@ -208,7 +208,7 @@ state_schema / skill schema
   -> 校验失败时 repair retry 或 run error
 ```
 
-它适合 GraphiteUI 的两个场景：
+它适合 TooGraph 的两个场景：
 
 - LLM 节点写普通 state。
 - LLM 节点为一个 Skill 生成入参。
@@ -321,7 +321,7 @@ Hermes 还把 OpenAI 工具协议转给其他 provider：
 
 ### Hermes 的启发
 
-Hermes 适合借鉴的不是“让 GraphiteUI 改成多轮 agent loop”，而是这些工程策略：
+Hermes 适合借鉴的不是“让 TooGraph 改成多轮 agent loop”，而是这些工程策略：
 
 - 每轮只暴露当前真实启用、真实可用的工具。
 - 工具 schema 不仅约束参数，也描述能力边界。
@@ -391,7 +391,7 @@ demo/openclaw/src/agents/pi-tools-parameter-schema.ts
 - 对顶层 `anyOf/oneOf` 的对象 union，会尽量合并成单个 object schema，提高 provider 兼容性。
 - 空 schema 会归一化为 `{ type: "object", properties: {} }`。
 
-这对 GraphiteUI 很重要。GraphiteUI 如果直接把内部 schema 原样发给所有 provider，会很容易遇到某些模型或网关 400。
+这对 TooGraph 很重要。TooGraph 如果直接把内部 schema 原样发给所有 provider，会很容易遇到某些模型或网关 400。
 
 ### OpenAI strict tool schema
 
@@ -444,7 +444,7 @@ Ollama：
 tools -> [{ type: "function", function: { name, description, parameters } }]
 ```
 
-同一个 GraphiteUI schema 以后也应走这种 provider adapter，而不是在每个节点、每个技能里硬编码 provider 差异。
+同一个 TooGraph schema 以后也应走这种 provider adapter，而不是在每个节点、每个技能里硬编码 provider 差异。
 
 ### 文本工具调用兜底
 
@@ -486,10 +486,10 @@ run --args-json must be valid JSON
 
 ### OpenClaw 的启发
 
-OpenClaw 对 GraphiteUI 的最大价值是 provider compatibility：
+OpenClaw 对 TooGraph 的最大价值是 provider compatibility：
 
-- GraphiteUI 的内部 schema 不应该等同于 provider schema。
-- 需要一层 `SchemaAdapter` 把 GraphiteUI schema 转成 provider 能接受的 schema。
+- TooGraph 的内部 schema 不应该等同于 provider schema。
+- 需要一层 `SchemaAdapter` 把 TooGraph schema 转成 provider 能接受的 schema。
 - strict 模式需要能力探测和兼容性检查，不能盲目打开。
 - 对本地模型、OpenAI-compatible 网关和特殊模型输出格式，需要 parser fallback，但 fallback 后必须回到统一执行协议。
 
@@ -521,7 +521,7 @@ function calling 不是模型真的在运行函数。它是一种“模型声明
       "type": "function",
       "function": {
         "name": "web_search",
-        "arguments": "{\"query\":\"GraphiteUI structured output\"}"
+        "arguments": "{\"query\":\"TooGraph structured output\"}"
       }
     }
   ]
@@ -553,19 +553,19 @@ function calling 的作用不是替代权限系统，而是提升模型输出“
 
 - 不能保证模型选择的工具一定正确。
 - 不能替代业务校验和权限检查。
-- 不能替代 GraphiteUI 的 skill registry。
-- 不能自动理解 GraphiteUI 的 state_schema 和 outputMapping。
+- 不能替代 TooGraph 的 skill registry。
+- 不能自动理解 TooGraph 的 state_schema 和 outputMapping。
 - 不能保证所有 provider 都支持同一套 schema。
 - 不能覆盖不支持 tool calling 的本地模型。
 - 不能防止工具执行产生副作用，所以审批和审计仍然必须在 runtime。
 
-## GraphiteUI 是否应该引入 Function Calling
+## TooGraph 是否应该引入 Function Calling
 
 建议引入，但只作为适配层和增强能力，不作为产品主干。
 
 ### 不建议的路线
 
-不建议把 GraphiteUI 改造成“模型直接 function call 技能”的主协议：
+不建议把 TooGraph 改造成“模型直接 function call 技能”的主协议：
 
 ```text
 LLM sees all enabled skills
@@ -575,7 +575,7 @@ LLM sees all enabled skills
 
 原因：
 
-- GraphiteUI 已经确定“图才是 Agent，单个 LLM 节点只做一次模型运行或一次能力调用准备”。
+- TooGraph 已经确定“图才是 Agent，单个 LLM 节点只做一次模型运行或一次能力调用准备”。
 - 一个 LLM 节点最多一个能力来源，不能把多工具选择和多轮调用藏进单节点。
 - 手动 Skill、动态 `capability` state 已经有明确协议。
 - 直接 tool_call 容易绕开 `skillBindings.outputMapping`、`result_package`、run detail 和权限审批。
@@ -583,10 +583,10 @@ LLM sees all enabled skills
 
 ### 建议的路线
 
-GraphiteUI 可以把 function calling 放在 provider adapter 内：
+TooGraph 可以把 function calling 放在 provider adapter 内：
 
 ```text
-GraphiteUI node_system / state_schema / skill schema
+TooGraph node_system / state_schema / skill schema
   -> 构造本次 LLM 节点需要的结构化任务
   -> provider 支持 structured output 时，用 response_format/json_schema
   -> provider 更适合 tool/function calling 时，用单工具 function schema 约束入参生成
@@ -595,7 +595,7 @@ GraphiteUI node_system / state_schema / skill schema
   -> 写 state / result_package / run detail
 ```
 
-也就是说，GraphiteUI 对外仍然表达：
+也就是说，TooGraph 对外仍然表达：
 
 - 这个 LLM 节点绑定了一个 Skill。
 - 这个 LLM 节点接收了一个 `capability` state，且该对象的 `kind` 是 `skill`、`subgraph` 或 `none`。
@@ -607,7 +607,7 @@ provider 内部可以选择：
 - 用 function calling 让模型生成一个“虚拟函数调用”，函数名就是当前唯一能力，参数就是 skill input。
 - 用 prompt fallback 让模型输出 JSON。
 
-最终 GraphiteUI runtime 看到的都应该是同一种结果：
+最终 TooGraph runtime 看到的都应该是同一种结果：
 
 ```json
 {
@@ -671,7 +671,7 @@ provider 内部可以选择：
 }
 ```
 
-但运行时仍应把它还原为 GraphiteUI 的 skill input，然后走现有 skill runtime。
+但运行时仍应把它还原为 TooGraph 的 skill input，然后走现有 skill runtime。
 
 ### 动态 Capability State
 
@@ -698,7 +698,7 @@ runtime executes capability
 runtime writes mapped outputs or result_package
 ```
 
-## 建议的 GraphiteUI 分层设计
+## 建议的 TooGraph 分层设计
 
 ### 1. Schema Source
 
@@ -716,7 +716,7 @@ runtime writes mapped outputs or result_package
 增加 provider schema adapter：
 
 ```text
-GraphiteUI schema
+TooGraph schema
   -> canonical JSON Schema
   -> provider-specific schema
 ```
@@ -804,12 +804,12 @@ Skill 执行还应记录：
 
 ## 最终建议
 
-GraphiteUI 应该把“结构化输出”作为比 function calling 更上层的正式能力。
+TooGraph 应该把“结构化输出”作为比 function calling 更上层的正式能力。
 
 推荐心智：
 
 ```text
-GraphiteUI 需要的是可校验的结构化 JSON。
+TooGraph 需要的是可校验的结构化 JSON。
 function calling 是某些 provider 生成结构化 JSON 的一种手段。
 ```
 
@@ -820,6 +820,6 @@ function calling 是某些 provider 生成结构化 JSON 的一种手段。
 3. provider 支持 structured output 时优先使用。
 4. provider 适合 function calling 时，把 function calling 作为 driver 的一种策略。
 5. 不支持时 fallback 到 prompt JSON，但仍然 runtime validate。
-6. 所有能力执行仍走 GraphiteUI skill/subgraph runtime，不能直接执行 provider tool call。
+6. 所有能力执行仍走 TooGraph skill/subgraph runtime，不能直接执行 provider tool call。
 
-这样既能获得 function calling 的结构约束收益，又不会破坏 GraphiteUI 已经收束好的图优先架构。
+这样既能获得 function calling 的结构约束收益，又不会破坏 TooGraph 已经收束好的图优先架构。

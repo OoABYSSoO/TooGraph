@@ -11,8 +11,8 @@ const componentSource = readFileSync(resolve(currentDirectory, "WorkspaceSelect.
 test("WorkspaceSelect is built on Element Plus select instead of reka-ui", () => {
   assert.match(componentSource, /import \{[\s\S]*ElOption,[\s\S]*ElSelect[\s\S]*\} from "element-plus";/);
   assert.match(componentSource, /<ElSelect[\s\S]*:model-value="modelValue(?: \|\| undefined)?"/);
-  assert.match(componentSource, /class="workspace-select__trigger graphite-select"/);
-  assert.match(componentSource, /popper-class="graphite-select-popper workspace-select__popper"/);
+  assert.match(componentSource, /class="workspace-select__trigger toograph-select"/);
+  assert.match(componentSource, /popper-class="toograph-select-popper workspace-select__popper"/);
   assert.match(componentSource, /<ElOption[\s\S]*v-for="option in options"/);
   assert.doesNotMatch(componentSource, /from "reka-ui"/);
   assert.doesNotMatch(componentSource, /<SelectRoot/);

@@ -11,7 +11,7 @@ import {
 } from "./frontend-build-plan.mjs";
 
 function createFixture() {
-  const root = mkdtempSync(join(tmpdir(), "graphiteui-frontend-build-"));
+  const root = mkdtempSync(join(tmpdir(), "toograph-frontend-build-"));
   const frontendDir = join(root, "frontend");
   const distDir = join(frontendDir, "dist");
   mkdirSync(join(frontendDir, "src"), { recursive: true });
@@ -186,7 +186,7 @@ test("allows a forced frontend build through an environment flag", () => {
     const plan = resolveFrontendBuildPlan({
       frontendDir: fixture.frontendDir,
       distDir: fixture.distDir,
-      env: { GRAPHITEUI_FORCE_FRONTEND_BUILD: "1" },
+      env: { TOOGRAPH_FORCE_FRONTEND_BUILD: "1" },
     });
 
     assert.equal(plan.shouldBuild, true);

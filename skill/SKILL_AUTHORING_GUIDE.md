@@ -1,13 +1,13 @@
-# GraphiteUI Skill 编写指南
+# TooGraph Skill 编写指南
 
-本文说明 GraphiteUI 当前 Skill 包的结构、运行意义和编写约束。它同时面向两类读者：
+本文说明 TooGraph 当前 Skill 包的结构、运行意义和编写约束。它同时面向两类读者：
 
 - 想手工创建或维护 Skill 的用户。
 - 后续技能生成能力，用来判断应该生成哪些文件、哪些内容不该生成。
 
 ## 核心心智
 
-Skill 是 GraphiteUI 图运行中的显式能力单元。它不是一个隐藏 Agent，也不应该自己决定图如何继续执行。
+Skill 是 TooGraph 图运行中的显式能力单元。它不是一个隐藏 Agent，也不应该自己决定图如何继续执行。
 
 一个 LLM 节点使用 Skill 时，职责链路是：
 
@@ -16,13 +16,13 @@ Skill 是 GraphiteUI 图运行中的显式能力单元。它不是一个隐藏 A
 -> 可选 before_llm.py 补充技能上下文
 -> LLM 根据 state、skill.json 和有效 llmInstruction 生成结构化技能参数
 -> 可选 after_llm.py 执行、校验或规范化
--> GraphiteUI runtime 根据 outputSchema 和 outputMapping 写入 state
+-> TooGraph runtime 根据 outputSchema 和 outputMapping 写入 state
 ```
 
 因此：
 
 - Skill 脚本只产出 JSON 结果，不直接写图 state。
-- state 绑定永远由 GraphiteUI runtime 负责。
+- state 绑定永远由 TooGraph runtime 负责。
 - 一个 LLM 节点一次最多使用一个显式能力。
 - 如果需要多步工具链，应拆成多个节点和边，而不是让一个 Skill 内部多轮自主调用。
 
@@ -49,11 +49,11 @@ skill/
       after_llm.py      # 可选
 ```
 
-`skill/official/` 保存 GraphiteUI 自带 Skill 包，默认只读，由仓库版本管理。`skill/user/` 保存用户自定义 Skill 包，也可以被 Git 追踪，适合沉淀为项目或团队能力。`skill/settings.json` 保存当前环境如何使用这些 Skill，目前只管理启用状态；它由程序自动生成和补齐，不属于 Skill 包内容，也不应进入 Git。
+`skill/official/` 保存 TooGraph 自带 Skill 包，默认只读，由仓库版本管理。`skill/user/` 保存用户自定义 Skill 包，也可以被 Git 追踪，适合沉淀为项目或团队能力。`skill/settings.json` 保存当前环境如何使用这些 Skill，目前只管理启用状态；它由程序自动生成和补齐，不属于 Skill 包内容，也不应进入 Git。
 
 `before_llm.py` 和 `after_llm.py` 使用固定文件名，不在 `skill.json` 中配置入口。
 
-如果生命周期脚本只使用 Python 标准库，不需要依赖文件。只要使用标准库以外的包，就应该在 Skill 包内放置 `requirements.txt` 并写清版本范围。GraphiteUI 当前会根据 Python Skill 包内显式的 `requirements.txt` 触发依赖检查和环境创建，不根据提示词临时安装未声明依赖。
+如果生命周期脚本只使用 Python 标准库，不需要依赖文件。只要使用标准库以外的包，就应该在 Skill 包内放置 `requirements.txt` 并写清版本范围。TooGraph 当前会根据 Python Skill 包内显式的 `requirements.txt` 触发依赖检查和环境创建，不根据提示词临时安装未声明依赖。
 
 ## 依赖文件与运行环境
 
@@ -65,14 +65,14 @@ Python Skill 的依赖规则：
 
 运行时处理规则：
 
-1. 如果 Skill 没有 `requirements.txt`，生命周期脚本直接使用当前 GraphiteUI 后端 Python 运行。
-2. 如果 Skill 有 `requirements.txt`，GraphiteUI 会先检查当前执行 Python 是否已经满足依赖版本。
+1. 如果 Skill 没有 `requirements.txt`，生命周期脚本直接使用当前 TooGraph 后端 Python 运行。
+2. 如果 Skill 有 `requirements.txt`，TooGraph 会先检查当前执行 Python 是否已经满足依赖版本。
 3. 如果当前 Python 已满足依赖，继续使用当前 Python，不额外创建环境。
-4. 如果当前 Python 不满足依赖，GraphiteUI 会在 `backend/data/skills/envs/` 下按 `skillKey + requirements.txt 内容 + Python 版本 + 平台` 的哈希创建或复用虚拟环境。
+4. 如果当前 Python 不满足依赖，TooGraph 会在 `backend/data/skills/envs/` 下按 `skillKey + requirements.txt 内容 + Python 版本 + 平台` 的哈希创建或复用虚拟环境。
 5. 创建和安装依赖时优先使用 `uv`；如果当前机器没有 `uv`，再回退到标准库 `venv` 加 `pip`。
 6. 该虚拟环境属于运行时缓存和用户数据，不进入 Git 管理，也不应该被手工移动到官方 `skill/` 目录。
 
-`requirements.txt` 是 Skill 的可迁移运行契约。即使某个依赖已经存在于主项目环境中，也应该在 Skill 自己的依赖文件里声明，这样迁移到其他 GraphiteUI 环境时仍能被检查和安装。
+`requirements.txt` 是 Skill 的可迁移运行契约。即使某个依赖已经存在于主项目环境中，也应该在 Skill 自己的依赖文件里声明，这样迁移到其他 TooGraph 环境时仍能被检查和安装。
 
 ## `skill.json`
 
@@ -82,7 +82,7 @@ Python Skill 的依赖规则：
 
 ```json
 {
-  "schemaVersion": "graphite.skill/v1",
+  "schemaVersion": "toograph.skill/v1",
   "skillKey": "example_skill",
   "name": "示例技能",
   "description": "当用户需要执行某类明确能力时选择此技能。",
@@ -112,7 +112,7 @@ Python Skill 的依赖规则：
 
 字段含义：
 
-- `schemaVersion`：固定为 `graphite.skill/v1`。
+- `schemaVersion`：固定为 `toograph.skill/v1`。
 - `skillKey`：稳定机器标识，也用于目录名。只能使用安全的相对标识，不要包含 `/`、`\`、`:`。
 - `name`：用户可见名称。
 - `description`：什么时候应该选择这个技能。能力选择器会把它作为适用场景说明。
@@ -141,7 +141,7 @@ Python Skill 的依赖规则：
 
 ```json
 {
-  "schemaVersion": "graphiteui.skill-settings/v1",
+  "schemaVersion": "toograph.skill-settings/v1",
   "entries": {
     "web_search": {
       "enabled": true
@@ -204,7 +204,7 @@ Python Skill 的依赖规则：
 }
 ```
 
-GraphiteUI 会把 `context` 注入技能入参规划提示词中的 `Skill Pre-LLM Context` 区域。这个上下文应短而准，避免塞入大段日志、完整文件树或无关数据。
+TooGraph 会把 `context` 注入技能入参规划提示词中的 `Skill Pre-LLM Context` 区域。这个上下文应短而准，避免塞入大段日志、完整文件树或无关数据。
 
 ## `after_llm.py`
 
@@ -221,7 +221,7 @@ GraphiteUI 会把 `context` 注入技能入参规划提示词中的 `Skill Pre-L
 不适合做：
 
 - 自己选择或修改图 state 名称。
-- 直接写 GraphiteUI state。
+- 直接写 TooGraph state。
 - 私下进行多轮模型调用。
 - 绕过权限、启用状态、审计记录或白名单。
 
@@ -326,7 +326,7 @@ Skill 能力必须显式声明，不靠 prompt 文本约束安全边界。
 - 读取 `.env`、`.git` 或受保护设置目录。
 - 把密钥写入 state、文档或日志。
 - 把大文件或媒体内容 base64 塞入 state。
-- 绕过 GraphiteUI 明确的权限、审批和白名单策略。
+- 绕过 TooGraph 明确的权限、审批和白名单策略。
 
 ## 与图 state 的关系
 

@@ -3,13 +3,13 @@
     <div class="node-card__agent-capability-row">
       <div class="node-card__agent-skill-select-shell" @pointerdown.stop @click.stop>
         <ElSelect
-          class="node-card__agent-skill-select graphite-select"
+          class="node-card__agent-skill-select toograph-select"
           :class="{ 'node-card__agent-skill-select--empty': isSkillEmpty }"
           :model-value="selectedSkillKey"
           :placeholder="skillPlaceholder"
           :disabled="skillSelectDisabled"
           filterable
-          popper-class="graphite-select-popper node-card__agent-skill-popper"
+          popper-class="toograph-select-popper node-card__agent-skill-popper"
           :aria-label="t('nodeCard.selectSkill')"
           @update:model-value="emit('update:selected-skill', String($event ?? ''))"
         >

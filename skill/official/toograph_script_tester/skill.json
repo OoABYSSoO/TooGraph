@@ -1,9 +1,9 @@
 {
-  "schemaVersion": "graphite.skill/v1",
-  "skillKey": "graphiteUI_script_tester",
-  "name": "GraphiteUI Script Tester",
+  "schemaVersion": "toograph.skill/v1",
+  "skillKey": "toograph_script_tester",
+  "name": "TooGraph Script Tester",
   "description": "当用户提供脚本并希望根据当前系统环境自动编写测试用例、运行测试、查看成功结果或报错时选择此技能。",
-  "llmInstruction": "你已绑定 GraphiteUI Script Tester。根据当前图 state 中的用户需求、脚本内容和 before_llm.py 注入的系统环境上下文，生成一次可运行的测试请求。如果输入 state 里传入的是可读取的本地文件路径字符串，before_llm.py 会把该文件内容追加到上下文中，你应把它当作被测试脚本的原文依据。只生成 files 和 command。files 必须包含被测试脚本、测试用例以及运行测试需要的最小辅助文件；path 必须是临时测试目录内的相对路径，content 必须是完整文件内容。command 必须是参数数组，使用 before_llm.py 标明当前系统可用且允许的命令，例如 python -m pytest、node --test、bash 脚本等。测试应保持确定性，不访问网络，不读取敏感路径，不依赖仓库状态。运行结果由技能运行时返回，不要在模型输出中伪造测试结果。",
+  "llmInstruction": "你已绑定 TooGraph Script Tester。根据当前图 state 中的用户需求、脚本内容和 before_llm.py 注入的系统环境上下文，生成一次可运行的测试请求。如果输入 state 里传入的是可读取的本地文件路径字符串，before_llm.py 会把该文件内容追加到上下文中，你应把它当作被测试脚本的原文依据。只生成 files 和 command。files 必须包含被测试脚本、测试用例以及运行测试需要的最小辅助文件；path 必须是临时测试目录内的相对路径，content 必须是完整文件内容。command 必须是参数数组，使用 before_llm.py 标明当前系统可用且允许的命令，例如 python -m pytest、node --test、bash 脚本等。测试应保持确定性，不访问网络，不读取敏感路径，不依赖仓库状态。运行结果由技能运行时返回，不要在模型输出中伪造测试结果。",
   "version": "1.0.0",
   "timeoutSeconds": 45,
   "permissions": ["file_write", "subprocess"],

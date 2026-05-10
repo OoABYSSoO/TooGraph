@@ -13,7 +13,7 @@ if str(SKILL_DIR) not in sys.path:
 from capability_catalog import normalize_selected_capability  # noqa: E402
 
 
-def graphiteui_capability_selector(**skill_inputs: Any) -> dict[str, Any]:
+def toograph_capability_selector(**skill_inputs: Any) -> dict[str, Any]:
     return normalize_selected_capability(**skill_inputs)
 
 
@@ -24,7 +24,7 @@ def main() -> None:
         payload = {}
     if not isinstance(payload, dict):
         payload = {}
-    print(json.dumps(graphiteui_capability_selector(**payload), ensure_ascii=False))
+    print(json.dumps(toograph_capability_selector(**payload), ensure_ascii=False))
 
 
 if __name__ == "__main__":

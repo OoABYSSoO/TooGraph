@@ -26,7 +26,7 @@ function buildDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [],
         writes: [{ state: "question", mode: "replace" }],
-        config: { value: "What is GraphiteUI?" },
+        config: { value: "What is TooGraph?" },
       },
       answer_helper: {
         kind: "agent",

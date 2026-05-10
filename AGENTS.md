@@ -1,4 +1,4 @@
-# GraphiteUI Agent Instructions
+# TooGraph Agent Instructions
 
 These instructions apply to all work in this repository and should persist across new Codex sessions.
 
@@ -9,10 +9,10 @@ These instructions apply to all work in this repository and should persist acros
 
 ## Start Workflow
 
-- After making code changes, restart GraphiteUI with the repository's standard cross-platform command: `npm start`.
+- After making code changes, restart TooGraph with the repository's standard cross-platform command: `npm start`.
 - Treat `node scripts/start.mjs` as the underlying standard start command for this repository; `npm start` should resolve to it.
-- GraphiteUI uses a single-port start model. The default public URL is `http://127.0.0.1:3477`, and the port can be overridden with `PORT=<port> npm start`.
-- `npm start` should reuse `frontend/dist` when its build manifest hash matches the current frontend inputs instead of rebuilding every launch. Use `GRAPHITEUI_FORCE_FRONTEND_BUILD=1 npm start` when a forced frontend rebuild is needed.
+- TooGraph uses a single-port start model. The default public URL is `http://127.0.0.1:3477`, and the port can be overridden with `PORT=<port> npm start`.
+- `npm start` should reuse `frontend/dist` when its build manifest hash matches the current frontend inputs instead of rebuilding every launch. Use `TOOGRAPH_FORCE_FRONTEND_BUILD=1 npm start` when a forced frontend rebuild is needed.
 - `npm run dev` is intentionally not a supported project command.
 - On Windows PowerShell, if execution policy blocks `npm.ps1`, use `npm.cmd start`.
 - `scripts/start.sh` remains the standard Bash wrapper for Linux, macOS, Git Bash, and WSL, and should stay behaviorally aligned with `scripts/start.mjs`.
@@ -26,7 +26,7 @@ These instructions apply to all work in this repository and should persist acros
   - Configure the `local` / Custom OpenAI-compatible Provider in the Model Providers page; the current local default base URL is `http://127.0.0.1:8888/v1`.
   - Save or discover the model list in the UI, then choose the default text model there.
 - Model execution reads only the saved Model Providers configuration and the default model selections from the UI. Do not document or reintroduce model provider setup through startup environment variables.
-- Keep GraphiteUI's own startup guidance on `npm start` and `node scripts/start.mjs`; those commands are not replaced by local runtime instructions.
+- Keep TooGraph's own startup guidance on `npm start` and `node scripts/start.mjs`; those commands are not replaced by local runtime instructions.
 
 ## UI Implementation Policy
 
@@ -46,13 +46,13 @@ These instructions apply to all work in this repository and should persist acros
 
 - Keep changes scoped to the request, but leave the touched area coherent: remove confusing duplication, stale UI states, and obvious footguns introduced or exposed by the work.
 - Protect user data and local configuration. Do not commit local runtime state, logs, generated build output, credentials, or machine-specific settings unless explicitly requested.
-- Treat `backend/data/settings`, `.graphiteui_*`, `.dev_*` logs, `dist`, and `.worktrees` as local/runtime artifacts unless a task explicitly targets them.
+- Treat `backend/data/settings`, `.toograph_*`, `.dev_*` logs, `dist`, and `.worktrees` as local/runtime artifacts unless a task explicitly targets them.
 - Prefer automatic, discoverable behavior over hidden manual steps when it improves the user's workflow, but make side effects visible and reversible.
 - Before finishing, run the smallest meaningful verification set for the changed surface; for UI work, include a visual check when practical. Clearly report any skipped or failing verification.
 
 ## Graph-First Product Architecture
 
-- GraphiteUI product behavior should be framed by graph templates whenever practical. Persistent operations, local file edits, memory updates, buddy self-configuration, and other side effects should happen because a designated graph/template ran, not because hidden product-specific imperative code made the decision.
+- TooGraph product behavior should be framed by graph templates whenever practical. Persistent operations, local file edits, memory updates, buddy self-configuration, and other side effects should happen because a designated graph/template ran, not because hidden product-specific imperative code made the decision.
 - Keep node responsibilities clear:
   - A whole graph is the Agent. Do not treat a single node as an autonomous multi-step agent.
   - LLM nodes perform one model turn. They reason, classify, plan, generate structured state, or prepare one capability call.
@@ -74,15 +74,15 @@ These instructions apply to all work in this repository and should persist acros
 ## Buddy Autonomous Agent Direction
 
 - Treat `docs/future/buddy-autonomous-agent-roadmap.md` as the durable direction for Buddy autonomy and self-evolution. Treat `docs/current_project_status.md` as the current implementation snapshot. If these conflict, update the snapshot or fold still-valid facts into the roadmap instead of inventing a third source of truth.
-- The `demo/hermes-agent/` project is a capability reference, not an architecture to copy. GraphiteUI should translate Hermes-style abilities into graph templates, explicit Skill calls, state, approvals, run records, revisions, and artifacts.
-- Hermes-style autonomy means more than tool use: multi-step capability loops, memory/session recall, skill creation and improvement, scheduled or triggered runs, delegation, safety guardrails, result budgeting, and self-improvement from execution traces. In GraphiteUI these must be expressed as auditable graph flows rather than a hidden agent loop.
-- Skill in GraphiteUI means a single controlled capability call for one LLM-node turn. A Skill can read context, prepare deterministic data, run a script, search, write one controlled output, or return artifacts. It must not own multi-step autonomy, retry loops, result review, final response generation, long-term memory policy, or follow-up capability selection.
+- The `demo/hermes-agent/` project is a capability reference, not an architecture to copy. TooGraph should translate Hermes-style abilities into graph templates, explicit Skill calls, state, approvals, run records, revisions, and artifacts.
+- Hermes-style autonomy means more than tool use: multi-step capability loops, memory/session recall, skill creation and improvement, scheduled or triggered runs, delegation, safety guardrails, result budgeting, and self-improvement from execution traces. In TooGraph these must be expressed as auditable graph flows rather than a hidden agent loop.
+- Skill in TooGraph means a single controlled capability call for one LLM-node turn. A Skill can read context, prepare deterministic data, run a script, search, write one controlled output, or return artifacts. It must not own multi-step autonomy, retry loops, result review, final response generation, long-term memory policy, or follow-up capability selection.
 - Multi-step intelligence belongs to graph templates: LLM node -> condition -> one Skill or dynamic subgraph execution -> `result_package` or mapped Skill outputs -> LLM review -> condition loop, pause, approval, failure handling, or final output.
 - Do not create a monolithic `self_evolve` Skill or Buddy-specific hidden runtime. Buddy self-evolution should be a graph-template pipeline that turns run traces, user corrections, failures, successes, and Buddy Home context into structured improvement candidates, validates or tests them, asks for human review when needed, and only then applies changes through controlled commands or Skills.
 - Existing Buddy templates are the starting point, not throwaway scaffolding:
   - `buddy_autonomous_loop` is the visible Buddy run path: context input, request intake, capability loop, final response, and a single user-facing `final_reply`.
   - `buddy_self_review` is the background review path: it should produce memory and evolution plans, not silently mutate Buddy Home or graph assets.
-  - `graphiteui_skill_creation_workflow` is the reference pattern for graph-expressed creation workflows: clarify, confirm examples, generate files, test, review, approve, then write through controlled capability calls.
+  - `toograph_skill_creation_workflow` is the reference pattern for graph-expressed creation workflows: clarify, confirm examples, generate files, test, review, approve, then write through controlled capability calls.
 - Buddy graph orchestration has two target modes:
   - Modify the current graph through a draft patch, validator, diff/preview, human approval, GraphCommandBus-style application, graph revision, and undo/redo.
   - Create a new graph template or reusable subgraph from a user goal, validate it, optionally test-run it, preview it, ask for approval, then save it as a user template that later capability selection can discover.
@@ -119,7 +119,7 @@ These instructions apply to all work in this repository and should persist acros
 
 - Automatic behavior should be visible, reversible, and auditable. Important side effects should leave run detail entries, artifact records, warnings/errors, buddy action logs, revision IDs, diffs, or undo records as appropriate.
 - Human review should be part of the graph/template/command flow when required, not a hidden UI-only prompt. Approval should happen before applying the side effect it authorizes.
-- Buddy and agent graph edits must go through GraphiteUI's command path, validator, audit trail, and undo/redo system. Do not simulate DOM clicks or mutate graph JSON invisibly.
+- Buddy and agent graph edits must go through TooGraph's command path, validator, audit trail, and undo/redo system. Do not simulate DOM clicks or mutate graph JSON invisibly.
 
 ## Buddy Memory and Context Hygiene
 
@@ -136,4 +136,4 @@ These instructions apply to all work in this repository and should persist acros
 
 ## Notes
 
-- `scripts/start.mjs` and `scripts/start.sh` should release occupied GraphiteUI ports before starting services again.
+- `scripts/start.mjs` and `scripts/start.sh` should release occupied TooGraph ports before starting services again.

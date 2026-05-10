@@ -4,7 +4,7 @@ export const SUPPORTED_LOCALES = ["zh-CN", "zh-TW", "en-US", "ja-JP", "ko-KR", "
 export type AppLocale = (typeof SUPPORTED_LOCALES)[number];
 
 export const DEFAULT_LOCALE: AppLocale = "zh-CN";
-export const LOCALE_STORAGE_KEY = "graphiteui:locale";
+export const LOCALE_STORAGE_KEY = "toograph:locale";
 
 export const LANGUAGE_OPTIONS = [
   { locale: "zh-CN", label: "简体中文", shortLabel: "简" },
@@ -20,7 +20,7 @@ export const LANGUAGE_OPTIONS = [
 const baseMessages = {
   "zh-CN": {
     app: {
-      productName: "GraphiteUI",
+      productName: "TooGraph",
       subtitle: "Workflow Studio",
       loadingWorkspace: "正在同步模板和图列表…",
     },
@@ -125,7 +125,7 @@ const baseMessages = {
     },
     home: {
       eyebrow: "Workspace",
-      title: "GraphiteUI 工作台",
+      title: "TooGraph 工作台",
       body: "最近运行、模板入口和已保存的图都会在这里汇合。",
       createGraph: "新建图",
       openEditor: "打开编排器",
@@ -485,7 +485,7 @@ const baseMessages = {
       codexOpenVerificationStep: "打开 OpenAI 授权页",
       codexOpenVerificationStepBody: "浏览器会打开 ChatGPT 授权页，网页登录状态可直接复用。",
       codexBrowserCallbackStep: "等待本机回调",
-      codexBrowserCallbackStepBody: "授权成功后，OpenAI 会回到 localhost:1455，GraphiteUI 会自动保存登录态。",
+      codexBrowserCallbackStepBody: "授权成功后，OpenAI 会回到 localhost:1455，TooGraph 会自动保存登录态。",
       codexDeviceCodeStep: "输入设备码",
       codexDeviceCodeStepBody: "在 OpenAI 页面输入下面的设备码。",
       codexDeviceLoginWaitingBody: "这是备用设备码流程；完成后这里会自动更新。",
@@ -789,7 +789,7 @@ const baseMessages = {
     buddy: {
       panelLabel: "伙伴对话面板",
       eyebrow: "伙伴",
-      title: "GraphiteUI 伙伴",
+      title: "TooGraph 伙伴",
       open: "打开伙伴对话",
       dragHint: "拖拽移动，点击对话",
       modeLabel: "图操作档位",
@@ -968,7 +968,7 @@ const baseMessages = {
   },
   "en-US": {
     app: {
-      productName: "GraphiteUI",
+      productName: "TooGraph",
       subtitle: "Workflow Studio",
       loadingWorkspace: "Syncing templates and graphs...",
     },
@@ -1073,7 +1073,7 @@ const baseMessages = {
     },
     home: {
       eyebrow: "Workspace",
-      title: "GraphiteUI Workspace",
+      title: "TooGraph Workspace",
       body: "Recent runs, templates, and saved graphs meet here.",
       createGraph: "New graph",
       openEditor: "Open editor",
@@ -1421,7 +1421,7 @@ const baseMessages = {
       codexLoginHelp: "Use ChatGPT sign-in first when you do not have an API key.",
       codexProviderUnavailable: "The backend did not return the ChatGPT login provider template.",
       codexLoggedInTitle: "ChatGPT connected",
-      codexLoggedInHelp: "GraphiteUI can now run graphs with the Codex models available to this ChatGPT account.",
+      codexLoggedInHelp: "TooGraph can now run graphs with the Codex models available to this ChatGPT account.",
       codexLoggedIn: "Signed in",
       codexLoginExpired: "Sign-in expired",
       codexNotLoggedIn: "Not signed in",
@@ -1433,11 +1433,11 @@ const baseMessages = {
       codexOpenVerificationStep: "Open the OpenAI authorization page",
       codexOpenVerificationStepBody: "The browser opens the ChatGPT authorization page and can reuse your web sign-in.",
       codexBrowserCallbackStep: "Wait for local callback",
-      codexBrowserCallbackStepBody: "After authorization, OpenAI returns to localhost:1455 and GraphiteUI saves the sign-in.",
+      codexBrowserCallbackStepBody: "After authorization, OpenAI returns to localhost:1455 and TooGraph saves the sign-in.",
       codexDeviceCodeStep: "Enter the device code",
       codexDeviceCodeStepBody: "Enter the device code below on the OpenAI page.",
       codexDeviceLoginWaitingBody: "This is the fallback device-code flow. This page updates automatically when it completes.",
-      codexAutoDetectHint: "GraphiteUI checks automatically after authorization. You can also check once manually.",
+      codexAutoDetectHint: "TooGraph checks automatically after authorization. You can also check once manually.",
       codexFallbackLogin: "Authorization page did not open?",
       codexFallbackLoginHint: "The Codex embedded browser may block external sign-in. Copy the authorization link into Chrome or Edge.",
       codexAdvancedLoginOptions: "Advanced sign-in options",
@@ -1454,7 +1454,7 @@ const baseMessages = {
       codexLogout: "Sign out",
       codexLogoutQuestion: "Click again to sign out of ChatGPT",
       codexLoginRequired: "Sign in to ChatGPT first.",
-      codexLoginStarted: "Verification page opened. GraphiteUI will detect sign-in automatically.",
+      codexLoginStarted: "Verification page opened. TooGraph will detect sign-in automatically.",
       codexPopupBlocked: "This browser blocked the authorization window. Expand the fallback flow and finish sign-in in an external browser.",
       codexLoginPending: "Sign-in is not complete yet.",
       codexLoginComplete: "ChatGPT sign-in completed.",
@@ -1737,7 +1737,7 @@ const baseMessages = {
     buddy: {
       panelLabel: "Buddy chat panel",
       eyebrow: "Buddy",
-      title: "GraphiteUI Buddy",
+      title: "TooGraph Buddy",
       open: "Open buddy chat",
       dragHint: "Drag to move, click to chat",
       modeLabel: "Graph tier",

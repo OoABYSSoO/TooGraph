@@ -17,7 +17,7 @@ test("LanguageSwitcher renders a compact global locale control", () => {
   assert.match(componentSource, /:global\(\.language-switcher-popper\.el-popper\)/);
   assert.match(componentSource, /:global\(\.language-switcher-popper \.el-popover\)/);
   assert.match(componentSource, /:global\(\.language-switcher-popper \.el-popper__arrow\)/);
-  assert.match(componentSource, /\.language-switcher__menu \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\),\s*var\(--graphite-glass-bg-strong\);/);
+  assert.match(componentSource, /\.language-switcher__menu \{[\s\S]*background:\s*var\(--toograph-glass-specular\),\s*var\(--toograph-glass-lens\),\s*var\(--toograph-glass-bg-strong\);/);
   assert.doesNotMatch(componentSource, /:teleported="false"/);
   assert.match(componentSource, /v-for="option in LANGUAGE_OPTIONS"/);
   assert.match(componentSource, /localeStore\.setLocale\(option\.locale\)/);

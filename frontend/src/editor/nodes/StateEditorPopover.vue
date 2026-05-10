@@ -12,11 +12,11 @@
         <span class="node-state-editor__field-label">{{ t("nodeCard.type") }}</span>
         <ElSelect
           ref="typeSelectRef"
-          class="node-state-editor__type-select graphite-select"
+          class="node-state-editor__type-select toograph-select"
           :aria-label="t('nodeCard.type')"
           :model-value="draft.definition.type"
           :teleported="false"
-          popper-class="graphite-select-popper node-state-editor__select-popper"
+          popper-class="toograph-select-popper node-state-editor__select-popper"
           @update:model-value="handleTypeSelect"
         >
           <ElOption v-for="typeOption in typeOptions" :key="typeOption" :label="typeOption" :value="typeOption" />
@@ -28,11 +28,11 @@
         <div class="node-state-editor__color-select-shell">
           <ElSelect
             ref="colorSelectRef"
-            class="node-state-editor__color-select graphite-select"
+            class="node-state-editor__color-select toograph-select"
             :aria-label="t('nodeCard.color')"
             :model-value="draft.definition.color"
             :teleported="false"
-            popper-class="graphite-select-popper node-state-editor__select-popper"
+            popper-class="toograph-select-popper node-state-editor__select-popper"
             @update:model-value="handleColorSelect"
           >
             <template #label>

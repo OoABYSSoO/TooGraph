@@ -23,8 +23,8 @@ test("StateEditorPopover uses compact metadata-first editing with Element Plus s
   assert.match(componentSource, /\.node-state-editor \{[\s\S]*padding:\s*12px;/);
   assert.match(componentSource, /\.node-state-editor \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.14\);/);
   assert.match(componentSource, /\.node-state-editor \{[\s\S]*box-shadow:\s*0 16px 34px rgba\(60,\s*41,\s*20,\s*0\.12\);/);
-  assert.match(componentSource, /<ElSelect[\s\S]*ref="typeSelectRef"[\s\S]*class="node-state-editor__type-select graphite-select"[\s\S]*:teleported="false"[\s\S]*popper-class="graphite-select-popper node-state-editor__select-popper"/);
-  assert.match(componentSource, /<ElSelect[\s\S]*ref="colorSelectRef"[\s\S]*class="node-state-editor__color-select graphite-select"[\s\S]*:teleported="false"[\s\S]*popper-class="graphite-select-popper node-state-editor__select-popper"/);
+  assert.match(componentSource, /<ElSelect[\s\S]*ref="typeSelectRef"[\s\S]*class="node-state-editor__type-select toograph-select"[\s\S]*:teleported="false"[\s\S]*popper-class="toograph-select-popper node-state-editor__select-popper"/);
+  assert.match(componentSource, /<ElSelect[\s\S]*ref="colorSelectRef"[\s\S]*class="node-state-editor__color-select toograph-select"[\s\S]*:teleported="false"[\s\S]*popper-class="toograph-select-popper node-state-editor__select-popper"/);
   assert.match(componentSource, /<ElSelect[\s\S]*:aria-label="t\('nodeCard\.type'\)"/);
   assert.match(componentSource, /<ElSelect[\s\S]*:aria-label="t\('nodeCard\.color'\)"/);
   assert.doesNotMatch(componentSource, /<label class="node-state-editor__field">[\s\S]*?<ElSelect/);

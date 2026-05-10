@@ -100,7 +100,7 @@ const zhTW = {
     expand: "展開",
   },
   home: {
-    title: "GraphiteUI 工作台",
+    title: "TooGraph 工作台",
     body: "最近執行、模板入口與已儲存的圖都會在這裡匯合。",
     createGraph: "新增圖",
     openEditor: "開啟編排器",
@@ -474,7 +474,7 @@ const jaJP = {
     expand: "展開",
   },
   home: {
-    title: "GraphiteUI ワークスペース",
+    title: "TooGraph ワークスペース",
     body: "最近の実行、テンプレート、保存済みグラフをここでまとめて確認できます。",
     createGraph: "新規グラフ",
     openEditor: "エディターを開く",
@@ -890,7 +890,7 @@ const koKR = {
     expand: "펼치기",
   },
   home: {
-    title: "GraphiteUI 작업 공간",
+    title: "TooGraph 작업 공간",
     body: "최근 실행, 템플릿, 저장된 그래프를 한곳에서 확인합니다.",
     createGraph: "새 그래프",
     openEditor: "편집기 열기",
@@ -1305,7 +1305,7 @@ const esES = {
     expand: "Expandir",
   },
   home: {
-    title: "Espacio de trabajo de GraphiteUI",
+    title: "Espacio de trabajo de TooGraph",
     body: "Ejecuciones recientes, plantillas y grafos guardados se reúnen aquí.",
     createGraph: "Nuevo grafo",
     openEditor: "Abrir editor",
@@ -1721,7 +1721,7 @@ const frFR = {
     expand: "Déplier",
   },
   home: {
-    title: "Espace de travail GraphiteUI",
+    title: "Espace de travail TooGraph",
     body: "Les exécutions récentes, modèles et graphes enregistrés sont regroupés ici.",
     createGraph: "Nouveau graphe",
     openEditor: "Ouvrir l’éditeur",
@@ -2136,7 +2136,7 @@ const deDE = {
     expand: "Aufklappen",
   },
   home: {
-    title: "GraphiteUI Arbeitsbereich",
+    title: "TooGraph Arbeitsbereich",
     body: "Aktuelle Ausführungen, Vorlagen und gespeicherte Graphen laufen hier zusammen.",
     createGraph: "Neuer Graph",
     openEditor: "Editor öffnen",

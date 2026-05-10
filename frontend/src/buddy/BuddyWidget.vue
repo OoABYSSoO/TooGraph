@@ -158,8 +158,8 @@
               <span class="buddy-widget__control-label">{{ t("buddy.modelLabel") }}</span>
               <ElSelect
                 v-model="buddyModelRef"
-                class="buddy-widget__model-select graphite-select"
-                popper-class="graphite-select-popper buddy-widget__select-popper"
+                class="buddy-widget__model-select toograph-select"
+                popper-class="toograph-select-popper buddy-widget__select-popper"
                 size="small"
                 filterable
                 :placeholder="buddyModelPlaceholder"
@@ -180,8 +180,8 @@
               <span class="buddy-widget__control-label">{{ t("buddy.modeLabel") }}</span>
               <ElSelect
                 v-model="buddyMode"
-                class="buddy-widget__mode-select graphite-select"
-                popper-class="graphite-select-popper buddy-widget__select-popper"
+                class="buddy-widget__mode-select toograph-select"
+                popper-class="toograph-select-popper buddy-widget__select-popper"
                 size="small"
                 :aria-label="t('buddy.modeLabel')"
                 :title="buddyModeLabel"
@@ -483,9 +483,9 @@ type BuddyModelOption = {
   label: string;
 };
 
-const BUDDY_HISTORY_STORAGE_KEY = "graphiteui:buddy-history";
-const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "graphiteui:buddy-active-session";
-const BUDDY_MODEL_STORAGE_KEY = "graphiteui:buddy-model";
+const BUDDY_HISTORY_STORAGE_KEY = "toograph:buddy-history";
+const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "toograph:buddy-active-session";
+const BUDDY_MODEL_STORAGE_KEY = "toograph:buddy-model";
 const DRAG_THRESHOLD_PX = 4;
 const AVATAR_SINGLE_CLICK_DELAY_MS = 220;
 const RUN_POLL_INTERVAL_MS = 700;
@@ -2236,7 +2236,7 @@ function formatErrorMessage(error: unknown): string {
   inset: 0;
   z-index: 4500;
   pointer-events: none;
-  font-family: var(--graphite-font-ui);
+  font-family: var(--toograph-font-ui);
 }
 
 .buddy-widget__debug-panel {
@@ -2251,8 +2251,8 @@ function formatErrorMessage(error: unknown): string {
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 8px;
   background:
-    var(--graphite-glass-specular),
-    var(--graphite-glass-lens),
+    var(--toograph-glass-specular),
+    var(--toograph-glass-lens),
     rgba(255, 252, 247, 0.86);
   box-shadow: 0 18px 42px rgba(69, 42, 20, 0.12);
   backdrop-filter: blur(22px) saturate(1.25);
@@ -2441,10 +2441,10 @@ function formatErrorMessage(error: unknown): string {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: visible;
-  border: 1px solid var(--graphite-glass-border);
+  border: 1px solid var(--toograph-glass-border);
   border-radius: 8px;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens), rgba(255, 252, 247, 0.88);
-  box-shadow: var(--graphite-glass-shadow), var(--graphite-glass-highlight), var(--graphite-glass-rim);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens), rgba(255, 252, 247, 0.88);
+  box-shadow: var(--toograph-glass-shadow), var(--toograph-glass-highlight), var(--toograph-glass-rim);
   backdrop-filter: blur(28px) saturate(1.55) contrast(1.02);
 }
 
@@ -2499,7 +2499,7 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__eyebrow {
   display: block;
-  color: var(--graphite-accent);
+  color: var(--toograph-accent);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
@@ -2508,7 +2508,7 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__heading h2 {
   margin: 3px 0 0;
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
   font-size: 16px;
   line-height: 1.2;
 }
@@ -2536,7 +2536,7 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__control-label {
-  color: var(--graphite-text-muted);
+  color: var(--toograph-text-muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
@@ -2574,7 +2574,7 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__mode-option small {
-  color: var(--graphite-text-muted);
+  color: var(--toograph-text-muted);
   font-size: 11px;
 }
 
@@ -2586,7 +2586,7 @@ function formatErrorMessage(error: unknown): string {
   justify-content: center;
   border: 1px solid rgba(154, 52, 18, 0.14);
   background: rgba(255, 255, 255, 0.62);
-  color: var(--graphite-accent-strong);
+  color: var(--toograph-accent-strong);
   cursor: pointer;
   transition:
     border-color 160ms ease,
@@ -2636,10 +2636,10 @@ function formatErrorMessage(error: unknown): string {
   display: grid;
   gap: 8px;
   padding: 10px;
-  border: 1px solid var(--graphite-glass-border);
+  border: 1px solid var(--toograph-glass-border);
   border-radius: 8px;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens), rgba(255, 252, 247, 0.94);
-  box-shadow: var(--graphite-glass-highlight), 0 16px 38px rgba(61, 43, 24, 0.16);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens), rgba(255, 252, 247, 0.94);
+  box-shadow: var(--toograph-glass-highlight), 0 16px 38px rgba(61, 43, 24, 0.16);
   backdrop-filter: blur(24px) saturate(1.45) contrast(1.02);
 }
 
@@ -2659,7 +2659,7 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__sessions-header strong {
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
   font-size: 12px;
   line-height: 1.2;
 }
@@ -2693,7 +2693,7 @@ function formatErrorMessage(error: unknown): string {
   border: 1px solid rgba(154, 52, 18, 0.1);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.62);
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
   text-align: left;
   cursor: pointer;
 }
@@ -2712,7 +2712,7 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__session-item small,
 .buddy-widget__sessions-status {
-  color: var(--graphite-text-muted);
+  color: var(--toograph-text-muted);
   font-size: 11px;
   line-height: 1.35;
 }
@@ -2804,7 +2804,7 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__empty {
-  color: var(--graphite-text-muted);
+  color: var(--toograph-text-muted);
 }
 
 .buddy-widget__error {
@@ -2826,7 +2826,7 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__message-label {
-  color: var(--graphite-text-muted);
+  color: var(--toograph-text-muted);
   font-size: 11px;
   font-weight: 700;
 }
@@ -2839,7 +2839,7 @@ function formatErrorMessage(error: unknown): string {
   border: 1px solid rgba(154, 52, 18, 0.1);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.64);
-  color: var(--graphite-text);
+  color: var(--toograph-text);
   font-size: 13px;
   line-height: 1.55;
   white-space: pre-wrap;
@@ -2854,7 +2854,7 @@ function formatErrorMessage(error: unknown): string {
   border: 1px solid rgba(245, 158, 11, 0.3);
   border-radius: 8px;
   background: rgba(255, 251, 235, 0.82);
-  color: var(--graphite-text);
+  color: var(--toograph-text);
   box-shadow: 0 12px 28px rgba(154, 52, 18, 0.09);
 }
 
@@ -2875,7 +2875,7 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__pause-header strong,
 .buddy-widget__pause-section > strong,
 .buddy-widget__pause-row > span {
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
   font-size: 12px;
   font-weight: 800;
   line-height: 1.25;
@@ -2925,7 +2925,7 @@ function formatErrorMessage(error: unknown): string {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: rgba(70, 53, 38, 0.82);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 11px;
   line-height: 1.45;
 }
@@ -2940,7 +2940,7 @@ function formatErrorMessage(error: unknown): string {
   border-color: rgba(154, 52, 18, 0.15);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.82);
-  color: var(--graphite-text);
+  color: var(--toograph-text);
   font-size: 12px;
   line-height: 1.45;
   box-shadow: none;
@@ -2991,7 +2991,7 @@ function formatErrorMessage(error: unknown): string {
   border-radius: 5px;
   background: rgba(37, 99, 235, 0.08);
   color: #1d4ed8;
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.92em;
 }
 
@@ -3028,7 +3028,7 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__message--user .buddy-widget__message-bubble {
   background: rgba(154, 52, 18, 0.08);
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
 }
 
 .buddy-widget__run-trace {
@@ -3151,7 +3151,7 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__run-trace-duration {
   flex: 0 0 auto;
   color: rgba(108, 82, 62, 0.62);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 10px;
   font-weight: 800;
 }
@@ -3212,7 +3212,7 @@ function formatErrorMessage(error: unknown): string {
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.74);
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
   padding: 9px 10px;
   font-size: 13px;
   line-height: 1.45;
@@ -3243,8 +3243,8 @@ function formatErrorMessage(error: unknown): string {
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 8px;
   background: rgba(255, 252, 247, 0.94);
-  color: var(--graphite-text);
-  box-shadow: var(--graphite-glass-highlight), 0 14px 34px rgba(61, 43, 24, 0.12);
+  color: var(--toograph-text);
+  box-shadow: var(--toograph-glass-highlight), 0 14px 34px rgba(61, 43, 24, 0.12);
   font-size: 13px;
   line-height: 1.45;
   overflow-wrap: anywhere;

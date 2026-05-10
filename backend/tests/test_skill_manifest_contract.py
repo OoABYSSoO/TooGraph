@@ -20,7 +20,7 @@ def _write_manifest(skill_dir: Path, payload: dict[str, object]) -> Path:
 
 def _ready_manifest(skill_key: str) -> dict[str, object]:
     return {
-        "schemaVersion": "graphite.skill/v1",
+        "schemaVersion": "toograph.skill/v1",
         "skillKey": skill_key,
         "name": skill_key.replace("_", " ").title(),
         "llmInstruction": f"Use {skill_key} only when it is explicitly bound to the LLM node.",
@@ -103,7 +103,7 @@ class SkillManifestContractTests(unittest.TestCase):
 
             definition = _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED).definition
 
-        self.assertEqual(definition.schema_version, "graphite.skill/v1")
+        self.assertEqual(definition.schema_version, "toograph.skill/v1")
         self.assertEqual(definition.runtime.type, "python")
         self.assertEqual(definition.runtime.entrypoint, "run.py")
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
@@ -217,7 +217,7 @@ class SkillManifestContractTests(unittest.TestCase):
             manifest = _write_manifest(
                 skill_dir,
                 {
-                    "schemaVersion": "graphite.skill/v1",
+                    "schemaVersion": "toograph.skill/v1",
                     "skillKey": "legacy_agent_skill",
                     "name": "Legacy Agent Skill",
                 },

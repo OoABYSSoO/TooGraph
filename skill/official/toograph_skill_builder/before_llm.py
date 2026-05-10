@@ -10,12 +10,12 @@ from typing import Any
 MAX_GUIDE_CHARS = 24000
 
 
-def graphiteui_skill_builder_before_llm(**payload: Any) -> dict[str, str]:
+def toograph_skill_builder_before_llm(**payload: Any) -> dict[str, str]:
     guide = _read_authoring_guide()
     if not guide:
         return {
             "context": (
-                "GraphiteUI Skill authoring guide was not found. "
+                "TooGraph Skill authoring guide was not found. "
                 "Generate only skill_key, skill_json, skill_md, before_llm_py, after_llm_py and requirements_txt. "
                 "Do not write files or install the generated Skill."
             )
@@ -24,7 +24,7 @@ def graphiteui_skill_builder_before_llm(**payload: Any) -> dict[str, str]:
     suffix = "\n\n[Guide truncated. Follow the visible rules.]" if len(guide) > MAX_GUIDE_CHARS else ""
     return {
         "context": (
-            "Use the following active GraphiteUI Skill authoring guide. "
+            "Use the following active TooGraph Skill authoring guide. "
             "Generate Skill identity and file contents only; do not write files, install, test, repair or create templates.\n\n"
             f"{trimmed}{suffix}"
         )
@@ -41,7 +41,7 @@ def _read_authoring_guide() -> str:
 
 def _candidate_repo_roots() -> list[Path]:
     candidates: list[Path] = []
-    env_root = str(os.getenv("GRAPHITE_REPO_ROOT") or "").strip()
+    env_root = str(os.getenv("TOOGRAPH_REPO_ROOT") or "").strip()
     if env_root:
         candidates.append(Path(env_root))
     current = Path(__file__).resolve()
@@ -64,7 +64,7 @@ def main() -> None:
         payload = {}
     if not isinstance(payload, dict):
         payload = {}
-    print(json.dumps(graphiteui_skill_builder_before_llm(**payload), ensure_ascii=False))
+    print(json.dumps(toograph_skill_builder_before_llm(**payload), ensure_ascii=False))
 
 
 if __name__ == "__main__":

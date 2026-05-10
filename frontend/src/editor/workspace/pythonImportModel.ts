@@ -1,7 +1,7 @@
-export function isGraphiteUiPythonExportFile(file: File) {
+export function isTooGraphPythonExportFile(file: File) {
   return file.name.toLowerCase().endsWith(".py");
 }
 
-export function isGraphiteUiPythonExportSource(source: string) {
-  return source.includes("GRAPHITEUI_EXPORT_VERSION = 1") && source.includes("GRAPHITEUI_EDITOR_GRAPH");
+export function isTooGraphPythonExportSource(source: string) {
+  return source.includes("TOOGRAPH_EXPORT_VERSION = 1") && source.includes("TOOGRAPH_EDITOR_GRAPH");
 }

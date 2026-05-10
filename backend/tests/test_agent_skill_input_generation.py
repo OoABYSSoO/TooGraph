@@ -117,11 +117,11 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
 
     def test_capability_selector_prompt_uses_before_llm_context_for_catalog(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            skill_dir = Path(temp_dir) / "graphiteui_capability_selector"
+            skill_dir = Path(temp_dir) / "toograph_capability_selector"
             skill_dir.mkdir()
             (skill_dir / "before_llm.py").write_text(
                 "import json\n"
-                "print(json.dumps({'context': 'Available GraphiteUI capabilities:\\n"
+                "print(json.dumps({'context': 'Available TooGraph capabilities:\\n"
                 "Graph Templates:\\n- kind: subgraph\\n  key: advanced_web_research_loop\\n"
                 "Skills:\\n- kind: skill\\n  key: web_search'}))\n",
                 encoding="utf-8",
@@ -130,14 +130,14 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                 input_values={"requirement": "帮我联网搜索资料"},
                 bindings=[
                     ResolvedAgentSkillBinding(
-                        binding=NodeSystemAgentSkillBinding(skillKey="graphiteui_capability_selector"),
+                        binding=NodeSystemAgentSkillBinding(skillKey="toograph_capability_selector"),
                         source="node_config",
                     )
                 ],
                 skill_definitions={
-                    "graphiteui_capability_selector": SkillDefinition(
-                        skillKey="graphiteui_capability_selector",
-                        name="GraphiteUI Capability Selector",
+                    "toograph_capability_selector": SkillDefinition(
+                        skillKey="toograph_capability_selector",
+                        name="TooGraph Capability Selector",
                         inputSchema=[
                             SkillIoField(key="requirement", name="Requirement", valueType="text", required=True),
                             SkillIoField(key="capability", name="Capability", valueType="capability", required=True),
@@ -151,7 +151,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
             )
 
         self.assertIn("== Skill Pre-LLM Context ==", prompt)
-        self.assertIn("Available GraphiteUI capabilities:", prompt)
+        self.assertIn("Available TooGraph capabilities:", prompt)
         self.assertIn("key: advanced_web_research_loop", prompt)
         self.assertIn("key: web_search", prompt)
         self.assertNotIn("== Available Capabilities ==", prompt)
@@ -348,7 +348,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
 
         def chat_with_local_model_with_meta_func(**kwargs):
             captured.update(kwargs)
-            return ('{"web_search": {"query": "GraphiteUI structured output"}}', {"warnings": []})
+            return ('{"web_search": {"query": "TooGraph structured output"}}', {"warnings": []})
 
         node = NodeSystemAgentNode.model_validate(
             {
@@ -395,7 +395,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
             chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
         )
 
-        self.assertEqual(skill_inputs, {"web_search": {"query": "GraphiteUI structured output"}})
+        self.assertEqual(skill_inputs, {"web_search": {"query": "TooGraph structured output"}})
         self.assertEqual(warnings, [])
         schema = captured["structured_output_schema"]
         self.assertEqual(schema["type"], "object")

@@ -7,11 +7,11 @@ from textwrap import dedent
 
 MESSAGE = dedent(
     """\
-    [GraphiteUI] This local runtime entrypoint is retired.
+    [TooGraph] This local runtime entrypoint is retired.
 
-    Start the OpenAI-compatible local or private gateway you want to use, then configure it in GraphiteUI:
+    Start the OpenAI-compatible local or private gateway you want to use, then configure it in TooGraph:
 
-      GraphiteUI -> Model Providers -> Local / Custom OpenAI-compatible
+      TooGraph -> Model Providers -> Local / Custom OpenAI-compatible
 
     This script exits without starting a runtime.
     """

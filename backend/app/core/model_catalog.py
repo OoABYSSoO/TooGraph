@@ -15,7 +15,7 @@ from app.tools.openai_codex_client import get_codex_auth_status
 
 
 LOCAL_PROVIDER_LABEL = "OpenAI-compatible Custom Provider"
-LOCAL_PROVIDER_DESCRIPTION = "Custom OpenAI-compatible endpoint used by GraphiteUI for local or private model routing."
+LOCAL_PROVIDER_DESCRIPTION = "Custom OpenAI-compatible endpoint used by TooGraph for local or private model routing."
 
 
 def build_model_ref(provider_id: str, model_id: str) -> str:

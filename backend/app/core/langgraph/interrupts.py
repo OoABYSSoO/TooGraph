@@ -8,7 +8,7 @@ from app.core.runtime.run_artifacts import append_run_snapshot, refresh_run_arti
 from app.core.runtime.state import set_run_status
 from app.core.schemas.node_system import NodeSystemGraphDocument
 
-AFTER_BREAKPOINT_NODE_PREFIX = "__graphite_after_breakpoint__"
+AFTER_BREAKPOINT_NODE_PREFIX = "__toograph_after_breakpoint__"
 
 
 def after_breakpoint_node_name(node_name: str) -> str:

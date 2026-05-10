@@ -20,7 +20,7 @@ DEFAULT_INCLUDE_RAW_CONTENT = False
 DEFAULT_TIMEOUT_SECONDS = 15.0
 DEFAULT_MAX_CHARS_PER_PAGE = 200_000
 DEFAULT_RETRY_ATTEMPTS = 5
-PAGE_FETCH_USER_AGENT = "GraphiteUI/1.0 (+https://github.com/OoABYSSoO/GraphiteUI)"
+PAGE_FETCH_USER_AGENT = "TooGraph/1.0 (+https://github.com/OoABYSSoO/TooGraph)"
 HTTP_PROXY_ENV_KEYS = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy")
 
 
@@ -108,7 +108,7 @@ def _search_with_tavily(
 
 def _search_with_duckduckgo(*, query: str, max_results: int, timeout_seconds: float) -> dict[str, Any]:
     headers = {
-        "User-Agent": "GraphiteUI/1.0 (+https://github.com/OoABYSSoO/GraphiteUI)",
+        "User-Agent": "TooGraph/1.0 (+https://github.com/OoABYSSoO/TooGraph)",
     }
     with httpx.Client(**_http_client_kwargs(timeout_seconds=timeout_seconds, follow_redirects=True)) as client:
         response = client.get(DUCKDUCKGO_SEARCH_URL, params={"q": query}, headers=headers)
@@ -194,8 +194,8 @@ def _fetch_source_documents(
 ) -> list[dict[str, Any]]:
     if not results:
         return []
-    artifact_dir = _compact_text(os.getenv("GRAPHITE_SKILL_ARTIFACT_DIR"))
-    artifact_relative_dir = _compact_text(os.getenv("GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR")).replace("\\", "/").strip("/")
+    artifact_dir = _compact_text(os.getenv("TOOGRAPH_SKILL_ARTIFACT_DIR"))
+    artifact_relative_dir = _compact_text(os.getenv("TOOGRAPH_SKILL_ARTIFACT_RELATIVE_DIR")).replace("\\", "/").strip("/")
     if not artifact_dir or not artifact_relative_dir:
         return []
 

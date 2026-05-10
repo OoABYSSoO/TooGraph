@@ -2,11 +2,11 @@
 set -euo pipefail
 
 cat >&2 <<'EOF'
-[GraphiteUI] This local runtime wrapper is retired.
+[TooGraph] This local runtime wrapper is retired.
 
-Start the OpenAI-compatible local or private gateway you want to use, then configure it in GraphiteUI:
+Start the OpenAI-compatible local or private gateway you want to use, then configure it in TooGraph:
 
-  GraphiteUI -> Model Providers -> Local / Custom OpenAI-compatible
+  TooGraph -> Model Providers -> Local / Custom OpenAI-compatible
 
 This script exits without starting a runtime.
 EOF

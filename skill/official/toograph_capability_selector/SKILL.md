@@ -1,9 +1,9 @@
 ---
-name: graphiteui_capability_selector
-description: Use when a GraphiteUI workflow needs to choose one enabled graph template or Skill from a user requirement.
+name: toograph_capability_selector
+description: Use when a TooGraph workflow needs to choose one enabled graph template or Skill from a user requirement.
 ---
 
-# GraphiteUI Capability Selector
+# TooGraph Capability Selector
 
 `before_llm.py` lists the local enabled graph templates and enabled Skills in the LLM-node skill-input planning prompt. The model chooses one item from that catalog and passes it as the `capability` input. `after_llm.py` validates that choice against the current local catalog and returns exactly one normalized capability object.
 

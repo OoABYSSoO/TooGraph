@@ -121,7 +121,7 @@ class OpenAICodexProviderTests(unittest.TestCase):
         self.assertEqual(query["state"], [session["state"]])
         self.assertEqual(query["id_token_add_organizations"], ["true"])
         self.assertEqual(query["codex_cli_simplified_flow"], ["true"])
-        self.assertEqual(query["originator"], ["graphiteui"])
+        self.assertEqual(query["originator"], ["toograph"])
         self.assertEqual(pending["status"], "pending")
         self.assertFalse(pending["authenticated"])
 

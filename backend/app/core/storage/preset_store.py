@@ -14,7 +14,7 @@ USER_PRESET_ROOT = PRESET_ROOT / "user"
 PRESET_SETTINGS_PATH = PRESET_ROOT / "settings.json"
 PRESET_DATA_DIR = USER_PRESET_ROOT
 PRESET_FILE_NAME = "preset.json"
-PRESET_SETTINGS_SCHEMA_VERSION = "graphiteui.node-preset-settings/v1"
+PRESET_SETTINGS_SCHEMA_VERSION = "toograph.node-preset-settings/v1"
 
 
 def save_preset(payload: NodeSystemPresetPayload) -> NodeSystemPresetDocument:

@@ -1,4 +1,4 @@
-# GraphiteUI Docs
+# TooGraph Docs
 
 `docs/` 只保留当前仍然有效的正式文档和长期设想，不保存迁移计划、临时进度记录、一次性分析报告或已经落地的设计草稿。
 
@@ -12,7 +12,7 @@
 
 - [structured-output-and-function-calling.md](structured-output-and-function-calling.md)
   - `demo/` 中 Claude Code、Hermes Agent 和 OpenClaw 的结构化输出实现对比
-  - function calling 的作用原理、边界和对 GraphiteUI 的引入建议
+  - function calling 的作用原理、边界和对 TooGraph 的引入建议
 
 - [../skill/SKILL_AUTHORING_GUIDE.md](../skill/SKILL_AUTHORING_GUIDE.md)
   - Skill 包结构、生命周期入口和权限边界

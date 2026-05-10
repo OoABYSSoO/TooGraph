@@ -501,9 +501,9 @@ onMounted(loadSkills);
 .skills-page__empty,
 .skills-page__notice {
   min-width: 0;
-  border: 1px solid var(--graphite-border);
+  border: 1px solid var(--toograph-border);
   border-radius: 24px;
-  background: var(--graphite-surface-panel);
+  background: var(--toograph-surface-panel);
   box-shadow: var(--skills-page-panel-shadow);
 }
 
@@ -556,8 +556,8 @@ onMounted(loadSkills);
 
 .skills-page__title {
   margin: 8px 0 10px;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 2rem;
   line-height: 1.16;
   overflow-wrap: anywhere;
@@ -630,7 +630,7 @@ onMounted(loadSkills);
 
 .skills-page__metric {
   min-width: 0;
-  border: 1px solid var(--graphite-border);
+  border: 1px solid var(--toograph-border);
   border-radius: 24px;
   padding: 16px;
   background: rgba(255, 255, 255, 0.62);
@@ -644,7 +644,7 @@ onMounted(loadSkills);
 .skills-page__metric strong {
   display: block;
   margin-top: 8px;
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
   font-size: 1.35rem;
 }
 
@@ -654,7 +654,7 @@ onMounted(loadSkills);
   gap: 14px;
   align-items: end;
   padding: 16px;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--graphite-glass-bg-strong);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens), var(--toograph-glass-bg-strong);
 }
 
 .skills-page__search-field,
@@ -729,9 +729,9 @@ onMounted(loadSkills);
 
 .skills-page__selector,
 .skills-page__detail {
-  border: 1px solid var(--graphite-border);
+  border: 1px solid var(--toograph-border);
   border-radius: 24px;
-  background: var(--graphite-surface-card);
+  background: var(--toograph-surface-card);
 }
 
 .skills-page__selector {
@@ -771,7 +771,7 @@ onMounted(loadSkills);
   border: 0;
   padding: 6px 0;
   background: transparent;
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -804,7 +804,7 @@ onMounted(loadSkills);
 
 .skills-page__detail-header h3 {
   margin: 6px 0 8px;
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
   font-size: 1.28rem;
 }
 
@@ -842,7 +842,7 @@ onMounted(loadSkills);
   padding: 4px 10px;
   background: rgba(255, 248, 240, 0.92);
   color: rgb(154, 52, 18);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.82rem;
   overflow-wrap: anywhere;
   white-space: normal;
@@ -851,7 +851,7 @@ onMounted(loadSkills);
 .skills-page__source {
   display: grid;
   gap: 4px;
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.82rem;
 }
 
@@ -949,7 +949,7 @@ onMounted(loadSkills);
 
 .skills-page__file-tree-button small {
   color: rgba(60, 41, 20, 0.48);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.72rem;
 }
 
@@ -970,7 +970,7 @@ onMounted(loadSkills);
   padding: 12px;
   background: rgba(39, 29, 20, 0.92);
   color: rgba(255, 248, 240, 0.92);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.82rem;
   line-height: 1.55;
   white-space: pre;

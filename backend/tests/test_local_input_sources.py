@@ -73,7 +73,7 @@ class LocalInputSourcesTests(unittest.TestCase):
             source.mkdir()
             (source / "README.md").write_text("hello", encoding="utf-8")
 
-            with patch.dict(os.environ, {"GRAPHITEUI_LOCAL_INPUT_READ_ROOTS": str(workspace)}):
+            with patch.dict(os.environ, {"TOOGRAPH_LOCAL_INPUT_READ_ROOTS": str(workspace)}):
                 response = TestClient(app).get(
                     "/api/local-input-sources/folder",
                     params={"path": str(source)},

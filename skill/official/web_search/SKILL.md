@@ -24,4 +24,4 @@ Runtime requirements:
 - Python package: `playwright`
 - Browser runtime: `python -m playwright install chromium`
 
-When `artifact_paths` contains paths, those paths are relative to GraphiteUI's whitelisted skill artifact directory and can be opened by the Output viewer. Downstream LLM nodes can receive the file state and read text documents into model context.
+When `artifact_paths` contains paths, those paths are relative to TooGraph's whitelisted skill artifact directory and can be opened by the Output viewer. Downstream LLM nodes can receive the file state and read text documents into model context.

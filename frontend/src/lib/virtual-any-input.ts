@@ -1,12 +1,12 @@
 import type { GraphNode } from "../types/node-system.ts";
 
-export const VIRTUAL_ANY_INPUT_STATE_KEY = "__graphiteui_virtual_any_input__";
-export const VIRTUAL_ANY_OUTPUT_STATE_KEY = "__graphiteui_virtual_any_output__";
+export const VIRTUAL_ANY_INPUT_STATE_KEY = "__toograph_virtual_any_input__";
+export const VIRTUAL_ANY_OUTPUT_STATE_KEY = "__toograph_virtual_any_output__";
 export const VIRTUAL_ANY_INPUT_LABEL = "+ input";
 export const VIRTUAL_ANY_OUTPUT_LABEL = "+ output";
 export const VIRTUAL_ANY_INPUT_COLOR = "#16a34a";
 export const VIRTUAL_ANY_OUTPUT_COLOR = "#9a3412";
-export const CREATE_AGENT_INPUT_STATE_KEY = "__graphiteui_create_agent_input__";
+export const CREATE_AGENT_INPUT_STATE_KEY = "__toograph_create_agent_input__";
 
 export function isVirtualAnyInputStateKey(stateKey: string | null | undefined) {
   return stateKey === VIRTUAL_ANY_INPUT_STATE_KEY;

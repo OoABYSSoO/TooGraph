@@ -30,7 +30,7 @@ function createBaseDocument(): GraphPayload {
         reads: [],
         writes: [{ state: "question", mode: "replace" }],
         config: {
-          value: "What is GraphiteUI?",
+          value: "What is TooGraph?",
         },
       },
     },
@@ -84,7 +84,7 @@ function createHarness(options: { locked?: boolean; importPythonGraph?: boolean 
       importedFiles.push(file.name);
       return Boolean(options.importPythonGraph);
     },
-    isGraphiteUiPythonExportFile: (file) => file.name.endsWith(".py"),
+    isTooGraphPythonExportFile: (file) => file.name.endsWith(".py"),
     uploadFile: async (file) => ({
       local_path: `uploads/${file.name}`,
       filename: file.name,
@@ -167,9 +167,9 @@ test("useWorkspaceNodeCreationController opens created state edge editor request
   });
 });
 
-test("useWorkspaceNodeCreationController routes GraphiteUI Python exports through graph import before file-node fallback", async () => {
+test("useWorkspaceNodeCreationController routes TooGraph Python exports through graph import before file-node fallback", async () => {
   const harness = createHarness({ importPythonGraph: true });
-  const file = new File(["# GraphiteUI export"], "graph.py", { type: "text/x-python" });
+  const file = new File(["# TooGraph export"], "graph.py", { type: "text/x-python" });
 
   await harness.controller.createNodeFromFileForTab("tab_a", { file, position: { x: 20, y: 30 } });
 

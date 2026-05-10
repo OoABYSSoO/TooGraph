@@ -8,8 +8,8 @@ import {
 
 const knowledgeBases = [
   {
-    name: "graphiteui-official",
-    label: "GraphiteUI Docs",
+    name: "toograph-official",
+    label: "TooGraph Docs",
     description: "  Product documentation  ",
   },
   {
@@ -20,10 +20,10 @@ const knowledgeBases = [
 ];
 
 test("buildInputKnowledgeBaseOptions preserves NodeCard catalog presentation", () => {
-  assert.deepEqual(buildInputKnowledgeBaseOptions(knowledgeBases, "graphiteui-official"), [
+  assert.deepEqual(buildInputKnowledgeBaseOptions(knowledgeBases, "toograph-official"), [
     {
-      value: "graphiteui-official",
-      label: "GraphiteUI Docs",
+      value: "toograph-official",
+      label: "TooGraph Docs",
       description: "Product documentation",
     },
     {
@@ -42,8 +42,8 @@ test("buildInputKnowledgeBaseOptions keeps an unavailable current value selectab
       description: "This knowledge base is no longer available in the imported catalog.",
     },
     {
-      value: "graphiteui-official",
-      label: "GraphiteUI Docs",
+      value: "toograph-official",
+      label: "TooGraph Docs",
       description: "Product documentation",
     },
     {
@@ -55,12 +55,12 @@ test("buildInputKnowledgeBaseOptions keeps an unavailable current value selectab
 });
 
 test("resolveSelectedKnowledgeBaseDescription preserves NodeCard meta text rules", () => {
-  const options = buildInputKnowledgeBaseOptions(knowledgeBases, "graphiteui-official");
+  const options = buildInputKnowledgeBaseOptions(knowledgeBases, "toograph-official");
 
   assert.equal(
     resolveSelectedKnowledgeBaseDescription({
       showKnowledgeBaseInput: false,
-      selectedValue: "graphiteui-official",
+      selectedValue: "toograph-official",
       options,
       emptyOptionsDescription: "Import a knowledge base first.",
       fallbackDescription: "Choose a knowledge base for this input.",
@@ -70,7 +70,7 @@ test("resolveSelectedKnowledgeBaseDescription preserves NodeCard meta text rules
   assert.equal(
     resolveSelectedKnowledgeBaseDescription({
       showKnowledgeBaseInput: true,
-      selectedValue: "graphiteui-official",
+      selectedValue: "toograph-official",
       options,
       emptyOptionsDescription: "Import a knowledge base first.",
       fallbackDescription: "Choose a knowledge base for this input.",

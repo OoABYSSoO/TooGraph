@@ -191,7 +191,7 @@ test("BuddyWidget lets the buddy runtime choose its own model", () => {
   assert.match(componentSource, /BUDDY_MODEL_STORAGE_KEY/);
   assert.match(componentSource, /v-model="buddyModelRef"/);
   assert.match(componentSource, /@visible-change="handleBuddyModelSelectVisibleChange"/);
-  assert.match(componentSource, /popper-class="graphite-select-popper buddy-widget__select-popper"/);
+  assert.match(componentSource, /popper-class="toograph-select-popper buddy-widget__select-popper"/);
   assert.match(componentSource, /:global\(\.buddy-widget__select-popper\.el-popper\)[\s\S]*z-index:\s*46\d\d\s*!important;/);
   assert.match(componentSource, /buddyModelOptions/);
   assert.match(componentSource, /return buildRuntimeModelOptions\(settings\);/);
@@ -314,7 +314,7 @@ test("BuddyWidget stores buddy chat in backend sessions and exposes a compact hi
   assert.match(componentSource, /import \{[\s\S]*appendBuddyChatMessage,[\s\S]*fetchBuddyChatMessages,[\s\S]*fetchBuddyChatSessions,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
   assert.match(componentSource, /import \{ ArrowDown, Check, Clock, Close, Delete, FullScreen, Plus, Promotion, SemiSelect \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /import \{ ElIcon, ElOption, ElPopover, ElSelect \} from "element-plus";/);
-  assert.match(componentSource, /const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "graphiteui:buddy-active-session";/);
+  assert.match(componentSource, /const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "toograph:buddy-active-session";/);
   assert.match(componentSource, /const chatSessions = ref<BuddyChatSession\[\]>\(\[\]\);/);
   assert.match(componentSource, /const activeSessionId = ref<string \| null>\(null\);/);
   assert.match(componentSource, /const activeSessionDeleteId = ref<string \| null>\(null\);/);

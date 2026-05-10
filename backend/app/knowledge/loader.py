@@ -23,22 +23,22 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 KNOWLEDGE_ROOT = BACKEND_DIR / "data" / "kb"
 DOWNLOAD_ROOT = KNOWLEDGE_ROOT / "_downloads"
-GRAPHITEUI_REPO_BLOB_BASE = "https://github.com/OoABYSSoO/GraphiteUI/blob/main/"
-GRAPHITEUI_KNOWLEDGE_BASE_ID = "graphiteui-official"
-DEFAULT_KNOWLEDGE_BASE = GRAPHITEUI_KNOWLEDGE_BASE_ID
-HTTP_USER_AGENT = "GraphiteUI-KB-Importer/1.0"
+TOOGRAPH_REPO_BLOB_BASE = "https://github.com/OoABYSSoO/TooGraph/blob/main/"
+TOOGRAPH_KNOWLEDGE_BASE_ID = "toograph-official"
+DEFAULT_KNOWLEDGE_BASE = TOOGRAPH_KNOWLEDGE_BASE_ID
+HTTP_USER_AGENT = "TooGraph-KB-Importer/1.0"
 PYTHON_DOCS_DOWNLOAD_URL = "https://docs.python.org/3/download.html"
 PYTHON_DOCS_BASE_URL = "https://docs.python.org/3/"
 LANGGRAPH_DOCS_START_URL = "https://docs.langchain.com/oss/python/langgraph/overview"
 LANGGRAPH_DOCS_ALLOWED_PREFIX = "https://docs.langchain.com/oss/python/langgraph/"
 BLOCK_TEXT_TAGS = ("h1", "h2", "h3", "h4", "p", "li", "pre", "dt", "dd", "blockquote")
-GRAPHITEUI_PROJECT_DOC_FILES = [
-    REPO_ROOT / "knowledge" / "GraphiteUI-official" / "what-is-graphiteui.md",
-    REPO_ROOT / "knowledge" / "GraphiteUI-official" / "capabilities.md",
-    REPO_ROOT / "knowledge" / "GraphiteUI-official" / "getting-started.md",
-    REPO_ROOT / "knowledge" / "GraphiteUI-official" / "node-editor-basics.md",
-    REPO_ROOT / "knowledge" / "GraphiteUI-official" / "current-architecture.md",
-    REPO_ROOT / "knowledge" / "GraphiteUI-official" / "runtime-and-roadmap.md",
+TOOGRAPH_PROJECT_DOC_FILES = [
+    REPO_ROOT / "knowledge" / "TooGraph-official" / "what-is-toograph.md",
+    REPO_ROOT / "knowledge" / "TooGraph-official" / "capabilities.md",
+    REPO_ROOT / "knowledge" / "TooGraph-official" / "getting-started.md",
+    REPO_ROOT / "knowledge" / "TooGraph-official" / "node-editor-basics.md",
+    REPO_ROOT / "knowledge" / "TooGraph-official" / "current-architecture.md",
+    REPO_ROOT / "knowledge" / "TooGraph-official" / "runtime-and-roadmap.md",
     REPO_ROOT / "README.md",
     REPO_ROOT / "docs" / "current_project_status.md",
 ]
@@ -173,24 +173,24 @@ def import_official_knowledge_bases() -> list[dict[str, object]]:
 
 def import_bundled_knowledge_bases() -> list[dict[str, object]]:
     imported = [
-        import_graphiteui_project_knowledge_base(),
+        import_toograph_project_knowledge_base(),
         import_python_official_knowledge_base(),
         import_langgraph_official_knowledge_base(),
     ]
     return imported
 
 
-def import_graphiteui_project_knowledge_base() -> dict[str, object]:
-    documents = _load_local_markdown_documents(GRAPHITEUI_PROJECT_DOC_FILES)
+def import_toograph_project_knowledge_base() -> dict[str, object]:
+    documents = _load_local_markdown_documents(TOOGRAPH_PROJECT_DOC_FILES)
     record = KnowledgeBaseRecord(
-        kb_id=GRAPHITEUI_KNOWLEDGE_BASE_ID,
-        label="GraphiteUI Project Docs",
-        description="Project-specific GraphiteUI documentation and current implementation notes.",
-        source_kind="graphiteui_project_docs",
-        source_url="https://github.com/OoABYSSoO/GraphiteUI",
+        kb_id=TOOGRAPH_KNOWLEDGE_BASE_ID,
+        label="TooGraph Project Docs",
+        description="Project-specific TooGraph documentation and current implementation notes.",
+        source_kind="toograph_project_docs",
+        source_url="https://github.com/OoABYSSoO/TooGraph",
         version="v1",
         payload={
-            "source_files": [str(path.relative_to(REPO_ROOT)) for path in GRAPHITEUI_PROJECT_DOC_FILES if path.exists()],
+            "source_files": [str(path.relative_to(REPO_ROOT)) for path in TOOGRAPH_PROJECT_DOC_FILES if path.exists()],
             "imported_at": _utc_now_iso(),
         },
     )
@@ -208,7 +208,7 @@ def import_python_official_knowledge_base() -> dict[str, object]:
     _download_file(archive_url, archive_path)
 
     documents: list[KnowledgeDocument] = []
-    with tempfile.TemporaryDirectory(prefix="graphiteui-python-docs-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="toograph-python-docs-") as temp_dir:
         temp_path = Path(temp_dir)
         with zipfile.ZipFile(archive_path) as archive:
             archive.extractall(temp_path)
@@ -425,7 +425,7 @@ def _score_project_specific_boosts(*, title: str, section: str, query_lower: str
         if any(term in query_lower for term in state_terms):
             score += 12
 
-    if "graphiteui" in title or "graphiteui" in section:
+    if "toograph" in title or "toograph" in section:
         score += 4
 
     return score
@@ -597,7 +597,7 @@ def _load_local_markdown_documents(paths: list[Path]) -> list[KnowledgeDocument]
             KnowledgeDocument(
                 doc_id=relative_path.removesuffix(path.suffix),
                 title=title,
-                url=urljoin(GRAPHITEUI_REPO_BLOB_BASE, relative_path),
+                url=urljoin(TOOGRAPH_REPO_BLOB_BASE, relative_path),
                 section=title,
                 content=content,
                 source_path=relative_path,

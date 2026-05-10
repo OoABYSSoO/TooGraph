@@ -23,12 +23,12 @@
       <label class="node-card__control-row">
         <span class="node-card__control-label">{{ t("nodeCard.knowledgeBase") }}</span>
         <ElSelect
-          class="node-card__control-select node-card__input-select graphite-select"
+          class="node-card__control-select node-card__input-select toograph-select"
           :model-value="inputKnowledgeBaseValue || undefined"
           :placeholder="inputKnowledgeBaseOptions.length === 0 ? t('nodeCard.noKnowledgeBases') : t('nodeCard.selectKnowledgeBase')"
           :disabled="inputKnowledgeBaseOptions.length === 0"
           :teleported="false"
-          popper-class="graphite-select-popper"
+          popper-class="toograph-select-popper"
           @pointerdown.stop
           @click.stop
           @update:model-value="emit('update:knowledge-base', $event)"

@@ -2100,7 +2100,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   overflow: hidden;
   height: 100%;
   min-height: 0;
-  background: var(--graphite-canvas-bg);
+  background: var(--toograph-canvas-bg);
   cursor: grab;
   outline: none;
   overscroll-behavior: none;
@@ -2189,13 +2189,13 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   gap: 4px;
   overflow: hidden;
   padding: 5px;
-  border: 1px solid var(--graphite-glass-border);
+  border: 1px solid var(--toograph-glass-border);
   border-radius: 999px;
-  background: var(--graphite-glass-bg);
+  background: var(--toograph-glass-bg);
   box-shadow:
     0 8px 20px rgba(31, 28, 24, 0.045),
-    var(--graphite-glass-highlight),
-    var(--graphite-glass-rim);
+    var(--toograph-glass-highlight),
+    var(--toograph-glass-rim);
   backdrop-filter: blur(20px) saturate(1.45) contrast(1.01);
   cursor: default;
   pointer-events: auto;
@@ -2216,8 +2216,8 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   white-space: nowrap;
   box-shadow:
     0 8px 20px rgba(31, 28, 24, 0.045),
-    var(--graphite-glass-highlight),
-    var(--graphite-glass-rim);
+    var(--toograph-glass-highlight),
+    var(--toograph-glass-rim);
   backdrop-filter: blur(18px) saturate(1.35);
 }
 
@@ -2228,7 +2228,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   inset: 1px;
   z-index: 0;
   border-radius: inherit;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens);
   mix-blend-mode: screen;
   opacity: 0.36;
 }
@@ -2298,13 +2298,13 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   width: 100%;
   overflow: hidden;
   padding: 5px;
-  border: 1px solid var(--graphite-glass-border);
+  border: 1px solid var(--toograph-glass-border);
   border-radius: 999px;
-  background: var(--graphite-glass-bg);
+  background: var(--toograph-glass-bg);
   box-shadow:
     0 8px 20px rgba(31, 28, 24, 0.045),
-    var(--graphite-glass-highlight),
-    var(--graphite-glass-rim);
+    var(--toograph-glass-highlight),
+    var(--toograph-glass-rim);
   backdrop-filter: blur(20px) saturate(1.45) contrast(1.01);
   cursor: default;
   pointer-events: auto;
@@ -2317,7 +2317,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   inset: 1px;
   z-index: 0;
   border-radius: inherit;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens);
   mix-blend-mode: screen;
   opacity: 0.36;
 }

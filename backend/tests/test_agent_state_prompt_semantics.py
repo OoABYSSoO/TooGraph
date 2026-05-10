@@ -201,7 +201,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             (folder / "MEMORY.md").write_text("Durable memory line.", encoding="utf-8")
             (folder / "ignored.md").write_text("This file was not selected.", encoding="utf-8")
 
-            with patch.dict(os.environ, {"GRAPHITEUI_LOCAL_INPUT_READ_ROOTS": str(workspace)}):
+            with patch.dict(os.environ, {"TOOGRAPH_LOCAL_INPUT_READ_ROOTS": str(workspace)}):
                 prompt = build_auto_system_prompt(
                     ["answer"],
                     {

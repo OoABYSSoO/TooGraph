@@ -589,10 +589,10 @@ onMounted(loadAll);
 .buddy-page__hero,
 .buddy-page__panel,
 .buddy-page__empty {
-  border: 1px solid var(--graphite-border);
+  border: 1px solid var(--toograph-border);
   border-radius: 24px;
-  background: var(--graphite-surface-panel);
-  box-shadow: var(--graphite-shadow-panel);
+  background: var(--toograph-surface-panel);
+  box-shadow: var(--toograph-shadow-panel);
 }
 
 .buddy-page__hero {
@@ -608,7 +608,7 @@ onMounted(loadAll);
 }
 
 .buddy-page__panel {
-  background: var(--graphite-surface-card);
+  background: var(--toograph-surface-card);
   padding: 20px;
 }
 
@@ -621,8 +621,8 @@ onMounted(loadAll);
 
 .buddy-page__title {
   margin: 8px 0 10px;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 2rem;
 }
 
@@ -657,11 +657,11 @@ onMounted(loadAll);
 }
 
 .buddy-page__tabs {
-  border: 1px solid var(--graphite-border);
+  border: 1px solid var(--toograph-border);
   border-radius: 24px;
-  background: var(--graphite-surface-panel);
+  background: var(--toograph-surface-panel);
   padding: 12px 16px 18px;
-  box-shadow: var(--graphite-shadow-panel);
+  box-shadow: var(--toograph-shadow-panel);
 }
 
 .buddy-page__panel-heading {
@@ -674,7 +674,7 @@ onMounted(loadAll);
 
 .buddy-page__panel-heading h3 {
   margin: 0 0 6px;
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
 }
 
 .buddy-page__form {

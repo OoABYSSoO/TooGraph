@@ -1,6 +1,6 @@
 ---
 name: local_workspace_executor
-description: Read context, write one file, or execute one script inside GraphiteUI's local workspace permission boundaries.
+description: Read context, write one file, or execute one script inside TooGraph's local workspace permission boundaries.
 ---
 
 # Local Workspace Executor
@@ -40,7 +40,7 @@ Supported operations:
 
 Default policy:
 
-- Read roots: any path inside the GraphiteUI repository except denied roots.
+- Read roots: any path inside the TooGraph repository except denied roots.
 - Write roots: `backend/data`.
 - Execute roots: `backend/data/tmp`, `skill/user`.
 - Execute extensions: `.py`, `.js`, `.mjs`, `.sh`, `.bat`, `.ps1`.

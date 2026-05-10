@@ -278,7 +278,7 @@ test("EditorWorkspaceShell routes menu selections and dropped files through the 
     componentSource,
     /const \{[\s\S]*createNodeFromFileForTab,[\s\S]*createNodeFromMenuForTab,[\s\S]*nodeCreationEntriesForTab,[\s\S]*nodeCreationMenuState,[\s\S]*openCreatedStateEdgeEditorForTab,[\s\S]*openNodeCreationMenuForTab,[\s\S]*updateNodeCreationQuery,[\s\S]*\} = useWorkspaceNodeCreationController\(\{/,
   );
-  assert.match(componentSource, /useWorkspaceNodeCreationController\(\{[\s\S]*documentsByTabId,[\s\S]*dataEdgeStateEditorRequestByTabId,[\s\S]*nodeCreationMenuByTabId,[\s\S]*persistedPresets,[\s\S]*guardGraphEditForTab,[\s\S]*markDocumentDirty,[\s\S]*setMessageFeedbackForTab,[\s\S]*importPythonGraphFile,[\s\S]*isGraphiteUiPythonExportFile,[\s\S]*\}\);/);
+  assert.match(componentSource, /useWorkspaceNodeCreationController\(\{[\s\S]*documentsByTabId,[\s\S]*dataEdgeStateEditorRequestByTabId,[\s\S]*nodeCreationMenuByTabId,[\s\S]*persistedPresets,[\s\S]*guardGraphEditForTab,[\s\S]*markDocumentDirty,[\s\S]*setMessageFeedbackForTab,[\s\S]*importPythonGraphFile,[\s\S]*isTooGraphPythonExportFile,[\s\S]*\}\);/);
   assert.match(nodeCreationControllerSource, /const result = createNodeFromCreationEntry\(document, \{/);
   assert.match(nodeCreationControllerSource, /const result = await createNodeFromDroppedFile\(document, \{/);
   assert.match(nodeCreationControllerSource, /buildOpenNodeCreationMenuState\(context\)/);
@@ -335,7 +335,7 @@ test("EditorWorkspaceShell keeps canvas viewport state in local editor drafts", 
   assert.match(documentStateSource, /writePersistedEditorViewportDraft\(tabId, viewport\)/);
 });
 
-test("EditorWorkspaceShell imports marked GraphiteUI Python files as new graph tabs", () => {
+test("EditorWorkspaceShell imports marked TooGraph Python files as new graph tabs", () => {
   assert.match(componentSource, /@import-python-graph="openPythonGraphImportDialog"/);
   assert.match(componentSource, /ref="pythonGraphImportInput"/);
   assert.match(componentSource, /import \{ useWorkspacePythonImportController \} from "\.\/useWorkspacePythonImportController\.ts";/);
@@ -344,7 +344,7 @@ test("EditorWorkspaceShell imports marked GraphiteUI Python files as new graph t
     /const \{[\s\S]*handlePythonGraphImportSelection,[\s\S]*importPythonGraphFile,[\s\S]*openPythonGraphImportDialog,[\s\S]*\} = useWorkspacePythonImportController\(\{/,
   );
   assert.match(pythonImportControllerSource, /async function importPythonGraphFile\(/);
-  assert.match(pythonImportControllerSource, /input\.isGraphiteUiPythonExportSource\(source\)/);
+  assert.match(pythonImportControllerSource, /input\.isTooGraphPythonExportSource\(source\)/);
   assert.match(pythonImportControllerSource, /openImportedGraphTab\(importedGraph, file\.name\)/);
   assert.doesNotMatch(componentSource, /function openImportedGraphTab\(/);
   assert.doesNotMatch(componentSource, /async function importPythonGraphFile\(/);

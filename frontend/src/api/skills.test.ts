@@ -25,7 +25,7 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
           name: "Web Search",
           description: "Searches the web.",
           llmInstruction: "Choose the query and run the bound web search skill.",
-          schemaVersion: "graphite.skill/v1",
+          schemaVersion: "toograph.skill/v1",
           inputSchema: [
             {
               key: "query",
@@ -79,7 +79,7 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
       name: "Web Search",
       description: "Searches the web.",
       llmInstruction: "Choose the query and run the bound web search skill.",
-      schemaVersion: "graphite.skill/v1",
+      schemaVersion: "toograph.skill/v1",
       inputSchema: [
         {
           key: "query",

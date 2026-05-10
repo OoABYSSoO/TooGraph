@@ -30,7 +30,7 @@ function buildDocument(): GraphPayload {
         name: "Question",
         description: "Primary prompt",
         type: "text",
-        value: "What is GraphiteUI?",
+        value: "What is TooGraph?",
         color: "#ffffff",
       },
       answer: {
@@ -49,7 +49,7 @@ function buildDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [],
         writes: [{ state: "question", mode: "replace" }],
-        config: { value: "What is GraphiteUI?" },
+        config: { value: "What is TooGraph?" },
       },
       answer_helper: {
         kind: "agent",
@@ -224,7 +224,7 @@ test("insertStateFieldIntoDocument advances the neutral state key counter for ex
     },
   });
 
-  assert.equal(nextDocument.metadata.graphiteui_state_key_counter, 9);
+  assert.equal(nextDocument.metadata.toograph_state_key_counter, 9);
 });
 
 test("updateStateFieldInDocument applies updater to existing definition", () => {

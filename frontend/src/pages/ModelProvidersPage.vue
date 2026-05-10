@@ -30,9 +30,9 @@
               <span>{{ t("settings.defaultModel") }}</span>
               <ElSelect
                 v-model="draft.text_model_ref"
-                class="model-providers-page__select graphite-select"
+                class="model-providers-page__select toograph-select"
                 :teleported="false"
-                popper-class="graphite-select-popper"
+                popper-class="toograph-select-popper"
                 @change="handleRuntimeDraftChange"
               >
                 <ElOption v-for="option in configuredModelOptions" :key="option.value" :label="option.label" :value="option.value" />
@@ -42,9 +42,9 @@
               <span>{{ t("settings.defaultVideoModel") }}</span>
               <ElSelect
                 v-model="draft.video_model_ref"
-                class="model-providers-page__select graphite-select"
+                class="model-providers-page__select toograph-select"
                 :teleported="false"
-                popper-class="graphite-select-popper"
+                popper-class="toograph-select-popper"
                 @change="handleRuntimeDraftChange"
               >
                 <ElOption v-for="option in configuredModelOptions" :key="option.value" :label="option.label" :value="option.value" />
@@ -58,9 +58,9 @@
               <span>{{ t("settings.defaultThinking") }}</span>
               <ElSelect
                 v-model="thinkingMode"
-                class="model-providers-page__select graphite-select"
+                class="model-providers-page__select toograph-select"
                 :teleported="false"
-                popper-class="graphite-select-popper"
+                popper-class="toograph-select-popper"
                 @change="handleRuntimeDraftChange"
               >
                 <ElOption v-for="option in thinkingLevelOptions" :key="option.value" :label="option.label" :value="option.value" />
@@ -372,9 +372,9 @@
                             <span class="model-providers-page__provider-field-label">{{ t("settings.providerTransport") }}</span>
                             <ElSelect
                               v-model="provider.transport"
-                              class="model-providers-page__select model-providers-page__provider-select graphite-select"
+                              class="model-providers-page__select model-providers-page__provider-select toograph-select"
                               :teleported="false"
-                              popper-class="graphite-select-popper"
+                              popper-class="toograph-select-popper"
                               @change="handleProviderDraftChange"
                             >
                               <ElOption label="OpenAI-compatible" value="openai-compatible" />
@@ -548,9 +548,9 @@
                 <span>{{ t("settings.providerTemplate") }}</span>
                 <ElSelect
                   v-model="pendingTemplateId"
-                  class="model-providers-page__select graphite-select"
+                  class="model-providers-page__select toograph-select"
                   :teleported="false"
-                  popper-class="graphite-select-popper"
+                  popper-class="toograph-select-popper"
                   :placeholder="t('settings.providerTemplate')"
                   @change="handlePendingTemplateChange"
                 >
@@ -614,13 +614,13 @@
                     <span>{{ t("settings.enabledModels") }}</span>
                     <ElSelect
                       v-model="providerEditorDraft.selected_models"
-                      class="model-providers-page__select graphite-select"
+                      class="model-providers-page__select toograph-select"
                       multiple
                       filterable
                       default-first-option
                       :reserve-keyword="false"
                       :teleported="false"
-                      popper-class="graphite-select-popper"
+                      popper-class="toograph-select-popper"
                       @change="handleProviderDraftChange"
                     >
                       <ElOption
@@ -654,9 +654,9 @@
                       <span>{{ t("settings.providerTransport") }}</span>
                       <ElSelect
                         v-model="providerEditorDraft.transport"
-                        class="model-providers-page__select graphite-select"
+                        class="model-providers-page__select toograph-select"
                         :teleported="false"
-                        popper-class="graphite-select-popper"
+                        popper-class="toograph-select-popper"
                         :disabled="isLoginProvider(providerEditorDraft)"
                         @change="handleProviderDraftChange"
                       >
@@ -1736,10 +1736,10 @@ onBeforeUnmount(() => {
 .model-providers-page__hero,
 .model-providers-page__panel,
 .model-providers-page__empty {
-  border: 1px solid var(--graphite-border);
+  border: 1px solid var(--toograph-border);
   border-radius: 24px;
-  background: var(--graphite-surface-panel);
-  box-shadow: var(--graphite-shadow-panel);
+  background: var(--toograph-surface-panel);
+  box-shadow: var(--toograph-shadow-panel);
 }
 
 .model-providers-page__hero,
@@ -1748,7 +1748,7 @@ onBeforeUnmount(() => {
 }
 
 .model-providers-page__panel {
-  background: var(--graphite-surface-card);
+  background: var(--toograph-surface-card);
   padding: 20px;
 }
 
@@ -1766,8 +1766,8 @@ onBeforeUnmount(() => {
 
 .model-providers-page__title {
   margin: 8px 0 10px;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 2rem;
 }
 
@@ -1950,7 +1950,7 @@ onBeforeUnmount(() => {
 }
 
 .model-providers-page__login-progress strong {
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
 }
 
 .model-providers-page__login-progress p,
@@ -1982,7 +1982,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: rgb(154, 52, 18);
   color: rgb(255, 248, 240);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.78rem;
   font-weight: 800;
 }
@@ -2005,8 +2005,8 @@ onBeforeUnmount(() => {
 
 .model-providers-page__device-code {
   min-width: 0;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-mono);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-mono);
   font-size: 1.2rem;
   font-weight: 800;
   letter-spacing: 0;
@@ -2111,7 +2111,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: rgba(239, 246, 255, 0.96);
   color: rgb(37, 99, 235);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0;
@@ -2218,7 +2218,7 @@ onBeforeUnmount(() => {
   border-radius: 12px;
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.88);
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
   box-sizing: border-box;
   font: inherit;
   outline: none;
@@ -2551,7 +2551,7 @@ onBeforeUnmount(() => {
   padding: 4px 10px;
   background: rgba(255, 248, 240, 0.92);
   color: rgb(154, 52, 18);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.84rem;
 }
 

@@ -27,7 +27,7 @@ type WorkspacePythonImportControllerInput = {
   updateWorkspace: (nextWorkspace: PersistedEditorWorkspace) => void;
   syncRouteToTab: (tab: WorkspaceRouteTab, mode?: "push" | "replace") => void;
   importGraphFromPythonSource: (source: string) => Promise<GraphPayload>;
-  isGraphiteUiPythonExportSource: (source: string) => boolean;
+  isTooGraphPythonExportSource: (source: string) => boolean;
   setMessageFeedbackForTab: (
     tabId: string,
     feedback: { tone: WorkspaceRunFeedback["tone"]; message: string; activeRunId?: string | null; activeRunStatus?: string | null },
@@ -88,13 +88,13 @@ export function useWorkspacePythonImportController(input: WorkspacePythonImportC
 
   async function importPythonGraphFile(file: PythonImportFile, options: { fallbackToFileNode: boolean }) {
     const source = await file.text();
-    if (!input.isGraphiteUiPythonExportSource(source)) {
+    if (!input.isTooGraphPythonExportSource(source)) {
       if (!options.fallbackToFileNode) {
         const tab = input.activeTab.value;
         if (tab) {
           input.setMessageFeedbackForTab(tab.tabId, {
             tone: "warning",
-            message: `${file.name} is not a GraphiteUI Python export.`,
+            message: `${file.name} is not a TooGraph Python export.`,
           });
         }
       }
@@ -110,7 +110,7 @@ export function useWorkspacePythonImportController(input: WorkspacePythonImportC
       if (tab) {
         input.setMessageFeedbackForTab(tab.tabId, {
           tone: "warning",
-          message: error instanceof Error ? error.message : "Failed to import GraphiteUI Python export.",
+          message: error instanceof Error ? error.message : "Failed to import TooGraph Python export.",
         });
       }
       return true;

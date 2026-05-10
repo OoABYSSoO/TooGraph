@@ -4,10 +4,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
-const officialTemplateRoot = resolve("backend/app/templates/official");
+const officialTemplateRoot = resolve("graph_template/official");
 
 function readTemplate(templateId) {
-  return JSON.parse(readFileSync(resolve(officialTemplateRoot, `${templateId}.json`), "utf8"));
+  return JSON.parse(readFileSync(resolve(officialTemplateRoot, templateId, "template.json"), "utf8"));
 }
 
 test("buddy visible chat template does not run self-review in the foreground path", () => {
@@ -45,11 +45,11 @@ test("buddy self-review stays out of visible template and capability catalogs", 
   const capabilityList = runPython(
     [
       "import json, sys",
-      `sys.path.insert(0, ${JSON.stringify(resolve("skill/graphiteui_capability_selector"))})`,
+      `sys.path.insert(0, ${JSON.stringify(resolve("skill/official/toograph_capability_selector"))})`,
       "from capability_catalog import load_capability_catalog",
       "print(json.dumps([item['key'] for item in load_capability_catalog(origin='buddy')['templates']]))",
     ].join("; "),
-    { GRAPHITE_REPO_ROOT: process.cwd() },
+    { TOOGRAPH_REPO_ROOT: process.cwd() },
   );
   assert.equal(capabilityList.includes("buddy_autonomous_loop"), true);
   assert.equal(capabilityList.includes("buddy_self_review"), false);

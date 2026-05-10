@@ -7,11 +7,11 @@ from textwrap import dedent
 
 MESSAGE = dedent(
     """\
-    [GraphiteUI] Bundled model download is retired.
+    [TooGraph] Bundled model download is retired.
 
-    Use the model manager for your OpenAI-compatible gateway, then configure it in GraphiteUI:
+    Use the model manager for your OpenAI-compatible gateway, then configure it in TooGraph:
 
-      GraphiteUI -> Model Providers -> Local / Custom OpenAI-compatible
+      TooGraph -> Model Providers -> Local / Custom OpenAI-compatible
 
     This script exits without downloading models.
     """

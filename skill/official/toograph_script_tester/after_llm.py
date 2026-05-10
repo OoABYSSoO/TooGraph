@@ -17,7 +17,7 @@ MAX_FILE_CHARS = 300000
 ALLOWED_COMMANDS = {"python", "python3", "node", "npm", "bash", "sh", "pwsh", "powershell", "cmd"}
 
 
-def graphiteui_script_tester(**skill_inputs: Any) -> dict[str, Any]:
+def toograph_script_tester(**skill_inputs: Any) -> dict[str, Any]:
     files = _normalize_files(skill_inputs.get("files"))
     if isinstance(files, str):
         return _result(False, files)
@@ -27,7 +27,7 @@ def graphiteui_script_tester(**skill_inputs: Any) -> dict[str, Any]:
     if not files:
         return _result(False, "No test files were provided.")
 
-    with tempfile.TemporaryDirectory(prefix="graphiteui_script_test_") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="toograph_script_test_") as temp_dir:
         temp_path = Path(temp_dir)
         file_error = _write_files(temp_path, files)
         if file_error:
@@ -264,7 +264,7 @@ def main() -> None:
         payload = {}
     if not isinstance(payload, dict):
         payload = {}
-    print(json.dumps(graphiteui_script_tester(**payload), ensure_ascii=False))
+    print(json.dumps(toograph_script_tester(**payload), ensure_ascii=False))
 
 
 if __name__ == "__main__":

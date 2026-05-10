@@ -696,8 +696,8 @@ function normalizeMarkdownTableCells(cells: string[], columnCount: number) {
 function renderInlineMarkdown(text: string) {
   const codeSpans: string[] = [];
   const markdownLinks: string[] = [];
-  const codePlaceholderPrefix = "%%GRAPHITEUI_CODE_SPAN_";
-  const markdownLinkPlaceholderPrefix = "%%GRAPHITEUI_MARKDOWN_LINK_";
+  const codePlaceholderPrefix = "%%TOOGRAPH_CODE_SPAN_";
+  const markdownLinkPlaceholderPrefix = "%%TOOGRAPH_MARKDOWN_LINK_";
   const escaped = escapeHtml(text).replace(/`([^`]+)`/g, (_match, code: string) => {
     const placeholder = `${codePlaceholderPrefix}${codeSpans.length}%%`;
     codeSpans.push(`<code>${code}</code>`);
@@ -724,9 +724,9 @@ function renderInlineMarkdown(text: string) {
 
 function renderOutputLinksInEscapedText(text: string) {
   return text
-    .split(/(%%GRAPHITEUI_(?:CODE_SPAN|MARKDOWN_LINK)_\d+%%)/g)
+    .split(/(%%TOOGRAPH_(?:CODE_SPAN|MARKDOWN_LINK)_\d+%%)/g)
     .map((part) => {
-      if (/^%%GRAPHITEUI_(?:CODE_SPAN|MARKDOWN_LINK)_\d+%%$/.test(part)) {
+      if (/^%%TOOGRAPH_(?:CODE_SPAN|MARKDOWN_LINK)_\d+%%$/.test(part)) {
         return part;
       }
       return linkifyOutputText(part)

@@ -92,7 +92,7 @@ def prepare_model_input_attachments(
                 "file_url": file_path.resolve().as_uri(),
             }
             if attachment_type == "video" and size > max_inline_video_bytes:
-                frame_output_dir = Path(tempfile.mkdtemp(prefix="graphite_video_frames_"))
+                frame_output_dir = Path(tempfile.mkdtemp(prefix="toograph_video_frames_"))
                 cleanup_paths.append(str(frame_output_dir))
                 try:
                     frames = extract_video_frame_attachments_func(

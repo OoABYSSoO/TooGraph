@@ -63,7 +63,7 @@ CODEX_BROWSER_SUCCESS_HTML = """<!doctype html>
   <title>Authentication successful</title>
 </head>
 <body>
-  <p>Authentication successful. You can close this window and return to GraphiteUI.</p>
+  <p>Authentication successful. You can close this window and return to TooGraph.</p>
 </body>
 </html>"""
 
@@ -76,7 +76,7 @@ CODEX_BROWSER_FAILURE_HTML = """<!doctype html>
   <title>Authentication failed</title>
 </head>
 <body>
-  <p>Authentication failed. Return to GraphiteUI and try a fallback sign-in option.</p>
+  <p>Authentication failed. Return to TooGraph and try a fallback sign-in option.</p>
 </body>
 </html>"""
 
@@ -271,7 +271,7 @@ def _build_codex_browser_authorization_url(*, state: str, code_challenge: str) -
             "state": state,
             "id_token_add_organizations": "true",
             "codex_cli_simplified_flow": "true",
-            "originator": "graphiteui",
+            "originator": "toograph",
         }
     )
     return f"{CODEX_OAUTH_AUTHORIZE_URL}?{query}"

@@ -17,7 +17,7 @@ TEMPLATE_SETTINGS_PATH = GRAPH_TEMPLATE_ROOT / "settings.json"
 TEMPLATE_FILE_NAME = "template.json"
 OFFICIAL_TEMPLATE_SOURCE = "official"
 USER_TEMPLATE_SOURCE = "user"
-TEMPLATE_SETTINGS_SCHEMA_VERSION = "graphiteui.template-settings/v1"
+TEMPLATE_SETTINGS_SCHEMA_VERSION = "toograph.template-settings/v1"
 
 
 def list_template_records(include_disabled: bool = False) -> list[dict[str, Any]]:

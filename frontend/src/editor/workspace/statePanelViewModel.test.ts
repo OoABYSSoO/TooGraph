@@ -22,7 +22,7 @@ test("buildStatePanelViewModel returns sorted state rows with readable values", 
         name: "Question",
         description: "Primary question.",
         type: "text",
-        value: "What is GraphiteUI?",
+        value: "What is TooGraph?",
         color: "#ffffff",
       },
     },
@@ -34,7 +34,7 @@ test("buildStatePanelViewModel returns sorted state rows with readable values", 
         ui: { position: { x: 0, y: 0 } },
         reads: [],
         writes: [{ state: "alpha", mode: "replace" }],
-        config: { value: "What is GraphiteUI?" },
+        config: { value: "What is TooGraph?" },
       },
       answer_helper: {
         kind: "agent",
@@ -111,7 +111,7 @@ test("buildStatePanelViewModel returns sorted state rows with readable values", 
       },
     ],
   );
-  assert.equal(view.rows[0].valuePreview, "What is GraphiteUI?");
+  assert.equal(view.rows[0].valuePreview, "What is TooGraph?");
   assert.match(view.rows[1].valuePreview, /"ok": true/);
   assert.equal(view.rows[0].bindingSummary, "1 reader · 1 writer");
 });

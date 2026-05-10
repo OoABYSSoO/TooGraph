@@ -7,15 +7,15 @@ import re
 from typing import Any
 
 
-SKILL_KEY = "graphiteui_capability_selector"
+SKILL_KEY = "toograph_capability_selector"
 DEFAULT_ORIGIN = "buddy"
 
 
 def build_capability_catalog_context(*, origin: str = DEFAULT_ORIGIN) -> str:
     catalog = load_capability_catalog(origin=origin)
     lines = [
-        "Available GraphiteUI capabilities:",
-        "Use this catalog only for the `capability` argument of graphiteui_capability_selector.",
+        "Available TooGraph capabilities:",
+        "Use this catalog only for the `capability` argument of toograph_capability_selector.",
         "Graph templates are preferred over Skills when both can satisfy the requirement.",
         "Choose exactly one item by returning {\"kind\":\"subgraph\",\"key\":\"...\"} or {\"kind\":\"skill\",\"key\":\"...\"}.",
         "If no item fits, return {\"kind\":\"none\"}. Do not invent keys outside this catalog.",
@@ -214,7 +214,7 @@ def _compact_text(value: Any) -> str:
 
 
 def _resolve_repo_root() -> Path:
-    configured = os.environ.get("GRAPHITE_REPO_ROOT")
+    configured = os.environ.get("TOOGRAPH_REPO_ROOT")
     if configured:
         return Path(configured).expanduser().resolve()
     return Path(__file__).resolve().parents[3]

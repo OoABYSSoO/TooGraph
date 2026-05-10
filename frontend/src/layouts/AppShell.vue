@@ -23,7 +23,7 @@
           <img class="app-shell__brand-logo" src="/logo.svg" alt="" aria-hidden="true" />
         </button>
         <div class="app-shell__brand-copy">
-          <h1 class="app-shell__title">GraphiteUI</h1>
+          <h1 class="app-shell__title">TooGraph</h1>
           <p class="app-shell__subtitle">{{ t("app.subtitle") }}</p>
         </div>
       </div>
@@ -151,7 +151,7 @@ import { useRoute } from "vue-router";
 import LanguageSwitcher from "./LanguageSwitcher.vue";
 import { resolvePrimaryNavigationSection, resolveShellLayoutMode } from "@/lib/layout-mode";
 
-const SIDEBAR_STORAGE_KEY = "graphiteui:sidebar-collapsed";
+const SIDEBAR_STORAGE_KEY = "toograph:sidebar-collapsed";
 
 const route = useRoute();
 const { t } = useI18n();
@@ -186,9 +186,9 @@ watch(isSidebarCollapsed, (nextValue) => {
   display: grid;
   grid-template-columns: var(--app-sidebar-width) minmax(0, 1fr);
   overflow: hidden;
-  background: var(--graphite-page-bg);
-  color: var(--graphite-text);
-  font-family: var(--graphite-font-ui);
+  background: var(--toograph-page-bg);
+  color: var(--toograph-text);
+  font-family: var(--toograph-font-ui);
   transition: grid-template-columns 180ms ease;
 }
 
@@ -209,8 +209,8 @@ watch(isSidebarCollapsed, (nextValue) => {
   display: grid;
   align-content: start;
   gap: 18px;
-  background: var(--graphite-glass-bg);
-  box-shadow: var(--graphite-glass-highlight);
+  background: var(--toograph-glass-bg);
+  box-shadow: var(--toograph-glass-highlight);
   backdrop-filter: blur(24px) saturate(1.35);
   min-height: 0;
   height: 100vh;
@@ -248,11 +248,11 @@ watch(isSidebarCollapsed, (nextValue) => {
   justify-content: center;
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 999px;
-  background: var(--graphite-glass-bg-strong);
+  background: var(--toograph-glass-bg-strong);
   cursor: pointer;
   overflow: hidden;
   padding: 2px;
-  box-shadow: var(--graphite-glass-highlight);
+  box-shadow: var(--toograph-glass-highlight);
   transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
@@ -266,13 +266,13 @@ watch(isSidebarCollapsed, (nextValue) => {
 .app-shell__brand-mark:hover {
   border-color: rgba(154, 52, 18, 0.22);
   background: rgba(255, 248, 240, 0.9);
-  box-shadow: var(--graphite-glass-highlight), 0 8px 18px rgba(154, 52, 18, 0.1);
+  box-shadow: var(--toograph-glass-highlight), 0 8px 18px rgba(154, 52, 18, 0.1);
   transform: translateY(-1px);
 }
 
 .app-shell__brand-mark:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.24), var(--graphite-glass-highlight);
+  box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.24), var(--toograph-glass-highlight);
 }
 
 .app-shell__brand-copy {
@@ -291,8 +291,8 @@ watch(isSidebarCollapsed, (nextValue) => {
 
 .app-shell__title {
   margin: 0;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 1rem;
   line-height: 1.15;
 }
@@ -301,7 +301,7 @@ watch(isSidebarCollapsed, (nextValue) => {
   margin: 4px 0 0;
   font-size: 0.72rem;
   line-height: 1.2;
-  color: var(--graphite-text-muted);
+  color: var(--toograph-text-muted);
 }
 
 .app-shell__nav {

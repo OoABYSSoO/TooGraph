@@ -18,7 +18,7 @@ class BuddyStoreTests(unittest.TestCase):
     def test_defaults_load_when_files_do_not_exist(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
-                self.assertEqual(store.load_profile()["name"], "GraphiteUI Buddy")
+                self.assertEqual(store.load_profile()["name"], "TooGraph Buddy")
                 self.assertEqual(store.load_policy()["graph_permission_mode"], "ask_first")
                 self.assertEqual(store.list_memories(), [])
                 self.assertIn("content", store.load_session_summary())
@@ -29,7 +29,7 @@ class BuddyStoreTests(unittest.TestCase):
             with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
                 profile = store.load_profile()
 
-            self.assertEqual(profile["name"], "GraphiteUI Buddy")
+            self.assertEqual(profile["name"], "TooGraph Buddy")
             expected_files = [
                 "AGENTS.md",
                 "SOUL.md",
@@ -57,7 +57,7 @@ class BuddyStoreTests(unittest.TestCase):
             agents = (buddy_home / "AGENTS.md").read_text(encoding="utf-8")
             user = (buddy_home / "USER.md").read_text(encoding="utf-8")
             memory = (buddy_home / "MEMORY.md").read_text(encoding="utf-8")
-            self.assertIn("# SOUL.md - GraphiteUI Buddy", soul)
+            self.assertIn("# SOUL.md - TooGraph Buddy", soul)
             self.assertIn("图模板", agents)
             self.assertIn("# USER.md - About Your Human", user)
             self.assertIn("# MEMORY.md - Long-Term Memory", memory)
@@ -73,7 +73,7 @@ class BuddyStoreTests(unittest.TestCase):
         self.assertEqual(len(revisions), 1)
         self.assertEqual(revisions[0]["target_type"], "profile")
         self.assertEqual(revisions[0]["operation"], "update")
-        self.assertEqual(revisions[0]["previous_value"]["name"], "GraphiteUI Buddy")
+        self.assertEqual(revisions[0]["previous_value"]["name"], "TooGraph Buddy")
         self.assertEqual(revisions[0]["next_value"]["name"], "小石墨")
 
     def test_memory_delete_is_soft_delete_and_restore_creates_revision(self) -> None:

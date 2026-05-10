@@ -181,7 +181,7 @@ onMounted(async () => {
 });
 
 function statusBadgeClass(status: string) {
-  return `graphite-status-badge graphite-status-badge--${status.replaceAll("_", "-")}`;
+  return `toograph-status-badge toograph-status-badge--${status.replaceAll("_", "-")}`;
 }
 
 function setRunPage(nextPage: number) {
@@ -200,14 +200,14 @@ function setGraphPage(nextPage: number) {
 <style scoped>
 .home-hero,
 .home-panel {
-  border: 1px solid var(--graphite-border);
+  border: 1px solid var(--toograph-border);
   border-radius: 28px;
-  background: var(--graphite-surface-panel);
-  box-shadow: var(--graphite-shadow-panel);
+  background: var(--toograph-surface-panel);
+  box-shadow: var(--toograph-shadow-panel);
 }
 
 .home-hero {
-  background: var(--graphite-surface-hero);
+  background: var(--toograph-surface-hero);
   padding: 24px;
 }
 
@@ -221,8 +221,8 @@ function setGraphPage(nextPage: number) {
 
 .home-hero__title {
   margin: 8px 0 10px;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 2rem;
 }
 
@@ -329,7 +329,7 @@ function setGraphPage(nextPage: number) {
   border: 1px solid rgba(154, 52, 18, 0.1);
   border-radius: 18px;
   padding: 16px;
-  background: var(--graphite-surface-card);
+  background: var(--toograph-surface-card);
 }
 
 .home-card {
@@ -342,7 +342,7 @@ function setGraphPage(nextPage: number) {
 .home-card:focus-visible {
   border-color: rgba(154, 52, 18, 0.2);
   background: rgba(255, 253, 249, 0.96);
-  box-shadow: var(--graphite-shadow-hover);
+  box-shadow: var(--toograph-shadow-hover);
   outline: none;
   transform: translateY(-1px);
 }
@@ -373,7 +373,7 @@ function setGraphPage(nextPage: number) {
 }
 
 .home-card__identifier {
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.84rem;
 }
 
@@ -402,12 +402,12 @@ function setGraphPage(nextPage: number) {
 }
 
 .home-badges span {
-  border: 1px solid var(--graphite-status-border, transparent);
+  border: 1px solid var(--toograph-status-border, transparent);
   border-radius: 999px;
   padding: 4px 10px;
-  background: var(--graphite-status-bg, rgba(255, 248, 240, 0.92));
-  color: var(--graphite-status-fg, rgb(154, 52, 18));
-  font-family: var(--graphite-font-mono);
+  background: var(--toograph-status-bg, rgba(255, 248, 240, 0.92));
+  color: var(--toograph-status-fg, rgb(154, 52, 18));
+  font-family: var(--toograph-font-mono);
   font-size: 0.84rem;
 }
 

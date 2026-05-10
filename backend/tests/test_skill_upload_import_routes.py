@@ -25,7 +25,7 @@ def _native_skill_manifest(
     runtime_entrypoint: str | None = None,
 ) -> str:
     manifest = {
-        "schemaVersion": "graphite.skill/v1",
+        "schemaVersion": "toograph.skill/v1",
         "skillKey": skill_key,
         "name": "Video Understanding" if skill_key == "video_understanding" else skill_key.replace("_", " ").title(),
         "description": "Use frame sampling rules to understand a video with image-only model capability.",
@@ -64,7 +64,7 @@ def _skill_markdown(skill_key: str = "uploaded_zip_skill") -> str:
     return f"""---
 name: Uploaded Skill
 description: Imported from an uploaded archive.
-graphite:
+toograph:
   skill_key: {skill_key}
   input_schema:
     - key: text
@@ -173,13 +173,15 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 catalog_items = {item["skillKey"]: item for item in response.json()}
                 self.assertEqual(
                     sorted(catalog_items),
-                    [
-                        "graphiteUI_script_tester",
-                        "graphiteUI_skill_builder",
-                        "graphiteui_capability_selector",
-                        "local_workspace_executor",
-                        "web_search",
-                    ],
+                    sorted(
+                        [
+                            "toograph_script_tester",
+                            "toograph_skill_builder",
+                            "toograph_capability_selector",
+                            "local_workspace_executor",
+                            "web_search",
+                        ]
+                    ),
                 )
                 source_path = {
                     key: item["sourcePath"].replace("\\", "/")
@@ -195,22 +197,22 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue(catalog_items["web_search"]["runtimeReady"])
                 self.assertTrue(catalog_items["web_search"]["runtimeRegistered"])
                 self.assertTrue(source_path["web_search"].endswith("/skill/official/web_search/skill.json"))
-                self.assertEqual(catalog_items["graphiteUI_skill_builder"]["sourceScope"], "official")
-                self.assertFalse(catalog_items["graphiteUI_skill_builder"]["canManage"])
-                self.assertTrue(catalog_items["graphiteUI_skill_builder"]["runtimeReady"])
-                self.assertTrue(catalog_items["graphiteUI_skill_builder"]["runtimeRegistered"])
+                self.assertEqual(catalog_items["toograph_skill_builder"]["sourceScope"], "official")
+                self.assertFalse(catalog_items["toograph_skill_builder"]["canManage"])
+                self.assertTrue(catalog_items["toograph_skill_builder"]["runtimeReady"])
+                self.assertTrue(catalog_items["toograph_skill_builder"]["runtimeRegistered"])
                 self.assertTrue(
-                    source_path["graphiteUI_skill_builder"].endswith(
-                        "/skill/official/graphiteUI_skill_builder/skill.json"
+                    source_path["toograph_skill_builder"].endswith(
+                        "/skill/official/toograph_skill_builder/skill.json"
                     )
                 )
-                self.assertEqual(catalog_items["graphiteUI_script_tester"]["sourceScope"], "official")
-                self.assertFalse(catalog_items["graphiteUI_script_tester"]["canManage"])
-                self.assertTrue(catalog_items["graphiteUI_script_tester"]["runtimeReady"])
-                self.assertTrue(catalog_items["graphiteUI_script_tester"]["runtimeRegistered"])
+                self.assertEqual(catalog_items["toograph_script_tester"]["sourceScope"], "official")
+                self.assertFalse(catalog_items["toograph_script_tester"]["canManage"])
+                self.assertTrue(catalog_items["toograph_script_tester"]["runtimeReady"])
+                self.assertTrue(catalog_items["toograph_script_tester"]["runtimeRegistered"])
                 self.assertTrue(
-                    source_path["graphiteUI_script_tester"].endswith(
-                        "/skill/official/graphiteUI_script_tester/skill.json"
+                    source_path["toograph_script_tester"].endswith(
+                        "/skill/official/toograph_script_tester/skill.json"
                     )
                 )
                 self.assertEqual(catalog_items["local_workspace_executor"]["sourceScope"], "official")
@@ -227,7 +229,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 settings_path = state_dir / "settings.json"
                 self.assertTrue(settings_path.exists())
                 settings_payload = json.loads(settings_path.read_text(encoding="utf-8"))
-                self.assertEqual(settings_payload["schemaVersion"], "graphiteui.skill-settings/v1")
+                self.assertEqual(settings_payload["schemaVersion"], "toograph.skill-settings/v1")
                 self.assertIn("web_search", settings_payload["entries"])
                 self.assertEqual(settings_payload["entries"]["web_search"], {"enabled": True})
 
@@ -288,7 +290,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertNotIn("capabilityPolicy", json.loads(imported_path.read_text(encoding="utf-8")))
 
                 settings_payload = json.loads((skills_dir / "settings.json").read_text(encoding="utf-8"))
-                self.assertEqual(settings_payload["schemaVersion"], "graphiteui.skill-settings/v1")
+                self.assertEqual(settings_payload["schemaVersion"], "toograph.skill-settings/v1")
                 self.assertEqual(settings_payload["entries"]["video_understanding"], {"enabled": True})
 
                 catalog_response = client.get("/api/skills/catalog?include_disabled=true")

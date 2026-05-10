@@ -122,4 +122,4 @@ def build_langgraph_state_schema(graph: NodeSystemGraphDocument):
         state_name: Annotated[Any, replace_reducer]
         for state_name in graph.state_schema
     }
-    return TypedDict("GraphiteUILangGraphState", annotations, total=False)
+    return TypedDict("TooGraphLangGraphState", annotations, total=False)

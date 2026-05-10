@@ -161,7 +161,7 @@ test("EditorTabBar normalizes Element Plus tab spacing with shared size variable
 });
 
 test("EditorTabBar keeps the warm project palette instead of the default blue Element Plus theme", () => {
-  assert.match(componentSource, /\.editor-tab-bar \{[\s\S]*--editor-tab-bar-paper:\s*var\(--graphite-glass-bg\);/);
+  assert.match(componentSource, /\.editor-tab-bar \{[\s\S]*--editor-tab-bar-paper:\s*var\(--toograph-glass-bg\);/);
   assert.match(componentSource, /\.editor-tab-bar__tab-shell \{[\s\S]*border-radius:\s*14px;/);
   assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__item\.is-active\) \{/);
 });
@@ -194,24 +194,24 @@ test("EditorTabBar uses a restrained paper-warm palette instead of heavy gold gr
 
   assert.match(
     componentSource,
-    /\.editor-tab-bar__tabs-shell \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\),\s*var\(--editor-tab-bar-paper\);/,
+    /\.editor-tab-bar__tabs-shell \{[\s\S]*background:\s*var\(--toograph-glass-specular\),\s*var\(--toograph-glass-lens\),\s*var\(--editor-tab-bar-paper\);/,
   );
   assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*background-blend-mode:\s*screen,\s*screen,\s*normal;/);
   assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*padding:\s*8px;/);
-  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*box-shadow:[\s\S]*var\(--graphite-glass-rim\);/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*box-shadow:[\s\S]*var\(--toograph-glass-rim\);/);
   assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*backdrop-filter:\s*blur\(28px\) saturate\(1\.65\) contrast\(1\.02\);/);
   assert.match(tabShellBlock, /background:\s*rgba\(255,\s*255,\s*255,\s*0\.28\);/);
   assert.match(activeTabBlock, /background:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/);
   assert.doesNotMatch(tabShellBlock, /linear-gradient/);
   assert.doesNotMatch(activeTabBlock, /linear-gradient/);
   assert.match(componentSource, /\.editor-tab-bar__tab-shell--active \{[\s\S]*color:\s*rgba\(111,\s*52,\s*22,\s*1\);/);
-  assert.match(componentSource, /border:\s*1px solid var\(--graphite-glass-border\);/);
+  assert.match(componentSource, /border:\s*1px solid var\(--toograph-glass-border\);/);
 });
 
 test("EditorTabBar gives the plus launcher the same liquid glass light stack as the tab strip", () => {
   assert.match(
     componentSource,
-    /\.editor-tab-bar__add-tab \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\),\s*var\(--graphite-glass-bg-strong\);/,
+    /\.editor-tab-bar__add-tab \{[\s\S]*background:\s*var\(--toograph-glass-specular\),\s*var\(--toograph-glass-lens\),\s*var\(--toograph-glass-bg-strong\);/,
   );
   assert.match(componentSource, /\.editor-tab-bar__add-tab \{[\s\S]*background-blend-mode:\s*screen,\s*screen,\s*normal;/);
 });

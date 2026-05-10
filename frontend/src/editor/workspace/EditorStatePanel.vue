@@ -125,11 +125,11 @@
               <div class="editor-state-panel__field">
                 <span class="editor-state-panel__field-label">{{ t("nodeCard.type") }}</span>
                 <ElSelect
-                  class="editor-state-panel__select graphite-select"
+                  class="editor-state-panel__select toograph-select"
                   :aria-label="t('nodeCard.type')"
                   :model-value="stateDefinition(row.key)?.type ?? 'text'"
                   :teleported="false"
-                  popper-class="graphite-select-popper editor-state-panel__select-popper"
+                  popper-class="toograph-select-popper editor-state-panel__select-popper"
                   @update:model-value="handleStateTypeSelect(row.key, $event)"
                 >
                   <ElOption v-for="typeOption in STATE_FIELD_TYPE_OPTIONS" :key="typeOption" :label="typeOption" :value="typeOption" />
@@ -139,11 +139,11 @@
               <div class="editor-state-panel__field">
                 <span class="editor-state-panel__field-label">{{ t("nodeCard.color") }}</span>
                 <ElSelect
-                  class="editor-state-panel__color-select graphite-select"
+                  class="editor-state-panel__color-select toograph-select"
                   :aria-label="t('nodeCard.color')"
                   :model-value="stateDefinition(row.key)?.color ?? ''"
                   :teleported="false"
-                  popper-class="graphite-select-popper editor-state-panel__select-popper"
+                  popper-class="toograph-select-popper editor-state-panel__select-popper"
                   @update:model-value="handleStateColorSelect(row.key, $event)"
                 >
                   <template #label>
@@ -597,11 +597,11 @@ function handleStateColorSelect(stateKey: string, value: string | number | boole
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
-  border: 1px solid var(--graphite-glass-border);
+  border: 1px solid var(--toograph-glass-border);
   border-radius: 28px;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--graphite-glass-bg-strong);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens), var(--toograph-glass-bg-strong);
   background-blend-mode: screen, screen, normal;
-  box-shadow: var(--graphite-glass-shadow), var(--graphite-glass-highlight), var(--graphite-glass-rim);
+  box-shadow: var(--toograph-glass-shadow), var(--toograph-glass-highlight), var(--toograph-glass-rim);
   backdrop-filter: blur(34px) saturate(1.7) contrast(1.02);
 }
 
@@ -621,7 +621,7 @@ function handleStateColorSelect(stateKey: string, value: string | number | boole
 
 .editor-state-panel__title {
   margin: 6px 0 0;
-  font-family: var(--graphite-font-display);
+  font-family: var(--toograph-font-display);
   font-size: 1.12rem;
   color: #1f2937;
 }
@@ -764,7 +764,7 @@ function handleStateColorSelect(stateKey: string, value: string | number | boole
   min-width: 0;
   border: 1px solid rgba(154, 52, 18, 0.18);
   border-radius: 24px;
-  background: var(--graphite-surface-card);
+  background: var(--toograph-surface-card);
   padding: 8px;
   display: grid;
   gap: 8px;

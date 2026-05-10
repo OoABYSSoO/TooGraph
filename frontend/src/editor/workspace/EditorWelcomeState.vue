@@ -136,14 +136,14 @@ function graphEdgeCount(graph: GraphDocument) {
 
 .editor-welcome__hero,
 .editor-welcome__panel {
-  border: 1px solid var(--graphite-border);
+  border: 1px solid var(--toograph-border);
   border-radius: 24px;
-  background: var(--graphite-surface-panel);
-  box-shadow: var(--graphite-shadow-panel);
+  background: var(--toograph-surface-panel);
+  box-shadow: var(--toograph-shadow-panel);
 }
 
 .editor-welcome__hero {
-  background: var(--graphite-surface-hero);
+  background: var(--toograph-surface-hero);
   padding: 24px;
 }
 
@@ -156,8 +156,8 @@ function graphEdgeCount(graph: GraphDocument) {
 
 .editor-welcome__title {
   margin: 8px 0 10px;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 2rem;
 }
 
@@ -236,7 +236,7 @@ function graphEdgeCount(graph: GraphDocument) {
   border: 1px solid rgba(154, 52, 18, 0.12);
   border-radius: 18px;
   padding: 16px;
-  background: var(--graphite-surface-card);
+  background: var(--toograph-surface-card);
 }
 
 .editor-welcome__card {
@@ -259,7 +259,7 @@ function graphEdgeCount(graph: GraphDocument) {
 .editor-welcome__card-id {
   display: block;
   margin-bottom: 6px;
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.72rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;

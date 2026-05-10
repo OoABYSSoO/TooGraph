@@ -155,14 +155,14 @@ function selectActiveOption(optionId: string) {
   width: min(336px, calc(100vw - 32px));
   overflow: hidden;
   isolation: isolate;
-  border: 1px solid var(--graphite-glass-border);
+  border: 1px solid var(--toograph-glass-border);
   border-radius: 22px;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--graphite-glass-bg-strong);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens), var(--toograph-glass-bg-strong);
   background-blend-mode: screen, screen, normal;
   box-shadow:
-    var(--graphite-glass-shadow),
-    var(--graphite-glass-highlight),
-    var(--graphite-glass-rim);
+    var(--toograph-glass-shadow),
+    var(--toograph-glass-highlight),
+    var(--toograph-glass-rim);
   backdrop-filter: blur(26px) saturate(1.55) contrast(1.01);
   padding: 8px;
   display: grid;
@@ -252,7 +252,7 @@ function selectActiveOption(optionId: string) {
   border: 1px solid rgba(213, 184, 146, 0.52);
   background: rgba(255, 255, 255, 0.48);
   color: rgba(154, 52, 18, 0.92);
-  box-shadow: var(--graphite-glass-highlight);
+  box-shadow: var(--toograph-glass-highlight);
 }
 
 .editor-tab-launcher-panel__entry-icon {

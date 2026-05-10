@@ -1,9 +1,9 @@
 ---
-name: graphiteUI_script_tester
+name: toograph_script_tester
 description: Use when a graph needs to generate deterministic tests for a provided local script and run them with an allowed system command.
 ---
 
-# GraphiteUI Script Tester
+# TooGraph Script Tester
 
 Use this skill when the graph has a script or generated script source and needs tests written and executed in a temporary workspace.
 

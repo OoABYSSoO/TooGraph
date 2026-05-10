@@ -13,12 +13,12 @@ test("fetchKnowledgeBases requests the knowledge bases endpoint", async () => {
     return new Response(
       JSON.stringify([
         {
-          name: "graphiteui-official",
-          kb_id: "graphiteui-official",
-          label: "GraphiteUI Project Docs",
-          description: "Project-specific GraphiteUI documentation and current implementation notes.",
-          sourceKind: "graphiteui_project_docs",
-          sourceUrl: "https://github.com/OoABYSSoO/GraphiteUI",
+          name: "toograph-official",
+          kb_id: "toograph-official",
+          label: "TooGraph Project Docs",
+          description: "Project-specific TooGraph documentation and current implementation notes.",
+          sourceKind: "toograph_project_docs",
+          sourceUrl: "https://github.com/OoABYSSoO/TooGraph",
           version: "v1",
           documentCount: 9,
           chunkCount: 16,
@@ -39,12 +39,12 @@ test("fetchKnowledgeBases requests the knowledge bases endpoint", async () => {
   assert.equal(requestedUrl, "/api/knowledge/bases");
   assert.deepEqual(knowledgeBases, [
     {
-      name: "graphiteui-official",
-      kb_id: "graphiteui-official",
-      label: "GraphiteUI Project Docs",
-      description: "Project-specific GraphiteUI documentation and current implementation notes.",
-      sourceKind: "graphiteui_project_docs",
-      sourceUrl: "https://github.com/OoABYSSoO/GraphiteUI",
+      name: "toograph-official",
+      kb_id: "toograph-official",
+      label: "TooGraph Project Docs",
+      description: "Project-specific TooGraph documentation and current implementation notes.",
+      sourceKind: "toograph_project_docs",
+      sourceUrl: "https://github.com/OoABYSSoO/TooGraph",
       version: "v1",
       documentCount: 9,
       chunkCount: 16,

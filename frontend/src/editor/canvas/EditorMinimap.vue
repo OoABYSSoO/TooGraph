@@ -150,10 +150,10 @@ function emitWorldPointFromEvent(event: PointerEvent) {
   height: 160px;
   isolation: isolate;
   overflow: hidden;
-  border: 1px solid var(--graphite-glass-border);
+  border: 1px solid var(--toograph-glass-border);
   border-radius: 18px;
-  background: var(--graphite-glass-bg);
-  box-shadow: var(--graphite-glass-shadow), var(--graphite-glass-highlight), var(--graphite-glass-rim);
+  background: var(--toograph-glass-bg);
+  box-shadow: var(--toograph-glass-shadow), var(--toograph-glass-highlight), var(--toograph-glass-rim);
   backdrop-filter: blur(24px) saturate(1.6) contrast(1.02);
   cursor: grab;
   pointer-events: auto;
@@ -167,7 +167,7 @@ function emitWorldPointFromEvent(event: PointerEvent) {
   inset: 1px;
   z-index: 0;
   border-radius: inherit;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens);
   mix-blend-mode: screen;
   opacity: 0.52;
 }

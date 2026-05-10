@@ -80,7 +80,7 @@ def extract_video_frame_attachments(
         raise RuntimeError("Video fallback requires a local filesystem path or file:// video attachment.")
 
     requested_frame_count = max(1, min(int(frame_count or DEFAULT_VIDEO_FRAME_COUNT), MAX_VIDEO_FRAME_COUNT))
-    frame_dir = Path(output_dir) if output_dir is not None else Path(tempfile.mkdtemp(prefix="graphite_video_frames_"))
+    frame_dir = Path(output_dir) if output_dir is not None else Path(tempfile.mkdtemp(prefix="toograph_video_frames_"))
     frame_dir.mkdir(parents=True, exist_ok=True)
     duration = _probe_video_duration(source_path)
     frame_paths = _extract_frame_files(source_path, frame_dir, duration=duration, frame_count=requested_frame_count)

@@ -99,11 +99,11 @@
         <label class="node-card__control-row">
           <span class="node-card__control-label">{{ t("nodeCard.operator") }}</span>
           <ElSelect
-            class="node-card__control-select node-card__condition-operator-select graphite-select"
+            class="node-card__control-select node-card__condition-operator-select toograph-select"
             :model-value="ruleOperatorValue"
             :title="body.operatorLabel"
             :teleported="false"
-            popper-class="graphite-select-popper"
+            popper-class="toograph-select-popper"
             @pointerdown.stop
             @click.stop
             @update:model-value="emit('update:operator', $event)"

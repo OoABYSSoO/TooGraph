@@ -118,7 +118,7 @@ test("uploaded asset description helper returns empty-state copy by target type"
 });
 
 test("createUploadedAssetEnvelope stores text-like files as local upload records with preview text", async () => {
-  const file = new File(["hello GraphiteUI"], "notes.txt", { type: "text/plain" });
+  const file = new File(["hello TooGraph"], "notes.txt", { type: "text/plain" });
 
   const envelope = await createUploadedAssetEnvelope(file, async (uploadFile) => ({
     local_path: `uploads/${uploadFile.name}`,
@@ -135,7 +135,7 @@ test("createUploadedAssetEnvelope stores text-like files as local upload records
     detectedType: "file",
     localPath: "uploads/notes.txt",
     contentType: "text/plain",
-    textPreview: "hello GraphiteUI",
+    textPreview: "hello TooGraph",
     encoding: "local_path",
   });
 });

@@ -29,7 +29,7 @@ const webSearchSkill: SkillDefinition = {
   name: "联网搜索",
   description: "Search the public web.",
   llmInstruction: "Decide a query and run web_search.",
-  schemaVersion: "graphite.skill/v1",
+  schemaVersion: "toograph.skill/v1",
   version: "1.0.0",
   capabilityPolicy: {
     default: { selectable: true, requiresApproval: false },
@@ -59,7 +59,7 @@ const localWorkspaceExecutorSkill: SkillDefinition = {
   name: "Local Workspace Executor",
   description: "Run one local workspace operation.",
   llmInstruction: "Prepare one local workspace operation.",
-  schemaVersion: "graphite.skill/v1",
+  schemaVersion: "toograph.skill/v1",
   version: "1.0.0",
   capabilityPolicy: {
     default: { selectable: true, requiresApproval: true },
@@ -96,7 +96,7 @@ const template: TemplateRecord = {
       name: "question",
       description: "User question",
       type: "text",
-      value: "什么是 GraphiteUI？",
+      value: "什么是 TooGraph？",
       color: "#d97706",
     },
   },
@@ -114,7 +114,7 @@ const template: TemplateRecord = {
       reads: [],
       writes: [{ state: "question", mode: "replace" }],
       config: {
-        value: "什么是 GraphiteUI？",
+        value: "什么是 TooGraph？",
       },
     },
   },
@@ -143,7 +143,7 @@ test("createDraftFromTemplate deep clones nested template content", () => {
   draft.state_schema.question.value = "changed";
   draft.metadata.category = "mutated";
 
-  assert.equal(template.state_schema.question.value, "什么是 GraphiteUI？");
+  assert.equal(template.state_schema.question.value, "什么是 TooGraph？");
   assert.equal(template.metadata.category, "demo");
 });
 
@@ -999,7 +999,7 @@ test("connectStateBindingInDocument materializes dynamic capability result packa
     "capability_selector",
     "selected_capability",
     "executor",
-    "__graphiteui_virtual_any_input__",
+    "__toograph_virtual_any_input__",
   );
   const executorNode = withCapability.nodes.executor;
 
@@ -1071,7 +1071,7 @@ test("createEditorSeedDraftGraph restores the first available seed for blank new
   assert.notEqual(draft.nodes, template.nodes);
 
   draft.state_schema.question.value = "changed";
-  assert.equal(template.state_schema.question.value, "什么是 GraphiteUI？");
+  assert.equal(template.state_schema.question.value, "什么是 TooGraph？");
 });
 
 test("pruneUnreferencedStateSchemaInDocument removes states that no node still references", () => {
@@ -1634,7 +1634,7 @@ test("connectStateBindingInDocument materializes a virtual output before connect
     edges: [],
     conditional_edges: [],
     metadata: {
-      graphiteui_state_key_counter: 2,
+      toograph_state_key_counter: 2,
     },
   };
 
@@ -1651,7 +1651,7 @@ test("connectStateBindingInDocument materializes a virtual output before connect
     { state: "state_3", required: true },
   ]);
   assert.equal(nextAgentDocument.state_schema.state_3?.name, "state_3");
-  assert.equal(nextAgentDocument.metadata.graphiteui_state_key_counter, 3);
+  assert.equal(nextAgentDocument.metadata.toograph_state_key_counter, 3);
   assert.deepEqual(nextAgentDocument.edges, [{ source: "empty_agent", target: "review_agent" }]);
 
   const nextOutputDocument = graphDocument.connectStateBindingInDocument(
@@ -1716,7 +1716,7 @@ test("connectStateBindingInDocument materializes an input virtual output with th
     edges: [],
     conditional_edges: [],
     metadata: {
-      graphiteui_state_key_counter: 2,
+      toograph_state_key_counter: 2,
     },
   };
 
@@ -1732,7 +1732,7 @@ test("connectStateBindingInDocument materializes an input virtual output with th
   assert.deepEqual(nextDocument.nodes.empty_file_input.writes, [{ state: "state_3", mode: "replace" }]);
   assert.deepEqual(nextDocument.nodes.empty_agent.reads, [{ state: "state_3", required: true }]);
   assert.equal(nextDocument.state_schema.state_3?.type, "file");
-  assert.equal(nextDocument.metadata.graphiteui_state_key_counter, 3);
+  assert.equal(nextDocument.metadata.toograph_state_key_counter, 3);
 });
 
 test("connectStateBindingInDocument adopts a selected concrete input binding for an empty input virtual output", () => {
@@ -1780,7 +1780,7 @@ test("connectStateBindingInDocument adopts a selected concrete input binding for
     edges: [],
     conditional_edges: [],
     metadata: {
-      graphiteui_state_key_counter: 4,
+      toograph_state_key_counter: 4,
     },
   };
 
@@ -1800,7 +1800,7 @@ test("connectStateBindingInDocument adopts a selected concrete input binding for
     { state: "fourth", required: true },
   ]);
   assert.equal(nextDocument.state_schema.state_5, undefined);
-  assert.equal(nextDocument.metadata.graphiteui_state_key_counter, 4);
+  assert.equal(nextDocument.metadata.toograph_state_key_counter, 4);
   assert.deepEqual(nextDocument.edges, [{ source: "empty_input", target: "multi_input_agent" }]);
   assert.deepEqual(document.nodes.empty_input.writes, []);
   assert.deepEqual(document.nodes.multi_input_agent.reads.map((binding) => binding.state), ["first", "second", "third", "fourth"]);
@@ -1848,7 +1848,7 @@ test("connectStateBindingInDocument materializes an agent virtual output before 
     edges: [],
     conditional_edges: [],
     metadata: {
-      graphiteui_state_key_counter: 2,
+      toograph_state_key_counter: 2,
     },
   };
 
@@ -1863,7 +1863,7 @@ test("connectStateBindingInDocument materializes an agent virtual output before 
   assert.deepEqual(nextDocument.nodes.writer_agent.writes, [{ state: "state_3", mode: "replace" }]);
   assert.deepEqual(nextDocument.nodes.output_result.reads, [{ state: "state_3", required: true }]);
   assert.equal(nextDocument.state_schema.state_3?.name, "state_3");
-  assert.equal(nextDocument.metadata.graphiteui_state_key_counter, 3);
+  assert.equal(nextDocument.metadata.toograph_state_key_counter, 3);
   assert.deepEqual(nextDocument.edges, [{ source: "writer_agent", target: "output_result" }]);
   assert.deepEqual(document.nodes.writer_agent.writes, []);
   assert.deepEqual(document.nodes.output_result.reads, [{ state: "previous", required: true }]);
@@ -1911,7 +1911,7 @@ test("connectStateBindingInDocument materializes another state from an agent vir
     edges: [],
     conditional_edges: [],
     metadata: {
-      graphiteui_state_key_counter: 2,
+      toograph_state_key_counter: 2,
     },
   };
 
@@ -1929,7 +1929,7 @@ test("connectStateBindingInDocument materializes another state from an agent vir
   ]);
   assert.deepEqual(nextDocument.nodes.output_result.reads, [{ state: "state_3", required: true }]);
   assert.equal(nextDocument.state_schema.state_3?.name, "state_3");
-  assert.equal(nextDocument.metadata.graphiteui_state_key_counter, 3);
+  assert.equal(nextDocument.metadata.toograph_state_key_counter, 3);
   assert.deepEqual(nextDocument.edges, [{ source: "writer_agent", target: "output_result" }]);
   assert.deepEqual(document.nodes.writer_agent.writes, [{ state: "existing", mode: "replace" }]);
 });
@@ -3499,7 +3499,7 @@ test("updateInputNodeConfigInDocument patches input config immutably", () => {
         reads: [],
         writes: [],
         config: {
-          value: "What is GraphiteUI?",
+          value: "What is TooGraph?",
         },
       },
     },
@@ -3510,7 +3510,7 @@ test("updateInputNodeConfigInDocument patches input config immutably", () => {
 
   const nextDocument = graphDocument.updateInputNodeConfigInDocument(document, "input_question", (config) => ({
     ...config,
-    value: "Explain GraphiteUI in Chinese.",
+    value: "Explain TooGraph in Chinese.",
   }));
 
   assert.notEqual(nextDocument, document);
@@ -3519,8 +3519,8 @@ test("updateInputNodeConfigInDocument patches input config immutably", () => {
   if (nextDocument.nodes.input_question.kind !== "input" || document.nodes.input_question.kind !== "input") {
     throw new Error("Expected input_question to remain an input node");
   }
-  assert.equal(nextDocument.nodes.input_question.config.value, "Explain GraphiteUI in Chinese.");
-  assert.equal(document.nodes.input_question.config.value, "What is GraphiteUI?");
+  assert.equal(nextDocument.nodes.input_question.config.value, "Explain TooGraph in Chinese.");
+  assert.equal(document.nodes.input_question.config.value, "What is TooGraph?");
 });
 
 test("updateInputNodeConfigInDocument returns original document for non-input or unchanged updates", () => {
@@ -3539,7 +3539,7 @@ test("updateInputNodeConfigInDocument returns original document for non-input or
         reads: [],
         writes: [],
         config: {
-          value: "What is GraphiteUI?",
+          value: "What is TooGraph?",
         },
       },
       output_answer: {

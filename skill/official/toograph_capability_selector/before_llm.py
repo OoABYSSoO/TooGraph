@@ -13,7 +13,7 @@ if str(SKILL_DIR) not in sys.path:
 from capability_catalog import DEFAULT_ORIGIN, build_capability_catalog_context  # noqa: E402
 
 
-def graphiteui_capability_selector_before_llm(**payload: Any) -> dict[str, str]:
+def toograph_capability_selector_before_llm(**payload: Any) -> dict[str, str]:
     graph_state = payload.get("graph_state")
     origin = ""
     if isinstance(graph_state, dict):
@@ -29,7 +29,7 @@ def main() -> None:
         payload = {}
     if not isinstance(payload, dict):
         payload = {}
-    print(json.dumps(graphiteui_capability_selector_before_llm(**payload), ensure_ascii=False))
+    print(json.dumps(toograph_capability_selector_before_llm(**payload), ensure_ascii=False))
 
 
 if __name__ == "__main__":

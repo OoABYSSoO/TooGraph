@@ -1,5 +1,5 @@
 {
-  "name": "graphiteui",
+  "name": "toograph",
   "private": true,
   "scripts": {
     "start": "node scripts/start.mjs"

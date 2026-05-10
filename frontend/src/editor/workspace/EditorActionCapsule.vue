@@ -113,11 +113,11 @@ const resolvedSaveAsGraphLabel = computed(() => props.saveAsGraphLabel ?? t("edi
   align-items: center;
   gap: 8px;
   overflow: hidden;
-  border: 1px solid var(--graphite-glass-border);
+  border: 1px solid var(--toograph-glass-border);
   border-radius: 999px;
-  background: var(--graphite-glass-bg);
+  background: var(--toograph-glass-bg);
   padding: 8px;
-  box-shadow: var(--graphite-glass-shadow), var(--graphite-glass-highlight), var(--graphite-glass-rim);
+  box-shadow: var(--toograph-glass-shadow), var(--toograph-glass-highlight), var(--toograph-glass-rim);
   backdrop-filter: blur(28px) saturate(1.65) contrast(1.02);
 }
 
@@ -128,7 +128,7 @@ const resolvedSaveAsGraphLabel = computed(() => props.saveAsGraphLabel ?? t("edi
   inset: 1px;
   z-index: 0;
   border-radius: inherit;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens);
   mix-blend-mode: screen;
   opacity: 0.62;
 }

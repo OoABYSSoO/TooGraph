@@ -4,10 +4,10 @@ import assert from "node:assert/strict";
 import { linkifyOutputText, resolveOutputPreviewContent, resolveOutputPreviewDisplayMode } from "./outputPreviewContentModel.ts";
 
 test("resolveOutputPreviewContent formats auto-detected JSON previews", () => {
-  const preview = resolveOutputPreviewContent('{"answer":"GraphiteUI","ok":true}', "auto");
+  const preview = resolveOutputPreviewContent('{"answer":"TooGraph","ok":true}', "auto");
 
   assert.equal(preview.kind, "json");
-  assert.equal(preview.text, '{\n  "answer": "GraphiteUI",\n  "ok": true\n}');
+  assert.equal(preview.text, '{\n  "answer": "TooGraph",\n  "ok": true\n}');
   assert.equal(preview.html, "");
 });
 
@@ -59,7 +59,7 @@ test("resolveOutputPreviewContent renders common markdown reader blocks safely",
     [
       "#### Details",
       "",
-      "1. Open [GraphiteUI](https://example.com?a=1&b=2)",
+      "1. Open [TooGraph](https://example.com?a=1&b=2)",
       "2. Keep `inline <code>` intact",
       "",
       "> quoted **text**",
@@ -74,7 +74,7 @@ test("resolveOutputPreviewContent renders common markdown reader blocks safely",
 
   assert.equal(preview.kind, "markdown");
   assert.match(preview.html, /<h4>Details<\/h4>/);
-  assert.match(preview.html, /<ol><li>Open <a href="https:\/\/example\.com\?a=1&amp;b=2" target="_blank" rel="noreferrer noopener">GraphiteUI<\/a><\/li><li>Keep <code>inline &lt;code&gt;<\/code> intact<\/li><\/ol>/);
+  assert.match(preview.html, /<ol><li>Open <a href="https:\/\/example\.com\?a=1&amp;b=2" target="_blank" rel="noreferrer noopener">TooGraph<\/a><\/li><li>Keep <code>inline &lt;code&gt;<\/code> intact<\/li><\/ol>/);
   assert.match(preview.html, /<blockquote><p>quoted <strong>text<\/strong><br>second line<\/p><\/blockquote>/);
   assert.match(preview.html, /<hr>/);
   assert.match(preview.html, /<p>unsafe \(javascript:alert\(1\)\)<\/p>/);
@@ -287,7 +287,7 @@ test("resolveOutputPreviewContent treats active waiting output as an empty previ
 });
 
 test("resolveOutputPreviewDisplayMode exposes the effective auto-detected format", () => {
-  assert.equal(resolveOutputPreviewDisplayMode('{"answer":"GraphiteUI"}', "auto"), "json");
+  assert.equal(resolveOutputPreviewDisplayMode('{"answer":"TooGraph"}', "auto"), "json");
   assert.equal(resolveOutputPreviewDisplayMode("# Final answer", "auto"), "markdown");
   assert.equal(resolveOutputPreviewDisplayMode("```python\nprint('hi')\n```", "auto"), "markdown");
   assert.equal(resolveOutputPreviewDisplayMode("> quoted", "auto"), "markdown");

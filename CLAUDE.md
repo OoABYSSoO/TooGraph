@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GraphiteUI is a visual node-based editor and runtime workspace for LangGraph-style agent workflows. Users compose workflows by creating nodes, connecting state/data edges and control-flow edges, configuring agent skills and runtime defaults, validating the graph, then running it against a FastAPI + LangGraph backend.
+TooGraph is a visual node-based editor and runtime workspace for LangGraph-style agent workflows. Users compose workflows by creating nodes, connecting state/data edges and control-flow edges, configuring agent skills and runtime defaults, validating the graph, then running it against a FastAPI + LangGraph backend.
 
 `node_system` is the only formal graph protocol in active use. `state_schema` is the single source of truth for graph data, while nodes declare what state they read and write.
 
@@ -55,10 +55,10 @@ For Bash-oriented environments, the repository also keeps this wrapper:
 
 Both startup paths should:
 
-- release occupied GraphiteUI ports before starting
+- release occupied TooGraph ports before starting
 - serve the UI and API from the single public port `3477` by default
 - wait for readiness checks
-- write server logs to `.graphiteui_server.log`
+- write server logs to `.toograph_server.log`
 
 ### Dependency Install
 
@@ -144,7 +144,7 @@ Expected response:
 
 ### Editor Reality
 
-The editor surface is custom Vue code. Element Plus is used for standard application controls, while the canvas, node cards, ports, routed edges, minimap, workspace shells, and runtime overlays are GraphiteUI-specific.
+The editor surface is custom Vue code. Element Plus is used for standard application controls, while the canvas, node cards, ports, routed edges, minimap, workspace shells, and runtime overlays are TooGraph-specific.
 
 Current node families:
 
@@ -212,7 +212,7 @@ Under `backend/data/`:
 - `settings/` - saved app settings
 - `skills/` - imported skill state
 - `memories/` - memory records loaded by `/api/memories`
-- `graphiteui.db` - SQLite database for knowledge base metadata and FTS search
+- `toograph.db` - SQLite database for knowledge base metadata and FTS search
 
 Some directories are created on demand. Indexed knowledge base content lives in SQLite plus FTS tables, while `backend/data/kb/` stores import manifests and download artifacts used by the knowledge importer.
 
@@ -220,9 +220,9 @@ Some directories are created on demand. Indexed knowledge base content lives in 
 
 Settings and runtime defaults are built from the backend model catalog and tool registry.
 
-For local or private model setup, start the OpenAI-compatible gateway you want to use, then configure it in GraphiteUI:
+For local or private model setup, start the OpenAI-compatible gateway you want to use, then configure it in TooGraph:
 
-- GraphiteUI -> Model Providers -> Local / Custom OpenAI-compatible
+- TooGraph -> Model Providers -> Local / Custom OpenAI-compatible
 
 Model execution reads saved Model Providers configuration and default model selections from the UI. Startup environment variables do not configure model providers.
 
@@ -270,7 +270,7 @@ Resume support exists for runs with available LangGraph checkpoints and valid gr
 | `POST /api/skills/{skill_key}/import` | Import a catalog skill |
 | `POST /api/skills/{skill_key}/disable` | Disable a managed skill |
 | `POST /api/skills/{skill_key}/enable` | Enable a managed skill |
-| `DELETE /api/skills/{skill_key}` | Delete an imported GraphiteUI skill |
+| `DELETE /api/skills/{skill_key}` | Delete an imported TooGraph skill |
 | `GET /api/memories` | List stored memories, optionally filtered by type |
 
 ## Built-In Templates

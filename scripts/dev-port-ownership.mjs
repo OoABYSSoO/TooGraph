@@ -16,7 +16,7 @@ function processText(info) {
   return normalizeText([info?.name, info?.executablePath, info?.commandLine].filter(Boolean).join(" "));
 }
 
-export function isGraphiteProcessInfo(info, context) {
+export function isTooGraphProcessInfo(info, context) {
   if (!info) {
     return false;
   }
@@ -101,13 +101,13 @@ export function createPortReleasePlan({ portPids, processInfos, context }) {
 
     const ownerInfo = processByPid.get(pid);
     const descendants = descendantsOf(pid, normalizedProcessInfos);
-    const knownOwner = context.knownGraphitePids.has(pid);
-    const ownerLooksLikeGraphite = isGraphiteProcessInfo(ownerInfo, context);
+    const knownOwner = context.knownTooGraphPids.has(pid);
+    const ownerLooksLikeTooGraph = isTooGraphProcessInfo(ownerInfo, context);
     const ownedDescendants = descendants.filter(
-      (info) => context.knownGraphitePids.has(info.pid) || isGraphiteProcessInfo(info, context),
+      (info) => context.knownTooGraphPids.has(info.pid) || isTooGraphProcessInfo(info, context),
     );
 
-    if (knownOwner || ownerLooksLikeGraphite || ownedDescendants.length > 0) {
+    if (knownOwner || ownerLooksLikeTooGraph || ownedDescendants.length > 0) {
       if (ownerInfo) {
         pushUnique(killPids, pid);
       }

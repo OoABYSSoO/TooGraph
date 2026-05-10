@@ -123,7 +123,7 @@ def delete_skill_endpoint(skill_key: str) -> dict[str, str]:
     if definition is None:
         raise HTTPException(status_code=404, detail=f"Skill '{skill_key}' does not exist.")
     if not definition.can_manage:
-        raise HTTPException(status_code=400, detail="Only imported GraphiteUI skills can be deleted.")
+        raise HTTPException(status_code=400, detail="Only imported TooGraph skills can be deleted.")
     delete_skill(skill_key)
     return {"skillKey": skill_key, "status": "deleted"}
 

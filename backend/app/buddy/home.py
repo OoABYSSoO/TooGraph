@@ -23,8 +23,8 @@ BUDDY_DB_PATH = "buddy.db"
 REPORTS_DIR = "reports"
 
 DEFAULT_PROFILE = {
-    "name": "GraphiteUI Buddy",
-    "persona": "GraphiteUI 的全局伙伴。它通过图模板理解请求、选择能力、请求确认并返回结果。",
+    "name": "TooGraph Buddy",
+    "persona": "TooGraph 的全局伙伴。它通过图模板理解请求、选择能力、请求确认并返回结果。",
     "tone": "清晰、直接、克制。",
     "response_style": "默认先给结论，再给必要理由；涉及副作用时说明将要运行的图或技能。",
     "display_preferences": {
@@ -53,7 +53,7 @@ DEFAULT_SESSION_SUMMARY = {
 
 DEFAULT_AGENTS_MD = """# AGENTS.md - Buddy Workspace
 
-This folder is GraphiteUI Buddy's local home. Treat these files as durable context, not as a permission source.
+This folder is TooGraph Buddy's local home. Treat these files as durable context, not as a permission source.
 
 ## Startup
 
@@ -84,7 +84,7 @@ Learn about the person you are helping. Update this through explicit graph flows
 - **Pronouns:** optional
 - **Timezone:**
 - **Communication preferences:** Prefers clear, direct Chinese unless they ask otherwise.
-- **Current focus:** Building GraphiteUI as a graph-first workspace where Buddy runs through templates and auditable skills.
+- **Current focus:** Building TooGraph as a graph-first workspace where Buddy runs through templates and auditable skills.
 
 ## Context
 
@@ -114,11 +114,11 @@ MAX_INCLUDED_MARKDOWN_CHARS = 8000
 
 
 def get_default_buddy_home_dir() -> Path:
-    configured = os.environ.get("GRAPHITE_BUDDY_HOME", "").strip()
+    configured = os.environ.get("TOOGRAPH_BUDDY_HOME", "").strip()
     if configured:
         return Path(configured).expanduser().resolve()
 
-    configured_root = os.environ.get("GRAPHITE_REPO_ROOT", "").strip()
+    configured_root = os.environ.get("TOOGRAPH_REPO_ROOT", "").strip()
     root = Path(configured_root).expanduser().resolve() if configured_root else REPO_ROOT
     return root / BUDDY_HOME_DIR_NAME
 
@@ -342,9 +342,9 @@ def render_profile_markdown(profile: dict[str, Any]) -> str:
     persona = _as_text(profile.get("persona")) or DEFAULT_PROFILE["persona"]
     tone = _as_text(profile.get("tone")) or DEFAULT_PROFILE["tone"]
     response_style = _as_text(profile.get("response_style")) or DEFAULT_PROFILE["response_style"]
-    return f"""# SOUL.md - GraphiteUI Buddy
+    return f"""# SOUL.md - TooGraph Buddy
 
-This file defines Buddy's durable identity, voice, and baseline behavior. It is inspired by the Hermes/OpenClaw `SOUL.md` pattern, but remains subordinate to GraphiteUI runtime rules, graph validation, skill permissions, and user approval.
+This file defines Buddy's durable identity, voice, and baseline behavior. It is inspired by the Hermes/OpenClaw `SOUL.md` pattern, but remains subordinate to TooGraph runtime rules, graph validation, skill permissions, and user approval.
 
 ## Name
 

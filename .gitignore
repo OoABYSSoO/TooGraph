@@ -95,12 +95,12 @@ backend/data/outputs/
 # Claude Code / Dev tools
 .claude/
 .worktrees/
-.graphite/
+.toograph/
 .dev_*.log
 .dev_*.err
 .dev_pids.json
-.graphiteui_*.log
-.graphiteui_pids.json
+.toograph_*.log
+.toograph_pids.json
 .next/
 
 # Agent/dev-only configs (not for open source)

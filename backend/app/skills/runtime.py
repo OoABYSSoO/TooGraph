@@ -124,22 +124,22 @@ class ScriptSkillRunner:
     ) -> dict[str, str]:
         env = {
             **os.environ,
-            "GRAPHITE_SKILL_KEY": self.skill_key,
-            "GRAPHITE_SKILL_DIR": str(self.skill_dir),
-            "GRAPHITE_SKILL_ENTRYPOINT": str(self.entrypoint_path),
-            "GRAPHITE_REPO_ROOT": str(REPO_ROOT),
-            "GRAPHITE_SKILL_PYTHON": python_environment.python_executable,
+            "TOOGRAPH_SKILL_KEY": self.skill_key,
+            "TOOGRAPH_SKILL_DIR": str(self.skill_dir),
+            "TOOGRAPH_SKILL_ENTRYPOINT": str(self.entrypoint_path),
+            "TOOGRAPH_REPO_ROOT": str(REPO_ROOT),
+            "TOOGRAPH_SKILL_PYTHON": python_environment.python_executable,
         }
         if python_environment.venv_dir is not None:
-            env["GRAPHITE_SKILL_VENV"] = str(python_environment.venv_dir)
+            env["TOOGRAPH_SKILL_VENV"] = str(python_environment.venv_dir)
         if python_environment.requirements_path is not None:
-            env["GRAPHITE_SKILL_REQUIREMENTS"] = str(python_environment.requirements_path)
+            env["TOOGRAPH_SKILL_REQUIREMENTS"] = str(python_environment.requirements_path)
         artifact_dir = str(context.get("artifact_dir") or "").strip()
         artifact_relative_dir = str(context.get("artifact_relative_dir") or "").strip()
         if artifact_dir:
-            env["GRAPHITE_SKILL_ARTIFACT_DIR"] = artifact_dir
+            env["TOOGRAPH_SKILL_ARTIFACT_DIR"] = artifact_dir
         if artifact_relative_dir:
-            env["GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR"] = artifact_relative_dir
+            env["TOOGRAPH_SKILL_ARTIFACT_RELATIVE_DIR"] = artifact_relative_dir
         return env
 
     def _build_command(self, *, python_executable: str) -> list[str]:
@@ -254,7 +254,7 @@ def ensure_skill_python_environment(
 ) -> SkillPythonEnvironment:
     requirements_hash = _requirements_environment_hash(requirements_path)
     env_dir = env_root / f"{_safe_env_skill_key(skill_key)}-{requirements_hash[:12]}"
-    marker_path = env_dir / ".graphiteui_requirements.sha256"
+    marker_path = env_dir / ".toograph_requirements.sha256"
     python_path = venv_python_path(env_dir)
     if (
         marker_path.is_file()

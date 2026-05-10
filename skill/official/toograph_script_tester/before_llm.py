@@ -15,7 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 DENIED_PATH_ROOTS = [REPO_ROOT / ".git", REPO_ROOT / "backend" / "data" / "settings"]
 
 
-def graphiteui_script_tester_before_llm(**payload: Any) -> dict[str, str]:
+def toograph_script_tester_before_llm(**payload: Any) -> dict[str, str]:
     available_commands = _list_available_commands()
     context_lines = [
         "System context:",
@@ -29,7 +29,7 @@ def graphiteui_script_tester_before_llm(**payload: Any) -> dict[str, str]:
         context_lines.extend(referenced_file_lines)
     context_lines.extend(
         [
-            "GraphiteUI Script Tester guidance:",
+            "TooGraph Script Tester guidance:",
             "- Generate only files and command.",
             "- files must be an array of objects with path and content; include the target script, generated tests, and minimal helper/config files.",
             "- command must be an argument array using an available allowed command, for example [\"python\", \"-m\", \"pytest\", \"-q\", \"test_target.py\"].",
@@ -163,7 +163,7 @@ def main() -> None:
         payload = {}
     if not isinstance(payload, dict):
         payload = {}
-    print(json.dumps(graphiteui_script_tester_before_llm(**payload), ensure_ascii=False))
+    print(json.dumps(toograph_script_tester_before_llm(**payload), ensure_ascii=False))
 
 
 if __name__ == "__main__":

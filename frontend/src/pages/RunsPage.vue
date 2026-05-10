@@ -238,7 +238,7 @@ onBeforeUnmount(() => {
 });
 
 function statusBadgeClass(status: string) {
-  return `graphite-status-badge graphite-status-badge--${status.replaceAll("_", "-")}`;
+  return `toograph-status-badge toograph-status-badge--${status.replaceAll("_", "-")}`;
 }
 </script>
 
@@ -253,9 +253,9 @@ function statusBadgeClass(status: string) {
 .runs-page__overview-card,
 .runs-page__run-row,
 .runs-page__empty {
-  border: 1px solid var(--graphite-border);
+  border: 1px solid var(--toograph-border);
   border-radius: 24px;
-  box-shadow: var(--graphite-shadow-card);
+  box-shadow: var(--toograph-shadow-card);
 }
 
 .runs-page__header {
@@ -264,7 +264,7 @@ function statusBadgeClass(status: string) {
   justify-content: space-between;
   gap: 18px;
   padding: 24px;
-  background: var(--graphite-surface-panel);
+  background: var(--toograph-surface-panel);
 }
 
 .runs-page__eyebrow {
@@ -276,8 +276,8 @@ function statusBadgeClass(status: string) {
 
 .runs-page__title {
   margin: 8px 0 10px;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 2rem;
 }
 
@@ -346,8 +346,8 @@ function statusBadgeClass(status: string) {
 }
 
 .runs-page__overview-card strong {
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 1.7rem;
   line-height: 1;
 }
@@ -358,7 +358,7 @@ function statusBadgeClass(status: string) {
   gap: 16px;
   align-items: end;
   padding: 16px;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--graphite-glass-bg-strong);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens), var(--toograph-glass-bg-strong);
   backdrop-filter: blur(22px) saturate(1.35);
 }
 
@@ -382,7 +382,7 @@ function statusBadgeClass(status: string) {
 .runs-page__segments {
   --el-segmented-bg-color: rgba(255, 248, 240, 0.72);
   --el-segmented-item-selected-bg-color: rgba(255, 255, 255, 0.96);
-  --el-segmented-item-selected-color: var(--graphite-accent-strong);
+  --el-segmented-item-selected-color: var(--toograph-accent-strong);
   --el-segmented-color: rgba(90, 58, 28, 0.74);
   width: 100%;
   overflow-x: auto;
@@ -414,7 +414,7 @@ function statusBadgeClass(status: string) {
 }
 
 .runs-page__segments :deep(.el-segmented__item.is-selected) {
-  color: var(--graphite-accent-strong);
+  color: var(--toograph-accent-strong);
   font-weight: 800;
 }
 
@@ -482,20 +482,20 @@ function statusBadgeClass(status: string) {
 .runs-page__run-row:hover {
   border-color: rgba(154, 52, 18, 0.22);
   background: rgba(255, 253, 249, 0.96);
-  box-shadow: var(--graphite-shadow-hover);
+  box-shadow: var(--toograph-shadow-hover);
   transform: translateY(-1px);
 }
 
 .runs-page__run-row:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3), var(--graphite-shadow-hover);
+  box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3), var(--toograph-shadow-hover);
 }
 
 .runs-page__status-rail {
   width: 5px;
   align-self: stretch;
   border-radius: 999px;
-  background: var(--graphite-status-fg, rgb(154, 52, 18));
+  background: var(--toograph-status-fg, rgb(154, 52, 18));
 }
 
 .runs-page__run-main {
@@ -512,7 +512,7 @@ function statusBadgeClass(status: string) {
 .runs-page__run-heading strong {
   min-width: 0;
   overflow: hidden;
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
   font-size: 1rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -520,12 +520,12 @@ function statusBadgeClass(status: string) {
 
 .runs-page__run-heading span,
 .runs-page__badges span {
-  border: 1px solid var(--graphite-status-border, transparent);
+  border: 1px solid var(--toograph-status-border, transparent);
   border-radius: 999px;
   padding: 4px 10px;
-  background: var(--graphite-status-bg, rgba(255, 248, 240, 0.92));
-  color: var(--graphite-status-fg, rgb(154, 52, 18));
-  font-family: var(--graphite-font-mono);
+  background: var(--toograph-status-bg, rgba(255, 248, 240, 0.92));
+  color: var(--toograph-status-fg, rgb(154, 52, 18));
+  font-family: var(--toograph-font-mono);
   font-size: 0.78rem;
 }
 
@@ -533,7 +533,7 @@ function statusBadgeClass(status: string) {
   margin: 6px 0 0;
   overflow: hidden;
   color: rgba(60, 41, 20, 0.58);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.82rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -627,7 +627,7 @@ function statusBadgeClass(status: string) {
   display: grid;
   gap: 14px;
   padding: 24px;
-  background: var(--graphite-surface-panel);
+  background: var(--toograph-surface-panel);
 }
 
 .runs-page__empty p {

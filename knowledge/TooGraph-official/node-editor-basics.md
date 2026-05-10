@@ -1,6 +1,6 @@
 # 节点编排基础
 
-GraphiteUI 画布的基本单位是节点、state 和边。当前正式心智是：
+TooGraph 画布的基本单位是节点、state 和边。当前正式心智是：
 
 - `state_schema` 是唯一数据源
 - 节点只负责读写 state

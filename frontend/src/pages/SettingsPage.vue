@@ -17,9 +17,9 @@
               <span>{{ t("settings.defaultModel") }}</span>
               <ElSelect
                 v-model="draft.text_model_ref"
-                class="settings-page__select graphite-select"
+                class="settings-page__select toograph-select"
                 :teleported="false"
-                popper-class="graphite-select-popper"
+                popper-class="toograph-select-popper"
               >
                 <ElOption v-for="option in configuredModelOptions" :key="option.value" :label="option.label" :value="option.value" />
               </ElSelect>
@@ -28,9 +28,9 @@
               <span>{{ t("settings.defaultVideoModel") }}</span>
               <ElSelect
                 v-model="draft.video_model_ref"
-                class="settings-page__select graphite-select"
+                class="settings-page__select toograph-select"
                 :teleported="false"
-                popper-class="graphite-select-popper"
+                popper-class="toograph-select-popper"
               >
                 <ElOption v-for="option in configuredModelOptions" :key="option.value" :label="option.label" :value="option.value" />
               </ElSelect>
@@ -43,9 +43,9 @@
               <span>{{ t("settings.defaultThinking") }}</span>
               <ElSelect
                 v-model="thinkingMode"
-                class="settings-page__select graphite-select"
+                class="settings-page__select toograph-select"
                 :teleported="false"
-                popper-class="graphite-select-popper"
+                popper-class="toograph-select-popper"
               >
                 <ElOption v-for="option in thinkingLevelOptions" :key="option.value" :label="option.label" :value="option.value" />
               </ElSelect>
@@ -310,10 +310,10 @@ onMounted(loadSettings);
 .settings-page__hero,
 .settings-page__panel,
 .settings-page__empty {
-  border: 1px solid var(--graphite-border);
+  border: 1px solid var(--toograph-border);
   border-radius: 24px;
-  background: var(--graphite-surface-panel);
-  box-shadow: var(--graphite-shadow-panel);
+  background: var(--toograph-surface-panel);
+  box-shadow: var(--toograph-shadow-panel);
 }
 
 .settings-page__hero,
@@ -322,7 +322,7 @@ onMounted(loadSettings);
 }
 
 .settings-page__panel {
-  background: var(--graphite-surface-card);
+  background: var(--toograph-surface-card);
   padding: 20px;
 }
 
@@ -335,8 +335,8 @@ onMounted(loadSettings);
 
 .settings-page__title {
   margin: 8px 0 10px;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 2rem;
 }
 
@@ -458,7 +458,7 @@ onMounted(loadSettings);
   padding: 4px 10px;
   background: rgba(255, 248, 240, 0.92);
   color: rgb(154, 52, 18);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.84rem;
 }
 

@@ -19,10 +19,10 @@
         <label class="node-card__control-row">
           <span class="node-card__control-label">{{ t("nodeCard.type") }}</span>
           <ElSelect
-            class="node-card__control-select graphite-select"
+            class="node-card__control-select toograph-select"
             :model-value="draft.definition.type"
             :teleported="false"
-            popper-class="graphite-select-popper node-card__port-picker-select-popper"
+            popper-class="toograph-select-popper node-card__port-picker-select-popper"
             @update:model-value="emit('update:type', $event)"
           >
             <ElOption v-for="typeOption in typeOptions" :key="typeOption" :label="typeOption" :value="typeOption" />
@@ -31,10 +31,10 @@
         <label class="node-card__control-row">
           <span class="node-card__control-label">{{ t("nodeCard.color") }}</span>
           <ElSelect
-            class="node-card__control-select graphite-select"
+            class="node-card__control-select toograph-select"
             :model-value="draft.definition.color"
             :teleported="false"
-            popper-class="graphite-select-popper node-card__port-picker-select-popper"
+            popper-class="toograph-select-popper node-card__port-picker-select-popper"
             @update:model-value="emit('update:color', $event)"
           >
             <template #label>

@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { createPortReleasePlan } from "./dev-port-ownership.mjs";
 
-test("kills descendants when a known GraphiteUI port owner process has already exited", () => {
+test("kills descendants when a known TooGraph port owner process has already exited", () => {
   const plan = createPortReleasePlan({
     port: "8765",
     portPids: ["34000"],
@@ -17,10 +17,10 @@ test("kills descendants when a known GraphiteUI port owner process has already e
       },
     ],
     context: {
-      knownGraphitePids: new Set(["34000"]),
-      rootDir: "C:\\Users\\abyss\\GraphiteUI",
-      backendDir: "C:\\Users\\abyss\\GraphiteUI\\backend",
-      frontendDir: "C:\\Users\\abyss\\GraphiteUI\\frontend",
+      knownTooGraphPids: new Set(["34000"]),
+      rootDir: "C:\\Users\\abyss\\TooGraph",
+      backendDir: "C:\\Users\\abyss\\TooGraph\\backend",
+      frontendDir: "C:\\Users\\abyss\\TooGraph\\frontend",
       backendPort: "8765",
       frontendPort: "3477",
     },
@@ -44,10 +44,10 @@ test("blocks unknown port owners and includes process details for the user", () 
       },
     ],
     context: {
-      knownGraphitePids: new Set(),
-      rootDir: "C:\\Users\\abyss\\GraphiteUI",
-      backendDir: "C:\\Users\\abyss\\GraphiteUI\\backend",
-      frontendDir: "C:\\Users\\abyss\\GraphiteUI\\frontend",
+      knownTooGraphPids: new Set(),
+      rootDir: "C:\\Users\\abyss\\TooGraph",
+      backendDir: "C:\\Users\\abyss\\TooGraph\\backend",
+      frontendDir: "C:\\Users\\abyss\\TooGraph\\frontend",
       backendPort: "8765",
       frontendPort: "3477",
     },
@@ -61,10 +61,10 @@ test("blocks unknown port owners and includes process details for the user", () 
 
 test("blocks lookalike dev servers that are not tied to this checkout", () => {
   const context = {
-    knownGraphitePids: new Set(),
-    rootDir: "C:\\Users\\abyss\\GraphiteUI",
-    backendDir: "C:\\Users\\abyss\\GraphiteUI\\backend",
-    frontendDir: "C:\\Users\\abyss\\GraphiteUI\\frontend",
+    knownTooGraphPids: new Set(),
+    rootDir: "C:\\Users\\abyss\\TooGraph",
+    backendDir: "C:\\Users\\abyss\\TooGraph\\backend",
+    frontendDir: "C:\\Users\\abyss\\TooGraph\\frontend",
     backendPort: "8765",
     frontendPort: "3477",
   };

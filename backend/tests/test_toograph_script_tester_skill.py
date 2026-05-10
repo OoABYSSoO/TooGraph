@@ -15,7 +15,7 @@ from app.skills.definitions import _parse_native_skill_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_TESTER_SKILL_DIR = REPO_ROOT / "skill" / "official" / "graphiteUI_script_tester"
+SCRIPT_TESTER_SKILL_DIR = REPO_ROOT / "skill" / "official" / "toograph_script_tester"
 SCRIPT_TESTER_MANIFEST_PATH = SCRIPT_TESTER_SKILL_DIR / "skill.json"
 SCRIPT_TESTER_BEFORE_LLM_PATH = SCRIPT_TESTER_SKILL_DIR / "before_llm.py"
 SCRIPT_TESTER_AFTER_LLM_PATH = SCRIPT_TESTER_SKILL_DIR / "after_llm.py"
@@ -35,11 +35,11 @@ def _run_skill_script(script_path: Path, payload: dict[str, object]) -> dict[str
     return parsed
 
 
-class GraphiteUiScriptTesterSkillTests(unittest.TestCase):
+class TooGraphScriptTesterSkillTests(unittest.TestCase):
     def test_manifest_exposes_script_testing_contract(self) -> None:
         definition = _parse_native_skill_manifest(SCRIPT_TESTER_MANIFEST_PATH, SkillSourceScope.OFFICIAL).definition
 
-        self.assertEqual(definition.skill_key, "graphiteUI_script_tester")
+        self.assertEqual(definition.skill_key, "toograph_script_tester")
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
         self.assertEqual(definition.llm_node_blockers, [])
         self.assertEqual(definition.permissions, ["file_write", "subprocess"])

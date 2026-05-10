@@ -28,7 +28,7 @@ test("buildSubgraphNodeFromGraph exposes graph input and output boundaries as re
     nodes: {},
     edges: [],
     conditional_edges: [],
-    metadata: { graphiteui_state_key_counter: 1 },
+    metadata: { toograph_state_key_counter: 1 },
   };
   const sourceGraph: GraphPayload = {
     graph_id: "graph_research",
@@ -178,7 +178,7 @@ test("applyNodeCreationResult auto-binds state outputs into a created output nod
         reads: [],
         writes: [{ state: "question", mode: "replace" }],
         config: {
-          value: "什么是 GraphiteUI？",
+          value: "什么是 TooGraph？",
         },
       },
     },
@@ -293,7 +293,7 @@ test("applyNodeCreationResult only adds a read binding for blank agent presets s
 
   assert.deepEqual(result.document.nodes.agent_created.reads, [{ state: "answer", required: true }]);
   assert.deepEqual(result.document.nodes.agent_created.writes, []);
-  assert.equal(result.document.metadata.graphiteui_state_key_counter, undefined);
+  assert.equal(result.document.metadata.toograph_state_key_counter, undefined);
   assert.deepEqual(result.document.edges, [{ source: "answer_source", target: "agent_created" }]);
 });
 
@@ -426,7 +426,7 @@ test("applyNodeCreationResult materializes a virtual agent any output when it sp
     edges: [],
     conditional_edges: [],
     metadata: {
-      graphiteui_state_key_counter: 2,
+      toograph_state_key_counter: 2,
     },
   };
 
@@ -458,7 +458,7 @@ test("applyNodeCreationResult materializes a virtual agent any output when it sp
     value: "",
     color: "#7c3aed",
   });
-  assert.equal(result.document.metadata.graphiteui_state_key_counter, 3);
+  assert.equal(result.document.metadata.toograph_state_key_counter, 3);
   assert.deepEqual(result.document.edges, [{ source: "empty_agent", target: "output_created" }]);
 });
 
@@ -483,7 +483,7 @@ test("applyNodeCreationResult materializes a virtual input output when it spawns
     edges: [],
     conditional_edges: [],
     metadata: {
-      graphiteui_state_key_counter: 4,
+      toograph_state_key_counter: 4,
     },
   };
 
@@ -509,7 +509,7 @@ test("applyNodeCreationResult materializes a virtual input output when it spawns
   assert.deepEqual(result.document.nodes.output_created.reads, [{ state: "state_5", required: true }]);
   assert.equal(result.document.nodes.output_created.name, "state_5");
   assert.equal(result.document.state_schema.state_5?.name, "state_5");
-  assert.equal(result.document.metadata.graphiteui_state_key_counter, 5);
+  assert.equal(result.document.metadata.toograph_state_key_counter, 5);
   assert.deepEqual(result.document.edges, [{ source: "empty_input", target: "output_created" }]);
 });
 
@@ -609,7 +609,7 @@ test("applyNodeCreationResult materializes an input virtual output when it spawn
   assert.equal(result.document.state_schema.state_1?.name, "Question");
   assert.equal(result.document.state_schema.state_1?.type, "text");
   assert.equal(result.document.state_schema.state_2?.name, "Answer");
-  assert.equal(result.document.metadata.graphiteui_state_key_counter, 2);
+  assert.equal(result.document.metadata.toograph_state_key_counter, 2);
   assert.deepEqual(result.document.edges, [{ source: "empty_input", target: "subgraph_created" }]);
 });
 
@@ -747,7 +747,7 @@ test("applyNodeCreationResult materializes a virtual target input when creating 
     edges: [],
     conditional_edges: [],
     metadata: {
-      graphiteui_state_key_counter: 2,
+      toograph_state_key_counter: 2,
     },
   };
 
@@ -778,7 +778,7 @@ test("applyNodeCreationResult materializes a virtual target input when creating 
     value: "",
     color: "#7c3aed",
   });
-  assert.equal(result.document.metadata.graphiteui_state_key_counter, 3);
+  assert.equal(result.document.metadata.toograph_state_key_counter, 3);
   assert.deepEqual(result.document.edges, [{ source: "input_created", target: "empty_agent" }]);
 });
 
@@ -966,7 +966,7 @@ test("connectStateInputSourceToTarget materializes a virtual input through an ex
     edges: [],
     conditional_edges: [],
     metadata: {
-      graphiteui_state_key_counter: 2,
+      toograph_state_key_counter: 2,
     },
   };
 

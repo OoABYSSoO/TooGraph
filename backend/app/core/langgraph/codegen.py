@@ -18,7 +18,7 @@ from app.core.schemas.node_system import (
     StateWriteMode,
 )
 
-EDITOR_ONLY_METADATA_KEYS = {"graphiteui_state_key_counter"}
+EDITOR_ONLY_METADATA_KEYS = {"toograph_state_key_counter"}
 
 
 def generate_langgraph_python_source(graph: NodeSystemGraphPayload) -> str:
@@ -43,9 +43,9 @@ from app.core.runtime.state_io import apply_state_writes, build_graph_state_valu
 from app.core.schemas.node_system import NodeSystemGraphPayload
 
 
-GRAPHITEUI_EXPORT_VERSION = 1
+TOOGRAPH_EXPORT_VERSION = 1
 GRAPH_PAYLOAD = {payload_literal}
-GRAPHITEUI_EDITOR_GRAPH = {editor_payload_literal}
+TOOGRAPH_EDITOR_GRAPH = {editor_payload_literal}
 INTERRUPT_AFTER_CONFIG = {interrupt_after_literal}
 
 
@@ -223,12 +223,12 @@ if __name__ == "__main__":
 
 def import_graph_payload_from_python_source(source: str) -> NodeSystemGraphPayload:
     assignments = _parse_literal_assignments(source)
-    if assignments.get("GRAPHITEUI_EXPORT_VERSION") != 1 or "GRAPHITEUI_EDITOR_GRAPH" not in assignments:
-        raise ValueError("Python file is not a GraphiteUI reversible export.")
+    if assignments.get("TOOGRAPH_EXPORT_VERSION") != 1 or "TOOGRAPH_EDITOR_GRAPH" not in assignments:
+        raise ValueError("Python file is not a TooGraph reversible export.")
 
-    editor_payload = assignments["GRAPHITEUI_EDITOR_GRAPH"]
+    editor_payload = assignments["TOOGRAPH_EDITOR_GRAPH"]
     if not isinstance(editor_payload, dict):
-        raise ValueError("GraphiteUI editor graph payload must be a dictionary.")
+        raise ValueError("TooGraph editor graph payload must be a dictionary.")
 
     graph_payload = dict(editor_payload)
     graph_payload["graph_id"] = None
@@ -248,12 +248,12 @@ def _parse_literal_assignments(source: str) -> dict[str, Any]:
         target = statement.targets[0]
         if not isinstance(target, ast.Name):
             continue
-        if target.id not in {"GRAPHITEUI_EXPORT_VERSION", "GRAPHITEUI_EDITOR_GRAPH", "GRAPH_PAYLOAD"}:
+        if target.id not in {"TOOGRAPH_EXPORT_VERSION", "TOOGRAPH_EDITOR_GRAPH", "GRAPH_PAYLOAD"}:
             continue
         try:
             assignments[target.id] = ast.literal_eval(statement.value)
         except (ValueError, SyntaxError) as exc:
-            raise ValueError(f"GraphiteUI export constant '{target.id}' is not a safe literal.") from exc
+            raise ValueError(f"TooGraph export constant '{target.id}' is not a safe literal.") from exc
     return assignments
 
 

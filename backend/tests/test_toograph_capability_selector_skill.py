@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 
-SELECTOR_SKILL_DIR = Path(__file__).resolve().parents[2] / "skill" / "official" / "graphiteui_capability_selector"
+SELECTOR_SKILL_DIR = Path(__file__).resolve().parents[2] / "skill" / "official" / "toograph_capability_selector"
 SELECTOR_BEFORE_LLM_PATH = SELECTOR_SKILL_DIR / "before_llm.py"
 SELECTOR_AFTER_LLM_PATH = SELECTOR_SKILL_DIR / "after_llm.py"
 
@@ -64,7 +64,7 @@ def _write_template(
     if status != "active":
         _write_settings(
             repo_root / "graph_template" / "settings.json",
-            "graphiteui.template-settings/v1",
+            "toograph.template-settings/v1",
             template_id,
             {"enabled": False},
         )
@@ -85,7 +85,7 @@ def _write_skill(
     _write_json(
         skill_dir / "skill.json",
         {
-            "schemaVersion": "graphite.skill/v1",
+            "schemaVersion": "toograph.skill/v1",
             "skillKey": skill_key,
             "name": name,
             "description": description,
@@ -100,7 +100,7 @@ def _write_skill(
     if status != "active" or not selectable:
         _write_settings(
             repo_root / "skill" / "settings.json",
-            "graphiteui.skill-settings/v1",
+            "toograph.skill-settings/v1",
             skill_key,
             {
                 "enabled": status == "active",
@@ -137,7 +137,7 @@ def _add_template_skill_node(repo_root: Path, template_id: str, skill_key: str) 
     template_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
+class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
     def test_manifest_declares_capability_and_found_outputs(self) -> None:
         manifest = json.loads((SELECTOR_SKILL_DIR / "skill.json").read_text(encoding="utf-8"))
 
@@ -149,7 +149,7 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
         self.assertEqual([field["key"] for field in manifest["outputSchema"]], ["capability", "found"])
 
     def test_before_llm_lists_available_templates_and_skills_for_llm_choice(self) -> None:
-        selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "graphiteui_capability_selector_before_test")
+        selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "toograph_capability_selector_before_test")
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
             _write_template(
@@ -171,11 +171,11 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                 description="This should not appear.",
                 status="disabled",
             )
-            with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
-                result = selector.graphiteui_capability_selector_before_llm(graph_state={})
+            with patch.dict("os.environ", {"TOOGRAPH_REPO_ROOT": str(repo_root)}, clear=True):
+                result = selector.toograph_capability_selector_before_llm(graph_state={})
 
         context = result["context"]
-        self.assertIn("Available GraphiteUI capabilities:", context)
+        self.assertIn("Available TooGraph capabilities:", context)
         self.assertIn("Graph templates are preferred over Skills when both can satisfy the requirement.", context)
         self.assertIn("kind: subgraph", context)
         self.assertIn("key: advanced_web_research_loop", context)
@@ -186,7 +186,7 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
         self.assertNotIn("blocked_skill", context)
 
     def test_selector_normalizes_llm_selected_template_capability(self) -> None:
-        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "graphiteui_capability_selector_after_test")
+        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_test")
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
             _write_template(
@@ -201,8 +201,8 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                 name="Web Search",
                 description="Search public web pages and save readable sources.",
             )
-            with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
-                result = selector.graphiteui_capability_selector(
+            with patch.dict("os.environ", {"TOOGRAPH_REPO_ROOT": str(repo_root)}, clear=True):
+                result = selector.toograph_capability_selector(
                     requirement="Research the latest materials.",
                     capability={"kind": "subgraph", "key": "advanced_web_research_loop"},
                 )
@@ -215,7 +215,7 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
         self.assertNotIn("requiresApproval", result["capability"])
 
     def test_selector_normalizes_llm_selected_skill_capability(self) -> None:
-        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "graphiteui_capability_selector_after_test_skill")
+        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_test_skill")
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
             _write_template(
@@ -230,8 +230,8 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                 name="Web Search",
                 description="Search public web pages and save readable sources.",
             )
-            with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
-                result = selector.graphiteui_capability_selector(
+            with patch.dict("os.environ", {"TOOGRAPH_REPO_ROOT": str(repo_root)}, clear=True):
+                result = selector.toograph_capability_selector(
                     requirement="Need current version information.",
                     capability={"kind": "skill", "key": "web_search"},
                 )
@@ -244,7 +244,7 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
         self.assertNotIn("requiresApproval", result["capability"])
 
     def test_selector_ignores_disabled_capabilities_but_not_legacy_selectable_policy(self) -> None:
-        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "graphiteui_capability_selector_after_test_disabled")
+        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_test_disabled")
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
             _write_template(
@@ -262,12 +262,12 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                 description="Search public web pages and save readable sources.",
                 selectable=False,
             )
-            with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
-                disabled_result = selector.graphiteui_capability_selector(
+            with patch.dict("os.environ", {"TOOGRAPH_REPO_ROOT": str(repo_root)}, clear=True):
+                disabled_result = selector.toograph_capability_selector(
                     requirement="Search for materials.",
                     capability={"kind": "subgraph", "key": "disabled_research"},
                 )
-                enabled_legacy_result = selector.graphiteui_capability_selector(
+                enabled_legacy_result = selector.toograph_capability_selector(
                     requirement="Search for materials.",
                     capability={"kind": "skill", "key": "web_search"},
                 )
@@ -279,7 +279,7 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
         self.assertEqual(enabled_legacy_result["capability"]["key"], "web_search")
 
     def test_selector_preserves_permissions_without_approval_flags(self) -> None:
-        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "graphiteui_capability_selector_after_test_permissions")
+        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_test_permissions")
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
             _write_skill(
@@ -311,20 +311,20 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
             )
             _add_template_skill_node(repo_root, "write_workspace_file", "local_workspace_executor")
 
-            with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": str(repo_root)}, clear=True):
-                web_skill = selector.graphiteui_capability_selector(
+            with patch.dict("os.environ", {"TOOGRAPH_REPO_ROOT": str(repo_root)}, clear=True):
+                web_skill = selector.toograph_capability_selector(
                     requirement="Need current information.",
                     capability={"kind": "skill", "key": "web_search"},
                 )
-                write_skill = selector.graphiteui_capability_selector(
+                write_skill = selector.toograph_capability_selector(
                     requirement="Write a report file.",
                     capability={"kind": "skill", "key": "local_workspace_executor"},
                 )
-                web_template = selector.graphiteui_capability_selector(
+                web_template = selector.toograph_capability_selector(
                     requirement="Research current information.",
                     capability={"kind": "subgraph", "key": "advanced_web_research_loop"},
                 )
-                write_template = selector.graphiteui_capability_selector(
+                write_template = selector.toograph_capability_selector(
                     requirement="Write a workspace file.",
                     capability={"kind": "subgraph", "key": "write_workspace_file"},
                 )
@@ -339,7 +339,7 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
         self.assertNotIn("requiresApproval", write_template["capability"])
 
     def test_selector_does_not_match_requirement_without_llm_selected_capability(self) -> None:
-        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "graphiteui_capability_selector_after_test_none")
+        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_test_none")
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
             _write_template(
@@ -348,8 +348,8 @@ class GraphiteUICapabilitySelectorSkillTests(unittest.TestCase):
                 label="Advanced Web Research",
                 description="Multi-round web research with evidence review.",
             )
-            with patch.dict("os.environ", {"GRAPHITE_REPO_ROOT": temp_dir}, clear=True):
-                result = selector.graphiteui_capability_selector(requirement="Research materials.")
+            with patch.dict("os.environ", {"TOOGRAPH_REPO_ROOT": temp_dir}, clear=True):
+                result = selector.toograph_capability_selector(requirement="Research materials.")
 
         self.assertEqual(set(result), {"capability", "found"})
         self.assertFalse(result["found"])

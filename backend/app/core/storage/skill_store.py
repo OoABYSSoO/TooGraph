@@ -20,7 +20,7 @@ SKILL_SETTINGS_PATH = SKILLS_ROOT / "settings.json"
 SKILLS_DIR = OFFICIAL_SKILLS_DIR
 SKILL_STATE_DATA_DIR = SKILLS_ROOT
 SKILL_STATE_PATH = SKILL_SETTINGS_PATH
-SKILL_SETTINGS_SCHEMA_VERSION = "graphiteui.skill-settings/v1"
+SKILL_SETTINGS_SCHEMA_VERSION = "toograph.skill-settings/v1"
 
 
 def skill_directory_for(skill_key: str) -> Path:
@@ -221,8 +221,8 @@ def _derive_skill_key(skill_file: Path) -> str:
     raw = skill_file.read_text(encoding="utf-8")
     frontmatter = _read_frontmatter(raw, skill_file)
     payload = yaml.safe_load(frontmatter) or {}
-    graphite = payload.get("graphite") or {}
-    skill_key = str(graphite.get("skill_key") or skill_file.parent.name).strip()
+    toograph = payload.get("toograph") or {}
+    skill_key = str(toograph.get("skill_key") or skill_file.parent.name).strip()
     return _validate_skill_key(skill_key)
 
 

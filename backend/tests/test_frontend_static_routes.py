@@ -21,7 +21,7 @@ class FrontendStaticRoutesTest(unittest.TestCase):
             assets_dir.mkdir()
             (dist_dir / "index.html").write_text("<div id=\"app\"></div>", encoding="utf-8")
             (dist_dir / "logo.svg").write_text("<svg></svg>", encoding="utf-8")
-            (assets_dir / "app.js").write_text("console.log('graphiteui');", encoding="utf-8")
+            (assets_dir / "app.js").write_text("console.log('toograph');", encoding="utf-8")
 
             app = FastAPI()
 
@@ -35,7 +35,7 @@ class FrontendStaticRoutesTest(unittest.TestCase):
                 self.assertEqual(client.get("/").text, "<div id=\"app\"></div>")
                 self.assertEqual(client.get("/workspace/graph-1").text, "<div id=\"app\"></div>")
                 self.assertEqual(client.get("/logo.svg").text, "<svg></svg>")
-                self.assertEqual(client.get("/assets/app.js").text, "console.log('graphiteui');")
+                self.assertEqual(client.get("/assets/app.js").text, "console.log('toograph');")
                 self.assertEqual(client.get("/api/ping").json(), {"ok": True})
 
                 missing_api = client.get("/api/missing")

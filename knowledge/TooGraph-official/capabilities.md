@@ -1,6 +1,6 @@
-# GraphiteUI 能做些什么
+# TooGraph 能做些什么
 
-GraphiteUI 当前适合做这些事情：
+TooGraph 当前适合做这些事情：
 
 - 新建、保存、加载、校验和运行一张节点图。
 - 通过 `input / agent / condition / output` 四类核心节点组织完整流程。

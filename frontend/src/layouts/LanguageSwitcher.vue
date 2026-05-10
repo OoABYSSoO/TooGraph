@@ -103,14 +103,14 @@ const popoverVisible = ref(false);
 }
 
 .language-switcher__copy small {
-  color: var(--graphite-text-muted);
+  color: var(--toograph-text-muted);
   font-size: 0.68rem;
   line-height: 1.1;
 }
 
 .language-switcher__copy strong {
   overflow: hidden;
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
   font-size: 0.86rem;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -165,11 +165,11 @@ const popoverVisible = ref(false);
   overflow-y: auto;
   gap: 4px;
   isolation: isolate;
-  border: 1px solid var(--graphite-glass-border);
+  border: 1px solid var(--toograph-glass-border);
   border-radius: 18px;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--graphite-glass-bg-strong);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens), var(--toograph-glass-bg-strong);
   background-blend-mode: screen, screen, normal;
-  box-shadow: var(--graphite-glass-shadow), var(--graphite-glass-highlight), var(--graphite-glass-rim);
+  box-shadow: var(--toograph-glass-shadow), var(--toograph-glass-highlight), var(--toograph-glass-rim);
   backdrop-filter: blur(24px) saturate(1.5) contrast(1.01);
   padding: 7px;
 }
@@ -213,7 +213,7 @@ const popoverVisible = ref(false);
 }
 
 .language-switcher__option-meta {
-  color: var(--graphite-text-muted);
+  color: var(--toograph-text-muted);
   font-size: 0.68rem;
   font-weight: 760;
   letter-spacing: 0.08em;

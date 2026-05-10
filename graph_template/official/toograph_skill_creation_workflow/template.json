@@ -1,5 +1,5 @@
 {
-  "template_id": "graphiteui_skill_creation_workflow",
+  "template_id": "toograph_skill_creation_workflow",
   "label": "创建自定义 Skill",
   "description": "需求澄清、样例确认、Skill 文件生成、脚本测试修复、生成方案审查和运行时权限控制写入的自定义 Skill 创作图模板。",
   "default_graph_name": "创建自定义 Skill",
@@ -30,7 +30,7 @@
       "color": "#2563eb",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "graphiteui_capability_selector",
+        "skillKey": "toograph_capability_selector",
         "nodeId": "select_existing_capability",
         "fieldKey": "capability",
         "managed": true
@@ -44,7 +44,7 @@
       "color": "#2563eb",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "graphiteui_capability_selector",
+        "skillKey": "toograph_capability_selector",
         "nodeId": "select_existing_capability",
         "fieldKey": "found",
         "managed": true
@@ -130,7 +130,7 @@
       "color": "#2563eb",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "graphiteUI_skill_builder",
+        "skillKey": "toograph_skill_builder",
         "nodeId": "build_skill_files",
         "fieldKey": "skill_key",
         "managed": true
@@ -144,7 +144,7 @@
       "color": "#2563eb",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "graphiteUI_skill_builder",
+        "skillKey": "toograph_skill_builder",
         "nodeId": "build_skill_files",
         "fieldKey": "skill_json",
         "managed": true
@@ -158,7 +158,7 @@
       "color": "#2563eb",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "graphiteUI_skill_builder",
+        "skillKey": "toograph_skill_builder",
         "nodeId": "build_skill_files",
         "fieldKey": "skill_md",
         "managed": true
@@ -172,7 +172,7 @@
       "color": "#2563eb",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "graphiteUI_skill_builder",
+        "skillKey": "toograph_skill_builder",
         "nodeId": "build_skill_files",
         "fieldKey": "before_llm_py",
         "managed": true
@@ -186,7 +186,7 @@
       "color": "#2563eb",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "graphiteUI_skill_builder",
+        "skillKey": "toograph_skill_builder",
         "nodeId": "build_skill_files",
         "fieldKey": "after_llm_py",
         "managed": true
@@ -200,7 +200,7 @@
       "color": "#2563eb",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "graphiteUI_skill_builder",
+        "skillKey": "toograph_skill_builder",
         "nodeId": "build_skill_files",
         "fieldKey": "requirements_txt",
         "managed": true
@@ -222,7 +222,7 @@
       "color": "#9333ea",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "graphiteUI_script_tester",
+        "skillKey": "toograph_script_tester",
         "nodeId": "run_script_test",
         "fieldKey": "success",
         "managed": true
@@ -236,7 +236,7 @@
       "color": "#9333ea",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "graphiteUI_script_tester",
+        "skillKey": "toograph_script_tester",
         "nodeId": "run_script_test",
         "fieldKey": "result",
         "managed": true
@@ -451,10 +451,10 @@
         }
       ],
       "config": {
-        "skillKey": "graphiteui_capability_selector",
+        "skillKey": "toograph_capability_selector",
         "skillBindings": [
           {
-            "skillKey": "graphiteui_capability_selector",
+            "skillKey": "toograph_capability_selector",
             "outputMapping": {
               "capability": "existing_capability",
               "found": "existing_capability_found"
@@ -462,10 +462,10 @@
           }
         ],
         "skillInstructionBlocks": {
-          "graphiteui_capability_selector": {
-            "skillKey": "graphiteui_capability_selector",
+          "toograph_capability_selector": {
+            "skillKey": "toograph_capability_selector",
             "title": "能力选择 skill instruction",
-            "content": "你已绑定 GraphiteUI Capability Selector。这里要检查的是用户想创建的目标 Skill 需求是否已经能被现有启用能力满足；不要因为当前流程本身是创建 Skill 的模板就选择 graphiteui_skill_creation_workflow。优先选择真正可直接满足目标需求的图模板，其次选择 Skill；没有合适能力时选择 {\"kind\":\"none\"}。",
+            "content": "你已绑定 TooGraph Capability Selector。这里要检查的是用户想创建的目标 Skill 需求是否已经能被现有启用能力满足；不要因为当前流程本身是创建 Skill 的模板就选择 toograph_skill_creation_workflow。优先选择真正可直接满足目标需求的图模板，其次选择 Skill；没有合适能力时选择 {\"kind\":\"none\"}。",
             "source": "node.override"
           }
         },
@@ -845,7 +845,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "整理给 GraphiteUI Skill Builder 的最终上下文。builder_context 写 Markdown，包含：目标 Skill 名称建议、稳定 skillKey 建议、用户需求、上游 capability_gap 摘要、已认可示例输入输出、outputSchema 字段建议、是否需要 before_llm.py、是否需要 after_llm.py、requirements.txt 需求、权限声明、测试重点和禁止事项。强调生成结果只包含 skill_key、skill_json、skill_md、before_llm_py、after_llm_py、requirements_txt。",
+        "taskInstruction": "整理给 TooGraph Skill Builder 的最终上下文。builder_context 写 Markdown，包含：目标 Skill 名称建议、稳定 skillKey 建议、用户需求、上游 capability_gap 摘要、已认可示例输入输出、outputSchema 字段建议、是否需要 before_llm.py、是否需要 after_llm.py、requirements.txt 需求、权限声明、测试重点和禁止事项。强调生成结果只包含 skill_key、skill_json、skill_md、before_llm_py、after_llm_py、requirements_txt。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -855,7 +855,7 @@
     "build_skill_files": {
       "kind": "agent",
       "name": "生成 Skill 文件",
-      "description": "调用 GraphiteUI Skill Builder 生成 Skill 包必要文件内容。",
+      "description": "调用 TooGraph Skill Builder 生成 Skill 包必要文件内容。",
       "ui": {
         "position": {
           "x": 5940,
@@ -916,10 +916,10 @@
         }
       ],
       "config": {
-        "skillKey": "graphiteUI_skill_builder",
+        "skillKey": "toograph_skill_builder",
         "skillBindings": [
           {
-            "skillKey": "graphiteUI_skill_builder",
+            "skillKey": "toograph_skill_builder",
             "outputMapping": {
               "skill_key": "generated_skill_key",
               "skill_json": "generated_skill_json",
@@ -1068,10 +1068,10 @@
         }
       ],
       "config": {
-        "skillKey": "graphiteUI_script_tester",
+        "skillKey": "toograph_script_tester",
         "skillBindings": [
           {
-            "skillKey": "graphiteUI_script_tester",
+            "skillKey": "toograph_script_tester",
             "outputMapping": {
               "success": "script_test_success",
               "result": "script_test_result"
@@ -1079,7 +1079,7 @@
           }
         ],
         "skillInstructionBlocks": {},
-        "taskInstruction": "根据 test_strategy 选择要测试的脚本源码：script_to_test 为 after_llm.py 时使用 generated_after_llm_py，为 before_llm.py 时使用 generated_before_llm_py。生成 GraphiteUI Script Tester 的 files 和 command：files 必须包含被测试脚本、pytest 测试文件以及必要的最小辅助文件；command 必须使用当前系统允许的命令，Python 生命周期脚本优先使用 [\"python\", \"-m\", \"pytest\", \"-q\", \"test_target.py\"]。测试覆盖已认可示例、字段规范化、错误输入和空输入；不要访问网络，不读取敏感路径，不依赖仓库状态。",
+        "taskInstruction": "根据 test_strategy 选择要测试的脚本源码：script_to_test 为 after_llm.py 时使用 generated_after_llm_py，为 before_llm.py 时使用 generated_before_llm_py。生成 TooGraph Script Tester 的 files 和 command：files 必须包含被测试脚本、pytest 测试文件以及必要的最小辅助文件；command 必须使用当前系统允许的命令，Python 生命周期脚本优先使用 [\"python\", \"-m\", \"pytest\", \"-q\", \"test_target.py\"]。测试覆盖已认可示例、字段规范化、错误输入和空输入；不要访问网络，不读取敏感路径，不依赖仓库状态。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",

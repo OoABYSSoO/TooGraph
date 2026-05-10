@@ -3,11 +3,11 @@
     <div class="node-card__agent-model-select-shell" @pointerdown.stop @click.stop>
       <ElSelect
         ref="agentModelSelectRef"
-        class="node-card__agent-model-select graphite-select"
+        class="node-card__agent-model-select toograph-select"
         :model-value="modelValue"
         :placeholder="modelOptions.length === 0 ? t('nodeCard.noConfiguredModels') : t('nodeCard.selectModel')"
         :disabled="modelOptions.length === 0"
-        popper-class="graphite-select-popper node-card__agent-model-popper"
+        popper-class="toograph-select-popper node-card__agent-model-popper"
         @visible-change="emit('model-visible-change', $event)"
         @update:model-value="emit('update:model-value', $event)"
       >
@@ -41,10 +41,10 @@
             <Opportunity />
           </span>
           <ElSelect
-            class="node-card__agent-thinking-select graphite-select"
+            class="node-card__agent-thinking-select toograph-select"
             :model-value="thinkingModeValue"
             :teleported="false"
-            popper-class="graphite-select-popper node-card__agent-thinking-popper"
+            popper-class="toograph-select-popper node-card__agent-thinking-popper"
             :aria-label="t('nodeCard.toggleThinking')"
             @pointerdown.stop
             @click.stop

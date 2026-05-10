@@ -7,10 +7,10 @@ from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemSt
 from app.core.schemas.skills import SkillDefinition, SkillIoField
 
 
-STRUCTURED_OUTPUT_SCHEMA_NAME = "graphiteui_structured_output"
+STRUCTURED_OUTPUT_SCHEMA_NAME = "toograph_structured_output"
 JSON_REPAIR_SYSTEM_PROMPT = "\n".join(
     [
-        "You are a JSON repair step for GraphiteUI.",
+        "You are a JSON repair step for TooGraph.",
         "Repair the provided model output so it matches the target JSON schema.",
         "Do not solve the original task again.",
         "Do not add new facts.",

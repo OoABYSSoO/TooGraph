@@ -483,9 +483,9 @@ onBeforeUnmount(() => {
 .model-logs-page__toolbar,
 .model-logs-page__entry-list,
 .model-logs-page__detail {
-  border: 1px solid var(--graphite-border);
+  border: 1px solid var(--toograph-border);
   border-radius: 24px;
-  box-shadow: var(--graphite-shadow-card);
+  box-shadow: var(--toograph-shadow-card);
 }
 
 .model-logs-page__header {
@@ -494,7 +494,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 18px;
   padding: 24px;
-  background: var(--graphite-surface-panel);
+  background: var(--toograph-surface-panel);
 }
 
 .model-logs-page__eyebrow,
@@ -507,8 +507,8 @@ onBeforeUnmount(() => {
 
 .model-logs-page__title {
   margin: 8px 0 10px;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 2rem;
 }
 
@@ -579,7 +579,7 @@ onBeforeUnmount(() => {
   padding: 5px 10px;
   background: rgba(255, 248, 240, 0.9);
   color: rgba(120, 53, 15, 0.76);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.76rem;
   white-space: nowrap;
 }
@@ -654,7 +654,7 @@ onBeforeUnmount(() => {
 
 .model-logs-page__entry-heading strong {
   overflow: hidden;
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -672,7 +672,7 @@ onBeforeUnmount(() => {
   margin-top: 8px;
   overflow: hidden;
   color: rgba(60, 41, 20, 0.56);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.74rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -692,7 +692,7 @@ onBeforeUnmount(() => {
 .model-logs-page__detail {
   min-width: 0;
   padding: 18px;
-  background: var(--graphite-surface-panel);
+  background: var(--toograph-surface-panel);
 }
 
 .model-logs-page__detail--empty {
@@ -721,8 +721,8 @@ onBeforeUnmount(() => {
 .model-logs-page__detail-header h3 {
   margin: 6px 0 0;
   overflow-wrap: anywhere;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 1.35rem;
 }
 
@@ -741,7 +741,7 @@ onBeforeUnmount(() => {
   padding: 4px 10px;
   background: rgba(239, 246, 255, 0.88);
   color: rgb(37, 99, 235);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.74rem;
   font-weight: 800;
   white-space: nowrap;
@@ -766,7 +766,7 @@ onBeforeUnmount(() => {
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.46);
   color: rgba(60, 41, 20, 0.68);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.76rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -813,7 +813,7 @@ onBeforeUnmount(() => {
 .model-logs-page__section h4,
 .model-logs-page__raw-summary span {
   margin: 0;
-  color: var(--graphite-text-strong);
+  color: var(--toograph-text-strong);
   font-size: 0.88rem;
   font-weight: 800;
 }
@@ -839,7 +839,7 @@ onBeforeUnmount(() => {
 
 .model-logs-page__message span {
   color: rgb(37, 99, 235);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.78rem;
   font-weight: 800;
 }
@@ -865,7 +865,7 @@ onBeforeUnmount(() => {
   margin: 0;
   background: rgba(255, 253, 249, 0.76);
   color: rgba(31, 23, 15, 0.82);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.78rem;
   line-height: 1.55;
   white-space: pre-wrap;
@@ -962,15 +962,15 @@ onBeforeUnmount(() => {
 
 :global(.model-logs-page__raw-dialog.el-dialog) {
   overflow: hidden;
-  border: 1px solid var(--graphite-glass-border);
+  border: 1px solid var(--toograph-glass-border);
   border-radius: 24px;
   padding: 0;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--graphite-glass-bg-strong);
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens), var(--toograph-glass-bg-strong);
   background-blend-mode: screen, screen, normal;
   box-shadow:
     0 28px 80px rgba(66, 31, 17, 0.18),
-    var(--graphite-glass-highlight),
-    var(--graphite-glass-rim);
+    var(--toograph-glass-highlight),
+    var(--toograph-glass-rim);
   backdrop-filter: blur(30px) saturate(1.55) contrast(1.02);
 }
 
@@ -991,8 +991,8 @@ onBeforeUnmount(() => {
 
 .model-logs-page__raw-dialog-header h3 {
   margin: 0;
-  color: var(--graphite-text-strong);
-  font-family: var(--graphite-font-display);
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-display);
   font-size: 1.35rem;
 }
 
@@ -1045,7 +1045,7 @@ onBeforeUnmount(() => {
   margin: 0;
   background: rgba(255, 253, 249, 0.82);
   color: rgba(31, 23, 15, 0.84);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.8rem;
   line-height: 1.58;
   white-space: pre-wrap;
@@ -1093,7 +1093,7 @@ onBeforeUnmount(() => {
   padding: 8px 10px;
   background: rgba(239, 246, 255, 0.72);
   color: rgb(37, 99, 235);
-  font-family: var(--graphite-font-mono);
+  font-family: var(--toograph-font-mono);
   font-size: 0.74rem;
   font-weight: 800;
 }

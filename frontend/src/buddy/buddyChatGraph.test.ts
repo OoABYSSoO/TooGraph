@@ -338,7 +338,7 @@ function createSkillDefinition(overrides: Partial<SkillDefinition> = {}): SkillD
     name: "Web Search",
     description: "Search the public web.",
     llmInstruction: "Choose the query and run the bound web search skill.",
-    schemaVersion: "graphite.skill/v1",
+    schemaVersion: "toograph.skill/v1",
     version: "1.0.0",
     capabilityPolicy: {
       default: { selectable: true, requiresApproval: false },
@@ -424,7 +424,7 @@ function createActivityGraph() {
             reads: [],
             writes: [],
             config: {
-              skillKey: "graphiteui_capability_selector",
+              skillKey: "toograph_capability_selector",
               taskInstruction: "",
               modelSource: "global",
               model: "",

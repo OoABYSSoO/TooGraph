@@ -6,7 +6,7 @@ import { createApp } from "vue";
 import App from "./App.vue";
 import { i18n } from "./i18n";
 import "./styles/base.css";
-import "./styles/graphite-select.css";
+import "./styles/toograph-select.css";
 import { router } from "@/router";
 
 const app = createApp(App);

@@ -1,9 +1,9 @@
 {
-  "schemaVersion": "graphite.skill/v1",
-  "skillKey": "graphiteui_capability_selector",
-  "name": "GraphiteUI Capability Selector",
+  "schemaVersion": "toograph.skill/v1",
+  "skillKey": "toograph_capability_selector",
+  "name": "TooGraph Capability Selector",
   "description": "当图流程需要根据用户需求从当前启用的图模板和 Skill 中选择一个可用能力时使用此技能。",
-  "llmInstruction": "你已绑定 GraphiteUI Capability Selector。Skill Pre-LLM Context 会列出当前启用的图模板和 Skill 清单，每项包含 key、名称、适用场景和权限摘要。你必须根据用户需求从清单中选择一个 capability 入参；优先选择图模板，其次选择 Skill；没有合适能力时选择 {\"kind\":\"none\"}。不要编造清单外能力。运行 Skill 本身不需要审批；写文件、删改文件或执行脚本由运行时的 需确认/完全访问 模式处理，不由本选择器判断。",
+  "llmInstruction": "你已绑定 TooGraph Capability Selector。Skill Pre-LLM Context 会列出当前启用的图模板和 Skill 清单，每项包含 key、名称、适用场景和权限摘要。你必须根据用户需求从清单中选择一个 capability 入参；优先选择图模板，其次选择 Skill；没有合适能力时选择 {\"kind\":\"none\"}。不要编造清单外能力。运行 Skill 本身不需要审批；写文件、删改文件或执行脚本由运行时的 需确认/完全访问 模式处理，不由本选择器判断。",
   "version": "1.0.0",
   "timeoutSeconds": 30,
   "permissions": [

@@ -24,7 +24,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(
             [record["template_id"] for record in records],
-            ["advanced_web_research_loop", "buddy_autonomous_loop", "graphiteui_skill_creation_workflow"],
+            ["advanced_web_research_loop", "buddy_autonomous_loop", "toograph_skill_creation_workflow"],
         )
         templates = {record["template_id"]: record for record in records}
         research_template = templates["advanced_web_research_loop"]
@@ -32,7 +32,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(research_template["label"], "高级联网搜索")
         self.assertEqual(research_template["default_graph_name"], "高级联网搜索")
         self.assertIn("多轮搜索", research_template["description"])
-        skill_template = templates["graphiteui_skill_creation_workflow"]
+        skill_template = templates["toograph_skill_creation_workflow"]
         self.assertEqual(skill_template["source"], "official")
         self.assertEqual(skill_template["label"], "创建自定义 Skill")
         self.assertEqual(skill_template["default_graph_name"], "创建自定义 Skill")
@@ -147,11 +147,11 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertTrue(cycle_tracker["has_cycle"])
         self.assertEqual(cycle_tracker["loop_limits_by_source"], {"should_continue_search": 5})
 
-    def test_graphiteui_skill_creation_workflow_contract(self) -> None:
+    def test_toograph_skill_creation_workflow_contract(self) -> None:
         template = next(
             record
             for record in _official_template_records()
-            if record["template_id"] == "graphiteui_skill_creation_workflow"
+            if record["template_id"] == "toograph_skill_creation_workflow"
         )
         states = template["state_schema"]
         nodes = template["nodes"]
@@ -190,12 +190,12 @@ class TemplateLayoutTests(unittest.TestCase):
 
         selector_node = nodes["select_existing_capability"]
         self.assertEqual(selector_node["kind"], "agent")
-        self.assertEqual(selector_node["config"]["skillKey"], "graphiteui_capability_selector")
+        self.assertEqual(selector_node["config"]["skillKey"], "toograph_capability_selector")
         self.assertEqual(
             selector_node["config"]["skillBindings"],
             [
                 {
-                    "skillKey": "graphiteui_capability_selector",
+                    "skillKey": "toograph_capability_selector",
                     "outputMapping": {
                         "capability": "existing_capability",
                         "found": "existing_capability_found",
@@ -213,12 +213,12 @@ class TemplateLayoutTests(unittest.TestCase):
 
         builder_node = nodes["build_skill_files"]
         self.assertEqual(builder_node["kind"], "agent")
-        self.assertEqual(builder_node["config"]["skillKey"], "graphiteUI_skill_builder")
+        self.assertEqual(builder_node["config"]["skillKey"], "toograph_skill_builder")
         self.assertEqual(
             builder_node["config"]["skillBindings"],
             [
                 {
-                    "skillKey": "graphiteUI_skill_builder",
+                    "skillKey": "toograph_skill_builder",
                     "outputMapping": {
                         "skill_key": "generated_skill_key",
                         "skill_json": "generated_skill_json",
@@ -233,7 +233,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         tester_node = nodes["run_script_test"]
         self.assertEqual(tester_node["kind"], "agent")
-        self.assertEqual(tester_node["config"]["skillKey"], "graphiteUI_script_tester")
+        self.assertEqual(tester_node["config"]["skillKey"], "toograph_script_tester")
         self.assertEqual(
             tester_node["config"]["skillBindings"][0]["outputMapping"],
             {
@@ -325,11 +325,11 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertEqual(nodes["output_final"]["reads"], [{"state": "final_summary", "required": True}])
 
-    def test_graphiteui_skill_creation_workflow_is_runtime_compatible(self) -> None:
+    def test_toograph_skill_creation_workflow_is_runtime_compatible(self) -> None:
         template = next(
             record
             for record in _official_template_records()
-            if record["template_id"] == "graphiteui_skill_creation_workflow"
+            if record["template_id"] == "toograph_skill_creation_workflow"
         )
         payload = {
             key: value
@@ -339,7 +339,7 @@ class TemplateLayoutTests(unittest.TestCase):
         graph = NodeSystemGraphPayload.model_validate(
             {
                 **payload,
-                "graph_id": "test_graphiteui_skill_creation_workflow",
+                "graph_id": "test_toograph_skill_creation_workflow",
                 "name": template["default_graph_name"],
             }
         )
@@ -429,12 +429,12 @@ class TemplateLayoutTests(unittest.TestCase):
         cycle_graph = nodes["run_capability_cycle"]["config"]["graph"]
         self.assertEqual(cycle_graph["metadata"].get("interrupt_after", []), [])
         selector_node = cycle_graph["nodes"]["select_capability"]
-        self.assertEqual(selector_node["config"]["skillKey"], "graphiteui_capability_selector")
+        self.assertEqual(selector_node["config"]["skillKey"], "toograph_capability_selector")
         self.assertEqual(
             selector_node["config"]["skillBindings"],
             [
                 {
-                    "skillKey": "graphiteui_capability_selector",
+                    "skillKey": "toograph_capability_selector",
                     "outputMapping": {
                         "capability": "selected_capability",
                         "found": "capability_found",

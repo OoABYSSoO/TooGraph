@@ -317,9 +317,9 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.match(agentRuntimeControlsSource, /@click\.stop/);
   assert.match(agentRuntimeControlsSource, /<ElSelect/);
   assert.match(agentRuntimeControlsSource, /ref="agentModelSelectRef"/);
-  assert.match(agentRuntimeControlsSource, /class="node-card__agent-model-select graphite-select"/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-model-select toograph-select"/);
   assert.match(agentRuntimeControlsSource, /@visible-change="emit\('model-visible-change', \$event\)"/);
-  assert.match(agentRuntimeControlsSource, /popper-class="graphite-select-popper node-card__agent-model-popper"/);
+  assert.match(agentRuntimeControlsSource, /popper-class="toograph-select-popper node-card__agent-model-popper"/);
   assert.equal(
     [...agentRuntimeControlsSource.matchAll(/<ElPopover\s+trigger="hover"\s+placement="top-start"[\s\S]*?popper-class="node-card__agent-toggle-hint-popper"/g)]
       .length,
@@ -328,7 +328,7 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.match(agentRuntimeControlsSource, /class="node-card__agent-toggle-card node-card__agent-toggle-card--thinking"/);
   assert.match(agentRuntimeControlsSource, /class="node-card__agent-thinking-icon"/);
   assert.match(agentRuntimeControlsSource, /<ElSelect/);
-  assert.match(agentRuntimeControlsSource, /class="node-card__agent-thinking-select graphite-select"/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-thinking-select toograph-select"/);
   assert.match(agentRuntimeControlsSource, /:model-value="thinkingModeValue"/);
   assert.match(agentRuntimeControlsSource, /v-for="option in thinkingOptions"/);
   assert.match(agentRuntimeControlsSource, /@update:model-value="emit\('update:thinking-mode', \$event\)"/);
@@ -407,7 +407,7 @@ test("NodeCard keeps agent model selection in the dropdown without rendering dup
 
   assert.match(agentSection, /<AgentNodeBody/);
   assert.match(agentNodeBodySource, /<AgentRuntimeControls/);
-  assert.match(agentRuntimeControlsSource, /class="node-card__agent-model-select graphite-select"/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-model-select toograph-select"/);
   assert.match(agentRuntimeControlsSource, /v-for="option in modelOptions"/);
   assert.match(agentSection, /@update:model-value="handleAgentModelValueChange"/);
   assert.doesNotMatch(agentSection, /class="node-card__available-model-pills"/);
@@ -428,7 +428,7 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.match(agentNodeBodySource, /import AgentSkillPicker from "\.\/AgentSkillPicker\.vue";/);
   assert.match(agentNodeBodySource, /<AgentSkillPicker[\s\S]*:selected-skill-key="selectedSkillKey"[\s\S]*:available-skill-definitions="availableSkillDefinitions"[\s\S]*:breakpoint-enabled="breakpointEnabled"[\s\S]*@update:selected-skill="emit\('select-skill', \$event\)"[\s\S]*@update:breakpoint-enabled="emit\('update:breakpoint-enabled', \$event\)"/);
   assert.match(agentSection, /@select-skill="selectAgentSkill"/);
-  assert.match(agentSkillPickerSource, /<ElSelect[\s\S]*class="node-card__agent-skill-select graphite-select"[\s\S]*:model-value="selectedSkillKey"[\s\S]*popper-class="graphite-select-popper node-card__agent-skill-popper"/);
+  assert.match(agentSkillPickerSource, /<ElSelect[\s\S]*class="node-card__agent-skill-select toograph-select"[\s\S]*:model-value="selectedSkillKey"[\s\S]*popper-class="toograph-select-popper node-card__agent-skill-popper"/);
   assert.match(agentSkillPickerSource, /class="node-card__agent-toggle-card node-card__agent-toggle-card--breakpoint"/);
   assert.match(componentSource, /from "\.\/skillPickerModel";/);
   assert.match(componentSource, /resolveSelectAgentSkillPatch/);
@@ -450,7 +450,7 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.match(statePortListSource, /node-card__port-pill--create/);
   assert.match(agentSection, /pendingStateInputTarget\?\.label \?\? pendingStateInputSource\?\.label \?\? '\+ input'/);
   assert.match(agentSection, /pendingStateOutputTarget\?\.label \?\? '\+ output'/);
-  assert.match(createPopoverSource, /<ElSelect[\s\S]*class="node-card__control-select graphite-select"[\s\S]*popper-class="graphite-select-popper node-card__port-picker-select-popper"/);
+  assert.match(createPopoverSource, /<ElSelect[\s\S]*class="node-card__control-select toograph-select"[\s\S]*popper-class="toograph-select-popper node-card__port-picker-select-popper"/);
   assert.doesNotMatch(agentSection, /t\("nodeCard\.key"\)/);
   assert.doesNotMatch(agentSection, /portStateDraft\.key/);
   assert.doesNotMatch(agentSection, /class="node-card__port-state-key"/);
@@ -680,10 +680,10 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*padding:\s*8px;/);
   assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.14\);/);
   assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*border-radius:\s*999px;/);
-  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*background:\s*var\(--graphite-glass-bg\);/);
-  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*box-shadow:\s*var\(--graphite-glass-shadow\),\s*var\(--graphite-glass-highlight\),\s*var\(--graphite-glass-rim\);/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*background:\s*var\(--toograph-glass-bg\);/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*box-shadow:\s*var\(--toograph-glass-shadow\),\s*var\(--toograph-glass-highlight\),\s*var\(--toograph-glass-rim\);/);
   assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*backdrop-filter:\s*blur\(24px\) saturate\(1\.6\) contrast\(1\.02\);/);
-  assert.match(topActionsSource, /\.node-card__top-actions::before \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\);/);
+  assert.match(topActionsSource, /\.node-card__top-actions::before \{[\s\S]*background:\s*var\(--toograph-glass-specular\),\s*var\(--toograph-glass-lens\);/);
   assert.match(topActionsSource, /\.node-card__top-actions::after \{[\s\S]*bottom:\s*-12px;/);
   assert.match(topActionsSource, /\.node-card__top-actions::after \{[\s\S]*height:\s*12px;/);
   assert.match(topActionsSource, /\.node-card__top-actions:hover \{[\s\S]*opacity:\s*1;/);
@@ -713,7 +713,7 @@ test("NodeCard uses a calmer display hierarchy on the canvas", () => {
   assert.match(componentSource, /'node-card--input': view\.body\.kind === 'input'/);
   assert.match(componentSource, /'node-card--agent': view\.body\.kind === 'agent'/);
   assert.match(componentSource, /'node-card--output': view\.body\.kind === 'output'/);
-  assert.match(componentSource, /\.node-card \{[\s\S]*background:\s*var\(--graphite-surface-card\);/);
+  assert.match(componentSource, /\.node-card \{[\s\S]*background:\s*var\(--toograph-surface-card\);/);
   assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-kind-rgb:\s*154,\s*52,\s*18;/);
   assert.match(componentSource, /\.node-card \{[\s\S]*border:\s*1px solid rgba\(var\(--node-card-kind-rgb\),\s*0\.2\);/);
   assert.match(componentSource, /\.node-card::before \{[\s\S]*background:\s*rgba\(var\(--node-card-kind-rgb\),\s*0\.72\);/);
@@ -727,9 +727,9 @@ test("NodeCard uses a calmer display hierarchy on the canvas", () => {
   assert.match(componentSource, /\.node-card--condition \{[\s\S]*--node-card-kind-rgb:\s*217,\s*119,\s*6;/);
   assert.match(componentSource, /\.node-card--output \{[\s\S]*--node-card-kind-rgb:\s*79,\s*70,\s*229;/);
   assert.match(componentSource, /\.node-card--subgraph \{[\s\S]*--node-card-kind-rgb:\s*13,\s*148,\s*136;/);
-  assert.match(componentSource, /\.node-card__title \{[\s\S]*font-family:\s*var\(--graphite-font-display\);/);
+  assert.match(componentSource, /\.node-card__title \{[\s\S]*font-family:\s*var\(--toograph-font-display\);/);
   assert.match(componentSource, /\.node-card__title \{[\s\S]*font-size:\s*1\.72rem;/);
-  assert.match(componentSource, /\.node-card__eyebrow \{[\s\S]*font-family:\s*var\(--graphite-font-mono\);/);
+  assert.match(componentSource, /\.node-card__eyebrow \{[\s\S]*font-family:\s*var\(--toograph-font-mono\);/);
   assert.match(componentSource, /\.node-card__eyebrow \{[\s\S]*color:\s*rgba\(var\(--node-card-kind-rgb\),\s*0\.84\);/);
 });
 
@@ -1241,7 +1241,7 @@ test("NodeCard closes floating panels on focus loss and keeps popup surfaces on 
   assert.match(floatingPanelsComposableSource, /options\.closeFloatingPanels\(\{ commitTextEditor: false \}\);/);
   assert.match(componentSource, /data-node-popup-surface="true"/);
   assert.match(componentSource, /\.node-card__text-editor-popper/);
-  assert.match(agentSkillPickerSource, /popper-class="graphite-select-popper node-card__agent-skill-popper"/);
+  assert.match(agentSkillPickerSource, /popper-class="toograph-select-popper node-card__agent-skill-popper"/);
   assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);
   assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
   assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*box-shadow:\s*0 16px 34px rgba\(60,\s*41,\s*20,\s*0\.12\);/);

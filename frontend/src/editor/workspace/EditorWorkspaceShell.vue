@@ -274,7 +274,7 @@ import {
 } from "./editorDraftPersistenceModel.ts";
 import type { WorkspaceSidePanelMode } from "./workspaceSidePanelModel.ts";
 import { downloadPythonSource } from "./pythonExportModel.ts";
-import { isGraphiteUiPythonExportFile, isGraphiteUiPythonExportSource } from "./pythonImportModel.ts";
+import { isTooGraphPythonExportFile, isTooGraphPythonExportSource } from "./pythonImportModel.ts";
 import { useWorkspaceDocumentState } from "./useWorkspaceDocumentState.ts";
 import { useWorkspaceEditGuardController } from "./useWorkspaceEditGuardController.ts";
 import { useWorkspaceGraphPersistenceController } from "./useWorkspaceGraphPersistenceController.ts";
@@ -707,7 +707,7 @@ const {
   updateWorkspace,
   syncRouteToTab,
   importGraphFromPythonSource,
-  isGraphiteUiPythonExportSource,
+  isTooGraphPythonExportSource,
   setMessageFeedbackForTab,
 });
 const {
@@ -729,7 +729,7 @@ const {
   markDocumentDirty,
   setMessageFeedbackForTab,
   importPythonGraphFile,
-  isGraphiteUiPythonExportFile,
+  isTooGraphPythonExportFile,
 });
 closeNodeCreationMenuFromController = closeNodeCreationMenuController;
 const { saveNodePresetForTab } = useWorkspacePresetController({
@@ -1070,7 +1070,7 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--graphite-page-bg);
+  background: var(--toograph-page-bg);
 }
 
 .editor-workspace-shell__file-input {

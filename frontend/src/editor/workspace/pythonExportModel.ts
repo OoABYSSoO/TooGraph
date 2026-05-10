@@ -1,4 +1,4 @@
-const DEFAULT_EXPORT_FILE_NAME = "graphiteui_graph";
+const DEFAULT_EXPORT_FILE_NAME = "toograph_graph";
 
 export function buildPythonExportFileName(graphName: string | null | undefined) {
   const normalizedName = (graphName ?? "")

@@ -1,8 +1,8 @@
 {
-  "schemaVersion": "graphite.skill/v1",
+  "schemaVersion": "toograph.skill/v1",
   "skillKey": "local_workspace_executor",
   "name": "Local Workspace Executor",
-  "description": "当用户需要在 GraphiteUI 本地工作区白名单内读取、写入或执行一个明确文件路径时选择此技能。",
+  "description": "当用户需要在 TooGraph 本地工作区白名单内读取、写入或执行一个明确文件路径时选择此技能。",
   "llmInstruction": "你已绑定 Local Workspace Executor。根据当前图 state、节点任务和预读文件上下文生成一个受控本地操作。operation 只能是 read、write 或 execute。path 必须是仓库内相对路径。write 必须提供 content，content 应该是要写入文件的完整最终内容；如果是在编辑已有文件，应基于预读上下文生成完整改后内容。execute 只执行 path 指向的脚本，不要伪造运行结果。默认只能写 backend/data、skill/user、graph_template/user 或 node_preset/user，默认只能执行 backend/data/tmp 或 skill/user 下的脚本；不要尝试访问 .git、.env 或 backend/data/settings。技能只返回 success 和 result。",
   "version": "1.0.0",
   "timeoutSeconds": 120,

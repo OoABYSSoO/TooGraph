@@ -416,7 +416,7 @@ def _validate_agent_node(
                 ValidationIssue(
                     code="agent_skill_not_agent_node_ready",
                     message=(
-                        f"Skill '{skill_key}' needs a GraphiteUI LLM-node manifest before it can be used by LLM nodes. "
+                        f"Skill '{skill_key}' needs a TooGraph LLM-node manifest before it can be used by LLM nodes. "
                         f"{blockers}"
                     ),
                     path=skill_path,

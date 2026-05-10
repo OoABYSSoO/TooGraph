@@ -24,9 +24,9 @@ test("resolveNextInputValueForBoundaryType follows legacy input switching rules"
       nextType: "knowledge_base",
       currentType: "text",
       currentValue: "hello",
-      knowledgeBaseNames: ["graphiteui-official", "python-official-3.14"],
+      knowledgeBaseNames: ["toograph-official", "python-official-3.14"],
     }),
-    "graphiteui-official",
+    "toograph-official",
   );
   assert.equal(
     resolveNextInputValueForBoundaryType({
@@ -50,7 +50,7 @@ test("resolveNextInputValueForBoundaryType follows legacy input switching rules"
     resolveNextInputValueForBoundaryType({
       nextType: "text",
       currentType: "knowledge_base",
-      currentValue: "graphiteui-official",
+      currentValue: "toograph-official",
       knowledgeBaseNames: [],
     }),
     "",

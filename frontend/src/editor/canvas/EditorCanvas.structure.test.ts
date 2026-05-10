@@ -209,10 +209,10 @@ test("EditorCanvas stacks zoom controls above the minimap at the bottom right", 
   assert.match(componentSource, /\.editor-canvas__zoom-toolbar \{[\s\S]*box-sizing:\s*border-box;/);
   assert.match(minimapSource, /\.editor-minimap \{[\s\S]*width:\s*var\(--editor-canvas-navigation-width,\s*224px\);/);
   assert.match(minimapSource, /\.editor-minimap \{[\s\S]*height:\s*160px;/);
-  assert.match(minimapSource, /\.editor-minimap \{[\s\S]*background:\s*var\(--graphite-glass-bg\);/);
-  assert.match(minimapSource, /\.editor-minimap \{[\s\S]*box-shadow:\s*var\(--graphite-glass-shadow\),\s*var\(--graphite-glass-highlight\),\s*var\(--graphite-glass-rim\);/);
+  assert.match(minimapSource, /\.editor-minimap \{[\s\S]*background:\s*var\(--toograph-glass-bg\);/);
+  assert.match(minimapSource, /\.editor-minimap \{[\s\S]*box-shadow:\s*var\(--toograph-glass-shadow\),\s*var\(--toograph-glass-highlight\),\s*var\(--toograph-glass-rim\);/);
   assert.match(minimapSource, /\.editor-minimap \{[\s\S]*backdrop-filter:\s*blur\(24px\) saturate\(1\.6\) contrast\(1\.02\);/);
-  assert.match(minimapSource, /\.editor-minimap::before \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\);/);
+  assert.match(minimapSource, /\.editor-minimap::before \{[\s\S]*background:\s*var\(--toograph-glass-specular\),\s*var\(--toograph-glass-lens\);/);
   assert.match(minimapSource, /\.editor-minimap__surface \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*1;/);
 });
 
@@ -865,10 +865,10 @@ test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes"
   assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*position:\s*relative;/);
   assert.match(componentSource, /\.editor-canvas__edge-view-button \{[\s\S]*border-radius:\s*999px;/);
   assert.match(componentSource, /\.editor-canvas__edge-view-button--active \{[\s\S]*background:\s*rgba\(154,\s*52,\s*18,\s*0\.9\);/);
-  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*background:\s*var\(--graphite-glass-bg\);/);
-  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*box-shadow:[\s\S]*0 8px 20px rgba\(31,\s*28,\s*24,\s*0\.045\),[\s\S]*var\(--graphite-glass-highlight\),[\s\S]*var\(--graphite-glass-rim\);/);
+  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*background:\s*var\(--toograph-glass-bg\);/);
+  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*box-shadow:[\s\S]*0 8px 20px rgba\(31,\s*28,\s*24,\s*0\.045\),[\s\S]*var\(--toograph-glass-highlight\),[\s\S]*var\(--toograph-glass-rim\);/);
   assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*backdrop-filter:\s*blur\(20px\) saturate\(1\.45\) contrast\(1\.01\);/);
-  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar::before \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\);/);
+  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar::before \{[\s\S]*background:\s*var\(--toograph-glass-specular\),\s*var\(--toograph-glass-lens\);/);
   assert.match(componentSource, /\.editor-canvas__edge-view-toolbar::before \{[\s\S]*opacity:\s*0\.36;/);
   assert.match(componentSource, /\.editor-canvas__edge-view-button \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*1;/);
 });

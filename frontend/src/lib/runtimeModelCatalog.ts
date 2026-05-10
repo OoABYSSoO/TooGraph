@@ -5,7 +5,7 @@ export type RuntimeModelOption = {
   label: string;
 };
 
-export const GLOBAL_RUNTIME_MODEL_OPTION_VALUE = "__graphiteui_global_model__";
+export const GLOBAL_RUNTIME_MODEL_OPTION_VALUE = "__toograph_global_model__";
 const GLOBAL_RUNTIME_MODEL_OPTION_LABEL = "\u5168\u5c40";
 
 export type RuntimeModelCatalog = {

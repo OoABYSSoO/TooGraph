@@ -19,10 +19,10 @@ test("EditorCloseConfirmDialog is built on Element Plus dialog instead of reka-u
 test("EditorCloseConfirmDialog uses one shared glass card instead of nested white panels", () => {
   const contentBlock = componentSource.match(/\.editor-close-dialog__content \{[\s\S]*?\n\}/)?.[0] ?? "";
 
-  assert.match(componentSource, /:global\(\.editor-close-dialog\.el-dialog\) \{[\s\S]*border:\s*1px solid var\(--graphite-glass-border\);/);
+  assert.match(componentSource, /:global\(\.editor-close-dialog\.el-dialog\) \{[\s\S]*border:\s*1px solid var\(--toograph-glass-border\);/);
   assert.match(
     componentSource,
-    /:global\(\.editor-close-dialog\.el-dialog\) \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\),\s*var\(--graphite-glass-bg-strong\);/,
+    /:global\(\.editor-close-dialog\.el-dialog\) \{[\s\S]*background:\s*var\(--toograph-glass-specular\),\s*var\(--toograph-glass-lens\),\s*var\(--toograph-glass-bg-strong\);/,
   );
   assert.match(componentSource, /:global\(\.editor-close-dialog\.el-dialog\) \{[\s\S]*backdrop-filter:\s*blur\(30px\) saturate\(1\.55\) contrast\(1\.02\);/);
   assert.doesNotMatch(contentBlock, /border:\s*1px solid/);

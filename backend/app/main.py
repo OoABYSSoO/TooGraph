@@ -24,7 +24,7 @@ from app.core.runtime.run_recovery import mark_interrupted_active_runs
 from app.core.storage.database import initialize_storage
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-FRONTEND_DIST_DIR = Path(os.environ.get("GRAPHITEUI_FRONTEND_DIST", ROOT_DIR / "frontend" / "dist"))
+FRONTEND_DIST_DIR = Path(os.environ.get("TOOGRAPH_FRONTEND_DIST", ROOT_DIR / "frontend" / "dist"))
 
 
 def startup() -> None:
@@ -75,9 +75,9 @@ def configure_frontend_static(app: FastAPI, frontend_dist_dir: str | Path = FRON
 
 
 app = FastAPI(
-    title="GraphiteUI Backend",
+    title="TooGraph Backend",
     version="0.1.0",
-    description="Backend scaffold for GraphiteUI.",
+    description="Backend scaffold for TooGraph.",
     lifespan=lifespan,
 )
 

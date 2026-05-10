@@ -306,7 +306,7 @@ def chat_with_model_provider(
         raise RuntimeError(f"{provider_id} returned an empty response.")
     if resolved_thinking_level != THINKING_LEVEL_OFF and not bool(meta.get("thinking_enabled")):
         warnings.append(
-            f"Thinking level '{resolved_thinking_level}' was requested for provider '{provider_id}', but GraphiteUI did not find a native thinking field for this provider/model."
+            f"Thinking level '{resolved_thinking_level}' was requested for provider '{provider_id}', but TooGraph did not find a native thinking field for this provider/model."
         )
     if structured_output_schema and not meta.get("structured_output_strategy"):
         meta["structured_output_strategy"] = "prompt_validation"
@@ -328,7 +328,7 @@ def _invoke_with_video_auto_fallback(
     except Exception as exc:
         if not should_fallback_video_to_frames(exc, input_attachments):
             raise
-        with tempfile.TemporaryDirectory(prefix="graphite_video_fallback_") as temp_dir:
+        with tempfile.TemporaryDirectory(prefix="toograph_video_fallback_") as temp_dir:
             fallback_attachments, fallback_meta = build_video_frame_fallback_attachments(
                 input_attachments,
                 output_dir=temp_dir,

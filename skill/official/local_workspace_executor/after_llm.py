@@ -157,7 +157,7 @@ def _resolve_allowed_path(repo_root: Path, value: Any, allowed_roots: list[str] 
         candidate = repo_root / candidate
     resolved = candidate.resolve(strict=False)
     if not _is_within(resolved, repo_root):
-        return {"type": "permission_denied", "message": "Path must stay inside the GraphiteUI repository."}
+        return {"type": "permission_denied", "message": "Path must stay inside the TooGraph repository."}
     for denied in DENIED_ROOTS:
         denied_path = (repo_root / denied).resolve(strict=False)
         if _is_within(resolved, denied_path):
@@ -176,7 +176,7 @@ def _is_within(path: Path, root: Path) -> bool:
 
 
 def _repo_root() -> Path:
-    configured = os.environ.get("GRAPHITE_REPO_ROOT")
+    configured = os.environ.get("TOOGRAPH_REPO_ROOT")
     if configured:
         return Path(configured).resolve()
     return Path(__file__).resolve().parents[3]

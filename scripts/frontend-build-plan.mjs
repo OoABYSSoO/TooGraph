@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-export const frontendBuildManifestFilename = ".graphiteui-build-manifest.json";
+export const frontendBuildManifestFilename = ".toograph-build-manifest.json";
 
 const manifestVersion = 1;
 
@@ -25,7 +25,7 @@ const frontendInputDirectories = ["src", "public"];
 const skippedDirectories = new Set([".git", "dist", "node_modules"]);
 
 function isForceBuildEnabled(env) {
-  const value = String(env.GRAPHITEUI_FORCE_FRONTEND_BUILD || "").trim().toLowerCase();
+  const value = String(env.TOOGRAPH_FORCE_FRONTEND_BUILD || "").trim().toLowerCase();
   return value === "1" || value === "true" || value === "yes" || value === "on";
 }
 

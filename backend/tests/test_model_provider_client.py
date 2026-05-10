@@ -286,7 +286,7 @@ class ModelProviderClientTests(unittest.TestCase):
             {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": "graphiteui_structured_output",
+                    "name": "toograph_structured_output",
                     "schema": schema,
                     "strict": False,
                 },

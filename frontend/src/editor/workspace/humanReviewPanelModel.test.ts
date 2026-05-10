@@ -133,13 +133,13 @@ function createRun(): RunDetail {
           inputs: {},
           outputs: {},
           family: "agent",
-          state_reads: [{ state_key: "question", input_key: "question", value: "What is GraphiteUI?" }],
+          state_reads: [{ state_key: "question", input_key: "question", value: "What is TooGraph?" }],
           state_writes: [
             {
               state_key: "draft",
               output_key: "draft",
               mode: "replace",
-              value: "GraphiteUI is a visual graph editor.",
+              value: "TooGraph is a visual graph editor.",
               changed: true,
             },
           ],
@@ -153,8 +153,8 @@ function createRun(): RunDetail {
     output_previews: [],
     artifacts: {
       state_values: {
-        question: "What is GraphiteUI?",
-        draft: "GraphiteUI is a visual graph editor.",
+        question: "What is TooGraph?",
+        draft: "TooGraph is a visual graph editor.",
         score: 0.8,
         manual_feedback: "",
       },
@@ -175,8 +175,8 @@ test("buildHumanReviewRows lists runtime state values with graph metadata", () =
     [
       ["manual_feedback", "manual_feedback", "text", "#7c3aed", ""],
       ["score", "score", "number", "#2563eb", "0.8"],
-      ["question", "question", "text", "#d97706", "What is GraphiteUI?"],
-      ["draft", "draft", "text", "#10b981", "GraphiteUI is a visual graph editor."],
+      ["question", "question", "text", "#d97706", "What is TooGraph?"],
+      ["draft", "draft", "text", "#10b981", "TooGraph is a visual graph editor."],
     ],
   );
 });
@@ -184,7 +184,7 @@ test("buildHumanReviewRows lists runtime state values with graph metadata", () =
 test("buildHumanReviewResumePayload returns only changed parsed state values", () => {
   const rows = buildHumanReviewRows(createRun(), createDocument());
   const payload = buildHumanReviewResumePayload(rows, {
-    question: "What is GraphiteUI?",
+    question: "What is TooGraph?",
     score: "0.95",
   });
 
@@ -299,7 +299,7 @@ test("buildHumanReviewPanelModel renders an inner subgraph breakpoint against th
         inner_node_id: "inner_input",
         subgraph_path: ["nested_research"],
         state_values: {
-          internal_question: "What is GraphiteUI?",
+          internal_question: "What is TooGraph?",
           manual_feedback: "",
         },
         node_status_map: {
@@ -324,7 +324,7 @@ test("buildHumanReviewPanelModel renders an inner subgraph breakpoint against th
                   state_key: "internal_question",
                   output_key: "internal_question",
                   mode: "replace",
-                  value: "What is GraphiteUI?",
+                  value: "What is TooGraph?",
                   changed: true,
                 },
               ],
@@ -489,8 +489,8 @@ test("buildHumanReviewPanelModel does not block continue when required fields al
   const run = createBranchingRun();
   run.artifacts = {
     state_values: {
-      question: "What is GraphiteUI?",
-      draft: "GraphiteUI is a visual graph editor.",
+      question: "What is TooGraph?",
+      draft: "TooGraph is a visual graph editor.",
       score: 0.8,
       manual_feedback: "Tighten the product wording.",
       pass_only_note: "Proceed with the approved branch.",
@@ -558,7 +558,7 @@ test("buildHumanReviewPanelModel ignores required reads on downstream output nod
     node_status_map: { input_question: "paused" },
     artifacts: {
       state_values: {
-        question: "What is GraphiteUI?",
+        question: "What is TooGraph?",
       },
     },
   };
@@ -682,8 +682,8 @@ function createBranchingRun(): RunDetail {
     node_status_map: { draft_writer: "paused" },
     artifacts: {
       state_values: {
-        question: "What is GraphiteUI?",
-        draft: "GraphiteUI is a visual graph editor.",
+        question: "What is TooGraph?",
+        draft: "TooGraph is a visual graph editor.",
       },
     },
   };
@@ -787,7 +787,7 @@ function createPreNodeReviewRun(): RunDetail {
     node_status_map: { review_entry: "paused" },
     artifacts: {
       state_values: {
-        question: "What is GraphiteUI?",
+        question: "What is TooGraph?",
         manual_feedback: "",
       },
     },

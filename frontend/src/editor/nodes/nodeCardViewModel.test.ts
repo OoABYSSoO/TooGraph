@@ -11,7 +11,7 @@ const stateSchema: Record<string, StateDefinition> = {
     name: "question",
     description: "User question for the workflow.",
     type: "text",
-    value: "什么是 GraphiteUI？",
+    value: "什么是 TooGraph？",
     color: "#d97706",
   },
   answer: {
@@ -32,14 +32,14 @@ test("buildNodeCardViewModel derives input body and output label", () => {
     reads: [],
     writes: [{ state: "question", mode: "replace" }],
     config: {
-      value: "什么是 GraphiteUI？",
+      value: "什么是 TooGraph？",
     },
   };
 
   const model = buildNodeCardViewModel("input_question", node, stateSchema);
 
   assert.equal(model.body.kind, "input");
-  assert.equal(model.body.valueText, "什么是 GraphiteUI？");
+  assert.equal(model.body.valueText, "什么是 TooGraph？");
   assert.equal(model.body.editorMode, "text");
   assert.equal(model.body.primaryOutput?.label, "question");
   assert.equal(model.body.primaryOutput?.typeLabel, "text");
@@ -79,7 +79,7 @@ test("buildNodeCardViewModel derives knowledge-base input editor mode from prima
     reads: [],
     writes: [{ state: "knowledge_base", mode: "replace" }],
     config: {
-      value: "graphiteui-official",
+      value: "toograph-official",
     },
   };
 
@@ -89,7 +89,7 @@ test("buildNodeCardViewModel derives knowledge-base input editor mode from prima
       name: "knowledge_base",
       description: "Knowledge base selection.",
       type: "knowledge_base",
-      value: "graphiteui-official",
+      value: "toograph-official",
       color: "#0f766e",
     },
   });
@@ -363,7 +363,7 @@ test("buildNodeCardViewModel exposes a virtual plus input for empty non-input no
     reads: [],
     writes: [{ state: "question", mode: "replace" }],
     config: {
-      value: "什么是 GraphiteUI？",
+      value: "什么是 TooGraph？",
     },
   };
 
@@ -543,7 +543,7 @@ test("buildNodeCardViewModel shows the auto-detected output display format", () 
     ...stateSchema,
     answer: {
       ...stateSchema.answer,
-      value: '{"answer":"GraphiteUI","ok":true}',
+      value: '{"answer":"TooGraph","ok":true}',
     },
   });
 
@@ -659,13 +659,13 @@ test("buildNodeCardViewModel previews connected state values before a run result
     ...stateSchema,
     answer: {
       ...stateSchema.answer,
-      value: "# 最终答案\n\nGraphiteUI 已迁移完成。",
+      value: "# 最终答案\n\nTooGraph 已迁移完成。",
     },
   });
 
   assert.equal(model.body.kind, "output");
   assert.equal(model.body.displayMode, "markdown");
-  assert.equal(model.body.previewText, "# 最终答案\n\nGraphiteUI 已迁移完成。");
+  assert.equal(model.body.previewText, "# 最终答案\n\nTooGraph 已迁移完成。");
 });
 
 test("buildNodeCardViewModel uses legacy shorthand label for markdown output display mode", () => {
@@ -712,14 +712,14 @@ test("buildNodeCardViewModel prefers latest run output preview and display mode 
   const model = buildNodeCardViewModel("output_answer", node, stateSchema, {
     runtime: {
       latestRunStatus: "completed",
-      outputPreviewText: "# 最终答案\n\nGraphiteUI 已迁移完成。",
+      outputPreviewText: "# 最终答案\n\nTooGraph 已迁移完成。",
       outputDisplayMode: "markdown",
       failedMessage: null,
     },
   });
 
   assert.equal(model.body.kind, "output");
-  assert.equal(model.body.previewText, "# 最终答案\n\nGraphiteUI 已迁移完成。");
+  assert.equal(model.body.previewText, "# 最终答案\n\nTooGraph 已迁移完成。");
   assert.equal(model.body.displayModeLabel, "MD");
 });
 
@@ -742,14 +742,14 @@ test("buildNodeCardViewModel lets manual output display mode override detected r
   const model = buildNodeCardViewModel("output_answer", node, stateSchema, {
     runtime: {
       latestRunStatus: "completed",
-      outputPreviewText: "# 最终答案\n\nGraphiteUI 已迁移完成。",
+      outputPreviewText: "# 最终答案\n\nTooGraph 已迁移完成。",
       outputDisplayMode: "markdown",
       failedMessage: null,
     },
   });
 
   assert.equal(model.body.kind, "output");
-  assert.equal(model.body.previewText, "# 最终答案\n\nGraphiteUI 已迁移完成。");
+  assert.equal(model.body.previewText, "# 最终答案\n\nTooGraph 已迁移完成。");
   assert.equal(model.body.displayMode, "plain");
   assert.equal(model.body.displayModeLabel, "PLAIN");
 });

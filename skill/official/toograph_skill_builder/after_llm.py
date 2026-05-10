@@ -36,7 +36,7 @@ LEGACY_LOCAL_SETTING_FIELDS = {
 }
 
 
-def graphiteui_skill_builder(**skill_inputs: Any) -> dict[str, Any]:
+def toograph_skill_builder(**skill_inputs: Any) -> dict[str, Any]:
     skill_json = _normalize_skill_json(skill_inputs.get("skill_json"))
     skill_key = _normalize_skill_key(skill_inputs.get("skill_key"), skill_json)
     if skill_key:
@@ -100,7 +100,7 @@ def main() -> None:
         payload = {}
     if not isinstance(payload, dict):
         payload = {}
-    print(json.dumps(graphiteui_skill_builder(**payload), ensure_ascii=False))
+    print(json.dumps(toograph_skill_builder(**payload), ensure_ascii=False))
 
 
 if __name__ == "__main__":

@@ -105,6 +105,6 @@ test("buildBuddyPageContext reports the absence of an active graph without inven
   });
 
   assert.match(context, /当前路径: \/settings/);
-  assert.match(context, /当前没有打开的 GraphiteUI 图/);
+  assert.match(context, /当前没有打开的 TooGraph 图/);
   assert.doesNotMatch(context, /选中节点:/);
 });

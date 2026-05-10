@@ -29,9 +29,9 @@ export type PersistedEditorWorkspace = {
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
-export const EDITOR_WORKSPACE_STORAGE_KEY = "graphiteui:editor-workspace";
-export const EDITOR_WORKSPACE_DOCUMENTS_STORAGE_KEY = "graphiteui:editor-document-drafts";
-export const EDITOR_WORKSPACE_VIEWPORTS_STORAGE_KEY = "graphiteui:editor-viewport-drafts";
+export const EDITOR_WORKSPACE_STORAGE_KEY = "toograph:editor-workspace";
+export const EDITOR_WORKSPACE_DOCUMENTS_STORAGE_KEY = "toograph:editor-document-drafts";
+export const EDITOR_WORKSPACE_VIEWPORTS_STORAGE_KEY = "toograph:editor-viewport-drafts";
 
 const EMPTY_EDITOR_WORKSPACE: PersistedEditorWorkspace = {
   activeTabId: null,

@@ -39,7 +39,7 @@ type WorkspaceNodeCreationControllerInput = {
     feedback: { tone: WorkspaceRunFeedback["tone"]; message: string; activeRunId?: string | null; activeRunStatus?: string | null },
   ) => void;
   importPythonGraphFile: (file: File, options: { fallbackToFileNode: boolean }) => Promise<boolean>;
-  isGraphiteUiPythonExportFile: (file: File) => boolean;
+  isTooGraphPythonExportFile: (file: File) => boolean;
   uploadFile?: (file: File) => Promise<UploadedAssetUploadResult>;
   now?: () => number;
 };
@@ -153,7 +153,7 @@ export function useWorkspaceNodeCreationController(input: WorkspaceNodeCreationC
     }
 
     try {
-      if (input.isGraphiteUiPythonExportFile(payload.file) && (await input.importPythonGraphFile(payload.file, { fallbackToFileNode: true }))) {
+      if (input.isTooGraphPythonExportFile(payload.file) && (await input.importPythonGraphFile(payload.file, { fallbackToFileNode: true }))) {
         closeNodeCreationMenu(tabId);
         return;
       }

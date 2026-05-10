@@ -49,7 +49,7 @@ def _parse_float_env(name: str, default: float) -> float:
 
 LOCAL_LLM_REQUEST_TIMEOUT_SEC = _parse_float_env("LOCAL_LLM_REQUEST_TIMEOUT_SEC", 180.0)
 ROOT_DIR = Path(__file__).resolve().parents[3]
-LOCAL_ONBOARDING_GUIDE_PATH = ROOT_DIR / "knowledge" / "GraphiteUI-official" / "getting-started.md"
+LOCAL_ONBOARDING_GUIDE_PATH = ROOT_DIR / "knowledge" / "TooGraph-official" / "getting-started.md"
 DEFAULT_AGENT_TEMPERATURE = 0.2
 DEFAULT_AGENT_THINKING_LEVEL = THINKING_LEVEL_HIGH
 DEFAULT_AGENT_THINKING_ENABLED = True
@@ -574,7 +574,7 @@ def _chat_with_local_model_with_meta(
         request_payload.update(thinking_request_payload)
     elif thinking_enabled:
         warnings.append(
-            f"Thinking mode was requested for provider '{provider_id}', but GraphiteUI currently only maps provider-specific thinking fields for the local gateway."
+            f"Thinking mode was requested for provider '{provider_id}', but TooGraph currently only maps provider-specific thinking fields for the local gateway."
         )
 
     started_at = time.monotonic()
@@ -649,7 +649,7 @@ def _chat_with_local_model_with_meta(
                 status_code=None,
                 error=str(exc),
             )
-            with tempfile.TemporaryDirectory(prefix="graphite_video_fallback_") as temp_dir:
+            with tempfile.TemporaryDirectory(prefix="toograph_video_fallback_") as temp_dir:
                 fallback_attachments, fallback_meta = build_video_frame_fallback_attachments(
                     input_attachments,
                     output_dir=temp_dir,
@@ -769,7 +769,7 @@ def generate_hello_greeting(state: dict[str, Any], params: dict[str, Any] | None
     params = params or {}
     name = str(state.get("name") or params.get("name") or "World").strip() or "World"
     system_prompt = (
-        "You are a product onboarding assistant for GraphiteUI. "
+        "You are a product onboarding assistant for TooGraph. "
         "Return only a short usage introduction in Chinese for a new user. "
         "Keep it within 3 sentences, mention that the user can inspect nodes, edit configuration, save the graph, "
         "and run the flow. Personalize it with the provided name when natural."
@@ -790,7 +790,7 @@ def generate_hello_greeting(state: dict[str, Any], params: dict[str, Any] | None
         }
     except RuntimeError as exc:  # pragma: no cover - fallback path depends on local model availability
         greeting = (
-            f"{name}，欢迎使用 GraphiteUI。你可以先点选节点查看配置，再尝试修改参数、保存图，"
+            f"{name}，欢迎使用 TooGraph。你可以先点选节点查看配置，再尝试修改参数、保存图，"
             "最后运行整条流程观察输出结果。"
         )
         llm_response = {

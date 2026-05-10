@@ -21,7 +21,7 @@ WEB_SEARCH_AFTER_LLM_PATH = (
 
 
 def _load_web_search_module():
-    spec = importlib.util.spec_from_file_location("graphiteui_web_search_skill_test", WEB_SEARCH_AFTER_LLM_PATH)
+    spec = importlib.util.spec_from_file_location("toograph_web_search_skill_test", WEB_SEARCH_AFTER_LLM_PATH)
     if spec is None or spec.loader is None:
         raise AssertionError("Could not load web_search skill script.")
     module = importlib.util.module_from_spec(spec)
@@ -54,10 +54,10 @@ class WebSearchSkillTests(unittest.TestCase):
             patch.object(web_search, "_search_with_tavily") as tavily_search,
         ):
             tavily_search.return_value = {
-                "answer": "GraphiteUI is a visual workflow studio.",
+                "answer": "TooGraph is a visual workflow studio.",
                 "results": [
                     {
-                        "title": "GraphiteUI Docs",
+                        "title": "TooGraph Docs",
                         "url": "https://example.com/docs",
                         "content": "A visual workflow editor for LangGraph-style automations.",
                         "score": 0.91,
@@ -66,11 +66,11 @@ class WebSearchSkillTests(unittest.TestCase):
             }
 
             result = web_search.web_search_skill(
-                query="GraphiteUI workflow studio",
+                query="TooGraph workflow studio",
             )
 
         tavily_search.assert_called_once_with(
-            query="GraphiteUI workflow studio",
+            query="TooGraph workflow studio",
             max_results=20,
             search_depth="basic",
             include_raw_content=False,
@@ -78,7 +78,7 @@ class WebSearchSkillTests(unittest.TestCase):
             timeout_seconds=15.0,
         )
         self.assertEqual(set(result), {"query", "source_urls", "artifact_paths", "errors"})
-        self.assertEqual(result["query"], "GraphiteUI workflow studio")
+        self.assertEqual(result["query"], "TooGraph workflow studio")
         self.assertEqual(result["source_urls"], ["https://example.com/docs"])
         self.assertEqual(result["artifact_paths"], [])
         self.assertEqual(result["errors"], [])
@@ -207,8 +207,8 @@ class WebSearchSkillTests(unittest.TestCase):
                     patch.dict(
                         os.environ,
                         {
-                            "GRAPHITE_SKILL_ARTIFACT_DIR": str(artifact_dir),
-                            "GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
+                            "TOOGRAPH_SKILL_ARTIFACT_DIR": str(artifact_dir),
+                            "TOOGRAPH_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
                         },
                         clear=True,
                     ),
@@ -262,8 +262,8 @@ class WebSearchSkillTests(unittest.TestCase):
                     patch.dict(
                         os.environ,
                         {
-                            "GRAPHITE_SKILL_ARTIFACT_DIR": str(artifact_dir),
-                            "GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
+                            "TOOGRAPH_SKILL_ARTIFACT_DIR": str(artifact_dir),
+                            "TOOGRAPH_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
                         },
                         clear=True,
                     ),
@@ -304,8 +304,8 @@ class WebSearchSkillTests(unittest.TestCase):
                 patch.dict(
                     os.environ,
                     {
-                        "GRAPHITE_SKILL_ARTIFACT_DIR": str(artifact_dir),
-                        "GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
+                        "TOOGRAPH_SKILL_ARTIFACT_DIR": str(artifact_dir),
+                        "TOOGRAPH_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
                     },
                     clear=True,
                 ),
@@ -350,8 +350,8 @@ class WebSearchSkillTests(unittest.TestCase):
                 patch.dict(
                     os.environ,
                     {
-                        "GRAPHITE_SKILL_ARTIFACT_DIR": str(artifact_dir),
-                        "GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
+                        "TOOGRAPH_SKILL_ARTIFACT_DIR": str(artifact_dir),
+                        "TOOGRAPH_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
                     },
                     clear=True,
                 ),
@@ -429,8 +429,8 @@ class WebSearchSkillTests(unittest.TestCase):
                 patch.dict(
                     os.environ,
                     {
-                        "GRAPHITE_SKILL_ARTIFACT_DIR": str(artifact_dir),
-                        "GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
+                        "TOOGRAPH_SKILL_ARTIFACT_DIR": str(artifact_dir),
+                        "TOOGRAPH_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
                     },
                     clear=True,
                 ),
@@ -469,8 +469,8 @@ class WebSearchSkillTests(unittest.TestCase):
                 patch.dict(
                     os.environ,
                     {
-                        "GRAPHITE_SKILL_ARTIFACT_DIR": str(artifact_dir),
-                        "GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
+                        "TOOGRAPH_SKILL_ARTIFACT_DIR": str(artifact_dir),
+                        "TOOGRAPH_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
                     },
                     clear=True,
                 ),
@@ -535,7 +535,7 @@ class _ArticleHandler(BaseHTTPRequestHandler):
 
 
 def _start_article_server(html: str) -> ThreadingHTTPServer:
-    handler = type("GraphiteUITestArticleHandler", (_ArticleHandler,), {"article_html": html})
+    handler = type("TooGraphTestArticleHandler", (_ArticleHandler,), {"article_html": html})
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

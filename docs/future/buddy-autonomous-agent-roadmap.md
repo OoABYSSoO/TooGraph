@@ -1,6 +1,6 @@
 # 伙伴自主 Agent 路线图
 
-本文是 GraphiteUI 伙伴、自主工具循环、技能生成和长期协作能力的唯一长期参考文档。若旧文档、临时计划或实现草稿与本文冲突，以本文为准。
+本文是 TooGraph 伙伴、自主工具循环、技能生成和长期协作能力的唯一长期参考文档。若旧文档、临时计划或实现草稿与本文冲突，以本文为准。
 
 ## 目标
 
@@ -50,7 +50,7 @@
 - LLM 节点卡片已改为单选 Skill 控件；动态 `capability.kind=subgraph` 只服务于模板内运行时能力选择，不作为普通卡片下拉项。
 - LLM 节点提示词区域支持技能说明胶囊；默认胶囊从 skill `llmInstruction` 动态展示，用户编辑后才作为 `node.override` 写入当前节点。
 - 旧内置模板已删除，旧模板运行入口兼容修补已删除。
-- 当前官方 Skill 包包括 `web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。
+- 当前官方 Skill 包包括 `web_search`、`toograph_capability_selector`、`toograph_skill_builder`、`toograph_script_tester` 和 `local_workspace_executor`。
 - `file` / `image` / `audio` / `video` state 已采用路径透传语义，值可以是本地路径字符串或路径数组；`file_list`、`array`、`object` 不再作为 state 类型存在。
 - LLM 节点会读取 `file` state 中的文本类文件，并只把文件名与原文全文放入模型上下文；图片、音频和视频路径走多模态附件处理。
 - `web_search` 不再输出 `context`，只输出 `query`、`source_urls`、`artifact_paths` 和 `errors`。
@@ -62,12 +62,12 @@
 - `capability.kind=subgraph` 已可由 LLM 节点动态执行：节点先生成目标图模板的公开输入，运行时执行子图并把公开输出封装进同一套 `result_package`。动态子图内部触发 `interrupt_after` 时，父级 run 已能进入标准 `awaiting_human`，恢复仍走父级 run 的 resume API。
 - 图运行前不再兼容补齐旧绑定。旧草稿、旧模板和旧技能需要按当前协议重建。
 - 已新增通用 `advanced_web_research_loop` 内置模板，用于验证“搜索技能执行 -> 证据评估 -> condition 控制补搜 -> 依据筛选 -> final_reply”的图式工具循环。它不是伙伴自主循环模板，但可作为联网研究子流程和后续伙伴模板的参考构件。
-- 偏离新职责的旧 `create_user_skill` 内置模板已删除。新的 `graphiteUI_skill_builder` 只产出 Skill 包文件内容；完整用户 Skill 生成流程已由官方 `graphiteui_skill_creation_workflow` 模板表达，写入、测试、错误修复和启用仍通过图节点和受控 Skill 分步完成。
+- 偏离新职责的旧 `create_user_skill` 内置模板已删除。新的 `toograph_skill_builder` 只产出 Skill 包文件内容；完整用户 Skill 生成流程已由官方 `toograph_skill_creation_workflow` 模板表达，写入、测试、错误修复和启用仍通过图节点和受控 Skill 分步完成。
 - 子图缩略图已能投射内部节点运行状态颜色，并在节点卡片上显示当前内部运行摘要。
 - 后端已有根目录 `buddy_home/` 的默认生成逻辑，以及基于 `SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memory、session summary、revision、command 等基础存取接口；它们应继续收束为 Buddy Home，而不是扩散到多个无关数据位置。
 - 官方 `buddy_autonomous_loop` 模板已创建并注册。它使用 Buddy Home 文件夹输入、请求理解子图、按需能力循环子图、最终回复子图和唯一 `final_reply` output；简单闲聊或可直接回答的请求会绕过能力循环。
 - 官方 `buddy_self_review` 模板已作为内部后台模板落地。伙伴可见回复完成后，前端会用主运行快照启动该后台 run；它只产出记忆更新计划和伙伴成长计划，不阻塞下一轮对话，也不直接写 Buddy Home。
-- 官方 `graphiteui_skill_creation_workflow` 模板已创建。它保留需求澄清、样例确认、Skill 文件生成、脚本测试、失败回环修复、生成方案审查和用户 Skill 目录写入这些流程边界，并避免使用普通编辑器创建不出来的节点。低层写入确认不再放在模板里由 LLM 判断；目标是由运行时的 `需确认` / `完全访问` 模式处理，这一统一低层审批拦截仍需补齐。
+- 官方 `toograph_skill_creation_workflow` 模板已创建。它保留需求澄清、样例确认、Skill 文件生成、脚本测试、失败回环修复、生成方案审查和用户 Skill 目录写入这些流程边界，并避免使用普通编辑器创建不出来的节点。低层写入确认不再放在模板里由 LLM 判断；目标是由运行时的 `需确认` / `完全访问` 模式处理，这一统一低层审批拦截仍需补齐。
 - 伙伴浮窗已有可见运行过程面板、节点级流式输出预览、每步耗时、完成后折叠摘要、正式回复 markdown 流式展示和后台复盘解耦。
 - 伙伴浮窗已复用标准 `awaiting_human` 暂停/恢复路径：暂停卡片会先展示当前产物和上下文，再展示需要补充的字段；底部输入会恢复当前断点，暂停期间不会继续消费后续队列消息。
 - 本地文件夹输入已能在普通仓库和 `.worktrees/<branch>` 工作区下读取根目录 `buddy_home/`，伙伴模板在分支工作区中不会因为路径推导失败而丢失 Buddy Home 上下文。
@@ -76,7 +76,7 @@
 部分完成但仍有技术债：
 
 - 子图能力已经可运行、可编辑并可在缩略图中显示内部状态，但父子图运行详情聚合、事件定位、从缩略图点击跳转到内部节点和更完整的嵌套可视化仍未完成。
-- `graphiteui_capability_selector` 已承担“从启用模板和启用 Skill 中选择单个能力”的职责。旧的独立自主决策 Skill 目标不再保留；后续要增强的是该选择器的候选描述、能力缺口输出、能力轨迹和审计记录。
+- `toograph_capability_selector` 已承担“从启用模板和启用 Skill 中选择单个能力”的职责。旧的独立自主决策 Skill 目标不再保留；后续要增强的是该选择器的候选描述、能力缺口输出、能力轨迹和审计记录。
 - Buddy Home 已有默认目录、默认文件、会话历史、记忆、summary、revision 和 command 存储基础，但能力使用统计、结构化检索索引、自我复盘报告和长期资料写回图流程尚未成形。
 - 伙伴主循环的上下文装配、需求理解、能力循环、最终回复和后台复盘已经作为官方模板内部子图或后台模板落地；稳定后是否拆成独立官方可复用模板仍待决定。
 - 前端伙伴构图代码仍残留 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧元数据。官方模板已使用 `metadata.origin=buddy`，但启动侧还未完全收束到统一来源语义。
@@ -187,9 +187,9 @@ input_question
 
 - LangGraph 也把 graph 作为父图里的 node 使用；父子图 state schema 相同时可以直接添加 compiled subgraph，schema 不同时通常通过父图节点函数手动转换输入输出。参考官方文档：[LangGraph subgraphs](https://docs.langchain.com/oss/python/langgraph/use-subgraphs)。
 - LangGraph 支持嵌套子图、checkpoint、interrupt、state inspection，以及 `subgraphs=True` 的子图事件流。
-- GraphiteUI 借鉴的是“graph as node”、嵌套运行、内部事件可见和可审计这些运行思想。
-- GraphiteUI 不采用默认共享 state key 的产品心智。GraphiteUI 的子图默认隔离内部 state，接口由内部 `input` / `output` 节点生成，并以可视化胶囊呈现。
-- GraphiteUI 的子图是实例化的画布组件。双击编辑当前实例，不是编辑全局共享定义。
+- TooGraph 借鉴的是“graph as node”、嵌套运行、内部事件可见和可审计这些运行思想。
+- TooGraph 不采用默认共享 state key 的产品心智。TooGraph 的子图默认隔离内部 state，接口由内部 `input` / `output` 节点生成，并以可视化胶囊呈现。
+- TooGraph 的子图是实例化的画布组件。双击编辑当前实例，不是编辑全局共享定义。
 
 ## 运行模型
 
@@ -235,7 +235,7 @@ Ran python -m pytest -q, exit 0
 事件来源：
 
 - 文件读取、目录枚举、搜索、命令执行、脚本测试、联网下载、图编辑、Buddy Home 写入和 skill/subgraph 执行都应能产生活动事件。
-- `local_workspace_executor`、`graphiteUI_script_tester`、`web_search` 和未来图编辑命令是首批适配对象。
+- `local_workspace_executor`、`toograph_script_tester`、`web_search` 和未来图编辑命令是首批适配对象。
 - 同一个节点可以产生多个活动事件；事件应带 `run_id`、`node_id`、可选 `subgraph_path`、时间戳、摘要和结构化 detail。
 
 展示规则：
@@ -248,7 +248,7 @@ Ran python -m pytest -q, exit 0
 
 ## 可追踪资产与本地设置分离
 
-GraphiteUI 的可复用资产应从本地运行偏好中分离出来。资产文件回答“这个东西是什么”，本地设置文件回答“当前环境怎么使用它”。Skill、图模板和节点预设应采用同一套目录心智：
+TooGraph 的可复用资产应从本地运行偏好中分离出来。资产文件回答“这个东西是什么”，本地设置文件回答“当前环境怎么使用它”。Skill、图模板和节点预设应采用同一套目录心智：
 
 ```text
 skill/
@@ -273,13 +273,13 @@ node_preset/
     <preset_id>/preset.json
 ```
 
-`official/` 放 GraphiteUI 自带资产，默认只读并进入 Git 管理。`user/` 放用户自定义资产，也可以进入 Git 管理，适合沉淀为项目或团队能力。根目录 `settings.json` 由程序自动生成和维护，不进入 Git 管理。当前收敛后的本地设置只记录启用/禁用；图或 Buddy 的运行权限另由 `需确认` / `完全访问` 模式控制。
+`official/` 放 TooGraph 自带资产，默认只读并进入 Git 管理。`user/` 放用户自定义资产，也可以进入 Git 管理，适合沉淀为项目或团队能力。根目录 `settings.json` 由程序自动生成和维护，不进入 Git 管理。当前收敛后的本地设置只记录启用/禁用；图或 Buddy 的运行权限另由 `需确认` / `完全访问` 模式控制。
 
 加载 catalog 时，程序应扫描 `official/` 和 `user/`，读取对应根目录的 `settings.json`，自动补齐缺失文件、缺失资产条目和缺失字段。多余条目不应自动删除，避免切分支、暂时移动资产或合并团队目录时丢失本地偏好；可以另做“清理无效本地设置”的显式按钮。
 
 对 Skill 而言，`skill.json` 应只保留能力包定义，例如 `name`、`description`、`llmInstruction`、`version`、`permissions`、`runtime`、`inputSchema`、`outputSchema` 和生命周期脚本文件。`enabled` 只属于 `skill/settings.json`；`hidden`、`selectable`、`requiresApproval`、`capabilityPolicy`、`targets` 和 `executionTargets` 都是旧协议，不应继续写进新 Skill 包定义。Skill 是否可见由 `enabled` 决定；运行 Skill 本身不需要审批，只有低层写文件、删改文件或执行脚本这类操作进入图/Buddy 权限模式。
 
-这条规则同样适用于图模板和节点预设：模板或预设 JSON 描述结构本体，本地 settings 描述当前是否启用。GraphiteUI 前端展示的是“资产定义 + 本地设置 + 运行时元数据”合并后的 catalog item，但详情页应清楚标明来源、资产文件路径和本地设置来源。
+这条规则同样适用于图模板和节点预设：模板或预设 JSON 描述结构本体，本地 settings 描述当前是否启用。TooGraph 前端展示的是“资产定义 + 本地设置 + 运行时元数据”合并后的 catalog item，但详情页应清楚标明来源、资产文件路径和本地设置来源。
 
 ## Buddy Home
 
@@ -301,7 +301,7 @@ buddy_home/
 文件语义：
 
 - `AGENTS.md`：伙伴在这个 home 中的工作准则、图优先规则、记忆卫生和长期资料边界。
-- `SOUL.md`：伙伴名称、人设、语气和回复风格，参考 Hermes/OpenClaw 的 `SOUL.md` 心智，但不能覆盖 GraphiteUI 运行规则、权限和审批。
+- `SOUL.md`：伙伴名称、人设、语气和回复风格，参考 Hermes/OpenClaw 的 `SOUL.md` 心智，但不能覆盖 TooGraph 运行规则、权限和审批。
 - `USER.md`：用户画像、稳定偏好、称呼、时区、长期协作习惯和需要跨会话保留的上下文。
 - `MEMORY.md`：人类可读的长期记忆摘要，保存稳定事实、项目决策、重复纠正和耐久经验；它不是原始日志。
 - `policy.json`：用户偏好、行为边界和审批偏好。它是上下文与决策依据，不是权限源；真实权限仍来自后端策略、skill 权限、白名单和图运行审批。
@@ -312,7 +312,7 @@ buddy_home/
 
 - 图模板本体不放进 Buddy Home。目标结构中，官方模板位于 `graph_template/official/`，用户自定义模板位于 `graph_template/user/`，本地启用状态位于 `graph_template/settings.json`。
 - 用户自定义 Skill 不放进 Buddy Home。目标结构中，官方 Skill 位于 `skill/official/`，用户自定义 Skill 位于 `skill/user/`，本地启用状态位于 `skill/settings.json`。Buddy Home 可以记录候选、草案、使用统计或改进建议。
-- 不维护长期 `TOOLS.md`。当前可用能力由启用的 Skill、启用的图模板和 `graphiteui_capability_selector` 读取，避免静态能力文件过期。
+- 不维护长期 `TOOLS.md`。当前可用能力由启用的 Skill、启用的图模板和 `toograph_capability_selector` 读取，避免静态能力文件过期。
 - 自然为空的结构化记录放进 `buddy.db`；自然为空的人类可读复盘放进 `reports/`。
 - Buddy Home 内的资料可以影响伙伴如何选择、解释和组织行动，但不能绕过本地能力设置、local executor policy、图断点、人类审批或后端校验。
 - `policy.json` 可以由伙伴提出修改，但涉及权限、审批级别或危险操作偏好的变化必须走显式确认与 revision。
@@ -347,7 +347,7 @@ buddy_self_review(读取主运行快照)
 
 ```json
 {
-  "schemaVersion": "graphite.skill/v1",
+  "schemaVersion": "toograph.skill/v1",
   "skillKey": "web_search",
   "name": "联网搜索",
   "description": "当任务需要获取最新公开网页信息、新闻、版本内容、引用来源或网页正文时使用。不负责最终总结。",
@@ -569,9 +569,9 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 这种封包/拆包方式让动态能力和静态绑定在下游拥有同一套阅读逻辑：差别只在于动态结果缺少静态 state key，但不缺少输出名称、描述、类型和值。
 
-## `graphiteui_capability_selector`
+## `toograph_capability_selector`
 
-`graphiteui_capability_selector` 是当前的能力选择 Skill。它负责“校验并规范化模型从本地候选能力清单中选出的能力”，不负责“执行”。
+`toograph_capability_selector` 是当前的能力选择 Skill。它负责“校验并规范化模型从本地候选能力清单中选出的能力”，不负责“执行”。
 
 它应该：
 
@@ -591,9 +591,9 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 ## 用户 Skill 生成能力
 
-旧 `graphiteUI_skill_builder` 曾被删除，因为它把生成、写入、校验、测试、修复、revision 和回滚混在一个 Skill 中，偏离了新的职责边界。
+旧 `toograph_skill_builder` 曾被删除，因为它把生成、写入、校验、测试、修复、revision 和回滚混在一个 Skill 中，偏离了新的职责边界。
 
-当前新的 `graphiteUI_skill_builder` 已按窄职责重建：读取用户需求和已确认的设计信息，只产出一个 Skill 包必要的身份和文件内容。随着生命周期入口收束，新的 Skill 包优先围绕固定入口组织：
+当前新的 `toograph_skill_builder` 已按窄职责重建：读取用户需求和已确认的设计信息，只产出一个 Skill 包必要的身份和文件内容。随着生命周期入口收束，新的 Skill 包优先围绕固定入口组织：
 
 - `skill_key`
 - `skill.json`
@@ -609,11 +609,11 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 - 检查或修改官方 `skill/official/<skill_key>/`。
 - 代替图模板中的用户确认、示例确认、设计确认和权限确认。
 
-写入、测试、错误修复和最终安装应由后续图节点通过明确的受控能力完成，而不是重新塞回这个生成 Skill。当前 `graphiteui_skill_creation_workflow` 已经把这条流程表达为官方模板；后续应继续打磨运行验证、审批体验、失败回环和启用流程，而不是把职责重新扩大到单个 Skill 内部。
+写入、测试、错误修复和最终安装应由后续图节点通过明确的受控能力完成，而不是重新塞回这个生成 Skill。当前 `toograph_skill_creation_workflow` 已经把这条流程表达为官方模板；后续应继续打磨运行验证、审批体验、失败回环和启用流程，而不是把职责重新扩大到单个 Skill 内部。
 
 ## Function Call 的位置
 
-当前 GraphiteUI 不依赖 OpenAI 语义上的 function call / tool calls 作为主干。
+当前 TooGraph 不依赖 OpenAI 语义上的 function call / tool calls 作为主干。
 
 当前主干是：
 
@@ -624,17 +624,17 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 - skill 输出进入 state 和 run detail。
 - 后续节点根据结构化结果继续运行。
 
-function call 未来可以作为某些模型的适配层，但不能绕过 GraphiteUI 的 skill registry、权限检查、审批路径和审计记录。不支持 function call 的本地模型也必须能通过结构化 JSON 输出参与同一套图循环。
+function call 未来可以作为某些模型的适配层，但不能绕过 TooGraph 的 skill registry、权限检查、审批路径和审计记录。不支持 function call 的本地模型也必须能通过结构化 JSON 输出参与同一套图循环。
 
 ## 新版伙伴自主循环模板
 
 当前仓库已创建并注册官方 `buddy_autonomous_loop` 模板。它已经按完整目标把上下文装配、请求理解、按需能力循环和最终回复整理为子图，且 output 只展示最终回复；自我复盘已拆到内部 `buddy_self_review` 后台模板。后续路线图不应再重建另一套伙伴循环，而应在这两个模板和统一图协议上继续补齐暂停交互、审批体验、Buddy Home 写回和审计展示。
 
-`buddy_autonomous_loop` 的目标不是复刻 Claude Code 或 Hermes Agent 代码里的多工具循环，而是把它们已经验证有效的循环能力翻译为 GraphiteUI 的图协议：
+`buddy_autonomous_loop` 的目标不是复刻 Claude Code 或 Hermes Agent 代码里的多工具循环，而是把它们已经验证有效的循环能力翻译为 TooGraph 的图协议：
 
 - Claude Code 的可取之处是清晰的“模型判断 -> 工具执行 -> 工具结果进入下一轮 -> 再判断”循环、工具结果预算、stop hook、上下文压缩、只读工具并发和动态工具刷新。
 - Hermes Agent 的可取之处是迭代预算、provider fallback、无效工具名修复、无效 JSON 自我纠错、危险操作审批、tool guardrail、会话持久化和结束原因诊断。
-- GraphiteUI 不应把这些能力做成隐藏在伙伴代码里的第二套 agent loop。图负责循环，LLM 节点只做一次模型运行、一次结构化判断或一次能力调用准备。
+- TooGraph 不应把这些能力做成隐藏在伙伴代码里的第二套 agent loop。图负责循环，LLM 节点只做一次模型运行、一次结构化判断或一次能力调用准备。
 - 每轮能力调用仍保持单能力语义：选择一个 `capability`，执行一个 skill 或 subgraph，得到一个 `result_package`，再由后续节点评估是否继续。
 - 顶层模板应优先用子图表达稳定能力段，例如上下文装配、需求理解、能力循环和最终回复。自我复盘属于回复后的后台模板，这样顶层图保留可读主干，细节仍可双击进入子图审查和编辑。
 
@@ -664,7 +664,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 - `request_understanding`：需求理解、任务类型、是否需要能力、是否需要澄清、风险等级和原因。
 - `clarification_prompt`：需要向用户补充询问的问题。
 - `clarification_answer`：用户在断点恢复时写入的澄清回答。
-- `selected_capability`：`capability` 类型，来自 `graphiteui_capability_selector`。
+- `selected_capability`：`capability` 类型，来自 `toograph_capability_selector`。
 - `capability_found`：是否找到了启用的能力。
 - `capability_gap`：找不到合适能力时的结构化缺口，包含缺口类型、原因、建议资产形态、构建需求，以及是否应向用户询问构建能力。
 - `capability_trace`：多轮能力循环的步骤摘要列表，用于最终回复和后续自我复盘，避免只保留最后一次 `capability_result`。
@@ -681,7 +681,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 - `ask_clarification`：写 `clarification_prompt` 并设置 `interrupt_after`。伙伴页面应把用户下一条输入作为 `clarification_answer` 恢复运行，而不是开启新一轮。
 - `merge_clarification`：把澄清回答合入 `request_understanding` 或写新的确认需求摘要。
 - `needs_capability`：顶层 condition。读取 `request_understanding.requires_capability`；简单闲聊、身份询问、页面解释等可直接回答的请求绕过能力循环，避免无意义地选择能力和检查权限。
-- `select_capability`：静态绑定 `graphiteui_capability_selector`，根据需求选择一个启用的图模板或 Skill。图模板优先，找不到则输出 `{ "kind": "none" }` 和 `capability_found=false`。
+- `select_capability`：静态绑定 `toograph_capability_selector`，根据需求选择一个启用的图模板或 Skill。图模板优先，找不到则输出 `{ "kind": "none" }` 和 `capability_found=false`。
 - `capability_found`：condition。未找到能力时进入直接回复或缺失能力说明；找到能力时进入 `execute_capability`。低层写文件、删改文件或执行脚本的确认不属于这个 condition，由运行时权限原语处理。
 - `review_missing_capability`：当选择器返回 `{ "kind": "none" }` 时，写 `capability_review` 与 `capability_gap`。普通任务缺能力时只向用户提出是否构建；只有用户明确要求创建能力或请求本身就是构建能力时，才标记可进入构建流程。
 - 能力循环不再包含模板内的低层审批节点。写文件、删改文件或执行脚本应由运行时根据当前图或 Buddy 的 `需确认` / `完全访问` 模式暂停或自动继续；LLM 节点只负责开放性确认、方案审查和最终解释。当前统一低层审批拦截仍是路线图项。
@@ -753,10 +753,10 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 当前不做：
 
 - 让 prompt 直接决定权限。
-- 让 function call 绕过 GraphiteUI skill registry。
+- 让 function call 绕过 TooGraph skill registry。
 - 让伙伴静默安装、启用或运行新 skill。
 - 让伙伴直接改 DOM 或模拟用户点击。
-- 建立第二套独立于 GraphiteUI skill 系统的插件系统。
+- 建立第二套独立于 TooGraph skill 系统的插件系统。
 - 把临时日志、原始报错、大媒体、base64、下载全文或可从当前图重新读取的信息写入长期记忆。
 - 把官方图模板、官方 Skill 或用户自定义 Skill 本体复制进 Buddy Home。
 

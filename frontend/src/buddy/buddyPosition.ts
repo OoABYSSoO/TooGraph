@@ -13,7 +13,7 @@ export type BuddyViewport = {
   height: number;
 };
 
-export const BUDDY_POSITION_STORAGE_KEY = "graphiteui:buddy-position";
+export const BUDDY_POSITION_STORAGE_KEY = "toograph:buddy-position";
 export const DEFAULT_BUDDY_SIZE: BuddySize = { width: 96, height: 96 };
 export const DEFAULT_BUDDY_MARGIN = 16;
 

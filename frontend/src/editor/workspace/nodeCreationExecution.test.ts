@@ -26,7 +26,7 @@ function createBaseDocument(): GraphPayload {
         reads: [],
         writes: [{ state: "question", mode: "replace" }],
         config: {
-          value: "什么是 GraphiteUI？",
+          value: "什么是 TooGraph？",
         },
       },
       branch_gate: {
@@ -139,7 +139,7 @@ test("createNodeFromCreationEntry builds the builtin empty agent preset and auto
   assert.equal(result.document.nodes.agent_created.kind === "agent" ? result.document.nodes.agent_created.config.thinkingMode : null, "high");
   assert.deepEqual(result.document.nodes.agent_created.reads, [{ state: "question", required: true }]);
   assert.deepEqual(result.document.nodes.agent_created.writes, []);
-  assert.equal(result.document.metadata.graphiteui_state_key_counter, undefined);
+  assert.equal(result.document.metadata.toograph_state_key_counter, undefined);
   assert.deepEqual(result.document.edges, [{ source: "input_question", target: "agent_created" }]);
 });
 
@@ -147,7 +147,7 @@ test("createNodeFromCreationEntry creates input boundary nodes with a virtual ou
   const document = {
     ...createBaseDocument(),
     metadata: {
-      graphiteui_state_key_counter: 7,
+      toograph_state_key_counter: 7,
     },
   };
   const entry: NodeCreationEntry = {
@@ -172,7 +172,7 @@ test("createNodeFromCreationEntry creates input boundary nodes with a virtual ou
 
   assert.deepEqual(result.document.nodes.input_created.writes, []);
   assert.deepEqual(result.document.state_schema, document.state_schema);
-  assert.equal(result.document.metadata.graphiteui_state_key_counter, 7);
+  assert.equal(result.document.metadata.toograph_state_key_counter, 7);
 });
 
 test("createNodeFromCreationEntry builds the builtin condition preset and auto-wires route edges", () => {
@@ -281,7 +281,7 @@ test("createNodeFromDroppedFile builds an input node from the uploaded asset env
   assert.equal(result.document.state_schema.state_1?.name, "diagram.png");
   assert.equal(result.document.state_schema.state_1?.type, "image");
   assert.equal(result.document.state_schema.state_1?.value, "uploads/diagram.png");
-  assert.equal(result.document.metadata.graphiteui_state_key_counter, 1);
+  assert.equal(result.document.metadata.toograph_state_key_counter, 1);
   assert.equal(result.document.nodes.input_file_created.config.value, "uploads/diagram.png");
 });
 

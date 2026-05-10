@@ -66,12 +66,12 @@ test("EditorTabLauncherPanel uses the shared liquid glass visual language", () =
   assert.match(componentSource, /<ElIcon><DocumentAdd \/><\/ElIcon>/);
   assert.match(componentSource, /<ElIcon><CollectionTag \/><\/ElIcon>/);
   assert.match(componentSource, /<ElIcon><FolderOpened \/><\/ElIcon>/);
-  assert.match(componentSource, /\.editor-tab-launcher-panel \{[\s\S]*border:\s*1px solid var\(--graphite-glass-border\);/);
+  assert.match(componentSource, /\.editor-tab-launcher-panel \{[\s\S]*border:\s*1px solid var\(--toograph-glass-border\);/);
   assert.match(
     componentSource,
-    /\.editor-tab-launcher-panel \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\),\s*var\(--graphite-glass-bg-strong\);/,
+    /\.editor-tab-launcher-panel \{[\s\S]*background:\s*var\(--toograph-glass-specular\),\s*var\(--toograph-glass-lens\),\s*var\(--toograph-glass-bg-strong\);/,
   );
-  assert.match(componentSource, /\.editor-tab-launcher-panel \{[\s\S]*box-shadow:[\s\S]*var\(--graphite-glass-rim\);/);
+  assert.match(componentSource, /\.editor-tab-launcher-panel \{[\s\S]*box-shadow:[\s\S]*var\(--toograph-glass-rim\);/);
   assert.match(componentSource, /\.editor-tab-launcher-panel \{[\s\S]*backdrop-filter:\s*blur\(26px\) saturate\(1\.55\) contrast\(1\.01\);/);
   assert.match(componentSource, /\.editor-tab-launcher-panel__entry \{[\s\S]*grid-template-columns:\s*40px minmax\(0,\s*1fr\) 18px;/);
   assert.match(componentSource, /\.editor-tab-launcher-panel__entry-icon \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.48\);/);

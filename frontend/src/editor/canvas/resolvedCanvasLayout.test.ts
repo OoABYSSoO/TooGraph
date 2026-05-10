@@ -32,7 +32,7 @@ const graph: GraphPayload = {
       ui: { position: { x: 80, y: 220 } },
       reads: [],
       writes: [{ state: "question", mode: "replace" }],
-      config: { value: "什么是 GraphiteUI？" },
+      config: { value: "什么是 TooGraph？" },
     },
     answer_helper: {
       kind: "agent",

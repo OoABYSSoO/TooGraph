@@ -12,10 +12,10 @@ const frontendDir = resolve(rootDir, "frontend");
 const frontendDistDir = resolve(frontendDir, "dist");
 
 const isWindows = process.platform === "win32";
-const appPort = String(process.env.PORT || process.env.GRAPHITEUI_PORT || "3477");
-const legacyBackendPort = String(process.env.GRAPHITEUI_LEGACY_BACKEND_PORT || "8765");
-const serverLogPath = resolve(rootDir, ".graphiteui_server.log");
-const pidPath = resolve(rootDir, ".graphiteui_pids.json");
+const appPort = String(process.env.PORT || process.env.TOOGRAPH_PORT || "3477");
+const legacyBackendPort = String(process.env.TOOGRAPH_LEGACY_BACKEND_PORT || "8765");
+const serverLogPath = resolve(rootDir, ".toograph_server.log");
+const pidPath = resolve(rootDir, ".toograph_pids.json");
 const legacyPidPath = resolve(rootDir, ".dev_pids.json");
 const legacyBackendLogPath = resolve(rootDir, ".dev_backend.log");
 const legacyFrontendLogPath = resolve(rootDir, ".dev_frontend.log");
@@ -171,7 +171,7 @@ function addLogPids(pids, logPath) {
   }
 }
 
-function loadKnownGraphitePids() {
+function loadKnownTooGraphPids() {
   const pids = new Set();
   addPidStatePids(pids, pidPath);
   addPidStatePids(pids, legacyPidPath);
@@ -231,7 +231,7 @@ async function listProcessInfos() {
 
 function portReleaseContext() {
   return {
-    knownGraphitePids: loadKnownGraphitePids(),
+    knownTooGraphPids: loadKnownTooGraphPids(),
     rootDir,
     backendDir,
     frontendDir,
@@ -289,7 +289,7 @@ async function killPortPids(port) {
   }
 
   if (plan.blockedOwners.length > 0) {
-    console.error(`Port ${port} is used by process(es) that do not look like GraphiteUI:`);
+    console.error(`Port ${port} is used by process(es) that do not look like TooGraph:`);
     for (const owner of plan.blockedOwners) {
       console.error(`  ${owner}`);
     }
@@ -297,10 +297,10 @@ async function killPortPids(port) {
   }
 
   if (plan.killPids.length === 0) {
-    throw new Error(`Port ${port} is occupied, but no live GraphiteUI process could be found to terminate.`);
+    throw new Error(`Port ${port} is occupied, but no live TooGraph process could be found to terminate.`);
   }
 
-  console.log(`Releasing GraphiteUI process(es) on port ${port}: ${plan.killPids.join(", ")}`);
+  console.log(`Releasing TooGraph process(es) on port ${port}: ${plan.killPids.join(", ")}`);
   await terminatePids(plan.killPids);
   await sleep(1000);
   const remainingPids = await findPortPids(port);
@@ -309,7 +309,7 @@ async function killPortPids(port) {
   }
 }
 
-async function releaseLegacyGraphitePort(port) {
+async function releaseLegacyTooGraphPort(port) {
   if (!port || port === appPort) {
     return;
   }
@@ -319,7 +319,7 @@ async function releaseLegacyGraphitePort(port) {
     return;
   }
 
-  console.log(`Stopping legacy GraphiteUI process(es) on port ${port}: ${plan.killPids.join(", ")}`);
+  console.log(`Stopping legacy TooGraph process(es) on port ${port}: ${plan.killPids.join(", ")}`);
   await terminatePids(plan.killPids);
 }
 
@@ -512,7 +512,7 @@ async function stopServices() {
     return;
   }
 
-  console.log("\nStopping GraphiteUI service...");
+  console.log("\nStopping TooGraph service...");
   await stopProcessTree(serverProcess);
   clearPidState();
   console.log("Service stopped.");
@@ -535,7 +535,7 @@ async function buildFrontend() {
 
   const build = npmCommand(["run", "build"]);
   if (buildPlan.reason === "forced") {
-    console.log("Building frontend... (forced by GRAPHITEUI_FORCE_FRONTEND_BUILD)");
+    console.log("Building frontend... (forced by TOOGRAPH_FORCE_FRONTEND_BUILD)");
   } else if (buildPlan.reason === "missing_dist") {
     console.log("Building frontend... (frontend/dist/index.html was not found)");
   } else if (buildPlan.reason === "missing_manifest") {
@@ -560,7 +560,7 @@ async function buildFrontend() {
 }
 
 async function main() {
-  console.log("Starting GraphiteUI...");
+  console.log("Starting TooGraph...");
   console.log(`  URL : http://127.0.0.1:${appPort}`);
   console.log(`  Port: ${appPort}`);
   console.log(`  Log : ${serverLogPath}`);
@@ -573,7 +573,7 @@ async function main() {
 
   await buildFrontend();
   await killPortPids(appPort);
-  await releaseLegacyGraphitePort(legacyBackendPort);
+  await releaseLegacyTooGraphPort(legacyBackendPort);
 
   serverProcess = spawnLoggedProcess(
     python.command,
@@ -591,7 +591,7 @@ async function main() {
       cwd: backendDir,
       env: {
         ...process.env,
-        GRAPHITEUI_FRONTEND_DIST: frontendDistDir,
+        TOOGRAPH_FRONTEND_DIST: frontendDistDir,
       },
     },
     serverLogPath,
@@ -602,14 +602,14 @@ async function main() {
 
   const serverReady = await waitForHttp(`http://127.0.0.1:${appPort}/health`, 30, 500);
   if (!serverReady) {
-    console.error(`GraphiteUI failed to start. Check ${serverLogPath}`);
+    console.error(`TooGraph failed to start. Check ${serverLogPath}`);
     await printLogTail(serverLogPath);
     await stopServices();
     process.exit(1);
   }
 
   console.log("");
-  console.log("GraphiteUI started.");
+  console.log("TooGraph started.");
   console.log(`  Open: http://127.0.0.1:${appPort}`);
   console.log(`  Health: http://127.0.0.1:${appPort}/health`);
   console.log("");
@@ -620,7 +620,7 @@ async function main() {
     if (stopping) {
       return;
     }
-    console.error(`GraphiteUI server exited unexpectedly. Check ${serverLogPath}`);
+    console.error(`TooGraph server exited unexpectedly. Check ${serverLogPath}`);
     await printLogTail(serverLogPath);
     await stopServices();
     process.exit(1);

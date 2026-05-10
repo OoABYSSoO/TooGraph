@@ -554,7 +554,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         result = execute_agent_node(
             state_schema,
             node,
-            {"query": "GraphiteUI latest"},
+            {"query": "TooGraph latest"},
             {"state": {}},
             node_name="searcher",
             state={"run_id": "run-1"},
@@ -584,7 +584,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 )
             },
             generate_agent_skill_inputs_func=lambda **kwargs: (
-                {"web_search": {"query": "GraphiteUI latest"}},
+                {"web_search": {"query": "TooGraph latest"}},
                 "planned skill inputs",
                 [],
                 kwargs["runtime_config"],
@@ -873,12 +873,12 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         result = execute_agent_node(
             state_schema,
             node,
-            {"query": "GraphiteUI"},
+            {"query": "TooGraph"},
             {"state": {}},
             node_name="web_search_agent",
             state={"run_id": "run-1"},
             get_skill_registry_func=lambda *, include_disabled: {"web_search": object()},
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "GraphiteUI"}}),
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "TooGraph"}}),
             invoke_skill_func=lambda skill_func, skill_inputs: {
                 "status": "succeeded",
                 "source_documents": source_documents,
@@ -931,12 +931,12 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         result = execute_agent_node(
             state_schema,
             node,
-            {"query": "GraphiteUI"},
+            {"query": "TooGraph"},
             {"state": {}},
             node_name="web_search_agent",
             state={"run_id": "run-1"},
             get_skill_registry_func=lambda *, include_disabled: {"web_search": object()},
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "GraphiteUI"}}),
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "TooGraph"}}),
             invoke_skill_func=lambda skill_func, skill_inputs: {
                 "status": "succeeded",
                 "source_documents": source_documents,
@@ -983,7 +983,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         result = execute_agent_node(
             state_schema,
             node,
-            {"name": "GraphiteUI 用户"},
+            {"name": "TooGraph 用户"},
             {"state": {}},
             node_name="writer",
             state={"run_id": "run-1"},
@@ -1058,14 +1058,14 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         result = execute_agent_node(
             state_schema,
             node,
-            {"query": "GraphiteUI"},
+            {"query": "TooGraph"},
             {"state": {}},
             node_name="searcher",
             state={"run_id": "run-1"},
             get_skill_registry_func=lambda *, include_disabled: {
                 "web_search": object(),
             },
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "GraphiteUI"}}),
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "TooGraph"}}),
             invoke_skill_func=lambda skill_func, skill_inputs, *, context=None: captured_contexts.append(context or {})
             or {"status": "succeeded", "summary": "联网结果"},
             resolve_agent_runtime_config_func=lambda agent_node: {},
@@ -1122,14 +1122,14 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             execute_agent_node(
                 state_schema,
                 node,
-                {"query": "GraphiteUI"},
+                {"query": "TooGraph"},
                 {"state": {}},
                 node_name="searcher",
                 state=run_state,
                 get_skill_registry_func=lambda *, include_disabled: {
                     "web_search": object(),
                 },
-                generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "GraphiteUI"}}),
+                generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "TooGraph"}}),
                 invoke_skill_func=invoke_skill_func,
                 resolve_agent_runtime_config_func=lambda agent_node: {},
                 build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
@@ -1175,14 +1175,14 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         result = execute_agent_node(
             state_schema,
             node,
-            {"name": "GraphiteUI 用户"},
+            {"name": "TooGraph 用户"},
             {"state": {}},
             node_name="writer",
             state={"run_id": "run-1"},
             get_skill_registry_func=lambda *, include_disabled: {
                 "web_search": object(),
             },
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "GraphiteUI"}}),
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "TooGraph"}}),
             invoke_skill_func=lambda skill_func, skill_inputs: {
                 "status": "failed",
                 "error": "Search query is required.",
