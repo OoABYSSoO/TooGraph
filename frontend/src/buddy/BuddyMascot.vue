@@ -405,7 +405,7 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--idle .buddy-mascot__tail {
-  animation: buddy-mascot-tail-sway 7.2s ease-in-out infinite;
+  animation: buddy-mascot-tail-sway 2.4s ease-in-out infinite;
 }
 
 .buddy-mascot--idle .buddy-mascot__sparkle-wrap {
@@ -524,10 +524,10 @@ function clampLookAxis(value: number | undefined) {
 @keyframes buddy-mascot-tail-sway {
   0%,
   100% {
-    transform: rotate(-1deg);
+    transform: rotate(-2deg);
   }
   50% {
-    transform: rotate(2deg);
+    transform: rotate(7deg);
   }
 }
 

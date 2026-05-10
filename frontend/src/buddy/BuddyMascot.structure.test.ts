@@ -267,11 +267,13 @@ test("BuddyMascot keeps the body stable except for small speaking and tap hops",
   assert.match(componentSource, /@keyframes buddy-mascot-tap-body-squash[\s\S]*scale\(1\.04,\s*0\.96\)[\s\S]*scale\(0\.97,\s*1\.04\)/);
 });
 
-test("BuddyMascot makes idle tail motion subtle so path morphing carries the expression", () => {
-  assert.match(componentSource, /\.buddy-mascot--idle[\s\S]*\.buddy-mascot__tail[\s\S]*animation:\s*buddy-mascot-tail-sway 7\.2s ease-in-out infinite;/);
+test("BuddyMascot keeps idle tail sway slower than thinking with the same amplitude", () => {
+  assert.match(componentSource, /\.buddy-mascot--idle[\s\S]*\.buddy-mascot__tail[\s\S]*animation:\s*buddy-mascot-tail-sway 2\.4s ease-in-out infinite;/);
   assert.match(componentSource, /\.buddy-mascot--idle[\s\S]*\.buddy-mascot__left-ear[\s\S]*animation:\s*buddy-mascot-ear-idle-left 4\.2s ease-in-out infinite;/);
   assert.match(componentSource, /\.buddy-mascot--idle[\s\S]*\.buddy-mascot__right-ear[\s\S]*animation:\s*buddy-mascot-ear-idle-right 4\.2s ease-in-out infinite;/);
-  assert.match(componentSource, /@keyframes buddy-mascot-tail-sway[\s\S]*rotate\(-1deg\)[\s\S]*rotate\(2deg\)/);
+  assert.match(componentSource, /\.buddy-mascot--thinking[\s\S]*\.buddy-mascot__tail[\s\S]*animation:\s*buddy-mascot-tail-thinking 1\.45s ease-in-out infinite;/);
+  assert.match(componentSource, /@keyframes buddy-mascot-tail-sway[\s\S]*rotate\(-2deg\)[\s\S]*rotate\(7deg\)/);
+  assert.match(componentSource, /@keyframes buddy-mascot-tail-thinking[\s\S]*rotate\(-2deg\)[\s\S]*rotate\(7deg\)/);
   assert.match(componentSource, /@keyframes buddy-mascot-ear-idle-left[\s\S]*rotate\(-8deg\)/);
   assert.match(componentSource, /@keyframes buddy-mascot-ear-idle-right[\s\S]*rotate\(8deg\)/);
 });
