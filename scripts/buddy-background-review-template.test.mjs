@@ -27,27 +27,30 @@ test("buddy visible chat template does not run autonomous review in the foregrou
   );
 });
 
-test("buddy autonomous review is an internal background template with controlled writeback", () => {
+test("buddy autonomous review is an internal background template with candidate writeback", () => {
   const template = readTemplate("buddy_autonomous_review");
 
   assert.equal(template.template_id, "buddy_autonomous_review");
   assert.equal(template.label, "自主复盘");
   assert.equal(template.metadata?.internal, true);
+  assert.deepEqual(template.metadata?.permissions, ["memory_candidate_write"]);
   assert.equal(template.nodes.review_buddy_memory, undefined);
   assert.equal(template.nodes.decide_autonomous_review.kind, "agent");
-  assert.equal(template.nodes.should_write_buddy_home.kind, "condition");
-  assert.equal(template.nodes.apply_buddy_home_writeback.kind, "agent");
-  assert.equal(template.nodes.apply_buddy_home_writeback.config.skillKey, "buddy_home_writer");
+  assert.equal(template.nodes.should_write_buddy_home, undefined);
+  assert.equal(template.nodes.apply_buddy_home_writeback, undefined);
+  assert.equal(template.nodes.has_memory_candidates.kind, "condition");
+  assert.equal(template.nodes.write_memory_candidates.kind, "agent");
+  assert.equal(template.nodes.write_memory_candidates.config.skillKey, "memory_candidate_writer");
   assert.equal(
-    template.nodes.apply_buddy_home_writeback.writes.some((binding) => binding.state === "writeback_result"),
+    template.nodes.write_memory_candidates.writes.some((binding) => binding.state === "candidate_memories"),
     true,
   );
   assert.equal(
     template.conditional_edges.some(
       (edge) =>
-        edge.source === "should_write_buddy_home" &&
-        edge.branches.true === "apply_buddy_home_writeback" &&
-        edge.branches.false === "output_autonomous_review",
+        edge.source === "has_memory_candidates" &&
+        edge.branches.true === "write_memory_candidates" &&
+        edge.branches.false === "output_improvement_candidates",
     ),
     true,
   );

@@ -170,6 +170,47 @@ class PlatformMemoryStoreTests(unittest.TestCase):
             ["create", "apply", "degrade", "archive", "restore"],
         )
 
+    def test_candidate_replace_route_applies_candidate_and_archives_superseded_memories(self) -> None:
+        with isolated_memory_database():
+            old_memory = store.create_memory(
+                {
+                    "scope": "project",
+                    "layer": "procedural",
+                    "type": "preference",
+                    "summary": "Old reporting preference",
+                    "content": "Report only a terse summary.",
+                    "evidence": [{"run_id": "run_old"}],
+                    "status": "active",
+                },
+                changed_by="test",
+            )
+            candidate = store.create_memory(
+                {
+                    "scope": "project",
+                    "layer": "procedural",
+                    "type": "preference",
+                    "summary": "Updated reporting preference",
+                    "content": "Report concise changes plus verification evidence.",
+                    "evidence": [{"run_id": "run_new"}],
+                    "status": "candidate",
+                    "supersedes": [old_memory["id"]],
+                },
+                changed_by="test",
+            )
+
+            with TestClient(app) as client:
+                replace_response = client.post(
+                    f"/api/memories/{candidate['id']}/replace",
+                    json={"change_reason": "User approved replacing the old preference."},
+                )
+                old_events_response = client.get(f"/api/memories/{old_memory['id']}/events")
+
+        self.assertEqual(replace_response.status_code, 200)
+        self.assertEqual(replace_response.json()["replacement"]["status"], "active")
+        self.assertEqual(replace_response.json()["superseded"][0]["id"], old_memory["id"])
+        self.assertEqual(replace_response.json()["superseded"][0]["status"], "archived")
+        self.assertEqual(old_events_response.json()[-1]["action"], "supersede")
+
 
 if __name__ == "__main__":
     unittest.main()

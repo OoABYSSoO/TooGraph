@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "toograph.skill/v1",
+  "skillKey": "toograph_graph_template_writer",
+  "name": "图模板写入器",
+  "description": "校验并写入一个用户图模板到 graph_template/user，同时记录可恢复的模板 revision artifact。",
+  "llmInstruction": "你已绑定图模板写入器。只在上游已经生成并校验 template_json 后调用。template_json 必须是完整 template.json 对象；reason 简短说明写入原因。此 Skill 只能写 graph_template/user/<template_id>/template.json，拒绝覆盖官方模板，并返回 template_id、template_path、revision_id。",
+  "version": "0.1.0",
+  "timeoutSeconds": 30,
+  "permissions": [
+    "file_write"
+  ],
+  "stateInputSchema": [
+    {
+      "key": "generated_template_json",
+      "name": "Generated Template JSON",
+      "valueType": "json",
+      "description": "待写入的完整 template.json 对象。"
+    },
+    {
+      "key": "validation_report",
+      "name": "Validation Report",
+      "valueType": "json",
+      "description": "上游图模板校验器返回的报告。"
+    }
+  ],
+  "llmOutputSchema": [
+    {
+      "key": "template_json",
+      "name": "Template JSON",
+      "valueType": "json",
+      "description": "待写入的完整图模板 JSON。"
+    },
+    {
+      "key": "reason",
+      "name": "Reason",
+      "valueType": "text",
+      "description": "写入用户图模板的审计原因。"
+    }
+  ],
+  "stateOutputSchema": [
+    {
+      "key": "success",
+      "name": "Success",
+      "valueType": "boolean",
+      "description": "是否写入成功。"
+    },
+    {
+      "key": "result",
+      "name": "Result",
+      "valueType": "markdown",
+      "description": "写入摘要或失败原因。"
+    },
+    {
+      "key": "template_id",
+      "name": "Template ID",
+      "valueType": "text",
+      "description": "写入的用户图模板 ID。"
+    },
+    {
+      "key": "template_path",
+      "name": "Template Path",
+      "valueType": "text",
+      "description": "写入的用户模板文件路径。"
+    },
+    {
+      "key": "revision_id",
+      "name": "Revision ID",
+      "valueType": "text",
+      "description": "本次写入对应的模板 revision artifact ID。"
+    }
+  ]
+}

@@ -47,7 +47,7 @@
 - 将 Graph Edit Playback 编译出的 editor commands 与 graph revision 绑定；每次应用命令前后已生成 command diff，并在回放结束后通过编辑器保存请求写入持久 graph revision；`graph_edit_summary`、operation journal 和运行详情/Buddy 虚拟操作标签已经包含 graph id、revision id、revision status 与 command diff 计数。
 - 接入 undo/redo：graph revision 已提供 restore API，可把保存图恢复到指定 revision 的 previous graph 并记录恢复 revision；图与模板管理页、编辑器动作栏修订历史、运行详情 operation journal 和 Buddy trace/history 胶囊已能从图编辑记录直接恢复对应 graph revision，并在恢复后刷新本地图列表或当前编辑器文档。
 - 扩展编辑已有图覆盖面：Graph Edit Playback 已支持移动节点、节点重命名/简介/Agent 任务说明、修改 input/output config、修改 state、选择 Agent Skill、流程/条件路由连线、删除节点与同计划恢复节点；Buddy 页面操作已能发现并点击编辑器“保存为模板”动作；编辑器节点选择已支持单选、多选切换、键盘选择、当前选择 affordance 和多选清除入口。
-- 历史 `graph_patch.draft` stub 已从 Buddy command 与前端 API surface 移除；图修改入口必须走编辑器语义命令、校验、revision 和撤销路径，后台复盘与 Buddy Home 写入提示继续显式禁止该旧 action。
+- 历史 `graph_patch.draft` stub 已从 Buddy command 与前端 API surface 移除；图修改入口必须走编辑器语义命令、校验、revision 和撤销路径，后台复盘与候选记忆提示继续显式禁止该旧 action。
 
 ### 3. 运行结果校验与自我修复
 
@@ -85,10 +85,10 @@
 - 建立作用域：user、project、buddy、template、graph、skill、knowledge collection。跨作用域召回必须显式且可审计。
 - 建立主存储：平台 SQLite 存储已建立 `memories`、`memory_revisions`、`memory_events`、`memories_fts`，`backend/app/memory/store.py` 提供 create/update/list/recall/revision/event 基础 API；后续 Hybrid RAG 阶段再接 embedding 表。
 - 每条记忆至少包含 summary、content、confidence、importance、evidence、artifact refs、source run/node/skill/template、status、scope 和 supersedes 信息；平台 store 已按这些字段归一化和持久化，Buddy Home 旧投影仍待迁移到该 store。
-- 支持候选记忆：`memory_candidate_writer` 已能创建带证据和来源的 `candidate` 状态平台记忆并记录 revision/event；平台 API 已支持候选应用、拒绝、归档、降权、revision/event 查询和 revision 恢复；替代、冲突提示和前端 review UI 仍待接入。
-- 实现预算化召回：平台 store 已支持 scope/layer/type/status 过滤、FTS 查询、importance/更新时间排序、top_k、max_chars 和 omitted 列表；冲突提示、候选状态联动和前端展示仍待接入模板/Skill 层。
+- 支持候选记忆：`memory_candidate_writer` 已能创建带证据和来源的 `candidate` 状态平台记忆并记录 revision/event，并返回相近 active 记忆的冲突提示；平台 API 已支持候选应用、拒绝、归档、替代、降权、revision/event 查询和 revision 恢复；Buddy 记忆页已提供平台候选审查表和应用/替代/拒绝/归档入口。
+- 实现预算化召回：平台 store 已支持 scope/layer/type/status 过滤、FTS 查询、importance/更新时间排序、top_k、max_chars 和 omitted 列表；候选写入 Skill 已接入 active 记忆冲突提示，Buddy 记忆页已展示候选、来源 run、替代关系和候选审查动作。
 - 新增或等价实现 `memory_recall` 与 `memory_candidate_writer` 能力：官方 Skill 已提供只读预算化 `memory_context` 召回，以及仅写入 `candidate` 记录的候选记忆生成。
-- 前端和运行详情展示召回命中、候选、应用/拒绝、冲突、revision 和来源 run。
+- 前端和运行详情展示召回命中、候选、应用/拒绝、冲突、revision 和来源 run；Buddy 记忆页已展示平台候选、来源 run、替代关系并提供应用/替代/拒绝/归档动作，运行详情时间线已汇总 `memory_recall` 与 `memory_candidate_write` 活动的命中、候选、跳过、冲突和记忆 ID；更细的 memory_context 展开视图仍待补齐。
 - Buddy Home 文件继续作为用户可编辑投影；底层 Store、command 和 revision 是审计与恢复来源。
 
 ### 上下文预算和大结果处理
@@ -107,12 +107,15 @@
 
 目标：Buddy 能从运行轨迹、失败、用户纠正和成功经验中提出小步、可逆、可审查的改进。
 
+已完成：
+
+- 后台复盘模板 `buddy_autonomous_review` 已停止直接调用 Buddy Home Writer；现在输出 `autonomous_review`、`improvement_candidates` 和 `memory_candidate_plan`，并且只在存在记忆沉淀时通过 `memory_candidate_writer` 写入平台 `candidate` 状态记忆。
+- 能力缺口链路已输出 `capability_builder_handoff`：当缺的是 Skill 且用户明确要补能力时，交接目标指向 `toograph_skill_creation_workflow`；当缺的是图模板创建能力时会显式标记目标流程尚未可用，不假装已经拥有能力。
+- Skill 改进链路已接入现有创建模板：新增只读 `toograph_skill_package_reader`，`toograph_skill_creation_workflow` 可读取目标 Skill 包，把旧 `skill.json`、`SKILL.md`、生命周期脚本和 requirements 纳入 builder context，再沿用生成、脚本测试、审查和受控 `skill/user/<skillKey>/` 写入路径。
+- 图模板改进链路已接入官方工作流：新增只读 `toograph_graph_template_reader`、只读 `toograph_graph_template_validator` 和受控写入 `toograph_graph_template_writer`，`toograph_graph_template_creation_workflow` 可读取已有模板、生成 graph diff 草案与预览、校验 node_system 与运行时兼容性、经运行时确认写入 `graph_template/user/<template_id>/template.json`，并记录 `backend/data/template_revisions` 下的可恢复 revision artifact；写入后可选通过页面操作工作流进行可见试运行。
+
 待做：
 
-- 后台复盘输出 improvement candidates，而不是直接做高风险变更。
-- Skill 改进链路：读取旧 Skill 包、生成补丁、测试、审查、用户批准、写入 `skill/user/` 或生成新 revision。
-- 图模板改进链路：生成 graph diff 草案、预览、校验、可选试运行、用户批准、保存为用户模板。
-- 能力缺口链路：建议进入 `toograph_skill_creation_workflow` 或图模板创建流程，不假装已经拥有能力。
 - 所有文件写入、脚本执行、图修改、权限扩大、网络访问和自动化创建都必须有清晰权限和可恢复 revision。
 
 ### Hybrid RAG 知识库

@@ -12,6 +12,14 @@
       "color": "#d97706",
       "binding": null
     },
+    "target_skill_key": {
+      "name": "目标 Skill Key",
+      "description": "可选：需要改进或迁移的已有 Skill key。",
+      "type": "text",
+      "value": "",
+      "color": "#9333ea",
+      "binding": null
+    },
     "capability_gap": {
       "name": "capability_gap",
       "description": "可选的能力缺口上下文，通常来自 Buddy 主循环在找不到合适能力时生成的结构化 gap。",
@@ -19,6 +27,48 @@
       "value": {},
       "color": "#dc2626",
       "binding": null
+    },
+    "existing_skill_package_success": {
+      "name": "读取已有 Skill 成功",
+      "description": "Skill Package Reader 是否找到了目标 Skill 包。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "toograph_skill_package_reader",
+        "nodeId": "read_existing_skill_package",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "existing_skill_package": {
+      "name": "已有 Skill 包",
+      "description": "读取到的已有 Skill 包文件内容，用于改进或迁移。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "toograph_skill_package_reader",
+        "nodeId": "read_existing_skill_package",
+        "fieldKey": "skill_package",
+        "managed": true
+      }
+    },
+    "existing_skill_package_result": {
+      "name": "读取已有 Skill 摘要",
+      "description": "读取已有 Skill 包的摘要或失败原因。",
+      "type": "markdown",
+      "value": "",
+      "color": "#15803d",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "toograph_skill_package_reader",
+        "nodeId": "read_existing_skill_package",
+        "fieldKey": "result",
+        "managed": true
+      }
     },
     "existing_capability": {
       "name": "已有能力",
@@ -376,6 +426,29 @@
     }
   },
   "nodes": {
+    "input_target_skill_key": {
+      "kind": "input",
+      "name": "目标 Skill Key",
+      "description": "可选提供需要改进或迁移的已有 Skill key。",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 104
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "target_skill_key",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
+    },
     "input_skill_request": {
       "kind": "input",
       "name": "输入需求",
@@ -397,6 +470,72 @@
       "config": {
         "value": "我想要一个把会议纪要整理成待办清单的 Skill",
         "boundaryType": "text"
+      }
+    },
+    "read_existing_skill_package": {
+      "kind": "agent",
+      "name": "读取已有 Skill 包",
+      "description": "读取已有官方或用户 Skill 包，供改进工作流生成兼容替代版本。",
+      "ui": {
+        "position": {
+          "x": 596,
+          "y": 40
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "target_skill_key",
+          "required": false
+        },
+        {
+          "state": "skill_request",
+          "required": false
+        },
+        {
+          "state": "capability_gap",
+          "required": false
+        }
+      ],
+      "writes": [
+        {
+          "state": "existing_skill_package_success",
+          "mode": "replace"
+        },
+        {
+          "state": "existing_skill_package",
+          "mode": "replace"
+        },
+        {
+          "state": "existing_skill_package_result",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "toograph_skill_package_reader",
+        "skillBindings": [
+          {
+            "skillKey": "toograph_skill_package_reader",
+            "outputMapping": {
+              "success": "existing_skill_package_success",
+              "skill_package": "existing_skill_package",
+              "result": "existing_skill_package_result"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {
+          "toograph_skill_package_reader": {
+            "skillKey": "toograph_skill_package_reader",
+            "title": "Skill package reader instruction",
+            "content": "你已绑定 Skill Package Reader。优先使用 target_skill_key；如果为空，只能在 skill_request 或 capability_gap 明确给出已有 Skill key 时读取。不要猜测不存在的 key，不要写文件，不要执行脚本。",
+            "source": "node.override"
+          }
+        },
+        "taskInstruction": "读取可选的已有 Skill 包。skill_key 优先来自 target_skill_key；如果用户需求明确说要改进某个已有 Skill，也可从 skill_request 或 capability_gap 中提取。没有明确目标时输出空 skill_key，让 reader 返回未找到结果。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "low",
+        "temperature": 0
       }
     },
     "select_existing_capability": {
@@ -473,6 +612,10 @@
           "required": false
         },
         {
+          "state": "existing_skill_package",
+          "required": false
+        },
+        {
           "state": "capability_gap",
           "required": false
         }
@@ -495,7 +638,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "评估用户是否真的需要创建新 Skill。capability_gap 是可选的上游能力缺口上下文；如果它存在，应把缺口类型、缺口原因、建议能力形态纳入判断。requirement_review 必须写 JSON 对象，包含 needs_clarification(boolean)、existing_capability_summary(string)、capability_gap_summary(string)、unclear_points(array)、questions(array)、reason(string)。如果 existing_capability_found 为 true，说明已有启用能力可能满足需求，应把 needs_clarification 设为 true，并在 questions 中询问用户是否仍要创建新 Skill；不要读取或执行 capability 对象本身。creation_decision 必须写 JSON 对象，包含 approved_to_create(boolean)、reason(string)；需求不明确时 approved_to_create 必须为 false，本轮通过 final_summary 询问用户，用户回答应在下一轮作为更完整的 skill_request 进入。除非已有能力明显满足且用户没有表达仍要创建，否则需求明确时默认 approved_to_create 为 true。confirmed_skill_requirement 写 Markdown，概括当前已确认的目标、输入、输出、权限、是否需要 before_llm.py、是否需要 after_llm.py、是否需要第三方依赖和限制。",
+        "taskInstruction": "评估用户是否真的需要创建或改进 Skill。capability_gap 是可选的上游能力缺口上下文；如果它存在，应把缺口类型、缺口原因、建议能力形态纳入判断。existing_skill_package 是可选的已有 Skill 包上下文；如果存在且用户目标是改进已有 Skill，按“改进已有 Skill”处理，confirmed_skill_requirement 必须说明要保留、修改、废弃的输入输出、权限和脚本行为。requirement_review 必须写 JSON 对象，包含 needs_clarification(boolean)、existing_capability_summary(string)、capability_gap_summary(string)、existing_skill_summary(string)、unclear_points(array)、questions(array)、reason(string)。如果 existing_capability_found 为 true 且用户没有明确要改进/替代该能力，说明已有启用能力可能满足需求，应把 needs_clarification 设为 true，并在 questions 中询问用户是否仍要创建或改进 Skill；不要读取或执行 capability 对象本身。creation_decision 必须写 JSON 对象，包含 approved_to_create(boolean)、reason(string)、mode(create|improve)。需求不明确时 approved_to_create 必须为 false，本轮通过 final_summary 询问用户，用户回答应在下一轮作为更完整的 skill_request 进入。除非已有能力明显满足且用户没有表达仍要创建/改进，否则需求明确时默认 approved_to_create 为 true。confirmed_skill_requirement 写 Markdown，概括当前已确认的目标、输入、输出、权限、是否需要 before_llm.py、是否需要 after_llm.py、requirements.txt 需求和限制。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -679,6 +822,10 @@
           "required": true
         },
         {
+          "state": "existing_skill_package",
+          "required": false
+        },
+        {
           "state": "capability_gap",
           "required": false
         }
@@ -693,7 +840,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "整理给 TooGraph Skill Builder 的最终上下文。builder_context 写 Markdown，包含：目标 Skill 名称建议、稳定 skillKey 建议、用户需求、上游 capability_gap 摘要、示例输入输出、outputSchema 字段建议、是否需要 before_llm.py、是否需要 after_llm.py、requirements.txt 需求、权限声明、测试重点和禁止事项。强调生成结果只包含 skill_key、skill_json、skill_md、before_llm_py、after_llm_py、requirements_txt。",
+        "taskInstruction": "整理给 TooGraph Skill Builder 的最终上下文。builder_context 写 Markdown，包含：目标 Skill 名称建议、稳定 skillKey 建议、用户需求、上游 capability_gap 摘要、existing_skill_package 摘要、示例输入输出、outputSchema 字段建议、是否需要 before_llm.py、是否需要 after_llm.py、requirements.txt 需求、权限声明、测试重点和禁止事项。若 existing_skill_package 存在，必须列出旧 skill.json / SKILL.md / before_llm.py / after_llm.py / requirements.txt 中需要保留、修改或删除的点；改进官方 Skill 时应写入 skill/user/<skillKey>/ 作为用户可恢复版本，不要改 official 包。强调生成结果只包含 skill_key、skill_json、skill_md、before_llm_py、after_llm_py、requirements_txt。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1565,8 +1712,16 @@
   },
   "edges": [
     {
+      "source": "input_target_skill_key",
+      "target": "read_existing_skill_package"
+    },
+    {
       "source": "input_skill_request",
       "target": "select_existing_capability"
+    },
+    {
+      "source": "input_skill_request",
+      "target": "read_existing_skill_package"
     },
     {
       "source": "input_capability_gap",
@@ -1574,6 +1729,10 @@
     },
     {
       "source": "select_existing_capability",
+      "target": "review_requirement"
+    },
+    {
+      "source": "read_existing_skill_package",
       "target": "review_requirement"
     },
     {

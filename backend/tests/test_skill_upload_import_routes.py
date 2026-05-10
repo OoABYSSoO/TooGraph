@@ -175,12 +175,16 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                             "buddy_home_writer",
                             "buddy_visible_subgraph_result_adapter",
                             "toograph_script_tester",
+                            "toograph_graph_template_reader",
+                            "toograph_graph_template_validator",
+                            "toograph_graph_template_writer",
                             "toograph_skill_builder",
                             "toograph_capability_selector",
                             "toograph_page_operator",
                             "local_workspace_executor",
                             "memory_candidate_writer",
                             "memory_recall",
+                            "toograph_skill_package_reader",
                             "web_search",
                         ]
                     ),
@@ -217,6 +221,19 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                         "/skill/official/toograph_script_tester/skill.json"
                     )
                 )
+                for skill_key in [
+                    "toograph_graph_template_reader",
+                    "toograph_graph_template_validator",
+                    "toograph_graph_template_writer",
+                ]:
+                    with self.subTest(skill_key=skill_key):
+                        self.assertEqual(catalog_items[skill_key]["sourceScope"], "official")
+                        self.assertFalse(catalog_items[skill_key]["canManage"])
+                        self.assertTrue(catalog_items[skill_key]["runtimeReady"])
+                        self.assertTrue(catalog_items[skill_key]["runtimeRegistered"])
+                        self.assertTrue(
+                            source_path[skill_key].endswith(f"/skill/official/{skill_key}/skill.json")
+                        )
                 self.assertEqual(catalog_items["local_workspace_executor"]["sourceScope"], "official")
                 self.assertFalse(catalog_items["local_workspace_executor"]["canManage"])
                 self.assertTrue(catalog_items["local_workspace_executor"]["runtimeReady"])
@@ -249,6 +266,15 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                         "/skill/official/memory_candidate_writer/skill.json"
                     )
                 )
+                self.assertEqual(catalog_items["toograph_skill_package_reader"]["sourceScope"], "official")
+                self.assertFalse(catalog_items["toograph_skill_package_reader"]["canManage"])
+                self.assertTrue(catalog_items["toograph_skill_package_reader"]["runtimeReady"])
+                self.assertTrue(catalog_items["toograph_skill_package_reader"]["runtimeRegistered"])
+                self.assertTrue(
+                    source_path["toograph_skill_package_reader"].endswith(
+                        "/skill/official/toograph_skill_package_reader/skill.json"
+                    )
+                )
                 self.assertNotIn("compatibility", catalog_items["web_search"])
 
                 settings_path = state_dir / "settings.json"
@@ -259,6 +285,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(settings_payload["entries"]["web_search"], {"enabled": True})
                 self.assertEqual(settings_payload["entries"]["memory_recall"], {"enabled": True})
                 self.assertEqual(settings_payload["entries"]["memory_candidate_writer"], {"enabled": True})
+                self.assertEqual(settings_payload["entries"]["toograph_skill_package_reader"], {"enabled": True})
 
     def test_official_skill_visibility_can_be_disabled_in_local_settings(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -123,6 +123,56 @@ def archive_memory(
     )
 
 
+def replace_memory_candidate(
+    memory_id: str,
+    *,
+    supersedes: list[str] | None = None,
+    changed_by: str = "system",
+    change_reason: str = "",
+) -> dict[str, Any]:
+    previous = get_memory(memory_id)
+    superseded_ids = [_normalize_identifier(item) for item in (supersedes or previous.get("supersedes") or [])]
+    superseded_ids = [item for item in superseded_ids if item and item != memory_id]
+    superseded_records = [get_memory(item) for item in superseded_ids]
+    next_value = {
+        **previous,
+        "status": "active",
+        "supersedes": superseded_ids,
+        "updated_at": utc_now_iso(),
+    }
+    replacement = _persist_memory_update(
+        previous,
+        next_value,
+        action="replace",
+        changed_by=changed_by,
+        change_reason=change_reason,
+    )
+    archived: list[dict[str, Any]] = []
+    for superseded in superseded_records:
+        archived_value = {
+            **superseded,
+            "status": "archived",
+            "updated_at": utc_now_iso(),
+        }
+        archived.append(
+            _persist_memory_update(
+                superseded,
+                archived_value,
+                action="supersede",
+                changed_by=changed_by,
+                change_reason=change_reason,
+                event_payload={
+                    "superseded_by": memory_id,
+                    "current_value": archived_value,
+                },
+            )
+        )
+    return {
+        "replacement": replacement,
+        "superseded": archived,
+    }
+
+
 def degrade_memory(
     memory_id: str,
     *,

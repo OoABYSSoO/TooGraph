@@ -25,6 +25,10 @@ class MemoryRestorePayload(MemoryLifecyclePayload):
     target: Literal["previous", "next"] = "previous"
 
 
+class MemoryReplacePayload(MemoryLifecyclePayload):
+    supersedes: list[str] | None = None
+
+
 @router.get("")
 def list_memories_endpoint(
     scope: str = Query(default=""),
@@ -56,6 +60,19 @@ def reject_memory_endpoint(memory_id: str, payload: MemoryLifecyclePayload) -> d
         return store.reject_memory_candidate(memory_id, changed_by="user", change_reason=payload.change_reason)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Memory not found") from exc
+
+
+@router.post("/{memory_id}/replace")
+def replace_memory_endpoint(memory_id: str, payload: MemoryReplacePayload) -> dict[str, Any]:
+    try:
+        return store.replace_memory_candidate(
+            memory_id,
+            supersedes=payload.supersedes,
+            changed_by="user",
+            change_reason=payload.change_reason,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Memory or superseded memory not found") from exc
 
 
 @router.post("/{memory_id}/archive")

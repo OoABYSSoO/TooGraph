@@ -36,6 +36,20 @@ test("BuddyPage manages profile, policy, memories, summary, and revisions", () =
   assert.match(source, /validateBuddyRunTemplateBinding/);
 });
 
+test("BuddyPage exposes platform memory candidate review actions", () => {
+  assert.match(source, /fetchPlatformMemories/);
+  assert.match(source, /applyPlatformMemoryCandidate/);
+  assert.match(source, /replacePlatformMemoryCandidate/);
+  assert.match(source, /rejectPlatformMemoryCandidate/);
+  assert.match(source, /archivePlatformMemory/);
+  assert.match(source, /const platformMemoryCandidates = ref<PlatformMemory\[\]>\(\[\]\);/);
+  assert.match(source, /<ElTable :data="platformMemoryCandidates"/);
+  assert.match(source, /platformMemoryActionId === platformMemoryActionKey\('apply', row\.id\)/);
+  assert.match(source, /platformMemoryActionId === platformMemoryActionKey\('replace', row\.id\)/);
+  assert.match(source, /reviewPlatformMemoryCandidate\(row, 'reject'\)/);
+  assert.match(source, /formatPlatformMemorySource\(row\.source\)/);
+});
+
 test("BuddyPage opens template binding first and renders it as Buddy input rows", () => {
   const bindingIndex = source.indexOf('name="binding"');
   const profileIndex = source.indexOf('name="profile"');

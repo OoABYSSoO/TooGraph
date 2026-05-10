@@ -107,6 +107,7 @@ class TemplateLayoutTests(unittest.TestCase):
                 "advanced_web_research_loop",
                 "buddy_autonomous_loop",
                 "buddy_capability_loop",
+                "toograph_graph_template_creation_workflow",
                 "toograph_page_operation_workflow",
                 "toograph_skill_creation_workflow",
             ],
@@ -144,6 +145,12 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(page_operation_template["label"], "操作 TooGraph 页面")
         self.assertEqual(page_operation_template["default_graph_name"], "操作 TooGraph 页面")
         self.assertIn("页面操作", page_operation_template["description"])
+
+        graph_template = templates["toograph_graph_template_creation_workflow"]
+        self.assertEqual(graph_template["source"], "official")
+        self.assertEqual(graph_template["label"], "创建图模板")
+        self.assertEqual(graph_template["default_graph_name"], "创建图模板")
+        self.assertIn("图模板", graph_template["description"])
 
     def test_official_templates_do_not_embed_breakpoint_metadata(self) -> None:
         for template in _official_template_records():
@@ -316,6 +323,10 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
         self.assertNotIn("interrupt_after", template["metadata"])
         self.assertNotIn("agent_breakpoint_timing", template["metadata"])
+        self.assertEqual(states["target_skill_key"]["type"], "text")
+        self.assertEqual(states["existing_skill_package_success"]["type"], "boolean")
+        self.assertEqual(states["existing_skill_package"]["type"], "json")
+        self.assertEqual(states["existing_skill_package_result"]["type"], "markdown")
         self.assertEqual(states["existing_capability"]["type"], "json")
         self.assertEqual(states["existing_capability_found"]["type"], "boolean")
         self.assertEqual(states["capability_gap"]["type"], "json")
@@ -370,6 +381,26 @@ class TemplateLayoutTests(unittest.TestCase):
             {"state": "existing_capability_found", "required": False},
             _read_contracts(nodes["review_requirement"]["reads"]),
         )
+        package_reader_node = nodes["read_existing_skill_package"]
+        self.assertEqual(package_reader_node["kind"], "agent")
+        self.assertEqual(package_reader_node["config"]["skillKey"], "toograph_skill_package_reader")
+        self.assertEqual(
+            package_reader_node["config"]["skillBindings"],
+            [
+                {
+                    "skillKey": "toograph_skill_package_reader",
+                    "outputMapping": {
+                        "success": "existing_skill_package_success",
+                        "skill_package": "existing_skill_package",
+                        "result": "existing_skill_package_result",
+                    },
+                }
+            ],
+        )
+        self.assertIn({"state": "existing_skill_package", "required": False}, _read_contracts(nodes["review_requirement"]["reads"]))
+        self.assertIn("改进已有 Skill", nodes["review_requirement"]["config"]["taskInstruction"])
+        self.assertIn({"state": "existing_skill_package", "required": False}, _read_contracts(nodes["prepare_builder_context"]["reads"]))
+        self.assertIn("existing_skill_package", nodes["prepare_builder_context"]["config"]["taskInstruction"])
 
         builder_node = nodes["build_skill_files"]
         self.assertEqual(builder_node["kind"], "agent")
@@ -453,6 +484,8 @@ class TemplateLayoutTests(unittest.TestCase):
             ],
         )
         self.assertIn({"source": "ask_clarification", "target": "output_final"}, template["edges"])
+        self.assertIn({"source": "input_target_skill_key", "target": "read_existing_skill_package"}, template["edges"])
+        self.assertIn({"source": "read_existing_skill_package", "target": "review_requirement"}, template["edges"])
         self.assertIn({"source": "draft_example_io", "target": "prepare_builder_context"}, template["edges"])
         self.assertNotIn({"source": "draft_example_io", "target": "review_example_feedback"}, template["edges"])
         self.assertTrue(nodes)
@@ -519,6 +552,144 @@ class TemplateLayoutTests(unittest.TestCase):
             {"script_test_passed": 3},
         )
 
+    def test_toograph_graph_template_creation_workflow_contract(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "toograph_graph_template_creation_workflow"
+        )
+        states = template["state_schema"]
+        nodes = template["nodes"]
+
+        self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
+        self.assertEqual(template["metadata"]["category"], "graph_template")
+        self.assertNotIn("interrupt_after", template["metadata"])
+        self.assertEqual(states["template_request"]["type"], "text")
+        self.assertEqual(states["target_template_id"]["type"], "text")
+        self.assertEqual(states["capability_gap"]["type"], "json")
+        self.assertEqual(states["existing_template_success"]["type"], "boolean")
+        self.assertEqual(states["existing_template_package"]["type"], "json")
+        self.assertEqual(states["existing_template_result"]["type"], "markdown")
+        self.assertEqual(states["graph_diff_draft"]["type"], "json")
+        self.assertEqual(states["template_preview"]["type"], "markdown")
+        self.assertEqual(states["generated_template_id"]["type"], "text")
+        self.assertEqual(states["generated_template_json"]["type"], "json")
+        self.assertEqual(states["validation_success"]["type"], "boolean")
+        self.assertEqual(states["validation_report"]["type"], "json")
+        self.assertEqual(states["write_template_success"]["type"], "boolean")
+        self.assertEqual(states["write_template_result"]["type"], "markdown")
+        self.assertEqual(states["written_template_path"]["type"], "text")
+        self.assertEqual(states["written_template_revision_id"]["type"], "text")
+        self.assertEqual(states["test_run_decision"]["type"], "json")
+        self.assertEqual(states["template_test_goal"]["type"], "text")
+        self.assertEqual(states["test_run_final_reply"]["type"], "markdown")
+        self.assertEqual(states["test_run_report"]["type"], "json")
+        self.assertEqual(states["final_summary"]["type"], "markdown")
+
+        reader_node = nodes["read_existing_template"]
+        self.assertEqual(reader_node["kind"], "agent")
+        self.assertEqual(reader_node["config"]["skillKey"], "toograph_graph_template_reader")
+        self.assertEqual(
+            reader_node["config"]["skillBindings"][0]["outputMapping"],
+            {
+                "success": "existing_template_success",
+                "template_package": "existing_template_package",
+                "result": "existing_template_result",
+            },
+        )
+
+        validator_node = nodes["validate_template_json"]
+        self.assertEqual(validator_node["kind"], "agent")
+        self.assertEqual(validator_node["config"]["skillKey"], "toograph_graph_template_validator")
+        self.assertEqual(
+            validator_node["config"]["skillBindings"][0]["outputMapping"],
+            {
+                "success": "validation_success",
+                "validation_report": "validation_report",
+            },
+        )
+
+        writer_node = nodes["write_template_json"]
+        self.assertEqual(writer_node["kind"], "agent")
+        self.assertEqual(writer_node["config"]["skillKey"], "toograph_graph_template_writer")
+        self.assertEqual(
+            writer_node["config"]["skillBindings"][0]["outputMapping"],
+            {
+                "success": "write_template_success",
+                "result": "write_template_result",
+                "template_id": "written_template_id",
+                "template_path": "written_template_path",
+                "revision_id": "written_template_revision_id",
+            },
+        )
+        self.assertIn("需确认", writer_node["config"]["taskInstruction"])
+        self.assertIn("graph_template/user", writer_node["config"]["taskInstruction"])
+
+        review_node = nodes["review_generated_template"]
+        self.assertIn("graph_diff_draft", review_node["config"]["taskInstruction"])
+        self.assertIn("template_preview", review_node["config"]["taskInstruction"])
+        self.assertIn("validation_report", review_node["config"]["taskInstruction"])
+
+        test_run_node = nodes["run_template_test"]
+        self.assertEqual(test_run_node["kind"], "subgraph")
+        self.assertEqual(test_run_node["config"]["graph"]["metadata"]["role"], "page_operation_workflow")
+        self.assertEqual(_read_contracts(test_run_node["reads"]), [{"state": "template_test_goal", "required": True}])
+        self.assertEqual(
+            test_run_node["writes"],
+            [
+                {"state": "test_run_final_reply", "mode": "replace"},
+                {"state": "test_run_report", "mode": "replace"},
+            ],
+        )
+
+        self.assertIn({"source": "input_target_template_id", "target": "read_existing_template"}, template["edges"])
+        self.assertIn({"source": "read_existing_template", "target": "review_template_requirement"}, template["edges"])
+        self.assertIn({"source": "validate_template_json", "target": "validation_passed"}, template["edges"])
+        self.assertIn({"source": "review_generated_template", "target": "write_template_json"}, template["edges"])
+        self.assertIn({"source": "write_template_json", "target": "should_run_template_test"}, template["edges"])
+        self.assertIn({"source": "run_template_test", "target": "finalize_written_template"}, template["edges"])
+        self.assertEqual(
+            nodes["validation_passed"]["config"]["rule"],
+            {"source": "$state.validation_success", "operator": "==", "value": True},
+        )
+        self.assertEqual(nodes["validation_passed"]["config"]["loopLimit"], 3)
+        self.assertEqual(
+            nodes["should_run_template_test"]["config"]["rule"],
+            {"source": "$state.test_run_decision.should_run", "operator": "==", "value": True},
+        )
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
+            ["output_final"],
+        )
+        self.assertEqual(_read_contracts(nodes["output_final"]["reads"]), [{"state": "final_summary", "required": True}])
+
+    def test_toograph_graph_template_creation_workflow_is_runtime_compatible(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "toograph_graph_template_creation_workflow"
+        )
+        payload = {
+            key: value
+            for key, value in template.items()
+            if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+        }
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **payload,
+                "graph_id": "test_toograph_graph_template_creation_workflow",
+                "name": template["default_graph_name"],
+            }
+        )
+
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+        cycle_tracker = build_langgraph_cycle_tracker(graph, build_execution_edges(graph))
+        self.assertTrue(cycle_tracker["has_cycle"])
+        self.assertEqual(cycle_tracker["loop_limits_by_source"], {"validation_passed": 3})
+
     def test_buddy_autonomous_loop_contract(self) -> None:
         template = next(record for record in _official_template_records() if record["template_id"] == "buddy_autonomous_loop")
         states = template["state_schema"]
@@ -534,6 +705,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["capability_result"]["type"], "result_package")
         self.assertEqual(states["capability_selection_audit"]["type"], "json")
         self.assertEqual(states["capability_gap"]["type"], "json")
+        self.assertEqual(states["capability_builder_handoff"]["type"], "json")
         self.assertEqual(states["capability_trace"]["type"], "json")
         self.assertNotIn("visible_page_operation_capability", states)
         self.assertEqual(states["visible_reply"]["type"], "markdown")
@@ -736,6 +908,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertNotIn("interrupt_after", cycle_graph["metadata"])
         self.assertNotIn("auto_resume_after_ui_operation_nodes", cycle_graph["metadata"])
         self.assertEqual(cycle_graph["metadata"]["role"], "buddy_capability_loop")
+        self.assertIn({"state": "capability_builder_handoff", "mode": "replace"}, nodes["buddy_capability_loop"]["writes"])
         self.assertEqual(cycle_graph["state_schema"]["context_brief"]["type"], "json")
         self.assertEqual(cycle_graph["state_schema"]["task_plan"]["type"], "json")
         selector_node = cycle_graph["nodes"]["select_capability"]
@@ -772,6 +945,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(cycle_graph["state_schema"]["capability_result"]["type"], "result_package")
         self.assertEqual(cycle_graph["state_schema"]["capability_selection_audit"]["type"], "json")
         self.assertEqual(cycle_graph["state_schema"]["capability_gap"]["type"], "json")
+        self.assertEqual(cycle_graph["state_schema"]["capability_builder_handoff"]["type"], "json")
         self.assertEqual(cycle_graph["state_schema"]["capability_trace"]["type"], "json")
         self.assertNotIn("visible_page_operation_capability", cycle_graph["state_schema"])
         self.assertNotIn("visible_subgraph_operation_result", cycle_graph["state_schema"])
@@ -859,9 +1033,17 @@ class TemplateLayoutTests(unittest.TestCase):
             _read_contracts(cycle_graph["nodes"]["output_capability_selection_audit"]["reads"]),
             [{"state": "capability_selection_audit", "required": False}],
         )
+        self.assertEqual(
+            _read_contracts(cycle_graph["nodes"]["output_capability_builder_handoff"]["reads"]),
+            [{"state": "capability_builder_handoff", "required": False}],
+        )
         missing_node = cycle_graph["nodes"]["review_missing_capability"]
         self.assertIn({"state": "capability_gap", "mode": "replace"}, missing_node["writes"])
+        self.assertIn({"state": "capability_builder_handoff", "mode": "replace"}, missing_node["writes"])
         self.assertIn("should_offer_build", missing_node["config"]["taskInstruction"])
+        self.assertIn("capability_builder_handoff", missing_node["config"]["taskInstruction"])
+        self.assertIn("toograph_skill_creation_workflow", missing_node["config"]["taskInstruction"])
+        self.assertIn("toograph_graph_template_creation_workflow", missing_node["config"]["taskInstruction"])
         review_node = cycle_graph["nodes"]["review_capability_result"]
         self.assertIn({"state": "capability_trace", "mode": "append"}, review_node["writes"])
         self.assertIn("capability_result.outputs.validation_report.value", review_node["config"]["taskInstruction"])
@@ -927,9 +1109,11 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(final_reply_node["writes"], [{"state": "final_reply", "mode": "replace"}])
         self.assertIn({"state": "capability_result", "required": False}, _read_contracts(final_reply_node["reads"]))
         self.assertIn({"state": "capability_review", "required": False}, _read_contracts(final_reply_node["reads"]))
+        self.assertIn({"state": "capability_builder_handoff", "required": False}, _read_contracts(final_reply_node["reads"]))
         self.assertIn({"state": "visible_reply", "required": False}, _read_contracts(final_reply_node["reads"]))
         self.assertIn("不要暴露内部 state 名称", final_reply_node["config"]["taskInstruction"])
         self.assertIn("needs_clarification", final_reply_node["config"]["taskInstruction"])
+        self.assertIn("capability_builder_handoff", final_reply_node["config"]["taskInstruction"])
 
     def test_buddy_internal_templates_are_hidden_but_loadable(self) -> None:
         public_template_ids = {record["template_id"] for record in _official_template_records()}
@@ -1203,12 +1387,27 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template["label"], "自主复盘")
         self.assertEqual(states["final_reply"]["type"], "markdown")
         self.assertEqual(states["autonomous_review"]["type"], "json")
-        self.assertEqual(states["writeback_commands"]["type"], "json")
-        self.assertEqual(states["writeback_result"]["type"], "markdown")
-        self.assertEqual(states["writeback_revisions"]["type"], "json")
+        self.assertEqual(template["metadata"]["permissions"], ["memory_candidate_write"])
+        self.assertNotIn("buddy_home_write", template["metadata"]["permissions"])
+        self.assertEqual(states["improvement_candidates"]["type"], "json")
+        self.assertEqual(states["memory_candidate_plan"]["type"], "json")
+        self.assertEqual(states["memory_candidate_success"]["type"], "boolean")
+        self.assertEqual(states["candidate_memories"]["type"], "json")
+        self.assertEqual(states["skipped_memory_candidates"]["type"], "json")
+        self.assertEqual(states["memory_candidate_result"]["type"], "markdown")
+        for removed_state in [
+            "writeback_commands",
+            "writeback_success",
+            "writeback_result",
+            "applied_writeback_commands",
+            "skipped_writeback_commands",
+            "writeback_revisions",
+        ]:
+            self.assertNotIn(removed_state, states)
         self.assertNotIn("buddy_mode", states)
         self.assertNotIn("input_buddy_mode", nodes)
         for node in nodes.values():
+            self.assertNotEqual(node.get("config", {}).get("skillKey"), "buddy_home_writer")
             for read in node.get("reads", []):
                 self.assertNotEqual(read.get("state"), "buddy_mode")
         for edge in template["edges"]:
@@ -1217,43 +1416,61 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "subgraph"], [])
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
-            ["output_autonomous_review", "output_writeback_result", "output_writeback_revisions"],
+            [
+                "output_autonomous_review",
+                "output_improvement_candidates",
+                "output_candidate_memories",
+                "output_memory_candidate_result",
+            ],
         )
         self.assertEqual(nodes["decide_autonomous_review"]["kind"], "agent")
         self.assertEqual(nodes["decide_autonomous_review"]["config"]["thinkingMode"], "low")
-        self.assertEqual(nodes["should_write_buddy_home"]["kind"], "condition")
         self.assertEqual(
-            nodes["should_write_buddy_home"]["config"]["rule"],
-            {"source": "$state.autonomous_review.should_write", "operator": "==", "value": True},
+            nodes["decide_autonomous_review"]["writes"],
+            [
+                {"state": "autonomous_review", "mode": "replace"},
+                {"state": "improvement_candidates", "mode": "replace"},
+                {"state": "memory_candidate_plan", "mode": "replace"},
+            ],
         )
-        writer_node = nodes["apply_buddy_home_writeback"]
+        self.assertIn("不要直接写 Buddy Home", nodes["decide_autonomous_review"]["config"]["taskInstruction"])
+        self.assertIn("improvement_candidates", nodes["decide_autonomous_review"]["config"]["taskInstruction"])
+        self.assertEqual(nodes["has_memory_candidates"]["kind"], "condition")
+        self.assertEqual(
+            nodes["has_memory_candidates"]["config"]["rule"],
+            {"source": "$state.memory_candidate_plan.has_candidates", "operator": "==", "value": True},
+        )
+        writer_node = nodes["write_memory_candidates"]
         self.assertEqual(writer_node["kind"], "agent")
-        self.assertEqual(writer_node["config"]["skillKey"], "buddy_home_writer")
+        self.assertEqual(writer_node["config"]["skillKey"], "memory_candidate_writer")
         self.assertEqual(
             writer_node["config"]["skillBindings"],
             [
                 {
-                    "skillKey": "buddy_home_writer",
+                    "skillKey": "memory_candidate_writer",
                     "outputMapping": {
-                        "success": "writeback_success",
-                        "result": "writeback_result",
-                        "applied_commands": "applied_writeback_commands",
-                        "skipped_commands": "skipped_writeback_commands",
-                        "revisions": "writeback_revisions",
+                        "success": "memory_candidate_success",
+                        "candidate_memories": "candidate_memories",
+                        "skipped_candidates": "skipped_memory_candidates",
+                        "result": "memory_candidate_result",
                     },
                 }
             ],
         )
-        self.assertIn({"source": "decide_autonomous_review", "target": "should_write_buddy_home"}, template["edges"])
+        self.assertIn({"source": "decide_autonomous_review", "target": "output_autonomous_review"}, template["edges"])
+        self.assertIn({"source": "decide_autonomous_review", "target": "output_improvement_candidates"}, template["edges"])
+        self.assertIn({"source": "decide_autonomous_review", "target": "has_memory_candidates"}, template["edges"])
+        self.assertIn({"source": "write_memory_candidates", "target": "output_candidate_memories"}, template["edges"])
+        self.assertIn({"source": "write_memory_candidates", "target": "output_memory_candidate_result"}, template["edges"])
         self.assertEqual(
             template["conditional_edges"],
             [
                 {
-                    "source": "should_write_buddy_home",
+                    "source": "has_memory_candidates",
                     "branches": {
-                        "true": "apply_buddy_home_writeback",
-                        "false": "output_autonomous_review",
-                        "exhausted": "output_autonomous_review",
+                        "true": "write_memory_candidates",
+                        "false": "output_improvement_candidates",
+                        "exhausted": "output_improvement_candidates",
                     },
                 }
             ],

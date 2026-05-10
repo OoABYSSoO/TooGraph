@@ -1,7 +1,7 @@
 {
   "template_id": "buddy_autonomous_review",
   "label": "自主复盘",
-  "description": "在伙伴可见回复完成后后台复盘本轮运行，自主判断是否需要写回 Buddy Home，并通过受控 writer 生成可追溯 revision。",
+  "description": "在伙伴可见回复完成后后台复盘本轮运行，输出可审查的改进候选，并仅把记忆沉淀写成 candidate 状态。",
   "default_graph_name": "自主复盘",
   "state_schema": {
     "source_run_id": {
@@ -88,87 +88,84 @@
     },
     "autonomous_review": {
       "name": "autonomous_review",
-      "description": "本轮自主复盘结论，包含是否写回、理由、证据、风险标记和跳过原因。",
+      "description": "本轮自主复盘结论，包含候选数量、理由、证据、风险标记和跳过原因。",
       "type": "json",
       "value": {},
       "color": "#9333ea",
       "binding": null
     },
-    "writeback_commands": {
-      "name": "writeback_commands",
-      "description": "将交给 Buddy Home Writer 的受控写回命令数组；无写回时为空数组。",
+    "improvement_candidates": {
+      "name": "improvement_candidates",
+      "description": "后台复盘产出的可审查改进候选；不会直接应用高风险或持久变更。",
       "type": "json",
       "value": [],
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "memory_candidate_plan": {
+      "name": "memory_candidate_plan",
+      "description": "交给候选记忆写入器的计划；只包含 candidate 状态记忆建议。",
+      "type": "json",
+      "value": {
+        "has_candidates": false,
+        "candidates": []
+      },
       "color": "#22c55e",
       "binding": null
     },
-    "writeback_success": {
-      "name": "writeback_success",
-      "description": "Buddy Home Writer 是否成功应用全部安全命令。",
+    "memory_candidate_success": {
+      "name": "memory_candidate_success",
+      "description": "候选记忆写入器是否成功创建全部候选记录。",
       "type": "boolean",
       "value": false,
       "color": "#16a34a",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "buddy_home_writer",
-        "nodeId": "apply_buddy_home_writeback",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_memory_candidates",
         "fieldKey": "success",
         "managed": true
       }
     },
-    "writeback_result": {
-      "name": "writeback_result",
-      "description": "Buddy Home Writer 写回摘要。",
-      "type": "markdown",
-      "value": "",
-      "color": "#15803d",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_home_writer",
-        "nodeId": "apply_buddy_home_writeback",
-        "fieldKey": "result",
-        "managed": true
-      }
-    },
-    "applied_writeback_commands": {
-      "name": "applied_writeback_commands",
-      "description": "已应用的 Buddy Home command 记录和结果。",
+    "candidate_memories": {
+      "name": "candidate_memories",
+      "description": "已写入平台记忆库的 candidate 状态记忆记录。",
       "type": "json",
       "value": [],
       "color": "#059669",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "buddy_home_writer",
-        "nodeId": "apply_buddy_home_writeback",
-        "fieldKey": "applied_commands",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_memory_candidates",
+        "fieldKey": "candidate_memories",
         "managed": true
       }
     },
-    "skipped_writeback_commands": {
-      "name": "skipped_writeback_commands",
-      "description": "因无效或越过安全边界而被跳过的写回命令。",
+    "skipped_memory_candidates": {
+      "name": "skipped_memory_candidates",
+      "description": "因缺少证据、内容无效或写入失败而跳过的候选记忆。",
       "type": "json",
       "value": [],
       "color": "#dc2626",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "buddy_home_writer",
-        "nodeId": "apply_buddy_home_writeback",
-        "fieldKey": "skipped_commands",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_memory_candidates",
+        "fieldKey": "skipped_candidates",
         "managed": true
       }
     },
-    "writeback_revisions": {
-      "name": "writeback_revisions",
-      "description": "本次自主复盘写回产生的 Buddy Home revision 列表。",
-      "type": "json",
-      "value": [],
-      "color": "#0d9488",
+    "memory_candidate_result": {
+      "name": "memory_candidate_result",
+      "description": "候选记忆写入摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#15803d",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "buddy_home_writer",
-        "nodeId": "apply_buddy_home_writeback",
-        "fieldKey": "revisions",
+        "skillKey": "memory_candidate_writer",
+        "nodeId": "write_memory_candidates",
+        "fieldKey": "result",
         "managed": true
       }
     }
@@ -394,7 +391,7 @@
     "decide_autonomous_review": {
       "kind": "agent",
       "name": "判断自主复盘",
-      "description": "复盘已完成的可见 Buddy 运行，自主决定是否把稳定信息写回 Buddy Home。",
+      "description": "复盘已完成的可见 Buddy 运行，生成可审查的改进候选和候选记忆计划。",
       "ui": {
         "position": {
           "x": 620,
@@ -450,7 +447,11 @@
           "mode": "replace"
         },
         {
-          "state": "writeback_commands",
+          "state": "improvement_candidates",
+          "mode": "replace"
+        },
+        {
+          "state": "memory_candidate_plan",
           "mode": "replace"
         }
       ],
@@ -458,17 +459,17 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "你在可见回复完成后进行后台自主复盘。不要向用户请求确认是否写 Buddy Home；是否写入由你判断。只沉淀稳定、可复用、低风险的信息，例如用户长期偏好、明确资料修正、会话摘要、伙伴表达风格小幅调整、精炼复盘报告和本轮实际能力使用统计。不要沉淀临时路径、一次性错误、完整日志、可从当前图重读的信息、敏感内容或权限升级。\n\n必须输出两个 state：\n1. autonomous_review：JSON 对象，包含 should_write(boolean)、reason(string)、evidence(array)、targets(array)、risk_flags(array)、skipped_reason(string)、source_run_id(string)。should_write 只有在 writeback_commands 非空且均为低风险命令时才为 true。\n2. writeback_commands：JSON 数组。无写回时必须是 []。允许 action 仅限 memory.create、memory.update、memory.delete、session_summary.update、profile.update、policy.update、report.create、capability_usage_stats.update。每个命令包含 action、payload、可选 target_id、change_reason。policy.update 只能用于 communication_preferences 这类非权限沟通偏好，不得包含 graph_permission_mode、behavior_boundaries 或未声明的 policy 字段。report.create 只能写 title、summary、content、可选 kind 和 source，用于保存精炼复盘报告，不能保存完整日志。capability_usage_stats.update 只能根据本轮实际 capability_trace / capability_result 写入，payload 包含 capability(kind/key/name)、success、run_id、summary、可选 duration_ms，或 entries 数组。不要输出 revision.restore、graph_patch.draft、文件写入、脚本执行或网络动作。",
+        "taskInstruction": "你在可见回复完成后进行后台自主复盘。不要直接写 Buddy Home，不要输出 writeback_commands，不要申请权限升级，不要生成文件写入、脚本执行、联网或图修改动作。所有持久化建议都必须是可审查候选；其中记忆沉淀只允许进入 memory_candidate_plan，再由候选记忆写入器保存为 candidate 状态。\n\n只沉淀稳定、可复用、有证据的信息，例如用户长期偏好、明确资料修正、会话摘要、伙伴表达风格小幅调整、精炼复盘报告建议和本轮实际能力使用统计。不要沉淀临时路径、一次性错误、完整日志、可从当前图重读的信息、敏感内容或权限边界变化。\n\n必须输出三个 state：\n1. autonomous_review：JSON 对象，包含 should_propose(boolean)、reason(string)、evidence(array)、risk_flags(array)、skipped_reason(string)、source_run_id(string)、has_memory_candidates(boolean)、candidate_counts(object)。has_memory_candidates 必须与 memory_candidate_plan.has_candidates 一致。\n2. improvement_candidates：JSON 数组。每项是待审查候选，包含 kind、title、summary、evidence、risk_level、review_required(true)、apply_path、source_run_id。允许 kind 为 memory_candidate、session_summary_candidate、profile_preference_candidate、policy_suggestion、skill_revision_candidate、graph_patch_candidate、template_candidate、report_candidate、capability_stats_candidate。高风险内容只能作为候选说明，不得应用。\n3. memory_candidate_plan：JSON 对象，形如 {\"has_candidates\": boolean, \"candidates\": []}。candidates 只放需要进入平台记忆候选库的条目；每条必须兼容 memory_candidate_writer：scope、layer、type、summary、content、confidence、importance、evidence、artifact_refs，可选 source、supersedes。没有候选时 has_candidates=false 且 candidates=[]。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "low",
         "temperature": 0.1
       }
     },
-    "should_write_buddy_home": {
+    "has_memory_candidates": {
       "kind": "condition",
-      "name": "需要写回?",
-      "description": "只有自主复盘明确需要低风险写回时才执行 Buddy Home Writer；否则只输出复盘审计。",
+      "name": "存在候选记忆?",
+      "description": "只有自主复盘明确生成平台记忆候选时才调用候选记忆写入器。",
       "ui": {
         "position": {
           "x": 1176,
@@ -482,7 +483,7 @@
       },
       "reads": [
         {
-          "state": "autonomous_review",
+          "state": "memory_candidate_plan",
           "required": true
         }
       ],
@@ -499,16 +500,16 @@
           "false": "false"
         },
         "rule": {
-          "source": "$state.autonomous_review.should_write",
+          "source": "$state.memory_candidate_plan.has_candidates",
           "operator": "==",
           "value": true
         }
       }
     },
-    "apply_buddy_home_writeback": {
+    "write_memory_candidates": {
       "kind": "agent",
-      "name": "受控写回 Buddy Home",
-      "description": "把自主复盘生成的安全命令交给 Buddy Home Writer，通过 command 和 revision 路径写入。",
+      "name": "写入候选记忆",
+      "description": "把自主复盘生成的记忆计划交给候选记忆写入器，只创建 candidate 状态记录。",
       "ui": {
         "position": {
           "x": 1700,
@@ -527,58 +528,57 @@
         },
         {
           "state": "autonomous_review",
-          "required": true
+          "required": false
         },
         {
-          "state": "writeback_commands",
+          "state": "improvement_candidates",
+          "required": false
+        },
+        {
+          "state": "memory_candidate_plan",
           "required": true
         }
       ],
       "writes": [
         {
-          "state": "writeback_success",
+          "state": "memory_candidate_success",
           "mode": "replace"
         },
         {
-          "state": "writeback_result",
+          "state": "candidate_memories",
           "mode": "replace"
         },
         {
-          "state": "applied_writeback_commands",
+          "state": "skipped_memory_candidates",
           "mode": "replace"
         },
         {
-          "state": "skipped_writeback_commands",
-          "mode": "replace"
-        },
-        {
-          "state": "writeback_revisions",
+          "state": "memory_candidate_result",
           "mode": "replace"
         }
       ],
       "config": {
-        "skillKey": "buddy_home_writer",
+        "skillKey": "memory_candidate_writer",
         "skillBindings": [
           {
-            "skillKey": "buddy_home_writer",
+            "skillKey": "memory_candidate_writer",
             "outputMapping": {
-              "success": "writeback_success",
-              "result": "writeback_result",
-              "applied_commands": "applied_writeback_commands",
-              "skipped_commands": "skipped_writeback_commands",
-              "revisions": "writeback_revisions"
+              "success": "memory_candidate_success",
+              "candidate_memories": "candidate_memories",
+              "skipped_candidates": "skipped_memory_candidates",
+              "result": "memory_candidate_result"
             }
           }
         ],
         "skillInstructionBlocks": {
-          "buddy_home_writer": {
-            "skillKey": "buddy_home_writer",
-            "title": "Buddy Home Writer instruction",
-            "content": "你已绑定 Buddy Home Writer。把 writeback_commands 原样作为 commands 输入，把 source_run_id 作为 run_id 输入。不要增加新命令，不要改写为通用文件写入，不要请求用户确认。技能会执行受控 command/revision 写回并返回原始结果。",
+          "memory_candidate_writer": {
+            "skillKey": "memory_candidate_writer",
+            "title": "Memory Candidate Writer instruction",
+            "content": "你已绑定候选记忆写入器。只把 memory_candidate_plan.candidates 原样作为 candidates 输入；把 source_run_id 作为 run_id，node_id 固定为 decide_autonomous_review，template_id 固定为 buddy_autonomous_review。不要新增候选，不要把候选改成 active，不要写 Buddy Home 或其他文件。",
             "source": "node.override"
           }
         },
-        "taskInstruction": "本节点只负责调用 Buddy Home Writer。commands 必须来自上游 writeback_commands；run_id 必须来自 source_run_id。不要总结、扩展、重写或伪造写回结果。",
+        "taskInstruction": "本节点只负责调用 memory_candidate_writer。candidates 必须来自 memory_candidate_plan.candidates；run_id 必须来自 source_run_id；node_id 使用 decide_autonomous_review；template_id 使用 buddy_autonomous_review。不要总结、扩展、重写或伪造候选写入结果。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "low",
@@ -610,9 +610,9 @@
         "fileNameTemplate": ""
       }
     },
-    "output_writeback_result": {
+    "output_improvement_candidates": {
       "kind": "output",
-      "name": "写回摘要",
+      "name": "改进候选",
       "description": "",
       "ui": {
         "position": {
@@ -623,21 +623,21 @@
       },
       "reads": [
         {
-          "state": "writeback_result",
-          "required": false
+          "state": "improvement_candidates",
+          "required": true
         }
       ],
       "writes": [],
       "config": {
-        "displayMode": "markdown",
+        "displayMode": "json",
         "persistEnabled": false,
         "persistFormat": "auto",
         "fileNameTemplate": ""
       }
     },
-    "output_writeback_revisions": {
+    "output_candidate_memories": {
       "kind": "output",
-      "name": "写回版本",
+      "name": "候选记忆",
       "description": "",
       "ui": {
         "position": {
@@ -648,13 +648,38 @@
       },
       "reads": [
         {
-          "state": "writeback_revisions",
+          "state": "candidate_memories",
           "required": false
         }
       ],
       "writes": [],
       "config": {
         "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_memory_candidate_result": {
+      "kind": "output",
+      "name": "候选记忆摘要",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 2256,
+          "y": 1518
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "memory_candidate_result",
+          "required": false
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "markdown",
         "persistEnabled": false,
         "persistFormat": "auto",
         "fileNameTemplate": ""
@@ -700,28 +725,32 @@
     },
     {
       "source": "decide_autonomous_review",
-      "target": "should_write_buddy_home"
-    },
-    {
-      "source": "apply_buddy_home_writeback",
       "target": "output_autonomous_review"
     },
     {
-      "source": "apply_buddy_home_writeback",
-      "target": "output_writeback_result"
+      "source": "decide_autonomous_review",
+      "target": "output_improvement_candidates"
     },
     {
-      "source": "apply_buddy_home_writeback",
-      "target": "output_writeback_revisions"
+      "source": "decide_autonomous_review",
+      "target": "has_memory_candidates"
+    },
+    {
+      "source": "write_memory_candidates",
+      "target": "output_candidate_memories"
+    },
+    {
+      "source": "write_memory_candidates",
+      "target": "output_memory_candidate_result"
     }
   ],
   "conditional_edges": [
     {
-      "source": "should_write_buddy_home",
+      "source": "has_memory_candidates",
       "branches": {
-        "true": "apply_buddy_home_writeback",
-        "false": "output_autonomous_review",
-        "exhausted": "output_autonomous_review"
+        "true": "write_memory_candidates",
+        "false": "output_improvement_candidates",
+        "exhausted": "output_improvement_candidates"
       }
     }
   ],
@@ -733,13 +762,13 @@
     "internal": true,
     "templateVersion": "2026-05-12",
     "permissions": [
-      "buddy_home_write"
+      "memory_candidate_write"
     ],
     "tags": [
       "buddy",
       "autonomous-review",
       "background",
-      "writeback"
+      "candidate-review"
     ]
   }
 }

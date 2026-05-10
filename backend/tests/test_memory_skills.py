@@ -168,6 +168,37 @@ class MemorySkillTests(unittest.TestCase):
             self.assertEqual(store.list_memory_revisions(candidate["id"])[0]["action"], "create")
             self.assertEqual(result["activity_events"][0]["kind"], "memory_candidate_write")
 
+    def test_memory_candidate_writer_accepts_candidate_plan_candidates(self) -> None:
+        candidate_writer = _load_skill_module(MEMORY_CANDIDATE_WRITER_SKILL_DIR)
+        with isolated_memory_database():
+            result = candidate_writer.memory_candidate_writer(
+                candidate_plan={
+                    "has_candidates": True,
+                    "candidates": [
+                        {
+                            "scope": "project",
+                            "layer": "semantic",
+                            "type": "preference",
+                            "summary": "Prefers candidate review",
+                            "content": "Persist self-review learnings as reviewable memory candidates first.",
+                            "evidence": [{"run_id": "run_review_plan", "node_id": "decide_autonomous_review"}],
+                        }
+                    ],
+                },
+                run_id="run_review_plan",
+                node_id="decide_autonomous_review",
+                template_id="buddy_autonomous_review",
+            )
+
+            self.assertEqual(result["success"], True)
+            self.assertEqual(len(result["candidate_memories"]), 1)
+            candidate = result["candidate_memories"][0]
+            self.assertEqual(candidate["status"], "candidate")
+            self.assertEqual(candidate["summary"], "Prefers candidate review")
+            self.assertEqual(candidate["source"]["run_id"], "run_review_plan")
+            self.assertEqual(candidate["source"]["node_id"], "decide_autonomous_review")
+            self.assertEqual(candidate["source"]["template_id"], "buddy_autonomous_review")
+
     def test_memory_candidate_writer_rejects_candidates_without_evidence(self) -> None:
         candidate_writer = _load_skill_module(MEMORY_CANDIDATE_WRITER_SKILL_DIR)
         with isolated_memory_database():
@@ -189,6 +220,43 @@ class MemorySkillTests(unittest.TestCase):
             self.assertEqual(result["candidate_memories"], [])
             self.assertEqual(result["skipped_candidates"][0]["error_type"], "missing_evidence")
             self.assertEqual(store.list_memories(status=None), [])
+
+    def test_memory_candidate_writer_returns_conflict_hints_for_similar_active_memory(self) -> None:
+        candidate_writer = _load_skill_module(MEMORY_CANDIDATE_WRITER_SKILL_DIR)
+        with isolated_memory_database():
+            active = store.create_memory(
+                {
+                    "scope": "project",
+                    "layer": "procedural",
+                    "type": "preference",
+                    "summary": "Prefers verification evidence",
+                    "content": "Completion reports should include verification evidence.",
+                    "evidence": [{"run_id": "run_existing"}],
+                    "status": "active",
+                },
+                changed_by="test",
+            )
+
+            result = candidate_writer.memory_candidate_writer(
+                candidates=[
+                    {
+                        "scope": "project",
+                        "layer": "procedural",
+                        "type": "preference",
+                        "summary": "Prefers verification evidence in reports",
+                        "content": "When reporting completion, include verification evidence and skipped checks.",
+                        "evidence": [{"run_id": "run_review_3", "node_id": "self_review"}],
+                    }
+                ],
+                run_id="run_review_3",
+                node_id="self_review",
+            )
+
+            self.assertEqual(result["success"], True)
+            candidate = result["candidate_memories"][0]
+            self.assertEqual(candidate["conflicts"][0]["id"], active["id"])
+            self.assertEqual(candidate["conflicts"][0]["status"], "active")
+            self.assertEqual(result["activity_events"][0]["detail"]["conflict_count"], 1)
 
 
 if __name__ == "__main__":

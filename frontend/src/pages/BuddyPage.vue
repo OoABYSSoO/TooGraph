@@ -304,6 +304,100 @@
               <ElEmpty v-if="memories.length === 0" :description="t('buddyPage.memory.empty')" />
             </article>
           </section>
+
+          <article class="buddy-page__panel buddy-page__panel--platform-memory">
+            <div class="buddy-page__panel-heading">
+              <div>
+                <h3>{{ t("buddyPage.platformMemory.title") }}</h3>
+                <p>{{ t("buddyPage.platformMemory.body", { count: platformMemoryCandidates.length }) }}</p>
+              </div>
+              <ElButton :loading="isLoadingPlatformMemories" @click="refreshPlatformMemoryCandidates">
+                <ElIcon><Refresh /></ElIcon>
+                <span>{{ t("buddyPage.platformMemory.refresh") }}</span>
+              </ElButton>
+            </div>
+            <ElTable :data="platformMemoryCandidates" class="buddy-page__table" empty-text=" ">
+              <ElTableColumn :label="t('buddyPage.platformMemory.scope')" width="178">
+                <template #default="{ row }">
+                  <div class="buddy-page__memory-tags">
+                    <ElTag size="small" effect="plain">{{ row.scope }}</ElTag>
+                    <ElTag size="small" effect="plain" type="warning">{{ row.layer }}</ElTag>
+                    <ElTag size="small" effect="plain" type="info">{{ row.type }}</ElTag>
+                  </div>
+                </template>
+              </ElTableColumn>
+              <ElTableColumn :label="t('buddyPage.platformMemory.candidate')" min-width="300">
+                <template #default="{ row }">
+                  <div class="buddy-page__platform-memory-main">
+                    <strong>{{ row.summary }}</strong>
+                    <span>{{ row.content }}</span>
+                  </div>
+                </template>
+              </ElTableColumn>
+              <ElTableColumn :label="t('buddyPage.platformMemory.source')" width="190" show-overflow-tooltip>
+                <template #default="{ row }">{{ formatPlatformMemorySource(row.source) }}</template>
+              </ElTableColumn>
+              <ElTableColumn :label="t('buddyPage.platformMemory.review')" width="150">
+                <template #default="{ row }">
+                  <div class="buddy-page__memory-tags">
+                    <ElTag v-if="row.supersedes.length" size="small" type="warning" effect="plain">
+                      {{ t("buddyPage.platformMemory.supersedes", { count: row.supersedes.length }) }}
+                    </ElTag>
+                    <ElTag v-if="row.conflicts?.length" size="small" type="danger" effect="plain">
+                      {{ t("buddyPage.platformMemory.conflicts", { count: row.conflicts.length }) }}
+                    </ElTag>
+                    <span v-if="!row.supersedes.length && !row.conflicts?.length" class="buddy-page__muted">
+                      {{ t("common.none") }}
+                    </span>
+                  </div>
+                </template>
+              </ElTableColumn>
+              <ElTableColumn :label="t('buddyPage.memory.actions')" width="330" fixed="right">
+                <template #default="{ row }">
+                  <div class="buddy-page__table-actions">
+                    <ElButton
+                      size="small"
+                      type="primary"
+                      :loading="platformMemoryActionId === platformMemoryActionKey('apply', row.id)"
+                      @click="reviewPlatformMemoryCandidate(row, 'apply')"
+                    >
+                      <ElIcon><Check /></ElIcon>
+                      <span>{{ t("buddyPage.platformMemory.apply") }}</span>
+                    </ElButton>
+                    <ElButton
+                      size="small"
+                      :disabled="row.supersedes.length === 0"
+                      :loading="platformMemoryActionId === platformMemoryActionKey('replace', row.id)"
+                      @click="reviewPlatformMemoryCandidate(row, 'replace')"
+                    >
+                      <ElIcon><RefreshLeft /></ElIcon>
+                      <span>{{ t("buddyPage.platformMemory.replace") }}</span>
+                    </ElButton>
+                    <ElButton
+                      size="small"
+                      type="warning"
+                      :loading="platformMemoryActionId === platformMemoryActionKey('reject', row.id)"
+                      @click="reviewPlatformMemoryCandidate(row, 'reject')"
+                    >
+                      <ElIcon><Delete /></ElIcon>
+                      <span>{{ t("buddyPage.platformMemory.reject") }}</span>
+                    </ElButton>
+                    <ElButton
+                      size="small"
+                      :loading="platformMemoryActionId === platformMemoryActionKey('archive', row.id)"
+                      @click="reviewPlatformMemoryCandidate(row, 'archive')"
+                    >
+                      {{ t("buddyPage.platformMemory.archive") }}
+                    </ElButton>
+                  </div>
+                </template>
+              </ElTableColumn>
+            </ElTable>
+            <ElEmpty
+              v-if="platformMemoryCandidates.length === 0"
+              :description="t('buddyPage.platformMemory.empty')"
+            />
+          </article>
         </ElTabPane>
 
         <ElTabPane :label="t('buddyPage.tabs.summary')" name="summary">
@@ -649,6 +743,13 @@ import {
   updateBuddySessionSummary,
 } from "@/api/buddy";
 import { fetchTemplate, fetchTemplates } from "@/api/graphs";
+import {
+  applyPlatformMemoryCandidate,
+  archivePlatformMemory,
+  fetchPlatformMemories,
+  rejectPlatformMemoryCandidate,
+  replacePlatformMemoryCandidate,
+} from "@/api/memories";
 import { cancelRun, fetchRun, fetchRuns, resumeRun } from "@/api/runs";
 import BuddyPauseCard from "@/buddy/BuddyPauseCard.vue";
 import {
@@ -676,6 +777,7 @@ import type {
 } from "@/types/buddy";
 import type { BuddyRunInputNodeOption, BuddyRunTemplateInputRow } from "@/buddy/buddyTemplateBindingModel";
 import type { TemplateRecord } from "@/types/node-system";
+import type { PlatformMemory } from "@/types/memory";
 import type { RunDetail, RunSummary } from "@/types/run";
 
 import {
@@ -706,14 +808,17 @@ const isSavingBinding = ref(false);
 const isLoadingPausedRuns = ref(false);
 const isLoadingPausedRunDetail = ref(false);
 const isLoadingBindingTemplate = ref(false);
+const isLoadingPlatformMemories = ref(false);
 const pausedRunActionBusy = ref(false);
 const memoryActionId = ref("");
+const platformMemoryActionId = ref("");
 const restoreActionId = ref("");
 const errorMessage = ref("");
 
 const profileDraft = ref<BuddyProfile>(defaultProfileDraft());
 const policyDraft = ref<BuddyPolicy>(defaultPolicyDraft());
 const memories = ref<BuddyMemory[]>([]);
+const platformMemoryCandidates = ref<PlatformMemory[]>([]);
 const memoryDraft = ref<MemoryDraft>(defaultMemoryDraft());
 const editingMemoryId = ref("");
 const summaryDraft = ref<BuddySessionSummary>(defaultSummaryDraft());
@@ -952,8 +1057,10 @@ function hasActiveBuddyPageWrite() {
       isLoadingPausedRuns.value ||
       isLoadingPausedRunDetail.value ||
       isLoadingBindingTemplate.value ||
+      isLoadingPlatformMemories.value ||
       pausedRunActionBusy.value ||
       memoryActionId.value ||
+      platformMemoryActionId.value ||
       restoreActionId.value,
   );
 }
@@ -963,10 +1070,21 @@ async function loadAll(options: LoadAllOptions = {}) {
     if (!options.silent) {
       isLoading.value = true;
     }
-    const [profile, policy, memoryList, summary, revisionList, commandList, templateList, runBinding] = await Promise.all([
+    const [
+      profile,
+      policy,
+      memoryList,
+      platformCandidateList,
+      summary,
+      revisionList,
+      commandList,
+      templateList,
+      runBinding,
+    ] = await Promise.all([
       fetchBuddyProfile(),
       fetchBuddyPolicy(),
       fetchBuddyMemories(),
+      fetchPlatformMemories({ status: "candidate" }),
       fetchBuddySessionSummary(),
       fetchBuddyRevisions(),
       fetchBuddyCommands(),
@@ -976,6 +1094,7 @@ async function loadAll(options: LoadAllOptions = {}) {
     profileDraft.value = profile;
     policyDraft.value = normalizeBuddyPolicy(policy);
     memories.value = memoryList;
+    platformMemoryCandidates.value = platformCandidateList;
     summaryDraft.value = summary;
     revisions.value = revisionList;
     commands.value = commandList;
@@ -1088,14 +1207,28 @@ async function cancelSelectedPausedRun() {
 }
 
 async function refreshMutableLists() {
-  const [memoryList, revisionList, commandList] = await Promise.all([
+  const [memoryList, platformCandidateList, revisionList, commandList] = await Promise.all([
     fetchBuddyMemories(),
+    fetchPlatformMemories({ status: "candidate" }),
     fetchBuddyRevisions(),
     fetchBuddyCommands(),
   ]);
   memories.value = memoryList;
+  platformMemoryCandidates.value = platformCandidateList;
   revisions.value = revisionList;
   commands.value = commandList;
+}
+
+async function refreshPlatformMemoryCandidates() {
+  try {
+    isLoadingPlatformMemories.value = true;
+    platformMemoryCandidates.value = await fetchPlatformMemories({ status: "candidate" });
+    errorMessage.value = "";
+  } catch (error) {
+    setError(error, "common.failedToLoad");
+  } finally {
+    isLoadingPlatformMemories.value = false;
+  }
 }
 
 async function refreshAuditTrail() {
@@ -1205,6 +1338,51 @@ async function removeMemory(memoryId: string) {
     setError(error, "common.failedToSave");
   } finally {
     memoryActionId.value = "";
+  }
+}
+
+type PlatformMemoryReviewAction = "apply" | "replace" | "reject" | "archive";
+
+function platformMemoryActionKey(action: PlatformMemoryReviewAction, memoryId: string) {
+  return `${action}:${memoryId}`;
+}
+
+function formatPlatformMemorySource(source: Record<string, unknown>) {
+  const runId = typeof source.run_id === "string" ? source.run_id : "";
+  const nodeId = typeof source.node_id === "string" ? source.node_id : "";
+  const templateId = typeof source.template_id === "string" ? source.template_id : "";
+  const parts = [
+    runId ? `run ${runId}` : "",
+    nodeId ? `node ${nodeId}` : "",
+    templateId ? `template ${templateId}` : "",
+  ].filter(Boolean);
+  return parts.join(" / ") || t("common.none");
+}
+
+async function reviewPlatformMemoryCandidate(memory: PlatformMemory, action: PlatformMemoryReviewAction) {
+  if (action === "replace" && memory.supersedes.length === 0) {
+    return;
+  }
+  const actionKey = platformMemoryActionKey(action, memory.id);
+  try {
+    platformMemoryActionId.value = actionKey;
+    const changeReason = t(`buddyPage.platformMemory.changeReasons.${action}`);
+    if (action === "apply") {
+      await applyPlatformMemoryCandidate(memory.id, changeReason);
+    } else if (action === "replace") {
+      await replacePlatformMemoryCandidate(memory.id, changeReason, memory.supersedes);
+    } else if (action === "reject") {
+      await rejectPlatformMemoryCandidate(memory.id, changeReason);
+    } else {
+      await archivePlatformMemory(memory.id, changeReason);
+    }
+    await refreshMutableLists();
+    errorMessage.value = "";
+    ElMessage.success(t(`buddyPage.platformMemory.results.${action}`));
+  } catch (error) {
+    setError(error, "common.failedToSave");
+  } finally {
+    platformMemoryActionId.value = "";
   }
 }
 
@@ -1432,6 +1610,30 @@ onMounted(loadAll);
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.buddy-page__memory-tags,
+.buddy-page__platform-memory-main {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.buddy-page__memory-tags {
+  align-content: start;
+  justify-items: start;
+}
+
+.buddy-page__platform-memory-main strong {
+  color: var(--toograph-text-strong);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.buddy-page__platform-memory-main span,
+.buddy-page__muted {
+  color: rgba(60, 41, 20, 0.62);
+  line-height: 1.45;
 }
 
 .buddy-page__binding-actions {

@@ -218,12 +218,12 @@ export function buildBuddyReviewGraph(template: TemplateRecord, input: BuildBudd
     capability_review: resolveRunStateValueByName(input.mainRun, "capability_review", {}),
     final_reply: resolveRunStateValueByName(input.mainRun, "final_reply", resolveBuddyReplyText(input.mainRun)),
     autonomous_review: {},
-    writeback_commands: [],
-    writeback_success: false,
-    writeback_result: "",
-    applied_writeback_commands: [],
-    skipped_writeback_commands: [],
-    writeback_revisions: [],
+    improvement_candidates: [],
+    memory_candidate_plan: {},
+    memory_candidate_success: false,
+    candidate_memories: [],
+    skipped_memory_candidates: [],
+    memory_candidate_result: "",
   };
 
   for (const [stateName, value] of Object.entries(stateValues)) {
@@ -678,8 +678,8 @@ const BUDDY_ACTIVITY_PHASE_BY_NODE_ID: Record<string, string> = {
   buddy_final_reply: "draftingReply",
   draft_final_reply: "draftingReply",
   decide_autonomous_review: "reviewingMemory",
-  should_write_buddy_home: "reviewingMemory",
-  apply_buddy_home_writeback: "reviewingMemory",
+  has_memory_candidates: "reviewingMemory",
+  write_memory_candidates: "reviewingMemory",
 };
 
 function buildBuddyActivityParams(labels: { node: string; stage: string }) {

@@ -326,6 +326,12 @@ function buildActivityLabel(event: ActivityEvent) {
   if (kind === "buddy_home_write") {
     return "Buddy Home writeback";
   }
+  if (kind === "memory_recall") {
+    return "Memory recall";
+  }
+  if (kind === "memory_candidate_write") {
+    return "Memory candidate write";
+  }
   return kind || "activity";
 }
 
@@ -439,6 +445,48 @@ function buildActivityArtifactLabels(event: ActivityEvent) {
     }
     if (revisionIds.length > 0) {
       labels.push(`revisions: ${revisionIds.join(", ")}`);
+    }
+    return labels;
+  }
+  if (normalizeText(event.kind) === "memory_recall") {
+    const includedCount = normalizeNumber(detail.included_count);
+    const omittedCount = normalizeNumber(detail.omitted_count);
+    const memoryIds = Array.isArray(detail.memory_ids)
+      ? uniqueNonEmpty(detail.memory_ids.map((memoryId) => normalizeText(memoryId)))
+      : [];
+    if (includedCount !== null) {
+      labels.push(`included: ${includedCount}`);
+    }
+    if (omittedCount !== null) {
+      labels.push(`omitted: ${omittedCount}`);
+    }
+    const query = normalizeText(detail.query);
+    if (query) {
+      labels.push(`query: ${query}`);
+    }
+    if (memoryIds.length > 0) {
+      labels.push(`memories: ${memoryIds.join(", ")}`);
+    }
+    return labels;
+  }
+  if (normalizeText(event.kind) === "memory_candidate_write") {
+    const candidateCount = normalizeNumber(detail.candidate_count);
+    const skippedCount = normalizeNumber(detail.skipped_count);
+    const conflictCount = normalizeNumber(detail.conflict_count);
+    const candidateIds = Array.isArray(detail.candidate_ids)
+      ? uniqueNonEmpty(detail.candidate_ids.map((candidateId) => normalizeText(candidateId)))
+      : [];
+    if (candidateCount !== null) {
+      labels.push(`candidates: ${candidateCount}`);
+    }
+    if (skippedCount !== null) {
+      labels.push(`skipped: ${skippedCount}`);
+    }
+    if (conflictCount !== null) {
+      labels.push(`conflicts: ${conflictCount}`);
+    }
+    if (candidateIds.length > 0) {
+      labels.push(`memories: ${candidateIds.join(", ")}`);
     }
     return labels;
   }
