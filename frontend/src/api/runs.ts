@@ -28,3 +28,7 @@ export async function resumeRun(
     ...(snapshotId?.trim() ? { snapshot_id: snapshotId.trim() } : {}),
   });
 }
+
+export async function cancelRun(runId: string, reason: string): Promise<{ run_id: string; status: string }> {
+  return apiPost(`/api/runs/${runId}/cancel`, { reason: reason.trim() });
+}

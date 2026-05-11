@@ -98,6 +98,12 @@ select {
   --toograph-status-fg: rgb(185, 28, 28);
 }
 
+.toograph-status-badge--cancelled {
+  --toograph-status-bg: rgba(243, 244, 246, 0.94);
+  --toograph-status-border: rgba(75, 85, 99, 0.16);
+  --toograph-status-fg: rgb(75, 85, 99);
+}
+
 .toograph-status-badge--awaiting-human {
   --toograph-status-bg: rgba(255, 247, 237, 0.96);
   --toograph-status-border: rgba(217, 119, 6, 0.2);

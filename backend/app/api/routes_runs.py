@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from app.core.langgraph import execute_node_system_graph_langgraph, get_langgraph_runtime_unsupported_reasons
 from app.core.runtime.run_events import publish_run_event, subscribe_run_events
-from app.core.runtime.state import set_run_status, touch_run_lifecycle
+from app.core.runtime.state import set_run_status, touch_run_lifecycle, utc_now_iso
 from app.core.schemas.node_system import NodeSystemGraphDocument
 from app.core.schemas.run import NodeExecutionDetail, RunDetail, RunSummary
 from app.core.storage.run_store import list_runs, load_run
@@ -19,6 +19,14 @@ from app.core.storage.run_store import save_run
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 logger = logging.getLogger(__name__)
+
+CANCELLABLE_RUN_STATUSES = {"paused", "awaiting_human"}
+PENDING_RESUME_METADATA_KEYS = (
+    "pending_permission_approval",
+    "pending_permission_approval_resume_payload",
+    "pending_subgraph_breakpoint",
+    "pending_subgraph_resume_payload",
+)
 
 
 @router.get("", response_model=list[RunSummary])
@@ -106,6 +114,34 @@ def get_run_node_detail_endpoint(run_id: str, node_id: str) -> NodeExecutionDeta
         status_code=404,
         detail=f"Node execution '{node_id}' does not exist in run '{run_id}'.",
     )
+
+
+@router.post("/{run_id}/cancel")
+def cancel_run_endpoint(
+    run_id: str,
+    payload: dict[str, Any] | None = Body(default=None),
+) -> dict[str, str]:
+    try:
+        run = load_run(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    status = str(run.get("status") or "").strip()
+    if status not in CANCELLABLE_RUN_STATUSES:
+        raise HTTPException(status_code=409, detail=f"Run '{run_id}' cannot be cancelled from status '{status}'.")
+
+    reason = str((payload or {}).get("reason") or "").strip() or "Run cancelled by user."
+    metadata = dict(run.get("metadata") or {})
+    for key in PENDING_RESUME_METADATA_KEYS:
+        metadata.pop(key, None)
+    metadata["cancelled"] = True
+    metadata["cancellation_reason"] = reason
+    metadata["cancelled_at"] = utc_now_iso()
+    run["metadata"] = metadata
+    set_run_status(run, "cancelled")
+    save_run(run)
+    publish_run_event(run_id, "run.cancelled", {"status": "cancelled", "reason": reason})
+    return {"run_id": run_id, "status": "cancelled"}
 
 
 @router.post("/{run_id}/resume")

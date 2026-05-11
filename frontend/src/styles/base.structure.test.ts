@@ -69,6 +69,7 @@ test("global base styles provide semantic run status badge variables", () => {
   assert.match(baseSource, /\.toograph-status-badge \{[\s\S]*--toograph-status-bg:/);
   assert.match(baseSource, /\.toograph-status-badge--completed \{[\s\S]*--toograph-status-bg:/);
   assert.match(baseSource, /\.toograph-status-badge--failed \{[\s\S]*--toograph-status-bg:/);
+  assert.match(baseSource, /\.toograph-status-badge--cancelled \{[\s\S]*--toograph-status-bg:/);
   assert.match(baseSource, /\.toograph-status-badge--awaiting-human \{[\s\S]*--toograph-status-bg:/);
   assert.match(baseSource, /\.toograph-status-badge--running \{[\s\S]*--toograph-status-bg:/);
 });

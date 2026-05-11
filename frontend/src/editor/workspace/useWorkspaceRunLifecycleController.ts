@@ -168,6 +168,11 @@ export function useWorkspaceRunLifecycleController(input: WorkspaceRunLifecycleC
       cancelRunEventStreamForTab(tabId);
       void pollRunForTab(tabId, runId);
     });
+    source.addEventListener("run.cancelled", () => {
+      input.clearRunActivityPanelHintForTab(tabId);
+      cancelRunEventStreamForTab(tabId);
+      void pollRunForTab(tabId, runId);
+    });
     source.onerror = () => {
       if (runEventSourceByTabId.get(tabId) === source) {
         cancelRunEventStreamForTab(tabId);
@@ -255,5 +260,5 @@ function buildStateNameByKey(document: GraphPayload | GraphDocument | undefined)
 }
 
 function isFinishedRunStatus(status: string | null | undefined) {
-  return status === "completed" || status === "failed";
+  return status === "completed" || status === "failed" || status === "cancelled";
 }

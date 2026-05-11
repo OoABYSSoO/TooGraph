@@ -28,9 +28,10 @@ test("resolveRunsCardDetail keeps list cards on the legacy detail affordance", (
 test("RUN_STATUS_FILTER_OPTIONS exposes high frequency status filters in display order", () => {
   assert.deepEqual(
     RUN_STATUS_FILTER_OPTIONS.map((option) => option.value),
-    ["", "queued", "running", "resuming", "awaiting_human", "completed", "failed"],
+    ["", "queued", "running", "resuming", "awaiting_human", "completed", "failed", "cancelled"],
   );
   assert.equal(RUN_STATUS_FILTER_OPTIONS.find((option) => option.value === "awaiting_human")?.label, "断点暂停");
+  assert.equal(RUN_STATUS_FILTER_OPTIONS.find((option) => option.value === "cancelled")?.label, "已取消");
 });
 
 test("buildRunStatusOverview summarizes total, attention, active, and completed runs", () => {
@@ -40,10 +41,11 @@ test("buildRunStatusOverview summarizes total, attention, active, and completed 
     createRun("run_3", "awaiting_human"),
     createRun("run_4", "failed"),
     createRun("run_5", "completed"),
+    createRun("run_6", "cancelled"),
   ];
 
   assert.deepEqual(buildRunStatusOverview(runs), [
-    { key: "total", label: "全部运行", value: 5 },
+    { key: "total", label: "全部运行", value: 6 },
     { key: "attention", label: "需要关注", value: 2 },
     { key: "active", label: "进行中", value: 2 },
     { key: "completed", label: "已完成", value: 1 },

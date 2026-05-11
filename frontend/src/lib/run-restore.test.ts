@@ -18,6 +18,7 @@ import {
 test("canRestoreRunStatus only enables restore for terminal run states", () => {
   assert.equal(canRestoreRunStatus("completed"), true);
   assert.equal(canRestoreRunStatus("failed"), true);
+  assert.equal(canRestoreRunStatus("cancelled"), true);
   assert.equal(canRestoreRunStatus("paused"), true);
   assert.equal(canRestoreRunStatus("awaiting_human"), true);
   assert.equal(canRestoreRunStatus("running"), false);

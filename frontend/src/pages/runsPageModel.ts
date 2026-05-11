@@ -35,6 +35,7 @@ export function buildRunStatusFilterOptions(): RunsStatusFilterOption[] {
     { label: translate("status.awaitingHuman"), value: "awaiting_human" },
     { label: translate("status.completed"), value: "completed" },
     { label: translate("status.failed"), value: "failed" },
+    { label: translate("status.cancelled"), value: "cancelled" },
   ];
 }
 
@@ -92,7 +93,8 @@ export function buildRunRestoreTargets(run: RunSummary): RunsRestoreTarget[] {
   const snapshots = run.run_snapshot_options ?? [];
   const pauseSnapshots = [...snapshots].filter((snapshot) => snapshot.kind === "pause" && snapshot.snapshot_id).reverse();
   const latestTerminal =
-    [...snapshots].reverse().find((snapshot) => snapshot.kind === "completed" || snapshot.kind === "failed") ?? null;
+    [...snapshots].reverse().find((snapshot) => snapshot.kind === "completed" || snapshot.kind === "failed" || snapshot.kind === "cancelled") ??
+    null;
   const targets: RunsRestoreTarget[] = [];
 
   for (const pauseSnapshot of pauseSnapshots) {
@@ -112,7 +114,7 @@ export function buildRunRestoreTargets(run: RunSummary): RunsRestoreTarget[] {
       detail: latestTerminal.status || run.status,
       snapshotId: latestTerminal.snapshot_id,
     });
-  } else if (run.status === "completed" || run.status === "failed") {
+  } else if (run.status === "completed" || run.status === "failed" || run.status === "cancelled") {
     targets.push({
       key: "current",
       label: translate("runs.finalResult"),

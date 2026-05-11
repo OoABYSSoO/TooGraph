@@ -385,7 +385,7 @@ test("BuddyWidget starts self-review as a separate background run after the visi
 });
 
 test("BuddyWidget treats awaiting-human graph runs as resumable pause cards", () => {
-  assert.match(componentSource, /import \{ fetchRun, resumeRun \} from "\.\.\/api\/runs\.ts";/);
+  assert.match(componentSource, /import \{ cancelRun, fetchRun, resumeRun \} from "\.\.\/api\/runs\.ts";/);
   assert.match(componentSource, /buildHumanReviewPanelModel/);
   assert.match(componentSource, /buildHumanReviewResumePayload/);
   assert.match(componentSource, /const pausedBuddyRun = ref<RunDetail \| null>\(null\);/);
@@ -396,6 +396,18 @@ test("BuddyWidget treats awaiting-human graph runs as resumable pause cards", ()
   assert.match(componentSource, /runDetail\.status === "awaiting_human"/);
   assert.match(componentSource, /if \(pausedBuddyRun\.value\) \{[\s\S]*break;/);
   assert.doesNotMatch(componentSource, /void startBuddySelfReviewRun\(runDetail\);[\s\S]*runDetail\.status === "awaiting_human"/);
+});
+
+test("BuddyWidget can cancel a paused run from the pause card", () => {
+  assert.match(componentSource, /buddy\.pause\.cancelRun/);
+  assert.match(componentSource, /@click="cancelPausedBuddyRun"/);
+  assert.match(componentSource, /async function cancelPausedBuddyRun\(\)/);
+  assert.match(componentSource, /await cancelRun\(run\.run_id,\s*t\("buddy\.pause\.cancelReason"\)\)/);
+  assert.match(
+    componentSource,
+    /updateAssistantMessage\(assistantMessageId,\s*t\("buddy\.pause\.cancelledReply"\),\s*\{[\s\S]*includeInContext:\s*false/,
+  );
+  assert.match(componentSource, /void persistBuddyMessage\(sessionId,[\s\S]*runId:\s*run\.run_id,[\s\S]*includeInContext:\s*false/);
 });
 
 test("BuddyWidget can deny a pending permission approval from the pause card", () => {

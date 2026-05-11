@@ -353,6 +353,15 @@
               </p>
               <div class="buddy-widget__pause-actions">
                 <ElButton
+                  size="small"
+                  type="danger"
+                  plain
+                  :loading="pausedBuddyResumeBusy"
+                  @click="cancelPausedBuddyRun"
+                >
+                  {{ t("buddy.pause.cancelRun") }}
+                </ElButton>
+                <ElButton
                   v-if="pausedBuddyPermissionApproval"
                   size="small"
                   type="danger"
@@ -468,7 +477,7 @@ import {
   fetchBuddyChatSessions,
 } from "../api/buddy.ts";
 import { fetchTemplate, runGraph } from "../api/graphs.ts";
-import { fetchRun, resumeRun } from "../api/runs.ts";
+import { cancelRun, fetchRun, resumeRun } from "../api/runs.ts";
 import { fetchSettings } from "../api/settings.ts";
 import { fetchSkillCatalog } from "../api/skills.ts";
 import { resolveOutputPreviewContent } from "../editor/nodes/outputPreviewContentModel.ts";
@@ -1404,6 +1413,75 @@ async function resumePausedBuddyRun(resumePayloadOverride: Record<string, unknow
   }
 }
 
+async function cancelPausedBuddyRun() {
+  const run = pausedBuddyRun.value;
+  const assistantMessageId = pausedBuddyAssistantMessageId.value;
+  const sessionId = activeSessionId.value;
+  if (!run || !assistantMessageId || !sessionId || pausedBuddyResumeBusy.value) {
+    return;
+  }
+
+  clearSpeakingIdleTimer();
+  errorMessage.value = "";
+  mood.value = "thinking";
+  pausedBuddyResumeBusy.value = true;
+  appendRunTraceEntry("node.started", {
+    labelKey: "buddy.activity.cancelling",
+    params: {},
+    preview: "",
+    tone: "info",
+    replaceKey: "local:cancelling",
+    timingKey: "local:cancelling",
+  });
+  setAssistantActivityText(assistantMessageId, t("buddy.activity.cancelling"));
+
+  try {
+    await cancelRun(run.run_id, t("buddy.pause.cancelReason"));
+    appendRunTraceEntry("node.completed", {
+      labelKey: "buddy.activity.cancelled",
+      params: {},
+      preview: "",
+      tone: "success",
+      replaceKey: "local:cancelling",
+      timingKey: "local:cancelling",
+    });
+    updateAssistantMessage(assistantMessageId, t("buddy.pause.cancelledReply"), {
+      includeInContext: false,
+      runId: run.run_id,
+    });
+    void persistBuddyMessage(sessionId, messages.value.find((message) => message.id === assistantMessageId), {
+      runId: run.run_id,
+      includeInContext: false,
+    });
+    resetPausedBuddyPause();
+    closeEventSource();
+    markRunTraceFinished();
+    activeRunId.value = null;
+    mood.value = "idle";
+  } catch (error) {
+    mood.value = "error";
+    const message = error instanceof Error ? error.message : t("buddy.runFailed");
+    errorMessage.value = message;
+    appendRunTraceEntry("node.failed", {
+      labelKey: "buddy.activity.failed",
+      params: { node: t("buddy.name") },
+      preview: message,
+      tone: "error",
+      replaceKey: "local:cancelling",
+      timingKey: "local:cancelling",
+    });
+  } finally {
+    pausedBuddyResumeBusy.value = false;
+    activeAbortController = null;
+    scheduleBuddySpeakingIdleIfNeeded();
+    if (pausedBuddyRun.value) {
+      await scrollPausedBuddyCardIntoView();
+    } else {
+      await scrollMessagesToBottom();
+    }
+  }
+}
+
 function handleBuddyRunAwaitingHuman(run: RunDetail, assistantMessageId: string) {
   pausedBuddyRun.value = run;
   pausedBuddyAssistantMessageId.value = assistantMessageId;
@@ -1424,7 +1502,7 @@ function handleBuddyRunAwaitingHuman(run: RunDetail, assistantMessageId: string)
 
 function finishBuddyVisibleRun(runDetail: RunDetail, assistantMessageId: string, sessionId: string, runId: string) {
   const finalReply = resolveBuddyReplyText(runDetail);
-  const includeReplyInContext = runDetail.status !== "failed";
+  const includeReplyInContext = runDetail.status === "completed";
   updateAssistantMessage(assistantMessageId, finalReply || t("buddy.emptyReply"), {
     includeInContext: includeReplyInContext,
   });
@@ -1437,7 +1515,7 @@ function finishBuddyVisibleRun(runDetail: RunDetail, assistantMessageId: string,
     assistantMessage.runId = runId;
   }
   void startBuddySelfReviewRun(runDetail);
-  mood.value = runDetail.status === "failed" ? "error" : "speaking";
+  mood.value = runDetail.status === "failed" ? "error" : runDetail.status === "cancelled" ? "idle" : "speaking";
   if (runDetail.status === "completed") {
     buddyContextStore.notifyBuddyDataChanged();
   }
@@ -1870,6 +1948,7 @@ function startRunEventStream(runId: string, assistantMessageId: string, graph: G
   eventSource.addEventListener("node.failed", (event) => handleStreamingEvent("node.failed", event));
   eventSource.addEventListener("run.completed", closeEventSource);
   eventSource.addEventListener("run.failed", closeEventSource);
+  eventSource.addEventListener("run.cancelled", closeEventSource);
   eventSource.onerror = closeEventSource;
 }
 

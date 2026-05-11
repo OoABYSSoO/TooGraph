@@ -378,6 +378,7 @@ test("EditorWorkspaceShell delegates run event stream parsing and URL projection
   assert.match(runLifecycleControllerSource, /const nextPreview = buildRunEventOutputPreviewUpdate\(input\.documentsByTabId\.value\[tabId\], currentPreview, payload\);/);
   assert.match(runLifecycleControllerSource, /preserveMissing: shouldPollRunStatus\(run\.status\)/);
   assert.match(runLifecycleControllerSource, /if \(shouldPollRunStatus\(run\.status\)\) \{/);
+  assert.match(runLifecycleControllerSource, /source\.addEventListener\("run\.cancelled"/);
   assert.doesNotMatch(componentSource, /function isActiveRunStatus\(status: string \| null \| undefined\)/);
   assert.doesNotMatch(componentSource, /function resolveStreamingOutputNodeIds/);
   assert.doesNotMatch(componentSource, /resolveRunEventText\(payload\)/);

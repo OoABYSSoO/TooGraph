@@ -5,7 +5,7 @@ from typing import Any, Literal, TypedDict
 from uuid import uuid4
 
 
-RunStatus = Literal["queued", "running", "paused", "awaiting_human", "resuming", "completed", "failed"]
+RunStatus = Literal["queued", "running", "paused", "awaiting_human", "resuming", "completed", "failed", "cancelled"]
 NodeStatus = Literal["idle", "running", "paused", "success", "failed"]
 
 
@@ -160,7 +160,7 @@ def set_run_status(
     elif status == "running":
         lifecycle["pause_reason"] = None
 
-    if status in {"completed", "failed"}:
+    if status in {"completed", "failed", "cancelled"}:
         state["completed_at"] = now
 
 
