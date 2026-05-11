@@ -220,6 +220,116 @@ test("buildHumanReviewPanelModel promotes downstream missing inputs into require
   assert.equal(panel.firstBlockingRequiredKey, "manual_feedback");
 });
 
+test("buildHumanReviewPanelModel extracts pending permission approval details", () => {
+  const run = createRun();
+  run.lifecycle.pause_reason = "permission_approval";
+  run.metadata = {
+    pending_permission_approval: {
+      kind: "skill_permission_approval",
+      skill_key: "local_workspace_executor",
+      skill_name: "Local Workspace Executor",
+      permissions: ["file_write", "subprocess"],
+      input_preview: '{\n  "path": "skill/user/demo/SKILL.md"\n}',
+      reason: "Skill declares risky permissions.",
+    },
+  };
+
+  const panel = buildHumanReviewPanelModel(run, createDocument());
+
+  assert.equal(panel.permissionApproval?.skillKey, "local_workspace_executor");
+  assert.equal(panel.permissionApproval?.skillName, "Local Workspace Executor");
+  assert.deepEqual(panel.permissionApproval?.permissions, ["file_write", "subprocess"]);
+  assert.equal(panel.permissionApproval?.inputPreview, '{\n  "path": "skill/user/demo/SKILL.md"\n}');
+  assert.equal(panel.summaryText, "Local Workspace Executor 需要确认：file_write、subprocess");
+});
+
+test("buildHumanReviewPanelModel extracts permission approval from scoped subgraph metadata", () => {
+  const document = createDocument();
+  document.state_schema.selected_capability = {
+    name: "selected_capability",
+    description: "",
+    type: "capability",
+    value: { kind: "skill", key: "local_workspace_executor" },
+    color: "#2563eb",
+  };
+  document.state_schema.dynamic_result = {
+    name: "dynamic_result",
+    description: "",
+    type: "result_package",
+    value: {},
+    color: "#0284c7",
+  };
+  document.nodes.run_capability_cycle = {
+    kind: "subgraph",
+    name: "能力循环",
+    description: "",
+    ui: { position: { x: 0, y: 0 } },
+    reads: [],
+    writes: [],
+    config: {
+      graph: {
+        graph_id: null,
+        name: "Capability Cycle",
+        state_schema: {
+          selected_capability: document.state_schema.selected_capability,
+          dynamic_result: document.state_schema.dynamic_result,
+        },
+        nodes: {
+          execute_capability: {
+            kind: "agent",
+            name: "执行能力",
+            description: "",
+            ui: { position: { x: 0, y: 0 } },
+            reads: [{ state: "selected_capability", required: true }],
+            writes: [{ state: "dynamic_result", mode: "replace" }],
+            config: {
+              skillKey: "",
+              taskInstruction: "",
+              modelSource: "global",
+              model: "",
+              thinkingMode: "on",
+              temperature: 0.2,
+            },
+          },
+        },
+        edges: [],
+        conditional_edges: [],
+        metadata: {},
+      },
+    },
+  };
+  const run = createRun();
+  run.current_node_id = "run_capability_cycle";
+  run.metadata = {
+    pending_subgraph_breakpoint: {
+      subgraph_node_id: "run_capability_cycle",
+      subgraph_node_name: "能力循环",
+      inner_node_id: "execute_capability",
+      inner_node_name: "执行能力",
+      state_values: {
+        selected_capability: { kind: "skill", key: "local_workspace_executor" },
+      },
+      node_status_map: { execute_capability: "paused" },
+      node_executions: [],
+      metadata: {
+        pending_permission_approval: {
+          kind: "skill_permission_approval",
+          skill_key: "local_workspace_executor",
+          skill_name: "Local Workspace Executor",
+          permissions: ["file_write"],
+          input_preview: '{\n  "operation": "write"\n}',
+        },
+      },
+    },
+  };
+
+  const panel = buildHumanReviewPanelModel(run, document);
+
+  assert.deepEqual(panel.scopePath, ["能力循环", "执行能力"]);
+  assert.equal(panel.permissionApproval?.skillKey, "local_workspace_executor");
+  assert.equal(panel.summaryText, "Local Workspace Executor 需要确认：file_write");
+});
+
 test("buildHumanReviewPanelModel renders an inner subgraph breakpoint against the embedded graph", () => {
   const document: GraphPayload = {
     graph_id: "parent_graph",

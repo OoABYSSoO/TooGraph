@@ -15,6 +15,12 @@ from app.core.runtime.agent_subgraph_input_generation import (
 from app.core.runtime.condition_eval import evaluate_condition_rule, resolve_branch_key
 from app.core.runtime.input_boundary import coerce_input_boundary_value, first_truthy
 from app.core.runtime.reference_resolution import resolve_condition_source
+from app.core.runtime.permission_approval import (
+    build_pending_permission_approval,
+    consume_pending_permission_approval,
+    find_pending_permission_approval_for_node,
+    should_pause_for_skill_permission_approval,
+)
 from app.core.runtime.skill_bindings import (
     ResolvedAgentSkillBinding,
     build_skill_output_mapping_details,
@@ -157,7 +163,17 @@ def execute_agent_node(
     ]
     generated_skill_inputs: dict[str, dict[str, Any]] = {}
     skill_input_reasoning = ""
-    if resolved_bindings:
+    pending_permission_approval = find_pending_permission_approval_for_node(
+        state,
+        node_name=node_name,
+        skill_keys={resolved_binding.binding.skill_key for resolved_binding in resolved_bindings},
+    )
+    if pending_permission_approval:
+        pending_skill_key = str(pending_permission_approval.get("skill_key") or "")
+        pending_skill_inputs = pending_permission_approval.get("skill_inputs")
+        generated_skill_inputs[pending_skill_key] = dict(pending_skill_inputs) if isinstance(pending_skill_inputs, dict) else {}
+        skill_input_reasoning = "Resuming approved risky Skill execution with stored Skill inputs."
+    elif resolved_bindings:
         generated_skill_inputs, skill_input_reasoning, skill_input_warnings, runtime_config = generate_agent_skill_inputs_func(
             node=node,
             input_values=input_values,
@@ -200,6 +216,50 @@ def execute_agent_node(
                 "recoverable": True,
             }
         else:
+            approved_pending = consume_pending_permission_approval(
+                state,
+                node_name=node_name,
+                skill_key=skill_key,
+                binding_source=resolved_binding.source,
+            )
+            if approved_pending is not None:
+                approved_inputs = approved_pending.get("skill_inputs")
+                if isinstance(approved_inputs, dict):
+                    skill_inputs = dict(approved_inputs)
+            else:
+                approval_decision = should_pause_for_skill_permission_approval(
+                    state=state,
+                    node_name=node_name,
+                    skill_key=skill_key,
+                    skill_definition=skill_definition,
+                )
+                if approval_decision.required:
+                    return {
+                        "outputs": {},
+                        "awaiting_human": True,
+                        "pending_permission_approval": build_pending_permission_approval(
+                            state=state,
+                            node_name=node_name,
+                            skill_key=skill_key,
+                            skill_name=str(getattr(skill_definition, "name", "") or skill_key),
+                            binding_source=resolved_binding.source,
+                            permissions=approval_decision.risky_permissions,
+                            skill_inputs=skill_inputs,
+                        ),
+                        "skill_input_reasoning": skill_input_reasoning,
+                        "subgraph_input_reasoning": "",
+                        "selected_skills": [skill_key],
+                        "selected_capabilities": [
+                            {"kind": "skill", "key": skill_key}
+                        ]
+                        if resolved_binding.source == "capability_state"
+                        else [],
+                        "skill_outputs": [],
+                        "capability_outputs": [],
+                        "runtime_config": runtime_config,
+                        "warnings": list(dict.fromkeys(warnings)),
+                        "final_result": "",
+                    }
             skill_invoke_kwargs: dict[str, Any] = {}
             if callable_accepts_keyword_func(invoke_skill_func, "context"):
                 invocation_index = _next_skill_artifact_invocation_index(state, node_name, skill_key)

@@ -50,6 +50,31 @@
         </template>
       </nav>
 
+      <section v-if="panelModel.permissionApproval" class="editor-human-review-panel__permission-section">
+        <div class="editor-human-review-panel__section-title">{{ t("humanReview.permissionTitle") }}</div>
+        <article class="editor-human-review-panel__state-card editor-human-review-panel__state-card--required">
+          <div class="editor-human-review-panel__state-head">
+            <span class="editor-human-review-panel__state-dot" aria-hidden="true" />
+            <div>
+              <div class="editor-human-review-panel__state-label">{{ panelModel.permissionApproval.skillName }}</div>
+              <div class="editor-human-review-panel__state-meta">{{ panelModel.permissionApproval.skillKey }}</div>
+            </div>
+          </div>
+          <p v-if="panelModel.permissionApproval.reason" class="editor-human-review-panel__state-description">
+            {{ panelModel.permissionApproval.reason }}
+          </p>
+          <div class="editor-human-review-panel__permission-tags">
+            <span v-for="permission in panelModel.permissionApproval.permissions" :key="permission">
+              {{ permission }}
+            </span>
+          </div>
+          <div v-if="panelModel.permissionApproval.inputPreview" class="editor-human-review-panel__permission-preview">
+            <strong>{{ t("humanReview.permissionInputs") }}</strong>
+            <pre>{{ panelModel.permissionApproval.inputPreview }}</pre>
+          </div>
+        </article>
+      </section>
+
       <section v-if="panelModel.producedRows.length > 0" class="editor-human-review-panel__produced-section">
         <div class="editor-human-review-panel__section-title">{{ t("humanReview.producedTitle") }}</div>
         <article
@@ -371,6 +396,7 @@ function handleResumeClick() {
 
 .editor-human-review-panel__produced-section,
 .editor-human-review-panel__required-section,
+.editor-human-review-panel__permission-section,
 .editor-human-review-panel__context-section,
 .editor-human-review-panel__other-list {
   display: grid;
@@ -560,6 +586,49 @@ function handleResumeClick() {
 
 .editor-human-review-panel__state-description {
   margin-top: 8px;
+}
+
+.editor-human-review-panel__permission-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.editor-human-review-panel__permission-tags span {
+  padding: 4px 7px;
+  border: 1px solid rgba(180, 83, 9, 0.24);
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.14);
+  color: #92400e;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.editor-human-review-panel__permission-preview {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.editor-human-review-panel__permission-preview strong {
+  font-size: 0.76rem;
+  color: rgba(74, 60, 45, 0.74);
+}
+
+.editor-human-review-panel__permission-preview pre {
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  padding: 9px;
+  border: 1px solid rgba(120, 113, 108, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.54);
+  color: rgba(49, 46, 43, 0.86);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .editor-human-review-panel__textarea {

@@ -13,6 +13,8 @@ from app.core.schemas.node_system import NodeSystemGraphDocument
 PRESERVED_RUNTIME_METADATA_KEYS = {
     "pending_subgraph_breakpoint",
     "pending_subgraph_resume_payload",
+    "pending_permission_approval",
+    "pending_permission_approval_resume_payload",
 }
 
 

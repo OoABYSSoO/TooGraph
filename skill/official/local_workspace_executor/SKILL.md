@@ -45,4 +45,4 @@ Default policy:
 - Execute roots: `backend/data/tmp`, `skill/user`.
 - Execute extensions: `.py`, `.js`, `.mjs`, `.sh`, `.bat`, `.ps1`.
 
-Execution is not an OS sandbox. It is constrained by path policy before launch, but the launched script still runs as a local process. This Skill declares file-write and subprocess capability; the target product behavior is that `需确认` mode pauses before writes or execution and `完全访问` mode can run them without an extra prompt. That low-level runtime approval interceptor is still being completed, so current safety comes from explicit graph design, Buddy mode, path policy, and human-review nodes where present. Plain `read` operations do not require approval by themselves.
+Execution is not an OS sandbox. It is constrained by path policy before launch, but the launched script still runs as a local process. This Skill declares file-write and subprocess capability; `需确认` mode pauses before writes or execution and `完全访问` mode can run them without an extra prompt. Plain `read` operations do not require approval by themselves.

@@ -75,6 +75,14 @@ class _SubgraphAwaitingHuman(Exception):
     pass
 
 
+INHERITED_PERMISSION_METADATA_KEYS = {
+    "graph_permission_mode",
+    "buddy_mode",
+    "buddy_requires_approval",
+    "buddy_can_execute_actions",
+}
+
+
 def execute_node_system_graph_langgraph(
     graph: NodeSystemGraphDocument,
     initial_state: dict[str, Any] | None = None,
@@ -314,6 +322,19 @@ def _record_subgraph_node_status(state: dict[str, Any], node_name: str, status: 
         save_run(parent_state)
 
 
+def _apply_inherited_permission_metadata(
+    subgraph_document: NodeSystemGraphDocument,
+    state: dict[str, Any],
+) -> NodeSystemGraphDocument:
+    metadata = dict(subgraph_document.metadata or {})
+    parent_metadata = state.get("metadata") if isinstance(state.get("metadata"), dict) else {}
+    for key in INHERITED_PERMISSION_METADATA_KEYS:
+        if key in parent_metadata:
+            metadata[key] = copy.deepcopy(parent_metadata[key])
+    subgraph_document.metadata = metadata
+    return subgraph_document
+
+
 def _build_langgraph_node_callable(
     *,
     graph: NodeSystemGraphDocument,
@@ -402,19 +423,34 @@ def _build_langgraph_node_callable(
                     )
                 if body.get("awaiting_human"):
                     duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
-                    _apply_subgraph_waiting_parent_state(
-                        state,
-                        node_name,
-                        node,
-                        body,
-                        state_reads=state_reads,
-                        duration_ms=duration_ms,
-                        node_outputs=node_outputs,
-                        active_edge_ids=active_edge_ids,
-                        started_perf=started_perf,
-                        checkpoint_saver=checkpoint_saver,
-                        checkpoint_lookup_config=checkpoint_lookup_config,
-                    )
+                    if body.get("pending_permission_approval"):
+                        _apply_permission_approval_waiting_state(
+                            state,
+                            node_name,
+                            node,
+                            body,
+                            state_reads=state_reads,
+                            duration_ms=duration_ms,
+                            node_outputs=node_outputs,
+                            active_edge_ids=active_edge_ids,
+                            started_perf=started_perf,
+                            checkpoint_saver=checkpoint_saver,
+                            checkpoint_lookup_config=checkpoint_lookup_config,
+                        )
+                    else:
+                        _apply_subgraph_waiting_parent_state(
+                            state,
+                            node_name,
+                            node,
+                            body,
+                            state_reads=state_reads,
+                            duration_ms=duration_ms,
+                            node_outputs=node_outputs,
+                            active_edge_ids=active_edge_ids,
+                            started_perf=started_perf,
+                            checkpoint_saver=checkpoint_saver,
+                            checkpoint_lookup_config=checkpoint_lookup_config,
+                        )
                     raise _SubgraphAwaitingHuman()
                 outputs = dict(body.get("outputs", {}))
                 selected_edge_ids = select_active_outgoing_edges(outgoing_edges, body)
@@ -641,6 +677,65 @@ def _apply_subgraph_waiting_parent_state(
     )
 
 
+def _apply_permission_approval_waiting_state(
+    state: dict[str, Any],
+    node_name: str,
+    node: Any,
+    body: dict[str, Any],
+    *,
+    state_reads: list[dict[str, Any]],
+    duration_ms: int,
+    node_outputs: dict[str, dict[str, Any]],
+    active_edge_ids: set[str],
+    started_perf: float,
+    checkpoint_saver: JsonCheckpointSaver,
+    checkpoint_lookup_config: dict[str, Any],
+) -> None:
+    pending = dict(body.get("pending_permission_approval") or {})
+    state["current_node_id"] = node_name
+    state["node_status_map"][node_name] = "paused"
+    _record_subgraph_node_status(state, node_name, "paused")
+    set_run_status(state, "awaiting_human", pause_reason="permission_approval")
+    metadata = state.setdefault("metadata", {})
+    metadata["pending_interrupt_nodes"] = [node_name]
+    metadata["pending_interrupts"] = []
+    metadata["pending_permission_approval"] = pending
+    metadata["resolved_runtime_backend"] = "langgraph"
+    state["node_executions"] = [
+        *state.get("node_executions", []),
+        {
+            "node_id": node_name,
+            "node_type": node.kind,
+            "status": "paused",
+            "started_at": utc_now_iso(),
+            "finished_at": utc_now_iso(),
+            "duration_ms": duration_ms,
+            "input_summary": _summarize_values(pending.get("skill_inputs", {})),
+            "output_summary": "",
+            "artifacts": {
+                "inputs": pending.get("skill_inputs", {}),
+                "outputs": {},
+                "family": node.kind,
+                "state_reads": state_reads,
+                "state_writes": [],
+                "permission_approval": pending,
+                "selected_capabilities": body.get("selected_capabilities", []),
+                "capability_outputs": [],
+            },
+            "warnings": body.get("warnings", []),
+            "errors": [],
+        },
+    ]
+    _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
+    _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
+    _append_run_snapshot(
+        state,
+        snapshot_id=f"pause_{len([item for item in state.get('run_snapshots', []) if item.get('kind') == 'pause']) + 1}",
+        kind="pause",
+        label=f"Approval required for {pending.get('skill_name') or node.name or node_name}",
+    )
+
+
 def _subgraph_input_boundaries(node: NodeSystemSubgraphNode) -> list[tuple[str, str]]:
     boundaries: list[tuple[str, str]] = []
     for inner_node_name, inner_node in node.config.graph.nodes.items():
@@ -728,6 +823,7 @@ def _build_pending_subgraph_breakpoint(
         "inner_node_name": inner_node.name if inner_node is not None and inner_node.name else inner_node_id,
         "subgraph_path": [*parent_path, node_name],
         "state_values": copy.deepcopy(subgraph_state.get("state_values", {})),
+        "metadata": copy.deepcopy(subgraph_state.get("metadata", {})),
         "node_status_map": dict(subgraph_state.get("node_status_map", {})),
         "node_executions": list(subgraph_state.get("node_executions", [])),
         "checkpoint_metadata": copy.deepcopy(subgraph_state.get("checkpoint_metadata", {})),
@@ -780,6 +876,7 @@ def _build_pending_dynamic_subgraph_breakpoint(
         "subgraph_path": [*parent_path, node_name],
         "subgraph_inputs": copy.deepcopy(subgraph_inputs),
         "state_values": copy.deepcopy(subgraph_state.get("state_values", {})),
+        "metadata": copy.deepcopy(subgraph_state.get("metadata", {})),
         "node_status_map": dict(subgraph_state.get("node_status_map", {})),
         "node_executions": list(subgraph_state.get("node_executions", [])),
         "checkpoint_metadata": copy.deepcopy(subgraph_state.get("checkpoint_metadata", {})),
@@ -804,6 +901,7 @@ def _execute_subgraph_node_runtime(
     persist_parent_progress: bool,
 ) -> dict[str, Any]:
     subgraph_document = _build_subgraph_document(parent_graph, node_name, node, input_values)
+    subgraph_document = _apply_inherited_permission_metadata(subgraph_document, state)
     parent_status_map = _root_parent_run_state(state).setdefault("subgraph_status_map", {})
     parent_status_map[node_name] = {
         inner_node_name: "idle"
@@ -890,9 +988,11 @@ def _resume_subgraph_node_runtime(
     persist_parent_progress: bool,
 ) -> dict[str, Any]:
     subgraph_document = _build_subgraph_document(parent_graph, node_name, node, input_values)
+    subgraph_document = _apply_inherited_permission_metadata(subgraph_document, state)
     subgraph_initial_state = create_initial_run_state(subgraph_document.graph_id, subgraph_document.name)
     subgraph_initial_state["run_id"] = str(state.get("run_id") or subgraph_initial_state["run_id"])
     subgraph_initial_state["state_values"] = copy.deepcopy(pending_subgraph.get("state_values") or {})
+    subgraph_initial_state["metadata"] = copy.deepcopy(pending_subgraph.get("metadata") or {})
     subgraph_initial_state["node_status_map"] = dict(pending_subgraph.get("node_status_map") or {})
     subgraph_initial_state["node_executions"] = list(pending_subgraph.get("node_executions") or [])
     subgraph_initial_state["checkpoint_metadata"] = copy.deepcopy(pending_subgraph.get("checkpoint_metadata") or {})
@@ -983,6 +1083,7 @@ def _execute_dynamic_subgraph_capability(
 
     template = load_template_record(template_key)
     subgraph_document = _build_dynamic_subgraph_document(template_key, template, subgraph_inputs)
+    subgraph_document = _apply_inherited_permission_metadata(subgraph_document, state)
     parent_status_map = _root_parent_run_state(state).setdefault("subgraph_status_map", {})
     parent_status_map[node_name] = {
         inner_node_name: "idle"
@@ -1085,9 +1186,11 @@ def _resume_dynamic_subgraph_capability(
     template = load_template_record(template_key)
     resume_inputs = copy.deepcopy(pending_subgraph.get("subgraph_inputs") or subgraph_inputs)
     subgraph_document = _build_dynamic_subgraph_document(template_key, template, resume_inputs)
+    subgraph_document = _apply_inherited_permission_metadata(subgraph_document, state)
     subgraph_initial_state = create_initial_run_state(subgraph_document.graph_id, subgraph_document.name)
     subgraph_initial_state["run_id"] = str(state.get("run_id") or subgraph_initial_state["run_id"])
     subgraph_initial_state["state_values"] = copy.deepcopy(pending_subgraph.get("state_values") or {})
+    subgraph_initial_state["metadata"] = copy.deepcopy(pending_subgraph.get("metadata") or {})
     subgraph_initial_state["node_status_map"] = dict(pending_subgraph.get("node_status_map") or {})
     subgraph_initial_state["node_executions"] = list(pending_subgraph.get("node_executions") or [])
     subgraph_initial_state["checkpoint_metadata"] = copy.deepcopy(pending_subgraph.get("checkpoint_metadata") or {})

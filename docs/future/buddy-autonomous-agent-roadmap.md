@@ -67,7 +67,7 @@
 - 后端已有根目录 `buddy_home/` 的默认生成逻辑，以及基于 `SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memory、session summary、revision、command 等基础存取接口；它们应继续收束为 Buddy Home，而不是扩散到多个无关数据位置。
 - 官方 `buddy_autonomous_loop` 模板已创建并注册。它使用 Buddy Home 文件夹输入、请求理解子图、按需能力循环子图、最终回复子图和唯一 `final_reply` output；简单闲聊或可直接回答的请求会绕过能力循环。
 - 官方 `buddy_self_review` 模板已作为内部后台模板落地。伙伴可见回复完成后，前端会用主运行快照启动该后台 run；它只产出记忆更新计划和伙伴成长计划，不阻塞下一轮对话，也不直接写 Buddy Home。
-- 官方 `toograph_skill_creation_workflow` 模板已创建。它保留需求澄清、样例确认、Skill 文件生成、脚本测试、失败回环修复、生成方案审查和用户 Skill 目录写入这些流程边界，并避免使用普通编辑器创建不出来的节点。低层写入确认不再放在模板里由 LLM 判断；目标是由运行时的 `需确认` / `完全访问` 模式处理，这一统一低层审批拦截仍需补齐。
+- 官方 `toograph_skill_creation_workflow` 模板已创建。它保留需求澄清、样例确认、Skill 文件生成、脚本测试、失败回环修复、生成方案审查和用户 Skill 目录写入这些流程边界，并避免使用普通编辑器创建不出来的节点。低层写入确认不再放在模板里由 LLM 判断；运行时会按 `需确认` / `完全访问` 模式处理。
 - 伙伴浮窗已有可见运行过程面板、节点级流式输出预览、每步耗时、完成后折叠摘要、正式回复 markdown 流式展示和后台复盘解耦。
 - 伙伴浮窗已复用标准 `awaiting_human` 暂停/恢复路径：暂停卡片会先展示当前产物和上下文，再展示需要补充的字段；底部输入会恢复当前断点，暂停期间不会继续消费后续队列消息。
 - 本地文件夹输入已能在普通仓库和 `.worktrees/<branch>` 工作区下读取根目录 `buddy_home/`，伙伴模板在分支工作区中不会因为路径推导失败而丢失 Buddy Home 上下文。
@@ -89,7 +89,7 @@
 
 1. 巩固伙伴运行来源：让伙伴图继续只依赖统一 `metadata.origin=buddy` 和必要的策略字段，确保运行详情、伙伴页面和新测试不再引入 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 这类旧标记。
 2. 完善伙伴断点交互：浮窗已有基础暂停卡片和恢复能力，下一步补齐拒绝、取消、刷新后找回和暂停期间队列策略；伙伴页面还需要运行与确认视图。
-3. 补齐动态能力审批路径：写文件、删改文件和执行任意脚本/命令必须按图或 Buddy 的 `需确认` / `完全访问` 模式进入标准断点，而不是只靠提示词或前端提醒；普通联网、读取、搜索和运行 Skill 本身不单独触发审批。
+3. 完善动态能力审批体验：当前运行时已能让声明 `file_write`、删除类权限或 `subprocess` 的 Skill 在 `需确认` 模式下进入标准 `awaiting_human`，并在 `完全访问` 模式下放行；下一步补齐拒绝、取消、刷新后找回、审批详情页和低层操作摘要。
 4. 建立 Buddy Home 写回流程：把长期记忆、会话摘要、用户画像、人设调整、能力使用统计和自我复盘报告写回做成显式模板/受控 Skill/命令记录/revision 流程。
 5. 重建图编辑命令流：删除或重建 `graph_patch.draft` stub，补齐图补丁预览、GraphCommandBus、graph revision、undo/redo 和完整审计闭环。
 6. 完善子图运行审计：在运行详情中聚合父子图事件，支持动态子图断点定位、scope path 展示和从缩略图跳转到内部节点。
@@ -129,7 +129,7 @@ input_question
 - `exhausted` 分支表示达到循环上限后用已有证据收束，而不是失败。
 - 证据评估节点不应为了追求完美资料无限补搜。已有约 5 份可读原文并足以回答时，应进入整理阶段，并在最终回复中说明资料局限。
 
-该模板证明当前节点系统已经能表达一个“万能循环”的核心局部：工具执行、结果评估、必要时再调用工具、最后整理回复。当前 `buddy_autonomous_loop` 已经在它前面补上请求理解和能力选择，在它后面补上最终回复与后台复盘入口；后续重点不是重建主循环，而是补齐低层操作审批、伙伴断点体验剩余项、Buddy Home 写回和低层活动审计。
+该模板证明当前节点系统已经能表达一个“万能循环”的核心局部：工具执行、结果评估、必要时再调用工具、最后整理回复。当前 `buddy_autonomous_loop` 已经在它前面补上请求理解和能力选择，在它后面补上最终回复与后台复盘入口；后续重点不是重建主循环，而是完善低层审批体验、伙伴断点体验剩余项、Buddy Home 写回和低层活动审计。
 
 ## 子图组件
 
@@ -409,7 +409,7 @@ effective_capability =
 - `capability.kind=subgraph` 只表达“选中的一个可运行子图能力”，主要服务伙伴主循环等动态模板。
 - `capability.kind=none` 表达没有合适能力。
 - 一个 LLM 节点不能同时使用卡片 skill 和输入 capability state；冲突时应作为协议错误处理。
-- 真正执行前仍必须通过 skill registry、本地 settings 启用状态和运行时注册状态；涉及写文件、删改文件和执行脚本时，还需要接入图/Buddy 的统一低层审批检查。
+- 真正执行前仍必须通过 skill registry、本地 settings 启用状态和运行时注册状态；涉及写文件、删改文件和执行脚本时，会接入图/Buddy 的统一低层审批检查。
 - 多个能力调用必须拆成多个节点，由图结构显式编排。
 
 ## 绑定技能的语义
@@ -684,7 +684,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 TooGr
 - `select_capability`：静态绑定 `toograph_capability_selector`，根据需求选择一个启用的图模板或 Skill。图模板优先，找不到则输出 `{ "kind": "none" }` 和 `capability_found=false`。
 - `capability_found`：condition。未找到能力时进入直接回复或缺失能力说明；找到能力时进入 `execute_capability`。低层写文件、删改文件或执行脚本的确认不属于这个 condition，由运行时权限原语处理。
 - `review_missing_capability`：当选择器返回 `{ "kind": "none" }` 时，写 `capability_review` 与 `capability_gap`。普通任务缺能力时只向用户提出是否构建；只有用户明确要求创建能力或请求本身就是构建能力时，才标记可进入构建流程。
-- 能力循环不再包含模板内的低层审批节点。写文件、删改文件或执行脚本应由运行时根据当前图或 Buddy 的 `需确认` / `完全访问` 模式暂停或自动继续；LLM 节点只负责开放性确认、方案审查和最终解释。当前统一低层审批拦截仍是路线图项。
+- 能力循环不再包含模板内的低层审批节点。写文件、删改文件或执行脚本由运行时根据当前图或 Buddy 的 `需确认` / `完全访问` 模式暂停或自动继续；LLM 节点只负责开放性确认、方案审查和最终解释。
 - `execute_capability`：读取 `selected_capability`。该节点只负责生成目标能力的公开输入；runtime 执行 skill 或动态 subgraph，并只写一个 `capability_result`。
 - `review_capability_result`：读取拆包后的 `capability_result`，判断是否已经足够、是否需要继续另一个能力、是否需要向用户解释失败或请求更多信息。
 - `continue_capability_loop`：condition。需要继续时回到 `select_capability`，达到 `loopLimit` 时进入最终回复。循环上限是正式行为，不是错误；达到上限时必须用已有信息收束。
@@ -740,7 +740,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 TooGr
 
 1. 伙伴运行来源巩固：保持 Buddy 图运行统一以 `metadata.origin=buddy` 和显式策略字段表达来源、权限和审计语义，并补齐相关运行详情与伙伴页面展示。
 2. 伙伴暂停交互剩余项：浮窗补齐拒绝、取消、刷新找回和队列策略；伙伴页面补齐运行与确认视图，并复用标准 `awaiting_human` / `/api/runs/{run_id}/resume`。
-3. 动态能力审批：让涉及写文件、删改文件或执行任意脚本/命令的 Skill 和动态子图按权限模式进入标准断点确认，审批结果写回 state 并进入 run detail。
+3. 动态能力审批体验：补齐拒绝、取消、刷新找回、审批详情页和低层操作摘要；当前最小闭环已经能让涉及写文件、删除类权限或 `subprocess` 的 Skill 按权限模式进入标准 `awaiting_human` 或自动放行。
 4. Buddy Home 写回：把记忆、用户资料、会话摘要、能力使用统计、报告和策略建议写成显式图流程，通过受控 Skill、command、revision 和审批路径落地。
 5. 图编辑命令流：清理或重建 `graph_patch.draft` stub，补齐 GraphCommandBus、图补丁预览、graph revision、undo/redo 和完整审计。
 6. 子图运行详情：补齐父子图运行审计聚合、动态子图断点定位、scope path 展示和从缩略图跳转到内部节点。

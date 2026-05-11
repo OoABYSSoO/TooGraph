@@ -265,6 +265,23 @@
               <p class="buddy-widget__pause-summary">
                 {{ pausedBuddyReviewModel?.summaryText || t("buddy.pause.body") }}
               </p>
+              <div v-if="pausedBuddyPermissionApproval" class="buddy-widget__pause-section">
+                <strong>{{ t("buddy.pause.permissionTitle") }}</strong>
+                <div class="buddy-widget__pause-row">
+                  <span>{{ pausedBuddyPermissionApproval.skillName }}</span>
+                  <small>{{ pausedBuddyPermissionApproval.skillKey }}</small>
+                  <div class="buddy-widget__pause-permissions">
+                    <span v-for="permission in pausedBuddyPermissionApproval.permissions" :key="permission">
+                      {{ permission }}
+                    </span>
+                  </div>
+                  <small v-if="pausedBuddyPermissionApproval.reason">{{ pausedBuddyPermissionApproval.reason }}</small>
+                  <template v-if="pausedBuddyPermissionApproval.inputPreview">
+                    <small>{{ t("buddy.pause.permissionInputs") }}</small>
+                    <pre>{{ pausedBuddyPermissionApproval.inputPreview }}</pre>
+                  </template>
+                </div>
+              </div>
               <div v-if="pausedBuddyProducedRows.length > 0" class="buddy-widget__pause-section">
                 <strong>{{ t("buddy.pause.producedTitle") }}</strong>
                 <div v-for="row in pausedBuddyProducedRows" :key="row.key" class="buddy-widget__pause-row">
@@ -292,7 +309,7 @@
                 </label>
               </div>
               <p
-                v-if="pausedBuddyRequiredRows.length === 0 && pausedBuddyProducedRows.length === 0"
+                v-if="!pausedBuddyPermissionApproval && pausedBuddyRequiredRows.length === 0 && pausedBuddyProducedRows.length === 0"
                 class="buddy-widget__pause-summary"
               >
                 {{ t("buddy.pause.empty") }}
@@ -672,6 +689,7 @@ const pausedBuddyReviewModel = computed<HumanReviewPanelModel | null>(() => {
 });
 const pausedBuddyRequiredRows = computed(() => pausedBuddyReviewModel.value?.requiredNow ?? []);
 const pausedBuddyProducedRows = computed(() => pausedBuddyReviewModel.value?.producedRows ?? []);
+const pausedBuddyPermissionApproval = computed(() => pausedBuddyReviewModel.value?.permissionApproval ?? null);
 const pausedBuddyScopeText = computed(() => pausedBuddyReviewModel.value?.scopePath.join(" / ") ?? "");
 const isPausedBuddyResumeBlocked = computed(() =>
   pausedBuddyRequiredRows.value.some((row) => !resolvePausedBuddyDraft(row).trim()),
@@ -2928,6 +2946,23 @@ function formatErrorMessage(error: unknown): string {
   font-family: var(--toograph-font-mono);
   font-size: 11px;
   line-height: 1.45;
+}
+
+.buddy-widget__pause-permissions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.buddy-widget__pause-permissions span {
+  width: fit-content;
+  padding: 3px 6px;
+  border: 1px solid rgba(180, 83, 9, 0.22);
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.14);
+  color: rgb(146, 64, 14);
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .buddy-widget__pause-actions {
