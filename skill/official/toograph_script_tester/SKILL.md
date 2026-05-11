@@ -19,4 +19,4 @@ Outputs:
 - `success`: Boolean indicating whether the test command exited with code 0.
 - `result`: Markdown result containing command, exit code, duration, stdout, stderr, or validation errors.
 
-The runtime writes only inside a temporary directory, validates file paths, and runs only allowlisted commands. The provided code still executes in the local system environment. In `需确认` mode, this capability should be approved before running generated or untrusted scripts; in `完全访问` mode, the graph may run it without an extra prompt.
+The runtime writes only inside a temporary directory, validates file paths, and runs only allowlisted commands. The provided code still executes in the local system environment. This Skill declares file-write and subprocess capability; the target product behavior is that `需确认` mode pauses before executing generated or untrusted scripts and `完全访问` mode can run them without an extra prompt. That low-level runtime approval interceptor is still being completed, so current safety comes from explicit graph design, allowlisted commands, temporary workspaces, and human-review nodes where present.

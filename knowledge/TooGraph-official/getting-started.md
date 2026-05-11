@@ -2,28 +2,35 @@
 
 第一次使用 TooGraph，推荐按下面的顺序走：
 
-1. 在仓库根目录运行 `npm run dev`，确保前后端都启动。
-2. 打开 `/editor/new`，从模板创建一张图，例如 `Hello World`。
-3. 先看清节点链路：`input -> agent -> output`。
-4. 在问题输入里改一个你关心的问题。
-5. 想验证联网能力时，从模板创建 `联网研究循环`，修改 input 里的研究问题。
-6. 想验证视频下载和广告创意分析链路时，从模板创建 `广告创意分析demo模板`，保留默认 `SLG` 或改成其他游戏类型。
-7. 确认相关 agent 节点已经挂载对应 skill，并且 Output 节点读取的是 `source_documents` 或 `downloaded_video_files` 这类 artifact state。
-8. 点击 `Validate`，确认图结构合法。
-9. 点击 `Run`，然后去 Output 节点和 Run Activity 面板看实时输出；如果抓取了网页正文或下载了媒体，Output 会展示对应本地 artifact。
+1. 在仓库根目录运行 `npm start`。这会执行 `node scripts/start.mjs`，构建或复用 `frontend/dist`，然后在单端口启动 TooGraph。
+2. 打开 `http://127.0.0.1:3477`，进入 Editor。
+3. 新建一张图，或从官方模板创建一张图，例如 `advanced_web_research_loop`、`buddy_autonomous_loop` 或 `toograph_skill_creation_workflow`。
+4. 先看清节点链路：最小图通常是 `input -> agent -> output`；复杂图会通过 `condition` 和 `subgraph` 表达分支、循环和封装流程。
+5. 在 input 节点里改一个你关心的问题。
+6. 如果要运行 LLM 节点，先到 Model Providers 页面配置可用的本地 OpenAI-compatible 网关、私有网关或云端 Provider，并选择默认文本模型。
+7. 点击 `Validate`，确认图结构合法。
+8. 点击 `Run`，然后在 Output 节点、Run Activity 面板或 Runs / Run Detail 页面查看输出、state、artifacts、warnings 和 errors。
+9. 如果图进入 `awaiting_human`，在 Human Review 面板或 Buddy 暂停卡片中补充必填 state，再通过 resume 继续运行。
+
+当前官方模板：
+
+- `advanced_web_research_loop`：多轮联网搜索、证据评估、补充检索和最终回复。
+- `buddy_autonomous_loop`：Buddy 可见主循环，读取 Buddy Home、本轮消息、页面上下文和对话历史，按需选择能力并输出唯一 `final_reply`。
+- `toograph_skill_creation_workflow`：通过澄清、样例确认、Skill 文件生成、脚本测试和写入审批来创建用户自定义 Skill。
+- `buddy_self_review`：Buddy 回复完成后的内部后台复盘模板，不作为普通模板入口。
 
 如果你想快速理解 TooGraph 自己的产品形态，建议先问这些问题：
 
 - TooGraph 是什么？
-- TooGraph 现在已经做到了什么程度？
-- State Panel 是怎么工作的？
-- web_search skill 是怎么把摘要、证据链接和本地 source documents 交给 workflow 的？
-- 广告创意分析demo模板是怎么下载公开视频并让 Output 展示本地视频 artifact 的？
+- TooGraph 当前有哪些节点类型？
+- `state_schema` 为什么是唯一数据源？
+- Skill 和 graph template 的边界是什么？
+- Buddy 为什么也是 graph run，而不是第二套 agent runtime？
 
 如果你想验证知识库源文档，推荐先导入这些库再作为显式输入使用：
 
-- 用 `toograph-official` 问项目本身
-- 用 `python-official-3.14` 问 Python API
-- 用 `langgraph-official-v1` 问 LangGraph 概念和机制
+- 用 `toograph-official` 问项目本身。
+- 用 `python-official-3.14` 问 Python API。
+- 用 `langgraph-official-v1` 问 LangGraph 概念和机制。
 
-知识库输入本身不再自动带检索 skill；需要检索时，应把检索能力做成 `skill/<skill_key>` 文件夹里的显式 skill 后再挂到 agent 节点。
+知识库输入本身不再自动带检索 Skill；需要检索时，应通过 `skill/official/<skill_key>/` 或 `skill/user/<skill_key>/` 中的显式 Skill 接入。

@@ -35,14 +35,14 @@ If a referenced path does not exist, the pre-read context says that only `write`
 Supported operations:
 
 - `read`: reads one UTF-8 text file and returns its content in `result`.
-- `write`: creates or overwrites one UTF-8 text file under `backend/data`.
+- `write`: creates or overwrites one UTF-8 text file under `backend/data`, `skill/user`, `graph_template/user`, or `node_preset/user`.
 - `execute`: runs one script under `backend/data/tmp` or `skill/user`.
 
 Default policy:
 
 - Read roots: any path inside the TooGraph repository except denied roots.
-- Write roots: `backend/data`.
+- Write roots: `backend/data`, `skill/user`, `graph_template/user`, `node_preset/user`.
 - Execute roots: `backend/data/tmp`, `skill/user`.
 - Execute extensions: `.py`, `.js`, `.mjs`, `.sh`, `.bat`, `.ps1`.
 
-Execution is not an OS sandbox. It is constrained by path policy before launch, but the launched script still runs as a local process. In `需确认` mode, `write` and `execute` operations must be approved before execution; in `完全访问` mode, the graph may run them without an extra prompt. Plain `read` operations do not require approval by themselves.
+Execution is not an OS sandbox. It is constrained by path policy before launch, but the launched script still runs as a local process. This Skill declares file-write and subprocess capability; the target product behavior is that `需确认` mode pauses before writes or execution and `完全访问` mode can run them without an extra prompt. That low-level runtime approval interceptor is still being completed, so current safety comes from explicit graph design, Buddy mode, path policy, and human-review nodes where present. Plain `read` operations do not require approval by themselves.

@@ -17,6 +17,7 @@
 - 当前官方技能包包括 `web_search`、`toograph_capability_selector`、`toograph_skill_builder`、`toograph_script_tester` 和 `local_workspace_executor`。后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
 - 根目录 `buddy_home/` 是伙伴长期资料的目标收束目录。它由程序在启动或读取时按默认内容自动补齐，属于本地用户数据，不进入 Git 管理。正式结构收束为 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json`、`buddy.db` 和 `reports/`；不维护长期 `TOOLS.md`，当前能力来自启用的 Skill、启用的图模板和能力选择 Skill。
+- 伙伴启动侧已收束到 `metadata.origin=buddy`，并使用明确的 `buddy_mode`、`buddy_can_execute_actions`、`buddy_requires_approval` 等策略字段表达来源与权限语义；旧的 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 不再写入新 Buddy 图。
 
 ## 当前协议
 
@@ -41,7 +42,7 @@
 - `state_schema` 支持 `binding` 元数据，用来标记某个 state 是否由技能输出自动绑定。
 - `file` / `image` / `audio` / `video` 类型 state 的值是本地 artifact 路径、路径列表，或 `kind=local_folder` 的本地文件夹选择包；不再有单独的 `file_list`、`array` 或 `object` state 类型。LLM 节点接收 `file` state 时，会读取文本类文件并只把“文件名 + 原文全文”拼入模型上下文；图片、音频和视频路径会走多模态附件处理，不作为文本读取。
 - Input 节点输出文件、图片、音频或视频时都写入本地路径；文件输入还可以切到“文件夹”模式，通过后端只读策略列出文件树，并在节点面板中勾选要注入的文件。Output 节点可通过 documents 预览展示这些 artifact。
-- 目标运行来源语义是 `origin=buddy`。当前前端伙伴构图代码仍残留 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧元数据；这些字段是待迁移标记，不应作为新一轮伙伴架构的设计依据。
+- 伙伴运行来源语义是 `metadata.origin=buddy`。新 Buddy 图不再写入 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 这类旧元数据；后续新增策略字段必须保持显式、可审计，并避免重新创造第二套运行协议。
 
 ## 当前技能
 
@@ -158,7 +159,7 @@
 - 动态读取 `capability` state 的 LLM 节点必须写唯一 `result_package` state；静态 `skillKey` 与动态 `capability` state 不能混用；没有静态 `skillKey` 的 `skillBindings` 会被视为旧协议并拒绝。
 - LangGraph runtime 是当前运行主链。
 - 后端不再在 graph run 入口修补旧模板结构；提交什么图，就按当前协议校验和执行什么图。
-- graph run、run detail、SSE 事件、状态快照和 artifact 输出仍是审计与回放的基础。
+- graph run、run detail、SSE 事件、状态快照、节点级 Run Activity 和 artifact 输出仍是审计与回放的基础。
 - 静态 Subgraph 节点和动态 `capability.kind=subgraph` 的内部 `interrupt_after` 都会通过父级 run 的 `pending_subgraph_breakpoint` 暂停，并在父级 resume 后继续内部 checkpoint。
 - 本地文件夹输入已能在普通仓库和 `.worktrees/<branch>` 工作区下读取根目录 `buddy_home/`，避免伙伴模板在分支工作区中丢失 Buddy Home 上下文。
 - `backend/app/buddy/home.py` 负责根目录 `buddy_home/` 的默认文件生成；`backend/app/buddy/store.py` 已提供基于 `SOUL.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memories、session summary、revisions、command 记录、`buddy_sessions` 和 `buddy_messages` 存取；`backend/app/buddy/commands.py` 已有命令记录入口。完整 Buddy Home 写回图流程仍未补齐。
@@ -166,11 +167,11 @@
 
 ## 当前仍在路线图中
 
-- 伙伴运行来源收束：官方模板已经使用 `metadata.origin=buddy`，但前端伙伴启动侧仍有 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧标记，需要清理或迁移为明确策略字段。
+- 伙伴运行来源巩固：保持 Buddy 图统一使用 `metadata.origin=buddy` 和明确策略字段，补充运行详情、伙伴页面和测试中的来源/权限展示，避免重新引入旧 metadata 或第二套运行协议。
 - 继续收束 `subgraph` 子图体验：补齐父子图运行详情页的审计聚合、事件定位、从缩略图点击跳转到内部节点，以及动态子图断点在运行详情中的更完整展示。
 - 完善伙伴断点交互：浮窗已有基础暂停卡片和恢复能力；仍需补齐拒绝、取消、刷新后找回、暂停期间队列策略细化，伙伴页面还需要运行与确认视图。
 - 补齐动态能力审批：写文件、删改文件和执行任意脚本/命令应按图或 Buddy 的 `需确认` / `完全访问` 模式进入标准 `awaiting_human`，而不是只靠提示词提醒；普通联网、读取、搜索和运行 Skill 本身不单独触发审批。
-- 实现统一 `activity_events`，让伙伴浮窗和运行详情页能展示文件探索、命令执行、写入行数、脚本测试等低层操作摘要。
+- 补齐低层 `activity_events`，在已有节点级 SSE / Run Activity 基础上，让伙伴浮窗和运行详情页能展示文件探索、命令执行、写入行数、脚本测试等程序化操作摘要。
 - 清理或按新命令流重建历史 `graph_patch.draft` stub，并完成图补丁预览、GraphCommandBus、graph revision、undo 和审计闭环。
 - 将人设、记忆、会话摘要、自我复盘报告和能力使用统计等长期状态更新表达为可审计的图模板流程，而不是隐藏产品逻辑。
 - 将内部 `agent` kind 迁移为面向用户和协议一致的 LLM 节点语义。

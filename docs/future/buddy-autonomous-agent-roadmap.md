@@ -79,21 +79,21 @@
 - `toograph_capability_selector` 已承担“从启用模板和启用 Skill 中选择单个能力”的职责。旧的独立自主决策 Skill 目标不再保留；后续要增强的是该选择器的候选描述、能力缺口输出、能力轨迹和审计记录。
 - Buddy Home 已有默认目录、默认文件、会话历史、记忆、summary、revision 和 command 存储基础，但能力使用统计、结构化检索索引、自我复盘报告和长期资料写回图流程尚未成形。
 - 伙伴主循环的上下文装配、需求理解、能力循环、最终回复和后台复盘已经作为官方模板内部子图或后台模板落地；稳定后是否拆成独立官方可复用模板仍待决定。
-- 前端伙伴构图代码仍残留 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧元数据。官方模板已使用 `metadata.origin=buddy`，但启动侧还未完全收束到统一来源语义。
+- 前端伙伴构图代码已停止写入 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧元数据。新 Buddy 图使用 `metadata.origin=buddy`，并通过 `buddy_mode`、`buddy_can_execute_actions`、`buddy_requires_approval` 等明确策略字段表达来源与权限语义；后续重点是让运行详情、伙伴页面和测试继续沿用这套语义，不重新扩展第二套伙伴运行协议。
 - 标准 graph run 已支持 `awaiting_human`、resume API、编辑器 Human Review、静态子图断点恢复和动态子图断点恢复；伙伴浮窗已复用基础暂停卡片和恢复交互，仍缺拒绝、取消、刷新后找回和队列策略细化；伙伴页面仍缺运行与确认视图。
-- 伙伴浮窗已经显示节点级运行过程，但还没有统一的低层 `activity_events`。类似 `Explored 7 files`、`ran 1 command`、`Editing store.py +132 -9` 的程序化操作摘要仍是待实现能力。
+- 伙伴浮窗和编辑器已经显示节点级运行过程与 SSE / Run Activity 事件，但还没有统一的低层 `activity_events`。类似 `Explored 7 files`、`ran 1 command`、`Editing store.py +132 -9` 的程序化操作摘要仍是待实现能力。
 - 内部协议仍使用 `agent` kind 表示 LLM 节点。用户界面和文档心智已改成 LLM 节点，但协议命名迁移仍未完成。
 - 当前仍残留 `backend/app/buddy/commands.py` 中的 `graph_patch.draft` 草案记录 stub。它是历史遗留入口，只能记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、graph revision、undo 或完整审计闭环；下一轮应删除它，或按新的图优先命令流重建。
 
 接下来要做：
 
-1. 收束伙伴运行来源：让伙伴启动图时只依赖统一 `metadata.origin=buddy` 和必要的策略字段，停止扩展 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 这类旧标记。
+1. 巩固伙伴运行来源：让伙伴图继续只依赖统一 `metadata.origin=buddy` 和必要的策略字段，确保运行详情、伙伴页面和新测试不再引入 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 这类旧标记。
 2. 完善伙伴断点交互：浮窗已有基础暂停卡片和恢复能力，下一步补齐拒绝、取消、刷新后找回和暂停期间队列策略；伙伴页面还需要运行与确认视图。
 3. 补齐动态能力审批路径：写文件、删改文件和执行任意脚本/命令必须按图或 Buddy 的 `需确认` / `完全访问` 模式进入标准断点，而不是只靠提示词或前端提醒；普通联网、读取、搜索和运行 Skill 本身不单独触发审批。
 4. 建立 Buddy Home 写回流程：把长期记忆、会话摘要、用户画像、人设调整、能力使用统计和自我复盘报告写回做成显式模板/受控 Skill/命令记录/revision 流程。
 5. 重建图编辑命令流：删除或重建 `graph_patch.draft` stub，补齐图补丁预览、GraphCommandBus、graph revision、undo/redo 和完整审计闭环。
 6. 完善子图运行审计：在运行详情中聚合父子图事件，支持动态子图断点定位、scope path 展示和从缩略图跳转到内部节点。
-7. 实现统一 `activity_events`：由运行时、技能和文件/命令原语程序化记录低层操作摘要，并让伙伴浮窗和运行详情页复用同一渲染器。
+7. 补齐低层 `activity_events`：由运行时、技能和文件/命令原语程序化记录低层操作摘要，并让伙伴浮窗和运行详情页复用同一渲染器。
 8. 迁移内部 `agent` kind 命名：在不引入第二套图协议的前提下，把用户可见和协议命名逐步收束为 LLM 节点语义。
 9. 补充测试覆盖：伙伴拒绝/取消/刷新恢复、权限拒绝、循环上限、Buddy Home 写回、活动事件、图补丁审计、运行详情中的子图断点展示和 output 只展示最终回复。
 
@@ -197,7 +197,7 @@ input_question
 
 伙伴运行时不是第二套 `buddy_run`，LLM 节点运行时也不是另一套 `graph_run`。伙伴只是用 `origin=buddy` 这类运行来源元数据启动图模板。运行来源用于策略判断、审计和 UI 展示，不用于创造第二套执行协议。
 
-当前代码里仍有待迁移的旧标记：前端伙伴构图代码会写入 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等元数据。这些字段只代表历史遗留状态，不是目标协议；新一轮实现应迁移到统一的运行来源元数据，例如 `origin=buddy`，并避免继续扩展第二套伙伴运行协议。
+当前 Buddy 图启动侧已经写入 `metadata.origin=buddy`，并使用 `buddy_mode`、`buddy_can_execute_actions`、`buddy_requires_approval` 等明确策略字段表达权限模式。`buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧字段不应再出现在新 Buddy 图中；后续实现只能在统一 graph run 元数据上补充审计所需的明确字段。
 
 因此：
 
@@ -738,13 +738,13 @@ function call 未来可以作为某些模型的适配层，但不能绕过 TooGr
 
 当前不再需要重建伙伴主循环模板。后续应在已有 `buddy_autonomous_loop`、`buddy_self_review`、统一 Skill 运行时和 graph run 协议上继续补齐能力，优先级如下：
 
-1. 伙伴运行来源收束：清理启动侧旧元数据，让伙伴图运行统一以 `metadata.origin=buddy` 和显式策略字段表达来源、权限和审计语义。
+1. 伙伴运行来源巩固：保持 Buddy 图运行统一以 `metadata.origin=buddy` 和显式策略字段表达来源、权限和审计语义，并补齐相关运行详情与伙伴页面展示。
 2. 伙伴暂停交互剩余项：浮窗补齐拒绝、取消、刷新找回和队列策略；伙伴页面补齐运行与确认视图，并复用标准 `awaiting_human` / `/api/runs/{run_id}/resume`。
 3. 动态能力审批：让涉及写文件、删改文件或执行任意脚本/命令的 Skill 和动态子图按权限模式进入标准断点确认，审批结果写回 state 并进入 run detail。
 4. Buddy Home 写回：把记忆、用户资料、会话摘要、能力使用统计、报告和策略建议写成显式图流程，通过受控 Skill、command、revision 和审批路径落地。
 5. 图编辑命令流：清理或重建 `graph_patch.draft` stub，补齐 GraphCommandBus、图补丁预览、graph revision、undo/redo 和完整审计。
 6. 子图运行详情：补齐父子图运行审计聚合、动态子图断点定位、scope path 展示和从缩略图跳转到内部节点。
-7. 低层活动事件：实现统一 `activity_events`，让文件读取、搜索、命令执行、脚本测试、写入、下载、图编辑和 Skill/subgraph 执行都能产生程序化摘要。
+7. 低层活动事件：补齐统一 `activity_events`，让文件读取、搜索、命令执行、脚本测试、写入、下载、图编辑和 Skill/subgraph 执行都能产生程序化摘要。
 8. 命名收束：将内部 `agent` kind 逐步迁移为 LLM 节点语义，避免新文档、新模板和新 UI 继续使用单节点 Agent 心智。
 9. 测试补齐：覆盖伙伴拒绝/取消/刷新恢复、权限拒绝、循环上限、Buddy Home 写回、活动事件、图补丁审计、运行详情中的子图断点展示和最终回复唯一 output。
 
