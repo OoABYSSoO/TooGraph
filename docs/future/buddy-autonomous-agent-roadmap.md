@@ -65,11 +65,11 @@
 - 偏离新职责的旧 `create_user_skill` 内置模板已删除。新的 `toograph_skill_builder` 只产出 Skill 包文件内容；完整用户 Skill 生成流程已由官方 `toograph_skill_creation_workflow` 模板表达，写入、测试、错误修复和启用仍通过图节点和受控 Skill 分步完成。
 - 子图缩略图已能投射内部节点运行状态颜色，并在节点卡片上显示当前内部运行摘要。
 - 后端已有根目录 `buddy_home/` 的默认生成逻辑，以及基于 `SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memory、session summary、revision、command 等基础存取接口；它们应继续收束为 Buddy Home，而不是扩散到多个无关数据位置。
-- 官方 `buddy_autonomous_loop` 模板已创建并注册。它使用 Buddy Home 文件夹输入、请求理解子图、按需能力循环子图、最终回复子图和唯一 `final_reply` output；简单闲聊或可直接回答的请求会绕过能力循环。
+- 官方 `buddy_autonomous_loop` 模板已创建并注册。它使用 Buddy Home 文件夹输入、请求理解子图、按需能力循环子图、最终回复子图和唯一 `final_reply` output；请求理解阶段会写 `visible_reply` 作为即时可见回复，简单闲聊或可直接回答的请求会绕过能力循环。
 - 官方 `buddy_self_review` 模板已作为内部后台模板落地。伙伴可见回复完成后，前端会用主运行快照启动该后台 run；它只产出记忆更新计划和伙伴成长计划，不阻塞下一轮对话，也不直接写 Buddy Home。
 - 官方 `toograph_skill_creation_workflow` 模板已创建。它保留需求澄清、样例确认、Skill 文件生成、脚本测试、失败回环修复、生成方案审查和用户 Skill 目录写入这些流程边界，并避免使用普通编辑器创建不出来的节点。低层写入确认不再放在模板里由 LLM 判断；运行时会按 `需确认` / `完全访问` 模式处理。
-- 伙伴浮窗已有可见运行过程面板、节点级流式输出预览、每步耗时、完成后折叠摘要、正式回复 markdown 流式展示和后台复盘解耦。
-- 伙伴浮窗已复用标准 `awaiting_human` 暂停/恢复路径：暂停卡片会先展示当前产物和上下文，再展示需要补充的字段；底部输入会恢复当前断点，暂停期间不会继续消费后续队列消息。
+- 伙伴浮窗已有每条助手消息自带的可见运行过程胶囊、节点级流式输出预览、每步耗时、完成后折叠摘要、即时 `visible_reply`、正式 `final_reply` markdown 展示和后台复盘解耦；前端不再设置固定整轮 Buddy 运行超时。
+- 伙伴浮窗已复用标准 `awaiting_human` 暂停/恢复路径：暂停卡片会先展示当前产物和上下文，再展示需要补充的字段，并在卡片内通过“执行当前方案 / 补充内容”的单一操作区恢复当前断点；底部输入在暂停时不会续跑旧断点，暂停期间不会继续消费后续队列消息。
 - 本地文件夹输入已能在普通仓库和 `.worktrees/<branch>` 工作区下读取根目录 `buddy_home/`，伙伴模板在分支工作区中不会因为路径推导失败而丢失 Buddy Home 上下文。
 - 伙伴历史会话已落到 Buddy Home 的 `buddy.db`：后端维护 `buddy_sessions` / `buddy_messages`，前端浮窗提供紧凑历史下拉、新建会话、删除确认和全屏展开。
 
@@ -80,7 +80,7 @@
 - Buddy Home 已有默认目录、默认文件、会话历史、记忆、summary、revision 和 command 存储基础，但能力使用统计、结构化检索索引、自我复盘报告和长期资料写回图流程尚未成形。
 - 伙伴主循环的上下文装配、需求理解、能力循环、最终回复和后台复盘已经作为官方模板内部子图或后台模板落地；稳定后是否拆成独立官方可复用模板仍待决定。
 - 前端伙伴构图代码已停止写入 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧元数据。新 Buddy 图使用 `metadata.origin=buddy`，并通过 `buddy_mode`、`buddy_can_execute_actions`、`buddy_requires_approval` 等明确策略字段表达来源与权限语义；后续重点是让运行详情、伙伴页面和测试继续沿用这套语义，不重新扩展第二套伙伴运行协议。
-- 标准 graph run 已支持 `awaiting_human`、resume API、编辑器 Human Review、静态子图断点恢复和动态子图断点恢复；伙伴浮窗已复用基础暂停卡片和恢复交互，仍缺拒绝、取消、刷新后找回和队列策略细化；伙伴页面仍缺运行与确认视图。
+- 标准 graph run 已支持 `awaiting_human`、resume API、编辑器 Human Review、静态子图断点恢复和动态子图断点恢复；伙伴浮窗已复用卡片内暂停/恢复交互，仍缺拒绝、取消、刷新后找回和队列策略细化；伙伴页面仍缺运行与确认视图。
 - 伙伴浮窗和编辑器已经显示节点级运行过程与 SSE / Run Activity 事件，但还没有统一的低层 `activity_events`。类似 `Explored 7 files`、`ran 1 command`、`Editing store.py +132 -9` 的程序化操作摘要仍是待实现能力。
 - 内部协议仍使用 `agent` kind 表示 LLM 节点。用户界面和文档心智已改成 LLM 节点，但协议命名迁移仍未完成。
 - 当前仍残留 `backend/app/buddy/commands.py` 中的 `graph_patch.draft` 草案记录 stub。它是历史遗留入口，只能记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、graph revision、undo 或完整审计闭环；下一轮应删除它，或按新的图优先命令流重建。
@@ -88,7 +88,7 @@
 接下来要做：
 
 1. 巩固伙伴运行来源：让伙伴图继续只依赖统一 `metadata.origin=buddy` 和必要的策略字段，确保运行详情、伙伴页面和新测试不再引入 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 这类旧标记。
-2. 完善伙伴断点交互：浮窗已有基础暂停卡片和恢复能力，下一步补齐拒绝、取消、刷新后找回和暂停期间队列策略；伙伴页面还需要运行与确认视图。
+2. 完善伙伴断点交互：浮窗已有卡片内续跑和单一补充输入，下一步补齐拒绝、取消、刷新后找回和暂停期间队列策略；伙伴页面还需要运行与确认视图。
 3. 完善动态能力审批体验：当前运行时已能让声明 `file_write`、删除类权限或 `subprocess` 的 Skill 在 `需确认` 模式下进入标准 `awaiting_human`，并在 `完全访问` 模式下放行；下一步补齐拒绝、取消、刷新后找回、审批详情页和低层操作摘要。
 4. 建立 Buddy Home 写回流程：把长期记忆、会话摘要、用户画像、人设调整、能力使用统计和自我复盘报告写回做成显式模板/受控 Skill/命令记录/revision 流程。
 5. 重建图编辑命令流：删除或重建 `graph_patch.draft` stub，补齐图补丁预览、GraphCommandBus、graph revision、undo/redo 和完整审计闭环。
@@ -712,10 +712,10 @@ function call 未来可以作为某些模型的适配层，但不能绕过 TooGr
 
 - 不能把本轮当作完成，也不能继续消费后续队列消息。
 - 当前 assistant 消息应变成“等待你确认/补充”的暂停卡片，而不是普通最终回复。
-- 输入框默认切换为“回复当前断点”。用户输入会作为 resume payload 写入断点所需 state。
+- 底部输入在暂停时锁定并提示用户回到暂停卡片；用户只能在卡片内选择执行当前方案或补充某个字段，补充内容会作为 resume payload 写入断点所需 state。
 - 如果用户确实要开始新问题，必须有明确操作，例如“取消本次运行并作为新问题发送”，避免把新问题误塞进旧断点。
 - 面板应显示暂停节点名称、暂停原因、需要补充的字段、当前产生的内容和相关上下文。
-- 暂停卡片应先展示当前已产出的信息、相关上下文和子图路径，再展示输入框或需要补充的字段，避免用户先看到空输入框才知道要回应什么。
+- 暂停卡片应先展示当前已产出的信息、相关上下文和子图路径，再展示“执行 / 补充”操作和单一补充输入，避免用户先看到多个空输入框才知道要回应什么。
 - 对权限、写文件、执行脚本、联网、图编辑、记忆写入等操作，卡片必须展示能力名称、权限类型、拟执行摘要、影响路径或目标对象，并提供继续、拒绝和查看详情。
 - 对澄清类断点，卡片展示问题和可编辑回答；恢复后图继续运行，而不是让伙伴前端自己总结。
 - 对子图内部断点，卡片显示路径，例如 `伙伴主循环 / 创建自定义 Skill / review_generated_skill`，并展示内部节点需要的 state。

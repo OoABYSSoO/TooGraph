@@ -128,6 +128,14 @@
       "color": "#4f46e5",
       "binding": null
     },
+    "visible_reply": {
+      "name": "visible_reply",
+      "description": "伙伴在能力执行前给用户的即时可见回复。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0f766e",
+      "binding": null
+    },
     "final_reply": {
       "name": "final_reply",
       "description": "展示给用户的最终伙伴回复。",
@@ -300,6 +308,10 @@
         {
           "state": "request_understanding",
           "mode": "replace"
+        },
+        {
+          "state": "visible_reply",
+          "mode": "replace"
         }
       ],
       "config": {
@@ -352,6 +364,14 @@
                   "policy.json"
                 ]
               },
+              "color": "#0f766e",
+              "binding": null
+            },
+            "visible_reply": {
+              "name": "visible_reply",
+              "description": "伙伴在能力执行前给用户的即时可见回复。",
+              "type": "markdown",
+              "value": "",
               "color": "#0f766e",
               "binding": null
             },
@@ -543,13 +563,17 @@
                 {
                   "state": "request_understanding",
                   "mode": "replace"
+                },
+                {
+                  "state": "visible_reply",
+                  "mode": "replace"
                 }
               ],
               "config": {
                 "skillKey": "",
                 "skillBindings": [],
                 "skillInstructionBlocks": {},
-                "taskInstruction": "输出 request_understanding JSON。字段必须包含 intent、user_goal、known_inputs、missing_information、needs_clarification(boolean)、clarification_focus、constraints、risk_level、requires_capability(boolean)、direct_answer_possible(boolean)。如果问题可以直接回复且不需要工具，将 requires_capability 设为 false。",
+                "taskInstruction": "输出 request_understanding JSON。字段必须包含 intent、user_goal、known_inputs、missing_information、needs_clarification(boolean)、clarification_focus、constraints、risk_level、requires_capability(boolean)、direct_answer_possible(boolean)。如果问题可以直接回复且不需要工具，将 requires_capability 设为 false。同时输出 visible_reply Markdown：用一到三句话快速回应用户，说明你已理解请求和下一步会做什么；如果需要澄清，说明需要补充的关键信息；不要声称已经完成尚未执行的动作。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "high",
@@ -700,6 +724,31 @@
                 "persistFormat": "auto",
                 "fileNameTemplate": ""
               }
+            },
+            "output_visible_reply": {
+              "kind": "output",
+              "name": "输出即时回复",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 1880,
+                  "y": 430
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "visible_reply",
+                  "required": false
+                }
+              ],
+              "writes": [],
+              "config": {
+                "displayMode": "markdown",
+                "persistEnabled": false,
+                "persistFormat": "md",
+                "fileNameTemplate": ""
+              }
             }
           },
           "edges": [
@@ -734,6 +783,10 @@
             {
               "source": "merge_clarification",
               "target": "output_request_understanding"
+            },
+            {
+              "source": "understand_request",
+              "target": "output_visible_reply"
             }
           ],
           "conditional_edges": [

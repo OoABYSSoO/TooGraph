@@ -494,6 +494,27 @@ test("buddy widget defaults to the autonomous loop template id", () => {
   assert.equal(BUDDY_TEMPLATE_ID, "buddy_autonomous_loop");
 });
 
+test("buildBuddyChatGraph clears visible and final reply states before each run", () => {
+  const graph = buildBuddyChatGraph(
+    {
+      ...createAgenticTemplate(),
+      state_schema: {
+        visible_reply: { name: "visible_reply", description: "", type: "markdown", value: "旧的即时回复", color: "#0f766e" },
+        final_reply: { name: "final_reply", description: "", type: "markdown", value: "旧的最终回复", color: "#4f46e5" },
+      },
+    },
+    {
+      userMessage: "继续",
+      history: [],
+      pageContext: "当前路径: /",
+      buddyMode: "ask_first",
+    },
+  );
+
+  assert.equal(graph.state_schema.visible_reply.value, "");
+  assert.equal(graph.state_schema.final_reply.value, "");
+});
+
 test("buddy review uses a separate internal template id", () => {
   assert.equal(BUDDY_REVIEW_TEMPLATE_ID, "buddy_self_review");
 });
@@ -719,6 +740,7 @@ test("resolveBuddyReplyFromRunEvent recognizes reply states by graph state name"
       ...createAgenticTemplate(),
       state_schema: {
         user_message: { name: "user_message", description: "", type: "text", value: "", color: "#9a3412" },
+        visible_reply: { name: "visible_reply", description: "", type: "markdown", value: "", color: "#0f766e" },
         final_reply: { name: "final_reply", description: "", type: "markdown", value: "", color: "#4f46e5" },
       },
     },
@@ -728,6 +750,18 @@ test("resolveBuddyReplyFromRunEvent recognizes reply states by graph state name"
       pageContext: "当前路径: /",
       buddyMode: "advisory",
     },
+  );
+
+  assert.equal(
+    resolveBuddyReplyFromRunEvent(
+      {
+        event: "state.updated",
+        state_key: "visible_reply",
+        value: "我先检查项目结构，然后把动作过程放在这里。",
+      },
+      graph,
+    ),
+    "我先检查项目结构，然后把动作过程放在这里。",
   );
 
   assert.equal(

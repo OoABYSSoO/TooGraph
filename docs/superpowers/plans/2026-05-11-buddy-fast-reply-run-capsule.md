@@ -4,7 +4,7 @@
 
 **Goal:** Make Buddy reply quickly, keep run activity paired with each assistant response, and let long Buddy runs continue without frontend whole-run timeout.
 
-**Architecture:** Add an early `visible_reply` state to the official Buddy graph template and teach the Buddy frontend to treat it as a displayable reply state. Move run trace storage from one global list to per-message run capsules while keeping a single active run pointer for streaming and polling. Remove the fixed Buddy poll timeout and rely on run terminal status, human pause, or explicit abort.
+**Architecture:** Add an early `visible_reply` state to the official Buddy graph template and teach the Buddy frontend to treat it as a displayable reply state. Move run trace storage from one global list to per-message run capsules while keeping a single active run pointer for streaming and polling. Keep paused-run continuation inside the pause card instead of the bottom composer. Remove the fixed Buddy poll timeout and rely on run terminal status, human pause, or explicit abort.
 
 **Tech Stack:** Vue 3, Element Plus, TypeScript, TooGraph graph templates, Python backend tests for template compatibility.
 
@@ -40,11 +40,11 @@ Save the design and this implementation plan under `docs/superpowers/`.
 - Test: `frontend/src/buddy/buddyChatGraph.test.ts`
 - Test: `backend/tests/test_template_layouts.py`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add frontend tests that verify `resolveBuddyReplyFromRunEvent` returns `visible_reply`, and `buildBuddyChatGraph` clears both `visible_reply` and `final_reply` before a new run. Add backend template assertions that `buddy_autonomous_loop` contains a top-level `visible_reply` state and the intake subgraph writes it.
 
-- [ ] **Step 2: Run tests and confirm failure**
+- [x] **Step 2: Run tests and confirm failure**
 
 Run:
 
@@ -55,11 +55,11 @@ python -m pytest backend/tests/test_template_layouts.py -q
 
 Expected: failures because `visible_reply` is not yet recognized or present.
 
-- [ ] **Step 3: Implement graph and frontend recognition**
+- [x] **Step 3: Implement graph and frontend recognition**
 
 Add `visible_reply` as markdown state, make the intake `understand_request` node write it, map it through the intake subgraph output, and include `"visible_reply"` in Buddy reply state recognition and run setup clearing.
 
-- [ ] **Step 4: Run tests and confirm pass**
+- [x] **Step 4: Run tests and confirm pass**
 
 Run the same commands from Step 2.
 
@@ -69,11 +69,11 @@ Run the same commands from Step 2.
 - Modify: `frontend/src/buddy/BuddyWidget.vue`
 - Test: `frontend/src/buddy/BuddyWidget.structure.test.ts`
 
-- [ ] **Step 1: Write failing structure tests**
+- [x] **Step 1: Write failing structure tests**
 
 Add tests that require Buddy messages to include per-message run trace state, require the template to call `visibleRunTraceEntries(message)`, and reject use of a global `runTraceEntries` ref.
 
-- [ ] **Step 2: Run test and confirm failure**
+- [x] **Step 2: Run test and confirm failure**
 
 Run:
 
@@ -83,11 +83,11 @@ cd frontend && npx tsx --test src/buddy/BuddyWidget.structure.test.ts
 
 Expected: failure because trace is still global.
 
-- [ ] **Step 3: Implement per-message run capsules**
+- [x] **Step 3: Implement per-message run capsules**
 
 Add a `runTrace` object to `BuddyMessage`, update `resetRunTraceForMessage`, `appendRunTraceEntry`, `markRunTraceFinished`, and template helpers to read/write trace data on the owning assistant message.
 
-- [ ] **Step 4: Run test and confirm pass**
+- [x] **Step 4: Run test and confirm pass**
 
 Run the same structure test command.
 
@@ -97,11 +97,11 @@ Run the same structure test command.
 - Modify: `frontend/src/buddy/BuddyWidget.vue`
 - Test: `frontend/src/buddy/BuddyWidget.structure.test.ts`
 
-- [ ] **Step 1: Write failing structure test**
+- [x] **Step 1: Write failing structure test**
 
 Assert that `RUN_POLL_TIMEOUT_MS` is absent and `pollRunUntilFinished` loops until terminal status or abort.
 
-- [ ] **Step 2: Run test and confirm failure**
+- [x] **Step 2: Run test and confirm failure**
 
 Run:
 
@@ -111,21 +111,44 @@ cd frontend && npx tsx --test src/buddy/BuddyWidget.structure.test.ts
 
 Expected: failure because `RUN_POLL_TIMEOUT_MS` still exists.
 
-- [ ] **Step 3: Remove timeout**
+- [x] **Step 3: Remove timeout**
 
 Change `pollRunUntilFinished` to `while (true)` with the existing abort-aware delay. Remove the timeout translation from Buddy if no longer used.
 
-- [ ] **Step 4: Run test and confirm pass**
+- [x] **Step 4: Run test and confirm pass**
 
 Run the same structure test command.
 
-### Task 5: Verify Build, Runtime, And Docs
+### Task 5: Keep Paused Run Continuation Inside The Pause Card
+
+**Files:**
+- Modify: `frontend/src/buddy/BuddyWidget.vue`
+- Modify: `frontend/src/i18n/messages.ts`
+- Test: `frontend/src/buddy/BuddyWidget.structure.test.ts`
+
+- [x] **Step 1: Write failing structure tests**
+
+Assert that the bottom composer is locked during a paused run, pause input state lives in the pause card, and required rows are shown as context rather than multiple editable input boxes.
+
+- [x] **Step 2: Implement pause-card action UI**
+
+Add the `execute` / `supplement` action mode, a single supplement input with an optional target selector, and keep resume payload construction on the existing Human Review model.
+
+- [x] **Step 3: Run test and confirm pass**
+
+Run:
+
+```bash
+cd frontend && npx tsx --test src/buddy/BuddyWidget.structure.test.ts
+```
+
+### Task 6: Verify Build, Runtime, And Docs
 
 **Files:**
 - Modify as needed: `docs/current_project_status.md`
 - Modify as needed: `knowledge/TooGraph-official/runtime-and-roadmap.md`
 
-- [ ] **Step 1: Run focused verification**
+- [x] **Step 1: Run focused verification**
 
 Run:
 
@@ -136,7 +159,7 @@ cd frontend && npx tsx --test src/buddy/buddyChatGraph.test.ts src/buddy/BuddyWi
 npm --prefix frontend run build
 ```
 
-- [ ] **Step 2: Restart TooGraph**
+- [x] **Step 2: Restart TooGraph**
 
 Run:
 
@@ -146,6 +169,6 @@ npm start
 
 Expected: service available at `http://127.0.0.1:3477`.
 
-- [ ] **Step 3: Commit and push**
+- [x] **Step 3: Commit and push**
 
 Use a Chinese commit message.

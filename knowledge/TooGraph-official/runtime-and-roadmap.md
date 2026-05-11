@@ -18,7 +18,7 @@ TooGraph 当前已经具备这些正式能力：
 - `state_schema` 作为唯一数据源参与整个执行链。
 - `subgraph` 节点运行、编辑、公开 input/output 边界和内部断点传播。
 - `awaiting_human`、resume API、编辑器 Human Review 和 Buddy 浮窗暂停卡片。
-- Buddy 浮窗对话、历史会话、`buddy_autonomous_loop` 可见运行和 `buddy_self_review` 后台复盘。
+- Buddy 浮窗对话、历史会话、`buddy_autonomous_loop` 可见运行、即时 `visible_reply`、每条助手消息自己的运行过程胶囊和 `buddy_self_review` 后台复盘。
 
 后端运行主链已经迁到 LangGraph，并支持：
 
@@ -54,7 +54,7 @@ Skill 链路已经做到：
 仍然明确属于后续工作的方向包括：
 
 - 动态能力审批：声明 `file_write`、删除类权限或 `subprocess` 的 Skill 会按图或 Buddy 的 `需确认` / `完全访问` 模式进入标准 `awaiting_human` 或自动放行。
-- Buddy 暂停交互：补齐拒绝、取消、刷新后找回、暂停期间队列策略和 Buddy 页面运行/确认视图。
+- Buddy 暂停交互：浮窗已把续跑收敛到暂停卡片内的单一操作区，仍需补齐拒绝、取消、刷新后找回、暂停期间队列策略和 Buddy 页面运行/确认视图。
 - Buddy Home 写回：把记忆、用户资料、会话摘要、自我复盘报告、能力使用统计和策略建议表达为显式图模板、受控 Skill、command、revision 和审批流程。
 - 子图运行详情：补齐父子图审计聚合、动态子图断点定位、scope path 展示和从缩略图跳转到内部节点。
 - 低层 `activity_events`：让文件读取、搜索、命令执行、脚本测试、写入、下载、图编辑和 Skill/subgraph 执行都能产生程序化摘要，并在 Buddy 浮窗和 Run Detail 中复用展示。

@@ -368,6 +368,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["capability_result"]["type"], "result_package")
         self.assertEqual(states["capability_gap"]["type"], "json")
         self.assertEqual(states["capability_trace"]["type"], "json")
+        self.assertEqual(states["visible_reply"]["type"], "markdown")
         self.assertEqual(states["final_reply"]["type"], "markdown")
         self.assertNotIn("approval_prompt", states)
         self.assertNotIn("capability_requires_approval", states)
@@ -421,6 +422,12 @@ class TemplateLayoutTests(unittest.TestCase):
 
         intake_graph = nodes["intake_request"]["config"]["graph"]
         self.assertEqual(intake_graph["metadata"]["interrupt_after"], ["ask_clarification"])
+        self.assertEqual(intake_graph["state_schema"]["visible_reply"]["type"], "markdown")
+        self.assertIn({"state": "visible_reply", "mode": "replace"}, nodes["intake_request"]["writes"])
+        self.assertIn({"state": "visible_reply", "mode": "replace"}, intake_graph["nodes"]["understand_request"]["writes"])
+        self.assertIn("visible_reply", intake_graph["nodes"]["understand_request"]["config"]["taskInstruction"])
+        self.assertIn("output_visible_reply", intake_graph["nodes"])
+        self.assertEqual(intake_graph["nodes"]["output_visible_reply"]["reads"], [{"state": "visible_reply", "required": False}])
         self.assertEqual(
             intake_graph["nodes"]["need_clarification"]["config"]["rule"],
             {"source": "$state.request_understanding.needs_clarification", "operator": "==", "value": True},

@@ -220,23 +220,23 @@
               v-if="shouldShowRunTraceForMessage(message)"
               class="buddy-widget__run-trace"
               :class="{
-                'buddy-widget__run-trace--expanded': isRunTraceExpanded,
-                'buddy-widget__run-trace--finished': runTraceFinishedAtMs !== null,
+                'buddy-widget__run-trace--expanded': isRunTraceExpanded(message),
+                'buddy-widget__run-trace--finished': message.runTrace?.finishedAtMs !== null,
               }"
             >
               <button
                 type="button"
                 class="buddy-widget__run-trace-toggle"
-                :title="isRunTraceExpanded ? t('buddy.runTraceCollapse') : t('buddy.runTraceExpand')"
-                :aria-expanded="isRunTraceExpanded"
-                @click="isRunTraceExpanded = !isRunTraceExpanded"
+                :title="isRunTraceExpanded(message) ? t('buddy.runTraceCollapse') : t('buddy.runTraceExpand')"
+                :aria-expanded="isRunTraceExpanded(message)"
+                @click="toggleRunTraceExpansion(message)"
               >
-                <span>{{ runTraceHeaderText }}</span>
+                <span>{{ runTraceHeaderText(message) }}</span>
                 <ElIcon><ArrowDown /></ElIcon>
               </button>
-              <div v-if="shouldShowRunTraceBody" class="buddy-widget__run-trace-body">
+              <div v-if="shouldShowRunTraceBody(message)" class="buddy-widget__run-trace-body">
                 <div
-                  v-for="entry in visibleRunTraceEntries"
+                  v-for="entry in visibleRunTraceEntries(message)"
                   :key="entry.replaceKey"
                   class="buddy-widget__run-trace-entry"
                   :class="`buddy-widget__run-trace-entry--${entry.tone}`"
@@ -265,6 +265,26 @@
               <p class="buddy-widget__pause-summary">
                 {{ pausedBuddyReviewModel?.summaryText || t("buddy.pause.body") }}
               </p>
+              <div class="buddy-widget__pause-mode-tabs" role="tablist" :aria-label="t('buddy.pause.actionLabel')">
+                <button
+                  type="button"
+                  class="buddy-widget__pause-mode"
+                  :class="{ 'buddy-widget__pause-mode--active': pausedBuddyActionMode === 'execute' }"
+                  :disabled="!pausedBuddyCanExecuteAction"
+                  @click="setPausedBuddyActionMode('execute')"
+                >
+                  {{ t("buddy.pause.executeAction") }}
+                </button>
+                <button
+                  v-if="pausedBuddyRequiredRows.length > 0"
+                  type="button"
+                  class="buddy-widget__pause-mode"
+                  :class="{ 'buddy-widget__pause-mode--active': pausedBuddyActionMode === 'supplement' }"
+                  @click="setPausedBuddyActionMode('supplement')"
+                >
+                  {{ t("buddy.pause.supplementAction") }}
+                </button>
+              </div>
               <div v-if="pausedBuddyPermissionApproval" class="buddy-widget__pause-section">
                 <strong>{{ t("buddy.pause.permissionTitle") }}</strong>
                 <div class="buddy-widget__pause-row">
@@ -292,21 +312,38 @@
               </div>
               <div v-if="pausedBuddyRequiredRows.length > 0" class="buddy-widget__pause-section">
                 <strong>{{ t("buddy.pause.requiredTitle") }}</strong>
-                <label
-                  v-for="row in pausedBuddyRequiredRows"
-                  :key="row.key"
-                  class="buddy-widget__pause-row buddy-widget__pause-row--editable"
-                >
+                <div v-for="row in pausedBuddyRequiredRows" :key="row.key" class="buddy-widget__pause-row">
                   <span>{{ row.label }}</span>
                   <small v-if="row.description">{{ row.description }}</small>
+                  <small>{{ resolvePausedBuddyDraft(row).trim() ? t("buddy.pause.filled") : t("buddy.pause.emptyValue") }}</small>
+                  <pre v-if="resolvePausedBuddyDraft(row).trim()">{{ resolvePausedBuddyDraft(row) }}</pre>
+                </div>
+                <div v-if="pausedBuddyActionMode === 'supplement'" class="buddy-widget__pause-editor">
+                  <ElSelect
+                    v-if="pausedBuddyRequiredRows.length > 1"
+                    :model-value="pausedBuddyTargetKey"
+                    class="buddy-widget__pause-target toograph-select"
+                    popper-class="toograph-select-popper buddy-widget__select-popper"
+                    size="small"
+                    :aria-label="t('buddy.pause.targetLabel')"
+                    @update:model-value="setPausedBuddyTargetKey"
+                  >
+                    <ElOption
+                      v-for="row in pausedBuddyRequiredRows"
+                      :key="row.key"
+                      :label="row.label"
+                      :value="row.key"
+                    />
+                  </ElSelect>
                   <ElInput
-                    :model-value="resolvePausedBuddyDraft(row)"
+                    :model-value="pausedBuddyInputText"
                     class="buddy-widget__pause-input"
                     type="textarea"
+                    :placeholder="pausedBuddySelectedRequiredRow?.label || t('buddy.pause.supplementAction')"
                     :autosize="{ minRows: 2, maxRows: 5 }"
-                    @update:model-value="setPausedBuddyDraft(row.key, $event)"
+                    @update:model-value="setPausedBuddyInputText"
                   />
-                </label>
+                </div>
               </div>
               <p
                 v-if="!pausedBuddyPermissionApproval && pausedBuddyRequiredRows.length === 0 && pausedBuddyProducedRows.length === 0"
@@ -356,13 +393,14 @@
             v-model="draft"
             class="buddy-widget__input"
             rows="2"
-            :placeholder="t('buddy.placeholder')"
+            :placeholder="pausedBuddyRun ? t('buddy.pause.composerLocked') : t('buddy.placeholder')"
+            :disabled="Boolean(pausedBuddyRun)"
             @keydown.enter.exact.prevent="sendMessage"
           />
           <button
             type="submit"
             class="buddy-widget__send"
-            :disabled="!draft.trim()"
+            :disabled="Boolean(pausedBuddyRun) || !draft.trim()"
             :title="t('buddy.send')"
             :aria-label="t('buddy.send')"
           >
@@ -472,9 +510,18 @@ type BuddyMessage = BuddyChatMessage & {
   id: string;
   clientOrder?: number | null;
   activityText?: string;
+  runId?: string | null;
+  runTrace?: BuddyMessageRunTrace;
 };
 
-type BuddyMessagePatch = Partial<Pick<BuddyMessage, "content" | "includeInContext" | "activityText">>;
+type BuddyMessageRunTrace = {
+  entries: BuddyRunTraceEntry[];
+  startedAtMs: number | null;
+  finishedAtMs: number | null;
+  isExpanded: boolean;
+};
+
+type BuddyMessagePatch = Partial<Pick<BuddyMessage, "content" | "includeInContext" | "activityText" | "runId">>;
 
 type BuddyQueuedTurn = {
   userMessageId: string;
@@ -485,6 +532,7 @@ type BuddyQueuedTurn = {
 };
 
 type BuddyMood = "idle" | "thinking" | "speaking" | "error";
+type PausedBuddyActionMode = "execute" | "supplement";
 type BuddyMascotMotion = "idle" | "roam" | "hop";
 type BuddyMascotFacing = "front" | "left" | "right";
 type BuddyMascotDebugAction = "idle" | "thinking" | "speaking" | "error" | "tap" | "dragging" | "hop" | "roam" | "face-left" | "face-front" | "face-right";
@@ -506,7 +554,6 @@ const BUDDY_MODEL_STORAGE_KEY = "toograph:buddy-model";
 const DRAG_THRESHOLD_PX = 4;
 const AVATAR_SINGLE_CLICK_DELAY_MS = 220;
 const RUN_POLL_INTERVAL_MS = 700;
-const RUN_POLL_TIMEOUT_MS = 240000;
 const RUN_TRACE_MAX_ENTRIES = 24;
 const BUDDY_ROAM_MIN_DELAY_MS = 8000;
 const BUDDY_ROAM_MAX_DELAY_MS = 18000;
@@ -566,19 +613,18 @@ const activeSessionDeleteId = ref<string | null>(null);
 const sessionDeleteConfirmTimeoutRef = ref<number | null>(null);
 const isPanelFullscreen = ref(false);
 const queuedTurns = ref<BuddyQueuedTurn[]>([]);
-const runTraceEntries = ref<BuddyRunTraceEntry[]>([]);
 const errorMessage = ref("");
 const mood = ref<BuddyMood>("idle");
 const tapNonce = ref(0);
 const activeRunId = ref<string | null>(null);
 const activeTraceMessageId = ref<string | null>(null);
-const isRunTraceExpanded = ref(false);
-const runTraceStartedAtMs = ref<number | null>(null);
-const runTraceFinishedAtMs = ref<number | null>(null);
 const pausedBuddyRun = ref<RunDetail | null>(null);
 const pausedBuddyAssistantMessageId = ref<string | null>(null);
 const pausedBuddyDraftsByKey = ref<Record<string, string>>({});
 const pausedBuddyResumeBusy = ref(false);
+const pausedBuddyActionMode = ref<PausedBuddyActionMode>("execute");
+const pausedBuddyTargetKey = ref("");
+const pausedBuddyInputText = ref("");
 const avatarElement = ref<HTMLElement | null>(null);
 const mascotLook = ref({ x: 0, y: 0 });
 const mascotMotion = ref<BuddyMascotMotion>("idle");
@@ -626,7 +672,7 @@ const isSessionSwitchLocked = computed(
   () =>
     queuedTurns.value.length > 0 ||
     activeRunId.value !== null ||
-    (activeTraceMessageId.value !== null && runTraceFinishedAtMs.value === null),
+    isActiveTraceUnfinished(),
 );
 const hasCurrentSessionContent = computed(() => messages.value.some((message) => message.content.trim()));
 const canCreateNewSession = computed(() => !isSessionSwitchLocked.value && hasCurrentSessionContent.value);
@@ -663,23 +709,6 @@ const latestActivityText = computed(() => {
     .find((message) => message.role === "assistant" && !message.content.trim() && message.activityText?.trim());
   return latestPendingMessage?.activityText?.trim() ?? "";
 });
-const shouldShowRunTraceBody = computed(() => runTraceFinishedAtMs.value === null || isRunTraceExpanded.value);
-const visibleRunTraceEntries = computed(() => {
-  if (isRunTraceExpanded.value || runTraceEntries.value.length <= 1) {
-    return runTraceEntries.value;
-  }
-  return runTraceEntries.value.slice(-1);
-});
-const runTraceHeaderText = computed(() => {
-  const startedAt = runTraceStartedAtMs.value;
-  const finishedAt = runTraceFinishedAtMs.value;
-  if (startedAt !== null && finishedAt !== null) {
-    return t("buddy.runTraceElapsed", {
-      duration: formatRunTraceDuration(Math.max(1, Math.round(finishedAt - startedAt))),
-    });
-  }
-  return t("buddy.runTraceLabel");
-});
 const pausedBuddyReviewModel = computed<HumanReviewPanelModel | null>(() => {
   const run = pausedBuddyRun.value;
   if (!run) {
@@ -691,9 +720,17 @@ const pausedBuddyRequiredRows = computed(() => pausedBuddyReviewModel.value?.req
 const pausedBuddyProducedRows = computed(() => pausedBuddyReviewModel.value?.producedRows ?? []);
 const pausedBuddyPermissionApproval = computed(() => pausedBuddyReviewModel.value?.permissionApproval ?? null);
 const pausedBuddyScopeText = computed(() => pausedBuddyReviewModel.value?.scopePath.join(" / ") ?? "");
-const isPausedBuddyResumeBlocked = computed(() =>
+const pausedBuddySelectedRequiredRow = computed(
+  () =>
+    pausedBuddyRequiredRows.value.find((row) => row.key === pausedBuddyTargetKey.value) ??
+    pausedBuddyRequiredRows.value[0] ??
+    null,
+);
+const pausedBuddyHasMissingRequiredInput = computed(() =>
   pausedBuddyRequiredRows.value.some((row) => !resolvePausedBuddyDraft(row).trim()),
 );
+const pausedBuddyCanExecuteAction = computed(() => !pausedBuddyHasMissingRequiredInput.value);
+const isPausedBuddyResumeBlocked = computed(() => pausedBuddyHasMissingRequiredInput.value);
 const bubbleText = computed(() => {
   if (mood.value === "thinking" && latestActivityText.value) {
     return latestActivityText.value;
@@ -1159,17 +1196,14 @@ async function sendMessage() {
   if (pausedBuddyRun.value && pausedBuddyResumeBusy.value) {
     return;
   }
-  draft.value = "";
 
   if (pausedBuddyRun.value) {
-    const userEntry = createMessage("user", userMessage, undefined, allocateBuddyMessageClientOrder());
-    messages.value.push(userEntry);
-    movePausedBuddyAssistantAfterMessage(userEntry.id);
-    void persistBuddyMessage(sessionId, userEntry);
-    await resumePausedBuddyRun(userMessage);
-    await scrollMessagesToBottom();
+    errorMessage.value = t("buddy.pause.useCard");
+    await scrollPausedBuddyCardIntoView();
     return;
   }
+
+  draft.value = "";
 
   const userEntry = createMessage("user", userMessage, undefined, allocateBuddyMessageClientOrder());
   const assistantEntry = createMessage("assistant", "", undefined, allocateBuddyMessageClientOrder());
@@ -1285,7 +1319,7 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
   }
 }
 
-async function resumePausedBuddyRun(text?: string) {
+async function resumePausedBuddyRun() {
   const run = pausedBuddyRun.value;
   const assistantMessageId = pausedBuddyAssistantMessageId.value;
   const sessionId = activeSessionId.value;
@@ -1308,9 +1342,7 @@ async function resumePausedBuddyRun(text?: string) {
   setAssistantActivityText(assistantMessageId, t("buddy.activity.resuming"));
 
   try {
-    const resumePayload = text?.trim()
-      ? buildBuddyResumePayloadFromText(text)
-      : buildBuddyResumePayloadFromDrafts();
+    const resumePayload = buildBuddyResumePayloadFromDrafts();
     activeAbortController = new AbortController();
     const response = await resumeRun(run.run_id, resumePayload);
     activeRunId.value = response.run_id;
@@ -1322,9 +1354,7 @@ async function resumePausedBuddyRun(text?: string) {
       replaceKey: "local:resuming",
       timingKey: "local:resuming",
     });
-    pausedBuddyRun.value = null;
-    pausedBuddyAssistantMessageId.value = null;
-    pausedBuddyDraftsByKey.value = {};
+    resetPausedBuddyPause();
     startRunEventStream(response.run_id, assistantMessageId, run.graph_snapshot as unknown as GraphPayload);
     const resumedRunDetail = await pollRunUntilFinished(response.run_id, activeAbortController.signal);
     if (resumedRunDetail.status === "awaiting_human") {
@@ -1368,6 +1398,7 @@ function handleBuddyRunAwaitingHuman(run: RunDetail, assistantMessageId: string)
   pausedBuddyRun.value = run;
   pausedBuddyAssistantMessageId.value = assistantMessageId;
   pausedBuddyDraftsByKey.value = buildPausedBuddyDraftsByKey(run);
+  resetPausedBuddyActionState(buildHumanReviewPanelModel(run, run.graph_snapshot as unknown as GraphPayload));
   activeRunId.value = run.run_id;
   mood.value = "thinking";
   setAssistantActivityText(assistantMessageId, t("buddy.pause.activity"));
@@ -1391,6 +1422,10 @@ function finishBuddyVisibleRun(runDetail: RunDetail, assistantMessageId: string,
     runId,
     includeInContext: includeReplyInContext,
   });
+  const assistantMessage = messages.value.find((message) => message.id === assistantMessageId);
+  if (assistantMessage) {
+    assistantMessage.runId = runId;
+  }
   void startBuddySelfReviewRun(runDetail);
   mood.value = runDetail.status === "failed" ? "error" : "speaking";
   if (runDetail.status === "completed") {
@@ -1468,11 +1503,7 @@ function completeLocalRunTrace(replaceKey: string, labelKey: string) {
 
 async function clearMessages() {
   queuedTurns.value = [];
-  runTraceEntries.value = [];
   activeTraceMessageId.value = null;
-  isRunTraceExpanded.value = false;
-  runTraceStartedAtMs.value = null;
-  runTraceFinishedAtMs.value = null;
   runTraceStartedAtByKey.clear();
   clearSpeakingIdleTimer();
   closeEventSource();
@@ -1673,7 +1704,7 @@ async function persistBuddyMessage(
       content: message.content,
       client_order: message.clientOrder ?? null,
       include_in_context: options.includeInContext ?? message.includeInContext !== false,
-      run_id: options.runId ?? null,
+      run_id: options.runId ?? message.runId ?? null,
     });
     await loadChatSessions();
   } catch (error) {
@@ -1708,11 +1739,7 @@ async function migrateLegacyBuddyHistory() {
 }
 
 function resetVisibleRunTrace() {
-  runTraceEntries.value = [];
   activeTraceMessageId.value = null;
-  isRunTraceExpanded.value = false;
-  runTraceStartedAtMs.value = null;
-  runTraceFinishedAtMs.value = null;
   runTraceStartedAtByKey.clear();
   resetPausedBuddyPause();
 }
@@ -1722,6 +1749,9 @@ function resetPausedBuddyPause() {
   pausedBuddyAssistantMessageId.value = null;
   pausedBuddyDraftsByKey.value = {};
   pausedBuddyResumeBusy.value = false;
+  pausedBuddyActionMode.value = "execute";
+  pausedBuddyTargetKey.value = "";
+  pausedBuddyInputText.value = "";
 }
 
 async function waitForChatSessionInitialization() {
@@ -1833,15 +1863,13 @@ function startRunEventStream(runId: string, assistantMessageId: string, graph: G
 }
 
 async function pollRunUntilFinished(runId: string, signal: AbortSignal): Promise<RunDetail> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < RUN_POLL_TIMEOUT_MS) {
+  while (true) {
     const run = await fetchRun(runId, { signal });
     if (!shouldPollRunStatus(run.status)) {
       return run;
     }
     await delay(RUN_POLL_INTERVAL_MS, signal);
   }
-  throw new Error(t("buddy.runTimeout"));
 }
 
 function closeEventSource() {
@@ -1849,25 +1877,100 @@ function closeEventSource() {
   eventSource = null;
 }
 
+function createEmptyRunTrace(startedAtMs: number | null = null): BuddyMessageRunTrace {
+  return {
+    entries: [],
+    startedAtMs,
+    finishedAtMs: null,
+    isExpanded: false,
+  };
+}
+
+function activeRunTrace() {
+  const messageId = activeTraceMessageId.value;
+  if (!messageId) {
+    return null;
+  }
+  return messages.value.find((message) => message.id === messageId)?.runTrace ?? null;
+}
+
+function ensureActiveRunTrace() {
+  const messageId = activeTraceMessageId.value;
+  if (!messageId) {
+    return null;
+  }
+  const target = messages.value.find((message) => message.id === messageId);
+  if (!target) {
+    return null;
+  }
+  if (!target.runTrace) {
+    target.runTrace = createEmptyRunTrace(nowRunTraceMs());
+  }
+  return target.runTrace;
+}
+
+function isActiveTraceUnfinished() {
+  const runTrace = activeRunTrace();
+  return activeTraceMessageId.value !== null && Boolean(runTrace) && runTrace?.finishedAtMs === null;
+}
+
+function isRunTraceExpanded(message: BuddyMessage) {
+  return message.runTrace?.isExpanded === true;
+}
+
+function toggleRunTraceExpansion(message: BuddyMessage) {
+  if (!message.runTrace) {
+    return;
+  }
+  message.runTrace.isExpanded = !message.runTrace.isExpanded;
+}
+
+function shouldShowRunTraceBody(message: BuddyMessage) {
+  return message.runTrace?.finishedAtMs === null || isRunTraceExpanded(message);
+}
+
+function visibleRunTraceEntries(message: BuddyMessage) {
+  const runTrace = message.runTrace;
+  if (!runTrace) {
+    return [];
+  }
+  if (runTrace.isExpanded || runTrace.entries.length <= 1) {
+    return runTrace.entries;
+  }
+  return runTrace.entries.slice(-1);
+}
+
+function runTraceHeaderText(message: BuddyMessage) {
+  const startedAt = message.runTrace?.startedAtMs ?? null;
+  const finishedAt = message.runTrace?.finishedAtMs ?? null;
+  if (startedAt !== null && finishedAt !== null) {
+    return t("buddy.runTraceElapsed", {
+      duration: formatRunTraceDuration(Math.max(1, Math.round(finishedAt - startedAt))),
+    });
+  }
+  return t("buddy.runTraceLabel");
+}
+
 function resetRunTraceForMessage(messageId: string) {
   activeTraceMessageId.value = messageId;
-  runTraceEntries.value = [];
-  isRunTraceExpanded.value = false;
-  runTraceStartedAtMs.value = nowRunTraceMs();
-  runTraceFinishedAtMs.value = null;
+  const target = messages.value.find((message) => message.id === messageId);
+  if (target) {
+    target.runTrace = createEmptyRunTrace(nowRunTraceMs());
+  }
   runTraceStartedAtByKey.clear();
 }
 
 function markRunTraceFinished() {
-  if (!activeTraceMessageId.value || runTraceFinishedAtMs.value !== null) {
+  const runTrace = activeRunTrace();
+  if (!activeTraceMessageId.value || !runTrace || runTrace.finishedAtMs !== null) {
     return;
   }
-  runTraceFinishedAtMs.value = nowRunTraceMs();
-  isRunTraceExpanded.value = false;
+  runTrace.finishedAtMs = nowRunTraceMs();
+  runTrace.isExpanded = false;
 }
 
 function shouldShowRunTraceForMessage(message: BuddyMessage) {
-  return message.id === activeTraceMessageId.value && runTraceEntries.value.length > 0;
+  return (message.runTrace?.entries.length ?? 0) > 0;
 }
 
 function shouldRenderMessage(message: BuddyMessage) {
@@ -1899,15 +2002,19 @@ function shouldShowPausedRunCard(message: BuddyMessage) {
 }
 
 function appendRunTraceEntry(eventType: string, traceEntry: BuddyRunTraceEntry) {
-  const timedTraceEntry = applyRunTraceTiming(eventType, traceEntry);
-  const existingIndex = runTraceEntries.value.findIndex((entry) => entry.replaceKey === timedTraceEntry.replaceKey);
-  if (existingIndex >= 0) {
-    runTraceEntries.value.splice(existingIndex, 1, mergeRunTraceEntry(runTraceEntries.value[existingIndex], timedTraceEntry));
-  } else {
-    runTraceEntries.value.push(timedTraceEntry);
+  const runTrace = ensureActiveRunTrace();
+  if (!runTrace) {
+    return;
   }
-  if (runTraceEntries.value.length > RUN_TRACE_MAX_ENTRIES) {
-    runTraceEntries.value.splice(0, runTraceEntries.value.length - RUN_TRACE_MAX_ENTRIES);
+  const timedTraceEntry = applyRunTraceTiming(eventType, traceEntry);
+  const existingIndex = runTrace.entries.findIndex((entry) => entry.replaceKey === timedTraceEntry.replaceKey);
+  if (existingIndex >= 0) {
+    runTrace.entries.splice(existingIndex, 1, mergeRunTraceEntry(runTrace.entries[existingIndex], timedTraceEntry));
+  } else {
+    runTrace.entries.push(timedTraceEntry);
+  }
+  if (runTrace.entries.length > RUN_TRACE_MAX_ENTRIES) {
+    runTrace.entries.splice(0, runTrace.entries.length - RUN_TRACE_MAX_ENTRIES);
   }
 }
 
@@ -1993,21 +2100,6 @@ function setAssistantActivityFromRunEvent(
   setAssistantActivityText(assistantMessageId, t(activity.labelKey, activity.params));
 }
 
-function movePausedBuddyAssistantAfterMessage(messageId: string) {
-  const assistantMessageId = pausedBuddyAssistantMessageId.value;
-  if (!assistantMessageId) {
-    return;
-  }
-  const assistantIndex = messages.value.findIndex((message) => message.id === assistantMessageId);
-  if (assistantIndex < 0) {
-    return;
-  }
-  const [assistantMessage] = messages.value.splice(assistantIndex, 1);
-  const anchorIndex = messages.value.findIndex((message) => message.id === messageId);
-  assistantMessage.clientOrder = allocateBuddyMessageClientOrder();
-  messages.value.splice(anchorIndex >= 0 ? anchorIndex + 1 : messages.value.length, 0, assistantMessage);
-}
-
 function buildPausedBuddyDraftsByKey(run: RunDetail) {
   const model = buildHumanReviewPanelModel(run, run.graph_snapshot as unknown as GraphPayload);
   return Object.fromEntries(model.allRows.map((row) => [row.key, row.draft]));
@@ -2024,45 +2116,44 @@ function setPausedBuddyDraft(key: string, value: string | number) {
   };
 }
 
+function resetPausedBuddyActionState(model: HumanReviewPanelModel) {
+  const firstRequired = model.requiredNow[0] ?? null;
+  pausedBuddyActionMode.value = firstRequired ? "supplement" : "execute";
+  pausedBuddyTargetKey.value = firstRequired?.key ?? "";
+  pausedBuddyInputText.value = firstRequired ? resolvePausedBuddyDraft(firstRequired) : "";
+}
+
+function setPausedBuddyActionMode(mode: PausedBuddyActionMode) {
+  pausedBuddyActionMode.value = mode;
+  if (mode === "supplement" && !pausedBuddyTargetKey.value) {
+    const firstRequired = pausedBuddyRequiredRows.value[0] ?? null;
+    if (firstRequired) {
+      setPausedBuddyTargetKey(firstRequired.key);
+    }
+  }
+}
+
+function setPausedBuddyTargetKey(key: string | number | boolean) {
+  const normalizedKey = String(key ?? "");
+  pausedBuddyTargetKey.value = normalizedKey;
+  const row = pausedBuddyRequiredRows.value.find((candidate) => candidate.key === normalizedKey);
+  pausedBuddyInputText.value = row ? resolvePausedBuddyDraft(row) : "";
+}
+
+function setPausedBuddyInputText(value: string | number) {
+  const text = String(value ?? "");
+  pausedBuddyInputText.value = text;
+  if (pausedBuddyTargetKey.value) {
+    setPausedBuddyDraft(pausedBuddyTargetKey.value, text);
+  }
+}
+
 function buildBuddyResumePayloadFromDrafts() {
   const model = pausedBuddyReviewModel.value;
   if (!model) {
     return {};
   }
   return buildHumanReviewResumePayload(model.allRows, pausedBuddyDraftsByKey.value);
-}
-
-function buildBuddyResumePayloadFromText(text: string) {
-  const model = pausedBuddyReviewModel.value;
-  if (!model) {
-    return {};
-  }
-  const targetRow = chooseBuddyResumeTextRow(model);
-  if (!targetRow) {
-    return buildBuddyResumePayloadFromDrafts();
-  }
-  const draftsByKey = {
-    ...pausedBuddyDraftsByKey.value,
-    [targetRow.key]: text.trim(),
-  };
-  return buildHumanReviewResumePayload(model.allRows, draftsByKey);
-}
-
-function chooseBuddyResumeTextRow(model: HumanReviewPanelModel): HumanReviewRow | null {
-  const emptyRequired = model.requiredNow.find((row) => !resolvePausedBuddyDraft(row).trim());
-  if (emptyRequired) {
-    return emptyRequired;
-  }
-  const firstRequired = model.requiredNow[0];
-  if (firstRequired) {
-    return firstRequired;
-  }
-  return (
-    model.allRows.find((row) => {
-      const normalizedName = `${row.key} ${row.label}`.toLowerCase();
-      return normalizedName.includes("approval") || normalizedName.includes("decision") || normalizedName.includes("answer");
-    }) ?? null
-  );
 }
 
 function buildHistoryBeforeMessage(messageId: string): BuddyChatMessage[] {
@@ -2176,6 +2267,7 @@ function messageRecordToBuddyMessage(record: BuddyChatMessageRecord): BuddyMessa
     content: record.content,
     clientOrder: record.client_order,
     includeInContext: record.include_in_context,
+    runId: record.run_id,
     activityText: "",
   };
 }
@@ -2924,6 +3016,47 @@ function formatErrorMessage(error: unknown): string {
   line-height: 1.45;
 }
 
+.buddy-widget__pause-mode-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 3px;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.buddy-widget__pause-mode {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(70, 53, 38, 0.78);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.buddy-widget__pause-mode:hover:not(:disabled),
+.buddy-widget__pause-mode:focus-visible {
+  border-color: rgba(37, 99, 235, 0.22);
+  color: var(--toograph-text-strong);
+  outline: none;
+}
+
+.buddy-widget__pause-mode--active {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: rgba(37, 99, 235, 0.1);
+  color: rgb(30, 64, 175);
+}
+
+.buddy-widget__pause-mode:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .buddy-widget__pause-section {
   padding-top: 2px;
 }
@@ -2968,6 +3101,19 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__pause-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+.buddy-widget__pause-editor {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.buddy-widget__pause-target {
+  width: 100%;
 }
 
 .buddy-widget__pause-input :deep(.el-textarea__inner) {
