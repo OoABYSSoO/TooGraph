@@ -27,6 +27,10 @@
   - `demo/hermes-agent/` 从收到一条消息到最终回复、工具循环、流式输出、压缩、记忆和后台复盘的源码级拆解
   - 作为 Buddy 自主循环的能力参考，明确哪些 Hermes 机制适合翻译为 TooGraph 图协议、运行事件、审批和后台模板
 
+- [future/claude-code-message-loop-reference.md](future/claude-code-message-loop-reference.md)
+  - `demo/claude-code-source/` 从收到一条消息到 REPL/headless/SDK 输入、模型流、工具执行、权限、持久化和最终回复的源码级拆解
+  - 作为 Buddy 快速响应和事件化运行体验的参考，明确哪些 Claude Code 机制适合翻译为 TooGraph 图模板、`activity_events`、暂停恢复和审计记录
+
 ## 已清理
 
 - 迁移闭环记录：`task_plan.md`、`findings.md`、`progress.md`
