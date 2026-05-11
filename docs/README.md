@@ -31,6 +31,10 @@
   - `demo/claude-code-source/` 从收到一条消息到 REPL/headless/SDK 输入、模型流、工具执行、权限、持久化和最终回复的源码级拆解
   - 作为 Buddy 快速响应和事件化运行体验的参考，明确哪些 Claude Code 机制适合翻译为 TooGraph 图模板、`activity_events`、暂停恢复和审计记录
 
+- [future/buddy-agent-loop-graph-template-design.md](future/buddy-agent-loop-graph-template-design.md)
+  - 综合 Hermes Agent 和 Claude Code 的优点，提出伙伴 Agent 循环的 TooGraph 图模板搭建方案
+  - 细化顶层模板、子图边界、节点契约、暂停恢复、悬浮窗体验、并行加速机会和当前图系统缺口
+
 ## 已清理
 
 - 迁移闭环记录：`task_plan.md`、`findings.md`、`progress.md`
