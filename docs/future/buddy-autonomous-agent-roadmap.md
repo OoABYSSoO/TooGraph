@@ -1,222 +1,533 @@
-# 伙伴自主 Agent 路线图
+# 伙伴自主 Agent 方针
 
-本文是 TooGraph 伙伴、自主工具循环、技能生成和长期协作能力的唯一长期参考文档。若旧文档、临时计划或实现草稿与本文冲突，以本文为准。
+本文是 TooGraph 伙伴、自主工具循环、技能生成、记忆写回和长期协作能力的唯一长期方针文档。此前关于 Hermes Agent、Claude Code 和伙伴循环模板的调研结论已经折叠进本文；后续不再单独维护这些调研文档。
 
-## 目标
+如果旧文档、临时计划、实现草稿或注释与本文冲突，以本文为准，并把仍然有效的信息折叠回本文或 `docs/current_project_status.md`，不要创建第三份方向文档。
 
-伙伴不是脱离图系统的特殊 Agent。伙伴收到消息后，应当通过一个图模板完成：
+## 核心目标
+
+伙伴不是脱离图系统的特殊 Agent。伙伴收到一条用户消息后，应通过一个可审计 graph run 完成：
 
 ```text
-输入消息和 Buddy Home 上下文
-  -> 判断用户意图
-  -> 查看当前技能目录
-  -> 决定需要哪些技能
-  -> 把选中的能力作为 capability state 传给下游 LLM 节点
-  -> 下游 LLM 节点根据绑定技能的说明决定如何填写技能输入并运行技能
-  -> 将动态能力输出封装为 result_package state
-  -> 下游节点拆包后按普通 state/file 语义阅读结果
-  -> 评估结果是否需要继续调用技能
-  -> 生成 final_reply
-  -> 可选地整理并写回 Buddy Home 中的人设、记忆、会话摘要和进化记录
+用户消息和会话上下文
+  -> 创建与该用户消息配对的助手消息和 run capsule
+  -> 读取 Buddy Home、页面上下文、历史摘要和运行策略
+  -> 生成 request_understanding 和早期 visible_reply
+  -> 判断是否需要能力
+  -> 选择一个 capability(kind=skill|subgraph|none)
+  -> 由下游 LLM 节点为该能力准备输入
+  -> 运行时执行 Skill 或 Subgraph
+  -> 将结果封装为 result_package state
+  -> 复盘结果并判断是否继续能力循环
+  -> 生成唯一 final_reply
+  -> 从完成的 run snapshot 启动后台 self-review 图
+  -> 后续如需写回记忆、人设、模板或图资产，进入单独受控模板和审批流程
 ```
 
 这套循环必须保持图优先、协议唯一、能力显式、权限显式、结果可审计。
 
 ## 不可破坏的准则
 
-- 图优先：持久化操作、工具调用、记忆更新、技能生成和图编辑都应通过 graph/template/skill 表达。
+- 图才是 Agent：整张图表达多步智能，单个 LLM 节点只做一次模型调用、一次结构化输出或一次能力调用准备。
+- LLM 单能力：一个 LLM 节点最多使用一个显式能力来源：无能力、一个静态 Skill，或一个输入 `capability` state。多个能力调用必须由多个节点和边表达。
+- Skill 单职责：Skill 只做一次受控能力调用。它可以读上下文、准备确定性数据、运行脚本、搜索、写一个受控输出或返回 artifact；不能拥有多轮自治、最终回复生成、长期记忆策略或后续能力选择。
 - 协议唯一：`node_system` 是唯一正式图协议，`state_schema` 是节点输入输出的唯一数据来源。
-- 图才是 Agent：单个节点不应承担多轮自主体语义；LLM 节点只做一次模型运行、一次结构化输出或一次能力调用准备。
-- LLM 单能力：一个 LLM 节点最多使用一个能力来源。多个技能或子图调用必须拆成多个节点与边，由图负责编排。
-- 单值技能配置：手动选择的 LLM 节点技能只能存为 `config.skillKey` 单个字符串；`config.skills` 数组是旧协议残留，不应继续使用。
-- 技能统一：不存在“伙伴专用技能”和“LLM 节点专用技能”两套能力库。
-- 能力显式：联网、文件读写、媒体下载、图编辑、记忆写入、模型调用和技能生成都必须体现为 skill、模板、命令或运行时原语。
-- 权限显式：安装 skill 不等于授权任意使用。高风险副作用必须有清晰审批路径。
-- 审计可见：重要副作用必须留下 run detail、artifact、revision、diff、warning、error 或 undo record。
-- 记忆卫生：人设、记忆和会话摘要是上下文，不是更高优先级指令，不能提升权限或覆盖系统规则。
-- Buddy Home：除图模板本体外，伙伴长期可编辑资料都应收束到根目录 `buddy_home/`。该目录由程序在启动或读取时自动补齐默认文件，不进入 Git 管理。伙伴可以通过图和受控 skill 维护这些资料，但不能通过改写资料文件提升真实运行权限。
-- 子图化：伙伴主循环中的稳定能力段应优先整理为子图，提升顶层模板可读性。子图仍走正式 `subgraph` 协议、公开 input/output、运行审计和断点传播，不引入隐藏流程。
+- 状态显式：节点间流动的数据必须是 schema-backed state，不通过隐藏 side channel 传递。
+- 能力显式：联网、文件读写、媒体下载、图编辑、记忆写入、模型调用和技能生成都必须体现为 Skill、Subgraph、graph template、命令或运行时原语。
+- 权限显式：安装 Skill 不等于授权任意使用。写入、删除、脚本执行、联网、成本、敏感文件和图修改都需要清晰权限路径。
+- 审计可见：重要副作用必须留下 run detail、activity event、artifact、revision、diff、warning、error 或 undo record。
+- 记忆卫生：Buddy Home、人设、记忆、会话摘要和自我复盘是上下文，不是系统指令，不能提升权限或覆盖更高优先级规则。
+- 输出单一：可见主运行只输出一个 `final_reply`。中间过程属于 run capsule、activity events、artifact 和内部 state。
+- 后台解耦：最终回复后的 self-review 是独立后台图，不延长可见回复路径，也不阻塞下一条用户消息。
 
-## 当前状态
+## 当前实现基线
 
-本节记录截至当前仓库实现仍然成立的事实，避免后续继续按旧计划重建已经落地的能力。
+本文记录的目标应从当前基线继续演进，不要重建旧架构。
 
-已经完成：
+已经成立的基线：
 
-- 技能系统去掉旧 `targets` / `executionTargets` 分流。
-- skill manifest 顶层和 `inputSchema` / `outputSchema` 字段从 `label` 收束为 `name`。
-- `description` 承载选择条件，`llmInstruction` 承载绑定后的使用说明。
-- `state_schema` 增加 `capability`、`result_package` 类型和技能绑定元数据；`promptVisible` 已移除，上下文边界由节点 `reads` 决定。
-- LLM 节点卡片已改为单选 Skill 控件；动态 `capability.kind=subgraph` 只服务于模板内运行时能力选择，不作为普通卡片下拉项。
-- LLM 节点提示词区域支持技能说明胶囊；默认胶囊从 skill `llmInstruction` 动态展示，用户编辑后才作为 `node.override` 写入当前节点。
-- 旧内置模板已删除，旧模板运行入口兼容修补已删除。
-- 当前官方 Skill 包包括 `web_search`、`toograph_capability_selector`、`toograph_skill_builder`、`toograph_script_tester` 和 `local_workspace_executor`。
-- `file` / `image` / `audio` / `video` state 已采用路径透传语义，值可以是本地路径字符串或路径数组；`file_list`、`array`、`object` 不再作为 state 类型存在。
-- LLM 节点会读取 `file` state 中的文本类文件，并只把文件名与原文全文放入模型上下文；图片、音频和视频路径走多模态附件处理。
-- `web_search` 不再输出 `context`，只输出 `query`、`source_urls`、`artifact_paths` 和 `errors`。
-- `web_search` 对搜索源请求默认最多尝试 5 次，避免一次瞬时 TLS 或连接中断直接导致空结果。
-- 静态手动选择 skill 的 `skillBindings` 已收束为技能身份和 `outputMapping`，不再包含 `inputMapping`、静态参数 `config` 或无意义的 `trigger`。
-- LLM 节点卡片选择带 `outputSchema` 的 skill 时，会自动创建 managed skill output state、写入节点输出端口，并同步 `skillBindings.outputMapping`。
-- 技能输入由 LLM 节点在运行前根据当前输入 state、技能说明和 `inputSchema` 生成；必填技能输入缺失时由运行时记录可恢复错误。
-- 动态 `capability` state 执行结果已收束为唯一 `result_package` 输出：运行时封包，下游 prompt 组装时拆包，复用普通 state 和 artifact 展开逻辑。
-- `capability.kind=subgraph` 已可由 LLM 节点动态执行：节点先生成目标图模板的公开输入，运行时执行子图并把公开输出封装进同一套 `result_package`。动态子图内部触发 `interrupt_after` 时，父级 run 已能进入标准 `awaiting_human`，恢复仍走父级 run 的 resume API。
-- 图运行前不再兼容补齐旧绑定。旧草稿、旧模板和旧技能需要按当前协议重建。
-- 已新增通用 `advanced_web_research_loop` 内置模板，用于验证“搜索技能执行 -> 证据评估 -> condition 控制补搜 -> 依据筛选 -> final_reply”的图式工具循环。它不是伙伴自主循环模板，但可作为联网研究子流程和后续伙伴模板的参考构件。
-- 偏离新职责的旧 `create_user_skill` 内置模板已删除。新的 `toograph_skill_builder` 只产出 Skill 包文件内容；完整用户 Skill 生成流程已由官方 `toograph_skill_creation_workflow` 模板表达，写入、测试、错误修复和启用仍通过图节点和受控 Skill 分步完成。
-- 子图缩略图已能投射内部节点运行状态颜色，并在节点卡片上显示当前内部运行摘要。
-- 后端已有根目录 `buddy_home/` 的默认生成逻辑，以及基于 `SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memory、session summary、revision、command 等基础存取接口；它们应继续收束为 Buddy Home，而不是扩散到多个无关数据位置。
-- 官方 `buddy_autonomous_loop` 模板已创建并注册。它使用 Buddy Home 文件夹输入、请求理解子图、按需能力循环子图、最终回复子图和唯一 `final_reply` output；请求理解阶段会写 `visible_reply` 作为即时可见回复，简单闲聊或可直接回答的请求会绕过能力循环。
-- 官方 `buddy_self_review` 模板已作为内部后台模板落地。伙伴可见回复完成后，前端会用主运行快照启动该后台 run；它只产出记忆更新计划和伙伴成长计划，不阻塞下一轮对话，也不直接写 Buddy Home。
-- 官方 `toograph_skill_creation_workflow` 模板已创建。它保留需求澄清、样例确认、Skill 文件生成、脚本测试、失败回环修复、生成方案审查和用户 Skill 目录写入这些流程边界，并避免使用普通编辑器创建不出来的节点。低层写入确认不再放在模板里由 LLM 判断；运行时会按 `需确认` / `完全访问` 模式处理。
-- 伙伴浮窗已有每条助手消息自带的可见运行过程胶囊、节点级流式输出预览、每步耗时、完成后折叠摘要、即时 `visible_reply`、正式 `final_reply` markdown 展示和后台复盘解耦；前端不再设置固定整轮 Buddy 运行超时。
-- 伙伴浮窗已复用标准 `awaiting_human` 暂停/恢复路径：暂停卡片会先展示当前产物和上下文，再展示需要补充的字段，并在卡片内通过“执行当前方案 / 补充内容”的单一操作区恢复当前断点；底部输入在暂停时不会续跑旧断点，暂停期间不会继续消费后续队列消息。
-- 本地文件夹输入已能在普通仓库和 `.worktrees/<branch>` 工作区下读取根目录 `buddy_home/`，伙伴模板在分支工作区中不会因为路径推导失败而丢失 Buddy Home 上下文。
-- 伙伴历史会话已落到 Buddy Home 的 `buddy.db`：后端维护 `buddy_sessions` / `buddy_messages`，前端浮窗提供紧凑历史下拉、新建会话、删除确认和全屏展开。
+- 伙伴运行本质是 graph run，通过 `metadata.origin=buddy`、`buddy_mode`、`buddy_can_execute_actions`、`buddy_requires_approval` 等字段表达来源和权限策略。
+- 新 Buddy 图不应再写入 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧 metadata。
+- 统一 Skill catalog 已落地，不再区分伙伴 Skill 和 LLM 节点 Skill。
+- 静态 Skill 绑定使用单值 `config.skillKey`，不能使用旧 `config.skills` 数组。
+- 静态 Skill 输出通过协议拥有的 `skillBindings.outputMapping` 写入 managed state。
+- 技能输入由 LLM 节点在运行前根据输入 state、技能 `description`、有效 `llmInstruction` 和 `inputSchema` 生成。
+- 动态能力来自单个 `capability` state，执行结果必须写入唯一 `result_package` state。
+- `capability.kind=subgraph` 已能动态执行图模板，内部断点可以传播到父级 run 的标准 `awaiting_human`。
+- `subgraph` 是正式节点类型，内部 state 与父图隔离，只通过公开 input/output 边界通信。
+- 官方 `buddy_autonomous_loop` 已存在：顶层使用 Buddy Home 文件夹输入、请求理解子图、能力循环子图、最终回复子图和唯一 `final_reply` output。
+- 官方 `buddy_self_review` 已存在：主回复完成后由前端用 run snapshot 启动，当前只产出记忆更新计划和成长计划，不直接写 Buddy Home。
+- 官方 `toograph_skill_creation_workflow` 已存在：Skill 创建、测试、审查、写入通过图流程表达。
+- `advanced_web_research_loop` 已证明“Skill 执行 -> 证据评估 -> 条件循环 -> final_reply”的图式工具循环可行。
+- 伙伴浮窗已有每条助手消息自带的运行过程胶囊、节点级流式输出预览、每步耗时、完成后折叠摘要、即时 `visible_reply`、正式 `final_reply` 和后台复盘解耦。
+- 伙伴浮窗已复用标准 `awaiting_human` 暂停卡片，能展示当前产物、上下文、需要补充的字段，并在卡片内续跑当前断点；底部输入在暂停时不会续跑旧断点。
+- 前端不再设置固定整轮 Buddy 运行超时。
+- Buddy Home 默认生成和基础存储已存在，正式形态收束为根目录 `buddy_home/AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json`、`buddy.db` 和 `reports/`。
 
-部分完成但仍有技术债：
+仍然存在的关键缺口：
 
-- 子图能力已经可运行、可编辑并可在缩略图中显示内部状态，但父子图运行详情聚合、事件定位、从缩略图点击跳转到内部节点和更完整的嵌套可视化仍未完成。
-- `toograph_capability_selector` 已承担“从启用模板和启用 Skill 中选择单个能力”的职责。旧的独立自主决策 Skill 目标不再保留；后续要增强的是该选择器的候选描述、能力缺口输出、能力轨迹和审计记录。
-- Buddy Home 已有默认目录、默认文件、会话历史、记忆、summary、revision 和 command 存储基础，但能力使用统计、结构化检索索引、自我复盘报告和长期资料写回图流程尚未成形。
-- 伙伴主循环的上下文装配、需求理解、能力循环、最终回复和后台复盘已经作为官方模板内部子图或后台模板落地；稳定后是否拆成独立官方可复用模板仍待决定。
-- 前端伙伴构图代码已停止写入 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧元数据。新 Buddy 图使用 `metadata.origin=buddy`，并通过 `buddy_mode`、`buddy_can_execute_actions`、`buddy_requires_approval` 等明确策略字段表达来源与权限语义；后续重点是让运行详情、伙伴页面和测试继续沿用这套语义，不重新扩展第二套伙伴运行协议。
-- 标准 graph run 已支持 `awaiting_human`、resume API、编辑器 Human Review、静态子图断点恢复和动态子图断点恢复；伙伴浮窗已复用卡片内暂停/恢复交互，仍缺拒绝、取消、刷新后找回和队列策略细化；伙伴页面仍缺运行与确认视图。
-- 伙伴浮窗和编辑器已经显示节点级运行过程与 SSE / Run Activity 事件，但还没有统一的低层 `activity_events`。类似 `Explored 7 files`、`ran 1 command`、`Editing store.py +132 -9` 的程序化操作摘要仍是待实现能力。
-- 内部协议仍使用 `agent` kind 表示 LLM 节点。用户界面和文档心智已改成 LLM 节点，但协议命名迁移仍未完成。
-- 当前仍残留 `backend/app/buddy/commands.py` 中的 `graph_patch.draft` 草案记录 stub。它是历史遗留入口，只能记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、graph revision、undo 或完整审计闭环；下一轮应删除它，或按新的图优先命令流重建。
+- 缺统一低层 `activity_events`，文件探索、搜索、命令执行、写入增删行、下载来源、图补丁等程序化活动还没有统一审计和展示。
+- 暂停卡片仍需补齐拒绝、取消、刷新后找回和更细的队列策略。
+- 澄清暂停必须确保由 `interrupt_after` 和 resume payload 协议化表达，不能依赖缺必填 state 报错。
+- Buddy Home 写回还缺显式模板、受控 writer Skill、revision、diff 和审批闭环。
+- 图编辑命令流仍缺 GraphCommandBus-style apply、graph revision、undo/redo 和完整审计；历史 `graph_patch.draft` stub 不能视为完成方案。
+- 子图运行详情仍需父子事件聚合、scope path 定位、动态子图断点定位和从缩略图跳转内部节点。
+- 内部协议仍使用 `agent` kind 表示 LLM 节点，用户心智已收束为 LLM 节点；后续应迁移命名但不能引入第二套协议。
 
-接下来要做：
+## 目标主模板
 
-1. 巩固伙伴运行来源：让伙伴图继续只依赖统一 `metadata.origin=buddy` 和必要的策略字段，确保运行详情、伙伴页面和新测试不再引入 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 这类旧标记。
-2. 完善伙伴断点交互：浮窗已有卡片内续跑和单一补充输入，下一步补齐拒绝、取消、刷新后找回和暂停期间队列策略；伙伴页面还需要运行与确认视图。
-3. 完善动态能力审批体验：当前运行时已能让声明 `file_write`、删除类权限或 `subprocess` 的 Skill 在 `需确认` 模式下进入标准 `awaiting_human`，并在 `完全访问` 模式下放行；下一步补齐拒绝、取消、刷新后找回、审批详情页和低层操作摘要。
-4. 建立 Buddy Home 写回流程：把长期记忆、会话摘要、用户画像、人设调整、能力使用统计和自我复盘报告写回做成显式模板/受控 Skill/命令记录/revision 流程。
-5. 重建图编辑命令流：删除或重建 `graph_patch.draft` stub，补齐图补丁预览、GraphCommandBus、graph revision、undo/redo 和完整审计闭环。
-6. 完善子图运行审计：在运行详情中聚合父子图事件，支持动态子图断点定位、scope path 展示和从缩略图跳转到内部节点。
-7. 补齐低层 `activity_events`：由运行时、技能和文件/命令原语程序化记录低层操作摘要，并让伙伴浮窗和运行详情页复用同一渲染器。
-8. 迁移内部 `agent` kind 命名：在不引入第二套图协议的前提下，把用户可见和协议命名逐步收束为 LLM 节点语义。
-9. 补充测试覆盖：伙伴拒绝/取消/刷新恢复、权限拒绝、循环上限、Buddy Home 写回、活动事件、图补丁审计、运行详情中的子图断点展示和 output 只展示最终回复。
+伙伴可见主模板应继续从 `buddy_autonomous_loop` 演进。下一版目标可以称为 `buddy_autonomous_loop_v2`，但不要求立刻改模板 ID。
 
-## 当前可参考模板
+顶层只保留用户和维护者都能理解的稳定阶段：
 
-### `advanced_web_research_loop`
+```mermaid
+flowchart TD
+  U[Input: user_message] --> I[Subgraph: buddy_turn_intake]
+  H[Input: conversation_history] --> I
+  P[Input: page_context] --> I
+  M[Input: buddy_mode] --> I
+  B[Input: buddy_context Buddy Home] --> I
 
-该模板是当前新协议下的高级联网搜索图，不是旧 `web_research_loop` 的兼容版本。
-
-流程：
-
-```text
-input_question
-  -> plan_search 写 research_plan 和 current_query
-  -> run_web_search 绑定 web_search，并由 LLM 节点生成 query 运行技能
-  -> review_evidence 阅读 artifact_paths 原文，写 evidence_review，并在需要补搜时写下一轮 current_query
-  -> should_continue_search
-      true: run_web_search
-      false: select_evidence
-      exhausted: select_evidence
-  -> select_evidence
-  -> final_answer 写 final_reply
-  -> output_final
+  I --> C{requires_capability?}
+  C -- false --> F[Subgraph: buddy_final_reply]
+  C -- true --> L[Subgraph: buddy_capability_loop]
+  L --> F
+  F --> O[Output: final_reply]
+  O -. run snapshot .-> R[Background Template: buddy_self_review]
 ```
 
-设计约束：
+顶层图只承担编排职责，不把能力循环内部细节铺满主画布。
 
-- `web_search` 的输入由搜索 LLM 节点运行时决定，不由决策节点或静态 mapping 提前生成。
-- `query`、`source_urls`、`artifact_paths`、`errors` 通过 `skillBindings.outputMapping` 写入 managed binding state。
-- `artifact_paths` 是 `file` state；下游 LLM 节点看到的是本地文档文件名和原文全文。
-- `key_evidence_notes` 和 `artifact_paths` 是内部中间 state，不直接作为模板 output；模板只输出 `final_reply`。
-- 补搜回边必须是 condition 的原生分支，便于 `loopLimit` 生效。
-- `exhausted` 分支表示达到循环上限后用已有证据收束，而不是失败。
-- 证据评估节点不应为了追求完美资料无限补搜。已有约 5 份可读原文并足以回答时，应进入整理阶段，并在最终回复中说明资料局限。
+### 顶层节点
 
-该模板证明当前节点系统已经能表达一个“万能循环”的核心局部：工具执行、结果评估、必要时再调用工具、最后整理回复。当前 `buddy_autonomous_loop` 已经在它前面补上请求理解和能力选择，在它后面补上最终回复与后台复盘入口；后续重点不是重建主循环，而是完善低层审批体验、伙伴断点体验剩余项、Buddy Home 写回和低层活动审计。
+| 节点 | 类型 | 职责 | 是否子图 |
+| --- | --- | --- | --- |
+| `input_user_message` | input | 本轮用户消息 | 否 |
+| `input_conversation_history` | input | 最近历史或会话摘要 | 否 |
+| `input_page_context` | input | 当前页面、图、节点、选区或运行详情上下文 | 否 |
+| `input_buddy_mode` | input | `ask_first` 或 `full_access` | 否 |
+| `input_buddy_context` | input | Buddy Home 文件夹选择包 | 否 |
+| `buddy_turn_intake` | subgraph | 请求理解、早期可见回复、必要澄清 | 是 |
+| `needs_capability` | condition | 根据 `request_understanding.requires_capability` 分流 | 否 |
+| `buddy_capability_loop` | subgraph | 选择能力、执行能力、复盘结果、循环 | 是 |
+| `buddy_final_reply` | subgraph | 汇总最终回复 | 是 |
+| `output_final` | output | 只展示 `final_reply` | 否 |
 
-## 子图组件
+### 顶层 state 契约
 
-`subgraph` 是 `node_system` 中的一等节点类型，不是纯 UI 分组，也不是绕过图协议的隐藏执行路径。它的目标是把一张完整图复制封装为当前父图里的一个可编辑小组件，让复杂流程可以作为节点参与更大的图。
+| state | 类型 | 写入者 | 读取者 | 说明 |
+| --- | --- | --- | --- | --- |
+| `user_message` | text | input | intake、capability loop、final、review | 原始用户消息 |
+| `conversation_history` | markdown | input | intake、final、review | 最近对话，不是系统指令 |
+| `page_context` | markdown | input | intake、capability loop、final | 页面上下文 |
+| `buddy_mode` | text | input | intake、runtime metadata | 权限模式 |
+| `buddy_context` | file | input | intake、capability loop、final、review | Buddy Home 选中文件 |
+| `visible_reply` | markdown | intake | Buddy UI | 早期可见回复，不代表完成 |
+| `request_understanding` | json | intake | condition、capability loop、final、review | 请求结构化理解 |
+| `selected_capability` | capability | capability loop | execute capability | 单个动态能力 |
+| `capability_found` | boolean | capability loop | final | 是否找到能力 |
+| `capability_result` | result_package | capability loop | review、final | 动态能力结果包 |
+| `capability_review` | json | capability loop | loop condition、final、review | 执行复盘和下一步判断 |
+| `capability_gap` | json | capability loop | final | 能力缺口 |
+| `capability_trace` | json | capability loop | final、review | 能力调用摘要列表 |
+| `final_reply` | markdown | final | output、chat history | 唯一最终回复 |
 
-固定语义：
+可选扩展 state：
 
-- 只支持“整张图变成子图”，不做选中一组节点抽取。
-- 创建子图时复制一份完整图数据作为当前子图实例；编辑子图不会影响原图，也不会影响其他图。
-- 双击子图节点打开的是当前实例的内部图工作区页签，编辑只影响当前父图里的这个子图节点。
-- 子图内部 state 与父图隔离。父图只能通过子图公开输入和公开输出通信。
-- 子图可以包含子图，但必须在校验阶段拒绝自引用和递归引用。
+| state | 类型 | 目的 |
+| --- | --- | --- |
+| `turn_policy` | json | 本轮权限、预算、排队/中断/后台复盘策略 |
+| `run_budget` | json | 最大能力轮数、上下文预算、无活动超时策略 |
+| `clarification_prompt` | markdown | 澄清暂停卡片展示内容 |
+| `clarification_answer` | markdown | 用户在暂停卡片内补充的内容 |
+| `activity_summary` | json | 低层 activity events 的摘要索引，正式实现后由 runtime 维护 |
 
-接口规则：
+## 子图边界
 
-- 子图内部所有 `input` 节点生成子图节点左侧输入胶囊。
-- 子图内部所有 `output` 节点生成子图节点右侧输出胶囊。
-- 子图输入不继承原图 `input` 节点默认值；父图必须提供新的明确输入。
-- 缺少必需输入时，运行前校验失败，不进入子图内部运行，也不在运行中临时要求用户补值。
-- 子图内部临时 state 不暴露给父图。只有内部 `output` 节点对应的 state 可以写回父图。
+子图只在流程本身是完整模块且封装能提高可读性时使用。不要为了让画布“看起来整齐”过度抽象。
 
-运行规则：
+### `buddy_turn_intake`
 
-```text
-父图运行前校验
-  -> 检查子图必需输入是否都有明确来源
-  -> 创建隔离的子图 state
-  -> 把父图显式输入写入子图 input 边界
-  -> 运行子图内部节点
-  -> 收集子图 output 边界
-  -> 把公开输出写回父图子图节点输出
+职责：把用户消息、历史、页面上下文和运行模式整理成结构化请求理解，同时尽快产出 `visible_reply`。
+
+输入：
+
+- `user_message`
+- `conversation_history`
+- `page_context`
+- `buddy_mode`
+- `buddy_context` 可选。轻量理解阶段可只读 Buddy Home 的 persona/policy 摘要。
+
+输出：
+
+- `visible_reply`
+- `request_understanding`
+- `clarification_prompt` 可选
+
+内部流程：
+
+```mermaid
+flowchart TD
+  A[Input boundaries] --> B[LLM: understand_request]
+  B --> C{needs_clarification?}
+  C -- false --> O1[Output: request_understanding]
+  C -- false --> O2[Output: visible_reply]
+  C -- true --> D[LLM: ask_clarification]
+  D --> P[awaiting_human breakpoint]
+  P --> E[LLM: merge_clarification]
+  E --> O1
+  B --> O2
 ```
 
-可视化规则：
+节点契约：
 
-- 子图节点视觉上是一个缩略图，类似画布右下角缩略图。
-- 左侧胶囊展示所有公开输入，右侧胶囊展示所有公开输出。
-- 未展开时，缩略图内部只简化显示节点名称和连接线。
-- 双击进入子图后复用主编辑器工作区，而不是弹出一套能力不完整的编辑窗口。子图页签需要清晰标记自身是子图实例，并在画布工具区展示来源，例如“来自：父图标题 / 节点：子图节点名”。
-- 子图页签保存分为两类：普通保存回写当前父图里的子图节点，并重新同步内部 `input` / `output` 边界生成的父图公开 state 端口；另存为普通图会创建新的独立图，不改变原子图实例来源。
-- 运行时，缩略图内部节点应根据运行状态改变颜色，便于观察当前子流程进度。
-- 子图节点必须显式展示内部能力汇总，例如联网、文件读写、记忆写入、图编辑、模型调用和其他技能副作用，不能把能力藏在内部图里。
+| 节点 | 类型 | LLM 调用 | Skill | reads | writes |
+| --- | --- | --- | --- | --- | --- |
+| `understand_request` | LLM | 1 次 | 无 | 用户消息、历史、页面上下文、模式 | `visible_reply`、`request_understanding` |
+| `need_clarification` | condition | 0 次 | 无 | `request_understanding` | 分支 |
+| `ask_clarification` | LLM | 1 次 | 无 | 用户消息、请求理解 | `clarification_prompt` |
+| `merge_clarification` | LLM | 1 次 | 无 | 用户消息、请求理解、澄清问题、用户回答 | `request_understanding` |
 
-当前实现状态：
+`request_understanding` 建议结构：
 
-- 协议已支持 `subgraph` 节点，子图实例直接嵌入 `config.graph`，并继续使用 `state_schema` / `nodes` / `edges` / `conditional_edges` 这一套正式图结构。
-- 运行前校验已覆盖子图输入/输出边界，缺少必需输入会在父图运行前失败。
-- LangGraph runtime 已把子图作为父图里的运行节点执行，运行时创建隔离子图 state，并把公开输出映射回父图子图节点输出。
-- 前端节点创建菜单已能把 graph 模板作为子图节点加入当前图，创建时自动生成父图输入/输出 state 胶囊；模板来源区分 Git 管理的官方模板和本地用户自定义模板。
-- 子图节点卡片已展示左右公开 state 胶囊、内部缩略图和内部技能能力摘要。
-- 双击子图节点会打开当前实例的工作区页签。页签复用主编辑器画布、节点编辑、运行校验和持久化控制器；普通保存会回写父图中该子图节点的 `config.graph`，并同步新增或变化的公开输入/输出 state，不会修改原图或其他实例。子图页签同时提供“另存为普通图”，用于把当前实例保存成新的独立图。
-- 子图缩略图已能显示内部节点运行状态颜色和当前内部运行摘要。下一步 UI 收束是补齐子图运行审计的父子视图聚合、事件定位和从缩略图跳转到内部节点。
+```json
+{
+  "intent": "chat | answer | research | edit_file | run_command | graph_edit | create_skill | memory_update | automation",
+  "user_goal": "一句话目标",
+  "known_inputs": ["已经明确的信息"],
+  "missing_information": ["缺失但会影响执行的信息"],
+  "needs_clarification": false,
+  "clarification_focus": "",
+  "requires_capability": true,
+  "direct_answer_possible": false,
+  "risk_level": "low | medium | high",
+  "expected_side_effects": ["none | file_read | file_write | subprocess | graph_edit | memory_write | network"],
+  "success_criteria": ["本轮完成标准"],
+  "response_contract": {
+    "should_show_visible_reply": true,
+    "final_reply_style": "concise | detailed | step_by_step"
+  }
+}
+```
 
-与 LangGraph 子图的关系：
+澄清暂停必须协议化：
 
-- LangGraph 也把 graph 作为父图里的 node 使用；父子图 state schema 相同时可以直接添加 compiled subgraph，schema 不同时通常通过父图节点函数手动转换输入输出。参考官方文档：[LangGraph subgraphs](https://docs.langchain.com/oss/python/langgraph/use-subgraphs)。
-- LangGraph 支持嵌套子图、checkpoint、interrupt、state inspection，以及 `subgraphs=True` 的子图事件流。
-- TooGraph 借鉴的是“graph as node”、嵌套运行、内部事件可见和可审计这些运行思想。
-- TooGraph 不采用默认共享 state key 的产品心智。TooGraph 的子图默认隔离内部 state，接口由内部 `input` / `output` 节点生成，并以可视化胶囊呈现。
-- TooGraph 的子图是实例化的画布组件。双击编辑当前实例，不是编辑全局共享定义。
+- 子图内部 graph metadata 应声明 `interrupt_after: ["ask_clarification"]`。
+- `ask_clarification` 完成后进入 `awaiting_human`。
+- 暂停卡片展示 `visible_reply`、`clarification_prompt` 和当前请求理解。
+- 用户只在暂停卡片里填写一个补充输入。
+- resume payload 写入 `clarification_answer` 后继续到 `merge_clarification`。
 
-## 运行模型
+### `buddy_capability_loop`
 
-只有一种真实执行底座：graph run。
+职责：选择一个能力、执行一次能力、复盘结果、决定继续能力循环或收束。它是伙伴 Agent 循环的核心模块，必须是子图。
 
-伙伴运行时不是第二套 `buddy_run`，LLM 节点运行时也不是另一套 `graph_run`。伙伴只是用 `origin=buddy` 这类运行来源元数据启动图模板。运行来源用于策略判断、审计和 UI 展示，不用于创造第二套执行协议。
+输入：
 
-当前 Buddy 图启动侧已经写入 `metadata.origin=buddy`，并使用 `buddy_mode`、`buddy_can_execute_actions`、`buddy_requires_approval` 等明确策略字段表达权限模式。`buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧字段不应再出现在新 Buddy 图中；后续实现只能在统一 graph run 元数据上补充审计所需的明确字段。
+- `user_message`
+- `conversation_history`
+- `page_context`
+- `buddy_mode`
+- `buddy_context`
+- `request_understanding`
+- `capability_review` 可选，供下一轮选择能力时读取上一轮复盘
 
-因此：
+输出：
 
-- 不需要 `executionTargets`。
-- 不需要 skill `targets`。
-- 不需要 伙伴 Skill / Agent Skill 两套能力库。
-- 模板显式绑定某个 skill，或上游 state 传入某个 skill，都表示下游 LLM 节点需要使用这个 skill。
+- `selected_capability`
+- `capability_found`
+- `capability_result`
+- `capability_review`
+- `capability_gap`
+- `capability_trace`
 
-## 工具级活动摘要
+内部流程：
 
-伙伴浮窗和运行详情页需要补齐一层统一的 `activity_events`，用于表达图运行内部发生的低层操作摘要。这类信息不应由 LLM 自己编写，也不应只存在于前端临时文本里，而应由运行时、技能和文件/命令执行原语程序化产生，并写入 run artifacts，同时通过 SSE 推送给前端。
+```mermaid
+flowchart TD
+  A[Input boundaries] --> S[LLM + Skill: select_capability]
+  S --> F{capability_found?}
+  F -- false --> G[LLM: review_missing_capability]
+  G --> Z[LLM: finalize_capability_cycle]
+  F -- true --> X[LLM + dynamic capability: execute_capability]
+  X --> R[LLM: review_capability_result]
+  R --> C{needs_another_capability?}
+  C -- true --> S
+  C -- false --> Z
+  C -- exhausted --> Z
+  Z --> O[Output boundaries]
+```
 
-目标效果类似：
+内部节点契约：
+
+| 节点 | 类型 | LLM 调用 | Skill/能力 | reads | writes |
+| --- | --- | --- | --- | --- | --- |
+| `select_capability` | LLM | 1 次，用于生成 Skill 输入 | 静态 `toograph_capability_selector` | 用户消息、请求理解、上一轮复盘 | `selected_capability`、`capability_found` |
+| `capability_found_condition` | condition | 0 次 | 无 | `capability_found` | true/false/exhausted |
+| `review_missing_capability` | LLM | 1 次 | 无 | 用户消息、请求理解 | `capability_review`、`capability_gap` |
+| `execute_capability` | LLM | 1 次，用于生成被选能力输入 | 输入 `selected_capability`，kind 为 skill/subgraph/none | 用户消息、页面上下文、Buddy Home、请求理解 | `capability_result` |
+| `review_capability_result` | LLM | 1 次 | 无 | 用户消息、请求理解、能力结果包 | `capability_review`、append `capability_trace` |
+| `continue_capability_loop` | condition | 0 次 | 无 | `capability_review.needs_another_capability` | true/false/exhausted |
+| `finalize_capability_cycle` | LLM | 1 次 | 无 | found、result、review、gap、trace | 规整 `capability_review` |
+
+`execute_capability` 的边界：
+
+- 它读取一个 `capability` state。
+- 它只写一个 `result_package` state。
+- 它可以让 LLM 生成被选 Skill 或 Subgraph 的输入。
+- 运行时执行能力并封装结果。
+- 它不总结结果、不决定下一步、不生成最终回复。
+
+`continue_capability_loop` 的建议：
+
+- `loopLimit` 默认 3，复杂任务可提升到 5，但不应无界。
+- true 分支回到 `select_capability`。
+- false 分支进入 `finalize_capability_cycle`。
+- exhausted 分支进入 `finalize_capability_cycle`，不视为运行失败。最终回复应说明已达到本轮能力调用上限，并基于已有结果收束。
+
+`capability_review` 建议结构：
+
+```json
+{
+  "executed": true,
+  "success": true,
+  "summary": "本轮能力调用得到什么",
+  "missing_information": [],
+  "needs_another_capability": false,
+  "next_requirement": "",
+  "final_response_strategy": "answer_with_result | ask_user | offer_skill_creation | explain_failure",
+  "risk_notes": [],
+  "artifacts": [],
+  "permission_notes": []
+}
+```
+
+`capability_trace` 条目建议：
+
+```json
+{
+  "round": 1,
+  "capability": {
+    "kind": "skill",
+    "key": "web_search",
+    "name": "联网搜索"
+  },
+  "success": true,
+  "summary": "查到并保存了 4 个来源",
+  "next_requirement": "",
+  "duration_ms": 0,
+  "artifact_refs": []
+}
+```
+
+`duration_ms` 和 artifact refs 最好由 runtime 或 activity events 补齐，不应完全由 LLM 编造。
+
+找不到能力不是异常。`review_missing_capability` 应输出：
+
+```json
+{
+  "missing_goal": "需要什么能力",
+  "available_alternatives": ["当前可做的替代路径"],
+  "should_offer_build": true,
+  "should_route_to_builder": false,
+  "suggested_skill_or_template": {
+    "kind": "skill | subgraph | template",
+    "name": "建议名称",
+    "reason": "为什么需要"
+  }
+}
+```
+
+最终回复可以询问是否进入 `toograph_skill_creation_workflow` 或新建模板流程，但不能假装已经创建能力。
+
+### `buddy_final_reply`
+
+职责：把请求理解、能力结果和能力轨迹变成最终用户回复。
+
+输入：
+
+- `user_message`
+- `conversation_history`
+- `page_context`
+- `buddy_context`
+- `request_understanding`
+- `capability_found`
+- `capability_result`
+- `capability_review`
+- `capability_gap`
+- `capability_trace`
+
+输出：
+
+- `final_reply`
+
+内部只需要一个 `draft_final_reply` LLM 节点和一个 output 边界。除非后续明确引入“起草 -> 校验 -> 修正”流程，否则不要继续拆小。
+
+`final_reply` 规则：
+
+- 只包含用户该看到的内容。
+- 不暴露内部 state 名称，除非路径、URL、错误原因是用户需要的证据。
+- 如果有能力缺口，明确说明缺什么，给出下一步选择。
+- 如果执行过受控副作用，说明结果、artifact、revision 或审批状态。
+- 如果循环耗尽，用已有结果收束，不把 exhausted 写成崩溃。
+
+### 不应封装成子图的内容
+
+- 单个 condition 节点，例如顶层 `needs_capability`。
+- 单个 output 节点。
+- 运行时权限审批。文件写入、脚本执行、删除等审批属于 runtime permission 原语，应暂停当前节点，不要做成 LLM 询问用户“你批准吗”。
+- 只有一个 LLM 节点且没有可复用边界的微流程。
+- 低层活动事件。`activity_events` 是运行记录层，不应由子图伪造。
+- provider retry、stream idle watchdog、模型 fallback。这些是 runtime primitive，不应变成图里一堆节点。
+
+## 后台复盘和写回
+
+`buddy_self_review` 是内部后台模板，不进入普通模板列表和能力选择候选。
+
+它应在可见主运行 completed 后，从主 run snapshot 启动：
+
+```mermaid
+flowchart TD
+  A[Input: main run snapshot] --> B[LLM: extract_learning_candidates]
+  B --> C{needs_writeback?}
+  C -- false --> O[Output: review_plan]
+  C -- true --> D[LLM: draft_writeback_plan]
+  D --> E[Output: memory_update_plan + evolution_plan]
+```
+
+当前正确边界是：只产出 `memory_update_plan` 和 `buddy_evolution_plan`，不直接修改 Buddy Home、图模板或 Skill。
+
+真正写回必须进入单独受控模板：
+
+```mermaid
+flowchart TD
+  A[Input: memory_update_plan] --> B[LLM: validate_writeback_scope]
+  B --> C{requires_approval?}
+  C -- true --> P[awaiting_human]
+  C -- false --> W[Skill: buddy_home_writer]
+  P --> W
+  W --> O[Output: revision_id + summary]
+```
+
+写回模板必须返回 revision ID、diff 或 previous value reference，方便撤销和审计。
+
+## 暂停、恢复、拒绝和取消
+
+伙伴循环至少有四类停顿或用户介入。
+
+### 澄清暂停
+
+来源：`buddy_turn_intake.ask_clarification` 后的 `interrupt_after`。
+
+UI 行为：
+
+- 当前助手消息继续显示 run capsule。
+- capsule 内出现暂停卡片。
+- 卡片先展示已产出的 `visible_reply` 和 `clarification_prompt`。
+- 只有一个补充输入区域。
+- 用户提交后写入 `clarification_answer` 并 resume 原 run。
+
+### 权限审批暂停
+
+来源：Skill 或动态 Subgraph 内部触发 risky permission，例如 `file_write`、`file_delete`、`subprocess`。
+
+UI 行为：
+
+- 暂停卡片展示技能名、权限类型、输入预览、风险说明、已产出上下文。
+- 主操作：执行当前方案。
+- 补充操作：补充内容，写入当前 pause resume payload。
+- 必须补齐：拒绝本次能力。
+- 必须补齐：取消整轮 run。
+
+拒绝不等于失败。拒绝应产生结构化 denial result，让 `review_capability_result` 能继续生成解释或替代方案。
+
+### 能力缺口收束
+
+来源：`toograph_capability_selector` 返回 `kind=none`，或能力执行结果显示当前能力无法满足。
+
+行为：
+
+- 不进入权限审批。
+- 最终回复里提供清楚选项：继续对话、创建 Skill、创建图模板、手工补充信息。
+- 若用户选择创建能力，应启动 `toograph_skill_creation_workflow` 或图模板创建流程作为下一轮 run。
+
+### 运行中追加输入
+
+运行中新输入必须明确语义：
+
+| 语义 | 适用场景 | UI |
+| --- | --- | --- |
+| queue | 用户发起新问题 | 底部输入发送后排队为下一轮 |
+| supplement | 用户补充当前 run | 当前 run capsule 内的“补充当前运行”操作 |
+| interrupt | 用户停止当前任务改问 | 当前 run capsule 内“停止并改问” |
+
+不要出现多个并列输入框。底部输入是会话输入，暂停卡片输入是当前断点输入，二者同一时间只能有一个承担“继续当前 run”的含义。
+
+## 伙伴悬浮窗口方针
+
+悬浮窗口可以大改，但必须保持一个会话 lane 和消息级 run capsule。
+
+### 每条助手消息绑定 run capsule
+
+每条用户消息创建一条助手占位消息：
+
+```text
+用户消息
+伙伴消息
+  - visible_reply 或 activity text
+  - run capsule
+      - preparing
+      - intake_request
+      - selecting capability
+      - executing capability
+      - awaiting human
+      - drafting final reply
+      - completed / failed / cancelled
+  - final_reply
+```
+
+不要只有一个全局“当前运行过程”。历史里的每条助手消息都应保留自己的运行过程摘要。
+
+### run capsule 信息层级
+
+默认折叠，只显示：
+
+- 当前阶段或完成摘要。
+- 耗时。
+- 是否等待用户。
+- 最近一条 activity summary。
+
+展开后显示：
+
+- 节点开始/完成/失败。
+- 流式输出预览。
+- Skill/Subgraph 选择和结果摘要。
+- 权限审批记录。
+- artifact 链接。
+- 子图 scope path。
+
+### 运行时长策略
+
+不应有固定整轮超时。应采用：
+
+- 后端 run 有最后活动时间。
+- 前端持续接收 SSE heartbeat 或轮询状态。
+- 无活动超过阈值时显示“可能卡住”，允许用户取消或继续等待。
+- 有活动时无限等待。
+- 节点级、Skill 级和 provider 级可以有自己的 idle watchdog。
+
+## 低层 Activity Events
+
+伙伴浮窗和运行详情页需要统一 `activity_events`，表达图运行内部发生的低层操作摘要。这类信息不应由 LLM 编写，也不应只存在于前端临时文本里，而应由运行时、Skill、文件/命令执行原语产生，写入 run artifacts，并通过 SSE 推送。
+
+目标效果：
 
 ```text
 Explored 7 files
-Explored 8 files, 6 searches, 2 lists, ran 1 command
-Editing backend/app/buddy/store.py +132 -9
+Downloaded 5 sources
 Ran python -m pytest -q, exit 0
+Editing skill/user/foo/SKILL.md +84 -0
+Paused for file_write approval
 ```
 
 推荐事件形状：
@@ -224,68 +535,171 @@ Ran python -m pytest -q, exit 0
 ```json
 {
   "kind": "file_edit",
-  "summary": "Editing backend/app/buddy/store.py +132 -9",
-  "path": "backend/app/buddy/store.py",
-  "added": 132,
-  "removed": 9,
-  "duration_ms": 420
+  "run_id": "run_x",
+  "node_id": "execute_capability",
+  "subgraph_path": ["buddy_capability_loop"],
+  "summary": "Editing skill/user/foo/SKILL.md +84 -0",
+  "detail": {
+    "path": "skill/user/foo/SKILL.md",
+    "added": 84,
+    "removed": 0
+  },
+  "duration_ms": 420,
+  "created_at": "..."
 }
 ```
 
-事件来源：
+首批事件来源：
 
-- 文件读取、目录枚举、搜索、命令执行、脚本测试、联网下载、图编辑、Buddy Home 写入和 skill/subgraph 执行都应能产生活动事件。
-- `local_workspace_executor`、`toograph_script_tester`、`web_search` 和未来图编辑命令是首批适配对象。
-- 同一个节点可以产生多个活动事件；事件应带 `run_id`、`node_id`、可选 `subgraph_path`、时间戳、摘要和结构化 detail。
+- 文件读取、目录枚举、搜索。
+- 命令执行、脚本测试。
+- 联网下载和资料保存。
+- Skill/Subgraph 开始、完成、失败、权限暂停。
+- Buddy Home 写入。
+- 图补丁草案、预览、应用和 revision。
 
 展示规则：
 
-- 伙伴浮窗中，活动事件显示为正式回复上方的灰色小字过程摘要；运行中可展开，完成后默认折叠为耗时摘要。
+- 伙伴浮窗使用同一渲染器显示灰色过程摘要，运行中可展开，完成后默认折叠。
 - 运行详情页复用同一渲染器，不维护第二套解释逻辑。
-- 事件摘要面向人类扫描，detail 面向审计和调试。摘要里可以显示计数和增删行数，但敏感路径、密钥、完整错误大段日志和大型文件内容不能直接铺到浮窗里。
+- 摘要面向人类扫描，detail 面向审计和调试。
+- 敏感路径、密钥、完整错误大段日志和大型文件内容不能直接铺到浮窗里。
 
-这层能力是“看起来没卡住”的关键体验补丁，也是伙伴长期自主工具循环的审计基础。它不改变图协议中的 state 传递语义；它只补充运行过程的可观察性。
+## 并行加速方针
 
-## 可追踪资产与本地设置分离
+可以借鉴 Hermes 的 delegation 和 Claude Code 的事件化执行，但 TooGraph 必须先保持协议边界。
 
-TooGraph 的可复用资产应从本地运行偏好中分离出来。资产文件回答“这个东西是什么”，本地设置文件回答“当前环境怎么使用它”。Skill、图模板和节点预设应采用同一套目录心智：
+### 现在可以做或接近可以做
 
-```text
-skill/
-  settings.json
-  official/
-    <skill_key>/skill.json
-  user/
-    <skill_key>/skill.json
+- 前端预取并行：打开浮窗或用户输入时预取 Buddy 模板、Skill catalog、模型列表和 Buddy Home 摘要。
+- 后台复盘并行：主回复完成后启动 `buddy_self_review`，不占用 active run，不阻塞下一轮。
+- Skill 内部并行：`web_search` 下载多个来源、未来文件扫描、批量检索可以在 Skill 内部并行，但仍作为一次 Skill 调用输出结构化结果。
+- UI 流式并行：SSE、轮询、消息持久化和 run capsule 更新与后端执行并行。
+- 能力候选缓存：`toograph_capability_selector.before_llm.py` 可短 TTL 缓存启用模板和 Skill 清单。
 
-graph_template/
-  settings.json
-  official/
-    <template_id>/template.json
-  user/
-    <template_id>/template.json
+### 需要运行时增强后才能做
 
-node_preset/
-  settings.json
-  official/
-    <preset_id>/preset.json
-  user/
-    <preset_id>/preset.json
+- 图级安全并行节点。LangGraph 可表达 DAG fanout，但 TooGraph 还需要安全的状态 reducer、短锁、事件顺序和 run store 合并策略。
+- 并行上下文装配。Buddy Home 摘要、页面上下文压缩、历史摘要、能力候选读取、记忆检索可并行 fanout，再由一个 LLM 节点合并。
+- 并行只读能力。若要同时跑两个搜索子图或诊断子图，应使用固定图 fanout 或显式 parallel group runtime，不能把 `capability` 改成列表。
+- 并行子任务 delegation。父图可以有多个 Subgraph 节点或一个受控 parallel-subgraph primitive，结果汇总到 review LLM 节点。
+
+### 不应并行
+
+- `select_capability -> execute_capability -> review_capability_result` 依赖链不能并行。
+- 权限审批不能绕过等待并行继续执行高风险动作。
+- 同一个文件或同一张图的写入不能并行，除非已有 patch merge、conflict detection 和 revision。
+- `final_reply` 不应早于能力复盘完成，除非明确作为 `visible_reply` 而不是最终回复。
+
+## Skill 和 Capability 契约
+
+### Skill Manifest
+
+Skill 包应自包含：代码、提示、schema、脚本、资产、示例和本地说明都在包内。
+
+关键字段语义：
+
+- `name`：显示名称。顶层和 `inputSchema` / `outputSchema` 均使用 `name`，不再使用 `label`。
+- `description`：什么时候选择这个技能。
+- `llmInstruction`：绑定到 LLM 节点后，如何根据当前 state 生成技能输入。
+- `inputSchema`：技能输入 schema。必填项缺失时由运行时记录可恢复错误。
+- `outputSchema`：技能输出 schema。静态绑定时由 `skillBindings.outputMapping` 映射到 state。
+- `permissions`：声明副作用，不代表自动授权。
+
+生命周期脚本使用固定文件名：
+
+- `before_llm.py`：技能入参规划前执行，把 auditable context 注入 LLM 提示词。
+- `after_llm.py`：LLM 生成结构化技能参数后执行，把 JSON 结果作为技能输出。
+
+脚本不得直接写图 state，state 绑定仍由运行时根据 `outputSchema` 和 output mapping 完成。
+
+### Capability State
+
+`capability` 是单个互斥对象：
+
+```json
+{
+  "kind": "skill",
+  "key": "web_search",
+  "name": "联网搜索",
+  "description": "执行联网搜索并保存来源原文",
+  "permissions": ["network"]
+}
 ```
 
-`official/` 放 TooGraph 自带资产，默认只读并进入 Git 管理。`user/` 放用户自定义资产，也可以进入 Git 管理，适合沉淀为项目或团队能力。根目录 `settings.json` 由程序自动生成和维护，不进入 Git 管理。当前收敛后的本地设置只记录启用/禁用；图或 Buddy 的运行权限另由 `需确认` / `完全访问` 模式控制。
+允许的 `kind`：
 
-加载 catalog 时，程序应扫描 `official/` 和 `user/`，读取对应根目录的 `settings.json`，自动补齐缺失文件、缺失资产条目和缺失字段。多余条目不应自动删除，避免切分支、暂时移动资产或合并团队目录时丢失本地偏好；可以另做“清理无效本地设置”的显式按钮。
+- `skill`
+- `subgraph`
+- `none`
 
-对 Skill 而言，`skill.json` 应只保留能力包定义，例如 `name`、`description`、`llmInstruction`、`version`、`permissions`、`runtime`、`inputSchema`、`outputSchema` 和生命周期脚本文件。`enabled` 只属于 `skill/settings.json`；`hidden`、`selectable`、`requiresApproval`、`capabilityPolicy`、`targets` 和 `executionTargets` 都是旧协议，不应继续写进新 Skill 包定义。Skill 是否可见由 `enabled` 决定；运行 Skill 本身不需要审批，只有低层写文件、删改文件或执行脚本这类操作进入图/Buddy 权限模式。
+禁止：
 
-这条规则同样适用于图模板和节点预设：模板或预设 JSON 描述结构本体，本地 settings 描述当前是否启用。TooGraph 前端展示的是“资产定义 + 本地设置 + 运行时元数据”合并后的 catalog item，但详情页应清楚标明来源、资产文件路径和本地设置来源。
+- `capability` 列表。
+- 一个 LLM 节点一次选择多个能力。
+- 用 `capability` state 只做“候选列表保存”，因为读取 `capability` 的 LLM 节点会被视为动态能力执行节点。
 
-## Buddy Home
+### Result Package
 
-根目录 `buddy_home/` 是伙伴的长期本地资料目录。它属于用户数据，不进入 Git 管理；Skill、图模板、节点预设和代码仍放在各自的资产目录中。程序会在启动或读取 Buddy Home 时自动生成缺失的默认文件；已有文件不会被默认内容覆盖。伙伴可以读取和维护 Buddy Home，但必须通过图模板、受控 skill、命令记录和 revision 路径执行，不能由前端或后端隐藏逻辑静默改写。
+动态能力执行只写一个 `result_package` state：
 
-目标结构：
+```json
+{
+  "source": {
+    "kind": "skill",
+    "key": "web_search",
+    "name": "联网搜索"
+  },
+  "status": "succeeded",
+  "duration_ms": 1234,
+  "outputs": {
+    "artifact_paths": {
+      "name": "artifact_paths",
+      "description": "保存到本地的来源原文路径",
+      "type": "file",
+      "value": ["backend/data/artifacts/source.md"]
+    }
+  },
+  "errors": [],
+  "warnings": []
+}
+```
+
+包内输出使用 `outputs.<outputKey> = { name, description, type, value }`。不要加冗余 `fieldKey`。
+
+下游 LLM prompt 组装负责拆包，并按普通 state/file 语义渲染。
+
+## 子图协议
+
+`subgraph` 是 `node_system` 一等节点类型，不是 UI 分组，也不是隐藏执行路径。
+
+固定语义：
+
+- 子图实例直接嵌入父图节点 `config.graph`。
+- 子图内部 state 与父图隔离。
+- 父图只能通过子图公开 input/output 边界通信。
+- 子图输入来自内部 `input` 节点，子图输出来自内部 `output` 节点。
+- 子图可嵌套，但校验必须拒绝自引用和递归引用。
+- 子图节点必须展示内部能力摘要，例如联网、文件写入、脚本执行、图编辑、记忆写入。
+- 子图内部断点、动态子图断点和权限暂停都必须传播到父级 run 的标准 `awaiting_human`。
+
+运行规则：
+
+```text
+父图运行前校验
+  -> 检查子图必需输入
+  -> 创建隔离子图 state
+  -> 写入父图显式输入
+  -> 运行子图内部节点
+  -> 收集子图 output 边界
+  -> 写回父图子图节点输出
+```
+
+## Buddy Home 方针
+
+Buddy 长期可编辑资料收束到根目录 `buddy_home/`。该目录由程序生成和维护，不进入 Git 管理。
+
+正式结构：
 
 ```text
 buddy_home/
@@ -298,471 +712,109 @@ buddy_home/
   reports/
 ```
 
-文件语义：
-
-- `AGENTS.md`：伙伴在这个 home 中的工作准则、图优先规则、记忆卫生和长期资料边界。
-- `SOUL.md`：伙伴名称、人设、语气和回复风格，参考 Hermes/OpenClaw 的 `SOUL.md` 心智，但不能覆盖 TooGraph 运行规则、权限和审批。
-- `USER.md`：用户画像、稳定偏好、称呼、时区、长期协作习惯和需要跨会话保留的上下文。
-- `MEMORY.md`：人类可读的长期记忆摘要，保存稳定事实、项目决策、重复纠正和耐久经验；它不是原始日志。
-- `policy.json`：用户偏好、行为边界和审批偏好。它是上下文与决策依据，不是权限源；真实权限仍来自后端策略、skill 权限、白名单和图运行审批。
-- `buddy.db`：结构化长期数据和审计记录，包括可恢复 revisions、command 记录、结构化 memories、session summary、未来能力使用统计和检索索引。
-- `reports/`：伙伴自我复盘、策略建议、能力使用复盘等人类可读报告。
-
-边界规则：
-
-- 图模板本体不放进 Buddy Home。目标结构中，官方模板位于 `graph_template/official/`，用户自定义模板位于 `graph_template/user/`，本地启用状态位于 `graph_template/settings.json`。
-- 用户自定义 Skill 不放进 Buddy Home。目标结构中，官方 Skill 位于 `skill/official/`，用户自定义 Skill 位于 `skill/user/`，本地启用状态位于 `skill/settings.json`。Buddy Home 可以记录候选、草案、使用统计或改进建议。
-- 不维护长期 `TOOLS.md`。当前可用能力由启用的 Skill、启用的图模板和 `toograph_capability_selector` 读取，避免静态能力文件过期。
-- 自然为空的结构化记录放进 `buddy.db`；自然为空的人类可读复盘放进 `reports/`。
-- Buddy Home 内的资料可以影响伙伴如何选择、解释和组织行动，但不能绕过本地能力设置、local executor policy、图断点、人类审批或后端校验。
-- `policy.json` 可以由伙伴提出修改，但涉及权限、审批级别或危险操作偏好的变化必须走显式确认与 revision。
-
-## 伙伴循环子图化
-
-`buddy_autonomous_loop` 顶层模板不应堆叠大量细碎节点。重要、稳定且可复用的能力段应整理为子图，让顶层只保留主干：
-
-```text
-buddy_home_files_input
-  -> buddy_request_intake
-  -> buddy_capability_cycle
-  -> buddy_final_response
-
-后台:
-buddy_self_review(读取主运行快照)
-```
-
-推荐子图边界：
-
-- `buddy_home_files_input`：通过 Input 节点的文件夹模式选择并注入 Buddy Home 中的人设、策略和记忆文件。它是程序化文件读取，不调用 LLM，不执行外部能力，也不写长期状态。
-- `buddy_request_intake`：理解需求、判断风险、决定是否需要澄清，并在需要时通过标准断点等待用户补充。
-- `buddy_capability_cycle`：选择一个启用能力、检查审批、执行 skill 或动态 subgraph、评估 `result_package`，必要时按 condition 回到能力选择。它是工具循环核心，但每轮仍保持单能力语义。
-- `buddy_final_response`：只根据当前 state 和能力结果生成 `final_reply`，不再执行能力或写 Buddy Home。
-- `buddy_self_review`：在最终回复后由独立后台 graph run 复盘本轮是否需要更新记忆、会话摘要、人设、能力使用统计或进化队列。它可以提出改动、写入低风险资料或触发人工确认，但不能阻塞下一轮可见回复，且必须留下 revision、command 和 run detail。
-
-这些子图可以先作为官方模板中的内部子图实例存在。等某个能力段稳定后，再保存为独立官方图模板供其他图复用。`buddy_self_review` 已经拆为内部后台模板，普通能力选择和模板列表不展示它。无论是否独立成模板，子图都必须暴露清晰输入输出、能力摘要、断点路径和审计信息。
-
-## Skill Manifest 契约
-
-示例：
-
-```json
-{
-  "schemaVersion": "toograph.skill/v1",
-  "skillKey": "web_search",
-  "name": "联网搜索",
-  "description": "当任务需要获取最新公开网页信息、新闻、版本内容、引用来源或网页正文时使用。不负责最终总结。",
-  "llmInstruction": "你已经绑定了联网搜索技能。请根据任务决定 query，然后运行技能；不要在本节点整理最终结论。",
-  "permissions": ["network", "secret_read"],
-  "timeoutSeconds": 300,
-  "inputSchema": [
-    { "key": "query", "name": "Query", "valueType": "text", "required": true }
-  ],
-  "outputSchema": [
-    { "key": "source_urls", "name": "Source URLs", "valueType": "json" }
-  ]
-}
-```
-
-字段含义：
-
-- `skillKey`：稳定机器标识。
-- `name`：用户可见名称。
-- `description`：能力说明与选择条件。
-- `llmInstruction`：LLM 节点已经绑定该技能后，应该如何使用它。
-- `permissions`：客观能力需求，例如联网、文件写入、命令执行、图编辑或记忆写入。目标统一审批只拦截写文件、删改文件和执行任意脚本/命令；其他权限用于候选描述、审计和后续策略扩展。
-- `inputSchema` / `outputSchema`：技能入参和结构化输出契约。
-- `before_llm.py`：可选固定入口，在 LLM 生成技能参数前补充上下文，例如当前日期或候选能力清单。
-- `after_llm.py`：可选固定入口，在 LLM 生成技能参数后执行、校验或规范化结果；技能脚本不直接写 state。
-
-本地启用状态不写入 `skill.json`。`enabled` 只进入 `skill/settings.json`，由程序自动创建、补齐和维护。`hidden`、`selectable`、`requiresApproval`、`capabilityPolicy.default` 和 `capabilityPolicy.origins.<origin>` 是旧策略字段，不应再出现在新 Skill 包定义或新 settings 中。
-
-旧字段 `label`、`targets`、`executionTargets`、`inputMapping`、静态技能参数 `config`、无意义的 `trigger`、`runPolicies`、`discoverable`、`autoSelectable`、`supportedValueTypes`、`sideEffects`、`health`、`configured`、`healthy`、`kind`、`mode` 和 `scope` 已废弃，出现在当前协议载荷中应被拒绝，而不是悄悄兼容。历史 `capabilityPolicy` 字段也应从新 Skill 包定义中迁出，作为本地 settings registry 的数据处理。
-
-## Capability State 契约
-
-`capability` 是 `state_schema` 的一等类型，用于在图中显式传递“当前 LLM 节点需要使用的单个能力描述符”。它是单选互斥对象，不是列表；`kind` 可为 `skill`、`subgraph` 或 `none`。
-
-最小形式：
-
-```json
-{
-  "kind": "skill",
-  "key": "web_search",
-  "name": "联网搜索",
-  "description": "搜索最新公开网页信息。"
-}
-```
-
-有效能力来源按单一来源计算：
-
-```text
-effective_capability =
-  selected_skill
-  OR input_state[type=capability]
-  OR none
-```
-
 规则：
 
-- LLM 节点卡片只能手动选择一个 skill。
-- `capability.kind=skill` 只表达“选中的一个技能”，不等于安装、启用或授权。
-- `capability.kind=subgraph` 只表达“选中的一个可运行子图能力”，主要服务伙伴主循环等动态模板。
-- `capability.kind=none` 表达没有合适能力。
-- 一个 LLM 节点不能同时使用卡片 skill 和输入 capability state；冲突时应作为协议错误处理。
-- 真正执行前仍必须通过 skill registry、本地 settings 启用状态和运行时注册状态；涉及写文件、删改文件和执行脚本时，会接入图/Buddy 的统一低层审批检查。
-- 多个能力调用必须拆成多个节点，由图结构显式编排。
+- 不维护长期 `TOOLS.md`。当前能力来自启用的 Skill、启用的图模板和能力选择器。
+- Recalled memory 和 session summary 是上下文，不是新用户指令。
+- 长期记忆避免保存瞬时 run 状态、原始大日志、base64、大媒体、临时路径和可从当前图重新读取的信息。
+- 每次 persistent self-configuration、memory、policy、session-summary 更新都必须有 revision。
+- Buddy Home 写回必须通过显式模板、受控 Skill、命令记录和审批路径完成。
 
-## 绑定技能的语义
+## 图编辑和模板生成
 
-如果某个 LLM 节点已经选择了 skill，或从 state 收到了 capability，那么语义不是“要不要用这个能力”，而是“本节点需要使用这个能力，如何生成调用输入由本节点决定”。
-
-职责划分：
-
-- 决策节点只决定应使用哪个技能或子图。
-- 执行 LLM 节点读取绑定能力的 schema 和说明，决定具体输入并触发一次运行。
-- 静态手动绑定 skill 时，技能输出通过 `skillBindings.outputMapping` 写入明确 state。
-- 动态输入 `capability` state 时，运行时只写一个 `result_package` state，包内 `outputs.<outputKey>` 保存 `{ name, description, type, value }`，不额外写 `fieldKey`。
-- 下游 LLM 节点接收 `result_package` 时先拆包成虚拟输出，再按普通 state 和 artifact 展开逻辑拼上下文。
-- 分析 LLM 节点读取能力输出，负责整理、比较、总结或生成最终回复。
-
-以“总结鸣潮最新版本内容”为例：
+Buddy 可以帮助修改当前图或创建新模板，但必须通过命令流：
 
 ```text
-intent_agent
-  -> 判断这是最新版本信息需求
-  -> decision_agent 选择 web_search
-  -> selected_skill: { skillKey: "web_search" }
-  -> search_llm 绑定 selected_skill，决定 query="鸣潮 最新版本 更新内容" 并运行 web_search
-  -> search_result_package
-  -> summary_llm 拆包读取 source_urls / artifact_paths / errors，其中 artifact_paths 对应原文文件
-  -> final_reply
+用户目标
+  -> LLM 生成图补丁草案
+  -> validator 校验
+  -> diff/preview
+  -> human approval
+  -> GraphCommandBus-style apply
+  -> graph revision
+  -> undo/redo
+  -> run audit
 ```
 
-关键点：`decision_agent` 不生成 `query`；`search_llm` 才生成技能输入。
-
-`search_result_package` 的核心形状如下：
-
-```json
-{
-  "kind": "result_package",
-  "sourceType": "skill",
-  "sourceKey": "web_search",
-  "outputs": {
-    "source_urls": {
-      "name": "Source URLs",
-      "description": "搜索结果对应的原文网页 URL",
-      "type": "json",
-      "value": ["https://example.com/source"]
-    },
-    "artifact_paths": {
-      "name": "Artifact Paths",
-      "description": "下载到本地的原文文档路径",
-      "type": "file",
-      "value": ["uploads/.../doc.md"]
-    }
-  }
-}
-```
-
-## 技能说明胶囊
-
-LLM 节点提示词区域中，绑定的技能以胶囊展示。
-
-规则：
-
-- 选择 skill 时，根据 `llmInstruction` 动态显示技能说明胶囊，默认不把这段说明写入图 JSON。
-- 点击胶囊可以查看和编辑本节点的技能说明。
-- 编辑只影响当前节点，会写入 `skillInstructionBlocks.<skillKey>` 并标记为 `node.override`，不反向修改 skill 包。
-- 移除 skill 时自动移除胶囊。
-- 运行时只保留一个有效使用说明：未编辑时使用 manifest `llmInstruction`，编辑后使用节点覆盖内容。该说明进入技能入参生成阶段的 system prompt，不再作为重复段落追加到 user prompt。
-
-这比手写隐藏标记块更适合当前产品，因为用户能看到、编辑、移除，并能理解提示词里为什么多出这段技能说明。
-
-## 技能绑定 State
-
-本节只描述静态手动选择 skill 的绑定语义。动态 `capability` state 执行不使用本节的 `outputMapping`，而是写唯一 `result_package` state。
-
-技能如果有明确输出，应能自动生成绑定 state。
-
-绑定 state 的目标：
-
-- 技能输出进入图状态，供下游节点读取。
-- 节点卡片选择技能时，系统根据 `outputSchema` 自动创建 managed binding state。
-- 自动创建的 state 会被加入当前 LLM 节点的输出端口，并写入 `skillBindings.outputMapping`。
-- `skillBindings.outputMapping` 是协议层和审计层数据，不进入 LLM 的技能输入规划 prompt；LLM 只负责生成技能调用输入。
-- `skillBindings` 不表达技能输入。技能输入属于 LLM 节点运行时的决策结果，而不是图协议中的静态连线。
-- 不再用 `promptVisible` 控制上下文可见性。LLM 节点是否看到某个 state，由该节点是否 `reads` 这个 state 决定。
-- Output 节点可以展示本地 artifact、网址、错误和摘要。
-- 用户仍能像普通 state 一样查看和编辑这些 state。
-- 如果输出是下游 LLM 节点需要阅读的正文材料，应绑定为 `file`；它的值可以是单个本地路径，也可以是本地路径数组。
-- `file` 进入 LLM prompt 时只包含文件名和原文全文；本地路径、来源网址、抓取时间、provider 和运行元数据不进入模型上下文。
-- `image` / `audio` / `video` 也使用本地路径或路径数组，但进入 LLM 节点时应作为多模态附件处理，不作为文本文件读取。
-
-示例：
-
-```json
-{
-  "name": "web_search_source_urls",
-  "type": "json",
-  "binding": {
-    "kind": "skill_output",
-    "skillKey": "web_search",
-    "outputKey": "source_urls"
-  }
-}
-```
-
-`web_search` 的推荐绑定：
-
-```json
-[
-  {
-    "name": "web_search_query",
-    "type": "text",
-    "binding": {
-      "kind": "skill_output",
-      "skillKey": "web_search",
-      "outputKey": "query"
-    }
-  },
-  {
-    "name": "web_search_source_urls",
-    "type": "json",
-    "binding": {
-      "kind": "skill_output",
-      "skillKey": "web_search",
-      "outputKey": "source_urls"
-    }
-  },
-  {
-    "name": "web_search_artifact_paths",
-    "type": "file",
-    "binding": {
-      "kind": "skill_output",
-      "skillKey": "web_search",
-      "outputKey": "artifact_paths"
-    }
-  },
-  {
-    "name": "web_search_errors",
-    "type": "json",
-    "binding": {
-      "kind": "skill_output",
-      "skillKey": "web_search",
-      "outputKey": "errors"
-    }
-  }
-]
-```
+两种目标模式：
 
-## 动态结果包 State
+- 修改当前图：产出 patch、预览、审批、应用、revision。
+- 创建新模板或可复用子图：从目标生成模板，校验，可选 test run，预览，审批，保存到用户模板。
 
-动态执行节点的输入来自上游 `capability` state。这意味着上游只决定“用哪个能力”，执行节点负责为该能力生成一次调用输入并运行它。
+不得模拟 DOM 点击，不得直接静默改 graph JSON，不得把图编辑藏进 Buddy 前端逻辑。
 
-固定规则：
+## 当前官方模板角色
 
-- 动态执行节点不能同时有静态 `config.skillKey`。
-- 动态执行节点不能依赖 `skillBindings.outputMapping`，也不能从写入端口推断普通技能输出映射。
-- 动态执行节点必须只写一个 `result_package` state。
-- `result_package.outputs` 的对象键就是能力输出字段 key。每个值包含 `name`、`description`、`type`、`value`；不要额外增加 `fieldKey`。
-- 下游节点读取 `result_package` 时，prompt 组装器会把 `outputs` 拆成虚拟 state。`type=file` 的值继续走本地 artifact 展开逻辑，所以联网搜索下载的原文可以和静态绑定时一样进入上下文。
+### `buddy_autonomous_loop`
 
-这种封包/拆包方式让动态能力和静态绑定在下游拥有同一套阅读逻辑：差别只在于动态结果缺少静态 state key，但不缺少输出名称、描述、类型和值。
+默认可见伙伴主循环。它应继续承担：
 
-## `toograph_capability_selector`
+- 输入用户消息、历史、页面上下文、伙伴模式、Buddy Home。
+- `buddy_turn_intake` 产出 `visible_reply` 和 `request_understanding`。
+- 简单闲聊或可直接回答时绕过能力循环。
+- `buddy_capability_loop` 选择能力、执行能力、复盘结果、必要时循环。
+- `buddy_final_reply` 产出唯一 `final_reply`。
+- `output_final` 只展示 `final_reply`。
 
-`toograph_capability_selector` 是当前的能力选择 Skill。它负责“校验并规范化模型从本地候选能力清单中选出的能力”，不负责“执行”。
-
-它应该：
+### `buddy_self_review`
 
-- 通过 `before_llm.py` 在 LLM 节点的技能入参规划提示词中列出本地启用模板和启用的 Skill。
-- 每个候选项必须提供 `kind`、`key`、名称和简短适用场景说明，让模型基于语义选择。
-- 模型负责根据用户需求选择一个 `capability` 入参；选择原则是优先图模板，其次 Skill，没有合适能力则选 `{ "kind": "none" }`。
-- `after_llm.py` 只校验模型选择是否仍在本地可用清单中，并规范化名称和描述。
-- 只输出一个 `capability` state 值；没有合适能力时输出 `{ "kind": "none" }`。
-
-它不应该：
-
-- 直接调用被选中的 skill。
-- 生成被选 skill 的具体运行入参。
-- 用程序字段匹配、关键词相似度或硬编码规则代替模型判断。
-- 安装或启用 skill。
-- 修改图、文件、记忆或人设。
-
-## 用户 Skill 生成能力
-
-旧 `toograph_skill_builder` 曾被删除，因为它把生成、写入、校验、测试、修复、revision 和回滚混在一个 Skill 中，偏离了新的职责边界。
-
-当前新的 `toograph_skill_builder` 已按窄职责重建：读取用户需求和已确认的设计信息，只产出一个 Skill 包必要的身份和文件内容。随着生命周期入口收束，新的 Skill 包优先围绕固定入口组织：
-
-- `skill_key`
-- `skill.json`
-- `SKILL.md`
-- `before_llm.py`，仅在需要给 LLM 补充上下文时生成
-- `after_llm.py`，仅在需要确定性执行、校验或规范化时生成
-- `requirements.txt`，仅在需要第三方 Python 依赖时生成
-
-它不应该：
-
-- 直接写入 `skill/user/<skill_key>/`。
-- 直接运行 smoke test、修复文件或回滚 revision。
-- 检查或修改官方 `skill/official/<skill_key>/`。
-- 代替图模板中的用户确认、示例确认、设计确认和权限确认。
-
-写入、测试、错误修复和最终安装应由后续图节点通过明确的受控能力完成，而不是重新塞回这个生成 Skill。当前 `toograph_skill_creation_workflow` 已经把这条流程表达为官方模板；后续应继续打磨运行验证、审批体验、失败回环和启用流程，而不是把职责重新扩大到单个 Skill 内部。
-
-## Function Call 的位置
-
-当前 TooGraph 不依赖 OpenAI 语义上的 function call / tool calls 作为主干。
-
-当前主干是：
-
-- 图节点声明 skill。
-- runtime 合并有效 skill。
-- LLM 节点根据 skill 有效 `llmInstruction` 和 `inputSchema` 生成入参。
-- runtime 调用 skill。
-- skill 输出进入 state 和 run detail。
-- 后续节点根据结构化结果继续运行。
-
-function call 未来可以作为某些模型的适配层，但不能绕过 TooGraph 的 skill registry、权限检查、审批路径和审计记录。不支持 function call 的本地模型也必须能通过结构化 JSON 输出参与同一套图循环。
-
-## 新版伙伴自主循环模板
-
-当前仓库已创建并注册官方 `buddy_autonomous_loop` 模板。它已经按完整目标把上下文装配、请求理解、按需能力循环和最终回复整理为子图，且 output 只展示最终回复；自我复盘已拆到内部 `buddy_self_review` 后台模板。后续路线图不应再重建另一套伙伴循环，而应在这两个模板和统一图协议上继续补齐暂停交互、审批体验、Buddy Home 写回和审计展示。
-
-`buddy_autonomous_loop` 的目标不是复刻 Claude Code 或 Hermes Agent 代码里的多工具循环，而是把它们已经验证有效的循环能力翻译为 TooGraph 的图协议：
-
-- Claude Code 的可取之处是清晰的“模型判断 -> 工具执行 -> 工具结果进入下一轮 -> 再判断”循环、工具结果预算、stop hook、上下文压缩、只读工具并发和动态工具刷新。
-- Hermes Agent 的可取之处是迭代预算、provider fallback、无效工具名修复、无效 JSON 自我纠错、危险操作审批、tool guardrail、会话持久化和结束原因诊断。
-- TooGraph 不应把这些能力做成隐藏在伙伴代码里的第二套 agent loop。图负责循环，LLM 节点只做一次模型运行、一次结构化判断或一次能力调用准备。
-- 每轮能力调用仍保持单能力语义：选择一个 `capability`，执行一个 skill 或 subgraph，得到一个 `result_package`，再由后续节点评估是否继续。
-- 顶层模板应优先用子图表达稳定能力段，例如上下文装配、需求理解、能力循环和最终回复。自我复盘属于回复后的后台模板，这样顶层图保留可读主干，细节仍可双击进入子图审查和编辑。
-
-完整目标流程：
-
-```text
-用户消息、页面上下文、历史、Buddy Home
-  -> buddy_home_files_input
-  -> buddy_request_intake
-  -> needs_capability
-  -> 需要能力时进入 buddy_capability_cycle，否则直接进入 buddy_final_response
-  -> buddy_final_response
-  -> output 只展示最终回复
-  -> 前端用主运行快照启动后台 buddy_self_review
-```
-
-当前模板包含的公开输入 state：
-
-- `user_message`：当前用户消息。
-- `conversation_history`：进入上下文的近期对话。
-- `page_context`：当前页面或编辑器上下文。
-- `buddy_mode`：伙伴运行模式。
-- `buddy_context`：`file` 类型，默认由 `input_buddy_context` 以 `kind=local_folder` 读取 `buddy_home/` 中勾选的 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md` 和 `policy.json`，由统一文件 state prompt 展开逻辑注入下游 LLM。
-
-当前模板包含的核心内部 state：
-
-- `request_understanding`：需求理解、任务类型、是否需要能力、是否需要澄清、风险等级和原因。
-- `clarification_prompt`：需要向用户补充询问的问题。
-- `clarification_answer`：用户在断点恢复时写入的澄清回答。
-- `selected_capability`：`capability` 类型，来自 `toograph_capability_selector`。
-- `capability_found`：是否找到了启用的能力。
-- `capability_gap`：找不到合适能力时的结构化缺口，包含缺口类型、原因、建议资产形态、构建需求，以及是否应向用户询问构建能力。
-- `capability_trace`：多轮能力循环的步骤摘要列表，用于最终回复和后续自我复盘，避免只保留最后一次 `capability_result`。
-- `capability_result`：`result_package` 类型，动态能力执行唯一输出。
-- `capability_review`：对结果包的评估，包括是否足够、是否继续、失败是否可恢复、下一轮需求。
-- `memory_update_plan`：是否需要写回记忆、会话摘要或用户资料。
-- `buddy_evolution_plan`：是否需要写入自我复盘、能力使用统计、改进建议或待审查队列。
-- `final_reply`：唯一用户可见最终回复。
-
-推荐节点职责：
-
-- `understand_request`：读取用户消息、历史、页面上下文、伙伴资料、策略、记忆和会话摘要，写 `request_understanding`。它不执行能力。
-- `need_clarification`：condition。需要澄清时进入 `ask_clarification`，否则输出请求理解。
-- `ask_clarification`：写 `clarification_prompt` 并设置 `interrupt_after`。伙伴页面应把用户下一条输入作为 `clarification_answer` 恢复运行，而不是开启新一轮。
-- `merge_clarification`：把澄清回答合入 `request_understanding` 或写新的确认需求摘要。
-- `needs_capability`：顶层 condition。读取 `request_understanding.requires_capability`；简单闲聊、身份询问、页面解释等可直接回答的请求绕过能力循环，避免无意义地选择能力和检查权限。
-- `select_capability`：静态绑定 `toograph_capability_selector`，根据需求选择一个启用的图模板或 Skill。图模板优先，找不到则输出 `{ "kind": "none" }` 和 `capability_found=false`。
-- `capability_found`：condition。未找到能力时进入直接回复或缺失能力说明；找到能力时进入 `execute_capability`。低层写文件、删改文件或执行脚本的确认不属于这个 condition，由运行时权限原语处理。
-- `review_missing_capability`：当选择器返回 `{ "kind": "none" }` 时，写 `capability_review` 与 `capability_gap`。普通任务缺能力时只向用户提出是否构建；只有用户明确要求创建能力或请求本身就是构建能力时，才标记可进入构建流程。
-- 能力循环不再包含模板内的低层审批节点。写文件、删改文件或执行脚本由运行时根据当前图或 Buddy 的 `需确认` / `完全访问` 模式暂停或自动继续；LLM 节点只负责开放性确认、方案审查和最终解释。
-- `execute_capability`：读取 `selected_capability`。该节点只负责生成目标能力的公开输入；runtime 执行 skill 或动态 subgraph，并只写一个 `capability_result`。
-- `review_capability_result`：读取拆包后的 `capability_result`，判断是否已经足够、是否需要继续另一个能力、是否需要向用户解释失败或请求更多信息。
-- `continue_capability_loop`：condition。需要继续时回到 `select_capability`，达到 `loopLimit` 时进入最终回复。循环上限是正式行为，不是错误；达到上限时必须用已有信息收束。
-- `draft_final_reply`：只生成 `final_reply`，不再执行能力或写长期状态。
-- `decide_memory_update`：判断是否需要写回伙伴记忆、资料或会话摘要。这个判断必须显式可见。
-- `review_memory_update`：需要写入长期数据时设置断点，展示拟写入内容和理由。
-- `write_memory_update`：通过受控 Skill 或后续正式命令流执行写回。不能由 output 节点或伙伴前端直接静默写。
-- `review_buddy_evolution`：作为 `buddy_self_review` 子图的一部分，判断是否需要记录能力使用统计、失败模式、模板选择偏好或未来改进建议。它不应静默修改官方模板或官方 Skill。
-- `output_final`：只展示 `final_reply`，不连接中间能力结果、审查 JSON 或内部草稿。
-
-退出条件：
-
-- 已能回答，进入 `draft_final_reply`。
-- 用户拒绝澄清、拒绝授权或取消本轮运行。
-- `capability_found=false` 且当前需求可以直接解释或建议下一步。
-- 工具或子图失败，且 `review_capability_result` 判断不可恢复。
-- 达到 `continue_capability_loop.loopLimit`，用已有信息收束并说明限制。
-- 风险超过当前策略或权限边界，生成拒绝或降级回复。
-
-## 伙伴页面断点交互
-
-伙伴页面和伙伴浮窗不应发明第二套断点协议。标准状态仍是 graph run 的 `awaiting_human`，恢复仍走 `/api/runs/{run_id}/resume`，展示模型应复用编辑器 Human Review 的 state 分组、必填校验、子图 scope path 和 resume payload 构造逻辑。
-
-伙伴浮窗运行到 `awaiting_human` 时：
-
-- 不能把本轮当作完成，也不能继续消费后续队列消息。
-- 当前 assistant 消息应变成“等待你确认/补充”的暂停卡片，而不是普通最终回复。
-- 底部输入在暂停时锁定并提示用户回到暂停卡片；用户只能在卡片内选择执行当前方案或补充某个字段，补充内容会作为 resume payload 写入断点所需 state。
-- 如果用户确实要开始新问题，必须有明确操作，例如“取消本次运行并作为新问题发送”，避免把新问题误塞进旧断点。
-- 面板应显示暂停节点名称、暂停原因、需要补充的字段、当前产生的内容和相关上下文。
-- 暂停卡片应先展示当前已产出的信息、相关上下文和子图路径，再展示“执行 / 补充”操作和单一补充输入，避免用户先看到多个空输入框才知道要回应什么。
-- 对权限、写文件、执行脚本、联网、图编辑、记忆写入等操作，卡片必须展示能力名称、权限类型、拟执行摘要、影响路径或目标对象，并提供继续、拒绝和查看详情。
-- 对澄清类断点，卡片展示问题和可编辑回答；恢复后图继续运行，而不是让伙伴前端自己总结。
-- 对子图内部断点，卡片显示路径，例如 `伙伴主循环 / 创建自定义 Skill / review_generated_skill`，并展示内部节点需要的 state。
-
-伙伴页面应增加“运行与确认”视图：
-
-- 展示当前 `origin=buddy` 且状态为 `awaiting_human`、`running`、`failed` 的最近 run。
-- 允许恢复暂停 run、拒绝或取消当前 run、打开完整运行详情。
-- 页面刷新后可以找回未处理的暂停 run。
-- 断点详情使用与编辑器 Human Review 一致的数据模型，但布局应更适合聊天场景：默认只展示必填与当前节点产物，其他 state 折叠。
-
-动态子图断点已经具备基础暂停/恢复语义。静态 Subgraph 节点和动态 `capability.kind=subgraph` 都会通过 `pending_subgraph_breakpoint` 进入父级 run 的标准 `awaiting_human` 路径；后续重点是把它们在运行详情和伙伴页面中展示得更完整：
-
-- 动态子图内部遇到 `interrupt_after` 时，父级 Buddy run 进入 `awaiting_human`。
-- 父 run 元数据需要继续完善子图节点、内部节点、scope path、内部 state、内部 node executions 和 checkpoint metadata 的展示与审计聚合。
-- 恢复时仍通过父 run 的 resume API，把 resume payload 转交给内部子图 checkpoint。
-- 动态子图完成后，仍按现有 `result_package.outputs.<outputKey> = { name, description, type, value }` 封包，不额外添加 `fieldKey`。
-
-## 当前实现顺序
-
-当前不再需要重建伙伴主循环模板。后续应在已有 `buddy_autonomous_loop`、`buddy_self_review`、统一 Skill 运行时和 graph run 协议上继续补齐能力，优先级如下：
-
-1. 伙伴运行来源巩固：保持 Buddy 图运行统一以 `metadata.origin=buddy` 和显式策略字段表达来源、权限和审计语义，并补齐相关运行详情与伙伴页面展示。
-2. 伙伴暂停交互剩余项：浮窗补齐拒绝、取消、刷新找回和队列策略；伙伴页面补齐运行与确认视图，并复用标准 `awaiting_human` / `/api/runs/{run_id}/resume`。
-3. 动态能力审批体验：补齐拒绝、取消、刷新找回、审批详情页和低层操作摘要；当前最小闭环已经能让涉及写文件、删除类权限或 `subprocess` 的 Skill 按权限模式进入标准 `awaiting_human` 或自动放行。
-4. Buddy Home 写回：把记忆、用户资料、会话摘要、能力使用统计、报告和策略建议写成显式图流程，通过受控 Skill、command、revision 和审批路径落地。
-5. 图编辑命令流：清理或重建 `graph_patch.draft` stub，补齐 GraphCommandBus、图补丁预览、graph revision、undo/redo 和完整审计。
-6. 子图运行详情：补齐父子图运行审计聚合、动态子图断点定位、scope path 展示和从缩略图跳转到内部节点。
-7. 低层活动事件：补齐统一 `activity_events`，让文件读取、搜索、命令执行、脚本测试、写入、下载、图编辑和 Skill/subgraph 执行都能产生程序化摘要。
-8. 命名收束：将内部 `agent` kind 逐步迁移为 LLM 节点语义，避免新文档、新模板和新 UI 继续使用单节点 Agent 心智。
-9. 测试补齐：覆盖伙伴拒绝/取消/刷新恢复、权限拒绝、循环上限、Buddy Home 写回、活动事件、图补丁审计、运行详情中的子图断点展示和最终回复唯一 output。
+内部后台复盘模板。它应继续：
+
+- 从主 run snapshot 读取用户消息、历史、页面上下文、Buddy Home、请求理解、能力结果、复盘和最终回复。
+- 产出 `memory_update_plan` 和 `buddy_evolution_plan`。
+- 不直接写 Buddy Home。
+- 不进入普通模板列表和能力选择候选。
+
+### `toograph_skill_creation_workflow`
+
+创建用户 Skill 的显式图流程。它应继续：
+
+- 检查已有能力。
+- 澄清需求。
+- 确认示例输入输出。
+- 生成 Skill 文件内容。
+- 测试脚本或生命周期入口。
+- 失败后回环修复。
+- 写入前审查。
+- 用户批准后通过受控 Skill 写入 `skill/user/<skill_key>/`。
+
+### `advanced_web_research_loop`
+
+高级联网搜索模板。它不是 Buddy 主循环，但可作为联网研究子流程参考：
+
+- 搜索词由绑定 `web_search` 的 LLM 节点运行时生成。
+- 搜索结果以文件 artifact 形式传给下游 LLM。
+- condition 回边控制补搜，`exhausted` 用已有证据收束。
+- 模板只公开 `final_reply`。
+
+## 近期优先级
+
+1. 巩固当前 `buddy_autonomous_loop`：确认澄清暂停真实使用 `interrupt_after`，能力循环继续保持单 `capability` state 和单 `result_package` 输出。
+2. 补统一 `activity_events`：先覆盖 Skill 执行、文件写入、命令执行、`web_search` 下载、图编辑草案。
+3. 补悬浮窗拒绝、取消、刷新找回和暂停期间队列策略：暂停卡片从“只能继续”升级为“执行当前方案 / 补充内容 / 拒绝 / 取消”。
+4. 建 Buddy Home 写回模板和 writer Skill：让后台复盘计划进入显式审批写回。
+5. 重建图编辑命令流：替代历史 `graph_patch.draft` stub，补齐 diff、validator、GraphCommandBus、revision、undo/redo 和审计。
+6. 完善父子图运行详情：父子事件统一时间线、`subgraph_path` 定位、动态子图断点展示、内部 artifact 和权限归属。
+7. 增强能力选择审计：候选数量、被拒绝候选简短原因、选中能力权限摘要、置信度或缺口说明。
+8. 做上下文压缩和结果预算：长历史摘要、`result_package` 展开预算、大日志/大文件摘要策略。
+9. 再考虑图级并行执行：先做固定 fanout 和只读子图试点，不要把 `capability` 改成列表。
+10. 迁移内部 `agent` kind 命名到 LLM 节点语义，同时保持单一图协议。
 
 ## 非目标
 
-当前不做：
-
-- 让 prompt 直接决定权限。
-- 让 function call 绕过 TooGraph skill registry。
-- 让伙伴静默安装、启用或运行新 skill。
-- 让伙伴直接改 DOM 或模拟用户点击。
-- 建立第二套独立于 TooGraph skill 系统的插件系统。
-- 把临时日志、原始报错、大媒体、base64、下载全文或可从当前图重新读取的信息写入长期记忆。
-- 把官方图模板、官方 Skill 或用户自定义 Skill 本体复制进 Buddy Home。
+- 不做隐藏 Buddy 专用 agent runtime。
+- 不做 monolithic `self_evolve` Skill。
+- 不让 Skill 拥有多轮自治、最终回复或长期记忆策略。
+- 不用 prompt 文本代替权限系统。
+- 不让后台复盘静默修改 Buddy Home、官方模板或官方 Skill。
+- 不把 `capability` 改成列表。
+- 不把 output 节点用于持久化副作用。
+- 不为了并行牺牲 state_schema、审计和可恢复性。
 
 ## 文档维护规则
 
-- 本文是伙伴自主 Agent 方向的唯一长期参考。
-- 当前状态快照写入 `docs/current_project_status.md`。
-- 阶段性计划完成后，不保留独立计划文档；把仍然有效的结论折回本文。
-- 被本文覆盖的旧路线文档应删除。
+- 本文是 Buddy 自主 Agent 方向的唯一长期方针。
+- `docs/current_project_status.md` 记录当前实现快照；本文记录方向、原则和目标结构。
+- 阶段性调研、临时设计和完成记录应在有效内容折叠进本文或当前状态后删除。
+- `docs/future/` 不保留一事一议的调研文档。
+- 若本文和 `AGENTS.md` 冲突，以 `AGENTS.md` 的图优先、显式能力、显式权限、artifact 输出、审计和记忆卫生准则为准，并尽快修正文档。

@@ -21,23 +21,12 @@
 
 - [future/buddy-autonomous-agent-roadmap.md](future/buddy-autonomous-agent-roadmap.md)
   - 伙伴、自主工具循环、技能生成和长期协作能力的唯一长期参考
-  - 包含 graph-first 运行模型、可追踪资产与本地设置分离、Buddy Home、伙伴循环子图化、子图组件、skill manifest 契约、`capability` state、`result_package` 动态结果包、技能说明胶囊、技能绑定 state、能力选择、Skill 生成能力、伙伴断点交互、已落地基线、剩余优先级、活动事件和 function call 取舍
-
-- [future/hermes-agent-message-loop-reference.md](future/hermes-agent-message-loop-reference.md)
-  - `demo/hermes-agent/` 从收到一条消息到最终回复、工具循环、流式输出、压缩、记忆和后台复盘的源码级拆解
-  - 作为 Buddy 自主循环的能力参考，明确哪些 Hermes 机制适合翻译为 TooGraph 图协议、运行事件、审批和后台模板
-
-- [future/claude-code-message-loop-reference.md](future/claude-code-message-loop-reference.md)
-  - `demo/claude-code-source/` 从收到一条消息到 REPL/headless/SDK 输入、模型流、工具执行、权限、持久化和最终回复的源码级拆解
-  - 作为 Buddy 快速响应和事件化运行体验的参考，明确哪些 Claude Code 机制适合翻译为 TooGraph 图模板、`activity_events`、暂停恢复和审计记录
-
-- [future/buddy-agent-loop-graph-template-design.md](future/buddy-agent-loop-graph-template-design.md)
-  - 综合 Hermes Agent 和 Claude Code 的优点，提出伙伴 Agent 循环的 TooGraph 图模板搭建方案
-  - 细化顶层模板、子图边界、节点契约、暂停恢复、悬浮窗体验、并行加速机会和当前图系统缺口
+  - 已合并 Hermes Agent、Claude Code 和伙伴循环模板调研中的有效结论，包含目标主模板、子图边界、节点契约、`capability` / `result_package` 协议、暂停恢复、悬浮窗体验、并行策略、Buddy Home 写回、活动事件、图编辑命令流和近期优先级
 
 ## 已清理
 
 - 迁移闭环记录：`task_plan.md`、`findings.md`、`progress.md`
+- Hermes Agent、Claude Code 和伙伴循环模板的一次性调研/设计文档，已折叠进 `docs/future/buddy-autonomous-agent-roadmap.md`
 - 已完成的 agent-only LangGraph runtime 规划文档
 - 已完成或偏离当前 `skill/official` / `skill/user` 资产目录主线的旧 skill 重构文档
 - 阶段性的外部 Agent 框架对标和 LangGraph 高级能力基线分析
