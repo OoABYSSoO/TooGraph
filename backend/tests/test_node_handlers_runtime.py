@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -148,6 +149,62 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["warnings"], ["warn"])
         self.assertEqual(result["final_result"], "value")
         self.assertEqual(finalized, {"answer": "value"})
+
+    def test_execute_agent_node_records_skill_activity_event(self) -> None:
+        state_schema = {
+            "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "writer",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "question"}],
+                "writes": [{"state": "answer"}],
+                "config": {"skillKey": "custom"},
+            }
+        )
+        recorded_events: list[dict[str, Any]] = []
+
+        def record_activity_event_func(state: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+            recorded_events.append(kwargs)
+            return {"sequence": len(recorded_events), **kwargs}
+
+        execute_agent_node(
+            state_schema,
+            node,
+            {"question": "q"},
+            {"state": {}},
+            node_name="writer",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {"custom": object()},
+            invoke_skill_func=lambda skill_func, skill_inputs: {"echo": skill_inputs["question"]},
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_skill_inputs_func=pass_through_skill_inputs_func,
+            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+                {"answer": "value"},
+                "",
+                [],
+                runtime_config,
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+            record_activity_event_func=record_activity_event_func,
+        )
+
+        self.assertEqual(len(recorded_events), 1)
+        event = recorded_events[0]
+        self.assertEqual(event["kind"], "skill_invocation")
+        self.assertEqual(event["node_id"], "writer")
+        self.assertEqual(event["status"], "succeeded")
+        self.assertEqual(event["summary"], "Skill 'custom' succeeded.")
+        self.assertEqual(event["detail"]["skill_key"], "custom")
+        self.assertEqual(event["detail"]["binding_source"], "node_config")
+        self.assertEqual(event["detail"]["input_keys"], ["question"])
+        self.assertEqual(event["detail"]["output_keys"], ["echo"])
 
     def test_execute_agent_node_treats_knowledge_base_state_as_normal_skill_input(self) -> None:
         state_schema = {

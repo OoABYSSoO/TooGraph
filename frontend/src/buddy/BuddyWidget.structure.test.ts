@@ -265,6 +265,7 @@ test("BuddyWidget renders assistant replies as safe markdown and keeps a compact
   assert.doesNotMatch(componentSource, /const runTraceEntries = ref<BuddyRunTraceEntry\[\]>\(\[\]\);/);
   assert.match(componentSource, /resolveBuddyRunTraceFromRunEvent/);
   assert.match(componentSource, /appendRunTraceEntry\(eventType, traceEntry\);/);
+  assert.match(componentSource, /addEventListener\("activity\.event"/);
   assert.match(componentSource, /v-for="entry in visibleRunTraceEntries\(message\)"/);
   assert.match(componentSource, /\.buddy-widget__run-trace-body[\s\S]*max-height:\s*calc\(1 \* 1\.45em \+ 14px\);[\s\S]*overflow:\s*hidden;/);
   assert.match(componentSource, /\.buddy-widget__run-trace--expanded \.buddy-widget__run-trace-body[\s\S]*max-height:\s*180px;[\s\S]*overflow:\s*auto;/);

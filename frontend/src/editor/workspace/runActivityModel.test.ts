@@ -44,6 +44,35 @@ test("appendRunActivityEvent titles state updates with state names when availabl
   assert.equal(state.entries[0]?.stateKey, "answer");
 });
 
+test("appendRunActivityEvent appends low-level activity events", () => {
+  let state: RunActivityState = { entries: [], autoFollow: true };
+  state = appendRunActivityEvent(state, {
+    eventType: "activity.event",
+    payload: {
+      sequence: 2,
+      kind: "skill_invocation",
+      summary: "Skill 'web_search' succeeded.",
+      node_id: "execute_capability",
+      status: "succeeded",
+      detail: { skill_key: "web_search" },
+      created_at: "2026-05-03T01:00:02Z",
+    },
+  });
+
+  assert.deepEqual(
+    state.entries.map((entry) => ({ kind: entry.kind, title: entry.title, nodeId: entry.nodeId, preview: entry.preview, sequence: entry.sequence })),
+    [
+      {
+        kind: "activity-event",
+        title: "Skill 'web_search' succeeded.",
+        nodeId: "execute_capability",
+        preview: '{\n  "skill_key": "web_search"\n}',
+        sequence: 2,
+      },
+    ],
+  );
+});
+
 test("appendRunActivityEvent updates the current stream entry for repeated node output chunks", () => {
   let state: RunActivityState = { entries: [], autoFollow: true };
   state = appendRunActivityEvent(state, {
@@ -95,6 +124,38 @@ test("buildRunActivityEntriesFromRun replays stored state events for completed r
   assert.deepEqual(
     buildRunActivityEntriesFromRun(run).map((entry) => ({ kind: entry.kind, stateKey: entry.stateKey, preview: entry.preview })),
     [{ kind: "state-updated", stateKey: "answer", preview: "Hello" }],
+  );
+});
+
+test("buildRunActivityEntriesFromRun replays stored low-level activity events", () => {
+  const run = {
+    run_id: "run_1",
+    artifacts: {
+      activity_events: [
+        {
+          node_id: "execute_capability",
+          kind: "skill_invocation",
+          summary: "Skill 'web_search' succeeded.",
+          status: "succeeded",
+          detail: { skill_key: "web_search" },
+          sequence: 1,
+          created_at: "2026-05-03T01:00:02Z",
+        },
+      ],
+    },
+    node_executions: [],
+  } as unknown as RunDetail;
+
+  assert.deepEqual(
+    buildRunActivityEntriesFromRun(run).map((entry) => ({ kind: entry.kind, title: entry.title, nodeId: entry.nodeId, preview: entry.preview })),
+    [
+      {
+        kind: "activity-event",
+        title: "Skill 'web_search' succeeded.",
+        nodeId: "execute_capability",
+        preview: '{\n  "skill_key": "web_search"\n}',
+      },
+    ],
   );
 });
 

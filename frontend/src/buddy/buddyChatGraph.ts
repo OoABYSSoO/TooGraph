@@ -259,6 +259,24 @@ export function resolveBuddyRunTraceFromRunEvent(
   const params = buildBuddyActivityParams(labels);
   const timingKey = buildBuddyTraceTimingKey(nodeId, subgraphNodeId);
   const durationMs = resolveBuddyTraceDurationMs(payload);
+  if (eventType === "activity.event") {
+    const preview = clampBuddyTracePreview(normalizeRunEventText(payload.summary));
+    if (!preview) {
+      return null;
+    }
+    const status = normalizeRunEventText(payload.status).toLowerCase();
+    const failed = status === "failed" || status === "error";
+    const succeeded = status === "succeeded" || status === "success" || status === "ok";
+    return {
+      labelKey: failed ? "buddy.activity.failed" : succeeded ? "buddy.activity.completed" : "buddy.activity.running",
+      params,
+      preview,
+      tone: failed ? "error" : succeeded ? "success" : "info",
+      replaceKey: buildBuddyActivityTraceReplaceKey(payload, nodeId, subgraphNodeId),
+      timingKey,
+      ...(durationMs !== undefined ? { durationMs } : {}),
+    };
+  }
   if (eventType === "node.output.delta") {
     const preview = resolveBuddyRunEventOutputPreview(payload);
     return preview
@@ -529,6 +547,17 @@ function buildBuddyTraceReplaceKey(kind: string, nodeId: string, subgraphNodeId:
 
 function buildBuddyTraceTimingKey(nodeId: string, subgraphNodeId: string) {
   return buildBuddyTraceReplaceKey("stage", nodeId, subgraphNodeId);
+}
+
+function buildBuddyActivityTraceReplaceKey(payload: Record<string, unknown>, nodeId: string, subgraphNodeId: string) {
+  const sequence = normalizeRunEventSequence(payload.sequence);
+  const fallback = normalizeRunEventText(payload.kind) || "event";
+  return `${buildBuddyTraceReplaceKey("activity", nodeId, subgraphNodeId)}:${sequence ?? fallback}`;
+}
+
+function normalizeRunEventSequence(value: unknown) {
+  const sequence = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isFinite(sequence) && sequence > 0 ? Math.round(sequence) : null;
 }
 
 function resolveBuddyTraceDurationMs(payload: Record<string, unknown>) {

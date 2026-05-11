@@ -12,6 +12,7 @@ from app.core.runtime.agent_subgraph_input_generation import (
     SubgraphCapabilityField,
     generate_agent_subgraph_inputs,
 )
+from app.core.runtime.activity_events import record_activity_event
 from app.core.runtime.condition_eval import evaluate_condition_rule, resolve_branch_key
 from app.core.runtime.input_boundary import coerce_input_boundary_value, first_truthy
 from app.core.runtime.reference_resolution import resolve_condition_source
@@ -132,6 +133,7 @@ def execute_agent_node(
     execute_subgraph_capability_func: Callable[..., dict[str, Any]] | None = None,
     finalize_agent_stream_delta_func: Callable[..., None] = finalize_agent_stream_delta,
     first_truthy_func: Callable[..., Any] = first_truthy,
+    record_activity_event_func: Callable[..., dict[str, Any]] = record_activity_event,
 ) -> dict[str, Any]:
     selected_skills: list[str] = []
     selected_capabilities: list[dict[str, str]] = []
@@ -315,6 +317,22 @@ def execute_agent_node(
                 "error": skill_error,
                 "error_type": skill_error_type,
             }
+        )
+        record_activity_event_func(
+            state,
+            kind="skill_invocation",
+            summary=_skill_invocation_activity_summary(skill_key, skill_status),
+            node_id=node_name,
+            status=skill_status,
+            duration_ms=duration_ms,
+            detail={
+                "skill_key": skill_key,
+                "binding_source": resolved_binding.source,
+                "input_keys": sorted(skill_inputs.keys()),
+                "output_keys": sorted(skill_result.keys()),
+                **({"error_type": skill_error_type} if skill_error_type else {}),
+            },
+            error=skill_error,
         )
 
     subgraph_keys = (
@@ -745,6 +763,12 @@ def _resolve_skill_error_type(skill_result: dict[str, Any]) -> str:
     if "required" in error and ("missing" in error or "required input" in error or "query" in error):
         return "missing_required_input"
     return ""
+
+
+def _skill_invocation_activity_summary(skill_key: str, status: str) -> str:
+    if status == "failed":
+        return f"Skill '{skill_key}' failed."
+    return f"Skill '{skill_key}' succeeded."
 
 
 def _compact_text(value: Any) -> str:

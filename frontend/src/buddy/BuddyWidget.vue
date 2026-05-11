@@ -1855,6 +1855,7 @@ function startRunEventStream(runId: string, assistantMessageId: string, graph: G
   eventSource.addEventListener("node.output.delta", (event) => handleStreamingEvent("node.output.delta", event));
   eventSource.addEventListener("node.output.completed", (event) => handleStreamingEvent("node.output.completed", event));
   eventSource.addEventListener("state.updated", (event) => handleStreamingEvent("state.updated", event));
+  eventSource.addEventListener("activity.event", (event) => handleStreamingEvent("activity.event", event));
   eventSource.addEventListener("node.completed", (event) => handleStreamingEvent("node.completed", event));
   eventSource.addEventListener("node.failed", (event) => handleStreamingEvent("node.failed", event));
   eventSource.addEventListener("run.completed", closeEventSource);

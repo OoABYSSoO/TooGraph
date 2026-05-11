@@ -1,6 +1,13 @@
 import type { RunDetail } from "@/types/run";
 
-export type RunActivityKind = "node-started" | "node-stream" | "state-updated" | "node-completed" | "node-failed" | "reasoning";
+export type RunActivityKind =
+  | "node-started"
+  | "node-stream"
+  | "state-updated"
+  | "activity-event"
+  | "node-completed"
+  | "node-failed"
+  | "reasoning";
 export type RunActivityStateNameByKey = Record<string, string | null | undefined>;
 
 export type RunActivityEntry = {
@@ -55,7 +62,7 @@ export function appendRunActivityEvent(
 
 export function buildRunActivityEntriesFromRun(run: RunDetail, stateNameByKey: RunActivityStateNameByKey = {}): RunActivityEntry[] {
   const stateEvents = run.artifacts?.state_events ?? [];
-  return stateEvents.map((event, index) => ({
+  const stateEntries: RunActivityEntry[] = stateEvents.map((event, index) => ({
     id: `state-${event.sequence ?? index + 1}-${event.node_id}-${event.state_key}`,
     kind: "state-updated",
     nodeId: event.node_id,
@@ -66,8 +73,14 @@ export function buildRunActivityEntriesFromRun(run: RunDetail, stateNameByKey: R
     detail: event,
     createdAt: event.created_at ?? "",
     sequence: Number(event.sequence ?? index + 1),
-    active: index === stateEvents.length - 1,
+    active: false,
   }));
+  const activityEvents = run.artifacts?.activity_events ?? [];
+  const activityEntries = activityEvents.map((event, index) =>
+    createActivityEntry(event as Record<string, unknown>, Number(event.sequence ?? index + 1)),
+  );
+  const entries = [...stateEntries, ...activityEntries].sort(compareRunActivityEntries);
+  return entries.map((entry, index) => ({ ...entry, active: index === entries.length - 1 }));
 }
 
 function buildRunActivityEntry(event: RunActivityIncomingEvent, sequence: number, stateNameByKey: RunActivityStateNameByKey): RunActivityEntry | null {
@@ -95,6 +108,9 @@ function buildRunActivityEntry(event: RunActivityIncomingEvent, sequence: number
       createdAt,
     );
   }
+  if (event.eventType === "activity.event") {
+    return createActivityEntry(payload, Number(payload.sequence ?? sequence));
+  }
   if (event.eventType === "node.completed") {
     return createEntry("node-completed", sequence, nodeId, nodeType, null, `${nodeId} completed`, `${Number(payload.duration_ms ?? 0)}ms`, payload, createdAt);
   }
@@ -105,6 +121,22 @@ function buildRunActivityEntry(event: RunActivityIncomingEvent, sequence: number
     return createEntry("reasoning", sequence, nodeId, nodeType, null, `${nodeId} reasoning`, normalizeText(payload.reasoning), payload, createdAt);
   }
   return null;
+}
+
+function createActivityEntry(payload: Record<string, unknown>, sequence: number): RunActivityEntry {
+  const nodeId = normalizeText(payload.node_id);
+  const title = normalizeText(payload.summary) || normalizeText(payload.kind) || "activity event";
+  const preview = formatActivityValue(payload.detail ?? payload.error ?? payload.status);
+  return createEntry("activity-event", sequence, nodeId, null, null, title, preview, payload, normalizeText(payload.created_at));
+}
+
+function compareRunActivityEntries(left: RunActivityEntry, right: RunActivityEntry) {
+  const leftTime = Date.parse(left.createdAt);
+  const rightTime = Date.parse(right.createdAt);
+  if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
+    return leftTime - rightTime;
+  }
+  return left.sequence - right.sequence;
 }
 
 function createEntry(

@@ -134,6 +134,20 @@ export type StateEvent = {
   created_at: string;
 };
 
+export type ActivityEvent = {
+  sequence?: number | null;
+  kind: string;
+  summary: string;
+  node_id?: string | null;
+  subgraph_node_id?: string | null;
+  subgraph_path?: string[];
+  status?: string | null;
+  duration_ms?: number | null;
+  detail?: Record<string, unknown>;
+  error?: string | null;
+  created_at: string;
+};
+
 export type RunSnapshot = {
   snapshot_id: string;
   kind: string;
@@ -161,6 +175,7 @@ export type RunSnapshotOption = {
 
 export type RunArtifacts = {
   skill_outputs?: Array<Record<string, unknown>>;
+  activity_events?: ActivityEvent[];
   capability_outputs?: Array<Record<string, unknown>>;
   output_previews?: OutputPreview[];
   saved_outputs?: SavedOutputArtifact[];

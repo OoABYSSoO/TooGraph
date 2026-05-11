@@ -146,6 +146,9 @@ export function useWorkspaceRunLifecycleController(input: WorkspaceRunLifecycleC
     source.addEventListener("state.updated", (event) => {
       handleRunEvent(tabId, "state.updated", event, { updateOutputPreview: true });
     });
+    source.addEventListener("activity.event", (event) => {
+      handleRunEvent(tabId, "activity.event", event);
+    });
     source.addEventListener("node.completed", (event) => {
       handleRunEvent(tabId, "node.completed", event);
     });

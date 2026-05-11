@@ -940,6 +940,38 @@ test("resolveBuddyRunTraceFromRunEvent keeps real inner node progress visible", 
   );
 });
 
+test("resolveBuddyRunTraceFromRunEvent renders low-level activity events", () => {
+  const graph = createActivityGraph();
+
+  assert.deepEqual(
+    resolveBuddyRunTraceFromRunEvent(
+      "activity.event",
+      {
+        sequence: 2,
+        kind: "skill_invocation",
+        node_id: "select_capability",
+        subgraph_node_id: "run_capability_cycle",
+        summary: "Skill 'capability_selector' succeeded.",
+        status: "succeeded",
+        duration_ms: 42,
+      },
+      graph,
+    ),
+    {
+      labelKey: "buddy.activity.completed",
+      params: {
+        node: "选择能力",
+        stage: "能力循环",
+      },
+      preview: "Skill 'capability_selector' succeeded.",
+      tone: "success",
+      replaceKey: "activity:run_capability_cycle:select_capability:2",
+      timingKey: "stage:run_capability_cycle:select_capability",
+      durationMs: 42,
+    },
+  );
+});
+
 test("resolveBuddyRunTraceFromRunEvent hides subgraph plumbing from buddy progress", () => {
   const graph = createActivityGraph();
 
