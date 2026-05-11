@@ -23,6 +23,10 @@
   - 伙伴、自主工具循环、技能生成和长期协作能力的唯一长期参考
   - 包含 graph-first 运行模型、可追踪资产与本地设置分离、Buddy Home、伙伴循环子图化、子图组件、skill manifest 契约、`capability` state、`result_package` 动态结果包、技能说明胶囊、技能绑定 state、能力选择、Skill 生成能力、伙伴断点交互、已落地基线、剩余优先级、活动事件和 function call 取舍
 
+- [future/hermes-agent-message-loop-reference.md](future/hermes-agent-message-loop-reference.md)
+  - `demo/hermes-agent/` 从收到一条消息到最终回复、工具循环、流式输出、压缩、记忆和后台复盘的源码级拆解
+  - 作为 Buddy 自主循环的能力参考，明确哪些 Hermes 机制适合翻译为 TooGraph 图协议、运行事件、审批和后台模板
+
 ## 已清理
 
 - 迁移闭环记录：`task_plan.md`、`findings.md`、`progress.md`
