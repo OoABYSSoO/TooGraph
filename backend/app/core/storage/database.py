@@ -17,9 +17,16 @@ MODEL_LOG_DATA_DIR = DATA_DIR / "model_logs"
 DB_PATH = DATA_DIR / "toograph.db"
 
 
+class ManagedConnection(sqlite3.Connection):
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        result = super().__exit__(exc_type, exc_value, traceback)
+        self.close()
+        return bool(result)
+
+
 def get_connection() -> sqlite3.Connection:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DB_PATH)
+    connection = sqlite3.connect(DB_PATH, factory=ManagedConnection)
     connection.row_factory = sqlite3.Row
     ensure_schema(connection)
     return connection
@@ -27,7 +34,7 @@ def get_connection() -> sqlite3.Connection:
 
 def initialize_storage() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DB_PATH)
+    connection = sqlite3.connect(DB_PATH, factory=ManagedConnection)
     connection.row_factory = sqlite3.Row
     try:
         ensure_schema(connection)

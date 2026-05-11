@@ -180,6 +180,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                             "toograph_graph_template_writer",
                             "toograph_skill_builder",
                             "toograph_capability_selector",
+                            "toograph_context_fanout",
                             "toograph_page_operator",
                             "local_workspace_executor",
                             "memory_candidate_writer",

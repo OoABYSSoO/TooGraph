@@ -1,0 +1,145 @@
+{
+  "schemaVersion": "toograph.skill/v1",
+  "skillKey": "toograph_context_fanout",
+  "name": "TooGraph Context Fanout",
+  "description": "Read-only parallel context assembly for Buddy: memory recall, knowledge retrieval, page-context compression, and capability candidate catalog reading with one merge budget report.",
+  "llmInstruction": "你已绑定 TooGraph Context Fanout。根据 fanout_request 和上游状态生成只读上下文装配参数：user_message、conversation_history、page_context、buddy_context、memory_query、memory_scope、knowledge_query、knowledge_base、capability_query、capability_origin、total_budget_chars。该 Skill 只读取记忆、知识库、页面上下文和能力目录，不写入任何状态或文件；输出 context_brief 只能作为 context_only 参考，不能成为权限来源。",
+  "version": "1.0.0",
+  "timeoutSeconds": 30,
+  "permissions": ["memory_read", "knowledge_read", "file_read"],
+  "stateInputSchema": [
+    {
+      "key": "fanout_request",
+      "name": "Fanout Request",
+      "valueType": "json",
+      "description": "当前 Buddy 回合的上下文装配需求、预算和来源约束。"
+    }
+  ],
+  "llmOutputSchema": [
+    {
+      "key": "user_message",
+      "name": "User Message",
+      "valueType": "text",
+      "description": "用户本轮消息。"
+    },
+    {
+      "key": "conversation_history",
+      "name": "Conversation History",
+      "valueType": "markdown",
+      "description": "最近或已压缩的伙伴对话历史。"
+    },
+    {
+      "key": "page_context",
+      "name": "Page Context",
+      "valueType": "markdown",
+      "description": "当前页面、选中图、节点、运行或可见 UI 事实。"
+    },
+    {
+      "key": "buddy_context",
+      "name": "Buddy Context",
+      "valueType": "json",
+      "description": "Buddy Home 文件夹选择包或已读取上下文。"
+    },
+    {
+      "key": "memory_query",
+      "name": "Memory Query",
+      "valueType": "text",
+      "description": "用于平台记忆召回的查询词；为空时使用 user_message。"
+    },
+    {
+      "key": "memory_scope",
+      "name": "Memory Scope",
+      "valueType": "text",
+      "description": "可选记忆作用域，例如 user、project、buddy、template、graph、skill。"
+    },
+    {
+      "key": "knowledge_query",
+      "name": "Knowledge Query",
+      "valueType": "text",
+      "description": "用于知识库检索的查询词；为空时使用 user_message。"
+    },
+    {
+      "key": "knowledge_base",
+      "name": "Knowledge Base",
+      "valueType": "text",
+      "description": "可选知识库 ID。"
+    },
+    {
+      "key": "capability_query",
+      "name": "Capability Query",
+      "valueType": "text",
+      "description": "用于筛选能力候选的需求摘要；为空时使用 user_message。"
+    },
+    {
+      "key": "capability_origin",
+      "name": "Capability Origin",
+      "valueType": "text",
+      "description": "能力目录来源，例如 buddy。"
+    },
+    {
+      "key": "total_budget_chars",
+      "name": "Total Budget Chars",
+      "valueType": "text",
+      "description": "合并 context_brief 的总字符预算，默认 6000。"
+    }
+  ],
+  "stateOutputSchema": [
+    {
+      "key": "success",
+      "name": "Success",
+      "valueType": "boolean",
+      "description": "Fanout 装配是否完成。"
+    },
+    {
+      "key": "context_brief",
+      "name": "Context Brief",
+      "valueType": "json",
+      "description": "预算化合并后的 context_only 上下文摘要。"
+    },
+    {
+      "key": "fanout_context",
+      "name": "Fanout Context",
+      "valueType": "json",
+      "description": "四路只读 fanout 的原始结构化结果和分支状态。"
+    },
+    {
+      "key": "memory_context",
+      "name": "Memory Context",
+      "valueType": "json",
+      "description": "平台记忆召回结果。"
+    },
+    {
+      "key": "knowledge_context",
+      "name": "Knowledge Context",
+      "valueType": "json",
+      "description": "知识库检索结果。"
+    },
+    {
+      "key": "page_context_summary",
+      "name": "Page Context Summary",
+      "valueType": "json",
+      "description": "预算化页面上下文摘要。"
+    },
+    {
+      "key": "capability_candidates",
+      "name": "Capability Candidates",
+      "valueType": "json",
+      "description": "当前启用模板和 Skill 的只读候选目录摘要。"
+    },
+    {
+      "key": "assembly_report",
+      "name": "Assembly Report",
+      "valueType": "json",
+      "description": "预算、分支、冲突和省略项审计报告。"
+    },
+    {
+      "key": "result",
+      "name": "Result",
+      "valueType": "markdown",
+      "description": "Fanout 装配摘要。"
+    }
+  ],
+  "metadata": {
+    "internal": true
+  }
+}

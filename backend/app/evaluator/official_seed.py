@@ -11,6 +11,16 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 DEFAULT_TEMPLATE_ROOT = ROOT_DIR / "graph_template" / "official"
 
 EXECUTABLE_RULE_KEYS = {"must_include", "forbidden", "not_contains"}
+EXECUTABLE_KNOWLEDGE_RETRIEVAL_KEYS = {
+    "min_results",
+    "required_chunk_ids",
+    "required_citation_ids",
+    "required_source_paths",
+    "required_terms",
+    "forbidden_terms",
+    "max_citations",
+    "max_context_chars",
+}
 
 
 def seed_official_eval_suites(template_root: str | Path | None = None) -> dict[str, Any]:
@@ -144,6 +154,8 @@ def _is_executable_check(record: dict[str, Any], kind: str) -> bool:
         return bool(_text(record.get("target"))) and not _descriptive_only(record)
     if kind == "citation":
         return bool(record.get("min_citations")) and not _descriptive_only(record)
+    if kind in {"knowledge_retrieval", "knowledge_context"}:
+        return any(_has_concrete_value(record.get(key)) for key in EXECUTABLE_KNOWLEDGE_RETRIEVAL_KEYS)
     return False
 
 
@@ -179,6 +191,16 @@ def _llm_judge_check(record: dict[str, Any], original_kind: str) -> dict[str, An
 
 def _descriptive_only(record: dict[str, Any]) -> bool:
     return bool(_text(record.get("description") or record.get("expectation")))
+
+
+def _has_concrete_value(value: Any) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, dict)):
+        return bool(value)
+    if isinstance(value, (int, float)):
+        return value > 0
+    return bool(value)
 
 
 def _suite_tags(template_metadata: dict[str, Any]) -> list[str]:

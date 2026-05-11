@@ -30,6 +30,8 @@ def evaluate_case_checks(
             results.append(_evaluate_rule_check(check_record, expected, output, artifact_map))
         elif kind == "citation":
             results.append(_evaluate_citation_check(check_record, expected, output, artifact_map))
+        elif kind in {"knowledge_retrieval", "knowledge_context"}:
+            results.append(_evaluate_knowledge_retrieval_check(check_record, expected, output, artifact_map))
         elif kind in {"llm_judge", "judge"}:
             results.append(
                 _evaluate_llm_judge_check(
@@ -181,6 +183,106 @@ def _evaluate_citation_check(
     )
 
 
+def _evaluate_knowledge_retrieval_check(
+    check: dict[str, Any],
+    expected: dict[str, Any],
+    final_output: dict[str, Any],
+    artifacts: dict[str, Any],
+) -> dict[str, Any]:
+    target_name = _text(check.get("target")) or _text(expected.get("target")) or "knowledge_context"
+    target = _resolve_target(target_name, final_output, artifacts)
+    package = _as_dict(target)
+    results = _knowledge_results(target)
+    citations = _knowledge_citations(package, results)
+    context = _text(package.get("context")) if package else _flatten_text(target)
+    searchable_text = _flatten_text(target)
+
+    min_results = _int_value(check.get("min_results"))
+    if min_results <= 0:
+        min_results = _int_value(expected.get("min_results"))
+    max_citations = _int_value(check.get("max_citations"))
+    if max_citations <= 0:
+        max_citations = _int_value(expected.get("max_citations"))
+    max_context_chars = _int_value(check.get("max_context_chars"))
+    if max_context_chars <= 0:
+        max_context_chars = _int_value(expected.get("max_context_chars"))
+
+    chunk_ids = _dedupe([_text(item.get("chunk_id")) for item in results if _text(item.get("chunk_id"))])
+    citation_ids = _dedupe([_text(item.get("citation_id")) for item in citations if _text(item.get("citation_id"))])
+    source_paths = _knowledge_source_paths(results, citations)
+    required_chunk_ids = _string_list(check.get("required_chunk_ids")) or _string_list(expected.get("required_chunk_ids"))
+    required_citation_ids = _string_list(check.get("required_citation_ids")) or _string_list(
+        expected.get("required_citation_ids")
+    )
+    required_source_paths = _string_list(check.get("required_source_paths")) or _string_list(
+        expected.get("required_source_paths")
+    )
+    required_terms = _string_list(check.get("required_terms")) or _string_list(expected.get("required_terms"))
+    forbidden_terms = (
+        _string_list(check.get("forbidden_terms"))
+        or _string_list(check.get("forbidden"))
+        or _string_list(expected.get("forbidden_terms"))
+        or _string_list(expected.get("forbidden"))
+    )
+
+    missing_chunk_ids = [item for item in required_chunk_ids if item not in chunk_ids]
+    missing_citation_ids = [item for item in required_citation_ids if item not in citation_ids]
+    missing_source_paths = [item for item in required_source_paths if item not in source_paths]
+    missing_terms = _missing_terms(required_terms, searchable_text)
+    forbidden_terms_found = _found_terms(forbidden_terms, searchable_text)
+    context_chars = len(context)
+
+    issues: list[str] = []
+    if min_results > 0 and len(results) < min_results:
+        issues.append(f"Expected at least {min_results} retrieval result(s), found {len(results)}.")
+    if missing_chunk_ids:
+        issues.append(f"Missing required chunk id(s): {', '.join(missing_chunk_ids)}.")
+    if missing_citation_ids:
+        issues.append(f"Missing required citation id(s): {', '.join(missing_citation_ids)}.")
+    if missing_source_paths:
+        issues.append(f"Missing required source path(s): {', '.join(missing_source_paths)}.")
+    if missing_terms:
+        issues.append(f"Missing required retrieval term(s): {', '.join(missing_terms)}.")
+    if forbidden_terms_found:
+        issues.append(f"Forbidden retrieval term(s) found: {', '.join(forbidden_terms_found)}.")
+    if max_citations > 0 and len(citations) > max_citations:
+        issues.append(f"Expected at most {max_citations} citation(s), found {len(citations)}.")
+    if max_context_chars > 0 and context_chars > max_context_chars:
+        issues.append(f"Expected context at most {max_context_chars} char(s), found {context_chars}.")
+
+    passed = not issues
+    return _result(
+        check,
+        status="passed" if passed else "failed",
+        score=1.0 if passed else 0.0,
+        message="Knowledge retrieval check passed." if passed else " ".join(issues),
+        expected={
+            "target": target_name,
+            "min_results": min_results,
+            "required_chunk_ids": required_chunk_ids,
+            "required_citation_ids": required_citation_ids,
+            "required_source_paths": required_source_paths,
+            "required_terms": required_terms,
+            "forbidden_terms": forbidden_terms,
+            "max_citations": max_citations,
+            "max_context_chars": max_context_chars,
+        },
+        actual={
+            "result_count": len(results),
+            "citation_count": len(citations),
+            "context_chars": context_chars,
+            "chunk_ids": chunk_ids,
+            "citation_ids": citation_ids,
+            "source_paths": source_paths,
+            "missing_chunk_ids": missing_chunk_ids,
+            "missing_citation_ids": missing_citation_ids,
+            "missing_source_paths": missing_source_paths,
+            "missing_terms": missing_terms,
+            "forbidden_terms_found": forbidden_terms_found,
+        },
+    )
+
+
 def _evaluate_llm_judge_check(
     case: dict[str, Any],
     check: dict[str, Any],
@@ -326,6 +428,65 @@ def _resolve_path(path: str, value: Any) -> Any:
             continue
         return None
     return current
+
+
+def _knowledge_results(target: Any) -> list[dict[str, Any]]:
+    if isinstance(target, list):
+        return [_as_dict(item) for item in target if isinstance(item, dict)]
+    package = _as_dict(target)
+    return [_as_dict(item) for item in _as_list(package.get("results")) if isinstance(item, dict)]
+
+
+def _knowledge_citations(package: dict[str, Any], results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    citations = [_normalize_knowledge_citation(item) for item in _as_list(package.get("citations"))]
+    citations = [item for item in citations if item]
+    if citations:
+        return citations
+    return [
+        {
+            "citation_id": _text(result.get("citation_id")),
+            "chunk_id": _text(result.get("chunk_id")),
+            "source": _text(result.get("source")),
+            "url": _text(result.get("url")),
+        }
+        for result in results
+        if _text(result.get("citation_id")) or _text(result.get("chunk_id"))
+    ]
+
+
+def _normalize_knowledge_citation(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return _as_dict(value)
+    text = _text(value)
+    return {"citation_id": text} if text else {}
+
+
+def _knowledge_source_paths(results: list[dict[str, Any]], citations: list[dict[str, Any]]) -> list[str]:
+    values: list[str] = []
+    for item in [*results, *citations]:
+        metadata = _as_dict(item.get("metadata"))
+        values.extend(
+            _text(candidate)
+            for candidate in [
+                metadata.get("source_path"),
+                metadata.get("path"),
+                item.get("source_path"),
+                item.get("source"),
+                item.get("url"),
+            ]
+            if _text(candidate)
+        )
+    return _dedupe(values)
+
+
+def _missing_terms(terms: list[str], text: str) -> list[str]:
+    normalized = text.lower()
+    return [term for term in terms if term.lower() not in normalized]
+
+
+def _found_terms(terms: list[str], text: str) -> list[str]:
+    normalized = text.lower()
+    return [term for term in terms if term.lower() in normalized]
 
 
 def _has_value(value: Any) -> bool:

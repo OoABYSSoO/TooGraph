@@ -63,6 +63,51 @@ class OfficialEvalSeedTests(unittest.TestCase):
         self.assertEqual(policy_case["checks"][0]["kind"], "llm_judge")
         self.assertEqual(policy_case["checks"][0]["details"]["original_kind"], "schema")
 
+    def test_seed_official_eval_suites_keeps_executable_knowledge_retrieval_checks(self) -> None:
+        with isolated_eval_database(), tempfile.TemporaryDirectory() as temp_dir:
+            template_root = Path(temp_dir) / "official"
+            template_dir = template_root / "rag_quality_template"
+            template_dir.mkdir(parents=True)
+            (template_dir / "template.json").write_text(
+                """
+                {
+                  "template_id": "rag_quality_template",
+                  "label": "RAG Quality Template",
+                  "description": "Fixture template for RAG eval checks.",
+                  "metadata": {"category": "test"}
+                }
+                """,
+                encoding="utf-8",
+            )
+            (template_dir / "eval_cases.json").write_text(
+                """
+                {
+                  "suite_id": "rag_quality_template_official",
+                  "cases": [
+                    {
+                      "case_id": "refund-retrieval-quality",
+                      "checks": [
+                        {
+                          "kind": "knowledge_retrieval",
+                          "target": "knowledge_context",
+                          "min_results": 1,
+                          "required_chunk_ids": ["refund-policy#rules"],
+                          "required_terms": ["refund"]
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """,
+                encoding="utf-8",
+            )
+
+            seed_official_eval_suites(template_root)
+            case = store.load_eval_case("rag_quality_template_official", "refund-retrieval-quality")
+
+        self.assertEqual(case["checks"][0]["kind"], "knowledge_retrieval")
+        self.assertEqual(case["checks"][0]["required_chunk_ids"], ["refund-policy#rules"])
+
 
 if __name__ == "__main__":
     unittest.main()

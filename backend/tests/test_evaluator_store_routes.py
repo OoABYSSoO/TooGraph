@@ -419,6 +419,129 @@ class EvaluatorStoreRouteTests(unittest.TestCase):
         self.assertEqual(results[2]["actual"]["forbidden_found"], [])
         self.assertEqual(results[3]["actual"]["citation_count"], 2)
 
+    def test_eval_check_executor_evaluates_knowledge_retrieval_quality(self) -> None:
+        case = {
+            "case_id": "refund_policy_retrieval",
+            "checks": [
+                {
+                    "kind": "knowledge_retrieval",
+                    "name": "Refund policy retrieval quality",
+                    "target": "knowledge_context",
+                    "min_results": 2,
+                    "required_chunk_ids": ["refund-policy#rules"],
+                    "required_citation_ids": ["kb:hybrid-test:1"],
+                    "required_source_paths": ["docs/policies/refund.md"],
+                    "required_terms": ["Refund audit policy", "human review"],
+                    "forbidden_terms": ["unverified shortcut"],
+                    "max_citations": 3,
+                    "max_context_chars": 900,
+                }
+            ],
+        }
+
+        results = evaluate_case_checks(
+            case,
+            final_output={
+                "knowledge_context": {
+                    "result_count": 2,
+                    "context": (
+                        "Refund audit policy requires support tickets and human review before approval. "
+                        "Evidence must stay citation-ready."
+                    ),
+                    "results": [
+                        {
+                            "citation_id": "kb:hybrid-test:1",
+                            "chunk_id": "refund-policy#rules",
+                            "title": "Refund Policy",
+                            "source": "https://example.test/refund",
+                            "summary": "Refund audit policy",
+                            "metadata": {"source_path": "docs/policies/refund.md"},
+                            "retrieval": {"mode": "hybrid", "keyword_score": 1.0, "vector_score": 0.77},
+                        },
+                        {
+                            "citation_id": "kb:hybrid-test:2",
+                            "chunk_id": "refund-policy#evidence",
+                            "title": "Refund Evidence",
+                            "source": "docs/policies/refund.md",
+                            "summary": "Evidence requirements",
+                            "metadata": {"source_path": "docs/policies/refund.md"},
+                            "retrieval": {"mode": "hybrid", "keyword_score": 0.8, "vector_score": 0.52},
+                        },
+                    ],
+                    "citations": [
+                        {"citation_id": "kb:hybrid-test:1", "chunk_id": "refund-policy#rules"},
+                        {"citation_id": "kb:hybrid-test:2", "chunk_id": "refund-policy#evidence"},
+                    ],
+                }
+            },
+            artifacts={},
+        )
+
+        self.assertEqual(results[0]["status"], "passed")
+        self.assertEqual(results[0]["score"], 1.0)
+        self.assertEqual(results[0]["actual"]["result_count"], 2)
+        self.assertEqual(results[0]["actual"]["citation_count"], 2)
+        self.assertEqual(results[0]["actual"]["missing_chunk_ids"], [])
+        self.assertEqual(results[0]["actual"]["missing_citation_ids"], [])
+        self.assertEqual(results[0]["actual"]["missing_source_paths"], [])
+        self.assertEqual(results[0]["actual"]["missing_terms"], [])
+        self.assertEqual(results[0]["actual"]["forbidden_terms_found"], [])
+
+    def test_eval_check_executor_reports_knowledge_retrieval_quality_failures(self) -> None:
+        case = {
+            "case_id": "weak_refund_retrieval",
+            "checks": [
+                {
+                    "kind": "knowledge_retrieval",
+                    "name": "Weak retrieval quality",
+                    "target": "knowledge_context",
+                    "min_results": 2,
+                    "required_chunk_ids": ["refund-policy#rules"],
+                    "required_citation_ids": ["kb:hybrid-test:1"],
+                    "required_source_paths": ["docs/policies/refund.md"],
+                    "required_terms": ["Refund audit policy"],
+                    "forbidden_terms": ["unverified shortcut"],
+                    "max_citations": 1,
+                    "max_context_chars": 30,
+                }
+            ],
+        }
+
+        results = evaluate_case_checks(
+            case,
+            final_output={
+                "knowledge_context": {
+                    "context": "Release notes mention an unverified shortcut for dashboards.",
+                    "results": [
+                        {
+                            "citation_id": "kb:hybrid-test:9",
+                            "chunk_id": "release-notes#overview",
+                            "title": "Release Notes",
+                            "source": "docs/releases/may.md",
+                            "metadata": {"source_path": "docs/releases/may.md"},
+                        }
+                    ],
+                    "citations": [
+                        {"citation_id": "kb:hybrid-test:9"},
+                        {"citation_id": "kb:hybrid-test:10"},
+                    ],
+                }
+            },
+            artifacts={},
+        )
+
+        actual = results[0]["actual"]
+        self.assertEqual(results[0]["status"], "failed")
+        self.assertIn("Expected at least 2 retrieval result", results[0]["message"])
+        self.assertEqual(actual["result_count"], 1)
+        self.assertEqual(actual["citation_count"], 2)
+        self.assertEqual(actual["missing_chunk_ids"], ["refund-policy#rules"])
+        self.assertEqual(actual["missing_citation_ids"], ["kb:hybrid-test:1"])
+        self.assertEqual(actual["missing_source_paths"], ["docs/policies/refund.md"])
+        self.assertEqual(actual["missing_terms"], ["Refund audit policy"])
+        self.assertEqual(actual["forbidden_terms_found"], ["unverified shortcut"])
+        self.assertGreater(actual["context_chars"], 30)
+
     def test_eval_check_executor_reports_failed_rule_and_missing_artifact(self) -> None:
         case = {
             "case_id": "unsafe_answer",
@@ -682,8 +805,8 @@ class EvaluatorStoreRouteTests(unittest.TestCase):
         self.assertEqual(case_response.status_code, 200)
         self.assertEqual(run_response.status_code, 200)
         self.assertEqual(result_response.status_code, 200)
-        self.assertEqual(suites_response.json()[0]["suite_id"], "template_quality")
-        self.assertEqual(suites_response.json()[0]["case_count"], 1)
+        suites_by_id = {suite["suite_id"]: suite for suite in suites_response.json()}
+        self.assertEqual(suites_by_id["template_quality"]["case_count"], 1)
         self.assertEqual(run_detail_response.json()["status"], "passed")
         self.assertEqual(run_detail_response.json()["case_results"][0]["graph_run_id"], "run_policy_1")
         self.assertEqual(run_detail_response.json()["case_results"][0]["check_results"][0]["kind"], "citation")

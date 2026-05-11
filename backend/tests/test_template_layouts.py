@@ -23,11 +23,13 @@ def _read_contracts(reads: list[dict]) -> list[dict]:
 
 
 BUDDY_INTERNAL_TEMPLATE_IDS = {
+    "buddy_context_fanout",
     "buddy_request_intake",
     "buddy_autonomous_review",
 }
 
 BUDDY_MAIN_LOOP_SUBGRAPH_TEMPLATE_IDS = {
+    "buddy_context_fanout": "buddy_context_fanout",
     "buddy_turn_intake": "buddy_request_intake",
     "buddy_capability_loop": "buddy_capability_loop",
 }
@@ -1745,6 +1747,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template["metadata"]["origin"], "buddy")
         self.assertEqual(states["buddy_context"]["type"], "file")
         self.assertEqual(states["context_brief"]["type"], "json")
+        self.assertEqual(states["fanout_context"]["type"], "json")
+        self.assertEqual(states["fanout_assembly_report"]["type"], "json")
         self.assertEqual(states["task_plan"]["type"], "json")
         self.assertEqual(states["selected_capability"]["type"], "capability")
         self.assertEqual(states["capability_found"]["type"], "boolean")
@@ -1770,11 +1774,12 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "subgraph"],
             [
+                "buddy_context_fanout",
                 "buddy_turn_intake",
                 "buddy_capability_loop",
             ],
         )
-        self.assertEqual(nodes["buddy_context_recall"]["kind"], "agent")
+        self.assertNotIn("buddy_context_recall", nodes)
         self.assertEqual(nodes["buddy_task_plan"]["kind"], "agent")
         self.assertEqual(nodes["buddy_final_reply"]["kind"], "agent")
         self.assertEqual(
@@ -1798,7 +1803,7 @@ class TemplateLayoutTests(unittest.TestCase):
             "input_conversation_history": {"x": 80, "y": 516},
             "input_page_context": {"x": 80, "y": 932},
             "input_buddy_context": {"x": 80, "y": 1348},
-            "buddy_context_recall": {"x": 660, "y": 360},
+            "buddy_context_fanout": {"x": 660, "y": 360},
             "buddy_turn_intake": {"x": 1240, "y": 360},
             "needs_task_plan": {"x": 1820, "y": 360},
             "buddy_task_plan": {"x": 2476, "y": 120},
@@ -1824,8 +1829,8 @@ class TemplateLayoutTests(unittest.TestCase):
             nodes["needs_capability"]["config"]["rule"],
             {"source": "$state.request_understanding.requires_capability", "operator": "==", "value": True},
         )
-        self.assertIn({"source": "input_buddy_context", "target": "buddy_context_recall"}, template["edges"])
-        self.assertIn({"source": "buddy_context_recall", "target": "buddy_turn_intake"}, template["edges"])
+        self.assertIn({"source": "input_buddy_context", "target": "buddy_context_fanout"}, template["edges"])
+        self.assertIn({"source": "buddy_context_fanout", "target": "buddy_turn_intake"}, template["edges"])
         self.assertIn({"source": "buddy_turn_intake", "target": "needs_task_plan"}, template["edges"])
         self.assertIn({"source": "buddy_task_plan", "target": "needs_capability"}, template["edges"])
         self.assertIn({"source": "buddy_capability_loop", "target": "should_pass_through_capability_result"}, template["edges"])
@@ -1879,11 +1884,40 @@ class TemplateLayoutTests(unittest.TestCase):
             buddy_context_node["config"]["value"]["selected"],
             ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md", "policy.json"],
         )
-        context_node = nodes["buddy_context_recall"]
-        self.assertEqual(context_node["config"]["skillKey"], "")
-        self.assertIn("context_only", context_node["config"]["taskInstruction"])
+        context_node = nodes["buddy_context_fanout"]
+        self.assertEqual(context_node["kind"], "subgraph")
+        self.assertEqual(context_node["config"]["graph"]["metadata"]["role"], "buddy_context_fanout")
         self.assertIn({"state": "buddy_context", "required": True}, _read_contracts(context_node["reads"]))
-        self.assertIn({"state": "context_brief", "mode": "replace"}, nodes["buddy_context_recall"]["writes"])
+        self.assertIn({"state": "context_brief", "mode": "replace"}, context_node["writes"])
+        self.assertIn({"state": "fanout_context", "mode": "replace"}, context_node["writes"])
+        self.assertIn({"state": "fanout_assembly_report", "mode": "replace"}, context_node["writes"])
+
+        fanout_graph = context_node["config"]["graph"]
+        self.assertNotIn("internal", fanout_graph["metadata"])
+        self.assertEqual(fanout_graph["state_schema"]["context_brief"]["type"], "json")
+        self.assertEqual(fanout_graph["state_schema"]["fanout_context"]["type"], "json")
+        self.assertEqual(fanout_graph["nodes"]["assemble_context_fanout"]["config"]["skillKey"], "toograph_context_fanout")
+        self.assertEqual(
+            fanout_graph["nodes"]["assemble_context_fanout"]["config"]["skillBindings"],
+            [
+                {
+                    "skillKey": "toograph_context_fanout",
+                    "outputMapping": {
+                        "success": "fanout_success",
+                        "context_brief": "context_brief",
+                        "fanout_context": "fanout_context",
+                        "memory_context": "fanout_memory_context",
+                        "knowledge_context": "fanout_knowledge_context",
+                        "page_context_summary": "fanout_page_context_summary",
+                        "capability_candidates": "fanout_capability_candidates",
+                        "assembly_report": "fanout_assembly_report",
+                        "result": "fanout_result",
+                    },
+                }
+            ],
+        )
+        self.assertIn({"source": "input_user_message", "target": "assemble_context_fanout"}, fanout_graph["edges"])
+        self.assertIn({"source": "assemble_context_fanout", "target": "output_context_brief"}, fanout_graph["edges"])
 
         self.assertNotIn("input_visible_page_operation_capability", nodes)
         self.assertNotIn(
