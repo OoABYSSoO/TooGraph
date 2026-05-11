@@ -423,9 +423,15 @@ class TemplateLayoutTests(unittest.TestCase):
         intake_graph = nodes["intake_request"]["config"]["graph"]
         self.assertEqual(intake_graph["metadata"]["interrupt_after"], ["ask_clarification"])
         self.assertEqual(intake_graph["state_schema"]["visible_reply"]["type"], "markdown")
-        self.assertIn({"state": "visible_reply", "mode": "replace"}, nodes["intake_request"]["writes"])
-        self.assertIn({"state": "visible_reply", "mode": "replace"}, intake_graph["nodes"]["understand_request"]["writes"])
-        self.assertIn("visible_reply", intake_graph["nodes"]["understand_request"]["config"]["taskInstruction"])
+        self.assertNotIn({"state": "buddy_context", "required": True}, nodes["intake_request"]["reads"])
+        self.assertNotIn({"source": "input_buddy_context", "target": "intake_request"}, template["edges"])
+        self.assertEqual(nodes["intake_request"]["writes"][0], {"state": "visible_reply", "mode": "replace"})
+        understand_node = intake_graph["nodes"]["understand_request"]
+        self.assertNotIn({"state": "buddy_context", "required": True}, understand_node["reads"])
+        self.assertNotIn({"source": "input_buddy_context", "target": "understand_request"}, intake_graph["edges"])
+        self.assertEqual(understand_node["writes"][0], {"state": "visible_reply", "mode": "replace"})
+        self.assertEqual(understand_node["config"]["thinkingMode"], "low")
+        self.assertIn("visible_reply", understand_node["config"]["taskInstruction"])
         self.assertIn("output_visible_reply", intake_graph["nodes"])
         self.assertEqual(intake_graph["nodes"]["output_visible_reply"]["reads"], [{"state": "visible_reply", "required": False}])
         self.assertEqual(
@@ -486,6 +492,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         draft_graph = nodes["draft_final_response"]["config"]["graph"]
         self.assertEqual([node_id for node_id, node in draft_graph["nodes"].items() if node["kind"] == "output"], ["output_final_reply"])
+        self.assertEqual(draft_graph["nodes"]["draft_final_reply"]["config"]["thinkingMode"], "low")
         self.assertEqual(draft_graph["nodes"]["output_final_reply"]["reads"], [{"state": "final_reply", "required": True}])
 
     def test_buddy_self_review_template_contract(self) -> None:
@@ -504,6 +511,8 @@ class TemplateLayoutTests(unittest.TestCase):
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
             ["output_memory_update_plan", "output_buddy_evolution_plan"],
         )
+        review_graph = nodes["review_buddy_memory"]["config"]["graph"]
+        self.assertEqual(review_graph["nodes"]["decide_memory_update"]["config"]["thinkingMode"], "low")
         self.assertIn({"source": "review_buddy_memory", "target": "output_memory_update_plan"}, template["edges"])
         self.assertIn({"source": "review_buddy_memory", "target": "output_buddy_evolution_plan"}, template["edges"])
 

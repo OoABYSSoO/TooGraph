@@ -25,7 +25,12 @@ logger = logging.getLogger(__name__)
 def list_runs_endpoint(
     graph_name: str = Query(default=""),
     status: str = Query(default=""),
+    include_internal: bool = Query(default=False),
 ) -> list[RunSummary]:
+    raw_runs = list_runs()
+    if not include_internal:
+        raw_runs = [run for run in raw_runs if not _is_internal_run(run)]
+
     runs = [
         RunSummary.model_validate(
             {
@@ -34,7 +39,7 @@ def list_runs_endpoint(
                 "run_snapshot_options": _build_run_snapshot_options(run),
             }
         )
-        for run in list_runs()
+        for run in raw_runs
     ]
     graph_name_query = graph_name.strip().lower()
     status_query = status.strip().lower()
@@ -45,6 +50,13 @@ def list_runs_endpoint(
         runs = [run for run in runs if run.status.lower() == status_query]
 
     return runs
+
+
+def _is_internal_run(run: dict[str, Any]) -> bool:
+    metadata = run.get("metadata")
+    if not isinstance(metadata, dict):
+        return False
+    return metadata.get("internal") is True or metadata.get("role") == "buddy_background_review"
 
 
 @router.get("/{run_id}", response_model=RunDetail)

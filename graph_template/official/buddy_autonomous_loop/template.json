@@ -298,19 +298,15 @@
         {
           "state": "buddy_mode",
           "required": true
-        },
-        {
-          "state": "buddy_context",
-          "required": true
         }
       ],
       "writes": [
         {
-          "state": "request_understanding",
+          "state": "visible_reply",
           "mode": "replace"
         },
         {
-          "state": "visible_reply",
+          "state": "request_understanding",
           "mode": "replace"
         }
       ],
@@ -493,39 +489,6 @@
                 "boundaryType": "text"
               }
             },
-            "input_buddy_context": {
-              "kind": "input",
-              "name": "伙伴上下文",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 60,
-                  "y": 540
-                },
-                "collapsed": false
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "buddy_context",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": {
-                  "kind": "local_folder",
-                  "root": "buddy_home",
-                  "selected": [
-                    "AGENTS.md",
-                    "SOUL.md",
-                    "USER.md",
-                    "MEMORY.md",
-                    "policy.json"
-                  ]
-                },
-                "boundaryType": "file"
-              }
-            },
             "understand_request": {
               "kind": "agent",
               "name": "理解请求",
@@ -553,19 +516,15 @@
                 {
                   "state": "buddy_mode",
                   "required": false
-                },
-                {
-                  "state": "buddy_context",
-                  "required": true
                 }
               ],
               "writes": [
                 {
-                  "state": "request_understanding",
+                  "state": "visible_reply",
                   "mode": "replace"
                 },
                 {
-                  "state": "visible_reply",
+                  "state": "request_understanding",
                   "mode": "replace"
                 }
               ],
@@ -573,10 +532,10 @@
                 "skillKey": "",
                 "skillBindings": [],
                 "skillInstructionBlocks": {},
-                "taskInstruction": "输出 request_understanding JSON。字段必须包含 intent、user_goal、known_inputs、missing_information、needs_clarification(boolean)、clarification_focus、constraints、risk_level、requires_capability(boolean)、direct_answer_possible(boolean)。如果问题可以直接回复且不需要工具，将 requires_capability 设为 false。同时输出 visible_reply Markdown：用一到三句话快速回应用户，说明你已理解请求和下一步会做什么；如果需要澄清，说明需要补充的关键信息；不要声称已经完成尚未执行的动作。",
+                "taskInstruction": "先输出 visible_reply Markdown：用一到三句话快速回应用户，说明你已理解请求和下一步会做什么；如果需要澄清，说明需要补充的关键信息；不要声称已经完成尚未执行的动作。再输出 request_understanding JSON。字段必须包含 intent、user_goal、known_inputs、missing_information、needs_clarification(boolean)、clarification_focus、constraints、risk_level、requires_capability(boolean)、direct_answer_possible(boolean)。如果问题可以直接回复且不需要工具，将 requires_capability 设为 false。",
                 "modelSource": "global",
                 "model": "",
-                "thinkingMode": "high",
+                "thinkingMode": "low",
                 "temperature": 0.1
               }
             },
@@ -766,10 +725,6 @@
             },
             {
               "source": "input_buddy_mode",
-              "target": "understand_request"
-            },
-            {
-              "source": "input_buddy_context",
               "target": "understand_request"
             },
             {
@@ -2145,7 +2100,7 @@
                 "taskInstruction": "撰写 final_reply Markdown。只输出给用户看的最终回复，不输出调试 JSON。若能力未找到或失败，清楚说明当前能做什么和缺少什么；如果 capability_gap.should_offer_build 为 true，询问用户是否要创建对应能力；如果 should_route_to_builder 为 true，说明可以进入能力构建流程但不要假装已经创建。若 capability_result 是结果包，读取拆包后的内容，不要暴露内部字段名，除非网址、文件路径或错误是用户需要的证据。可以用 capability_trace 汇总多轮能力调用，但不要复制大段中间结果。",
                 "modelSource": "global",
                 "model": "",
-                "thinkingMode": "high",
+                "thinkingMode": "low",
                 "temperature": 0.2
               }
             },
@@ -2316,10 +2271,6 @@
     },
     {
       "source": "input_buddy_mode",
-      "target": "intake_request"
-    },
-    {
-      "source": "input_buddy_context",
       "target": "intake_request"
     },
     {
