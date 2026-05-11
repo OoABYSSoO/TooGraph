@@ -353,6 +353,16 @@
               </p>
               <div class="buddy-widget__pause-actions">
                 <ElButton
+                  v-if="pausedBuddyPermissionApproval"
+                  size="small"
+                  type="danger"
+                  plain
+                  :loading="pausedBuddyResumeBusy"
+                  @click="denyPausedBuddyPermissionApproval"
+                >
+                  {{ t("buddy.pause.denyPermission") }}
+                </ElButton>
+                <ElButton
                   size="small"
                   type="primary"
                   :loading="pausedBuddyResumeBusy"
@@ -1319,7 +1329,7 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
   }
 }
 
-async function resumePausedBuddyRun() {
+async function resumePausedBuddyRun(resumePayloadOverride: Record<string, unknown> | null = null) {
   const run = pausedBuddyRun.value;
   const assistantMessageId = pausedBuddyAssistantMessageId.value;
   const sessionId = activeSessionId.value;
@@ -1342,7 +1352,7 @@ async function resumePausedBuddyRun() {
   setAssistantActivityText(assistantMessageId, t("buddy.activity.resuming"));
 
   try {
-    const resumePayload = buildBuddyResumePayloadFromDrafts();
+    const resumePayload = resumePayloadOverride ?? buildBuddyResumePayloadFromDrafts();
     activeAbortController = new AbortController();
     const response = await resumeRun(run.run_id, resumePayload);
     activeRunId.value = response.run_id;
@@ -2122,6 +2132,21 @@ function resetPausedBuddyActionState(model: HumanReviewPanelModel) {
   pausedBuddyActionMode.value = firstRequired ? "supplement" : "execute";
   pausedBuddyTargetKey.value = firstRequired?.key ?? "";
   pausedBuddyInputText.value = firstRequired ? resolvePausedBuddyDraft(firstRequired) : "";
+}
+
+function denyPausedBuddyPermissionApproval() {
+  const approval = pausedBuddyPermissionApproval.value;
+  if (!approval || pausedBuddyResumeBusy.value) {
+    return;
+  }
+  void resumePausedBuddyRun({
+    permission_approval: {
+      decision: "denied",
+      reason: t("buddy.pause.deniedReason", {
+        skill: approval.skillName || approval.skillKey,
+      }),
+    },
+  });
 }
 
 function setPausedBuddyActionMode(mode: PausedBuddyActionMode) {
@@ -3101,6 +3126,8 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__pause-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: flex-end;
 }
 

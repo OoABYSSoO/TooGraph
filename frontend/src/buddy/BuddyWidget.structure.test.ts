@@ -398,6 +398,14 @@ test("BuddyWidget treats awaiting-human graph runs as resumable pause cards", ()
   assert.doesNotMatch(componentSource, /void startBuddySelfReviewRun\(runDetail\);[\s\S]*runDetail\.status === "awaiting_human"/);
 });
 
+test("BuddyWidget can deny a pending permission approval from the pause card", () => {
+  assert.match(componentSource, /v-if="pausedBuddyPermissionApproval"[\s\S]*buddy\.pause\.denyPermission/);
+  assert.match(componentSource, /@click="denyPausedBuddyPermissionApproval"/);
+  assert.match(componentSource, /function denyPausedBuddyPermissionApproval\(\)/);
+  assert.match(componentSource, /permission_approval:\s*\{[\s\S]*decision:\s*"denied"/);
+  assert.match(componentSource, /buddy\.pause\.deniedReason/);
+});
+
 test("BuddyWidget shows pause context before asking for more input", () => {
   const producedTitleIndex = componentSource.indexOf('t("buddy.pause.producedTitle")');
   const requiredTitleIndex = componentSource.indexOf('t("buddy.pause.requiredTitle")');

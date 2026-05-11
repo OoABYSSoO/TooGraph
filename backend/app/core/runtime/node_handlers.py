@@ -228,6 +228,20 @@ def execute_agent_node(
                 approved_inputs = approved_pending.get("skill_inputs")
                 if isinstance(approved_inputs, dict):
                     skill_inputs = dict(approved_inputs)
+                if str(approved_pending.get("status") or "") == "denied":
+                    denial_reason = _compact_text(approved_pending.get("denial_reason")) or "The user denied this permission request."
+                    skill_result = _permission_denied_skill_result(skill_key, denial_reason)
+                else:
+                    skill_invoke_kwargs: dict[str, Any] = {}
+                    if callable_accepts_keyword_func(invoke_skill_func, "context"):
+                        invocation_index = _next_skill_artifact_invocation_index(state, node_name, skill_key)
+                        skill_invoke_kwargs["context"] = create_skill_artifact_context(
+                            run_id=str(state.get("run_id") or "run"),
+                            node_id=node_name,
+                            skill_key=skill_key,
+                            invocation_index=invocation_index,
+                        )
+                    skill_result = invoke_skill_func(skill_func, skill_inputs, **skill_invoke_kwargs)
             else:
                 approval_decision = should_pause_for_skill_permission_approval(
                     state=state,
@@ -262,16 +276,16 @@ def execute_agent_node(
                         "warnings": list(dict.fromkeys(warnings)),
                         "final_result": "",
                     }
-            skill_invoke_kwargs: dict[str, Any] = {}
-            if callable_accepts_keyword_func(invoke_skill_func, "context"):
-                invocation_index = _next_skill_artifact_invocation_index(state, node_name, skill_key)
-                skill_invoke_kwargs["context"] = create_skill_artifact_context(
-                    run_id=str(state.get("run_id") or "run"),
-                    node_id=node_name,
-                    skill_key=skill_key,
-                    invocation_index=invocation_index,
-                )
-            skill_result = invoke_skill_func(skill_func, skill_inputs, **skill_invoke_kwargs)
+                skill_invoke_kwargs: dict[str, Any] = {}
+                if callable_accepts_keyword_func(invoke_skill_func, "context"):
+                    invocation_index = _next_skill_artifact_invocation_index(state, node_name, skill_key)
+                    skill_invoke_kwargs["context"] = create_skill_artifact_context(
+                        run_id=str(state.get("run_id") or "run"),
+                        node_id=node_name,
+                        skill_key=skill_key,
+                        invocation_index=invocation_index,
+                    )
+                skill_result = invoke_skill_func(skill_func, skill_inputs, **skill_invoke_kwargs)
         duration_ms = int((perf_counter() - started_at) * 1000)
         skill_status, skill_error = _resolve_skill_invocation_status(skill_key, skill_result)
         skill_error_type = _resolve_skill_error_type(skill_result)
@@ -763,6 +777,16 @@ def _resolve_skill_error_type(skill_result: dict[str, Any]) -> str:
     if "required" in error and ("missing" in error or "required input" in error or "query" in error):
         return "missing_required_input"
     return ""
+
+
+def _permission_denied_skill_result(skill_key: str, reason: str) -> dict[str, Any]:
+    return {
+        "status": "failed",
+        "error_type": "permission_denied",
+        "error": f"Permission denied for skill '{skill_key}': {reason}",
+        "denial_reason": reason,
+        "recoverable": True,
+    }
 
 
 def _skill_invocation_activity_summary(skill_key: str, status: str) -> str:
