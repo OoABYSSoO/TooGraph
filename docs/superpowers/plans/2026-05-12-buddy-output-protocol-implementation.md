@@ -199,7 +199,7 @@ test("resolveBuddyPublicOutputMessageKind separates text bubbles from cards", ()
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `npm test -- buddyPublicOutput.test.ts`
+Run: `node --test frontend/src/buddy/buddyPublicOutput.test.ts`
 
 Expected: FAIL because `buddyPublicOutput.ts` does not exist.
 
@@ -279,7 +279,7 @@ function resolveDirectUpstreamNodeIds(graph: Pick<GraphPayload, "edges" | "condi
 
 - [ ] **Step 4: Verify binding tests pass**
 
-Run: `npm test -- buddyPublicOutput.test.ts`
+Run: `node --test frontend/src/buddy/buddyPublicOutput.test.ts`
 
 Expected: PASS.
 
@@ -336,7 +336,7 @@ test("reduceBuddyPublicOutputEvent ignores states without parent output bindings
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `npm test -- buddyPublicOutput.test.ts`
+Run: `node --test frontend/src/buddy/buddyPublicOutput.test.ts`
 
 Expected: FAIL because reducer exports are missing.
 
@@ -410,7 +410,7 @@ Implement private helpers with immutable updates:
 
 - [ ] **Step 4: Verify reducer tests pass**
 
-Run: `npm test -- buddyPublicOutput.test.ts`
+Run: `node --test frontend/src/buddy/buddyPublicOutput.test.ts`
 
 Expected: PASS.
 
@@ -455,7 +455,7 @@ Keep legacy `final_reply` tests only if the function is explicitly renamed or do
 
 - [ ] **Step 2: Run the focused Buddy tests**
 
-Run: `npm test -- buddyChatGraph.test.ts buddyPublicOutput.test.ts`
+Run: `node --test frontend/src/buddy/buddyChatGraph.test.ts frontend/src/buddy/buddyPublicOutput.test.ts`
 
 Expected before implementation: the new request-understanding test fails if current reply extraction still treats internal states as display candidates.
 
@@ -566,7 +566,7 @@ If the run completed and no public output message exists, update the hidden assi
 
 - [ ] **Step 7: Verify Buddy tests**
 
-Run: `npm test -- buddyPublicOutput.test.ts buddyChatGraph.test.ts BuddyWidget.structure.test.ts`
+Run: `node --test frontend/src/buddy/buddyPublicOutput.test.ts frontend/src/buddy/buddyChatGraph.test.ts frontend/src/buddy/BuddyWidget.structure.test.ts`
 
 Expected: PASS.
 
@@ -622,7 +622,7 @@ test("buildRunNodeTimingByNodeIdFromRun uses node executions", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `npm test -- runNodeTimingModel.test.ts`
+Run: `node --test frontend/src/editor/workspace/runNodeTimingModel.test.ts`
 
 Expected: FAIL because `runNodeTimingModel.ts` does not exist.
 
@@ -684,7 +684,7 @@ Add private helpers `normalizeNodeId`, `normalizeExecutionStatus`, and `complete
 
 - [ ] **Step 4: Verify node timing tests pass**
 
-Run: `npm test -- runNodeTimingModel.test.ts`
+Run: `node --test frontend/src/editor/workspace/runNodeTimingModel.test.ts`
 
 Expected: PASS.
 
@@ -725,7 +725,7 @@ Update `useWorkspaceRunController.test.ts` so `clearQueuedRunVisualState` clears
 
 - [ ] **Step 2: Run focused workspace tests**
 
-Run: `npm test -- useWorkspaceRunVisualState.test.ts useWorkspaceRunController.test.ts useWorkspaceTabLifecycleController.test.ts`
+Run: `node --test frontend/src/editor/workspace/useWorkspaceRunVisualState.test.ts frontend/src/editor/workspace/useWorkspaceRunController.test.ts frontend/src/editor/workspace/useWorkspaceTabLifecycleController.test.ts`
 
 Expected before implementation: FAIL because timing state is not wired.
 
@@ -786,7 +786,7 @@ Add tests for visible and hidden states.
 
 - [ ] **Step 6: Verify workspace and canvas tests**
 
-Run: `npm test -- useWorkspaceRunVisualState.test.ts useWorkspaceRunController.test.ts useWorkspaceTabLifecycleController.test.ts canvasRunPresentationModel.test.ts EditorCanvas.structure.test.ts`
+Run: `node --test frontend/src/editor/workspace/useWorkspaceRunVisualState.test.ts frontend/src/editor/workspace/useWorkspaceRunController.test.ts frontend/src/editor/workspace/useWorkspaceTabLifecycleController.test.ts frontend/src/editor/canvas/canvasRunPresentationModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts`
 
 Expected: PASS.
 
@@ -826,7 +826,7 @@ assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*left:/);
 
 - [ ] **Step 2: Run structure test to verify it fails**
 
-Run: `npm test -- NodeCard.structure.test.ts`
+Run: `node --test frontend/src/editor/nodes/NodeCard.structure.test.ts`
 
 Expected: FAIL because the capsule does not exist.
 
@@ -891,7 +891,7 @@ Add success, failed, paused modifiers with subtle border and text color changes,
 
 - [ ] **Step 5: Verify NodeCard tests pass**
 
-Run: `npm test -- NodeCard.structure.test.ts`
+Run: `node --test frontend/src/editor/nodes/NodeCard.structure.test.ts`
 
 Expected: PASS.
 
@@ -913,7 +913,7 @@ git push
 Run:
 
 ```bash
-npm test -- buddyPublicOutput.test.ts buddyChatGraph.test.ts BuddyWidget.structure.test.ts runNodeTimingModel.test.ts useWorkspaceRunVisualState.test.ts useWorkspaceRunController.test.ts useWorkspaceTabLifecycleController.test.ts canvasRunPresentationModel.test.ts EditorCanvas.structure.test.ts NodeCard.structure.test.ts
+node --test frontend/src/buddy/buddyPublicOutput.test.ts frontend/src/buddy/buddyChatGraph.test.ts frontend/src/buddy/BuddyWidget.structure.test.ts frontend/src/editor/workspace/runNodeTimingModel.test.ts frontend/src/editor/workspace/useWorkspaceRunVisualState.test.ts frontend/src/editor/workspace/useWorkspaceRunController.test.ts frontend/src/editor/workspace/useWorkspaceTabLifecycleController.test.ts frontend/src/editor/canvas/canvasRunPresentationModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts
 ```
 
 Expected: PASS.
@@ -933,7 +933,7 @@ Expected: PASS.
 Run:
 
 ```bash
-npm test
+node --test $(find frontend/src -name '*.test.ts' -print)
 ```
 
 Expected: PASS.
