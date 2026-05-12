@@ -160,6 +160,7 @@
 - LangGraph runtime 是当前运行主链。
 - 后端不再在 graph run 入口修补旧模板结构；提交什么图，就按当前协议校验和执行什么图。
 - graph run、run detail、SSE 事件、状态快照、节点级 Run Activity 和 artifact 输出仍是审计与回放的基础。
+- 低层 `activity_events` 已有第一阶段统一形状：运行时会记录通用 Skill 调用、动态子图调用和权限暂停；Skill 可以返回确定性的细粒度事件并由运行时补齐节点/子图上下文；`local_workspace_executor` 已返回文件读取、文件写入和脚本执行事件；`web_search` 已返回搜索与资料下载摘要事件；`graph_patch.draft` 命令记录已带图补丁草案事件形状。
 - 静态 Subgraph 节点和动态 `capability.kind=subgraph` 的内部 `interrupt_after` 都会通过父级 run 的 `pending_subgraph_breakpoint` 暂停，并在父级 resume 后继续内部 checkpoint。
 - 本地文件夹输入已能在普通仓库和 `.worktrees/<branch>` 工作区下读取根目录 `buddy_home/`，避免伙伴模板在分支工作区中丢失 Buddy Home 上下文。
 - `backend/app/buddy/home.py` 负责根目录 `buddy_home/` 的默认文件生成；`backend/app/buddy/store.py` 已提供基于 `SOUL.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memories、session summary、revisions、command 记录、`buddy_sessions` 和 `buddy_messages` 存取；`backend/app/buddy/commands.py` 已有命令记录入口。完整 Buddy Home 写回图流程仍未补齐。
@@ -171,7 +172,7 @@
 - 继续收束 `subgraph` 子图体验：补齐父子图运行详情页的审计聚合、事件定位、从缩略图点击跳转到内部节点，以及动态子图断点在运行详情中的更完整展示。
 - 完善伙伴断点交互：浮窗已有卡片内续跑、单一补充输入、上下文优先展示、拒绝待审批能力、取消暂停 run，以及刷新或重新打开会话后的暂停 run 找回；仍需补齐暂停期间队列策略细化，伙伴页面还需要运行与确认视图。
 - 完善动态能力审批体验：当前已能在 `需确认` 模式下对写文件、删除类权限和 `subprocess` Skill 进入标准 `awaiting_human`，并能在 Buddy 浮窗内拒绝、取消和刷新后恢复暂停审批；仍需补齐伙伴页面审批详情页和更细的低层操作摘要。
-- 补齐低层 `activity_events`，在已有节点级 SSE / Run Activity 基础上，让伙伴浮窗和运行详情页能展示文件探索、命令执行、写入行数、脚本测试等程序化操作摘要。
+- 扩展低层 `activity_events` 覆盖面：第一阶段已覆盖 Skill 调用、权限暂停、动态子图调用、本地文件/脚本、`web_search` 下载和图补丁草案；仍需补齐文件探索/搜索、Buddy Home 写回、图补丁应用/revision、脚本测试细节和父子图运行详情聚合。
 - 清理或按新命令流重建历史 `graph_patch.draft` stub，并完成图补丁预览、GraphCommandBus、graph revision、undo 和审计闭环。
 - 将人设、记忆、会话摘要、自我复盘报告和能力使用统计等长期状态更新表达为可审计的图模板流程，而不是隐藏产品逻辑。
 - 将内部 `agent` kind 迁移为面向用户和协议一致的 LLM 节点语义。

@@ -159,6 +159,31 @@ test("buildRunActivityEntriesFromRun replays stored low-level activity events", 
   );
 });
 
+test("buildRunActivityEntriesFromRun replays file write activity summaries", () => {
+  const run = {
+    run_id: "run_1",
+    artifacts: {
+      activity_events: [
+        {
+          node_id: "execute_capability",
+          kind: "file_write",
+          summary: "Editing skill/user/demo/SKILL.md +3 -0",
+          status: "succeeded",
+          detail: { path: "skill/user/demo/SKILL.md", added: 3, removed: 0 },
+          sequence: 1,
+          created_at: "2026-05-12T01:00:00Z",
+        },
+      ],
+    },
+    node_executions: [],
+  } as unknown as RunDetail;
+
+  assert.deepEqual(
+    buildRunActivityEntriesFromRun(run).map((entry) => ({ title: entry.title, nodeId: entry.nodeId })),
+    [{ title: "Editing skill/user/demo/SKILL.md +3 -0", nodeId: "execute_capability" }],
+  );
+});
+
 test("buildRunActivityEntriesFromRun titles stored state events with state names", () => {
   const run = {
     run_id: "run_1",
