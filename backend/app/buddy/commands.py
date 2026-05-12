@@ -64,17 +64,31 @@ def _execute_graph_patch_draft(
 ) -> dict[str, Any]:
     patch = _required_graph_patch(payload.get("patch"))
     graph_id = target_id or _optional_text(payload.get("graph_id"))
+    graph_name = _optional_text(payload.get("graph_name"))
     resolved_target_id = graph_id or "unsaved_graph"
     now = utc_now_iso()
     command_id = f"cmd_{uuid4().hex[:12]}"
+    activity_event = {
+        "kind": "graph_patch_draft",
+        "summary": _graph_patch_draft_activity_summary(graph_name=graph_name, graph_id=graph_id, operation_count=len(patch)),
+        "status": "awaiting_approval",
+        "detail": {
+            "graph_id": graph_id,
+            "graph_name": graph_name,
+            "operation_count": len(patch),
+            "operations": [operation.get("op") for operation in patch],
+        },
+        "created_at": now,
+    }
     result = {
         "draft_id": command_id,
         "graph_id": graph_id,
-        "graph_name": _optional_text(payload.get("graph_name")),
+        "graph_name": graph_name,
         "summary": _optional_text(payload.get("summary")) or "Buddy graph patch draft.",
         "rationale": _optional_text(payload.get("rationale")) or "",
         "patch": patch,
         "preview": deepcopy(payload.get("preview")) if isinstance(payload.get("preview"), dict) else None,
+        "activity_event": activity_event,
     }
     command = {
         "command_id": command_id,
@@ -87,6 +101,7 @@ def _execute_graph_patch_draft(
         "run_id": None,
         "payload": deepcopy(payload),
         "change_reason": change_reason,
+        "activity_event": activity_event,
         "created_at": now,
         "completed_at": None,
     }
@@ -160,6 +175,12 @@ def _required_graph_patch(value: Any) -> list[dict[str, Any]]:
             _required_text(operation.get("from"), f"patch[{index}].from")
         patch.append(deepcopy(operation))
     return patch
+
+
+def _graph_patch_draft_activity_summary(*, graph_name: str | None, graph_id: str | None, operation_count: int) -> str:
+    target = graph_name or graph_id or "unsaved graph"
+    noun = "operation" if operation_count == 1 else "operations"
+    return f"Drafted graph patch for {target} ({operation_count} {noun})."
 
 
 def _required_text(value: Any, field_name: str) -> str:

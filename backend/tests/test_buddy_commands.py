@@ -117,6 +117,13 @@ class BuddyCommandRouteTests(unittest.TestCase):
         self.assertEqual(body["command"]["status"], "awaiting_approval")
         self.assertEqual(body["command"]["target_type"], "graph")
         self.assertEqual(body["command"]["target_id"], "graph_buddy_loop")
+        self.assertEqual(body["command"]["activity_event"]["kind"], "graph_patch_draft")
+        self.assertEqual(
+            body["command"]["activity_event"]["summary"],
+            "Drafted graph patch for 伙伴对话循环 (1 operation).",
+        )
+        self.assertEqual(body["command"]["activity_event"]["detail"]["graph_id"], "graph_buddy_loop")
+        self.assertEqual(body["command"]["activity_event"]["detail"]["operation_count"], 1)
         self.assertIsNone(body["command"]["revision_id"])
         self.assertIsNone(body["command"]["run_id"])
         self.assertIsNone(body["command"]["completed_at"])
