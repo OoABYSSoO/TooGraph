@@ -3,7 +3,10 @@ import test from "node:test";
 
 import type { BuddyCommandRecord, BuddyRevision } from "../types/buddy.ts";
 
-import { buildBuddyRevisionHistoryRows } from "./buddyRevisionHistoryModel.ts";
+import {
+  buildBuddyRevisionHistoryRows,
+  filterBuddyRevisionHistoryRows,
+} from "./buddyRevisionHistoryModel.ts";
 
 test("buildBuddyRevisionHistoryRows links revisions to command source runs", () => {
   const revisions: BuddyRevision[] = [
@@ -79,4 +82,54 @@ test("buildBuddyRevisionHistoryRows keeps legacy revisions visible without comma
   assert.equal(rows[0]?.sourceLabel, "Legacy revision");
   assert.equal(rows[0]?.sourceRunId, "");
   assert.equal(rows[0]?.sourceCommandId, "");
+});
+
+test("filterBuddyRevisionHistoryRows narrows history by target type without reordering", () => {
+  const rows = buildBuddyRevisionHistoryRows(
+    [
+      {
+        revision_id: "rev_profile",
+        target_type: "profile",
+        target_id: "profile",
+        operation: "update",
+        previous_value: { name: "Old" },
+        next_value: { name: "New" },
+        changed_by: "user",
+        change_reason: "Manual profile update.",
+        created_at: "2026-05-12T03:00:00Z",
+      },
+      {
+        revision_id: "rev_memory_newer",
+        target_type: "memory",
+        target_id: "memory_2",
+        operation: "update",
+        previous_value: { title: "Old" },
+        next_value: { title: "New" },
+        changed_by: "buddy_command",
+        change_reason: "Updated stable preference.",
+        created_at: "2026-05-12T04:00:00Z",
+      },
+      {
+        revision_id: "rev_memory_older",
+        target_type: "memory",
+        target_id: "memory_1",
+        operation: "create",
+        previous_value: {},
+        next_value: { title: "Preference" },
+        changed_by: "buddy_command",
+        change_reason: "Created stable preference.",
+        created_at: "2026-05-12T02:00:00Z",
+      },
+    ],
+    [],
+  );
+
+  assert.deepEqual(
+    filterBuddyRevisionHistoryRows(rows, "memory").map((row) => row.revision_id),
+    ["rev_memory_newer", "rev_memory_older"],
+  );
+  assert.deepEqual(
+    filterBuddyRevisionHistoryRows(rows, "all").map((row) => row.revision_id),
+    ["rev_memory_newer", "rev_profile", "rev_memory_older"],
+  );
 });

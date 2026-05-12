@@ -238,7 +238,18 @@
                 <p>{{ t("buddyPage.history.body") }}</p>
               </div>
             </div>
-            <ElTable :data="orderedRevisionRows" class="buddy-page__table" empty-text=" ">
+            <div class="buddy-page__history-toolbar">
+              <span class="buddy-page__filter-label">{{ t("buddyPage.history.targetFilter") }}</span>
+              <ElSegmented
+                v-model="historyTargetFilter"
+                class="buddy-page__history-filter"
+                :options="historyTargetOptions"
+              />
+              <span class="buddy-page__meta">
+                {{ t("buddyPage.history.showingCount", { count: filteredRevisionRows.length, total: orderedRevisionRows.length }) }}
+              </span>
+            </div>
+            <ElTable :data="filteredRevisionRows" class="buddy-page__table" empty-text=" ">
               <ElTableColumn type="expand" width="44">
                 <template #default="{ row }">
                   <div class="buddy-page__history-diff">
@@ -276,7 +287,10 @@
                 </template>
               </ElTableColumn>
             </ElTable>
-            <ElEmpty v-if="orderedRevisionRows.length === 0" :description="t('buddyPage.history.empty')" />
+            <ElEmpty
+              v-if="filteredRevisionRows.length === 0"
+              :description="orderedRevisionRows.length === 0 ? t('buddyPage.history.empty') : t('buddyPage.history.filteredEmpty')"
+            />
           </article>
         </ElTabPane>
 
@@ -363,7 +377,12 @@ import type {
 } from "@/types/buddy";
 import type { RunDetail, RunSummary } from "@/types/run";
 
-import { buildBuddyRevisionHistoryRows } from "./buddyRevisionHistoryModel.ts";
+import {
+  BUDDY_REVISION_HISTORY_TARGET_FILTERS,
+  buildBuddyRevisionHistoryRows,
+  filterBuddyRevisionHistoryRows,
+  type BuddyRevisionHistoryTargetFilter,
+} from "./buddyRevisionHistoryModel.ts";
 
 type MemoryDraft = Pick<BuddyMemory, "type" | "title" | "content">;
 type LoadAllOptions = {
@@ -374,6 +393,7 @@ const { t } = useI18n();
 const buddyContextStore = useBuddyContextStore();
 const buddyMascotDebugStore = useBuddyMascotDebugStore();
 const activeTab = ref("profile");
+const historyTargetFilter = ref<BuddyRevisionHistoryTargetFilter>("all");
 const hasLoaded = ref(false);
 const isLoading = ref(false);
 const isSavingProfile = ref(false);
@@ -416,6 +436,13 @@ const canSaveMemory = computed(() => {
   return Boolean(memoryDraft.value.title.trim() && memoryDraft.value.content.trim() && !isSavingMemory.value);
 });
 const orderedRevisionRows = computed(() => buildBuddyRevisionHistoryRows(revisions.value, commands.value));
+const filteredRevisionRows = computed(() => filterBuddyRevisionHistoryRows(orderedRevisionRows.value, historyTargetFilter.value));
+const historyTargetOptions = computed(() =>
+  BUDDY_REVISION_HISTORY_TARGET_FILTERS.map((value) => ({
+    label: t(`buddyPage.history.targets.${value}`),
+    value,
+  })),
+);
 const permissionModeOptions = computed(() => [
   { label: t("buddy.modes.askFirst"), value: "ask_first" },
   { label: t("buddy.modes.fullAccess"), value: "full_access" },
@@ -934,6 +961,25 @@ onMounted(loadAll);
 
 .buddy-page__table {
   width: 100%;
+}
+
+.buddy-page__history-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.buddy-page__filter-label {
+  color: rgba(60, 41, 20, 0.68);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.buddy-page__history-filter {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .buddy-page__history-source {

@@ -966,6 +966,15 @@ const baseMessages = {
       history: {
         title: "备份历史",
         body: "每次人设、边界、记忆和摘要发生变化都会写入这里。",
+        targetFilter: "筛选对象",
+        showingCount: "显示 {count} / {total}",
+        targets: {
+          all: "全部",
+          profile: "人设",
+          policy: "边界",
+          memory: "记忆",
+          session_summary: "摘要",
+        },
         target: "对象",
         operation: "动作",
         source: "来源",
@@ -976,6 +985,7 @@ const baseMessages = {
         actions: "操作",
         restore: "恢复",
         empty: "暂无备份历史。",
+        filteredEmpty: "当前筛选下没有历史记录。",
         restored: "已恢复历史版本。",
       },
       mascotDebug: {
@@ -1960,6 +1970,15 @@ const baseMessages = {
       history: {
         title: "Revision History",
         body: "Changes to profile, boundaries, memories, and summaries are recorded here.",
+        targetFilter: "Filter target",
+        showingCount: "Showing {count} / {total}",
+        targets: {
+          all: "All",
+          profile: "Profile",
+          policy: "Boundaries",
+          memory: "Memory",
+          session_summary: "Summary",
+        },
         target: "Target",
         operation: "Operation",
         source: "Source",
@@ -1970,6 +1989,7 @@ const baseMessages = {
         actions: "Actions",
         restore: "Restore",
         empty: "No revision history yet.",
+        filteredEmpty: "No history matches this filter.",
         restored: "Revision restored.",
       },
       mascotDebug: {

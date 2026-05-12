@@ -9,6 +9,15 @@ export type BuddyRevisionHistoryRow = BuddyRevision & {
   nextValueText: string;
 };
 
+export const BUDDY_REVISION_HISTORY_TARGET_FILTERS = [
+  "all",
+  "profile",
+  "policy",
+  "memory",
+  "session_summary",
+] as const;
+export type BuddyRevisionHistoryTargetFilter = (typeof BUDDY_REVISION_HISTORY_TARGET_FILTERS)[number];
+
 export function buildBuddyRevisionHistoryRows(
   revisions: BuddyRevision[],
   commands: BuddyCommandRecord[],
@@ -34,6 +43,16 @@ export function buildBuddyRevisionHistoryRows(
         nextValueText: formatRevisionValue(revision.next_value),
       };
     });
+}
+
+export function filterBuddyRevisionHistoryRows(
+  rows: BuddyRevisionHistoryRow[],
+  targetFilter: BuddyRevisionHistoryTargetFilter,
+) {
+  if (targetFilter === "all") {
+    return rows;
+  }
+  return rows.filter((row) => row.target_type === targetFilter);
 }
 
 function buildSourceLabel(command: BuddyCommandRecord | undefined) {

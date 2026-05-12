@@ -61,13 +61,18 @@ test("BuddyPage reuses the standard paused-run card for confirmations", () => {
 });
 
 test("BuddyPage links revision history to command audit records", () => {
-  assert.match(source, /import \{ buildBuddyRevisionHistoryRows \} from "\.\/buddyRevisionHistoryModel\.ts";/);
+  assert.match(source, /import \{[\s\S]*BUDDY_REVISION_HISTORY_TARGET_FILTERS,[\s\S]*buildBuddyRevisionHistoryRows,[\s\S]*filterBuddyRevisionHistoryRows,[\s\S]*\} from "\.\/buddyRevisionHistoryModel\.ts";/);
   assert.match(source, /const commands = ref<BuddyCommandRecord\[\]>\(\[\]\);/);
+  assert.match(source, /const historyTargetFilter = ref<BuddyRevisionHistoryTargetFilter>\("all"\);/);
   assert.match(source, /const orderedRevisionRows = computed\(\(\) => buildBuddyRevisionHistoryRows\(revisions\.value, commands\.value\)\);/);
-  assert.match(source, /<ElTable :data="orderedRevisionRows"/);
+  assert.match(source, /const filteredRevisionRows = computed\(\(\) => filterBuddyRevisionHistoryRows\(orderedRevisionRows\.value, historyTargetFilter\.value\)\);/);
+  assert.match(source, /const historyTargetOptions = computed\(\(\) =>\s*BUDDY_REVISION_HISTORY_TARGET_FILTERS\.map/);
+  assert.match(source, /<ElSegmented[\s\S]*v-model="historyTargetFilter"[\s\S]*:options="historyTargetOptions"/);
+  assert.match(source, /<ElTable :data="filteredRevisionRows"/);
   assert.match(source, /row\.sourceLabel/);
   assert.match(source, /row\.previousValueText/);
   assert.match(source, /row\.nextValueText/);
+  assert.match(source, /filteredRevisionRows\.length === 0/);
 });
 
 test("BuddyPage hosts the mascot action debug panel as a tab after History", () => {
