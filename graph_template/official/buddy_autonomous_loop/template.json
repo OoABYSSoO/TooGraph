@@ -673,31 +673,6 @@
                 "temperature": 0.1
               }
             },
-            "output_request_understanding": {
-              "kind": "output",
-              "name": "输出请求理解",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 1880,
-                  "y": 270
-                },
-                "collapsed": false
-              },
-              "reads": [
-                {
-                  "state": "request_understanding",
-                  "required": true
-                }
-              ],
-              "writes": [],
-              "config": {
-                "displayMode": "json",
-                "persistEnabled": false,
-                "persistFormat": "auto",
-                "fileNameTemplate": ""
-              }
-            },
             "output_visible_reply": {
               "kind": "output",
               "name": "输出即时回复",
@@ -720,6 +695,31 @@
                 "displayMode": "markdown",
                 "persistEnabled": false,
                 "persistFormat": "md",
+                "fileNameTemplate": ""
+              }
+            },
+            "output_request_understanding": {
+              "kind": "output",
+              "name": "输出请求理解",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 1880,
+                  "y": 270
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "request_understanding",
+                  "required": true
+                }
+              ],
+              "writes": [],
+              "config": {
+                "displayMode": "json",
+                "persistEnabled": false,
+                "persistFormat": "auto",
                 "fileNameTemplate": ""
               }
             }

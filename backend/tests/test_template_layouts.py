@@ -429,6 +429,15 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertNotIn({"state": "buddy_context", "required": True}, nodes["intake_request"]["reads"])
         self.assertNotIn({"source": "input_buddy_context", "target": "intake_request"}, template["edges"])
         self.assertEqual(nodes["intake_request"]["writes"][0], {"state": "visible_reply", "mode": "replace"})
+        intake_output_boundaries = [
+            node["reads"][0]["state"]
+            for node in intake_graph["nodes"].values()
+            if node["kind"] == "output"
+        ]
+        self.assertEqual(
+            intake_output_boundaries,
+            [write["state"] for write in nodes["intake_request"]["writes"]],
+        )
         understand_node = intake_graph["nodes"]["understand_request"]
         self.assertNotIn({"state": "buddy_context", "required": True}, understand_node["reads"])
         self.assertNotIn({"source": "input_buddy_context", "target": "understand_request"}, intake_graph["edges"])
