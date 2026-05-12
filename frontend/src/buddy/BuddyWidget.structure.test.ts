@@ -394,7 +394,7 @@ test("BuddyWidget treats awaiting-human graph runs as resumable pause cards", ()
   assert.match(componentSource, /class="buddy-widget__pause-card"/);
   assert.match(componentSource, /resumePausedBuddyRun/);
   assert.match(componentSource, /runDetail\.status === "awaiting_human"/);
-  assert.match(componentSource, /if \(pausedBuddyRun\.value\) \{[\s\S]*break;/);
+  assert.match(componentSource, /shouldHoldBuddyQueueDrain\(\{ hasPausedRun: Boolean\(pausedBuddyRun\.value\) \}\)/);
   assert.doesNotMatch(componentSource, /void startBuddySelfReviewRun\(runDetail\);[\s\S]*runDetail\.status === "awaiting_human"/);
 });
 
@@ -444,9 +444,10 @@ test("BuddyWidget recovers awaiting-human paused runs after session activation",
 test("BuddyWidget keeps recovered paused runs session-locked and queue-safe", () => {
   assert.match(componentSource, /const isSessionSwitchLocked = computed\([\s\S]*activeRunId\.value !== null/);
   assert.match(componentSource, /const isSessionSwitchLocked = computed\([\s\S]*isActiveTraceUnfinished\(\)/);
-  assert.match(componentSource, /if \(pausedBuddyRun\.value\) \{[\s\S]*break;/);
+  assert.match(componentSource, /shouldHoldBuddyQueueDrain\(\{ hasPausedRun: Boolean\(pausedBuddyRun\.value\) \}\)/);
   assert.match(componentSource, /:disabled="Boolean\(pausedBuddyRun\)"/);
-  assert.match(componentSource, /if \(pausedBuddyRun\.value\) \{[\s\S]*errorMessage\.value = t\("buddy\.pause\.useCard"\);/);
+  assert.match(componentSource, /resolveBuddyComposerDecision\(\{[\s\S]*hasPausedRun: Boolean\(pausedBuddyRun\.value\),[\s\S]*isResumeBusy: pausedBuddyResumeBusy\.value/);
+  assert.match(componentSource, /if \(composerDecision\.kind === "route_to_pause_card"\) \{[\s\S]*errorMessage\.value = t\("buddy\.pause\.useCard"\);/);
 });
 
 test("BuddyWidget can deny a pending permission approval from the pause card", () => {

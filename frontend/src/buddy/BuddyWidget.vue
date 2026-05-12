@@ -500,6 +500,12 @@ import BuddyMascot from "./BuddyMascot.vue";
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
 import { findLatestRecoverablePausedRunMessage, isRecoverablePausedRunStatus } from "./buddyPausedRunRecovery.ts";
 import {
+  resolveBuddyComposerDecision,
+  resolveInitialBuddyPauseActionMode,
+  shouldHoldBuddyQueueDrain,
+  type BuddyPauseActionMode,
+} from "./buddyPauseQueuePolicy.ts";
+import {
   BUDDY_REVIEW_TEMPLATE_ID,
   BUDDY_TEMPLATE_ID,
   BUDDY_MODE_OPTIONS,
@@ -556,7 +562,6 @@ type BuddyPauseHandlingOptions = {
 };
 
 type BuddyMood = "idle" | "thinking" | "speaking" | "error";
-type PausedBuddyActionMode = "execute" | "supplement";
 type BuddyMascotMotion = "idle" | "roam" | "hop";
 type BuddyMascotFacing = "front" | "left" | "right";
 type BuddyMascotDebugAction = "idle" | "thinking" | "speaking" | "error" | "tap" | "dragging" | "hop" | "roam" | "face-left" | "face-front" | "face-right";
@@ -646,7 +651,7 @@ const pausedBuddyRun = ref<RunDetail | null>(null);
 const pausedBuddyAssistantMessageId = ref<string | null>(null);
 const pausedBuddyDraftsByKey = ref<Record<string, string>>({});
 const pausedBuddyResumeBusy = ref(false);
-const pausedBuddyActionMode = ref<PausedBuddyActionMode>("execute");
+const pausedBuddyActionMode = ref<BuddyPauseActionMode>("execute");
 const pausedBuddyTargetKey = ref("");
 const pausedBuddyInputText = ref("");
 const avatarElement = ref<HTMLElement | null>(null);
@@ -1204,10 +1209,15 @@ function randomBetween(min: number, max: number) {
 }
 
 async function sendMessage() {
-  const userMessage = draft.value.trim();
-  if (!userMessage) {
+  const composerDecision = resolveBuddyComposerDecision({
+    draftText: draft.value,
+    hasPausedRun: Boolean(pausedBuddyRun.value),
+    isResumeBusy: pausedBuddyResumeBusy.value,
+  });
+  if (composerDecision.kind === "ignore_empty" || composerDecision.kind === "ignore_resume_busy") {
     return;
   }
+  const userMessage = composerDecision.userMessage;
 
   cancelBuddyRoamTimers();
   clearBuddyDebugActionTimer();
@@ -1218,11 +1228,7 @@ async function sendMessage() {
   if (!sessionId) {
     return;
   }
-  if (pausedBuddyRun.value && pausedBuddyResumeBusy.value) {
-    return;
-  }
-
-  if (pausedBuddyRun.value) {
+  if (composerDecision.kind === "route_to_pause_card") {
     errorMessage.value = t("buddy.pause.useCard");
     await scrollPausedBuddyCardIntoView();
     return;
@@ -1259,7 +1265,7 @@ async function drainBuddyQueue() {
         continue;
       }
       await processQueuedTurn(nextTurn);
-      if (pausedBuddyRun.value) {
+      if (shouldHoldBuddyQueueDrain({ hasPausedRun: Boolean(pausedBuddyRun.value) })) {
         break;
       }
     }
@@ -2258,7 +2264,7 @@ function setPausedBuddyDraft(key: string, value: string | number) {
 
 function resetPausedBuddyActionState(model: HumanReviewPanelModel) {
   const firstRequired = model.requiredNow[0] ?? null;
-  pausedBuddyActionMode.value = firstRequired ? "supplement" : "execute";
+  pausedBuddyActionMode.value = resolveInitialBuddyPauseActionMode(model.requiredNow.length);
   pausedBuddyTargetKey.value = firstRequired?.key ?? "";
   pausedBuddyInputText.value = firstRequired ? resolvePausedBuddyDraft(firstRequired) : "";
 }
@@ -2278,7 +2284,7 @@ function denyPausedBuddyPermissionApproval() {
   });
 }
 
-function setPausedBuddyActionMode(mode: PausedBuddyActionMode) {
+function setPausedBuddyActionMode(mode: BuddyPauseActionMode) {
   pausedBuddyActionMode.value = mode;
   if (mode === "supplement" && !pausedBuddyTargetKey.value) {
     const firstRequired = pausedBuddyRequiredRows.value[0] ?? null;
