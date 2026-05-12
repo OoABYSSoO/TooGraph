@@ -95,6 +95,30 @@ def format_graph_state_input_prompt_lines(
     return format_state_prompt_lines(key, definition, value=format_prompt_value(value))
 
 
+def collect_local_input_prompt_references(
+    input_values: dict[str, Any],
+    *,
+    state_schema: dict[str, NodeSystemStateDefinition] | None = None,
+) -> list[dict[str, str]]:
+    resolved_state_schema = state_schema or {}
+    references: list[dict[str, str]] = []
+    for state_key, value in input_values.items():
+        definition = resolved_state_schema.get(state_key)
+        if not _is_file_reference_prompt_state(definition):
+            continue
+        for reference in _collect_file_state_references(value):
+            if reference.get("source") != "local_input":
+                continue
+            references.append(
+                {
+                    "state_key": str(state_key),
+                    "root": str(reference.get("root") or ""),
+                    "relative_path": str(reference.get("relative_path") or reference.get("name") or ""),
+                }
+            )
+    return references
+
+
 def sanitize_prompt_value(value: Any) -> Any:
     envelope = normalize_uploaded_file_envelope(value)
     if envelope is not None:
