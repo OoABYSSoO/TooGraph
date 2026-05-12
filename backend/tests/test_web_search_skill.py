@@ -77,7 +77,7 @@ class WebSearchSkillTests(unittest.TestCase):
             api_key="tvly-test",
             timeout_seconds=15.0,
         )
-        self.assertEqual(set(result), {"query", "source_urls", "artifact_paths", "errors"})
+        self.assertEqual(set(result), {"query", "source_urls", "artifact_paths", "errors", "activity_events"})
         self.assertEqual(result["query"], "TooGraph workflow studio")
         self.assertEqual(result["source_urls"], ["https://example.com/docs"])
         self.assertEqual(result["artifact_paths"], [])
@@ -106,7 +106,7 @@ class WebSearchSkillTests(unittest.TestCase):
             max_results=20,
             timeout_seconds=15.0,
         )
-        self.assertEqual(set(result), {"query", "source_urls", "artifact_paths", "errors"})
+        self.assertEqual(set(result), {"query", "source_urls", "artifact_paths", "errors", "activity_events"})
         self.assertEqual(result["query"], "fallback search")
         self.assertEqual(result["source_urls"], ["https://example.org/fallback"])
         self.assertEqual(result["artifact_paths"], [])
@@ -227,10 +227,15 @@ class WebSearchSkillTests(unittest.TestCase):
                     result = web_search.web_search_skill(query="full article")
 
                 document_path = artifact_dir / "doc_001.md"
-                self.assertEqual(set(result), {"query", "source_urls", "artifact_paths", "errors"})
+                self.assertEqual(set(result), {"query", "source_urls", "artifact_paths", "errors", "activity_events"})
                 self.assertEqual(result["query"], "full article")
                 self.assertEqual(result["artifact_paths"], ["run_1/searcher/web_search/invocation_001/doc_001.md"])
                 self.assertEqual(result["errors"], [])
+                self.assertEqual(result["activity_events"][0]["kind"], "web_search")
+                self.assertEqual(result["activity_events"][0]["detail"]["query"], "full article")
+                self.assertEqual(result["activity_events"][1]["kind"], "web_download")
+                self.assertEqual(result["activity_events"][1]["summary"], "Downloaded 1 source document.")
+                self.assertEqual(result["activity_events"][1]["detail"]["downloaded_count"], 1)
                 self.assertTrue(document_path.is_file())
                 document_text = document_path.read_text(encoding="utf-8")
                 self.assertIn("# Full Article Title", document_text)
@@ -507,11 +512,13 @@ class WebSearchSkillTests(unittest.TestCase):
         web_search = _load_web_search_module()
         result = web_search.web_search_skill(query="   ")
 
-        self.assertEqual(set(result), {"query", "source_urls", "artifact_paths", "errors"})
+        self.assertEqual(set(result), {"query", "source_urls", "artifact_paths", "errors", "activity_events"})
         self.assertEqual(result["query"], "")
         self.assertEqual(result["source_urls"], [])
         self.assertEqual(result["artifact_paths"], [])
         self.assertEqual(result["errors"], ["Search query is required."])
+        self.assertEqual(result["activity_events"][0]["kind"], "web_search")
+        self.assertEqual(result["activity_events"][0]["status"], "failed")
 
     def test_web_search_skill_is_runtime_registered(self) -> None:
         registry = get_skill_registry(include_disabled=True)

@@ -27,9 +27,25 @@ HTTP_PROXY_ENV_KEYS = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy",
 def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
     query = _compact_text(skill_inputs.get("query"))
     if not query:
-        return _final_response(query="", source_urls=[], artifact_paths=[], errors=["Search query is required."])
+        return _final_response(
+            query="",
+            source_urls=[],
+            artifact_paths=[],
+            errors=["Search query is required."],
+            activity_events=[
+                _web_search_event(
+                    query="",
+                    provider="none",
+                    status="failed",
+                    candidate_count=0,
+                    source_url_count=0,
+                    error="Search query is required.",
+                )
+            ],
+        )
 
     api_key = _resolve_tavily_api_key(skill_inputs)
+    provider = "tavily" if api_key else "duckduckgo"
 
     try:
         if api_key:
@@ -54,7 +70,23 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
                 attempts=DEFAULT_RETRY_ATTEMPTS,
             )
     except Exception as exc:
-        return _final_response(query=query, source_urls=[], artifact_paths=[], errors=[str(exc)])
+        error = str(exc)
+        return _final_response(
+            query=query,
+            source_urls=[],
+            artifact_paths=[],
+            errors=[error],
+            activity_events=[
+                _web_search_event(
+                    query=query,
+                    provider=provider,
+                    status="failed",
+                    candidate_count=0,
+                    source_url_count=0,
+                    error=error,
+                )
+            ],
+        )
 
     results = _normalize_results(raw_response.get("results", []), max_results=DEFAULT_SEARCH_CANDIDATES)
     source_documents = _fetch_source_documents(
@@ -78,7 +110,31 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
         for document in source_documents
         if document.get("status") == "failed" and document.get("error")
     ]
-    return _final_response(query=query, source_urls=source_urls, artifact_paths=artifact_paths, errors=errors)
+    activity_events = [
+        _web_search_event(
+            query=query,
+            provider=provider,
+            status="succeeded",
+            candidate_count=len(results),
+            source_url_count=len(source_urls),
+        )
+    ]
+    if source_documents:
+        activity_events.append(
+            _web_download_event(
+                downloaded_count=len(successful_documents),
+                failed_count=len(errors),
+                artifact_paths=artifact_paths,
+                source_urls=source_urls,
+            )
+        )
+    return _final_response(
+        query=query,
+        source_urls=source_urls,
+        artifact_paths=artifact_paths,
+        errors=errors,
+        activity_events=activity_events,
+    )
 
 
 def _search_with_tavily(
@@ -455,13 +511,92 @@ def _final_response(
     source_urls: list[str],
     artifact_paths: list[str],
     errors: list[str],
+    activity_events: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
         "query": query,
         "source_urls": source_urls,
         "artifact_paths": artifact_paths,
         "errors": errors,
+        "activity_events": activity_events,
     }
+
+
+def _web_search_event(
+    *,
+    query: str,
+    provider: str,
+    status: str,
+    candidate_count: int,
+    source_url_count: int,
+    error: str = "",
+) -> dict[str, Any]:
+    detail: dict[str, Any] = {
+        "query": query,
+        "provider": provider,
+        "candidate_count": candidate_count,
+        "source_url_count": source_url_count,
+    }
+    if error:
+        detail["error"] = error
+    return _activity_event(
+        kind="web_search",
+        summary=_web_search_summary(query=query, provider=provider, status=status, candidate_count=candidate_count),
+        status=status,
+        detail=detail,
+        error=error,
+    )
+
+
+def _web_download_event(
+    *,
+    downloaded_count: int,
+    failed_count: int,
+    artifact_paths: list[str],
+    source_urls: list[str],
+) -> dict[str, Any]:
+    status = "failed" if downloaded_count == 0 and failed_count > 0 else "succeeded"
+    return _activity_event(
+        kind="web_download",
+        summary=_web_download_summary(downloaded_count),
+        status=status,
+        detail={
+            "downloaded_count": downloaded_count,
+            "failed_count": failed_count,
+            "artifact_paths": artifact_paths,
+            "source_urls": source_urls,
+        },
+    )
+
+
+def _activity_event(
+    *,
+    kind: str,
+    summary: str,
+    status: str,
+    detail: dict[str, Any],
+    error: str = "",
+) -> dict[str, Any]:
+    event: dict[str, Any] = {
+        "kind": kind,
+        "summary": summary,
+        "status": status,
+        "detail": detail,
+    }
+    if error:
+        event["error"] = error
+    return event
+
+
+def _web_search_summary(*, query: str, provider: str, status: str, candidate_count: int) -> str:
+    if status == "failed":
+        return f"Search failed for `{query}`."
+    return f"Found {candidate_count} candidate sources with {provider}."
+
+
+def _web_download_summary(downloaded_count: int) -> str:
+    noun = "source document" if downloaded_count == 1 else "source documents"
+    return f"Downloaded {downloaded_count} {noun}."
 
 
 def _resolve_tavily_api_key(skill_inputs: dict[str, Any]) -> str:
