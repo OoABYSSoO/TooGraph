@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { RunDetail } from "../types/run.ts";
+import type { NodeExecutionDetail, RunDetail } from "../types/run.ts";
 
 import {
+  buildRunAggregatedTimeline,
   buildRunStatusFacts,
   formatRunArtifactValue,
   listRunOutputArtifacts,
@@ -71,6 +72,37 @@ function createRunDetail(overrides: Partial<RunDetail> = {}): RunDetail {
   };
 }
 
+function createRunArtifacts(overrides: Partial<RunDetail["artifacts"]> = {}): RunDetail["artifacts"] {
+  return {
+    ...createRunDetail().artifacts,
+    ...overrides,
+  };
+}
+
+function createNodeExecution(overrides: Partial<NodeExecutionDetail> & Pick<NodeExecutionDetail, "node_id">): NodeExecutionDetail {
+  const nodeType = overrides.node_type ?? "agent";
+  return {
+    node_id: overrides.node_id,
+    node_type: nodeType,
+    status: overrides.status ?? "success",
+    started_at: overrides.started_at ?? "2026-05-12T01:00:00.000Z",
+    finished_at: overrides.finished_at ?? null,
+    duration_ms: overrides.duration_ms ?? 1,
+    input_summary: overrides.input_summary ?? "",
+    output_summary: overrides.output_summary ?? "",
+    artifacts: {
+      inputs: {},
+      outputs: {},
+      family: nodeType,
+      state_reads: [],
+      state_writes: [],
+      ...overrides.artifacts,
+    },
+    warnings: overrides.warnings ?? [],
+    errors: overrides.errors ?? [],
+  };
+}
+
 test("formatRunArtifactValue keeps strings and pretty prints structured payloads", () => {
   assert.equal(formatRunArtifactValue("hello"), "hello");
   assert.equal(formatRunArtifactValue(null), "");
@@ -133,6 +165,184 @@ test("listRunOutputArtifacts maps exported outputs into renderable cards", () =>
       persistLabel: "persist md",
       fileName: "answer.md",
       documentRefs: [],
+    },
+  ]);
+});
+
+test("buildRunAggregatedTimeline interleaves parent nodes, subgraph nodes, and activity events", () => {
+  const run = createRunDetail({
+    node_executions: [
+      createNodeExecution({
+        node_id: "intake_request",
+        started_at: "2026-05-12T01:00:00.000Z",
+        duration_ms: 12,
+        output_summary: "Request accepted.",
+      }),
+      createNodeExecution({
+        node_id: "run_capability_cycle",
+        node_type: "subgraph",
+        started_at: "2026-05-12T01:00:01.000Z",
+        duration_ms: 140,
+        output_summary: "Capability loop finished.",
+        artifacts: {
+          inputs: {},
+          outputs: {},
+          family: "subgraph",
+          state_reads: [],
+          state_writes: [],
+          subgraph: {
+            graph_id: "subgraph_1",
+            name: "Capability Loop",
+            status: "completed",
+            node_executions: [
+              createNodeExecution({
+                node_id: "execute_capability",
+                started_at: "2026-05-12T01:00:02.000Z",
+                duration_ms: 80,
+                output_summary: "Executed selected capability.",
+                artifacts: {
+                  inputs: {},
+                  outputs: { result_package: { status: "ok" } },
+                  family: "agent",
+                  state_reads: [],
+                  state_writes: [
+                    {
+                      state_key: "capability_result",
+                      output_key: "result_package",
+                      mode: "replace",
+                      changed: true,
+                    },
+                  ],
+                },
+              }),
+            ],
+          },
+        },
+      }),
+    ],
+    artifacts: createRunArtifacts({
+      activity_events: [
+        {
+          sequence: 1,
+          kind: "file_search",
+          summary: "Found 3 matching files.",
+          node_id: "execute_capability",
+          subgraph_node_id: "run_capability_cycle",
+          subgraph_path: ["run_capability_cycle"],
+          status: "succeeded",
+          duration_ms: 15,
+          detail: { query: "buddy" },
+          created_at: "2026-05-12T01:00:02.500Z",
+        },
+      ],
+    }),
+  });
+
+  assert.deepEqual(
+    buildRunAggregatedTimeline(run).map((item) => ({
+      kind: item.kind,
+      label: item.label,
+      summary: item.summary,
+      status: item.status,
+      durationMs: item.durationMs,
+      artifactLabels: item.artifactLabels,
+      nodeId: item.nodeId,
+      subgraphNodeId: item.subgraphNodeId,
+      subgraphPath: item.subgraphPath,
+      pathLabel: item.pathLabel,
+    })),
+    [
+      {
+        kind: "node",
+        label: "intake_request",
+        summary: "Request accepted.",
+        status: "success",
+        durationMs: 12,
+        artifactLabels: [],
+        nodeId: "intake_request",
+        subgraphNodeId: null,
+        subgraphPath: [],
+        pathLabel: "intake_request",
+      },
+      {
+        kind: "node",
+        label: "run_capability_cycle",
+        summary: "Capability loop finished.",
+        status: "success",
+        durationMs: 140,
+        artifactLabels: ["subgraph: Capability Loop"],
+        nodeId: "run_capability_cycle",
+        subgraphNodeId: null,
+        subgraphPath: [],
+        pathLabel: "run_capability_cycle",
+      },
+      {
+        kind: "node",
+        label: "execute_capability",
+        summary: "Executed selected capability.",
+        status: "success",
+        durationMs: 80,
+        artifactLabels: ["outputs: result_package", "writes: capability_result"],
+        nodeId: "execute_capability",
+        subgraphNodeId: "run_capability_cycle",
+        subgraphPath: ["run_capability_cycle"],
+        pathLabel: "run_capability_cycle / execute_capability",
+      },
+      {
+        kind: "activity",
+        label: "file_search",
+        summary: "Found 3 matching files.",
+        status: "succeeded",
+        durationMs: 15,
+        artifactLabels: ["query: buddy"],
+        nodeId: "execute_capability",
+        subgraphNodeId: "run_capability_cycle",
+        subgraphPath: ["run_capability_cycle"],
+        pathLabel: "run_capability_cycle / execute_capability",
+      },
+    ],
+  );
+});
+
+test("buildRunAggregatedTimeline includes subgraph permission approvals as pause items", () => {
+  const run = createRunDetail({
+    status: "awaiting_human",
+    metadata: {
+      pending_subgraph_breakpoint: {
+        subgraph_node_id: "run_capability_cycle",
+        inner_node_id: "execute_capability",
+        subgraph_path: ["run_capability_cycle"],
+        metadata: {
+          pending_permission_approval: {
+            kind: "skill_permission_approval",
+            skill_key: "local_workspace_executor",
+            skill_name: "Local Workspace Executor",
+            permissions: ["file_write", "command_run"],
+          },
+        },
+      },
+    },
+  });
+
+  const permissionItems = buildRunAggregatedTimeline(run).filter((item) => item.kind === "permission");
+
+  assert.deepEqual(permissionItems.map((item) => ({
+    label: item.label,
+    summary: item.summary,
+    status: item.status,
+    nodeId: item.nodeId,
+    subgraphNodeId: item.subgraphNodeId,
+    subgraphPath: item.subgraphPath,
+    pathLabel: item.pathLabel,
+  })), [
+    {
+      label: "Local Workspace Executor",
+      summary: "Requires permission: file_write, command_run",
+      status: "awaiting_human",
+      nodeId: "execute_capability",
+      subgraphNodeId: "run_capability_cycle",
+      subgraphPath: ["run_capability_cycle"],
+      pathLabel: "run_capability_cycle / execute_capability",
     },
   ]);
 });
