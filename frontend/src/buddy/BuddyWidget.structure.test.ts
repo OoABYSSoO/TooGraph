@@ -232,7 +232,7 @@ test("BuddyWidget keeps the composer enabled and queues sends while a reply is r
   assert.match(componentSource, /const assistantMessage = ensureAssistantMessageForTurn\(turn\);/);
   assert.match(componentSource, /function ensureAssistantMessageForTurn\(turn: BuddyQueuedTurn\): BuddyMessage/);
   assert.match(componentSource, /function shouldRenderMessage\(message: BuddyMessage\)/);
-  assert.match(componentSource, /message\.role === "assistant"[\s\S]*!message\.content\.trim\(\)[\s\S]*Boolean\(message\.activityText\?\.trim\(\)\)/);
+  assert.doesNotMatch(extractFunctionBlock("shouldRenderMessage"), /activityText/);
 });
 
 test("BuddyWidget keeps runtime error replies out of model context and persisted history", () => {
@@ -244,74 +244,42 @@ test("BuddyWidget keeps runtime error replies out of model context and persisted
   assert.match(componentSource, /persistBuddyMessage\(turn\.sessionId,[\s\S]*includeInContext: false,[\s\S]*\);/);
 });
 
-test("BuddyWidget shows live run activity while the assistant reply is still empty", () => {
+test("BuddyWidget keeps live run activity out of the chat transcript", () => {
   assert.match(componentSource, /resolveBuddyRunActivityFromRunEvent/);
   assert.match(componentSource, /activityText/);
-  assert.match(componentSource, /shouldShowAssistantActivityBubble\(message\)/);
-  assert.match(componentSource, /message\.activityText \|\| t\("buddy\.streaming"\)/);
+  assert.doesNotMatch(componentSource, /shouldShowAssistantActivityBubble\(message\)/);
+  assert.doesNotMatch(componentSource, /message\.activityText \|\| t\("buddy\.streaming"\)/);
   assert.match(componentSource, /setAssistantActivityText\(assistantMessage\.id, t\("buddy\.activity\.preparing"\)\);/);
   assert.match(componentSource, /setAssistantActivityFromRunEvent\(assistantMessageId, eventType, payload, graph\);/);
   assert.match(componentSource, /if \(mood\.value === "thinking" && latestActivityText\.value\) \{/);
 });
 
-test("BuddyWidget renders assistant replies as safe markdown and keeps a compact run trace panel", () => {
+test("BuddyWidget renders assistant replies from parent graph output nodes only", () => {
   assert.match(componentSource, /import \{ resolveOutputPreviewContent \} from "\.\.\/editor\/nodes\/outputPreviewContentModel\.ts";/);
+  assert.match(componentSource, /buildBuddyPublicOutputBindings/);
+  assert.match(componentSource, /reduceBuddyPublicOutputEvent/);
+  assert.match(componentSource, /publicOutput\?:/);
+  assert.match(componentSource, /buildPublicOutputMessageId\(controllerMessageId, outputNodeId\)/);
+  assert.match(componentSource, /upsertPublicOutputMessages/);
   assert.match(componentSource, /v-html="renderBuddyMarkdown\(message\.content\)"/);
-  assert.match(componentSource, /class="buddy-widget__run-trace"/);
-  assert.match(componentSource, /type BuddyMessageRunTrace = \{/);
-  assert.doesNotMatch(componentSource, /const runTraceEntries = ref<BuddyRunTraceEntry\[\]>\(\[\]\);/);
-  assert.match(componentSource, /resolveBuddyRunTraceFromRunEvent/);
-  assert.match(componentSource, /appendRunTraceEntry\(eventType, traceEntry\);/);
+  assert.match(componentSource, /class="buddy-widget__public-output-card"/);
   assert.match(componentSource, /addEventListener\("activity\.event"/);
-  assert.match(componentSource, /v-for="entry in visibleRunTraceEntries\(message\)"/);
-  assert.match(componentSource, /\.buddy-widget__run-trace-body[\s\S]*max-height:\s*calc\(1 \* 1\.45em \+ 14px\);[\s\S]*overflow:\s*hidden;/);
-  assert.match(componentSource, /\.buddy-widget__run-trace--expanded \.buddy-widget__run-trace-body[\s\S]*max-height:\s*180px;[\s\S]*overflow:\s*auto;/);
+  assert.doesNotMatch(componentSource, /resolveBuddyReplyFromRunEvent/);
+  assert.doesNotMatch(componentSource, /resolveBuddyRunTraceFromRunEvent/);
 });
 
-test("BuddyWidget records and displays per-stage run trace durations", () => {
+test("BuddyWidget records and displays public output durations", () => {
   assert.match(componentSource, /import \{ formatRunDuration \} from "\.\.\/lib\/run-display-name\.ts";/);
-  assert.match(componentSource, /const runTraceStartedAtByKey = new Map<string, number>\(\);/);
-  assert.match(componentSource, /function appendRunTraceEntry\(eventType: string, traceEntry: BuddyRunTraceEntry\)/);
-  assert.match(componentSource, /mergeRunTraceEntry\(runTrace\.entries\[existingIndex\], timedTraceEntry\)/);
-  assert.match(componentSource, /runTraceStartedAtByKey\.set\(traceEntry\.timingKey, nowRunTraceMs\(\)\);/);
-  assert.match(componentSource, /durationMs: Math\.max\(1, Math\.round\(nowRunTraceMs\(\) - startedAt\)\),/);
-  assert.match(componentSource, /class="buddy-widget__run-trace-duration"/);
-  assert.match(componentSource, /formatRunTraceDuration\(entry\.durationMs\)/);
-});
-
-test("BuddyWidget pulses the run trace dot for currently running steps only", () => {
-  assert.match(componentSource, /\.buddy-widget__run-trace-dot\s*\{[\s\S]*position:\s*relative;/);
-  assert.match(componentSource, /\.buddy-widget__run-trace-entry--info \.buddy-widget__run-trace-dot,[\s\S]*\.buddy-widget__run-trace-entry--stream \.buddy-widget__run-trace-dot\s*\{[\s\S]*animation:\s*buddy-widget-run-trace-dot-pulse 1\.08s ease-in-out infinite;/);
-  assert.match(componentSource, /\.buddy-widget__run-trace-entry--info \.buddy-widget__run-trace-dot::after,[\s\S]*\.buddy-widget__run-trace-entry--stream \.buddy-widget__run-trace-dot::after\s*\{[\s\S]*animation:\s*buddy-widget-run-trace-ring-pulse 1\.08s ease-out infinite;/);
-  assert.match(componentSource, /\.buddy-widget__run-trace-entry--info \.buddy-widget__run-trace-dot,[\s\S]*\.buddy-widget__run-trace-entry--stream \.buddy-widget__run-trace-dot\s*\{[\s\S]*--buddy-run-trace-pulse-color:\s*rgba\(22,\s*163,\s*74,\s*0\.24\);[\s\S]*background:\s*#16a34a;/);
-  assert.match(componentSource, /@keyframes buddy-widget-run-trace-dot-pulse[\s\S]*box-shadow:\s*0 0 0 0 var\(--buddy-run-trace-pulse-color\);[\s\S]*box-shadow:\s*0 0 0 5px rgba\(22,\s*163,\s*74,\s*0\);/);
-  assert.match(componentSource, /@keyframes buddy-widget-run-trace-ring-pulse[\s\S]*transform:\s*scale\(0\.72\);[\s\S]*transform:\s*scale\(1\.65\);/);
-  assert.doesNotMatch(extractCssBlock(".buddy-widget__run-trace-entry--success .buddy-widget__run-trace-dot"), /animation:/);
-  assert.doesNotMatch(extractCssBlock(".buddy-widget__run-trace-entry--error .buddy-widget__run-trace-dot"), /animation:/);
-});
-
-test("BuddyWidget keeps the run trace above the formal reply and collapses to elapsed summary", () => {
-  assert.match(componentSource, /startedAtMs: number \| null;/);
-  assert.match(componentSource, /finishedAtMs: number \| null;/);
-  assert.match(componentSource, /function runTraceHeaderText\(message: BuddyMessage\)/);
-  assert.match(componentSource, /markRunTraceFinished\(\);/);
-  assert.match(componentSource, /if \(!hasAssistantMessageContent\(assistantMessageId\)\) \{[\s\S]*markRunTraceFinished\(\);[\s\S]*\}/);
-  assert.match(componentSource, /v-if="shouldShowRunTraceForMessage\(message\)"/);
-  assert.match(componentSource, /v-if="shouldShowRunTraceBody\(message\)"/);
-  assert.match(componentSource, /v-if="message\.role === 'assistant' && message\.content"/);
-  assert.match(componentSource, /shouldShowAssistantActivityBubble\(message\)/);
-  assert.doesNotMatch(componentSource, /message\.content \|\| message\.activityText \|\| t\("buddy\.streaming"\)/);
-});
-
-test("BuddyWidget starts each visible run trace collapsed to one active line", () => {
-  assert.match(componentSource, /function createEmptyRunTrace\([^)]*\): BuddyMessageRunTrace \{[\s\S]*isExpanded:\s*false,/);
-  assert.match(componentSource, /function visibleRunTraceEntries\(message: BuddyMessage\) \{[\s\S]*return runTrace\.entries\.slice\(-1\);/);
-  assert.match(componentSource, /\.buddy-widget__run-trace-body[\s\S]*max-height:\s*calc\(1 \* 1\.45em \+ 14px\);[\s\S]*overflow:\s*hidden;/);
+  assert.match(componentSource, /formatPublicOutputDuration/);
+  assert.match(componentSource, /message\.publicOutput\.durationMs/);
+  assert.match(componentSource, /class="buddy-widget__public-output-duration"/);
+  assert.match(componentSource, /resolvePublicOutputDurationFromRunDetail/);
+  assert.doesNotMatch(componentSource, /runTraceStartedAtByKey/);
 });
 
 test("BuddyWidget stores buddy chat in backend sessions and exposes a compact history dropdown", () => {
   assert.match(componentSource, /import \{[\s\S]*appendBuddyChatMessage,[\s\S]*fetchBuddyChatMessages,[\s\S]*fetchBuddyChatSessions,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
-  assert.match(componentSource, /import \{ ArrowDown, Check, Clock, Close, Delete, FullScreen, Plus, Promotion, SemiSelect \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import \{ Check, Clock, Close, Delete, FullScreen, Plus, Promotion, SemiSelect \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /import \{ ElIcon, ElOption, ElPopover, ElSelect \} from "element-plus";/);
   assert.match(componentSource, /const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "toograph:buddy-active-session";/);
   assert.match(componentSource, /const chatSessions = ref<BuddyChatSession\[\]>\(\[\]\);/);
@@ -338,7 +306,7 @@ test("BuddyWidget stores buddy chat in backend sessions and exposes a compact hi
 });
 
 test("BuddyWidget uses the top toolbar for new chat and fullscreen expansion", () => {
-  assert.match(componentSource, /import \{ ArrowDown, Check, Clock, Close, Delete, FullScreen, Plus, Promotion, SemiSelect \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import \{ Check, Clock, Close, Delete, FullScreen, Plus, Promotion, SemiSelect \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /const isPanelFullscreen = ref\(false\);/);
   assert.match(componentSource, /const avatarStyle = computed\(\(\) => \{[\s\S]*left:\s*`\$\{position\.value\.x\}px`,[\s\S]*top:\s*`\$\{position\.value\.y\}px`,/);
   assert.match(componentSource, /const hasCurrentSessionContent = computed\(\(\) => messages\.value\.some\(\(message\) => message\.content\.trim\(\)\)\);/);
@@ -431,14 +399,14 @@ test("BuddyWidget recovers awaiting-human paused runs after session activation",
   assert.match(componentSource, /const candidate = findLatestRecoverablePausedRunMessage\(messages\.value\);/);
   assert.match(componentSource, /const run = await fetchRun\(candidate\.runId\);/);
   assert.match(componentSource, /if \(!isRecoverablePausedRunStatus\(run\.status\)\) \{/);
-  assert.match(componentSource, /resetRunTraceForMessage\(candidate\.messageId\);/);
+  assert.doesNotMatch(componentSource, /resetRunTraceForMessage\(candidate\.messageId\);/);
   assert.match(componentSource, /handleBuddyRunAwaitingHuman\(run,\s*candidate\.messageId\);/);
   assert.match(componentSource, /buddy\.pause\.recoveryFailed/);
 });
 
 test("BuddyWidget keeps recovered paused runs session-locked and queue-safe", () => {
   assert.match(componentSource, /const isSessionSwitchLocked = computed\([\s\S]*activeRunId\.value !== null/);
-  assert.match(componentSource, /const isSessionSwitchLocked = computed\([\s\S]*isActiveTraceUnfinished\(\)/);
+  assert.doesNotMatch(componentSource, /isActiveTraceUnfinished\(\)/);
   assert.match(componentSource, /shouldHoldBuddyQueueDrain\(\{ hasPausedRun: Boolean\(pausedBuddyRun\.value\) \}\)/);
   assert.match(componentSource, /:disabled="Boolean\(pausedBuddyRun\)"/);
   assert.match(componentSource, /resolveBuddyComposerDecision\(\{[\s\S]*hasPausedRun: Boolean\(pausedBuddyRun\.value\),[\s\S]*isResumeBusy: pausedBuddyResumeBusy\.value/);
@@ -479,8 +447,9 @@ test("BuddyWidget keeps paused run continuation inside the pause card", () => {
   assert.match(componentSource, /if \(pausedBuddyRun\.value\) \{[\s\S]*await scrollPausedBuddyCardIntoView\(\);[\s\S]*return;/);
   assert.doesNotMatch(componentSource, /if \(pausedBuddyRun\.value\) \{[\s\S]*await resumePausedBuddyRun\(userMessage\);[\s\S]*return;/);
   assert.doesNotMatch(componentSource, /buildBuddyResumePayloadFromText/);
-  assert.match(componentSource, /appendRunTraceEntry\("node\.started",[\s\S]*buddy\.activity\.resuming/);
-  assert.match(componentSource, /appendRunTraceEntry\("node\.completed",[\s\S]*buddy\.activity\.resumed/);
+  assert.match(componentSource, /setAssistantActivityText\(assistantMessageId,\s*t\("buddy\.activity\.resuming"\)\)/);
+  assert.doesNotMatch(componentSource, /appendRunTraceEntry\("node\.started"/);
+  assert.doesNotMatch(componentSource, /appendRunTraceEntry\("node\.completed"/);
 });
 
 test("BuddyWidget does not impose a whole-run polling timeout", () => {

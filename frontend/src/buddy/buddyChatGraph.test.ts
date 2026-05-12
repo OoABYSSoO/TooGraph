@@ -808,6 +808,20 @@ test("resolveBuddyReplyFromRunEvent reads completed output values for named repl
   );
 });
 
+test("resolveBuddyReplyFromRunEvent does not treat request_understanding as visible chat text", () => {
+  assert.equal(
+    resolveBuddyReplyFromRunEvent(
+      {
+        event: "state.updated",
+        state_key: "request_understanding",
+        value: { intent: "greeting" },
+      },
+      createAgenticTemplate() as never,
+    ),
+    "",
+  );
+});
+
 test("resolveBuddyReplyFromRunEvent streams partial markdown from a structured reply field", () => {
   const graph = buildBuddyChatGraph(
     {
