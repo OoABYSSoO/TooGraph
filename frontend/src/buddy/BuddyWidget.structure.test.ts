@@ -424,6 +424,23 @@ test("BuddyWidget persists awaiting-human paused run placeholders outside model 
   );
 });
 
+test("BuddyWidget recovers awaiting-human paused runs after session activation", () => {
+  assert.match(
+    componentSource,
+    /import \{ findLatestRecoverablePausedRunMessage, isRecoverablePausedRunStatus \} from "\.\/buddyPausedRunRecovery\.ts";/,
+  );
+  assert.match(componentSource, /let chatSessionActivationGeneration = 0;/);
+  assert.match(componentSource, /const activationGeneration = \+\+chatSessionActivationGeneration;/);
+  assert.match(componentSource, /await recoverPausedBuddyRunFromLoadedMessages\(sessionId,\s*activationGeneration\);/);
+  assert.match(componentSource, /async function recoverPausedBuddyRunFromLoadedMessages\(sessionId: string, activationGeneration: number\)/);
+  assert.match(componentSource, /const candidate = findLatestRecoverablePausedRunMessage\(messages\.value\);/);
+  assert.match(componentSource, /const run = await fetchRun\(candidate\.runId\);/);
+  assert.match(componentSource, /if \(!isRecoverablePausedRunStatus\(run\.status\)\) \{/);
+  assert.match(componentSource, /resetRunTraceForMessage\(candidate\.messageId\);/);
+  assert.match(componentSource, /handleBuddyRunAwaitingHuman\(run,\s*candidate\.messageId\);/);
+  assert.match(componentSource, /buddy\.pause\.recoveryFailed/);
+});
+
 test("BuddyWidget can deny a pending permission approval from the pause card", () => {
   assert.match(componentSource, /v-if="pausedBuddyPermissionApproval"[\s\S]*buddy\.pause\.denyPermission/);
   assert.match(componentSource, /@click="denyPausedBuddyPermissionApproval"/);

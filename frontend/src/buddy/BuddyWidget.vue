@@ -498,6 +498,7 @@ import type { SettingsPayload } from "../types/settings.ts";
 
 import BuddyMascot from "./BuddyMascot.vue";
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
+import { findLatestRecoverablePausedRunMessage, isRecoverablePausedRunStatus } from "./buddyPausedRunRecovery.ts";
 import {
   BUDDY_REVIEW_TEMPLATE_ID,
   BUDDY_TEMPLATE_ID,
@@ -677,6 +678,7 @@ let buddyRoamSequenceId = 0;
 let buddyDebugActionTimerId: number | null = null;
 let pendingMascotLookPointer: { x: number; y: number } | null = null;
 let chatSessionInitializationPromise: Promise<void> | null = null;
+let chatSessionActivationGeneration = 0;
 const backgroundReviewAbortControllers = new Set<AbortController>();
 const runTraceStartedAtByKey = new Map<string, number>();
 let nextBuddyMessageClientOrder = 0;
@@ -1713,6 +1715,7 @@ async function activateChatSession(sessionId: string, options: { skipInitializat
   if (!options.skipInitializationWait) {
     await waitForChatSessionInitialization();
   }
+  const activationGeneration = ++chatSessionActivationGeneration;
   isSessionLoading.value = true;
   errorMessage.value = "";
   try {
@@ -1722,11 +1725,40 @@ async function activateChatSession(sessionId: string, options: { skipInitializat
     messages.value = records.map(messageRecordToBuddyMessage);
     resetNextBuddyMessageClientOrder();
     resetVisibleRunTrace();
+    await recoverPausedBuddyRunFromLoadedMessages(sessionId, activationGeneration);
     await scrollMessagesToBottom();
   } catch (error) {
     errorMessage.value = t("buddy.historyLoadFailed", { error: formatErrorMessage(error) });
   } finally {
     isSessionLoading.value = false;
+  }
+}
+
+function isCurrentChatSessionActivation(sessionId: string, activationGeneration: number) {
+  return activeSessionId.value === sessionId && chatSessionActivationGeneration === activationGeneration;
+}
+
+async function recoverPausedBuddyRunFromLoadedMessages(sessionId: string, activationGeneration: number) {
+  const candidate = findLatestRecoverablePausedRunMessage(messages.value);
+  if (!candidate) {
+    return;
+  }
+
+  try {
+    const run = await fetchRun(candidate.runId);
+    if (!isCurrentChatSessionActivation(sessionId, activationGeneration)) {
+      return;
+    }
+    if (!isRecoverablePausedRunStatus(run.status)) {
+      return;
+    }
+    resetRunTraceForMessage(candidate.messageId);
+    handleBuddyRunAwaitingHuman(run, candidate.messageId);
+    await scrollPausedBuddyCardIntoView();
+  } catch (error) {
+    if (isCurrentChatSessionActivation(sessionId, activationGeneration)) {
+      errorMessage.value = t("buddy.pause.recoveryFailed", { error: formatErrorMessage(error) });
+    }
   }
 }
 
