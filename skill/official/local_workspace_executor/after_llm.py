@@ -41,10 +41,21 @@ def _read_file(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
     if not target.is_file():
         return _failed("not_found", "Path is not a file.")
     content = target.read_text(encoding="utf-8", errors="replace")
-    result = f"Read `{_display_path(repo_root, target)}` ({len(content)} characters).\n\n{content[:MAX_READ_CHARS]}"
+    display_path = _display_path(repo_root, target)
+    result = f"Read `{display_path}` ({len(content)} characters).\n\n{content[:MAX_READ_CHARS]}"
     if len(content) > MAX_READ_CHARS:
         result += "\n\n[truncated]"
-    return _succeeded(result)
+    return _succeeded(
+        result,
+        activity_events=[
+            _activity_event(
+                kind="file_read",
+                summary=f"Read {display_path} ({len(content)} characters).",
+                status="succeeded",
+                detail={"path": display_path, "characters": len(content)},
+            )
+        ],
+    )
 
 
 def _write_file(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
@@ -55,9 +66,30 @@ def _write_file(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
         return _failed("missing_content", "content is required for write.")
     target = target_result
     content = _as_text(payload.get("content"))
+    previous_text = target.read_text(encoding="utf-8", errors="replace") if target.is_file() else ""
+    previous_lines = _line_count(previous_text)
+    next_lines = _line_count(content)
+    added = max(next_lines - previous_lines, 0)
+    removed = max(previous_lines - next_lines, 0)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")
-    return _succeeded(f"Wrote `{_display_path(repo_root, target)}` ({len(content)} characters).")
+    display_path = _display_path(repo_root, target)
+    return _succeeded(
+        f"Wrote `{display_path}` ({len(content)} characters).",
+        activity_events=[
+            _activity_event(
+                kind="file_write",
+                summary=f"Editing {display_path} +{added} -{removed}",
+                status="succeeded",
+                detail={
+                    "path": display_path,
+                    "characters": len(content),
+                    "added": added,
+                    "removed": removed,
+                },
+            )
+        ],
+    )
 
 
 def _execute_script(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
@@ -84,6 +116,15 @@ def _execute_script(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
+        event = _command_activity_event(
+            repo_root=repo_root,
+            target=target,
+            command=command_result,
+            exit_code=124,
+            stdout=_truncate(exc.stdout or ""),
+            stderr=_truncate(exc.stderr or ""),
+            status="failed",
+        )
         return _failed(
             "timeout",
             _format_execution_result(
@@ -94,8 +135,18 @@ def _execute_script(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
                 _truncate(exc.stderr or ""),
                 prefix=f"Timed out after {DEFAULT_TIMEOUT_SECONDS} seconds.",
             ),
+            activity_events=[event],
         )
 
+    event = _command_activity_event(
+        repo_root=repo_root,
+        target=target,
+        command=command_result,
+        exit_code=completed.returncode,
+        stdout=_truncate(completed.stdout),
+        stderr=_truncate(completed.stderr),
+        status="succeeded" if completed.returncode == 0 else "failed",
+    )
     result = _format_execution_result(
         repo_root,
         target,
@@ -104,8 +155,8 @@ def _execute_script(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
         _truncate(completed.stderr),
     )
     if completed.returncode != 0:
-        return _failed("process_failed", result)
-    return _succeeded(result)
+        return _failed("process_failed", result, activity_events=[event])
+    return _succeeded(result, activity_events=[event])
 
 
 def _build_execute_command(target: Path) -> list[str] | dict[str, str]:
@@ -206,12 +257,59 @@ def _truncate(value: str | bytes | None) -> str:
     return text[:MAX_OUTPUT_CHARS]
 
 
-def _succeeded(result: str) -> dict[str, Any]:
-    return {"success": True, "result": result}
+def _line_count(value: str) -> int:
+    if not value:
+        return 0
+    return len(value.splitlines())
 
 
-def _failed(error_type: str, message: str) -> dict[str, Any]:
-    return {"success": False, "result": f"{error_type}: {message}"}
+def _activity_event(*, kind: str, summary: str, status: str, detail: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "kind": kind,
+        "summary": summary,
+        "status": status,
+        "detail": detail,
+    }
+
+
+def _command_activity_event(
+    *,
+    repo_root: Path,
+    target: Path,
+    command: list[str],
+    exit_code: int,
+    stdout: str,
+    stderr: str,
+    status: str,
+) -> dict[str, Any]:
+    display_path = _display_path(repo_root, target)
+    return _activity_event(
+        kind="command",
+        summary=f"Ran {display_path}, exit {exit_code}.",
+        status=status,
+        detail={
+            "path": display_path,
+            "command": command,
+            "cwd": _display_path(repo_root, target.parent),
+            "exit_code": exit_code,
+            "stdout_chars": len(stdout),
+            "stderr_chars": len(stderr),
+        },
+    )
+
+
+def _succeeded(result: str, *, activity_events: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {"success": True, "result": result}
+    if activity_events:
+        payload["activity_events"] = activity_events
+    return payload
+
+
+def _failed(error_type: str, message: str, *, activity_events: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {"success": False, "result": f"{error_type}: {message}"}
+    if activity_events:
+        payload["activity_events"] = activity_events
+    return payload
 
 
 def main() -> None:

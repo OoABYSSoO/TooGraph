@@ -124,9 +124,15 @@ class LocalWorkspaceExecutorSkillTests(unittest.TestCase):
                 repo_root=repo_root,
             )
 
-        self.assertEqual(write_result, {"success": True, "result": "Wrote `backend/data/tmp/note.txt` (15 characters)."})
+        self.assertEqual(write_result["success"], True)
+        self.assertEqual(write_result["result"], "Wrote `backend/data/tmp/note.txt` (15 characters).")
+        self.assertEqual(write_result["activity_events"][0]["kind"], "file_write")
+        self.assertEqual(write_result["activity_events"][0]["summary"], "Editing backend/data/tmp/note.txt +1 -0")
+        self.assertEqual(write_result["activity_events"][0]["detail"]["path"], "backend/data/tmp/note.txt")
         self.assertTrue(read_result["success"])
         self.assertIn("hello workspace", str(read_result["result"]))
+        self.assertEqual(read_result["activity_events"][0]["kind"], "file_read")
+        self.assertEqual(read_result["activity_events"][0]["detail"]["characters"], len("hello workspace"))
 
     def test_write_outside_backend_data_is_denied(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -167,6 +173,9 @@ class LocalWorkspaceExecutorSkillTests(unittest.TestCase):
         self.assertEqual(result["success"], True)
         self.assertIn("exit code 0", str(result["result"]))
         self.assertIn("hello workspace", str(result["result"]))
+        self.assertEqual(result["activity_events"][0]["kind"], "command")
+        self.assertEqual(result["activity_events"][0]["status"], "succeeded")
+        self.assertEqual(result["activity_events"][0]["detail"]["exit_code"], 0)
 
     def test_execute_outside_execute_roots_is_denied(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
