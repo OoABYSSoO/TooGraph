@@ -20,21 +20,23 @@ ALLOWED_COMMANDS = {"python", "python3", "node", "npm", "bash", "sh", "pwsh", "p
 def toograph_script_tester(**skill_inputs: Any) -> dict[str, Any]:
     files = _normalize_files(skill_inputs.get("files"))
     if isinstance(files, str):
-        return _result(False, files)
+        return _result(False, files, activity_events=[_validation_event(files)])
     command = _normalize_command(skill_inputs.get("command"))
     if isinstance(command, str):
-        return _result(False, command)
+        return _result(False, command, activity_events=[_validation_event(command)])
     if not files:
-        return _result(False, "No test files were provided.")
+        message = "No test files were provided."
+        return _result(False, message, activity_events=[_validation_event(message)])
 
     with tempfile.TemporaryDirectory(prefix="toograph_script_test_") as temp_dir:
         temp_path = Path(temp_dir)
         file_error = _write_files(temp_path, files)
         if file_error:
-            return _result(False, file_error)
+            return _result(False, file_error, activity_events=[_validation_event(file_error)])
 
         display_command = _display_command(command)
         run_command = _resolve_runtime_command(command)
+        workspace_event = _workspace_event(files)
         started_at = time.monotonic()
         try:
             completed = subprocess.run(
@@ -49,44 +51,84 @@ def toograph_script_tester(**skill_inputs: Any) -> dict[str, Any]:
         except subprocess.TimeoutExpired as exc:
             stdout = _truncate(exc.stdout)
             stderr = _truncate(exc.stderr)
+            duration_seconds = time.monotonic() - started_at
             return _result(
                 False,
                 _format_result(
                     command=display_command,
                     exit_code=124,
-                    duration_seconds=time.monotonic() - started_at,
+                    duration_seconds=duration_seconds,
                     stdout=stdout,
                     stderr=stderr,
                     detail=f"Timed out after {RUN_TIMEOUT_SECONDS} seconds.",
                 ),
+                activity_events=[
+                    workspace_event,
+                    _command_event(
+                        command=display_command,
+                        command_args=command,
+                        exit_code=124,
+                        duration_seconds=duration_seconds,
+                        stdout=stdout,
+                        stderr=stderr,
+                    ),
+                ],
             )
         except OSError as exc:
+            duration_seconds = time.monotonic() - started_at
             return _result(
                 False,
                 _format_result(
                     command=display_command,
                     exit_code=None,
-                    duration_seconds=time.monotonic() - started_at,
+                    duration_seconds=duration_seconds,
                     stdout="",
                     stderr=str(exc),
                     detail="The command could not be started.",
                 ),
+                activity_events=[
+                    workspace_event,
+                    _command_event(
+                        command=display_command,
+                        command_args=command,
+                        exit_code=None,
+                        duration_seconds=duration_seconds,
+                        stdout="",
+                        stderr=str(exc),
+                    ),
+                ],
             )
 
         success = completed.returncode == 0
         stdout = _truncate(completed.stdout)
         stderr = _truncate(completed.stderr)
-        detail = "All generated tests passed." if success else _first_non_empty_line(stderr, stdout) or "The test command failed."
+        duration_seconds = time.monotonic() - started_at
+        detail = (
+            "All generated tests passed."
+            if success
+            else _first_non_empty_line(stderr, stdout) or "The test command failed."
+        )
         return _result(
             success,
             _format_result(
                 command=display_command,
                 exit_code=completed.returncode,
-                duration_seconds=time.monotonic() - started_at,
+                duration_seconds=duration_seconds,
                 stdout=stdout,
                 stderr=stderr,
                 detail=detail,
             ),
+            activity_events=[
+                workspace_event,
+                _command_event(
+                    command=display_command,
+                    command_args=command,
+                    exit_code=completed.returncode,
+                    duration_seconds=duration_seconds,
+                    stdout=stdout,
+                    stderr=stderr,
+                ),
+            ],
         )
 
 
@@ -185,8 +227,62 @@ def _display_command(command: list[str]) -> str:
     return " ".join(shlex.quote(part) for part in command)
 
 
-def _result(success: bool, result: str) -> dict[str, Any]:
-    return {"success": success, "result": result}
+def _result(success: bool, result: str, *, activity_events: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {"success": success, "result": result}
+    if activity_events:
+        payload["activity_events"] = activity_events
+    return payload
+
+
+def _validation_event(error: str) -> dict[str, Any]:
+    return {
+        "kind": "script_test_validation",
+        "summary": "Rejected script test request.",
+        "status": "failed",
+        "detail": {"error": error},
+        "error": error,
+    }
+
+
+def _workspace_event(files: list[dict[str, str]]) -> dict[str, Any]:
+    file_paths = [file_spec["path"] for file_spec in files]
+    file_count = len(file_paths)
+    noun = "file" if file_count == 1 else "files"
+    return {
+        "kind": "test_workspace",
+        "summary": f"Prepared test workspace with {file_count} {noun}.",
+        "status": "succeeded",
+        "detail": {
+            "file_count": file_count,
+            "files": file_paths,
+            "total_characters": sum(len(file_spec["content"]) for file_spec in files),
+        },
+    }
+
+
+def _command_event(
+    *,
+    command: str,
+    command_args: list[str],
+    exit_code: int | None,
+    duration_seconds: float,
+    stdout: str,
+    stderr: str,
+) -> dict[str, Any]:
+    status = "succeeded" if exit_code == 0 else "failed"
+    exit_label = exit_code if exit_code is not None else "not-started"
+    return {
+        "kind": "command",
+        "summary": f"Ran {command}, exit {exit_label}.",
+        "status": status,
+        "duration_ms": max(int(duration_seconds * 1000), 0),
+        "detail": {
+            "command": command_args,
+            "exit_code": exit_code,
+            "stdout_chars": len(stdout),
+            "stderr_chars": len(stderr),
+        },
+    }
 
 
 def _is_safe_relative_path(value: str) -> bool:

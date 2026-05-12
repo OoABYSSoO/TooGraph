@@ -98,6 +98,13 @@ class TooGraphScriptTesterSkillTests(unittest.TestCase):
         self.assertIs(payload["success"], True)
         self.assertIn("1 passed", str(payload["result"]).lower())
         self.assertIn("python -m pytest -q test_calculator.py", str(payload["result"]))
+        self.assertEqual(payload["activity_events"][0]["kind"], "test_workspace")
+        self.assertEqual(payload["activity_events"][0]["summary"], "Prepared test workspace with 2 files.")
+        self.assertEqual(payload["activity_events"][0]["detail"]["file_count"], 2)
+        self.assertEqual(payload["activity_events"][1]["kind"], "command")
+        self.assertEqual(payload["activity_events"][1]["summary"], "Ran python -m pytest -q test_calculator.py, exit 0.")
+        self.assertEqual(payload["activity_events"][1]["status"], "succeeded")
+        self.assertEqual(payload["activity_events"][1]["detail"]["exit_code"], 0)
 
     def test_after_llm_runs_non_python_allowed_script_tests(self) -> None:
         if shutil.which("sh") is None:
@@ -137,6 +144,11 @@ class TooGraphScriptTesterSkillTests(unittest.TestCase):
         self.assertIs(payload["success"], False)
         self.assertIn("test_add", str(payload["result"]))
         self.assertIn("assert", str(payload["result"]))
+        command_event = payload["activity_events"][1]
+        self.assertEqual(command_event["kind"], "command")
+        self.assertEqual(command_event["status"], "failed")
+        self.assertNotEqual(command_event["detail"]["exit_code"], 0)
+        self.assertGreater(command_event["detail"]["stdout_chars"], 0)
 
     def test_after_llm_rejects_unsupported_commands(self) -> None:
         payload = _run_skill_script(
@@ -149,6 +161,9 @@ class TooGraphScriptTesterSkillTests(unittest.TestCase):
 
         self.assertIs(payload["success"], False)
         self.assertIn("not allowed", str(payload["result"]))
+        self.assertEqual(payload["activity_events"][0]["kind"], "script_test_validation")
+        self.assertEqual(payload["activity_events"][0]["status"], "failed")
+        self.assertIn("curl", payload["activity_events"][0]["detail"]["error"])
 
 
 if __name__ == "__main__":
