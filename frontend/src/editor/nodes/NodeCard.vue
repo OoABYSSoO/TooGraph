@@ -16,6 +16,15 @@
     @click.capture="handleLockedNodeCardInteractionCapture"
     @keydown.capture="handleLockedNodeCardInteractionCapture"
   >
+    <div
+      v-if="shouldShowNodeRunTiming"
+      class="node-card__run-timing-capsule"
+      :class="`node-card__run-timing-capsule--${runTiming?.status ?? 'running'}`"
+      :title="t('nodeCard.runTiming')"
+    >
+      <ElIcon aria-hidden="true"><Clock /></ElIcon>
+      <span>{{ formattedNodeRunTimingDuration }}</span>
+    </div>
     <NodeCardTopActions
       :body-kind="view.body.kind"
       :active-top-action="activeTopAction"
@@ -431,7 +440,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ElIcon, ElInput, ElPopover } from "element-plus";
-import { Check, Collection, Document, FolderOpened } from "@element-plus/icons-vue";
+import { Check, Clock, Collection, Document, FolderOpened } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 import AgentNodeBody from "./AgentNodeBody.vue";
@@ -449,6 +458,7 @@ import type { RunNodeTiming } from "../workspace/runNodeTimingModel.ts";
 import { fetchLocalFolderTree, type LocalFolderTreeEntry } from "@/api/localInputSources";
 import { buildSkillArtifactFileUrl, uploadSkillArtifactFile } from "@/api/skillArtifacts";
 import { isAgentOutputManagedByDynamicCapability } from "@/lib/agent-capability-management";
+import { formatRunDuration } from "@/lib/run-display-name";
 import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_COLOR, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "@/lib/virtual-any-input";
 
 import {
@@ -627,6 +637,7 @@ const stateEditorPopoverStyle = transparentPopoverStyle;
 const agentAddPopoverStyle = transparentPopoverStyle;
 const stateTypeOptions = STATE_FIELD_TYPE_OPTIONS;
 const conditionRuleOperatorOptions = CONDITION_RULE_OPERATOR_OPTIONS;
+const nodeRunTimingNowMs = ref(nowNodeRunTimingMs());
 const agentThinkingOptions = computed<Array<{ value: AgentThinkingControlMode; label: string }>>(() => [
   { value: "off", label: t("nodeCard.thinkingOff") },
   { value: "low", label: t("nodeCard.thinkingLow") },
@@ -904,6 +915,18 @@ const agentTemperatureInput = computed(() => {
 const hasAdvancedSettings = computed(() => props.node.kind === "agent" || props.node.kind === "output");
 const canSavePreset = computed(() => props.node.kind === "agent");
 const isTopActionVisible = computed(() => props.humanReviewPending || props.selected || Boolean(props.hovered) || activeTopAction.value !== null);
+const shouldShowNodeRunTiming = computed(() => Boolean(props.runTiming));
+const nodeRunTimingDurationMs = computed(() => {
+  const timing = props.runTiming;
+  if (!timing) {
+    return null;
+  }
+  if (timing.status === "running" && timing.startedAtMs !== null) {
+    return Math.max(0, Math.round(nodeRunTimingNowMs.value - timing.startedAtMs));
+  }
+  return timing.durationMs;
+});
+const formattedNodeRunTimingDuration = computed(() => formatNodeRunTimingDuration(nodeRunTimingDurationMs.value));
 const hasFloatingPanelOpen = computed(
   () =>
     activeTopAction.value !== null ||
@@ -921,9 +944,41 @@ const shouldRevealAgentCreateOutputPort = computed(
     !isAgentOutputManagedByCapability.value &&
     (shouldShowAgentCreateOutputPort.value || props.selected || Boolean(props.hovered) || hasFloatingPanelOpen.value),
 );
+let nodeRunTimingIntervalId: number | null = null;
 
 function isPortCreateOpen(side: "input" | "output") {
   return activePortPickerSide.value === side && Boolean(portStateDraft.value);
+}
+
+function formatNodeRunTimingDuration(durationMs: number | null | undefined) {
+  return formatRunDuration(durationMs);
+}
+
+function nowNodeRunTimingMs() {
+  return typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
+}
+
+function clearNodeRunTimingInterval() {
+  if (nodeRunTimingIntervalId === null || typeof window === "undefined") {
+    nodeRunTimingIntervalId = null;
+    return;
+  }
+  window.clearInterval(nodeRunTimingIntervalId);
+  nodeRunTimingIntervalId = null;
+}
+
+function refreshNodeRunTimingInterval() {
+  clearNodeRunTimingInterval();
+  if (props.runTiming?.status !== "running" || props.runTiming.startedAtMs === null) {
+    return;
+  }
+  nodeRunTimingNowMs.value = nowNodeRunTimingMs();
+  if (typeof window === "undefined") {
+    return;
+  }
+  nodeRunTimingIntervalId = window.setInterval(() => {
+    nodeRunTimingNowMs.value = nowNodeRunTimingMs();
+  }, 250);
 }
 
 watch(
@@ -959,7 +1014,14 @@ watch(
   },
 );
 
+watch(
+  () => [props.runTiming?.status ?? null, props.runTiming?.startedAtMs ?? null] as const,
+  refreshNodeRunTimingInterval,
+  { immediate: true },
+);
+
 onBeforeUnmount(() => {
+  clearNodeRunTimingInterval();
   removeGlobalFloatingPanelListeners();
   clearTopActionTimeout();
   clearTextTriggerPointerState();
@@ -1943,6 +2005,51 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   box-shadow:
     0 22px 40px rgba(60, 41, 20, 0.1),
     0 0 0 2px rgba(var(--node-card-kind-rgb), 0.08);
+}
+
+.node-card__run-timing-capsule {
+  position: absolute;
+  top: -12px;
+  left: 16px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid rgba(var(--node-card-kind-rgb), 0.18);
+  border-radius: 999px;
+  background: rgba(255, 251, 247, 0.96);
+  color: rgba(71, 47, 29, 0.84);
+  box-shadow: 0 8px 18px rgba(60, 41, 20, 0.11);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.node-card__run-timing-capsule :deep(.el-icon) {
+  font-size: 13px;
+}
+
+.node-card__run-timing-capsule--running {
+  border-color: rgba(16, 185, 129, 0.36);
+  color: #047857;
+}
+
+.node-card__run-timing-capsule--success {
+  border-color: rgba(16, 185, 129, 0.42);
+  color: #047857;
+}
+
+.node-card__run-timing-capsule--failed {
+  border-color: rgba(239, 68, 68, 0.44);
+  color: #b91c1c;
+}
+
+.node-card__run-timing-capsule--paused {
+  border-color: rgba(245, 158, 11, 0.44);
+  color: #b45309;
 }
 
 .node-card__header {

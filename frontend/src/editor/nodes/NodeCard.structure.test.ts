@@ -87,6 +87,15 @@ test("NodeCard accepts canvas-provided real dimensions through CSS variables", (
   assert.match(componentSource, /\.node-card--subgraph \{[\s\S]*width:\s*var\(--node-card-width,\s*820px\);/);
 });
 
+test("NodeCard renders a top-left run timing capsule", () => {
+  assert.match(componentSource, /node-card__run-timing-capsule/);
+  assert.match(componentSource, /Clock/);
+  assert.match(componentSource, /formatNodeRunTimingDuration/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*position:\s*absolute;/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*top:/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*left:/);
+});
+
 test("NodeCard stretches primary editable surfaces when the canvas resizes the node", () => {
   assert.match(componentSource, /\.node-card \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/);
   assert.match(componentSource, /\.node-card__body \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
