@@ -3,8 +3,8 @@
   "skillKey": "toograph_capability_selector",
   "name": "TooGraph Capability Selector",
   "description": "当图流程需要根据用户需求从当前启用的图模板和 Skill 中选择一个可用能力时使用此技能。",
-  "llmInstruction": "你已绑定 TooGraph Capability Selector。Skill Pre-LLM Context 会列出当前启用的图模板和 Skill 清单，每项包含 key、名称、适用场景和权限摘要。你必须根据用户需求从清单中选择一个 capability 入参；优先选择图模板，其次选择 Skill；没有合适能力时选择 {\"kind\":\"none\"}。不要编造清单外能力。运行 Skill 本身不需要审批；写文件、删改文件或执行脚本由运行时的 需确认/完全访问 模式处理，不由本选择器判断。",
-  "version": "1.0.0",
+  "llmInstruction": "你已绑定 TooGraph Capability Selector。Skill Pre-LLM Context 会列出当前启用的图模板和 Skill 清单，每项包含 key、名称、适用场景和权限摘要。你必须根据用户需求从清单中选择一个 capability 入参；优先选择图模板，其次选择 Skill；没有合适能力时选择 {\"kind\":\"none\"}。同时给出 selection_reason，并用 rejected_candidates 简短说明 1-5 个未选候选为什么不如当前选择合适。不要编造清单外能力。运行 Skill 本身不需要审批；写文件、删改文件或执行脚本由运行时的 需确认/完全访问 模式处理，不由本选择器判断。",
+  "version": "1.1.0",
   "timeoutSeconds": 30,
   "permissions": [
     "file_read"
@@ -30,6 +30,20 @@
       "valueType": "capability",
       "required": true,
       "description": "LLM 从候选清单中选出的单个能力对象，kind 为 subgraph、skill 或 none。"
+    },
+    {
+      "key": "selection_reason",
+      "name": "Selection Reason",
+      "valueType": "text",
+      "required": false,
+      "description": "为什么选择该能力或为什么没有合适能力。"
+    },
+    {
+      "key": "rejected_candidates",
+      "name": "Rejected Candidates",
+      "valueType": "json",
+      "required": false,
+      "description": "简短列出若干未选择的候选能力及原因，格式为数组，每项包含 kind、key、reason。"
     }
   ],
   "outputSchema": [
@@ -44,6 +58,12 @@
       "name": "Found",
       "valueType": "boolean",
       "description": "是否找到了可用的图模板或 Skill 能力。"
+    },
+    {
+      "key": "audit",
+      "name": "Audit",
+      "valueType": "json",
+      "description": "能力选择审计摘要，包含候选数量、选中能力、权限摘要、拒绝候选原因和缺口说明。"
     }
   ]
 }

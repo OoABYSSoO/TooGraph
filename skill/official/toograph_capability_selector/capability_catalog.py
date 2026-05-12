@@ -19,6 +19,7 @@ def build_capability_catalog_context(*, origin: str = DEFAULT_ORIGIN) -> str:
         "Graph templates are preferred over Skills when both can satisfy the requirement.",
         "Choose exactly one item by returning {\"kind\":\"subgraph\",\"key\":\"...\"} or {\"kind\":\"skill\",\"key\":\"...\"}.",
         "If no item fits, return {\"kind\":\"none\"}. Do not invent keys outside this catalog.",
+        "Also provide selection_reason and rejected_candidates so the run audit can explain the choice.",
         "",
         "Graph Templates:",
     ]
@@ -42,21 +43,42 @@ def load_capability_catalog(*, origin: str = DEFAULT_ORIGIN) -> dict[str, list[d
 def normalize_selected_capability(**skill_inputs: Any) -> dict[str, Any]:
     origin = _compact_text(skill_inputs.get("origin")) or DEFAULT_ORIGIN
     selected = _coerce_capability(skill_inputs.get("capability"))
-    if selected["kind"] == "none":
-        return _none_response()
-
     repo_root = _resolve_repo_root()
-    if selected["kind"] == "subgraph":
-        candidates, _errors = _load_template_candidates(repo_root)
-    elif selected["kind"] == "skill":
-        candidates, _errors = _load_skill_candidates(repo_root, origin=origin)
-    else:
-        return _none_response()
+    templates, template_errors = _load_template_candidates(repo_root)
+    skills, skill_errors = _load_skill_candidates(repo_root, origin=origin)
+    catalog = {
+        "templates": templates,
+        "skills": skills,
+        "errors": [{"message": item} for item in [*template_errors, *skill_errors]],
+    }
+    if selected["kind"] == "none":
+        audit = _build_selection_audit(
+            catalog=catalog,
+            selected=selected,
+            candidate=None,
+            skill_inputs=skill_inputs,
+            gap="No capability was selected from the enabled catalog.",
+        )
+        return _none_response(audit)
 
-    candidate = {item["key"]: item for item in candidates}.get(selected["key"])
+    candidate = _candidate_by_kind_and_key(catalog).get((selected["kind"], selected["key"]))
     if candidate is None:
-        return _none_response()
+        audit = _build_selection_audit(
+            catalog=catalog,
+            selected=selected,
+            candidate=None,
+            skill_inputs=skill_inputs,
+            gap=f"Selected capability '{selected['key']}' is not enabled or no longer exists.",
+        )
+        return _none_response(audit)
 
+    audit = _build_selection_audit(
+        catalog=catalog,
+        selected=selected,
+        candidate=candidate,
+        skill_inputs=skill_inputs,
+        gap="",
+    )
     return {
         "found": True,
         "capability": {
@@ -65,7 +87,9 @@ def normalize_selected_capability(**skill_inputs: Any) -> dict[str, Any]:
             "name": candidate["name"],
             "description": candidate["description"],
             "permissions": list(candidate.get("permissions") or []),
-        }
+        },
+        "audit": audit,
+        "activity_events": [_build_selection_activity_event(audit, found=True)],
     }
 
 
@@ -279,8 +303,24 @@ def _unique_permissions(values: Any) -> list[str]:
     return result
 
 
-def _none_response() -> dict[str, Any]:
-    return {"found": False, "capability": {"kind": "none"}}
+def _none_response(audit: dict[str, Any] | None = None) -> dict[str, Any]:
+    selection_audit = audit or {
+        "candidate_count": 0,
+        "candidate_counts": {"subgraph": 0, "skill": 0},
+        "selected": {"kind": "none", "key": "", "name": ""},
+        "selection_reason": "",
+        "selected_permissions": [],
+        "permission_summary": "none",
+        "rejected_candidates": [],
+        "gap": "No capability was selected from the enabled catalog.",
+        "catalog_errors": [],
+    }
+    return {
+        "found": False,
+        "capability": {"kind": "none"},
+        "audit": selection_audit,
+        "activity_events": [_build_selection_activity_event(selection_audit, found=False)],
+    }
 
 
 def _format_candidate_lines(candidates: list[dict[str, Any]]) -> list[str]:
@@ -296,3 +336,121 @@ def _format_candidate_lines(candidates: list[dict[str, Any]]) -> list[str]:
             ]
         )
     return lines
+
+
+def _build_selection_audit(
+    *,
+    catalog: dict[str, Any],
+    selected: dict[str, str],
+    candidate: dict[str, Any] | None,
+    skill_inputs: dict[str, Any],
+    gap: str,
+) -> dict[str, Any]:
+    all_candidates = _all_catalog_candidates(catalog)
+    selected_permissions = list(candidate.get("permissions") or []) if candidate else []
+    selected_name = _compact_text(candidate.get("name")) if candidate else ""
+    selected_record = {
+        "kind": candidate["kind"] if candidate else selected["kind"],
+        "key": candidate["key"] if candidate else selected["key"],
+        "name": selected_name,
+    }
+    selection_reason = _compact_text(skill_inputs.get("selection_reason"))
+    if not selection_reason and candidate:
+        selection_reason = f"Selected {selected_name or candidate['key']} from the enabled catalog."
+    return {
+        "candidate_count": len(all_candidates),
+        "candidate_counts": {
+            "subgraph": len(catalog.get("templates") or []),
+            "skill": len(catalog.get("skills") or []),
+        },
+        "selected": selected_record,
+        "selection_reason": selection_reason,
+        "selected_permissions": selected_permissions,
+        "permission_summary": ", ".join(selected_permissions) if selected_permissions else "none",
+        "rejected_candidates": _normalize_rejected_candidates(
+            raw_rejections=skill_inputs.get("rejected_candidates"),
+            catalog=catalog,
+            selected=selected_record,
+            found=candidate is not None,
+        ),
+        "gap": gap,
+        "catalog_errors": [_compact_text(item.get("message")) for item in catalog.get("errors") or [] if isinstance(item, dict) and _compact_text(item.get("message"))],
+    }
+
+
+def _normalize_rejected_candidates(
+    *,
+    raw_rejections: Any,
+    catalog: dict[str, Any],
+    selected: dict[str, str],
+    found: bool,
+) -> list[dict[str, str]]:
+    candidates_by_key = _candidate_by_kind_and_key(catalog)
+    rejected: list[dict[str, str]] = []
+    if isinstance(raw_rejections, list):
+        for item in raw_rejections:
+            if not isinstance(item, dict):
+                continue
+            kind = _compact_text(item.get("kind")).lower()
+            key = _compact_text(item.get("key"))
+            if not kind or not key or (kind, key) == (selected.get("kind"), selected.get("key")):
+                continue
+            candidate = candidates_by_key.get((kind, key))
+            if candidate is None:
+                continue
+            rejected.append(
+                {
+                    "kind": candidate["kind"],
+                    "key": candidate["key"],
+                    "name": candidate["name"],
+                    "reason": _compact_text(item.get("reason")) or "Not selected.",
+                }
+            )
+            if len(rejected) >= 5:
+                return rejected
+    if rejected:
+        return rejected
+
+    fallback_reason = "LLM selected another capability." if found else "No fit selected for this requirement."
+    for candidate in _all_catalog_candidates(catalog):
+        if (candidate["kind"], candidate["key"]) == (selected.get("kind"), selected.get("key")):
+            continue
+        rejected.append(
+            {
+                "kind": candidate["kind"],
+                "key": candidate["key"],
+                "name": candidate["name"],
+                "reason": fallback_reason,
+            }
+        )
+        if len(rejected) >= 3:
+            break
+    return rejected
+
+
+def _build_selection_activity_event(audit: dict[str, Any], *, found: bool) -> dict[str, Any]:
+    candidate_count = int(audit.get("candidate_count") or 0)
+    selected = audit.get("selected") if isinstance(audit.get("selected"), dict) else {}
+    selected_name = _compact_text(selected.get("name")) or _compact_text(selected.get("key")) or "none"
+    permission_summary = _compact_text(audit.get("permission_summary")) or "none"
+    gap = _compact_text(audit.get("gap"))
+    if found:
+        summary = f"Selected {selected_name} from {candidate_count} candidates; permissions: {permission_summary}."
+        status = "succeeded"
+    else:
+        summary = f"No capability selected from {candidate_count} candidates; gap: {gap or 'none'}."
+        status = "not_found"
+    return {
+        "kind": "capability_selection",
+        "summary": summary,
+        "status": status,
+        "detail": audit,
+    }
+
+
+def _all_catalog_candidates(catalog: dict[str, Any]) -> list[dict[str, Any]]:
+    return [*(catalog.get("templates") or []), *(catalog.get("skills") or [])]
+
+
+def _candidate_by_kind_and_key(catalog: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
+    return {(candidate["kind"], candidate["key"]): candidate for candidate in _all_catalog_candidates(catalog)}

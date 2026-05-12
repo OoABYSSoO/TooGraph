@@ -141,12 +141,15 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
     def test_manifest_declares_capability_and_found_outputs(self) -> None:
         manifest = json.loads((SELECTOR_SKILL_DIR / "skill.json").read_text(encoding="utf-8"))
 
+        input_keys = [field["key"] for field in manifest["inputSchema"]]
         capability_inputs = [field for field in manifest["inputSchema"] if field["key"] == "capability"]
         self.assertNotIn("runtime", manifest)
         self.assertNotIn("capabilityPolicy", manifest)
         self.assertEqual(manifest["timeoutSeconds"], 30)
+        self.assertIn("selection_reason", input_keys)
+        self.assertIn("rejected_candidates", input_keys)
         self.assertEqual(capability_inputs[0]["valueType"], "capability")
-        self.assertEqual([field["key"] for field in manifest["outputSchema"]], ["capability", "found"])
+        self.assertEqual([field["key"] for field in manifest["outputSchema"]], ["capability", "found", "audit"])
 
     def test_before_llm_lists_available_templates_and_skills_for_llm_choice(self) -> None:
         selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "toograph_capability_selector_before_test")
@@ -177,6 +180,7 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
         context = result["context"]
         self.assertIn("Available TooGraph capabilities:", context)
         self.assertIn("Graph templates are preferred over Skills when both can satisfy the requirement.", context)
+        self.assertIn("Also provide selection_reason and rejected_candidates", context)
         self.assertIn("kind: subgraph", context)
         self.assertIn("key: advanced_web_research_loop", context)
         self.assertIn("name: Advanced Web Research", context)
@@ -205,14 +209,50 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
                 result = selector.toograph_capability_selector(
                     requirement="Research the latest materials.",
                     capability={"kind": "subgraph", "key": "advanced_web_research_loop"},
+                    selection_reason="Research is better handled by a multi-step graph template.",
+                    rejected_candidates=[
+                        {
+                            "kind": "skill",
+                            "key": "web_search",
+                            "reason": "Only searches once and does not review evidence.",
+                        }
+                    ],
                 )
 
-        self.assertEqual(set(result), {"capability", "found"})
+        self.assertEqual(set(result), {"capability", "found", "audit", "activity_events"})
         self.assertTrue(result["found"])
         self.assertEqual(result["capability"]["kind"], "subgraph")
         self.assertEqual(result["capability"]["key"], "advanced_web_research_loop")
         self.assertEqual(result["capability"]["name"], "Advanced Web Research")
         self.assertNotIn("requiresApproval", result["capability"])
+        self.assertEqual(
+            result["audit"],
+            {
+                "candidate_count": 2,
+                "candidate_counts": {"subgraph": 1, "skill": 1},
+                "selected": {
+                    "kind": "subgraph",
+                    "key": "advanced_web_research_loop",
+                    "name": "Advanced Web Research",
+                },
+                "selection_reason": "Research is better handled by a multi-step graph template.",
+                "selected_permissions": [],
+                "permission_summary": "none",
+                "rejected_candidates": [
+                    {
+                        "kind": "skill",
+                        "key": "web_search",
+                        "name": "Web Search",
+                        "reason": "Only searches once and does not review evidence.",
+                    }
+                ],
+                "gap": "",
+                "catalog_errors": [],
+            },
+        )
+        self.assertEqual(result["activity_events"][0]["kind"], "capability_selection")
+        self.assertIn("Selected Advanced Web Research from 2 candidates", result["activity_events"][0]["summary"])
+        self.assertEqual(result["activity_events"][0]["detail"], result["audit"])
 
     def test_selector_normalizes_llm_selected_skill_capability(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_test_skill")
@@ -236,7 +276,7 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
                     capability={"kind": "skill", "key": "web_search"},
                 )
 
-        self.assertEqual(set(result), {"capability", "found"})
+        self.assertEqual(set(result), {"capability", "found", "audit", "activity_events"})
         self.assertTrue(result["found"])
         self.assertEqual(result["capability"]["kind"], "skill")
         self.assertEqual(result["capability"]["key"], "web_search")
@@ -272,9 +312,10 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
                     capability={"kind": "skill", "key": "web_search"},
                 )
 
-        self.assertEqual(set(disabled_result), {"capability", "found"})
+        self.assertEqual(set(disabled_result), {"capability", "found", "audit", "activity_events"})
         self.assertFalse(disabled_result["found"])
         self.assertEqual(disabled_result["capability"], {"kind": "none"})
+        self.assertEqual(disabled_result["audit"]["gap"], "Selected capability 'disabled_research' is not enabled or no longer exists.")
         self.assertTrue(enabled_legacy_result["found"])
         self.assertEqual(enabled_legacy_result["capability"]["key"], "web_search")
 
@@ -351,9 +392,12 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
             with patch.dict("os.environ", {"TOOGRAPH_REPO_ROOT": temp_dir}, clear=True):
                 result = selector.toograph_capability_selector(requirement="Research materials.")
 
-        self.assertEqual(set(result), {"capability", "found"})
+        self.assertEqual(set(result), {"capability", "found", "audit", "activity_events"})
         self.assertFalse(result["found"])
         self.assertEqual(result["capability"], {"kind": "none"})
+        self.assertEqual(result["audit"]["candidate_count"], 1)
+        self.assertEqual(result["audit"]["gap"], "No capability was selected from the enabled catalog.")
+        self.assertEqual(result["activity_events"][0]["status"], "not_found")
 
 
 if __name__ == "__main__":

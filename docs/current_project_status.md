@@ -70,7 +70,8 @@
 - 位置：`skill/official/toograph_capability_selector/`
 - 显示名称：`TooGraph Capability Selector`
 - 作用：根据 LLM 节点技能入参规划阶段看到的本地可用能力清单，让模型选择并校验规范化单个 `capability`。
-- 生命周期：`before_llm.py` 读取当前启用的图模板和启用的 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`，按同一清单做真实性与启用状态校验，并保留 `permissions` 供候选描述、审计和后续运行时策略使用。它不输出 `requiresApproval`，也不恢复 per-skill 审批协议。
+- 生命周期：`before_llm.py` 读取当前启用的图模板和启用的 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`、`selection_reason` 和 `rejected_candidates`，按同一清单做真实性与启用状态校验，并保留 `permissions` 供候选描述、审计和后续运行时策略使用。它不输出 `requiresApproval`，也不恢复 per-skill 审批协议。
+- 审计输出：除 `capability` 和 `found` 外，选择器返回 `audit`，记录候选数量、按类型计数、选中能力、选择原因、选中权限摘要、被拒绝候选原因、缺口说明和 catalog 读取错误；同时返回 `capability_selection` 低层 `activity_events`，Buddy 主模板会把 `audit` 映射到 `capability_selection_audit` state。
 - 选择对象包括当前启用的图模板和启用的 Skill；图模板优先于 Skill。
 - 它不执行被选能力，不生成被选能力的运行入参，也不做程序字段匹配；模型基于候选项的名称和描述判断，脚本只做真实性与启用状态校验。
 
@@ -110,7 +111,7 @@
 - 位置：`graph_template/official/buddy_autonomous_loop/template.json`
 - 显示名称：`伙伴自主循环`
 - 作用：作为伙伴浮窗和伙伴页面的默认图循环，把本轮用户消息、对话历史、页面上下文和 Buddy Home 长期资料转成一次可审计 graph run。
-- 主要流程：输入用户消息、历史、页面上下文、伙伴模式和 Buddy Home 选中文件 -> `intake_request` 子图理解请求并写 `visible_reply` 作为即时回复，必要时在 `ask_clarification` 断点等待用户澄清 -> `needs_capability` 判断是否需要启用能力；不需要时直接进入 `draft_final_response`，需要时进入 `run_capability_cycle` 调用 `toograph_capability_selector`，找到能力后由动态能力执行节点写唯一 `capability_result` 结果包，找不到能力时写 `capability_gap` 并在最终回复中询问是否构建该能力；多轮能力调用摘要写入 `capability_trace` -> `draft_final_response` 子图只写 `final_reply` -> `output_final` 展示 `final_reply` 并结束可见主运行。写文件、删改文件或执行脚本的确认不在模板内由 LLM 判断，而由运行时根据 `需确认` / `完全访问` 模式处理。
+- 主要流程：输入用户消息、历史、页面上下文、伙伴模式和 Buddy Home 选中文件 -> `intake_request` 子图理解请求并写 `visible_reply` 作为即时回复，必要时在 `ask_clarification` 断点等待用户澄清 -> `needs_capability` 判断是否需要启用能力；不需要时直接进入 `draft_final_response`，需要时进入 `run_capability_cycle` 调用 `toograph_capability_selector`，并把能力选择审计写入 `capability_selection_audit`；找到能力后由动态能力执行节点写唯一 `capability_result` 结果包，找不到能力时写 `capability_gap` 并在最终回复中询问是否构建该能力；多轮能力调用摘要写入 `capability_trace` -> `draft_final_response` 子图只写 `final_reply` -> `output_final` 展示 `final_reply` 并结束可见主运行。写文件、删改文件或执行脚本的确认不在模板内由 LLM 判断，而由运行时根据 `需确认` / `完全访问` 模式处理。
 - 动态能力语义：只有 `execute_capability` 读取 `selected_capability` 这个 `capability` state，并且它只写一个 `result_package` state。其他复盘节点不能读取 `capability` state，否则会被运行协议视为动态能力执行节点。
 - 断点语义：澄清和人工确认类断点使用子图内部 `interrupt_after`。静态 Subgraph 节点和动态 `capability.kind=subgraph` 的内部断点都会通过父级 Buddy run 的标准暂停/恢复路径展示子图 scope，而不是由伙伴前端额外发明确认协议。写文件、删改文件或执行脚本这类低层操作审批由运行时权限原语转换为标准 `awaiting_human`。
 - 边界：当前模板已经表达完整可见回复主干，但长期记忆写回、Buddy Home 修改、图补丁应用和更完整的伙伴页面暂停交互仍应作为后续显式模板/命令流补齐，不能隐藏在 output 节点或前端逻辑里。

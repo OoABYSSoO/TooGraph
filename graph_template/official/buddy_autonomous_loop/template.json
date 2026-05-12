@@ -92,6 +92,20 @@
         "managed": true
       }
     },
+    "capability_selection_audit": {
+      "name": "capability_selection_audit",
+      "description": "能力选择审计摘要，包含候选数量、选中原因、拒绝候选、权限摘要和缺口说明。",
+      "type": "json",
+      "value": {},
+      "color": "#7c2d12",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "toograph_capability_selector",
+        "nodeId": "select_capability",
+        "fieldKey": "audit",
+        "managed": true
+      }
+    },
     "capability_result": {
       "name": "capability_result",
       "description": "动态能力执行后的结果包。包内每个输出保留原始 name、description、type 和 value。",
@@ -847,6 +861,10 @@
           "mode": "replace"
         },
         {
+          "state": "capability_selection_audit",
+          "mode": "replace"
+        },
+        {
           "state": "capability_result",
           "mode": "replace"
         },
@@ -951,6 +969,20 @@
                 "skillKey": "toograph_capability_selector",
                 "nodeId": "select_capability",
                 "fieldKey": "found",
+                "managed": true
+              }
+            },
+            "capability_selection_audit": {
+              "name": "capability_selection_audit",
+              "description": "能力选择审计摘要。",
+              "type": "json",
+              "value": {},
+              "color": "#7c2d12",
+              "binding": {
+                "kind": "skill_output",
+                "skillKey": "toograph_capability_selector",
+                "nodeId": "select_capability",
+                "fieldKey": "audit",
                 "managed": true
               }
             },
@@ -1173,6 +1205,10 @@
                 {
                   "state": "capability_found",
                   "mode": "replace"
+                },
+                {
+                  "state": "capability_selection_audit",
+                  "mode": "replace"
                 }
               ],
               "config": {
@@ -1182,7 +1218,8 @@
                     "skillKey": "toograph_capability_selector",
                     "outputMapping": {
                       "capability": "selected_capability",
-                      "found": "capability_found"
+                      "found": "capability_found",
+                      "audit": "capability_selection_audit"
                     }
                   }
                 ],
@@ -1511,6 +1548,31 @@
                 "fileNameTemplate": ""
               }
             },
+            "output_capability_selection_audit": {
+              "kind": "output",
+              "name": "输出能力选择审计",
+              "description": "输出候选数量、选择原因、拒绝候选、权限摘要和缺口说明。",
+              "ui": {
+                "position": {
+                  "x": 5160,
+                  "y": 360
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "capability_selection_audit",
+                  "required": false
+                }
+              ],
+              "writes": [],
+              "config": {
+                "displayMode": "json",
+                "persistEnabled": false,
+                "persistFormat": "auto",
+                "fileNameTemplate": ""
+              }
+            },
             "output_capability_result": {
               "kind": "output",
               "name": "输出能力结果",
@@ -1634,6 +1696,10 @@
             {
               "source": "finalize_capability_cycle",
               "target": "output_capability_found"
+            },
+            {
+              "source": "finalize_capability_cycle",
+              "target": "output_capability_selection_audit"
             },
             {
               "source": "finalize_capability_cycle",

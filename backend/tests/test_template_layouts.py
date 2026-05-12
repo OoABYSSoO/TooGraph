@@ -366,6 +366,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["selected_capability"]["type"], "capability")
         self.assertEqual(states["capability_found"]["type"], "boolean")
         self.assertEqual(states["capability_result"]["type"], "result_package")
+        self.assertEqual(states["capability_selection_audit"]["type"], "json")
         self.assertEqual(states["capability_gap"]["type"], "json")
         self.assertEqual(states["capability_trace"]["type"], "json")
         self.assertEqual(states["visible_reply"]["type"], "markdown")
@@ -458,10 +459,12 @@ class TemplateLayoutTests(unittest.TestCase):
                     "outputMapping": {
                         "capability": "selected_capability",
                         "found": "capability_found",
+                        "audit": "capability_selection_audit",
                     },
                 }
             ],
         )
+        self.assertIn({"state": "capability_selection_audit", "mode": "replace"}, selector_node["writes"])
         for removed_node_id in [
             "review_capability_permission",
             "needs_capability_approval",
@@ -476,8 +479,13 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn({"state": "selected_capability", "required": True}, execute_node["reads"])
         self.assertEqual(execute_node["writes"], [{"state": "capability_result", "mode": "replace"}])
         self.assertEqual(cycle_graph["state_schema"]["capability_result"]["type"], "result_package")
+        self.assertEqual(cycle_graph["state_schema"]["capability_selection_audit"]["type"], "json")
         self.assertEqual(cycle_graph["state_schema"]["capability_gap"]["type"], "json")
         self.assertEqual(cycle_graph["state_schema"]["capability_trace"]["type"], "json")
+        self.assertEqual(
+            cycle_graph["nodes"]["output_capability_selection_audit"]["reads"],
+            [{"state": "capability_selection_audit", "required": False}],
+        )
         missing_node = cycle_graph["nodes"]["review_missing_capability"]
         self.assertIn({"state": "capability_gap", "mode": "replace"}, missing_node["writes"])
         self.assertIn("should_offer_build", missing_node["config"]["taskInstruction"])
