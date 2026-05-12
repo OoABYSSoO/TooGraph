@@ -1,5 +1,13 @@
 import type { BuddyCommandRecord, BuddyRevision } from "../types/buddy.ts";
 
+export type BuddyRevisionDiffChangeKind = "added" | "removed" | "changed";
+export type BuddyRevisionDiffEntry = {
+  field: string;
+  changeKind: BuddyRevisionDiffChangeKind;
+  previousValueText: string;
+  nextValueText: string;
+};
+
 export type BuddyRevisionHistoryRow = BuddyRevision & {
   sourceCommandId: string;
   sourceRunId: string;
@@ -7,6 +15,7 @@ export type BuddyRevisionHistoryRow = BuddyRevision & {
   sourceLabel: string;
   previousValueText: string;
   nextValueText: string;
+  diffEntries: BuddyRevisionDiffEntry[];
 };
 
 export const BUDDY_REVISION_HISTORY_TARGET_FILTERS = [
@@ -41,6 +50,7 @@ export function buildBuddyRevisionHistoryRows(
         sourceLabel: buildSourceLabel(command),
         previousValueText: formatRevisionValue(revision.previous_value),
         nextValueText: formatRevisionValue(revision.next_value),
+        diffEntries: buildRevisionDiffEntries(revision.previous_value, revision.next_value),
       };
     });
 }
@@ -65,6 +75,55 @@ function buildSourceLabel(command: BuddyCommandRecord | undefined) {
   }
   parts.push(`Command ${command.command_id}`);
   return parts.join(" | ");
+}
+
+function buildRevisionDiffEntries(
+  previousValue: Record<string, unknown>,
+  nextValue: Record<string, unknown>,
+): BuddyRevisionDiffEntry[] {
+  const fields = [...Object.keys(previousValue ?? {})];
+  for (const field of Object.keys(nextValue ?? {})) {
+    if (!fields.includes(field)) {
+      fields.push(field);
+    }
+  }
+
+  return fields.flatMap((field) => {
+    const hasPrevious = Object.prototype.hasOwnProperty.call(previousValue, field);
+    const hasNext = Object.prototype.hasOwnProperty.call(nextValue, field);
+    if (hasPrevious && hasNext && areRevisionValuesEqual(previousValue[field], nextValue[field])) {
+      return [];
+    }
+    const changeKind: BuddyRevisionDiffChangeKind = hasPrevious ? (hasNext ? "changed" : "removed") : "added";
+    return [{
+      field,
+      changeKind,
+      previousValueText: hasPrevious ? formatCompactRevisionValue(previousValue[field]) : "",
+      nextValueText: hasNext ? formatCompactRevisionValue(nextValue[field]) : "",
+    }];
+  });
+}
+
+function areRevisionValuesEqual(left: unknown, right: unknown) {
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch {
+    return Object.is(left, right);
+  }
+}
+
+function formatCompactRevisionValue(value: unknown) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean" || value === null) {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value ?? "");
+  }
 }
 
 function formatRevisionValue(value: Record<string, unknown>) {

@@ -72,6 +72,9 @@ test("BuddyPage links revision history to command audit records", () => {
   assert.match(source, /row\.sourceLabel/);
   assert.match(source, /row\.previousValueText/);
   assert.match(source, /row\.nextValueText/);
+  assert.match(source, /v-for="entry in row\.diffEntries"/);
+  assert.match(source, /historyDiffTagType\(entry\.changeKind\)/);
+  assert.match(source, /<details class="buddy-page__history-raw-diff">/);
   assert.match(source, /filteredRevisionRows\.length === 0/);
 });
 
