@@ -441,6 +441,14 @@ test("BuddyWidget recovers awaiting-human paused runs after session activation",
   assert.match(componentSource, /buddy\.pause\.recoveryFailed/);
 });
 
+test("BuddyWidget keeps recovered paused runs session-locked and queue-safe", () => {
+  assert.match(componentSource, /const isSessionSwitchLocked = computed\([\s\S]*activeRunId\.value !== null/);
+  assert.match(componentSource, /const isSessionSwitchLocked = computed\([\s\S]*isActiveTraceUnfinished\(\)/);
+  assert.match(componentSource, /if \(pausedBuddyRun\.value\) \{[\s\S]*break;/);
+  assert.match(componentSource, /:disabled="Boolean\(pausedBuddyRun\)"/);
+  assert.match(componentSource, /if \(pausedBuddyRun\.value\) \{[\s\S]*errorMessage\.value = t\("buddy\.pause\.useCard"\);/);
+});
+
 test("BuddyWidget can deny a pending permission approval from the pause card", () => {
   assert.match(componentSource, /v-if="pausedBuddyPermissionApproval"[\s\S]*buddy\.pause\.denyPermission/);
   assert.match(componentSource, /@click="denyPausedBuddyPermissionApproval"/);
