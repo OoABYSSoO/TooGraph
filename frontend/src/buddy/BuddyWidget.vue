@@ -254,134 +254,13 @@
                 </div>
               </div>
             </section>
-            <section v-if="shouldShowPausedRunCard(message)" class="buddy-widget__pause-card">
-              <div class="buddy-widget__pause-header">
-                <div>
-                  <strong>{{ t("buddy.pause.title") }}</strong>
-                  <small v-if="pausedBuddyScopeText">{{ pausedBuddyScopeText }}</small>
-                </div>
-                <span>{{ t("status.awaitingHuman") }}</span>
-              </div>
-              <p class="buddy-widget__pause-summary">
-                {{ pausedBuddyReviewModel?.summaryText || t("buddy.pause.body") }}
-              </p>
-              <div class="buddy-widget__pause-mode-tabs" role="tablist" :aria-label="t('buddy.pause.actionLabel')">
-                <button
-                  type="button"
-                  class="buddy-widget__pause-mode"
-                  :class="{ 'buddy-widget__pause-mode--active': pausedBuddyActionMode === 'execute' }"
-                  :disabled="!pausedBuddyCanExecuteAction"
-                  @click="setPausedBuddyActionMode('execute')"
-                >
-                  {{ t("buddy.pause.executeAction") }}
-                </button>
-                <button
-                  v-if="pausedBuddyRequiredRows.length > 0"
-                  type="button"
-                  class="buddy-widget__pause-mode"
-                  :class="{ 'buddy-widget__pause-mode--active': pausedBuddyActionMode === 'supplement' }"
-                  @click="setPausedBuddyActionMode('supplement')"
-                >
-                  {{ t("buddy.pause.supplementAction") }}
-                </button>
-              </div>
-              <div v-if="pausedBuddyPermissionApproval" class="buddy-widget__pause-section">
-                <strong>{{ t("buddy.pause.permissionTitle") }}</strong>
-                <div class="buddy-widget__pause-row">
-                  <span>{{ pausedBuddyPermissionApproval.skillName }}</span>
-                  <small>{{ pausedBuddyPermissionApproval.skillKey }}</small>
-                  <div class="buddy-widget__pause-permissions">
-                    <span v-for="permission in pausedBuddyPermissionApproval.permissions" :key="permission">
-                      {{ permission }}
-                    </span>
-                  </div>
-                  <small v-if="pausedBuddyPermissionApproval.reason">{{ pausedBuddyPermissionApproval.reason }}</small>
-                  <template v-if="pausedBuddyPermissionApproval.inputPreview">
-                    <small>{{ t("buddy.pause.permissionInputs") }}</small>
-                    <pre>{{ pausedBuddyPermissionApproval.inputPreview }}</pre>
-                  </template>
-                </div>
-              </div>
-              <div v-if="pausedBuddyProducedRows.length > 0" class="buddy-widget__pause-section">
-                <strong>{{ t("buddy.pause.producedTitle") }}</strong>
-                <div v-for="row in pausedBuddyProducedRows" :key="row.key" class="buddy-widget__pause-row">
-                  <span>{{ row.label }}</span>
-                  <small v-if="row.description">{{ row.description }}</small>
-                  <pre>{{ row.draft || t("buddy.pause.emptyValue") }}</pre>
-                </div>
-              </div>
-              <div v-if="pausedBuddyRequiredRows.length > 0" class="buddy-widget__pause-section">
-                <strong>{{ t("buddy.pause.requiredTitle") }}</strong>
-                <div v-for="row in pausedBuddyRequiredRows" :key="row.key" class="buddy-widget__pause-row">
-                  <span>{{ row.label }}</span>
-                  <small v-if="row.description">{{ row.description }}</small>
-                  <small>{{ resolvePausedBuddyDraft(row).trim() ? t("buddy.pause.filled") : t("buddy.pause.emptyValue") }}</small>
-                  <pre v-if="resolvePausedBuddyDraft(row).trim()">{{ resolvePausedBuddyDraft(row) }}</pre>
-                </div>
-                <div v-if="pausedBuddyActionMode === 'supplement'" class="buddy-widget__pause-editor">
-                  <ElSelect
-                    v-if="pausedBuddyRequiredRows.length > 1"
-                    :model-value="pausedBuddyTargetKey"
-                    class="buddy-widget__pause-target toograph-select"
-                    popper-class="toograph-select-popper buddy-widget__select-popper"
-                    size="small"
-                    :aria-label="t('buddy.pause.targetLabel')"
-                    @update:model-value="setPausedBuddyTargetKey"
-                  >
-                    <ElOption
-                      v-for="row in pausedBuddyRequiredRows"
-                      :key="row.key"
-                      :label="row.label"
-                      :value="row.key"
-                    />
-                  </ElSelect>
-                  <ElInput
-                    :model-value="pausedBuddyInputText"
-                    class="buddy-widget__pause-input"
-                    type="textarea"
-                    :placeholder="pausedBuddySelectedRequiredRow?.label || t('buddy.pause.supplementAction')"
-                    :autosize="{ minRows: 2, maxRows: 5 }"
-                    @update:model-value="setPausedBuddyInputText"
-                  />
-                </div>
-              </div>
-              <p
-                v-if="!pausedBuddyPermissionApproval && pausedBuddyRequiredRows.length === 0 && pausedBuddyProducedRows.length === 0"
-                class="buddy-widget__pause-summary"
-              >
-                {{ t("buddy.pause.empty") }}
-              </p>
-              <div class="buddy-widget__pause-actions">
-                <ElButton
-                  size="small"
-                  type="danger"
-                  plain
-                  :loading="pausedBuddyResumeBusy"
-                  @click="cancelPausedBuddyRun"
-                >
-                  {{ t("buddy.pause.cancelRun") }}
-                </ElButton>
-                <ElButton
-                  v-if="pausedBuddyPermissionApproval"
-                  size="small"
-                  type="danger"
-                  plain
-                  :loading="pausedBuddyResumeBusy"
-                  @click="denyPausedBuddyPermissionApproval"
-                >
-                  {{ t("buddy.pause.denyPermission") }}
-                </ElButton>
-                <ElButton
-                  size="small"
-                  type="primary"
-                  :loading="pausedBuddyResumeBusy"
-                  :disabled="isPausedBuddyResumeBlocked"
-                  @click="resumePausedBuddyRun()"
-                >
-                  {{ t("buddy.pause.continue") }}
-                </ElButton>
-              </div>
-            </section>
+            <BuddyPauseCard
+              v-if="shouldShowPausedRunCard(message)"
+              :run="pausedBuddyRun"
+              :busy="pausedBuddyResumeBusy"
+              @resume="resumePausedBuddyRun"
+              @cancel="cancelPausedBuddyRun"
+            />
             <template v-else>
               <div
                 v-if="message.role === 'assistant' && message.content"
@@ -481,12 +360,6 @@ import { cancelRun, fetchRun, resumeRun } from "../api/runs.ts";
 import { fetchSettings } from "../api/settings.ts";
 import { fetchSkillCatalog } from "../api/skills.ts";
 import { resolveOutputPreviewContent } from "../editor/nodes/outputPreviewContentModel.ts";
-import {
-  buildHumanReviewPanelModel,
-  buildHumanReviewResumePayload,
-  type HumanReviewPanelModel,
-  type HumanReviewRow,
-} from "../editor/workspace/humanReviewPanelModel.ts";
 import { formatRunDuration } from "../lib/run-display-name.ts";
 import { buildRuntimeModelOptions } from "../lib/runtimeModelCatalog.ts";
 import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
@@ -497,13 +370,12 @@ import type { RunDetail } from "../types/run.ts";
 import type { SettingsPayload } from "../types/settings.ts";
 
 import BuddyMascot from "./BuddyMascot.vue";
+import BuddyPauseCard from "./BuddyPauseCard.vue";
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
 import { findLatestRecoverablePausedRunMessage, isRecoverablePausedRunStatus } from "./buddyPausedRunRecovery.ts";
 import {
   resolveBuddyComposerDecision,
-  resolveInitialBuddyPauseActionMode,
   shouldHoldBuddyQueueDrain,
-  type BuddyPauseActionMode,
 } from "./buddyPauseQueuePolicy.ts";
 import {
   BUDDY_REVIEW_TEMPLATE_ID,
@@ -649,11 +521,7 @@ const activeRunId = ref<string | null>(null);
 const activeTraceMessageId = ref<string | null>(null);
 const pausedBuddyRun = ref<RunDetail | null>(null);
 const pausedBuddyAssistantMessageId = ref<string | null>(null);
-const pausedBuddyDraftsByKey = ref<Record<string, string>>({});
 const pausedBuddyResumeBusy = ref(false);
-const pausedBuddyActionMode = ref<BuddyPauseActionMode>("execute");
-const pausedBuddyTargetKey = ref("");
-const pausedBuddyInputText = ref("");
 const avatarElement = ref<HTMLElement | null>(null);
 const mascotLook = ref({ x: 0, y: 0 });
 const mascotMotion = ref<BuddyMascotMotion>("idle");
@@ -739,28 +607,6 @@ const latestActivityText = computed(() => {
     .find((message) => message.role === "assistant" && !message.content.trim() && message.activityText?.trim());
   return latestPendingMessage?.activityText?.trim() ?? "";
 });
-const pausedBuddyReviewModel = computed<HumanReviewPanelModel | null>(() => {
-  const run = pausedBuddyRun.value;
-  if (!run) {
-    return null;
-  }
-  return buildHumanReviewPanelModel(run, run.graph_snapshot as unknown as GraphPayload);
-});
-const pausedBuddyRequiredRows = computed(() => pausedBuddyReviewModel.value?.requiredNow ?? []);
-const pausedBuddyProducedRows = computed(() => pausedBuddyReviewModel.value?.producedRows ?? []);
-const pausedBuddyPermissionApproval = computed(() => pausedBuddyReviewModel.value?.permissionApproval ?? null);
-const pausedBuddyScopeText = computed(() => pausedBuddyReviewModel.value?.scopePath.join(" / ") ?? "");
-const pausedBuddySelectedRequiredRow = computed(
-  () =>
-    pausedBuddyRequiredRows.value.find((row) => row.key === pausedBuddyTargetKey.value) ??
-    pausedBuddyRequiredRows.value[0] ??
-    null,
-);
-const pausedBuddyHasMissingRequiredInput = computed(() =>
-  pausedBuddyRequiredRows.value.some((row) => !resolvePausedBuddyDraft(row).trim()),
-);
-const pausedBuddyCanExecuteAction = computed(() => !pausedBuddyHasMissingRequiredInput.value);
-const isPausedBuddyResumeBlocked = computed(() => pausedBuddyHasMissingRequiredInput.value);
 const bubbleText = computed(() => {
   if (mood.value === "thinking" && latestActivityText.value) {
     return latestActivityText.value;
@@ -1373,7 +1219,7 @@ async function resumePausedBuddyRun(resumePayloadOverride: Record<string, unknow
   setAssistantActivityText(assistantMessageId, t("buddy.activity.resuming"));
 
   try {
-    const resumePayload = resumePayloadOverride ?? buildBuddyResumePayloadFromDrafts();
+    const resumePayload = resumePayloadOverride ?? {};
     activeAbortController = new AbortController();
     const response = await resumeRun(run.run_id, resumePayload);
     activeRunId.value = response.run_id;
@@ -1501,8 +1347,6 @@ function handleBuddyRunAwaitingHuman(
 ) {
   pausedBuddyRun.value = run;
   pausedBuddyAssistantMessageId.value = assistantMessageId;
-  pausedBuddyDraftsByKey.value = buildPausedBuddyDraftsByKey(run);
-  resetPausedBuddyActionState(buildHumanReviewPanelModel(run, run.graph_snapshot as unknown as GraphPayload));
   activeRunId.value = run.run_id;
   mood.value = "thinking";
   setAssistantActivityText(assistantMessageId, t("buddy.pause.activity"));
@@ -1891,11 +1735,7 @@ function resetVisibleRunTrace() {
 function resetPausedBuddyPause() {
   pausedBuddyRun.value = null;
   pausedBuddyAssistantMessageId.value = null;
-  pausedBuddyDraftsByKey.value = {};
   pausedBuddyResumeBusy.value = false;
-  pausedBuddyActionMode.value = "execute";
-  pausedBuddyTargetKey.value = "";
-  pausedBuddyInputText.value = "";
 }
 
 async function waitForChatSessionInitialization() {
@@ -2244,77 +2084,6 @@ function setAssistantActivityFromRunEvent(
     return;
   }
   setAssistantActivityText(assistantMessageId, t(activity.labelKey, activity.params));
-}
-
-function buildPausedBuddyDraftsByKey(run: RunDetail) {
-  const model = buildHumanReviewPanelModel(run, run.graph_snapshot as unknown as GraphPayload);
-  return Object.fromEntries(model.allRows.map((row) => [row.key, row.draft]));
-}
-
-function resolvePausedBuddyDraft(row: HumanReviewRow) {
-  return pausedBuddyDraftsByKey.value[row.key] ?? row.draft;
-}
-
-function setPausedBuddyDraft(key: string, value: string | number) {
-  pausedBuddyDraftsByKey.value = {
-    ...pausedBuddyDraftsByKey.value,
-    [key]: String(value ?? ""),
-  };
-}
-
-function resetPausedBuddyActionState(model: HumanReviewPanelModel) {
-  const firstRequired = model.requiredNow[0] ?? null;
-  pausedBuddyActionMode.value = resolveInitialBuddyPauseActionMode(model.requiredNow.length);
-  pausedBuddyTargetKey.value = firstRequired?.key ?? "";
-  pausedBuddyInputText.value = firstRequired ? resolvePausedBuddyDraft(firstRequired) : "";
-}
-
-function denyPausedBuddyPermissionApproval() {
-  const approval = pausedBuddyPermissionApproval.value;
-  if (!approval || pausedBuddyResumeBusy.value) {
-    return;
-  }
-  void resumePausedBuddyRun({
-    permission_approval: {
-      decision: "denied",
-      reason: t("buddy.pause.deniedReason", {
-        skill: approval.skillName || approval.skillKey,
-      }),
-    },
-  });
-}
-
-function setPausedBuddyActionMode(mode: BuddyPauseActionMode) {
-  pausedBuddyActionMode.value = mode;
-  if (mode === "supplement" && !pausedBuddyTargetKey.value) {
-    const firstRequired = pausedBuddyRequiredRows.value[0] ?? null;
-    if (firstRequired) {
-      setPausedBuddyTargetKey(firstRequired.key);
-    }
-  }
-}
-
-function setPausedBuddyTargetKey(key: string | number | boolean) {
-  const normalizedKey = String(key ?? "");
-  pausedBuddyTargetKey.value = normalizedKey;
-  const row = pausedBuddyRequiredRows.value.find((candidate) => candidate.key === normalizedKey);
-  pausedBuddyInputText.value = row ? resolvePausedBuddyDraft(row) : "";
-}
-
-function setPausedBuddyInputText(value: string | number) {
-  const text = String(value ?? "");
-  pausedBuddyInputText.value = text;
-  if (pausedBuddyTargetKey.value) {
-    setPausedBuddyDraft(pausedBuddyTargetKey.value, text);
-  }
-}
-
-function buildBuddyResumePayloadFromDrafts() {
-  const model = pausedBuddyReviewModel.value;
-  if (!model) {
-    return {};
-  }
-  return buildHumanReviewResumePayload(model.allRows, pausedBuddyDraftsByKey.value);
 }
 
 function buildHistoryBeforeMessage(messageId: string): BuddyChatMessage[] {
@@ -3115,184 +2884,6 @@ function formatErrorMessage(error: unknown): string {
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-.buddy-widget__pause-card {
-  display: grid;
-  gap: 10px;
-  width: min(100%, 360px);
-  padding: 12px;
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: 8px;
-  background: rgba(255, 251, 235, 0.82);
-  color: var(--toograph-text);
-  box-shadow: 0 12px 28px rgba(154, 52, 18, 0.09);
-}
-
-.buddy-widget__pause-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.buddy-widget__pause-header div,
-.buddy-widget__pause-section,
-.buddy-widget__pause-row {
-  display: grid;
-  gap: 4px;
-}
-
-.buddy-widget__pause-header strong,
-.buddy-widget__pause-section > strong,
-.buddy-widget__pause-row > span {
-  color: var(--toograph-text-strong);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.25;
-}
-
-.buddy-widget__pause-header small,
-.buddy-widget__pause-row small {
-  color: rgba(108, 82, 62, 0.72);
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.buddy-widget__pause-header > span {
-  flex: 0 0 auto;
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: rgba(245, 158, 11, 0.14);
-  color: rgb(146, 64, 14);
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.buddy-widget__pause-summary {
-  margin: 0;
-  color: rgba(70, 53, 38, 0.82);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.buddy-widget__pause-mode-tabs {
-  display: flex;
-  gap: 6px;
-  padding: 3px;
-  border: 1px solid rgba(154, 52, 18, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.5);
-}
-
-.buddy-widget__pause-mode {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 6px 8px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: rgba(70, 53, 38, 0.78);
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.buddy-widget__pause-mode:hover:not(:disabled),
-.buddy-widget__pause-mode:focus-visible {
-  border-color: rgba(37, 99, 235, 0.22);
-  color: var(--toograph-text-strong);
-  outline: none;
-}
-
-.buddy-widget__pause-mode--active {
-  border-color: rgba(37, 99, 235, 0.18);
-  background: rgba(37, 99, 235, 0.1);
-  color: rgb(30, 64, 175);
-}
-
-.buddy-widget__pause-mode:disabled {
-  cursor: not-allowed;
-  opacity: 0.48;
-}
-
-.buddy-widget__pause-section {
-  padding-top: 2px;
-}
-
-.buddy-widget__pause-row {
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid rgba(154, 52, 18, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.56);
-}
-
-.buddy-widget__pause-row pre {
-  max-height: 112px;
-  margin: 0;
-  overflow: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: rgba(70, 53, 38, 0.82);
-  font-family: var(--toograph-font-mono);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.buddy-widget__pause-permissions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.buddy-widget__pause-permissions span {
-  width: fit-content;
-  padding: 3px 6px;
-  border: 1px solid rgba(180, 83, 9, 0.22);
-  border-radius: 999px;
-  background: rgba(251, 191, 36, 0.14);
-  color: rgb(146, 64, 14);
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.buddy-widget__pause-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.buddy-widget__pause-editor {
-  display: grid;
-  gap: 8px;
-  padding: 8px;
-  border: 1px solid rgba(154, 52, 18, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.42);
-}
-
-.buddy-widget__pause-target {
-  width: 100%;
-}
-
-.buddy-widget__pause-input :deep(.el-textarea__inner) {
-  min-height: 56px !important;
-  border-color: rgba(154, 52, 18, 0.15);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.82);
-  color: var(--toograph-text);
-  font-size: 12px;
-  line-height: 1.45;
-  box-shadow: none;
-}
-
-.buddy-widget__pause-input :deep(.el-textarea__inner:focus) {
-  border-color: rgba(37, 99, 235, 0.45);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
 .buddy-widget__message-markdown {

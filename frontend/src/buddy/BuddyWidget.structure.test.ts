@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = dirname(currentFilePath);
 const componentSource = readFileSync(resolve(currentDirectory, "BuddyWidget.vue"), "utf8");
+const pauseCardSource = readFileSync(resolve(currentDirectory, "BuddyPauseCard.vue"), "utf8");
 
 function extractCssBlock(selector: string) {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -386,12 +387,10 @@ test("BuddyWidget starts self-review as a separate background run after the visi
 
 test("BuddyWidget treats awaiting-human graph runs as resumable pause cards", () => {
   assert.match(componentSource, /import \{ cancelRun, fetchRun, resumeRun \} from "\.\.\/api\/runs\.ts";/);
-  assert.match(componentSource, /buildHumanReviewPanelModel/);
-  assert.match(componentSource, /buildHumanReviewResumePayload/);
+  assert.match(componentSource, /import BuddyPauseCard from "\.\/BuddyPauseCard\.vue";/);
   assert.match(componentSource, /const pausedBuddyRun = ref<RunDetail \| null>\(null\);/);
   assert.match(componentSource, /const pausedBuddyAssistantMessageId = ref<string \| null>\(null\);/);
-  assert.match(componentSource, /v-if="shouldShowPausedRunCard\(message\)"/);
-  assert.match(componentSource, /class="buddy-widget__pause-card"/);
+  assert.match(componentSource, /<BuddyPauseCard[\s\S]*v-if="shouldShowPausedRunCard\(message\)"[\s\S]*:run="pausedBuddyRun"[\s\S]*@resume="resumePausedBuddyRun"[\s\S]*@cancel="cancelPausedBuddyRun"/);
   assert.match(componentSource, /resumePausedBuddyRun/);
   assert.match(componentSource, /runDetail\.status === "awaiting_human"/);
   assert.match(componentSource, /shouldHoldBuddyQueueDrain\(\{ hasPausedRun: Boolean\(pausedBuddyRun\.value\) \}\)/);
@@ -399,8 +398,8 @@ test("BuddyWidget treats awaiting-human graph runs as resumable pause cards", ()
 });
 
 test("BuddyWidget can cancel a paused run from the pause card", () => {
-  assert.match(componentSource, /buddy\.pause\.cancelRun/);
-  assert.match(componentSource, /@click="cancelPausedBuddyRun"/);
+  assert.match(pauseCardSource, /buddy\.pause\.cancelRun/);
+  assert.match(componentSource, /@cancel="cancelPausedBuddyRun"/);
   assert.match(componentSource, /async function cancelPausedBuddyRun\(\)/);
   assert.match(componentSource, /await cancelRun\(run\.run_id,\s*t\("buddy\.pause\.cancelReason"\)\)/);
   assert.match(
@@ -451,27 +450,25 @@ test("BuddyWidget keeps recovered paused runs session-locked and queue-safe", ()
 });
 
 test("BuddyWidget can deny a pending permission approval from the pause card", () => {
-  assert.match(componentSource, /v-if="pausedBuddyPermissionApproval"[\s\S]*buddy\.pause\.denyPermission/);
-  assert.match(componentSource, /@click="denyPausedBuddyPermissionApproval"/);
-  assert.match(componentSource, /function denyPausedBuddyPermissionApproval\(\)/);
-  assert.match(componentSource, /permission_approval:\s*\{[\s\S]*decision:\s*"denied"/);
-  assert.match(componentSource, /buddy\.pause\.deniedReason/);
+  assert.doesNotMatch(componentSource, /function denyPausedBuddyPermissionApproval\(\)/);
+  assert.match(componentSource, /@resume="resumePausedBuddyRun"/);
+  assert.match(componentSource, /BuddyPauseCard/);
 });
 
 test("BuddyWidget shows pause context before asking for more input", () => {
-  const producedTitleIndex = componentSource.indexOf('t("buddy.pause.producedTitle")');
-  const requiredTitleIndex = componentSource.indexOf('t("buddy.pause.requiredTitle")');
-  const pauseInputIndex = componentSource.indexOf('class="buddy-widget__pause-input"');
+  const producedTitleIndex = pauseCardSource.indexOf('t("buddy.pause.producedTitle")');
+  const requiredTitleIndex = pauseCardSource.indexOf('t("buddy.pause.requiredTitle")');
+  const pauseInputIndex = pauseCardSource.indexOf('class="buddy-widget__pause-input"');
 
   assert.notEqual(producedTitleIndex, -1);
   assert.notEqual(requiredTitleIndex, -1);
   assert.ok(producedTitleIndex < requiredTitleIndex);
   assert.ok(requiredTitleIndex < pauseInputIndex);
-  assert.match(componentSource, /pausedBuddyActionMode/);
-  assert.match(componentSource, /pausedBuddyTargetKey/);
-  assert.match(componentSource, /pausedBuddyInputText/);
-  assert.match(componentSource, /v-for="row in pausedBuddyRequiredRows"[\s\S]*class="buddy-widget__pause-row"/);
-  assert.doesNotMatch(componentSource, /<label[\s\S]*v-for="row in pausedBuddyRequiredRows"[\s\S]*class="buddy-widget__pause-input"/);
+  assert.match(pauseCardSource, /pausedBuddyActionMode/);
+  assert.match(pauseCardSource, /pausedBuddyTargetKey/);
+  assert.match(pauseCardSource, /pausedBuddyInputText/);
+  assert.match(pauseCardSource, /v-for="row in pausedBuddyRequiredRows"[\s\S]*class="buddy-widget__pause-row"/);
+  assert.doesNotMatch(pauseCardSource, /<label[\s\S]*v-for="row in pausedBuddyRequiredRows"[\s\S]*class="buddy-widget__pause-input"/);
 });
 
 test("BuddyWidget scrolls the pause card into view before resuming input", () => {

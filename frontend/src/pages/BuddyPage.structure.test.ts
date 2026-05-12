@@ -23,6 +23,7 @@ test("BuddyPage manages profile, policy, memories, summary, and revisions", () =
   assert.match(source, /name="policy"/);
   assert.match(source, /name="memory"/);
   assert.match(source, /name="summary"/);
+  assert.match(source, /name="confirmation"/);
   assert.match(source, /name="history"/);
 });
 
@@ -42,4 +43,17 @@ test("BuddyPage reloads buddy data when the widget reports external updates", ()
   assert.match(source, /watch\(\s*\(\) => buddyContextStore\.dataRefreshNonce,/);
   assert.match(source, /if \(!hasLoaded\.value \|\| hasActiveBuddyPageWrite\(\)\) \{/);
   assert.match(source, /void loadAll\(\{ silent: true \}\);/);
+});
+
+test("BuddyPage reuses the standard paused-run card for confirmations", () => {
+  assert.match(source, /import BuddyPauseCard from "@\/buddy\/BuddyPauseCard\.vue";/);
+  assert.match(source, /import \{ cancelRun, fetchRun, fetchRuns, resumeRun \} from "@\/api\/runs";/);
+  assert.match(source, /fetchRuns\(\{ status: "awaiting_human" \}\)/);
+  assert.match(source, /<BuddyPauseCard[\s\S]*:run="selectedPausedRunDetail"[\s\S]*@resume="resumeSelectedPausedRun"[\s\S]*@cancel="cancelSelectedPausedRun"/);
+  assert.match(source, /async function resumeSelectedPausedRun\(payload: Record<string, unknown>\)/);
+  assert.match(source, /await resumeRun\(selectedPausedRunDetail\.value\.run_id,\s*payload\)/);
+  assert.match(source, /async function cancelSelectedPausedRun\(\)/);
+  assert.match(source, /await cancelRun\(selectedPausedRunDetail\.value\.run_id,\s*t\("buddy\.pause\.cancelReason"\)\)/);
+  assert.doesNotMatch(source, /buildHumanReviewResumePayload/);
+  assert.doesNotMatch(source, /permission_approval:\s*\{/);
 });
