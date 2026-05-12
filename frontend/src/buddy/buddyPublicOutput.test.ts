@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   buildBuddyPublicOutputBindings,
+  createBuddyPublicOutputRuntimeState,
+  reduceBuddyPublicOutputEvent,
   resolveBuddyPublicOutputMessageKind,
 } from "./buddyPublicOutput.ts";
 
@@ -105,4 +107,42 @@ test("resolveBuddyPublicOutputMessageKind separates text bubbles from cards", ()
   assert.equal(resolveBuddyPublicOutputMessageKind({ stateType: "json", displayMode: "json" }), "card");
   assert.equal(resolveBuddyPublicOutputMessageKind({ stateType: "result_package", displayMode: "auto" }), "card");
   assert.equal(resolveBuddyPublicOutputMessageKind({ stateType: "file", displayMode: "documents" }), "card");
+});
+
+test("reduceBuddyPublicOutputEvent starts output timing from upstream node start and completes on matching state", () => {
+  const bindings = [
+    {
+      outputNodeId: "output_answer",
+      outputNodeName: "Answer",
+      stateKey: "answer",
+      stateName: "answer",
+      stateType: "markdown",
+      displayMode: "markdown",
+      upstreamNodeIds: ["writer"],
+    },
+  ];
+  let state = createBuddyPublicOutputRuntimeState();
+
+  state = reduceBuddyPublicOutputEvent(state, bindings, "node.started", { node_id: "writer" }, 1000);
+  state = reduceBuddyPublicOutputEvent(state, bindings, "state.updated", { node_id: "writer", state_key: "answer", value: "你好" }, 1900);
+
+  assert.deepEqual(state.order, ["output_answer"]);
+  assert.equal(state.messagesByOutputNodeId.output_answer.content, "你好");
+  assert.equal(state.messagesByOutputNodeId.output_answer.durationMs, 900);
+  assert.equal(state.messagesByOutputNodeId.output_answer.status, "completed");
+});
+
+test("reduceBuddyPublicOutputEvent ignores states without parent output bindings", () => {
+  let state = createBuddyPublicOutputRuntimeState();
+
+  state = reduceBuddyPublicOutputEvent(
+    state,
+    [],
+    "state.updated",
+    { node_id: "writer", state_key: "request_understanding", value: { intent: "debug" } },
+    1000,
+  );
+
+  assert.deepEqual(state.order, []);
+  assert.deepEqual(state.messagesByOutputNodeId, {});
 });
