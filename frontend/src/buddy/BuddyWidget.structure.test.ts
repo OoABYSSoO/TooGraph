@@ -410,6 +410,20 @@ test("BuddyWidget can cancel a paused run from the pause card", () => {
   assert.match(componentSource, /void persistBuddyMessage\(sessionId,[\s\S]*runId:\s*run\.run_id,[\s\S]*includeInContext:\s*false/);
 });
 
+test("BuddyWidget persists awaiting-human paused run placeholders outside model context", () => {
+  assert.match(componentSource, /type BuddyPauseHandlingOptions = \{[\s\S]*persist\?: boolean;[\s\S]*\};/);
+  assert.match(componentSource, /handleBuddyRunAwaitingHuman\(runDetail,\s*assistantMessage\.id,\s*\{ persist: true \}\)/);
+  assert.match(componentSource, /handleBuddyRunAwaitingHuman\(resumedRunDetail,\s*assistantMessageId,\s*\{ persist: true \}\)/);
+  assert.match(
+    componentSource,
+    /updateAssistantMessage\(assistantMessageId,\s*t\("buddy\.pause\.persistedReply"\),\s*\{[\s\S]*includeInContext:\s*false,[\s\S]*runId:\s*run\.run_id/,
+  );
+  assert.match(
+    componentSource,
+    /if \(options\.persist && activeSessionId\.value\) \{[\s\S]*persistBuddyMessage\(activeSessionId\.value,[\s\S]*runId:\s*run\.run_id,[\s\S]*includeInContext:\s*false/,
+  );
+});
+
 test("BuddyWidget can deny a pending permission approval from the pause card", () => {
   assert.match(componentSource, /v-if="pausedBuddyPermissionApproval"[\s\S]*buddy\.pause\.denyPermission/);
   assert.match(componentSource, /@click="denyPausedBuddyPermissionApproval"/);

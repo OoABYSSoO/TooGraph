@@ -550,6 +550,10 @@ type BuddyQueuedTurn = {
   history: BuddyChatMessage[];
 };
 
+type BuddyPauseHandlingOptions = {
+  persist?: boolean;
+};
+
 type BuddyMood = "idle" | "thinking" | "speaking" | "error";
 type PausedBuddyActionMode = "execute" | "supplement";
 type BuddyMascotMotion = "idle" | "roam" | "hop";
@@ -1300,7 +1304,7 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
     const runDetail = await pollRunUntilFinished(run.run_id, activeAbortController.signal);
     if (runDetail.status === "awaiting_human") {
       keepRunPaused = true;
-      handleBuddyRunAwaitingHuman(runDetail, assistantMessage.id);
+      handleBuddyRunAwaitingHuman(runDetail, assistantMessage.id, { persist: true });
       return;
     }
     finishBuddyVisibleRun(runDetail, assistantMessage.id, turn.sessionId, run.run_id);
@@ -1377,7 +1381,7 @@ async function resumePausedBuddyRun(resumePayloadOverride: Record<string, unknow
     startRunEventStream(response.run_id, assistantMessageId, run.graph_snapshot as unknown as GraphPayload);
     const resumedRunDetail = await pollRunUntilFinished(response.run_id, activeAbortController.signal);
     if (resumedRunDetail.status === "awaiting_human") {
-      handleBuddyRunAwaitingHuman(resumedRunDetail, assistantMessageId);
+      handleBuddyRunAwaitingHuman(resumedRunDetail, assistantMessageId, { persist: true });
       return;
     }
     finishBuddyVisibleRun(resumedRunDetail, assistantMessageId, sessionId, response.run_id);
@@ -1482,7 +1486,11 @@ async function cancelPausedBuddyRun() {
   }
 }
 
-function handleBuddyRunAwaitingHuman(run: RunDetail, assistantMessageId: string) {
+function handleBuddyRunAwaitingHuman(
+  run: RunDetail,
+  assistantMessageId: string,
+  options: BuddyPauseHandlingOptions = {},
+) {
   pausedBuddyRun.value = run;
   pausedBuddyAssistantMessageId.value = assistantMessageId;
   pausedBuddyDraftsByKey.value = buildPausedBuddyDraftsByKey(run);
@@ -1498,6 +1506,16 @@ function handleBuddyRunAwaitingHuman(run: RunDetail, assistantMessageId: string)
     replaceKey: "local:awaiting-human",
     timingKey: "local:awaiting-human",
   });
+  updateAssistantMessage(assistantMessageId, t("buddy.pause.persistedReply"), {
+    includeInContext: false,
+    runId: run.run_id,
+  });
+  if (options.persist && activeSessionId.value) {
+    void persistBuddyMessage(activeSessionId.value, messages.value.find((message) => message.id === assistantMessageId), {
+      runId: run.run_id,
+      includeInContext: false,
+    });
+  }
 }
 
 function finishBuddyVisibleRun(runDetail: RunDetail, assistantMessageId: string, sessionId: string, runId: string) {
