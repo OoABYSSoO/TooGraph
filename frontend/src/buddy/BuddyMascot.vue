@@ -348,10 +348,10 @@ function transitionTailTo(targetSide: TailSide, durationMs = TAIL_IDLE_SWITCH_DU
 
 function resolveTailSideForFacing(facing: BuddyMascotFacing): TailSide {
   if (facing === "left") {
-    return "right";
+    return "left";
   }
   if (facing === "right") {
-    return "left";
+    return "right";
   }
   return tailSide.value;
 }

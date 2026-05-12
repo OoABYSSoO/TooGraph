@@ -134,7 +134,7 @@ test("BuddyMascot exposes tail poses and directional part offsets without body m
   assert.match(componentSource, /\.buddy-mascot--facing-left\s*\{[\s\S]*--buddy-mascot-tail-root-x:\s*12px;[\s\S]*--buddy-mascot-left-eye-facing-x:\s*-70px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*-110px;[\s\S]*--buddy-mascot-left-ear-x:\s*18px;[\s\S]*--buddy-mascot-right-ear-x:\s*12px;/);
   assert.match(componentSource, /\.buddy-mascot--facing-right\s*\{[\s\S]*--buddy-mascot-tail-root-x:\s*-12px;[\s\S]*--buddy-mascot-left-eye-facing-x:\s*110px;[\s\S]*--buddy-mascot-right-eye-facing-x:\s*70px;[\s\S]*--buddy-mascot-left-ear-x:\s*-12px;[\s\S]*--buddy-mascot-right-ear-x:\s*-18px;/);
   assert.match(componentSource, /function resolveTailSideForFacing\(facing: BuddyMascotFacing\): TailSide/);
-  assert.match(resolveTailSideForFacingFunction, /if \(facing === "left"\) \{[\s\S]*return "right";[\s\S]*if \(facing === "right"\) \{[\s\S]*return "left";/);
+  assert.match(resolveTailSideForFacingFunction, /if \(facing === "left"\) \{[\s\S]*return "left";[\s\S]*if \(facing === "right"\) \{[\s\S]*return "right";/);
   assert.match(componentSource, /\.buddy-mascot__tail-pose\s*\{[\s\S]*opacity:\s*1;/);
   assert.doesNotMatch(componentSource, /\.buddy-mascot--facing-left \.buddy-mascot__body-turn/);
   assert.doesNotMatch(componentSource, /\.buddy-mascot--facing-right \.buddy-mascot__body-turn/);
@@ -195,7 +195,9 @@ test("BuddyMascot accelerates tail correction when facing changes without snappi
 });
 
 test("BuddyMascot settles the front tail side from the previous lateral facing", () => {
+  const resolveTailSideForFacingFunction = extractFunctionBlock(componentSource, "resolveTailSideForFacing");
   const resolveFrontTailSideFromPreviousFacingFunction = extractFunctionBlock(componentSource, "resolveFrontTailSideFromPreviousFacing");
+  assert.match(resolveTailSideForFacingFunction, /if \(facing === "left"\) \{[\s\S]*return "left";[\s\S]*if \(facing === "right"\) \{[\s\S]*return "right";/);
   assert.match(componentSource, /const enteredFrontFromLateral = props\.facing === "front" && isLateralFacing\(previousFacing\);/);
   assert.match(componentSource, /const targetSide = enteredFrontFromLateral\s*\?\s*resolveFrontTailSideFromPreviousFacing\(previousFacing\)\s*:\s*resolveTailSideForFacing\(props\.facing\);/);
   assert.match(componentSource, /if \(enteredFrontFromLateral\) \{[\s\S]*transitionTailTo\(targetSide, TAIL_FACING_SWITCH_DURATION_MS, true\);[\s\S]*return;[\s\S]*\}/);
