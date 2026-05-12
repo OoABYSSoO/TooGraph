@@ -8,6 +8,7 @@ import type { GraphPayload } from "@/types/node-system";
 import type { RunDetail } from "@/types/run";
 
 import type { RunActivityState } from "./runActivityModel.ts";
+import type { RunNodeTimingByNodeId } from "./runNodeTimingModel.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 import { useWorkspaceTabLifecycleController } from "./useWorkspaceTabLifecycleController.ts";
 import type { WorkspaceSidePanelMode } from "./workspaceSidePanelModel.ts";
@@ -55,6 +56,10 @@ function createLifecycleHarness() {
     tab_b: { x: 3, y: 4, scale: 2 },
   });
   const runNodeStatusByTabId = ref<Record<string, Record<string, string>>>({ tab_a: { node_a: "running" }, tab_b: {} });
+  const runNodeTimingByTabId = ref<Record<string, RunNodeTimingByNodeId>>({
+    tab_a: { node_a: { status: "running", startedAtMs: 1000, durationMs: null } },
+    tab_b: {},
+  });
   const currentRunNodeIdByTabId = ref<Record<string, string | null>>({ tab_a: "node_a", tab_b: null });
   const latestRunDetailByTabId = ref<Record<string, RunDetail | null>>({ tab_a: {} as RunDetail, tab_b: null });
   const restoredRunSnapshotIdByTabId = ref<Record<string, string | null>>({ tab_a: "snapshot_a", tab_b: null });
@@ -95,6 +100,7 @@ function createLifecycleHarness() {
     focusRequestByTabId,
     viewportByTabId,
     runNodeStatusByTabId,
+    runNodeTimingByTabId,
     currentRunNodeIdByTabId,
     latestRunDetailByTabId,
     restoredRunSnapshotIdByTabId,
@@ -147,6 +153,7 @@ function createLifecycleHarness() {
       focusRequestByTabId,
       viewportByTabId,
       runNodeStatusByTabId,
+      runNodeTimingByTabId,
       currentRunNodeIdByTabId,
       latestRunDetailByTabId,
       restoredRunSnapshotIdByTabId,

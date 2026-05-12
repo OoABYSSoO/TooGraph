@@ -5,11 +5,13 @@ import { ref } from "vue";
 import type { GraphPayload } from "@/types/node-system";
 import type { RunDetail } from "@/types/run";
 
+import type { RunNodeTimingByNodeId } from "./runNodeTimingModel.ts";
 import { useWorkspaceRunVisualState, type WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 
 function createVisualHarness() {
   const latestRunDetailByTabId = ref<Record<string, RunDetail | null>>({});
   const runNodeStatusByTabId = ref<Record<string, Record<string, string>>>({});
+  const runNodeTimingByTabId = ref<Record<string, RunNodeTimingByNodeId>>({});
   const currentRunNodeIdByTabId = ref<Record<string, string | null>>({});
   const runOutputPreviewByTabId = ref<Record<string, Record<string, { text: string; displayMode: string | null }>>>({});
   const runFailureMessageByTabId = ref<Record<string, Record<string, string>>>({});
@@ -20,6 +22,7 @@ function createVisualHarness() {
   const controller = useWorkspaceRunVisualState({
     latestRunDetailByTabId,
     runNodeStatusByTabId,
+    runNodeTimingByTabId,
     currentRunNodeIdByTabId,
     runOutputPreviewByTabId,
     runFailureMessageByTabId,
@@ -31,6 +34,7 @@ function createVisualHarness() {
   return {
     latestRunDetailByTabId,
     runNodeStatusByTabId,
+    runNodeTimingByTabId,
     currentRunNodeIdByTabId,
     runOutputPreviewByTabId,
     runFailureMessageByTabId,
@@ -112,6 +116,7 @@ test("useWorkspaceRunVisualState applies run visual state without mutating unrel
 
   assert.deepEqual(harness.latestRunDetailByTabId.value.tab_a, run);
   assert.deepEqual(harness.runNodeStatusByTabId.value.tab_a, run.node_status_map);
+  assert.equal(harness.runNodeTimingByTabId.value.tab_a.agent_a.status, "failed");
   assert.equal(harness.currentRunNodeIdByTabId.value.tab_a, "agent_a");
   assert.deepEqual(harness.activeRunEdgeIdsByTabId.value.tab_a, ["edge_a"]);
   assert.deepEqual(harness.runFailureMessageByTabId.value.tab_a, { agent_a: "agent failed" });
@@ -168,6 +173,18 @@ test("useWorkspaceRunVisualState projects subgraph status from run detail and li
       summarize: "success",
     },
   });
+});
+
+test("useWorkspaceRunVisualState applies live node timing events", () => {
+  const harness = createVisualHarness();
+
+  harness.controller.applyRunEventVisualStateToTab("tab_a", "node.started", { node_id: "agent" });
+  assert.equal(harness.runNodeTimingByTabId.value.tab_a.agent.status, "running");
+  assert.equal(typeof harness.runNodeTimingByTabId.value.tab_a.agent.startedAtMs, "number");
+
+  harness.controller.applyRunEventVisualStateToTab("tab_a", "node.completed", { node_id: "agent", duration_ms: 42 });
+  assert.equal(harness.runNodeTimingByTabId.value.tab_a.agent.status, "success");
+  assert.equal(harness.runNodeTimingByTabId.value.tab_a.agent.durationMs, 42);
 });
 
 test("useWorkspaceRunVisualState exposes direct feedback and message helpers", () => {

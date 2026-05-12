@@ -6,6 +6,7 @@ import type { RunDetail } from "../../types/run.ts";
 
 import { setTabScopedRecordEntry } from "./editorTabRuntimeModel.ts";
 import type { RunActivityState } from "./runActivityModel.ts";
+import type { RunNodeTimingByNodeId } from "./runNodeTimingModel.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 
 type WorkspaceRunControllerInput = {
@@ -16,6 +17,7 @@ type WorkspaceRunControllerInput = {
   humanReviewBusyByTabId: Ref<Record<string, boolean>>;
   humanReviewErrorByTabId: Ref<Record<string, string | null>>;
   runNodeStatusByTabId: Ref<Record<string, Record<string, string>>>;
+  runNodeTimingByTabId: Ref<Record<string, RunNodeTimingByNodeId>>;
   currentRunNodeIdByTabId: Ref<Record<string, string | null>>;
   runOutputPreviewByTabId: Ref<Record<string, Record<string, { text: string; displayMode: string | null }>>>;
   runFailureMessageByTabId: Ref<Record<string, Record<string, string>>>;
@@ -41,6 +43,7 @@ type WorkspaceRunControllerInput = {
 export function useWorkspaceRunController(input: WorkspaceRunControllerInput) {
   function clearQueuedRunVisualState(tabId: string) {
     input.runNodeStatusByTabId.value = setTabScopedRecordEntry(input.runNodeStatusByTabId.value, tabId, {});
+    input.runNodeTimingByTabId.value = setTabScopedRecordEntry(input.runNodeTimingByTabId.value, tabId, {});
     input.currentRunNodeIdByTabId.value = setTabScopedRecordEntry(input.currentRunNodeIdByTabId.value, tabId, null);
     input.runOutputPreviewByTabId.value = setTabScopedRecordEntry(input.runOutputPreviewByTabId.value, tabId, {});
     input.runFailureMessageByTabId.value = setTabScopedRecordEntry(input.runFailureMessageByTabId.value, tabId, {});

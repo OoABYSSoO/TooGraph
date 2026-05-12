@@ -98,6 +98,7 @@
                 :selected-node-id="focusedNodeIdByTabId[tab.tabId] ?? null"
                 :focus-request="focusRequestByTabId[tab.tabId] ?? null"
                 :run-node-status-by-node-id="runNodeStatusByTabId[tab.tabId] ?? undefined"
+                :run-node-timing-by-node-id="runNodeTimingByTabId[tab.tabId] ?? undefined"
                 :current-run-node-id="currentRunNodeIdByTabId[tab.tabId] ?? null"
                 :latest-run-status="feedbackForTab(tab.tabId)?.activeRunStatus ?? null"
                 :run-output-preview-by-node-id="runOutputPreviewByTabId[tab.tabId] ?? undefined"
@@ -291,6 +292,7 @@ import { useWorkspaceSidePanelController } from "./useWorkspaceSidePanelControll
 import { useWorkspaceTabLifecycleController } from "./useWorkspaceTabLifecycleController.ts";
 import { useWorkspaceGraphMutationActions } from "./useWorkspaceGraphMutationActions.ts";
 import type { RunActivityState } from "./runActivityModel.ts";
+import type { RunNodeTimingByNodeId } from "./runNodeTimingModel.ts";
 
 type DataEdgeStateEditorRequest = CreatedStateEdgeEditorRequest;
 
@@ -330,6 +332,7 @@ const focusRequestByTabId = ref<Record<string, NodeFocusRequest | null>>({});
 const viewportByTabId = ref<Record<string, CanvasViewport>>({});
 const dataEdgeStateEditorRequestByTabId = ref<Record<string, DataEdgeStateEditorRequest | null>>({});
 const runNodeStatusByTabId = ref<Record<string, Record<string, string>>>({});
+const runNodeTimingByTabId = ref<Record<string, RunNodeTimingByNodeId>>({});
 const currentRunNodeIdByTabId = ref<Record<string, string | null>>({});
 const latestRunDetailByTabId = ref<Record<string, RunDetail | null>>({});
 const restoredRunSnapshotIdByTabId = ref<Record<string, string | null>>({});
@@ -477,6 +480,7 @@ const {
 } = useWorkspaceRunVisualState({
   latestRunDetailByTabId,
   runNodeStatusByTabId,
+  runNodeTimingByTabId,
   currentRunNodeIdByTabId,
   runOutputPreviewByTabId,
   runFailureMessageByTabId,
@@ -763,6 +767,7 @@ const {
   focusRequestByTabId,
   viewportByTabId,
   runNodeStatusByTabId,
+  runNodeTimingByTabId,
   currentRunNodeIdByTabId,
   latestRunDetailByTabId,
   restoredRunSnapshotIdByTabId,
@@ -792,6 +797,7 @@ const { runActiveGraph, resumeHumanReviewRun } = useWorkspaceRunController({
   humanReviewBusyByTabId,
   humanReviewErrorByTabId,
   runNodeStatusByTabId,
+  runNodeTimingByTabId,
   currentRunNodeIdByTabId,
   runOutputPreviewByTabId,
   runFailureMessageByTabId,

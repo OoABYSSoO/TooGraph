@@ -548,6 +548,7 @@ test("EditorWorkspaceShell delegates tab runtime record cleanup to the runtime m
   assert.match(clearTabRuntimeSource, /clearRecord\(input\.loadingByTabId, tabId\);/);
   assert.match(clearTabRuntimeSource, /clearRecord\(input\.feedbackByTabId, tabId\);/);
   assert.match(clearTabRuntimeSource, /clearRecord\(input\.viewportByTabId, tabId\);/);
+  assert.match(clearTabRuntimeSource, /clearRecord\(input\.runNodeTimingByTabId, tabId\);/);
   assert.match(clearTabRuntimeSource, /clearRecord\(input\.runOutputPreviewByTabId, tabId\);/);
   assert.match(clearTabRuntimeSource, /clearRecord\(input\.activeRunEdgeIdsByTabId, tabId\);/);
   assert.doesNotMatch(clearTabRuntimeSource, /delete next[A-Za-z]+\[tabId\]/);
@@ -584,6 +585,10 @@ test("EditorWorkspaceShell delegates run visual tab-state writes to the runtime 
   assert.match(
     applyRunVisualSource,
     /input\.runNodeStatusByTabId\.value = setTabScopedRecordEntry\(input\.runNodeStatusByTabId\.value, tabId, visualRun\.node_status_map \?\? \{\}\);/,
+  );
+  assert.match(
+    applyRunVisualSource,
+    /input\.runNodeTimingByTabId\.value = setTabScopedRecordEntry\(input\.runNodeTimingByTabId\.value, tabId, buildRunNodeTimingByNodeIdFromRun\(visualRun\)\);/,
   );
   assert.match(
     applyRunVisualSource,
@@ -630,12 +635,17 @@ test("EditorWorkspaceShell delegates document load tab-state writes to the runti
 test("EditorWorkspaceShell delegates run invocation tab-state writes to the runtime model", () => {
   assert.match(componentSource, /useWorkspaceRunController\(\{/);
   assert.match(componentSource, /runNodeStatusByTabId,/);
+  assert.match(componentSource, /runNodeTimingByTabId,/);
   assert.match(componentSource, /humanReviewBusyByTabId,/);
   assert.doesNotMatch(componentSource, /async function runActiveGraph\(\)/);
   assert.doesNotMatch(componentSource, /async function resumeHumanReviewRun\(tabId: string, payload: Record<string, unknown>\)/);
   assert.match(
     runControllerSource,
     /input\.runNodeStatusByTabId\.value = setTabScopedRecordEntry\(input\.runNodeStatusByTabId\.value, tabId, \{\}\);/,
+  );
+  assert.match(
+    runControllerSource,
+    /input\.runNodeTimingByTabId\.value = setTabScopedRecordEntry\(input\.runNodeTimingByTabId\.value, tabId, \{\}\);/,
   );
   assert.match(
     runControllerSource,

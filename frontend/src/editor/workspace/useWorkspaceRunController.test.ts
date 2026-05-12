@@ -7,6 +7,7 @@ import type { GraphDocument, GraphPayload, GraphRunResponse } from "@/types/node
 import type { RunDetail } from "@/types/run";
 
 import type { RunActivityState } from "./runActivityModel.ts";
+import type { RunNodeTimingByNodeId } from "./runNodeTimingModel.ts";
 import { useWorkspaceRunController } from "./useWorkspaceRunController.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 
@@ -59,6 +60,9 @@ function createRunHarness(
   const humanReviewBusyByTabId = ref<Record<string, boolean>>({});
   const humanReviewErrorByTabId = ref<Record<string, string | null>>({});
   const runNodeStatusByTabId = ref<Record<string, Record<string, string>>>({ tab_a: { old_node: "success" } });
+  const runNodeTimingByTabId = ref<Record<string, RunNodeTimingByNodeId>>({
+    tab_a: { old_node: { status: "success", startedAtMs: null, durationMs: 12 } },
+  });
   const currentRunNodeIdByTabId = ref<Record<string, string | null>>({ tab_a: "old_node" });
   const runOutputPreviewByTabId = ref<Record<string, Record<string, { text: string; displayMode: string | null }>>>({
     tab_a: { old_node: { text: "old", displayMode: null } },
@@ -103,6 +107,7 @@ function createRunHarness(
     humanReviewBusyByTabId,
     humanReviewErrorByTabId,
     runNodeStatusByTabId,
+    runNodeTimingByTabId,
     currentRunNodeIdByTabId,
     runOutputPreviewByTabId,
     runFailureMessageByTabId,
@@ -168,6 +173,7 @@ function createRunHarness(
     humanReviewBusyByTabId,
     humanReviewErrorByTabId,
     runNodeStatusByTabId,
+    runNodeTimingByTabId,
     currentRunNodeIdByTabId,
     runOutputPreviewByTabId,
     runFailureMessageByTabId,
@@ -193,6 +199,7 @@ test("useWorkspaceRunController runs the latest document after model refresh and
   assert.equal(harness.runGraphDocuments[0]?.name, "After");
   assert.deepEqual(harness.cancelledPolling, ["tab_a"]);
   assert.deepEqual(harness.runNodeStatusByTabId.value.tab_a, {});
+  assert.deepEqual(harness.runNodeTimingByTabId.value.tab_a, {});
   assert.equal(harness.currentRunNodeIdByTabId.value.tab_a, null);
   assert.deepEqual(harness.runOutputPreviewByTabId.value.tab_a, {});
   assert.deepEqual(harness.runFailureMessageByTabId.value.tab_a, {});
