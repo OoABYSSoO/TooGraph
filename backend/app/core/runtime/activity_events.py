@@ -63,6 +63,7 @@ def record_skill_activity_events(
     binding_source: str,
     raw_events: Any,
     publish_run_event_func: Callable[[str | None, str, dict[str, Any] | None], None] | None = None,
+    record_activity_event_func: Callable[..., dict[str, Any]] = record_activity_event,
 ) -> list[dict[str, Any]]:
     if not isinstance(raw_events, list):
         return []
@@ -76,7 +77,7 @@ def record_skill_activity_events(
         if not kind or not summary:
             continue
         detail = raw_event.get("detail") if isinstance(raw_event.get("detail"), dict) else {}
-        event = record_activity_event(
+        event = record_activity_event_func(
             state,
             kind=kind,
             summary=summary,

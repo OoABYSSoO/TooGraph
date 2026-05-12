@@ -206,6 +206,69 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(event["detail"]["input_keys"], ["question"])
         self.assertEqual(event["detail"]["output_keys"], ["echo"])
 
+    def test_execute_agent_node_records_skill_returned_activity_events(self) -> None:
+        state_schema = {
+            "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "writer",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "question"}],
+                "writes": [{"state": "answer"}],
+                "config": {"skillKey": "custom"},
+            }
+        )
+        recorded_events: list[dict[str, Any]] = []
+
+        def record_activity_event_func(state: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+            recorded_events.append(kwargs)
+            return {"sequence": len(recorded_events), **kwargs}
+
+        execute_agent_node(
+            state_schema,
+            node,
+            {"question": "q"},
+            {"state": {}},
+            node_name="writer",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {"custom": object()},
+            invoke_skill_func=lambda skill_func, skill_inputs: {
+                "echo": skill_inputs["question"],
+                "activity_events": [
+                    {
+                        "kind": "file_read",
+                        "summary": "Read docs/a.md",
+                        "detail": {"path": "docs/a.md", "characters": 42},
+                    }
+                ],
+            },
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_skill_inputs_func=pass_through_skill_inputs_func,
+            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+                {"answer": "value"},
+                "",
+                [],
+                runtime_config,
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+            record_activity_event_func=record_activity_event_func,
+        )
+
+        self.assertEqual(len(recorded_events), 2)
+        self.assertEqual(recorded_events[0]["kind"], "skill_invocation")
+        self.assertEqual(recorded_events[1]["kind"], "file_read")
+        self.assertEqual(recorded_events[1]["node_id"], "writer")
+        self.assertEqual(recorded_events[1]["summary"], "Read docs/a.md")
+        self.assertEqual(recorded_events[1]["detail"]["skill_key"], "custom")
+        self.assertEqual(recorded_events[1]["detail"]["binding_source"], "node_config")
+        self.assertEqual(recorded_events[1]["detail"]["path"], "docs/a.md")
+
     def test_execute_agent_node_treats_knowledge_base_state_as_normal_skill_input(self) -> None:
         state_schema = {
             "kb": NodeSystemStateDefinition.model_validate({"type": "knowledge_base"}),
@@ -487,6 +550,11 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "config": {"skillKey": ""},
             }
         )
+        recorded_events: list[dict[str, Any]] = []
+
+        def record_activity_event_func(state: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+            recorded_events.append(kwargs)
+            return {"sequence": len(recorded_events), **kwargs}
 
         result = execute_agent_node(
             state_schema,
@@ -523,6 +591,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             ),
             finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
             first_truthy_func=lambda values: next((value for value in values if value), None),
+            record_activity_event_func=record_activity_event_func,
         )
 
         self.assertTrue(result["awaiting_human"])
@@ -533,6 +602,11 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(approval["binding_source"], "capability_state")
         self.assertEqual(approval["permissions"], ["file_write", "subprocess"])
         self.assertEqual(approval["skill_inputs"], {"path": "skill/user/demo/SKILL.md"})
+        self.assertEqual(recorded_events[0]["kind"], "permission_pause")
+        self.assertEqual(recorded_events[0]["node_id"], "execute_capability")
+        self.assertEqual(recorded_events[0]["status"], "awaiting_human")
+        self.assertEqual(recorded_events[0]["detail"]["skill_key"], "local_workspace_executor")
+        self.assertEqual(recorded_events[0]["detail"]["permissions"], ["file_write", "subprocess"])
 
     def test_execute_agent_node_resumes_risky_skill_with_stored_approval_inputs(self) -> None:
         state_schema = {
@@ -797,6 +871,82 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             },
         )
         self.assertIn('"sourceType": "subgraph"', result["final_result"].replace("'", '"'))
+
+    def test_execute_agent_node_records_dynamic_subgraph_activity_event(self) -> None:
+        state_schema = {
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
+            "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "dynamic_result": NodeSystemStateDefinition.model_validate({"type": "result_package"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "subgraph_executor",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "selected_capability"}, {"state": "question"}],
+                "writes": [{"state": "dynamic_result"}],
+                "config": {"skillKey": ""},
+            }
+        )
+        recorded_events: list[dict[str, Any]] = []
+
+        def record_activity_event_func(state: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+            recorded_events.append(kwargs)
+            return {"sequence": len(recorded_events), **kwargs}
+
+        execute_agent_node(
+            state_schema,
+            node,
+            {
+                "selected_capability": {
+                    "kind": "subgraph",
+                    "key": "advanced_web_research_loop",
+                    "name": "高级联网搜索",
+                },
+                "question": "总结今天 AI 新闻",
+            },
+            {"state": {}},
+            node_name="subgraph_executor",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {},
+            get_skill_definition_registry_func=lambda *, include_disabled: {},
+            generate_agent_subgraph_inputs_func=lambda **kwargs: (
+                {"advanced_web_research_loop": {"user_question": "总结今天 AI 新闻"}},
+                "planned subgraph inputs",
+                [],
+                kwargs["runtime_config"],
+            ),
+            execute_subgraph_capability_func=lambda **kwargs: {
+                "source_name": "Advanced Web Research",
+                "status": "succeeded",
+                "outputs": {"final_reply": "最终答案"},
+                "output_definitions": {},
+                "duration_ms": 12,
+                "error": "",
+                "error_type": "",
+                "warnings": [],
+                "subgraph": {"graph_id": "advanced_web_research_loop"},
+            },
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("dynamic subgraph results should be packaged without an extra LLM response")
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+            record_activity_event_func=record_activity_event_func,
+        )
+
+        self.assertEqual(len(recorded_events), 1)
+        self.assertEqual(recorded_events[0]["kind"], "subgraph_invocation")
+        self.assertEqual(recorded_events[0]["summary"], "Subgraph 'advanced_web_research_loop' succeeded.")
+        self.assertEqual(recorded_events[0]["node_id"], "subgraph_executor")
+        self.assertEqual(recorded_events[0]["status"], "succeeded")
+        self.assertEqual(recorded_events[0]["duration_ms"], 12)
+        self.assertEqual(recorded_events[0]["detail"]["capability_key"], "advanced_web_research_loop")
+        self.assertEqual(recorded_events[0]["detail"]["input_keys"], ["user_question"])
+        self.assertEqual(recorded_events[0]["detail"]["output_keys"], ["final_reply"])
 
     def test_execute_agent_node_infers_skill_output_mapping_from_state_outputs(self) -> None:
         state_schema = {

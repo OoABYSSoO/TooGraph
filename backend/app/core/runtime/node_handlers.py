@@ -12,7 +12,7 @@ from app.core.runtime.agent_subgraph_input_generation import (
     SubgraphCapabilityField,
     generate_agent_subgraph_inputs,
 )
-from app.core.runtime.activity_events import record_activity_event
+from app.core.runtime.activity_events import record_activity_event, record_skill_activity_events
 from app.core.runtime.condition_eval import evaluate_condition_rule, resolve_branch_key
 from app.core.runtime.input_boundary import coerce_input_boundary_value, first_truthy
 from app.core.runtime.reference_resolution import resolve_condition_source
@@ -250,6 +250,19 @@ def execute_agent_node(
                     skill_definition=skill_definition,
                 )
                 if approval_decision.required:
+                    record_activity_event_func(
+                        state,
+                        kind="permission_pause",
+                        summary=_permission_pause_activity_summary(skill_key, approval_decision.risky_permissions),
+                        node_id=node_name,
+                        status="awaiting_human",
+                        detail={
+                            "skill_key": skill_key,
+                            "binding_source": resolved_binding.source,
+                            "permissions": approval_decision.risky_permissions,
+                            "input_keys": sorted(skill_inputs.keys()),
+                        },
+                    )
                     return {
                         "outputs": {},
                         "awaiting_human": True,
@@ -347,6 +360,14 @@ def execute_agent_node(
                 **({"error_type": skill_error_type} if skill_error_type else {}),
             },
             error=skill_error,
+        )
+        record_skill_activity_events(
+            state,
+            node_id=node_name,
+            skill_key=skill_key,
+            binding_source=resolved_binding.source,
+            raw_events=skill_result.get("activity_events"),
+            record_activity_event_func=record_activity_event_func,
         )
 
     subgraph_keys = (
@@ -460,6 +481,22 @@ def execute_agent_node(
                 "error_type": error_type,
                 "subgraph": execution_result.get("subgraph"),
             }
+        )
+        record_activity_event_func(
+            state,
+            kind="subgraph_invocation",
+            summary=_subgraph_invocation_activity_summary(subgraph_key, status),
+            node_id=node_name,
+            status=status,
+            duration_ms=duration_ms,
+            detail={
+                "capability_key": subgraph_key,
+                "capability_name": subgraph_definition.name or subgraph_key,
+                "input_keys": sorted(subgraph_inputs.keys()),
+                "output_keys": sorted(dict(execution_result.get("outputs") or {}).keys()),
+                **({"error_type": error_type} if error_type else {}),
+            },
+            error=error,
         )
 
     mapped_capability_and_skill_outputs = {**mapped_skill_outputs, **mapped_capability_outputs}
@@ -793,6 +830,17 @@ def _skill_invocation_activity_summary(skill_key: str, status: str) -> str:
     if status == "failed":
         return f"Skill '{skill_key}' failed."
     return f"Skill '{skill_key}' succeeded."
+
+
+def _permission_pause_activity_summary(skill_key: str, permissions: list[str]) -> str:
+    permission_label = ", ".join(permissions) or "risky permission"
+    return f"Paused for {permission_label} approval before Skill '{skill_key}'."
+
+
+def _subgraph_invocation_activity_summary(subgraph_key: str, status: str) -> str:
+    if status == "failed":
+        return f"Subgraph '{subgraph_key}' failed."
+    return f"Subgraph '{subgraph_key}' succeeded."
 
 
 def _compact_text(value: Any) -> str:
