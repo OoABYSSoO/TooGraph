@@ -91,9 +91,22 @@ test("NodeCard renders a top-left run timing capsule", () => {
   assert.match(componentSource, /node-card__run-timing-capsule/);
   assert.match(componentSource, /Clock/);
   assert.match(componentSource, /formatNodeRunTimingDuration/);
+  assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-floating-capsule-height:\s*58px;/);
+  assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-floating-capsule-offset:\s*8px;/);
   assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*position:\s*absolute;/);
   assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*top:/);
-  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*left:/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*left:\s*0;/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*height:\s*var\(--node-card-floating-capsule-height,\s*58px\);/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*box-sizing:\s*border-box;/);
+  assert.match(
+    componentSource,
+    /\.node-card__run-timing-capsule \{[\s\S]*transform:\s*translateY\(calc\(-100% - var\(--node-card-floating-capsule-offset,\s*8px\)\)\);/,
+  );
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*box-shadow:\s*var\(--toograph-glass-shadow\),\s*var\(--toograph-glass-highlight\),\s*var\(--toograph-glass-rim\);/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*backdrop-filter:\s*blur\(24px\)\s*saturate\(1\.6\)\s*contrast\(1\.02\);/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule::before \{/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule :deep\(\.el-icon\) \{[\s\S]*width:\s*40px;/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule :deep\(\.el-icon\) \{[\s\S]*height:\s*40px;/);
 });
 
 test("NodeCard stretches primary editable surfaces when the canvas resizes the node", () => {
@@ -681,10 +694,17 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.match(componentSource, /"--el-popover-bg-color":\s*"transparent"/);
   assert.match(topActionsSource, /node-card__top-action-button--confirm/);
   assert.match(componentSource, /\.node-card \{[\s\S]*overflow:\s*visible;/);
+  assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-floating-capsule-height:\s*58px;/);
+  assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-floating-capsule-offset:\s*8px;/);
   assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*top:\s*0;/);
-  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*right:\s*18px;/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*right:\s*0;/);
   assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*z-index:\s*12;/);
-  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*transform:\s*translateY\(calc\(-100% - 8px\)\);/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*height:\s*var\(--node-card-floating-capsule-height,\s*58px\);/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*box-sizing:\s*border-box;/);
+  assert.match(
+    topActionsSource,
+    /\.node-card__top-actions \{[\s\S]*transform:\s*translateY\(calc\(-100% - var\(--node-card-floating-capsule-offset,\s*8px\)\)\);/,
+  );
   assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*gap:\s*8px;/);
   assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*padding:\s*8px;/);
   assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.14\);/);

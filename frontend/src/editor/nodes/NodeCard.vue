@@ -23,7 +23,7 @@
       :title="t('nodeCard.runTiming')"
     >
       <ElIcon aria-hidden="true"><Clock /></ElIcon>
-      <span>{{ formattedNodeRunTimingDuration }}</span>
+      <span class="node-card__run-timing-text">{{ formattedNodeRunTimingDuration }}</span>
     </div>
     <NodeCardTopActions
       :body-kind="view.body.kind"
@@ -1951,6 +1951,8 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 <style scoped>
 .node-card {
   --node-card-inline-padding: 24px;
+  --node-card-floating-capsule-height: 58px;
+  --node-card-floating-capsule-offset: 8px;
   --node-card-kind-rgb: 154, 52, 18;
   position: relative;
   width: var(--node-card-width, 460px);
@@ -2009,46 +2011,76 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 
 .node-card__run-timing-capsule {
   position: absolute;
-  top: -12px;
-  left: 16px;
-  z-index: 3;
+  top: 0;
+  left: 0;
+  z-index: 12;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-height: 24px;
-  padding: 0 9px;
-  border: 1px solid rgba(var(--node-card-kind-rgb), 0.18);
+  gap: 8px;
+  height: var(--node-card-floating-capsule-height, 58px);
+  box-sizing: border-box;
+  padding: 8px 14px 8px 8px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 999px;
-  background: rgba(255, 251, 247, 0.96);
+  background: var(--toograph-glass-bg);
   color: rgba(71, 47, 29, 0.84);
-  box-shadow: 0 8px 18px rgba(60, 41, 20, 0.11);
-  font-size: 12px;
-  line-height: 1;
+  box-shadow: var(--toograph-glass-shadow), var(--toograph-glass-highlight), var(--toograph-glass-rim);
+  backdrop-filter: blur(24px) saturate(1.6) contrast(1.02);
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.1;
   white-space: nowrap;
   pointer-events: none;
+  transform: translateY(calc(-100% - var(--node-card-floating-capsule-offset, 8px)));
+}
+
+.node-card__run-timing-capsule::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--toograph-glass-specular), var(--toograph-glass-lens);
+  mix-blend-mode: screen;
+  opacity: 0.5;
 }
 
 .node-card__run-timing-capsule :deep(.el-icon) {
+  position: relative;
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(var(--node-card-kind-rgb), 0.16);
+  border-radius: 999px;
+  background: rgba(255, 252, 247, 0.94);
   font-size: 13px;
 }
 
+.node-card__run-timing-text {
+  position: relative;
+  z-index: 1;
+  font-variant-numeric: tabular-nums;
+}
+
 .node-card__run-timing-capsule--running {
-  border-color: rgba(16, 185, 129, 0.36);
+  border-color: rgba(16, 185, 129, 0.3);
   color: #047857;
 }
 
 .node-card__run-timing-capsule--success {
-  border-color: rgba(16, 185, 129, 0.42);
+  border-color: rgba(16, 185, 129, 0.34);
   color: #047857;
 }
 
 .node-card__run-timing-capsule--failed {
-  border-color: rgba(239, 68, 68, 0.44);
+  border-color: rgba(239, 68, 68, 0.34);
   color: #b91c1c;
 }
 
 .node-card__run-timing-capsule--paused {
-  border-color: rgba(245, 158, 11, 0.44);
+  border-color: rgba(245, 158, 11, 0.34);
   color: #b45309;
 }
 

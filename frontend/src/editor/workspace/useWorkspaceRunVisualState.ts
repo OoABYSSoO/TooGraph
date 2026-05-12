@@ -97,7 +97,11 @@ export function useWorkspaceRunVisualState(input: WorkspaceRunVisualStateInput) 
 
     input.latestRunDetailByTabId.value = setTabScopedRecordEntry(input.latestRunDetailByTabId.value, tabId, visualRun);
     input.runNodeStatusByTabId.value = setTabScopedRecordEntry(input.runNodeStatusByTabId.value, tabId, visualRun.node_status_map ?? {});
-    input.runNodeTimingByTabId.value = setTabScopedRecordEntry(input.runNodeTimingByTabId.value, tabId, buildRunNodeTimingByNodeIdFromRun(visualRun));
+    input.runNodeTimingByTabId.value = setTabScopedRecordEntry(
+      input.runNodeTimingByTabId.value,
+      tabId,
+      buildRunNodeTimingByNodeIdFromRun(visualRun, document),
+    );
     input.currentRunNodeIdByTabId.value = setTabScopedRecordEntry(input.currentRunNodeIdByTabId.value, tabId, visualRun.current_node_id ?? null);
     input.subgraphRunStatusByTabId.value = setTabScopedRecordEntry(
       input.subgraphRunStatusByTabId.value,
@@ -118,14 +122,19 @@ export function useWorkspaceRunVisualState(input: WorkspaceRunVisualStateInput) 
     });
   }
 
-  function applyRunEventVisualStateToTab(tabId: string, eventType: string, payload: Record<string, unknown>) {
+  function applyRunEventVisualStateToTab(
+    tabId: string,
+    eventType: string,
+    payload: Record<string, unknown>,
+    document?: GraphPayload | GraphDocument | null,
+  ) {
     const subgraphNodeId = normalizeRunEventText(payload.subgraph_node_id);
     const innerNodeId = normalizeRunEventText(payload.node_id);
     if (!subgraphNodeId) {
       input.runNodeTimingByTabId.value = setTabScopedRecordEntry(
         input.runNodeTimingByTabId.value,
         tabId,
-        reduceRunNodeTimingEvent(input.runNodeTimingByTabId.value[tabId] ?? {}, eventType, payload, nowRunNodeTimingMs()),
+        reduceRunNodeTimingEvent(input.runNodeTimingByTabId.value[tabId] ?? {}, eventType, payload, nowRunNodeTimingMs(), document),
       );
     }
     if (!subgraphNodeId || !innerNodeId) {

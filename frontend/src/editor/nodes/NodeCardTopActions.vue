@@ -212,12 +212,14 @@ const { t } = useI18n();
 .node-card__top-actions {
   position: absolute;
   top: 0;
-  right: 18px;
+  right: 0;
   z-index: 12;
   isolation: isolate;
   display: flex;
   align-items: center;
   gap: 8px;
+  height: var(--node-card-floating-capsule-height, 58px);
+  box-sizing: border-box;
   padding: 8px;
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 999px;
@@ -226,7 +228,7 @@ const { t } = useI18n();
   backdrop-filter: blur(24px) saturate(1.6) contrast(1.02);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(calc(-100% - 8px));
+  transform: translateY(calc(-100% - var(--node-card-floating-capsule-offset, 8px)));
   transition: opacity 160ms ease, transform 160ms ease;
 }
 

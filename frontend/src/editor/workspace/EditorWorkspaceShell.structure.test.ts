@@ -588,7 +588,7 @@ test("EditorWorkspaceShell delegates run visual tab-state writes to the runtime 
   );
   assert.match(
     applyRunVisualSource,
-    /input\.runNodeTimingByTabId\.value = setTabScopedRecordEntry\(input\.runNodeTimingByTabId\.value, tabId, buildRunNodeTimingByNodeIdFromRun\(visualRun\)\);/,
+    /buildRunNodeTimingByNodeIdFromRun\(visualRun,\s*document\)/,
   );
   assert.match(
     applyRunVisualSource,

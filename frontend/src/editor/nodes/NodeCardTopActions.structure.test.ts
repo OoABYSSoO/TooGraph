@@ -39,7 +39,13 @@ test("NodeCardTopActions owns advanced agent and output controls while emitting 
 
 test("NodeCardTopActions carries top-action scoped styles", () => {
   assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*position:\s*absolute;/);
-  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*transform:\s*translateY\(calc\(-100% - 8px\)\);/);
+  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*right:\s*0;/);
+  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*height:\s*var\(--node-card-floating-capsule-height,\s*58px\);/);
+  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*box-sizing:\s*border-box;/);
+  assert.match(
+    componentSource,
+    /\.node-card__top-actions \{[\s\S]*transform:\s*translateY\(calc\(-100% - var\(--node-card-floating-capsule-offset,\s*8px\)\)\);/,
+  );
   assert.match(componentSource, /\.node-card__top-action-button \{[\s\S]*width:\s*56px;/);
   assert.match(componentSource, /\.node-card__top-popover \{[\s\S]*border-radius:\s*14px;/);
   assert.match(componentSource, /\.node-card__control-button--active \{[\s\S]*background:\s*rgba\(154,\s*52,\s*18,\s*0\.12\);/);
