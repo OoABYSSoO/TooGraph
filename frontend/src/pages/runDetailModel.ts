@@ -268,7 +268,7 @@ function buildActivityTimelineItem(event: ActivityEvent, index: number, order: n
   const nodeId = normalizeText(event.node_id) || null;
   const subgraphPath = normalizeTimelinePath(event.subgraph_path);
   const subgraphNodeId = normalizeText(event.subgraph_node_id) || subgraphPath.at(-1) || null;
-  const label = normalizeText(event.kind) || "activity";
+  const label = buildActivityLabel(event);
   return {
     key: `activity:${event.sequence ?? index + 1}:${subgraphPath.join("/")}:${nodeId ?? label}`,
     kind: "activity",
@@ -286,6 +286,14 @@ function buildActivityTimelineItem(event: ActivityEvent, index: number, order: n
     detailText: buildActivityDetailText(event),
     order,
   };
+}
+
+function buildActivityLabel(event: ActivityEvent) {
+  const kind = normalizeText(event.kind);
+  if (kind === "buddy_home_write") {
+    return "Buddy Home writeback";
+  }
+  return kind || "activity";
 }
 
 function buildPermissionTimelineItems(run: RunDetail): RunAggregatedTimelineItem[] {
@@ -380,6 +388,23 @@ function buildNodeArtifactLabels(execution: NodeExecutionDetail) {
 function buildActivityArtifactLabels(event: ActivityEvent) {
   const detail = recordFromUnknown(event.detail);
   const labels: string[] = [];
+  if (normalizeText(event.kind) === "buddy_home_write") {
+    const appliedCount = normalizeNumber(detail.applied_count);
+    const skippedCount = normalizeNumber(detail.skipped_count);
+    const revisionIds = Array.isArray(detail.revision_ids)
+      ? uniqueNonEmpty(detail.revision_ids.map((revisionId) => normalizeText(revisionId)))
+      : [];
+    if (appliedCount !== null) {
+      labels.push(`applied: ${appliedCount}`);
+    }
+    if (skippedCount !== null) {
+      labels.push(`skipped: ${skippedCount}`);
+    }
+    if (revisionIds.length > 0) {
+      labels.push(`revisions: ${revisionIds.join(", ")}`);
+    }
+    return labels;
+  }
   const skillKey = normalizeText(detail.skill_key);
   if (skillKey) {
     labels.push(`skill: ${skillKey}`);

@@ -238,9 +238,31 @@
                 <p>{{ t("buddyPage.history.body") }}</p>
               </div>
             </div>
-            <ElTable :data="orderedRevisions" class="buddy-page__table" empty-text=" ">
+            <ElTable :data="orderedRevisionRows" class="buddy-page__table" empty-text=" ">
+              <ElTableColumn type="expand" width="44">
+                <template #default="{ row }">
+                  <div class="buddy-page__history-diff">
+                    <section>
+                      <span>{{ t("buddyPage.history.before") }}</span>
+                      <pre>{{ row.previousValueText || t("common.none") }}</pre>
+                    </section>
+                    <section>
+                      <span>{{ t("buddyPage.history.after") }}</span>
+                      <pre>{{ row.nextValueText || t("common.none") }}</pre>
+                    </section>
+                  </div>
+                </template>
+              </ElTableColumn>
               <ElTableColumn prop="target_type" :label="t('buddyPage.history.target')" width="150" />
               <ElTableColumn prop="operation" :label="t('buddyPage.history.operation')" width="130" />
+              <ElTableColumn :label="t('buddyPage.history.source')" min-width="220">
+                <template #default="{ row }">
+                  <div class="buddy-page__history-source">
+                    <span>{{ row.sourceLabel }}</span>
+                    <small v-if="row.sourceAction">{{ row.sourceAction }}</small>
+                  </div>
+                </template>
+              </ElTableColumn>
               <ElTableColumn prop="change_reason" :label="t('buddyPage.history.reason')" min-width="260" show-overflow-tooltip />
               <ElTableColumn :label="t('buddyPage.history.createdAt')" width="190">
                 <template #default="{ row }">{{ formatDate(row.created_at) }}</template>
@@ -254,7 +276,32 @@
                 </template>
               </ElTableColumn>
             </ElTable>
-            <ElEmpty v-if="orderedRevisions.length === 0" :description="t('buddyPage.history.empty')" />
+            <ElEmpty v-if="orderedRevisionRows.length === 0" :description="t('buddyPage.history.empty')" />
+          </article>
+        </ElTabPane>
+
+        <ElTabPane :label="t('buddyPage.tabs.mascotDebug')" name="mascot-debug">
+          <article class="buddy-page__panel buddy-page__panel--mascot-debug">
+            <div class="buddy-page__panel-heading">
+              <div>
+                <h3>{{ t("buddyPage.mascotDebug.title") }}</h3>
+              </div>
+            </div>
+            <div class="buddy-page__debug-grid">
+              <section v-for="group in BUDDY_DEBUG_ACTION_GROUPS" :key="group.labelKey" class="buddy-page__debug-group">
+                <span class="buddy-page__debug-label">{{ t(group.labelKey) }}</span>
+                <div class="buddy-page__debug-actions">
+                  <ElButton
+                    v-for="action in group.actions"
+                    :key="action.action"
+                    class="buddy-page__debug-button"
+                    @click="buddyMascotDebugStore.trigger(action.action)"
+                  >
+                    {{ action.label }}
+                  </ElButton>
+                </div>
+              </section>
+            </div>
           </article>
         </ElTabPane>
       </ElTabs>
@@ -284,7 +331,9 @@ import {
 import { Check, Delete, EditPen, Plus, Refresh, RefreshLeft } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
+import { BUDDY_DEBUG_ACTION_GROUPS } from "@/buddy/buddyMascotDebug";
 import {
+  fetchBuddyCommands,
   createBuddyMemory,
   deleteBuddyMemory,
   fetchBuddyMemories,
@@ -302,6 +351,7 @@ import { cancelRun, fetchRun, fetchRuns, resumeRun } from "@/api/runs";
 import BuddyPauseCard from "@/buddy/BuddyPauseCard.vue";
 import AppShell from "@/layouts/AppShell.vue";
 import { useBuddyContextStore } from "@/stores/buddyContext";
+import { useBuddyMascotDebugStore } from "@/stores/buddyMascotDebug";
 import type {
   BuddyCommandRecord,
   BuddyCommandResponse,
@@ -313,6 +363,8 @@ import type {
 } from "@/types/buddy";
 import type { RunDetail, RunSummary } from "@/types/run";
 
+import { buildBuddyRevisionHistoryRows } from "./buddyRevisionHistoryModel.ts";
+
 type MemoryDraft = Pick<BuddyMemory, "type" | "title" | "content">;
 type LoadAllOptions = {
   silent?: boolean;
@@ -320,6 +372,7 @@ type LoadAllOptions = {
 
 const { t } = useI18n();
 const buddyContextStore = useBuddyContextStore();
+const buddyMascotDebugStore = useBuddyMascotDebugStore();
 const activeTab = ref("profile");
 const hasLoaded = ref(false);
 const isLoading = ref(false);
@@ -341,6 +394,7 @@ const memoryDraft = ref<MemoryDraft>(defaultMemoryDraft());
 const editingMemoryId = ref("");
 const summaryDraft = ref<BuddySessionSummary>(defaultSummaryDraft());
 const revisions = ref<BuddyRevision[]>([]);
+const commands = ref<BuddyCommandRecord[]>([]);
 const lastCommand = ref<BuddyCommandRecord | null>(null);
 const pausedRunSummaries = ref<RunSummary[]>([]);
 const selectedPausedRunId = ref("");
@@ -361,9 +415,7 @@ const policyPreferenceText = computed({
 const canSaveMemory = computed(() => {
   return Boolean(memoryDraft.value.title.trim() && memoryDraft.value.content.trim() && !isSavingMemory.value);
 });
-const orderedRevisions = computed(() => {
-  return [...revisions.value].sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at));
-});
+const orderedRevisionRows = computed(() => buildBuddyRevisionHistoryRows(revisions.value, commands.value));
 const permissionModeOptions = computed(() => [
   { label: t("buddy.modes.askFirst"), value: "ask_first" },
   { label: t("buddy.modes.fullAccess"), value: "full_access" },
@@ -471,18 +523,20 @@ async function loadAll(options: LoadAllOptions = {}) {
     if (!options.silent) {
       isLoading.value = true;
     }
-    const [profile, policy, memoryList, summary, revisionList] = await Promise.all([
+    const [profile, policy, memoryList, summary, revisionList, commandList] = await Promise.all([
       fetchBuddyProfile(),
       fetchBuddyPolicy(),
       fetchBuddyMemories(),
       fetchBuddySessionSummary(),
       fetchBuddyRevisions(),
+      fetchBuddyCommands(),
     ]);
     profileDraft.value = profile;
     policyDraft.value = normalizeBuddyPolicy(policy);
     memories.value = memoryList;
     summaryDraft.value = summary;
     revisions.value = revisionList;
+    commands.value = commandList;
     await loadPausedRuns({ silent: true });
     errorMessage.value = "";
     hasLoaded.value = true;
@@ -576,9 +630,20 @@ async function cancelSelectedPausedRun() {
 }
 
 async function refreshMutableLists() {
-  const [memoryList, revisionList] = await Promise.all([fetchBuddyMemories(), fetchBuddyRevisions()]);
+  const [memoryList, revisionList, commandList] = await Promise.all([
+    fetchBuddyMemories(),
+    fetchBuddyRevisions(),
+    fetchBuddyCommands(),
+  ]);
   memories.value = memoryList;
   revisions.value = revisionList;
+  commands.value = commandList;
+}
+
+async function refreshAuditTrail() {
+  const [revisionList, commandList] = await Promise.all([fetchBuddyRevisions(), fetchBuddyCommands()]);
+  revisions.value = revisionList;
+  commands.value = commandList;
 }
 
 async function saveProfile() {
@@ -587,7 +652,7 @@ async function saveProfile() {
     profileDraft.value = acceptCommandResult(
       await updateBuddyProfile(profileDraft.value, t("buddyPage.changeReasons.profile")),
     );
-    revisions.value = await fetchBuddyRevisions();
+    await refreshAuditTrail();
     errorMessage.value = "";
     ElMessage.success(t("buddyPage.saved"));
   } catch (error) {
@@ -606,7 +671,7 @@ async function savePolicy() {
         t("buddyPage.changeReasons.policy"),
       ),
     );
-    revisions.value = await fetchBuddyRevisions();
+    await refreshAuditTrail();
     errorMessage.value = "";
     ElMessage.success(t("buddyPage.saved"));
   } catch (error) {
@@ -691,7 +756,7 @@ async function saveSummary() {
     summaryDraft.value = acceptCommandResult(
       await updateBuddySessionSummary(summaryDraft.value, t("buddyPage.changeReasons.summary")),
     );
-    revisions.value = await fetchBuddyRevisions();
+    await refreshAuditTrail();
     errorMessage.value = "";
     ElMessage.success(t("buddyPage.saved"));
   } catch (error) {
@@ -871,6 +936,78 @@ onMounted(loadAll);
   width: 100%;
 }
 
+.buddy-page__history-source {
+  display: grid;
+  gap: 2px;
+  line-height: 1.35;
+}
+
+.buddy-page__history-source small {
+  color: rgba(60, 41, 20, 0.58);
+}
+
+.buddy-page__history-diff {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px 10px;
+}
+
+.buddy-page__history-diff section {
+  min-width: 0;
+}
+
+.buddy-page__history-diff span {
+  display: block;
+  margin-bottom: 6px;
+  color: rgba(60, 41, 20, 0.68);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.buddy-page__history-diff pre {
+  max-height: 260px;
+  margin: 0;
+  overflow: auto;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 252, 247, 0.72);
+  color: var(--toograph-text-strong);
+  padding: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.buddy-page__panel--mascot-debug {
+  max-width: 760px;
+}
+
+.buddy-page__debug-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.buddy-page__debug-group {
+  display: grid;
+  gap: 8px;
+}
+
+.buddy-page__debug-label {
+  color: rgba(60, 41, 20, 0.68);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.buddy-page__debug-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.buddy-page__debug-button {
+  min-width: 78px;
+}
+
 .buddy-page__meta {
   flex: 0 0 auto;
   font-size: 0.88rem;
@@ -909,6 +1046,10 @@ onMounted(loadAll);
   }
 
   .buddy-page__split {
+    grid-template-columns: 1fr;
+  }
+
+  .buddy-page__history-diff {
     grid-template-columns: 1fr;
   }
 }

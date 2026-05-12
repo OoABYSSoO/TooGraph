@@ -122,19 +122,15 @@ test("BuddyWidget tracks dragging and click pulses for mascot animation", () => 
   assert.match(componentSource, /tapNonce\.value \+= 1;/);
 });
 
-test("BuddyWidget exposes a temporary mascot action debug panel on the buddy page", () => {
-  assert.match(componentSource, /type BuddyMascotDebugAction =/);
-  assert.match(componentSource, /"idle" \| "thinking" \| "speaking" \| "error"/);
-  assert.match(componentSource, /"tap" \| "dragging" \| "hop" \| "roam"/);
-  assert.match(componentSource, /"face-left" \| "face-front" \| "face-right"/);
-  assert.doesNotMatch(componentSource, /action: "spin"/);
-  assert.match(componentSource, /const BUDDY_DEBUG_ACTION_GROUPS/);
-  assert.match(componentSource, /class="buddy-widget__debug-panel"/);
-  assert.match(componentSource, /v-if="shouldShowMascotDebugPanel"/);
-  assert.match(componentSource, /v-for="group in BUDDY_DEBUG_ACTION_GROUPS"/);
-  assert.match(componentSource, /v-for="action in group\.actions"/);
-  assert.match(componentSource, /@click="triggerMascotDebugAction\(action\.action\)"/);
-  assert.match(componentSource, /const shouldShowMascotDebugPanel = computed\(\(\) => route\.path === "\/buddy"\);/);
+test("BuddyWidget listens for mascot debug actions requested from the Buddy page", () => {
+  assert.match(componentSource, /import type \{ BuddyMascotDebugAction \} from "\.\/buddyMascotDebug\.ts";/);
+  assert.match(componentSource, /import \{ useBuddyMascotDebugStore \} from "\.\.\/stores\/buddyMascotDebug\.ts";/);
+  assert.match(componentSource, /const buddyMascotDebugStore = useBuddyMascotDebugStore\(\);/);
+  assert.match(componentSource, /const \{ latestRequest: mascotDebugRequest \} = storeToRefs\(buddyMascotDebugStore\);/);
+  assert.match(componentSource, /watch\(mascotDebugRequest,\s*\(request\) => \{/);
+  assert.match(componentSource, /triggerMascotDebugAction\(request\.action\);/);
+  assert.doesNotMatch(componentSource, /class="buddy-widget__debug-panel"/);
+  assert.doesNotMatch(componentSource, /shouldShowMascotDebugPanel/);
 });
 
 test("BuddyWidget debug panel can trigger every mascot animation state without graph runs", () => {

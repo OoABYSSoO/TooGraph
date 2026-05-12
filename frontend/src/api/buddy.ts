@@ -1,6 +1,7 @@
 import type {
   BuddyChatMessageRecord,
   BuddyChatSession,
+  BuddyCommandRecord,
   BuddyCommandResponse,
   BuddyGraphPatchDraft,
   BuddyGraphPatchDraftPayload,
@@ -120,6 +121,10 @@ export function fetchBuddyRevisions(targetType?: string, targetId?: string) {
   }
   const query = params.toString();
   return apiGet<BuddyRevision[]>(`/api/buddy/revisions${query ? `?${query}` : ""}`);
+}
+
+export function fetchBuddyCommands() {
+  return apiGet<BuddyCommandRecord[]>("/api/buddy/commands");
 }
 
 export function restoreBuddyRevision(revisionId: string) {

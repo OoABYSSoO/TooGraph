@@ -125,6 +125,19 @@ function buildRunActivityEntry(event: RunActivityIncomingEvent, sequence: number
 
 function createActivityEntry(payload: Record<string, unknown>, sequence: number): RunActivityEntry {
   const nodeId = normalizeText(payload.node_id);
+  if (normalizeText(payload.kind) === "buddy_home_write") {
+    return createEntry(
+      "activity-event",
+      sequence,
+      nodeId,
+      null,
+      null,
+      "Buddy Home writeback",
+      formatBuddyHomeWritebackPreview(payload.detail),
+      payload,
+      normalizeText(payload.created_at),
+    );
+  }
   const title = normalizeText(payload.summary) || normalizeText(payload.kind) || "activity event";
   const preview = formatActivityValue(payload.detail ?? payload.error ?? payload.status);
   return createEntry("activity-event", sequence, nodeId, null, null, title, preview, payload, normalizeText(payload.created_at));
@@ -201,4 +214,28 @@ function formatActivityValue(value: unknown) {
     return "";
   }
   return JSON.stringify(value, null, 2);
+}
+
+function formatBuddyHomeWritebackPreview(value: unknown) {
+  const detail = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const parts: string[] = [];
+  const appliedCount = normalizeNumber(detail.applied_count);
+  const skippedCount = normalizeNumber(detail.skipped_count);
+  const revisionIds = Array.isArray(detail.revision_ids)
+    ? detail.revision_ids.map((revisionId) => normalizeText(revisionId)).filter(Boolean)
+    : [];
+  if (appliedCount !== null) {
+    parts.push(`applied ${appliedCount}`);
+  }
+  if (skippedCount !== null) {
+    parts.push(`skipped ${skippedCount}`);
+  }
+  if (revisionIds.length > 0) {
+    parts.push(`revisions ${revisionIds.join(", ")}`);
+  }
+  return parts.join(" | ") || formatActivityValue(value);
+}
+
+function normalizeNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }

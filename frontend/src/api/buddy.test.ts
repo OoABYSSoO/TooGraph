@@ -7,6 +7,7 @@ import {
   createBuddyMemory,
   createBuddyGraphPatchDraft,
   deleteBuddyChatSession,
+  fetchBuddyCommands,
   fetchBuddyChatMessages,
   fetchBuddyChatSessions,
   fetchBuddyProfile,
@@ -100,6 +101,19 @@ test("buddy API creates memories and restores revisions through command flow", a
     payload: {},
     change_reason: "User restored a buddy revision from the Buddy page.",
   });
+  globalThis.fetch = originalFetch;
+});
+
+test("buddy API reads command audit records", async () => {
+  const requests: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requests.push(String(input));
+    return new Response(JSON.stringify([]), { status: 200, headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+
+  await fetchBuddyCommands();
+
+  assert.deepEqual(requests, ["/api/buddy/commands"]);
   globalThis.fetch = originalFetch;
 });
 

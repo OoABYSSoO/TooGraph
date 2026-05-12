@@ -105,6 +105,9 @@ class BuddyHomeWriterSkillTests(unittest.TestCase):
         self.assertEqual(result["success"], False)
         self.assertEqual(result["applied_commands"], [])
         self.assertEqual(result["skipped_commands"][0]["error_type"], "permission_boundary")
+        event_detail = result["activity_events"][0]["detail"]
+        self.assertEqual(event_detail["applied_commands"], [])
+        self.assertEqual(event_detail["skipped_commands"], result["skipped_commands"])
         self.assertEqual(policy["graph_permission_mode"], "ask_first")
 
     def test_writer_rejects_behavior_boundary_policy_updates(self) -> None:

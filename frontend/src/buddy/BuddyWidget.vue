@@ -1,26 +1,5 @@
 <template>
   <div class="buddy-widget" aria-live="polite">
-    <aside
-      v-if="shouldShowMascotDebugPanel"
-      class="buddy-widget__debug-panel"
-      aria-label="Mascot action debug panel"
-    >
-      <div class="buddy-widget__debug-title">动作调试</div>
-      <div v-for="group in BUDDY_DEBUG_ACTION_GROUPS" :key="group.label" class="buddy-widget__debug-group">
-        <span class="buddy-widget__debug-label">{{ group.label }}</span>
-        <div class="buddy-widget__debug-actions">
-          <button
-            v-for="action in group.actions"
-            :key="action.action"
-            type="button"
-            class="buddy-widget__debug-button"
-            @click="triggerMascotDebugAction(action.action)"
-          >
-            {{ action.label }}
-          </button>
-        </div>
-      </div>
-    </aside>
     <div
       class="buddy-widget__anchor"
       :class="[
@@ -344,6 +323,7 @@
 import { ArrowDown, Check, Clock, Close, Delete, FullScreen, Plus, Promotion, SemiSelect } from "@element-plus/icons-vue";
 import { ElButton, ElInput } from "element-plus";
 import { ElIcon, ElOption, ElPopover, ElSelect } from "element-plus";
+import { storeToRefs } from "pinia";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
@@ -364,6 +344,7 @@ import { formatRunDuration } from "../lib/run-display-name.ts";
 import { buildRuntimeModelOptions } from "../lib/runtimeModelCatalog.ts";
 import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
 import { useBuddyContextStore } from "../stores/buddyContext.ts";
+import { useBuddyMascotDebugStore } from "../stores/buddyMascotDebug.ts";
 import type { BuddyChatMessageRecord, BuddyChatSession } from "../types/buddy.ts";
 import type { GraphPayload } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
@@ -371,6 +352,7 @@ import type { SettingsPayload } from "../types/settings.ts";
 
 import BuddyMascot from "./BuddyMascot.vue";
 import BuddyPauseCard from "./BuddyPauseCard.vue";
+import type { BuddyMascotDebugAction } from "./buddyMascotDebug.ts";
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
 import { findLatestRecoverablePausedRunMessage, isRecoverablePausedRunStatus } from "./buddyPausedRunRecovery.ts";
 import {
@@ -436,14 +418,6 @@ type BuddyPauseHandlingOptions = {
 type BuddyMood = "idle" | "thinking" | "speaking" | "error";
 type BuddyMascotMotion = "idle" | "roam" | "hop";
 type BuddyMascotFacing = "front" | "left" | "right";
-type BuddyMascotDebugAction = "idle" | "thinking" | "speaking" | "error" | "tap" | "dragging" | "hop" | "roam" | "face-left" | "face-front" | "face-right";
-type BuddyMascotDebugActionGroup = {
-  label: string;
-  actions: Array<{
-    label: string;
-    action: BuddyMascotDebugAction;
-  }>;
-};
 type BuddyModelOption = {
   value: string;
   label: string;
@@ -464,38 +438,11 @@ const BUDDY_ROAM_STEP_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
 const BUDDY_ROAM_TARGET_MIN_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
 const BUDDY_ROAM_TARGET_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 3;
 const BUDDY_ROAM_TARGET_REACHED_DISTANCE_PX = 1;
-const BUDDY_DEBUG_ACTION_GROUPS: BuddyMascotDebugActionGroup[] = [
-  {
-    label: "状态",
-    actions: [
-      { label: "Idle", action: "idle" },
-      { label: "Thinking", action: "thinking" },
-      { label: "Speaking", action: "speaking" },
-      { label: "Error", action: "error" },
-    ],
-  },
-  {
-    label: "动作",
-    actions: [
-      { label: "Tap", action: "tap" },
-      { label: "Drag", action: "dragging" },
-      { label: "Hop", action: "hop" },
-      { label: "Roam", action: "roam" },
-    ],
-  },
-  {
-    label: "朝向",
-    actions: [
-      { label: "Left", action: "face-left" },
-      { label: "Front", action: "face-front" },
-      { label: "Right", action: "face-right" },
-    ],
-  },
-];
-
 const { t } = useI18n();
 const route = useRoute();
 const buddyContextStore = useBuddyContextStore();
+const buddyMascotDebugStore = useBuddyMascotDebugStore();
+const { latestRequest: mascotDebugRequest } = storeToRefs(buddyMascotDebugStore);
 
 const viewport = ref(resolveViewport());
 const position = ref(resolveDefaultBuddyPosition(viewport.value));
@@ -558,7 +505,6 @@ let nextBuddyMessageClientOrder = 0;
 
 const isDragging = computed(() => Boolean(pointerDrag.value?.moved));
 const isMascotDragging = computed(() => isDragging.value || debugDragging.value);
-const shouldShowMascotDebugPanel = computed(() => route.path === "/buddy");
 const canBuddyRoam = computed(() =>
   !isPanelOpen.value &&
   mood.value === "idle" &&
@@ -672,6 +618,13 @@ watch(canBuddyRoam, (canRoam) => {
     return;
   }
   cancelBuddyRoamTimers();
+});
+
+watch(mascotDebugRequest, (request) => {
+  if (!request) {
+    return;
+  }
+  triggerMascotDebugAction(request.action);
 });
 
 function handleAvatarClick() {
@@ -2277,79 +2230,6 @@ function formatErrorMessage(error: unknown): string {
   z-index: 4500;
   pointer-events: none;
   font-family: var(--toograph-font-ui);
-}
-
-.buddy-widget__debug-panel {
-  position: fixed;
-  left: 18px;
-  bottom: 18px;
-  z-index: 4520;
-  width: min(320px, calc(100vw - 36px));
-  display: grid;
-  gap: 9px;
-  padding: 10px;
-  border: 1px solid rgba(154, 52, 18, 0.14);
-  border-radius: 8px;
-  background:
-    var(--toograph-glass-specular),
-    var(--toograph-glass-lens),
-    rgba(255, 252, 247, 0.86);
-  box-shadow: 0 18px 42px rgba(69, 42, 20, 0.12);
-  backdrop-filter: blur(22px) saturate(1.25);
-  pointer-events: auto;
-}
-
-.buddy-widget__debug-title {
-  color: rgba(90, 59, 36, 0.96);
-  font-size: 12px;
-  font-weight: 850;
-}
-
-.buddy-widget__debug-group {
-  display: grid;
-  gap: 5px;
-}
-
-.buddy-widget__debug-label {
-  color: rgba(108, 82, 62, 0.72);
-  font-size: 10px;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.buddy-widget__debug-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.buddy-widget__debug-button {
-  appearance: none;
-  min-height: 26px;
-  padding: 0 9px;
-  border: 1px solid rgba(154, 52, 18, 0.14);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.7);
-  color: rgba(77, 51, 32, 0.92);
-  font-size: 11px;
-  font-weight: 800;
-  cursor: pointer;
-  transition:
-    transform 140ms ease,
-    border-color 140ms ease,
-    background 140ms ease,
-    color 140ms ease;
-}
-
-.buddy-widget__debug-button:hover {
-  transform: translateY(-1px);
-  border-color: rgba(37, 99, 235, 0.22);
-  background: rgba(239, 246, 255, 0.86);
-  color: #1d4ed8;
-}
-
-.buddy-widget__debug-button:active {
-  transform: translateY(0);
 }
 
 .buddy-widget__anchor {

@@ -80,11 +80,7 @@ def buddy_home_writer(**skill_inputs: Any) -> dict[str, Any]:
                 "kind": "buddy_home_write",
                 "summary": result_text,
                 "status": "succeeded" if success else "failed",
-                "detail": {
-                    "applied_count": len(applied_commands),
-                    "skipped_count": len(skipped_commands),
-                    "revision_ids": [revision.get("revision_id") for revision in revisions],
-                },
+                "detail": _activity_detail(applied_commands, skipped_commands, revisions),
             }
         ],
     }
@@ -159,6 +155,35 @@ def _result_text(applied_commands: list[dict[str, Any]], skipped_commands: list[
     return " ".join(parts)
 
 
+def _activity_detail(
+    applied_commands: list[dict[str, Any]],
+    skipped_commands: list[dict[str, Any]],
+    revisions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "applied_count": len(applied_commands),
+        "skipped_count": len(skipped_commands),
+        "revision_ids": [revision.get("revision_id") for revision in revisions],
+        "applied_commands": [_summarize_applied_command(result) for result in applied_commands],
+        "skipped_commands": deepcopy(skipped_commands),
+    }
+
+
+def _summarize_applied_command(result: dict[str, Any]) -> dict[str, Any]:
+    command = result.get("command") if isinstance(result.get("command"), dict) else {}
+    revision = result.get("revision") if isinstance(result.get("revision"), dict) else {}
+    return {
+        "command_id": command.get("command_id"),
+        "action": command.get("action"),
+        "status": command.get("status"),
+        "target_type": command.get("target_type"),
+        "target_id": command.get("target_id"),
+        "revision_id": command.get("revision_id") or revision.get("revision_id"),
+        "run_id": command.get("run_id"),
+        "change_reason": command.get("change_reason"),
+    }
+
+
 def _failed(error_type: str, error: str, *, skipped_commands: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     return {
         "success": False,
@@ -171,7 +196,14 @@ def _failed(error_type: str, error: str, *, skipped_commands: list[dict[str, Any
                 "kind": "buddy_home_write",
                 "summary": f"Buddy Home writeback failed: {error}",
                 "status": "failed",
-                "detail": {"error_type": error_type},
+                "detail": {
+                    "error_type": error_type,
+                    "applied_count": 0,
+                    "skipped_count": len(skipped_commands or []),
+                    "revision_ids": [],
+                    "applied_commands": [],
+                    "skipped_commands": deepcopy(skipped_commands or []),
+                },
                 "error": error,
             }
         ],

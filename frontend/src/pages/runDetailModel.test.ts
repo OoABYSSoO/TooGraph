@@ -347,6 +347,44 @@ test("buildRunAggregatedTimeline includes subgraph permission approvals as pause
   ]);
 });
 
+test("buildRunAggregatedTimeline summarizes Buddy Home writeback activity", () => {
+  const run = createRunDetail({
+    artifacts: createRunArtifacts({
+      activity_events: [
+        {
+          sequence: 1,
+          kind: "buddy_home_write",
+          summary: "Applied 1 Buddy Home command. Skipped 1 unsafe or invalid command.",
+          node_id: "apply_buddy_home_writeback",
+          status: "failed",
+          duration_ms: 9,
+          detail: {
+            applied_count: 1,
+            skipped_count: 1,
+            revision_ids: ["rev_memory_1"],
+            skipped_commands: [
+              {
+                index: 1,
+                action: "policy.update",
+                error_type: "permission_boundary",
+                error: "Autonomous Buddy Home writeback cannot change permission or behavior boundary policy fields.",
+              },
+            ],
+          },
+          created_at: "2026-05-12T01:00:02.500Z",
+        },
+      ],
+    }),
+  });
+
+  const [item] = buildRunAggregatedTimeline(run);
+
+  assert.equal(item?.label, "Buddy Home writeback");
+  assert.deepEqual(item?.artifactLabels, ["applied: 1", "skipped: 1", "revisions: rev_memory_1"]);
+  assert.match(item?.detailText ?? "", /permission_boundary/);
+  assert.match(item?.detailText ?? "", /rev_memory_1/);
+});
+
 test("listRunOutputArtifacts keeps skill artifact document references for paged display", () => {
   const artifacts = listRunOutputArtifacts(
     createRunDetail({

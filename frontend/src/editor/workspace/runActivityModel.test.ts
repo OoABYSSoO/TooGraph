@@ -184,6 +184,41 @@ test("buildRunActivityEntriesFromRun replays file write activity summaries", () 
   );
 });
 
+test("buildRunActivityEntriesFromRun formats Buddy Home writeback activity", () => {
+  const run = {
+    run_id: "run_1",
+    artifacts: {
+      activity_events: [
+        {
+          node_id: "apply_buddy_home_writeback",
+          kind: "buddy_home_write",
+          summary: "Applied 1 Buddy Home command. Skipped 1 unsafe or invalid command.",
+          status: "failed",
+          detail: {
+            applied_count: 1,
+            skipped_count: 1,
+            revision_ids: ["rev_memory_1"],
+          },
+          sequence: 1,
+          created_at: "2026-05-12T01:00:00Z",
+        },
+      ],
+    },
+    node_executions: [],
+  } as unknown as RunDetail;
+
+  assert.deepEqual(
+    buildRunActivityEntriesFromRun(run).map((entry) => ({ title: entry.title, nodeId: entry.nodeId, preview: entry.preview })),
+    [
+      {
+        title: "Buddy Home writeback",
+        nodeId: "apply_buddy_home_writeback",
+        preview: "applied 1 | skipped 1 | revisions rev_memory_1",
+      },
+    ],
+  );
+});
+
 test("buildRunActivityEntriesFromRun titles stored state events with state names", () => {
   const run = {
     run_id: "run_1",

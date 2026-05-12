@@ -17,6 +17,7 @@ test("BuddyPage manages profile, policy, memories, summary, and revisions", () =
   assert.match(source, /deleteBuddyMemory/);
   assert.match(source, /fetchBuddySessionSummary/);
   assert.match(source, /fetchBuddyRevisions/);
+  assert.match(source, /fetchBuddyCommands/);
   assert.match(source, /restoreBuddyRevision/);
   assert.match(source, /<ElTabs/);
   assert.match(source, /name="profile"/);
@@ -25,6 +26,7 @@ test("BuddyPage manages profile, policy, memories, summary, and revisions", () =
   assert.match(source, /name="summary"/);
   assert.match(source, /name="confirmation"/);
   assert.match(source, /name="history"/);
+  assert.match(source, /name="mascot-debug"/);
 });
 
 test("BuddyPage exposes the unified buddy permission mode", () => {
@@ -56,4 +58,23 @@ test("BuddyPage reuses the standard paused-run card for confirmations", () => {
   assert.match(source, /await cancelRun\(selectedPausedRunDetail\.value\.run_id,\s*t\("buddy\.pause\.cancelReason"\)\)/);
   assert.doesNotMatch(source, /buildHumanReviewResumePayload/);
   assert.doesNotMatch(source, /permission_approval:\s*\{/);
+});
+
+test("BuddyPage links revision history to command audit records", () => {
+  assert.match(source, /import \{ buildBuddyRevisionHistoryRows \} from "\.\/buddyRevisionHistoryModel\.ts";/);
+  assert.match(source, /const commands = ref<BuddyCommandRecord\[\]>\(\[\]\);/);
+  assert.match(source, /const orderedRevisionRows = computed\(\(\) => buildBuddyRevisionHistoryRows\(revisions\.value, commands\.value\)\);/);
+  assert.match(source, /<ElTable :data="orderedRevisionRows"/);
+  assert.match(source, /row\.sourceLabel/);
+  assert.match(source, /row\.previousValueText/);
+  assert.match(source, /row\.nextValueText/);
+});
+
+test("BuddyPage hosts the mascot action debug panel as a tab after History", () => {
+  assert.match(source, /import \{ BUDDY_DEBUG_ACTION_GROUPS \} from "@\/buddy\/buddyMascotDebug";/);
+  assert.match(source, /import \{ useBuddyMascotDebugStore \} from "@\/stores\/buddyMascotDebug";/);
+  assert.match(source, /<ElTabPane :label="t\('buddyPage\.tabs\.mascotDebug'\)" name="mascot-debug">/);
+  assert.match(source, /v-for="group in BUDDY_DEBUG_ACTION_GROUPS"/);
+  assert.match(source, /v-for="action in group\.actions"/);
+  assert.match(source, /@click="buddyMascotDebugStore\.trigger\(action\.action\)"/);
 });
