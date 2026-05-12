@@ -55,6 +55,46 @@ def record_activity_event(
     return event
 
 
+def record_skill_activity_events(
+    state: dict[str, Any],
+    *,
+    node_id: str,
+    skill_key: str,
+    binding_source: str,
+    raw_events: Any,
+    publish_run_event_func: Callable[[str | None, str, dict[str, Any] | None], None] | None = None,
+) -> list[dict[str, Any]]:
+    if not isinstance(raw_events, list):
+        return []
+
+    recorded: list[dict[str, Any]] = []
+    for raw_event in raw_events:
+        if not isinstance(raw_event, dict):
+            continue
+        kind = _compact_text(raw_event.get("kind"))
+        summary = _compact_text(raw_event.get("summary"))
+        if not kind or not summary:
+            continue
+        detail = raw_event.get("detail") if isinstance(raw_event.get("detail"), dict) else {}
+        event = record_activity_event(
+            state,
+            kind=kind,
+            summary=summary,
+            node_id=_compact_text(raw_event.get("node_id")) or node_id,
+            status=_compact_text(raw_event.get("status")) or None,
+            duration_ms=_optional_int(raw_event.get("duration_ms")),
+            detail={
+                "skill_key": skill_key,
+                "binding_source": binding_source,
+                **detail,
+            },
+            error=_compact_text(raw_event.get("error")) or None,
+            publish_run_event_func=publish_run_event_func,
+        )
+        recorded.append(event)
+    return recorded
+
+
 def _root_run_state(state: dict[str, Any]) -> dict[str, Any]:
     root = state
     seen: set[int] = set()
@@ -94,3 +134,12 @@ def _next_activity_event_sequence(events: list[dict[str, Any]]) -> int:
 
 def _compact_text(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None

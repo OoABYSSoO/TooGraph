@@ -48,6 +48,44 @@ class RuntimeActivityEventsTests(unittest.TestCase):
         self.assertIsInstance(event["created_at"], str)
         self.assertEqual(published, [("run-activity", "activity.event", event)])
 
+    def test_record_skill_activity_events_normalizes_skill_payloads(self) -> None:
+        state = {"run_id": "run-activity"}
+        published: list[tuple[str, str, dict]] = []
+
+        from app.core.runtime.activity_events import record_skill_activity_events
+
+        events = record_skill_activity_events(
+            state,
+            node_id="execute_capability",
+            skill_key="local_workspace_executor",
+            binding_source="capability_state",
+            raw_events=[
+                {
+                    "kind": "file_write",
+                    "summary": "Editing skill/user/demo/SKILL.md +3 -0",
+                    "status": "succeeded",
+                    "detail": {"path": "skill/user/demo/SKILL.md", "added": 3, "removed": 0},
+                },
+                {"summary": "missing kind"},
+                "not an event",
+            ],
+            publish_run_event_func=lambda run_id, event_type, payload=None: published.append(
+                (str(run_id), event_type, dict(payload or {}))
+            ),
+        )
+
+        self.assertEqual(len(events), 1)
+        event = events[0]
+        self.assertEqual(event["kind"], "file_write")
+        self.assertEqual(event["node_id"], "execute_capability")
+        self.assertEqual(event["summary"], "Editing skill/user/demo/SKILL.md +3 -0")
+        self.assertEqual(event["detail"]["skill_key"], "local_workspace_executor")
+        self.assertEqual(event["detail"]["binding_source"], "capability_state")
+        self.assertEqual(event["detail"]["path"], "skill/user/demo/SKILL.md")
+        self.assertEqual(event["detail"]["added"], 3)
+        self.assertEqual(event["detail"]["removed"], 0)
+        self.assertEqual(published[0][1], "activity.event")
+
 
 if __name__ == "__main__":
     unittest.main()
