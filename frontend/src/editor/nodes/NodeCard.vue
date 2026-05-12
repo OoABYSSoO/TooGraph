@@ -2017,17 +2017,17 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   isolation: isolate;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   height: var(--node-card-floating-capsule-height, 58px);
   box-sizing: border-box;
-  padding: 8px 14px 8px 8px;
+  padding: 8px 16px 8px 14px;
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 999px;
   background: var(--toograph-glass-bg);
   color: rgba(71, 47, 29, 0.84);
   box-shadow: var(--toograph-glass-shadow), var(--toograph-glass-highlight), var(--toograph-glass-rim);
   backdrop-filter: blur(24px) saturate(1.6) contrast(1.02);
-  font-size: 0.76rem;
+  font-size: 0.92rem;
   font-weight: 800;
   line-height: 1.1;
   white-space: nowrap;
@@ -2050,12 +2050,13 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 .node-card__run-timing-capsule :deep(.el-icon) {
   position: relative;
   z-index: 1;
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(var(--node-card-kind-rgb), 0.16);
-  border-radius: 999px;
-  background: rgba(255, 252, 247, 0.94);
-  font-size: 13px;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  background: transparent;
+  color: currentColor;
+  font-size: 18px;
 }
 
 .node-card__run-timing-text {

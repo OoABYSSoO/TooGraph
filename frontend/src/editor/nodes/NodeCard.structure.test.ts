@@ -24,6 +24,7 @@ const agentSkillPickerSource = readFileSync(resolve(currentDirectory, "AgentSkil
 const agentRuntimeControlsSource = readFileSync(resolve(currentDirectory, "AgentRuntimeControls.vue"), "utf8").replace(/\r\n/g, "\n");
 const statePortListSource = readFileSync(resolve(currentDirectory, "StatePortList.vue"), "utf8").replace(/\r\n/g, "\n");
 const portListSurfaceSource = `${statePortListSource}\n${conditionNodeBodySource}\n${primaryStatePortSource}\n${floatingStatePortPillSource}`;
+const runTimingIconStyle = componentSource.match(/\.node-card__run-timing-capsule :deep\(\.el-icon\) \{[\s\S]*?\n\}/)?.[0] ?? "";
 
 test("NodeCard does not render the reads and writes summary block", () => {
   assert.doesNotMatch(componentSource, /class="node-card__state-summary"/);
@@ -104,9 +105,13 @@ test("NodeCard renders a top-left run timing capsule", () => {
   );
   assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*box-shadow:\s*var\(--toograph-glass-shadow\),\s*var\(--toograph-glass-highlight\),\s*var\(--toograph-glass-rim\);/);
   assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*backdrop-filter:\s*blur\(24px\)\s*saturate\(1\.6\)\s*contrast\(1\.02\);/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*font-size:\s*0\.92rem;/);
   assert.match(componentSource, /\.node-card__run-timing-capsule::before \{/);
-  assert.match(componentSource, /\.node-card__run-timing-capsule :deep\(\.el-icon\) \{[\s\S]*width:\s*40px;/);
-  assert.match(componentSource, /\.node-card__run-timing-capsule :deep\(\.el-icon\) \{[\s\S]*height:\s*40px;/);
+  assert.match(runTimingIconStyle, /width:\s*18px;/);
+  assert.match(runTimingIconStyle, /height:\s*18px;/);
+  assert.match(runTimingIconStyle, /border:\s*0;/);
+  assert.match(runTimingIconStyle, /background:\s*transparent;/);
+  assert.doesNotMatch(runTimingIconStyle, /border-radius/);
 });
 
 test("NodeCard stretches primary editable surfaces when the canvas resizes the node", () => {
