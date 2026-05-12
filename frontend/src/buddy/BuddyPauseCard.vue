@@ -65,10 +65,10 @@
       </div>
       <div v-if="pausedBuddyActionMode === 'supplement'" class="buddy-widget__pause-editor">
         <ElSelect
-          v-if="pausedBuddyRequiredRows.length > 1"
-          :model-value="pausedBuddyTargetKey"
           class="buddy-widget__pause-target toograph-select"
           popper-class="toograph-select-popper buddy-widget__select-popper"
+          v-if="pausedBuddyRequiredRows.length > 1"
+          :model-value="pausedBuddyTargetKey"
           size="small"
           :aria-label="t('buddy.pause.targetLabel')"
           @update:model-value="setPausedBuddyTargetKey"
