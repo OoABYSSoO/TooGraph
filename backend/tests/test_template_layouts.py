@@ -422,7 +422,9 @@ class TemplateLayoutTests(unittest.TestCase):
 
         intake_graph = nodes["intake_request"]["config"]["graph"]
         self.assertEqual(intake_graph["metadata"]["interrupt_after"], ["ask_clarification"])
+        self.assertEqual(intake_graph["metadata"]["role"], "buddy_request_intake")
         self.assertEqual(intake_graph["state_schema"]["visible_reply"]["type"], "markdown")
+        self.assertEqual(intake_graph["state_schema"]["clarification_answer"]["type"], "markdown")
         self.assertNotIn({"state": "buddy_context", "required": True}, nodes["intake_request"]["reads"])
         self.assertNotIn({"source": "input_buddy_context", "target": "intake_request"}, template["edges"])
         self.assertEqual(nodes["intake_request"]["writes"][0], {"state": "visible_reply", "mode": "replace"})
@@ -438,6 +440,11 @@ class TemplateLayoutTests(unittest.TestCase):
             intake_graph["nodes"]["need_clarification"]["config"]["rule"],
             {"source": "$state.request_understanding.needs_clarification", "operator": "==", "value": True},
         )
+        ask_clarification_node = intake_graph["nodes"]["ask_clarification"]
+        self.assertEqual(ask_clarification_node["writes"], [{"state": "clarification_prompt", "mode": "replace"}])
+        self.assertNotIn({"state": "clarification_answer", "required": True}, ask_clarification_node["reads"])
+        merge_clarification_node = intake_graph["nodes"]["merge_clarification"]
+        self.assertIn({"state": "clarification_answer", "required": True}, merge_clarification_node["reads"])
 
         cycle_graph = nodes["run_capability_cycle"]["config"]["graph"]
         self.assertEqual(cycle_graph["metadata"].get("interrupt_after", []), [])
