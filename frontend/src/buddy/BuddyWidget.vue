@@ -1384,7 +1384,7 @@ function finishBuddyVisibleRun(runDetail: RunDetail, assistantMessageId: string,
   if (assistantMessage) {
     assistantMessage.runId = runId;
   }
-  void startBuddySelfReviewRun(runDetail);
+  void startBuddyAutonomousReviewRun(runDetail);
   mood.value = runDetail.status === "failed" ? "error" : runDetail.status === "cancelled" ? "idle" : "speaking";
   if (runDetail.status === "completed") {
     buddyContextStore.notifyBuddyDataChanged();
@@ -1394,7 +1394,7 @@ function finishBuddyVisibleRun(runDetail: RunDetail, assistantMessageId: string,
   }
 }
 
-async function startBuddySelfReviewRun(mainRun: RunDetail) {
+async function startBuddyAutonomousReviewRun(mainRun: RunDetail) {
   if (mainRun.status !== "completed") {
     return;
   }
@@ -1405,13 +1405,13 @@ async function startBuddySelfReviewRun(mainRun: RunDetail) {
       buddyModel: buddyModelRef.value,
     });
     const reviewRun = await runGraph(graph);
-    void pollBuddySelfReviewRun(reviewRun.run_id);
+    void pollBuddyAutonomousReviewRun(reviewRun.run_id);
   } catch (error) {
-    console.warn("[Buddy] Background self-review failed to start.", error);
+    console.warn("[Buddy] Background autonomous review failed to start.", error);
   }
 }
 
-async function pollBuddySelfReviewRun(runId: string) {
+async function pollBuddyAutonomousReviewRun(runId: string) {
   const controller = new AbortController();
   backgroundReviewAbortControllers.add(controller);
   try {
@@ -1419,11 +1419,11 @@ async function pollBuddySelfReviewRun(runId: string) {
     if (run.status === "completed") {
       buddyContextStore.notifyBuddyDataChanged();
     } else if (run.status === "failed") {
-      console.warn("[Buddy] Background self-review failed.", run.errors);
+      console.warn("[Buddy] Background autonomous review failed.", run.errors);
     }
   } catch (error) {
     if (!(error instanceof DOMException && error.name === "AbortError")) {
-      console.warn("[Buddy] Background self-review polling failed.", error);
+      console.warn("[Buddy] Background autonomous review polling failed.", error);
     }
   } finally {
     backgroundReviewAbortControllers.delete(controller);

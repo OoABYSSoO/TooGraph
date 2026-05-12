@@ -24,6 +24,7 @@ class BuddyCommandRouteTests(unittest.TestCase):
                         json={
                             "action": "profile.update",
                             "payload": {"name": "Tutu"},
+                            "run_id": "run_review_1",
                             "change_reason": "Manual profile update.",
                         },
                     )
@@ -40,7 +41,7 @@ class BuddyCommandRouteTests(unittest.TestCase):
         self.assertEqual(body["command"]["status"], "succeeded")
         self.assertEqual(body["command"]["target_type"], "profile")
         self.assertEqual(body["command"]["target_id"], "profile")
-        self.assertIsNone(body["command"]["run_id"])
+        self.assertEqual(body["command"]["run_id"], "run_review_1")
         self.assertTrue(body["command"]["command_id"].startswith("cmd_"))
         self.assertTrue(body["command"]["revision_id"].startswith("rev_"))
         self.assertEqual(body["revision"]["revision_id"], body["command"]["revision_id"])

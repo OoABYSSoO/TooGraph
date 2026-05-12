@@ -263,10 +263,10 @@ function createAgenticTemplate(): TemplateRecord {
 
 function createReviewTemplate(): TemplateRecord {
   return {
-    template_id: "buddy_self_review",
-    label: "伙伴后台复盘",
-    description: "Review buddy turns after the visible reply.",
-    default_graph_name: "伙伴后台复盘",
+    template_id: "buddy_autonomous_review",
+    label: "自主复盘",
+    description: "Review buddy turns after the visible reply and apply safe Buddy Home writebacks.",
+    default_graph_name: "自主复盘",
     status: "active",
     state_schema: {
       user_message: { name: "user_message", description: "", type: "text", value: "", color: "#d97706" },
@@ -277,8 +277,8 @@ function createReviewTemplate(): TemplateRecord {
       capability_result: { name: "capability_result", description: "", type: "result_package", value: {}, color: "#0284c7" },
       capability_review: { name: "capability_review", description: "", type: "json", value: {}, color: "#0f766e" },
       final_reply: { name: "final_reply", description: "", type: "markdown", value: "", color: "#16a34a" },
-      memory_update_plan: { name: "memory_update_plan", description: "", type: "json", value: {}, color: "#22c55e" },
-      buddy_evolution_plan: { name: "buddy_evolution_plan", description: "", type: "json", value: {}, color: "#a855f7" },
+      autonomous_review: { name: "autonomous_review", description: "", type: "json", value: {}, color: "#9333ea" },
+      writeback_commands: { name: "writeback_commands", description: "", type: "json", value: [], color: "#22c55e" },
     },
     nodes: {
       input_user_message: {
@@ -299,9 +299,9 @@ function createReviewTemplate(): TemplateRecord {
         writes: [{ state: "final_reply", mode: "replace" }],
         config: { value: "" },
       },
-      decide_memory_update: {
+      decide_autonomous_review: {
         kind: "agent",
-        name: "判断记忆更新",
+        name: "判断自主复盘",
         description: "",
         ui: { position: { x: 640, y: 160 }, collapsed: false },
         reads: [
@@ -309,8 +309,8 @@ function createReviewTemplate(): TemplateRecord {
           { state: "final_reply", required: true },
         ],
         writes: [
-          { state: "memory_update_plan", mode: "replace" },
-          { state: "buddy_evolution_plan", mode: "replace" },
+          { state: "autonomous_review", mode: "replace" },
+          { state: "writeback_commands", mode: "replace" },
         ],
         config: {
           skillKey: "",
@@ -324,8 +324,8 @@ function createReviewTemplate(): TemplateRecord {
       },
     },
     edges: [
-      { source: "input_user_message", target: "decide_memory_update" },
-      { source: "input_final_reply", target: "decide_memory_update" },
+      { source: "input_user_message", target: "decide_autonomous_review" },
+      { source: "input_final_reply", target: "decide_autonomous_review" },
     ],
     conditional_edges: [],
     metadata: { internal: true },
@@ -515,11 +515,11 @@ test("buildBuddyChatGraph clears visible and final reply states before each run"
   assert.equal(graph.state_schema.final_reply.value, "");
 });
 
-test("buddy review uses a separate internal template id", () => {
-  assert.equal(BUDDY_REVIEW_TEMPLATE_ID, "buddy_self_review");
+test("buddy review uses a separate internal autonomous review template id", () => {
+  assert.equal(BUDDY_REVIEW_TEMPLATE_ID, "buddy_autonomous_review");
 });
 
-test("buildBuddyReviewGraph hydrates an internal background review run from the visible chat run", () => {
+test("buildBuddyReviewGraph hydrates an internal autonomous review run from the visible chat run", () => {
   const graph = buildBuddyReviewGraph(createReviewTemplate(), {
     mainRun: {
       run_id: "run_visible_1",
@@ -565,7 +565,7 @@ test("buildBuddyReviewGraph hydrates an internal background review run from the 
   });
 
   assert.equal(graph.graph_id, null);
-  assert.equal(graph.name, "伙伴后台复盘");
+  assert.equal(graph.name, "自主复盘");
   assert.equal(graph.metadata.buddy_review_run, true);
   assert.equal(graph.metadata.buddy_parent_run_id, "run_visible_1");
   assert.equal(graph.metadata.internal, true);
@@ -575,9 +575,9 @@ test("buildBuddyReviewGraph hydrates an internal background review run from the 
   assertInputNode(graph.nodes.input_final_reply);
   assert.equal(graph.nodes.input_user_message.config.value, "你好");
   assert.equal(graph.nodes.input_final_reply.config.value, "你好，我在。");
-  assertAgentNode(graph.nodes.decide_memory_update);
-  assert.equal(graph.nodes.decide_memory_update.config.modelSource, "override");
-  assert.equal(graph.nodes.decide_memory_update.config.model, "openai/gpt-4.1");
+  assertAgentNode(graph.nodes.decide_autonomous_review);
+  assert.equal(graph.nodes.decide_autonomous_review.config.modelSource, "override");
+  assert.equal(graph.nodes.decide_autonomous_review.config.model, "openai/gpt-4.1");
 });
 
 test("buildBuddyChatGraph keeps enabled skills visible in ask-first mode", () => {

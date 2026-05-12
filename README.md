@@ -316,11 +316,13 @@ TooGraph/
 - `advanced_web_research_loop`（界面名称：高级联网搜索）
 - `buddy_autonomous_loop`（界面名称：伙伴自主循环）
 - `toograph_skill_creation_workflow`（界面名称：创建自定义 Skill）
-- `buddy_self_review`（伙伴运行后的后台自检模板，不作为普通用户入口）
+- `buddy_autonomous_review`（界面名称：自主复盘，伙伴运行后的内部后台写回模板，不作为普通用户入口）
 
 `advanced_web_research_loop` 是当前联网搜索基线模板：它会规划搜索词、调用 `web_search`、判断证据是否足够、按需循环补查，并输出最终答案；证据链接和本地 source documents 作为中间 state 供后续节点使用，不直接连接 output 节点。
 
 `buddy_autonomous_loop` 是当前 Buddy 的可见运行路径：读取 Buddy Home 和用户请求，选择一个 Skill 或动态图模板能力，执行后回到 LLM 复盘，并在需要时继续循环、暂停补充信息或输出唯一用户可见的 `final_reply`。
+
+`buddy_autonomous_review` 是当前 Buddy 的后台自主复盘路径：可见回复完成后由前端用 run snapshot 启动，模型自行判断是否需要低风险写回 Buddy Home，并通过 `buddy_home_writer` 走 command / revision 路径留下可回滚记录。
 
 `toograph_skill_creation_workflow` 是创建用户自定义 Skill 的官方流程模板：它会检查已有能力、澄清需求、让用户确认示例输入输出，调用 `toograph_skill_builder` 生成 `skill_key` / `skill.json` / `SKILL.md` / `before_llm.py` / `after_llm.py` / `requirements.txt`，再用 `toograph_script_tester` 测试 Python 生命周期脚本；测试失败会回到构建节点修复，最后只有在用户明确批准后才通过 `local_workspace_executor` 写入 `skill/user/<skill_key>/`。
 

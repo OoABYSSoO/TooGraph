@@ -317,7 +317,7 @@ Current official templates live in `graph_template/official/<template_id>/templa
 - `advanced_web_research_loop`
 - `buddy_autonomous_loop`
 - `toograph_skill_creation_workflow`
-- `buddy_self_review` - internal background Buddy self-review template, not a normal user-facing template entry
+- `buddy_autonomous_review` - internal background Buddy autonomous review and Buddy Home writeback template, not a normal user-facing template entry
 
 ## Working Expectations For Agents
 

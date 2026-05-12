@@ -26,7 +26,7 @@
 - Keep recovery on the standard `awaiting_human` run path and reuse `handleBuddyRunAwaitingHuman`.
 - Do not recover terminal runs into pause cards. `completed`, `failed`, and `cancelled` runs remain normal history messages.
 - Recovered pause placeholder messages must use `includeInContext: false`.
-- Do not start background self-review while recovering a paused run; self-review belongs only to completed visible runs.
+- Do not start background autonomous review while recovering a paused run; autonomous review belongs only to completed visible runs.
 
 ### Task 1: Pure Recovery Helper
 

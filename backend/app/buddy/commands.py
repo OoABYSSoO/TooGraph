@@ -24,9 +24,10 @@ def execute_command(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("payload must be an object.")
 
     target_id = _optional_text(payload.get("target_id"))
+    run_id = _optional_text(payload.get("run_id"))
     change_reason = _optional_text(payload.get("change_reason")) or f"Buddy command executed: {action}."
     if action == "graph_patch.draft":
-        return _execute_graph_patch_draft(command_payload, target_id=target_id, change_reason=change_reason)
+        return _execute_graph_patch_draft(command_payload, target_id=target_id, run_id=run_id, change_reason=change_reason)
 
     previous_revision_ids = {str(revision.get("revision_id")) for revision in store.list_revisions()}
 
@@ -46,7 +47,7 @@ def execute_command(payload: dict[str, Any]) -> dict[str, Any]:
         "target_type": target_type,
         "target_id": resolved_target_id,
         "revision_id": revision.get("revision_id") if isinstance(revision, dict) else None,
-        "run_id": None,
+        "run_id": run_id,
         "payload": deepcopy(command_payload),
         "change_reason": change_reason,
         "created_at": now,
@@ -60,6 +61,7 @@ def _execute_graph_patch_draft(
     payload: dict[str, Any],
     *,
     target_id: str | None,
+    run_id: str | None,
     change_reason: str,
 ) -> dict[str, Any]:
     patch = _required_graph_patch(payload.get("patch"))
@@ -98,7 +100,7 @@ def _execute_graph_patch_draft(
         "target_type": "graph",
         "target_id": resolved_target_id,
         "revision_id": None,
-        "run_id": None,
+        "run_id": run_id,
         "payload": deepcopy(payload),
         "change_reason": change_reason,
         "activity_event": activity_event,

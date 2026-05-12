@@ -80,11 +80,10 @@ def _write_skill(
     selectable: bool = True,
     status: str = "active",
     permissions: list[str] | None = None,
+    internal: bool = False,
 ) -> None:
     skill_dir = repo_root / "skill" / source / skill_key
-    _write_json(
-        skill_dir / "skill.json",
-        {
+    payload = {
             "schemaVersion": "toograph.skill/v1",
             "skillKey": skill_key,
             "name": name,
@@ -94,8 +93,10 @@ def _write_skill(
             "permissions": permissions if permissions is not None else (["network"] if "search" in description.lower() else []),
             "inputSchema": [{"key": "query", "name": "Query", "valueType": "text", "required": True}],
             "outputSchema": [{"key": "result", "name": "Result", "valueType": "json"}],
-        },
-    )
+    }
+    if internal:
+        payload["metadata"] = {"internal": True}
+    _write_json(skill_dir / "skill.json", payload)
     (skill_dir / "after_llm.py").write_text("import json\nprint(json.dumps({'result': {}}))\n", encoding="utf-8")
     if status != "active" or not selectable:
         _write_settings(
@@ -318,6 +319,32 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
         self.assertEqual(disabled_result["audit"]["gap"], "Selected capability 'disabled_research' is not enabled or no longer exists.")
         self.assertTrue(enabled_legacy_result["found"])
         self.assertEqual(enabled_legacy_result["capability"]["key"], "web_search")
+
+    def test_selector_hides_internal_writer_skills_from_capability_catalog(self) -> None:
+        selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "toograph_capability_selector_before_internal_skill")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _write_skill(
+                repo_root,
+                skill_key="buddy_home_writer",
+                name="Buddy Home Writer",
+                description="Internal controlled writer for Buddy Home.",
+                permissions=["buddy_home_write"],
+                internal=True,
+            )
+            _write_skill(
+                repo_root,
+                skill_key="web_search",
+                name="Web Search",
+                description="Search public web pages.",
+                permissions=["network"],
+            )
+            with patch.dict("os.environ", {"TOOGRAPH_REPO_ROOT": str(repo_root)}, clear=True):
+                result = selector.toograph_capability_selector_before_llm(graph_state={})
+
+        context = result["context"]
+        self.assertIn("key: web_search", context)
+        self.assertNotIn("buddy_home_writer", context)
 
     def test_selector_preserves_permissions_without_approval_flags(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_test_permissions")

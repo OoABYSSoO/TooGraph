@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "toograph.skill/v1",
+  "skillKey": "buddy_home_writer",
+  "name": "Buddy Home Writer",
+  "description": "Internal controlled writer that applies safe Buddy Home command writes with revisions.",
+  "llmInstruction": "你已绑定 Buddy Home Writer。根据上游自主复盘结果生成 commands 数组，只包含确实需要自动沉淀到 Buddy Home 的低风险写回命令。允许的 action 是 memory.create、memory.update、memory.delete、session_summary.update、profile.update、policy.update。不要生成 revision.restore、graph_patch.draft、文件路径写入、脚本执行或任何权限升级。policy.update 只能用于非权限类偏好，不得修改 graph_permission_mode 或 behavior_boundaries。技能会通过 Buddy command/store 写入并生成 revision；不要在本节点总结或伪造写入结果。",
+  "version": "1.0.0",
+  "timeoutSeconds": 30,
+  "permissions": ["buddy_home_write"],
+  "metadata": {
+    "internal": true
+  },
+  "inputSchema": [
+    {
+      "key": "commands",
+      "name": "Commands",
+      "valueType": "json",
+      "required": true,
+      "description": "Buddy Home 写回命令数组。每项包含 action、payload、可选 target_id、可选 change_reason。"
+    },
+    {
+      "key": "run_id",
+      "name": "Run ID",
+      "valueType": "text",
+      "required": false,
+      "description": "触发自主复盘的源运行 ID，用于写入 command 记录。"
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "success",
+      "name": "Success",
+      "valueType": "boolean",
+      "description": "所有安全命令是否成功应用，且没有命令被安全边界拒绝。"
+    },
+    {
+      "key": "result",
+      "name": "Result",
+      "valueType": "markdown",
+      "description": "写回摘要。"
+    },
+    {
+      "key": "applied_commands",
+      "name": "Applied Commands",
+      "valueType": "json",
+      "description": "已执行命令及其结果、command 记录和 revision。"
+    },
+    {
+      "key": "skipped_commands",
+      "name": "Skipped Commands",
+      "valueType": "json",
+      "description": "因为无效、越权或执行失败而跳过的命令。"
+    },
+    {
+      "key": "revisions",
+      "name": "Revisions",
+      "valueType": "json",
+      "description": "本次写回产生的 Buddy Home revision 列表。"
+    }
+  ]
+}

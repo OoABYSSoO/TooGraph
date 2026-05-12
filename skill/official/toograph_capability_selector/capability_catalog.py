@@ -179,6 +179,8 @@ def _load_skill_candidates(repo_root: Path, *, origin: str) -> tuple[list[dict[s
             settings_entry = settings_entries.get(skill_key)
             if not _is_asset_enabled(settings_entry):
                 continue
+            if _is_skill_hidden_from_capability_selector(payload):
+                continue
             if _skill_readiness_error(skill_dir, payload):
                 continue
             permissions = _normalize_permissions(payload.get("permissions"))
@@ -220,6 +222,11 @@ def _is_asset_enabled(settings_entry: Any) -> bool:
 def _is_template_hidden_from_capability_selector(payload: dict[str, Any]) -> bool:
     if _compact_text(payload.get("status")).lower() in {"disabled", "deleted"}:
         return True
+    metadata = payload.get("metadata")
+    return isinstance(metadata, dict) and metadata.get("internal") is True
+
+
+def _is_skill_hidden_from_capability_selector(payload: dict[str, Any]) -> bool:
     metadata = payload.get("metadata")
     return isinstance(metadata, dict) and metadata.get("internal") is True
 

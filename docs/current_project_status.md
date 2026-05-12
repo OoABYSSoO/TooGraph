@@ -9,12 +9,12 @@
 - 伙伴不是独立运行时。伙伴本质也是按图模板发起一次 graph run，并通过运行来源、状态和技能目录表达上下文。
 - 产品心智已收束为“图才是 Agent，单个节点是 LLM 节点”。当前协议中仍存在 `agent` kind 命名，这是待迁移的内部命名；新设计不应继续把单节点描述为多轮 Agent。
 - 旧的 `buddy_agentic_tool_loop`、`buddy_chat_loop`、`web_research_loop` 等模板不再随仓库提供，也不再通过后端兼容逻辑修补。
-- 新版伙伴自主循环模板 `buddy_autonomous_loop` 已创建为官方图模板。它通过 Input 节点以本地文件夹方式注入 Buddy Home 选中文件，再通过子图串联请求理解、按需能力选择与动态执行、最终回复；请求理解阶段会写 `visible_reply` 作为即时可见回复，简单闲聊或可直接回答的请求会绕过能力循环，最终 output 仍只展示 `final_reply`。回复完成后，伙伴前端会另起内部 `buddy_self_review` 后台模板复盘本轮记忆与成长计划，不阻塞下一轮对话。
+- 新版伙伴自主循环模板 `buddy_autonomous_loop` 已创建为官方图模板。它通过 Input 节点以本地文件夹方式注入 Buddy Home 选中文件，再通过子图串联请求理解、按需能力选择与动态执行、最终回复；请求理解阶段会写 `visible_reply` 作为即时可见回复，简单闲聊或可直接回答的请求会绕过能力循环，最终 output 仍只展示 `final_reply`。回复完成后，伙伴前端会另起内部 `buddy_autonomous_review` 后台模板进行“自主复盘”，模型自行判断是否需要低风险写回 Buddy Home，并通过 `buddy_home_writer` 走 command / revision 路径，不阻塞下一轮对话。
 - 动态 `capability.kind=subgraph` 已支持内部断点向父级 run 传播。动态子图遇到 `interrupt_after` 时，父级 run 会进入标准 `awaiting_human`，恢复仍走父级 run 的 resume API。
 - 伙伴浮窗已复用标准 `awaiting_human` 暂停卡片：能展示子图 scope、必填 state、当前已产出的内容和上下文，并在卡片内通过“执行当前方案 / 补充内容”的单一操作区恢复原 run；暂停时不会把本轮当作最终完成，底部聊天输入不会续跑旧断点。
-- 当前普通模板列表提供三个可见官方图模板：`advanced_web_research_loop`（高级联网搜索）、`buddy_autonomous_loop`（伙伴自主循环）和 `toograph_skill_creation_workflow`（创建自定义 Skill）。仓库还包含内部后台模板 `buddy_self_review`，它不进入普通模板列表和能力选择候选。
+- 当前普通模板列表提供三个可见官方图模板：`advanced_web_research_loop`（高级联网搜索）、`buddy_autonomous_loop`（伙伴自主循环）和 `toograph_skill_creation_workflow`（创建自定义 Skill）。仓库还包含内部后台模板 `buddy_autonomous_review`（自主复盘），它不进入普通模板列表和能力选择候选。
 - 技能系统已收束为统一技能库，不再区分“伙伴技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
-- 当前官方技能包包括 `web_search`、`toograph_capability_selector`、`toograph_skill_builder`、`toograph_script_tester` 和 `local_workspace_executor`。后续新能力应按当前统一 Skill 结构专门编写。
+- 当前官方技能包包括 `web_search`、`toograph_capability_selector`、`toograph_skill_builder`、`toograph_script_tester`、`local_workspace_executor` 和内部 `buddy_home_writer`。后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
 - 根目录 `buddy_home/` 是伙伴长期资料的目标收束目录。它由程序在启动或读取时按默认内容自动补齐，属于本地用户数据，不进入 Git 管理。正式结构收束为 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json`、`buddy.db` 和 `reports/`；不维护长期 `TOOLS.md`，当前能力来自启用的 Skill、启用的图模板和能力选择 Skill。
 - 伙伴启动侧已收束到 `metadata.origin=buddy`，并使用明确的 `buddy_mode`、`buddy_can_execute_actions`、`buddy_requires_approval` 等策略字段表达来源与权限语义；旧的 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 不再写入新 Buddy 图。
@@ -116,13 +116,13 @@
 - 断点语义：澄清和人工确认类断点使用子图内部 `interrupt_after`。静态 Subgraph 节点和动态 `capability.kind=subgraph` 的内部断点都会通过父级 Buddy run 的标准暂停/恢复路径展示子图 scope，而不是由伙伴前端额外发明确认协议。写文件、删改文件或执行脚本这类低层操作审批由运行时权限原语转换为标准 `awaiting_human`。
 - 边界：当前模板已经表达完整可见回复主干，但长期记忆写回、Buddy Home 修改、图补丁应用和更完整的伙伴页面暂停交互仍应作为后续显式模板/命令流补齐，不能隐藏在 output 节点或前端逻辑里。
 
-### `buddy_self_review`
+### `buddy_autonomous_review`
 
-- 位置：`graph_template/official/buddy_self_review/template.json`
-- 显示名称：`伙伴后台复盘`
-- 作用：作为伙伴浮窗在主回复完成后启动的内部后台模板，读取主运行留下的用户消息、历史、页面上下文、Buddy Home 上下文、请求理解、能力结果、能力复盘和最终回复，产出 `memory_update_plan` 与 `buddy_evolution_plan`。
+- 位置：`graph_template/official/buddy_autonomous_review/template.json`
+- 显示名称：`自主复盘`
+- 作用：作为伙伴浮窗在主回复完成后启动的内部后台模板，读取主运行留下的用户消息、历史、页面上下文、Buddy Home 上下文、请求理解、能力结果、能力复盘和最终回复，产出 `autonomous_review` 与 `writeback_commands`，并在模型判断需要低风险写回时调用 `buddy_home_writer`。
 - 可见性：该模板标记为 `metadata.internal=true`，不会进入普通模板列表和 `toograph_capability_selector` 候选清单，但可以通过明确模板 ID 读取并发起 graph run。
-- 边界：当前只产出计划，不直接写 Buddy Home，也不阻塞下一轮伙伴回复。后续如要落地记忆写回，应继续通过显式 Skill、命令记录、revision 和审批路径完成。
+- 边界：用户不确认每次 Buddy Home 是否应该更新；是否更新由模型在本后台图中判断。正常低风险 memory、session summary 和 profile 写回自动应用并留下 command、revision 与 activity event；涉及权限升级或能力边界扩大的 policy 变化会被 writer 拒绝，不静默提权。
 
 ### `toograph_skill_creation_workflow`
 
@@ -150,7 +150,7 @@
 - subgraph 节点把一个 graph 模板复制为当前父图内的独立实例。模板分为 Git 管理的官方模板和 `graph_template/user/` 下的用户自定义模板；前端“保存为模板”只会创建用户自定义模板。节点卡片先展示公开输入/输出胶囊，再展示紧凑的内部 DAG 缩略图、内部能力摘要和子图内部运行状态；DAG 缩略图按行优先顺序展示实际内部执行/判断节点，隐藏 `input` / `output` 边界节点，宽度未知时默认三列，并会根据节点卡片当前宽度在 `1` 到可见节点总数之间自适应列数。缩略图会展示普通连线和条件分支连线，连线路径复用主图 sequence-flow 回流线逻辑并使用缩略图尺寸参数；只有目标节点明确落到下一行时才走下方换行路径，轻微纵向偏移仍保持回流路径。节点位置和连线路径来自同一个响应式布局计算，不再照搬大画布坐标导致横向裁切或因卡片尺寸变化造成连线错位。运行时会把子图内部节点状态投射到缩略图颜色、闪烁高亮与当前节点提示上；主图和缩略图的已完成节点都使用绿色包框。双击节点会打开当前实例的工作区页签，页签内复用正式画布编辑器。子图页签的保存会回写父图中该节点的 `config.graph`，并按内部 `input` / `output` 边界重新同步父图公开 state 端口；也可以另存为普通图。画布左上工具区会显示来源胶囊，例如“来自：Untitled Graph / 节点：高级联网搜索 Subgraph”。
 - output 节点负责展示、预览、导出或链接图运行产物，不拥有隐藏持久化策略；Markdown 预览支持安全渲染标题、列表、引用、分割线、表格、链接、inline code 和带语言标签的浅色代码围栏，并保留代码块缩进与横向滚动。
 - Skills 页面围绕统一 skill catalog 展示、导入、启用、禁用和删除技能。
-- 伙伴浮窗支持模型选择、对话入口、后端持久化历史会话、新建会话、历史下拉、删除确认、全屏展开、markdown 回复、每条助手消息自带运行过程胶囊、节点级流式输出预览和每步耗时，并会以 `buddy_autonomous_loop` 作为可见伙伴运行模板。主运行可先显示 `visible_reply`，再在 `final_reply` 到达后更新为最终回复；前端不再设置固定整轮运行超时，只等终态、断点或显式中止。主运行完成回复后，前端会把同一次运行的 state 快照灌入内部 `buddy_self_review` 模板并作为后台 run 启动；后台复盘不占用 `activeRunId`，不锁定下一轮输入。浮窗已把 `awaiting_human` 展示为暂停卡片，支持必填 state 草稿、卡片内单一续跑操作区、拒绝待审批能力、取消暂停中的整轮 run、刷新或重新打开会话后找回仍在 `awaiting_human` 的暂停 run，并在卡片中先展示当前产物/上下文再展示需要补充的信息；底部输入在暂停时只提示回到卡片。后续重点是伙伴页面运行与确认视图、暂停期间队列策略细化和 Buddy Home 写回流程。
+- 伙伴浮窗支持模型选择、对话入口、后端持久化历史会话、新建会话、历史下拉、删除确认、全屏展开、markdown 回复、每条助手消息自带运行过程胶囊、节点级流式输出预览和每步耗时，并会以 `buddy_autonomous_loop` 作为可见伙伴运行模板。主运行可先显示 `visible_reply`，再在 `final_reply` 到达后更新为最终回复；前端不再设置固定整轮运行超时，只等终态、断点或显式中止。主运行完成回复后，前端会把同一次运行的 state 快照灌入内部 `buddy_autonomous_review` 模板并作为后台 run 启动；后台复盘不占用 `activeRunId`，不锁定下一轮输入，低风险 Buddy Home 写回由 `buddy_home_writer` 生成 revision 供用户在历史中回看和恢复。浮窗已把 `awaiting_human` 展示为暂停卡片，支持必填 state 草稿、卡片内单一续跑操作区、拒绝待审批能力、取消暂停中的整轮 run、刷新或重新打开会话后找回仍在 `awaiting_human` 的暂停 run，并在卡片中先展示当前产物/上下文再展示需要补充的信息；底部输入在暂停时只提示回到卡片。后续重点是更完整的 Buddy Home 历史 diff / 版本切换体验、伙伴页面运行与确认视图、暂停期间队列策略细化。
 
 ## 当前后端能力
 

@@ -18,7 +18,7 @@ TooGraph 当前已经具备这些正式能力：
 - `state_schema` 作为唯一数据源参与整个执行链。
 - `subgraph` 节点运行、编辑、公开 input/output 边界和内部断点传播。
 - `awaiting_human`、resume API、编辑器 Human Review 和 Buddy 浮窗暂停卡片。
-- Buddy 浮窗对话、历史会话、`buddy_autonomous_loop` 可见运行、即时 `visible_reply`、每条助手消息自己的运行过程胶囊和 `buddy_self_review` 后台复盘。
+- Buddy 浮窗对话、历史会话、`buddy_autonomous_loop` 可见运行、即时 `visible_reply`、每条助手消息自己的运行过程胶囊和 `buddy_autonomous_review` 后台自主复盘。
 
 后端运行主链已经迁到 LangGraph，并支持：
 

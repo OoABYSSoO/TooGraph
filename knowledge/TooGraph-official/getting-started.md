@@ -17,7 +17,7 @@
 - `advanced_web_research_loop`：多轮联网搜索、证据评估、补充检索和最终回复。
 - `buddy_autonomous_loop`：Buddy 可见主循环，读取 Buddy Home、本轮消息、页面上下文和对话历史，先写即时 `visible_reply`，按需选择能力并输出唯一最终 `final_reply`。
 - `toograph_skill_creation_workflow`：通过澄清、样例确认、Skill 文件生成、脚本测试和写入审批来创建用户自定义 Skill。
-- `buddy_self_review`：Buddy 回复完成后的内部后台复盘模板，不作为普通模板入口。
+- `buddy_autonomous_review`：Buddy 回复完成后的内部后台自主复盘模板，显示名为“自主复盘”，不作为普通模板入口。
 
 如果你想快速理解 TooGraph 自己的产品形态，建议先问这些问题：
 

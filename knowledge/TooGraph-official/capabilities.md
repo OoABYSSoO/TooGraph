@@ -17,7 +17,7 @@ TooGraph 当前适合做这些事情：
 - 在 Run Detail 里查看节点执行结果、技能输出、状态快照、输出产物、warnings 和 errors。
 - 通过节点创建菜单、手柄拖出创建、文件拖入创建和 preset 保存来扩展图。
 - 使用 minimap、线条显示模式和运行态高亮管理较复杂的画布。
-- 使用 Buddy 浮窗发起 `buddy_autonomous_loop` graph run，并在完成后由内部 `buddy_self_review` 后台模板产出记忆和成长计划。
+- 使用 Buddy 浮窗发起 `buddy_autonomous_loop` graph run，并在完成后由内部 `buddy_autonomous_review` 后台模板自主判断是否需要写回 Buddy Home；低风险写回通过 `buddy_home_writer` 生成 command 和 revision。
 
 当前比较适合的使用场景是：
 

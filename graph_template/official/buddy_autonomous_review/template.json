@@ -1,0 +1,784 @@
+{
+  "template_id": "buddy_autonomous_review",
+  "label": "自主复盘",
+  "description": "在伙伴可见回复完成后后台复盘本轮运行，自主判断是否需要写回 Buddy Home，并通过受控 writer 生成可追溯 revision。",
+  "default_graph_name": "自主复盘",
+  "state_schema": {
+    "source_run_id": {
+      "name": "source_run_id",
+      "description": "触发本次自主复盘的可见 Buddy run ID。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": null
+    },
+    "user_message": {
+      "name": "user_message",
+      "description": "用户本轮对伙伴说的话。",
+      "type": "text",
+      "value": "",
+      "color": "#d97706",
+      "binding": null
+    },
+    "conversation_history": {
+      "name": "conversation_history",
+      "description": "伙伴对话历史摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#64748b",
+      "binding": null
+    },
+    "page_context": {
+      "name": "page_context",
+      "description": "当前页面、选中图、节点或其他 UI 上下文。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0891b2",
+      "binding": null
+    },
+    "buddy_mode": {
+      "name": "buddy_mode",
+      "description": "可见 Buddy 运行使用的权限模式。",
+      "type": "text",
+      "value": "ask_first",
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "buddy_context": {
+      "name": "buddy_context",
+      "description": "从 Buddy Home 文件夹中选择并注入的长期上下文文件。",
+      "type": "file",
+      "value": {
+        "kind": "local_folder",
+        "root": "buddy_home",
+        "selected": [
+          "AGENTS.md",
+          "SOUL.md",
+          "USER.md",
+          "MEMORY.md",
+          "policy.json"
+        ]
+      },
+      "color": "#0f766e",
+      "binding": null
+    },
+    "request_understanding": {
+      "name": "request_understanding",
+      "description": "对用户请求的结构化理解、澄清需求、目标和约束。",
+      "type": "json",
+      "value": {},
+      "color": "#16a34a",
+      "binding": null
+    },
+    "capability_result": {
+      "name": "capability_result",
+      "description": "动态能力执行后的结果包。包内每个输出保留原始 name、description、type 和 value。",
+      "type": "result_package",
+      "value": {},
+      "color": "#0284c7",
+      "binding": null
+    },
+    "capability_review": {
+      "name": "capability_review",
+      "description": "对能力选择、权限、执行结果和是否继续调用能力的复盘。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": null
+    },
+    "final_reply": {
+      "name": "final_reply",
+      "description": "展示给用户的最终伙伴回复。",
+      "type": "markdown",
+      "value": "",
+      "color": "#16a34a",
+      "binding": null
+    },
+    "autonomous_review": {
+      "name": "autonomous_review",
+      "description": "本轮自主复盘结论，包含是否写回、理由、证据、风险标记和跳过原因。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": null
+    },
+    "writeback_commands": {
+      "name": "writeback_commands",
+      "description": "将交给 Buddy Home Writer 的受控写回命令数组；无写回时为空数组。",
+      "type": "json",
+      "value": [],
+      "color": "#22c55e",
+      "binding": null
+    },
+    "writeback_success": {
+      "name": "writeback_success",
+      "description": "Buddy Home Writer 是否成功应用全部安全命令。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "buddy_home_writer",
+        "nodeId": "apply_buddy_home_writeback",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "writeback_result": {
+      "name": "writeback_result",
+      "description": "Buddy Home Writer 写回摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#15803d",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "buddy_home_writer",
+        "nodeId": "apply_buddy_home_writeback",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "applied_writeback_commands": {
+      "name": "applied_writeback_commands",
+      "description": "已应用的 Buddy Home command 记录和结果。",
+      "type": "json",
+      "value": [],
+      "color": "#059669",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "buddy_home_writer",
+        "nodeId": "apply_buddy_home_writeback",
+        "fieldKey": "applied_commands",
+        "managed": true
+      }
+    },
+    "skipped_writeback_commands": {
+      "name": "skipped_writeback_commands",
+      "description": "因无效或越过安全边界而被跳过的写回命令。",
+      "type": "json",
+      "value": [],
+      "color": "#dc2626",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "buddy_home_writer",
+        "nodeId": "apply_buddy_home_writeback",
+        "fieldKey": "skipped_commands",
+        "managed": true
+      }
+    },
+    "writeback_revisions": {
+      "name": "writeback_revisions",
+      "description": "本次自主复盘写回产生的 Buddy Home revision 列表。",
+      "type": "json",
+      "value": [],
+      "color": "#0d9488",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "buddy_home_writer",
+        "nodeId": "apply_buddy_home_writeback",
+        "fieldKey": "revisions",
+        "managed": true
+      }
+    }
+  },
+  "nodes": {
+    "input_source_run_id": {
+      "kind": "input",
+      "name": "源运行 ID",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 60,
+          "y": 60
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "source_run_id",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
+    },
+    "input_user_message": {
+      "kind": "input",
+      "name": "用户消息",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 60,
+          "y": 175
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "user_message",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
+    },
+    "input_conversation_history": {
+      "kind": "input",
+      "name": "对话历史",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 60,
+          "y": 290
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "conversation_history",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "markdown"
+      }
+    },
+    "input_page_context": {
+      "kind": "input",
+      "name": "页面上下文",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 60,
+          "y": 405
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "page_context",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "markdown"
+      }
+    },
+    "input_buddy_mode": {
+      "kind": "input",
+      "name": "伙伴模式",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 60,
+          "y": 520
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "buddy_mode",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "ask_first",
+        "boundaryType": "text"
+      }
+    },
+    "input_buddy_context": {
+      "kind": "input",
+      "name": "Buddy Home Files",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 60,
+          "y": 635
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "buddy_context",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": {
+          "kind": "local_folder",
+          "root": "buddy_home",
+          "selected": [
+            "AGENTS.md",
+            "SOUL.md",
+            "USER.md",
+            "MEMORY.md",
+            "policy.json"
+          ]
+        },
+        "boundaryType": "file"
+      }
+    },
+    "input_request_understanding": {
+      "kind": "input",
+      "name": "请求理解",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 60,
+          "y": 750
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "request_understanding",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": {},
+        "boundaryType": "json"
+      }
+    },
+    "input_capability_result": {
+      "kind": "input",
+      "name": "能力结果",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 60,
+          "y": 865
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "capability_result",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": {},
+        "boundaryType": "result_package"
+      }
+    },
+    "input_capability_review": {
+      "kind": "input",
+      "name": "能力复盘",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 60,
+          "y": 980
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "capability_review",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": {},
+        "boundaryType": "json"
+      }
+    },
+    "input_final_reply": {
+      "kind": "input",
+      "name": "最终回复",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 60,
+          "y": 1095
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "final_reply",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "markdown"
+      }
+    },
+    "decide_autonomous_review": {
+      "kind": "agent",
+      "name": "判断自主复盘",
+      "description": "复盘已完成的可见 Buddy 运行，自主决定是否把稳定信息写回 Buddy Home。",
+      "ui": {
+        "position": {
+          "x": 620,
+          "y": 420
+        },
+        "collapsed": false,
+        "size": {
+          "width": 460,
+          "height": 320
+        }
+      },
+      "reads": [
+        {
+          "state": "source_run_id",
+          "required": false
+        },
+        {
+          "state": "user_message",
+          "required": true
+        },
+        {
+          "state": "conversation_history",
+          "required": false
+        },
+        {
+          "state": "page_context",
+          "required": false
+        },
+        {
+          "state": "buddy_mode",
+          "required": false
+        },
+        {
+          "state": "buddy_context",
+          "required": true
+        },
+        {
+          "state": "request_understanding",
+          "required": true
+        },
+        {
+          "state": "capability_result",
+          "required": false
+        },
+        {
+          "state": "capability_review",
+          "required": false
+        },
+        {
+          "state": "final_reply",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "autonomous_review",
+          "mode": "replace"
+        },
+        {
+          "state": "writeback_commands",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "你在可见回复完成后进行后台自主复盘。不要向用户请求确认是否写 Buddy Home；是否写入由你判断。只沉淀稳定、可复用、低风险的信息，例如用户长期偏好、明确资料修正、会话摘要、伙伴表达风格小幅调整。不要沉淀临时路径、一次性错误、完整日志、可从当前图重读的信息、敏感内容或权限升级。\n\n必须输出两个 state：\n1. autonomous_review：JSON 对象，包含 should_write(boolean)、reason(string)、evidence(array)、targets(array)、risk_flags(array)、skipped_reason(string)、source_run_id(string)。should_write 只有在 writeback_commands 非空且均为低风险命令时才为 true。\n2. writeback_commands：JSON 数组。无写回时必须是 []。允许 action 仅限 memory.create、memory.update、memory.delete、session_summary.update、profile.update、policy.update。每个命令包含 action、payload、可选 target_id、change_reason。policy.update 只能用于非权限类偏好，不得包含 graph_permission_mode 或 behavior_boundaries。不要输出 revision.restore、graph_patch.draft、文件写入、脚本执行或网络动作。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "low",
+        "temperature": 0.1
+      }
+    },
+    "should_write_buddy_home": {
+      "kind": "condition",
+      "name": "需要写回?",
+      "description": "只有自主复盘明确需要低风险写回时才执行 Buddy Home Writer；否则只输出复盘审计。",
+      "ui": {
+        "position": {
+          "x": 1160,
+          "y": 440
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 250
+        }
+      },
+      "reads": [
+        {
+          "state": "autonomous_review",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
+        "loopLimit": 1,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.autonomous_review.should_write",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "apply_buddy_home_writeback": {
+      "kind": "agent",
+      "name": "受控写回 Buddy Home",
+      "description": "把自主复盘生成的安全命令交给 Buddy Home Writer，通过 command 和 revision 路径写入。",
+      "ui": {
+        "position": {
+          "x": 1700,
+          "y": 360
+        },
+        "collapsed": false,
+        "size": {
+          "width": 460,
+          "height": 320
+        }
+      },
+      "reads": [
+        {
+          "state": "source_run_id",
+          "required": false
+        },
+        {
+          "state": "autonomous_review",
+          "required": true
+        },
+        {
+          "state": "writeback_commands",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "writeback_success",
+          "mode": "replace"
+        },
+        {
+          "state": "writeback_result",
+          "mode": "replace"
+        },
+        {
+          "state": "applied_writeback_commands",
+          "mode": "replace"
+        },
+        {
+          "state": "skipped_writeback_commands",
+          "mode": "replace"
+        },
+        {
+          "state": "writeback_revisions",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "buddy_home_writer",
+        "skillBindings": [
+          {
+            "skillKey": "buddy_home_writer",
+            "outputMapping": {
+              "success": "writeback_success",
+              "result": "writeback_result",
+              "applied_commands": "applied_writeback_commands",
+              "skipped_commands": "skipped_writeback_commands",
+              "revisions": "writeback_revisions"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {
+          "buddy_home_writer": {
+            "skillKey": "buddy_home_writer",
+            "title": "Buddy Home Writer instruction",
+            "content": "你已绑定 Buddy Home Writer。把 writeback_commands 原样作为 commands 输入，把 source_run_id 作为 run_id 输入。不要增加新命令，不要改写为通用文件写入，不要请求用户确认。技能会执行受控 command/revision 写回并返回原始结果。",
+            "source": "node.override"
+          }
+        },
+        "taskInstruction": "本节点只负责调用 Buddy Home Writer。commands 必须来自上游 writeback_commands；run_id 必须来自 source_run_id。不要总结、扩展、重写或伪造写回结果。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "low",
+        "temperature": 0
+      }
+    },
+    "output_autonomous_review": {
+      "kind": "output",
+      "name": "自主复盘结果",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 2240,
+          "y": 210
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "autonomous_review",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_writeback_result": {
+      "kind": "output",
+      "name": "写回摘要",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 2240,
+          "y": 400
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "writeback_result",
+          "required": false
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_writeback_revisions": {
+      "kind": "output",
+      "name": "写回版本",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 2240,
+          "y": 590
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "writeback_revisions",
+          "required": false
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    }
+  },
+  "edges": [
+    {
+      "source": "input_source_run_id",
+      "target": "decide_autonomous_review"
+    },
+    {
+      "source": "input_user_message",
+      "target": "decide_autonomous_review"
+    },
+    {
+      "source": "input_conversation_history",
+      "target": "decide_autonomous_review"
+    },
+    {
+      "source": "input_page_context",
+      "target": "decide_autonomous_review"
+    },
+    {
+      "source": "input_buddy_mode",
+      "target": "decide_autonomous_review"
+    },
+    {
+      "source": "input_buddy_context",
+      "target": "decide_autonomous_review"
+    },
+    {
+      "source": "input_request_understanding",
+      "target": "decide_autonomous_review"
+    },
+    {
+      "source": "input_capability_result",
+      "target": "decide_autonomous_review"
+    },
+    {
+      "source": "input_capability_review",
+      "target": "decide_autonomous_review"
+    },
+    {
+      "source": "input_final_reply",
+      "target": "decide_autonomous_review"
+    },
+    {
+      "source": "decide_autonomous_review",
+      "target": "should_write_buddy_home"
+    },
+    {
+      "source": "apply_buddy_home_writeback",
+      "target": "output_autonomous_review"
+    },
+    {
+      "source": "apply_buddy_home_writeback",
+      "target": "output_writeback_result"
+    },
+    {
+      "source": "apply_buddy_home_writeback",
+      "target": "output_writeback_revisions"
+    }
+  ],
+  "conditional_edges": [
+    {
+      "source": "should_write_buddy_home",
+      "branches": {
+        "true": "apply_buddy_home_writeback",
+        "false": "output_autonomous_review",
+        "exhausted": "output_autonomous_review"
+      }
+    }
+  ],
+  "metadata": {
+    "graphProtocol": "node_system",
+    "origin": "buddy",
+    "role": "buddy_autonomous_review",
+    "englishName": "Autonomous Review",
+    "internal": true,
+    "templateVersion": "2026-05-12",
+    "permissions": [
+      "buddy_home_write"
+    ],
+    "tags": [
+      "buddy",
+      "autonomous-review",
+      "background",
+      "writeback"
+    ]
+  }
+}

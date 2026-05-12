@@ -32,6 +32,7 @@ class BuddyCommandPayload(BaseModel):
     action: str = Field(min_length=1)
     payload: dict[str, Any] = Field(default_factory=dict)
     target_id: str | None = None
+    run_id: str | None = None
     change_reason: str = "User requested a buddy command."
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)

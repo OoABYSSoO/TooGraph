@@ -371,15 +371,15 @@ test("BuddyWidget leaves buddy self config loading and memory curation to the ch
   assert.doesNotMatch(componentSource, /function formatMemoriesForPrompt/);
 });
 
-test("BuddyWidget starts self-review as a separate background run after the visible reply", () => {
+test("BuddyWidget starts autonomous review as a separate background run after the visible reply", () => {
   assert.match(componentSource, /BUDDY_REVIEW_TEMPLATE_ID/);
   assert.match(componentSource, /buildBuddyReviewGraph/);
-  assert.match(componentSource, /void startBuddySelfReviewRun\(runDetail\);/);
-  assert.match(componentSource, /async function startBuddySelfReviewRun\(mainRun: RunDetail\)/);
+  assert.match(componentSource, /void startBuddyAutonomousReviewRun\(runDetail\);/);
+  assert.match(componentSource, /async function startBuddyAutonomousReviewRun\(mainRun: RunDetail\)/);
   assert.match(componentSource, /fetchTemplate\(BUDDY_REVIEW_TEMPLATE_ID\)/);
   assert.match(componentSource, /const graph = buildBuddyReviewGraph\(template,\s*\{[\s\S]*mainRun,[\s\S]*buddyModel: buddyModelRef\.value,[\s\S]*\}\);/);
   assert.match(componentSource, /const reviewRun = await runGraph\(graph\);/);
-  assert.match(componentSource, /void pollBuddySelfReviewRun\(reviewRun\.run_id\);/);
+  assert.match(componentSource, /void pollBuddyAutonomousReviewRun\(reviewRun\.run_id\);/);
   assert.match(componentSource, /const backgroundReviewAbortControllers = new Set<AbortController>\(\);/);
   assert.match(componentSource, /abortBackgroundReviewRuns\(\);/);
   assert.doesNotMatch(componentSource, /activeRunId\.value = reviewRun\.run_id/);
@@ -394,7 +394,7 @@ test("BuddyWidget treats awaiting-human graph runs as resumable pause cards", ()
   assert.match(componentSource, /resumePausedBuddyRun/);
   assert.match(componentSource, /runDetail\.status === "awaiting_human"/);
   assert.match(componentSource, /shouldHoldBuddyQueueDrain\(\{ hasPausedRun: Boolean\(pausedBuddyRun\.value\) \}\)/);
-  assert.doesNotMatch(componentSource, /void startBuddySelfReviewRun\(runDetail\);[\s\S]*runDetail\.status === "awaiting_human"/);
+  assert.doesNotMatch(componentSource, /void startBuddyAutonomousReviewRun\(runDetail\);[\s\S]*runDetail\.status === "awaiting_human"/);
 });
 
 test("BuddyWidget can cancel a paused run from the pause card", () => {

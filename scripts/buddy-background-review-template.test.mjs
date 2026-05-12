@@ -10,27 +10,50 @@ function readTemplate(templateId) {
   return JSON.parse(readFileSync(resolve(officialTemplateRoot, templateId, "template.json"), "utf8"));
 }
 
-test("buddy visible chat template does not run self-review in the foreground path", () => {
+test("buddy visible chat template does not run autonomous review in the foreground path", () => {
   const template = readTemplate("buddy_autonomous_loop");
 
   assert.equal(template.nodes.review_buddy_memory, undefined);
+  assert.equal(template.nodes.apply_buddy_home_writeback, undefined);
   assert.equal(
     template.edges.some((edge) => edge.target === "review_buddy_memory" || edge.source === "review_buddy_memory"),
     false,
   );
+  assert.equal(
+    template.edges.some(
+      (edge) => edge.target === "apply_buddy_home_writeback" || edge.source === "apply_buddy_home_writeback",
+    ),
+    false,
+  );
 });
 
-test("buddy self-review is an internal background template", () => {
-  const template = readTemplate("buddy_self_review");
+test("buddy autonomous review is an internal background template with controlled writeback", () => {
+  const template = readTemplate("buddy_autonomous_review");
 
-  assert.equal(template.template_id, "buddy_self_review");
+  assert.equal(template.template_id, "buddy_autonomous_review");
+  assert.equal(template.label, "自主复盘");
   assert.equal(template.metadata?.internal, true);
-  assert.equal(template.nodes.review_buddy_memory.kind, "subgraph");
-  assert.equal(template.nodes.review_buddy_memory.writes.some((binding) => binding.state === "memory_update_plan"), true);
-  assert.equal(template.nodes.review_buddy_memory.writes.some((binding) => binding.state === "buddy_evolution_plan"), true);
+  assert.equal(template.nodes.review_buddy_memory, undefined);
+  assert.equal(template.nodes.decide_autonomous_review.kind, "agent");
+  assert.equal(template.nodes.should_write_buddy_home.kind, "condition");
+  assert.equal(template.nodes.apply_buddy_home_writeback.kind, "agent");
+  assert.equal(template.nodes.apply_buddy_home_writeback.config.skillKey, "buddy_home_writer");
+  assert.equal(
+    template.nodes.apply_buddy_home_writeback.writes.some((binding) => binding.state === "writeback_result"),
+    true,
+  );
+  assert.equal(
+    template.conditional_edges.some(
+      (edge) =>
+        edge.source === "should_write_buddy_home" &&
+        edge.branches.true === "apply_buddy_home_writeback" &&
+        edge.branches.false === "output_autonomous_review",
+    ),
+    true,
+  );
 });
 
-test("buddy self-review stays out of visible template and capability catalogs", () => {
+test("buddy autonomous review stays out of visible template and capability catalogs", () => {
   const templateList = runPython(
     [
       "import json",
@@ -41,6 +64,7 @@ test("buddy self-review stays out of visible template and capability catalogs", 
   );
   assert.equal(templateList.includes("buddy_autonomous_loop"), true);
   assert.equal(templateList.includes("buddy_self_review"), false);
+  assert.equal(templateList.includes("buddy_autonomous_review"), false);
 
   const capabilityList = runPython(
     [
@@ -53,6 +77,8 @@ test("buddy self-review stays out of visible template and capability catalogs", 
   );
   assert.equal(capabilityList.includes("buddy_autonomous_loop"), true);
   assert.equal(capabilityList.includes("buddy_self_review"), false);
+  assert.equal(capabilityList.includes("buddy_autonomous_review"), false);
+  assert.equal(capabilityList.includes("buddy_home_writer"), false);
 });
 
 function runPython(script, extraEnv = {}) {

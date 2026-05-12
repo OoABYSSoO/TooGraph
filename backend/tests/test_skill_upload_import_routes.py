@@ -175,6 +175,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                     sorted(catalog_items),
                     sorted(
                         [
+                            "buddy_home_writer",
                             "toograph_script_tester",
                             "toograph_skill_builder",
                             "toograph_capability_selector",

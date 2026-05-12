@@ -5,7 +5,7 @@ import { GLOBAL_RUNTIME_MODEL_OPTION_VALUE } from "../lib/runtimeModelCatalog.ts
 import { routeStreamingJsonStateText } from "../lib/streamingJsonStateRouter.ts";
 
 export const BUDDY_TEMPLATE_ID = "buddy_autonomous_loop";
-export const BUDDY_REVIEW_TEMPLATE_ID = "buddy_self_review";
+export const BUDDY_REVIEW_TEMPLATE_ID = "buddy_autonomous_review";
 export const BUDDY_USER_MESSAGE_STATE_KEY = "state_1";
 export const BUDDY_HISTORY_STATE_KEY = "state_2";
 export const BUDDY_PAGE_CONTEXT_STATE_KEY = "state_3";
@@ -157,6 +157,7 @@ export function buildBuddyReviewGraph(template: TemplateRecord, input: BuildBudd
   applyBuddyModelOverride(graph, input.buddyModel);
 
   const stateValues: Record<string, unknown> = {
+    source_run_id: input.mainRun.run_id,
     user_message: resolveRunStateValueByName(input.mainRun, "user_message", ""),
     conversation_history: resolveRunStateValueByName(input.mainRun, "conversation_history", ""),
     page_context: resolveRunStateValueByName(input.mainRun, "page_context", ""),
@@ -166,8 +167,13 @@ export function buildBuddyReviewGraph(template: TemplateRecord, input: BuildBudd
     capability_result: resolveRunStateValueByName(input.mainRun, "capability_result", {}),
     capability_review: resolveRunStateValueByName(input.mainRun, "capability_review", {}),
     final_reply: resolveRunStateValueByName(input.mainRun, "final_reply", resolveBuddyReplyText(input.mainRun)),
-    memory_update_plan: {},
-    buddy_evolution_plan: {},
+    autonomous_review: {},
+    writeback_commands: [],
+    writeback_success: false,
+    writeback_result: "",
+    applied_writeback_commands: [],
+    skipped_writeback_commands: [],
+    writeback_revisions: [],
   };
 
   for (const [stateName, value] of Object.entries(stateValues)) {
@@ -595,8 +601,9 @@ const BUDDY_ACTIVITY_PHASE_BY_NODE_ID: Record<string, string> = {
   finalize_capability_cycle: "reviewingCapability",
   draft_final_response: "draftingReply",
   draft_final_reply: "draftingReply",
-  review_buddy_memory: "reviewingMemory",
-  decide_memory_update: "reviewingMemory",
+  decide_autonomous_review: "reviewingMemory",
+  should_write_buddy_home: "reviewingMemory",
+  apply_buddy_home_writeback: "reviewingMemory",
 };
 
 function buildBuddyActivityParams(labels: { node: string; stage: string }) {
