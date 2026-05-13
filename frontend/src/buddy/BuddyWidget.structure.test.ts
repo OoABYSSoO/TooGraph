@@ -335,6 +335,14 @@ test("BuddyWidget leaves buddy self config loading and memory curation to the ch
   assert.doesNotMatch(componentSource, /function formatMemoriesForPrompt/);
 });
 
+test("BuddyWidget starts visible runs from the saved template binding", () => {
+  assert.match(componentSource, /fetchBuddyRunTemplateBinding/);
+  assert.match(componentSource, /const binding = await fetchBuddyRunTemplateBinding\(\);/);
+  assert.match(componentSource, /fetchTemplate\(binding\.template_id\)/);
+  assert.match(componentSource, /buildBuddyChatGraph\([\s\S]*template,[\s\S]*binding,[\s\S]*\);/);
+  assert.doesNotMatch(componentSource, /fetchTemplate\(BUDDY_TEMPLATE_ID\)/);
+});
+
 test("BuddyWidget starts autonomous review as a separate background run after the visible reply", () => {
   assert.match(componentSource, /BUDDY_REVIEW_TEMPLATE_ID/);
   assert.match(componentSource, /buildBuddyReviewGraph/);
