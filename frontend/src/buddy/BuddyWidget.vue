@@ -323,6 +323,7 @@ import { resolveOutputPreviewContent } from "../editor/nodes/outputPreviewConten
 import { formatRunDuration } from "../lib/run-display-name.ts";
 import { buildRuntimeModelOptions } from "../lib/runtimeModelCatalog.ts";
 import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
+import { buildRunNodeTimingByNodeIdFromRun } from "../lib/runTelemetryProjection.ts";
 import { useBuddyContextStore } from "../stores/buddyContext.ts";
 import { useBuddyMascotDebugStore } from "../stores/buddyMascotDebug.ts";
 import type { BuddyChatMessageRecord, BuddyChatSession } from "../types/buddy.ts";
@@ -1244,7 +1245,7 @@ function handleBuddyRunAwaitingHuman(
 function finishBuddyVisibleRun(runDetail: RunDetail, assistantMessageId: string, sessionId: string, runId: string) {
   const graph = runDetail.graph_snapshot as unknown as GraphPayload;
   const publicOutputBindings = buildBuddyPublicOutputBindings(graph);
-  const outputState = buildPublicOutputRuntimeStateFromRunDetail(runDetail, publicOutputBindings);
+  const outputState = buildPublicOutputRuntimeStateFromRunDetail(runDetail, publicOutputBindings, graph);
   const publicOutputMessages = upsertPublicOutputMessages(assistantMessageId, runId, outputState);
   const includeReplyInContext = runDetail.status === "completed";
   const assistantMessage = messages.value.find((message) => message.id === assistantMessageId);
@@ -1818,16 +1819,24 @@ function renderPublicOutputContentForStorage(output: BuddyPublicOutputMessage) {
 function buildPublicOutputRuntimeStateFromRunDetail(
   runDetail: RunDetail,
   bindings: BuddyPublicOutputBinding[],
+  graph: GraphPayload,
 ): BuddyPublicOutputRuntimeState {
   const outputState = createBuddyPublicOutputRuntimeState();
   const seenOutputNodeIds = new Set<string>();
+  const outputTimingByNodeId = buildRunNodeTimingByNodeIdFromRun(
+    {
+      node_executions: runDetail.node_executions,
+      artifacts: { state_events: runDetail.artifacts?.state_events ?? [] },
+    },
+    graph,
+  );
   for (const preview of listRunDetailOutputPreviews(runDetail)) {
     const binding = findPublicOutputBindingForPreview(bindings, preview.node_id, preview.source_key);
     if (!binding || seenOutputNodeIds.has(binding.outputNodeId)) {
       continue;
     }
     seenOutputNodeIds.add(binding.outputNodeId);
-    const durationMs = resolvePublicOutputDurationFromRunDetail(runDetail, binding);
+    const timing = outputTimingByNodeId[binding.outputNodeId] ?? null;
     outputState.order.push(binding.outputNodeId);
     outputState.messagesByOutputNodeId[binding.outputNodeId] = {
       outputNodeId: binding.outputNodeId,
@@ -1838,8 +1847,8 @@ function buildPublicOutputRuntimeStateFromRunDetail(
       displayMode: binding.displayMode,
       kind: resolveBuddyPublicOutputMessageKind(binding),
       content: preview.value,
-      startedAtMs: null,
-      durationMs,
+      startedAtMs: timing?.startedAtEpochMs ?? null,
+      durationMs: timing?.durationMs ?? null,
       status: runDetail.status === "failed" ? "failed" : "completed",
     };
   }
@@ -1864,39 +1873,8 @@ function findPublicOutputBindingForPreview(
   );
 }
 
-function resolvePublicOutputDurationFromRunDetail(runDetail: RunDetail, binding: BuddyPublicOutputBinding) {
-  const stateEvent = runDetail.artifacts?.state_events?.find((event) => event.state_key === binding.stateKey);
-  const stateUpdatedAt = parseTimeMs(stateEvent?.created_at);
-  const upstreamExecutions = (runDetail.node_executions ?? []).filter((execution) =>
-    binding.upstreamNodeIds.includes(execution.node_id),
-  );
-  const upstreamStartedAt = firstFiniteNumber(upstreamExecutions.map((execution) => parseTimeMs(execution.started_at)));
-  if (stateUpdatedAt !== null && upstreamStartedAt !== null) {
-    return Math.max(0, Math.round(stateUpdatedAt - upstreamStartedAt));
-  }
-  const upstreamDuration = firstFiniteNumber(upstreamExecutions.map((execution) => execution.duration_ms));
-  return upstreamDuration === null ? null : Math.max(0, Math.round(upstreamDuration));
-}
-
-function parseTimeMs(value: string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-  const time = Date.parse(value);
-  return Number.isFinite(time) ? time : null;
-}
-
-function firstFiniteNumber(values: Array<number | null | undefined>) {
-  for (const value of values) {
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return value;
-    }
-  }
-  return null;
-}
-
 function nowPublicOutputMs() {
-  return typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
+  return Date.now();
 }
 
 function formatPublicOutputDuration(durationMs: number | null | undefined) {

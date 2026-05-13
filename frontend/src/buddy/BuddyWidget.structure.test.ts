@@ -273,7 +273,7 @@ test("BuddyWidget records and displays public output durations", () => {
   assert.match(componentSource, /formatPublicOutputDuration/);
   assert.match(componentSource, /message\.publicOutput\.durationMs/);
   assert.match(componentSource, /class="buddy-widget__public-output-duration"/);
-  assert.match(componentSource, /resolvePublicOutputDurationFromRunDetail/);
+  assert.match(componentSource, /buildRunNodeTimingByNodeIdFromRun/);
   assert.doesNotMatch(componentSource, /runTraceStartedAtByKey/);
 });
 
