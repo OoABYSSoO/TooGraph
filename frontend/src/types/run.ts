@@ -136,6 +136,16 @@ export type StateEvent = {
   created_at: string;
 };
 
+export type StateStreamEvent = {
+  node_id?: string | null;
+  state_key: string;
+  status?: string | null;
+  source?: string | null;
+  chunk_count?: number | null;
+  sequence?: number | null;
+  created_at: string;
+};
+
 export type ActivityEvent = {
   sequence?: number | null;
   kind: string;
@@ -185,6 +195,7 @@ export type RunArtifacts = {
   node_outputs?: Record<string, Record<string, unknown>>;
   active_edge_ids?: string[];
   state_events?: StateEvent[];
+  state_stream_events?: StateStreamEvent[];
   state_values?: Record<string, unknown>;
   streaming_outputs?: Record<string, Record<string, unknown>>;
   cycle_iterations?: CycleIterationRecord[];

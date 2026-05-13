@@ -74,6 +74,7 @@ class RunState(TypedDict, total=False):
     state_values: dict[str, Any]
     state_last_writers: dict[str, dict[str, Any]]
     state_events: list[dict[str, Any]]
+    state_stream_events: list[dict[str, Any]]
     started_at: str
     completed_at: str | None
     duration_ms: int | None
@@ -208,6 +209,7 @@ def create_initial_run_state(graph_id: str, graph_name: str, max_revision_round:
         state_values={},
         state_last_writers={},
         state_events=[],
+        state_stream_events=[],
         run_snapshots=[],
         cycle_summary={},
         cycle_iterations=[],

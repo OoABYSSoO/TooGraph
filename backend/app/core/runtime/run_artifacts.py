@@ -40,6 +40,7 @@ def refresh_run_artifacts(
     ]
     state_values = dict(state.get("state_values", {}))
     state_events = list(state.get("state_events", []))
+    state_stream_events = list(state.get("state_stream_events", []))
     activity_events = list(state.get("activity_events", []))
     state_last_writers = dict(state.get("state_last_writers", {}))
     state["artifacts"] = {
@@ -52,6 +53,7 @@ def refresh_run_artifacts(
         "node_outputs": node_outputs,
         "active_edge_ids": sorted(active_edge_ids),
         "state_events": state_events,
+        "state_stream_events": state_stream_events,
         "state_values": state_values,
         "streaming_outputs": dict(state.get("streaming_outputs", {})),
         "cycle_iterations": list(state.get("cycle_iterations", [])),

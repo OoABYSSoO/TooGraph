@@ -234,3 +234,51 @@ test("buildRunNodeTimingByNodeIdFromRun derives output timing from writer state 
   assert.equal(timings.output.startedAtEpochMs, Date.parse("2026-05-13T10:00:00.000Z"));
   assert.equal(timings.output.durationMs, 2250);
 });
+
+test("buildRunNodeTimingByNodeIdFromRun prefers persisted state stream completion events for output timing", () => {
+  const timings = buildRunNodeTimingByNodeIdFromRun(
+    {
+      node_executions: [
+        {
+          node_id: "agent",
+          status: "success",
+          started_at: "2026-05-13T10:00:00.000Z",
+          finished_at: "2026-05-13T10:00:08.500Z",
+          duration_ms: 8500,
+        },
+      ],
+      artifacts: {
+        state_stream_events: [
+          {
+            node_id: "agent",
+            state_key: "state_ja",
+            status: "completed",
+            created_at: "2026-05-13T10:00:07.500Z",
+          },
+          {
+            node_id: "agent",
+            state_key: "state_en",
+            status: "completed",
+            created_at: "2026-05-13T10:00:07.700Z",
+          },
+        ],
+        state_events: [
+          {
+            node_id: "agent",
+            state_key: "state_ja",
+            created_at: "2026-05-13T10:00:08.500Z",
+          },
+          {
+            node_id: "agent",
+            state_key: "state_en",
+            created_at: "2026-05-13T10:00:08.500Z",
+          },
+        ],
+      },
+    },
+    multiOutputGraphDocument(),
+  );
+
+  assert.equal(timings.output_ja.durationMs, 7500);
+  assert.equal(timings.output_en.durationMs, 7700);
+});

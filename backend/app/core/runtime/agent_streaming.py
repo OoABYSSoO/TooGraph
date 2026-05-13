@@ -5,6 +5,7 @@ from typing import Any
 
 from app.core.runtime.run_events import publish_run_event
 from app.core.runtime.state import utc_now_iso
+from app.core.runtime.streaming_json_state_router import route_streaming_json_state_text
 
 
 def build_agent_stream_delta_callback(
@@ -29,6 +30,13 @@ def build_agent_stream_delta_callback(
         chunk_count += 1
         text_parts.append(chunk_text)
         full_text = "".join(text_parts)
+        updated_at = utc_now_iso()
+        existing_record = state.setdefault("streaming_outputs", {}).get(node_name)
+        completed_state_keys = set(
+            existing_record.get("completed_state_keys", [])
+            if isinstance(existing_record, dict) and isinstance(existing_record.get("completed_state_keys"), list)
+            else []
+        )
         stream_record = {
             "node_id": node_name,
             "output_keys": list(output_keys),
@@ -36,7 +44,8 @@ def build_agent_stream_delta_callback(
             "text": full_text,
             "chunk_count": chunk_count,
             "completed": False,
-            "updated_at": utc_now_iso(),
+            "completed_state_keys": sorted(completed_state_keys),
+            "updated_at": updated_at,
         }
         state.setdefault("streaming_outputs", {})[node_name] = stream_record
         publish_run_event(
@@ -48,6 +57,18 @@ def build_agent_stream_delta_callback(
                 "chunk_index": chunk_count,
             },
         )
+        _record_completed_stream_state_events(
+            state=state,
+            run_id=run_id,
+            node_name=node_name,
+            text=full_text,
+            output_keys=list(output_keys),
+            stream_state_keys=list(stream_state_keys or output_keys),
+            completed_state_keys=completed_state_keys,
+            chunk_count=chunk_count,
+            created_at=updated_at,
+        )
+        stream_record["completed_state_keys"] = sorted(completed_state_keys)
 
     return _on_delta
 
@@ -84,3 +105,47 @@ def finalize_agent_stream_delta(
                 "updated_at": utc_now_iso(),
             },
         )
+
+
+def _record_completed_stream_state_events(
+    *,
+    state: dict[str, Any],
+    run_id: str,
+    node_name: str,
+    text: str,
+    output_keys: list[str],
+    stream_state_keys: list[str],
+    completed_state_keys: set[str],
+    chunk_count: int,
+    created_at: str,
+) -> None:
+    target_state_keys = [key for key in (stream_state_keys or output_keys) if key]
+    if not target_state_keys:
+        return
+    routed = route_streaming_json_state_text(text, target_state_keys)
+    state_stream_events = state.setdefault("state_stream_events", [])
+    for state_key, route in routed.items():
+        if not route.get("completed") or state_key in completed_state_keys:
+            continue
+        event = {
+            "node_id": node_name,
+            "state_key": state_key,
+            "status": "completed",
+            "source": "node.output.delta",
+            "chunk_count": chunk_count,
+            "sequence": _next_state_stream_event_sequence(state_stream_events),
+            "created_at": created_at,
+        }
+        state_stream_events.append(event)
+        completed_state_keys.add(state_key)
+        publish_run_event(run_id, "state.stream.completed", event)
+
+
+def _next_state_stream_event_sequence(events: list[dict[str, Any]]) -> int:
+    max_sequence = 0
+    for event in events:
+        try:
+            max_sequence = max(max_sequence, int(event.get("sequence", 0)))
+        except (TypeError, ValueError):
+            continue
+    return max_sequence + 1

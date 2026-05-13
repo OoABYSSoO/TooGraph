@@ -1,5 +1,5 @@
 import type { GraphDocument, GraphNode, GraphPayload } from "../types/node-system.ts";
-import type { NodeExecutionDetail, StateEvent } from "../types/run.ts";
+import type { NodeExecutionDetail, StateEvent, StateStreamEvent } from "../types/run.ts";
 import { routeStreamingJsonStateText } from "./streamingJsonStateRouter.ts";
 
 export type RunNodeTimingStatus = "running" | "success" | "failed" | "paused";
@@ -18,6 +18,7 @@ type RunTimingSource = {
   node_executions?: Array<Partial<NodeExecutionDetail>>;
   artifacts?: {
     state_events?: Array<Partial<StateEvent>>;
+    state_stream_events?: Array<Partial<StateStreamEvent>>;
   };
 };
 
@@ -117,6 +118,7 @@ export function buildRunNodeTimingByNodeIdFromRun(
     };
   }
   result = deriveOutputTimingsFromRunningExecutions(result, run, document);
+  result = deriveOutputTimingsFromStateStreamEvents(result, run, document);
   return deriveOutputTimingsFromRun(result, run, document);
 }
 
@@ -253,6 +255,48 @@ function deriveOutputTimingsFromRun(
       writerStartedAtEpochMs !== null && eventCreatedAtEpochMs !== null
         ? Math.max(0, Math.round(eventCreatedAtEpochMs - writerStartedAtEpochMs))
         : fallbackDurationMs;
+    for (const outputNodeId of listOutputNodeIdsForState(document, stateKey)) {
+      const existing = next[outputNodeId];
+      if (existing?.status === "success" && existing.durationMs !== null) {
+        continue;
+      }
+      next = {
+        ...next,
+        [outputNodeId]: {
+          status: "success",
+          startedAtEpochMs: writerStartedAtEpochMs,
+          durationMs,
+        },
+      };
+    }
+  }
+  return next;
+}
+
+function deriveOutputTimingsFromStateStreamEvents(
+  current: RunNodeTimingByNodeId,
+  run: RunTimingSource,
+  document?: TimingGraphDocument | null,
+) {
+  let next = current;
+  for (const event of run.artifacts?.state_stream_events ?? []) {
+    if (normalizeText(event.status) !== "completed") {
+      continue;
+    }
+    const stateKey = normalizeText(event.state_key);
+    if (!stateKey) {
+      continue;
+    }
+    const writerNodeId = normalizeText(event.node_id);
+    const eventCreatedAtEpochMs = parseIsoEpochMs(event.created_at);
+    const writerExecution = writerNodeId
+      ? findLastNodeExecution(run.node_executions ?? [], writerNodeId, eventCreatedAtEpochMs)
+      : null;
+    const writerStartedAtEpochMs = parseIsoEpochMs(writerExecution?.started_at);
+    const durationMs =
+      writerStartedAtEpochMs !== null && eventCreatedAtEpochMs !== null
+        ? Math.max(0, Math.round(eventCreatedAtEpochMs - writerStartedAtEpochMs))
+        : null;
     for (const outputNodeId of listOutputNodeIdsForState(document, stateKey)) {
       next = {
         ...next,
