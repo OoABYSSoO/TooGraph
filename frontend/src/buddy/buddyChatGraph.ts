@@ -5,7 +5,6 @@ import { GLOBAL_RUNTIME_MODEL_OPTION_VALUE } from "../lib/runtimeModelCatalog.ts
 import { routeStreamingJsonStateText } from "../lib/streamingJsonStateRouter.ts";
 import { buildBuddyHomeContextValue, validateBuddyRunTemplateBinding } from "./buddyTemplateBindingModel.ts";
 
-export const BUDDY_TEMPLATE_ID = "buddy_autonomous_loop";
 export const BUDDY_REVIEW_TEMPLATE_ID = "buddy_autonomous_review";
 export const BUDDY_REPLY_STATE_KEY = "state_4";
 export const BUDDY_PROFILE_STATE_KEY = "state_6";
@@ -149,7 +148,6 @@ export function buildBuddyReviewGraph(template: TemplateRecord, input: BuildBudd
     user_message: resolveRunStateValueByName(input.mainRun, "user_message", ""),
     conversation_history: resolveRunStateValueByName(input.mainRun, "conversation_history", ""),
     page_context: resolveRunStateValueByName(input.mainRun, "page_context", ""),
-    buddy_mode: resolveRunStateValueByName(input.mainRun, "buddy_mode", DEFAULT_BUDDY_MODE),
     buddy_context: resolveRunStateValueByName(input.mainRun, "buddy_context", ""),
     request_understanding: resolveRunStateValueByName(input.mainRun, "request_understanding", {}),
     capability_result: resolveRunStateValueByName(input.mainRun, "capability_result", {}),

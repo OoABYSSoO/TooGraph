@@ -30,7 +30,6 @@ function createTemplate(): TemplateRecord {
       state_2: { name: "conversation_history", description: "", type: "markdown", value: "", color: "#0f766e" },
       state_3: { name: "page_context", description: "", type: "markdown", value: "", color: "#2563eb" },
       state_4: { name: "buddy_reply", description: "", type: "markdown", value: "", color: "#d97706" },
-      state_5: { name: "buddy_mode", description: "", type: "text", value: "ask_first", color: "#7c3aed" },
       state_6: { name: "buddy_profile", description: "", type: "markdown", value: "", color: "#a855f7" },
       state_7: { name: "buddy_policy", description: "", type: "markdown", value: "", color: "#dc2626" },
       state_8: { name: "buddy_memory_context", description: "", type: "markdown", value: "", color: "#059669" },
@@ -62,15 +61,6 @@ function createTemplate(): TemplateRecord {
         ui: { position: { x: 80, y: 880 }, collapsed: false },
         reads: [],
         writes: [{ state: "state_3", mode: "replace" }],
-        config: { value: "" },
-      },
-      input_buddy_mode: {
-        kind: "input",
-        name: "input_buddy_mode",
-        description: "",
-        ui: { position: { x: 80, y: 1280 }, collapsed: false },
-        reads: [],
-        writes: [{ state: "state_5", mode: "replace" }],
         config: { value: "" },
       },
       input_buddy_profile: {
@@ -118,7 +108,6 @@ function createTemplate(): TemplateRecord {
           { state: "state_1", required: true },
           { state: "state_2", required: false },
           { state: "state_3", required: false },
-          { state: "state_5", required: true },
           { state: "state_6", required: false },
           { state: "state_7", required: false },
           { state: "state_8", required: false },
@@ -154,7 +143,6 @@ function createTemplate(): TemplateRecord {
       { source: "input_user_message", target: "buddy_reply_agent" },
       { source: "input_conversation_history", target: "buddy_reply_agent" },
       { source: "input_page_context", target: "buddy_reply_agent" },
-      { source: "input_buddy_mode", target: "buddy_reply_agent" },
       { source: "input_buddy_profile", target: "buddy_reply_agent" },
       { source: "input_buddy_policy", target: "buddy_reply_agent" },
       { source: "input_buddy_memory_context", target: "buddy_reply_agent" },
@@ -176,7 +164,6 @@ function createAgenticTemplate(): TemplateRecord {
       state_1: { name: "user_message", description: "", type: "text", value: "", color: "#9a3412" },
       state_2: { name: "conversation_history", description: "", type: "markdown", value: "", color: "#0f766e" },
       state_3: { name: "page_context", description: "", type: "markdown", value: "", color: "#2563eb" },
-      state_7: { name: "skill_catalog_snapshot", description: "", type: "json", value: [], color: "#1d4ed8" },
       state_16: { name: "approval_prompt", description: "", type: "markdown", value: "", color: "#ea580c" },
       state_25: { name: "direct_reply", description: "", type: "markdown", value: "", color: "#d97706" },
       state_26: { name: "denied_reply", description: "", type: "markdown", value: "", color: "#a16207" },
@@ -209,15 +196,6 @@ function createAgenticTemplate(): TemplateRecord {
         reads: [],
         writes: [{ state: "state_3", mode: "replace" }],
         config: { value: "" },
-      },
-      input_skill_catalog_snapshot: {
-        kind: "input",
-        name: "input_skill_catalog_snapshot",
-        description: "",
-        ui: { position: { x: 80, y: 1340 }, collapsed: false },
-        reads: [],
-        writes: [{ state: "state_7", mode: "replace" }],
-        config: { value: [] },
       },
       request_approval_agent: {
         kind: "agent",
@@ -578,7 +556,7 @@ test("buildBuddyReviewGraph hydrates an internal autonomous review run from the 
   assert.equal(graph.nodes.decide_autonomous_review.config.model, "openai/gpt-4.1");
 });
 
-test("buildBuddyChatGraph records ask-first mode without injecting permission or catalog state", () => {
+test("buildBuddyChatGraph records ask-first mode without injecting permission or catalog inputs", () => {
   const graph = buildBuddyChatGraph(createAgenticTemplate(), {
     userMessage: "帮我搜索最新资料",
     history: [],
@@ -586,9 +564,10 @@ test("buildBuddyChatGraph records ask-first mode without injecting permission or
     buddyMode: "ask_first",
   });
 
-  assert.deepEqual(graph.state_schema.state_7.value, []);
-  assertInputNode(graph.nodes.input_skill_catalog_snapshot);
-  assert.deepEqual(graph.nodes.input_skill_catalog_snapshot.config.value, []);
+  assert.equal(graph.state_schema.buddy_mode, undefined);
+  assert.equal(graph.state_schema.skill_catalog_snapshot, undefined);
+  assert.equal(graph.nodes.input_buddy_mode, undefined);
+  assert.equal(graph.nodes.input_skill_catalog_snapshot, undefined);
   assert.deepEqual(graph.metadata.interrupt_after, ["request_approval_agent"]);
   assert.equal(graph.metadata.buddy_mode, "ask_first");
   assert.equal(graph.metadata.buddy_requires_approval, true);
@@ -618,7 +597,6 @@ test("buildBuddyChatGraph injects only configured input-node bindings", () => {
   assert.equal(graph.state_schema.state_1.value, "帮我看当前页面");
   assert.equal(graph.state_schema.state_2.value, "伙伴: 我在。");
   assert.equal(graph.state_schema.state_3.value, "");
-  assert.equal(graph.state_schema.state_5.value, "ask_first");
   assert.equal(graph.state_schema[BUDDY_REPLY_STATE_KEY].value, "");
   assertInputNode(graph.nodes.input_user_message);
   assertInputNode(graph.nodes.input_conversation_history);

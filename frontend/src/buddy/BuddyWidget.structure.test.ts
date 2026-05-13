@@ -340,7 +340,7 @@ test("BuddyWidget starts visible runs from the saved template binding", () => {
   assert.match(componentSource, /const binding = await fetchBuddyRunTemplateBinding\(\);/);
   assert.match(componentSource, /fetchTemplate\(binding\.template_id\)/);
   assert.match(componentSource, /buildBuddyChatGraph\([\s\S]*template,[\s\S]*binding,[\s\S]*\);/);
-  assert.doesNotMatch(componentSource, /fetchTemplate\(BUDDY_TEMPLATE_ID\)/);
+  assert.doesNotMatch(componentSource, /fetchTemplate\("buddy_autonomous_loop"\)/);
 });
 
 test("BuddyWidget starts autonomous review as a separate background run after the visible reply", () => {

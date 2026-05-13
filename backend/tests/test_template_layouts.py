@@ -542,6 +542,14 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["writeback_commands"]["type"], "json")
         self.assertEqual(states["writeback_result"]["type"], "markdown")
         self.assertEqual(states["writeback_revisions"]["type"], "json")
+        self.assertNotIn("buddy_mode", states)
+        self.assertNotIn("input_buddy_mode", nodes)
+        for node in nodes.values():
+            for read in node.get("reads", []):
+                self.assertNotEqual(read.get("state"), "buddy_mode")
+        for edge in template["edges"]:
+            self.assertNotEqual(edge.get("source"), "input_buddy_mode")
+            self.assertNotEqual(edge.get("target"), "input_buddy_mode")
         self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "subgraph"], [])
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],

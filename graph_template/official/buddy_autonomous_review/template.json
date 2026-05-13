@@ -36,14 +36,6 @@
       "color": "#0891b2",
       "binding": null
     },
-    "buddy_mode": {
-      "name": "buddy_mode",
-      "description": "可见 Buddy 运行使用的权限模式。",
-      "type": "text",
-      "value": "ask_first",
-      "color": "#7c3aed",
-      "binding": null
-    },
     "buddy_context": {
       "name": "buddy_context",
       "description": "从 Buddy Home 文件夹中选择并注入的长期上下文文件。",
@@ -274,29 +266,6 @@
         "boundaryType": "markdown"
       }
     },
-    "input_buddy_mode": {
-      "kind": "input",
-      "name": "伙伴模式",
-      "description": "",
-      "ui": {
-        "position": {
-          "x": 60,
-          "y": 520
-        },
-        "collapsed": false
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "buddy_mode",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": "ask_first",
-        "boundaryType": "text"
-      }
-    },
     "input_buddy_context": {
       "kind": "input",
       "name": "Buddy Home Files",
@@ -452,10 +421,6 @@
         },
         {
           "state": "page_context",
-          "required": false
-        },
-        {
-          "state": "buddy_mode",
           "required": false
         },
         {
@@ -711,10 +676,6 @@
     },
     {
       "source": "input_page_context",
-      "target": "decide_autonomous_review"
-    },
-    {
-      "source": "input_buddy_mode",
       "target": "decide_autonomous_review"
     },
     {
