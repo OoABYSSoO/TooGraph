@@ -4,9 +4,12 @@ import assert from "node:assert/strict";
 import type { TemplateRecord } from "../types/node-system.ts";
 import {
   BUDDY_RUN_INPUT_SOURCE_OPTIONS,
+  buildBuddyRunInputNodeOptions,
+  buildBuddyRunTemplateSourceRows,
   buildBuddyHomeContextValue,
   buildBuddyRunTemplateInputRows,
   buildDefaultBuddyRunTemplateBinding,
+  setBuddyRunTemplateSourceBinding,
   validateBuddyRunTemplateBinding,
 } from "./buddyTemplateBindingModel.ts";
 
@@ -96,6 +99,69 @@ test("binding model validates current message and duplicate sources", () => {
   });
   assert.equal(duplicate.valid, false);
   assert.match(duplicate.issues.join("\n"), /exactly once/);
+});
+
+test("binding model exposes Buddy input rows with current message required", () => {
+  const rows = buildBuddyRunTemplateSourceRows({
+    template_id: "custom_loop",
+    input_bindings: {
+      input_prompt: "current_message",
+      input_history: "conversation_history",
+    },
+  });
+
+  assert.deepEqual(rows.map((row) => [row.source, row.required, row.selectedNodeId]), [
+    ["current_message", true, "input_prompt"],
+    ["conversation_history", false, "input_history"],
+    ["page_context", false, ""],
+    ["buddy_home_context", false, ""],
+  ]);
+});
+
+test("binding model builds input-node options and disables nodes already used by another Buddy input", () => {
+  const options = buildBuddyRunInputNodeOptions(
+    template(),
+    {
+      template_id: "custom_loop",
+      input_bindings: {
+        input_prompt: "current_message",
+        input_history: "conversation_history",
+      },
+    },
+    "page_context",
+  );
+
+  assert.deepEqual(options.map((option) => [option.value, option.label, option.disabled, option.disabledReason]), [
+    ["input_prompt", "Prompt / prompt (prompt)", true, "Already bound to current_message."],
+    ["input_history", "History / history (history)", true, "Already bound to conversation_history."],
+    ["input_invalid", "Invalid /  (input_invalid)", true, "Input node must write exactly one state."],
+  ]);
+});
+
+test("binding model updates source rows without duplicating source or input node selections", () => {
+  const initial = {
+    template_id: "custom_loop",
+    input_bindings: {
+      input_prompt: "current_message",
+      input_history: "conversation_history",
+    },
+  };
+
+  const moved = setBuddyRunTemplateSourceBinding(initial, "current_message", "input_history");
+  assert.deepEqual(moved.input_bindings, {
+    input_history: "current_message",
+  });
+
+  const optional = setBuddyRunTemplateSourceBinding(moved, "page_context", "input_prompt");
+  assert.deepEqual(optional.input_bindings, {
+    input_history: "current_message",
+    input_prompt: "page_context",
+  });
+
+  const cleared = setBuddyRunTemplateSourceBinding(optional, "page_context", "");
+  assert.deepEqual(cleared.input_bindings, {
+    input_history: "current_message",
+  });
 });
 
 test("binding model exposes source options and Buddy Home folder package", () => {

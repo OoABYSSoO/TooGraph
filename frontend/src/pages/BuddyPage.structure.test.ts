@@ -36,6 +36,23 @@ test("BuddyPage manages profile, policy, memories, summary, and revisions", () =
   assert.match(source, /validateBuddyRunTemplateBinding/);
 });
 
+test("BuddyPage opens template binding first and renders it as Buddy input rows", () => {
+  const bindingIndex = source.indexOf('name="binding"');
+  const profileIndex = source.indexOf('name="profile"');
+  assert.ok(bindingIndex > -1);
+  assert.ok(profileIndex > -1);
+  assert.ok(bindingIndex < profileIndex);
+  assert.match(source, /const activeTab = ref\("binding"\);/);
+  assert.match(source, /buildBuddyRunTemplateSourceRows/);
+  assert.match(source, /buildBuddyRunInputNodeOptions/);
+  assert.match(source, /setBuddyRunTemplateSourceBinding/);
+  assert.match(source, /<ElTable :data="bindingSourceRows"[\s\S]*buddy-page__binding-table/);
+  assert.match(source, /:model-value="row\.selectedNodeId"/);
+  assert.match(source, /@update:model-value="setBindingInputNode\(row\.source, \$event\)"/);
+  assert.doesNotMatch(source, /:model-value="bindingDraft\.input_bindings\[row\.nodeId\]/);
+  assert.doesNotMatch(source, /function setBindingSource\(nodeId: string, value: unknown\)/);
+});
+
 test("BuddyPage exposes the unified buddy permission mode", () => {
   assert.match(source, /<ElSegmented[\s\S]*v-model="policyDraft\.graph_permission_mode"[\s\S]*:options="permissionModeOptions"/);
   assert.match(source, /permissionModeOptions/);

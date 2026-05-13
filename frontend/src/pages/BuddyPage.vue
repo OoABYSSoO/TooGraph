@@ -30,6 +30,101 @@
 
       <div v-if="isLoading && !hasLoaded" class="buddy-page__empty">{{ t("buddyPage.loading") }}</div>
       <ElTabs v-else v-model="activeTab" class="buddy-page__tabs">
+        <ElTabPane :label="t('buddyPage.tabs.binding')" name="binding">
+          <article class="buddy-page__panel">
+            <div class="buddy-page__panel-heading">
+              <div>
+                <h3>{{ t("buddyPage.binding.title") }}</h3>
+                <p>{{ t("buddyPage.binding.body") }}</p>
+              </div>
+            </div>
+            <ElForm label-position="top" class="buddy-page__form buddy-page__form--wide">
+              <ElFormItem :label="t('buddyPage.binding.template')">
+                <ElSelect
+                  v-model="bindingDraft.template_id"
+                  :loading="isLoadingBindingTemplate"
+                  filterable
+                  @change="selectBindingTemplate"
+                >
+                  <ElOption
+                    v-for="option in bindingTemplateOptions"
+                    :key="option.value"
+                    :label="option.label"
+                    :value="option.value"
+                  />
+                </ElSelect>
+              </ElFormItem>
+              <ElAlert
+                v-if="!bindingValidation.valid"
+                type="warning"
+                show-icon
+                :closable="false"
+                :title="bindingValidation.issues.join(' ')"
+              />
+              <ElTable :data="bindingSourceRows" class="buddy-page__table buddy-page__binding-table" empty-text=" ">
+                <ElTableColumn :label="t('buddyPage.binding.buddyInput')" min-width="210">
+                  <template #default="{ row }">
+                    <div class="buddy-page__binding-source">
+                      <span class="buddy-page__binding-source-label">{{ t(row.labelKey) }}</span>
+                      <ElTag size="small" :type="row.required ? 'danger' : 'info'" effect="plain">
+                        {{ row.required ? t("buddyPage.binding.required") : t("buddyPage.binding.optional") }}
+                      </ElTag>
+                    </div>
+                  </template>
+                </ElTableColumn>
+                <ElTableColumn :label="t('buddyPage.binding.inputNode')" min-width="310">
+                  <template #default="{ row }">
+                    <ElSelect
+                      :model-value="row.selectedNodeId"
+                      :placeholder="t('buddyPage.binding.selectInputNode')"
+                      :clearable="!row.required"
+                      :disabled="!selectedBindingTemplate"
+                      filterable
+                      @update:model-value="setBindingInputNode(row.source, $event)"
+                    >
+                      <ElOption
+                        v-if="!row.required"
+                        :label="t('buddyPage.binding.sources.none')"
+                        value=""
+                      />
+                      <ElOption
+                        v-for="option in bindingInputNodeOptionsForSource(row.source)"
+                        :key="option.value"
+                        :label="option.label"
+                        :value="option.value"
+                        :disabled="option.disabled"
+                      />
+                    </ElSelect>
+                  </template>
+                </ElTableColumn>
+                <ElTableColumn :label="t('buddyPage.binding.selectedState')" min-width="260">
+                  <template #default="{ row }">
+                    <div v-if="selectedBindingInputRow(row.selectedNodeId)" class="buddy-page__binding-state">
+                      <span>{{ selectedBindingInputRow(row.selectedNodeId)?.stateName || t("common.state") }}</span>
+                      <small>{{ selectedBindingInputRow(row.selectedNodeId)?.stateKey }}</small>
+                    </div>
+                    <span v-else class="buddy-page__meta">{{ t("buddyPage.binding.noInputNode") }}</span>
+                  </template>
+                </ElTableColumn>
+              </ElTable>
+              <div class="buddy-page__actions">
+                <ElButton
+                  type="primary"
+                  :loading="isSavingBinding"
+                  :disabled="!bindingValidation.valid"
+                  @click="saveBinding"
+                >
+                  <ElIcon><Check /></ElIcon>
+                  <span>{{ t("buddyPage.binding.save") }}</span>
+                </ElButton>
+                <ElButton :disabled="isSavingBinding" @click="resetBindingToDefault">
+                  {{ t("buddyPage.binding.resetDefault") }}
+                </ElButton>
+              </div>
+            </ElForm>
+          </article>
+        </ElTabPane>
+
         <ElTabPane :label="t('buddyPage.tabs.profile')" name="profile">
           <article class="buddy-page__panel">
             <div class="buddy-page__panel-heading">
@@ -170,79 +265,6 @@
                 <ElButton type="primary" :loading="isSavingSummary" @click="saveSummary">
                   <ElIcon><Check /></ElIcon>
                   <span>{{ t("buddyPage.saveSummary") }}</span>
-                </ElButton>
-              </div>
-            </ElForm>
-          </article>
-        </ElTabPane>
-
-        <ElTabPane :label="t('buddyPage.tabs.binding')" name="binding">
-          <article class="buddy-page__panel">
-            <div class="buddy-page__panel-heading">
-              <div>
-                <h3>{{ t("buddyPage.binding.title") }}</h3>
-                <p>{{ t("buddyPage.binding.body") }}</p>
-              </div>
-            </div>
-            <ElForm label-position="top" class="buddy-page__form buddy-page__form--wide">
-              <ElFormItem :label="t('buddyPage.binding.template')">
-                <ElSelect
-                  v-model="bindingDraft.template_id"
-                  :loading="isLoadingBindingTemplate"
-                  filterable
-                  @change="selectBindingTemplate"
-                >
-                  <ElOption
-                    v-for="option in bindingTemplateOptions"
-                    :key="option.value"
-                    :label="option.label"
-                    :value="option.value"
-                  />
-                </ElSelect>
-              </ElFormItem>
-              <ElAlert
-                v-if="!bindingValidation.valid"
-                type="warning"
-                show-icon
-                :closable="false"
-                :title="bindingValidation.issues.join(' ')"
-              />
-              <ElTable :data="bindingInputRows" class="buddy-page__table buddy-page__binding-table" empty-text=" ">
-                <ElTableColumn prop="nodeName" :label="t('buddyPage.binding.inputNode')" min-width="150" />
-                <ElTableColumn prop="nodeId" :label="t('buddyPage.binding.nodeId')" min-width="190" show-overflow-tooltip />
-                <ElTableColumn prop="stateName" :label="t('buddyPage.binding.stateName')" min-width="150" />
-                <ElTableColumn prop="stateKey" :label="t('buddyPage.binding.stateKey')" min-width="160" show-overflow-tooltip />
-                <ElTableColumn prop="stateType" :label="t('buddyPage.binding.stateType')" width="110" />
-                <ElTableColumn :label="t('buddyPage.binding.source')" min-width="210" fixed="right">
-                  <template #default="{ row }">
-                    <ElSelect
-                      :model-value="bindingDraft.input_bindings[row.nodeId] || ''"
-                      :disabled="Boolean(row.disabledReason)"
-                      @update:model-value="(value) => setBindingSource(row.nodeId, value)"
-                    >
-                      <ElOption
-                        v-for="option in bindingSourceOptions"
-                        :key="option.value"
-                        :label="option.label"
-                        :value="option.value"
-                      />
-                    </ElSelect>
-                    <small v-if="row.disabledReason" class="buddy-page__binding-warning">{{ row.disabledReason }}</small>
-                  </template>
-                </ElTableColumn>
-              </ElTable>
-              <div class="buddy-page__actions">
-                <ElButton
-                  type="primary"
-                  :loading="isSavingBinding"
-                  :disabled="!bindingValidation.valid"
-                  @click="saveBinding"
-                >
-                  <ElIcon><Check /></ElIcon>
-                  <span>{{ t("buddyPage.binding.save") }}</span>
-                </ElButton>
-                <ElButton :disabled="isSavingBinding" @click="resetBindingToDefault">
-                  {{ t("buddyPage.binding.resetDefault") }}
                 </ElButton>
               </div>
             </ElForm>
@@ -468,9 +490,11 @@ import { fetchTemplate, fetchTemplates } from "@/api/graphs";
 import { cancelRun, fetchRun, fetchRuns, resumeRun } from "@/api/runs";
 import BuddyPauseCard from "@/buddy/BuddyPauseCard.vue";
 import {
-  BUDDY_RUN_INPUT_SOURCE_OPTIONS,
+  buildBuddyRunInputNodeOptions,
   buildBuddyRunTemplateInputRows,
+  buildBuddyRunTemplateSourceRows,
   buildDefaultBuddyRunTemplateBinding,
+  setBuddyRunTemplateSourceBinding,
   validateBuddyRunTemplateBinding,
 } from "@/buddy/buddyTemplateBindingModel";
 import AppShell from "@/layouts/AppShell.vue";
@@ -487,6 +511,7 @@ import type {
   BuddyRunTemplateBinding,
   BuddySessionSummary,
 } from "@/types/buddy";
+import type { BuddyRunTemplateInputRow } from "@/buddy/buddyTemplateBindingModel";
 import type { TemplateRecord } from "@/types/node-system";
 import type { RunDetail, RunSummary } from "@/types/run";
 
@@ -506,7 +531,7 @@ type LoadAllOptions = {
 const { t } = useI18n();
 const buddyContextStore = useBuddyContextStore();
 const buddyMascotDebugStore = useBuddyMascotDebugStore();
-const activeTab = ref("profile");
+const activeTab = ref("binding");
 const historyTargetFilter = ref<BuddyRevisionHistoryTargetFilter>("all");
 const hasLoaded = ref(false);
 const isLoading = ref(false);
@@ -557,17 +582,12 @@ const canSaveMemory = computed(() => {
 const orderedRevisionRows = computed(() => buildBuddyRevisionHistoryRows(revisions.value, commands.value));
 const filteredRevisionRows = computed(() => filterBuddyRevisionHistoryRows(orderedRevisionRows.value, historyTargetFilter.value));
 const bindingInputRows = computed(() => buildBuddyRunTemplateInputRows(selectedBindingTemplate.value));
+const bindingSourceRows = computed(() => buildBuddyRunTemplateSourceRows(bindingDraft.value));
 const bindingValidation = computed(() => validateBuddyRunTemplateBinding(selectedBindingTemplate.value, bindingDraft.value));
 const bindingTemplateOptions = computed(() =>
   availableTemplates.value.map((template) => ({
     label: `${template.label} (${template.template_id})`,
     value: template.template_id,
-  })),
-);
-const bindingSourceOptions = computed(() =>
-  BUDDY_RUN_INPUT_SOURCE_OPTIONS.map((option) => ({
-    label: t(option.labelKey),
-    value: option.value,
   })),
 );
 const historyTargetOptions = computed(() =>
@@ -671,6 +691,17 @@ function historyDiffKindLabel(kind: BuddyRevisionDiffChangeKind) {
     return t("buddyPage.history.diffKinds.removed");
   }
   return t("buddyPage.history.diffKinds.changed");
+}
+
+function bindingInputNodeOptionsForSource(source: BuddyRunInputSource) {
+  return buildBuddyRunInputNodeOptions(selectedBindingTemplate.value, bindingDraft.value, source);
+}
+
+function selectedBindingInputRow(nodeId: string): BuddyRunTemplateInputRow | null {
+  if (!nodeId) {
+    return null;
+  }
+  return bindingInputRows.value.find((row) => row.nodeId === nodeId) ?? null;
 }
 
 function setError(error: unknown, fallbackKey = "common.failedToLoad") {
@@ -985,18 +1016,8 @@ async function selectBindingTemplate(value: unknown) {
   await loadBindingTemplate(templateId);
 }
 
-function setBindingSource(nodeId: string, value: unknown) {
-  const source = value as BuddyRunInputSource | "";
-  const nextBindings = { ...bindingDraft.value.input_bindings };
-  if (source) {
-    nextBindings[nodeId] = source;
-  } else {
-    delete nextBindings[nodeId];
-  }
-  bindingDraft.value = {
-    ...bindingDraft.value,
-    input_bindings: nextBindings,
-  };
+function setBindingInputNode(source: BuddyRunInputSource, value: unknown) {
+  bindingDraft.value = setBuddyRunTemplateSourceBinding(bindingDraft.value, source, String(value || ""));
 }
 
 function resetBindingToDefault() {
@@ -1201,12 +1222,31 @@ onMounted(loadAll);
   margin-top: 12px;
 }
 
-.buddy-page__binding-warning {
-  display: block;
-  margin-top: 6px;
-  color: rgba(154, 52, 18, 0.72);
-  font-size: 0.76rem;
-  line-height: 1.35;
+.buddy-page__binding-source,
+.buddy-page__binding-state {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.buddy-page__binding-source {
+  grid-template-columns: minmax(0, auto) auto;
+  align-items: center;
+  justify-content: start;
+  column-gap: 8px;
+}
+
+.buddy-page__binding-source-label,
+.buddy-page__binding-state span {
+  min-width: 0;
+  color: #1f2937;
+  font-weight: 850;
+}
+
+.buddy-page__binding-state small {
+  color: rgba(60, 41, 20, 0.62);
+  font-size: 0.78rem;
+  font-weight: 750;
 }
 
 .buddy-page__history-toolbar {

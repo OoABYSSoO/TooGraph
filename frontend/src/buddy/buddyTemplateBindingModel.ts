@@ -23,6 +23,20 @@ export type BuddyRunTemplateInputRow = {
   disabledReason: string;
 };
 
+export type BuddyRunTemplateSourceRow = {
+  source: BuddyRunInputSource;
+  labelKey: string;
+  required: boolean;
+  selectedNodeId: string;
+};
+
+export type BuddyRunInputNodeOption = {
+  value: string;
+  label: string;
+  disabled: boolean;
+  disabledReason: string;
+};
+
 export const BUDDY_RUN_INPUT_SOURCE_OPTIONS: BuddyRunInputSourceOption[] = [
   { value: "", labelKey: "buddyPage.binding.sources.none" },
   { value: "current_message", labelKey: "buddyPage.binding.sources.currentMessage" },
@@ -41,6 +55,66 @@ export function buildDefaultBuddyRunTemplateBinding(): BuddyRunTemplateBinding {
       input_page_context: "page_context",
       input_buddy_context: "buddy_home_context",
     },
+  };
+}
+
+export function buildBuddyRunTemplateSourceRows(binding: Pick<BuddyRunTemplateBinding, "input_bindings">): BuddyRunTemplateSourceRow[] {
+  return BUDDY_RUN_INPUT_SOURCE_OPTIONS
+    .filter((option): option is { value: BuddyRunInputSource; labelKey: string } => isBuddyRunInputSource(option.value))
+    .map((option) => ({
+      source: option.value,
+      labelKey: option.labelKey,
+      required: option.value === "current_message",
+      selectedNodeId: findBoundInputNodeIdForSource(binding, option.value),
+    }));
+}
+
+export function buildBuddyRunInputNodeOptions(
+  template: TemplateRecord | null | undefined,
+  binding: Pick<BuddyRunTemplateBinding, "input_bindings">,
+  source: BuddyRunInputSource,
+): BuddyRunInputNodeOption[] {
+  const selectedByOtherSources = new Map(
+    Object.entries(binding.input_bindings ?? {})
+      .filter((entry): entry is [string, BuddyRunInputSource] => isBuddyRunInputSource(entry[1]) && entry[1] !== source)
+      .map(([nodeId, selectedSource]) => [nodeId, selectedSource]),
+  );
+
+  return buildBuddyRunTemplateInputRows(template).map((row) => {
+    const selectedSource = selectedByOtherSources.get(row.nodeId);
+    const disabledReason = row.disabledReason || (selectedSource ? `Already bound to ${selectedSource}.` : "");
+    return {
+      value: row.nodeId,
+      label: formatInputNodeOptionLabel(row),
+      disabled: Boolean(disabledReason),
+      disabledReason,
+    };
+  });
+}
+
+export function setBuddyRunTemplateSourceBinding(
+  binding: BuddyRunTemplateBinding | Omit<BuddyRunTemplateBinding, "version">,
+  source: BuddyRunInputSource,
+  nodeId: string,
+): BuddyRunTemplateBinding {
+  const normalizedNodeId = String(nodeId || "").trim();
+  const nextBindings = Object.fromEntries(
+    Object.entries(binding.input_bindings ?? {}).filter(([boundNodeId, boundSource]) => {
+      if (boundSource === source) {
+        return false;
+      }
+      return normalizedNodeId ? boundNodeId !== normalizedNodeId : true;
+    }),
+  ) as Record<string, BuddyRunInputSource>;
+
+  if (normalizedNodeId) {
+    nextBindings[normalizedNodeId] = source;
+  }
+
+  return {
+    ...binding,
+    version: "version" in binding ? binding.version : 1,
+    input_bindings: nextBindings,
   };
 }
 
@@ -117,6 +191,14 @@ export function isBuddyRunInputSource(value: unknown): value is BuddyRunInputSou
     || value === "conversation_history"
     || value === "page_context"
     || value === "buddy_home_context";
+}
+
+function findBoundInputNodeIdForSource(binding: Pick<BuddyRunTemplateBinding, "input_bindings">, source: BuddyRunInputSource) {
+  return Object.entries(binding.input_bindings ?? {}).find(([, boundSource]) => boundSource === source)?.[0] ?? "";
+}
+
+function formatInputNodeOptionLabel(row: BuddyRunTemplateInputRow) {
+  return `${row.nodeName} / ${row.stateName} (${row.stateKey || row.nodeId})`;
 }
 
 function buildInputRow(template: TemplateRecord, nodeId: string, node: InputNode): BuddyRunTemplateInputRow {
