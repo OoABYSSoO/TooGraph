@@ -25,6 +25,7 @@ from app.tools.openai_codex_client import (
     resolve_codex_access_token,
 )
 from app.tools import model_provider_anthropic, model_provider_codex, model_provider_discovery, model_provider_gemini, model_provider_openai
+from app.tools.model_provider_media import inline_provider_image_attachments
 from app.tools.video_frame_fallback import (
     build_video_frame_fallback_attachments,
     should_fallback_video_to_frames,
@@ -289,7 +290,12 @@ def chat_with_model_provider(
     else:  # pragma: no cover - guarded by normalize_transport
         raise RuntimeError(f"Unsupported provider transport: {normalized_transport}")
 
-    content, meta = _invoke_with_video_auto_fallback(invoke, input_attachments=input_attachments)
+    request_attachments = _prepare_request_attachments_for_transport(normalized_transport, input_attachments)
+    content, meta = _invoke_with_video_auto_fallback(
+        invoke,
+        input_attachments=request_attachments,
+        transport=normalized_transport,
+    )
     stream_fallback_error = str(meta.get("stream_fallback_error") or "").strip()
     if stream_fallback_error:
         warnings.append(f"Streaming request failed; retried once without streaming. {stream_fallback_error}")
@@ -322,6 +328,7 @@ def _invoke_with_video_auto_fallback(
     invoke: Callable[[list[dict[str, Any]] | None], tuple[str, dict[str, Any]]],
     *,
     input_attachments: list[dict[str, Any]] | None,
+    transport: str,
 ) -> tuple[str, dict[str, Any]]:
     try:
         return invoke(input_attachments)
@@ -333,6 +340,7 @@ def _invoke_with_video_auto_fallback(
                 input_attachments,
                 output_dir=temp_dir,
             )
+            fallback_attachments = _prepare_request_attachments_for_transport(transport, fallback_attachments)
             try:
                 content, meta = invoke(fallback_attachments)
             except Exception as fallback_exc:
@@ -342,6 +350,15 @@ def _invoke_with_video_auto_fallback(
         meta["video_fallback"] = fallback_meta
         meta["_video_fallback_warning"] = f"Native video request failed; analyzed extracted frames instead. {exc}"
         return content, meta
+
+
+def _prepare_request_attachments_for_transport(
+    transport: str,
+    input_attachments: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]] | None:
+    if transport in {TRANSPORT_OPENAI_COMPATIBLE, TRANSPORT_CODEX_RESPONSES}:
+        return inline_provider_image_attachments(input_attachments)
+    return input_attachments
 
 
 def chat_with_model_ref_with_meta(

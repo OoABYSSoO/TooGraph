@@ -116,6 +116,9 @@ def _normalize_media_attachments(input_attachments: list[dict[str, Any]] | None)
 
 
 def _attachment_url(attachment: dict[str, Any]) -> str:
+    data_url = str(attachment.get("data_url") or "").strip()
+    if data_url.startswith("data:"):
+        return data_url
     for key in ("file_url", "url"):
         value = str(attachment.get(key) or "").strip()
         if value and not value.startswith("data:"):

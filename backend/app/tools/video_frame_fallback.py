@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from app.tools.ffmpeg_resolver import FfmpegTools, resolve_ffmpeg_tools
+
 
 DEFAULT_VIDEO_FRAME_COUNT = 8
 MAX_VIDEO_FRAME_COUNT = 16
+_FFMPEG_DURATION_PATTERN = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
 VIDEO_FALLBACK_ERROR_MARKERS = (
     "video",
     "video_url",
@@ -80,10 +84,11 @@ def extract_video_frame_attachments(
         raise RuntimeError("Video fallback requires a local filesystem path or file:// video attachment.")
 
     requested_frame_count = max(1, min(int(frame_count or DEFAULT_VIDEO_FRAME_COUNT), MAX_VIDEO_FRAME_COUNT))
+    tools = resolve_ffmpeg_tools()
     frame_dir = Path(output_dir) if output_dir is not None else Path(tempfile.mkdtemp(prefix="toograph_video_frames_"))
     frame_dir.mkdir(parents=True, exist_ok=True)
-    duration = _probe_video_duration(source_path)
-    frame_paths = _extract_frame_files(source_path, frame_dir, duration=duration, frame_count=requested_frame_count)
+    duration = _probe_video_duration(source_path, tools=tools)
+    frame_paths = _extract_frame_files(source_path, frame_dir, duration=duration, frame_count=requested_frame_count, tools=tools)
     return [
         _build_frame_attachment(attachment, frame_path, index=index, timestamp=_frame_timestamp(duration, index, len(frame_paths)))
         for index, frame_path in enumerate(frame_paths, start=1)
@@ -113,6 +118,7 @@ def _extract_frame_files(
     *,
     duration: float | None,
     frame_count: int,
+    tools: FfmpegTools,
 ) -> list[Path]:
     frame_paths: list[Path] = []
     if duration is not None and duration > 0:
@@ -120,7 +126,7 @@ def _extract_frame_files(
             timestamp = _frame_timestamp(duration, index, frame_count)
             frame_path = frame_dir / f"frame_{index:03d}.jpg"
             command = [
-                "ffmpeg",
+                tools.ffmpeg,
                 "-hide_banner",
                 "-loglevel",
                 "error",
@@ -141,7 +147,7 @@ def _extract_frame_files(
 
     pattern = frame_dir / "frame_%03d.jpg"
     command = [
-        "ffmpeg",
+        tools.ffmpeg,
         "-hide_banner",
         "-loglevel",
         "error",
@@ -158,9 +164,18 @@ def _extract_frame_files(
     return sorted(path for path in frame_dir.glob("frame_*.jpg") if path.stat().st_size > 0)[:frame_count]
 
 
-def _probe_video_duration(video_path: Path) -> float | None:
+def _probe_video_duration(video_path: Path, *, tools: FfmpegTools | None = None) -> float | None:
+    resolved_tools = tools or resolve_ffmpeg_tools()
+    if resolved_tools.ffprobe:
+        duration = _probe_video_duration_with_ffprobe(video_path, ffprobe=resolved_tools.ffprobe)
+        if duration is not None:
+            return duration
+    return _probe_video_duration_with_ffmpeg(video_path, ffmpeg=resolved_tools.ffmpeg)
+
+
+def _probe_video_duration_with_ffprobe(video_path: Path, *, ffprobe: str) -> float | None:
     command = [
-        "ffprobe",
+        ffprobe,
         "-v",
         "error",
         "-show_entries",
@@ -181,6 +196,31 @@ def _probe_video_duration(video_path: Path) -> float | None:
     except (TypeError, ValueError, json.JSONDecodeError):
         return None
     return duration if duration > 0 else None
+
+
+def _probe_video_duration_with_ffmpeg(video_path: Path, *, ffmpeg: str) -> float | None:
+    command = [
+        ffmpeg,
+        "-hide_banner",
+        "-i",
+        str(video_path),
+    ]
+    try:
+        completed = subprocess.run(command, text=True, capture_output=True, timeout=10, check=False)
+    except OSError:
+        return None
+    return _parse_ffmpeg_duration(f"{completed.stderr}\n{completed.stdout}")
+
+
+def _parse_ffmpeg_duration(output: str) -> float | None:
+    match = _FFMPEG_DURATION_PATTERN.search(output or "")
+    if not match:
+        return None
+    hours, minutes, seconds = match.groups()
+    try:
+        return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+    except ValueError:
+        return None
 
 
 def _build_frame_attachment(
@@ -212,7 +252,7 @@ def _run_media_command(command: list[str]) -> None:
     try:
         completed = subprocess.run(command, text=True, capture_output=True, timeout=30, check=False)
     except FileNotFoundError as exc:
-        raise RuntimeError("ffmpeg and ffprobe are required for video frame fallback.") from exc
+        raise RuntimeError("ffmpeg is required for video frame fallback.") from exc
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError("Video frame extraction timed out.") from exc
     if completed.returncode != 0:

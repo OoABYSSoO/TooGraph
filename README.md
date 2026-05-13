@@ -121,6 +121,8 @@ python --version
 
 如果需要运行 LLM 节点，还需要准备一个可访问的模型服务：可以是本地 OpenAI-compatible 网关、私有网关，或云端 Provider。模型入口在 TooGraph 的 Model Providers 页面配置，不通过启动环境变量配置。
 
+视频输入在模型不支持原生视频时会回退为抽帧图片。TooGraph 会优先使用系统已有的 `ffmpeg`，后端依赖中也包含跨平台的 `imageio-ffmpeg` 作为应用内兜底；如果当前 Python 环境没有安装这个依赖，可以重新执行后端依赖安装命令。需要在运行时自动安装应用私有兜底组件时，启动前设置 `TOOGRAPH_AUTO_INSTALL_FFMPEG=1`。该模式只写入 `backend/data/runtime_tools/`，不会安装系统包或修改系统 PATH。
+
 ### 安装依赖
 
 ```bash
