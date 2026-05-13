@@ -45,6 +45,7 @@ These instructions apply to all work in this repository and should persist acros
 ## Product and Engineering Quality
 
 - Keep changes scoped to the request, but leave the touched area coherent: remove confusing duplication, stale UI states, and obvious footguns introduced or exposed by the work.
+- Before adding any feature, inspect the existing architecture, data flow, and nearby implementations first. Prefer reusing established interfaces, protocol paths, storage APIs, validators, command buses, graph/runtime primitives, and UI patterns. Do not add product-specific special-case code or bypasses just to satisfy one feature; architectural consistency and a reasonable data/control path are more important than isolated feature completion. A feature that works but violates repository architecture, duplicates an existing interface, or creates an incoherent execution chain is not acceptable.
 - Protect user data and local configuration. Do not commit local runtime state, logs, generated build output, credentials, or machine-specific settings unless explicitly requested.
 - Treat `backend/data/settings`, `.toograph_*`, `.dev_*` logs, `dist`, and `.worktrees` as local/runtime artifacts unless a task explicitly targets them.
 - Prefer automatic, discoverable behavior over hidden manual steps when it improves the user's workflow, but make side effects visible and reversible.
