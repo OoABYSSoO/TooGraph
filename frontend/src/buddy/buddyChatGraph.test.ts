@@ -3,14 +3,13 @@ import assert from "node:assert/strict";
 
 import type { RunDetail } from "../types/run.ts";
 import type { AgentNode, InputNode, TemplateRecord } from "../types/node-system.ts";
+import type { BuddyRunTemplateBinding } from "../types/buddy.ts";
 
 import {
   BUDDY_REVIEW_TEMPLATE_ID,
-  BUDDY_TEMPLATE_ID,
   BUDDY_MODE_OPTIONS,
-  BUDDY_MODE_STATE_KEY,
   BUDDY_REPLY_STATE_KEY,
-  buildBuddyChatGraph,
+  buildBuddyChatGraph as buildBuddyChatGraphPayload,
   buildBuddyReviewGraph,
   formatBuddyHistory,
   resolveBuddyReplyFromRunEvent,
@@ -19,7 +18,6 @@ import {
   resolveBuddyMode,
   resolveBuddyReplyText,
 } from "./buddyChatGraph.ts";
-import type { SkillDefinition } from "../types/skills.ts";
 
 function createTemplate(): TemplateRecord {
   return {
@@ -332,36 +330,6 @@ function createReviewTemplate(): TemplateRecord {
   };
 }
 
-function createSkillDefinition(overrides: Partial<SkillDefinition> = {}): SkillDefinition {
-  return {
-    skillKey: "web_search",
-    name: "Web Search",
-    description: "Search the public web.",
-    llmInstruction: "Choose the query and run the bound web search skill.",
-    schemaVersion: "toograph.skill/v1",
-    version: "1.0.0",
-    capabilityPolicy: {
-      default: { selectable: true, requiresApproval: false },
-      origins: {
-        buddy: { selectable: true, requiresApproval: false },
-      },
-    },
-    permissions: ["network", "secret_read"],
-    runtime: { type: "python", entrypoint: "run.py", timeoutSeconds: 10 },
-    inputSchema: [{ key: "query", name: "Query", valueType: "text", required: true, description: "" }],
-    outputSchema: [{ key: "citations", name: "Citations", valueType: "json", required: false, description: "" }],
-    llmNodeEligibility: "ready",
-    llmNodeBlockers: [],
-    sourceScope: "installed",
-    sourcePath: "skill/official/web_search/skill.json",
-    runtimeReady: true,
-    runtimeRegistered: true,
-    status: "active",
-    canManage: true,
-    ...overrides,
-  };
-}
-
 function createActivityGraph() {
   const graph = buildBuddyChatGraph(createAgenticTemplate(), {
     userMessage: "你好",
@@ -442,6 +410,61 @@ function createActivityGraph() {
   return graph;
 }
 
+function buildBuddyChatGraph(
+  template: TemplateRecord,
+  input: Parameters<typeof buildBuddyChatGraphPayload>[1],
+  binding: BuddyRunTemplateBinding = createBuddyRunTemplateBinding(template),
+) {
+  return buildBuddyChatGraphPayload(template, input, binding);
+}
+
+function createBuddyRunTemplateBinding(
+  template: TemplateRecord,
+  inputBindings: Record<string, BuddyRunTemplateBinding["input_bindings"][string]> = {},
+): BuddyRunTemplateBinding {
+  const bindings = { ...inputBindings };
+  if (!Object.values(bindings).includes("current_message")) {
+    const currentMessageNodeId = isBindableInputNodeId(template, "input_user_message")
+      ? "input_user_message"
+      : findBindableInputNodeId(template);
+    if (currentMessageNodeId) {
+      bindings[currentMessageNodeId] = "current_message";
+    }
+  }
+  if (!Object.values(bindings).includes("conversation_history")) {
+    if (isBindableInputNodeId(template, "input_conversation_history")) {
+      bindings.input_conversation_history = "conversation_history";
+    }
+  }
+  if (!Object.values(bindings).includes("page_context")) {
+    if (isBindableInputNodeId(template, "input_page_context")) {
+      bindings.input_page_context = "page_context";
+    }
+  }
+  if (!Object.values(bindings).includes("buddy_home_context")) {
+    if (isBindableInputNodeId(template, "input_buddy_context")) {
+      bindings.input_buddy_context = "buddy_home_context";
+    }
+  }
+  return {
+    template_id: template.template_id,
+    input_bindings: bindings,
+  };
+}
+
+function findBindableInputNodeId(template: TemplateRecord) {
+  return Object.entries(template.nodes).find(([, node]) => node.kind === "input" && isBindableInput(template, node))?.[0] ?? "";
+}
+
+function isBindableInputNodeId(template: TemplateRecord, nodeId: string) {
+  const node = template.nodes[nodeId];
+  return Boolean(node && isBindableInput(template, node));
+}
+
+function isBindableInput(template: TemplateRecord, node: TemplateRecord["nodes"][string]) {
+  return node.kind === "input" && node.writes.length === 1 && Boolean(template.state_schema[node.writes[0].state]);
+}
+
 function assertInputNode(node: TemplateRecord["nodes"][string]): asserts node is InputNode {
   assert.equal(node.kind, "input");
 }
@@ -488,31 +511,6 @@ test("resolveBuddyMode accepts current tiers and migrates legacy values", () => 
   assert.equal(resolveBuddyMode("approval"), "ask_first");
   assert.equal(resolveBuddyMode("unrestricted"), "full_access");
   assert.equal(resolveBuddyMode("unknown"), "ask_first");
-});
-
-test("buddy widget defaults to the autonomous loop template id", () => {
-  assert.equal(BUDDY_TEMPLATE_ID, "buddy_autonomous_loop");
-});
-
-test("buildBuddyChatGraph clears visible and final reply states before each run", () => {
-  const graph = buildBuddyChatGraph(
-    {
-      ...createAgenticTemplate(),
-      state_schema: {
-        visible_reply: { name: "visible_reply", description: "", type: "markdown", value: "旧的即时回复", color: "#0f766e" },
-        final_reply: { name: "final_reply", description: "", type: "markdown", value: "旧的最终回复", color: "#4f46e5" },
-      },
-    },
-    {
-      userMessage: "继续",
-      history: [],
-      pageContext: "当前路径: /",
-      buddyMode: "ask_first",
-    },
-  );
-
-  assert.equal(graph.state_schema.visible_reply.value, "");
-  assert.equal(graph.state_schema.final_reply.value, "");
 });
 
 test("buddy review uses a separate internal autonomous review template id", () => {
@@ -580,79 +578,64 @@ test("buildBuddyReviewGraph hydrates an internal autonomous review run from the 
   assert.equal(graph.nodes.decide_autonomous_review.config.model, "openai/gpt-4.1");
 });
 
-test("buildBuddyChatGraph keeps enabled skills visible in ask-first mode", () => {
+test("buildBuddyChatGraph records ask-first mode without injecting permission or catalog state", () => {
   const graph = buildBuddyChatGraph(createAgenticTemplate(), {
     userMessage: "帮我搜索最新资料",
     history: [],
     pageContext: "当前路径: /editor",
     buddyMode: "ask_first",
-    skillCatalog: [
-      createSkillDefinition(),
-      createSkillDefinition({
-        skillKey: "restricted_media_fetcher",
-        name: "Restricted Media Fetcher",
-        description: "Fetch authorized media with approval.",
-        capabilityPolicy: {
-          default: { selectable: true, requiresApproval: true },
-          origins: {
-            buddy: { selectable: true, requiresApproval: true },
-          },
-        },
-        permissions: ["network", "file_write"],
-      }),
-    ],
   });
 
-  const catalog = graph.state_schema.state_7.value as SkillDefinition[];
-  assert.equal(graph.name, "伙伴自主工具循环");
-  assert.equal(catalog[0].skillKey, "web_search");
-  assert.equal(catalog[0].capabilityPolicy.origins.buddy.selectable, true);
-  assert.equal(catalog[0].capabilityPolicy.origins.buddy.requiresApproval, false);
-  assert.equal(catalog[1].capabilityPolicy.origins.buddy.selectable, true);
-  assert.equal(catalog[1].capabilityPolicy.origins.buddy.requiresApproval, true);
+  assert.deepEqual(graph.state_schema.state_7.value, []);
   assertInputNode(graph.nodes.input_skill_catalog_snapshot);
-  assert.deepEqual(graph.nodes.input_skill_catalog_snapshot.config.value, catalog);
-});
-
-test("buildBuddyChatGraph records ask-first mode without adding a generic approval breakpoint", () => {
-  const graph = buildBuddyChatGraph(createAgenticTemplate(), {
-    userMessage: "帮我搜索最新资料",
-    history: [],
-    pageContext: "当前路径: /editor",
-    buddyMode: "ask_first",
-    skillCatalog: [createSkillDefinition()],
-  });
-
-  const catalog = graph.state_schema.state_7.value as SkillDefinition[];
-  assert.equal(catalog[0].capabilityPolicy.origins.buddy.selectable, true);
+  assert.deepEqual(graph.nodes.input_skill_catalog_snapshot.config.value, []);
   assert.deepEqual(graph.metadata.interrupt_after, ["request_approval_agent"]);
   assert.equal(graph.metadata.buddy_mode, "ask_first");
   assert.equal(graph.metadata.buddy_requires_approval, true);
   assert.equal(graph.metadata.agent_breakpoint_timing, undefined);
 });
 
-test("buildBuddyChatGraph injects the current message, history, and page context", () => {
-  const graph = buildBuddyChatGraph(createTemplate(), {
-    userMessage: "帮我看当前页面",
-    history: [{ role: "assistant", content: "我在。" }],
-    pageContext: "当前路径: /editor",
-    buddyMode: "full_access",
-  });
+test("buildBuddyChatGraph injects only configured input-node bindings", () => {
+  const graph = buildBuddyChatGraph(
+    createTemplate(),
+    {
+      userMessage: "帮我看当前页面",
+      history: [{ role: "assistant", content: "我在。" }],
+      pageContext: "当前路径: /editor",
+      buddyMode: "full_access",
+    },
+    {
+      template_id: "basic_buddy_loop",
+      input_bindings: {
+        input_user_message: "current_message",
+        input_conversation_history: "conversation_history",
+      },
+    },
+  );
 
   assert.equal(graph.graph_id, null);
   assert.equal(graph.name, "伙伴对话循环");
   assert.equal(graph.state_schema.state_1.value, "帮我看当前页面");
   assert.equal(graph.state_schema.state_2.value, "伙伴: 我在。");
-  assert.equal(graph.state_schema.state_3.value, "当前路径: /editor");
-  assert.equal(graph.state_schema[BUDDY_MODE_STATE_KEY].value, "full_access");
+  assert.equal(graph.state_schema.state_3.value, "");
+  assert.equal(graph.state_schema.state_5.value, "ask_first");
   assert.equal(graph.state_schema[BUDDY_REPLY_STATE_KEY].value, "");
   assertInputNode(graph.nodes.input_user_message);
-  assertInputNode(graph.nodes.input_buddy_mode);
+  assertInputNode(graph.nodes.input_conversation_history);
+  assertInputNode(graph.nodes.input_page_context);
   assert.equal(graph.nodes.input_user_message.config.value, "帮我看当前页面");
-  assert.equal(graph.nodes.input_buddy_mode.config.value, "full_access");
+  assert.equal(graph.nodes.input_conversation_history.config.value, "伙伴: 我在。");
+  assert.equal(graph.nodes.input_page_context.config.value, "");
   assert.equal(graph.metadata.origin, "buddy");
   assert.equal(graph.metadata.buddy_mode, "full_access");
   assert.equal(graph.metadata.buddy_can_execute_actions, true);
+  assert.deepEqual(graph.metadata.buddy_template_binding, {
+    template_id: "basic_buddy_loop",
+    input_bindings: {
+      input_user_message: "current_message",
+      input_conversation_history: "conversation_history",
+    },
+  });
   assert.equal(graph.metadata.buddy_run, undefined);
   assert.equal(graph.metadata.buddy_permission_tier, undefined);
   assert.equal(graph.metadata.buddy_graph_patch_drafts_enabled, undefined);
@@ -669,7 +652,6 @@ test("buildBuddyChatGraph marks ask-first mode without a blanket reply breakpoin
     buddyMode: "ask_first",
   });
 
-  assert.equal(graph.state_schema[BUDDY_MODE_STATE_KEY].value, "ask_first");
   assert.equal(graph.metadata.origin, "buddy");
   assert.equal(graph.metadata.buddy_mode, "ask_first");
   assert.equal(graph.metadata.buddy_can_execute_actions, false);
@@ -735,22 +717,13 @@ test("resolveBuddyReplyText prefers the buddy reply state over fallback text", (
 });
 
 test("resolveBuddyReplyFromRunEvent recognizes reply states by graph state name", () => {
-  const graph = buildBuddyChatGraph(
-    {
-      ...createAgenticTemplate(),
-      state_schema: {
-        user_message: { name: "user_message", description: "", type: "text", value: "", color: "#9a3412" },
-        visible_reply: { name: "visible_reply", description: "", type: "markdown", value: "", color: "#0f766e" },
-        final_reply: { name: "final_reply", description: "", type: "markdown", value: "", color: "#4f46e5" },
-      },
+  const graph = {
+    state_schema: {
+      user_message: { name: "user_message", description: "", type: "text", value: "", color: "#9a3412" },
+      visible_reply: { name: "visible_reply", description: "", type: "markdown", value: "", color: "#0f766e" },
+      final_reply: { name: "final_reply", description: "", type: "markdown", value: "", color: "#4f46e5" },
     },
-    {
-      userMessage: "你好",
-      history: [],
-      pageContext: "当前路径: /",
-      buddyMode: "advisory",
-    },
-  );
+  };
 
   assert.equal(
     resolveBuddyReplyFromRunEvent(
@@ -778,20 +751,11 @@ test("resolveBuddyReplyFromRunEvent recognizes reply states by graph state name"
 });
 
 test("resolveBuddyReplyFromRunEvent reads completed output values for named reply states", () => {
-  const graph = buildBuddyChatGraph(
-    {
-      ...createAgenticTemplate(),
-      state_schema: {
-        final_reply: { name: "final_reply", description: "", type: "markdown", value: "", color: "#4f46e5" },
-      },
+  const graph = {
+    state_schema: {
+      final_reply: { name: "final_reply", description: "", type: "markdown", value: "", color: "#4f46e5" },
     },
-    {
-      userMessage: "你好",
-      history: [],
-      pageContext: "当前路径: /",
-      buddyMode: "advisory",
-    },
-  );
+  };
 
   assert.equal(
     resolveBuddyReplyFromRunEvent(
@@ -823,20 +787,11 @@ test("resolveBuddyReplyFromRunEvent does not treat request_understanding as visi
 });
 
 test("resolveBuddyReplyFromRunEvent streams partial markdown from a structured reply field", () => {
-  const graph = buildBuddyChatGraph(
-    {
-      ...createAgenticTemplate(),
-      state_schema: {
-        final_reply: { name: "final_reply", description: "", type: "markdown", value: "", color: "#4f46e5" },
-      },
+  const graph = {
+    state_schema: {
+      final_reply: { name: "final_reply", description: "", type: "markdown", value: "", color: "#4f46e5" },
     },
-    {
-      userMessage: "你好",
-      history: [],
-      pageContext: "当前路径: /",
-      buddyMode: "advisory",
-    },
-  );
+  };
 
   assert.equal(
     resolveBuddyReplyFromRunEvent(
