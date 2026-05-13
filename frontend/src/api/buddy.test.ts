@@ -7,6 +7,7 @@ import {
   createBuddyMemory,
   createBuddyGraphPatchDraft,
   deleteBuddyChatSession,
+  fetchBuddyRunTemplateBinding,
   fetchBuddyCommands,
   fetchBuddyChatMessages,
   fetchBuddyChatSessions,
@@ -14,6 +15,7 @@ import {
   restoreBuddyRevision,
   updateBuddyChatSession,
   updateBuddyProfile,
+  updateBuddyRunTemplateBinding,
 } from "./buddy.ts";
 
 const originalFetch = globalThis.fetch;
@@ -114,6 +116,35 @@ test("buddy API reads command audit records", async () => {
   await fetchBuddyCommands();
 
   assert.deepEqual(requests, ["/api/buddy/commands"]);
+  globalThis.fetch = originalFetch;
+});
+
+test("buddy API manages run template binding through command flow", async () => {
+  const requests: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    requests.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
+    const payload = init?.method === "POST"
+      ? { result: { template_id: "custom_loop", input_bindings: { input_prompt: "current_message" } } }
+      : { template_id: "custom_loop", input_bindings: { input_prompt: "current_message" } };
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  await fetchBuddyRunTemplateBinding();
+  await updateBuddyRunTemplateBinding(
+    { template_id: "custom_loop", input_bindings: { input_prompt: "current_message" } },
+    "用户更新伙伴运行模板绑定。",
+  );
+
+  assert.equal(requests[0].url, "/api/buddy/run-template-binding");
+  assert.equal(requests[1].url, "/api/buddy/commands");
+  assert.deepEqual(requests[1].body, {
+    action: "run_template_binding.update",
+    payload: { template_id: "custom_loop", input_bindings: { input_prompt: "current_message" } },
+    change_reason: "用户更新伙伴运行模板绑定。",
+  });
   globalThis.fetch = originalFetch;
 });
 
