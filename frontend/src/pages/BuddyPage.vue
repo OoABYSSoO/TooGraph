@@ -61,20 +61,30 @@
                 :closable="false"
                 :title="bindingValidation.issues.join(' ')"
               />
-              <ElTable :data="bindingSourceRows" class="buddy-page__table buddy-page__binding-table" empty-text=" ">
-                <ElTableColumn :label="t('buddyPage.binding.buddyInput')" min-width="210">
-                  <template #default="{ row }">
+              <section class="buddy-page__binding-grid" :aria-label="t('buddyPage.binding.buddyInput')">
+                <article
+                  v-for="row in bindingSourceRows"
+                  :key="row.source"
+                  class="buddy-page__binding-card"
+                  :class="{
+                    'buddy-page__binding-card--required': row.required,
+                    'buddy-page__binding-card--empty': !row.selectedNodeId,
+                  }"
+                >
+                  <header class="buddy-page__binding-card-header">
                     <div class="buddy-page__binding-source">
                       <span class="buddy-page__binding-source-label">{{ t(row.labelKey) }}</span>
-                      <ElTag size="small" :type="row.required ? 'danger' : 'info'" effect="plain">
-                        {{ row.required ? t("buddyPage.binding.required") : t("buddyPage.binding.optional") }}
-                      </ElTag>
+                      <small>{{ row.source }}</small>
                     </div>
-                  </template>
-                </ElTableColumn>
-                <ElTableColumn :label="t('buddyPage.binding.inputNode')" min-width="310">
-                  <template #default="{ row }">
+                    <ElTag size="small" :type="row.required ? 'warning' : 'info'" effect="plain">
+                      {{ row.required ? t("buddyPage.binding.required") : t("buddyPage.binding.optional") }}
+                    </ElTag>
+                  </header>
+
+                  <label class="buddy-page__binding-picker">
+                    <span>{{ t("buddyPage.binding.inputNode") }}</span>
                     <ElSelect
+                      class="buddy-page__binding-select"
                       :model-value="row.selectedNodeId"
                       :placeholder="t('buddyPage.binding.selectInputNode')"
                       :clearable="!row.required"
@@ -95,18 +105,23 @@
                         :disabled="option.disabled"
                       />
                     </ElSelect>
-                  </template>
-                </ElTableColumn>
-                <ElTableColumn :label="t('buddyPage.binding.selectedState')" min-width="260">
-                  <template #default="{ row }">
-                    <div v-if="selectedBindingInputRow(row.selectedNodeId)" class="buddy-page__binding-state">
-                      <span>{{ selectedBindingInputRow(row.selectedNodeId)?.stateName || t("common.state") }}</span>
-                      <small>{{ selectedBindingInputRow(row.selectedNodeId)?.stateKey }}</small>
-                    </div>
-                    <span v-else class="buddy-page__meta">{{ t("buddyPage.binding.noInputNode") }}</span>
-                  </template>
-                </ElTableColumn>
-              </ElTable>
+                  </label>
+
+                  <div
+                    v-if="selectedBindingInputRow(row.selectedNodeId)"
+                    class="buddy-page__binding-state-card"
+                    aria-live="polite"
+                  >
+                    <span>{{ t("buddyPage.binding.selectedState") }}</span>
+                    <strong>{{ selectedBindingInputRow(row.selectedNodeId)?.stateName || t("common.state") }}</strong>
+                    <code>{{ selectedBindingInputRow(row.selectedNodeId)?.stateKey }}</code>
+                  </div>
+                  <div v-else class="buddy-page__binding-state-card buddy-page__binding-state-card--empty">
+                    <span>{{ t("buddyPage.binding.selectedState") }}</span>
+                    <strong>{{ t("buddyPage.binding.noInputNode") }}</strong>
+                  </div>
+                </article>
+              </section>
               <div class="buddy-page__actions">
                 <ElButton
                   type="primary"
@@ -1218,34 +1233,131 @@ onMounted(loadAll);
   width: 100%;
 }
 
-.buddy-page__binding-table {
-  margin-top: 12px;
+.buddy-page__binding-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.buddy-page__binding-card {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 20px;
+  padding: 16px;
+  background:
+    var(--toograph-glass-specular),
+    var(--toograph-glass-lens),
+    rgba(255, 255, 255, 0.44);
+  box-shadow: 0 4px 14px rgba(61, 43, 24, 0.035);
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.buddy-page__binding-card:hover {
+  border-color: rgba(154, 52, 18, 0.16);
+  box-shadow: 0 10px 24px rgba(61, 43, 24, 0.055);
+  transform: translateY(-1px);
+}
+
+.buddy-page__binding-card--required {
+  border-color: rgba(217, 119, 6, 0.2);
+  background:
+    var(--toograph-glass-specular),
+    var(--toograph-glass-lens),
+    rgba(255, 248, 240, 0.72);
+}
+
+.buddy-page__binding-card--empty:not(.buddy-page__binding-card--required) {
+  background:
+    var(--toograph-glass-specular),
+    var(--toograph-glass-lens),
+    rgba(255, 255, 255, 0.3);
+}
+
+.buddy-page__binding-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
 }
 
 .buddy-page__binding-source,
-.buddy-page__binding-state {
+.buddy-page__binding-picker,
+.buddy-page__binding-state-card {
   display: grid;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
 }
 
-.buddy-page__binding-source {
-  grid-template-columns: minmax(0, auto) auto;
-  align-items: center;
-  justify-content: start;
-  column-gap: 8px;
-}
-
-.buddy-page__binding-source-label,
-.buddy-page__binding-state span {
+.buddy-page__binding-source-label {
   min-width: 0;
-  color: #1f2937;
+  color: var(--toograph-text-strong);
   font-weight: 850;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
-.buddy-page__binding-state small {
-  color: rgba(60, 41, 20, 0.62);
-  font-size: 0.78rem;
+.buddy-page__binding-source small,
+.buddy-page__binding-picker > span,
+.buddy-page__binding-state-card > span {
+  color: rgba(60, 41, 20, 0.58);
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.buddy-page__binding-source small,
+.buddy-page__binding-state-card code {
+  font-family: var(--toograph-font-mono);
+}
+
+.buddy-page__binding-picker {
+  color: rgba(60, 41, 20, 0.76);
+}
+
+.buddy-page__binding-select {
+  width: 100%;
+}
+
+.buddy-page__binding-state-card {
+  border: 1px solid rgba(154, 52, 18, 0.08);
+  border-radius: 16px;
+  padding: 11px 12px;
+  background: rgba(255, 252, 247, 0.72);
+}
+
+.buddy-page__binding-state-card strong {
+  min-width: 0;
+  color: var(--toograph-text-strong);
+  font-size: 0.92rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.buddy-page__binding-state-card code {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid rgba(154, 52, 18, 0.08);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: rgba(255, 248, 240, 0.92);
+  color: rgb(154, 52, 18);
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.buddy-page__binding-state-card--empty {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.buddy-page__binding-state-card--empty strong {
+  color: rgba(60, 41, 20, 0.52);
   font-weight: 750;
 }
 

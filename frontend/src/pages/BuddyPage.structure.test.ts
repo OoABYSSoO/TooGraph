@@ -46,11 +46,13 @@ test("BuddyPage opens template binding first and renders it as Buddy input rows"
   assert.match(source, /buildBuddyRunTemplateSourceRows/);
   assert.match(source, /buildBuddyRunInputNodeOptions/);
   assert.match(source, /setBuddyRunTemplateSourceBinding/);
-  assert.match(source, /<ElTable :data="bindingSourceRows"[\s\S]*buddy-page__binding-table/);
+  assert.match(source, /v-for="row in bindingSourceRows"/);
+  assert.match(source, /class="buddy-page__binding-card"/);
   assert.match(source, /:model-value="row\.selectedNodeId"/);
   assert.match(source, /@update:model-value="setBindingInputNode\(row\.source, \$event\)"/);
   assert.doesNotMatch(source, /:model-value="bindingDraft\.input_bindings\[row\.nodeId\]/);
   assert.doesNotMatch(source, /function setBindingSource\(nodeId: string, value: unknown\)/);
+  assert.doesNotMatch(source, /<ElTable :data="bindingSourceRows"/);
 });
 
 test("BuddyPage exposes the unified buddy permission mode", () => {
