@@ -70,39 +70,9 @@
         "managed": true
       }
     },
-    "existing_capability": {
-      "name": "已有能力",
-      "description": "能力选择技能从当前启用模板和 Skill 中选择出的单个可用能力候选；这里作为审查上下文保存，不触发动态执行。",
-      "type": "json",
-      "value": {
-        "kind": "none"
-      },
-      "color": "#2563eb",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_capability_selector",
-        "nodeId": "select_existing_capability",
-        "fieldKey": "capability",
-        "managed": true
-      }
-    },
-    "existing_capability_found": {
-      "name": "已有能力可用",
-      "description": "能力选择技能是否找到了可复用的启用模板或 Skill；下游节点只用这个布尔值做分支判断。",
-      "type": "boolean",
-      "value": false,
-      "color": "#2563eb",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_capability_selector",
-        "nodeId": "select_existing_capability",
-        "fieldKey": "found",
-        "managed": true
-      }
-    },
     "requirement_review": {
       "name": "需求评估",
-      "description": "对需求是否清晰、是否已有能力可复用、是否继续创建 Skill 的结构化判断。",
+      "description": "对需求是否清晰、是否继续创建或改进 Skill 的结构化判断。",
       "type": "json",
       "value": {},
       "color": "#0f766e",
@@ -538,59 +508,6 @@
         "temperature": 0
       }
     },
-    "select_existing_capability": {
-      "kind": "agent",
-      "name": "检查已有能力",
-      "description": "从启用的模板和 Skill 中检查是否已有能力能满足目标需求。",
-      "ui": {
-        "position": {
-          "x": 596,
-          "y": 470
-        },
-        "collapsed": false
-      },
-      "reads": [
-        {
-          "state": "skill_request",
-          "required": true
-        }
-      ],
-      "writes": [
-        {
-          "state": "existing_capability",
-          "mode": "replace"
-        },
-        {
-          "state": "existing_capability_found",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "skillKey": "toograph_capability_selector",
-        "skillBindings": [
-          {
-            "skillKey": "toograph_capability_selector",
-            "outputMapping": {
-              "capability": "existing_capability",
-              "found": "existing_capability_found"
-            }
-          }
-        ],
-        "skillInstructionBlocks": {
-          "toograph_capability_selector": {
-            "skillKey": "toograph_capability_selector",
-            "title": "能力选择 skill instruction",
-            "content": "你已绑定 TooGraph Capability Selector。这里要检查的是用户想创建的目标 Skill 需求是否已经能被现有启用能力满足；不要因为当前流程本身是创建 Skill 的模板就选择 toograph_skill_creation_workflow。优先选择真正可直接满足目标需求的图模板，其次选择 Skill；没有合适能力时选择 {\"kind\":\"none\"}。",
-            "source": "node.override"
-          }
-        },
-        "taskInstruction": "根据 skill_request 检查当前启用的能力清单。只选择能直接完成用户目标需求的能力；不要选择本模板自身作为答案。",
-        "modelSource": "global",
-        "model": "",
-        "thinkingMode": "high",
-        "temperature": 0.1
-      }
-    },
     "review_requirement": {
       "kind": "agent",
       "name": "评估需求",
@@ -606,10 +523,6 @@
         {
           "state": "skill_request",
           "required": true
-        },
-        {
-          "state": "existing_capability_found",
-          "required": false
         },
         {
           "state": "existing_skill_package",
@@ -638,7 +551,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "评估用户是否真的需要创建或改进 Skill。capability_gap 是可选的上游能力缺口上下文；如果它存在，应把缺口类型、缺口原因、建议能力形态纳入判断。existing_skill_package 是可选的已有 Skill 包上下文；如果存在且用户目标是改进已有 Skill，按“改进已有 Skill”处理，confirmed_skill_requirement 必须说明要保留、修改、废弃的输入输出、权限和脚本行为。requirement_review 必须写 JSON 对象，包含 needs_clarification(boolean)、existing_capability_summary(string)、capability_gap_summary(string)、existing_skill_summary(string)、unclear_points(array)、questions(array)、reason(string)。如果 existing_capability_found 为 true 且用户没有明确要改进/替代该能力，说明已有启用能力可能满足需求，应把 needs_clarification 设为 true，并在 questions 中询问用户是否仍要创建或改进 Skill；不要读取或执行 capability 对象本身。creation_decision 必须写 JSON 对象，包含 approved_to_create(boolean)、reason(string)、mode(create|improve)。需求不明确时 approved_to_create 必须为 false，本轮通过 final_summary 询问用户，用户回答应在下一轮作为更完整的 skill_request 进入。除非已有能力明显满足且用户没有表达仍要创建/改进，否则需求明确时默认 approved_to_create 为 true。confirmed_skill_requirement 写 Markdown，概括当前已确认的目标、输入、输出、权限、是否需要 before_llm.py、是否需要 after_llm.py、requirements.txt 需求和限制。",
+        "taskInstruction": "评估用户是否真的需要创建或改进 Skill。capability_gap 是可选的上游能力缺口上下文；如果它存在，应把缺口类型、缺口原因、建议能力形态纳入判断。existing_skill_package 是可选的已有 Skill 包上下文；如果存在且用户目标是改进已有 Skill，按“改进已有 Skill”处理，confirmed_skill_requirement 必须说明要保留、修改、废弃的输入输出、权限和脚本行为。requirement_review 必须写 JSON 对象，包含 needs_clarification(boolean)、capability_gap_summary(string)、existing_skill_summary(string)、unclear_points(array)、questions(array)、reason(string)。creation_decision 必须写 JSON 对象，包含 approved_to_create(boolean)、reason(string)、mode(create|improve)。需求不明确时 approved_to_create 必须为 false，本轮通过 final_summary 询问用户，用户回答应在下一轮作为更完整的 skill_request 进入。需求明确时默认 approved_to_create 为 true。confirmed_skill_requirement 写 Markdown，概括当前已确认的目标、输入、输出、权限、是否需要 before_llm.py、是否需要 after_llm.py、requirements.txt 需求和限制。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -648,7 +561,7 @@
     "need_clarification": {
       "kind": "condition",
       "name": "是否需要澄清",
-      "description": "需求不清晰或已有能力可能已满足时，先让用户确认。",
+      "description": "需求不清晰时先让用户确认。",
       "ui": {
         "position": {
           "x": 1708,
@@ -716,7 +629,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "根据 requirement_review 生成需要用户回答的澄清问题，并把问题写入 clarification_questions 与 final_summary。优先用带选项的问题，每题给 2 到 4 个选项；允许用户不认可选项并自由补充。问题应覆盖输入格式、输出格式、是否需要确定性脚本、权限范围、失败处理、依赖和是否已有能力已经足够。\n不要使用断点等待用户，也不要继续创建文件；本轮最终回复直接询问用户，用户回答会在下一轮作为更完整的 skill_request 重新进入模板。",
+        "taskInstruction": "根据 requirement_review 生成需要用户回答的澄清问题，并把问题写入 clarification_questions 与 final_summary。优先用带选项的问题，每题给 2 到 4 个选项；允许用户不认可选项并自由补充。问题应覆盖输入格式、输出格式、是否需要确定性脚本、权限范围、失败处理、依赖和是否确实要创建或改进 Skill。\n不要使用断点等待用户，也不要继续创建文件；本轮最终回复直接询问用户，用户回答会在下一轮作为更完整的 skill_request 重新进入模板。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1622,7 +1535,7 @@
     "finalize_no_create": {
       "kind": "agent",
       "name": "无需创建",
-      "description": "用户确认不创建新 Skill 时给出已有能力或收束说明。",
+      "description": "用户确认不创建新 Skill 时给出收束说明。",
       "ui": {
         "position": {
           "x": 3740,
@@ -1634,10 +1547,6 @@
         {
           "state": "skill_request",
           "required": true
-        },
-        {
-          "state": "existing_capability_found",
-          "required": false
         },
         {
           "state": "creation_decision",
@@ -1654,7 +1563,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "用户或需求评估认为无需创建新 Skill 时，final_summary 写 Markdown，说明没有写入任何文件。如果 existing_capability_found 为 true，说明已有启用能力可用；否则说明当前没有找到合适能力。必要时补充后续如果仍要创建需要提供的信息。",
+        "taskInstruction": "用户或需求评估认为无需创建新 Skill 时，final_summary 写 Markdown，说明没有写入任何文件，并补充后续如果仍要创建需要提供的信息。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1717,18 +1626,10 @@
     },
     {
       "source": "input_skill_request",
-      "target": "select_existing_capability"
-    },
-    {
-      "source": "input_skill_request",
       "target": "read_existing_skill_package"
     },
     {
       "source": "input_capability_gap",
-      "target": "review_requirement"
-    },
-    {
-      "source": "select_existing_capability",
       "target": "review_requirement"
     },
     {

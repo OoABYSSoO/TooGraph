@@ -247,8 +247,21 @@ class TooGraphContextFanoutSkillTests(unittest.TestCase):
         self.assertGreaterEqual(result["assembly_report"]["budget"]["omitted_count"], 1)
         self.assertEqual(result["assembly_report"]["merge_policy"], "priority_budget_with_conflict_notes")
         self.assertEqual(result["context_brief"]["instruction_boundary"], "context_only")
-        self.assertIn("policy_navigator_agent", [item["key"] for item in result["capability_candidates"]["templates"]])
-        self.assertIn("web_search", [item["key"] for item in result["capability_candidates"]["skills"]])
+        self.assertEqual(
+            result["capability_candidates"]["templates"],
+            [
+                {
+                    "kind": "subgraph",
+                    "key": "toograph_page_operation_workflow",
+                    "name": "操作 TooGraph 页面",
+                    "description": "固定 TooGraph 页面操作入口。",
+                    "permissions": [],
+                    "output_contract": [],
+                    "score": 0,
+                }
+            ],
+        )
+        self.assertEqual(result["capability_candidates"]["skills"], [])
         self.assertEqual(result["activity_events"][0]["kind"], "context_fanout")
 
 

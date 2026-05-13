@@ -5,6 +5,14 @@ import sys
 from typing import Any
 
 
+DEFAULT_SELECTED_CAPABILITY = {
+    "kind": "subgraph",
+    "key": "toograph_page_operation_workflow",
+    "name": "操作 TooGraph 页面",
+    "description": "固定 TooGraph 页面操作入口。",
+}
+
+
 def buddy_visible_subgraph_result_adapter(**skill_inputs: Any) -> dict[str, Any]:
     selected = _normalize_selected_capability(skill_inputs.get("selected_capability"))
     if selected.get("kind") != "subgraph":
@@ -299,10 +307,12 @@ def _failed(*, code: str, message: str, detail: dict[str, Any] | None = None) ->
 
 
 def _normalize_selected_capability(value: Any) -> dict[str, Any]:
+    if value is None:
+        return dict(DEFAULT_SELECTED_CAPABILITY)
     if isinstance(value, str):
         stripped = value.strip()
         if not stripped:
-            return {}
+            return dict(DEFAULT_SELECTED_CAPABILITY)
         try:
             return _normalize_selected_capability(json.loads(stripped))
         except json.JSONDecodeError:

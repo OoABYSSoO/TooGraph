@@ -26,6 +26,11 @@ import { createNodeFromCreationEntry, createNodeFromDroppedFile } from "./nodeCr
 import type { UploadedAssetUploadResult } from "../nodes/uploadedAssetModel.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 
+const BATCH_FILE_NODE_OFFSET = {
+  x: 36,
+  y: 132,
+} as const;
+
 type WorkspaceNodeCreationControllerInput = {
   documentsByTabId: Ref<Record<string, GraphPayload | GraphDocument>>;
   dataEdgeStateEditorRequestByTabId: Ref<Record<string, CreatedStateEdgeEditorRequest | null>>;
@@ -141,37 +146,75 @@ export function useWorkspaceNodeCreationController(input: WorkspaceNodeCreationC
     );
   }
 
-  async function createNodeFromFileForTab(tabId: string, payload: { file: File; position: GraphPosition }) {
+  function resolveFileDropNodePosition(position: GraphPosition, index: number): GraphPosition {
+    return {
+      x: position.x + BATCH_FILE_NODE_OFFSET.x * index,
+      y: position.y + BATCH_FILE_NODE_OFFSET.y * index,
+    };
+  }
+
+  function listDroppedFiles(payload: { file?: File | null; files?: readonly File[] | null }) {
+    if (payload.files && payload.files.length > 0) {
+      return [...payload.files];
+    }
+    return payload.file ? [payload.file] : [];
+  }
+
+  async function createNodeFromFileForTab(tabId: string, payload: { file?: File | null; files?: readonly File[] | null; position: GraphPosition }) {
     if (input.guardGraphEditForTab(tabId)) {
       closeNodeCreationMenu(tabId);
       return;
     }
     const document = input.documentsByTabId.value[tabId];
-    if (!document) {
+    const files = listDroppedFiles(payload);
+    if (!document || files.length === 0) {
       closeNodeCreationMenu(tabId);
       return;
     }
 
-    try {
-      if (input.isTooGraphPythonExportFile(payload.file) && (await input.importPythonGraphFile(payload.file, { fallbackToFileNode: true }))) {
-        closeNodeCreationMenu(tabId);
-        return;
-      }
+    let nextDocument = document;
+    const createdFileNames: string[] = [];
+    const failedFileNames: string[] = [];
 
-      const result = await createNodeFromDroppedFile(document, {
-        file: payload.file,
-        position: payload.position,
-        uploadFile: input.uploadFile,
-      });
-      input.markDocumentDirty(tabId, result.document);
-      input.setMessageFeedbackForTab(tabId, {
-        tone: "neutral",
-        message: `Created ${result.document.nodes[result.createdNodeId]?.name ?? "input node"} from ${payload.file.name}.`,
-      });
-    } catch (error) {
+    for (const file of files) {
+      try {
+        if (input.isTooGraphPythonExportFile(file) && (await input.importPythonGraphFile(file, { fallbackToFileNode: true }))) {
+          continue;
+        }
+
+        const result = await createNodeFromDroppedFile(nextDocument, {
+          file,
+          position: resolveFileDropNodePosition(payload.position, createdFileNames.length),
+          uploadFile: input.uploadFile,
+        });
+        nextDocument = result.document;
+        createdFileNames.push(file.name);
+      } catch (error) {
+        failedFileNames.push(file.name);
+      }
+    }
+
+    if (createdFileNames.length > 0) {
+      input.markDocumentDirty(tabId, nextDocument);
+    }
+
+    if (failedFileNames.length > 0) {
       input.setMessageFeedbackForTab(tabId, {
         tone: "warning",
-        message: error instanceof Error ? error.message : "Failed to create input node from file.",
+        message:
+          createdFileNames.length > 0
+            ? `Created ${createdFileNames.length} input ${createdFileNames.length === 1 ? "node" : "nodes"}; failed to import ${failedFileNames.join(", ")}.`
+            : `Failed to create input ${failedFileNames.length === 1 ? "node" : "nodes"} from ${failedFileNames.join(", ")}.`,
+      });
+    } else if (createdFileNames.length === 1) {
+      input.setMessageFeedbackForTab(tabId, {
+        tone: "neutral",
+        message: `Created input node from ${createdFileNames[0]}.`,
+      });
+    } else if (createdFileNames.length > 1) {
+      input.setMessageFeedbackForTab(tabId, {
+        tone: "neutral",
+        message: `Created ${createdFileNames.length} input nodes from ${createdFileNames.length} files.`,
       });
     }
     closeNodeCreationMenu(tabId);

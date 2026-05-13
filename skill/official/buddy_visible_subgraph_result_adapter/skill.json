@@ -3,7 +3,7 @@
   "skillKey": "buddy_visible_subgraph_result_adapter",
   "name": "伙伴可见子图结果适配器",
   "description": "Internal adapter that wraps a visible page-operation template run back into the originally selected Buddy subgraph capability result package.",
-  "llmInstruction": "你已绑定伙伴可见子图结果适配器。只把上游 capability_selection_audit.selected、operation_report、visible_page_operation_final_reply、visible_page_operation_report、user_message/request_understanding.user_goal 复制进结构化参数；不要改写运行结果，不要总结，不要发明 run id 或输出字段。固定模板运行 Skill 分支只复制紧凑 operation_report，不要读取或复制 page_operation_context/operation_result；页面操作 workflow 分支复制 page_operation_final_reply/page_operation_workflow_report。",
+  "llmInstruction": "你已绑定伙伴可见子图结果适配器。目标 capability 固定为 {\"kind\":\"subgraph\",\"key\":\"toograph_page_operation_workflow\"}。只把上游 operation_report、visible_page_operation_final_reply、visible_page_operation_report、user_message/request_understanding.user_goal 复制进结构化参数；不要改写运行结果，不要总结，不要发明 run id 或输出字段。页面操作 workflow 分支复制 page_operation_final_reply/page_operation_workflow_report。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [],
@@ -11,12 +11,6 @@
     "internal": true
   },
   "stateInputSchema": [
-    {
-      "key": "capability_selection_audit",
-      "name": "Capability Selection Audit",
-      "valueType": "json",
-      "description": "能力选择审计，其中 selected 表示原始目标 subgraph capability。"
-    },
     {
       "key": "operation_report",
       "name": "Operation Report",
@@ -53,7 +47,7 @@
       "key": "selected_capability",
       "name": "Selected Capability",
       "valueType": "json",
-      "description": "从 capability_selection_audit.selected 复制的原始目标能力，必须是 kind=subgraph。"
+      "description": "固定目标能力；省略时后处理会使用 toograph_page_operation_workflow。"
     },
     {
       "key": "operation_report",

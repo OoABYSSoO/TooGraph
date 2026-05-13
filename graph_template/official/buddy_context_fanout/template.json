@@ -1,7 +1,7 @@
 {
   "template_id": "buddy_context_fanout",
   "label": "伙伴上下文 Fanout",
-  "description": "内部子图模板：并行读取记忆、知识库、页面上下文和能力候选目录，合并为 context_only 的 context_brief 与 fanout 审计报告。",
+  "description": "内部子图模板：并行读取记忆、知识库、页面上下文和固定页面操作能力信息，合并为 context_only 的 context_brief 与 fanout 审计报告。",
   "default_graph_name": "伙伴上下文 Fanout",
   "state_schema": {
     "user_message": {
@@ -132,7 +132,7 @@
     },
     "fanout_capability_candidates": {
       "name": "fanout_capability_candidates",
-      "description": "当前启用模板和 Skill 的只读能力候选目录摘要。",
+      "description": "固定页面操作能力的只读上下文摘要。",
       "type": "json",
       "value": {},
       "color": "#9333ea",

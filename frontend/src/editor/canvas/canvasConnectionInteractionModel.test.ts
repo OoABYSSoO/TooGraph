@@ -26,6 +26,7 @@ import {
   resolveCanvasDragOverDropEffect,
   resolveCanvasDoubleClickCreationAction,
   resolveCanvasDropCreationAction,
+  resolveCanvasHasDraggedFiles,
   resolveCanvasNodePointerDownConnectionAction,
 } from "./canvasConnectionInteractionModel.ts";
 
@@ -107,8 +108,9 @@ test("canvas connection interaction model resolves empty-canvas double-click cre
 
 test("canvas connection interaction model resolves file-drop creation actions", () => {
   const file = { name: "workflow.md" } as File;
+  const secondFile = { name: "reference.png" } as File;
   const payload = {
-    file,
+    files: [file, secondFile],
     position: { x: 160, y: 90 },
     clientX: 260,
     clientY: 190,
@@ -135,7 +137,7 @@ test("canvas connection interaction model resolves file-drop creation actions", 
       interactionLocked: false,
       isIgnoredTarget: false,
       ...payload,
-      file: null,
+      files: [],
     }),
     { type: "ignore-missing-file" },
   );
@@ -150,6 +152,13 @@ test("canvas connection interaction model resolves file-drop creation actions", 
       payload,
     },
   );
+});
+
+test("canvas connection interaction model detects dragged files before FileList is populated", () => {
+  assert.equal(resolveCanvasHasDraggedFiles({ fileCount: 0, itemKinds: [], types: ["Files"] }), true);
+  assert.equal(resolveCanvasHasDraggedFiles({ fileCount: 0, itemKinds: ["string", "file"], types: [] }), true);
+  assert.equal(resolveCanvasHasDraggedFiles({ fileCount: 2, itemKinds: [], types: [] }), true);
+  assert.equal(resolveCanvasHasDraggedFiles({ fileCount: 0, itemKinds: ["string"], types: ["text/plain"] }), false);
 });
 
 test("canvas connection interaction model resolves drag-over drop effects", () => {

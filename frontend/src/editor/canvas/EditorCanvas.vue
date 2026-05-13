@@ -595,6 +595,7 @@ import {
   resolveCanvasDoubleClickCreationAction,
   resolveCanvasDragOverDropEffect,
   resolveCanvasDropCreationAction,
+  resolveCanvasHasDraggedFiles,
   resolveCanvasNodePointerDownConnectionAction,
   resolveCanvasPendingConnectionCreationMenuAction,
   type CanvasAnchorPointerDownAction,
@@ -709,7 +710,7 @@ const emit = defineEmits<{
   (event: "remove-route", payload: { sourceNodeId: string; branchKey: string }): void;
   (event: "open-node-creation-menu", payload: CanvasNodeCreationMenuPayload): void;
   (event: "open-subgraph-editor", payload: { nodeId: string }): void;
-  (event: "create-node-from-file", payload: { file: File; position: GraphPosition; clientX: number; clientY: number }): void;
+  (event: "create-node-from-file", payload: { files: File[]; position: GraphPosition; clientX: number; clientY: number }): void;
   (event: "update:viewport", payload: CanvasViewport): void;
 }>();
 
@@ -1624,9 +1625,14 @@ function canCompleteCanvasConnection(anchor: ProjectedCanvasAnchor) {
 }
 
 function handleCanvasDragOver(event: DragEvent) {
+  const dataTransfer = event.dataTransfer;
   event.dataTransfer!.dropEffect = resolveCanvasDragOverDropEffect({
     interactionLocked: isGraphEditingLocked(),
-    hasDraggedFiles: Boolean(event.dataTransfer?.files?.length),
+    hasDraggedFiles: resolveCanvasHasDraggedFiles({
+      fileCount: dataTransfer?.files?.length ?? 0,
+      itemKinds: dataTransfer?.items ? Array.from(dataTransfer.items).map((item) => item.kind) : [],
+      types: dataTransfer?.types ? Array.from(dataTransfer.types) : [],
+    }),
   });
 }
 
@@ -1635,7 +1641,7 @@ function handleCanvasDrop(event: DragEvent) {
   const dropCreationAction = resolveCanvasDropCreationAction({
     interactionLocked: isGraphEditingLocked(),
     isIgnoredTarget: isIgnoredCanvasDropTarget(target),
-    file: event.dataTransfer?.files?.[0] ?? null,
+    files: event.dataTransfer?.files ? Array.from(event.dataTransfer.files) : [],
     position: resolveCanvasPoint(event),
     clientX: event.clientX,
     clientY: event.clientY,

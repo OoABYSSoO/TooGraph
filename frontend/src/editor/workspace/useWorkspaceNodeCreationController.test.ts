@@ -190,3 +190,38 @@ test("useWorkspaceNodeCreationController creates uploaded file input nodes when 
   assert.match(harness.feedback.at(-1)?.feedback.message ?? "", /notes\.txt/);
   assert.equal(harness.controller.nodeCreationMenuState("tab_a")?.open, false);
 });
+
+test("useWorkspaceNodeCreationController creates one input node per dropped file", async () => {
+  const harness = createHarness();
+  const image = new File([Uint8Array.from([1, 2, 3])], "diagram.png", { type: "image/png" });
+  const text = new File(["print('hello')"], "script.py", { type: "text/x-python" });
+
+  await harness.controller.createNodeFromFileForTab("tab_a", {
+    files: [image, text],
+    position: { x: 20, y: 30 },
+  });
+
+  assert.equal(harness.dirtyDocuments.length, 1);
+  const document = harness.dirtyDocuments[0]!;
+  const createdInputs = Object.values(document.nodes)
+    .filter((node) => node.kind === "input" && node.name !== "Question Input")
+    .sort((left, right) => left.ui.position.y - right.ui.position.y);
+
+  assert.equal(createdInputs.length, 2);
+  assert.equal(createdInputs[0]?.name, "diagram.png Input");
+  assert.equal(createdInputs[1]?.name, "script.py Input");
+  assert.deepEqual(createdInputs.map((node) => node.ui.position), [
+    { x: 20, y: 30 },
+    { x: 56, y: 162 },
+  ]);
+  assert.deepEqual(
+    createdInputs.map((node) => document.state_schema[node.writes[0]!.state]?.type),
+    ["image", "file"],
+  );
+  assert.deepEqual(
+    createdInputs.map((node) => node.config.boundaryType),
+    ["image", "file"],
+  );
+  assert.equal(harness.feedback.at(-1)?.feedback.tone, "neutral");
+  assert.match(harness.feedback.at(-1)?.feedback.message ?? "", /Created 2 input nodes/);
+});

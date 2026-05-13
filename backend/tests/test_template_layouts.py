@@ -1437,8 +1437,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["existing_skill_package_success"]["type"], "boolean")
         self.assertEqual(states["existing_skill_package"]["type"], "json")
         self.assertEqual(states["existing_skill_package_result"]["type"], "markdown")
-        self.assertEqual(states["existing_capability"]["type"], "json")
-        self.assertEqual(states["existing_capability_found"]["type"], "boolean")
+        self.assertNotIn("existing_capability", states)
+        self.assertNotIn("existing_capability_found", states)
         self.assertEqual(states["capability_gap"]["type"], "json")
         self.assertEqual(states["generated_skill_key"]["type"], "text")
         self.assertEqual(states["generated_skill_json"]["type"], "json")
@@ -1463,21 +1463,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertNotIn("write_approval", states)
         self.assertNotIn("write_decision", states)
 
-        selector_node = nodes["select_existing_capability"]
-        self.assertEqual(selector_node["kind"], "agent")
-        self.assertEqual(selector_node["config"]["skillKey"], "toograph_capability_selector")
-        self.assertEqual(
-            selector_node["config"]["skillBindings"],
-            [
-                {
-                    "skillKey": "toograph_capability_selector",
-                    "outputMapping": {
-                        "capability": "existing_capability",
-                        "found": "existing_capability_found",
-                    },
-                }
-            ],
-        )
+        self.assertNotIn("select_existing_capability", nodes)
         self.assertNotIn("merge_clarification", nodes)
         self.assertNotIn("review_example_feedback", nodes)
         self.assertNotIn("examples_approved", nodes)
@@ -1487,10 +1473,7 @@ class TemplateLayoutTests(unittest.TestCase):
         for node_id in ["review_requirement", "ask_clarification", "finalize_no_create"]:
             with self.subTest(capability_context_reader=node_id):
                 self.assertNotIn("existing_capability", [read["state"] for read in nodes[node_id]["reads"]])
-        self.assertIn(
-            {"state": "existing_capability_found", "required": False},
-            _read_contracts(nodes["review_requirement"]["reads"]),
-        )
+        self.assertNotIn({"state": "existing_capability_found", "required": False}, _read_contracts(nodes["review_requirement"]["reads"]))
         package_reader_node = nodes["read_existing_skill_package"]
         self.assertEqual(package_reader_node["kind"], "agent")
         self.assertEqual(package_reader_node["config"]["skillKey"], "toograph_skill_package_reader")
@@ -1595,6 +1578,8 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertIn({"source": "ask_clarification", "target": "output_final"}, template["edges"])
         self.assertIn({"source": "input_target_skill_key", "target": "read_existing_skill_package"}, template["edges"])
+        self.assertNotIn({"source": "input_skill_request", "target": "select_existing_capability"}, template["edges"])
+        self.assertNotIn({"source": "select_existing_capability", "target": "review_requirement"}, template["edges"])
         self.assertIn({"source": "read_existing_skill_package", "target": "review_requirement"}, template["edges"])
         self.assertIn({"source": "draft_example_io", "target": "prepare_builder_context"}, template["edges"])
         self.assertNotIn({"source": "draft_example_io", "target": "review_example_feedback"}, template["edges"])
@@ -1815,7 +1800,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["selected_capability"]["type"], "capability")
         self.assertEqual(states["capability_found"]["type"], "boolean")
         self.assertEqual(states["capability_result"]["type"], "result_package")
-        self.assertEqual(states["capability_selection_audit"]["type"], "json")
+        self.assertNotIn("capability_selection_audit", states)
         self.assertEqual(states["capability_gap"]["type"], "json")
         self.assertEqual(states["capability_builder_handoff"]["type"], "json")
         self.assertEqual(states["capability_trace"]["type"], "json")
@@ -2065,12 +2050,11 @@ class TemplateLayoutTests(unittest.TestCase):
                     "outputMapping": {
                         "capability": "selected_capability",
                         "found": "capability_found",
-                        "audit": "capability_selection_audit",
                     },
                 }
             ],
         )
-        self.assertIn({"state": "capability_selection_audit", "mode": "replace"}, selector_node["writes"])
+        self.assertNotIn({"state": "capability_selection_audit", "mode": "replace"}, selector_node["writes"])
         for removed_node_id in [
             "review_capability_permission",
             "needs_capability_approval",
@@ -2085,7 +2069,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn({"state": "selected_capability", "required": True}, _read_contracts(execute_node["reads"]))
         self.assertEqual(execute_node["writes"], [{"state": "capability_result", "mode": "replace"}])
         self.assertEqual(cycle_graph["state_schema"]["capability_result"]["type"], "result_package")
-        self.assertEqual(cycle_graph["state_schema"]["capability_selection_audit"]["type"], "json")
+        self.assertNotIn("capability_selection_audit", cycle_graph["state_schema"])
         self.assertEqual(cycle_graph["state_schema"]["capability_gap"]["type"], "json")
         self.assertEqual(cycle_graph["state_schema"]["capability_builder_handoff"]["type"], "json")
         self.assertEqual(cycle_graph["state_schema"]["capability_trace"]["type"], "json")
@@ -2137,7 +2121,7 @@ class TemplateLayoutTests(unittest.TestCase):
             ],
         )
         self.assertNotIn({"state": "selected_capability", "required": True}, _read_contracts(visible_executor["reads"]))
-        self.assertIn({"state": "capability_selection_audit", "required": True}, _read_contracts(visible_executor["reads"]))
+        self.assertNotIn({"state": "capability_selection_audit", "required": True}, _read_contracts(visible_executor["reads"]))
         self.assertEqual(
             visible_executor["writes"],
             [
@@ -2171,10 +2155,7 @@ class TemplateLayoutTests(unittest.TestCase):
             "page_operation_context",
             adapt_node["config"]["skillInstructionBlocks"]["buddy_visible_subgraph_result_adapter"]["content"],
         )
-        self.assertEqual(
-            _read_contracts(cycle_graph["nodes"]["output_capability_selection_audit"]["reads"]),
-            [{"state": "capability_selection_audit", "required": False}],
-        )
+        self.assertNotIn("output_capability_selection_audit", cycle_graph["nodes"])
         self.assertEqual(
             _read_contracts(cycle_graph["nodes"]["output_capability_builder_handoff"]["reads"]),
             [{"state": "capability_builder_handoff", "required": False}],

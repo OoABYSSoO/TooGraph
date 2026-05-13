@@ -41,6 +41,8 @@ class BuddyVisibleSubgraphResultAdapterSkillTests(unittest.TestCase):
         self.assertEqual(definition.skill_key, "buddy_visible_subgraph_result_adapter")
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
         self.assertEqual(definition.permissions, [])
+        self.assertNotIn("selected_capability", [field.key for field in definition.state_input_schema])
+        self.assertNotIn("capability_selection_audit", [field.key for field in definition.state_input_schema])
         self.assertNotIn("page_operation_context", [field.key for field in definition.state_input_schema])
         self.assertNotIn("operation_result", [field.key for field in definition.state_input_schema])
         self.assertEqual(
@@ -242,11 +244,6 @@ class BuddyVisibleSubgraphResultAdapterSkillTests(unittest.TestCase):
         result = _run_skill_script(
             ADAPTER_AFTER_LLM_PATH,
             {
-                "selected_capability": {
-                    "kind": "subgraph",
-                    "key": "toograph_page_operation_workflow",
-                    "name": "操作 TooGraph 页面",
-                },
                 "page_operation_final_reply": "已打开运行历史。",
                 "page_operation_workflow_report": {"goal_completed": True, "route_after": "/runs"},
                 "user_goal": "打开运行历史。",

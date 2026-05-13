@@ -1,7 +1,7 @@
 {
   "suite": "toograph_skill_creation_workflow_core",
   "name": "Skill 创建工作流核心回归",
-  "description": "覆盖需求澄清、已有能力复用、生成审查和受控用户 Skill 写入边界。",
+  "description": "覆盖需求澄清、已有 Skill 改进、生成审查和受控用户 Skill 写入边界。",
   "cases": [
     {
       "case_id": "skill-creation-clarifies-unsafe-write",

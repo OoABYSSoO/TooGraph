@@ -313,7 +313,10 @@ test("EditorWorkspaceShell routes menu selections and dropped files through the 
   );
   assert.match(componentSource, /useWorkspaceNodeCreationController\(\{[\s\S]*documentsByTabId,[\s\S]*dataEdgeStateEditorRequestByTabId,[\s\S]*nodeCreationMenuByTabId,[\s\S]*persistedPresets,[\s\S]*guardGraphEditForTab,[\s\S]*markDocumentDirty,[\s\S]*setMessageFeedbackForTab,[\s\S]*importPythonGraphFile,[\s\S]*isTooGraphPythonExportFile,[\s\S]*\}\);/);
   assert.match(nodeCreationControllerSource, /const result = createNodeFromCreationEntry\(document, \{/);
-  assert.match(nodeCreationControllerSource, /const result = await createNodeFromDroppedFile\(document, \{/);
+  assert.match(nodeCreationControllerSource, /const BATCH_FILE_NODE_OFFSET = \{[\s\S]*x: 36,[\s\S]*y: 132,[\s\S]*\} as const;/);
+  assert.match(nodeCreationControllerSource, /function listDroppedFiles\(payload: \{ file\?: File \| null; files\?: readonly File\[\] \| null \}\)/);
+  assert.match(nodeCreationControllerSource, /const result = await createNodeFromDroppedFile\(nextDocument, \{/);
+  assert.match(nodeCreationControllerSource, /position: resolveFileDropNodePosition\(payload\.position, createdFileNames\.length\),/);
   assert.match(nodeCreationControllerSource, /buildOpenNodeCreationMenuState\(context\)/);
   assert.match(nodeCreationControllerSource, /buildClosedNodeCreationMenuState\(\)/);
   assert.match(nodeCreationControllerSource, /buildUpdatedNodeCreationMenuQuery\(currentState, query\)/);

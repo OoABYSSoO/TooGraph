@@ -2,83 +2,25 @@
   "schemaVersion": "toograph.skill/v1",
   "skillKey": "toograph_capability_selector",
   "name": "TooGraph 能力选择器",
-  "description": "当图流程需要根据用户需求从当前启用的图模板和 Skill 中选择一个可用能力时使用此技能。",
-  "llmInstruction": "你已绑定 TooGraph 能力选择器。Skill Pre-LLM Context 会列出当前启用的图模板和 Skill 清单，每项包含 key、名称、适用场景和权限摘要。你必须根据用户需求从清单中选择一个 capability 入参；优先选择图模板，其次选择 Skill；没有合适能力时选择 {\"kind\":\"none\"}。同时给出 selection_reason，并用 rejected_candidates 简短说明 1-5 个未选候选为什么不如当前选择合适。还必须在运行前判断 invocation_purpose：answer_delegate 表示把用户问题委托给该能力直接回答，evidence_gathering 表示只收集材料供外层综合，action_execution 表示执行操作或副作用；再给出 expected_final_response_strategy：answer_delegate 且目标模板 final_reply 可直接回答时用 pass_through，否则通常用 compose、ask_user 或 continue。不要编造清单外能力。运行 Skill 本身不需要审批；写文件、删改文件或执行脚本由运行时的 需确认/完全访问 模式处理，不由本选择器判断。",
-  "version": "1.1.0",
+  "description": "固定选择 TooGraph 页面操作 workflow。",
+  "llmInstruction": "你已绑定 TooGraph 能力选择器。本 Skill 不需要 LLM 选择候选能力；后处理会固定返回页面操作子图 capability。",
+  "version": "2.0.0",
   "timeoutSeconds": 30,
-  "permissions": [
-    "file_read"
-  ],
-  "stateInputSchema": [
-    {
-      "key": "requirement",
-      "name": "Requirement",
-      "valueType": "text",
-      "description": "用户希望完成的原始需求 state，能力选择器据此挑选单个 Skill、Subgraph 或 none。"
-    }
-  ],
-  "llmOutputSchema": [
-    {
-      "key": "requirement",
-      "name": "Requirement",
-      "valueType": "text",
-      "description": "用户希望完成的原始需求。"
-    },
-    {
-      "key": "origin",
-      "name": "Origin",
-      "valueType": "text",
-      "description": "能力选择来源，例如 buddy；没有特殊来源时返回 buddy。"
-    },
-    {
-      "key": "capability",
-      "name": "Capability",
-      "valueType": "capability",
-      "description": "LLM 从候选清单中选出的单个能力对象，kind 为 subgraph、skill 或 none。"
-    },
-    {
-      "key": "selection_reason",
-      "name": "Selection Reason",
-      "valueType": "text",
-      "description": "为什么选择该能力或为什么没有合适能力。"
-    },
-    {
-      "key": "invocation_purpose",
-      "name": "Invocation Purpose",
-      "valueType": "text",
-      "description": "本次调用能力的用途：answer_delegate 表示委托该能力直接回答用户；evidence_gathering 表示只收集材料；action_execution 表示执行操作或副作用。"
-    },
-    {
-      "key": "expected_final_response_strategy",
-      "name": "Expected Final Response Strategy",
-      "valueType": "text",
-      "description": "运行前预期的最终回复策略：pass_through、compose、ask_user 或 continue。answer_delegate 通常为 pass_through；收集材料或执行操作通常为 compose。"
-    },
-    {
-      "key": "rejected_candidates",
-      "name": "Rejected Candidates",
-      "valueType": "json",
-      "description": "简短列出若干未选择的候选能力及原因，格式为数组，每项包含 kind、key、reason；没有时返回空数组。"
-    }
-  ],
+  "permissions": [],
+  "stateInputSchema": [],
+  "llmOutputSchema": [],
   "stateOutputSchema": [
     {
       "key": "capability",
       "name": "Capability",
       "valueType": "capability",
-      "description": "单个能力对象，kind 为 subgraph、skill 或 none。"
+      "description": "固定页面操作子图 capability。"
     },
     {
       "key": "found",
       "name": "Found",
       "valueType": "boolean",
-      "description": "是否找到了可用的图模板或 Skill 能力。"
-    },
-    {
-      "key": "audit",
-      "name": "Audit",
-      "valueType": "json",
-      "description": "能力选择审计摘要，包含候选数量、选中能力、权限摘要、拒绝候选原因和缺口说明。"
+      "description": "固定为 true。"
     }
   ]
 }

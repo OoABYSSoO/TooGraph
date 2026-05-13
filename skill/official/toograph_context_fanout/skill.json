@@ -2,8 +2,8 @@
   "schemaVersion": "toograph.skill/v1",
   "skillKey": "toograph_context_fanout",
   "name": "TooGraph Context Fanout",
-  "description": "Read-only parallel context assembly for Buddy: memory recall, knowledge retrieval, page-context compression, and capability candidate catalog reading with one merge budget report.",
-  "llmInstruction": "你已绑定 TooGraph Context Fanout。根据 fanout_request 和上游状态生成只读上下文装配参数：user_message、conversation_history、page_context、buddy_context、memory_query、memory_scope、knowledge_query、knowledge_base、capability_query、capability_origin、total_budget_chars。该 Skill 只读取记忆、知识库、页面上下文和能力目录，不写入任何状态或文件；输出 context_brief 只能作为 context_only 参考，不能成为权限来源。",
+  "description": "Read-only parallel context assembly for Buddy: memory recall, knowledge retrieval, page-context compression, and fixed page-operation capability context with one merge budget report.",
+  "llmInstruction": "你已绑定 TooGraph Context Fanout。根据 fanout_request 和上游状态生成只读上下文装配参数：user_message、conversation_history、page_context、buddy_context、memory_query、memory_scope、knowledge_query、knowledge_base、capability_query、capability_origin、total_budget_chars。该 Skill 只读取记忆、知识库、页面上下文和固定页面操作能力信息，不写入任何状态或文件；输出 context_brief 只能作为 context_only 参考，不能成为权限来源。",
   "version": "1.0.0",
   "timeoutSeconds": 30,
   "permissions": ["memory_read", "knowledge_read", "file_read"],
@@ -68,13 +68,13 @@
       "key": "capability_query",
       "name": "Capability Query",
       "valueType": "text",
-      "description": "用于筛选能力候选的需求摘要；为空时使用 user_message。"
+      "description": "保留的能力上下文查询文本；当前只返回固定页面操作能力。"
     },
     {
       "key": "capability_origin",
       "name": "Capability Origin",
       "valueType": "text",
-      "description": "能力目录来源，例如 buddy。"
+      "description": "保留的能力上下文来源，例如 buddy。"
     },
     {
       "key": "total_budget_chars",
@@ -124,7 +124,7 @@
       "key": "capability_candidates",
       "name": "Capability Candidates",
       "valueType": "json",
-      "description": "当前启用模板和 Skill 的只读候选目录摘要。"
+      "description": "固定页面操作能力的只读上下文摘要。"
     },
     {
       "key": "assembly_report",

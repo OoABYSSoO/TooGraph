@@ -63,7 +63,7 @@ export type CanvasDoubleClickCreationAction =
   | { type: "open-creation-menu"; payload: CanvasNodeCreationMenuPayload };
 
 export type CanvasFileDropCreationPayload = {
-  file: File;
+  files: File[];
   position: GraphPosition;
   clientX: number;
   clientY: number;
@@ -258,7 +258,7 @@ export function resolveCanvasDoubleClickCreationAction(input: {
 export function resolveCanvasDropCreationAction(input: {
   interactionLocked: boolean;
   isIgnoredTarget: boolean;
-  file: File | null;
+  files: readonly File[];
   position: GraphPosition;
   clientX: number;
   clientY: number;
@@ -271,19 +271,33 @@ export function resolveCanvasDropCreationAction(input: {
     return { type: "ignore-target" };
   }
 
-  if (!input.file) {
+  if (input.files.length === 0) {
     return { type: "ignore-missing-file" };
   }
 
   return {
     type: "create-from-file",
     payload: {
-      file: input.file,
+      files: [...input.files],
       position: input.position,
       clientX: input.clientX,
       clientY: input.clientY,
     },
   };
+}
+
+export function resolveCanvasHasDraggedFiles(input: {
+  fileCount: number;
+  itemKinds: readonly string[];
+  types: readonly string[];
+}): boolean {
+  if (input.fileCount > 0) {
+    return true;
+  }
+  if (input.itemKinds.some((kind) => kind.toLowerCase() === "file")) {
+    return true;
+  }
+  return input.types.some((type) => type.toLowerCase() === "files");
 }
 
 export function resolveCanvasDragOverDropEffect(input: {

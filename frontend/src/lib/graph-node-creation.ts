@@ -280,6 +280,7 @@ export function buildInputNodeFromFile(params: {
 }): CreatedNodeResult {
   const stateKey = params.stateKey;
   const uploadedValue = params.localPath;
+  const boundaryType = resolveInputBoundaryTypeForFile(params.detectedType);
   return {
     id: params.id,
     node: {
@@ -290,6 +291,7 @@ export function buildInputNodeFromFile(params: {
       reads: [],
       writes: [{ state: stateKey, mode: "replace" }],
       config: {
+        boundaryType,
         value: uploadedValue,
       },
     },
@@ -301,6 +303,10 @@ export function buildInputNodeFromFile(params: {
       },
     },
   };
+}
+
+function resolveInputBoundaryTypeForFile(detectedType: string) {
+  return detectedType === "image" || detectedType === "audio" || detectedType === "video" ? detectedType : "file";
 }
 
 function ensureStateDefinitionForCreation<T extends GraphPayload | GraphDocument>(document: T, stateKey: string, stateType: string) {

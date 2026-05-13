@@ -89,7 +89,7 @@ TooGraph 的推荐模型配置入口是 Model Providers 页面。你可以在界
 - Git 管理的官方 Skill 定义来自 `skill/official/<skill_key>/` 文件夹；用户自定义 Skill 写入 `skill/user/<skill_key>/`。两类 Skill 包都可以进入 Git 管理；当前环境的启用状态只写入被忽略的 `skill/settings.json`，缺失时程序会按现有 Skill 自动生成和补齐。
 - 当前官方 Skill 包包括 `web_search`、`toograph_capability_selector`、`toograph_page_operator`、`toograph_skill_builder`、`toograph_script_tester`、`local_workspace_executor` 和内部 `buddy_home_writer`。
 - `web_search` 使用 `before_llm.py` 在技能入参规划前补充当前日期，使用 `after_llm.py` 执行联网搜索、引用整理、可选网页正文抓取、本地 source document artifact 输出，并把原文网址写入下载后的本地文档。
-- `toograph_capability_selector` 使用 `before_llm.py` 列出当前启用的图模板和可选 Skill 清单，再用 `after_llm.py` 校验并规范化模型选择的单个 `capability` state。
+- `toograph_capability_selector` 是硬约束的固定选择器：不再生成候选目录或审计信息，只通过 `after_llm.py` 输出 `found=true` 和 `{ "kind": "subgraph", "key": "toograph_page_operation_workflow" }`。
 - `toograph_page_operator` 读取当前页面操作书，支持普通页面 click 和编辑器 `graph_edit editor.graph.playback`，让 Buddy 通过应用内虚拟鼠标/键盘可见地执行页面操作。
 - `toograph_skill_builder` 使用 `before_llm.py` 注入当前 Skill 编写指南，生成 `skill_key`、`skill.json`、`SKILL.md`、`before_llm.py`、`after_llm.py` 和可选 `requirements.txt` 内容；它不负责写入、测试、修复或启用生成的 Skill。
 - `toograph_script_tester` 接收脚本内容和测试目标，由 LLM 生成临时测试工作区并运行允许的测试命令；它不再只限定 Python/pytest，执行前仍受当前图或 Buddy 权限模式约束。
@@ -335,7 +335,7 @@ TooGraph/
 
 `buddy_autonomous_review` 是当前 Buddy 的后台自主复盘路径：可见回复完成后由前端用 run snapshot 启动，模型自行判断是否需要低风险写回 Buddy Home，并通过 `buddy_home_writer` 走 command / revision 路径留下可回滚记录。
 
-`toograph_skill_creation_workflow` 是创建用户自定义 Skill 的官方流程模板：它会检查已有能力、澄清需求、生成示例输入输出，调用 `toograph_skill_builder` 生成 `skill_key` / `skill.json` / `SKILL.md` / `before_llm.py` / `after_llm.py` / `requirements.txt`，再用 `toograph_script_tester` 测试生命周期脚本或相关文件；测试失败会回到构建节点修复，最后通过受控执行器写入 `skill/user/<skill_key>/`。
+`toograph_skill_creation_workflow` 是创建用户自定义 Skill 的官方流程模板：它会澄清需求、读取可选的已有 Skill 包、生成示例输入输出，调用 `toograph_skill_builder` 生成 `skill_key` / `skill.json` / `SKILL.md` / `before_llm.py` / `after_llm.py` / `requirements.txt`，再用 `toograph_script_tester` 测试生命周期脚本或相关文件；测试失败会回到构建节点修复，最后通过受控执行器写入 `skill/user/<skill_key>/`。
 
 ## 文档与知识库
 

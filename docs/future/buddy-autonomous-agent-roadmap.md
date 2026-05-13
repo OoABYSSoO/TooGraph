@@ -9,7 +9,7 @@
 - 图协议与校验：`backend/app/core/schemas/`、`backend/app/core/compiler/`
 - 运行时：`backend/app/core/langgraph/`、`backend/app/core/runtime/`
 - Buddy 前端链路：`frontend/src/buddy/`
-- 模板与能力发现测试：`backend/tests/test_template_layouts.py`、`backend/tests/test_toograph_capability_selector_skill.py`
+- 模板与固定能力选择测试：`backend/tests/test_template_layouts.py`、`backend/tests/test_toograph_capability_selector_skill.py`
 
 ## 长期约束
 
@@ -55,8 +55,7 @@
 
 当前基线与后续约束：
 
-- 为目标模板公开 output 建立结果契约：能力选择目录已读取 `metadata.outputContract` 或从 root output 节点推导默认契约，并把 final_response/evidence/artifact/internal、direct pass-through、required 标志写入 capability/audit；`advanced_web_research_loop` 与 `toograph_page_operation_workflow` 已声明首批显式契约。
-- 在能力选择阶段前置判断：selector catalog 已把 output contract 注入 LLM 选择上下文，并在归一化时阻止 evidence-only 模板被登记为 `answer_delegate/pass_through`；只有声明 direct `final_response` 的模板才保留运行后可透传路径，其余走后续整理节点。
+- 当前官方 selector 已收敛为固定页面操作入口，只输出 `found` 与 `capability`，其中 capability 固定为 `toograph_page_operation_workflow`；后续如恢复多能力发现，应重新通过图模板表达候选、校验和审计，而不是把复杂 catalog 逻辑塞回 selector Skill。
 - 为 `result_package` 增加预算化摘要和 artifact refs：result_package state 在下游 LLM prompt 中按输入/输出预算渲染为 `inputs_summary`、`value_summary`、`value_omitted` 与紧凑 `artifact_refs`，完整 state 仍保留在运行记录中，避免把原始日志、大页面快照或长正文直接塞进外层 LLM。
 - 对触发的目标 run 读取终态、root outputs、errors、warnings、activity events 和 artifacts，生成结构化 validation report；页面操作续跑报告已携带紧凑 target run validation，Buddy 可见子图适配器已把它写入 `capability_result.outputs.validation_report`，并用 output contract 判断 pass-through、missing required outputs、repair/user-reply 需求。
 - 失败后支持有限修复：Buddy 可见子图适配器已在 validation report 中输出 `repair_options`，限定为重新绑定输入、重新运行、切换模板、请求用户补充或明确结束并说明缺口；能力复核节点只从这些方向中选择下一步。

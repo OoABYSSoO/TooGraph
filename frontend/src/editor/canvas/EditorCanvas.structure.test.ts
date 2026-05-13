@@ -1179,10 +1179,12 @@ test("EditorCanvas emits node-creation intents for empty-canvas double click and
   assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasDoubleClickCreationAction/);
   assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasDragOverDropEffect/);
   assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasDropCreationAction/);
+  assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasHasDraggedFiles/);
   assert.match(componentSource, /import \{[\s\S]*resolveCanvasDoubleClickCreationAction,[\s\S]*\} from "\.\/canvasConnectionInteractionModel";/);
   assert.match(componentSource, /import \{[\s\S]*resolveCanvasDragOverDropEffect,[\s\S]*\} from "\.\/canvasConnectionInteractionModel";/);
   assert.match(componentSource, /import \{[\s\S]*resolveCanvasDropCreationAction,[\s\S]*\} from "\.\/canvasConnectionInteractionModel";/);
-  assert.match(componentSource, /event\.dataTransfer!\.dropEffect = resolveCanvasDragOverDropEffect\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*hasDraggedFiles: Boolean\(event\.dataTransfer\?\.files\?\.length\),[\s\S]*\}\);/);
+  assert.match(componentSource, /import \{[\s\S]*resolveCanvasHasDraggedFiles,[\s\S]*\} from "\.\/canvasConnectionInteractionModel";/);
+  assert.match(componentSource, /event\.dataTransfer!\.dropEffect = resolveCanvasDragOverDropEffect\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*hasDraggedFiles: resolveCanvasHasDraggedFiles\(\{[\s\S]*fileCount: dataTransfer\?\.files\?\.length \?\? 0,[\s\S]*itemKinds: dataTransfer\?\.items \? Array\.from\(dataTransfer\.items\)\.map\(\(item\) => item\.kind\) : \[\],[\s\S]*types: dataTransfer\?\.types \? Array\.from\(dataTransfer\.types\) : \[\],[\s\S]*\}\),[\s\S]*\}\);/);
   assert.match(componentSource, /function handleCanvasDoubleClick\(event: MouseEvent\)/);
   assert.match(componentSource, /const doubleClickCreationAction = resolveCanvasDoubleClickCreationAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*isIgnoredTarget: isIgnoredCanvasDoubleClickTarget\(target\),[\s\S]*position: resolveCanvasPoint\(event\),[\s\S]*clientX: event\.clientX,[\s\S]*clientY: event\.clientY,[\s\S]*\}\);/);
   assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
@@ -1190,7 +1192,7 @@ test("EditorCanvas emits node-creation intents for empty-canvas double click and
   assert.match(componentSource, /case "open-creation-menu":[\s\S]*emit\("open-node-creation-menu", doubleClickCreationAction\.payload\);/);
   assert.match(componentSource, /function isIgnoredCanvasDoubleClickTarget\(target: HTMLElement \| null\)/);
   assert.doesNotMatch(componentSource, /if \(\s*target\?\.closest\([\s\S]*\)\s*\) \{\s*return;\s*\}\s*const position = resolveCanvasPoint\(event\);/);
-  assert.match(componentSource, /const dropCreationAction = resolveCanvasDropCreationAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*isIgnoredTarget: isIgnoredCanvasDropTarget\(target\),[\s\S]*file: event\.dataTransfer\?\.files\?\.\[0\] \?\? null,[\s\S]*position: resolveCanvasPoint\(event\),[\s\S]*clientX: event\.clientX,[\s\S]*clientY: event\.clientY,[\s\S]*\}\);/);
+  assert.match(componentSource, /const dropCreationAction = resolveCanvasDropCreationAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*isIgnoredTarget: isIgnoredCanvasDropTarget\(target\),[\s\S]*files: event\.dataTransfer\?\.files \? Array\.from\(event\.dataTransfer\.files\) : \[\],[\s\S]*position: resolveCanvasPoint\(event\),[\s\S]*clientX: event\.clientX,[\s\S]*clientY: event\.clientY,[\s\S]*\}\);/);
   assert.match(componentSource, /case "create-from-file":[\s\S]*emit\("create-node-from-file", dropCreationAction\.payload\);/);
   assert.match(componentSource, /function isIgnoredCanvasDropTarget\(target: HTMLElement \| null\)/);
 });

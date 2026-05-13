@@ -4,7 +4,6 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
-import re
 import sys
 from typing import Any, Callable
 
@@ -225,31 +224,33 @@ def _page_branch(
 
 
 def _capabilities_branch(*, query: str, origin: str, budget_chars: int) -> dict[str, Any]:
-    selector_dir = Path(__file__).resolve().parents[1] / "toograph_capability_selector"
-    if str(selector_dir) not in sys.path:
-        sys.path.insert(0, str(selector_dir))
-    from capability_catalog import load_capability_catalog
-
-    catalog = load_capability_catalog(origin=origin or "buddy")
-    query_terms = _query_terms(query)
-    templates = _rank_capability_candidates(catalog.get("templates") or [], query_terms)
-    skills = _rank_capability_candidates(catalog.get("skills") or [], query_terms)
+    templates = [
+        {
+            "kind": "subgraph",
+            "key": "toograph_page_operation_workflow",
+            "name": "操作 TooGraph 页面",
+            "description": "固定 TooGraph 页面操作入口。",
+            "permissions": [],
+            "output_contract": [],
+            "score": 0,
+        }
+    ]
+    skills: list[dict[str, Any]] = []
     value = {
         "kind": "capability_candidates",
         "origin": origin or "buddy",
         "query": query,
-        "templates": templates[:8],
-        "skills": skills[:8],
+        "templates": templates,
+        "skills": skills,
         "counts": {
-            "templates": len(catalog.get("templates") or []),
-            "skills": len(catalog.get("skills") or []),
-            "errors": len(catalog.get("errors") or []),
+            "templates": len(templates),
+            "skills": 0,
+            "errors": 0,
         },
-        "errors": catalog.get("errors") or [],
+        "errors": [],
     }
     summary_lines = [
         *[f"- template:{item['key']} {item.get('name', '')}" for item in value["templates"][:5]],
-        *[f"- skill:{item['key']} {item.get('name', '')}" for item in value["skills"][:5]],
     ]
     return _branch_result(
         "capabilities",
@@ -388,34 +389,6 @@ def _budget_text(value: str, max_chars: int, *, source: str) -> tuple[str, list[
     )
 
 
-def _rank_capability_candidates(candidates: list[Any], query_terms: set[str]) -> list[dict[str, Any]]:
-    normalized: list[dict[str, Any]] = []
-    for item in candidates:
-        if not isinstance(item, dict):
-            continue
-        text = " ".join(
-            [
-                str(item.get("key") or ""),
-                str(item.get("name") or ""),
-                str(item.get("description") or ""),
-                " ".join(str(flow) for flow in item.get("target_flows") or []),
-            ]
-        ).lower()
-        score = sum(1 for term in query_terms if term and term in text)
-        normalized.append(
-            {
-                "kind": str(item.get("kind") or ""),
-                "key": str(item.get("key") or ""),
-                "name": str(item.get("name") or ""),
-                "description": str(item.get("description") or ""),
-                "permissions": list(item.get("permissions") or []),
-                "output_contract": list(item.get("output_contract") or []),
-                "score": score,
-            }
-        )
-    return sorted(normalized, key=lambda item: (-int(item.get("score") or 0), item["kind"], item["key"]))
-
-
 def _detect_conflicts(branch_results: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     conflicts: list[dict[str, Any]] = []
     page_summary = str(branch_results.get("page", {}).get("summary") or "").lower()
@@ -447,10 +420,6 @@ def _buddy_context_summary(value: Any) -> str:
             return "Buddy Home selected files: " + ", ".join(str(item) for item in selected)
         return json.dumps(_safe_json(value), ensure_ascii=False, sort_keys=True)
     return _text(value)
-
-
-def _query_terms(value: str) -> set[str]:
-    return {part for part in re.split(r"[^0-9A-Za-z_\u4e00-\u9fff]+", value.lower()) if len(part) >= 2}
 
 
 def _section(name: str, value: str) -> str:

@@ -90,12 +90,19 @@ test("uploaded asset presentation helpers preserve NodeCard display text", () =>
   assert.match(resolveUploadedAssetInputAccept("file"), /video\/\*/);
   assert.match(resolveUploadedAssetInputAccept("file"), /application\/pdf/);
   assert.match(resolveUploadedAssetInputAccept("file"), /\.docx/);
+  assert.match(resolveUploadedAssetInputAccept("file"), /\.py/);
+  assert.match(resolveUploadedAssetInputAccept("file"), /\.ts/);
   assert.match(resolveUploadedAssetInputAccept(null), /image\/\*/);
   assert.match(resolveUploadedAssetInputAccept(null), /video\/\*/);
   assert.match(resolveUploadedAssetInputAccept(null), /application\/pdf/);
   assert.equal(resolveUploadedAssetSummary(textAsset), "text/plain · 2 KB");
   assert.equal(resolveUploadedAssetTextPreview(textAsset), "a".repeat(3000));
   assert.equal(resolveUploadedAssetDescription(textAsset, "file"), "Stored as file upload. text/plain · 2 KB");
+});
+
+test("uploaded asset local-path fallback recognizes common code file MIME types", () => {
+  assert.equal(tryParseUploadedAssetEnvelope("uploads/script.py", "file")?.contentType, "text/x-python");
+  assert.equal(tryParseUploadedAssetEnvelope("uploads/component.ts", "file")?.contentType, "text/typescript");
 });
 
 test("uploaded asset description helper returns empty-state copy by target type", () => {

@@ -1,20 +1,21 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
 from typing import Any
 
 
-SKILL_DIR = Path(__file__).resolve().parent
-if str(SKILL_DIR) not in sys.path:
-    sys.path.insert(0, str(SKILL_DIR))
+PAGE_OPERATION_CAPABILITY = {
+    "kind": "subgraph",
+    "key": "toograph_page_operation_workflow",
+}
 
-from capability_catalog import normalize_selected_capability  # noqa: E402
 
-
-def toograph_capability_selector(**skill_inputs: Any) -> dict[str, Any]:
-    return normalize_selected_capability(**skill_inputs)
+def toograph_capability_selector(**_skill_inputs: Any) -> dict[str, Any]:
+    return {
+        "capability": dict(PAGE_OPERATION_CAPABILITY),
+        "found": True,
+    }
 
 
 def main() -> None:

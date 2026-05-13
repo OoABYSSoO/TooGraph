@@ -51,7 +51,42 @@ const DOCUMENT_ACCEPT = [
   ".numbers",
   ".key",
 ].join(",");
-const GENERIC_FILE_ACCEPT = [IMAGE_ACCEPT, AUDIO_ACCEPT, VIDEO_ACCEPT, DOCUMENT_ACCEPT].join(",");
+const CODE_ACCEPT = [
+  ".py",
+  ".js",
+  ".jsx",
+  ".ts",
+  ".tsx",
+  ".vue",
+  ".css",
+  ".scss",
+  ".less",
+  ".java",
+  ".c",
+  ".cc",
+  ".cpp",
+  ".h",
+  ".hpp",
+  ".cs",
+  ".go",
+  ".rs",
+  ".rb",
+  ".php",
+  ".sh",
+  ".bash",
+  ".zsh",
+  ".fish",
+  ".bat",
+  ".cmd",
+  ".ps1",
+  ".sql",
+  ".toml",
+  ".ini",
+  ".env",
+  ".log",
+  ".gitignore",
+].join(",");
+const GENERIC_FILE_ACCEPT = [IMAGE_ACCEPT, AUDIO_ACCEPT, VIDEO_ACCEPT, DOCUMENT_ACCEPT, CODE_ACCEPT].join(",");
 
 export function isUploadedAssetStateType(stateType: string): stateType is UploadedAssetType {
   return stateType === "image" || stateType === "audio" || stateType === "video" || stateType === "file";
@@ -284,6 +319,18 @@ function resolveMimeTypeFromFileName(fileName: string, detectedType: UploadedAss
   }
   if (/\.jsonl?$/i.test(fileName)) {
     return "application/json";
+  }
+  if (/\.py$/i.test(fileName)) {
+    return "text/x-python";
+  }
+  if (/\.tsx?$/i.test(fileName)) {
+    return "text/typescript";
+  }
+  if (/\.jsx?$/i.test(fileName)) {
+    return "text/javascript";
+  }
+  if (/\.(vue|css|scss|less|sql|toml|ini|env|sh|bash|zsh|fish|bat|cmd|ps1|java|c|cc|cpp|h|hpp|cs|go|rs|rb|php)$/i.test(fileName)) {
+    return "text/plain";
   }
   return "application/octet-stream";
 }
