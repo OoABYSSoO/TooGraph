@@ -42,7 +42,10 @@
               <ElFormItem :label="t('buddyPage.binding.template')">
                 <ElSelect
                   v-model="bindingDraft.template_id"
+                  class="buddy-page__template-select toograph-select"
                   :loading="isLoadingBindingTemplate"
+                  :teleported="false"
+                  popper-class="toograph-select-popper buddy-page__binding-select-popper"
                   filterable
                   @change="selectBindingTemplate"
                 >
@@ -51,7 +54,12 @@
                     :key="option.value"
                     :label="option.label"
                     :value="option.value"
-                  />
+                  >
+                    <span class="buddy-page__template-option">
+                      <strong>{{ option.name }}</strong>
+                      <small>{{ option.value }}</small>
+                    </span>
+                  </ElOption>
                 </ElSelect>
               </ElFormItem>
               <ElAlert
@@ -84,11 +92,13 @@
                   <label class="buddy-page__binding-picker">
                     <span>{{ t("buddyPage.binding.inputNode") }}</span>
                     <ElSelect
-                      class="buddy-page__binding-select"
+                      class="buddy-page__binding-select toograph-select"
                       :model-value="row.selectedNodeId"
                       :placeholder="t('buddyPage.binding.selectInputNode')"
                       :clearable="!row.required"
                       :disabled="!selectedBindingTemplate"
+                      :teleported="false"
+                      popper-class="toograph-select-popper buddy-page__binding-select-popper"
                       filterable
                       @update:model-value="setBindingInputNode(row.source, $event)"
                     >
@@ -96,14 +106,33 @@
                         v-if="!row.required"
                         :label="t('buddyPage.binding.sources.none')"
                         value=""
-                      />
+                      >
+                        <span class="buddy-page__binding-option buddy-page__binding-option--empty">
+                          <strong>{{ t("buddyPage.binding.sources.none") }}</strong>
+                          <small>{{ t("buddyPage.binding.noInputNode") }}</small>
+                        </span>
+                      </ElOption>
                       <ElOption
                         v-for="option in bindingInputNodeOptionsForSource(row.source)"
                         :key="option.value"
                         :label="option.label"
                         :value="option.value"
                         :disabled="option.disabled"
-                      />
+                      >
+                        <span
+                          class="buddy-page__binding-option"
+                          :class="{ 'buddy-page__binding-option--disabled': option.disabled }"
+                        >
+                          <span class="buddy-page__binding-option-main">
+                            <strong>{{ option.nodeName }}</strong>
+                            <small>{{ option.stateName || t("common.state") }}</small>
+                          </span>
+                          <code>{{ option.stateKey || option.value }}</code>
+                          <small v-if="bindingOptionDisabledReason(option)" class="buddy-page__binding-option-reason">
+                            {{ bindingOptionDisabledReason(option) }}
+                          </small>
+                        </span>
+                      </ElOption>
                     </ElSelect>
                   </label>
 
@@ -122,8 +151,9 @@
                   </div>
                 </article>
               </section>
-              <div class="buddy-page__actions">
+              <div class="buddy-page__actions buddy-page__binding-actions">
                 <ElButton
+                  class="buddy-page__binding-action buddy-page__binding-action--primary"
                   type="primary"
                   :loading="isSavingBinding"
                   :disabled="!bindingValidation.valid"
@@ -132,7 +162,11 @@
                   <ElIcon><Check /></ElIcon>
                   <span>{{ t("buddyPage.binding.save") }}</span>
                 </ElButton>
-                <ElButton :disabled="isSavingBinding" @click="resetBindingToDefault">
+                <ElButton
+                  class="buddy-page__binding-action buddy-page__binding-action--secondary"
+                  :disabled="isSavingBinding"
+                  @click="resetBindingToDefault"
+                >
                   {{ t("buddyPage.binding.resetDefault") }}
                 </ElButton>
               </div>
@@ -505,6 +539,7 @@ import { fetchTemplate, fetchTemplates } from "@/api/graphs";
 import { cancelRun, fetchRun, fetchRuns, resumeRun } from "@/api/runs";
 import BuddyPauseCard from "@/buddy/BuddyPauseCard.vue";
 import {
+  BUDDY_RUN_INPUT_SOURCE_OPTIONS,
   buildBuddyRunInputNodeOptions,
   buildBuddyRunTemplateInputRows,
   buildBuddyRunTemplateSourceRows,
@@ -526,7 +561,7 @@ import type {
   BuddyRunTemplateBinding,
   BuddySessionSummary,
 } from "@/types/buddy";
-import type { BuddyRunTemplateInputRow } from "@/buddy/buddyTemplateBindingModel";
+import type { BuddyRunInputNodeOption, BuddyRunTemplateInputRow } from "@/buddy/buddyTemplateBindingModel";
 import type { TemplateRecord } from "@/types/node-system";
 import type { RunDetail, RunSummary } from "@/types/run";
 
@@ -602,6 +637,7 @@ const bindingValidation = computed(() => validateBuddyRunTemplateBinding(selecte
 const bindingTemplateOptions = computed(() =>
   availableTemplates.value.map((template) => ({
     label: `${template.label} (${template.template_id})`,
+    name: template.label,
     value: template.template_id,
   })),
 );
@@ -710,6 +746,18 @@ function historyDiffKindLabel(kind: BuddyRevisionDiffChangeKind) {
 
 function bindingInputNodeOptionsForSource(source: BuddyRunInputSource) {
   return buildBuddyRunInputNodeOptions(selectedBindingTemplate.value, bindingDraft.value, source);
+}
+
+function bindingInputSourceLabel(source: BuddyRunInputSource) {
+  const option = BUDDY_RUN_INPUT_SOURCE_OPTIONS.find((candidate) => candidate.value === source);
+  return option ? t(option.labelKey) : source;
+}
+
+function bindingOptionDisabledReason(option: BuddyRunInputNodeOption) {
+  if (option.disabledSource) {
+    return t("buddyPage.binding.alreadyBoundTo", { source: bindingInputSourceLabel(option.disabledSource) });
+  }
+  return option.disabledReason;
 }
 
 function selectedBindingInputRow(nodeId: string): BuddyRunTemplateInputRow | null {
@@ -1229,6 +1277,54 @@ onMounted(loadAll);
   flex-wrap: wrap;
 }
 
+.buddy-page__binding-actions {
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 2px;
+}
+
+.buddy-page__binding-action {
+  min-height: 38px;
+  border-radius: 14px;
+  padding: 9px 15px;
+  font-weight: 750;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.buddy-page__binding-action:hover:not(.is-disabled) {
+  transform: translateY(-1px);
+}
+
+.buddy-page__binding-action--primary {
+  border-color: rgba(154, 52, 18, 0.18);
+  background: linear-gradient(180deg, rgb(180, 83, 9), rgb(154, 52, 18));
+  box-shadow: 0 10px 18px rgba(154, 52, 18, 0.16);
+  color: rgb(255, 248, 240);
+}
+
+.buddy-page__binding-action--primary:hover:not(.is-disabled) {
+  border-color: rgba(154, 52, 18, 0.24);
+  background: linear-gradient(180deg, rgb(190, 90, 15), rgb(124, 45, 18));
+  box-shadow: 0 14px 24px rgba(154, 52, 18, 0.2);
+}
+
+.buddy-page__binding-action--secondary {
+  border-color: rgba(154, 52, 18, 0.16);
+  background:
+    var(--toograph-glass-specular),
+    rgba(255, 251, 246, 0.86);
+  color: rgb(124, 45, 18);
+  box-shadow: var(--toograph-glass-highlight);
+}
+
+.buddy-page__binding-action--secondary:hover:not(.is-disabled) {
+  border-color: rgba(154, 52, 18, 0.24);
+  background:
+    var(--toograph-glass-specular),
+    rgba(255, 248, 240, 0.96);
+  color: rgb(154, 52, 18);
+}
+
 .buddy-page__table {
   width: 100%;
 }
@@ -1320,6 +1416,153 @@ onMounted(loadAll);
 
 .buddy-page__binding-select {
   width: 100%;
+}
+
+.buddy-page__template-select {
+  width: 100%;
+}
+
+.buddy-page__template-select :deep(.el-select__wrapper),
+.buddy-page__binding-select :deep(.el-select__wrapper) {
+  min-height: 40px;
+  border-radius: 14px;
+  background:
+    var(--toograph-glass-specular),
+    rgba(255, 255, 255, 0.72);
+}
+
+.buddy-page__binding-card--required .buddy-page__binding-select :deep(.el-select__wrapper) {
+  border-color: rgba(217, 119, 6, 0.2);
+  background:
+    var(--toograph-glass-specular),
+    rgba(255, 252, 247, 0.9);
+}
+
+.buddy-page__template-option {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.buddy-page__template-option strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--toograph-text-strong);
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buddy-page__template-option small {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(60, 41, 20, 0.58);
+  font-family: var(--toograph-font-mono);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buddy-page__binding-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  line-height: 1.2;
+}
+
+.buddy-page__binding-option-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.buddy-page__binding-option strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--toograph-text-strong);
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buddy-page__binding-option small {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(60, 41, 20, 0.58);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buddy-page__binding-option code {
+  max-width: 120px;
+  overflow: hidden;
+  border: 1px solid rgba(154, 52, 18, 0.08);
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: rgba(255, 248, 240, 0.92);
+  color: rgb(154, 52, 18);
+  font-family: var(--toograph-font-mono);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buddy-page__binding-option-reason {
+  grid-column: 1 / -1;
+  color: rgba(154, 52, 18, 0.66) !important;
+}
+
+.buddy-page__binding-option--empty,
+.buddy-page__binding-option--disabled {
+  opacity: 0.72;
+}
+
+:global(.buddy-page__binding-select-popper .el-select-dropdown__item) {
+  height: auto;
+  min-height: 42px;
+  padding: 7px 10px;
+}
+
+:global(.buddy-page__binding-select-popper.el-popper) {
+  border-color: rgba(154, 52, 18, 0.14);
+  background: rgb(255, 252, 247);
+  box-shadow:
+    var(--toograph-glass-highlight),
+    0 18px 38px rgba(61, 43, 24, 0.14);
+}
+
+:global(.buddy-page__binding-select-popper .el-select-dropdown) {
+  border-radius: 16px;
+  background:
+    var(--toograph-glass-specular),
+    rgb(255, 252, 247);
+}
+
+:global(.buddy-page__binding-select-popper .el-popper__arrow::before) {
+  border-color: rgba(154, 52, 18, 0.14);
+  background: rgb(255, 252, 247);
+}
+
+:global(.buddy-page__binding-select-popper .el-select-dropdown__item.hover),
+:global(.buddy-page__binding-select-popper .el-select-dropdown__item:hover) {
+  background: rgb(255, 248, 240);
+}
+
+:global(.buddy-page__binding-select-popper .el-select-dropdown__item.is-selected) {
+  background: rgba(154, 52, 18, 0.12);
+}
+
+:global(.buddy-page__binding-select-popper .el-select-dropdown__item.is-disabled) {
+  cursor: not-allowed;
+}
+
+:global(.buddy-page__binding-select-popper .el-select-dropdown__item.is-disabled:hover) {
+  background: transparent;
 }
 
 .buddy-page__binding-state-card {

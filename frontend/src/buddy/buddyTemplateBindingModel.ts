@@ -33,6 +33,11 @@ export type BuddyRunTemplateSourceRow = {
 export type BuddyRunInputNodeOption = {
   value: string;
   label: string;
+  nodeName: string;
+  stateName: string;
+  stateKey: string;
+  stateType: string;
+  disabledSource?: BuddyRunInputSource;
   disabled: boolean;
   disabledReason: string;
 };
@@ -86,6 +91,11 @@ export function buildBuddyRunInputNodeOptions(
     return {
       value: row.nodeId,
       label: formatInputNodeOptionLabel(row),
+      nodeName: row.nodeName,
+      stateName: row.stateName,
+      stateKey: row.stateKey,
+      stateType: row.stateType,
+      disabledSource: selectedSource,
       disabled: Boolean(disabledReason),
       disabledReason,
     };

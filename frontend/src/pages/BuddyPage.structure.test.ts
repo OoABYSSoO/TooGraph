@@ -48,6 +48,13 @@ test("BuddyPage opens template binding first and renders it as Buddy input rows"
   assert.match(source, /setBuddyRunTemplateSourceBinding/);
   assert.match(source, /v-for="row in bindingSourceRows"/);
   assert.match(source, /class="buddy-page__binding-card"/);
+  assert.match(source, /class="buddy-page__template-select toograph-select"/);
+  assert.match(source, /popper-class="toograph-select-popper buddy-page__binding-select-popper"/);
+  assert.match(source, /class="buddy-page__binding-select toograph-select"/);
+  assert.match(source, /class="buddy-page__binding-option"/);
+  assert.match(source, /bindingOptionDisabledReason\(option\)/);
+  assert.match(source, /class="buddy-page__binding-action buddy-page__binding-action--primary"/);
+  assert.match(source, /class="buddy-page__binding-action buddy-page__binding-action--secondary"/);
   assert.match(source, /:model-value="row\.selectedNodeId"/);
   assert.match(source, /@update:model-value="setBindingInputNode\(row\.source, \$event\)"/);
   assert.doesNotMatch(source, /:model-value="bindingDraft\.input_bindings\[row\.nodeId\]/);
