@@ -176,6 +176,79 @@
           </article>
         </ElTabPane>
 
+        <ElTabPane :label="t('buddyPage.tabs.binding')" name="binding">
+          <article class="buddy-page__panel">
+            <div class="buddy-page__panel-heading">
+              <div>
+                <h3>{{ t("buddyPage.binding.title") }}</h3>
+                <p>{{ t("buddyPage.binding.body") }}</p>
+              </div>
+            </div>
+            <ElForm label-position="top" class="buddy-page__form buddy-page__form--wide">
+              <ElFormItem :label="t('buddyPage.binding.template')">
+                <ElSelect
+                  v-model="bindingDraft.template_id"
+                  :loading="isLoadingBindingTemplate"
+                  filterable
+                  @change="selectBindingTemplate"
+                >
+                  <ElOption
+                    v-for="option in bindingTemplateOptions"
+                    :key="option.value"
+                    :label="option.label"
+                    :value="option.value"
+                  />
+                </ElSelect>
+              </ElFormItem>
+              <ElAlert
+                v-if="!bindingValidation.valid"
+                type="warning"
+                show-icon
+                :closable="false"
+                :title="bindingValidation.issues.join(' ')"
+              />
+              <ElTable :data="bindingInputRows" class="buddy-page__table buddy-page__binding-table" empty-text=" ">
+                <ElTableColumn prop="nodeName" :label="t('buddyPage.binding.inputNode')" min-width="150" />
+                <ElTableColumn prop="nodeId" :label="t('buddyPage.binding.nodeId')" min-width="190" show-overflow-tooltip />
+                <ElTableColumn prop="stateName" :label="t('buddyPage.binding.stateName')" min-width="150" />
+                <ElTableColumn prop="stateKey" :label="t('buddyPage.binding.stateKey')" min-width="160" show-overflow-tooltip />
+                <ElTableColumn prop="stateType" :label="t('buddyPage.binding.stateType')" width="110" />
+                <ElTableColumn :label="t('buddyPage.binding.source')" min-width="210" fixed="right">
+                  <template #default="{ row }">
+                    <ElSelect
+                      :model-value="bindingDraft.input_bindings[row.nodeId] || ''"
+                      :disabled="Boolean(row.disabledReason)"
+                      @update:model-value="(value) => setBindingSource(row.nodeId, value)"
+                    >
+                      <ElOption
+                        v-for="option in bindingSourceOptions"
+                        :key="option.value"
+                        :label="option.label"
+                        :value="option.value"
+                      />
+                    </ElSelect>
+                    <small v-if="row.disabledReason" class="buddy-page__binding-warning">{{ row.disabledReason }}</small>
+                  </template>
+                </ElTableColumn>
+              </ElTable>
+              <div class="buddy-page__actions">
+                <ElButton
+                  type="primary"
+                  :loading="isSavingBinding"
+                  :disabled="!bindingValidation.valid"
+                  @click="saveBinding"
+                >
+                  <ElIcon><Check /></ElIcon>
+                  <span>{{ t("buddyPage.binding.save") }}</span>
+                </ElButton>
+                <ElButton :disabled="isSavingBinding" @click="resetBindingToDefault">
+                  {{ t("buddyPage.binding.resetDefault") }}
+                </ElButton>
+              </div>
+            </ElForm>
+          </article>
+        </ElTabPane>
+
         <ElTabPane :label="t('buddyPage.tabs.confirmation')" name="confirmation">
           <section class="buddy-page__split buddy-page__split--confirmations">
             <article class="buddy-page__panel buddy-page__panel--paused-list">
@@ -361,7 +434,9 @@ import {
   ElInput,
   ElMessage,
   ElMessageBox,
+  ElOption,
   ElSegmented,
+  ElSelect,
   ElTabPane,
   ElTable,
   ElTableColumn,
@@ -380,15 +455,24 @@ import {
   fetchBuddyPolicy,
   fetchBuddyProfile,
   fetchBuddyRevisions,
+  fetchBuddyRunTemplateBinding,
   fetchBuddySessionSummary,
   restoreBuddyRevision,
   updateBuddyMemory,
   updateBuddyPolicy,
   updateBuddyProfile,
+  updateBuddyRunTemplateBinding,
   updateBuddySessionSummary,
 } from "@/api/buddy";
+import { fetchTemplate, fetchTemplates } from "@/api/graphs";
 import { cancelRun, fetchRun, fetchRuns, resumeRun } from "@/api/runs";
 import BuddyPauseCard from "@/buddy/BuddyPauseCard.vue";
+import {
+  BUDDY_RUN_INPUT_SOURCE_OPTIONS,
+  buildBuddyRunTemplateInputRows,
+  buildDefaultBuddyRunTemplateBinding,
+  validateBuddyRunTemplateBinding,
+} from "@/buddy/buddyTemplateBindingModel";
 import AppShell from "@/layouts/AppShell.vue";
 import { useBuddyContextStore } from "@/stores/buddyContext";
 import { useBuddyMascotDebugStore } from "@/stores/buddyMascotDebug";
@@ -399,8 +483,11 @@ import type {
   BuddyPolicy,
   BuddyProfile,
   BuddyRevision,
+  BuddyRunInputSource,
+  BuddyRunTemplateBinding,
   BuddySessionSummary,
 } from "@/types/buddy";
+import type { TemplateRecord } from "@/types/node-system";
 import type { RunDetail, RunSummary } from "@/types/run";
 
 import {
@@ -427,8 +514,10 @@ const isSavingProfile = ref(false);
 const isSavingPolicy = ref(false);
 const isSavingMemory = ref(false);
 const isSavingSummary = ref(false);
+const isSavingBinding = ref(false);
 const isLoadingPausedRuns = ref(false);
 const isLoadingPausedRunDetail = ref(false);
+const isLoadingBindingTemplate = ref(false);
 const pausedRunActionBusy = ref(false);
 const memoryActionId = ref("");
 const restoreActionId = ref("");
@@ -440,6 +529,9 @@ const memories = ref<BuddyMemory[]>([]);
 const memoryDraft = ref<MemoryDraft>(defaultMemoryDraft());
 const editingMemoryId = ref("");
 const summaryDraft = ref<BuddySessionSummary>(defaultSummaryDraft());
+const availableTemplates = ref<TemplateRecord[]>([]);
+const selectedBindingTemplate = ref<TemplateRecord | null>(null);
+const bindingDraft = ref<BuddyRunTemplateBinding>(buildDefaultBuddyRunTemplateBinding());
 const revisions = ref<BuddyRevision[]>([]);
 const commands = ref<BuddyCommandRecord[]>([]);
 const lastCommand = ref<BuddyCommandRecord | null>(null);
@@ -464,6 +556,20 @@ const canSaveMemory = computed(() => {
 });
 const orderedRevisionRows = computed(() => buildBuddyRevisionHistoryRows(revisions.value, commands.value));
 const filteredRevisionRows = computed(() => filterBuddyRevisionHistoryRows(orderedRevisionRows.value, historyTargetFilter.value));
+const bindingInputRows = computed(() => buildBuddyRunTemplateInputRows(selectedBindingTemplate.value));
+const bindingValidation = computed(() => validateBuddyRunTemplateBinding(selectedBindingTemplate.value, bindingDraft.value));
+const bindingTemplateOptions = computed(() =>
+  availableTemplates.value.map((template) => ({
+    label: `${template.label} (${template.template_id})`,
+    value: template.template_id,
+  })),
+);
+const bindingSourceOptions = computed(() =>
+  BUDDY_RUN_INPUT_SOURCE_OPTIONS.map((option) => ({
+    label: t(option.labelKey),
+    value: option.value,
+  })),
+);
 const historyTargetOptions = computed(() =>
   BUDDY_REVISION_HISTORY_TARGET_FILTERS.map((value) => ({
     label: t(`buddyPage.history.targets.${value}`),
@@ -577,6 +683,15 @@ function acceptCommandResult<T>(response: BuddyCommandResponse<T>): T {
   return response.result;
 }
 
+function normalizeBindingDraft(binding: BuddyRunTemplateBinding): BuddyRunTemplateBinding {
+  return {
+    version: binding.version ?? 1,
+    template_id: binding.template_id || buildDefaultBuddyRunTemplateBinding().template_id,
+    input_bindings: { ...(binding.input_bindings ?? {}) },
+    updated_at: binding.updated_at,
+  };
+}
+
 function hasActiveBuddyPageWrite() {
   return Boolean(
     isLoading.value ||
@@ -584,8 +699,10 @@ function hasActiveBuddyPageWrite() {
       isSavingPolicy.value ||
       isSavingMemory.value ||
       isSavingSummary.value ||
+      isSavingBinding.value ||
       isLoadingPausedRuns.value ||
       isLoadingPausedRunDetail.value ||
+      isLoadingBindingTemplate.value ||
       pausedRunActionBusy.value ||
       memoryActionId.value ||
       restoreActionId.value,
@@ -597,13 +714,15 @@ async function loadAll(options: LoadAllOptions = {}) {
     if (!options.silent) {
       isLoading.value = true;
     }
-    const [profile, policy, memoryList, summary, revisionList, commandList] = await Promise.all([
+    const [profile, policy, memoryList, summary, revisionList, commandList, templateList, runBinding] = await Promise.all([
       fetchBuddyProfile(),
       fetchBuddyPolicy(),
       fetchBuddyMemories(),
       fetchBuddySessionSummary(),
       fetchBuddyRevisions(),
       fetchBuddyCommands(),
+      fetchTemplates(),
+      fetchBuddyRunTemplateBinding(),
     ]);
     profileDraft.value = profile;
     policyDraft.value = normalizeBuddyPolicy(policy);
@@ -611,6 +730,9 @@ async function loadAll(options: LoadAllOptions = {}) {
     summaryDraft.value = summary;
     revisions.value = revisionList;
     commands.value = commandList;
+    availableTemplates.value = templateList;
+    bindingDraft.value = normalizeBindingDraft(runBinding);
+    await loadBindingTemplate(bindingDraft.value.template_id);
     await loadPausedRuns({ silent: true });
     errorMessage.value = "";
     hasLoaded.value = true;
@@ -620,6 +742,19 @@ async function loadAll(options: LoadAllOptions = {}) {
     if (!options.silent) {
       isLoading.value = false;
     }
+  }
+}
+
+async function loadBindingTemplate(templateId: string) {
+  if (!templateId) {
+    selectedBindingTemplate.value = null;
+    return;
+  }
+  try {
+    isLoadingBindingTemplate.value = true;
+    selectedBindingTemplate.value = await fetchTemplate(templateId);
+  } finally {
+    isLoadingBindingTemplate.value = false;
   }
 }
 
@@ -840,6 +975,54 @@ async function saveSummary() {
   }
 }
 
+async function selectBindingTemplate(value: unknown) {
+  const templateId = String(value || "");
+  bindingDraft.value = {
+    ...bindingDraft.value,
+    template_id: templateId,
+    input_bindings: {},
+  };
+  await loadBindingTemplate(templateId);
+}
+
+function setBindingSource(nodeId: string, value: unknown) {
+  const source = value as BuddyRunInputSource | "";
+  const nextBindings = { ...bindingDraft.value.input_bindings };
+  if (source) {
+    nextBindings[nodeId] = source;
+  } else {
+    delete nextBindings[nodeId];
+  }
+  bindingDraft.value = {
+    ...bindingDraft.value,
+    input_bindings: nextBindings,
+  };
+}
+
+function resetBindingToDefault() {
+  bindingDraft.value = buildDefaultBuddyRunTemplateBinding();
+  void loadBindingTemplate(bindingDraft.value.template_id);
+}
+
+async function saveBinding() {
+  if (!bindingValidation.value.valid || isSavingBinding.value) {
+    return;
+  }
+  try {
+    isSavingBinding.value = true;
+    bindingDraft.value = normalizeBindingDraft(
+      acceptCommandResult(await updateBuddyRunTemplateBinding(bindingDraft.value, t("buddyPage.changeReasons.binding"))),
+    );
+    await refreshAuditTrail();
+    errorMessage.value = "";
+    ElMessage.success(t("buddyPage.saved"));
+  } catch (error) {
+    setError(error, "common.failedToSave");
+  } finally {
+    isSavingBinding.value = false;
+  }
+}
+
 async function restoreRevision(revisionId: string) {
   try {
     restoreActionId.value = revisionId;
@@ -967,6 +1150,10 @@ onMounted(loadAll);
   max-width: 920px;
 }
 
+.buddy-page__form--wide {
+  max-width: none;
+}
+
 .buddy-page__split {
   display: grid;
   grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr);
@@ -1008,6 +1195,18 @@ onMounted(loadAll);
 
 .buddy-page__table {
   width: 100%;
+}
+
+.buddy-page__binding-table {
+  margin-top: 12px;
+}
+
+.buddy-page__binding-warning {
+  display: block;
+  margin-top: 6px;
+  color: rgba(154, 52, 18, 0.72);
+  font-size: 0.76rem;
+  line-height: 1.35;
 }
 
 .buddy-page__history-toolbar {

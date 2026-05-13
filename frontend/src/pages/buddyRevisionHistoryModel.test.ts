@@ -4,6 +4,7 @@ import test from "node:test";
 import type { BuddyCommandRecord, BuddyRevision } from "../types/buddy.ts";
 
 import {
+  BUDDY_REVISION_HISTORY_TARGET_FILTERS,
   buildBuddyRevisionHistoryRows,
   filterBuddyRevisionHistoryRows,
 } from "./buddyRevisionHistoryModel.ts";
@@ -188,4 +189,40 @@ test("filterBuddyRevisionHistoryRows narrows history by target type without reor
     filterBuddyRevisionHistoryRows(rows, "all").map((row) => row.revision_id),
     ["rev_memory_newer", "rev_profile", "rev_memory_older"],
   );
+});
+
+test("revision history includes run template binding target", () => {
+  assert.ok(BUDDY_REVISION_HISTORY_TARGET_FILTERS.includes("run_template_binding"));
+  const rows = buildBuddyRevisionHistoryRows(
+    [
+      {
+        revision_id: "rev_binding",
+        target_type: "run_template_binding",
+        target_id: "run_template_binding",
+        operation: "update",
+        previous_value: { template_id: "buddy_autonomous_loop", input_bindings: { input_user_message: "current_message" } },
+        next_value: { template_id: "custom_loop", input_bindings: { input_prompt: "current_message" } },
+        changed_by: "buddy_command",
+        change_reason: "用户更新伙伴运行模板绑定。",
+        created_at: "2026-05-13T00:00:00Z",
+      },
+    ],
+    [
+      {
+        command_id: "cmd_binding",
+        kind: "buddy.manual_write",
+        action: "run_template_binding.update",
+        status: "succeeded",
+        target_type: "run_template_binding",
+        target_id: "run_template_binding",
+        revision_id: "rev_binding",
+        run_id: null,
+        payload: {},
+        change_reason: "用户更新伙伴运行模板绑定。",
+        created_at: "2026-05-13T00:00:00Z",
+        completed_at: "2026-05-13T00:00:00Z",
+      },
+    ],
+  );
+  assert.equal(filterBuddyRevisionHistoryRows(rows, "run_template_binding").length, 1);
 });

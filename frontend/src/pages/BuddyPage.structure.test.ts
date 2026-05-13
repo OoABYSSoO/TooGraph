@@ -17,16 +17,23 @@ test("BuddyPage manages profile, policy, memories, summary, and revisions", () =
   assert.match(source, /deleteBuddyMemory/);
   assert.match(source, /fetchBuddySessionSummary/);
   assert.match(source, /fetchBuddyRevisions/);
+  assert.match(source, /fetchBuddyRunTemplateBinding/);
   assert.match(source, /fetchBuddyCommands/);
   assert.match(source, /restoreBuddyRevision/);
+  assert.match(source, /updateBuddyRunTemplateBinding/);
+  assert.match(source, /fetchTemplates/);
+  assert.match(source, /fetchTemplate/);
   assert.match(source, /<ElTabs/);
   assert.match(source, /name="profile"/);
   assert.match(source, /name="policy"/);
   assert.match(source, /name="memory"/);
   assert.match(source, /name="summary"/);
+  assert.match(source, /name="binding"/);
   assert.match(source, /name="confirmation"/);
   assert.match(source, /name="history"/);
   assert.match(source, /name="mascot-debug"/);
+  assert.match(source, /buildBuddyRunTemplateInputRows/);
+  assert.match(source, /validateBuddyRunTemplateBinding/);
 });
 
 test("BuddyPage exposes the unified buddy permission mode", () => {
@@ -85,4 +92,12 @@ test("BuddyPage hosts the mascot action debug panel as a tab after History", () 
   assert.match(source, /v-for="group in BUDDY_DEBUG_ACTION_GROUPS"/);
   assert.match(source, /v-for="action in group\.actions"/);
   assert.match(source, /@click="buddyMascotDebugStore\.trigger\(action\.action\)"/);
+});
+
+test("BuddyPage places template binding before confirmations", () => {
+  const bindingIndex = source.indexOf('name="binding"');
+  const confirmationIndex = source.indexOf('name="confirmation"');
+  assert.ok(bindingIndex > -1);
+  assert.ok(confirmationIndex > -1);
+  assert.ok(bindingIndex < confirmationIndex);
 });
