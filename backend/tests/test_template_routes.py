@@ -37,6 +37,40 @@ def _graph_payload(name: str = "Reusable Flow") -> dict[str, object]:
     }
 
 
+def _agent_graph_payload(name: str = "Reusable Agent Flow") -> dict[str, object]:
+    return {
+        "graph_id": None,
+        "name": name,
+        "state_schema": {
+            "answer": {"name": "Answer", "description": "", "type": "markdown", "value": "", "color": "#2563eb"},
+        },
+        "nodes": {
+            "agent": {
+                "kind": "agent",
+                "name": "Agent",
+                "description": "",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [],
+                "writes": [{"state": "answer", "mode": "replace"}],
+                "config": {
+                    "skillKey": "",
+                    "skillBindings": [],
+                    "suspendedFreeWrites": [],
+                    "skillInstructionBlocks": {},
+                    "taskInstruction": "Respond.",
+                    "modelSource": "global",
+                    "model": "",
+                    "thinkingMode": "xhigh",
+                    "temperature": 0.2,
+                },
+            }
+        },
+        "edges": [],
+        "conditional_edges": [],
+        "metadata": {"description": "Agent template config preservation"},
+    }
+
+
 class TemplateRouteTests(unittest.TestCase):
     def test_templates_are_listed_from_official_and_user_template_folders(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -99,6 +133,27 @@ class TemplateRouteTests(unittest.TestCase):
             settings_payload = json.loads((root / "settings.json").read_text(encoding="utf-8"))
             self.assertTrue(settings_payload["entries"][saved_payload["template_id"]]["enabled"])
             self.assertEqual(list_response.json(), [saved_payload["template"]])
+
+    def test_save_template_preserves_agent_config_and_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            official_dir = root / "official"
+            user_dir = root / "user"
+            official_dir.mkdir()
+
+            with (
+                patch("app.templates.loader.OFFICIAL_TEMPLATES_ROOT", official_dir),
+                patch("app.templates.loader.USER_TEMPLATES_ROOT", user_dir),
+                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.json", create=True),
+                TestClient(app) as client,
+            ):
+                payload = _agent_graph_payload()
+                save_response = client.post("/api/templates/save", json=payload)
+
+            self.assertEqual(save_response.status_code, 200)
+            saved_template = save_response.json()["template"]
+            self.assertEqual(saved_template["description"], "Agent template config preservation")
+            self.assertEqual(saved_template["nodes"]["agent"]["config"], payload["nodes"]["agent"]["config"])
 
     def test_user_templates_can_be_disabled_enabled_listed_and_deleted(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -16,7 +16,7 @@ def save_graph(graph_payload: NodeSystemGraphPayload) -> NodeSystemGraphDocument
     existing_document = NodeSystemGraphDocument.model_validate(existing_payload) if existing_payload else None
     graph = NodeSystemGraphDocument.model_validate(
         {
-            **graph_payload.model_dump(exclude={"graph_id"}, by_alias=True),
+            **graph_payload.model_dump(exclude={"graph_id"}, by_alias=True, mode="json"),
             "graph_id": graph_id,
             "status": existing_document.status if existing_document else NodeSystemCatalogStatus.ACTIVE,
         }

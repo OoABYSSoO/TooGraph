@@ -44,6 +44,12 @@ function graphDocument(name: string, graphId: string | null = null): GraphPayloa
   } as unknown as GraphPayload | GraphDocument;
 }
 
+function agentConfig(document: GraphPayload | GraphDocument) {
+  const node = document.nodes.node_a;
+  assert.equal(node?.kind, "agent");
+  return node.config;
+}
+
 function parentGraphWithSubgraph(): GraphPayload {
   return {
     graph_id: null,
@@ -74,7 +80,13 @@ function parentGraphWithSubgraph(): GraphPayload {
   };
 }
 
-function createHarness(options: { locked?: boolean } = {}) {
+function createHarness(options: {
+  locked?: boolean;
+  requestSaveMetadata?: (request: {
+    document: GraphPayload | GraphDocument;
+    target: "graph" | "template";
+  }) => Promise<GraphPayload | GraphDocument | null>;
+} = {}) {
   const initialTab: EditorWorkspaceTab = {
     tabId: "tab_a",
     kind: "new",
@@ -101,6 +113,7 @@ function createHarness(options: { locked?: boolean } = {}) {
   const committedDocuments: Array<{ tabId: string; document: GraphPayload | GraphDocument }> = [];
   const feedback: Array<{ tabId: string; feedback: Partial<WorkspaceRunFeedback> }> = [];
   const downloads: Array<{ source: string; fileName: string }> = [];
+  const saveToasts: string[] = [];
   let graphLoadCount = 0;
   let templateLoadCount = 0;
 
@@ -177,6 +190,10 @@ function createHarness(options: { locked?: boolean } = {}) {
     setMessageFeedbackForTab: (tabId, nextFeedback) => {
       feedback.push({ tabId, feedback: nextFeedback });
     },
+    requestSaveMetadata: options.requestSaveMetadata,
+    showSaveSuccessToast: (message) => {
+      saveToasts.push(message);
+    },
   });
 
   return {
@@ -190,6 +207,7 @@ function createHarness(options: { locked?: boolean } = {}) {
     routeSyncs,
     committedDocuments,
     feedback,
+    saveToasts,
     downloads,
     get graphLoadCount() {
       return graphLoadCount;
@@ -216,6 +234,47 @@ test("useWorkspaceGraphPersistenceController saves the active tab as an existing
   assert.deepEqual(harness.routeSyncs, [{ graphId: "graph_saved", mode: "replace" }]);
   assert.equal(harness.graphLoadCount, 1);
   assert.equal(harness.feedback.at(-1)?.feedback.tone, "success");
+  assert.deepEqual(harness.saveToasts, ["Saved graph graph_saved."]);
+});
+
+test("useWorkspaceGraphPersistenceController asks for graph metadata before saving a default-named graph", async () => {
+  const requests: Array<{ document: GraphPayload | GraphDocument; target: "graph" | "template" }> = [];
+  const harness = createHarness({
+    requestSaveMetadata: async (request) => {
+      requests.push(request);
+      return {
+        ...request.document,
+        name: "翻译工作流",
+        metadata: {
+          ...request.document.metadata,
+          description: "把输入内容翻译成多种语言。",
+        },
+      };
+    },
+  });
+  harness.documentsByTabId.value.tab_a = graphDocument("Untitled Graph");
+
+  const saved = await harness.controller.saveTab("tab_a");
+
+  assert.equal(saved, true);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0]?.target, "graph");
+  assert.equal(requests[0]?.document.name, "Untitled Graph");
+  assert.equal(harness.savedDocuments[0]?.name, "翻译工作流");
+  assert.equal(harness.savedDocuments[0]?.metadata.description, "把输入内容翻译成多种语言。");
+});
+
+test("useWorkspaceGraphPersistenceController cancels saving when default-name metadata is dismissed", async () => {
+  const harness = createHarness({
+    requestSaveMetadata: async () => null,
+  });
+  harness.documentsByTabId.value.tab_a = graphDocument("Untitled Graph");
+
+  const saved = await harness.controller.saveTab("tab_a");
+
+  assert.equal(saved, false);
+  assert.equal(harness.savedDocuments.length, 0);
+  assert.equal(harness.graphLoadCount, 0);
 });
 
 test("useWorkspaceGraphPersistenceController saves subgraph tabs back into the parent node without saving a standalone graph", async () => {
@@ -366,6 +425,65 @@ test("useWorkspaceGraphPersistenceController saves the active graph as a user te
   assert.equal(harness.templateLoadCount, 1);
   assert.equal(harness.feedback.at(-1)?.feedback.tone, "success");
   assert.equal(harness.feedback.at(-1)?.feedback.message, "Saved template user_template_1.");
+  assert.deepEqual(harness.saveToasts, ["Saved template user_template_1."]);
+});
+
+test("useWorkspaceGraphPersistenceController asks for template metadata before saving a default-named template", async () => {
+  const requests: Array<{ document: GraphPayload | GraphDocument; target: "graph" | "template" }> = [];
+  const harness = createHarness({
+    requestSaveMetadata: async (request) => {
+      requests.push(request);
+      return {
+        ...request.document,
+        name: "研究模板",
+        metadata: {
+          ...request.document.metadata,
+          description: "可复用的研究图模板。",
+        },
+      };
+    },
+  });
+  harness.documentsByTabId.value.tab_a = graphDocument("Untitled Graph");
+
+  const saved = await harness.controller.saveActiveGraphAsTemplate();
+
+  assert.equal(saved, true);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0]?.target, "template");
+  assert.equal(harness.savedTemplateDocuments[0]?.name, "研究模板");
+  assert.equal(harness.savedTemplateDocuments[0]?.metadata.description, "可复用的研究图模板。");
+});
+
+test("useWorkspaceGraphPersistenceController preserves agent runtime and capability config in the saved payload", async () => {
+  const harness = createHarness();
+  const document = graphDocument("Runtime Config");
+  const config = agentConfig(document);
+  config.skillKey = "web_search";
+  config.skillBindings = [{ skillKey: "web_search", outputMapping: { result: "answer" } }];
+  config.suspendedFreeWrites = [{ state: "draft", mode: "append" }];
+  config.skillInstructionBlocks = {
+    web_search: {
+      skillKey: "web_search",
+      title: "搜索说明",
+      content: "只搜索公开网页。",
+      source: "node.override",
+    },
+  };
+  config.taskInstruction = "Search and summarize.";
+  config.modelSource = "override";
+  config.model = "openai/gpt-5.5";
+  config.thinkingMode = "xhigh";
+  config.temperature = 0.8;
+  document.state_schema = {
+    answer: { name: "Answer", description: "", type: "markdown", value: "", color: "#2563eb" },
+    draft: { name: "Draft", description: "", type: "markdown", value: "", color: "#10b981" },
+  };
+
+  harness.documentsByTabId.value.tab_a = document;
+  await harness.controller.saveTab("tab_a");
+
+  const savedConfig = agentConfig(harness.savedDocuments[0]!);
+  assert.deepEqual(savedConfig, config);
 });
 
 test("useWorkspaceGraphPersistenceController renames through dirty commits and honors locked graphs", () => {

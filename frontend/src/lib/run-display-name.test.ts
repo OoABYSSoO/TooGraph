@@ -54,8 +54,8 @@ test("formatRunDuration can render seconds with fixed decimals", () => {
 test("formatRunTokenUsageKTokens renders compact ktoken values", () => {
   assert.equal(formatRunTokenUsageKTokens(null), null);
   assert.equal(formatRunTokenUsageKTokens(0), null);
-  assert.equal(formatRunTokenUsageKTokens(380), "0.38 ktokens");
-  assert.equal(formatRunTokenUsageKTokens(3420), "3.42 ktokens");
-  assert.equal(formatRunTokenUsageKTokens(12_400), "12.4 ktokens");
-  assert.equal(formatRunTokenUsageKTokens(125_000), "125 ktokens");
+  assert.equal(formatRunTokenUsageKTokens(380), "0.38k Tokens");
+  assert.equal(formatRunTokenUsageKTokens(3420), "3.42k Tokens");
+  assert.equal(formatRunTokenUsageKTokens(12_400), "12.4k Tokens");
+  assert.equal(formatRunTokenUsageKTokens(125_000), "125k Tokens");
 });

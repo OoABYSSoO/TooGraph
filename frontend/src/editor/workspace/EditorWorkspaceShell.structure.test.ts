@@ -423,7 +423,7 @@ test("EditorWorkspaceShell resumes restored pause snapshots against their origin
 test("EditorWorkspaceShell locks graph editing while a run is awaiting human review", () => {
   const guardFunctionSource = editGuardControllerSource.match(/function guardGraphEditForTab\(tabId: string\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
 
-  assert.match(componentSource, /import \{ ElMessage \} from "element-plus";/);
+  assert.match(componentSource, /import \{[\s\S]*ElMessage[\s\S]*\} from "element-plus";/);
   assert.match(componentSource, /import \{ useWorkspaceEditGuardController \} from "\.\/useWorkspaceEditGuardController\.ts";/);
   assert.match(componentSource, /:interaction-locked="isGraphInteractionLocked\(tab\.tabId\)"/);
   assert.match(editGuardControllerSource, /function isGraphInteractionLocked\(tabId: string\)/);
@@ -446,6 +446,29 @@ test("EditorWorkspaceShell locks graph editing while a run is awaiting human rev
   assert.match(editGuardControllerSource, /if \(guardGraphEditForTab\(tabId\)\) \{/);
   assert.match(guardFunctionSource, /showGraphLockedEditToast\(\);/);
   assert.doesNotMatch(guardFunctionSource, /setMessageFeedbackForTab/);
+});
+
+test("EditorWorkspaceShell prompts default-named graph and template saves for metadata with floating success feedback", () => {
+  assert.match(componentSource, /import \{[\s\S]*ElButton,[\s\S]*ElDialog,[\s\S]*ElInput,[\s\S]*ElMessage[\s\S]*\} from "element-plus";/);
+  assert.match(componentSource, /<ElDialog[\s\S]*class="editor-workspace-shell__save-metadata-dialog"/);
+  assert.match(componentSource, /const saveMetadataDialog = ref<SaveMetadataDialogState>\(createClosedSaveMetadataDialog\(\)\);/);
+  assert.match(componentSource, /function requestSaveMetadataForDocument\(request: SaveMetadataRequest\)/);
+  assert.match(componentSource, /readGraphSaveDescription\(request\.document\)/);
+  assert.match(componentSource, /isDefaultGraphSaveName\(name\)/);
+  assert.match(componentSource, /applyGraphSaveMetadata\(document,[\s\S]*description: saveMetadataDialog\.value\.description,/);
+  assert.match(componentSource, /requestSaveMetadata: requestSaveMetadataForDocument,/);
+  assert.match(componentSource, /showSaveSuccessToast,/);
+  assert.match(componentSource, /function showSaveSuccessToast\(message: string\) \{[\s\S]*customClass:\s*"editor-workspace-shell__save-toast"[\s\S]*type:\s*"success"[\s\S]*duration:\s*3200,/);
+  assert.match(componentSource, /:global\(\.editor-workspace-shell__save-toast\.el-message\) \{[\s\S]*border:\s*1px solid rgba\(22,\s*101,\s*52,\s*0\.42\);/);
+  assert.match(componentSource, /animation:\s*editor-workspace-shell-save-toast-float 3\.2s ease forwards;/);
+  assert.match(componentSource, /@keyframes editor-workspace-shell-save-toast-float/);
+  assert.match(graphPersistenceControllerSource, /import \{ shouldRequestSaveMetadata, type SaveMetadataRequest \} from "\.\/saveMetadataModel\.ts";/);
+  assert.match(graphPersistenceControllerSource, /requestSaveMetadata\?: \(request: SaveMetadataRequest\) => Promise<GraphPayload \| GraphDocument \| null>;/);
+  assert.match(graphPersistenceControllerSource, /showSaveSuccessToast\?: \(message: string\) => void;/);
+  assert.match(graphPersistenceControllerSource, /async function prepareDocumentForSave\(/);
+  assert.match(graphPersistenceControllerSource, /shouldRequestSaveMetadata\(prunedDocument\)/);
+  assert.match(graphPersistenceControllerSource, /const requestedDocument = await input\.requestSaveMetadata\(\{[\s\S]*document: prunedDocument,[\s\S]*target,[\s\S]*\}\);/);
+  assert.match(graphPersistenceControllerSource, /input\.showSaveSuccessToast\?\.\(message\);/);
 });
 
 test("EditorWorkspaceShell removes the persistent bottom-left status feedback overlay", () => {

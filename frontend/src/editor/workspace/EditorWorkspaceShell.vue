@@ -211,13 +211,56 @@
       @discard="discardPendingClose"
       @save-and-close="saveAndClosePendingTab"
     />
+
+    <ElDialog
+      :model-value="saveMetadataDialog.open"
+      class="editor-workspace-shell__save-metadata-dialog"
+      :title="saveMetadataDialogTitle"
+      width="min(520px, calc(100vw - 32px))"
+      :close-on-click-modal="false"
+      @update:model-value="handleSaveMetadataDialogModelValue"
+    >
+      <div class="editor-workspace-shell__save-metadata-body">
+        <p class="editor-workspace-shell__save-metadata-copy">{{ saveMetadataDialogCopy }}</p>
+        <label class="editor-workspace-shell__save-metadata-field">
+          <span>{{ saveMetadataDialogNameLabel }}</span>
+          <ElInput
+            v-model="saveMetadataDialog.name"
+            :placeholder="saveMetadataDialogNamePlaceholder"
+            maxlength="80"
+            show-word-limit
+            @keyup.enter="confirmSaveMetadataDialog"
+          />
+        </label>
+        <label class="editor-workspace-shell__save-metadata-field">
+          <span>{{ t("editor.saveMetadataDescription") }}</span>
+          <ElInput
+            v-model="saveMetadataDialog.description"
+            type="textarea"
+            :autosize="{ minRows: 3, maxRows: 6 }"
+            :placeholder="t('editor.saveMetadataDescriptionPlaceholder')"
+            maxlength="240"
+            show-word-limit
+          />
+        </label>
+        <p v-if="saveMetadataDialog.error" class="editor-workspace-shell__save-metadata-error">
+          {{ saveMetadataDialog.error }}
+        </p>
+      </div>
+      <template #footer>
+        <div class="editor-workspace-shell__save-metadata-actions">
+          <ElButton @click="cancelSaveMetadataDialog">{{ t("common.cancel") }}</ElButton>
+          <ElButton type="primary" @click="confirmSaveMetadataDialog">{{ t("common.save") }}</ElButton>
+        </div>
+      </template>
+    </ElDialog>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
+import { ElButton, ElDialog, ElInput, ElMessage } from "element-plus";
 import { useI18n } from "vue-i18n";
 
 import { fetchPreset, fetchPresets, savePreset } from "@/api/presets";
@@ -276,6 +319,13 @@ import {
 import type { WorkspaceSidePanelMode } from "./workspaceSidePanelModel.ts";
 import { downloadPythonSource } from "./pythonExportModel.ts";
 import { isTooGraphPythonExportFile, isTooGraphPythonExportSource } from "./pythonImportModel.ts";
+import {
+  applyGraphSaveMetadata,
+  isDefaultGraphSaveName,
+  readGraphSaveDescription,
+  type SaveMetadataRequest,
+  type SaveMetadataTarget,
+} from "./saveMetadataModel.ts";
 import { useWorkspaceDocumentState } from "./useWorkspaceDocumentState.ts";
 import { useWorkspaceEditGuardController } from "./useWorkspaceEditGuardController.ts";
 import { useWorkspaceGraphPersistenceController } from "./useWorkspaceGraphPersistenceController.ts";
@@ -381,6 +431,97 @@ const activeStateCount = computed(() => {
   }
   return Object.keys(document.state_schema ?? {}).length;
 });
+
+type SaveMetadataDialogState = {
+  open: boolean;
+  target: SaveMetadataTarget;
+  document: GraphPayload | GraphDocument | null;
+  name: string;
+  description: string;
+  error: string;
+  resolve: ((document: GraphPayload | GraphDocument | null) => void) | null;
+};
+
+function createClosedSaveMetadataDialog(): SaveMetadataDialogState {
+  return {
+    open: false,
+    target: "graph",
+    document: null,
+    name: "",
+    description: "",
+    error: "",
+    resolve: null,
+  };
+}
+
+const saveMetadataDialog = ref<SaveMetadataDialogState>(createClosedSaveMetadataDialog());
+const saveMetadataDialogTitle = computed(() =>
+  saveMetadataDialog.value.target === "template" ? t("editor.saveMetadataTemplateTitle") : t("editor.saveMetadataGraphTitle"),
+);
+const saveMetadataDialogCopy = computed(() =>
+  saveMetadataDialog.value.target === "template" ? t("editor.saveMetadataTemplateCopy") : t("editor.saveMetadataGraphCopy"),
+);
+const saveMetadataDialogNameLabel = computed(() =>
+  saveMetadataDialog.value.target === "template" ? t("editor.saveMetadataTemplateName") : t("editor.saveMetadataGraphName"),
+);
+const saveMetadataDialogNamePlaceholder = computed(() =>
+  saveMetadataDialog.value.target === "template" ? t("editor.saveMetadataTemplateNamePlaceholder") : t("editor.saveMetadataGraphNamePlaceholder"),
+);
+
+function requestSaveMetadataForDocument(request: SaveMetadataRequest) {
+  return new Promise<GraphPayload | GraphDocument | null>((resolve) => {
+    saveMetadataDialog.value = {
+      open: true,
+      target: request.target,
+      document: request.document,
+      name: "",
+      description: readGraphSaveDescription(request.document),
+      error: "",
+      resolve,
+    };
+  });
+}
+
+function settleSaveMetadataDialog(document: GraphPayload | GraphDocument | null) {
+  const resolve = saveMetadataDialog.value.resolve;
+  saveMetadataDialog.value = createClosedSaveMetadataDialog();
+  resolve?.(document);
+}
+
+function handleSaveMetadataDialogModelValue(value: boolean) {
+  if (!value && saveMetadataDialog.value.open) {
+    cancelSaveMetadataDialog();
+  }
+}
+
+function cancelSaveMetadataDialog() {
+  settleSaveMetadataDialog(null);
+}
+
+function confirmSaveMetadataDialog() {
+  const document = saveMetadataDialog.value.document;
+  if (!document) {
+    settleSaveMetadataDialog(null);
+    return;
+  }
+
+  const name = saveMetadataDialog.value.name.trim();
+  if (isDefaultGraphSaveName(name)) {
+    saveMetadataDialog.value = {
+      ...saveMetadataDialog.value,
+      error: t("editor.saveMetadataNameRequired"),
+    };
+    return;
+  }
+
+  settleSaveMetadataDialog(
+    applyGraphSaveMetadata(document, {
+      name,
+      description: saveMetadataDialog.value.description,
+    }),
+  );
+}
+
 let closeNodeCreationMenuFromController: ((tabId: string) => void) | null = null;
 function closeNodeCreationMenu(tabId: string) {
   closeNodeCreationMenuFromController?.(tabId);
@@ -694,6 +835,8 @@ const {
   validateGraph,
   exportLangGraphPython,
   downloadPythonSource,
+  requestSaveMetadata: requestSaveMetadataForDocument,
+  showSaveSuccessToast,
   setMessageFeedbackForTab,
 });
 const {
@@ -937,6 +1080,18 @@ function showPresetSaveToast(type: "success" | "error", message: string) {
     grouping: true,
     placement: "top",
     showClose: true,
+    message,
+  });
+}
+
+function showSaveSuccessToast(message: string) {
+  ElMessage({
+    customClass: "editor-workspace-shell__save-toast",
+    type: "success",
+    duration: 3200,
+    grouping: true,
+    placement: "top",
+    showClose: false,
     message,
   });
 }
@@ -1223,6 +1378,37 @@ onMounted(() => {
   font-weight: 700;
 }
 
+:global(.editor-workspace-shell__save-toast.el-message) {
+  top: 46% !important;
+  left: 50%;
+  min-width: min(360px, calc(100vw - 40px));
+  max-width: min(620px, calc(100vw - 40px));
+  justify-content: flex-start;
+  border: 1px solid rgba(22, 101, 52, 0.42);
+  border-radius: 28px;
+  padding: 18px 24px;
+  background: rgba(240, 253, 244, 0.97);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.7) inset,
+    0 24px 62px rgba(20, 83, 45, 0.24),
+    0 0 42px rgba(34, 197, 94, 0.24);
+  backdrop-filter: blur(26px) saturate(1.6) contrast(1.04);
+  transform: translate(-50%, -50%);
+  animation: editor-workspace-shell-save-toast-float 3.2s ease forwards;
+}
+
+:global(.editor-workspace-shell__save-toast .el-message__content) {
+  color: #14532d;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+:global(.editor-workspace-shell__save-toast .el-message__icon) {
+  color: #16a34a;
+  font-size: 21px;
+}
+
 :global(.editor-workspace-shell__state-delete-toast.el-message) {
   border: 1px solid rgba(154, 52, 18, 0.22);
   border-radius: 16px;
@@ -1271,6 +1457,100 @@ onMounted(() => {
     opacity: 0;
     transform: translate(-50%, -66%) scale(0.98);
   }
+}
+
+@keyframes editor-workspace-shell-save-toast-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -36%) scale(0.96);
+  }
+
+  14%,
+  68% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -88%) scale(0.98);
+  }
+}
+
+:global(.editor-workspace-shell__save-metadata-dialog.el-dialog) {
+  border: 1px solid rgba(154, 52, 18, 0.18);
+  border-radius: 20px;
+  background:
+    linear-gradient(140deg, rgba(255, 252, 247, 0.98), rgba(255, 247, 237, 0.96)),
+    rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 70px rgba(60, 41, 20, 0.2);
+  overflow: hidden;
+}
+
+:global(.editor-workspace-shell__save-metadata-dialog .el-dialog__header) {
+  padding: 22px 24px 8px;
+}
+
+:global(.editor-workspace-shell__save-metadata-dialog .el-dialog__title) {
+  color: #1f2937;
+  font-size: 1.12rem;
+  font-weight: 850;
+}
+
+:global(.editor-workspace-shell__save-metadata-dialog .el-dialog__body) {
+  padding: 10px 24px 4px;
+}
+
+:global(.editor-workspace-shell__save-metadata-dialog .el-dialog__footer) {
+  padding: 14px 24px 22px;
+}
+
+.editor-workspace-shell__save-metadata-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.editor-workspace-shell__save-metadata-copy {
+  margin: 0;
+  color: #6b5a4a;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.editor-workspace-shell__save-metadata-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #7c2d12;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.editor-workspace-shell__save-metadata-field :deep(.el-input__wrapper),
+.editor-workspace-shell__save-metadata-field :deep(.el-textarea__inner) {
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgba(154, 52, 18, 0.14) inset,
+    0 8px 22px rgba(60, 41, 20, 0.06);
+}
+
+.editor-workspace-shell__save-metadata-field :deep(.el-textarea__inner) {
+  resize: none;
+}
+
+.editor-workspace-shell__save-metadata-error {
+  margin: 0;
+  color: #be123c;
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.editor-workspace-shell__save-metadata-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .editor-workspace-shell__status-card {

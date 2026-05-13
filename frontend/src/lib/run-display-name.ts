@@ -82,5 +82,5 @@ export function formatRunTokenUsageKTokens(tokenCount: number | null | undefined
   }
   const ktokens = tokenCount / 1000;
   const fractionDigits = ktokens < 10 ? 2 : ktokens < 100 ? 1 : 0;
-  return `${ktokens.toFixed(fractionDigits)} ktokens`;
+  return `${ktokens.toFixed(fractionDigits)}k Tokens`;
 }

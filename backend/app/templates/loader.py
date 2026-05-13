@@ -58,17 +58,19 @@ def load_template_record(template_id: str) -> dict[str, Any]:
 
 def save_user_template_record(graph_payload: NodeSystemGraphPayload) -> dict[str, Any]:
     template_id = _generate_user_template_id()
+    graph_data = graph_payload.model_dump(by_alias=True, mode="json")
+    metadata = graph_data.get("metadata") if isinstance(graph_data.get("metadata"), dict) else {}
     record = NodeSystemTemplate.model_validate(
         {
             "template_id": template_id,
-            "label": graph_payload.name,
-            "description": str(graph_payload.metadata.get("description") or ""),
-            "default_graph_name": graph_payload.name,
-            "state_schema": graph_payload.state_schema,
-            "nodes": graph_payload.nodes,
-            "edges": graph_payload.edges,
-            "conditional_edges": graph_payload.conditional_edges,
-            "metadata": graph_payload.metadata,
+            "label": graph_data["name"],
+            "description": str(metadata.get("description") or ""),
+            "default_graph_name": graph_data["name"],
+            "state_schema": graph_data["state_schema"],
+            "nodes": graph_data["nodes"],
+            "edges": graph_data["edges"],
+            "conditional_edges": graph_data["conditional_edges"],
+            "metadata": graph_data["metadata"],
         }
     ).model_dump(by_alias=True, mode="json", exclude={"status"})
     path = _template_path(USER_TEMPLATES_ROOT, template_id)

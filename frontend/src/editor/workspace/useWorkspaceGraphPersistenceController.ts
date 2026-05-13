@@ -23,6 +23,7 @@ import type {
 
 import { buildPythonExportFileName } from "./pythonExportModel.ts";
 import { formatValidationFeedback } from "./runFeedbackModel.ts";
+import { shouldRequestSaveMetadata, type SaveMetadataRequest } from "./saveMetadataModel.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 
 type WorkspaceRouteTab = Pick<EditorWorkspaceTab, "graphId" | "kind" | "templateId" | "defaultTemplateId" | "subgraphSource">;
@@ -45,6 +46,8 @@ type WorkspaceGraphPersistenceControllerInput = {
   validateGraph: (document: GraphPayload | GraphDocument) => Promise<GraphValidationResponse>;
   exportLangGraphPython: (document: GraphPayload | GraphDocument) => Promise<string>;
   downloadPythonSource: (source: string, fileName: string) => void;
+  requestSaveMetadata?: (request: SaveMetadataRequest) => Promise<GraphPayload | GraphDocument | null>;
+  showSaveSuccessToast?: (message: string) => void;
   setMessageFeedbackForTab: (
     tabId: string,
     feedback: { tone: WorkspaceRunFeedback["tone"]; message: string; activeRunId?: string | null; activeRunStatus?: string | null },
@@ -52,6 +55,30 @@ type WorkspaceGraphPersistenceControllerInput = {
 };
 
 export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPersistenceControllerInput) {
+  async function prepareDocumentForSave(
+    document: GraphPayload | GraphDocument,
+    target: SaveMetadataRequest["target"],
+  ): Promise<GraphPayload | GraphDocument | null> {
+    const prunedDocument = pruneUnreferencedStateSchemaInDocument(document);
+    if (!shouldRequestSaveMetadata(prunedDocument) || !input.requestSaveMetadata) {
+      return prunedDocument;
+    }
+
+    const requestedDocument = await input.requestSaveMetadata({
+      document: prunedDocument,
+      target,
+    });
+    return requestedDocument ? pruneUnreferencedStateSchemaInDocument(requestedDocument) : null;
+  }
+
+  function setSaveSuccessFeedback(tabId: string, message: string) {
+    input.setMessageFeedbackForTab(tabId, {
+      tone: "success",
+      message,
+    });
+    input.showSaveSuccessToast?.(message);
+  }
+
   function renameActiveGraph(name: string) {
     const tab = input.activeTab.value;
     if (!tab) {
@@ -84,7 +111,10 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
     }
 
     try {
-      const documentToSave = pruneUnreferencedStateSchemaInDocument(document);
+      const documentToSave = await prepareDocumentForSave(document, "graph");
+      if (!documentToSave) {
+        return false;
+      }
       const response = await input.saveGraph(documentToSave);
       const savedGraph = await input.fetchGraph(response.graph_id);
       input.registerDocumentForTab(tabId, savedGraph);
@@ -120,10 +150,7 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
         );
       }
 
-      input.setMessageFeedbackForTab(tabId, {
-        tone: "success",
-        message: `Saved graph ${savedGraph.graph_id}.`,
-      });
+      setSaveSuccessFeedback(tabId, `Saved graph ${savedGraph.graph_id}.`);
       return response.saved;
     } catch (error) {
       input.setMessageFeedbackForTab(tabId, {
@@ -199,7 +226,10 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
     }
 
     try {
-      const documentToSave = pruneUnreferencedStateSchemaInDocument(document);
+      const documentToSave = await prepareDocumentForSave(document, "graph");
+      if (!documentToSave) {
+        return false;
+      }
       const response = await input.saveGraph(documentToSave);
       const savedGraph = await input.fetchGraph(response.graph_id);
       const nextWorkspace = ensureSavedGraphTab(input.workspace.value, {
@@ -210,10 +240,7 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
       const savedTabId = nextWorkspace.activeTabId;
       if (savedTabId) {
         input.registerDocumentForTab(savedTabId, savedGraph);
-        input.setMessageFeedbackForTab(savedTabId, {
-          tone: "success",
-          message: `Saved graph ${savedGraph.graph_id}.`,
-        });
+        setSaveSuccessFeedback(savedTabId, `Saved graph ${savedGraph.graph_id}.`);
       }
       await input.loadGraphs();
       input.syncRouteToTab(
@@ -261,13 +288,13 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
     }
 
     try {
-      const documentToSave = pruneUnreferencedStateSchemaInDocument(document);
+      const documentToSave = await prepareDocumentForSave(document, "template");
+      if (!documentToSave) {
+        return false;
+      }
       const response = await input.saveGraphAsTemplate(documentToSave);
       await input.loadTemplates();
-      input.setMessageFeedbackForTab(tab.tabId, {
-        tone: "success",
-        message: `Saved template ${response.template_id}.`,
-      });
+      setSaveSuccessFeedback(tab.tabId, `Saved template ${response.template_id}.`);
       return response.saved;
     } catch (error) {
       input.setMessageFeedbackForTab(tab.tabId, {
