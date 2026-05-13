@@ -24,6 +24,28 @@ function graphDocument() {
   };
 }
 
+function multiOutputGraphDocument() {
+  return {
+    nodes: {
+      agent: {
+        kind: "agent",
+        reads: [],
+        writes: [{ state: "state_ja" }, { state: "state_en" }],
+      },
+      output_ja: {
+        kind: "output",
+        reads: [{ state: "state_ja" }],
+        writes: [],
+      },
+      output_en: {
+        kind: "output",
+        reads: [{ state: "state_en" }],
+        writes: [],
+      },
+    },
+  };
+}
+
 test("reduceRunNodeTimingEvent starts and completes node timing", () => {
   let timings: RunNodeTimingByNodeId = {};
 
@@ -43,6 +65,33 @@ test("reduceRunNodeTimingEvent starts output timing from its upstream writer", (
 
   timings = reduceRunNodeTimingEvent(timings, "state.updated", { node_id: "agent", state_key: "reply" }, 3250, graphDocument());
   assert.deepEqual(timings.output, { status: "success", startedAtEpochMs: 1000, durationMs: 2250 });
+});
+
+test("reduceRunNodeTimingEvent completes each output from routed streaming state completion", () => {
+  let timings: RunNodeTimingByNodeId = {};
+
+  timings = reduceRunNodeTimingEvent(timings, "node.started", { node_id: "agent" }, 1000, multiOutputGraphDocument());
+  timings = reduceRunNodeTimingEvent(
+    timings,
+    "node.output.delta",
+    {
+      node_id: "agent",
+      text: '{"state_ja":"こんにちは","state_en":"Hel',
+      output_keys: ["state_ja", "state_en"],
+      stream_state_keys: ["state_ja", "state_en"],
+    },
+    8500,
+    multiOutputGraphDocument(),
+  );
+
+  assert.deepEqual(timings.output_ja, { status: "success", startedAtEpochMs: 1000, durationMs: 7500 });
+  assert.deepEqual(timings.output_en, { status: "running", startedAtEpochMs: 1000, durationMs: null });
+
+  timings = reduceRunNodeTimingEvent(timings, "state.updated", { node_id: "agent", state_key: "state_ja" }, 9200, multiOutputGraphDocument());
+  assert.deepEqual(timings.output_ja, { status: "success", startedAtEpochMs: 1000, durationMs: 7500 });
+
+  timings = reduceRunNodeTimingEvent(timings, "state.updated", { node_id: "agent", state_key: "state_en" }, 9300, multiOutputGraphDocument());
+  assert.deepEqual(timings.output_en, { status: "success", startedAtEpochMs: 1000, durationMs: 8300 });
 });
 
 test("reduceRunNodeTimingEvent marks failed nodes and computes duration when the payload omits it", () => {

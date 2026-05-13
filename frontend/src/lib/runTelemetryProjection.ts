@@ -1,5 +1,6 @@
 import type { GraphDocument, GraphNode, GraphPayload } from "../types/node-system.ts";
 import type { NodeExecutionDetail, StateEvent } from "../types/run.ts";
+import { routeStreamingJsonStateText } from "./streamingJsonStateRouter.ts";
 
 export type RunNodeTimingStatus = "running" | "success" | "failed" | "paused";
 
@@ -88,6 +89,10 @@ export function reduceRunNodeTimingEvent(
       return current;
     }
     return completeNodeAndConnectedOutputTiming(current, nodeId, "paused", payload.duration_ms, nowEpochMs, document);
+  }
+  if (eventType === "node.output.delta" || eventType === "node.output.completed") {
+    const completedAtEpochMs = parseIsoEpochMs(payload.updated_at) ?? parseIsoEpochMs(payload.created_at) ?? nowEpochMs;
+    return completeOutputTimingsForStreamingStateCompletions(current, payload, completedAtEpochMs, document, nodeId);
   }
   if (eventType === "state.updated") {
     const createdAtEpochMs = parseIsoEpochMs(payload.created_at) ?? nowEpochMs;
@@ -181,6 +186,9 @@ function completeOutputTimingForState(
   let next = current;
   for (const outputNodeId of listOutputNodeIdsForState(document, stateKey)) {
     const existing = next[outputNodeId];
+    if (existing?.status === "success" && existing.durationMs !== null) {
+      continue;
+    }
     const writerTiming = writerNodeId ? next[writerNodeId] : null;
     const startedAtEpochMs = existing?.startedAtEpochMs ?? writerTiming?.startedAtEpochMs ?? null;
     next = {
@@ -191,6 +199,34 @@ function completeOutputTimingForState(
         durationMs: startedAtEpochMs === null ? null : Math.max(0, Math.round(finishedAtEpochMs - startedAtEpochMs)),
       },
     };
+  }
+  return next;
+}
+
+function completeOutputTimingsForStreamingStateCompletions(
+  current: RunNodeTimingByNodeId,
+  payload: Record<string, unknown>,
+  finishedAtEpochMs: number,
+  document?: TimingGraphDocument | null,
+  writerNodeId?: string,
+) {
+  const text = typeof payload.text === "string" ? payload.text : "";
+  if (!text) {
+    return current;
+  }
+  const outputKeys = listPayloadStateKeys(payload.output_keys);
+  const streamStateKeys = listPayloadStateKeys(payload.stream_state_keys, outputKeys);
+  const targetStateKeys = streamStateKeys.length > 0 ? streamStateKeys : outputKeys;
+  if (targetStateKeys.length <= 1) {
+    return current;
+  }
+  let next = current;
+  const routed = routeStreamingJsonStateText(text, targetStateKeys);
+  for (const [stateKey, route] of Object.entries(routed)) {
+    if (!route.completed) {
+      continue;
+    }
+    next = completeOutputTimingForState(next, stateKey, "success", finishedAtEpochMs, document, writerNodeId);
   }
   return next;
 }
@@ -327,6 +363,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 function normalizePositiveNumber(value: unknown) {
   const numberValue = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
   return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : 0;
+}
+
+function listPayloadStateKeys(value: unknown, fallback: string[] = []) {
+  return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : fallback;
 }
 
 function listConnectedOutputNodeIdsForWriter(document: TimingGraphDocument | null | undefined, writerNodeId: string) {
