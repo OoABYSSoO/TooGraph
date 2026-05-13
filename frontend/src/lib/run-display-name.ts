@@ -75,3 +75,12 @@ export function formatRunDuration(durationMs: number | null | undefined, options
   const seconds = totalSeconds % 60;
   return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
 }
+
+export function formatRunTokenUsageKTokens(tokenCount: number | null | undefined) {
+  if (!Number.isFinite(tokenCount) || !tokenCount || tokenCount <= 0) {
+    return null;
+  }
+  const ktokens = tokenCount / 1000;
+  const fractionDigits = ktokens < 10 ? 2 : ktokens < 100 ? 1 : 0;
+  return `${ktokens.toFixed(fractionDigits)} ktokens`;
+}

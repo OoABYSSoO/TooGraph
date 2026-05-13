@@ -67,6 +67,50 @@ test("buildRunNodeTimingByNodeIdFromRun uses node executions", () => {
   assert.equal(timings.agent.durationMs, 1200);
 });
 
+test("buildRunNodeTimingByNodeIdFromRun restores model token usage on the writer node only", () => {
+  const timings = buildRunNodeTimingByNodeIdFromRun(
+    {
+      node_executions: [
+        {
+          node_id: "agent",
+          status: "success",
+          started_at: "2026-05-13T10:00:00.000Z",
+          finished_at: "2026-05-13T10:00:03.500Z",
+          duration_ms: 3500,
+          artifacts: {
+            runtime_config: {
+              provider_usage: {
+                input_tokens: 1200,
+                output_tokens: 280,
+              },
+              structured_output_repair_provider_usage: {
+                prompt_tokens: 35,
+                completion_tokens: 15,
+              },
+              skill_input_provider_usage: {
+                total_tokens: 420,
+              },
+            },
+          },
+        },
+      ],
+      artifacts: {
+        state_events: [
+          {
+            node_id: "agent",
+            state_key: "reply",
+            created_at: "2026-05-13T10:00:02.250Z",
+          },
+        ],
+      },
+    },
+    graphDocument(),
+  );
+
+  assert.equal(timings.agent.tokenCount, 1950);
+  assert.equal(timings.output.tokenCount, undefined);
+});
+
 test("buildRunNodeTimingByNodeIdFromRun restores running node timing from started_at", () => {
   const timings = buildRunNodeTimingByNodeIdFromRun({
     node_executions: [

@@ -7,6 +7,7 @@ export type RunNodeTiming = {
   status: RunNodeTimingStatus;
   startedAtEpochMs: number | null;
   durationMs: number | null;
+  tokenCount?: number;
 };
 
 export type RunNodeTimingByNodeId = Record<string, RunNodeTiming>;
@@ -18,6 +19,42 @@ type RunTimingSource = {
     state_events?: Array<Partial<StateEvent>>;
   };
 };
+
+const RUNTIME_CONFIG_USAGE_KEYS = [
+  "provider_usage",
+  "structured_output_repair_provider_usage",
+  "skill_input_provider_usage",
+  "skill_input_structured_output_repair_provider_usage",
+  "subgraph_input_provider_usage",
+  "subgraph_input_structured_output_repair_provider_usage",
+] as const;
+
+const DIRECT_TOKEN_TOTAL_KEYS = ["total_tokens", "totalTokens", "totalTokenCount", "total_token_count"] as const;
+
+const TOKEN_PART_KEYS = [
+  "input_tokens",
+  "output_tokens",
+  "prompt_tokens",
+  "completion_tokens",
+  "inputTokens",
+  "outputTokens",
+  "promptTokens",
+  "completionTokens",
+  "inputTokenCount",
+  "outputTokenCount",
+  "promptTokenCount",
+  "candidatesTokenCount",
+  "thoughtsTokenCount",
+  "cachedContentTokenCount",
+  "input_token_count",
+  "output_token_count",
+  "prompt_token_count",
+  "completion_token_count",
+  "candidates_token_count",
+  "thoughts_token_count",
+  "cache_creation_input_tokens",
+  "cache_read_input_tokens",
+] as const;
 
 export function reduceRunNodeTimingEvent(
   current: RunNodeTimingByNodeId,
@@ -80,11 +117,16 @@ export function buildRunNodeTimingByNodeIdFromRun(
 
 function timingFromExecution(execution: Partial<NodeExecutionDetail>): RunNodeTiming {
   const status = normalizeExecutionStatus(execution.status);
-  return {
+  const timing: RunNodeTiming = {
     status,
     startedAtEpochMs: parseIsoEpochMs(execution.started_at),
     durationMs: status === "running" ? null : normalizeDurationMs(execution.duration_ms),
   };
+  const tokenCount = resolveExecutionTokenCount(execution);
+  if (tokenCount !== null) {
+    timing.tokenCount = tokenCount;
+  }
+  return timing;
 }
 
 function startNodeAndConnectedOutputTiming(
@@ -240,8 +282,51 @@ function completeNodeTiming(
       status,
       startedAtEpochMs: existing?.startedAtEpochMs ?? null,
       durationMs,
+      ...(existing?.tokenCount !== undefined ? { tokenCount: existing.tokenCount } : {}),
     },
   };
+}
+
+function resolveExecutionTokenCount(execution: Partial<NodeExecutionDetail>) {
+  const runtimeConfig = asRecord(execution.artifacts?.runtime_config);
+  if (!runtimeConfig) {
+    return null;
+  }
+  let tokenCount = 0;
+  for (const usageKey of RUNTIME_CONFIG_USAGE_KEYS) {
+    tokenCount += normalizeProviderUsageTokenCount(runtimeConfig[usageKey]) ?? 0;
+  }
+  return tokenCount > 0 ? Math.round(tokenCount) : null;
+}
+
+function normalizeProviderUsageTokenCount(value: unknown) {
+  const usage = asRecord(value);
+  if (!usage) {
+    return null;
+  }
+  for (const totalKey of DIRECT_TOKEN_TOTAL_KEYS) {
+    const total = normalizePositiveNumber(usage[totalKey]);
+    if (total > 0) {
+      return total;
+    }
+  }
+  let tokenCount = 0;
+  for (const partKey of TOKEN_PART_KEYS) {
+    tokenCount += normalizePositiveNumber(usage[partKey]);
+  }
+  return tokenCount > 0 ? tokenCount : null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function normalizePositiveNumber(value: unknown) {
+  const numberValue = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : 0;
 }
 
 function listConnectedOutputNodeIdsForWriter(document: TimingGraphDocument | null | undefined, writerNodeId: string) {

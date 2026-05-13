@@ -20,10 +20,15 @@
       v-if="shouldShowNodeRunTiming"
       class="node-card__run-timing-capsule"
       :class="`node-card__run-timing-capsule--${runTiming?.status ?? 'running'}`"
-      :title="t('nodeCard.runTiming')"
+      :title="nodeRunTimingTitle"
     >
       <ElIcon aria-hidden="true"><Clock /></ElIcon>
       <span class="node-card__run-timing-text">{{ formattedNodeRunTimingDuration }}</span>
+      <template v-if="shouldShowNodeRunTokenUsage">
+        <span class="node-card__run-timing-divider" aria-hidden="true"></span>
+        <ElIcon class="node-card__run-token-icon" aria-hidden="true"><Coin /></ElIcon>
+        <span class="node-card__run-token-text">{{ formattedNodeRunTokenUsage }}</span>
+      </template>
     </div>
     <NodeCardTopActions
       :body-kind="view.body.kind"
@@ -440,7 +445,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ElIcon, ElInput, ElPopover } from "element-plus";
-import { Check, Clock, Collection, Document, FolderOpened } from "@element-plus/icons-vue";
+import { Check, Clock, Coin, Collection, Document, FolderOpened } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 import AgentNodeBody from "./AgentNodeBody.vue";
@@ -458,7 +463,7 @@ import type { RunNodeTiming } from "../workspace/runNodeTimingModel.ts";
 import { fetchLocalFolderTree, type LocalFolderTreeEntry } from "@/api/localInputSources";
 import { buildSkillArtifactFileUrl, uploadSkillArtifactFile } from "@/api/skillArtifacts";
 import { isAgentOutputManagedByDynamicCapability } from "@/lib/agent-capability-management";
-import { formatRunDuration } from "@/lib/run-display-name";
+import { formatRunDuration, formatRunTokenUsageKTokens } from "@/lib/run-display-name";
 import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_COLOR, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "@/lib/virtual-any-input";
 
 import {
@@ -927,6 +932,12 @@ const nodeRunTimingDurationMs = computed(() => {
   return timing.durationMs;
 });
 const formattedNodeRunTimingDuration = computed(() => formatNodeRunTimingDuration(nodeRunTimingDurationMs.value));
+const formattedNodeRunTokenUsage = computed(() => formatRunTokenUsageKTokens(props.runTiming?.tokenCount));
+const shouldShowNodeRunTokenUsage = computed(() => Boolean(formattedNodeRunTokenUsage.value));
+const nodeRunTimingTitle = computed(() => {
+  const tokenUsage = formattedNodeRunTokenUsage.value;
+  return tokenUsage ? `${t("nodeCard.runTiming")} · ${tokenUsage}` : t("nodeCard.runTiming");
+});
 const hasFloatingPanelOpen = computed(
   () =>
     activeTopAction.value !== null ||
@@ -2065,6 +2076,42 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   position: relative;
   z-index: 1;
   font-variant-numeric: tabular-nums;
+}
+
+.node-card__run-timing-divider {
+  position: relative;
+  z-index: 1;
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.2;
+}
+
+.node-card__run-token-icon {
+  opacity: 0.72;
+}
+
+.node-card__run-token-text {
+  position: relative;
+  z-index: 1;
+  color: rgba(71, 47, 29, 0.66);
+  font-variant-numeric: tabular-nums;
+  font-weight: 760;
+}
+
+.node-card__run-timing-capsule--running .node-card__run-token-text,
+.node-card__run-timing-capsule--success .node-card__run-token-text {
+  color: rgba(4, 120, 87, 0.7);
+}
+
+.node-card__run-timing-capsule--failed .node-card__run-token-text {
+  color: rgba(185, 28, 28, 0.68);
+}
+
+.node-card__run-timing-capsule--paused .node-card__run-token-text {
+  color: rgba(180, 83, 9, 0.7);
 }
 
 .node-card__run-timing-capsule--running {
