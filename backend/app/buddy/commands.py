@@ -137,6 +137,12 @@ def _dispatch_command(
             "session_summary",
             "session_summary",
         )
+    if action == "run_template_binding.update":
+        return (
+            store.save_run_template_binding(payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason),
+            "run_template_binding",
+            "run_template_binding",
+        )
     if action == "revision.restore":
         revision_id = _required_target_id(target_id, action)
         result = store.restore_revision(revision_id, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason)

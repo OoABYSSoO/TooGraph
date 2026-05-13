@@ -28,6 +28,26 @@ BUDDY_HOME_DIR = get_default_buddy_home_dir()
 DEFAULT_CHAT_SESSION_TITLE = "新的对话"
 MAX_CHAT_SESSION_TITLE_CHARS = 32
 MAX_CHAT_MESSAGE_PREVIEW_CHARS = 96
+RUN_TEMPLATE_BINDING_KEY = "run_template_binding"
+RUN_TEMPLATE_BINDING_TARGET_TYPE = "run_template_binding"
+RUN_TEMPLATE_BINDING_TARGET_ID = "run_template_binding"
+RUN_TEMPLATE_BINDING_VERSION = 1
+ALLOWED_RUN_TEMPLATE_INPUT_SOURCES = {
+    "current_message",
+    "conversation_history",
+    "page_context",
+    "buddy_home_context",
+}
+DEFAULT_RUN_TEMPLATE_BINDING = {
+    "version": RUN_TEMPLATE_BINDING_VERSION,
+    "template_id": "buddy_autonomous_loop",
+    "input_bindings": {
+        "input_user_message": "current_message",
+        "input_conversation_history": "conversation_history",
+        "input_page_context": "page_context",
+        "input_buddy_context": "buddy_home_context",
+    },
+}
 
 
 def initialize_buddy_home() -> None:
@@ -197,6 +217,45 @@ def save_session_summary(payload: dict[str, Any], *, changed_by: str, change_rea
         )
         connection.commit()
     return load_session_summary()
+
+
+def load_run_template_binding() -> dict[str, Any]:
+    with _connection() as connection:
+        row = connection.execute("SELECT value_json FROM buddy_kv WHERE key = ?", (RUN_TEMPLATE_BINDING_KEY,)).fetchone()
+    if not row:
+        return _normalize_run_template_binding(DEFAULT_RUN_TEMPLATE_BINDING)
+    try:
+        value = json.loads(str(row["value_json"] or "{}"))
+    except Exception:
+        value = {}
+    if not isinstance(value, dict):
+        value = {}
+    return _normalize_run_template_binding(value)
+
+
+def save_run_template_binding(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
+    previous = load_run_template_binding()
+    next_value = _normalize_run_template_binding(payload)
+    _write_with_revision(
+        RUN_TEMPLATE_BINDING_TARGET_TYPE,
+        RUN_TEMPLATE_BINDING_TARGET_ID,
+        "update",
+        previous,
+        next_value,
+        changed_by,
+        change_reason,
+    )
+    with _connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO buddy_kv (key, value_json, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at
+            """,
+            (RUN_TEMPLATE_BINDING_KEY, _json_dumps(next_value), next_value["updated_at"]),
+        )
+        connection.commit()
+    return load_run_template_binding()
 
 
 def list_chat_sessions(*, include_deleted: bool = False) -> list[dict[str, Any]]:
@@ -453,6 +512,28 @@ def restore_revision(revision_id: str, *, changed_by: str, change_reason: str) -
                 ("session_summary", _json_dumps(restored), utc_now_iso()),
             )
             connection.commit()
+    elif target_type == RUN_TEMPLATE_BINDING_TARGET_TYPE:
+        current = load_run_template_binding()
+        restored = _normalize_run_template_binding(restored)
+        _write_with_revision(
+            RUN_TEMPLATE_BINDING_TARGET_TYPE,
+            RUN_TEMPLATE_BINDING_TARGET_ID,
+            "restore",
+            current,
+            restored,
+            changed_by,
+            change_reason,
+        )
+        with _connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO buddy_kv (key, value_json, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at
+                """,
+                (RUN_TEMPLATE_BINDING_KEY, _json_dumps(restored), utc_now_iso()),
+            )
+            connection.commit()
     else:
         raise ValueError(f"Unsupported revision target type: {target_type}")
     return {"target_type": target_type, "target_id": target_id, "current_value": restored}
@@ -598,6 +679,33 @@ def _normalize_policy(payload: dict[str, Any]) -> dict[str, Any]:
     else:
         graph_permission_mode = "ask_first"
     return {**deepcopy(DEFAULT_POLICY), **payload, "graph_permission_mode": graph_permission_mode}
+
+
+def _normalize_run_template_binding(payload: dict[str, Any]) -> dict[str, Any]:
+    template_id = str(payload.get("template_id") or "").strip()
+    if not template_id:
+        raise ValueError("template_id is required.")
+    raw_bindings = payload.get("input_bindings")
+    if not isinstance(raw_bindings, dict):
+        raise ValueError("input_bindings must be an object.")
+    input_bindings: dict[str, str] = {}
+    for node_id, source in raw_bindings.items():
+        normalized_node_id = str(node_id or "").strip()
+        normalized_source = str(source or "").strip()
+        if not normalized_node_id or not normalized_source:
+            continue
+        if normalized_source not in ALLOWED_RUN_TEMPLATE_INPUT_SOURCES:
+            raise ValueError(f"Unsupported Buddy input source: {normalized_source}")
+        input_bindings[normalized_node_id] = normalized_source
+    current_message_count = sum(1 for source in input_bindings.values() if source == "current_message")
+    if current_message_count != 1:
+        raise ValueError("current_message must be bound exactly once.")
+    return {
+        "version": RUN_TEMPLATE_BINDING_VERSION,
+        "template_id": template_id,
+        "input_bindings": input_bindings,
+        "updated_at": str(payload.get("updated_at") or utc_now_iso()),
+    }
 
 
 def _write_json(file_name: str, payload: Any) -> None:

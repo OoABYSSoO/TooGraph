@@ -131,6 +131,11 @@ def update_session_summary_endpoint(payload: BuddyUpdatePayload) -> dict[str, An
     return store.save_session_summary(payload.data(), changed_by="user", change_reason=payload.change_reason)
 
 
+@router.get("/run-template-binding")
+def get_run_template_binding_endpoint() -> dict[str, Any]:
+    return store.load_run_template_binding()
+
+
 @router.get("/sessions")
 def list_chat_sessions_endpoint(include_deleted: bool = Query(default=False)) -> list[dict[str, Any]]:
     return store.list_chat_sessions(include_deleted=include_deleted)

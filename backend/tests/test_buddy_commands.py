@@ -151,6 +151,43 @@ class BuddyCommandRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 422)
 
+    def test_run_template_binding_update_command_records_command_and_revision(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+                with TestClient(app) as client:
+                    response = client.post(
+                        "/api/buddy/commands",
+                        json={
+                            "action": "run_template_binding.update",
+                            "payload": {
+                                "template_id": "custom_loop",
+                                "input_bindings": {
+                                    "input_prompt": "current_message",
+                                    "input_context": "page_context",
+                                },
+                            },
+                            "run_id": "run_binding_1",
+                            "change_reason": "Manual binding update.",
+                        },
+                    )
+                    revisions_response = client.get(
+                        "/api/buddy/revisions",
+                        params={"target_type": "run_template_binding", "target_id": "run_template_binding"},
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["result"]["template_id"], "custom_loop")
+        self.assertEqual(body["result"]["input_bindings"]["input_prompt"], "current_message")
+        self.assertEqual(body["command"]["action"], "run_template_binding.update")
+        self.assertEqual(body["command"]["target_type"], "run_template_binding")
+        self.assertEqual(body["command"]["target_id"], "run_template_binding")
+        self.assertEqual(body["command"]["run_id"], "run_binding_1")
+        self.assertTrue(body["command"]["revision_id"].startswith("rev_"))
+        self.assertEqual(body["revision"]["revision_id"], body["command"]["revision_id"])
+        self.assertEqual(revisions_response.status_code, 200)
+        self.assertEqual(revisions_response.json()[-1]["previous_value"]["template_id"], "buddy_autonomous_loop")
+
     def test_command_rejects_unsupported_action(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
