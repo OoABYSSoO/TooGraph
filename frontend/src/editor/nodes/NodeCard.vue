@@ -951,7 +951,7 @@ function isPortCreateOpen(side: "input" | "output") {
 }
 
 function formatNodeRunTimingDuration(durationMs: number | null | undefined) {
-  return formatRunDuration(durationMs);
+  return formatRunDuration(durationMs, { secondsFractionDigits: 2 });
 }
 
 function nowNodeRunTimingMs() {
@@ -963,7 +963,7 @@ function clearNodeRunTimingInterval() {
     nodeRunTimingIntervalId = null;
     return;
   }
-  window.clearInterval(nodeRunTimingIntervalId);
+  window.cancelAnimationFrame(nodeRunTimingIntervalId);
   nodeRunTimingIntervalId = null;
 }
 
@@ -976,9 +976,11 @@ function refreshNodeRunTimingInterval() {
   if (typeof window === "undefined") {
     return;
   }
-  nodeRunTimingIntervalId = window.setInterval(() => {
+  const tick = () => {
     nodeRunTimingNowMs.value = nowNodeRunTimingMs();
-  }, 250);
+    nodeRunTimingIntervalId = window.requestAnimationFrame(tick);
+  };
+  nodeRunTimingIntervalId = window.requestAnimationFrame(tick);
 }
 
 watch(

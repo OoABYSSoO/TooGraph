@@ -40,3 +40,8 @@ test("formatRunDuration uses compact human readable units", () => {
   assert.equal(formatRunDuration(12_400), "12s");
   assert.equal(formatRunDuration(125_000), "2m 5s");
 });
+
+test("formatRunDuration can render seconds with fixed decimals", () => {
+  assert.equal(formatRunDuration(1240, { secondsFractionDigits: 2 }), "1.24s");
+  assert.equal(formatRunDuration(12_400, { secondsFractionDigits: 2 }), "12.40s");
+});

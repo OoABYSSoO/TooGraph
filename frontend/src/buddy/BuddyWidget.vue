@@ -1878,7 +1878,7 @@ function nowPublicOutputMs() {
 }
 
 function formatPublicOutputDuration(durationMs: number | null | undefined) {
-  return t("buddy.outputDuration", { duration: formatRunDuration(durationMs ?? undefined) });
+  return t("buddy.outputDuration", { duration: formatRunDuration(durationMs ?? undefined, { secondsFractionDigits: 2 }) });
 }
 
 function formatPublicOutputCardContent(content: string) {

@@ -74,6 +74,7 @@ export function buildRunNodeTimingByNodeIdFromRun(
       [nodeId]: timingFromExecution(execution),
     };
   }
+  result = deriveOutputTimingsFromRunningExecutions(result, run, document);
   return deriveOutputTimingsFromRun(result, run, document);
 }
 
@@ -181,6 +182,38 @@ function deriveOutputTimingsFromRun(
           status: "success",
           startedAtEpochMs: writerStartedAtEpochMs,
           durationMs,
+        },
+      };
+    }
+  }
+  return next;
+}
+
+function deriveOutputTimingsFromRunningExecutions(
+  current: RunNodeTimingByNodeId,
+  run: RunTimingSource,
+  document?: TimingGraphDocument | null,
+) {
+  let next = current;
+  for (const execution of run.node_executions ?? []) {
+    const nodeId = normalizeText(execution.node_id);
+    if (!nodeId || normalizeExecutionStatus(execution.status) !== "running") {
+      continue;
+    }
+    const startedAtEpochMs = parseIsoEpochMs(execution.started_at);
+    if (startedAtEpochMs === null) {
+      continue;
+    }
+    for (const outputNodeId of listConnectedOutputNodeIdsForWriter(document, nodeId)) {
+      if (next[outputNodeId]?.status === "success") {
+        continue;
+      }
+      next = {
+        ...next,
+        [outputNodeId]: {
+          status: "running",
+          startedAtEpochMs,
+          durationMs: null,
         },
       };
     }

@@ -85,6 +85,32 @@ test("buildRunNodeTimingByNodeIdFromRun restores running node timing from starte
   assert.equal(timings.agent.durationMs, null);
 });
 
+test("buildRunNodeTimingByNodeIdFromRun starts output timing from a running upstream writer", () => {
+  const timings = buildRunNodeTimingByNodeIdFromRun(
+    {
+      node_executions: [
+        {
+          node_id: "agent",
+          status: "running",
+          started_at: "2026-05-13T10:00:00.000Z",
+          finished_at: null,
+          duration_ms: 0,
+        },
+      ],
+      artifacts: {
+        state_events: [],
+      },
+    },
+    graphDocument(),
+  );
+
+  assert.deepEqual(timings.output, {
+    status: "running",
+    startedAtEpochMs: Date.parse("2026-05-13T10:00:00.000Z"),
+    durationMs: null,
+  });
+});
+
 test("buildRunNodeTimingByNodeIdFromRun derives output timing from writer state events", () => {
   const timings = buildRunNodeTimingByNodeIdFromRun(
     {

@@ -7,6 +7,10 @@ type RunDisplayNameOptions = {
   timeZone?: string;
 };
 
+type RunDurationFormatOptions = {
+  secondsFractionDigits?: number;
+};
+
 const runDateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
 
 function resolveRunDateTimeFormatter(timeZone?: string) {
@@ -46,12 +50,19 @@ export function formatRunDisplayName(run: RunDisplayNameSource, _options: RunDis
   return run.graph_name?.trim() || "Untitled Graph";
 }
 
-export function formatRunDuration(durationMs: number | null | undefined) {
+export function formatRunDuration(durationMs: number | null | undefined, options: RunDurationFormatOptions = {}) {
   if (!Number.isFinite(durationMs) || !durationMs || durationMs <= 0) {
     return "—";
   }
   if (durationMs < 1000) {
     return `${Math.round(durationMs)}ms`;
+  }
+  const secondsFractionDigits =
+    typeof options.secondsFractionDigits === "number" && Number.isFinite(options.secondsFractionDigits)
+      ? Math.max(0, Math.min(3, Math.round(options.secondsFractionDigits)))
+      : null;
+  if (secondsFractionDigits !== null && durationMs < 60_000) {
+    return `${(durationMs / 1000).toFixed(secondsFractionDigits)}s`;
   }
   const totalSeconds = Math.round(durationMs / 1000);
   if (totalSeconds < 10) {
