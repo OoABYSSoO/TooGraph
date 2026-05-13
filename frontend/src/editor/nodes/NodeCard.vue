@@ -921,8 +921,8 @@ const nodeRunTimingDurationMs = computed(() => {
   if (!timing) {
     return null;
   }
-  if (timing.status === "running" && timing.startedAtMs !== null) {
-    return Math.max(0, Math.round(nodeRunTimingNowMs.value - timing.startedAtMs));
+  if (timing.status === "running" && timing.startedAtEpochMs !== null) {
+    return Math.max(0, Math.round(nodeRunTimingNowMs.value - timing.startedAtEpochMs));
   }
   return timing.durationMs;
 });
@@ -955,7 +955,7 @@ function formatNodeRunTimingDuration(durationMs: number | null | undefined) {
 }
 
 function nowNodeRunTimingMs() {
-  return typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
+  return Date.now();
 }
 
 function clearNodeRunTimingInterval() {
@@ -969,7 +969,7 @@ function clearNodeRunTimingInterval() {
 
 function refreshNodeRunTimingInterval() {
   clearNodeRunTimingInterval();
-  if (props.runTiming?.status !== "running" || props.runTiming.startedAtMs === null) {
+  if (props.runTiming?.status !== "running" || props.runTiming.startedAtEpochMs === null) {
     return;
   }
   nodeRunTimingNowMs.value = nowNodeRunTimingMs();
@@ -1015,7 +1015,7 @@ watch(
 );
 
 watch(
-  () => [props.runTiming?.status ?? null, props.runTiming?.startedAtMs ?? null] as const,
+  () => [props.runTiming?.status ?? null, props.runTiming?.startedAtEpochMs ?? null] as const,
   refreshNodeRunTimingInterval,
   { immediate: true },
 );

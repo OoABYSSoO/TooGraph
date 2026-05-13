@@ -165,7 +165,7 @@ export function useWorkspaceRunVisualState(input: WorkspaceRunVisualStateInput) 
 }
 
 function nowRunNodeTimingMs() {
-  return typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
+  return Date.now();
 }
 
 function buildSubgraphRunStatusByNodeId(run: RunDetail): Record<string, Record<string, string>> {

@@ -57,7 +57,7 @@ function createLifecycleHarness() {
   });
   const runNodeStatusByTabId = ref<Record<string, Record<string, string>>>({ tab_a: { node_a: "running" }, tab_b: {} });
   const runNodeTimingByTabId = ref<Record<string, RunNodeTimingByNodeId>>({
-    tab_a: { node_a: { status: "running", startedAtMs: 1000, durationMs: null } },
+    tab_a: { node_a: { status: "running", startedAtEpochMs: 1000, durationMs: null } },
     tab_b: {},
   });
   const currentRunNodeIdByTabId = ref<Record<string, string | null>>({ tab_a: "node_a", tab_b: null });

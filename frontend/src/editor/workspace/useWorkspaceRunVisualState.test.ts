@@ -180,7 +180,7 @@ test("useWorkspaceRunVisualState applies live node timing events", () => {
 
   harness.controller.applyRunEventVisualStateToTab("tab_a", "node.started", { node_id: "agent" });
   assert.equal(harness.runNodeTimingByTabId.value.tab_a.agent.status, "running");
-  assert.equal(typeof harness.runNodeTimingByTabId.value.tab_a.agent.startedAtMs, "number");
+  assert.equal(typeof harness.runNodeTimingByTabId.value.tab_a.agent.startedAtEpochMs, "number");
 
   harness.controller.applyRunEventVisualStateToTab("tab_a", "node.completed", { node_id: "agent", duration_ms: 42 });
   assert.equal(harness.runNodeTimingByTabId.value.tab_a.agent.status, "success");

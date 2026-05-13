@@ -30,7 +30,7 @@ export function resolveRunNodeClassListForCanvasNode(input: CanvasRunPresentatio
 }
 
 export function shouldShowRunNodeTiming(input: {
-  timing?: { status?: string; durationMs?: number | null; startedAtMs?: number | null } | null;
+  timing?: { status?: string; durationMs?: number | null; startedAtEpochMs?: number | null } | null;
 }) {
   return Boolean(input.timing && ["running", "success", "failed", "paused"].includes(String(input.timing.status ?? "")));
 }

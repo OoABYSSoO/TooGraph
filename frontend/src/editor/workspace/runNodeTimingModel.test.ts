@@ -28,21 +28,21 @@ test("reduceRunNodeTimingEvent starts and completes node timing", () => {
   let timings: RunNodeTimingByNodeId = {};
 
   timings = reduceRunNodeTimingEvent(timings, "node.started", { node_id: "agent" }, 1000);
-  assert.deepEqual(timings.agent, { status: "running", startedAtMs: 1000, durationMs: null });
+  assert.deepEqual(timings.agent, { status: "running", startedAtEpochMs: 1000, durationMs: null });
 
   timings = reduceRunNodeTimingEvent(timings, "node.completed", { node_id: "agent", duration_ms: 875 }, 2000);
-  assert.deepEqual(timings.agent, { status: "success", startedAtMs: 1000, durationMs: 875 });
+  assert.deepEqual(timings.agent, { status: "success", startedAtEpochMs: 1000, durationMs: 875 });
 });
 
 test("reduceRunNodeTimingEvent starts output timing from its upstream writer", () => {
   let timings: RunNodeTimingByNodeId = {};
 
   timings = reduceRunNodeTimingEvent(timings, "node.started", { node_id: "agent" }, 1000, graphDocument());
-  assert.deepEqual(timings.agent, { status: "running", startedAtMs: 1000, durationMs: null });
-  assert.deepEqual(timings.output, { status: "running", startedAtMs: 1000, durationMs: null });
+  assert.deepEqual(timings.agent, { status: "running", startedAtEpochMs: 1000, durationMs: null });
+  assert.deepEqual(timings.output, { status: "running", startedAtEpochMs: 1000, durationMs: null });
 
   timings = reduceRunNodeTimingEvent(timings, "state.updated", { node_id: "agent", state_key: "reply" }, 3250, graphDocument());
-  assert.deepEqual(timings.output, { status: "success", startedAtMs: 1000, durationMs: 2250 });
+  assert.deepEqual(timings.output, { status: "success", startedAtEpochMs: 1000, durationMs: 2250 });
 });
 
 test("reduceRunNodeTimingEvent marks failed nodes and computes duration when the payload omits it", () => {
@@ -51,7 +51,7 @@ test("reduceRunNodeTimingEvent marks failed nodes and computes duration when the
   timings = reduceRunNodeTimingEvent(timings, "node.started", { node_id: "agent" }, 1000);
   timings = reduceRunNodeTimingEvent(timings, "node.failed", { node_id: "agent" }, 2250);
 
-  assert.deepEqual(timings.agent, { status: "failed", startedAtMs: 1000, durationMs: 1250 });
+  assert.deepEqual(timings.agent, { status: "failed", startedAtEpochMs: 1000, durationMs: 1250 });
 });
 
 test("buildRunNodeTimingByNodeIdFromRun uses node executions", () => {
@@ -67,22 +67,51 @@ test("buildRunNodeTimingByNodeIdFromRun uses node executions", () => {
   assert.equal(timings.agent.durationMs, 1200);
 });
 
+test("buildRunNodeTimingByNodeIdFromRun restores running node timing from started_at", () => {
+  const timings = buildRunNodeTimingByNodeIdFromRun({
+    node_executions: [
+      {
+        node_id: "agent",
+        status: "running",
+        started_at: "2026-05-13T10:00:00.000Z",
+        finished_at: null,
+        duration_ms: 0,
+      },
+    ],
+  });
+
+  assert.equal(timings.agent.status, "running");
+  assert.equal(timings.agent.startedAtEpochMs, Date.parse("2026-05-13T10:00:00.000Z"));
+  assert.equal(timings.agent.durationMs, null);
+});
+
 test("buildRunNodeTimingByNodeIdFromRun derives output timing from writer state events", () => {
   const timings = buildRunNodeTimingByNodeIdFromRun(
     {
       node_executions: [
-        { node_id: "agent", status: "success", duration_ms: 8537 },
+        {
+          node_id: "agent",
+          status: "success",
+          started_at: "2026-05-13T10:00:00.000Z",
+          finished_at: "2026-05-13T10:00:03.500Z",
+          duration_ms: 3500,
+        },
       ],
       artifacts: {
         state_events: [
-          { node_id: "agent", state_key: "reply" },
+          {
+            node_id: "agent",
+            state_key: "reply",
+            created_at: "2026-05-13T10:00:02.250Z",
+          },
         ],
       },
     },
     graphDocument(),
   );
 
-  assert.equal(timings.agent.durationMs, 8537);
+  assert.equal(timings.agent.durationMs, 3500);
   assert.equal(timings.output.status, "success");
-  assert.equal(timings.output.durationMs, 8537);
+  assert.equal(timings.output.startedAtEpochMs, Date.parse("2026-05-13T10:00:00.000Z"));
+  assert.equal(timings.output.durationMs, 2250);
 });

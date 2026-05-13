@@ -61,7 +61,7 @@ function createRunHarness(
   const humanReviewErrorByTabId = ref<Record<string, string | null>>({});
   const runNodeStatusByTabId = ref<Record<string, Record<string, string>>>({ tab_a: { old_node: "success" } });
   const runNodeTimingByTabId = ref<Record<string, RunNodeTimingByNodeId>>({
-    tab_a: { old_node: { status: "success", startedAtMs: null, durationMs: 12 } },
+    tab_a: { old_node: { status: "success", startedAtEpochMs: null, durationMs: 12 } },
   });
   const currentRunNodeIdByTabId = ref<Record<string, string | null>>({ tab_a: "old_node" });
   const runOutputPreviewByTabId = ref<Record<string, Record<string, { text: string; displayMode: string | null }>>>({
