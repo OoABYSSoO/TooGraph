@@ -213,6 +213,8 @@ class RunDetail(RunSummary):
 
 class NodeExecutionDetail(BaseModel):
     """Per-node execution detail returned by GET /api/runs/{run_id}/nodes/{node_id}."""
+    execution_id: str | None = None
+    attempt: int | None = None
     node_id: str
     node_type: str
     status: str

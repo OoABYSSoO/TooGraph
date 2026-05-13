@@ -58,6 +58,8 @@ export type NodeExecutionArtifacts = {
 };
 
 export type NodeExecutionDetail = {
+  execution_id?: string | null;
+  attempt?: number | null;
   node_id: string;
   node_type: string;
   status: string;

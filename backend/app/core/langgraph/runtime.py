@@ -59,6 +59,7 @@ from app.core.runtime.execution_graph import (
 )
 from app.core.runtime.run_artifacts import append_run_snapshot as _append_run_snapshot
 from app.core.runtime.run_artifacts import refresh_run_artifacts as _refresh_run_artifacts
+from app.core.runtime.node_execution_records import finish_node_execution, start_node_execution
 from app.core.runtime.runtime_summaries import summarize_first_value as _summarize_values
 from app.core.runtime.state_io import apply_state_writes, collect_node_inputs
 from app.core.runtime.run_events import publish_run_event
@@ -355,6 +356,15 @@ def _build_langgraph_node_callable(
     def _call(current_values: dict[str, Any]) -> dict[str, Any]:
         with run_lock:
             node_started_perf = time.perf_counter()
+            node_started_at = utc_now_iso()
+            iteration = _current_cycle_iteration(cycle_tracker)
+            node_execution = start_node_execution(
+                state,
+                node_id=node_name,
+                node_type=node.kind,
+                started_at=node_started_at,
+                iteration=iteration,
+            )
             state["current_node_id"] = node_name
             state["node_status_map"][node_name] = "running"
             _record_subgraph_node_status(state, node_name, "running")
@@ -370,7 +380,7 @@ def _build_langgraph_node_callable(
                     "node_id": node_name,
                     "node_type": node.kind,
                     "status": "running",
-                    "started_at": utc_now_iso(),
+                    "started_at": node_started_at,
                     **_subgraph_event_context(state),
                 },
             )
@@ -385,7 +395,6 @@ def _build_langgraph_node_callable(
                 )
 
             try:
-                iteration = _current_cycle_iteration(cycle_tracker)
                 input_values, state_reads = collect_node_inputs(node, state)
                 if isinstance(node, NodeSystemSubgraphNode):
                     pending_subgraph = _pending_subgraph_breakpoint_for_node(state, node_name)
@@ -431,6 +440,7 @@ def _build_langgraph_node_callable(
                             body,
                             state_reads=state_reads,
                             duration_ms=duration_ms,
+                            node_execution=node_execution,
                             node_outputs=node_outputs,
                             active_edge_ids=active_edge_ids,
                             started_perf=started_perf,
@@ -445,6 +455,7 @@ def _build_langgraph_node_callable(
                             body,
                             state_reads=state_reads,
                             duration_ms=duration_ms,
+                            node_execution=node_execution,
                             node_outputs=node_outputs,
                             active_edge_ids=active_edge_ids,
                             started_perf=started_perf,
@@ -497,36 +508,30 @@ def _build_langgraph_node_callable(
                     state["saved_outputs"] = [*state.get("saved_outputs", []), *body["saved_outputs"]]
                 if body.get("final_result"):
                     state["final_result"] = str(body["final_result"])
-                state["node_executions"] = [
-                    *state.get("node_executions", []),
-                    {
-                        "node_id": node_name,
-                        "node_type": node.kind,
-                        "status": "success",
-                        "started_at": utc_now_iso(),
-                        "finished_at": utc_now_iso(),
-                        "duration_ms": duration_ms,
-                        "input_summary": _summarize_values(input_values),
-                        "output_summary": _summarize_values(outputs, body.get("final_result")),
-                        "artifacts": {
-                            "inputs": input_values,
-                            "outputs": outputs,
-                            "family": node.kind,
-                            "iteration": iteration,
-                            "subgraph": body.get("subgraph"),
-                            "selected_branch": body.get("selected_branch"),
-                            "response": body.get("response"),
-                            "reasoning": body.get("reasoning"),
-                            "runtime_config": body.get("runtime_config"),
-                            "selected_capabilities": body.get("selected_capabilities", []),
-                            "capability_outputs": body.get("capability_outputs", []),
-                            "state_reads": state_reads,
-                            "state_writes": state_writes,
-                        },
-                        "warnings": body.get("warnings", []),
-                        "errors": [],
+                finish_node_execution(
+                    node_execution,
+                    status="success",
+                    duration_ms=duration_ms,
+                    input_summary=_summarize_values(input_values),
+                    output_summary=_summarize_values(outputs, body.get("final_result")),
+                    artifacts={
+                        "inputs": input_values,
+                        "outputs": outputs,
+                        "family": node.kind,
+                        "iteration": iteration,
+                        "subgraph": body.get("subgraph"),
+                        "selected_branch": body.get("selected_branch"),
+                        "response": body.get("response"),
+                        "reasoning": body.get("reasoning"),
+                        "runtime_config": body.get("runtime_config"),
+                        "selected_capabilities": body.get("selected_capabilities", []),
+                        "capability_outputs": body.get("capability_outputs", []),
+                        "state_reads": state_reads,
+                        "state_writes": state_writes,
                     },
-                ]
+                    warnings=body.get("warnings", []),
+                    errors=[],
+                )
                 active_edge_ids.update(selected_edge_ids)
                 _record_cycle_activity(
                     state=state,
@@ -543,6 +548,7 @@ def _build_langgraph_node_callable(
                         "node_id": node_name,
                         "node_type": node.kind,
                         "status": "success",
+                        "started_at": node_execution.get("started_at"),
                         "duration_ms": duration_ms,
                         "output_keys": list(outputs.keys()),
                         **_subgraph_event_context(state),
@@ -566,25 +572,19 @@ def _build_langgraph_node_callable(
                 _record_subgraph_node_status(state, node_name, "failed")
                 set_run_status(state, "failed")
                 state["errors"] = [*state.get("errors", []), str(exc)]
-                state["node_executions"] = [
-                    *state.get("node_executions", []),
-                    {
-                        "node_id": node_name,
-                        "node_type": node.kind,
-                        "status": "failed",
-                        "started_at": utc_now_iso(),
-                        "finished_at": utc_now_iso(),
-                        "duration_ms": duration_ms,
-                        "input_summary": "",
-                        "output_summary": "",
-                        "artifacts": {
-                            "family": node.kind,
-                            "iteration": iteration,
-                        },
-                        "warnings": [],
-                        "errors": [str(exc)],
+                finish_node_execution(
+                    node_execution,
+                    status="failed",
+                    duration_ms=duration_ms,
+                    input_summary="",
+                    output_summary="",
+                    artifacts={
+                        "family": node.kind,
+                        "iteration": iteration,
                     },
-                ]
+                    warnings=[],
+                    errors=[str(exc)],
+                )
                 if persist_progress:
                     _persist_langgraph_progress(
                         state,
@@ -628,6 +628,7 @@ def _apply_subgraph_waiting_parent_state(
     *,
     state_reads: list[dict[str, Any]],
     duration_ms: int,
+    node_execution: dict[str, Any],
     node_outputs: dict[str, dict[str, Any]],
     active_edge_ids: set[str],
     started_perf: float,
@@ -644,29 +645,23 @@ def _apply_subgraph_waiting_parent_state(
     metadata["pending_interrupts"] = []
     metadata["pending_subgraph_breakpoint"] = pending
     metadata["resolved_runtime_backend"] = "langgraph"
-    state["node_executions"] = [
-        *state.get("node_executions", []),
-        {
-            "node_id": node_name,
-            "node_type": node.kind,
-            "status": "paused",
-            "started_at": utc_now_iso(),
-            "finished_at": utc_now_iso(),
-            "duration_ms": duration_ms,
-            "input_summary": _summarize_values(subgraph_artifact.get("input_values", {})),
-            "output_summary": "",
-            "artifacts": {
-                "inputs": subgraph_artifact.get("input_values", {}),
-                "outputs": {},
-                "family": node.kind,
-                "subgraph": subgraph_artifact,
-                "state_reads": state_reads,
-                "state_writes": [],
-            },
-            "warnings": body.get("warnings", []),
-            "errors": [],
+    finish_node_execution(
+        node_execution,
+        status="paused",
+        duration_ms=duration_ms,
+        input_summary=_summarize_values(subgraph_artifact.get("input_values", {})),
+        output_summary="",
+        artifacts={
+            "inputs": subgraph_artifact.get("input_values", {}),
+            "outputs": {},
+            "family": node.kind,
+            "subgraph": subgraph_artifact,
+            "state_reads": state_reads,
+            "state_writes": [],
         },
-    ]
+        warnings=body.get("warnings", []),
+        errors=[],
+    )
     _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
     _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
     _append_run_snapshot(
@@ -685,6 +680,7 @@ def _apply_permission_approval_waiting_state(
     *,
     state_reads: list[dict[str, Any]],
     duration_ms: int,
+    node_execution: dict[str, Any],
     node_outputs: dict[str, dict[str, Any]],
     active_edge_ids: set[str],
     started_perf: float,
@@ -701,31 +697,25 @@ def _apply_permission_approval_waiting_state(
     metadata["pending_interrupts"] = []
     metadata["pending_permission_approval"] = pending
     metadata["resolved_runtime_backend"] = "langgraph"
-    state["node_executions"] = [
-        *state.get("node_executions", []),
-        {
-            "node_id": node_name,
-            "node_type": node.kind,
-            "status": "paused",
-            "started_at": utc_now_iso(),
-            "finished_at": utc_now_iso(),
-            "duration_ms": duration_ms,
-            "input_summary": _summarize_values(pending.get("skill_inputs", {})),
-            "output_summary": "",
-            "artifacts": {
-                "inputs": pending.get("skill_inputs", {}),
-                "outputs": {},
-                "family": node.kind,
-                "state_reads": state_reads,
-                "state_writes": [],
-                "permission_approval": pending,
-                "selected_capabilities": body.get("selected_capabilities", []),
-                "capability_outputs": [],
-            },
-            "warnings": body.get("warnings", []),
-            "errors": [],
+    finish_node_execution(
+        node_execution,
+        status="paused",
+        duration_ms=duration_ms,
+        input_summary=_summarize_values(pending.get("skill_inputs", {})),
+        output_summary="",
+        artifacts={
+            "inputs": pending.get("skill_inputs", {}),
+            "outputs": {},
+            "family": node.kind,
+            "state_reads": state_reads,
+            "state_writes": [],
+            "permission_approval": pending,
+            "selected_capabilities": body.get("selected_capabilities", []),
+            "capability_outputs": [],
         },
-    ]
+        warnings=body.get("warnings", []),
+        errors=[],
+    )
     _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
     _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
     _append_run_snapshot(
@@ -1424,6 +1414,14 @@ def _build_langgraph_route_callable(
 
                 condition_node = graph.nodes[condition_name]
                 condition_started_perf = time.perf_counter()
+                condition_started_at = utc_now_iso()
+                condition_execution = start_node_execution(
+                    state,
+                    node_id=condition_name,
+                    node_type=condition_node.kind,
+                    started_at=condition_started_at,
+                    iteration=iteration,
+                )
                 state["node_status_map"][condition_name] = "running"
                 _record_subgraph_node_status(state, condition_name, "running")
                 publish_run_event(
@@ -1433,81 +1431,106 @@ def _build_langgraph_route_callable(
                         "node_id": condition_name,
                         "node_type": condition_node.kind,
                         "status": "running",
-                        "started_at": utc_now_iso(),
+                        "started_at": condition_started_at,
                         **_subgraph_event_context(state),
                     },
                 )
                 try:
                     input_values, _state_reads = collect_node_inputs(condition_node, state)
                     body = _execute_node(graph, condition_name, condition_node, input_values, state)
-                except Exception:
-                    state["node_status_map"][condition_name] = "failed"
-                    _record_subgraph_node_status(state, condition_name, "failed")
-                    raise
 
-                selected_branch = str(body.get("selected_branch") or "").strip()
-                if not selected_branch:
-                    state["node_status_map"][condition_name] = "failed"
-                    raise ValueError(f"Condition node '{condition_name}' did not produce a selected branch.")
+                    selected_branch = str(body.get("selected_branch") or "").strip()
+                    if not selected_branch:
+                        raise ValueError(f"Condition node '{condition_name}' did not produce a selected branch.")
 
-                conditional_edge = conditional_edges_by_source.get(condition_name)
-                if conditional_edge is None:
-                    state["node_status_map"][condition_name] = "failed"
-                    raise ValueError(f"Condition node '{condition_name}' has no conditional edge mapping.")
+                    conditional_edge = conditional_edges_by_source.get(condition_name)
+                    if conditional_edge is None:
+                        raise ValueError(f"Condition node '{condition_name}' has no conditional edge mapping.")
 
-                visual_target = str(conditional_edge.branches.get(selected_branch) or "")
-                if not visual_target:
-                    state["node_status_map"][condition_name] = "failed"
-                    raise ValueError(
-                        f"Condition node '{condition_name}' selected branch '{selected_branch}', but that branch has no target."
-                    )
-
-                current_step_edge_ids: set[str] = set()
-                edge_id = conditional_edge_ids.get((condition_name, selected_branch, visual_target))
-                if edge_id:
-                    current_step_edge_ids.add(edge_id)
-
-                loop_limit_violation = _peek_condition_loop_limit_violation(
-                    cycle_tracker,
-                    sorted(current_step_edge_ids),
-                )
-                if loop_limit_violation is not None:
-                    max_iterations, source_node = loop_limit_violation
-                    exhausted_visual_target = str(conditional_edge.branches.get("exhausted") or "")
-                    exhausted_edge_id = conditional_edge_ids.get(
-                        (condition_name, "exhausted", exhausted_visual_target)
-                    )
-                    if exhausted_visual_target and exhausted_edge_id:
-                        selected_branch = "exhausted"
-                        visual_target = exhausted_visual_target
-                        current_step_edge_ids = {exhausted_edge_id}
-                        _mark_cycle_iteration_stop_reason(cycle_tracker, iteration, "max_iterations_exceeded")
-                        state["loop_limit_exhaustion"] = {
-                            "condition_node": source_node,
-                            "max_iterations": max_iterations,
-                        }
-                    else:
-                        state["node_status_map"][condition_name] = "failed"
-                        _mark_cycle_iteration_stop_reason(cycle_tracker, iteration, "max_iterations_exceeded")
+                    visual_target = str(conditional_edge.branches.get(selected_branch) or "")
+                    if not visual_target:
                         raise ValueError(
-                            f"Cycle execution exceeded loopLimit ({max_iterations}) for condition '{source_node}'. Add an exit branch or raise loopLimit."
+                            f"Condition node '{condition_name}' selected branch '{selected_branch}', but that branch has no target."
                         )
 
-                state["node_status_map"][condition_name] = "success"
-                _record_subgraph_node_status(state, condition_name, "success")
-                duration_ms = int((time.perf_counter() - condition_started_perf) * 1000)
-                publish_run_event(
-                    str(state.get("run_id") or ""),
-                    "node.completed",
-                    {
-                        "node_id": condition_name,
-                        "node_type": condition_node.kind,
-                        "status": "success",
-                        "selected_branch": selected_branch,
-                        "duration_ms": duration_ms,
-                        **_subgraph_event_context(state),
-                    },
-                )
+                    current_step_edge_ids: set[str] = set()
+                    edge_id = conditional_edge_ids.get((condition_name, selected_branch, visual_target))
+                    if edge_id:
+                        current_step_edge_ids.add(edge_id)
+
+                    loop_limit_violation = _peek_condition_loop_limit_violation(
+                        cycle_tracker,
+                        sorted(current_step_edge_ids),
+                    )
+                    if loop_limit_violation is not None:
+                        max_iterations, source_node = loop_limit_violation
+                        exhausted_visual_target = str(conditional_edge.branches.get("exhausted") or "")
+                        exhausted_edge_id = conditional_edge_ids.get(
+                            (condition_name, "exhausted", exhausted_visual_target)
+                        )
+                        if exhausted_visual_target and exhausted_edge_id:
+                            selected_branch = "exhausted"
+                            visual_target = exhausted_visual_target
+                            current_step_edge_ids = {exhausted_edge_id}
+                            _mark_cycle_iteration_stop_reason(cycle_tracker, iteration, "max_iterations_exceeded")
+                            state["loop_limit_exhaustion"] = {
+                                "condition_node": source_node,
+                                "max_iterations": max_iterations,
+                            }
+                        else:
+                            _mark_cycle_iteration_stop_reason(cycle_tracker, iteration, "max_iterations_exceeded")
+                            raise ValueError(
+                                f"Cycle execution exceeded loopLimit ({max_iterations}) for condition '{source_node}'. Add an exit branch or raise loopLimit."
+                            )
+
+                    state["node_status_map"][condition_name] = "success"
+                    _record_subgraph_node_status(state, condition_name, "success")
+                    duration_ms = int((time.perf_counter() - condition_started_perf) * 1000)
+                    finish_node_execution(
+                        condition_execution,
+                        status="success",
+                        duration_ms=duration_ms,
+                        input_summary=_summarize_values(input_values),
+                        output_summary=str(selected_branch),
+                        artifacts={
+                            "inputs": input_values,
+                            "outputs": dict(body.get("outputs", {})),
+                            "family": condition_node.kind,
+                            "iteration": iteration,
+                            "selected_branch": selected_branch,
+                            "state_reads": _state_reads,
+                            "state_writes": [],
+                        },
+                        warnings=body.get("warnings", []),
+                        errors=[],
+                    )
+                    publish_run_event(
+                        str(state.get("run_id") or ""),
+                        "node.completed",
+                        {
+                            "node_id": condition_name,
+                            "node_type": condition_node.kind,
+                            "status": "success",
+                            "started_at": condition_execution.get("started_at"),
+                            "selected_branch": selected_branch,
+                            "duration_ms": duration_ms,
+                            **_subgraph_event_context(state),
+                        },
+                    )
+                except Exception as exc:
+                    state["node_status_map"][condition_name] = "failed"
+                    _record_subgraph_node_status(state, condition_name, "failed")
+                    finish_node_execution(
+                        condition_execution,
+                        status="failed",
+                        duration_ms=int((time.perf_counter() - condition_started_perf) * 1000),
+                        input_summary="",
+                        output_summary="",
+                        artifacts={"family": condition_node.kind, "iteration": iteration},
+                        warnings=[],
+                        errors=[str(exc)],
+                    )
+                    raise
                 selected_steps.append((condition_name, selected_branch, visual_target))
                 selected_edge_ids.update(current_step_edge_ids)
 
