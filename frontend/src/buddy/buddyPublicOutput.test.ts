@@ -179,3 +179,130 @@ test("reduceBuddyPublicOutputEvent ignores states without parent output bindings
   assert.deepEqual(state.order, []);
   assert.deepEqual(state.messagesByOutputNodeId, {});
 });
+
+test("reduceBuddyPublicOutputEvent strips a single output JSON envelope by state key", () => {
+  const bindings = [
+    {
+      outputNodeId: "output_answer",
+      outputNodeName: "Answer",
+      stateKey: "answer",
+      stateName: "answer",
+      stateType: "markdown",
+      displayMode: "markdown",
+      upstreamNodeIds: ["writer"],
+    },
+  ];
+  let state = createBuddyPublicOutputRuntimeState();
+
+  state = reduceBuddyPublicOutputEvent(
+    state,
+    bindings,
+    "node.output.delta",
+    {
+      node_id: "writer",
+      text: '{"answer":"你好，TooGraph',
+      output_keys: ["answer"],
+      stream_state_keys: ["answer"],
+    },
+    1000,
+  );
+
+  assert.deepEqual(state.order, ["output_answer"]);
+  assert.equal(state.messagesByOutputNodeId.output_answer.content, "你好，TooGraph");
+  assert.equal(state.messagesByOutputNodeId.output_answer.status, "streaming");
+});
+
+test("reduceBuddyPublicOutputEvent preserves JSON text inside a stripped single output envelope", () => {
+  const bindings = [
+    {
+      outputNodeId: "output_payload",
+      outputNodeName: "Payload",
+      stateKey: "payload",
+      stateName: "payload",
+      stateType: "json",
+      displayMode: "json",
+      upstreamNodeIds: ["writer"],
+    },
+  ];
+  let state = createBuddyPublicOutputRuntimeState();
+
+  state = reduceBuddyPublicOutputEvent(
+    state,
+    bindings,
+    "node.output.delta",
+    {
+      node_id: "writer",
+      text: '{"payload":"{\\\"ok\\\":true}"}',
+      output_keys: ["payload"],
+      stream_state_keys: ["payload"],
+    },
+    1000,
+  );
+
+  assert.deepEqual(state.order, ["output_payload"]);
+  assert.equal(state.messagesByOutputNodeId.output_payload.content, '{"ok":true}');
+  assert.equal(state.messagesByOutputNodeId.output_payload.kind, "card");
+});
+
+test("reduceBuddyPublicOutputEvent preserves JSON object bodies inside a stripped single output envelope", () => {
+  const bindings = [
+    {
+      outputNodeId: "output_payload",
+      outputNodeName: "Payload",
+      stateKey: "payload",
+      stateName: "payload",
+      stateType: "json",
+      displayMode: "json",
+      upstreamNodeIds: ["writer"],
+    },
+  ];
+  let state = createBuddyPublicOutputRuntimeState();
+
+  state = reduceBuddyPublicOutputEvent(
+    state,
+    bindings,
+    "node.output.delta",
+    {
+      node_id: "writer",
+      text: '{"payload":{"ok":true',
+      output_keys: ["payload"],
+      stream_state_keys: ["payload"],
+    },
+    1000,
+  );
+
+  assert.deepEqual(state.order, ["output_payload"]);
+  assert.equal(state.messagesByOutputNodeId.output_payload.content, '{"ok":true');
+  assert.equal(state.messagesByOutputNodeId.output_payload.kind, "card");
+});
+
+test("reduceBuddyPublicOutputEvent hides a single output JSON envelope before the body starts", () => {
+  const bindings = [
+    {
+      outputNodeId: "output_answer",
+      outputNodeName: "Answer",
+      stateKey: "answer",
+      stateName: "answer",
+      stateType: "markdown",
+      displayMode: "markdown",
+      upstreamNodeIds: ["writer"],
+    },
+  ];
+  let state = createBuddyPublicOutputRuntimeState();
+
+  state = reduceBuddyPublicOutputEvent(
+    state,
+    bindings,
+    "node.output.delta",
+    {
+      node_id: "writer",
+      text: '{"answer"',
+      output_keys: ["answer"],
+      stream_state_keys: ["answer"],
+    },
+    1000,
+  );
+
+  assert.deepEqual(state.order, []);
+  assert.deepEqual(state.messagesByOutputNodeId, {});
+});

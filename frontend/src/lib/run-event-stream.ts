@@ -1,4 +1,4 @@
-import { routeStreamingJsonStateText } from "./streamingJsonStateRouter.ts";
+import { projectStreamingJsonStateText } from "./streamingJsonStateRouter.ts";
 
 export type RunEventPayload = Record<string, unknown>;
 
@@ -113,14 +113,17 @@ export function buildRunEventOutputPreviewUpdate(
   const outputKeys = listRunEventOutputKeys(payload);
   const streamStateKeys = listRunEventOutputKeys({ output_keys: payload.stream_state_keys }, outputKeys);
   if (streamStateKeys.length > 1) {
-    const routed = routeStreamingJsonStateText(text, streamStateKeys);
     const nextPreviewByNodeId = { ...currentPreviewByNodeId };
     let changed = false;
-    for (const [stateKey, route] of Object.entries(routed)) {
+    for (const stateKey of streamStateKeys) {
+      const projection = projectStreamingJsonStateText(text, stateKey);
+      if (projection.kind !== "projected") {
+        continue;
+      }
       const previewNodeIds = resolveOutputNodeIdsForState(document, stateKey);
       for (const nodeId of previewNodeIds) {
         nextPreviewByNodeId[nodeId] = {
-          text: route.text,
+          text: projection.text,
           displayMode: resolveRunEventPreviewDisplayMode(document, nodeId),
         };
         changed = true;
@@ -135,7 +138,13 @@ export function buildRunEventOutputPreviewUpdate(
     return null;
   }
 
-  return buildRunEventOutputPreviewByNodeId(currentPreviewByNodeId, previewNodeIds, text, document);
+  const singleStateProjection =
+    streamStateKeys.length === 1 ? projectStreamingJsonStateText(text, streamStateKeys[0]) : { kind: "unmatched" as const };
+  if (singleStateProjection.kind === "pending") {
+    return null;
+  }
+  const previewText = singleStateProjection.kind === "projected" ? singleStateProjection.text : text;
+  return buildRunEventOutputPreviewByNodeId(currentPreviewByNodeId, previewNodeIds, previewText, document);
 }
 
 export function stringifyRunEventPreviewValue(value: unknown) {

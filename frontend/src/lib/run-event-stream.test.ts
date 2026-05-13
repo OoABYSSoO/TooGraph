@@ -255,6 +255,84 @@ test("buildRunEventOutputPreviewUpdate routes multi-state JSON streams to matchi
   );
 });
 
+test("buildRunEventOutputPreviewUpdate strips a single output JSON envelope by state key", () => {
+  const document = {
+    nodes: {
+      output_answer: { kind: "output", reads: [{ state: "answer" }], config: { displayMode: "markdown" } },
+    },
+  };
+
+  assert.deepEqual(
+    buildRunEventOutputPreviewUpdate(document, {}, {
+      node_id: "agent_writer",
+      text: '{"answer":"你好，TooGraph',
+      output_keys: ["answer"],
+      stream_state_keys: ["answer"],
+    }),
+    {
+      output_answer: { text: "你好，TooGraph", displayMode: "markdown" },
+    },
+  );
+});
+
+test("buildRunEventOutputPreviewUpdate preserves JSON text inside a stripped single output envelope", () => {
+  const document = {
+    nodes: {
+      output_payload: { kind: "output", reads: [{ state: "payload" }], config: { displayMode: "json" } },
+    },
+  };
+
+  assert.deepEqual(
+    buildRunEventOutputPreviewUpdate(document, {}, {
+      node_id: "agent_writer",
+      text: '{"payload":"{\\\"ok\\\":true}"}',
+      output_keys: ["payload"],
+      stream_state_keys: ["payload"],
+    }),
+    {
+      output_payload: { text: '{"ok":true}', displayMode: "json" },
+    },
+  );
+});
+
+test("buildRunEventOutputPreviewUpdate preserves JSON object bodies inside a stripped single output envelope", () => {
+  const document = {
+    nodes: {
+      output_payload: { kind: "output", reads: [{ state: "payload" }], config: { displayMode: "json" } },
+    },
+  };
+
+  assert.deepEqual(
+    buildRunEventOutputPreviewUpdate(document, {}, {
+      node_id: "agent_writer",
+      text: '{"payload":{"ok":true',
+      output_keys: ["payload"],
+      stream_state_keys: ["payload"],
+    }),
+    {
+      output_payload: { text: '{"ok":true', displayMode: "json" },
+    },
+  );
+});
+
+test("buildRunEventOutputPreviewUpdate hides a single output JSON envelope before the body starts", () => {
+  const document = {
+    nodes: {
+      output_answer: { kind: "output", reads: [{ state: "answer" }], config: { displayMode: "markdown" } },
+    },
+  };
+
+  assert.equal(
+    buildRunEventOutputPreviewUpdate(document, {}, {
+      node_id: "agent_writer",
+      text: '{"answer"',
+      output_keys: ["answer"],
+      stream_state_keys: ["answer"],
+    }),
+    null,
+  );
+});
+
 test("buildRunEventOutputPreviewUpdate does not broadcast ambiguous multi-state text streams", () => {
   const document = {
     nodes: {

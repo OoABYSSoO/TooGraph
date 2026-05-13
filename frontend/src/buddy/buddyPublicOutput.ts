@@ -1,5 +1,5 @@
 import type { ConditionalEdge, GraphEdge, GraphPayload } from "../types/node-system.ts";
-import { routeStreamingJsonStateText } from "../lib/streamingJsonStateRouter.ts";
+import { projectStreamingJsonStateText } from "../lib/streamingJsonStateRouter.ts";
 
 export type BuddyPublicOutputBinding = {
   outputNodeId: string;
@@ -189,14 +189,27 @@ function applyStreamingDelta(
 
   let nextState = state;
   if (targetStateKeys.length > 1) {
-    const routed = routeStreamingJsonStateText(text, targetStateKeys);
-    for (const [stateKey, route] of Object.entries(routed)) {
-      nextState = upsertMessagesForState(nextState, bindings, stateKey, route.text, "streaming", nowMs);
+    for (const stateKey of targetStateKeys) {
+      const projection = projectStreamingJsonStateText(text, stateKey);
+      if (projection.kind === "projected") {
+        nextState = upsertMessagesForState(nextState, bindings, stateKey, projection.text, "streaming", nowMs);
+      }
     }
     return nextState;
   }
 
-  return upsertMessagesForState(nextState, bindings, targetStateKeys[0], text, "streaming", nowMs);
+  const singleStateProjection = projectStreamingJsonStateText(text, targetStateKeys[0]);
+  if (singleStateProjection.kind === "pending") {
+    return nextState;
+  }
+  return upsertMessagesForState(
+    nextState,
+    bindings,
+    targetStateKeys[0],
+    singleStateProjection.kind === "projected" ? singleStateProjection.text : text,
+    "streaming",
+    nowMs,
+  );
 }
 
 function completeStateOutput(
