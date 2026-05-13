@@ -127,6 +127,52 @@ test("buildRunActivityEntriesFromRun replays stored state events for completed r
   );
 });
 
+test("buildRunActivityEntriesFromRun restores node lifecycle entries from node executions", () => {
+  const run = {
+    run_id: "run_1",
+    node_executions: [
+      {
+        node_id: "agent",
+        node_type: "agent",
+        status: "success",
+        started_at: "2026-05-13T10:00:00.000Z",
+        finished_at: "2026-05-13T10:00:01.200Z",
+        duration_ms: 1200,
+        input_summary: "",
+        output_summary: "Answer",
+        artifacts: {
+          inputs: {},
+          outputs: { answer: "Hello" },
+          family: "agent",
+          state_reads: [],
+          state_writes: [],
+        },
+        warnings: [],
+        errors: [],
+      },
+    ],
+    artifacts: {
+      state_events: [
+        {
+          node_id: "agent",
+          state_key: "answer",
+          output_key: "answer",
+          mode: "replace",
+          value: "Hello",
+          sequence: 1,
+          created_at: "2026-05-13T10:00:01.000Z",
+        },
+      ],
+      activity_events: [],
+    },
+  } as unknown as RunDetail;
+
+  assert.deepEqual(
+    buildRunActivityEntriesFromRun(run).map((entry) => entry.kind),
+    ["node-started", "state-updated", "node-completed"],
+  );
+});
+
 test("buildRunActivityEntriesFromRun replays stored low-level activity events", () => {
   const run = {
     run_id: "run_1",

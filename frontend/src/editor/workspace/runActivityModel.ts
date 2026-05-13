@@ -61,6 +61,46 @@ export function appendRunActivityEvent(
 }
 
 export function buildRunActivityEntriesFromRun(run: RunDetail, stateNameByKey: RunActivityStateNameByKey = {}): RunActivityEntry[] {
+  const nodeEntries = (run.node_executions ?? []).flatMap((execution, index) => {
+    const nodeId = normalizeText(execution.node_id);
+    const nodeType = normalizeText(execution.node_type) || null;
+    const baseSequence = (index + 1) * 1000;
+    const startedAt = normalizeText(execution.started_at);
+    const finishedAt = normalizeText(execution.finished_at);
+    const entries: RunActivityEntry[] = [];
+    if (startedAt) {
+      entries.push(
+        createEntry(
+          "node-started",
+          baseSequence,
+          nodeId,
+          nodeType,
+          null,
+          `${nodeId} running`,
+          "agent running",
+          execution,
+          startedAt,
+        ),
+      );
+    }
+    if (finishedAt) {
+      const failed = execution.status === "failed" || execution.status === "error";
+      entries.push(
+        createEntry(
+          failed ? "node-failed" : "node-completed",
+          baseSequence + 999,
+          nodeId,
+          nodeType,
+          null,
+          failed ? `${nodeId} failed` : `${nodeId} completed`,
+          failed ? (execution.errors ?? []).join("\n") : `${Number(execution.duration_ms ?? 0)}ms`,
+          execution,
+          finishedAt,
+        ),
+      );
+    }
+    return entries;
+  });
   const stateEvents = run.artifacts?.state_events ?? [];
   const stateEntries: RunActivityEntry[] = stateEvents.map((event, index) => ({
     id: `state-${event.sequence ?? index + 1}-${event.node_id}-${event.state_key}`,
@@ -79,7 +119,7 @@ export function buildRunActivityEntriesFromRun(run: RunDetail, stateNameByKey: R
   const activityEntries = activityEvents.map((event, index) =>
     createActivityEntry(event as Record<string, unknown>, Number(event.sequence ?? index + 1)),
   );
-  const entries = [...stateEntries, ...activityEntries].sort(compareRunActivityEntries);
+  const entries = [...nodeEntries, ...stateEntries, ...activityEntries].sort(compareRunActivityEntries);
   return entries.map((entry, index) => ({ ...entry, active: index === entries.length - 1 }));
 }
 
