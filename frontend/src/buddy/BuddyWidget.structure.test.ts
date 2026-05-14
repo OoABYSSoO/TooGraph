@@ -187,7 +187,7 @@ test("BuddyWidget tracks dragging and click pulses for mascot animation", () => 
 
 test("BuddyWidget listens for mascot debug actions requested from the Buddy page", () => {
   assert.match(componentSource, /import type \{ BuddyMascotDebugAction \} from "\.\/buddyMascotDebug\.ts";/);
-  assert.match(componentSource, /import \{ useBuddyMascotDebugStore \} from "\.\.\/stores\/buddyMascotDebug\.ts";/);
+  assert.match(componentSource, /import \{[\s\S]*useBuddyMascotDebugStore[\s\S]*\} from "\.\.\/stores\/buddyMascotDebug\.ts";/);
   assert.match(componentSource, /const buddyMascotDebugStore = useBuddyMascotDebugStore\(\);/);
   assert.match(componentSource, /latestRequest: mascotDebugRequest,[\s\S]*motionConfig: buddyMascotMotionConfig,[\s\S]*virtualCursorEnabled,[\s\S]*= storeToRefs\(buddyMascotDebugStore\);/);
   assert.match(componentSource, /watch\(mascotDebugRequest,\s*\(request\) => \{/);
@@ -382,6 +382,26 @@ test("BuddyWidget keeps virtual-cursor follow jumps from being flattened by slow
   assert.match(componentSource, /if \(isBuddyVirtualCursorFollowTargetReached\(position\.value, targetPosition\)\) \{[\s\S]*if \(isFollowingMotionActive\) \{[\s\S]*buddyVirtualCursorFollowTargetPosition = targetPosition;[\s\S]*return;[\s\S]*\}/);
   assert.equal(extractCssBlock(".buddy-widget__virtual-cursor-follow-range"), "");
   assert.match(componentSource, /function finishBuddyVirtualCursorFollowSequence\(shouldPersistPosition: boolean\)[\s\S]*cancelBuddyVirtualCursorFollowTimers\(\);[\s\S]*mascotMotion\.value = "idle";/);
+});
+
+test("BuddyWidget executes virtual UI operation events through the virtual cursor", () => {
+  assert.match(componentSource, /latestVirtualOperationRequest,/);
+  assert.match(componentSource, /watch\(latestVirtualOperationRequest,\s*\(request\) => \{/);
+  assert.match(componentSource, /executeVirtualOperationRequest\(request\);/);
+  assert.match(componentSource, /eventType === "activity\.event"[\s\S]*handleBuddyVirtualUiOperationEvent\(payload\);/);
+  assert.match(componentSource, /function handleBuddyVirtualUiOperationEvent\(payload: Record<string, unknown>\)/);
+  assert.match(componentSource, /if \(kind !== "virtual_ui_operation"\)/);
+  assert.match(componentSource, /buddyMascotDebugStore\.requestVirtualOperation\(\{/);
+  assert.match(componentSource, /targetId: "app\.nav\.runs"/);
+  assert.match(componentSource, /function executeVirtualOperationRequest\(request: BuddyVirtualOperationRequest \| null\)/);
+  assert.match(componentSource, /function executeBuddyVirtualClickOperation\(operation: BuddyVirtualOperation\)/);
+  assert.match(componentSource, /function resolveVirtualOperationAffordance\(targetId: string\)/);
+  assert.match(componentSource, /"app\.nav\.runs": '\[data-virtual-affordance-id="app\.nav\.runs"\]'/);
+  assert.doesNotMatch(componentSource, /"app\.nav\.buddy":/);
+  assert.match(componentSource, /moveVirtualCursorToWithArmedTransition\(cursorPosition\)/);
+  assert.match(componentSource, /dispatchVirtualClick\(affordance\.element\);/);
+  assert.match(componentSource, /operation\.cursorLifecycle === "return_after_step"/);
+  assert.match(componentSource, /buddyMascotDebugStore\.setVirtualCursorEnabled\(false\);/);
 });
 
 test("BuddyWidget debug panel can trigger every mascot animation state without graph runs", () => {

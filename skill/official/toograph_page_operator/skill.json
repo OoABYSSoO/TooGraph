@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "toograph.skill/v1",
+  "skillKey": "toograph_page_operator",
+  "name": "TooGraph Page Operator",
+  "description": "根据结构化页面操作书执行一条语义级页面操作请求。首期支持非伙伴页面的应用导航点击，并通过伙伴虚拟鼠标播放可见操作。",
+  "llmInstruction": "你已绑定 TooGraph Page Operator。根据页面操作书和用户目标，只生成一条语义命令。当前只允许 click_nav 到普通应用导航目标，例如 runs。不要选择伙伴页面、伙伴浮窗、伙伴形象或调试入口。不要输出 DOM selector、坐标、鼠标轨迹或多步计划。",
+  "version": "0.1.0",
+  "timeoutSeconds": 30,
+  "permissions": [
+    "virtual_ui_operation"
+  ],
+  "inputSchema": [
+    {
+      "key": "page_path",
+      "name": "Page Path",
+      "valueType": "text",
+      "required": true,
+      "description": "当前页面路径，例如 / 或 /editor。"
+    },
+    {
+      "key": "user_goal",
+      "name": "User Goal",
+      "valueType": "text",
+      "required": false,
+      "description": "用户希望完成的页面操作目标。"
+    },
+    {
+      "key": "action",
+      "name": "Action",
+      "valueType": "text",
+      "required": true,
+      "description": "语义动作。首期只支持 click_nav。"
+    },
+    {
+      "key": "target",
+      "name": "Target",
+      "valueType": "text",
+      "required": true,
+      "description": "语义目标。首期支持 runs / 运行历史 / 历史。"
+    },
+    {
+      "key": "cursor_lifecycle",
+      "name": "Cursor Lifecycle",
+      "valueType": "text",
+      "required": false,
+      "description": "虚拟鼠标生命周期，keep、return_after_step 或 return_at_end。"
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "ok",
+      "name": "OK",
+      "valueType": "boolean",
+      "description": "语义操作是否被接受。"
+    },
+    {
+      "key": "next_page_path",
+      "name": "Next Page Path",
+      "valueType": "text",
+      "description": "操作成功后预期的新页面路径。"
+    },
+    {
+      "key": "cursor_session_id",
+      "name": "Cursor Session ID",
+      "valueType": "text",
+      "description": "虚拟鼠标会话 ID，首期为空字符串。"
+    },
+    {
+      "key": "journal",
+      "name": "Journal",
+      "valueType": "json",
+      "description": "操作日志摘要。"
+    },
+    {
+      "key": "error",
+      "name": "Error",
+      "valueType": "json",
+      "description": "失败时的结构化错误。"
+    }
+  ]
+}

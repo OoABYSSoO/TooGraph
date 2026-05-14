@@ -8,6 +8,19 @@ export type BuddyMascotDebugRequest = {
   action: BuddyMascotDebugAction;
 };
 
+export type BuddyVirtualOperationCursorLifecycle = "keep" | "return_after_step" | "return_at_end";
+
+export type BuddyVirtualOperation = {
+  kind: "click";
+  targetId: string;
+  cursorLifecycle?: BuddyVirtualOperationCursorLifecycle;
+};
+
+export type BuddyVirtualOperationRequest = {
+  id: number;
+  operation: BuddyVirtualOperation;
+};
+
 export type BuddyMascotMotionDebugConfig = {
   moveDurationMs: number;
   stepPauseMs: number;
@@ -41,9 +54,11 @@ const BUDDY_MASCOT_MOTION_CONFIG_LIMITS = {
 
 export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {
   const latestRequest = ref<BuddyMascotDebugRequest | null>(null);
+  const latestVirtualOperationRequest = ref<BuddyVirtualOperationRequest | null>(null);
   const virtualCursorEnabled = ref(false);
   const motionConfig = ref<BuddyMascotMotionDebugConfig>(readStoredMotionConfig());
   const nextRequestId = ref(0);
+  const nextVirtualOperationRequestId = ref(0);
 
   function trigger(action: BuddyMascotDebugAction) {
     nextRequestId.value += 1;
@@ -55,6 +70,14 @@ export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {
 
   function setVirtualCursorEnabled(enabled: boolean) {
     virtualCursorEnabled.value = enabled;
+  }
+
+  function requestVirtualOperation(operation: BuddyVirtualOperation) {
+    nextVirtualOperationRequestId.value += 1;
+    latestVirtualOperationRequest.value = {
+      id: nextVirtualOperationRequestId.value,
+      operation: { ...operation },
+    };
   }
 
   function setMotionConfig(patch: Partial<BuddyMascotMotionDebugConfig>) {
@@ -72,10 +95,12 @@ export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {
 
   return {
     latestRequest,
+    latestVirtualOperationRequest,
     virtualCursorEnabled,
     motionConfig,
     trigger,
     setVirtualCursorEnabled,
+    requestVirtualOperation,
     setMotionConfig,
     resetMotionConfig,
   };

@@ -108,3 +108,32 @@ test("buildBuddyPageContext reports the absence of an active graph without inven
   assert.match(context, /当前没有打开的 TooGraph 图/);
   assert.doesNotMatch(context, /选中节点:/);
 });
+
+test("buildBuddyPageContext exposes only non-buddy page operations", () => {
+  const context = buildBuddyPageContext({
+    routePath: "/editor",
+    editor: null,
+  });
+
+  assert.match(context, /页面操作书:/);
+  assert.match(context, /app\.nav\.runs/);
+  assert.match(context, /命令: click_nav runs/);
+  assert.match(context, /伙伴页面、伙伴浮窗、伙伴形象[\s\S]*不可由伙伴自己操作/);
+  assert.doesNotMatch(context, /app\.nav\.buddy/);
+  assert.doesNotMatch(context, /buddy\.tab\.history/);
+});
+
+test("buildBuddyPageContext filters buddy self-surface details on the Buddy page", () => {
+  const context = buildBuddyPageContext({
+    routePath: "/buddy",
+    editor: null,
+  });
+
+  assert.match(context, /伙伴相关页面内容已过滤/);
+  assert.match(context, /页面操作书:/);
+  assert.match(context, /app\.nav\.runs/);
+  assert.doesNotMatch(context, /app\.nav\.buddy/);
+  assert.doesNotMatch(context, /buddy\.tab\.history/);
+  assert.doesNotMatch(context, /Buddy Home/);
+  assert.doesNotMatch(context, /mascot-debug/);
+});

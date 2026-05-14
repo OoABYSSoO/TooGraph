@@ -31,11 +31,27 @@ export function buildBuddyPageContext(input: BuildBuddyPageContextInput): string
     "",
     `当前路径: ${input.routePath || "/"}`,
     ...(input.activeBuddyRunId ? [`伙伴本轮运行: ${input.activeBuddyRunId}`] : []),
+    ...buildPageOperationBookLines(input.routePath),
     ...buildEditorContextLines(input.editor ?? null),
     "</page-context>",
   ];
 
   return lines.filter((line) => line !== null).join("\n");
+}
+
+function buildPageOperationBookLines(routePath: string): string[] {
+  const normalizedPath = normalizeRoutePath(routePath);
+  return [
+    ...(normalizedPath.startsWith("/buddy") ? ["伙伴相关页面内容已过滤。"] : []),
+    "页面操作书:",
+    "- app.nav.runs: 点击“运行历史”。命令: click_nav runs。结果路径: /runs。",
+    "- forbidden: 伙伴页面、伙伴浮窗、伙伴形象、伙伴调试面板和 Buddy 导航目标不可由伙伴自己操作。",
+  ];
+}
+
+function normalizeRoutePath(routePath: string): string {
+  const value = (routePath || "/").trim() || "/";
+  return value.split(/[?#]/, 1)[0] || "/";
 }
 
 function buildEditorContextLines(editor: BuddyEditorContextSnapshot | null): string[] {
