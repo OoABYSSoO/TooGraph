@@ -567,11 +567,13 @@ const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_Y_RADIUS_PX = BUDDY_IDLE_VIRTUAL_CURS
 const BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG = 0;
 const BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG = -36;
 const BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS = 360;
+const BUDDY_VIRTUAL_CURSOR_READY_FRAME_DELAY_MS = 80;
 const BUDDY_VIRTUAL_CURSOR_MOVE_TRANSITION_MS = 180;
 const BUDDY_VIRTUAL_CURSOR_ROTATE_TRANSITION_MS = 120;
 const BUDDY_VIRTUAL_CURSOR_MIN_FLIGHT_DURATION_MS = 140;
 const BUDDY_VIRTUAL_CURSOR_MAX_FLIGHT_DURATION_MS = 6000;
 const BUDDY_VIRTUAL_CURSOR_MAX_ROTATE_TRANSITION_MS = 900;
+const BUDDY_VIRTUAL_CURSOR_FLIGHT_SETTLE_MS = 80;
 const BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE = 0.72;
 const BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE = 1;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 2.15;
@@ -675,6 +677,7 @@ let buddyVirtualCursorFollowSequenceId = 0;
 let buddyVirtualCursorIdleFrameId: number | null = null;
 let virtualCursorTransitionTimerId: number | null = null;
 let virtualCursorTransitionFrameId: number | null = null;
+let virtualCursorFlightFrameId: number | null = null;
 let virtualCursorAngleFrameTimestampMs: number | null = null;
 let virtualCursorMorphAnimationKey = 0;
 let buddyDebugActionTimerId: number | null = null;
@@ -1215,10 +1218,9 @@ function runBuddyIdleVirtualCursorOrbit(sequenceId: number, options: BuddyIdleRu
   cancelBuddyVirtualCursorIdleFrame();
   virtualCursorIdleActionMode.value = "orbit";
   buddyMascotDebugStore.setVirtualCursorEnabled(true);
-  buddyRoamMotionTimerId = window.setTimeout(() => {
-    buddyRoamMotionTimerId = null;
+  scheduleVirtualCursorIdleActionStart(sequenceId, () => {
     runBuddyIdleVirtualCursorOrbitFrame(sequenceId, performance.now(), resolveVirtualCursorOrbitAngle(virtualCursorPosition.value));
-  }, BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS);
+  });
 }
 
 function runBuddyIdleVirtualCursorOrbitFrame(sequenceId: number, startedAtMs: number, startAngle: number) {
@@ -1252,10 +1254,28 @@ function runBuddyIdleVirtualCursorChase(sequenceId: number, options: BuddyIdleRu
   }
   virtualCursorIdleActionMode.value = "chase";
   buddyMascotDebugStore.setVirtualCursorEnabled(true);
+  scheduleVirtualCursorIdleActionStart(sequenceId, () => {
+    moveBuddyIdleVirtualCursorChaseTarget(sequenceId);
+  });
+}
+
+function scheduleVirtualCursorIdleActionStart(sequenceId: number, callback: () => void) {
+  const delayMs = virtualCursorPhase.value === "active"
+    ? BUDDY_VIRTUAL_CURSOR_READY_FRAME_DELAY_MS
+    : BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS + BUDDY_VIRTUAL_CURSOR_READY_FRAME_DELAY_MS;
   buddyRoamMotionTimerId = window.setTimeout(() => {
     buddyRoamMotionTimerId = null;
-    moveBuddyIdleVirtualCursorChaseTarget(sequenceId);
-  }, BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS);
+    if (sequenceId !== buddyRoamSequenceId || virtualCursorIdleActionMode.value === "none") {
+      return;
+    }
+    if (virtualCursorPhase.value !== "active") {
+      if (virtualCursorEnabled.value && virtualCursorPhase.value === "launching") {
+        scheduleVirtualCursorIdleActionStart(sequenceId, callback);
+      }
+      return;
+    }
+    callback();
+  }, delayMs);
 }
 
 function moveBuddyIdleVirtualCursorChaseTarget(sequenceId: number) {
@@ -1265,13 +1285,23 @@ function moveBuddyIdleVirtualCursorChaseTarget(sequenceId: number) {
   cancelBuddyVirtualCursorIdleFrame();
   const targetPosition = resolveRandomVirtualCursorChasePosition();
   const flightDurationMs = resolveVirtualCursorMoveDurationMs(virtualCursorPosition.value, targetPosition);
-  moveVirtualCursorTo(targetPosition, { durationMs: flightDurationMs });
-  updateMascotLookFromVirtualCursor();
-  requestBuddyFollowVirtualCursor();
+  const flightWaitMs = moveVirtualCursorToWithArmedTransition(targetPosition, { durationMs: flightDurationMs });
+  if (typeof window === "undefined") {
+    updateMascotLookFromVirtualCursor();
+    requestBuddyFollowVirtualCursor();
+  } else {
+    window.requestAnimationFrame(() => {
+      if (sequenceId !== buddyRoamSequenceId || virtualCursorIdleActionMode.value !== "chase") {
+        return;
+      }
+      updateMascotLookFromVirtualCursor();
+      requestBuddyFollowVirtualCursor();
+    });
+  }
   buddyRoamMotionTimerId = window.setTimeout(() => {
     buddyRoamMotionTimerId = null;
     runBuddyIdleVirtualCursorChaseLoop(sequenceId, targetPosition, performance.now());
-  }, flightDurationMs);
+  }, flightWaitMs);
 }
 
 function runBuddyIdleVirtualCursorChaseLoop(sequenceId: number, centerPosition: BuddyPosition, startedAtMs: number) {
@@ -1471,9 +1501,17 @@ function cancelBuddyVirtualCursorIdleFrame() {
     window.cancelAnimationFrame(buddyVirtualCursorIdleFrameId);
     buddyVirtualCursorIdleFrameId = null;
   }
+  clearVirtualCursorFlightFrame();
   virtualCursorAngleFrameTimestampMs = null;
   setVirtualCursorMoveTransitionDuration(BUDDY_VIRTUAL_CURSOR_MOVE_TRANSITION_MS);
   setVirtualCursorRotateTransitionDuration(BUDDY_VIRTUAL_CURSOR_ROTATE_TRANSITION_MS);
+}
+
+function clearVirtualCursorFlightFrame() {
+  if (virtualCursorFlightFrameId !== null && typeof window !== "undefined") {
+    window.cancelAnimationFrame(virtualCursorFlightFrameId);
+  }
+  virtualCursorFlightFrameId = null;
 }
 
 function requestBuddyFollowVirtualCursor() {
@@ -1875,6 +1913,7 @@ function startVirtualCursorMorph(fromPath: string, toPath: string) {
 }
 
 function clearVirtualCursorTransition() {
+  clearVirtualCursorFlightFrame();
   if (virtualCursorTransitionFrameId !== null && typeof window !== "undefined") {
     window.cancelAnimationFrame(virtualCursorTransitionFrameId);
   }
@@ -1916,6 +1955,7 @@ function moveVirtualCursorTo(
   nextPosition: BuddyPosition,
   options: { updateAngle?: boolean; durationMs?: number; rotateDurationMs?: number; angleDeg?: number; smoothAngle?: boolean } = {},
 ) {
+  clearVirtualCursorFlightFrame();
   const currentPosition = virtualCursorPosition.value;
   const targetAngleDeg = options.angleDeg ?? resolveVirtualCursorFlightAngle(currentPosition, nextPosition);
   setVirtualCursorMoveTransitionDuration(options.durationMs ?? resolveVirtualCursorMoveDurationMs(currentPosition, nextPosition));
@@ -1928,6 +1968,35 @@ function moveVirtualCursorTo(
     virtualCursorAngleFrameTimestampMs = null;
   }
   virtualCursorPosition.value = nextPosition;
+}
+
+function moveVirtualCursorToWithArmedTransition(
+  nextPosition: BuddyPosition,
+  options: { updateAngle?: boolean; durationMs?: number; rotateDurationMs?: number; angleDeg?: number; smoothAngle?: boolean } = {},
+) {
+  const currentPosition = virtualCursorPosition.value;
+  const targetAngleDeg = options.angleDeg ?? resolveVirtualCursorFlightAngle(currentPosition, nextPosition);
+  const durationMs = options.durationMs ?? resolveVirtualCursorMoveDurationMs(currentPosition, nextPosition);
+  const rotateDurationMs = options.rotateDurationMs ?? resolveVirtualCursorRotateDurationMs(targetAngleDeg);
+  clearVirtualCursorFlightFrame();
+  setVirtualCursorMoveTransitionDuration(durationMs);
+  setVirtualCursorRotateTransitionDuration(rotateDurationMs);
+
+  const moveOptions = {
+    ...options,
+    durationMs,
+    rotateDurationMs,
+  };
+  if (typeof window === "undefined") {
+    moveVirtualCursorTo(nextPosition, moveOptions);
+    return virtualCursorMoveDurationMs.value;
+  }
+
+  virtualCursorFlightFrameId = window.requestAnimationFrame(() => {
+    virtualCursorFlightFrameId = null;
+    moveVirtualCursorTo(nextPosition, moveOptions);
+  });
+  return virtualCursorMoveDurationMs.value + BUDDY_VIRTUAL_CURSOR_FLIGHT_SETTLE_MS;
 }
 
 function setVirtualCursorMoveTransitionDuration(durationMs: number) {

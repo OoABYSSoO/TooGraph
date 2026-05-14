@@ -353,11 +353,21 @@ test("BuddyMascot moves eye wrapper layers toward the pointer without replacing 
   );
 });
 
-test("BuddyMascot shows outward drooped ears and dizzy spiral eyes in error mood", () => {
+test("BuddyMascot shows outward drooped ears and circular dizzy spiral eyes in error mood", () => {
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__left-ear"), /animation:\s*buddy-mascot-error-ear-left 760ms ease-out both;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__right-ear"), /animation:\s*buddy-mascot-error-ear-right 760ms ease-out both;/);
   assert.match(componentSource, /class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--left"/);
   assert.match(componentSource, /class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--right"/);
+  assert.match(
+    componentSource,
+    /d="M-80 82 m0-8 a8 8 0 1 1 -8 8 a16 16 0 1 1 16 16 a26 26 0 1 1 -26 -26 a36 36 0 1 1 36 36"/,
+  );
+  assert.match(
+    componentSource,
+    /d="M80 82 m0-8 a8 8 0 1 1 -8 8 a16 16 0 1 1 16 16 a26 26 0 1 1 -26 -26 a36 36 0 1 1 36 36"/,
+  );
+  assert.doesNotMatch(componentSource, /C-48 48 -48 116/);
+  assert.doesNotMatch(componentSource, /C112 48 112 116/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot__dizzy-eye"), /opacity:\s*0;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot__dizzy-eye"), /stroke-width:\s*10;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__resting-eye"), /display:\s*none;/);
