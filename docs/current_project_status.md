@@ -123,7 +123,7 @@
 - 显示名称：`自主复盘`
 - 作用：作为伙伴浮窗在主回复完成后启动的内部后台模板，读取主运行留下的用户消息、历史、页面上下文、Buddy Home 上下文、请求理解、能力结果、能力复盘和最终回复，产出 `autonomous_review` 与 `writeback_commands`，并在模型判断需要低风险写回时调用 `buddy_home_writer`。
 - 可见性：该模板标记为 `metadata.internal=true`，不会进入普通模板列表和 `toograph_capability_selector` 候选清单，但可以通过明确模板 ID 读取并发起 graph run。
-- 边界：用户不确认每次 Buddy Home 是否应该更新；是否更新由模型在本后台图中判断。正常低风险 memory、session summary 和 profile 写回自动应用并留下 command、revision 与 activity event；涉及权限升级或能力边界扩大的 policy 变化会被 writer 拒绝，不静默提权。
+- 边界：用户不确认每次 Buddy Home 是否应该更新；是否更新由模型在本后台图中判断。正常低风险 memory、session summary、profile、非权限沟通偏好、精炼复盘报告和能力使用统计写回自动应用并留下 command、revision 与 activity event；涉及权限升级、行为边界扩大、任意文件写入、脚本执行、图补丁或 revision restore 的变化会被 writer 拒绝，不静默提权。
 
 ### `toograph_skill_creation_workflow`
 
@@ -166,18 +166,17 @@
 - 低层 `activity_events` 已有第一阶段统一形状：运行时会记录通用 Skill 调用、动态子图调用、权限暂停，以及本地文件夹输入展开为 LLM 上下文时的选中文件读取事件；Skill 可以返回确定性的细粒度事件并由运行时补齐节点/子图上下文；`local_workspace_executor` 已返回文件读取、文件列表、文件搜索、文件写入和脚本执行事件；`toograph_script_tester` 已返回临时测试工作区和测试命令事件；`web_search` 已返回搜索与资料下载摘要事件；`graph_patch.draft` 命令记录已带图补丁草案事件形状；`buddy_home_writer` 已返回 `buddy_home_write` 事件，包含 applied/skipped/revision 明细。
 - 静态 Subgraph 节点和动态 `capability.kind=subgraph` 的内部 `interrupt_after` 都会通过父级 run 的 `pending_subgraph_breakpoint` 暂停，并在父级 resume 后继续内部 checkpoint。
 - 本地文件夹输入已能在普通仓库和 `.worktrees/<branch>` 工作区下读取根目录 `buddy_home/`，避免伙伴模板在分支工作区中丢失 Buddy Home 上下文。
-- `backend/app/buddy/home.py` 负责根目录 `buddy_home/` 的默认文件生成；`backend/app/buddy/store.py` 已提供基于 `SOUL.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memories、session summary、revisions、command 记录、`buddy_sessions`、`buddy_messages` 和运行模板绑定存取；`buddy_messages` 已支持 `metadata_json`，用于持久化运行过程胶囊这类显示元数据，空正文消息只允许用于 `metadata.kind=output_trace`。`backend/app/buddy/commands.py` 已有命令记录入口。低风险 Buddy Home 写回已通过 `buddy_autonomous_review` 和 `buddy_home_writer` 接入该命令/revision 路径；运行模板绑定也通过 command / revision 路径更新和恢复。
+- `backend/app/buddy/home.py` 负责根目录 `buddy_home/` 的默认文件生成；`backend/app/buddy/store.py` 已提供基于 `SOUL.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memories、session summary、reports、capability usage stats、revisions、command 记录、`buddy_sessions`、`buddy_messages` 和运行模板绑定存取；`buddy_messages` 已支持 `metadata_json`，用于持久化运行过程胶囊这类显示元数据，空正文消息只允许用于 `metadata.kind=output_trace`。`backend/app/buddy/commands.py` 已有命令记录入口。低风险 Buddy Home 写回已通过 `buddy_autonomous_review` 和 `buddy_home_writer` 接入该命令/revision 路径，覆盖 memory、session summary、profile、`policy.communication_preferences`、`reports/` 精炼复盘报告和 `capability_usage_stats` 聚合统计；运行模板绑定也通过 command / revision 路径更新和恢复。
 - `backend/app/buddy/commands.py` 仍保留 `graph_patch.draft` 草案记录 stub。这是历史遗留入口，只记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、图 revision、undo 或完整审计闭环。
 
 ## 当前仍在路线图中
 
-- 近期顺序：先完成唯一方针阶段 2 的写回范围扩展，为 policy 非权限偏好、报告和能力使用统计定义可审计、可恢复的 Buddy Home 写回规则；随后进入阶段 3，从替代 `graph_patch.draft` stub 的图补丁草案协议开始。
+- 近期顺序：唯一方针阶段 2 已完成；下一步进入阶段 3，从替代 `graph_patch.draft` stub 的图补丁草案协议开始。
 - 伙伴运行来源巩固：保持 Buddy 图统一使用 `metadata.origin=buddy`、模板绑定和明确策略字段，继续补充运行详情、伙伴页面和测试中的来源/权限展示，避免重新引入旧 metadata 或第二套运行协议。
 - 继续收束 `subgraph` 子图体验：父子图运行详情审计聚合已有基础，仍需补齐从缩略图点击跳转到内部节点，以及动态子图断点在运行详情中的更完整定位。
 - 完善伙伴断点交互：浮窗和伙伴页面确认页签都已复用标准暂停卡；仍需继续打磨多暂停 run 的优先级、跨会话定位、失败恢复提示和低层操作摘要。
 - 完善动态能力审批体验：当前已能在 `需确认` 模式下对写文件、删除类权限和 `subprocess` Skill 进入标准 `awaiting_human`，并能在 Buddy 浮窗和伙伴页面内恢复、拒绝或取消；仍需补齐更细的低层操作摘要和审批后的结果归因。
 - 扩展低层 `activity_events` 覆盖面：第一阶段已覆盖 Skill 调用、权限暂停、动态子图调用、本地文件读取/列表/搜索/写入/脚本、本地文件夹输入上下文读取、脚本测试、`web_search` 下载、图补丁草案和 Buddy Home 写回；仍需补齐图补丁应用/revision。
 - 清理或按新命令流重建历史 `graph_patch.draft` stub，并完成图补丁预览、GraphCommandBus、graph revision、undo 和审计闭环。
-- 将更丰富的人设、记忆、会话摘要、自我复盘报告和能力使用统计等长期状态更新表达为可审计的图模板流程，而不是隐藏产品逻辑；当前 Buddy Home 低风险写回基础路径已经落地。
 - 继续完善上下文预算和性能策略：已有节点耗时、公开 output 耗时和可用 token 用量显示；仍需为历史、Buddy Home、`result_package`、大日志和大 artifact 建立预算、摘要和按需展开规则。
 - 将内部 `agent` kind 迁移为面向用户和协议一致的 LLM 节点语义。
