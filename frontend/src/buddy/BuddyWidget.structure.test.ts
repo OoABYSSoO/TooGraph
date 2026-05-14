@@ -155,9 +155,13 @@ test("BuddyWidget listens for mascot debug actions requested from the Buddy page
 
 test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow it", () => {
   const activateVirtualCursorBlock = extractFunctionBlock("activateVirtualCursor");
+  const startVirtualCursorLaunchBlock = extractFunctionBlock("startVirtualCursorLaunch");
+  const startVirtualCursorReturnBlock = extractFunctionBlock("startVirtualCursorReturn");
   assert.match(componentSource, /latestRequest: mascotDebugRequest,[\s\S]*motionConfig: buddyMascotMotionConfig,[\s\S]*virtualCursorEnabled,[\s\S]*= storeToRefs\(buddyMascotDebugStore\);/);
   assert.match(componentSource, /type VirtualCursorPhase = "hidden" \| "launching" \| "active" \| "returning";/);
   assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS = 360;/);
+  assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE = 0\.72;/);
+  assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE = 1;/);
   assert.match(componentSource, /const VIRTUAL_CURSOR_STAR_PATH =/);
   assert.match(componentSource, /const VIRTUAL_CURSOR_SHAPE_PATH =/);
   assert.match(componentSource, /v-if="isVirtualCursorRendered"/);
@@ -176,11 +180,13 @@ test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow
   assert.match(componentSource, /const virtualCursorPath = ref\(VIRTUAL_CURSOR_STAR_PATH\);/);
   assert.match(componentSource, /const virtualCursorMorphAnimation = ref/);
   assert.match(componentSource, /const virtualCursorAngleDeg = ref\(BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG\);/);
+  assert.match(componentSource, /const virtualCursorScale = ref\(BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE\);/);
   assert.match(componentSource, /const virtualCursorDetached = ref\(false\);/);
   assert.match(componentSource, /const virtualCursorDragging = ref\(false\);/);
   assert.match(componentSource, /const virtualCursorStyle = computed/);
   assert.match(componentSource, /"--buddy-widget-virtual-cursor-morph-duration-ms": `\$\{BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS\}ms`/);
   assert.match(componentSource, /"--buddy-widget-virtual-cursor-angle": `\$\{virtualCursorAngleDeg\.value\}deg`/);
+  assert.match(componentSource, /"--buddy-widget-virtual-cursor-scale": virtualCursorScale\.value,/);
   assert.match(componentSource, /const shouldFloatVirtualCursor = computed\(\(\) =>/);
   assert.match(componentSource, /virtualCursorPhase\.value === "active" && !virtualCursorDragging\.value/);
   assert.match(componentSource, /translate: `\$\{virtualCursorPosition\.value\.x\}px \$\{virtualCursorPosition\.value\.y\}px`/);
@@ -197,12 +203,21 @@ test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow
   assert.match(componentSource, /'buddy-widget__virtual-cursor--returning': virtualCursorPhase === 'returning'/);
   assert.match(componentSource, /'buddy-widget__virtual-cursor--floating': shouldFloatVirtualCursor/);
   assert.match(componentSource, /function handleVirtualCursorPointerMove\(event: PointerEvent\)/);
-  assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG = -14;/);
+  assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG = -22;/);
   assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG = 0;/);
   assert.match(componentSource, /watch\(virtualCursorEnabled, \(enabled\) => \{[\s\S]*activateVirtualCursor\(\);[\s\S]*deactivateVirtualCursor\(\);/);
   assert.match(componentSource, /function deactivateVirtualCursor\(\)[\s\S]*startVirtualCursorReturn\(\);/);
-  assert.match(componentSource, /function startVirtualCursorLaunch\(\)[\s\S]*virtualCursorPhase\.value = "launching";[\s\S]*virtualCursorPath\.value = VIRTUAL_CURSOR_STAR_PATH;[\s\S]*resolveVirtualCursorLaunchPosition\(viewport\.value, position\.value\)/);
-  assert.match(componentSource, /function startVirtualCursorReturn\(\)[\s\S]*virtualCursorPhase\.value = "returning";[\s\S]*virtualCursorPath\.value = VIRTUAL_CURSOR_SHAPE_PATH;[\s\S]*virtualCursorAngleDeg\.value = BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG;[\s\S]*moveVirtualCursorTo\(dockedPosition, \{ updateAngle: false \}\)/);
+  assert.match(startVirtualCursorLaunchBlock, /virtualCursorPhase\.value = "launching";/);
+  assert.match(startVirtualCursorLaunchBlock, /virtualCursorScale\.value = BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE;/);
+  assert.match(startVirtualCursorLaunchBlock, /virtualCursorPath\.value = VIRTUAL_CURSOR_STAR_PATH;/);
+  assert.match(startVirtualCursorLaunchBlock, /virtualCursorScale\.value = BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE;/);
+  assert.match(startVirtualCursorLaunchBlock, /resolveVirtualCursorLaunchPosition\(viewport\.value, position\.value\)/);
+  assert.match(startVirtualCursorReturnBlock, /virtualCursorPhase\.value = "returning";/);
+  assert.match(startVirtualCursorReturnBlock, /virtualCursorScale\.value = BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE;/);
+  assert.match(startVirtualCursorReturnBlock, /virtualCursorPath\.value = VIRTUAL_CURSOR_SHAPE_PATH;/);
+  assert.match(startVirtualCursorReturnBlock, /virtualCursorAngleDeg\.value = BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG;/);
+  assert.match(startVirtualCursorReturnBlock, /virtualCursorScale\.value = BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE;/);
+  assert.match(startVirtualCursorReturnBlock, /moveVirtualCursorTo\(dockedPosition, \{ updateAngle: false \}\)/);
   assert.match(componentSource, /function startVirtualCursorMorph\(fromPath: string, toPath: string\)/);
   assert.match(componentSource, /function resolveVirtualCursorLaunchPosition\(currentViewport: \{ width: number; height: number \}, buddyPosition: BuddyPosition\): BuddyPosition/);
   assert.match(componentSource, /const horizontalDirection = resolveBoxCenter\(buddyPosition, DEFAULT_BUDDY_SIZE\)\.x > currentViewport\.width \/ 2 \? -1 : 1;/);
@@ -214,8 +229,11 @@ test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow
   assert.match(componentSource, /virtualCursorAngleDeg\.value = BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG;/);
   assert.match(componentSource, /virtualCursorDragging\.value = false;/);
   assert.match(extractCssBlock(".buddy-widget__virtual-cursor--floating .buddy-widget__virtual-cursor-svg"), /animation:\s*buddy-widget-virtual-cursor-float 1\.8s ease-in-out infinite;/);
+  assert.match(extractCssBlock(".buddy-widget__virtual-cursor-svg"), /scale:\s*var\(--buddy-widget-virtual-cursor-scale\);/);
+  assert.match(extractCssBlock(".buddy-widget__virtual-cursor-svg"), /transition:\s*scale 160ms cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\);/);
   assert.match(componentSource, /\.buddy-widget__virtual-cursor--launching\s*\{[\s\S]*translate var\(--buddy-widget-virtual-cursor-morph-duration-ms,\s*360ms\)[\s\S]*rotate 120ms ease/);
   assert.match(componentSource, /\.buddy-widget__virtual-cursor--returning\s*\{[\s\S]*translate var\(--buddy-widget-virtual-cursor-morph-duration-ms,\s*360ms\)[\s\S]*filter 140ms ease/);
+  assert.match(componentSource, /\.buddy-widget__virtual-cursor--launching \.buddy-widget__virtual-cursor-svg,\s*\.buddy-widget__virtual-cursor--returning \.buddy-widget__virtual-cursor-svg\s*\{[\s\S]*scale var\(--buddy-widget-virtual-cursor-morph-duration-ms,\s*360ms\)/);
   assert.doesNotMatch(extractCssBlock(".buddy-widget__virtual-cursor--returning"), /rotate 120ms/);
   assert.match(extractCssBlock(".buddy-widget__virtual-cursor--returning .buddy-widget__virtual-cursor-shape"), /stroke-width:\s*0;/);
   assert.match(componentSource, /@keyframes buddy-widget-virtual-cursor-float[\s\S]*translateY\(-2px\) rotate\(-1deg\)/);

@@ -554,8 +554,10 @@ const BUDDY_ROAM_TARGET_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 3;
 const BUDDY_ROAM_TARGET_REACHED_DISTANCE_PX = 1;
 const BUDDY_VIRTUAL_CURSOR_SIZE = { width: 42, height: 42 };
 const BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG = 0;
-const BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG = -14;
+const BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG = -22;
 const BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS = 360;
+const BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE = 0.72;
+const BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE = 1;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 2.15;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 1.25;
 const VIRTUAL_CURSOR_STAR_PATH =
@@ -583,6 +585,7 @@ const virtualCursorPhase = ref<VirtualCursorPhase>("hidden");
 const virtualCursorPath = ref(VIRTUAL_CURSOR_STAR_PATH);
 const virtualCursorMorphAnimation = ref<{ key: number; values: string; durationMs: number } | null>(null);
 const virtualCursorAngleDeg = ref(BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG);
+const virtualCursorScale = ref(BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE);
 const virtualCursorDetached = ref(false);
 const virtualCursorDragging = ref(false);
 const isPanelOpen = ref(false);
@@ -701,6 +704,7 @@ const anchorStyle = computed(() => ({
 const virtualCursorStyle = computed(() => ({
   "--buddy-widget-virtual-cursor-morph-duration-ms": `${BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS}ms`,
   "--buddy-widget-virtual-cursor-angle": `${virtualCursorAngleDeg.value}deg`,
+  "--buddy-widget-virtual-cursor-scale": virtualCursorScale.value,
   translate: `${virtualCursorPosition.value.x}px ${virtualCursorPosition.value.y}px`,
   rotate: "var(--buddy-widget-virtual-cursor-angle)",
 }));
@@ -1459,10 +1463,12 @@ function startVirtualCursorLaunch() {
   virtualCursorPosition.value = resolveDefaultVirtualCursorPosition(viewport.value, position.value);
   virtualCursorPath.value = VIRTUAL_CURSOR_STAR_PATH;
   virtualCursorAngleDeg.value = BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG;
+  virtualCursorScale.value = BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE;
   startVirtualCursorMorph(VIRTUAL_CURSOR_STAR_PATH, VIRTUAL_CURSOR_SHAPE_PATH);
 
   const targetPosition = resolveVirtualCursorLaunchPosition(viewport.value, position.value);
   if (typeof window === "undefined") {
+    virtualCursorScale.value = BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE;
     moveVirtualCursorTo(targetPosition);
     finishVirtualCursorLaunch();
     return;
@@ -1470,6 +1476,7 @@ function startVirtualCursorLaunch() {
 
   virtualCursorTransitionFrameId = window.requestAnimationFrame(() => {
     virtualCursorTransitionFrameId = null;
+    virtualCursorScale.value = BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE;
     moveVirtualCursorTo(targetPosition);
   });
   virtualCursorTransitionTimerId = window.setTimeout(finishVirtualCursorLaunch, BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS);
@@ -1485,6 +1492,7 @@ function finishVirtualCursorLaunch() {
   }
   virtualCursorPhase.value = "active";
   virtualCursorDetached.value = true;
+  virtualCursorScale.value = BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE;
   settleVirtualCursorRotation();
   updateMascotLookFromVirtualCursor();
   requestBuddyFollowVirtualCursor();
@@ -1501,12 +1509,14 @@ function startVirtualCursorReturn() {
   virtualCursorPhase.value = "returning";
   virtualCursorDetached.value = true;
   virtualCursorDragging.value = false;
+  virtualCursorScale.value = BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE;
   virtualCursorPath.value = VIRTUAL_CURSOR_SHAPE_PATH;
   startVirtualCursorMorph(VIRTUAL_CURSOR_SHAPE_PATH, VIRTUAL_CURSOR_STAR_PATH);
 
   const dockedPosition = resolveDefaultVirtualCursorPosition(viewport.value, position.value);
   if (typeof window === "undefined") {
     virtualCursorAngleDeg.value = BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG;
+    virtualCursorScale.value = BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE;
     moveVirtualCursorTo(dockedPosition, { updateAngle: false });
     finishVirtualCursorReturn();
     return;
@@ -1515,6 +1525,7 @@ function startVirtualCursorReturn() {
   virtualCursorTransitionFrameId = window.requestAnimationFrame(() => {
     virtualCursorTransitionFrameId = null;
     virtualCursorAngleDeg.value = BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG;
+    virtualCursorScale.value = BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE;
     moveVirtualCursorTo(dockedPosition, { updateAngle: false });
   });
   virtualCursorTransitionTimerId = window.setTimeout(finishVirtualCursorReturn, BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS);
@@ -1530,6 +1541,7 @@ function finishVirtualCursorReturn() {
   virtualCursorDetached.value = false;
   virtualCursorDragging.value = false;
   virtualCursorAngleDeg.value = BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG;
+  virtualCursorScale.value = BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE;
   mascotLook.value = { x: 0, y: 0 };
 }
 
@@ -3040,6 +3052,8 @@ function formatErrorMessage(error: unknown): string {
   height: 100%;
   pointer-events: none;
   user-select: none;
+  scale: var(--buddy-widget-virtual-cursor-scale);
+  transition: scale 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .buddy-widget__virtual-cursor-shape {
@@ -3056,6 +3070,11 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__virtual-cursor--floating .buddy-widget__virtual-cursor-svg {
   animation: buddy-widget-virtual-cursor-float 1.8s ease-in-out infinite;
+}
+
+.buddy-widget__virtual-cursor--launching .buddy-widget__virtual-cursor-svg,
+.buddy-widget__virtual-cursor--returning .buddy-widget__virtual-cursor-svg {
+  transition: scale var(--buddy-widget-virtual-cursor-morph-duration-ms, 360ms) cubic-bezier(0.2, 0.9, 0.22, 1);
 }
 
 .buddy-widget__virtual-cursor:active {

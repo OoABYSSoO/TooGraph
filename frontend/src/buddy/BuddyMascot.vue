@@ -237,8 +237,8 @@ const mascotClasses = computed(() => ({
 }));
 const eyeLookStyle = computed<Record<string, string>>(() => {
   const shouldTrackPointer = props.facing === "front";
-  const x = shouldTrackPointer ? clampLookAxis(props.lookX) * 12 : 0;
-  const y = shouldTrackPointer ? clampLookAxis(props.lookY) * 7 : 0;
+  const x = shouldTrackPointer ? clampLookAxis(props.lookX) * 16 : 0;
+  const y = shouldTrackPointer ? clampLookAxis(props.lookY) * 10 : 0;
   return {
     "--buddy-mascot-look-x": `${x.toFixed(2)}px`,
     "--buddy-mascot-look-y": `${y.toFixed(2)}px`,
