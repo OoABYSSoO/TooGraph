@@ -515,14 +515,25 @@
                 <label class="buddy-page__debug-motion-field">
                   <span>{{ t("buddyPage.mascotDebug.motion.virtualCursorSpeed") }}</span>
                   <ElInputNumber
-                    :model-value="buddyMascotDebugStore.motionConfig.virtualCursorFlightSpeedPxPerMs"
-                    :min="0.8"
-                    :max="6"
-                    :step="0.1"
-                    :precision="1"
+                    :model-value="buddyMascotDebugStore.motionConfig.virtualCursorFlightSpeedPxPerS"
+                    :min="40"
+                    :max="1200"
+                    :step="10"
                     controls-position="right"
                     size="small"
-                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ virtualCursorFlightSpeedPxPerMs: Number(value) })"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ virtualCursorFlightSpeedPxPerS: Number(value) })"
+                  />
+                </label>
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.virtualCursorRotationSpeed") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.virtualCursorRotationSpeedDegPerS"
+                    :min="90"
+                    :max="1440"
+                    :step="30"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ virtualCursorRotationSpeedDegPerS: Number(value) })"
                   />
                 </label>
               </div>

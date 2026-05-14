@@ -11,20 +11,23 @@ export type BuddyMascotDebugRequest = {
 export type BuddyMascotMotionDebugConfig = {
   moveDurationMs: number;
   stepPauseMs: number;
-  virtualCursorFlightSpeedPxPerMs: number;
+  virtualCursorFlightSpeedPxPerS: number;
+  virtualCursorRotationSpeedDegPerS: number;
 };
 
 export const DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG: BuddyMascotMotionDebugConfig = {
   moveDurationMs: 360,
   stepPauseMs: 8,
-  virtualCursorFlightSpeedPxPerMs: 2.6,
+  virtualCursorFlightSpeedPxPerS: 100,
+  virtualCursorRotationSpeedDegPerS: 360,
 };
 
 const BUDDY_MASCOT_MOTION_CONFIG_STORAGE_KEY = "toograph:buddy-mascot-motion-debug-config";
 const BUDDY_MASCOT_MOTION_CONFIG_LIMITS = {
   moveDurationMs: { min: 120, max: 1200 },
   stepPauseMs: { min: 0, max: 240 },
-  virtualCursorFlightSpeedPxPerMs: { min: 0.8, max: 6 },
+  virtualCursorFlightSpeedPxPerS: { min: 40, max: 1200 },
+  virtualCursorRotationSpeedDegPerS: { min: 90, max: 1440 },
 } as const;
 
 export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {
@@ -109,12 +112,17 @@ function normalizeMotionConfig(config: Partial<BuddyMascotMotionDebugConfig>): B
       BUDDY_MASCOT_MOTION_CONFIG_LIMITS.stepPauseMs.min,
       BUDDY_MASCOT_MOTION_CONFIG_LIMITS.stepPauseMs.max,
     ),
-    virtualCursorFlightSpeedPxPerMs: clampMotionConfigValue(
-      config.virtualCursorFlightSpeedPxPerMs,
-      DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG.virtualCursorFlightSpeedPxPerMs,
-      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorFlightSpeedPxPerMs.min,
-      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorFlightSpeedPxPerMs.max,
-      1,
+    virtualCursorFlightSpeedPxPerS: clampMotionConfigValue(
+      config.virtualCursorFlightSpeedPxPerS,
+      DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG.virtualCursorFlightSpeedPxPerS,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorFlightSpeedPxPerS.min,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorFlightSpeedPxPerS.max,
+    ),
+    virtualCursorRotationSpeedDegPerS: clampMotionConfigValue(
+      config.virtualCursorRotationSpeedDegPerS,
+      DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG.virtualCursorRotationSpeedDegPerS,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorRotationSpeedDegPerS.min,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorRotationSpeedDegPerS.max,
     ),
   };
 }

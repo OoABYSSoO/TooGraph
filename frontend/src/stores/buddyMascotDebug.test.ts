@@ -38,35 +38,45 @@ test("buddy mascot debug store exposes live motion timing controls", () => {
   assert.deepEqual(store.motionConfig, {
     moveDurationMs: 360,
     stepPauseMs: 8,
-    virtualCursorFlightSpeedPxPerMs: 2.6,
+    virtualCursorFlightSpeedPxPerS: 100,
+    virtualCursorRotationSpeedDegPerS: 360,
   });
 
-  store.setMotionConfig({ moveDurationMs: 300, stepPauseMs: 0, virtualCursorFlightSpeedPxPerMs: 1.4 });
+  store.setMotionConfig({
+    moveDurationMs: 300,
+    stepPauseMs: 0,
+    virtualCursorFlightSpeedPxPerS: 180,
+    virtualCursorRotationSpeedDegPerS: 540,
+  });
   assert.deepEqual(store.motionConfig, {
     moveDurationMs: 300,
     stepPauseMs: 0,
-    virtualCursorFlightSpeedPxPerMs: 1.4,
+    virtualCursorFlightSpeedPxPerS: 180,
+    virtualCursorRotationSpeedDegPerS: 540,
   });
 
-  store.setMotionConfig({ moveDurationMs: 40, stepPauseMs: 900, virtualCursorFlightSpeedPxPerMs: 99 });
+  store.setMotionConfig({ moveDurationMs: 40, stepPauseMs: 900, virtualCursorFlightSpeedPxPerS: 2000, virtualCursorRotationSpeedDegPerS: 4000 });
   assert.deepEqual(store.motionConfig, {
     moveDurationMs: 120,
     stepPauseMs: 240,
-    virtualCursorFlightSpeedPxPerMs: 6,
+    virtualCursorFlightSpeedPxPerS: 1200,
+    virtualCursorRotationSpeedDegPerS: 1440,
   });
 
-  store.setMotionConfig({ virtualCursorFlightSpeedPxPerMs: 0 });
+  store.setMotionConfig({ virtualCursorFlightSpeedPxPerS: 0, virtualCursorRotationSpeedDegPerS: 0 });
   assert.deepEqual(store.motionConfig, {
     moveDurationMs: 120,
     stepPauseMs: 240,
-    virtualCursorFlightSpeedPxPerMs: 0.8,
+    virtualCursorFlightSpeedPxPerS: 40,
+    virtualCursorRotationSpeedDegPerS: 90,
   });
 
   store.resetMotionConfig();
   assert.deepEqual(store.motionConfig, {
     moveDurationMs: 360,
     stepPauseMs: 8,
-    virtualCursorFlightSpeedPxPerMs: 2.6,
+    virtualCursorFlightSpeedPxPerS: 100,
+    virtualCursorRotationSpeedDegPerS: 360,
   });
 });
 
