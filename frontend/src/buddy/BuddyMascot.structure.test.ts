@@ -353,15 +353,20 @@ test("BuddyMascot moves eye wrapper layers toward the pointer without replacing 
   );
 });
 
-test("BuddyMascot shows a drooped-ear sad-eye animation in error mood", () => {
+test("BuddyMascot shows outward drooped ears and dizzy spiral eyes in error mood", () => {
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__left-ear"), /animation:\s*buddy-mascot-error-ear-left 760ms ease-out both;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__right-ear"), /animation:\s*buddy-mascot-error-ear-right 760ms ease-out both;/);
-  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__look-eye--left"), /rotate\(-10deg\)/);
-  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__look-eye--right"), /rotate\(10deg\)/);
-  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__resting-eye"), /animation:\s*buddy-mascot-error-eye-sad 680ms ease-out both;/);
+  assert.match(componentSource, /class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--left"/);
+  assert.match(componentSource, /class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--right"/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot__dizzy-eye"), /opacity:\s*0;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__resting-eye"), /opacity:\s*0;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__dizzy-eye"), /opacity:\s*1;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__dizzy-eye"), /animation:\s*buddy-mascot-error-eye-dizzy 760ms ease-out both;/);
+  assert.match(componentSource, /rotate\(calc\(var\(--buddy-mascot-left-ear-rotate\) \+ -24deg\)\)/);
+  assert.match(componentSource, /rotate\(calc\(var\(--buddy-mascot-right-ear-rotate\) \+ 24deg\)\)/);
   assert.match(componentSource, /@keyframes buddy-mascot-error-ear-left/);
   assert.match(componentSource, /@keyframes buddy-mascot-error-ear-right/);
-  assert.match(componentSource, /@keyframes buddy-mascot-error-eye-sad/);
+  assert.match(componentSource, /@keyframes buddy-mascot-error-eye-dizzy/);
 });
 
 test("BuddyMascot changes the eyes into chevrons while dragging", () => {
