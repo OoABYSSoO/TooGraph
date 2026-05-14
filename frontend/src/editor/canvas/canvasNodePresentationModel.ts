@@ -32,6 +32,9 @@ export function resolveFallbackNodeSize(node: Pick<GraphNode, "kind">): Measured
   if (node.kind === "input") {
     return { width: 460, height: 320 };
   }
+  if (node.kind === "batch") {
+    return { width: 640, height: 360 };
+  }
   return { width: 460, height: 360 };
 }
 

@@ -16,6 +16,7 @@ import { resolveInputNodeVirtualOutputType } from "./input-boundary.ts";
 import type {
   AgentNode,
   AgentSkillBinding,
+  BatchNode,
   ConditionNode,
   GraphCorePayload,
   GraphDocument,
@@ -266,7 +267,7 @@ function bindStateToSourceOutput(node: GraphNode | undefined, stateKey: string) 
     node.writes = [{ state: stateKey, mode: "replace" }];
     return;
   }
-  if (node.kind === "subgraph") {
+  if (node.kind === "batch" || node.kind === "subgraph") {
     if (!node.writes.some((binding) => binding.state === stateKey)) {
       node.writes = [...node.writes, { state: stateKey, mode: "replace" }];
     }
@@ -621,6 +622,131 @@ export function updateAgentNodeConfigInDocument<T extends GraphPayload | GraphDo
   reconcileAgentSkillOutputBindings(nextDocument, nodeId, options.skillDefinitions ?? []);
   reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
   return nextDocument;
+}
+
+export function updateBatchNodeConfigInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  nodeId: string,
+  updater: (current: BatchNode["config"]) => BatchNode["config"],
+): T {
+  const node = document.nodes[nodeId];
+  if (!node || node.kind !== "batch") {
+    return document;
+  }
+
+  const nextConfig = updater(node.config);
+  if (JSON.stringify(nextConfig) === JSON.stringify(node.config)) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  const nextNode = nextDocument.nodes[nodeId];
+  if (nextNode.kind !== "batch") {
+    return document;
+  }
+
+  nextNode.config = nextConfig;
+  return nextDocument;
+}
+
+export function updateBatchNodeSubgraphWorkerInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  nodeId: string,
+  template: TemplateRecord,
+): T {
+  const node = document.nodes[nodeId];
+  if (!node || node.kind !== "batch") {
+    return document;
+  }
+
+  const draft = createDraftFromTemplate(template);
+  const graph: GraphCorePayload = {
+    state_schema: draft.state_schema,
+    nodes: draft.nodes,
+    edges: draft.edges,
+    conditional_edges: draft.conditional_edges,
+    metadata: {
+      ...draft.metadata,
+      sourceTemplateId: template.template_id,
+      sourceTemplateSource: template.source ?? "official",
+    },
+  };
+  const nextDocument = cloneGraphDocument(document);
+  const nextNode = nextDocument.nodes[nodeId];
+  if (nextNode.kind !== "batch") {
+    return document;
+  }
+
+  nextNode.config = {
+    ...nextNode.config,
+    workerSource: "subgraph",
+    subgraphWorker: {
+      graph: clonePlainValue(graph),
+      templateId: template.template_id,
+      templateSource: template.source ?? "official",
+      label: template.label.trim() || template.default_graph_name.trim() || template.template_id,
+    },
+  };
+  syncBatchSubgraphWorkerBoundaryPorts(nextDocument, nodeId, graph);
+
+  if (
+    JSON.stringify(nextDocument.nodes[nodeId]) === JSON.stringify(node) &&
+    JSON.stringify(nextDocument.state_schema) === JSON.stringify(document.state_schema) &&
+    JSON.stringify(nextDocument.metadata) === JSON.stringify(document.metadata)
+  ) {
+    return document;
+  }
+
+  return nextDocument;
+}
+
+export function updateBatchNodeDefaultWorkerInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  nodeId: string,
+): T {
+  const node = document.nodes[nodeId];
+  if (!node || node.kind !== "batch") {
+    return document;
+  }
+  if (node.config.workerSource === "default_llm" && !node.config.subgraphWorker) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  const nextNode = nextDocument.nodes[nodeId];
+  if (nextNode.kind !== "batch") {
+    return document;
+  }
+  nextNode.config = {
+    ...nextNode.config,
+    workerSource: "default_llm",
+    subgraphWorker: null,
+    inputModes: pruneBatchInputModes(nextNode.config.inputModes, nextNode.reads),
+  };
+  return nextDocument;
+}
+
+function syncBatchSubgraphWorkerBoundaryPorts<T extends GraphPayload | GraphDocument>(
+  document: T,
+  nodeId: string,
+  graph: GraphCorePayload,
+) {
+  const node = document.nodes[nodeId];
+  if (!node || node.kind !== "batch") {
+    return;
+  }
+
+  node.reads = syncSubgraphReadBindings(document, node.reads, listSubgraphInputBoundaries(graph));
+  node.writes = syncSubgraphWriteBindings(document, node.writes, listSubgraphOutputBoundaries(graph));
+  node.config.inputModes = node.reads.reduce<Record<string, "shared" | "batch">>((modes, binding, index) => {
+    modes[binding.state] = node.config.inputModes[binding.state] ?? (index === 0 ? "batch" : "shared");
+    return modes;
+  }, {});
+}
+
+function pruneBatchInputModes(inputModes: BatchNode["config"]["inputModes"], reads: ReadBinding[]) {
+  const readStates = new Set(reads.map((binding) => binding.state));
+  return Object.fromEntries(Object.entries(inputModes).filter(([stateKey]) => readStates.has(stateKey)));
 }
 
 export function reconcileAgentSkillOutputBindingsInDocument<T extends GraphPayload | GraphDocument>(
@@ -1016,6 +1142,12 @@ function removeManagedStateKeysFromDocument(document: GraphPayload | GraphDocume
           outputMapping: Object.fromEntries(Object.entries(binding.outputMapping ?? {}).filter(([, stateKey]) => !stateKeys.has(stateKey))),
         }));
     }
+
+    if (node.kind === "batch") {
+      node.config.inputModes = Object.fromEntries(
+        Object.entries(node.config.inputModes ?? {}).filter(([stateKey]) => !stateKeys.has(stateKey)),
+      );
+    }
   }
 
   document.edges = document.edges.filter((edge) => {
@@ -1382,6 +1514,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
   if (isVirtualAnyOutputStateKey(sourceStateKey)) {
     if (
       nextSourceNode.kind === "agent" ||
+      nextSourceNode.kind === "batch" ||
       nextSourceNode.kind === "subgraph" ||
       isCreateAgentInputStateKey(targetStateKey) ||
       isVirtualAnyInputStateKey(targetStateKey)
@@ -1403,7 +1536,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
   }
 
   if (isCreateAgentInputStateKey(targetStateKey)) {
-    if (nextTargetNode.kind !== "agent" && nextTargetNode.kind !== "subgraph") {
+    if (nextTargetNode.kind !== "agent" && nextTargetNode.kind !== "batch" && nextTargetNode.kind !== "subgraph") {
       return document;
     }
     nextTargetNode.reads = [...nextTargetNode.reads, { state: resolvedSourceStateKey, required: true }];
@@ -1414,7 +1547,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
 
   if (isVirtualAnyInputStateKey(targetStateKey)) {
     nextTargetNode.reads =
-      (nextTargetNode.kind === "agent" || nextTargetNode.kind === "subgraph") && nextTargetNode.reads.length > 0
+      (nextTargetNode.kind === "agent" || nextTargetNode.kind === "batch" || nextTargetNode.kind === "subgraph") && nextTargetNode.reads.length > 0
         ? [...nextTargetNode.reads, { state: resolvedSourceStateKey, required: true }]
         : [{ state: resolvedSourceStateKey, required: true }];
     if (nextTargetNode.kind === "condition") {

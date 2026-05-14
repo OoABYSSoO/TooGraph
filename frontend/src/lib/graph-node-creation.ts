@@ -6,6 +6,7 @@ import { resolveInputNodeVirtualOutputType } from "./input-boundary.ts";
 
 import type {
   GraphDocument,
+  BatchNode,
   GraphCorePayload,
   GraphNode,
   GraphPayload,
@@ -114,6 +115,33 @@ function buildOutputNode(position: GraphPosition): OutputNode {
   };
 }
 
+function buildBatchNode(position: GraphPosition): BatchNode {
+  return {
+    kind: "batch",
+    name: "",
+    description: "",
+    ui: normalizeCreatedNodeUi(position),
+    reads: [],
+    writes: [],
+    config: {
+      workerSource: "default_llm",
+      inputModes: {},
+      maxConcurrency: 4,
+      retryCount: 3,
+      continueOnError: true,
+      defaultWorker: {
+        skillKey: "",
+        taskInstruction: "",
+        modelSource: "global",
+        model: "",
+        thinkingMode: "high",
+        temperature: 0.2,
+      },
+      subgraphWorker: null,
+    },
+  };
+}
+
 function buildSubgraphNode(position: GraphPosition): SubgraphNode {
   return {
     kind: "subgraph",
@@ -146,6 +174,14 @@ export function buildGenericOutputNode(params: { id: string; position: GraphPosi
   return {
     id: params.id,
     node: buildOutputNode(params.position),
+    state_schema: {},
+  };
+}
+
+export function buildGenericBatchNode(params: { id: string; position: GraphPosition }): CreatedNodeResult {
+  return {
+    id: params.id,
+    node: buildBatchNode(params.position),
     state_schema: {},
   };
 }
@@ -329,7 +365,7 @@ function bindCreatedStateToNode(node: GraphNode, stateKey: string) {
     return;
   }
 
-  if (node.kind === "agent") {
+  if (node.kind === "agent" || node.kind === "batch") {
     if (!node.reads.some((binding) => binding.state === stateKey)) {
       node.reads = [...node.reads, { state: stateKey, required: true }];
     }
@@ -353,7 +389,7 @@ function bindCreatedStateToSourceNode(node: GraphNode | undefined, stateKey: str
     node.writes = [{ state: stateKey, mode: "replace" }];
     return;
   }
-  if (node.kind === "subgraph") {
+  if (node.kind === "batch" || node.kind === "subgraph") {
     if (node.writes.length > 0) {
       node.writes = [{ ...node.writes[0], state: stateKey, mode: "replace" }, ...node.writes.slice(1)];
       return;
@@ -543,6 +579,7 @@ export function applyNodeCreationResult<T extends GraphPayload | GraphDocument>(
     sourceStateKey &&
     (input.createdNode.kind === "output" ||
       input.createdNode.kind === "agent" ||
+      input.createdNode.kind === "batch" ||
       input.createdNode.kind === "condition" ||
       input.createdNode.kind === "subgraph")
   ) {

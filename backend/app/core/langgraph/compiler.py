@@ -14,6 +14,7 @@ from app.core.langgraph.build_plan import (
 )
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
+    NodeSystemBatchNode,
     NodeSystemConditionNode,
     NodeSystemGraphPayload,
     NodeSystemInputNode,
@@ -24,6 +25,7 @@ from app.core.schemas.node_system import (
 
 RUNTIME_START = "__start__"
 RUNTIME_END = "__end__"
+RUNTIME_NODE_TYPES = (NodeSystemAgentNode, NodeSystemBatchNode, NodeSystemSubgraphNode)
 
 
 def get_langgraph_runtime_unsupported_reasons(
@@ -77,7 +79,7 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
     runtime_nodes = {
         node_name: graph_nodes[node_name]
         for node_name, node in graph.nodes.items()
-        if isinstance(node, (NodeSystemAgentNode, NodeSystemSubgraphNode))
+        if isinstance(node, RUNTIME_NODE_TYPES)
     }
     input_boundaries = [
         LangGraphBoundaryPlan(node=node_name, state=node.writes[0].state)
@@ -99,7 +101,7 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
 
     def _runtime_target_for_visual_node(target: str) -> str | None:
         target_node = graph.nodes.get(target)
-        if isinstance(target_node, (NodeSystemAgentNode, NodeSystemSubgraphNode)):
+        if isinstance(target_node, RUNTIME_NODE_TYPES):
             return target
         if isinstance(target_node, NodeSystemOutputNode):
             return RUNTIME_END
@@ -192,18 +194,18 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
     for edge in graph.edges:
         source_node = graph.nodes.get(edge.source)
         target_node = graph.nodes.get(edge.target)
-        if isinstance(source_node, (NodeSystemAgentNode, NodeSystemSubgraphNode)) and isinstance(
+        if isinstance(source_node, RUNTIME_NODE_TYPES) and isinstance(
             target_node,
-            (NodeSystemAgentNode, NodeSystemSubgraphNode),
+            RUNTIME_NODE_TYPES,
         ):
             runtime_edges.append(LangGraphEdgePlan(source=edge.source, target=edge.target))
             runtime_outgoing_counts[edge.source] += 1
             runtime_incoming_counts[edge.target] += 1
             continue
-        if isinstance(source_node, (NodeSystemAgentNode, NodeSystemSubgraphNode)) and isinstance(target_node, NodeSystemConditionNode):
+        if isinstance(source_node, RUNTIME_NODE_TYPES) and isinstance(target_node, NodeSystemConditionNode):
             _add_runtime_condition_route(edge.source, edge.target)
             continue
-        if isinstance(source_node, NodeSystemInputNode) and isinstance(target_node, (NodeSystemAgentNode, NodeSystemSubgraphNode)):
+        if isinstance(source_node, NodeSystemInputNode) and isinstance(target_node, RUNTIME_NODE_TYPES):
             runtime_entry_candidates.add(edge.target)
             continue
         if isinstance(source_node, NodeSystemInputNode) and isinstance(target_node, NodeSystemConditionNode):

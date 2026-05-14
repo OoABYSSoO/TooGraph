@@ -21,6 +21,7 @@ export type NodePortViewModel = {
   typeLabel: string;
   stateColor: string;
   virtual?: boolean;
+  batchMode?: "shared" | "batch";
   managedBySkill?: {
     role: "input" | "output";
     skillKey: string;
@@ -116,6 +117,18 @@ export type NodeCardViewModel = {
         primaryOutput: NodePortViewModel | null;
       }
     | {
+        kind: "batch";
+        workerLabel: string;
+        workerValue: string;
+        taskInstruction: string;
+        inputModes: Record<string, "shared" | "batch">;
+        maxConcurrency: number;
+        retryCount: number;
+        continueOnError: boolean;
+        primaryInput: NodePortViewModel | null;
+        primaryOutput: NodePortViewModel | null;
+      }
+    | {
         kind: "condition";
         sourceLabel: string;
         operatorLabel: string;
@@ -166,6 +179,7 @@ export function buildNodeCardViewModel(
         required: binding.required,
         typeLabel: getStateTypeLabel(binding.state, stateSchema),
         stateColor: stateSchema[binding.state]?.color ?? "#d97706",
+        batchMode: node.kind === "batch" ? resolveBatchInputMode(node, binding.state) : undefined,
         managedBySkill: resolveManagedSkillInputPort(binding),
         managedByCapability: resolveManagedCapabilityInputPort(node, binding.state, stateSchema),
       }));
@@ -215,6 +229,41 @@ function formatNodeKindLabel(kind: GraphNode["kind"]): string {
   return kind === "agent" ? "LLM" : kind.toUpperCase();
 }
 
+function resolveBatchInputMode(node: Extract<GraphNode, { kind: "batch" }>, stateKey: string): "shared" | "batch" {
+  return node.config.inputModes?.[stateKey] === "batch" ? "batch" : "shared";
+}
+
+function resolveBatchWorkerLabel(node: Extract<GraphNode, { kind: "batch" }>): string {
+  if (node.config.workerSource === "default_llm") {
+    return "Default LLM";
+  }
+  return node.config.subgraphWorker?.label?.trim() || node.config.subgraphWorker?.templateId?.trim() || "Template";
+}
+
+function resolveBatchWorkerValue(node: Extract<GraphNode, { kind: "batch" }>): string {
+  if (node.config.workerSource === "default_llm") {
+    return "default_llm";
+  }
+  const templateId = node.config.subgraphWorker?.templateId?.trim();
+  return templateId ? `template:${templateId}` : "default_llm";
+}
+
+function normalizePositiveInteger(value: unknown, fallback: number): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 1) {
+    return fallback;
+  }
+  return Math.floor(numeric);
+}
+
+function normalizeNonNegativeInteger(value: unknown, fallback: number): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return fallback;
+  }
+  return Math.floor(numeric);
+}
+
 function buildBody(
   node: GraphNode,
   stateSchema: Record<string, StateDefinition>,
@@ -247,6 +296,23 @@ function buildBody(
       modelLabel: resolveAgentModelLabel(node),
       thinkingLabel: resolveThinkingLabel(node),
       skillLabel: node.config.skillKey.trim() || "No skill",
+      primaryInput: inputs[0] ?? null,
+      primaryOutput: outputs[0] ?? null,
+    };
+  }
+
+  if (node.kind === "batch") {
+    return {
+      kind: "batch",
+      workerLabel: resolveBatchWorkerLabel(node),
+      workerValue: resolveBatchWorkerValue(node),
+      taskInstruction: node.config.defaultWorker.taskInstruction?.trim() || "",
+      inputModes: Object.fromEntries(
+        node.reads.map((binding) => [binding.state, resolveBatchInputMode(node, binding.state)]),
+      ),
+      maxConcurrency: normalizePositiveInteger(node.config.maxConcurrency, 4),
+      retryCount: normalizeNonNegativeInteger(node.config.retryCount, 3),
+      continueOnError: Boolean(node.config.continueOnError),
       primaryInput: inputs[0] ?? null,
       primaryOutput: outputs[0] ?? null,
     };

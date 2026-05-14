@@ -98,6 +98,7 @@
                 :skill-definitions="skillDefinitions"
                 :skill-definitions-loading="skillDefinitionsLoading"
                 :skill-definitions-error="skillDefinitionsError"
+                :templates="graphTemplates"
                 :available-agent-model-refs="agentRuntimeCatalog.availableModelRefs"
                 :agent-model-display-lookup="agentRuntimeCatalog.modelDisplayLookup"
                 :global-text-model-ref="agentRuntimeCatalog.globalTextModelRef"
@@ -125,6 +126,8 @@
                 @reorder-port-state="reorderNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.stateKey, $event.targetIndex)"
                 @disconnect-data-edge="disconnectDataEdgeForTab(tab.tabId, $event.sourceNodeId, $event.targetNodeId, $event.stateKey, $event.mode)"
                 @update-agent-config="updateAgentConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
+                @update-batch-config="updateBatchConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
+                @update-batch-worker="updateBatchWorkerForTab(tab.tabId, $event.nodeId, resolveBatchWorkerSelection($event.workerValue))"
                 @toggle-agent-breakpoint="toggleAgentBreakpointForTab(tab.tabId, $event.nodeId, $event.enabled)"
                 @update-condition-config="updateConditionConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-condition-branch="updateConditionBranchForTab(tab.tabId, $event.nodeId, $event.currentKey, $event.nextKey, $event.mappingKeys)"
@@ -660,6 +663,15 @@ function settleSaveMetadataDialog(document: GraphPayload | GraphDocument | null)
   const resolve = saveMetadataDialog.value.resolve;
   saveMetadataDialog.value = createClosedSaveMetadataDialog();
   resolve?.(document);
+}
+
+function resolveBatchWorkerSelection(workerValue: string) {
+  if (workerValue === "default_llm") {
+    return { source: "default_llm" as const };
+  }
+  const templateId = workerValue.startsWith("template:") ? workerValue.slice("template:".length) : "";
+  const template = graphTemplates.value.find((candidate) => candidate.template_id === templateId) ?? null;
+  return template ? { source: "template" as const, template } : { source: "default_llm" as const };
 }
 
 function handleSaveMetadataDialogModelValue(value: boolean) {
@@ -1614,6 +1626,8 @@ const {
   updateInputConfigForTab,
   updateNodeMetadataForTab,
   updateAgentConfigForTab,
+  updateBatchConfigForTab,
+  updateBatchWorkerForTab,
   toggleAgentBreakpointForTab,
   updateConditionConfigForTab,
   updateConditionBranchForTab,

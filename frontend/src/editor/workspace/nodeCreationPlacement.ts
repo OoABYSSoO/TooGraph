@@ -169,6 +169,13 @@ function bindStateInputForPlacement(node: GraphNode, stateKey: string) {
     return;
   }
 
+  if (node.kind === "batch") {
+    if (!node.reads.some((binding) => binding.state === stateKey)) {
+      node.reads = [...node.reads, { state: stateKey, required: true }];
+    }
+    return;
+  }
+
   if (!node.reads.some((binding) => binding.state === stateKey)) {
     node.reads = [...node.reads, { state: stateKey, required: true }];
   }
@@ -189,7 +196,7 @@ function bindStateOutputForPlacement(node: GraphNode, stateKey: string) {
     return;
   }
 
-  if (node.kind === "agent" && !node.writes.some((binding) => binding.state === stateKey)) {
+  if ((node.kind === "agent" || node.kind === "batch") && !node.writes.some((binding) => binding.state === stateKey)) {
     node.writes = [...node.writes, { state: stateKey, mode: "replace" }];
   }
 }

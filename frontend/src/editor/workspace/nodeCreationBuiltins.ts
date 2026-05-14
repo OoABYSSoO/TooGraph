@@ -9,8 +9,9 @@ export const NODE_CREATION_FAMILY_PRIORITY: Record<NodeCreationEntry["family"], 
   input: 0,
   output: 1,
   agent: 2,
-  condition: 3,
-  subgraph: 4,
+  batch: 3,
+  condition: 4,
+  subgraph: 5,
 };
 
 export function buildBuiltinNodeCreationEntries(): NodeCreationEntry[] {
@@ -53,6 +54,16 @@ export function buildBuiltinNodeCreationEntries(): NodeCreationEntry[] {
       mode: "preset",
       origin: "builtin",
       presetId: "preset.condition.empty.v0",
+      acceptsValueTypes: null,
+    },
+    {
+      id: "node-batch",
+      family: "batch",
+      label: "Batch",
+      description: "Run one LLM worker across arrays and assemble result arrays.",
+      mode: "node",
+      origin: "builtin",
+      nodeKind: "batch",
       acceptsValueTypes: null,
     },
     {

@@ -675,6 +675,92 @@ test("canCompleteGraphConnection allows agent virtual outputs to create another 
   );
 });
 
+test("canCompleteGraphConnection treats batch nodes as array-capable state readers and writers", () => {
+  const graphWithBatch: GraphPayload = {
+    ...document,
+    state_schema: {
+      segments: { name: "segments", description: "", type: "json", value: [], color: "#0891b2" },
+      summary: { name: "summary", description: "", type: "text", value: "", color: "#d97706" },
+    },
+    nodes: {
+      source: {
+        kind: "input",
+        name: "source",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "segments", mode: "replace" }],
+        config: { value: [] },
+      },
+      batch_runner: {
+        kind: "batch",
+        name: "batch_runner",
+        description: "",
+        ui: { position: { x: 260, y: 0 } },
+        reads: [],
+        writes: [{ state: "summary", mode: "replace" }],
+        config: {
+          workerSource: "default_llm",
+          inputModes: {},
+          maxConcurrency: 3,
+          retryCount: 3,
+          continueOnError: false,
+          defaultWorker: {
+            skillKey: "",
+            taskInstruction: "",
+            modelSource: "global",
+            model: "",
+            thinkingMode: "high",
+            temperature: 0.2,
+          },
+        },
+      },
+      sink: {
+        kind: "output",
+        name: "sink",
+        description: "",
+        ui: { position: { x: 520, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+  };
+
+  assert.equal(
+    canCompleteGraphConnection(graphWithBatch, {
+      sourceNodeId: "source",
+      sourceKind: "state-out",
+      sourceStateKey: "segments",
+    }, {
+      nodeId: "batch_runner",
+      kind: "state-in",
+      stateKey: CREATE_AGENT_INPUT_STATE_KEY,
+    }),
+    true,
+  );
+  assert.equal(
+    canCompleteGraphConnection(graphWithBatch, {
+      sourceNodeId: "batch_runner",
+      sourceKind: "state-out",
+      sourceStateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+    }, {
+      nodeId: "sink",
+      kind: "state-in",
+      stateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+    }),
+    true,
+  );
+  assert.equal(canConnectStateInputSource(graphWithBatch, "batch_runner", "sink", VIRTUAL_ANY_INPUT_STATE_KEY), true);
+});
+
 test("canCompleteGraphConnection allows virtual input outputs to target concrete state input bindings", () => {
   const pending: PendingGraphConnection = {
     sourceNodeId: "empty_input",

@@ -172,7 +172,7 @@ export function supportsCreationSourceType(
   sourceAnchorKind: NodeCreationAnchorKind | null = null,
 ) {
   if (sourceAnchorKind === "state-in") {
-    return entry.family === "input" || entry.family === "agent";
+    return entry.family === "input" || entry.family === "agent" || entry.family === "batch";
   }
 
   if (entry.family === "input") {

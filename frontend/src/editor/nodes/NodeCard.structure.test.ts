@@ -13,6 +13,7 @@ const textEditorComposableSource = readFileSync(resolve(currentDirectory, "useNo
 const floatingPanelsComposableSource = readFileSync(resolve(currentDirectory, "useNodeFloatingPanels.ts"), "utf8").replace(/\r\n/g, "\n");
 const portReorderComposableSource = readFileSync(resolve(currentDirectory, "usePortReorder.ts"), "utf8").replace(/\r\n/g, "\n");
 const agentNodeBodySource = readFileSync(resolve(currentDirectory, "AgentNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
+const batchNodeBodySource = readFileSync(resolve(currentDirectory, "BatchNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 const inputNodeBodySource = readFileSync(resolve(currentDirectory, "InputNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 const outputNodeBodySource = readFileSync(resolve(currentDirectory, "OutputNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 const subgraphNodeBodySource = readFileSync(resolve(currentDirectory, "SubgraphNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
@@ -32,6 +33,65 @@ test("NodeCard does not render the reads and writes summary block", () => {
   assert.doesNotMatch(componentSource, /\.node-card__state-token \{/);
   assert.doesNotMatch(componentSource, />Reads</);
   assert.doesNotMatch(componentSource, />Writes</);
+});
+
+test("BatchNodeBody exposes template workers and keeps failure policy in advanced actions", () => {
+  assert.match(componentSource, /:template-options="batchWorkerTemplateOptions"/);
+  assert.match(componentSource, /:batch-max-concurrency="view\.body\.kind === 'batch' \? view\.body\.maxConcurrency : 4"/);
+  assert.match(componentSource, /:batch-retry-count="view\.body\.kind === 'batch' \? view\.body\.retryCount : 3"/);
+  assert.match(componentSource, /:batch-continue-on-error="view\.body\.kind === 'batch' \? view\.body\.continueOnError : true"/);
+  assert.match(componentSource, /@update:batch-retry-count="updateBatchRetryCount"/);
+  assert.match(batchNodeBodySource, /templateOptions/);
+  assert.match(batchNodeBodySource, /ElOptionGroup/);
+  assert.doesNotMatch(batchNodeBodySource, /batch-node-body__run-summary/);
+  assert.doesNotMatch(batchNodeBodySource, /batchConcurrencySummary/);
+  assert.doesNotMatch(batchNodeBodySource, /batchRetrySummary/);
+  assert.doesNotMatch(batchNodeBodySource, /batch-node-body__mode-rail/);
+  assert.doesNotMatch(batchNodeBodySource, /batch-node-body__mode-switch-card/);
+  assert.match(batchNodeBodySource, /@update-batch-mode="\(stateKey, mode\) => emit\('update-input-mode', stateKey, mode\)"/);
+  assert.doesNotMatch(batchNodeBodySource, /batchFailureStop"\)/);
+  assert.doesNotMatch(batchNodeBodySource, /batchFailureContinue"\)/);
+  assert.doesNotMatch(batchNodeBodySource, /active-text="Keep"/);
+  assert.doesNotMatch(batchNodeBodySource, /inactive-text="Stop"/);
+  assert.match(statePortListSource, /<ElSwitch[\s\S]*class="node-card__port-pill-batch-switch"[\s\S]*v-if="shouldShowBatchModeSwitch\(port\)"[\s\S]*inline-prompt[\s\S]*:active-text="t\('nodeCard\.batchInputModeBatch'\)"[\s\S]*:inactive-text="t\('nodeCard\.batchInputModeShared'\)"/);
+  assert.match(statePortListSource, /@update:model-value="emit\('update-batch-mode', port\.key, \$event \? 'batch' : 'shared'\)"/);
+  assert.match(statePortListSource, /\.node-card__port-pill-batch-switch \{[\s\S]*--el-switch-on-color:\s*#3b82f6;/);
+  assert.match(statePortListSource, /function shouldShowBatchModeSwitch\(port: NodePortViewModel\)/);
+  assert.match(topActionsSource, /bodyKind === 'batch'/);
+  assert.match(topActionsSource, /batchRetryCount/);
+  assert.match(topActionsSource, /batchFailurePolicy/);
+  assert.match(topActionsSource, /batchFailureContinue/);
+  assert.match(topActionsSource, /batchFailureStop/);
+});
+
+test("BatchNodeBody renders Default LLM mode through the LLM prompt and runtime controls", () => {
+  const batchSectionMatch = componentSource.match(
+    /<section v-else-if="view\.body\.kind === 'batch'"[\s\S]*?<\/section>/,
+  );
+  assert.ok(batchSectionMatch, "expected to find the Batch node section");
+  const batchSection = batchSectionMatch[0];
+
+  assert.match(batchSection, /<BatchNodeBody/);
+  assert.match(batchSection, /:input-create-visible="shouldRevealAgentCreateInputPort"/);
+  assert.match(batchSection, /:input-create-accent-color="pendingStateInputTarget\?\.stateColor \?\? pendingStateInputSource\?\.stateColor \?\? '#16a34a'"/);
+  assert.match(batchSection, /:input-create-label="pendingStateInputTarget\?\.label \?\? pendingStateInputSource\?\.label \?\? '\+ input'"/);
+  assert.match(batchSection, /:output-create-visible="shouldRevealAgentCreateOutputPort"/);
+  assert.match(batchSection, /:output-create-accent-color="pendingStateOutputTarget\?\.stateColor \?\? VIRTUAL_ANY_OUTPUT_COLOR"/);
+  assert.match(batchSection, /:output-create-label="pendingStateOutputTarget\?\.label \?\? '\+ output'"/);
+  assert.match(batchSection, /:model-value="batchDefaultResolvedModelValue \|\| undefined"/);
+  assert.match(batchSection, /:model-options="agentModelOptions"/);
+  assert.match(batchSection, /:thinking-mode-value="batchDefaultThinkingModeValue"/);
+  assert.match(batchSection, /:thinking-options="agentThinkingOptions"/);
+  assert.match(batchSection, /:thinking-enabled="batchDefaultThinkingEnabled"/);
+  assert.match(batchSection, /@model-visible-change="handleAgentModelSelectVisibleChange"/);
+  assert.match(batchSection, /@update:model-value="handleBatchDefaultModelValueChange"/);
+  assert.match(batchSection, /@update:thinking-mode="handleBatchDefaultThinkingModeSelect"/);
+  assert.match(batchSection, /@task-input="handleBatchDefaultTaskInstructionInput"/);
+  assert.match(batchNodeBodySource, /import AgentRuntimeControls from "\.\/AgentRuntimeControls\.vue";/);
+  assert.match(batchNodeBodySource, /const isDefaultWorker = computed\(\(\) => props\.body\.workerValue === "default_llm"\);/);
+  assert.match(batchNodeBodySource, /<AgentRuntimeControls[\s\S]*v-if="isDefaultWorker"[\s\S]*:model-value="modelValue"[\s\S]*:thinking-mode-value="thinkingModeValue"[\s\S]*@update:model-value="emit\('update:model-value', \$event\)"/);
+  assert.match(batchNodeBodySource, /<div v-if="isDefaultWorker" class="node-card__surface node-card__prompt-surface">[\s\S]*<textarea[\s\S]*:value="body\.taskInstruction"[\s\S]*:placeholder="t\('nodeCard\.nodePromptPlaceholder'\)"[\s\S]*@input="emit\('task-input', \$event\)"/);
+  assert.doesNotMatch(batchNodeBodySource, /<AgentSkillPicker/);
 });
 
 test("NodeCard renders output state pills with an integrated anchor slot", () => {
@@ -1252,7 +1312,7 @@ test("NodeCard delegates output preview presentation while keeping Advanced in t
   assert.match(outputNodeBodySource, /node-card__preview--empty/);
   assert.doesNotMatch(outputSection, /Connected to \$\{view\.body\.connectedStateLabel/);
   assert.doesNotMatch(outputSection, /<pre v-else class="node-card__preview-text">/);
-  assert.match(componentSource, /view\.body\.kind === 'output' \? 340 : 280/);
+  assert.match(componentSource, /view\.body\.kind === 'output' \? 340 : view\.body\.kind === 'batch' \? 320 : 280/);
 });
 
 test("NodeCard uses an Element Plus switch card for output persistence like the agent thinking control", () => {

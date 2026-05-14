@@ -42,9 +42,11 @@ export function addStateBindingToDocument<T extends GraphPayload | GraphDocument
   const nextNode = nextDocument.nodes[nodeId];
 
   if (mode === "read") {
-    if (nextNode.kind === "agent") {
+    if (nextNode.kind === "agent" || nextNode.kind === "batch") {
       nextNode.reads = [...nextNode.reads, { state: stateKey, required: false }];
-      reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
+      if (nextNode.kind === "agent") {
+        reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
+      }
       return nextDocument;
     }
 
@@ -67,9 +69,11 @@ export function addStateBindingToDocument<T extends GraphPayload | GraphDocument
     return document;
   }
 
-  if (nextNode.kind === "agent") {
+  if (nextNode.kind === "agent" || nextNode.kind === "batch") {
     nextNode.writes = [...nextNode.writes, { state: stateKey, mode: "replace" }];
-    reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
+    if (nextNode.kind === "agent") {
+      reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
+    }
     return nextDocument;
   }
 
@@ -98,7 +102,7 @@ export function removeStateBindingFromDocument<T extends GraphPayload | GraphDoc
   }
 
   if (mode === "read") {
-    if (node.kind !== "agent" && node.kind !== "condition" && node.kind !== "output" && node.kind !== "subgraph") {
+    if (node.kind !== "agent" && node.kind !== "batch" && node.kind !== "condition" && node.kind !== "output" && node.kind !== "subgraph") {
       return document;
     }
     const readBinding = node.reads.find((binding) => binding.state === stateKey);
@@ -110,12 +114,20 @@ export function removeStateBindingFromDocument<T extends GraphPayload | GraphDoc
     }
     const nextDocument = cloneGraphDocument(document);
     nextDocument.nodes[nodeId].reads = nextDocument.nodes[nodeId].reads.filter((binding) => binding.state !== stateKey);
-    reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
+    const nextNode = nextDocument.nodes[nodeId];
+    if (nextNode.kind === "agent") {
+      reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
+    }
+    if (nextNode.kind === "batch") {
+      const { [stateKey]: _removed, ...nextInputModes } = nextNode.config.inputModes;
+      void _removed;
+      nextNode.config.inputModes = nextInputModes;
+    }
     pruneDisconnectedFlowEdges(nextDocument, nodeId, mode);
     return nextDocument;
   }
 
-  if (node.kind !== "agent" && node.kind !== "subgraph") {
+  if (node.kind !== "agent" && node.kind !== "batch" && node.kind !== "subgraph") {
     return document;
   }
   if (document.state_schema[stateKey]?.binding?.kind === "skill_output" || document.state_schema[stateKey]?.binding?.kind === "capability_result") {
@@ -159,6 +171,9 @@ function canNodeBindState(document: GraphPayload | GraphDocument, node: GraphNod
     if (node.kind === "agent") {
       return !node.reads.some((binding) => binding.state === stateKey);
     }
+    if (node.kind === "batch") {
+      return !node.reads.some((binding) => binding.state === stateKey);
+    }
     if (node.kind === "condition") {
       return node.reads[0]?.state !== stateKey;
     }
@@ -175,6 +190,9 @@ function canNodeBindState(document: GraphPayload | GraphDocument, node: GraphNod
     if (isDynamicCapabilityExecutorNode(document, node)) {
       return false;
     }
+    return !node.writes.some((binding) => binding.state === stateKey);
+  }
+  if (node.kind === "batch") {
     return !node.writes.some((binding) => binding.state === stateKey);
   }
   if (node.kind === "input") {

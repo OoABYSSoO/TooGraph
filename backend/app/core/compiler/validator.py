@@ -8,6 +8,7 @@ from app.core.schemas.node_system import (
     FIXED_CONDITION_BRANCH_MAPPING,
     GraphValidationResponse,
     NodeSystemAgentNode,
+    NodeSystemBatchNode,
     NodeSystemConditionNode,
     NodeSystemGraphDocument,
     NodeSystemGraphEdge,
@@ -56,6 +57,8 @@ def validate_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
         issues.extend(_validate_node_shape(node_name, node))
         if isinstance(node, NodeSystemAgentNode):
             issues.extend(_validate_agent_node(node_name, node, state_schema, runtime_skill_keys, skill_catalog))
+        elif isinstance(node, NodeSystemBatchNode):
+            issues.extend(_validate_batch_node(node_name, node))
         elif isinstance(node, NodeSystemConditionNode):
             issues.extend(_validate_condition_node(node_name, node, graph))
         elif isinstance(node, NodeSystemSubgraphNode):
@@ -203,6 +206,8 @@ def _validate_embedded_graph(
                     f"{path_prefix}.nodes.{node_name}",
                 )
             )
+        elif isinstance(node, NodeSystemBatchNode):
+            issues.extend(_prefix_issues(_validate_batch_node(node_name, node), f"{path_prefix}.nodes.{node_name}"))
         elif isinstance(node, NodeSystemConditionNode):
             issues.extend(_prefix_issues(_validate_condition_node(node_name, node, graph), path_prefix))
         elif isinstance(node, NodeSystemSubgraphNode):
@@ -252,6 +257,132 @@ def _subgraph_output_boundaries(node: NodeSystemSubgraphNode) -> list[tuple[str,
         if isinstance(inner_node, NodeSystemOutputNode) and inner_node.reads:
             boundaries.append((inner_node_name, inner_node.reads[0].state))
     return boundaries
+
+
+def _validate_batch_node(node_name: str, node: NodeSystemBatchNode) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    read_states = {binding.state for binding in node.reads}
+    batch_states = [
+        state_key
+        for state_key, mode in node.config.input_modes.items()
+        if getattr(mode, "value", mode) == "batch"
+    ]
+    worker_source = getattr(node.config.worker_source, "value", node.config.worker_source)
+
+    if not node.reads:
+        issues.append(
+            ValidationIssue(
+                code="batch_read_missing",
+                message=f"Batch node '{node_name}' must read at least one input state.",
+                path=f"nodes.{node_name}.reads",
+            )
+        )
+    if not node.writes:
+        issues.append(
+            ValidationIssue(
+                code="batch_write_missing",
+                message=f"Batch node '{node_name}' must write at least one assembled output state.",
+                path=f"nodes.{node_name}.writes",
+            )
+        )
+    if not batch_states:
+        issues.append(
+            ValidationIssue(
+                code="batch_input_missing",
+                message=f"Batch node '{node_name}' must mark at least one input state as batch.",
+                path=f"nodes.{node_name}.config.inputModes",
+            )
+        )
+    for state_key in node.config.input_modes:
+        if state_key not in read_states:
+            issues.append(
+                ValidationIssue(
+                    code="batch_input_mode_unknown_state",
+                    message=f"Batch node '{node_name}' config references unread input state '{state_key}'.",
+                    path=f"nodes.{node_name}.config.inputModes.{state_key}",
+                )
+            )
+    if worker_source == "default_llm" and node.config.default_worker.skill_key:
+        issues.append(
+            ValidationIssue(
+                code="batch_default_worker_skill_not_supported",
+                message=f"Batch node '{node_name}' default worker currently supports one LLM turn without a Skill.",
+                path=f"nodes.{node_name}.config.defaultWorker.skillKey",
+            )
+        )
+    if worker_source == "subgraph":
+        if node.config.subgraph_worker is None:
+            issues.append(
+                ValidationIssue(
+                    code="batch_subgraph_worker_missing",
+                    message=f"Batch node '{node_name}' selected a template worker but has no embedded graph snapshot.",
+                    path=f"nodes.{node_name}.config.subgraphWorker",
+                )
+            )
+        else:
+            worker_node = _batch_subgraph_worker_node(node)
+            input_boundaries = _subgraph_input_boundaries(worker_node)
+            output_boundaries = _subgraph_output_boundaries(worker_node)
+            if len(node.reads) < len(input_boundaries):
+                missing = input_boundaries[len(node.reads) :]
+                labels = ", ".join(f"{inner_node}.{state_key}" for inner_node, state_key in missing)
+                issues.append(
+                    ValidationIssue(
+                        code="batch_subgraph_input_binding_missing",
+                        message=f"Batch node '{node_name}' template worker is missing parent inputs for: {labels}.",
+                        path=f"nodes.{node_name}.reads",
+                    )
+                )
+            if len(node.reads) > len(input_boundaries):
+                issues.append(
+                    ValidationIssue(
+                        code="batch_subgraph_input_binding_extra",
+                        message=f"Batch node '{node_name}' has more parent inputs than template worker input boundaries.",
+                        path=f"nodes.{node_name}.reads",
+                    )
+                )
+            for index, binding in enumerate(node.reads[: len(input_boundaries)]):
+                if not binding.required:
+                    issues.append(
+                        ValidationIssue(
+                            code="batch_subgraph_input_not_required",
+                            message=f"Batch node '{node_name}' template worker input {index + 1} must be required.",
+                            path=f"nodes.{node_name}.reads.{index}.required",
+                        )
+                    )
+            if len(node.writes) < len(output_boundaries):
+                missing = output_boundaries[len(node.writes) :]
+                labels = ", ".join(f"{inner_node}.{state_key}" for inner_node, state_key in missing)
+                issues.append(
+                    ValidationIssue(
+                        code="batch_subgraph_output_binding_missing",
+                        message=f"Batch node '{node_name}' template worker is missing parent outputs for: {labels}.",
+                        path=f"nodes.{node_name}.writes",
+                    )
+                )
+            if len(node.writes) > len(output_boundaries):
+                issues.append(
+                    ValidationIssue(
+                        code="batch_subgraph_output_binding_extra",
+                        message=f"Batch node '{node_name}' has more parent outputs than template worker output boundaries.",
+                        path=f"nodes.{node_name}.writes",
+                    )
+                )
+    return issues
+
+
+def _batch_subgraph_worker_node(node: NodeSystemBatchNode) -> NodeSystemSubgraphNode:
+    if node.config.subgraph_worker is None:
+        raise ValueError("Batch subgraph worker is missing.")
+    return NodeSystemSubgraphNode(
+        kind="subgraph",
+        name=node.config.subgraph_worker.label or node.name,
+        description=node.description,
+        ui=node.ui,
+        reads=list(node.reads),
+        writes=list(node.writes),
+        config={"graph": node.config.subgraph_worker.graph.model_dump(by_alias=True, mode="json")},
+    )
 
 
 def _validate_subgraph_node(

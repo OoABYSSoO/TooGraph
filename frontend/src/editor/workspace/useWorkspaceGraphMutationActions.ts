@@ -14,6 +14,9 @@ import {
   reorderNodePortStateInDocument,
   updateAgentBreakpointInDocument,
   updateAgentNodeConfigInDocument,
+  updateBatchNodeDefaultWorkerInDocument,
+  updateBatchNodeConfigInDocument,
+  updateBatchNodeSubgraphWorkerInDocument,
   updateConditionBranchInDocument,
   updateConditionNodeConfigInDocument,
   updateInputNodeConfigInDocument,
@@ -24,6 +27,7 @@ import { connectStateInputSourceToTarget } from "@/lib/graph-node-creation";
 import { isVirtualAnyOutputStateKey } from "@/lib/virtual-any-input";
 import type {
   AgentNode,
+  BatchNode,
   ConditionNode,
   GraphDocument,
   GraphNode,
@@ -33,6 +37,7 @@ import type {
   NodeCreationContext,
   OutputNode,
   StateDefinition,
+  TemplateRecord,
 } from "@/types/node-system";
 import type { SkillDefinition } from "@/types/skills";
 
@@ -376,6 +381,37 @@ export function useWorkspaceGraphMutationActions(input: WorkspaceGraphMutationAc
     );
   }
 
+  function updateBatchConfigForTab(tabId: string, nodeId: string, patch: Partial<BatchNode["config"]>) {
+    commitDocumentMutationForTab(
+      tabId,
+      (document) =>
+        updateBatchNodeConfigInDocument(document, nodeId, (current) => ({
+          ...current,
+          ...patch,
+        })),
+      {
+        focusNodeId: nodeId,
+      },
+    );
+  }
+
+  function updateBatchWorkerForTab(
+    tabId: string,
+    nodeId: string,
+    worker: { source: "default_llm" } | { source: "template"; template: TemplateRecord },
+  ) {
+    commitDocumentMutationForTab(
+      tabId,
+      (document) =>
+        worker.source === "default_llm"
+          ? updateBatchNodeDefaultWorkerInDocument(document, nodeId)
+          : updateBatchNodeSubgraphWorkerInDocument(document, nodeId, worker.template),
+      {
+        focusNodeId: nodeId,
+      },
+    );
+  }
+
   function toggleAgentBreakpointForTab(tabId: string, nodeId: string, enabled: boolean) {
     commitDocumentMutationForTab(tabId, (document) => updateAgentBreakpointInDocument(document, nodeId, enabled), {
       focusNodeId: nodeId,
@@ -508,6 +544,8 @@ export function useWorkspaceGraphMutationActions(input: WorkspaceGraphMutationAc
     updateInputConfigForTab,
     updateNodeMetadataForTab,
     updateAgentConfigForTab,
+    updateBatchConfigForTab,
+    updateBatchWorkerForTab,
     toggleAgentBreakpointForTab,
     updateConditionConfigForTab,
     updateConditionBranchForTab,

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import perf_counter
 from typing import Any, Callable
 
@@ -34,15 +36,25 @@ from app.core.runtime.skill_bindings import (
 from app.core.runtime.skill_invocation import callable_accepts_keyword, invoke_skill
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
+    NodeSystemBatchNode,
     NodeSystemConditionNode,
     NodeSystemInputNode,
     NodeSystemStateDefinition,
     NodeSystemStateType,
+    NodeSystemSubgraphNode,
     StateWriteMode,
 )
 from app.core.storage.skill_artifact_store import create_skill_artifact_context
 from app.skills.definitions import get_skill_definition_registry
 from app.skills.registry import get_skill_registry
+
+
+class _BatchItemExecutionError(Exception):
+    def __init__(self, *, attempts: int, attempt_warnings: list[str], original: Exception) -> None:
+        super().__init__(str(original))
+        self.attempts = attempts
+        self.attempt_warnings = attempt_warnings
+        self.original = original
 
 
 def execute_input_node(
@@ -93,6 +105,228 @@ def execute_condition_node(
         "selected_branch": branch_key,
         "final_result": branch_key,
     }
+
+
+def execute_batch_node(
+    state_schema: dict[str, NodeSystemStateDefinition],
+    node: NodeSystemBatchNode,
+    input_values: dict[str, Any],
+    graph_context: dict[str, Any],
+    *,
+    node_name: str,
+    state: dict[str, Any],
+    resolve_agent_runtime_config_func: Callable[..., dict[str, Any]] = resolve_agent_runtime_config,
+    generate_agent_response_func: Callable[..., tuple[dict[str, Any], str, list[str], dict[str, Any]]] = generate_agent_response,
+    execute_subgraph_worker_func: Callable[..., dict[str, Any]] | None = None,
+    first_truthy_func: Callable[..., Any] = first_truthy,
+) -> dict[str, Any]:
+    worker_source = str(getattr(node.config.worker_source, "value", node.config.worker_source) or "default_llm")
+    if worker_source not in {"default_llm", "subgraph"}:
+        raise ValueError(f"Batch node '{node_name}' uses unsupported worker source '{worker_source}'.")
+    if worker_source == "subgraph" and node.config.subgraph_worker is None:
+        raise ValueError(f"Batch node '{node_name}' selected a template worker but has no embedded graph snapshot.")
+    if worker_source == "subgraph" and execute_subgraph_worker_func is None:
+        raise ValueError(f"Batch node '{node_name}' cannot execute template workers in this runtime.")
+
+    batch_states = [
+        binding.state
+        for binding in node.reads
+        if _batch_input_mode(node, binding.state) == "batch"
+    ]
+    if not batch_states:
+        raise ValueError(f"Batch node '{node_name}' must mark at least one input state as batch.")
+
+    batch_lengths: dict[str, int] = {}
+    for state_key in batch_states:
+        value = input_values.get(state_key)
+        if not isinstance(value, list):
+            raise ValueError(f"Batch input state '{state_key}' for node '{node_name}' must be an array.")
+        batch_lengths[state_key] = len(value)
+
+    item_count = next(iter(batch_lengths.values()), 0)
+    mismatched = {state_key: length for state_key, length in batch_lengths.items() if length != item_count}
+    if mismatched:
+        length_summary = ", ".join(f"{key}={length}" for key, length in batch_lengths.items())
+        raise ValueError(f"Batch input arrays for node '{node_name}' must have the same length: {length_summary}.")
+
+    default_worker_node = _build_batch_default_worker_node(node) if worker_source == "default_llm" else None
+    subgraph_worker_node = _build_batch_subgraph_worker_node(node) if worker_source == "subgraph" else None
+    worker_runtime_config = resolve_agent_runtime_config_func(default_worker_node) if default_worker_node is not None else {}
+    output_keys = [binding.state for binding in node.writes]
+    output_items: dict[str, list[Any]] = {state_key: [None] * item_count for state_key in output_keys}
+    item_results: list[dict[str, Any]] = [None] * item_count  # type: ignore[list-item]
+    warnings: list[str] = []
+
+    def run_item_once(index: int) -> tuple[int, dict[str, Any], str, list[str], dict[str, Any], dict[str, Any], dict[str, Any]]:
+        item_inputs = _build_batch_item_inputs(node, input_values, index)
+        if worker_source == "subgraph":
+            if subgraph_worker_node is None or execute_subgraph_worker_func is None:
+                raise ValueError(f"Batch node '{node_name}' cannot execute template workers in this runtime.")
+            execution_result = execute_subgraph_worker_func(
+                worker_node=subgraph_worker_node,
+                item_inputs=item_inputs,
+                item_index=index,
+                node_name=node_name,
+                state=state,
+            )
+            return (
+                index,
+                item_inputs,
+                "",
+                list(execution_result.get("warnings", [])),
+                {},
+                dict(execution_result.get("outputs", {})),
+                {"subgraph": copy.deepcopy(execution_result.get("subgraph"))},
+            )
+        if default_worker_node is None:
+            raise ValueError(f"Batch node '{node_name}' cannot execute default LLM workers in this runtime.")
+        response_payload, reasoning, item_warnings, runtime_config = generate_agent_response_func(
+            default_worker_node,
+            item_inputs,
+            {},
+            copy.deepcopy(worker_runtime_config),
+            state_schema=state_schema,
+            on_delta=None,
+        )
+        return index, item_inputs, reasoning, item_warnings, runtime_config, response_payload, {}
+
+    def run_item(index: int) -> tuple[int, dict[str, Any], str, list[str], dict[str, Any], dict[str, Any], dict[str, Any], int]:
+        max_attempts = max(1, int(node.config.retry_count or 0) + 1)
+        attempt_warnings: list[str] = []
+        for attempt in range(1, max_attempts + 1):
+            try:
+                _index, item_inputs, reasoning, item_warnings, runtime_config, response_payload, item_artifacts = run_item_once(index)
+                return (
+                    _index,
+                    item_inputs,
+                    reasoning,
+                    attempt_warnings + item_warnings,
+                    runtime_config,
+                    response_payload,
+                    item_artifacts,
+                    attempt,
+                )
+            except Exception as exc:
+                if attempt >= max_attempts:
+                    raise _BatchItemExecutionError(
+                        attempts=attempt,
+                        attempt_warnings=attempt_warnings,
+                        original=exc,
+                    ) from exc
+                attempt_warnings.append(f"Batch item {index + 1} attempt {attempt} failed: {exc}")
+
+        raise RuntimeError(f"Batch item {index + 1} failed without an execution attempt.")
+
+    max_workers = max(1, min(int(node.config.max_concurrency or 1), item_count or 1))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(run_item, index): index for index in range(item_count)}
+        for future in as_completed(futures):
+            index = futures[future]
+            try:
+                _index, item_inputs, reasoning, item_warnings, runtime_config, response_payload, item_artifacts, attempts = future.result()
+            except _BatchItemExecutionError as exc:
+                if not node.config.continue_on_error:
+                    raise exc.original from exc
+                item_results[index] = {
+                    "index": index,
+                    "status": "failed",
+                    "error": str(exc),
+                    "attempts": exc.attempts,
+                }
+                warnings.append(f"Batch item {index + 1} failed after {exc.attempts} attempts: {exc}")
+                warnings.extend(exc.attempt_warnings)
+                continue
+            except Exception as exc:
+                if not node.config.continue_on_error:
+                    raise
+                item_results[index] = {
+                    "index": index,
+                    "status": "failed",
+                    "error": str(exc),
+                    "attempts": 1,
+                }
+                warnings.append(f"Batch item {index + 1} failed: {exc}")
+                continue
+
+            for output_key in output_keys:
+                output_items[output_key][index] = copy.deepcopy(response_payload.get(output_key))
+            item_results[index] = {
+                "index": index,
+                "status": "succeeded",
+                "attempts": attempts,
+                "inputs": item_inputs,
+                "outputs": {
+                    output_key: copy.deepcopy(response_payload.get(output_key))
+                    for output_key in output_keys
+                },
+                "reasoning": reasoning,
+                "runtime_config": runtime_config,
+                **item_artifacts,
+            }
+            warnings.extend(item_warnings)
+
+    success_count = sum(1 for item in item_results if isinstance(item, dict) and item.get("status") == "succeeded")
+    failure_count = item_count - success_count
+    batch_result = {
+        "kind": "batch_result",
+        "worker_source": worker_source,
+        "item_count": item_count,
+        "success_count": success_count,
+        "failure_count": failure_count,
+        "max_concurrency": max_workers,
+        "retry_count": int(node.config.retry_count or 0),
+        "continue_on_error": bool(node.config.continue_on_error),
+        "items": item_results,
+    }
+    final_result = first_truthy_func(output_items.values())
+    return {
+        "outputs": output_items,
+        "final_result": "" if final_result is None else str(final_result),
+        "warnings": list(dict.fromkeys(warnings)),
+        "batch": batch_result,
+    }
+
+
+def _batch_input_mode(node: NodeSystemBatchNode, state_key: str) -> str:
+    mode = node.config.input_modes.get(state_key)
+    return str(getattr(mode, "value", mode) or "shared")
+
+
+def _build_batch_item_inputs(node: NodeSystemBatchNode, input_values: dict[str, Any], index: int) -> dict[str, Any]:
+    item_inputs: dict[str, Any] = {}
+    for binding in node.reads:
+        value = input_values.get(binding.state)
+        if _batch_input_mode(node, binding.state) == "batch":
+            item_inputs[binding.state] = copy.deepcopy(value[index])
+        else:
+            item_inputs[binding.state] = copy.deepcopy(value)
+    return item_inputs
+
+
+def _build_batch_default_worker_node(node: NodeSystemBatchNode) -> NodeSystemAgentNode:
+    return NodeSystemAgentNode(
+        kind="agent",
+        name=f"{node.name or 'Batch'} Worker",
+        description=node.description,
+        ui=node.ui,
+        reads=copy.deepcopy(node.reads),
+        writes=copy.deepcopy(node.writes),
+        config=copy.deepcopy(node.config.default_worker),
+    )
+
+
+def _build_batch_subgraph_worker_node(node: NodeSystemBatchNode) -> NodeSystemSubgraphNode:
+    if node.config.subgraph_worker is None:
+        raise ValueError("Batch subgraph worker is missing.")
+    return NodeSystemSubgraphNode(
+        kind="subgraph",
+        name=node.config.subgraph_worker.label or f"{node.name or 'Batch'} Worker",
+        description=node.description,
+        ui=node.ui,
+        reads=copy.deepcopy(node.reads),
+        writes=copy.deepcopy(node.writes),
+        config={"graph": node.config.subgraph_worker.graph.model_dump(by_alias=True, mode="json")},
+    )
 
 
 def _pending_dynamic_subgraph_breakpoint(

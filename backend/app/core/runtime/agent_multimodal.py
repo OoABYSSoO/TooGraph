@@ -8,11 +8,12 @@ from urllib.parse import unquote, urlparse
 
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
 from app.core.storage.skill_artifact_store import read_skill_artifact_file_metadata
-from app.tools.video_frame_fallback import extract_video_frame_attachments
+from app.tools.video_frame_fallback import extract_video_frame_attachments, probe_video_duration_seconds
 
 
 MAX_INLINE_VIDEO_BYTES = 16 * 1024 * 1024
-DEFAULT_VIDEO_FRAME_COUNT = 4
+DEFAULT_SHORT_LLM_VIDEO_SECONDS = 30.0
+DEFAULT_VIDEO_FRAME_COUNT = 30
 
 
 def normalize_uploaded_file_envelope(value: Any) -> dict[str, Any] | None:
@@ -54,13 +55,16 @@ def prepare_model_input_attachments(
     input_attachments: list[dict[str, Any]],
     *,
     max_inline_video_bytes: int = MAX_INLINE_VIDEO_BYTES,
+    max_video_duration_seconds: float | None = DEFAULT_SHORT_LLM_VIDEO_SECONDS,
     video_frame_count: int = DEFAULT_VIDEO_FRAME_COUNT,
     extract_video_frame_attachments_func: Any = extract_video_frame_attachments,
+    probe_video_duration_seconds_func: Any | None = None,
 ) -> tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
     prepared: list[dict[str, Any]] = []
     warnings: list[str] = []
     large_video_fallbacks: list[dict[str, Any]] = []
     cleanup_paths: list[str] = []
+    duration_probe = probe_video_duration_seconds_func or probe_video_duration_seconds
 
     for attachment in input_attachments:
         if not isinstance(attachment, dict):
@@ -91,6 +95,14 @@ def prepare_model_input_attachments(
                 "filesystem_path": str(file_path),
                 "file_url": file_path.resolve().as_uri(),
             }
+            if attachment_type == "video" and max_video_duration_seconds is not None:
+                duration = _safe_probe_video_duration(file_attachment, duration_probe)
+                if duration is not None and duration > float(max_video_duration_seconds):
+                    limit_label = _format_seconds_limit(max_video_duration_seconds)
+                    raise ValueError(
+                        f"Ordinary LLM nodes can analyze videos up to {limit_label} seconds at 1fps. "
+                        "This video is longer; use the long-video analysis template instead."
+                    )
             if attachment_type == "video" and size > max_inline_video_bytes:
                 frame_output_dir = Path(tempfile.mkdtemp(prefix="toograph_video_frames_"))
                 cleanup_paths.append(str(frame_output_dir))
@@ -121,6 +133,24 @@ def prepare_model_input_attachments(
             continue
 
     return prepared, warnings, {"large_video_fallbacks": large_video_fallbacks, "cleanup_paths": cleanup_paths}
+
+
+def _safe_probe_video_duration(attachment: dict[str, Any], probe_video_duration_seconds_func: Any) -> float | None:
+    try:
+        duration = probe_video_duration_seconds_func(attachment)
+    except Exception:
+        return None
+    try:
+        normalized = float(duration)
+    except (TypeError, ValueError):
+        return None
+    return normalized if normalized > 0 else None
+
+
+def _format_seconds_limit(value: float) -> str:
+    if float(value).is_integer():
+        return str(int(value))
+    return f"{value:.2f}".rstrip("0").rstrip(".")
 
 
 def _attachment_url(attachment: dict[str, Any]) -> str:

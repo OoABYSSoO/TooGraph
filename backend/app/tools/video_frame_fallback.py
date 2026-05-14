@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import subprocess
 import tempfile
@@ -11,8 +12,9 @@ from urllib.parse import unquote, urlparse
 from app.tools.ffmpeg_resolver import FfmpegTools, resolve_ffmpeg_tools
 
 
-DEFAULT_VIDEO_FRAME_COUNT = 8
-MAX_VIDEO_FRAME_COUNT = 16
+DEFAULT_VIDEO_FRAME_COUNT = 30
+MAX_VIDEO_FRAME_COUNT = 30
+DEFAULT_VIDEO_FRAME_RATE_FPS = 1.0
 _FFMPEG_DURATION_PATTERN = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
 VIDEO_FALLBACK_ERROR_MARKERS = (
     "video",
@@ -77,6 +79,7 @@ def extract_video_frame_attachments(
     attachment: dict[str, Any],
     *,
     frame_count: int = DEFAULT_VIDEO_FRAME_COUNT,
+    frame_rate_fps: float | None = DEFAULT_VIDEO_FRAME_RATE_FPS,
     output_dir: str | Path | None = None,
 ) -> list[dict[str, Any]]:
     source_path = _resolve_source_video_path(attachment)
@@ -88,11 +91,25 @@ def extract_video_frame_attachments(
     frame_dir = Path(output_dir) if output_dir is not None else Path(tempfile.mkdtemp(prefix="toograph_video_frames_"))
     frame_dir.mkdir(parents=True, exist_ok=True)
     duration = _probe_video_duration(source_path, tools=tools)
+    if duration is not None and duration > 0 and frame_rate_fps is not None and frame_rate_fps > 0:
+        requested_frame_count = max(1, min(requested_frame_count, math.ceil(duration * frame_rate_fps)))
     frame_paths = _extract_frame_files(source_path, frame_dir, duration=duration, frame_count=requested_frame_count, tools=tools)
     return [
         _build_frame_attachment(attachment, frame_path, index=index, timestamp=_frame_timestamp(duration, index, len(frame_paths)))
         for index, frame_path in enumerate(frame_paths, start=1)
     ]
+
+
+def probe_video_duration_seconds(attachment: dict[str, Any] | str | Path) -> float | None:
+    if isinstance(attachment, dict):
+        source_path = _resolve_source_video_path(attachment)
+        if source_path is None:
+            return None
+    else:
+        source_path = Path(attachment)
+        if not source_path.is_file():
+            return None
+    return _probe_video_duration(source_path)
 
 
 def _resolve_source_video_path(attachment: dict[str, Any]) -> Path | None:

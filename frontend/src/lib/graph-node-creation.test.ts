@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   applyNodeCreationResult,
   buildGenericInputNode,
+  buildGenericBatchNode,
   buildGenericOutputNode,
   buildNodeFromPreset,
   buildSubgraphNodeFromGraph,
@@ -123,6 +124,26 @@ test("buildGenericOutputNode stores empty metadata so default text remains displ
   assert.equal(result.node.kind, "output");
   assert.equal(result.node.name, "");
   assert.equal(result.node.description, "");
+});
+
+test("buildGenericBatchNode creates a default-LLM batch node with empty bindings", () => {
+  const result = buildGenericBatchNode({
+    id: "batch_created",
+    position: { x: 360, y: 160 },
+  });
+
+  assert.equal(result.node.kind, "batch");
+  assert.equal(result.node.name, "");
+  assert.equal(result.node.description, "");
+  assert.deepEqual(result.node.reads, []);
+  assert.deepEqual(result.node.writes, []);
+  assert.equal(result.node.config.workerSource, "default_llm");
+  assert.deepEqual(result.node.config.inputModes, {});
+  assert.equal(result.node.config.maxConcurrency, 4);
+  assert.equal(result.node.config.retryCount, 3);
+  assert.equal(result.node.config.continueOnError, true);
+  assert.equal(result.node.config.defaultWorker.modelSource, "global");
+  assert.equal(result.node.config.defaultWorker.thinkingMode, "high");
 });
 
 test("buildNodeFromPreset preserves preset node semantics while replacing the canvas position", () => {

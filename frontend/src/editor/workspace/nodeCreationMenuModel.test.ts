@@ -9,6 +9,7 @@ import {
   buildUpdatedNodeCreationMenuQuery,
   supportsCreationSourceType,
 } from "./nodeCreationMenuModel.ts";
+import { buildBuiltinNodeCreationEntries } from "./nodeCreationBuiltins.ts";
 import type { GraphDocument, NodeCreationContext, NodeCreationEntry, PresetDocument, TemplateRecord } from "@/types/node-system";
 
 const builtins: NodeCreationEntry[] = [
@@ -217,6 +218,15 @@ test("buildNodeCreationEntries keeps node entries ahead of persisted presets wit
       "preset-condition-empty",
     ],
   );
+});
+
+test("buildBuiltinNodeCreationEntries exposes a first-class Batch node", () => {
+  const entries = buildBuiltinNodeCreationEntries();
+  const batch = entries.find((entry) => entry.id === "node-batch");
+
+  assert.equal(batch?.family, "batch");
+  assert.equal(batch?.mode, "node");
+  assert.equal(batch?.nodeKind, "batch");
 });
 
 test("buildNodeCreationEntries filters creation candidates by query and source type", () => {

@@ -14,6 +14,10 @@ const DEFAULT_NODE_TEXT_BY_KIND: Partial<Record<GraphNode["kind"], NodeDefaultTe
     title: "Output",
     description: "Preview or persist the current workflow result.",
   },
+  batch: {
+    title: "Batch",
+    description: "Run one worker across batch inputs and assemble output arrays.",
+  },
 };
 
 export function resolveDefaultNodeTitle(kind: string | undefined) {
@@ -51,7 +55,7 @@ export function isDefaultNodeDescription(kind: string | undefined, value: string
 }
 
 function resolveDefaultNodeText(kind: string | undefined) {
-  if (kind !== "input" && kind !== "output") {
+  if (kind !== "input" && kind !== "output" && kind !== "batch") {
     return null;
   }
   return DEFAULT_NODE_TEXT_BY_KIND[kind] ?? null;

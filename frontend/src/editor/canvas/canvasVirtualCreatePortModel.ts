@@ -24,7 +24,7 @@ type VirtualCreatePortVisibilityInput = {
 };
 
 export function shouldShowAgentCreateInputPortByDefault(node: GraphNode | undefined) {
-  return node?.kind === "agent" && node.reads.length === 0;
+  return (node?.kind === "agent" || node?.kind === "batch") && node.reads.length === 0;
 }
 
 function isDynamicCapabilityExecutorNode(
@@ -43,7 +43,7 @@ export function shouldShowAgentCreateOutputPortByDefault(
   if (isDynamicCapabilityExecutorNode(nodeId, node, stateSchema)) {
     return false;
   }
-  return (node?.kind === "agent" || node?.kind === "input") && node.writes.length === 0;
+  return (node?.kind === "agent" || node?.kind === "batch" || node?.kind === "input") && node.writes.length === 0;
 }
 
 export function isAgentCreateInputAnchorVisible(input: VirtualCreatePortVisibilityInput) {
@@ -107,7 +107,7 @@ export function buildTransientAgentCreateInputAnchors(input: {
 }): ProjectedCanvasAnchor[] {
   return Object.entries(input.document.nodes).flatMap(([nodeId, node]) => {
     if (
-      node.kind !== "agent" ||
+      (node.kind !== "agent" && node.kind !== "batch") ||
       node.reads.length === 0 ||
       input.pendingAgentInputSourceByNodeId[nodeId] ||
       !input.isAgentCreateInputAnchorVisible(nodeId)
@@ -170,7 +170,7 @@ export function buildTransientAgentOutputAnchors(input: {
   isAgentCreateOutputAnchorVisible: (nodeId: string) => boolean;
 }): ProjectedCanvasAnchor[] {
   return Object.entries(input.document.nodes).flatMap(([nodeId, node]) => {
-    if (node.kind !== "agent" || node.writes.length === 0 || !input.isAgentCreateOutputAnchorVisible(nodeId)) {
+    if ((node.kind !== "agent" && node.kind !== "batch") || node.writes.length === 0 || !input.isAgentCreateOutputAnchorVisible(nodeId)) {
       return [];
     }
 

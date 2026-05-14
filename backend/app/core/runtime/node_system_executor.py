@@ -47,6 +47,7 @@ from app.core.runtime.llm_output_parser import (
 )
 from app.core.runtime.node_handlers import (
     execute_agent_node as _execute_agent_node_impl,
+    execute_batch_node as _execute_batch_node_impl,
     execute_condition_node as _execute_condition_node_impl,
     execute_input_node as _execute_input_node_impl,
 )
@@ -86,6 +87,7 @@ from app.core.runtime.skill_invocation import (
 from app.core.runtime.state import touch_run_lifecycle
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
+    NodeSystemBatchNode,
     NodeSystemConditionNode,
     NodeSystemGraphDocument,
     NodeSystemInputNode,
@@ -131,6 +133,7 @@ def _execute_node(
     state: dict[str, Any],
     *,
     execute_dynamic_subgraph_func: Any | None = None,
+    execute_subgraph_worker_func: Any | None = None,
 ) -> dict[str, Any]:
     graph_context = {
         "metadata": state.get("metadata", {}),
@@ -148,6 +151,16 @@ def _execute_node(
             node_name=node_name,
             state=state,
             execute_dynamic_subgraph_func=execute_dynamic_subgraph_func,
+        )
+    if isinstance(node, NodeSystemBatchNode):
+        return _execute_batch_node(
+            graph.state_schema,
+            node,
+            input_values,
+            graph_context,
+            node_name=node_name,
+            state=state,
+            execute_subgraph_worker_func=execute_subgraph_worker_func,
         )
     if isinstance(node, NodeSystemOutputNode):
         return _execute_output_node(node_name, node, input_values, state)
@@ -198,6 +211,30 @@ def _execute_agent_node(
         resolve_subgraph_capability_definition_func=_resolve_subgraph_capability_definition,
         execute_subgraph_capability_func=execute_dynamic_subgraph_func,
         finalize_agent_stream_delta_func=_finalize_agent_stream_delta,
+        first_truthy_func=_first_truthy,
+    )
+
+
+def _execute_batch_node(
+    state_schema: dict[str, NodeSystemStateDefinition],
+    node: NodeSystemBatchNode,
+    input_values: dict[str, Any],
+    graph_context: dict[str, Any],
+    *,
+    node_name: str,
+    state: dict[str, Any],
+    execute_subgraph_worker_func: Any | None = None,
+) -> dict[str, Any]:
+    return _execute_batch_node_impl(
+        state_schema,
+        node,
+        input_values,
+        graph_context,
+        node_name=node_name,
+        state=state,
+        resolve_agent_runtime_config_func=_resolve_agent_runtime_config,
+        generate_agent_response_func=_generate_agent_response,
+        execute_subgraph_worker_func=execute_subgraph_worker_func,
         first_truthy_func=_first_truthy,
     )
 

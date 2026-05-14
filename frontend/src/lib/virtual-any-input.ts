@@ -25,7 +25,7 @@ export function shouldExposeVirtualAnyInput(node: Pick<GraphNode, "kind" | "read
 }
 
 export function shouldExposeVirtualAnyOutput(node: Pick<GraphNode, "kind" | "writes">) {
-  return (node.kind === "agent" || node.kind === "input") && node.writes.length === 0;
+  return (node.kind === "agent" || node.kind === "batch" || node.kind === "input") && node.writes.length === 0;
 }
 
 export function buildVirtualAnyInputPort() {

@@ -101,6 +101,19 @@
             >
               <Connection />
             </ElIcon>
+            <ElSwitch
+              class="node-card__port-pill-batch-switch"
+              v-if="shouldShowBatchModeSwitch(port)"
+              :model-value="port.batchMode === 'batch'"
+              :width="64"
+              inline-prompt
+              :active-text="t('nodeCard.batchInputModeBatch')"
+              :inactive-text="t('nodeCard.batchInputModeShared')"
+              :aria-label="`${port.label} ${t('nodeCard.batchInputModeBatch')}`"
+              @pointerdown.stop
+              @click.stop
+              @update:model-value="emit('update-batch-mode', port.key, $event ? 'batch' : 'shared')"
+            />
             <button
               v-if="side === 'input' && canRemovePort(port)"
               type="button"
@@ -227,7 +240,7 @@
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
-import { ElIcon, ElPopover } from "element-plus";
+import { ElIcon, ElPopover, ElSwitch } from "element-plus";
 import { Check, Connection, Delete } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
@@ -275,6 +288,7 @@ const emit = defineEmits<{
   (event: "update:color", value: string): void;
   (event: "update:description", value: string): void;
   (event: "open-create", side: "input" | "output"): void;
+  (event: "update-batch-mode", stateKey: string, mode: "shared" | "batch"): void;
   (event: "update:create-name", value: string | number): void;
   (event: "update:create-type", value: string | number | boolean | undefined): void;
   (event: "update:create-color", value: string | number | boolean | undefined): void;
@@ -346,6 +360,10 @@ function isLeadingManagedIcon(port: NodePortViewModel) {
 
 function isTrailingManagedIcon(port: NodePortViewModel) {
   return props.side === "input" && port.managedBySkill?.role === "input";
+}
+
+function shouldShowBatchModeSwitch(port: NodePortViewModel) {
+  return props.side === "input" && !port.virtual && Boolean(port.batchMode);
 }
 
 function managedPortTitle(port: NodePortViewModel) {
@@ -557,6 +575,25 @@ function handlePortClick(port: NodePortViewModel) {
   right: 7px;
 }
 
+.node-card__port-pill-batch-switch {
+  flex: none;
+  margin-left: 2px;
+  --el-switch-on-color: #3b82f6;
+  --el-switch-off-color: rgba(59, 130, 246, 0.22);
+}
+
+.node-card__port-pill-batch-switch :deep(.el-switch__core) {
+  height: 24px;
+  min-width: 64px;
+  border-color: rgba(59, 130, 246, 0.28);
+}
+
+.node-card__port-pill-batch-switch :deep(.el-switch__inner) {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
 .node-card__port-pill--revealed .node-card__port-pill-remove,
 .node-card__port-pill:focus-visible .node-card__port-pill-remove {
   opacity: 1;
@@ -581,6 +618,11 @@ function handlePortClick(port: NodePortViewModel) {
 .node-card__port-pill--confirm .node-card__port-pill-remove {
   opacity: 1;
   pointer-events: auto;
+}
+
+.node-card__port-pill--confirm .node-card__port-pill-batch-switch {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .node-card__port-pill-label {

@@ -287,6 +287,7 @@
           :state-schema="document.state_schema"
           :knowledge-bases="knowledgeBases"
           :skill-definitions="skillDefinitions"
+          :templates="templates"
           :skill-definitions-loading="skillDefinitionsLoading"
           :skill-definitions-error="skillDefinitionsError"
           :available-agent-model-refs="availableAgentModelRefs"
@@ -314,6 +315,8 @@
           @remove-port-state="emit('remove-port-state', $event)"
           @reorder-port-state="emit('reorder-port-state', $event)"
           @update-agent-config="emit('update-agent-config', $event)"
+          @update-batch-config="emit('update-batch-config', $event)"
+          @update-batch-worker="emit('update-batch-worker', $event)"
           @toggle-agent-breakpoint="emit('toggle-agent-breakpoint', $event)"
           @update-condition-config="emit('update-condition-config', $event)"
           @update-condition-branch="emit('update-condition-branch', $event)"
@@ -623,7 +626,7 @@ import { isAgentBreakpointEnabledInDocument } from "@/lib/graph-document";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { SkillDefinition } from "@/types/skills";
 import type { RunNodeTiming } from "../workspace/runNodeTimingModel.ts";
-import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphNodeSize, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
+import type { AgentNode, BatchNode, ConditionNode, GraphDocument, GraphNode, GraphNodeSize, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition, TemplateRecord } from "@/types/node-system";
 
 const TOOGRAPH_VIRTUAL_POINTER_EVENT_KEY = "__toographVirtualPointerEvent";
 const TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY = "__toographVirtualEmptyCanvasPointerEvent";
@@ -646,6 +649,7 @@ const props = defineProps<{
   document: GraphPayload | GraphDocument;
   knowledgeBases: KnowledgeBaseRecord[];
   skillDefinitions: SkillDefinition[];
+  templates: TemplateRecord[];
   skillDefinitionsLoading: boolean;
   skillDefinitionsError: string | null;
   availableAgentModelRefs: string[];
@@ -686,6 +690,8 @@ const emit = defineEmits<{
   (event: "remove-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
   (event: "reorder-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string; targetIndex: number }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
+  (event: "update-batch-config", payload: { nodeId: string; patch: Partial<BatchNode["config"]> }): void;
+  (event: "update-batch-worker", payload: { nodeId: string; workerValue: string }): void;
   (event: "toggle-agent-breakpoint", payload: { nodeId: string; enabled: boolean }): void;
   (event: "update-condition-config", payload: { nodeId: string; patch: Partial<ConditionNode["config"]> }): void;
   (event: "update-condition-branch", payload: { nodeId: string; currentKey: string; nextKey: string; mappingKeys: string[] }): void;

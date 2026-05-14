@@ -287,6 +287,57 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(attachments[0]["state_key"], "reference_image")
         self.assertTrue(str(attachments[0]["file_url"]).startswith("file://"))
 
+    def test_rejects_video_upload_inputs_longer_than_short_llm_limit_before_provider_call(self) -> None:
+        def chat_with_local_model_with_meta_func(**_kwargs):
+            raise AssertionError("provider should not be called for over-limit ordinary LLM video inputs")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            artifact_root = Path(temp_dir) / "skill_artifacts"
+            video_path = artifact_root / "uploads" / "long_clip.mp4"
+            video_path.parent.mkdir(parents=True)
+            video_path.write_bytes(b"fake-video")
+            video_payload = {
+                "kind": "uploaded_file",
+                "name": "long_clip.mp4",
+                "mimeType": "video/mp4",
+                "size": video_path.stat().st_size,
+                "detectedType": "video",
+                "encoding": "local_path",
+                "localPath": "uploads/long_clip.mp4",
+                "contentType": "video/mp4",
+            }
+
+            with (
+                patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", artifact_root),
+                patch(
+                    "app.core.runtime.agent_multimodal.probe_video_duration_seconds",
+                    return_value=30.25,
+                    create=True,
+                ),
+            ):
+                with self.assertRaisesRegex(ValueError, "30 seconds|30 秒|long-video|长视频"):
+                    generate_agent_response(
+                        _agent_node(writes=[{"state": "answer"}], task_instruction="描述视频。"),
+                        {"reference_video": video_payload},
+                        {},
+                        {
+                            "resolved_provider_id": "local",
+                            "runtime_model_name": "vision-model",
+                            "resolved_temperature": 0.2,
+                            "resolved_thinking": False,
+                            "resolved_thinking_level": "off",
+                            "resolved_model_ref": "local/vision-model",
+                        },
+                        state_schema={
+                            "reference_video": NodeSystemStateDefinition(
+                                name="参考视频",
+                                type=NodeSystemStateType.VIDEO,
+                            ),
+                            "answer": NodeSystemStateDefinition(type=NodeSystemStateType.TEXT),
+                        },
+                        chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+                    )
+
     def test_routes_video_upload_inputs_as_model_attachments_from_local_paths(self) -> None:
         captured: dict[str, object] = {}
 

@@ -584,7 +584,7 @@ export function resolveCanvasAgentCreateInputTargetAnchor(input: {
   }
 
   const node = input.node;
-  if (!input.pendingSource || !node || node.kind !== "agent") {
+  if (!input.pendingSource || !node || (node.kind !== "agent" && node.kind !== "batch")) {
     return null;
   }
 
@@ -846,6 +846,9 @@ function isConcreteCanvasStateKey(stateKey: string | null | undefined) {
 function resolveFallbackWidth(node: Pick<GraphNode, "kind">) {
   if (node.kind === "condition") {
     return 560;
+  }
+  if (node.kind === "batch") {
+    return 640;
   }
   return 460;
 }

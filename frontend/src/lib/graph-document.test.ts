@@ -21,6 +21,7 @@ const {
   updateAgentNodeConfigInDocument,
   updateAgentBreakpointInDocument,
   connectStateBindingInDocument,
+  updateBatchNodeSubgraphWorkerInDocument,
   updateSubgraphNodeGraphInDocument,
 } = graphDocument;
 
@@ -425,6 +426,104 @@ test("updateSubgraphNodeGraphInDocument syncs subgraph boundary ports into paren
   assert.equal(nextDocument.state_schema.state_2.type, "file");
   assert.deepEqual(document.nodes.research_subgraph.config.graph.metadata, { version: 1 });
   assert.equal(unchangedDocument, document);
+});
+
+test("updateBatchNodeSubgraphWorkerInDocument lists template worker boundaries as batch ports", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Parent Graph",
+    state_schema: {},
+    nodes: {
+      batch_segments: {
+        kind: "batch",
+        name: "Batch Segments",
+        description: "",
+        ui: { position: { x: 120, y: 80 } },
+        reads: [],
+        writes: [],
+        config: {
+          workerSource: "default_llm",
+          inputModes: {},
+          maxConcurrency: 3,
+          retryCount: 3,
+          continueOnError: false,
+          defaultWorker: {
+            skillKey: "",
+            taskInstruction: "",
+            modelSource: "global",
+            model: "",
+            thinkingMode: "off",
+            temperature: 0.2,
+          },
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+  const segmentTemplate: TemplateRecord = {
+    template_id: "segment_analyzer",
+    label: "Segment Analyzer",
+    description: "Analyze one video segment.",
+    default_graph_name: "Segment Analyzer Graph",
+    source: "user",
+    state_schema: {
+      inner_segment: { name: "Segment", description: "", type: "file", value: "", color: "#16a34a" },
+      inner_instruction: { name: "Instruction", description: "", type: "text", value: "", color: "#d97706" },
+      inner_report: { name: "Report", description: "", type: "markdown", value: "", color: "#2563eb" },
+    },
+    nodes: {
+      segment_input: {
+        kind: "input",
+        name: "Segment",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "inner_segment", mode: "replace" }],
+        config: { value: "", boundaryType: "file" },
+      },
+      instruction_input: {
+        kind: "input",
+        name: "Instruction",
+        description: "",
+        ui: { position: { x: 0, y: 120 } },
+        reads: [],
+        writes: [{ state: "inner_instruction", mode: "replace" }],
+        config: { value: "", boundaryType: "text" },
+      },
+      report_output: {
+        kind: "output",
+        name: "Report",
+        description: "",
+        ui: { position: { x: 400, y: 0 } },
+        reads: [{ state: "inner_report", required: true }],
+        writes: [],
+        config: {
+          displayMode: "markdown",
+          persistEnabled: false,
+          persistFormat: "md",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = updateBatchNodeSubgraphWorkerInDocument(document, "batch_segments", segmentTemplate);
+  const nextNode = nextDocument.nodes.batch_segments;
+
+  assert.equal(nextNode.kind, "batch");
+  assert.equal(nextNode.kind === "batch" ? nextNode.config.workerSource : "", "subgraph");
+  assert.equal(nextNode.kind === "batch" ? nextNode.config.subgraphWorker?.templateId : "", "segment_analyzer");
+  assert.deepEqual(nextNode.kind === "batch" ? nextNode.reads.map((binding) => binding.state) : [], ["state_1", "state_2"]);
+  assert.deepEqual(nextNode.kind === "batch" ? nextNode.writes.map((binding) => binding.state) : [], ["state_3"]);
+  assert.equal(nextNode.kind === "batch" ? nextNode.config.inputModes.state_1 : "", "batch");
+  assert.equal(nextNode.kind === "batch" ? nextNode.config.inputModes.state_2 : "", "shared");
+  assert.equal(nextDocument.state_schema.state_1.name, "Segment");
+  assert.equal(nextDocument.state_schema.state_3.name, "Report");
 });
 
 test("createDraftFromTemplate accepts Vue reactive template records", () => {

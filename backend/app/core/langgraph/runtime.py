@@ -440,6 +440,10 @@ def _build_langgraph_node_callable(
                             **kwargs,
                             persist_parent_progress=persist_progress,
                         ),
+                        execute_subgraph_worker_func=lambda **kwargs: _execute_batch_subgraph_worker_runtime(
+                            parent_graph=graph,
+                            **kwargs,
+                        ),
                     )
                 if body.get("awaiting_human"):
                     duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
@@ -535,6 +539,7 @@ def _build_langgraph_node_callable(
                         "response": body.get("response"),
                         "reasoning": body.get("reasoning"),
                         "runtime_config": body.get("runtime_config"),
+                        "batch": body.get("batch"),
                         "selected_capabilities": body.get("selected_capabilities", []),
                         "capability_outputs": body.get("capability_outputs", []),
                         "context_assembly_report": body.get("context_assembly_report"),
@@ -999,6 +1004,66 @@ def _execute_subgraph_node_runtime(
         "final_result": "" if first_value is None else str(first_value),
         "warnings": list(subgraph_state.get("warnings", [])),
         "subgraph": {**subgraph_artifact, "output_values": output_values_by_internal_state},
+    }
+
+
+def _execute_batch_subgraph_worker_runtime(
+    *,
+    parent_graph: NodeSystemGraphDocument,
+    worker_node: NodeSystemSubgraphNode,
+    item_inputs: dict[str, Any],
+    item_index: int,
+    node_name: str,
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    worker_node_name = f"{node_name}_item_{item_index + 1}"
+    subgraph_document = _build_subgraph_document(parent_graph, worker_node_name, worker_node, item_inputs)
+    subgraph_document = _apply_inherited_permission_metadata(subgraph_document, state)
+    subgraph_initial_state = create_initial_run_state(subgraph_document.graph_id, subgraph_document.name)
+    subgraph_initial_state["run_id"] = str(state.get("run_id") or subgraph_initial_state["run_id"])
+    subgraph_initial_state["checkpoint_metadata"] = {
+        "available": False,
+        "checkpoint_id": None,
+        "thread_id": _subgraph_checkpoint_thread_id(subgraph_initial_state["run_id"], [node_name, f"item_{item_index + 1}"]),
+        "checkpoint_ns": "",
+        "saver": None,
+        "resume_source": None,
+    }
+    subgraph_state = execute_node_system_graph_langgraph(
+        subgraph_document,
+        subgraph_initial_state,
+        persist_progress=False,
+        save_final_run=False,
+        emit_lifecycle_events=False,
+    )
+    if subgraph_state.get("status") == "awaiting_human":
+        raise ValueError(f"Batch node '{node_name}' template worker item {item_index + 1} cannot pause for human review.")
+    errors = [str(item) for item in subgraph_state.get("errors", []) if str(item)]
+    status = str(subgraph_state.get("status") or "completed")
+    if status == "failed" or errors:
+        error_summary = "; ".join(errors) or f"Template worker item {item_index + 1} failed."
+        raise ValueError(error_summary)
+
+    output_values_by_internal_state = {
+        internal_state_key: copy.deepcopy(subgraph_state.get("state_values", {}).get(internal_state_key))
+        for _inner_node_name, internal_state_key in _subgraph_output_boundaries(worker_node)
+    }
+    parent_outputs: dict[str, Any] = {}
+    for index, (_inner_node_name, internal_state_key) in enumerate(_subgraph_output_boundaries(worker_node)):
+        external_binding = worker_node.writes[index] if index < len(worker_node.writes) else None
+        if external_binding is None:
+            raise ValueError(f"Batch node '{node_name}' template worker is missing required output {index + 1}.")
+        parent_outputs[external_binding.state] = copy.deepcopy(output_values_by_internal_state.get(internal_state_key))
+
+    first_value = next((value for value in parent_outputs.values() if value not in (None, "", [], {})), "")
+    return {
+        "outputs": parent_outputs,
+        "final_result": "" if first_value is None else str(first_value),
+        "warnings": list(subgraph_state.get("warnings", [])),
+        "subgraph": {
+            **_build_subgraph_execution_artifact(worker_node, subgraph_document, subgraph_state),
+            "output_values": output_values_by_internal_state,
+        },
     }
 
 

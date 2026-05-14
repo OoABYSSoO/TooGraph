@@ -7,6 +7,7 @@
       'node-card--hovered': hovered,
       'node-card--input': view.body.kind === 'input',
       'node-card--agent': view.body.kind === 'agent',
+      'node-card--batch': view.body.kind === 'batch',
       'node-card--condition': view.body.kind === 'condition',
       'node-card--output': view.body.kind === 'output',
       'node-card--subgraph': view.body.kind === 'subgraph',
@@ -39,10 +40,13 @@
       :human-review-pending="humanReviewPending"
       :has-advanced-settings="hasAdvancedSettings"
       :can-save-preset="canSavePreset"
-      :advanced-popover-width="view.body.kind === 'output' ? 340 : 280"
+      :advanced-popover-width="view.body.kind === 'output' ? 340 : view.body.kind === 'batch' ? 320 : 280"
       :action-popover-style="actionPopoverStyle"
       :confirm-popover-style="confirmPopoverStyle"
       :agent-temperature-input="agentTemperatureInput"
+      :batch-max-concurrency="view.body.kind === 'batch' ? view.body.maxConcurrency : 4"
+      :batch-retry-count="view.body.kind === 'batch' ? view.body.retryCount : 3"
+      :batch-continue-on-error="view.body.kind === 'batch' ? view.body.continueOnError : true"
       :output-display-mode-options="outputDisplayModeOptions"
       :output-persist-format-options="outputPersistFormatOptions"
       :output-file-name-template="view.body.kind === 'output' ? view.body.fileNameTemplate : ''"
@@ -55,6 +59,9 @@
       @edit-subgraph-action="handleEditSubgraphActionClick"
       @human-review="handleHumanReviewActionClick"
       @update:agent-temperature="handleAgentTemperatureInputValue"
+      @update:batch-max-concurrency="updateBatchMaxConcurrency"
+      @update:batch-retry-count="updateBatchRetryCount"
+      @update:batch-continue-on-error="updateBatchContinueOnError"
       @update:output-display-mode="updateOutputDisplayMode"
       @update:output-persist-format="updateOutputPersistFormat"
       @update:output-file-name="handleOutputFileNameInputValue"
@@ -346,6 +353,73 @@
       />
     </section>
 
+    <section v-else-if="view.body.kind === 'batch'" class="node-card__body node-card__body--batch">
+      <BatchNodeBody
+        ref="batchNodeBodyRef"
+        :node-id="nodeId"
+        :body="view.body"
+        :template-options="batchWorkerTemplateOptions"
+        :ordered-input-ports="orderedAgentInputPorts"
+        :ordered-output-ports="orderedAgentOutputPorts"
+        :state-editor-popover-style="stateEditorPopoverStyle"
+        :agent-add-popover-style="agentAddPopoverStyle"
+        :confirm-popover-style="confirmPopoverStyle"
+        :state-editor-draft="stateEditorDraft"
+        :state-editor-error="stateEditorError"
+        :type-options="stateTypeOptions"
+        :color-options="stateColorOptions"
+        :input-create-visible="shouldRevealAgentCreateInputPort"
+        :input-create-open="isPortCreateOpen('input')"
+        :input-create-accent-color="pendingStateInputTarget?.stateColor ?? pendingStateInputSource?.stateColor ?? '#16a34a'"
+        :input-create-label="pendingStateInputTarget?.label ?? pendingStateInputSource?.label ?? '+ input'"
+        :input-create-anchor-state-key="agentCreateInputAnchorStateKey"
+        :output-create-visible="shouldRevealAgentCreateOutputPort"
+        :output-create-open="isPortCreateOpen('output')"
+        :output-create-accent-color="pendingStateOutputTarget?.stateColor ?? VIRTUAL_ANY_OUTPUT_COLOR"
+        :output-create-label="pendingStateOutputTarget?.label ?? '+ output'"
+        :output-create-anchor-state-key="VIRTUAL_ANY_OUTPUT_STATE_KEY"
+        :create-draft="portStateDraft"
+        :create-title="portPickerTitle"
+        :create-error="portStateError"
+        :create-hint="t('nodeCard.createStateBindHint')"
+        :model-value="batchDefaultResolvedModelValue || undefined"
+        :model-options="agentModelOptions"
+        :global-model-ref="trimmedGlobalTextModelRef"
+        :thinking-mode-value="batchDefaultThinkingModeValue"
+        :thinking-options="agentThinkingOptions"
+        :thinking-enabled="batchDefaultThinkingEnabled"
+        :is-state-editor-open="isStateEditorOpen"
+        :is-state-editor-confirm-open="isStateEditorConfirmOpen"
+        :is-remove-port-state-confirm-open="isRemovePortStateConfirmOpen"
+        :is-state-editor-pill-revealed="isStateEditorPillRevealed"
+        :is-port-reordering="isPortReordering"
+        :is-port-reorder-placeholder="isPortReorderPlaceholder"
+        @pointer-enter="handleStateEditorPillPointerEnter"
+        @pointer-leave="handleStateEditorPillPointerLeave"
+        @reorder-pointer-down="handlePortReorderPointerDown"
+        @port-click="handlePortStatePillClick"
+        @remove-click="handleRemovePortStateClick"
+        @open-create="openPortStateCreate"
+        @update:name="handleStateEditorNameInput"
+        @update:type="handleStateEditorTypeValue"
+        @update:color="handleStateEditorColorInput"
+        @update:description="handleStateEditorDescriptionInput"
+        @update:create-name="handlePortDraftNameValue"
+        @update:create-type="handlePortDraftTypeSelect"
+        @update:create-color="handlePortDraftColorSelect"
+        @update:create-description="handlePortDraftDescriptionValue"
+        @update:create-value="updatePortDraftValue"
+        @cancel-create="closePortPicker"
+        @commit-create="commitPortStateCreate"
+        @update-input-mode="updateBatchInputMode"
+        @update-worker="updateBatchWorker"
+        @model-visible-change="handleAgentModelSelectVisibleChange"
+        @update:model-value="handleBatchDefaultModelValueChange"
+        @update:thinking-mode="handleBatchDefaultThinkingModeSelect"
+        @task-input="handleBatchDefaultTaskInstructionInput"
+      />
+    </section>
+
     <section v-else-if="view.body.kind === 'output'" class="node-card__body node-card__body--output">
       <OutputNodeBody
         :body="view.body"
@@ -464,6 +538,7 @@ import { Check, Clock, Coin, Collection, Document, FolderOpened } from "@element
 import { useI18n } from "vue-i18n";
 
 import AgentNodeBody from "./AgentNodeBody.vue";
+import BatchNodeBody from "./BatchNodeBody.vue";
 import ConditionNodeBody from "./ConditionNodeBody.vue";
 import FloatingStatePortPill from "./FloatingStatePortPill.vue";
 import InputNodeBody from "./InputNodeBody.vue";
@@ -472,7 +547,7 @@ import OutputNodeBody from "./OutputNodeBody.vue";
 import PrimaryStatePort from "./PrimaryStatePort.vue";
 import SubgraphNodeBody from "./SubgraphNodeBody.vue";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
-import type { AgentNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
+import type { AgentNode, BatchNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition, TemplateRecord } from "@/types/node-system";
 import type { SkillDefinition } from "@/types/skills";
 import type { RunNodeTiming } from "../workspace/runNodeTimingModel.ts";
 import { fetchLocalFolderTree, type LocalFolderTreeEntry } from "@/api/localInputSources";
@@ -581,6 +656,7 @@ const props = defineProps<{
   stateSchema: Record<string, StateDefinition>;
   knowledgeBases: KnowledgeBaseRecord[];
   skillDefinitions: SkillDefinition[];
+  templates: TemplateRecord[];
   skillDefinitionsLoading: boolean;
   skillDefinitionsError: string | null;
   availableAgentModelRefs: string[];
@@ -612,6 +688,8 @@ const emit = defineEmits<{
   (event: "reorder-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string; targetIndex: number }): void;
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
+  (event: "update-batch-config", payload: { nodeId: string; patch: Partial<BatchNode["config"]> }): void;
+  (event: "update-batch-worker", payload: { nodeId: string; workerValue: string }): void;
   (event: "toggle-agent-breakpoint", payload: { nodeId: string; enabled: boolean }): void;
   (event: "update-condition-config", payload: { nodeId: string; patch: Partial<ConditionNode["config"]> }): void;
   (event: "update-condition-branch", payload: { nodeId: string; currentKey: string; nextKey: string; mappingKeys: string[] }): void;
@@ -689,10 +767,10 @@ const view = computed(() =>
   }),
 );
 const agentInputPorts = computed<NodePortViewModel[]>(() =>
-  view.value.body.kind === "agent" || view.value.body.kind === "subgraph" ? view.value.inputs.filter((port) => !port.virtual) : [],
+  view.value.body.kind === "agent" || view.value.body.kind === "batch" || view.value.body.kind === "subgraph" ? view.value.inputs.filter((port) => !port.virtual) : [],
 );
 const agentOutputPorts = computed<NodePortViewModel[]>(() =>
-  view.value.body.kind === "agent" || view.value.body.kind === "subgraph" ? view.value.outputs.filter((port) => !port.virtual) : [],
+  view.value.body.kind === "agent" || view.value.body.kind === "batch" || view.value.body.kind === "subgraph" ? view.value.outputs.filter((port) => !port.virtual) : [],
 );
 const isAgentOutputManagedBySkill = computed(() => props.node.kind === "agent" && props.node.config.skillKey.trim().length > 0);
 const isAgentOutputManagedByCapability = computed(() =>
@@ -715,11 +793,19 @@ const outputPreviewContent = computed(() => {
   }
   return resolveOutputPreviewContent(view.value.body.previewText, view.value.body.displayMode);
 });
+const batchWorkerTemplateOptions = computed(() =>
+  props.templates.map((template) => ({
+    value: `template:${template.template_id}`,
+    label: template.label.trim() || template.default_graph_name.trim() || template.template_id,
+    description: template.description,
+  })),
+);
 const conditionRuleValueDraft = ref("");
 const activePortPickerSide = ref<"input" | "output" | null>(null);
 const portStateDraft = ref<StateFieldDraft | null>(null);
 const portStateError = ref<string | null>(null);
 const agentNodeBodyRef = ref<{ collapseModelSelect?: () => void } | null>(null);
+const batchNodeBodyRef = ref<{ collapseModelSelect?: () => void } | null>(null);
 const titleEditorInputRef = ref<{ focus?: () => void } | null>(null);
 const descriptionEditorInputRef = ref<{ focus?: () => void } | null>(null);
 const hoveredStateEditorPillAnchorId = ref<string | null>(null);
@@ -907,16 +993,21 @@ watch(
 );
 const trimmedGlobalTextModelRef = computed(() => props.globalTextModelRef.trim());
 const agentResolvedModelValue = computed(() => {
-  if (props.node.kind !== "agent") {
-    return GLOBAL_RUNTIME_MODEL_OPTION_VALUE;
-  }
-  const overrideModel = props.node.config.model.trim();
-  return props.node.config.modelSource === "override" && overrideModel ? overrideModel : GLOBAL_RUNTIME_MODEL_OPTION_VALUE;
+  return props.node.kind === "agent" ? resolveAgentLikeModelValue(props.node.config) : GLOBAL_RUNTIME_MODEL_OPTION_VALUE;
+});
+const batchDefaultResolvedModelValue = computed(() => {
+  return props.node.kind === "batch" ? resolveAgentLikeModelValue(props.node.config.defaultWorker) : GLOBAL_RUNTIME_MODEL_OPTION_VALUE;
 });
 const agentThinkingModeValue = computed<AgentThinkingControlMode>(() =>
   props.node.kind === "agent" ? normalizeAgentThinkingMode(props.node.config.thinkingMode) : "off",
 );
 const agentThinkingEnabled = computed(() => props.node.kind === "agent" ? agentThinkingModeValue.value !== "off" : true);
+const batchDefaultThinkingModeValue = computed<AgentThinkingControlMode>(() =>
+  props.node.kind === "batch" ? normalizeAgentThinkingMode(props.node.config.defaultWorker.thinkingMode) : "off",
+);
+const batchDefaultThinkingEnabled = computed(() =>
+  props.node.kind === "batch" ? batchDefaultThinkingModeValue.value !== "off" : true,
+);
 const agentModelOptions = computed(() =>
   buildAgentModelSelectOptions(trimmedGlobalTextModelRef.value, props.availableAgentModelRefs, props.agentModelDisplayLookup),
 );
@@ -942,7 +1033,7 @@ const agentTemperatureInput = computed(() => {
   }
   return String(normalizeAgentTemperature(props.node.config.temperature));
 });
-const hasAdvancedSettings = computed(() => props.node.kind === "agent" || props.node.kind === "output");
+const hasAdvancedSettings = computed(() => props.node.kind === "agent" || props.node.kind === "batch" || props.node.kind === "output");
 const canSavePreset = computed(() => props.node.kind === "agent");
 const isTopActionVisible = computed(() => props.humanReviewPending || props.selected || Boolean(props.hovered) || activeTopAction.value !== null);
 const shouldShowNodeRunTiming = computed(() => Boolean(props.runTiming));
@@ -984,6 +1075,11 @@ let nodeRunTimingIntervalId: number | null = null;
 
 function isPortCreateOpen(side: "input" | "output") {
   return activePortPickerSide.value === side && Boolean(portStateDraft.value);
+}
+
+function resolveAgentLikeModelValue(config: AgentNode["config"]) {
+  const overrideModel = config.model.trim();
+  return config.modelSource === "override" && overrideModel ? overrideModel : GLOBAL_RUNTIME_MODEL_OPTION_VALUE;
 }
 
 function formatNodeRunTimingDuration(durationMs: number | null | undefined) {
@@ -1223,6 +1319,38 @@ function emitAgentConfigPatch(patch: Partial<AgentNode["config"]>) {
   emit("update-agent-config", { nodeId: props.nodeId, patch });
 }
 
+function emitBatchConfigPatch(patch: Partial<BatchNode["config"]>) {
+  if (guardLockedGraphInteraction()) {
+    return;
+  }
+  if (props.node.kind !== "batch") {
+    return;
+  }
+  emit("update-batch-config", { nodeId: props.nodeId, patch });
+}
+
+function emitBatchWorkerUpdate(workerValue: string) {
+  if (guardLockedGraphInteraction()) {
+    return;
+  }
+  if (props.node.kind !== "batch") {
+    return;
+  }
+  emit("update-batch-worker", { nodeId: props.nodeId, workerValue });
+}
+
+function emitBatchDefaultWorkerConfigPatch(patch: Partial<AgentNode["config"]>) {
+  if (props.node.kind !== "batch") {
+    return;
+  }
+  emitBatchConfigPatch({
+    defaultWorker: {
+      ...props.node.config.defaultWorker,
+      ...patch,
+    },
+  });
+}
+
 function emitConditionConfigPatch(patch: Partial<ConditionNode["config"]>) {
   if (guardLockedGraphInteraction()) {
     return;
@@ -1270,6 +1398,14 @@ function handleAgentTaskInstructionInput(event: Event) {
     return;
   }
   emitAgentConfigPatch({ taskInstruction: target.value });
+}
+
+function handleBatchDefaultTaskInstructionInput(event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLTextAreaElement)) {
+    return;
+  }
+  emitBatchDefaultWorkerConfigPatch({ taskInstruction: target.value });
 }
 
 function selectAgentSkill(skillKey: string) {
@@ -1769,11 +1905,34 @@ function collapseAgentModelSelect() {
   agentNodeBodyRef.value?.collapseModelSelect?.();
 }
 
+function collapseBatchModelSelect() {
+  batchNodeBodyRef.value?.collapseModelSelect?.();
+}
+
 function handleAgentThinkingModeSelect(nextValue: string | number | boolean | undefined) {
   if (typeof nextValue !== "string") {
     return;
   }
   updateAgentThinkingMode(normalizeAgentThinkingMode(nextValue));
+}
+
+function handleBatchDefaultModelValueChange(nextValue: string | number | boolean | undefined) {
+  if (typeof nextValue !== "string") {
+    return;
+  }
+  const normalizedValue = nextValue.trim();
+  if (!normalizedValue) {
+    return;
+  }
+  emitBatchDefaultWorkerConfigPatch(resolveAgentModelSelection(normalizedValue));
+  collapseBatchModelSelect();
+}
+
+function handleBatchDefaultThinkingModeSelect(nextValue: string | number | boolean | undefined) {
+  if (typeof nextValue !== "string") {
+    return;
+  }
+  emitBatchDefaultWorkerConfigPatch({ thinkingMode: normalizeAgentThinkingMode(nextValue) });
 }
 
 function updateAgentThinkingMode(thinkingMode: AgentNode["config"]["thinkingMode"]) {
@@ -1796,6 +1955,36 @@ function handleAgentTemperatureInputValue(value: string | number) {
     return;
   }
   emitAgentConfigPatch({ temperature: nextValue });
+}
+
+function updateBatchInputMode(stateKey: string, mode: "shared" | "batch") {
+  if (props.node.kind !== "batch") {
+    return;
+  }
+  emitBatchConfigPatch({
+    inputModes: {
+      ...props.node.config.inputModes,
+      [stateKey]: mode,
+    },
+  });
+}
+
+function updateBatchWorker(workerValue: string) {
+  emitBatchWorkerUpdate(workerValue);
+}
+
+function updateBatchMaxConcurrency(value: number) {
+  const nextValue = Math.max(1, Math.min(16, Math.floor(Number(value) || 1)));
+  emitBatchConfigPatch({ maxConcurrency: nextValue });
+}
+
+function updateBatchRetryCount(value: number) {
+  const nextValue = Math.max(0, Math.min(10, Math.floor(Number(value) || 0)));
+  emitBatchConfigPatch({ retryCount: nextValue });
+}
+
+function updateBatchContinueOnError(value: boolean) {
+  emitBatchConfigPatch({ continueOnError: value });
 }
 
 function handleInputValueInput(event: Event) {
@@ -2068,6 +2257,11 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 
 .node-card--agent {
   --node-card-kind-rgb: 37, 99, 235;
+}
+
+.node-card--batch {
+  --node-card-kind-rgb: 2, 132, 199;
+  width: var(--node-card-width, 640px);
 }
 
 .node-card--condition {
@@ -2361,6 +2555,7 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 .node-card__body--input,
 .node-card__body--agent,
 .node-card__body--output,
+.node-card__body--batch,
 .node-card__body--subgraph {
   display: flex;
   flex-direction: column;

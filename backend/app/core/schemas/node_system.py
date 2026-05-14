@@ -86,6 +86,16 @@ class NodeSystemReadBindingKind(str, Enum):
     SKILL_INPUT = "skill_input"
 
 
+class BatchWorkerSource(str, Enum):
+    DEFAULT_LLM = "default_llm"
+    SUBGRAPH = "subgraph"
+
+
+class BatchInputMode(str, Enum):
+    SHARED = "shared"
+    BATCH = "batch"
+
+
 class NodeSystemStateBindingMetadata(BaseModel):
     kind: NodeSystemStateBindingKind = NodeSystemStateBindingKind.SKILL_OUTPUT
     skill_key: str = Field(default="", alias="skillKey")
@@ -327,6 +337,35 @@ class NodeSystemAgentConfig(BaseModel):
         return normalize_thinking_level(value)
 
 
+class NodeSystemBatchSubgraphWorkerConfig(BaseModel):
+    graph: "NodeSystemGraphCore"
+    template_id: str = Field(default="", alias="templateId")
+    template_source: str = Field(default="", alias="templateSource")
+    label: str = ""
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
+
+
+class NodeSystemBatchConfig(BaseModel):
+    worker_source: BatchWorkerSource = Field(default=BatchWorkerSource.DEFAULT_LLM, alias="workerSource")
+    input_modes: dict[str, BatchInputMode] = Field(default_factory=dict, alias="inputModes")
+    max_concurrency: int = Field(default=4, ge=1, le=16, alias="maxConcurrency")
+    retry_count: int = Field(default=3, ge=0, le=10, alias="retryCount")
+    continue_on_error: bool = Field(default=True, alias="continueOnError")
+    default_worker: NodeSystemAgentConfig = Field(default_factory=NodeSystemAgentConfig, alias="defaultWorker")
+    subgraph_worker: NodeSystemBatchSubgraphWorkerConfig | None = Field(default=None, alias="subgraphWorker")
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
+
+    @field_validator("input_modes")
+    @classmethod
+    def validate_input_mode_state_keys(cls, value: dict[str, BatchInputMode]) -> dict[str, BatchInputMode]:
+        return {
+            _validate_identifier(state_key, label="Batch input state"): mode
+            for state_key, mode in value.items()
+        }
+
+
 class NodeSystemConditionRule(BaseModel):
     source: str = Field(..., min_length=1)
     operator: ConditionOperator = ConditionOperator.EXISTS
@@ -421,6 +460,16 @@ class NodeSystemAgentNode(BaseModel):
     config: NodeSystemAgentConfig = Field(default_factory=NodeSystemAgentConfig)
 
 
+class NodeSystemBatchNode(BaseModel):
+    kind: Literal["batch"] = "batch"
+    name: str = ""
+    description: str = ""
+    ui: NodeSystemNodeUi
+    reads: list[NodeSystemReadBinding] = Field(default_factory=list)
+    writes: list[NodeSystemWriteBinding] = Field(default_factory=list)
+    config: NodeSystemBatchConfig = Field(default_factory=NodeSystemBatchConfig)
+
+
 class NodeSystemConditionNode(BaseModel):
     kind: Literal["condition"] = "condition"
     name: str = ""
@@ -454,6 +503,7 @@ class NodeSystemSubgraphNode(BaseModel):
 NodeSystemNode = (
     NodeSystemInputNode
     | NodeSystemAgentNode
+    | NodeSystemBatchNode
     | NodeSystemConditionNode
     | NodeSystemOutputNode
     | NodeSystemSubgraphNode
@@ -576,4 +626,5 @@ class NodeSystemGraphDocument(NodeSystemGraphPayload):
     status: NodeSystemCatalogStatus = NodeSystemCatalogStatus.ACTIVE
 
 
+NodeSystemBatchSubgraphWorkerConfig.model_rebuild()
 NodeSystemSubgraphConfig.model_rebuild()

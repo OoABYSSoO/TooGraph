@@ -44,6 +44,29 @@ function buildDocument(): GraphPayload {
           temperature: 0.2,
         },
       },
+      batch_runner: {
+        kind: "batch",
+        name: "batch_runner",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          workerSource: "default_llm",
+          inputModes: {},
+          maxConcurrency: 3,
+          retryCount: 3,
+          continueOnError: false,
+          defaultWorker: {
+            skillKey: "",
+            taskInstruction: "",
+            modelSource: "global",
+            model: "",
+            thinkingMode: "high",
+            temperature: 0.2,
+          },
+        },
+      },
       score_gate: {
         kind: "condition",
         name: "score_gate",
@@ -92,13 +115,13 @@ test("listStateBindingNodeOptions follows current reader and writer rules", () =
   const readerOptions = listStateBindingNodeOptions(document, "review", "read");
   assert.deepEqual(
     readerOptions.map((option) => `${option.nodeLabel}:${option.kind}`),
-    ["answer_helper:agent", "output_answer:output", "score_gate:condition"],
+    ["answer_helper:agent", "batch_runner:batch", "output_answer:output", "score_gate:condition"],
   );
 
   const writerOptions = listStateBindingNodeOptions(document, "review", "write");
   assert.deepEqual(
     writerOptions.map((option) => `${option.nodeLabel}:${option.kind}`),
-    ["answer_helper:agent", "input_question:input"],
+    ["answer_helper:agent", "batch_runner:batch", "input_question:input"],
   );
 });
 
@@ -109,6 +132,9 @@ test("addStateBindingToDocument appends agent readers and replaces single-input 
   assert.equal(nextAgentDocument.nodes.answer_helper.reads.at(-1)?.state, "review");
   assert.equal(nextAgentDocument.nodes.answer_helper.reads.at(-1)?.required, false);
   assert.deepEqual(document.nodes.answer_helper.reads.map((binding) => binding.state), ["question"]);
+
+  const nextBatchDocument = addStateBindingToDocument(document, "review", "batch_runner", "read");
+  assert.deepEqual(nextBatchDocument.nodes.batch_runner.reads, [{ state: "review", required: false }]);
 
   const nextOutputDocument = addStateBindingToDocument(document, "review", "output_answer", "read");
   assert.deepEqual(nextOutputDocument.nodes.output_answer.reads, [{ state: "review", required: true }]);
@@ -127,8 +153,35 @@ test("addStateBindingToDocument appends agent writers and replaces input writers
   const nextAgentDocument = addStateBindingToDocument(document, "review", "answer_helper", "write");
   assert.deepEqual(nextAgentDocument.nodes.answer_helper.writes.map((binding) => binding.state), ["answer", "review"]);
 
+  const nextBatchDocument = addStateBindingToDocument(document, "review", "batch_runner", "write");
+  assert.deepEqual(nextBatchDocument.nodes.batch_runner.writes, [{ state: "review", mode: "replace" }]);
+
   const nextInputDocument = addStateBindingToDocument(document, "review", "input_question", "write");
   assert.deepEqual(nextInputDocument.nodes.input_question.writes, [{ state: "review", mode: "replace" }]);
+});
+
+test("removeStateBindingFromDocument removes batch bindings and prunes input modes", () => {
+  const document = buildDocument();
+  const batch = document.nodes.batch_runner;
+  assert.equal(batch.kind, "batch");
+  if (batch.kind === "batch") {
+    batch.reads = [{ state: "review", required: false }];
+    batch.writes = [{ state: "answer", mode: "replace" }];
+    batch.config.inputModes = {
+      review: "batch",
+      question: "shared",
+    };
+  }
+
+  const nextReadDocument = removeStateBindingFromDocument(document, "review", "batch_runner", "read");
+  assert.deepEqual(nextReadDocument.nodes.batch_runner.reads, []);
+  assert.equal(nextReadDocument.nodes.batch_runner.kind, "batch");
+  if (nextReadDocument.nodes.batch_runner.kind === "batch") {
+    assert.deepEqual(nextReadDocument.nodes.batch_runner.config.inputModes, { question: "shared" });
+  }
+
+  const nextWriteDocument = removeStateBindingFromDocument(document, "answer", "batch_runner", "write");
+  assert.deepEqual(nextWriteDocument.nodes.batch_runner.writes, []);
 });
 
 test("removeStateBindingFromDocument removes existing read and write relations", () => {

@@ -204,6 +204,69 @@ test("buildNodeCardViewModel derives agent body, ports, and labels", () => {
   assert.deepEqual(model.stateSummary?.writes, ["answer"]);
 });
 
+test("buildNodeCardViewModel derives batch body and per-input modes", () => {
+  const node: GraphNode = {
+    kind: "batch",
+    name: "segment_batch",
+    description: "Analyze segments in parallel.",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [
+      { state: "segments", required: true },
+      { state: "question", required: true },
+    ],
+    writes: [{ state: "reports", mode: "replace" }],
+    config: {
+      workerSource: "default_llm",
+      inputModes: {
+        segments: "batch",
+        question: "shared",
+      },
+      maxConcurrency: 4,
+      retryCount: 3,
+      continueOnError: true,
+      defaultWorker: {
+        skillKey: "",
+        taskInstruction: "Analyze one segment.",
+        modelSource: "global",
+        model: "",
+        thinkingMode: "high",
+        temperature: 0.2,
+      },
+    },
+  };
+
+  const model = buildNodeCardViewModel("segment_batch", node, {
+    ...stateSchema,
+    segments: {
+      name: "segments",
+      description: "Video segment array.",
+      type: "json",
+      value: [],
+      color: "#0f766e",
+    },
+    reports: {
+      name: "reports",
+      description: "Assembled segment reports.",
+      type: "json",
+      value: [],
+      color: "#4f46e5",
+    },
+  });
+
+  assert.equal(model.kindLabel, "BATCH");
+  assert.equal(model.body.kind, "batch");
+  assert.equal(model.body.workerLabel, "Default LLM");
+  assert.equal(model.body.workerValue, "default_llm");
+  assert.equal(model.body.taskInstruction, "Analyze one segment.");
+  assert.equal(model.body.inputModes.segments, "batch");
+  assert.equal(model.body.inputModes.question, "shared");
+  assert.equal(model.body.maxConcurrency, 4);
+  assert.equal(model.body.retryCount, 3);
+  assert.equal(model.body.continueOnError, true);
+  assert.deepEqual(model.inputs.map((port) => port.label), ["segments", "question"]);
+  assert.deepEqual(model.outputs.map((port) => port.label), ["reports"]);
+});
+
 test("buildNodeCardViewModel derives displayed skill instruction from the selected skill definition", () => {
   const node: GraphNode = {
     kind: "agent",

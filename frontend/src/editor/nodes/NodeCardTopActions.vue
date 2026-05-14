@@ -57,6 +57,53 @@
             />
           </label>
         </div>
+        <div v-else-if="bodyKind === 'batch'" class="node-card__advanced-popover-content">
+          <label class="node-card__control-row">
+            <span class="node-card__control-label">{{ t("nodeCard.batchMaxConcurrency") }}</span>
+            <ElInput
+              :model-value="batchMaxConcurrency"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              max="16"
+              @update:model-value="emit('update:batch-max-concurrency', Number($event))"
+            />
+          </label>
+          <label class="node-card__control-row">
+            <span class="node-card__control-label">{{ t("nodeCard.batchRetryCount") }}</span>
+            <ElInput
+              :model-value="batchRetryCount"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              max="10"
+              @update:model-value="emit('update:batch-retry-count', Number($event))"
+            />
+          </label>
+          <div class="node-card__control-row">
+            <span class="node-card__control-label">{{ t("nodeCard.batchFailurePolicy") }}</span>
+            <div class="node-card__control-list node-card__control-list--equal">
+              <button
+                type="button"
+                class="node-card__control-button"
+                :class="{ 'node-card__control-button--active': !batchContinueOnError }"
+                @pointerdown.stop
+                @click.stop="emit('update:batch-continue-on-error', false)"
+              >
+                {{ t("nodeCard.batchFailureStop") }}
+              </button>
+              <button
+                type="button"
+                class="node-card__control-button"
+                :class="{ 'node-card__control-button--active': batchContinueOnError }"
+                @pointerdown.stop
+                @click.stop="emit('update:batch-continue-on-error', true)"
+              >
+                {{ t("nodeCard.batchFailureContinue") }}
+              </button>
+            </div>
+          </div>
+        </div>
         <div v-else-if="bodyKind === 'output'" class="node-card__advanced-popover-content">
           <div class="node-card__control-row">
             <span class="node-card__control-label">{{ t("nodeCard.display") }}</span>
@@ -194,7 +241,7 @@ import { useI18n } from "vue-i18n";
 import type { NodeTopAction } from "./useNodeFloatingPanels";
 import type { OutputNode } from "@/types/node-system";
 
-type BodyKind = "input" | "agent" | "output" | "condition" | "subgraph";
+type BodyKind = "input" | "agent" | "batch" | "output" | "condition" | "subgraph";
 type OutputDisplayModeOption = {
   value: OutputNode["config"]["displayMode"];
   label: string;
@@ -217,6 +264,9 @@ const props = defineProps<{
   actionPopoverStyle: CSSProperties;
   confirmPopoverStyle: CSSProperties;
   agentTemperatureInput: string;
+  batchMaxConcurrency: number;
+  batchRetryCount: number;
+  batchContinueOnError: boolean;
   outputDisplayModeOptions: OutputDisplayModeOption[];
   outputPersistFormatOptions: OutputPersistFormatOption[];
   outputFileNameTemplate: string;
@@ -232,6 +282,9 @@ const emit = defineEmits<{
   (event: "edit-subgraph-action"): void;
   (event: "human-review"): void;
   (event: "update:agent-temperature", value: string | number): void;
+  (event: "update:batch-max-concurrency", value: number): void;
+  (event: "update:batch-retry-count", value: number): void;
+  (event: "update:batch-continue-on-error", value: boolean): void;
   (event: "update:output-display-mode", value: OutputNode["config"]["displayMode"]): void;
   (event: "update:output-persist-format", value: OutputNode["config"]["persistFormat"]): void;
   (event: "update:output-file-name", value: string | number): void;
@@ -416,6 +469,11 @@ function actionAffordanceLabel(actionLabel: string) {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.node-card__control-list--equal {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .node-card__control-button {

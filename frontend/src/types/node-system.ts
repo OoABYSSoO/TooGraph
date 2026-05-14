@@ -8,7 +8,7 @@ export type GraphNodeSize = {
   height: number;
 };
 
-export type NodeFamily = "input" | "output" | "agent" | "condition" | "subgraph";
+export type NodeFamily = "input" | "output" | "agent" | "batch" | "condition" | "subgraph";
 
 export type StateDefinition = {
   name: string;
@@ -94,6 +94,34 @@ export type AgentNode = {
   };
 };
 
+export type BatchInputMode = "shared" | "batch";
+export type BatchWorkerSource = "default_llm" | "subgraph";
+
+export type BatchSubgraphWorker = {
+  graph: GraphCorePayload;
+  templateId?: string;
+  templateSource?: TemplateSource;
+  label?: string;
+};
+
+export type BatchNode = {
+  kind: "batch";
+  name: string;
+  description: string;
+  ui: NodeUi;
+  reads: ReadBinding[];
+  writes: WriteBinding[];
+  config: {
+    workerSource: BatchWorkerSource;
+    inputModes: Record<string, BatchInputMode>;
+    maxConcurrency: number;
+    retryCount: number;
+    continueOnError: boolean;
+    defaultWorker: AgentNode["config"];
+    subgraphWorker?: BatchSubgraphWorker | null;
+  };
+};
+
 export type AgentSkillInstructionBlock = {
   skillKey: string;
   title: string;
@@ -155,7 +183,7 @@ export type SubgraphNode = {
   };
 };
 
-export type GraphNode = InputNode | AgentNode | ConditionNode | OutputNode | SubgraphNode;
+export type GraphNode = InputNode | AgentNode | BatchNode | ConditionNode | OutputNode | SubgraphNode;
 
 export type GraphEdge = {
   source: string;
@@ -322,7 +350,7 @@ export type NodeCreationEntry = {
   description: string;
   mode: "node" | "preset" | "subgraph";
   origin?: "builtin" | "persisted";
-  nodeKind?: "input" | "output" | "subgraph";
+  nodeKind?: "input" | "output" | "batch" | "subgraph";
   presetId?: string;
   graphId?: string;
   templateId?: string;

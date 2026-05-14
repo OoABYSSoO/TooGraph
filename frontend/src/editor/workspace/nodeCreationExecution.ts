@@ -3,6 +3,7 @@ import { createUploadedAssetEnvelope, type UploadedAssetUploadResult } from "../
 import {
   applyNodeCreationResult,
   buildGenericInputNode,
+  buildGenericBatchNode,
   buildGenericOutputNode,
   buildGenericSubgraphNode,
   buildInputNodeFromFile,
@@ -122,6 +123,23 @@ export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocume
   if (input.entry.mode === "node" && input.entry.nodeKind === "output") {
     const created = applyCreatedNodePlacement(
       buildGenericOutputNode({
+        id: createdNodeId,
+        position: input.context?.position ?? { x: 0, y: 0 },
+      }),
+      createdNodeId,
+      input.context,
+    );
+    return applyNodeCreationResult(document, {
+      createdNodeId,
+      createdNode: created.node,
+      mergedStateSchema: created.state_schema,
+      context: input.context ?? null,
+    });
+  }
+
+  if (input.entry.mode === "node" && input.entry.nodeKind === "batch") {
+    const created = applyCreatedNodePlacement(
+      buildGenericBatchNode({
         id: createdNodeId,
         position: input.context?.position ?? { x: 0, y: 0 },
       }),
