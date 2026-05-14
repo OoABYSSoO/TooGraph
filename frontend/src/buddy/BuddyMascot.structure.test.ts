@@ -329,6 +329,8 @@ test("BuddyMascot keeps tail curve breathing after large side transitions", () =
 test("BuddyMascot moves eye wrapper layers toward the pointer without replacing blink transforms", () => {
   assert.match(componentSource, /lookX\?: number;/);
   assert.match(componentSource, /lookY\?: number;/);
+  assert.match(componentSource, /lookRangeX\?: number;/);
+  assert.match(componentSource, /lookRangeY\?: number;/);
   assert.match(componentSource, /:style="eyeLookStyle"/);
   assert.match(componentSource, /class="buddy-mascot__look-eye buddy-mascot__look-eye--left"/);
   assert.match(componentSource, /class="buddy-mascot__look-eye buddy-mascot__look-eye--right"/);
@@ -337,8 +339,8 @@ test("BuddyMascot moves eye wrapper layers toward the pointer without replacing 
   assert.match(componentSource, /cx="-80" cy="82"/);
   assert.match(componentSource, /cx="80" cy="82"/);
   assert.match(componentSource, /const shouldTrackPointer = props\.facing === "front";/);
-  assert.match(componentSource, /const x = shouldTrackPointer \? clampLookAxis\(props\.lookX\) \* 18 : 0;/);
-  assert.match(componentSource, /const y = shouldTrackPointer \? clampLookAxis\(props\.lookY\) \* 12 : 0;/);
+  assert.match(componentSource, /const x = shouldTrackPointer \? clampLookAxis\(props\.lookX\) \* props\.lookRangeX : 0;/);
+  assert.match(componentSource, /const y = shouldTrackPointer \? clampLookAxis\(props\.lookY\) \* props\.lookRangeY : 0;/);
   assert.match(
     componentSource,
     /\.buddy-mascot__look-eye--left\s*\{[\s\S]*transform:\s*translate\(\s*calc\(var\(--buddy-mascot-look-x,\s*0px\) \+ var\(--buddy-mascot-left-eye-facing-x,\s*0px\)\),\s*calc\(var\(--buddy-mascot-look-y,\s*0px\) \+ var\(--buddy-mascot-eye-facing-y,\s*0px\)\)\s*\);/,

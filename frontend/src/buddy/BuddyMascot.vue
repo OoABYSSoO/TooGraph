@@ -191,6 +191,8 @@ const props = withDefaults(
     tailSwitchNonce?: number;
     lookX?: number;
     lookY?: number;
+    lookRangeX?: number;
+    lookRangeY?: number;
     virtualCursor?: boolean;
     hideSparkle?: boolean;
   }>(),
@@ -203,6 +205,8 @@ const props = withDefaults(
     tailSwitchNonce: 0,
     lookX: 0,
     lookY: 0,
+    lookRangeX: 18,
+    lookRangeY: 12,
     virtualCursor: false,
     hideSparkle: false,
   },
@@ -238,8 +242,8 @@ const mascotClasses = computed(() => ({
 }));
 const eyeLookStyle = computed<Record<string, string>>(() => {
   const shouldTrackPointer = props.facing === "front";
-  const x = shouldTrackPointer ? clampLookAxis(props.lookX) * 18 : 0;
-  const y = shouldTrackPointer ? clampLookAxis(props.lookY) * 12 : 0;
+  const x = shouldTrackPointer ? clampLookAxis(props.lookX) * props.lookRangeX : 0;
+  const y = shouldTrackPointer ? clampLookAxis(props.lookY) * props.lookRangeY : 0;
   return {
     "--buddy-mascot-look-x": `${x.toFixed(2)}px`,
     "--buddy-mascot-look-y": `${y.toFixed(2)}px`,

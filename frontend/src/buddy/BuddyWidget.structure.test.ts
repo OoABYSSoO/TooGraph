@@ -21,6 +21,15 @@ function extractFunctionBlock(name: string) {
   return match?.[1] ?? "";
 }
 
+function extractSourceBetween(startText: string, endText: string) {
+  const startIndex = componentSource.indexOf(startText);
+  const endIndex = componentSource.indexOf(endText, startIndex + startText.length);
+  if (startIndex === -1 || endIndex === -1) {
+    return "";
+  }
+  return componentSource.slice(startIndex, endIndex);
+}
+
 test("BuddyWidget renders the mascot without a circular avatar frame and keeps a contour shadow", () => {
   const avatarBlock = extractCssBlock(".buddy-widget__avatar");
 
@@ -47,6 +56,8 @@ test("BuddyWidget renders the animated inline mascot component", () => {
   assert.match(componentSource, /:tap-nonce="tapNonce"/);
   assert.match(componentSource, /:look-x="mascotLook\.x"/);
   assert.match(componentSource, /:look-y="mascotLook\.y"/);
+  assert.match(componentSource, /:look-range-x="buddyMascotMotionConfig\.mascotLookRangeX"/);
+  assert.match(componentSource, /:look-range-y="buddyMascotMotionConfig\.mascotLookRangeY"/);
   assert.match(componentSource, /:tail-switch-nonce="tailSwitchNonce"/);
   assert.match(componentSource, /:virtual-cursor="virtualCursorEnabled && !virtualCursorDetached"/);
   assert.match(componentSource, /:hide-sparkle="isVirtualCursorRendered"/);
@@ -205,6 +216,11 @@ test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow
   assert.match(componentSource, /const VIRTUAL_CURSOR_SHAPE_PATH =/);
   assert.match(componentSource, /v-if="isVirtualCursorRendered"/);
   assert.match(componentSource, /class="buddy-widget__virtual-cursor"/);
+  assert.match(componentSource, /class="buddy-widget__virtual-cursor-follow-range"/);
+  assert.match(componentSource, /:style="virtualCursorFollowRangeStyle"/);
+  assert.match(componentSource, /const shouldShowVirtualCursorFollowRange = computed/);
+  assert.match(componentSource, /const virtualCursorFollowRangeStyle = computed/);
+  assert.match(componentSource, /const radius = buddyMascotMotionConfig\.value\.virtualCursorFollowMaxDistancePx;/);
   assert.match(componentSource, /class="buddy-widget__virtual-cursor-svg"/);
   assert.match(componentSource, /viewBox="-80 -80 160 160"/);
   assert.match(componentSource, /class="buddy-widget__virtual-cursor-shape"/);
@@ -301,7 +317,8 @@ test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow
   assert.match(componentSource, /function requestBuddyFollowVirtualCursor\(\)/);
   assert.match(componentSource, /function runBuddyVirtualCursorFollowStep\(sequenceId: number\)/);
   assert.match(componentSource, /resolveBuddyVirtualCursorFollowTargetPosition/);
-  assert.match(componentSource, /BUDDY_VIRTUAL_CURSOR_FOLLOW_MAX_DISTANCE_PX/);
+  assert.match(componentSource, /function resolveCurrentVirtualCursorTrackingPosition\(\)/);
+  assert.match(componentSource, /function resolveVirtualCursorFollowMaxDistancePx\(\)/);
   assert.match(activateVirtualCursorBlock, /cancelMascotLookFrame\(\);/);
   assert.match(activateVirtualCursorBlock, /pendingMascotLookPointer = null;/);
   assert.match(activateVirtualCursorBlock, /startVirtualCursorLaunch\(\);/);
@@ -310,6 +327,9 @@ test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow
 test("BuddyWidget keeps virtual-cursor follow jumps from being flattened by slow cursor drags", () => {
   assert.match(componentSource, /let buddyVirtualCursorIdleFrameId: number \| null = null;/);
   assert.match(componentSource, /let virtualCursorFlightFrameId: number \| null = null;/);
+  assert.match(componentSource, /let virtualCursorFlightTrackingFrameId: number \| null = null;/);
+  assert.match(componentSource, /let virtualCursorFlightTracking: \{/);
+  assert.match(componentSource, /let virtualCursorTrackingPosition: BuddyPosition \| null = null;/);
   assert.match(componentSource, /const BUDDY_IDLE_VIRTUAL_CURSOR_ORBIT_LAP_DURATION_MS = 1200;/);
   assert.doesNotMatch(componentSource, /BUDDY_IDLE_VIRTUAL_CURSOR_ORBIT_DURATION_MS/);
   assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_READY_FRAME_DELAY_MS = 80;/);
@@ -317,6 +337,11 @@ test("BuddyWidget keeps virtual-cursor follow jumps from being flattened by slow
   assert.match(componentSource, /function cancelBuddyVirtualCursorIdleFrame\(\)/);
   assert.match(componentSource, /function clearVirtualCursorFlightFrame\(\)/);
   assert.match(componentSource, /window\.cancelAnimationFrame\(virtualCursorFlightFrameId\);/);
+  assert.match(componentSource, /function clearVirtualCursorFlightTracking\(\)/);
+  assert.match(componentSource, /function startVirtualCursorFlightTracking\(fromPosition: BuddyPosition, toPosition: BuddyPosition, durationMs: number\)/);
+  assert.match(componentSource, /function runVirtualCursorFlightTrackingFrame\(\)/);
+  assert.match(componentSource, /virtualCursorTrackingPosition = interpolateBuddyPosition\(/);
+  assert.match(componentSource, /requestBuddyFollowVirtualCursor\(\);/);
   assert.match(componentSource, /function runBuddyIdleVirtualCursorOrbitFrame\(sequenceId: number, startedAtMs: number, startAngle: number\)/);
   assert.match(componentSource, /elapsedMs \/ BUDDY_IDLE_VIRTUAL_CURSOR_ORBIT_LAP_DURATION_MS/);
   assert.match(componentSource, /if \(Math\.random\(\) < 0\.5\) \{[\s\S]*finishBuddyIdleVirtualCursorAction\(sequenceId\);[\s\S]*return;[\s\S]*\}[\s\S]*runBuddyIdleVirtualCursorOrbitFrame\(sequenceId, performance\.now\(\), startAngle\);/);
@@ -326,7 +351,7 @@ test("BuddyWidget keeps virtual-cursor follow jumps from being flattened by slow
   assert.match(componentSource, /runBuddyIdleVirtualCursorChase\(sequenceId: number[\s\S]*scheduleVirtualCursorIdleActionStart\(sequenceId, \(\) => \{[\s\S]*moveBuddyIdleVirtualCursorChaseTarget\(sequenceId\);/);
   assert.match(componentSource, /window\.requestAnimationFrame\(\(\) => runBuddyIdleVirtualCursorOrbitFrame\(sequenceId, startedAtMs, startAngle\)\)/);
   assert.match(componentSource, /function resolveVirtualCursorOrbitTangentAngle\(angle: number\)/);
-  assert.match(componentSource, /moveVirtualCursorTo\(resolveVirtualCursorOrbitPosition\(angle\), \{[\s\S]*angleDeg: resolveVirtualCursorOrbitTangentAngle\(angle\),[\s\S]*smoothAngle: true,[\s\S]*durationMs: 0,[\s\S]*rotateDurationMs: 0,[\s\S]*\}\);/);
+  assert.match(componentSource, /moveVirtualCursorTo\(resolveVirtualCursorOrbitPosition\(angle\), \{[\s\S]*angleDeg: resolveVirtualCursorOrbitTangentAngle\(angle\),[\s\S]*durationMs: 0,[\s\S]*rotateDurationMs: 0,[\s\S]*\}\);/);
   assert.match(componentSource, /function runBuddyIdleVirtualCursorChaseLoop\(sequenceId: number, centerPosition: BuddyPosition, startedAtMs: number\)/);
   assert.match(componentSource, /BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_PERIOD_MS/);
   assert.match(componentSource, /BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX/);
@@ -337,7 +362,11 @@ test("BuddyWidget keeps virtual-cursor follow jumps from being flattened by slow
   assert.match(componentSource, /function moveVirtualCursorToWithArmedTransition\(/);
   assert.match(componentSource, /clearVirtualCursorFlightFrame\(\);[\s\S]*setVirtualCursorMoveTransitionDuration\(durationMs\);[\s\S]*setVirtualCursorRotateTransitionDuration\(rotateDurationMs\);[\s\S]*virtualCursorFlightFrameId = window\.requestAnimationFrame/);
   assert.match(componentSource, /const flightWaitMs = moveVirtualCursorToWithArmedTransition\(targetPosition, \{ durationMs: flightDurationMs \}\);/);
-  assert.match(componentSource, /buddyRoamMotionTimerId = window\.setTimeout\(\(\) => \{[\s\S]*updateMascotLookFromVirtualCursor\(\);[\s\S]*requestBuddyFollowVirtualCursor\(\);[\s\S]*runBuddyIdleVirtualCursorChaseLoop\(sequenceId, targetPosition, performance\.now\(\)\);[\s\S]*\}, flightWaitMs\);/);
+  assert.match(componentSource, /buddyRoamMotionTimerId = window\.setTimeout\(\(\) => \{[\s\S]*runBuddyIdleVirtualCursorChaseLoop\(sequenceId, targetPosition, performance\.now\(\)\);[\s\S]*\}, flightWaitMs\);/);
+  assert.doesNotMatch(
+    extractSourceBetween("function moveBuddyIdleVirtualCursorChaseTarget", "function runBuddyIdleVirtualCursorChaseLoop"),
+    /updateMascotLookFromVirtualCursor\(\);[\s\S]*requestBuddyFollowVirtualCursor\(\);[\s\S]*runBuddyIdleVirtualCursorChaseLoop/,
+  );
   assert.match(componentSource, /\}, flightWaitMs\);/);
   assert.doesNotMatch(componentSource, /moveVirtualCursorTo\(targetPosition, \{ durationMs: flightDurationMs \}\);/);
   assert.match(componentSource, /\{ durationMs: 0, rotateDurationMs: 0 \}/);
@@ -348,6 +377,7 @@ test("BuddyWidget keeps virtual-cursor follow jumps from being flattened by slow
   assert.match(componentSource, /if \(!wasFollowing && virtualCursorIdleActionMode\.value === "none"\) \{[\s\S]*cancelBuddyRoamTimers\(\);[\s\S]*\}/);
   assert.match(componentSource, /const isFollowingMotionActive = buddyVirtualCursorFollowMotionTimerId !== null;/);
   assert.match(componentSource, /if \(isBuddyRoamTargetReached\(position\.value, targetPosition\)\) \{[\s\S]*if \(isFollowingMotionActive\) \{[\s\S]*buddyVirtualCursorFollowTargetPosition = targetPosition;[\s\S]*return;[\s\S]*\}/);
+  assert.match(extractCssBlock(".buddy-widget__virtual-cursor-follow-range"), /border:\s*1px dashed rgba\(242,\s*201,\s*104,\s*0\.52\);/);
   assert.match(componentSource, /function finishBuddyVirtualCursorFollowSequence\(shouldPersistPosition: boolean\)[\s\S]*cancelBuddyVirtualCursorFollowTimers\(\);[\s\S]*mascotMotion\.value = "idle";/);
 });
 

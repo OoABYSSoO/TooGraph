@@ -38,8 +38,11 @@ test("buddy mascot debug store exposes live motion timing controls", () => {
   assert.deepEqual(store.motionConfig, {
     moveDurationMs: 360,
     stepPauseMs: 8,
-    virtualCursorFlightSpeedPxPerS: 100,
-    virtualCursorRotationSpeedDegPerS: 360,
+    virtualCursorFlightSpeedPxPerS: 1200,
+    virtualCursorRotationSpeedDegPerS: 720,
+    mascotLookRangeX: 24,
+    mascotLookRangeY: 16,
+    virtualCursorFollowMaxDistancePx: 160,
   });
 
   store.setMotionConfig({
@@ -47,36 +50,65 @@ test("buddy mascot debug store exposes live motion timing controls", () => {
     stepPauseMs: 0,
     virtualCursorFlightSpeedPxPerS: 180,
     virtualCursorRotationSpeedDegPerS: 540,
+    mascotLookRangeX: 28,
+    mascotLookRangeY: 18,
+    virtualCursorFollowMaxDistancePx: 140,
   });
   assert.deepEqual(store.motionConfig, {
     moveDurationMs: 300,
     stepPauseMs: 0,
     virtualCursorFlightSpeedPxPerS: 180,
     virtualCursorRotationSpeedDegPerS: 540,
+    mascotLookRangeX: 28,
+    mascotLookRangeY: 18,
+    virtualCursorFollowMaxDistancePx: 140,
   });
 
-  store.setMotionConfig({ moveDurationMs: 40, stepPauseMs: 900, virtualCursorFlightSpeedPxPerS: 2000, virtualCursorRotationSpeedDegPerS: 4000 });
+  store.setMotionConfig({
+    moveDurationMs: 40,
+    stepPauseMs: 900,
+    virtualCursorFlightSpeedPxPerS: 2000,
+    virtualCursorRotationSpeedDegPerS: 4000,
+    mascotLookRangeX: 100,
+    mascotLookRangeY: 100,
+    virtualCursorFollowMaxDistancePx: 900,
+  });
   assert.deepEqual(store.motionConfig, {
     moveDurationMs: 120,
     stepPauseMs: 240,
     virtualCursorFlightSpeedPxPerS: 1200,
     virtualCursorRotationSpeedDegPerS: 1440,
+    mascotLookRangeX: 40,
+    mascotLookRangeY: 28,
+    virtualCursorFollowMaxDistancePx: 360,
   });
 
-  store.setMotionConfig({ virtualCursorFlightSpeedPxPerS: 0, virtualCursorRotationSpeedDegPerS: 0 });
+  store.setMotionConfig({
+    virtualCursorFlightSpeedPxPerS: 0,
+    virtualCursorRotationSpeedDegPerS: 0,
+    mascotLookRangeX: 0,
+    mascotLookRangeY: 0,
+    virtualCursorFollowMaxDistancePx: 0,
+  });
   assert.deepEqual(store.motionConfig, {
     moveDurationMs: 120,
     stepPauseMs: 240,
     virtualCursorFlightSpeedPxPerS: 40,
     virtualCursorRotationSpeedDegPerS: 90,
+    mascotLookRangeX: 8,
+    mascotLookRangeY: 6,
+    virtualCursorFollowMaxDistancePx: 80,
   });
 
   store.resetMotionConfig();
   assert.deepEqual(store.motionConfig, {
     moveDurationMs: 360,
     stepPauseMs: 8,
-    virtualCursorFlightSpeedPxPerS: 100,
-    virtualCursorRotationSpeedDegPerS: 360,
+    virtualCursorFlightSpeedPxPerS: 1200,
+    virtualCursorRotationSpeedDegPerS: 720,
+    mascotLookRangeX: 24,
+    mascotLookRangeY: 16,
+    virtualCursorFollowMaxDistancePx: 160,
   });
 });
 

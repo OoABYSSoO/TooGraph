@@ -1,5 +1,11 @@
 <template>
   <div class="buddy-widget" aria-live="polite">
+    <div
+      v-if="shouldShowVirtualCursorFollowRange"
+      class="buddy-widget__virtual-cursor-follow-range"
+      :style="virtualCursorFollowRangeStyle"
+      aria-hidden="true"
+    />
     <button
       v-if="isVirtualCursorRendered"
       type="button"
@@ -391,6 +397,8 @@
           :tail-switch-nonce="tailSwitchNonce"
           :look-x="mascotLook.x"
           :look-y="mascotLook.y"
+          :look-range-x="buddyMascotMotionConfig.mascotLookRangeX"
+          :look-range-y="buddyMascotMotionConfig.mascotLookRangeY"
           :virtual-cursor="virtualCursorEnabled && !virtualCursorDetached"
           :hide-sparkle="isVirtualCursorRendered"
         />
@@ -576,7 +584,6 @@ const BUDDY_VIRTUAL_CURSOR_MAX_ROTATE_TRANSITION_MS = 900;
 const BUDDY_VIRTUAL_CURSOR_FLIGHT_SETTLE_MS = 80;
 const BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE = 0.72;
 const BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE = 1;
-const BUDDY_VIRTUAL_CURSOR_FOLLOW_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 2.15;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 1.25;
 const VIRTUAL_CURSOR_STAR_PATH =
   "M0-72 C5-46 18-33 44-28 C18-23 5-10 0 16 C-5-10 -18-23 -44-28 C-18-33 -5-46 0-72Z";
@@ -678,6 +685,9 @@ let buddyVirtualCursorIdleFrameId: number | null = null;
 let virtualCursorTransitionTimerId: number | null = null;
 let virtualCursorTransitionFrameId: number | null = null;
 let virtualCursorFlightFrameId: number | null = null;
+let virtualCursorFlightTrackingFrameId: number | null = null;
+let virtualCursorFlightTracking: { fromPosition: BuddyPosition; toPosition: BuddyPosition; startedAtMs: number; durationMs: number } | null = null;
+let virtualCursorTrackingPosition: BuddyPosition | null = null;
 let virtualCursorAngleFrameTimestampMs: number | null = null;
 let virtualCursorMorphAnimationKey = 0;
 let buddyDebugActionTimerId: number | null = null;
@@ -740,6 +750,16 @@ const virtualCursorStyle = computed(() => ({
   rotate: "var(--buddy-widget-virtual-cursor-angle)",
 }));
 const isVirtualCursorRendered = computed(() => virtualCursorPhase.value !== "hidden");
+const shouldShowVirtualCursorFollowRange = computed(() => virtualCursorPhase.value === "active");
+const virtualCursorFollowRangeStyle = computed(() => {
+  const radius = buddyMascotMotionConfig.value.virtualCursorFollowMaxDistancePx;
+  const buddyCenter = resolveBoxCenter(position.value, DEFAULT_BUDDY_SIZE);
+  return {
+    width: `${radius * 2}px`,
+    height: `${radius * 2}px`,
+    translate: `${buddyCenter.x - radius}px ${buddyCenter.y - radius}px`,
+  };
+});
 const shouldFloatVirtualCursor = computed(() =>
   virtualCursorPhase.value === "active" && !virtualCursorDragging.value && virtualCursorIdleActionMode.value === "none",
 );
@@ -1098,7 +1118,7 @@ function updateMascotLookFromPointer() {
 
 function updateMascotLookFromVirtualCursor() {
   const buddyCenter = resolveBoxCenter(position.value, DEFAULT_BUDDY_SIZE);
-  const cursorCenter = resolveBoxCenter(virtualCursorPosition.value, BUDDY_VIRTUAL_CURSOR_SIZE);
+  const cursorCenter = resolveBoxCenter(resolveCurrentVirtualCursorTrackingPosition(), BUDDY_VIRTUAL_CURSOR_SIZE);
   const deltaX = cursorCenter.x - buddyCenter.x;
   const deltaY = cursorCenter.y - buddyCenter.y;
   const distance = Math.hypot(deltaX, deltaY);
@@ -1233,7 +1253,6 @@ function runBuddyIdleVirtualCursorOrbitFrame(sequenceId: number, startedAtMs: nu
   const angle = startAngle + progress * Math.PI * 2;
   moveVirtualCursorTo(resolveVirtualCursorOrbitPosition(angle), {
     angleDeg: resolveVirtualCursorOrbitTangentAngle(angle),
-    smoothAngle: true,
     durationMs: 0,
     rotateDurationMs: 0,
   });
@@ -1295,8 +1314,7 @@ function moveBuddyIdleVirtualCursorChaseTarget(sequenceId: number) {
     if (sequenceId !== buddyRoamSequenceId || virtualCursorIdleActionMode.value !== "chase") {
       return;
     }
-    updateMascotLookFromVirtualCursor();
-    requestBuddyFollowVirtualCursor();
+    clearVirtualCursorFlightTracking();
     runBuddyIdleVirtualCursorChaseLoop(sequenceId, targetPosition, performance.now());
   }, flightWaitMs);
 }
@@ -1318,7 +1336,6 @@ function runBuddyIdleVirtualCursorChaseLoop(sequenceId: number, centerPosition: 
     ),
     {
       angleDeg: resolveVirtualCursorChaseLoopTangentAngle(angle),
-      smoothAngle: true,
       durationMs: 0,
       rotateDurationMs: 0,
     },
@@ -1370,6 +1387,7 @@ function resolveVirtualCursorChaseLoopTangentAngle(angle: number) {
 
 function resolveRandomVirtualCursorChasePosition(): BuddyPosition {
   const buddyCenter = resolveBoxCenter(position.value, DEFAULT_BUDDY_SIZE);
+  const followMaxDistancePx = resolveVirtualCursorFollowMaxDistancePx();
   const chaseLoopHorizontalMarginPx = DEFAULT_BUDDY_MARGIN + BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX;
   const chaseLoopVerticalMarginPx = DEFAULT_BUDDY_MARGIN + BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_Y_RADIUS_PX;
   const chaseLoopSafeMarginPx = Math.max(chaseLoopHorizontalMarginPx, chaseLoopVerticalMarginPx);
@@ -1384,7 +1402,7 @@ function resolveRandomVirtualCursorChasePosition(): BuddyPosition {
       chaseLoopSafeMarginPx,
     );
     const candidateCenter = resolveBoxCenter(candidate, BUDDY_VIRTUAL_CURSOR_SIZE);
-    if (Math.hypot(candidateCenter.x - buddyCenter.x, candidateCenter.y - buddyCenter.y) > BUDDY_VIRTUAL_CURSOR_FOLLOW_MAX_DISTANCE_PX * 1.15) {
+    if (Math.hypot(candidateCenter.x - buddyCenter.x, candidateCenter.y - buddyCenter.y) > followMaxDistancePx * 1.15) {
       return candidate;
     }
   }
@@ -1392,8 +1410,8 @@ function resolveRandomVirtualCursorChasePosition(): BuddyPosition {
   const verticalDirection = buddyCenter.y > viewport.value.height / 2 ? -1 : 1;
   return clampBuddyPosition(
     {
-      x: buddyCenter.x + horizontalDirection * BUDDY_VIRTUAL_CURSOR_FOLLOW_MAX_DISTANCE_PX * 1.3 - BUDDY_VIRTUAL_CURSOR_SIZE.width / 2,
-      y: buddyCenter.y + verticalDirection * BUDDY_VIRTUAL_CURSOR_FOLLOW_MAX_DISTANCE_PX * 0.9 - BUDDY_VIRTUAL_CURSOR_SIZE.height / 2,
+      x: buddyCenter.x + horizontalDirection * followMaxDistancePx * 1.3 - BUDDY_VIRTUAL_CURSOR_SIZE.width / 2,
+      y: buddyCenter.y + verticalDirection * followMaxDistancePx * 0.9 - BUDDY_VIRTUAL_CURSOR_SIZE.height / 2,
     },
     viewport.value,
     BUDDY_VIRTUAL_CURSOR_SIZE,
@@ -1509,6 +1527,16 @@ function clearVirtualCursorFlightFrame() {
     window.cancelAnimationFrame(virtualCursorFlightFrameId);
   }
   virtualCursorFlightFrameId = null;
+  clearVirtualCursorFlightTracking();
+}
+
+function clearVirtualCursorFlightTracking() {
+  if (virtualCursorFlightTrackingFrameId !== null && typeof window !== "undefined") {
+    window.cancelAnimationFrame(virtualCursorFlightTrackingFrameId);
+  }
+  virtualCursorFlightTrackingFrameId = null;
+  virtualCursorFlightTracking = null;
+  virtualCursorTrackingPosition = null;
 }
 
 function requestBuddyFollowVirtualCursor() {
@@ -1593,11 +1621,11 @@ function runBuddyVirtualCursorFollowStep(sequenceId: number) {
 
 function resolveBuddyVirtualCursorFollowTargetPosition(): BuddyPosition {
   const buddyCenter = resolveBoxCenter(position.value, DEFAULT_BUDDY_SIZE);
-  const cursorCenter = resolveBoxCenter(virtualCursorPosition.value, BUDDY_VIRTUAL_CURSOR_SIZE);
+  const cursorCenter = resolveBoxCenter(resolveCurrentVirtualCursorTrackingPosition(), BUDDY_VIRTUAL_CURSOR_SIZE);
   const deltaX = buddyCenter.x - cursorCenter.x;
   const deltaY = buddyCenter.y - cursorCenter.y;
   const distance = Math.hypot(deltaX, deltaY);
-  if (distance <= BUDDY_VIRTUAL_CURSOR_FOLLOW_MAX_DISTANCE_PX) {
+  if (distance <= resolveVirtualCursorFollowMaxDistancePx()) {
     return position.value;
   }
 
@@ -1884,6 +1912,7 @@ function startVirtualCursorReturn() {
 function finishVirtualCursorReturn() {
   virtualCursorTransitionTimerId = null;
   const dockedPosition = resolveDefaultVirtualCursorPosition(viewport.value, position.value);
+  clearVirtualCursorFlightTracking();
   setVirtualCursorMoveTransitionDuration(BUDDY_VIRTUAL_CURSOR_MOVE_TRANSITION_MS);
   setVirtualCursorRotateTransitionDuration(BUDDY_VIRTUAL_CURSOR_ROTATE_TRANSITION_MS);
   virtualCursorPosition.value = dockedPosition;
@@ -1986,14 +2015,74 @@ function moveVirtualCursorToWithArmedTransition(
   };
   if (typeof window === "undefined") {
     moveVirtualCursorTo(nextPosition, moveOptions);
+    startVirtualCursorFlightTracking(currentPosition, nextPosition, durationMs);
     return virtualCursorMoveDurationMs.value;
   }
 
   virtualCursorFlightFrameId = window.requestAnimationFrame(() => {
     virtualCursorFlightFrameId = null;
     moveVirtualCursorTo(nextPosition, moveOptions);
+    startVirtualCursorFlightTracking(currentPosition, nextPosition, durationMs);
   });
   return virtualCursorMoveDurationMs.value + BUDDY_VIRTUAL_CURSOR_FLIGHT_SETTLE_MS;
+}
+
+function startVirtualCursorFlightTracking(fromPosition: BuddyPosition, toPosition: BuddyPosition, durationMs: number) {
+  clearVirtualCursorFlightTracking();
+  if (durationMs <= 0) {
+    virtualCursorTrackingPosition = toPosition;
+    updateMascotLookFromVirtualCursor();
+    requestBuddyFollowVirtualCursor();
+    virtualCursorTrackingPosition = null;
+    return;
+  }
+  virtualCursorFlightTracking = {
+    fromPosition,
+    toPosition,
+    startedAtMs: typeof performance === "undefined" ? Date.now() : performance.now(),
+    durationMs,
+  };
+  runVirtualCursorFlightTrackingFrame();
+}
+
+function runVirtualCursorFlightTrackingFrame() {
+  const tracking = virtualCursorFlightTracking;
+  if (!tracking) {
+    return;
+  }
+  const nowMs = typeof performance === "undefined" ? Date.now() : performance.now();
+  const progress = Math.min(1, Math.max(0, (nowMs - tracking.startedAtMs) / tracking.durationMs));
+  virtualCursorTrackingPosition = interpolateBuddyPosition(tracking.fromPosition, tracking.toPosition, progress);
+  updateMascotLookFromVirtualCursor();
+  requestBuddyFollowVirtualCursor();
+  if (virtualCursorFlightTracking !== tracking) {
+    virtualCursorFlightTrackingFrameId = null;
+    return;
+  }
+  if (progress >= 1) {
+    virtualCursorFlightTrackingFrameId = null;
+    virtualCursorFlightTracking = null;
+    virtualCursorTrackingPosition = null;
+    return;
+  }
+  if (typeof window !== "undefined") {
+    virtualCursorFlightTrackingFrameId = window.requestAnimationFrame(runVirtualCursorFlightTrackingFrame);
+  }
+}
+
+function interpolateBuddyPosition(fromPosition: BuddyPosition, toPosition: BuddyPosition, progress: number): BuddyPosition {
+  return {
+    x: fromPosition.x + (toPosition.x - fromPosition.x) * progress,
+    y: fromPosition.y + (toPosition.y - fromPosition.y) * progress,
+  };
+}
+
+function resolveCurrentVirtualCursorTrackingPosition() {
+  return virtualCursorTrackingPosition ?? virtualCursorPosition.value;
+}
+
+function resolveVirtualCursorFollowMaxDistancePx() {
+  return buddyMascotMotionConfig.value.virtualCursorFollowMaxDistancePx;
 }
 
 function setVirtualCursorMoveTransitionDuration(durationMs: number) {
@@ -3471,6 +3560,22 @@ function formatErrorMessage(error: unknown): string {
     radial-gradient(circle at 20% 16%, rgba(255, 255, 255, 0.42), transparent 34%),
     linear-gradient(135deg, rgba(45, 32, 21, 0.16), rgba(154, 52, 18, 0.08));
   backdrop-filter: blur(18px) saturate(1.22);
+}
+
+.buddy-widget__virtual-cursor-follow-range {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 4521;
+  border: 1px dashed rgba(242, 201, 104, 0.52);
+  border-radius: 999px;
+  pointer-events: none;
+  background: rgba(242, 201, 104, 0.05);
+  box-shadow: 0 0 18px rgba(242, 201, 104, 0.12);
+  transition:
+    translate var(--buddy-widget-roam-duration-ms, 360ms) ease,
+    width 120ms ease,
+    height 120ms ease;
 }
 
 .buddy-widget__virtual-cursor {

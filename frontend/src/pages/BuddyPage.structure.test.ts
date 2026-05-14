@@ -133,15 +133,24 @@ test("BuddyPage debug tab exposes live mascot motion timing controls", () => {
   assert.match(source, /buddyMascotDebugStore\.motionConfig\.stepPauseMs/);
   assert.match(source, /buddyMascotDebugStore\.motionConfig\.virtualCursorFlightSpeedPxPerS/);
   assert.match(source, /buddyMascotDebugStore\.motionConfig\.virtualCursorRotationSpeedDegPerS/);
+  assert.match(source, /buddyMascotDebugStore\.motionConfig\.mascotLookRangeX/);
+  assert.match(source, /buddyMascotDebugStore\.motionConfig\.mascotLookRangeY/);
+  assert.match(source, /buddyMascotDebugStore\.motionConfig\.virtualCursorFollowMaxDistancePx/);
   assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ moveDurationMs: Number\(value\) \}\)/);
   assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ stepPauseMs: Number\(value\) \}\)/);
   assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ virtualCursorFlightSpeedPxPerS: Number\(value\) \}\)/);
   assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ virtualCursorRotationSpeedDegPerS: Number\(value\) \}\)/);
+  assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ mascotLookRangeX: Number\(value\) \}\)/);
+  assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ mascotLookRangeY: Number\(value\) \}\)/);
+  assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ virtualCursorFollowMaxDistancePx: Number\(value\) \}\)/);
   assert.match(source, /buddyMascotDebugStore\.resetMotionConfig\(\)/);
   assert.match(source, /t\("buddyPage\.mascotDebug\.motion\.moveDuration"\)/);
   assert.match(source, /t\("buddyPage\.mascotDebug\.motion\.stepPause"\)/);
   assert.match(source, /t\("buddyPage\.mascotDebug\.motion\.virtualCursorSpeed"\)/);
   assert.match(source, /t\("buddyPage\.mascotDebug\.motion\.virtualCursorRotationSpeed"\)/);
+  assert.match(source, /t\("buddyPage\.mascotDebug\.motion\.mascotLookRangeX"\)/);
+  assert.match(source, /t\("buddyPage\.mascotDebug\.motion\.mascotLookRangeY"\)/);
+  assert.match(source, /t\("buddyPage\.mascotDebug\.motion\.virtualCursorFollowRange"\)/);
   assert.match(source, /buddy-page__debug-motion-grid/);
 });
 

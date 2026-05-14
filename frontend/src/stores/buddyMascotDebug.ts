@@ -13,13 +13,19 @@ export type BuddyMascotMotionDebugConfig = {
   stepPauseMs: number;
   virtualCursorFlightSpeedPxPerS: number;
   virtualCursorRotationSpeedDegPerS: number;
+  mascotLookRangeX: number;
+  mascotLookRangeY: number;
+  virtualCursorFollowMaxDistancePx: number;
 };
 
 export const DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG: BuddyMascotMotionDebugConfig = {
   moveDurationMs: 360,
   stepPauseMs: 8,
-  virtualCursorFlightSpeedPxPerS: 100,
-  virtualCursorRotationSpeedDegPerS: 360,
+  virtualCursorFlightSpeedPxPerS: 1200,
+  virtualCursorRotationSpeedDegPerS: 720,
+  mascotLookRangeX: 24,
+  mascotLookRangeY: 16,
+  virtualCursorFollowMaxDistancePx: 160,
 };
 
 const BUDDY_MASCOT_MOTION_CONFIG_STORAGE_KEY = "toograph:buddy-mascot-motion-debug-config";
@@ -28,6 +34,9 @@ const BUDDY_MASCOT_MOTION_CONFIG_LIMITS = {
   stepPauseMs: { min: 0, max: 240 },
   virtualCursorFlightSpeedPxPerS: { min: 40, max: 1200 },
   virtualCursorRotationSpeedDegPerS: { min: 90, max: 1440 },
+  mascotLookRangeX: { min: 8, max: 40 },
+  mascotLookRangeY: { min: 6, max: 28 },
+  virtualCursorFollowMaxDistancePx: { min: 80, max: 360 },
 } as const;
 
 export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {
@@ -123,6 +132,24 @@ function normalizeMotionConfig(config: Partial<BuddyMascotMotionDebugConfig>): B
       DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG.virtualCursorRotationSpeedDegPerS,
       BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorRotationSpeedDegPerS.min,
       BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorRotationSpeedDegPerS.max,
+    ),
+    mascotLookRangeX: clampMotionConfigValue(
+      config.mascotLookRangeX,
+      DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG.mascotLookRangeX,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.mascotLookRangeX.min,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.mascotLookRangeX.max,
+    ),
+    mascotLookRangeY: clampMotionConfigValue(
+      config.mascotLookRangeY,
+      DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG.mascotLookRangeY,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.mascotLookRangeY.min,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.mascotLookRangeY.max,
+    ),
+    virtualCursorFollowMaxDistancePx: clampMotionConfigValue(
+      config.virtualCursorFollowMaxDistancePx,
+      DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG.virtualCursorFollowMaxDistancePx,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorFollowMaxDistancePx.min,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorFollowMaxDistancePx.max,
     ),
   };
 }
