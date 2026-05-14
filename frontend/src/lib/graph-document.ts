@@ -776,6 +776,10 @@ function reconcileAgentSkillStateInputBindings<T extends GraphPayload | GraphDoc
       managedReads.push(buildManagedSkillInputReadBinding(inferredStateKey, attachedSkillKey, field));
       continue;
     }
+
+    const materializedStateKey = createManagedSkillInputState(document, definition, field);
+    boundStateKeys.add(materializedStateKey);
+    managedReads.push(buildManagedSkillInputReadBinding(materializedStateKey, attachedSkillKey, field));
   }
 
   node.reads = [
@@ -1215,6 +1219,23 @@ type SkillInputStateCandidate = {
   score: number;
   stateKey: string;
 };
+
+function createManagedSkillInputState(
+  document: GraphPayload | GraphDocument,
+  skill: SkillDefinition,
+  field: SkillIoField,
+) {
+  const stateType = normalizeSkillFieldStateType(field.valueType);
+  const stateField = buildNextMaterializedVirtualStateField(document, stateType);
+  document.state_schema[stateField.key] = {
+    ...stateField.definition,
+    name: field.name.trim() || field.key,
+    description: field.description.trim() || `${skill.name.trim() || skill.skillKey} input: ${field.key}`,
+    type: stateType,
+  };
+  rememberMaterializedStateKeyIndex(document, stateField.key);
+  return stateField.key;
+}
 
 function createManagedSkillOutputState(
   document: GraphPayload | GraphDocument,

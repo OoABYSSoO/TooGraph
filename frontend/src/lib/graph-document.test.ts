@@ -58,6 +58,11 @@ const webSearchSkill: SkillDefinition = {
   canManage: true,
 };
 
+const webSearchSkillWithoutStateInputs: SkillDefinition = {
+  ...webSearchSkill,
+  stateInputSchema: [],
+};
+
 const localWorkspaceExecutorSkill: SkillDefinition = {
   skillKey: "local_workspace_executor",
   name: "Local Workspace Executor",
@@ -539,7 +544,7 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
       ...config,
       skillKey: "web_search",
     }),
-    { skillDefinitions: [webSearchSkill] },
+    { skillDefinitions: [webSearchSkillWithoutStateInputs] },
   );
 
   const node = nextDocument.nodes.search_agent;
@@ -644,7 +649,7 @@ test("updateAgentNodeConfigInDocument suspends free agent outputs while a static
     document,
     "search_agent",
     (config) => ({ ...config, skillKey: "web_search" }),
-    { skillDefinitions: [webSearchSkill] },
+    { skillDefinitions: [webSearchSkillWithoutStateInputs] },
   );
   const skillNode = withSkill.nodes.search_agent;
 
@@ -664,7 +669,7 @@ test("updateAgentNodeConfigInDocument suspends free agent outputs while a static
     connectedSkillDocument,
     "search_agent",
     (config) => ({ ...config, skillKey: "" }),
-    { skillDefinitions: [webSearchSkill] },
+    { skillDefinitions: [webSearchSkillWithoutStateInputs] },
   );
   const restoredNode = withoutSkill.nodes.search_agent;
 
@@ -804,6 +809,63 @@ test("updateAgentNodeConfigInDocument automatically binds matching skill state i
   ]);
   assert.equal("inputMapping" in (node.config.skillBindings?.[0] ?? {}), false);
   assert.deepEqual(document.nodes.search_agent.reads, [{ state: "extra_notes", required: false }]);
+});
+
+test("updateAgentNodeConfigInDocument materializes missing skill state inputs", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Skill Missing Input Graph",
+    state_schema: {},
+    nodes: {
+      search_agent: {
+        kind: "agent",
+        name: "Search Agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          skillKey: "",
+          skillBindings: [],
+          skillInstructionBlocks: {},
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "high",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = updateAgentNodeConfigInDocument(
+    document,
+    "search_agent",
+    (config) => ({
+      ...config,
+      skillKey: "web_search",
+    }),
+    { skillDefinitions: [webSearchSkill] },
+  );
+
+  const node = nextDocument.nodes.search_agent;
+  assert.equal(node.kind, "agent");
+  assert.deepEqual(node.reads, [
+    { state: "state_1", required: true, binding: { kind: "skill_input", skillKey: "web_search", fieldKey: "user_question", managed: true } },
+    { state: "state_2", required: false, binding: { kind: "skill_input", skillKey: "web_search", fieldKey: "search_context", managed: true } },
+  ]);
+  assert.equal(nextDocument.state_schema.state_1?.name, "User Question");
+  assert.equal(nextDocument.state_schema.state_1?.description, "Question to research.");
+  assert.equal(nextDocument.state_schema.state_1?.type, "text");
+  assert.equal(nextDocument.state_schema.state_1?.value, "");
+  assert.equal(nextDocument.state_schema.state_2?.name, "Search Context");
+  assert.equal(nextDocument.state_schema.state_2?.description, "Extra search context.");
+  assert.equal(nextDocument.state_schema.state_2?.type, "markdown");
+  assert.equal(nextDocument.state_schema.state_2?.value, "");
+  assert.deepEqual(document.nodes.search_agent.reads, []);
 });
 
 test("reconcileAgentSkillOutputBindingsInDocument prunes stale managed outputs for the attached skill schema", () => {
