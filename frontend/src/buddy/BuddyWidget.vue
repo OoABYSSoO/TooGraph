@@ -578,6 +578,7 @@ const BUDDY_VIRTUAL_CURSOR_MAX_ROTATE_TRANSITION_MS = 900;
 const BUDDY_VIRTUAL_CURSOR_FLIGHT_SETTLE_MS = 80;
 const BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE = 0.72;
 const BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE = 1;
+const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_REACHED_DISTANCE_PX = 12;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 1.25;
 const VIRTUAL_CURSOR_STAR_PATH =
   "M0-72 C5-46 18-33 44-28 C18-23 5-10 0 16 C-5-10 -18-23 -44-28 C-18-33 -5-46 0-72Z";
@@ -1464,6 +1465,10 @@ function isBuddyRoamTargetReached(currentPosition: BuddyPosition, targetPosition
   return Math.hypot(targetPosition.x - currentPosition.x, targetPosition.y - currentPosition.y) <= BUDDY_ROAM_TARGET_REACHED_DISTANCE_PX;
 }
 
+function isBuddyVirtualCursorFollowTargetReached(currentPosition: BuddyPosition, targetPosition: BuddyPosition) {
+  return Math.hypot(targetPosition.x - currentPosition.x, targetPosition.y - currentPosition.y) <= BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_REACHED_DISTANCE_PX;
+}
+
 function finishBuddyRoamSequence(shouldPersistPosition: boolean) {
   buddyRoamTargetPosition = null;
   mascotMotion.value = "idle";
@@ -1529,7 +1534,7 @@ function requestBuddyFollowVirtualCursor() {
   }
   const targetPosition = resolveBuddyVirtualCursorFollowTargetPosition();
   const isFollowingMotionActive = buddyVirtualCursorFollowMotionTimerId !== null;
-  if (isBuddyRoamTargetReached(position.value, targetPosition)) {
+  if (isBuddyVirtualCursorFollowTargetReached(position.value, targetPosition)) {
     if (isFollowingMotionActive) {
       buddyVirtualCursorFollowTargetPosition = targetPosition;
       return;
@@ -1568,7 +1573,7 @@ function runBuddyVirtualCursorFollowStep(sequenceId: number) {
     finishBuddyVirtualCursorFollowSequence(false);
     return;
   }
-  if (isBuddyRoamTargetReached(position.value, targetPosition)) {
+  if (isBuddyVirtualCursorFollowTargetReached(position.value, targetPosition)) {
     finishBuddyVirtualCursorFollowSequence(true);
     return;
   }
@@ -1592,7 +1597,7 @@ function runBuddyVirtualCursorFollowStep(sequenceId: number) {
       finishBuddyVirtualCursorFollowSequence(false);
       return;
     }
-    if (isBuddyRoamTargetReached(position.value, latestTargetPosition)) {
+    if (isBuddyVirtualCursorFollowTargetReached(position.value, latestTargetPosition)) {
       finishBuddyVirtualCursorFollowSequence(true);
       return;
     }
@@ -1615,10 +1620,11 @@ function resolveBuddyVirtualCursorFollowTargetPosition(): BuddyPosition {
 
   const unitX = distance < 1 ? -0.82 : deltaX / distance;
   const unitY = distance < 1 ? 0.58 : deltaY / distance;
+  const followTargetDistancePx = resolveVirtualCursorFollowTargetDistancePx();
   return clampBuddyPosition(
     {
-      x: cursorCenter.x + unitX * BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_DISTANCE_PX - DEFAULT_BUDDY_SIZE.width / 2,
-      y: cursorCenter.y + unitY * BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_DISTANCE_PX - DEFAULT_BUDDY_SIZE.height / 2,
+      x: cursorCenter.x + unitX * followTargetDistancePx - DEFAULT_BUDDY_SIZE.width / 2,
+      y: cursorCenter.y + unitY * followTargetDistancePx - DEFAULT_BUDDY_SIZE.height / 2,
     },
     viewport.value,
     DEFAULT_BUDDY_SIZE,
@@ -2067,6 +2073,13 @@ function resolveCurrentVirtualCursorTrackingPosition() {
 
 function resolveVirtualCursorFollowMaxDistancePx() {
   return buddyMascotMotionConfig.value.virtualCursorFollowMaxDistancePx;
+}
+
+function resolveVirtualCursorFollowTargetDistancePx() {
+  return Math.min(
+    BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_DISTANCE_PX,
+    Math.max(BUDDY_VIRTUAL_CURSOR_SIZE.width * 0.38, resolveVirtualCursorFollowMaxDistancePx() * 0.72),
+  );
 }
 
 function setVirtualCursorMoveTransitionDuration(durationMs: number) {
@@ -3609,7 +3622,7 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__virtual-cursor--floating .buddy-widget__virtual-cursor-svg {
-  animation: buddy-widget-virtual-cursor-float 1.8s ease-in-out infinite;
+  animation: buddy-widget-virtual-cursor-float 1.5s ease-in-out infinite;
 }
 
 .buddy-widget__virtual-cursor--launching .buddy-widget__virtual-cursor-svg,
@@ -3735,7 +3748,7 @@ function formatErrorMessage(error: unknown): string {
     transform: translateY(0) rotate(0deg);
   }
   50% {
-    transform: translateY(-2px) rotate(-1deg);
+    transform: translateY(-4px) rotate(-2deg);
   }
 }
 
