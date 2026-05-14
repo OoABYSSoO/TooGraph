@@ -38,24 +38,35 @@ test("buddy mascot debug store exposes live motion timing controls", () => {
   assert.deepEqual(store.motionConfig, {
     moveDurationMs: 360,
     stepPauseMs: 8,
+    virtualCursorFlightSpeedPxPerMs: 2.6,
   });
 
-  store.setMotionConfig({ moveDurationMs: 300, stepPauseMs: 0 });
+  store.setMotionConfig({ moveDurationMs: 300, stepPauseMs: 0, virtualCursorFlightSpeedPxPerMs: 1.4 });
   assert.deepEqual(store.motionConfig, {
     moveDurationMs: 300,
     stepPauseMs: 0,
+    virtualCursorFlightSpeedPxPerMs: 1.4,
   });
 
-  store.setMotionConfig({ moveDurationMs: 40, stepPauseMs: 900 });
+  store.setMotionConfig({ moveDurationMs: 40, stepPauseMs: 900, virtualCursorFlightSpeedPxPerMs: 99 });
   assert.deepEqual(store.motionConfig, {
     moveDurationMs: 120,
     stepPauseMs: 240,
+    virtualCursorFlightSpeedPxPerMs: 6,
+  });
+
+  store.setMotionConfig({ virtualCursorFlightSpeedPxPerMs: 0 });
+  assert.deepEqual(store.motionConfig, {
+    moveDurationMs: 120,
+    stepPauseMs: 240,
+    virtualCursorFlightSpeedPxPerMs: 0.8,
   });
 
   store.resetMotionConfig();
   assert.deepEqual(store.motionConfig, {
     moveDurationMs: 360,
     stepPauseMs: 8,
+    virtualCursorFlightSpeedPxPerMs: 2.6,
   });
 });
 

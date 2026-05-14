@@ -811,6 +811,10 @@ function clampLookAxis(value: number | undefined) {
   animation: buddy-mascot-error-eye-spin 920ms linear infinite;
 }
 
+.buddy-mascot--error .buddy-mascot__dizzy-eye--right {
+  animation-delay: -230ms;
+}
+
 .buddy-mascot--dragging .buddy-mascot__tail {
   animation: buddy-mascot-tail-drag 1.2s ease-in-out infinite;
 }

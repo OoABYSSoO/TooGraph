@@ -512,6 +512,19 @@
                     @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ stepPauseMs: Number(value) })"
                   />
                 </label>
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.virtualCursorSpeed") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.virtualCursorFlightSpeedPxPerMs"
+                    :min="0.8"
+                    :max="6"
+                    :step="0.1"
+                    :precision="1"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ virtualCursorFlightSpeedPxPerMs: Number(value) })"
+                  />
+                </label>
               </div>
             </section>
             <div class="buddy-page__debug-grid">

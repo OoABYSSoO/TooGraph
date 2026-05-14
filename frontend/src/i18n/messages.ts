@@ -1054,6 +1054,7 @@ const baseMessages = {
           title: "移动参数",
           moveDuration: "移动时长 ms",
           stepPause: "落地停顿 ms",
+          virtualCursorSpeed: "虚拟鼠标速度 px/ms",
           reset: "重置",
         },
         groups: {
@@ -2125,6 +2126,7 @@ const baseMessages = {
           title: "Motion timing",
           moveDuration: "Move duration ms",
           stepPause: "Landing pause ms",
+          virtualCursorSpeed: "Virtual cursor speed px/ms",
           reset: "Reset",
         },
         groups: {

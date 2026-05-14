@@ -131,11 +131,14 @@ test("BuddyPage debug tab exposes live mascot motion timing controls", () => {
   assert.match(source, /ElInputNumber/);
   assert.match(source, /buddyMascotDebugStore\.motionConfig\.moveDurationMs/);
   assert.match(source, /buddyMascotDebugStore\.motionConfig\.stepPauseMs/);
+  assert.match(source, /buddyMascotDebugStore\.motionConfig\.virtualCursorFlightSpeedPxPerMs/);
   assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ moveDurationMs: Number\(value\) \}\)/);
   assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ stepPauseMs: Number\(value\) \}\)/);
+  assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ virtualCursorFlightSpeedPxPerMs: Number\(value\) \}\)/);
   assert.match(source, /buddyMascotDebugStore\.resetMotionConfig\(\)/);
   assert.match(source, /t\("buddyPage\.mascotDebug\.motion\.moveDuration"\)/);
   assert.match(source, /t\("buddyPage\.mascotDebug\.motion\.stepPause"\)/);
+  assert.match(source, /t\("buddyPage\.mascotDebug\.motion\.virtualCursorSpeed"\)/);
   assert.match(source, /buddy-page__debug-motion-grid/);
 });
 
