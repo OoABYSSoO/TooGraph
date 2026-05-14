@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="-80 -80 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">Buddy cursor option 3 - soft four point</title>
+  <desc id="desc">A softer four-point gold virtual cursor with rounded sides and a gentle lower point.</desc>
+  <defs>
+    <radialGradient id="cursorGold3" cx="-14" cy="-42" r="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffe08a"/>
+      <stop offset="56%" stop-color="#e4b65b"/>
+      <stop offset="100%" stop-color="#c68b32"/>
+    </radialGradient>
+  </defs>
+  <path
+    fill="url(#cursorGold3)"
+    stroke="#171818"
+    stroke-width="8"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+    d="M0-72
+       C14-35 33 5 52 34
+       C27 35 13 46 0 64
+       C-13 46 -27 35 -52 34
+       C-33 5 -14-35 0-72Z"
+  />
+</svg>

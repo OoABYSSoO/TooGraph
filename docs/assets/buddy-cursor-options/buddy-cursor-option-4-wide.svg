@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="-80 -80 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">Buddy cursor option 4 - wide four point</title>
+  <desc id="desc">A wider four-point gold virtual cursor with pronounced side points and inward-curved lower edges.</desc>
+  <defs>
+    <linearGradient id="cursorGold4" x1="-58" y1="-70" x2="58" y2="66" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#f7d36f"/>
+      <stop offset="48%" stop-color="#dfad50"/>
+      <stop offset="100%" stop-color="#bd812c"/>
+    </linearGradient>
+  </defs>
+  <path
+    fill="url(#cursorGold4)"
+    stroke="#171818"
+    stroke-width="7"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+    d="M0-70
+       C17-35 42 4 60 32
+       C31 34 13 46 0 68
+       C-13 46 -31 34 -60 32
+       C-42 4 -17-35 0-70Z"
+  />
+</svg>

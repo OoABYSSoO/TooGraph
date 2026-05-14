@@ -1,43 +1,52 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="220" viewBox="0 0 760 220" role="img" aria-labelledby="title desc">
-  <title id="title">Buddy virtual cursor SVG options</title>
-  <desc id="desc">Four gold virtual cursor SVG options for selecting Buddy's transformed head sparkle cursor.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="230" viewBox="0 0 920 230" role="img" aria-labelledby="title desc">
+  <title id="title">Buddy four-point virtual cursor SVG options</title>
+  <desc id="desc">Five four-point gold virtual cursor SVG options based on Buddy cursor option B.</desc>
   <defs>
-    <radialGradient id="cursorGoldA" cx="-10" cy="-34" r="104" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#f7d77a"/>
-      <stop offset="58%" stop-color="#dfad50"/>
-      <stop offset="100%" stop-color="#c78b31"/>
-    </radialGradient>
-    <linearGradient id="cursorGoldB" x1="-42" y1="-72" x2="42" y2="72" gradientUnits="userSpaceOnUse">
+    <linearGradient id="cursorGold1" x1="-42" y1="-72" x2="42" y2="72" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#f6d36f"/>
       <stop offset="44%" stop-color="#e2b65f"/>
       <stop offset="100%" stop-color="#bd7f2a"/>
     </linearGradient>
-    <radialGradient id="cursorGoldC" cx="-18" cy="-42" r="116" gradientUnits="userSpaceOnUse">
+    <linearGradient id="cursorGold2" x1="-34" y1="-76" x2="34" y2="70" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#f9d978"/>
+      <stop offset="52%" stop-color="#dfad50"/>
+      <stop offset="100%" stop-color="#bd7f2a"/>
+    </linearGradient>
+    <radialGradient id="cursorGold3" cx="-14" cy="-42" r="112" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#ffe08a"/>
-      <stop offset="54%" stop-color="#e3b55a"/>
-      <stop offset="100%" stop-color="#c58c35"/>
+      <stop offset="56%" stop-color="#e4b65b"/>
+      <stop offset="100%" stop-color="#c68b32"/>
     </radialGradient>
-    <linearGradient id="cursorGoldD" x1="0" y1="-74" x2="0" y2="74" gradientUnits="userSpaceOnUse">
+    <linearGradient id="cursorGold4" x1="-58" y1="-70" x2="58" y2="66" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#f7d36f"/>
+      <stop offset="48%" stop-color="#dfad50"/>
+      <stop offset="100%" stop-color="#bd812c"/>
+    </linearGradient>
+    <linearGradient id="cursorGold5" x1="0" y1="-68" x2="0" y2="62" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#f8d979"/>
-      <stop offset="62%" stop-color="#dba84d"/>
+      <stop offset="58%" stop-color="#dba84d"/>
       <stop offset="100%" stop-color="#bb7f2d"/>
     </linearGradient>
   </defs>
-  <rect width="760" height="220" rx="18" fill="#fbf8f1"/>
-  <g transform="translate(95 96)">
-    <path fill="url(#cursorGoldA)" stroke="#171818" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" d="M0-70 C6-38 19-22 45-10 C23-5 11 12 26 46 C10 34 2 31 0 70 C-2 31 -10 34 -26 46 C-11 12 -23-5 -45-10 C-19-22 -6-38 0-70Z"/>
-    <text x="0" y="104" text-anchor="middle" fill="#171818" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">A fan</text>
+  <rect width="920" height="230" rx="18" fill="#fbf8f1"/>
+  <g transform="translate(92 98)">
+    <path fill="url(#cursorGold1)" stroke="#171818" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" d="M0-74 C11-36 28 5 48 36 C25 34 10 47 0 66 C-10 47 -25 34 -48 36 C-28 5 -11-36 0-74Z"/>
+    <text x="0" y="104" text-anchor="middle" fill="#171818" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">1 original</text>
   </g>
-  <g transform="translate(285 96)">
-    <path fill="url(#cursorGoldB)" stroke="#171818" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" d="M0-74 C11-36 28 5 48 36 C25 34 10 47 0 66 C-10 47 -25 34 -48 36 C-28 5 -11-36 0-74Z"/>
-    <text x="0" y="104" text-anchor="middle" fill="#171818" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">B pointer</text>
+  <g transform="translate(276 98)">
+    <path fill="url(#cursorGold2)" stroke="#171818" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" d="M0-76 C8-38 22 7 38 40 C20 35 8 48 0 70 C-8 48 -20 35 -38 40 C-22 7 -8-38 0-76Z"/>
+    <text x="0" y="104" text-anchor="middle" fill="#171818" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">2 slim</text>
   </g>
-  <g transform="translate(475 96)">
-    <path fill="url(#cursorGoldC)" stroke="#171818" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" d="M0-68 C8-41 20-25 43-14 C57-8 56 6 41 11 C22 18 22 30 37 50 C14 47 5 39 0 69 C-5 39 -14 47 -37 50 C-22 30 -22 18 -41 11 C-56 6 -57-8 -43-14 C-20-25 -8-41 0-68Z"/>
-    <text x="0" y="104" text-anchor="middle" fill="#171818" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">C soft</text>
+  <g transform="translate(460 98)">
+    <path fill="url(#cursorGold3)" stroke="#171818" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" d="M0-72 C14-35 33 5 52 34 C27 35 13 46 0 64 C-13 46 -27 35 -52 34 C-33 5 -14-35 0-72Z"/>
+    <text x="0" y="104" text-anchor="middle" fill="#171818" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">3 soft</text>
   </g>
-  <g transform="translate(665 96)">
-    <path fill="url(#cursorGoldD)" stroke="#171818" stroke-width="10" stroke-linejoin="round" stroke-linecap="round" d="M0-70 L17-24 L56-8 L22 16 L43 54 L8 38 L0 72 L-8 38 L-43 54 L-22 16 L-56-8 L-17-24Z"/>
-    <text x="0" y="104" text-anchor="middle" fill="#171818" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">D bold</text>
+  <g transform="translate(644 98)">
+    <path fill="url(#cursorGold4)" stroke="#171818" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" d="M0-70 C17-35 42 4 60 32 C31 34 13 46 0 68 C-13 46 -31 34 -60 32 C-42 4 -17-35 0-70Z"/>
+    <text x="0" y="104" text-anchor="middle" fill="#171818" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">4 wide</text>
+  </g>
+  <g transform="translate(828 98)">
+    <path fill="url(#cursorGold5)" stroke="#171818" stroke-width="9" stroke-linejoin="round" stroke-linecap="round" d="M0-66 C12-34 30 3 47 32 C25 31 10 42 0 59 C-10 42 -25 31 -47 32 C-30 3 -12-34 0-66Z"/>
+    <text x="0" y="104" text-anchor="middle" fill="#171818" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">5 compact</text>
   </g>
 </svg>
