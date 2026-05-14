@@ -631,6 +631,11 @@ function clampLookAxis(value: number | undefined) {
 
 .buddy-mascot.buddy-mascot--virtual-cursor .buddy-mascot__sparkle {
   transform: translateY(-2px) scale(1.04);
+  stroke: #171818;
+  stroke-width: 16px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
   filter: drop-shadow(0 6px 6px rgba(32, 24, 16, 0.16));
 }
 

@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = dirname(currentFilePath);
 const componentSource = readFileSync(resolve(currentDirectory, "BuddyMascot.vue"), "utf8");
+const publicCursorSource = readFileSync(resolve(currentDirectory, "../../public/buddy-cursor.svg"), "utf8");
+const docsCursorSource = readFileSync(resolve(currentDirectory, "../../../docs/assets/buddy-cursor.svg"), "utf8");
 function extractPathData(source: string, marker: string) {
   const markerIndex = source.indexOf(marker);
   assert.notEqual(markerIndex, -1, `Missing SVG path marker: ${marker}`);
@@ -125,6 +127,29 @@ test("BuddyMascot keeps the transformed virtual cursor visible instead of fading
   assert.match(componentSource, /buddy-mascot-cursor-ready/);
   assert.doesNotMatch(componentSource, /buddy-mascot-cursor-depart/);
   assert.doesNotMatch(virtualCursorSparkleBlock, /opacity:\s*0;/);
+});
+
+test("BuddyMascot gives the transformed virtual cursor the same black outline as the standalone asset", () => {
+  const virtualCursorSparkleBlock = extractCssBlock(
+    componentSource,
+    ".buddy-mascot.buddy-mascot--virtual-cursor .buddy-mascot__sparkle",
+  );
+  assert.match(virtualCursorSparkleBlock, /stroke:\s*#171818;/);
+  assert.match(virtualCursorSparkleBlock, /stroke-width:\s*16px;/);
+  assert.match(virtualCursorSparkleBlock, /paint-order:\s*stroke fill;/);
+  assert.match(publicCursorSource, /stroke="#171818"/);
+  assert.match(docsCursorSource, /stroke="#171818"/);
+});
+
+test("Buddy cursor assets reuse the mascot sparkle gold gradient", () => {
+  for (const source of [publicCursorSource, docsCursorSource]) {
+    assert.match(source, /stop-color="#f2c968"/);
+    assert.match(source, /stop-color="#dfad50"/);
+    assert.match(source, /stop-color="#c89136"/);
+    assert.doesNotMatch(source, /stop-color="#ffe08a"/);
+    assert.doesNotMatch(source, /stop-color="#e4b65b"/);
+    assert.doesNotMatch(source, /stop-color="#c68b32"/);
+  }
 });
 
 test("BuddyMascot supports idle, thinking, speaking, dragging, and tap animations", () => {

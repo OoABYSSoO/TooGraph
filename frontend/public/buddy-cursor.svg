@@ -3,9 +3,9 @@
   <desc id="desc">A soft four-point gold virtual cursor with rounded sides and a gentle lower point.</desc>
   <defs>
     <radialGradient id="buddyCursorGold" cx="-14" cy="-42" r="112" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#ffe08a"/>
-      <stop offset="56%" stop-color="#e4b65b"/>
-      <stop offset="100%" stop-color="#c68b32"/>
+      <stop offset="0%" stop-color="#f2c968"/>
+      <stop offset="62%" stop-color="#dfad50"/>
+      <stop offset="100%" stop-color="#c89136"/>
     </radialGradient>
   </defs>
   <path
