@@ -16,3 +16,16 @@ test("buddy mascot debug store records requested actions as ordered events", () 
   assert.deepEqual(firstRequest, { id: 1, action: "thinking" });
   assert.deepEqual(store.latestRequest, { id: 2, action: "thinking" });
 });
+
+test("buddy mascot debug store toggles the virtual cursor debug mode", () => {
+  setActivePinia(createPinia());
+  const store = useBuddyMascotDebugStore();
+
+  assert.equal(store.virtualCursorEnabled, false);
+
+  store.setVirtualCursorEnabled(true);
+  assert.equal(store.virtualCursorEnabled, true);
+
+  store.setVirtualCursorEnabled(false);
+  assert.equal(store.virtualCursorEnabled, false);
+});

@@ -120,6 +120,13 @@ test("BuddyPage hosts the mascot action debug panel as a tab after History", () 
   assert.match(source, /@click="buddyMascotDebugStore\.trigger\(action\.action\)"/);
 });
 
+test("BuddyPage debug tab can enable and disable the virtual cursor", () => {
+  assert.match(source, /buddyMascotDebugStore\.virtualCursorEnabled/);
+  assert.match(source, /buddyMascotDebugStore\.setVirtualCursorEnabled\(!buddyMascotDebugStore\.virtualCursorEnabled\)/);
+  assert.match(source, /t\("buddyPage\.mascotDebug\.virtualCursor\.(enable|disable)"\)/);
+  assert.match(source, /buddy-page__debug-button--cursor/);
+});
+
 test("BuddyPage places template binding before confirmations", () => {
   const bindingIndex = source.indexOf('name="binding"');
   const confirmationIndex = source.indexOf('name="confirmation"');

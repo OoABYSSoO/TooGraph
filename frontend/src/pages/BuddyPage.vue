@@ -471,6 +471,15 @@
                 <h3>{{ t("buddyPage.mascotDebug.title") }}</h3>
               </div>
             </div>
+            <div class="buddy-page__debug-cursor-row">
+              <ElButton
+                class="buddy-page__debug-button buddy-page__debug-button--cursor"
+                :type="buddyMascotDebugStore.virtualCursorEnabled ? 'primary' : 'default'"
+                @click="buddyMascotDebugStore.setVirtualCursorEnabled(!buddyMascotDebugStore.virtualCursorEnabled)"
+              >
+                {{ buddyMascotDebugStore.virtualCursorEnabled ? t("buddyPage.mascotDebug.virtualCursor.disable") : t("buddyPage.mascotDebug.virtualCursor.enable") }}
+              </ElButton>
+            </div>
             <div class="buddy-page__debug-grid">
               <section v-for="group in BUDDY_DEBUG_ACTION_GROUPS" :key="group.labelKey" class="buddy-page__debug-group">
                 <span class="buddy-page__debug-label">{{ t(group.labelKey) }}</span>
@@ -1726,6 +1735,11 @@ onMounted(loadAll);
   max-width: 760px;
 }
 
+.buddy-page__debug-cursor-row {
+  display: flex;
+  margin-bottom: 16px;
+}
+
 .buddy-page__debug-grid {
   display: grid;
   gap: 16px;
@@ -1750,6 +1764,10 @@ onMounted(loadAll);
 
 .buddy-page__debug-button {
   min-width: 78px;
+}
+
+.buddy-page__debug-button--cursor {
+  min-width: 132px;
 }
 
 .buddy-page__meta {
