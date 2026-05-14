@@ -40,9 +40,9 @@ test("buddy mascot debug store exposes live motion timing controls", () => {
     stepPauseMs: 8,
     virtualCursorFlightSpeedPxPerS: 1200,
     virtualCursorRotationSpeedDegPerS: 720,
-    mascotLookRangeX: 24,
-    mascotLookRangeY: 16,
-    virtualCursorFollowMaxDistancePx: 160,
+    mascotLookRangeX: 40,
+    mascotLookRangeY: 28,
+    virtualCursorFollowMaxDistancePx: 64,
   });
 
   store.setMotionConfig({
@@ -97,7 +97,7 @@ test("buddy mascot debug store exposes live motion timing controls", () => {
     virtualCursorRotationSpeedDegPerS: 90,
     mascotLookRangeX: 8,
     mascotLookRangeY: 6,
-    virtualCursorFollowMaxDistancePx: 80,
+    virtualCursorFollowMaxDistancePx: 32,
   });
 
   store.resetMotionConfig();
@@ -106,9 +106,9 @@ test("buddy mascot debug store exposes live motion timing controls", () => {
     stepPauseMs: 8,
     virtualCursorFlightSpeedPxPerS: 1200,
     virtualCursorRotationSpeedDegPerS: 720,
-    mascotLookRangeX: 24,
-    mascotLookRangeY: 16,
-    virtualCursorFollowMaxDistancePx: 160,
+    mascotLookRangeX: 40,
+    mascotLookRangeY: 28,
+    virtualCursorFollowMaxDistancePx: 64,
   });
 });
 

@@ -1,11 +1,5 @@
 <template>
   <div class="buddy-widget" aria-live="polite">
-    <div
-      v-if="shouldShowVirtualCursorFollowRange"
-      class="buddy-widget__virtual-cursor-follow-range"
-      :style="virtualCursorFollowRangeStyle"
-      aria-hidden="true"
-    />
     <button
       v-if="isVirtualCursorRendered"
       type="button"
@@ -750,16 +744,6 @@ const virtualCursorStyle = computed(() => ({
   rotate: "var(--buddy-widget-virtual-cursor-angle)",
 }));
 const isVirtualCursorRendered = computed(() => virtualCursorPhase.value !== "hidden");
-const shouldShowVirtualCursorFollowRange = computed(() => virtualCursorPhase.value === "active");
-const virtualCursorFollowRangeStyle = computed(() => {
-  const radius = buddyMascotMotionConfig.value.virtualCursorFollowMaxDistancePx;
-  const buddyCenter = resolveBoxCenter(position.value, DEFAULT_BUDDY_SIZE);
-  return {
-    width: `${radius * 2}px`,
-    height: `${radius * 2}px`,
-    translate: `${buddyCenter.x - radius}px ${buddyCenter.y - radius}px`,
-  };
-});
 const shouldFloatVirtualCursor = computed(() =>
   virtualCursorPhase.value === "active" && !virtualCursorDragging.value && virtualCursorIdleActionMode.value === "none",
 );
@@ -3560,22 +3544,6 @@ function formatErrorMessage(error: unknown): string {
     radial-gradient(circle at 20% 16%, rgba(255, 255, 255, 0.42), transparent 34%),
     linear-gradient(135deg, rgba(45, 32, 21, 0.16), rgba(154, 52, 18, 0.08));
   backdrop-filter: blur(18px) saturate(1.22);
-}
-
-.buddy-widget__virtual-cursor-follow-range {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 4521;
-  border: 1px dashed rgba(242, 201, 104, 0.52);
-  border-radius: 999px;
-  pointer-events: none;
-  background: rgba(242, 201, 104, 0.05);
-  box-shadow: 0 0 18px rgba(242, 201, 104, 0.12);
-  transition:
-    translate var(--buddy-widget-roam-duration-ms, 360ms) ease,
-    width 120ms ease,
-    height 120ms ease;
 }
 
 .buddy-widget__virtual-cursor {

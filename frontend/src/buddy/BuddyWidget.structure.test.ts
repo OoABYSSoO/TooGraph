@@ -216,11 +216,9 @@ test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow
   assert.match(componentSource, /const VIRTUAL_CURSOR_SHAPE_PATH =/);
   assert.match(componentSource, /v-if="isVirtualCursorRendered"/);
   assert.match(componentSource, /class="buddy-widget__virtual-cursor"/);
-  assert.match(componentSource, /class="buddy-widget__virtual-cursor-follow-range"/);
-  assert.match(componentSource, /:style="virtualCursorFollowRangeStyle"/);
-  assert.match(componentSource, /const shouldShowVirtualCursorFollowRange = computed/);
-  assert.match(componentSource, /const virtualCursorFollowRangeStyle = computed/);
-  assert.match(componentSource, /const radius = buddyMascotMotionConfig\.value\.virtualCursorFollowMaxDistancePx;/);
+  assert.doesNotMatch(componentSource, /class="buddy-widget__virtual-cursor-follow-range"/);
+  assert.doesNotMatch(componentSource, /virtualCursorFollowRangeStyle/);
+  assert.doesNotMatch(componentSource, /shouldShowVirtualCursorFollowRange/);
   assert.match(componentSource, /class="buddy-widget__virtual-cursor-svg"/);
   assert.match(componentSource, /viewBox="-80 -80 160 160"/);
   assert.match(componentSource, /class="buddy-widget__virtual-cursor-shape"/);
@@ -377,7 +375,7 @@ test("BuddyWidget keeps virtual-cursor follow jumps from being flattened by slow
   assert.match(componentSource, /if \(!wasFollowing && virtualCursorIdleActionMode\.value === "none"\) \{[\s\S]*cancelBuddyRoamTimers\(\);[\s\S]*\}/);
   assert.match(componentSource, /const isFollowingMotionActive = buddyVirtualCursorFollowMotionTimerId !== null;/);
   assert.match(componentSource, /if \(isBuddyRoamTargetReached\(position\.value, targetPosition\)\) \{[\s\S]*if \(isFollowingMotionActive\) \{[\s\S]*buddyVirtualCursorFollowTargetPosition = targetPosition;[\s\S]*return;[\s\S]*\}/);
-  assert.match(extractCssBlock(".buddy-widget__virtual-cursor-follow-range"), /border:\s*1px dashed rgba\(242,\s*201,\s*104,\s*0\.52\);/);
+  assert.equal(extractCssBlock(".buddy-widget__virtual-cursor-follow-range"), "");
   assert.match(componentSource, /function finishBuddyVirtualCursorFollowSequence\(shouldPersistPosition: boolean\)[\s\S]*cancelBuddyVirtualCursorFollowTimers\(\);[\s\S]*mascotMotion\.value = "idle";/);
 });
 

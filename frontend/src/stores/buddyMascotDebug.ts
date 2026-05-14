@@ -23,9 +23,9 @@ export const DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG: BuddyMascotMotionDebugCon
   stepPauseMs: 8,
   virtualCursorFlightSpeedPxPerS: 1200,
   virtualCursorRotationSpeedDegPerS: 720,
-  mascotLookRangeX: 24,
-  mascotLookRangeY: 16,
-  virtualCursorFollowMaxDistancePx: 160,
+  mascotLookRangeX: 40,
+  mascotLookRangeY: 28,
+  virtualCursorFollowMaxDistancePx: 64,
 };
 
 const BUDDY_MASCOT_MOTION_CONFIG_STORAGE_KEY = "toograph:buddy-mascot-motion-debug-config";
@@ -36,7 +36,7 @@ const BUDDY_MASCOT_MOTION_CONFIG_LIMITS = {
   virtualCursorRotationSpeedDegPerS: { min: 90, max: 1440 },
   mascotLookRangeX: { min: 8, max: 40 },
   mascotLookRangeY: { min: 6, max: 28 },
-  virtualCursorFollowMaxDistancePx: { min: 80, max: 360 },
+  virtualCursorFollowMaxDistancePx: { min: 32, max: 360 },
 } as const;
 
 export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {

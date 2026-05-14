@@ -564,7 +564,7 @@
                   <span>{{ t("buddyPage.mascotDebug.motion.virtualCursorFollowRange") }}</span>
                   <ElInputNumber
                     :model-value="buddyMascotDebugStore.motionConfig.virtualCursorFollowMaxDistancePx"
-                    :min="80"
+                    :min="32"
                     :max="360"
                     :step="10"
                     controls-position="right"

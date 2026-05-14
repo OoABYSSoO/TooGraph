@@ -143,6 +143,7 @@ test("BuddyPage debug tab exposes live mascot motion timing controls", () => {
   assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ mascotLookRangeX: Number\(value\) \}\)/);
   assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ mascotLookRangeY: Number\(value\) \}\)/);
   assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ virtualCursorFollowMaxDistancePx: Number\(value\) \}\)/);
+  assert.match(source, /virtualCursorFollowMaxDistancePx"[\s\S]*:min="32"/);
   assert.match(source, /buddyMascotDebugStore\.resetMotionConfig\(\)/);
   assert.match(source, /t\("buddyPage\.mascotDebug\.motion\.moveDuration"\)/);
   assert.match(source, /t\("buddyPage\.mascotDebug\.motion\.stepPause"\)/);
