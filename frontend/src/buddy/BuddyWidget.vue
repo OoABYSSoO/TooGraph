@@ -553,6 +553,7 @@ const BUDDY_ROAM_TARGET_MIN_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
 const BUDDY_ROAM_TARGET_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 3;
 const BUDDY_ROAM_TARGET_REACHED_DISTANCE_PX = 1;
 const BUDDY_VIRTUAL_CURSOR_SIZE = { width: 42, height: 42 };
+const BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG = 0;
 const BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG = -14;
 const BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS = 360;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 2.15;
@@ -699,7 +700,9 @@ const anchorStyle = computed(() => ({
 }));
 const virtualCursorStyle = computed(() => ({
   "--buddy-widget-virtual-cursor-morph-duration-ms": `${BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS}ms`,
-  transform: `translate3d(${virtualCursorPosition.value.x}px, ${virtualCursorPosition.value.y}px, 0) rotate(${virtualCursorAngleDeg.value}deg)`,
+  "--buddy-widget-virtual-cursor-angle": `${virtualCursorAngleDeg.value}deg`,
+  translate: `${virtualCursorPosition.value.x}px ${virtualCursorPosition.value.y}px`,
+  rotate: "var(--buddy-widget-virtual-cursor-angle)",
 }));
 const isVirtualCursorRendered = computed(() => virtualCursorPhase.value !== "hidden");
 const shouldFloatVirtualCursor = computed(() =>
@@ -1203,10 +1206,14 @@ function requestBuddyFollowVirtualCursor() {
     return;
   }
   const targetPosition = resolveBuddyVirtualCursorFollowTargetPosition();
+  const isFollowingMotionActive = buddyVirtualCursorFollowMotionTimerId !== null;
   if (isBuddyRoamTargetReached(position.value, targetPosition)) {
+    if (isFollowingMotionActive) {
+      buddyVirtualCursorFollowTargetPosition = targetPosition;
+      return;
+    }
     if (
       buddyVirtualCursorFollowTargetPosition !== null ||
-      buddyVirtualCursorFollowMotionTimerId !== null ||
       buddyVirtualCursorFollowStepTimerId !== null
     ) {
       finishBuddyVirtualCursorFollowSequence(true);
@@ -1296,7 +1303,7 @@ function resolveBuddyVirtualCursorFollowTargetPosition(): BuddyPosition {
 }
 
 function finishBuddyVirtualCursorFollowSequence(shouldPersistPosition: boolean) {
-  buddyVirtualCursorFollowTargetPosition = null;
+  cancelBuddyVirtualCursorFollowTimers();
   mascotMotion.value = "idle";
   mascotFacing.value = "front";
   if (shouldPersistPosition) {
@@ -1451,7 +1458,7 @@ function startVirtualCursorLaunch() {
   virtualCursorDragging.value = false;
   virtualCursorPosition.value = resolveDefaultVirtualCursorPosition(viewport.value, position.value);
   virtualCursorPath.value = VIRTUAL_CURSOR_STAR_PATH;
-  virtualCursorAngleDeg.value = BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG;
+  virtualCursorAngleDeg.value = BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG;
   startVirtualCursorMorph(VIRTUAL_CURSOR_STAR_PATH, VIRTUAL_CURSOR_SHAPE_PATH);
 
   const targetPosition = resolveVirtualCursorLaunchPosition(viewport.value, position.value);
@@ -1499,14 +1506,16 @@ function startVirtualCursorReturn() {
 
   const dockedPosition = resolveDefaultVirtualCursorPosition(viewport.value, position.value);
   if (typeof window === "undefined") {
-    moveVirtualCursorTo(dockedPosition);
+    virtualCursorAngleDeg.value = BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG;
+    moveVirtualCursorTo(dockedPosition, { updateAngle: false });
     finishVirtualCursorReturn();
     return;
   }
 
   virtualCursorTransitionFrameId = window.requestAnimationFrame(() => {
     virtualCursorTransitionFrameId = null;
-    moveVirtualCursorTo(dockedPosition);
+    virtualCursorAngleDeg.value = BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG;
+    moveVirtualCursorTo(dockedPosition, { updateAngle: false });
   });
   virtualCursorTransitionTimerId = window.setTimeout(finishVirtualCursorReturn, BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS);
 }
@@ -1520,7 +1529,7 @@ function finishVirtualCursorReturn() {
   virtualCursorPhase.value = "hidden";
   virtualCursorDetached.value = false;
   virtualCursorDragging.value = false;
-  settleVirtualCursorRotation();
+  virtualCursorAngleDeg.value = BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG;
   mascotLook.value = { x: 0, y: 0 };
 }
 
@@ -1574,8 +1583,10 @@ function resolveVirtualCursorLaunchPosition(currentViewport: { width: number; he
   );
 }
 
-function moveVirtualCursorTo(nextPosition: BuddyPosition) {
-  virtualCursorAngleDeg.value = resolveVirtualCursorFlightAngle(virtualCursorPosition.value, nextPosition);
+function moveVirtualCursorTo(nextPosition: BuddyPosition, options: { updateAngle?: boolean } = {}) {
+  if (options.updateAngle !== false) {
+    virtualCursorAngleDeg.value = resolveVirtualCursorFlightAngle(virtualCursorPosition.value, nextPosition);
+  }
   virtualCursorPosition.value = nextPosition;
 }
 
@@ -2999,20 +3010,27 @@ function formatErrorMessage(error: unknown): string {
   touch-action: none;
   user-select: none;
   transform-origin: 50% 58%;
-  will-change: transform;
+  will-change: translate, rotate;
   filter:
     drop-shadow(0 5px 9px rgba(40, 32, 20, 0.22))
     drop-shadow(0 0 8px rgba(242, 201, 104, 0.32))
     drop-shadow(0 0 2px rgba(255, 251, 235, 0.82));
   transition:
-    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    translate 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    rotate 120ms ease,
     filter 140ms ease;
 }
 
-.buddy-widget__virtual-cursor--launching,
+.buddy-widget__virtual-cursor--launching {
+  transition:
+    translate var(--buddy-widget-virtual-cursor-morph-duration-ms, 360ms) cubic-bezier(0.2, 0.9, 0.22, 1),
+    rotate 120ms ease,
+    filter 140ms ease;
+}
+
 .buddy-widget__virtual-cursor--returning {
   transition:
-    transform var(--buddy-widget-virtual-cursor-morph-duration-ms, 360ms) cubic-bezier(0.2, 0.9, 0.22, 1),
+    translate var(--buddy-widget-virtual-cursor-morph-duration-ms, 360ms) cubic-bezier(0.2, 0.9, 0.22, 1),
     filter 140ms ease;
 }
 
@@ -3030,6 +3048,10 @@ function formatErrorMessage(error: unknown): string {
   stroke-linecap: round;
   stroke-linejoin: round;
   paint-order: stroke fill;
+}
+
+.buddy-widget__virtual-cursor--returning .buddy-widget__virtual-cursor-shape {
+  stroke-width: 0;
 }
 
 .buddy-widget__virtual-cursor--floating .buddy-widget__virtual-cursor-svg {
