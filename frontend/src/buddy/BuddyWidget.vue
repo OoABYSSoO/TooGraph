@@ -694,6 +694,7 @@ let virtualCursorFlightTracking: { fromPosition: BuddyPosition; toPosition: Budd
 let virtualCursorTrackingPosition: BuddyPosition | null = null;
 let virtualCursorAngleFrameTimestampMs: number | null = null;
 let virtualCursorMorphAnimationKey = 0;
+let virtualCursorPickupPending = false;
 let buddyDebugActionTimerId: number | null = null;
 let traceClockTimerId: number | null = null;
 let pendingMascotLookPointer: { x: number; y: number } | null = null;
@@ -892,6 +893,7 @@ function stopBuddyIdleAnimation(options: { closeVirtualCursor?: boolean } = {}) 
   cancelBuddyVirtualCursorFollowTimers();
   clearBuddyDebugActionTimer();
   virtualCursorIdleActionMode.value = "none";
+  virtualCursorPickupPending = false;
   if (options.closeVirtualCursor) {
     const wasVirtualCursorEnabled = virtualCursorEnabled.value;
     buddyMascotDebugStore.setVirtualCursorEnabled(false);
@@ -1014,6 +1016,7 @@ function activateVirtualCursor() {
 }
 
 function deactivateVirtualCursor() {
+  virtualCursorPickupPending = false;
   clearVirtualCursorDrag();
   cancelBuddyVirtualCursorFollowTimers();
   startVirtualCursorReturn();
@@ -1235,6 +1238,7 @@ function runBuddyIdleVirtualCursorOrbit(sequenceId: number, options: BuddyIdleRu
   }
   cancelBuddyVirtualCursorIdleFrame();
   virtualCursorIdleActionMode.value = "orbit";
+  virtualCursorPickupPending = true;
   buddyMascotDebugStore.setVirtualCursorEnabled(true);
   scheduleVirtualCursorIdleActionStart(sequenceId, () => {
     runBuddyIdleVirtualCursorOrbitFrame(sequenceId, performance.now(), resolveVirtualCursorOrbitAngle(virtualCursorPosition.value));
@@ -1274,6 +1278,7 @@ function runBuddyIdleVirtualCursorChase(sequenceId: number, options: BuddyIdleRu
     return;
   }
   virtualCursorIdleActionMode.value = "chase";
+  virtualCursorPickupPending = true;
   buddyMascotDebugStore.setVirtualCursorEnabled(true);
   scheduleVirtualCursorIdleActionStart(sequenceId, () => {
     moveBuddyIdleVirtualCursorChaseTarget(sequenceId);
@@ -1347,9 +1352,21 @@ function finishBuddyIdleVirtualCursorAction(sequenceId: number) {
   if (sequenceId !== buddyRoamSequenceId) {
     return;
   }
+  pickupVirtualCursor({ sequenceId, finishIdleAnimation: true });
+}
+
+function pickupVirtualCursor(options: { sequenceId?: number; finishIdleAnimation?: boolean } = {}) {
+  const sequenceId = options.sequenceId ?? buddyRoamSequenceId;
   cancelBuddyVirtualCursorIdleFrame();
   virtualCursorIdleActionMode.value = "none";
+  virtualCursorPickupPending = false;
   buddyMascotDebugStore.setVirtualCursorEnabled(false);
+  if (!options.finishIdleAnimation) {
+    return;
+  }
+  if (buddyRoamMotionTimerId !== null) {
+    window.clearTimeout(buddyRoamMotionTimerId);
+  }
   buddyRoamMotionTimerId = window.setTimeout(() => {
     buddyRoamMotionTimerId = null;
     finishBuddyIdleAnimation(sequenceId);
@@ -1653,9 +1670,13 @@ function finishBuddyVirtualCursorFollowSequence(shouldPersistPosition: boolean) 
   if (shouldPersistPosition) {
     persistPosition();
   }
+  if (virtualCursorPickupPending && virtualCursorIdleActionMode.value === "none" && virtualCursorEnabled.value) {
+    pickupVirtualCursor({ finishIdleAnimation: true });
+    return;
+  }
   if (virtualCursorIdleActionMode.value === "chase") {
     if (Math.random() < 0.5) {
-      finishBuddyIdleVirtualCursorAction(buddyRoamSequenceId);
+      pickupVirtualCursor({ sequenceId: buddyRoamSequenceId, finishIdleAnimation: true });
       return;
     }
     moveBuddyIdleVirtualCursorChaseTarget(buddyRoamSequenceId);

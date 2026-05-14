@@ -384,6 +384,16 @@ test("BuddyWidget keeps virtual-cursor follow jumps from being flattened by slow
   assert.match(componentSource, /function finishBuddyVirtualCursorFollowSequence\(shouldPersistPosition: boolean\)[\s\S]*cancelBuddyVirtualCursorFollowTimers\(\);[\s\S]*mascotMotion\.value = "idle";/);
 });
 
+test("BuddyWidget lets the buddy pick up idle-created virtual cursors after catching them", () => {
+  assert.match(componentSource, /let virtualCursorPickupPending = false;/);
+  assert.match(componentSource, /function pickupVirtualCursor\(/);
+  assert.match(componentSource, /runBuddyIdleVirtualCursorOrbit\(sequenceId: number[\s\S]*virtualCursorPickupPending = true;[\s\S]*buddyMascotDebugStore\.setVirtualCursorEnabled\(true\);/);
+  assert.match(componentSource, /runBuddyIdleVirtualCursorChase\(sequenceId: number[\s\S]*virtualCursorPickupPending = true;[\s\S]*buddyMascotDebugStore\.setVirtualCursorEnabled\(true\);/);
+  assert.match(componentSource, /if \(virtualCursorPickupPending && virtualCursorIdleActionMode\.value === "none" && virtualCursorEnabled\.value\) \{[\s\S]*pickupVirtualCursor\(\{ finishIdleAnimation: true \}\);[\s\S]*return;[\s\S]*\}/);
+  assert.match(componentSource, /if \(virtualCursorIdleActionMode\.value === "chase"\) \{[\s\S]*if \(Math\.random\(\) < 0\.5\) \{[\s\S]*pickupVirtualCursor\(\{ sequenceId: buddyRoamSequenceId, finishIdleAnimation: true \}\);[\s\S]*return;[\s\S]*\}/);
+  assert.match(componentSource, /function finishBuddyIdleVirtualCursorAction\(sequenceId: number\)[\s\S]*pickupVirtualCursor\(\{ sequenceId, finishIdleAnimation: true \}\);/);
+});
+
 test("BuddyWidget executes virtual UI operation events through the virtual cursor", () => {
   assert.match(componentSource, /latestVirtualOperationRequest,/);
   assert.match(componentSource, /watch\(latestVirtualOperationRequest,\s*\(request\) => \{/);
