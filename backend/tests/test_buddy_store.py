@@ -206,6 +206,56 @@ class BuddyStoreTests(unittest.TestCase):
         self.assertEqual(messages[0]["content"], "")
         self.assertFalse(messages[0]["include_in_context"])
 
+    def test_report_create_writes_markdown_file_and_revision(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home = Path(temp_dir) / "buddy_home"
+            with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
+                report = store.create_report(
+                    {
+                        "kind": "autonomous_review",
+                        "title": "能力使用复盘",
+                        "summary": "本轮联网搜索能力有效。",
+                        "content": "用户要求查资料，伙伴选择 web_search 并产出最终回复。",
+                        "source": {"run_id": "run_review_report"},
+                    },
+                    changed_by="buddy_command",
+                    change_reason="自主复盘生成报告。",
+                )
+                revisions = store.list_revisions(target_type="report", target_id=report["id"])
+                report_path = buddy_home / report["path"]
+                report_exists = report_path.exists()
+                report_text = report_path.read_text(encoding="utf-8")
+
+        self.assertTrue(report["id"].startswith("report_"))
+        self.assertEqual(report["path"], f"reports/{report['id']}.md")
+        self.assertTrue(report_exists)
+        self.assertIn("# 能力使用复盘", report_text)
+        self.assertEqual(len(revisions), 1)
+        self.assertEqual(revisions[0]["operation"], "create")
+        self.assertEqual(revisions[0]["next_value"]["summary"], "本轮联网搜索能力有效。")
+
+    def test_report_create_revision_restore_removes_created_report_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home = Path(temp_dir) / "buddy_home"
+            with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
+                report = store.create_report(
+                    {"title": "临时报告", "content": "这是一份可撤销的报告。"},
+                    changed_by="buddy_command",
+                    change_reason="自主复盘生成报告。",
+                )
+                revision = store.list_revisions(target_type="report", target_id=report["id"])[0]
+                restored = store.restore_revision(
+                    revision["revision_id"],
+                    changed_by="user",
+                    change_reason="用户恢复报告创建前状态。",
+                )
+                report_exists = (buddy_home / report["path"]).exists()
+
+        self.assertEqual(restored["target_type"], "report")
+        self.assertEqual(restored["target_id"], report["id"])
+        self.assertEqual(restored["current_value"], {})
+        self.assertFalse(report_exists)
+
     def test_buddy_database_migrates_legacy_messages_before_client_order_index(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             buddy_home = Path(temp_dir) / "buddy_home"

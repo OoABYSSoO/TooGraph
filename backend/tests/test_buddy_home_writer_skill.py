@@ -185,6 +185,38 @@ class BuddyHomeWriterSkillTests(unittest.TestCase):
         self.assertEqual(result["skipped_commands"][0]["error_type"], "unsupported_policy_field")
         self.assertNotIn("favorite_color", policy)
 
+    def test_writer_applies_report_create_commands(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home_dir = Path(temp_dir) / "buddy_home"
+            result = _run_writer(
+                {
+                    "run_id": "run_review_report",
+                    "commands": [
+                        {
+                            "action": "report.create",
+                            "payload": {
+                                "kind": "autonomous_review",
+                                "title": "运行复盘报告",
+                                "summary": "这次运行沉淀为一份报告。",
+                                "content": "报告正文只保存精炼结论，不保存完整日志。",
+                                "source": {"run_id": "run_review_report"},
+                            },
+                            "change_reason": "自主复盘生成报告。",
+                        }
+                    ],
+                },
+                buddy_home_dir=buddy_home_dir,
+            )
+            report_exists = (buddy_home_dir / result["applied_commands"][0]["result"]["path"]).exists()
+
+        self.assertEqual(result["success"], True)
+        applied = result["applied_commands"][0]
+        self.assertEqual(applied["command"]["action"], "report.create")
+        self.assertEqual(applied["command"]["target_type"], "report")
+        self.assertEqual(applied["command"]["run_id"], "run_review_report")
+        self.assertEqual(result["activity_events"][0]["kind"], "buddy_home_write")
+        self.assertTrue(report_exists)
+
 
 if __name__ == "__main__":
     unittest.main()

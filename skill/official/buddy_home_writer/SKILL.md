@@ -1,6 +1,6 @@
 ---
 name: Buddy Home Writer
-description: Internal controlled Buddy Home writer that applies safe command-based memory, session summary, profile, and policy updates with revision records.
+description: Internal controlled Buddy Home writer that applies safe command-based memory, session summary, profile, policy, and report updates with revision records.
 ---
 
 # Buddy Home Writer
@@ -17,6 +17,7 @@ Allowed actions:
 - `session_summary.update`
 - `profile.update`
 - `policy.update`
+- `report.create`
 
 Safety boundary:
 
@@ -24,3 +25,4 @@ Safety boundary:
 - `policy.update` is limited to `communication_preferences`.
 - `policy.update` cannot modify `graph_permission_mode`, `behavior_boundaries`, or undeclared policy fields.
 - Unsupported or unsafe commands are skipped and returned in `skipped_commands`.
+- `report.create` writes a concise Markdown report under `buddy_home/reports/` through the command/revision path. It must not store full logs, secrets, or large transient output.

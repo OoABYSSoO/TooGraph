@@ -13,6 +13,7 @@ from app.buddy.home import (
     DEFAULT_SESSION_SUMMARY,
     MEMORY_PATH,
     POLICY_PATH,
+    REPORTS_DIR,
     SOUL_PATH,
     ensure_buddy_home,
     get_default_buddy_home_dir,
@@ -217,6 +218,29 @@ def save_session_summary(payload: dict[str, Any], *, changed_by: str, change_rea
         )
         connection.commit()
     return load_session_summary()
+
+
+def create_report(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
+    initialize_buddy_home()
+    now = utc_now_iso()
+    report_id = _normalize_report_id(payload.get("id")) or f"report_{uuid4().hex[:12]}"
+    report = {
+        "id": report_id,
+        "kind": str(payload.get("kind") or "autonomous_review").strip() or "autonomous_review",
+        "title": str(payload.get("title") or "Buddy report").strip() or "Buddy report",
+        "summary": str(payload.get("summary") or "").strip(),
+        "content": str(payload.get("content") or "").strip(),
+        "source": payload.get("source") if isinstance(payload.get("source"), dict) else {},
+        "path": _report_relative_path(report_id),
+        "created_at": now,
+        "updated_at": now,
+    }
+    report_path = _report_path(report_id)
+    if report_path.exists():
+        raise ValueError(f"Report already exists: {report_id}")
+    _write_with_revision("report", report_id, "create", {}, report, changed_by, change_reason)
+    _write_report_file(report)
+    return report
 
 
 def load_run_template_binding() -> dict[str, Any]:
@@ -515,6 +539,19 @@ def restore_revision(revision_id: str, *, changed_by: str, change_reason: str) -
                 ("session_summary", _json_dumps(restored), utc_now_iso()),
             )
             connection.commit()
+    elif target_type == "report":
+        current = _load_report_value(target_id)
+        _write_with_revision("report", target_id, "restore", current, restored, changed_by, change_reason)
+        if restored:
+            restored = {
+                **restored,
+                "id": target_id,
+                "path": restored.get("path") or _report_relative_path(target_id),
+                "updated_at": utc_now_iso(),
+            }
+            _write_report_file(restored)
+        else:
+            _report_path(target_id).unlink(missing_ok=True)
     elif target_type == RUN_TEMPLATE_BINDING_TARGET_TYPE:
         current = load_run_template_binding()
         restored = _normalize_run_template_binding(restored)
@@ -713,6 +750,65 @@ def _normalize_run_template_binding(payload: dict[str, Any]) -> dict[str, Any]:
 
 def _write_json(file_name: str, payload: Any) -> None:
     write_json_file(buddy_home_path(file_name), payload)
+
+
+def _normalize_report_id(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    normalized = "".join(character if character.isalnum() or character in {"_", "-"} else "_" for character in raw)
+    return normalized[:80]
+
+
+def _report_relative_path(report_id: str) -> str:
+    return f"{REPORTS_DIR}/{report_id}.md"
+
+
+def _report_path(report_id: str) -> Path:
+    initialize_buddy_home()
+    return BUDDY_HOME_DIR / REPORTS_DIR / f"{report_id}.md"
+
+
+def _write_report_file(report: dict[str, Any]) -> None:
+    report_id = _normalize_report_id(report.get("id"))
+    if not report_id:
+        raise ValueError("Report id is required.")
+    path = _report_path(report_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_render_report_markdown(report), encoding="utf-8")
+
+
+def _load_report_value(report_id: str) -> dict[str, Any]:
+    path = _report_path(report_id)
+    if not path.exists():
+        return {}
+    return {
+        "id": report_id,
+        "path": _report_relative_path(report_id),
+        "content": path.read_text(encoding="utf-8"),
+    }
+
+
+def _render_report_markdown(report: dict[str, Any]) -> str:
+    title = str(report.get("title") or "Buddy report").strip() or "Buddy report"
+    summary = str(report.get("summary") or "").strip()
+    content = str(report.get("content") or "").strip()
+    source = report.get("source") if isinstance(report.get("source"), dict) else {}
+    lines = [
+        f"# {title}",
+        "",
+        f"- ID: {report.get('id') or ''}",
+        f"- Kind: {report.get('kind') or 'autonomous_review'}",
+        f"- Created: {report.get('created_at') or ''}",
+        f"- Updated: {report.get('updated_at') or ''}",
+    ]
+    if source:
+        lines.extend(["", "## Source", "", "```json", json.dumps(source, ensure_ascii=False, indent=2), "```"])
+    if summary:
+        lines.extend(["", "## Summary", "", summary])
+    if content:
+        lines.extend(["", "## Content", "", content])
+    return "\n".join(lines).rstrip() + "\n"
 
 
 @contextmanager
