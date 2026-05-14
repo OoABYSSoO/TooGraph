@@ -1050,6 +1050,12 @@ const baseMessages = {
           enable: "启用虚拟鼠标",
           disable: "关闭虚拟鼠标",
         },
+        motion: {
+          title: "移动参数",
+          moveDuration: "移动时长 ms",
+          stepPause: "落地停顿 ms",
+          reset: "重置",
+        },
         groups: {
           state: "状态",
           motion: "动作",
@@ -2114,6 +2120,12 @@ const baseMessages = {
         virtualCursor: {
           enable: "Enable virtual cursor",
           disable: "Disable virtual cursor",
+        },
+        motion: {
+          title: "Motion timing",
+          moveDuration: "Move duration ms",
+          stepPause: "Landing pause ms",
+          reset: "Reset",
         },
         groups: {
           state: "State",

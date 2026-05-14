@@ -29,3 +29,31 @@ test("buddy mascot debug store toggles the virtual cursor debug mode", () => {
   store.setVirtualCursorEnabled(false);
   assert.equal(store.virtualCursorEnabled, false);
 });
+
+test("buddy mascot debug store exposes live motion timing controls", () => {
+  setActivePinia(createPinia());
+  const store = useBuddyMascotDebugStore();
+
+  assert.deepEqual(store.motionConfig, {
+    moveDurationMs: 420,
+    stepPauseMs: 8,
+  });
+
+  store.setMotionConfig({ moveDurationMs: 300, stepPauseMs: 0 });
+  assert.deepEqual(store.motionConfig, {
+    moveDurationMs: 300,
+    stepPauseMs: 0,
+  });
+
+  store.setMotionConfig({ moveDurationMs: 40, stepPauseMs: 900 });
+  assert.deepEqual(store.motionConfig, {
+    moveDurationMs: 120,
+    stepPauseMs: 240,
+  });
+
+  store.resetMotionConfig();
+  assert.deepEqual(store.motionConfig, {
+    moveDurationMs: 420,
+    stepPauseMs: 8,
+  });
+});

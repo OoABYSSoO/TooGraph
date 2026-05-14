@@ -480,6 +480,40 @@
                 {{ buddyMascotDebugStore.virtualCursorEnabled ? t("buddyPage.mascotDebug.virtualCursor.disable") : t("buddyPage.mascotDebug.virtualCursor.enable") }}
               </ElButton>
             </div>
+            <section class="buddy-page__debug-motion-panel">
+              <header class="buddy-page__debug-motion-header">
+                <span>{{ t("buddyPage.mascotDebug.motion.title") }}</span>
+                <ElButton size="small" text @click="buddyMascotDebugStore.resetMotionConfig()">
+                  {{ t("buddyPage.mascotDebug.motion.reset") }}
+                </ElButton>
+              </header>
+              <div class="buddy-page__debug-motion-grid">
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.moveDuration") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.moveDurationMs"
+                    :min="120"
+                    :max="1200"
+                    :step="20"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ moveDurationMs: Number(value) })"
+                  />
+                </label>
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.stepPause") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.stepPauseMs"
+                    :min="0"
+                    :max="240"
+                    :step="4"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ stepPauseMs: Number(value) })"
+                  />
+                </label>
+              </div>
+            </section>
             <div class="buddy-page__debug-grid">
               <section v-for="group in BUDDY_DEBUG_ACTION_GROUPS" :key="group.labelKey" class="buddy-page__debug-group">
                 <span class="buddy-page__debug-label">{{ t(group.labelKey) }}</span>
@@ -512,6 +546,7 @@ import {
   ElFormItem,
   ElIcon,
   ElInput,
+  ElInputNumber,
   ElMessage,
   ElMessageBox,
   ElOption,
@@ -1738,6 +1773,40 @@ onMounted(loadAll);
 .buddy-page__debug-cursor-row {
   display: flex;
   margin-bottom: 16px;
+}
+
+.buddy-page__debug-motion-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid rgba(210, 162, 117, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 250, 242, 0.62);
+}
+
+.buddy-page__debug-motion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(38, 26, 14, 0.82);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.buddy-page__debug-motion-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.buddy-page__debug-motion-field {
+  display: grid;
+  gap: 6px;
+  color: rgba(60, 41, 20, 0.68);
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .buddy-page__debug-grid {

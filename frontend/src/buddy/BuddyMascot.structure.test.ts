@@ -147,7 +147,9 @@ test("BuddyMascot gives the transformed virtual cursor the same black outline as
 });
 
 test("Buddy cursor assets reuse the mascot sparkle gold gradient", () => {
+  assert.match(componentSource, /id="buddyMascotSparkleGold" cx="0" cy="-136" r="56" gradientUnits="userSpaceOnUse"/);
   for (const source of [publicCursorSource, docsCursorSource]) {
+    assert.match(source, /id="buddyCursorGold" cx="0" cy="-24" r="56" gradientUnits="userSpaceOnUse"/);
     assert.match(source, /stop-color="#f2c968"/);
     assert.match(source, /stop-color="#dfad50"/);
     assert.match(source, /stop-color="#c89136"/);

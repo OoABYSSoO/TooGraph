@@ -4,7 +4,10 @@
       v-if="virtualCursorEnabled"
       type="button"
       class="buddy-widget__virtual-cursor"
-      :class="{ 'buddy-widget__virtual-cursor--docked': !virtualCursorDetached }"
+      :class="{
+        'buddy-widget__virtual-cursor--docked': !virtualCursorDetached,
+        'buddy-widget__virtual-cursor--floating': shouldFloatVirtualCursor,
+      }"
       :style="virtualCursorStyle"
       :title="t('buddy.virtualCursor')"
       :aria-label="t('buddy.virtualCursor')"
@@ -507,9 +510,6 @@ const AVATAR_SINGLE_CLICK_DELAY_MS = 220;
 const RUN_POLL_INTERVAL_MS = 700;
 const BUDDY_ROAM_MIN_DELAY_MS = 8000;
 const BUDDY_ROAM_MAX_DELAY_MS = 18000;
-const BUDDY_ROAM_MOVE_DURATION_MS = 560;
-const BUDDY_ROAM_STEP_PAUSE_MS = 32;
-const BUDDY_MASCOT_HOP_DURATION_MS = 520;
 const BUDDY_ROAM_STEP_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
 const BUDDY_ROAM_TARGET_MIN_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
 const BUDDY_ROAM_TARGET_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 3;
@@ -526,13 +526,18 @@ const { t } = useI18n();
 const route = useRoute();
 const buddyContextStore = useBuddyContextStore();
 const buddyMascotDebugStore = useBuddyMascotDebugStore();
-const { latestRequest: mascotDebugRequest, virtualCursorEnabled } = storeToRefs(buddyMascotDebugStore);
+const {
+  latestRequest: mascotDebugRequest,
+  motionConfig: buddyMascotMotionConfig,
+  virtualCursorEnabled,
+} = storeToRefs(buddyMascotDebugStore);
 
 const viewport = ref(resolveViewport());
 const position = ref(resolveDefaultBuddyPosition(viewport.value));
 const virtualCursorPosition = ref(resolveDefaultVirtualCursorPosition(viewport.value, position.value));
 const virtualCursorAngleDeg = ref(BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG);
 const virtualCursorDetached = ref(false);
+const virtualCursorDragging = ref(false);
 const isPanelOpen = ref(false);
 const draft = ref("");
 const buddyMode = ref<BuddyMode>(DEFAULT_BUDDY_MODE);
@@ -637,11 +642,16 @@ const buddyModelPlaceholder = computed(() =>
   buddyModelLoadError.value ? t("buddy.modelLoadFailed") : t("buddy.modelLoading"),
 );
 const anchorStyle = computed(() => ({
+  "--buddy-widget-roam-duration-ms": `${buddyMascotMotionConfig.value.moveDurationMs}ms`,
+  "--buddy-widget-hop-duration-ms": `${buddyMascotMotionConfig.value.moveDurationMs}ms`,
   transform: isPanelFullscreen.value ? "none" : `translate3d(${position.value.x}px, ${position.value.y}px, 0)`,
 }));
 const virtualCursorStyle = computed(() => ({
   transform: `translate3d(${virtualCursorPosition.value.x}px, ${virtualCursorPosition.value.y}px, 0) rotate(${virtualCursorAngleDeg.value}deg)`,
 }));
+const shouldFloatVirtualCursor = computed(() =>
+  virtualCursorEnabled.value && virtualCursorDetached.value && !virtualCursorDragging.value,
+);
 const avatarStyle = computed(() => {
   if (!isPanelFullscreen.value) {
     return {};
@@ -862,6 +872,9 @@ function handlePointerUp(event: PointerEvent) {
 function activateVirtualCursor() {
   cancelBuddyRoamTimers();
   clearBuddyDebugActionTimer();
+  cancelMascotLookFrame();
+  pendingMascotLookPointer = null;
+  virtualCursorDragging.value = false;
   virtualCursorDetached.value = false;
   virtualCursorPosition.value = resolveDefaultVirtualCursorPosition(viewport.value, position.value);
   settleVirtualCursorRotation();
@@ -876,6 +889,7 @@ function handleVirtualCursorPointerDown(event: PointerEvent) {
   clearBuddyDebugActionTimer();
   clearVirtualCursorDrag();
   virtualCursorDetached.value = true;
+  virtualCursorDragging.value = true;
   virtualCursorDrag = {
     pointerId: event.pointerId,
     startX: event.clientX,
@@ -920,6 +934,7 @@ function handleVirtualCursorPointerUp(event: PointerEvent) {
 
 function clearVirtualCursorDrag() {
   virtualCursorDrag = null;
+  virtualCursorDragging.value = false;
   window.removeEventListener("pointermove", handleVirtualCursorPointerMove);
   window.removeEventListener("pointerup", handleVirtualCursorPointerUp);
 }
@@ -1030,8 +1045,8 @@ function runBuddyRoamStep(sequenceId: number) {
     buddyRoamStepTimerId = window.setTimeout(() => {
       buddyRoamStepTimerId = null;
       runBuddyRoamStep(sequenceId);
-    }, BUDDY_ROAM_STEP_PAUSE_MS);
-  }, BUDDY_ROAM_MOVE_DURATION_MS);
+    }, buddyMascotMotionConfig.value.stepPauseMs);
+  }, buddyMascotMotionConfig.value.moveDurationMs);
 }
 
 function resolveBuddyRoamTargetPosition(): BuddyPosition {
@@ -1193,8 +1208,8 @@ function runBuddyVirtualCursorFollowStep(sequenceId: number) {
     buddyVirtualCursorFollowStepTimerId = window.setTimeout(() => {
       buddyVirtualCursorFollowStepTimerId = null;
       runBuddyVirtualCursorFollowStep(sequenceId);
-    }, BUDDY_ROAM_STEP_PAUSE_MS);
-  }, BUDDY_ROAM_MOVE_DURATION_MS);
+    }, buddyMascotMotionConfig.value.stepPauseMs);
+  }, buddyMascotMotionConfig.value.moveDurationMs);
 }
 
 function resolveBuddyVirtualCursorFollowTargetPosition(): BuddyPosition {
@@ -1334,10 +1349,10 @@ function triggerMascotDebugAction(action: BuddyMascotDebugAction) {
       }, 1100);
       break;
     case "hop":
-      playMascotDebugMotion("hop", BUDDY_MASCOT_HOP_DURATION_MS, "front");
+      playMascotDebugMotion("hop", buddyMascotMotionConfig.value.moveDurationMs, "front");
       break;
     case "roam":
-      playMascotDebugMotion("roam", BUDDY_ROAM_MOVE_DURATION_MS, "right");
+      playMascotDebugMotion("roam", buddyMascotMotionConfig.value.moveDurationMs, "right");
       break;
     case "face-left":
       mood.value = "idle";
@@ -2764,7 +2779,7 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__anchor--roaming {
-  transition: transform 560ms cubic-bezier(0.2, 1.05, 0.32, 1);
+  transition: transform var(--buddy-widget-roam-duration-ms, 420ms) cubic-bezier(0.2, 1.05, 0.32, 1);
 }
 
 .buddy-widget__anchor--fullscreen {
@@ -2822,6 +2837,10 @@ function formatErrorMessage(error: unknown): string {
   visibility: hidden;
 }
 
+.buddy-widget__virtual-cursor--floating img {
+  animation: buddy-widget-virtual-cursor-float 1.8s ease-in-out infinite;
+}
+
 .buddy-widget__virtual-cursor:active {
   cursor: grabbing;
   filter:
@@ -2869,11 +2888,11 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__avatar--roaming {
-  animation: buddy-widget-avatar-hop-path 560ms cubic-bezier(0.2, 1.05, 0.32, 1) both;
+  animation: buddy-widget-avatar-hop-path var(--buddy-widget-roam-duration-ms, 420ms) cubic-bezier(0.2, 1.05, 0.32, 1) both;
 }
 
 .buddy-widget__avatar--hopping {
-  animation: buddy-widget-avatar-hop-path 520ms cubic-bezier(0.2, 1.05, 0.32, 1) both;
+  animation: buddy-widget-avatar-hop-path var(--buddy-widget-hop-duration-ms, 420ms) cubic-bezier(0.2, 1.05, 0.32, 1) both;
 }
 
 .buddy-widget__avatar:active {
@@ -2909,6 +2928,16 @@ function formatErrorMessage(error: unknown): string {
   }
   66% {
     transform: translateY(-6px);
+  }
+}
+
+@keyframes buddy-widget-virtual-cursor-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-2px) rotate(-1deg);
   }
 }
 

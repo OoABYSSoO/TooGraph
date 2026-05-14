@@ -127,6 +127,18 @@ test("BuddyPage debug tab can enable and disable the virtual cursor", () => {
   assert.match(source, /buddy-page__debug-button--cursor/);
 });
 
+test("BuddyPage debug tab exposes live mascot motion timing controls", () => {
+  assert.match(source, /ElInputNumber/);
+  assert.match(source, /buddyMascotDebugStore\.motionConfig\.moveDurationMs/);
+  assert.match(source, /buddyMascotDebugStore\.motionConfig\.stepPauseMs/);
+  assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ moveDurationMs: Number\(value\) \}\)/);
+  assert.match(source, /buddyMascotDebugStore\.setMotionConfig\(\{ stepPauseMs: Number\(value\) \}\)/);
+  assert.match(source, /buddyMascotDebugStore\.resetMotionConfig\(\)/);
+  assert.match(source, /t\("buddyPage\.mascotDebug\.motion\.moveDuration"\)/);
+  assert.match(source, /t\("buddyPage\.mascotDebug\.motion\.stepPause"\)/);
+  assert.match(source, /buddy-page__debug-motion-grid/);
+});
+
 test("BuddyPage places template binding before confirmations", () => {
   const bindingIndex = source.indexOf('name="binding"');
   const confirmationIndex = source.indexOf('name="confirmation"');
