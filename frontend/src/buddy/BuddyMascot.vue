@@ -702,6 +702,16 @@ function clampLookAxis(value: number | undefined) {
   transition: opacity 120ms ease;
 }
 
+.buddy-mascot__dizzy-eye--left {
+  transform-box: view-box;
+  transform-origin: -80px 82px;
+}
+
+.buddy-mascot__dizzy-eye--right {
+  transform-box: view-box;
+  transform-origin: 80px 82px;
+}
+
 .buddy-mascot--idle .buddy-mascot__tail {
   animation: buddy-mascot-tail-sway 1.8s ease-in-out infinite;
 }
@@ -792,12 +802,13 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--error .buddy-mascot__resting-eye {
+  display: none;
   opacity: 0;
 }
 
 .buddy-mascot--error .buddy-mascot__dizzy-eye {
   opacity: 1;
-  animation: buddy-mascot-error-eye-dizzy 760ms ease-out both;
+  animation: buddy-mascot-error-eye-spin 920ms linear infinite;
 }
 
 .buddy-mascot--dragging .buddy-mascot__tail {
@@ -1111,14 +1122,12 @@ function clampLookAxis(value: number | undefined) {
   }
 }
 
-@keyframes buddy-mascot-error-eye-dizzy {
+@keyframes buddy-mascot-error-eye-spin {
   0% {
-    stroke-dasharray: 0 220;
-    transform: scale(0.82) rotate(-18deg);
+    transform: rotate(0deg);
   }
   100% {
-    stroke-dasharray: 220 0;
-    transform: scale(1) rotate(0deg);
+    transform: rotate(360deg);
   }
 }
 

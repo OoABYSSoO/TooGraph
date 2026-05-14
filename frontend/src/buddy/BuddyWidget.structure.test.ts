@@ -57,6 +57,7 @@ test("BuddyWidget runs one weighted idle animation at a time while the panel is 
   assert.match(componentSource, /type BuddyMascotMotion = "idle" \| "roam" \| "hop";/);
   assert.match(componentSource, /type BuddyMascotFacing = "front" \| "left" \| "right";/);
   assert.match(componentSource, /type BuddyIdleAnimationAction = "tail-switch" \| "random-move" \| "virtual-cursor-orbit" \| "virtual-cursor-chase";/);
+  assert.match(componentSource, /type BuddyIdleRunOptions = \{ force\?: boolean \};/);
   assert.match(componentSource, /const BUDDY_IDLE_ANIMATION_MIN_DELAY_MS = 5000;/);
   assert.match(componentSource, /const BUDDY_IDLE_ANIMATION_MAX_DELAY_MS = 10000;/);
   assert.match(componentSource, /const BUDDY_IDLE_ANIMATION_ACTIONS: BuddyIdleAnimationAction\[\] = \["tail-switch", "random-move", "virtual-cursor-orbit", "virtual-cursor-chase"\];/);
@@ -85,6 +86,8 @@ test("BuddyWidget runs one weighted idle animation at a time while the panel is 
   assert.match(componentSource, /return Math\.round\(randomBetween\(baseDurationMs, baseDurationMs \* 2\)\);/);
   assert.match(componentSource, /function chooseBuddyIdleAnimationAction\(\): BuddyIdleAnimationAction/);
   assert.match(componentSource, /BUDDY_IDLE_ANIMATION_ACTIONS\[Math\.floor\(Math\.random\(\) \* BUDDY_IDLE_ANIMATION_ACTIONS\.length\)\]/);
+  assert.match(componentSource, /function canRunBuddyIdleAnimation\(options: BuddyIdleRunOptions = \{\}\)/);
+  assert.match(componentSource, /return options\.force \|\| canBuddyRoam\.value;/);
   assert.match(componentSource, /function runBuddyIdleAnimation\(\)/);
   assert.match(componentSource, /const action = chooseBuddyIdleAnimationAction\(\);/);
   assert.match(componentSource, /case "tail-switch":[\s\S]*runBuddyIdleTailSwitch\(buddyRoamSequenceId\);/);
@@ -116,14 +119,14 @@ test("BuddyWidget schedules random hop movement without jump-turn spin actions",
   assert.match(componentSource, /let buddyRoamSequenceId = 0;/);
   assert.match(componentSource, /function scheduleBuddyRoam\(\)/);
   assert.match(componentSource, /randomBetween\(BUDDY_IDLE_ANIMATION_MIN_DELAY_MS, BUDDY_IDLE_ANIMATION_MAX_DELAY_MS\)/);
-  assert.match(componentSource, /function runBuddyIdleRoam\(sequenceId: number\)/);
+  assert.match(componentSource, /function runBuddyIdleRoam\(sequenceId: number, options: BuddyIdleRunOptions = \{\}\)/);
   assert.match(componentSource, /buddyRoamTargetPosition = resolveBuddyRoamTargetPosition\(\);/);
-  assert.match(componentSource, /runBuddyRoamStep\(sequenceId\);/);
-  assert.match(componentSource, /function runBuddyRoamStep\(sequenceId: number\)/);
+  assert.match(componentSource, /runBuddyRoamStep\(sequenceId, options\);/);
+  assert.match(componentSource, /function runBuddyRoamStep\(sequenceId: number, options: BuddyIdleRunOptions = \{\}\)/);
   assert.match(componentSource, /const nextPosition = resolveBuddyRoamStepPosition\(position\.value, targetPosition\);/);
   assert.match(componentSource, /restartAvatarHopAnimation\(\);[\s\S]*mascotFacing\.value = resolveBuddyRoamFacing\(nextPosition\.x - position\.value\.x\);/);
   assert.match(componentSource, /mascotFacing\.value = resolveBuddyRoamFacing\(nextPosition\.x - position\.value\.x\);/);
-  assert.match(componentSource, /buddyRoamStepTimerId = window\.setTimeout\(\(\) => \{[\s\S]*runBuddyRoamStep\(sequenceId\);[\s\S]*\}, buddyMascotMotionConfig\.value\.stepPauseMs\);/);
+  assert.match(componentSource, /buddyRoamStepTimerId = window\.setTimeout\(\(\) => \{[\s\S]*runBuddyRoamStep\(sequenceId, options\);[\s\S]*\}, buddyMascotMotionConfig\.value\.stepPauseMs\);/);
   assert.match(componentSource, /function resolveBuddyRoamStepPosition\(currentPosition: BuddyPosition, targetPosition: BuddyPosition\): BuddyPosition/);
   assert.match(componentSource, /if \(distance <= BUDDY_ROAM_STEP_DISTANCE_PX\) \{/);
   assert.match(componentSource, /currentPosition\.x \+ \(deltaX \/ distance\) \* BUDDY_ROAM_STEP_DISTANCE_PX/);
@@ -140,10 +143,11 @@ test("BuddyWidget schedules random hop movement without jump-turn spin actions",
 
 test("BuddyWidget exposes debug triggers for each idle animation and stops virtual cursor animation on buddy click", () => {
   assert.match(componentSource, /case "idle-tail-switch":[\s\S]*runBuddyIdleTailSwitch\(\+\+buddyRoamSequenceId\);/);
-  assert.match(componentSource, /case "idle-random-move":[\s\S]*runBuddyIdleRoam\(\+\+buddyRoamSequenceId\);/);
-  assert.match(componentSource, /case "idle-virtual-cursor-orbit":[\s\S]*runBuddyIdleVirtualCursorOrbit\(\+\+buddyRoamSequenceId\);/);
-  assert.match(componentSource, /case "idle-virtual-cursor-chase":[\s\S]*runBuddyIdleVirtualCursorChase\(\+\+buddyRoamSequenceId\);/);
+  assert.match(componentSource, /case "idle-random-move":[\s\S]*mood\.value = "idle";[\s\S]*runBuddyIdleRoam\(\+\+buddyRoamSequenceId, \{ force: true \}\);/);
+  assert.match(componentSource, /case "idle-virtual-cursor-orbit":[\s\S]*mood\.value = "idle";[\s\S]*runBuddyIdleVirtualCursorOrbit\(\+\+buddyRoamSequenceId, \{ force: true \}\);/);
+  assert.match(componentSource, /case "idle-virtual-cursor-chase":[\s\S]*mood\.value = "idle";[\s\S]*runBuddyIdleVirtualCursorChase\(\+\+buddyRoamSequenceId, \{ force: true \}\);/);
   assert.match(componentSource, /function handleAvatarClick\(\)[\s\S]*stopBuddyIdleAnimation\(\{ closeVirtualCursor: true \}\);/);
+  assert.match(componentSource, /function handleAvatarClick\(\)[\s\S]*if \(mood\.value === "error"\) \{[\s\S]*mood\.value = "idle";/);
   assert.match(componentSource, /function stopBuddyIdleAnimation\(options: \{ closeVirtualCursor\?: boolean \} = \{\}\)/);
   assert.match(componentSource, /buddyMascotDebugStore\.setVirtualCursorEnabled\(false\);/);
 });
@@ -279,6 +283,8 @@ test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow
 });
 
 test("BuddyWidget keeps virtual-cursor follow jumps from being flattened by slow cursor drags", () => {
+  assert.match(componentSource, /watch\(canBuddyRoam, \(canRoam\) => \{[\s\S]*if \(virtualCursorIdleActionMode\.value !== "none"\) \{[\s\S]*return;[\s\S]*\}[\s\S]*cancelBuddyRoamTimers\(\);/);
+  assert.match(componentSource, /if \(!wasFollowing && virtualCursorIdleActionMode\.value === "none"\) \{[\s\S]*cancelBuddyRoamTimers\(\);[\s\S]*\}/);
   assert.match(componentSource, /const isFollowingMotionActive = buddyVirtualCursorFollowMotionTimerId !== null;/);
   assert.match(componentSource, /if \(isBuddyRoamTargetReached\(position\.value, targetPosition\)\) \{[\s\S]*if \(isFollowingMotionActive\) \{[\s\S]*buddyVirtualCursorFollowTargetPosition = targetPosition;[\s\S]*return;[\s\S]*\}/);
   assert.match(componentSource, /function finishBuddyVirtualCursorFollowSequence\(shouldPersistPosition: boolean\)[\s\S]*cancelBuddyVirtualCursorFollowTimers\(\);[\s\S]*mascotMotion\.value = "idle";/);

@@ -537,6 +537,7 @@ type BuddyMascotMotion = "idle" | "roam" | "hop";
 type BuddyMascotFacing = "front" | "left" | "right";
 type VirtualCursorPhase = "hidden" | "launching" | "active" | "returning";
 type BuddyIdleAnimationAction = "tail-switch" | "random-move" | "virtual-cursor-orbit" | "virtual-cursor-chase";
+type BuddyIdleRunOptions = { force?: boolean };
 type VirtualCursorIdleActionMode = "none" | "orbit" | "chase";
 type BuddyModelOption = {
   value: string;
@@ -810,6 +811,9 @@ watch(canBuddyRoam, (canRoam) => {
     scheduleBuddyRoam();
     return;
   }
+  if (virtualCursorIdleActionMode.value !== "none") {
+    return;
+  }
   cancelBuddyRoamTimers();
 });
 
@@ -832,6 +836,11 @@ watch(mascotDebugRequest, (request) => {
 
 function handleAvatarClick() {
   stopBuddyIdleAnimation({ closeVirtualCursor: true });
+  if (mood.value === "error") {
+    mood.value = "idle";
+    mascotMotion.value = "idle";
+    mascotFacing.value = "front";
+  }
   if (suppressNextClick) {
     suppressNextClick = false;
     return;
@@ -1138,20 +1147,20 @@ function finishBuddyIdleAnimation(sequenceId: number) {
   scheduleBuddyRoam();
 }
 
-function runBuddyIdleRoam(sequenceId: number) {
+function runBuddyIdleRoam(sequenceId: number, options: BuddyIdleRunOptions = {}) {
   if (sequenceId !== buddyRoamSequenceId) {
     return;
   }
   buddyRoamTargetPosition = resolveBuddyRoamTargetPosition();
-  runBuddyRoamStep(sequenceId);
+  runBuddyRoamStep(sequenceId, options);
 }
 
-function runBuddyRoamStep(sequenceId: number) {
+function runBuddyRoamStep(sequenceId: number, options: BuddyIdleRunOptions = {}) {
   if (sequenceId !== buddyRoamSequenceId) {
     return;
   }
   const targetPosition = buddyRoamTargetPosition;
-  if (!canBuddyRoam.value || targetPosition === null) {
+  if (!canRunBuddyIdleAnimation(options) || targetPosition === null) {
     finishBuddyRoamSequence(false);
     return;
   }
@@ -1169,7 +1178,7 @@ function runBuddyRoamStep(sequenceId: number) {
     }
     buddyRoamMotionTimerId = null;
     mascotMotion.value = "idle";
-    if (!canBuddyRoam.value) {
+    if (!canRunBuddyIdleAnimation(options)) {
       finishBuddyRoamSequence(false);
       return;
     }
@@ -1179,13 +1188,13 @@ function runBuddyRoamStep(sequenceId: number) {
     }
     buddyRoamStepTimerId = window.setTimeout(() => {
       buddyRoamStepTimerId = null;
-      runBuddyRoamStep(sequenceId);
+      runBuddyRoamStep(sequenceId, options);
     }, buddyMascotMotionConfig.value.stepPauseMs);
   }, motionDurationMs);
 }
 
-function runBuddyIdleVirtualCursorOrbit(sequenceId: number) {
-  if (sequenceId !== buddyRoamSequenceId || !canBuddyRoam.value) {
+function runBuddyIdleVirtualCursorOrbit(sequenceId: number, options: BuddyIdleRunOptions = {}) {
+  if (sequenceId !== buddyRoamSequenceId || !canRunBuddyIdleAnimation(options)) {
     return;
   }
   virtualCursorIdleActionMode.value = "orbit";
@@ -1208,8 +1217,8 @@ function runBuddyIdleVirtualCursorOrbit(sequenceId: number) {
   buddyRoamMotionTimerId = window.setTimeout(runOrbitStep, BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS);
 }
 
-function runBuddyIdleVirtualCursorChase(sequenceId: number) {
-  if (sequenceId !== buddyRoamSequenceId || !canBuddyRoam.value) {
+function runBuddyIdleVirtualCursorChase(sequenceId: number, options: BuddyIdleRunOptions = {}) {
+  if (sequenceId !== buddyRoamSequenceId || !canRunBuddyIdleAnimation(options)) {
     return;
   }
   virtualCursorIdleActionMode.value = "chase";
@@ -1399,7 +1408,7 @@ function requestBuddyFollowVirtualCursor() {
     buddyVirtualCursorFollowTargetPosition !== null ||
     buddyVirtualCursorFollowMotionTimerId !== null ||
     buddyVirtualCursorFollowStepTimerId !== null;
-  if (!wasFollowing) {
+  if (!wasFollowing && virtualCursorIdleActionMode.value === "none") {
     cancelBuddyRoamTimers();
   }
   buddyVirtualCursorFollowTargetPosition = targetPosition;
@@ -1614,13 +1623,16 @@ function triggerMascotDebugAction(action: BuddyMascotDebugAction) {
       runBuddyIdleTailSwitch(++buddyRoamSequenceId);
       break;
     case "idle-random-move":
-      runBuddyIdleRoam(++buddyRoamSequenceId);
+      mood.value = "idle";
+      runBuddyIdleRoam(++buddyRoamSequenceId, { force: true });
       break;
     case "idle-virtual-cursor-orbit":
-      runBuddyIdleVirtualCursorOrbit(++buddyRoamSequenceId);
+      mood.value = "idle";
+      runBuddyIdleVirtualCursorOrbit(++buddyRoamSequenceId, { force: true });
       break;
     case "idle-virtual-cursor-chase":
-      runBuddyIdleVirtualCursorChase(++buddyRoamSequenceId);
+      mood.value = "idle";
+      runBuddyIdleVirtualCursorChase(++buddyRoamSequenceId, { force: true });
       break;
     case "face-left":
       mood.value = "idle";
@@ -1657,6 +1669,10 @@ function resolveMascotMoveDurationMs(mode: "fixed" | "random") {
 
 function chooseBuddyIdleAnimationAction(): BuddyIdleAnimationAction {
   return BUDDY_IDLE_ANIMATION_ACTIONS[Math.floor(Math.random() * BUDDY_IDLE_ANIMATION_ACTIONS.length)] ?? "tail-switch";
+}
+
+function canRunBuddyIdleAnimation(options: BuddyIdleRunOptions = {}) {
+  return options.force || canBuddyRoam.value;
 }
 
 function startVirtualCursorLaunch() {

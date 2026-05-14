@@ -359,14 +359,18 @@ test("BuddyMascot shows outward drooped ears and dizzy spiral eyes in error mood
   assert.match(componentSource, /class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--left"/);
   assert.match(componentSource, /class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--right"/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot__dizzy-eye"), /opacity:\s*0;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__resting-eye"), /display:\s*none;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__resting-eye"), /opacity:\s*0;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__dizzy-eye"), /opacity:\s*1;/);
-  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__dizzy-eye"), /animation:\s*buddy-mascot-error-eye-dizzy 760ms ease-out both;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__dizzy-eye"), /animation:\s*buddy-mascot-error-eye-spin 920ms linear infinite;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot__dizzy-eye--left"), /transform-origin:\s*-80px 82px;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot__dizzy-eye--right"), /transform-origin:\s*80px 82px;/);
   assert.match(componentSource, /rotate\(calc\(var\(--buddy-mascot-left-ear-rotate\) \+ -24deg\)\)/);
   assert.match(componentSource, /rotate\(calc\(var\(--buddy-mascot-right-ear-rotate\) \+ 24deg\)\)/);
   assert.match(componentSource, /@keyframes buddy-mascot-error-ear-left/);
   assert.match(componentSource, /@keyframes buddy-mascot-error-ear-right/);
-  assert.match(componentSource, /@keyframes buddy-mascot-error-eye-dizzy/);
+  assert.doesNotMatch(componentSource, /@keyframes buddy-mascot-error-eye-dizzy/);
+  assert.match(componentSource, /@keyframes buddy-mascot-error-eye-spin[\s\S]*rotate\(360deg\)/);
 });
 
 test("BuddyMascot changes the eyes into chevrons while dragging", () => {
@@ -391,7 +395,6 @@ test("BuddyMascot removes the jump-turn spin motion completely", () => {
   assert.doesNotMatch(componentSource, /tail-spin/);
   assert.doesNotMatch(componentSource, /ear-spin/);
   assert.doesNotMatch(componentSource, /look-spin/);
-  assert.doesNotMatch(componentSource, /eye-spin/);
 });
 
 test("BuddyMascot keeps the tail animated while thinking and speaking", () => {
