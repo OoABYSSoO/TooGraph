@@ -10,6 +10,22 @@
   "metadata": {
     "internal": true
   },
+  "stateInputSchema": [
+    {
+      "key": "autonomous_review",
+      "name": "Autonomous Review",
+      "valueType": "json",
+      "required": true,
+      "description": "Buddy 自主复盘或写回计划 state，供 LLM 生成低风险 Buddy Home 写回 commands。"
+    },
+    {
+      "key": "source_run_id",
+      "name": "Source Run ID",
+      "valueType": "text",
+      "required": false,
+      "description": "触发写回的源运行 ID state，用于审计和 revision 关联。"
+    }
+  ],
   "inputSchema": [
     {
       "key": "commands",

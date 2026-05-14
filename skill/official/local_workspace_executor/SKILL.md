@@ -7,14 +7,20 @@ description: Read, list, search, write one file, or execute one script inside To
 
 Use this skill when a graph needs one explicit local workspace operation on one repository path.
 
-The LLM node generates only these skill input fields:
+State inputs:
+
+- `workspace_request`: the user's or upstream graph node's local workspace goal.
+- `target_path`: optional repository-relative path. `before_llm.py` can pre-read matching files.
+- `workspace_context`: optional extra constraints, snippets, or desired result notes.
+
+The LLM node generates only these LLM parameters:
 
 - `path`: repository-relative file path.
 - `operation`: `read`, `list`, `search`, `write`, or `execute`.
 - `content`: required only when `operation` is `write`; it must be the complete final file content.
 - `query`: required only when `operation` is `search`; it must be the text to search for.
 
-The skill returns only:
+The skill exposes these state outputs:
 
 - `success`: whether the operation succeeded.
 - `result`: the successful output or failure detail.

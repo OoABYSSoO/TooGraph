@@ -41,8 +41,12 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
         self.assertEqual(definition.permissions, ["virtual_ui_operation"])
         self.assertEqual(
+            [field.key for field in definition.state_input_schema],
+            ["page_path", "user_goal", "page_context"],
+        )
+        self.assertEqual(
             [field.key for field in definition.input_schema],
-            ["page_path", "user_goal", "action", "target", "cursor_lifecycle"],
+            ["action", "target", "cursor_lifecycle"],
         )
         self.assertEqual(
             [field.key for field in definition.output_schema],

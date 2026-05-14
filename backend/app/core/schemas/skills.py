@@ -70,6 +70,7 @@ class SkillDefinition(BaseModel):
     )
     permissions: list[str] = Field(default_factory=list)
     runtime: SkillRuntimeSpec = Field(default_factory=SkillRuntimeSpec)
+    state_input_schema: list[SkillIoField] = Field(default_factory=list, alias="stateInputSchema")
     input_schema: list[SkillIoField] = Field(default_factory=list, alias="inputSchema")
     output_schema: list[SkillIoField] = Field(default_factory=list, alias="outputSchema")
     llm_node_eligibility: SkillLlmNodeEligibility = Field(

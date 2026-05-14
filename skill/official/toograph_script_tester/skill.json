@@ -7,6 +7,29 @@
   "version": "1.0.0",
   "timeoutSeconds": 45,
   "permissions": ["file_write", "subprocess"],
+  "stateInputSchema": [
+    {
+      "key": "script_requirement",
+      "name": "Script Requirement",
+      "valueType": "markdown",
+      "required": true,
+      "description": "用户希望脚本测试验证的行为、边界和成功标准。"
+    },
+    {
+      "key": "script_path",
+      "name": "Script Path",
+      "valueType": "text",
+      "required": false,
+      "description": "可选本地脚本路径；before_llm.py 会在允许范围内读取脚本内容作为测试依据。"
+    },
+    {
+      "key": "script_source",
+      "name": "Script Source",
+      "valueType": "text",
+      "required": false,
+      "description": "可选脚本文本内容；当没有本地路径或希望测试临时代码时使用。"
+    }
+  ],
   "inputSchema": [
     {
       "key": "files",

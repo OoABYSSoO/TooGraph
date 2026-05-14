@@ -11,10 +11,16 @@ Lifecycle:
 - `before_llm.py` adds the current local date to the skill-input planning context.
 - `after_llm.py` receives the LLM-generated `query`, performs the search and page download, and returns structured outputs.
 
-Input:
+State inputs:
+
+- `user_question`: current public web question or fact-checking need.
+- `search_context`: optional constraints such as region, time range, known facts, or preferred source hints.
+
+LLM parameters:
+
 - `query`: required public web search query.
 
-Outputs:
+State outputs:
 - `query`: actual query sent to the search provider.
 - `source_urls`: final source URL list for successfully saved local source documents.
 - `artifact_paths`: final local artifact path list for successfully fetched readable pages.

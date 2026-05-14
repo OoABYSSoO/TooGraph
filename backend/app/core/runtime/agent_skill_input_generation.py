@@ -167,10 +167,10 @@ def build_skill_input_system_prompt(
     resolved_state_schema = state_schema or {}
     parts = [
         "You are the skill-input planning phase of a graph LLM node.",
-        "Choose concrete arguments for every bound skill from the current graph state and the skill schemas.",
+        "Choose concrete LLM parameter arguments for every bound skill from the current graph state and the skill schemas.",
         "Return only one JSON object. Do not add markdown fences or prose.",
         "The top-level keys must be skill keys. Each value must be a JSON object of arguments for that skill.",
-        "Do not summarize skill results. Do not answer the user here. Only produce skill arguments.",
+        "Do not summarize skill results. Do not answer the user here. Only produce LLM parameters described by llmParameterSchema.",
     ]
     if input_values:
         parts.append("\n== Graph State Inputs ==")
@@ -185,7 +185,7 @@ def build_skill_input_system_prompt(
         definition = skill_definitions.get(skill_key)
         parts.append(f"- skillKey: {skill_key}")
         if definition is None:
-            parts.append("  inputSchema: []")
+            parts.append("  llmParameterSchema: []")
             example[skill_key] = {}
             continue
         if definition.name:
@@ -195,7 +195,11 @@ def build_skill_input_system_prompt(
         llm_instruction = resolve_effective_skill_llm_instruction(node, skill_key, definition)
         if llm_instruction:
             parts.append(f"  llmInstruction: {llm_instruction}")
-        parts.append("  inputSchema:")
+        if definition.state_input_schema:
+            parts.append("  stateInputSchema:")
+            for field in definition.state_input_schema:
+                parts.extend(format_skill_input_field_lines(field))
+        parts.append("  llmParameterSchema:")
         for field in definition.input_schema:
             parts.extend(format_skill_input_field_lines(field))
         example[skill_key] = {
@@ -277,7 +281,7 @@ def build_skill_input_user_prompt(node: NodeSystemAgentNode) -> str:
     return (
         node.config.task_instruction
         if node.config.task_instruction
-        else "Generate skill arguments from the graph state and skill schemas."
+        else "Generate skill LLM parameters from the graph state and skill schemas."
     ).strip()
 
 

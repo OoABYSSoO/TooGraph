@@ -24,7 +24,7 @@ def local_workspace_executor_before_llm(**payload: Any) -> dict[str, str]:
 
     lines = [
         "Local Workspace Executor policy:",
-        "- Generate skill input fields: path, operation, content only when operation is write, and query only when operation is search.",
+        "- Generate only LLM parameter fields: path, operation, content only when operation is write, and query only when operation is search.",
         "- operation must be one of: read, list, search, write, execute.",
         "- read/list/search are repository read operations and never write files.",
         "- read is a pre-LLM context aid: existing repository files below are read before planning, including non-artifact files.",

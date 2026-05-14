@@ -7,6 +7,29 @@
   "version": "1.0.0",
   "timeoutSeconds": 120,
   "permissions": ["file_read", "file_write", "subprocess"],
+  "stateInputSchema": [
+    {
+      "key": "workspace_request",
+      "name": "Workspace Request",
+      "valueType": "text",
+      "required": true,
+      "description": "用户或上游图节点希望在本地工作区完成的明确操作目标。"
+    },
+    {
+      "key": "target_path",
+      "name": "Target Path",
+      "valueType": "text",
+      "required": false,
+      "description": "可选仓库内相对路径；before_llm.py 会尝试预读相关文件并注入摘要。"
+    },
+    {
+      "key": "workspace_context",
+      "name": "Workspace Context",
+      "valueType": "markdown",
+      "required": false,
+      "description": "可选补充上下文，例如已有文件片段、约束或期望结果。"
+    }
+  ],
   "inputSchema": [
     {
       "key": "path",
