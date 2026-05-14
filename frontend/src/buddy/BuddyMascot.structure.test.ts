@@ -359,6 +359,7 @@ test("BuddyMascot shows outward drooped ears and dizzy spiral eyes in error mood
   assert.match(componentSource, /class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--left"/);
   assert.match(componentSource, /class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--right"/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot__dizzy-eye"), /opacity:\s*0;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot__dizzy-eye"), /stroke-width:\s*10;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__resting-eye"), /display:\s*none;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__resting-eye"), /opacity:\s*0;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__dizzy-eye"), /opacity:\s*1;/);

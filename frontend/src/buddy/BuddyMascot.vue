@@ -82,11 +82,11 @@
             />
             <g class="buddy-mascot__look-eye buddy-mascot__look-eye--left">
               <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--left" cx="-80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
-              <path class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--left" d="M-82 42 C-42 42 -40 116 -82 116 C-128 116 -124 48 -84 50 C-50 52 -52 104 -82 104 C-108 104 -108 64 -82 64 C-62 64 -62 92 -82 92 C-94 92 -94 76 -82 76" />
+              <path class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--left" d="M-80 48 C-48 48 -48 116 -80 116 C-118 116 -118 54 -80 54 C-54 54 -54 100 -80 100 C-100 100 -100 70 -80 70" />
             </g>
             <g class="buddy-mascot__look-eye buddy-mascot__look-eye--right">
               <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--right" cx="80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
-              <path class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--right" d="M78 42 C118 42 120 116 78 116 C32 116 36 48 76 50 C110 52 108 104 78 104 C52 104 52 64 78 64 C98 64 98 92 78 92 C66 92 66 76 78 76" />
+              <path class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--right" d="M80 48 C112 48 112 116 80 116 C42 116 42 54 80 54 C106 54 106 100 80 100 C60 100 60 70 80 70" />
             </g>
             <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--left" d="M-104 52 L-64 82 L-104 112" />
             <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--right" d="M104 52 L64 82 L104 112" />
@@ -696,7 +696,7 @@ function clampLookAxis(value: number | undefined) {
   opacity: 0;
   fill: none;
   stroke: url(#buddyMascotEyeGold);
-  stroke-width: 9;
+  stroke-width: 10;
   stroke-linecap: round;
   stroke-linejoin: round;
   transition: opacity 120ms ease;

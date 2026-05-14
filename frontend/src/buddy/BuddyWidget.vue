@@ -554,17 +554,22 @@ const BUDDY_IDLE_ANIMATION_MIN_DELAY_MS = 5000;
 const BUDDY_IDLE_ANIMATION_MAX_DELAY_MS = 10000;
 const BUDDY_IDLE_ANIMATION_ACTIONS: BuddyIdleAnimationAction[] = ["tail-switch", "random-move", "virtual-cursor-orbit", "virtual-cursor-chase"];
 const BUDDY_IDLE_TAIL_SWITCH_DURATION_MS = 1000;
-const BUDDY_IDLE_VIRTUAL_CURSOR_ORBIT_STEP_MS = 320;
-const BUDDY_IDLE_VIRTUAL_CURSOR_ORBIT_STEPS = 8;
+const BUDDY_IDLE_VIRTUAL_CURSOR_ORBIT_DURATION_MS = 2400;
 const BUDDY_IDLE_VIRTUAL_CURSOR_ORBIT_RADIUS_PX = DEFAULT_BUDDY_SIZE.width * 0.68;
 const BUDDY_ROAM_STEP_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
 const BUDDY_ROAM_TARGET_MIN_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
 const BUDDY_ROAM_TARGET_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 3;
 const BUDDY_ROAM_TARGET_REACHED_DISTANCE_PX = 1;
 const BUDDY_VIRTUAL_CURSOR_SIZE = { width: 42, height: 42 };
+const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_PERIOD_MS = 960;
+const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX = BUDDY_VIRTUAL_CURSOR_SIZE.width * 0.44;
 const BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG = 0;
 const BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG = -36;
 const BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS = 360;
+const BUDDY_VIRTUAL_CURSOR_MOVE_TRANSITION_MS = 180;
+const BUDDY_VIRTUAL_CURSOR_MIN_FLIGHT_DURATION_MS = 140;
+const BUDDY_VIRTUAL_CURSOR_MAX_FLIGHT_DURATION_MS = 360;
+const BUDDY_VIRTUAL_CURSOR_FLIGHT_SPEED_PX_PER_MS = 2.6;
 const BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE = 0.72;
 const BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE = 1;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 2.15;
@@ -595,6 +600,7 @@ const virtualCursorPath = ref(VIRTUAL_CURSOR_STAR_PATH);
 const virtualCursorMorphAnimation = ref<{ key: number; values: string; durationMs: number } | null>(null);
 const virtualCursorAngleDeg = ref(BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG);
 const virtualCursorScale = ref(BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE);
+const virtualCursorMoveDurationMs = ref(BUDDY_VIRTUAL_CURSOR_MOVE_TRANSITION_MS);
 const virtualCursorDetached = ref(false);
 const virtualCursorDragging = ref(false);
 const virtualCursorIdleActionMode = ref<VirtualCursorIdleActionMode>("none");
@@ -663,6 +669,7 @@ let buddyVirtualCursorFollowMotionTimerId: number | null = null;
 let buddyVirtualCursorFollowStepTimerId: number | null = null;
 let buddyVirtualCursorFollowTargetPosition: BuddyPosition | null = null;
 let buddyVirtualCursorFollowSequenceId = 0;
+let buddyVirtualCursorIdleFrameId: number | null = null;
 let virtualCursorTransitionTimerId: number | null = null;
 let virtualCursorTransitionFrameId: number | null = null;
 let virtualCursorMorphAnimationKey = 0;
@@ -718,6 +725,7 @@ const anchorStyle = computed(() => ({
 }));
 const virtualCursorStyle = computed(() => ({
   "--buddy-widget-virtual-cursor-morph-duration-ms": `${BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS}ms`,
+  "--buddy-widget-virtual-cursor-move-duration-ms": `${virtualCursorMoveDurationMs.value}ms`,
   "--buddy-widget-virtual-cursor-angle": `${virtualCursorAngleDeg.value}deg`,
   "--buddy-widget-virtual-cursor-scale": virtualCursorScale.value,
   translate: `${virtualCursorPosition.value.x}px ${virtualCursorPosition.value.y}px`,
@@ -783,6 +791,7 @@ onBeforeUnmount(() => {
   clearTraceClockTimer();
   cancelBuddyRoamTimers();
   cancelBuddyVirtualCursorFollowTimers();
+  cancelBuddyVirtualCursorIdleFrame();
   clearVirtualCursorTransition();
   cancelMascotLookFrame();
   closeEventSource();
@@ -1022,6 +1031,7 @@ function handleVirtualCursorPointerMove(event: PointerEvent) {
       BUDDY_VIRTUAL_CURSOR_SIZE,
       DEFAULT_BUDDY_MARGIN,
     ),
+    { durationMs: 0 },
   );
   updateMascotLookFromVirtualCursor();
   requestBuddyFollowVirtualCursor();
@@ -1197,24 +1207,33 @@ function runBuddyIdleVirtualCursorOrbit(sequenceId: number, options: BuddyIdleRu
   if (sequenceId !== buddyRoamSequenceId || !canRunBuddyIdleAnimation(options)) {
     return;
   }
+  cancelBuddyVirtualCursorIdleFrame();
   virtualCursorIdleActionMode.value = "orbit";
   buddyMascotDebugStore.setVirtualCursorEnabled(true);
-  let stepIndex = 0;
-  const runOrbitStep = () => {
-    if (sequenceId !== buddyRoamSequenceId || virtualCursorIdleActionMode.value !== "orbit") {
-      return;
-    }
-    if (stepIndex >= BUDDY_IDLE_VIRTUAL_CURSOR_ORBIT_STEPS) {
-      finishBuddyIdleVirtualCursorAction(sequenceId);
-      return;
-    }
-    const angle = (Math.PI * 2 * stepIndex) / BUDDY_IDLE_VIRTUAL_CURSOR_ORBIT_STEPS;
-    moveVirtualCursorTo(resolveVirtualCursorOrbitPosition(angle));
-    updateMascotLookFromVirtualCursor();
-    stepIndex += 1;
-    buddyRoamMotionTimerId = window.setTimeout(runOrbitStep, BUDDY_IDLE_VIRTUAL_CURSOR_ORBIT_STEP_MS);
-  };
-  buddyRoamMotionTimerId = window.setTimeout(runOrbitStep, BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS);
+  buddyRoamMotionTimerId = window.setTimeout(() => {
+    buddyRoamMotionTimerId = null;
+    runBuddyIdleVirtualCursorOrbitFrame(sequenceId, performance.now(), resolveVirtualCursorOrbitAngle(virtualCursorPosition.value));
+  }, BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS);
+}
+
+function runBuddyIdleVirtualCursorOrbitFrame(sequenceId: number, startedAtMs: number, startAngle: number) {
+  if (sequenceId !== buddyRoamSequenceId || virtualCursorIdleActionMode.value !== "orbit") {
+    cancelBuddyVirtualCursorIdleFrame();
+    return;
+  }
+  const elapsedMs = performance.now() - startedAtMs;
+  const progress = Math.min(1, elapsedMs / BUDDY_IDLE_VIRTUAL_CURSOR_ORBIT_DURATION_MS);
+  const angle = startAngle + progress * Math.PI * 2;
+  moveVirtualCursorTo(resolveVirtualCursorOrbitPosition(angle), { durationMs: 0 });
+  updateMascotLookFromVirtualCursor();
+  if (progress >= 1) {
+    buddyVirtualCursorIdleFrameId = null;
+    setVirtualCursorMoveTransitionDuration(BUDDY_VIRTUAL_CURSOR_MOVE_TRANSITION_MS);
+    settleVirtualCursorRotation();
+    finishBuddyIdleVirtualCursorAction(sequenceId);
+    return;
+  }
+  buddyVirtualCursorIdleFrameId = window.requestAnimationFrame(() => runBuddyIdleVirtualCursorOrbitFrame(sequenceId, startedAtMs, startAngle));
 }
 
 function runBuddyIdleVirtualCursorChase(sequenceId: number, options: BuddyIdleRunOptions = {}) {
@@ -1233,15 +1252,48 @@ function moveBuddyIdleVirtualCursorChaseTarget(sequenceId: number) {
   if (sequenceId !== buddyRoamSequenceId || virtualCursorIdleActionMode.value !== "chase") {
     return;
   }
-  moveVirtualCursorTo(resolveRandomVirtualCursorChasePosition());
+  cancelBuddyVirtualCursorIdleFrame();
+  const targetPosition = resolveRandomVirtualCursorChasePosition();
+  const flightDurationMs = resolveVirtualCursorMoveDurationMs(virtualCursorPosition.value, targetPosition);
+  moveVirtualCursorTo(targetPosition, { durationMs: flightDurationMs });
   updateMascotLookFromVirtualCursor();
   requestBuddyFollowVirtualCursor();
+  buddyRoamMotionTimerId = window.setTimeout(() => {
+    buddyRoamMotionTimerId = null;
+    runBuddyIdleVirtualCursorChaseLoop(sequenceId, targetPosition, performance.now());
+  }, flightDurationMs);
+}
+
+function runBuddyIdleVirtualCursorChaseLoop(sequenceId: number, centerPosition: BuddyPosition, startedAtMs: number) {
+  if (sequenceId !== buddyRoamSequenceId || virtualCursorIdleActionMode.value !== "chase") {
+    cancelBuddyVirtualCursorIdleFrame();
+    return;
+  }
+  const elapsedMs = performance.now() - startedAtMs;
+  const progress = (elapsedMs % BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_PERIOD_MS) / BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_PERIOD_MS;
+  const angle = progress * Math.PI * 2;
+  moveVirtualCursorTo(
+    clampBuddyPosition(
+      {
+        x: centerPosition.x + Math.sin(angle) * BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX,
+        y: centerPosition.y + Math.sin(angle * 2) * BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX * 0.58,
+      },
+      viewport.value,
+      BUDDY_VIRTUAL_CURSOR_SIZE,
+      DEFAULT_BUDDY_MARGIN,
+    ),
+    { durationMs: 0 },
+  );
+  updateMascotLookFromVirtualCursor();
+  requestBuddyFollowVirtualCursor();
+  buddyVirtualCursorIdleFrameId = window.requestAnimationFrame(() => runBuddyIdleVirtualCursorChaseLoop(sequenceId, centerPosition, startedAtMs));
 }
 
 function finishBuddyIdleVirtualCursorAction(sequenceId: number) {
   if (sequenceId !== buddyRoamSequenceId) {
     return;
   }
+  cancelBuddyVirtualCursorIdleFrame();
   virtualCursorIdleActionMode.value = "none";
   buddyMascotDebugStore.setVirtualCursorEnabled(false);
   buddyRoamMotionTimerId = window.setTimeout(() => {
@@ -1261,6 +1313,12 @@ function resolveVirtualCursorOrbitPosition(angle: number): BuddyPosition {
     BUDDY_VIRTUAL_CURSOR_SIZE,
     DEFAULT_BUDDY_MARGIN,
   );
+}
+
+function resolveVirtualCursorOrbitAngle(cursorPosition: BuddyPosition) {
+  const buddyCenter = resolveBoxCenter(position.value, DEFAULT_BUDDY_SIZE);
+  const cursorCenter = resolveBoxCenter(cursorPosition, BUDDY_VIRTUAL_CURSOR_SIZE);
+  return Math.atan2(cursorCenter.y - buddyCenter.y, cursorCenter.x - buddyCenter.x);
 }
 
 function resolveRandomVirtualCursorChasePosition(): BuddyPosition {
@@ -1366,6 +1424,7 @@ function finishBuddyRoamSequence(shouldPersistPosition: boolean) {
 
 function cancelBuddyRoamTimers() {
   buddyRoamSequenceId += 1;
+  cancelBuddyVirtualCursorIdleFrame();
   if (buddyRoamTimerId !== null) {
     window.clearTimeout(buddyRoamTimerId);
     buddyRoamTimerId = null;
@@ -1382,6 +1441,14 @@ function cancelBuddyRoamTimers() {
   virtualCursorIdleActionMode.value = "none";
   mascotMotion.value = "idle";
   mascotFacing.value = "front";
+}
+
+function cancelBuddyVirtualCursorIdleFrame() {
+  if (buddyVirtualCursorIdleFrameId !== null) {
+    window.cancelAnimationFrame(buddyVirtualCursorIdleFrameId);
+    buddyVirtualCursorIdleFrameId = null;
+  }
+  setVirtualCursorMoveTransitionDuration(BUDDY_VIRTUAL_CURSOR_MOVE_TRANSITION_MS);
 }
 
 function requestBuddyFollowVirtualCursor() {
@@ -1489,6 +1556,7 @@ function resolveBuddyVirtualCursorFollowTargetPosition(): BuddyPosition {
 
 function finishBuddyVirtualCursorFollowSequence(shouldPersistPosition: boolean) {
   cancelBuddyVirtualCursorFollowTimers();
+  cancelBuddyVirtualCursorIdleFrame();
   mascotMotion.value = "idle";
   mascotFacing.value = "front";
   if (shouldPersistPosition) {
@@ -1706,6 +1774,7 @@ function finishVirtualCursorLaunch() {
   virtualCursorTransitionTimerId = null;
   virtualCursorPath.value = VIRTUAL_CURSOR_SHAPE_PATH;
   virtualCursorMorphAnimation.value = null;
+  setVirtualCursorMoveTransitionDuration(BUDDY_VIRTUAL_CURSOR_MOVE_TRANSITION_MS);
   if (!virtualCursorEnabled.value) {
     startVirtualCursorReturn();
     return;
@@ -1754,6 +1823,7 @@ function startVirtualCursorReturn() {
 function finishVirtualCursorReturn() {
   virtualCursorTransitionTimerId = null;
   const dockedPosition = resolveDefaultVirtualCursorPosition(viewport.value, position.value);
+  setVirtualCursorMoveTransitionDuration(BUDDY_VIRTUAL_CURSOR_MOVE_TRANSITION_MS);
   virtualCursorPosition.value = dockedPosition;
   virtualCursorPath.value = VIRTUAL_CURSOR_STAR_PATH;
   virtualCursorMorphAnimation.value = null;
@@ -1815,11 +1885,29 @@ function resolveVirtualCursorLaunchPosition(currentViewport: { width: number; he
   );
 }
 
-function moveVirtualCursorTo(nextPosition: BuddyPosition, options: { updateAngle?: boolean } = {}) {
+function moveVirtualCursorTo(nextPosition: BuddyPosition, options: { updateAngle?: boolean; durationMs?: number } = {}) {
+  const currentPosition = virtualCursorPosition.value;
+  setVirtualCursorMoveTransitionDuration(options.durationMs ?? resolveVirtualCursorMoveDurationMs(currentPosition, nextPosition));
   if (options.updateAngle !== false) {
-    virtualCursorAngleDeg.value = resolveVirtualCursorFlightAngle(virtualCursorPosition.value, nextPosition);
+    virtualCursorAngleDeg.value = resolveVirtualCursorFlightAngle(currentPosition, nextPosition);
   }
   virtualCursorPosition.value = nextPosition;
+}
+
+function setVirtualCursorMoveTransitionDuration(durationMs: number) {
+  virtualCursorMoveDurationMs.value = Math.round(clampNumber(durationMs, 0, BUDDY_VIRTUAL_CURSOR_MAX_FLIGHT_DURATION_MS));
+}
+
+function resolveVirtualCursorMoveDurationMs(fromPosition: BuddyPosition, toPosition: BuddyPosition) {
+  const distance = Math.hypot(toPosition.x - fromPosition.x, toPosition.y - fromPosition.y);
+  if (distance < 1) {
+    return 0;
+  }
+  return clampNumber(
+    distance / BUDDY_VIRTUAL_CURSOR_FLIGHT_SPEED_PX_PER_MS,
+    BUDDY_VIRTUAL_CURSOR_MIN_FLIGHT_DURATION_MS,
+    BUDDY_VIRTUAL_CURSOR_MAX_FLIGHT_DURATION_MS,
+  );
 }
 
 function settleVirtualCursorRotation() {
@@ -1840,6 +1928,10 @@ function resolveBoxCenter(positionValue: BuddyPosition, size: { width: number; h
     x: positionValue.x + size.width / 2,
     y: positionValue.y + size.height / 2,
   };
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 async function sendMessage() {
@@ -3248,7 +3340,7 @@ function formatErrorMessage(error: unknown): string {
     drop-shadow(0 0 8px rgba(242, 201, 104, 0.32))
     drop-shadow(0 0 2px rgba(255, 251, 235, 0.82));
   transition:
-    translate 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    translate var(--buddy-widget-virtual-cursor-move-duration-ms, 180ms) cubic-bezier(0.16, 1, 0.3, 1),
     rotate 120ms ease,
     filter 140ms ease;
 }
