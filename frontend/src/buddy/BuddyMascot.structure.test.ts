@@ -165,6 +165,7 @@ test("BuddyMascot supports idle, thinking, speaking, dragging, and tap animation
   assert.match(componentSource, /type BuddyMascotFacing = "front" \| "left" \| "right";/);
   assert.match(componentSource, /dragging\?: boolean;/);
   assert.match(componentSource, /tapNonce\?: number;/);
+  assert.match(componentSource, /tailSwitchNonce\?: number;/);
   assert.match(componentSource, /motion\?: BuddyMascotMotion;/);
   assert.match(componentSource, /facing\?: BuddyMascotFacing;/);
   assert.match(componentSource, /buddy-mascot--idle/);
@@ -175,6 +176,7 @@ test("BuddyMascot supports idle, thinking, speaking, dragging, and tap animation
   assert.match(componentSource, /buddy-mascot--dragging/);
   assert.match(componentSource, /buddy-mascot--tap/);
   assert.match(componentSource, /watch\(\(\) => props\.tapNonce/);
+  assert.match(componentSource, /watch\(\(\) => props\.tailSwitchNonce, triggerTailSideSwitch\);/);
 });
 
 test("BuddyMascot exposes tail poses and directional part offsets without body mirroring", () => {
@@ -207,11 +209,9 @@ test("BuddyMascot exposes tail poses and directional part offsets without body m
   assert.doesNotMatch(componentSource, /scaleX\(0\.92\) rotate/);
 });
 
-test("BuddyMascot changes tail side after a random idle dwell instead of continuously swinging", () => {
+test("BuddyMascot changes tail side only when the idle state machine triggers the tail nonce", () => {
   assert.match(componentSource, /type TailSide = "left" \| "right";/);
   assert.match(componentSource, /const TAIL_IDLE_SWITCH_DURATION_MS = 1000;/);
-  assert.match(componentSource, /const TAIL_IDLE_MIN_DWELL_MS = 5200;/);
-  assert.match(componentSource, /const TAIL_IDLE_MAX_DWELL_MS = 9000;/);
   assert.match(componentSource, /import \{ computed, nextTick, onBeforeUnmount, ref, watch \} from "vue";/);
   assert.match(componentSource, /ref="tailAnimateElement"/);
   assert.match(componentSource, /const tailBasePath = ref<string>\(TAIL_POSE_PATHS\.right\);/);
@@ -219,9 +219,12 @@ test("BuddyMascot changes tail side after a random idle dwell instead of continu
   assert.match(componentSource, /const tailSwingAnimation = ref<\{ key: number; values: string; durationMs: number; keyTimes: string; keySplines: string \} \| null>\(null\);/);
   assert.match(componentSource, /const tailAnimateElement = ref<SVGAnimationElement \| null>\(null\);/);
   assert.match(componentSource, /watch\(\[effectiveMood, \(\) => props\.facing, \(\) => props\.dragging\], syncTailTarget, \{ immediate: true \}\);/);
-  assert.match(componentSource, /function scheduleIdleTailSideSwitch\(\)/);
-  assert.match(componentSource, /randomBetween\(TAIL_IDLE_MIN_DWELL_MS, TAIL_IDLE_MAX_DWELL_MS\)/);
+  assert.match(componentSource, /watch\(\(\) => props\.tailSwitchNonce, triggerTailSideSwitch\);/);
+  assert.match(componentSource, /function triggerTailSideSwitch\(nextNonce: number, previousNonce: number \| undefined\)/);
   assert.match(componentSource, /tailSide\.value === "right" \? "left" : "right"/);
+  assert.doesNotMatch(componentSource, /function scheduleIdleTailSideSwitch/);
+  assert.doesNotMatch(componentSource, /TAIL_IDLE_MIN_DWELL_MS/);
+  assert.doesNotMatch(componentSource, /TAIL_IDLE_MAX_DWELL_MS/);
   assert.match(componentSource, /function transitionTailTo\(targetSide: TailSide, durationMs = TAIL_IDLE_SWITCH_DURATION_MS, forceSwitch = false\)/);
   assert.match(componentSource, /tailSwingAnimation\.value = \{[\s\S]*key: tailAnimationKey,[\s\S]*values: buildTailPoseValues\(route\),[\s\S]*durationMs,[\s\S]*keyTimes: buildTailKeyTimes\(route\.length\),[\s\S]*keySplines: buildTailKeySplines\(route\.length\),[\s\S]*\};/);
   assert.match(componentSource, /void nextTick\(\(\) => \{[\s\S]*tailAnimateElement\.value\?\.beginElement\(\);[\s\S]*\}\);/);
@@ -239,7 +242,7 @@ test("BuddyMascot accelerates tail correction when facing changes without snappi
   assert.match(componentSource, /let previousFacing: BuddyMascotFacing = props\.facing;/);
   assert.match(componentSource, /const crossedLateralFacing = isOppositeSideFacing\(previousFacing, props\.facing\);[\s\S]*previousFacing = props\.facing;/);
   assert.match(componentSource, /if \(props\.facing !== "front"\) \{[\s\S]*transitionTailTo\(targetSide, TAIL_FACING_SWITCH_DURATION_MS, crossedLateralFacing\);[\s\S]*return;/);
-  assert.match(componentSource, /transitionTailTo\(tailSide\.value === "right" \? "left" : "right", TAIL_IDLE_SWITCH_DURATION_MS\);/);
+  assert.match(componentSource, /if \(enteredFrontFromLateral\) \{[\s\S]*transitionTailTo\(targetSide, TAIL_FACING_SWITCH_DURATION_MS, true\);[\s\S]*return;/);
   assert.match(componentSource, /type TailPose = \(typeof TAIL_POSE_ORDER\)\[number\];/);
   assert.match(componentSource, /const TAIL_POSE_ORDER = \["right", "backRight", "backCenter", "backLeft", "left"\] as const;/);
   assert.match(componentSource, /const startPose = tailSwingAnimation\.value \? estimateCurrentTailPose\(\) : poseFromSide\(tailSide\.value\);/);
@@ -334,8 +337,8 @@ test("BuddyMascot moves eye wrapper layers toward the pointer without replacing 
   assert.match(componentSource, /cx="-80" cy="82"/);
   assert.match(componentSource, /cx="80" cy="82"/);
   assert.match(componentSource, /const shouldTrackPointer = props\.facing === "front";/);
-  assert.match(componentSource, /const x = shouldTrackPointer \? clampLookAxis\(props\.lookX\) \* 16 : 0;/);
-  assert.match(componentSource, /const y = shouldTrackPointer \? clampLookAxis\(props\.lookY\) \* 10 : 0;/);
+  assert.match(componentSource, /const x = shouldTrackPointer \? clampLookAxis\(props\.lookX\) \* 18 : 0;/);
+  assert.match(componentSource, /const y = shouldTrackPointer \? clampLookAxis\(props\.lookY\) \* 12 : 0;/);
   assert.match(
     componentSource,
     /\.buddy-mascot__look-eye--left\s*\{[\s\S]*transform:\s*translate\(\s*calc\(var\(--buddy-mascot-look-x,\s*0px\) \+ var\(--buddy-mascot-left-eye-facing-x,\s*0px\)\),\s*calc\(var\(--buddy-mascot-look-y,\s*0px\) \+ var\(--buddy-mascot-eye-facing-y,\s*0px\)\)\s*\);/,
@@ -348,6 +351,17 @@ test("BuddyMascot moves eye wrapper layers toward the pointer without replacing 
     componentSource,
     /@keyframes buddy-mascot-blink[\s\S]*transform:\s*scaleY\(1\);[\s\S]*transform:\s*scaleY\(0\.08\);/,
   );
+});
+
+test("BuddyMascot shows a drooped-ear sad-eye animation in error mood", () => {
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__left-ear"), /animation:\s*buddy-mascot-error-ear-left 760ms ease-out both;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__right-ear"), /animation:\s*buddy-mascot-error-ear-right 760ms ease-out both;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__look-eye--left"), /rotate\(-10deg\)/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__look-eye--right"), /rotate\(10deg\)/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__resting-eye"), /animation:\s*buddy-mascot-error-eye-sad 680ms ease-out both;/);
+  assert.match(componentSource, /@keyframes buddy-mascot-error-ear-left/);
+  assert.match(componentSource, /@keyframes buddy-mascot-error-ear-right/);
+  assert.match(componentSource, /@keyframes buddy-mascot-error-eye-sad/);
 });
 
 test("BuddyMascot changes the eyes into chevrons while dragging", () => {

@@ -130,8 +130,6 @@ const TAIL_POSE_ORDER = ["right", "backRight", "backCenter", "backLeft", "left"]
 const TAIL_IDLE_SWITCH_DURATION_MS = 1000;
 const TAIL_FACING_SWITCH_DURATION_MS = 320;
 const TAIL_CURVE_MICRO_DURATION_MS = 6800;
-const TAIL_IDLE_MIN_DWELL_MS = 5200;
-const TAIL_IDLE_MAX_DWELL_MS = 9000;
 const TAIL_KEY_SPLINE = "0.42 0 0.58 1";
 const SPARKLE_STAR_PATH = "M0-180 C5-154 18-141 44-136 C18-131 5-118 0-92 C-5-118 -18-131 -44-136 C-18-141 -5-154 0-180Z";
 const SPARKLE_CURSOR_PATH = "M0-184 C14-147 33-107 52-78 C27-77 13-66 0-48 C-13-66 -27-77 -52-78 C-33-107 -14-147 0-184Z";
@@ -188,6 +186,7 @@ const props = withDefaults(
     facing?: BuddyMascotFacing;
     dragging?: boolean;
     tapNonce?: number;
+    tailSwitchNonce?: number;
     lookX?: number;
     lookY?: number;
     virtualCursor?: boolean;
@@ -199,6 +198,7 @@ const props = withDefaults(
     facing: "front",
     dragging: false,
     tapNonce: 0,
+    tailSwitchNonce: 0,
     lookX: 0,
     lookY: 0,
     virtualCursor: false,
@@ -215,7 +215,6 @@ const sparklePath = ref<string>(SPARKLE_STAR_PATH);
 const sparkleMorphAnimation = ref<{ key: number; values: string; durationMs: number } | null>(null);
 const sparkleAnimateElement = ref<SVGAnimationElement | null>(null);
 let tapTimeoutId: number | null = null;
-let tailDwellTimerId: number | null = null;
 let tailTransitionTimerId: number | null = null;
 let sparkleMorphTimerId: number | null = null;
 let tailAnimationKey = 0;
@@ -237,8 +236,8 @@ const mascotClasses = computed(() => ({
 }));
 const eyeLookStyle = computed<Record<string, string>>(() => {
   const shouldTrackPointer = props.facing === "front";
-  const x = shouldTrackPointer ? clampLookAxis(props.lookX) * 16 : 0;
-  const y = shouldTrackPointer ? clampLookAxis(props.lookY) * 10 : 0;
+  const x = shouldTrackPointer ? clampLookAxis(props.lookX) * 18 : 0;
+  const y = shouldTrackPointer ? clampLookAxis(props.lookY) * 12 : 0;
   return {
     "--buddy-mascot-look-x": `${x.toFixed(2)}px`,
     "--buddy-mascot-look-y": `${y.toFixed(2)}px`,
@@ -247,6 +246,7 @@ const eyeLookStyle = computed<Record<string, string>>(() => {
 const tailCurveAnimationValues = computed(() => buildTailCurveMicroValues(tailSide.value));
 
 watch(() => props.tapNonce, triggerTapAnimation);
+watch(() => props.tailSwitchNonce, triggerTailSideSwitch);
 watch(() => props.virtualCursor, syncSparklePath, { immediate: true });
 watch([effectiveMood, () => props.facing, () => props.dragging], syncTailTarget, { immediate: true });
 
@@ -328,7 +328,6 @@ function clearSparkleMorphTimer() {
 }
 
 function syncTailTarget() {
-  clearTailDwellTimer();
   const enteredFrontFromLateral = props.facing === "front" && isLateralFacing(previousFacing);
   const targetSide = enteredFrontFromLateral
     ? resolveFrontTailSideFromPreviousFacing(previousFacing)
@@ -346,28 +345,16 @@ function syncTailTarget() {
     return;
   }
 
-  if (effectiveMood.value === "idle" && !props.dragging) {
-    scheduleIdleTailSideSwitch();
-  }
 }
 
-function scheduleIdleTailSideSwitch() {
-  clearTailDwellTimer();
-  if (typeof window === "undefined") {
+function triggerTailSideSwitch(nextNonce: number, previousNonce: number | undefined) {
+  if (nextNonce === previousNonce || props.facing !== "front" || effectiveMood.value !== "idle" || props.dragging) {
     return;
   }
-
-  tailDwellTimerId = window.setTimeout(() => {
-    tailDwellTimerId = null;
-    if (props.facing !== "front" || effectiveMood.value !== "idle" || props.dragging) {
-      return;
-    }
-    transitionTailTo(tailSide.value === "right" ? "left" : "right", TAIL_IDLE_SWITCH_DURATION_MS);
-  }, randomBetween(TAIL_IDLE_MIN_DWELL_MS, TAIL_IDLE_MAX_DWELL_MS));
+  transitionTailTo(tailSide.value === "right" ? "left" : "right", TAIL_IDLE_SWITCH_DURATION_MS);
 }
 
 function transitionTailTo(targetSide: TailSide, durationMs = TAIL_IDLE_SWITCH_DURATION_MS, forceSwitch = false) {
-  clearTailDwellTimer();
   const startPose = tailSwingAnimation.value ? estimateCurrentTailPose() : poseFromSide(tailSide.value);
   clearTailTransitionTimer();
 
@@ -375,9 +362,6 @@ function transitionTailTo(targetSide: TailSide, durationMs = TAIL_IDLE_SWITCH_DU
     tailSwingAnimation.value = null;
     tailBasePath.value = TAIL_POSE_PATHS[targetSide];
     tailTransitionTargetSide = null;
-    if (props.facing === "front" && effectiveMood.value === "idle" && !props.dragging) {
-      scheduleIdleTailSideSwitch();
-    }
     return;
   }
 
@@ -512,18 +496,8 @@ function nowMs() {
 }
 
 function clearTailTimers() {
-  clearTailDwellTimer();
   clearTailTransitionTimer();
   tailTransitionTargetSide = null;
-}
-
-function clearTailDwellTimer() {
-  if (tailDwellTimerId === null || typeof window === "undefined") {
-    tailDwellTimerId = null;
-    return;
-  }
-  window.clearTimeout(tailDwellTimerId);
-  tailDwellTimerId = null;
 }
 
 function clearTailTransitionTimer() {
@@ -533,10 +507,6 @@ function clearTailTransitionTimer() {
   }
   window.clearTimeout(tailTransitionTimerId);
   tailTransitionTimerId = null;
-}
-
-function randomBetween(min: number, max: number) {
-  return Math.round(min + Math.random() * (max - min));
 }
 
 function clampLookAxis(value: number | undefined) {
@@ -790,6 +760,26 @@ function clampLookAxis(value: number | undefined) {
 
 .buddy-mascot--error {
   filter: saturate(0.85);
+}
+
+.buddy-mascot--error .buddy-mascot__left-ear {
+  animation: buddy-mascot-error-ear-left 760ms ease-out both;
+}
+
+.buddy-mascot--error .buddy-mascot__right-ear {
+  animation: buddy-mascot-error-ear-right 760ms ease-out both;
+}
+
+.buddy-mascot--error .buddy-mascot__look-eye--left {
+  transform: translate(-4px, 12px) rotate(-10deg);
+}
+
+.buddy-mascot--error .buddy-mascot__look-eye--right {
+  transform: translate(4px, 12px) rotate(10deg);
+}
+
+.buddy-mascot--error .buddy-mascot__resting-eye {
+  animation: buddy-mascot-error-eye-sad 680ms ease-out both;
 }
 
 .buddy-mascot--dragging .buddy-mascot__tail {
@@ -1074,6 +1064,41 @@ function clampLookAxis(value: number | undefined) {
   }
   50% {
     transform: scaleY(0.9);
+  }
+}
+
+@keyframes buddy-mascot-error-ear-left {
+  0% {
+    transform: translate(var(--buddy-mascot-left-ear-x), var(--buddy-mascot-left-ear-y))
+      scale(var(--buddy-mascot-left-ear-scale))
+      rotate(var(--buddy-mascot-left-ear-rotate));
+  }
+  100% {
+    transform: translate(var(--buddy-mascot-left-ear-x), calc(var(--buddy-mascot-left-ear-y) + 16px))
+      scale(0.94)
+      rotate(calc(var(--buddy-mascot-left-ear-rotate) + 24deg));
+  }
+}
+
+@keyframes buddy-mascot-error-ear-right {
+  0% {
+    transform: translate(var(--buddy-mascot-right-ear-x), var(--buddy-mascot-right-ear-y))
+      scale(var(--buddy-mascot-right-ear-scale))
+      rotate(var(--buddy-mascot-right-ear-rotate));
+  }
+  100% {
+    transform: translate(var(--buddy-mascot-right-ear-x), calc(var(--buddy-mascot-right-ear-y) + 16px))
+      scale(0.94)
+      rotate(calc(var(--buddy-mascot-right-ear-rotate) + -24deg));
+  }
+}
+
+@keyframes buddy-mascot-error-eye-sad {
+  0% {
+    transform: scaleY(1);
+  }
+  100% {
+    transform: scaleY(0.62);
   }
 }
 
