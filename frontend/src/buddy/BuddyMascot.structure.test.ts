@@ -360,12 +360,13 @@ test("BuddyMascot shows outward drooped ears and circular dizzy spiral eyes in e
   assert.match(componentSource, /class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--right"/);
   assert.match(
     componentSource,
-    /d="M-80 82 m0-8 a8 8 0 1 1 -8 8 a16 16 0 1 1 16 16 a26 26 0 1 1 -26 -26 a36 36 0 1 1 36 36"/,
+    /d="M-80 82 C-70 70 -50 74 -50 90 C-50 112 -76 124 -96 108 C-122 88 -110 48 -76 44 C-34 40 -12 88 -42 122"/,
   );
   assert.match(
     componentSource,
-    /d="M80 82 m0-8 a8 8 0 1 1 -8 8 a16 16 0 1 1 16 16 a26 26 0 1 1 -26 -26 a36 36 0 1 1 36 36"/,
+    /d="M80 82 C90 70 110 74 110 90 C110 112 84 124 64 108 C38 88 50 48 84 44 C126 40 148 88 118 122"/,
   );
+  assert.doesNotMatch(componentSource, /m0-8 a8 8/);
   assert.doesNotMatch(componentSource, /C-48 48 -48 116/);
   assert.doesNotMatch(componentSource, /C112 48 112 116/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot__dizzy-eye"), /opacity:\s*0;/);

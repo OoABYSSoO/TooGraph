@@ -82,11 +82,11 @@
             />
             <g class="buddy-mascot__look-eye buddy-mascot__look-eye--left">
               <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--left" cx="-80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
-              <path class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--left" d="M-80 82 m0-8 a8 8 0 1 1 -8 8 a16 16 0 1 1 16 16 a26 26 0 1 1 -26 -26 a36 36 0 1 1 36 36" />
+              <path class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--left" d="M-80 82 C-70 70 -50 74 -50 90 C-50 112 -76 124 -96 108 C-122 88 -110 48 -76 44 C-34 40 -12 88 -42 122" />
             </g>
             <g class="buddy-mascot__look-eye buddy-mascot__look-eye--right">
               <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--right" cx="80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
-              <path class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--right" d="M80 82 m0-8 a8 8 0 1 1 -8 8 a16 16 0 1 1 16 16 a26 26 0 1 1 -26 -26 a36 36 0 1 1 36 36" />
+              <path class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--right" d="M80 82 C90 70 110 74 110 90 C110 112 84 124 64 108 C38 88 50 48 84 44 C126 40 148 88 118 122" />
             </g>
             <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--left" d="M-104 52 L-64 82 L-104 112" />
             <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--right" d="M104 52 L64 82 L104 112" />
