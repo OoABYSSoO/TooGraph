@@ -77,8 +77,17 @@ test("BuddyWidget lets the idle mascot roam only while the panel is closed and t
   assert.match(componentSource, /\}, buddyMascotMotionConfig\.value\.moveDurationMs\);/);
   assert.match(componentSource, /\}, buddyMascotMotionConfig\.value\.stepPauseMs\);/);
   assert.match(extractCssBlock(".buddy-widget__anchor--roaming"), /var\(--buddy-widget-roam-duration-ms,\s*420ms\) cubic-bezier\(0\.2,\s*1\.05,\s*0\.32,\s*1\)/);
-  assert.match(extractCssBlock(".buddy-widget__avatar--roaming"), /buddy-widget-avatar-hop-path var\(--buddy-widget-roam-duration-ms,\s*420ms\) cubic-bezier\(0\.2,\s*1\.05,\s*0\.32,\s*1\) both/);
-  assert.match(extractCssBlock(".buddy-widget__avatar--hopping"), /buddy-widget-avatar-hop-path var\(--buddy-widget-hop-duration-ms,\s*420ms\) cubic-bezier\(0\.2,\s*1\.05,\s*0\.32,\s*1\) both/);
+  assert.match(componentSource, /const avatarHopCycle = ref\(0\);/);
+  assert.match(componentSource, /function restartAvatarHopAnimation\(\)/);
+  assert.match(componentSource, /avatarHopCycle\.value \+= 1;/);
+  assert.match(componentSource, /'buddy-widget__avatar--hop-cycle-a': avatarHopCycle % 2 === 0/);
+  assert.match(componentSource, /'buddy-widget__avatar--hop-cycle-b': avatarHopCycle % 2 === 1/);
+  assert.match(extractCssBlock(".buddy-widget__avatar--roaming.buddy-widget__avatar--hop-cycle-a"), /buddy-widget-avatar-hop-path-a var\(--buddy-widget-roam-duration-ms,\s*420ms\) cubic-bezier\(0\.2,\s*1\.05,\s*0\.32,\s*1\) both/);
+  assert.match(extractCssBlock(".buddy-widget__avatar--roaming.buddy-widget__avatar--hop-cycle-b"), /buddy-widget-avatar-hop-path-b var\(--buddy-widget-roam-duration-ms,\s*420ms\) cubic-bezier\(0\.2,\s*1\.05,\s*0\.32,\s*1\) both/);
+  assert.match(extractCssBlock(".buddy-widget__avatar--hopping.buddy-widget__avatar--hop-cycle-a"), /buddy-widget-avatar-hop-path-a var\(--buddy-widget-hop-duration-ms,\s*420ms\) cubic-bezier\(0\.2,\s*1\.05,\s*0\.32,\s*1\) both/);
+  assert.match(extractCssBlock(".buddy-widget__avatar--hopping.buddy-widget__avatar--hop-cycle-b"), /buddy-widget-avatar-hop-path-b var\(--buddy-widget-hop-duration-ms,\s*420ms\) cubic-bezier\(0\.2,\s*1\.05,\s*0\.32,\s*1\) both/);
+  assert.match(componentSource, /@keyframes buddy-widget-avatar-hop-path-a/);
+  assert.match(componentSource, /@keyframes buddy-widget-avatar-hop-path-b/);
 });
 
 test("BuddyWidget schedules random hop movement without jump-turn spin actions", () => {
@@ -94,6 +103,7 @@ test("BuddyWidget schedules random hop movement without jump-turn spin actions",
   assert.match(componentSource, /runBuddyRoamStep\(buddyRoamSequenceId\);/);
   assert.match(componentSource, /function runBuddyRoamStep\(sequenceId: number\)/);
   assert.match(componentSource, /const nextPosition = resolveBuddyRoamStepPosition\(position\.value, targetPosition\);/);
+  assert.match(componentSource, /restartAvatarHopAnimation\(\);[\s\S]*mascotFacing\.value = resolveBuddyRoamFacing\(nextPosition\.x - position\.value\.x\);/);
   assert.match(componentSource, /mascotFacing\.value = resolveBuddyRoamFacing\(nextPosition\.x - position\.value\.x\);/);
   assert.match(componentSource, /buddyRoamStepTimerId = window\.setTimeout\(\(\) => \{[\s\S]*runBuddyRoamStep\(sequenceId\);[\s\S]*\}, buddyMascotMotionConfig\.value\.stepPauseMs\);/);
   assert.match(componentSource, /function resolveBuddyRoamStepPosition\(currentPosition: BuddyPosition, targetPosition: BuddyPosition\): BuddyPosition/);
@@ -177,6 +187,7 @@ test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow
   assert.match(extractCssBlock(".buddy-widget__virtual-cursor--floating img"), /animation:\s*buddy-widget-virtual-cursor-float 1\.8s ease-in-out infinite;/);
   assert.match(componentSource, /@keyframes buddy-widget-virtual-cursor-float[\s\S]*translateY\(-2px\) rotate\(-1deg\)/);
   assert.match(extractCssBlock(".buddy-widget__virtual-cursor"), /transform-origin:\s*50% 58%;/);
+  assert.match(extractCssBlock(".buddy-widget__virtual-cursor"), /drop-shadow\(0 0 8px rgba\(242,\s*201,\s*104,\s*0\.32\)\)/);
   assert.match(extractCssBlock(".buddy-widget__virtual-cursor"), /transform 160ms cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\)/);
   assert.match(componentSource, /function requestBuddyFollowVirtualCursor\(\)/);
   assert.match(componentSource, /function runBuddyVirtualCursorFollowStep\(sequenceId: number\)/);
@@ -198,6 +209,7 @@ test("BuddyWidget debug panel can trigger every mascot animation state without g
   assert.match(componentSource, /case "error":[\s\S]*mood\.value = "error";/);
   assert.match(componentSource, /case "tap":[\s\S]*tapNonce\.value \+= 1;/);
   assert.match(componentSource, /case "dragging":[\s\S]*debugDragging\.value = true;/);
+  assert.match(componentSource, /function playMascotDebugMotion\(motion: BuddyMascotMotion, durationMs: number, facing: BuddyMascotFacing\)[\s\S]*restartAvatarHopAnimation\(\);/);
   assert.match(componentSource, /playMascotDebugMotion\("hop", buddyMascotMotionConfig\.value\.moveDurationMs, "front"\);/);
   assert.match(componentSource, /playMascotDebugMotion\("roam", buddyMascotMotionConfig\.value\.moveDurationMs, "right"\);/);
   assert.doesNotMatch(componentSource, /playMascotDebugMotion\("spin"/);

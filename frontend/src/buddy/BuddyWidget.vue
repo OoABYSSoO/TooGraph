@@ -337,6 +337,8 @@
         :class="{
           'buddy-widget__avatar--roaming': mascotMotion === 'roam',
           'buddy-widget__avatar--hopping': mascotMotion === 'hop',
+          'buddy-widget__avatar--hop-cycle-a': avatarHopCycle % 2 === 0,
+          'buddy-widget__avatar--hop-cycle-b': avatarHopCycle % 2 === 1,
         }"
         :style="avatarStyle"
         :title="t('buddy.dragHint')"
@@ -540,6 +542,7 @@ const virtualCursorDetached = ref(false);
 const virtualCursorDragging = ref(false);
 const isPanelOpen = ref(false);
 const draft = ref("");
+const avatarHopCycle = ref(0);
 const buddyMode = ref<BuddyMode>(DEFAULT_BUDDY_MODE);
 const buddyModelRef = ref("");
 const buddyModelOptions = ref<BuddyModelOption[]>([]);
@@ -1025,6 +1028,7 @@ function runBuddyRoamStep(sequenceId: number) {
   }
 
   const nextPosition = resolveBuddyRoamStepPosition(position.value, targetPosition);
+  restartAvatarHopAnimation();
   mascotFacing.value = resolveBuddyRoamFacing(nextPosition.x - position.value.x);
   mascotMotion.value = "roam";
   position.value = nextPosition;
@@ -1186,6 +1190,7 @@ function runBuddyVirtualCursorFollowStep(sequenceId: number) {
   }
 
   const nextPosition = resolveBuddyRoamStepPosition(position.value, targetPosition);
+  restartAvatarHopAnimation();
   mascotFacing.value = resolveBuddyRoamFacing(nextPosition.x - position.value.x);
   mascotMotion.value = "roam";
   position.value = nextPosition;
@@ -1300,9 +1305,14 @@ function clearTraceClockTimer() {
   traceClockTimerId = null;
 }
 
+function restartAvatarHopAnimation() {
+  avatarHopCycle.value += 1;
+}
+
 function playMascotDebugMotion(motion: BuddyMascotMotion, durationMs: number, facing: BuddyMascotFacing) {
   mood.value = "idle";
   mascotFacing.value = facing;
+  restartAvatarHopAnimation();
   mascotMotion.value = motion;
   buddyDebugActionTimerId = window.setTimeout(() => {
     mascotMotion.value = "idle";
@@ -2819,6 +2829,7 @@ function formatErrorMessage(error: unknown): string {
   will-change: transform;
   filter:
     drop-shadow(0 5px 9px rgba(40, 32, 20, 0.22))
+    drop-shadow(0 0 8px rgba(242, 201, 104, 0.32))
     drop-shadow(0 0 2px rgba(255, 251, 235, 0.82));
   transition:
     transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
@@ -2845,6 +2856,7 @@ function formatErrorMessage(error: unknown): string {
   cursor: grabbing;
   filter:
     drop-shadow(0 4px 7px rgba(40, 32, 20, 0.26))
+    drop-shadow(0 0 8px rgba(242, 201, 104, 0.36))
     drop-shadow(0 0 2px rgba(255, 251, 235, 0.9));
 }
 
@@ -2887,12 +2899,20 @@ function formatErrorMessage(error: unknown): string {
     drop-shadow(0 0 4px rgba(255, 255, 255, 0.98));
 }
 
-.buddy-widget__avatar--roaming {
-  animation: buddy-widget-avatar-hop-path var(--buddy-widget-roam-duration-ms, 420ms) cubic-bezier(0.2, 1.05, 0.32, 1) both;
+.buddy-widget__avatar--roaming.buddy-widget__avatar--hop-cycle-a {
+  animation: buddy-widget-avatar-hop-path-a var(--buddy-widget-roam-duration-ms, 420ms) cubic-bezier(0.2, 1.05, 0.32, 1) both;
 }
 
-.buddy-widget__avatar--hopping {
-  animation: buddy-widget-avatar-hop-path var(--buddy-widget-hop-duration-ms, 420ms) cubic-bezier(0.2, 1.05, 0.32, 1) both;
+.buddy-widget__avatar--roaming.buddy-widget__avatar--hop-cycle-b {
+  animation: buddy-widget-avatar-hop-path-b var(--buddy-widget-roam-duration-ms, 420ms) cubic-bezier(0.2, 1.05, 0.32, 1) both;
+}
+
+.buddy-widget__avatar--hopping.buddy-widget__avatar--hop-cycle-a {
+  animation: buddy-widget-avatar-hop-path-a var(--buddy-widget-hop-duration-ms, 420ms) cubic-bezier(0.2, 1.05, 0.32, 1) both;
+}
+
+.buddy-widget__avatar--hopping.buddy-widget__avatar--hop-cycle-b {
+  animation: buddy-widget-avatar-hop-path-b var(--buddy-widget-hop-duration-ms, 420ms) cubic-bezier(0.2, 1.05, 0.32, 1) both;
 }
 
 .buddy-widget__avatar:active {
@@ -2918,7 +2938,20 @@ function formatErrorMessage(error: unknown): string {
   box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3);
 }
 
-@keyframes buddy-widget-avatar-hop-path {
+@keyframes buddy-widget-avatar-hop-path-a {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  34% {
+    transform: translateY(-18px);
+  }
+  66% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes buddy-widget-avatar-hop-path-b {
   0%,
   100% {
     transform: translateY(0);
