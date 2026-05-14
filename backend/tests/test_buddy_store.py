@@ -256,6 +256,69 @@ class BuddyStoreTests(unittest.TestCase):
         self.assertEqual(restored["current_value"], {})
         self.assertFalse(report_exists)
 
+    def test_capability_usage_stats_update_accumulates_counts_and_revision(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+                stats = store.update_capability_usage_stats(
+                    {
+                        "entries": [
+                            {
+                                "capability": {"kind": "skill", "key": "web_search", "name": "联网搜索"},
+                                "success": True,
+                                "run_id": "run_capability_1",
+                                "summary": "用于查找资料。",
+                                "duration_ms": 1250,
+                            },
+                            {
+                                "capability": {"kind": "skill", "key": "web_search", "name": "联网搜索"},
+                                "success": False,
+                                "run_id": "run_capability_2",
+                                "summary": "外部搜索失败。",
+                            },
+                        ]
+                    },
+                    changed_by="buddy_command",
+                    change_reason="自主复盘更新能力使用统计。",
+                )
+                revisions = store.list_revisions(target_type="capability_usage_stats", target_id="capability_usage_stats")
+                loaded = store.load_capability_usage_stats()
+
+        web_search = stats["capabilities"]["skill:web_search"]
+        self.assertEqual(web_search["use_count"], 2)
+        self.assertEqual(web_search["success_count"], 1)
+        self.assertEqual(web_search["failure_count"], 1)
+        self.assertEqual(web_search["recent_runs"][0]["run_id"], "run_capability_2")
+        self.assertEqual(loaded["capabilities"]["skill:web_search"]["use_count"], 2)
+        self.assertEqual(len(revisions), 1)
+        self.assertEqual(revisions[0]["next_value"]["capabilities"]["skill:web_search"]["last_summary"], "外部搜索失败。")
+
+    def test_capability_usage_stats_restore_returns_previous_value(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+                store.update_capability_usage_stats(
+                    {
+                        "capability": {"kind": "subgraph", "key": "advanced_web_research_loop", "name": "高级联网搜索"},
+                        "success": True,
+                        "run_id": "run_capability_restore",
+                    },
+                    changed_by="buddy_command",
+                    change_reason="自主复盘更新能力使用统计。",
+                )
+                revision = store.list_revisions(
+                    target_type="capability_usage_stats",
+                    target_id="capability_usage_stats",
+                )[0]
+                restored = store.restore_revision(
+                    revision["revision_id"],
+                    changed_by="user",
+                    change_reason="用户恢复能力统计。",
+                )
+                loaded = store.load_capability_usage_stats()
+
+        self.assertEqual(restored["target_type"], "capability_usage_stats")
+        self.assertEqual(restored["target_id"], "capability_usage_stats")
+        self.assertEqual(loaded["capabilities"], {})
+
     def test_buddy_database_migrates_legacy_messages_before_client_order_index(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             buddy_home = Path(temp_dir) / "buddy_home"

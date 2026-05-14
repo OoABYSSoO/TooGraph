@@ -8,6 +8,8 @@ from typing import Any, Iterator
 from uuid import uuid4
 
 from app.buddy.home import (
+    CAPABILITY_USAGE_STATS_KEY,
+    DEFAULT_CAPABILITY_USAGE_STATS,
     DEFAULT_POLICY,
     DEFAULT_PROFILE,
     DEFAULT_SESSION_SUMMARY,
@@ -33,6 +35,9 @@ RUN_TEMPLATE_BINDING_KEY = "run_template_binding"
 RUN_TEMPLATE_BINDING_TARGET_TYPE = "run_template_binding"
 RUN_TEMPLATE_BINDING_TARGET_ID = "run_template_binding"
 RUN_TEMPLATE_BINDING_VERSION = 1
+CAPABILITY_USAGE_STATS_TARGET_TYPE = "capability_usage_stats"
+CAPABILITY_USAGE_STATS_TARGET_ID = "capability_usage_stats"
+MAX_CAPABILITY_USAGE_RECENT_RUNS = 5
 ALLOWED_RUN_TEMPLATE_INPUT_SOURCES = {
     "current_message",
     "conversation_history",
@@ -241,6 +246,41 @@ def create_report(payload: dict[str, Any], *, changed_by: str, change_reason: st
     _write_with_revision("report", report_id, "create", {}, report, changed_by, change_reason)
     _write_report_file(report)
     return report
+
+
+def load_capability_usage_stats() -> dict[str, Any]:
+    with _connection() as connection:
+        row = connection.execute(
+            "SELECT value_json FROM buddy_kv WHERE key = ?",
+            (CAPABILITY_USAGE_STATS_KEY,),
+        ).fetchone()
+    if not row:
+        return _normalize_capability_usage_stats(deepcopy(DEFAULT_CAPABILITY_USAGE_STATS))
+    try:
+        value = json.loads(str(row["value_json"] or "{}"))
+    except Exception:
+        value = {}
+    return _normalize_capability_usage_stats(value if isinstance(value, dict) else {})
+
+
+def update_capability_usage_stats(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
+    previous = load_capability_usage_stats()
+    next_value = deepcopy(previous)
+    now = utc_now_iso()
+    for entry in _coerce_capability_usage_entries(payload):
+        _apply_capability_usage_entry(next_value, entry, now=now)
+    next_value["updated_at"] = now
+    _write_with_revision(
+        CAPABILITY_USAGE_STATS_TARGET_TYPE,
+        CAPABILITY_USAGE_STATS_TARGET_ID,
+        "update",
+        previous,
+        next_value,
+        changed_by,
+        change_reason,
+    )
+    _write_kv(CAPABILITY_USAGE_STATS_KEY, next_value, now)
+    return load_capability_usage_stats()
 
 
 def load_run_template_binding() -> dict[str, Any]:
@@ -552,6 +592,19 @@ def restore_revision(revision_id: str, *, changed_by: str, change_reason: str) -
             _write_report_file(restored)
         else:
             _report_path(target_id).unlink(missing_ok=True)
+    elif target_type == CAPABILITY_USAGE_STATS_TARGET_TYPE:
+        current = load_capability_usage_stats()
+        restored = _normalize_capability_usage_stats(restored)
+        _write_with_revision(
+            CAPABILITY_USAGE_STATS_TARGET_TYPE,
+            CAPABILITY_USAGE_STATS_TARGET_ID,
+            "restore",
+            current,
+            restored,
+            changed_by,
+            change_reason,
+        )
+        _write_kv(CAPABILITY_USAGE_STATS_KEY, restored, utc_now_iso())
     elif target_type == RUN_TEMPLATE_BINDING_TARGET_TYPE:
         current = load_run_template_binding()
         restored = _normalize_run_template_binding(restored)
@@ -750,6 +803,101 @@ def _normalize_run_template_binding(payload: dict[str, Any]) -> dict[str, Any]:
 
 def _write_json(file_name: str, payload: Any) -> None:
     write_json_file(buddy_home_path(file_name), payload)
+
+
+def _write_kv(key: str, payload: dict[str, Any], updated_at: str) -> None:
+    with _connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO buddy_kv (key, value_json, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at
+            """,
+            (key, _json_dumps(payload), updated_at),
+        )
+        connection.commit()
+
+
+def _normalize_capability_usage_stats(payload: dict[str, Any]) -> dict[str, Any]:
+    capabilities = payload.get("capabilities") if isinstance(payload.get("capabilities"), dict) else {}
+    normalized_capabilities: dict[str, Any] = {}
+    for capability_id, record in capabilities.items():
+        if isinstance(record, dict):
+            normalized_capabilities[str(capability_id)] = _normalize_capability_usage_record(record)
+    return {
+        "version": 1,
+        "capabilities": normalized_capabilities,
+        "updated_at": str(payload.get("updated_at") or ""),
+    }
+
+
+def _normalize_capability_usage_record(record: dict[str, Any]) -> dict[str, Any]:
+    recent_runs = record.get("recent_runs") if isinstance(record.get("recent_runs"), list) else []
+    return {
+        "kind": str(record.get("kind") or "skill"),
+        "key": str(record.get("key") or ""),
+        "name": str(record.get("name") or record.get("key") or ""),
+        "use_count": int(record.get("use_count") or 0),
+        "success_count": int(record.get("success_count") or 0),
+        "failure_count": int(record.get("failure_count") or 0),
+        "last_used_at": str(record.get("last_used_at") or ""),
+        "last_run_id": str(record.get("last_run_id") or ""),
+        "last_summary": str(record.get("last_summary") or ""),
+        "last_duration_ms": int(record.get("last_duration_ms") or 0),
+        "recent_runs": [item for item in recent_runs if isinstance(item, dict)][:MAX_CAPABILITY_USAGE_RECENT_RUNS],
+    }
+
+
+def _coerce_capability_usage_entries(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    entries = payload.get("entries")
+    if isinstance(entries, list):
+        return [entry for entry in entries if isinstance(entry, dict)]
+    return [payload]
+
+
+def _apply_capability_usage_entry(stats: dict[str, Any], entry: dict[str, Any], *, now: str) -> None:
+    capability = entry.get("capability") if isinstance(entry.get("capability"), dict) else {}
+    kind = str(capability.get("kind") or entry.get("kind") or "skill").strip() or "skill"
+    key = str(capability.get("key") or entry.get("key") or "").strip()
+    if not key:
+        raise ValueError("capability_usage_stats.update requires capability.key.")
+    name = str(capability.get("name") or entry.get("name") or key).strip() or key
+    capability_id = f"{kind}:{key}"
+    capabilities = stats.setdefault("capabilities", {})
+    existing = _normalize_capability_usage_record(capabilities.get(capability_id) if isinstance(capabilities.get(capability_id), dict) else {})
+    success = bool(entry.get("success", True))
+    run_id = str(entry.get("run_id") or "").strip()
+    summary = str(entry.get("summary") or "").strip()
+    duration_ms = _coerce_non_negative_int(entry.get("duration_ms"))
+    next_record = {
+        **existing,
+        "kind": kind,
+        "key": key,
+        "name": name,
+        "use_count": int(existing.get("use_count") or 0) + 1,
+        "success_count": int(existing.get("success_count") or 0) + (1 if success else 0),
+        "failure_count": int(existing.get("failure_count") or 0) + (0 if success else 1),
+        "last_used_at": now,
+        "last_run_id": run_id,
+        "last_summary": summary,
+        "last_duration_ms": duration_ms,
+    }
+    recent_entry = {
+        "run_id": run_id,
+        "success": success,
+        "summary": summary,
+        "duration_ms": duration_ms,
+        "used_at": now,
+    }
+    next_record["recent_runs"] = [recent_entry, *existing.get("recent_runs", [])][:MAX_CAPABILITY_USAGE_RECENT_RUNS]
+    capabilities[capability_id] = next_record
+
+
+def _coerce_non_negative_int(value: Any) -> int:
+    try:
+        return max(0, int(float(value)))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _normalize_report_id(value: Any) -> str:

@@ -16,6 +16,7 @@ ALLOWED_ACTIONS = {
     "profile.update",
     "policy.update",
     "report.create",
+    "capability_usage_stats.update",
 }
 POLICY_PERMISSION_FIELDS = {"behavior_boundaries", "graph_permission_mode"}
 POLICY_AUTONOMOUS_ALLOWED_FIELDS = {"communication_preferences"}

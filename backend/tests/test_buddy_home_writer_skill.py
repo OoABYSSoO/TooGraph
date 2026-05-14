@@ -217,6 +217,41 @@ class BuddyHomeWriterSkillTests(unittest.TestCase):
         self.assertEqual(result["activity_events"][0]["kind"], "buddy_home_write")
         self.assertTrue(report_exists)
 
+    def test_writer_applies_capability_usage_stats_updates(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = _run_writer(
+                {
+                    "run_id": "run_review_stats",
+                    "commands": [
+                        {
+                            "action": "capability_usage_stats.update",
+                            "payload": {
+                                "entries": [
+                                    {
+                                        "capability": {
+                                            "kind": "subgraph",
+                                            "key": "advanced_web_research_loop",
+                                            "name": "高级联网搜索",
+                                        },
+                                        "success": True,
+                                        "run_id": "run_review_stats",
+                                        "summary": "用于完成资料查询。",
+                                    }
+                                ]
+                            },
+                            "change_reason": "自主复盘更新能力使用统计。",
+                        }
+                    ],
+                },
+                buddy_home_dir=Path(temp_dir) / "buddy_home",
+            )
+
+        self.assertEqual(result["success"], True)
+        applied = result["applied_commands"][0]
+        self.assertEqual(applied["command"]["action"], "capability_usage_stats.update")
+        self.assertEqual(applied["command"]["target_type"], "capability_usage_stats")
+        self.assertEqual(applied["result"]["capabilities"]["subgraph:advanced_web_research_loop"]["use_count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

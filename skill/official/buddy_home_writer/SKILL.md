@@ -18,6 +18,7 @@ Allowed actions:
 - `profile.update`
 - `policy.update`
 - `report.create`
+- `capability_usage_stats.update`
 
 Safety boundary:
 
@@ -26,3 +27,4 @@ Safety boundary:
 - `policy.update` cannot modify `graph_permission_mode`, `behavior_boundaries`, or undeclared policy fields.
 - Unsupported or unsafe commands are skipped and returned in `skipped_commands`.
 - `report.create` writes a concise Markdown report under `buddy_home/reports/` through the command/revision path. It must not store full logs, secrets, or large transient output.
+- `capability_usage_stats.update` updates aggregate usage counters for capabilities that actually ran in the source run. Payloads can provide one entry or an `entries` array with `capability.kind`, `capability.key`, optional `capability.name`, `success`, `run_id`, `summary`, and optional `duration_ms`.
