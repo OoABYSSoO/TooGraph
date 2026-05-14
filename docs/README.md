@@ -32,7 +32,7 @@
 - 阶段性的外部 Agent 框架对标和 LangGraph 高级能力基线分析
 - 被新版伙伴自主 Agent 路线图合并和替代的旧权限、记忆和技能分类文档
 - 旧内置模板和旧技能包的说明
-- `docs/superpowers/plans/` 与 `docs/superpowers/specs/` 下 2026-05-11 至 2026-05-13 的阶段性实现计划和设计稿，已按当前代码事实折叠进 `current_project_status.md` 与唯一方针文档
+- `docs/superpowers/` 下 2026-05-11 至 2026-05-13 的阶段性实现计划和设计稿，已按当前代码事实折叠进 `current_project_status.md` 与唯一方针文档；伙伴运行过程胶囊设计稿也已随持久化实现落地并删除
 
 ## 维护原则
 
