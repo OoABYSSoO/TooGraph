@@ -124,9 +124,14 @@ test("BuddyMascot keeps the transformed virtual cursor visible instead of fading
     componentSource,
     ".buddy-mascot.buddy-mascot--virtual-cursor .buddy-mascot__sparkle-wrap",
   );
+  const virtualCursorSparkleShapeBlock = extractCssBlock(
+    componentSource,
+    ".buddy-mascot.buddy-mascot--virtual-cursor .buddy-mascot__sparkle",
+  );
   assert.match(componentSource, /buddy-mascot-cursor-ready/);
   assert.doesNotMatch(componentSource, /buddy-mascot-cursor-depart/);
   assert.doesNotMatch(virtualCursorSparkleBlock, /opacity:\s*0;/);
+  assert.match(virtualCursorSparkleShapeBlock, /transform:\s*translateY\(-2px\) rotate\(-14deg\) scale\(1\.04\);/);
 });
 
 test("BuddyMascot gives the transformed virtual cursor the same black outline as the standalone asset", () => {
