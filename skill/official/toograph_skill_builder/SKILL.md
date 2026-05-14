@@ -1,9 +1,9 @@
 ---
-name: toograph_skill_builder
+name: TooGraph 技能生成器
 description: Generate the identity and package file contents for a TooGraph Skill from an approved user requirement.
 ---
 
-# TooGraph Skill Builder
+# TooGraph 技能生成器
 
 Use this skill after the user requirement and expected behavior for a new custom TooGraph Skill are clear. It produces the Skill identity and file contents only; it does not install, write, test, repair, package, or enable the generated Skill.
 

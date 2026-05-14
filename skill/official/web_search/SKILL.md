@@ -1,5 +1,5 @@
 ---
-name: web_search
+name: 联网搜索
 description: Search the public web and return successful source URLs, local readable page artifacts, and URL-specific errors for downstream graph nodes.
 ---
 

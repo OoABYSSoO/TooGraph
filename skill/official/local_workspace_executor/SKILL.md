@@ -1,9 +1,9 @@
 ---
-name: local_workspace_executor
+name: 本地工作区执行器
 description: Read, list, search, write one file, or execute one script inside TooGraph's local workspace permission boundaries.
 ---
 
-# Local Workspace Executor
+# 本地工作区执行器
 
 Use this skill when a graph needs one explicit local workspace operation on one repository path.
 

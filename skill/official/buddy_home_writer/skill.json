@@ -1,9 +1,9 @@
 {
   "schemaVersion": "toograph.skill/v1",
   "skillKey": "buddy_home_writer",
-  "name": "Buddy Home Writer",
+  "name": "伙伴之家写入器",
   "description": "Internal controlled writer that applies safe Buddy Home command writes with revisions.",
-  "llmInstruction": "你已绑定 Buddy Home Writer。根据上游自主复盘结果生成 commands 数组，只包含确实需要自动沉淀到 Buddy Home 的低风险写回命令。允许的 action 是 memory.create、memory.update、memory.delete、session_summary.update、profile.update、policy.update、report.create、capability_usage_stats.update。不要生成 revision.restore、graph_patch.draft、文件路径写入、脚本执行或任何权限升级。policy.update 只能用于 communication_preferences 这类非权限沟通偏好，不得修改 graph_permission_mode、behavior_boundaries 或未声明的 policy 字段。report.create 只能写精炼复盘报告，payload 包含 title、summary、content、可选 kind 和 source，不能保存完整日志或敏感内容。capability_usage_stats.update 只能记录本轮实际使用过的 Skill 或 Subgraph，payload 包含 capability(kind/key/name)、success、run_id、summary、可选 duration_ms，或 entries 数组。技能会通过 Buddy command/store 写入并生成 revision；不要在本节点总结或伪造写入结果。",
+  "llmInstruction": "你已绑定伙伴之家写入器。根据上游自主复盘结果生成 commands 数组，只包含确实需要自动沉淀到 Buddy Home 的低风险写回命令。允许的 action 是 memory.create、memory.update、memory.delete、session_summary.update、profile.update、policy.update、report.create、capability_usage_stats.update。不要生成 revision.restore、graph_patch.draft、文件路径写入、脚本执行或任何权限升级。policy.update 只能用于 communication_preferences 这类非权限沟通偏好，不得修改 graph_permission_mode、behavior_boundaries 或未声明的 policy 字段。report.create 只能写精炼复盘报告，payload 包含 title、summary、content、可选 kind 和 source，不能保存完整日志或敏感内容。capability_usage_stats.update 只能记录本轮实际使用过的 Skill 或 Subgraph，payload 包含 capability(kind/key/name)、success、run_id、summary、可选 duration_ms，或 entries 数组。技能会通过 Buddy command/store 写入并生成 revision；不要在本节点总结或伪造写入结果。",
   "version": "1.0.0",
   "timeoutSeconds": 30,
   "permissions": ["buddy_home_write"],

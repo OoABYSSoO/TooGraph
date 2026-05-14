@@ -23,7 +23,7 @@ def local_workspace_executor_before_llm(**payload: Any) -> dict[str, str]:
     candidate_paths = _candidate_paths(graph_state, task_instruction)
 
     lines = [
-        "Local Workspace Executor policy:",
+        "本地工作区执行器 policy:",
         "- Generate only LLM parameter fields: path, operation, content only when operation is write, and query only when operation is search.",
         "- operation must be one of: read, list, search, write, execute.",
         "- read/list/search are repository read operations and never write files.",

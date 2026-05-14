@@ -1,9 +1,9 @@
 ---
-name: toograph_script_tester
+name: TooGraph 脚本测试器
 description: Use when a graph needs to generate deterministic tests for a provided local script and run them with an allowed system command.
 ---
 
-# TooGraph Script Tester
+# TooGraph 脚本测试器
 
 Use this skill when the graph has a script or generated script source and needs tests written and executed in a temporary workspace.
 

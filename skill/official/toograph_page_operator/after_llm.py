@@ -49,13 +49,13 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
     if action not in {"click_nav", "click_navigation", "navigate"}:
         return _failed(
             code="unsupported_action",
-            message="TooGraph Page Operator phase 1 only supports click_nav.",
+            message="TooGraph 页面操作器第一阶段只支持 click_nav。",
             recoverable=True,
         )
     if target not in RUNS_TARGET_ALIASES:
         return _failed(
             code="unsupported_target",
-            message="TooGraph Page Operator phase 1 only supports the Runs navigation target.",
+            message="TooGraph 页面操作器第一阶段只支持运行历史导航目标。",
             recoverable=True,
         )
 

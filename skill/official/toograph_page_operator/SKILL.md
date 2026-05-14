@@ -1,9 +1,9 @@
 ---
-name: toograph_page_operator
+name: TooGraph 页面操作器
 description: Execute one semantic app-page operation through Buddy's virtual cursor without exposing DOM selectors or screen coordinates to the LLM.
 ---
 
-# TooGraph Page Operator
+# TooGraph 页面操作器
 
 This official Skill validates one semantic page operation and asks TooGraph's app-native virtual operator layer to play the operation through Buddy's virtual cursor.
 

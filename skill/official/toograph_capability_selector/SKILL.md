@@ -1,9 +1,9 @@
 ---
-name: toograph_capability_selector
+name: TooGraph 能力选择器
 description: Use when a TooGraph workflow needs to choose one enabled graph template or Skill from a user requirement.
 ---
 
-# TooGraph Capability Selector
+# TooGraph 能力选择器
 
 `before_llm.py` lists the local enabled graph templates and enabled Skills in the LLM-node skill-input planning prompt. The model chooses one item from that catalog and passes it as the `capability` input. `after_llm.py` validates that choice against the current local catalog and returns exactly one normalized capability object.
 

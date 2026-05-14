@@ -1,9 +1,9 @@
 ---
-name: Buddy Home Writer
+name: 伙伴之家写入器
 description: Internal controlled Buddy Home writer that applies safe command-based memory, session summary, profile, policy, and report updates with revision records.
 ---
 
-# Buddy Home Writer
+# 伙伴之家写入器
 
 This is an internal TooGraph Skill used by Buddy autonomous review templates.
 

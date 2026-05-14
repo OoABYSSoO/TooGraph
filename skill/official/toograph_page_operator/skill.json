@@ -1,9 +1,9 @@
 {
   "schemaVersion": "toograph.skill/v1",
   "skillKey": "toograph_page_operator",
-  "name": "TooGraph Page Operator",
+  "name": "TooGraph 页面操作器",
   "description": "根据结构化页面操作书执行一条语义级页面操作请求。首期支持非伙伴页面的应用导航点击，并通过伙伴虚拟鼠标播放可见操作。",
-  "llmInstruction": "你已绑定 TooGraph Page Operator。根据页面操作书和用户目标，只生成一条语义命令。当前只允许 click_nav 到普通应用导航目标，例如 runs。不要选择伙伴页面、伙伴浮窗、伙伴形象或调试入口。不要输出 DOM selector、坐标、鼠标轨迹或多步计划。",
+  "llmInstruction": "你已绑定 TooGraph 页面操作器。根据页面操作书和用户目标，只生成一条语义命令。当前只允许 click_nav 到普通应用导航目标，例如 runs。不要选择伙伴页面、伙伴浮窗、伙伴形象或调试入口。不要输出 DOM selector、坐标、鼠标轨迹或多步计划。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [
