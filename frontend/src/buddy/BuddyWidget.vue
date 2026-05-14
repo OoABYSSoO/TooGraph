@@ -186,100 +186,103 @@
           <p v-if="messages.length === 0" class="buddy-widget__empty">
             {{ t("buddy.empty") }}
           </p>
-          <template v-for="message in messages" :key="message.id">
-          <article
-            v-if="shouldRenderMessage(message)"
-            class="buddy-widget__message"
-            :class="`buddy-widget__message--${message.role}`"
-          >
-            <span class="buddy-widget__message-label">
-              {{ message.role === "user" ? t("buddy.user") : t("buddy.name") }}
-            </span>
-            <BuddyPauseCard
-              v-if="shouldShowPausedRunCard(message)"
-              :run="pausedBuddyRun"
-              :busy="pausedBuddyResumeBusy"
-              @resume="resumePausedBuddyRun"
-              @cancel="cancelPausedBuddyRun"
-            />
-            <template v-else>
-              <section
-                v-if="message.role === 'assistant' && message.outputTrace"
-                class="buddy-widget__run-trace"
-                :class="`buddy-widget__run-trace--${message.outputTrace.status}`"
-              >
-                <button
-                  type="button"
-                  class="buddy-widget__run-trace-summary"
-                  :aria-expanded="isTraceMessageExpanded(message.id)"
-                  :aria-label="isTraceMessageExpanded(message.id) ? t('buddy.runTraceCollapse') : t('buddy.runTraceExpand')"
-                  @click="toggleTraceMessage(message.id)"
-                >
-                  <span
-                    class="buddy-widget__run-trace-dot"
-                    :class="`buddy-widget__run-trace-dot--${message.outputTrace.status}`"
-                    aria-hidden="true"
-                  />
-                  <span class="buddy-widget__run-trace-title">
-                    {{ resolveTraceSegmentSummary(message.outputTrace) }}
-                  </span>
-                  <span class="buddy-widget__run-trace-duration">
-                    {{ formatTraceDuration(resolveTraceSegmentDurationMs(message.outputTrace)) }}
-                  </span>
-                  <span
-                    class="buddy-widget__run-trace-chevron"
-                    :class="{ 'buddy-widget__run-trace-chevron--expanded': isTraceMessageExpanded(message.id) }"
-                    aria-hidden="true"
-                  />
-                </button>
-                <div
-                  v-if="isTraceMessageExpanded(message.id)"
-                  class="buddy-widget__run-trace-detail"
-                >
-                  <ol class="buddy-widget__run-trace-list">
-                    <li
-                      v-for="record in message.outputTrace.records"
-                      :key="record.recordId"
-                      class="buddy-widget__run-trace-row"
-                    >
-                      <span
-                        class="buddy-widget__run-trace-dot buddy-widget__run-trace-dot--small"
-                        :class="`buddy-widget__run-trace-dot--${record.status}`"
-                        aria-hidden="true"
-                      />
-                      <span class="buddy-widget__run-trace-row-label">{{ record.label }}</span>
-                      <span class="buddy-widget__run-trace-row-duration">
-                        {{ formatTraceDuration(resolveTraceRecordDurationMs(record)) }}
-                      </span>
-                    </li>
-                  </ol>
-                  <div class="buddy-widget__run-trace-total">
-                    <span>{{ t("buddy.runTraceLabel") }}</span>
-                    <strong>{{ formatTraceDuration(resolveTraceSegmentDurationMs(message.outputTrace)) }}</strong>
-                  </div>
-                </div>
-              </section>
-              <section
-                v-if="message.role === 'assistant' && message.publicOutput?.kind === 'card'"
-                class="buddy-widget__public-output-card"
-                :class="`buddy-widget__public-output-card--${message.publicOutput.status}`"
-              >
-                <header class="buddy-widget__public-output-card-header">
-                  <strong>{{ message.publicOutput.stateName }}</strong>
-                  <span>{{ t("buddy.outputCard") }}</span>
-                </header>
-                <pre>{{ formatPublicOutputCardContent(message.content) }}</pre>
-              </section>
-              <div
-                v-else-if="message.role === 'assistant' && message.content"
-                class="buddy-widget__message-bubble buddy-widget__message-markdown"
-                v-html="renderBuddyMarkdown(message.content)"
+          <template v-for="(message, messageIndex) in messages" :key="message.id">
+            <article
+              v-if="shouldRenderMessage(message)"
+              class="buddy-widget__message"
+              :class="[
+                `buddy-widget__message--${message.role}`,
+                { 'buddy-widget__message--grouped': !shouldShowMessageRoleLabel(messageIndex) },
+              ]"
+            >
+              <span v-if="shouldShowMessageRoleLabel(messageIndex)" class="buddy-widget__message-label">
+                {{ message.role === "user" ? t("buddy.user") : t("buddy.name") }}
+              </span>
+              <BuddyPauseCard
+                v-if="shouldShowPausedRunCard(message)"
+                :run="pausedBuddyRun"
+                :busy="pausedBuddyResumeBusy"
+                @resume="resumePausedBuddyRun"
+                @cancel="cancelPausedBuddyRun"
               />
-              <p v-else-if="message.role === 'user'" class="buddy-widget__message-bubble">
-                {{ message.content }}
-              </p>
-            </template>
-          </article>
+              <template v-else>
+                <section
+                  v-if="message.role === 'assistant' && message.outputTrace"
+                  class="buddy-widget__run-trace"
+                  :class="`buddy-widget__run-trace--${message.outputTrace.status}`"
+                >
+                  <button
+                    type="button"
+                    class="buddy-widget__run-trace-summary"
+                    :aria-expanded="isTraceMessageExpanded(message.id)"
+                    :aria-label="isTraceMessageExpanded(message.id) ? t('buddy.runTraceCollapse') : t('buddy.runTraceExpand')"
+                    @click="toggleTraceMessage(message.id)"
+                  >
+                    <span
+                      class="buddy-widget__run-trace-dot"
+                      :class="`buddy-widget__run-trace-dot--${message.outputTrace.status}`"
+                      aria-hidden="true"
+                    />
+                    <span class="buddy-widget__run-trace-title">
+                      {{ resolveTraceSegmentSummary(message.outputTrace) }}
+                    </span>
+                    <span class="buddy-widget__run-trace-duration">
+                      {{ formatTraceDuration(buildTraceSegmentDurationKey(message.id), resolveTraceSegmentDurationMs(message.outputTrace)) }}
+                    </span>
+                    <span
+                      class="buddy-widget__run-trace-chevron"
+                      :class="{ 'buddy-widget__run-trace-chevron--expanded': isTraceMessageExpanded(message.id) }"
+                      aria-hidden="true"
+                    />
+                  </button>
+                  <div
+                    v-if="isTraceMessageExpanded(message.id)"
+                    class="buddy-widget__run-trace-detail"
+                  >
+                    <ol class="buddy-widget__run-trace-list">
+                      <li
+                        v-for="record in message.outputTrace.records"
+                        :key="record.recordId"
+                        class="buddy-widget__run-trace-row"
+                      >
+                        <span
+                          class="buddy-widget__run-trace-dot buddy-widget__run-trace-dot--small"
+                          :class="`buddy-widget__run-trace-dot--${record.status}`"
+                          aria-hidden="true"
+                        />
+                        <span class="buddy-widget__run-trace-row-label">{{ record.label }}</span>
+                        <span class="buddy-widget__run-trace-row-duration">
+                          {{ formatTraceDuration(buildTraceRecordDurationKey(message.id, record.recordId), resolveTraceRecordDurationMs(record)) }}
+                        </span>
+                      </li>
+                    </ol>
+                    <div class="buddy-widget__run-trace-total">
+                      <span>{{ t("buddy.runTraceLabel") }}</span>
+                      <strong>{{ formatTraceDuration(buildTraceSegmentDurationKey(message.id), resolveTraceSegmentDurationMs(message.outputTrace)) }}</strong>
+                    </div>
+                  </div>
+                </section>
+                <section
+                  v-if="message.role === 'assistant' && message.publicOutput?.kind === 'card'"
+                  class="buddy-widget__public-output-card"
+                  :class="`buddy-widget__public-output-card--${message.publicOutput.status}`"
+                >
+                  <header class="buddy-widget__public-output-card-header">
+                    <strong>{{ message.publicOutput.stateName }}</strong>
+                    <span>{{ t("buddy.outputCard") }}</span>
+                  </header>
+                  <pre>{{ formatPublicOutputCardContent(message.content) }}</pre>
+                </section>
+                <div
+                  v-else-if="message.role === 'assistant' && message.content"
+                  class="buddy-widget__message-bubble buddy-widget__message-markdown"
+                  v-html="renderBuddyMarkdown(message.content)"
+                />
+                <p v-else-if="message.role === 'user'" class="buddy-widget__message-bubble">
+                  {{ message.content }}
+                </p>
+              </template>
+            </article>
           </template>
           <p v-if="errorMessage" class="buddy-widget__error">{{ errorMessage }}</p>
           <p v-if="queuedTurns.length > 0" class="buddy-widget__queue">
@@ -366,6 +369,11 @@ import { formatRunDuration } from "../lib/run-display-name.ts";
 import { buildRuntimeModelOptions } from "../lib/runtimeModelCatalog.ts";
 import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
 import { buildRunNodeTimingByNodeIdFromRun } from "../lib/runTelemetryProjection.ts";
+import {
+  advanceSmoothNumberDisplay,
+  isSmoothNumberDisplaySettled,
+  type SmoothNumberDisplayState,
+} from "../lib/smoothNumberDisplay.ts";
 import { useBuddyContextStore } from "../stores/buddyContext.ts";
 import { useBuddyMascotDebugStore } from "../stores/buddyMascotDebug.ts";
 import type { BuddyChatMessageRecord, BuddyChatSession } from "../types/buddy.ts";
@@ -422,6 +430,7 @@ import {
   serializeBuddyPosition,
   type BuddyPosition,
 } from "./buddyPosition.ts";
+import { shouldShowGroupedBuddyMessageLabel } from "./buddyMessageGrouping.ts";
 
 type BuddyMessage = BuddyChatMessage & {
   id: string;
@@ -459,6 +468,11 @@ type BuddyPauseHandlingOptions = {
   persist?: boolean;
 };
 
+type TraceDurationTarget = {
+  durationMs: number;
+  animateInitial: boolean;
+};
+
 type BuddyMood = "idle" | "thinking" | "speaking" | "error";
 type BuddyMascotMotion = "idle" | "roam" | "hop";
 type BuddyMascotFacing = "front" | "left" | "right";
@@ -481,6 +495,10 @@ const BUDDY_ROAM_STEP_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
 const BUDDY_ROAM_TARGET_MIN_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
 const BUDDY_ROAM_TARGET_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 3;
 const BUDDY_ROAM_TARGET_REACHED_DISTANCE_PX = 1;
+const TRACE_DURATION_SMOOTH_OPTIONS = {
+  timeConstantMs: 180,
+  snapEpsilon: 8,
+} as const;
 const { t } = useI18n();
 const route = useRoute();
 const buddyContextStore = useBuddyContextStore();
@@ -518,6 +536,7 @@ const mascotFacing = ref<BuddyMascotFacing>("front");
 const messageListElement = ref<HTMLElement | null>(null);
 const debugDragging = ref(false);
 const traceClockNowMs = ref(Date.now());
+const traceDurationDisplayByKey = ref<Record<string, SmoothNumberDisplayState>>({});
 const expandedTraceMessageIds = ref<Set<string>>(new Set());
 const pointerDrag = ref<{
   pointerId: number;
@@ -667,13 +686,7 @@ watch(canBuddyRoam, (canRoam) => {
   cancelBuddyRoamTimers();
 });
 
-watch(hasRunningTraceSegment, (hasRunning) => {
-  if (hasRunning) {
-    startTraceClockTimer();
-    return;
-  }
-  clearTraceClockTimer();
-});
+watch(hasRunningTraceSegment, refreshTraceClockTimer);
 
 watch(mascotDebugRequest, (request) => {
   if (!request) {
@@ -983,21 +996,36 @@ function clearBuddyDebugActionTimer() {
   debugDragging.value = false;
 }
 
-function startTraceClockTimer() {
-  traceClockNowMs.value = Date.now();
-  if (traceClockTimerId !== null) {
+function refreshTraceClockTimer() {
+  updateTraceDurationDisplays(Date.now());
+  if (hasRunningTraceSegment.value || hasUnsettledTraceDurationDisplay()) {
+    startTraceClockTimer();
     return;
   }
-  traceClockTimerId = window.setInterval(() => {
-    traceClockNowMs.value = Date.now();
-  }, 120);
+  clearTraceClockTimer();
+}
+
+function startTraceClockTimer() {
+  if (traceClockTimerId !== null || typeof window === "undefined") {
+    return;
+  }
+  const tick = () => {
+    updateTraceDurationDisplays(Date.now());
+    if (hasRunningTraceSegment.value || hasUnsettledTraceDurationDisplay()) {
+      traceClockTimerId = window.requestAnimationFrame(tick);
+      return;
+    }
+    traceClockTimerId = null;
+  };
+  traceClockTimerId = window.requestAnimationFrame(tick);
 }
 
 function clearTraceClockTimer() {
-  if (traceClockTimerId === null) {
+  if (traceClockTimerId === null || typeof window === "undefined") {
+    traceClockTimerId = null;
     return;
   }
-  window.clearInterval(traceClockTimerId);
+  window.cancelAnimationFrame(traceClockTimerId);
   traceClockTimerId = null;
 }
 
@@ -1844,6 +1872,10 @@ function shouldRenderMessage(message: BuddyMessage) {
   );
 }
 
+function shouldShowMessageRoleLabel(messageIndex: number) {
+  return shouldShowGroupedBuddyMessageLabel(messages.value, messageIndex, shouldRenderMessage);
+}
+
 function shouldShowPausedRunCard(message: BuddyMessage) {
   return (
     message.role === "assistant" &&
@@ -2068,27 +2100,90 @@ function findCurrentTraceRecord(segment: BuddyOutputTraceSegment) {
 }
 
 function resolveTraceSegmentDurationMs(segment: BuddyOutputTraceSegment) {
+  return resolveTraceSegmentDurationMsAt(segment, traceClockNowMs.value);
+}
+
+function resolveTraceRecordDurationMs(record: BuddyOutputTraceRecord) {
+  return resolveTraceRecordDurationMsAt(record, traceClockNowMs.value);
+}
+
+function resolveTraceSegmentDurationMsAt(segment: BuddyOutputTraceSegment, nowMs: number) {
   if (segment.durationMs !== null) {
     return segment.durationMs;
   }
   if (segment.status === "running" && segment.startedAtMs !== null) {
-    return Math.max(0, traceClockNowMs.value - segment.startedAtMs);
+    return Math.max(0, nowMs - segment.startedAtMs);
   }
   return null;
 }
 
-function resolveTraceRecordDurationMs(record: BuddyOutputTraceRecord) {
+function resolveTraceRecordDurationMsAt(record: BuddyOutputTraceRecord, nowMs: number) {
   if (record.durationMs !== null) {
     return record.durationMs;
   }
   if (record.status === "running" && record.startedAtMs !== null) {
-    return Math.max(0, traceClockNowMs.value - record.startedAtMs);
+    return Math.max(0, nowMs - record.startedAtMs);
   }
   return null;
 }
 
-function formatTraceDuration(durationMs: number | null | undefined) {
-  return formatRunDuration(durationMs ?? undefined, { secondsFractionDigits: 2 });
+function buildTraceSegmentDurationKey(messageId: string) {
+  return `segment:${messageId}`;
+}
+
+function buildTraceRecordDurationKey(messageId: string, recordId: string) {
+  return `record:${messageId}:${recordId}`;
+}
+
+function collectTraceDurationTargets(nowMs: number) {
+  const targets: Record<string, TraceDurationTarget> = {};
+  for (const message of messages.value) {
+    if (!shouldRenderMessage(message) || !message.outputTrace) {
+      continue;
+    }
+    const segmentDurationMs = resolveTraceSegmentDurationMsAt(message.outputTrace, nowMs);
+    if (segmentDurationMs !== null) {
+      targets[buildTraceSegmentDurationKey(message.id)] = {
+        durationMs: segmentDurationMs,
+        animateInitial: message.outputTrace.status === "running",
+      };
+    }
+    for (const record of message.outputTrace.records) {
+      const recordDurationMs = resolveTraceRecordDurationMsAt(record, nowMs);
+      if (recordDurationMs !== null) {
+        targets[buildTraceRecordDurationKey(message.id, record.recordId)] = {
+          durationMs: recordDurationMs,
+          animateInitial: record.status === "running",
+        };
+      }
+    }
+  }
+  return targets;
+}
+
+function updateTraceDurationDisplays(nowMs: number) {
+  traceClockNowMs.value = nowMs;
+  const previousDisplays = traceDurationDisplayByKey.value;
+  const targets = collectTraceDurationTargets(nowMs);
+  const nextDisplays: Record<string, SmoothNumberDisplayState> = {};
+  for (const [key, target] of Object.entries(targets)) {
+    nextDisplays[key] = advanceSmoothNumberDisplay(previousDisplays[key], target.durationMs, nowMs, {
+      ...TRACE_DURATION_SMOOTH_OPTIONS,
+      initialValue: target.animateInitial ? 0 : target.durationMs,
+    });
+  }
+  traceDurationDisplayByKey.value = nextDisplays;
+}
+
+function hasUnsettledTraceDurationDisplay() {
+  return Object.values(traceDurationDisplayByKey.value).some(
+    (display) => !isSmoothNumberDisplaySettled(display, TRACE_DURATION_SMOOTH_OPTIONS),
+  );
+}
+
+function formatTraceDuration(displayKey: string, durationMs: number | null | undefined) {
+  const display = traceDurationDisplayByKey.value[displayKey];
+  return formatRunDuration(display?.value ?? durationMs ?? undefined, { secondsFractionDigits: 2 });
 }
 
 function stringifyPublicOutputContent(value: unknown) {
@@ -2846,6 +2941,10 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__message {
   display: grid;
   gap: 4px;
+}
+
+.buddy-widget__message--grouped {
+  margin-top: -5px;
 }
 
 .buddy-widget__message-label {

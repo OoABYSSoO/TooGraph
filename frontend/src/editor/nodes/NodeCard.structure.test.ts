@@ -89,12 +89,16 @@ test("NodeCard accepts canvas-provided real dimensions through CSS variables", (
 });
 
 test("NodeCard renders a top-left run timing capsule", () => {
+  assert.match(componentSource, /import \{[\s\S]*advanceSmoothNumberDisplay,[\s\S]*isSmoothNumberDisplaySettled,[\s\S]*\} from "@\/lib\/smoothNumberDisplay";/);
   assert.match(componentSource, /node-card__run-timing-capsule/);
   assert.match(componentSource, /Clock/);
   assert.match(componentSource, /Coin/);
   assert.match(componentSource, /formatNodeRunTimingDuration/);
   assert.match(componentSource, /formatRunTokenUsageKTokens/);
   assert.match(componentSource, /formattedNodeRunTokenUsage/);
+  assert.match(componentSource, /const nodeRunTimingDisplay = ref<SmoothNumberDisplayState \| null>\(null\);/);
+  assert.match(componentSource, /advanceSmoothNumberDisplay\([\s\S]*nodeRunTimingDisplay\.value/);
+  assert.match(componentSource, /isSmoothNumberDisplaySettled\(nodeRunTimingDisplay\.value/);
   assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-floating-capsule-height:\s*58px;/);
   assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-floating-capsule-offset:\s*8px;/);
   assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*position:\s*absolute;/);

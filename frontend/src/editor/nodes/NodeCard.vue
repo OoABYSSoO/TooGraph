@@ -464,6 +464,11 @@ import { fetchLocalFolderTree, type LocalFolderTreeEntry } from "@/api/localInpu
 import { buildSkillArtifactFileUrl, uploadSkillArtifactFile } from "@/api/skillArtifacts";
 import { isAgentOutputManagedByDynamicCapability } from "@/lib/agent-capability-management";
 import { formatRunDuration, formatRunTokenUsageKTokens } from "@/lib/run-display-name";
+import {
+  advanceSmoothNumberDisplay,
+  isSmoothNumberDisplaySettled,
+  type SmoothNumberDisplayState,
+} from "@/lib/smoothNumberDisplay";
 import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_COLOR, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "@/lib/virtual-any-input";
 
 import {
@@ -643,6 +648,11 @@ const agentAddPopoverStyle = transparentPopoverStyle;
 const stateTypeOptions = STATE_FIELD_TYPE_OPTIONS;
 const conditionRuleOperatorOptions = CONDITION_RULE_OPERATOR_OPTIONS;
 const nodeRunTimingNowMs = ref(nowNodeRunTimingMs());
+const nodeRunTimingDisplay = ref<SmoothNumberDisplayState | null>(null);
+const NODE_RUN_TIMING_SMOOTH_OPTIONS = {
+  timeConstantMs: 180,
+  snapEpsilon: 8,
+} as const;
 const agentThinkingOptions = computed<Array<{ value: AgentThinkingControlMode; label: string }>>(() => [
   { value: "off", label: t("nodeCard.thinkingOff") },
   { value: "low", label: t("nodeCard.thinkingLow") },
@@ -931,7 +941,7 @@ const nodeRunTimingDurationMs = computed(() => {
   }
   return timing.durationMs;
 });
-const formattedNodeRunTimingDuration = computed(() => formatNodeRunTimingDuration(nodeRunTimingDurationMs.value));
+const formattedNodeRunTimingDuration = computed(() => formatNodeRunTimingDuration(nodeRunTimingDisplay.value?.value ?? nodeRunTimingDurationMs.value));
 const formattedNodeRunTokenUsage = computed(() => formatRunTokenUsageKTokens(props.runTiming?.tokenCount));
 const shouldShowNodeRunTokenUsage = computed(() => Boolean(formattedNodeRunTokenUsage.value));
 const nodeRunTimingTitle = computed(() => {
@@ -980,18 +990,47 @@ function clearNodeRunTimingInterval() {
 
 function refreshNodeRunTimingInterval() {
   clearNodeRunTimingInterval();
-  if (props.runTiming?.status !== "running" || props.runTiming.startedAtEpochMs === null) {
+  updateNodeRunTimingDisplay(nowNodeRunTimingMs());
+  if (!shouldAnimateNodeRunTimingDisplay()) {
     return;
   }
-  nodeRunTimingNowMs.value = nowNodeRunTimingMs();
   if (typeof window === "undefined") {
     return;
   }
   const tick = () => {
-    nodeRunTimingNowMs.value = nowNodeRunTimingMs();
-    nodeRunTimingIntervalId = window.requestAnimationFrame(tick);
+    updateNodeRunTimingDisplay(nowNodeRunTimingMs());
+    if (shouldAnimateNodeRunTimingDisplay()) {
+      nodeRunTimingIntervalId = window.requestAnimationFrame(tick);
+      return;
+    }
+    nodeRunTimingIntervalId = null;
   };
   nodeRunTimingIntervalId = window.requestAnimationFrame(tick);
+}
+
+function updateNodeRunTimingDisplay(nowMs: number) {
+  nodeRunTimingNowMs.value = nowMs;
+  const durationMs = nodeRunTimingDurationMs.value;
+  if (durationMs === null) {
+    nodeRunTimingDisplay.value = null;
+    return;
+  }
+  nodeRunTimingDisplay.value = advanceSmoothNumberDisplay(
+    nodeRunTimingDisplay.value,
+    durationMs,
+    nowMs,
+    {
+      ...NODE_RUN_TIMING_SMOOTH_OPTIONS,
+      initialValue: props.runTiming?.status === "running" ? 0 : durationMs,
+    },
+  );
+}
+
+function shouldAnimateNodeRunTimingDisplay() {
+  return (
+    (props.runTiming?.status === "running" && props.runTiming.startedAtEpochMs !== null) ||
+    !isSmoothNumberDisplaySettled(nodeRunTimingDisplay.value, NODE_RUN_TIMING_SMOOTH_OPTIONS)
+  );
 }
 
 watch(
@@ -1028,7 +1067,7 @@ watch(
 );
 
 watch(
-  () => [props.runTiming?.status ?? null, props.runTiming?.startedAtEpochMs ?? null] as const,
+  () => [props.runTiming?.status ?? null, props.runTiming?.startedAtEpochMs ?? null, props.runTiming?.durationMs ?? null] as const,
   refreshNodeRunTimingInterval,
   { immediate: true },
 );

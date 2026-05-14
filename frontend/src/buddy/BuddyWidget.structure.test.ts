@@ -270,6 +270,7 @@ test("BuddyWidget renders assistant replies from parent graph output nodes only"
 
 test("BuddyWidget renders output-segment run trace capsules instead of per-message duration chips", () => {
   assert.match(componentSource, /import \{ formatRunDuration \} from "\.\.\/lib\/run-display-name\.ts";/);
+  assert.match(componentSource, /import \{[\s\S]*advanceSmoothNumberDisplay,[\s\S]*isSmoothNumberDisplaySettled,[\s\S]*\} from "\.\.\/lib\/smoothNumberDisplay\.ts";/);
   assert.match(componentSource, /buildBuddyOutputTracePlan/);
   assert.match(componentSource, /reduceBuddyOutputTraceEvent/);
   assert.match(componentSource, /buildBuddyOutputTraceStateFromRunDetail/);
@@ -279,9 +280,20 @@ test("BuddyWidget renders output-segment run trace capsules instead of per-messa
   assert.match(componentSource, /buddy-widget__run-trace-dot--running/);
   assert.match(componentSource, /formatTraceDuration/);
   assert.match(componentSource, /traceClockNowMs/);
+  assert.match(componentSource, /traceDurationDisplayByKey/);
+  assert.match(componentSource, /window\.requestAnimationFrame\(tick\)/);
   assert.match(componentSource, /buildRunNodeTimingByNodeIdFromRun/);
   assert.doesNotMatch(componentSource, /formatPublicOutputDuration/);
   assert.doesNotMatch(componentSource, /runTraceStartedAtByKey/);
+});
+
+test("BuddyWidget groups consecutive visible messages by role label", () => {
+  assert.match(componentSource, /import \{ shouldShowGroupedBuddyMessageLabel \} from "\.\/buddyMessageGrouping\.ts";/);
+  assert.match(componentSource, /v-for="\(\s*message,\s*messageIndex\s*\) in messages"/);
+  assert.match(componentSource, /v-if="shouldShowMessageRoleLabel\(messageIndex\)"/);
+  assert.match(componentSource, /'buddy-widget__message--grouped': !shouldShowMessageRoleLabel\(messageIndex\)/);
+  assert.match(componentSource, /function shouldShowMessageRoleLabel\(messageIndex: number\)/);
+  assert.match(componentSource, /\.buddy-widget__message--grouped\s*\{/);
 });
 
 test("BuddyWidget stores buddy chat in backend sessions and exposes a compact history dropdown", () => {
