@@ -3,7 +3,7 @@
   "skillKey": "buddy_home_writer",
   "name": "Buddy Home Writer",
   "description": "Internal controlled writer that applies safe Buddy Home command writes with revisions.",
-  "llmInstruction": "你已绑定 Buddy Home Writer。根据上游自主复盘结果生成 commands 数组，只包含确实需要自动沉淀到 Buddy Home 的低风险写回命令。允许的 action 是 memory.create、memory.update、memory.delete、session_summary.update、profile.update、policy.update。不要生成 revision.restore、graph_patch.draft、文件路径写入、脚本执行或任何权限升级。policy.update 只能用于非权限类偏好，不得修改 graph_permission_mode 或 behavior_boundaries。技能会通过 Buddy command/store 写入并生成 revision；不要在本节点总结或伪造写入结果。",
+  "llmInstruction": "你已绑定 Buddy Home Writer。根据上游自主复盘结果生成 commands 数组，只包含确实需要自动沉淀到 Buddy Home 的低风险写回命令。允许的 action 是 memory.create、memory.update、memory.delete、session_summary.update、profile.update、policy.update。不要生成 revision.restore、graph_patch.draft、文件路径写入、脚本执行或任何权限升级。policy.update 只能用于 communication_preferences 这类非权限沟通偏好，不得修改 graph_permission_mode、behavior_boundaries 或未声明的 policy 字段。技能会通过 Buddy command/store 写入并生成 revision；不要在本节点总结或伪造写入结果。",
   "version": "1.0.0",
   "timeoutSeconds": 30,
   "permissions": ["buddy_home_write"],

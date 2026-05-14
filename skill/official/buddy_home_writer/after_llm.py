@@ -17,6 +17,7 @@ ALLOWED_ACTIONS = {
     "policy.update",
 }
 POLICY_PERMISSION_FIELDS = {"behavior_boundaries", "graph_permission_mode"}
+POLICY_AUTONOMOUS_ALLOWED_FIELDS = {"communication_preferences"}
 
 
 def buddy_home_writer(**skill_inputs: Any) -> dict[str, Any]:
@@ -117,13 +118,10 @@ def _normalize_command(
             "error": f"Unsupported Buddy Home writeback action: {action or '(empty)'}",
         }
     payload = value.get("payload") if isinstance(value.get("payload"), dict) else {}
-    if action == "policy.update" and _contains_permission_boundary_change(payload):
-        return {}, {
-            "index": index,
-            "action": action,
-            "error_type": "permission_boundary",
-            "error": "Autonomous Buddy Home writeback cannot change permission or behavior boundary policy fields.",
-        }
+    if action == "policy.update":
+        policy_error = _validate_policy_update_payload(payload)
+        if policy_error:
+            return {}, {"index": index, "action": action, **policy_error}
 
     normalized = {
         "action": action,
@@ -142,6 +140,24 @@ def _normalize_command(
 
 def _contains_permission_boundary_change(payload: dict[str, Any]) -> bool:
     return any(field in payload for field in POLICY_PERMISSION_FIELDS)
+
+
+def _validate_policy_update_payload(payload: dict[str, Any]) -> dict[str, str] | None:
+    if _contains_permission_boundary_change(payload):
+        return {
+            "error_type": "permission_boundary",
+            "error": "Autonomous Buddy Home writeback cannot change permission or behavior boundary policy fields.",
+        }
+    unsupported_fields = sorted(set(payload) - POLICY_AUTONOMOUS_ALLOWED_FIELDS)
+    if unsupported_fields:
+        return {
+            "error_type": "unsupported_policy_field",
+            "error": (
+                "Autonomous Buddy Home policy writeback only supports communication_preferences; "
+                f"unsupported fields: {', '.join(unsupported_fields)}"
+            ),
+        }
+    return None
 
 
 def _result_text(applied_commands: list[dict[str, Any]], skipped_commands: list[dict[str, Any]]) -> str:

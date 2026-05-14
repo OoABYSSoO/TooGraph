@@ -21,5 +21,6 @@ Allowed actions:
 Safety boundary:
 
 - Do not use this Skill for arbitrary file writes, script execution, graph patches, revision restore, or permission escalation.
-- `policy.update` cannot modify `graph_permission_mode` or `behavior_boundaries`.
+- `policy.update` is limited to `communication_preferences`.
+- `policy.update` cannot modify `graph_permission_mode`, `behavior_boundaries`, or undeclared policy fields.
 - Unsupported or unsafe commands are skipped and returned in `skipped_commands`.

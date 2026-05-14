@@ -130,6 +130,61 @@ class BuddyHomeWriterSkillTests(unittest.TestCase):
         self.assertEqual(result["applied_commands"], [])
         self.assertEqual(result["skipped_commands"][0]["error_type"], "permission_boundary")
 
+    def test_writer_applies_safe_policy_preference_updates(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home_dir = Path(temp_dir) / "buddy_home"
+            result = _run_writer(
+                {
+                    "run_id": "run_review_policy",
+                    "commands": [
+                        {
+                            "action": "policy.update",
+                            "payload": {
+                                "communication_preferences": [
+                                    "默认在回复开头给出结论。",
+                                    "涉及副作用时说明会走图或 Skill。",
+                                ]
+                            },
+                            "change_reason": "自主复盘识别到稳定沟通偏好。",
+                        }
+                    ],
+                },
+                buddy_home_dir=buddy_home_dir,
+            )
+            policy = json.loads((buddy_home_dir / "policy.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result["success"], True)
+        self.assertEqual(len(result["applied_commands"]), 1)
+        applied = result["applied_commands"][0]
+        self.assertEqual(applied["command"]["action"], "policy.update")
+        self.assertEqual(applied["command"]["target_type"], "policy")
+        self.assertEqual(applied["command"]["run_id"], "run_review_policy")
+        self.assertEqual(policy["graph_permission_mode"], "ask_first")
+        self.assertIn("默认在回复开头给出结论。", policy["communication_preferences"])
+        self.assertTrue(applied["command"]["revision_id"].startswith("rev_"))
+
+    def test_writer_rejects_unknown_policy_writeback_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home_dir = Path(temp_dir) / "buddy_home"
+            result = _run_writer(
+                {
+                    "commands": [
+                        {
+                            "action": "policy.update",
+                            "payload": {"favorite_color": "green"},
+                            "change_reason": "尝试写入未声明的 policy 字段。",
+                        }
+                    ],
+                },
+                buddy_home_dir=buddy_home_dir,
+            )
+            policy = json.loads((buddy_home_dir / "policy.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result["success"], False)
+        self.assertEqual(result["applied_commands"], [])
+        self.assertEqual(result["skipped_commands"][0]["error_type"], "unsupported_policy_field")
+        self.assertNotIn("favorite_color", policy)
+
 
 if __name__ == "__main__":
     unittest.main()
