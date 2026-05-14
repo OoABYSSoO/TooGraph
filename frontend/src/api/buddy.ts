@@ -115,6 +115,7 @@ export function appendBuddyChatMessage(
     client_order?: number | null;
     include_in_context?: boolean;
     run_id?: string | null;
+    metadata?: Record<string, unknown>;
   },
 ) {
   return apiPost<BuddyChatMessageRecord>(`/api/buddy/sessions/${encodeURIComponent(sessionId)}/messages`, payload);

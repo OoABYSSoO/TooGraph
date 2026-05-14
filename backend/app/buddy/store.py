@@ -377,7 +377,7 @@ def delete_chat_session(session_id: str, *, changed_by: str, change_reason: str)
 def list_chat_messages(session_id: str, *, limit: int | None = None) -> list[dict[str, Any]]:
     get_chat_session(session_id)
     query = """
-        SELECT message_id, session_id, role, content, client_order, include_in_context, run_id, created_at, updated_at
+        SELECT message_id, session_id, role, content, client_order, include_in_context, run_id, metadata_json, created_at, updated_at
         FROM buddy_messages
         WHERE session_id = ?
         ORDER BY client_order IS NULL ASC, client_order ASC, created_at ASC, rowid ASC
@@ -404,7 +404,8 @@ def append_chat_message(
     if role not in {"user", "assistant"}:
         raise ValueError("Message role must be user or assistant.")
     content = str(payload.get("content") or "")
-    if not content.strip():
+    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    if not content.strip() and metadata.get("kind") != "output_trace":
         raise ValueError("Message content cannot be empty.")
     now = utc_now_iso()
     client_order = _coerce_chat_message_client_order(payload.get("client_order"))
@@ -416,6 +417,7 @@ def append_chat_message(
         "client_order": client_order,
         "include_in_context": bool(payload.get("include_in_context", True)),
         "run_id": payload.get("run_id") if payload.get("run_id") is None else str(payload.get("run_id")),
+        "metadata": metadata,
         "created_at": now,
         "updated_at": now,
     }
@@ -425,8 +427,8 @@ def append_chat_message(
         connection.execute(
             """
             INSERT INTO buddy_messages
-                (message_id, session_id, role, content, client_order, include_in_context, run_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (message_id, session_id, role, content, client_order, include_in_context, run_id, metadata_json, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 message["message_id"],
@@ -436,6 +438,7 @@ def append_chat_message(
                 message["client_order"],
                 int(message["include_in_context"]),
                 message["run_id"],
+                _json_dumps(message["metadata"]),
                 message["created_at"],
                 message["updated_at"],
             ),
@@ -775,7 +778,7 @@ def _get_chat_message(message_id: str) -> dict[str, Any]:
     with _connection() as connection:
         row = connection.execute(
             """
-            SELECT message_id, session_id, role, content, client_order, include_in_context, run_id, created_at, updated_at
+            SELECT message_id, session_id, role, content, client_order, include_in_context, run_id, metadata_json, created_at, updated_at
             FROM buddy_messages
             WHERE message_id = ?
             """,
@@ -833,6 +836,7 @@ def _chat_message_from_row(row: Any) -> dict[str, Any]:
         "client_order": row["client_order"],
         "include_in_context": bool(row["include_in_context"]),
         "run_id": row["run_id"],
+        "metadata": _json_loads_object(row["metadata_json"]),
         "created_at": str(row["created_at"] or ""),
         "updated_at": str(row["updated_at"] or ""),
     }

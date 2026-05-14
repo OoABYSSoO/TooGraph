@@ -384,6 +384,10 @@ import type { SettingsPayload } from "../types/settings.ts";
 import BuddyMascot from "./BuddyMascot.vue";
 import BuddyPauseCard from "./BuddyPauseCard.vue";
 import type { BuddyMascotDebugAction } from "./buddyMascotDebug.ts";
+import {
+  buildOutputTraceBuddyMessageMetadata,
+  resolveOutputTraceBuddyMessageMetadata,
+} from "./buddyMessageMetadata.ts";
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
 import { findLatestRecoverablePausedRunMessage, isRecoverablePausedRunStatus } from "./buddyPausedRunRecovery.ts";
 import {
@@ -1362,13 +1366,19 @@ function finishBuddyVisibleRun(runDetail: RunDetail, assistantMessageId: string,
   const outputTracePlan = buildBuddyOutputTracePlan(graph, publicOutputBindings);
   const outputTraceState = buildBuddyOutputTraceStateFromRunDetail(runDetail, outputTracePlan, graph);
   const outputState = buildPublicOutputRuntimeStateFromRunDetail(runDetail, publicOutputBindings, graph);
-  const { publicOutputMessages } = syncBuddyRunDisplayMessages(assistantMessageId, runId, outputTraceState, outputState);
+  const { publicOutputMessages, outputTraceMessages } = syncBuddyRunDisplayMessages(assistantMessageId, runId, outputTraceState, outputState);
   const includeReplyInContext = runDetail.status === "completed";
   const assistantMessage = messages.value.find((message) => message.id === assistantMessageId);
   if (assistantMessage) {
     assistantMessage.runId = runId;
     assistantMessage.activityText = "";
     assistantMessage.includeInContext = false;
+  }
+  for (const message of outputTraceMessages) {
+    void persistBuddyMessage(sessionId, message, {
+      runId,
+      includeInContext: false,
+    });
   }
   if (publicOutputMessages.length === 0) {
     updateAssistantMessage(assistantMessageId, t("buddy.emptyReply"), {
@@ -1660,7 +1670,11 @@ async function persistBuddyMessage(
   message: BuddyMessage | undefined,
   options: { runId?: string | null; includeInContext?: boolean } = {},
 ) {
-  if (!message || !message.content.trim()) {
+  if (!message) {
+    return;
+  }
+  const metadata = buildBuddyMessageMetadata(message);
+  if (!message.content.trim() && !metadata) {
     return;
   }
   try {
@@ -1671,6 +1685,7 @@ async function persistBuddyMessage(
       client_order: message.clientOrder ?? null,
       include_in_context: options.includeInContext ?? message.includeInContext !== false,
       run_id: options.runId ?? message.runId ?? null,
+      ...(metadata ? { metadata } : {}),
     });
     await loadChatSessions();
   } catch (error) {
@@ -2351,7 +2366,15 @@ function messageRecordToBuddyMessage(record: BuddyChatMessageRecord): BuddyMessa
     includeInContext: record.include_in_context,
     runId: record.run_id,
     activityText: "",
+    outputTrace: resolveOutputTraceBuddyMessageMetadata(record.metadata) ?? undefined,
   };
+}
+
+function buildBuddyMessageMetadata(message: BuddyMessage) {
+  if (message.outputTrace) {
+    return buildOutputTraceBuddyMessageMetadata(message.outputTrace);
+  }
+  return null;
 }
 
 function allocateBuddyMessageClientOrder() {

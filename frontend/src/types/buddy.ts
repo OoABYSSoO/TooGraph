@@ -64,6 +64,7 @@ export type BuddyChatMessageRecord = {
   client_order: number | null;
   include_in_context: boolean;
   run_id: string | null;
+  metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 };

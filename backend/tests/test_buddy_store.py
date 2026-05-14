@@ -174,6 +174,38 @@ class BuddyStoreTests(unittest.TestCase):
             ],
         )
 
+    def test_chat_messages_persist_display_metadata_for_trace_records(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+                session = store.create_chat_session({}, changed_by="user", change_reason="测试创建会话")
+                trace_metadata = {
+                    "kind": "output_trace",
+                    "outputTrace": {
+                        "segmentId": "segment_1",
+                        "boundaryNodeId": "llm_1",
+                        "boundaryLabel": "回复",
+                    },
+                }
+                trace_message = store.append_chat_message(
+                    session["session_id"],
+                    {
+                        "role": "assistant",
+                        "content": "",
+                        "client_order": 1,
+                        "include_in_context": False,
+                        "run_id": "run_1",
+                        "metadata": trace_metadata,
+                    },
+                    changed_by="buddy",
+                    change_reason="测试追加运行胶囊",
+                )
+                messages = store.list_chat_messages(session["session_id"])
+
+        self.assertEqual(trace_message["metadata"], trace_metadata)
+        self.assertEqual(messages[0]["metadata"], trace_metadata)
+        self.assertEqual(messages[0]["content"], "")
+        self.assertFalse(messages[0]["include_in_context"])
+
     def test_buddy_database_migrates_legacy_messages_before_client_order_index(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             buddy_home = Path(temp_dir) / "buddy_home"
@@ -235,6 +267,7 @@ class BuddyStoreTests(unittest.TestCase):
 
         self.assertEqual(messages[0]["client_order"], 0)
         self.assertEqual(messages[0]["content"], "旧消息")
+        self.assertEqual(messages[0]["metadata"], {})
 
 
 if __name__ == "__main__":

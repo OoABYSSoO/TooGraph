@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.buddy import commands, store
 
@@ -61,13 +61,20 @@ class BuddySessionPatchPayload(BaseModel):
 class BuddyChatMessagePayload(BaseModel):
     message_id: str | None = None
     role: Literal["user", "assistant"]
-    content: str = Field(min_length=1)
+    content: str = ""
     client_order: float | None = None
     include_in_context: bool = True
     run_id: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
     change_reason: str = "用户追加伙伴历史消息。"
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    @model_validator(mode="after")
+    def validate_message_content(self) -> "BuddyChatMessagePayload":
+        if self.content.strip() or self.metadata.get("kind") == "output_trace":
+            return self
+        raise ValueError("Message content cannot be empty.")
 
     def data(self) -> dict[str, Any]:
         payload = self.model_dump()

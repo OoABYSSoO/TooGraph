@@ -72,6 +72,19 @@ class BuddyRouteTests(unittest.TestCase):
                             "run_id": "run_1",
                         },
                     )
+                    trace_response = client.post(
+                        f"/api/buddy/sessions/{session['session_id']}/messages",
+                        json={
+                            "role": "assistant",
+                            "content": "",
+                            "include_in_context": False,
+                            "run_id": "run_1",
+                            "metadata": {
+                                "kind": "output_trace",
+                                "outputTrace": {"segmentId": "segment_1"},
+                            },
+                        },
+                    )
                     sessions_response = client.get("/api/buddy/sessions")
                     messages_response = client.get(f"/api/buddy/sessions/{session['session_id']}/messages")
                     delete_response = client.delete(f"/api/buddy/sessions/{session['session_id']}")
@@ -80,12 +93,14 @@ class BuddyRouteTests(unittest.TestCase):
         self.assertEqual(created_response.status_code, 200)
         self.assertEqual(user_response.status_code, 200)
         self.assertEqual(assistant_response.status_code, 200)
+        self.assertEqual(trace_response.status_code, 200)
         self.assertEqual(sessions_response.status_code, 200)
         self.assertEqual(sessions_response.json()[0]["title"], "你好")
-        self.assertEqual(sessions_response.json()[0]["message_count"], 2)
+        self.assertEqual(sessions_response.json()[0]["message_count"], 3)
         self.assertEqual(messages_response.status_code, 200)
-        self.assertEqual([message["role"] for message in messages_response.json()], ["user", "assistant"])
+        self.assertEqual([message["role"] for message in messages_response.json()], ["user", "assistant", "assistant"])
         self.assertFalse(messages_response.json()[1]["include_in_context"])
+        self.assertEqual(messages_response.json()[2]["metadata"]["kind"], "output_trace")
         self.assertEqual(delete_response.status_code, 200)
         self.assertTrue(delete_response.json()["deleted"])
         self.assertEqual(sessions_after_delete_response.json(), [])

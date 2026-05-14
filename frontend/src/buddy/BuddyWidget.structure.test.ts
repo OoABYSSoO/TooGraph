@@ -271,6 +271,7 @@ test("BuddyWidget renders assistant replies from parent graph output nodes only"
 test("BuddyWidget renders output-segment run trace capsules instead of per-message duration chips", () => {
   assert.match(componentSource, /import \{ formatRunDuration \} from "\.\.\/lib\/run-display-name\.ts";/);
   assert.match(componentSource, /import \{[\s\S]*advanceSmoothNumberDisplay,[\s\S]*isSmoothNumberDisplaySettled,[\s\S]*\} from "\.\.\/lib\/smoothNumberDisplay\.ts";/);
+  assert.match(componentSource, /import \{[\s\S]*buildOutputTraceBuddyMessageMetadata,[\s\S]*resolveOutputTraceBuddyMessageMetadata,[\s\S]*\} from "\.\/buddyMessageMetadata\.ts";/);
   assert.match(componentSource, /buildBuddyOutputTracePlan/);
   assert.match(componentSource, /reduceBuddyOutputTraceEvent/);
   assert.match(componentSource, /buildBuddyOutputTraceStateFromRunDetail/);
@@ -283,6 +284,11 @@ test("BuddyWidget renders output-segment run trace capsules instead of per-messa
   assert.match(componentSource, /traceDurationDisplayByKey/);
   assert.match(componentSource, /window\.requestAnimationFrame\(tick\)/);
   assert.match(componentSource, /buildRunNodeTimingByNodeIdFromRun/);
+  assert.match(componentSource, /const \{ publicOutputMessages, outputTraceMessages \} = syncBuddyRunDisplayMessages/);
+  assert.match(componentSource, /for \(const message of outputTraceMessages\) \{[\s\S]*persistBuddyMessage\(sessionId, message,[\s\S]*includeInContext:\s*false/);
+  assert.match(componentSource, /const metadata = buildBuddyMessageMetadata\(message\);/);
+  assert.match(componentSource, /\.\.\.\(metadata \? \{ metadata \} : \{\}\)/);
+  assert.match(componentSource, /outputTrace:\s*resolveOutputTraceBuddyMessageMetadata\(record\.metadata\) \?\? undefined/);
   assert.doesNotMatch(componentSource, /formatPublicOutputDuration/);
   assert.doesNotMatch(componentSource, /runTraceStartedAtByKey/);
 });

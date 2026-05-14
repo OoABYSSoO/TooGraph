@@ -207,6 +207,7 @@ def ensure_buddy_database(home_dir: Path) -> Path:
                 client_order REAL,
                 include_in_context INTEGER NOT NULL DEFAULT 1,
                 run_id TEXT,
+                metadata_json TEXT NOT NULL DEFAULT '{}',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY(session_id) REFERENCES buddy_sessions(session_id)
@@ -240,6 +241,7 @@ def ensure_buddy_database(home_dir: Path) -> Path:
 
 def _migrate_buddy_database(connection: sqlite3.Connection) -> None:
     _ensure_column(connection, "buddy_messages", "client_order", "client_order REAL")
+    _ensure_column(connection, "buddy_messages", "metadata_json", "metadata_json TEXT NOT NULL DEFAULT '{}'")
     _backfill_message_client_order(connection)
 
 
