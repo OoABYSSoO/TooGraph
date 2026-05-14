@@ -91,7 +91,11 @@ export function removeStateBindingFromDocument<T extends GraphPayload | GraphDoc
     if (node.kind !== "agent" && node.kind !== "condition" && node.kind !== "output") {
       return document;
     }
-    if (!node.reads.some((binding) => binding.state === stateKey)) {
+    const readBinding = node.reads.find((binding) => binding.state === stateKey);
+    if (!readBinding) {
+      return document;
+    }
+    if (readBinding.binding?.kind === "skill_input" && readBinding.binding.managed !== false) {
       return document;
     }
     const nextDocument = cloneGraphDocument(document);

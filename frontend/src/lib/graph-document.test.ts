@@ -37,6 +37,10 @@ const webSearchSkill: SkillDefinition = {
   },
   permissions: ["network"],
   runtime: { type: "python", entrypoint: "run.py" },
+  stateInputSchema: [
+    { key: "user_question", name: "User Question", valueType: "text", required: true, description: "Question to research." },
+    { key: "search_context", name: "Search Context", valueType: "markdown", required: false, description: "Extra search context." },
+  ],
   inputSchema: [{ key: "query", name: "Query", valueType: "text", required: true, description: "" }],
   outputSchema: [
     { key: "query", name: "Query", valueType: "text", required: false, description: "Search query." },
@@ -727,6 +731,79 @@ test("updateAgentNodeConfigInDocument does not create static skill input mapping
   const node = nextDocument.nodes.search_agent;
   assert.equal(node.kind, "agent");
   assert.equal("inputMapping" in (node.config.skillBindings?.[0] ?? {}), false);
+});
+
+test("updateAgentNodeConfigInDocument automatically binds matching skill state inputs", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Skill Managed Input Graph",
+    state_schema: {
+      user_question: {
+        name: "User Question",
+        description: "User request.",
+        type: "text",
+        value: "What changed today?",
+        color: "#d97706",
+      },
+      search_context: {
+        name: "Search Context",
+        description: "Known constraints.",
+        type: "markdown",
+        value: "",
+        color: "#2563eb",
+      },
+      extra_notes: {
+        name: "Extra Notes",
+        description: "User added input.",
+        type: "text",
+        value: "",
+        color: "#7c3aed",
+      },
+    },
+    nodes: {
+      search_agent: {
+        kind: "agent",
+        name: "Search Agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "extra_notes", required: false }],
+        writes: [],
+        config: {
+          skillKey: "",
+          skillBindings: [],
+          skillInstructionBlocks: {},
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "high",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = updateAgentNodeConfigInDocument(
+    document,
+    "search_agent",
+    (config) => ({
+      ...config,
+      skillKey: "web_search",
+    }),
+    { skillDefinitions: [webSearchSkill] },
+  );
+
+  const node = nextDocument.nodes.search_agent;
+  assert.equal(node.kind, "agent");
+  assert.deepEqual(node.reads, [
+    { state: "user_question", required: true, binding: { kind: "skill_input", skillKey: "web_search", fieldKey: "user_question", managed: true } },
+    { state: "search_context", required: false, binding: { kind: "skill_input", skillKey: "web_search", fieldKey: "search_context", managed: true } },
+    { state: "extra_notes", required: false },
+  ]);
+  assert.equal("inputMapping" in (node.config.skillBindings?.[0] ?? {}), false);
+  assert.deepEqual(document.nodes.search_agent.reads, [{ state: "extra_notes", required: false }]);
 });
 
 test("reconcileAgentSkillOutputBindingsInDocument prunes stale managed outputs for the attached skill schema", () => {

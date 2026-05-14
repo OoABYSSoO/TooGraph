@@ -1446,6 +1446,18 @@ function isSkillManagedOutputState(stateKey: string) {
   );
 }
 
+function isSkillManagedInputState(stateKey: string) {
+  return (
+    props.node.kind === "agent" &&
+    props.node.reads.some(
+      (binding) =>
+        binding.state === stateKey &&
+        binding.binding?.kind === "skill_input" &&
+        binding.binding.managed !== false,
+    )
+  );
+}
+
 function handleStateEditorActionClick(anchorId: string, stateKey: string | null | undefined) {
   if (!stateKey) {
     return;
@@ -1474,6 +1486,9 @@ function handleRemovePortStateClick(anchorId: string, side: "input" | "output", 
     return;
   }
   if (side === "output" && isSkillManagedOutputState(stateKey)) {
+    return;
+  }
+  if (side === "input" && isSkillManagedInputState(stateKey)) {
     return;
   }
   if (guardLockedStateEditAttempt()) {

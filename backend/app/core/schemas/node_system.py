@@ -80,6 +80,10 @@ class NodeSystemStateBindingKind(str, Enum):
     CAPABILITY_RESULT = "capability_result"
 
 
+class NodeSystemReadBindingKind(str, Enum):
+    SKILL_INPUT = "skill_input"
+
+
 class NodeSystemStateBindingMetadata(BaseModel):
     kind: NodeSystemStateBindingKind = NodeSystemStateBindingKind.SKILL_OUTPUT
     skill_key: str = Field(default="", alias="skillKey")
@@ -109,6 +113,26 @@ class NodeSystemStateBindingMetadata(BaseModel):
 
         self.skill_key = ""
         self.field_key = self.field_key or "result_package"
+        return self
+
+
+class NodeSystemReadBindingMetadata(BaseModel):
+    kind: NodeSystemReadBindingKind = NodeSystemReadBindingKind.SKILL_INPUT
+    skill_key: str = Field(..., min_length=1, alias="skillKey")
+    field_key: str = Field(..., min_length=1, alias="fieldKey")
+    managed: bool = True
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+    @field_validator("skill_key", "field_key")
+    @classmethod
+    def validate_binding_identifier(cls, value: str) -> str:
+        return _validate_identifier(value, label="Skill input binding identifier")
+
+    @model_validator(mode="after")
+    def validate_binding_shape(self) -> "NodeSystemReadBindingMetadata":
+        if self.kind != NodeSystemReadBindingKind.SKILL_INPUT:
+            raise ValueError("Read binding metadata only supports skill_input.")
         return self
 
 
@@ -186,8 +210,9 @@ class NodeSystemStateDefinition(BaseModel):
 class NodeSystemReadBinding(BaseModel):
     state: str = Field(..., min_length=1)
     required: bool = False
+    binding: NodeSystemReadBindingMetadata | None = None
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
     @field_validator("state")
     @classmethod

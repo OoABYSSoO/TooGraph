@@ -23,7 +23,9 @@ test("StatePortList owns agent real state port rows and emits parent side effect
   assert.match(componentSource, /@pointerdown\.stop="handlePortPointerDown\(port, \$event\)"/);
   assert.match(componentSource, /@click\.stop="handlePortClick\(port\)"/);
   assert.match(componentSource, /@click\.stop="emit\('remove-click', anchorId\(port\.key\), side, port\.key\)"/);
-  assert.match(componentSource, /v-if="isManagedPort\(port\)"/);
+  assert.match(componentSource, /v-if="isLeadingManagedIcon\(port\)"/);
+  assert.match(componentSource, /v-if="isTrailingManagedIcon\(port\)"/);
+  assert.match(componentSource, /function isRemovalLockedManagedPort\(port: NodePortViewModel\)/);
   assert.match(componentSource, /<Connection \/>/);
   assert.match(componentSource, /v-if="side === 'output' && canRemovePort\(port\)"/);
   assert.match(componentSource, /function canEditPort\(port: NodePortViewModel\)/);

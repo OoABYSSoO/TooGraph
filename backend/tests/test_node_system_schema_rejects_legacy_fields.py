@@ -13,6 +13,7 @@ from app.core.schemas.node_system import (
     NodeSystemConditionConfig,
     NodeSystemGraphDocument,
     NodeSystemInputConfig,
+    NodeSystemReadBinding,
     NodeSystemStateDefinition,
 )
 
@@ -80,6 +81,25 @@ class NodeSystemSchemaLegacyFieldRejectionTests(unittest.TestCase):
         self.assertEqual(dumped["binding"]["nodeId"], "executor")
         self.assertEqual(dumped["binding"]["fieldKey"], "result_package")
         self.assertEqual(dumped["binding"]["skillKey"], "")
+
+    def test_read_binding_accepts_managed_skill_input_binding(self) -> None:
+        binding = NodeSystemReadBinding.model_validate(
+            {
+                "state": "user_question",
+                "required": True,
+                "binding": {
+                    "kind": "skill_input",
+                    "skillKey": "web_search",
+                    "fieldKey": "user_question",
+                    "managed": True,
+                },
+            }
+        )
+
+        dumped = binding.model_dump(by_alias=True)
+        self.assertEqual(dumped["binding"]["kind"].value, "skill_input")
+        self.assertEqual(dumped["binding"]["skillKey"], "web_search")
+        self.assertEqual(dumped["binding"]["fieldKey"], "user_question")
 
     def test_condition_config_rejects_condition_mode(self) -> None:
         with self.assertRaises(ValidationError):

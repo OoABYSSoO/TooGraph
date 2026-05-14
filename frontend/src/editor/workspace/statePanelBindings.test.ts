@@ -155,3 +155,40 @@ test("removeStateBindingFromDocument never removes input node state outputs", ()
   assert.deepEqual(nextInputWriteDocument.nodes.input_question.writes, [{ state: "question", mode: "replace" }]);
   assert.deepEqual(nextInputWriteDocument.edges, document.edges);
 });
+
+test("removeStateBindingFromDocument does not remove managed skill input reads", () => {
+  const document = buildDocument();
+  const agent = document.nodes.answer_helper;
+  assert.equal(agent.kind, "agent");
+  if (agent.kind === "agent") {
+    agent.config.skillKey = "web_search";
+    agent.reads = [
+      {
+        state: "question",
+        required: true,
+        binding: {
+          kind: "skill_input",
+          skillKey: "web_search",
+          fieldKey: "user_question",
+          managed: true,
+        },
+      },
+    ];
+  }
+
+  const nextDocument = removeStateBindingFromDocument(document, "question", "answer_helper", "read");
+
+  assert.equal(nextDocument, document);
+  assert.deepEqual(nextDocument.nodes.answer_helper.reads, [
+    {
+      state: "question",
+      required: true,
+      binding: {
+        kind: "skill_input",
+        skillKey: "web_search",
+        fieldKey: "user_question",
+        managed: true,
+      },
+    },
+  ]);
+});

@@ -70,9 +70,9 @@
               <ElIcon v-else><Delete /></ElIcon>
             </button>
             <ElIcon
-              v-if="isManagedPort(port)"
+              v-if="isLeadingManagedIcon(port)"
               class="node-card__port-pill-source-icon"
-              :title="port.managedBySkill ? 'Skill managed output' : 'Dynamic capability managed state'"
+              :title="managedPortTitle(port)"
             >
               <Connection />
             </ElIcon>
@@ -83,6 +83,13 @@
               <span class="node-card__port-pill-label-text">{{ port.label }}</span>
               <ElIcon class="node-card__port-pill-confirm-icon"><Check /></ElIcon>
             </span>
+            <ElIcon
+              v-if="isTrailingManagedIcon(port)"
+              class="node-card__port-pill-source-icon node-card__port-pill-source-icon--trailing"
+              :title="managedPortTitle(port)"
+            >
+              <Connection />
+            </ElIcon>
             <button
               v-if="side === 'input' && canRemovePort(port)"
               type="button"
@@ -275,7 +282,7 @@ function canEditPort(port: NodePortViewModel) {
 }
 
 function canRemovePort(port: NodePortViewModel) {
-  return !port.virtual && !(props.side === "output" && isManagedPort(port));
+  return !port.virtual && !isRemovalLockedManagedPort(port);
 }
 
 function canReorderPort(port: NodePortViewModel) {
@@ -284,6 +291,28 @@ function canReorderPort(port: NodePortViewModel) {
 
 function isManagedPort(port: NodePortViewModel) {
   return Boolean(port.managedBySkill || port.managedByCapability);
+}
+
+function isRemovalLockedManagedPort(port: NodePortViewModel) {
+  return Boolean(port.managedBySkill || (props.side === "output" && port.managedByCapability));
+}
+
+function isLeadingManagedIcon(port: NodePortViewModel) {
+  return isManagedPort(port) && !(props.side === "input" && port.managedBySkill?.role === "input");
+}
+
+function isTrailingManagedIcon(port: NodePortViewModel) {
+  return props.side === "input" && port.managedBySkill?.role === "input";
+}
+
+function managedPortTitle(port: NodePortViewModel) {
+  if (port.managedBySkill?.role === "input") {
+    return "Skill managed input";
+  }
+  if (port.managedBySkill?.role === "output") {
+    return "Skill managed output";
+  }
+  return "Dynamic capability managed state";
 }
 
 function handlePortPointerDown(port: NodePortViewModel, pointerEvent: PointerEvent) {

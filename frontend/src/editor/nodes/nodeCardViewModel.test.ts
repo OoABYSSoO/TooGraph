@@ -241,13 +241,53 @@ test("buildNodeCardViewModel marks skill-managed output ports", () => {
   });
 
   assert.deepEqual(model.outputs[0]?.managedBySkill, {
+    role: "output",
     skillKey: "web_search",
     fieldKey: "artifact_paths",
   });
   assert.equal(model.body.kind, "agent");
   assert.deepEqual(model.body.primaryOutput?.managedBySkill, {
+    role: "output",
     skillKey: "web_search",
     fieldKey: "artifact_paths",
+  });
+});
+
+test("buildNodeCardViewModel marks skill-managed input ports", () => {
+  const node: GraphNode = {
+    kind: "agent",
+    name: "search_helper",
+    description: "Run a selected skill.",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [
+      {
+        state: "question",
+        required: true,
+        binding: {
+          kind: "skill_input",
+          skillKey: "web_search",
+          fieldKey: "user_question",
+          managed: true,
+        },
+      },
+    ],
+    writes: [],
+    config: {
+      skillKey: "web_search",
+      taskInstruction: "准备技能输入。",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "high",
+      temperature: 0.2,
+    },
+  };
+
+  const model = buildNodeCardViewModel("search_helper", node, stateSchema);
+
+  assert.deepEqual(model.inputs[0]?.managedBySkill, {
+    role: "input",
+    skillKey: "web_search",
+    fieldKey: "user_question",
   });
 });
 

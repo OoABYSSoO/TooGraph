@@ -21,6 +21,7 @@ export type NodePortViewModel = {
   stateColor: string;
   virtual?: boolean;
   managedBySkill?: {
+    role: "input" | "output";
     skillKey: string;
     fieldKey: string;
   };
@@ -164,6 +165,7 @@ export function buildNodeCardViewModel(
         required: binding.required,
         typeLabel: getStateTypeLabel(binding.state, stateSchema),
         stateColor: stateSchema[binding.state]?.color ?? "#d97706",
+        managedBySkill: resolveManagedSkillInputPort(binding),
         managedByCapability: resolveManagedCapabilityInputPort(node, binding.state, stateSchema),
       }));
 
@@ -525,8 +527,20 @@ function resolveManagedSkillOutputPort(
     return undefined;
   }
   return {
+    role: "output",
     skillKey: binding.skillKey,
     fieldKey: binding.fieldKey,
+  };
+}
+
+function resolveManagedSkillInputPort(binding: Extract<GraphNode, { kind: "agent" }>["reads"][number]): NodePortViewModel["managedBySkill"] {
+  if (binding.binding?.kind !== "skill_input" || binding.binding.managed === false) {
+    return undefined;
+  }
+  return {
+    role: "input",
+    skillKey: binding.binding.skillKey,
+    fieldKey: binding.binding.fieldKey,
   };
 }
 

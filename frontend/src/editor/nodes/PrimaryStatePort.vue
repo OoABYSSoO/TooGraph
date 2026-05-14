@@ -43,7 +43,7 @@
           <ElIcon
             v-if="isManagedPort"
             class="node-card__port-pill-source-icon"
-            :title="port.managedBySkill ? 'Skill managed output' : 'Dynamic capability managed state'"
+            :title="managedPortTitle"
           >
             <Connection />
           </ElIcon>
@@ -209,6 +209,15 @@ const popoverWidth = computed(() => {
 });
 const isManagedPort = computed(() => Boolean(props.port?.managedBySkill || props.port?.managedByCapability));
 const canEditPort = computed(() => Boolean(props.port && !props.port.virtual && !isManagedPort.value));
+const managedPortTitle = computed(() => {
+  if (props.port?.managedBySkill?.role === "input") {
+    return "Skill managed input";
+  }
+  if (props.port?.managedBySkill?.role === "output") {
+    return "Skill managed output";
+  }
+  return "Dynamic capability managed state";
+});
 
 function handlePortClick() {
   if (!props.port) {

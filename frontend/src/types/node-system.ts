@@ -33,6 +33,12 @@ export type StateDefinition = {
 export type ReadBinding = {
   state: string;
   required?: boolean;
+  binding?: {
+    kind: "skill_input";
+    skillKey: string;
+    fieldKey: string;
+    managed?: boolean;
+  } | null;
 };
 
 export type WriteBinding = {

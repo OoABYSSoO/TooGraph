@@ -616,6 +616,7 @@ export function updateAgentNodeConfigInDocument<T extends GraphPayload | GraphDo
   }
 
   nextNode.config = nextConfig;
+  reconcileAgentSkillStateInputBindings(nextDocument, nodeId, options.skillDefinitions ?? []);
   reconcileAgentSkillOutputBindings(nextDocument, nodeId, options.skillDefinitions ?? []);
   reconcileAgentCapabilityInputBindingsInPlace(nextDocument, nodeId);
   return nextDocument;
@@ -638,6 +639,7 @@ export function reconcileAgentSkillOutputBindingsInDocument<T extends GraphPaylo
 
   const nextDocument = cloneGraphDocument(document);
   for (const nodeId of agentNodeIds) {
+    reconcileAgentSkillStateInputBindings(nextDocument, nodeId, skillDefinitions);
     reconcileAgentSkillOutputBindings(nextDocument, nodeId, skillDefinitions);
   }
 
@@ -716,6 +718,70 @@ export function reconcileAgentCapabilityInputBindingsInPlace<T extends GraphPayl
 
   const resultStateKey = keptManagedStateKey ?? createManagedCapabilityResultState(document, nodeId);
   node.writes = [{ state: resultStateKey, mode: "replace" }];
+}
+
+function reconcileAgentSkillStateInputBindings<T extends GraphPayload | GraphDocument>(
+  document: T,
+  nodeId: string,
+  skillDefinitions: SkillDefinition[],
+) {
+  let node = document.nodes[nodeId];
+  if (!node || node.kind !== "agent") {
+    return;
+  }
+
+  const skillDefinitionMap = new Map(skillDefinitions.map((definition) => [definition.skillKey, definition]));
+  const attachedSkillKey = node.config.skillKey.trim();
+  const definition = attachedSkillKey ? skillDefinitionMap.get(attachedSkillKey) : undefined;
+  const activeInputKeys = new Set(definition?.stateInputSchema?.map((field) => field.key) ?? []);
+
+  if (!definition?.stateInputSchema?.length) {
+    node.reads = node.reads.filter((binding) => !isManagedSkillInputReadBinding(binding));
+    return;
+  }
+
+  const existingManagedReadByField = new Map<string, ReadBinding>();
+  for (const readBinding of node.reads) {
+    const binding = readBinding.binding;
+    if (
+      binding?.kind === "skill_input" &&
+      binding.skillKey === attachedSkillKey &&
+      binding.managed !== false &&
+      activeInputKeys.has(binding.fieldKey) &&
+      document.state_schema[readBinding.state]
+    ) {
+      existingManagedReadByField.set(binding.fieldKey, readBinding);
+    }
+  }
+
+  const freeReads = node.reads.filter((binding) => !isManagedSkillInputReadBinding(binding));
+  const boundStateKeys = new Set<string>();
+  const managedReads: ReadBinding[] = [];
+
+  for (const field of definition.stateInputSchema) {
+    const existingRead = existingManagedReadByField.get(field.key);
+    if (existingRead && document.state_schema[existingRead.state] && !boundStateKeys.has(existingRead.state)) {
+      boundStateKeys.add(existingRead.state);
+      managedReads.push(buildManagedSkillInputReadBinding(existingRead.state, attachedSkillKey, field));
+      continue;
+    }
+
+    const inferredStateKey = inferSkillInputStateKey(
+      document,
+      field,
+      new Set([...boundStateKeys]),
+    );
+    if (inferredStateKey) {
+      boundStateKeys.add(inferredStateKey);
+      managedReads.push(buildManagedSkillInputReadBinding(inferredStateKey, attachedSkillKey, field));
+      continue;
+    }
+  }
+
+  node.reads = [
+    ...managedReads,
+    ...freeReads.filter((binding) => !boundStateKeys.has(binding.state)),
+  ];
 }
 
 function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocument>(
@@ -980,6 +1046,10 @@ function isManagedSkillOutputStateForNode(
   );
 }
 
+function isManagedSkillInputReadBinding(binding: ReadBinding) {
+  return binding.binding?.kind === "skill_input" && binding.binding.managed !== false;
+}
+
 function isDynamicCapabilityExecutorNode(document: GraphPayload | GraphDocument, node: AgentNode) {
   if (node.config.skillKey.trim()) {
     return false;
@@ -1082,13 +1152,77 @@ function findExistingSkillOutputState(
   })?.[0] ?? null;
 }
 
+function buildManagedSkillInputReadBinding(
+  stateKey: string,
+  skillKey: string,
+  field: SkillIoField,
+): ReadBinding {
+  return {
+    state: stateKey,
+    required: Boolean(field.required),
+    binding: {
+      kind: "skill_input",
+      skillKey,
+      fieldKey: field.key,
+      managed: true,
+    },
+  };
+}
+
+function inferSkillInputStateKey(
+  document: GraphPayload | GraphDocument,
+  field: SkillIoField,
+  usedStateKeys: Set<string>,
+) {
+  const candidates: SkillInputStateCandidate[] = [];
+  const fieldKey = normalizeName(field.key);
+  const fieldName = normalizeName(field.name);
+  for (const [stateKey, definition] of Object.entries(document.state_schema)) {
+    if (usedStateKeys.has(stateKey)) {
+      continue;
+    }
+    let score = 0;
+    const stateKeyName = normalizeName(stateKey);
+    const stateDisplayName = normalizeName(definition.name);
+    if (stateKey === field.key) {
+      score = 100;
+    } else if (stateKeyName === fieldKey) {
+      score = 90;
+    } else if (fieldName && stateDisplayName === fieldName) {
+      score = 80;
+    } else if (stateTypeMatchesSkillField(definition, field)) {
+      if (fieldKey && stateKeyName.includes(fieldKey)) {
+        score = 70;
+      } else if (fieldName && stateDisplayName.includes(fieldName)) {
+        score = 60;
+      }
+    }
+    if (score > 0) {
+      candidates.push({ score, stateKey });
+    }
+  }
+
+  if (candidates.length === 0) {
+    return "";
+  }
+  candidates.sort((left, right) => right.score - left.score || left.stateKey.localeCompare(right.stateKey));
+  const bestScore = candidates[0]?.score ?? 0;
+  const bestCandidates = candidates.filter((candidate) => candidate.score === bestScore);
+  return bestCandidates.length === 1 ? bestCandidates[0].stateKey : "";
+}
+
+type SkillInputStateCandidate = {
+  score: number;
+  stateKey: string;
+};
+
 function createManagedSkillOutputState(
   document: GraphPayload | GraphDocument,
   nodeId: string,
   skill: SkillDefinition,
   field: SkillIoField,
 ) {
-  const stateType = normalizeSkillOutputStateType(field.valueType);
+  const stateType = normalizeSkillFieldStateType(field.valueType);
   const stateField = buildNextMaterializedVirtualStateField(document, stateType);
   const skillName = skill.name.trim() || skill.skillKey;
   const fieldName = field.name.trim() || field.key;
@@ -1119,7 +1253,7 @@ function syncManagedSkillOutputStateDefinition(
   if (!definition) {
     return;
   }
-  const nextType = normalizeSkillOutputStateType(field.valueType);
+  const nextType = normalizeSkillFieldStateType(field.valueType);
   const currentType = definition.type?.trim() || nextType;
   const nextValue = currentType === nextType ? definition.value : defaultMaterializedStateValueForType(nextType);
   document.state_schema[stateKey] = {
@@ -1131,9 +1265,20 @@ function syncManagedSkillOutputStateDefinition(
   };
 }
 
-function normalizeSkillOutputStateType(valueType: string) {
+function normalizeSkillFieldStateType(valueType: string) {
   const normalized = valueType.trim();
   return STATE_FIELD_TYPE_VALUES.has(normalized) ? normalized : "json";
+}
+
+function normalizeName(value: string) {
+  return [...value.toLowerCase()].filter((character) => /[\p{Letter}\p{Number}]/u.test(character)).join("");
+}
+
+function stateTypeMatchesSkillField(definition: StateDefinition | undefined, field: SkillIoField) {
+  if (!definition) {
+    return false;
+  }
+  return definition.type?.trim() === normalizeSkillFieldStateType(field.valueType);
 }
 
 export function updateConditionNodeConfigInDocument<T extends GraphPayload | GraphDocument>(
