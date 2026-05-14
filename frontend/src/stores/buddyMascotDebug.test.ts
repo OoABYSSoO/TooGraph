@@ -35,7 +35,7 @@ test("buddy mascot debug store exposes live motion timing controls", () => {
   const store = useBuddyMascotDebugStore();
 
   assert.deepEqual(store.motionConfig, {
-    moveDurationMs: 420,
+    moveDurationMs: 360,
     stepPauseMs: 8,
   });
 
@@ -53,7 +53,7 @@ test("buddy mascot debug store exposes live motion timing controls", () => {
 
   store.resetMotionConfig();
   assert.deepEqual(store.motionConfig, {
-    moveDurationMs: 420,
+    moveDurationMs: 360,
     stepPauseMs: 8,
   });
 });
