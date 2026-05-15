@@ -3858,8 +3858,8 @@ function formatErrorMessage(error: unknown): string {
 
 <style scoped>
 .buddy-widget {
-  --buddy-widget-bubble-width: 320px;
-  --buddy-widget-bubble-height: 256px;
+  --buddy-widget-bubble-max-width: 320px;
+  --buddy-widget-bubble-max-height: 256px;
 
   position: fixed;
   inset: 0;
@@ -4874,8 +4874,9 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__bubble {
   bottom: calc(100% + 10px);
-  width: min(var(--buddy-widget-bubble-width), calc(100vw - 32px));
-  height: min(var(--buddy-widget-bubble-height), calc(100vh - 120px));
+  width: max-content;
+  max-width: min(var(--buddy-widget-bubble-max-width), calc(100vw - 32px));
+  max-height: min(var(--buddy-widget-bubble-max-height), calc(100vh - 120px));
   box-sizing: border-box;
   overflow: auto;
   padding: 9px 11px;
