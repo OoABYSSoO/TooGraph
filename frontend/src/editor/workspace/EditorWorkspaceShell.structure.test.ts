@@ -458,8 +458,9 @@ test("EditorWorkspaceShell prompts default-named graph and template saves for me
   assert.match(componentSource, /applyGraphSaveMetadata\(document,[\s\S]*description: saveMetadataDialog\.value\.description,/);
   assert.match(componentSource, /requestSaveMetadata: requestSaveMetadataForDocument,/);
   assert.match(componentSource, /showSaveSuccessToast,/);
-  assert.match(componentSource, /function showSaveSuccessToast\(message: string\) \{[\s\S]*customClass:\s*"editor-workspace-shell__save-toast"[\s\S]*type:\s*"success"[\s\S]*duration:\s*3200,/);
+  assert.match(componentSource, /function showSaveSuccessToast\(message: string\) \{[\s\S]*customClass:\s*"editor-workspace-shell__save-toast"[\s\S]*type:\s*"success"[\s\S]*duration:\s*3200,[\s\S]*grouping:\s*false,/);
   assert.match(componentSource, /:global\(\.editor-workspace-shell__save-toast\.el-message\) \{[\s\S]*border:\s*1px solid rgba\(22,\s*101,\s*52,\s*0\.42\);/);
+  assert.doesNotMatch(componentSource, /:global\(\.editor-workspace-shell__save-toast\.el-message\) \{[\s\S]*top:\s*46% !important;/);
   assert.match(componentSource, /animation:\s*editor-workspace-shell-save-toast-float 3\.2s ease forwards;/);
   assert.match(componentSource, /@keyframes editor-workspace-shell-save-toast-float/);
   assert.match(graphPersistenceControllerSource, /import \{ shouldRequestSaveMetadata, type SaveMetadataRequest \} from "\.\/saveMetadataModel\.ts";/);

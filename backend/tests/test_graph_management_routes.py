@@ -127,6 +127,33 @@ class GraphManagementRouteTests(unittest.TestCase):
                 self.assertEqual(graph_response.json()["name"], "Renamed Flow")
                 self.assertEqual(graph_response.json()["status"], "disabled")
 
+    def test_saving_graphs_resolves_duplicate_names_with_numbered_suffixes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            graph_dir = Path(temp_dir) / "graphs"
+            with (
+                patch("app.core.storage.database.GRAPH_DATA_DIR", graph_dir),
+                patch("app.core.storage.graph_store.GRAPH_DATA_DIR", graph_dir),
+                TestClient(app) as client,
+            ):
+                first_response = client.post("/api/graphs/save", json=_graph_payload("graph_first", "Managed Flow"))
+                second_response = client.post("/api/graphs/save", json=_graph_payload(None, "Managed Flow"))
+                third_response = client.post("/api/graphs/save", json=_graph_payload(None, "Managed Flow"))
+                update_response = client.post("/api/graphs/save", json=_graph_payload("graph_first", "Managed Flow"))
+
+                self.assertEqual(first_response.status_code, 200)
+                self.assertEqual(second_response.status_code, 200)
+                self.assertEqual(third_response.status_code, 200)
+                self.assertEqual(update_response.status_code, 200)
+
+                first_graph = client.get("/api/graphs/graph_first").json()
+                second_graph = client.get(f"/api/graphs/{second_response.json()['graph_id']}").json()
+                third_graph = client.get(f"/api/graphs/{third_response.json()['graph_id']}").json()
+
+                self.assertEqual(first_graph["name"], "Managed Flow")
+                self.assertEqual(second_graph["name"], "Managed Flow_1")
+                self.assertEqual(third_graph["name"], "Managed Flow_2")
+                self.assertEqual(client.get("/api/graphs/graph_first").json()["name"], "Managed Flow")
+
     def test_saving_graph_preserves_agent_config_ui_and_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             graph_dir = Path(temp_dir) / "graphs"

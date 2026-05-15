@@ -82,6 +82,8 @@ function parentGraphWithSubgraph(): GraphPayload {
 
 function createHarness(options: {
   locked?: boolean;
+  savedGraph?: GraphDocument;
+  savedTemplateLabel?: string;
   requestSaveMetadata?: (request: {
     document: GraphPayload | GraphDocument;
     target: "graph" | "template";
@@ -105,7 +107,7 @@ function createHarness(options: {
   const documentsByTabId = ref<Record<string, GraphPayload | GraphDocument>>({
     tab_a: graphDocument("Draft"),
   });
-  const savedGraph = graphDocument("Saved Graph", "graph_saved") as GraphDocument;
+  const savedGraph = options.savedGraph ?? graphDocument("Draft", "graph_saved") as GraphDocument;
   const savedDocuments: Array<GraphPayload | GraphDocument> = [];
   const savedTemplateDocuments: Array<GraphPayload | GraphDocument> = [];
   const registeredDocuments: Array<{ tabId: string; document: GraphPayload | GraphDocument }> = [];
@@ -160,14 +162,15 @@ function createHarness(options: {
     },
     saveGraphAsTemplate: async (document) => {
       savedTemplateDocuments.push(document);
+      const savedTemplateLabel = options.savedTemplateLabel ?? document.name;
       return {
         template_id: "user_template_1",
         saved: true,
         template: {
           template_id: "user_template_1",
-          label: document.name,
+          label: savedTemplateLabel,
           description: "",
-          default_graph_name: document.name,
+          default_graph_name: savedTemplateLabel,
           source: "user",
           state_schema: document.state_schema,
           nodes: document.nodes,
@@ -229,12 +232,12 @@ test("useWorkspaceGraphPersistenceController saves the active tab as an existing
   assert.deepEqual(harness.registeredDocuments, [{ tabId: "tab_a", document: harness.savedGraph }]);
   assert.equal(harness.workspace.value.tabs[0]?.kind, "existing");
   assert.equal(harness.workspace.value.tabs[0]?.graphId, "graph_saved");
-  assert.equal(harness.workspace.value.tabs[0]?.title, "Saved Graph");
+  assert.equal(harness.workspace.value.tabs[0]?.title, "Draft");
   assert.equal(harness.workspace.value.tabs[0]?.dirty, false);
   assert.deepEqual(harness.routeSyncs, [{ graphId: "graph_saved", mode: "replace" }]);
   assert.equal(harness.graphLoadCount, 1);
   assert.equal(harness.feedback.at(-1)?.feedback.tone, "success");
-  assert.deepEqual(harness.saveToasts, ["Saved graph graph_saved."]);
+  assert.deepEqual(harness.saveToasts, ['Saved graph "Draft".']);
 });
 
 test("useWorkspaceGraphPersistenceController asks for graph metadata before saving a default-named graph", async () => {
@@ -424,8 +427,29 @@ test("useWorkspaceGraphPersistenceController saves the active graph as a user te
   assert.equal(harness.savedTemplateDocuments[0]?.name, "Draft");
   assert.equal(harness.templateLoadCount, 1);
   assert.equal(harness.feedback.at(-1)?.feedback.tone, "success");
-  assert.equal(harness.feedback.at(-1)?.feedback.message, "Saved template user_template_1.");
-  assert.deepEqual(harness.saveToasts, ["Saved template user_template_1."]);
+  assert.equal(harness.feedback.at(-1)?.feedback.message, 'Saved template "Draft".');
+  assert.deepEqual(harness.saveToasts, ['Saved template "Draft".']);
+});
+
+test("useWorkspaceGraphPersistenceController warns with the resolved name when duplicate graph or template names are renamed", async () => {
+  const graphHarness = createHarness({
+    savedGraph: graphDocument("Draft_1", "graph_saved") as GraphDocument,
+  });
+
+  await graphHarness.controller.saveTab("tab_a");
+
+  assert.equal(graphHarness.workspace.value.tabs[0]?.title, "Draft_1");
+  assert.equal(graphHarness.workspace.value.tabs[0]?.dirty, false);
+  assert.deepEqual(graphHarness.saveToasts, ['Saved graph "Draft_1" because "Draft" already exists.']);
+
+  const templateHarness = createHarness({
+    savedTemplateLabel: "Draft_1",
+  });
+
+  await templateHarness.controller.saveActiveGraphAsTemplate();
+
+  assert.equal(templateHarness.feedback.at(-1)?.feedback.message, 'Saved template "Draft_1" because "Draft" already exists.');
+  assert.deepEqual(templateHarness.saveToasts, ['Saved template "Draft_1" because "Draft" already exists.']);
 });
 
 test("useWorkspaceGraphPersistenceController asks for template metadata before saving a default-named template", async () => {
