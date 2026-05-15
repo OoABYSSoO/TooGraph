@@ -6,7 +6,7 @@ from typing import Any
 
 
 SUPPORTED_CURSOR_LIFECYCLES = {"keep", "return_after_step", "return_at_end"}
-SUPPORTED_COMMANDS = {
+KNOWN_CLICK_TARGETS = {
     "click app.nav.home": {
         "target_id": "app.nav.home",
         "target_label": "首页",
@@ -103,19 +103,14 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
             recoverable=True,
             detail={"commands": commands},
         )
-    command_info = SUPPORTED_COMMANDS.get(command)
-    if not command_info:
-        return _failed(
-            code="unsupported_target",
-            message="TooGraph 页面操作器第一阶段只支持普通应用导航目标。",
-            recoverable=True,
-            detail={"commands": commands, "target_id": target_id},
-        )
+    command_info = KNOWN_CLICK_TARGETS.get(command, {})
+    target_id = _compact_text(command_info.get("target_id")) or target_id
+    target_label = _compact_text(command_info.get("target_label")) or target_id
 
     operation = {
         "kind": "click",
-        "target_id": command_info["target_id"],
-        "target_label": command_info["target_label"],
+        "target_id": target_id,
+        "target_label": target_label,
     }
     operation_request = {
         "version": 1,
@@ -127,8 +122,8 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
     journal_entry = {
         "kind": "click",
         "command": command,
-        "target_id": command_info["target_id"],
-        "target_label": command_info["target_label"],
+        "target_id": target_id,
+        "target_label": target_label,
         "status": "requested",
         "reason": reason,
     }
@@ -140,7 +135,7 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
         "activity_events": [
             {
                 "kind": "virtual_ui_operation",
-                "summary": f"Requested virtual click on {command_info['target_label']}.",
+                "summary": f"Requested virtual click on {target_label}.",
                 "status": "requested",
                 "detail": {
                     "commands": commands,

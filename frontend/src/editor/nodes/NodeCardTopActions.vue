@@ -12,6 +12,11 @@
       data-top-action-surface="true"
       data-human-review-action="true"
       class="node-card__human-review-button"
+      :data-virtual-affordance-id="actionAffordanceId('humanReview')"
+      :data-virtual-affordance-label="actionAffordanceLabel(t('nodeCard.humanReview'))"
+      data-virtual-affordance-role="button"
+      data-virtual-affordance-zone="editor-canvas.node-action"
+      data-virtual-affordance-actions="click"
       @click.stop="emit('human-review')"
     >
       {{ t("nodeCard.humanReview") }}
@@ -26,7 +31,16 @@
       popper-class="node-card__action-popover"
     >
       <template #reference>
-        <ElButton round class="node-card__top-action-button node-card__top-action-button--advanced" @click.stop="emit('toggle-advanced')">
+        <ElButton
+          round
+          class="node-card__top-action-button node-card__top-action-button--advanced"
+          :data-virtual-affordance-id="actionAffordanceId('advanced')"
+          :data-virtual-affordance-label="actionAffordanceLabel(t('nodeCard.advanced'))"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.node-action"
+          data-virtual-affordance-actions="click"
+          @click.stop="emit('toggle-advanced')"
+        >
           <ElIcon><Operation /></ElIcon>
         </ElButton>
       </template>
@@ -101,6 +115,11 @@
           data-top-action-surface="true"
           class="node-card__top-action-button node-card__top-action-button--edit-subgraph"
           :class="{ 'node-card__top-action-button--confirm node-card__top-action-button--confirm-success': activeTopAction === 'edit-subgraph' }"
+          :data-virtual-affordance-id="actionAffordanceId('editSubgraph')"
+          :data-virtual-affordance-label="actionAffordanceLabel('编辑子图')"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.node-action"
+          data-virtual-affordance-actions="click"
           @click.stop="emit('edit-subgraph-action')"
         >
           <ElIcon v-if="activeTopAction === 'edit-subgraph'"><Check /></ElIcon>
@@ -123,6 +142,11 @@
           data-top-action-surface="true"
           class="node-card__top-action-button node-card__top-action-button--preset"
           :class="{ 'node-card__top-action-button--confirm node-card__top-action-button--confirm-success': activeTopAction === 'preset' }"
+          :data-virtual-affordance-id="actionAffordanceId('savePreset')"
+          :data-virtual-affordance-label="actionAffordanceLabel('保存预设')"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.node-action"
+          data-virtual-affordance-actions="click"
           @click.stop="emit('preset-action')"
         >
           <ElIcon v-if="activeTopAction === 'preset'"><Check /></ElIcon>
@@ -144,6 +168,12 @@
           data-top-action-surface="true"
           class="node-card__top-action-button node-card__top-action-button--delete"
           :class="{ 'node-card__top-action-button--confirm node-card__top-action-button--confirm-danger': activeTopAction === 'delete' }"
+          :data-virtual-affordance-id="actionAffordanceId('delete')"
+          :data-virtual-affordance-label="actionAffordanceLabel(t('common.delete'))"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.node-action"
+          data-virtual-affordance-actions="click"
+          data-virtual-affordance-requires-confirmation="true"
           @click.stop="emit('delete-action')"
         >
           <ElIcon v-if="activeTopAction === 'delete'"><Check /></ElIcon>
@@ -174,7 +204,9 @@ type OutputPersistFormatOption = {
   label: string;
 };
 
-defineProps<{
+const props = defineProps<{
+  nodeId: string;
+  nodeLabel: string;
   bodyKind: BodyKind;
   activeTopAction: NodeTopAction | null;
   isTopActionVisible: boolean;
@@ -206,6 +238,14 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+
+function actionAffordanceId(action: string) {
+  return `editor.canvas.node.${props.nodeId}.${action}`;
+}
+
+function actionAffordanceLabel(actionLabel: string) {
+  return `${actionLabel}：${props.nodeLabel || props.nodeId}`;
+}
 </script>
 
 <style scoped>

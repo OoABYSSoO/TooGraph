@@ -46,6 +46,11 @@
             :data-port-reorder-node-id="canReorderPort(port) ? nodeId : undefined"
             :data-port-reorder-side="canReorderPort(port) ? side : undefined"
             :data-port-reorder-state-key="canReorderPort(port) ? port.key : undefined"
+            :data-virtual-affordance-id="portVirtualAffordanceId(port)"
+            :data-virtual-affordance-label="portVirtualAffordanceLabel(port)"
+            data-virtual-affordance-role="button"
+            data-virtual-affordance-zone="editor-canvas.port"
+            data-virtual-affordance-actions="click"
             @pointerenter="emit('pointer-enter', anchorId(port.key))"
             @pointerleave="emit('pointer-leave', anchorId(port.key))"
             @pointerdown.stop="handlePortPointerDown(port, $event)"
@@ -63,6 +68,12 @@
               class="node-card__port-pill-remove node-card__port-pill-remove--leading"
               :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(anchorId(port.key)) }"
               :aria-label="t('nodeCard.removeStateBinding')"
+              :data-virtual-affordance-id="removePortVirtualAffordanceId(port)"
+              :data-virtual-affordance-label="removePortVirtualAffordanceLabel(port)"
+              data-virtual-affordance-role="button"
+              data-virtual-affordance-zone="editor-canvas.port"
+              data-virtual-affordance-actions="click"
+              data-virtual-affordance-requires-confirmation="true"
               @pointerdown.stop
               @click.stop="emit('remove-click', anchorId(port.key), side, port.key)"
             >
@@ -96,6 +107,12 @@
               class="node-card__port-pill-remove node-card__port-pill-remove--trailing"
               :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(anchorId(port.key)) }"
               :aria-label="t('nodeCard.removeStateBinding')"
+              :data-virtual-affordance-id="removePortVirtualAffordanceId(port)"
+              :data-virtual-affordance-label="removePortVirtualAffordanceLabel(port)"
+              data-virtual-affordance-role="button"
+              data-virtual-affordance-zone="editor-canvas.port"
+              data-virtual-affordance-actions="click"
+              data-virtual-affordance-requires-confirmation="true"
               @pointerdown.stop
               @click.stop="emit('remove-click', anchorId(port.key), side, port.key)"
             >
@@ -162,6 +179,11 @@
           "
           :style="{ '--node-card-port-accent': createAccentColor }"
           :data-agent-create-port="side"
+          :data-virtual-affordance-id="createPortVirtualAffordanceId"
+          :data-virtual-affordance-label="createPortVirtualAffordanceLabel"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.port"
+          data-virtual-affordance-actions="click"
           data-anchor-hitarea="true"
           @pointerdown.stop
           @click.stop="emit('open-create', side)"
@@ -268,6 +290,10 @@ const anchorSlotKind = computed(() => (props.side === "input" ? "state-in" : "st
 const editorPlacement = computed(() => (props.side === "input" ? "bottom-start" : "bottom-end"));
 const confirmPlacement = computed(() => (props.side === "input" ? "top-start" : "top-end"));
 const createPlacement = computed(() => (props.side === "input" ? "bottom-start" : "bottom-end"));
+const createPortVirtualAffordanceId = computed(() => `editor.canvas.node.${props.nodeId}.port.${props.side}.create`);
+const createPortVirtualAffordanceLabel = computed(() => {
+  return `${props.side === "input" ? "创建输入状态" : "创建输出状态"}：${props.createLabel}`;
+});
 
 function anchorId(stateKey: string) {
   return `${anchorPrefix.value}:${stateKey}`;
@@ -275,6 +301,22 @@ function anchorId(stateKey: string) {
 
 function anchorSlotId(stateKey: string) {
   return `${props.nodeId}:${anchorSlotKind.value}:${stateKey}`;
+}
+
+function portVirtualAffordanceId(port: NodePortViewModel) {
+  return `editor.canvas.node.${props.nodeId}.port.${props.side}.${port.key}`;
+}
+
+function portVirtualAffordanceLabel(port: NodePortViewModel) {
+  return `${props.side === "input" ? "输入状态" : "输出状态"}：${port.label}`;
+}
+
+function removePortVirtualAffordanceId(port: NodePortViewModel) {
+  return `${portVirtualAffordanceId(port)}.remove`;
+}
+
+function removePortVirtualAffordanceLabel(port: NodePortViewModel) {
+  return `移除状态绑定：${port.label}`;
 }
 
 function canEditPort(port: NodePortViewModel) {

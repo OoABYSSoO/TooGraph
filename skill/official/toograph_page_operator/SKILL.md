@@ -10,8 +10,7 @@ This official Skill validates one page-operation command sequence and asks TooGr
 Current phase:
 
 - Supports one operation per invocation.
-- Supports application navigation clicks only.
-- Supports safe application navigation click commands from the current page operation book.
+- Supports safe `click` commands from the current page operation book, including application navigation and editor canvas targets.
 - Rejects Buddy self surfaces such as the Buddy page, Buddy floating window, Buddy avatar, and debug controls.
 - Does not expose DOM selectors, screen coordinates, or low-level mouse trajectories to the LLM.
 
@@ -26,7 +25,7 @@ Runtime context:
 
 LLM output:
 
-- `commands`: array of command strings copied from the page operation book, such as `["click app.nav.library"]`.
+- `commands`: array of command strings copied from the page operation book, such as `["click app.nav.library"]` or `["click editor.canvas.node.agent_1"]`.
 - `cursor_lifecycle`: virtual cursor lifecycle, such as `return_after_step`.
 - `reason`: short audit reason for choosing the command.
 

@@ -5,44 +5,6 @@ import sys
 from typing import Any
 
 
-SUPPORTED_COMMANDS = {
-    "click app.nav.home": {
-        "target_id": "app.nav.home",
-        "target_label": "首页",
-    },
-    "click app.nav.editor": {
-        "target_id": "app.nav.editor",
-        "target_label": "图编辑器",
-    },
-    "click app.nav.runs": {
-        "target_id": "app.nav.runs",
-        "target_label": "运行历史",
-    },
-    "click app.nav.library": {
-        "target_id": "app.nav.library",
-        "target_label": "图库",
-    },
-    "click app.nav.presets": {
-        "target_id": "app.nav.presets",
-        "target_label": "预设节点",
-    },
-    "click app.nav.skills": {
-        "target_id": "app.nav.skills",
-        "target_label": "技能",
-    },
-    "click app.nav.models": {
-        "target_id": "app.nav.models",
-        "target_label": "模型",
-    },
-    "click app.nav.modelLogs": {
-        "target_id": "app.nav.modelLogs",
-        "target_label": "模型日志",
-    },
-    "click app.nav.settings": {
-        "target_id": "app.nav.settings",
-        "target_label": "设置",
-    },
-}
 DEFAULT_FORBIDDEN_NOTE = "伙伴页面、伙伴浮窗、伙伴形象和伙伴调试入口已过滤，不作为可操作内容返回。"
 
 
@@ -86,7 +48,7 @@ def _sanitize_operation_book(value: Any, page_path: str) -> dict[str, Any]:
         commands = [
             command
             for command in _list_text(operation.get("commands"))
-            if command in SUPPORTED_COMMANDS and not _is_self_surface_command(command)
+            if _is_supported_click_command(command, target_id)
         ]
         if not commands:
             continue
@@ -159,9 +121,14 @@ def _list_text(value: Any) -> list[str]:
     return [_compact_text(item) for item in value if _compact_text(item)]
 
 
-def _is_self_surface_command(command: str) -> bool:
-    parts = command.split()
-    return len(parts) >= 2 and _is_self_surface_target(parts[1])
+def _is_supported_click_command(command: str, target_id: str) -> bool:
+    parts = command.strip().split(maxsplit=1)
+    if len(parts) != 2 or parts[0].lower() != "click":
+        return False
+    command_target_id = parts[1].strip()
+    if target_id and command_target_id != target_id:
+        return False
+    return not _is_self_surface_target(command_target_id)
 
 
 def _is_self_surface_target(target_id: str) -> bool:

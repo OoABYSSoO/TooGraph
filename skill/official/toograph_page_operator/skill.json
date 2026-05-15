@@ -2,8 +2,8 @@
   "schemaVersion": "toograph.skill/v1",
   "skillKey": "toograph_page_operator",
   "name": "TooGraph 页面操作器",
-  "description": "根据结构化页面操作书执行一条页面命令请求。首期支持非伙伴页面的应用导航点击，并通过伙伴虚拟鼠标播放可见操作。",
-  "llmInstruction": "你已绑定 TooGraph 页面操作器。根据页面操作书和用户目标，只输出 commands、cursor_lifecycle、reason。commands 必须来自页面操作书里的命令字符串，例如 [\"click app.nav.runs\"]。当前只允许一条命令，且只允许普通应用页面目标。不要选择伙伴页面、伙伴浮窗、伙伴形象或调试入口。不要输出 DOM selector、坐标、鼠标轨迹或多步计划。",
+  "description": "根据结构化页面操作书执行一条页面命令请求。首期支持非伙伴页面和图编辑器画布目标的 click 命令，并通过伙伴虚拟鼠标播放可见操作。",
+  "llmInstruction": "你已绑定 TooGraph 页面操作器。根据页面操作书和用户目标，只输出 commands、cursor_lifecycle、reason。commands 必须来自页面操作书里的命令字符串，例如 [\"click app.nav.runs\"] 或 [\"click editor.canvas.node.agent_1\"]。当前只允许一条 click 命令。不要选择伙伴页面、伙伴浮窗、伙伴形象或调试入口。不要输出 DOM selector、坐标、鼠标轨迹或多步计划。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [
@@ -22,7 +22,7 @@
       "key": "commands",
       "name": "Commands",
       "valueType": "text_array",
-      "description": "LLM 从页面操作书中选择的一条命令字符串数组。首期一次只输出一条普通应用导航命令，例如 [\"click app.nav.library\"]。"
+      "description": "LLM 从页面操作书中选择的一条命令字符串数组。首期一次只输出一条 click 命令，例如 [\"click app.nav.library\"] 或 [\"click editor.canvas.node.agent_1\"]。"
     },
     {
       "key": "cursor_lifecycle",

@@ -31,6 +31,8 @@
       </template>
     </div>
     <NodeCardTopActions
+      :node-id="nodeId"
+      :node-label="view.title"
       :body-kind="view.body.kind"
       :active-top-action="activeTopAction"
       :is-top-action-visible="isTopActionVisible"
@@ -74,6 +76,11 @@
             role="button"
             tabindex="0"
             data-text-editor-trigger="true"
+            :data-virtual-affordance-id="`editor.canvas.node.${nodeId}.title`"
+            :data-virtual-affordance-label="`节点标题：${view.title || nodeId}`"
+            data-virtual-affordance-role="button"
+            data-virtual-affordance-zone="editor-canvas.node"
+            data-virtual-affordance-actions="click"
             @pointerdown="handleTextTriggerPointerDown('title', $event)"
             @pointermove="handleTextTriggerPointerMove('title', $event)"
             @pointerup="handleTextTriggerPointerUp('title', $event)"
@@ -117,6 +124,11 @@
           role="button"
           tabindex="0"
           data-text-editor-trigger="true"
+          :data-virtual-affordance-id="`editor.canvas.node.${nodeId}.description`"
+          :data-virtual-affordance-label="`节点描述：${view.title || nodeId}`"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.node"
+          data-virtual-affordance-actions="click"
           @pointerdown="handleTextTriggerPointerDown('description', $event)"
           @pointermove="handleTextTriggerPointerMove('description', $event)"
           @pointerup="handleTextTriggerPointerUp('description', $event)"
