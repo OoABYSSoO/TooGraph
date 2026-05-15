@@ -107,20 +107,48 @@ test("shouldHydrateExistingGraphDocument skips already loaded or loading graph t
   assert.equal(shouldHydrateExistingGraphDocument({ hasDocument: false, isLoading: false }), true);
 });
 
-test("resolveExistingGraphDocumentHydrationSource chooses persisted, cached, then fetch", () => {
+test("resolveExistingGraphDocumentHydrationSource ignores stale drafts for clean existing graph tabs", () => {
   const persisted = createDocument("Persisted");
   const cached = createSavedDocument("Cached");
 
-  assert.deepEqual(resolveExistingGraphDocumentHydrationSource({ persistedDraft: persisted, cachedGraph: cached }), {
+  assert.deepEqual(
+    resolveExistingGraphDocumentHydrationSource({ persistedDraft: persisted, cachedGraph: cached, tabDirty: false }),
+    {
+      type: "cached-graph",
+      graph: cached,
+      clearDirty: false,
+    },
+  );
+  assert.deepEqual(resolveExistingGraphDocumentHydrationSource({ persistedDraft: persisted, cachedGraph: null, tabDirty: false }), {
+    type: "fetch",
+  });
+});
+
+test("resolveExistingGraphDocumentHydrationSource preserves real dirty drafts for existing graph tabs", () => {
+  const persisted = createDocument("Persisted");
+  const cached = createSavedDocument("Cached");
+
+  assert.deepEqual(resolveExistingGraphDocumentHydrationSource({ persistedDraft: persisted, cachedGraph: cached, tabDirty: true }), {
     type: "persisted",
     document: persisted,
   });
-  assert.deepEqual(resolveExistingGraphDocumentHydrationSource({ persistedDraft: null, cachedGraph: cached }), {
+  assert.deepEqual(resolveExistingGraphDocumentHydrationSource({ persistedDraft: null, cachedGraph: cached, tabDirty: true }), {
     type: "cached-graph",
     graph: cached,
+    clearDirty: false,
   });
-  assert.deepEqual(resolveExistingGraphDocumentHydrationSource({ persistedDraft: null, cachedGraph: null }), {
+  assert.deepEqual(resolveExistingGraphDocumentHydrationSource({ persistedDraft: null, cachedGraph: null, tabDirty: true }), {
     type: "fetch",
+  });
+});
+
+test("resolveExistingGraphDocumentHydrationSource clears dirty state for drafts identical to the saved graph", () => {
+  const cached = createSavedDocument("Cached");
+
+  assert.deepEqual(resolveExistingGraphDocumentHydrationSource({ persistedDraft: cached, cachedGraph: cached, tabDirty: true }), {
+    type: "cached-graph",
+    graph: cached,
+    clearDirty: true,
   });
 });
 

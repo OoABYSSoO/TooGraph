@@ -9,6 +9,7 @@ import {
   resolveRestoredRunTabTitle,
 } from "../../lib/run-restore.ts";
 import {
+  applyDocumentMetaToWorkspaceTab,
   createUnsavedWorkspaceTab,
   ensureSavedGraphTab,
   readPersistedEditorDocumentDraft,
@@ -64,7 +65,9 @@ export function useWorkspaceOpenController(input: WorkspaceOpenControllerInput) 
       const template = input.templates().find((candidate) => candidate.template_id === tab.templateId);
       if (template) {
         const draft = createDraftFromTemplate(template);
-        draft.name = tab.title;
+        if (tab.dirty) {
+          draft.name = tab.title;
+        }
         return draft;
       }
     }
@@ -156,7 +159,12 @@ export function useWorkspaceOpenController(input: WorkspaceOpenControllerInput) 
 
     try {
       const persistedDraft = readDocumentDraft(tabId);
-      const hydrationSource = resolveExistingGraphDocumentHydrationSource({ persistedDraft, cachedGraph: null });
+      const tab = input.workspace.value.tabs.find((candidate) => candidate.tabId === tabId) ?? null;
+      const hydrationSource = resolveExistingGraphDocumentHydrationSource({
+        persistedDraft,
+        cachedGraph: null,
+        tabDirty: Boolean(tab?.dirty),
+      });
       if (hydrationSource.type === "persisted") {
         input.registerDocumentForTab(tabId, hydrationSource.document);
         return;
@@ -182,6 +190,7 @@ export function useWorkspaceOpenController(input: WorkspaceOpenControllerInput) 
     input.updateWorkspace(nextWorkspace);
 
     const nextTabId = nextWorkspace.activeTabId;
+    const nextTab = nextWorkspace.tabs.find((tab) => tab.tabId === nextTabId) ?? null;
     if (
       nextTabId &&
       shouldHydrateExistingGraphDocument({
@@ -190,11 +199,24 @@ export function useWorkspaceOpenController(input: WorkspaceOpenControllerInput) 
       })
     ) {
       const persistedDraft = readDocumentDraft(nextTabId);
-      const hydrationSource = resolveExistingGraphDocumentHydrationSource({ persistedDraft, cachedGraph: graph });
+      const hydrationSource = resolveExistingGraphDocumentHydrationSource({
+        persistedDraft,
+        cachedGraph: graph,
+        tabDirty: Boolean(nextTab?.dirty),
+      });
       if (hydrationSource.type === "persisted") {
         input.registerDocumentForTab(nextTabId, hydrationSource.document);
       } else if (hydrationSource.type === "cached-graph") {
         input.registerDocumentForTab(nextTabId, cloneGraphDocument(hydrationSource.graph));
+        if (hydrationSource.clearDirty) {
+          input.updateWorkspace(
+            applyDocumentMetaToWorkspaceTab(input.workspace.value, nextTabId, {
+              title: hydrationSource.graph.name,
+              dirty: false,
+              graphId: hydrationSource.graph.graph_id,
+            }),
+          );
+        }
       } else if (hydrationSource.type === "fetch") {
         void loadExistingGraphIntoTab(nextTabId, graphId);
       }

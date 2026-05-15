@@ -34,6 +34,10 @@ type WorkspaceDocumentStateInput = {
 export function useWorkspaceDocumentState(input: WorkspaceDocumentStateInput) {
   function setDocumentForTab(tabId: string, nextDocument: GraphPayload | GraphDocument) {
     input.documentsByTabId.value = setTabScopedRecordEntry(input.documentsByTabId.value, tabId, nextDocument);
+  }
+
+  function persistDocumentDraftForTab(tabId: string, nextDocument: GraphPayload | GraphDocument) {
+    setDocumentForTab(tabId, nextDocument);
     writePersistedEditorDocumentDraft(tabId, nextDocument);
   }
 
@@ -82,12 +86,12 @@ export function useWorkspaceDocumentState(input: WorkspaceDocumentStateInput) {
 
     const nextDocument = applyRunWrittenStateValuesToDocument(document, run);
     if (nextDocument !== document) {
-      setDocumentForTab(tabId, nextDocument);
+      persistDocumentDraftForTab(tabId, nextDocument);
     }
   }
 
   function commitDirtyDocumentForTab(tabId: string, nextDocument: GraphPayload | GraphDocument) {
-    setDocumentForTab(tabId, nextDocument);
+    persistDocumentDraftForTab(tabId, nextDocument);
     input.updateWorkspace(
       applyDocumentMetaToWorkspaceTab(input.workspace.value, tabId, {
         title: nextDocument.name,

@@ -216,6 +216,16 @@ test("EditorWorkspaceShell delegates graph mutation actions to a workspace compo
   assert.doesNotMatch(componentSource, /function deleteStateField/);
 });
 
+test("EditorWorkspaceShell does not mark clean opened graphs dirty during skill binding reconciliation", () => {
+  const reconcileSource =
+    componentSource.match(/function reconcileOpenDocumentsWithSkillDefinitions\(\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+
+  assert.match(reconcileSource, /for \(const \[tabId, document\] of Object\.entries\(documentsByTabId\.value\)\)/);
+  assert.match(reconcileSource, /const tab = workspace\.value\.tabs\.find\(\(candidate\) => candidate\.tabId === tabId\) \?\? null;/);
+  assert.match(reconcileSource, /if \(!tab\?\.dirty\) \{[\s\S]*continue;/);
+  assert.match(reconcileSource, /markDocumentDirty\(tabId, nextDocument\);/);
+});
+
 test("EditorWorkspaceShell blocks deleting State definitions that are still referenced by nodes", () => {
   assert.match(graphMutationActionsSource, /import \{[\s\S]*deleteStateFieldFromDocument[\s\S]*listStateFieldUsageLabels[\s\S]*\} from "\.\/statePanelFields\.ts";/);
   assert.match(graphMutationActionsSource, /function deleteStateField\(tabId: string, stateKey: string\)/);
@@ -546,9 +556,18 @@ test("EditorWorkspaceShell persists graph document drafts across route changes a
   assert.match(ensureDocumentsSource, /hydrationSource\.type === "persisted" \? hydrationSource\.document : createDraftForTab\(tab\)/);
   assert.doesNotMatch(ensureDocumentsSource, /persistedDraft \?\? createDraftForTab\(tab\)/);
   assert.match(loadExistingSource, /!shouldHydrateExistingGraphDocument\(\{[\s\S]*hasDocument: Boolean\(input\.documentsByTabId\.value\[tabId\]\),[\s\S]*isLoading: Boolean\(input\.loadingByTabId\.value\[tabId\]\),[\s\S]*\}\)/);
-  assert.match(loadExistingSource, /const hydrationSource = resolveExistingGraphDocumentHydrationSource\(\{ persistedDraft, cachedGraph: null \}\);/);
+  assert.match(loadExistingSource, /const tab = input\.workspace\.value\.tabs\.find\(\(candidate\) => candidate\.tabId === tabId\) \?\? null;/);
+  assert.match(
+    loadExistingSource,
+    /const hydrationSource = resolveExistingGraphDocumentHydrationSource\(\{\s*persistedDraft,\s*cachedGraph: null,\s*tabDirty: Boolean\(tab\?\.dirty\),\s*\}\);/,
+  );
   assert.match(openExistingSource, /nextTabId &&[\s\S]*shouldHydrateExistingGraphDocument\(\{[\s\S]*hasDocument: Boolean\(input\.documentsByTabId\.value\[nextTabId\]\),[\s\S]*isLoading: Boolean\(input\.loadingByTabId\.value\[nextTabId\]\),[\s\S]*\}\)/);
-  assert.match(openExistingSource, /const hydrationSource = resolveExistingGraphDocumentHydrationSource\(\{ persistedDraft, cachedGraph: graph \}\);/);
+  assert.match(openExistingSource, /const nextTab = nextWorkspace\.tabs\.find\(\(tab\) => tab\.tabId === nextTabId\) \?\? null;/);
+  assert.match(
+    openExistingSource,
+    /const hydrationSource = resolveExistingGraphDocumentHydrationSource\(\{\s*persistedDraft,\s*cachedGraph: graph,\s*tabDirty: Boolean\(nextTab\?\.dirty\),\s*\}\);/,
+  );
+  assert.match(openExistingSource, /if \(hydrationSource\.clearDirty\) \{[\s\S]*applyDocumentMetaToWorkspaceTab\(input\.workspace\.value, nextTabId, \{/);
   assert.match(documentStateSource, /writePersistedEditorDocumentDraft\(tabId, nextDocument\);/);
   assert.match(componentSource, /removeDocumentDraft: removePersistedEditorDocumentDraft,/);
   assert.match(tabLifecycleControllerSource, /input\.removeDocumentDraft\(tabId\);/);
@@ -818,7 +837,7 @@ test("EditorWorkspaceShell persists terminal run state values into the graph dra
   assert.match(documentStateSource, /import \{ applyRunWrittenStateValuesToDocument \} from "\.\/runStatePersistence\.ts";/);
   assert.match(documentStateSource, /function persistRunStateValuesForTab\(tabId: string, run: RunDetail\)/);
   assert.match(documentStateSource, /const nextDocument = applyRunWrittenStateValuesToDocument\(document, run\);/);
-  assert.match(documentStateSource, /if \(nextDocument !== document\) \{[\s\S]*setDocumentForTab\(tabId, nextDocument\);[\s\S]*\}/);
+  assert.match(documentStateSource, /if \(nextDocument !== document\) \{[\s\S]*persistDocumentDraftForTab\(tabId, nextDocument\);[\s\S]*\}/);
   assert.match(componentSource, /persistRunStateValuesForTab,/);
   assert.match(runLifecycleControllerSource, /input\.persistRunStateValuesForTab\(tabId, run\);/);
 });

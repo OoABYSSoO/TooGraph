@@ -54,16 +54,30 @@ export function shouldHydrateExistingGraphDocument(params: { hasDocument: boolea
 export function resolveExistingGraphDocumentHydrationSource(params: {
   persistedDraft: GraphDraft | null;
   cachedGraph: GraphDocument | null;
+  tabDirty: boolean;
 }) {
-  if (params.persistedDraft) {
+  if (params.tabDirty && params.persistedDraft) {
+    if (params.cachedGraph && areGraphDraftsEquivalent(params.persistedDraft, params.cachedGraph)) {
+      return { type: "cached-graph" as const, graph: params.cachedGraph, clearDirty: true };
+    }
     return { type: "persisted" as const, document: params.persistedDraft };
   }
 
   if (params.cachedGraph) {
-    return { type: "cached-graph" as const, graph: params.cachedGraph };
+    return { type: "cached-graph" as const, graph: params.cachedGraph, clearDirty: false };
   }
 
   return { type: "fetch" as const };
+}
+
+function areGraphDraftsEquivalent(left: GraphDraft, right: GraphDraft) {
+  return JSON.stringify(normalizeGraphDraftForComparison(left)) === JSON.stringify(normalizeGraphDraftForComparison(right));
+}
+
+function normalizeGraphDraftForComparison(draft: GraphDraft) {
+  const normalized = JSON.parse(JSON.stringify(draft)) as Record<string, unknown>;
+  delete normalized.status;
+  return normalized;
 }
 
 export function resolveWorkspaceDraftPersistenceRequest(params: {

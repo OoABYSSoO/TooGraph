@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { computed, ref } from "vue";
 
-import type { PersistedEditorWorkspace } from "@/lib/editor-workspace";
+import type { EditorWorkspaceTab, PersistedEditorWorkspace } from "@/lib/editor-workspace";
 import type { GraphDocument, GraphPayload, TemplateRecord } from "@/types/node-system";
 import type { RunDetail } from "@/types/run";
 
@@ -155,6 +155,20 @@ function createHarness(options: { templates?: TemplateRecord[]; graphs?: GraphDo
   };
 }
 
+function createExistingTab(overrides: Partial<EditorWorkspaceTab> = {}): EditorWorkspaceTab {
+  return {
+    tabId: "tab_existing",
+    kind: "existing",
+    graphId: "graph_saved",
+    title: "Saved Graph",
+    dirty: false,
+    templateId: null,
+    defaultTemplateId: null,
+    subgraphSource: null,
+    ...overrides,
+  };
+}
+
 test("useWorkspaceOpenController opens new template tabs and syncs the route", () => {
   const harness = createHarness();
 
@@ -194,6 +208,29 @@ test("useWorkspaceOpenController opens plain new tabs as blank graphs", () => {
   assert.equal(harness.handledRouteSignature.value, "new:");
 });
 
+test("useWorkspaceOpenController rebuilds clean template tabs from the template default graph name", () => {
+  const harness = createHarness({ templates: [createTemplate("template_a", "Template Graph")] });
+  harness.workspace.value = {
+    activeTabId: "tab_template",
+    tabs: [
+      {
+        tabId: "tab_template",
+        kind: "template",
+        graphId: null,
+        title: "Template",
+        dirty: false,
+        templateId: "template_a",
+        defaultTemplateId: "template_a",
+        subgraphSource: null,
+      },
+    ],
+  };
+
+  harness.controller.ensureUnsavedTabDocuments();
+
+  assert.equal(harness.documentsByTabId.value.tab_template?.name, "Template Graph");
+});
+
 test("useWorkspaceOpenController opens cached existing graphs without fetching", () => {
   const graph = createGraph("graph_cached", "Cached Graph");
   const harness = createHarness({ graphs: [graph] });
@@ -211,15 +248,50 @@ test("useWorkspaceOpenController opens cached existing graphs without fetching",
   assert.equal(harness.handledRouteSignature.value, "existing:graph_cached");
 });
 
-test("useWorkspaceOpenController prefers persisted drafts when loading existing graph tabs", async () => {
+test("useWorkspaceOpenController ignores persisted drafts when loading clean existing graph tabs", async () => {
   const draft = createGraph("graph_draft", "Persisted Draft");
   const harness = createHarness({ documentDrafts: { tab_existing: draft } });
+  harness.workspace.value = {
+    activeTabId: "tab_existing",
+    tabs: [createExistingTab()],
+  };
+
+  await harness.controller.loadExistingGraphIntoTab("tab_existing", "graph_saved");
+
+  assert.equal(harness.documentsByTabId.value.tab_existing?.name, "Fetched Graph");
+  assert.equal(harness.loadingByTabId.value.tab_existing, false);
+  assert.equal(harness.errorByTabId.value.tab_existing, null);
+  assert.deepEqual(harness.fetchedGraphIds, ["graph_saved"]);
+});
+
+test("useWorkspaceOpenController prefers persisted drafts when loading dirty existing graph tabs", async () => {
+  const draft = createGraph("graph_draft", "Persisted Draft");
+  const harness = createHarness({ documentDrafts: { tab_existing: draft } });
+  harness.workspace.value = {
+    activeTabId: "tab_existing",
+    tabs: [createExistingTab({ dirty: true })],
+  };
 
   await harness.controller.loadExistingGraphIntoTab("tab_existing", "graph_saved");
 
   assert.equal(harness.documentsByTabId.value.tab_existing?.name, "Persisted Draft");
   assert.equal(harness.loadingByTabId.value.tab_existing, false);
   assert.equal(harness.errorByTabId.value.tab_existing, null);
+  assert.deepEqual(harness.fetchedGraphIds, []);
+});
+
+test("useWorkspaceOpenController clears stale dirty state when a persisted draft matches the cached graph", () => {
+  const graph = createGraph("graph_saved", "Saved Graph");
+  const harness = createHarness({ graphs: [graph], documentDrafts: { tab_existing: graph } });
+  harness.workspace.value = {
+    activeTabId: "tab_existing",
+    tabs: [createExistingTab({ dirty: true })],
+  };
+
+  harness.controller.openExistingGraph("graph_saved", "push");
+
+  assert.equal(harness.workspace.value.tabs[0]?.dirty, false);
+  assert.equal(harness.documentsByTabId.value.tab_existing?.name, "Saved Graph");
   assert.deepEqual(harness.fetchedGraphIds, []);
 });
 

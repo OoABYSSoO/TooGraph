@@ -1179,6 +1179,10 @@ function reconcileOpenDocumentsWithSkillDefinitions() {
   }
 
   for (const [tabId, document] of Object.entries(documentsByTabId.value)) {
+    const tab = workspace.value.tabs.find((candidate) => candidate.tabId === tabId) ?? null;
+    if (!tab?.dirty) {
+      continue;
+    }
     const nextDocument = reconcileAgentSkillOutputBindingsInDocument(document, skillDefinitions.value);
     if (nextDocument !== document) {
       markDocumentDirty(tabId, nextDocument);

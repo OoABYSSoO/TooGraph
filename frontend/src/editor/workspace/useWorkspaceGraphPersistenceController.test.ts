@@ -425,6 +425,11 @@ test("useWorkspaceGraphPersistenceController saves the active graph as a user te
   await harness.controller.saveActiveGraphAsTemplate();
 
   assert.equal(harness.savedTemplateDocuments[0]?.name, "Draft");
+  assert.equal(harness.savedDocuments.length, 0);
+  assert.equal(harness.registeredDocuments.length, 0);
+  assert.equal(harness.graphLoadCount, 0);
+  assert.equal(harness.activeTab.value?.kind, "new");
+  assert.equal(harness.activeTab.value?.graphId, null);
   assert.equal(harness.templateLoadCount, 1);
   assert.equal(harness.feedback.at(-1)?.feedback.tone, "success");
   assert.equal(harness.feedback.at(-1)?.feedback.message, 'Saved template "Draft".');
