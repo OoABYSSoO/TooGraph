@@ -107,7 +107,11 @@ test("AppShell exposes model request logs as a primary sidebar destination", () 
 
 test("AppShell registers only non-buddy navigation affordances for virtual page operations", () => {
   assert.match(componentSource, /to="\/runs"[\s\S]*data-virtual-affordance-id="app\.nav\.runs"/);
-  assert.doesNotMatch(componentSource, /data-virtual-affordance-id="app\.nav\.buddy"/);
+  assert.match(componentSource, /data-virtual-affordance-label="运行历史"/);
+  assert.match(componentSource, /data-virtual-affordance-actions="click"/);
+  assert.match(componentSource, /data-virtual-affordance-path-after-click="\/runs"/);
+  assert.match(componentSource, /data-virtual-affordance-id="app\.nav\.settings"/);
+  assert.match(componentSource, /data-virtual-affordance-id="app\.nav\.buddy"[\s\S]*data-virtual-affordance-self-surface="true"/);
 });
 
 test("AppShell exposes Buddy as a primary sidebar destination", () => {

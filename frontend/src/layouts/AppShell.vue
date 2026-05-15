@@ -32,6 +32,12 @@
         <RouterLink
           to="/"
           class="app-shell__link"
+          data-virtual-affordance-id="app.nav.home"
+          data-virtual-affordance-label="首页"
+          data-virtual-affordance-role="navigation-link"
+          data-virtual-affordance-zone="app-shell"
+          data-virtual-affordance-actions="click"
+          data-virtual-affordance-path-after-click="/"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'home' }"
           :title="t('nav.home')"
         >
@@ -41,6 +47,12 @@
         <RouterLink
           to="/editor"
           class="app-shell__link"
+          data-virtual-affordance-id="app.nav.editor"
+          data-virtual-affordance-label="图编辑器"
+          data-virtual-affordance-role="navigation-link"
+          data-virtual-affordance-zone="app-shell"
+          data-virtual-affordance-actions="click"
+          data-virtual-affordance-path-after-click="/editor"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'editor' }"
           :title="t('nav.editor')"
         >
@@ -51,6 +63,11 @@
           to="/runs"
           class="app-shell__link"
           data-virtual-affordance-id="app.nav.runs"
+          data-virtual-affordance-label="运行历史"
+          data-virtual-affordance-role="navigation-link"
+          data-virtual-affordance-zone="app-shell"
+          data-virtual-affordance-actions="click"
+          data-virtual-affordance-path-after-click="/runs"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'runs' }"
           :title="t('nav.runs')"
         >
@@ -60,6 +77,12 @@
         <RouterLink
           to="/library"
           class="app-shell__link"
+          data-virtual-affordance-id="app.nav.library"
+          data-virtual-affordance-label="图库"
+          data-virtual-affordance-role="navigation-link"
+          data-virtual-affordance-zone="app-shell"
+          data-virtual-affordance-actions="click"
+          data-virtual-affordance-path-after-click="/library"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'graphLibrary' }"
           :title="t('nav.graphLibrary')"
         >
@@ -69,6 +92,12 @@
         <RouterLink
           to="/buddy"
           class="app-shell__link"
+          data-virtual-affordance-id="app.nav.buddy"
+          data-virtual-affordance-label="伙伴"
+          data-virtual-affordance-role="navigation-link"
+          data-virtual-affordance-zone="buddy-page"
+          data-virtual-affordance-actions="click"
+          data-virtual-affordance-self-surface="true"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'buddy' }"
           :title="t('nav.buddy')"
         >
@@ -78,6 +107,12 @@
         <RouterLink
           to="/presets"
           class="app-shell__link"
+          data-virtual-affordance-id="app.nav.presets"
+          data-virtual-affordance-label="预设节点"
+          data-virtual-affordance-role="navigation-link"
+          data-virtual-affordance-zone="app-shell"
+          data-virtual-affordance-actions="click"
+          data-virtual-affordance-path-after-click="/presets"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'presets' }"
           :title="t('nav.presets')"
         >
@@ -87,6 +122,12 @@
         <RouterLink
           to="/skills"
           class="app-shell__link"
+          data-virtual-affordance-id="app.nav.skills"
+          data-virtual-affordance-label="技能"
+          data-virtual-affordance-role="navigation-link"
+          data-virtual-affordance-zone="app-shell"
+          data-virtual-affordance-actions="click"
+          data-virtual-affordance-path-after-click="/skills"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'skills' }"
           :title="t('nav.skills')"
         >
@@ -96,6 +137,12 @@
         <RouterLink
           to="/models"
           class="app-shell__link"
+          data-virtual-affordance-id="app.nav.models"
+          data-virtual-affordance-label="模型"
+          data-virtual-affordance-role="navigation-link"
+          data-virtual-affordance-zone="app-shell"
+          data-virtual-affordance-actions="click"
+          data-virtual-affordance-path-after-click="/models"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'models' }"
           :title="t('nav.models')"
         >
@@ -105,6 +152,12 @@
         <RouterLink
           to="/model-logs"
           class="app-shell__link"
+          data-virtual-affordance-id="app.nav.modelLogs"
+          data-virtual-affordance-label="模型日志"
+          data-virtual-affordance-role="navigation-link"
+          data-virtual-affordance-zone="app-shell"
+          data-virtual-affordance-actions="click"
+          data-virtual-affordance-path-after-click="/model-logs"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'modelLogs' }"
           :title="t('nav.modelLogs')"
         >
@@ -114,6 +167,12 @@
         <RouterLink
           to="/settings"
           class="app-shell__link"
+          data-virtual-affordance-id="app.nav.settings"
+          data-virtual-affordance-label="设置"
+          data-virtual-affordance-role="navigation-link"
+          data-virtual-affordance-zone="app-shell"
+          data-virtual-affordance-actions="click"
+          data-virtual-affordance-path-after-click="/settings"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'settings' }"
           :title="t('nav.settings')"
         >
