@@ -10,12 +10,15 @@ description: Use when a TooGraph workflow needs to choose one enabled graph temp
 State inputs:
 
 - `requirement`: original user or workflow requirement.
+
+Runtime context:
+
 - `origin`: optional capability-selection origin, such as `buddy`.
 
 LLM parameters:
 
 - `requirement`: the requirement used for audit continuity.
-- `origin`: optional origin copied from state or defaulted to `buddy`.
+- `origin`: optional origin defaulted by the model from runtime context, or omitted to use `buddy`.
 - `capability`: the single selected capability object.
 - `selection_reason`: concise reason for the selected item or for selecting none.
 - `rejected_candidates`: optional short list of rejected candidates and reasons.

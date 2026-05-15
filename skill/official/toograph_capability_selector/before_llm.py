@@ -14,11 +14,8 @@ from capability_catalog import DEFAULT_ORIGIN, build_capability_catalog_context 
 
 
 def toograph_capability_selector_before_llm(**payload: Any) -> dict[str, str]:
-    graph_state = payload.get("graph_state")
-    origin = ""
-    if isinstance(graph_state, dict):
-        origin = str(graph_state.get("origin") or "").strip()
-    origin = str(payload.get("origin") or origin or DEFAULT_ORIGIN).strip()
+    runtime_context = payload.get("runtime_context") if isinstance(payload.get("runtime_context"), dict) else {}
+    origin = str(runtime_context.get("origin") or payload.get("origin") or DEFAULT_ORIGIN).strip()
     return {"context": build_capability_catalog_context(origin=origin)}
 
 

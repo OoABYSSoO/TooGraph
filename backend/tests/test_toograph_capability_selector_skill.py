@@ -176,7 +176,7 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
                 status="disabled",
             )
             with patch.dict("os.environ", {"TOOGRAPH_REPO_ROOT": str(repo_root)}, clear=True):
-                result = selector.toograph_capability_selector_before_llm(graph_state={})
+                result = selector.toograph_capability_selector_before_llm(runtime_context={})
 
         context = result["context"]
         self.assertIn("Available TooGraph capabilities:", context)
@@ -340,7 +340,7 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
                 permissions=["network"],
             )
             with patch.dict("os.environ", {"TOOGRAPH_REPO_ROOT": str(repo_root)}, clear=True):
-                result = selector.toograph_capability_selector_before_llm(graph_state={})
+                result = selector.toograph_capability_selector_before_llm(runtime_context={})
 
         context = result["context"]
         self.assertIn("key: web_search", context)

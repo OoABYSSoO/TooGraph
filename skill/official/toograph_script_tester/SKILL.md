@@ -7,7 +7,7 @@ description: Use when a graph needs to generate deterministic tests for a provid
 
 Use this skill when the graph has a script or generated script source and needs tests written and executed in a temporary workspace.
 
-`before_llm.py` injects current system context, including OS, Python executable/version, and available allowed commands. If a graph state value is a readable local file path string, `before_llm.py` also appends that file's text content to the context. The LLM uses that context to produce a complete test workspace and one command to run.
+`before_llm.py` injects current system context, including OS, Python executable/version, and available allowed commands. If TooGraph runtime passes explicit file hints in `runtime_context`, it appends readable file previews to the context. It does not inspect graph state to discover local files.
 
 State inputs:
 

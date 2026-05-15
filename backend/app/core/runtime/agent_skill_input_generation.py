@@ -54,6 +54,7 @@ def generate_agent_skill_inputs(
         skill_definitions=skill_definitions,
         state_schema=state_schema,
         node=node,
+        runtime_context=resolve_skill_runtime_context(runtime_config),
     )
     structured_output_schema = build_skill_input_output_schema(bindings, skill_definitions)
     user_prompt = build_skill_input_user_prompt(node)
@@ -163,6 +164,7 @@ def build_skill_input_system_prompt(
     skill_definitions: dict[str, SkillDefinition],
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
     node: NodeSystemAgentNode | None = None,
+    runtime_context: dict[str, Any] | None = None,
 ) -> str:
     resolved_state_schema = state_schema or {}
     parts = [
@@ -209,10 +211,10 @@ def build_skill_input_system_prompt(
         }
 
     before_llm_context_lines = format_skill_before_llm_context_lines(
-        input_values=input_values,
         bindings=bindings,
         skill_definitions=skill_definitions,
         node=node,
+        runtime_context=runtime_context,
     )
     if before_llm_context_lines:
         parts.extend(before_llm_context_lines)
@@ -224,10 +226,10 @@ def build_skill_input_system_prompt(
 
 def format_skill_before_llm_context_lines(
     *,
-    input_values: dict[str, Any],
     bindings: list[ResolvedAgentSkillBinding],
     skill_definitions: dict[str, SkillDefinition],
     node: NodeSystemAgentNode | None = None,
+    runtime_context: dict[str, Any] | None = None,
 ) -> list[str]:
     entries: list[tuple[str, str]] = []
     for resolved_binding in bindings:
@@ -240,7 +242,7 @@ def format_skill_before_llm_context_lines(
             continue
         payload = {
             "skill_key": skill_key,
-            "graph_state": input_values,
+            "runtime_context": runtime_context or {},
             "task_instruction": node.config.task_instruction if node is not None else "",
         }
         context_payload = invoke_lifecycle_before_llm(
@@ -262,6 +264,16 @@ def format_skill_before_llm_context_lines(
         lines.append("  context:")
         lines.extend(f"    {line}" for line in context_text.splitlines())
     return lines
+
+
+def resolve_skill_runtime_context(runtime_config: dict[str, Any]) -> dict[str, Any]:
+    value = runtime_config.get("skill_runtime_context")
+    if isinstance(value, dict):
+        return dict(value)
+    value = runtime_config.get("runtime_context")
+    if isinstance(value, dict):
+        return dict(value)
+    return {}
 
 
 def format_before_llm_context_payload(payload: dict[str, Any]) -> str:

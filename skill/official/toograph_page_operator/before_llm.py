@@ -19,11 +19,12 @@ APP_NAVIGATION_OPERATIONS = [
 
 
 def toograph_page_operator_before_llm(**payload: Any) -> dict[str, str]:
-    graph_state = payload.get("graph_state")
-    page_path = ""
-    if isinstance(graph_state, dict):
-        page_path = _compact_text(graph_state.get("page_path")) or _extract_path_from_page_context(graph_state.get("page_context"))
-    page_path = _compact_text(payload.get("page_path")) or page_path or _extract_path_from_page_context(payload.get("page_context")) or "/"
+    runtime_context = payload.get("runtime_context") if isinstance(payload.get("runtime_context"), dict) else {}
+    page_path = (
+        _compact_text(runtime_context.get("page_path"))
+        or _extract_path_from_page_context(runtime_context.get("page_context"))
+        or "/"
+    )
     operation_book = {
         "current_page_path": page_path,
         "operation_book": {

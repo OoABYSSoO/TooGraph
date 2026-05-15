@@ -67,18 +67,25 @@ class TooGraphScriptTesterSkillTests(unittest.TestCase):
         self.assertIn("files", context)
         self.assertIn("command", context)
 
-    def test_before_llm_inlines_file_content_for_path_string_inputs(self) -> None:
+    def test_before_llm_inlines_runtime_context_file_content(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             script_path = Path(temp_dir) / "sample_script.py"
             script_path.write_text("def multiply(a, b):\n    return a * b\n", encoding="utf-8")
 
-            payload = _run_skill_script(SCRIPT_TESTER_BEFORE_LLM_PATH, {"graph_state": {"script_path": str(script_path)}})
+            payload = _run_skill_script(
+                SCRIPT_TESTER_BEFORE_LLM_PATH,
+                {
+                    "runtime_context": {"referenced_files": [str(script_path)]},
+                    "graph_state": {"script_path": str(Path(temp_dir) / "ignored.py")},
+                },
+            )
 
         context = str(payload.get("context") or "")
         self.assertIn("Referenced file contents", context)
-        self.assertIn("script_path", context)
+        self.assertIn("runtime_context.referenced_files[0]", context)
         self.assertIn(str(script_path), context)
         self.assertIn("def multiply(a, b):", context)
+        self.assertNotIn("ignored.py", context)
 
     def test_after_llm_runs_generated_test_command_successfully(self) -> None:
         payload = _run_skill_script(

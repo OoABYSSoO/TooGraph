@@ -72,10 +72,8 @@ class LocalWorkspaceExecutorSkillTests(unittest.TestCase):
             payload = _run_skill_script(
                 EXECUTOR_BEFORE_LLM_PATH,
                 {
-                    "graph_state": {
-                        "target_path": "docs/note.md",
-                        "operation": "write",
-                    }
+                    "runtime_context": {"candidate_paths": ["docs/note.md"]},
+                    "graph_state": {"target_path": "backend/data/tmp/ignored.txt"},
                 },
                 repo_root=repo_root,
             )
@@ -90,10 +88,8 @@ class LocalWorkspaceExecutorSkillTests(unittest.TestCase):
             payload = _run_skill_script(
                 EXECUTOR_BEFORE_LLM_PATH,
                 {
-                    "graph_state": {
-                        "target_path": "backend/data/tmp/new.txt",
-                        "operation": "execute",
-                    }
+                    "runtime_context": {"candidate_paths": ["backend/data/tmp/new.txt"]},
+                    "graph_state": {"target_path": "docs/ignored.md"},
                 },
                 repo_root=repo_root,
             )

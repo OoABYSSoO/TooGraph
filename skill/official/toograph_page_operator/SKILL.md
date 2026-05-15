@@ -15,11 +15,14 @@ Current phase:
 - Rejects Buddy self surfaces such as the Buddy page, Buddy floating window, Buddy avatar, and debug controls.
 - Does not expose DOM selectors, screen coordinates, or low-level mouse trajectories to the LLM.
 
-State inputs:
+Graph state inputs:
+
+- `user_goal`: optional user goal for the desired page operation.
+
+Runtime context:
 
 - `page_path`: current application route.
-- `user_goal`: optional user goal for the desired page operation.
-- `page_context`: optional page content summary. Partner-related content is filtered before the LLM sees the operation book.
+- `page_context`: optional page content summary produced by the app runtime. Partner-related content is filtered before the LLM sees the operation book.
 
 LLM parameters:
 
@@ -35,4 +38,4 @@ State outputs:
 - `journal`: operation journal summary.
 - `error`: structured failure detail.
 
-`before_llm.py` injects the current page operation book. `after_llm.py` validates the LLM command, returns the expected next page path, and emits a `virtual_ui_operation` activity event for the frontend runtime to execute.
+`before_llm.py` injects the current page operation book from runtime context, not graph state. `after_llm.py` validates the LLM command, returns the expected next page path, and emits a `virtual_ui_operation` activity event for the frontend runtime to execute.

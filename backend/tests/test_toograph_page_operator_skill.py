@@ -42,7 +42,7 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertEqual(definition.permissions, ["virtual_ui_operation"])
         self.assertEqual(
             [field.key for field in definition.state_input_schema],
-            ["page_path", "user_goal", "page_context"],
+            ["user_goal"],
         )
         self.assertEqual(
             [field.key for field in definition.input_schema],
@@ -56,11 +56,19 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
     def test_before_llm_returns_operation_book_without_buddy_targets(self) -> None:
         result = _run_skill_script(
             PAGE_OPERATOR_BEFORE_LLM_PATH,
-            {"page_context": "当前路径: /buddy\n伙伴页面里有历史按钮，但不应该返回。"},
+            {
+                "graph_state": {"page_path": "/stale-graph-state"},
+                "page_context": "当前路径: /stale-top-level",
+                "runtime_context": {
+                    "page_context": "当前路径: /buddy\n伙伴页面里有历史按钮，但不应该返回。",
+                },
+            },
         )
 
         context = str(result.get("context") or "")
         self.assertIn('"current_page_path": "/buddy"', context)
+        self.assertNotIn("/stale-graph-state", context)
+        self.assertNotIn("/stale-top-level", context)
         self.assertIn('"affordance_id": "app.nav.runs"', context)
         self.assertIn("伙伴页面、伙伴浮窗、伙伴形象", context)
         self.assertNotIn("app.nav.buddy", context)

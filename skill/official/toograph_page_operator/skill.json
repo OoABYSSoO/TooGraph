@@ -11,25 +11,11 @@
   ],
   "stateInputSchema": [
     {
-      "key": "page_path",
-      "name": "Page Path",
-      "valueType": "text",
-      "required": true,
-      "description": "当前页面路径，例如 / 或 /editor。"
-    },
-    {
       "key": "user_goal",
       "name": "User Goal",
       "valueType": "text",
       "required": false,
       "description": "用户希望完成的页面操作目标。"
-    },
-    {
-      "key": "page_context",
-      "name": "Page Context",
-      "valueType": "markdown",
-      "required": false,
-      "description": "当前页面内容摘要或页面路径文本；before_llm.py 会过滤伙伴相关内容后生成页面操作书。"
     }
   ],
   "inputSchema": [

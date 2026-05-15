@@ -13,7 +13,7 @@ Skill 是 TooGraph 图运行中的显式能力单元。它不是一个隐藏 Age
 
 ```text
 图 state 输入（由 stateInputSchema 描述，由节点 reads 绑定）
--> 可选 before_llm.py 读取这些 state 和运行上下文，生成只读技能上下文
+运行时上下文 -> 可选 before_llm.py 生成只读技能上下文
 -> LLM 消费 state 输入、before_llm 上下文和有效 llmInstruction
 -> LLM 只生成 inputSchema 描述的结构化技能参数
 -> 可选 after_llm.py 消费这些参数，执行、校验或规范化
@@ -22,17 +22,17 @@ Skill 是 TooGraph 图运行中的显式能力单元。它不是一个隐藏 Age
 
 因此：
 
-- `stateInputSchema` 描述 Skill 希望从图里读取的 state。它是“图输入契约”，不是 LLM 要编造的 JSON 参数。
+- `stateInputSchema` 描述 LLM 节点为了使用该 Skill 希望从图里读取的 state。它是“图输入契约”，不是 `before_llm.py` 的输入契约，也不是 LLM 要编造的 JSON 参数。
 - `inputSchema` 描述 LLM 要生成并传给 `after_llm.py` 的调用参数。它是“LLM 参数契约”。
 - `outputSchema` 描述 Skill 结果中可以被 runtime 映射成下游 state 的字段。它是“图输出契约”。
-- `before_llm.py` 只做确定性、可审计、只读的上下文整理。页面操作书、可点击目标清单、文件摘要、候选能力列表都属于这里。
+- `before_llm.py` 只做确定性、可审计、只读的运行时上下文整理。当前时间、页面操作书、可点击目标清单、运行环境摘要、文件预读摘要、候选能力列表都属于这里。
 - `after_llm.py` 才负责把 LLM 的单条语义命令变成真实受控操作，例如虚拟鼠标点击、联网搜索、文件写入或脚本测试。
 - Skill 脚本只产出 JSON 结果，不直接写图 state。
 - state 绑定永远由 TooGraph runtime 负责。
 - 一个 LLM 节点一次最多使用一个显式能力。
 - 如果需要多步工具链，应拆成多个节点和边，而不是让一个 Skill 内部多轮自主调用。
 
-以“页面操作书”为例：`before_llm.py` 接收当前页面路径和页面内容 state，过滤伙伴页面、伙伴形象、调试入口等不允许操作的内容，然后返回可操作目标和动作说明；LLM 只选择“点击运行历史”这样的单条语义命令；`after_llm.py` 把这条命令映射到虚拟鼠标动作、审计日志和下一页路径。LLM 不应该输出 DOM selector、坐标或轨迹，也不依赖视觉截图理解页面。
+以“页面操作书”为例：`before_llm.py` 接收运行时提供的当前页面路径、页面内容摘要和可操作目标清单，过滤伙伴页面、伙伴形象、调试入口等不允许操作的内容，然后返回可操作目标和动作说明；LLM 只选择“点击运行历史”这样的单条语义命令；`after_llm.py` 把这条命令映射到虚拟鼠标动作、审计日志和下一页路径。LLM 不应该输出 DOM selector、坐标或轨迹，也不依赖视觉截图理解页面。
 
 ## 文件结构
 
@@ -137,11 +137,11 @@ Python Skill 的依赖规则：
 - `version`：Skill 包版本。
 - `timeoutSeconds`：生命周期脚本执行超时时间。
 - `permissions`：声明网络、文件、子进程、浏览器自动化等能力需求。这是 Skill 的客观能力边界，应该留在包定义中。
-- `stateInputSchema`：Skill 希望从图 state 中读取的输入字段。它用于 UI 说明、后续自动绑定、before_llm 上下文准备和审计理解。
+- `stateInputSchema`：LLM 节点使用该 Skill 时希望从图 state 中读取的输入字段。它用于 UI 说明、后续自动绑定和审计理解；不要把只来自运行时的页面路径、当前 DOM 摘要、当前日期、系统环境等内容放进这里。
 - `inputSchema`：LLM 需要生成并传给 Skill 的结构化调用参数，也就是 `after_llm.py` 的主要输入。
 - `outputSchema`：Skill 最终返回并由 runtime 绑定到下游 state 的字段。
 
-不要把同一个概念混在一个 schema 里。用户问题、当前页面内容、上游文件路径、脚本原文等“已经存在于图里的东西”应进入 `stateInputSchema`；搜索词、点击目标、文件写入内容、命令数组等“需要 LLM 为本次调用决定的东西”应进入 `inputSchema`；下游节点需要继续读取的结果进入 `outputSchema`。
+不要把同一个概念混在一个 schema 里。用户问题、上游文件路径、脚本原文、约束说明等“由图流程产生并需要 LLM 阅读的东西”应进入 `stateInputSchema`；当前页面路径、页面可操作目标、当前日期、启用能力清单、系统命令可用性、运行时预读文件摘要等“当次运行时可重新获取的环境信息”应由 `before_llm.py` 从运行时上下文补充；搜索词、点击目标、文件写入内容、命令数组等“需要 LLM 为本次调用决定的东西”应进入 `inputSchema`；下游节点需要继续读取的结果进入 `outputSchema`。
 
 ## `skill/settings.json`
 
@@ -194,9 +194,9 @@ Python Skill 的依赖规则：
 适合做：
 
 - 补充当前日期、运行来源或局部环境信息。
-- 根据 `stateInputSchema` 绑定的页面 state 生成页面操作书。
+- 根据运行时页面快照生成页面操作书。
 - 列出当前启用的候选能力。
-- 读取只读目录或配置摘要。
+- 读取运行时明确授权的只读目录、配置摘要或文件预读提示。
 - 生成短小、明确、可审计的提示上下文。
 
 不适合做：
@@ -212,14 +212,14 @@ Python Skill 的依赖规则：
 ```json
 {
   "skill_key": "web_search",
-  "graph_state": {
-    "user_question": "今天有哪些相关更新？"
+  "runtime_context": {
+    "current_date": "2026-05-08"
   },
   "task_instruction": "根据用户问题生成搜索词。"
 }
 ```
 
-`graph_state` 里的内容来自节点读取的 state；作者应按 `stateInputSchema` 中声明的语义消费它。当前运行时可能仍会传入更宽的 state 包，脚本必须只使用自己需要且允许的字段，不要把无关 state 原样塞进上下文。
+`before_llm.py` 不接收图 state，也不应依赖 `stateInputSchema`。图 state 会由 TooGraph runtime 直接放进技能入参规划提示词，供 LLM 阅读。`before_llm.py` 只应消费 `runtime_context` 中由运行时显式提供的只读信息，例如当前页面快照、当前日期、启用能力清单、系统环境或预读文件摘要。脚本必须只使用自己需要且允许的字段，不要把无关运行时信息原样塞进上下文。
 
 输出必须是 JSON 对象。推荐返回：
 
@@ -363,8 +363,11 @@ Skill 不负责决定输出写入哪个 state。
 ```text
 节点 reads / 上游 state
 -> stateInputSchema 描述 Skill 需要理解的 state 语义
--> before_llm.py 可读取并整理为短上下文
--> LLM 基于这些内容生成 inputSchema 参数
+-> LLM 直接读取这些图 state
+
+运行时上下文
+-> before_llm.py 整理为短上下文
+-> LLM 结合图 state 和运行时上下文生成 inputSchema 参数
 ```
 
 `stateInputSchema` 是自动绑定和人类审计的依据。后续 LLM 节点选择某个 Skill 时，可以根据它自动添加必要输入 state；用户仍可以额外添加输入 state，但不应删除 Skill 绑定所需的 state。

@@ -34,7 +34,7 @@
 - 用户编辑胶囊后才会把该节点的覆盖说明写入 `skillInstructionBlocks`，并标记为 `node.override`；移除 skill 时对应覆盖会移除，且不会反向写回技能包原始文档。
 - 静态手动选择的 Skill 使用 `config.skillKey` 和协议拥有的 `skillBindings.outputMapping`。`outputMapping` 由图协议、前端和运行时维护，只用于确定 skill 输出写入哪个 state 与运行审计；LLM 不看也不修改它。
 - 技能输入由 LLM 节点在运行前根据当前输入 state、技能 `description`、有效 `llmInstruction` 和 `inputSchema` 生成。有效 `llmInstruction` 默认来自 skill manifest；如果当前节点存在 `node.override` 胶囊覆盖，则使用覆盖内容。这个说明只进入技能入参生成阶段的 system prompt，不会再追加到 user prompt。
-- Skill 生命周期脚本使用固定文件名而不是在 manifest 中配置入口。存在 `before_llm.py` 时，运行时会在技能入参规划前执行它，并把返回的上下文注入 LLM 提示词；存在 `after_llm.py` 时，运行时会在 LLM 生成结构化技能参数后执行它，并把它返回的 JSON 当作技能结果。写入 state 仍由 TooGraph runtime 根据 `outputSchema` 和 `skillBindings.outputMapping` 完成，脚本不直接绑定 state。
+- Skill 生命周期脚本使用固定文件名而不是在 manifest 中配置入口。存在 `before_llm.py` 时，运行时会在技能入参规划前执行它，只向它传入运行时上下文和节点任务说明，并把返回的上下文注入 LLM 提示词；图 state 直接进入 LLM 入参规划提示词，不传给 `before_llm.py`。存在 `after_llm.py` 时，运行时会在 LLM 生成结构化技能参数后执行它，并把它返回的 JSON 当作技能结果。写入 state 仍由 TooGraph runtime 根据 `outputSchema` 和 `skillBindings.outputMapping` 完成，脚本不直接绑定 state。
 - 在 LLM 节点卡片选择带 `outputSchema` 的静态 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
 - 动态能力执行来自输入 `capability` state，不复用 `skillBindings.outputMapping`，也不会推断普通输出映射。这类节点必须只写一个 `result_package` state。包内 `outputs.<outputKey>` 保存 `{ name, description, type, value }`，不额外捏造 `fieldKey`；下游 LLM 节点会把这些虚拟输出拆开并复用普通 state/file 展开逻辑。
 - 当 `capability.kind=subgraph` 进入 LLM 节点时，该节点只负责根据当前 state 和目标模板公开输入 schema 生成子图输入；运行时负责执行对应图模板，并把公开 output 边界封装为同一套 `result_package`。这条路径不经过静态 Subgraph 节点端口 mapping，也不让 LLM 二次总结子图结果。若动态子图内部触发 `interrupt_after`，父级 run 会进入标准 `awaiting_human`，并通过 `pending_subgraph_breakpoint` 与父级 resume API 恢复。
@@ -81,7 +81,7 @@
 - 位置：`skill/official/toograph_script_tester/`
 - 显示名称：`TooGraph Script Tester`
 - 作用：接收脚本内容和用户测试目标，由 LLM 根据当前系统环境编写测试工作区，然后在临时目录运行一次允许的测试命令。
-- 生命周期：`before_llm.py` 注入当前系统上下文，包括 OS、Python executable/version 和可用 allowlist 命令；如果输入 state 的字符串值是可读取的本地文件路径，还会把该文件文本追加到上下文；LLM 只生成 `files` 与 `command`；`after_llm.py` 写入临时文件、运行命令，并只返回 `success` 与 `result`。
+- 生命周期：`before_llm.py` 注入当前系统上下文，包括 OS、Python executable/version 和可用 allowlist 命令；如果运行时显式提供可读取文件提示，还会把该文件文本摘要追加到上下文；LLM 只生成 `files` 与 `command`；`after_llm.py` 写入临时文件、运行命令，并只返回 `success` 与 `result`。
 - 通用性：不再限定 Python/pytest。Python 脚本可使用 `python -m pytest`，JavaScript 脚本可在系统有 Node 时使用 `node --test`，其他脚本只要命令在 allowlist 且当前系统可执行即可。
 - 权限和依赖：声明 `file_write` 与 `subprocess` 权限，并在 `requirements.txt` 中声明 `pytest` 作为 Python 测试常用依赖。该 Skill 会执行用户提供的脚本和测试代码；当前运行时会按图或 Buddy 的 `需确认` / `完全访问` 模式在执行前暂停或放行。
 
@@ -89,8 +89,8 @@
 
 - 位置：`skill/official/local_workspace_executor/`
 - 显示名称：`Local Workspace Executor`
-- 作用：提供受控的单路径本地工作区操作能力，支持预读上下文、读取、列出、搜索、写入一个文件或执行一个脚本。
-- 生命周期：`before_llm.py` 会从图 state 和节点任务描述中提取仓库路径并预读已有文件，供 LLM 生成写入内容或执行参数；`after_llm.py` 执行 `read`、`list`、`search`、`write` 或 `execute`，并只返回 `success` 与 `result`。
+- 作用：提供受控的单路径本地工作区操作能力，支持运行时预读上下文、读取、列出、搜索、写入一个文件或执行一个脚本。
+- 生命周期：`before_llm.py` 只从运行时显式提供的路径提示中预读已有文件，供 LLM 生成写入内容或执行参数；`after_llm.py` 执行 `read`、`list`、`search`、`write` 或 `execute`，并只返回 `success` 与 `result`。
 - 默认权限：预读可读取仓库内普通文件，但 `.git`、`.env`、`backend/data/settings` 永远拒绝；写入只允许 `backend/data`、`skill/user`、`graph_template/user` 和 `node_preset/user`；执行只允许 `backend/data/tmp` 和 `skill/user`。
 - 边界：该 Skill 会写本地文件并启动本地进程。当前已有路径白名单和拒绝规则，但它们只是启动前检查，不是 OS 沙箱；运行时会按 `需确认` / `完全访问` 自动暂停或放行。
 

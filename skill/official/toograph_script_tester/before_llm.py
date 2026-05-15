@@ -24,7 +24,8 @@ def toograph_script_tester_before_llm(**payload: Any) -> dict[str, str]:
         f"- Python version: {platform.python_version()}",
         f"- Available test commands: {', '.join(available_commands) if available_commands else 'none detected'}",
     ]
-    referenced_file_lines = _format_referenced_file_context(payload.get("graph_state"))
+    runtime_context = payload.get("runtime_context") if isinstance(payload.get("runtime_context"), dict) else {}
+    referenced_file_lines = _format_referenced_file_context(runtime_context)
     if referenced_file_lines:
         context_lines.extend(referenced_file_lines)
     context_lines.extend(
@@ -56,24 +57,24 @@ def _list_available_commands() -> list[str]:
     return available
 
 
-def _format_referenced_file_context(graph_state: Any) -> list[str]:
-    references = _collect_referenced_files(graph_state)
+def _format_referenced_file_context(runtime_context: dict[str, Any]) -> list[str]:
+    references = _collect_referenced_files(runtime_context)
     if not references:
         return []
 
     lines = ["Referenced file contents:"]
     for source_key, file_path, content in references:
-        lines.append(f"- state: {source_key}")
+        lines.append(f"- runtime_context: {source_key}")
         lines.append(f"  path: {file_path}")
         lines.append("  content:")
         lines.extend(f"    {line}" for line in _fenced(content).splitlines())
     return lines
 
 
-def _collect_referenced_files(graph_state: Any) -> list[tuple[str, Path, str]]:
+def _collect_referenced_files(runtime_context: dict[str, Any]) -> list[tuple[str, Path, str]]:
     references: list[tuple[str, Path, str]] = []
     seen_paths: set[Path] = set()
-    for source_key, raw_value in _iter_string_values(graph_state):
+    for source_key, raw_value in _iter_runtime_file_hints(runtime_context):
         file_path = _resolve_referenced_file_path(raw_value)
         if file_path is None or file_path in seen_paths:
             continue
@@ -87,7 +88,14 @@ def _collect_referenced_files(graph_state: Any) -> list[tuple[str, Path, str]]:
     return references
 
 
-def _iter_string_values(value: Any, key_path: str = "graph_state") -> list[tuple[str, str]]:
+def _iter_runtime_file_hints(runtime_context: dict[str, Any]) -> list[tuple[str, str]]:
+    values: list[tuple[str, str]] = []
+    for key in ("referenced_files", "file_paths", "paths"):
+        values.extend(_iter_string_values(runtime_context.get(key), f"runtime_context.{key}"))
+    return values
+
+
+def _iter_string_values(value: Any, key_path: str) -> list[tuple[str, str]]:
     if isinstance(value, str):
         return [(key_path, value)]
     if isinstance(value, list):
@@ -98,7 +106,7 @@ def _iter_string_values(value: Any, key_path: str = "graph_state") -> list[tuple
     if isinstance(value, dict):
         values = []
         for key, item in value.items():
-            child_key_path = str(key) if key_path == "graph_state" else f"{key_path}.{key}"
+            child_key_path = f"{key_path}.{key}"
             values.extend(_iter_string_values(item, child_key_path))
         return values
     return []

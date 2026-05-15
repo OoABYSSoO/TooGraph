@@ -16,13 +16,6 @@
       "valueType": "text",
       "required": true,
       "description": "用户希望完成的原始需求 state，能力选择器据此挑选单个 Skill、Subgraph 或 none。"
-    },
-    {
-      "key": "origin",
-      "name": "Origin",
-      "valueType": "text",
-      "required": false,
-      "description": "能力选择来源 state，例如 buddy；未提供时默认为 buddy。"
     }
   ],
   "inputSchema": [
