@@ -157,7 +157,7 @@
 
 - FastAPI 提供 graphs / runs / templates / presets / settings / skills / knowledge / memories API。
 - 后端 Skill catalog 合并官方 Skill 和用户自定义 Skill。官方 Skill 只读，用户 Skill 可在 Skills 页面启用、停用和删除。
-- validator 负责 `node_system` graph 结构校验。必填 `llmOutputSchema` 字段不再做静态绑定校验，而是在 LLM 节点生成结构化 LLM 输出后由运行时检查。
+- validator 负责 `node_system` graph 结构校验。`llmOutputSchema` 字段不再做静态绑定校验，而是在 LLM 节点生成结构化 LLM 输出后由运行时检查缺失字段。
 - 动态读取 `capability` state 的 LLM 节点必须写唯一 `result_package` state；静态 `skillKey` 与动态 `capability` state 不能混用；没有静态 `skillKey` 的 `skillBindings` 会被视为旧协议并拒绝。
 - LangGraph runtime 是当前运行主链。
 - 后端不再在 graph run 入口修补旧模板结构；提交什么图，就按当前协议校验和执行什么图。

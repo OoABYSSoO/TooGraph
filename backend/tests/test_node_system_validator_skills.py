@@ -133,7 +133,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
         )
         definition = _agent_skill_definition(
             "summarize_text",
-            input_schema=[SkillIoField(key="text", name="Text", valueType="text", required=True)],
+            input_schema=[SkillIoField(key="text", name="Text", valueType="text")],
         )
 
         with (

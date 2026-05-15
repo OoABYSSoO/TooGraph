@@ -17,18 +17,18 @@ Current phase:
 
 Graph state inputs:
 
-- `user_goal`: optional user goal for the desired page operation.
+- `user_goal`: user goal for the desired page operation.
 
 Runtime context:
 
 - `page_path`: current application route.
-- `page_context`: optional page content summary produced by the app runtime. Partner-related content is filtered before the LLM sees the operation book.
+- `page_context`: page content summary produced by the app runtime when available. Partner-related content is filtered before the LLM sees the operation book.
 
 LLM output:
 
 - `action`: semantic action. Current phase supports `click_nav`.
 - `target`: semantic target. Current phase supports `runs` and its aliases.
-- `cursor_lifecycle`: optional virtual cursor lifecycle, such as `return_after_step`.
+- `cursor_lifecycle`: virtual cursor lifecycle, such as `return_after_step`.
 
 State outputs:
 

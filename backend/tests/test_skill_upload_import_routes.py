@@ -37,7 +37,6 @@ def _native_skill_manifest(
                 "key": "video",
                 "name": "Video",
                 "valueType": "video",
-                "required": True,
                 "description": "Source video file.",
             }
         ],
@@ -46,7 +45,6 @@ def _native_skill_manifest(
                 "key": "summary",
                 "name": "Summary",
                 "valueType": "text",
-                "required": True,
                 "description": "Structured video summary.",
             }
         ],
@@ -70,7 +68,6 @@ toograph:
     - key: text
       name: Text
       valueType: text
-      required: true
       description: Source text.
   state_output_schema:
     - key: result

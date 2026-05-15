@@ -1163,7 +1163,7 @@ function buildManagedSkillInputReadBinding(
 ): ReadBinding {
   return {
     state: stateKey,
-    required: Boolean(field.required),
+    required: true,
     binding: {
       kind: "skill_input",
       skillKey,

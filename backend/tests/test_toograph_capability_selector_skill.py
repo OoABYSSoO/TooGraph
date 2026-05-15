@@ -91,7 +91,7 @@ def _write_skill(
             "llmInstruction": "Generate structured Skill LLM output from the current graph state.",
             "version": "1.0.0",
             "permissions": permissions if permissions is not None else (["network"] if "search" in description.lower() else []),
-            "llmOutputSchema": [{"key": "query", "name": "Query", "valueType": "text", "required": True}],
+            "llmOutputSchema": [{"key": "query", "name": "Query", "valueType": "text"}],
             "stateOutputSchema": [{"key": "result", "name": "Result", "valueType": "json"}],
     }
     if internal:

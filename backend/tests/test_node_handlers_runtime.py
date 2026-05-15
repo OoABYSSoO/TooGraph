@@ -527,7 +527,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     skillKey="web_search",
                     name="Web Search",
                     llmOutputSchema=[
-                        SkillIoField(key="query", name="Query", valueType="text", required=True),
+                        SkillIoField(key="query", name="Query", valueType="text"),
                     ],
                     stateOutputSchema=[SkillIoField(key="summary", name="Summary", valueType="markdown")],
                     runtimeReady=True,
@@ -595,7 +595,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     skillKey="web_search",
                     name="Web Search",
                     llmOutputSchema=[
-                        SkillIoField(key="query", name="Query", valueType="text", required=True),
+                        SkillIoField(key="query", name="Query", valueType="text"),
                         SkillIoField(key="max_results", name="Max Results", valueType="text"),
                     ],
                     stateOutputSchema=[
@@ -698,7 +698,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     skillKey="local_workspace_executor",
                     name="Local Workspace Executor",
                     permissions=["file_write", "subprocess"],
-                    llmOutputSchema=[SkillIoField(key="path", name="Path", valueType="text", required=True)],
+                    llmOutputSchema=[SkillIoField(key="path", name="Path", valueType="text")],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
@@ -1121,7 +1121,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "web_search": SkillDefinition(
                     skillKey="web_search",
                     name="Web Search",
-                    llmOutputSchema=[SkillIoField(key="query", name="Query", valueType="text", required=True)],
+                    llmOutputSchema=[SkillIoField(key="query", name="Query", valueType="text")],
                     stateOutputSchema=[
                         SkillIoField(
                             key="source_urls",
@@ -1235,7 +1235,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     skillKey="web_search",
                     name="Web Search",
                     llmOutputSchema=[
-                        SkillIoField(key="query", name="Query", valueType="text", required=True),
+                        SkillIoField(key="query", name="Query", valueType="text"),
                     ],
                     stateOutputSchema=[SkillIoField(key="error", name="Error", valueType="text")],
                     runtimeReady=True,
@@ -1260,11 +1260,11 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["skill_outputs"][0]["output_mapping"], {})
         self.assertEqual(result["skill_outputs"][0]["output_mapping_details"], [])
         self.assertEqual(result["skill_outputs"][0]["status"], "failed")
-        self.assertEqual(result["skill_outputs"][0]["error_type"], "missing_required_input")
+        self.assertEqual(result["skill_outputs"][0]["error_type"], "missing_skill_llm_output")
         self.assertIn("query", result["skill_outputs"][0]["error"])
         self.assertEqual(result["outputs"]["dynamic_result"]["kind"], "result_package")
         self.assertEqual(result["outputs"]["dynamic_result"]["status"], "failed")
-        self.assertEqual(result["outputs"]["dynamic_result"]["errorType"], "missing_required_input")
+        self.assertEqual(result["outputs"]["dynamic_result"]["errorType"], "missing_skill_llm_output")
         self.assertIn("query", result["outputs"]["dynamic_result"]["error"])
         self.assertIsInstance(result["final_result"], str)
         self.assertIn("Skill 'web_search' failed before execution", result["warnings"][0])

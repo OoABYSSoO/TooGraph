@@ -12,8 +12,6 @@ Use this skill when the graph has a script or generated script source and needs 
 State inputs:
 
 - `script_requirement`: expected behavior, edge cases, and success criteria.
-- `script_path`: optional readable local script path.
-- `script_source`: optional script source text when no path is available.
 
 LLM output:
 

@@ -147,7 +147,7 @@
                 <h4>{{ t("skills.stateInputSchema") }}</h4>
                 <div class="skills-page__schema-list">
                   <span v-for="field in selectedSkill.stateInputSchema ?? []" :key="`state-in-${field.key}`">
-                    {{ field.key }} · {{ field.valueType }} · {{ field.required ? t("skills.required") : t("skills.optional") }}
+                    {{ field.key }} · {{ field.valueType }}
                   </span>
                   <span v-if="(selectedSkill.stateInputSchema ?? []).length === 0">{{ t("common.none") }}</span>
                 </div>
@@ -156,7 +156,7 @@
                 <h4>{{ t("skills.llmOutputSchema") }}</h4>
                 <div class="skills-page__schema-list">
                   <span v-for="field in selectedSkill.llmOutputSchema" :key="`llm-in-${field.key}`">
-                    {{ field.key }} · {{ field.valueType }} · {{ field.required ? t("skills.required") : t("skills.optional") }}
+                    {{ field.key }} · {{ field.valueType }}
                   </span>
                   <span v-if="selectedSkill.llmOutputSchema.length === 0">{{ t("common.none") }}</span>
                 </div>
@@ -165,7 +165,7 @@
                 <h4>{{ t("skills.stateOutputSchema") }}</h4>
                 <div class="skills-page__schema-list">
                   <span v-for="field in selectedSkill.stateOutputSchema" :key="`out-${field.key}`">
-                    {{ field.key }} · {{ field.valueType }} · {{ field.required ? t("skills.required") : t("skills.optional") }}
+                    {{ field.key }} · {{ field.valueType }}
                   </span>
                   <span v-if="selectedSkill.stateOutputSchema.length === 0">{{ t("common.none") }}</span>
                 </div>

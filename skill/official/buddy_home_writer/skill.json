@@ -15,15 +15,7 @@
       "key": "autonomous_review",
       "name": "Autonomous Review",
       "valueType": "json",
-      "required": true,
       "description": "Buddy 自主复盘或写回计划 state，供 LLM 生成低风险 Buddy Home 写回 commands。"
-    },
-    {
-      "key": "source_run_id",
-      "name": "Source Run ID",
-      "valueType": "text",
-      "required": false,
-      "description": "触发写回的源运行 ID state，用于审计和 revision 关联。"
     }
   ],
   "llmOutputSchema": [
@@ -31,15 +23,13 @@
       "key": "commands",
       "name": "Commands",
       "valueType": "json",
-      "required": true,
       "description": "Buddy Home 写回命令数组。每项包含 action、payload、可选 target_id、可选 change_reason。"
     },
     {
       "key": "run_id",
       "name": "Run ID",
       "valueType": "text",
-      "required": false,
-      "description": "触发自主复盘的源运行 ID，用于写入 command 记录。"
+      "description": "触发自主复盘的源运行 ID；没有可用 ID 时返回空字符串。"
     }
   ],
   "stateOutputSchema": [

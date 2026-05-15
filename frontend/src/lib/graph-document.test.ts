@@ -38,15 +38,14 @@ const webSearchSkill: SkillDefinition = {
   permissions: ["network"],
   runtime: { type: "python", entrypoint: "run.py" },
   stateInputSchema: [
-    { key: "user_question", name: "User Question", valueType: "text", required: true, description: "Question to research." },
-    { key: "search_context", name: "Search Context", valueType: "markdown", required: false, description: "Extra search context." },
+    { key: "user_question", name: "User Question", valueType: "text", description: "Question to research." },
   ],
-  llmOutputSchema: [{ key: "query", name: "Query", valueType: "text", required: true, description: "" }],
+  llmOutputSchema: [{ key: "query", name: "Query", valueType: "text", description: "" }],
   stateOutputSchema: [
-    { key: "query", name: "Query", valueType: "text", required: false, description: "Search query." },
-    { key: "source_urls", name: "Source URLs", valueType: "json", required: false, description: "URLs." },
-    { key: "artifact_paths", name: "Artifact Paths", valueType: "file", required: false, description: "Files." },
-    { key: "errors", name: "Errors", valueType: "json", required: false, description: "Errors." },
+    { key: "query", name: "Query", valueType: "text", description: "Search query." },
+    { key: "source_urls", name: "Source URLs", valueType: "json", description: "URLs." },
+    { key: "artifact_paths", name: "Artifact Paths", valueType: "file", description: "Files." },
+    { key: "errors", name: "Errors", valueType: "json", description: "Errors." },
   ],
   llmNodeEligibility: "ready",
   llmNodeBlockers: [],
@@ -77,13 +76,13 @@ const localWorkspaceExecutorSkill: SkillDefinition = {
   permissions: ["file_read", "file_write", "subprocess"],
   runtime: { type: "python", entrypoint: "after_llm.py" },
   llmOutputSchema: [
-    { key: "path", name: "Path", valueType: "text", required: true, description: "" },
-    { key: "operation", name: "Operation", valueType: "text", required: true, description: "" },
-    { key: "content", name: "Content", valueType: "text", required: false, description: "" },
+    { key: "path", name: "Path", valueType: "text", description: "" },
+    { key: "operation", name: "Operation", valueType: "text", description: "" },
+    { key: "content", name: "Content", valueType: "text", description: "" },
   ],
   stateOutputSchema: [
-    { key: "success", name: "Success", valueType: "boolean", required: false, description: "操作是否成功。" },
-    { key: "result", name: "Result", valueType: "markdown", required: false, description: "成功输出或失败报错内容。" },
+    { key: "success", name: "Success", valueType: "boolean", description: "操作是否成功。" },
+    { key: "result", name: "Result", valueType: "markdown", description: "成功输出或失败报错内容。" },
   ],
   llmNodeEligibility: "ready",
   llmNodeBlockers: [],
@@ -804,7 +803,6 @@ test("updateAgentNodeConfigInDocument automatically binds matching skill state i
   assert.equal(node.kind, "agent");
   assert.deepEqual(node.reads, [
     { state: "user_question", required: true, binding: { kind: "skill_input", skillKey: "web_search", fieldKey: "user_question", managed: true } },
-    { state: "search_context", required: false, binding: { kind: "skill_input", skillKey: "web_search", fieldKey: "search_context", managed: true } },
     { state: "extra_notes", required: false },
   ]);
   assert.equal("inputMapping" in (node.config.skillBindings?.[0] ?? {}), false);
@@ -855,16 +853,11 @@ test("updateAgentNodeConfigInDocument materializes missing skill state inputs", 
   assert.equal(node.kind, "agent");
   assert.deepEqual(node.reads, [
     { state: "state_1", required: true, binding: { kind: "skill_input", skillKey: "web_search", fieldKey: "user_question", managed: true } },
-    { state: "state_2", required: false, binding: { kind: "skill_input", skillKey: "web_search", fieldKey: "search_context", managed: true } },
   ]);
   assert.equal(nextDocument.state_schema.state_1?.name, "User Question");
   assert.equal(nextDocument.state_schema.state_1?.description, "Question to research.");
   assert.equal(nextDocument.state_schema.state_1?.type, "text");
   assert.equal(nextDocument.state_schema.state_1?.value, "");
-  assert.equal(nextDocument.state_schema.state_2?.name, "Search Context");
-  assert.equal(nextDocument.state_schema.state_2?.description, "Extra search context.");
-  assert.equal(nextDocument.state_schema.state_2?.type, "markdown");
-  assert.equal(nextDocument.state_schema.state_2?.value, "");
   assert.deepEqual(document.nodes.search_agent.reads, []);
 });
 

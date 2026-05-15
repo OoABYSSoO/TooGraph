@@ -28,7 +28,6 @@ class SkillIoField(BaseModel):
     key: str = Field(..., min_length=1)
     name: str = Field(..., min_length=1)
     value_type: str = Field(..., alias="valueType", min_length=1)
-    required: bool = False
     description: str = ""
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")

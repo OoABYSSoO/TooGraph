@@ -55,8 +55,7 @@ def build_skill_llm_output_schema(
         for field in getattr(definition, "llm_output_schema", []) or []:
             field_schema = schema_for_skill_io_field(field)
             field_properties[field.key] = field_schema
-            if field.required:
-                required_fields.append(field.key)
+            required_fields.append(field.key)
         properties[skill_key] = _object_schema(
             field_properties,
             required=required_fields,

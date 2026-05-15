@@ -69,7 +69,18 @@ def _normalize_skill_json(value: Any) -> dict[str, Any]:
 
 
 def _strip_legacy_local_settings(value: dict[str, Any]) -> dict[str, Any]:
-    return {str(key): item for key, item in value.items() if str(key) not in LEGACY_LOCAL_SETTING_FIELDS}
+    normalized = {str(key): item for key, item in value.items() if str(key) not in LEGACY_LOCAL_SETTING_FIELDS}
+    for schema_key in ("stateInputSchema", "state_input_schema", "llmOutputSchema", "llm_output_schema", "stateOutputSchema", "state_output_schema"):
+        fields = normalized.get(schema_key)
+        if not isinstance(fields, list):
+            continue
+        normalized[schema_key] = [
+            {str(field_key): field_value for field_key, field_value in field.items() if str(field_key) != "required"}
+            if isinstance(field, dict)
+            else field
+            for field in fields
+        ]
+    return normalized
 
 
 def _normalize_skill_key(value: Any, skill_json: dict[str, Any]) -> str:

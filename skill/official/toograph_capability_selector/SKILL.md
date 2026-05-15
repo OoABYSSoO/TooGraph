@@ -13,15 +13,15 @@ State inputs:
 
 Runtime context:
 
-- `origin`: optional capability-selection origin, such as `buddy`.
+- `origin`: capability-selection origin, such as `buddy`; the Skill uses `buddy` when no origin is supplied.
 
 LLM output:
 
 - `requirement`: the requirement used for audit continuity.
-- `origin`: optional origin defaulted by the model from runtime context, or omitted to use `buddy`.
+- `origin`: origin defaulted by the model from runtime context, or `buddy`.
 - `capability`: the single selected capability object.
 - `selection_reason`: concise reason for the selected item or for selecting none.
-- `rejected_candidates`: optional short list of rejected candidates and reasons.
+- `rejected_candidates`: short list of rejected candidates and reasons; use an empty array when there are none.
 
 State outputs:
 

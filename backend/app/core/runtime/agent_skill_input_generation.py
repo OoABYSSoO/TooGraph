@@ -207,7 +207,6 @@ def build_skill_input_system_prompt(
         example[skill_key] = {
             field.key: example_skill_input_value(field)
             for field in definition.llm_output_schema
-            if field.required
         }
 
     before_llm_context_lines = format_skill_before_llm_context_lines(
@@ -219,7 +218,7 @@ def build_skill_input_system_prompt(
     if before_llm_context_lines:
         parts.extend(before_llm_context_lines)
 
-    parts.append("\n== Required JSON Shape ==")
+    parts.append("\n== Skill LLM Output JSON Shape ==")
     parts.append(json.dumps(example, ensure_ascii=False, indent=2))
     return "\n".join(parts)
 
@@ -325,7 +324,6 @@ def format_skill_input_field_lines(field: SkillIoField) -> list[str]:
     if field.name and field.name != field.key:
         lines.append(f"      name: {field.name}")
     lines.append(f"      type: {field.value_type}")
-    lines.append(f"      required: {field.required}")
     if field.description:
         lines.append(f"      description: {field.description}")
     return lines

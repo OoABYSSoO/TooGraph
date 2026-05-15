@@ -2,7 +2,6 @@ export type SkillIoField = {
   key: string;
   name: string;
   valueType: string;
-  required: boolean;
   description: string;
 };
 

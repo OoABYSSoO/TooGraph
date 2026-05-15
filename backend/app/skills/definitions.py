@@ -218,12 +218,13 @@ def _parse_io_fields(fields: list[dict]) -> list[SkillIoField]:
     for field in fields:
         if "label" in field:
             raise ValueError("Skill IO field 'label' is no longer supported. Use 'name'.")
+        if "required" in field:
+            raise ValueError("Skill IO field 'required' is no longer supported. Declare only required Skill fields.")
         parsed_fields.append(
             SkillIoField(
                 key=str(field["key"]),
                 name=str(field.get("name") or field["key"]),
                 valueType=str(field.get("valueType") or field.get("value_type") or "text"),
-                required=bool(field.get("required", False)),
                 description=str(field.get("description") or ""),
             )
         )

@@ -12,12 +12,11 @@ It does not write files directly. It validates a small command list and calls th
 State inputs:
 
 - `autonomous_review`: Buddy autonomous review result or writeback plan used by the LLM to decide safe write commands.
-- `source_run_id`: optional source run ID for audit and revision linkage.
 
 LLM output:
 
 - `commands`: safe Buddy Home command array generated from the review.
-- `run_id`: optional source run ID copied into command records.
+- `run_id`: source run ID copied into command records, or an empty string when the review does not contain one.
 
 State outputs:
 

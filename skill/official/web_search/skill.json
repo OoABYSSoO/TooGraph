@@ -12,15 +12,7 @@
       "key": "user_question",
       "name": "User Question",
       "valueType": "text",
-      "required": true,
       "description": "用户需要联网检索、核查或补充时效信息的问题。"
-    },
-    {
-      "key": "search_context",
-      "name": "Search Context",
-      "valueType": "markdown",
-      "required": false,
-      "description": "可选补充上下文，例如已知条件、地区、时间范围或必须核查的来源。"
     }
   ],
   "llmOutputSchema": [
@@ -28,7 +20,6 @@
       "key": "query",
       "name": "Query",
       "valueType": "text",
-      "required": true,
       "description": "Search query or question to look up on the public web."
     }
   ],

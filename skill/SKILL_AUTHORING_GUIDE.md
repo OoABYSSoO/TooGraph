@@ -103,7 +103,6 @@ Python Skill 的依赖规则：
       "key": "source_state",
       "name": "Source State",
       "valueType": "text",
-      "required": true,
       "description": "运行此 Skill 前需要从图中读取的 state 内容。"
     }
   ],
@@ -112,7 +111,6 @@ Python Skill 的依赖规则：
       "key": "operation",
       "name": "Operation",
       "valueType": "text",
-      "required": true,
       "description": "LLM 根据 state 和 before_llm 上下文生成的结构化调用参数。"
     }
   ],
@@ -137,9 +135,11 @@ Python Skill 的依赖规则：
 - `version`：Skill 包版本。
 - `timeoutSeconds`：生命周期脚本执行超时时间。
 - `permissions`：声明网络、文件、子进程、浏览器自动化等能力需求。这是 Skill 的客观能力边界，应该留在包定义中。
-- `stateInputSchema`：LLM 节点使用该 Skill 时希望从图 state 中读取的输入字段。它用于 UI 说明、后续自动绑定和审计理解；不要把只来自运行时的页面路径、当前 DOM 摘要、当前日期、系统环境等内容放进这里。
-- `llmOutputSchema`：LLM 本轮需要生成的结构化输出，也就是 `after_llm.py` 的主要输入。
+- `stateInputSchema`：LLM 节点使用该 Skill 时必须从图 state 中读取的输入字段。它用于 UI 说明、后续自动绑定和审计理解；不要把只来自运行时的页面路径、当前 DOM 摘要、当前日期、系统环境等内容放进这里。
+- `llmOutputSchema`：LLM 本轮需要生成的结构化输出，也就是 `after_llm.py` 的主要输入。声明出的字段会进入结构化输出 JSON schema；当某个字段在特定操作下没有业务值时，用空字符串、空数组或空对象表达。
 - `stateOutputSchema`：Skill 最终返回并由 runtime 绑定到下游 state 的字段。
+
+Skill IO 字段不再支持 `required`。不要声明“可选输入”：`stateInputSchema` 只放真正必须来自图 state 的内容；运行时可重新取得的上下文放进 `before_llm.py`；人类或上游流程临时补充的额外信息可以作为普通节点 reads 加入，不属于 Skill 自身契约。
 
 不要把同一个概念混在一个 schema 里。用户问题、上游文件路径、脚本原文、约束说明等“由图流程产生并需要 LLM 阅读的东西”应进入 `stateInputSchema`；当前页面路径、页面可操作目标、当前日期、启用能力清单、系统命令可用性、运行时预读文件摘要等“当次运行时可重新获取的环境信息”应由 `before_llm.py` 从运行时上下文补充；搜索词、点击目标、文件写入内容、命令数组等“需要 LLM 在本轮输出中决定的东西”应进入 `llmOutputSchema`；下游节点需要继续读取的结果进入 `stateOutputSchema`。
 
@@ -370,7 +370,7 @@ Skill 不负责决定输出写入哪个 state。
 -> LLM 结合图 state 和运行时上下文生成 llmOutputSchema 结构化输出
 ```
 
-`stateInputSchema` 是自动绑定和人类审计的依据。后续 LLM 节点选择某个 Skill 时，可以根据它自动添加必要输入 state；用户仍可以额外添加输入 state，但不应删除 Skill 绑定所需的 state。
+`stateInputSchema` 是自动绑定和人类审计的依据。后续 LLM 节点选择某个 Skill 时，可以根据它自动添加必要输入 state；用户仍可以额外添加输入 state，但不应删除 Skill 绑定所需的 state。不要为了“可能有用”的上下文增加 Skill state 输入。
 
 输出侧：
 

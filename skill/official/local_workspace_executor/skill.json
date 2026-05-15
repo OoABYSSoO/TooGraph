@@ -12,22 +12,7 @@
       "key": "workspace_request",
       "name": "Workspace Request",
       "valueType": "text",
-      "required": true,
       "description": "用户或上游图节点希望在本地工作区完成的明确操作目标。"
-    },
-    {
-      "key": "target_path",
-      "name": "Target Path",
-      "valueType": "text",
-      "required": false,
-      "description": "可选仓库内相对路径，供 LLM 生成本次受控操作参数。"
-    },
-    {
-      "key": "workspace_context",
-      "name": "Workspace Context",
-      "valueType": "markdown",
-      "required": false,
-      "description": "可选补充上下文，例如已有文件片段、约束或期望结果。"
     }
   ],
   "llmOutputSchema": [
@@ -35,29 +20,25 @@
       "key": "path",
       "name": "Path",
       "valueType": "text",
-      "required": true,
       "description": "仓库内相对路径。read/list/search 使用仓库读策略；write 默认只允许 backend/data、skill/user、graph_template/user 或 node_preset/user；execute 默认只允许 backend/data/tmp 或 skill/user。"
     },
     {
       "key": "operation",
       "name": "Operation",
       "valueType": "text",
-      "required": true,
       "description": "要执行的操作：read、list、search、write 或 execute。"
     },
     {
       "key": "content",
       "name": "Content",
       "valueType": "text",
-      "required": false,
-      "description": "write 操作写入的完整最终文本内容；read 和 execute 不需要。"
+      "description": "write 操作写入的完整最终文本内容；其他操作返回空字符串。"
     },
     {
       "key": "query",
       "name": "Query",
       "valueType": "text",
-      "required": false,
-      "description": "search 操作使用的文本搜索词；其他操作不需要。"
+      "description": "search 操作使用的文本搜索词；其他操作返回空字符串。"
     }
   ],
   "stateOutputSchema": [

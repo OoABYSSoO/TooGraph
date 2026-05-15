@@ -14,11 +14,10 @@ Lifecycle:
 State inputs:
 
 - `user_question`: current public web question or fact-checking need.
-- `search_context`: optional constraints such as region, time range, known facts, or preferred source hints.
 
 LLM output:
 
-- `query`: required public web search query.
+- `query`: public web search query.
 
 State outputs:
 - `query`: actual query sent to the search provider.

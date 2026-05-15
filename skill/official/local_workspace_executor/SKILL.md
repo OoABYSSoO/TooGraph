@@ -10,15 +10,13 @@ Use this skill when a graph needs one explicit local workspace operation on one 
 State inputs:
 
 - `workspace_request`: the user's or upstream graph node's local workspace goal.
-- `target_path`: optional repository-relative path for the requested operation.
-- `workspace_context`: optional extra constraints, snippets, or desired result notes.
 
 The LLM node generates only this structured LLM output:
 
 - `path`: repository-relative file path.
 - `operation`: `read`, `list`, `search`, `write`, or `execute`.
-- `content`: required only when `operation` is `write`; it must be the complete final file content.
-- `query`: required only when `operation` is `search`; it must be the text to search for.
+- `content`: complete final file content for `write`; return an empty string for other operations.
+- `query`: search text for `search`; return an empty string for other operations.
 
 The skill exposes these state outputs:
 

@@ -45,6 +45,7 @@ class LocalWorkspaceExecutorSkillTests(unittest.TestCase):
         self.assertEqual(definition.llm_node_blockers, [])
         self.assertEqual(definition.permissions, ["file_read", "file_write", "subprocess"])
         self.assertFalse(definition.capability_policy.default.requires_approval)
+        self.assertEqual([field.key for field in definition.state_input_schema], ["workspace_request"])
         self.assertEqual(
             [field.key for field in definition.llm_output_schema],
             ["path", "operation", "content", "query"],

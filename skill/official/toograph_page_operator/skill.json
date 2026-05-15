@@ -14,7 +14,6 @@
       "key": "user_goal",
       "name": "User Goal",
       "valueType": "text",
-      "required": false,
       "description": "用户希望完成的页面操作目标。"
     }
   ],
@@ -23,22 +22,19 @@
       "key": "action",
       "name": "Action",
       "valueType": "text",
-      "required": true,
       "description": "语义动作。首期只支持 click_nav。"
     },
     {
       "key": "target",
       "name": "Target",
       "valueType": "text",
-      "required": true,
       "description": "语义目标。首期支持 runs / 运行历史 / 历史。"
     },
     {
       "key": "cursor_lifecycle",
       "name": "Cursor Lifecycle",
       "valueType": "text",
-      "required": false,
-      "description": "虚拟鼠标生命周期，keep、return_after_step 或 return_at_end。"
+      "description": "虚拟鼠标生命周期，keep、return_after_step 或 return_at_end；没有连续操作时返回 return_after_step。"
     }
   ],
   "stateOutputSchema": [
