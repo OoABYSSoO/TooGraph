@@ -3858,7 +3858,7 @@ function formatErrorMessage(error: unknown): string {
 
 <style scoped>
 .buddy-widget {
-  --buddy-widget-panel-width: 1680px;
+  --buddy-widget-bubble-width: 1520px;
 
   position: fixed;
   inset: 0;
@@ -4101,7 +4101,7 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__panel {
   bottom: calc(100% + 12px);
   z-index: 1;
-  width: min(var(--buddy-widget-panel-width), calc(100vw - 32px));
+  width: min(420px, calc(100vw - 32px));
   max-height: min(640px, calc(100vh - 132px));
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -4119,7 +4119,7 @@ function formatErrorMessage(error: unknown): string {
   left: 50%;
   right: auto;
   bottom: auto;
-  width: min(var(--buddy-widget-panel-width), calc(100vw - 96px));
+  width: min(1440px, calc(100vw - 96px));
   height: min(920px, calc(100vh - 80px));
   max-height: calc(100vh - 80px);
   transform: translate(-50%, -50%);
@@ -4873,7 +4873,7 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__bubble {
   bottom: calc(100% + 10px);
-  max-width: min(380px, calc(100vw - 32px));
+  width: min(var(--buddy-widget-bubble-width), calc(100vw - 32px));
   max-height: min(340px, calc(100vh - 120px));
   overflow: auto;
   padding: 9px 11px;
@@ -4894,7 +4894,7 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__bubble-html-frame {
-  width: min(356px, calc(100vw - 56px));
+  width: 100%;
   min-height: 240px;
   overflow: hidden;
   border: 1px solid rgba(154, 52, 18, 0.12);
