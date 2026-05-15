@@ -308,3 +308,35 @@ test("buildBuddyOutputTraceStateFromRunDetail rebuilds completed segments from r
   assert.deepEqual(segments[0].records.map((record) => record.label), ["A", "B"]);
   assert.deepEqual(segments[1].records.map((record) => record.label), ["C", "C / toograph_script_tester"]);
 });
+
+test("buildBuddyOutputTraceStateFromRunDetail keeps in-progress executions running", () => {
+  const graph = fiveNodeGraph();
+  const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));
+  const run = {
+    status: "running",
+    node_executions: [
+      {
+        node_id: "node_a",
+        node_type: "agent",
+        status: "running",
+        started_at: "2026-05-13T10:00:00.000Z",
+        finished_at: null,
+        duration_ms: null,
+        input_summary: "",
+        output_summary: "",
+        artifacts: { inputs: {}, outputs: {}, family: "agent", state_reads: [], state_writes: [] },
+        warnings: [],
+        errors: [],
+      },
+    ],
+    artifacts: {},
+  } as Partial<RunDetail> as RunDetail;
+
+  const state = buildBuddyOutputTraceStateFromRunDetail(run, plan, graph);
+  const segments = listBuddyOutputTraceSegmentsForDisplay(state);
+
+  assert.equal(segments.length, 1);
+  assert.equal(segments[0].status, "running");
+  assert.equal(segments[0].records[0].status, "running");
+  assert.equal(segments[0].records[0].label, "A");
+});

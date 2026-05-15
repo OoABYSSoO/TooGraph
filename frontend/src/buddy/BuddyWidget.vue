@@ -554,6 +554,11 @@ type BuddyPauseHandlingOptions = {
   persist?: boolean;
 };
 
+type BuddyStreamingRunDisplaySnapshot = {
+  publicOutputState: BuddyPublicOutputRuntimeState;
+  outputTraceState: BuddyOutputTraceRuntimeState;
+};
+
 type TraceDurationTarget = {
   durationMs: number;
   animateInitial: boolean;
@@ -3182,7 +3187,16 @@ function startRunEventStream(
   let publicOutputState = createBuddyPublicOutputRuntimeState();
   const outputTracePlan = buildBuddyOutputTracePlan(graph, publicOutputBindings);
   let outputTraceState = createBuddyOutputTraceRuntimeState(outputTracePlan);
-  eventSource = new EventSource(streamUrl);
+  const source = new EventSource(streamUrl);
+  eventSource = source;
+  void hydrateBuddyStreamingRunDisplayFromSnapshot(runId, source, graph, publicOutputBindings, outputTracePlan).then((snapshot) => {
+    if (!snapshot || eventSource !== source) {
+      return;
+    }
+    outputTraceState = snapshot.outputTraceState;
+    publicOutputState = snapshot.publicOutputState;
+    syncStreamingBuddyRunDisplay(assistantMessageId, runId, outputTraceState, publicOutputState);
+  });
   const handleStreamingEvent = (eventType: string, event: Event) => {
     const payload = parseRunEventPayload(event);
     if (!payload) {
@@ -3206,37 +3220,41 @@ function startRunEventStream(
       payload,
       nowPublicOutputMs(),
     );
-    const { publicOutputMessages, outputTraceMessages } = syncBuddyRunDisplayMessages(
-      assistantMessageId,
-      runId,
-      outputTraceState,
-      publicOutputState,
-    );
-    if (publicOutputMessages.length > 0) {
-      mood.value = "speaking";
-    }
-    if (publicOutputMessages.length > 0 || outputTraceMessages.length > 0) {
-      const controllerMessage = messages.value.find((message) => message.id === assistantMessageId);
-      if (controllerMessage) {
-        controllerMessage.activityText = "";
-        controllerMessage.runId = runId;
-        controllerMessage.includeInContext = false;
-      }
-      void scrollMessagesToBottom();
-    }
+    syncStreamingBuddyRunDisplay(assistantMessageId, runId, outputTraceState, publicOutputState);
     setAssistantActivityFromRunEvent(assistantMessageId, eventType, payload, graph);
   };
-  eventSource.addEventListener("node.started", (event) => handleStreamingEvent("node.started", event));
-  eventSource.addEventListener("node.output.delta", (event) => handleStreamingEvent("node.output.delta", event));
-  eventSource.addEventListener("node.output.completed", (event) => handleStreamingEvent("node.output.completed", event));
-  eventSource.addEventListener("state.updated", (event) => handleStreamingEvent("state.updated", event));
-  eventSource.addEventListener("activity.event", (event) => handleStreamingEvent("activity.event", event));
-  eventSource.addEventListener("node.completed", (event) => handleStreamingEvent("node.completed", event));
-  eventSource.addEventListener("node.failed", (event) => handleStreamingEvent("node.failed", event));
-  eventSource.addEventListener("run.completed", closeEventSource);
-  eventSource.addEventListener("run.failed", closeEventSource);
-  eventSource.addEventListener("run.cancelled", closeEventSource);
-  eventSource.onerror = closeEventSource;
+  source.addEventListener("node.started", (event) => handleStreamingEvent("node.started", event));
+  source.addEventListener("node.output.delta", (event) => handleStreamingEvent("node.output.delta", event));
+  source.addEventListener("node.output.completed", (event) => handleStreamingEvent("node.output.completed", event));
+  source.addEventListener("state.updated", (event) => handleStreamingEvent("state.updated", event));
+  source.addEventListener("activity.event", (event) => handleStreamingEvent("activity.event", event));
+  source.addEventListener("node.completed", (event) => handleStreamingEvent("node.completed", event));
+  source.addEventListener("node.failed", (event) => handleStreamingEvent("node.failed", event));
+  source.addEventListener("run.completed", () => closeEventSource(source));
+  source.addEventListener("run.failed", () => closeEventSource(source));
+  source.addEventListener("run.cancelled", () => closeEventSource(source));
+  source.onerror = () => closeEventSource(source);
+}
+
+async function hydrateBuddyStreamingRunDisplayFromSnapshot(
+  runId: string,
+  source: EventSource,
+  graph: GraphPayload,
+  publicOutputBindings: BuddyPublicOutputBinding[],
+  outputTracePlan: ReturnType<typeof buildBuddyOutputTracePlan>,
+): Promise<BuddyStreamingRunDisplaySnapshot | null> {
+  try {
+    const runDetail = await fetchRun(runId);
+    if (eventSource !== source) {
+      return null;
+    }
+    return {
+      outputTraceState: buildBuddyOutputTraceStateFromRunDetail(runDetail, outputTracePlan, graph),
+      publicOutputState: buildPublicOutputRuntimeStateFromRunDetail(runDetail, publicOutputBindings, graph),
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function pollRunUntilFinished(runId: string, signal: AbortSignal): Promise<RunDetail> {
@@ -3249,9 +3267,11 @@ async function pollRunUntilFinished(runId: string, signal: AbortSignal): Promise
   }
 }
 
-function closeEventSource() {
-  eventSource?.close();
-  eventSource = null;
+function closeEventSource(source: EventSource | null = eventSource) {
+  source?.close();
+  if (eventSource === source) {
+    eventSource = null;
+  }
 }
 
 function shouldRenderMessage(message: BuddyMessage) {
@@ -3273,6 +3293,33 @@ function shouldShowPausedRunCard(message: BuddyMessage) {
     pausedBuddyRun.value?.status === "awaiting_human" &&
     pausedBuddyAssistantMessageId.value === message.id
   );
+}
+
+function syncStreamingBuddyRunDisplay(
+  assistantMessageId: string,
+  runId: string,
+  outputTraceState: BuddyOutputTraceRuntimeState,
+  publicOutputState: BuddyPublicOutputRuntimeState,
+) {
+  const { publicOutputMessages, outputTraceMessages } = syncBuddyRunDisplayMessages(
+    assistantMessageId,
+    runId,
+    outputTraceState,
+    publicOutputState,
+  );
+  if (publicOutputMessages.length > 0) {
+    mood.value = "speaking";
+  }
+  if (publicOutputMessages.length > 0 || outputTraceMessages.length > 0) {
+    const controllerMessage = messages.value.find((message) => message.id === assistantMessageId);
+    if (controllerMessage) {
+      controllerMessage.activityText = "";
+      controllerMessage.runId = runId;
+      controllerMessage.includeInContext = false;
+    }
+    void scrollMessagesToBottom();
+  }
+  return { publicOutputMessages, outputTraceMessages };
 }
 
 function syncBuddyRunDisplayMessages(

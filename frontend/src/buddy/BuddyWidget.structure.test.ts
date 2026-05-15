@@ -609,6 +609,18 @@ test("BuddyWidget renders output-segment run trace capsules instead of per-messa
   assert.doesNotMatch(componentSource, /runTraceStartedAtByKey/);
 });
 
+test("BuddyWidget seeds streaming run trace capsules from the current run snapshot", () => {
+  assert.match(componentSource, /const source = new EventSource\(streamUrl\);[\s\S]*eventSource = source;[\s\S]*void hydrateBuddyStreamingRunDisplayFromSnapshot\(/);
+  assert.match(componentSource, /async function hydrateBuddyStreamingRunDisplayFromSnapshot\(/);
+  assert.match(componentSource, /fetchRun\(runId\)/);
+  assert.match(componentSource, /if \(eventSource !== source\) \{[\s\S]*return null;[\s\S]*\}/);
+  assert.match(componentSource, /buildBuddyOutputTraceStateFromRunDetail\(runDetail, outputTracePlan, graph\)/);
+  assert.match(componentSource, /buildPublicOutputRuntimeStateFromRunDetail\(runDetail, publicOutputBindings, graph\)/);
+  assert.match(componentSource, /function syncStreamingBuddyRunDisplay\(/);
+  assert.match(componentSource, /syncStreamingBuddyRunDisplay\(assistantMessageId, runId, outputTraceState, publicOutputState\)/);
+  assert.match(componentSource, /source\.addEventListener\("run\.completed", \(\) => closeEventSource\(source\)\);/);
+});
+
 test("BuddyWidget groups consecutive visible messages by role label", () => {
   assert.match(componentSource, /import \{ shouldShowGroupedBuddyMessageLabel \} from "\.\/buddyMessageGrouping\.ts";/);
   assert.match(componentSource, /v-for="\(\s*message,\s*messageIndex\s*\) in messages"/);

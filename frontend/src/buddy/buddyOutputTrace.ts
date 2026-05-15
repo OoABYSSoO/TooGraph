@@ -557,7 +557,8 @@ function appendExecutionTimelineItems(
   const nodeType = normalizeText(execution.node_type) || normalizeText(execution.artifacts?.family);
   const startedAtMs = parseEventEpochMs(execution.started_at);
   const durationMs = normalizeDurationMs(execution.duration_ms);
-  const finishedAtMs = parseEventEpochMs(execution.finished_at) ?? (startedAtMs !== null && durationMs !== null ? startedAtMs + durationMs : startedAtMs);
+  const finishedAtMs = parseEventEpochMs(execution.finished_at) ?? (startedAtMs !== null && durationMs !== null ? startedAtMs + durationMs : null);
+  const completionEventTimeMs = finishedAtMs ?? (isTerminalExecutionStatus(execution.status) ? startedAtMs : null);
   const context = subgraphNodeId
     ? {
         subgraph_node_id: subgraphNodeId,
@@ -586,7 +587,7 @@ function appendExecutionTimelineItems(
     }
   }
 
-  if (finishedAtMs !== null) {
+  if (completionEventTimeMs !== null) {
     items.push({
       eventType: normalizeExecutionStatus(execution.status) === "failed" ? "node.failed" : "node.completed",
       payload: {
@@ -597,7 +598,7 @@ function appendExecutionTimelineItems(
         duration_ms: execution.duration_ms,
         ...context,
       },
-      timeMs: finishedAtMs,
+      timeMs: completionEventTimeMs,
       order: nextOrder(),
     });
   }
@@ -642,6 +643,11 @@ function normalizeActivityStatus(status: unknown, error: unknown): BuddyOutputTr
 function normalizeExecutionStatus(value: unknown) {
   const status = normalizeText(value).toLowerCase();
   return status === "failed" || status === "error" ? "failed" : "completed";
+}
+
+function isTerminalExecutionStatus(value: unknown) {
+  const status = normalizeText(value).toLowerCase();
+  return Boolean(status) && !["running", "pending", "queued", "awaiting_human", "in_progress"].includes(status);
 }
 
 function resolveDurationMs(startedAtMs: number | null | undefined, completedAtMs: number | null | undefined) {
