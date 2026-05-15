@@ -5,7 +5,40 @@ export type BuddyVirtualClickOperation = {
   targetId: string;
 };
 
-export type BuddyVirtualOperation = BuddyVirtualClickOperation;
+export type BuddyVirtualFocusOperation = {
+  kind: "focus";
+  targetId: string;
+};
+
+export type BuddyVirtualClearOperation = {
+  kind: "clear";
+  targetId: string;
+};
+
+export type BuddyVirtualTypeOperation = {
+  kind: "type";
+  targetId: string;
+  text: string;
+};
+
+export type BuddyVirtualPressOperation = {
+  kind: "press";
+  targetId: string;
+  key: string;
+};
+
+export type BuddyVirtualWaitOperation = {
+  kind: "wait";
+  option: string;
+};
+
+export type BuddyVirtualOperation =
+  | BuddyVirtualClickOperation
+  | BuddyVirtualFocusOperation
+  | BuddyVirtualClearOperation
+  | BuddyVirtualTypeOperation
+  | BuddyVirtualPressOperation
+  | BuddyVirtualWaitOperation;
 
 export type BuddyVirtualOperationPlan = {
   version: 1;
@@ -68,10 +101,26 @@ function listOperations(value: unknown): BuddyVirtualOperation[] {
     }
     const kind = normalizeText(record.kind).toLowerCase();
     const targetId = normalizeText(record.target_id ?? record.targetId);
-    if (kind !== "click" || !targetId || isBuddySelfTarget(targetId)) {
+    if (kind === "wait") {
+      operations.push({ kind: "wait", option: normalizeText(record.option) });
+      continue;
+    }
+    if (!targetId || isBuddySelfTarget(targetId)) {
       return [];
     }
-    operations.push({ kind: "click", targetId });
+    if (kind === "click" || kind === "focus" || kind === "clear") {
+      operations.push({ kind, targetId });
+      continue;
+    }
+    if (kind === "type") {
+      operations.push({ kind: "type", targetId, text: normalizeText(record.text) });
+      continue;
+    }
+    if (kind === "press") {
+      operations.push({ kind: "press", targetId, key: normalizeText(record.key) });
+      continue;
+    }
+    return [];
   }
   return operations;
 }

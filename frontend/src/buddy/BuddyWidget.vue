@@ -452,6 +452,7 @@ import {
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
 import { buildPageOperationBook, collectPageOperationSnapshot } from "./pageOperationAffordances.ts";
 import { resolveBuddyVirtualOperationPlanFromActivityEvent } from "./virtualOperationProtocol.ts";
+import type { BuddyVirtualOperationPlan } from "./virtualOperationProtocol.ts";
 import { findLatestRecoverablePausedRunMessage, isRecoverablePausedRunStatus } from "./buddyPausedRunRecovery.ts";
 import {
   resolveBuddyComposerDecision,
@@ -587,9 +588,6 @@ const BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE = 1;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_REACHED_DISTANCE_PX = 12;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 1.25;
 const BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS = 80;
-const BUDDY_VIRTUAL_OPERATION_TARGET_SELECTORS: Record<string, string> = {
-  "app.nav.runs": '[data-virtual-affordance-id="app.nav.runs"]',
-};
 const VIRTUAL_CURSOR_STAR_PATH =
   "M0-72 C5-46 18-33 44-28 C18-23 5-10 0 16 C-5-10 -18-23 -44-28 C-18-33 -5-46 0-72Z";
 const VIRTUAL_CURSOR_SHAPE_PATH =
@@ -2219,39 +2217,123 @@ async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequ
   if (!request) {
     return;
   }
-  for (const operation of request.request.operations) {
-    if (operation.kind === "click") {
-      await executeBuddyVirtualClickOperation(operation);
-    }
+  await executeVirtualOperationCommands(request.request);
+}
+
+async function executeVirtualOperationCommands(operationPlan: BuddyVirtualOperationPlan) {
+  stopBuddyIdleAnimation();
+  await ensureVirtualCursorReadyForOperation();
+  for (const operation of operationPlan.operations) {
+    await executeBuddyVirtualOperationCommand(operation);
   }
-  if (request.request.cursorLifecycle === "return_after_step" || request.request.cursorLifecycle === "return_at_end") {
+  if (operationPlan.cursorLifecycle === "return_after_step" || operationPlan.cursorLifecycle === "return_at_end") {
     await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
     buddyMascotDebugStore.setVirtualCursorEnabled(false);
   }
 }
 
+async function executeBuddyVirtualOperationCommand(operation: BuddyVirtualOperation) {
+  switch (operation.kind) {
+    case "click":
+      await executeBuddyVirtualClickOperation(operation);
+      return;
+    case "focus":
+      await executeBuddyVirtualFocusOperation(operation);
+      return;
+    case "clear":
+      await executeBuddyVirtualClearOperation(operation);
+      return;
+    case "type":
+      await executeBuddyVirtualTypeOperation(operation);
+      return;
+    case "press":
+      await executeBuddyVirtualPressOperation(operation);
+      return;
+    case "wait":
+      await executeBuddyVirtualWaitOperation(operation);
+      return;
+  }
+}
+
 async function executeBuddyVirtualClickOperation(operation: BuddyVirtualOperation) {
+  if (!("targetId" in operation)) {
+    return;
+  }
   const affordance = resolveVirtualOperationAffordance(operation.targetId);
   if (!affordance) {
     return;
   }
-  stopBuddyIdleAnimation();
-  await ensureVirtualCursorReadyForOperation();
-  const cursorPosition = resolveVirtualCursorPositionForElement(affordance.element);
-  const flightWaitMs = moveVirtualCursorToWithArmedTransition(cursorPosition);
-  await waitForVirtualOperation(flightWaitMs);
+  await moveVirtualCursorToElement(affordance.element);
   dispatchVirtualClick(affordance.element);
+}
+
+async function executeBuddyVirtualFocusOperation(operation: BuddyVirtualOperation) {
+  if (!("targetId" in operation)) {
+    return;
+  }
+  const affordance = resolveVirtualOperationAffordance(operation.targetId);
+  if (!affordance) {
+    return;
+  }
+  await moveVirtualCursorToElement(affordance.element);
+  affordance.element.focus();
+}
+
+async function executeBuddyVirtualClearOperation(operation: BuddyVirtualOperation) {
+  if (!("targetId" in operation)) {
+    return;
+  }
+  await executeBuddyVirtualFocusOperation(operation);
+  const input = resolveVirtualOperationTextInput(operation.targetId);
+  if (!input) {
+    return;
+  }
+  input.value = "";
+  dispatchVirtualInputEvents(input, "deleteContentBackward", "");
+}
+
+async function executeBuddyVirtualTypeOperation(operation: BuddyVirtualOperation) {
+  if (!("targetId" in operation) || operation.kind !== "type" || !operation.text) {
+    return;
+  }
+  await executeBuddyVirtualFocusOperation(operation);
+  const input = resolveVirtualOperationTextInput(operation.targetId);
+  if (!input) {
+    return;
+  }
+  input.value = `${input.value}${operation.text}`;
+  dispatchVirtualInputEvents(input, "insertText", operation.text);
+}
+
+async function executeBuddyVirtualPressOperation(operation: BuddyVirtualOperation) {
+  if (!("targetId" in operation) || operation.kind !== "press" || !operation.key) {
+    return;
+  }
+  const affordance = resolveVirtualOperationAffordance(operation.targetId);
+  if (!affordance) {
+    return;
+  }
+  await moveVirtualCursorToElement(affordance.element);
+  affordance.element.focus();
+  affordance.element.dispatchEvent(new KeyboardEvent("keydown", { key: operation.key, bubbles: true }));
+  affordance.element.dispatchEvent(new KeyboardEvent("keyup", { key: operation.key, bubbles: true }));
+}
+
+async function executeBuddyVirtualWaitOperation(operation: BuddyVirtualOperation) {
+  if (operation.kind !== "wait") {
+    return;
+  }
+  await waitForVirtualOperation(operation.option === "short" ? 300 : 120);
 }
 
 function resolveVirtualOperationAffordance(targetId: string): { element: HTMLElement } | null {
   if (targetId.startsWith("buddy.") || targetId === "app.nav.buddy") {
     return null;
   }
-  const selector = BUDDY_VIRTUAL_OPERATION_TARGET_SELECTORS[targetId];
-  if (!selector || typeof document === "undefined") {
+  if (typeof document === "undefined") {
     return null;
   }
-  const element = document.querySelector<HTMLElement>(selector);
+  const element = document.querySelector<HTMLElement>(`[data-virtual-affordance-id="${escapeVirtualOperationTargetId(targetId)}"]`);
   if (!element) {
     return null;
   }
@@ -2260,6 +2342,32 @@ function resolveVirtualOperationAffordance(targetId: string): { element: HTMLEle
     return null;
   }
   return { element };
+}
+
+function resolveVirtualOperationTextInput(targetId: string): HTMLInputElement | HTMLTextAreaElement | null {
+  const affordance = resolveVirtualOperationAffordance(targetId);
+  if (!affordance) {
+    return null;
+  }
+  if (isVirtualOperationTextInputElement(affordance.element)) {
+    return affordance.element;
+  }
+  const input = affordance.element.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea");
+  return input && isVirtualOperationTextInputElement(input) ? input : null;
+}
+
+function isVirtualOperationTextInputElement(element: Element): element is HTMLInputElement | HTMLTextAreaElement {
+  return element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement;
+}
+
+async function moveVirtualCursorToElement(element: HTMLElement) {
+  const cursorPosition = resolveVirtualCursorPositionForElement(element);
+  const flightWaitMs = moveVirtualCursorToWithArmedTransition(cursorPosition);
+  await waitForVirtualOperation(flightWaitMs);
+}
+
+function escapeVirtualOperationTargetId(targetId: string) {
+  return targetId.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 async function ensureVirtualCursorReadyForOperation() {
@@ -2294,6 +2402,15 @@ function dispatchVirtualClick(element: HTMLElement) {
       view: window,
     }),
   );
+}
+
+function dispatchVirtualInputEvents(element: HTMLInputElement | HTMLTextAreaElement, inputType: string, data: string) {
+  if (typeof InputEvent === "function") {
+    element.dispatchEvent(new InputEvent("input", { bubbles: true, inputType, data }));
+  } else {
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  element.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 function dispatchVirtualPointerEvent(element: HTMLElement, type: "pointerdown" | "pointerup", clientX: number, clientY: number) {

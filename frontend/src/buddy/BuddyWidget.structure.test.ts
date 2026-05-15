@@ -404,14 +404,23 @@ test("BuddyWidget executes virtual UI operation events through the virtual curso
   assert.match(componentSource, /const operationPlan = resolveBuddyVirtualOperationPlanFromActivityEvent\(payload\);/);
   assert.match(componentSource, /buddyMascotDebugStore\.requestVirtualOperation\(operationPlan\);/);
   assert.match(componentSource, /function executeVirtualOperationRequest\(request: BuddyVirtualOperationRequest \| null\)/);
-  assert.match(componentSource, /for \(const operation of request\.request\.operations\)/);
+  assert.match(componentSource, /async function executeVirtualOperationCommands\(operationPlan:/);
+  assert.match(componentSource, /for \(const operation of operationPlan\.operations\)/);
+  assert.match(componentSource, /async function executeBuddyVirtualOperationCommand\(operation: BuddyVirtualOperation\)/);
+  assert.match(componentSource, /case "focus":[\s\S]*executeBuddyVirtualFocusOperation/);
+  assert.match(componentSource, /case "clear":[\s\S]*executeBuddyVirtualClearOperation/);
+  assert.match(componentSource, /case "type":[\s\S]*executeBuddyVirtualTypeOperation/);
+  assert.match(componentSource, /case "press":[\s\S]*executeBuddyVirtualPressOperation/);
+  assert.match(componentSource, /case "wait":[\s\S]*executeBuddyVirtualWaitOperation/);
   assert.match(componentSource, /function executeBuddyVirtualClickOperation\(operation: BuddyVirtualOperation\)/);
   assert.match(componentSource, /function resolveVirtualOperationAffordance\(targetId: string\)/);
-  assert.match(componentSource, /"app\.nav\.runs": '\[data-virtual-affordance-id="app\.nav\.runs"\]'/);
+  assert.match(componentSource, /querySelector<HTMLElement>\(`\[data-virtual-affordance-id="\$\{escapeVirtualOperationTargetId\(targetId\)\}"\]`\)/);
   assert.doesNotMatch(componentSource, /"app\.nav\.buddy":/);
+  assert.doesNotMatch(componentSource, /BUDDY_VIRTUAL_OPERATION_TARGET_SELECTORS/);
   assert.match(componentSource, /moveVirtualCursorToWithArmedTransition\(cursorPosition\)/);
   assert.match(componentSource, /dispatchVirtualClick\(affordance\.element\);/);
-  assert.match(componentSource, /request\.request\.cursorLifecycle === "return_after_step"/);
+  assert.match(componentSource, /operationPlan\.cursorLifecycle === "return_after_step"/);
+  assert.match(componentSource, /dispatchVirtualInputEvents/);
   assert.match(componentSource, /buddyMascotDebugStore\.setVirtualCursorEnabled\(false\);/);
 });
 

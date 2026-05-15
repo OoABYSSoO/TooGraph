@@ -57,3 +57,40 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent rejects legacy single op
 
   assert.equal(plan, null);
 });
+
+test("resolveBuddyVirtualOperationPlanFromActivityEvent parses keyboard command operations", () => {
+  const plan = resolveBuddyVirtualOperationPlanFromActivityEvent({
+    kind: "virtual_ui_operation",
+    detail: {
+      operation_request: {
+        version: 1,
+        commands: [
+          "focus settings.input",
+          "clear settings.input",
+          "type settings.input hello",
+          "press settings.input Enter",
+          "wait short",
+        ],
+        operations: [
+          { kind: "focus", target_id: "settings.input" },
+          { kind: "clear", target_id: "settings.input" },
+          { kind: "type", target_id: "settings.input", text: "hello" },
+          { kind: "press", target_id: "settings.input", key: "Enter" },
+          { kind: "wait", option: "short" },
+        ],
+        cursor_lifecycle: "keep",
+        reason: "test input",
+      },
+    },
+  });
+
+  assert.deepEqual(plan?.operations, [
+    { kind: "focus", targetId: "settings.input" },
+    { kind: "clear", targetId: "settings.input" },
+    { kind: "type", targetId: "settings.input", text: "hello" },
+    { kind: "press", targetId: "settings.input", key: "Enter" },
+    { kind: "wait", option: "short" },
+  ]);
+  assert.equal(plan?.cursorLifecycle, "keep");
+  assert.equal(plan?.reason, "test input");
+});
