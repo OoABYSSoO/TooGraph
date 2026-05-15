@@ -16,6 +16,7 @@ import { resolveInputNodeVirtualOutputType } from "./input-boundary.ts";
 import type {
   AgentNode,
   AgentSkillBinding,
+  BatchDefaultWorkerSnapshot,
   BatchNode,
   ConditionNode,
   GraphCorePayload,
@@ -671,6 +672,10 @@ export function updateBatchNodeSubgraphWorkerInDocument<T extends GraphPayload |
       sourceTemplateSource: template.source ?? "official",
     },
   };
+  const defaultWorkerSnapshot =
+    node.config.workerSource === "default_llm"
+      ? createBatchDefaultWorkerSnapshot(document, node)
+      : clonePlainValue(node.config.defaultWorkerSnapshot ?? null);
   const nextDocument = cloneGraphDocument(document);
   const nextNode = nextDocument.nodes[nodeId];
   if (nextNode.kind !== "batch") {
@@ -680,6 +685,7 @@ export function updateBatchNodeSubgraphWorkerInDocument<T extends GraphPayload |
   nextNode.config = {
     ...nextNode.config,
     workerSource: "subgraph",
+    defaultWorkerSnapshot,
     subgraphWorker: {
       graph: clonePlainValue(graph),
       templateId: template.template_id,
@@ -717,6 +723,20 @@ export function updateBatchNodeDefaultWorkerInDocument<T extends GraphPayload | 
   if (nextNode.kind !== "batch") {
     return document;
   }
+  const snapshot = nextNode.config.defaultWorkerSnapshot ?? null;
+  if (snapshot) {
+    restoreBatchDefaultWorkerSnapshot(nextDocument, nextNode, snapshot);
+    nextNode.config = {
+      ...nextNode.config,
+      workerSource: "default_llm",
+      defaultWorker: clonePlainValue(snapshot.defaultWorker),
+      defaultWorkerSnapshot: null,
+      subgraphWorker: null,
+      inputModes: pruneBatchInputModes(clonePlainValue(snapshot.inputModes), nextNode.reads),
+    };
+    return nextDocument;
+  }
+
   nextNode.config = {
     ...nextNode.config,
     workerSource: "default_llm",
@@ -724,6 +744,37 @@ export function updateBatchNodeDefaultWorkerInDocument<T extends GraphPayload | 
     inputModes: pruneBatchInputModes(nextNode.config.inputModes, nextNode.reads),
   };
   return nextDocument;
+}
+
+function createBatchDefaultWorkerSnapshot(
+  document: GraphPayload | GraphDocument,
+  node: BatchNode,
+): BatchDefaultWorkerSnapshot {
+  const stateKeys = new Set([...node.reads.map((binding) => binding.state), ...node.writes.map((binding) => binding.state)]);
+  const stateSchema = Object.fromEntries(
+    [...stateKeys]
+      .map((stateKey) => [stateKey, document.state_schema[stateKey]] as const)
+      .filter((entry): entry is readonly [string, StateDefinition] => Boolean(entry[1])),
+  );
+  return {
+    defaultWorker: clonePlainValue(node.config.defaultWorker),
+    reads: clonePlainValue(node.reads),
+    writes: clonePlainValue(node.writes),
+    inputModes: clonePlainValue(pruneBatchInputModes(node.config.inputModes, node.reads)),
+    stateSchema: clonePlainValue(stateSchema),
+  };
+}
+
+function restoreBatchDefaultWorkerSnapshot(
+  document: GraphPayload | GraphDocument,
+  node: BatchNode,
+  snapshot: BatchDefaultWorkerSnapshot,
+) {
+  for (const [stateKey, definition] of Object.entries(snapshot.stateSchema)) {
+    document.state_schema[stateKey] = clonePlainValue(definition);
+  }
+  node.reads = clonePlainValue(snapshot.reads);
+  node.writes = clonePlainValue(snapshot.writes);
 }
 
 function syncBatchSubgraphWorkerBoundaryPorts<T extends GraphPayload | GraphDocument>(

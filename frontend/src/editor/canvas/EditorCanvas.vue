@@ -2396,6 +2396,8 @@ function isLockedNodeEditTarget(target: EventTarget | null) {
         ".el-switch",
         ".el-select",
         ".el-input",
+        ".toograph-capsule-switch",
+        ".toograph-select-popper",
       ].join(", "),
     ),
   );

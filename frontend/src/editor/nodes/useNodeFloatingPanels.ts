@@ -39,6 +39,7 @@ const floatingPanelSurfaceSelector = [
   ".node-card__agent-add-popover-popper",
   ".node-card__port-picker-select-popper",
   ".node-card__agent-model-popper",
+  ".toograph-select-popper",
 ].join(", ");
 
 const defaultTimeoutScheduler: NodeFloatingPanelTimeoutScheduler = {

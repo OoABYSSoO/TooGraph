@@ -74,7 +74,10 @@
         :error="createError"
         :hint="createHint"
         :type-options="typeOptions"
+        :selection-value="createSelectionValue"
+        :existing-state-options="createExistingStateOptions"
         :virtual-affordance-base-id="virtualAffordanceId"
+        @update:selection="emit('update:create-selection', $event)"
         @update:name="emit('update:create-name', $event)"
         @update:type="emit('update:create-type', $event)"
         @update:color="emit('update:create-color', $event)"
@@ -117,6 +120,7 @@ import { useI18n } from "vue-i18n";
 
 import StateEditorPopover from "./StateEditorPopover.vue";
 import StatePortCreatePopover from "./StatePortCreatePopover.vue";
+import type { StatePortExistingStateOption } from "./statePortCreateModel";
 import type { NodePortViewModel } from "./nodeCardViewModel";
 import type { StateColorOption, StateFieldDraft, StateFieldType } from "@/editor/workspace/statePanelFields";
 
@@ -133,6 +137,8 @@ const props = withDefaults(defineProps<{
   createTitle: string;
   createError: string | null;
   createHint: string;
+  createSelectionValue: string;
+  createExistingStateOptions: StatePortExistingStateOption[];
   stateEditorPopoverStyle: CSSProperties;
   createPopoverStyle: CSSProperties;
   stateEditorDraft: StateFieldDraft | null;
@@ -159,6 +165,7 @@ const emit = defineEmits<{
   (event: "update:color", value: string): void;
   (event: "update:description", value: string): void;
   (event: "update:create-name", value: string | number): void;
+  (event: "update:create-selection", value: string): void;
   (event: "update:create-type", value: string | number | boolean | undefined): void;
   (event: "update:create-color", value: string | number | boolean | undefined): void;
   (event: "update:create-description", value: string | number): void;

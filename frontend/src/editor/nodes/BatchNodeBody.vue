@@ -3,13 +3,11 @@
     <div class="batch-node-body__controls">
       <label class="batch-node-body__worker-field">
         <span class="batch-node-body__field-label">{{ t("nodeCard.batchWorker") }}</span>
-        <ElSelect
-          class="batch-node-body__worker-select toograph-select"
+        <ToographSelect
+          class="batch-node-body__worker-select"
           :model-value="body.workerValue"
           size="small"
-          :teleported="false"
-          popper-class="toograph-select-popper"
-          @pointerdown.stop
+          remount-on-select
           @update:model-value="emit('update-worker', String($event))"
         >
           <ElOption :label="t('nodeCard.batchDefaultWorker')" value="default_llm" />
@@ -24,7 +22,7 @@
               :value="option.value"
             />
           </ElOptionGroup>
-        </ElSelect>
+        </ToographSelect>
       </label>
     </div>
 
@@ -54,6 +52,8 @@
           :create-title="createTitle"
           :create-error="createError"
           :create-hint="createHint"
+          :create-selection-value="createSelectionValue"
+          :create-existing-state-options="createExistingStateOptions"
           :create-type-options="typeOptions"
           :create-popover-style="agentAddPopoverStyle"
           @pointer-enter="emit('pointer-enter', $event)"
@@ -66,6 +66,7 @@
           @update:type="emit('update:type', $event)"
           @update:color="emit('update:color', $event)"
           @update:description="emit('update:description', $event)"
+          @update:create-selection="emit('update:create-selection', $event)"
           @update:create-name="emit('update:create-name', $event)"
           @update:create-type="emit('update:create-type', $event)"
           @update:create-color="emit('update:create-color', $event)"
@@ -102,6 +103,8 @@
           :create-title="createTitle"
           :create-error="createError"
           :create-hint="createHint"
+          :create-selection-value="createSelectionValue"
+          :create-existing-state-options="createExistingStateOptions"
           :create-type-options="typeOptions"
           :create-popover-style="agentAddPopoverStyle"
           @pointer-enter="emit('pointer-enter', $event)"
@@ -114,6 +117,7 @@
           @update:type="emit('update:type', $event)"
           @update:color="emit('update:color', $event)"
           @update:description="emit('update:description', $event)"
+          @update:create-selection="emit('update:create-selection', $event)"
           @update:create-name="emit('update:create-name', $event)"
           @update:create-type="emit('update:create-type', $event)"
           @update:create-color="emit('update:create-color', $event)"
@@ -160,12 +164,14 @@
 
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
-import { ElOption, ElOptionGroup, ElSelect } from "element-plus";
+import { ElOption, ElOptionGroup } from "element-plus";
 import { useI18n } from "vue-i18n";
 
+import ToographSelect from "@/components/ToographSelect.vue";
 import AgentRuntimeControls from "./AgentRuntimeControls.vue";
 import StatePortList from "./StatePortList.vue";
 import type { AgentThinkingControlMode } from "./agentConfigModel";
+import type { StatePortExistingStateOption } from "./statePortCreateModel";
 import type { NodeCardViewModel, NodePortViewModel } from "./nodeCardViewModel";
 import type { StateColorOption, StateFieldDraft, StateFieldType } from "@/editor/workspace/statePanelFields";
 
@@ -214,6 +220,8 @@ const props = defineProps<{
   createTitle: string;
   createError: string | null;
   createHint: string;
+  createSelectionValue: string;
+  createExistingStateOptions: StatePortExistingStateOption[];
   modelValue?: string;
   modelOptions: AgentModelOption[];
   globalModelRef: string;
@@ -239,6 +247,7 @@ const emit = defineEmits<{
   (event: "update:type", value: string): void;
   (event: "update:color", value: string): void;
   (event: "update:description", value: string): void;
+  (event: "update:create-selection", value: string): void;
   (event: "update:create-name", value: string | number): void;
   (event: "update:create-type", value: string | number | boolean | undefined): void;
   (event: "update:create-color", value: string | number | boolean | undefined): void;

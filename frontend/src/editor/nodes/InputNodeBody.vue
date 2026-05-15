@@ -22,19 +22,15 @@
     <div v-if="showKnowledgeBaseInput" class="node-card__surface node-card__input-picker">
       <label class="node-card__control-row">
         <span class="node-card__control-label">{{ t("nodeCard.knowledgeBase") }}</span>
-        <ElSelect
-          class="node-card__control-select node-card__input-select toograph-select"
+        <ToographSelect
+          class="node-card__control-select node-card__input-select"
           :model-value="inputKnowledgeBaseValue || undefined"
           :placeholder="inputKnowledgeBaseOptions.length === 0 ? t('nodeCard.noKnowledgeBases') : t('nodeCard.selectKnowledgeBase')"
           :disabled="inputKnowledgeBaseOptions.length === 0"
-          :teleported="false"
-          popper-class="toograph-select-popper"
-          @pointerdown.stop
-          @click.stop
           @update:model-value="emit('update:knowledge-base', $event)"
         >
           <ElOption v-for="option in inputKnowledgeBaseOptions" :key="option.value" :label="option.label" :value="option.value" />
-        </ElSelect>
+        </ToographSelect>
       </label>
       <div class="node-card__input-meta">
         {{ selectedKnowledgeBaseDescription }}
@@ -243,9 +239,10 @@
 
 <script setup lang="ts">
 import { computed, ref, type Component } from "vue";
-import { ElOption, ElSegmented, ElSelect } from "element-plus";
+import { ElOption, ElSegmented } from "element-plus";
 import { useI18n } from "vue-i18n";
 
+import ToographSelect from "@/components/ToographSelect.vue";
 import type { LocalFolderTreeEntry } from "@/api/localInputSources";
 import type { InputKnowledgeBaseOption } from "./inputKnowledgeBaseModel";
 import type { NodeCardViewModel } from "./nodeCardViewModel";

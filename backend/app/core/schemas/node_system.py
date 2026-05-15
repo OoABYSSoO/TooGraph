@@ -346,6 +346,16 @@ class NodeSystemBatchSubgraphWorkerConfig(BaseModel):
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 
 
+class NodeSystemBatchDefaultWorkerSnapshot(BaseModel):
+    default_worker: NodeSystemAgentConfig = Field(default_factory=NodeSystemAgentConfig, alias="defaultWorker")
+    reads: list[NodeSystemReadBinding] = Field(default_factory=list)
+    writes: list[NodeSystemWriteBinding] = Field(default_factory=list)
+    input_modes: dict[str, BatchInputMode] = Field(default_factory=dict, alias="inputModes")
+    state_schema: dict[str, NodeSystemStateDefinition] = Field(default_factory=dict, alias="stateSchema")
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
+
+
 class NodeSystemBatchConfig(BaseModel):
     worker_source: BatchWorkerSource = Field(default=BatchWorkerSource.DEFAULT_LLM, alias="workerSource")
     input_modes: dict[str, BatchInputMode] = Field(default_factory=dict, alias="inputModes")
@@ -353,6 +363,7 @@ class NodeSystemBatchConfig(BaseModel):
     retry_count: int = Field(default=3, ge=0, le=10, alias="retryCount")
     continue_on_error: bool = Field(default=True, alias="continueOnError")
     default_worker: NodeSystemAgentConfig = Field(default_factory=NodeSystemAgentConfig, alias="defaultWorker")
+    default_worker_snapshot: NodeSystemBatchDefaultWorkerSnapshot | None = Field(default=None, alias="defaultWorkerSnapshot")
     subgraph_worker: NodeSystemBatchSubgraphWorkerConfig | None = Field(default=None, alias="subgraphWorker")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")

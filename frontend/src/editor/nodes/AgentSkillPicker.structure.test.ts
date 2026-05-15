@@ -12,8 +12,11 @@ test("AgentSkillPicker owns agent skill picker presentation and emits parent sid
 
   assert.match(componentSource, /defineProps<\{[\s\S]*selectedSkillKey: string;[\s\S]*loading: boolean;[\s\S]*error: string \| null;[\s\S]*availableSkillDefinitions: SkillDefinition\[\];[\s\S]*breakpointEnabled: boolean;[\s\S]*confirmPopoverStyle: CSSProperties;[\s\S]*\}>/);
   assert.match(componentSource, /defineEmits<\{[\s\S]*\(event: "update:selected-skill", skillKey: string\): void;[\s\S]*\(event: "update:breakpoint-enabled", value: string \| number \| boolean\): void;[\s\S]*\}>/);
-  assert.match(componentSource, /<ElSelect[\s\S]*class="node-card__agent-skill-select toograph-select"[\s\S]*:class="\{ 'node-card__agent-skill-select--empty': isSkillEmpty \}"[\s\S]*:model-value="selectedSkillKey"[\s\S]*:disabled="skillSelectDisabled"[\s\S]*filterable[\s\S]*popper-class="toograph-select-popper node-card__agent-skill-popper"[\s\S]*@update:model-value="emit\('update:selected-skill', String\(\$event \?\? ''\)\)"/);
+  assert.match(componentSource, /import ToographSelect from "@\/components\/ToographSelect\.vue";/);
+  assert.match(componentSource, /import ToographCapsuleSwitch from "@\/components\/ToographCapsuleSwitch\.vue";/);
+  assert.match(componentSource, /<ToographSelect[\s\S]*class="node-card__agent-skill-select"[\s\S]*:class="\{ 'node-card__agent-skill-select--empty': isSkillEmpty \}"[\s\S]*:model-value="selectedSkillKey"[\s\S]*:disabled="skillSelectDisabled"[\s\S]*filterable[\s\S]*popper-class="node-card__agent-skill-popper"[\s\S]*@update:model-value="emit\('update:selected-skill', String\(\$event \?\? ''\)\)"/);
   assert.doesNotMatch(componentSource, /fit-input-width/);
+  assert.doesNotMatch(componentSource, /<ElSelect/);
   assert.match(componentSource, /<ElOption :label="t\('nodeCard\.noSkillOption'\)" value="" \/>/);
   assert.match(componentSource, /v-if="selectedSkillMissing"/);
   assert.match(componentSource, /v-if="loading"/);
@@ -24,8 +27,9 @@ test("AgentSkillPicker owns agent skill picker presentation and emits parent sid
   assert.doesNotMatch(componentSource, /definition\.runtime\.type/);
   assert.doesNotMatch(componentSource, /definition\.runtime\.entrypoint/);
   assert.match(componentSource, /class="node-card__agent-toggle-card node-card__agent-toggle-card--breakpoint"/);
-  assert.match(componentSource, /:model-value="breakpointEnabled"/);
+  assert.match(componentSource, /<ToographCapsuleSwitch[\s\S]*class="node-card__agent-toggle-switch node-card__agent-breakpoint-switch"[\s\S]*:model-value="breakpointEnabled"/);
   assert.match(componentSource, /@update:model-value="emit\('update:breakpoint-enabled', \$event\)"/);
+  assert.doesNotMatch(componentSource, /<ElSwitch/);
   assert.match(componentSource, /const isSkillEmpty = computed/);
   assert.match(componentSource, /const selectedSkillMissing = computed/);
   assert.match(componentSource, /const skillSelectDisabled = computed/);

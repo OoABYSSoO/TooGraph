@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const currentFilePath = fileURLToPath(import.meta.url);
 const stylesDirectory = dirname(currentFilePath);
 const srcDirectory = resolve(stylesDirectory, "..");
+const editorNodesDirectory = resolve(srcDirectory, "editor", "nodes");
 const mainSource = readFileSync(resolve(srcDirectory, "main.ts"), "utf8");
 const selectThemeSource = readFileSync(resolve(stylesDirectory, "toograph-select.css"), "utf8");
 
@@ -42,14 +43,25 @@ test("Vue files use themed Element Plus selects instead of native select dropdow
 
   for (const path of listVueFiles(srcDirectory)) {
     const source = readFileSync(path, "utf8");
+    const relativePath = path.replace(`${srcDirectory}/`, "");
     if (/<select(\s|>)/.test(source)) {
-      offenders.push(path.replace(`${srcDirectory}/`, ""));
+      offenders.push(relativePath);
     }
     if (/<ElSelect[\s\S]*?>/.test(source)) {
+      if (path.startsWith(`${editorNodesDirectory}/`)) {
+        offenders.push(`${relativePath}: raw ElSelect in editor node component`);
+        continue;
+      }
+      if (relativePath === "components/ToographSelect.vue") {
+        if (!/class="toograph-select"/.test(source) || !/const resolvedPopperClass = computed/.test(source)) {
+          offenders.push(`${relativePath}: shared select wrapper missing theme contract`);
+        }
+        continue;
+      }
       const selectBlocks = source.match(/<ElSelect[\s\S]*?>/g) ?? [];
       for (const block of selectBlocks) {
         if (!/class="[^"]*toograph-select/.test(block) || !/popper-class="[^"]*toograph-select-popper/.test(block)) {
-          offenders.push(`${path.replace(`${srcDirectory}/`, "")}: unthemed ElSelect`);
+          offenders.push(`${relativePath}: unthemed ElSelect`);
         }
       }
     }

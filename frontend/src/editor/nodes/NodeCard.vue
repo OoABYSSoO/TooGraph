@@ -221,6 +221,8 @@
             :create-title="portPickerTitle"
             :create-error="portStateError"
             :create-hint="t('nodeCard.createStateBindHint')"
+            :create-selection-value="portStateSelectionValue"
+            :create-existing-state-options="existingPortStateOptions"
             :state-editor-popover-style="stateEditorPopoverStyle"
             :create-popover-style="agentAddPopoverStyle"
             :state-editor-draft="stateEditorDraft"
@@ -240,6 +242,7 @@
             @update:color="handleStateEditorColorInput"
             @update:description="handleStateEditorDescriptionInput"
             @update:create-name="handlePortDraftNameValue"
+            @update:create-selection="handlePortStateSelectionValue"
             @update:create-type="handlePortDraftTypeSelect"
             @update:create-color="handlePortDraftColorSelect"
             @update:create-description="handlePortDraftDescriptionValue"
@@ -285,6 +288,8 @@
         :create-title="portPickerTitle"
         :create-error="portStateError"
         :create-hint="t('nodeCard.createStateBindHint')"
+        :create-selection-value="portStateSelectionValue"
+        :create-existing-state-options="existingPortStateOptions"
         :model-value="agentResolvedModelValue || undefined"
         :model-options="agentModelOptions"
         :global-model-ref="trimmedGlobalTextModelRef"
@@ -306,6 +311,7 @@
         @update:color="handleStateEditorColorInput"
         @update:description="handleStateEditorDescriptionInput"
         @open-create="openPortStateCreate"
+        @update:create-selection="handlePortStateSelectionValue"
         @update:create-name="handlePortDraftNameValue"
         @update:create-type="handlePortDraftTypeSelect"
         @update:create-color="handlePortDraftColorSelect"
@@ -382,6 +388,8 @@
         :create-title="portPickerTitle"
         :create-error="portStateError"
         :create-hint="t('nodeCard.createStateBindHint')"
+        :create-selection-value="portStateSelectionValue"
+        :create-existing-state-options="existingPortStateOptions"
         :model-value="batchDefaultResolvedModelValue || undefined"
         :model-options="agentModelOptions"
         :global-model-ref="trimmedGlobalTextModelRef"
@@ -400,6 +408,7 @@
         @port-click="handlePortStatePillClick"
         @remove-click="handleRemovePortStateClick"
         @open-create="openPortStateCreate"
+        @update:create-selection="handlePortStateSelectionValue"
         @update:name="handleStateEditorNameInput"
         @update:type="handleStateEditorTypeValue"
         @update:color="handleStateEditorColorInput"
@@ -438,6 +447,8 @@
             :create-title="portPickerTitle"
             :create-error="portStateError"
             :create-hint="t('nodeCard.createStateBindHint')"
+            :create-selection-value="portStateSelectionValue"
+            :create-existing-state-options="existingPortStateOptions"
             :state-editor-popover-style="stateEditorPopoverStyle"
             :create-popover-style="agentAddPopoverStyle"
             :state-editor-draft="stateEditorDraft"
@@ -457,6 +468,7 @@
             @update:color="handleStateEditorColorInput"
             @update:description="handleStateEditorDescriptionInput"
             @update:create-name="handlePortDraftNameValue"
+            @update:create-selection="handlePortStateSelectionValue"
             @update:create-type="handlePortDraftTypeSelect"
             @update:create-color="handlePortDraftColorSelect"
             @update:create-description="handlePortDraftDescriptionValue"
@@ -482,6 +494,8 @@
         :state-editor-draft="stateEditorDraft"
         :state-editor-error="stateEditorError"
         :port-state-draft="portStateDraft"
+        :port-state-selection-value="portStateSelectionValue"
+        :existing-state-options="existingPortStateOptions"
         :port-picker-title="portPickerTitle"
         :port-state-error="portStateError"
         :state-type-options="stateTypeOptions"
@@ -502,6 +516,7 @@
         @update:color="handleStateEditorColorInput"
         @update:description="handleStateEditorDescriptionInput"
         @update:create-name="handlePortDraftNameValue"
+        @update:create-selection="handlePortStateSelectionValue"
         @update:create-type="handlePortDraftTypeSelect"
         @update:create-color="handlePortDraftColorSelect"
         @update:create-description="handlePortDraftDescriptionValue"
@@ -624,6 +639,10 @@ import {
   updateStateEditorDraftType,
 } from "./stateEditorModel";
 import {
+  PORT_STATE_CREATE_NEW_VALUE,
+  buildStatePortExistingStateDraft,
+  buildStatePortExistingStateOptions,
+  createStateDraftFromSourceState,
   createStateDraftFromQuery,
   updateStatePortDraftColor,
   updateStatePortDraftDescription,
@@ -800,9 +819,12 @@ const batchWorkerTemplateOptions = computed(() =>
     description: template.description,
   })),
 );
+const existingPortStateOptions = computed(() => buildStatePortExistingStateOptions(props.stateSchema));
 const conditionRuleValueDraft = ref("");
 const activePortPickerSide = ref<"input" | "output" | null>(null);
+const portStateSelectionValue = ref(PORT_STATE_CREATE_NEW_VALUE);
 const portStateDraft = ref<StateFieldDraft | null>(null);
+const newPortStateDraftCache = ref<StateFieldDraft | null>(null);
 const portStateError = ref<string | null>(null);
 const agentNodeBodyRef = ref<{ collapseModelSelect?: () => void } | null>(null);
 const batchNodeBodyRef = ref<{ collapseModelSelect?: () => void } | null>(null);
@@ -1251,6 +1273,8 @@ function isLockedInteractiveTarget(target: EventTarget | null) {
         ".el-switch",
         ".el-select",
         ".el-input",
+        ".toograph-capsule-switch",
+        ".toograph-select-popper",
       ].join(", "),
     ),
   );
@@ -1463,12 +1487,52 @@ function openPortStateCreate(side: "input" | "output") {
   closeStateEditor();
   portStateError.value = null;
   activePortPickerSide.value = side;
-  portStateDraft.value = createStateDraftFromQuery("", Object.keys(props.stateSchema));
+  const nextDraft = createInitialPortStateDraft(side);
+  portStateSelectionValue.value = PORT_STATE_CREATE_NEW_VALUE;
+  newPortStateDraftCache.value = nextDraft;
+  portStateDraft.value = nextDraft;
+}
+
+function createInitialPortStateDraft(side: "input" | "output") {
+  const baseDraft = createStateDraftFromQuery("", Object.keys(props.stateSchema));
+  if (props.node.kind === "input" && side === "output") {
+    return createStateDraftFromSourceState(baseDraft, {
+      type: inputStateType.value,
+      value: inputStateValue.value,
+    });
+  }
+  return baseDraft;
 }
 
 function closePortPicker() {
   activePortPickerSide.value = null;
+  portStateSelectionValue.value = PORT_STATE_CREATE_NEW_VALUE;
   portStateDraft.value = null;
+  newPortStateDraftCache.value = null;
+  portStateError.value = null;
+}
+
+function handlePortStateSelectionValue(value: string | number | boolean | undefined) {
+  if (guardLockedGraphInteraction()) {
+    return;
+  }
+  const nextValue = String(value ?? PORT_STATE_CREATE_NEW_VALUE);
+  if (portStateSelectionValue.value === PORT_STATE_CREATE_NEW_VALUE && portStateDraft.value) {
+    newPortStateDraftCache.value = portStateDraft.value;
+  }
+  if (nextValue === PORT_STATE_CREATE_NEW_VALUE) {
+    portStateSelectionValue.value = PORT_STATE_CREATE_NEW_VALUE;
+    portStateDraft.value = newPortStateDraftCache.value ?? createStateDraftFromQuery("", Object.keys(props.stateSchema));
+    portStateError.value = null;
+    return;
+  }
+
+  const existingDraft = buildStatePortExistingStateDraft(nextValue, props.stateSchema);
+  if (!existingDraft) {
+    return;
+  }
+  portStateSelectionValue.value = nextValue;
+  portStateDraft.value = existingDraft;
   portStateError.value = null;
 }
 
@@ -1476,30 +1540,33 @@ function handlePortDraftNameValue(value: string | number) {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  if (!portStateDraft.value) {
+  if (!portStateDraft.value || portStateSelectionValue.value !== PORT_STATE_CREATE_NEW_VALUE) {
     return;
   }
   portStateDraft.value = updateStatePortDraftName(portStateDraft.value, value);
+  newPortStateDraftCache.value = portStateDraft.value;
 }
 
 function handlePortDraftTypeSelect(value: string | number | boolean | undefined) {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  if (!portStateDraft.value) {
+  if (!portStateDraft.value || portStateSelectionValue.value !== PORT_STATE_CREATE_NEW_VALUE) {
     return;
   }
   portStateDraft.value = updateStatePortDraftType(portStateDraft.value, value);
+  newPortStateDraftCache.value = portStateDraft.value;
 }
 
 function handlePortDraftDescriptionValue(value: string | number) {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  if (!portStateDraft.value) {
+  if (!portStateDraft.value || portStateSelectionValue.value !== PORT_STATE_CREATE_NEW_VALUE) {
     return;
   }
   portStateDraft.value = updateStatePortDraftDescription(portStateDraft.value, value);
+  newPortStateDraftCache.value = portStateDraft.value;
 }
 
 function handlePortDraftColorSelect(value: string | number | boolean | undefined) {
@@ -1513,20 +1580,22 @@ function updatePortDraftColor(color: string) {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  if (!portStateDraft.value) {
+  if (!portStateDraft.value || portStateSelectionValue.value !== PORT_STATE_CREATE_NEW_VALUE) {
     return;
   }
   portStateDraft.value = updateStatePortDraftColor(portStateDraft.value, color);
+  newPortStateDraftCache.value = portStateDraft.value;
 }
 
 function updatePortDraftValue(value: unknown) {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  if (!portStateDraft.value) {
+  if (!portStateDraft.value || portStateSelectionValue.value !== PORT_STATE_CREATE_NEW_VALUE) {
     return;
   }
   portStateDraft.value = updateStatePortDraftValue(portStateDraft.value, value);
+  newPortStateDraftCache.value = portStateDraft.value;
 }
 
 function commitPortStateCreate() {
@@ -1534,6 +1603,16 @@ function commitPortStateCreate() {
     return;
   }
   if (!activePortPickerSide.value || !portStateDraft.value) {
+    return;
+  }
+
+  if (portStateSelectionValue.value !== PORT_STATE_CREATE_NEW_VALUE) {
+    emit("bind-port-state", {
+      nodeId: props.nodeId,
+      side: activePortPickerSide.value,
+      stateKey: portStateSelectionValue.value,
+    });
+    closePortPicker();
     return;
   }
 

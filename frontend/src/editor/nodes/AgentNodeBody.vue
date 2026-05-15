@@ -25,6 +25,8 @@
         :create-title="createTitle"
         :create-error="createError"
         :create-hint="createHint"
+        :create-selection-value="createSelectionValue"
+        :create-existing-state-options="createExistingStateOptions"
         :create-type-options="typeOptions"
         :create-popover-style="agentAddPopoverStyle"
         @pointer-enter="emit('pointer-enter', $event)"
@@ -37,6 +39,7 @@
         @update:color="emit('update:color', $event)"
         @update:description="emit('update:description', $event)"
         @open-create="emit('open-create', $event)"
+        @update:create-selection="emit('update:create-selection', $event)"
         @update:create-name="emit('update:create-name', $event)"
         @update:create-type="emit('update:create-type', $event)"
         @update:create-color="emit('update:create-color', $event)"
@@ -71,6 +74,8 @@
         :create-title="createTitle"
         :create-error="createError"
         :create-hint="createHint"
+        :create-selection-value="createSelectionValue"
+        :create-existing-state-options="createExistingStateOptions"
         :create-type-options="typeOptions"
         :create-popover-style="agentAddPopoverStyle"
         @pointer-enter="emit('pointer-enter', $event)"
@@ -83,6 +88,7 @@
         @update:color="emit('update:color', $event)"
         @update:description="emit('update:description', $event)"
         @open-create="emit('open-create', $event)"
+        @update:create-selection="emit('update:create-selection', $event)"
         @update:create-name="emit('update:create-name', $event)"
         @update:create-type="emit('update:create-type', $event)"
         @update:create-color="emit('update:create-color', $event)"
@@ -175,6 +181,7 @@ import AgentRuntimeControls from "./AgentRuntimeControls.vue";
 import AgentSkillPicker from "./AgentSkillPicker.vue";
 import StatePortList from "./StatePortList.vue";
 import type { AgentThinkingControlMode } from "./agentConfigModel";
+import type { StatePortExistingStateOption } from "./statePortCreateModel";
 import type { NodeCardViewModel, NodePortViewModel } from "./nodeCardViewModel";
 import type { SkillDefinition } from "@/types/skills";
 import type { StateColorOption, StateFieldDraft, StateFieldType } from "@/editor/workspace/statePanelFields";
@@ -223,6 +230,8 @@ const props = defineProps<{
   createTitle: string;
   createError: string | null;
   createHint: string;
+  createSelectionValue: string;
+  createExistingStateOptions: StatePortExistingStateOption[];
   modelValue?: string;
   modelOptions: AgentModelOption[];
   globalModelRef: string;
@@ -247,6 +256,7 @@ const emit = defineEmits<{
   (event: "update:color", value: string): void;
   (event: "update:description", value: string): void;
   (event: "open-create", side: "input" | "output"): void;
+  (event: "update:create-selection", value: string): void;
   (event: "update:create-name", value: string | number): void;
   (event: "update:create-type", value: string | number | boolean | undefined): void;
   (event: "update:create-color", value: string | number | boolean | undefined): void;

@@ -53,7 +53,7 @@ test("BatchNodeBody exposes template workers and keeps failure policy in advance
   assert.doesNotMatch(batchNodeBodySource, /batchFailureContinue"\)/);
   assert.doesNotMatch(batchNodeBodySource, /active-text="Keep"/);
   assert.doesNotMatch(batchNodeBodySource, /inactive-text="Stop"/);
-  assert.match(statePortListSource, /<ElSwitch[\s\S]*class="node-card__port-pill-batch-switch"[\s\S]*v-if="shouldShowBatchModeSwitch\(port\)"[\s\S]*inline-prompt[\s\S]*:active-text="t\('nodeCard\.batchInputModeBatch'\)"[\s\S]*:inactive-text="t\('nodeCard\.batchInputModeShared'\)"/);
+  assert.match(statePortListSource, /<ToographCapsuleSwitch[\s\S]*class="node-card__port-pill-batch-switch"[\s\S]*v-if="shouldShowBatchModeSwitch\(port\)"[\s\S]*variant="blue"[\s\S]*:active-text="t\('nodeCard\.batchInputModeBatch'\)"[\s\S]*:inactive-text="t\('nodeCard\.batchInputModeShared'\)"/);
   assert.match(statePortListSource, /@update:model-value="emit\('update-batch-mode', port\.key, \$event \? 'batch' : 'shared'\)"/);
   assert.match(statePortListSource, /\.node-card__port-pill-batch-switch \{[\s\S]*--el-switch-on-color:\s*#3b82f6;/);
   assert.match(statePortListSource, /function shouldShowBatchModeSwitch\(port: NodePortViewModel\)/);
@@ -92,6 +92,17 @@ test("BatchNodeBody renders Default LLM mode through the LLM prompt and runtime 
   assert.match(batchNodeBodySource, /<AgentRuntimeControls[\s\S]*v-if="isDefaultWorker"[\s\S]*:model-value="modelValue"[\s\S]*:thinking-mode-value="thinkingModeValue"[\s\S]*@update:model-value="emit\('update:model-value', \$event\)"/);
   assert.match(batchNodeBodySource, /<div v-if="isDefaultWorker" class="node-card__surface node-card__prompt-surface">[\s\S]*<textarea[\s\S]*:value="body\.taskInstruction"[\s\S]*:placeholder="t\('nodeCard\.nodePromptPlaceholder'\)"[\s\S]*@input="emit\('task-input', \$event\)"/);
   assert.doesNotMatch(batchNodeBodySource, /<AgentSkillPicker/);
+});
+
+test("BatchNodeBody uses the shared select wrapper for worker selection", () => {
+  assert.match(batchNodeBodySource, /import ToographSelect from "@\/components\/ToographSelect\.vue";/);
+  assert.match(batchNodeBodySource, /import \{ computed, ref, type CSSProperties \} from "vue";/);
+  assert.match(batchNodeBodySource, /<ToographSelect[\s\S]*class="batch-node-body__worker-select"[\s\S]*:model-value="body\.workerValue"[\s\S]*remount-on-select[\s\S]*@update:model-value="emit\('update-worker', String\(\$event\)\)"/);
+  assert.doesNotMatch(batchNodeBodySource, /<ElSelect/);
+  assert.doesNotMatch(batchNodeBodySource, /workerSelectRef/);
+  assert.doesNotMatch(batchNodeBodySource, /workerSelectRenderKey/);
+  assert.doesNotMatch(batchNodeBodySource, /collapseWorkerSelect/);
+  assert.doesNotMatch(batchNodeBodySource, /batch-node-body__worker-popper/);
 });
 
 test("NodeCard renders output state pills with an integrated anchor slot", () => {
@@ -430,11 +441,11 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.match(agentRuntimeControlsSource, /class="node-card__agent-model-select-shell"/);
   assert.match(agentRuntimeControlsSource, /@pointerdown\.stop/);
   assert.match(agentRuntimeControlsSource, /@click\.stop/);
-  assert.match(agentRuntimeControlsSource, /<ElSelect/);
+  assert.match(agentRuntimeControlsSource, /<ToographSelect/);
   assert.match(agentRuntimeControlsSource, /ref="agentModelSelectRef"/);
-  assert.match(agentRuntimeControlsSource, /class="node-card__agent-model-select toograph-select"/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-model-select"/);
   assert.match(agentRuntimeControlsSource, /@visible-change="emit\('model-visible-change', \$event\)"/);
-  assert.match(agentRuntimeControlsSource, /popper-class="toograph-select-popper node-card__agent-model-popper"/);
+  assert.match(agentRuntimeControlsSource, /popper-class="node-card__agent-model-popper"/);
   assert.equal(
     [...agentRuntimeControlsSource.matchAll(/<ElPopover\s+trigger="hover"\s+placement="top-start"[\s\S]*?popper-class="node-card__agent-toggle-hint-popper"/g)]
       .length,
@@ -442,8 +453,8 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   );
   assert.match(agentRuntimeControlsSource, /class="node-card__agent-toggle-card node-card__agent-toggle-card--thinking"/);
   assert.match(agentRuntimeControlsSource, /class="node-card__agent-thinking-icon"/);
-  assert.match(agentRuntimeControlsSource, /<ElSelect/);
-  assert.match(agentRuntimeControlsSource, /class="node-card__agent-thinking-select toograph-select"/);
+  assert.match(agentRuntimeControlsSource, /<ToographSelect/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-thinking-select"/);
   assert.match(agentRuntimeControlsSource, /:model-value="thinkingModeValue"/);
   assert.match(agentRuntimeControlsSource, /v-for="option in thinkingOptions"/);
   assert.match(agentRuntimeControlsSource, /@update:model-value="emit\('update:thinking-mode', \$event\)"/);
@@ -522,7 +533,7 @@ test("NodeCard keeps agent model selection in the dropdown without rendering dup
 
   assert.match(agentSection, /<AgentNodeBody/);
   assert.match(agentNodeBodySource, /<AgentRuntimeControls/);
-  assert.match(agentRuntimeControlsSource, /class="node-card__agent-model-select toograph-select"/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-model-select"/);
   assert.match(agentRuntimeControlsSource, /v-for="option in modelOptions"/);
   assert.match(agentSection, /@update:model-value="handleAgentModelValueChange"/);
   assert.doesNotMatch(agentSection, /class="node-card__available-model-pills"/);
@@ -543,7 +554,7 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.match(agentNodeBodySource, /import AgentSkillPicker from "\.\/AgentSkillPicker\.vue";/);
   assert.match(agentNodeBodySource, /<AgentSkillPicker[\s\S]*:selected-skill-key="selectedSkillKey"[\s\S]*:available-skill-definitions="availableSkillDefinitions"[\s\S]*:breakpoint-enabled="breakpointEnabled"[\s\S]*@update:selected-skill="emit\('select-skill', \$event\)"[\s\S]*@update:breakpoint-enabled="emit\('update:breakpoint-enabled', \$event\)"/);
   assert.match(agentSection, /@select-skill="selectAgentSkill"/);
-  assert.match(agentSkillPickerSource, /<ElSelect[\s\S]*class="node-card__agent-skill-select toograph-select"[\s\S]*:model-value="selectedSkillKey"[\s\S]*popper-class="toograph-select-popper node-card__agent-skill-popper"/);
+  assert.match(agentSkillPickerSource, /<ToographSelect[\s\S]*class="node-card__agent-skill-select"[\s\S]*:model-value="selectedSkillKey"[\s\S]*popper-class="node-card__agent-skill-popper"/);
   assert.match(agentSkillPickerSource, /class="node-card__agent-toggle-card node-card__agent-toggle-card--breakpoint"/);
   assert.match(componentSource, /from "\.\/skillPickerModel";/);
   assert.match(componentSource, /resolveSelectAgentSkillPatch/);
@@ -565,7 +576,7 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.match(statePortListSource, /node-card__port-pill--create/);
   assert.match(agentSection, /pendingStateInputTarget\?\.label \?\? pendingStateInputSource\?\.label \?\? '\+ input'/);
   assert.match(agentSection, /pendingStateOutputTarget\?\.label \?\? '\+ output'/);
-  assert.match(createPopoverSource, /<ElSelect[\s\S]*class="node-card__control-select toograph-select"[\s\S]*popper-class="toograph-select-popper node-card__port-picker-select-popper"/);
+  assert.match(createPopoverSource, /<ToographSelect[\s\S]*class="node-card__control-select"[\s\S]*popper-class="node-card__port-picker-select-popper"/);
   assert.doesNotMatch(agentSection, /t\("nodeCard\.key"\)/);
   assert.doesNotMatch(agentSection, /portStateDraft\.key/);
   assert.doesNotMatch(agentSection, /class="node-card__port-state-key"/);
@@ -590,6 +601,27 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.doesNotMatch(agentSection, /<div v-if="activePortPickerSide" class="node-card__port-picker"/);
   assert.doesNotMatch(agentSection, /<div v-if="isSkillPickerOpen" class="node-card__skill-picker"/);
   assert.doesNotMatch(agentSection, /v-for="definition in availableSkillDefinitions"/);
+});
+
+test("NodeCard keeps new state drafts while the create popover switches to existing states", () => {
+  assert.match(componentSource, /const portStateSelectionValue = ref\(PORT_STATE_CREATE_NEW_VALUE\);/);
+  assert.match(componentSource, /const newPortStateDraftCache = ref<StateFieldDraft \| null>\(null\);/);
+  assert.match(componentSource, /const existingPortStateOptions = computed\(\(\) => buildStatePortExistingStateOptions\(props\.stateSchema\)\);/);
+  assert.match(componentSource, /function createInitialPortStateDraft\(side: "input" \| "output"\)/);
+  assert.match(componentSource, /if \(props\.node\.kind === "input" && side === "output"\) \{[\s\S]*return createStateDraftFromSourceState\(baseDraft, \{[\s\S]*type: inputStateType\.value,[\s\S]*value: inputStateValue\.value,[\s\S]*\}\);/);
+  assert.match(componentSource, /const nextDraft = createInitialPortStateDraft\(side\);/);
+  assert.match(componentSource, /function handlePortStateSelectionValue\(value: string \| number \| boolean \| undefined\)/);
+  assert.match(componentSource, /if \(portStateSelectionValue\.value === PORT_STATE_CREATE_NEW_VALUE && portStateDraft\.value\) \{[\s\S]*newPortStateDraftCache\.value = portStateDraft\.value;/);
+  assert.match(componentSource, /if \(nextValue === PORT_STATE_CREATE_NEW_VALUE\) \{[\s\S]*portStateDraft\.value = newPortStateDraftCache\.value \?\? createStateDraftFromQuery\("", Object\.keys\(props\.stateSchema\)\);/);
+  assert.match(componentSource, /const existingDraft = buildStatePortExistingStateDraft\(nextValue, props\.stateSchema\);/);
+  assert.match(componentSource, /portStateSelectionValue\.value = nextValue;/);
+  assert.match(componentSource, /portStateDraft\.value = existingDraft;/);
+  assert.match(componentSource, /if \(portStateSelectionValue\.value !== PORT_STATE_CREATE_NEW_VALUE\) \{[\s\S]*emit\("bind-port-state", \{[\s\S]*stateKey: portStateSelectionValue\.value,/);
+  assert.match(componentSource, /@update:create-selection="handlePortStateSelectionValue"/);
+  assert.match(agentNodeBodySource, /:create-selection-value="createSelectionValue"/);
+  assert.match(statePortListSource, /:selection-value="createSelectionValue"/);
+  assert.match(primaryStatePortSource, /:selection-value="createSelectionValue"/);
+  assert.match(conditionNodeBodySource, /:selection-value="portStateSelectionValue"/);
 });
 
 test("NodeCard renders plus input and plus output as virtual agent state port rows", () => {
@@ -1315,7 +1347,7 @@ test("NodeCard delegates output preview presentation while keeping Advanced in t
   assert.match(componentSource, /view\.body\.kind === 'output' \? 340 : view\.body\.kind === 'batch' \? 320 : 280/);
 });
 
-test("NodeCard uses an Element Plus switch card for output persistence like the agent thinking control", () => {
+test("NodeCard uses a shared capsule switch card for output persistence like the agent controls", () => {
   const outputSectionMatch = componentSource.match(
     /<section v-else-if="view\.body\.kind === 'output'"[\s\S]*?<\/section>/,
   );
@@ -1329,14 +1361,14 @@ test("NodeCard uses an Element Plus switch card for output persistence like the 
   assert.match(outputNodeBodySource, /class="node-card__output-persist-card"/);
   assert.match(outputNodeBodySource, /class="node-card__output-persist-icon"/);
   assert.match(outputNodeBodySource, /<DocumentChecked \/>/);
-  assert.match(outputNodeBodySource, /<ElSwitch/);
+  assert.match(outputNodeBodySource, /<ToographCapsuleSwitch/);
   assert.match(outputNodeBodySource, /class="node-card__output-persist-switch"/);
   assert.match(outputNodeBodySource, /:model-value="body\.persistEnabled"/);
   assert.match(outputNodeBodySource, /:width="56"/);
-  assert.match(outputNodeBodySource, /inline-prompt/);
   assert.match(outputNodeBodySource, /active-text="ON"/);
   assert.match(outputNodeBodySource, /inactive-text="OFF"/);
   assert.match(outputNodeBodySource, /@update:model-value="emit\('update:persist-enabled', \$event\)"/);
+  assert.doesNotMatch(outputNodeBodySource, /<ElSwitch/);
   assert.doesNotMatch(outputSection, /node-card__persist-button/);
   assert.doesNotMatch(outputSection, /node-card__toggle/);
   assert.match(componentSource, /function handleOutputPersistToggle\(value: string \| number \| boolean\)/);
@@ -1344,7 +1376,6 @@ test("NodeCard uses an Element Plus switch card for output persistence like the 
   assert.match(outputNodeBodySource, /\.node-card__output-persist-card \{[\s\S]*min-height:\s*48px;/);
   assert.match(outputNodeBodySource, /\.node-card__output-persist-card \{[\s\S]*border-radius:\s*16px;/);
   assert.match(outputNodeBodySource, /\.node-card__output-persist-card \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.88\);/);
-  assert.match(outputNodeBodySource, /\.node-card__output-persist-switch \{[\s\S]*--el-switch-on-color:\s*#c96b1f;/);
 });
 
 test("NodeCard closes floating panels on focus loss and keeps popup surfaces on the warm theme", () => {
@@ -1363,7 +1394,8 @@ test("NodeCard closes floating panels on focus loss and keeps popup surfaces on 
   assert.match(floatingPanelsComposableSource, /options\.closeFloatingPanels\(\{ commitTextEditor: false \}\);/);
   assert.match(componentSource, /data-node-popup-surface="true"/);
   assert.match(componentSource, /\.node-card__text-editor-popper/);
-  assert.match(agentSkillPickerSource, /popper-class="toograph-select-popper node-card__agent-skill-popper"/);
+  assert.match(agentSkillPickerSource, /popper-class="node-card__agent-skill-popper"/);
+  assert.match(floatingPanelsComposableSource, /"\.toograph-select-popper"/);
   assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);
   assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
   assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*box-shadow:\s*0 16px 34px rgba\(60,\s*41,\s*20,\s*0\.12\);/);

@@ -21,6 +21,7 @@ const {
   updateAgentNodeConfigInDocument,
   updateAgentBreakpointInDocument,
   connectStateBindingInDocument,
+  updateBatchNodeDefaultWorkerInDocument,
   updateBatchNodeSubgraphWorkerInDocument,
   updateSubgraphNodeGraphInDocument,
 } = graphDocument;
@@ -524,6 +525,220 @@ test("updateBatchNodeSubgraphWorkerInDocument lists template worker boundaries a
   assert.equal(nextNode.kind === "batch" ? nextNode.config.inputModes.state_2 : "", "shared");
   assert.equal(nextDocument.state_schema.state_1.name, "Segment");
   assert.equal(nextDocument.state_schema.state_3.name, "Report");
+});
+
+test("batch worker switching restores edited Default LLM boundary state after using a template", () => {
+  const document: GraphPayload = {
+    name: "Batch Switch Draft",
+    state_schema: {
+      default_input: {
+        name: "Default Input",
+        description: "Default LLM input.",
+        type: "text",
+        value: "原始输入",
+        color: "#0f766e",
+      },
+      default_output: {
+        name: "Default Output",
+        description: "Default LLM output.",
+        type: "text",
+        value: "",
+        color: "#4f46e5",
+      },
+    },
+    nodes: {
+      batch_segments: {
+        kind: "batch",
+        name: "Batch",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "default_input", required: true }],
+        writes: [{ state: "default_output", mode: "replace" }],
+        config: {
+          workerSource: "default_llm",
+          inputModes: {
+            default_input: "batch",
+          },
+          maxConcurrency: 4,
+          retryCount: 3,
+          continueOnError: true,
+          defaultWorker: {
+            skillKey: "",
+            taskInstruction: "用户编辑过的 Default LLM prompt",
+            modelSource: "override",
+            model: "local/custom",
+            thinkingMode: "xhigh",
+            temperature: 0.2,
+          },
+          subgraphWorker: null,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+  const segmentTemplate: TemplateRecord = {
+    template_id: "segment_analyzer",
+    label: "Segment Analyzer",
+    description: "",
+    default_graph_name: "Segment Analyzer",
+    source: "user",
+    state_schema: {
+      template_input_a: { name: "Template Input A", description: "", type: "json", value: [], color: "#0891b2" },
+      template_input_b: { name: "Template Input B", description: "", type: "text", value: "", color: "#d97706" },
+      template_output: { name: "Template Output", description: "", type: "json", value: [], color: "#4f46e5" },
+    },
+    nodes: {
+      template_a: {
+        kind: "input",
+        name: "Template Input A",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "template_input_a", mode: "replace" }],
+        config: { value: "", boundaryType: "file" },
+      },
+      template_b: {
+        kind: "input",
+        name: "Template Input B",
+        description: "",
+        ui: { position: { x: 0, y: 120 } },
+        reads: [],
+        writes: [{ state: "template_input_b", mode: "replace" }],
+        config: { value: "", boundaryType: "text" },
+      },
+      template_output: {
+        kind: "output",
+        name: "Template Output",
+        description: "",
+        ui: { position: { x: 400, y: 0 } },
+        reads: [{ state: "template_output", required: true }],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const templateDocument = updateBatchNodeSubgraphWorkerInDocument(document, "batch_segments", segmentTemplate);
+  const templateNode = templateDocument.nodes.batch_segments;
+
+  assert.equal(templateNode.kind, "batch");
+  assert.equal(templateNode.kind === "batch" ? templateNode.config.workerSource : "", "subgraph");
+  assert.deepEqual(templateNode.kind === "batch" ? templateNode.reads.map((binding) => binding.state) : [], [
+    "default_input",
+    "state_1",
+  ]);
+  assert.deepEqual(templateNode.kind === "batch" ? templateNode.writes.map((binding) => binding.state) : [], ["default_output"]);
+  assert.equal(templateDocument.state_schema.default_input.name, "Template Input A");
+  assert.equal(templateDocument.state_schema.default_output.name, "Template Output");
+
+  const restoredDocument = updateBatchNodeDefaultWorkerInDocument(templateDocument, "batch_segments");
+  const restoredNode = restoredDocument.nodes.batch_segments;
+
+  assert.equal(restoredNode.kind, "batch");
+  assert.equal(restoredNode.kind === "batch" ? restoredNode.config.workerSource : "", "default_llm");
+  assert.deepEqual(restoredNode.kind === "batch" ? restoredNode.reads : [], [{ state: "default_input", required: true }]);
+  assert.deepEqual(restoredNode.kind === "batch" ? restoredNode.writes : [], [{ state: "default_output", mode: "replace" }]);
+  assert.deepEqual(restoredNode.kind === "batch" ? restoredNode.config.inputModes : {}, { default_input: "batch" });
+  assert.equal(restoredNode.kind === "batch" ? restoredNode.config.defaultWorker.taskInstruction : "", "用户编辑过的 Default LLM prompt");
+  assert.equal(restoredNode.kind === "batch" ? restoredNode.config.defaultWorker.model : "", "local/custom");
+  assert.equal(restoredNode.kind === "batch" ? restoredNode.config.defaultWorker.thinkingMode : "", "xhigh");
+  assert.equal(restoredDocument.state_schema.default_input.name, "Default Input");
+  assert.equal(restoredDocument.state_schema.default_output.name, "Default Output");
+});
+
+test("batch worker switching restores an initially empty Default LLM boundary", () => {
+  const document: GraphPayload = {
+    name: "Empty Batch Switch Draft",
+    state_schema: {},
+    nodes: {
+      batch_segments: {
+        kind: "batch",
+        name: "Batch",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          workerSource: "default_llm",
+          inputModes: {},
+          maxConcurrency: 4,
+          retryCount: 3,
+          continueOnError: true,
+          defaultWorker: {
+            skillKey: "",
+            taskInstruction: "",
+            modelSource: "global",
+            model: "",
+            thinkingMode: "high",
+            temperature: 0.2,
+          },
+          subgraphWorker: null,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+  const template: TemplateRecord = {
+    template_id: "single_template",
+    label: "Single Template",
+    description: "",
+    default_graph_name: "Single Template",
+    source: "official",
+    state_schema: {
+      template_input: { name: "Template Input", description: "", type: "text", value: "", color: "#0891b2" },
+      template_output: { name: "Template Output", description: "", type: "text", value: "", color: "#4f46e5" },
+    },
+    nodes: {
+      template_input: {
+        kind: "input",
+        name: "Template Input",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "template_input", mode: "replace" }],
+        config: { value: "", boundaryType: "text" },
+      },
+      template_output: {
+        kind: "output",
+        name: "Template Output",
+        description: "",
+        ui: { position: { x: 400, y: 0 } },
+        reads: [{ state: "template_output", required: true }],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const templateDocument = updateBatchNodeSubgraphWorkerInDocument(document, "batch_segments", template);
+  const restoredDocument = updateBatchNodeDefaultWorkerInDocument(templateDocument, "batch_segments");
+  const restoredNode = restoredDocument.nodes.batch_segments;
+
+  assert.equal(restoredNode.kind, "batch");
+  assert.equal(restoredNode.kind === "batch" ? restoredNode.config.workerSource : "", "default_llm");
+  assert.deepEqual(restoredNode.kind === "batch" ? restoredNode.reads : [], []);
+  assert.deepEqual(restoredNode.kind === "batch" ? restoredNode.writes : [], []);
+  assert.deepEqual(restoredNode.kind === "batch" ? restoredNode.config.inputModes : {}, {});
 });
 
 test("createDraftFromTemplate accepts Vue reactive template records", () => {

@@ -10,30 +10,26 @@
 
       <div class="node-state-editor__field">
         <span class="node-state-editor__field-label">{{ t("nodeCard.type") }}</span>
-        <ElSelect
-          ref="typeSelectRef"
-          class="node-state-editor__type-select toograph-select"
+        <ToographSelect
+          class="node-state-editor__type-select"
           :aria-label="t('nodeCard.type')"
           :model-value="draft.definition.type"
-          :teleported="false"
-          popper-class="toograph-select-popper node-state-editor__select-popper"
-          @update:model-value="handleTypeSelect"
+          popper-class="node-state-editor__select-popper"
+          @update:model-value="emit('update:type', String($event ?? 'text'))"
         >
           <ElOption v-for="typeOption in typeOptions" :key="typeOption" :label="typeOption" :value="typeOption" />
-        </ElSelect>
+        </ToographSelect>
       </div>
 
       <div class="node-state-editor__field">
         <span class="node-state-editor__field-label">{{ t("nodeCard.color") }}</span>
         <div class="node-state-editor__color-select-shell">
-          <ElSelect
-            ref="colorSelectRef"
-            class="node-state-editor__color-select toograph-select"
+          <ToographSelect
+            class="node-state-editor__color-select"
             :aria-label="t('nodeCard.color')"
             :model-value="draft.definition.color"
-            :teleported="false"
-            popper-class="toograph-select-popper node-state-editor__select-popper"
-            @update:model-value="handleColorSelect"
+            popper-class="node-state-editor__select-popper"
+            @update:model-value="emit('update:color', String($event ?? ''))"
           >
             <template #label>
               <span class="node-state-editor__color-select-value">
@@ -46,7 +42,7 @@
                 <span class="node-state-editor__color-option-label">{{ option.label }}</span>
               </div>
             </ElOption>
-          </ElSelect>
+          </ToographSelect>
         </div>
       </div>
     </div>
@@ -67,10 +63,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
-import { ElInput, ElOption, ElSelect } from "element-plus";
+import { computed } from "vue";
+import { ElInput, ElOption } from "element-plus";
 import { useI18n } from "vue-i18n";
 
+import ToographSelect from "@/components/ToographSelect.vue";
 import type { StateColorOption, StateFieldDraft, StateFieldType } from "@/editor/workspace/statePanelFields";
 
 const props = defineProps<{
@@ -88,8 +85,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const typeSelectRef = ref<{ blur?: () => void; toggleMenu?: () => void; expanded?: boolean } | null>(null);
-const colorSelectRef = ref<{ blur?: () => void; toggleMenu?: () => void; expanded?: boolean } | null>(null);
 
 const selectedColorStyle = computed(() => {
   const matched = props.colorOptions.find((option) => option.value === props.draft.definition.color);
@@ -98,24 +93,6 @@ const selectedColorStyle = computed(() => {
     backgroundColor: selectedSwatch,
   };
 });
-
-async function collapseSelectMenu(selectRef: typeof typeSelectRef) {
-  await nextTick();
-  if (selectRef.value?.expanded) {
-    selectRef.value.toggleMenu?.();
-  }
-  selectRef.value?.blur?.();
-}
-
-async function handleTypeSelect(value: string | number | boolean | undefined) {
-  emit("update:type", String(value ?? "text"));
-  await collapseSelectMenu(typeSelectRef);
-}
-
-async function handleColorSelect(value: string | number | boolean | undefined) {
-  emit("update:color", String(value ?? ""));
-  await collapseSelectMenu(colorSelectRef);
-}
 </script>
 
 <style scoped>

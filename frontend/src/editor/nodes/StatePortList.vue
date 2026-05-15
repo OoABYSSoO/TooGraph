@@ -101,17 +101,15 @@
             >
               <Connection />
             </ElIcon>
-            <ElSwitch
+            <ToographCapsuleSwitch
               class="node-card__port-pill-batch-switch"
               v-if="shouldShowBatchModeSwitch(port)"
               :model-value="port.batchMode === 'batch'"
               :width="64"
-              inline-prompt
+              variant="blue"
               :active-text="t('nodeCard.batchInputModeBatch')"
               :inactive-text="t('nodeCard.batchInputModeShared')"
               :aria-label="`${port.label} ${t('nodeCard.batchInputModeBatch')}`"
-              @pointerdown.stop
-              @click.stop
               @update:model-value="emit('update-batch-mode', port.key, $event ? 'batch' : 'shared')"
             />
             <button
@@ -226,7 +224,10 @@
       :error="createError"
       :hint="createHint"
       :type-options="createTypeOptions"
+      :selection-value="createSelectionValue"
+      :existing-state-options="createExistingStateOptions"
       :virtual-affordance-base-id="createPortVirtualAffordanceId"
+      @update:selection="emit('update:create-selection', $event)"
       @update:name="emit('update:create-name', $event)"
       @update:type="emit('update:create-type', $event)"
       @update:color="emit('update:create-color', $event)"
@@ -240,16 +241,18 @@
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
-import { ElIcon, ElPopover, ElSwitch } from "element-plus";
+import { ElIcon, ElPopover } from "element-plus";
 import { Check, Connection, Delete } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
+import ToographCapsuleSwitch from "@/components/ToographCapsuleSwitch.vue";
 import StateEditorPopover from "./StateEditorPopover.vue";
 import StatePortCreatePopover from "./StatePortCreatePopover.vue";
+import { PORT_STATE_CREATE_NEW_VALUE, type StatePortExistingStateOption } from "./statePortCreateModel";
 import type { NodePortViewModel } from "./nodeCardViewModel";
 import type { StateColorOption, StateFieldDraft, StateFieldType } from "@/editor/workspace/statePanelFields";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   side: "input" | "output";
   ports: NodePortViewModel[];
   nodeId: string;
@@ -263,6 +266,8 @@ const props = defineProps<{
   createTitle: string;
   createError: string | null;
   createHint: string;
+  createSelectionValue?: string;
+  createExistingStateOptions?: StatePortExistingStateOption[];
   createTypeOptions: string[];
   createPopoverStyle: CSSProperties;
   stateEditorDraft: StateFieldDraft | null;
@@ -275,7 +280,10 @@ const props = defineProps<{
   isStateEditorPillRevealed: (anchorId: string) => boolean;
   isPortReordering: (side: "input" | "output", stateKey: string) => boolean;
   isPortReorderPlaceholder: (side: "input" | "output", stateKey: string) => boolean;
-}>();
+}>(), {
+  createSelectionValue: PORT_STATE_CREATE_NEW_VALUE,
+  createExistingStateOptions: () => [],
+});
 
 const emit = defineEmits<{
   (event: "pointer-enter", anchorId: string): void;
@@ -289,6 +297,7 @@ const emit = defineEmits<{
   (event: "update:description", value: string): void;
   (event: "open-create", side: "input" | "output"): void;
   (event: "update-batch-mode", stateKey: string, mode: "shared" | "batch"): void;
+  (event: "update:create-selection", value: string): void;
   (event: "update:create-name", value: string | number): void;
   (event: "update:create-type", value: string | number | boolean | undefined): void;
   (event: "update:create-color", value: string | number | boolean | undefined): void;

@@ -104,6 +104,14 @@ export type BatchSubgraphWorker = {
   label?: string;
 };
 
+export type BatchDefaultWorkerSnapshot = {
+  defaultWorker: AgentNode["config"];
+  reads: ReadBinding[];
+  writes: WriteBinding[];
+  inputModes: Record<string, BatchInputMode>;
+  stateSchema: Record<string, StateDefinition>;
+};
+
 export type BatchNode = {
   kind: "batch";
   name: string;
@@ -118,6 +126,7 @@ export type BatchNode = {
     retryCount: number;
     continueOnError: boolean;
     defaultWorker: AgentNode["config"];
+    defaultWorkerSnapshot?: BatchDefaultWorkerSnapshot | null;
     subgraphWorker?: BatchSubgraphWorker | null;
   };
 };

@@ -1,13 +1,13 @@
 <template>
   <div class="node-card__agent-runtime-row">
     <div class="node-card__agent-model-select-shell" @pointerdown.stop @click.stop>
-      <ElSelect
+      <ToographSelect
         ref="agentModelSelectRef"
-        class="node-card__agent-model-select toograph-select"
+        class="node-card__agent-model-select"
         :model-value="modelValue"
         :placeholder="modelOptions.length === 0 ? t('nodeCard.noConfiguredModels') : t('nodeCard.selectModel')"
         :disabled="modelOptions.length === 0"
-        popper-class="toograph-select-popper node-card__agent-model-popper"
+        popper-class="node-card__agent-model-popper"
         @visible-change="emit('model-visible-change', $event)"
         @update:model-value="emit('update:model-value', $event)"
       >
@@ -17,7 +17,7 @@
           :label="option.label"
           :value="option.value"
         />
-      </ElSelect>
+      </ToographSelect>
     </div>
     <ElPopover
       trigger="hover"
@@ -40,18 +40,15 @@
           >
             <Opportunity />
           </span>
-          <ElSelect
-            class="node-card__agent-thinking-select toograph-select"
+          <ToographSelect
+            class="node-card__agent-thinking-select"
             :model-value="thinkingModeValue"
-            :teleported="false"
-            popper-class="toograph-select-popper node-card__agent-thinking-popper"
+            popper-class="node-card__agent-thinking-popper"
             :aria-label="t('nodeCard.toggleThinking')"
-            @pointerdown.stop
-            @click.stop
             @update:model-value="emit('update:thinking-mode', $event)"
           >
             <ElOption v-for="option in thinkingOptions" :key="option.value" :label="option.label" :value="option.value" />
-          </ElSelect>
+          </ToographSelect>
         </div>
       </template>
       <div class="node-card__confirm-hint node-card__confirm-hint--toggle">{{ t("nodeCard.thinkingMode") }}</div>
@@ -62,10 +59,11 @@
 <script setup lang="ts">
 import type { CSSProperties } from "vue";
 import { ref } from "vue";
-import { ElOption, ElPopover, ElSelect } from "element-plus";
+import { ElOption, ElPopover } from "element-plus";
 import { Opportunity } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
+import ToographSelect from "@/components/ToographSelect.vue";
 import type { AgentThinkingControlMode } from "./agentConfigModel";
 
 type AgentModelOption = {
@@ -95,13 +93,10 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const agentModelSelectRef = ref<{ blur?: () => void; toggleMenu?: () => void; expanded?: boolean } | null>(null);
+const agentModelSelectRef = ref<{ collapseSelect?: () => void } | null>(null);
 
 function collapseModelSelect() {
-  if (agentModelSelectRef.value?.expanded) {
-    agentModelSelectRef.value.toggleMenu?.();
-  }
-  agentModelSelectRef.value?.blur?.();
+  agentModelSelectRef.value?.collapseSelect?.();
 }
 
 defineExpose({

@@ -16,7 +16,9 @@ test("OutputNodeBody owns output presentation and forwards parent side effects",
   assert.match(componentSource, /<div class="node-card__output-toolbar">/);
   assert.match(componentSource, /<slot name="primary-input" \/>/);
   assert.match(componentSource, /class="node-card__output-persist-card"[\s\S]*class="node-card__output-persist-icon"[\s\S]*:class="\{ 'node-card__output-persist-icon--enabled': body\.persistEnabled \}"[\s\S]*<DocumentChecked \/>/);
-  assert.match(componentSource, /<ElSwitch[\s\S]*class="node-card__output-persist-switch"[\s\S]*:model-value="body\.persistEnabled"[\s\S]*:width="56"[\s\S]*inline-prompt[\s\S]*active-text="ON"[\s\S]*inactive-text="OFF"[\s\S]*@update:model-value="emit\('update:persist-enabled', \$event\)"/);
+  assert.match(componentSource, /import ToographCapsuleSwitch from "@\/components\/ToographCapsuleSwitch\.vue";/);
+  assert.match(componentSource, /<ToographCapsuleSwitch[\s\S]*class="node-card__output-persist-switch"[\s\S]*:model-value="body\.persistEnabled"[\s\S]*:width="56"[\s\S]*active-text="ON"[\s\S]*inactive-text="OFF"[\s\S]*@update:model-value="emit\('update:persist-enabled', \$event\)"/);
+  assert.doesNotMatch(componentSource, /<ElSwitch/);
   assert.match(componentSource, /<div class="node-card__surface node-card__surface--output">/);
   assert.match(componentSource, /\{\{ body\.previewTitle\.toUpperCase\(\) \}\}/);
   assert.match(componentSource, /\{\{ body\.displayModeLabel \}\}/);

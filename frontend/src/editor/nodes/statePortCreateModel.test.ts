@@ -2,6 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildStatePortExistingStateDraft,
+  buildStatePortExistingStateOptions,
+  createStateDraftFromSourceState,
   createStateDraftFromQuery,
   matchesStatePortSearch,
   updateStatePortDraftColor,
@@ -132,4 +135,76 @@ test("state port draft value helper preserves the rest of the draft", () => {
   assert.equal(updated.key, draft.key);
   assert.equal(updated.definition.name, draft.definition.name);
   assert.deepEqual(updated.definition.value, { answer: "yes" });
+});
+
+test("state port existing state options show state keys alongside names", () => {
+  const options = buildStatePortExistingStateOptions({
+    state_1: {
+      name: "User Question",
+      description: "",
+      type: "text",
+      value: "",
+      color: "#d97706",
+    },
+    final_answer: {
+      name: "",
+      description: "",
+      type: "markdown",
+      value: "",
+      color: "#2563eb",
+    },
+  });
+
+  assert.deepEqual(options, [
+    {
+      value: "state_1",
+      key: "state_1",
+      name: "User Question",
+      label: "state_1 · User Question",
+      type: "text",
+    },
+    {
+      value: "final_answer",
+      key: "final_answer",
+      name: "final_answer",
+      label: "final_answer · final_answer",
+      type: "markdown",
+    },
+  ]);
+});
+
+test("state port existing state draft clones the selected state definition", () => {
+  const stateSchema = {
+    state_1: {
+      name: "User Question",
+      description: "Question from the user.",
+      type: "text",
+      value: "What happened?",
+      color: "#d97706",
+    },
+  } as const;
+
+  const draft = buildStatePortExistingStateDraft("state_1", stateSchema);
+
+  assert.deepEqual(draft, {
+    key: "state_1",
+    definition: stateSchema.state_1,
+  });
+  assert.notEqual(draft?.definition, stateSchema.state_1);
+  assert.equal(buildStatePortExistingStateDraft("missing", stateSchema), null);
+});
+
+test("state port draft can inherit the current input boundary value when creating a bound output state", () => {
+  const draft = createStateDraftFromSourceState(
+    createStateDraftFromQuery("Question", ["state_1"]),
+    {
+      type: "text",
+      value: "用户刚刚输入的草稿",
+    },
+  );
+
+  assert.equal(draft.key, "state_2");
+  assert.equal(draft.definition.name, "Question");
+  assert.equal(draft.definition.type, "text");
+  assert.equal(draft.definition.value, "用户刚刚输入的草稿");
 });

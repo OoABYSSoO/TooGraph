@@ -23,8 +23,10 @@ test("StatePortList owns agent real state port rows and emits parent side effect
   assert.match(componentSource, /@pointerdown\.stop="handlePortPointerDown\(port, \$event\)"/);
   assert.match(componentSource, /@click\.stop="handlePortClick\(port\)"/);
   assert.match(componentSource, /@click\.stop="emit\('remove-click', anchorId\(port\.key\), side, port\.key\)"/);
-  assert.match(componentSource, /<ElSwitch[\s\S]*class="node-card__port-pill-batch-switch"[\s\S]*v-if="shouldShowBatchModeSwitch\(port\)"/);
+  assert.match(componentSource, /import ToographCapsuleSwitch from "@\/components\/ToographCapsuleSwitch\.vue";/);
+  assert.match(componentSource, /<ToographCapsuleSwitch[\s\S]*class="node-card__port-pill-batch-switch"[\s\S]*v-if="shouldShowBatchModeSwitch\(port\)"[\s\S]*variant="blue"/);
   assert.match(componentSource, /@update:model-value="emit\('update-batch-mode', port\.key, \$event \? 'batch' : 'shared'\)"/);
+  assert.doesNotMatch(componentSource, /<ElSwitch/);
   assert.match(componentSource, /\(event: "update-batch-mode", stateKey: string, mode: "shared" \| "batch"\): void;/);
   assert.match(componentSource, /function shouldShowBatchModeSwitch\(port: NodePortViewModel\)/);
   assert.match(componentSource, /v-if="isLeadingManagedIcon\(port\)"/);

@@ -10,16 +10,13 @@
         >
           <DocumentChecked />
         </span>
-        <ElSwitch
+        <ToographCapsuleSwitch
           class="node-card__output-persist-switch"
           :model-value="body.persistEnabled"
           :width="56"
-          inline-prompt
           active-text="ON"
           inactive-text="OFF"
           :aria-label="t('nodeCard.toggleOutputPersistence')"
-          @pointerdown.stop
-          @click.stop
           @update:model-value="emit('update:persist-enabled', $event)"
         />
       </div>
@@ -116,11 +113,11 @@
 </template>
 
 <script setup lang="ts">
-import { ElSwitch } from "element-plus";
 import { DocumentChecked } from "@element-plus/icons-vue";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import ToographCapsuleSwitch from "@/components/ToographCapsuleSwitch.vue";
 import type { NodeCardViewModel } from "./nodeCardViewModel";
 import SandboxedHtmlFrame from "@/components/SandboxedHtmlFrame.vue";
 import OutputDocumentPager from "./OutputDocumentPager.vue";

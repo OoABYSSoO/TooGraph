@@ -2,14 +2,14 @@
   <div class="node-card__agent-capability-stack">
     <div class="node-card__agent-capability-row">
       <div class="node-card__agent-skill-select-shell" @pointerdown.stop @click.stop>
-        <ElSelect
-          class="node-card__agent-skill-select toograph-select"
+        <ToographSelect
+          class="node-card__agent-skill-select"
           :class="{ 'node-card__agent-skill-select--empty': isSkillEmpty }"
           :model-value="selectedSkillKey"
           :placeholder="skillPlaceholder"
           :disabled="skillSelectDisabled"
           filterable
-          popper-class="toograph-select-popper node-card__agent-skill-popper"
+          popper-class="node-card__agent-skill-popper"
           :aria-label="t('nodeCard.selectSkill')"
           @update:model-value="emit('update:selected-skill', String($event ?? ''))"
         >
@@ -26,7 +26,7 @@
             :label="definition.name"
             :value="definition.skillKey"
           />
-        </ElSelect>
+        </ToographSelect>
       </div>
       <ElPopover
         trigger="hover"
@@ -48,16 +48,13 @@
             >
               <Flag />
             </ElIcon>
-            <ElSwitch
+            <ToographCapsuleSwitch
               class="node-card__agent-toggle-switch node-card__agent-breakpoint-switch"
               :model-value="breakpointEnabled"
               :width="56"
-              inline-prompt
               active-text="ON"
               inactive-text="OFF"
               :aria-label="t('nodeCard.toggleBreakpoint')"
-              @pointerdown.stop
-              @click.stop
               @update:model-value="emit('update:breakpoint-enabled', $event)"
             />
           </div>
@@ -77,10 +74,12 @@
 <script setup lang="ts">
 import type { CSSProperties } from "vue";
 import { computed } from "vue";
-import { ElIcon, ElOption, ElPopover, ElSelect, ElSwitch } from "element-plus";
+import { ElIcon, ElOption, ElPopover } from "element-plus";
 import { Flag } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
+import ToographCapsuleSwitch from "@/components/ToographCapsuleSwitch.vue";
+import ToographSelect from "@/components/ToographSelect.vue";
 import type { SkillDefinition } from "@/types/skills";
 
 const props = defineProps<{

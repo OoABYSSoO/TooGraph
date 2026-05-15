@@ -17,7 +17,9 @@ test("InputNodeBody owns input presentation and forwards parent side effects", (
   assert.match(componentSource, /<ElSegmented[\s\S]*class="node-card__input-boundary-toggle"[\s\S]*:model-value="inputBoundarySelection"[\s\S]*:options="inputTypeOptions"[\s\S]*@update:model-value="emit\('update:boundary-selection', \$event\)"/);
   assert.doesNotMatch(componentSource, /:disabled="Boolean\(inputAssetEnvelope\)"/);
   assert.match(componentSource, /<slot name="primary-output" \/>/);
-  assert.match(componentSource, /v-if="showKnowledgeBaseInput"[\s\S]*class="node-card__surface node-card__input-picker"[\s\S]*<ElSelect[\s\S]*:model-value="inputKnowledgeBaseValue \|\| undefined"[\s\S]*@update:model-value="emit\('update:knowledge-base', \$event\)"/);
+  assert.match(componentSource, /import ToographSelect from "@\/components\/ToographSelect\.vue";/);
+  assert.match(componentSource, /v-if="showKnowledgeBaseInput"[\s\S]*class="node-card__surface node-card__input-picker"[\s\S]*<ToographSelect[\s\S]*:model-value="inputKnowledgeBaseValue \|\| undefined"[\s\S]*@update:model-value="emit\('update:knowledge-base', \$event\)"/);
+  assert.doesNotMatch(componentSource, /<ElSelect/);
   assert.match(componentSource, /<ElOption v-for="option in inputKnowledgeBaseOptions"/);
   assert.match(componentSource, /v-else-if="showLocalFolderInput"[\s\S]*class="node-card__surface node-card__local-folder"/);
   assert.match(componentSource, /:value="localFolderRoot"[\s\S]*@input="emit\('local-folder-root-input',/);

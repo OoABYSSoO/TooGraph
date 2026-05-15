@@ -7,35 +7,61 @@
   >
     <div class="node-card__port-picker-title">{{ title }}</div>
     <div class="node-card__port-picker-form">
-      <div class="node-card__port-picker-grid">
+      <div class="node-card__port-picker-grid node-card__port-picker-grid--identity">
+        <label class="node-card__control-row">
+          <span class="node-card__control-label">{{ t("nodeCard.state") }}</span>
+          <ToographSelect
+            class="node-card__control-select node-card__state-selection-select"
+            :model-value="selectionValue"
+            popper-class="node-card__port-picker-select-popper node-card__state-selection-popper"
+            :data-virtual-affordance-id="virtualAffordanceId('selection')"
+            @update:model-value="emit('update:selection', String($event ?? PORT_STATE_CREATE_NEW_VALUE))"
+          >
+            <ElOption :label="t('nodeCard.newStateOption')" :value="PORT_STATE_CREATE_NEW_VALUE" />
+            <ElOption
+              v-for="option in existingStateOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            >
+              <div class="node-card__state-option">
+                <span class="node-card__state-option-key">{{ option.key }}</span>
+                <span class="node-card__state-option-name">{{ option.name }}</span>
+              </div>
+            </ElOption>
+          </ToographSelect>
+        </label>
         <label class="node-card__control-row">
           <span class="node-card__control-label">{{ t("nodeCard.name") }}</span>
           <ElInput
             :aria-label="t('nodeCard.name')"
             :data-virtual-affordance-id="virtualAffordanceId('name')"
+            :disabled="!isNewStateSelection"
             :model-value="draft.definition.name"
             @update:model-value="emit('update:name', $event)"
           />
         </label>
+      </div>
+      <div class="node-card__port-picker-grid node-card__port-picker-grid--meta">
         <label class="node-card__control-row">
           <span class="node-card__control-label">{{ t("nodeCard.type") }}</span>
-          <ElSelect
-            class="node-card__control-select toograph-select"
+          <ToographSelect
+            class="node-card__control-select"
             :model-value="draft.definition.type"
-            :teleported="false"
-            popper-class="toograph-select-popper node-card__port-picker-select-popper"
+            :disabled="!isNewStateSelection"
+            popper-class="node-card__port-picker-select-popper"
             @update:model-value="emit('update:type', $event)"
           >
             <ElOption v-for="typeOption in typeOptions" :key="typeOption" :label="typeOption" :value="typeOption" />
-          </ElSelect>
+          </ToographSelect>
         </label>
         <label class="node-card__control-row">
           <span class="node-card__control-label">{{ t("nodeCard.color") }}</span>
-          <ElSelect
-            class="node-card__control-select toograph-select"
+          <ToographSelect
+            class="node-card__control-select"
             :model-value="draft.definition.color"
-            :teleported="false"
-            popper-class="toograph-select-popper node-card__port-picker-select-popper"
+            :disabled="!isNewStateSelection"
+            popper-class="node-card__port-picker-select-popper"
             @update:model-value="emit('update:color', $event)"
           >
             <template #label>
@@ -49,7 +75,7 @@
                 <span>{{ option.label }}</span>
               </div>
             </ElOption>
-          </ElSelect>
+          </ToographSelect>
         </label>
       </div>
       <label class="node-card__control-row">
@@ -59,16 +85,18 @@
           :data-virtual-affordance-id="virtualAffordanceId('description')"
           type="textarea"
           :rows="2"
+          :disabled="!isNewStateSelection"
           :model-value="draft.definition.description"
           @update:model-value="emit('update:description', $event)"
         />
       </label>
       <StateDefaultValueEditor
+        v-if="isNewStateSelection"
         :field="draft.definition"
         @update-value="emit('update:value', $event)"
       />
       <div class="node-card__port-picker-hint" :class="{ 'node-card__port-picker-hint--error': Boolean(error) }">
-        {{ error ?? hint }}
+        {{ hintText }}
       </div>
       <div class="node-card__port-picker-actions">
         <button
@@ -87,7 +115,7 @@
           @pointerdown.stop
           @click.stop="emit('create')"
         >
-          {{ t("nodeCard.create") }}
+          {{ isNewStateSelection ? t("nodeCard.create") : t("nodeCard.bindState") }}
         </button>
       </div>
     </div>
@@ -96,14 +124,18 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { ElInput, ElOption, ElSelect } from "element-plus";
+import { ElInput, ElOption } from "element-plus";
 import { useI18n } from "vue-i18n";
 
+import ToographSelect from "@/components/ToographSelect.vue";
 import StateDefaultValueEditor from "@/editor/workspace/StateDefaultValueEditor.vue";
 import { resolveStateColorOptions, type StateFieldDraft } from "@/editor/workspace/statePanelFields";
+import { PORT_STATE_CREATE_NEW_VALUE, type StatePortExistingStateOption } from "./statePortCreateModel";
 
 const props = defineProps<{
   draft: StateFieldDraft;
+  selectionValue: string;
+  existingStateOptions: StatePortExistingStateOption[];
   title: string;
   error: string | null;
   hint: string;
@@ -112,6 +144,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  (event: "update:selection", value: string): void;
   (event: "update:name", value: string | number): void;
   (event: "update:type", value: string | number | boolean | undefined): void;
   (event: "update:color", value: string | number | boolean | undefined): void;
@@ -123,6 +156,8 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
+const isNewStateSelection = computed(() => props.selectionValue === PORT_STATE_CREATE_NEW_VALUE);
+const hintText = computed(() => props.error ?? (isNewStateSelection.value ? props.hint : t("nodeCard.bindExistingStateHint")));
 const colorOptions = computed(() => resolveStateColorOptions(props.draft.definition.color ?? ""));
 const selectedColorStyle = computed(() => {
   const selectedColor = props.draft.definition.color ?? "";
@@ -130,7 +165,7 @@ const selectedColorStyle = computed(() => {
   return { backgroundColor: matchedOption?.swatch ?? selectedColor };
 });
 
-function virtualAffordanceId(field: "name" | "description" | "cancel" | "create") {
+function virtualAffordanceId(field: "selection" | "name" | "description" | "cancel" | "create") {
   return props.virtualAffordanceBaseId ? `${props.virtualAffordanceBaseId}.${field}` : undefined;
 }
 </script>
@@ -172,6 +207,35 @@ function virtualAffordanceId(field: "name" | "description" | "cancel" | "create"
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px 12px;
+}
+
+.node-card__port-picker-grid--identity {
+  grid-template-columns: minmax(132px, 0.92fr) minmax(0, 1fr);
+}
+
+.node-card__port-picker-grid--meta {
+  grid-template-columns: minmax(0, 1fr) 132px;
+}
+
+.node-card__state-option {
+  display: grid;
+  grid-template-columns: minmax(82px, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.node-card__state-option-key {
+  color: rgba(59, 130, 246, 0.82);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.76rem;
+}
+
+.node-card__state-option-name {
+  overflow: hidden;
+  color: #1f2937;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .node-card__port-picker-color-value,

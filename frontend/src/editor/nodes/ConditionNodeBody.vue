@@ -69,6 +69,9 @@
               :error="portStateError"
               :hint="t('nodeCard.createStateBindHint')"
               :type-options="stateTypeOptions"
+              :selection-value="portStateSelectionValue"
+              :existing-state-options="existingStateOptions"
+              @update:selection="emit('update:create-selection', $event)"
               @update:name="emit('update:create-name', $event)"
               @update:type="emit('update:create-type', $event)"
               @update:color="emit('update:create-color', $event)"
@@ -98,18 +101,14 @@
       <div class="node-card__condition-controls-row">
         <label class="node-card__control-row">
           <span class="node-card__control-label">{{ t("nodeCard.operator") }}</span>
-          <ElSelect
-            class="node-card__control-select node-card__condition-operator-select toograph-select"
+          <ToographSelect
+            class="node-card__control-select node-card__condition-operator-select"
             :model-value="ruleOperatorValue"
             :title="body.operatorLabel"
-            :teleported="false"
-            popper-class="toograph-select-popper"
-            @pointerdown.stop
-            @click.stop
             @update:model-value="emit('update:operator', $event)"
           >
             <ElOption v-for="option in conditionRuleOperatorOptions" :key="option.value" :label="option.label" :value="option.value" />
-          </ElSelect>
+          </ToographSelect>
         </label>
         <label class="node-card__control-row">
           <span class="node-card__control-label">{{ t("nodeCard.value") }}</span>
@@ -147,13 +146,15 @@
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
-import { ElIcon, ElInputNumber, ElOption, ElPopover, ElSelect } from "element-plus";
+import { ElIcon, ElInputNumber, ElOption, ElPopover } from "element-plus";
 import { Check, Delete } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
+import ToographSelect from "@/components/ToographSelect.vue";
 import StateEditorPopover from "./StateEditorPopover.vue";
 import StatePortCreatePopover from "./StatePortCreatePopover.vue";
 import { CONDITION_LOOP_LIMIT_MAX, CONDITION_LOOP_LIMIT_MIN } from "./conditionLoopLimit";
+import type { StatePortExistingStateOption } from "./statePortCreateModel";
 import type { NodeCardViewModel } from "./nodeCardViewModel";
 import type { ConditionNode } from "@/types/node-system";
 import type { StateColorOption, StateFieldDraft, StateFieldType } from "@/editor/workspace/statePanelFields";
@@ -177,6 +178,8 @@ const props = defineProps<{
   stateEditorDraft: StateFieldDraft | null;
   stateEditorError: string | null;
   portStateDraft: StateFieldDraft | null;
+  portStateSelectionValue: string;
+  existingStateOptions: StatePortExistingStateOption[];
   portPickerTitle: string;
   portStateError: string | null;
   stateTypeOptions: string[];
@@ -199,6 +202,7 @@ const emit = defineEmits<{
   (event: "update:type", value: string): void;
   (event: "update:color", value: string): void;
   (event: "update:description", value: string): void;
+  (event: "update:create-selection", value: string): void;
   (event: "update:create-name", value: string | number): void;
   (event: "update:create-type", value: string | number | boolean | undefined): void;
   (event: "update:create-color", value: string | number | boolean | undefined): void;

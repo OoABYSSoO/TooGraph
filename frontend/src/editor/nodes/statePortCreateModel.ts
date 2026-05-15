@@ -12,6 +12,16 @@ export type StatePortDraft = {
   definition: StateDefinition;
 };
 
+export const PORT_STATE_CREATE_NEW_VALUE = "__toograph_new_state__";
+
+export type StatePortExistingStateOption = {
+  value: string;
+  key: string;
+  name: string;
+  label: string;
+  type: string;
+};
+
 export function matchesStatePortSearch(field: StatePortSearchField, query: string) {
   const normalizedQuery = normalizeStateSearchText(query);
   if (!normalizedQuery) {
@@ -36,6 +46,42 @@ export function matchesStatePortSearch(field: StatePortSearchField, query: strin
   const queryCompact = normalizedQuery.replace(/\s+/g, "");
   const initials = words.map((word) => word[0] ?? "").join("");
   return isSubsequence(queryCompact, initials) || haystacks.some((value) => isSubsequence(queryCompact, value.replace(/\s+/g, "")));
+}
+
+export function buildStatePortExistingStateOptions(stateSchema: Record<string, StateDefinition>): StatePortExistingStateOption[] {
+  return Object.entries(stateSchema).map(([key, definition]) => {
+    const name = definition.name.trim() || key;
+    return {
+      value: key,
+      key,
+      name,
+      label: `${key} · ${name}`,
+      type: definition.type,
+    };
+  });
+}
+
+export function buildStatePortExistingStateDraft(stateKey: string, stateSchema: Record<string, StateDefinition>): StatePortDraft | null {
+  const definition = stateSchema[stateKey];
+  if (!definition) {
+    return null;
+  }
+  return {
+    key: stateKey,
+    definition: cloneStateDefinition(definition),
+  };
+}
+
+export function createStateDraftFromSourceState(
+  draft: StatePortDraft,
+  source: Pick<StateDefinition, "type" | "value">,
+): StatePortDraft {
+  const nextType = (source.type?.trim() || draft.definition.type) as StateFieldType;
+  const hasValue = Object.prototype.hasOwnProperty.call(source, "value");
+  return updateStatePortDraftDefinition(draft, {
+    type: nextType,
+    value: hasValue ? cloneStateValue(source.value) : defaultValueForStateType(nextType),
+  });
 }
 
 export function createStateDraftFromQuery(query: string, existingKeys: string[]): StatePortDraft {
@@ -86,6 +132,28 @@ function updateStatePortDraftDefinition(draft: StatePortDraft, patch: Partial<St
       ...patch,
     },
   };
+}
+
+function cloneStateDefinition(definition: StateDefinition): StateDefinition {
+  if (typeof structuredClone === "function") {
+    return structuredClone(definition) as StateDefinition;
+  }
+
+  const cloned: StateDefinition = { ...definition };
+  if (definition.binding) {
+    cloned.binding = { ...definition.binding };
+  }
+  return cloned;
+}
+
+function cloneStateValue(value: unknown): unknown {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  if (typeof structuredClone === "function") {
+    return structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value)) as unknown;
 }
 
 function createIndexedStateKey(prefix: string, existingKeys: string[]) {
