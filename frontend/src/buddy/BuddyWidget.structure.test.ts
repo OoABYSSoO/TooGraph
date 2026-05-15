@@ -567,17 +567,20 @@ test("BuddyWidget renders assistant replies from parent graph output nodes only"
   assert.doesNotMatch(componentSource, /resolveBuddyRunTraceFromRunEvent/);
 });
 
-test("BuddyWidget closed reply bubble is wider and renders markdown or sandboxed html", () => {
+test("BuddyWidget closed reply bubble uses compact card dimensions and renders markdown or sandboxed html", () => {
   assert.match(componentSource, /const bubblePreviewContent = computed/);
   assert.match(componentSource, /v-if="bubblePreviewContent\.kind === 'html'"/);
   assert.match(componentSource, /v-else-if="bubblePreviewContent\.kind === 'markdown'"/);
   assert.match(componentSource, /v-html="bubblePreviewContent\.html"/);
-  assert.match(componentSource, /--buddy-widget-bubble-width:\s*360px;/);
+  assert.match(componentSource, /--buddy-widget-bubble-width:\s*320px;/);
+  assert.match(componentSource, /--buddy-widget-bubble-height:\s*256px;/);
   assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*width:\s*min\(var\(--buddy-widget-bubble-width\), calc\(100vw - 32px\)\);/);
+  assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*height:\s*min\(var\(--buddy-widget-bubble-height\), calc\(100vh - 120px\)\);/);
   assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*box-sizing:\s*border-box;/);
-  assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*max-height:\s*min\(340px, calc\(100vh - 120px\)\);/);
   assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*overflow:\s*auto;/);
   assert.match(componentSource, /\.buddy-widget__bubble-html-frame \{[\s\S]*width:\s*100%;/);
+  assert.match(componentSource, /\.buddy-widget__bubble-html-frame \{[\s\S]*height:\s*100%;/);
+  assert.match(componentSource, /\.buddy-widget__bubble-html-frame \{[\s\S]*min-height:\s*0;/);
 });
 
 test("BuddyWidget renders output-segment run trace capsules instead of per-message duration chips", () => {
