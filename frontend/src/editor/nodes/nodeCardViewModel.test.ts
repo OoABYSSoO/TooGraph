@@ -656,6 +656,38 @@ test("buildNodeCardViewModel auto-displays file output state arrays as documents
   assert.equal(model.body.displayModeLabel, "DOCS");
 });
 
+test("buildNodeCardViewModel auto-displays html output states as sandboxed html", () => {
+  const node: GraphNode = {
+    kind: "output",
+    name: "output_page",
+    description: "Preview generated page.",
+    ui: { position: { x: 980, y: 420 } },
+    reads: [{ state: "rendered_page", required: false }],
+    writes: [],
+    config: {
+      displayMode: "auto",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+
+  const model = buildNodeCardViewModel("output_page", node, {
+    ...stateSchema,
+    rendered_page: {
+      name: "Rendered Page",
+      description: "Complete HTML page.",
+      type: "html",
+      value: "<!doctype html><html><body><h1>Page</h1></body></html>",
+      color: "#1d4ed8",
+    },
+  });
+
+  assert.equal(model.body.kind, "output");
+  assert.equal(model.body.displayMode, "html");
+  assert.equal(model.body.displayModeLabel, "HTML");
+});
+
 test("buildNodeCardViewModel uses the legacy output empty state when no upstream state is connected", () => {
   const node: GraphNode = {
     kind: "output",

@@ -323,6 +323,12 @@
                   </header>
                   <pre>{{ formatPublicOutputCardContent(message.content) }}</pre>
                 </section>
+                <SandboxedHtmlFrame
+                  v-else-if="message.role === 'assistant' && message.content && resolveBuddyRenderedContent(message).kind === 'html'"
+                  class="buddy-widget__message-html-frame"
+                  :source="resolveBuddyRenderedContent(message).html"
+                  title="Buddy HTML reply"
+                />
                 <div
                   v-else-if="message.role === 'assistant' && message.content"
                   class="buddy-widget__message-bubble buddy-widget__message-markdown"
@@ -361,8 +367,19 @@
         </form>
       </section>
 
-      <div v-if="bubbleText && !isPanelOpen" class="buddy-widget__bubble">
-        {{ bubbleText }}
+      <div v-if="bubblePreviewContent.text && !isPanelOpen" class="buddy-widget__bubble">
+        <SandboxedHtmlFrame
+          v-if="bubblePreviewContent.kind === 'html'"
+          class="buddy-widget__bubble-html-frame"
+          :source="bubblePreviewContent.html"
+          title="Buddy HTML reply"
+        />
+        <div
+          v-else-if="bubblePreviewContent.kind === 'markdown'"
+          class="buddy-widget__bubble-markdown"
+          v-html="bubblePreviewContent.html"
+        />
+        <span v-else>{{ bubblePreviewContent.text }}</span>
       </div>
 
       <button
@@ -421,6 +438,7 @@ import {
 import { fetchTemplate, runGraph } from "../api/graphs.ts";
 import { cancelRun, fetchRun, resumeRun } from "../api/runs.ts";
 import { fetchSettings } from "../api/settings.ts";
+import SandboxedHtmlFrame from "../components/SandboxedHtmlFrame.vue";
 import { resolveOutputPreviewContent } from "../editor/nodes/outputPreviewContentModel.ts";
 import { formatRunDuration } from "../lib/run-display-name.ts";
 import { buildRuntimeModelOptions } from "../lib/runtimeModelCatalog.ts";
@@ -774,6 +792,9 @@ const latestActivityText = computed(() => {
     .find((message) => message.role === "assistant" && !message.content.trim() && message.activityText?.trim());
   return latestPendingMessage?.activityText?.trim() ?? "";
 });
+const latestBuddyMessageForBubble = computed(() =>
+  [...messages.value].reverse().find((message) => message.role === "assistant" && message.content.trim()) ?? null,
+);
 const bubbleText = computed(() => {
   if (mood.value === "thinking" && latestActivityText.value) {
     return latestActivityText.value;
@@ -784,8 +805,14 @@ const bubbleText = computed(() => {
   if (mood.value === "error") {
     return t("buddy.errorBubble");
   }
-  const latestBuddyMessage = [...messages.value].reverse().find((message) => message.role === "assistant" && message.content.trim());
-  return latestBuddyMessage?.content.trim().slice(0, 84) || t("buddy.readyBubble");
+  return latestBuddyMessageForBubble.value?.content.trim() || t("buddy.readyBubble");
+});
+const bubblePreviewContent = computed(() => {
+  const latestMessage = latestBuddyMessageForBubble.value;
+  if (latestMessage && bubbleText.value === latestMessage.content.trim()) {
+    return resolveBuddyRenderedContent(latestMessage);
+  }
+  return resolveOutputPreviewContent(bubbleText.value, "plain");
 });
 
 onMounted(() => {
@@ -3568,6 +3595,24 @@ function renderBuddyMarkdown(content: string) {
   return resolveOutputPreviewContent(content, "markdown").html;
 }
 
+function resolveBuddyRenderedContent(message: BuddyMessage) {
+  return resolveOutputPreviewContent(message.content, resolveBuddyDisplayMode(message));
+}
+
+function resolveBuddyDisplayMode(message: BuddyMessage) {
+  const displayMode = message.publicOutput?.displayMode.trim().toLowerCase() ?? "";
+  const stateType = message.publicOutput?.stateType.trim().toLowerCase() ?? "";
+  if (displayMode === "html" || stateType === "html" || looksLikeHtmlDocument(message.content)) {
+    return "html";
+  }
+  return "markdown";
+}
+
+function looksLikeHtmlDocument(content: string) {
+  const trimmed = content.trim().toLowerCase();
+  return /^<!doctype\s+html\b/.test(trimmed) || /^<html(?:\s|>)/.test(trimmed);
+}
+
 function updateAssistantMessage(messageId: string, content: string, patch: BuddyMessagePatch = {}) {
   const target = messages.value.find((message) => message.id === messageId);
   if (!target) {
@@ -4472,11 +4517,25 @@ function formatErrorMessage(error: unknown): string {
   white-space: normal;
 }
 
+.buddy-widget__message-html-frame {
+  width: 100%;
+  min-height: 300px;
+  overflow: hidden;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
 .buddy-widget__message-markdown :deep(p),
 .buddy-widget__message-markdown :deep(ul),
 .buddy-widget__message-markdown :deep(ol),
 .buddy-widget__message-markdown :deep(blockquote),
-.buddy-widget__message-markdown :deep(pre) {
+.buddy-widget__message-markdown :deep(pre),
+.buddy-widget__bubble-markdown :deep(p),
+.buddy-widget__bubble-markdown :deep(ul),
+.buddy-widget__bubble-markdown :deep(ol),
+.buddy-widget__bubble-markdown :deep(blockquote),
+.buddy-widget__bubble-markdown :deep(pre) {
   margin: 0 0 8px;
 }
 
@@ -4484,26 +4543,36 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__message-markdown :deep(ul:last-child),
 .buddy-widget__message-markdown :deep(ol:last-child),
 .buddy-widget__message-markdown :deep(blockquote:last-child),
-.buddy-widget__message-markdown :deep(pre:last-child) {
+.buddy-widget__message-markdown :deep(pre:last-child),
+.buddy-widget__bubble-markdown :deep(p:last-child),
+.buddy-widget__bubble-markdown :deep(ul:last-child),
+.buddy-widget__bubble-markdown :deep(ol:last-child),
+.buddy-widget__bubble-markdown :deep(blockquote:last-child),
+.buddy-widget__bubble-markdown :deep(pre:last-child) {
   margin-bottom: 0;
 }
 
 .buddy-widget__message-markdown :deep(ul),
-.buddy-widget__message-markdown :deep(ol) {
+.buddy-widget__message-markdown :deep(ol),
+.buddy-widget__bubble-markdown :deep(ul),
+.buddy-widget__bubble-markdown :deep(ol) {
   padding-left: 18px;
 }
 
-.buddy-widget__message-markdown :deep(a) {
+.buddy-widget__message-markdown :deep(a),
+.buddy-widget__bubble-markdown :deep(a) {
   color: #2563eb;
   font-weight: 650;
   text-decoration: none;
 }
 
-.buddy-widget__message-markdown :deep(a:hover) {
+.buddy-widget__message-markdown :deep(a:hover),
+.buddy-widget__bubble-markdown :deep(a:hover) {
   text-decoration: underline;
 }
 
-.buddy-widget__message-markdown :deep(code) {
+.buddy-widget__message-markdown :deep(code),
+.buddy-widget__bubble-markdown :deep(code) {
   padding: 1px 4px;
   border-radius: 5px;
   background: rgba(37, 99, 235, 0.08);
@@ -4512,7 +4581,8 @@ function formatErrorMessage(error: unknown): string {
   font-size: 0.92em;
 }
 
-.buddy-widget__message-markdown :deep(pre) {
+.buddy-widget__message-markdown :deep(pre),
+.buddy-widget__bubble-markdown :deep(pre) {
   max-width: 100%;
   overflow: auto;
   padding: 9px 10px;
@@ -4521,7 +4591,8 @@ function formatErrorMessage(error: unknown): string {
   background: rgba(248, 250, 252, 0.92);
 }
 
-.buddy-widget__message-markdown :deep(pre code) {
+.buddy-widget__message-markdown :deep(pre code),
+.buddy-widget__bubble-markdown :deep(pre code) {
   padding: 0;
   background: transparent;
   color: #1f2937;
@@ -4800,7 +4871,9 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__bubble {
   bottom: calc(100% + 10px);
-  max-width: min(260px, calc(100vw - 32px));
+  max-width: min(380px, calc(100vw - 32px));
+  max-height: min(340px, calc(100vh - 120px));
+  overflow: auto;
   padding: 9px 11px;
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 8px;
@@ -4809,8 +4882,22 @@ function formatErrorMessage(error: unknown): string {
   box-shadow: var(--toograph-glass-highlight), 0 14px 34px rgba(61, 43, 24, 0.12);
   font-size: 13px;
   line-height: 1.45;
+  white-space: normal;
   overflow-wrap: anywhere;
   backdrop-filter: blur(14px) saturate(1.18);
+}
+
+.buddy-widget__bubble-markdown {
+  white-space: normal;
+}
+
+.buddy-widget__bubble-html-frame {
+  width: min(356px, calc(100vw - 56px));
+  min-height: 240px;
+  overflow: hidden;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .buddy-widget__anchor--left .buddy-widget__bubble {

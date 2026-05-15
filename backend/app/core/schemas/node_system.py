@@ -60,6 +60,7 @@ class NodeSystemStateType(str, Enum):
     NUMBER = "number"
     BOOLEAN = "boolean"
     MARKDOWN = "markdown"
+    HTML = "html"
     JSON = "json"
     IMAGE = "image"
     AUDIO = "audio"
@@ -180,6 +181,7 @@ class DisplayMode(str, Enum):
     AUTO = "auto"
     PLAIN = "plain"
     MARKDOWN = "markdown"
+    HTML = "html"
     JSON = "json"
     DOCUMENTS = "documents"
 

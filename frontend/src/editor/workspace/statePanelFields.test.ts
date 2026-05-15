@@ -100,6 +100,13 @@ test("buildDefaultStateField returns a unique text state", () => {
   assert.ok(defaultStateColorValues.includes(field.definition.color));
 });
 
+test("state field type options include html as a text-like rendered page state", () => {
+  assert.ok(STATE_FIELD_TYPE_OPTIONS.includes("html"));
+  assert.equal(defaultValueForStateType("html"), "");
+  assert.equal(parseStateValueInput("html", "<main>Hi</main>"), "<main>Hi</main>");
+  assert.equal(formatStateValueInput("html", "<main>Hi</main>"), "<main>Hi</main>");
+});
+
 test("buildNextDefaultStateField assigns a non-empty default color unless one is provided", () => {
   const document = buildDocument();
   const defaultField = buildNextDefaultStateField(document, {

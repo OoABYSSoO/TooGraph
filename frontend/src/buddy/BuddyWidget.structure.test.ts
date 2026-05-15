@@ -552,16 +552,29 @@ test("BuddyWidget keeps live run activity out of the chat transcript", () => {
 
 test("BuddyWidget renders assistant replies from parent graph output nodes only", () => {
   assert.match(componentSource, /import \{ resolveOutputPreviewContent \} from "\.\.\/editor\/nodes\/outputPreviewContentModel\.ts";/);
+  assert.match(componentSource, /import SandboxedHtmlFrame from "\.\.\/components\/SandboxedHtmlFrame\.vue";/);
   assert.match(componentSource, /buildBuddyPublicOutputBindings/);
   assert.match(componentSource, /reduceBuddyPublicOutputEvent/);
   assert.match(componentSource, /publicOutput\?:/);
   assert.match(componentSource, /buildPublicOutputMessageId\(controllerMessageId, output\.outputNodeId\)/);
   assert.match(componentSource, /syncBuddyRunDisplayMessages/);
   assert.match(componentSource, /v-html="renderBuddyMarkdown\(message\.content\)"/);
+  assert.match(componentSource, /v-else-if="message\.role === 'assistant' && message\.content && resolveBuddyRenderedContent\(message\)\.kind === 'html'"/);
+  assert.match(componentSource, /<SandboxedHtmlFrame[\s\S]*:source="resolveBuddyRenderedContent\(message\)\.html"/);
   assert.match(componentSource, /class="buddy-widget__public-output-card"/);
   assert.match(componentSource, /addEventListener\("activity\.event"/);
   assert.doesNotMatch(componentSource, /resolveBuddyReplyFromRunEvent/);
   assert.doesNotMatch(componentSource, /resolveBuddyRunTraceFromRunEvent/);
+});
+
+test("BuddyWidget closed reply bubble is wider and renders markdown or sandboxed html", () => {
+  assert.match(componentSource, /const bubblePreviewContent = computed/);
+  assert.match(componentSource, /v-if="bubblePreviewContent\.kind === 'html'"/);
+  assert.match(componentSource, /v-else-if="bubblePreviewContent\.kind === 'markdown'"/);
+  assert.match(componentSource, /v-html="bubblePreviewContent\.html"/);
+  assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*max-width:\s*min\(380px, calc\(100vw - 32px\)\);/);
+  assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*max-height:\s*min\(340px, calc\(100vh - 120px\)\);/);
+  assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*overflow:\s*auto;/);
 });
 
 test("BuddyWidget renders output-segment run trace capsules instead of per-message duration chips", () => {

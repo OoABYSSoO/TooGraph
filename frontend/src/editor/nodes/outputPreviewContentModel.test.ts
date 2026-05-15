@@ -21,6 +21,16 @@ test("resolveOutputPreviewContent renders safe markdown without exposing raw HTM
   assert.doesNotMatch(preview.html, /<script>/);
 });
 
+test("resolveOutputPreviewContent exposes html documents for sandboxed page rendering", () => {
+  const source = "<!doctype html><html><body><h1>Rendered</h1><script>window.evil = true</script></body></html>";
+  const preview = resolveOutputPreviewContent(source, "html");
+
+  assert.equal(preview.kind, "html");
+  assert.equal(preview.text, source);
+  assert.equal(preview.html, source);
+  assert.equal(preview.isEmpty, false);
+});
+
 test("resolveOutputPreviewContent renders markdown tables as safe table markup", () => {
   const preview = resolveOutputPreviewContent("| 语言 | 问候 |\n| --- | --- |\n| 中文 | **你好** |\n| English | `Hello` |", "markdown");
 
@@ -279,6 +289,32 @@ test("resolveOutputPreviewContent paginates multi-output result packages by outp
   assert.equal(preview.packagePages?.[1]?.documentRefs[0]?.localPath, "run_1/search/doc_001.md");
 });
 
+test("resolveOutputPreviewContent renders html result package pages with html display kind", () => {
+  const source = "<!doctype html><html><body><h1>Page</h1></body></html>";
+  const preview = resolveOutputPreviewContent(
+    JSON.stringify({
+      kind: "result_package",
+      outputs: {
+        page: {
+          name: "Page",
+          type: "html",
+          value: source,
+        },
+        notes: {
+          name: "Notes",
+          type: "markdown",
+          value: "# Notes",
+        },
+      },
+    }),
+    "auto",
+  );
+
+  assert.equal(preview.kind, "package");
+  assert.equal(preview.packagePages?.[0]?.kind, "html");
+  assert.equal(preview.packagePages?.[0]?.html, source);
+});
+
 test("resolveOutputPreviewContent treats active waiting output as an empty preview state", () => {
   const preview = resolveOutputPreviewContent("Waiting for output...", "auto");
 
@@ -294,6 +330,7 @@ test("resolveOutputPreviewDisplayMode exposes the effective auto-detected format
   assert.equal(resolveOutputPreviewDisplayMode("1. First\n2. Second", "auto"), "markdown");
   assert.equal(resolveOutputPreviewDisplayMode("| A | B |\n| --- | --- |\n| 1 | 2 |", "auto"), "markdown");
   assert.equal(resolveOutputPreviewDisplayMode("# Final answer", "plain"), "plain");
+  assert.equal(resolveOutputPreviewDisplayMode("<html><body>Hi</body></html>", "html"), "html");
   assert.equal(resolveOutputPreviewDisplayMode("[]", "documents"), "documents");
   assert.equal(
     resolveOutputPreviewDisplayMode(

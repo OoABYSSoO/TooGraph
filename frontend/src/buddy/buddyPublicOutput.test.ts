@@ -104,6 +104,7 @@ test("buildBuddyPublicOutputBindings scans only root output nodes", () => {
 test("resolveBuddyPublicOutputMessageKind separates text bubbles from cards", () => {
   assert.equal(resolveBuddyPublicOutputMessageKind({ stateType: "markdown", displayMode: "markdown" }), "text");
   assert.equal(resolveBuddyPublicOutputMessageKind({ stateType: "text", displayMode: "plain" }), "text");
+  assert.equal(resolveBuddyPublicOutputMessageKind({ stateType: "html", displayMode: "html" }), "text");
   assert.equal(resolveBuddyPublicOutputMessageKind({ stateType: "json", displayMode: "json" }), "card");
   assert.equal(resolveBuddyPublicOutputMessageKind({ stateType: "result_package", displayMode: "auto" }), "card");
   assert.equal(resolveBuddyPublicOutputMessageKind({ stateType: "file", displayMode: "documents" }), "card");

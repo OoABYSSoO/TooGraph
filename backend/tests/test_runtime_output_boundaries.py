@@ -95,6 +95,32 @@ class RuntimeOutputBoundariesTests(unittest.TestCase):
         self.assertEqual(body["output_previews"][0]["value"], "# Done")
         self.assertEqual(body["final_result"], "# Done")
 
+    def test_execute_output_node_resolves_single_html_result_package_output(self) -> None:
+        node = NodeSystemOutputNode.model_validate(
+            {
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "dynamic_result"}],
+                "config": {"displayMode": "auto"},
+            }
+        )
+        package = {
+            "kind": "result_package",
+            "outputs": {
+                "page": {
+                    "name": "Rendered Page",
+                    "description": "A complete HTML page.",
+                    "type": "html",
+                    "value": "<!doctype html><html><body><h1>Hi</h1></body></html>",
+                }
+            },
+        }
+
+        body = execute_output_node("output_page", node, {"dynamic_result": package}, {"run_id": "run_1"})
+
+        self.assertEqual(body["output_previews"][0]["display_mode"], "html")
+        self.assertEqual(body["output_previews"][0]["label"], "Rendered Page")
+        self.assertEqual(body["output_previews"][0]["source_key"], "dynamic_result.page")
+
     def test_execute_output_node_keeps_multi_output_result_package_wrapped(self) -> None:
         node = NodeSystemOutputNode.model_validate(
             {

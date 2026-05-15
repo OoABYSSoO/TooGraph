@@ -22,10 +22,12 @@ test("OutputNodeBody owns output presentation and forwards parent side effects",
   assert.match(componentSource, /\{\{ body\.displayModeLabel \}\}/);
   assert.match(componentSource, /'node-card__preview--plain': outputPreviewContent\.kind === 'plain'/);
   assert.match(componentSource, /'node-card__preview--markdown': outputPreviewContent\.kind === 'markdown'/);
+  assert.match(componentSource, /'node-card__preview--html': outputPreviewContent\.kind === 'html'/);
   assert.match(componentSource, /'node-card__preview--json': outputPreviewContent\.kind === 'json'/);
   assert.match(componentSource, /'node-card__preview--package': outputPreviewContent\.kind === 'package'/);
   assert.match(componentSource, /'node-card__preview--empty': outputPreviewContent\.isEmpty/);
   assert.match(componentSource, /import OutputDocumentPager from "\.\/OutputDocumentPager\.vue";/);
+  assert.match(componentSource, /import SandboxedHtmlFrame from "@\/components\/SandboxedHtmlFrame\.vue";/);
   assert.match(componentSource, /import OutputLinkedText from "\.\/OutputLinkedText\.vue";/);
   assert.match(componentSource, /const activePackagePageIndex = ref\(0\);/);
   assert.match(componentSource, /const packagePages = computed\(\(\) => props\.outputPreviewContent\.packagePages \?\? \[\]\);/);
@@ -34,6 +36,7 @@ test("OutputNodeBody owns output presentation and forwards parent side effects",
   assert.match(componentSource, /v-for="\([^"]*page, index[^"]*packagePages"/);
   assert.match(componentSource, /@click\.stop="activePackagePageIndex = index"/);
   assert.match(componentSource, /<OutputDocumentPager[\s\S]*v-else-if="outputPreviewContent\.kind === 'documents' && outputPreviewContent\.documentRefs\.length > 0"[\s\S]*:documents="outputPreviewContent\.documentRefs"/);
+  assert.match(componentSource, /<SandboxedHtmlFrame[\s\S]*v-else-if="outputPreviewContent\.kind === 'html'"[\s\S]*class="node-card__preview-html-frame"[\s\S]*:source="outputPreviewContent\.html"/);
   assert.match(componentSource, /v-else-if="outputPreviewContent\.kind === 'markdown'"[\s\S]*v-html="outputPreviewContent\.html"/);
   assert.match(componentSource, /class="node-card__preview"[\s\S]*@pointerdown\.stop[\s\S]*@click\.stop/);
   assert.match(componentSource, /<pre v-else class="node-card__preview-text"><OutputLinkedText :text="outputPreviewContent\.text" \/><\/pre>/);
