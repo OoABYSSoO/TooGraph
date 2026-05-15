@@ -18,6 +18,10 @@ def _official_template_records() -> list[dict]:
     return [record for record in list_template_records() if record.get("source") == "official"]
 
 
+def _read_contracts(reads: list[dict]) -> list[dict]:
+    return [{key: value for key, value in read.items() if not (key == "binding" and value is None)} for read in reads]
+
+
 class TemplateLayoutTests(unittest.TestCase):
     def test_builtin_template_registry_contains_official_templates(self) -> None:
         records = _official_template_records()
@@ -118,7 +122,7 @@ class TemplateLayoutTests(unittest.TestCase):
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
             ["output_final"],
         )
-        self.assertEqual(nodes["output_final"]["reads"], [{"state": "final_reply", "required": True}])
+        self.assertEqual(_read_contracts(nodes["output_final"]["reads"]), [{"state": "final_reply", "required": True}])
         self.assertNotIn("output_evidence", nodes)
         self.assertNotIn("output_documents", nodes)
         self.assertNotIn({"source": "final_answer", "target": "output_evidence"}, template["edges"])
@@ -208,7 +212,7 @@ class TemplateLayoutTests(unittest.TestCase):
                 self.assertNotIn("existing_capability", [read["state"] for read in nodes[node_id]["reads"]])
         self.assertIn(
             {"state": "existing_capability_found", "required": False},
-            nodes["review_requirement"]["reads"],
+            _read_contracts(nodes["review_requirement"]["reads"]),
         )
 
         builder_node = nodes["build_skill_files"]
@@ -323,7 +327,7 @@ class TemplateLayoutTests(unittest.TestCase):
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
             ["output_final"],
         )
-        self.assertEqual(nodes["output_final"]["reads"], [{"state": "final_summary", "required": True}])
+        self.assertEqual(_read_contracts(nodes["output_final"]["reads"]), [{"state": "final_summary", "required": True}])
 
     def test_toograph_skill_creation_workflow_is_runtime_compatible(self) -> None:
         template = next(
@@ -391,7 +395,7 @@ class TemplateLayoutTests(unittest.TestCase):
             ],
         )
         self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "output"], ["output_final"])
-        self.assertEqual(nodes["output_final"]["reads"], [{"state": "final_reply", "required": True}])
+        self.assertEqual(_read_contracts(nodes["output_final"]["reads"]), [{"state": "final_reply", "required": True}])
         self.assertIn("needs_capability", nodes)
         self.assertEqual(nodes["needs_capability"]["kind"], "condition")
         self.assertEqual(
@@ -434,7 +438,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(intake_graph["metadata"]["role"], "buddy_request_intake")
         self.assertEqual(intake_graph["state_schema"]["visible_reply"]["type"], "markdown")
         self.assertEqual(intake_graph["state_schema"]["clarification_answer"]["type"], "markdown")
-        self.assertNotIn({"state": "buddy_context", "required": True}, nodes["intake_request"]["reads"])
+        self.assertNotIn({"state": "buddy_context", "required": True}, _read_contracts(nodes["intake_request"]["reads"]))
         self.assertNotIn({"source": "input_buddy_context", "target": "intake_request"}, template["edges"])
         self.assertEqual(nodes["intake_request"]["writes"][0], {"state": "visible_reply", "mode": "replace"})
         intake_output_boundaries = [
@@ -447,22 +451,31 @@ class TemplateLayoutTests(unittest.TestCase):
             [write["state"] for write in nodes["intake_request"]["writes"]],
         )
         understand_node = intake_graph["nodes"]["understand_request"]
-        self.assertNotIn({"state": "buddy_context", "required": True}, understand_node["reads"])
+        self.assertNotIn({"state": "buddy_context", "required": True}, _read_contracts(understand_node["reads"]))
         self.assertNotIn({"source": "input_buddy_context", "target": "understand_request"}, intake_graph["edges"])
         self.assertEqual(understand_node["writes"][0], {"state": "visible_reply", "mode": "replace"})
         self.assertEqual(understand_node["config"]["thinkingMode"], "low")
         self.assertIn("visible_reply", understand_node["config"]["taskInstruction"])
         self.assertIn("output_visible_reply", intake_graph["nodes"])
-        self.assertEqual(intake_graph["nodes"]["output_visible_reply"]["reads"], [{"state": "visible_reply", "required": False}])
+        self.assertEqual(
+            _read_contracts(intake_graph["nodes"]["output_visible_reply"]["reads"]),
+            [{"state": "visible_reply", "required": False}],
+        )
         self.assertEqual(
             intake_graph["nodes"]["need_clarification"]["config"]["rule"],
             {"source": "$state.request_understanding.needs_clarification", "operator": "==", "value": True},
         )
         ask_clarification_node = intake_graph["nodes"]["ask_clarification"]
         self.assertEqual(ask_clarification_node["writes"], [{"state": "clarification_prompt", "mode": "replace"}])
-        self.assertNotIn({"state": "clarification_answer", "required": True}, ask_clarification_node["reads"])
+        self.assertNotIn(
+            {"state": "clarification_answer", "required": True},
+            _read_contracts(ask_clarification_node["reads"]),
+        )
         merge_clarification_node = intake_graph["nodes"]["merge_clarification"]
-        self.assertIn({"state": "clarification_answer", "required": True}, merge_clarification_node["reads"])
+        self.assertIn(
+            {"state": "clarification_answer", "required": True},
+            _read_contracts(merge_clarification_node["reads"]),
+        )
 
         cycle_graph = nodes["run_capability_cycle"]["config"]["graph"]
         self.assertEqual(cycle_graph["metadata"].get("interrupt_after", []), [])
@@ -493,14 +506,14 @@ class TemplateLayoutTests(unittest.TestCase):
             self.assertNotIn(removed_node_id, cycle_graph["nodes"])
         execute_node = cycle_graph["nodes"]["execute_capability"]
         self.assertEqual(execute_node["config"]["skillKey"], "")
-        self.assertIn({"state": "selected_capability", "required": True}, execute_node["reads"])
+        self.assertIn({"state": "selected_capability", "required": True}, _read_contracts(execute_node["reads"]))
         self.assertEqual(execute_node["writes"], [{"state": "capability_result", "mode": "replace"}])
         self.assertEqual(cycle_graph["state_schema"]["capability_result"]["type"], "result_package")
         self.assertEqual(cycle_graph["state_schema"]["capability_selection_audit"]["type"], "json")
         self.assertEqual(cycle_graph["state_schema"]["capability_gap"]["type"], "json")
         self.assertEqual(cycle_graph["state_schema"]["capability_trace"]["type"], "json")
         self.assertEqual(
-            cycle_graph["nodes"]["output_capability_selection_audit"]["reads"],
+            _read_contracts(cycle_graph["nodes"]["output_capability_selection_audit"]["reads"]),
             [{"state": "capability_selection_audit", "required": False}],
         )
         missing_node = cycle_graph["nodes"]["review_missing_capability"]
@@ -525,7 +538,10 @@ class TemplateLayoutTests(unittest.TestCase):
         draft_graph = nodes["draft_final_response"]["config"]["graph"]
         self.assertEqual([node_id for node_id, node in draft_graph["nodes"].items() if node["kind"] == "output"], ["output_final_reply"])
         self.assertEqual(draft_graph["nodes"]["draft_final_reply"]["config"]["thinkingMode"], "low")
-        self.assertEqual(draft_graph["nodes"]["output_final_reply"]["reads"], [{"state": "final_reply", "required": True}])
+        self.assertEqual(
+            _read_contracts(draft_graph["nodes"]["output_final_reply"]["reads"]),
+            [{"state": "final_reply", "required": True}],
+        )
 
     def test_buddy_autonomous_review_template_contract(self) -> None:
         template = load_template_record("buddy_autonomous_review")
