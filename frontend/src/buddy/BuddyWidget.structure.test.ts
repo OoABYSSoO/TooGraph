@@ -653,9 +653,15 @@ test("BuddyWidget uses the top toolbar for new chat and fullscreen expansion", (
   assert.match(componentSource, /<FullScreen v-else \/>/);
   assert.match(componentSource, /@click="closePanel"/);
   assert.match(componentSource, /class="buddy-widget__backdrop"/);
-  assert.match(componentSource, /\.buddy-widget__panel--fullscreen\s*\{[\s\S]*width:\s*min\(1440px,/);
+  assert.match(componentSource, /\.buddy-widget__panel--fullscreen\s*\{[\s\S]*width:\s*min\(var\(--buddy-widget-panel-width\), calc\(100vw - 96px\)\);/);
   assert.match(componentSource, /\.buddy-widget__anchor--fullscreen \.buddy-widget__avatar\s*\{[\s\S]*position:\s*fixed;[\s\S]*right:\s*auto;[\s\S]*z-index:\s*4;/);
   assert.doesNotMatch(componentSource, /\.buddy-widget__anchor--fullscreen \.buddy-widget__avatar\s*\{[\s\S]*display:\s*none;/);
+});
+
+test("BuddyWidget keeps the chat panel wide for rendered replies", () => {
+  assert.match(componentSource, /--buddy-widget-panel-width:\s*1680px;/);
+  assert.match(componentSource, /\.buddy-widget__panel\s*\{[\s\S]*width:\s*min\(var\(--buddy-widget-panel-width\), calc\(100vw - 32px\)\);/);
+  assert.match(componentSource, /\.buddy-widget__panel--fullscreen\s*\{[\s\S]*width:\s*min\(var\(--buddy-widget-panel-width\), calc\(100vw - 96px\)\);/);
 });
 
 test("BuddyWidget leaves buddy self config loading and memory curation to the chat graph template", () => {
