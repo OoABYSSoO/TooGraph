@@ -75,6 +75,12 @@ export type PageOperationBook = {
   forbidden: string[];
 };
 
+export type PageOperationRuntimeContext = {
+  page_path: string;
+  page_snapshot: PageOperationSnapshot;
+  page_operation_book: PageOperationBook;
+};
+
 export function normalizePageAffordance(input: PageAffordanceInit): PageAffordance | null {
   const id = compactText(input.id);
   const label = compactText(input.label);
@@ -171,6 +177,33 @@ export function buildPageOperationBook(snapshot: PageOperationSnapshotInit | Pag
     inputs,
     unavailable,
     forbidden: ["伙伴页面、伙伴浮窗、伙伴形象、伙伴调试入口不可由伙伴自己操作。"],
+  };
+}
+
+export function buildPageOperationRuntimeContext(input: {
+  routePath: string;
+  root: ParentNode | null;
+  title?: string | null;
+}): PageOperationRuntimeContext {
+  const snapshot = collectPageOperationSnapshot(input);
+  const pageOperationBook = buildPageOperationBook(snapshot);
+  return {
+    page_path: snapshot.path,
+    page_snapshot: snapshot,
+    page_operation_book: pageOperationBook,
+  };
+}
+
+export function attachPageOperationRuntimeContext<T extends { metadata?: Record<string, unknown> | null }>(
+  graph: T,
+  runtimeContext: PageOperationRuntimeContext,
+): T & { metadata: Record<string, unknown> } {
+  return {
+    ...graph,
+    metadata: {
+      ...(isPlainRecord(graph.metadata) ? graph.metadata : {}),
+      skill_runtime_context: runtimeContext,
+    },
   };
 }
 
@@ -352,6 +385,10 @@ function isTextInputElement(element: HTMLElement): element is HTMLInputElement |
 
 function readDataValue(element: HTMLElement, key: string): string {
   return compactText(element.dataset[key]);
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function readBooleanData(element: HTMLElement, key: string): boolean {

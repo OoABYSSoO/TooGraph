@@ -480,20 +480,31 @@ test("EditorWorkspaceShell removes the persistent bottom-left status feedback ov
 
 test("EditorWorkspaceShell subscribes to run events for live output previews", () => {
   assert.match(componentSource, /import \{ useWorkspaceRunLifecycleController \} from "\.\/useWorkspaceRunLifecycleController\.ts";/);
-  assert.match(componentSource, /useWorkspaceRunLifecycleController\(\{[\s\S]*documentsByTabId,[\s\S]*runOutputPreviewByTabId,[\s\S]*restoredRunSnapshotIdByTabId,[\s\S]*fetchRun,[\s\S]*applyRunVisualStateToTab,[\s\S]*openHumanReviewPanelForTab,[\s\S]*persistRunStateValuesForTab,[\s\S]*setMessageFeedbackForTab,[\s\S]*\}\);/);
+  assert.match(componentSource, /import \{ resolveBuddyVirtualOperationPlanFromActivityEvent \} from "@\/buddy\/virtualOperationProtocol";/);
+  assert.match(componentSource, /import \{ useBuddyMascotDebugStore \} from "@\/stores\/buddyMascotDebug";/);
+  assert.match(componentSource, /const buddyMascotDebugStore = useBuddyMascotDebugStore\(\);/);
+  assert.match(componentSource, /useWorkspaceRunLifecycleController\(\{[\s\S]*documentsByTabId,[\s\S]*runOutputPreviewByTabId,[\s\S]*restoredRunSnapshotIdByTabId,[\s\S]*fetchRun,[\s\S]*applyRunVisualStateToTab,[\s\S]*openHumanReviewPanelForTab,[\s\S]*persistRunStateValuesForTab,[\s\S]*handleActivityEvent: handleWorkspaceRunActivityEvent,[\s\S]*setMessageFeedbackForTab,[\s\S]*\}\);/);
   assert.match(runLifecycleControllerSource, /const runEventSourceByTabId = new Map<string, RunEventSourceLike>\(\);/);
   assert.match(runLifecycleControllerSource, /function startRunEventStreamForTab\(tabId: string, runId: string\)/);
   assert.match(runLifecycleControllerSource, /return new EventSource\(url\);/);
   assert.match(runLifecycleControllerSource, /addEventListener\("node\.output\.delta"/);
+  assert.match(runLifecycleControllerSource, /if \(eventType === "activity\.event"\) \{[\s\S]*input\.handleActivityEvent\?\.\(payload\);[\s\S]*\}/);
   assert.match(runLifecycleControllerSource, /function applyStreamingOutputPreviewToTab/);
   assert.match(runLifecycleControllerSource, /buildRunEventOutputPreviewUpdate/);
+  assert.match(componentSource, /function handleWorkspaceRunActivityEvent\(payload: Record<string, unknown>\)/);
+  assert.match(componentSource, /const operationPlan = resolveBuddyVirtualOperationPlanFromActivityEvent\(payload\);[\s\S]*buddyMascotDebugStore\.requestVirtualOperation\(operationPlan\);/);
   assert.match(componentSource, /useWorkspaceRunController\(\{[\s\S]*startRunEventStreamForTab,[\s\S]*\}\);/);
   assert.match(runControllerSource, /input\.startRunEventStreamForTab\(tabId, runId\);/);
 });
 
 test("EditorWorkspaceShell runs the latest document after async model refresh", () => {
   assert.match(componentSource, /import \{ useWorkspaceRunController \} from "\.\/useWorkspaceRunController\.ts";/);
+  assert.match(componentSource, /import \{ attachPageOperationRuntimeContext, buildPageOperationRuntimeContext \} from "@\/buddy\/pageOperationAffordances";/);
+  assert.match(componentSource, /async function runGraphWithPageOperationContext\(payload: GraphPayload \| GraphDocument\)/);
+  assert.match(componentSource, /const pageOperationContext = buildPageOperationRuntimeContext\(\{[\s\S]*routePath: route\.fullPath,[\s\S]*root: typeof document === "undefined" \? null : document,[\s\S]*\}\);/);
+  assert.match(componentSource, /return runGraph\(attachPageOperationRuntimeContext\(payload, pageOperationContext\)\);/);
   assert.match(componentSource, /const \{ runActiveGraph, resumeHumanReviewRun \} = useWorkspaceRunController\(\{/);
+  assert.match(componentSource, /useWorkspaceRunController\(\{[\s\S]*runGraph: runGraphWithPageOperationContext,[\s\S]*resumeRun,/);
   assert.match(runControllerSource, /await input\.refreshAgentModels\(\);/);
   assert.match(runControllerSource, /const latestDocument = input\.documentsByTabId\.value\[tab\.tabId\];/);
   assert.match(runControllerSource, /if \(!latestDocument\) \{[\s\S]*?return;[\s\S]*?\}/);

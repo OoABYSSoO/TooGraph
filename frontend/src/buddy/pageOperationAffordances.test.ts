@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  attachPageOperationRuntimeContext,
   buildPageOperationBook,
+  buildPageOperationRuntimeContext,
   formatPageOperationBookLines,
   normalizePageAffordance,
 } from "./pageOperationAffordances.ts";
@@ -108,4 +110,35 @@ test("formatPageOperationBookLines renders commands without selectors or coordin
   assert.match(text, /commands: focus settings\.modelProviders\.local\.baseUrl/);
   assert.match(text, /type settings\.modelProviders\.local\.baseUrl <text>/);
   assert.doesNotMatch(text, /querySelector|selector|x:|y:/i);
+});
+
+test("buildPageOperationRuntimeContext packages snapshot and operation book for graph runs", () => {
+  const runtimeContext = buildPageOperationRuntimeContext({
+    routePath: "/editor?tab=active",
+    root: null,
+    title: "图编辑器",
+  });
+
+  assert.equal(runtimeContext.page_path, "/editor");
+  assert.equal(runtimeContext.page_snapshot.path, "/editor");
+  assert.equal(runtimeContext.page_operation_book.page.path, "/editor");
+  assert.equal(runtimeContext.page_operation_book.page.title, "图编辑器");
+});
+
+test("attachPageOperationRuntimeContext preserves graph metadata while adding skill runtime context", () => {
+  const runtimeContext = buildPageOperationRuntimeContext({
+    routePath: "/runs",
+    root: null,
+    title: "运行历史",
+  });
+  const graph = {
+    name: "侧视图页面操作",
+    metadata: { existing: "keep" },
+  };
+
+  const result = attachPageOperationRuntimeContext(graph, runtimeContext);
+
+  assert.notEqual(result, graph);
+  assert.deepEqual(result.metadata.existing, "keep");
+  assert.deepEqual(result.metadata.skill_runtime_context, runtimeContext);
 });

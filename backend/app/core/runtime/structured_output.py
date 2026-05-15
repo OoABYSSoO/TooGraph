@@ -158,6 +158,10 @@ def _schema_for_value_type(value_type: str) -> dict[str, Any]:
         return {"type": "number"}
     if normalized == NodeSystemStateType.BOOLEAN.value:
         return {"type": "boolean"}
+    if normalized in {"text_array", "string_array"}:
+        return {"type": "array", "items": {"type": "string"}}
+    if normalized == "json_array":
+        return {"type": "array", "items": {}}
     if normalized in {NodeSystemStateType.JSON.value, NodeSystemStateType.RESULT_PACKAGE.value}:
         return {"type": "object", "additionalProperties": True}
     if normalized == NodeSystemStateType.CAPABILITY.value:

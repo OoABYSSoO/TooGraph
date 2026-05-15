@@ -268,6 +268,8 @@ import { fetchKnowledgeBases } from "@/api/knowledge";
 import { fetchRun, resumeRun } from "@/api/runs";
 import { fetchSettings } from "@/api/settings";
 import { fetchSkillDefinitions } from "@/api/skills";
+import { attachPageOperationRuntimeContext, buildPageOperationRuntimeContext } from "@/buddy/pageOperationAffordances";
+import { resolveBuddyVirtualOperationPlanFromActivityEvent } from "@/buddy/virtualOperationProtocol";
 import {
   exportLangGraphPython,
   fetchGraph,
@@ -295,6 +297,7 @@ import {
 } from "@/lib/editor-workspace";
 import type { CanvasViewport } from "@/editor/canvas/canvasViewport";
 import { useBuddyContextStore } from "@/stores/buddyContext";
+import { useBuddyMascotDebugStore } from "@/stores/buddyMascotDebug";
 import { useGraphDocumentStore } from "@/stores/graphDocument";
 import type { RunDetail } from "@/types/run";
 import type {
@@ -360,6 +363,7 @@ const router = useRouter();
 const route = useRoute();
 const graphStore = useGraphDocumentStore();
 const buddyContextStore = useBuddyContextStore();
+const buddyMascotDebugStore = useBuddyMascotDebugStore();
 const { t } = useI18n();
 
 const workspace = ref<PersistedEditorWorkspace>({
@@ -699,6 +703,7 @@ const {
   openHumanReviewPanelForTab,
   persistRunStateValuesForTab,
   clearRunActivityPanelHintForTab,
+  handleActivityEvent: handleWorkspaceRunActivityEvent,
   setMessageFeedbackForTab,
 });
 const activeTabRouteSignature = computed(() => {
@@ -947,7 +952,7 @@ const { runActiveGraph, resumeHumanReviewRun } = useWorkspaceRunController({
   activeRunEdgeIdsByTabId,
   runActivityByTabId,
   refreshAgentModels,
-  runGraph,
+  runGraph: runGraphWithPageOperationContext,
   resumeRun,
   cancelRunPolling,
   getRunGeneration,
@@ -959,6 +964,22 @@ const { runActiveGraph, resumeHumanReviewRun } = useWorkspaceRunController({
   showRunErrorToast,
   translate: (key, params) => t(key, params ?? {}),
 });
+
+async function runGraphWithPageOperationContext(payload: GraphPayload | GraphDocument) {
+  const pageOperationContext = buildPageOperationRuntimeContext({
+    routePath: route.fullPath,
+    root: typeof document === "undefined" ? null : document,
+  });
+  return runGraph(attachPageOperationRuntimeContext(payload, pageOperationContext));
+}
+
+function handleWorkspaceRunActivityEvent(payload: Record<string, unknown>) {
+  const operationPlan = resolveBuddyVirtualOperationPlanFromActivityEvent(payload);
+  if (!operationPlan) {
+    return;
+  }
+  buddyMascotDebugStore.requestVirtualOperation(operationPlan);
+}
 
 function updateWorkspace(nextWorkspace: PersistedEditorWorkspace) {
   workspace.value = nextWorkspace;

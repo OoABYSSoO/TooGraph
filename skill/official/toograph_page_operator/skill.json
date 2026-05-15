@@ -21,8 +21,8 @@
     {
       "key": "commands",
       "name": "Commands",
-      "valueType": "json",
-      "description": "LLM 从页面操作书中选择的一条命令数组。首期只支持 [\"click app.nav.runs\"]。"
+      "valueType": "text_array",
+      "description": "LLM 从页面操作书中选择的一条命令字符串数组。首期一次只输出一条普通应用导航命令，例如 [\"click app.nav.library\"]。"
     },
     {
       "key": "cursor_lifecycle",

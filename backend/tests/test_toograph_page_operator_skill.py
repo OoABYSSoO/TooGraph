@@ -48,6 +48,8 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
             [field.key for field in definition.llm_output_schema],
             ["commands", "cursor_lifecycle", "reason"],
         )
+        llm_output_types = {field.key: field.value_type for field in definition.llm_output_schema}
+        self.assertEqual(llm_output_types["commands"], "text_array")
         self.assertEqual(
             [field.key for field in definition.state_output_schema],
             ["ok", "next_page_path", "cursor_session_id", "journal", "error"],
@@ -72,6 +74,13 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
                                 "resultHint": {"path": "/runs"},
                             },
                             {
+                                "targetId": "app.nav.library",
+                                "label": "图库",
+                                "role": "navigation-link",
+                                "commands": ["click app.nav.library"],
+                                "resultHint": {"path": "/library"},
+                            },
+                            {
                                 "targetId": "app.nav.buddy",
                                 "label": "伙伴",
                                 "role": "navigation-link",
@@ -93,8 +102,10 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertNotIn("/stale-top-level", context)
         self.assertIn('"targetId": "app.nav.runs"', context)
         self.assertIn('"click app.nav.runs"', context)
+        self.assertIn('"targetId": "app.nav.library"', context)
+        self.assertIn('"click app.nav.library"', context)
         context_payload = json.loads(context)
-        self.assertEqual(context_payload["available_commands"], ["click app.nav.runs"])
+        self.assertEqual(context_payload["available_commands"], ["click app.nav.runs", "click app.nav.library"])
         self.assertEqual(context_payload["output_contract"]["commands"], ["click app.nav.runs"])
         self.assertIn("伙伴页面、伙伴浮窗、伙伴形象", context)
         self.assertNotIn("app.nav.buddy", context)
@@ -123,6 +134,25 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertEqual(event["detail"]["commands"], ["click app.nav.runs"])
         self.assertEqual(event["detail"]["reason"], "用户要打开运行历史页。")
         self.assertEqual(event["detail"]["cursor_lifecycle"], "return_after_step")
+
+    def test_after_llm_accepts_nested_commands_object_as_compatibility_fallback(self) -> None:
+        result = _run_skill_script(
+            PAGE_OPERATOR_AFTER_LLM_PATH,
+            {
+                "page_path": "/editor",
+                "commands": {"commands": ["click app.nav.library"]},
+                "cursor_lifecycle": "return-after-step",
+                "reason": "模型把 commands 数组包进了对象。",
+            },
+        )
+
+        self.assertEqual(result["ok"], True)
+        self.assertEqual(result["next_page_path"], "/library")
+        self.assertEqual(result["journal"][0]["target_id"], "app.nav.library")
+        event = result["activity_events"][0]
+        self.assertEqual(event["detail"]["commands"], ["click app.nav.library"])
+        self.assertEqual(event["detail"]["operation"]["target_id"], "app.nav.library")
+        self.assertEqual(event["detail"]["operation_request"]["next_page_path"], "/library")
 
     def test_after_llm_rejects_buddy_self_targets(self) -> None:
         result = _run_skill_script(

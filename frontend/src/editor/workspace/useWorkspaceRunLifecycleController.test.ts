@@ -88,7 +88,7 @@ function runDetail(status: string, patch: Partial<RunDetail> = {}): RunDetail {
   } as RunDetail;
 }
 
-function createHarness(options: { fetchRun?: () => Promise<RunDetail> } = {}) {
+function createHarness(options: { fetchRun?: () => Promise<RunDetail>; handleActivityEvent?: (payload: Record<string, unknown>) => void } = {}) {
   const documentsByTabId = ref<Record<string, GraphPayload>>({ tab_a: createDocument() });
   const runOutputPreviewByTabId = ref<Record<string, Record<string, { text: string; displayMode: string | null }>>>({});
   const runActivityByTabId = ref<Record<string, RunActivityState>>({});
@@ -137,6 +137,7 @@ function createHarness(options: { fetchRun?: () => Promise<RunDetail> } = {}) {
     clearRunActivityPanelHintForTab: (tabId) => {
       clearedRunActivityHints.push(tabId);
     },
+    handleActivityEvent: options.handleActivityEvent,
     setMessageFeedbackForTab: (tabId, nextFeedback) => {
       feedback.push({ tabId, feedback: nextFeedback });
     },
@@ -183,6 +184,55 @@ test("useWorkspaceRunLifecycleController streams output preview updates through 
     harness.runActivityByTabId.value.tab_a.entries.map((entry) => ({ kind: entry.kind, nodeId: entry.nodeId, preview: entry.preview })),
     [{ kind: "node-stream", nodeId: "agent_1", preview: "hello world" }],
   );
+});
+
+test("useWorkspaceRunLifecycleController forwards streamed activity events to an optional side-effect handler", () => {
+  const activityPayloads: Record<string, unknown>[] = [];
+  const harness = createHarness({
+    handleActivityEvent: (payload) => {
+      activityPayloads.push(payload);
+    },
+  });
+
+  harness.controller.startRunEventStreamForTab("tab_a", "run_1");
+  harness.eventSources[0]?.emit(
+    "activity.event",
+    new MessageEvent("activity.event", {
+      data: JSON.stringify({
+        node_id: "agent_1",
+        kind: "virtual_ui_operation",
+        summary: "Requested virtual click on 图库.",
+        detail: {
+          operation_request: {
+            version: 1,
+            commands: ["click app.nav.library"],
+            operations: [{ kind: "click", target_id: "app.nav.library" }],
+            cursor_lifecycle: "return_after_step",
+            next_page_path: "/library",
+            reason: "用户要打开图库。",
+          },
+        },
+      }),
+    }),
+  );
+
+  assert.deepEqual(activityPayloads, [
+    {
+      node_id: "agent_1",
+      kind: "virtual_ui_operation",
+      summary: "Requested virtual click on 图库.",
+      detail: {
+        operation_request: {
+          version: 1,
+          commands: ["click app.nav.library"],
+          operations: [{ kind: "click", target_id: "app.nav.library" }],
+          cursor_lifecycle: "return_after_step",
+          next_page_path: "/library",
+          reason: "用户要打开图库。",
+        },
+      },
+    },
+  ]);
 });
 
 test("useWorkspaceRunLifecycleController forwards subgraph node events to live visual state", () => {

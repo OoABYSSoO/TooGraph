@@ -51,6 +51,7 @@ type WorkspaceRunLifecycleControllerInput = {
   openHumanReviewPanelForTab: (tabId: string, nodeId: string | null) => void;
   persistRunStateValuesForTab: (tabId: string, run: RunDetail) => void;
   clearRunActivityPanelHintForTab: (tabId: string) => void;
+  handleActivityEvent?: (payload: Record<string, unknown>) => void;
   setMessageFeedbackForTab: (
     tabId: string,
     feedback: { tone: WorkspaceRunFeedback["tone"]; message: string; activeRunId?: string | null; activeRunStatus?: string | null },
@@ -112,6 +113,9 @@ export function useWorkspaceRunLifecycleController(input: WorkspaceRunLifecycleC
     }
     if (options.updateOutputPreview) {
       applyStreamingOutputPreviewToTab(tabId, payload);
+    }
+    if (eventType === "activity.event") {
+      input.handleActivityEvent?.(payload);
     }
     input.applyRunEventVisualStateToTab(tabId, eventType, payload, input.documentsByTabId.value[tabId]);
     appendRunActivityEventToTab(tabId, eventType, payload);
