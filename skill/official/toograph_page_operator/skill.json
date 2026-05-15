@@ -45,12 +45,6 @@
       "description": "语义操作是否被接受。"
     },
     {
-      "key": "next_page_path",
-      "name": "Next Page Path",
-      "valueType": "text",
-      "description": "操作成功后预期的新页面路径。"
-    },
-    {
       "key": "cursor_session_id",
       "name": "Cursor Session ID",
       "valueType": "text",

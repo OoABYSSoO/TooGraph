@@ -23,9 +23,9 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses operation request
     commands: ["click app.nav.runs"],
     operations: [{ kind: "click", targetId: "app.nav.runs" }],
     cursorLifecycle: "return_after_step",
-    nextPagePath: "/runs",
     reason: "用户要打开运行历史页。",
   });
+  assert.equal("nextPagePath" in (plan ?? {}), false);
 });
 
 test("resolveBuddyVirtualOperationPlanFromActivityEvent rejects buddy self targets", () => {

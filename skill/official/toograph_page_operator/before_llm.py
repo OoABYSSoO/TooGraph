@@ -9,47 +9,38 @@ SUPPORTED_COMMANDS = {
     "click app.nav.home": {
         "target_id": "app.nav.home",
         "target_label": "首页",
-        "next_page_path": "/",
     },
     "click app.nav.editor": {
         "target_id": "app.nav.editor",
         "target_label": "图编辑器",
-        "next_page_path": "/editor",
     },
     "click app.nav.runs": {
         "target_id": "app.nav.runs",
         "target_label": "运行历史",
-        "next_page_path": "/runs",
     },
     "click app.nav.library": {
         "target_id": "app.nav.library",
         "target_label": "图库",
-        "next_page_path": "/library",
     },
     "click app.nav.presets": {
         "target_id": "app.nav.presets",
         "target_label": "预设节点",
-        "next_page_path": "/presets",
     },
     "click app.nav.skills": {
         "target_id": "app.nav.skills",
         "target_label": "技能",
-        "next_page_path": "/skills",
     },
     "click app.nav.models": {
         "target_id": "app.nav.models",
         "target_label": "模型",
-        "next_page_path": "/models",
     },
     "click app.nav.modelLogs": {
         "target_id": "app.nav.modelLogs",
         "target_label": "模型日志",
-        "next_page_path": "/model-logs",
     },
     "click app.nav.settings": {
         "target_id": "app.nav.settings",
         "target_label": "设置",
-        "next_page_path": "/settings",
     },
 }
 DEFAULT_FORBIDDEN_NOTE = "伙伴页面、伙伴浮窗、伙伴形象和伙伴调试入口已过滤，不作为可操作内容返回。"

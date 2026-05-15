@@ -52,7 +52,7 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertEqual(llm_output_types["commands"], "text_array")
         self.assertEqual(
             [field.key for field in definition.state_output_schema],
-            ["ok", "next_page_path", "cursor_session_id", "journal", "error"],
+            ["ok", "cursor_session_id", "journal", "error"],
         )
 
     def test_before_llm_returns_operation_book_without_buddy_targets(self) -> None:
@@ -124,13 +124,15 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         )
 
         self.assertEqual(result["ok"], True)
-        self.assertEqual(result["next_page_path"], "/runs")
+        self.assertNotIn("next_page_path", result)
         self.assertEqual(result["journal"][0]["target_id"], "app.nav.runs")
         event = result["activity_events"][0]
         self.assertEqual(event["kind"], "virtual_ui_operation")
         self.assertEqual(event["status"], "requested")
         self.assertEqual(event["detail"]["operation"]["kind"], "click")
         self.assertEqual(event["detail"]["operation"]["target_id"], "app.nav.runs")
+        self.assertNotIn("next_page_path", event["detail"])
+        self.assertNotIn("next_page_path", event["detail"]["operation_request"])
         self.assertEqual(event["detail"]["commands"], ["click app.nav.runs"])
         self.assertEqual(event["detail"]["reason"], "用户要打开运行历史页。")
         self.assertEqual(event["detail"]["cursor_lifecycle"], "return_after_step")
@@ -147,12 +149,12 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         )
 
         self.assertEqual(result["ok"], True)
-        self.assertEqual(result["next_page_path"], "/library")
+        self.assertNotIn("next_page_path", result)
         self.assertEqual(result["journal"][0]["target_id"], "app.nav.library")
         event = result["activity_events"][0]
         self.assertEqual(event["detail"]["commands"], ["click app.nav.library"])
         self.assertEqual(event["detail"]["operation"]["target_id"], "app.nav.library")
-        self.assertEqual(event["detail"]["operation_request"]["next_page_path"], "/library")
+        self.assertNotIn("next_page_path", event["detail"]["operation_request"])
 
     def test_after_llm_rejects_buddy_self_targets(self) -> None:
         result = _run_skill_script(
@@ -164,6 +166,7 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         )
 
         self.assertEqual(result["ok"], False)
+        self.assertNotIn("next_page_path", result)
         self.assertEqual(result["error"]["code"], "forbidden_self_surface")
         self.assertEqual(result["activity_events"][0]["kind"], "virtual_ui_operation")
         self.assertEqual(result["activity_events"][0]["status"], "failed")

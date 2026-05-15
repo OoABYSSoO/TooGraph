@@ -45,7 +45,6 @@ export type BuddyVirtualOperationPlan = {
   commands: string[];
   operations: BuddyVirtualOperation[];
   cursorLifecycle: BuddyVirtualOperationCursorLifecycle;
-  nextPagePath: string;
   reason: string;
 };
 
@@ -76,7 +75,6 @@ export function resolveBuddyVirtualOperationPlanFromActivityEvent(payload: Recor
     commands,
     operations,
     cursorLifecycle: normalizeCursorLifecycle(operationRequest.cursor_lifecycle ?? operationRequest.cursorLifecycle),
-    nextPagePath: normalizeText(operationRequest.next_page_path ?? operationRequest.nextPagePath),
     reason: normalizeText(operationRequest.reason),
   };
 }
