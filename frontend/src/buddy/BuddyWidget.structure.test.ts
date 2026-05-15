@@ -479,9 +479,13 @@ test("BuddyWidget lets the buddy runtime choose its own model", () => {
 
 test("BuddyWidget builds page context from the shared editor snapshot", () => {
   assert.match(componentSource, /import \{ buildBuddyPageContext \} from "\.\/buddyPageContext\.ts";/);
+  assert.match(componentSource, /import \{ buildPageOperationBook, collectPageOperationSnapshot \} from "\.\/pageOperationAffordances\.ts";/);
   assert.match(componentSource, /import \{ useBuddyContextStore \} from "\.\.\/stores\/buddyContext\.ts";/);
   assert.match(componentSource, /const buddyContextStore = useBuddyContextStore\(\);/);
-  assert.match(componentSource, /return buildBuddyPageContext\(\{[\s\S]*routePath: route\.fullPath,[\s\S]*editor: buddyContextStore\.editorSnapshot,[\s\S]*activeBuddyRunId: activeRunId\.value,[\s\S]*\}\);/);
+  assert.match(componentSource, /const pageOperationContext = buildPageOperationRuntimeContext\(\);[\s\S]*pageContext: pageOperationContext\.pageContext,[\s\S]*pageOperationContext: pageOperationContext\.skillRuntimeContext/);
+  assert.match(componentSource, /const snapshot = collectPageOperationSnapshot\(\{[\s\S]*routePath: route\.fullPath,[\s\S]*root: typeof document === "undefined" \? null : document,[\s\S]*\}\);/);
+  assert.match(componentSource, /pageContext: buildBuddyPageContext\(\{[\s\S]*routePath: route\.fullPath,[\s\S]*editor: buddyContextStore\.editorSnapshot,[\s\S]*activeBuddyRunId: activeRunId\.value,[\s\S]*pageOperationBook,[\s\S]*\}\)/);
+  assert.match(componentSource, /skillRuntimeContext: \{[\s\S]*page_path: snapshot\.path,[\s\S]*page_snapshot: snapshot,[\s\S]*page_operation_book: pageOperationBook,[\s\S]*\}/);
 });
 
 test("BuddyWidget notifies buddy pages to refresh after a completed chat graph run", () => {

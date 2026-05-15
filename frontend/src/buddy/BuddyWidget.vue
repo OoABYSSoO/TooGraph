@@ -450,6 +450,7 @@ import {
   resolveOutputTraceBuddyMessageMetadata,
 } from "./buddyMessageMetadata.ts";
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
+import { buildPageOperationBook, collectPageOperationSnapshot } from "./pageOperationAffordances.ts";
 import { findLatestRecoverablePausedRunMessage, isRecoverablePausedRunStatus } from "./buddyPausedRunRecovery.ts";
 import {
   resolveBuddyComposerDecision,
@@ -2437,12 +2438,14 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
     activeAbortController = new AbortController();
     const binding = await fetchBuddyRunTemplateBinding();
     const template = await fetchTemplate(binding.template_id);
+    const pageOperationContext = buildPageOperationRuntimeContext();
     const graph = buildBuddyChatGraph(
       template,
       {
         userMessage: turn.userMessage,
         history,
-        pageContext: buildPageContext(),
+        pageContext: pageOperationContext.pageContext,
+        pageOperationContext: pageOperationContext.skillRuntimeContext,
         buddyMode: buddyMode.value,
         buddyModel: buddyModelRef.value,
       },
@@ -3591,11 +3594,28 @@ async function scrollPausedBuddyCardIntoView() {
 }
 
 function buildPageContext() {
-  return buildBuddyPageContext({
+  return buildPageOperationRuntimeContext().pageContext;
+}
+
+function buildPageOperationRuntimeContext() {
+  const snapshot = collectPageOperationSnapshot({
     routePath: route.fullPath,
-    editor: buddyContextStore.editorSnapshot,
-    activeBuddyRunId: activeRunId.value,
+    root: typeof document === "undefined" ? null : document,
   });
+  const pageOperationBook = buildPageOperationBook(snapshot);
+  return {
+    pageContext: buildBuddyPageContext({
+      routePath: route.fullPath,
+      editor: buddyContextStore.editorSnapshot,
+      activeBuddyRunId: activeRunId.value,
+      pageOperationBook,
+    }),
+    skillRuntimeContext: {
+      page_path: snapshot.path,
+      page_snapshot: snapshot,
+      page_operation_book: pageOperationBook,
+    },
+  };
 }
 
 function createMessage(

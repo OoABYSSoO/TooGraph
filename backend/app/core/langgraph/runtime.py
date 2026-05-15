@@ -81,6 +81,7 @@ INHERITED_PERMISSION_METADATA_KEYS = {
     "buddy_mode",
     "buddy_requires_approval",
     "buddy_can_execute_actions",
+    "skill_runtime_context",
 }
 
 

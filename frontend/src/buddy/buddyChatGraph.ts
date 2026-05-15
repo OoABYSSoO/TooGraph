@@ -65,8 +65,15 @@ export type BuildBuddyChatGraphInput = {
   userMessage: string;
   history: BuddyChatMessage[];
   pageContext: string;
+  pageOperationContext?: BuddySkillRuntimeContext | null;
   buddyMode?: unknown;
   buddyModel?: unknown;
+};
+
+export type BuddySkillRuntimeContext = {
+  page_path?: string;
+  page_snapshot?: unknown;
+  page_operation_book?: unknown;
 };
 
 export type BuildBuddyReviewGraphInput = {
@@ -112,6 +119,7 @@ export function buildBuddyChatGraph(
       buddy_template_binding: cloneJson(binding),
       buddy_mode: buddyMode,
       buddy_can_execute_actions: buddyMode === "full_access",
+      skill_runtime_context: cloneJson(input.pageOperationContext ?? {}),
     },
   };
   applyBuddyModePolicy(graph, buddyMode);

@@ -1,4 +1,6 @@
 import type { GraphDocument, GraphNode, GraphPayload, ReadBinding, WriteBinding } from "../types/node-system.ts";
+import type { PageOperationBook } from "./pageOperationAffordances.ts";
+import { formatPageOperationBookLines } from "./pageOperationAffordances.ts";
 
 export type BuddyEditorFeedbackSnapshot = {
   message?: string | null;
@@ -18,6 +20,7 @@ export type BuildBuddyPageContextInput = {
   routePath: string;
   editor?: BuddyEditorContextSnapshot | null;
   activeBuddyRunId?: string | null;
+  pageOperationBook?: PageOperationBook | null;
 };
 
 export function buildBuddyPageContext(input: BuildBuddyPageContextInput): string {
@@ -31,22 +34,13 @@ export function buildBuddyPageContext(input: BuildBuddyPageContextInput): string
     "",
     `当前路径: ${input.routePath || "/"}`,
     ...(input.activeBuddyRunId ? [`伙伴本轮运行: ${input.activeBuddyRunId}`] : []),
-    ...buildPageOperationBookLines(input.routePath),
+    ...(normalizeRoutePath(input.routePath).startsWith("/buddy") ? ["伙伴相关页面内容已过滤。"] : []),
+    ...formatPageOperationBookLines(input.pageOperationBook ?? null),
     ...buildEditorContextLines(input.editor ?? null),
     "</page-context>",
   ];
 
   return lines.filter((line) => line !== null).join("\n");
-}
-
-function buildPageOperationBookLines(routePath: string): string[] {
-  const normalizedPath = normalizeRoutePath(routePath);
-  return [
-    ...(normalizedPath.startsWith("/buddy") ? ["伙伴相关页面内容已过滤。"] : []),
-    "页面操作书:",
-    "- app.nav.runs: 点击“运行历史”。命令: click_nav runs。结果路径: /runs。",
-    "- forbidden: 伙伴页面、伙伴浮窗、伙伴形象、伙伴调试面板和 Buddy 导航目标不可由伙伴自己操作。",
-  ];
 }
 
 function normalizeRoutePath(routePath: string): string {

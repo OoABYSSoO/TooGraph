@@ -150,6 +150,83 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["final_result"], "value")
         self.assertEqual(finalized, {"answer": "value"})
 
+    def test_execute_agent_node_passes_graph_skill_runtime_context_to_skill_input_planning(self) -> None:
+        state_schema = {
+            "user_goal": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "ok": NodeSystemStateDefinition.model_validate({"type": "boolean"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "operate_page",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "user_goal", "required": True}],
+                "writes": [{"state": "ok", "mode": "replace"}],
+                "config": {
+                    "skillKey": "toograph_page_operator",
+                    "skillBindings": [
+                        {
+                            "skillKey": "toograph_page_operator",
+                            "outputMapping": {"ok": "ok"},
+                        }
+                    ],
+                },
+            }
+        )
+        captured: dict[str, Any] = {}
+
+        def generate_skill_inputs(**kwargs: Any):
+            captured["runtime_config"] = kwargs["runtime_config"]
+            return (
+                {
+                    "toograph_page_operator": {
+                        "commands": [{"action": "click", "target_id": "app.nav.runs"}],
+                        "cursor_lifecycle": "return_after_step",
+                        "reason": "test",
+                    }
+                },
+                "",
+                [],
+                kwargs["runtime_config"],
+            )
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {"user_goal": "打开运行历史"},
+            {"metadata": {"skill_runtime_context": {"page_path": "/editor"}}, "state": {}},
+            node_name="operate_page",
+            state={"run_id": "run-1", "metadata": {"skill_runtime_context": {"page_path": "/editor"}}, "activity_events": []},
+            get_skill_registry_func=lambda *, include_disabled: {"toograph_page_operator": "toograph_page_operator"},
+            get_skill_definition_registry_func=lambda *, include_disabled: {
+                "toograph_page_operator": SkillDefinition(
+                    skillKey="toograph_page_operator",
+                    name="页面操作",
+                    llmOutputSchema=[
+                        SkillIoField(key="commands", name="Commands", valueType="json"),
+                        SkillIoField(key="cursor_lifecycle", name="Cursor Lifecycle", valueType="text"),
+                        SkillIoField(key="reason", name="Reason", valueType="text"),
+                    ],
+                    stateOutputSchema=[SkillIoField(key="ok", name="OK", valueType="boolean")],
+                    runtimeReady=True,
+                    runtimeRegistered=True,
+                )
+            },
+            invoke_skill_func=lambda skill_func, skill_inputs: {"ok": True},
+            resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_skill_inputs_func=generate_skill_inputs,
+            generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("mapped skill output should satisfy node writes")
+            ),
+            finalize_agent_stream_delta_func=lambda **kwargs: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertEqual(captured["runtime_config"]["skill_runtime_context"], {"page_path": "/editor"})
+        self.assertEqual(result["outputs"], {"ok": True})
+
     def test_execute_agent_node_records_skill_activity_event(self) -> None:
         state_schema = {
             "question": NodeSystemStateDefinition.model_validate({"type": "text"}),

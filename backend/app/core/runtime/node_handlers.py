@@ -146,6 +146,13 @@ def execute_agent_node(
     response_reasoning = ""
     warnings: list[str] = []
     runtime_config = resolve_agent_runtime_config_func(node)
+    graph_metadata = graph_context.get("metadata") if isinstance(graph_context.get("metadata"), dict) else {}
+    skill_runtime_context = graph_metadata.get("skill_runtime_context") if isinstance(graph_metadata, dict) else None
+    if isinstance(skill_runtime_context, dict):
+        runtime_config = {
+            **runtime_config,
+            "skill_runtime_context": dict(skill_runtime_context),
+        }
     skill_definitions = get_skill_definition_registry_func(include_disabled=False)
     resolved_bindings = resolve_agent_skill_bindings(node, input_values=input_values, state_schema=state_schema)
     resolved_bindings = [

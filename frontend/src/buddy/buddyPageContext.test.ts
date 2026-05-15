@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import type { GraphPayload } from "../types/node-system.ts";
 
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
+import { buildPageOperationBook } from "./pageOperationAffordances.ts";
 
 function createGraph(): GraphPayload {
   return {
@@ -113,11 +114,29 @@ test("buildBuddyPageContext exposes only non-buddy page operations", () => {
   const context = buildBuddyPageContext({
     routePath: "/editor",
     editor: null,
+    pageOperationBook: buildPageOperationBook({
+      snapshotId: "snapshot-ctx",
+      path: "/editor",
+      title: "图编辑器",
+      affordances: [
+        {
+          id: "app.nav.runs",
+          label: "运行历史",
+          role: "navigation-link",
+          zone: "app-shell",
+          actions: ["click"],
+          enabled: true,
+          visible: true,
+          pathAfterClick: "/runs",
+        },
+      ],
+    }),
   });
 
   assert.match(context, /页面操作书:/);
   assert.match(context, /app\.nav\.runs/);
-  assert.match(context, /命令: click_nav runs/);
+  assert.match(context, /click app\.nav\.runs/);
+  assert.doesNotMatch(context, /click_nav runs/);
   assert.match(context, /伙伴页面、伙伴浮窗、伙伴形象[\s\S]*不可由伙伴自己操作/);
   assert.doesNotMatch(context, /app\.nav\.buddy/);
   assert.doesNotMatch(context, /buddy\.tab\.history/);
@@ -127,6 +146,43 @@ test("buildBuddyPageContext filters buddy self-surface details on the Buddy page
   const context = buildBuddyPageContext({
     routePath: "/buddy",
     editor: null,
+    pageOperationBook: buildPageOperationBook({
+      snapshotId: "snapshot-buddy",
+      path: "/buddy",
+      title: "伙伴",
+      affordances: [
+        {
+          id: "app.nav.runs",
+          label: "运行历史",
+          role: "navigation-link",
+          zone: "app-shell",
+          actions: ["click"],
+          enabled: true,
+          visible: true,
+          pathAfterClick: "/runs",
+        },
+        {
+          id: "app.nav.buddy",
+          label: "伙伴",
+          role: "navigation-link",
+          zone: "buddy-page",
+          actions: ["click"],
+          enabled: true,
+          visible: true,
+          safety: { selfSurface: true },
+        },
+        {
+          id: "buddy.tab.history",
+          label: "Buddy Home",
+          role: "tab",
+          zone: "buddy-page",
+          actions: ["click"],
+          enabled: true,
+          visible: true,
+          safety: { selfSurface: true },
+        },
+      ],
+    }),
   });
 
   assert.match(context, /伙伴相关页面内容已过滤/);

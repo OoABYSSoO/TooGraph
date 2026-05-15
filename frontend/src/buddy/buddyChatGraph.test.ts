@@ -641,6 +641,52 @@ test("buildBuddyChatGraph marks ask-first mode without a blanket reply breakpoin
   assert.equal(graph.metadata.agent_breakpoint_timing, undefined);
 });
 
+test("buildBuddyChatGraph carries page operation context for skill runtime", () => {
+  const graph = buildBuddyChatGraph(createTemplate(), {
+    userMessage: "打开运行历史",
+    history: [],
+    pageContext: "当前路径: /editor",
+    pageOperationContext: {
+      page_path: "/editor",
+      page_operation_book: {
+        page: { path: "/editor", title: "图编辑器", snapshotId: "snapshot-graph" },
+        allowedOperations: [
+          {
+            targetId: "app.nav.runs",
+            label: "运行历史",
+            role: "navigation-link",
+            commands: ["click app.nav.runs"],
+            resultHint: { path: "/runs" },
+          },
+        ],
+        inputs: [],
+        unavailable: [],
+        forbidden: ["伙伴自身区域不可操作"],
+      },
+    },
+    buddyMode: "ask_first",
+  });
+
+  assert.deepEqual(graph.metadata.skill_runtime_context, {
+    page_path: "/editor",
+    page_operation_book: {
+      page: { path: "/editor", title: "图编辑器", snapshotId: "snapshot-graph" },
+      allowedOperations: [
+        {
+          targetId: "app.nav.runs",
+          label: "运行历史",
+          role: "navigation-link",
+          commands: ["click app.nav.runs"],
+          resultHint: { path: "/runs" },
+        },
+      ],
+      inputs: [],
+      unavailable: [],
+      forbidden: ["伙伴自身区域不可操作"],
+    },
+  });
+});
+
 test("buildBuddyChatGraph overrides template agent models with the buddy model", () => {
   const template = createTemplate();
   const templateAgent = template.nodes.buddy_reply_agent;
