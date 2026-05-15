@@ -572,8 +572,9 @@ test("BuddyWidget closed reply bubble is wider and renders markdown or sandboxed
   assert.match(componentSource, /v-if="bubblePreviewContent\.kind === 'html'"/);
   assert.match(componentSource, /v-else-if="bubblePreviewContent\.kind === 'markdown'"/);
   assert.match(componentSource, /v-html="bubblePreviewContent\.html"/);
-  assert.match(componentSource, /--buddy-widget-bubble-width:\s*1520px;/);
+  assert.match(componentSource, /--buddy-widget-bubble-width:\s*360px;/);
   assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*width:\s*min\(var\(--buddy-widget-bubble-width\), calc\(100vw - 32px\)\);/);
+  assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*box-sizing:\s*border-box;/);
   assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*max-height:\s*min\(340px, calc\(100vh - 120px\)\);/);
   assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*overflow:\s*auto;/);
   assert.match(componentSource, /\.buddy-widget__bubble-html-frame \{[\s\S]*width:\s*100%;/);

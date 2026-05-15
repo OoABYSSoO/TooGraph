@@ -3858,7 +3858,7 @@ function formatErrorMessage(error: unknown): string {
 
 <style scoped>
 .buddy-widget {
-  --buddy-widget-bubble-width: 1520px;
+  --buddy-widget-bubble-width: 360px;
 
   position: fixed;
   inset: 0;
@@ -4874,6 +4874,7 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__bubble {
   bottom: calc(100% + 10px);
   width: min(var(--buddy-widget-bubble-width), calc(100vw - 32px));
+  box-sizing: border-box;
   max-height: min(340px, calc(100vh - 120px));
   overflow: auto;
   padding: 9px 11px;
