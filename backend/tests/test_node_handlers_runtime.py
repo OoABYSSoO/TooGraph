@@ -180,7 +180,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             return (
                 {
                     "toograph_page_operator": {
-                        "commands": [{"action": "click", "target_id": "app.nav.runs"}],
+                        "commands": ["click app.nav.runs"],
                         "cursor_lifecycle": "return_after_step",
                         "reason": "test",
                     }

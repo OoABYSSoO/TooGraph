@@ -5,13 +5,13 @@ description: Execute one semantic app-page operation through Buddy's virtual cur
 
 # TooGraph 页面操作器
 
-This official Skill validates one semantic page operation and asks TooGraph's app-native virtual operator layer to play the operation through Buddy's virtual cursor.
+This official Skill validates one page-operation command sequence and asks TooGraph's app-native virtual operator layer to play the operation through Buddy's virtual cursor.
 
 Current phase:
 
 - Supports one operation per invocation.
 - Supports application navigation clicks only.
-- Supports `click_nav` target `runs`.
+- Supports the operation-book command `click app.nav.runs`.
 - Rejects Buddy self surfaces such as the Buddy page, Buddy floating window, Buddy avatar, and debug controls.
 - Does not expose DOM selectors, screen coordinates, or low-level mouse trajectories to the LLM.
 
@@ -22,13 +22,13 @@ Graph state inputs:
 Runtime context:
 
 - `page_path`: current application route.
-- `page_context`: page content summary produced by the app runtime when available. Partner-related content is filtered before the LLM sees the operation book.
+- `page_operation_book`: structured page operation book produced by the app runtime. Partner-related content is filtered before the LLM sees the operation book.
 
 LLM output:
 
-- `action`: semantic action. Current phase supports `click_nav`.
-- `target`: semantic target. Current phase supports `runs` and its aliases.
+- `commands`: array of command strings copied from the page operation book. Current phase supports `["click app.nav.runs"]`.
 - `cursor_lifecycle`: virtual cursor lifecycle, such as `return_after_step`.
+- `reason`: short audit reason for choosing the command.
 
 State outputs:
 
@@ -38,4 +38,4 @@ State outputs:
 - `journal`: operation journal summary.
 - `error`: structured failure detail.
 
-`before_llm.py` injects the current page operation book from runtime context, not graph state. `after_llm.py` validates the LLM command, returns the expected next page path, and emits a `virtual_ui_operation` activity event for the frontend runtime to execute.
+`before_llm.py` injects the current page operation book from runtime context, not graph state. `after_llm.py` validates the LLM command list, returns the expected next page path, and emits a `virtual_ui_operation` activity event for the frontend runtime to execute.

@@ -46,7 +46,7 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         )
         self.assertEqual(
             [field.key for field in definition.llm_output_schema],
-            ["action", "target", "cursor_lifecycle"],
+            ["commands", "cursor_lifecycle", "reason"],
         )
         self.assertEqual(
             [field.key for field in definition.state_output_schema],
@@ -60,7 +60,29 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
                 "graph_state": {"page_path": "/stale-graph-state"},
                 "page_context": "当前路径: /stale-top-level",
                 "runtime_context": {
-                    "page_context": "当前路径: /buddy\n伙伴页面里有历史按钮，但不应该返回。",
+                    "page_path": "/buddy",
+                    "page_operation_book": {
+                        "page": {"path": "/buddy", "title": "伙伴", "snapshotId": "snapshot-test"},
+                        "allowedOperations": [
+                            {
+                                "targetId": "app.nav.runs",
+                                "label": "运行历史",
+                                "role": "navigation-link",
+                                "commands": ["click app.nav.runs"],
+                                "resultHint": {"path": "/runs"},
+                            },
+                            {
+                                "targetId": "app.nav.buddy",
+                                "label": "伙伴",
+                                "role": "navigation-link",
+                                "commands": ["click app.nav.buddy"],
+                                "resultHint": {"path": "/buddy"},
+                            },
+                        ],
+                        "inputs": [],
+                        "unavailable": [],
+                        "forbidden": ["伙伴页面、伙伴浮窗、伙伴形象和伙伴调试入口已过滤。"],
+                    },
                 },
             },
         )
@@ -69,7 +91,11 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertIn('"current_page_path": "/buddy"', context)
         self.assertNotIn("/stale-graph-state", context)
         self.assertNotIn("/stale-top-level", context)
-        self.assertIn('"affordance_id": "app.nav.runs"', context)
+        self.assertIn('"targetId": "app.nav.runs"', context)
+        self.assertIn('"click app.nav.runs"', context)
+        context_payload = json.loads(context)
+        self.assertEqual(context_payload["available_commands"], ["click app.nav.runs"])
+        self.assertEqual(context_payload["output_contract"]["commands"], ["click app.nav.runs"])
         self.assertIn("伙伴页面、伙伴浮窗、伙伴形象", context)
         self.assertNotIn("app.nav.buddy", context)
         self.assertNotIn("buddy.tab.history", context)
@@ -80,9 +106,9 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
             PAGE_OPERATOR_AFTER_LLM_PATH,
             {
                 "page_path": "/",
-                "action": "click_nav",
-                "target": "runs",
+                "commands": ["click app.nav.runs"],
                 "cursor_lifecycle": "return_after_step",
+                "reason": "用户要打开运行历史页。",
             },
         )
 
@@ -94,6 +120,8 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertEqual(event["status"], "requested")
         self.assertEqual(event["detail"]["operation"]["kind"], "click")
         self.assertEqual(event["detail"]["operation"]["target_id"], "app.nav.runs")
+        self.assertEqual(event["detail"]["commands"], ["click app.nav.runs"])
+        self.assertEqual(event["detail"]["reason"], "用户要打开运行历史页。")
         self.assertEqual(event["detail"]["cursor_lifecycle"], "return_after_step")
 
     def test_after_llm_rejects_buddy_self_targets(self) -> None:
@@ -101,8 +129,7 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
             PAGE_OPERATOR_AFTER_LLM_PATH,
             {
                 "page_path": "/buddy",
-                "action": "click_nav",
-                "target": "app.nav.buddy",
+                "commands": ["click app.nav.buddy"],
             },
         )
 

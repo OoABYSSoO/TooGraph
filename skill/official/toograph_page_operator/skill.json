@@ -2,8 +2,8 @@
   "schemaVersion": "toograph.skill/v1",
   "skillKey": "toograph_page_operator",
   "name": "TooGraph 页面操作器",
-  "description": "根据结构化页面操作书执行一条语义级页面操作请求。首期支持非伙伴页面的应用导航点击，并通过伙伴虚拟鼠标播放可见操作。",
-  "llmInstruction": "你已绑定 TooGraph 页面操作器。根据页面操作书和用户目标，只生成一条语义命令。当前只允许 click_nav 到普通应用导航目标，例如 runs。不要选择伙伴页面、伙伴浮窗、伙伴形象或调试入口。不要输出 DOM selector、坐标、鼠标轨迹或多步计划。",
+  "description": "根据结构化页面操作书执行一条页面命令请求。首期支持非伙伴页面的应用导航点击，并通过伙伴虚拟鼠标播放可见操作。",
+  "llmInstruction": "你已绑定 TooGraph 页面操作器。根据页面操作书和用户目标，只输出 commands、cursor_lifecycle、reason。commands 必须来自页面操作书里的命令字符串，例如 [\"click app.nav.runs\"]。当前只允许一条命令，且只允许普通应用页面目标。不要选择伙伴页面、伙伴浮窗、伙伴形象或调试入口。不要输出 DOM selector、坐标、鼠标轨迹或多步计划。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [
@@ -19,22 +19,22 @@
   ],
   "llmOutputSchema": [
     {
-      "key": "action",
-      "name": "Action",
-      "valueType": "text",
-      "description": "语义动作。首期只支持 click_nav。"
-    },
-    {
-      "key": "target",
-      "name": "Target",
-      "valueType": "text",
-      "description": "语义目标。首期支持 runs / 运行历史 / 历史。"
+      "key": "commands",
+      "name": "Commands",
+      "valueType": "json",
+      "description": "LLM 从页面操作书中选择的一条命令数组。首期只支持 [\"click app.nav.runs\"]。"
     },
     {
       "key": "cursor_lifecycle",
       "name": "Cursor Lifecycle",
       "valueType": "text",
       "description": "虚拟鼠标生命周期，keep、return_after_step 或 return_at_end；没有连续操作时返回 return_after_step。"
+    },
+    {
+      "key": "reason",
+      "name": "Reason",
+      "valueType": "text",
+      "description": "选择这些页面命令的简短理由，用于审计。"
     }
   ],
   "stateOutputSchema": [

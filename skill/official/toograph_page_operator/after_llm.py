@@ -6,20 +6,7 @@ from typing import Any
 
 
 SUPPORTED_CURSOR_LIFECYCLES = {"keep", "return_after_step", "return_at_end"}
-RUNS_TARGET_ALIASES = {
-    "runs",
-    "run",
-    "run_history",
-    "run history",
-    "history",
-    "histories",
-    "运行",
-    "运行页",
-    "运行历史",
-    "运行记录",
-    "历史",
-    "历史页",
-}
+SUPPORTED_COMMAND = "click app.nav.runs"
 BUDDY_SELF_TARGETS = {
     "app.nav.buddy",
     "buddy",
@@ -36,27 +23,55 @@ BUDDY_SELF_TARGETS = {
 
 
 def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
-    action = _normalize_token(skill_inputs.get("action"))
-    target = _normalize_token(skill_inputs.get("target"))
+    commands = _normalize_commands(skill_inputs.get("commands"))
     cursor_lifecycle = _normalize_cursor_lifecycle(skill_inputs.get("cursor_lifecycle"))
+    reason = _compact_text(skill_inputs.get("reason"))
 
-    if target in BUDDY_SELF_TARGETS or target.startswith("buddy."):
+    if not commands:
+        return _failed(
+            code="missing_commands",
+            message="页面操作器需要 commands 数组，且命令必须来自页面操作书。",
+            recoverable=True,
+        )
+    if len(commands) != 1:
+        return _failed(
+            code="unsupported_command_sequence",
+            message="页面操作器第一阶段一次只支持一条命令。",
+            recoverable=True,
+            detail={"commands": commands},
+        )
+
+    command = commands[0]
+    parsed = _parse_command(command)
+    if not parsed:
+        return _failed(
+            code="invalid_command",
+            message="页面操作命令格式无效。请使用页面操作书中的命令字符串，例如 click app.nav.runs。",
+            recoverable=True,
+            detail={"commands": commands},
+        )
+
+    action, target_id = parsed
+    if _is_self_surface_target(target_id):
         return _failed(
             code="forbidden_self_surface",
             message="伙伴不能操作伙伴页面、伙伴浮窗或自己的形象。",
             recoverable=False,
+            detail={"commands": commands, "target_id": target_id},
         )
-    if action not in {"click_nav", "click_navigation", "navigate"}:
+    if action != "click":
         return _failed(
             code="unsupported_action",
-            message="TooGraph 页面操作器第一阶段只支持 click_nav。",
+            message="TooGraph 页面操作器第一阶段只支持 click 命令。",
             recoverable=True,
+            detail={"commands": commands},
         )
-    if target not in RUNS_TARGET_ALIASES:
+    if command != SUPPORTED_COMMAND:
         return _failed(
             code="unsupported_target",
             message="TooGraph 页面操作器第一阶段只支持运行历史导航目标。",
             recoverable=True,
+            detail={"commands": commands, "target_id": target_id},
         )
 
     operation = {
@@ -64,12 +79,22 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
         "target_id": "app.nav.runs",
         "target_label": "运行历史",
     }
+    operation_request = {
+        "version": 1,
+        "commands": commands,
+        "operations": [operation],
+        "cursor_lifecycle": cursor_lifecycle,
+        "next_page_path": "/runs",
+        "reason": reason,
+    }
     journal_entry = {
         "kind": "click",
+        "command": command,
         "target_id": "app.nav.runs",
         "target_label": "运行历史",
         "status": "requested",
         "next_page_path": "/runs",
+        "reason": reason,
     }
     return {
         "ok": True,
@@ -83,22 +108,28 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
                 "summary": "Requested virtual click on app navigation Runs.",
                 "status": "requested",
                 "detail": {
+                    "commands": commands,
+                    "operation_request": operation_request,
                     "operation": operation,
                     "cursor_lifecycle": cursor_lifecycle,
                     "next_page_path": "/runs",
                     "journal": [journal_entry],
+                    "reason": reason,
                 },
             }
         ],
     }
 
 
-def _failed(*, code: str, message: str, recoverable: bool) -> dict[str, Any]:
+def _failed(*, code: str, message: str, recoverable: bool, detail: dict[str, Any] | None = None) -> dict[str, Any]:
     error = {
         "code": code,
         "message": message,
         "recoverable": recoverable,
     }
+    event_detail = {"error": error}
+    if detail:
+        event_detail.update(detail)
     return {
         "ok": False,
         "next_page_path": "",
@@ -112,22 +143,53 @@ def _failed(*, code: str, message: str, recoverable: bool) -> dict[str, Any]:
                 "kind": "virtual_ui_operation",
                 "summary": message,
                 "status": "failed",
-                "detail": {"error": error},
+                "detail": event_detail,
                 "error": message,
             }
         ],
     }
 
 
+def _normalize_commands(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    commands: list[str] = []
+    for item in value:
+        command = _compact_text(item)
+        if command:
+            commands.append(command)
+    return commands
+
+
+def _parse_command(command: str) -> tuple[str, str] | None:
+    parts = command.strip().split(maxsplit=1)
+    if len(parts) != 2:
+        return None
+    return parts[0].lower(), parts[1].strip()
+
+
+def _is_self_surface_target(target_id: str) -> bool:
+    normalized = target_id.strip().lower()
+    return (
+        normalized in BUDDY_SELF_TARGETS
+        or normalized.startswith("buddy.")
+        or normalized == "app.nav.buddy"
+        or "mascot" in normalized
+        or "debug" in normalized
+        or "伙伴" in normalized
+        or "调试" in normalized
+    )
+
+
 def _normalize_cursor_lifecycle(value: Any) -> str:
-    normalized = _normalize_token(value)
+    normalized = _compact_text(value).lower().replace("-", "_")
     if normalized in SUPPORTED_CURSOR_LIFECYCLES:
         return normalized
     return "return_after_step"
 
 
-def _normalize_token(value: Any) -> str:
-    return str(value or "").strip().lower().replace("-", "_")
+def _compact_text(value: Any) -> str:
+    return str(value or "").strip()
 
 
 def main() -> None:
