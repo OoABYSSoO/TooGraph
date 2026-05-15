@@ -621,6 +621,24 @@ test("BuddyWidget seeds streaming run trace capsules from the current run snapsh
   assert.match(componentSource, /source\.addEventListener\("run\.completed", \(\) => closeEventSource\(source\)\);/);
 });
 
+test("BuddyWidget shows a pending run trace capsule immediately after sending", () => {
+  assert.match(componentSource, /import \{[\s\S]*createBuddyPendingOutputTraceRuntimeState,[\s\S]*\} from "\.\/buddyOutputTrace\.ts";/);
+  assert.match(
+    componentSource,
+    /messages\.value\.push\(userEntry, assistantEntry\);[\s\S]*showBuddyImmediatePendingTrace\(assistantEntry\.id\);[\s\S]*queuedTurns\.value\.push\(/,
+  );
+  assert.match(componentSource, /function showBuddyImmediatePendingTrace\(assistantMessageId: string\)/);
+  assert.match(componentSource, /segmentId:\s*"__pending__"/);
+  assert.match(componentSource, /boundaryLabel:\s*t\("buddy\.activity\.preparing"\)/);
+  assert.match(
+    componentSource,
+    /const publicOutputBindings = buildBuddyPublicOutputBindings\(graph\);[\s\S]*showBuddyGraphPendingTrace\(assistantMessage\.id, graph, publicOutputBindings\);[\s\S]*const run = await runGraph\(graph\);/,
+  );
+  assert.match(componentSource, /function showBuddyGraphPendingTrace\(/);
+  assert.match(componentSource, /createBuddyPendingOutputTraceRuntimeState\(outputTracePlan, nowPublicOutputMs\(\)\)/);
+  assert.match(componentSource, /function hasVisibleBuddyRunDisplaySnapshot\(/);
+});
+
 test("BuddyWidget groups consecutive visible messages by role label", () => {
   assert.match(componentSource, /import \{ shouldShowGroupedBuddyMessageLabel \} from "\.\/buddyMessageGrouping\.ts";/);
   assert.match(componentSource, /v-for="\(\s*message,\s*messageIndex\s*\) in messages"/);

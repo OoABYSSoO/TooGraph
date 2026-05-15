@@ -500,6 +500,7 @@ import {
   buildBuddyOutputTracePlan,
   buildBuddyOutputTraceStateFromRunDetail,
   createBuddyOutputTraceRuntimeState,
+  createBuddyPendingOutputTraceRuntimeState,
   listBuddyOutputTraceSegmentsForDisplay,
   reduceBuddyOutputTraceEvent,
   type BuddyOutputTraceRecord,
@@ -2509,6 +2510,7 @@ async function sendMessage() {
   const userEntry = createMessage("user", userMessage, undefined, allocateBuddyMessageClientOrder());
   const assistantEntry = createMessage("assistant", "", undefined, allocateBuddyMessageClientOrder());
   messages.value.push(userEntry, assistantEntry);
+  showBuddyImmediatePendingTrace(assistantEntry.id);
   const history = buildHistoryBeforeMessage(userEntry.id);
   void persistBuddyMessage(sessionId, userEntry);
   queuedTurns.value.push({
@@ -2573,10 +2575,11 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
       },
       binding,
     );
+    const publicOutputBindings = buildBuddyPublicOutputBindings(graph);
+    showBuddyGraphPendingTrace(assistantMessage.id, graph, publicOutputBindings);
     setAssistantActivityText(assistantMessage.id, t("buddy.activity.starting"));
     const run = await runGraph(graph);
     activeRunId.value = run.run_id;
-    const publicOutputBindings = buildBuddyPublicOutputBindings(graph);
     startRunEventStream(run.run_id, assistantMessage.id, graph, publicOutputBindings);
     const runDetail = await pollRunUntilFinished(run.run_id, activeAbortController.signal);
     if (runDetail.status === "awaiting_human") {
@@ -2592,6 +2595,7 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
     mood.value = "error";
     const message = error instanceof Error ? error.message : t("buddy.runFailed");
     errorMessage.value = message;
+    removeBuddyRunDisplayMessages(assistantMessage.id);
     updateAssistantMessage(assistantMessage.id, t("buddy.errorReply", { error: message }), { includeInContext: false });
     void persistBuddyMessage(turn.sessionId, messages.value.find((entry) => entry.id === assistantMessage.id), {
       includeInContext: false,
@@ -3172,6 +3176,41 @@ function persistPosition() {
   window.localStorage.setItem(BUDDY_POSITION_STORAGE_KEY, serializeBuddyPosition(position.value));
 }
 
+function showBuddyImmediatePendingTrace(assistantMessageId: string) {
+  const outputTrace: BuddyOutputTraceSegment = {
+    segmentId: "__pending__",
+    boundaryNodeId: "__pending__",
+    boundaryLabel: t("buddy.activity.preparing"),
+    outputNodeIds: [],
+    status: "running",
+    startedAtMs: nowPublicOutputMs(),
+    completedAtMs: null,
+    durationMs: null,
+    records: [],
+  };
+  const existingMessages = new Map(messages.value.map((message) => [message.id, message]));
+  removeBuddyRunDisplayMessages(assistantMessageId);
+  messages.value.splice(resolveBuddyRunDisplayInsertionIndex(assistantMessageId), 0, buildOutputTraceMessage(assistantMessageId, "", outputTrace, existingMessages));
+}
+
+function showBuddyGraphPendingTrace(
+  assistantMessageId: string,
+  graph: GraphPayload,
+  publicOutputBindings: BuddyPublicOutputBinding[],
+) {
+  const outputTracePlan = buildBuddyOutputTracePlan(graph, publicOutputBindings);
+  const outputTraceState = createBuddyPendingOutputTraceRuntimeState(outputTracePlan, nowPublicOutputMs());
+  if (listBuddyOutputTraceSegmentsForDisplay(outputTraceState).length === 0) {
+    return;
+  }
+  syncStreamingBuddyRunDisplay(
+    assistantMessageId,
+    "",
+    outputTraceState,
+    createBuddyPublicOutputRuntimeState(),
+  );
+}
+
 function startRunEventStream(
   runId: string,
   assistantMessageId: string,
@@ -3191,6 +3230,9 @@ function startRunEventStream(
   eventSource = source;
   void hydrateBuddyStreamingRunDisplayFromSnapshot(runId, source, graph, publicOutputBindings, outputTracePlan).then((snapshot) => {
     if (!snapshot || eventSource !== source) {
+      return;
+    }
+    if (!hasVisibleBuddyRunDisplaySnapshot(snapshot)) {
       return;
     }
     outputTraceState = snapshot.outputTraceState;
@@ -3257,6 +3299,13 @@ async function hydrateBuddyStreamingRunDisplayFromSnapshot(
   }
 }
 
+function hasVisibleBuddyRunDisplaySnapshot(snapshot: BuddyStreamingRunDisplaySnapshot) {
+  return (
+    listBuddyOutputTraceSegmentsForDisplay(snapshot.outputTraceState).length > 0 ||
+    snapshot.publicOutputState.order.length > 0
+  );
+}
+
 async function pollRunUntilFinished(runId: string, signal: AbortSignal): Promise<RunDetail> {
   while (true) {
     const run = await fetchRun(runId, { signal });
@@ -3295,6 +3344,13 @@ function shouldShowPausedRunCard(message: BuddyMessage) {
   );
 }
 
+function removeBuddyRunDisplayMessages(controllerMessageId: string) {
+  const displayPrefix = `${controllerMessageId}:`;
+  messages.value = messages.value.filter(
+    (message) => !message.id.startsWith(`${displayPrefix}trace:`) && !message.id.startsWith(`${displayPrefix}output:`),
+  );
+}
+
 function syncStreamingBuddyRunDisplay(
   assistantMessageId: string,
   runId: string,
@@ -3329,10 +3385,7 @@ function syncBuddyRunDisplayMessages(
   outputState: BuddyPublicOutputRuntimeState,
 ) {
   const existingMessages = new Map(messages.value.map((message) => [message.id, message]));
-  const displayPrefix = `${controllerMessageId}:`;
-  messages.value = messages.value.filter(
-    (message) => !message.id.startsWith(`${displayPrefix}trace:`) && !message.id.startsWith(`${displayPrefix}output:`),
-  );
+  removeBuddyRunDisplayMessages(controllerMessageId);
 
   const outputTraceMessages: BuddyMessage[] = [];
   const publicOutputMessages: BuddyMessage[] = [];

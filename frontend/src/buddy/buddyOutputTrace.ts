@@ -129,6 +129,30 @@ export function createBuddyOutputTraceRuntimeState(plan: BuddyOutputTracePlan): 
   };
 }
 
+export function createBuddyPendingOutputTraceRuntimeState(
+  plan: BuddyOutputTracePlan,
+  startedAtMs: number,
+): BuddyOutputTraceRuntimeState {
+  const state = createBuddyOutputTraceRuntimeState(plan);
+  const segmentId = state.order[0];
+  const segment = segmentId ? state.segmentsById[segmentId] : null;
+  if (!segment) {
+    return state;
+  }
+  return {
+    ...state,
+    activeSegmentId: segmentId,
+    segmentsById: {
+      ...state.segmentsById,
+      [segmentId]: {
+        ...segment,
+        status: "running",
+        startedAtMs,
+      },
+    },
+  };
+}
+
 export function reduceBuddyOutputTraceEvent(
   state: BuddyOutputTraceRuntimeState,
   plan: BuddyOutputTracePlan,

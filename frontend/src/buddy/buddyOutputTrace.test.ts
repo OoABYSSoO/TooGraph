@@ -8,6 +8,7 @@ import {
   buildBuddyOutputTracePlan,
   buildBuddyOutputTraceStateFromRunDetail,
   createBuddyOutputTraceRuntimeState,
+  createBuddyPendingOutputTraceRuntimeState,
   listBuddyOutputTraceSegmentsForDisplay,
   reduceBuddyOutputTraceEvent,
 } from "./buddyOutputTrace.ts";
@@ -94,6 +95,20 @@ test("buildBuddyOutputTracePlan groups multiple parent outputs behind one bounda
     "output_e4",
   ]);
   assert.equal(plan.segmentIdByOutputNodeId.output_b2, "boundary:node_b");
+});
+
+test("createBuddyPendingOutputTraceRuntimeState shows the first segment immediately", () => {
+  const graph = fiveNodeGraph();
+  const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));
+
+  const state = createBuddyPendingOutputTraceRuntimeState(plan, 1234);
+  const segments = listBuddyOutputTraceSegmentsForDisplay(state);
+
+  assert.equal(segments.length, 1);
+  assert.equal(segments[0].segmentId, "boundary:node_b");
+  assert.equal(segments[0].status, "running");
+  assert.equal(segments[0].startedAtMs, 1234);
+  assert.deepEqual(segments[0].records, []);
 });
 
 test("reduceBuddyOutputTraceEvent splits records after each output boundary completes", () => {
