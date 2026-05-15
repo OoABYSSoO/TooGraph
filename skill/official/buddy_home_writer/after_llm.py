@@ -9,9 +9,7 @@ from typing import Any
 
 
 ALLOWED_ACTIONS = {
-    "memory.create",
-    "memory.update",
-    "memory.delete",
+    "memory_document.update",
     "session_summary.update",
     "profile.update",
     "policy.update",

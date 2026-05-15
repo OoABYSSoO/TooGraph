@@ -33,6 +33,7 @@ def toograph_context_fanout(**skill_inputs: Any) -> dict[str, Any]:
         "memory": lambda: _memory_branch(
             query=_text(merged_inputs.get("memory_query")) or user_message,
             scope=_text(merged_inputs.get("memory_scope")),
+            buddy_context=buddy_context,
             budget_chars=budgets["memory"],
         ),
         "knowledge": lambda: _knowledge_branch(
@@ -117,49 +118,59 @@ def toograph_context_fanout(**skill_inputs: Any) -> dict[str, Any]:
     }
 
 
-def _memory_branch(*, query: str, scope: str, budget_chars: int) -> dict[str, Any]:
-    repo_root = _repo_root()
-    backend_path = repo_root / "backend"
-    if str(backend_path) not in sys.path:
-        sys.path.insert(0, str(backend_path))
-    from app.memory import store
+def _memory_branch(*, query: str, scope: str, buddy_context: Any, budget_chars: int) -> dict[str, Any]:
+    del scope
+    memory_markdown = _extract_buddy_memory_markdown(buddy_context)
+    if not memory_markdown:
+        repo_root = _repo_root()
+        backend_path = repo_root / "backend"
+        if str(backend_path) not in sys.path:
+            sys.path.insert(0, str(backend_path))
+        try:
+            from app.buddy.home import build_buddy_home_context_pack
 
-    recalled = store.recall_memories(
-        query=query,
-        scope=_optional_filter(scope),
-        status="active",
-        top_k=8,
-        max_chars=budget_chars,
-    )
+            memory_markdown = _text(build_buddy_home_context_pack().get("memory_markdown"))
+        except Exception:
+            memory_markdown = ""
+    summary, omitted = _budget_text(memory_markdown, budget_chars, source="buddy_home/MEMORY.md")
     memory_context = {
-        "kind": "memory_context",
-        "query": recalled["query"],
-        "filters": {
-            "scope": recalled["scope"],
-            "layer": recalled["layer"],
-            "type": recalled["type"],
-            "status": recalled["status"],
-        },
-        "max_chars": recalled["max_chars"],
-        "used_chars": recalled["used_chars"],
-        "total_count": recalled["total_count"],
-        "included_count": recalled["included_count"],
-        "omitted_count": recalled["omitted_count"],
-        "memories": recalled["memories"],
-        "omitted": recalled["omitted"],
+        "kind": "buddy_home_memory_context",
+        "query": query,
+        "source": "buddy_home/MEMORY.md",
+        "used_chars": len(summary),
+        "source_chars": len(memory_markdown),
+        "content": summary,
+        "omitted": omitted,
     }
-    summary = "\n".join(
-        f"- {memory.get('summary', '')}: {memory.get('content', '')}"
-        for memory in recalled["memories"]
-    )
     return _branch_result(
         "memory",
         memory_context,
         summary=summary,
         budget_chars=budget_chars,
-        omitted=recalled["omitted"],
-        source_count=recalled["included_count"],
+        omitted=omitted,
+        source_count=1 if memory_markdown else 0,
     )
+
+
+def _extract_buddy_memory_markdown(buddy_context: Any) -> str:
+    if isinstance(buddy_context, dict):
+        for key in ("memory_markdown", "memory", "MEMORY.md"):
+            value = buddy_context.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        files = buddy_context.get("files")
+        if isinstance(files, list):
+            for item in files:
+                if not isinstance(item, dict):
+                    continue
+                name = _text(item.get("name") or item.get("path"))
+                if name.endswith("MEMORY.md"):
+                    content = _text(item.get("content"))
+                    if content:
+                        return content
+    if isinstance(buddy_context, str) and "MEMORY.md" in buddy_context:
+        return buddy_context.strip()
+    return ""
 
 
 def _knowledge_branch(*, query: str, knowledge_base: str, budget_chars: int) -> dict[str, Any]:
@@ -428,15 +439,12 @@ def _section(name: str, value: str) -> str:
 
 def _empty_memory_context() -> dict[str, Any]:
     return {
-        "kind": "memory_context",
+        "kind": "buddy_home_memory_context",
         "query": "",
-        "filters": {},
-        "max_chars": 0,
+        "source": "buddy_home/MEMORY.md",
         "used_chars": 0,
-        "total_count": 0,
-        "included_count": 0,
-        "omitted_count": 0,
-        "memories": [],
+        "source_chars": 0,
+        "content": "",
         "omitted": [],
     }
 

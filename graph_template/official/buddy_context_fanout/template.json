@@ -90,7 +90,7 @@
     },
     "fanout_memory_context": {
       "name": "fanout_memory_context",
-      "description": "平台记忆召回结果。",
+      "description": "Buddy Home MEMORY.md 上下文。",
       "type": "json",
       "value": {},
       "color": "#0f766e",
@@ -487,7 +487,7 @@
       "toograph_context_fanout"
     ],
     "requiredPermissions": [
-      "memory_read",
+      "buddy_session_read",
       "knowledge_read",
       "file_read"
     ]

@@ -62,51 +62,23 @@
     },
     "product_memory_request": {
       "name": "产品记忆召回请求",
-      "description": "面向 memory_recall Skill 的只读召回参数。",
+      "description": "面向 buddy_session_recall Skill 的只读召回参数。",
       "type": "json",
       "value": {},
       "color": "#9333ea",
       "binding": null
     },
-    "memory_recall_success": {
+    "buddy_session_recall_success": {
       "name": "记忆召回成功",
-      "description": "memory_recall 是否成功。",
+      "description": "buddy_session_recall 是否成功。",
       "type": "boolean",
       "value": false,
       "color": "#16a34a",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "nodeId": "recall_product_memory",
         "fieldKey": "success",
-        "managed": true
-      }
-    },
-    "memory_context": {
-      "name": "产品记忆上下文",
-      "description": "召回的产品偏好、历史调研结论、禁用假设和验证经验。",
-      "type": "json",
-      "value": {},
-      "color": "#7c3aed",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_recall",
-        "nodeId": "recall_product_memory",
-        "fieldKey": "memory_context",
-        "managed": true
-      }
-    },
-    "recalled_memories": {
-      "name": "纳入记忆",
-      "description": "本轮纳入上下文的产品记忆。",
-      "type": "json",
-      "value": [],
-      "color": "#8b5cf6",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_recall",
-        "nodeId": "recall_product_memory",
-        "fieldKey": "recalled_memories",
         "managed": true
       }
     },
@@ -118,21 +90,21 @@
       "color": "#a855f7",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "nodeId": "recall_product_memory",
         "fieldKey": "omitted_memories",
         "managed": true
       }
     },
-    "memory_recall_result": {
+    "buddy_session_recall_result": {
       "name": "记忆召回摘要",
-      "description": "memory_recall 返回的召回摘要。",
+      "description": "buddy_session_recall 返回的召回摘要。",
       "type": "markdown",
       "value": "",
       "color": "#6d28d9",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "nodeId": "recall_product_memory",
         "fieldKey": "result",
         "managed": true
@@ -218,70 +190,6 @@
       "color": "#0891b2",
       "binding": null
     },
-    "product_memory_plan": {
-      "name": "产品候选记忆计划",
-      "description": "需要写入候选记忆的稳定产品偏好、用户洞察和验证规则。",
-      "type": "json",
-      "value": {},
-      "color": "#9333ea",
-      "binding": null
-    },
-    "candidate_write_success": {
-      "name": "候选记忆写入成功",
-      "description": "memory_candidate_writer 是否成功写入候选。",
-      "type": "boolean",
-      "value": false,
-      "color": "#16a34a",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_candidate_writer",
-        "nodeId": "write_product_memory_candidates",
-        "fieldKey": "success",
-        "managed": true
-      }
-    },
-    "candidate_memories": {
-      "name": "候选记忆",
-      "description": "写入平台 store 的 candidate 状态记忆。",
-      "type": "json",
-      "value": [],
-      "color": "#7c3aed",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_candidate_writer",
-        "nodeId": "write_product_memory_candidates",
-        "fieldKey": "candidate_memories",
-        "managed": true
-      }
-    },
-    "skipped_candidates": {
-      "name": "跳过候选",
-      "description": "因证据不足或格式无效跳过的候选。",
-      "type": "json",
-      "value": [],
-      "color": "#dc2626",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_candidate_writer",
-        "nodeId": "write_product_memory_candidates",
-        "fieldKey": "skipped_candidates",
-        "managed": true
-      }
-    },
-    "candidate_write_result": {
-      "name": "候选记忆写入摘要",
-      "description": "memory_candidate_writer 返回的写入摘要。",
-      "type": "markdown",
-      "value": "",
-      "color": "#6d28d9",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_candidate_writer",
-        "nodeId": "write_product_memory_candidates",
-        "fieldKey": "result",
-        "managed": true
-      }
-    },
     "final_research_package": {
       "name": "最终产品研究包",
       "description": "面向用户展示和导出的完整竞品研究包。",
@@ -289,6 +197,34 @@
       "value": "",
       "color": "#b45309",
       "binding": null
+    },
+    "session_recall_context": {
+      "name": "session_recall_context",
+      "description": "从 Buddy 历史会话中召回的上下文窗口。",
+      "type": "json",
+      "value": {},
+      "color": "#7c3aed",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "buddy_session_recall",
+        "nodeId": "recall_product_memory",
+        "fieldKey": "session_recall_context",
+        "managed": true
+      }
+    },
+    "recalled_sessions": {
+      "name": "recalled_sessions",
+      "description": "从 Buddy 历史会话中召回的会话片段。",
+      "type": "json",
+      "value": [],
+      "color": "#8b5cf6",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "buddy_session_recall",
+        "nodeId": "recall_product_memory",
+        "fieldKey": "recalled_sessions",
+        "managed": true
+      }
     }
   },
   "nodes": {
@@ -296,82 +232,235 @@
       "kind": "input",
       "name": "输入产品方向",
       "description": "填写产品方向和初始假设。",
-      "ui": { "position": { "x": 40, "y": 40 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 40
+        },
+        "collapsed": false,
+        "size": {
+          "width": 340,
+          "height": 180
+        }
+      },
       "reads": [],
-      "writes": [{ "state": "product_idea", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
+      "writes": [
+        {
+          "state": "product_idea",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
     },
     "input_competitor_sources": {
       "kind": "input",
       "name": "输入竞品资料",
       "description": "粘贴竞品资料。",
-      "ui": { "position": { "x": 40, "y": 260 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 260
+        },
+        "collapsed": false,
+        "size": {
+          "width": 340,
+          "height": 180
+        }
+      },
       "reads": [],
-      "writes": [{ "state": "competitor_sources", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
+      "writes": [
+        {
+          "state": "competitor_sources",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
     },
     "input_user_reviews": {
       "kind": "input",
       "name": "输入用户评论",
       "description": "粘贴评论、反馈或社区讨论。",
-      "ui": { "position": { "x": 40, "y": 480 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 480
+        },
+        "collapsed": false,
+        "size": {
+          "width": 340,
+          "height": 180
+        }
+      },
       "reads": [],
-      "writes": [{ "state": "user_reviews", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
+      "writes": [
+        {
+          "state": "user_reviews",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
     },
     "input_interview_notes": {
       "kind": "input",
       "name": "输入访谈材料",
       "description": "粘贴访谈或销售反馈。",
-      "ui": { "position": { "x": 40, "y": 700 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 700
+        },
+        "collapsed": false,
+        "size": {
+          "width": 340,
+          "height": 180
+        }
+      },
       "reads": [],
-      "writes": [{ "state": "interview_notes", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
+      "writes": [
+        {
+          "state": "interview_notes",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
     },
     "input_target_market": {
       "kind": "input",
       "name": "输入目标市场",
       "description": "填写行业、人群、地区或渠道。",
-      "ui": { "position": { "x": 40, "y": 920 }, "collapsed": false, "size": { "width": 340, "height": 160 } },
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 920
+        },
+        "collapsed": false,
+        "size": {
+          "width": 340,
+          "height": 160
+        }
+      },
       "reads": [],
-      "writes": [{ "state": "target_market", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
+      "writes": [
+        {
+          "state": "target_market",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
     },
     "input_research_goal": {
       "kind": "input",
       "name": "输入研究目标",
       "description": "填写本次研究问题。",
-      "ui": { "position": { "x": 40, "y": 1120 }, "collapsed": false, "size": { "width": 340, "height": 160 } },
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 1120
+        },
+        "collapsed": false,
+        "size": {
+          "width": 340,
+          "height": 160
+        }
+      },
       "reads": [],
-      "writes": [{ "state": "research_goal", "mode": "replace" }],
-      "config": { "value": "形成证据链明确的机会点、MVP 和 PRD 草稿。", "boundaryType": "text" }
+      "writes": [
+        {
+          "state": "research_goal",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "形成证据链明确的机会点、MVP 和 PRD 草稿。",
+        "boundaryType": "text"
+      }
     },
     "input_existing_knowledge": {
       "kind": "input",
       "name": "输入已有知识",
       "description": "粘贴团队已有调研或业务约束。",
-      "ui": { "position": { "x": 40, "y": 1320 }, "collapsed": false, "size": { "width": 340, "height": 180 } },
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 1320
+        },
+        "collapsed": false,
+        "size": {
+          "width": 340,
+          "height": 180
+        }
+      },
       "reads": [],
-      "writes": [{ "state": "existing_knowledge_notes", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
+      "writes": [
+        {
+          "state": "existing_knowledge_notes",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
     },
     "prepare_product_memory_request": {
       "kind": "agent",
       "name": "准备产品记忆召回",
       "description": "生成只读产品记忆召回请求。",
-      "ui": { "position": { "x": 520, "y": 180 }, "collapsed": false, "size": { "width": 420, "height": 280 } },
+      "ui": {
+        "position": {
+          "x": 520,
+          "y": 180
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 280
+        }
+      },
       "reads": [
-        { "state": "product_idea", "required": true },
-        { "state": "target_market", "required": false },
-        { "state": "research_goal", "required": true },
-        { "state": "existing_knowledge_notes", "required": false }
+        {
+          "state": "product_idea",
+          "required": true
+        },
+        {
+          "state": "target_market",
+          "required": false
+        },
+        {
+          "state": "research_goal",
+          "required": true
+        },
+        {
+          "state": "existing_knowledge_notes",
+          "required": false
+        }
       ],
-      "writes": [{ "state": "product_memory_request", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "product_memory_request",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "生成 product_memory_request JSON，只召回产品偏好、历史调研结论、用户洞察、禁用假设和验证经验。字段包含 query、scope、layer、memory_type、status、top_k、max_chars。scope 默认 user，layer 优先 procedural，status 默认 active，top_k 不超过 8，max_chars 不超过 3000。不要生成研究结论。",
+        "taskInstruction": "生成 product_memory_request JSON，只用于只读召回 Buddy 历史会话中的长期偏好、历史反馈和相关上下文。字段包含 mode、query、limit、window；mode 默认 discover，limit 不超过 8，window 不超过 2。query 应结合本模板输入和用户目标，避免过宽；不要写 scope、layer、status、top_k、max_chars，不要生成业务结论。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -381,39 +470,64 @@
     "recall_product_memory": {
       "kind": "agent",
       "name": "召回产品记忆",
-      "description": "运行 memory_recall Skill，只透传召回结果。",
-      "ui": { "position": { "x": 1060, "y": 180 }, "collapsed": false, "size": { "width": 420, "height": 300 } },
-      "reads": [{ "state": "product_memory_request", "required": true }],
+      "description": "运行 buddy_session_recall Skill，只透传召回结果。",
+      "ui": {
+        "position": {
+          "x": 1060,
+          "y": 180
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "product_memory_request",
+          "required": true
+        }
+      ],
       "writes": [
-        { "state": "memory_recall_success", "mode": "replace" },
-        { "state": "memory_context", "mode": "replace" },
-        { "state": "recalled_memories", "mode": "replace" },
-        { "state": "omitted_memories", "mode": "replace" },
-        { "state": "memory_recall_result", "mode": "replace" }
+        {
+          "state": "buddy_session_recall_success",
+          "mode": "replace"
+        },
+        {
+          "state": "session_recall_context",
+          "mode": "replace"
+        },
+        {
+          "state": "recalled_sessions",
+          "mode": "replace"
+        },
+        {
+          "state": "buddy_session_recall_result",
+          "mode": "replace"
+        }
       ],
       "config": {
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "skillBindings": [
           {
-            "skillKey": "memory_recall",
+            "skillKey": "buddy_session_recall",
             "outputMapping": {
-              "success": "memory_recall_success",
-              "memory_context": "memory_context",
-              "recalled_memories": "recalled_memories",
-              "omitted_memories": "omitted_memories",
-              "result": "memory_recall_result"
+              "success": "buddy_session_recall_success",
+              "session_recall_context": "session_recall_context",
+              "sessions": "recalled_sessions",
+              "result": "buddy_session_recall_result"
             }
           }
         ],
         "skillInstructionBlocks": {
-          "memory_recall": {
-            "skillKey": "memory_recall",
-            "title": "产品记忆召回 skill instruction",
-            "content": "你已绑定记忆召回技能。根据 product_memory_request 生成只读召回参数；不要改写记忆，不要写入记忆。技能结果会写入 memory_context、recalled_memories、omitted_memories 和 result。",
+          "buddy_session_recall": {
+            "skillKey": "buddy_session_recall",
+            "title": "Buddy session recall instruction",
+            "content": "你已绑定 Buddy 会话召回技能。只把 product_memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
             "source": "node.override"
           }
         },
-        "taskInstruction": "本节点只负责运行 memory_recall。缺失字段时使用 scope=user、status=active、top_k=8、max_chars=3000。不要输出研究结论。",
+        "taskInstruction": "本节点只负责运行 buddy_session_recall。根据上游 product_memory_request 生成 recall_request；mode 只能是 browse、discover 或 scroll，默认 discover；limit 不超过 8，window 不超过 2。不要输出业务结论，不写 MEMORY.md，不创建逐条审批记录。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -424,16 +538,49 @@
       "kind": "agent",
       "name": "建立证据索引",
       "description": "把输入材料切分成可引用证据。",
-      "ui": { "position": { "x": 520, "y": 600 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "ui": {
+        "position": {
+          "x": 520,
+          "y": 600
+        },
+        "collapsed": false,
+        "size": {
+          "width": 460,
+          "height": 340
+        }
+      },
       "reads": [
-        { "state": "product_idea", "required": true },
-        { "state": "competitor_sources", "required": true },
-        { "state": "user_reviews", "required": false },
-        { "state": "interview_notes", "required": false },
-        { "state": "target_market", "required": false },
-        { "state": "existing_knowledge_notes", "required": false }
+        {
+          "state": "product_idea",
+          "required": true
+        },
+        {
+          "state": "competitor_sources",
+          "required": true
+        },
+        {
+          "state": "user_reviews",
+          "required": false
+        },
+        {
+          "state": "interview_notes",
+          "required": false
+        },
+        {
+          "state": "target_market",
+          "required": false
+        },
+        {
+          "state": "existing_knowledge_notes",
+          "required": false
+        }
       ],
-      "writes": [{ "state": "source_evidence_map", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "source_evidence_map",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -449,13 +596,37 @@
       "kind": "agent",
       "name": "生成竞品画像",
       "description": "从证据中抽取竞品定位、用户、功能、定价和风险。",
-      "ui": { "position": { "x": 1060, "y": 600 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "ui": {
+        "position": {
+          "x": 1060,
+          "y": 600
+        },
+        "collapsed": false,
+        "size": {
+          "width": 440,
+          "height": 320
+        }
+      },
       "reads": [
-        { "state": "competitor_sources", "required": true },
-        { "state": "source_evidence_map", "required": true },
-        { "state": "target_market", "required": false }
+        {
+          "state": "competitor_sources",
+          "required": true
+        },
+        {
+          "state": "source_evidence_map",
+          "required": true
+        },
+        {
+          "state": "target_market",
+          "required": false
+        }
       ],
-      "writes": [{ "state": "competitor_profiles", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "competitor_profiles",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -471,13 +642,37 @@
       "kind": "agent",
       "name": "生成功能矩阵",
       "description": "生成可追溯的 CSV 风格功能矩阵。",
-      "ui": { "position": { "x": 1600, "y": 600 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "ui": {
+        "position": {
+          "x": 1600,
+          "y": 600
+        },
+        "collapsed": false,
+        "size": {
+          "width": 440,
+          "height": 320
+        }
+      },
       "reads": [
-        { "state": "product_idea", "required": true },
-        { "state": "competitor_profiles", "required": true },
-        { "state": "source_evidence_map", "required": true }
+        {
+          "state": "product_idea",
+          "required": true
+        },
+        {
+          "state": "competitor_profiles",
+          "required": true
+        },
+        {
+          "state": "source_evidence_map",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "feature_matrix", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "feature_matrix",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -493,15 +688,40 @@
       "kind": "agent",
       "name": "聚类用户反馈",
       "description": "清洗和聚类评论、访谈、反馈。",
-      "ui": { "position": { "x": 520, "y": 1040 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "ui": {
+        "position": {
+          "x": 520,
+          "y": 1040
+        },
+        "collapsed": false,
+        "size": {
+          "width": 460,
+          "height": 340
+        }
+      },
       "reads": [
-        { "state": "user_reviews", "required": false },
-        { "state": "interview_notes", "required": false },
-        { "state": "source_evidence_map", "required": true }
+        {
+          "state": "user_reviews",
+          "required": false
+        },
+        {
+          "state": "interview_notes",
+          "required": false
+        },
+        {
+          "state": "source_evidence_map",
+          "required": true
+        }
       ],
       "writes": [
-        { "state": "clean_feedback", "mode": "replace" },
-        { "state": "user_review_clusters", "mode": "replace" }
+        {
+          "state": "clean_feedback",
+          "mode": "replace"
+        },
+        {
+          "state": "user_review_clusters",
+          "mode": "replace"
+        }
       ],
       "config": {
         "skillKey": "",
@@ -518,13 +738,37 @@
       "kind": "agent",
       "name": "提炼用户痛点",
       "description": "把聚类反馈转成痛点、动机和现有方案不足。",
-      "ui": { "position": { "x": 1060, "y": 1040 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "ui": {
+        "position": {
+          "x": 1060,
+          "y": 1040
+        },
+        "collapsed": false,
+        "size": {
+          "width": 440,
+          "height": 320
+        }
+      },
       "reads": [
-        { "state": "user_review_clusters", "required": true },
-        { "state": "feature_matrix", "required": true },
-        { "state": "competitor_profiles", "required": true }
+        {
+          "state": "user_review_clusters",
+          "required": true
+        },
+        {
+          "state": "feature_matrix",
+          "required": true
+        },
+        {
+          "state": "competitor_profiles",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "pain_points", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "pain_points",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -540,15 +784,45 @@
       "kind": "agent",
       "name": "排序机会点",
       "description": "根据痛点、竞品空缺和产品目标排序机会。",
-      "ui": { "position": { "x": 1600, "y": 1040 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "ui": {
+        "position": {
+          "x": 1600,
+          "y": 1040
+        },
+        "collapsed": false,
+        "size": {
+          "width": 460,
+          "height": 340
+        }
+      },
       "reads": [
-        { "state": "product_idea", "required": true },
-        { "state": "pain_points", "required": true },
-        { "state": "feature_matrix", "required": true },
-        { "state": "memory_context", "required": false },
-        { "state": "research_goal", "required": true }
+        {
+          "state": "product_idea",
+          "required": true
+        },
+        {
+          "state": "pain_points",
+          "required": true
+        },
+        {
+          "state": "feature_matrix",
+          "required": true
+        },
+        {
+          "state": "session_recall_context",
+          "required": false
+        },
+        {
+          "state": "research_goal",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "opportunity_report", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "opportunity_report",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -564,13 +838,37 @@
       "kind": "agent",
       "name": "生成 MVP 方案",
       "description": "把机会点转成 MVP 范围和里程碑。",
-      "ui": { "position": { "x": 520, "y": 1480 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "ui": {
+        "position": {
+          "x": 520,
+          "y": 1480
+        },
+        "collapsed": false,
+        "size": {
+          "width": 440,
+          "height": 320
+        }
+      },
       "reads": [
-        { "state": "opportunity_report", "required": true },
-        { "state": "target_market", "required": false },
-        { "state": "product_idea", "required": true }
+        {
+          "state": "opportunity_report",
+          "required": true
+        },
+        {
+          "state": "target_market",
+          "required": false
+        },
+        {
+          "state": "product_idea",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "mvp_plan", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "mvp_plan",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -586,14 +884,41 @@
       "kind": "agent",
       "name": "起草 PRD",
       "description": "基于证据、机会和 MVP 生成 PRD 草稿。",
-      "ui": { "position": { "x": 1060, "y": 1480 }, "collapsed": false, "size": { "width": 460, "height": 340 } },
+      "ui": {
+        "position": {
+          "x": 1060,
+          "y": 1480
+        },
+        "collapsed": false,
+        "size": {
+          "width": 460,
+          "height": 340
+        }
+      },
       "reads": [
-        { "state": "mvp_plan", "required": true },
-        { "state": "opportunity_report", "required": true },
-        { "state": "feature_matrix", "required": true },
-        { "state": "pain_points", "required": true }
+        {
+          "state": "mvp_plan",
+          "required": true
+        },
+        {
+          "state": "opportunity_report",
+          "required": true
+        },
+        {
+          "state": "feature_matrix",
+          "required": true
+        },
+        {
+          "state": "pain_points",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "prd_draft", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "prd_draft",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -609,14 +934,41 @@
       "kind": "agent",
       "name": "生成验证计划",
       "description": "输出实验、访谈、指标和失败标准。",
-      "ui": { "position": { "x": 1600, "y": 1480 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
+      "ui": {
+        "position": {
+          "x": 1600,
+          "y": 1480
+        },
+        "collapsed": false,
+        "size": {
+          "width": 440,
+          "height": 320
+        }
+      },
       "reads": [
-        { "state": "prd_draft", "required": true },
-        { "state": "mvp_plan", "required": true },
-        { "state": "opportunity_report", "required": true },
-        { "state": "user_review_clusters", "required": true }
+        {
+          "state": "prd_draft",
+          "required": true
+        },
+        {
+          "state": "mvp_plan",
+          "required": true
+        },
+        {
+          "state": "opportunity_report",
+          "required": true
+        },
+        {
+          "state": "user_review_clusters",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "validation_plan", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "validation_plan",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -628,92 +980,66 @@
         "temperature": 0.25
       }
     },
-    "prepare_product_memory_plan": {
-      "kind": "agent",
-      "name": "准备产品候选记忆",
-      "description": "只生成 candidate 状态候选记忆。",
-      "ui": { "position": { "x": 2140, "y": 1480 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
-      "reads": [
-        { "state": "opportunity_report", "required": true },
-        { "state": "mvp_plan", "required": true },
-        { "state": "validation_plan", "required": true },
-        { "state": "product_idea", "required": true }
-      ],
-      "writes": [{ "state": "product_memory_plan", "mode": "replace" }],
-      "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
-        "taskInstruction": "product_memory_plan 写成 JSON，包含 candidates 数组。只把有证据的稳定用户洞察、产品偏好、验证规则和机会判断写成 candidate 状态候选：scope=user、layer=procedural、type=preference 或 fact，summary、content、confidence、importance、evidence、artifact_refs。不得写入未验证市场结论、敏感商业数据或无来源判断。",
-        "modelSource": "global",
-        "model": "",
-        "thinkingMode": "high",
-        "temperature": 0.2
-      }
-    },
-    "write_product_memory_candidates": {
-      "kind": "agent",
-      "name": "写入产品候选记忆",
-      "description": "运行 memory_candidate_writer，只写入 candidate 状态记忆。",
-      "ui": { "position": { "x": 2680, "y": 1480 }, "collapsed": false, "size": { "width": 440, "height": 320 } },
-      "reads": [{ "state": "product_memory_plan", "required": true }],
-      "writes": [
-        { "state": "candidate_write_success", "mode": "replace" },
-        { "state": "candidate_memories", "mode": "replace" },
-        { "state": "skipped_candidates", "mode": "replace" },
-        { "state": "candidate_write_result", "mode": "replace" }
-      ],
-      "config": {
-        "skillKey": "memory_candidate_writer",
-        "skillBindings": [
-          {
-            "skillKey": "memory_candidate_writer",
-            "outputMapping": {
-              "success": "candidate_write_success",
-              "candidate_memories": "candidate_memories",
-              "skipped_candidates": "skipped_candidates",
-              "result": "candidate_write_result"
-            }
-          }
-        ],
-        "skillInstructionBlocks": {
-          "memory_candidate_writer": {
-            "skillKey": "memory_candidate_writer",
-            "title": "产品候选记忆写入 skill instruction",
-            "content": "你已绑定候选记忆写入技能。只把 product_memory_plan 中证据充足的候选写入 candidate 状态；不要应用为 active，不要覆盖既有记忆，不要写入未验证市场结论或无来源判断。技能结果会写入 candidate_memories、skipped_candidates 和 result。",
-            "source": "node.override"
-          }
-        },
-        "taskInstruction": "本节点只负责运行 memory_candidate_writer。将 product_memory_plan 中证据充足的 candidates 交给技能；不要总结研究包，不要改写候选。",
-        "modelSource": "global",
-        "model": "",
-        "thinkingMode": "high",
-        "temperature": 0.2
-      }
-    },
     "build_final_research_package": {
       "kind": "agent",
       "name": "生成最终研究包",
       "description": "汇总竞品画像、功能矩阵、痛点、机会、MVP、PRD 和验证计划。",
-      "ui": { "position": { "x": 2140, "y": 1040 }, "collapsed": false, "size": { "width": 460, "height": 360 } },
+      "ui": {
+        "position": {
+          "x": 2140,
+          "y": 1040
+        },
+        "collapsed": false,
+        "size": {
+          "width": 460,
+          "height": 360
+        }
+      },
       "reads": [
-        { "state": "competitor_profiles", "required": true },
-        { "state": "feature_matrix", "required": true },
-        { "state": "user_review_clusters", "required": true },
-        { "state": "pain_points", "required": true },
-        { "state": "opportunity_report", "required": true },
-        { "state": "mvp_plan", "required": true },
-        { "state": "prd_draft", "required": true },
-        { "state": "validation_plan", "required": true },
-        { "state": "candidate_write_result", "required": false },
-        { "state": "candidate_memories", "required": false }
+        {
+          "state": "competitor_profiles",
+          "required": true
+        },
+        {
+          "state": "feature_matrix",
+          "required": true
+        },
+        {
+          "state": "user_review_clusters",
+          "required": true
+        },
+        {
+          "state": "pain_points",
+          "required": true
+        },
+        {
+          "state": "opportunity_report",
+          "required": true
+        },
+        {
+          "state": "mvp_plan",
+          "required": true
+        },
+        {
+          "state": "prd_draft",
+          "required": true
+        },
+        {
+          "state": "validation_plan",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "final_research_package", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "final_research_package",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "final_research_package 写成 Markdown，包含：1. 研究结论摘要；2. 证据和限制；3. 竞品画像；4. 功能矩阵；5. 用户痛点；6. 机会点排序；7. MVP 方案；8. PRD 草稿；9. 验证计划；10. 候选记忆状态；11. 人工确认清单。必须保留假设、不确定项和证据不足。",
+        "taskInstruction": "final_research_package 写成 Markdown，包含：1. 研究结论摘要；2. 证据和限制；3. 竞品画像；4. 功能矩阵；5. 用户痛点；6. 机会点排序；7. MVP 方案；8. PRD 草稿；9. 验证计划；10. 会话召回参考；11. 人工确认清单。必须保留假设、不确定项和证据不足。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -724,8 +1050,23 @@
       "kind": "output",
       "name": "输出最终研究包",
       "description": "展示和导出最终竞品研究包。",
-      "ui": { "position": { "x": 2680, "y": 1040 }, "collapsed": false, "size": { "width": 360, "height": 220 } },
-      "reads": [{ "state": "final_research_package", "required": true }],
+      "ui": {
+        "position": {
+          "x": 2680,
+          "y": 1040
+        },
+        "collapsed": false,
+        "size": {
+          "width": 360,
+          "height": 220
+        }
+      },
+      "reads": [
+        {
+          "state": "final_research_package",
+          "required": true
+        }
+      ],
       "writes": [],
       "config": {
         "format": "markdown",
@@ -734,53 +1075,174 @@
     }
   },
   "edges": [
-    { "source": "input_product_idea", "target": "prepare_product_memory_request" },
-    { "source": "input_target_market", "target": "prepare_product_memory_request" },
-    { "source": "input_research_goal", "target": "prepare_product_memory_request" },
-    { "source": "input_existing_knowledge", "target": "prepare_product_memory_request" },
-    { "source": "prepare_product_memory_request", "target": "recall_product_memory" },
-    { "source": "input_product_idea", "target": "build_source_evidence_map" },
-    { "source": "input_competitor_sources", "target": "build_source_evidence_map" },
-    { "source": "input_user_reviews", "target": "build_source_evidence_map" },
-    { "source": "input_interview_notes", "target": "build_source_evidence_map" },
-    { "source": "input_existing_knowledge", "target": "build_source_evidence_map" },
-    { "source": "build_source_evidence_map", "target": "build_competitor_profiles" },
-    { "source": "input_competitor_sources", "target": "build_competitor_profiles" },
-    { "source": "build_competitor_profiles", "target": "build_feature_matrix" },
-    { "source": "build_source_evidence_map", "target": "build_feature_matrix" },
-    { "source": "build_source_evidence_map", "target": "cluster_user_feedback" },
-    { "source": "input_user_reviews", "target": "cluster_user_feedback" },
-    { "source": "input_interview_notes", "target": "cluster_user_feedback" },
-    { "source": "cluster_user_feedback", "target": "extract_pain_points" },
-    { "source": "build_feature_matrix", "target": "extract_pain_points" },
-    { "source": "build_competitor_profiles", "target": "extract_pain_points" },
-    { "source": "extract_pain_points", "target": "rank_opportunities" },
-    { "source": "build_feature_matrix", "target": "rank_opportunities" },
-    { "source": "recall_product_memory", "target": "rank_opportunities" },
-    { "source": "rank_opportunities", "target": "build_mvp_plan" },
-    { "source": "input_product_idea", "target": "build_mvp_plan" },
-    { "source": "build_mvp_plan", "target": "draft_prd" },
-    { "source": "rank_opportunities", "target": "draft_prd" },
-    { "source": "build_feature_matrix", "target": "draft_prd" },
-    { "source": "extract_pain_points", "target": "draft_prd" },
-    { "source": "draft_prd", "target": "build_validation_plan" },
-    { "source": "build_mvp_plan", "target": "build_validation_plan" },
-    { "source": "rank_opportunities", "target": "build_validation_plan" },
-    { "source": "cluster_user_feedback", "target": "build_validation_plan" },
-    { "source": "rank_opportunities", "target": "prepare_product_memory_plan" },
-    { "source": "build_mvp_plan", "target": "prepare_product_memory_plan" },
-    { "source": "build_validation_plan", "target": "prepare_product_memory_plan" },
-    { "source": "prepare_product_memory_plan", "target": "write_product_memory_candidates" },
-    { "source": "build_competitor_profiles", "target": "build_final_research_package" },
-    { "source": "build_feature_matrix", "target": "build_final_research_package" },
-    { "source": "cluster_user_feedback", "target": "build_final_research_package" },
-    { "source": "extract_pain_points", "target": "build_final_research_package" },
-    { "source": "rank_opportunities", "target": "build_final_research_package" },
-    { "source": "build_mvp_plan", "target": "build_final_research_package" },
-    { "source": "draft_prd", "target": "build_final_research_package" },
-    { "source": "build_validation_plan", "target": "build_final_research_package" },
-    { "source": "write_product_memory_candidates", "target": "build_final_research_package" },
-    { "source": "build_final_research_package", "target": "output_final_research_package" }
+    {
+      "source": "input_product_idea",
+      "target": "prepare_product_memory_request"
+    },
+    {
+      "source": "input_target_market",
+      "target": "prepare_product_memory_request"
+    },
+    {
+      "source": "input_research_goal",
+      "target": "prepare_product_memory_request"
+    },
+    {
+      "source": "input_existing_knowledge",
+      "target": "prepare_product_memory_request"
+    },
+    {
+      "source": "prepare_product_memory_request",
+      "target": "recall_product_memory"
+    },
+    {
+      "source": "input_product_idea",
+      "target": "build_source_evidence_map"
+    },
+    {
+      "source": "input_competitor_sources",
+      "target": "build_source_evidence_map"
+    },
+    {
+      "source": "input_user_reviews",
+      "target": "build_source_evidence_map"
+    },
+    {
+      "source": "input_interview_notes",
+      "target": "build_source_evidence_map"
+    },
+    {
+      "source": "input_existing_knowledge",
+      "target": "build_source_evidence_map"
+    },
+    {
+      "source": "build_source_evidence_map",
+      "target": "build_competitor_profiles"
+    },
+    {
+      "source": "input_competitor_sources",
+      "target": "build_competitor_profiles"
+    },
+    {
+      "source": "build_competitor_profiles",
+      "target": "build_feature_matrix"
+    },
+    {
+      "source": "build_source_evidence_map",
+      "target": "build_feature_matrix"
+    },
+    {
+      "source": "build_source_evidence_map",
+      "target": "cluster_user_feedback"
+    },
+    {
+      "source": "input_user_reviews",
+      "target": "cluster_user_feedback"
+    },
+    {
+      "source": "input_interview_notes",
+      "target": "cluster_user_feedback"
+    },
+    {
+      "source": "cluster_user_feedback",
+      "target": "extract_pain_points"
+    },
+    {
+      "source": "build_feature_matrix",
+      "target": "extract_pain_points"
+    },
+    {
+      "source": "build_competitor_profiles",
+      "target": "extract_pain_points"
+    },
+    {
+      "source": "extract_pain_points",
+      "target": "rank_opportunities"
+    },
+    {
+      "source": "build_feature_matrix",
+      "target": "rank_opportunities"
+    },
+    {
+      "source": "recall_product_memory",
+      "target": "rank_opportunities"
+    },
+    {
+      "source": "rank_opportunities",
+      "target": "build_mvp_plan"
+    },
+    {
+      "source": "input_product_idea",
+      "target": "build_mvp_plan"
+    },
+    {
+      "source": "build_mvp_plan",
+      "target": "draft_prd"
+    },
+    {
+      "source": "rank_opportunities",
+      "target": "draft_prd"
+    },
+    {
+      "source": "build_feature_matrix",
+      "target": "draft_prd"
+    },
+    {
+      "source": "extract_pain_points",
+      "target": "draft_prd"
+    },
+    {
+      "source": "draft_prd",
+      "target": "build_validation_plan"
+    },
+    {
+      "source": "build_mvp_plan",
+      "target": "build_validation_plan"
+    },
+    {
+      "source": "rank_opportunities",
+      "target": "build_validation_plan"
+    },
+    {
+      "source": "cluster_user_feedback",
+      "target": "build_validation_plan"
+    },
+    {
+      "source": "build_competitor_profiles",
+      "target": "build_final_research_package"
+    },
+    {
+      "source": "build_feature_matrix",
+      "target": "build_final_research_package"
+    },
+    {
+      "source": "cluster_user_feedback",
+      "target": "build_final_research_package"
+    },
+    {
+      "source": "extract_pain_points",
+      "target": "build_final_research_package"
+    },
+    {
+      "source": "rank_opportunities",
+      "target": "build_final_research_package"
+    },
+    {
+      "source": "build_mvp_plan",
+      "target": "build_final_research_package"
+    },
+    {
+      "source": "draft_prd",
+      "target": "build_final_research_package"
+    },
+    {
+      "source": "build_validation_plan",
+      "target": "build_final_research_package"
+    },
+    {
+      "source": "build_final_research_package",
+      "target": "output_final_research_package"
+    }
   ],
   "metadata": {
     "category": "business",
@@ -789,7 +1251,13 @@
     "capabilityDiscoverableDefault": true,
     "gallery": {
       "headline": "把竞品资料和用户反馈变成带证据链的产品机会与 PRD 草稿。",
-      "targetUsers": ["产品经理", "创业团队", "增长团队", "用户研究员", "独立开发者"],
+      "targetUsers": [
+        "产品经理",
+        "创业团队",
+        "增长团队",
+        "用户研究员",
+        "独立开发者"
+      ],
       "demoPitch": "不是普通竞品分析，而是把证据、矩阵、痛点、机会、MVP、PRD 和验证计划串成可复跑工作流。"
     },
     "mockMode": {
@@ -797,16 +1265,55 @@
       "description": "使用随包 mock 竞品资料和用户评论，无需外部账号即可演示。"
     },
     "inputSchema": [
-      { "key": "product_idea", "label": "产品方向", "type": "markdown", "required": true },
-      { "key": "competitor_sources", "label": "竞品资料", "type": "markdown", "required": true },
-      { "key": "user_reviews", "label": "用户评论", "type": "markdown", "required": false },
-      { "key": "interview_notes", "label": "访谈材料", "type": "markdown", "required": false },
-      { "key": "target_market", "label": "目标市场", "type": "text", "required": false },
-      { "key": "research_goal", "label": "研究目标", "type": "text", "required": true },
-      { "key": "existing_knowledge_notes", "label": "已有知识", "type": "markdown", "required": false }
+      {
+        "key": "product_idea",
+        "label": "产品方向",
+        "type": "markdown",
+        "required": true
+      },
+      {
+        "key": "competitor_sources",
+        "label": "竞品资料",
+        "type": "markdown",
+        "required": true
+      },
+      {
+        "key": "user_reviews",
+        "label": "用户评论",
+        "type": "markdown",
+        "required": false
+      },
+      {
+        "key": "interview_notes",
+        "label": "访谈材料",
+        "type": "markdown",
+        "required": false
+      },
+      {
+        "key": "target_market",
+        "label": "目标市场",
+        "type": "text",
+        "required": false
+      },
+      {
+        "key": "research_goal",
+        "label": "研究目标",
+        "type": "text",
+        "required": true
+      },
+      {
+        "key": "existing_knowledge_notes",
+        "label": "已有知识",
+        "type": "markdown",
+        "required": false
+      }
     ],
-    "requiredSkills": ["memory_recall", "memory_candidate_writer"],
-    "requiredPermissions": ["memory_read", "memory_candidate_write"],
+    "requiredSkills": [
+      "buddy_session_recall"
+    ],
+    "requiredPermissions": [
+      "buddy_session_read"
+    ],
     "knowledgeRequirements": {
       "state": "existing_knowledge_notes",
       "sourceStates": [
@@ -828,34 +1335,132 @@
       "citationOutput": "source_evidence_map"
     },
     "artifactContract": [
-      { "path": "competitor_profiles.json", "state": "competitor_profiles", "type": "json", "description": "竞品画像。" },
-      { "path": "feature_matrix.csv", "state": "feature_matrix", "type": "csv", "description": "带证据的功能矩阵。" },
-      { "path": "review_clusters.json", "state": "user_review_clusters", "type": "json", "description": "用户反馈聚类。" },
-      { "path": "pain_points.md", "state": "pain_points", "type": "markdown", "description": "用户痛点。" },
-      { "path": "opportunity_report.md", "state": "opportunity_report", "type": "markdown", "description": "机会点排序报告。" },
-      { "path": "mvp_plan.md", "state": "mvp_plan", "type": "markdown", "description": "MVP 方案。" },
-      { "path": "prd_draft.md", "state": "prd_draft", "type": "markdown", "description": "PRD 草稿。" },
-      { "path": "validation_plan.md", "state": "validation_plan", "type": "markdown", "description": "验证计划。" },
-      { "path": "final_research_package.md", "state": "final_research_package", "type": "markdown", "description": "最终产品研究包。" }
+      {
+        "path": "competitor_profiles.json",
+        "state": "competitor_profiles",
+        "type": "json",
+        "description": "竞品画像。"
+      },
+      {
+        "path": "feature_matrix.csv",
+        "state": "feature_matrix",
+        "type": "csv",
+        "description": "带证据的功能矩阵。"
+      },
+      {
+        "path": "review_clusters.json",
+        "state": "user_review_clusters",
+        "type": "json",
+        "description": "用户反馈聚类。"
+      },
+      {
+        "path": "pain_points.md",
+        "state": "pain_points",
+        "type": "markdown",
+        "description": "用户痛点。"
+      },
+      {
+        "path": "opportunity_report.md",
+        "state": "opportunity_report",
+        "type": "markdown",
+        "description": "机会点排序报告。"
+      },
+      {
+        "path": "mvp_plan.md",
+        "state": "mvp_plan",
+        "type": "markdown",
+        "description": "MVP 方案。"
+      },
+      {
+        "path": "prd_draft.md",
+        "state": "prd_draft",
+        "type": "markdown",
+        "description": "PRD 草稿。"
+      },
+      {
+        "path": "validation_plan.md",
+        "state": "validation_plan",
+        "type": "markdown",
+        "description": "验证计划。"
+      },
+      {
+        "path": "final_research_package.md",
+        "state": "final_research_package",
+        "type": "markdown",
+        "description": "最终产品研究包。"
+      }
     ],
     "outputContract": [
-      { "key": "final_research_package", "label": "最终产品研究包", "role": "primary", "type": "markdown", "required": true, "passThrough": true },
-      { "key": "competitor_profiles", "label": "竞品画像", "role": "artifact", "type": "json", "required": true },
-      { "key": "feature_matrix", "label": "功能矩阵", "role": "artifact", "type": "markdown", "required": true },
-      { "key": "user_review_clusters", "label": "用户反馈聚类", "role": "artifact", "type": "json", "required": true },
-      { "key": "pain_points", "label": "用户痛点", "role": "artifact", "type": "markdown", "required": true },
-      { "key": "opportunity_report", "label": "机会点报告", "role": "artifact", "type": "markdown", "required": true },
-      { "key": "mvp_plan", "label": "MVP 方案", "role": "artifact", "type": "markdown", "required": true },
-      { "key": "prd_draft", "label": "PRD 草稿", "role": "artifact", "type": "markdown", "required": true },
-      { "key": "validation_plan", "label": "验证计划", "role": "artifact", "type": "markdown", "required": true },
-      { "key": "candidate_memories", "label": "产品候选记忆", "role": "memory_candidates", "type": "json", "required": false }
+      {
+        "key": "final_research_package",
+        "label": "最终产品研究包",
+        "role": "primary",
+        "type": "markdown",
+        "required": true,
+        "passThrough": true
+      },
+      {
+        "key": "competitor_profiles",
+        "label": "竞品画像",
+        "role": "artifact",
+        "type": "json",
+        "required": true
+      },
+      {
+        "key": "feature_matrix",
+        "label": "功能矩阵",
+        "role": "artifact",
+        "type": "markdown",
+        "required": true
+      },
+      {
+        "key": "user_review_clusters",
+        "label": "用户反馈聚类",
+        "role": "artifact",
+        "type": "json",
+        "required": true
+      },
+      {
+        "key": "pain_points",
+        "label": "用户痛点",
+        "role": "artifact",
+        "type": "markdown",
+        "required": true
+      },
+      {
+        "key": "opportunity_report",
+        "label": "机会点报告",
+        "role": "artifact",
+        "type": "markdown",
+        "required": true
+      },
+      {
+        "key": "mvp_plan",
+        "label": "MVP 方案",
+        "role": "artifact",
+        "type": "markdown",
+        "required": true
+      },
+      {
+        "key": "prd_draft",
+        "label": "PRD 草稿",
+        "role": "artifact",
+        "type": "markdown",
+        "required": true
+      },
+      {
+        "key": "validation_plan",
+        "label": "验证计划",
+        "role": "artifact",
+        "type": "markdown",
+        "required": true
+      }
     ],
     "evalCases": "eval_cases.json",
     "safetyNotes": [
       "不得把少量评论包装成统计结论。",
       "不得编造竞品功能、定价、用户数量或市场数据。",
-      "PRD 中必须区分证据、推断和假设。",
-      "产品经验只写 candidate 状态候选，不能自动应用为 active。"
+      "PRD 中必须区分证据、推断和假设。"
     ]
   }
 }

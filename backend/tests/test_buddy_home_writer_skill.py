@@ -55,35 +55,38 @@ class BuddyHomeWriterSkillTests(unittest.TestCase):
             ["success", "result", "applied_commands", "skipped_commands", "revisions"],
         )
 
-    def test_writer_applies_memory_command_with_revision_and_run_id(self) -> None:
+    def test_writer_applies_memory_document_command_with_revision_and_run_id(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home_dir = Path(temp_dir) / "buddy_home"
             result = _run_writer(
                 {
                     "run_id": "run_review_1",
                     "commands": [
                         {
-                            "action": "memory.create",
+                            "action": "memory_document.update",
                             "payload": {
-                                "type": "preference",
-                                "title": "回复偏好",
-                                "content": "用户希望先给结论。",
+                                "content": "# MEMORY.md - Long-Term Memory\n\n- 用户希望先给结论。\n",
                             },
                             "change_reason": "自主复盘识别到稳定回复偏好。",
                         }
                     ],
                 },
-                buddy_home_dir=Path(temp_dir) / "buddy_home",
+                buddy_home_dir=buddy_home_dir,
             )
+            memory_text = (buddy_home_dir / "MEMORY.md").read_text(encoding="utf-8")
 
         self.assertEqual(result["success"], True)
         self.assertEqual(len(result["applied_commands"]), 1)
         applied = result["applied_commands"][0]
-        self.assertEqual(applied["command"]["action"], "memory.create")
+        self.assertEqual(applied["command"]["action"], "memory_document.update")
         self.assertEqual(applied["command"]["run_id"], "run_review_1")
+        self.assertEqual(applied["command"]["target_type"], "home_file")
+        self.assertEqual(applied["command"]["target_id"], "MEMORY.md")
         self.assertTrue(applied["command"]["revision_id"].startswith("rev_"))
         self.assertEqual(result["revisions"][0]["revision_id"], applied["command"]["revision_id"])
         self.assertEqual(result["activity_events"][0]["kind"], "buddy_home_write")
         self.assertIn("Applied 1 Buddy Home command", result["result"])
+        self.assertIn("用户希望先给结论", memory_text)
 
     def test_writer_rejects_permission_escalating_policy_updates(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

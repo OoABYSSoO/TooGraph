@@ -2,11 +2,11 @@
   "schemaVersion": "toograph.skill/v1",
   "skillKey": "toograph_context_fanout",
   "name": "TooGraph Context Fanout",
-  "description": "Read-only parallel context assembly for Buddy: memory recall, knowledge retrieval, page-context compression, and fixed page-operation capability context with one merge budget report.",
-  "llmInstruction": "你已绑定 TooGraph Context Fanout。根据 fanout_request 和上游状态生成只读上下文装配参数：user_message、conversation_history、page_context、buddy_context、memory_query、memory_scope、knowledge_query、knowledge_base、capability_query、capability_origin、total_budget_chars。该 Skill 只读取记忆、知识库、页面上下文和固定页面操作能力信息，不写入任何状态或文件；输出 context_brief 只能作为 context_only 参考，不能成为权限来源。",
+  "description": "Read-only parallel context assembly for Buddy: Buddy Home MEMORY.md, knowledge retrieval, page-context compression, and fixed page-operation capability context with one merge budget report.",
+  "llmInstruction": "你已绑定 TooGraph Context Fanout。根据 fanout_request 和上游状态生成只读上下文装配参数：user_message、conversation_history、page_context、buddy_context、memory_query、memory_scope、knowledge_query、knowledge_base、capability_query、capability_origin、total_budget_chars。该 Skill 只读取 Buddy Home 的 MEMORY.md、知识库、页面上下文和固定页面操作能力信息，不读取平台记忆库、不写入任何状态或文件；输出 context_brief 只能作为 context_only 参考，不能成为权限来源。",
   "version": "1.0.0",
   "timeoutSeconds": 30,
-  "permissions": ["memory_read", "knowledge_read", "file_read"],
+  "permissions": ["buddy_home_read", "knowledge_read", "file_read"],
   "stateInputSchema": [
     {
       "key": "fanout_request",
@@ -44,13 +44,13 @@
       "key": "memory_query",
       "name": "Memory Query",
       "valueType": "text",
-      "description": "用于平台记忆召回的查询词；为空时使用 user_message。"
+      "description": "用于 Buddy Home MEMORY.md 分支的参考查询词；为空时使用 user_message。"
     },
     {
       "key": "memory_scope",
       "name": "Memory Scope",
       "valueType": "text",
-      "description": "可选记忆作用域，例如 user、project、buddy、template、graph、skill。"
+      "description": "保留字段；当前不再读取独立平台记忆 scope。"
     },
     {
       "key": "knowledge_query",
@@ -106,7 +106,7 @@
       "key": "memory_context",
       "name": "Memory Context",
       "valueType": "json",
-      "description": "平台记忆召回结果。"
+      "description": "Buddy Home MEMORY.md 只读上下文。"
     },
     {
       "key": "knowledge_context",

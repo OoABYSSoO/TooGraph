@@ -172,71 +172,6 @@
             </p>
           </article>
 
-          <article class="run-detail__panel" :class="{ 'run-detail__panel--wide': memoryContextCards.length > 0 }">
-            <div class="run-detail__panel-heading">
-              <div>
-                <span class="run-detail__section-kicker">{{ t("runDetail.context") }}</span>
-                <h3>{{ t("runDetail.supportingArtifacts") }}</h3>
-              </div>
-            </div>
-            <div class="run-detail__info-grid">
-              <div class="run-detail__info">
-                <span>{{ t("runDetail.memory") }}</span>
-                <strong class="run-detail__content">{{ viewedRun?.memory_summary || t("common.none") }}</strong>
-              </div>
-            </div>
-            <div v-if="memoryContextCards.length > 0" class="run-detail__memory-context-list">
-              <section v-for="card in memoryContextCards" :key="card.key" class="run-detail__memory-card">
-                <div class="run-detail__timeline-heading">
-                  <div class="run-detail__timeline-title">
-                    <strong>{{ t("runDetail.memoryContext") }}</strong>
-                    <small>{{ card.query || t("runDetail.memoryContextNoQuery") }}</small>
-                  </div>
-                  <span>{{ t("runDetail.memoryContextCaptured") }}</span>
-                </div>
-                <div class="run-detail__badges">
-                  <span v-for="label in card.filterLabels" :key="`${card.key}-filter-${label}`">{{ label }}</span>
-                  <span v-for="label in card.statLabels" :key="`${card.key}-stat-${label}`">{{ label }}</span>
-                </div>
-                <div class="run-detail__memory-columns">
-                  <section class="run-detail__memory-section">
-                    <span class="run-detail__meta-title">{{ t("runDetail.memoryContextIncluded") }}</span>
-                    <p v-if="card.memories.length === 0" class="run-detail__muted">{{ t("common.none") }}</p>
-                    <article v-for="memory in card.memories" v-else :key="memory.key" class="run-detail__memory-item">
-                      <div class="run-detail__memory-title">
-                        <strong>{{ memory.title }}</strong>
-                        <small v-if="memory.id">{{ memory.id }}</small>
-                      </div>
-                      <p v-if="memory.content" class="run-detail__memory-content">{{ memory.content }}</p>
-                      <div class="run-detail__badges">
-                        <span v-for="label in memory.metaLabels" :key="`${memory.key}-meta-${label}`">{{ label }}</span>
-                      </div>
-                      <div v-if="memory.evidenceLabels.length > 0" class="run-detail__badges">
-                        <span v-for="label in memory.evidenceLabels" :key="`${memory.key}-evidence-${label}`">{{ label }}</span>
-                      </div>
-                    </article>
-                  </section>
-                  <section class="run-detail__memory-section">
-                    <span class="run-detail__meta-title">{{ t("runDetail.memoryContextOmitted") }}</span>
-                    <p v-if="card.omitted.length === 0" class="run-detail__muted">{{ t("common.none") }}</p>
-                    <article v-for="memory in card.omitted" v-else :key="memory.key" class="run-detail__memory-item">
-                      <div class="run-detail__memory-title">
-                        <strong>{{ memory.title }}</strong>
-                        <small v-if="memory.id">{{ memory.id }}</small>
-                      </div>
-                      <div class="run-detail__badges">
-                        <span v-for="label in memory.metaLabels" :key="`${memory.key}-meta-${label}`">{{ label }}</span>
-                      </div>
-                    </article>
-                  </section>
-                </div>
-                <details class="run-detail__operation-detail">
-                  <summary>{{ t("runDetail.memoryContextRaw") }}</summary>
-                  <pre class="run-detail__content run-detail__operation-detail-content">{{ card.detailText || t("common.none") }}</pre>
-                </details>
-              </section>
-            </div>
-          </article>
         </section>
 
         <article v-if="outputArtifacts.length > 0" class="run-detail__panel">
@@ -382,7 +317,7 @@ import { buildSnapshotScopedRun, canRestoreRunDetail, resolveRunRestoreUrl, reso
 import type { OperationJournalPage } from "@/types/operationJournal";
 import type { RunDetail } from "@/types/run";
 
-import { buildRunAggregatedTimeline, buildRunMemoryContextCards, buildRunStatusFacts, listRunOutputArtifacts } from "./runDetailModel.ts";
+import { buildRunAggregatedTimeline, buildRunStatusFacts, listRunOutputArtifacts } from "./runDetailModel.ts";
 import { buildOperationJournalDisplayItems, type OperationJournalDisplayItem } from "./operationJournalModel.ts";
 import ArtifactDocumentPager from "./ArtifactDocumentPager.vue";
 
@@ -431,7 +366,6 @@ const cycleVisualization = computed(() =>
   viewedRun.value ? buildCycleVisualization(viewedRun.value) : { hasCycle: false, summary: null, backEdges: [], iterations: [] },
 );
 const outputArtifacts = computed(() => (viewedRun.value ? listRunOutputArtifacts(viewedRun.value) : []));
-const memoryContextCards = computed(() => (viewedRun.value ? buildRunMemoryContextCards(viewedRun.value) : []));
 const aggregatedTimeline = computed(() => (viewedRun.value ? buildRunAggregatedTimeline(viewedRun.value) : []));
 const operationJournalItems = computed(() => buildOperationJournalDisplayItems(operationJournal.value?.entries ?? []));
 const operationJournalVisible = computed(() =>

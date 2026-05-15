@@ -6,15 +6,13 @@ import { fileURLToPath } from "node:url";
 
 const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "BuddyPage.vue"), "utf8");
 
-test("BuddyPage manages profile, policy, memories, summary, and revisions", () => {
+test("BuddyPage manages profile, policy, MEMORY.md, summary, and revisions", () => {
   assert.match(source, /fetchBuddyProfile/);
   assert.match(source, /updateBuddyProfile/);
   assert.match(source, /fetchBuddyPolicy/);
   assert.match(source, /updateBuddyPolicy/);
-  assert.match(source, /fetchBuddyMemories/);
-  assert.match(source, /createBuddyMemory/);
-  assert.match(source, /updateBuddyMemory/);
-  assert.match(source, /deleteBuddyMemory/);
+  assert.match(source, /fetchBuddyMemoryDocument/);
+  assert.match(source, /updateBuddyMemoryDocument/);
   assert.match(source, /fetchBuddySessionSummary/);
   assert.match(source, /fetchBuddyRevisions/);
   assert.match(source, /fetchBuddyRunTemplateBinding/);
@@ -34,20 +32,11 @@ test("BuddyPage manages profile, policy, memories, summary, and revisions", () =
   assert.match(source, /name="mascot-debug"/);
   assert.match(source, /buildBuddyRunTemplateInputRows/);
   assert.match(source, /validateBuddyRunTemplateBinding/);
-});
-
-test("BuddyPage exposes platform memory candidate review actions", () => {
-  assert.match(source, /fetchPlatformMemories/);
-  assert.match(source, /applyPlatformMemoryCandidate/);
-  assert.match(source, /replacePlatformMemoryCandidate/);
-  assert.match(source, /rejectPlatformMemoryCandidate/);
-  assert.match(source, /archivePlatformMemory/);
-  assert.match(source, /const platformMemoryCandidates = ref<PlatformMemory\[\]>\(\[\]\);/);
-  assert.match(source, /<ElTable :data="platformMemoryCandidates"/);
-  assert.match(source, /platformMemoryActionId === platformMemoryActionKey\('apply', row\.id\)/);
-  assert.match(source, /platformMemoryActionId === platformMemoryActionKey\('replace', row\.id\)/);
-  assert.match(source, /reviewPlatformMemoryCandidate\(row, 'reject'\)/);
-  assert.match(source, /formatPlatformMemorySource\(row\.source\)/);
+  assert.match(source, /memoryDocumentDraft/);
+  assert.match(source, /saveMemoryDocument/);
+  assert.doesNotMatch(source, /fetchPlatformMemories/);
+  assert.doesNotMatch(source, /platformMemoryCandidates/);
+  assert.doesNotMatch(source, /createBuddyMemory/);
 });
 
 test("BuddyPage opens template binding first and renders it as Buddy input rows", () => {

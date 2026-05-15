@@ -65,15 +65,9 @@ def _dispatch_command(
         return store.save_profile(payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason), "profile", "profile"
     if action == "policy.update":
         return store.save_policy(payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason), "policy", "policy"
-    if action == "memory.create":
-        result = store.create_memory(payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason)
-        return result, "memory", str(result.get("id") or "")
-    if action == "memory.update":
-        memory_id = _required_target_id(target_id, action)
-        return store.update_memory(memory_id, payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason), "memory", memory_id
-    if action == "memory.delete":
-        memory_id = _required_target_id(target_id, action)
-        return store.delete_memory(memory_id, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason), "memory", memory_id
+    if action == "memory_document.update":
+        result = store.save_memory_document(payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason)
+        return result, "home_file", "MEMORY.md"
     if action == "session_summary.update":
         return (
             store.save_session_summary(payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason),

@@ -439,8 +439,8 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(metadata["graphProtocol"], "node_system")
         self.assertEqual(metadata["category"], "business")
-        self.assertEqual(metadata["requiredSkills"], ["memory_recall"])
-        self.assertEqual(metadata["requiredPermissions"], ["memory_read"])
+        self.assertEqual(metadata["requiredSkills"], ["buddy_session_recall"])
+        self.assertEqual(metadata["requiredPermissions"], ["buddy_session_read"])
         self.assertEqual(metadata["knowledgeRequirements"]["state"], "policy_knowledge_base")
         self.assertEqual(metadata["knowledgeRequirements"]["citationOutput"], "citation_map")
         self.assertIn("citation_id", metadata["knowledgeRequirements"]["retrievalFields"])
@@ -473,7 +473,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["policy_sources"]["type"], "text")
         self.assertEqual(states["raw_policy_text"]["type"], "markdown")
         self.assertEqual(states["policy_knowledge_base"]["type"], "knowledge_base")
-        self.assertEqual(states["memory_context"]["type"], "json")
+        self.assertEqual(states["session_recall_context"]["type"], "json")
         self.assertEqual(states["policy_source_review"]["type"], "json")
         self.assertEqual(states["policy_metadata"]["type"], "json")
         self.assertEqual(states["policy_sections"]["type"], "json")
@@ -488,18 +488,17 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(nodes["input_policy_knowledge_base"]["config"]["boundaryType"], "knowledge_base")
         recall_node = nodes["recall_policy_memory"]
         self.assertEqual(recall_node["kind"], "agent")
-        self.assertEqual(recall_node["config"]["skillKey"], "memory_recall")
+        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
         self.assertEqual(
             recall_node["config"]["skillBindings"],
             [
                 {
-                    "skillKey": "memory_recall",
+                    "skillKey": "buddy_session_recall",
                     "outputMapping": {
-                        "success": "memory_recall_success",
-                        "memory_context": "memory_context",
-                        "recalled_memories": "recalled_memories",
-                        "omitted_memories": "omitted_memories",
-                        "result": "memory_recall_result",
+                        "success": "buddy_session_recall_success",
+                        "session_recall_context": "session_recall_context",
+                        "sessions": "recalled_sessions",
+                        "result": "buddy_session_recall_result",
                     },
                 }
             ],
@@ -507,11 +506,10 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             {binding["state"]: binding["mode"] for binding in recall_node["writes"]},
             {
-                "memory_recall_success": "replace",
-                "memory_context": "replace",
-                "recalled_memories": "replace",
-                "omitted_memories": "replace",
-                "memory_recall_result": "replace",
+                "buddy_session_recall_success": "replace",
+                "session_recall_context": "replace",
+                "recalled_sessions": "replace",
+                "buddy_session_recall_result": "replace",
             },
         )
         self.assertIn("不得编造检索结果", nodes["policy_source_validator"]["config"]["taskInstruction"])
@@ -566,8 +564,8 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(metadata["graphProtocol"], "node_system")
         self.assertEqual(metadata["category"], "business")
-        self.assertEqual(metadata["requiredSkills"], ["memory_recall", "web_search"])
-        self.assertEqual(metadata["requiredPermissions"], ["memory_read", "network", "secret_read", "browser_automation"])
+        self.assertEqual(metadata["requiredSkills"], ["buddy_session_recall", "web_search"])
+        self.assertEqual(metadata["requiredPermissions"], ["buddy_session_read", "network", "secret_read", "browser_automation"])
         self.assertEqual(metadata["mockMode"]["input"], "examples/mock_news_input.json")
         self.assertIs(metadata["mockMode"]["supported"], True)
         self.assertEqual(
@@ -609,15 +607,14 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(nodes["input_use_web_search"]["config"]["boundaryType"], "boolean")
         recall_node = nodes["recall_content_memory"]
         self.assertEqual(recall_node["kind"], "agent")
-        self.assertEqual(recall_node["config"]["skillKey"], "memory_recall")
+        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
         self.assertEqual(
             recall_node["config"]["skillBindings"][0]["outputMapping"],
             {
-                "success": "memory_recall_success",
-                "memory_context": "memory_context",
-                "recalled_memories": "recalled_memories",
-                "omitted_memories": "omitted_memories",
-                "result": "memory_recall_result",
+                "success": "buddy_session_recall_success",
+                "session_recall_context": "session_recall_context",
+                "sessions": "recalled_sessions",
+                "result": "buddy_session_recall_result",
             },
         )
 
@@ -719,8 +716,8 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(metadata["graphProtocol"], "node_system")
         self.assertEqual(metadata["category"], "business")
-        self.assertEqual(metadata["requiredSkills"], ["memory_recall", "memory_candidate_writer"])
-        self.assertEqual(metadata["requiredPermissions"], ["memory_read", "memory_candidate_write"])
+        self.assertEqual(metadata["requiredSkills"], ["buddy_session_recall"])
+        self.assertEqual(metadata["requiredPermissions"], ["buddy_session_read"])
         self.assertEqual(metadata["mockMode"]["input"], "examples/mock_repurposer_input.json")
         self.assertEqual(
             [item["key"] for item in metadata["inputSchema"]],
@@ -728,7 +725,7 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertEqual(
             [item["key"] for item in metadata["outputContract"]],
-            ["final_distribution_pack", "style_rewrite_outputs", "candidate_memories", "ai_tone_report"],
+            ["final_distribution_pack", "style_rewrite_outputs", "ai_tone_report"],
         )
         self.assertTrue(metadata["outputContract"][0]["passThrough"])
         self.assertEqual(
@@ -744,42 +741,30 @@ class TemplateLayoutTests(unittest.TestCase):
         )
 
         self.assertEqual(states["source_content"]["type"], "markdown")
-        self.assertEqual(states["memory_context"]["type"], "json")
+        self.assertEqual(states["session_recall_context"]["type"], "json")
         self.assertEqual(states["core_message"]["type"], "json")
         self.assertEqual(states["style_profile"]["type"], "json")
         self.assertEqual(states["draft_outputs"]["type"], "json")
         self.assertEqual(states["ai_tone_report"]["type"], "json")
         self.assertEqual(states["style_rewrite_outputs"]["type"], "json")
-        self.assertEqual(states["candidate_plan"]["type"], "json")
-        self.assertEqual(states["candidate_memories"]["type"], "json")
+        self.assertNotIn("candidate_plan", states)
+        self.assertNotIn("candidate_memories", states)
         self.assertEqual(states["final_distribution_pack"]["type"], "markdown")
         self.assertFalse(any("promptVisible" in definition for definition in states.values()))
 
         recall_node = nodes["recall_style_memory"]
-        self.assertEqual(recall_node["config"]["skillKey"], "memory_recall")
+        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
         self.assertEqual(
             recall_node["config"]["skillBindings"][0]["outputMapping"],
             {
-                "success": "memory_recall_success",
-                "memory_context": "memory_context",
-                "recalled_memories": "recalled_memories",
-                "omitted_memories": "omitted_memories",
-                "result": "memory_recall_result",
+                "success": "buddy_session_recall_success",
+                "session_recall_context": "session_recall_context",
+                "sessions": "recalled_sessions",
+                "result": "buddy_session_recall_result",
             },
         )
-        writer_node = nodes["write_style_memory_candidates"]
-        self.assertEqual(writer_node["config"]["skillKey"], "memory_candidate_writer")
-        self.assertEqual(
-            writer_node["config"]["skillBindings"][0]["outputMapping"],
-            {
-                "success": "candidate_write_success",
-                "candidate_memories": "candidate_memories",
-                "skipped_candidates": "skipped_candidates",
-                "result": "candidate_write_result",
-            },
-        )
-        self.assertIn("candidate 状态", nodes["prepare_style_memory_candidate"]["config"]["taskInstruction"])
-        self.assertIn("不要应用为 active", writer_node["config"]["skillInstructionBlocks"]["memory_candidate_writer"]["content"])
+        self.assertNotIn("prepare_style_memory_candidate", nodes)
+        self.assertNotIn("write_style_memory_candidates", nodes)
         self.assertIn("AI 味", nodes["detect_ai_tone"]["config"]["taskInstruction"])
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
@@ -833,8 +818,8 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(metadata["graphProtocol"], "node_system")
         self.assertEqual(metadata["category"], "business")
-        self.assertEqual(metadata["requiredSkills"], ["memory_recall", "memory_candidate_writer"])
-        self.assertEqual(metadata["requiredPermissions"], ["memory_read", "memory_candidate_write"])
+        self.assertEqual(metadata["requiredSkills"], ["buddy_session_recall"])
+        self.assertEqual(metadata["requiredPermissions"], ["buddy_session_read"])
         self.assertEqual(metadata["mockMode"]["input"], "examples/mock_job_application_input.json")
         self.assertEqual(
             [item["key"] for item in metadata["inputSchema"]],
@@ -857,7 +842,6 @@ class TemplateLayoutTests(unittest.TestCase):
                 "project_story_library",
                 "interview_questions",
                 "learning_plan",
-                "candidate_memories",
             ],
         )
         self.assertTrue(metadata["outputContract"][0]["passThrough"])
@@ -885,8 +869,6 @@ class TemplateLayoutTests(unittest.TestCase):
             "target_city",
             "salary_expectation",
             "memory_request",
-            "candidate_memory_plan",
-            "candidate_memories",
             "final_application_package",
         ]:
             self.assertIn(state_name, states)
@@ -898,30 +880,20 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertFalse(any("promptVisible" in definition for definition in states.values()))
 
         recall_node = nodes["recall_candidate_memory"]
-        self.assertEqual(recall_node["config"]["skillKey"], "memory_recall")
+        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
         self.assertEqual(
             recall_node["config"]["skillBindings"][0]["outputMapping"],
             {
-                "success": "memory_recall_success",
-                "memory_context": "memory_context",
-                "recalled_memories": "recalled_memories",
-                "omitted_memories": "omitted_memories",
-                "result": "memory_recall_result",
+                "success": "buddy_session_recall_success",
+                "session_recall_context": "session_recall_context",
+                "sessions": "recalled_sessions",
+                "result": "buddy_session_recall_result",
             },
         )
-        writer_node = nodes["write_candidate_memory_candidates"]
-        self.assertEqual(writer_node["config"]["skillKey"], "memory_candidate_writer")
-        self.assertEqual(
-            writer_node["config"]["skillBindings"][0]["outputMapping"],
-            {
-                "success": "candidate_write_success",
-                "candidate_memories": "candidate_memories",
-                "skipped_candidates": "skipped_candidates",
-                "result": "candidate_write_result",
-            },
-        )
-        self.assertIn("candidate 状态", nodes["prepare_candidate_memory_plan"]["config"]["taskInstruction"])
-        self.assertIn("不要应用为 active", writer_node["config"]["skillInstructionBlocks"]["memory_candidate_writer"]["content"])
+        self.assertNotIn("prepare_candidate_memory_plan", nodes)
+        self.assertNotIn("write_candidate_memory_candidates", nodes)
+        self.assertNotIn("candidate_memory_plan", states)
+        self.assertNotIn("candidate_memories", states)
         self.assertIn("不承诺录用", nodes["build_gap_analysis"]["config"]["taskInstruction"])
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
@@ -976,8 +948,8 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(metadata["graphProtocol"], "node_system")
         self.assertEqual(metadata["category"], "business")
-        self.assertEqual(metadata["requiredSkills"], ["memory_recall", "memory_candidate_writer"])
-        self.assertEqual(metadata["requiredPermissions"], ["memory_read", "memory_candidate_write"])
+        self.assertEqual(metadata["requiredSkills"], ["buddy_session_recall"])
+        self.assertEqual(metadata["requiredPermissions"], ["buddy_session_read"])
         self.assertEqual(metadata["mockMode"]["input"], "examples/mock_game_creative_input.json")
         self.assertEqual(
             [item["key"] for item in metadata["inputSchema"]],
@@ -1006,7 +978,6 @@ class TemplateLayoutTests(unittest.TestCase):
                 "best_variant",
                 "image_generation_todo",
                 "video_generation_todo",
-                "candidate_memories",
             ],
         )
         self.assertTrue(metadata["outputContract"][0]["passThrough"])
@@ -1053,32 +1024,21 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertFalse(any("promptVisible" in definition for definition in states.values()))
 
         recall_node = nodes["recall_creative_memory"]
-        self.assertEqual(recall_node["config"]["skillKey"], "memory_recall")
+        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
         self.assertEqual(
             recall_node["config"]["skillBindings"][0]["outputMapping"],
             {
-                "success": "memory_recall_success",
-                "memory_context": "memory_context",
-                "recalled_memories": "recalled_memories",
-                "omitted_memories": "omitted_memories",
-                "result": "memory_recall_result",
-            },
-        )
-        writer_node = nodes["write_creative_memory_candidates"]
-        self.assertEqual(writer_node["config"]["skillKey"], "memory_candidate_writer")
-        self.assertEqual(
-            writer_node["config"]["skillBindings"][0]["outputMapping"],
-            {
-                "success": "candidate_write_success",
-                "candidate_memories": "candidate_memories",
-                "skipped_candidates": "skipped_candidates",
-                "result": "candidate_write_result",
+                "success": "buddy_session_recall_success",
+                "session_recall_context": "session_recall_context",
+                "sessions": "recalled_sessions",
+                "result": "buddy_session_recall_result",
             },
         )
         self.assertIn("game_genre", nodes["build_creative_brief"]["config"]["taskInstruction"])
         self.assertIn("平台合规风险", nodes["review_creatives"]["config"]["taskInstruction"])
-        self.assertIn("candidate 状态", nodes["prepare_creative_memory_plan"]["config"]["taskInstruction"])
-        self.assertIn("不要应用为 active", writer_node["config"]["skillInstructionBlocks"]["memory_candidate_writer"]["content"])
+        self.assertNotIn("prepare_creative_memory_plan", nodes)
+        self.assertNotIn("write_creative_memory_candidates", nodes)
+        self.assertNotIn("candidate_memories", states)
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
             ["output_final_summary"],
@@ -1132,8 +1092,8 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(metadata["graphProtocol"], "node_system")
         self.assertEqual(metadata["category"], "business")
-        self.assertEqual(metadata["requiredSkills"], ["memory_recall", "memory_candidate_writer"])
-        self.assertEqual(metadata["requiredPermissions"], ["memory_read", "memory_candidate_write"])
+        self.assertEqual(metadata["requiredSkills"], ["buddy_session_recall"])
+        self.assertEqual(metadata["requiredPermissions"], ["buddy_session_read"])
         self.assertEqual(metadata["mockMode"]["input"], "examples/mock_product_research_input.json")
         self.assertEqual(
             [item["key"] for item in metadata["inputSchema"]],
@@ -1159,7 +1119,6 @@ class TemplateLayoutTests(unittest.TestCase):
                 "mvp_plan",
                 "prd_draft",
                 "validation_plan",
-                "candidate_memories",
             ],
         )
         self.assertTrue(metadata["outputContract"][0]["passThrough"])
@@ -1202,32 +1161,21 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertFalse(any("promptVisible" in definition for definition in states.values()))
 
         recall_node = nodes["recall_product_memory"]
-        self.assertEqual(recall_node["config"]["skillKey"], "memory_recall")
+        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
         self.assertEqual(
             recall_node["config"]["skillBindings"][0]["outputMapping"],
             {
-                "success": "memory_recall_success",
-                "memory_context": "memory_context",
-                "recalled_memories": "recalled_memories",
-                "omitted_memories": "omitted_memories",
-                "result": "memory_recall_result",
-            },
-        )
-        writer_node = nodes["write_product_memory_candidates"]
-        self.assertEqual(writer_node["config"]["skillKey"], "memory_candidate_writer")
-        self.assertEqual(
-            writer_node["config"]["skillBindings"][0]["outputMapping"],
-            {
-                "success": "candidate_write_success",
-                "candidate_memories": "candidate_memories",
-                "skipped_candidates": "skipped_candidates",
-                "result": "candidate_write_result",
+                "success": "buddy_session_recall_success",
+                "session_recall_context": "session_recall_context",
+                "sessions": "recalled_sessions",
+                "result": "buddy_session_recall_result",
             },
         )
         self.assertIn("evidence", nodes["build_feature_matrix"]["config"]["taskInstruction"])
         self.assertIn("假设", nodes["draft_prd"]["config"]["taskInstruction"])
-        self.assertIn("candidate 状态", nodes["prepare_product_memory_plan"]["config"]["taskInstruction"])
-        self.assertIn("不要应用为 active", writer_node["config"]["skillInstructionBlocks"]["memory_candidate_writer"]["content"])
+        self.assertNotIn("prepare_product_memory_plan", nodes)
+        self.assertNotIn("write_product_memory_candidates", nodes)
+        self.assertNotIn("candidate_memories", states)
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
             ["output_final_research_package"],
@@ -1281,8 +1229,8 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(metadata["graphProtocol"], "node_system")
         self.assertEqual(metadata["category"], "business")
-        self.assertEqual(metadata["requiredSkills"], ["memory_recall", "memory_candidate_writer"])
-        self.assertEqual(metadata["requiredPermissions"], ["memory_read", "memory_candidate_write"])
+        self.assertEqual(metadata["requiredSkills"], ["buddy_session_recall"])
+        self.assertEqual(metadata["requiredPermissions"], ["buddy_session_read"])
         self.assertEqual(metadata["mockMode"]["input"], "examples/mock_ecommerce_review_input.json")
         self.assertEqual(
             [item["key"] for item in metadata["inputSchema"]],
@@ -1309,7 +1257,6 @@ class TemplateLayoutTests(unittest.TestCase):
                 "product_copy",
                 "short_video_scripts",
                 "xiaohongshu_notes",
-                "candidate_memories",
             ],
         )
         self.assertTrue(metadata["outputContract"][0]["passThrough"])
@@ -1354,32 +1301,21 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertFalse(any("promptVisible" in definition for definition in states.values()))
 
         recall_node = nodes["recall_review_memory"]
-        self.assertEqual(recall_node["config"]["skillKey"], "memory_recall")
+        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
         self.assertEqual(
             recall_node["config"]["skillBindings"][0]["outputMapping"],
             {
-                "success": "memory_recall_success",
-                "memory_context": "memory_context",
-                "recalled_memories": "recalled_memories",
-                "omitted_memories": "omitted_memories",
-                "result": "memory_recall_result",
-            },
-        )
-        writer_node = nodes["write_review_memory_candidates"]
-        self.assertEqual(writer_node["config"]["skillKey"], "memory_candidate_writer")
-        self.assertEqual(
-            writer_node["config"]["skillBindings"][0]["outputMapping"],
-            {
-                "success": "candidate_write_success",
-                "candidate_memories": "candidate_memories",
-                "skipped_candidates": "skipped_candidates",
-                "result": "candidate_write_result",
+                "success": "buddy_session_recall_success",
+                "session_recall_context": "session_recall_context",
+                "sessions": "recalled_sessions",
+                "result": "buddy_session_recall_result",
             },
         )
         self.assertIn("evidence", nodes["extract_selling_and_risk_points"]["config"]["taskInstruction"])
         self.assertIn("合规", nodes["draft_marketing_artifacts"]["config"]["taskInstruction"])
-        self.assertIn("candidate 状态", nodes["prepare_review_memory_plan"]["config"]["taskInstruction"])
-        self.assertIn("不要应用为 active", writer_node["config"]["skillInstructionBlocks"]["memory_candidate_writer"]["content"])
+        self.assertNotIn("prepare_review_memory_plan", nodes)
+        self.assertNotIn("write_review_memory_candidates", nodes)
+        self.assertNotIn("candidate_memories", states)
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
             ["output_final_review_mining_package"],
@@ -2508,16 +2444,25 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template["metadata"]["role"], "buddy_autonomous_review")
         self.assertIs(template["metadata"]["internal"], True)
         self.assertEqual(template["label"], "自主复盘")
+        self.assertEqual(template["metadata"]["requiredSkills"], ["buddy_session_recall", "buddy_home_writer"])
+        self.assertEqual(template["metadata"]["permissions"], ["buddy_session_read", "buddy_home_write"])
+        self.assertEqual(states["current_session_id"]["type"], "text")
         self.assertEqual(states["final_reply"]["type"], "markdown")
+        self.assertEqual(states["recall_request"]["type"], "json")
+        self.assertEqual(states["buddy_session_recall_success"]["type"], "boolean")
+        self.assertEqual(states["session_recall_context"]["type"], "json")
+        self.assertEqual(states["recalled_sessions"]["type"], "json")
+        self.assertEqual(states["buddy_session_recall_result"]["type"], "markdown")
         self.assertEqual(states["autonomous_review"]["type"], "json")
-        self.assertEqual(template["metadata"]["permissions"], ["memory_candidate_write"])
-        self.assertNotIn("buddy_home_write", template["metadata"]["permissions"])
         self.assertEqual(states["improvement_candidates"]["type"], "json")
-        self.assertEqual(states["memory_candidate_plan"]["type"], "json")
-        self.assertEqual(states["memory_candidate_success"]["type"], "boolean")
-        self.assertEqual(states["candidate_memories"]["type"], "json")
-        self.assertEqual(states["skipped_memory_candidates"]["type"], "json")
-        self.assertEqual(states["memory_candidate_result"]["type"], "markdown")
+        self.assertEqual(states["memory_candidates"]["type"], "json")
+        self.assertEqual(states["memory_filter_report"]["type"], "json")
+        self.assertEqual(states["memory_update_plan"]["type"], "json")
+        self.assertEqual(states["memory_review_result"]["type"], "markdown")
+        self.assertEqual(states["memory_write_success"]["type"], "boolean")
+        self.assertEqual(states["applied_memory_commands"]["type"], "json")
+        self.assertEqual(states["skipped_memory_commands"]["type"], "json")
+        self.assertEqual(states["memory_write_result"]["type"], "markdown")
         for removed_state in [
             "writeback_commands",
             "writeback_success",
@@ -2530,7 +2475,6 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertNotIn("buddy_mode", states)
         self.assertNotIn("input_buddy_mode", nodes)
         for node in nodes.values():
-            self.assertNotEqual(node.get("config", {}).get("skillKey"), "buddy_home_writer")
             for read in node.get("reads", []):
                 self.assertNotEqual(read.get("state"), "buddy_mode")
         for edge in template["edges"]:
@@ -2541,59 +2485,109 @@ class TemplateLayoutTests(unittest.TestCase):
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
             [
                 "output_autonomous_review",
+                "output_session_recall_result",
                 "output_improvement_candidates",
-                "output_candidate_memories",
-                "output_memory_candidate_result",
+                "output_memory_filter_report",
+                "output_memory_review_result",
+                "output_applied_memory_commands",
+                "output_memory_write_result",
             ],
         )
-        self.assertEqual(nodes["decide_autonomous_review"]["kind"], "agent")
-        self.assertEqual(nodes["decide_autonomous_review"]["config"]["thinkingMode"], "low")
+        self.assertEqual(nodes["prepare_session_recall_request"]["kind"], "agent")
         self.assertEqual(
-            nodes["decide_autonomous_review"]["writes"],
-            [
-                {"state": "autonomous_review", "mode": "replace"},
-                {"state": "improvement_candidates", "mode": "replace"},
-                {"state": "memory_candidate_plan", "mode": "replace"},
-            ],
+            nodes["prepare_session_recall_request"]["writes"],
+            [{"state": "recall_request", "mode": "replace"}],
         )
-        self.assertIn("不要直接写 Buddy Home", nodes["decide_autonomous_review"]["config"]["taskInstruction"])
-        self.assertIn("improvement_candidates", nodes["decide_autonomous_review"]["config"]["taskInstruction"])
-        self.assertEqual(nodes["has_memory_candidates"]["kind"], "condition")
+        self.assertIn("current_session_id", nodes["prepare_session_recall_request"]["config"]["taskInstruction"])
+        recall_node = nodes["recall_related_sessions"]
+        self.assertEqual(recall_node["kind"], "agent")
+        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
         self.assertEqual(
-            nodes["has_memory_candidates"]["config"]["rule"],
-            {"source": "$state.memory_candidate_plan.has_candidates", "operator": "==", "value": True},
-        )
-        writer_node = nodes["write_memory_candidates"]
-        self.assertEqual(writer_node["kind"], "agent")
-        self.assertEqual(writer_node["config"]["skillKey"], "memory_candidate_writer")
-        self.assertEqual(
-            writer_node["config"]["skillBindings"],
+            recall_node["config"]["skillBindings"],
             [
                 {
-                    "skillKey": "memory_candidate_writer",
+                    "skillKey": "buddy_session_recall",
                     "outputMapping": {
-                        "success": "memory_candidate_success",
-                        "candidate_memories": "candidate_memories",
-                        "skipped_candidates": "skipped_memory_candidates",
-                        "result": "memory_candidate_result",
+                        "success": "buddy_session_recall_success",
+                        "session_recall_context": "session_recall_context",
+                        "sessions": "recalled_sessions",
+                        "result": "buddy_session_recall_result",
                     },
                 }
             ],
         )
-        self.assertIn({"source": "decide_autonomous_review", "target": "output_autonomous_review"}, template["edges"])
-        self.assertIn({"source": "decide_autonomous_review", "target": "output_improvement_candidates"}, template["edges"])
-        self.assertIn({"source": "decide_autonomous_review", "target": "has_memory_candidates"}, template["edges"])
-        self.assertIn({"source": "write_memory_candidates", "target": "output_candidate_memories"}, template["edges"])
-        self.assertIn({"source": "write_memory_candidates", "target": "output_memory_candidate_result"}, template["edges"])
+        self.assertEqual(
+            {binding["state"]: binding["mode"] for binding in recall_node["writes"]},
+            {
+                "buddy_session_recall_success": "replace",
+                "session_recall_context": "replace",
+                "recalled_sessions": "replace",
+                "buddy_session_recall_result": "replace",
+            },
+        )
+        extract_node = nodes["extract_memory_candidates"]
+        self.assertEqual(extract_node["kind"], "agent")
+        self.assertEqual(extract_node["config"]["thinkingMode"], "low")
+        self.assertEqual(
+            extract_node["writes"],
+            [
+                {"state": "autonomous_review", "mode": "replace"},
+                {"state": "improvement_candidates", "mode": "replace"},
+                {"state": "memory_candidates", "mode": "replace"},
+            ],
+        )
+        self.assertIn("session_recall_context", extract_node["config"]["taskInstruction"])
+        self.assertEqual(nodes["filter_memory_candidates"]["writes"], [{"state": "memory_filter_report", "mode": "replace"}])
+        self.assertEqual(
+            nodes["merge_memory_document"]["writes"],
+            [
+                {"state": "memory_update_plan", "mode": "replace"},
+                {"state": "memory_review_result", "mode": "replace"},
+            ],
+        )
+        self.assertIn("完整的新 MEMORY.md 内容", nodes["merge_memory_document"]["config"]["taskInstruction"])
+        self.assertEqual(nodes["has_memory_updates"]["kind"], "condition")
+        self.assertEqual(
+            nodes["has_memory_updates"]["config"]["rule"],
+            {"source": "$state.memory_update_plan.has_updates", "operator": "==", "value": True},
+        )
+        writer_node = nodes["write_memory_updates"]
+        self.assertEqual(writer_node["kind"], "agent")
+        self.assertEqual(writer_node["config"]["skillKey"], "buddy_home_writer")
+        self.assertEqual(
+            writer_node["config"]["skillBindings"],
+            [
+                {
+                    "skillKey": "buddy_home_writer",
+                    "outputMapping": {
+                        "success": "memory_write_success",
+                        "applied_commands": "applied_memory_commands",
+                        "skipped_commands": "skipped_memory_commands",
+                        "result": "memory_write_result",
+                    },
+                }
+            ],
+        )
+        self.assertIn({"source": "prepare_session_recall_request", "target": "recall_related_sessions"}, template["edges"])
+        self.assertIn({"source": "recall_related_sessions", "target": "extract_memory_candidates"}, template["edges"])
+        self.assertIn({"source": "recall_related_sessions", "target": "output_session_recall_result"}, template["edges"])
+        self.assertIn({"source": "extract_memory_candidates", "target": "filter_memory_candidates"}, template["edges"])
+        self.assertIn({"source": "filter_memory_candidates", "target": "merge_memory_document"}, template["edges"])
+        self.assertIn({"source": "merge_memory_document", "target": "output_autonomous_review"}, template["edges"])
+        self.assertIn({"source": "merge_memory_document", "target": "output_improvement_candidates"}, template["edges"])
+        self.assertIn({"source": "merge_memory_document", "target": "output_memory_filter_report"}, template["edges"])
+        self.assertIn({"source": "merge_memory_document", "target": "has_memory_updates"}, template["edges"])
+        self.assertIn({"source": "write_memory_updates", "target": "output_applied_memory_commands"}, template["edges"])
+        self.assertIn({"source": "write_memory_updates", "target": "output_memory_write_result"}, template["edges"])
         self.assertEqual(
             template["conditional_edges"],
             [
                 {
-                    "source": "has_memory_candidates",
+                    "source": "has_memory_updates",
                     "branches": {
-                        "true": "write_memory_candidates",
-                        "false": "output_improvement_candidates",
-                        "exhausted": "output_improvement_candidates",
+                        "true": "write_memory_updates",
+                        "false": "output_memory_review_result",
+                        "exhausted": "output_memory_review_result",
                     },
                 }
             ],

@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 import json
 from pathlib import Path
+import re
 from typing import Any, Iterator
 from uuid import uuid4
 
@@ -21,17 +22,20 @@ from app.buddy.home import (
     get_default_buddy_home_dir,
     open_buddy_database,
     read_profile_markdown,
-    render_memory_markdown,
     render_profile_markdown,
 )
 from app.core.storage.json_file_utils import read_json_file, utc_now_iso, write_json_file
-from app.memory import store as platform_memory_store
 
 
 BUDDY_HOME_DIR = get_default_buddy_home_dir()
 DEFAULT_CHAT_SESSION_TITLE = "新的对话"
 MAX_CHAT_SESSION_TITLE_CHARS = 32
 MAX_CHAT_MESSAGE_PREVIEW_CHARS = 96
+DEFAULT_RECALL_BOOKEND = 3
+DEFAULT_RECALL_WINDOW = 5
+MAX_RECALL_LIMIT = 50
+MAX_RECALL_WINDOW = 20
+HIDDEN_SESSION_SOURCES = {"tool"}
 RUN_TEMPLATE_BINDING_KEY = "run_template_binding"
 RUN_TEMPLATE_BINDING_TARGET_TYPE = "run_template_binding"
 RUN_TEMPLATE_BINDING_TARGET_ID = "run_template_binding"
@@ -55,15 +59,10 @@ DEFAULT_RUN_TEMPLATE_BINDING = {
         "input_buddy_context": "buddy_home_context",
     },
 }
-PLATFORM_BUDDY_MEMORY_SCOPE = "buddy"
-PLATFORM_BUDDY_MEMORY_ID_PREFIX = "buddy_home_"
-PLATFORM_BUDDY_MEMORY_CHANGED_BY = "buddy_home_migration"
-PLATFORM_BUDDY_MEMORY_CHANGE_REASON = "Migrate legacy Buddy Home memory projection into platform memory."
 
 
 def initialize_buddy_home() -> None:
     ensure_buddy_home(BUDDY_HOME_DIR)
-    migrate_buddy_home_memories_to_platform()
 
 
 def buddy_home_path(file_name: str) -> Path:
@@ -101,146 +100,29 @@ def save_policy(payload: dict[str, Any], *, changed_by: str, change_reason: str)
     return load_policy()
 
 
-def list_memories(*, include_deleted: bool = False) -> list[dict[str, Any]]:
-    with _connection() as connection:
-        rows = connection.execute(
-            """
-            SELECT id, type, title, content, source_json, confidence, enabled, deleted, created_at, updated_at
-            FROM buddy_memories
-            ORDER BY created_at ASC
-            """
-        ).fetchall()
-    memories = [_memory_from_row(row) for row in rows]
-    if include_deleted:
-        return memories
-    return [memory for memory in memories if memory.get("enabled", True) and not memory.get("deleted", False)]
-
-
-def migrate_buddy_home_memories_to_platform() -> dict[str, Any]:
-    legacy_memories = _read_buddy_memories(include_deleted=True)
-    created: list[dict[str, Any]] = []
-    updated: list[dict[str, Any]] = []
-    skipped: list[str] = []
-    for legacy_memory in legacy_memories:
-        platform_id = _platform_buddy_memory_id(legacy_memory.get("id"))
-        if not platform_id:
-            continue
-        payload = _platform_memory_payload_from_buddy_memory(legacy_memory, platform_id=platform_id)
-        try:
-            existing = platform_memory_store.get_memory(platform_id)
-        except KeyError:
-            created.append(
-                platform_memory_store.create_memory(
-                    payload,
-                    changed_by=PLATFORM_BUDDY_MEMORY_CHANGED_BY,
-                    change_reason=PLATFORM_BUDDY_MEMORY_CHANGE_REASON,
-                )
-            )
-            continue
-        if _platform_memory_payload_matches(existing, payload):
-            skipped.append(platform_id)
-            continue
-        updated.append(
-            platform_memory_store.update_memory(
-                platform_id,
-                payload,
-                changed_by=PLATFORM_BUDDY_MEMORY_CHANGED_BY,
-                change_reason=PLATFORM_BUDDY_MEMORY_CHANGE_REASON,
-            )
-        )
+def load_memory_document() -> dict[str, Any]:
+    initialize_buddy_home()
+    path = BUDDY_HOME_DIR / MEMORY_PATH
     return {
-        "total_count": len(legacy_memories),
-        "created_count": len(created),
-        "updated_count": len(updated),
-        "skipped_count": len(skipped),
-        "created": created,
-        "updated": updated,
-        "skipped": skipped,
+        "path": MEMORY_PATH,
+        "content": path.read_text(encoding="utf-8"),
+        "updated_at": "",
     }
 
 
-def create_memory(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
-    now = utc_now_iso()
-    source = payload.get("source") if isinstance(payload.get("source"), dict) else {"kind": "manual", "message_ids": []}
-    memory = {
-        "id": f"mem_{uuid4().hex[:12]}",
-        "type": str(payload.get("type") or "fact").strip() or "fact",
-        "title": str(payload.get("title") or "Untitled memory").strip() or "Untitled memory",
-        "content": str(payload.get("content") or "").strip(),
-        "source": source,
-        "confidence": float(payload.get("confidence") or 1),
-        "enabled": bool(payload.get("enabled", True)),
-        "deleted": bool(payload.get("deleted", False)),
-        "created_at": now,
-        "updated_at": now,
-    }
-    with _connection() as connection:
-        connection.execute(
-            """
-            INSERT INTO buddy_memories
-                (id, type, title, content, source_json, confidence, enabled, deleted, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                memory["id"],
-                memory["type"],
-                memory["title"],
-                memory["content"],
-                _json_dumps(memory["source"]),
-                memory["confidence"],
-                int(memory["enabled"]),
-                int(memory["deleted"]),
-                memory["created_at"],
-                memory["updated_at"],
-            ),
-        )
-        connection.commit()
-    _write_with_revision("memory", memory["id"], "create", {}, memory, changed_by, change_reason)
-    _sync_memory_markdown()
-    return memory
-
-
-def update_memory(memory_id: str, payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
-    previous = _get_memory(memory_id)
-    cleaned = _clean_dict(payload)
+def save_memory_document(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
+    previous = load_memory_document()
+    content = str(payload.get("content") or "")
+    if not content.strip():
+        raise ValueError("MEMORY.md content cannot be empty.")
     next_value = {
-        **previous,
-        **cleaned,
-        "source": cleaned.get("source") if isinstance(cleaned.get("source"), dict) else previous.get("source", {}),
-        "confidence": float(cleaned.get("confidence", previous.get("confidence", 1)) or 1),
-        "enabled": bool(cleaned.get("enabled", previous.get("enabled", True))),
-        "deleted": bool(cleaned.get("deleted", previous.get("deleted", False))),
+        "path": MEMORY_PATH,
+        "content": content,
         "updated_at": utc_now_iso(),
     }
-    with _connection() as connection:
-        connection.execute(
-            """
-            UPDATE buddy_memories
-            SET type = ?, title = ?, content = ?, source_json = ?, confidence = ?,
-                enabled = ?, deleted = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            (
-                str(next_value.get("type") or "fact"),
-                str(next_value.get("title") or "Untitled memory"),
-                str(next_value.get("content") or ""),
-                _json_dumps(next_value.get("source") if isinstance(next_value.get("source"), dict) else {}),
-                float(next_value.get("confidence") or 1),
-                int(bool(next_value.get("enabled", True))),
-                int(bool(next_value.get("deleted", False))),
-                str(next_value["updated_at"]),
-                memory_id,
-            ),
-        )
-        connection.commit()
-    next_value = _get_memory(memory_id)
-    _write_with_revision("memory", memory_id, "update", previous, next_value, changed_by, change_reason)
-    _sync_memory_markdown()
-    return next_value
-
-
-def delete_memory(memory_id: str, *, changed_by: str, change_reason: str) -> dict[str, Any]:
-    return update_memory(memory_id, {"enabled": False, "deleted": True}, changed_by=changed_by, change_reason=change_reason)
+    _write_with_revision("home_file", MEMORY_PATH, "update", previous, next_value, changed_by, change_reason)
+    (BUDDY_HOME_DIR / MEMORY_PATH).write_text(content, encoding="utf-8")
+    return load_memory_document()
 
 
 def load_session_summary() -> dict[str, Any]:
@@ -373,7 +255,7 @@ def save_run_template_binding(payload: dict[str, Any], *, changed_by: str, chang
 
 def list_chat_sessions(*, include_deleted: bool = False) -> list[dict[str, Any]]:
     query = """
-        SELECT session_id, title, archived, deleted, created_at, updated_at
+        SELECT session_id, title, archived, deleted, parent_session_id, source, ended_at, end_reason, created_at, updated_at
         FROM buddy_sessions
     """
     params: list[Any] = []
@@ -397,25 +279,36 @@ def create_chat_session(
     del changed_by, change_reason
     now = utc_now_iso()
     title = _normalize_chat_session_title((payload or {}).get("title"))
+    parent_session_id = _normalize_optional_text((payload or {}).get("parent_session_id"))
+    source = _normalize_session_source((payload or {}).get("source"))
     session = {
         "session_id": f"session_{uuid4().hex[:12]}",
         "title": title or DEFAULT_CHAT_SESSION_TITLE,
         "archived": False,
         "deleted": False,
+        "parent_session_id": parent_session_id,
+        "source": source,
+        "ended_at": _normalize_optional_text((payload or {}).get("ended_at")),
+        "end_reason": _normalize_optional_text((payload or {}).get("end_reason")),
         "created_at": now,
         "updated_at": now,
     }
     with _connection() as connection:
         connection.execute(
             """
-            INSERT INTO buddy_sessions (session_id, title, archived, deleted, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO buddy_sessions
+                (session_id, title, archived, deleted, parent_session_id, source, ended_at, end_reason, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 session["session_id"],
                 session["title"],
                 int(session["archived"]),
                 int(session["deleted"]),
+                session["parent_session_id"],
+                session["source"],
+                session["ended_at"],
+                session["end_reason"],
                 session["created_at"],
                 session["updated_at"],
             ),
@@ -428,7 +321,7 @@ def get_chat_session(session_id: str, *, include_deleted: bool = False) -> dict[
     with _connection() as connection:
         row = connection.execute(
             """
-            SELECT session_id, title, archived, deleted, created_at, updated_at
+            SELECT session_id, title, archived, deleted, parent_session_id, source, ended_at, end_reason, created_at, updated_at
             FROM buddy_sessions
             WHERE session_id = ?
             """,
@@ -456,15 +349,36 @@ def update_chat_session(
     if "title" in payload:
         next_title = _normalize_chat_session_title(payload.get("title")) or DEFAULT_CHAT_SESSION_TITLE
     next_archived = bool(payload.get("archived", previous.get("archived", False)))
+    next_parent_session_id = previous.get("parent_session_id")
+    if "parent_session_id" in payload:
+        next_parent_session_id = _normalize_optional_text(payload.get("parent_session_id"))
+    next_source = previous.get("source") or "buddy"
+    if "source" in payload:
+        next_source = _normalize_session_source(payload.get("source"))
+    next_ended_at = previous.get("ended_at")
+    if "ended_at" in payload:
+        next_ended_at = _normalize_optional_text(payload.get("ended_at"))
+    next_end_reason = previous.get("end_reason")
+    if "end_reason" in payload:
+        next_end_reason = _normalize_optional_text(payload.get("end_reason"))
     now = utc_now_iso()
     with _connection() as connection:
         connection.execute(
             """
             UPDATE buddy_sessions
-            SET title = ?, archived = ?, updated_at = ?
+            SET title = ?, archived = ?, parent_session_id = ?, source = ?, ended_at = ?, end_reason = ?, updated_at = ?
             WHERE session_id = ?
             """,
-            (next_title, int(next_archived), now, session_id),
+            (
+                next_title,
+                int(next_archived),
+                next_parent_session_id,
+                next_source,
+                next_ended_at,
+                next_end_reason,
+                now,
+                session_id,
+            ),
         )
         connection.commit()
     return get_chat_session(session_id, include_deleted=bool(previous.get("deleted")))
@@ -502,6 +416,48 @@ def list_chat_messages(session_id: str, *, limit: int | None = None) -> list[dic
     with _connection() as connection:
         rows = connection.execute(query, params).fetchall()
     return [_chat_message_from_row(row) for row in rows]
+
+
+def recall_chat_messages(
+    *,
+    mode: str = "browse",
+    query: str = "",
+    session_id: str | None = None,
+    anchor_message_id: str | None = None,
+    direction: str = "around",
+    limit: int = 10,
+    window: int = DEFAULT_RECALL_WINDOW,
+    bookend: int = DEFAULT_RECALL_BOOKEND,
+    sort: str | None = None,
+    role_filter: Any = None,
+    current_session_id: str | None = None,
+) -> dict[str, Any]:
+    normalized_mode = str(mode or "browse").strip().lower()
+    normalized_limit = _bounded_int(limit, default=10, minimum=1, maximum=MAX_RECALL_LIMIT)
+    normalized_window = _bounded_int(window, default=DEFAULT_RECALL_WINDOW, minimum=0, maximum=MAX_RECALL_WINDOW)
+    normalized_bookend = _bounded_int(bookend, default=DEFAULT_RECALL_BOOKEND, minimum=0, maximum=10)
+    normalized_query = str(query or "").strip()
+    normalized_sort = _normalize_recall_sort(sort)
+    normalized_roles = _normalize_role_filter(role_filter)
+    if normalized_mode == "discover":
+        return _recall_chat_messages_discover(
+            query=normalized_query,
+            limit=normalized_limit,
+            window=normalized_window,
+            bookend=normalized_bookend,
+            sort=normalized_sort,
+            role_filter=normalized_roles,
+            current_session_id=str(current_session_id or "").strip(),
+        )
+    if normalized_mode == "scroll":
+        return _recall_chat_messages_scroll(
+            session_id=str(session_id or "").strip(),
+            anchor_message_id=str(anchor_message_id or "").strip(),
+            direction=str(direction or "around").strip().lower(),
+            window=normalized_window,
+            current_session_id=str(current_session_id or "").strip(),
+        )
+    return _recall_chat_messages_browse(limit=normalized_limit)
 
 
 def append_chat_message(
@@ -571,6 +527,603 @@ def append_chat_message(
     return _get_chat_message(str(message["message_id"]))
 
 
+def _recall_chat_messages_browse(*, limit: int) -> dict[str, Any]:
+    sessions = _list_browsable_recall_sessions(limit=limit)
+    return {
+        "kind": "buddy_session_recall",
+        "mode": "browse",
+        "query": "",
+        "hit_count": 0,
+        "session_count": len(sessions),
+        "sessions": [{**session, "messages": [], "hit_message_ids": []} for session in sessions],
+    }
+
+
+def _list_browsable_recall_sessions(*, limit: int) -> list[dict[str, Any]]:
+    sessions: list[dict[str, Any]] = []
+    seen_lineage_roots: set[str] = set()
+    for listed_session in list_chat_sessions():
+        if not _is_recall_visible_session(listed_session):
+            continue
+        listed_session_id = str(listed_session.get("session_id") or "")
+        lineage_root = _resolve_session_lineage_root(listed_session_id)
+        if not lineage_root or lineage_root in seen_lineage_roots:
+            continue
+        projected_session_id = _resolve_compressed_lineage_tip(lineage_root)
+        if listed_session_id not in {lineage_root, projected_session_id}:
+            continue
+        try:
+            projected_session = get_chat_session(projected_session_id)
+        except KeyError:
+            continue
+        if not _is_recall_visible_session(projected_session):
+            continue
+        sessions.append(
+            {
+                **projected_session,
+                "lineage_root_session_id": lineage_root,
+            }
+        )
+        seen_lineage_roots.add(lineage_root)
+        if len(sessions) >= limit:
+            break
+    return sessions
+
+
+def _is_recall_visible_session(session: dict[str, Any]) -> bool:
+    return (
+        not bool(session.get("archived"))
+        and not bool(session.get("deleted"))
+        and str(session.get("source") or "buddy") not in HIDDEN_SESSION_SOURCES
+    )
+
+
+def _resolve_compressed_lineage_tip(session_id: str) -> str:
+    if not session_id:
+        return ""
+    hidden_placeholders = ",".join("?" for _ in HIDDEN_SESSION_SOURCES)
+    source_filter = f"AND source NOT IN ({hidden_placeholders})" if hidden_placeholders else ""
+    current = session_id
+    visited: set[str] = set()
+    with _connection() as connection:
+        while current and current not in visited:
+            visited.add(current)
+            parent = connection.execute(
+                """
+                SELECT session_id, ended_at, end_reason
+                FROM buddy_sessions
+                WHERE session_id = ? AND deleted = 0
+                """,
+                (current,),
+            ).fetchone()
+            if not parent or str(parent["end_reason"] or "") != "compression":
+                return current
+            params: tuple[Any, ...]
+            if hidden_placeholders:
+                params = (current, *sorted(HIDDEN_SESSION_SOURCES))
+            else:
+                params = (current,)
+            rows = connection.execute(
+                f"""
+                SELECT session_id, created_at, updated_at
+                FROM buddy_sessions
+                WHERE parent_session_id = ?
+                  AND deleted = 0
+                  AND archived = 0
+                  {source_filter}
+                ORDER BY created_at DESC, updated_at DESC, rowid DESC
+                """,
+                params,
+            ).fetchall()
+            next_session_id = ""
+            parent_ended_at = str(parent["ended_at"] or "")
+            for row in rows:
+                child_created_at = str(row["created_at"] or "")
+                if not parent_ended_at or not child_created_at or child_created_at >= parent_ended_at:
+                    next_session_id = str(row["session_id"] or "")
+                    break
+            if not next_session_id:
+                return current
+            current = next_session_id
+    return current or session_id
+
+
+def _recall_chat_messages_discover(
+    *,
+    query: str,
+    limit: int,
+    window: int,
+    bookend: int,
+    sort: str,
+    role_filter: tuple[str, ...],
+    current_session_id: str = "",
+) -> dict[str, Any]:
+    if not query:
+        return _recall_chat_messages_browse(limit=limit)
+    raw_hits = _search_chat_message_hits(
+        query,
+        limit=max(50, limit * 10),
+        sort=sort,
+        role_filter=role_filter,
+    )
+    session_entries: list[dict[str, Any]] = []
+    seen_lineage_roots: set[str] = set()
+    current_root = _resolve_session_lineage_root(current_session_id) if current_session_id else ""
+    for hit in raw_hits:
+        hit_session_id = str(hit.get("session_id") or "")
+        lineage_root = _resolve_session_lineage_root(hit_session_id)
+        if current_root and lineage_root == current_root:
+            continue
+        dedupe_key = lineage_root or hit_session_id
+        if dedupe_key in seen_lineage_roots:
+            continue
+        session = get_chat_session(hit_session_id)
+        view = _get_anchored_message_view(
+            session_id=hit_session_id,
+            anchor_message_id=str(hit.get("message_id") or ""),
+            window=window,
+            bookend=bookend,
+            role_filter=role_filter,
+        )
+        if not view["messages"]:
+            continue
+        entry = {
+            **session,
+            "lineage_root_session_id": lineage_root or hit_session_id,
+            "matched_role": str(hit.get("role") or ""),
+            "match_message_id": str(hit.get("message_id") or ""),
+            "snippet": str(hit.get("snippet") or ""),
+            "bookend_start": view["bookend_start"],
+            "messages": view["messages"],
+            "bookend_end": view["bookend_end"],
+            "messages_before": view["messages_before"],
+            "messages_after": view["messages_after"],
+            "has_more_before": view["has_more_before"],
+            "has_more_after": view["has_more_after"],
+            "hit_message_ids": [
+                str(candidate.get("message_id") or "")
+                for candidate in raw_hits
+                if _resolve_session_lineage_root(str(candidate.get("session_id") or "")) == dedupe_key
+            ],
+        }
+        session_entries.append(entry)
+        seen_lineage_roots.add(dedupe_key)
+        if len(session_entries) >= limit:
+            break
+    return {
+        "kind": "buddy_session_recall",
+        "mode": "discover",
+        "query": query,
+        "hit_count": len(raw_hits),
+        "session_count": len(session_entries),
+        "sessions": session_entries,
+    }
+
+
+def _recall_chat_messages_scroll(
+    *,
+    session_id: str,
+    anchor_message_id: str,
+    direction: str,
+    window: int,
+    current_session_id: str = "",
+) -> dict[str, Any]:
+    if not session_id:
+        raise ValueError("session_id is required for scroll recall.")
+    session = get_chat_session(session_id)
+    if current_session_id:
+        target_root = _resolve_session_lineage_root(session_id)
+        current_root = _resolve_session_lineage_root(current_session_id)
+        if target_root and current_root and target_root == current_root:
+            raise ValueError("scroll target is already in the current session lineage.")
+    if anchor_message_id:
+        anchor_owner = _safe_message_session_id(anchor_message_id)
+        if anchor_owner and anchor_owner != session_id:
+            if _resolve_session_lineage_root(anchor_owner) == _resolve_session_lineage_root(session_id):
+                session_id = anchor_owner
+                session = get_chat_session(session_id)
+            else:
+                raise ValueError(f"anchor_message_id {anchor_message_id} is not in session {session_id}.")
+    view = _get_anchored_message_view(
+        session_id=session_id,
+        anchor_message_id=anchor_message_id,
+        window=window,
+        bookend=0,
+        role_filter=("user", "assistant"),
+        direction=direction,
+    )
+    return {
+        "kind": "buddy_session_recall",
+        "mode": "scroll",
+        "query": "",
+        "hit_count": 1 if view["messages"] else 0,
+        "session_count": 1,
+        "sessions": [
+            {
+                **session,
+                "lineage_root_session_id": _resolve_session_lineage_root(session_id) or session_id,
+                "messages": view["messages"],
+                "hit_message_ids": [anchor_message_id] if anchor_message_id else [],
+                "messages_before": view["messages_before"],
+                "messages_after": view["messages_after"],
+                "has_more_before": view["has_more_before"],
+                "has_more_after": view["has_more_after"],
+            }
+        ],
+    }
+
+
+def _search_chat_message_hits(
+    query: str,
+    *,
+    limit: int,
+    sort: str,
+    role_filter: tuple[str, ...],
+) -> list[dict[str, Any]]:
+    if not query.strip():
+        return []
+    if _contains_cjk(query):
+        cjk_tokens = _query_search_tokens(query, cjk_only=True)
+        if cjk_tokens and all(_count_cjk(token) >= 3 for token in cjk_tokens):
+            rows = _search_chat_message_hits_fts(
+                _trigram_query(query),
+                limit=limit,
+                sort=sort,
+                role_filter=role_filter,
+                table_name="buddy_messages_fts_trigram",
+            )
+            if rows:
+                return rows
+        return _search_chat_message_hits_like(query, limit=limit, role_filter=role_filter)
+
+    match_query = _sanitize_fts5_query(query)
+    rows = _search_chat_message_hits_fts(
+        match_query,
+        limit=limit,
+        sort=sort,
+        role_filter=role_filter,
+        table_name="buddy_messages_fts",
+    )
+    if rows:
+        return rows
+    return _search_chat_message_hits_like(query, limit=limit, role_filter=role_filter)
+
+
+def _search_chat_message_hits_fts(
+    match_query: str,
+    *,
+    limit: int,
+    sort: str,
+    role_filter: tuple[str, ...],
+    table_name: str,
+) -> list[dict[str, Any]]:
+    if not match_query:
+        return []
+    if table_name not in {"buddy_messages_fts", "buddy_messages_fts_trigram"}:
+        raise ValueError("Unsupported Buddy message FTS table.")
+    order_by = _fts_order_by_sql(sort)
+    role_placeholders = ",".join("?" for _ in role_filter)
+    hidden_placeholders = ",".join("?" for _ in HIDDEN_SESSION_SOURCES)
+    source_filter = f"AND bs.source NOT IN ({hidden_placeholders})" if hidden_placeholders else ""
+    sql = f"""
+        SELECT
+            bm.message_id,
+            bm.session_id,
+            bm.role,
+            snippet({table_name}, 3, '>>>', '<<<', '...', 40) AS snippet,
+            bm.content,
+            bm.created_at,
+            bs.parent_session_id,
+            bs.source,
+            rank
+        FROM {table_name}
+        JOIN buddy_messages AS bm ON bm.rowid = {table_name}.rowid
+        JOIN buddy_sessions AS bs ON bs.session_id = bm.session_id
+        WHERE {table_name}.content MATCH ?
+          AND bs.deleted = 0
+          AND bs.archived = 0
+          {source_filter}
+          AND bm.role IN ({role_placeholders})
+        {order_by}
+        LIMIT ?
+    """
+    params: list[Any] = [match_query, *sorted(HIDDEN_SESSION_SOURCES), *role_filter, limit]
+    with _connection() as connection:
+        try:
+            rows = connection.execute(sql, params).fetchall()
+        except Exception:
+            return []
+    return _dedupe_hit_rows([_hit_from_row(row) for row in rows])
+
+
+def _search_chat_message_hits_like(
+    query: str,
+    *,
+    limit: int,
+    role_filter: tuple[str, ...],
+) -> list[dict[str, Any]]:
+    tokens = _query_search_tokens(query) or [query.strip()]
+    if not tokens:
+        return []
+    role_placeholders = ",".join("?" for _ in role_filter)
+    hidden_placeholders = ",".join("?" for _ in HIDDEN_SESSION_SOURCES)
+    source_filter = f"AND bs.source NOT IN ({hidden_placeholders})" if hidden_placeholders else ""
+    token_clauses = []
+    params: list[Any] = []
+    for token in tokens:
+        escaped = _escape_like_token(token)
+        token_clauses.append("bm.content LIKE ? ESCAPE '\\'")
+        params.append(f"%{escaped}%")
+    sql = f"""
+        SELECT
+            bm.message_id,
+            bm.session_id,
+            bm.role,
+            bm.content,
+            bm.created_at,
+            bs.parent_session_id,
+            bs.source
+        FROM buddy_messages AS bm
+        JOIN buddy_sessions AS bs ON bs.session_id = bm.session_id
+        WHERE ({' OR '.join(token_clauses)})
+          AND bs.deleted = 0
+          AND bs.archived = 0
+          {source_filter}
+          AND bm.role IN ({role_placeholders})
+        ORDER BY bm.created_at DESC, bm.rowid DESC
+        LIMIT ?
+    """
+    params.extend([*sorted(HIDDEN_SESSION_SOURCES), *role_filter, limit])
+    with _connection() as connection:
+        rows = connection.execute(sql, params).fetchall()
+    first_token = tokens[0]
+    hits = []
+    for row in rows:
+        hit = _hit_from_row(row)
+        hit["snippet"] = _make_text_snippet(str(row["content"] or ""), tokens=[first_token, *tokens[1:]])
+        hits.append(hit)
+    return _dedupe_hit_rows(hits)
+
+
+def _hit_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "message_id": str(row["message_id"] or ""),
+        "session_id": str(row["session_id"] or ""),
+        "role": str(row["role"] or ""),
+        "snippet": str(row["snippet"] or "") if _row_has_key(row, "snippet") else "",
+        "created_at": str(row["created_at"] or ""),
+        "parent_session_id": row["parent_session_id"] if _row_has_key(row, "parent_session_id") else None,
+        "source": str(row["source"] or "buddy") if _row_has_key(row, "source") else "buddy",
+    }
+
+
+def _dedupe_hit_rows(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    deduped: list[dict[str, Any]] = []
+    for hit in hits:
+        message_id = str(hit.get("message_id") or "")
+        if message_id and message_id not in seen:
+            seen.add(message_id)
+            deduped.append(hit)
+    return deduped
+
+
+def _safe_message_session_id(message_id: str) -> str:
+    try:
+        return str(_get_chat_message(message_id).get("session_id") or "")
+    except KeyError:
+        return ""
+
+
+def _get_anchored_message_view(
+    *,
+    session_id: str,
+    anchor_message_id: str,
+    window: int,
+    bookend: int,
+    role_filter: tuple[str, ...],
+    direction: str = "around",
+) -> dict[str, Any]:
+    messages = list_chat_messages(session_id)
+    anchor_index = 0
+    if anchor_message_id:
+        for index, message in enumerate(messages):
+            if message["message_id"] == anchor_message_id:
+                anchor_index = index
+                break
+        else:
+            return _empty_anchored_message_view()
+    if direction == "before":
+        start = max(0, anchor_index - window)
+        end = anchor_index + 1
+    elif direction == "after":
+        start = anchor_index
+        end = min(len(messages), anchor_index + window + 1)
+    else:
+        start = max(0, anchor_index - window)
+        end = min(len(messages), anchor_index + window + 1)
+    window_messages = [
+        message
+        for message in messages[start:end]
+        if message["message_id"] == anchor_message_id or message.get("role") in role_filter
+    ]
+    before_candidates = [
+        message
+        for message in messages[:start]
+        if message.get("role") in role_filter and str(message.get("content") or "").strip()
+    ]
+    after_candidates = [
+        message
+        for message in messages[end:]
+        if message.get("role") in role_filter and str(message.get("content") or "").strip()
+    ]
+    return {
+        "messages": window_messages,
+        "bookend_start": before_candidates[:bookend] if bookend else [],
+        "bookend_end": after_candidates[-bookend:] if bookend else [],
+        "messages_before": max(0, anchor_index - start),
+        "messages_after": max(0, end - anchor_index - 1),
+        "has_more_before": start > 0,
+        "has_more_after": end < len(messages),
+    }
+
+
+def _empty_anchored_message_view() -> dict[str, Any]:
+    return {
+        "messages": [],
+        "bookend_start": [],
+        "bookend_end": [],
+        "messages_before": 0,
+        "messages_after": 0,
+        "has_more_before": False,
+        "has_more_after": False,
+    }
+
+
+def _sanitize_fts5_query(query: str) -> str:
+    quoted_parts: list[str] = []
+
+    def preserve_quoted(match: re.Match[str]) -> str:
+        quoted_parts.append(match.group(0))
+        return f"\x00Q{len(quoted_parts) - 1}\x00"
+
+    sanitized = re.sub(r'"[^"]*"', preserve_quoted, query)
+    sanitized = re.sub(r'[+{}()"^]', " ", sanitized)
+    sanitized = re.sub(r"\*+", "*", sanitized)
+    sanitized = re.sub(r"(^|\s)\*", r"\1", sanitized)
+    sanitized = re.sub(r"(?i)^(AND|OR|NOT)\b\s*", "", sanitized.strip())
+    sanitized = re.sub(r"(?i)\s+(AND|OR|NOT)\s*$", "", sanitized.strip())
+    sanitized = re.sub(r"\b(\w+(?:[._-]\w+)+)\b", r'"\1"', sanitized)
+    for index, quoted in enumerate(quoted_parts):
+        sanitized = sanitized.replace(f"\x00Q{index}\x00", quoted)
+    return sanitized.strip()
+
+
+def _trigram_query(query: str) -> str:
+    tokens = _query_search_tokens(query, preserve_operators=True)
+    parts = []
+    for token in tokens:
+        if token.upper() in {"AND", "OR", "NOT"}:
+            parts.append(token.upper())
+        else:
+            parts.append(f'"{token.replace(chr(34), chr(34) * 2)}"')
+    return " ".join(parts)
+
+
+def _query_search_tokens(
+    query: str,
+    *,
+    cjk_only: bool = False,
+    preserve_operators: bool = False,
+) -> list[str]:
+    raw = query.strip().strip('"')
+    tokens = [token.strip().strip('"') for token in raw.split() if token.strip().strip('"')]
+    if not tokens and raw:
+        tokens = [raw]
+    results: list[str] = []
+    for token in tokens:
+        upper = token.upper()
+        if upper in {"AND", "OR", "NOT"}:
+            if preserve_operators:
+                results.append(upper)
+            continue
+        if cjk_only and not _contains_cjk(token):
+            continue
+        results.append(token)
+    return results
+
+
+def _contains_cjk(text: str) -> bool:
+    return any(_is_cjk_codepoint(ord(character)) for character in text)
+
+
+def _count_cjk(text: str) -> int:
+    return sum(1 for character in text if _is_cjk_codepoint(ord(character)))
+
+
+def _is_cjk_codepoint(codepoint: int) -> bool:
+    return (
+        0x4E00 <= codepoint <= 0x9FFF
+        or 0x3400 <= codepoint <= 0x4DBF
+        or 0x20000 <= codepoint <= 0x2A6DF
+        or 0x3000 <= codepoint <= 0x303F
+        or 0x3040 <= codepoint <= 0x309F
+        or 0x30A0 <= codepoint <= 0x30FF
+        or 0xAC00 <= codepoint <= 0xD7AF
+    )
+
+
+def _escape_like_token(token: str) -> str:
+    return token.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _make_text_snippet(content: str, *, tokens: list[str]) -> str:
+    normalized_tokens = [token for token in tokens if token and token.upper() not in {"AND", "OR", "NOT"}]
+    for token in normalized_tokens:
+        index = content.find(token)
+        if index >= 0:
+            start = max(0, index - 40)
+            end = min(len(content), index + len(token) + 40)
+            prefix = "..." if start > 0 else ""
+            suffix = "..." if end < len(content) else ""
+            return f"{prefix}{content[start:index]}>>>{content[index:index + len(token)]}<<<{content[index + len(token):end]}{suffix}"
+    return content[:120]
+
+
+def _fts_order_by_sql(sort: str) -> str:
+    if sort == "newest":
+        return "ORDER BY bm.created_at DESC, rank"
+    if sort == "oldest":
+        return "ORDER BY bm.created_at ASC, rank"
+    return "ORDER BY rank"
+
+
+def _bounded_int(value: Any, *, default: int, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(float(value))
+    except (TypeError, ValueError):
+        parsed = default
+    return min(max(parsed, minimum), maximum)
+
+
+def _normalize_recall_sort(value: Any) -> str:
+    normalized = str(value or "rank").strip().lower()
+    return normalized if normalized in {"rank", "newest", "oldest"} else "rank"
+
+
+def _normalize_role_filter(value: Any) -> tuple[str, ...]:
+    allowed = {"user", "assistant"}
+    if isinstance(value, str):
+        candidates = [item.strip() for item in value.split(",")]
+    elif isinstance(value, list | tuple | set):
+        candidates = [str(item).strip() for item in value]
+    else:
+        candidates = []
+    roles = tuple(role for role in candidates if role in allowed)
+    return roles or ("user", "assistant")
+
+
+def _resolve_session_lineage_root(session_id: str) -> str:
+    if not session_id:
+        return ""
+    visited: set[str] = set()
+    current = session_id
+    with _connection() as connection:
+        while current and current not in visited:
+            visited.add(current)
+            row = connection.execute(
+                "SELECT parent_session_id FROM buddy_sessions WHERE session_id = ?",
+                (current,),
+            ).fetchone()
+            if not row:
+                return session_id
+            parent = str(row["parent_session_id"] or "").strip()
+            if not parent:
+                return current
+            current = parent
+    return current or session_id
+
+
 def list_revisions(target_type: str | None = None, target_id: str | None = None) -> list[dict[str, Any]]:
     query = """
         SELECT revision_id, target_type, target_id, operation, previous_value_json, next_value_json,
@@ -609,12 +1162,18 @@ def restore_revision(revision_id: str, *, changed_by: str, change_reason: str) -
         restored = _normalize_policy(restored)
         _write_with_revision("policy", "policy", "restore", current, restored, changed_by, change_reason)
         _write_json(POLICY_PATH, restored)
-    elif target_type == "memory":
-        current = _get_memory(target_id)
-        restored = {**restored, "updated_at": utc_now_iso(), "deleted": False, "enabled": True}
-        _replace_memory(target_id, restored)
-        _write_with_revision("memory", target_id, "restore", current, _get_memory(target_id), changed_by, change_reason)
-        _sync_memory_markdown()
+    elif target_type == "home_file" and target_id == MEMORY_PATH:
+        current = load_memory_document()
+        next_value = {
+            "path": MEMORY_PATH,
+            "content": str(restored.get("content") or ""),
+            "updated_at": utc_now_iso(),
+        }
+        if not next_value["content"].strip():
+            raise ValueError("Cannot restore an empty MEMORY.md revision.")
+        _write_with_revision("home_file", MEMORY_PATH, "restore", current, next_value, changed_by, change_reason)
+        (BUDDY_HOME_DIR / MEMORY_PATH).write_text(next_value["content"], encoding="utf-8")
+        restored = load_memory_document()
     elif target_type == "session_summary":
         current = load_session_summary()
         _write_with_revision("session_summary", "session_summary", "restore", current, restored, changed_by, change_reason)
@@ -763,130 +1322,6 @@ def _write_with_revision(
         )
         connection.commit()
     return revision
-
-
-def _get_memory(memory_id: str) -> dict[str, Any]:
-    with _connection() as connection:
-        row = connection.execute(
-            """
-            SELECT id, type, title, content, source_json, confidence, enabled, deleted, created_at, updated_at
-            FROM buddy_memories
-            WHERE id = ?
-            """,
-            (memory_id,),
-        ).fetchone()
-    if not row:
-        raise KeyError(memory_id)
-    return _memory_from_row(row)
-
-
-def _replace_memory(memory_id: str, payload: dict[str, Any]) -> None:
-    with _connection() as connection:
-        connection.execute(
-            """
-            UPDATE buddy_memories
-            SET type = ?, title = ?, content = ?, source_json = ?, confidence = ?,
-                enabled = ?, deleted = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            (
-                str(payload.get("type") or "fact"),
-                str(payload.get("title") or "Untitled memory"),
-                str(payload.get("content") or ""),
-                _json_dumps(payload.get("source") if isinstance(payload.get("source"), dict) else {}),
-                float(payload.get("confidence") or 1),
-                int(bool(payload.get("enabled", True))),
-                int(bool(payload.get("deleted", False))),
-                str(payload.get("updated_at") or utc_now_iso()),
-                memory_id,
-            ),
-        )
-        connection.commit()
-
-
-def _read_buddy_memories(*, include_deleted: bool) -> list[dict[str, Any]]:
-    return list_memories(include_deleted=include_deleted)
-
-
-def _platform_buddy_memory_id(value: Any) -> str:
-    legacy_id = str(value or "").strip()
-    if not legacy_id:
-        return ""
-    raw_id = f"{PLATFORM_BUDDY_MEMORY_ID_PREFIX}{legacy_id}"
-    return "".join(character if character.isalnum() or character in {"_", "-"} else "_" for character in raw_id)[:80]
-
-
-def _platform_memory_payload_from_buddy_memory(
-    memory: dict[str, Any],
-    *,
-    platform_id: str,
-) -> dict[str, Any]:
-    legacy_type = str(memory.get("type") or "fact").strip() or "fact"
-    legacy_source = memory.get("source") if isinstance(memory.get("source"), dict) else {}
-    legacy_id = str(memory.get("id") or "")
-    return {
-        "id": platform_id,
-        "scope": PLATFORM_BUDDY_MEMORY_SCOPE,
-        "layer": _platform_memory_layer_for_buddy_type(legacy_type),
-        "type": legacy_type,
-        "summary": str(memory.get("title") or "Untitled memory").strip() or "Untitled memory",
-        "content": str(memory.get("content") or "").strip(),
-        "confidence": float(memory.get("confidence") or 1),
-        "importance": 0.65,
-        "evidence": [
-            {
-                "kind": "buddy_home_memory",
-                "buddy_memory_id": legacy_id,
-                "title": str(memory.get("title") or ""),
-                "source": legacy_source,
-            }
-        ],
-        "artifact_refs": [],
-        "source": {
-            "kind": "buddy_home_projection",
-            "buddy_memory_id": legacy_id,
-            "legacy_source": legacy_source,
-            "created_at": str(memory.get("created_at") or ""),
-            "updated_at": str(memory.get("updated_at") or ""),
-        },
-        "status": "archived" if memory.get("deleted") or not memory.get("enabled", True) else "active",
-        "supersedes": [],
-        "created_at": str(memory.get("created_at") or ""),
-    }
-
-
-def _platform_memory_layer_for_buddy_type(memory_type: str) -> str:
-    normalized = str(memory_type or "").strip().lower().replace(" ", "_")
-    if normalized in {"preference", "preferences", "procedure", "procedural", "style", "habit"}:
-        return "procedural"
-    if normalized in {"episode", "episodic", "summary", "session_summary"}:
-        return "episodic"
-    if normalized in {"policy", "safety", "boundary", "boundaries"}:
-        return "safety"
-    return "semantic"
-
-
-def _platform_memory_payload_matches(existing: dict[str, Any], payload: dict[str, Any]) -> bool:
-    comparable_keys = [
-        "scope",
-        "layer",
-        "type",
-        "summary",
-        "content",
-        "confidence",
-        "importance",
-        "evidence",
-        "artifact_refs",
-        "source",
-        "status",
-        "supersedes",
-    ]
-    return all(existing.get(key) == payload.get(key) for key in comparable_keys)
-
-
-def _sync_memory_markdown() -> None:
-    memories = list_memories(include_deleted=True)
-    (BUDDY_HOME_DIR / MEMORY_PATH).write_text(render_memory_markdown(memories), encoding="utf-8")
 
 
 def _read_dict(file_name: str, default: dict[str, Any]) -> dict[str, Any]:
@@ -1106,25 +1541,6 @@ def _connection() -> Iterator[Any]:
         connection.close()
 
 
-def _memory_from_row(row: Any) -> dict[str, Any]:
-    try:
-        source = json.loads(str(row["source_json"] or "{}"))
-    except Exception:
-        source = {}
-    return {
-        "id": str(row["id"] or ""),
-        "type": str(row["type"] or "fact"),
-        "title": str(row["title"] or "Untitled memory"),
-        "content": str(row["content"] or ""),
-        "source": source if isinstance(source, dict) else {},
-        "confidence": float(row["confidence"] or 1),
-        "enabled": bool(row["enabled"]),
-        "deleted": bool(row["deleted"]),
-        "created_at": str(row["created_at"] or ""),
-        "updated_at": str(row["updated_at"] or ""),
-    }
-
-
 def _revision_from_row(row: Any) -> dict[str, Any]:
     return {
         "revision_id": str(row["revision_id"] or ""),
@@ -1177,6 +1593,10 @@ def _chat_session_from_row(row: Any) -> dict[str, Any]:
         "title": str(row["title"] or DEFAULT_CHAT_SESSION_TITLE),
         "archived": bool(row["archived"]),
         "deleted": bool(row["deleted"]),
+        "parent_session_id": row["parent_session_id"] if _row_has_key(row, "parent_session_id") else None,
+        "source": str(row["source"] or "buddy") if _row_has_key(row, "source") else "buddy",
+        "ended_at": row["ended_at"] if _row_has_key(row, "ended_at") else None,
+        "end_reason": row["end_reason"] if _row_has_key(row, "end_reason") else None,
         "created_at": str(row["created_at"] or ""),
         "updated_at": str(row["updated_at"] or ""),
     }
@@ -1254,6 +1674,16 @@ def _normalize_chat_session_title(value: Any) -> str:
     return _truncate_chat_session_title(" ".join(str(value or "").strip().split()))
 
 
+def _normalize_optional_text(value: Any) -> str | None:
+    normalized = " ".join(str(value or "").strip().split())
+    return normalized or None
+
+
+def _normalize_session_source(value: Any) -> str:
+    normalized = _normalize_optional_text(value) or "buddy"
+    return normalized[:40]
+
+
 def _truncate_chat_session_title(value: str) -> str:
     if len(value) <= MAX_CHAT_SESSION_TITLE_CHARS:
         return value
@@ -1277,6 +1707,13 @@ def _json_loads_object(value: Any) -> dict[str, Any]:
 
 def _json_dumps(payload: Any) -> str:
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def _row_has_key(row: Any, key: str) -> bool:
+    try:
+        return key in row.keys()
+    except Exception:
+        return False
 
 
 def _merged_display_preferences(previous: dict[str, Any], cleaned: dict[str, Any]) -> dict[str, Any]:

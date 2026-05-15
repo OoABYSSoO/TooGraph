@@ -22,12 +22,6 @@ class BuddyUpdatePayload(BaseModel):
         return payload
 
 
-class BuddyMemoryPayload(BuddyUpdatePayload):
-    type: str = "fact"
-    title: str = Field(min_length=1)
-    content: str = Field(min_length=1)
-
-
 class BuddyCommandPayload(BaseModel):
     action: str = Field(min_length=1)
     payload: dict[str, Any] = Field(default_factory=dict)
@@ -40,14 +34,27 @@ class BuddyCommandPayload(BaseModel):
 
 class BuddySessionPayload(BaseModel):
     title: str | None = None
+    parent_session_id: str | None = None
+    source: str | None = None
+    ended_at: str | None = None
+    end_reason: str | None = None
     change_reason: str = "用户创建伙伴历史会话。"
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    def data(self) -> dict[str, Any]:
+        payload = self.model_dump()
+        payload.pop("change_reason", None)
+        return {key: value for key, value in payload.items() if value is not None}
 
 
 class BuddySessionPatchPayload(BaseModel):
     title: str | None = None
     archived: bool | None = None
+    parent_session_id: str | None = None
+    source: str | None = None
+    ended_at: str | None = None
+    end_reason: str | None = None
     change_reason: str = "用户更新伙伴历史会话。"
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
@@ -82,6 +89,10 @@ class BuddyChatMessagePayload(BaseModel):
         return payload
 
 
+class BuddyMemoryDocumentPayload(BuddyUpdatePayload):
+    content: str = Field(min_length=1)
+
+
 @router.get("/profile")
 def get_profile_endpoint() -> dict[str, Any]:
     return store.load_profile()
@@ -102,30 +113,17 @@ def update_policy_endpoint(payload: BuddyUpdatePayload) -> dict[str, Any]:
     return store.save_policy(payload.data(), changed_by="user", change_reason=payload.change_reason)
 
 
-@router.get("/memories")
-def list_memories_endpoint(include_deleted: bool = Query(default=False)) -> list[dict[str, Any]]:
-    return store.list_memories(include_deleted=include_deleted)
+@router.get("/memory-document")
+def get_memory_document_endpoint() -> dict[str, Any]:
+    return store.load_memory_document()
 
 
-@router.post("/memories")
-def create_memory_endpoint(payload: BuddyMemoryPayload) -> dict[str, Any]:
-    return store.create_memory(payload.data(), changed_by="user", change_reason=payload.change_reason)
-
-
-@router.patch("/memories/{memory_id}")
-def update_memory_endpoint(memory_id: str, payload: BuddyUpdatePayload) -> dict[str, Any]:
+@router.put("/memory-document")
+def update_memory_document_endpoint(payload: BuddyMemoryDocumentPayload) -> dict[str, Any]:
     try:
-        return store.update_memory(memory_id, payload.data(), changed_by="user", change_reason=payload.change_reason)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Memory not found") from exc
-
-
-@router.delete("/memories/{memory_id}")
-def delete_memory_endpoint(memory_id: str) -> dict[str, Any]:
-    try:
-        return store.delete_memory(memory_id, changed_by="user", change_reason="用户删除记忆。")
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Memory not found") from exc
+        return store.save_memory_document(payload.data(), changed_by="user", change_reason=payload.change_reason)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/session-summary")
@@ -151,7 +149,7 @@ def list_chat_sessions_endpoint(include_deleted: bool = Query(default=False)) ->
 @router.post("/sessions")
 def create_chat_session_endpoint(payload: BuddySessionPayload) -> dict[str, Any]:
     return store.create_chat_session(
-        {"title": payload.title},
+        payload.data(),
         changed_by="user",
         change_reason=payload.change_reason,
     )

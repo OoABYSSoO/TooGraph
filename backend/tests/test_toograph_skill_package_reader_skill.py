@@ -38,23 +38,23 @@ class ToographSkillPackageReaderSkillTests(unittest.TestCase):
     def test_reader_returns_existing_official_skill_files_without_runtime_artifacts(self) -> None:
         reader = _load_skill_module()
 
-        result = reader.toograph_skill_package_reader(skill_key="memory_recall")
+        result = reader.toograph_skill_package_reader(skill_key="buddy_session_recall")
 
         self.assertEqual(result["success"], True)
         package = result["skill_package"]
-        self.assertEqual(package["skill_key"], "memory_recall")
+        self.assertEqual(package["skill_key"], "buddy_session_recall")
         self.assertEqual(package["source_scope"], "official")
         self.assertIn("skill.json", package["files"])
         self.assertIn("SKILL.md", package["files"])
         self.assertIn("after_llm.py", package["files"])
         self.assertNotIn("__pycache__", "\n".join(package["files"]))
-        self.assertIn("memory_recall", package["files"]["skill.json"])
+        self.assertIn("buddy_session_recall", package["files"]["skill.json"])
         self.assertIn("Read", result["result"])
 
     def test_reader_rejects_path_traversal_skill_keys(self) -> None:
         reader = _load_skill_module()
 
-        result = reader.toograph_skill_package_reader(skill_key="../memory_recall")
+        result = reader.toograph_skill_package_reader(skill_key="../buddy_session_recall")
 
         self.assertEqual(result["success"], False)
         self.assertEqual(result["skill_package"], {})

@@ -38,9 +38,9 @@
 
 ## Required Skills/Subgraphs
 
-- `memory_recall`
+- `buddy_session_recall`
 
-权限需求：`memory_read`。轻量模式不需要网络、浏览器自动化或外部账号。
+权限需求：`buddy_session_read`。轻量模式不需要网络、浏览器自动化或外部账号。
 
 ## Sample Run
 

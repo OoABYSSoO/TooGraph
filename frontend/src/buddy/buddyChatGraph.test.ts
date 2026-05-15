@@ -256,11 +256,11 @@ function createReviewTemplate(): TemplateRecord {
       final_reply: { name: "final_reply", description: "", type: "markdown", value: "", color: "#16a34a" },
       autonomous_review: { name: "autonomous_review", description: "", type: "json", value: {}, color: "#9333ea" },
       improvement_candidates: { name: "improvement_candidates", description: "", type: "json", value: [], color: "#7c3aed" },
-      memory_candidate_plan: { name: "memory_candidate_plan", description: "", type: "json", value: {}, color: "#22c55e" },
-      memory_candidate_success: { name: "memory_candidate_success", description: "", type: "boolean", value: false, color: "#16a34a" },
-      candidate_memories: { name: "candidate_memories", description: "", type: "json", value: [], color: "#059669" },
-      skipped_memory_candidates: { name: "skipped_memory_candidates", description: "", type: "json", value: [], color: "#dc2626" },
-      memory_candidate_result: { name: "memory_candidate_result", description: "", type: "markdown", value: "", color: "#15803d" },
+      memory_update_plan: { name: "memory_update_plan", description: "", type: "json", value: { has_updates: false, commands: [] }, color: "#22c55e" },
+      memory_write_success: { name: "memory_write_success", description: "", type: "boolean", value: false, color: "#16a34a" },
+      applied_memory_commands: { name: "applied_memory_commands", description: "", type: "json", value: [], color: "#059669" },
+      skipped_memory_commands: { name: "skipped_memory_commands", description: "", type: "json", value: [], color: "#dc2626" },
+      memory_write_result: { name: "memory_write_result", description: "", type: "markdown", value: "", color: "#15803d" },
     },
     nodes: {
       input_source_run_id: {
@@ -302,7 +302,7 @@ function createReviewTemplate(): TemplateRecord {
         writes: [
           { state: "autonomous_review", mode: "replace" },
           { state: "improvement_candidates", mode: "replace" },
-          { state: "memory_candidate_plan", mode: "replace" },
+          { state: "memory_update_plan", mode: "replace" },
         ],
         config: {
           skillKey: "",
@@ -314,31 +314,31 @@ function createReviewTemplate(): TemplateRecord {
           temperature: 0.2,
         },
       },
-      write_memory_candidates: {
+      write_memory_updates: {
         kind: "agent",
-        name: "写入候选记忆",
+        name: "写入 MEMORY.md 更新",
         description: "",
         ui: { position: { x: 1160, y: 160 }, collapsed: false },
         reads: [
           { state: "source_run_id", required: false },
-          { state: "memory_candidate_plan", required: true },
+          { state: "memory_update_plan", required: true },
         ],
         writes: [
-          { state: "memory_candidate_success", mode: "replace" },
-          { state: "candidate_memories", mode: "replace" },
-          { state: "skipped_memory_candidates", mode: "replace" },
-          { state: "memory_candidate_result", mode: "replace" },
+          { state: "memory_write_success", mode: "replace" },
+          { state: "applied_memory_commands", mode: "replace" },
+          { state: "skipped_memory_commands", mode: "replace" },
+          { state: "memory_write_result", mode: "replace" },
         ],
         config: {
-          skillKey: "memory_candidate_writer",
+          skillKey: "buddy_home_writer",
           skillBindings: [
             {
-              skillKey: "memory_candidate_writer",
+              skillKey: "buddy_home_writer",
               outputMapping: {
-                success: "memory_candidate_success",
-                candidate_memories: "candidate_memories",
-                skipped_candidates: "skipped_memory_candidates",
-                result: "memory_candidate_result",
+                success: "memory_write_success",
+                applied_commands: "applied_memory_commands",
+                skipped_commands: "skipped_memory_commands",
+                result: "memory_write_result",
               },
             },
           ],
@@ -621,11 +621,11 @@ test("buildBuddyReviewGraph hydrates an internal autonomous review run from the 
   assert.equal(graph.state_schema.final_reply.value, "你好，我在。");
   assert.deepEqual(graph.state_schema.autonomous_review.value, {});
   assert.deepEqual(graph.state_schema.improvement_candidates.value, []);
-  assert.deepEqual(graph.state_schema.memory_candidate_plan.value, {});
-  assert.equal(graph.state_schema.memory_candidate_success.value, false);
-  assert.deepEqual(graph.state_schema.candidate_memories.value, []);
-  assert.deepEqual(graph.state_schema.skipped_memory_candidates.value, []);
-  assert.equal(graph.state_schema.memory_candidate_result.value, "");
+  assert.deepEqual(graph.state_schema.memory_update_plan.value, { has_updates: false, commands: [] });
+  assert.equal(graph.state_schema.memory_write_success.value, false);
+  assert.deepEqual(graph.state_schema.applied_memory_commands.value, []);
+  assert.deepEqual(graph.state_schema.skipped_memory_commands.value, []);
+  assert.equal(graph.state_schema.memory_write_result.value, "");
   assert.equal(graph.state_schema.writeback_commands, undefined);
   assertInputNode(graph.nodes.input_source_run_id);
   assertInputNode(graph.nodes.input_user_message);

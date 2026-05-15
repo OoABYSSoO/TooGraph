@@ -114,8 +114,6 @@ No durable memories yet.
 - Avoid raw logs, temporary failures, secrets, full transcripts, and information that can be reread from the graph or project files.
 """
 
-MAX_INCLUDED_MEMORIES = 20
-MAX_MEMORY_CONTENT_CHARS = 1200
 MAX_INCLUDED_MARKDOWN_CHARS = 8000
 
 
@@ -150,19 +148,6 @@ def ensure_buddy_database(home_dir: Path) -> Path:
     try:
         connection.executescript(
             """
-            CREATE TABLE IF NOT EXISTS buddy_memories (
-                id TEXT PRIMARY KEY,
-                type TEXT NOT NULL,
-                title TEXT NOT NULL,
-                content TEXT NOT NULL,
-                source_json TEXT NOT NULL DEFAULT '{}',
-                confidence REAL NOT NULL DEFAULT 1,
-                enabled INTEGER NOT NULL DEFAULT 1,
-                deleted INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-
             CREATE TABLE IF NOT EXISTS buddy_revisions (
                 revision_id TEXT PRIMARY KEY,
                 target_type TEXT NOT NULL,
@@ -201,8 +186,13 @@ def ensure_buddy_database(home_dir: Path) -> Path:
                 title TEXT NOT NULL,
                 archived INTEGER NOT NULL DEFAULT 0,
                 deleted INTEGER NOT NULL DEFAULT 0,
+                parent_session_id TEXT,
+                source TEXT NOT NULL DEFAULT 'buddy',
+                ended_at TEXT,
+                end_reason TEXT,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(parent_session_id) REFERENCES buddy_sessions(session_id)
             );
 
             CREATE TABLE IF NOT EXISTS buddy_messages (
@@ -219,9 +209,6 @@ def ensure_buddy_database(home_dir: Path) -> Path:
                 FOREIGN KEY(session_id) REFERENCES buddy_sessions(session_id)
             );
 
-            CREATE INDEX IF NOT EXISTS idx_buddy_memories_visible
-                ON buddy_memories (enabled, deleted, updated_at);
-
             CREATE INDEX IF NOT EXISTS idx_buddy_revisions_target
                 ON buddy_revisions (target_type, target_id, created_at);
 
@@ -235,6 +222,19 @@ def ensure_buddy_database(home_dir: Path) -> Path:
         _migrate_buddy_database(connection)
         connection.execute(
             """
+            CREATE INDEX IF NOT EXISTS idx_buddy_sessions_parent
+                ON buddy_sessions (parent_session_id)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_buddy_sessions_source
+                ON buddy_sessions (source)
+            """
+        )
+        _ensure_buddy_message_fts(connection)
+        connection.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_buddy_messages_client_order
                 ON buddy_messages (session_id, client_order)
             """
@@ -246,9 +246,79 @@ def ensure_buddy_database(home_dir: Path) -> Path:
 
 
 def _migrate_buddy_database(connection: sqlite3.Connection) -> None:
+    _ensure_column(connection, "buddy_sessions", "parent_session_id", "parent_session_id TEXT")
+    _ensure_column(connection, "buddy_sessions", "source", "source TEXT NOT NULL DEFAULT 'buddy'")
+    _ensure_column(connection, "buddy_sessions", "ended_at", "ended_at TEXT")
+    _ensure_column(connection, "buddy_sessions", "end_reason", "end_reason TEXT")
     _ensure_column(connection, "buddy_messages", "client_order", "client_order REAL")
     _ensure_column(connection, "buddy_messages", "metadata_json", "metadata_json TEXT NOT NULL DEFAULT '{}'")
     _backfill_message_client_order(connection)
+    connection.execute("DROP INDEX IF EXISTS idx_buddy_memories_visible")
+    connection.execute("DROP TABLE IF EXISTS buddy_memories")
+
+
+def _ensure_buddy_message_fts(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE VIRTUAL TABLE IF NOT EXISTS buddy_messages_fts USING fts5(
+            message_id UNINDEXED,
+            session_id UNINDEXED,
+            role,
+            content,
+            created_at UNINDEXED
+        );
+
+        CREATE VIRTUAL TABLE IF NOT EXISTS buddy_messages_fts_trigram USING fts5(
+            message_id UNINDEXED,
+            session_id UNINDEXED,
+            role,
+            content,
+            created_at UNINDEXED,
+            tokenize='trigram'
+        );
+
+        DROP TRIGGER IF EXISTS buddy_messages_ai_fts;
+        DROP TRIGGER IF EXISTS buddy_messages_ad_fts;
+        DROP TRIGGER IF EXISTS buddy_messages_au_fts;
+
+        CREATE TRIGGER buddy_messages_ai_fts AFTER INSERT ON buddy_messages BEGIN
+            INSERT INTO buddy_messages_fts(rowid, message_id, session_id, role, content, created_at)
+            VALUES (new.rowid, new.message_id, new.session_id, new.role, new.content, new.created_at);
+            INSERT INTO buddy_messages_fts_trigram(rowid, message_id, session_id, role, content, created_at)
+            VALUES (new.rowid, new.message_id, new.session_id, new.role, new.content, new.created_at);
+        END;
+
+        CREATE TRIGGER buddy_messages_ad_fts AFTER DELETE ON buddy_messages BEGIN
+            DELETE FROM buddy_messages_fts WHERE rowid = old.rowid;
+            DELETE FROM buddy_messages_fts_trigram WHERE rowid = old.rowid;
+        END;
+
+        CREATE TRIGGER buddy_messages_au_fts AFTER UPDATE ON buddy_messages BEGIN
+            DELETE FROM buddy_messages_fts WHERE rowid = old.rowid;
+            DELETE FROM buddy_messages_fts_trigram WHERE rowid = old.rowid;
+            INSERT INTO buddy_messages_fts(rowid, message_id, session_id, role, content, created_at)
+            VALUES (new.rowid, new.message_id, new.session_id, new.role, new.content, new.created_at);
+            INSERT INTO buddy_messages_fts_trigram(rowid, message_id, session_id, role, content, created_at)
+            VALUES (new.rowid, new.message_id, new.session_id, new.role, new.content, new.created_at);
+        END;
+        """
+    )
+    connection.execute("DELETE FROM buddy_messages_fts")
+    connection.execute("DELETE FROM buddy_messages_fts_trigram")
+    connection.execute(
+        """
+        INSERT INTO buddy_messages_fts(rowid, message_id, session_id, role, content, created_at)
+        SELECT rowid, message_id, session_id, role, content, created_at
+        FROM buddy_messages
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO buddy_messages_fts_trigram(rowid, message_id, session_id, role, content, created_at)
+        SELECT rowid, message_id, session_id, role, content, created_at
+        FROM buddy_messages
+        """
+    )
 
 
 def _ensure_column(connection: sqlite3.Connection, table_name: str, column_name: str, column_definition: str) -> bool:
@@ -300,21 +370,17 @@ def build_buddy_home_context_pack(home_dir: Path | None = None) -> dict[str, Any
         label="policy",
         warnings=warnings,
     )
-    memories = _read_memories_from_db(buddy_home, warnings=warnings)
     session_summary = _read_session_summary_from_db(buddy_home, warnings=warnings)
-    included_memories = _compact_memories(memories)
     return {
         "profile": profile,
         "policy": policy,
         "home_instructions": _read_markdown(buddy_home / AGENTS_PATH, warnings=warnings, label="AGENTS.md"),
         "user_profile": _read_markdown(buddy_home / USER_PATH, warnings=warnings, label="USER.md"),
         "memory_markdown": _read_markdown(buddy_home / MEMORY_PATH, warnings=warnings, label="MEMORY.md"),
-        "memories": included_memories,
         "session_summary": session_summary,
         "capability_usage_stats": _read_capability_usage_stats_from_db(buddy_home, warnings=warnings),
         "meta": {
-            "memory_count": len(memories),
-            "included_memory_count": len(included_memories),
+            "memory_source": MEMORY_PATH,
             "warnings": warnings,
         },
     }
@@ -391,47 +457,6 @@ This file defines Buddy's durable identity, voice, and baseline behavior. It is 
 """
 
 
-def render_memory_markdown(memories: list[dict[str, Any]]) -> str:
-    visible = [
-        memory
-        for memory in memories
-        if memory.get("enabled", True) and not memory.get("deleted", False)
-    ]
-    if visible:
-        entries = "\n\n".join(
-            [
-                "\n".join(
-                    [
-                        f"### {memory.get('title') or 'Untitled memory'}",
-                        "",
-                        f"- Type: {memory.get('type') or 'fact'}",
-                        f"- Confidence: {memory.get('confidence', 1)}",
-                        f"- Updated: {memory.get('updated_at') or ''}",
-                        "",
-                        str(memory.get("content") or "").strip(),
-                    ]
-                )
-                for memory in visible
-            ]
-        )
-    else:
-        entries = "No durable memories yet."
-    return f"""# MEMORY.md - Long-Term Memory
-
-This file is Buddy's human-readable durable memory. It should contain distilled context that remains useful across sessions.
-
-## Managed Entries
-
-{entries}
-
-## Notes
-
-- Keep memories compact, source-aware, and easy to revise.
-- Prefer stable preferences, project decisions, repeated corrections, and durable lessons.
-- Avoid raw logs, temporary failures, secrets, full transcripts, and information that can be reread from the graph or project files.
-"""
-
-
 def _write_json_if_missing(path: Path, payload: Any) -> None:
     if path.exists():
         return
@@ -479,22 +504,6 @@ def _read_markdown(path: Path, *, warnings: list[str], label: str) -> str:
         return ""
 
 
-def _read_memories_from_db(home_dir: Path, *, warnings: list[str]) -> list[dict[str, Any]]:
-    try:
-        with open_buddy_database(home_dir) as connection:
-            rows = connection.execute(
-                """
-                SELECT id, type, title, content, source_json, confidence, enabled, deleted, created_at, updated_at
-                FROM buddy_memories
-                ORDER BY created_at ASC
-                """
-            ).fetchall()
-    except Exception as exc:
-        warnings.append(f"Could not read buddy memories: {exc}")
-        return []
-    return [_memory_from_row(row) for row in rows]
-
-
 def _read_session_summary_from_db(home_dir: Path, *, warnings: list[str]) -> dict[str, Any]:
     try:
         with open_buddy_database(home_dir) as connection:
@@ -530,46 +539,6 @@ def _read_capability_usage_stats_from_db(home_dir: Path, *, warnings: list[str])
         warnings.append(f"Could not decode capability_usage_stats: {exc}")
         return deepcopy(DEFAULT_CAPABILITY_USAGE_STATS)
     return value if isinstance(value, dict) else deepcopy(DEFAULT_CAPABILITY_USAGE_STATS)
-
-
-def _memory_from_row(row: sqlite3.Row) -> dict[str, Any]:
-    try:
-        source = json.loads(str(row["source_json"] or "{}"))
-    except Exception:
-        source = {}
-    return {
-        "id": str(row["id"] or ""),
-        "type": str(row["type"] or "fact"),
-        "title": str(row["title"] or "Untitled memory"),
-        "content": str(row["content"] or ""),
-        "source": source if isinstance(source, dict) else {},
-        "confidence": float(row["confidence"] or 1),
-        "enabled": bool(row["enabled"]),
-        "deleted": bool(row["deleted"]),
-        "created_at": str(row["created_at"] or ""),
-        "updated_at": str(row["updated_at"] or ""),
-    }
-
-
-def _compact_memories(memories: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    visible = [
-        memory
-        for memory in memories
-        if memory.get("enabled", True) and not memory.get("deleted", False)
-    ]
-    compacted: list[dict[str, Any]] = []
-    for memory in visible[:MAX_INCLUDED_MEMORIES]:
-        compacted.append(
-            {
-                "id": _as_text(memory.get("id")),
-                "type": _as_text(memory.get("type") or "fact"),
-                "title": _as_text(memory.get("title") or "Untitled memory"),
-                "content": _truncate(_as_text(memory.get("content")), MAX_MEMORY_CONTENT_CHARS),
-                "confidence": memory.get("confidence", 1),
-                "updated_at": _as_text(memory.get("updated_at")),
-            }
-        )
-    return compacted
 
 
 def _extract_section(content: str, heading: str) -> str:

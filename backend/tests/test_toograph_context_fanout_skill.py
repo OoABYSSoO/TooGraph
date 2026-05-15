@@ -15,7 +15,6 @@ from app.core.schemas.skills import SkillLlmNodeEligibility, SkillSourceScope
 from app.core.storage import database
 from app.knowledge import loader
 from app.knowledge.loader import KnowledgeBaseRecord, KnowledgeDocument
-from app.memory import store as memory_store
 from app.skills.definitions import _parse_native_skill_manifest
 
 
@@ -164,7 +163,7 @@ class TooGraphContextFanoutSkillTests(unittest.TestCase):
 
         self.assertEqual(definition.skill_key, "toograph_context_fanout")
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
-        self.assertEqual(definition.permissions, ["memory_read", "knowledge_read", "file_read"])
+        self.assertEqual(definition.permissions, ["buddy_home_read", "knowledge_read", "file_read"])
         self.assertEqual([field.key for field in definition.state_input_schema], ["fanout_request"])
         self.assertEqual(
             [field.key for field in definition.llm_output_schema],
@@ -204,25 +203,15 @@ class TooGraphContextFanoutSkillTests(unittest.TestCase):
             _write_template(repo_root)
             _write_skill(repo_root)
             _seed_knowledge_base()
-            memory_store.create_memory(
-                {
-                    "scope": "project",
-                    "layer": "procedural",
-                    "type": "preference",
-                    "summary": "Prefers concise verified replies",
-                    "content": "When answering policy questions, keep replies concise and cite the source.",
-                    "importance": 0.9,
-                    "status": "active",
-                },
-                changed_by="test",
-            )
-
             with patch.dict("os.environ", {"TOOGRAPH_REPO_ROOT": str(repo_root)}, clear=True):
                 result = fanout.toograph_context_fanout(
                     user_message="请解释退款政策，并给出可执行清单。",
                     conversation_history="用户之前要求回答要简短。",
                     page_context="Route: /library\nActive panel: Templates\n" + ("Visible card. " * 120),
-                    buddy_context={"kind": "local_folder", "root": "buddy_home", "selected": ["MEMORY.md"]},
+                    buddy_context={
+                        "kind": "buddy_home_context",
+                        "memory_markdown": "# MEMORY.md\n\n- 回答政策问题时保持简洁并引用来源。",
+                    },
                     memory_query="concise policy citation",
                     memory_scope="project",
                     knowledge_query="refund policy audit",
@@ -239,8 +228,8 @@ class TooGraphContextFanoutSkillTests(unittest.TestCase):
             [branch["key"] for branch in result["fanout_context"]["branches"]],
             ["memory", "knowledge", "page", "capabilities"],
         )
-        self.assertEqual(result["memory_context"]["kind"], "memory_context")
-        self.assertEqual(result["memory_context"]["included_count"], 1)
+        self.assertEqual(result["memory_context"]["kind"], "buddy_home_memory_context")
+        self.assertIn("引用来源", result["memory_context"]["content"])
         self.assertEqual(result["knowledge_context"]["result_count"], 1)
         self.assertIn("Refund Policy", result["context_brief"]["knowledge"])
         self.assertLessEqual(result["assembly_report"]["budget"]["used_chars"], 1400)

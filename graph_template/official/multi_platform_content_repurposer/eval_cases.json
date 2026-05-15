@@ -28,11 +28,6 @@
           "description": "必须输出 AI 味检测和改写指令。"
         },
         {
-          "kind": "rule",
-          "key": "style_memory_candidates_are_candidate_only",
-          "description": "风格偏好只能写为 candidate 状态记忆，不能应用为 active。"
-        },
-        {
           "kind": "artifact",
           "key": "final_pack_contains_manual_review_notes",
           "description": "最终包必须保留人工复核提示和限制。"

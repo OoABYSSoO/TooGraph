@@ -3,7 +3,7 @@ import type {
   BuddyChatSession,
   BuddyCommandRecord,
   BuddyCommandResponse,
-  BuddyMemory,
+  BuddyMemoryDocument,
   BuddyPolicy,
   BuddyProfile,
   BuddyRevision,
@@ -43,29 +43,12 @@ export function updateBuddyPolicy(payload: Partial<BuddyPolicy>, changeReason: s
   return executeBuddyCommand<BuddyPolicy>("policy.update", payload, changeReason);
 }
 
-export function fetchBuddyMemories(includeDeleted = false) {
-  return apiGet<BuddyMemory[]>(`/api/buddy/memories${includeDeleted ? "?include_deleted=true" : ""}`);
+export function fetchBuddyMemoryDocument() {
+  return apiGet<BuddyMemoryDocument>("/api/buddy/memory-document");
 }
 
-export function createBuddyMemory(payload: Pick<BuddyMemory, "type" | "title" | "content">) {
-  return executeBuddyCommand<BuddyMemory>(
-    "memory.create",
-    payload,
-    "User created buddy memory from the Buddy page.",
-  );
-}
-
-export function updateBuddyMemory(memoryId: string, payload: Partial<BuddyMemory>, changeReason: string) {
-  return executeBuddyCommand<BuddyMemory>("memory.update", payload, changeReason, memoryId);
-}
-
-export function deleteBuddyMemory(memoryId: string) {
-  return executeBuddyCommand<BuddyMemory>(
-    "memory.delete",
-    {},
-    "User deleted buddy memory from the Buddy page.",
-    memoryId,
-  );
+export function updateBuddyMemoryDocument(payload: Pick<BuddyMemoryDocument, "content">, changeReason: string) {
+  return executeBuddyCommand<BuddyMemoryDocument>("memory_document.update", payload, changeReason);
 }
 
 export function fetchBuddySessionSummary() {
@@ -88,11 +71,29 @@ export function fetchBuddyChatSessions(includeDeleted = false) {
   return apiGet<BuddyChatSession[]>(`/api/buddy/sessions${includeDeleted ? "?include_deleted=true" : ""}`);
 }
 
-export function createBuddyChatSession(payload: { title?: string | null } = {}) {
+export function createBuddyChatSession(
+  payload: {
+    title?: string | null;
+    parent_session_id?: string | null;
+    source?: string | null;
+    ended_at?: string | null;
+    end_reason?: string | null;
+  } = {},
+) {
   return apiPost<BuddyChatSession>("/api/buddy/sessions", payload);
 }
 
-export function updateBuddyChatSession(sessionId: string, payload: { title?: string | null; archived?: boolean | null }) {
+export function updateBuddyChatSession(
+  sessionId: string,
+  payload: {
+    title?: string | null;
+    archived?: boolean | null;
+    parent_session_id?: string | null;
+    source?: string | null;
+    ended_at?: string | null;
+    end_reason?: string | null;
+  },
+) {
   return apiPatch<BuddyChatSession>(`/api/buddy/sessions/${encodeURIComponent(sessionId)}`, payload);
 }
 

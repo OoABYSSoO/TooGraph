@@ -32,26 +32,35 @@ class BuddyRouteTests(unittest.TestCase):
         self.assertEqual(revisions_response.status_code, 200)
         self.assertEqual(len(revisions_response.json()), 1)
 
-    def test_memory_delete_and_restore(self) -> None:
+    def test_memory_document_update_and_restore(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+            buddy_home = Path(temp_dir) / "buddy_home"
+            with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
                 with TestClient(app) as client:
-                    created = client.post(
-                        "/api/buddy/memories",
-                        json={"type": "preference", "title": "偏好", "content": "喜欢简短回答。"},
-                    ).json()
-                    delete_response = client.delete(f"/api/buddy/memories/{created['id']}")
-                    enabled_memories = client.get("/api/buddy/memories").json()
+                    initial_response = client.get("/api/buddy/memory-document")
+                    update_response = client.post(
+                        "/api/buddy/commands",
+                        json={
+                            "action": "memory_document.update",
+                            "payload": {"content": "# MEMORY.md - Long-Term Memory\n\n- 喜欢简短回答。\n"},
+                            "change_reason": "用户直接编辑 MEMORY.md。",
+                        },
+                    )
+                    current_response = client.get("/api/buddy/memory-document")
                     revisions = client.get(
                         "/api/buddy/revisions",
-                        params={"target_type": "memory", "target_id": created["id"]},
+                        params={"target_type": "home_file", "target_id": "MEMORY.md"},
                     ).json()
                     restore_response = client.post(f"/api/buddy/revisions/{revisions[-1]['revision_id']}/restore")
+                    restored_response = client.get("/api/buddy/memory-document")
 
-        self.assertEqual(delete_response.status_code, 200)
-        self.assertEqual(enabled_memories, [])
+        self.assertEqual(initial_response.status_code, 200)
+        self.assertIn("No durable memories yet.", initial_response.json()["content"])
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.json()["command"]["action"], "memory_document.update")
+        self.assertIn("喜欢简短回答", current_response.json()["content"])
         self.assertEqual(restore_response.status_code, 200)
-        self.assertFalse(restore_response.json()["current_value"]["deleted"])
+        self.assertIn("No durable memories yet.", restored_response.json()["content"])
 
     def test_chat_session_message_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

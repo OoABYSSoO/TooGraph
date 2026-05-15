@@ -24,11 +24,6 @@
         "kind": "rule",
         "target": "product_copy.md",
         "expectation": "文案不得使用绝对化宣传、虚假稀缺、竞品贬损或违规功效表述。"
-      },
-      {
-        "kind": "memory",
-        "target": "candidate_memories",
-        "expectation": "评论洞察经验只能写入 candidate 状态，不能直接应用为 active。"
       }
     ]
   }

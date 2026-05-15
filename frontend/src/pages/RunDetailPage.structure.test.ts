@@ -83,9 +83,10 @@ test("RunDetailPage renders skill artifact document lists with a paged reader", 
 test("RunDetailPage renders the aggregated parent and subgraph timeline", () => {
   assert.match(
     componentSource,
-    /import \{ buildRunAggregatedTimeline, buildRunMemoryContextCards, buildRunStatusFacts, listRunOutputArtifacts \} from "\.\/runDetailModel\.ts";/,
+    /import \{ buildRunAggregatedTimeline, buildRunStatusFacts, listRunOutputArtifacts \} from "\.\/runDetailModel\.ts";/,
   );
   assert.match(componentSource, /const aggregatedTimeline = computed\(\(\) => \(viewedRun\.value \? buildRunAggregatedTimeline\(viewedRun\.value\) : \[\]\)\);/);
+  assert.doesNotMatch(componentSource, /buildRunMemoryContextCards/);
   assert.match(componentSource, /v-for="item in aggregatedTimeline"/);
   assert.doesNotMatch(componentSource, /v-for="execution in run\.node_executions"/);
   assert.match(componentSource, /\{\{ item\.pathLabel \}\}/);

@@ -1,7 +1,7 @@
 {
   "template_id": "multi_platform_content_repurposer",
   "label": "一文多发内容改写助手",
-  "description": "把原始文章、README 或脚本改写成公众号、小红书、知乎、B站、抖音、X 和 YouTube 等多平台内容包，并沉淀可审查的风格候选记忆。",
+  "description": "把原始文章、README 或脚本改写成公众号、小红书、知乎、B站、抖音、X 和 YouTube 等多平台内容包。",
   "default_graph_name": "一文多发内容改写助手",
   "state_schema": {
     "source_content": {
@@ -46,51 +46,23 @@
     },
     "memory_request": {
       "name": "风格记忆召回请求",
-      "description": "面向 memory_recall Skill 的只读召回参数。",
+      "description": "面向 buddy_session_recall Skill 的只读召回参数。",
       "type": "json",
       "value": {},
       "color": "#9333ea",
       "binding": null
     },
-    "memory_recall_success": {
+    "buddy_session_recall_success": {
       "name": "记忆召回成功",
-      "description": "memory_recall 是否成功。",
+      "description": "buddy_session_recall 是否成功。",
       "type": "boolean",
       "value": false,
       "color": "#16a34a",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "nodeId": "recall_style_memory",
         "fieldKey": "success",
-        "managed": true
-      }
-    },
-    "memory_context": {
-      "name": "风格记忆上下文",
-      "description": "预算化召回结果，用于风格画像和禁用表达参考。",
-      "type": "json",
-      "value": {},
-      "color": "#7c3aed",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_recall",
-        "nodeId": "recall_style_memory",
-        "fieldKey": "memory_context",
-        "managed": true
-      }
-    },
-    "recalled_memories": {
-      "name": "纳入记忆",
-      "description": "本轮纳入上下文的记忆记录。",
-      "type": "json",
-      "value": [],
-      "color": "#8b5cf6",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_recall",
-        "nodeId": "recall_style_memory",
-        "fieldKey": "recalled_memories",
         "managed": true
       }
     },
@@ -102,21 +74,21 @@
       "color": "#a855f7",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "nodeId": "recall_style_memory",
         "fieldKey": "omitted_memories",
         "managed": true
       }
     },
-    "memory_recall_result": {
+    "buddy_session_recall_result": {
       "name": "记忆召回摘要",
-      "description": "memory_recall 返回的召回摘要。",
+      "description": "buddy_session_recall 返回的召回摘要。",
       "type": "markdown",
       "value": "",
       "color": "#6d28d9",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "nodeId": "recall_style_memory",
         "fieldKey": "result",
         "managed": true
@@ -186,70 +158,6 @@
       "color": "#ea580c",
       "binding": null
     },
-    "candidate_plan": {
-      "name": "风格候选记忆计划",
-      "description": "需要写入候选记忆的风格偏好、证据和作用域建议。",
-      "type": "json",
-      "value": {},
-      "color": "#9333ea",
-      "binding": null
-    },
-    "candidate_write_success": {
-      "name": "候选记忆写入成功",
-      "description": "memory_candidate_writer 是否成功写入候选。",
-      "type": "boolean",
-      "value": false,
-      "color": "#16a34a",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_candidate_writer",
-        "nodeId": "write_style_memory_candidates",
-        "fieldKey": "success",
-        "managed": true
-      }
-    },
-    "candidate_memories": {
-      "name": "候选记忆",
-      "description": "写入平台 store 的 candidate 状态记忆。",
-      "type": "json",
-      "value": [],
-      "color": "#7c3aed",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_candidate_writer",
-        "nodeId": "write_style_memory_candidates",
-        "fieldKey": "candidate_memories",
-        "managed": true
-      }
-    },
-    "skipped_candidates": {
-      "name": "跳过候选",
-      "description": "因证据不足或格式无效跳过的候选。",
-      "type": "json",
-      "value": [],
-      "color": "#dc2626",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_candidate_writer",
-        "nodeId": "write_style_memory_candidates",
-        "fieldKey": "skipped_candidates",
-        "managed": true
-      }
-    },
-    "candidate_write_result": {
-      "name": "候选记忆写入摘要",
-      "description": "memory_candidate_writer 返回的写入摘要。",
-      "type": "markdown",
-      "value": "",
-      "color": "#6d28d9",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_candidate_writer",
-        "nodeId": "write_style_memory_candidates",
-        "fieldKey": "result",
-        "managed": true
-      }
-    },
     "final_distribution_pack": {
       "name": "最终多平台内容包",
       "description": "面向用户展示和导出的完整多平台内容包。",
@@ -257,6 +165,34 @@
       "value": "",
       "color": "#b45309",
       "binding": null
+    },
+    "session_recall_context": {
+      "name": "session_recall_context",
+      "description": "从 Buddy 历史会话中召回的上下文窗口。",
+      "type": "json",
+      "value": {},
+      "color": "#7c3aed",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "buddy_session_recall",
+        "nodeId": "recall_style_memory",
+        "fieldKey": "session_recall_context",
+        "managed": true
+      }
+    },
+    "recalled_sessions": {
+      "name": "recalled_sessions",
+      "description": "从 Buddy 历史会话中召回的会话片段。",
+      "type": "json",
+      "value": [],
+      "color": "#8b5cf6",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "buddy_session_recall",
+        "nodeId": "recall_style_memory",
+        "fieldKey": "recalled_sessions",
+        "managed": true
+      }
     }
   },
   "nodes": {
@@ -434,7 +370,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "生成 memory_request JSON，只召回用户写作风格、平台偏好、禁用表达和历史反馈。字段包含 query、scope、layer、memory_type、status、top_k、max_chars。scope 默认 user，layer 优先 procedural，status 默认 active，top_k 不超过 8，max_chars 不超过 3000。不要生成平台稿件。",
+        "taskInstruction": "生成 memory_request JSON，只用于只读召回 Buddy 历史会话中的长期偏好、历史反馈和相关上下文。字段包含 mode、query、limit、window；mode 默认 discover，limit 不超过 8，window 不超过 2。query 应结合本模板输入和用户目标，避免过宽；不要写 scope、layer、status、top_k、max_chars，不要生成业务结论。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -444,7 +380,7 @@
     "recall_style_memory": {
       "kind": "agent",
       "name": "召回风格记忆",
-      "description": "运行 memory_recall Skill，只透传召回结果。",
+      "description": "运行 buddy_session_recall Skill，只透传召回结果。",
       "ui": {
         "position": {
           "x": 1060,
@@ -464,49 +400,44 @@
       ],
       "writes": [
         {
-          "state": "memory_recall_success",
+          "state": "buddy_session_recall_success",
           "mode": "replace"
         },
         {
-          "state": "memory_context",
+          "state": "session_recall_context",
           "mode": "replace"
         },
         {
-          "state": "recalled_memories",
+          "state": "recalled_sessions",
           "mode": "replace"
         },
         {
-          "state": "omitted_memories",
-          "mode": "replace"
-        },
-        {
-          "state": "memory_recall_result",
+          "state": "buddy_session_recall_result",
           "mode": "replace"
         }
       ],
       "config": {
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "skillBindings": [
           {
-            "skillKey": "memory_recall",
+            "skillKey": "buddy_session_recall",
             "outputMapping": {
-              "success": "memory_recall_success",
-              "memory_context": "memory_context",
-              "recalled_memories": "recalled_memories",
-              "omitted_memories": "omitted_memories",
-              "result": "memory_recall_result"
+              "success": "buddy_session_recall_success",
+              "session_recall_context": "session_recall_context",
+              "sessions": "recalled_sessions",
+              "result": "buddy_session_recall_result"
             }
           }
         ],
         "skillInstructionBlocks": {
-          "memory_recall": {
-            "skillKey": "memory_recall",
-            "title": "记忆召回 skill instruction",
-            "content": "你已绑定记忆召回技能。根据 memory_request 生成只读召回参数；不要改写记忆，不要写入记忆。技能结果会写入 memory_context、recalled_memories、omitted_memories 和 result。",
+          "buddy_session_recall": {
+            "skillKey": "buddy_session_recall",
+            "title": "Buddy session recall instruction",
+            "content": "你已绑定 Buddy 会话召回技能。只把 memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
             "source": "node.override"
           }
         },
-        "taskInstruction": "本节点只负责运行 memory_recall。缺失字段时使用 scope=user、status=active、top_k=8、max_chars=3000。不要输出内容稿件。",
+        "taskInstruction": "本节点只负责运行 buddy_session_recall。根据上游 memory_request 生成 recall_request；mode 只能是 browse、discover 或 scroll，默认 discover；limit 不超过 8，window 不超过 2。不要输出业务结论，不写 MEMORY.md，不创建逐条审批记录。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -576,7 +507,7 @@
           "required": false
         },
         {
-          "state": "memory_context",
+          "state": "session_recall_context",
           "required": false
         },
         {
@@ -831,131 +762,10 @@
         "temperature": 0.2
       }
     },
-    "prepare_style_memory_candidate": {
-      "kind": "agent",
-      "name": "准备风格候选记忆",
-      "description": "只生成可审查候选记忆计划，不直接写 active 记忆。",
-      "ui": {
-        "position": {
-          "x": 5380,
-          "y": 300
-        },
-        "collapsed": false,
-        "size": {
-          "width": 420,
-          "height": 300
-        }
-      },
-      "reads": [
-        {
-          "state": "historical_samples",
-          "required": false
-        },
-        {
-          "state": "human_feedback",
-          "required": false
-        },
-        {
-          "state": "style_profile",
-          "required": true
-        },
-        {
-          "state": "ai_tone_report",
-          "required": true
-        },
-        {
-          "state": "style_consistency_score",
-          "required": true
-        }
-      ],
-      "writes": [
-        {
-          "state": "candidate_plan",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
-        "taskInstruction": "candidate_plan 写成 JSON，包含 candidates 数组。只把有证据的稳定偏好写成 candidate 状态候选：scope=user、layer=procedural、type=preference，summary、content、confidence、importance、evidence、artifact_refs。不得写入秘密、临时路径、无来源判断或权限扩大建议；没有足够证据时 candidates 为空。",
-        "modelSource": "global",
-        "model": "",
-        "thinkingMode": "high",
-        "temperature": 0.2
-      }
-    },
-    "write_style_memory_candidates": {
-      "kind": "agent",
-      "name": "写入候选记忆",
-      "description": "运行 memory_candidate_writer，只写入 candidate 状态记忆。",
-      "ui": {
-        "position": {
-          "x": 5920,
-          "y": 300
-        },
-        "collapsed": false,
-        "size": {
-          "width": 420,
-          "height": 300
-        }
-      },
-      "reads": [
-        {
-          "state": "candidate_plan",
-          "required": true
-        }
-      ],
-      "writes": [
-        {
-          "state": "candidate_write_success",
-          "mode": "replace"
-        },
-        {
-          "state": "candidate_memories",
-          "mode": "replace"
-        },
-        {
-          "state": "skipped_candidates",
-          "mode": "replace"
-        },
-        {
-          "state": "candidate_write_result",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "skillKey": "memory_candidate_writer",
-        "skillBindings": [
-          {
-            "skillKey": "memory_candidate_writer",
-            "outputMapping": {
-              "success": "candidate_write_success",
-              "candidate_memories": "candidate_memories",
-              "skipped_candidates": "skipped_candidates",
-              "result": "candidate_write_result"
-            }
-          }
-        ],
-        "skillInstructionBlocks": {
-          "memory_candidate_writer": {
-            "skillKey": "memory_candidate_writer",
-            "title": "候选记忆写入 skill instruction",
-            "content": "你已绑定候选记忆写入器。只根据 candidate_plan 生成 candidates，并且只允许写入 candidate 状态记忆；不要应用为 active，不要写 Buddy Home，不要扩大权限。",
-            "source": "node.override"
-          }
-        },
-        "taskInstruction": "本节点只负责运行 memory_candidate_writer。将 candidate_plan 中证据充足的 candidates 交给技能；不要总结内容包，不要改写候选。",
-        "modelSource": "global",
-        "model": "",
-        "thinkingMode": "high",
-        "temperature": 0.2
-      }
-    },
     "build_final_pack": {
       "kind": "agent",
       "name": "组装最终内容包",
-      "description": "合并重写稿、评分、发布计划和候选记忆摘要。",
+      "description": "合并重写稿、评分、发布计划。",
       "ui": {
         "position": {
           "x": 6460,
@@ -979,14 +789,6 @@
         {
           "state": "publishing_plan",
           "required": true
-        },
-        {
-          "state": "candidate_write_result",
-          "required": false
-        },
-        {
-          "state": "skipped_candidates",
-          "required": false
         }
       ],
       "writes": [
@@ -999,7 +801,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "final_distribution_pack 写成 Markdown，包含核心观点摘要、各平台最终稿、发布计划、风格一致性评分、AI 味降低说明、需要人工复核的问题、候选记忆写入摘要。不要隐藏 skipped_candidates；说明候选记忆仍需用户审查后才能成为 active 记忆。",
+        "taskInstruction": "final_distribution_pack 写成 Markdown，包含核心观点摘要、各平台最终稿、发布计划、风格一致性评分、AI 味降低说明、需要人工复核的问题、会话召回参考。不要隐藏 ；不要写入或承诺更新长期记忆。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1090,20 +892,12 @@
       "target": "score_and_plan_publish"
     },
     {
-      "source": "score_and_plan_publish",
-      "target": "prepare_style_memory_candidate"
-    },
-    {
-      "source": "prepare_style_memory_candidate",
-      "target": "write_style_memory_candidates"
-    },
-    {
-      "source": "write_style_memory_candidates",
-      "target": "build_final_pack"
-    },
-    {
       "source": "build_final_pack",
       "target": "output_final_distribution_pack"
+    },
+    {
+      "source": "score_and_plan_publish",
+      "target": "build_final_pack"
     }
   ],
   "conditional_edges": [],
@@ -1156,12 +950,10 @@
       }
     ],
     "requiredSkills": [
-      "memory_recall",
-      "memory_candidate_writer"
+      "buddy_session_recall"
     ],
     "requiredPermissions": [
-      "memory_read",
-      "memory_candidate_write"
+      "buddy_session_read"
     ],
     "mockMode": {
       "supported": true,
@@ -1219,15 +1011,6 @@
         "required": true
       },
       {
-        "key": "candidate_memories",
-        "name": "候选风格记忆",
-        "description": "需要用户审查的 candidate 状态记忆记录。",
-        "type": "json",
-        "role": "artifact",
-        "passThrough": false,
-        "required": false
-      },
-      {
         "key": "ai_tone_report",
         "name": "AI 味检测",
         "description": "AI 味问题、改写指令和前后评分。",
@@ -1245,13 +1028,11 @@
           "core_message_preserved",
           "all_target_platforms_present",
           "ai_tone_report_present",
-          "style_memory_candidates_are_candidate_only",
           "final_pack_contains_manual_review_notes"
         ]
       }
     ],
     "safetyNotes": [
-      "候选风格记忆只能写入 candidate 状态，不能直接应用为 active。",
       "改写不得丢失源内容中的关键事实、限制和不确定项。",
       "人工反馈通过普通输入进入下一轮，不使用用户可见断点。"
     ]

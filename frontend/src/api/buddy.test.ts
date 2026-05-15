@@ -4,8 +4,8 @@ import assert from "node:assert/strict";
 import {
   appendBuddyChatMessage,
   createBuddyChatSession,
-  createBuddyMemory,
   deleteBuddyChatSession,
+  fetchBuddyMemoryDocument,
   fetchBuddyRunTemplateBinding,
   fetchBuddyCommands,
   fetchBuddyChatMessages,
@@ -13,6 +13,7 @@ import {
   fetchBuddyProfile,
   restoreBuddyRevision,
   updateBuddyChatSession,
+  updateBuddyMemoryDocument,
   updateBuddyProfile,
   updateBuddyRunTemplateBinding,
 } from "./buddy.ts";
@@ -43,24 +44,26 @@ test("buddy API reads profile and sends profile writes through command flow", as
   globalThis.fetch = originalFetch;
 });
 
-test("buddy API creates memories and restores revisions through command flow", async () => {
+test("buddy API updates MEMORY.md and restores revisions through command flow", async () => {
   const requests: Array<{ url: string; body: unknown }> = [];
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     requests.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
     return new Response(JSON.stringify({ result: { ok: true } }), { status: 200, headers: { "Content-Type": "application/json" } });
   }) as typeof fetch;
 
-  await createBuddyMemory({ type: "preference", title: "Reply style", content: "Keep replies short." });
+  await fetchBuddyMemoryDocument();
+  await updateBuddyMemoryDocument({ content: "# MEMORY.md\n\n- Keep replies short." }, "Manual memory update.");
   await restoreBuddyRevision("rev_1");
 
-  assert.equal(requests[0].url, "/api/buddy/commands");
-  assert.deepEqual(requests[0].body, {
-    action: "memory.create",
-    payload: { type: "preference", title: "Reply style", content: "Keep replies short." },
-    change_reason: "User created buddy memory from the Buddy page.",
-  });
+  assert.equal(requests[0].url, "/api/buddy/memory-document");
   assert.equal(requests[1].url, "/api/buddy/commands");
   assert.deepEqual(requests[1].body, {
+    action: "memory_document.update",
+    payload: { content: "# MEMORY.md\n\n- Keep replies short." },
+    change_reason: "Manual memory update.",
+  });
+  assert.equal(requests[2].url, "/api/buddy/commands");
+  assert.deepEqual(requests[2].body, {
     action: "revision.restore",
     target_id: "rev_1",
     payload: {},

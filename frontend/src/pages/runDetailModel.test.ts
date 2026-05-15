@@ -5,7 +5,6 @@ import type { NodeExecutionDetail, RunDetail } from "../types/run.ts";
 
 import {
   buildRunAggregatedTimeline,
-  buildRunMemoryContextCards,
   buildRunStatusFacts,
   formatRunArtifactValue,
   listRunOutputArtifacts,
@@ -183,94 +182,6 @@ test("listRunOutputArtifacts maps exported outputs into renderable cards", () =>
       documentRefs: [],
     },
   ]);
-});
-
-test("buildRunMemoryContextCards expands saved memory_context into auditable cards", () => {
-  const cards = buildRunMemoryContextCards(
-    createRunDetail({
-      state_snapshot: {
-        values: {
-          memory_context: {
-            kind: "memory_context",
-            query: "verification evidence",
-            filters: {
-              scope: "project",
-              layer: "procedural",
-              type: "preference",
-              status: "active",
-            },
-            max_chars: 4000,
-            used_chars: 241,
-            total_count: 3,
-            included_count: 2,
-            omitted_count: 1,
-            memories: [
-              {
-                id: "mem_1",
-                scope: "project",
-                layer: "procedural",
-                type: "preference",
-                status: "active",
-                summary: "Verify before reporting",
-                content: "Run the relevant test command before claiming a fix.",
-                confidence: 0.92,
-                importance: 0.84,
-                evidence: ["User requires evidence before completion."],
-                source: {
-                  run_id: "run_previous",
-                  node_id: "recall_memory_context",
-                },
-                char_count: 86,
-              },
-            ],
-            omitted: [
-              {
-                id: "mem_3",
-                scope: "project",
-                layer: "episodic",
-                type: "summary",
-                summary: "Long prior debugging trace",
-                char_count: 6200,
-              },
-            ],
-          },
-        },
-        last_writers: {},
-      },
-    }),
-  );
-
-  assert.equal(cards.length, 1);
-  assert.equal(cards[0]?.query, "verification evidence");
-  assert.deepEqual(cards[0]?.filterLabels, ["scope: project", "layer: procedural", "type: preference", "status: active"]);
-  assert.deepEqual(cards[0]?.statLabels, ["included: 2", "omitted: 1", "total: 3", "budget: 241/4000 chars"]);
-  assert.deepEqual(cards[0]?.memories[0], {
-    key: "memory_context:memory_context:mem_1:0",
-    id: "mem_1",
-    title: "Verify before reporting",
-    content: "Run the relevant test command before claiming a fix.",
-    metaLabels: [
-      "project",
-      "procedural",
-      "preference",
-      "active",
-      "confidence: 0.92",
-      "importance: 0.84",
-      "source: run_previous / recall_memory_context",
-      "chars: 86",
-    ],
-    evidenceLabels: ["User requires evidence before completion."],
-  });
-  assert.deepEqual(cards[0]?.omitted[0], {
-    key: "memory_context:memory_context:omitted:mem_3:0",
-    id: "mem_3",
-    title: "Long prior debugging trace",
-    content: "",
-    metaLabels: ["project", "episodic", "summary", "chars: 6200"],
-    evidenceLabels: [],
-  });
-  assert.match(cards[0]?.detailText ?? "", /verification evidence/);
-  assert.match(cards[0]?.detailText ?? "", /mem_3/);
 });
 
 test("buildRunAggregatedTimeline interleaves parent nodes, subgraph nodes, and activity events", () => {
@@ -489,23 +400,22 @@ test("buildRunAggregatedTimeline summarizes Buddy Home writeback activity", () =
   assert.match(item?.detailText ?? "", /rev_memory_1/);
 });
 
-test("buildRunAggregatedTimeline summarizes platform memory recall activity", () => {
+test("buildRunAggregatedTimeline summarizes Buddy session recall activity", () => {
   const run = createRunDetail({
     artifacts: createRunArtifacts({
       activity_events: [
         {
           sequence: 2,
-          kind: "memory_recall",
-          summary: "Recalled 2 memories (1 omitted by budget).",
-          node_id: "recall_memory_context",
+          kind: "buddy_session_recall",
+          summary: "Recalled 2 sessions from Buddy history with 3 message hit(s).",
+          node_id: "recall_buddy_history",
           status: "succeeded",
           duration_ms: 5,
           detail: {
+            mode: "discover",
             query: "verification evidence",
-            scope: "project",
-            included_count: 2,
-            omitted_count: 1,
-            memory_ids: ["mem_1", "mem_2"],
+            session_count: 2,
+            hit_count: 3,
           },
           created_at: "2026-05-12T01:00:02.500Z",
         },
@@ -515,49 +425,9 @@ test("buildRunAggregatedTimeline summarizes platform memory recall activity", ()
 
   const [item] = buildRunAggregatedTimeline(run);
 
-  assert.equal(item?.label, "Memory recall");
-  assert.deepEqual(item?.artifactLabels, [
-    "included: 2",
-    "omitted: 1",
-    "query: verification evidence",
-    "memories: mem_1, mem_2",
-  ]);
+  assert.equal(item?.label, "Buddy session recall");
+  assert.deepEqual(item?.artifactLabels, ["mode: discover", "sessions: 2", "hits: 3", "query: verification evidence"]);
   assert.match(item?.detailText ?? "", /verification evidence/);
-});
-
-test("buildRunAggregatedTimeline summarizes platform memory candidate writes", () => {
-  const run = createRunDetail({
-    artifacts: createRunArtifacts({
-      activity_events: [
-        {
-          sequence: 3,
-          kind: "memory_candidate_write",
-          summary: "Created 1 memory candidates.",
-          node_id: "write_memory_candidate",
-          status: "succeeded",
-          duration_ms: 7,
-          detail: {
-            candidate_count: 1,
-            skipped_count: 0,
-            conflict_count: 1,
-            candidate_ids: ["mem_candidate_1"],
-          },
-          created_at: "2026-05-12T01:00:03.500Z",
-        },
-      ],
-    }),
-  });
-
-  const [item] = buildRunAggregatedTimeline(run);
-
-  assert.equal(item?.label, "Memory candidate write");
-  assert.deepEqual(item?.artifactLabels, [
-    "candidates: 1",
-    "skipped: 0",
-    "conflicts: 1",
-    "memories: mem_candidate_1",
-  ]);
-  assert.match(item?.detailText ?? "", /mem_candidate_1/);
 });
 
 test("buildRunAggregatedTimeline summarizes virtual template operation activity", () => {

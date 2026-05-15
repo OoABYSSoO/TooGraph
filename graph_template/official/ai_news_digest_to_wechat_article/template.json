@@ -54,51 +54,23 @@
     },
     "memory_request": {
       "name": "内容偏好记忆请求",
-      "description": "面向 memory_recall Skill 的只读召回请求。",
+      "description": "面向 buddy_session_recall Skill 的只读召回请求。",
       "type": "json",
       "value": {},
       "color": "#9333ea",
       "binding": null
     },
-    "memory_recall_success": {
+    "buddy_session_recall_success": {
       "name": "记忆召回成功",
-      "description": "memory_recall 是否成功。",
+      "description": "buddy_session_recall 是否成功。",
       "type": "boolean",
       "value": false,
       "color": "#16a34a",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "nodeId": "recall_content_memory",
         "fieldKey": "success",
-        "managed": true
-      }
-    },
-    "memory_context": {
-      "name": "内容偏好记忆",
-      "description": "预算化召回结果，用于风格和受众偏好参考。",
-      "type": "json",
-      "value": {},
-      "color": "#7c3aed",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_recall",
-        "nodeId": "recall_content_memory",
-        "fieldKey": "memory_context",
-        "managed": true
-      }
-    },
-    "recalled_memories": {
-      "name": "纳入记忆",
-      "description": "本轮纳入上下文的记忆记录。",
-      "type": "json",
-      "value": [],
-      "color": "#8b5cf6",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_recall",
-        "nodeId": "recall_content_memory",
-        "fieldKey": "recalled_memories",
         "managed": true
       }
     },
@@ -110,21 +82,21 @@
       "color": "#a855f7",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "nodeId": "recall_content_memory",
         "fieldKey": "omitted_memories",
         "managed": true
       }
     },
-    "memory_recall_result": {
+    "buddy_session_recall_result": {
       "name": "记忆召回摘要",
-      "description": "memory_recall 返回的召回摘要。",
+      "description": "buddy_session_recall 返回的召回摘要。",
       "type": "markdown",
       "value": "",
       "color": "#6d28d9",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "nodeId": "recall_content_memory",
         "fieldKey": "result",
         "managed": true
@@ -289,6 +261,34 @@
       "value": "",
       "color": "#b45309",
       "binding": null
+    },
+    "session_recall_context": {
+      "name": "session_recall_context",
+      "description": "从 Buddy 历史会话中召回的上下文窗口。",
+      "type": "json",
+      "value": {},
+      "color": "#7c3aed",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "buddy_session_recall",
+        "nodeId": "recall_content_memory",
+        "fieldKey": "session_recall_context",
+        "managed": true
+      }
+    },
+    "recalled_sessions": {
+      "name": "recalled_sessions",
+      "description": "从 Buddy 历史会话中召回的会话片段。",
+      "type": "json",
+      "value": [],
+      "color": "#8b5cf6",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "buddy_session_recall",
+        "nodeId": "recall_content_memory",
+        "fieldKey": "recalled_sessions",
+        "managed": true
+      }
     }
   },
   "nodes": {
@@ -497,7 +497,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "生成 memory_request JSON，只用于只读召回用户的内容偏好、常用平台风格、禁用表达和历史选题。字段包含 query、scope、layer、memory_type、status、top_k、max_chars。scope 默认 user，layer 可用 procedural 或 semantic，status 默认 active，top_k 不超过 8，max_chars 不超过 3000。不要写新闻总结。",
+        "taskInstruction": "生成 memory_request JSON，只用于只读召回 Buddy 历史会话中的长期偏好、历史反馈和相关上下文。字段包含 mode、query、limit、window；mode 默认 discover，limit 不超过 8，window 不超过 2。query 应结合本模板输入和用户目标，避免过宽；不要写 scope、layer、status、top_k、max_chars，不要生成业务结论。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -507,7 +507,7 @@
     "recall_content_memory": {
       "kind": "agent",
       "name": "召回内容偏好",
-      "description": "运行 memory_recall Skill，只透传召回结果。",
+      "description": "运行 buddy_session_recall Skill，只透传召回结果。",
       "ui": {
         "position": {
           "x": 1060,
@@ -527,49 +527,44 @@
       ],
       "writes": [
         {
-          "state": "memory_recall_success",
+          "state": "buddy_session_recall_success",
           "mode": "replace"
         },
         {
-          "state": "memory_context",
+          "state": "session_recall_context",
           "mode": "replace"
         },
         {
-          "state": "recalled_memories",
+          "state": "recalled_sessions",
           "mode": "replace"
         },
         {
-          "state": "omitted_memories",
-          "mode": "replace"
-        },
-        {
-          "state": "memory_recall_result",
+          "state": "buddy_session_recall_result",
           "mode": "replace"
         }
       ],
       "config": {
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "skillBindings": [
           {
-            "skillKey": "memory_recall",
+            "skillKey": "buddy_session_recall",
             "outputMapping": {
-              "success": "memory_recall_success",
-              "memory_context": "memory_context",
-              "recalled_memories": "recalled_memories",
-              "omitted_memories": "omitted_memories",
-              "result": "memory_recall_result"
+              "success": "buddy_session_recall_success",
+              "session_recall_context": "session_recall_context",
+              "sessions": "recalled_sessions",
+              "result": "buddy_session_recall_result"
             }
           }
         ],
         "skillInstructionBlocks": {
-          "memory_recall": {
-            "skillKey": "memory_recall",
-            "title": "记忆召回 skill instruction",
-            "content": "你已绑定记忆召回技能。根据 memory_request 生成只读召回参数；不要总结新闻、不要改写记忆、不要写入记忆。技能结果会写入 memory_context、recalled_memories、omitted_memories 和 result。",
+          "buddy_session_recall": {
+            "skillKey": "buddy_session_recall",
+            "title": "Buddy session recall instruction",
+            "content": "你已绑定 Buddy 会话召回技能。只把 memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
             "source": "node.override"
           }
         },
-        "taskInstruction": "本节点只负责运行 memory_recall。缺失字段时使用 scope=user、status=active、top_k=8、max_chars=3000。不要输出内容稿件。",
+        "taskInstruction": "本节点只负责运行 buddy_session_recall。根据上游 memory_request 生成 recall_request；mode 只能是 browse、discover 或 scroll，默认 discover；limit 不超过 8，window 不超过 2。不要输出业务结论，不写 MEMORY.md，不创建逐条审批记录。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -609,7 +604,7 @@
           "required": true
         },
         {
-          "state": "memory_context",
+          "state": "session_recall_context",
           "required": false
         }
       ],
@@ -882,7 +877,7 @@
           "required": true
         },
         {
-          "state": "memory_context",
+          "state": "session_recall_context",
           "required": false
         }
       ],
@@ -940,7 +935,7 @@
           "required": false
         },
         {
-          "state": "memory_context",
+          "state": "session_recall_context",
           "required": false
         }
       ],
@@ -1242,11 +1237,11 @@
       }
     ],
     "requiredSkills": [
-      "memory_recall",
+      "buddy_session_recall",
       "web_search"
     ],
     "requiredPermissions": [
-      "memory_read",
+      "buddy_session_read",
       "network",
       "secret_read",
       "browser_automation"

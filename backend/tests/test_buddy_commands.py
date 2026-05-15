@@ -50,37 +50,37 @@ class BuddyCommandRouteTests(unittest.TestCase):
         self.assertEqual(commands_response.status_code, 200)
         self.assertEqual(commands_response.json()[-1]["command_id"], body["command"]["command_id"])
 
-    def test_memory_delete_command_soft_deletes_and_reports_revision(self) -> None:
+    def test_memory_document_update_command_records_file_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+            buddy_home = Path(temp_dir) / "buddy_home"
+            with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
                 with TestClient(app) as client:
-                    created_response = client.post(
+                    update_response = client.post(
                         "/api/buddy/commands",
                         json={
-                            "action": "memory.create",
-                            "payload": {"type": "preference", "title": "Reply style", "content": "Keep replies short."},
-                            "change_reason": "Manual memory create.",
+                            "action": "memory_document.update",
+                            "payload": {"content": "# MEMORY.md - Long-Term Memory\n\n- Keep replies short.\n"},
+                            "run_id": "run_memory_1",
+                            "change_reason": "Manual memory document update.",
                         },
                     )
-                    memory_id = created_response.json()["result"]["id"]
-                    delete_response = client.post(
-                        "/api/buddy/commands",
-                        json={
-                            "action": "memory.delete",
-                            "target_id": memory_id,
-                            "change_reason": "Manual memory delete.",
-                        },
+                    revisions_response = client.get(
+                        "/api/buddy/revisions",
+                        params={"target_type": "home_file", "target_id": "MEMORY.md"},
                     )
-                    enabled_memories = client.get("/api/buddy/memories").json()
+                    memory_text = (buddy_home / "MEMORY.md").read_text(encoding="utf-8")
 
-        self.assertEqual(delete_response.status_code, 200)
-        body = delete_response.json()
-        self.assertEqual(body["command"]["action"], "memory.delete")
-        self.assertEqual(body["command"]["target_type"], "memory")
-        self.assertEqual(body["command"]["target_id"], memory_id)
-        self.assertTrue(body["result"]["deleted"])
+        self.assertEqual(update_response.status_code, 200)
+        body = update_response.json()
+        self.assertEqual(body["command"]["action"], "memory_document.update")
+        self.assertEqual(body["command"]["target_type"], "home_file")
+        self.assertEqual(body["command"]["target_id"], "MEMORY.md")
+        self.assertEqual(body["command"]["run_id"], "run_memory_1")
+        self.assertEqual(body["result"]["path"], "MEMORY.md")
+        self.assertIn("Keep replies short", memory_text)
         self.assertTrue(body["command"]["revision_id"].startswith("rev_"))
-        self.assertEqual(enabled_memories, [])
+        self.assertEqual(revisions_response.status_code, 200)
+        self.assertEqual(revisions_response.json()[-1]["target_id"], "MEMORY.md")
 
     def test_graph_patch_draft_is_rejected_in_favor_of_editor_command_flow(self) -> None:
         patch_payload = {

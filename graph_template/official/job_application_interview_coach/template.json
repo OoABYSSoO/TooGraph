@@ -1,7 +1,7 @@
 {
   "template_id": "job_application_interview_coach",
   "label": "求职简历与面试教练",
-  "description": "根据候选人画像、简历、项目经历和目标 JD，生成岗位匹配报告、差距分析、简历改写、项目故事库、面试题预测、模拟面试反馈、学习计划和候选人记忆候选。",
+  "description": "根据候选人画像、简历、项目经历和目标 JD，生成岗位匹配报告、差距分析、简历改写、项目故事库、面试题预测、模拟面试反馈、学习计划和会话召回参考。",
   "default_graph_name": "求职简历与面试教练",
   "state_schema": {
     "candidate_profile": {
@@ -62,51 +62,23 @@
     },
     "memory_request": {
       "name": "候选人记忆召回请求",
-      "description": "面向 memory_recall Skill 的只读召回参数。",
+      "description": "面向 buddy_session_recall Skill 的只读召回参数。",
       "type": "json",
       "value": {},
       "color": "#9333ea",
       "binding": null
     },
-    "memory_recall_success": {
+    "buddy_session_recall_success": {
       "name": "记忆召回成功",
-      "description": "memory_recall 是否成功。",
+      "description": "buddy_session_recall 是否成功。",
       "type": "boolean",
       "value": false,
       "color": "#16a34a",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "nodeId": "recall_candidate_memory",
         "fieldKey": "success",
-        "managed": true
-      }
-    },
-    "memory_context": {
-      "name": "候选人记忆上下文",
-      "description": "召回的长期职业画像、项目偏好、历史面试反馈和求职约束。",
-      "type": "json",
-      "value": {},
-      "color": "#7c3aed",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_recall",
-        "nodeId": "recall_candidate_memory",
-        "fieldKey": "memory_context",
-        "managed": true
-      }
-    },
-    "recalled_memories": {
-      "name": "纳入记忆",
-      "description": "本轮纳入上下文的候选人记忆。",
-      "type": "json",
-      "value": [],
-      "color": "#8b5cf6",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_recall",
-        "nodeId": "recall_candidate_memory",
-        "fieldKey": "recalled_memories",
         "managed": true
       }
     },
@@ -118,21 +90,21 @@
       "color": "#a855f7",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "nodeId": "recall_candidate_memory",
         "fieldKey": "omitted_memories",
         "managed": true
       }
     },
-    "memory_recall_result": {
+    "buddy_session_recall_result": {
       "name": "记忆召回摘要",
-      "description": "memory_recall 返回的召回摘要。",
+      "description": "buddy_session_recall 返回的召回摘要。",
       "type": "markdown",
       "value": "",
       "color": "#6d28d9",
       "binding": {
         "kind": "skill_output",
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "nodeId": "recall_candidate_memory",
         "fieldKey": "result",
         "managed": true
@@ -218,70 +190,6 @@
       "color": "#ea580c",
       "binding": null
     },
-    "candidate_memory_plan": {
-      "name": "候选人候选记忆计划",
-      "description": "需要写入候选记忆的稳定职业画像、项目故事和面试薄弱点。",
-      "type": "json",
-      "value": {},
-      "color": "#9333ea",
-      "binding": null
-    },
-    "candidate_write_success": {
-      "name": "候选记忆写入成功",
-      "description": "memory_candidate_writer 是否成功写入候选。",
-      "type": "boolean",
-      "value": false,
-      "color": "#16a34a",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_candidate_writer",
-        "nodeId": "write_candidate_memory_candidates",
-        "fieldKey": "success",
-        "managed": true
-      }
-    },
-    "candidate_memories": {
-      "name": "候选记忆",
-      "description": "写入平台 store 的 candidate 状态记忆。",
-      "type": "json",
-      "value": [],
-      "color": "#7c3aed",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_candidate_writer",
-        "nodeId": "write_candidate_memory_candidates",
-        "fieldKey": "candidate_memories",
-        "managed": true
-      }
-    },
-    "skipped_candidates": {
-      "name": "跳过候选",
-      "description": "因证据不足或格式无效跳过的候选。",
-      "type": "json",
-      "value": [],
-      "color": "#dc2626",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_candidate_writer",
-        "nodeId": "write_candidate_memory_candidates",
-        "fieldKey": "skipped_candidates",
-        "managed": true
-      }
-    },
-    "candidate_write_result": {
-      "name": "候选记忆写入摘要",
-      "description": "memory_candidate_writer 返回的写入摘要。",
-      "type": "markdown",
-      "value": "",
-      "color": "#6d28d9",
-      "binding": {
-        "kind": "skill_output",
-        "skillKey": "memory_candidate_writer",
-        "nodeId": "write_candidate_memory_candidates",
-        "fieldKey": "result",
-        "managed": true
-      }
-    },
     "final_application_package": {
       "name": "最终求职准备包",
       "description": "面向用户展示和导出的求职准备完整包。",
@@ -289,6 +197,34 @@
       "value": "",
       "color": "#b45309",
       "binding": null
+    },
+    "session_recall_context": {
+      "name": "session_recall_context",
+      "description": "从 Buddy 历史会话中召回的上下文窗口。",
+      "type": "json",
+      "value": {},
+      "color": "#7c3aed",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "buddy_session_recall",
+        "nodeId": "recall_candidate_memory",
+        "fieldKey": "session_recall_context",
+        "managed": true
+      }
+    },
+    "recalled_sessions": {
+      "name": "recalled_sessions",
+      "description": "从 Buddy 历史会话中召回的会话片段。",
+      "type": "json",
+      "value": [],
+      "color": "#8b5cf6",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "buddy_session_recall",
+        "nodeId": "recall_candidate_memory",
+        "fieldKey": "recalled_sessions",
+        "managed": true
+      }
     }
   },
   "nodes": {
@@ -297,115 +233,242 @@
       "name": "输入候选人画像",
       "description": "填写长期职业画像、目标方向和约束。",
       "ui": {
-        "position": { "x": 40, "y": 40 },
+        "position": {
+          "x": 40,
+          "y": 40
+        },
         "collapsed": false,
-        "size": { "width": 340, "height": 180 }
+        "size": {
+          "width": 340,
+          "height": 180
+        }
       },
       "reads": [],
-      "writes": [{ "state": "candidate_profile", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
+      "writes": [
+        {
+          "state": "candidate_profile",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
     },
     "input_resume": {
       "kind": "input",
       "name": "输入简历",
       "description": "粘贴当前简历。",
       "ui": {
-        "position": { "x": 40, "y": 260 },
+        "position": {
+          "x": 40,
+          "y": 260
+        },
         "collapsed": false,
-        "size": { "width": 340, "height": 180 }
+        "size": {
+          "width": 340,
+          "height": 180
+        }
       },
       "reads": [],
-      "writes": [{ "state": "resume", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
+      "writes": [
+        {
+          "state": "resume",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
     },
     "input_project_experiences": {
       "kind": "input",
       "name": "输入项目经历",
       "description": "粘贴项目细节、指标和复盘。",
       "ui": {
-        "position": { "x": 40, "y": 480 },
+        "position": {
+          "x": 40,
+          "y": 480
+        },
         "collapsed": false,
-        "size": { "width": 340, "height": 180 }
+        "size": {
+          "width": 340,
+          "height": 180
+        }
       },
       "reads": [],
-      "writes": [{ "state": "project_experiences", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
+      "writes": [
+        {
+          "state": "project_experiences",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
     },
     "input_job_description": {
       "kind": "input",
       "name": "输入目标 JD",
       "description": "粘贴目标岗位描述。",
       "ui": {
-        "position": { "x": 40, "y": 700 },
+        "position": {
+          "x": 40,
+          "y": 700
+        },
         "collapsed": false,
-        "size": { "width": 340, "height": 180 }
+        "size": {
+          "width": 340,
+          "height": 180
+        }
       },
       "reads": [],
-      "writes": [{ "state": "job_description", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
+      "writes": [
+        {
+          "state": "job_description",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
     },
     "input_target_city": {
       "kind": "input",
       "name": "输入目标城市",
       "description": "填写目标城市或远程偏好。",
       "ui": {
-        "position": { "x": 40, "y": 920 },
+        "position": {
+          "x": 40,
+          "y": 920
+        },
         "collapsed": false,
-        "size": { "width": 340, "height": 160 }
+        "size": {
+          "width": 340,
+          "height": 160
+        }
       },
       "reads": [],
-      "writes": [{ "state": "target_city", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
+      "writes": [
+        {
+          "state": "target_city",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
     },
     "input_salary_expectation": {
       "kind": "input",
       "name": "输入薪资期望",
       "description": "填写薪资期望和谈判约束。",
       "ui": {
-        "position": { "x": 40, "y": 1120 },
+        "position": {
+          "x": 40,
+          "y": 1120
+        },
         "collapsed": false,
-        "size": { "width": 340, "height": 160 }
+        "size": {
+          "width": 340,
+          "height": 160
+        }
       },
       "reads": [],
-      "writes": [{ "state": "salary_expectation", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
+      "writes": [
+        {
+          "state": "salary_expectation",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
     },
     "input_interview_transcript": {
       "kind": "input",
       "name": "输入模拟面试记录",
       "description": "可选，粘贴问答记录。",
       "ui": {
-        "position": { "x": 40, "y": 1320 },
+        "position": {
+          "x": 40,
+          "y": 1320
+        },
         "collapsed": false,
-        "size": { "width": 340, "height": 180 }
+        "size": {
+          "width": 340,
+          "height": 180
+        }
       },
       "reads": [],
-      "writes": [{ "state": "interview_transcript", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "text" }
+      "writes": [
+        {
+          "state": "interview_transcript",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
     },
     "prepare_candidate_memory_request": {
       "kind": "agent",
       "name": "准备候选人记忆召回",
       "description": "生成只读记忆召回请求，查找候选人长期画像、历史面试反馈和求职偏好。",
       "ui": {
-        "position": { "x": 520, "y": 200 },
+        "position": {
+          "x": 520,
+          "y": 200
+        },
         "collapsed": false,
-        "size": { "width": 420, "height": 280 }
+        "size": {
+          "width": 420,
+          "height": 280
+        }
       },
       "reads": [
-        { "state": "candidate_profile", "required": true },
-        { "state": "resume", "required": true },
-        { "state": "project_experiences", "required": false },
-        { "state": "job_description", "required": true },
-        { "state": "target_city", "required": false },
-        { "state": "salary_expectation", "required": false }
+        {
+          "state": "candidate_profile",
+          "required": true
+        },
+        {
+          "state": "resume",
+          "required": true
+        },
+        {
+          "state": "project_experiences",
+          "required": false
+        },
+        {
+          "state": "job_description",
+          "required": true
+        },
+        {
+          "state": "target_city",
+          "required": false
+        },
+        {
+          "state": "salary_expectation",
+          "required": false
+        }
       ],
-      "writes": [{ "state": "memory_request", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "memory_request",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "生成 memory_request JSON，只召回候选人的稳定职业画像、项目故事、历史面试反馈、求职偏好、目标城市和薪资约束。字段包含 query、scope、layer、memory_type、status、top_k、max_chars。scope 默认 user，layer 优先 procedural，status 默认 active，top_k 不超过 8，max_chars 不超过 3000。不要生成求职建议。",
+        "taskInstruction": "生成 memory_request JSON，只用于只读召回 Buddy 历史会话中的长期偏好、历史反馈和相关上下文。字段包含 mode、query、limit、window；mode 默认 discover，limit 不超过 8，window 不超过 2。query 应结合本模板输入和用户目标，避免过宽；不要写 scope、layer、status、top_k、max_chars，不要生成业务结论。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -415,43 +478,64 @@
     "recall_candidate_memory": {
       "kind": "agent",
       "name": "召回候选人记忆",
-      "description": "运行 memory_recall Skill，只透传召回结果。",
+      "description": "运行 buddy_session_recall Skill，只透传召回结果。",
       "ui": {
-        "position": { "x": 1060, "y": 200 },
+        "position": {
+          "x": 1060,
+          "y": 200
+        },
         "collapsed": false,
-        "size": { "width": 420, "height": 300 }
+        "size": {
+          "width": 420,
+          "height": 300
+        }
       },
-      "reads": [{ "state": "memory_request", "required": true }],
+      "reads": [
+        {
+          "state": "memory_request",
+          "required": true
+        }
+      ],
       "writes": [
-        { "state": "memory_recall_success", "mode": "replace" },
-        { "state": "memory_context", "mode": "replace" },
-        { "state": "recalled_memories", "mode": "replace" },
-        { "state": "omitted_memories", "mode": "replace" },
-        { "state": "memory_recall_result", "mode": "replace" }
+        {
+          "state": "buddy_session_recall_success",
+          "mode": "replace"
+        },
+        {
+          "state": "session_recall_context",
+          "mode": "replace"
+        },
+        {
+          "state": "recalled_sessions",
+          "mode": "replace"
+        },
+        {
+          "state": "buddy_session_recall_result",
+          "mode": "replace"
+        }
       ],
       "config": {
-        "skillKey": "memory_recall",
+        "skillKey": "buddy_session_recall",
         "skillBindings": [
           {
-            "skillKey": "memory_recall",
+            "skillKey": "buddy_session_recall",
             "outputMapping": {
-              "success": "memory_recall_success",
-              "memory_context": "memory_context",
-              "recalled_memories": "recalled_memories",
-              "omitted_memories": "omitted_memories",
-              "result": "memory_recall_result"
+              "success": "buddy_session_recall_success",
+              "session_recall_context": "session_recall_context",
+              "sessions": "recalled_sessions",
+              "result": "buddy_session_recall_result"
             }
           }
         ],
         "skillInstructionBlocks": {
-          "memory_recall": {
-            "skillKey": "memory_recall",
-            "title": "候选人记忆召回 skill instruction",
-            "content": "你已绑定记忆召回技能。根据 memory_request 生成只读召回参数；不要改写记忆，不要写入记忆。技能结果会写入 memory_context、recalled_memories、omitted_memories 和 result。",
+          "buddy_session_recall": {
+            "skillKey": "buddy_session_recall",
+            "title": "Buddy session recall instruction",
+            "content": "你已绑定 Buddy 会话召回技能。只把 memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
             "source": "node.override"
           }
         },
-        "taskInstruction": "本节点只负责运行 memory_recall。缺失字段时使用 scope=user、status=active、top_k=8、max_chars=3000。不要输出求职建议。",
+        "taskInstruction": "本节点只负责运行 buddy_session_recall。根据上游 memory_request 生成 recall_request；mode 只能是 browse、discover 或 scroll，默认 discover；limit 不超过 8，window 不超过 2。不要输出业务结论，不写 MEMORY.md，不创建逐条审批记录。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -463,16 +547,36 @@
       "name": "拆解 JD 能力矩阵",
       "description": "把目标 JD 拆成职责、硬性要求、软技能、加分项和风险。",
       "ui": {
-        "position": { "x": 520, "y": 620 },
+        "position": {
+          "x": 520,
+          "y": 620
+        },
         "collapsed": false,
-        "size": { "width": 420, "height": 300 }
+        "size": {
+          "width": 420,
+          "height": 300
+        }
       },
       "reads": [
-        { "state": "job_description", "required": true },
-        { "state": "target_city", "required": false },
-        { "state": "salary_expectation", "required": false }
+        {
+          "state": "job_description",
+          "required": true
+        },
+        {
+          "state": "target_city",
+          "required": false
+        },
+        {
+          "state": "salary_expectation",
+          "required": false
+        }
       ],
-      "writes": [{ "state": "jd_requirements", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "jd_requirements",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -489,20 +593,47 @@
       "name": "映射经历到 JD",
       "description": "把简历和项目经历映射到 JD 能力矩阵。",
       "ui": {
-        "position": { "x": 1060, "y": 620 },
+        "position": {
+          "x": 1060,
+          "y": 620
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 340 }
+        "size": {
+          "width": 440,
+          "height": 340
+        }
       },
       "reads": [
-        { "state": "candidate_profile", "required": true },
-        { "state": "resume", "required": true },
-        { "state": "project_experiences", "required": false },
-        { "state": "jd_requirements", "required": true },
-        { "state": "memory_context", "required": false }
+        {
+          "state": "candidate_profile",
+          "required": true
+        },
+        {
+          "state": "resume",
+          "required": true
+        },
+        {
+          "state": "project_experiences",
+          "required": false
+        },
+        {
+          "state": "jd_requirements",
+          "required": true
+        },
+        {
+          "state": "session_recall_context",
+          "required": false
+        }
       ],
       "writes": [
-        { "state": "experience_match_map", "mode": "replace" },
-        { "state": "matching_report", "mode": "replace" }
+        {
+          "state": "experience_match_map",
+          "mode": "replace"
+        },
+        {
+          "state": "matching_report",
+          "mode": "replace"
+        }
       ],
       "config": {
         "skillKey": "",
@@ -520,20 +651,47 @@
       "name": "生成差距与风险分析",
       "description": "输出差距、补强路径、薪资策略和人工判断提示。",
       "ui": {
-        "position": { "x": 1600, "y": 620 },
+        "position": {
+          "x": 1600,
+          "y": 620
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 340 }
+        "size": {
+          "width": 440,
+          "height": 340
+        }
       },
       "reads": [
-        { "state": "jd_requirements", "required": true },
-        { "state": "experience_match_map", "required": true },
-        { "state": "target_city", "required": false },
-        { "state": "salary_expectation", "required": false },
-        { "state": "memory_context", "required": false }
+        {
+          "state": "jd_requirements",
+          "required": true
+        },
+        {
+          "state": "experience_match_map",
+          "required": true
+        },
+        {
+          "state": "target_city",
+          "required": false
+        },
+        {
+          "state": "salary_expectation",
+          "required": false
+        },
+        {
+          "state": "session_recall_context",
+          "required": false
+        }
       ],
       "writes": [
-        { "state": "gap_analysis", "mode": "replace" },
-        { "state": "salary_strategy", "mode": "replace" }
+        {
+          "state": "gap_analysis",
+          "mode": "replace"
+        },
+        {
+          "state": "salary_strategy",
+          "mode": "replace"
+        }
       ],
       "config": {
         "skillKey": "",
@@ -551,18 +709,44 @@
       "name": "改写简历 Bullet",
       "description": "针对目标 JD 改写简历，但保留可验证事实边界。",
       "ui": {
-        "position": { "x": 520, "y": 1080 },
+        "position": {
+          "x": 520,
+          "y": 1080
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 340 }
+        "size": {
+          "width": 440,
+          "height": 340
+        }
       },
       "reads": [
-        { "state": "resume", "required": true },
-        { "state": "project_experiences", "required": false },
-        { "state": "jd_requirements", "required": true },
-        { "state": "matching_report", "required": true },
-        { "state": "gap_analysis", "required": true }
+        {
+          "state": "resume",
+          "required": true
+        },
+        {
+          "state": "project_experiences",
+          "required": false
+        },
+        {
+          "state": "jd_requirements",
+          "required": true
+        },
+        {
+          "state": "matching_report",
+          "required": true
+        },
+        {
+          "state": "gap_analysis",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "rewritten_resume", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "rewritten_resume",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -579,17 +763,40 @@
       "name": "生成项目故事库",
       "description": "把项目经历整理成 STAR/CAR 面试故事。",
       "ui": {
-        "position": { "x": 1060, "y": 1080 },
+        "position": {
+          "x": 1060,
+          "y": 1080
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 340 }
+        "size": {
+          "width": 440,
+          "height": 340
+        }
       },
       "reads": [
-        { "state": "project_experiences", "required": true },
-        { "state": "jd_requirements", "required": true },
-        { "state": "experience_match_map", "required": true },
-        { "state": "memory_context", "required": false }
+        {
+          "state": "project_experiences",
+          "required": true
+        },
+        {
+          "state": "jd_requirements",
+          "required": true
+        },
+        {
+          "state": "experience_match_map",
+          "required": true
+        },
+        {
+          "state": "session_recall_context",
+          "required": false
+        }
       ],
-      "writes": [{ "state": "project_story_library", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "project_story_library",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -606,17 +813,40 @@
       "name": "预测面试题",
       "description": "基于 JD、差距和故事库生成面试题与追问。",
       "ui": {
-        "position": { "x": 1600, "y": 1080 },
+        "position": {
+          "x": 1600,
+          "y": 1080
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 340 }
+        "size": {
+          "width": 440,
+          "height": 340
+        }
       },
       "reads": [
-        { "state": "jd_requirements", "required": true },
-        { "state": "experience_match_map", "required": true },
-        { "state": "project_story_library", "required": true },
-        { "state": "gap_analysis", "required": true }
+        {
+          "state": "jd_requirements",
+          "required": true
+        },
+        {
+          "state": "experience_match_map",
+          "required": true
+        },
+        {
+          "state": "project_story_library",
+          "required": true
+        },
+        {
+          "state": "gap_analysis",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "interview_questions", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "interview_questions",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -633,17 +863,40 @@
       "name": "评估模拟面试",
       "description": "根据可选面试记录输出反馈；无记录时输出评分表和练习方式。",
       "ui": {
-        "position": { "x": 520, "y": 1540 },
+        "position": {
+          "x": 520,
+          "y": 1540
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 340 }
+        "size": {
+          "width": 440,
+          "height": 340
+        }
       },
       "reads": [
-        { "state": "interview_questions", "required": true },
-        { "state": "interview_transcript", "required": false },
-        { "state": "project_story_library", "required": true },
-        { "state": "gap_analysis", "required": true }
+        {
+          "state": "interview_questions",
+          "required": true
+        },
+        {
+          "state": "interview_transcript",
+          "required": false
+        },
+        {
+          "state": "project_story_library",
+          "required": true
+        },
+        {
+          "state": "gap_analysis",
+          "required": true
+        }
       ],
-      "writes": [{ "state": "mock_interview_feedback", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "mock_interview_feedback",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -660,18 +913,44 @@
       "name": "生成阶段准备计划",
       "description": "把差距、面试题和反馈转成可执行准备计划。",
       "ui": {
-        "position": { "x": 1060, "y": 1540 },
+        "position": {
+          "x": 1060,
+          "y": 1540
+        },
         "collapsed": false,
-        "size": { "width": 440, "height": 340 }
+        "size": {
+          "width": 440,
+          "height": 340
+        }
       },
       "reads": [
-        { "state": "gap_analysis", "required": true },
-        { "state": "interview_questions", "required": true },
-        { "state": "mock_interview_feedback", "required": true },
-        { "state": "target_city", "required": false },
-        { "state": "salary_expectation", "required": false }
+        {
+          "state": "gap_analysis",
+          "required": true
+        },
+        {
+          "state": "interview_questions",
+          "required": true
+        },
+        {
+          "state": "mock_interview_feedback",
+          "required": true
+        },
+        {
+          "state": "target_city",
+          "required": false
+        },
+        {
+          "state": "salary_expectation",
+          "required": false
+        }
       ],
-      "writes": [{ "state": "learning_plan", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "learning_plan",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -683,100 +962,61 @@
         "temperature": 0.25
       }
     },
-    "prepare_candidate_memory_plan": {
-      "kind": "agent",
-      "name": "准备候选人记忆候选",
-      "description": "只生成 candidate 状态候选记忆，供用户审核。",
-      "ui": {
-        "position": { "x": 1600, "y": 1540 },
-        "collapsed": false,
-        "size": { "width": 440, "height": 340 }
-      },
-      "reads": [
-        { "state": "candidate_profile", "required": true },
-        { "state": "project_story_library", "required": true },
-        { "state": "matching_report", "required": true },
-        { "state": "gap_analysis", "required": true },
-        { "state": "learning_plan", "required": true }
-      ],
-      "writes": [{ "state": "candidate_memory_plan", "mode": "replace" }],
-      "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
-        "taskInstruction": "candidate_memory_plan 写成 JSON，包含 candidates 数组。只把有证据的稳定职业画像、项目故事、面试薄弱点和求职约束写成 candidate 状态候选：scope=user、layer=procedural、type=preference 或 fact，summary、content、confidence、importance、evidence、artifact_refs。不得写入敏感隐私、薪资秘密、临时面试状态、无证据判断或权限扩大建议；没有足够证据时 candidates 为空。",
-        "modelSource": "global",
-        "model": "",
-        "thinkingMode": "high",
-        "temperature": 0.2
-      }
-    },
-    "write_candidate_memory_candidates": {
-      "kind": "agent",
-      "name": "写入候选人候选记忆",
-      "description": "运行 memory_candidate_writer，只写入 candidate 状态记忆。",
-      "ui": {
-        "position": { "x": 2140, "y": 1540 },
-        "collapsed": false,
-        "size": { "width": 440, "height": 320 }
-      },
-      "reads": [{ "state": "candidate_memory_plan", "required": true }],
-      "writes": [
-        { "state": "candidate_write_success", "mode": "replace" },
-        { "state": "candidate_memories", "mode": "replace" },
-        { "state": "skipped_candidates", "mode": "replace" },
-        { "state": "candidate_write_result", "mode": "replace" }
-      ],
-      "config": {
-        "skillKey": "memory_candidate_writer",
-        "skillBindings": [
-          {
-            "skillKey": "memory_candidate_writer",
-            "outputMapping": {
-              "success": "candidate_write_success",
-              "candidate_memories": "candidate_memories",
-              "skipped_candidates": "skipped_candidates",
-              "result": "candidate_write_result"
-            }
-          }
-        ],
-        "skillInstructionBlocks": {
-          "memory_candidate_writer": {
-            "skillKey": "memory_candidate_writer",
-            "title": "候选人记忆候选写入 skill instruction",
-            "content": "你已绑定候选记忆写入技能。只把 candidate_memory_plan 中证据充足的候选写入 candidate 状态；不要应用为 active，不要覆盖既有记忆，不要写入敏感隐私或无来源判断。技能结果会写入 candidate_memories、skipped_candidates 和 result。",
-            "source": "node.override"
-          }
-        },
-        "taskInstruction": "本节点只负责运行 memory_candidate_writer。将 candidate_memory_plan 中证据充足的 candidates 交给技能；不要总结求职包，不要改写候选。",
-        "modelSource": "global",
-        "model": "",
-        "thinkingMode": "high",
-        "temperature": 0.2
-      }
-    },
     "build_final_application_package": {
       "kind": "agent",
       "name": "生成最终求职准备包",
-      "description": "汇总匹配报告、差距、简历、故事库、题库、反馈、计划和候选记忆状态。",
+      "description": "汇总匹配报告、差距、简历、故事库、题库、反馈、计划。",
       "ui": {
-        "position": { "x": 2140, "y": 1080 },
+        "position": {
+          "x": 2140,
+          "y": 1080
+        },
         "collapsed": false,
-        "size": { "width": 460, "height": 360 }
+        "size": {
+          "width": 460,
+          "height": 360
+        }
       },
       "reads": [
-        { "state": "matching_report", "required": true },
-        { "state": "gap_analysis", "required": true },
-        { "state": "rewritten_resume", "required": true },
-        { "state": "project_story_library", "required": true },
-        { "state": "interview_questions", "required": true },
-        { "state": "mock_interview_feedback", "required": true },
-        { "state": "learning_plan", "required": true },
-        { "state": "salary_strategy", "required": false },
-        { "state": "candidate_write_result", "required": false },
-        { "state": "candidate_memories", "required": false }
+        {
+          "state": "matching_report",
+          "required": true
+        },
+        {
+          "state": "gap_analysis",
+          "required": true
+        },
+        {
+          "state": "rewritten_resume",
+          "required": true
+        },
+        {
+          "state": "project_story_library",
+          "required": true
+        },
+        {
+          "state": "interview_questions",
+          "required": true
+        },
+        {
+          "state": "mock_interview_feedback",
+          "required": true
+        },
+        {
+          "state": "learning_plan",
+          "required": true
+        },
+        {
+          "state": "salary_strategy",
+          "required": false
+        }
       ],
-      "writes": [{ "state": "final_application_package", "mode": "replace" }],
+      "writes": [
+        {
+          "state": "final_application_package",
+          "mode": "replace"
+        }
+      ],
       "config": {
         "skillKey": "",
         "skillBindings": [],
@@ -793,11 +1033,22 @@
       "name": "输出最终求职准备包",
       "description": "展示和导出最终求职准备包。",
       "ui": {
-        "position": { "x": 2680, "y": 1080 },
+        "position": {
+          "x": 2680,
+          "y": 1080
+        },
         "collapsed": false,
-        "size": { "width": 360, "height": 220 }
+        "size": {
+          "width": 360,
+          "height": 220
+        }
       },
-      "reads": [{ "state": "final_application_package", "required": true }],
+      "reads": [
+        {
+          "state": "final_application_package",
+          "required": true
+        }
+      ],
       "writes": [],
       "config": {
         "format": "markdown",
@@ -806,49 +1057,162 @@
     }
   },
   "edges": [
-    { "source": "input_candidate_profile", "target": "prepare_candidate_memory_request" },
-    { "source": "input_resume", "target": "prepare_candidate_memory_request" },
-    { "source": "input_project_experiences", "target": "prepare_candidate_memory_request" },
-    { "source": "input_job_description", "target": "prepare_candidate_memory_request" },
-    { "source": "input_target_city", "target": "prepare_candidate_memory_request" },
-    { "source": "input_salary_expectation", "target": "prepare_candidate_memory_request" },
-    { "source": "prepare_candidate_memory_request", "target": "recall_candidate_memory" },
-    { "source": "input_job_description", "target": "analyze_jd_requirements" },
-    { "source": "input_target_city", "target": "analyze_jd_requirements" },
-    { "source": "input_salary_expectation", "target": "analyze_jd_requirements" },
-    { "source": "analyze_jd_requirements", "target": "map_experience_to_jd" },
-    { "source": "recall_candidate_memory", "target": "map_experience_to_jd" },
-    { "source": "input_resume", "target": "map_experience_to_jd" },
-    { "source": "input_project_experiences", "target": "map_experience_to_jd" },
-    { "source": "map_experience_to_jd", "target": "build_gap_analysis" },
-    { "source": "analyze_jd_requirements", "target": "build_gap_analysis" },
-    { "source": "recall_candidate_memory", "target": "build_gap_analysis" },
-    { "source": "build_gap_analysis", "target": "rewrite_resume_bullets" },
-    { "source": "map_experience_to_jd", "target": "rewrite_resume_bullets" },
-    { "source": "analyze_jd_requirements", "target": "rewrite_resume_bullets" },
-    { "source": "build_gap_analysis", "target": "build_project_story_library" },
-    { "source": "map_experience_to_jd", "target": "build_project_story_library" },
-    { "source": "input_project_experiences", "target": "build_project_story_library" },
-    { "source": "build_project_story_library", "target": "predict_interview_questions" },
-    { "source": "build_gap_analysis", "target": "predict_interview_questions" },
-    { "source": "map_experience_to_jd", "target": "predict_interview_questions" },
-    { "source": "predict_interview_questions", "target": "review_mock_interview" },
-    { "source": "build_project_story_library", "target": "review_mock_interview" },
-    { "source": "input_interview_transcript", "target": "review_mock_interview" },
-    { "source": "review_mock_interview", "target": "build_learning_plan" },
-    { "source": "predict_interview_questions", "target": "build_learning_plan" },
-    { "source": "build_gap_analysis", "target": "build_learning_plan" },
-    { "source": "build_learning_plan", "target": "prepare_candidate_memory_plan" },
-    { "source": "build_project_story_library", "target": "prepare_candidate_memory_plan" },
-    { "source": "map_experience_to_jd", "target": "prepare_candidate_memory_plan" },
-    { "source": "prepare_candidate_memory_plan", "target": "write_candidate_memory_candidates" },
-    { "source": "rewrite_resume_bullets", "target": "build_final_application_package" },
-    { "source": "build_project_story_library", "target": "build_final_application_package" },
-    { "source": "predict_interview_questions", "target": "build_final_application_package" },
-    { "source": "review_mock_interview", "target": "build_final_application_package" },
-    { "source": "build_learning_plan", "target": "build_final_application_package" },
-    { "source": "write_candidate_memory_candidates", "target": "build_final_application_package" },
-    { "source": "build_final_application_package", "target": "output_final_application_package" }
+    {
+      "source": "input_candidate_profile",
+      "target": "prepare_candidate_memory_request"
+    },
+    {
+      "source": "input_resume",
+      "target": "prepare_candidate_memory_request"
+    },
+    {
+      "source": "input_project_experiences",
+      "target": "prepare_candidate_memory_request"
+    },
+    {
+      "source": "input_job_description",
+      "target": "prepare_candidate_memory_request"
+    },
+    {
+      "source": "input_target_city",
+      "target": "prepare_candidate_memory_request"
+    },
+    {
+      "source": "input_salary_expectation",
+      "target": "prepare_candidate_memory_request"
+    },
+    {
+      "source": "prepare_candidate_memory_request",
+      "target": "recall_candidate_memory"
+    },
+    {
+      "source": "input_job_description",
+      "target": "analyze_jd_requirements"
+    },
+    {
+      "source": "input_target_city",
+      "target": "analyze_jd_requirements"
+    },
+    {
+      "source": "input_salary_expectation",
+      "target": "analyze_jd_requirements"
+    },
+    {
+      "source": "analyze_jd_requirements",
+      "target": "map_experience_to_jd"
+    },
+    {
+      "source": "recall_candidate_memory",
+      "target": "map_experience_to_jd"
+    },
+    {
+      "source": "input_resume",
+      "target": "map_experience_to_jd"
+    },
+    {
+      "source": "input_project_experiences",
+      "target": "map_experience_to_jd"
+    },
+    {
+      "source": "map_experience_to_jd",
+      "target": "build_gap_analysis"
+    },
+    {
+      "source": "analyze_jd_requirements",
+      "target": "build_gap_analysis"
+    },
+    {
+      "source": "recall_candidate_memory",
+      "target": "build_gap_analysis"
+    },
+    {
+      "source": "build_gap_analysis",
+      "target": "rewrite_resume_bullets"
+    },
+    {
+      "source": "map_experience_to_jd",
+      "target": "rewrite_resume_bullets"
+    },
+    {
+      "source": "analyze_jd_requirements",
+      "target": "rewrite_resume_bullets"
+    },
+    {
+      "source": "build_gap_analysis",
+      "target": "build_project_story_library"
+    },
+    {
+      "source": "map_experience_to_jd",
+      "target": "build_project_story_library"
+    },
+    {
+      "source": "input_project_experiences",
+      "target": "build_project_story_library"
+    },
+    {
+      "source": "build_project_story_library",
+      "target": "predict_interview_questions"
+    },
+    {
+      "source": "build_gap_analysis",
+      "target": "predict_interview_questions"
+    },
+    {
+      "source": "map_experience_to_jd",
+      "target": "predict_interview_questions"
+    },
+    {
+      "source": "predict_interview_questions",
+      "target": "review_mock_interview"
+    },
+    {
+      "source": "build_project_story_library",
+      "target": "review_mock_interview"
+    },
+    {
+      "source": "input_interview_transcript",
+      "target": "review_mock_interview"
+    },
+    {
+      "source": "review_mock_interview",
+      "target": "build_learning_plan"
+    },
+    {
+      "source": "predict_interview_questions",
+      "target": "build_learning_plan"
+    },
+    {
+      "source": "build_gap_analysis",
+      "target": "build_learning_plan"
+    },
+    {
+      "source": "rewrite_resume_bullets",
+      "target": "build_final_application_package"
+    },
+    {
+      "source": "build_project_story_library",
+      "target": "build_final_application_package"
+    },
+    {
+      "source": "predict_interview_questions",
+      "target": "build_final_application_package"
+    },
+    {
+      "source": "review_mock_interview",
+      "target": "build_final_application_package"
+    },
+    {
+      "source": "build_learning_plan",
+      "target": "build_final_application_package"
+    },
+    {
+      "source": "build_final_application_package",
+      "target": "output_final_application_package"
+    },
+    {
+      "source": "map_experience_to_jd",
+      "target": "build_final_application_package"
+    }
   ],
   "metadata": {
     "category": "business",
@@ -857,7 +1221,13 @@
     "capabilityDiscoverableDefault": true,
     "gallery": {
       "headline": "把简历、项目经历和 JD 变成可审查的求职准备包。",
-      "targetUsers": ["求职者", "转岗候选人", "职业教练", "高校就业指导", "招聘顾问"],
+      "targetUsers": [
+        "求职者",
+        "转岗候选人",
+        "职业教练",
+        "高校就业指导",
+        "招聘顾问"
+      ],
       "demoPitch": "不是普通润色简历，而是把 JD 拆解、经历映射、项目故事、面试题和准备计划串成可复跑的图工作流。"
     },
     "mockMode": {
@@ -865,42 +1235,166 @@
       "description": "使用随包 mock 简历、项目经历和 JD，无需外部账号即可演示。"
     },
     "inputSchema": [
-      { "key": "candidate_profile", "label": "候选人画像", "type": "markdown", "required": true },
-      { "key": "resume", "label": "简历", "type": "markdown", "required": true },
-      { "key": "project_experiences", "label": "项目经历", "type": "markdown", "required": false },
-      { "key": "job_description", "label": "目标 JD", "type": "markdown", "required": true },
-      { "key": "target_city", "label": "目标城市", "type": "text", "required": false },
-      { "key": "salary_expectation", "label": "薪资期望", "type": "text", "required": false },
-      { "key": "interview_transcript", "label": "模拟面试记录", "type": "markdown", "required": false }
+      {
+        "key": "candidate_profile",
+        "label": "候选人画像",
+        "type": "markdown",
+        "required": true
+      },
+      {
+        "key": "resume",
+        "label": "简历",
+        "type": "markdown",
+        "required": true
+      },
+      {
+        "key": "project_experiences",
+        "label": "项目经历",
+        "type": "markdown",
+        "required": false
+      },
+      {
+        "key": "job_description",
+        "label": "目标 JD",
+        "type": "markdown",
+        "required": true
+      },
+      {
+        "key": "target_city",
+        "label": "目标城市",
+        "type": "text",
+        "required": false
+      },
+      {
+        "key": "salary_expectation",
+        "label": "薪资期望",
+        "type": "text",
+        "required": false
+      },
+      {
+        "key": "interview_transcript",
+        "label": "模拟面试记录",
+        "type": "markdown",
+        "required": false
+      }
     ],
-    "requiredSkills": ["memory_recall", "memory_candidate_writer"],
-    "requiredPermissions": ["memory_read", "memory_candidate_write"],
+    "requiredSkills": [
+      "buddy_session_recall"
+    ],
+    "requiredPermissions": [
+      "buddy_session_read"
+    ],
     "artifactContract": [
-      { "path": "jd_requirement_matrix.json", "state": "jd_requirements", "type": "json", "description": "JD 能力矩阵。" },
-      { "path": "matching_report.md", "state": "matching_report", "type": "markdown", "description": "岗位匹配报告。" },
-      { "path": "gap_analysis.md", "state": "gap_analysis", "type": "markdown", "description": "差距和风险分析。" },
-      { "path": "rewritten_resume.md", "state": "rewritten_resume", "type": "markdown", "description": "改写后的简历正文和 bullet。" },
-      { "path": "project_story_library.json", "state": "project_story_library", "type": "json", "description": "STAR/CAR 项目故事库。" },
-      { "path": "interview_questions.json", "state": "interview_questions", "type": "json", "description": "面试题预测和评分 rubric。" },
-      { "path": "mock_interview_feedback.md", "state": "mock_interview_feedback", "type": "markdown", "description": "模拟面试反馈或练习说明。" },
-      { "path": "learning_plan.md", "state": "learning_plan", "type": "markdown", "description": "阶段性准备计划。" },
-      { "path": "salary_strategy.md", "state": "salary_strategy", "type": "markdown", "description": "薪资和城市策略提示。" },
-      { "path": "final_application_package.md", "state": "final_application_package", "type": "markdown", "description": "最终求职准备包。" }
+      {
+        "path": "jd_requirement_matrix.json",
+        "state": "jd_requirements",
+        "type": "json",
+        "description": "JD 能力矩阵。"
+      },
+      {
+        "path": "matching_report.md",
+        "state": "matching_report",
+        "type": "markdown",
+        "description": "岗位匹配报告。"
+      },
+      {
+        "path": "gap_analysis.md",
+        "state": "gap_analysis",
+        "type": "markdown",
+        "description": "差距和风险分析。"
+      },
+      {
+        "path": "rewritten_resume.md",
+        "state": "rewritten_resume",
+        "type": "markdown",
+        "description": "改写后的简历正文和 bullet。"
+      },
+      {
+        "path": "project_story_library.json",
+        "state": "project_story_library",
+        "type": "json",
+        "description": "STAR/CAR 项目故事库。"
+      },
+      {
+        "path": "interview_questions.json",
+        "state": "interview_questions",
+        "type": "json",
+        "description": "面试题预测和评分 rubric。"
+      },
+      {
+        "path": "mock_interview_feedback.md",
+        "state": "mock_interview_feedback",
+        "type": "markdown",
+        "description": "模拟面试反馈或练习说明。"
+      },
+      {
+        "path": "learning_plan.md",
+        "state": "learning_plan",
+        "type": "markdown",
+        "description": "阶段性准备计划。"
+      },
+      {
+        "path": "salary_strategy.md",
+        "state": "salary_strategy",
+        "type": "markdown",
+        "description": "薪资和城市策略提示。"
+      },
+      {
+        "path": "final_application_package.md",
+        "state": "final_application_package",
+        "type": "markdown",
+        "description": "最终求职准备包。"
+      }
     ],
     "outputContract": [
-      { "key": "final_application_package", "label": "最终求职准备包", "role": "primary", "type": "markdown", "required": true, "passThrough": true },
-      { "key": "matching_report", "label": "岗位匹配报告", "role": "artifact", "type": "markdown", "required": true },
-      { "key": "rewritten_resume", "label": "改写简历", "role": "artifact", "type": "markdown", "required": true },
-      { "key": "project_story_library", "label": "项目故事库", "role": "artifact", "type": "json", "required": true },
-      { "key": "interview_questions", "label": "面试题预测", "role": "artifact", "type": "json", "required": true },
-      { "key": "learning_plan", "label": "阶段准备计划", "role": "artifact", "type": "markdown", "required": true },
-      { "key": "candidate_memories", "label": "候选人记忆候选", "role": "memory_candidates", "type": "json", "required": false }
+      {
+        "key": "final_application_package",
+        "label": "最终求职准备包",
+        "role": "primary",
+        "type": "markdown",
+        "required": true,
+        "passThrough": true
+      },
+      {
+        "key": "matching_report",
+        "label": "岗位匹配报告",
+        "role": "artifact",
+        "type": "markdown",
+        "required": true
+      },
+      {
+        "key": "rewritten_resume",
+        "label": "改写简历",
+        "role": "artifact",
+        "type": "markdown",
+        "required": true
+      },
+      {
+        "key": "project_story_library",
+        "label": "项目故事库",
+        "role": "artifact",
+        "type": "json",
+        "required": true
+      },
+      {
+        "key": "interview_questions",
+        "label": "面试题预测",
+        "role": "artifact",
+        "type": "json",
+        "required": true
+      },
+      {
+        "key": "learning_plan",
+        "label": "阶段准备计划",
+        "role": "artifact",
+        "type": "markdown",
+        "required": true
+      }
     ],
     "evalCases": "eval_cases.json",
     "safetyNotes": [
       "不能承诺录用、薪资结果、签证或劳动法结论。",
       "简历改写必须保留事实边界，不能编造项目、指标、学历、证书或工作经历。",
-      "长期记忆只写 candidate 状态候选，必须有证据和人工审核路径。",
       "涉及薪资、城市和职业判断时必须保留不确定项和人工确认提示。"
     ]
   }

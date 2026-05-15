@@ -183,8 +183,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                             "toograph_context_fanout",
                             "toograph_page_operator",
                             "local_workspace_executor",
-                            "memory_candidate_writer",
-                            "memory_recall",
+                            "buddy_session_recall",
                             "toograph_skill_package_reader",
                             "web_search",
                         ]
@@ -253,18 +252,13 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                         "/skill/official/buddy_visible_subgraph_result_adapter/skill.json"
                     )
                 )
-                self.assertEqual(catalog_items["memory_recall"]["sourceScope"], "official")
-                self.assertFalse(catalog_items["memory_recall"]["canManage"])
-                self.assertTrue(catalog_items["memory_recall"]["runtimeReady"])
-                self.assertTrue(catalog_items["memory_recall"]["runtimeRegistered"])
-                self.assertTrue(source_path["memory_recall"].endswith("/skill/official/memory_recall/skill.json"))
-                self.assertEqual(catalog_items["memory_candidate_writer"]["sourceScope"], "official")
-                self.assertFalse(catalog_items["memory_candidate_writer"]["canManage"])
-                self.assertTrue(catalog_items["memory_candidate_writer"]["runtimeReady"])
-                self.assertTrue(catalog_items["memory_candidate_writer"]["runtimeRegistered"])
+                self.assertEqual(catalog_items["buddy_session_recall"]["sourceScope"], "official")
+                self.assertFalse(catalog_items["buddy_session_recall"]["canManage"])
+                self.assertTrue(catalog_items["buddy_session_recall"]["runtimeReady"])
+                self.assertTrue(catalog_items["buddy_session_recall"]["runtimeRegistered"])
                 self.assertTrue(
-                    source_path["memory_candidate_writer"].endswith(
-                        "/skill/official/memory_candidate_writer/skill.json"
+                    source_path["buddy_session_recall"].endswith(
+                        "/skill/official/buddy_session_recall/skill.json"
                     )
                 )
                 self.assertEqual(catalog_items["toograph_skill_package_reader"]["sourceScope"], "official")
@@ -284,8 +278,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(settings_payload["schemaVersion"], "toograph.skill-settings/v1")
                 self.assertIn("web_search", settings_payload["entries"])
                 self.assertEqual(settings_payload["entries"]["web_search"], {"enabled": True})
-                self.assertEqual(settings_payload["entries"]["memory_recall"], {"enabled": True})
-                self.assertEqual(settings_payload["entries"]["memory_candidate_writer"], {"enabled": True})
+                self.assertEqual(settings_payload["entries"]["buddy_session_recall"], {"enabled": True})
                 self.assertEqual(settings_payload["entries"]["toograph_skill_package_reader"], {"enabled": True})
 
     def test_official_skill_visibility_can_be_disabled_in_local_settings(self) -> None:

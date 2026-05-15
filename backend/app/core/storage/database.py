@@ -118,54 +118,6 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_knowledge_chunk_embeddings_content_hash
             ON knowledge_chunk_embeddings (kb_id, content_hash);
 
-        CREATE TABLE IF NOT EXISTS memories (
-            id TEXT PRIMARY KEY,
-            scope TEXT NOT NULL DEFAULT 'user',
-            layer TEXT NOT NULL DEFAULT 'semantic',
-            type TEXT NOT NULL DEFAULT 'fact',
-            summary TEXT NOT NULL,
-            content TEXT NOT NULL DEFAULT '',
-            confidence REAL NOT NULL DEFAULT 1,
-            importance REAL NOT NULL DEFAULT 0.5,
-            evidence_json TEXT NOT NULL DEFAULT '[]',
-            artifact_refs_json TEXT NOT NULL DEFAULT '[]',
-            source_json TEXT NOT NULL DEFAULT '{}',
-            status TEXT NOT NULL DEFAULT 'active',
-            supersedes_json TEXT NOT NULL DEFAULT '[]',
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE TABLE IF NOT EXISTS memory_revisions (
-            revision_id TEXT PRIMARY KEY,
-            memory_id TEXT NOT NULL,
-            action TEXT NOT NULL,
-            previous_json TEXT NOT NULL DEFAULT '{}',
-            next_json TEXT NOT NULL DEFAULT '{}',
-            actor TEXT NOT NULL DEFAULT '',
-            reason TEXT NOT NULL DEFAULT '',
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE TABLE IF NOT EXISTS memory_events (
-            event_id TEXT PRIMARY KEY,
-            memory_id TEXT NOT NULL,
-            action TEXT NOT NULL,
-            actor TEXT NOT NULL DEFAULT '',
-            reason TEXT NOT NULL DEFAULT '',
-            payload_json TEXT NOT NULL DEFAULT '{}',
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_memories_scope_layer_type_status
-            ON memories (scope, layer, type, status);
-
-        CREATE INDEX IF NOT EXISTS idx_memory_revisions_memory_id
-            ON memory_revisions (memory_id, created_at);
-
-        CREATE INDEX IF NOT EXISTS idx_memory_events_memory_id
-            ON memory_events (memory_id, created_at);
-
         CREATE TABLE IF NOT EXISTS eval_suites (
             suite_id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
@@ -257,6 +209,7 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(connection, "knowledge_bases", "embedding_count", "INTEGER NOT NULL DEFAULT 0")
     _ensure_column(connection, "knowledge_bases", "embedding_updated_at", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(connection, "knowledge_chunks", "content_hash", "TEXT NOT NULL DEFAULT ''")
+    _drop_platform_memory_schema(connection)
     connection.execute(
         """
         CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_chunks_fts
@@ -272,21 +225,6 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         )
         """
     )
-    connection.execute(
-        """
-        CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts
-        USING fts5(
-            memory_id UNINDEXED,
-            scope UNINDEXED,
-            layer UNINDEXED,
-            type UNINDEXED,
-            status UNINDEXED,
-            summary,
-            content,
-            tokenize='porter unicode61 remove_diacritics 2'
-        )
-        """
-    )
     connection.commit()
 
 
@@ -294,3 +232,17 @@ def _ensure_column(connection: sqlite3.Connection, table: str, column: str, defi
     columns = {str(row["name"]) for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
     if column not in columns:
         connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+def _drop_platform_memory_schema(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        DROP TABLE IF EXISTS memories_fts;
+        DROP INDEX IF EXISTS idx_memories_scope_layer_type_status;
+        DROP INDEX IF EXISTS idx_memory_revisions_memory_id;
+        DROP INDEX IF EXISTS idx_memory_events_memory_id;
+        DROP TABLE IF EXISTS memory_events;
+        DROP TABLE IF EXISTS memory_revisions;
+        DROP TABLE IF EXISTS memories;
+        """
+    )

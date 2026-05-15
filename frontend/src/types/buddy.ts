@@ -12,16 +12,9 @@ export type BuddyPolicy = {
   communication_preferences: string[];
 };
 
-export type BuddyMemory = {
-  id: string;
-  type: string;
-  title: string;
+export type BuddyMemoryDocument = {
+  path: string;
   content: string;
-  source: Record<string, unknown>;
-  confidence: number;
-  enabled: boolean;
-  deleted: boolean;
-  created_at: string;
   updated_at: string;
 };
 
@@ -49,6 +42,10 @@ export type BuddyChatSession = {
   title: string;
   archived: boolean;
   deleted: boolean;
+  parent_session_id: string | null;
+  source: string;
+  ended_at: string | null;
+  end_reason: string | null;
   created_at: string;
   updated_at: string;
   message_count: number;

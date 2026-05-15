@@ -24,11 +24,6 @@
         "kind": "rule",
         "target": "final_application_package.md",
         "expectation": "必须包含不承诺录用、薪资不确定和人工确认提示。"
-      },
-      {
-        "kind": "memory",
-        "target": "candidate_memories",
-        "expectation": "候选人长期画像只能写入 candidate 状态，不能直接应用为 active。"
       }
     ]
   }
