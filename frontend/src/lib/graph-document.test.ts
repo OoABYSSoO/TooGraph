@@ -41,8 +41,8 @@ const webSearchSkill: SkillDefinition = {
     { key: "user_question", name: "User Question", valueType: "text", required: true, description: "Question to research." },
     { key: "search_context", name: "Search Context", valueType: "markdown", required: false, description: "Extra search context." },
   ],
-  inputSchema: [{ key: "query", name: "Query", valueType: "text", required: true, description: "" }],
-  outputSchema: [
+  llmOutputSchema: [{ key: "query", name: "Query", valueType: "text", required: true, description: "" }],
+  stateOutputSchema: [
     { key: "query", name: "Query", valueType: "text", required: false, description: "Search query." },
     { key: "source_urls", name: "Source URLs", valueType: "json", required: false, description: "URLs." },
     { key: "artifact_paths", name: "Artifact Paths", valueType: "file", required: false, description: "Files." },
@@ -76,12 +76,12 @@ const localWorkspaceExecutorSkill: SkillDefinition = {
   },
   permissions: ["file_read", "file_write", "subprocess"],
   runtime: { type: "python", entrypoint: "after_llm.py" },
-  inputSchema: [
+  llmOutputSchema: [
     { key: "path", name: "Path", valueType: "text", required: true, description: "" },
     { key: "operation", name: "Operation", valueType: "text", required: true, description: "" },
     { key: "content", name: "Content", valueType: "text", required: false, description: "" },
   ],
-  outputSchema: [
+  stateOutputSchema: [
     { key: "success", name: "Success", valueType: "boolean", required: false, description: "操作是否成功。" },
     { key: "result", name: "Result", valueType: "markdown", required: false, description: "成功输出或失败报错内容。" },
   ],

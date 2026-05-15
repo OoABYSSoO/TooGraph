@@ -26,7 +26,7 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
           description: "Searches the web.",
           llmInstruction: "Choose the query and run the bound web search skill.",
           schemaVersion: "toograph.skill/v1",
-          inputSchema: [
+          llmOutputSchema: [
             {
               key: "query",
               name: "Query",
@@ -35,7 +35,7 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
               description: "Web search query.",
             },
           ],
-          outputSchema: [
+          stateOutputSchema: [
             {
               key: "summary",
               name: "Summary",
@@ -80,7 +80,7 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
       description: "Searches the web.",
       llmInstruction: "Choose the query and run the bound web search skill.",
       schemaVersion: "toograph.skill/v1",
-      inputSchema: [
+      llmOutputSchema: [
         {
           key: "query",
           name: "Query",
@@ -89,7 +89,7 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
           description: "Web search query.",
         },
       ],
-      outputSchema: [
+      stateOutputSchema: [
         {
           key: "summary",
           name: "Summary",

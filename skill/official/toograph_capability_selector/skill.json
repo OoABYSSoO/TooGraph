@@ -18,7 +18,7 @@
       "description": "用户希望完成的原始需求 state，能力选择器据此挑选单个 Skill、Subgraph 或 none。"
     }
   ],
-  "inputSchema": [
+  "llmOutputSchema": [
     {
       "key": "requirement",
       "name": "Requirement",
@@ -55,7 +55,7 @@
       "description": "简短列出若干未选择的候选能力及原因，格式为数组，每项包含 kind、key、reason。"
     }
   ],
-  "outputSchema": [
+  "stateOutputSchema": [
     {
       "key": "capability",
       "name": "Capability",

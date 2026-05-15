@@ -5,7 +5,7 @@ description: Use when a TooGraph workflow needs to choose one enabled graph temp
 
 # TooGraph 能力选择器
 
-`before_llm.py` lists the local enabled graph templates and enabled Skills in the LLM-node skill-input planning prompt. The model chooses one item from that catalog and passes it as the `capability` input. `after_llm.py` validates that choice against the current local catalog and returns exactly one normalized capability object.
+`before_llm.py` lists the local enabled graph templates and enabled Skills in the LLM-node Skill LLM output planning prompt. The model chooses one item from that catalog and passes it as the `capability` input. `after_llm.py` validates that choice against the current local catalog and returns exactly one normalized capability object.
 
 State inputs:
 
@@ -15,7 +15,7 @@ Runtime context:
 
 - `origin`: optional capability-selection origin, such as `buddy`.
 
-LLM parameters:
+LLM output:
 
 - `requirement`: the requirement used for audit continuity.
 - `origin`: optional origin defaulted by the model from runtime context, or omitted to use `buddy`.

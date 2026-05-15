@@ -34,8 +34,8 @@ export type SkillDefinition = {
   permissions: string[];
   runtime: SkillRuntimeSpec;
   stateInputSchema?: SkillIoField[];
-  inputSchema: SkillIoField[];
-  outputSchema: SkillIoField[];
+  llmOutputSchema: SkillIoField[];
+  stateOutputSchema: SkillIoField[];
   llmNodeEligibility: string;
   llmNodeBlockers: string[];
   sourceScope: string;

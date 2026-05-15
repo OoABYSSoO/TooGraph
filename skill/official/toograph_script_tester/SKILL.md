@@ -15,7 +15,7 @@ State inputs:
 - `script_path`: optional readable local script path.
 - `script_source`: optional script source text when no path is available.
 
-LLM parameters:
+LLM output:
 
 - `files`: JSON array of `{ "path": "...", "content": "..." }`. Include the target script, generated tests, and any minimal helper/config files.
 - `command`: JSON command argument array, such as `["python", "-m", "pytest", "-q", "test_target.py"]` or `["node", "--test", "test.mjs"]`.

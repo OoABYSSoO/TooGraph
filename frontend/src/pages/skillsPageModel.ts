@@ -64,8 +64,8 @@ function buildSkillSearchText(skill: SkillDefinition): string {
     skill.status,
     ...skill.permissions,
     ...(skill.stateInputSchema ?? []).map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
-    ...skill.inputSchema.map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
-    ...skill.outputSchema.map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
+    ...skill.llmOutputSchema.map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
+    ...skill.stateOutputSchema.map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
   ]
     .join(" ")
     .toLowerCase();

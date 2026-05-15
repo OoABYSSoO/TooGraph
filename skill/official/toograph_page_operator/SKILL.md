@@ -24,7 +24,7 @@ Runtime context:
 - `page_path`: current application route.
 - `page_context`: optional page content summary produced by the app runtime. Partner-related content is filtered before the LLM sees the operation book.
 
-LLM parameters:
+LLM output:
 
 - `action`: semantic action. Current phase supports `click_nav`.
 - `target`: semantic target. Current phase supports `runs` and its aliases.

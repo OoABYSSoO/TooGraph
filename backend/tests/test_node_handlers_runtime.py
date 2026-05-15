@@ -371,7 +371,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "custom": SkillDefinition(
                     skillKey="custom",
                     name="Custom",
-                    outputSchema=[SkillIoField(key="answer", name="Answer", valueType="text")],
+                    stateOutputSchema=[SkillIoField(key="answer", name="Answer", valueType="text")],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
@@ -526,10 +526,10 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "web_search": SkillDefinition(
                     skillKey="web_search",
                     name="Web Search",
-                    inputSchema=[
+                    llmOutputSchema=[
                         SkillIoField(key="query", name="Query", valueType="text", required=True),
                     ],
-                    outputSchema=[SkillIoField(key="summary", name="Summary", valueType="markdown")],
+                    stateOutputSchema=[SkillIoField(key="summary", name="Summary", valueType="markdown")],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
@@ -594,11 +594,11 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "web_search": SkillDefinition(
                     skillKey="web_search",
                     name="Web Search",
-                    inputSchema=[
+                    llmOutputSchema=[
                         SkillIoField(key="query", name="Query", valueType="text", required=True),
                         SkillIoField(key="max_results", name="Max Results", valueType="text"),
                     ],
-                    outputSchema=[
+                    stateOutputSchema=[
                         SkillIoField(
                             key="summary",
                             name="Summary",
@@ -698,7 +698,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     skillKey="local_workspace_executor",
                     name="Local Workspace Executor",
                     permissions=["file_write", "subprocess"],
-                    inputSchema=[SkillIoField(key="path", name="Path", valueType="text", required=True)],
+                    llmOutputSchema=[SkillIoField(key="path", name="Path", valueType="text", required=True)],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
@@ -1121,8 +1121,8 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "web_search": SkillDefinition(
                     skillKey="web_search",
                     name="Web Search",
-                    inputSchema=[SkillIoField(key="query", name="Query", valueType="text", required=True)],
-                    outputSchema=[
+                    llmOutputSchema=[SkillIoField(key="query", name="Query", valueType="text", required=True)],
+                    stateOutputSchema=[
                         SkillIoField(
                             key="source_urls",
                             name="Source URLs",
@@ -1234,10 +1234,10 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "web_search": SkillDefinition(
                     skillKey="web_search",
                     name="Web Search",
-                    inputSchema=[
+                    llmOutputSchema=[
                         SkillIoField(key="query", name="Query", valueType="text", required=True),
                     ],
-                    outputSchema=[SkillIoField(key="error", name="Error", valueType="text")],
+                    stateOutputSchema=[SkillIoField(key="error", name="Error", valueType="text")],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )

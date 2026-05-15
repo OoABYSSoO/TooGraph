@@ -42,11 +42,11 @@ class TooGraphSkillBuilderSkillTests(unittest.TestCase):
         self.assertEqual(definition.llm_node_blockers, [])
         self.assertEqual(definition.permissions, ["file_read"])
         self.assertEqual(
-            [field.key for field in definition.input_schema],
+            [field.key for field in definition.llm_output_schema],
             ["skill_key", "skill_json", "skill_md", "before_llm_py", "after_llm_py", "requirements_txt"],
         )
         self.assertEqual(
-            [field.key for field in definition.output_schema],
+            [field.key for field in definition.state_output_schema],
             ["skill_key", "skill_json", "skill_md", "before_llm_py", "after_llm_py", "requirements_txt"],
         )
 
@@ -69,7 +69,7 @@ class TooGraphSkillBuilderSkillTests(unittest.TestCase):
             "name": "Tone Rewriter",
             "description": "当用户需要改写文本语气时选择此技能。",
             "llmInstruction": "Rewrite the text.",
-            "outputSchema": [{"key": "rewritten_text", "name": "Rewritten Text", "valueType": "markdown"}],
+            "stateOutputSchema": [{"key": "rewritten_text", "name": "Rewritten Text", "valueType": "markdown"}],
         }
         payload = _run_skill_script(
             BUILDER_AFTER_LLM_PATH,
@@ -129,7 +129,7 @@ class TooGraphSkillBuilderSkillTests(unittest.TestCase):
                     "targets": ["buddy"],
                     "executionTargets": ["default"],
                     "runPolicies": {},
-                    "outputSchema": [],
+                    "stateOutputSchema": [],
                 },
                 "skill_md": "# Safe Generated Skill",
                 "before_llm_py": "",
@@ -145,7 +145,7 @@ class TooGraphSkillBuilderSkillTests(unittest.TestCase):
                 "skillKey": "safe_generated_skill",
                 "name": "Safe Generated Skill",
                 "description": "Generate safe output.",
-                "outputSchema": [],
+                "stateOutputSchema": [],
             },
         )
 

@@ -30,7 +30,7 @@
       "description": "可选脚本文本内容；当没有本地路径或希望测试临时代码时使用。"
     }
   ],
-  "inputSchema": [
+  "llmOutputSchema": [
     {
       "key": "files",
       "name": "Files",
@@ -46,7 +46,7 @@
       "description": "在临时测试目录中运行的命令参数数组，例如 [\"python\", \"-m\", \"pytest\", \"-q\", \"test_target.py\"]。"
     }
   ],
-  "outputSchema": [
+  "stateOutputSchema": [
     {
       "key": "success",
       "name": "Success",

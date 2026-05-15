@@ -14,7 +14,7 @@ State inputs:
 - `autonomous_review`: Buddy autonomous review result or writeback plan used by the LLM to decide safe write commands.
 - `source_run_id`: optional source run ID for audit and revision linkage.
 
-LLM parameters:
+LLM output:
 
 - `commands`: safe Buddy Home command array generated from the review.
 - `run_id`: optional source run ID copied into command records.

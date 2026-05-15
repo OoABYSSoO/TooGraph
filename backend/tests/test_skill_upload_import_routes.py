@@ -29,10 +29,10 @@ def _native_skill_manifest(
         "skillKey": skill_key,
         "name": "Video Understanding" if skill_key == "video_understanding" else skill_key.replace("_", " ").title(),
         "description": "Use frame sampling rules to understand a video with image-only model capability.",
-        "llmInstruction": "Prepare the skill input from bound graph state and run the skill.",
+        "llmInstruction": "Prepare the structured Skill LLM output from bound graph state and run the skill.",
         "version": "0.1.0",
         "permissions": ["model_vision", "file_read"],
-        "inputSchema": [
+        "llmOutputSchema": [
             {
                 "key": "video",
                 "name": "Video",
@@ -41,7 +41,7 @@ def _native_skill_manifest(
                 "description": "Source video file.",
             }
         ],
-        "outputSchema": [
+        "stateOutputSchema": [
             {
                 "key": "summary",
                 "name": "Summary",
@@ -66,13 +66,13 @@ name: Uploaded Skill
 description: Imported from an uploaded archive.
 toograph:
   skill_key: {skill_key}
-  input_schema:
+  llm_output_schema:
     - key: text
       name: Text
       valueType: text
       required: true
       description: Source text.
-  output_schema:
+  state_output_schema:
     - key: result
       name: Result
       valueType: text
@@ -179,6 +179,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                             "toograph_script_tester",
                             "toograph_skill_builder",
                             "toograph_capability_selector",
+                            "toograph_page_operator",
                             "local_workspace_executor",
                             "web_search",
                         ]

@@ -45,11 +45,11 @@ class TooGraphScriptTesterSkillTests(unittest.TestCase):
         self.assertEqual(definition.permissions, ["file_write", "subprocess"])
         self.assertFalse(definition.capability_policy.default.requires_approval)
         self.assertEqual(
-            [field.key for field in definition.input_schema],
+            [field.key for field in definition.llm_output_schema],
             ["files", "command"],
         )
         self.assertEqual(
-            [field.key for field in definition.output_schema],
+            [field.key for field in definition.state_output_schema],
             ["success", "result"],
         )
         requirements = (SCRIPT_TESTER_SKILL_DIR / "requirements.txt").read_text(encoding="utf-8")

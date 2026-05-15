@@ -24,10 +24,10 @@ def _ready_manifest(skill_key: str) -> dict[str, object]:
         "skillKey": skill_key,
         "name": skill_key.replace("_", " ").title(),
         "llmInstruction": f"Use {skill_key} only when it is explicitly bound to the LLM node.",
-        "inputSchema": [
+        "llmOutputSchema": [
             {"key": "text", "name": "Text", "valueType": "text", "required": True}
         ],
-        "outputSchema": [
+        "stateOutputSchema": [
             {"key": "result", "name": "Result", "valueType": "text"}
         ],
         "runtime": {"type": "python", "entrypoint": "run.py"},
@@ -93,10 +93,10 @@ class SkillManifestContractTests(unittest.TestCase):
             skill_dir.mkdir()
             payload = _ready_manifest("normalize_storyboard_shots")
             payload["timeoutSeconds"] = 91
-            payload["inputSchema"] = [
+            payload["llmOutputSchema"] = [
                 {"key": "shots", "name": "Shots", "valueType": "json", "required": True}
             ]
-            payload["outputSchema"] = [
+            payload["stateOutputSchema"] = [
                 {"key": "normalized_shots", "name": "Normalized Shots", "valueType": "json"}
             ]
             manifest = _write_manifest(skill_dir, payload)
@@ -127,7 +127,7 @@ class SkillManifestContractTests(unittest.TestCase):
                     "description": "Current page operation book prepared for the LLM.",
                 }
             ]
-            payload["inputSchema"] = [
+            payload["llmOutputSchema"] = [
                 {
                     "key": "action",
                     "name": "Action",
@@ -143,9 +143,11 @@ class SkillManifestContractTests(unittest.TestCase):
 
         serialized = definition.model_dump(by_alias=True)
         self.assertEqual([field.key for field in definition.state_input_schema], ["page_context"])
-        self.assertEqual([field.key for field in definition.input_schema], ["action"])
+        self.assertEqual([field.key for field in definition.llm_output_schema], ["action"])
         self.assertEqual(serialized["stateInputSchema"][0]["key"], "page_context")
-        self.assertEqual(serialized["inputSchema"][0]["key"], "action")
+        self.assertEqual(serialized["llmOutputSchema"][0]["key"], "action")
+        self.assertNotIn("inputSchema", serialized)
+        self.assertNotIn("outputSchema", serialized)
 
     def test_static_health_fields_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -201,7 +203,7 @@ class SkillManifestContractTests(unittest.TestCase):
     def test_legacy_skill_protocol_fields_are_rejected(self) -> None:
         legacy_fields = {
             "runPolicies": "skill/settings.json",
-            "supportedValueTypes": "outputSchema",
+            "supportedValueTypes": "stateOutputSchema",
             "sideEffects": "permissions",
             "kind": "no longer supported",
             "mode": "no longer supported",
@@ -237,7 +239,7 @@ class SkillManifestContractTests(unittest.TestCase):
             skill_dir = Path(temp_dir) / "legacy_io_label"
             skill_dir.mkdir()
             payload = _ready_manifest("legacy_io_label")
-            payload["inputSchema"] = [
+            payload["llmOutputSchema"] = [
                 {"key": "text", "label": "Text", "valueType": "text", "required": True}
             ]
             manifest = _write_manifest(skill_dir, payload)
@@ -280,10 +282,30 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertEqual(definition.runtime.entrypoint, "")
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
         self.assertEqual([field.key for field in definition.state_input_schema], ["user_question", "search_context"])
-        self.assertEqual([field.key for field in definition.input_schema], ["query"])
-        self.assertEqual([field.key for field in definition.output_schema], ["query", "source_urls", "artifact_paths", "errors"])
+        self.assertEqual([field.key for field in definition.llm_output_schema], ["query"])
+        self.assertEqual([field.key for field in definition.state_output_schema], ["query", "source_urls", "artifact_paths", "errors"])
         self.assertIn("network", definition.permissions)
         self.assertIn("browser_automation", definition.permissions)
+
+    def test_legacy_llm_and_state_output_schema_names_are_rejected(self) -> None:
+        legacy_fields = {
+            "inputSchema": "llmOutputSchema",
+            "input_schema": "llm_output_schema",
+            "outputSchema": "stateOutputSchema",
+            "output_schema": "state_output_schema",
+        }
+        for legacy_field, replacement in legacy_fields.items():
+            with self.subTest(legacy_field=legacy_field):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    skill_dir = Path(temp_dir) / f"legacy_{legacy_field}"
+                    skill_dir.mkdir()
+                    payload = _ready_manifest(f"legacy_{legacy_field}")
+                    payload[legacy_field] = [{"key": "legacy", "name": "Legacy", "valueType": "text"}]
+                    manifest = _write_manifest(skill_dir, payload)
+                    (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
+
+                    with self.assertRaisesRegex(ValueError, f"{legacy_field}.*{replacement}"):
+                        _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ State inputs:
 - `target_path`: optional repository-relative path for the requested operation.
 - `workspace_context`: optional extra constraints, snippets, or desired result notes.
 
-The LLM node generates only these LLM parameters:
+The LLM node generates only this structured LLM output:
 
 - `path`: repository-relative file path.
 - `operation`: `read`, `list`, `search`, `write`, or `execute`.

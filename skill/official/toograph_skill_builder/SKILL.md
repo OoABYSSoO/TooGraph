@@ -16,7 +16,7 @@ State inputs:
 - `confirmed_skill_requirement`: confirmed requirement, boundaries, examples, and acceptance criteria for the target Skill.
 - `builder_context`: optional capability gap, graph-flow context, or user constraints.
 
-LLM parameters:
+LLM output:
 
 - `skill_key`: stable machine identifier for the generated Skill, used later as the user Skill directory name.
 - `skill_json`: `skill.json` as a JSON object using `toograph.skill/v1`.
@@ -30,7 +30,7 @@ State outputs:
 
 Rules:
 - `skill_key` must match `skill_json.skillKey`.
-- The generated `skill_json` must distinguish `stateInputSchema` for graph state inputs, `inputSchema` for LLM-generated call parameters, and `outputSchema` for downstream state outputs.
+- The generated `skill_json` must distinguish `stateInputSchema` for graph state inputs, `llmOutputSchema` for structured LLM output, and `stateOutputSchema` for downstream state outputs.
 - The generated Skill must keep TooGraph state binding in the runtime, not inside skill scripts.
 - The generated Skill must declare permissions in `skill.json` when it needs network, file access, browser automation, secret access, or subprocess execution.
 - The generated `skill_json` must not include local usage settings. Skill visibility is controlled only by `skill/settings.json` with an `enabled` flag, which the app generates outside the Skill package.

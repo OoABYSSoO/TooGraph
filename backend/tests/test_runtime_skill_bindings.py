@@ -263,7 +263,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
         definition = SkillDefinition(
             skillKey="web_search",
             name="Web Search",
-            outputSchema=[
+            stateOutputSchema=[
                 SkillIoField(key="source_urls", name="Source URLs", valueType="json"),
                 SkillIoField(key="artifact_paths", name="Artifact Paths", valueType="file"),
             ],

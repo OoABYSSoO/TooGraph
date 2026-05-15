@@ -41,13 +41,13 @@ def resolve_agent_skill_output_binding(
     state_schema: dict[str, NodeSystemStateDefinition],
     skill_definition: SkillDefinition | None,
 ) -> NodeSystemAgentSkillBinding:
-    if skill_definition is None or not skill_definition.output_schema:
+    if skill_definition is None or not skill_definition.state_output_schema:
         return binding
 
     output_mapping = dict(binding.output_mapping)
     used_state_keys = {state_key for state_key in output_mapping.values() if state_key}
     writable_state_keys = [write.state for write in node.writes]
-    for field in skill_definition.output_schema:
+    for field in skill_definition.state_output_schema:
         if output_mapping.get(field.key):
             continue
         state_key = _infer_skill_output_state_key(
@@ -183,7 +183,7 @@ def build_skill_output_mapping_details(
 ) -> list[dict[str, str]]:
     output_fields = {
         field.key: field
-        for field in (skill_definition.output_schema if skill_definition is not None else [])
+        for field in (skill_definition.state_output_schema if skill_definition is not None else [])
     }
     details: list[dict[str, str]] = []
     for output_key, state_key in binding.output_mapping.items():

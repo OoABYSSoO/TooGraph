@@ -15,16 +15,16 @@ Skill 是 TooGraph 图运行中的显式能力单元。它不是一个隐藏 Age
 图 state 输入（由 stateInputSchema 描述，由节点 reads 绑定）
 运行时上下文 -> 可选 before_llm.py 生成只读技能上下文
 -> LLM 消费 state 输入、before_llm 上下文和有效 llmInstruction
--> LLM 只生成 inputSchema 描述的结构化技能参数
--> 可选 after_llm.py 消费这些参数，执行、校验或规范化
--> TooGraph runtime 根据 outputSchema 和 outputMapping 写入下游 state
+-> LLM 只生成 llmOutputSchema 描述的结构化 LLM 输出
+-> 可选 after_llm.py 消费这些结构化输出，执行、校验或规范化
+-> TooGraph runtime 根据 stateOutputSchema 和 outputMapping 写入下游 state
 ```
 
 因此：
 
 - `stateInputSchema` 描述 LLM 节点为了使用该 Skill 希望从图里读取的 state。它是“图输入契约”，不是 `before_llm.py` 的输入契约，也不是 LLM 要编造的 JSON 参数。
-- `inputSchema` 描述 LLM 要生成并传给 `after_llm.py` 的调用参数。它是“LLM 参数契约”。
-- `outputSchema` 描述 Skill 结果中可以被 runtime 映射成下游 state 的字段。它是“图输出契约”。
+- `llmOutputSchema` 描述 LLM 要生成并传给 `after_llm.py` 的本轮结构化输出，随后会作为 `after_llm.py` 的输入。它是“LLM 输出契约”。
+- `stateOutputSchema` 描述 Skill 结果中可以被 runtime 映射成下游 state 的字段。它是“图输出契约”。
 - `before_llm.py` 只做确定性、可审计、只读的运行时上下文整理。当前时间、页面操作书、可点击目标清单、运行环境摘要、文件预读摘要、候选能力列表都属于这里。
 - `after_llm.py` 才负责把 LLM 的单条语义命令变成真实受控操作，例如虚拟鼠标点击、联网搜索、文件写入或脚本测试。
 - Skill 脚本只产出 JSON 结果，不直接写图 state。
@@ -94,7 +94,7 @@ Python Skill 的依赖规则：
   "skillKey": "example_skill",
   "name": "示例技能",
   "description": "当用户需要执行某类明确能力时选择此技能。",
-  "llmInstruction": "你已绑定示例技能。根据当前输入生成符合 inputSchema 的结构化参数；不要总结技能结果。",
+  "llmInstruction": "你已绑定示例技能。根据当前输入生成符合 llmOutputSchema 的结构化 LLM 输出；不要总结技能结果。",
   "version": "1.0.0",
   "timeoutSeconds": 30,
   "permissions": [],
@@ -107,7 +107,7 @@ Python Skill 的依赖规则：
       "description": "运行此 Skill 前需要从图中读取的 state 内容。"
     }
   ],
-  "inputSchema": [
+  "llmOutputSchema": [
     {
       "key": "operation",
       "name": "Operation",
@@ -116,7 +116,7 @@ Python Skill 的依赖规则：
       "description": "LLM 根据 state 和 before_llm 上下文生成的结构化调用参数。"
     }
   ],
-  "outputSchema": [
+  "stateOutputSchema": [
     {
       "key": "result",
       "name": "Result",
@@ -133,15 +133,15 @@ Python Skill 的依赖规则：
 - `skillKey`：稳定机器标识，也用于目录名。只能使用安全的相对标识，不要包含 `/`、`\`、`:`。
 - `name`：用户可见名称。
 - `description`：什么时候应该选择这个技能。能力选择器会把它作为适用场景说明。
-- `llmInstruction`：当 LLM 节点已经绑定该 Skill 后，如何生成技能参数。
+- `llmInstruction`：当 LLM 节点已经绑定该 Skill 后，如何生成结构化 LLM 输出。
 - `version`：Skill 包版本。
 - `timeoutSeconds`：生命周期脚本执行超时时间。
 - `permissions`：声明网络、文件、子进程、浏览器自动化等能力需求。这是 Skill 的客观能力边界，应该留在包定义中。
 - `stateInputSchema`：LLM 节点使用该 Skill 时希望从图 state 中读取的输入字段。它用于 UI 说明、后续自动绑定和审计理解；不要把只来自运行时的页面路径、当前 DOM 摘要、当前日期、系统环境等内容放进这里。
-- `inputSchema`：LLM 需要生成并传给 Skill 的结构化调用参数，也就是 `after_llm.py` 的主要输入。
-- `outputSchema`：Skill 最终返回并由 runtime 绑定到下游 state 的字段。
+- `llmOutputSchema`：LLM 本轮需要生成的结构化输出，也就是 `after_llm.py` 的主要输入。
+- `stateOutputSchema`：Skill 最终返回并由 runtime 绑定到下游 state 的字段。
 
-不要把同一个概念混在一个 schema 里。用户问题、上游文件路径、脚本原文、约束说明等“由图流程产生并需要 LLM 阅读的东西”应进入 `stateInputSchema`；当前页面路径、页面可操作目标、当前日期、启用能力清单、系统命令可用性、运行时预读文件摘要等“当次运行时可重新获取的环境信息”应由 `before_llm.py` 从运行时上下文补充；搜索词、点击目标、文件写入内容、命令数组等“需要 LLM 为本次调用决定的东西”应进入 `inputSchema`；下游节点需要继续读取的结果进入 `outputSchema`。
+不要把同一个概念混在一个 schema 里。用户问题、上游文件路径、脚本原文、约束说明等“由图流程产生并需要 LLM 阅读的东西”应进入 `stateInputSchema`；当前页面路径、页面可操作目标、当前日期、启用能力清单、系统命令可用性、运行时预读文件摘要等“当次运行时可重新获取的环境信息”应由 `before_llm.py` 从运行时上下文补充；搜索词、点击目标、文件写入内容、命令数组等“需要 LLM 在本轮输出中决定的东西”应进入 `llmOutputSchema`；下游节点需要继续读取的结果进入 `stateOutputSchema`。
 
 ## `skill/settings.json`
 
@@ -178,8 +178,8 @@ Python Skill 的依赖规则：
 
 - 这个 Skill 适合什么任务。
 - State 输入字段含义，也就是 `stateInputSchema`。
-- LLM 参数字段含义，也就是 `inputSchema`。
-- State 输出字段含义，也就是 `outputSchema`。
+- LLM 输出字段含义，也就是 `llmOutputSchema`。
+- State 输出字段含义，也就是 `stateOutputSchema`。
 - 运行脚本需要的依赖文件，例如 `requirements.txt`。
 - 是否会访问网络、读写文件、执行脚本或产生持久 artifact。
 - 使用限制和失败情况。
@@ -219,7 +219,7 @@ Python Skill 的依赖规则：
 }
 ```
 
-`before_llm.py` 不接收图 state，也不应依赖 `stateInputSchema`。图 state 会由 TooGraph runtime 直接放进技能入参规划提示词，供 LLM 阅读。`before_llm.py` 只应消费 `runtime_context` 中由运行时显式提供的只读信息，例如当前页面快照、当前日期、启用能力清单、系统环境或预读文件摘要。脚本必须只使用自己需要且允许的字段，不要把无关运行时信息原样塞进上下文。
+`before_llm.py` 不接收图 state，也不应依赖 `stateInputSchema`。图 state 会由 TooGraph runtime 直接放进技能 LLM 输出规划提示词，供 LLM 阅读。`before_llm.py` 只应消费 `runtime_context` 中由运行时显式提供的只读信息，例如当前页面快照、当前日期、启用能力清单、系统环境或预读文件摘要。脚本必须只使用自己需要且允许的字段，不要把无关运行时信息原样塞进上下文。
 
 输出必须是 JSON 对象。推荐返回：
 
@@ -229,11 +229,11 @@ Python Skill 的依赖规则：
 }
 ```
 
-TooGraph 会把 `context` 注入技能入参规划提示词中的 `Skill Pre-LLM Context` 区域。这个上下文应短而准，避免塞入大段日志、完整文件树或无关数据。
+TooGraph 会把 `context` 注入技能 LLM 输出规划提示词中的 `Skill Pre-LLM Context` 区域。这个上下文应短而准，避免塞入大段日志、完整文件树或无关数据。
 
 ## `after_llm.py`
 
-`after_llm.py` 是 LLM 生成结构化技能参数后的可选执行或后处理脚本。
+`after_llm.py` 是 LLM 生成结构化 LLM 输出后的可选执行或后处理脚本。
 
 适合做：
 
@@ -242,7 +242,7 @@ TooGraph 会把 `context` 注入技能入参规划提示词中的 `Skill Pre-LLM
 - 把 LLM 选择的页面语义目标映射成虚拟鼠标动作和下一页路径。
 - 下载资源并返回 artifact 路径。
 - 调用受控本地脚本。
-- 把 LLM 输出规范化为 `outputSchema`。
+- 把 LLM 输出规范化为 `stateOutputSchema`。
 
 不适合做：
 
@@ -251,7 +251,7 @@ TooGraph 会把 `context` 注入技能入参规划提示词中的 `Skill Pre-LLM
 - 私下进行多轮模型调用。
 - 绕过权限、启用状态、审计记录或白名单。
 
-输入来自 stdin，是 LLM 生成的结构化技能参数，也就是 `inputSchema`。输出必须是 JSON 对象，字段应至少覆盖 `outputSchema` 中下游需要的结果。脚本也可以返回 `activity_events`、`status`、`error_type` 等审计或运行时辅助字段，但这些字段只有在声明进 `outputSchema` 或被运行时专门消费时，才会成为普通下游 state。
+输入来自 stdin，是 LLM 生成的结构化 LLM 输出，也就是 `llmOutputSchema`。输出必须是 JSON 对象，字段应至少覆盖 `stateOutputSchema` 中下游需要的结果。脚本也可以返回 `activity_events`、`status`、`error_type` 等审计或运行时辅助字段，但这些字段只有在声明进 `stateOutputSchema` 或被运行时专门消费时，才会成为普通下游 state。
 
 最小结构：
 
@@ -312,7 +312,7 @@ if __name__ == "__main__":
 
 ## 输出设计原则
 
-`outputSchema` 只放下游节点真正需要读取的内容。
+`stateOutputSchema` 只放下游节点真正需要读取的内容。
 
 应该输出：
 
@@ -367,7 +367,7 @@ Skill 不负责决定输出写入哪个 state。
 
 运行时上下文
 -> before_llm.py 整理为短上下文
--> LLM 结合图 state 和运行时上下文生成 inputSchema 参数
+-> LLM 结合图 state 和运行时上下文生成 llmOutputSchema 结构化输出
 ```
 
 `stateInputSchema` 是自动绑定和人类审计的依据。后续 LLM 节点选择某个 Skill 时，可以根据它自动添加必要输入 state；用户仍可以额外添加输入 state，但不应删除 Skill 绑定所需的 state。
@@ -398,10 +398,10 @@ skill_result
 
 - `skillKey` 是否稳定、唯一、适合做目录名。
 - `description` 是否清楚说明什么时候应该选择它。
-- `llmInstruction` 是否只说明如何生成技能参数，而不是让同一节点总结结果。
+- `llmInstruction` 是否只说明如何生成结构化 LLM 输出，而不是让同一节点总结结果。
 - `stateInputSchema` 是否只描述真正需要从图 state 读取的输入。
-- `inputSchema` 是否只描述 LLM 需要生成并交给 `after_llm.py` 的结构化参数。
-- `outputSchema` 是否只包含下游真正需要变成 state 的字段。
+- `llmOutputSchema` 是否只描述 LLM 需要生成并交给 `after_llm.py` 的结构化输出。
+- `stateOutputSchema` 是否只包含下游真正需要变成 state 的字段。
 - `permissions` 是否覆盖所有外部能力。
 - 是否真的需要 `before_llm.py`。
 - 是否真的需要 `after_llm.py`。

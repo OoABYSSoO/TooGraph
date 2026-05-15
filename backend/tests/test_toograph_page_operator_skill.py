@@ -45,11 +45,11 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
             ["user_goal"],
         )
         self.assertEqual(
-            [field.key for field in definition.input_schema],
+            [field.key for field in definition.llm_output_schema],
             ["action", "target", "cursor_lifecycle"],
         )
         self.assertEqual(
-            [field.key for field in definition.output_schema],
+            [field.key for field in definition.state_output_schema],
             ["ok", "next_page_path", "cursor_session_id", "journal", "error"],
         )
 

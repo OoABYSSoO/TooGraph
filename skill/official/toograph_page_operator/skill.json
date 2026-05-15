@@ -18,7 +18,7 @@
       "description": "用户希望完成的页面操作目标。"
     }
   ],
-  "inputSchema": [
+  "llmOutputSchema": [
     {
       "key": "action",
       "name": "Action",
@@ -41,7 +41,7 @@
       "description": "虚拟鼠标生命周期，keep、return_after_step 或 return_at_end。"
     }
   ],
-  "outputSchema": [
+  "stateOutputSchema": [
     {
       "key": "ok",
       "name": "OK",

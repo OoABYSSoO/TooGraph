@@ -88,11 +88,11 @@ def _write_skill(
             "skillKey": skill_key,
             "name": name,
             "description": description,
-            "llmInstruction": "Generate skill inputs from the current graph state.",
+            "llmInstruction": "Generate structured Skill LLM output from the current graph state.",
             "version": "1.0.0",
             "permissions": permissions if permissions is not None else (["network"] if "search" in description.lower() else []),
-            "inputSchema": [{"key": "query", "name": "Query", "valueType": "text", "required": True}],
-            "outputSchema": [{"key": "result", "name": "Result", "valueType": "json"}],
+            "llmOutputSchema": [{"key": "query", "name": "Query", "valueType": "text", "required": True}],
+            "stateOutputSchema": [{"key": "result", "name": "Result", "valueType": "json"}],
     }
     if internal:
         payload["metadata"] = {"internal": True}
@@ -142,15 +142,15 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
     def test_manifest_declares_capability_and_found_outputs(self) -> None:
         manifest = json.loads((SELECTOR_SKILL_DIR / "skill.json").read_text(encoding="utf-8"))
 
-        input_keys = [field["key"] for field in manifest["inputSchema"]]
-        capability_inputs = [field for field in manifest["inputSchema"] if field["key"] == "capability"]
+        input_keys = [field["key"] for field in manifest["llmOutputSchema"]]
+        capability_inputs = [field for field in manifest["llmOutputSchema"] if field["key"] == "capability"]
         self.assertNotIn("runtime", manifest)
         self.assertNotIn("capabilityPolicy", manifest)
         self.assertEqual(manifest["timeoutSeconds"], 30)
         self.assertIn("selection_reason", input_keys)
         self.assertIn("rejected_candidates", input_keys)
         self.assertEqual(capability_inputs[0]["valueType"], "capability")
-        self.assertEqual([field["key"] for field in manifest["outputSchema"]], ["capability", "found", "audit"])
+        self.assertEqual([field["key"] for field in manifest["stateOutputSchema"]], ["capability", "found", "audit"])
 
     def test_before_llm_lists_available_templates_and_skills_for_llm_choice(self) -> None:
         selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "toograph_capability_selector_before_test")

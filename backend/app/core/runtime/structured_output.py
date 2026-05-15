@@ -40,7 +40,7 @@ def build_agent_state_output_schema(
     return _object_schema(properties, required=output_keys, additional_properties=False)
 
 
-def build_skill_input_output_schema(
+def build_skill_llm_output_schema(
     bindings: list[Any],
     skill_definitions: dict[str, SkillDefinition],
 ) -> dict[str, Any]:
@@ -52,7 +52,7 @@ def build_skill_input_output_schema(
         definition = skill_definitions.get(skill_key)
         field_properties: dict[str, Any] = {}
         required_fields: list[str] = []
-        for field in getattr(definition, "input_schema", []) or []:
+        for field in getattr(definition, "llm_output_schema", []) or []:
             field_schema = schema_for_skill_io_field(field)
             field_properties[field.key] = field_schema
             if field.required:

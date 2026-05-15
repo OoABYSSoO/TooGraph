@@ -819,7 +819,7 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
   if (attachedSkillKey) {
     const definition = skillDefinitionMap.get(attachedSkillKey);
     if (definition) {
-      const activeOutputKeys = new Set(definition.outputSchema.map((field) => field.key));
+      const activeOutputKeys = new Set(definition.stateOutputSchema.map((field) => field.key));
       const staleManagedStateKeys = collectStaleManagedSkillOutputStateKeys(
         document,
         nodeId,
@@ -848,14 +848,14 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
     node.writes = node.writes.filter((binding) => isManagedSkillOutputStateForNode(document, nodeId, binding.state, attachedSkillKey));
 
     const existingBinding = currentBindingBySkill.get(attachedSkillKey);
-    if (!definition?.outputSchema.length) {
+    if (!definition?.stateOutputSchema.length) {
       if (existingBinding && Object.keys(existingBinding.outputMapping ?? {}).length > 0) {
         nextSkillBindings.push(existingBinding);
         processedSkillKeys.add(attachedSkillKey);
       }
     } else {
       const outputMapping = { ...(existingBinding?.outputMapping ?? {}) };
-      for (const field of definition.outputSchema) {
+      for (const field of definition.stateOutputSchema) {
         const mappedState = outputMapping[field.key];
         if (mappedState && document.state_schema[mappedState]) {
           syncManagedSkillOutputStateDefinition(document, mappedState, definition, field);

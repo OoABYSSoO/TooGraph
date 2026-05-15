@@ -26,7 +26,7 @@
       "description": "触发写回的源运行 ID state，用于审计和 revision 关联。"
     }
   ],
-  "inputSchema": [
+  "llmOutputSchema": [
     {
       "key": "commands",
       "name": "Commands",
@@ -42,7 +42,7 @@
       "description": "触发自主复盘的源运行 ID，用于写入 command 记录。"
     }
   ],
-  "outputSchema": [
+  "stateOutputSchema": [
     {
       "key": "success",
       "name": "Success",

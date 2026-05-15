@@ -23,7 +23,7 @@
       "description": "可选补充上下文，例如已知条件、地区、时间范围或必须核查的来源。"
     }
   ],
-  "inputSchema": [
+  "llmOutputSchema": [
     {
       "key": "query",
       "name": "Query",
@@ -32,7 +32,7 @@
       "description": "Search query or question to look up on the public web."
     }
   ],
-  "outputSchema": [
+  "stateOutputSchema": [
     {
       "key": "query",
       "name": "Query",

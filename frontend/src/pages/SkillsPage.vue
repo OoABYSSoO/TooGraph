@@ -153,21 +153,21 @@
                 </div>
               </section>
               <section>
-                <h4>{{ t("skills.llmInputSchema") }}</h4>
+                <h4>{{ t("skills.llmOutputSchema") }}</h4>
                 <div class="skills-page__schema-list">
-                  <span v-for="field in selectedSkill.inputSchema" :key="`llm-in-${field.key}`">
+                  <span v-for="field in selectedSkill.llmOutputSchema" :key="`llm-in-${field.key}`">
                     {{ field.key }} · {{ field.valueType }} · {{ field.required ? t("skills.required") : t("skills.optional") }}
                   </span>
-                  <span v-if="selectedSkill.inputSchema.length === 0">{{ t("common.none") }}</span>
+                  <span v-if="selectedSkill.llmOutputSchema.length === 0">{{ t("common.none") }}</span>
                 </div>
               </section>
               <section>
                 <h4>{{ t("skills.stateOutputSchema") }}</h4>
                 <div class="skills-page__schema-list">
-                  <span v-for="field in selectedSkill.outputSchema" :key="`out-${field.key}`">
+                  <span v-for="field in selectedSkill.stateOutputSchema" :key="`out-${field.key}`">
                     {{ field.key }} · {{ field.valueType }} · {{ field.required ? t("skills.required") : t("skills.optional") }}
                   </span>
-                  <span v-if="selectedSkill.outputSchema.length === 0">{{ t("common.none") }}</span>
+                  <span v-if="selectedSkill.stateOutputSchema.length === 0">{{ t("common.none") }}</span>
                 </div>
               </section>
               <section>

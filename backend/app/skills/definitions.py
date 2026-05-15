@@ -156,8 +156,8 @@ def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> 
             fallback_timeout_seconds=payload.get("timeoutSeconds") or payload.get("timeout_seconds"),
         ),
         stateInputSchema=_parse_io_fields(payload.get("stateInputSchema") or payload.get("state_input_schema") or []),
-        inputSchema=_parse_io_fields(payload.get("inputSchema") or payload.get("input_schema") or []),
-        outputSchema=_parse_io_fields(payload.get("outputSchema") or payload.get("output_schema") or []),
+        llmOutputSchema=_parse_io_fields(payload.get("llmOutputSchema") or payload.get("llm_output_schema") or []),
+        stateOutputSchema=_parse_io_fields(payload.get("stateOutputSchema") or payload.get("state_output_schema") or []),
     )
     eligibility, blockers = _resolve_llm_node_eligibility(definition, path.parent)
     definition.llm_node_eligibility = eligibility
@@ -184,8 +184,8 @@ def _parse_skill_file(path: Path, source_scope: SkillSourceScope) -> SkillDefini
     description = str(payload.get("description") or "").strip()
 
     state_input_schema = _parse_io_fields(toograph.get("state_input_schema") or toograph.get("stateInputSchema") or [])
-    input_schema = _parse_io_fields(toograph.get("input_schema", []))
-    output_schema = _parse_io_fields(toograph.get("output_schema", []))
+    llm_output_schema = _parse_io_fields(toograph.get("llm_output_schema") or toograph.get("llmOutputSchema") or [])
+    state_output_schema = _parse_io_fields(toograph.get("state_output_schema") or toograph.get("stateOutputSchema") or [])
 
     definition = SkillDefinition(
         skillKey=skill_key,
@@ -200,8 +200,8 @@ def _parse_skill_file(path: Path, source_scope: SkillSourceScope) -> SkillDefini
             fallback_timeout_seconds=toograph.get("timeout_seconds") or toograph.get("timeoutSeconds"),
         ),
         stateInputSchema=state_input_schema,
-        inputSchema=input_schema,
-        outputSchema=output_schema,
+        llmOutputSchema=llm_output_schema,
+        stateOutputSchema=state_output_schema,
     )
     eligibility, blockers = _resolve_llm_node_eligibility(definition, path.parent)
     definition.llm_node_eligibility = eligibility
@@ -290,8 +290,12 @@ def _reject_legacy_skill_protocol_fields(payload: object) -> None:
         "capability_policy": "graph or Buddy permission mode; visibility uses skill/settings.json",
         "runPolicies": "graph or Buddy permission mode; visibility uses skill/settings.json",
         "run_policies": "graph or Buddy permission mode; visibility uses skill/settings.json",
-        "supportedValueTypes": "outputSchema",
-        "supported_value_types": "output_schema",
+        "supportedValueTypes": "stateOutputSchema",
+        "supported_value_types": "state_output_schema",
+        "inputSchema": "llmOutputSchema",
+        "input_schema": "llm_output_schema",
+        "outputSchema": "stateOutputSchema",
+        "output_schema": "state_output_schema",
         "sideEffects": "permissions",
         "side_effects": "permissions",
         "health": "skill/settings.json and runtime readiness",
@@ -327,8 +331,8 @@ def _resolve_llm_node_eligibility(definition: SkillDefinition, skill_dir: Path) 
                 command=definition.runtime.command,
             )
         )
-    if not definition.output_schema:
-        blockers.append("Skill manifest is missing outputSchema.")
+    if not definition.state_output_schema:
+        blockers.append("Skill manifest is missing stateOutputSchema.")
 
     if blockers:
         return SkillLlmNodeEligibility.NEEDS_MANIFEST, blockers

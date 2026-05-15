@@ -22,9 +22,9 @@
 
 ## 当前协议
 
-- skill manifest 顶层和 `inputSchema` / `outputSchema` 字段都使用 `name` 表示显示名称，不再使用 `label`。
+- skill manifest 顶层和 `llmOutputSchema` / `stateOutputSchema` 字段都使用 `name` 表示显示名称，不再使用 `label`。
 - “什么时候选择这个技能”写进 `description`。
-- “绑定到 LLM 节点后应该如何生成调用输入”写进 `llmInstruction`。
+- “绑定到 LLM 节点后应该如何生成结构化 LLM 输出”写进 `llmInstruction`。
 - 一个 LLM 节点最多使用一个显式能力来源：无能力、一个手动选择的 Skill，或一个输入 `capability` state。`capability` 是单个互斥对象，`kind` 可为 `skill`、`subgraph` 或 `none`，不能是列表。多个能力调用必须拆成多个节点和边。
 - 手动复用图仍通过 Subgraph 节点完成；`capability.kind=subgraph` 主要用于伙伴主循环等模板在运行时动态选择可运行子图能力，不作为普通 LLM 节点卡片下拉项。
 - 复杂模板应优先用子图提升可读性。伙伴自主循环尤其应把上下文装配、需求理解、能力循环和最终回复拆为可审计子图；回复后的自我复盘应作为独立后台图模板运行，而不是继续占用可见回复链路。
@@ -33,9 +33,9 @@
 - 添加到 LLM 节点的 skill 会在节点提示词编辑区显示可编辑的技能说明胶囊；默认胶囊由 skill `llmInstruction` 动态展示，不写入图 JSON。
 - 用户编辑胶囊后才会把该节点的覆盖说明写入 `skillInstructionBlocks`，并标记为 `node.override`；移除 skill 时对应覆盖会移除，且不会反向写回技能包原始文档。
 - 静态手动选择的 Skill 使用 `config.skillKey` 和协议拥有的 `skillBindings.outputMapping`。`outputMapping` 由图协议、前端和运行时维护，只用于确定 skill 输出写入哪个 state 与运行审计；LLM 不看也不修改它。
-- 技能输入由 LLM 节点在运行前根据当前输入 state、技能 `description`、有效 `llmInstruction` 和 `inputSchema` 生成。有效 `llmInstruction` 默认来自 skill manifest；如果当前节点存在 `node.override` 胶囊覆盖，则使用覆盖内容。这个说明只进入技能入参生成阶段的 system prompt，不会再追加到 user prompt。
-- Skill 生命周期脚本使用固定文件名而不是在 manifest 中配置入口。存在 `before_llm.py` 时，运行时会在技能入参规划前执行它，只向它传入运行时上下文和节点任务说明，并把返回的上下文注入 LLM 提示词；图 state 直接进入 LLM 入参规划提示词，不传给 `before_llm.py`。存在 `after_llm.py` 时，运行时会在 LLM 生成结构化技能参数后执行它，并把它返回的 JSON 当作技能结果。写入 state 仍由 TooGraph runtime 根据 `outputSchema` 和 `skillBindings.outputMapping` 完成，脚本不直接绑定 state。
-- 在 LLM 节点卡片选择带 `outputSchema` 的静态 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
+- 结构化 LLM 输出由 LLM 节点在运行前根据当前输入 state、技能 `description`、有效 `llmInstruction` 和 `llmOutputSchema` 生成。有效 `llmInstruction` 默认来自 skill manifest；如果当前节点存在 `node.override` 胶囊覆盖，则使用覆盖内容。这个说明只进入技能 LLM 输出规划阶段的 system prompt，不会再追加到 user prompt。
+- Skill 生命周期脚本使用固定文件名而不是在 manifest 中配置入口。存在 `before_llm.py` 时，运行时会在技能 LLM 输出规划前执行它，只向它传入运行时上下文和节点任务说明，并把返回的上下文注入 LLM 提示词；图 state 直接进入 LLM 输出规划提示词，不传给 `before_llm.py`。存在 `after_llm.py` 时，运行时会在 LLM 生成结构化 LLM 输出后执行它，并把它返回的 JSON 当作技能结果。写入 state 仍由 TooGraph runtime 根据 `stateOutputSchema` 和 `skillBindings.outputMapping` 完成，脚本不直接绑定 state。
+- 在 LLM 节点卡片选择带 `stateOutputSchema` 的静态 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
 - 动态能力执行来自输入 `capability` state，不复用 `skillBindings.outputMapping`，也不会推断普通输出映射。这类节点必须只写一个 `result_package` state。包内 `outputs.<outputKey>` 保存 `{ name, description, type, value }`，不额外捏造 `fieldKey`；下游 LLM 节点会把这些虚拟输出拆开并复用普通 state/file 展开逻辑。
 - 当 `capability.kind=subgraph` 进入 LLM 节点时，该节点只负责根据当前 state 和目标模板公开输入 schema 生成子图输入；运行时负责执行对应图模板，并把公开 output 边界封装为同一套 `result_package`。这条路径不经过静态 Subgraph 节点端口 mapping，也不让 LLM 二次总结子图结果。若动态子图内部触发 `interrupt_after`，父级 run 会进入标准 `awaiting_human`，并通过 `pending_subgraph_breakpoint` 与父级 resume API 恢复。
 - 图运行前不再做旧草稿兼容补齐。提交到运行时的图必须已经符合当前协议。
@@ -70,7 +70,7 @@
 
 - 位置：`skill/official/toograph_capability_selector/`
 - 显示名称：`TooGraph Capability Selector`
-- 作用：根据 LLM 节点技能入参规划阶段看到的本地可用能力清单，让模型选择并校验规范化单个 `capability`。
+- 作用：根据 LLM 节点技能 LLM 输出规划阶段看到的本地可用能力清单，让模型选择并校验规范化单个 `capability`。
 - 生命周期：`before_llm.py` 读取当前启用的图模板和启用的 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`、`selection_reason` 和 `rejected_candidates`，按同一清单做真实性与启用状态校验，并保留 `permissions` 供候选描述、审计和后续运行时策略使用。它不输出 `requiresApproval`，也不恢复 per-skill 审批协议。
 - 审计输出：除 `capability` 和 `found` 外，选择器返回 `audit`，记录候选数量、按类型计数、选中能力、选择原因、选中权限摘要、被拒绝候选原因、缺口说明和 catalog 读取错误；同时返回 `capability_selection` 低层 `activity_events`，Buddy 主模板会把 `audit` 映射到 `capability_selection_audit` state。
 - 选择对象包括当前启用的图模板和启用的 Skill；图模板优先于 Skill。
@@ -103,7 +103,7 @@
 - 作用：围绕 `web_search` 搭建多轮联网研究流程，适合“总结最新新闻、版本内容、公开资料依据”等需要先搜索再整理的任务。
 - 主要流程：输入问题 -> 制定研究计划与首轮搜索词 -> 运行 `web_search` -> 阅读本地原文并评估证据 -> 需要补搜时由 condition 分支直接回到搜索节点 -> 证据足够或达到上限后筛选依据 -> 生成 `final_reply`。
 - 循环语义：补搜回边是 `should_continue_search` condition 的原生分支。condition 节点协议固定为 `true / false / exhausted` 三个分支，`loopLimit` 默认 5 且可在节点上设置，达到上限时走 `exhausted` 分支并用已有资料收束，而不是撞 LangGraph 递归限制。
-- 技能语义：搜索节点绑定 `web_search`，技能输入仍由该 LLM 节点运行时生成；模板不使用 `inputMapping` 或静态技能参数。
+- 技能语义：搜索节点绑定 `web_search`，结构化 LLM 输出仍由该 LLM 节点运行时生成；模板不使用 `inputMapping` 或静态技能调用参数。
 - 输出语义：`query`、`source_urls`、`artifact_paths`、`errors` 通过 managed binding state 透传；后续 LLM 节点读取 `artifact_paths` 对应的本地原文，负责证据筛选和最终总结。模板只公开 `final_reply` 这一个 output 节点，关键依据笔记和原文路径属于内部中间 state，不直接连接 output 节点。
 - 模型语义：模板默认使用全局模型配置，不写死某个 provider。LLM 节点和伙伴模型下拉的第一项是“全局（实时读取当前全局设定的模型）”，后面才是具体模型 override。若全局本地网关未启动，运行该模板前需要在 Model Providers 页面选择可用模型，或在图中为 LLM 节点设置 override。
 
@@ -157,7 +157,7 @@
 
 - FastAPI 提供 graphs / runs / templates / presets / settings / skills / knowledge / memories API。
 - 后端 Skill catalog 合并官方 Skill 和用户自定义 Skill。官方 Skill 只读，用户 Skill 可在 Skills 页面启用、停用和删除。
-- validator 负责 `node_system` graph 结构校验。必填技能输入不再做静态绑定校验，而是在 LLM 节点生成技能输入后由运行时检查。
+- validator 负责 `node_system` graph 结构校验。必填 `llmOutputSchema` 字段不再做静态绑定校验，而是在 LLM 节点生成结构化 LLM 输出后由运行时检查。
 - 动态读取 `capability` state 的 LLM 节点必须写唯一 `result_package` state；静态 `skillKey` 与动态 `capability` state 不能混用；没有静态 `skillKey` 的 `skillBindings` 会被视为旧协议并拒绝。
 - LangGraph runtime 是当前运行主链。
 - 后端不再在 graph run 入口修补旧模板结构；提交什么图，就按当前协议校验和执行什么图。

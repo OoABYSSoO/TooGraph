@@ -48,9 +48,9 @@ class BuddyHomeWriterSkillTests(unittest.TestCase):
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
         self.assertEqual(definition.permissions, ["buddy_home_write"])
         self.assertEqual(manifest["metadata"], {"internal": True})
-        self.assertEqual([field.key for field in definition.input_schema], ["commands", "run_id"])
+        self.assertEqual([field.key for field in definition.llm_output_schema], ["commands", "run_id"])
         self.assertEqual(
-            [field.key for field in definition.output_schema],
+            [field.key for field in definition.state_output_schema],
             ["success", "result", "applied_commands", "skipped_commands", "revisions"],
         )
 

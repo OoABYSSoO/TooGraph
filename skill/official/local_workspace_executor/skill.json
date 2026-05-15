@@ -30,7 +30,7 @@
       "description": "可选补充上下文，例如已有文件片段、约束或期望结果。"
     }
   ],
-  "inputSchema": [
+  "llmOutputSchema": [
     {
       "key": "path",
       "name": "Path",
@@ -60,7 +60,7 @@
       "description": "search 操作使用的文本搜索词；其他操作不需要。"
     }
   ],
-  "outputSchema": [
+  "stateOutputSchema": [
     {
       "key": "success",
       "name": "Success",
