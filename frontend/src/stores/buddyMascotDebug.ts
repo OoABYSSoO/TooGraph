@@ -2,23 +2,22 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 
 import type { BuddyMascotDebugAction } from "../buddy/buddyMascotDebug.ts";
+import type {
+  BuddyVirtualOperation,
+  BuddyVirtualOperationCursorLifecycle,
+  BuddyVirtualOperationPlan,
+} from "../buddy/virtualOperationProtocol.ts";
 
 export type BuddyMascotDebugRequest = {
   id: number;
   action: BuddyMascotDebugAction;
 };
 
-export type BuddyVirtualOperationCursorLifecycle = "keep" | "return_after_step" | "return_at_end";
-
-export type BuddyVirtualOperation = {
-  kind: "click";
-  targetId: string;
-  cursorLifecycle?: BuddyVirtualOperationCursorLifecycle;
-};
+export type { BuddyVirtualOperation, BuddyVirtualOperationCursorLifecycle };
 
 export type BuddyVirtualOperationRequest = {
   id: number;
-  operation: BuddyVirtualOperation;
+  request: BuddyVirtualOperationPlan;
 };
 
 export type BuddyMascotMotionDebugConfig = {
@@ -72,11 +71,15 @@ export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {
     virtualCursorEnabled.value = enabled;
   }
 
-  function requestVirtualOperation(operation: BuddyVirtualOperation) {
+  function requestVirtualOperation(request: BuddyVirtualOperationPlan) {
     nextVirtualOperationRequestId.value += 1;
     latestVirtualOperationRequest.value = {
       id: nextVirtualOperationRequestId.value,
-      operation: { ...operation },
+      request: {
+        ...request,
+        commands: [...request.commands],
+        operations: request.operations.map((operation) => ({ ...operation })),
+      },
     };
   }
 

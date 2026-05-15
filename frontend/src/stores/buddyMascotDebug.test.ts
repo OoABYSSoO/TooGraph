@@ -36,31 +36,43 @@ test("buddy mascot debug store records virtual operation requests", () => {
   const store = useBuddyMascotDebugStore();
 
   store.requestVirtualOperation({
-    kind: "click",
-    targetId: "app.nav.runs",
+    version: 1,
+    commands: ["click app.nav.runs"],
+    operations: [{ kind: "click", targetId: "app.nav.runs" }],
     cursorLifecycle: "return_after_step",
+    nextPagePath: "/runs",
+    reason: "first",
   });
   const firstRequest = store.latestVirtualOperationRequest;
   store.requestVirtualOperation({
-    kind: "click",
-    targetId: "app.nav.runs",
+    version: 1,
+    commands: ["click app.nav.runs"],
+    operations: [{ kind: "click", targetId: "app.nav.runs" }],
     cursorLifecycle: "keep",
+    nextPagePath: "/runs",
+    reason: "second",
   });
 
   assert.deepEqual(firstRequest, {
     id: 1,
-    operation: {
-      kind: "click",
-      targetId: "app.nav.runs",
+    request: {
+      version: 1,
+      commands: ["click app.nav.runs"],
+      operations: [{ kind: "click", targetId: "app.nav.runs" }],
       cursorLifecycle: "return_after_step",
+      nextPagePath: "/runs",
+      reason: "first",
     },
   });
   assert.deepEqual(store.latestVirtualOperationRequest, {
     id: 2,
-    operation: {
-      kind: "click",
-      targetId: "app.nav.runs",
+    request: {
+      version: 1,
+      commands: ["click app.nav.runs"],
+      operations: [{ kind: "click", targetId: "app.nav.runs" }],
       cursorLifecycle: "keep",
+      nextPagePath: "/runs",
+      reason: "second",
     },
   });
 });

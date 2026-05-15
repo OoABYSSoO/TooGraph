@@ -451,6 +451,7 @@ import {
 } from "./buddyMessageMetadata.ts";
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
 import { buildPageOperationBook, collectPageOperationSnapshot } from "./pageOperationAffordances.ts";
+import { resolveBuddyVirtualOperationPlanFromActivityEvent } from "./virtualOperationProtocol.ts";
 import { findLatestRecoverablePausedRunMessage, isRecoverablePausedRunStatus } from "./buddyPausedRunRecovery.ts";
 import {
   resolveBuddyComposerDecision,
@@ -2207,33 +2208,25 @@ function clampVirtualCursorFramePosition(positionValue: BuddyPosition): BuddyPos
 }
 
 function handleBuddyVirtualUiOperationEvent(payload: Record<string, unknown>) {
-  const kind = normalizeVirtualOperationText(payload.kind);
-  if (kind !== "virtual_ui_operation") {
+  const operationPlan = resolveBuddyVirtualOperationPlanFromActivityEvent(payload);
+  if (!operationPlan) {
     return;
   }
-  const detail = recordFromUnknown(payload.detail);
-  const operation = recordFromUnknown(detail?.operation);
-  const operationKind = normalizeVirtualOperationText(operation?.kind);
-  const targetId = normalizeVirtualOperationText(operation?.target_id ?? operation?.targetId);
-  if (operationKind !== "click" || !targetId) {
-    return;
-  }
-  if (targetId !== "app.nav.runs") {
-    return;
-  }
-  buddyMascotDebugStore.requestVirtualOperation({
-    kind: "click",
-    targetId: "app.nav.runs",
-    cursorLifecycle: normalizeVirtualOperationCursorLifecycle(detail?.cursor_lifecycle ?? detail?.cursorLifecycle),
-  });
+  buddyMascotDebugStore.requestVirtualOperation(operationPlan);
 }
 
 async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequest | null) {
   if (!request) {
     return;
   }
-  if (request.operation.kind === "click") {
-    await executeBuddyVirtualClickOperation(request.operation);
+  for (const operation of request.request.operations) {
+    if (operation.kind === "click") {
+      await executeBuddyVirtualClickOperation(operation);
+    }
+  }
+  if (request.request.cursorLifecycle === "return_after_step" || request.request.cursorLifecycle === "return_at_end") {
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
+    buddyMascotDebugStore.setVirtualCursorEnabled(false);
   }
 }
 
@@ -2248,10 +2241,6 @@ async function executeBuddyVirtualClickOperation(operation: BuddyVirtualOperatio
   const flightWaitMs = moveVirtualCursorToWithArmedTransition(cursorPosition);
   await waitForVirtualOperation(flightWaitMs);
   dispatchVirtualClick(affordance.element);
-  if (operation.cursorLifecycle === "return_after_step" || operation.cursorLifecycle === "return_at_end") {
-    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
-    buddyMascotDebugStore.setVirtualCursorEnabled(false);
-  }
 }
 
 function resolveVirtualOperationAffordance(targetId: string): { element: HTMLElement } | null {
@@ -2334,22 +2323,6 @@ function waitForVirtualOperation(timeoutMs: number) {
     }
     window.setTimeout(resolve, Math.max(0, Math.round(timeoutMs)));
   });
-}
-
-function normalizeVirtualOperationCursorLifecycle(value: unknown): BuddyVirtualOperation["cursorLifecycle"] {
-  const normalized = normalizeVirtualOperationText(value);
-  if (normalized === "keep" || normalized === "return_after_step" || normalized === "return_at_end") {
-    return normalized;
-  }
-  return "return_after_step";
-}
-
-function normalizeVirtualOperationText(value: unknown) {
-  return String(value ?? "").trim();
-}
-
-function recordFromUnknown(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 
 function clampNumber(value: number, min: number, max: number) {
