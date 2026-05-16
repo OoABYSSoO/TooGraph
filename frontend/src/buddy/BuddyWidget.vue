@@ -613,6 +613,8 @@ const BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE = 1;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_REACHED_DISTANCE_PX = 12;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 1.25;
 const BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS = 80;
+const BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_WAIT_MS = 2400;
+const BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_RETRY_MS = 80;
 const VIRTUAL_CURSOR_STAR_PATH =
   "M0-72 C5-46 18-33 44-28 C18-23 5-10 0 16 C-5-10 -18-23 -44-28 C-18-33 -5-46 0-72Z";
 const VIRTUAL_CURSOR_SHAPE_PATH =
@@ -2394,7 +2396,7 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
   const playbackState = createGraphEditPlaybackUiState();
   await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
   for (const step of response.playbackSteps) {
-    const targetElement = resolveGraphEditPlaybackStepElement(step, playbackState) ?? affordance?.element ?? null;
+    const targetElement = await resolveGraphEditPlaybackStepElementWithRetry(step, playbackState);
     if (isGraphEditPlaybackDragStep(step)) {
       await executeGraphEditPlaybackDragStep(step, targetElement, playbackState);
     } else if (targetElement) {
@@ -2507,6 +2509,18 @@ function requestGraphEditPlaybackPlan(input: { requestId: string; graphEditInten
   return detail.response;
 }
 
+async function resolveGraphEditPlaybackStepElementWithRetry(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState) {
+  const deadlineMs = Date.now() + BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_WAIT_MS;
+  while (Date.now() <= deadlineMs) {
+    const targetElement = resolveGraphEditPlaybackStepElement(step, playbackState);
+    if (targetElement) {
+      return targetElement;
+    }
+    await waitForVirtualOperation(BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_RETRY_MS);
+  }
+  return resolveGraphEditPlaybackStepElement(step, playbackState);
+}
+
 function resolveGraphEditPlaybackStepElement(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState): HTMLElement | null {
   const targetId = resolveAliasedGraphEditPlaybackTarget(step.target, playbackState);
   const exactAffordance = resolveVirtualOperationAffordance(targetId);
@@ -2514,13 +2528,24 @@ function resolveGraphEditPlaybackStepElement(step: GraphEditPlaybackStep, playba
     return exactAffordance.element;
   }
   if (targetId.startsWith("editor.canvas.")) {
-    return resolveVirtualOperationAffordance(targetId)?.element ?? null;
+    return resolveVirtualOperationAffordance(targetId)?.element ?? resolveGraphEditPlaybackStepFallbackElement(step, playbackState);
   }
   const nodeId = resolveGraphEditPlaybackTargetNodeId(targetId);
   if (nodeId) {
     return resolveVirtualOperationAffordance(`editor.canvas.node.${nodeId}`)?.element ?? null;
   }
-  return resolveVirtualOperationAffordance("editor.canvas.surface")?.element ?? null;
+  return resolveGraphEditPlaybackStepFallbackElement(step, playbackState);
+}
+
+function resolveGraphEditPlaybackStepFallbackElement(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState): HTMLElement | null {
+  const targetId = resolveAliasedGraphEditPlaybackTarget(step.target, playbackState);
+  if (targetId === "editor.canvas.empty.createFirstNode") {
+    return resolveVirtualOperationAffordance("editor.canvas.surface")?.element ?? null;
+  }
+  if ((step.kind === "move_virtual_cursor" || step.kind === "open_node_creation_menu") && targetId === "editor.canvas.surface") {
+    return resolveVirtualOperationAffordance("editor.canvas.surface")?.element ?? null;
+  }
+  return null;
 }
 
 function resolveGraphEditPlaybackTargetNodeId(targetId: string): string {
@@ -2682,34 +2707,39 @@ function resolveVirtualOperationAffordance(targetId: string): { element: HTMLEle
   if (typeof document === "undefined") {
     return null;
   }
-  const element = document.querySelector<HTMLElement>(`[data-virtual-affordance-id="${escapeVirtualOperationTargetId(targetId)}"]`);
-  if (!element) {
-    return null;
+  const affordanceElements = document.querySelectorAll<HTMLElement>(`[data-virtual-affordance-id="${escapeVirtualOperationTargetId(targetId)}"]`);
+  let visibleElement: HTMLElement | null = null;
+  for (const element of affordanceElements) {
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      continue;
+    }
+    visibleElement = element;
   }
-  const rect = element.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) {
-    return null;
-  }
-  return { element };
+  return visibleElement ? { element: visibleElement } : null;
 }
 
 function resolveVirtualOperationTextInput(targetId: string): HTMLInputElement | HTMLTextAreaElement | null {
   const affordance = resolveVirtualOperationAffordance(targetId);
+  if (affordance) {
+    return resolveVirtualOperationTextInputElement(affordance.element) ?? resolveVirtualOperationTextInputAffordance(`${targetId}.input`);
+  }
+  return resolveVirtualOperationTextInputAffordance(`${targetId}.input`);
+}
+
+function resolveVirtualOperationTextInputAffordance(targetId: string): HTMLInputElement | HTMLTextAreaElement | null {
+  const affordance = resolveVirtualOperationAffordance(targetId);
   if (!affordance) {
-    const inputAffordance = resolveVirtualOperationAffordance(`${targetId}.input`);
-    if (!inputAffordance) {
-      return null;
-    }
-    if (isVirtualOperationTextInputElement(inputAffordance.element)) {
-      return inputAffordance.element;
-    }
-    const nestedInput = inputAffordance.element.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea");
-    return nestedInput && isVirtualOperationTextInputElement(nestedInput) ? nestedInput : null;
+    return null;
   }
-  if (isVirtualOperationTextInputElement(affordance.element)) {
-    return affordance.element;
+  return resolveVirtualOperationTextInputElement(affordance.element);
+}
+
+function resolveVirtualOperationTextInputElement(element: HTMLElement): HTMLInputElement | HTMLTextAreaElement | null {
+  if (isVirtualOperationTextInputElement(element)) {
+    return element;
   }
-  const input = affordance.element.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea");
+  const input = element.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea");
   return input && isVirtualOperationTextInputElement(input) ? input : null;
 }
 
