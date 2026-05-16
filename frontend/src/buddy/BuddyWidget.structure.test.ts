@@ -462,6 +462,13 @@ test("BuddyWidget can interrupt virtual operations and skips graph connections t
   assert.match(componentSource, /class="buddy-widget__virtual-operation-banner"/);
   assert.match(componentSource, /@click="interruptVirtualOperation"/);
   assert.match(componentSource, /class="buddy-widget__virtual-operation-stop-icon"/);
+  assert.match(componentSource, /import \{[\s\S]*resolveBuddyVirtualOperationUserAction,[\s\S]*shouldHandleVirtualCursorPointerDown[\s\S]*\} from "\.\/buddyVirtualOperationInteractionPolicy\.ts";/);
+  assert.match(componentSource, /const isVirtualOperationRunning = computed\(\(\) => Boolean\(activeVirtualOperationToken\.value\)\);/);
+  assert.match(componentSource, /'buddy-widget__virtual-cursor--operation-active': isVirtualOperationRunning,/);
+  assert.match(componentSource, /\.buddy-widget__virtual-cursor--operation-active\s*\{[\s\S]*pointer-events:\s*none;/);
+  assert.match(componentSource, /function handleAvatarClick\(\) \{[\s\S]*resolveBuddyVirtualOperationUserAction\(\{[\s\S]*source: "avatar_click"/);
+  assert.match(componentSource, /function handleVirtualCursorPointerDown\(event: PointerEvent\) \{[\s\S]*shouldHandleVirtualCursorPointerDown\(\{[\s\S]*isOperationRunning: isVirtualOperationRunning\.value/);
+  assert.match(componentSource, /function interruptVirtualOperation\(\) \{[\s\S]*resolveBuddyVirtualOperationUserAction\(\{[\s\S]*source: "stop_button"/);
   const operationBannerBlock = extractCssBlock(".buddy-widget__virtual-operation-banner");
   assert.match(operationBannerBlock, /left:\s*50%;/);
   assert.match(operationBannerBlock, /top:\s*calc\(var\(--editor-canvas-floating-top-clearance,\s*18px\) \+ 64px\);/);
