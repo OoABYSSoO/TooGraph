@@ -332,7 +332,7 @@
           data-virtual-affordance-actions="click"
           @pointerenter="setHoveredFlowHandleNode(anchor.nodeId)"
           @pointerleave="clearHoveredFlowHandleNode(anchor.nodeId)"
-          @pointerdown.prevent.stop="handleAnchorPointerDown(anchor)"
+          @pointerdown.prevent.stop="handleAnchorPointerDown(anchor, $event)"
         />
       </div>
       <div class="editor-canvas__route-handles" aria-hidden="true">
@@ -349,7 +349,7 @@
           data-virtual-affordance-actions="click"
           @pointerenter="setHoveredFlowHandleNode(anchor.nodeId)"
           @pointerleave="clearHoveredFlowHandleNode(anchor.nodeId)"
-          @pointerdown.prevent.stop="handleAnchorPointerDown(anchor)"
+          @pointerdown.prevent.stop="handleAnchorPointerDown(anchor, $event)"
         >
           <span class="editor-canvas__route-handle-label">{{ anchor.branch }}</span>
         </div>
@@ -376,7 +376,7 @@
           r="5.5"
           @pointerenter="setHoveredPointAnchorNode(anchor.nodeId)"
           @pointerleave="clearHoveredPointAnchorNode(anchor.nodeId)"
-          @pointerdown.prevent.stop="handleAnchorPointerDown(anchor)"
+          @pointerdown.prevent.stop="handleAnchorPointerDown(anchor, $event)"
         />
       </svg>
     </div>
@@ -768,6 +768,7 @@ const connectionInteraction = useCanvasConnectionInteraction({
 const {
   pendingConnection,
   pendingConnectionPoint,
+  pendingConnectionPointerId,
   autoSnappedTargetAnchor,
   activeConnectionHoverNodeId,
   clearPendingConnection,
@@ -776,6 +777,7 @@ const {
   startOrTogglePendingConnectionFromAnchor,
   updatePendingConnectionTarget,
   setPendingConnectionPoint,
+  isForeignPendingConnectionPointer,
   setActiveConnectionHoverNode,
 } = connectionInteraction;
 const selectedEdgeId = ref<string | null>(null);
@@ -1249,6 +1251,13 @@ const anchorConnectStyle = (anchor: ProjectedCanvasAnchor) =>
   buildPointAnchorConnectStyle(anchor, canvasInteractionStyleContext.value);
 
 function handleCanvasPointerDown(event: PointerEvent) {
+  if (activeConnection.value && isForeignPendingConnectionPointer(event.pointerId)) {
+    canvasRef.value?.focus();
+    event.preventDefault();
+    canvasRef.value?.setPointerCapture(event.pointerId);
+    viewport.beginPan(event);
+    return;
+  }
   const startedPinchZoom = trackTouchPointerDown(event);
   const canvasPointerDownAction = resolveCanvasPointerDownAction({
     startedPinchZoom,
@@ -1304,7 +1313,7 @@ function handleCanvasPointerMove(event: PointerEvent) {
   ) {
     return;
   }
-  if (activeConnection.value) {
+  if (activeConnection.value && !isForeignPendingConnectionPointer(event.pointerId)) {
     const connectionPointerMoveRequest = resolveCanvasConnectionPointerMoveRequest({
       connection: activeConnection.value,
       hoverNodeId: resolveNodeIdAtPointer(event),
@@ -1355,7 +1364,7 @@ function handleCanvasPointerUp(event: PointerEvent) {
     canvasRef.value.releasePointerCapture(event.pointerId);
   }
   releaseNodeDragResizePointerCapture(event.pointerId);
-  if (activeConnection.value) {
+  if (activeConnection.value && !isForeignPendingConnectionPointer(event.pointerId)) {
     const connectionPointerUpAction = resolveCanvasConnectionPointerUpAction({
       connection: activeConnection.value,
       interactionLocked: isGraphEditingLocked(),
@@ -1852,7 +1861,7 @@ function applyEdgePointerDownBaseAction(action: {
   }
 }
 
-function handleAnchorPointerDown(anchor: ProjectedCanvasAnchor) {
+function handleAnchorPointerDown(anchor: ProjectedCanvasAnchor, event: PointerEvent) {
   const anchorPointerDownAction = resolveCanvasAnchorPointerDownAction({
     interactionLocked: isGraphEditingLocked(),
     anchor,
@@ -1875,7 +1884,7 @@ function handleAnchorPointerDown(anchor: ProjectedCanvasAnchor) {
       if (anchorPointerDownAction.clearWindowSelection) {
         window.getSelection()?.removeAllRanges();
       }
-      const pendingConnectionResult = startOrTogglePendingConnectionFromAnchor(anchor);
+      const pendingConnectionResult = startOrTogglePendingConnectionFromAnchor(anchor, event.pointerId);
       if (pendingConnectionResult.status !== "ignored") {
         selectedEdgeId.value = null;
       }

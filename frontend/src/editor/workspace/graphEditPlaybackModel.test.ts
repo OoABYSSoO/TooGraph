@@ -214,6 +214,66 @@ test("buildGraphEditPlaybackPlan targets precise editor affordances for human-li
   assert.equal(plan.playbackSteps.some((step) => step.kind === "apply_graph_command" && step.commandId === "graph-command-5"), false);
 });
 
+test("buildGraphEditPlaybackPlan includes edge endpoints so replay can skip existing connections", () => {
+  const plan = buildGraphEditPlaybackPlan(emptyDocument(), {
+    operations: [
+      {
+        kind: "create_node",
+        ref: "input_name",
+        nodeId: "input_name",
+        nodeType: "input",
+        title: "input节点",
+      },
+      {
+        kind: "create_state",
+        ref: "name",
+        stateKey: "name",
+        name: "姓名",
+        valueType: "text",
+        nodeRef: "input_name",
+        bindingMode: "write",
+      },
+      {
+        kind: "bind_state",
+        nodeRef: "input_name",
+        stateRef: "name",
+        mode: "write",
+      },
+      {
+        kind: "create_node",
+        ref: "ask_name",
+        nodeId: "ask_name",
+        nodeType: "agent",
+        title: "LLM节点",
+      },
+      {
+        kind: "bind_state",
+        nodeRef: "ask_name",
+        stateRef: "name",
+        mode: "read",
+        sourceNodeRef: "input_name",
+      },
+      {
+        kind: "connect_nodes",
+        sourceRef: "input_name",
+        targetRef: "ask_name",
+      },
+    ],
+  });
+
+  assert.equal(plan.valid, true);
+
+  const dataEdgeStep = plan.playbackSteps.find((step) => step.kind === "drag_state_edge_to_node");
+  assert.equal(dataEdgeStep?.sourceNodeId, "input_name");
+  assert.equal(dataEdgeStep?.sourceStateKey, "name");
+  assert.equal(dataEdgeStep?.nodeId, "ask_name");
+  assert.equal(dataEdgeStep?.stateKey, "name");
+
+  const flowEdgeStep = plan.playbackSteps.find((step) => step.kind === "draw_flow_edge" && step.endTarget === "editor.canvas.anchor.ask_name:flow-in");
+  assert.equal(flowEdgeStep?.sourceNodeId, "input_name");
+  assert.equal(flowEdgeStep?.nodeId, "ask_name");
+});
+
 test("applyGraphEditPlaybackPlan applies semantic graph commands to the current document", () => {
   const plan = buildGraphEditPlaybackPlan(emptyDocument(), {
     operations: [

@@ -684,6 +684,8 @@ function buildPlaybackStepsForCommand(command: GraphEditCommand): GraphEditPlayb
           target: flowAnchorTarget(command.sourceNodeId),
           endTarget: flowInputAnchorTarget(command.targetNodeId),
           label: command.summary,
+          sourceNodeId: command.sourceNodeId,
+          nodeId: command.targetNodeId,
         },
       ];
   }
@@ -854,6 +856,8 @@ function stateBindingGestureSteps(command: GraphEditBindStateCommand): GraphEdit
       target: stateAnchorTarget(command.sourceNodeId, "out", command.stateKey),
       endTarget: canvasNodeTarget(command.nodeId),
       label: `Drag state ${command.stateKey} into ${command.nodeId}.`,
+      nodeId: command.nodeId,
+      stateKey: command.stateKey,
       sourceNodeId: command.sourceNodeId,
       sourceStateKey: command.stateKey,
       sourceAnchorKind: "state-out",

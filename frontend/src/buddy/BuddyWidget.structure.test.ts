@@ -457,6 +457,28 @@ test("BuddyWidget executes virtual UI operation events through the virtual curso
   assert.match(componentSource, /buddyMascotDebugStore\.setVirtualCursorEnabled\(false\);/);
 });
 
+test("BuddyWidget can interrupt virtual operations and skips graph connections that already exist", () => {
+  assert.match(componentSource, /v-if="virtualOperationStatus"/);
+  assert.match(componentSource, /class="buddy-widget__virtual-operation-banner"/);
+  assert.match(componentSource, /@click="interruptVirtualOperation"/);
+  assert.match(componentSource, /class="buddy-widget__virtual-operation-stop-icon"/);
+  assert.match(extractCssBlock(".buddy-widget__virtual-operation-banner"), /border:\s*1px solid rgba\(245,\s*158,\s*11,\s*0\.42\);/);
+  assert.match(extractCssBlock(".buddy-widget__virtual-operation-stop"), /border-radius:\s*999px;/);
+  assert.match(componentSource, /\.buddy-widget__virtual-operation-stop-icon::before\s*\{[\s\S]*width:\s*8px;[\s\S]*height:\s*8px;/);
+  assert.match(componentSource, /type BuddyVirtualOperationToken = \{/);
+  assert.match(componentSource, /const virtualOperationStatus = ref<BuddyVirtualOperationStatus \| null>\(null\);/);
+  assert.match(componentSource, /function interruptVirtualOperation\(\)/);
+  assert.match(componentSource, /function isVirtualOperationInterrupted\(token: BuddyVirtualOperationToken \| null\)/);
+  assert.match(componentSource, /waitForVirtualOperation\([^)]*, activeVirtualOperationToken\.value\)/);
+  assert.match(componentSource, /shouldSkipGraphEditPlaybackConnectionStep\(step, playbackState\)/);
+  assert.match(componentSource, /function resolveGraphEditPlaybackDataEdgeTarget\(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState\)/);
+  assert.match(componentSource, /function resolveGraphEditPlaybackFlowEdgeTarget\(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState\)/);
+  assert.match(componentSource, /resolveVirtualOperationAffordance\(edgeTargetId\)/);
+  assert.match(componentSource, /const BUDDY_VIRTUAL_POINTER_ID = 9001;/);
+  assert.match(componentSource, /function markVirtualPointerEvent/);
+  assert.match(componentSource, /pointerId: BUDDY_VIRTUAL_POINTER_ID,/);
+});
+
 test("BuddyWidget debug panel can trigger every mascot animation state without graph runs", () => {
   assert.match(componentSource, /let buddyDebugActionTimerId: number \| null = null;/);
   assert.match(componentSource, /onBeforeUnmount\(\(\) => \{[\s\S]*clearBuddyDebugActionTimer\(\);/);

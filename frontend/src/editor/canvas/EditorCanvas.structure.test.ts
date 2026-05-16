@@ -172,6 +172,22 @@ test("EditorCanvas exposes canvas objects to the virtual page operation book", (
   assert.match(componentSource, /function resolveCanvasVirtualAnchorLabel\(anchor: ProjectedCanvasAnchor\)/);
 });
 
+test("EditorCanvas keeps virtual connection drags owned by the synthetic pointer while real pointers can pan", () => {
+  const canvasConnectionInteractionsSource = readCanvasConnectionInteractionsSource();
+
+  assert.match(componentSource, /@pointerdown\.prevent\.stop="handleAnchorPointerDown\(anchor, \$event\)"/);
+  assert.match(componentSource, /function handleAnchorPointerDown\(anchor: ProjectedCanvasAnchor, event: PointerEvent\)/);
+  assert.match(componentSource, /startOrTogglePendingConnectionFromAnchor\(anchor, event\.pointerId\)/);
+  assert.match(componentSource, /if \(activeConnection\.value && isForeignPendingConnectionPointer\(event\.pointerId\)\) \{/);
+  assert.match(componentSource, /viewport\.beginPan\(event\);/);
+  assert.match(componentSource, /if \(activeConnection\.value && !isForeignPendingConnectionPointer\(event\.pointerId\)\) \{/);
+  assert.match(componentSource, /pendingConnectionPointerId,/);
+  assert.match(componentSource, /isForeignPendingConnectionPointer,/);
+  assert.match(canvasConnectionInteractionsSource, /const pendingConnectionPointerId = ref<number \| null>\(null\);/);
+  assert.match(canvasConnectionInteractionsSource, /function isPendingConnectionPointer\(pointerId: number\)/);
+  assert.match(canvasConnectionInteractionsSource, /function isForeignPendingConnectionPointer\(pointerId: number\)/);
+});
+
 test("EditorCanvas can show an editing source capsule beside the edge visibility controls", () => {
   assert.match(componentSource, /sourceContextLabel\?: string \| null;/);
   assert.match(
@@ -697,7 +713,7 @@ test("EditorCanvas renders condition route outputs as right-side floating branch
   assert.match(componentSource, /\{\{ anchor\.branch \}\}/);
   assert.doesNotMatch(componentSource, /class="editor-canvas__route-handle-button"/);
   assert.doesNotMatch(componentSource, /formatRouteHandleLabel\(anchor\.branch\)/);
-  assert.match(componentSource, /@pointerdown\.prevent\.stop="handleAnchorPointerDown\(anchor\)"/);
+  assert.match(componentSource, /@pointerdown\.prevent\.stop="handleAnchorPointerDown\(anchor, \$event\)"/);
   assert.match(componentSource, /@pointerenter="setHoveredFlowHandleNode\(anchor\.nodeId\)"/);
   assert.match(componentSource, /@pointerleave="clearHoveredFlowHandleNode\(anchor\.nodeId\)"/);
   assert.match(componentSource, /\.editor-canvas__route-handles \{[\s\S]*z-index:\s*12;/);
@@ -1219,8 +1235,8 @@ test("EditorCanvas opens reverse node creation when input drags end on empty can
   assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasAnchorPointerDownAction/);
   assert.match(componentSource, /switch \(anchorPointerDownAction\.type\) \{[\s\S]*case "complete-connection":[\s\S]*completePendingConnection\(anchorPointerDownAction\.targetAnchor\);[\s\S]*return;/);
   assert.match(componentSource, /case "ignore-anchor":[\s\S]*return;/);
-  assert.match(componentSource, /case "start-or-toggle-connection":[\s\S]*window\.getSelection\(\)\?\.removeAllRanges\(\);[\s\S]*const pendingConnectionResult = startOrTogglePendingConnectionFromAnchor\(anchor\);/);
-  assert.match(componentSource, /const pendingConnectionResult = startOrTogglePendingConnectionFromAnchor\(anchor\);/);
+  assert.match(componentSource, /case "start-or-toggle-connection":[\s\S]*window\.getSelection\(\)\?\.removeAllRanges\(\);[\s\S]*const pendingConnectionResult = startOrTogglePendingConnectionFromAnchor\(anchor, event\.pointerId\);/);
+  assert.match(componentSource, /const pendingConnectionResult = startOrTogglePendingConnectionFromAnchor\(anchor, event\.pointerId\);/);
   assert.match(componentSource, /if \(pendingConnectionResult\.status !== "ignored"\) \{[\s\S]*selectedEdgeId\.value = null;/);
   assert.match(canvasConnectionInteractionsSource, /const nextPendingConnection = buildPendingConnectionFromAnchor\(anchor\);/);
   assert.match(canvasConnectionInteractionsSource, /isSamePendingConnection\(pendingConnection\.value, nextPendingConnection\)/);
@@ -1274,7 +1290,7 @@ test("EditorCanvas snaps flow drags to eligible target node bodies before mouseu
   assert.match(componentSource, /import \{[\s\S]*resolveCanvasAutoSnappedTargetAnchor as resolveCanvasAutoSnappedTargetAnchorModel,[\s\S]*\} from "\.\/canvasConnectionInteractionModel";/);
   assert.match(componentSource, /function resolveAutoSnappedTargetAnchor\(event: PointerEvent\)/);
   assert.match(componentSource, /function resolveEligibleTargetAnchorForNodeBody\(nodeId: string\)/);
-  assert.match(componentSource, /if \(activeConnection\.value\) \{[\s\S]*const connectionPointerMoveRequest = resolveCanvasConnectionPointerMoveRequest\(\{[\s\S]*targetAnchor: resolveAutoSnappedTargetAnchor\(event\),[\s\S]*fallbackPoint: resolveCanvasPoint\(event\),/);
+  assert.match(componentSource, /if \(activeConnection\.value && !isForeignPendingConnectionPointer\(event\.pointerId\)\) \{[\s\S]*const connectionPointerMoveRequest = resolveCanvasConnectionPointerMoveRequest\(\{[\s\S]*targetAnchor: resolveAutoSnappedTargetAnchor\(event\),[\s\S]*fallbackPoint: resolveCanvasPoint\(event\),/);
   assert.match(componentSource, /updatePendingConnectionTarget\(\{[\s\S]*targetAnchor: connectionPointerMoveRequest\.targetAnchor,[\s\S]*fallbackPoint: connectionPointerMoveRequest\.fallbackPoint,/);
   assert.match(canvasConnectionInteractionsSource, /autoSnappedTargetAnchor\.value = input\.targetAnchor;/);
   assert.match(canvasConnectionInteractionsSource, /pendingConnectionPoint\.value = input\.targetAnchor[\s\S]*\? \{ x: input\.targetAnchor\.x, y: input\.targetAnchor\.y \}[\s\S]*: input\.fallbackPoint;/);
