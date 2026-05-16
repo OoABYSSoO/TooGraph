@@ -180,6 +180,57 @@ test("buildGraphReplayIntentsFromTargetGraph handles cyclic flow graphs without 
   ]);
 });
 
+test("buildGraphReplayIntentsFromTargetGraph replays condition routes from graph protocol conditional_edges", () => {
+  const graph = targetGraph();
+  graph.nodes.ask_name = {
+    kind: "condition",
+    name: "是否继续",
+    description: "判断是否继续处理。",
+    ui: { position: { x: 360, y: 160 }, collapsed: false },
+    reads: [{ state: "name", required: true }],
+    writes: [],
+    config: {
+      branches: ["true", "false", "exhausted"],
+      loopLimit: 5,
+      branchMapping: { true: "true", false: "false" },
+      rule: { source: "$state.name", operator: "exists", value: true },
+    },
+  };
+  graph.edges = [{ source: "input_name", target: "ask_name" }];
+  graph.conditional_edges = [
+    {
+      source: "ask_name",
+      branches: {
+        true: "output_name",
+        false: "output_name",
+        exhausted: "output_name",
+      },
+    },
+  ];
+
+  const result = buildGraphReplayIntentsFromTargetGraph(graph);
+  const plan = buildGraphEditPlaybackPlan(createEmptyDraftGraph(), result.intentPackage);
+  const applied = applyGraphEditPlaybackPlan(createEmptyDraftGraph(), plan);
+
+  assert.equal(result.valid, true);
+  assert.deepEqual(result.warnings, []);
+  assert.equal(result.intentPackage.operations.filter((operation) => operation.kind === "connect_route").length, 3);
+  assert.equal(plan.valid, true);
+  assert.equal(plan.graphCommands.filter((command) => command.kind === "connect_route").length, 3);
+  assert.equal(
+    plan.playbackSteps.some(
+      (step) =>
+        step.kind === "draw_flow_edge" &&
+        step.target === "editor.canvas.anchor.ask_name:branch:true" &&
+        step.endTarget === "editor.canvas.anchor.output_name:flow-in" &&
+        step.sourceAnchorKind === "route-out",
+    ),
+    true,
+  );
+  assert.equal(applied.applied, true);
+  assert.deepEqual(applied.document.conditional_edges, graph.conditional_edges);
+});
+
 function operationLabel(operation: ReturnType<typeof buildGraphReplayIntentsFromTargetGraph>["intentPackage"]["operations"][number]) {
   if ("ref" in operation) {
     return operation.ref;
@@ -215,7 +266,7 @@ test("buildGraphReplayIntentsFromTargetGraph reports unsupported graph features 
 
   assert.equal(result.valid, true);
   assert.match(result.warnings.join("\n"), /subgraph nodes are not replayable yet: subflow/);
-  assert.match(result.warnings.join("\n"), /conditional edges are not replayable yet/);
+  assert.match(result.warnings.join("\n"), /condition route skipped because source is not a replayable condition node: ask_name/);
   assert.equal(result.intentPackage.operations.some((operation) => operation.kind === "create_node" && operation.ref === "subflow"), false);
 });
 

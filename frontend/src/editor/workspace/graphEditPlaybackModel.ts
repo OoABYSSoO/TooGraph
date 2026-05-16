@@ -1,5 +1,6 @@
 import {
   cloneGraphDocument,
+  connectConditionRouteInDocument,
   connectFlowNodesInDocument,
   updateAgentNodeConfigInDocument,
   updateNodeMetadataInDocument,
@@ -35,6 +36,7 @@ export const GRAPH_EDIT_PLAYBACK_CAPABILITY_MANUAL = [
   "- 支持 create_state: 创建 state，并提供 name、description、valueType、value。",
   "- 支持 bind_state: 把 state 绑定到节点 read/write 端口。",
   "- 支持 connect_nodes: 连接两个节点的流程边。",
+  "- 支持 connect_route: 连接 condition 节点的 true/false/exhausted 分支路由。",
   "- 支持 update_node: 修改已有节点标题、简介或 Agent 任务说明。",
   "- 执行器会把语义命令编译成可见 UI playback 和可审计 graph commands。",
 ].join("\n");
@@ -117,12 +119,20 @@ export type GraphEditConnectNodesIntent = {
   targetRef: string;
 };
 
+export type GraphEditConnectRouteIntent = {
+  kind: "connect_route";
+  sourceRef: string;
+  branchKey: string;
+  targetRef: string;
+};
+
 export type GraphEditIntent =
   | GraphEditCreateNodeIntent
   | GraphEditUpdateNodeIntent
   | GraphEditCreateStateIntent
   | GraphEditBindStateIntent
-  | GraphEditConnectNodesIntent;
+  | GraphEditConnectNodesIntent
+  | GraphEditConnectRouteIntent;
 
 export type GraphEditIntentPackage = {
   operations: GraphEditIntent[];
@@ -191,12 +201,22 @@ export type GraphEditConnectNodesCommand = GraphEditCommandBase & {
   targetNodeId: string;
 };
 
+export type GraphEditConnectRouteCommand = GraphEditCommandBase & {
+  kind: "connect_route";
+  sourceRef: string;
+  sourceNodeId: string;
+  branchKey: string;
+  targetRef: string;
+  targetNodeId: string;
+};
+
 export type GraphEditCommand =
   | GraphEditCreateNodeCommand
   | GraphEditUpdateNodeCommand
   | GraphEditCreateStateCommand
   | GraphEditBindStateCommand
-  | GraphEditConnectNodesCommand;
+  | GraphEditConnectNodesCommand
+  | GraphEditConnectRouteCommand;
 
 export type GraphEditPlaybackStep = {
   kind:
@@ -227,7 +247,8 @@ export type GraphEditPlaybackStep = {
   nodeType?: GraphEditNodeType;
   sourceNodeId?: string;
   sourceStateKey?: string;
-  sourceAnchorKind?: "state-out" | "flow-out";
+  sourceAnchorKind?: "state-out" | "flow-out" | "route-out";
+  branchKey?: string;
 };
 
 export type GraphEditPlaybackPlan = {
@@ -349,6 +370,8 @@ function compileGraphEditIntent(
       return compileBindStateCommand(operation, index, context, issues);
     case "connect_nodes":
       return compileConnectNodesCommand(operation, index, context, issues);
+    case "connect_route":
+      return compileConnectRouteCommand(operation, index, context, issues);
   }
 }
 
@@ -580,6 +603,41 @@ function compileConnectNodesCommand(
   };
 }
 
+function compileConnectRouteCommand(
+  operation: GraphEditConnectRouteIntent,
+  index: number,
+  context: CompilerContext,
+  issues: string[],
+): GraphEditConnectRouteCommand | null {
+  const sourceRef = compactText(operation.sourceRef);
+  const targetRef = compactText(operation.targetRef);
+  const branchKey = compactText(operation.branchKey);
+  const sourceNodeId = resolveNodeRef(context, sourceRef);
+  const targetNodeId = resolveNodeRef(context, targetRef);
+  if (!sourceNodeId) {
+    issues.push(`operations[${index}] connect_route references unknown source node: ${sourceRef}.`);
+  }
+  if (!branchKey) {
+    issues.push(`operations[${index}] connect_route requires branchKey.`);
+  }
+  if (!targetNodeId) {
+    issues.push(`operations[${index}] connect_route references unknown target node: ${targetRef}.`);
+  }
+  if (!sourceNodeId || !branchKey || !targetNodeId) {
+    return null;
+  }
+  return {
+    kind: "connect_route",
+    commandId: `graph-command-${index + 1}`,
+    sourceRef,
+    sourceNodeId,
+    branchKey,
+    targetRef,
+    targetNodeId,
+    summary: `Connect ${sourceNodeId}.${branchKey} route to ${targetNodeId}.`,
+  };
+}
+
 function buildPlaybackStepsForCommands(commands: GraphEditCommand[]): GraphEditPlaybackStep[] {
   const steps: GraphEditPlaybackStep[] = [];
   for (let index = 0; index < commands.length; index += 1) {
@@ -687,6 +745,19 @@ function buildPlaybackStepsForCommand(command: GraphEditCommand): GraphEditPlayb
           label: command.summary,
           sourceNodeId: command.sourceNodeId,
           nodeId: command.targetNodeId,
+        },
+      ];
+    case "connect_route":
+      return [
+        {
+          kind: "draw_flow_edge",
+          target: routeAnchorTarget(command.sourceNodeId, command.branchKey),
+          endTarget: flowInputAnchorTarget(command.targetNodeId),
+          label: command.summary,
+          sourceNodeId: command.sourceNodeId,
+          nodeId: command.targetNodeId,
+          sourceAnchorKind: "route-out",
+          branchKey: command.branchKey,
         },
       ];
   }
@@ -940,6 +1011,10 @@ function flowInputAnchorTarget(nodeId: string) {
   return `editor.canvas.anchor.${nodeId}:flow-in`;
 }
 
+function routeAnchorTarget(nodeId: string, branchKey: string) {
+  return `editor.canvas.anchor.${nodeId}:branch:${branchKey}`;
+}
+
 function stateAnchorTarget(nodeId: string, direction: "in" | "out", stateKey: string) {
   return `editor.canvas.anchor.${nodeId}:state-${direction}:${stateKey}`;
 }
@@ -968,6 +1043,8 @@ function applyGraphEditCommand<T extends GraphPayload | GraphDocument>(document:
       return bindStateInDocument(document, command);
     case "connect_nodes":
       return connectFlowNodesInDocument(document, command.sourceNodeId, command.targetNodeId);
+    case "connect_route":
+      return connectConditionRouteInDocument(document, command.sourceNodeId, command.branchKey, command.targetNodeId);
   }
 }
 

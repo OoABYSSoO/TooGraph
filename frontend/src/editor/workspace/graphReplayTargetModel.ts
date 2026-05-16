@@ -8,6 +8,7 @@ import type {
 import type {
   GraphEditCreateNodeIntent,
   GraphEditCreateStateIntent,
+  GraphEditConnectRouteIntent,
   GraphEditIntent,
   GraphEditNodeType,
 } from "./graphEditPlaybackModel.ts";
@@ -45,6 +46,7 @@ type GraphReplayCompileContext = {
   writerByState: Map<string, string>;
   outgoingEdgesBySource: Map<string, string[]>;
   incomingEdgeCountByNode: Map<string, number>;
+  conditionRoutes: GraphEditConnectRouteIntent[];
   warnings: string[];
 };
 
@@ -75,6 +77,7 @@ export function buildGraphReplayIntentsFromTargetGraph(graph: GraphPayload | Gra
     writerByState: new Map(),
     outgoingEdgesBySource: new Map(),
     incomingEdgeCountByNode: new Map(),
+    conditionRoutes: [],
     warnings: [],
   };
   const operations: GraphEditIntent[] = [];
@@ -102,6 +105,31 @@ export function buildGraphReplayIntentsFromTargetGraph(graph: GraphPayload | Gra
     context.incomingEdgeCountByNode.set(edge.target, (context.incomingEdgeCountByNode.get(edge.target) ?? 0) + 1);
   }
 
+  for (const conditionalEdge of graph.conditional_edges) {
+    const sourceNode = graph.nodes[conditionalEdge.source];
+    if (!context.supportedNodeIds.has(conditionalEdge.source) || sourceNode?.kind !== "condition") {
+      context.warnings.push(`condition route skipped because source is not a replayable condition node: ${conditionalEdge.source}.`);
+      continue;
+    }
+    for (const [branchKey, targetNodeId] of Object.entries(conditionalEdge.branches)) {
+      if (!sourceNode.config.branches.includes(branchKey)) {
+        context.warnings.push(`condition route skipped because branch is not declared on ${conditionalEdge.source}: ${branchKey}.`);
+        continue;
+      }
+      if (!context.supportedNodeIds.has(targetNodeId)) {
+        context.warnings.push(`condition route skipped because it references an unsupported node: ${conditionalEdge.source}.${branchKey} -> ${targetNodeId}.`);
+        continue;
+      }
+      context.conditionRoutes.push({
+        kind: "connect_route",
+        sourceRef: conditionalEdge.source,
+        branchKey,
+        targetRef: targetNodeId,
+      });
+      context.incomingEdgeCountByNode.set(targetNodeId, (context.incomingEdgeCountByNode.get(targetNodeId) ?? 0) + 1);
+    }
+  }
+
   const rootNodeIds = Object.keys(graph.nodes)
     .filter((nodeId) => context.supportedNodeIds.has(nodeId) && (context.incomingEdgeCountByNode.get(nodeId) ?? 0) === 0)
     .sort((left, right) => compareNodePosition(graph.nodes[left], graph.nodes[right]) || left.localeCompare(right));
@@ -123,8 +151,8 @@ export function buildGraphReplayIntentsFromTargetGraph(graph: GraphPayload | Gra
     }
   }
 
-  if (graph.conditional_edges.length > 0) {
-    context.warnings.push(`conditional edges are not replayable yet: ${graph.conditional_edges.length}.`);
+  for (const route of context.conditionRoutes) {
+    emitConditionRoute(route, context, operations);
   }
 
   return {
@@ -135,7 +163,7 @@ export function buildGraphReplayIntentsFromTargetGraph(graph: GraphPayload | Gra
     summary: {
       states: Object.keys(graph.state_schema).length,
       nodes: context.supportedNodeIds.size,
-      flowEdges: graph.edges.length,
+      flowEdges: graph.edges.length + context.conditionRoutes.length,
       playbackIntents: issues.length === 0 ? operations.length : 0,
     },
   };
@@ -248,6 +276,15 @@ function emitFlowEdge(sourceNodeId: string, targetNodeId: string, context: Graph
     sourceRef: sourceNodeId,
     targetRef: targetNodeId,
   });
+}
+
+function emitConditionRoute(route: GraphEditConnectRouteIntent, context: GraphReplayCompileContext, operations: GraphEditIntent[]) {
+  const edgeKey = `${route.sourceRef}:${route.branchKey}->${route.targetRef}`;
+  if (context.emittedEdges.has(edgeKey)) {
+    return;
+  }
+  context.emittedEdges.add(edgeKey);
+  operations.push(route);
 }
 
 function resolveTargetCreationSource(
