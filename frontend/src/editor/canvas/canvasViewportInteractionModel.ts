@@ -48,6 +48,11 @@ export type CanvasSizeUpdateAction =
   | { type: "ignore-unchanged-size" }
   | { type: "update-size"; size: CanvasSizeSnapshot };
 
+export type CanvasViewportEnsurePointVisibleAction =
+  | { type: "ignore-missing-canvas-size" }
+  | { type: "keep-viewport" }
+  | { type: "set-viewport"; viewport: CanvasViewport };
+
 export function resolveWheelZoomDelta(deltaY: number) {
   if (deltaY === 0) {
     return 0;
@@ -138,6 +143,39 @@ export function resolveCanvasSizeUpdateAction(input: {
   return { type: "update-size", size: input.nextSize };
 }
 
+export function resolveCanvasViewportEnsurePointVisibleAction(input: {
+  worldPoint: CanvasWorldPoint | null;
+  viewport: CanvasViewport;
+  canvasSize: CanvasSizeSnapshot | null;
+  margin?: number;
+}): CanvasViewportEnsurePointVisibleAction {
+  if (!input.worldPoint || !input.canvasSize || input.canvasSize.width <= 0 || input.canvasSize.height <= 0) {
+    return { type: "ignore-missing-canvas-size" };
+  }
+
+  const scale = input.viewport.scale > 0 ? input.viewport.scale : 1;
+  const margin = normalizeVisibleMargin(input.margin ?? 96, input.canvasSize);
+  const screenX = input.viewport.x + input.worldPoint.x * scale;
+  const screenY = input.viewport.y + input.worldPoint.y * scale;
+  const targetX = clampNumber(screenX, margin.x, input.canvasSize.width - margin.x);
+  const targetY = clampNumber(screenY, margin.y, input.canvasSize.height - margin.y);
+  const deltaX = targetX - screenX;
+  const deltaY = targetY - screenY;
+
+  if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) {
+    return { type: "keep-viewport" };
+  }
+
+  return {
+    type: "set-viewport",
+    viewport: {
+      x: Math.round(input.viewport.x + deltaX),
+      y: Math.round(input.viewport.y + deltaY),
+      scale: input.viewport.scale,
+    },
+  };
+}
+
 export function resolveCanvasWorldPoint(input: {
   clientX: number;
   clientY: number;
@@ -157,4 +195,16 @@ export function resolveCanvasWorldPoint(input: {
 
 function normalizeZoomButtonScale(scale: number) {
   return clampCanvasViewportScale(Number(scale.toFixed(2)));
+}
+
+function normalizeVisibleMargin(margin: number, canvasSize: CanvasSizeSnapshot) {
+  const safeMargin = Math.max(0, Number.isFinite(margin) ? margin : 0);
+  return {
+    x: Math.min(safeMargin, canvasSize.width / 2),
+    y: Math.min(safeMargin, canvasSize.height / 2),
+  };
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }

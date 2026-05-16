@@ -73,6 +73,34 @@ test("resolveNodePointerDownAction resolves node drag pointer-down routing", () 
       setPointerCapture: false,
     },
   );
+  assert.deepEqual(
+    resolveNodePointerDownAction({
+      nodeId: "node-a",
+      nodeExists: true,
+      interactionLocked: false,
+      preserveInlineEditorFocus: false,
+      graphEditPlaybackRunning: true,
+      isVirtualPointerEvent: false,
+    }),
+    {
+      type: "ignore-graph-edit-playback",
+      preventDefault: true,
+    },
+  );
+  assert.deepEqual(
+    resolveNodePointerDownAction({
+      nodeId: "node-a",
+      nodeExists: true,
+      interactionLocked: false,
+      preserveInlineEditorFocus: false,
+      graphEditPlaybackRunning: true,
+      isVirtualPointerEvent: true,
+    }),
+    {
+      type: "start-drag",
+      ...setupPolicy,
+    },
+  );
 });
 
 test("resolveNodeResizePointerDownAction resolves resize pointer-down routing", () => {
@@ -126,6 +154,20 @@ test("resolveNodeResizePointerDownAction resolves resize pointer-down routing", 
     {
       type: "start-resize",
       ...setupPolicy,
+    },
+  );
+  assert.deepEqual(
+    resolveNodeResizePointerDownAction({
+      nodeId: "node-a",
+      nodeExists: true,
+      interactionLocked: false,
+      hasActiveConnection: false,
+      graphEditPlaybackRunning: true,
+      isVirtualPointerEvent: false,
+    }),
+    {
+      type: "ignore-graph-edit-playback",
+      preventDefault: true,
     },
   );
 });

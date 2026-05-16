@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  resolveCanvasViewportEnsurePointVisibleAction,
   resolveCanvasPanPointerMoveAction,
   resolveCanvasSizeUpdateAction,
   resolveCanvasWheelZoomRequest,
@@ -126,6 +127,50 @@ test("canvas viewport interaction model resolves canvas size update actions", ()
       nextSize: { width: 120, height: 90 },
     }),
     { type: "update-size", size: { width: 120, height: 90 } },
+  );
+});
+
+test("canvas viewport interaction model keeps playback points inside the visible canvas margin", () => {
+  assert.deepEqual(
+    resolveCanvasViewportEnsurePointVisibleAction({
+      worldPoint: { x: 240, y: 180 },
+      viewport: { x: 0, y: 0, scale: 1 },
+      canvasSize: { width: 800, height: 600 },
+      margin: 96,
+    }),
+    { type: "keep-viewport" },
+  );
+  assert.deepEqual(
+    resolveCanvasViewportEnsurePointVisibleAction({
+      worldPoint: { x: 1200, y: 800 },
+      viewport: { x: 0, y: 0, scale: 1 },
+      canvasSize: { width: 800, height: 600 },
+      margin: 96,
+    }),
+    {
+      type: "set-viewport",
+      viewport: { x: -496, y: -296, scale: 1 },
+    },
+  );
+  assert.deepEqual(
+    resolveCanvasViewportEnsurePointVisibleAction({
+      worldPoint: { x: 100, y: 50 },
+      viewport: { x: -500, y: -300, scale: 2 },
+      canvasSize: { width: 800, height: 600 },
+      margin: 96,
+    }),
+    {
+      type: "set-viewport",
+      viewport: { x: -104, y: -4, scale: 2 },
+    },
+  );
+  assert.deepEqual(
+    resolveCanvasViewportEnsurePointVisibleAction({
+      worldPoint: { x: 100, y: 50 },
+      viewport: { x: 0, y: 0, scale: 1 },
+      canvasSize: { width: 0, height: 600 },
+    }),
+    { type: "ignore-missing-canvas-size" },
   );
 });
 

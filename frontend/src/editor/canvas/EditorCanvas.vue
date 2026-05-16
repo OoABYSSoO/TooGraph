@@ -556,6 +556,7 @@ import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewpor
 import {
   resolveCanvasPanPointerMoveAction,
   resolveCanvasSizeUpdateAction,
+  resolveCanvasViewportEnsurePointVisibleAction,
   resolveCanvasWheelZoomRequest,
   resolveCanvasWorldPoint,
   resolveCanvasZoomButtonAction,
@@ -600,7 +601,22 @@ import type { SkillDefinition } from "@/types/skills";
 import type { RunNodeTiming } from "../workspace/runNodeTimingModel.ts";
 import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphNodeSize, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 
+const TOOGRAPH_VIRTUAL_POINTER_EVENT_KEY = "__toographVirtualPointerEvent";
 const TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY = "__toographVirtualEmptyCanvasPointerEvent";
+const TOOGRAPH_GRAPH_EDIT_PLAYBACK_RUNNING_EVENT = "toograph:graph-edit-playback-running";
+const TOOGRAPH_GRAPH_EDIT_PLAYBACK_ENSURE_VISIBLE_EVENT = "toograph:graph-edit-playback-ensure-visible";
+
+type GraphEditPlaybackRunningEventDetail = {
+  running?: boolean;
+};
+
+type GraphEditPlaybackEnsureVisibleEventDetail = {
+  position?: Partial<GraphPosition> | null;
+  targetId?: string | null;
+  nodeId?: string | null;
+  margin?: number;
+  response?: { ok: boolean; moved: boolean };
+};
 
 const props = defineProps<{
   document: GraphPayload | GraphDocument;
@@ -784,6 +800,7 @@ const {
 } = connectionInteraction;
 const selectedEdgeId = ref<string | null>(null);
 const edgeVisibilityMode = ref<EdgeVisibilityMode>("smart");
+const isGraphEditPlaybackRunning = ref(false);
 let canvasResizeObserver: ResizeObserver | null = null;
 
 const edgeInteractions = useCanvasEdgeInteractions({
@@ -1127,13 +1144,87 @@ watch([pendingAgentInputSourceByNodeId, pendingStateInputSourceTargetByNodeId], 
   });
 });
 
+function handleGraphEditPlaybackRunningEvent(event: Event) {
+  const detail = (event as CustomEvent<GraphEditPlaybackRunningEventDetail>).detail;
+  isGraphEditPlaybackRunning.value = Boolean(detail?.running);
+  if (isGraphEditPlaybackRunning.value) {
+    teardownNodeDragResize();
+  }
+}
+
+function handleGraphEditPlaybackEnsureVisibleEvent(event: Event) {
+  const detail = (event as CustomEvent<GraphEditPlaybackEnsureVisibleEventDetail>).detail;
+  if (!detail) {
+    return;
+  }
+  const worldPoint = resolveGraphEditPlaybackEnsureVisibleWorldPoint(detail);
+  const canvasRect = canvasRef.value?.getBoundingClientRect() ?? null;
+  const canvasSizeSnapshot = canvasRect && canvasRect.width > 0 && canvasRect.height > 0
+    ? { width: canvasRect.width, height: canvasRect.height }
+    : null;
+  const action = resolveCanvasViewportEnsurePointVisibleAction({
+    worldPoint,
+    viewport: viewport.viewport,
+    canvasSize: canvasSizeSnapshot,
+    margin: detail.margin,
+  });
+  switch (action.type) {
+    case "ignore-missing-canvas-size":
+      detail.response = { ok: false, moved: false };
+      return;
+    case "keep-viewport":
+      detail.response = { ok: true, moved: false };
+      return;
+    case "set-viewport":
+      viewport.setViewport(action.viewport);
+      detail.response = { ok: true, moved: true };
+      return;
+  }
+}
+
+function resolveGraphEditPlaybackEnsureVisibleWorldPoint(detail: GraphEditPlaybackEnsureVisibleEventDetail): GraphPosition | null {
+  const position = detail.position;
+  if (position && typeof position.x === "number" && typeof position.y === "number") {
+    return { x: position.x, y: position.y };
+  }
+  const nodeId = detail.nodeId || resolveGraphEditPlaybackTargetNodeId(detail.targetId ?? "");
+  if (!nodeId) {
+    return null;
+  }
+  const node = props.document.nodes[nodeId];
+  if (!node) {
+    return null;
+  }
+  const nodeSize = resolveNodeRenderedSize({
+    nodeId,
+    node,
+    measuredNodeSizes: measuredNodeSizes.value,
+  });
+  return {
+    x: node.ui.position.x + nodeSize.width / 2,
+    y: node.ui.position.y + nodeSize.height / 2,
+  };
+}
+
+function resolveGraphEditPlaybackTargetNodeId(targetId: string) {
+  return (
+    targetId.match(/^editor\.canvas\.node\.([^.:]+)/)?.[1] ??
+    targetId.match(/^editor\.canvas\.anchor\.([^.:]+)/)?.[1] ??
+    ""
+  );
+}
+
 onMounted(() => {
   updateCanvasSize();
   attachCanvasResizeObserver();
   scheduleAnchorMeasurement();
+  window.addEventListener(TOOGRAPH_GRAPH_EDIT_PLAYBACK_RUNNING_EVENT, handleGraphEditPlaybackRunningEvent as EventListener);
+  window.addEventListener(TOOGRAPH_GRAPH_EDIT_PLAYBACK_ENSURE_VISIBLE_EVENT, handleGraphEditPlaybackEnsureVisibleEvent as EventListener);
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener(TOOGRAPH_GRAPH_EDIT_PLAYBACK_RUNNING_EVENT, handleGraphEditPlaybackRunningEvent as EventListener);
+  window.removeEventListener(TOOGRAPH_GRAPH_EDIT_PLAYBACK_ENSURE_VISIBLE_EVENT, handleGraphEditPlaybackEnsureVisibleEvent as EventListener);
   teardownNodeMeasurements();
   cancelScheduledDragFrame();
 
@@ -1460,6 +1551,14 @@ function isVirtualEmptyCanvasPointerEvent(event: PointerEvent) {
   return (event as PointerEvent & Record<string, unknown>)[TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY] === true;
 }
 
+function isVirtualPointerEvent(event: PointerEvent) {
+  return (event as PointerEvent & Record<string, unknown>)[TOOGRAPH_VIRTUAL_POINTER_EVENT_KEY] === true;
+}
+
+function shouldIgnoreRealPointerDuringGraphEditPlayback(event: PointerEvent) {
+  return isGraphEditPlaybackRunning.value && !isVirtualPointerEvent(event);
+}
+
 function isPointerWithinNodeElement(nodeElement: HTMLElement, event: PointerEvent) {
   const rect = nodeElement.getBoundingClientRect();
   return (
@@ -1537,9 +1636,16 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
     nodeExists: Boolean(node),
     interactionLocked: isGraphEditingLocked(),
     preserveInlineEditorFocus,
+    graphEditPlaybackRunning: isGraphEditPlaybackRunning.value,
+    isVirtualPointerEvent: isVirtualPointerEvent(event),
   });
   switch (nodePointerDownAction.type) {
     case "ignore-missing-node":
+      return;
+    case "ignore-graph-edit-playback":
+      if (nodePointerDownAction.preventDefault) {
+        event.preventDefault();
+      }
       return;
     case "locked-edit-attempt":
       if (nodePointerDownAction.preventDefault) {
@@ -1630,9 +1736,16 @@ function handleNodeResizePointerDown(nodeId: string, handle: NodeResizeHandle, e
     nodeExists: Boolean(node),
     interactionLocked: isGraphEditingLocked(),
     hasActiveConnection: Boolean(activeConnection.value),
+    graphEditPlaybackRunning: isGraphEditPlaybackRunning.value,
+    isVirtualPointerEvent: isVirtualPointerEvent(event),
   });
   switch (nodeResizePointerDownAction.type) {
     case "ignore-missing-node":
+      return;
+    case "ignore-graph-edit-playback":
+      if (nodeResizePointerDownAction.preventDefault) {
+        event.preventDefault();
+      }
       return;
     case "locked-edit-attempt":
       if (nodeResizePointerDownAction.preventDefault) {
@@ -1790,6 +1903,10 @@ function handleWheel(event: WheelEvent) {
 }
 
 function handleEdgePointerDown(edge: ProjectedCanvasEdge, event: PointerEvent) {
+  if (shouldIgnoreRealPointerDuringGraphEditPlayback(event)) {
+    event.preventDefault();
+    return;
+  }
   const edgePointerDownAction = resolveCanvasEdgePointerDownAction({
     interactionLocked: isGraphEditingLocked(),
     edge,
@@ -1869,6 +1986,10 @@ function applyEdgePointerDownBaseAction(action: {
 }
 
 function handleAnchorPointerDown(anchor: ProjectedCanvasAnchor, event: PointerEvent) {
+  if (shouldIgnoreRealPointerDuringGraphEditPlayback(event)) {
+    event.preventDefault();
+    return;
+  }
   const anchorPointerDownAction = resolveCanvasAnchorPointerDownAction({
     interactionLocked: isGraphEditingLocked(),
     anchor,

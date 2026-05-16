@@ -54,6 +54,7 @@ type CanvasNodeResizePointerDownSetupPolicy = {
 
 export type CanvasNodePointerDownAction =
   | { type: "ignore-missing-node" }
+  | { type: "ignore-graph-edit-playback"; preventDefault: true }
   | {
       type: "locked-edit-attempt";
       preventDefault: true;
@@ -65,6 +66,7 @@ export type CanvasNodePointerDownAction =
 
 export type CanvasNodeResizePointerDownAction =
   | { type: "ignore-missing-node" }
+  | { type: "ignore-graph-edit-playback"; preventDefault: true }
   | { type: "locked-edit-attempt"; preventDefault: true }
   | { type: "ignore-active-connection" }
   | ({ type: "start-resize" } & CanvasNodeResizePointerDownSetupPolicy);
@@ -86,9 +88,15 @@ export function resolveNodePointerDownAction(input: {
   nodeExists: boolean;
   interactionLocked: boolean;
   preserveInlineEditorFocus: boolean;
+  graphEditPlaybackRunning?: boolean;
+  isVirtualPointerEvent?: boolean;
 }): CanvasNodePointerDownAction {
   if (!input.nodeExists) {
     return { type: "ignore-missing-node" };
+  }
+
+  if (input.graphEditPlaybackRunning && !input.isVirtualPointerEvent) {
+    return { type: "ignore-graph-edit-playback", preventDefault: true };
   }
 
   if (input.interactionLocked) {
@@ -119,9 +127,15 @@ export function resolveNodeResizePointerDownAction(input: {
   nodeExists: boolean;
   interactionLocked: boolean;
   hasActiveConnection: boolean;
+  graphEditPlaybackRunning?: boolean;
+  isVirtualPointerEvent?: boolean;
 }): CanvasNodeResizePointerDownAction {
   if (!input.nodeExists) {
     return { type: "ignore-missing-node" };
+  }
+
+  if (input.graphEditPlaybackRunning && !input.isVirtualPointerEvent) {
+    return { type: "ignore-graph-edit-playback", preventDefault: true };
   }
 
   if (input.interactionLocked) {

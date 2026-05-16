@@ -477,7 +477,7 @@ import {
   type BuddyVirtualOperationRequest,
 } from "../stores/buddyMascotDebug.ts";
 import type { BuddyChatMessageRecord, BuddyChatSession } from "../types/buddy.ts";
-import type { GraphPayload } from "../types/node-system.ts";
+import type { GraphPayload, GraphPosition } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
 import type { SettingsPayload } from "../types/settings.ts";
 
@@ -651,8 +651,12 @@ const BUDDY_VIRTUAL_OPERATION_TYPE_CHARACTER_DELAY_MS = 18;
 const BUDDY_VIRTUAL_POINTER_ID = 9001;
 const TOOGRAPH_VIRTUAL_POINTER_EVENT_KEY = "__toographVirtualPointerEvent";
 const TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY = "__toographVirtualEmptyCanvasPointerEvent";
+const TOOGRAPH_GRAPH_EDIT_PLAYBACK_RUNNING_EVENT = "toograph:graph-edit-playback-running";
+const TOOGRAPH_GRAPH_EDIT_PLAYBACK_ENSURE_VISIBLE_EVENT = "toograph:graph-edit-playback-ensure-visible";
 const BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_WAIT_MS = 2400;
 const BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_RETRY_MS = 80;
+const BUDDY_GRAPH_EDIT_PLAYBACK_VIEWPORT_SETTLE_MS = 80;
+const BUDDY_GRAPH_EDIT_PLAYBACK_VISIBLE_MARGIN_PX = 112;
 const VIRTUAL_CURSOR_STAR_PATH =
   "M0-72 C5-46 18-33 44-28 C18-23 5-10 0 16 C-5-10 -18-23 -44-28 C-18-33 -5-46 0-72Z";
 const VIRTUAL_CURSOR_SHAPE_PATH =
@@ -2523,6 +2527,11 @@ type GraphEditPlaybackUiState = {
   stateKeyAliases: Map<string, string>;
 };
 
+type GraphEditPlaybackEnsureVisibleResponse = {
+  ok: boolean;
+  moved: boolean;
+};
+
 async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOperation) {
   if (operation.kind !== "graph_edit") {
     return;
@@ -2543,56 +2552,62 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
   if (!response?.ok) {
     return;
   }
+  setGraphEditPlaybackRunning(true);
   const playbackState = createGraphEditPlaybackUiState();
-  await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
-  if (isVirtualOperationInterrupted(token)) {
-    return;
-  }
-  for (let stepIndex = 0; stepIndex < response.playbackSteps.length; stepIndex += 1) {
+  try {
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
     if (isVirtualOperationInterrupted(token)) {
-      break;
+      return;
     }
-    const step = response.playbackSteps[stepIndex]!;
-    const targetElement = await resolveGraphEditPlaybackStepElementWithRetry(step, playbackState, token);
-    if (isVirtualOperationInterrupted(token)) {
-      break;
-    }
-    if (shouldSkipGraphEditPlaybackTextStep(step, response.playbackSteps, stepIndex, playbackState, targetElement)) {
-      continue;
-    }
-    if (shouldSkipGraphEditPlaybackConnectionStep(step, playbackState)) {
-      continue;
-    }
-    if (isGraphEditPlaybackDragStep(step)) {
-      await executeGraphEditPlaybackDragStep(step, targetElement, playbackState);
-    } else if (targetElement) {
-      await moveVirtualCursorToGraphEditStep(step, targetElement);
-    }
-    if (isVirtualOperationInterrupted(token)) {
-      break;
-    }
-    if (step.kind === "open_node_creation_menu") {
-      if (!step.sourceAnchorKind && targetElement) {
-        dispatchVirtualDoubleClick(targetElement, resolveGraphEditPlaybackPositionClientPoint(step));
+    for (let stepIndex = 0; stepIndex < response.playbackSteps.length; stepIndex += 1) {
+      if (isVirtualOperationInterrupted(token)) {
+        break;
       }
-    } else if (step.kind === "choose_node_type" && targetElement) {
-      const beforeNodeIds = listGraphEditPlaybackNodeAffordanceIds();
-      dispatchVirtualClick(targetElement);
-      await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
-      rememberCreatedNodeAlias(step, beforeNodeIds, playbackState);
-    } else if (step.kind === "open_state_panel" && targetElement) {
-      dispatchVirtualClick(targetElement);
-    } else if (step.kind === "focus_node_field" && targetElement) {
-      await focusGraphEditPlaybackField(step, targetElement, playbackState);
-    } else if (step.kind === "type_node_field" || step.kind === "type_state_field") {
-      await typeGraphEditPlaybackField(step, playbackState);
-    } else if (step.kind === "commit_state_field" && targetElement) {
-      const beforeStateKeys = listGraphEditPlaybackPortStateKeys(step, playbackState);
-      dispatchVirtualClick(targetElement);
-      await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
-      rememberCreatedStateAlias(step, beforeStateKeys, playbackState);
+      const step = response.playbackSteps[stepIndex]!;
+      await ensureGraphEditPlaybackStepVisible(step, playbackState);
+      const targetElement = await resolveGraphEditPlaybackStepElementWithRetry(step, playbackState, token);
+      if (isVirtualOperationInterrupted(token)) {
+        break;
+      }
+      if (shouldSkipGraphEditPlaybackTextStep(step, response.playbackSteps, stepIndex, playbackState, targetElement)) {
+        continue;
+      }
+      if (shouldSkipGraphEditPlaybackConnectionStep(step, playbackState)) {
+        continue;
+      }
+      if (isGraphEditPlaybackDragStep(step)) {
+        await executeGraphEditPlaybackDragStep(step, targetElement, playbackState);
+      } else if (targetElement) {
+        await moveVirtualCursorToGraphEditStep(step, targetElement);
+      }
+      if (isVirtualOperationInterrupted(token)) {
+        break;
+      }
+      if (step.kind === "open_node_creation_menu") {
+        if (!step.sourceAnchorKind && targetElement) {
+          dispatchVirtualDoubleClick(targetElement, resolveGraphEditPlaybackPositionClientPoint(step));
+        }
+      } else if (step.kind === "choose_node_type" && targetElement) {
+        const beforeNodeIds = listGraphEditPlaybackNodeAffordanceIds();
+        dispatchVirtualClick(targetElement);
+        await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
+        rememberCreatedNodeAlias(step, beforeNodeIds, playbackState);
+      } else if (step.kind === "open_state_panel" && targetElement) {
+        dispatchVirtualClick(targetElement);
+      } else if (step.kind === "focus_node_field" && targetElement) {
+        await focusGraphEditPlaybackField(step, targetElement, playbackState);
+      } else if (step.kind === "type_node_field" || step.kind === "type_state_field") {
+        await typeGraphEditPlaybackField(step, playbackState);
+      } else if (step.kind === "commit_state_field" && targetElement) {
+        const beforeStateKeys = listGraphEditPlaybackPortStateKeys(step, playbackState);
+        dispatchVirtualClick(targetElement);
+        await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
+        rememberCreatedStateAlias(step, beforeStateKeys, playbackState);
+      }
+      await waitForVirtualOperation(resolveGraphEditPlaybackStepDelayMs(step));
     }
-    await waitForVirtualOperation(resolveGraphEditPlaybackStepDelayMs(step));
+  } finally {
+    setGraphEditPlaybackRunning(false);
   }
   virtualCursorDragging.value = false;
 }
@@ -2606,6 +2621,22 @@ function createGraphEditPlaybackUiState(): GraphEditPlaybackUiState {
     nodeIdAliases: new Map(),
     stateKeyAliases: new Map(),
   };
+}
+
+async function ensureGraphEditPlaybackStepVisible(
+  step: GraphEditPlaybackStep,
+  playbackState: GraphEditPlaybackUiState,
+) {
+  const resolvedStep = resolveAliasedGraphEditPlaybackStep(step, playbackState);
+  const response = requestGraphEditPlaybackEnsureVisible({
+    position: resolvedStep.position,
+    targetId: resolvedStep.target,
+    nodeId: resolvedStep.nodeId,
+    margin: BUDDY_GRAPH_EDIT_PLAYBACK_VISIBLE_MARGIN_PX,
+  });
+  if (response?.moved) {
+    await waitForVirtualOperation(BUDDY_GRAPH_EDIT_PLAYBACK_VIEWPORT_SETTLE_MS);
+  }
 }
 
 async function executeGraphEditPlaybackDragStep(
@@ -2706,6 +2737,43 @@ function requestGraphEditPlaybackPlan(input: { requestId: string; graphEditInten
     response: null,
   };
   window.dispatchEvent(new CustomEvent("toograph:graph-edit-playback-plan-request", { detail }));
+  return detail.response;
+}
+
+function setGraphEditPlaybackRunning(running: boolean) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.dispatchEvent(
+    new CustomEvent(TOOGRAPH_GRAPH_EDIT_PLAYBACK_RUNNING_EVENT, {
+      detail: { running },
+    }),
+  );
+}
+
+function requestGraphEditPlaybackEnsureVisible(input: {
+  position?: GraphPosition;
+  targetId?: string;
+  nodeId?: string;
+  margin?: number;
+}): GraphEditPlaybackEnsureVisibleResponse | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const detail: {
+    position?: GraphPosition;
+    targetId?: string;
+    nodeId?: string;
+    margin?: number;
+    response: GraphEditPlaybackEnsureVisibleResponse | null;
+  } = {
+    position: input.position,
+    targetId: input.targetId,
+    nodeId: input.nodeId,
+    margin: input.margin,
+    response: null,
+  };
+  window.dispatchEvent(new CustomEvent(TOOGRAPH_GRAPH_EDIT_PLAYBACK_ENSURE_VISIBLE_EVENT, { detail }));
   return detail.response;
 }
 
