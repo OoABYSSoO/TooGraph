@@ -117,6 +117,7 @@
 - 动态能力语义：只有 `execute_capability` 读取 `selected_capability` 这个 `capability` state，并且它只写一个 `result_package` state。其他复盘节点不能读取 `capability` state，否则会被运行协议视为动态能力执行节点。
 - 断点语义：澄清和人工确认类断点使用子图内部 `interrupt_after`。静态 Subgraph 节点和动态 `capability.kind=subgraph` 的内部断点都会通过父级 Buddy run 的标准暂停/恢复路径展示子图 scope，而不是由伙伴前端额外发明确认协议。写文件、删改文件或执行脚本这类低层操作审批由运行时权限原语转换为标准 `awaiting_human`。
 - 边界：当前模板已经表达完整可见回复主干；低风险 Buddy Home 写回已由后台自主复盘模板和受控 writer Skill 接管。图编辑后续方向已收束为 TooGraph 内建 App-Native Virtual Operator：伙伴读取结构化页面快照和 affordance registry，控制自己的虚拟鼠标/键盘在图编辑页操作，不移动系统鼠标、不依赖截图视觉、不从外部 MCP 或浏览器自动化起步；可借鉴 OpenAI Computer Use / CUA 的 action loop 和基础动作词表，但在 TooGraph 中由结构化快照、Virtual Input Driver、Editor Action Adapter 和 operation journal 承接；操作日志、图变更 diff、revision 和 undo/redo 仍需补齐。
+- Graph Edit Playback 的第一层前端模型已落在 `frontend/src/editor/workspace/graphEditPlaybackModel.ts`：LLM 只需要产出 `create_node`、`create_state`、`bind_state`、`connect_nodes`、`update_node` 等产品语义意图；确定性编译器会生成 graph commands 和 UI playback steps，并能把命令应用到当前图文档。该层还不是完整的虚拟鼠标动画执行器，后续应把 playback steps 接到 Editor Action Adapter 和 Virtual Input Driver，避免图节点“凭空出现”。
 
 ### `buddy_autonomous_review`
 
