@@ -9,6 +9,11 @@ import {
   buildNextDefaultStateField,
   insertStateFieldIntoDocument,
 } from "./statePanelFields.ts";
+import {
+  resolveNodeCreationFinalPositionFromGesture,
+  resolveNodeCreationGesturePositionForFinalPosition,
+  type NodeCreationPlacementContext,
+} from "./nodeCreationPlacement.ts";
 
 import type {
   AgentNode,
@@ -408,6 +413,18 @@ function compileCreateNodeCommand(
   const positionIndex = context.nextPositionIndex;
   context.nextPositionIndex += 1;
   const title = compactText(operation.title) || defaultNodeTitle(operation.nodeType);
+  const defaultPosition = normalizePosition(operation.position, positionIndex);
+  const position = hasExplicitPosition(operation.position)
+    ? defaultPosition
+    : resolveDefaultNodeCreationGesturePosition({
+        nodeId,
+        nodeType: operation.nodeType,
+        title,
+        description: compactText(operation.description),
+        taskInstruction: compactText(operation.taskInstruction),
+        finalPosition: defaultPosition,
+        creationSource,
+      });
   return {
     kind: "create_node",
     commandId: `graph-command-${index + 1}`,
@@ -417,7 +434,7 @@ function compileCreateNodeCommand(
     title,
     description: compactText(operation.description),
     taskInstruction: compactText(operation.taskInstruction),
-    position: normalizePosition(operation.position, positionIndex),
+    position,
     positionHint: compactText(operation.positionHint),
     menuTarget: creationSource ? "editor.canvas.surface" : isFirstNode ? "editor.canvas.empty.createFirstNode" : "editor.canvas.surface",
     creationSource,
@@ -978,7 +995,18 @@ function createNodeInDocument<T extends GraphPayload | GraphDocument>(document: 
     return document;
   }
   const nextDocument = cloneGraphDocument(document);
-  nextDocument.nodes[command.nodeId] = buildGraphNodeFromCommand(command);
+  const node = buildGraphNodeFromCommand(command);
+  nextDocument.nodes[command.nodeId] = {
+    ...node,
+    ui: {
+      ...node.ui,
+      position: resolveNodeCreationFinalPositionFromGesture({
+        nodeId: command.nodeId,
+        node,
+        context: placementContextFromCreateNodeCommand(command),
+      }),
+    },
+  };
   return nextDocument;
 }
 
@@ -1022,13 +1050,29 @@ function createStateInDocument<T extends GraphPayload | GraphDocument>(document:
 }
 
 function buildGraphNodeFromCommand(command: GraphEditCreateNodeCommand): GraphNode {
-  switch (command.nodeType) {
+  return buildGraphNodeFromCreationFields({
+    nodeType: command.nodeType,
+    title: command.title,
+    description: command.description,
+    taskInstruction: command.taskInstruction,
+    position: command.position,
+  });
+}
+
+function buildGraphNodeFromCreationFields(input: {
+  nodeType: GraphEditNodeType;
+  title: string;
+  description: string;
+  taskInstruction: string;
+  position: GraphPosition;
+}): GraphNode {
+  switch (input.nodeType) {
     case "input":
       return {
         kind: "input",
-        name: command.title,
-        description: command.description || "Workflow input boundary.",
-        ui: { position: command.position, collapsed: false },
+        name: input.title,
+        description: input.description || "Workflow input boundary.",
+        ui: { position: input.position, collapsed: false },
         reads: [],
         writes: [],
         config: { value: "" },
@@ -1036,9 +1080,9 @@ function buildGraphNodeFromCommand(command: GraphEditCreateNodeCommand): GraphNo
     case "output":
       return {
         kind: "output",
-        name: command.title,
-        description: command.description || "Workflow output preview.",
-        ui: { position: command.position, collapsed: false },
+        name: input.title,
+        description: input.description || "Workflow output preview.",
+        ui: { position: input.position, collapsed: false },
         reads: [],
         writes: [],
         config: {
@@ -1051,9 +1095,9 @@ function buildGraphNodeFromCommand(command: GraphEditCreateNodeCommand): GraphNo
     case "condition":
       return {
         kind: "condition",
-        name: command.title,
-        description: command.description || "Branch based on graph state.",
-        ui: { position: command.position, collapsed: false },
+        name: input.title,
+        description: input.description || "Branch based on graph state.",
+        ui: { position: input.position, collapsed: false },
         reads: [],
         writes: [],
         config: {
@@ -1066,14 +1110,14 @@ function buildGraphNodeFromCommand(command: GraphEditCreateNodeCommand): GraphNo
     case "agent":
       return {
         kind: "agent",
-        name: command.title,
-        description: command.description || "One-turn LLM node.",
-        ui: { position: command.position, collapsed: false },
+        name: input.title,
+        description: input.description || "One-turn LLM node.",
+        ui: { position: input.position, collapsed: false },
         reads: [],
         writes: [],
         config: {
           skillKey: "",
-          taskInstruction: command.taskInstruction,
+          taskInstruction: input.taskInstruction,
           modelSource: "global",
           model: "",
           thinkingMode: "high",
@@ -1107,6 +1151,61 @@ function normalizePosition(position: Partial<GraphPosition> | null | undefined, 
   const x = typeof position?.x === "number" && Number.isFinite(position.x) ? position.x : 160 + index * 220;
   const y = typeof position?.y === "number" && Number.isFinite(position.y) ? position.y : 120 + (index % 3) * 140;
   return { x, y };
+}
+
+function hasExplicitPosition(position: Partial<GraphPosition> | null | undefined) {
+  return (
+    (typeof position?.x === "number" && Number.isFinite(position.x)) ||
+    (typeof position?.y === "number" && Number.isFinite(position.y))
+  );
+}
+
+function resolveDefaultNodeCreationGesturePosition(input: {
+  nodeId: string;
+  nodeType: GraphEditNodeType;
+  title: string;
+  description: string;
+  taskInstruction: string;
+  finalPosition: GraphPosition;
+  creationSource: GraphEditNodeCreationSourceCommand | null;
+}): GraphPosition {
+  const node = buildGraphNodeFromCreationFields({
+    nodeType: input.nodeType,
+    title: input.title,
+    description: input.description,
+    taskInstruction: input.taskInstruction,
+    position: input.finalPosition,
+  });
+  return resolveNodeCreationGesturePositionForFinalPosition({
+    nodeId: input.nodeId,
+    node,
+    finalPosition: input.finalPosition,
+    context: placementContextFromCreationSource(input.creationSource),
+  });
+}
+
+function placementContextFromCreateNodeCommand(command: GraphEditCreateNodeCommand): NodeCreationPlacementContext {
+  return {
+    ...placementContextFromCreationSource(command.creationSource),
+    position: command.position,
+  };
+}
+
+function placementContextFromCreationSource(
+  creationSource: GraphEditNodeCreationSourceCommand | null,
+): NodeCreationPlacementContext {
+  if (creationSource?.kind === "state") {
+    return {
+      sourceAnchorKind: "state-out",
+      sourceStateKey: creationSource.stateKey,
+    };
+  }
+  if (creationSource?.kind === "flow") {
+    return {
+      sourceAnchorKind: "flow-out",
+    };
+  }
+  return {};
 }
 
 function defaultNodeTitle(nodeType: GraphEditNodeType): string {

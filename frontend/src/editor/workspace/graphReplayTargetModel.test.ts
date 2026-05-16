@@ -103,6 +103,16 @@ test("buildGraphReplayIntentsFromTargetGraph compiles a target graph into replay
     "output_name:name",
     "ask_name:output_name",
   ]);
+  assert.deepEqual(
+    result.intentPackage.operations
+      .filter((operation) => operation.kind === "create_node")
+      .map((operation) => ({ ref: operation.ref, position: operation.position })),
+    [
+      { ref: "input_name", position: { x: 350, y: 320 } },
+      { ref: "ask_name", position: { x: 366, y: 305 } },
+      { ref: "output_name", position: { x: 606, y: 194 } },
+    ],
+  );
   assert.deepEqual(result.intentPackage.operations[3], {
     kind: "create_node",
     ref: "ask_name",
@@ -111,7 +121,7 @@ test("buildGraphReplayIntentsFromTargetGraph compiles a target graph into replay
     title: "LLM节点",
     description: "给姓名加问号。",
     taskInstruction: "读取姓名，给这个姓名加问号。",
-    position: { x: 360, y: 160 },
+    position: { x: 366, y: 305 },
     creationSource: { kind: "state", sourceNodeRef: "input_name", stateRef: "name" },
   });
 
@@ -122,6 +132,9 @@ test("buildGraphReplayIntentsFromTargetGraph compiles a target graph into replay
   assert.equal(applied.applied, true);
   assert.deepEqual(Object.keys(applied.document.state_schema), ["name"]);
   assert.deepEqual(Object.keys(applied.document.nodes), ["input_name", "ask_name", "output_name"]);
+  assert.deepEqual(applied.document.nodes.input_name?.ui.position, targetGraph().nodes.input_name.ui.position);
+  assert.deepEqual(applied.document.nodes.ask_name?.ui.position, targetGraph().nodes.ask_name.ui.position);
+  assert.deepEqual(applied.document.nodes.output_name?.ui.position, targetGraph().nodes.output_name.ui.position);
   assert.equal(applied.document.nodes.ask_name?.kind, "agent");
   assert.equal(applied.document.nodes.ask_name?.config.taskInstruction, "读取姓名，给这个姓名加问号。");
   assert.deepEqual(applied.document.nodes.input_name?.writes, [{ state: "name", mode: "replace" }]);

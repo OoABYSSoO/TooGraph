@@ -429,7 +429,10 @@ test("BuddyWidget executes virtual UI operation events through the virtual curso
   assert.match(componentSource, /dispatchVirtualPointerEvent\(targetElement, "pointerdown"/);
   assert.match(componentSource, /dispatchVirtualPointerEvent\(pointerSurface, "pointermove"/);
   assert.match(componentSource, /dispatchVirtualPointerEvent\(pointerSurface, "pointerup"/);
-  assert.match(componentSource, /dispatchVirtualDoubleClick\(targetElement\);/);
+  assert.match(componentSource, /dispatchVirtualDoubleClick\(targetElement, resolveGraphEditPlaybackPositionClientPoint\(step\)\);/);
+  assert.match(componentSource, /function resolveGraphEditPlaybackPositionClientPoint\(step: GraphEditPlaybackStep\): BuddyPosition \| null/);
+  assert.match(componentSource, /async function typeVirtualText\(element: HTMLInputElement \| HTMLTextAreaElement, text: string\)/);
+  assert.match(componentSource, /function shouldSkipGraphEditPlaybackTextStep\(/);
   assert.match(componentSource, /if \(step\.kind === "choose_node_type" && targetElement\) \{[\s\S]*const beforeNodeIds = listGraphEditPlaybackNodeAffordanceIds\(\);[\s\S]*dispatchVirtualClick\(targetElement\);[\s\S]*rememberCreatedNodeAlias\(step, beforeNodeIds, playbackState\);/);
   assert.match(componentSource, /if \(step\.kind === "commit_state_field" && targetElement\) \{[\s\S]*const beforeStateKeys = listGraphEditPlaybackPortStateKeys\(step, playbackState\);[\s\S]*dispatchVirtualClick\(targetElement\);[\s\S]*rememberCreatedStateAlias\(step, beforeStateKeys, playbackState\);/);
   assert.doesNotMatch(componentSource, /dispatchGraphEditPlaybackOpenMenu/);

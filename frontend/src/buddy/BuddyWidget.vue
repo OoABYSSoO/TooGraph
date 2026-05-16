@@ -613,6 +613,7 @@ const BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE = 1;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_REACHED_DISTANCE_PX = 12;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 1.25;
 const BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS = 80;
+const BUDDY_VIRTUAL_OPERATION_TYPE_CHARACTER_DELAY_MS = 18;
 const BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_WAIT_MS = 2400;
 const BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_RETRY_MS = 80;
 const VIRTUAL_CURSOR_STAR_PATH =
@@ -2340,8 +2341,7 @@ async function executeBuddyVirtualTypeOperation(operation: BuddyVirtualOperation
   if (!input) {
     return;
   }
-  input.value = `${input.value}${operation.text}`;
-  dispatchVirtualInputEvents(input, "insertText", operation.text);
+  await typeVirtualText(input, operation.text);
 }
 
 async function executeBuddyVirtualPressOperation(operation: BuddyVirtualOperation) {
@@ -2395,16 +2395,20 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
   }
   const playbackState = createGraphEditPlaybackUiState();
   await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
-  for (const step of response.playbackSteps) {
+  for (let stepIndex = 0; stepIndex < response.playbackSteps.length; stepIndex += 1) {
+    const step = response.playbackSteps[stepIndex]!;
     const targetElement = await resolveGraphEditPlaybackStepElementWithRetry(step, playbackState);
+    if (shouldSkipGraphEditPlaybackTextStep(step, response.playbackSteps, stepIndex, playbackState, targetElement)) {
+      continue;
+    }
     if (isGraphEditPlaybackDragStep(step)) {
       await executeGraphEditPlaybackDragStep(step, targetElement, playbackState);
     } else if (targetElement) {
-      await moveVirtualCursorToElement(targetElement);
+      await moveVirtualCursorToGraphEditStep(step, targetElement);
     }
     if (step.kind === "open_node_creation_menu") {
       if (!step.sourceAnchorKind && targetElement) {
-        dispatchVirtualDoubleClick(targetElement);
+        dispatchVirtualDoubleClick(targetElement, resolveGraphEditPlaybackPositionClientPoint(step));
       }
     } else if (step.kind === "choose_node_type" && targetElement) {
       const beforeNodeIds = listGraphEditPlaybackNodeAffordanceIds();
@@ -2447,8 +2451,8 @@ async function executeGraphEditPlaybackDragStep(
   if (!targetElement) {
     return;
   }
-  await moveVirtualCursorToElement(targetElement);
   const resolvedStep = resolveAliasedGraphEditPlaybackStep(step, playbackState);
+  await moveVirtualCursorToGraphEditStep(resolvedStep, targetElement);
   virtualCursorDragging.value = true;
   await dispatchVirtualGraphDragPointerEvents(resolvedStep, targetElement);
   virtualCursorDragging.value = false;
@@ -2482,6 +2486,10 @@ function buildVirtualDragPoints(startPoint: BuddyPosition, endPoint: BuddyPositi
 
 function resolveGraphEditPlaybackDragEndPoint(step: GraphEditPlaybackStep): BuddyPosition | null {
   const endTarget = typeof step.endTarget === "string" ? step.endTarget : "";
+  const positionPoint = resolveGraphEditPlaybackPositionClientPoint(step);
+  if (positionPoint && (!endTarget || endTarget === "editor.canvas.surface" || endTarget === "editor.canvas.empty.createFirstNode")) {
+    return positionPoint;
+  }
   if (endTarget) {
     const endAffordance = resolveVirtualOperationAffordance(endTarget);
     if (endAffordance) {
@@ -2581,6 +2589,41 @@ function replaceAllLiteral(value: string, search: string, replacement: string) {
   return value.split(search).join(replacement);
 }
 
+function shouldSkipGraphEditPlaybackTextStep(
+  step: GraphEditPlaybackStep,
+  steps: GraphEditPlaybackStep[],
+  stepIndex: number,
+  playbackState: GraphEditPlaybackUiState,
+  targetElement: HTMLElement | null,
+) {
+  if (step.kind === "focus_node_field") {
+    const nextStep = steps[stepIndex + 1];
+    return Boolean(
+      nextStep?.kind === "type_node_field" &&
+        nextStep.target === step.target &&
+        isGraphEditPlaybackTextAlreadyCurrent(nextStep, playbackState, targetElement),
+    );
+  }
+  if (step.kind === "type_node_field") {
+    return isGraphEditPlaybackTextAlreadyCurrent(step, playbackState, targetElement);
+  }
+  return false;
+}
+
+function isGraphEditPlaybackTextAlreadyCurrent(
+  step: GraphEditPlaybackStep,
+  playbackState: GraphEditPlaybackUiState,
+  targetElement: HTMLElement | null,
+) {
+  const expectedText = normalizeVirtualText(step.value ?? "");
+  const targetId = resolveAliasedGraphEditPlaybackTarget(step.target, playbackState);
+  const input = resolveVirtualOperationTextInput(targetId);
+  if (input) {
+    return normalizeVirtualText(input.value) === expectedText;
+  }
+  return normalizeVirtualText(targetElement?.textContent ?? "") === expectedText;
+}
+
 async function focusGraphEditPlaybackField(
   step: GraphEditPlaybackStep,
   targetElement: HTMLElement,
@@ -2607,8 +2650,7 @@ async function typeGraphEditPlaybackField(step: GraphEditPlaybackStep, playbackS
   }
   await moveVirtualCursorToElement(input);
   input.focus();
-  input.value = step.value ?? "";
-  dispatchVirtualInputEvents(input, "insertReplacementText", step.value ?? "");
+  await replaceVirtualText(input, step.value ?? "");
   if (targetId.endsWith(".title") || targetId.endsWith(".description")) {
     await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
     dispatchGraphEditPlaybackTextCommit(input, targetId);
@@ -2765,6 +2807,59 @@ function resolveElementCenterPoint(element: HTMLElement): BuddyPosition {
   };
 }
 
+async function moveVirtualCursorToGraphEditStep(step: GraphEditPlaybackStep, element: HTMLElement) {
+  const positionPoint = resolveGraphEditPlaybackPositionClientPoint(step);
+  if (positionPoint && (step.kind === "move_virtual_cursor" || step.kind === "open_node_creation_menu")) {
+    await waitForVirtualOperation(moveVirtualCursorToClientPoint(positionPoint));
+    return;
+  }
+  await moveVirtualCursorToElement(element);
+}
+
+function resolveGraphEditPlaybackPositionClientPoint(step: GraphEditPlaybackStep): BuddyPosition | null {
+  const position = step.position;
+  if (!position || typeof position.x !== "number" || typeof position.y !== "number") {
+    return null;
+  }
+  const canvas = resolveVirtualOperationAffordance("editor.canvas.surface")?.element;
+  const viewportElement = canvas?.querySelector<HTMLElement>(".editor-canvas__viewport") ?? null;
+  if (!canvas) {
+    return null;
+  }
+  const canvasRect = canvas.getBoundingClientRect();
+  const viewportTransform = resolveGraphEditPlaybackViewportTransform(viewportElement);
+  return {
+    x: canvasRect.left + viewportTransform.x + position.x * viewportTransform.scaleX,
+    y: canvasRect.top + viewportTransform.y + position.y * viewportTransform.scaleY,
+  };
+}
+
+function resolveGraphEditPlaybackViewportTransform(viewportElement: HTMLElement | null) {
+  if (!viewportElement || typeof window === "undefined" || typeof window.getComputedStyle !== "function") {
+    return { x: 0, y: 0, scaleX: 1, scaleY: 1 };
+  }
+  const transform = window.getComputedStyle(viewportElement).transform;
+  if (!transform || transform === "none") {
+    return { x: 0, y: 0, scaleX: 1, scaleY: 1 };
+  }
+  try {
+    if (typeof DOMMatrixReadOnly === "function") {
+      const matrix = new DOMMatrixReadOnly(transform);
+      return { x: matrix.e, y: matrix.f, scaleX: matrix.a || 1, scaleY: matrix.d || 1 };
+    }
+  } catch {
+    // Fall through to the lightweight matrix parser below.
+  }
+  const matrixMatch = transform.match(/^matrix\(([^)]+)\)$/);
+  const values = matrixMatch?.[1]?.split(",").map((value) => Number(value.trim())) ?? [];
+  return {
+    x: Number.isFinite(values[4]) ? values[4]! : 0,
+    y: Number.isFinite(values[5]) ? values[5]! : 0,
+    scaleX: Number.isFinite(values[0]) && values[0] !== 0 ? values[0]! : 1,
+    scaleY: Number.isFinite(values[3]) && values[3] !== 0 ? values[3]! : 1,
+  };
+}
+
 function escapeVirtualOperationTargetId(targetId: string) {
   return targetId.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
@@ -2805,12 +2900,12 @@ function dispatchVirtualClick(element: HTMLElement) {
   );
 }
 
-function dispatchVirtualDoubleClick(element: HTMLElement) {
+function dispatchVirtualDoubleClick(element: HTMLElement, point?: BuddyPosition | null) {
   const rect = element.getBoundingClientRect();
-  const clientX = rect.left + rect.width / 2;
-  const clientY = rect.top + rect.height / 2;
-  dispatchVirtualPointerTap(element);
-  dispatchVirtualPointerTap(element);
+  const clientX = point?.x ?? rect.left + rect.width / 2;
+  const clientY = point?.y ?? rect.top + rect.height / 2;
+  dispatchVirtualPointerTap(element, point);
+  dispatchVirtualPointerTap(element, point);
   element.dispatchEvent(
     new MouseEvent("dblclick", {
       bubbles: true,
@@ -2822,12 +2917,29 @@ function dispatchVirtualDoubleClick(element: HTMLElement) {
   );
 }
 
-function dispatchVirtualPointerTap(element: HTMLElement) {
+function dispatchVirtualPointerTap(element: HTMLElement, point?: BuddyPosition | null) {
   const rect = element.getBoundingClientRect();
-  const clientX = rect.left + rect.width / 2;
-  const clientY = rect.top + rect.height / 2;
+  const clientX = point?.x ?? rect.left + rect.width / 2;
+  const clientY = point?.y ?? rect.top + rect.height / 2;
   dispatchVirtualPointerEvent(element, "pointerdown", clientX, clientY);
   dispatchVirtualPointerEvent(element, "pointerup", clientX, clientY);
+}
+
+async function replaceVirtualText(element: HTMLInputElement | HTMLTextAreaElement, text: string) {
+  if (element.value) {
+    element.value = "";
+    dispatchVirtualInputEvents(element, "deleteContentBackward", "");
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TYPE_CHARACTER_DELAY_MS);
+  }
+  await typeVirtualText(element, text);
+}
+
+async function typeVirtualText(element: HTMLInputElement | HTMLTextAreaElement, text: string) {
+  for (const character of text) {
+    element.value = `${element.value}${character}`;
+    dispatchVirtualInputEvents(element, "insertText", character);
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TYPE_CHARACTER_DELAY_MS);
+  }
 }
 
 function dispatchVirtualInputEvents(element: HTMLInputElement | HTMLTextAreaElement, inputType: string, data: string) {
@@ -2837,6 +2949,10 @@ function dispatchVirtualInputEvents(element: HTMLInputElement | HTMLTextAreaElem
     element.dispatchEvent(new Event("input", { bubbles: true }));
   }
   element.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function normalizeVirtualText(value: unknown) {
+  return String(value ?? "").replace(/\r\n/g, "\n").trim();
 }
 
 function dispatchVirtualPointerEvent(element: HTMLElement, type: "pointerdown" | "pointermove" | "pointerup", clientX: number, clientY: number) {

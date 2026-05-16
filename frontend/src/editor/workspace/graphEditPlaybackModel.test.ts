@@ -88,7 +88,7 @@ test("buildGraphEditPlaybackPlan compiles graph intentions without exposing mous
 
   assert.equal(plan.valid, true);
   assert.deepEqual(plan.issues, []);
-  assert.deepEqual(plan.graphCommands[0]?.kind === "create_node" ? plan.graphCommands[0].position : null, { x: 160, y: 120 });
+  assert.deepEqual(plan.graphCommands[0]?.kind === "create_node" ? plan.graphCommands[0].position : null, { x: 390, y: 300 });
   assert.deepEqual(plan.graphCommands.map((command) => command.kind), [
     "create_node",
     "create_state",

@@ -175,6 +175,88 @@ test("createNodeFromCreationEntry creates input boundary nodes with a virtual ou
   assert.equal(result.document.metadata.toograph_state_key_counter, 7);
 });
 
+test("createNodeFromCreationEntry places double-click-created nodes around the gesture point", () => {
+  const document = createBaseDocument();
+  const entry: NodeCreationEntry = {
+    id: "node-input",
+    family: "input",
+    label: "Input",
+    description: "Create a workflow input boundary.",
+    mode: "node",
+    origin: "builtin",
+    nodeKind: "input",
+    acceptsValueTypes: null,
+  };
+
+  const result = createNodeFromCreationEntry(document, {
+    entry,
+    createdNodeId: "input_centered",
+    persistedPresets: [],
+    context: {
+      position: { x: 500, y: 420 },
+    },
+  });
+
+  assert.deepEqual(result.document.nodes.input_centered.ui.position, { x: 270, y: 260 });
+});
+
+test("createNodeFromCreationEntry places state-drag-created nodes with their input port on the release point", () => {
+  const document = createBaseDocument();
+  const entry: NodeCreationEntry = {
+    id: "preset-agent-empty",
+    family: "agent",
+    label: "Empty LLM Node",
+    description: "Blank one-turn LLM node.",
+    mode: "preset",
+    origin: "builtin",
+    presetId: "preset.agent.empty.v0",
+    acceptsValueTypes: null,
+  };
+
+  const result = createNodeFromCreationEntry(document, {
+    entry,
+    createdNodeId: "agent_from_state",
+    persistedPresets: [],
+    context: {
+      position: { x: 600, y: 320 },
+      sourceNodeId: "input_question",
+      sourceAnchorKind: "state-out",
+      sourceStateKey: "question",
+      sourceValueType: "text",
+    },
+  });
+
+  assert.deepEqual(result.document.nodes.agent_from_state.ui.position, { x: 594, y: 175 });
+  assert.deepEqual(result.document.nodes.agent_from_state.reads, [{ state: "question", required: true }]);
+});
+
+test("createNodeFromCreationEntry places flow-drag-created nodes with their flow input on the release point", () => {
+  const document = createBaseDocument();
+  const entry: NodeCreationEntry = {
+    id: "preset-agent-empty",
+    family: "agent",
+    label: "Empty LLM Node",
+    description: "Blank one-turn LLM node.",
+    mode: "preset",
+    origin: "builtin",
+    presetId: "preset.agent.empty.v0",
+    acceptsValueTypes: null,
+  };
+
+  const result = createNodeFromCreationEntry(document, {
+    entry,
+    createdNodeId: "agent_from_flow",
+    persistedPresets: [],
+    context: {
+      position: { x: 620, y: 300 },
+      sourceNodeId: "input_question",
+      sourceAnchorKind: "flow-out",
+    },
+  });
+
+  assert.deepEqual(result.document.nodes.agent_from_flow.ui.position, { x: 614, y: 266 });
+});
+
 test("createNodeFromCreationEntry builds the builtin condition preset and auto-wires route edges", () => {
   const document = createBaseDocument();
   const entry: NodeCreationEntry = {
