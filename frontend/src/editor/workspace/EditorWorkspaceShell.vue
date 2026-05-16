@@ -1169,6 +1169,15 @@ type GraphEditPlaybackPlanRequestDetail = {
   response?: unknown;
 };
 
+type GraphEditPlaybackOpenNodeMenuDetail = {
+  position?: unknown;
+  sourceNodeId?: unknown;
+  sourceStateKey?: unknown;
+  sourceAnchorKind?: unknown;
+  clientX?: unknown;
+  clientY?: unknown;
+};
+
 type GraphEditPlaybackApplyCommandDetail = {
   requestId?: unknown;
   commandId?: unknown;
@@ -1210,11 +1219,46 @@ function handleGraphEditPlaybackPlanRequest(event: Event) {
   };
 }
 
+function handleGraphEditPlaybackOpenNodeMenu(event: Event) {
+  const detail = (event as CustomEvent<GraphEditPlaybackOpenNodeMenuDetail>).detail;
+  const tab = ensureGraphEditPlaybackTab();
+  if (!tab) {
+    return;
+  }
+  const position = normalizeGraphEditPlaybackMenuPosition(detail?.position);
+  const sourceNodeId = compactPlaybackText(detail?.sourceNodeId);
+  const sourceStateKey = compactPlaybackText(detail?.sourceStateKey);
+  const document = documentsByTabId.value[tab.tabId] ?? null;
+  openNodeCreationMenuForTab(tab.tabId, {
+    position,
+    sourceNodeId,
+    sourceStateKey,
+    sourceAnchorKind: detail?.sourceAnchorKind === "state-out" ? "state-out" : detail?.sourceAnchorKind === "flow-out" ? "flow-out" : undefined,
+    sourceValueType: sourceStateKey && document ? document.state_schema[sourceStateKey]?.type ?? null : null,
+    clientX: typeof detail?.clientX === "number" && Number.isFinite(detail.clientX) ? detail.clientX : undefined,
+    clientY: typeof detail?.clientY === "number" && Number.isFinite(detail.clientY) ? detail.clientY : undefined,
+  });
+}
+
 function ensureGraphEditPlaybackTab() {
   if (!activeTab.value && workspace.value.tabs.length === 0) {
     openNewTab(null, "replace");
   }
   return activeTab.value;
+}
+
+function normalizeGraphEditPlaybackMenuPosition(value: unknown): { x: number; y: number } {
+  if (value && typeof value === "object" && "x" in value && "y" in value) {
+    const position = value as { x?: unknown; y?: unknown };
+    if (typeof position.x === "number" && Number.isFinite(position.x) && typeof position.y === "number" && Number.isFinite(position.y)) {
+      return { x: position.x, y: position.y };
+    }
+  }
+  return { x: 160, y: 120 };
+}
+
+function compactPlaybackText(value: unknown) {
+  return String(value ?? "").trim() || undefined;
 }
 
 function handleGraphEditPlaybackApplyCommand(event: Event) {
@@ -1238,6 +1282,9 @@ function handleGraphEditPlaybackApplyCommand(event: Event) {
     return;
   }
   markDocumentDirty(pending.tabId, nextDocument);
+  if (command.kind === "create_node") {
+    closeNodeCreationMenu(pending.tabId);
+  }
   const focusNodeId = resolveGraphEditCommandFocusNodeId(command);
   if (focusNodeId) {
     focusNodeForTab(pending.tabId, focusNodeId);
@@ -1254,7 +1301,7 @@ function resolveGraphEditCommandFocusNodeId(command: GraphEditCommand): string {
   if ("nodeId" in command) {
     return command.nodeId;
   }
-  if ("targetNodeId" in command) {
+  if ("targetNodeId" in command && typeof command.targetNodeId === "string") {
     return command.targetNodeId;
   }
   return "";
@@ -1509,6 +1556,7 @@ watch(
 
 onBeforeUnmount(() => {
   window.removeEventListener("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener);
+  window.removeEventListener("toograph:graph-edit-playback-open-node-menu", handleGraphEditPlaybackOpenNodeMenu as EventListener);
   window.removeEventListener("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener);
   pendingGraphEditPlaybackPlans.clear();
   pendingGraphEditPlaybackAppliedCommandIds.clear();
@@ -1518,6 +1566,7 @@ onBeforeUnmount(() => {
 
 onMounted(() => {
   window.addEventListener("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener);
+  window.addEventListener("toograph:graph-edit-playback-open-node-menu", handleGraphEditPlaybackOpenNodeMenu as EventListener);
   window.addEventListener("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener);
   loadInitialWorkspaceResources();
   updateWorkspace(readPersistedEditorWorkspace());

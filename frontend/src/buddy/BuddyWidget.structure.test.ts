@@ -417,9 +417,12 @@ test("BuddyWidget executes virtual UI operation events through the virtual curso
   assert.match(componentSource, /async function executeBuddyVirtualGraphEditOperation\(operation: BuddyVirtualOperation\)/);
   assert.match(componentSource, /requestGraphEditPlaybackPlan\(\{[\s\S]*requestId,[\s\S]*graphEditIntents: operation\.graphEditIntents,[\s\S]*\}\);/);
   assert.match(componentSource, /window\.dispatchEvent\(new CustomEvent\("toograph:graph-edit-playback-plan-request", \{ detail \}\)\);/);
+  assert.match(componentSource, /dispatchGraphEditPlaybackOpenMenu\(step, targetElement\);/);
+  assert.match(componentSource, /new CustomEvent\("toograph:graph-edit-playback-open-node-menu"/);
   assert.match(componentSource, /dispatchGraphEditPlaybackApplyCommand\(requestId, step\.commandId\);/);
   assert.match(componentSource, /window\.dispatchEvent\([\s\S]*new CustomEvent\("toograph:graph-edit-playback-apply-command"/);
   assert.match(componentSource, /function resolveVirtualOperationAffordance\(targetId: string\)/);
+  assert.match(componentSource, /const exactAffordance = resolveVirtualOperationAffordance\(step\.target\);/);
   assert.match(componentSource, /querySelector<HTMLElement>\(`\[data-virtual-affordance-id="\$\{escapeVirtualOperationTargetId\(targetId\)\}"\]`\)/);
   assert.doesNotMatch(componentSource, /"app\.nav\.buddy":/);
   assert.doesNotMatch(componentSource, /BUDDY_VIRTUAL_OPERATION_TARGET_SELECTORS/);

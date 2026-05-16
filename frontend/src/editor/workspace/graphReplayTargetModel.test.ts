@@ -81,17 +81,39 @@ test("buildGraphReplayIntentsFromTargetGraph compiles a target graph into replay
   assert.deepEqual(
     result.intentPackage.operations.map((operation) => operation.kind),
     [
+      "create_node",
       "create_state",
-      "create_node",
-      "create_node",
-      "create_node",
       "bind_state",
-      "bind_state",
+      "create_node",
       "bind_state",
       "connect_nodes",
+      "create_node",
+      "bind_state",
       "connect_nodes",
     ],
   );
+  assert.deepEqual(result.intentPackage.operations.map(operationLabel), [
+    "input_name",
+    "name",
+    "input_name:name",
+    "ask_name",
+    "ask_name:name",
+    "input_name:ask_name",
+    "output_name",
+    "output_name:name",
+    "ask_name:output_name",
+  ]);
+  assert.deepEqual(result.intentPackage.operations[3], {
+    kind: "create_node",
+    ref: "ask_name",
+    nodeId: "ask_name",
+    nodeType: "agent",
+    title: "LLM节点",
+    description: "给姓名加问号。",
+    taskInstruction: "读取姓名，给这个姓名加问号。",
+    position: { x: 360, y: 160 },
+    creationSource: { kind: "state", sourceNodeRef: "input_name", stateRef: "name" },
+  });
 
   const plan = buildGraphEditPlaybackPlan(createEmptyDraftGraph(), result.intentPackage);
   const applied = applyGraphEditPlaybackPlan(createEmptyDraftGraph(), plan);
@@ -109,6 +131,51 @@ test("buildGraphReplayIntentsFromTargetGraph compiles a target graph into replay
     { source: "ask_name", target: "output_name" },
   ]);
 });
+
+test("buildGraphReplayIntentsFromTargetGraph handles cyclic flow graphs without replay recursion", () => {
+  const graph = targetGraph();
+  graph.nodes.output_name = {
+    kind: "agent",
+    name: "复核节点",
+    description: "回到 LLM 节点继续复核。",
+    ui: { position: { x: 600, y: 160 }, collapsed: false },
+    reads: [{ state: "name" }],
+    writes: [],
+    config: {
+      skillKey: "",
+      taskInstruction: "复核姓名处理结果。",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "high",
+      temperature: 0.2,
+    },
+  };
+  graph.edges.push({ source: "output_name", target: "ask_name" });
+
+  const result = buildGraphReplayIntentsFromTargetGraph(graph);
+  const plan = buildGraphEditPlaybackPlan(createEmptyDraftGraph(), result.intentPackage);
+  const applied = applyGraphEditPlaybackPlan(createEmptyDraftGraph(), plan);
+
+  assert.equal(result.valid, true);
+  assert.equal(plan.valid, true);
+  assert.equal(applied.applied, true);
+  assert.equal(result.intentPackage.operations.filter((operation) => operation.kind === "connect_nodes").length, 3);
+  assert.deepEqual(applied.document.edges, [
+    { source: "input_name", target: "ask_name" },
+    { source: "ask_name", target: "output_name" },
+    { source: "output_name", target: "ask_name" },
+  ]);
+});
+
+function operationLabel(operation: ReturnType<typeof buildGraphReplayIntentsFromTargetGraph>["intentPackage"]["operations"][number]) {
+  if ("ref" in operation) {
+    return operation.ref;
+  }
+  if (operation.kind === "bind_state") {
+    return `${operation.nodeRef}:${operation.stateRef}`;
+  }
+  return `${operation.sourceRef}:${operation.targetRef}`;
+}
 
 test("buildGraphReplayIntentsFromTargetGraph reports unsupported graph features without asking an LLM", () => {
   const graph = targetGraph();

@@ -35,6 +35,11 @@
         :key="entry.id"
         type="button"
         class="editor-node-creation-menu__entry"
+        :data-virtual-affordance-id="`editor.nodeType.${entry.family}`"
+        :data-virtual-affordance-label="entry.label"
+        data-virtual-affordance-role="button"
+        data-virtual-affordance-zone="editor-canvas.node-creation"
+        data-virtual-affordance-actions="click"
         @click="$emit('select-entry', entry)"
       >
         <span class="editor-node-creation-menu__entry-family">{{ entry.family }}</span>

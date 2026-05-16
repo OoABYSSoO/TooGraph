@@ -686,9 +686,13 @@ test("EditorWorkspaceShell applies virtual graph edit playback commands through 
   assert.match(componentSource, /const pendingGraphEditPlaybackPlans = new Map<string, \{ tabId: string; plan: GraphEditPlaybackPlan \}\>\(\);/);
   assert.match(componentSource, /const pendingGraphEditPlaybackAppliedCommandIds = new Map<string, Set<string>>\(\);/);
   assert.match(componentSource, /window\.addEventListener\("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener\);/);
+  assert.match(componentSource, /window\.addEventListener\("toograph:graph-edit-playback-open-node-menu", handleGraphEditPlaybackOpenNodeMenu as EventListener\);/);
   assert.match(componentSource, /window\.addEventListener\("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener\);/);
   assert.match(componentSource, /window\.removeEventListener\("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener\);/);
+  assert.match(componentSource, /window\.removeEventListener\("toograph:graph-edit-playback-open-node-menu", handleGraphEditPlaybackOpenNodeMenu as EventListener\);/);
   assert.match(componentSource, /function handleGraphEditPlaybackPlanRequest\(event: Event\)/);
+  assert.match(componentSource, /function handleGraphEditPlaybackOpenNodeMenu\(event: Event\)/);
+  assert.match(componentSource, /openNodeCreationMenuForTab\(tab\.tabId, \{[\s\S]*sourceNodeId,[\s\S]*sourceStateKey,/);
   assert.match(componentSource, /openNewTab\(null, "replace"\);/);
   assert.match(componentSource, /const plan = buildGraphEditPlaybackPlan\(document, \{ operations: detail\.graphEditIntents \}\);/);
   assert.match(componentSource, /detail\.response = \{[\s\S]*ok: plan\.valid,[\s\S]*playbackSteps: plan\.playbackSteps,[\s\S]*issues: plan\.issues,[\s\S]*\};/);

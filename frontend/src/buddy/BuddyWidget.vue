@@ -2391,6 +2391,9 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
     if (targetElement) {
       await moveVirtualCursorToElement(targetElement);
     }
+    if (step.kind === "open_node_creation_menu") {
+      dispatchGraphEditPlaybackOpenMenu(step, targetElement);
+    }
     if (step.kind === "apply_graph_command" && step.commandId) {
       dispatchGraphEditPlaybackApplyCommand(requestId, step.commandId);
     }
@@ -2415,6 +2418,26 @@ function requestGraphEditPlaybackPlan(input: { requestId: string; graphEditInten
   return detail.response;
 }
 
+function dispatchGraphEditPlaybackOpenMenu(step: GraphEditPlaybackStep, targetElement: HTMLElement | null) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const rect = targetElement?.getBoundingClientRect();
+  window.dispatchEvent(
+    new CustomEvent("toograph:graph-edit-playback-open-node-menu", {
+      detail: {
+        position: step.position,
+        nodeType: step.nodeType,
+        sourceNodeId: step.sourceNodeId,
+        sourceStateKey: step.sourceStateKey,
+        sourceAnchorKind: step.sourceAnchorKind,
+        clientX: rect ? rect.left + rect.width / 2 : undefined,
+        clientY: rect ? rect.top + rect.height / 2 : undefined,
+      },
+    }),
+  );
+}
+
 function dispatchGraphEditPlaybackApplyCommand(requestId: string, commandId: string) {
   if (typeof window === "undefined") {
     return;
@@ -2427,6 +2450,10 @@ function dispatchGraphEditPlaybackApplyCommand(requestId: string, commandId: str
 }
 
 function resolveGraphEditPlaybackStepElement(step: GraphEditPlaybackStep): HTMLElement | null {
+  const exactAffordance = resolveVirtualOperationAffordance(step.target);
+  if (exactAffordance) {
+    return exactAffordance.element;
+  }
   if (step.target.startsWith("editor.canvas.")) {
     return resolveVirtualOperationAffordance(step.target)?.element ?? null;
   }

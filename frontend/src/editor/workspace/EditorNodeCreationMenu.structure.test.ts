@@ -16,6 +16,8 @@ test("EditorNodeCreationMenu is built on Element Plus input instead of hand-roll
 test("EditorNodeCreationMenu renders creation entries and emits selection events", () => {
   assert.match(componentSource, /v-for="entry in entries"/);
   assert.match(componentSource, /@click="\$emit\('select-entry', entry\)"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`editor\.nodeType\.\$\{entry\.family\}`"/);
+  assert.match(componentSource, /data-virtual-affordance-zone="editor-canvas.node-creation"/);
   assert.match(componentSource, /@click="\$emit\('close'\)"/);
   assert.match(componentSource, /t\("nodeCreation\.empty"\)/);
   assert.match(componentSource, /\.editor-node-creation-menu \{[\s\S]*position:\s*fixed;/);
