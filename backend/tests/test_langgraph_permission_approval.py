@@ -17,7 +17,7 @@ def _approval_graph() -> NodeSystemGraphDocument:
             "state_schema": {
                 "selected_capability": {
                     "type": "capability",
-                    "value": {"kind": "skill", "key": "local_workspace_executor"},
+                    "value": {"kind": "action", "key": "local_workspace_executor"},
                 },
                 "request": {"type": "text", "value": "write a user skill file"},
                 "dynamic_result": {"type": "result_package"},
@@ -27,7 +27,7 @@ def _approval_graph() -> NodeSystemGraphDocument:
                     "kind": "input",
                     "ui": {"position": {"x": 0, "y": 0}},
                     "writes": [{"state": "selected_capability"}],
-                    "config": {"value": {"kind": "skill", "key": "local_workspace_executor"}},
+                    "config": {"value": {"kind": "action", "key": "local_workspace_executor"}},
                 },
                 "request_input": {
                     "kind": "input",
@@ -41,7 +41,7 @@ def _approval_graph() -> NodeSystemGraphDocument:
                     "ui": {"position": {"x": 320, "y": 80}},
                     "reads": [{"state": "selected_capability"}, {"state": "request"}],
                     "writes": [{"state": "dynamic_result"}],
-                    "config": {"skillKey": ""},
+                    "config": {"actionKey": ""},
                 },
                 "output_result": {
                     "kind": "output",
@@ -68,7 +68,7 @@ def _subgraph_approval_graph() -> NodeSystemGraphDocument:
         "state_schema": {
             "selected_capability": {
                 "type": "capability",
-                "value": {"kind": "skill", "key": "local_workspace_executor"},
+                "value": {"kind": "action", "key": "local_workspace_executor"},
             },
             "request": {"type": "text", "value": "write a user skill file"},
             "dynamic_result": {"type": "result_package"},
@@ -78,7 +78,7 @@ def _subgraph_approval_graph() -> NodeSystemGraphDocument:
                 "kind": "input",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "writes": [{"state": "selected_capability"}],
-                "config": {"value": {"kind": "skill", "key": "local_workspace_executor"}},
+                "config": {"value": {"kind": "action", "key": "local_workspace_executor"}},
             },
             "request_input": {
                 "kind": "input",
@@ -92,7 +92,7 @@ def _subgraph_approval_graph() -> NodeSystemGraphDocument:
                 "ui": {"position": {"x": 320, "y": 80}},
                 "reads": [{"state": "selected_capability"}, {"state": "request"}],
                 "writes": [{"state": "dynamic_result"}],
-                "config": {"skillKey": ""},
+                "config": {"actionKey": ""},
             },
             "output_result": {
                 "kind": "output",
@@ -115,7 +115,7 @@ def _subgraph_approval_graph() -> NodeSystemGraphDocument:
             "state_schema": {
                 "selected_capability": {
                     "type": "capability",
-                    "value": {"kind": "skill", "key": "local_workspace_executor"},
+                    "value": {"kind": "action", "key": "local_workspace_executor"},
                 },
                 "request": {"type": "text", "value": "write a user skill file"},
                 "dynamic_result": {"type": "result_package"},
@@ -125,7 +125,7 @@ def _subgraph_approval_graph() -> NodeSystemGraphDocument:
                     "kind": "input",
                     "ui": {"position": {"x": 0, "y": 0}},
                     "writes": [{"state": "selected_capability"}],
-                    "config": {"value": {"kind": "skill", "key": "local_workspace_executor"}},
+                    "config": {"value": {"kind": "action", "key": "local_workspace_executor"}},
                 },
                 "request_input": {
                     "kind": "input",

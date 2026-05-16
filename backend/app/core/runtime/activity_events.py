@@ -95,7 +95,7 @@ def record_skill_activity_events(
             continue
         detail = raw_event.get("detail") if isinstance(raw_event.get("detail"), dict) else {}
         detail = {
-            "skill_key": skill_key,
+            "action_key": skill_key,
             "binding_source": binding_source,
             **detail,
         }

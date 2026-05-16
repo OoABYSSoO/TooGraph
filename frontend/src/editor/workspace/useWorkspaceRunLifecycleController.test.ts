@@ -71,8 +71,8 @@ function runDetail(status: string, patch: Partial<RunDetail> = {}): RunDetail {
     revision_round: 1,
     started_at: "",
     metadata: {},
-    selected_skills: [],
-    skill_outputs: [],
+    selected_actions: [],
+    action_outputs: [],
     evaluation_result: {},
     memory_summary: "",
     final_result: "",
@@ -292,8 +292,8 @@ test("useWorkspaceRunLifecycleController appends node and state activity events 
     new MessageEvent("activity.event", {
       data: JSON.stringify({
         node_id: "agent_1",
-        kind: "skill_invocation",
-        summary: "Skill 'web_search' succeeded.",
+        kind: "action_invocation",
+        summary: "Action 'web_search' succeeded.",
         detail: { skill_key: "web_search" },
         sequence: 4,
         created_at: "2026-05-03T01:00:03Z",
@@ -310,7 +310,7 @@ test("useWorkspaceRunLifecycleController appends node and state activity events 
       { kind: "node-started", title: "agent_1 running", stateKey: null, preview: "agent running", active: false },
       { kind: "state-updated", title: "Answer", stateKey: "answer", preview: "Final answer", active: false },
       { kind: "reasoning", title: "agent_1 reasoning", stateKey: null, preview: "Checked sources", active: false },
-      { kind: "activity-event", title: "Skill 'web_search' succeeded.", stateKey: null, preview: '{\n  "skill_key": "web_search"\n}', active: true },
+      { kind: "activity-event", title: "Action 'web_search' succeeded.", stateKey: null, preview: '{\n  "action_key": "web_search"\n}', active: true },
     ],
   );
 });
@@ -337,8 +337,8 @@ test("useWorkspaceRunLifecycleController reconciles terminal run activity from s
           activity_events: [
             {
               node_id: "agent_1",
-              kind: "skill_invocation",
-              summary: "Skill 'web_search' succeeded.",
+              kind: "action_invocation",
+              summary: "Action 'web_search' succeeded.",
               detail: { skill_key: "web_search" },
               sequence: 2,
               created_at: "2026-05-03T01:00:02Z",
@@ -364,7 +364,7 @@ test("useWorkspaceRunLifecycleController reconciles terminal run activity from s
   assert.deepEqual(
     harness.runActivityByTabId.value.tab_a.entries.map((entry) => ({ kind: entry.kind, title: entry.title, sequence: entry.sequence, preview: entry.preview })),
     [
-      { kind: "activity-event", title: "Skill 'web_search' succeeded.", sequence: 2, preview: '{\n  "skill_key": "web_search"\n}' },
+      { kind: "activity-event", title: "Action 'web_search' succeeded.", sequence: 2, preview: '{\n  "action_key": "web_search"\n}' },
       { kind: "state-updated", title: "Answer", sequence: 3, preview: "Stored answer" },
     ],
   );

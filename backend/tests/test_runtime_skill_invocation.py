@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.runtime.skill_invocation import callable_accepts_keyword, invoke_skill
+from app.core.runtime.action_invocation import callable_accepts_keyword, invoke_skill
 from app.skills import runtime as skill_runtime
 from app.skills.runtime import ScriptSkillRunner
 

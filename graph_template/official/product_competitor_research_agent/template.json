@@ -75,8 +75,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_product_memory",
         "fieldKey": "success",
         "managed": true
@@ -89,8 +89,8 @@
       "value": [],
       "color": "#a855f7",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_product_memory",
         "fieldKey": "omitted_memories",
         "managed": true
@@ -103,8 +103,8 @@
       "value": "",
       "color": "#6d28d9",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_product_memory",
         "fieldKey": "result",
         "managed": true
@@ -205,8 +205,8 @@
       "value": {},
       "color": "#7c3aed",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_product_memory",
         "fieldKey": "session_recall_context",
         "managed": true
@@ -219,8 +219,8 @@
       "value": [],
       "color": "#8b5cf6",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_product_memory",
         "fieldKey": "recalled_sessions",
         "managed": true
@@ -457,9 +457,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "生成 product_memory_request JSON，只用于只读召回 Buddy 历史会话中的长期偏好、历史反馈和相关上下文。字段包含 mode、query、limit、window；mode 默认 discover，limit 不超过 8，window 不超过 2。query 应结合本模板输入和用户目标，避免过宽；不要写 scope、layer、status、top_k、max_chars，不要生成业务结论。",
         "modelSource": "global",
         "model": "",
@@ -507,10 +507,10 @@
         }
       ],
       "config": {
-        "skillKey": "buddy_session_recall",
-        "skillBindings": [
+        "actionKey": "buddy_session_recall",
+        "actionBindings": [
           {
-            "skillKey": "buddy_session_recall",
+            "actionKey": "buddy_session_recall",
             "outputMapping": {
               "success": "buddy_session_recall_success",
               "session_recall_context": "session_recall_context",
@@ -519,9 +519,9 @@
             }
           }
         ],
-        "skillInstructionBlocks": {
+        "actionInstructionBlocks": {
           "buddy_session_recall": {
-            "skillKey": "buddy_session_recall",
+            "actionKey": "buddy_session_recall",
             "title": "Buddy session recall instruction",
             "content": "你已绑定 Buddy 会话召回技能。只把 product_memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
             "source": "node.override"
@@ -582,9 +582,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "source_evidence_map 写成 JSON，包含 evidence_items 数组。每条包含 id、source_type、source_name、quote_or_summary、reliability、related_competitor、related_user_segment、notes。必须保留来源边界，没有来源时标注 evidence_missing。",
         "modelSource": "global",
         "model": "",
@@ -628,9 +628,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "competitor_profiles 写成 JSON，包含 competitors 数组。每个竞品包含 name、positioning、target_users、core_features、pricing_or_business_model、strengths、weaknesses、evidence_ids、unknowns。不得编造竞品能力。",
         "modelSource": "global",
         "model": "",
@@ -674,9 +674,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "feature_matrix 写成 Markdown 代码块中的 CSV。列至少包含 feature, user_job, our_hypothesis, competitor_coverage, evidence, gap_or_opportunity, confidence。每个判断都必须有 evidence id 或标注 evidence_missing。",
         "modelSource": "global",
         "model": "",
@@ -724,9 +724,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "clean_feedback 写成去噪后的 JSON 数组；user_review_clusters 写成 JSON，包含 clusters 数组，每个 cluster 包含 theme、sentiment、frequency_estimate、representative_quotes、evidence_ids、segments、confidence。不要把少量评论包装成统计结论。",
         "modelSource": "global",
         "model": "",
@@ -770,9 +770,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "pain_points 写成 Markdown，按 pain point 列出 user segment、current workaround、competitor gap、evidence_ids、severity、frequency_confidence、what_not_to_assume。证据不足时必须标注。",
         "modelSource": "global",
         "model": "",
@@ -824,9 +824,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "opportunity_report 写成 Markdown，包含 ranked opportunities、why_now、evidence、user_value、business_value、implementation_risk、confidence、assumptions、discarded_options。必须区分证据、推断和假设。",
         "modelSource": "global",
         "model": "",
@@ -870,9 +870,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "mvp_plan 写成 Markdown，包含 MVP scope、must-have、not-now、user journey、data model hints、launch milestones、success metrics、kill criteria。必须保留假设和需要验证的问题。",
         "modelSource": "global",
         "model": "",
@@ -920,9 +920,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "prd_draft 写成 Markdown，包含 background、problem、goals、non-goals、personas、requirements、user stories、acceptance criteria、analytics、open questions、risks。必须明确哪些是证据，哪些是假设，不得把未验证机会写成确定需求。",
         "modelSource": "global",
         "model": "",
@@ -970,9 +970,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "validation_plan 写成 Markdown，包含 assumptions_to_test、research_tasks、prototype_or_landing_tests、interview_questions、success_metrics、failure_thresholds、timeline、decision_rules。必须包含先验证高风险假设的路径。",
         "modelSource": "global",
         "model": "",
@@ -1036,9 +1036,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "final_research_package 写成 Markdown，包含：1. 研究结论摘要；2. 证据和限制；3. 竞品画像；4. 功能矩阵；5. 用户痛点；6. 机会点排序；7. MVP 方案；8. PRD 草稿；9. 验证计划；10. 会话召回参考；11. 人工确认清单。必须保留假设、不确定项和证据不足。",
         "modelSource": "global",
         "model": "",
@@ -1308,7 +1308,7 @@
         "required": false
       }
     ],
-    "requiredSkills": [
+    "requiredActions": [
       "buddy_session_recall"
     ],
     "requiredPermissions": [

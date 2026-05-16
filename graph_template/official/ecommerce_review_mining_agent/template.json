@@ -75,8 +75,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_review_memory",
         "fieldKey": "success",
         "managed": true
@@ -89,8 +89,8 @@
       "value": [],
       "color": "#a855f7",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_review_memory",
         "fieldKey": "omitted_memories",
         "managed": true
@@ -103,8 +103,8 @@
       "value": "",
       "color": "#6d28d9",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_review_memory",
         "fieldKey": "result",
         "managed": true
@@ -213,8 +213,8 @@
       "value": {},
       "color": "#7c3aed",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_review_memory",
         "fieldKey": "session_recall_context",
         "managed": true
@@ -227,8 +227,8 @@
       "value": [],
       "color": "#8b5cf6",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_review_memory",
         "fieldKey": "recalled_sessions",
         "managed": true
@@ -465,9 +465,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "生成 review_memory_request JSON，只用于只读召回 Buddy 历史会话中的长期偏好、历史反馈和相关上下文。字段包含 mode、query、limit、window；mode 默认 discover，limit 不超过 8，window 不超过 2。query 应结合本模板输入和用户目标，避免过宽；不要写 scope、layer、status、top_k、max_chars，不要生成业务结论。",
         "modelSource": "global",
         "model": "",
@@ -515,10 +515,10 @@
         }
       ],
       "config": {
-        "skillKey": "buddy_session_recall",
-        "skillBindings": [
+        "actionKey": "buddy_session_recall",
+        "actionBindings": [
           {
-            "skillKey": "buddy_session_recall",
+            "actionKey": "buddy_session_recall",
             "outputMapping": {
               "success": "buddy_session_recall_success",
               "session_recall_context": "session_recall_context",
@@ -527,9 +527,9 @@
             }
           }
         ],
-        "skillInstructionBlocks": {
+        "actionInstructionBlocks": {
           "buddy_session_recall": {
-            "skillKey": "buddy_session_recall",
+            "actionKey": "buddy_session_recall",
             "title": "Buddy session recall instruction",
             "content": "你已绑定 Buddy 会话召回技能。只把 review_memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
             "source": "node.override"
@@ -586,9 +586,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "review_source_map 写成 JSON，包含 source、review_id、product_side(own/competitor/store)、quote、rating、date_if_any、evidence_id。clean_reviews 写成 JSON 数组，去重、去广告、去无意义短评，并保留 evidence_id。不要把少量评论包装成统计结论。",
         "modelSource": "global",
         "model": "",
@@ -624,9 +624,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "positive_review_clusters 写成 JSON，包含 clusters 数组。每个 cluster 包含 theme、evidence_ids、representative_quotes、own_vs_competitor、frequency_hint、confidence、marketing_angle。frequency_hint 只能是定性估计。",
         "modelSource": "global",
         "model": "",
@@ -662,9 +662,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "negative_review_clusters 写成 JSON，包含 clusters 数组。每个 cluster 包含 theme、evidence_ids、representative_quotes、risk_type、own_vs_competitor、severity_hint、confidence、mitigation。不得弱化真实差评风险。",
         "modelSource": "global",
         "model": "",
@@ -712,9 +712,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "user_persona 和 purchase_motivation 都写成 Markdown，必须标注 evidence ids、适用场景、推断边界和不确定项。不要把评论里的少数观点写成全体用户画像。",
         "modelSource": "global",
         "model": "",
@@ -774,9 +774,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "selling_points 和 risk_points 都写成 Markdown。每个卖点必须包含 evidence ids、适用平台、可用表达、禁用夸张表达；每个风险必须包含 evidence ids、严重度、缓解建议和售后/合规提示。必须包含 evidence，不得生成无来源功效承诺。",
         "modelSource": "global",
         "model": "",
@@ -844,9 +844,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "product_copy、short_video_scripts、xiaohongshu_notes 均写成 Markdown。必须遵守合规说明，保留证据边界，避免绝对化、医疗功效、虚假稀缺、夸大收益和竞品贬损。每段文案后标注使用的卖点/risk/evidence。",
         "modelSource": "global",
         "model": "",
@@ -914,9 +914,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "final_review_mining_package 写成 Markdown，包含：1. 数据来源和限制；2. 好评点聚类；3. 差评点聚类；4. 用户画像；5. 购买动机；6. 卖点和证据；7. 风险点；8. 详情页文案；9. 短视频脚本；10. 小红书笔记；11. 会话召回参考；12. 人工合规检查清单。必须保留证据、不确定项和合规提示。",
         "modelSource": "global",
         "model": "",
@@ -1126,7 +1126,7 @@
         "required": false
       }
     ],
-    "requiredSkills": [
+    "requiredActions": [
       "buddy_session_recall"
     ],
     "requiredPermissions": [

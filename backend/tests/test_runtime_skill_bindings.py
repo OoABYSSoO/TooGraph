@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.runtime.skill_bindings import (
-    map_skill_outputs,
+    map_action_outputs,
     normalize_agent_skill_bindings,
     resolve_agent_skill_output_binding,
     resolve_agent_skill_bindings,
@@ -22,7 +22,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
             {
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
-                "config": {"skillKey": "summarize_text"},
+                "config": {"actionKey": "summarize_text"},
             }
         )
 
@@ -38,10 +38,10 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "config": {
-                    "skillKey": "summarize_text",
-                    "skillBindings": [
+                    "actionKey": "summarize_text",
+                    "actionBindings": [
                         {
-                            "skillKey": "summarize_text",
+                            "actionKey": "summarize_text",
                             "outputMapping": {"summary": "summary_text"},
                         }
                     ],
@@ -70,7 +70,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "selected_capability"}],
-                "config": {"skillKey": "web_search"},
+                "config": {"actionKey": "web_search"},
             }
         )
         state_schema = {
@@ -81,7 +81,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
             node,
             input_values={
                 "selected_capability": {
-                    "kind": "skill",
+                    "kind": "action",
                     "key": "file_reader",
                     "name": "File Reader",
                 }
@@ -97,7 +97,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "selected_capability"}],
-                "config": {"skillKey": ""},
+                "config": {"actionKey": ""},
             }
         )
         state_schema = {
@@ -108,7 +108,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
             node,
             input_values={
                 "selected_capability": {
-                    "kind": "skill",
+                    "kind": "action",
                     "key": "file_reader",
                     "name": "File Reader",
                 }
@@ -127,7 +127,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "selected_capability"}],
-                "config": {"skillKey": ""},
+                "config": {"actionKey": ""},
             }
         )
         state_schema = {
@@ -138,7 +138,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
             node,
             input_values={
                 "selected_capability": {
-                    "kind": "skill",
+                    "kind": "action",
                     "key": "web_search",
                     "name": "Web Search",
                     "description": "Search the web.",
@@ -158,7 +158,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "selected_capability"}],
-                "config": {"skillKey": ""},
+                "config": {"actionKey": ""},
             }
         )
         state_schema = {
@@ -167,7 +167,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
 
         resolved = resolve_agent_skill_bindings(
             node,
-            input_values={"selected_capability": [{"kind": "skill", "key": "web_search"}]},
+            input_values={"selected_capability": [{"kind": "action", "key": "web_search"}]},
             state_schema=state_schema,
         )
 
@@ -180,10 +180,10 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "selected_capability"}],
                 "config": {
-                    "skillKey": "",
-                    "skillBindings": [
+                    "actionKey": "",
+                    "actionBindings": [
                         {
-                            "skillKey": "web_search",
+                            "actionKey": "web_search",
                             "outputMapping": {"summary": "summary_text"},
                         }
                     ],
@@ -196,7 +196,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
 
         resolved = resolve_agent_skill_bindings(
             node,
-            input_values={"selected_capability": {"kind": "skill", "key": "web_search"}},
+            input_values={"selected_capability": {"kind": "action", "key": "web_search"}},
             state_schema=state_schema,
         )
 
@@ -209,7 +209,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "selected_capability"}, {"state": "raw_json"}],
-                "config": {"skillKey": ""},
+                "config": {"actionKey": ""},
             }
         )
         state_schema = {
@@ -220,24 +220,24 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
         bindings = normalize_agent_skill_bindings(
             node,
             input_values={
-                "selected_capability": {"kind": "skill", "key": "web_search"},
-                "raw_json": {"kind": "skill", "key": "file_reader"},
+                "selected_capability": {"kind": "action", "key": "web_search"},
+                "raw_json": {"kind": "action", "key": "file_reader"},
             },
             state_schema=state_schema,
         )
 
         self.assertEqual([binding.skill_key for binding in bindings], ["web_search"])
 
-    def test_map_skill_outputs_writes_declared_keys(self) -> None:
+    def test_map_action_outputs_writes_declared_keys(self) -> None:
         node = NodeSystemAgentNode.model_validate(
             {
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "config": {
-                    "skillKey": "summarize_text",
-                    "skillBindings": [
+                    "actionKey": "summarize_text",
+                    "actionBindings": [
                         {
-                            "skillKey": "summarize_text",
+                            "actionKey": "summarize_text",
                             "outputMapping": {"summary": "summary_text"},
                         }
                     ],
@@ -246,7 +246,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
         )
         binding = normalize_agent_skill_bindings(node)[0]
 
-        mapped = map_skill_outputs(binding, {"summary": "Short", "key_points": ["a"]})
+        mapped = map_action_outputs(binding, {"summary": "Short", "key_points": ["a"]})
 
         self.assertEqual(mapped, {"summary_text": "Short"})
 
@@ -256,7 +256,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "writes": [{"state": "source_urls"}, {"state": "artifact_paths"}],
-                "config": {"skillKey": "web_search"},
+                "config": {"actionKey": "web_search"},
             }
         )
         binding = normalize_agent_skill_bindings(node)[0]

@@ -51,8 +51,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_policy_memory",
         "fieldKey": "success",
         "managed": true
@@ -65,8 +65,8 @@
       "value": [],
       "color": "#a855f7",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_policy_memory",
         "fieldKey": "omitted_memories",
         "managed": true
@@ -79,8 +79,8 @@
       "value": "",
       "color": "#6d28d9",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_policy_memory",
         "fieldKey": "result",
         "managed": true
@@ -189,8 +189,8 @@
       "value": {},
       "color": "#9333ea",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_policy_memory",
         "fieldKey": "session_recall_context",
         "managed": true
@@ -203,8 +203,8 @@
       "value": [],
       "color": "#7c3aed",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_policy_memory",
         "fieldKey": "recalled_sessions",
         "managed": true
@@ -360,9 +360,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "生成 memory_request JSON，只用于只读召回 Buddy 历史会话中的长期偏好、历史反馈和相关上下文。字段包含 mode、query、limit、window；mode 默认 discover，limit 不超过 8，window 不超过 2。query 应结合本模板输入和用户目标，避免过宽；不要写 scope、layer、status、top_k、max_chars，不要生成业务结论。",
         "modelSource": "global",
         "model": "",
@@ -410,10 +410,10 @@
         }
       ],
       "config": {
-        "skillKey": "buddy_session_recall",
-        "skillBindings": [
+        "actionKey": "buddy_session_recall",
+        "actionBindings": [
           {
-            "skillKey": "buddy_session_recall",
+            "actionKey": "buddy_session_recall",
             "outputMapping": {
               "success": "buddy_session_recall_success",
               "session_recall_context": "session_recall_context",
@@ -422,9 +422,9 @@
             }
           }
         ],
-        "skillInstructionBlocks": {
+        "actionInstructionBlocks": {
           "buddy_session_recall": {
-            "skillKey": "buddy_session_recall",
+            "actionKey": "buddy_session_recall",
             "title": "Buddy session recall instruction",
             "content": "你已绑定 Buddy 会话召回技能。只把 memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
             "source": "node.override"
@@ -481,9 +481,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "校验政策材料来源。policy_source_review 必须是 JSON，包含 source_type、publisher、published_at、effective_at、officiality、is_reprint、missing_pages、version_conflicts、confidence、warnings。citation_map 必须是数组，每项包含 citation_id、source、title_or_clause、location、quote_summary、confidence。只能根据 policy_sources、raw_policy_text 和已显式给出的知识库片段建立引用；policy_knowledge_base 若只是知识库名称，不得编造检索结果。",
         "modelSource": "global",
         "model": "",
@@ -527,9 +527,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "policy_metadata 写成 JSON，字段至少包含 title、issuer、document_number、published_at、effective_at、expires_at、region、policy_type、target_groups、application_window、official_source、citation_ids、unknown_fields。无法从原文确认的字段写入 unknown_fields，不要猜。",
         "modelSource": "global",
         "model": "",
@@ -577,9 +577,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "policy_sections 写成数组，每项包含 section_id、title、plain_explanation、requirements、benefits、materials、deadline、process_steps、citation_ids、missing_information。eligibility_rules 写成数组，每项包含 rule_id、applies_to、must_have、must_not_have、evidence_needed、deadline、citation_ids、certainty。所有规则必须可追溯到 citation_ids；没有依据时写 missing_information。",
         "modelSource": "global",
         "model": "",
@@ -631,9 +631,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "policy_cards 写成 JSON 数组，每张卡包含 card_id、benefit_name、who_can_apply、what_you_get、key_conditions、materials、deadline、how_to_apply、citation_ids、risk_notes。plain_language_summary 写成 Markdown，用短句解释政策覆盖谁、能拿到什么、怎么申请、什么时候截止和需要注意什么；每个关键事实后标 citation_id。",
         "modelSource": "global",
         "model": "",
@@ -693,9 +693,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "matched_benefits 写成 JSON 数组，每项 status 只能是 可能符合、可能不符合、信息不足 三者之一，必须包含 reasons、missing_user_info、next_evidence_needed、citation_ids。eligibility_report 写成 Markdown，先说明这不是行政审批结论，再逐项给出保守判断。action_checklist 写成数组，包含 action、owner、deadline、required_materials、where_to_verify、citation_ids、risk_level。",
         "modelSource": "global",
         "model": "",
@@ -747,9 +747,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "uncertainty_report 写成 Markdown，必须列出：原文未明确事项、来源或版本风险、用户信息不足事项、需要咨询官方窗口的事项、不得承诺的事项。若资料足够，也要保留至少一个人工核验建议。不要输出确定性审批承诺、法律意见或财务建议。",
         "modelSource": "global",
         "model": "",
@@ -809,9 +809,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "final_policy_package 写成 Markdown，结构固定为：一页摘要、政策元信息、权益卡片、资格初判、行动清单、引用表、不确定与风险提示、人工确认建议。关键事实必须保留 citation_id；资格判断只能沿用 可能符合/可能不符合/信息不足；最后说明需以官方窗口或原文为准。",
         "modelSource": "global",
         "model": "",
@@ -946,7 +946,7 @@
         "description": "用户画像，用于资格初判。"
       }
     ],
-    "requiredSkills": [
+    "requiredActions": [
       "buddy_session_recall"
     ],
     "requiredPermissions": [

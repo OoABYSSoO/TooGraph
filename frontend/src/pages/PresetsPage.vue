@@ -216,7 +216,7 @@ function stateSchemaKeys(preset: PresetDocument) {
 }
 
 function presetSkills(preset: PresetDocument) {
-  const skillKey = preset.definition.node.kind === "agent" ? preset.definition.node.config.skillKey.trim() : "";
+  const skillKey = preset.definition.node.kind === "agent" ? preset.definition.node.config.actionKey.trim() : "";
   return skillKey ? [skillKey] : [];
 }
 

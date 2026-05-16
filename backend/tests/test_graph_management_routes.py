@@ -39,12 +39,12 @@ def _agent_graph_payload(graph_id: str | None = None, name: str = "Agent Flow") 
                 "reads": [],
                 "writes": [{"state": "answer", "mode": "replace"}],
                 "config": {
-                    "skillKey": "web_search",
-                    "skillBindings": [{"skillKey": "web_search", "outputMapping": {"result": "answer"}}],
+                    "actionKey": "web_search",
+                    "actionBindings": [{"actionKey": "web_search", "outputMapping": {"result": "answer"}}],
                     "suspendedFreeWrites": [{"state": "draft", "mode": "append"}],
-                    "skillInstructionBlocks": {
+                    "actionInstructionBlocks": {
                         "web_search": {
-                            "skillKey": "web_search",
+                            "actionKey": "web_search",
                             "title": "搜索说明",
                             "content": "只搜索公开网页。",
                             "source": "node.override",

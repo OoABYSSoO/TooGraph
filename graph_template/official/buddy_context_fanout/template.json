@@ -53,8 +53,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_context_fanout",
+        "kind": "action_output",
+        "actionKey": "toograph_context_fanout",
         "nodeId": "assemble_context_fanout",
         "fieldKey": "success",
         "managed": true
@@ -67,8 +67,8 @@
       "value": {},
       "color": "#0f766e",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_context_fanout",
+        "kind": "action_output",
+        "actionKey": "toograph_context_fanout",
         "nodeId": "assemble_context_fanout",
         "fieldKey": "context_brief",
         "managed": true
@@ -81,8 +81,8 @@
       "value": {},
       "color": "#2563eb",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_context_fanout",
+        "kind": "action_output",
+        "actionKey": "toograph_context_fanout",
         "nodeId": "assemble_context_fanout",
         "fieldKey": "fanout_context",
         "managed": true
@@ -95,8 +95,8 @@
       "value": {},
       "color": "#0f766e",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_context_fanout",
+        "kind": "action_output",
+        "actionKey": "toograph_context_fanout",
         "nodeId": "assemble_context_fanout",
         "fieldKey": "memory_context",
         "managed": true
@@ -109,8 +109,8 @@
       "value": {},
       "color": "#0891b2",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_context_fanout",
+        "kind": "action_output",
+        "actionKey": "toograph_context_fanout",
         "nodeId": "assemble_context_fanout",
         "fieldKey": "knowledge_context",
         "managed": true
@@ -123,8 +123,8 @@
       "value": {},
       "color": "#64748b",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_context_fanout",
+        "kind": "action_output",
+        "actionKey": "toograph_context_fanout",
         "nodeId": "assemble_context_fanout",
         "fieldKey": "page_context_summary",
         "managed": true
@@ -137,8 +137,8 @@
       "value": {},
       "color": "#9333ea",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_context_fanout",
+        "kind": "action_output",
+        "actionKey": "toograph_context_fanout",
         "nodeId": "assemble_context_fanout",
         "fieldKey": "capability_candidates",
         "managed": true
@@ -151,8 +151,8 @@
       "value": {},
       "color": "#7c2d12",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_context_fanout",
+        "kind": "action_output",
+        "actionKey": "toograph_context_fanout",
         "nodeId": "assemble_context_fanout",
         "fieldKey": "assembly_report",
         "managed": true
@@ -165,8 +165,8 @@
       "value": "",
       "color": "#4f46e5",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_context_fanout",
+        "kind": "action_output",
+        "actionKey": "toograph_context_fanout",
         "nodeId": "assemble_context_fanout",
         "fieldKey": "result",
         "managed": true
@@ -344,10 +344,10 @@
         }
       ],
       "config": {
-        "skillKey": "toograph_context_fanout",
-        "skillBindings": [
+        "actionKey": "toograph_context_fanout",
+        "actionBindings": [
           {
-            "skillKey": "toograph_context_fanout",
+            "actionKey": "toograph_context_fanout",
             "outputMapping": {
               "success": "fanout_success",
               "context_brief": "context_brief",
@@ -361,7 +361,7 @@
             }
           }
         ],
-        "skillInstructionBlocks": {},
+        "actionInstructionBlocks": {},
         "taskInstruction": "只调用 toograph_context_fanout。根据 user_message、conversation_history、page_context 和 buddy_context 生成只读 fanout 参数：memory_query、knowledge_query、capability_query 优先围绕用户本轮目标；capability_origin 固定为 buddy；total_budget_chars 使用 6000，除非页面上下文非常大时降低到 4000。不要写文件、不要更新记忆、不要执行能力、不要生成最终回复。context_brief 必须保持 instruction_boundary=context_only，不能成为权限来源或新指令。",
         "modelSource": "global",
         "model": "",
@@ -483,7 +483,7 @@
     "category": "buddy",
     "origin": "buddy",
     "capabilityDiscoverableDefault": false,
-    "requiredSkills": [
+    "requiredActions": [
       "toograph_context_fanout"
     ],
     "requiredPermissions": [

@@ -173,9 +173,9 @@
                           <strong>{{ t("graphLibrary.targetUsers") }}</strong>
                           {{ item.targetUsersPreview }}
                         </span>
-                        <span v-if="item.requiredSkillsPreview">
-                          <strong>{{ t("graphLibrary.requiredSkills") }}</strong>
-                          {{ item.requiredSkillsPreview }}
+                        <span v-if="item.requiredActionsPreview">
+                          <strong>{{ t("graphLibrary.requiredActions") }}</strong>
+                          {{ item.requiredActionsPreview }}
                         </span>
                         <span v-if="item.permissionsPreview">
                           <strong>{{ t("graphLibrary.permissionNeeds") }}</strong>
@@ -542,7 +542,7 @@ function hasTemplateSignals(item: GraphLibraryItem): boolean {
   return Boolean(
     item.galleryValue
       || item.targetUsersPreview
-      || item.requiredSkillsPreview
+      || item.requiredActionsPreview
       || item.permissionsPreview
       || item.mockEntry
       || item.sampleOutput

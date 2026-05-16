@@ -67,8 +67,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_content_memory",
         "fieldKey": "success",
         "managed": true
@@ -81,8 +81,8 @@
       "value": [],
       "color": "#a855f7",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_content_memory",
         "fieldKey": "omitted_memories",
         "managed": true
@@ -95,8 +95,8 @@
       "value": "",
       "color": "#6d28d9",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_content_memory",
         "fieldKey": "result",
         "managed": true
@@ -125,8 +125,8 @@
       "value": [],
       "color": "#7c3aed",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "web_search",
+        "kind": "action_output",
+        "actionKey": "web_search",
         "nodeId": "run_web_search",
         "fieldKey": "query",
         "managed": true
@@ -139,8 +139,8 @@
       "value": [],
       "color": "#9333ea",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "web_search",
+        "kind": "action_output",
+        "actionKey": "web_search",
         "nodeId": "run_web_search",
         "fieldKey": "source_urls",
         "managed": true
@@ -153,8 +153,8 @@
       "value": [],
       "color": "#10b981",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "web_search",
+        "kind": "action_output",
+        "actionKey": "web_search",
         "nodeId": "run_web_search",
         "fieldKey": "artifact_paths",
         "managed": true
@@ -167,8 +167,8 @@
       "value": [],
       "color": "#dc2626",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "web_search",
+        "kind": "action_output",
+        "actionKey": "web_search",
         "nodeId": "run_web_search",
         "fieldKey": "errors",
         "managed": true
@@ -269,8 +269,8 @@
       "value": {},
       "color": "#7c3aed",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_content_memory",
         "fieldKey": "session_recall_context",
         "managed": true
@@ -283,8 +283,8 @@
       "value": [],
       "color": "#8b5cf6",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_content_memory",
         "fieldKey": "recalled_sessions",
         "managed": true
@@ -494,9 +494,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "生成 memory_request JSON，只用于只读召回 Buddy 历史会话中的长期偏好、历史反馈和相关上下文。字段包含 mode、query、limit、window；mode 默认 discover，limit 不超过 8，window 不超过 2。query 应结合本模板输入和用户目标，避免过宽；不要写 scope、layer、status、top_k、max_chars，不要生成业务结论。",
         "modelSource": "global",
         "model": "",
@@ -544,10 +544,10 @@
         }
       ],
       "config": {
-        "skillKey": "buddy_session_recall",
-        "skillBindings": [
+        "actionKey": "buddy_session_recall",
+        "actionBindings": [
           {
-            "skillKey": "buddy_session_recall",
+            "actionKey": "buddy_session_recall",
             "outputMapping": {
               "success": "buddy_session_recall_success",
               "session_recall_context": "session_recall_context",
@@ -556,9 +556,9 @@
             }
           }
         ],
-        "skillInstructionBlocks": {
+        "actionInstructionBlocks": {
           "buddy_session_recall": {
-            "skillKey": "buddy_session_recall",
+            "actionKey": "buddy_session_recall",
             "title": "Buddy session recall instruction",
             "content": "你已绑定 Buddy 会话召回技能。只把 memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
             "source": "node.override"
@@ -619,9 +619,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "news_fetch_plan 写成 Markdown，说明将如何使用 raw_news_items、是否需要联网补充、新闻去重标准、来源充足标准和事实检查重点。current_query 写一条适合公开网页检索的搜索词；即使 use_web_search 为 false，也要给出可审计的候选查询词供用户后续启用。",
         "modelSource": "global",
         "model": "",
@@ -721,10 +721,10 @@
         }
       ],
       "config": {
-        "skillKey": "web_search",
-        "skillBindings": [
+        "actionKey": "web_search",
+        "actionBindings": [
           {
-            "skillKey": "web_search",
+            "actionKey": "web_search",
             "outputMapping": {
               "query": "executed_queries",
               "source_urls": "source_urls",
@@ -733,9 +733,9 @@
             }
           }
         ],
-        "skillInstructionBlocks": {
+        "actionInstructionBlocks": {
           "web_search": {
-            "skillKey": "web_search",
+            "actionKey": "web_search",
             "title": "联网搜索 skill instruction",
             "content": "你已绑定联网搜索技能，因此本节点只负责生成 query 并交给技能执行；不要总结、改写或评价搜索结果。技能会输出来源 URL、本地原文 artifact 和错误列表。",
             "source": "node.override"
@@ -800,9 +800,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "clean_news_items 写成 JSON 数组，每条包含 item_id、title、source_name、source_url、published_at、fact_summary、why_it_matters、duplicate_of、citation_ids、confidence。citation_map 写成数组，每项包含 citation_id、source_url、title、publisher、published_at、quote_summary、local_artifact_path。去重时合并同一事件的多条报道；没有来源的断言必须降低 confidence 或进入缺口。",
         "modelSource": "global",
         "model": "",
@@ -842,9 +842,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "clustered_topics 写成 JSON 数组，每个簇包含 cluster_id、theme、item_ids、merged_facts、conflicting_facts、citation_ids、audience_relevance。不要把重复报道当作多个新闻。",
         "modelSource": "global",
         "model": "",
@@ -892,9 +892,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "importance_ranking 写成 JSON 数组，包含 cluster_id、score、impact、novelty、certainty、audience_fit、reason。top_news_cards 写成 JSON 数组，包含 card_id、headline、one_sentence_summary、impact_for_readers、source_citations、what_to_watch_next、risk_or_uncertainty。必须保留 citation_ids。",
         "modelSource": "global",
         "model": "",
@@ -954,9 +954,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "article_outline 写成 Markdown，包含主线、段落结构和引用安排。wechat_article 写成公众号正文，区分事实、影响和观点，关键事实后标 citation_id，不编造未验证细节。title_candidates 写成 JSON 数组，每项包含 title、angle、risk、why_it_works。避免夸大、标题党和无来源判断。",
         "modelSource": "global",
         "model": "",
@@ -1004,9 +1004,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "fact_check_report 写成 JSON，包含 unsupported_claims、missing_citations、source_conflicts、opinion_marking_issues、stale_or_uncertain_items、required_edits、overall_status。没有来源的事实必须列入 unsupported_claims；如果材料不足，overall_status 不能是 pass。",
         "modelSource": "global",
         "model": "",
@@ -1066,9 +1066,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "distribution_pack 写成 JSON，对每个目标平台输出 platform、draft、style_notes、citation_policy、risk_notes。final_content_package 写成 Markdown，包含 Top 新闻卡片、公众号文章、事实检查摘要、标题候选、多平台稿、引用表和需要人工确认的缺口。若 fact_check_report 不是 pass，最终内容包必须显式列出需要修改或确认的地方。",
         "modelSource": "global",
         "model": "",
@@ -1236,7 +1236,7 @@
         "description": "写作风格和受众约束。"
       }
     ],
-    "requiredSkills": [
+    "requiredActions": [
       "buddy_session_recall",
       "web_search"
     ],

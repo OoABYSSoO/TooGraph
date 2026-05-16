@@ -35,8 +35,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_graph_template_reader",
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_reader",
         "nodeId": "read_existing_template",
         "fieldKey": "success",
         "managed": true
@@ -49,8 +49,8 @@
       "value": {},
       "color": "#9333ea",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_graph_template_reader",
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_reader",
         "nodeId": "read_existing_template",
         "fieldKey": "template_package",
         "managed": true
@@ -63,8 +63,8 @@
       "value": "",
       "color": "#15803d",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_graph_template_reader",
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_reader",
         "nodeId": "read_existing_template",
         "fieldKey": "result",
         "managed": true
@@ -133,8 +133,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_graph_template_validator",
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_validator",
         "nodeId": "validate_template_json",
         "fieldKey": "success",
         "managed": true
@@ -147,8 +147,8 @@
       "value": {},
       "color": "#0f766e",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_graph_template_validator",
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_validator",
         "nodeId": "validate_template_json",
         "fieldKey": "validation_report",
         "managed": true
@@ -187,8 +187,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_graph_template_writer",
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_writer",
         "nodeId": "write_template_json",
         "fieldKey": "success",
         "managed": true
@@ -201,8 +201,8 @@
       "value": "",
       "color": "#15803d",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_graph_template_writer",
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_writer",
         "nodeId": "write_template_json",
         "fieldKey": "result",
         "managed": true
@@ -215,8 +215,8 @@
       "value": "",
       "color": "#2563eb",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_graph_template_writer",
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_writer",
         "nodeId": "write_template_json",
         "fieldKey": "template_id",
         "managed": true
@@ -229,8 +229,8 @@
       "value": "",
       "color": "#2563eb",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_graph_template_writer",
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_writer",
         "nodeId": "write_template_json",
         "fieldKey": "template_path",
         "managed": true
@@ -243,8 +243,8 @@
       "value": "",
       "color": "#2563eb",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_graph_template_writer",
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_writer",
         "nodeId": "write_template_json",
         "fieldKey": "revision_id",
         "managed": true
@@ -377,10 +377,10 @@
         }
       ],
       "config": {
-        "skillKey": "toograph_graph_template_reader",
-        "skillBindings": [
+        "actionKey": "toograph_graph_template_reader",
+        "actionBindings": [
           {
-            "skillKey": "toograph_graph_template_reader",
+            "actionKey": "toograph_graph_template_reader",
             "outputMapping": {
               "success": "existing_template_success",
               "template_package": "existing_template_package",
@@ -388,7 +388,7 @@
             }
           }
         ],
-        "skillInstructionBlocks": {},
+        "actionInstructionBlocks": {},
         "taskInstruction": "如果 target_template_id 非空，调用图模板读取器读取该模板；如果为空，传入空 template_id 并允许读取失败，后续按新建模板处理。不要写文件，不要生成模板。",
         "modelSource": "global",
         "model": "",
@@ -436,9 +436,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "评估 template_request、capability_gap 和 existing_template_package。写 requirement_review JSON：needs_clarification(boolean)、should_create_template(boolean)、mode(new_template|improve_existing)、target_template_id、missing_information(array)、required_states(array)、required_nodes(array)、required_skills(array)、output_contract(array)、permissions(array)、risk_notes(array)、success_criteria(array)。若需求不清晰，final_summary 写澄清导语；若不应创建，final_summary 写原因和替代建议。必须遵守 node_system 和 state_schema，不要提出隐藏运行时或直接改官方模板。",
         "modelSource": "global",
         "model": "",
@@ -550,9 +550,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "根据 requirement_review.missing_information 写 clarification_questions Markdown，并同步写 final_summary。一次只问影响模板生成的关键问题；本轮正常结束，下一轮从普通输入继续，不使用断点。",
         "modelSource": "global",
         "model": "",
@@ -584,9 +584,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "根据 requirement_review 写最终说明，解释为什么本轮不创建图模板，并给出可复用已有模板、Skill 或澄清下一步。不要写文件。",
         "modelSource": "global",
         "model": "",
@@ -638,9 +638,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "根据需求和已有模板上下文，写 generation_brief Markdown、graph_diff_draft JSON、template_preview Markdown、test_run_decision JSON。graph_diff_draft 必须列出 states_added、states_changed、nodes_added、nodes_changed、edges_changed、output_contract、permissions、rollback_notes。template_preview 必须能让用户审查节点职责、输入输出、权限、风险和保存路径。test_run_decision 包含 should_run(boolean)、sample_input、reason；只有模板有安全的 mock/sample 输入时 should_run=true。",
         "modelSource": "global",
         "model": "",
@@ -696,9 +696,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "生成完整 generated_template_json 对象，必须是 node_system template.json：template_id、label、description、default_graph_name、state_schema、nodes、edges、conditional_edges、metadata。template_id 必须匹配 [a-z][a-z0-9_]{2,80}，优先以 user_ 或业务短名开头，不能使用官方模板 ID。每个 LLM 节点最多一个 skillKey；动态能力必须用 capability state；输出节点只展示结果。写 generated_template_id。若 validation_report 有失败，修复失败项后重新生成。根据 test_run_decision.sample_input 写 template_test_goal，格式为：运行图模板 <generated_template_id>，输入：<sample_input>。",
         "modelSource": "global",
         "model": "",
@@ -734,17 +734,17 @@
         }
       ],
       "config": {
-        "skillKey": "toograph_graph_template_validator",
-        "skillBindings": [
+        "actionKey": "toograph_graph_template_validator",
+        "actionBindings": [
           {
-            "skillKey": "toograph_graph_template_validator",
+            "actionKey": "toograph_graph_template_validator",
             "outputMapping": {
               "success": "validation_success",
               "validation_report": "validation_report"
             }
           }
         ],
-        "skillInstructionBlocks": {},
+        "actionInstructionBlocks": {},
         "taskInstruction": "调用图模板校验器。template_json 必须直接来自 generated_template_json，不要修改或总结。",
         "modelSource": "global",
         "model": "",
@@ -832,9 +832,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "复核 graph_diff_draft、template_preview、generated_template_json 和 validation_report，写 save_review JSON：ready_to_write、template_id、risk_notes、permission_notes、test_run_decision、approval_note。final_summary 写面向用户的预览摘要，明确写入将通过图模板写入器进入 graph_template/user，并由运行时 需确认/完全访问 权限决定是否暂停确认；不要在这里写文件。",
         "modelSource": "global",
         "model": "",
@@ -890,10 +890,10 @@
         }
       ],
       "config": {
-        "skillKey": "toograph_graph_template_writer",
-        "skillBindings": [
+        "actionKey": "toograph_graph_template_writer",
+        "actionBindings": [
           {
-            "skillKey": "toograph_graph_template_writer",
+            "actionKey": "toograph_graph_template_writer",
             "outputMapping": {
               "success": "write_template_success",
               "result": "write_template_result",
@@ -903,7 +903,7 @@
             }
           }
         ],
-        "skillInstructionBlocks": {},
+        "actionInstructionBlocks": {},
         "taskInstruction": "调用图模板写入器。template_json 必须直接来自 generated_template_json；reason 使用 save_review.approval_note 或本轮模板创建原因。写入路径只能是 graph_template/user/<template_id>/template.json。这个文件写入动作必须通过运行时 需确认/完全访问 权限路径，不要绕过用户确认。",
         "modelSource": "global",
         "model": "",
@@ -1024,8 +1024,8 @@
               "value": false,
               "color": "#16a34a",
               "binding": {
-                "kind": "skill_output",
-                "skillKey": "toograph_page_operator",
+                "kind": "action_output",
+                "actionKey": "toograph_page_operator",
                 "nodeId": "execute_page_operation",
                 "fieldKey": "ok",
                 "managed": true
@@ -1038,8 +1038,8 @@
               "value": "",
               "color": "#2563eb",
               "binding": {
-                "kind": "skill_output",
-                "skillKey": "toograph_page_operator",
+                "kind": "action_output",
+                "actionKey": "toograph_page_operator",
                 "nodeId": "execute_page_operation",
                 "fieldKey": "operation_request_id",
                 "managed": true
@@ -1052,8 +1052,8 @@
               "value": {},
               "color": "#4f46e5",
               "binding": {
-                "kind": "skill_output",
-                "skillKey": "toograph_page_operator",
+                "kind": "action_output",
+                "actionKey": "toograph_page_operator",
                 "nodeId": "execute_page_operation",
                 "fieldKey": "journal",
                 "managed": true
@@ -1066,8 +1066,8 @@
               "value": {},
               "color": "#dc2626",
               "binding": {
-                "kind": "skill_output",
-                "skillKey": "toograph_page_operator",
+                "kind": "action_output",
+                "actionKey": "toograph_page_operator",
                 "nodeId": "execute_page_operation",
                 "fieldKey": "error",
                 "managed": true
@@ -1174,9 +1174,9 @@
                 }
               ],
               "config": {
-                "skillKey": "",
-                "skillBindings": [],
-                "skillInstructionBlocks": {},
+                "actionKey": "",
+                "actionBindings": [],
+                "actionInstructionBlocks": {},
                 "taskInstruction": "分析 user_goal，写入 goal_plan JSON。必须包含 goal_type、target_hints、required_side_effects、success_criteria、requires_run_terminal_status(boolean)、requires_save(boolean)、risk_notes、failure_boundaries。支持查看记录、打开页面或页签、新建图、编辑图、运行当前图、运行指定图模板。loop_trace 初始化为空数组。不要发起页面操作；页面操作书由后续页面操作器 Skill 的 runtime context 自动注入。",
                 "modelSource": "global",
                 "model": "",
@@ -1301,8 +1301,8 @@
                       "value": false,
                       "color": "#16a34a",
                       "binding": {
-                        "kind": "skill_output",
-                        "skillKey": "toograph_page_operator",
+                        "kind": "action_output",
+                        "actionKey": "toograph_page_operator",
                         "nodeId": "execute_page_operation",
                         "fieldKey": "ok",
                         "managed": true
@@ -1315,8 +1315,8 @@
                       "value": "",
                       "color": "#2563eb",
                       "binding": {
-                        "kind": "skill_output",
-                        "skillKey": "toograph_page_operator",
+                        "kind": "action_output",
+                        "actionKey": "toograph_page_operator",
                         "nodeId": "execute_page_operation",
                         "fieldKey": "operation_request_id",
                         "managed": true
@@ -1329,8 +1329,8 @@
                       "value": {},
                       "color": "#4f46e5",
                       "binding": {
-                        "kind": "skill_output",
-                        "skillKey": "toograph_page_operator",
+                        "kind": "action_output",
+                        "actionKey": "toograph_page_operator",
                         "nodeId": "execute_page_operation",
                         "fieldKey": "journal",
                         "managed": true
@@ -1343,8 +1343,8 @@
                       "value": {},
                       "color": "#dc2626",
                       "binding": {
-                        "kind": "skill_output",
-                        "skillKey": "toograph_page_operator",
+                        "kind": "action_output",
+                        "actionKey": "toograph_page_operator",
                         "nodeId": "execute_page_operation",
                         "fieldKey": "error",
                         "managed": true
@@ -1501,9 +1501,9 @@
                         }
                       ],
                       "config": {
-                        "skillKey": "",
-                        "skillBindings": [],
-                        "skillInstructionBlocks": {},
+                        "actionKey": "",
+                        "actionBindings": [],
+                        "actionInstructionBlocks": {},
                         "taskInstruction": "根据 user_goal、goal_plan、operation_result、goal_review 和 loop_trace 选择下一步页面操作意图并写 operation_request JSON。不要输出 DOM selector、坐标、截图描述或浏览器自动化步骤；具体可用命令由下一节点绑定的页面操作器 Skill 从 runtime context 的页面操作书中选择。若目标是运行指定图模板，operation_request 必须包含 semantic_intent=run_template、target_template_id、target_template_name、search_text、input_text=user_goal、requires_terminal_run=true，并让下一节点只输出 template_target，不输出逐步 commands。字段至少包含 target_hint、semantic_intent、reason、expected_route、expected_entity、expected_run、expected_graph_change、requires_terminal_run、blocked_reason。若目标已完成，blocked_reason 写 already_completed；若缺少必要信息，blocked_reason 写 needs_clarification。不要调用技能。",
                         "modelSource": "global",
                         "model": "",
@@ -1559,10 +1559,10 @@
                         }
                       ],
                       "config": {
-                        "skillKey": "toograph_page_operator",
-                        "skillBindings": [
+                        "actionKey": "toograph_page_operator",
+                        "actionBindings": [
                           {
-                            "skillKey": "toograph_page_operator",
+                            "actionKey": "toograph_page_operator",
                             "outputMapping": {
                               "ok": "operation_ok",
                               "operation_request_id": "operation_request_id",
@@ -1571,9 +1571,9 @@
                             }
                           }
                         ],
-                        "skillInstructionBlocks": {
+                        "actionInstructionBlocks": {
                           "toograph_page_operator": {
-                            "skillKey": "toograph_page_operator",
+                            "actionKey": "toograph_page_operator",
                             "title": "页面操作器 skill instruction",
                             "content": "你已绑定 TooGraph 页面操作器。本节点只调用一次 toograph_page_operator。若 operation_request.semantic_intent 是 run_template 或包含 target_template_id/target_template_name，直接输出 template_target 对象，包含 template_id、template_name、search_text、input_text；input_text 必须是本次要写入目标模板 input 节点的目标文本，通常直接使用 user_goal。不要把打开图库、搜索、点开模板、写 input、运行拆成 commands。其他普通页面操作才根据 operation_request 和当前页面操作书输出一条合法 commands；如果 operation_request.command 为空或 blocked_reason 非空，优先选择安全 wait short 或返回不可执行原因。不要输出 DOM selector、坐标、截图、伙伴自表面目标或多步计划。",
                             "source": "node.override"
@@ -1662,9 +1662,9 @@
                         }
                       ],
                       "config": {
-                        "skillKey": "",
-                        "skillBindings": [],
-                        "skillInstructionBlocks": {},
+                        "actionKey": "",
+                        "actionBindings": [],
+                        "actionInstructionBlocks": {},
                         "taskInstruction": "使用 page_operation_context.page_facts、operation_result 和 goal_plan 验证用户目标。goal_review 必须是 JSON 对象，包含 goal_completed(boolean)、needs_more_operations(boolean)、needs_clarification(boolean)、failure_reason、next_requirement、evidence。只有最新页面事实或 operation_result 明确匹配 success_criteria 时才把 goal_completed 设为 true。运行图目标必须看到 operation_result.triggered_run_id 且 triggered_run_status 为 completed、failed 或 cancelled；若 triggered_run_status 仍是 queued/running/resuming/awaiting_human，则 needs_more_operations 设为 true。失败时优先使用 canonical failure_reason：target_graph_not_found、run_record_not_found、stale_page_snapshot、destructive_operation_blocked、triggered_run_failed、operation_interrupted。关注 triggered_run_status、triggered_run_id、triggered_graph_id、route_after、page_snapshot_after、page_facts.activeGraph 和 graph_edit_summary。page_snapshot 写 operation_result.page_snapshot_after 或 page_operation_context.page_snapshot。operation_report 写紧凑对象，包含 operation_request_id、status、route_before、route_after、target_id、triggered_run_id、triggered_run_status、graph_edit_summary、goal_completed、failure_reason。loop_trace 写追加后的紧凑数组。",
                         "modelSource": "global",
                         "model": "",
@@ -2046,9 +2046,9 @@
                 }
               ],
               "config": {
-                "skillKey": "",
-                "skillBindings": [],
-                "skillInstructionBlocks": {},
+                "actionKey": "",
+                "actionBindings": [],
+                "actionInstructionBlocks": {},
                 "taskInstruction": "生成最终用户回复。只有 goal_review.goal_completed 为 true 时才说明已完成，并包含可用的 route、graph id/name、run id、触发 run 终态或保存结果。若 needs_clarification 为 true，明确需要用户补充什么。若失败，按 goal_review.failure_reason 简洁说明失败原因：target_graph_not_found=找不到目标图；run_record_not_found=找不到匹配运行记录；stale_page_snapshot=页面快照过期；destructive_operation_blocked=破坏性操作被阻止；triggered_run_failed=触发的 run 失败；operation_interrupted=操作被用户或运行时中断。不要声称只是发出请求就完成。",
                 "modelSource": "global",
                 "model": "",
@@ -2398,9 +2398,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "写最终 Markdown：模板 ID、保存路径、revision id、校验摘要、试运行是否执行及结果、后续如何在图库使用。若 write_template_success=false，说明失败原因和修复建议。不要再调用任何能力。",
         "modelSource": "global",
         "model": "",

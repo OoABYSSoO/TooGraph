@@ -27,7 +27,7 @@ class RuntimeActivityEventsTests(unittest.TestCase):
 
         event = record_activity_event(
             state,
-            kind="skill_invocation",
+            kind="action_invocation",
             summary="Skill 'web_search' succeeded.",
             node_id="execute_capability",
             status="succeeded",
@@ -40,7 +40,7 @@ class RuntimeActivityEventsTests(unittest.TestCase):
 
         self.assertEqual(parent_state["activity_events"], [event])
         self.assertEqual(event["sequence"], 1)
-        self.assertEqual(event["kind"], "skill_invocation")
+        self.assertEqual(event["kind"], "action_invocation")
         self.assertEqual(event["summary"], "Skill 'web_search' succeeded.")
         self.assertEqual(event["node_id"], "execute_capability")
         self.assertEqual(event["subgraph_node_id"], "run_capability_cycle")
@@ -134,7 +134,7 @@ class RuntimeActivityEventsTests(unittest.TestCase):
         self.assertEqual(event["kind"], "file_write")
         self.assertEqual(event["node_id"], "execute_capability")
         self.assertEqual(event["summary"], "Editing skill/user/demo/SKILL.md +3 -0")
-        self.assertEqual(event["detail"]["skill_key"], "local_workspace_executor")
+        self.assertEqual(event["detail"]["action_key"], "local_workspace_executor")
         self.assertEqual(event["detail"]["binding_source"], "capability_state")
         self.assertEqual(event["detail"]["path"], "skill/user/demo/SKILL.md")
         self.assertEqual(event["detail"]["added"], 3)

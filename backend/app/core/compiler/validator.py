@@ -302,12 +302,12 @@ def _validate_batch_node(node_name: str, node: NodeSystemBatchNode) -> list[Vali
                     path=f"nodes.{node_name}.config.inputModes.{state_key}",
                 )
             )
-    if worker_source == "default_llm" and node.config.default_worker.skill_key:
+    if worker_source == "default_llm" and node.config.default_worker.action_key:
         issues.append(
             ValidationIssue(
-                code="batch_default_worker_skill_not_supported",
-                message=f"Batch node '{node_name}' default worker currently supports one LLM turn without a Skill.",
-                path=f"nodes.{node_name}.config.defaultWorker.skillKey",
+                code="batch_default_worker_action_not_supported",
+                message=f"Batch node '{node_name}' default worker currently supports one LLM turn without an Action.",
+                path=f"nodes.{node_name}.config.defaultWorker.actionKey",
             )
         )
     if worker_source == "subgraph":
@@ -462,42 +462,42 @@ def _validate_agent_node(
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     dynamic_capability_state_reads = _agent_capability_state_reads(node, state_schema)
-    if node.config.skill_bindings and not node.config.skill_key:
+    if node.config.action_bindings and not node.config.action_key:
         issues.append(
             ValidationIssue(
-                code="agent_skill_binding_without_skill_key",
+                code="agent_action_binding_without_action_key",
                 message=(
-                    f"LLM node '{node_name}' defines skillBindings without a static skillKey. "
-                    "Use skillKey for static skills or a capability state input with one result_package output for dynamic capabilities."
+                    f"LLM node '{node_name}' defines actionBindings without a static actionKey. "
+                    "Use actionKey for static Actions or a capability state input with one result_package output for dynamic capabilities."
                 ),
-                path=f"nodes.{node_name}.config.skillBindings",
+                path=f"nodes.{node_name}.config.actionBindings",
             )
         )
-    for binding_index, binding in enumerate(node.config.skill_bindings):
-        if node.config.skill_key and binding.skill_key != node.config.skill_key:
+    for binding_index, binding in enumerate(node.config.action_bindings):
+        if node.config.action_key and binding.action_key != node.config.action_key:
             issues.append(
                 ValidationIssue(
-                    code="agent_skill_binding_mismatched_skill_key",
+                    code="agent_action_binding_mismatched_action_key",
                     message=(
-                        f"LLM node '{node_name}' maps skill '{binding.skill_key}', but its static skillKey is "
-                        f"'{node.config.skill_key}'."
+                        f"LLM node '{node_name}' maps Action '{binding.action_key}', but its static actionKey is "
+                        f"'{node.config.action_key}'."
                     ),
-                    path=f"nodes.{node_name}.config.skillBindings.{binding_index}.skillKey",
+                    path=f"nodes.{node_name}.config.actionBindings.{binding_index}.actionKey",
                 )
             )
 
-    if node.config.skill_key and dynamic_capability_state_reads:
+    if node.config.action_key and dynamic_capability_state_reads:
         issues.append(
             ValidationIssue(
                 code="agent_static_and_dynamic_capability_mixed",
                 message=(
-                    f"LLM node '{node_name}' cannot combine a static skillKey with capability state inputs. "
-                    "Use either a static mounted skill or a dynamic capability executor."
+                    f"LLM node '{node_name}' cannot combine a static actionKey with capability state inputs. "
+                    "Use either a static mounted Action or a dynamic capability executor."
                 ),
                 path=f"nodes.{node_name}.reads",
             )
         )
-    if not node.config.skill_key and dynamic_capability_state_reads:
+    if not node.config.action_key and dynamic_capability_state_reads:
         result_package_writes = [
             binding.state
             for binding in node.writes
@@ -566,15 +566,15 @@ def _validate_agent_node(
                 )
             )
 
-    issues.extend(_validate_agent_skill_bindings(node_name, node, state_schema, skill_catalog))
+    issues.extend(_validate_agent_action_bindings(node_name, node, state_schema, skill_catalog))
 
     return issues
 
 
 def _iter_agent_skill_refs(node_name: str, node: NodeSystemAgentNode) -> list[tuple[str, str]]:
     refs: list[tuple[str, str]] = []
-    if node.config.skill_key:
-        refs.append((node.config.skill_key, f"nodes.{node_name}.config.skillKey"))
+    if node.config.action_key:
+        refs.append((node.config.action_key, f"nodes.{node_name}.config.actionKey"))
     return refs
 
 
@@ -664,27 +664,27 @@ def _validate_condition_node(
     return issues
 
 
-def _validate_agent_skill_bindings(
+def _validate_agent_action_bindings(
     node_name: str,
     node: NodeSystemAgentNode,
     state_schema: dict[str, object],
     skill_catalog: dict[str, SkillDefinition],
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
-    for binding_index, binding in enumerate(node.config.skill_bindings):
-        definition = skill_catalog.get(binding.skill_key)
+    for binding_index, binding in enumerate(node.config.action_bindings):
+        definition = skill_catalog.get(binding.action_key)
         if definition is None:
             continue
         for output_key, state_key in binding.output_mapping.items():
             if state_key not in state_schema:
                 issues.append(
                     ValidationIssue(
-                        code="agent_skill_output_state_unknown",
+                        code="agent_action_output_state_unknown",
                         message=(
-                            f"LLM node '{node_name}' maps output '{output_key}' from skill '{binding.skill_key}' "
+                            f"LLM node '{node_name}' maps output '{output_key}' from Action '{binding.action_key}' "
                             f"to unknown state '{state_key}'."
                         ),
-                        path=f"nodes.{node_name}.config.skillBindings.{binding_index}.outputMapping.{output_key}",
+                        path=f"nodes.{node_name}.config.actionBindings.{binding_index}.outputMapping.{output_key}",
                     )
                 )
     return issues

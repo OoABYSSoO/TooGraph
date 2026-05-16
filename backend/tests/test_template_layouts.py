@@ -340,12 +340,12 @@ class TemplateLayoutTests(unittest.TestCase):
 
         search_node = nodes["run_web_search"]
         self.assertEqual(search_node["kind"], "agent")
-        self.assertEqual(search_node["config"]["skillKey"], "web_search")
+        self.assertEqual(search_node["config"]["actionKey"], "web_search")
         self.assertEqual(
-            search_node["config"]["skillBindings"],
+            search_node["config"]["actionBindings"],
             [
                 {
-                    "skillKey": "web_search",
+                    "actionKey": "web_search",
                     "outputMapping": {
                         "query": "executed_queries",
                         "source_urls": "source_urls",
@@ -355,7 +355,7 @@ class TemplateLayoutTests(unittest.TestCase):
                 }
             ],
         )
-        self.assertNotIn("inputMapping", search_node["config"]["skillBindings"][0])
+        self.assertNotIn("inputMapping", search_node["config"]["actionBindings"][0])
         self.assertEqual(
             {binding["state"]: binding["mode"] for binding in search_node["writes"]},
             {
@@ -439,7 +439,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(metadata["graphProtocol"], "node_system")
         self.assertEqual(metadata["category"], "business")
-        self.assertEqual(metadata["requiredSkills"], ["buddy_session_recall"])
+        self.assertEqual(metadata["requiredActions"], ["buddy_session_recall"])
         self.assertEqual(metadata["requiredPermissions"], ["buddy_session_read"])
         self.assertEqual(metadata["knowledgeRequirements"]["state"], "policy_knowledge_base")
         self.assertEqual(metadata["knowledgeRequirements"]["citationOutput"], "citation_map")
@@ -488,12 +488,12 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(nodes["input_policy_knowledge_base"]["config"]["boundaryType"], "knowledge_base")
         recall_node = nodes["recall_policy_memory"]
         self.assertEqual(recall_node["kind"], "agent")
-        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
+        self.assertEqual(recall_node["config"]["actionKey"], "buddy_session_recall")
         self.assertEqual(
-            recall_node["config"]["skillBindings"],
+            recall_node["config"]["actionBindings"],
             [
                 {
-                    "skillKey": "buddy_session_recall",
+                    "actionKey": "buddy_session_recall",
                     "outputMapping": {
                         "success": "buddy_session_recall_success",
                         "session_recall_context": "session_recall_context",
@@ -564,7 +564,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(metadata["graphProtocol"], "node_system")
         self.assertEqual(metadata["category"], "business")
-        self.assertEqual(metadata["requiredSkills"], ["buddy_session_recall", "web_search"])
+        self.assertEqual(metadata["requiredActions"], ["buddy_session_recall", "web_search"])
         self.assertEqual(metadata["requiredPermissions"], ["buddy_session_read", "network", "secret_read", "browser_automation"])
         self.assertEqual(metadata["mockMode"]["input"], "examples/mock_news_input.json")
         self.assertIs(metadata["mockMode"]["supported"], True)
@@ -607,9 +607,9 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(nodes["input_use_web_search"]["config"]["boundaryType"], "boolean")
         recall_node = nodes["recall_content_memory"]
         self.assertEqual(recall_node["kind"], "agent")
-        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
+        self.assertEqual(recall_node["config"]["actionKey"], "buddy_session_recall")
         self.assertEqual(
-            recall_node["config"]["skillBindings"][0]["outputMapping"],
+            recall_node["config"]["actionBindings"][0]["outputMapping"],
             {
                 "success": "buddy_session_recall_success",
                 "session_recall_context": "session_recall_context",
@@ -620,9 +620,9 @@ class TemplateLayoutTests(unittest.TestCase):
 
         search_node = nodes["run_web_search"]
         self.assertEqual(search_node["kind"], "agent")
-        self.assertEqual(search_node["config"]["skillKey"], "web_search")
+        self.assertEqual(search_node["config"]["actionKey"], "web_search")
         self.assertEqual(
-            search_node["config"]["skillBindings"][0]["outputMapping"],
+            search_node["config"]["actionBindings"][0]["outputMapping"],
             {
                 "query": "executed_queries",
                 "source_urls": "source_urls",
@@ -716,7 +716,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(metadata["graphProtocol"], "node_system")
         self.assertEqual(metadata["category"], "business")
-        self.assertEqual(metadata["requiredSkills"], ["buddy_session_recall"])
+        self.assertEqual(metadata["requiredActions"], ["buddy_session_recall"])
         self.assertEqual(metadata["requiredPermissions"], ["buddy_session_read"])
         self.assertEqual(metadata["mockMode"]["input"], "examples/mock_repurposer_input.json")
         self.assertEqual(
@@ -753,9 +753,9 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertFalse(any("promptVisible" in definition for definition in states.values()))
 
         recall_node = nodes["recall_style_memory"]
-        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
+        self.assertEqual(recall_node["config"]["actionKey"], "buddy_session_recall")
         self.assertEqual(
-            recall_node["config"]["skillBindings"][0]["outputMapping"],
+            recall_node["config"]["actionBindings"][0]["outputMapping"],
             {
                 "success": "buddy_session_recall_success",
                 "session_recall_context": "session_recall_context",
@@ -818,7 +818,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(metadata["graphProtocol"], "node_system")
         self.assertEqual(metadata["category"], "business")
-        self.assertEqual(metadata["requiredSkills"], ["buddy_session_recall"])
+        self.assertEqual(metadata["requiredActions"], ["buddy_session_recall"])
         self.assertEqual(metadata["requiredPermissions"], ["buddy_session_read"])
         self.assertEqual(metadata["mockMode"]["input"], "examples/mock_job_application_input.json")
         self.assertEqual(
@@ -880,9 +880,9 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertFalse(any("promptVisible" in definition for definition in states.values()))
 
         recall_node = nodes["recall_candidate_memory"]
-        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
+        self.assertEqual(recall_node["config"]["actionKey"], "buddy_session_recall")
         self.assertEqual(
-            recall_node["config"]["skillBindings"][0]["outputMapping"],
+            recall_node["config"]["actionBindings"][0]["outputMapping"],
             {
                 "success": "buddy_session_recall_success",
                 "session_recall_context": "session_recall_context",
@@ -948,7 +948,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(metadata["graphProtocol"], "node_system")
         self.assertEqual(metadata["category"], "business")
-        self.assertEqual(metadata["requiredSkills"], ["buddy_session_recall"])
+        self.assertEqual(metadata["requiredActions"], ["buddy_session_recall"])
         self.assertEqual(metadata["requiredPermissions"], ["buddy_session_read"])
         self.assertEqual(metadata["mockMode"]["input"], "examples/mock_game_creative_input.json")
         self.assertEqual(
@@ -1024,9 +1024,9 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertFalse(any("promptVisible" in definition for definition in states.values()))
 
         recall_node = nodes["recall_creative_memory"]
-        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
+        self.assertEqual(recall_node["config"]["actionKey"], "buddy_session_recall")
         self.assertEqual(
-            recall_node["config"]["skillBindings"][0]["outputMapping"],
+            recall_node["config"]["actionBindings"][0]["outputMapping"],
             {
                 "success": "buddy_session_recall_success",
                 "session_recall_context": "session_recall_context",
@@ -1092,7 +1092,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(metadata["graphProtocol"], "node_system")
         self.assertEqual(metadata["category"], "business")
-        self.assertEqual(metadata["requiredSkills"], ["buddy_session_recall"])
+        self.assertEqual(metadata["requiredActions"], ["buddy_session_recall"])
         self.assertEqual(metadata["requiredPermissions"], ["buddy_session_read"])
         self.assertEqual(metadata["mockMode"]["input"], "examples/mock_product_research_input.json")
         self.assertEqual(
@@ -1161,9 +1161,9 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertFalse(any("promptVisible" in definition for definition in states.values()))
 
         recall_node = nodes["recall_product_memory"]
-        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
+        self.assertEqual(recall_node["config"]["actionKey"], "buddy_session_recall")
         self.assertEqual(
-            recall_node["config"]["skillBindings"][0]["outputMapping"],
+            recall_node["config"]["actionBindings"][0]["outputMapping"],
             {
                 "success": "buddy_session_recall_success",
                 "session_recall_context": "session_recall_context",
@@ -1229,7 +1229,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(metadata["graphProtocol"], "node_system")
         self.assertEqual(metadata["category"], "business")
-        self.assertEqual(metadata["requiredSkills"], ["buddy_session_recall"])
+        self.assertEqual(metadata["requiredActions"], ["buddy_session_recall"])
         self.assertEqual(metadata["requiredPermissions"], ["buddy_session_read"])
         self.assertEqual(metadata["mockMode"]["input"], "examples/mock_ecommerce_review_input.json")
         self.assertEqual(
@@ -1301,9 +1301,9 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertFalse(any("promptVisible" in definition for definition in states.values()))
 
         recall_node = nodes["recall_review_memory"]
-        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
+        self.assertEqual(recall_node["config"]["actionKey"], "buddy_session_recall")
         self.assertEqual(
-            recall_node["config"]["skillBindings"][0]["outputMapping"],
+            recall_node["config"]["actionBindings"][0]["outputMapping"],
             {
                 "success": "buddy_session_recall_success",
                 "session_recall_context": "session_recall_context",
@@ -1412,12 +1412,12 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertNotIn({"state": "existing_capability_found", "required": False}, _read_contracts(nodes["review_requirement"]["reads"]))
         package_reader_node = nodes["read_existing_skill_package"]
         self.assertEqual(package_reader_node["kind"], "agent")
-        self.assertEqual(package_reader_node["config"]["skillKey"], "toograph_skill_package_reader")
+        self.assertEqual(package_reader_node["config"]["actionKey"], "toograph_skill_package_reader")
         self.assertEqual(
-            package_reader_node["config"]["skillBindings"],
+            package_reader_node["config"]["actionBindings"],
             [
                 {
-                    "skillKey": "toograph_skill_package_reader",
+                    "actionKey": "toograph_skill_package_reader",
                     "outputMapping": {
                         "success": "existing_skill_package_success",
                         "skill_package": "existing_skill_package",
@@ -1433,12 +1433,12 @@ class TemplateLayoutTests(unittest.TestCase):
 
         builder_node = nodes["build_skill_files"]
         self.assertEqual(builder_node["kind"], "agent")
-        self.assertEqual(builder_node["config"]["skillKey"], "toograph_skill_builder")
+        self.assertEqual(builder_node["config"]["actionKey"], "toograph_skill_builder")
         self.assertEqual(
-            builder_node["config"]["skillBindings"],
+            builder_node["config"]["actionBindings"],
             [
                 {
-                    "skillKey": "toograph_skill_builder",
+                    "actionKey": "toograph_skill_builder",
                     "outputMapping": {
                         "skill_key": "generated_skill_key",
                         "skill_json": "generated_skill_json",
@@ -1453,9 +1453,9 @@ class TemplateLayoutTests(unittest.TestCase):
 
         tester_node = nodes["run_script_test"]
         self.assertEqual(tester_node["kind"], "agent")
-        self.assertEqual(tester_node["config"]["skillKey"], "toograph_script_tester")
+        self.assertEqual(tester_node["config"]["actionKey"], "toograph_script_tester")
         self.assertEqual(
-            tester_node["config"]["skillBindings"][0]["outputMapping"],
+            tester_node["config"]["actionBindings"][0]["outputMapping"],
             {
                 "success": "script_test_success",
                 "result": "script_test_result",
@@ -1465,7 +1465,7 @@ class TemplateLayoutTests(unittest.TestCase):
         executor_nodes = {
             node_id
             for node_id, node in nodes.items()
-            if node["kind"] == "agent" and node["config"].get("skillKey") == "local_workspace_executor"
+            if node["kind"] == "agent" and node["config"].get("actionKey") == "local_workspace_executor"
         }
         self.assertEqual(
             executor_nodes,
@@ -1480,7 +1480,7 @@ class TemplateLayoutTests(unittest.TestCase):
         for node_id in executor_nodes:
             with self.subTest(node_id=node_id):
                 self.assertEqual(
-                    nodes[node_id]["config"]["skillBindings"][0]["outputMapping"],
+                    nodes[node_id]["config"]["actionBindings"][0]["outputMapping"],
                     {
                         "success": f"{node_id}_success",
                         "result": f"{node_id}_result",
@@ -1619,9 +1619,9 @@ class TemplateLayoutTests(unittest.TestCase):
 
         reader_node = nodes["read_existing_template"]
         self.assertEqual(reader_node["kind"], "agent")
-        self.assertEqual(reader_node["config"]["skillKey"], "toograph_graph_template_reader")
+        self.assertEqual(reader_node["config"]["actionKey"], "toograph_graph_template_reader")
         self.assertEqual(
-            reader_node["config"]["skillBindings"][0]["outputMapping"],
+            reader_node["config"]["actionBindings"][0]["outputMapping"],
             {
                 "success": "existing_template_success",
                 "template_package": "existing_template_package",
@@ -1631,9 +1631,9 @@ class TemplateLayoutTests(unittest.TestCase):
 
         validator_node = nodes["validate_template_json"]
         self.assertEqual(validator_node["kind"], "agent")
-        self.assertEqual(validator_node["config"]["skillKey"], "toograph_graph_template_validator")
+        self.assertEqual(validator_node["config"]["actionKey"], "toograph_graph_template_validator")
         self.assertEqual(
-            validator_node["config"]["skillBindings"][0]["outputMapping"],
+            validator_node["config"]["actionBindings"][0]["outputMapping"],
             {
                 "success": "validation_success",
                 "validation_report": "validation_report",
@@ -1642,9 +1642,9 @@ class TemplateLayoutTests(unittest.TestCase):
 
         writer_node = nodes["write_template_json"]
         self.assertEqual(writer_node["kind"], "agent")
-        self.assertEqual(writer_node["config"]["skillKey"], "toograph_graph_template_writer")
+        self.assertEqual(writer_node["config"]["actionKey"], "toograph_graph_template_writer")
         self.assertEqual(
-            writer_node["config"]["skillBindings"][0]["outputMapping"],
+            writer_node["config"]["actionBindings"][0]["outputMapping"],
             {
                 "success": "write_template_success",
                 "result": "write_template_result",
@@ -1879,12 +1879,12 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertNotIn("internal", fanout_graph["metadata"])
         self.assertEqual(fanout_graph["state_schema"]["context_brief"]["type"], "json")
         self.assertEqual(fanout_graph["state_schema"]["fanout_context"]["type"], "json")
-        self.assertEqual(fanout_graph["nodes"]["assemble_context_fanout"]["config"]["skillKey"], "toograph_context_fanout")
+        self.assertEqual(fanout_graph["nodes"]["assemble_context_fanout"]["config"]["actionKey"], "toograph_context_fanout")
         self.assertEqual(
-            fanout_graph["nodes"]["assemble_context_fanout"]["config"]["skillBindings"],
+            fanout_graph["nodes"]["assemble_context_fanout"]["config"]["actionBindings"],
             [
                 {
-                    "skillKey": "toograph_context_fanout",
+                    "actionKey": "toograph_context_fanout",
                     "outputMapping": {
                         "success": "fanout_success",
                         "context_brief": "context_brief",
@@ -1962,7 +1962,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn({"source": "ask_clarification", "target": "output_visible_reply"}, intake_graph["edges"])
 
         task_plan_node = nodes["buddy_task_plan"]
-        self.assertEqual(task_plan_node["config"]["skillKey"], "")
+        self.assertEqual(task_plan_node["config"]["actionKey"], "")
         self.assertIn("最多一个 in_progress", task_plan_node["config"]["taskInstruction"])
         self.assertIn({"state": "request_understanding", "required": True}, _read_contracts(task_plan_node["reads"]))
         self.assertIn({"state": "task_plan", "mode": "replace"}, nodes["buddy_task_plan"]["writes"])
@@ -1977,12 +1977,12 @@ class TemplateLayoutTests(unittest.TestCase):
         selector_node = cycle_graph["nodes"]["select_capability"]
         self.assertIn({"state": "context_brief", "required": True}, _read_contracts(selector_node["reads"]))
         self.assertIn({"state": "task_plan", "required": False}, _read_contracts(selector_node["reads"]))
-        self.assertEqual(selector_node["config"]["skillKey"], "toograph_capability_selector")
+        self.assertEqual(selector_node["config"]["actionKey"], "toograph_capability_selector")
         self.assertEqual(
-            selector_node["config"]["skillBindings"],
+            selector_node["config"]["actionBindings"],
             [
                 {
-                    "skillKey": "toograph_capability_selector",
+                    "actionKey": "toograph_capability_selector",
                     "outputMapping": {
                         "capability": "selected_capability",
                         "found": "capability_found",
@@ -2001,7 +2001,7 @@ class TemplateLayoutTests(unittest.TestCase):
         ]:
             self.assertNotIn(removed_node_id, cycle_graph["nodes"])
         execute_node = cycle_graph["nodes"]["execute_capability"]
-        self.assertEqual(execute_node["config"]["skillKey"], "")
+        self.assertEqual(execute_node["config"]["actionKey"], "")
         self.assertIn({"state": "selected_capability", "required": True}, _read_contracts(execute_node["reads"]))
         self.assertEqual(execute_node["writes"], [{"state": "capability_result", "mode": "replace"}])
         self.assertEqual(cycle_graph["state_schema"]["capability_result"]["type"], "result_package")
@@ -2041,12 +2041,12 @@ class TemplateLayoutTests(unittest.TestCase):
             ],
         )
         visible_executor = cycle_graph["nodes"]["run_visible_template_operation"]
-        self.assertEqual(visible_executor["config"]["skillKey"], "toograph_page_operator")
+        self.assertEqual(visible_executor["config"]["actionKey"], "toograph_page_operator")
         self.assertEqual(
-            visible_executor["config"]["skillBindings"],
+            visible_executor["config"]["actionBindings"],
             [
                 {
-                    "skillKey": "toograph_page_operator",
+                    "actionKey": "toograph_page_operator",
                     "outputMapping": {
                         "ok": "visible_template_operation_ok",
                         "operation_request_id": "visible_template_operation_request_id",
@@ -2070,12 +2070,12 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn("template_target", visible_executor["config"]["taskInstruction"])
         self.assertIn("user_goal", visible_executor["config"]["taskInstruction"])
         adapt_node = cycle_graph["nodes"]["adapt_visible_subgraph_result"]
-        self.assertEqual(adapt_node["config"]["skillKey"], "buddy_visible_subgraph_result_adapter")
+        self.assertEqual(adapt_node["config"]["actionKey"], "buddy_visible_subgraph_result_adapter")
         self.assertEqual(
-            adapt_node["config"]["skillBindings"],
+            adapt_node["config"]["actionBindings"],
             [
                 {
-                    "skillKey": "buddy_visible_subgraph_result_adapter",
+                    "actionKey": "buddy_visible_subgraph_result_adapter",
                     "outputMapping": {
                         "result_package": "capability_result",
                     },
@@ -2089,7 +2089,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn({"state": "visible_page_operation_final_reply", "required": False}, _read_contracts(adapt_node["reads"]))
         self.assertNotIn(
             "page_operation_context",
-            adapt_node["config"]["skillInstructionBlocks"]["buddy_visible_subgraph_result_adapter"]["content"],
+            adapt_node["config"]["actionInstructionBlocks"]["buddy_visible_subgraph_result_adapter"]["content"],
         )
         self.assertNotIn("output_capability_selection_audit", cycle_graph["nodes"])
         self.assertEqual(
@@ -2163,7 +2163,7 @@ class TemplateLayoutTests(unittest.TestCase):
             self.assertIn({"source": input_node_id, "target": "select_capability"}, cycle_graph["edges"])
 
         final_reply_node = nodes["buddy_final_reply"]
-        self.assertEqual(final_reply_node["config"]["skillKey"], "")
+        self.assertEqual(final_reply_node["config"]["actionKey"], "")
         self.assertEqual(final_reply_node["config"]["thinkingMode"], "low")
         self.assertEqual(final_reply_node["writes"], [{"state": "final_reply", "mode": "replace"}])
         self.assertIn({"state": "capability_result", "required": False}, _read_contracts(final_reply_node["reads"]))
@@ -2299,12 +2299,12 @@ class TemplateLayoutTests(unittest.TestCase):
 
         operator_node = loop_graph["nodes"]["execute_page_operation"]
         self.assertEqual(operator_node["kind"], "agent")
-        self.assertEqual(operator_node["config"]["skillKey"], "toograph_page_operator")
+        self.assertEqual(operator_node["config"]["actionKey"], "toograph_page_operator")
         self.assertEqual(
-            operator_node["config"]["skillBindings"],
+            operator_node["config"]["actionBindings"],
             [
                 {
-                    "skillKey": "toograph_page_operator",
+                    "actionKey": "toograph_page_operator",
                     "outputMapping": {
                         "ok": "operation_ok",
                         "operation_request_id": "operation_request_id",
@@ -2314,7 +2314,7 @@ class TemplateLayoutTests(unittest.TestCase):
                 }
             ],
         )
-        self.assertNotIn("inputMapping", operator_node["config"]["skillBindings"][0])
+        self.assertNotIn("inputMapping", operator_node["config"]["actionBindings"][0])
         self.assertEqual(
             {binding["state"]: binding["mode"] for binding in operator_node["writes"]},
             {
@@ -2444,7 +2444,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template["metadata"]["role"], "buddy_autonomous_review")
         self.assertIs(template["metadata"]["internal"], True)
         self.assertEqual(template["label"], "自主复盘")
-        self.assertEqual(template["metadata"]["requiredSkills"], ["buddy_session_recall", "buddy_home_writer"])
+        self.assertEqual(template["metadata"]["requiredActions"], ["buddy_session_recall", "buddy_home_writer"])
         self.assertEqual(template["metadata"]["permissions"], ["buddy_session_read", "buddy_home_write"])
         self.assertEqual(states["current_session_id"]["type"], "text")
         self.assertEqual(states["final_reply"]["type"], "markdown")
@@ -2501,12 +2501,12 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn("current_session_id", nodes["prepare_session_recall_request"]["config"]["taskInstruction"])
         recall_node = nodes["recall_related_sessions"]
         self.assertEqual(recall_node["kind"], "agent")
-        self.assertEqual(recall_node["config"]["skillKey"], "buddy_session_recall")
+        self.assertEqual(recall_node["config"]["actionKey"], "buddy_session_recall")
         self.assertEqual(
-            recall_node["config"]["skillBindings"],
+            recall_node["config"]["actionBindings"],
             [
                 {
-                    "skillKey": "buddy_session_recall",
+                    "actionKey": "buddy_session_recall",
                     "outputMapping": {
                         "success": "buddy_session_recall_success",
                         "session_recall_context": "session_recall_context",
@@ -2553,12 +2553,12 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         writer_node = nodes["write_memory_updates"]
         self.assertEqual(writer_node["kind"], "agent")
-        self.assertEqual(writer_node["config"]["skillKey"], "buddy_home_writer")
+        self.assertEqual(writer_node["config"]["actionKey"], "buddy_home_writer")
         self.assertEqual(
-            writer_node["config"]["skillBindings"],
+            writer_node["config"]["actionBindings"],
             [
                 {
-                    "skillKey": "buddy_home_writer",
+                    "actionKey": "buddy_home_writer",
                     "outputMapping": {
                         "success": "memory_write_success",
                         "applied_commands": "applied_memory_commands",

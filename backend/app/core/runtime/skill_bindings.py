@@ -80,7 +80,7 @@ def resolve_agent_skill_bindings(
     bound_keys: set[str] = set()
     skill_key = node.config.skill_key
     if skill_key and skill_key not in bound_keys:
-        binding = configured_bindings.get(skill_key) or NodeSystemAgentSkillBinding(skillKey=skill_key)
+        binding = configured_bindings.get(skill_key) or NodeSystemAgentSkillBinding(actionKey=skill_key)
         bindings.append(
             ResolvedAgentSkillBinding(binding=binding, source="node_config")
         )
@@ -90,7 +90,7 @@ def resolve_agent_skill_bindings(
     for skill_key in iter_capability_state_skill_keys(node, input_values=input_values, state_schema=state_schema)[:1]:
         if skill_key in bound_keys:
             continue
-        binding = NodeSystemAgentSkillBinding(skillKey=skill_key)
+        binding = NodeSystemAgentSkillBinding(actionKey=skill_key)
         bindings.append(
             ResolvedAgentSkillBinding(binding=binding, source="capability_state")
         )
@@ -139,7 +139,7 @@ def iter_capability_state_subgraph_keys(
 
 
 def extract_capability_skill_key(value: Any) -> str:
-    return _extract_capability_key(value, expected_kind="skill")
+    return _extract_capability_key(value, expected_kind="action")
 
 
 def extract_capability_subgraph_key(value: Any) -> str:
@@ -173,6 +173,10 @@ def map_skill_outputs(binding: NodeSystemAgentSkillBinding, skill_result: dict[s
         state_key: skill_result.get(output_key)
         for output_key, state_key in binding.output_mapping.items()
     }
+
+
+def map_action_outputs(binding: NodeSystemAgentSkillBinding, skill_result: dict[str, Any]) -> dict[str, Any]:
+    return map_skill_outputs(binding, skill_result)
 
 
 def build_skill_output_mapping_details(

@@ -3540,7 +3540,7 @@ function resolveAliasedGraphEditPlaybackCommand(command: GraphEditCommand, playb
         sourceNodeId: resolveGraphEditPlaybackNodeAlias(command.sourceNodeId, playbackState),
         targetNodeId: resolveGraphEditPlaybackNodeAlias(command.targetNodeId, playbackState),
       };
-    case "select_skill":
+    case "select_action":
       return {
         ...command,
         nodeId: resolveGraphEditPlaybackNodeAlias(command.nodeId, playbackState),

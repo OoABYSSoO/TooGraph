@@ -399,16 +399,16 @@ function normalizeGraphEditIntent(record: Record<string, unknown>): GraphEditInt
       ...(record.required === true ? { required: true } : {}),
     };
   }
-  if (kind === "select_skill") {
+  if (kind === "select_action") {
     const nodeRef = normalizeText(record.nodeRef ?? record.node_ref);
-    const skillKey = normalizeText(record.skillKey ?? record.skill_key);
-    if (!nodeRef || !skillKey) {
+    const actionKey = normalizeText(record.actionKey ?? record.action_key);
+    if (!nodeRef || !actionKey) {
       return null;
     }
     const intent: GraphEditIntent = {
-      kind: "select_skill",
+      kind: "select_action",
       nodeRef,
-      skillKey,
+      actionKey,
     };
     assignOptionalText(intent, "taskInstruction", record.taskInstruction ?? record.task_instruction);
     return intent;

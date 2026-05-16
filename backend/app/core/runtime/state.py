@@ -57,8 +57,8 @@ class RunState(TypedDict, total=False):
     checkpoint_metadata: RunCheckpointMetadata
     revision_round: int
     max_revision_round: int
-    selected_skills: list[str]
-    skill_outputs: list[dict[str, Any]]
+    selected_actions: list[str]
+    action_outputs: list[dict[str, Any]]
     activity_events: list[dict[str, Any]]
     selected_capabilities: list[dict[str, Any]]
     capability_outputs: list[dict[str, Any]]
@@ -192,8 +192,8 @@ def create_initial_run_state(graph_id: str, graph_name: str, max_revision_round:
         ),
         revision_round=0,
         max_revision_round=max_revision_round,
-        selected_skills=[],
-        skill_outputs=[],
+        selected_actions=[],
+        action_outputs=[],
         activity_events=[],
         selected_capabilities=[],
         capability_outputs=[],

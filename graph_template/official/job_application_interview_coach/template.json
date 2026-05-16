@@ -75,8 +75,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_candidate_memory",
         "fieldKey": "success",
         "managed": true
@@ -89,8 +89,8 @@
       "value": [],
       "color": "#a855f7",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_candidate_memory",
         "fieldKey": "omitted_memories",
         "managed": true
@@ -103,8 +103,8 @@
       "value": "",
       "color": "#6d28d9",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_candidate_memory",
         "fieldKey": "result",
         "managed": true
@@ -205,8 +205,8 @@
       "value": {},
       "color": "#7c3aed",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_candidate_memory",
         "fieldKey": "session_recall_context",
         "managed": true
@@ -219,8 +219,8 @@
       "value": [],
       "color": "#8b5cf6",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_candidate_memory",
         "fieldKey": "recalled_sessions",
         "managed": true
@@ -465,9 +465,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "生成 memory_request JSON，只用于只读召回 Buddy 历史会话中的长期偏好、历史反馈和相关上下文。字段包含 mode、query、limit、window；mode 默认 discover，limit 不超过 8，window 不超过 2。query 应结合本模板输入和用户目标，避免过宽；不要写 scope、layer、status、top_k、max_chars，不要生成业务结论。",
         "modelSource": "global",
         "model": "",
@@ -515,10 +515,10 @@
         }
       ],
       "config": {
-        "skillKey": "buddy_session_recall",
-        "skillBindings": [
+        "actionKey": "buddy_session_recall",
+        "actionBindings": [
           {
-            "skillKey": "buddy_session_recall",
+            "actionKey": "buddy_session_recall",
             "outputMapping": {
               "success": "buddy_session_recall_success",
               "session_recall_context": "session_recall_context",
@@ -527,9 +527,9 @@
             }
           }
         ],
-        "skillInstructionBlocks": {
+        "actionInstructionBlocks": {
           "buddy_session_recall": {
-            "skillKey": "buddy_session_recall",
+            "actionKey": "buddy_session_recall",
             "title": "Buddy session recall instruction",
             "content": "你已绑定 Buddy 会话召回技能。只把 memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
             "source": "node.override"
@@ -578,9 +578,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "jd_requirements 写成 JSON，包含 role_title、company_context、must_have_requirements、nice_to_have_requirements、responsibilities、soft_skills、seniority_signals、location_or_salary_constraints、evidence_quotes、uncertainties。每条要求必须标注来自 JD 的证据片段或说明证据不足。",
         "modelSource": "global",
         "model": "",
@@ -636,9 +636,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "experience_match_map 写成 JSON，按 JD 要求列出 evidence_strength、resume_evidence、project_evidence、missing_evidence、suggested_supporting_materials、risk_level。matching_report 写成 Markdown，保守总结匹配度、核心优势、证据不足项和下一步补充材料。不得编造经历或指标。",
         "modelSource": "global",
         "model": "",
@@ -694,9 +694,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "gap_analysis 写成 Markdown，列出硬性差距、证据不足、可用项目补强、面试风险、需要人工判断的事项。必须明确“不承诺录用”，不得输出确定性职业、薪资或法律承诺。salary_strategy 写成 Markdown，包含表达方式、可谈判范围、城市/远程约束和风险提示；信息不足时输出问题清单。",
         "modelSource": "global",
         "model": "",
@@ -748,9 +748,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "rewritten_resume 写成 Markdown，包含 Summary、Targeted Experience Bullets、Project Bullets、Skills Reframing、Do Not Claim、Need Evidence。每条改写 bullet 必须具体、可验证、尽量量化；没有证据的指标必须标为待补充，不能编造。",
         "modelSource": "global",
         "model": "",
@@ -798,9 +798,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "project_story_library 写成 JSON，包含 stories 数组。每个故事包含 title、target_requirement_ids、format(STAR/CAR)、situation、task_or_challenge、action、result、metrics、evidence_needed、likely_followups、risk_notes。没有证据的结果不能写成确定事实。",
         "modelSource": "global",
         "model": "",
@@ -848,9 +848,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "interview_questions 写成 JSON，按 technical、project_deep_dive、behavioral、system_design_or_case、risk_followups、candidate_questions 分类。每题包含 why_likely、what_good_answer_covers、story_refs、scoring_rubric、followups。",
         "modelSource": "global",
         "model": "",
@@ -898,9 +898,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "mock_interview_feedback 写成 Markdown。如果 interview_transcript 为空，输出模拟面试使用说明、评分表和建议的 30 分钟练习流程；如果有记录，逐题评估结构、证据、清晰度、风险、追问响应，并给出具体改写建议。",
         "modelSource": "global",
         "model": "",
@@ -952,9 +952,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "learning_plan 写成 Markdown，包含 7 天、14 天、30 天三个准备节奏；每项任务包含目标、材料、练习方式、完成标准和复盘问题。必须把高风险差距放在前面。",
         "modelSource": "global",
         "model": "",
@@ -1018,9 +1018,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "final_application_package 写成 Markdown，结构包含：1. 岗位匹配摘要；2. 差距和风险；3. 简历改写；4. 项目故事库摘要；5. 面试题与练习方式；6. 模拟面试反馈；7. 阶段准备计划；8. 薪资与城市策略；9. 记忆候选状态；10. 人工确认清单。必须保留不确定项、证据不足和不承诺录用提示。",
         "modelSource": "global",
         "model": "",
@@ -1278,7 +1278,7 @@
         "required": false
       }
     ],
-    "requiredSkills": [
+    "requiredActions": [
       "buddy_session_recall"
     ],
     "requiredPermissions": [

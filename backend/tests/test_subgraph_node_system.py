@@ -63,7 +63,7 @@ def _inner_breakpoint_graph() -> dict:
         "reads": [{"state": "internal_question", "required": True}],
         "writes": [{"state": "internal_question", "mode": "replace"}],
         "config": {
-            "skillKey": "",
+            "actionKey": "",
             "taskInstruction": "",
             "modelSource": "global",
             "model": "",
@@ -139,7 +139,7 @@ def _dynamic_breakpoint_template() -> dict:
         "reads": [{"state": "final_reply", "required": True}],
         "writes": [{"state": "final_reply", "mode": "replace"}],
         "config": {
-            "skillKey": "",
+            "actionKey": "",
             "taskInstruction": "",
             "modelSource": "global",
             "model": "",
@@ -455,7 +455,7 @@ def test_langgraph_runtime_pauses_parent_when_dynamic_subgraph_hits_inner_breakp
                     "ui": {"position": {"x": 320, "y": 80}},
                     "reads": [{"state": "selected_capability"}, {"state": "requirement"}],
                     "writes": [{"state": "dynamic_result"}],
-                    "config": {"skillKey": ""},
+                    "config": {"actionKey": ""},
                 },
                 "result_output": {
                     "kind": "output",
@@ -547,7 +547,7 @@ def test_langgraph_runtime_resumes_parent_after_dynamic_subgraph_breakpoint(monk
                     "ui": {"position": {"x": 320, "y": 80}},
                     "reads": [{"state": "selected_capability"}, {"state": "requirement"}],
                     "writes": [{"state": "dynamic_result"}],
-                    "config": {"skillKey": ""},
+                    "config": {"actionKey": ""},
                 },
                 "result_output": {
                     "kind": "output",
@@ -630,7 +630,7 @@ def test_langgraph_runtime_runs_dynamic_subgraph_capability_and_packages_outputs
                     "ui": {"position": {"x": 320, "y": 80}},
                     "reads": [{"state": "selected_capability"}, {"state": "requirement"}],
                     "writes": [{"state": "dynamic_result"}],
-                    "config": {"skillKey": ""},
+                    "config": {"actionKey": ""},
                 },
                 "result_output": {
                     "kind": "output",

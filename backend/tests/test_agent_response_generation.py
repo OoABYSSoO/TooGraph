@@ -193,11 +193,11 @@ class AgentResponseGenerationTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "writes": [{"state": "answer"}],
                 "config": {
-                    "skillKey": "web_search",
+                    "actionKey": "web_search",
                     "taskInstruction": "Summarize the skill result.",
-                    "skillInstructionBlocks": {
+                    "actionInstructionBlocks": {
                         "web_search": {
-                            "skillKey": "web_search",
+                            "actionKey": "web_search",
                             "title": "联网搜索 skill instruction",
                             "content": "Use this only while invoking the skill.",
                             "source": "node.override",

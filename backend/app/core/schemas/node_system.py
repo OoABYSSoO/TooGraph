@@ -78,12 +78,12 @@ class StateWriteMode(str, Enum):
 
 
 class NodeSystemStateBindingKind(str, Enum):
-    SKILL_OUTPUT = "skill_output"
+    ACTION_OUTPUT = "action_output"
     CAPABILITY_RESULT = "capability_result"
 
 
 class NodeSystemReadBindingKind(str, Enum):
-    SKILL_INPUT = "skill_input"
+    ACTION_INPUT = "action_input"
 
 
 class BatchWorkerSource(str, Enum):
@@ -97,20 +97,27 @@ class BatchInputMode(str, Enum):
 
 
 class NodeSystemStateBindingMetadata(BaseModel):
-    kind: NodeSystemStateBindingKind = NodeSystemStateBindingKind.SKILL_OUTPUT
-    skill_key: str = Field(default="", alias="skillKey")
+    kind: NodeSystemStateBindingKind = NodeSystemStateBindingKind.ACTION_OUTPUT
+    action_key: str = Field(default="", alias="actionKey")
     node_id: str = Field(..., min_length=1, alias="nodeId")
     field_key: str = Field(default="", alias="fieldKey")
     managed: bool = True
 
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_legacy_skill_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "skillKey" in data:
+            raise ValueError("'skillKey' is no longer supported for state bindings. Use 'actionKey' instead.")
+        return data
 
     @field_validator("node_id")
     @classmethod
     def validate_required_binding_identifier(cls, value: str) -> str:
         return _validate_identifier(value, label="State binding identifier")
 
-    @field_validator("skill_key", "field_key")
+    @field_validator("action_key", "field_key")
     @classmethod
     def validate_optional_binding_identifier(cls, value: str) -> str:
         stripped = value.strip()
@@ -118,34 +125,49 @@ class NodeSystemStateBindingMetadata(BaseModel):
 
     @model_validator(mode="after")
     def validate_binding_shape(self) -> "NodeSystemStateBindingMetadata":
-        if self.kind == NodeSystemStateBindingKind.SKILL_OUTPUT:
-            self.skill_key = _validate_identifier(self.skill_key, label="Skill key")
-            self.field_key = _validate_identifier(self.field_key, label="Skill output field")
+        if self.kind == NodeSystemStateBindingKind.ACTION_OUTPUT:
+            self.action_key = _validate_identifier(self.action_key, label="Action key")
+            self.field_key = _validate_identifier(self.field_key, label="Action output field")
             return self
 
-        self.skill_key = ""
+        self.action_key = ""
         self.field_key = self.field_key or "result_package"
         return self
 
+    @property
+    def skill_key(self) -> str:
+        return self.action_key
+
 
 class NodeSystemReadBindingMetadata(BaseModel):
-    kind: NodeSystemReadBindingKind = NodeSystemReadBindingKind.SKILL_INPUT
-    skill_key: str = Field(..., min_length=1, alias="skillKey")
+    kind: NodeSystemReadBindingKind = NodeSystemReadBindingKind.ACTION_INPUT
+    action_key: str = Field(..., min_length=1, alias="actionKey")
     field_key: str = Field(..., min_length=1, alias="fieldKey")
     managed: bool = True
 
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 
-    @field_validator("skill_key", "field_key")
+    @model_validator(mode="before")
+    @classmethod
+    def reject_legacy_skill_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "skillKey" in data:
+            raise ValueError("'skillKey' is no longer supported for read bindings. Use 'actionKey' instead.")
+        return data
+
+    @field_validator("action_key", "field_key")
     @classmethod
     def validate_binding_identifier(cls, value: str) -> str:
-        return _validate_identifier(value, label="Skill input binding identifier")
+        return _validate_identifier(value, label="Action input binding identifier")
 
     @model_validator(mode="after")
     def validate_binding_shape(self) -> "NodeSystemReadBindingMetadata":
-        if self.kind != NodeSystemReadBindingKind.SKILL_INPUT:
-            raise ValueError("Read binding metadata only supports skill_input.")
+        if self.kind != NodeSystemReadBindingKind.ACTION_INPUT:
+            raise ValueError("Read binding metadata only supports action_input.")
         return self
+
+    @property
+    def skill_key(self) -> str:
+        return self.action_key
 
 
 class AgentModelSource(str, Enum):
@@ -265,16 +287,23 @@ class NodeSystemInputConfig(BaseModel):
         return _reject_legacy_default_value_alias(data)
 
 
-class NodeSystemAgentSkillBinding(BaseModel):
-    skill_key: str = Field(..., min_length=1, alias="skillKey")
+class NodeSystemAgentActionBinding(BaseModel):
+    action_key: str = Field(..., min_length=1, alias="actionKey")
     output_mapping: dict[str, str] = Field(default_factory=dict, alias="outputMapping")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 
-    @field_validator("skill_key")
+    @model_validator(mode="before")
     @classmethod
-    def validate_skill_key(cls, value: str) -> str:
-        return _validate_identifier(value, label="Skill key")
+    def reject_legacy_skill_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "skillKey" in data:
+            raise ValueError("'skillKey' is no longer supported for action bindings. Use 'actionKey' instead.")
+        return data
+
+    @field_validator("action_key")
+    @classmethod
+    def validate_action_key(cls, value: str) -> str:
+        return _validate_identifier(value, label="Action key")
 
     @field_validator("output_mapping")
     @classmethod
@@ -283,32 +312,53 @@ class NodeSystemAgentSkillBinding(BaseModel):
         for mapping_key, state_key in value.items():
             next_mapping_key = mapping_key.strip()
             if not next_mapping_key:
-                raise ValueError("Skill mapping key cannot be empty.")
+                raise ValueError("Action mapping key cannot be empty.")
             normalized[next_mapping_key] = _validate_identifier(state_key, label="State reference")
         return normalized
 
+    @property
+    def skill_key(self) -> str:
+        return self.action_key
 
-class NodeSystemSkillInstructionBlock(BaseModel):
-    skill_key: str = Field(..., min_length=1, alias="skillKey")
+
+class NodeSystemActionInstructionBlock(BaseModel):
+    action_key: str = Field(..., min_length=1, alias="actionKey")
     title: str = ""
     content: str = ""
-    source: Literal["skill.llmInstruction", "node.override"] = "skill.llmInstruction"
+    source: Literal["action.llmInstruction", "node.override"] = "action.llmInstruction"
 
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 
-    @field_validator("skill_key")
+    @model_validator(mode="before")
     @classmethod
-    def validate_skill_key(cls, value: str) -> str:
-        return _validate_identifier(value, label="Skill key")
+    def reject_legacy_skill_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "skillKey" in data:
+            raise ValueError("'skillKey' is no longer supported for action instruction blocks. Use 'actionKey' instead.")
+        if isinstance(data, dict) and data.get("source") == "skill.llmInstruction":
+            raise ValueError("'skill.llmInstruction' is no longer supported. Use 'action.llmInstruction' instead.")
+        return data
+
+    @field_validator("action_key")
+    @classmethod
+    def validate_action_key(cls, value: str) -> str:
+        return _validate_identifier(value, label="Action key")
+
+    @property
+    def skill_key(self) -> str:
+        return self.action_key
+
+
+NodeSystemAgentSkillBinding = NodeSystemAgentActionBinding
+NodeSystemSkillInstructionBlock = NodeSystemActionInstructionBlock
 
 
 class NodeSystemAgentConfig(BaseModel):
-    skill_key: str = Field(default="", alias="skillKey")
-    skill_bindings: list[NodeSystemAgentSkillBinding] = Field(default_factory=list, alias="skillBindings")
+    action_key: str = Field(default="", alias="actionKey")
+    action_bindings: list[NodeSystemAgentActionBinding] = Field(default_factory=list, alias="actionBindings")
     suspended_free_writes: list[NodeSystemWriteBinding] = Field(default_factory=list, alias="suspendedFreeWrites")
-    skill_instruction_blocks: dict[str, NodeSystemSkillInstructionBlock] = Field(
+    action_instruction_blocks: dict[str, NodeSystemActionInstructionBlock] = Field(
         default_factory=dict,
-        alias="skillInstructionBlocks",
+        alias="actionInstructionBlocks",
     )
     task_instruction: str = Field(default="", alias="taskInstruction")
     model_source: AgentModelSource = Field(default=AgentModelSource.GLOBAL, alias="modelSource")
@@ -316,25 +366,47 @@ class NodeSystemAgentConfig(BaseModel):
     thinking_mode: AgentThinkingMode = Field(default=AgentThinkingMode.HIGH, alias="thinkingMode")
     temperature: float = Field(default=0.2, ge=0, le=2)
 
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 
     @model_validator(mode="before")
     @classmethod
-    def reject_legacy_skills_array(cls, data: Any) -> Any:
-        if isinstance(data, dict) and "skills" in data:
-            raise ValueError("'skills' is no longer supported for agent config. Use single 'skillKey' instead.")
+    def reject_legacy_skill_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            legacy_fields = ["skills", "skillKey", "skillBindings", "skillInstructionBlocks"]
+            for legacy_field in legacy_fields:
+                if legacy_field not in data:
+                    continue
+                replacement = {
+                    "skills": "single actionKey",
+                    "skillKey": "actionKey",
+                    "skillBindings": "actionBindings",
+                    "skillInstructionBlocks": "actionInstructionBlocks",
+                }[legacy_field]
+                raise ValueError(f"'{legacy_field}' is no longer supported for agent config. Use '{replacement}' instead.")
         return data
 
-    @field_validator("skill_key")
+    @field_validator("action_key")
     @classmethod
-    def validate_optional_skill_key(cls, value: str) -> str:
+    def validate_optional_action_key(cls, value: str) -> str:
         stripped = value.strip()
-        return _validate_identifier(stripped, label="Skill key") if stripped else ""
+        return _validate_identifier(stripped, label="Action key") if stripped else ""
 
     @field_validator("thinking_mode", mode="before")
     @classmethod
     def normalize_thinking_mode(cls, value: Any) -> str:
         return normalize_thinking_level(value)
+
+    @property
+    def skill_key(self) -> str:
+        return self.action_key
+
+    @property
+    def skill_bindings(self) -> list[NodeSystemAgentActionBinding]:
+        return self.action_bindings
+
+    @property
+    def skill_instruction_blocks(self) -> dict[str, NodeSystemActionInstructionBlock]:
+        return self.action_instruction_blocks
 
 
 class NodeSystemBatchSubgraphWorkerConfig(BaseModel):

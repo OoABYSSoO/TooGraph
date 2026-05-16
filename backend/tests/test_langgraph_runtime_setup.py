@@ -58,7 +58,7 @@ def _build_graph() -> NodeSystemGraphPayload:
                     "ui": {"position": {"x": 240, "y": 0}},
                     "reads": [{"state": "answer", "required": True}],
                     "writes": [{"state": "summary"}],
-                    "config": {"skillKey": "", "taskInstruction": ""},
+                    "config": {"actionKey": "", "taskInstruction": ""},
                 },
             },
             "edges": [{"source": "input_answer", "target": "agent_answer"}],
@@ -148,7 +148,7 @@ class LangGraphRuntimeSetupTest(unittest.TestCase):
             },
             "state_last_writers": {"summary": {"node_id": "agent_answer"}},
             "state_events": [{"state_key": "summary"}],
-            "activity_events": [{"kind": "skill_invocation"}],
+            "activity_events": [{"kind": "action_invocation"}],
         }
 
         prepared = prepare_langgraph_runtime_state(_build_graph(), state, resume_from_checkpoint=False)
@@ -167,7 +167,7 @@ class LangGraphRuntimeSetupTest(unittest.TestCase):
                 "stale_node": "success",
             },
             "state_values": {"answer": "checkpoint answer", "summary": "checkpoint summary"},
-            "activity_events": [{"kind": "skill_invocation"}],
+            "activity_events": [{"kind": "action_invocation"}],
         }
 
         prepared = prepare_langgraph_runtime_state(_build_graph(), state, resume_from_checkpoint=True)
@@ -176,7 +176,7 @@ class LangGraphRuntimeSetupTest(unittest.TestCase):
         self.assertEqual(prepared["node_status_map"], {"input_answer": "success", "agent_answer": "success"})
         self.assertEqual(prepared["state_values"]["answer"], "checkpoint answer")
         self.assertEqual(prepared["state_values"]["summary"], "checkpoint summary")
-        self.assertEqual(prepared["activity_events"], [{"kind": "skill_invocation"}])
+        self.assertEqual(prepared["activity_events"], [{"kind": "action_invocation"}])
         self.assertEqual(prepared["metadata"]["resolved_runtime_backend"], "langgraph")
 
 

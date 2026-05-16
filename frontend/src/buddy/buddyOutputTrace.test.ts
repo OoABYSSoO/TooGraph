@@ -239,7 +239,7 @@ test("reduceBuddyOutputTraceEvent records skill activity inside the active segme
     "activity.event",
     {
       sequence: 1,
-      kind: "skill_invocation",
+      kind: "action_invocation",
       summary: "Skill web_search succeeded.",
       node_id: "node_a",
       status: "succeeded",
@@ -482,7 +482,7 @@ test("buildBuddyOutputTraceStateFromRunDetail rebuilds completed segments from r
       activity_events: [
         {
           sequence: 1,
-          kind: "skill_invocation",
+          kind: "action_invocation",
           summary: "Skill ran.",
           node_id: "node_c",
           status: "succeeded",

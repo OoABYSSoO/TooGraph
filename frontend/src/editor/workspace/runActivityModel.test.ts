@@ -82,8 +82,8 @@ test("appendRunActivityEvent appends low-level activity events", () => {
     eventType: "activity.event",
     payload: {
       sequence: 2,
-      kind: "skill_invocation",
-      summary: "Skill 'web_search' succeeded.",
+      kind: "action_invocation",
+      summary: "Action 'web_search' succeeded.",
       node_id: "execute_capability",
       status: "succeeded",
       detail: { skill_key: "web_search" },
@@ -96,9 +96,9 @@ test("appendRunActivityEvent appends low-level activity events", () => {
     [
       {
         kind: "activity-event",
-        title: "Skill 'web_search' succeeded.",
+        title: "Action 'web_search' succeeded.",
         nodeId: "execute_capability",
-        preview: '{\n  "skill_key": "web_search"\n}',
+        preview: '{\n  "action_key": "web_search"\n}',
         sequence: 2,
       },
     ],
@@ -212,8 +212,8 @@ test("buildRunActivityEntriesFromRun replays stored low-level activity events", 
       activity_events: [
         {
           node_id: "execute_capability",
-          kind: "skill_invocation",
-          summary: "Skill 'web_search' succeeded.",
+          kind: "action_invocation",
+          summary: "Action 'web_search' succeeded.",
           status: "succeeded",
           detail: { skill_key: "web_search" },
           sequence: 1,
@@ -229,9 +229,9 @@ test("buildRunActivityEntriesFromRun replays stored low-level activity events", 
     [
       {
         kind: "activity-event",
-        title: "Skill 'web_search' succeeded.",
+        title: "Action 'web_search' succeeded.",
         nodeId: "execute_capability",
-        preview: '{\n  "skill_key": "web_search"\n}',
+        preview: '{\n  "action_key": "web_search"\n}',
       },
     ],
   );

@@ -503,10 +503,10 @@ def _build_langgraph_node_callable(
                     )
                 state["node_status_map"][node_name] = "success"
                 _record_subgraph_node_status(state, node_name, "success")
-                if body.get("selected_skills"):
-                    state["selected_skills"] = [*state.get("selected_skills", []), *body["selected_skills"]]
-                if body.get("skill_outputs"):
-                    state["skill_outputs"] = [*state.get("skill_outputs", []), *body["skill_outputs"]]
+                if body.get("selected_actions"):
+                    state["selected_actions"] = [*state.get("selected_actions", []), *body["selected_actions"]]
+                if body.get("action_outputs"):
+                    state["action_outputs"] = [*state.get("action_outputs", []), *body["action_outputs"]]
                 if body.get("selected_capabilities"):
                     state["selected_capabilities"] = [
                         *state.get("selected_capabilities", []),

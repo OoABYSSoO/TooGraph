@@ -17,8 +17,8 @@ export type StateDefinition = {
   value?: unknown;
   color: string;
   binding?: {
-    kind: "skill_output";
-    skillKey: string;
+    kind: "action_output";
+    actionKey: string;
     nodeId: string;
     fieldKey: string;
     managed?: boolean;
@@ -34,8 +34,8 @@ export type ReadBinding = {
   state: string;
   required?: boolean;
   binding?: {
-    kind: "skill_input";
-    skillKey: string;
+    kind: "action_input";
+    actionKey: string;
     fieldKey: string;
     managed?: boolean;
   } | null;
@@ -46,8 +46,8 @@ export type WriteBinding = {
   mode?: "replace" | "append";
 };
 
-export type AgentSkillBinding = {
-  skillKey: string;
+export type AgentActionBinding = {
+  actionKey: string;
   outputMapping?: Record<string, string>;
 };
 
@@ -82,10 +82,10 @@ export type AgentNode = {
   reads: ReadBinding[];
   writes: WriteBinding[];
   config: {
-    skillKey: string;
-    skillBindings?: AgentSkillBinding[];
+    actionKey: string;
+    actionBindings?: AgentActionBinding[];
     suspendedFreeWrites?: WriteBinding[];
-    skillInstructionBlocks?: Record<string, AgentSkillInstructionBlock>;
+    actionInstructionBlocks?: Record<string, AgentActionInstructionBlock>;
     taskInstruction: string;
     modelSource: "global" | "override";
     model: string;
@@ -131,11 +131,11 @@ export type BatchNode = {
   };
 };
 
-export type AgentSkillInstructionBlock = {
-  skillKey: string;
+export type AgentActionInstructionBlock = {
+  actionKey: string;
   title: string;
   content: string;
-  source: "skill.llmInstruction" | "node.override";
+  source: "action.llmInstruction" | "node.override";
 };
 
 export type ConditionNode = {

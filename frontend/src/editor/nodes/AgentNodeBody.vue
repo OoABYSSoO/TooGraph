@@ -123,10 +123,10 @@
     @update:breakpoint-enabled="emit('update:breakpoint-enabled', $event)"
   />
   <div class="node-card__surface node-card__prompt-surface">
-    <div v-if="skillInstructionBlocks.length > 0" class="node-card__skill-instruction-capsules">
+    <div v-if="actionInstructionBlocks.length > 0" class="node-card__skill-instruction-capsules">
       <ElPopover
-        v-for="block in skillInstructionBlocks"
-        :key="block.skillKey"
+        v-for="block in actionInstructionBlocks"
+        :key="block.actionKey"
         placement="top-start"
         :width="380"
         trigger="click"
@@ -151,7 +151,7 @@
             :model-value="block.content"
             type="textarea"
             :autosize="{ minRows: 6, maxRows: 10 }"
-            @update:model-value="emit('update-skill-instruction', { skillKey: block.skillKey, content: String($event) })"
+            @update:model-value="emit('update-skill-instruction', { skillKey: block.actionKey, content: String($event) })"
           />
         </div>
       </ElPopover>
@@ -275,8 +275,8 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const runtimeControlsRef = ref<{ collapseModelSelect?: () => void } | null>(null);
-const skillInstructionBlocks = computed(() =>
-  Object.values(props.body.skillInstructionBlocks ?? {}).filter((block) => block.content.trim() || block.title.trim()),
+const actionInstructionBlocks = computed(() =>
+  Object.values(props.body.actionInstructionBlocks ?? {}).filter((block) => block.content.trim() || block.title.trim()),
 );
 
 function collapseModelSelect() {

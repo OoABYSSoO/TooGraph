@@ -53,10 +53,10 @@ def _agent_graph_payload(name: str = "Reusable Agent Flow") -> dict[str, object]
                 "reads": [],
                 "writes": [{"state": "answer", "mode": "replace"}],
                 "config": {
-                    "skillKey": "",
-                    "skillBindings": [],
+                    "actionKey": "",
+                    "actionBindings": [],
                     "suspendedFreeWrites": [],
-                    "skillInstructionBlocks": {},
+                    "actionInstructionBlocks": {},
                     "taskInstruction": "Respond.",
                     "modelSource": "global",
                     "model": "",

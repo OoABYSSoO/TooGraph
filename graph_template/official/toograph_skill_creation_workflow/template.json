@@ -35,8 +35,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_skill_package_reader",
+        "kind": "action_output",
+        "actionKey": "toograph_skill_package_reader",
         "nodeId": "read_existing_skill_package",
         "fieldKey": "success",
         "managed": true
@@ -49,8 +49,8 @@
       "value": {},
       "color": "#9333ea",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_skill_package_reader",
+        "kind": "action_output",
+        "actionKey": "toograph_skill_package_reader",
         "nodeId": "read_existing_skill_package",
         "fieldKey": "skill_package",
         "managed": true
@@ -63,8 +63,8 @@
       "value": "",
       "color": "#15803d",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_skill_package_reader",
+        "kind": "action_output",
+        "actionKey": "toograph_skill_package_reader",
         "nodeId": "read_existing_skill_package",
         "fieldKey": "result",
         "managed": true
@@ -125,8 +125,8 @@
       "value": "",
       "color": "#2563eb",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_skill_builder",
+        "kind": "action_output",
+        "actionKey": "toograph_skill_builder",
         "nodeId": "build_skill_files",
         "fieldKey": "skill_key",
         "managed": true
@@ -139,8 +139,8 @@
       "value": {},
       "color": "#2563eb",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_skill_builder",
+        "kind": "action_output",
+        "actionKey": "toograph_skill_builder",
         "nodeId": "build_skill_files",
         "fieldKey": "skill_json",
         "managed": true
@@ -153,8 +153,8 @@
       "value": "",
       "color": "#2563eb",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_skill_builder",
+        "kind": "action_output",
+        "actionKey": "toograph_skill_builder",
         "nodeId": "build_skill_files",
         "fieldKey": "skill_md",
         "managed": true
@@ -167,8 +167,8 @@
       "value": "",
       "color": "#2563eb",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_skill_builder",
+        "kind": "action_output",
+        "actionKey": "toograph_skill_builder",
         "nodeId": "build_skill_files",
         "fieldKey": "before_llm_py",
         "managed": true
@@ -181,8 +181,8 @@
       "value": "",
       "color": "#2563eb",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_skill_builder",
+        "kind": "action_output",
+        "actionKey": "toograph_skill_builder",
         "nodeId": "build_skill_files",
         "fieldKey": "after_llm_py",
         "managed": true
@@ -195,8 +195,8 @@
       "value": "",
       "color": "#2563eb",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_skill_builder",
+        "kind": "action_output",
+        "actionKey": "toograph_skill_builder",
         "nodeId": "build_skill_files",
         "fieldKey": "requirements_txt",
         "managed": true
@@ -217,8 +217,8 @@
       "value": false,
       "color": "#9333ea",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_script_tester",
+        "kind": "action_output",
+        "actionKey": "toograph_script_tester",
         "nodeId": "run_script_test",
         "fieldKey": "success",
         "managed": true
@@ -231,8 +231,8 @@
       "value": "",
       "color": "#9333ea",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "toograph_script_tester",
+        "kind": "action_output",
+        "actionKey": "toograph_script_tester",
         "nodeId": "run_script_test",
         "fieldKey": "result",
         "managed": true
@@ -261,8 +261,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
+        "kind": "action_output",
+        "actionKey": "local_workspace_executor",
         "nodeId": "write_skill_json",
         "fieldKey": "success",
         "managed": true
@@ -275,8 +275,8 @@
       "value": "",
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
+        "kind": "action_output",
+        "actionKey": "local_workspace_executor",
         "nodeId": "write_skill_json",
         "fieldKey": "result",
         "managed": true
@@ -289,8 +289,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
+        "kind": "action_output",
+        "actionKey": "local_workspace_executor",
         "nodeId": "write_skill_md",
         "fieldKey": "success",
         "managed": true
@@ -303,8 +303,8 @@
       "value": "",
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
+        "kind": "action_output",
+        "actionKey": "local_workspace_executor",
         "nodeId": "write_skill_md",
         "fieldKey": "result",
         "managed": true
@@ -317,8 +317,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
+        "kind": "action_output",
+        "actionKey": "local_workspace_executor",
         "nodeId": "write_before_llm_py",
         "fieldKey": "success",
         "managed": true
@@ -331,8 +331,8 @@
       "value": "",
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
+        "kind": "action_output",
+        "actionKey": "local_workspace_executor",
         "nodeId": "write_before_llm_py",
         "fieldKey": "result",
         "managed": true
@@ -345,8 +345,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
+        "kind": "action_output",
+        "actionKey": "local_workspace_executor",
         "nodeId": "write_after_llm_py",
         "fieldKey": "success",
         "managed": true
@@ -359,8 +359,8 @@
       "value": "",
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
+        "kind": "action_output",
+        "actionKey": "local_workspace_executor",
         "nodeId": "write_after_llm_py",
         "fieldKey": "result",
         "managed": true
@@ -373,8 +373,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
+        "kind": "action_output",
+        "actionKey": "local_workspace_executor",
         "nodeId": "write_requirements_txt",
         "fieldKey": "success",
         "managed": true
@@ -387,8 +387,8 @@
       "value": "",
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "local_workspace_executor",
+        "kind": "action_output",
+        "actionKey": "local_workspace_executor",
         "nodeId": "write_requirements_txt",
         "fieldKey": "result",
         "managed": true
@@ -482,10 +482,10 @@
         }
       ],
       "config": {
-        "skillKey": "toograph_skill_package_reader",
-        "skillBindings": [
+        "actionKey": "toograph_skill_package_reader",
+        "actionBindings": [
           {
-            "skillKey": "toograph_skill_package_reader",
+            "actionKey": "toograph_skill_package_reader",
             "outputMapping": {
               "success": "existing_skill_package_success",
               "skill_package": "existing_skill_package",
@@ -493,9 +493,9 @@
             }
           }
         ],
-        "skillInstructionBlocks": {
+        "actionInstructionBlocks": {
           "toograph_skill_package_reader": {
-            "skillKey": "toograph_skill_package_reader",
+            "actionKey": "toograph_skill_package_reader",
             "title": "Skill package reader instruction",
             "content": "你已绑定 Skill Package Reader。优先使用 target_skill_key；如果为空，只能在 skill_request 或 capability_gap 明确给出已有 Skill key 时读取。不要猜测不存在的 key，不要写文件，不要执行脚本。",
             "source": "node.override"
@@ -548,9 +548,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "评估用户是否真的需要创建或改进 Skill。capability_gap 是可选的上游能力缺口上下文；如果它存在，应把缺口类型、缺口原因、建议能力形态纳入判断。existing_skill_package 是可选的已有 Skill 包上下文；如果存在且用户目标是改进已有 Skill，按“改进已有 Skill”处理，confirmed_skill_requirement 必须说明要保留、修改、废弃的输入输出、权限和脚本行为。requirement_review 必须写 JSON 对象，包含 needs_clarification(boolean)、capability_gap_summary(string)、existing_skill_summary(string)、unclear_points(array)、questions(array)、reason(string)。creation_decision 必须写 JSON 对象，包含 approved_to_create(boolean)、reason(string)、mode(create|improve)。需求不明确时 approved_to_create 必须为 false，本轮通过 final_summary 询问用户，用户回答应在下一轮作为更完整的 skill_request 进入。需求明确时默认 approved_to_create 为 true。confirmed_skill_requirement 写 Markdown，概括当前已确认的目标、输入、输出、权限、是否需要 before_llm.py、是否需要 after_llm.py、requirements.txt 需求和限制。",
         "modelSource": "global",
         "model": "",
@@ -626,9 +626,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "根据 requirement_review 生成需要用户回答的澄清问题，并把问题写入 clarification_questions 与 final_summary。优先用带选项的问题，每题给 2 到 4 个选项；允许用户不认可选项并自由补充。问题应覆盖输入格式、输出格式、是否需要确定性脚本、权限范围、失败处理、依赖和是否确实要创建或改进 Skill。\n不要使用断点等待用户，也不要继续创建文件；本轮最终回复直接询问用户，用户回答会在下一轮作为更完整的 skill_request 重新进入模板。",
         "modelSource": "global",
         "model": "",
@@ -700,9 +700,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "根据确认后的需求生成用于构建和测试的示例输入输出。必须包含至少一个典型输入、一个边界输入、对应的期望输出、输出字段解释，以及会用于测试的断言重点。不要开始生成 Skill 文件之外的解释，不要要求用户在断点或样例反馈字段中确认；如果需求仍不足以生成示例，应把缺口反映在示例说明中，后续节点会在最终结果中诚实说明。",
         "modelSource": "global",
         "model": "",
@@ -750,9 +750,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "整理给 TooGraph Skill Builder 的最终上下文。builder_context 写 Markdown，包含：目标 Skill 名称建议、稳定 skillKey 建议、用户需求、上游 capability_gap 摘要、existing_skill_package 摘要、示例输入输出、outputSchema 字段建议、是否需要 before_llm.py、是否需要 after_llm.py、requirements.txt 需求、权限声明、测试重点和禁止事项。若 existing_skill_package 存在，必须列出旧 skill.json / SKILL.md / before_llm.py / after_llm.py / requirements.txt 中需要保留、修改或删除的点；改进官方 Skill 时应写入 skill/user/<skillKey>/ 作为用户可恢复版本，不要改 official 包。强调生成结果只包含 skill_key、skill_json、skill_md、before_llm_py、after_llm_py、requirements_txt。",
         "modelSource": "global",
         "model": "",
@@ -824,10 +824,10 @@
         }
       ],
       "config": {
-        "skillKey": "toograph_skill_builder",
-        "skillBindings": [
+        "actionKey": "toograph_skill_builder",
+        "actionBindings": [
           {
-            "skillKey": "toograph_skill_builder",
+            "actionKey": "toograph_skill_builder",
             "outputMapping": {
               "skill_key": "generated_skill_key",
               "skill_json": "generated_skill_json",
@@ -838,7 +838,7 @@
             }
           }
         ],
-        "skillInstructionBlocks": {},
+        "actionInstructionBlocks": {},
         "taskInstruction": "根据 builder_context 生成目标 Skill 的六个输出字段。如果上一轮 script_test_success 为 false，必须阅读 script_test_result，修复生成的 Python 源码或 manifest 后重新输出完整六个字段。不要写路径，不要生成压缩包，不要输出测试报告或安装步骤。skill_json.skillKey 必须与 generated_skill_key 一致。before_llm.py 和 after_llm.py 不需要时输出空字符串。requirements.txt 不需要第三方依赖时输出空字符串。",
         "modelSource": "global",
         "model": "",
@@ -882,9 +882,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "判断是否需要测试生成的 Python 脚本。test_strategy 写 JSON 对象，包含 needs_python_test(boolean)、script_filename(string)、script_to_test(\"after_llm.py\"|\"before_llm.py\"|\"\"), reason(string)、test_focus(array)。如果 generated_after_llm_py 非空，优先测试 after_llm.py；否则如果 generated_before_llm_py 非空，测试 before_llm.py；如果两者都为空，needs_python_test 为 false。",
         "modelSource": "global",
         "model": "",
@@ -976,17 +976,17 @@
         }
       ],
       "config": {
-        "skillKey": "toograph_script_tester",
-        "skillBindings": [
+        "actionKey": "toograph_script_tester",
+        "actionBindings": [
           {
-            "skillKey": "toograph_script_tester",
+            "actionKey": "toograph_script_tester",
             "outputMapping": {
               "success": "script_test_success",
               "result": "script_test_result"
             }
           }
         ],
-        "skillInstructionBlocks": {},
+        "actionInstructionBlocks": {},
         "taskInstruction": "根据 test_strategy 选择要测试的脚本源码：script_to_test 为 after_llm.py 时使用 generated_after_llm_py，为 before_llm.py 时使用 generated_before_llm_py。生成 TooGraph Script Tester 的 files 和 command：files 必须包含被测试脚本、pytest 测试文件以及必要的最小辅助文件；command 必须使用当前系统允许的命令，Python 生命周期脚本优先使用 [\"python\", \"-m\", \"pytest\", \"-q\", \"test_target.py\"]。测试覆盖已认可示例、字段规范化、错误输入和空输入；不要访问网络，不读取敏感路径，不依赖仓库状态。",
         "modelSource": "global",
         "model": "",
@@ -1082,9 +1082,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "审查生成结果并写 generation_review Markdown，包含 Skill 名称、skillKey、description、outputSchema 摘要、将写入的文件列表、目标目录 skill/user/<skillKey>/、脚本测试 success/result、权限声明和风险提示。不要把这里当成用户审批断点；真正的写文件或脚本执行由运行时权限模式处理，需确认模式会在受控执行器实际写入前暂停，完全访问模式会自动继续。",
         "modelSource": "global",
         "model": "",
@@ -1124,17 +1124,17 @@
         }
       ],
       "config": {
-        "skillKey": "local_workspace_executor",
-        "skillBindings": [
+        "actionKey": "local_workspace_executor",
+        "actionBindings": [
           {
-            "skillKey": "local_workspace_executor",
+            "actionKey": "local_workspace_executor",
             "outputMapping": {
               "success": "write_skill_json_success",
               "result": "write_skill_json_result"
             }
           }
         ],
-        "skillInstructionBlocks": {},
+        "actionInstructionBlocks": {},
         "taskInstruction": "调用 Local Workspace Executor 写入 skill.json。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/skill.json。content 必须是 generated_skill_json 的格式化 JSON 文本，使用 2 空格缩进，不要包 markdown 代码块。写文件动作本身不在本模板中做大模型审批；运行时会根据当前图或 Buddy 的 需确认/完全访问 模式决定是否暂停确认。",
         "modelSource": "global",
         "model": "",
@@ -1174,17 +1174,17 @@
         }
       ],
       "config": {
-        "skillKey": "local_workspace_executor",
-        "skillBindings": [
+        "actionKey": "local_workspace_executor",
+        "actionBindings": [
           {
-            "skillKey": "local_workspace_executor",
+            "actionKey": "local_workspace_executor",
             "outputMapping": {
               "success": "write_skill_md_success",
               "result": "write_skill_md_result"
             }
           }
         ],
-        "skillInstructionBlocks": {},
+        "actionInstructionBlocks": {},
         "taskInstruction": "调用 Local Workspace Executor 写入 SKILL.md。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/SKILL.md。content 必须是 generated_skill_md 原文，不要包 markdown 代码块。写文件动作本身不在本模板中做大模型审批；运行时会根据当前图或 Buddy 的 需确认/完全访问 模式决定是否暂停确认。",
         "modelSource": "global",
         "model": "",
@@ -1260,17 +1260,17 @@
         }
       ],
       "config": {
-        "skillKey": "local_workspace_executor",
-        "skillBindings": [
+        "actionKey": "local_workspace_executor",
+        "actionBindings": [
           {
-            "skillKey": "local_workspace_executor",
+            "actionKey": "local_workspace_executor",
             "outputMapping": {
               "success": "write_before_llm_py_success",
               "result": "write_before_llm_py_result"
             }
           }
         ],
-        "skillInstructionBlocks": {},
+        "actionInstructionBlocks": {},
         "taskInstruction": "调用 Local Workspace Executor 写入 before_llm.py。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/before_llm.py。content 必须是 generated_before_llm_py 原文，不要包 markdown 代码块。写文件动作本身不在本模板中做大模型审批；运行时会根据当前图或 Buddy 的 需确认/完全访问 模式决定是否暂停确认。",
         "modelSource": "global",
         "model": "",
@@ -1346,17 +1346,17 @@
         }
       ],
       "config": {
-        "skillKey": "local_workspace_executor",
-        "skillBindings": [
+        "actionKey": "local_workspace_executor",
+        "actionBindings": [
           {
-            "skillKey": "local_workspace_executor",
+            "actionKey": "local_workspace_executor",
             "outputMapping": {
               "success": "write_after_llm_py_success",
               "result": "write_after_llm_py_result"
             }
           }
         ],
-        "skillInstructionBlocks": {},
+        "actionInstructionBlocks": {},
         "taskInstruction": "调用 Local Workspace Executor 写入 after_llm.py。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/after_llm.py。content 必须是 generated_after_llm_py 原文，不要包 markdown 代码块。写文件动作本身不在本模板中做大模型审批；运行时会根据当前图或 Buddy 的 需确认/完全访问 模式决定是否暂停确认。",
         "modelSource": "global",
         "model": "",
@@ -1432,17 +1432,17 @@
         }
       ],
       "config": {
-        "skillKey": "local_workspace_executor",
-        "skillBindings": [
+        "actionKey": "local_workspace_executor",
+        "actionBindings": [
           {
-            "skillKey": "local_workspace_executor",
+            "actionKey": "local_workspace_executor",
             "outputMapping": {
               "success": "write_requirements_txt_success",
               "result": "write_requirements_txt_result"
             }
           }
         ],
-        "skillInstructionBlocks": {},
+        "actionInstructionBlocks": {},
         "taskInstruction": "调用 Local Workspace Executor 写入 requirements.txt。operation 必须是 write。path 必须是 skill/user/<generated_skill_key>/requirements.txt。content 必须是 generated_requirements_txt 原文，不要包 markdown 代码块。写文件动作本身不在本模板中做大模型审批；运行时会根据当前图或 Buddy 的 需确认/完全访问 模式决定是否暂停确认。",
         "modelSource": "global",
         "model": "",
@@ -1522,9 +1522,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "汇总最终结果。final_summary 写 Markdown，说明 Skill 已写入 skill/user/<generated_skill_key>/，列出各文件写入的 success/result、脚本测试 success/result、需要用户注意的依赖或权限，以及下一步可以在 Skill 管理页启用/使用。不要声称写入了 success 为 false 或没有执行器结果确认的文件；如果运行时在需确认模式下曾暂停，说明写入是在用户恢复后完成的。",
         "modelSource": "global",
         "model": "",
@@ -1560,9 +1560,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "用户或需求评估认为无需创建新 Skill 时，final_summary 写 Markdown，说明没有写入任何文件，并补充后续如果仍要创建需要提供的信息。",
         "modelSource": "global",
         "model": "",

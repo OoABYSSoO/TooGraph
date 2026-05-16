@@ -578,7 +578,8 @@ function resolveTraceActivityLabel(
     return `${nodeLabel} / ${virtualOperation.label}`;
   }
   const capabilityLabel =
-    normalizeText(recordFromUnknown(payload.detail)?.skill_key)
+    normalizeText(recordFromUnknown(payload.detail)?.action_key)
+    || normalizeText(recordFromUnknown(payload.detail)?.skill_key)
     || normalizeText(recordFromUnknown(payload.detail)?.capability_key)
     || normalizeText(payload.kind)
     || "activity";

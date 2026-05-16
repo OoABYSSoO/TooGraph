@@ -23,7 +23,7 @@ export type GraphLibraryItem = {
   stateCount: number;
   galleryValue: string;
   targetUsersPreview: string;
-  requiredSkillsPreview: string;
+  requiredActionsPreview: string;
   permissionsPreview: string;
   mockEntry: string;
   sampleOutput: string;
@@ -189,7 +189,7 @@ function buildSearchText(item: GraphLibraryItem): string {
     item.canManage ? "manageable" : "readonly",
     item.galleryValue,
     item.targetUsersPreview,
-    item.requiredSkillsPreview,
+    item.requiredActionsPreview,
     item.permissionsPreview,
     item.mockEntry,
     item.sampleOutput,
@@ -206,7 +206,7 @@ function buildTemplateGalleryFields(
   GraphLibraryItem,
   | "galleryValue"
   | "targetUsersPreview"
-  | "requiredSkillsPreview"
+  | "requiredActionsPreview"
   | "permissionsPreview"
   | "mockEntry"
   | "sampleOutput"
@@ -221,7 +221,7 @@ function buildTemplateGalleryFields(
   return {
     galleryValue: text(gallery.valueProposition),
     targetUsersPreview: previewList(stringList(gallery.targetUsers), 3),
-    requiredSkillsPreview: previewList(stringList(metadata.requiredSkills), 3),
+    requiredActionsPreview: previewList(stringList(metadata.requiredActions), 3),
     permissionsPreview: previewList(stringList(metadata.requiredPermissions || metadata.permissions), 4),
     mockEntry: readMockEntry(metadata, gallery),
     sampleOutput: readSampleOutput(metadata),
@@ -235,7 +235,7 @@ function emptyTemplateGalleryFields(): Pick<
   GraphLibraryItem,
   | "galleryValue"
   | "targetUsersPreview"
-  | "requiredSkillsPreview"
+  | "requiredActionsPreview"
   | "permissionsPreview"
   | "mockEntry"
   | "sampleOutput"
@@ -246,7 +246,7 @@ function emptyTemplateGalleryFields(): Pick<
   return {
     galleryValue: "",
     targetUsersPreview: "",
-    requiredSkillsPreview: "",
+    requiredActionsPreview: "",
     permissionsPreview: "",
     mockEntry: "",
     sampleOutput: "",

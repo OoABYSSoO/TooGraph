@@ -791,7 +791,7 @@ const agentInputPorts = computed<NodePortViewModel[]>(() =>
 const agentOutputPorts = computed<NodePortViewModel[]>(() =>
   view.value.body.kind === "agent" || view.value.body.kind === "batch" || view.value.body.kind === "subgraph" ? view.value.outputs.filter((port) => !port.virtual) : [],
 );
-const isAgentOutputManagedBySkill = computed(() => props.node.kind === "agent" && props.node.config.skillKey.trim().length > 0);
+const isAgentOutputManagedBySkill = computed(() => props.node.kind === "agent" && props.node.config.actionKey.trim().length > 0);
 const isAgentOutputManagedByCapability = computed(() =>
   isAgentOutputManagedByDynamicCapability({
     nodeId: props.nodeId,
@@ -1033,7 +1033,7 @@ const batchDefaultThinkingEnabled = computed(() =>
 const agentModelOptions = computed(() =>
   buildAgentModelSelectOptions(trimmedGlobalTextModelRef.value, props.availableAgentModelRefs, props.agentModelDisplayLookup),
 );
-const selectedSkillKey = computed(() => props.node.kind === "agent" ? props.node.config.skillKey.trim() : "");
+const selectedSkillKey = computed(() => props.node.kind === "agent" ? props.node.config.actionKey.trim() : "");
 const availableSkillDefinitions = computed(() =>
   props.node.kind === "agent" ? listSelectableSkillDefinitions(props.skillDefinitions) : [],
 );
@@ -1440,10 +1440,10 @@ function selectAgentSkill(skillKey: string) {
     return;
   }
   const patch = resolveSelectAgentSkillPatch(
-    props.node.config.skillKey,
+    props.node.config.actionKey,
     skillKey,
     props.skillDefinitions,
-    props.node.config.skillInstructionBlocks ?? {},
+    props.node.config.actionInstructionBlocks ?? {},
   );
   if (!patch) {
     return;
@@ -1458,7 +1458,7 @@ function handleSkillInstructionInput(payload: { skillKey: string; content: strin
   if (props.node.kind !== "agent") {
     return;
   }
-  const currentBlocks = props.node.config.skillInstructionBlocks ?? {};
+  const currentBlocks = props.node.config.actionInstructionBlocks ?? {};
   const patch = resolveSkillInstructionOverridePatch(
     payload.skillKey,
     payload.content,
@@ -1670,7 +1670,7 @@ function isSkillManagedOutputState(stateKey: string) {
   const binding = props.stateSchema[stateKey]?.binding;
   return (
     props.node.kind === "agent" &&
-    binding?.kind === "skill_output" &&
+    binding?.kind === "action_output" &&
     binding.nodeId === props.nodeId &&
     binding.managed !== false
   );
@@ -1682,7 +1682,7 @@ function isSkillManagedInputState(stateKey: string) {
     props.node.reads.some(
       (binding) =>
         binding.state === stateKey &&
-        binding.binding?.kind === "skill_input" &&
+        binding.binding?.kind === "action_input" &&
         binding.binding.managed !== false,
     )
   );

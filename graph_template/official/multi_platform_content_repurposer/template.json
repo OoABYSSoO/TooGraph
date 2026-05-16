@@ -59,8 +59,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_style_memory",
         "fieldKey": "success",
         "managed": true
@@ -73,8 +73,8 @@
       "value": [],
       "color": "#a855f7",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_style_memory",
         "fieldKey": "omitted_memories",
         "managed": true
@@ -87,8 +87,8 @@
       "value": "",
       "color": "#6d28d9",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_style_memory",
         "fieldKey": "result",
         "managed": true
@@ -173,8 +173,8 @@
       "value": {},
       "color": "#7c3aed",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_style_memory",
         "fieldKey": "session_recall_context",
         "managed": true
@@ -187,8 +187,8 @@
       "value": [],
       "color": "#8b5cf6",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_style_memory",
         "fieldKey": "recalled_sessions",
         "managed": true
@@ -367,9 +367,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "生成 memory_request JSON，只用于只读召回 Buddy 历史会话中的长期偏好、历史反馈和相关上下文。字段包含 mode、query、limit、window；mode 默认 discover，limit 不超过 8，window 不超过 2。query 应结合本模板输入和用户目标，避免过宽；不要写 scope、layer、status、top_k、max_chars，不要生成业务结论。",
         "modelSource": "global",
         "model": "",
@@ -417,10 +417,10 @@
         }
       ],
       "config": {
-        "skillKey": "buddy_session_recall",
-        "skillBindings": [
+        "actionKey": "buddy_session_recall",
+        "actionBindings": [
           {
-            "skillKey": "buddy_session_recall",
+            "actionKey": "buddy_session_recall",
             "outputMapping": {
               "success": "buddy_session_recall_success",
               "session_recall_context": "session_recall_context",
@@ -429,9 +429,9 @@
             }
           }
         ],
-        "skillInstructionBlocks": {
+        "actionInstructionBlocks": {
           "buddy_session_recall": {
-            "skillKey": "buddy_session_recall",
+            "actionKey": "buddy_session_recall",
             "title": "Buddy session recall instruction",
             "content": "你已绑定 Buddy 会话召回技能。只把 memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
             "source": "node.override"
@@ -476,9 +476,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "core_message 写成 JSON，包含 thesis、must_keep_facts、examples、audience、forbidden_changes、claims_needing_care、source_tone、desired_reader_action。不要开始改写。",
         "modelSource": "global",
         "model": "",
@@ -522,9 +522,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "style_profile 写成 JSON，包含 voice、sentence_patterns、paragraph_length、example_style、title_style、personal_judgment_pattern、phrases_to_use、phrases_to_avoid、evidence。记忆和样本冲突时优先样本，并记录 conflict_notes。",
         "modelSource": "global",
         "model": "",
@@ -568,9 +568,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "platform_strategy 写成 JSON，对每个平台输出 platform、goal、hook、structure、length_target、tone_rules、must_keep、must_avoid、cta。策略必须说明如何保留 core_message，同时适配平台。",
         "modelSource": "global",
         "model": "",
@@ -610,9 +610,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "draft_outputs 写成 JSON，以平台名为 key。每个平台包含 title、body、caption_or_script、hashtags、cta、assumptions。不要丢失 must_keep_facts，不要把技术细节改成空泛宣传。",
         "modelSource": "global",
         "model": "",
@@ -652,9 +652,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "ai_tone_report 写成 JSON，以平台名为 key，每项包含 score_before、generic_phrases、over_structured_sections、missing_examples、missing_personal_judgment、style_mismatches、rewrite_instructions。必须指出具体 AI 味句子或段落。",
         "modelSource": "global",
         "model": "",
@@ -702,9 +702,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "style_rewrite_outputs 写成 JSON，以平台名为 key，包含 title、body、caption_or_script、hashtags、cta、changes_applied、remaining_risks。必须按 rewrite_instructions 降低 AI 味，并保留 core_message 中的关键事实。",
         "modelSource": "global",
         "model": "",
@@ -752,9 +752,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "style_consistency_score 写成 JSON，以平台名为 key，包含 factual_preservation、style_fit、ai_tone_after、platform_fit、issues。publishing_plan 写成 JSON，包含 recommended_order、best_titles、cover_prompts、reuse_notes、manual_review_items。",
         "modelSource": "global",
         "model": "",
@@ -798,9 +798,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "final_distribution_pack 写成 Markdown，包含核心观点摘要、各平台最终稿、发布计划、风格一致性评分、AI 味降低说明、需要人工复核的问题、会话召回参考。不要隐藏 ；不要写入或承诺更新长期记忆。",
         "modelSource": "global",
         "model": "",
@@ -949,7 +949,7 @@
         "description": "可选人工反馈。"
       }
     ],
-    "requiredSkills": [
+    "requiredActions": [
       "buddy_session_recall"
     ],
     "requiredPermissions": [

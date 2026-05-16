@@ -34,7 +34,7 @@ def _preset_payload(preset_id: str = "agent_writer") -> dict[str, object]:
                 "reads": [{"state": "question", "required": True}],
                 "writes": [],
                 "config": {
-                    "skillKey": "",
+                    "actionKey": "",
                     "taskInstruction": "Answer the question.",
                     "modelSource": "global",
                     "model": "",

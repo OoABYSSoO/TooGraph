@@ -15,7 +15,7 @@ import { resolveInputNodeVirtualOutputType } from "./input-boundary.ts";
 
 import type {
   AgentNode,
-  AgentSkillBinding,
+  AgentActionBinding,
   BatchDefaultWorkerSnapshot,
   BatchNode,
   ConditionNode,
@@ -863,7 +863,7 @@ export function reconcileAgentCapabilityInputBindingsInPlace<T extends GraphPayl
     if (managedStateKeys.size > 0) {
       removeManagedStateKeysFromDocument(document, managedStateKeys);
     }
-    if (node.config.skillKey.trim()) {
+    if (node.config.actionKey.trim()) {
       return;
     }
     const restoredFreeWrites = normalizeWriteBindings(node.config.suspendedFreeWrites).filter((binding) => document.state_schema[binding.state]);
@@ -909,7 +909,7 @@ function reconcileAgentSkillStateInputBindings<T extends GraphPayload | GraphDoc
   }
 
   const skillDefinitionMap = new Map(skillDefinitions.map((definition) => [definition.skillKey, definition]));
-  const attachedSkillKey = node.config.skillKey.trim();
+  const attachedSkillKey = node.config.actionKey.trim();
   const definition = attachedSkillKey ? skillDefinitionMap.get(attachedSkillKey) : undefined;
   const activeInputKeys = new Set(definition?.stateInputSchema?.map((field) => field.key) ?? []);
 
@@ -922,8 +922,8 @@ function reconcileAgentSkillStateInputBindings<T extends GraphPayload | GraphDoc
   for (const readBinding of node.reads) {
     const binding = readBinding.binding;
     if (
-      binding?.kind === "skill_input" &&
-      binding.skillKey === attachedSkillKey &&
+      binding?.kind === "action_input" &&
+      binding.actionKey === attachedSkillKey &&
       binding.managed !== false &&
       activeInputKeys.has(binding.fieldKey) &&
       document.state_schema[readBinding.state]
@@ -977,16 +977,16 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
   }
 
   const skillDefinitionMap = new Map(skillDefinitions.map((definition) => [definition.skillKey, definition]));
-  const attachedSkillKey = node.config.skillKey.trim();
+  const attachedSkillKey = node.config.actionKey.trim();
   const attachedSkillKeys = new Set(attachedSkillKey ? [attachedSkillKey] : []);
-  let currentBindings = normalizeAgentSkillBindings(node.config.skillBindings);
-  let currentBindingBySkill = new Map(currentBindings.map((binding) => [binding.skillKey, binding]));
+  let currentBindings = normalizeAgentActionBindings(node.config.actionBindings);
+  let currentBindingBySkill = new Map(currentBindings.map((binding) => [binding.actionKey, binding]));
   const removedManagedStateKeys = collectRemovedManagedSkillOutputStateKeys(document, nodeId, currentBindings, attachedSkillKeys);
-  const nextSkillBindings: AgentSkillBinding[] = [];
+  const nextSkillBindings: AgentActionBinding[] = [];
   const processedSkillKeys = new Set<string>();
   const refreshCurrentBindings = () => {
-    currentBindings = normalizeAgentSkillBindings(node.config.skillBindings);
-    currentBindingBySkill = new Map(currentBindings.map((binding) => [binding.skillKey, binding]));
+    currentBindings = normalizeAgentActionBindings(node.config.actionBindings);
+    currentBindingBySkill = new Map(currentBindings.map((binding) => [binding.actionKey, binding]));
   };
 
   if (removedManagedStateKeys.size > 0) {
@@ -1051,7 +1051,7 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
       }
 
       nextSkillBindings.push({
-        skillKey: attachedSkillKey,
+        actionKey: attachedSkillKey,
         outputMapping,
       });
       processedSkillKeys.add(attachedSkillKey);
@@ -1064,13 +1064,13 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
   }
 
   for (const binding of currentBindings) {
-    if (!attachedSkillKeys.has(binding.skillKey) || processedSkillKeys.has(binding.skillKey)) {
+    if (!attachedSkillKeys.has(binding.actionKey) || processedSkillKeys.has(binding.actionKey)) {
       continue;
     }
     nextSkillBindings.push(binding);
   }
 
-  node.config.skillBindings = nextSkillBindings;
+  node.config.actionBindings = nextSkillBindings;
 }
 
 function normalizeWriteBindings(value: AgentNode["config"]["suspendedFreeWrites"]): WriteBinding[] {
@@ -1100,34 +1100,34 @@ function mergeWriteBindings(...bindingGroups: WriteBinding[][]): WriteBinding[] 
   return merged;
 }
 
-function normalizeAgentSkillBindings(value: AgentNode["config"]["skillBindings"]): AgentSkillBinding[] {
+function normalizeAgentActionBindings(value: AgentNode["config"]["actionBindings"]): AgentActionBinding[] {
   if (!Array.isArray(value)) {
     return [];
   }
   return value
     .map((binding) => ({
-      skillKey: String(binding.skillKey ?? "").trim(),
+      actionKey: String(binding.actionKey ?? "").trim(),
       outputMapping: { ...(binding.outputMapping ?? {}) },
     }))
-    .filter((binding) => binding.skillKey);
+    .filter((binding) => binding.actionKey);
 }
 
 function collectRemovedManagedSkillOutputStateKeys(
   document: GraphPayload | GraphDocument,
   nodeId: string,
-  currentBindings: AgentSkillBinding[],
+  currentBindings: AgentActionBinding[],
   attachedSkillKeys: Set<string>,
 ) {
   const removedStateKeys = new Set<string>();
   for (const binding of currentBindings) {
-    if (attachedSkillKeys.has(binding.skillKey)) {
+    if (attachedSkillKeys.has(binding.actionKey)) {
       continue;
     }
     for (const stateKey of Object.values(binding.outputMapping ?? {})) {
       const stateBinding = document.state_schema[stateKey]?.binding;
       if (
-        stateBinding?.kind === "skill_output" &&
-        stateBinding.skillKey === binding.skillKey &&
+        stateBinding?.kind === "action_output" &&
+        stateBinding.actionKey === binding.actionKey &&
         stateBinding.nodeId === nodeId &&
         stateBinding.managed !== false
       ) {
@@ -1141,15 +1141,15 @@ function collectRemovedManagedSkillOutputStateKeys(
 function collectStaleManagedSkillOutputStateKeys(
   document: GraphPayload | GraphDocument,
   nodeId: string,
-  skillKey: string,
+  actionKey: string,
   activeFieldKeys: Set<string>,
 ) {
   const staleStateKeys = new Set<string>();
   for (const [stateKey, definition] of Object.entries(document.state_schema)) {
     const binding = definition.binding;
     if (
-      binding?.kind === "skill_output" &&
-      binding.skillKey === skillKey &&
+      binding?.kind === "action_output" &&
+      binding.actionKey === actionKey &&
       binding.nodeId === nodeId &&
       binding.managed !== false &&
       !activeFieldKeys.has(binding.fieldKey)
@@ -1187,9 +1187,9 @@ function removeManagedStateKeysFromDocument(document: GraphPayload | GraphDocume
       } else {
         delete node.config.suspendedFreeWrites;
       }
-      node.config.skillBindings = normalizeAgentSkillBindings(node.config.skillBindings)
+      node.config.actionBindings = normalizeAgentActionBindings(node.config.actionBindings)
         .map((binding) => ({
-          skillKey: binding.skillKey,
+          actionKey: binding.actionKey,
           outputMapping: Object.fromEntries(Object.entries(binding.outputMapping ?? {}).filter(([, stateKey]) => !stateKeys.has(stateKey))),
         }));
     }
@@ -1227,19 +1227,19 @@ function isManagedSkillOutputStateForNode(
 ) {
   const stateBinding = document.state_schema[stateKey]?.binding;
   return (
-    stateBinding?.kind === "skill_output" &&
+    stateBinding?.kind === "action_output" &&
     stateBinding.nodeId === nodeId &&
     stateBinding.managed !== false &&
-    (skillKey === undefined || stateBinding.skillKey === skillKey)
+    (skillKey === undefined || stateBinding.actionKey === skillKey)
   );
 }
 
 function isManagedSkillInputReadBinding(binding: ReadBinding) {
-  return binding.binding?.kind === "skill_input" && binding.binding.managed !== false;
+  return binding.binding?.kind === "action_input" && binding.binding.managed !== false;
 }
 
 function isDynamicCapabilityExecutorNode(document: GraphPayload | GraphDocument, node: AgentNode) {
-  if (node.config.skillKey.trim()) {
+  if (node.config.actionKey.trim()) {
     return false;
   }
   return node.reads.some((binding) => document.state_schema[binding.state]?.type?.trim() === "capability");
@@ -1326,14 +1326,14 @@ function ensureAgentWriteBinding(node: AgentNode, stateKey: string) {
 function findExistingSkillOutputState(
   document: GraphPayload | GraphDocument,
   nodeId: string,
-  skillKey: string,
+  actionKey: string,
   fieldKey: string,
 ) {
   return Object.entries(document.state_schema).find(([, definition]) => {
     const binding = definition.binding;
     return (
-      binding?.kind === "skill_output" &&
-      binding.skillKey === skillKey &&
+      binding?.kind === "action_output" &&
+      binding.actionKey === actionKey &&
       binding.nodeId === nodeId &&
       binding.fieldKey === fieldKey
     );
@@ -1342,15 +1342,15 @@ function findExistingSkillOutputState(
 
 function buildManagedSkillInputReadBinding(
   stateKey: string,
-  skillKey: string,
+  actionKey: string,
   field: SkillIoField,
 ): ReadBinding {
   return {
     state: stateKey,
     required: true,
     binding: {
-      kind: "skill_input",
-      skillKey,
+      kind: "action_input",
+      actionKey,
       fieldKey: field.key,
       managed: true,
     },
@@ -1437,8 +1437,8 @@ function createManagedSkillOutputState(
     description: field.description.trim() || `${skillName} output: ${field.key}`,
     type: stateType,
     binding: {
-      kind: "skill_output",
-      skillKey: skill.skillKey,
+      kind: "action_output",
+      actionKey: skill.skillKey,
       nodeId,
       fieldKey: field.key,
       managed: true,

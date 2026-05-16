@@ -50,7 +50,7 @@ export const GRAPH_EDIT_PLAYBACK_CAPABILITY_MANUAL = [
   "- 支持 update_state: 修改已有 state 的名称、简介、类型、默认值或颜色。",
   "- 支持 update_input_config: 修改已有 input 节点的边界类型或默认值。",
   "- 支持 update_output_config: 修改已有 output 节点的展示、持久化和文件名配置。",
-  "- 支持 select_skill: 为已有 Agent 节点选择一个 scalar skillKey，并可同步更新任务说明。",
+  "- 支持 select_action: 为已有 Agent 节点选择一个 scalar actionKey，并可同步更新任务说明。",
   "- 支持 delete_node: 删除已有节点并记录可审计恢复快照。",
   "- 支持 restore_node: 恢复同一计划中刚删除的节点及其相关连线。",
   "- 执行器会把语义命令编译成可见 UI playback 和可审计 graph commands。",
@@ -174,10 +174,10 @@ export type GraphEditConnectRouteIntent = {
   targetRef: string;
 };
 
-export type GraphEditSelectSkillIntent = {
-  kind: "select_skill";
+export type GraphEditSelectActionIntent = {
+  kind: "select_action";
   nodeRef: string;
-  skillKey: string;
+  actionKey: string;
   taskInstruction?: string;
 };
 
@@ -202,7 +202,7 @@ export type GraphEditIntent =
   | GraphEditBindStateIntent
   | GraphEditConnectNodesIntent
   | GraphEditConnectRouteIntent
-  | GraphEditSelectSkillIntent
+  | GraphEditSelectActionIntent
   | GraphEditDeleteNodeIntent
   | GraphEditRestoreNodeIntent;
 
@@ -329,11 +329,11 @@ export type GraphEditDeletedNodeSnapshot = {
   conditionalEdges: ConditionalEdge[];
 };
 
-export type GraphEditSelectSkillCommand = GraphEditCommandBase & {
-  kind: "select_skill";
+export type GraphEditSelectActionCommand = GraphEditCommandBase & {
+  kind: "select_action";
   nodeRef: string;
   nodeId: string;
-  skillKey: string;
+  actionKey: string;
   taskInstruction: string | null;
 };
 
@@ -358,7 +358,7 @@ export type GraphEditCommand =
   | GraphEditBindStateCommand
   | GraphEditConnectNodesCommand
   | GraphEditConnectRouteCommand
-  | GraphEditSelectSkillCommand
+  | GraphEditSelectActionCommand
   | GraphEditDeleteNodeCommand
   | GraphEditRestoreNodeCommand;
 
@@ -532,8 +532,8 @@ function compileGraphEditIntent(
       return compileConnectNodesCommand(operation, index, context, issues);
     case "connect_route":
       return compileConnectRouteCommand(operation, index, context, issues);
-    case "select_skill":
-      return compileSelectSkillCommand(operation, index, context, issues);
+    case "select_action":
+      return compileSelectActionCommand(operation, index, context, issues);
     case "delete_node":
       return compileDeleteNodeCommand(operation, index, context, issues);
     case "restore_node":
@@ -986,26 +986,26 @@ function compileConnectRouteCommand(
   };
 }
 
-function compileSelectSkillCommand(
-  operation: GraphEditSelectSkillIntent,
+function compileSelectActionCommand(
+  operation: GraphEditSelectActionIntent,
   index: number,
   context: CompilerContext,
   issues: string[],
-): GraphEditSelectSkillCommand | null {
+): GraphEditSelectActionCommand | null {
   const nodeRef = compactText(operation.nodeRef);
   const nodeId = resolveNodeRef(context, nodeRef);
-  const skillKey = compactText(operation.skillKey);
+  const actionKey = compactText(operation.actionKey);
   if (!nodeId) {
-    issues.push(`operations[${index}] select_skill references unknown node: ${nodeRef}.`);
+    issues.push(`operations[${index}] select_action references unknown node: ${nodeRef}.`);
     return null;
   }
   const node = resolveNodeSnapshot(context, nodeId);
   if (node?.kind !== "agent") {
-    issues.push(`operations[${index}] select_skill requires an agent node: ${nodeRef}.`);
+    issues.push(`operations[${index}] select_action requires an agent node: ${nodeRef}.`);
     return null;
   }
-  if (!skillKey) {
-    issues.push(`operations[${index}] select_skill requires skillKey.`);
+  if (!actionKey) {
+    issues.push(`operations[${index}] select_action requires actionKey.`);
     return null;
   }
   const taskInstruction = nullableText(operation.taskInstruction);
@@ -1013,18 +1013,18 @@ function compileSelectSkillCommand(
     ...node,
     config: {
       ...node.config,
-      skillKey,
+      actionKey,
       taskInstruction: taskInstruction ?? node.config.taskInstruction,
     },
   };
   return {
-    kind: "select_skill",
+    kind: "select_action",
     commandId: `graph-command-${index + 1}`,
     nodeRef,
     nodeId,
-    skillKey,
+    actionKey,
     taskInstruction,
-    summary: `Select skill ${skillKey} for ${nodeId}.`,
+    summary: `Select action ${actionKey} for ${nodeId}.`,
   };
 }
 
@@ -1238,7 +1238,7 @@ function buildPlaybackStepsForCommand(command: GraphEditCommand): GraphEditPlayb
           branchKey: command.branchKey,
         },
       ];
-    case "select_skill":
+    case "select_action":
     case "delete_node":
     case "restore_node":
       return [
@@ -1611,8 +1611,8 @@ function applyGraphEditCommand<T extends GraphPayload | GraphDocument>(document:
       return connectFlowNodesInDocument(document, command.sourceNodeId, command.targetNodeId);
     case "connect_route":
       return connectConditionRouteInDocument(document, command.sourceNodeId, command.branchKey, command.targetNodeId);
-    case "select_skill":
-      return selectSkillInDocument(document, command);
+    case "select_action":
+      return selectActionInDocument(document, command);
     case "delete_node":
       return removeNodeFromDocument(document, command.nodeId);
     case "restore_node":
@@ -1778,10 +1778,10 @@ function updateOutputConfigInDocument<T extends GraphPayload | GraphDocument>(do
   }));
 }
 
-function selectSkillInDocument<T extends GraphPayload | GraphDocument>(document: T, command: GraphEditSelectSkillCommand): T {
+function selectActionInDocument<T extends GraphPayload | GraphDocument>(document: T, command: GraphEditSelectActionCommand): T {
   return updateAgentNodeConfigInDocument(document, command.nodeId, (current) => ({
     ...current,
-    skillKey: command.skillKey,
+    actionKey: command.actionKey,
     taskInstruction: command.taskInstruction ?? current.taskInstruction,
   }));
 }
@@ -1894,7 +1894,7 @@ function buildGraphNodeFromCreationFields(input: {
         reads: [],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: input.taskInstruction,
           modelSource: "global",
           model: "",

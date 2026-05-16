@@ -91,8 +91,8 @@
       "value": false,
       "color": "#16a34a",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_creative_memory",
         "fieldKey": "success",
         "managed": true
@@ -105,8 +105,8 @@
       "value": [],
       "color": "#a855f7",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_creative_memory",
         "fieldKey": "omitted_memories",
         "managed": true
@@ -119,8 +119,8 @@
       "value": "",
       "color": "#6d28d9",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_creative_memory",
         "fieldKey": "result",
         "managed": true
@@ -269,8 +269,8 @@
       "value": {},
       "color": "#7c3aed",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_creative_memory",
         "fieldKey": "session_recall_context",
         "managed": true
@@ -283,8 +283,8 @@
       "value": [],
       "color": "#8b5cf6",
       "binding": {
-        "kind": "skill_output",
-        "skillKey": "buddy_session_recall",
+        "kind": "action_output",
+        "actionKey": "buddy_session_recall",
         "nodeId": "recall_creative_memory",
         "fieldKey": "recalled_sessions",
         "managed": true
@@ -579,9 +579,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "生成 creative_memory_request JSON，只用于只读召回 Buddy 历史会话中的长期偏好、历史反馈和相关上下文。字段包含 mode、query、limit、window；mode 默认 discover，limit 不超过 8，window 不超过 2。query 应结合本模板输入和用户目标，避免过宽；不要写 scope、layer、status、top_k、max_chars，不要生成业务结论。",
         "modelSource": "global",
         "model": "",
@@ -629,10 +629,10 @@
         }
       ],
       "config": {
-        "skillKey": "buddy_session_recall",
-        "skillBindings": [
+        "actionKey": "buddy_session_recall",
+        "actionBindings": [
           {
-            "skillKey": "buddy_session_recall",
+            "actionKey": "buddy_session_recall",
             "outputMapping": {
               "success": "buddy_session_recall_success",
               "session_recall_context": "session_recall_context",
@@ -641,9 +641,9 @@
             }
           }
         ],
-        "skillInstructionBlocks": {
+        "actionInstructionBlocks": {
           "buddy_session_recall": {
-            "skillKey": "buddy_session_recall",
+            "actionKey": "buddy_session_recall",
             "title": "Buddy session recall instruction",
             "content": "你已绑定 Buddy 会话召回技能。只把 creative_memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
             "source": "node.override"
@@ -728,9 +728,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "把输入整理成 JSON：normalized_inputs 包含 product, audience, goal, constraints, evidence_sources；clean_news_items 从 market_notes 提取新闻/趋势；ad_items 从 competitor_ad_notes 提取广告条目；normalized_video_items 和 selected_video_items 从 material_analysis 提取视频/素材项；video_analysis_results 总结镜头、节奏、角色、UI、可用资产和缺失素材。保留 evidence 引用，不要生成创意。",
         "modelSource": "global",
         "model": "",
@@ -778,9 +778,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "pattern_summary 写成 Markdown，包含 hook patterns、emotional triggers、visual rhythm、proof moments、CTA patterns、genre-specific opportunities、overused tropes、compliance risks。必须说明这些模式如何依赖 game_genre，不要把 SLG 固定为唯一类型。",
         "modelSource": "global",
         "model": "",
@@ -824,9 +824,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "news_context 写成 Markdown，包含 market timing、player sentiment、genre trends、seasonal hooks、risks、evidence。没有市场材料时明确降级为 mock/空上下文，不要编造新闻。",
         "modelSource": "global",
         "model": "",
@@ -890,9 +890,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "creative_brief 写成 Markdown，必须显式使用 game_genre，并包含 audience insight、core promise、creative territories、mandatory proof、asset plan、platform constraints、do-not-use、success metrics、risks。不同 game_genre 必须影响策略，不能把模板固定成 SLG。",
         "modelSource": "global",
         "model": "",
@@ -936,9 +936,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "script_variants 写成 JSON，包含 variants 数组，至少 4 个差异化方向。每个变体包含 id、angle、hook、beats、voiceover、onscreen_text、visual_notes、cta、target_platform、duration_seconds、asset_needs、risk_notes。不要只改标题，必须有结构差异。",
         "modelSource": "global",
         "model": "",
@@ -982,9 +982,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "storyboard_packages 写成 Markdown，按变体列出 frame-by-frame 图片分镜、画面主体、构图、UI/角色/场景素材、文字层、生成提示词、负面提示词和人工检查点。",
         "modelSource": "global",
         "model": "",
@@ -1032,9 +1032,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "video_prompt_packages 写成 Markdown，按变体列出 shot list、camera motion、transition、pace、sound direction、AI video prompt、editing notes、required assets、fallback plan。必须与 game_genre 和脚本策略一致。",
         "modelSource": "global",
         "model": "",
@@ -1090,9 +1090,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "review_results 写成 JSON，包含 per_variant_scores、global_findings、rewrite_recommendations、platform_compliance_risks。评分维度必须包含 strategy_fit、genre_fit、differentiation、execution_clarity、asset_feasibility、platform_compliance_risk、iteration_priority。必须显式输出平台合规风险和不确定项。",
         "modelSource": "global",
         "model": "",
@@ -1136,9 +1136,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "best_variant 写成 JSON，包含 selected_variant_id、why_selected、test_hypothesis、required_revisions、fallback_variant_ids、production_priority、risks_to_confirm。不得忽略 review_results 中的高风险合规或资产缺口。",
         "modelSource": "global",
         "model": "",
@@ -1190,9 +1190,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "image_generation_todo 和 video_generation_todo 均写成 Markdown。任务必须可执行，包含输入素材、提示词、尺寸/时长、负责人建议、检查点、失败回退和审核要求。不要直接生成图片或视频。",
         "modelSource": "global",
         "model": "",
@@ -1264,9 +1264,9 @@
         }
       ],
       "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
         "taskInstruction": "final_summary 写成 Markdown，包含：1. Creative Brief 摘要；2. 竞品模式和新闻上下文；3. 脚本变体；4. 分镜与视频提示词；5. 审核评分和平台合规风险；6. 推荐最佳变体；7. 图片/视频生成任务；8. 会话召回参考；9. 人工确认清单。必须说明所有外部素材和平台合规点都需要人工复核。",
         "modelSource": "global",
         "model": "",
@@ -1568,7 +1568,7 @@
         "required": false
       }
     ],
-    "requiredSkills": [
+    "requiredActions": [
       "buddy_session_recall"
     ],
     "requiredPermissions": [

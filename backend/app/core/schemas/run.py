@@ -155,7 +155,7 @@ class NodeExecutionArtifacts(BaseModel):
 
 
 class RunArtifacts(BaseModel):
-    skill_outputs: list[dict[str, Any]] = Field(default_factory=list)
+    action_outputs: list[dict[str, Any]] = Field(default_factory=list)
     activity_events: list[ActivityEvent] = Field(default_factory=list)
     capability_outputs: list[dict[str, Any]] = Field(default_factory=list)
     output_previews: list[OutputPreview] = Field(default_factory=list)
@@ -193,8 +193,8 @@ class RunSummary(BaseModel):
 class RunDetail(RunSummary):
     """Full detail returned by GET /api/runs/{run_id}."""
     metadata: dict[str, Any] = Field(default_factory=dict)
-    selected_skills: list[str] = Field(default_factory=list)
-    skill_outputs: list[dict[str, Any]] = Field(default_factory=list)
+    selected_actions: list[str] = Field(default_factory=list)
+    action_outputs: list[dict[str, Any]] = Field(default_factory=list)
     selected_capabilities: list[dict[str, Any]] = Field(default_factory=list)
     capability_outputs: list[dict[str, Any]] = Field(default_factory=list)
     evaluation_result: dict[str, Any] = Field(default_factory=dict)

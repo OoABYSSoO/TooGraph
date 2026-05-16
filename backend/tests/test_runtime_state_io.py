@@ -31,7 +31,7 @@ class RuntimeStateIoTests(unittest.TestCase):
                     "selected_capability": {
                         "name": "Selected Capability",
                         "type": "capability",
-                        "value": {"kind": "skill", "key": "web_search"},
+                        "value": {"kind": "action", "key": "web_search"},
                     },
                 },
                 "nodes": {
@@ -65,7 +65,7 @@ class RuntimeStateIoTests(unittest.TestCase):
                 "ready": True,
                 "payload": {"previous": True},
                 "files": ["previous.txt"],
-                "selected_capability": {"kind": "skill", "key": "previous"},
+                "selected_capability": {"kind": "action", "key": "previous"},
                 "obsolete": "remove me",
             },
             "state_last_writers": {"question": {"node_id": "input"}},

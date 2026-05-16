@@ -10,7 +10,7 @@ export function isAgentOutputManagedByDynamicCapability(input: {
     return false;
   }
 
-  const hasIncomingCapability = !node.config.skillKey.trim() && node.reads.some(
+  const hasIncomingCapability = !node.config.actionKey.trim() && node.reads.some(
     (binding) => input.stateSchema?.[binding.state]?.type?.trim() === "capability",
   );
   if (hasIncomingCapability) {

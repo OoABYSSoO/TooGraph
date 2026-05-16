@@ -548,7 +548,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                             "reads": [],
                             "writes": [],
                             "config": {
-                                "skillKey": "rewrite_text",
+                                "actionKey": "rewrite_text",
                                 "taskInstruction": "",
                             },
                         },
@@ -559,7 +559,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                             "ui": {"position": {"x": 220, "y": 0}, "collapsed": False},
                             "reads": [],
                             "writes": [],
-                            "config": {"skillKey": "video_understanding", "taskInstruction": ""},
+                            "config": {"actionKey": "video_understanding", "taskInstruction": ""},
                         },
                     },
                     "edges": [],

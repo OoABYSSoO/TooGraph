@@ -498,16 +498,16 @@ def _chat_openai_compatible(messages: list[dict[str, str]], *, temperature: floa
 
 def _run_agent_node(node_name: str, node: dict[str, Any], input_values: dict[str, Any]) -> dict[str, Any]:
     config = dict(node.get("config") or {})
-    if str(config.get("skillKey") or "").strip():
+    if str(config.get("actionKey") or "").strip():
         raise NotImplementedError(
-            f"Agent node '{node_name}' uses TooGraph Skill '{config.get('skillKey')}', "
+            f"Agent node '{node_name}' uses TooGraph Action '{config.get('actionKey')}', "
             "which is not bundled in this standalone export yet."
         )
     for value in input_values.values():
-        if isinstance(value, dict) and value.get("kind") in {"skill", "subgraph"}:
+        if isinstance(value, dict) and value.get("kind") in {"action", "tool", "subgraph"}:
             raise NotImplementedError(
                 f"Agent node '{node_name}' received a dynamic capability state. "
-                "Standalone dynamic Skill/Subgraph capability execution is not bundled yet."
+                "Standalone dynamic Action/Tool/Subgraph capability execution is not bundled yet."
             )
 
     output_keys = [_binding_state(binding) for binding in _node_writes(node) if _binding_state(binding)]
@@ -905,7 +905,7 @@ def _build_export_node_config(
 def _build_export_agent_config(node: NodeSystemAgentNode) -> dict[str, Any]:
     config: dict[str, Any] = {}
     if node.config.skill_key:
-        config["skillKey"] = node.config.skill_key
+        config["actionKey"] = node.config.skill_key
     if node.config.task_instruction:
         config["taskInstruction"] = node.config.task_instruction
     if node.config.model_source == AgentModelSource.OVERRIDE:

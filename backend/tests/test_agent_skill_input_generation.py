@@ -40,7 +40,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
             input_values={"question": "latest release"},
             bindings=[
                 ResolvedAgentSkillBinding(
-                    binding=NodeSystemAgentSkillBinding(skillKey="web_search"),
+                    binding=NodeSystemAgentSkillBinding(actionKey="web_search"),
                     source="node_config",
                 )
             ],
@@ -62,7 +62,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
             input_values={"user_goal": "打开运行历史"},
             bindings=[
                 ResolvedAgentSkillBinding(
-                    binding=NodeSystemAgentSkillBinding(skillKey="toograph_page_operator"),
+                    binding=NodeSystemAgentSkillBinding(actionKey="toograph_page_operator"),
                     source="node_config",
                 )
             ],
@@ -108,7 +108,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                 input_values={"question": "最新模型发布日期"},
                 bindings=[
                     ResolvedAgentSkillBinding(
-                        binding=NodeSystemAgentSkillBinding(skillKey="web_search"),
+                        binding=NodeSystemAgentSkillBinding(actionKey="web_search"),
                         source="node_config",
                     )
                 ],
@@ -145,7 +145,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                 input_values={"page_path": "/stale-graph-state"},
                 bindings=[
                     ResolvedAgentSkillBinding(
-                        binding=NodeSystemAgentSkillBinding(skillKey="toograph_page_operator"),
+                        binding=NodeSystemAgentSkillBinding(actionKey="toograph_page_operator"),
                         source="node_config",
                     )
                 ],
@@ -180,7 +180,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                     "kind": "agent",
                     "ui": {"position": {"x": 0, "y": 0}},
                     "config": {
-                        "skillKey": "local_workspace_executor",
+                        "actionKey": "local_workspace_executor",
                         "taskInstruction": "写入 backend/data/tmp/example.txt。",
                     },
                 }
@@ -189,7 +189,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                 input_values={},
                 bindings=[
                     ResolvedAgentSkillBinding(
-                        binding=NodeSystemAgentSkillBinding(skillKey="local_workspace_executor"),
+                        binding=NodeSystemAgentSkillBinding(actionKey="local_workspace_executor"),
                         source="node_config",
                     )
                 ],
@@ -221,7 +221,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                 input_values={"requirement": "帮我联网搜索资料"},
                 bindings=[
                     ResolvedAgentSkillBinding(
-                        binding=NodeSystemAgentSkillBinding(skillKey="toograph_capability_selector"),
+                        binding=NodeSystemAgentSkillBinding(actionKey="toograph_capability_selector"),
                         source="node_config",
                     )
                 ],
@@ -253,11 +253,11 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "config": {
-                    "skillKey": "web_search",
+                    "actionKey": "web_search",
                     "taskInstruction": "Generate the search arguments.",
-                    "skillInstructionBlocks": {
+                    "actionInstructionBlocks": {
                         "web_search": {
-                            "skillKey": "web_search",
+                            "actionKey": "web_search",
                             "title": "联网搜索 skill instruction",
                             "content": "Use the user-edited query rule.",
                             "source": "node.override",
@@ -271,7 +271,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
             input_values={"question": "latest release"},
             bindings=[
                 ResolvedAgentSkillBinding(
-                    binding=NodeSystemAgentSkillBinding(skillKey="web_search"),
+                    binding=NodeSystemAgentSkillBinding(actionKey="web_search"),
                     source="node_config",
                 )
             ],
@@ -298,10 +298,10 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "config": {
-                    "skillKey": "web_search",
-                    "skillInstructionBlocks": {
+                    "actionKey": "web_search",
+                    "actionInstructionBlocks": {
                         "web_search": {
-                            "skillKey": "web_search",
+                            "actionKey": "web_search",
                             "title": "联网搜索 skill instruction",
                             "content": "   ",
                             "source": "node.override",
@@ -315,7 +315,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
             input_values={"question": "latest release"},
             bindings=[
                 ResolvedAgentSkillBinding(
-                    binding=NodeSystemAgentSkillBinding(skillKey="web_search"),
+                    binding=NodeSystemAgentSkillBinding(actionKey="web_search"),
                     source="node_config",
                 )
             ],
@@ -339,7 +339,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
             bindings=[
                 ResolvedAgentSkillBinding(
                     binding=NodeSystemAgentSkillBinding(
-                        skillKey="web_search",
+                        actionKey="web_search",
                         outputMapping={
                             "query": "planned_query",
                             "source_urls": "search_sources",
@@ -392,7 +392,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                 input_values={
                     "search_result": {
                         "kind": "result_package",
-                        "sourceType": "skill",
+                        "sourceType": "action",
                         "sourceKey": "web_search",
                         "outputs": {
                             "artifact_paths": {
@@ -406,7 +406,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                 },
                 bindings=[
                     ResolvedAgentSkillBinding(
-                        binding=NodeSystemAgentSkillBinding(skillKey="extract_facts"),
+                        binding=NodeSystemAgentSkillBinding(actionKey="extract_facts"),
                         source="node_config",
                     )
                 ],
@@ -446,7 +446,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "config": {
-                    "skillKey": "web_search",
+                    "actionKey": "web_search",
                     "taskInstruction": "Build search arguments.",
                 },
             }
@@ -457,7 +457,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
             input_values={"question": "How should LLM nodes emit JSON?"},
             bindings=[
                 ResolvedAgentSkillBinding(
-                    binding=NodeSystemAgentSkillBinding(skillKey="web_search"),
+                    binding=NodeSystemAgentSkillBinding(actionKey="web_search"),
                     source="node_config",
                 )
             ],
@@ -516,7 +516,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                 "kind": "agent",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "config": {
-                    "skillKey": "web_search",
+                    "actionKey": "web_search",
                     "taskInstruction": "ORIGINAL SKILL TASK",
                 },
             }
@@ -527,7 +527,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
             input_values={"question": "ORIGINAL SECRET INPUT"},
             bindings=[
                 ResolvedAgentSkillBinding(
-                    binding=NodeSystemAgentSkillBinding(skillKey="web_search"),
+                    binding=NodeSystemAgentSkillBinding(actionKey="web_search"),
                     source="node_config",
                 )
             ],

@@ -130,7 +130,7 @@ function buildBatchNode(position: GraphPosition): BatchNode {
       retryCount: 3,
       continueOnError: true,
       defaultWorker: {
-        skillKey: "",
+        actionKey: "",
         taskInstruction: "",
         modelSource: "global",
         model: "",

@@ -464,9 +464,9 @@ function buildActivityArtifactLabels(event: ActivityEvent) {
     }
     return labels;
   }
-  const skillKey = normalizeText(detail.skill_key);
-  if (skillKey) {
-    labels.push(`skill: ${skillKey}`);
+  const actionKey = normalizeText(detail.action_key) || normalizeText(detail.skill_key);
+  if (actionKey) {
+    labels.push(`action: ${actionKey}`);
   }
   const path = normalizeText(detail.path);
   if (path) {

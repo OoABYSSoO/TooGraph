@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from pydantic import ValidationError
+
 from app.core.schemas.node_system import NodeSystemCatalogStatus, NodeSystemGraphPayload, NodeSystemTemplate
 from app.core.storage.json_file_utils import read_json_file, write_json_file
 
@@ -31,10 +33,7 @@ def list_template_records(include_disabled: bool = False) -> list[dict[str, Any]
         load_template_record_from_path(path, source=OFFICIAL_TEMPLATE_SOURCE)
         for path in _iter_template_paths(OFFICIAL_TEMPLATES_ROOT)
     ]
-    user_records = [
-        load_template_record_from_path(path, source=USER_TEMPLATE_SOURCE)
-        for path in _iter_template_paths(USER_TEMPLATES_ROOT)
-    ]
+    user_records = _load_user_template_records()
     all_records = [*official_records, *user_records]
     settings_entries = ensure_template_settings(
         {record["template_id"]: True for record in all_records},
@@ -106,6 +105,16 @@ def load_template_record_from_path(path: Path, *, source: str) -> dict[str, Any]
         template.model_dump(by_alias=True, mode="json", exclude={"status"}),
         source,
     )
+
+
+def _load_user_template_records() -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for path in _iter_template_paths(USER_TEMPLATES_ROOT):
+        try:
+            records.append(load_template_record_from_path(path, source=USER_TEMPLATE_SOURCE))
+        except (ValidationError, ValueError):
+            continue
+    return records
 
 
 def disable_user_template_record(template_id: str) -> dict[str, Any]:

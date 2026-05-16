@@ -207,7 +207,7 @@ export type RunSnapshotOption = {
 };
 
 export type RunArtifacts = {
-  skill_outputs?: Array<Record<string, unknown>>;
+  action_outputs?: Array<Record<string, unknown>>;
   activity_events?: ActivityEvent[];
   capability_outputs?: Array<Record<string, unknown>>;
   output_previews?: OutputPreview[];
@@ -243,8 +243,8 @@ export type RunSummary = {
 
 export type RunDetail = RunSummary & {
   metadata: Record<string, unknown>;
-  selected_skills: string[];
-  skill_outputs: Array<Record<string, unknown>>;
+  selected_actions: string[];
+  action_outputs: Array<Record<string, unknown>>;
   selected_capabilities?: Array<Record<string, unknown>>;
   capability_outputs?: Array<Record<string, unknown>>;
   evaluation_result: Record<string, unknown>;

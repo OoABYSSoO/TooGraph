@@ -109,7 +109,7 @@ export type NodeCardViewModel = {
     | {
         kind: "agent";
         taskInstruction: string;
-        skillInstructionBlocks: NonNullable<Extract<GraphNode, { kind: "agent" }>["config"]["skillInstructionBlocks"]>;
+        actionInstructionBlocks: NonNullable<Extract<GraphNode, { kind: "agent" }>["config"]["actionInstructionBlocks"]>;
         modelLabel: string;
         thinkingLabel: string;
         skillLabel: string;
@@ -288,14 +288,14 @@ function buildBody(
     return {
       kind: "agent",
       taskInstruction: node.config.taskInstruction?.trim() || "",
-      skillInstructionBlocks: resolveDisplayAgentSkillInstructionBlocks(
-        node.config.skillKey,
+      actionInstructionBlocks: resolveDisplayAgentSkillInstructionBlocks(
+        node.config.actionKey,
         options.skillDefinitions ?? [],
-        node.config.skillInstructionBlocks ?? {},
+        node.config.actionInstructionBlocks ?? {},
       ),
       modelLabel: resolveAgentModelLabel(node),
       thinkingLabel: resolveThinkingLabel(node),
-      skillLabel: node.config.skillKey.trim() || "No skill",
+      skillLabel: node.config.actionKey.trim() || "No skill",
       primaryInput: inputs[0] ?? null,
       primaryOutput: outputs[0] ?? null,
     };
@@ -561,7 +561,7 @@ function listSubgraphCapabilities(node: Extract<GraphNode, { kind: "subgraph" }>
   const capabilities = new Set<string>();
   for (const innerNode of Object.values(node.config.graph.nodes)) {
     if (innerNode.kind === "agent") {
-      const skillKey = innerNode.config.skillKey.trim();
+      const skillKey = innerNode.config.actionKey.trim();
       if (skillKey) {
         capabilities.add(skillKey);
       }
@@ -590,23 +590,23 @@ function resolveManagedSkillOutputPort(
   stateSchema: Record<string, StateDefinition>,
 ): NodePortViewModel["managedBySkill"] {
   const binding = stateSchema[stateKey]?.binding;
-  if (binding?.kind !== "skill_output" || binding.nodeId !== nodeId || binding.managed === false) {
+  if (binding?.kind !== "action_output" || binding.nodeId !== nodeId || binding.managed === false) {
     return undefined;
   }
   return {
     role: "output",
-    skillKey: binding.skillKey,
+    skillKey: binding.actionKey,
     fieldKey: binding.fieldKey,
   };
 }
 
 function resolveManagedSkillInputPort(binding: Extract<GraphNode, { kind: "agent" }>["reads"][number]): NodePortViewModel["managedBySkill"] {
-  if (binding.binding?.kind !== "skill_input" || binding.binding.managed === false) {
+  if (binding.binding?.kind !== "action_input" || binding.binding.managed === false) {
     return undefined;
   }
   return {
     role: "input",
-    skillKey: binding.binding.skillKey,
+    skillKey: binding.binding.actionKey,
     fieldKey: binding.binding.fieldKey,
   };
 }

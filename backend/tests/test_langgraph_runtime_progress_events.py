@@ -34,7 +34,7 @@ class LangGraphRuntimeProgressEventTests(unittest.TestCase):
                         "ui": {"position": {"x": 240, "y": 0}},
                         "reads": [{"state": "question"}],
                         "writes": [{"state": "answer"}],
-                        "config": {"taskInstruction": "Say hello.", "skillKey": ""},
+                        "config": {"taskInstruction": "Say hello.", "actionKey": ""},
                     },
                     "output_answer": {
                         "kind": "output",
@@ -117,7 +117,7 @@ class LangGraphRuntimeProgressEventTests(unittest.TestCase):
                         "ui": {"position": {"x": 240, "y": 0}},
                         "reads": [{"state": "question"}],
                         "writes": [{"state": "answer"}],
-                        "config": {"taskInstruction": "Say hello.", "skillKey": ""},
+                        "config": {"taskInstruction": "Say hello.", "actionKey": ""},
                     },
                     "output_answer": {
                         "kind": "output",
@@ -179,7 +179,7 @@ class LangGraphRuntimeProgressEventTests(unittest.TestCase):
                         "ui": {"position": {"x": 240, "y": 0}},
                         "reads": [{"state": "question"}],
                         "writes": [{"state": "answer"}],
-                        "config": {"taskInstruction": "Answer briefly.", "skillKey": ""},
+                        "config": {"taskInstruction": "Answer briefly.", "actionKey": ""},
                     },
                     "output_answer": {
                         "kind": "output",

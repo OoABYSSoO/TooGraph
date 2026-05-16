@@ -65,7 +65,7 @@ class NodeSystemSchemaLegacyFieldRejectionTests(unittest.TestCase):
     def test_agent_config_preserves_suspended_free_writes(self) -> None:
         config = NodeSystemAgentConfig.model_validate(
             {
-                "skillKey": "web_search",
+                "actionKey": "web_search",
                 "suspendedFreeWrites": [
                     {"state": "free_answer", "mode": "replace"},
                     {"state": "free_notes", "mode": "append"},
@@ -94,16 +94,16 @@ class NodeSystemSchemaLegacyFieldRejectionTests(unittest.TestCase):
         self.assertEqual(dumped["binding"]["kind"].value, "capability_result")
         self.assertEqual(dumped["binding"]["nodeId"], "executor")
         self.assertEqual(dumped["binding"]["fieldKey"], "result_package")
-        self.assertEqual(dumped["binding"]["skillKey"], "")
+        self.assertEqual(dumped["binding"]["actionKey"], "")
 
-    def test_read_binding_accepts_managed_skill_input_binding(self) -> None:
+    def test_read_binding_accepts_managed_action_input_binding(self) -> None:
         binding = NodeSystemReadBinding.model_validate(
             {
                 "state": "user_question",
                 "required": True,
                 "binding": {
-                    "kind": "skill_input",
-                    "skillKey": "web_search",
+                    "kind": "action_input",
+                    "actionKey": "web_search",
                     "fieldKey": "user_question",
                     "managed": True,
                 },
@@ -111,8 +111,8 @@ class NodeSystemSchemaLegacyFieldRejectionTests(unittest.TestCase):
         )
 
         dumped = binding.model_dump(by_alias=True)
-        self.assertEqual(dumped["binding"]["kind"].value, "skill_input")
-        self.assertEqual(dumped["binding"]["skillKey"], "web_search")
+        self.assertEqual(dumped["binding"]["kind"].value, "action_input")
+        self.assertEqual(dumped["binding"]["actionKey"], "web_search")
         self.assertEqual(dumped["binding"]["fieldKey"], "user_question")
 
     def test_condition_config_rejects_condition_mode(self) -> None:

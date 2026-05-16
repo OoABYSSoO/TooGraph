@@ -76,8 +76,8 @@ function createRun(overrides: Partial<RunDetail> = {}): RunDetail {
     revision_round: 0,
     started_at: "2026-04-27T00:00:00Z",
     metadata: {},
-    selected_skills: [],
-    skill_outputs: [],
+    selected_actions: [],
+    action_outputs: [],
     evaluation_result: {},
     memory_summary: "",
     final_result: "# Answer\n\nPersist me.",
@@ -87,7 +87,7 @@ function createRun(overrides: Partial<RunDetail> = {}): RunDetail {
     errors: [],
     output_previews: [],
     artifacts: {
-      skill_outputs: [],
+      action_outputs: [],
       output_previews: [],
       saved_outputs: [],
       exported_outputs: [

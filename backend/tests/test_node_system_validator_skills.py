@@ -69,7 +69,7 @@ def _graph_with_agent_config(config: dict) -> NodeSystemGraphDocument:
 
 class NodeSystemValidatorSkillTests(unittest.TestCase):
     def test_legacy_breakpoint_metadata_is_rejected(self) -> None:
-        graph = _graph_with_agent_config({"skillKey": ""})
+        graph = _graph_with_agent_config({"actionKey": ""})
         graph.metadata = {
             "interrupt_before": ["agent"],
             "interruptAfter": ["agent"],
@@ -81,7 +81,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
         self.assertIn("legacy_breakpoint_metadata_not_supported", [issue.code for issue in validation.issues])
 
     def test_needs_manifest_skill_is_rejected_for_agent_nodes(self) -> None:
-        graph = _graph_with_agent_config({"skillKey": "legacy_skill"})
+        graph = _graph_with_agent_config({"actionKey": "legacy_skill"})
         definition = _agent_skill_definition(
             "legacy_skill",
             eligibility=SkillLlmNodeEligibility.NEEDS_MANIFEST,
@@ -100,10 +100,10 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
     def test_binding_output_mapping_to_unknown_state_is_rejected(self) -> None:
         graph = _graph_with_agent_config(
             {
-                "skillKey": "summarize_text",
-                "skillBindings": [
+                "actionKey": "summarize_text",
+                "actionBindings": [
                     {
-                        "skillKey": "summarize_text",
+                        "actionKey": "summarize_text",
                         "outputMapping": {"summary": "missing_state"},
                     }
                 ],
@@ -117,15 +117,15 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
         ):
             validation = validate_graph(graph)
 
-        self.assertIn("agent_skill_output_state_unknown", [issue.code for issue in validation.issues])
+        self.assertIn("agent_action_output_state_unknown", [issue.code for issue in validation.issues])
 
     def test_required_skill_inputs_are_generated_at_runtime_not_validated_as_static_bindings(self) -> None:
         graph = _graph_with_agent_config(
             {
-                "skillKey": "summarize_text",
-                "skillBindings": [
+                "actionKey": "summarize_text",
+                "actionBindings": [
                     {
-                        "skillKey": "summarize_text",
+                        "actionKey": "summarize_text",
                         "outputMapping": {"summary": "summary_text"},
                     }
                 ],
@@ -147,9 +147,9 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
     def test_binding_only_skill_is_rejected_as_legacy_attachment(self) -> None:
         graph = _graph_with_agent_config(
             {
-                "skillBindings": [
+                "actionBindings": [
                     {
-                        "skillKey": "desktop_profile",
+                        "actionKey": "desktop_profile",
                     }
                 ]
             }
@@ -157,7 +157,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
 
         validation = validate_graph(graph)
 
-        self.assertIn("agent_skill_binding_without_skill_key", [issue.code for issue in validation.issues])
+        self.assertIn("agent_action_binding_without_action_key", [issue.code for issue in validation.issues])
 
     def test_dynamic_capability_node_requires_single_result_package_output(self) -> None:
         graph = NodeSystemGraphDocument.model_validate(
@@ -165,7 +165,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
                 "graph_id": "graph-1",
                 "name": "Graph",
                 "state_schema": {
-                    "selected_capability": {"type": "capability", "value": {"kind": "skill", "key": "web_search"}},
+                    "selected_capability": {"type": "capability", "value": {"kind": "action", "key": "web_search"}},
                     "question": {"type": "text", "value": "q"},
                     "answer": {"type": "text", "value": ""},
                 },
@@ -175,7 +175,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
                         "ui": {"position": {"x": 0, "y": 0}},
                         "reads": [{"state": "selected_capability"}, {"state": "question"}],
                         "writes": [{"state": "answer"}],
-                        "config": {"skillKey": ""},
+                        "config": {"actionKey": ""},
                     },
                 },
                 "edges": [],
@@ -193,7 +193,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
                 "graph_id": "graph-1",
                 "name": "Graph",
                 "state_schema": {
-                    "selected_capability": {"type": "capability", "value": {"kind": "skill", "key": "file_reader"}},
+                    "selected_capability": {"type": "capability", "value": {"kind": "action", "key": "file_reader"}},
                     "question": {"type": "text", "value": "q"},
                     "answer": {"type": "text", "value": ""},
                 },
@@ -203,7 +203,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
                         "ui": {"position": {"x": 0, "y": 0}},
                         "reads": [{"state": "selected_capability"}, {"state": "question"}],
                         "writes": [{"state": "answer"}],
-                        "config": {"skillKey": "web_search"},
+                        "config": {"actionKey": "web_search"},
                     },
                 },
                 "edges": [],

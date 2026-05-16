@@ -100,7 +100,7 @@ const BUILTIN_EMPTY_AGENT_PRESET: PresetDocument = {
       reads: [],
       writes: [],
       config: {
-        skillKey: "",
+        actionKey: "",
         taskInstruction: "",
         modelSource: "global",
         model: "",

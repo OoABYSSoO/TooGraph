@@ -109,7 +109,7 @@ export function removeStateBindingFromDocument<T extends GraphPayload | GraphDoc
     if (!readBinding) {
       return document;
     }
-    if (readBinding.binding?.kind === "skill_input" && readBinding.binding.managed !== false) {
+    if (readBinding.binding?.kind === "action_input" && readBinding.binding.managed !== false) {
       return document;
     }
     const nextDocument = cloneGraphDocument(document);
@@ -130,7 +130,7 @@ export function removeStateBindingFromDocument<T extends GraphPayload | GraphDoc
   if (node.kind !== "agent" && node.kind !== "batch" && node.kind !== "subgraph") {
     return document;
   }
-  if (document.state_schema[stateKey]?.binding?.kind === "skill_output" || document.state_schema[stateKey]?.binding?.kind === "capability_result") {
+  if (document.state_schema[stateKey]?.binding?.kind === "action_output" || document.state_schema[stateKey]?.binding?.kind === "capability_result") {
     return document;
   }
   if (!node.writes.some((binding) => binding.state === stateKey)) {
@@ -207,7 +207,7 @@ function canNodeBindState(document: GraphPayload | GraphDocument, node: GraphNod
 function isDynamicCapabilityExecutorNode(document: GraphPayload | GraphDocument, node: GraphNode) {
   return (
     node.kind === "agent" &&
-    !node.config.skillKey.trim() &&
+    !node.config.actionKey.trim() &&
     node.reads.some((binding) => document.state_schema[binding.state]?.type?.trim() === "capability")
   );
 }

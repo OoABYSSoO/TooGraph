@@ -110,7 +110,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "question"}],
                 "writes": [{"state": "answer"}],
-                "config": {"skillKey": "custom"},
+                "config": {"actionKey": "custom"},
             }
         )
         finalized: dict[str, object] = {}
@@ -140,9 +140,11 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result["outputs"], {"answer": "value"})
         self.assertEqual(result["reasoning"], "reason")
-        self.assertEqual(result["selected_skills"], ["custom"])
-        self.assertEqual(result["skill_outputs"][0]["inputs"], {"question": "q"})
-        self.assertEqual(result["skill_outputs"][0]["outputs"], {"echo": "q"})
+        self.assertEqual(result["selected_actions"], ["custom"])
+        self.assertNotIn("selected_skills", result)
+        self.assertEqual(result["action_outputs"][0]["inputs"], {"question": "q"})
+        self.assertEqual(result["action_outputs"][0]["outputs"], {"echo": "q"})
+        self.assertNotIn("skill_outputs", result)
         self.assertEqual(result["runtime_config"]["runtime"], "updated")
         self.assertEqual(result["runtime_config"]["kwargs"]["on_delta"], "delta")
         self.assertEqual(result["runtime_config"]["kwargs"]["state_schema"], state_schema)
@@ -163,10 +165,10 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "reads": [{"state": "user_goal", "required": True}],
                 "writes": [{"state": "ok", "mode": "replace"}],
                 "config": {
-                    "skillKey": "toograph_page_operator",
-                    "skillBindings": [
+                    "actionKey": "toograph_page_operator",
+                    "actionBindings": [
                         {
-                            "skillKey": "toograph_page_operator",
+                            "actionKey": "toograph_page_operator",
                             "outputMapping": {"ok": "ok"},
                         }
                     ],
@@ -227,7 +229,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(captured["runtime_config"]["skill_runtime_context"], {"page_path": "/editor"})
         self.assertEqual(result["outputs"], {"ok": True})
 
-    def test_execute_agent_node_passes_graph_skill_runtime_context_to_skill_invocation(self) -> None:
+    def test_execute_agent_node_passes_graph_skill_runtime_context_to_action_invocation(self) -> None:
         state_schema = {
             "user_goal": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "ok": NodeSystemStateDefinition.model_validate({"type": "boolean"}),
@@ -240,10 +242,10 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "reads": [{"state": "user_goal", "required": True}],
                 "writes": [{"state": "ok", "mode": "replace"}],
                 "config": {
-                    "skillKey": "toograph_page_operator",
-                    "skillBindings": [
+                    "actionKey": "toograph_page_operator",
+                    "actionBindings": [
                         {
-                            "skillKey": "toograph_page_operator",
+                            "actionKey": "toograph_page_operator",
                             "outputMapping": {"ok": "ok"},
                         }
                     ],
@@ -323,7 +325,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "question"}],
                 "writes": [{"state": "answer"}],
-                "config": {"skillKey": "custom"},
+                "config": {"actionKey": "custom"},
             }
         )
         recorded_events: list[dict[str, Any]] = []
@@ -358,11 +360,11 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
 
         self.assertEqual(len(recorded_events), 1)
         event = recorded_events[0]
-        self.assertEqual(event["kind"], "skill_invocation")
+        self.assertEqual(event["kind"], "action_invocation")
         self.assertEqual(event["node_id"], "writer")
         self.assertEqual(event["status"], "succeeded")
-        self.assertEqual(event["summary"], "Skill 'custom' succeeded.")
-        self.assertEqual(event["detail"]["skill_key"], "custom")
+        self.assertEqual(event["summary"], "Action 'custom' succeeded.")
+        self.assertEqual(event["detail"]["action_key"], "custom")
         self.assertEqual(event["detail"]["binding_source"], "node_config")
         self.assertEqual(event["detail"]["input_keys"], ["question"])
         self.assertEqual(event["detail"]["output_keys"], ["echo"])
@@ -379,7 +381,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "question"}],
                 "writes": [{"state": "answer"}],
-                "config": {"skillKey": "custom"},
+                "config": {"actionKey": "custom"},
             }
         )
         recorded_events: list[dict[str, Any]] = []
@@ -422,11 +424,11 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(len(recorded_events), 2)
-        self.assertEqual(recorded_events[0]["kind"], "skill_invocation")
+        self.assertEqual(recorded_events[0]["kind"], "action_invocation")
         self.assertEqual(recorded_events[1]["kind"], "file_read")
         self.assertEqual(recorded_events[1]["node_id"], "writer")
         self.assertEqual(recorded_events[1]["summary"], "Read docs/a.md")
-        self.assertEqual(recorded_events[1]["detail"]["skill_key"], "custom")
+        self.assertEqual(recorded_events[1]["detail"]["action_key"], "custom")
         self.assertEqual(recorded_events[1]["detail"]["binding_source"], "node_config")
         self.assertEqual(recorded_events[1]["detail"]["path"], "docs/a.md")
 
@@ -505,7 +507,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "buddy_context"}],
                 "writes": [{"state": "answer"}],
-                "config": {"skillKey": "custom"},
+                "config": {"actionKey": "custom"},
             }
         )
         recorded_events: list[dict[str, Any]] = []
@@ -551,7 +553,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(result["outputs"], {"answer": "skill answer"})
-        self.assertEqual([event["kind"] for event in recorded_events], ["file_context_read", "skill_invocation"])
+        self.assertEqual([event["kind"] for event in recorded_events], ["file_context_read", "action_invocation"])
         self.assertEqual(recorded_events[0]["summary"], "Prepared 1 selected local input file for LLM context.")
         self.assertEqual(recorded_events[0]["detail"]["phase"], "skill_input_planning")
         self.assertEqual(recorded_events[0]["detail"]["files"], ["SOUL.md"])
@@ -569,7 +571,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "kb"}, {"state": "question"}],
                 "writes": [{"state": "answer"}],
-                "config": {"skillKey": "custom_retrieval"},
+                "config": {"actionKey": "custom_retrieval"},
             }
         )
 
@@ -596,7 +598,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             first_truthy_func=lambda values: next((value for value in values if value), None),
         )
 
-        self.assertEqual(result["skill_outputs"][0]["inputs"], {"kb": "docs", "question": "q"})
+        self.assertEqual(result["action_outputs"][0]["inputs"], {"kb": "docs", "question": "q"})
         self.assertEqual(result["outputs"], {"answer": "q"})
 
     def test_execute_agent_node_static_skill_ignores_capability_state_inputs(self) -> None:
@@ -612,7 +614,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "selected_capability"}, {"state": "question"}],
                 "writes": [{"state": "answer"}],
-                "config": {"skillKey": "web_search"},
+                "config": {"actionKey": "web_search"},
             }
         )
         invoked: list[str] = []
@@ -625,7 +627,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             state_schema,
             node,
             {
-                "selected_capability": {"kind": "skill", "key": "file_reader", "name": "File Reader"},
+                "selected_capability": {"kind": "action", "key": "file_reader", "name": "File Reader"},
                 "question": "q",
             },
             {"state": {}},
@@ -652,7 +654,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(invoked, ["web_search"])
-        self.assertEqual(result["selected_skills"], ["web_search"])
+        self.assertEqual(result["selected_actions"], ["web_search"])
         self.assertEqual(result["outputs"], {"answer": "web_search"})
 
     def test_execute_agent_node_uses_llm_generated_skill_inputs(self) -> None:
@@ -668,8 +670,8 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "reads": [{"state": "question"}],
                 "writes": [{"state": "answer"}],
                 "config": {
-                    "skillKey": "web_search",
-                    "skillBindings": [{"skillKey": "web_search"}],
+                    "actionKey": "web_search",
+                    "actionBindings": [{"actionKey": "web_search"}],
                 },
             }
         )
@@ -717,8 +719,8 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(captured_inputs, [{"query": "鸣潮 最新版本 更新内容"}])
-        self.assertEqual(result["skill_outputs"][0]["inputs"], {"query": "鸣潮 最新版本 更新内容"})
-        self.assertEqual(result["skill_outputs"][0]["input_source"], "agent_llm")
+        self.assertEqual(result["action_outputs"][0]["inputs"], {"query": "鸣潮 最新版本 更新内容"})
+        self.assertEqual(result["action_outputs"][0]["input_source"], "agent_llm")
         self.assertEqual(result["reasoning"], "")
         self.assertEqual(result["outputs"], {"answer": "searched"})
 
@@ -735,7 +737,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "selected_capability"}, {"state": "query"}],
                 "writes": [{"state": "dynamic_result"}],
-                "config": {"skillKey": ""},
+                "config": {"actionKey": ""},
             }
         )
         captured_inputs: list[dict[str, object]] = []
@@ -744,7 +746,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             state_schema,
             node,
             {
-                "selected_capability": {"kind": "skill", "key": "web_search"},
+                "selected_capability": {"kind": "action", "key": "web_search"},
                 "query": "fallback query",
             },
             {"state": {}},
@@ -787,11 +789,11 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(captured_inputs, [{"query": "Wuthering Waves latest version", "max_results": "8"}])
-        self.assertEqual(result["skill_outputs"][0]["binding_source"], "capability_state")
-        self.assertEqual(result["skill_outputs"][0]["output_mapping"], {})
-        self.assertEqual(result["skill_outputs"][0]["output_mapping_details"], [])
+        self.assertEqual(result["action_outputs"][0]["binding_source"], "capability_state")
+        self.assertEqual(result["action_outputs"][0]["output_mapping"], {})
+        self.assertEqual(result["action_outputs"][0]["output_mapping_details"], [])
         self.assertEqual(
-            result["skill_outputs"][0]["inputs"],
+            result["action_outputs"][0]["inputs"],
             {"query": "Wuthering Waves latest version", "max_results": "8"},
         )
         self.assertEqual(
@@ -834,7 +836,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "selected_capability"}, {"state": "request"}],
                 "writes": [{"state": "dynamic_result"}],
-                "config": {"skillKey": ""},
+                "config": {"actionKey": ""},
             }
         )
         recorded_events: list[dict[str, Any]] = []
@@ -847,7 +849,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             state_schema,
             node,
             {
-                "selected_capability": {"kind": "skill", "key": "local_workspace_executor"},
+                "selected_capability": {"kind": "action", "key": "local_workspace_executor"},
                 "request": "write a file",
             },
             {"state": {}},
@@ -892,7 +894,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(recorded_events[0]["kind"], "permission_pause")
         self.assertEqual(recorded_events[0]["node_id"], "execute_capability")
         self.assertEqual(recorded_events[0]["status"], "awaiting_human")
-        self.assertEqual(recorded_events[0]["detail"]["skill_key"], "local_workspace_executor")
+        self.assertEqual(recorded_events[0]["detail"]["action_key"], "local_workspace_executor")
         self.assertEqual(recorded_events[0]["detail"]["permissions"], ["file_write", "subprocess"])
 
     def test_execute_agent_node_resumes_risky_skill_with_stored_approval_inputs(self) -> None:
@@ -908,7 +910,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "selected_capability"}, {"state": "request"}],
                 "writes": [{"state": "dynamic_result"}],
-                "config": {"skillKey": ""},
+                "config": {"actionKey": ""},
             }
         )
         stored_inputs = {"path": "skill/user/demo/SKILL.md", "content": "# Demo"}
@@ -934,7 +936,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             state_schema,
             node,
             {
-                "selected_capability": {"kind": "skill", "key": "local_workspace_executor"},
+                "selected_capability": {"kind": "action", "key": "local_workspace_executor"},
                 "request": "write a file",
             },
             {"state": {}},
@@ -983,7 +985,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "selected_capability"}, {"state": "request"}],
                 "writes": [{"state": "dynamic_result"}],
-                "config": {"skillKey": ""},
+                "config": {"actionKey": ""},
             }
         )
         stored_inputs = {"path": "skill/user/demo/SKILL.md", "content": "# Demo"}
@@ -1013,7 +1015,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             state_schema,
             node,
             {
-                "selected_capability": {"kind": "skill", "key": "local_workspace_executor"},
+                "selected_capability": {"kind": "action", "key": "local_workspace_executor"},
                 "request": "write a file",
             },
             {"state": {}},
@@ -1053,8 +1055,8 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(package["errorType"], "permission_denied")
         self.assertEqual(package["error"], "Permission denied for skill 'local_workspace_executor': 不要写本地文件")
         self.assertEqual(package["inputs"], stored_inputs)
-        self.assertEqual(result["skill_outputs"][0]["status"], "failed")
-        self.assertEqual(result["skill_outputs"][0]["error_type"], "permission_denied")
+        self.assertEqual(result["action_outputs"][0]["status"], "failed")
+        self.assertEqual(result["action_outputs"][0]["error_type"], "permission_denied")
 
     def test_execute_agent_node_uses_llm_inputs_for_capability_state_selected_subgraph(self) -> None:
         state_schema = {
@@ -1069,7 +1071,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "selected_capability"}, {"state": "question"}],
                 "writes": [{"state": "dynamic_result"}],
-                "config": {"skillKey": ""},
+                "config": {"actionKey": ""},
             }
         )
         captured_subgraph_inputs: list[dict[str, object]] = []
@@ -1128,7 +1130,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(captured_subgraph_inputs, [{"user_question": "总结今天 AI 新闻"}])
-        self.assertEqual(result["selected_skills"], [])
+        self.assertEqual(result["selected_actions"], [])
         self.assertEqual(result["selected_capabilities"], [{"kind": "subgraph", "key": "advanced_web_research_loop"}])
         self.assertEqual(result["capability_outputs"][0]["binding_source"], "capability_state")
         self.assertEqual(result["capability_outputs"][0]["input_source"], "agent_llm")
@@ -1172,7 +1174,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "selected_capability"}, {"state": "question"}],
                 "writes": [{"state": "dynamic_result"}],
-                "config": {"skillKey": ""},
+                "config": {"actionKey": ""},
             }
         )
         recorded_events: list[dict[str, Any]] = []
@@ -1260,7 +1262,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "query"}],
                 "writes": [{"state": "source_urls"}, {"state": "artifact_paths"}],
-                "config": {"skillKey": "web_search"},
+                "config": {"actionKey": "web_search"},
             }
         )
         skill_result = {
@@ -1327,21 +1329,21 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             },
         )
         self.assertEqual(
-            result["skill_outputs"][0]["state_writes"],
+            result["action_outputs"][0]["state_writes"],
             {
                 "source_urls": ["https://example.test/source"],
                 "artifact_paths": ["run/doc_001.md"],
             },
         )
         self.assertEqual(
-            result["skill_outputs"][0]["output_mapping"],
+            result["action_outputs"][0]["output_mapping"],
             {
                 "source_urls": "source_urls",
                 "artifact_paths": "artifact_paths",
             },
         )
         self.assertEqual(
-            result["skill_outputs"][0]["output_mapping_details"],
+            result["action_outputs"][0]["output_mapping_details"],
             [
                 {
                     "output_key": "source_urls",
@@ -1378,7 +1380,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "selected_capability"}],
                 "writes": [{"state": "dynamic_result"}],
-                "config": {"skillKey": ""},
+                "config": {"actionKey": ""},
             }
         )
         invoked: list[str] = []
@@ -1386,7 +1388,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         result = execute_agent_node(
             state_schema,
             node,
-            {"selected_capability": {"kind": "skill", "key": "web_search"}},
+            {"selected_capability": {"kind": "action", "key": "web_search"}},
             {"state": {}},
             node_name="tool_executor",
             state={"run_id": "run-1"},
@@ -1416,21 +1418,21 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(invoked, [])
-        self.assertEqual(result["selected_skills"], ["web_search"])
-        self.assertEqual(result["skill_outputs"][0]["binding_source"], "capability_state")
-        self.assertEqual(result["skill_outputs"][0]["output_mapping"], {})
-        self.assertEqual(result["skill_outputs"][0]["output_mapping_details"], [])
-        self.assertEqual(result["skill_outputs"][0]["status"], "failed")
-        self.assertEqual(result["skill_outputs"][0]["error_type"], "missing_skill_llm_output")
-        self.assertIn("query", result["skill_outputs"][0]["error"])
+        self.assertEqual(result["selected_actions"], ["web_search"])
+        self.assertEqual(result["action_outputs"][0]["binding_source"], "capability_state")
+        self.assertEqual(result["action_outputs"][0]["output_mapping"], {})
+        self.assertEqual(result["action_outputs"][0]["output_mapping_details"], [])
+        self.assertEqual(result["action_outputs"][0]["status"], "failed")
+        self.assertEqual(result["action_outputs"][0]["error_type"], "missing_skill_llm_output")
+        self.assertIn("query", result["action_outputs"][0]["error"])
         self.assertEqual(result["outputs"]["dynamic_result"]["kind"], "result_package")
         self.assertEqual(result["outputs"]["dynamic_result"]["status"], "failed")
         self.assertEqual(result["outputs"]["dynamic_result"]["errorType"], "missing_skill_llm_output")
         self.assertIn("query", result["outputs"]["dynamic_result"]["error"])
         self.assertIsInstance(result["final_result"], str)
-        self.assertIn("Skill 'web_search' failed before execution", result["warnings"][0])
+        self.assertIn("Action 'web_search' failed before execution", result["warnings"][0])
 
-    def test_execute_agent_node_maps_bound_skill_outputs_into_state_outputs(self) -> None:
+    def test_execute_agent_node_maps_bound_action_outputs_into_state_outputs(self) -> None:
         state_schema = {
             "source_text": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "summary_text": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -1444,10 +1446,10 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "reads": [{"state": "source_text"}],
                 "writes": [{"state": "answer"}],
                 "config": {
-                    "skillKey": "summarize_text",
-                    "skillBindings": [
+                    "actionKey": "summarize_text",
+                    "actionBindings": [
                         {
-                            "skillKey": "summarize_text",
+                            "actionKey": "summarize_text",
                             "outputMapping": {"summary": "summary_text"},
                         }
                     ],
@@ -1492,12 +1494,12 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "answer": "Final using Long text / 2",
             },
         )
-        self.assertEqual(result["skill_outputs"][0]["inputs"], {"text": "Long text", "max_sentences": 2})
-        self.assertEqual(result["skill_outputs"][0]["output_mapping"], {"summary": "summary_text"})
-        self.assertEqual(result["skill_outputs"][0]["state_writes"], {"summary_text": "Long text / 2"})
-        self.assertEqual(result["skill_outputs"][0]["status"], "succeeded")
+        self.assertEqual(result["action_outputs"][0]["inputs"], {"text": "Long text", "max_sentences": 2})
+        self.assertEqual(result["action_outputs"][0]["output_mapping"], {"summary": "summary_text"})
+        self.assertEqual(result["action_outputs"][0]["state_writes"], {"summary_text": "Long text / 2"})
+        self.assertEqual(result["action_outputs"][0]["status"], "succeeded")
 
-    def test_execute_agent_node_skips_generation_when_bound_skill_outputs_cover_all_writes(self) -> None:
+    def test_execute_agent_node_skips_generation_when_bound_action_outputs_cover_all_writes(self) -> None:
         state_schema = {
             "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "context": NodeSystemStateDefinition.model_validate({"type": "markdown"}),
@@ -1514,10 +1516,10 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     {"state": "snapshot", "mode": "replace"},
                 ],
                 "config": {
-                    "skillKey": "load_context",
-                    "skillBindings": [
+                    "actionKey": "load_context",
+                    "actionBindings": [
                         {
-                            "skillKey": "load_context",
+                            "actionKey": "load_context",
                             "outputMapping": {"context": "context", "snapshot": "snapshot"},
                         }
                     ],
@@ -1571,10 +1573,10 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "reads": [{"state": "query"}],
                 "writes": [{"state": "search_report"}, {"state": "source_documents"}],
                 "config": {
-                    "skillKey": "web_search",
-                    "skillBindings": [
+                    "actionKey": "web_search",
+                    "actionBindings": [
                         {
-                            "skillKey": "web_search",
+                            "actionKey": "web_search",
                             "outputMapping": {"source_documents": "source_documents"},
                         }
                     ],
@@ -1618,7 +1620,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["outputs"]["search_report"], "report")
         self.assertEqual(result["outputs"]["source_documents"], source_documents)
 
-    def test_execute_agent_node_preserves_append_skill_outputs_when_response_mentions_same_state(self) -> None:
+    def test_execute_agent_node_preserves_append_action_outputs_when_response_mentions_same_state(self) -> None:
         state_schema = {
             "query": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "search_report": NodeSystemStateDefinition.model_validate({"type": "markdown"}),
@@ -1635,10 +1637,10 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     {"state": "source_documents", "mode": "append"},
                 ],
                 "config": {
-                    "skillKey": "web_search",
-                    "skillBindings": [
+                    "actionKey": "web_search",
+                    "actionBindings": [
                         {
-                            "skillKey": "web_search",
+                            "actionKey": "web_search",
                             "outputMapping": {"source_documents": "source_documents"},
                         }
                     ],
@@ -1692,7 +1694,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "reads": [{"state": "name"}],
                 "writes": [{"state": "answer"}],
                 "config": {
-                    "skillKey": "web_search",
+                    "actionKey": "web_search",
                     "taskInstruction": "联网搜索，告知今天的日期和北京天气",
                 },
             }
@@ -1726,7 +1728,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(captured_inputs, {"query": "Beijing weather today"})
-        self.assertEqual(result["skill_outputs"][0]["inputs"], {"query": "Beijing weather today"})
+        self.assertEqual(result["action_outputs"][0]["inputs"], {"query": "Beijing weather today"})
         self.assertEqual(result["outputs"]["answer"], "联网结果")
 
     def test_execute_agent_node_rejects_static_skill_input_mapping(self) -> None:
@@ -1739,10 +1741,10 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     "reads": [{"state": "question"}],
                     "writes": [{"state": "answer"}],
                     "config": {
-                        "skillKey": "web_search",
-                        "skillBindings": [
+                        "actionKey": "web_search",
+                        "actionBindings": [
                             {
-                                "skillKey": "web_search",
+                                "actionKey": "web_search",
                                 "inputMapping": {"query": "question"},
                             }
                         ],
@@ -1763,10 +1765,10 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "reads": [{"state": "query"}],
                 "writes": [{"state": "answer"}],
                 "config": {
-                    "skillKey": "web_search",
-                    "skillBindings": [
+                    "actionKey": "web_search",
+                    "actionBindings": [
                         {
-                            "skillKey": "web_search",
+                            "actionKey": "web_search",
                         }
                     ],
                 },
@@ -1821,10 +1823,10 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "reads": [{"state": "query"}],
                 "writes": [{"state": "answer"}],
                 "config": {
-                    "skillKey": "web_search",
-                    "skillBindings": [
+                    "actionKey": "web_search",
+                    "actionBindings": [
                         {
-                            "skillKey": "web_search",
+                            "actionKey": "web_search",
                         }
                     ],
                 },
@@ -1887,7 +1889,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "ui": {"position": {"x": 0, "y": 0}},
                 "reads": [{"state": "name"}],
                 "writes": [{"state": "answer"}],
-                "config": {"skillKey": "web_search"},
+                "config": {"actionKey": "web_search"},
             }
         )
 
@@ -1919,9 +1921,9 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             first_truthy_func=lambda values: next((value for value in values if value), None),
         )
 
-        self.assertEqual(result["skill_outputs"][0]["status"], "failed")
-        self.assertEqual(result["skill_outputs"][0]["error"], "Search query is required.")
-        self.assertIn("Skill 'web_search' failed: Search query is required.", result["warnings"])
+        self.assertEqual(result["action_outputs"][0]["status"], "failed")
+        self.assertEqual(result["action_outputs"][0]["error"], "Search query is required.")
+        self.assertIn("Action 'web_search' failed: Search query is required.", result["warnings"])
 
 
 if __name__ == "__main__":
