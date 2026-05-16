@@ -317,7 +317,7 @@ function createActivityGraph() {
   });
   graph.state_schema.state_10 = { name: "request_understanding", description: "", type: "json", value: {}, color: "#16a34a" };
   graph.state_schema.state_27 = { name: "final_reply", description: "", type: "markdown", value: "", color: "#4f46e5" };
-  graph.nodes.intake_request = {
+  graph.nodes.buddy_turn_intake = {
     kind: "subgraph",
     name: "理解请求",
     description: "",
@@ -351,7 +351,7 @@ function createActivityGraph() {
       },
     },
   };
-  graph.nodes.run_capability_cycle = {
+  graph.nodes.buddy_capability_loop = {
     kind: "subgraph",
     name: "能力循环",
     description: "",
@@ -841,7 +841,7 @@ test("resolveBuddyRunTraceFromRunEvent summarizes streaming output from non-outp
       {
         node_id: "understand_request",
         node_type: "agent",
-        subgraph_node_id: "intake_request",
+        subgraph_node_id: "buddy_turn_intake",
         output_keys: ["state_10"],
         stream_state_keys: ["state_10"],
         text: '{"state_10":"正在识别：这是一个简单问候，不需要调用能力',
@@ -856,8 +856,8 @@ test("resolveBuddyRunTraceFromRunEvent summarizes streaming output from non-outp
       },
       preview: "正在识别：这是一个简单问候，不需要调用能力",
       tone: "stream",
-      replaceKey: "node:intake_request:understand_request",
-      timingKey: "stage:intake_request:understand_request",
+      replaceKey: "node:buddy_turn_intake:understand_request",
+      timingKey: "stage:buddy_turn_intake:understand_request",
     },
   );
 });
@@ -869,7 +869,7 @@ test("resolveBuddyRunTraceFromRunEvent hides aggregate subgraph containers from 
     resolveBuddyRunTraceFromRunEvent(
       "node.completed",
       {
-        node_id: "intake_request",
+        node_id: "buddy_turn_intake",
         node_type: "subgraph",
         status: "success",
         duration_ms: 1534,
@@ -882,7 +882,7 @@ test("resolveBuddyRunTraceFromRunEvent hides aggregate subgraph containers from 
     resolveBuddyRunTraceFromRunEvent(
       "node.started",
       {
-        node_id: "intake_request",
+        node_id: "buddy_turn_intake",
         node_type: "subgraph",
       },
       graph,
@@ -900,7 +900,7 @@ test("resolveBuddyRunTraceFromRunEvent keeps real inner node progress visible", 
       {
         node_id: "understand_request",
         node_type: "agent",
-        subgraph_node_id: "intake_request",
+        subgraph_node_id: "buddy_turn_intake",
         status: "success",
         duration_ms: 1534,
       },
@@ -914,8 +914,8 @@ test("resolveBuddyRunTraceFromRunEvent keeps real inner node progress visible", 
       },
       preview: "",
       tone: "success",
-      replaceKey: "node:intake_request:understand_request",
-      timingKey: "stage:intake_request:understand_request",
+      replaceKey: "node:buddy_turn_intake:understand_request",
+      timingKey: "stage:buddy_turn_intake:understand_request",
       durationMs: 1534,
     },
   );
@@ -925,11 +925,11 @@ test("resolveBuddyRunTraceFromRunEvent keeps real inner node progress visible", 
       {
         node_id: "understand_request",
         node_type: "agent",
-        subgraph_node_id: "intake_request",
+        subgraph_node_id: "buddy_turn_intake",
       },
       graph,
     )?.replaceKey,
-    "node:intake_request:understand_request",
+    "node:buddy_turn_intake:understand_request",
   );
 });
 
@@ -943,7 +943,7 @@ test("resolveBuddyRunTraceFromRunEvent renders low-level activity events", () =>
         sequence: 2,
         kind: "skill_invocation",
         node_id: "select_capability",
-        subgraph_node_id: "run_capability_cycle",
+        subgraph_node_id: "buddy_capability_loop",
         summary: "Skill 'capability_selector' succeeded.",
         status: "succeeded",
         duration_ms: 42,
@@ -958,8 +958,8 @@ test("resolveBuddyRunTraceFromRunEvent renders low-level activity events", () =>
       },
       preview: "Skill 'capability_selector' succeeded.",
       tone: "success",
-      replaceKey: "activity:run_capability_cycle:select_capability:2",
-      timingKey: "stage:run_capability_cycle:select_capability",
+      replaceKey: "activity:buddy_capability_loop:select_capability:2",
+      timingKey: "stage:buddy_capability_loop:select_capability",
       durationMs: 42,
     },
   );
@@ -974,7 +974,7 @@ test("resolveBuddyRunTraceFromRunEvent hides subgraph plumbing from buddy progre
       {
         node_id: "input_user_message",
         node_type: "input",
-        subgraph_node_id: "intake_request",
+        subgraph_node_id: "buddy_turn_intake",
         status: "success",
       },
       graph,
@@ -987,7 +987,7 @@ test("resolveBuddyRunTraceFromRunEvent hides subgraph plumbing from buddy progre
       {
         node_id: "output_final_reply",
         node_type: "output",
-        subgraph_node_id: "draft_final_response",
+        subgraph_node_id: "buddy_final_reply",
         status: "success",
       },
       graph,
@@ -1000,7 +1000,7 @@ test("resolveBuddyRunTraceFromRunEvent hides subgraph plumbing from buddy progre
       {
         node_id: "understand_request",
         node_type: "agent",
-        subgraph_node_id: "intake_request",
+        subgraph_node_id: "buddy_turn_intake",
         output_keys: ["state_10"],
         stream_state_keys: ["state_10"],
         output_values: {
@@ -1021,8 +1021,8 @@ test("resolveBuddyRunActivityFromRunEvent describes inner buddy subgraph activit
     {
       node_id: "understand_request",
       node_type: "agent",
-      subgraph_node_id: "intake_request",
-      subgraph_path: ["intake_request"],
+      subgraph_node_id: "buddy_turn_intake",
+      subgraph_path: ["buddy_turn_intake"],
     },
     createActivityGraph(),
   );
@@ -1040,7 +1040,7 @@ test("resolveBuddyRunActivityFromRunEvent names subgraph containers without dupl
   const activity = resolveBuddyRunActivityFromRunEvent(
     "node.started",
     {
-      node_id: "intake_request",
+      node_id: "buddy_turn_intake",
       node_type: "subgraph",
     },
     createActivityGraph(),
@@ -1063,8 +1063,8 @@ test("resolveBuddyRunActivityFromRunEvent reports capability selection and node 
       {
         node_id: "select_capability",
         node_type: "agent",
-        subgraph_node_id: "run_capability_cycle",
-        subgraph_path: ["run_capability_cycle"],
+        subgraph_node_id: "buddy_capability_loop",
+        subgraph_path: ["buddy_capability_loop"],
       },
       graph,
     ),
@@ -1082,7 +1082,7 @@ test("resolveBuddyRunActivityFromRunEvent reports capability selection and node 
       {
         node_id: "understand_request",
         node_type: "agent",
-        subgraph_node_id: "intake_request",
+        subgraph_node_id: "buddy_turn_intake",
       },
       graph,
     ),
@@ -1100,7 +1100,7 @@ test("resolveBuddyRunActivityFromRunEvent reports capability selection and node 
         node_id: "understand_request",
         node_type: "agent",
         state_key: "state_10",
-        subgraph_node_id: "intake_request",
+        subgraph_node_id: "buddy_turn_intake",
       },
       graph,
     ),
