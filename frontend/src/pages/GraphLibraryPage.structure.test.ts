@@ -20,6 +20,13 @@ test("GraphLibraryPage renders templates and graphs as separate side-by-side col
   assert.match(componentSource, /@media \(max-width:\s*980px\) \{[\s\S]*\.graph-library-page__columns \{[\s\S]*grid-template-columns:\s*1fr;/);
 });
 
+test("GraphLibraryPage lays out two template cards and two graph cards per wide row", () => {
+  assert.match(componentSource, /\.graph-library-page__column-list \{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+  assert.match(componentSource, /@media \(max-width:\s*1280px\) \{[\s\S]*\.graph-library-page__column-list \{[\s\S]*grid-template-columns:\s*1fr;/);
+  assert.match(componentSource, /@media \(max-width:\s*980px\) \{[\s\S]*\.graph-library-page__column-list \{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+  assert.match(componentSource, /@media \(max-width:\s*700px\) \{[\s\S]*\.graph-library-page__column-list \{[\s\S]*grid-template-columns:\s*1fr;/);
+});
+
 test("GraphLibraryPage keeps start actions compact instead of repeating the full editor welcome catalog", () => {
   assert.doesNotMatch(componentSource, /import EditorWelcomeState from "@\/editor\/workspace\/EditorWelcomeState\.vue";/);
   assert.match(componentSource, /ref="pythonGraphImportInput"/);

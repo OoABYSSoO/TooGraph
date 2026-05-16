@@ -694,6 +694,7 @@ onMounted(loadCatalog);
 }
 
 .graph-library-page__column-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -825,6 +826,12 @@ onMounted(loadCatalog);
   background: rgba(248, 250, 252, 0.72);
 }
 
+@media (max-width: 1280px) {
+  .graph-library-page__column-list {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 1180px) {
   .graph-library-page__overview {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -838,6 +845,10 @@ onMounted(loadCatalog);
 @media (max-width: 980px) {
   .graph-library-page__columns {
     grid-template-columns: 1fr;
+  }
+
+  .graph-library-page__column-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -855,6 +866,10 @@ onMounted(loadCatalog);
   }
 
   .graph-library-page__overview {
+    grid-template-columns: 1fr;
+  }
+
+  .graph-library-page__column-list {
     grid-template-columns: 1fr;
   }
 
