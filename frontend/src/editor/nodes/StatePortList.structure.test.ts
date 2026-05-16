@@ -38,6 +38,7 @@ test("StatePortList owns agent real state port rows and emits parent side effect
   assert.match(componentSource, /data-agent-create-port/);
   assert.match(componentSource, /@click\.stop="emit\('open-create', side\)"/);
   assert.match(componentSource, /<StatePortCreatePopover[\s\S]*v-if="createOpen && createDraft"[\s\S]*:draft="createDraft"/);
+  assert.match(componentSource, /:virtual-affordance-base-id="createPortVirtualAffordanceId"/);
   assert.match(componentSource, /@update:name="emit\('update:create-name', \$event\)"/);
   assert.match(componentSource, /@update:type="emit\('update:create-type', \$event\)"/);
   assert.match(componentSource, /@update:color="emit\('update:create-color', \$event\)"/);

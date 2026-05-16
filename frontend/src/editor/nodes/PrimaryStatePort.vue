@@ -74,6 +74,7 @@
         :error="createError"
         :hint="createHint"
         :type-options="typeOptions"
+        :virtual-affordance-base-id="virtualAffordanceId"
         @update:name="emit('update:create-name', $event)"
         @update:type="emit('update:create-type', $event)"
         @update:color="emit('update:create-color', $event)"

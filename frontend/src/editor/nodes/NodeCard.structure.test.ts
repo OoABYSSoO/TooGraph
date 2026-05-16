@@ -92,10 +92,17 @@ test("NodeCard exposes node text and primary state ports as virtual canvas affor
   assert.match(componentSource, /:node-id="nodeId"[\s\S]*:node-label="view\.title"/);
   assert.match(componentSource, /:data-virtual-affordance-id="`editor\.canvas\.node\.\$\{nodeId\}\.title`"/);
   assert.match(componentSource, /:data-virtual-affordance-label="`节点标题：\$\{view\.title \|\| nodeId\}`"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`editor\.canvas\.node\.\$\{nodeId\}\.title\.input`"/);
   assert.match(componentSource, /:data-virtual-affordance-id="`editor\.canvas\.node\.\$\{nodeId\}\.description`"/);
   assert.match(componentSource, /:data-virtual-affordance-label="`节点描述：\$\{view\.title \|\| nodeId\}`"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`editor\.canvas\.node\.\$\{nodeId\}\.description\.input`"/);
   assert.match(primaryStatePortSource, /:data-virtual-affordance-id="virtualAffordanceId"/);
   assert.match(primaryStatePortSource, /:data-virtual-affordance-label="virtualAffordanceLabel"/);
+  assert.match(primaryStatePortSource, /:virtual-affordance-base-id="virtualAffordanceId"/);
+  assert.match(createPopoverSource, /virtualAffordanceBaseId\?: string;/);
+  assert.match(createPopoverSource, /:data-virtual-affordance-id="virtualAffordanceId\('name'\)"/);
+  assert.match(createPopoverSource, /:data-virtual-affordance-id="virtualAffordanceId\('description'\)"/);
+  assert.match(createPopoverSource, /:data-virtual-affordance-id="virtualAffordanceId\('create'\)"/);
   assert.match(primaryStatePortSource, /const virtualAffordanceId = computed/);
   assert.match(primaryStatePortSource, /const virtualAffordanceLabel = computed/);
 });

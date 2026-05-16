@@ -213,6 +213,7 @@
       :error="createError"
       :hint="createHint"
       :type-options="createTypeOptions"
+      :virtual-affordance-base-id="createPortVirtualAffordanceId"
       @update:name="emit('update:create-name', $event)"
       @update:type="emit('update:create-type', $event)"
       @update:color="emit('update:create-color', $event)"

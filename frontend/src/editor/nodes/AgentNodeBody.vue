@@ -152,6 +152,11 @@
     </div>
     <textarea
       class="node-card__surface-textarea"
+      :data-virtual-affordance-id="`editor.canvas.node.${nodeId}.taskInstruction`"
+      :data-virtual-affordance-label="`Agent prompt：${nodeId}`"
+      data-virtual-affordance-role="textbox"
+      data-virtual-affordance-zone="editor-canvas.node"
+      data-virtual-affordance-actions="type"
       :value="body.taskInstruction"
       :placeholder="t('nodeCard.nodePromptPlaceholder')"
       @pointerdown.stop

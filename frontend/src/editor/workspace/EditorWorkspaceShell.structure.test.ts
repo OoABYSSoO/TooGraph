@@ -681,26 +681,20 @@ test("EditorWorkspaceShell delegates run visual tab-state writes to the runtime 
   assert.doesNotMatch(pollRunSource, /\[tabId\]: run,/);
 });
 
-test("EditorWorkspaceShell applies virtual graph edit playback commands through the active editor tab", () => {
-  assert.match(componentSource, /import \{[\s\S]*applyGraphEditCommandToDocument,[\s\S]*buildGraphEditPlaybackPlan,[\s\S]*type GraphEditPlaybackPlan[\s\S]*\} from "\.\/graphEditPlaybackModel\.ts";/);
-  assert.match(componentSource, /const pendingGraphEditPlaybackPlans = new Map<string, \{ tabId: string; plan: GraphEditPlaybackPlan \}\>\(\);/);
-  assert.match(componentSource, /const pendingGraphEditPlaybackAppliedCommandIds = new Map<string, Set<string>>\(\);/);
+test("EditorWorkspaceShell only returns graph edit playback plans and leaves edits to real canvas events", () => {
+  assert.match(componentSource, /import \{[\s\S]*buildGraphEditPlaybackPlan,[\s\S]*type GraphEditIntent[\s\S]*\} from "\.\/graphEditPlaybackModel\.ts";/);
+  assert.doesNotMatch(componentSource, /applyGraphEditCommandToDocument/);
+  assert.doesNotMatch(componentSource, /type GraphEditPlaybackPlan[,}\s]/);
+  assert.doesNotMatch(componentSource, /pendingGraphEditPlaybackPlans/);
+  assert.doesNotMatch(componentSource, /pendingGraphEditPlaybackAppliedCommandIds/);
   assert.match(componentSource, /window\.addEventListener\("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener\);/);
-  assert.match(componentSource, /window\.addEventListener\("toograph:graph-edit-playback-open-node-menu", handleGraphEditPlaybackOpenNodeMenu as EventListener\);/);
-  assert.match(componentSource, /window\.addEventListener\("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener\);/);
   assert.match(componentSource, /window\.removeEventListener\("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener\);/);
-  assert.match(componentSource, /window\.removeEventListener\("toograph:graph-edit-playback-open-node-menu", handleGraphEditPlaybackOpenNodeMenu as EventListener\);/);
+  assert.doesNotMatch(componentSource, /toograph:graph-edit-playback-open-node-menu/);
+  assert.doesNotMatch(componentSource, /toograph:graph-edit-playback-apply-command/);
   assert.match(componentSource, /function handleGraphEditPlaybackPlanRequest\(event: Event\)/);
-  assert.match(componentSource, /function handleGraphEditPlaybackOpenNodeMenu\(event: Event\)/);
-  assert.match(componentSource, /openNodeCreationMenuForTab\(tab\.tabId, \{[\s\S]*sourceNodeId,[\s\S]*sourceStateKey,/);
   assert.match(componentSource, /openNewTab\(null, "replace"\);/);
   assert.match(componentSource, /const plan = buildGraphEditPlaybackPlan\(document, \{ operations: detail\.graphEditIntents \}\);/);
   assert.match(componentSource, /detail\.response = \{[\s\S]*ok: plan\.valid,[\s\S]*playbackSteps: plan\.playbackSteps,[\s\S]*issues: plan\.issues,[\s\S]*\};/);
-  assert.match(componentSource, /function handleGraphEditPlaybackApplyCommand\(event: Event\)/);
-  assert.match(componentSource, /const nextDocument = applyGraphEditCommandToDocument\(document, command\);/);
-  assert.match(componentSource, /markDocumentDirty\(pending\.tabId, nextDocument\);/);
-  assert.match(componentSource, /const appliedCommandIds = pendingGraphEditPlaybackAppliedCommandIds\.get\(requestId\);[\s\S]*appliedCommandIds\?\.add\(commandId\);/);
-  assert.match(componentSource, /if \(appliedCommandIds && appliedCommandIds\.size >= pending\.plan\.graphCommands\.length\) \{[\s\S]*pendingGraphEditPlaybackPlans\.delete\(requestId\);[\s\S]*pendingGraphEditPlaybackAppliedCommandIds\.delete\(requestId\);/);
 });
 
 test("EditorWorkspaceShell delegates document load tab-state writes to the runtime model", () => {

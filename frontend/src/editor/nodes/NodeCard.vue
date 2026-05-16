@@ -100,6 +100,7 @@
           <div class="node-card__text-editor-title">{{ textEditorTitle('title') }}</div>
           <ElInput
             ref="titleEditorInputRef"
+            :data-virtual-affordance-id="`editor.canvas.node.${nodeId}.title.input`"
             :model-value="textEditorDraftValue('title')"
             @update:model-value="handleTextEditorDraftInput('title', $event)"
             @keydown.enter.prevent="commitTextEditor('title')"
@@ -148,6 +149,7 @@
         <div class="node-card__text-editor-title">{{ textEditorTitle('description') }}</div>
         <ElInput
           ref="descriptionEditorInputRef"
+          :data-virtual-affordance-id="`editor.canvas.node.${nodeId}.description.input`"
           :model-value="textEditorDraftValue('description')"
           type="textarea"
           :autosize="{ minRows: 4, maxRows: 7 }"

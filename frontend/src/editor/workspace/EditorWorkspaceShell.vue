@@ -387,11 +387,8 @@ import {
   type SaveMetadataTarget,
 } from "./saveMetadataModel.ts";
 import {
-  applyGraphEditCommandToDocument,
   buildGraphEditPlaybackPlan,
-  type GraphEditCommand,
   type GraphEditIntent,
-  type GraphEditPlaybackPlan,
 } from "./graphEditPlaybackModel.ts";
 import {
   buildGraphReplayIntentsFromTargetGraph,
@@ -471,8 +468,6 @@ const runActivityHintByTabId = ref<Record<string, boolean>>({});
 const feedbackByTabId = ref<Record<string, WorkspaceRunFeedback | null>>({});
 const routeRestoreError = ref<string | null>(null);
 const nodeCreationMenuByTabId = ref<Record<string, NodeCreationMenuState>>({});
-const pendingGraphEditPlaybackPlans = new Map<string, { tabId: string; plan: GraphEditPlaybackPlan }>();
-const pendingGraphEditPlaybackAppliedCommandIds = new Map<string, Set<string>>();
 const graphReplayDebugDialogOpen = ref(false);
 const graphReplayDebugJsonText = ref("");
 const graphReplayDebugCompileResult = ref<GraphReplayTargetCompileResult | null>(null);
@@ -1169,20 +1164,6 @@ type GraphEditPlaybackPlanRequestDetail = {
   response?: unknown;
 };
 
-type GraphEditPlaybackOpenNodeMenuDetail = {
-  position?: unknown;
-  sourceNodeId?: unknown;
-  sourceStateKey?: unknown;
-  sourceAnchorKind?: unknown;
-  clientX?: unknown;
-  clientY?: unknown;
-};
-
-type GraphEditPlaybackApplyCommandDetail = {
-  requestId?: unknown;
-  commandId?: unknown;
-};
-
 function handleGraphEditPlaybackPlanRequest(event: Event) {
   const detail = (event as CustomEvent<GraphEditPlaybackPlanRequestDetail>).detail;
   if (!detail || !Array.isArray(detail.graphEditIntents)) {
@@ -1205,12 +1186,6 @@ function handleGraphEditPlaybackPlanRequest(event: Event) {
   }
 
   const plan = buildGraphEditPlaybackPlan(document, { operations: detail.graphEditIntents });
-  pendingGraphEditPlaybackPlans.delete(requestId);
-  pendingGraphEditPlaybackAppliedCommandIds.delete(requestId);
-  if (plan.valid) {
-    pendingGraphEditPlaybackPlans.set(requestId, { tabId: tab.tabId, plan });
-    pendingGraphEditPlaybackAppliedCommandIds.set(requestId, new Set());
-  }
   detail.response = {
     requestId,
     ok: plan.valid,
@@ -1219,92 +1194,11 @@ function handleGraphEditPlaybackPlanRequest(event: Event) {
   };
 }
 
-function handleGraphEditPlaybackOpenNodeMenu(event: Event) {
-  const detail = (event as CustomEvent<GraphEditPlaybackOpenNodeMenuDetail>).detail;
-  const tab = ensureGraphEditPlaybackTab();
-  if (!tab) {
-    return;
-  }
-  const position = normalizeGraphEditPlaybackMenuPosition(detail?.position);
-  const sourceNodeId = compactPlaybackText(detail?.sourceNodeId);
-  const sourceStateKey = compactPlaybackText(detail?.sourceStateKey);
-  const document = documentsByTabId.value[tab.tabId] ?? null;
-  openNodeCreationMenuForTab(tab.tabId, {
-    position,
-    sourceNodeId,
-    sourceStateKey,
-    sourceAnchorKind: detail?.sourceAnchorKind === "state-out" ? "state-out" : detail?.sourceAnchorKind === "flow-out" ? "flow-out" : undefined,
-    sourceValueType: sourceStateKey && document ? document.state_schema[sourceStateKey]?.type ?? null : null,
-    clientX: typeof detail?.clientX === "number" && Number.isFinite(detail.clientX) ? detail.clientX : undefined,
-    clientY: typeof detail?.clientY === "number" && Number.isFinite(detail.clientY) ? detail.clientY : undefined,
-  });
-}
-
 function ensureGraphEditPlaybackTab() {
   if (!activeTab.value && workspace.value.tabs.length === 0) {
     openNewTab(null, "replace");
   }
   return activeTab.value;
-}
-
-function normalizeGraphEditPlaybackMenuPosition(value: unknown): { x: number; y: number } {
-  if (value && typeof value === "object" && "x" in value && "y" in value) {
-    const position = value as { x?: unknown; y?: unknown };
-    if (typeof position.x === "number" && Number.isFinite(position.x) && typeof position.y === "number" && Number.isFinite(position.y)) {
-      return { x: position.x, y: position.y };
-    }
-  }
-  return { x: 160, y: 120 };
-}
-
-function compactPlaybackText(value: unknown) {
-  return String(value ?? "").trim() || undefined;
-}
-
-function handleGraphEditPlaybackApplyCommand(event: Event) {
-  const detail = (event as CustomEvent<GraphEditPlaybackApplyCommandDetail>).detail;
-  const requestId = String(detail?.requestId ?? "").trim();
-  const commandId = String(detail?.commandId ?? "").trim();
-  if (!requestId || !commandId) {
-    return;
-  }
-  const pending = pendingGraphEditPlaybackPlans.get(requestId);
-  if (!pending || guardGraphEditForTab(pending.tabId)) {
-    return;
-  }
-  const document = documentsByTabId.value[pending.tabId];
-  const command = pending.plan.graphCommands.find((candidate) => candidate.commandId === commandId) ?? null;
-  if (!document || !command) {
-    return;
-  }
-  const nextDocument = applyGraphEditCommandToDocument(document, command);
-  if (nextDocument === document) {
-    return;
-  }
-  markDocumentDirty(pending.tabId, nextDocument);
-  if (command.kind === "create_node") {
-    closeNodeCreationMenu(pending.tabId);
-  }
-  const focusNodeId = resolveGraphEditCommandFocusNodeId(command);
-  if (focusNodeId) {
-    focusNodeForTab(pending.tabId, focusNodeId);
-  }
-  const appliedCommandIds = pendingGraphEditPlaybackAppliedCommandIds.get(requestId);
-  appliedCommandIds?.add(commandId);
-  if (appliedCommandIds && appliedCommandIds.size >= pending.plan.graphCommands.length) {
-    pendingGraphEditPlaybackPlans.delete(requestId);
-    pendingGraphEditPlaybackAppliedCommandIds.delete(requestId);
-  }
-}
-
-function resolveGraphEditCommandFocusNodeId(command: GraphEditCommand): string {
-  if ("nodeId" in command) {
-    return command.nodeId;
-  }
-  if ("targetNodeId" in command && typeof command.targetNodeId === "string") {
-    return command.targetNodeId;
-  }
-  return "";
 }
 
 function updateWorkspace(nextWorkspace: PersistedEditorWorkspace) {
@@ -1556,18 +1450,12 @@ watch(
 
 onBeforeUnmount(() => {
   window.removeEventListener("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener);
-  window.removeEventListener("toograph:graph-edit-playback-open-node-menu", handleGraphEditPlaybackOpenNodeMenu as EventListener);
-  window.removeEventListener("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener);
-  pendingGraphEditPlaybackPlans.clear();
-  pendingGraphEditPlaybackAppliedCommandIds.clear();
   buddyContextStore.clearEditorSnapshot();
   teardownRunLifecycle();
 });
 
 onMounted(() => {
   window.addEventListener("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener);
-  window.addEventListener("toograph:graph-edit-playback-open-node-menu", handleGraphEditPlaybackOpenNodeMenu as EventListener);
-  window.addEventListener("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener);
   loadInitialWorkspaceResources();
   updateWorkspace(readPersistedEditorWorkspace());
   ensureTabViewportDrafts();

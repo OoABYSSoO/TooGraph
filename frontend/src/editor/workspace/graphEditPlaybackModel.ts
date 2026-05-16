@@ -200,6 +200,8 @@ export type GraphEditPlaybackStep = {
     | "focus_node_field"
     | "type_node_field"
     | "open_state_panel"
+    | "type_state_field"
+    | "commit_state_field"
     | "highlight_state_field"
     | "highlight_node_port"
     | "drag_state_edge_to_canvas"
@@ -210,8 +212,12 @@ export type GraphEditPlaybackStep = {
   endTarget?: string;
   label: string;
   commandId?: string;
+  commandIds?: string[];
   value?: string;
   position?: GraphPosition;
+  nodeId?: string;
+  stateKey?: string;
+  bindingMode?: GraphEditStateBindingMode;
   nodeType?: GraphEditNodeType;
   sourceNodeId?: string;
   sourceStateKey?: string;
@@ -562,17 +568,24 @@ function buildPlaybackStepsForCommands(commands: GraphEditCommand[]): GraphEditP
     const command = commands[index];
     if (command.kind === "create_node") {
       const nextCommand = commands[index + 1];
-      const pairedStateBinding = resolveCreationSourceStateBinding(command, nextCommand);
-      const pairedFlowConnection = resolveCreationSourceFlowConnection(command, nextCommand);
-      steps.push(...buildCreateNodePlaybackSteps(command, { includeTextSteps: false }));
-      if (pairedStateBinding) {
-        steps.push(...buildCreationSourceBindingApplySteps(pairedStateBinding));
+      const pairedCommand = resolveCreationSourceStateBinding(command, nextCommand) ?? resolveCreationSourceFlowConnection(command, nextCommand);
+      steps.push(...buildCreateNodePlaybackSteps(command, { includeTextSteps: false, pairedCommand }));
+      if (pairedCommand?.kind === "bind_state") {
+        steps.push(...buildCreationSourceBindingHighlightSteps(pairedCommand));
         index += 1;
-      } else if (pairedFlowConnection) {
-        steps.push(...buildCreationSourceFlowApplySteps(pairedFlowConnection));
+      } else if (pairedCommand?.kind === "connect_nodes") {
         index += 1;
       }
       steps.push(...nodeTextPlaybackSteps(command));
+      continue;
+    }
+    if (command.kind === "create_state") {
+      const nextCommand = commands[index + 1];
+      const pairedCommand = resolveCreatedStatePortBinding(command, nextCommand);
+      steps.push(...buildCreateStatePlaybackSteps(command, pairedCommand));
+      if (pairedCommand) {
+        index += 1;
+      }
       continue;
     }
     steps.push(...buildPlaybackStepsForCommand(command));
@@ -606,14 +619,22 @@ function resolveCreationSourceFlowConnection(command: GraphEditCreateNodeCommand
   return nextCommand;
 }
 
-function buildCreationSourceBindingApplySteps(command: GraphEditBindStateCommand): GraphEditPlaybackStep[] {
+function resolveCreatedStatePortBinding(command: GraphEditCreateStateCommand, nextCommand: GraphEditCommand | undefined) {
+  if (
+    !command.targetNodeId ||
+    !command.bindingMode ||
+    nextCommand?.kind !== "bind_state" ||
+    nextCommand.nodeId !== command.targetNodeId ||
+    nextCommand.stateKey !== command.stateKey ||
+    nextCommand.mode !== command.bindingMode
+  ) {
+    return null;
+  }
+  return nextCommand;
+}
+
+function buildCreationSourceBindingHighlightSteps(command: GraphEditBindStateCommand): GraphEditPlaybackStep[] {
   return [
-    {
-      kind: "apply_graph_command",
-      target: nodePortTarget(command.nodeId, command.mode, command.stateKey),
-      label: command.summary,
-      commandId: command.commandId,
-    },
     {
       kind: "highlight_node_port",
       target: nodePortTarget(command.nodeId, command.mode, command.stateKey),
@@ -622,59 +643,17 @@ function buildCreationSourceBindingApplySteps(command: GraphEditBindStateCommand
   ];
 }
 
-function buildCreationSourceFlowApplySteps(command: GraphEditConnectNodesCommand): GraphEditPlaybackStep[] {
-  return [
-    {
-      kind: "apply_graph_command",
-      target: `${canvasNodeTarget(command.sourceNodeId)}->${canvasNodeTarget(command.targetNodeId)}`,
-      label: command.summary,
-      commandId: command.commandId,
-    },
-  ];
-}
-
 function buildPlaybackStepsForCommand(command: GraphEditCommand): GraphEditPlaybackStep[] {
   switch (command.kind) {
     case "create_node":
-      return buildCreateNodePlaybackSteps(command, { includeTextSteps: true });
+      return buildCreateNodePlaybackSteps(command, { includeTextSteps: true, pairedCommand: null });
     case "update_node":
-      return [
-        ...nodeTextPlaybackSteps(command),
-        {
-          kind: "apply_graph_command",
-          target: command.nodeId,
-          label: command.summary,
-          commandId: command.commandId,
-        },
-      ];
+      return nodeTextPlaybackSteps(command);
     case "create_state":
-      return [
-        {
-          kind: "open_state_panel",
-          target: createStateTarget(command),
-          label: command.targetNodeId ? `Open the ${command.bindingMode === "read" ? "input" : "output"} state editor.` : "Open the state panel.",
-        },
-        {
-          kind: "apply_graph_command",
-          target: createStateTarget(command),
-          label: command.summary,
-          commandId: command.commandId,
-        },
-        {
-          kind: "highlight_state_field",
-          target: stateFieldTarget(command),
-          label: `Highlight state ${command.name}.`,
-        },
-      ];
+      return buildCreateStatePlaybackSteps(command, null);
     case "bind_state":
       return [
         ...stateBindingGestureSteps(command),
-        {
-          kind: "apply_graph_command",
-          target: nodePortTarget(command.nodeId, command.mode, command.stateKey),
-          label: command.summary,
-          commandId: command.commandId,
-        },
         {
           kind: "highlight_node_port",
           target: nodePortTarget(command.nodeId, command.mode, command.stateKey),
@@ -689,14 +668,86 @@ function buildPlaybackStepsForCommand(command: GraphEditCommand): GraphEditPlayb
           endTarget: flowInputAnchorTarget(command.targetNodeId),
           label: command.summary,
         },
-        {
-          kind: "apply_graph_command",
-          target: `${canvasNodeTarget(command.sourceNodeId)}->${canvasNodeTarget(command.targetNodeId)}`,
-          label: command.summary,
-          commandId: command.commandId,
-        },
       ];
   }
+}
+
+function buildCreateStatePlaybackSteps(command: GraphEditCreateStateCommand, pairedCommand: GraphEditBindStateCommand | null): GraphEditPlaybackStep[] {
+  if (!command.targetNodeId || !command.bindingMode) {
+    return [
+      {
+        kind: "open_state_panel",
+        target: createStateTarget(command),
+        label: "Open the state panel.",
+      },
+      {
+        kind: "apply_graph_command",
+        target: createStateTarget(command),
+        label: command.summary,
+        commandId: command.commandId,
+      },
+      {
+        kind: "highlight_state_field",
+        target: stateFieldTarget(command),
+        label: `Highlight state ${command.name}.`,
+        stateKey: command.stateKey,
+      },
+    ];
+  }
+
+  const createTarget = createStateTarget(command);
+  const commandIds = pairedCommand ? [command.commandId, pairedCommand.commandId] : [command.commandId];
+  const steps: GraphEditPlaybackStep[] = [
+    {
+      kind: "open_state_panel",
+      target: createTarget,
+      label: `Open the ${command.bindingMode === "read" ? "input" : "output"} state editor.`,
+      nodeId: command.targetNodeId,
+      stateKey: command.stateKey,
+      bindingMode: command.bindingMode,
+    },
+    {
+      kind: "type_state_field",
+      target: `${createTarget}.name`,
+      label: `Type state ${command.name}.`,
+      value: command.name,
+      nodeId: command.targetNodeId,
+      stateKey: command.stateKey,
+      bindingMode: command.bindingMode,
+    },
+  ];
+  if (command.description) {
+    steps.push({
+      kind: "type_state_field",
+      target: `${createTarget}.description`,
+      label: `Type state ${command.name} description.`,
+      value: command.description,
+      nodeId: command.targetNodeId,
+      stateKey: command.stateKey,
+      bindingMode: command.bindingMode,
+    });
+  }
+  steps.push(
+    {
+      kind: "commit_state_field",
+      target: `${createTarget}.create`,
+      label: command.summary,
+      commandId: command.commandId,
+      commandIds,
+      nodeId: command.targetNodeId,
+      stateKey: command.stateKey,
+      bindingMode: command.bindingMode,
+    },
+    {
+      kind: "highlight_node_port",
+      target: nodePortTarget(command.targetNodeId, command.bindingMode, command.stateKey),
+      label: `Show ${command.stateKey} on the ${command.bindingMode} port.`,
+      stateKey: command.stateKey,
+      nodeId: command.targetNodeId,
+      bindingMode: command.bindingMode,
+    },
+  );
+  return steps;
 }
 
 function nodeCreationGestureSteps(command: GraphEditCreateNodeCommand): GraphEditPlaybackStep[] {
@@ -740,7 +791,11 @@ function nodeCreationGestureSteps(command: GraphEditCreateNodeCommand): GraphEdi
   ];
 }
 
-function buildCreateNodePlaybackSteps(command: GraphEditCreateNodeCommand, options: { includeTextSteps: boolean }): GraphEditPlaybackStep[] {
+function buildCreateNodePlaybackSteps(
+  command: GraphEditCreateNodeCommand,
+  options: { includeTextSteps: boolean; pairedCommand: GraphEditBindStateCommand | GraphEditConnectNodesCommand | null },
+): GraphEditPlaybackStep[] {
+  const commandIds = options.pairedCommand ? [command.commandId, options.pairedCommand.commandId] : [command.commandId];
   const steps: GraphEditPlaybackStep[] = [
     ...nodeCreationGestureSteps(command),
     {
@@ -748,6 +803,8 @@ function buildCreateNodePlaybackSteps(command: GraphEditCreateNodeCommand, optio
       target: `editor.nodeType.${command.nodeType}`,
       label: `Choose ${command.nodeType} node.`,
       commandId: command.commandId,
+      commandIds,
+      nodeId: command.nodeId,
     },
   ];
   if (options.includeTextSteps) {

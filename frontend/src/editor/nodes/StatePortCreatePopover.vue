@@ -12,6 +12,7 @@
           <span class="node-card__control-label">{{ t("nodeCard.name") }}</span>
           <ElInput
             :aria-label="t('nodeCard.name')"
+            :data-virtual-affordance-id="virtualAffordanceId('name')"
             :model-value="draft.definition.name"
             @update:model-value="emit('update:name', $event)"
           />
@@ -55,6 +56,7 @@
         <span class="node-card__control-label">{{ t("nodeCard.description") }}</span>
         <ElInput
           :aria-label="t('nodeCard.description')"
+          :data-virtual-affordance-id="virtualAffordanceId('description')"
           type="textarea"
           :rows="2"
           :model-value="draft.definition.description"
@@ -72,6 +74,7 @@
         <button
           type="button"
           class="node-card__port-picker-button"
+          :data-virtual-affordance-id="virtualAffordanceId('cancel')"
           @pointerdown.stop
           @click.stop="emit('cancel')"
         >
@@ -80,6 +83,7 @@
         <button
           type="button"
           class="node-card__port-picker-button node-card__port-picker-button--primary"
+          :data-virtual-affordance-id="virtualAffordanceId('create')"
           @pointerdown.stop
           @click.stop="emit('create')"
         >
@@ -104,6 +108,7 @@ const props = defineProps<{
   error: string | null;
   hint: string;
   typeOptions: string[];
+  virtualAffordanceBaseId?: string;
 }>();
 
 const emit = defineEmits<{
@@ -124,6 +129,10 @@ const selectedColorStyle = computed(() => {
   const matchedOption = colorOptions.value.find((option) => option.value === selectedColor);
   return { backgroundColor: matchedOption?.swatch ?? selectedColor };
 });
+
+function virtualAffordanceId(field: "name" | "description" | "cancel" | "create") {
+  return props.virtualAffordanceBaseId ? `${props.virtualAffordanceBaseId}.${field}` : undefined;
+}
 </script>
 
 <style scoped>

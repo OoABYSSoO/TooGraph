@@ -19,7 +19,7 @@ test("AgentNodeBody owns agent body presentation and forwards parent side effect
   assert.match(componentSource, /<AgentSkillPicker[\s\S]*:selected-skill-key="selectedSkillKey"[\s\S]*:available-skill-definitions="availableSkillDefinitions"[\s\S]*:breakpoint-enabled="breakpointEnabled"[\s\S]*@update:selected-skill="emit\('select-skill', \$event\)"[\s\S]*@update:breakpoint-enabled="emit\('update:breakpoint-enabled', \$event\)"/);
   assert.doesNotMatch(componentSource, /attachedSkillBadges/);
   assert.doesNotMatch(componentSource, /attach-skill/);
-  assert.match(componentSource, /class="node-card__surface node-card__prompt-surface"[\s\S]*<textarea[\s\S]*class="node-card__surface-textarea"[\s\S]*:value="body\.taskInstruction"[\s\S]*@input="emit\('task-input', \$event\)"/);
+  assert.match(componentSource, /class="node-card__surface node-card__prompt-surface"[\s\S]*<textarea[\s\S]*class="node-card__surface-textarea"[\s\S]*:data-virtual-affordance-id="`editor\.canvas\.node\.\$\{nodeId\}\.taskInstruction`"[\s\S]*:value="body\.taskInstruction"[\s\S]*@input="emit\('task-input', \$event\)"/);
   assert.match(componentSource, /class="node-card__skill-instruction-capsule"[\s\S]*@update:model-value="emit\('update-skill-instruction'/);
   assert.match(componentSource, /defineExpose\(\{[\s\S]*collapseModelSelect[\s\S]*\}\);/);
   assert.match(componentSource, /\.node-card__surface \{[\s\S]*border-radius:\s*24px;/);

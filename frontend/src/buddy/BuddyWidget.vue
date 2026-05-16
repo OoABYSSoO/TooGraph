@@ -1,19 +1,5 @@
 <template>
   <div class="buddy-widget" aria-live="polite">
-    <svg
-      v-if="virtualGraphDragLine"
-      class="buddy-widget__graph-drag-line"
-      :class="`buddy-widget__graph-drag-line--${virtualGraphDragLine.tone}`"
-      :viewBox="`0 0 ${viewport.width} ${viewport.height}`"
-      aria-hidden="true"
-    >
-      <line
-        :x1="virtualGraphDragLine.start.x"
-        :y1="virtualGraphDragLine.start.y"
-        :x2="virtualGraphDragLine.end.x"
-        :y2="virtualGraphDragLine.end.y"
-      />
-    </svg>
     <button
       v-if="isVirtualCursorRendered"
       type="button"
@@ -587,7 +573,6 @@ type VirtualCursorPhase = "hidden" | "launching" | "active" | "returning";
 type BuddyIdleAnimationAction = "tail-switch" | "random-move" | "virtual-cursor-orbit" | "virtual-cursor-chase";
 type BuddyIdleRunOptions = { force?: boolean };
 type VirtualCursorIdleActionMode = "none" | "orbit" | "chase";
-type VirtualGraphDragLineTone = "state" | "flow";
 type BuddyModelOption = {
   value: string;
   label: string;
@@ -660,7 +645,6 @@ const virtualCursorRotateDurationMs = ref(BUDDY_VIRTUAL_CURSOR_ROTATE_TRANSITION
 const virtualCursorDetached = ref(false);
 const virtualCursorDragging = ref(false);
 const virtualCursorIdleActionMode = ref<VirtualCursorIdleActionMode>("none");
-const virtualGraphDragLine = ref<{ start: BuddyPosition; end: BuddyPosition; tone: VirtualGraphDragLineTone } | null>(null);
 const isPanelOpen = ref(false);
 const draft = ref("");
 const avatarHopCycle = ref(0);
@@ -2386,6 +2370,11 @@ type GraphEditPlaybackPlanRequestResponse = {
   issues: string[];
 };
 
+type GraphEditPlaybackUiState = {
+  nodeIdAliases: Map<string, string>;
+  stateKeyAliases: Map<string, string>;
+};
+
 async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOperation) {
   if (operation.kind !== "graph_edit") {
     return;
@@ -2402,60 +2391,91 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
   if (!response?.ok) {
     return;
   }
+  const playbackState = createGraphEditPlaybackUiState();
+  await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
   for (const step of response.playbackSteps) {
-    const targetElement = resolveGraphEditPlaybackStepElement(step) ?? affordance?.element ?? null;
+    const targetElement = resolveGraphEditPlaybackStepElement(step, playbackState) ?? affordance?.element ?? null;
     if (isGraphEditPlaybackDragStep(step)) {
-      await executeGraphEditPlaybackDragStep(step, targetElement);
+      await executeGraphEditPlaybackDragStep(step, targetElement, playbackState);
     } else if (targetElement) {
       await moveVirtualCursorToElement(targetElement);
     }
     if (step.kind === "open_node_creation_menu") {
       if (!step.sourceAnchorKind && targetElement) {
-        dispatchVirtualPointerTap(targetElement);
-        await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
-        dispatchVirtualPointerTap(targetElement);
+        dispatchVirtualDoubleClick(targetElement);
       }
-      dispatchGraphEditPlaybackOpenMenu(step, targetElement);
-    }
-    if (step.kind === "choose_node_type" && targetElement) {
-      dispatchVirtualPointerTap(targetElement);
-    }
-    if (step.commandId) {
-      dispatchGraphEditPlaybackApplyCommand(requestId, step.commandId);
-      if (step.kind === "apply_graph_command") {
-        clearVirtualGraphDragLine();
-      }
+    } else if (step.kind === "choose_node_type" && targetElement) {
+      const beforeNodeIds = listGraphEditPlaybackNodeAffordanceIds();
+      dispatchVirtualClick(targetElement);
+      await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
+      rememberCreatedNodeAlias(step, beforeNodeIds, playbackState);
+    } else if (step.kind === "open_state_panel" && targetElement) {
+      dispatchVirtualClick(targetElement);
+    } else if (step.kind === "focus_node_field" && targetElement) {
+      await focusGraphEditPlaybackField(step, targetElement, playbackState);
+    } else if (step.kind === "type_node_field" || step.kind === "type_state_field") {
+      await typeGraphEditPlaybackField(step, playbackState);
+    } else if (step.kind === "commit_state_field" && targetElement) {
+      const beforeStateKeys = listGraphEditPlaybackPortStateKeys(step, playbackState);
+      dispatchVirtualClick(targetElement);
+      await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
+      rememberCreatedStateAlias(step, beforeStateKeys, playbackState);
     }
     await waitForVirtualOperation(resolveGraphEditPlaybackStepDelayMs(step));
   }
-  clearVirtualGraphDragLine();
+  virtualCursorDragging.value = false;
 }
 
 function isGraphEditPlaybackDragStep(step: GraphEditPlaybackStep) {
   return step.kind === "drag_state_edge_to_canvas" || step.kind === "drag_state_edge_to_node" || step.kind === "draw_flow_edge";
 }
 
-async function executeGraphEditPlaybackDragStep(step: GraphEditPlaybackStep, targetElement: HTMLElement | null) {
+function createGraphEditPlaybackUiState(): GraphEditPlaybackUiState {
+  return {
+    nodeIdAliases: new Map(),
+    stateKeyAliases: new Map(),
+  };
+}
+
+async function executeGraphEditPlaybackDragStep(
+  step: GraphEditPlaybackStep,
+  targetElement: HTMLElement | null,
+  playbackState: GraphEditPlaybackUiState,
+) {
   if (!targetElement) {
     return;
   }
   await moveVirtualCursorToElement(targetElement);
+  const resolvedStep = resolveAliasedGraphEditPlaybackStep(step, playbackState);
+  virtualCursorDragging.value = true;
+  await dispatchVirtualGraphDragPointerEvents(resolvedStep, targetElement);
+  virtualCursorDragging.value = false;
+}
+
+async function dispatchVirtualGraphDragPointerEvents(step: GraphEditPlaybackStep, targetElement: HTMLElement) {
+  const pointerSurface = resolveVirtualOperationAffordance("editor.canvas.surface")?.element ?? targetElement;
   const startPoint = resolveElementCenterPoint(targetElement);
   const endPoint = resolveGraphEditPlaybackDragEndPoint(step) ?? startPoint;
-  virtualCursorDragging.value = true;
-  virtualGraphDragLine.value = {
-    start: startPoint,
-    end: startPoint,
-    tone: step.kind === "draw_flow_edge" ? "flow" : "state",
-  };
-  const flightWaitMs = moveVirtualCursorToClientPoint(endPoint);
-  virtualGraphDragLine.value = {
-    start: startPoint,
-    end: endPoint,
-    tone: step.kind === "draw_flow_edge" ? "flow" : "state",
-  };
-  await waitForVirtualOperation(flightWaitMs);
-  virtualCursorDragging.value = false;
+  dispatchVirtualPointerEvent(targetElement, "pointerdown", startPoint.x, startPoint.y);
+  const dragPoints = buildVirtualDragPoints(startPoint, endPoint);
+  for (const point of dragPoints) {
+    dispatchVirtualPointerEvent(pointerSurface, "pointermove", point.x, point.y);
+    await waitForVirtualOperation(moveVirtualCursorToClientPoint(point, { durationMs: 80 }));
+  }
+  dispatchVirtualPointerEvent(pointerSurface, "pointerup", endPoint.x, endPoint.y);
+}
+
+function buildVirtualDragPoints(startPoint: BuddyPosition, endPoint: BuddyPosition) {
+  const points: BuddyPosition[] = [];
+  const steps = 5;
+  for (let index = 1; index <= steps; index += 1) {
+    const progress = index / steps;
+    points.push({
+      x: startPoint.x + (endPoint.x - startPoint.x) * progress,
+      y: startPoint.y + (endPoint.y - startPoint.y) * progress,
+    });
+  }
+  return points;
 }
 
 function resolveGraphEditPlaybackDragEndPoint(step: GraphEditPlaybackStep): BuddyPosition | null {
@@ -2468,11 +2488,6 @@ function resolveGraphEditPlaybackDragEndPoint(step: GraphEditPlaybackStep): Budd
   }
   const surface = resolveVirtualOperationAffordance("editor.canvas.surface");
   return surface ? resolveElementCenterPoint(surface.element) : null;
-}
-
-function clearVirtualGraphDragLine() {
-  virtualGraphDragLine.value = null;
-  virtualCursorDragging.value = false;
 }
 
 function requestGraphEditPlaybackPlan(input: { requestId: string; graphEditIntents: GraphEditIntent[] }): GraphEditPlaybackPlanRequestResponse | null {
@@ -2492,67 +2507,169 @@ function requestGraphEditPlaybackPlan(input: { requestId: string; graphEditInten
   return detail.response;
 }
 
-function dispatchGraphEditPlaybackOpenMenu(step: GraphEditPlaybackStep, targetElement: HTMLElement | null) {
-  if (typeof window === "undefined") {
-    return;
-  }
-  const rect = targetElement?.getBoundingClientRect();
-  window.dispatchEvent(
-    new CustomEvent("toograph:graph-edit-playback-open-node-menu", {
-      detail: {
-        position: step.position,
-        nodeType: step.nodeType,
-        sourceNodeId: step.sourceNodeId,
-        sourceStateKey: step.sourceStateKey,
-        sourceAnchorKind: step.sourceAnchorKind,
-        clientX: rect ? rect.left + rect.width / 2 : undefined,
-        clientY: rect ? rect.top + rect.height / 2 : undefined,
-      },
-    }),
-  );
-}
-
-function dispatchGraphEditPlaybackApplyCommand(requestId: string, commandId: string) {
-  if (typeof window === "undefined") {
-    return;
-  }
-  window.dispatchEvent(
-    new CustomEvent("toograph:graph-edit-playback-apply-command", {
-      detail: { requestId, commandId },
-    }),
-  );
-}
-
-function resolveGraphEditPlaybackStepElement(step: GraphEditPlaybackStep): HTMLElement | null {
-  const exactAffordance = resolveVirtualOperationAffordance(step.target);
+function resolveGraphEditPlaybackStepElement(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState): HTMLElement | null {
+  const targetId = resolveAliasedGraphEditPlaybackTarget(step.target, playbackState);
+  const exactAffordance = resolveVirtualOperationAffordance(targetId);
   if (exactAffordance) {
     return exactAffordance.element;
   }
-  if (step.target.startsWith("editor.canvas.")) {
-    return resolveVirtualOperationAffordance(step.target)?.element ?? null;
+  if (targetId.startsWith("editor.canvas.")) {
+    return resolveVirtualOperationAffordance(targetId)?.element ?? null;
   }
-  const nodeId = resolveGraphEditPlaybackStepNodeId(step);
+  const nodeId = resolveGraphEditPlaybackTargetNodeId(targetId);
   if (nodeId) {
     return resolveVirtualOperationAffordance(`editor.canvas.node.${nodeId}`)?.element ?? null;
   }
   return resolveVirtualOperationAffordance("editor.canvas.surface")?.element ?? null;
 }
 
-function resolveGraphEditPlaybackStepNodeId(step: GraphEditPlaybackStep): string {
-  if (step.target.includes("->")) {
-    return "";
+function resolveGraphEditPlaybackTargetNodeId(targetId: string): string {
+  return targetId.match(/^editor\.canvas\.node\.([^.]+)/)?.[1] ?? "";
+}
+
+function resolveAliasedGraphEditPlaybackStep(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState): GraphEditPlaybackStep {
+  return {
+    ...step,
+    target: resolveAliasedGraphEditPlaybackTarget(step.target, playbackState),
+    endTarget: step.endTarget ? resolveAliasedGraphEditPlaybackTarget(step.endTarget, playbackState) : undefined,
+    sourceNodeId: step.sourceNodeId ? playbackState.nodeIdAliases.get(step.sourceNodeId) ?? step.sourceNodeId : undefined,
+    sourceStateKey: step.sourceStateKey ? playbackState.stateKeyAliases.get(step.sourceStateKey) ?? step.sourceStateKey : undefined,
+  };
+}
+
+function resolveAliasedGraphEditPlaybackTarget(targetId: string, playbackState: GraphEditPlaybackUiState) {
+  let resolvedTargetId = targetId;
+  for (const [plannedNodeId, actualNodeId] of playbackState.nodeIdAliases) {
+    resolvedTargetId = replaceAllLiteral(resolvedTargetId, `editor.canvas.node.${plannedNodeId}`, `editor.canvas.node.${actualNodeId}`);
+    resolvedTargetId = replaceAllLiteral(resolvedTargetId, `editor.canvas.anchor.${plannedNodeId}:`, `editor.canvas.anchor.${actualNodeId}:`);
   }
-  const [nodeId = ""] = step.target.split(".", 1);
-  return nodeId.startsWith("input_") || nodeId.startsWith("agent_") || nodeId.startsWith("output_") || nodeId.startsWith("condition_")
-    ? nodeId
-    : "";
+  for (const [plannedStateKey, actualStateKey] of playbackState.stateKeyAliases) {
+    resolvedTargetId = replaceAllLiteral(resolvedTargetId, `:state-out:${plannedStateKey}`, `:state-out:${actualStateKey}`);
+    resolvedTargetId = replaceAllLiteral(resolvedTargetId, `:state-in:${plannedStateKey}`, `:state-in:${actualStateKey}`);
+    resolvedTargetId = replaceAllLiteral(resolvedTargetId, `.port.input.${plannedStateKey}`, `.port.input.${actualStateKey}`);
+    resolvedTargetId = replaceAllLiteral(resolvedTargetId, `.port.output.${plannedStateKey}`, `.port.output.${actualStateKey}`);
+  }
+  return resolvedTargetId;
+}
+
+function replaceAllLiteral(value: string, search: string, replacement: string) {
+  return value.split(search).join(replacement);
+}
+
+async function focusGraphEditPlaybackField(
+  step: GraphEditPlaybackStep,
+  targetElement: HTMLElement,
+  playbackState: GraphEditPlaybackUiState,
+) {
+  const targetId = resolveAliasedGraphEditPlaybackTarget(step.target, playbackState);
+  if (targetId.endsWith(".title") || targetId.endsWith(".description")) {
+    dispatchVirtualPointerTap(targetElement);
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
+    dispatchVirtualPointerTap(targetElement);
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
+  } else {
+    dispatchVirtualClick(targetElement);
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
+  }
+  resolveVirtualOperationTextInput(targetId)?.focus();
+}
+
+async function typeGraphEditPlaybackField(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState) {
+  const targetId = resolveAliasedGraphEditPlaybackTarget(step.target, playbackState);
+  const input = resolveVirtualOperationTextInput(targetId);
+  if (!input) {
+    return;
+  }
+  await moveVirtualCursorToElement(input);
+  input.focus();
+  input.value = step.value ?? "";
+  dispatchVirtualInputEvents(input, "insertReplacementText", step.value ?? "");
+  if (targetId.endsWith(".title") || targetId.endsWith(".description")) {
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
+    dispatchGraphEditPlaybackTextCommit(input, targetId);
+  }
+}
+
+function dispatchGraphEditPlaybackTextCommit(element: HTMLElement, targetId: string) {
+  const eventInit = {
+    bubbles: true,
+    cancelable: true,
+    key: "Enter",
+    code: "Enter",
+    ctrlKey: targetId.endsWith(".description"),
+    metaKey: false,
+  };
+  element.dispatchEvent(new KeyboardEvent("keydown", eventInit));
+  element.dispatchEvent(new KeyboardEvent("keyup", eventInit));
+}
+
+function listGraphEditPlaybackNodeAffordanceIds() {
+  if (typeof document === "undefined") {
+    return new Set<string>();
+  }
+  const nodeIds = new Set<string>();
+  document.querySelectorAll<HTMLElement>("[data-virtual-affordance-id]").forEach((element) => {
+    const targetId = element.dataset.virtualAffordanceId ?? "";
+    const nodeId = targetId.match(/^editor\.canvas\.node\.([^.]+)$/)?.[1] ?? "";
+    if (nodeId) {
+      nodeIds.add(nodeId);
+    }
+  });
+  return nodeIds;
+}
+
+function rememberCreatedNodeAlias(step: GraphEditPlaybackStep, beforeNodeIds: Set<string>, playbackState: GraphEditPlaybackUiState) {
+  const plannedNodeId = step.nodeId ?? "";
+  if (!plannedNodeId || playbackState.nodeIdAliases.has(plannedNodeId)) {
+    return;
+  }
+  const createdNodeIds = [...listGraphEditPlaybackNodeAffordanceIds()].filter((nodeId) => !beforeNodeIds.has(nodeId));
+  if (createdNodeIds.length === 1) {
+    playbackState.nodeIdAliases.set(plannedNodeId, createdNodeIds[0]!);
+  }
+}
+
+function listGraphEditPlaybackPortStateKeys(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState) {
+  if (typeof document === "undefined") {
+    return new Set<string>();
+  }
+  const plannedNodeId = step.nodeId ?? "";
+  const nodeId = plannedNodeId ? playbackState.nodeIdAliases.get(plannedNodeId) ?? plannedNodeId : "";
+  const side = step.bindingMode === "read" ? "input" : step.bindingMode === "write" ? "output" : "";
+  if (!nodeId || !side) {
+    return new Set<string>();
+  }
+  const stateKeys = new Set<string>();
+  const prefix = `editor.canvas.node.${nodeId}.port.${side}.`;
+  document.querySelectorAll<HTMLElement>("[data-virtual-affordance-id]").forEach((element) => {
+    const targetId = element.dataset.virtualAffordanceId ?? "";
+    if (!targetId.startsWith(prefix) || targetId.endsWith(".create") || targetId.endsWith(".remove")) {
+      return;
+    }
+    const stateKey = targetId.slice(prefix.length);
+    if (stateKey && !stateKey.includes(".")) {
+      stateKeys.add(stateKey);
+    }
+  });
+  return stateKeys;
+}
+
+function rememberCreatedStateAlias(step: GraphEditPlaybackStep, beforeStateKeys: Set<string>, playbackState: GraphEditPlaybackUiState) {
+  const plannedStateKey = step.stateKey ?? "";
+  if (!plannedStateKey || playbackState.stateKeyAliases.has(plannedStateKey)) {
+    return;
+  }
+  const createdStateKeys = [...listGraphEditPlaybackPortStateKeys(step, playbackState)].filter((stateKey) => !beforeStateKeys.has(stateKey));
+  if (createdStateKeys.length === 1) {
+    playbackState.stateKeyAliases.set(plannedStateKey, createdStateKeys[0]!);
+  }
 }
 
 function resolveGraphEditPlaybackStepDelayMs(step: GraphEditPlaybackStep): number {
   if (step.kind === "apply_graph_command") {
     return 180;
   }
-  if (step.kind === "type_node_field") {
+  if (step.kind === "type_node_field" || step.kind === "type_state_field" || step.kind === "commit_state_field") {
     return 160;
   }
   return 90;
@@ -2579,7 +2696,15 @@ function resolveVirtualOperationAffordance(targetId: string): { element: HTMLEle
 function resolveVirtualOperationTextInput(targetId: string): HTMLInputElement | HTMLTextAreaElement | null {
   const affordance = resolveVirtualOperationAffordance(targetId);
   if (!affordance) {
-    return null;
+    const inputAffordance = resolveVirtualOperationAffordance(`${targetId}.input`);
+    if (!inputAffordance) {
+      return null;
+    }
+    if (isVirtualOperationTextInputElement(inputAffordance.element)) {
+      return inputAffordance.element;
+    }
+    const nestedInput = inputAffordance.element.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea");
+    return nestedInput && isVirtualOperationTextInputElement(nestedInput) ? nestedInput : null;
   }
   if (isVirtualOperationTextInputElement(affordance.element)) {
     return affordance.element;
@@ -2598,8 +2723,8 @@ async function moveVirtualCursorToElement(element: HTMLElement) {
   await waitForVirtualOperation(flightWaitMs);
 }
 
-function moveVirtualCursorToClientPoint(point: BuddyPosition) {
-  return moveVirtualCursorToWithArmedTransition(resolveVirtualCursorPositionForClientPoint(point));
+function moveVirtualCursorToClientPoint(point: BuddyPosition, options: { durationMs?: number } = {}) {
+  return moveVirtualCursorToWithArmedTransition(resolveVirtualCursorPositionForClientPoint(point), options);
 }
 
 function resolveElementCenterPoint(element: HTMLElement): BuddyPosition {
@@ -2650,6 +2775,23 @@ function dispatchVirtualClick(element: HTMLElement) {
   );
 }
 
+function dispatchVirtualDoubleClick(element: HTMLElement) {
+  const rect = element.getBoundingClientRect();
+  const clientX = rect.left + rect.width / 2;
+  const clientY = rect.top + rect.height / 2;
+  dispatchVirtualPointerTap(element);
+  dispatchVirtualPointerTap(element);
+  element.dispatchEvent(
+    new MouseEvent("dblclick", {
+      bubbles: true,
+      cancelable: true,
+      clientX,
+      clientY,
+      view: window,
+    }),
+  );
+}
+
 function dispatchVirtualPointerTap(element: HTMLElement) {
   const rect = element.getBoundingClientRect();
   const clientX = rect.left + rect.width / 2;
@@ -2667,7 +2809,7 @@ function dispatchVirtualInputEvents(element: HTMLInputElement | HTMLTextAreaElem
   element.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-function dispatchVirtualPointerEvent(element: HTMLElement, type: "pointerdown" | "pointerup", clientX: number, clientY: number) {
+function dispatchVirtualPointerEvent(element: HTMLElement, type: "pointerdown" | "pointermove" | "pointerup", clientX: number, clientY: number) {
   const eventInit = {
     bubbles: true,
     cancelable: true,
@@ -2676,7 +2818,7 @@ function dispatchVirtualPointerEvent(element: HTMLElement, type: "pointerdown" |
     pointerId: 1,
     pointerType: "mouse",
     button: 0,
-    buttons: type === "pointerdown" ? 1 : 0,
+    buttons: type === "pointerup" ? 0 : 1,
     view: window,
   };
   if (typeof PointerEvent === "function") {
