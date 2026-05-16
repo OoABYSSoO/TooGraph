@@ -417,9 +417,14 @@ test("BuddyWidget executes virtual UI operation events through the virtual curso
   assert.match(componentSource, /async function executeBuddyVirtualGraphEditOperation\(operation: BuddyVirtualOperation\)/);
   assert.match(componentSource, /requestGraphEditPlaybackPlan\(\{[\s\S]*requestId,[\s\S]*graphEditIntents: operation\.graphEditIntents,[\s\S]*\}\);/);
   assert.match(componentSource, /window\.dispatchEvent\(new CustomEvent\("toograph:graph-edit-playback-plan-request", \{ detail \}\)\);/);
+  assert.match(componentSource, /v-if="virtualGraphDragLine"/);
+  assert.match(componentSource, /class="buddy-widget__graph-drag-line"/);
+  assert.match(componentSource, /executeGraphEditPlaybackDragStep\(step, targetElement\)/);
+  assert.match(componentSource, /dispatchVirtualPointerTap\(targetElement\);[\s\S]*dispatchVirtualPointerTap\(targetElement\);/);
+  assert.match(componentSource, /if \(step\.kind === "choose_node_type" && targetElement\) \{[\s\S]*dispatchVirtualPointerTap\(targetElement\);/);
   assert.match(componentSource, /dispatchGraphEditPlaybackOpenMenu\(step, targetElement\);/);
   assert.match(componentSource, /new CustomEvent\("toograph:graph-edit-playback-open-node-menu"/);
-  assert.match(componentSource, /dispatchGraphEditPlaybackApplyCommand\(requestId, step\.commandId\);/);
+  assert.match(componentSource, /if \(step\.commandId\) \{[\s\S]*dispatchGraphEditPlaybackApplyCommand\(requestId, step\.commandId\);/);
   assert.match(componentSource, /window\.dispatchEvent\([\s\S]*new CustomEvent\("toograph:graph-edit-playback-apply-command"/);
   assert.match(componentSource, /function resolveVirtualOperationAffordance\(targetId: string\)/);
   assert.match(componentSource, /const exactAffordance = resolveVirtualOperationAffordance\(step\.target\);/);

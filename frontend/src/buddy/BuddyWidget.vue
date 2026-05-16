@@ -1,5 +1,19 @@
 <template>
   <div class="buddy-widget" aria-live="polite">
+    <svg
+      v-if="virtualGraphDragLine"
+      class="buddy-widget__graph-drag-line"
+      :class="`buddy-widget__graph-drag-line--${virtualGraphDragLine.tone}`"
+      :viewBox="`0 0 ${viewport.width} ${viewport.height}`"
+      aria-hidden="true"
+    >
+      <line
+        :x1="virtualGraphDragLine.start.x"
+        :y1="virtualGraphDragLine.start.y"
+        :x2="virtualGraphDragLine.end.x"
+        :y2="virtualGraphDragLine.end.y"
+      />
+    </svg>
     <button
       v-if="isVirtualCursorRendered"
       type="button"
@@ -573,6 +587,7 @@ type VirtualCursorPhase = "hidden" | "launching" | "active" | "returning";
 type BuddyIdleAnimationAction = "tail-switch" | "random-move" | "virtual-cursor-orbit" | "virtual-cursor-chase";
 type BuddyIdleRunOptions = { force?: boolean };
 type VirtualCursorIdleActionMode = "none" | "orbit" | "chase";
+type VirtualGraphDragLineTone = "state" | "flow";
 type BuddyModelOption = {
   value: string;
   label: string;
@@ -645,6 +660,7 @@ const virtualCursorRotateDurationMs = ref(BUDDY_VIRTUAL_CURSOR_ROTATE_TRANSITION
 const virtualCursorDetached = ref(false);
 const virtualCursorDragging = ref(false);
 const virtualCursorIdleActionMode = ref<VirtualCursorIdleActionMode>("none");
+const virtualGraphDragLine = ref<{ start: BuddyPosition; end: BuddyPosition; tone: VirtualGraphDragLineTone } | null>(null);
 const isPanelOpen = ref(false);
 const draft = ref("");
 const avatarHopCycle = ref(0);
@@ -2388,17 +2404,75 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
   }
   for (const step of response.playbackSteps) {
     const targetElement = resolveGraphEditPlaybackStepElement(step) ?? affordance?.element ?? null;
-    if (targetElement) {
+    if (isGraphEditPlaybackDragStep(step)) {
+      await executeGraphEditPlaybackDragStep(step, targetElement);
+    } else if (targetElement) {
       await moveVirtualCursorToElement(targetElement);
     }
     if (step.kind === "open_node_creation_menu") {
+      if (!step.sourceAnchorKind && targetElement) {
+        dispatchVirtualPointerTap(targetElement);
+        await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
+        dispatchVirtualPointerTap(targetElement);
+      }
       dispatchGraphEditPlaybackOpenMenu(step, targetElement);
     }
-    if (step.kind === "apply_graph_command" && step.commandId) {
+    if (step.kind === "choose_node_type" && targetElement) {
+      dispatchVirtualPointerTap(targetElement);
+    }
+    if (step.commandId) {
       dispatchGraphEditPlaybackApplyCommand(requestId, step.commandId);
+      if (step.kind === "apply_graph_command") {
+        clearVirtualGraphDragLine();
+      }
     }
     await waitForVirtualOperation(resolveGraphEditPlaybackStepDelayMs(step));
   }
+  clearVirtualGraphDragLine();
+}
+
+function isGraphEditPlaybackDragStep(step: GraphEditPlaybackStep) {
+  return step.kind === "drag_state_edge_to_canvas" || step.kind === "drag_state_edge_to_node" || step.kind === "draw_flow_edge";
+}
+
+async function executeGraphEditPlaybackDragStep(step: GraphEditPlaybackStep, targetElement: HTMLElement | null) {
+  if (!targetElement) {
+    return;
+  }
+  await moveVirtualCursorToElement(targetElement);
+  const startPoint = resolveElementCenterPoint(targetElement);
+  const endPoint = resolveGraphEditPlaybackDragEndPoint(step) ?? startPoint;
+  virtualCursorDragging.value = true;
+  virtualGraphDragLine.value = {
+    start: startPoint,
+    end: startPoint,
+    tone: step.kind === "draw_flow_edge" ? "flow" : "state",
+  };
+  const flightWaitMs = moveVirtualCursorToClientPoint(endPoint);
+  virtualGraphDragLine.value = {
+    start: startPoint,
+    end: endPoint,
+    tone: step.kind === "draw_flow_edge" ? "flow" : "state",
+  };
+  await waitForVirtualOperation(flightWaitMs);
+  virtualCursorDragging.value = false;
+}
+
+function resolveGraphEditPlaybackDragEndPoint(step: GraphEditPlaybackStep): BuddyPosition | null {
+  const endTarget = typeof step.endTarget === "string" ? step.endTarget : "";
+  if (endTarget) {
+    const endAffordance = resolveVirtualOperationAffordance(endTarget);
+    if (endAffordance) {
+      return resolveElementCenterPoint(endAffordance.element);
+    }
+  }
+  const surface = resolveVirtualOperationAffordance("editor.canvas.surface");
+  return surface ? resolveElementCenterPoint(surface.element) : null;
+}
+
+function clearVirtualGraphDragLine() {
+  virtualGraphDragLine.value = null;
+  virtualCursorDragging.value = false;
 }
 
 function requestGraphEditPlaybackPlan(input: { requestId: string; graphEditIntents: GraphEditIntent[] }): GraphEditPlaybackPlanRequestResponse | null {
@@ -2524,6 +2598,18 @@ async function moveVirtualCursorToElement(element: HTMLElement) {
   await waitForVirtualOperation(flightWaitMs);
 }
 
+function moveVirtualCursorToClientPoint(point: BuddyPosition) {
+  return moveVirtualCursorToWithArmedTransition(resolveVirtualCursorPositionForClientPoint(point));
+}
+
+function resolveElementCenterPoint(element: HTMLElement): BuddyPosition {
+  const rect = element.getBoundingClientRect();
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+  };
+}
+
 function escapeVirtualOperationTargetId(targetId: string) {
   return targetId.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
@@ -2538,10 +2624,13 @@ async function ensureVirtualCursorReadyForOperation() {
 }
 
 function resolveVirtualCursorPositionForElement(element: HTMLElement): BuddyPosition {
-  const rect = element.getBoundingClientRect();
+  return resolveVirtualCursorPositionForClientPoint(resolveElementCenterPoint(element));
+}
+
+function resolveVirtualCursorPositionForClientPoint(point: BuddyPosition): BuddyPosition {
   return clampVirtualCursorFramePosition({
-    x: rect.left + rect.width / 2 - BUDDY_VIRTUAL_CURSOR_SIZE.width / 2,
-    y: rect.top + rect.height / 2 - BUDDY_VIRTUAL_CURSOR_SIZE.height / 2,
+    x: point.x - BUDDY_VIRTUAL_CURSOR_SIZE.width / 2,
+    y: point.y - BUDDY_VIRTUAL_CURSOR_SIZE.height / 2,
   });
 }
 
@@ -2549,8 +2638,7 @@ function dispatchVirtualClick(element: HTMLElement) {
   const rect = element.getBoundingClientRect();
   const clientX = rect.left + rect.width / 2;
   const clientY = rect.top + rect.height / 2;
-  dispatchVirtualPointerEvent(element, "pointerdown", clientX, clientY);
-  dispatchVirtualPointerEvent(element, "pointerup", clientX, clientY);
+  dispatchVirtualPointerTap(element);
   element.dispatchEvent(
     new MouseEvent("click", {
       bubbles: true,
@@ -2560,6 +2648,14 @@ function dispatchVirtualClick(element: HTMLElement) {
       view: window,
     }),
   );
+}
+
+function dispatchVirtualPointerTap(element: HTMLElement) {
+  const rect = element.getBoundingClientRect();
+  const clientX = rect.left + rect.width / 2;
+  const clientY = rect.top + rect.height / 2;
+  dispatchVirtualPointerEvent(element, "pointerdown", clientX, clientY);
+  dispatchVirtualPointerEvent(element, "pointerup", clientX, clientY);
 }
 
 function dispatchVirtualInputEvents(element: HTMLInputElement | HTMLTextAreaElement, inputType: string, data: string) {
@@ -4112,6 +4208,28 @@ function formatErrorMessage(error: unknown): string {
   width: 100vw;
   height: 100vh;
   z-index: 4510;
+}
+
+.buddy-widget__graph-drag-line {
+  position: fixed;
+  inset: 0;
+  z-index: 4523;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+.buddy-widget__graph-drag-line line {
+  stroke: #dfad50;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  filter:
+    drop-shadow(0 2px 4px rgba(40, 32, 20, 0.28))
+    drop-shadow(0 0 8px rgba(242, 201, 104, 0.45));
+}
+
+.buddy-widget__graph-drag-line--state line {
+  stroke: #2563eb;
 }
 
 .buddy-widget__backdrop {

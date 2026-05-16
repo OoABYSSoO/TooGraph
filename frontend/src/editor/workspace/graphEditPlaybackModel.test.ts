@@ -100,7 +100,6 @@ test("buildGraphEditPlaybackPlan compiles graph intentions without exposing mous
     "move_virtual_cursor",
     "open_node_creation_menu",
     "choose_node_type",
-    "apply_graph_command",
     "focus_node_field",
     "type_node_field",
     "focus_node_field",
@@ -168,13 +167,14 @@ test("buildGraphEditPlaybackPlan targets precise editor affordances for human-li
   });
 
   assert.equal(plan.valid, true);
+  assert.equal(plan.playbackSteps.find((step) => step.kind === "choose_node_type" && step.target === "editor.nodeType.input")?.commandId, "graph-command-1");
+  assert.equal(plan.playbackSteps.find((step) => step.kind === "choose_node_type" && step.target === "editor.nodeType.agent")?.commandId, "graph-command-4");
   assert.deepEqual(
     plan.playbackSteps.map((step) => [step.kind, step.target]),
     [
       ["move_virtual_cursor", "editor.canvas.empty.createFirstNode"],
       ["open_node_creation_menu", "editor.canvas.empty.createFirstNode"],
       ["choose_node_type", "editor.nodeType.input"],
-      ["apply_graph_command", "editor.canvas.node.input_name"],
       ["focus_node_field", "editor.canvas.node.input_name.title"],
       ["type_node_field", "editor.canvas.node.input_name.title"],
       ["focus_node_field", "editor.canvas.node.input_name.description"],
@@ -184,21 +184,24 @@ test("buildGraphEditPlaybackPlan targets precise editor affordances for human-li
       ["highlight_state_field", "editor.canvas.node.input_name.port.output.name"],
       ["apply_graph_command", "editor.canvas.node.input_name.port.output.name"],
       ["highlight_node_port", "editor.canvas.node.input_name.port.output.name"],
-      ["drag_state_edge_to_canvas", "editor.canvas.node.input_name.port.output.name"],
+      ["drag_state_edge_to_canvas", "editor.canvas.anchor.input_name:state-out:name"],
       ["open_node_creation_menu", "editor.canvas.surface"],
       ["choose_node_type", "editor.nodeType.agent"],
-      ["apply_graph_command", "editor.canvas.node.ask_name"],
+      ["apply_graph_command", "editor.canvas.node.ask_name.port.input.name"],
+      ["highlight_node_port", "editor.canvas.node.ask_name.port.input.name"],
       ["focus_node_field", "editor.canvas.node.ask_name.title"],
       ["type_node_field", "editor.canvas.node.ask_name.title"],
       ["focus_node_field", "editor.canvas.node.ask_name.description"],
       ["type_node_field", "editor.canvas.node.ask_name.description"],
       ["focus_node_field", "editor.canvas.node.ask_name.taskInstruction"],
       ["type_node_field", "editor.canvas.node.ask_name.taskInstruction"],
-      ["drag_state_edge_to_node", "editor.canvas.node.input_name.port.output.name"],
-      ["apply_graph_command", "editor.canvas.node.ask_name.port.input.name"],
-      ["highlight_node_port", "editor.canvas.node.ask_name.port.input.name"],
     ],
   );
+  const stateDragStep = plan.playbackSteps.find((step) => step.kind === "drag_state_edge_to_canvas");
+  assert.equal(stateDragStep?.endTarget, "editor.canvas.surface");
+  const bindIndex = plan.playbackSteps.findIndex((step) => step.commandId === "graph-command-5");
+  const editAgentTitleIndex = plan.playbackSteps.findIndex((step) => step.kind === "focus_node_field" && step.target === "editor.canvas.node.ask_name.title");
+  assert.ok(bindIndex > -1 && editAgentTitleIndex > -1 && bindIndex < editAgentTitleIndex);
 });
 
 test("applyGraphEditPlaybackPlan applies semantic graph commands to the current document", () => {
