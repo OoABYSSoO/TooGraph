@@ -489,7 +489,10 @@ import {
   resolveOutputTraceBuddyMessageMetadata,
 } from "./buddyMessageMetadata.ts";
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
-import { buildPageOperationBook, collectPageOperationSnapshot } from "./pageOperationAffordances.ts";
+import {
+  buildPageOperationRuntimeContext as buildPageOperationSkillRuntimeContext,
+  collectPageOperationSnapshot,
+} from "./pageOperationAffordances.ts";
 import {
   buildPageOperationResult,
   buildPageOperationResumePayload,
@@ -2331,16 +2334,17 @@ async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequ
     error = caughtError instanceof Error ? caughtError.message : String(caughtError);
   }
   await nextTick();
-  const pageOperationContextAfter = buildPageOperationRuntimeContext();
+  const pageOperationContextAfterBase = buildPageOperationRuntimeContext();
   const operationResult = buildPageOperationResult({
     operationPlan,
     status,
     routeBefore,
     routeAfter: route.fullPath,
     pageOperationContextBefore: pageOperationContextBefore.skillRuntimeContext,
-    pageOperationContextAfter: pageOperationContextAfter.skillRuntimeContext,
+    pageOperationContextAfter: pageOperationContextAfterBase.skillRuntimeContext,
     error,
   });
+  const pageOperationContextAfter = buildPageOperationRuntimeContext(operationResult.operation_report);
   await maybeAutoResumePageOperationRun(operationPlan, operationResult, pageOperationContextAfter);
 }
 
@@ -4845,24 +4849,44 @@ function buildPageContext() {
   return buildPageOperationRuntimeContext().pageContext;
 }
 
-function buildPageOperationRuntimeContext() {
+function buildPageOperationRuntimeContext(latestOperationReport: Record<string, unknown> | null = null) {
   const snapshot = collectPageOperationSnapshot({
     routePath: route.fullPath,
     root: typeof document === "undefined" ? null : document,
   });
-  const pageOperationBook = buildPageOperationBook(snapshot);
+  const skillRuntimeContext = buildPageOperationSkillRuntimeContext({
+    routePath: route.fullPath,
+    root: typeof document === "undefined" ? null : document,
+    snapshot,
+    editor: buildBuddyPageOperationEditorFacts(),
+    latestOperationReport,
+  });
   return {
     pageContext: buildBuddyPageContext({
       routePath: route.fullPath,
       editor: buddyContextStore.editorSnapshot,
       activeBuddyRunId: activeRunId.value,
-      pageOperationBook,
+      pageOperationBook: skillRuntimeContext.page_operation_book,
+      pageFacts: skillRuntimeContext.page_facts,
     }),
-    skillRuntimeContext: {
-      page_path: snapshot.path,
-      page_snapshot: snapshot,
-      page_operation_book: pageOperationBook,
-    },
+    skillRuntimeContext,
+  };
+}
+
+function buildBuddyPageOperationEditorFacts() {
+  const editor = buddyContextStore.editorSnapshot;
+  if (!editor) {
+    return null;
+  }
+  const documentName = editor.document?.name ?? "";
+  const documentGraphId = editor.document && "graph_id" in editor.document ? editor.document.graph_id ?? "" : "";
+  return {
+    activeTabId: editor.activeTabId,
+    activeTabTitle: editor.activeTabTitle,
+    activeTabKind: editor.activeTabKind,
+    activeGraphId: editor.activeGraphId ?? documentGraphId,
+    activeGraphName: editor.activeGraphName ?? documentName ?? editor.activeTabTitle,
+    activeGraphDirty: editor.activeGraphDirty === true,
   };
 }
 

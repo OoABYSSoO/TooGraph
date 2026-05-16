@@ -142,6 +142,32 @@ test("buildBuddyPageContext exposes only non-buddy page operations", () => {
   assert.doesNotMatch(context, /buddy\.tab\.history/);
 });
 
+test("buildBuddyPageContext renders structured page facts as readable markdown", () => {
+  const context = buildBuddyPageContext({
+    routePath: "/editor/graph_1",
+    editor: null,
+    pageFacts: {
+      route: { path: "/editor/graph_1", title: "图编辑器", snapshotId: "snapshot-facts" },
+      activeEditorTab: { tabId: "tab_1", title: "投放素材分析", kind: "existing" },
+      activeGraph: { graphId: "graph_1", name: "投放素材分析", dirty: true },
+      visibleGraphs: [{ id: "graph_1", label: "投放素材分析" }],
+      visibleTemplates: [{ id: "template_1", label: "页面操作模板" }],
+      visibleRuns: [{ id: "run_1", label: "运行 run_1" }],
+      latestForegroundRun: { runId: "run_1", status: "completed", resultSummary: "最终回答" },
+      latestOperationResult: { operation_request_id: "vop_1234567890abcdef", status: "succeeded", route_after: "/editor/graph_1" },
+    },
+  });
+
+  assert.match(context, /页面标题: 图编辑器/);
+  assert.match(context, /活跃编辑器标签: 投放素材分析 \(tab_1, existing\)/);
+  assert.match(context, /活跃图: 投放素材分析 \(graph_1, dirty: true\)/);
+  assert.match(context, /可见图: 投放素材分析\(graph_1\)/);
+  assert.match(context, /可见模板: 页面操作模板\(template_1\)/);
+  assert.match(context, /可见运行: 运行 run_1\(run_1\)/);
+  assert.match(context, /最新前台运行: run_1 \(completed\) 最终回答/);
+  assert.match(context, /最新页面操作: vop_1234567890abcdef \(succeeded\) -> \/editor\/graph_1/);
+});
+
 test("buildBuddyPageContext filters buddy self-surface details on the Buddy page", () => {
   const context = buildBuddyPageContext({
     routePath: "/buddy",

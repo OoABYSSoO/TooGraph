@@ -1,5 +1,5 @@
 import type { GraphDocument, GraphNode, GraphPayload, ReadBinding, WriteBinding } from "../types/node-system.ts";
-import type { PageOperationBook } from "./pageOperationAffordances.ts";
+import type { PageOperationBook, PageOperationFacts } from "./pageOperationAffordances.ts";
 import { formatPageOperationBookLines } from "./pageOperationAffordances.ts";
 
 export type BuddyEditorFeedbackSnapshot = {
@@ -10,7 +10,12 @@ export type BuddyEditorFeedbackSnapshot = {
 };
 
 export type BuddyEditorContextSnapshot = {
+  activeTabId?: string | null;
   activeTabTitle?: string | null;
+  activeTabKind?: string | null;
+  activeGraphId?: string | null;
+  activeGraphName?: string | null;
+  activeGraphDirty?: boolean | null;
   document?: GraphPayload | GraphDocument | null;
   focusedNodeId?: string | null;
   feedback?: BuddyEditorFeedbackSnapshot | null;
@@ -21,6 +26,7 @@ export type BuildBuddyPageContextInput = {
   editor?: BuddyEditorContextSnapshot | null;
   activeBuddyRunId?: string | null;
   pageOperationBook?: PageOperationBook | null;
+  pageFacts?: PageOperationFacts | null;
 };
 
 export function buildBuddyPageContext(input: BuildBuddyPageContextInput): string {
@@ -35,6 +41,7 @@ export function buildBuddyPageContext(input: BuildBuddyPageContextInput): string
     `当前路径: ${input.routePath || "/"}`,
     ...(input.activeBuddyRunId ? [`伙伴本轮运行: ${input.activeBuddyRunId}`] : []),
     ...(normalizeRoutePath(input.routePath).startsWith("/buddy") ? ["伙伴相关页面内容已过滤。"] : []),
+    ...buildPageFactLines(input.pageFacts ?? null),
     ...formatPageOperationBookLines(input.pageOperationBook ?? null),
     ...buildEditorContextLines(input.editor ?? null),
     "</page-context>",
@@ -70,6 +77,45 @@ function buildEditorContextLines(editor: BuddyEditorContextSnapshot | null): str
   ];
 
   return lines.filter(Boolean);
+}
+
+function buildPageFactLines(facts: PageOperationFacts | null): string[] {
+  if (!facts) {
+    return [];
+  }
+  return [
+    facts.route.title ? `页面标题: ${facts.route.title}` : "",
+    facts.activeEditorTab
+      ? `活跃编辑器标签: ${facts.activeEditorTab.title} (${facts.activeEditorTab.tabId}, ${facts.activeEditorTab.kind})`
+      : "",
+    facts.activeGraph ? `活跃图: ${facts.activeGraph.name} (${facts.activeGraph.graphId ?? "unsaved"}, dirty: ${facts.activeGraph.dirty})` : "",
+    facts.visibleGraphs.length > 0 ? `可见图: ${facts.visibleGraphs.map(formatEntityFact).join(", ")}` : "",
+    facts.visibleTemplates.length > 0 ? `可见模板: ${facts.visibleTemplates.map(formatEntityFact).join(", ")}` : "",
+    facts.visibleRuns.length > 0 ? `可见运行: ${facts.visibleRuns.map(formatEntityFact).join(", ")}` : "",
+    facts.latestForegroundRun
+      ? `最新前台运行: ${facts.latestForegroundRun.runId} (${facts.latestForegroundRun.status})${
+          facts.latestForegroundRun.resultSummary ? ` ${facts.latestForegroundRun.resultSummary}` : ""
+        }`
+      : "",
+    formatLatestOperationResult(facts.latestOperationResult),
+  ].filter(Boolean);
+}
+
+function formatEntityFact(entity: { id: string; label: string }) {
+  return `${entity.label}(${entity.id})`;
+}
+
+function formatLatestOperationResult(value: Record<string, unknown> | null) {
+  if (!value) {
+    return "";
+  }
+  const requestId = normalizeText(value.operation_request_id);
+  const status = normalizeText(value.status);
+  const routeAfter = normalizeText(value.route_after);
+  if (!requestId && !status && !routeAfter) {
+    return "";
+  }
+  return `最新页面操作: ${requestId || "unknown"} (${status || "unknown"})${routeAfter ? ` -> ${routeAfter}` : ""}`;
 }
 
 function countNodesByKind(document: GraphPayload | GraphDocument): Record<GraphNode["kind"], number> {
@@ -158,4 +204,8 @@ function buildFeedbackLines(feedback: BuddyEditorFeedbackSnapshot | null): strin
     feedback.currentNodeLabel ? `当前运行节点: ${feedback.currentNodeLabel}` : "",
     feedback.message ? `运行反馈: ${feedback.message}` : "",
   ].filter(Boolean);
+}
+
+function normalizeText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
 }

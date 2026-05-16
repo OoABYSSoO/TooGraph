@@ -114,6 +114,21 @@ test("formatRunArtifactValue keeps strings and pretty prints structured payloads
   );
 });
 
+test("formatRunArtifactValue renders operation reports compactly", () => {
+  assert.equal(
+    formatRunArtifactValue({
+      operation_request_id: "vop_1234567890abcdef",
+      status: "succeeded",
+      target_id: "app.nav.runs",
+      route_before: "/",
+      route_after: "/runs",
+      triggered_run_id: "run_123",
+      triggered_run_status: "completed",
+    }),
+    "succeeded · app.nav.runs · / -> /runs · run run_123 completed",
+  );
+});
+
 test("listRunOutputArtifacts maps exported outputs into renderable cards", () => {
   const artifacts = listRunOutputArtifacts(
     createRunDetail({

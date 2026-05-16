@@ -79,6 +79,19 @@ test("buildPageOperationResult captures route, snapshots, commands, and target i
     triggered_graph_id: null,
     triggered_run_status: null,
     graph_edit_summary: null,
+    operation_report: {
+      operation_request_id: "vop_1234567890abcdef",
+      status: "succeeded",
+      target_id: "app.nav.runs",
+      commands: ["click app.nav.runs"],
+      route_before: "/",
+      route_after: "/runs",
+      triggered_run_id: null,
+      triggered_graph_id: null,
+      triggered_run_status: null,
+      graph_edit_summary: null,
+      error: null,
+    },
     error: null,
   });
 });
@@ -109,6 +122,7 @@ test("buildPageOperationResumePayload writes the required resume state keys", ()
     }),
     {
       operation_result: operationResult,
+      operation_report: operationResult.operation_report,
       page_context: "当前路径: /runs",
       page_operation_context: pageOperationContextAfter,
     },
@@ -162,4 +176,3 @@ test("canAutoResumePageOperationRun requires matching awaiting_human metadata", 
     false,
   );
 });
-

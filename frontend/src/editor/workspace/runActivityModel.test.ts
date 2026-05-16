@@ -44,6 +44,38 @@ test("appendRunActivityEvent titles state updates with state names when availabl
   assert.equal(state.entries[0]?.stateKey, "answer");
 });
 
+test("appendRunActivityEvent shows compact operation report state updates", () => {
+  let state: RunActivityState = { entries: [], autoFollow: true };
+  state = appendRunActivityEvent(
+    state,
+    {
+      eventType: "state.updated",
+      payload: {
+        node_id: "verify_operation",
+        state_key: "operation_report",
+        value: {
+          operation_request_id: "vop_1234567890abcdef",
+          status: "succeeded",
+          target_id: "app.nav.runs",
+          route_before: "/",
+          route_after: "/runs",
+          triggered_run_id: "run_123",
+          triggered_run_status: "completed",
+        },
+        sequence: 2,
+        created_at: "2026-05-03T01:00:03Z",
+      },
+    },
+    { operation_report: "Operation Report" },
+  );
+
+  assert.equal(state.entries[0]?.title, "Operation Report");
+  assert.equal(
+    state.entries[0]?.preview,
+    "succeeded · app.nav.runs · / -> /runs · run run_123 completed",
+  );
+});
+
 test("appendRunActivityEvent appends low-level activity events", () => {
   let state: RunActivityState = { entries: [], autoFollow: true };
   state = appendRunActivityEvent(state, {

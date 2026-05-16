@@ -17,6 +17,21 @@ export type PageOperationResult = {
   triggered_graph_id: string | null;
   triggered_run_status: string | null;
   graph_edit_summary: Record<string, unknown> | null;
+  operation_report: PageOperationReport;
+  error: string | null;
+};
+
+export type PageOperationReport = {
+  operation_request_id: string;
+  status: PageOperationResultStatus;
+  target_id: string | null;
+  commands: string[];
+  route_before: string;
+  route_after: string;
+  triggered_run_id: string | null;
+  triggered_graph_id: string | null;
+  triggered_run_status: string | null;
+  graph_edit_summary: Record<string, unknown> | null;
   error: string | null;
 };
 
@@ -33,20 +48,41 @@ export function buildPageOperationResult(input: {
   graphEditSummary?: Record<string, unknown> | null;
   error?: string | null;
 }): PageOperationResult {
-  return {
-    operation_request_id: input.operationPlan.operationRequestId ?? "",
+  const operationRequestId = input.operationPlan.operationRequestId ?? "";
+  const targetId = firstOperationTargetId(input.operationPlan);
+  const triggeredRunId = normalizeNullableText(input.triggeredRunId);
+  const triggeredGraphId = normalizeNullableText(input.triggeredGraphId);
+  const triggeredRunStatus = normalizeNullableText(input.triggeredRunStatus);
+  const graphEditSummary = input.graphEditSummary ?? defaultGraphEditSummary(input.operationPlan);
+  const error = normalizeNullableText(input.error);
+  const report: PageOperationReport = {
+    operation_request_id: operationRequestId,
     status: input.status,
-    target_id: firstOperationTargetId(input.operationPlan),
+    target_id: targetId,
+    commands: [...input.operationPlan.commands],
+    route_before: input.routeBefore,
+    route_after: input.routeAfter,
+    triggered_run_id: triggeredRunId,
+    triggered_graph_id: triggeredGraphId,
+    triggered_run_status: triggeredRunStatus,
+    graph_edit_summary: graphEditSummary,
+    error,
+  };
+  return {
+    operation_request_id: operationRequestId,
+    status: input.status,
+    target_id: targetId,
     commands: [...input.operationPlan.commands],
     route_before: input.routeBefore,
     route_after: input.routeAfter,
     page_snapshot_before: input.pageOperationContextBefore.page_snapshot,
     page_snapshot_after: input.pageOperationContextAfter.page_snapshot,
-    triggered_run_id: normalizeNullableText(input.triggeredRunId),
-    triggered_graph_id: normalizeNullableText(input.triggeredGraphId),
-    triggered_run_status: normalizeNullableText(input.triggeredRunStatus),
-    graph_edit_summary: input.graphEditSummary ?? defaultGraphEditSummary(input.operationPlan),
-    error: normalizeNullableText(input.error),
+    triggered_run_id: triggeredRunId,
+    triggered_graph_id: triggeredGraphId,
+    triggered_run_status: triggeredRunStatus,
+    graph_edit_summary: graphEditSummary,
+    operation_report: report,
+    error,
   };
 }
 
@@ -57,6 +93,7 @@ export function buildPageOperationResumePayload(input: {
 }): Record<string, unknown> {
   return {
     operation_result: input.operationResult,
+    operation_report: input.operationResult.operation_report,
     page_context: input.pageContext,
     page_operation_context: input.pageOperationContext,
   };
@@ -107,4 +144,3 @@ function normalizeNullableText(value: unknown): string | null {
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
-

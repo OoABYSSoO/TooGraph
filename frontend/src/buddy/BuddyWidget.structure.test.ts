@@ -581,19 +581,22 @@ test("BuddyWidget lets the buddy runtime choose its own model", () => {
 
 test("BuddyWidget builds page context from the shared editor snapshot", () => {
   assert.match(componentSource, /import \{ buildBuddyPageContext \} from "\.\/buddyPageContext\.ts";/);
-  assert.match(componentSource, /import \{ buildPageOperationBook, collectPageOperationSnapshot \} from "\.\/pageOperationAffordances\.ts";/);
+  assert.match(componentSource, /buildPageOperationRuntimeContext as buildPageOperationSkillRuntimeContext/);
+  assert.match(componentSource, /collectPageOperationSnapshot/);
   assert.match(componentSource, /import \{ useBuddyContextStore \} from "\.\.\/stores\/buddyContext\.ts";/);
   assert.match(componentSource, /const buddyContextStore = useBuddyContextStore\(\);/);
   assert.match(componentSource, /const pageOperationContext = buildPageOperationRuntimeContext\(\);[\s\S]*pageContext: pageOperationContext\.pageContext,[\s\S]*pageOperationContext: pageOperationContext\.skillRuntimeContext/);
   assert.match(componentSource, /const snapshot = collectPageOperationSnapshot\(\{[\s\S]*routePath: route\.fullPath,[\s\S]*root: typeof document === "undefined" \? null : document,[\s\S]*\}\);/);
-  assert.match(componentSource, /pageContext: buildBuddyPageContext\(\{[\s\S]*routePath: route\.fullPath,[\s\S]*editor: buddyContextStore\.editorSnapshot,[\s\S]*activeBuddyRunId: activeRunId\.value,[\s\S]*pageOperationBook,[\s\S]*\}\)/);
-  assert.match(componentSource, /skillRuntimeContext: \{[\s\S]*page_path: snapshot\.path,[\s\S]*page_snapshot: snapshot,[\s\S]*page_operation_book: pageOperationBook,[\s\S]*\}/);
+  assert.match(componentSource, /const skillRuntimeContext = buildPageOperationSkillRuntimeContext\(\{[\s\S]*snapshot,[\s\S]*editor: buildBuddyPageOperationEditorFacts\(\),[\s\S]*latestOperationReport,[\s\S]*\}\);/);
+  assert.match(componentSource, /pageContext: buildBuddyPageContext\(\{[\s\S]*routePath: route\.fullPath,[\s\S]*editor: buddyContextStore\.editorSnapshot,[\s\S]*activeBuddyRunId: activeRunId\.value,[\s\S]*pageOperationBook: skillRuntimeContext\.page_operation_book,[\s\S]*pageFacts: skillRuntimeContext\.page_facts,[\s\S]*\}\)/);
+  assert.match(componentSource, /skillRuntimeContext,/);
 });
 
 test("BuddyWidget resumes page operation runs after virtual UI execution", () => {
   assert.match(componentSource, /import \{[\s\S]*buildPageOperationResult,[\s\S]*buildPageOperationResumePayload,[\s\S]*canAutoResumePageOperationRun,[\s\S]*\} from "\.\/pageOperationResume\.ts";/);
-  assert.match(componentSource, /const pageOperationContextBefore = buildPageOperationRuntimeContext\(\);[\s\S]*await executeVirtualOperationCommands\(operationPlan\);[\s\S]*const pageOperationContextAfter = buildPageOperationRuntimeContext\(\);/);
-  assert.match(componentSource, /buildPageOperationResult\(\{[\s\S]*operationPlan,[\s\S]*routeBefore,[\s\S]*routeAfter: route\.fullPath,[\s\S]*pageOperationContextBefore: pageOperationContextBefore\.skillRuntimeContext,[\s\S]*pageOperationContextAfter: pageOperationContextAfter\.skillRuntimeContext,[\s\S]*\}\);/);
+  assert.match(componentSource, /const pageOperationContextBefore = buildPageOperationRuntimeContext\(\);[\s\S]*await executeVirtualOperationCommands\(operationPlan\);[\s\S]*const pageOperationContextAfterBase = buildPageOperationRuntimeContext\(\);/);
+  assert.match(componentSource, /buildPageOperationResult\(\{[\s\S]*operationPlan,[\s\S]*routeBefore,[\s\S]*routeAfter: route\.fullPath,[\s\S]*pageOperationContextBefore: pageOperationContextBefore\.skillRuntimeContext,[\s\S]*pageOperationContextAfter: pageOperationContextAfterBase\.skillRuntimeContext,[\s\S]*\}\);/);
+  assert.match(componentSource, /const pageOperationContextAfter = buildPageOperationRuntimeContext\(operationResult\.operation_report\);/);
   assert.match(componentSource, /async function maybeAutoResumePageOperationRun\(/);
   assert.match(componentSource, /const runDetail = await fetchRun\(operationPlan\.runId\);[\s\S]*canAutoResumePageOperationRun\(runDetail, operationPlan\.operationRequestId\)/);
   assert.match(componentSource, /await resumeRun\([\s\S]*operationPlan\.runId,[\s\S]*buildPageOperationResumePayload\(\{[\s\S]*operationResult,[\s\S]*pageContext: pageOperationContextAfter\.pageContext,[\s\S]*pageOperationContext: pageOperationContextAfter\.skillRuntimeContext,[\s\S]*\}\),[\s\S]*\);/);

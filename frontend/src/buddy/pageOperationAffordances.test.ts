@@ -192,6 +192,73 @@ test("buildPageOperationRuntimeContext packages snapshot and operation book for 
   assert.equal(runtimeContext.page_operation_book.page.title, "图编辑器");
 });
 
+test("buildPageOperationRuntimeContext adds structured page facts for goal verification", () => {
+  const runtimeContext = buildPageOperationRuntimeContext({
+    routePath: "/library",
+    root: null,
+    title: "图库",
+    snapshot: {
+      snapshotId: "snapshot-facts",
+      path: "/library",
+      title: "图库",
+      affordances: [
+        {
+          id: "library.template.toograph_page_operation_workflow.open",
+          label: "页面操作工作流",
+          role: "button",
+          actions: ["click"],
+        },
+        {
+          id: "library.graph.graph_saved.open",
+          label: "已保存图",
+          role: "button",
+          actions: ["click"],
+        },
+        {
+          id: "runs.run.run_123.openDetail",
+          label: "运行 run_123",
+          role: "navigation-link",
+          actions: ["click"],
+        },
+      ],
+    },
+    editor: {
+      activeTabId: "tab_1",
+      activeTabTitle: "投放素材分析",
+      activeTabKind: "existing",
+      activeGraphId: "graph_saved",
+      activeGraphName: "投放素材分析",
+      activeGraphDirty: true,
+    },
+    latestForegroundRun: {
+      runId: "run_123",
+      status: "completed",
+      resultSummary: "输出完成。",
+    },
+    latestOperationReport: {
+      operation_request_id: "vop_1234567890abcdef",
+      status: "succeeded",
+      route_after: "/library",
+    },
+  });
+
+  assert.deepEqual(runtimeContext.page_facts, {
+    route: { path: "/library", title: "图库", snapshotId: "snapshot-facts" },
+    activeEditorTab: { tabId: "tab_1", title: "投放素材分析", kind: "existing" },
+    activeGraph: { graphId: "graph_saved", name: "投放素材分析", dirty: true },
+    visibleGraphs: [{ id: "graph_saved", label: "已保存图" }],
+    visibleTemplates: [{ id: "toograph_page_operation_workflow", label: "页面操作工作流" }],
+    visibleRuns: [{ id: "run_123", label: "运行 run_123" }],
+    latestForegroundRun: { runId: "run_123", status: "completed", resultSummary: "输出完成。" },
+    latestOperationResult: {
+      operation_request_id: "vop_1234567890abcdef",
+      status: "succeeded",
+      route_after: "/library",
+    },
+  });
+  assert.deepEqual(runtimeContext.operation_report, runtimeContext.page_facts.latestOperationResult);
+});
+
 test("attachPageOperationRuntimeContext preserves graph metadata while adding skill runtime context", () => {
   const runtimeContext = buildPageOperationRuntimeContext({
     routePath: "/runs",

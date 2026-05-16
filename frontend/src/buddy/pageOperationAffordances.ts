@@ -87,6 +87,39 @@ export type PageOperationRuntimeContext = {
   page_path: string;
   page_snapshot: PageOperationSnapshot;
   page_operation_book: PageOperationBook;
+  page_facts: PageOperationFacts;
+  operation_report: Record<string, unknown> | null;
+};
+
+export type PageOperationEntityFact = {
+  id: string;
+  label: string;
+};
+
+export type PageOperationEditorFactInput = {
+  activeTabId?: unknown;
+  activeTabTitle?: unknown;
+  activeTabKind?: unknown;
+  activeGraphId?: unknown;
+  activeGraphName?: unknown;
+  activeGraphDirty?: unknown;
+};
+
+export type PageOperationRunFactInput = {
+  runId?: unknown;
+  status?: unknown;
+  resultSummary?: unknown;
+};
+
+export type PageOperationFacts = {
+  route: { path: string; title: string; snapshotId: string };
+  activeEditorTab: { tabId: string; title: string; kind: string } | null;
+  activeGraph: { graphId: string | null; name: string; dirty: boolean } | null;
+  visibleGraphs: PageOperationEntityFact[];
+  visibleTemplates: PageOperationEntityFact[];
+  visibleRuns: PageOperationEntityFact[];
+  latestForegroundRun: { runId: string; status: string; resultSummary: string } | null;
+  latestOperationResult: Record<string, unknown> | null;
 };
 
 export function normalizePageAffordance(input: PageAffordanceInit): PageAffordance | null {
@@ -197,17 +230,104 @@ function isEditorRoutePath(routePath: string): boolean {
   return normalized === "/editor" || normalized.startsWith("/editor/");
 }
 
+function normalizePageOperationSnapshot(input: PageOperationSnapshotInit | PageOperationSnapshot): PageOperationSnapshot {
+  return {
+    snapshotId: compactText(input.snapshotId),
+    path: normalizeRoutePath(input.path),
+    title: compactText(input.title),
+    affordances: input.affordances
+      .map((affordance) => normalizePageAffordance(affordance))
+      .filter((affordance): affordance is PageAffordance => affordance !== null),
+  };
+}
+
+function buildPageOperationFacts(
+  snapshot: PageOperationSnapshot,
+  editor: PageOperationEditorFactInput | null,
+  latestForegroundRun: PageOperationRunFactInput | null,
+  latestOperationReport: Record<string, unknown> | null,
+): PageOperationFacts {
+  return {
+    route: { path: snapshot.path, title: snapshot.title, snapshotId: snapshot.snapshotId },
+    activeEditorTab: normalizeEditorTabFact(editor),
+    activeGraph: normalizeActiveGraphFact(editor),
+    visibleGraphs: extractVisibleEntityFacts(snapshot.affordances, /^library\.graph\.(.+)\.open$/),
+    visibleTemplates: extractVisibleEntityFacts(snapshot.affordances, /^library\.template\.(.+)\.open$/),
+    visibleRuns: extractVisibleEntityFacts(snapshot.affordances, /^runs\.run\.(.+)\.openDetail$/),
+    latestForegroundRun: normalizeRunFact(latestForegroundRun),
+    latestOperationResult: normalizeRecord(latestOperationReport),
+  };
+}
+
+function normalizeEditorTabFact(editor: PageOperationEditorFactInput | null): PageOperationFacts["activeEditorTab"] {
+  const tabId = compactText(editor?.activeTabId);
+  if (!tabId) {
+    return null;
+  }
+  return {
+    tabId,
+    title: compactText(editor?.activeTabTitle) || tabId,
+    kind: compactText(editor?.activeTabKind) || "unknown",
+  };
+}
+
+function normalizeActiveGraphFact(editor: PageOperationEditorFactInput | null): PageOperationFacts["activeGraph"] {
+  const graphName = compactText(editor?.activeGraphName);
+  const graphId = compactText(editor?.activeGraphId);
+  if (!graphName && !graphId) {
+    return null;
+  }
+  return {
+    graphId: graphId || null,
+    name: graphName || graphId || "Untitled Graph",
+    dirty: editor?.activeGraphDirty === true,
+  };
+}
+
+function normalizeRunFact(run: PageOperationRunFactInput | null): PageOperationFacts["latestForegroundRun"] {
+  const runId = compactText(run?.runId);
+  if (!runId) {
+    return null;
+  }
+  return {
+    runId,
+    status: compactText(run?.status) || "unknown",
+    resultSummary: compactText(run?.resultSummary),
+  };
+}
+
+function extractVisibleEntityFacts(affordances: PageAffordance[], pattern: RegExp): PageOperationEntityFact[] {
+  return affordances.flatMap((affordance) => {
+    const match = affordance.id.match(pattern);
+    if (!match?.[1]) {
+      return [];
+    }
+    return [{ id: match[1], label: affordance.label }];
+  });
+}
+
+function normalizeRecord(value: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
+  return isPlainRecord(value) ? { ...value } : null;
+}
+
 export function buildPageOperationRuntimeContext(input: {
   routePath: string;
   root: ParentNode | null;
   title?: string | null;
+  snapshot?: PageOperationSnapshotInit | PageOperationSnapshot | null;
+  editor?: PageOperationEditorFactInput | null;
+  latestForegroundRun?: PageOperationRunFactInput | null;
+  latestOperationReport?: Record<string, unknown> | null;
 }): PageOperationRuntimeContext {
-  const snapshot = collectPageOperationSnapshot(input);
+  const snapshot = input.snapshot ? normalizePageOperationSnapshot(input.snapshot) : collectPageOperationSnapshot(input);
   const pageOperationBook = buildPageOperationBook(snapshot);
+  const pageFacts = buildPageOperationFacts(snapshot, input.editor ?? null, input.latestForegroundRun ?? null, input.latestOperationReport ?? null);
   return {
     page_path: snapshot.path,
     page_snapshot: snapshot,
     page_operation_book: pageOperationBook,
+    page_facts: pageFacts,
+    operation_report: pageFacts.latestOperationResult,
   };
 }
 

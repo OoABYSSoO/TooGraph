@@ -253,7 +253,34 @@ function formatActivityValue(value: unknown) {
   if (value === undefined || value === null) {
     return "";
   }
+  const operationReport = formatOperationReportValue(value);
+  if (operationReport) {
+    return operationReport;
+  }
   return JSON.stringify(value, null, 2);
+}
+
+function formatOperationReportValue(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return "";
+  }
+  const report = value as Record<string, unknown>;
+  const requestId = normalizeText(report.operation_request_id);
+  const status = normalizeText(report.status);
+  if (!requestId || !status) {
+    return "";
+  }
+  const targetId = normalizeText(report.target_id);
+  const routeBefore = normalizeText(report.route_before);
+  const routeAfter = normalizeText(report.route_after);
+  const triggeredRunId = normalizeText(report.triggered_run_id);
+  const triggeredRunStatus = normalizeText(report.triggered_run_status);
+  return [
+    status,
+    targetId,
+    routeBefore || routeAfter ? `${routeBefore || "?"} -> ${routeAfter || "?"}` : "",
+    triggeredRunId ? `run ${triggeredRunId}${triggeredRunStatus ? ` ${triggeredRunStatus}` : ""}` : "",
+  ].filter(Boolean).join(" · ");
 }
 
 function formatBuddyHomeWritebackPreview(value: unknown) {
