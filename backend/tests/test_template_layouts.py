@@ -710,6 +710,44 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertTrue(cycle_tracker["has_cycle"])
         self.assertEqual(cycle_tracker["loop_limits_by_source"], {"continue_operation_loop": 6})
 
+    def test_toograph_page_operation_workflow_declares_end_to_end_target_flows(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "toograph_page_operation_workflow"
+        )
+        flows = template["metadata"].get("targetFlows")
+        self.assertIsInstance(flows, list)
+        flows_by_id = {flow["id"]: flow for flow in flows}
+
+        self.assertEqual(
+            list(flows_by_id),
+            [
+                "open_runs_page",
+                "open_run_detail",
+                "open_library_page",
+                "create_blank_graph",
+                "open_named_graph",
+                "run_current_graph",
+                "create_basic_llm_graph",
+                "rename_current_node",
+            ],
+        )
+        self.assertIn("app.nav.runs", flows_by_id["open_runs_page"]["operationTargets"])
+        self.assertIn("runs.run.<runId>.openDetail", flows_by_id["open_run_detail"]["operationTargets"])
+        self.assertIn("app.nav.library", flows_by_id["open_library_page"]["operationTargets"])
+        self.assertIn("library.action.newBlankGraph", flows_by_id["create_blank_graph"]["operationTargets"])
+        self.assertIn("library.graph.<graphId>.open", flows_by_id["open_named_graph"]["operationTargets"])
+        self.assertIn("editor.action.runActiveGraph", flows_by_id["run_current_graph"]["operationTargets"])
+        self.assertIn("editor.graph.playback", flows_by_id["create_basic_llm_graph"]["operationTargets"])
+        self.assertIn("editor.graph.playback", flows_by_id["rename_current_node"]["operationTargets"])
+        self.assertIn("triggered_run_status terminal", flows_by_id["run_current_graph"]["completionEvidence"])
+        for flow_id, flow in flows_by_id.items():
+            with self.subTest(flow_id=flow_id):
+                self.assertTrue(flow["sampleGoal"])
+                self.assertTrue(flow["completionEvidence"])
+                self.assertLessEqual(len(flow["operationTargets"]), 5)
+
     def test_buddy_autonomous_review_template_contract(self) -> None:
         template = load_template_record("buddy_autonomous_review")
         states = template["state_schema"]

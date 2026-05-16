@@ -625,6 +625,56 @@
   "metadata": {
     "graphProtocol": "node_system",
     "role": "page_operation_workflow",
-    "pageOperationTemplate": true
+    "pageOperationTemplate": true,
+    "targetFlows": [
+      {
+        "id": "open_runs_page",
+        "sampleGoal": "打开运行记录",
+        "operationTargets": ["app.nav.runs", "runs.action.refresh"],
+        "completionEvidence": ["page_facts.route.path == /runs", "visibleRuns contains run cards"]
+      },
+      {
+        "id": "open_run_detail",
+        "sampleGoal": "打开某个运行详情",
+        "operationTargets": ["app.nav.runs", "runs.search.graphName", "runs.run.<runId>.openDetail"],
+        "completionEvidence": ["page_facts.route.path starts with /runs/", "visible run detail matches requested run id"]
+      },
+      {
+        "id": "open_library_page",
+        "sampleGoal": "打开图与模板页面",
+        "operationTargets": ["app.nav.library", "library.search.query"],
+        "completionEvidence": ["page_facts.route.path == /library", "visibleGraphs or visibleTemplates are available"]
+      },
+      {
+        "id": "create_blank_graph",
+        "sampleGoal": "新建一个空白图",
+        "operationTargets": ["app.nav.library", "library.action.newBlankGraph", "editor.launcher.createNew"],
+        "completionEvidence": ["page_facts.route.path starts with /editor", "page_facts.activeGraph exists", "active graph is dirty or unnamed draft"]
+      },
+      {
+        "id": "open_named_graph",
+        "sampleGoal": "打开名为 X 的图",
+        "operationTargets": ["app.nav.library", "library.search.query", "library.graph.<graphId>.open", "editor.launcher.openGraph.<graphId>"],
+        "completionEvidence": ["page_facts.activeGraph.name matches target", "page_facts.activeGraph.graphId matches visible graph id"]
+      },
+      {
+        "id": "run_current_graph",
+        "sampleGoal": "运行当前图并告诉我结果",
+        "operationTargets": ["editor.action.runActiveGraph", "editor.action.toggleRunActivity"],
+        "completionEvidence": ["triggered_run_id present", "triggered_run_status terminal", "page_facts.latestForegroundRun.runId matches triggered_run_id"]
+      },
+      {
+        "id": "create_basic_llm_graph",
+        "sampleGoal": "新建一个包含输入、LLM、输出的图",
+        "operationTargets": ["app.nav.library", "library.action.newBlankGraph", "editor.graph.playback", "editor.action.saveActiveGraph"],
+        "completionEvidence": ["graph_edit_summary.applied is true", "page_facts.activeGraph exists", "node labels include input, LLM, output"]
+      },
+      {
+        "id": "rename_current_node",
+        "sampleGoal": "编辑当前图，给某个节点改名",
+        "operationTargets": ["editor.canvas.node.<nodeId>", "editor.graph.playback", "editor.action.saveActiveGraph"],
+        "completionEvidence": ["graph_edit_summary.applied is true", "page_facts.activeGraph.dirty or saved revision updated", "target node label changed"]
+      }
+    ]
   }
 }
