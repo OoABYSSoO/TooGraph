@@ -30,6 +30,33 @@ test("text editor model reads draft values by field", () => {
   assert.equal(resolveTextEditorDraftValue(drafts, "description"), "Draft body");
 });
 
+test("text editor model treats generic node default text as placeholder-only", () => {
+  const drafts = buildTextEditorDrafts({
+    kind: "input",
+    name: "Input",
+    description: "Provide a value to the current workflow.",
+  });
+
+  assert.equal(drafts.title, "");
+  assert.equal(drafts.description, "");
+  assert.deepEqual(
+    resolveTextEditorMetadataPatch("title", "", {
+      kind: "input",
+      name: "Input",
+      description: "Provide a value to the current workflow.",
+    }),
+    { name: "" },
+  );
+  assert.deepEqual(
+    resolveTextEditorMetadataPatch("description", "", {
+      kind: "input",
+      name: "Input",
+      description: "Provide a value to the current workflow.",
+    }),
+    { description: "" },
+  );
+});
+
 test("text editor open state helpers match the active field exactly", () => {
   assert.equal(isTextEditorOpenState("title", "title"), true);
   assert.equal(isTextEditorOpenState("description", "title"), false);
