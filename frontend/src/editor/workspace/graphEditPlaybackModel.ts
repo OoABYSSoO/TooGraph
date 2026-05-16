@@ -4,6 +4,7 @@ import {
   updateAgentNodeConfigInDocument,
   updateNodeMetadataInDocument,
 } from "../../lib/graph-document.ts";
+import { buildFixedConditionConfig } from "../../lib/condition-protocol.ts";
 import { addStateBindingToDocument } from "./statePanelBindings.ts";
 import {
   buildNextDefaultStateField,
@@ -1104,12 +1105,7 @@ function buildGraphNodeFromCreationFields(input: {
         ui: { position: input.position, collapsed: false },
         reads: [],
         writes: [],
-        config: {
-          branches: ["true", "false"],
-          loopLimit: 1,
-          branchMapping: { true: "true", false: "false" },
-          rule: { source: "", operator: "exists", value: null },
-        },
+        config: buildFixedConditionConfig({ source: "", operator: "exists", value: null }),
       } satisfies ConditionNode;
     case "agent":
       return {
