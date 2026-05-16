@@ -13,8 +13,8 @@ DEFAULT_SELECTED_CAPABILITY = {
 }
 
 
-def buddy_visible_subgraph_result_adapter(**skill_inputs: Any) -> dict[str, Any]:
-    selected = _normalize_selected_capability(skill_inputs.get("selected_capability"))
+def buddy_visible_subgraph_result_adapter(**action_inputs: Any) -> dict[str, Any]:
+    selected = _normalize_selected_capability(action_inputs.get("selected_capability"))
     if selected.get("kind") != "subgraph":
         return _failed(
             code="unsupported_capability_kind",
@@ -22,9 +22,9 @@ def buddy_visible_subgraph_result_adapter(**skill_inputs: Any) -> dict[str, Any]
             detail={"selected_capability": selected},
         )
 
-    user_goal = _compact_text(skill_inputs.get("user_goal"))
-    operation_result = _normalize_json_object(skill_inputs.get("operation_result"))
-    operation_report = _normalize_json_object(skill_inputs.get("operation_report"))
+    user_goal = _compact_text(action_inputs.get("user_goal"))
+    operation_result = _normalize_json_object(action_inputs.get("operation_result"))
+    operation_report = _normalize_json_object(action_inputs.get("operation_report"))
     direct_operation = operation_report or operation_result
     if direct_operation:
         return _wrap_direct_template_operation(
@@ -33,8 +33,8 @@ def buddy_visible_subgraph_result_adapter(**skill_inputs: Any) -> dict[str, Any]
             operation_report=direct_operation,
         )
 
-    page_operation_final_reply = _compact_text(skill_inputs.get("page_operation_final_reply"))
-    page_operation_workflow_report = _normalize_json_object(skill_inputs.get("page_operation_workflow_report"))
+    page_operation_final_reply = _compact_text(action_inputs.get("page_operation_final_reply"))
+    page_operation_workflow_report = _normalize_json_object(action_inputs.get("page_operation_workflow_report"))
     if page_operation_final_reply or page_operation_workflow_report:
         return _wrap_page_operation_workflow_outputs(
             selected=selected,
@@ -43,7 +43,7 @@ def buddy_visible_subgraph_result_adapter(**skill_inputs: Any) -> dict[str, Any]
             operation_report=page_operation_workflow_report,
         )
 
-    visible_result = _normalize_result_package(skill_inputs.get("visible_operation_result"))
+    visible_result = _normalize_result_package(action_inputs.get("visible_operation_result"))
     if visible_result:
         return _wrap_result_package(
             selected=selected,
@@ -55,10 +55,10 @@ def buddy_visible_subgraph_result_adapter(**skill_inputs: Any) -> dict[str, Any]
         code="invalid_visible_operation_result",
         message="需要 operation_report 或页面操作 workflow 输出，才能适配可见图模板结果。",
         detail={
-            "operation_report": skill_inputs.get("operation_report"),
-            "page_operation_final_reply": skill_inputs.get("page_operation_final_reply"),
-            "page_operation_workflow_report": skill_inputs.get("page_operation_workflow_report"),
-            "visible_operation_result": skill_inputs.get("visible_operation_result"),
+            "operation_report": action_inputs.get("operation_report"),
+            "page_operation_final_reply": action_inputs.get("page_operation_final_reply"),
+            "page_operation_workflow_report": action_inputs.get("page_operation_workflow_report"),
+            "visible_operation_result": action_inputs.get("visible_operation_result"),
         },
     )
 
@@ -96,9 +96,9 @@ def _wrap_direct_template_operation(
         error=error,
         error_type=_compact_text(operation_report.get("errorType") or operation_report.get("error_type")),
         final_reply_name="可见模板运行回复",
-        final_reply_description="页面操作 Skill 在运行目标模板后得到的用户可见摘要。",
+        final_reply_description="页面操作 Action 在运行目标模板后得到的用户可见摘要。",
         operation_report_name="可见模板运行报告",
-        operation_report_description="固定模板运行 Skill 和前端续跑返回的结构化操作报告。",
+        operation_report_description="固定模板运行 Action 和前端续跑返回的结构化操作报告。",
         visible_result_name="固定模板页面操作结果",
         visible_result_description="toograph_page_operator 触发并等待目标模板运行后的紧凑操作结果。",
     )
@@ -691,7 +691,7 @@ def _compact_text(value: Any) -> str:
 def main() -> None:
     payload = json.loads(sys.stdin.read() or "{}")
     if not isinstance(payload, dict):
-        raise SystemExit("Skill input must be a JSON object.")
+        raise SystemExit("Action input must be a JSON object.")
     print(json.dumps(buddy_visible_subgraph_result_adapter(**payload), ensure_ascii=False))
 
 

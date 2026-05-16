@@ -149,6 +149,8 @@ class NodeExecutionArtifacts(BaseModel):
     runtime_config: dict[str, Any] | None = None
     selected_capabilities: list[dict[str, Any]] = Field(default_factory=list)
     capability_outputs: list[dict[str, Any]] = Field(default_factory=list)
+    selected_tools: list[str] = Field(default_factory=list)
+    tool_outputs: list[dict[str, Any]] = Field(default_factory=list)
     context_assembly_report: dict[str, Any] | None = None
     state_reads: list[NodeStateReadRecord] = Field(default_factory=list)
     state_writes: list[NodeStateWriteRecord] = Field(default_factory=list)
@@ -156,6 +158,7 @@ class NodeExecutionArtifacts(BaseModel):
 
 class RunArtifacts(BaseModel):
     action_outputs: list[dict[str, Any]] = Field(default_factory=list)
+    tool_outputs: list[dict[str, Any]] = Field(default_factory=list)
     activity_events: list[ActivityEvent] = Field(default_factory=list)
     capability_outputs: list[dict[str, Any]] = Field(default_factory=list)
     output_previews: list[OutputPreview] = Field(default_factory=list)
@@ -195,6 +198,8 @@ class RunDetail(RunSummary):
     metadata: dict[str, Any] = Field(default_factory=dict)
     selected_actions: list[str] = Field(default_factory=list)
     action_outputs: list[dict[str, Any]] = Field(default_factory=list)
+    selected_tools: list[str] = Field(default_factory=list)
+    tool_outputs: list[dict[str, Any]] = Field(default_factory=list)
     selected_capabilities: list[dict[str, Any]] = Field(default_factory=list)
     capability_outputs: list[dict[str, Any]] = Field(default_factory=list)
     evaluation_result: dict[str, Any] = Field(default_factory=dict)

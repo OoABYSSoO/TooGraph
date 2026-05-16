@@ -3,7 +3,7 @@
   "actionKey": "buddy_session_recall",
   "name": "Buddy Session Recall",
   "description": "Read-only Buddy session recall over buddy.db messages with browse, discover, and scroll modes.",
-  "llmInstruction": "你已绑定 Buddy 会话召回技能。根据 recall_request 和上游状态生成检索参数。mode 只能是 browse、discover 或 scroll。discover 使用 query 搜索真实 buddy_messages，返回 snippet、命中窗口和 session bookends；browse 列出最近会话；scroll 使用 session_id 和 anchor_message_id 展开上下文。可选参数包括 limit、window、bookend、sort、role_filter、current_session_id。current_session_id 用于排除当前会话谱系，避免把正在运行的上下文当历史记忆再次召回。该技能只读取 buddy.db 会话历史，不总结、不改写、不写入 MEMORY.md，也不创建逐条审批记录。",
+  "llmInstruction": "你已绑定 Buddy 会话召回 Action。根据 recall_request 和上游状态生成检索参数。mode 只能是 browse、discover 或 scroll。discover 使用 query 搜索真实 buddy_messages，返回 snippet、命中窗口和 session bookends；browse 列出最近会话；scroll 使用 session_id 和 anchor_message_id 展开上下文。可选参数包括 limit、window、bookend、sort、role_filter、current_session_id。current_session_id 用于排除当前会话谱系，避免把正在运行的上下文当历史记忆再次召回。该 Action只读取 buddy.db 会话历史，不总结、不改写、不写入 MEMORY.md，也不创建逐条审批记录。",
   "version": "1.0.0",
   "timeoutSeconds": 15,
   "permissions": ["buddy_session_read"],

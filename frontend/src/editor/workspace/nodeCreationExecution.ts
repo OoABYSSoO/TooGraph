@@ -1,4 +1,4 @@
-import { uploadSkillArtifactFile } from "../../api/capabilityArtifacts.ts";
+import { uploadCapabilityArtifactFile } from "../../api/capabilityArtifacts.ts";
 import { createUploadedAssetEnvelope, type UploadedAssetUploadResult } from "../nodes/uploadedAssetModel.ts";
 import {
   applyNodeCreationResult,
@@ -6,6 +6,7 @@ import {
   buildGenericBatchNode,
   buildGenericOutputNode,
   buildGenericSubgraphNode,
+  buildGenericToolNode,
   buildInputNodeFromFile,
   buildNodeFromPreset,
   buildSubgraphNodeFromGraph,
@@ -171,6 +172,23 @@ export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocume
     });
   }
 
+  if (input.entry.mode === "node" && input.entry.nodeKind === "tool") {
+    const created = applyCreatedNodePlacement(
+      buildGenericToolNode({
+        id: createdNodeId,
+        position: input.context?.position ?? { x: 0, y: 0 },
+      }),
+      createdNodeId,
+      input.context,
+    );
+    return applyNodeCreationResult(document, {
+      createdNodeId,
+      createdNode: created.node,
+      mergedStateSchema: created.state_schema,
+      context: input.context ?? null,
+    });
+  }
+
   if (input.entry.mode === "subgraph") {
     const template = resolveCreationTemplate(input.entry, input.templates);
     if (!template) {
@@ -225,7 +243,7 @@ export async function createNodeFromDroppedFile<T extends GraphPayload | GraphDo
   input: CreateNodeFromDroppedFileInput,
 ) {
   const createdNodeId = input.createdNodeId ?? createGraphNodeId("input");
-  const envelope = await createUploadedAssetEnvelope(input.file, input.uploadFile ?? uploadSkillArtifactFile);
+  const envelope = await createUploadedAssetEnvelope(input.file, input.uploadFile ?? uploadCapabilityArtifactFile);
   const stateField = buildNextDefaultStateField(document, {
     name: envelope.name,
     type: envelope.detectedType,

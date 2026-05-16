@@ -11,7 +11,8 @@ export const NODE_CREATION_FAMILY_PRIORITY: Record<NodeCreationEntry["family"], 
   agent: 2,
   batch: 3,
   condition: 4,
-  subgraph: 5,
+  tool: 5,
+  subgraph: 6,
 };
 
 export function buildBuiltinNodeCreationEntries(): NodeCreationEntry[] {
@@ -64,6 +65,16 @@ export function buildBuiltinNodeCreationEntries(): NodeCreationEntry[] {
       mode: "node",
       origin: "builtin",
       nodeKind: "batch",
+      acceptsValueTypes: null,
+    },
+    {
+      id: "node-tool",
+      family: "tool",
+      label: "Tool",
+      description: "Run deterministic processing without an LLM turn.",
+      mode: "node",
+      origin: "builtin",
+      nodeKind: "tool",
       acceptsValueTypes: null,
     },
     {

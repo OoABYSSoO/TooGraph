@@ -1,13 +1,13 @@
 import type { AgentActionInstructionBlock, AgentNode } from "../../types/node-system.ts";
-import type { SkillDefinition } from "../../types/actions.ts";
+import type { ActionDefinition } from "../../types/actions.ts";
 
-export type AgentSkillPatch = Partial<Pick<AgentNode["config"], "actionKey" | "actionInstructionBlocks">>;
+export type AgentActionPatch = Partial<Pick<AgentNode["config"], "actionKey" | "actionInstructionBlocks">>;
 
-export function listSelectableSkillDefinitions(skillDefinitions: SkillDefinition[]) {
-  return skillDefinitions.filter(isAgentAttachableSkillDefinition);
+export function listSelectableActionDefinitions(actionDefinitions: ActionDefinition[]) {
+  return actionDefinitions.filter(isAgentAttachableActionDefinition);
 }
 
-export function isAgentAttachableSkillDefinition(definition: SkillDefinition) {
+export function isAgentAttachableActionDefinition(definition: ActionDefinition) {
   return (
     definition.status === "active" &&
     definition.llmNodeEligibility === "ready" &&
@@ -16,20 +16,20 @@ export function isAgentAttachableSkillDefinition(definition: SkillDefinition) {
   );
 }
 
-export function resolveSelectAgentSkillPatch(
-  currentSkillKey: string,
-  skillKey: string,
-  _skillDefinitions: SkillDefinition[],
+export function resolveSelectAgentActionPatch(
+  currentActionKey: string,
+  actionKey: string,
+  _actionDefinitions: ActionDefinition[],
   currentInstructionBlocks: Record<string, AgentActionInstructionBlock> = {},
-): AgentSkillPatch | null {
-  const normalizedSkillKey = skillKey.trim();
-  const normalizedCurrentSkillKey = currentSkillKey.trim();
-  if (normalizedSkillKey === normalizedCurrentSkillKey) {
+): AgentActionPatch | null {
+  const normalizedActionKey = actionKey.trim();
+  const normalizedCurrentActionKey = currentActionKey.trim();
+  if (normalizedActionKey === normalizedCurrentActionKey) {
     return null;
   }
 
-  if (!normalizedSkillKey) {
-    return !normalizedCurrentSkillKey && Object.keys(currentInstructionBlocks).length === 0
+  if (!normalizedActionKey) {
+    return !normalizedCurrentActionKey && Object.keys(currentInstructionBlocks).length === 0
       ? null
       : {
           actionKey: "",
@@ -37,15 +37,15 @@ export function resolveSelectAgentSkillPatch(
         };
   }
 
-  const currentOverride = currentInstructionBlocks[normalizedSkillKey];
+  const currentOverride = currentInstructionBlocks[normalizedActionKey];
   return {
-    actionKey: normalizedSkillKey,
+    actionKey: normalizedActionKey,
     actionInstructionBlocks:
       currentOverride?.source === "node.override" && currentOverride.content.trim()
         ? {
-            [normalizedSkillKey]: {
+            [normalizedActionKey]: {
               ...currentOverride,
-              actionKey: normalizedSkillKey,
+              actionKey: normalizedActionKey,
               source: "node.override",
             },
           }
@@ -53,23 +53,23 @@ export function resolveSelectAgentSkillPatch(
   };
 }
 
-export function resolveDisplayAgentSkillInstructionBlocks(
-  skillKey: string,
-  skillDefinitions: SkillDefinition[],
+export function resolveDisplayAgentActionInstructionBlocks(
+  actionKey: string,
+  actionDefinitions: ActionDefinition[],
   currentInstructionBlocks: Record<string, AgentActionInstructionBlock> = {},
 ): Record<string, AgentActionInstructionBlock> {
-  const normalizedSkillKey = skillKey.trim();
-  if (!normalizedSkillKey) {
+  const normalizedActionKey = actionKey.trim();
+  if (!normalizedActionKey) {
     return {};
   }
-  const currentBlock = currentInstructionBlocks[normalizedSkillKey];
-  const definition = skillDefinitions.find((candidate) => candidate.skillKey === normalizedSkillKey);
+  const currentBlock = currentInstructionBlocks[normalizedActionKey];
+  const definition = actionDefinitions.find((candidate) => candidate.actionKey === normalizedActionKey);
   if (currentBlock?.source === "node.override") {
     return {
-      [normalizedSkillKey]: {
+      [normalizedActionKey]: {
         ...currentBlock,
-        actionKey: normalizedSkillKey,
-        title: currentBlock.title.trim() || `${definition?.name?.trim() || normalizedSkillKey} skill instruction`,
+        actionKey: normalizedActionKey,
+        title: currentBlock.title.trim() || `${definition?.name?.trim() || normalizedActionKey} action instruction`,
         source: "node.override",
       },
     };
@@ -79,40 +79,40 @@ export function resolveDisplayAgentSkillInstructionBlocks(
     return {};
   }
   return {
-    [normalizedSkillKey]: {
-      actionKey: normalizedSkillKey,
-      title: currentBlock?.title?.trim() || `${definition?.name?.trim() || normalizedSkillKey} skill instruction`,
+    [normalizedActionKey]: {
+      actionKey: normalizedActionKey,
+      title: currentBlock?.title?.trim() || `${definition?.name?.trim() || normalizedActionKey} action instruction`,
       content: instruction,
       source: "action.llmInstruction",
     },
   };
 }
 
-export function resolveSkillInstructionOverridePatch(
-  skillKey: string,
+export function resolveActionInstructionOverridePatch(
+  actionKey: string,
   content: string,
-  skillDefinitions: SkillDefinition[],
+  actionDefinitions: ActionDefinition[],
   currentInstructionBlocks: Record<string, AgentActionInstructionBlock> = {},
 ): Pick<AgentNode["config"], "actionInstructionBlocks"> | null {
-  const normalizedSkillKey = skillKey.trim();
-  if (!normalizedSkillKey) {
+  const normalizedActionKey = actionKey.trim();
+  if (!normalizedActionKey) {
     return null;
   }
-  const displayedBlocks = resolveDisplayAgentSkillInstructionBlocks(
-    normalizedSkillKey,
-    skillDefinitions,
+  const displayedBlocks = resolveDisplayAgentActionInstructionBlocks(
+    normalizedActionKey,
+    actionDefinitions,
     currentInstructionBlocks,
   );
-  const currentBlock = currentInstructionBlocks[normalizedSkillKey] ?? displayedBlocks[normalizedSkillKey];
+  const currentBlock = currentInstructionBlocks[normalizedActionKey] ?? displayedBlocks[normalizedActionKey];
   if (!currentBlock) {
     return null;
   }
   return {
     actionInstructionBlocks: {
       ...currentInstructionBlocks,
-      [normalizedSkillKey]: {
+      [normalizedActionKey]: {
         ...currentBlock,
-        actionKey: normalizedSkillKey,
+        actionKey: normalizedActionKey,
         content,
         source: "node.override",
       },

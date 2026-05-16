@@ -79,11 +79,13 @@ class StateWriteMode(str, Enum):
 
 class NodeSystemStateBindingKind(str, Enum):
     ACTION_OUTPUT = "action_output"
+    TOOL_OUTPUT = "tool_output"
     CAPABILITY_RESULT = "capability_result"
 
 
 class NodeSystemReadBindingKind(str, Enum):
     ACTION_INPUT = "action_input"
+    TOOL_INPUT = "tool_input"
 
 
 class BatchWorkerSource(str, Enum):
@@ -99,6 +101,7 @@ class BatchInputMode(str, Enum):
 class NodeSystemStateBindingMetadata(BaseModel):
     kind: NodeSystemStateBindingKind = NodeSystemStateBindingKind.ACTION_OUTPUT
     action_key: str = Field(default="", alias="actionKey")
+    tool_key: str = Field(default="", alias="toolKey")
     node_id: str = Field(..., min_length=1, alias="nodeId")
     field_key: str = Field(default="", alias="fieldKey")
     managed: bool = True
@@ -107,7 +110,7 @@ class NodeSystemStateBindingMetadata(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_legacy_skill_aliases(cls, data: Any) -> Any:
+    def reject_legacy_action_protocol_aliases(cls, data: Any) -> Any:
         if isinstance(data, dict) and "skillKey" in data:
             raise ValueError("'skillKey' is no longer supported for state bindings. Use 'actionKey' instead.")
         return data
@@ -117,7 +120,7 @@ class NodeSystemStateBindingMetadata(BaseModel):
     def validate_required_binding_identifier(cls, value: str) -> str:
         return _validate_identifier(value, label="State binding identifier")
 
-    @field_validator("action_key", "field_key")
+    @field_validator("action_key", "tool_key", "field_key")
     @classmethod
     def validate_optional_binding_identifier(cls, value: str) -> str:
         stripped = value.strip()
@@ -127,21 +130,25 @@ class NodeSystemStateBindingMetadata(BaseModel):
     def validate_binding_shape(self) -> "NodeSystemStateBindingMetadata":
         if self.kind == NodeSystemStateBindingKind.ACTION_OUTPUT:
             self.action_key = _validate_identifier(self.action_key, label="Action key")
+            self.tool_key = ""
             self.field_key = _validate_identifier(self.field_key, label="Action output field")
+            return self
+        if self.kind == NodeSystemStateBindingKind.TOOL_OUTPUT:
+            self.tool_key = _validate_identifier(self.tool_key, label="Tool key")
+            self.action_key = ""
+            self.field_key = _validate_identifier(self.field_key, label="Tool output field")
             return self
 
         self.action_key = ""
+        self.tool_key = ""
         self.field_key = self.field_key or "result_package"
         return self
-
-    @property
-    def skill_key(self) -> str:
-        return self.action_key
 
 
 class NodeSystemReadBindingMetadata(BaseModel):
     kind: NodeSystemReadBindingKind = NodeSystemReadBindingKind.ACTION_INPUT
-    action_key: str = Field(..., min_length=1, alias="actionKey")
+    action_key: str = Field(default="", alias="actionKey")
+    tool_key: str = Field(default="", alias="toolKey")
     field_key: str = Field(..., min_length=1, alias="fieldKey")
     managed: bool = True
 
@@ -149,25 +156,30 @@ class NodeSystemReadBindingMetadata(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_legacy_skill_aliases(cls, data: Any) -> Any:
+    def reject_legacy_action_protocol_aliases(cls, data: Any) -> Any:
         if isinstance(data, dict) and "skillKey" in data:
             raise ValueError("'skillKey' is no longer supported for read bindings. Use 'actionKey' instead.")
         return data
 
-    @field_validator("action_key", "field_key")
+    @field_validator("action_key", "tool_key", "field_key")
     @classmethod
     def validate_binding_identifier(cls, value: str) -> str:
-        return _validate_identifier(value, label="Action input binding identifier")
+        stripped = value.strip()
+        return _validate_identifier(stripped, label="Read binding identifier") if stripped else ""
 
     @model_validator(mode="after")
     def validate_binding_shape(self) -> "NodeSystemReadBindingMetadata":
-        if self.kind != NodeSystemReadBindingKind.ACTION_INPUT:
-            raise ValueError("Read binding metadata only supports action_input.")
+        if self.kind == NodeSystemReadBindingKind.ACTION_INPUT:
+            self.action_key = _validate_identifier(self.action_key, label="Action key")
+            self.tool_key = ""
+            self.field_key = _validate_identifier(self.field_key, label="Action input field")
+            return self
+        if self.kind == NodeSystemReadBindingKind.TOOL_INPUT:
+            self.tool_key = _validate_identifier(self.tool_key, label="Tool key")
+            self.action_key = ""
+            self.field_key = _validate_identifier(self.field_key, label="Tool input field")
+            return self
         return self
-
-    @property
-    def skill_key(self) -> str:
-        return self.action_key
 
 
 class AgentModelSource(str, Enum):
@@ -295,7 +307,7 @@ class NodeSystemAgentActionBinding(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_legacy_skill_aliases(cls, data: Any) -> Any:
+    def reject_legacy_action_protocol_aliases(cls, data: Any) -> Any:
         if isinstance(data, dict) and "skillKey" in data:
             raise ValueError("'skillKey' is no longer supported for action bindings. Use 'actionKey' instead.")
         return data
@@ -316,10 +328,6 @@ class NodeSystemAgentActionBinding(BaseModel):
             normalized[next_mapping_key] = _validate_identifier(state_key, label="State reference")
         return normalized
 
-    @property
-    def skill_key(self) -> str:
-        return self.action_key
-
 
 class NodeSystemActionInstructionBlock(BaseModel):
     action_key: str = Field(..., min_length=1, alias="actionKey")
@@ -331,7 +339,7 @@ class NodeSystemActionInstructionBlock(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_legacy_skill_aliases(cls, data: Any) -> Any:
+    def reject_legacy_action_protocol_aliases(cls, data: Any) -> Any:
         if isinstance(data, dict) and "skillKey" in data:
             raise ValueError("'skillKey' is no longer supported for action instruction blocks. Use 'actionKey' instead.")
         if isinstance(data, dict) and data.get("source") == "skill.llmInstruction":
@@ -342,14 +350,6 @@ class NodeSystemActionInstructionBlock(BaseModel):
     @classmethod
     def validate_action_key(cls, value: str) -> str:
         return _validate_identifier(value, label="Action key")
-
-    @property
-    def skill_key(self) -> str:
-        return self.action_key
-
-
-NodeSystemAgentSkillBinding = NodeSystemAgentActionBinding
-NodeSystemSkillInstructionBlock = NodeSystemActionInstructionBlock
 
 
 class NodeSystemAgentConfig(BaseModel):
@@ -370,7 +370,7 @@ class NodeSystemAgentConfig(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_legacy_skill_fields(cls, data: Any) -> Any:
+    def reject_legacy_action_protocol_fields(cls, data: Any) -> Any:
         if isinstance(data, dict):
             legacy_fields = ["skills", "skillKey", "skillBindings", "skillInstructionBlocks"]
             for legacy_field in legacy_fields:
@@ -395,18 +395,6 @@ class NodeSystemAgentConfig(BaseModel):
     @classmethod
     def normalize_thinking_mode(cls, value: Any) -> str:
         return normalize_thinking_level(value)
-
-    @property
-    def skill_key(self) -> str:
-        return self.action_key
-
-    @property
-    def skill_bindings(self) -> list[NodeSystemAgentActionBinding]:
-        return self.action_bindings
-
-    @property
-    def skill_instruction_blocks(self) -> dict[str, NodeSystemActionInstructionBlock]:
-        return self.action_instruction_blocks
 
 
 class NodeSystemBatchSubgraphWorkerConfig(BaseModel):
@@ -523,6 +511,27 @@ class NodeSystemSubgraphConfig(BaseModel):
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 
 
+class NodeSystemToolConfig(BaseModel):
+    tool_key: str = Field(default="", alias="toolKey")
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_action_or_skill_protocol_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for legacy_field in ("skillKey", "actionKey"):
+                if legacy_field in data:
+                    raise ValueError(f"'{legacy_field}' is not supported for tool config. Use 'toolKey' instead.")
+        return data
+
+    @field_validator("tool_key")
+    @classmethod
+    def validate_optional_tool_key(cls, value: str) -> str:
+        stripped = value.strip()
+        return _validate_identifier(stripped, label="Tool key") if stripped else ""
+
+
 class NodeSystemInputNode(BaseModel):
     kind: Literal["input"] = "input"
     name: str = ""
@@ -583,6 +592,16 @@ class NodeSystemSubgraphNode(BaseModel):
     config: NodeSystemSubgraphConfig
 
 
+class NodeSystemToolNode(BaseModel):
+    kind: Literal["tool"] = "tool"
+    name: str = ""
+    description: str = ""
+    ui: NodeSystemNodeUi
+    reads: list[NodeSystemReadBinding] = Field(default_factory=list)
+    writes: list[NodeSystemWriteBinding] = Field(default_factory=list)
+    config: NodeSystemToolConfig = Field(default_factory=NodeSystemToolConfig)
+
+
 NodeSystemNode = (
     NodeSystemInputNode
     | NodeSystemAgentNode
@@ -590,6 +609,7 @@ NodeSystemNode = (
     | NodeSystemConditionNode
     | NodeSystemOutputNode
     | NodeSystemSubgraphNode
+    | NodeSystemToolNode
 )
 
 NodeSystemNodeConfig = NodeSystemNode

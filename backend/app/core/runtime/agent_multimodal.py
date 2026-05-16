@@ -7,7 +7,7 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
-from app.core.storage.skill_artifact_store import read_skill_artifact_file_metadata
+from app.core.storage.capability_artifact_store import read_capability_artifact_file_metadata
 from app.tools.video_frame_fallback import extract_video_frame_attachments, probe_video_duration_seconds
 
 
@@ -279,7 +279,7 @@ def _build_artifact_media_attachment(
     if not local_path:
         return None
     try:
-        metadata = read_skill_artifact_file_metadata(local_path)
+        metadata = read_capability_artifact_file_metadata(local_path)
     except (FileNotFoundError, ValueError):
         return None
 
@@ -296,7 +296,7 @@ def _build_artifact_media_attachment(
     name = str(record.get("filename") or record.get("name") or metadata.get("name") or Path(local_path).name).strip()
     return {
         "type": media_type,
-        "source": "skill_artifact",
+        "source": "capability_artifact",
         "state_key": state_key,
         "name": name,
         "mime_type": _normalize_media_mime_type(content_type, media_type, name),

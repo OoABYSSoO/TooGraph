@@ -5,7 +5,7 @@ description: Use when a graph needs to generate deterministic tests for a provid
 
 # TooGraph 脚本测试器
 
-Use this skill when the graph has a script or generated script source and needs tests written and executed in a temporary workspace.
+Use this action when the graph has a script or generated script source and needs tests written and executed in a temporary workspace.
 
 `before_llm.py` injects current system context, including OS, Python executable/version, and available allowed commands. If TooGraph runtime passes explicit file hints in `runtime_context`, it appends readable file previews to the context. It does not inspect graph state to discover local files.
 
@@ -23,4 +23,4 @@ State outputs:
 - `success`: Boolean indicating whether the test command exited with code 0.
 - `result`: Markdown result containing command, exit code, duration, stdout, stderr, or validation errors.
 
-The runtime writes only inside a temporary directory, validates file paths, and runs only allowlisted commands. The provided code still executes in the local system environment. This Skill declares file-write and subprocess capability; `需确认` mode pauses before executing generated or untrusted scripts and `完全访问` mode can run them without an extra prompt.
+The runtime writes only inside a temporary directory, validates file paths, and runs only allowlisted commands. The provided code still executes in the local system environment. This Action declares file-write and subprocess capability; `需确认` mode pauses before executing generated or untrusted scripts and `完全访问` mode can run them without an extra prompt.

@@ -1540,7 +1540,7 @@ def _normalize_capability_usage_stats(payload: dict[str, Any]) -> dict[str, Any]
 def _normalize_capability_usage_record(record: dict[str, Any]) -> dict[str, Any]:
     recent_runs = record.get("recent_runs") if isinstance(record.get("recent_runs"), list) else []
     return {
-        "kind": str(record.get("kind") or "skill"),
+        "kind": str(record.get("kind") or "action"),
         "key": str(record.get("key") or ""),
         "name": str(record.get("name") or record.get("key") or ""),
         "use_count": int(record.get("use_count") or 0),
@@ -1563,7 +1563,7 @@ def _coerce_capability_usage_entries(payload: dict[str, Any]) -> list[dict[str, 
 
 def _apply_capability_usage_entry(stats: dict[str, Any], entry: dict[str, Any], *, now: str) -> None:
     capability = entry.get("capability") if isinstance(entry.get("capability"), dict) else {}
-    kind = str(capability.get("kind") or entry.get("kind") or "skill").strip() or "skill"
+    kind = str(capability.get("kind") or entry.get("kind") or "action").strip() or "action"
     key = str(capability.get("key") or entry.get("key") or "").strip()
     if not key:
         raise ValueError("capability_usage_stats.update requires capability.key.")

@@ -21,7 +21,7 @@
         "buddy_context": {
           "enabled_capabilities": [
             "toograph_page_operation_workflow",
-            "toograph_skill_creation_workflow"
+            "toograph_action_creation_workflow"
           ],
           "permission_policy": {
             "graph_write": "approval_required",

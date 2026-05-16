@@ -6,7 +6,7 @@ from typing import Any
 from app.core.runtime.agent_multimodal import normalize_uploaded_file_envelope
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
 from app.core.storage.local_input_sources import read_local_input_file_metadata, read_local_input_text_for_prompt
-from app.core.storage.skill_artifact_store import read_skill_artifact_file_metadata, read_skill_artifact_text_for_prompt
+from app.core.storage.capability_artifact_store import read_capability_artifact_file_metadata, read_capability_artifact_text_for_prompt
 
 
 RESULT_PACKAGE_INPUT_PROMPT_CHAR_LIMIT = 1200
@@ -34,23 +34,23 @@ ARTIFACT_REF_KEYS = (
 def build_effective_system_prompt(
     output_keys: list[str],
     input_values: dict[str, Any],
-    skill_context: dict[str, Any],
+    action_context: dict[str, Any],
     *,
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
 ) -> str:
-    return build_auto_system_prompt(output_keys, input_values, skill_context, state_schema=state_schema)
+    return build_auto_system_prompt(output_keys, input_values, action_context, state_schema=state_schema)
 
 
 def build_auto_system_prompt(
     output_keys: list[str],
     input_values: dict[str, Any],
-    skill_context: dict[str, Any],
+    action_context: dict[str, Any],
     *,
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
 ) -> str:
     resolved_state_schema = state_schema or {}
     parts = [
-        "你是一个工作流处理节点。根据输入和技能结果完成用户的任务指令。",
+        "你是一个工作流处理节点。根据输入和Action 结果完成用户的任务指令。",
         "严格返回一个 JSON 对象，不要加 markdown 围栏或任何前缀。",
     ]
 
@@ -60,13 +60,13 @@ def build_auto_system_prompt(
             definition = resolved_state_schema.get(key)
             parts.extend(format_graph_state_input_prompt_lines(key, definition, value))
 
-    if skill_context:
-        parts.append("\n== Skill Results ==")
-        parts.append("涉及事实、日期、天气、新闻或外部资料时，必须以技能结果为依据；不要编造技能结果中不存在的事实。")
-        parts.append("如果技能结果没有提供足够证据，明确说明未检索到可靠答案。")
+    if action_context:
+        parts.append("\n== Action Results ==")
+        parts.append("涉及事实、日期、天气、新闻或外部资料时，必须以Action 结果为依据；不要编造Action 结果中不存在的事实。")
+        parts.append("如果Action 结果没有提供足够证据，明确说明未检索到可靠答案。")
         parts.append("引用链接必须完整复制 URL；不要用省略号、截断链接或泛称代替标题和链接。")
-        for skill_key, result in skill_context.items():
-            parts.append(f"[{skill_key}]")
+        for action_key, result in action_context.items():
+            parts.append(f"[{action_key}]")
             if isinstance(result, dict):
                 for result_key, result_value in result.items():
                     display = format_prompt_value(result_value)
@@ -148,7 +148,7 @@ def build_context_assembly_report(
     node_type: str,
     input_values: dict[str, Any],
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
-    skill_context: dict[str, Any] | None = None,
+    action_context: dict[str, Any] | None = None,
     llm_phases: list[str] | None = None,
 ) -> dict[str, Any]:
     resolved_state_schema = state_schema or {}
@@ -213,13 +213,13 @@ def build_context_assembly_report(
                 }
             )
 
-    skill_results: list[dict[str, Any]] = []
-    for skill_key, result in dict(skill_context or {}).items():
+    action_results: list[dict[str, Any]] = []
+    for action_key, result in dict(action_context or {}).items():
         value_chars = _count_value_chars(result)
         prompt_chars = _count_prompt_chars([format_prompt_value(result)])
-        skill_results.append(
+        action_results.append(
             {
-                "skill_key": str(skill_key),
+                "action_key": str(action_key),
                 "value_chars": value_chars,
                 "prompt_chars": prompt_chars,
                 "token_estimate": _estimate_tokens(prompt_chars),
@@ -239,7 +239,7 @@ def build_context_assembly_report(
             "result_output_count": len(result_outputs),
             "memory_count": len(memories),
             "knowledge_chunk_count": len(knowledge_chunks),
-            "skill_result_count": len(skill_results),
+            "action_result_count": len(action_results),
             "value_chars": total_value_chars,
             "prompt_chars": total_prompt_chars,
             "token_estimate": _estimate_tokens(total_prompt_chars),
@@ -249,7 +249,7 @@ def build_context_assembly_report(
         "result_outputs": result_outputs,
         "memories": memories,
         "knowledge_chunks": knowledge_chunks,
-        "skill_results": skill_results,
+        "action_results": action_results,
     }
 
 
@@ -281,7 +281,7 @@ def format_file_state_prompt_lines(
     for index, reference in enumerate(references):
         if index > 0:
             lines.append("")
-        reference_source = reference.get("source", "skill_artifact")
+        reference_source = reference.get("source", "capability_artifact")
         local_path = reference["local_path"]
         requested_name = reference.get("name", "")
         requested_content_type = reference.get("content_type", "")
@@ -294,7 +294,7 @@ def format_file_state_prompt_lines(
                     str(reference.get("relative_path") or ""),
                 )
             else:
-                metadata = read_skill_artifact_file_metadata(local_path)
+                metadata = read_capability_artifact_file_metadata(local_path)
             file_name = requested_name or str(metadata.get("name") or file_name)
             content_type = requested_content_type or str(metadata.get("content_type") or content_type)
             if not allow_text or not _is_text_like_artifact(file_name, content_type):
@@ -311,7 +311,7 @@ def format_file_state_prompt_lines(
                     str(reference.get("relative_path") or ""),
                 )
             else:
-                artifact = read_skill_artifact_text_for_prompt(local_path)
+                artifact = read_capability_artifact_text_for_prompt(local_path)
             content = str(artifact.get("content") or "")
         except Exception:
             if not allow_text:
@@ -537,7 +537,7 @@ def _build_file_context_records(
 
     records: list[dict[str, Any]] = []
     for reference in _collect_file_state_references(value):
-        reference_source = reference.get("source", "skill_artifact")
+        reference_source = reference.get("source", "capability_artifact")
         local_path = str(reference.get("local_path") or "")
         requested_name = str(reference.get("name") or "")
         requested_content_type = str(reference.get("content_type") or "")
@@ -554,7 +554,7 @@ def _build_file_context_records(
                     str(reference.get("relative_path") or ""),
                 )
             else:
-                metadata = read_skill_artifact_file_metadata(local_path)
+                metadata = read_capability_artifact_file_metadata(local_path)
             file_name = requested_name or str(metadata.get("name") or file_name)
             content_type = requested_content_type or str(metadata.get("content_type") or content_type)
             try:
@@ -568,7 +568,7 @@ def _build_file_context_records(
                         str(reference.get("relative_path") or ""),
                     )
                 else:
-                    artifact = read_skill_artifact_text_for_prompt(local_path)
+                    artifact = read_capability_artifact_text_for_prompt(local_path)
                 char_count = len(str(artifact.get("content") or ""))
                 text_injected = True
         except Exception:
@@ -1037,7 +1037,7 @@ def format_state_output_contract_lines(state_type: NodeSystemStateType) -> list[
     if state_type == NodeSystemStateType.CAPABILITY:
         return [
             "  output_format: capability JSON object",
-            "  output_rule: 这个字段只能是单个能力对象；kind 必须是 skill、subgraph 或 none；不要返回数组。",
+            "  output_rule: 这个字段只能是单个能力对象；kind 必须是 action、subgraph 或 none；不要返回数组。",
         ]
     if state_type == NodeSystemStateType.RESULT_PACKAGE:
         return [
@@ -1052,7 +1052,7 @@ def format_state_output_contract_lines(state_type: NodeSystemStateType) -> list[
     }:
         return [
             "  output_format: local artifact path string or JSON array of local artifact path strings",
-            "  output_rule: 只能使用输入或技能结果中已经存在的本地文件路径；不要编造路径。",
+            "  output_rule: 只能使用输入或Action 结果中已经存在的本地文件路径；不要编造路径。",
         ]
     if state_type == NodeSystemStateType.NUMBER:
         return ["  output_format: JSON number"]

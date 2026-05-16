@@ -54,7 +54,7 @@
     },
     "memory_request": {
       "name": "内容偏好记忆请求",
-      "description": "面向 buddy_session_recall Skill 的只读召回请求。",
+      "description": "面向 buddy_session_recall Action 的只读召回请求。",
       "type": "json",
       "value": {},
       "color": "#9333ea",
@@ -507,7 +507,7 @@
     "recall_content_memory": {
       "kind": "agent",
       "name": "召回内容偏好",
-      "description": "运行 buddy_session_recall Skill，只透传召回结果。",
+      "description": "运行 buddy_session_recall Action，只透传召回结果。",
       "ui": {
         "position": {
           "x": 1060,
@@ -560,7 +560,7 @@
           "buddy_session_recall": {
             "actionKey": "buddy_session_recall",
             "title": "Buddy session recall instruction",
-            "content": "你已绑定 Buddy 会话召回技能。只把 memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
+            "content": "你已绑定 Buddy 会话召回 Action。只把 memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
             "source": "node.override"
           }
         },
@@ -672,7 +672,7 @@
     "run_web_search": {
       "kind": "agent",
       "name": "运行联网搜索",
-      "description": "根据搜索词运行 web_search，只透传技能输出。",
+      "description": "根据搜索词运行 web_search，只透传Action 输出。",
       "ui": {
         "position": {
           "x": 2820,
@@ -736,8 +736,8 @@
         "actionInstructionBlocks": {
           "web_search": {
             "actionKey": "web_search",
-            "title": "联网搜索 skill instruction",
-            "content": "你已绑定联网搜索技能，因此本节点只负责生成 query 并交给技能执行；不要总结、改写或评价搜索结果。技能会输出来源 URL、本地原文 artifact 和错误列表。",
+            "title": "联网搜索 action instruction",
+            "content": "你已绑定联网搜索 Action，因此本节点只负责生成 query 并交给Action 执行；不要总结、改写或评价搜索结果。Action 会输出来源 URL、本地原文 artifact 和错误列表。",
             "source": "node.override"
           }
         },

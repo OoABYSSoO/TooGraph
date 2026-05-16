@@ -5,9 +5,9 @@ description: Recall real Buddy chat sessions and message windows from buddy.db.
 
 # Buddy Session Recall
 
-Use this Skill when a Buddy graph needs historical conversation context from `buddy.db`.
+Use this Action when a Buddy graph needs historical conversation context from `buddy.db`.
 
-The Skill is read-only. It returns real persisted Buddy messages with session metadata; it does not summarize, rewrite, or promote messages into long-term memory.
+The Action is read-only. It returns real persisted Buddy messages with session metadata; it does not summarize, rewrite, or promote messages into long-term memory.
 
 Supported modes:
 
@@ -24,4 +24,4 @@ Useful request fields:
 - `sort`: `rank`, `newest`, or `oldest`.
 - `role_filter`: default `["user", "assistant"]`.
 
-Long-term memory remains `buddy_home/MEMORY.md`. This Skill is only for session recall.
+Long-term memory remains `buddy_home/MEMORY.md`. This Action is only for session recall.

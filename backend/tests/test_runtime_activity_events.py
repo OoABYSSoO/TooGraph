@@ -28,11 +28,11 @@ class RuntimeActivityEventsTests(unittest.TestCase):
         event = record_activity_event(
             state,
             kind="action_invocation",
-            summary="Skill 'web_search' succeeded.",
+            summary="Action 'web_search' succeeded.",
             node_id="execute_capability",
             status="succeeded",
             duration_ms=23,
-            detail={"skill_key": "web_search"},
+            detail={"action_key": "web_search"},
             publish_run_event_func=lambda run_id, event_type, payload=None: published.append(
                 (str(run_id), event_type, dict(payload or {}))
             ),
@@ -41,13 +41,13 @@ class RuntimeActivityEventsTests(unittest.TestCase):
         self.assertEqual(parent_state["activity_events"], [event])
         self.assertEqual(event["sequence"], 1)
         self.assertEqual(event["kind"], "action_invocation")
-        self.assertEqual(event["summary"], "Skill 'web_search' succeeded.")
+        self.assertEqual(event["summary"], "Action 'web_search' succeeded.")
         self.assertEqual(event["node_id"], "execute_capability")
         self.assertEqual(event["subgraph_node_id"], "run_capability_cycle")
         self.assertEqual(event["subgraph_path"], ["run_capability_cycle"])
         self.assertEqual(event["status"], "succeeded")
         self.assertEqual(event["duration_ms"], 23)
-        self.assertEqual(event["detail"], {"skill_key": "web_search"})
+        self.assertEqual(event["detail"], {"action_key": "web_search"})
         self.assertIsInstance(event["created_at"], str)
         self.assertEqual(published, [("run-activity", "activity.event", event)])
 
@@ -103,16 +103,16 @@ class RuntimeActivityEventsTests(unittest.TestCase):
         self.assertEqual(state["activity_events"], [event])
         self.assertEqual(published, [("run-activity", "activity.event", event)])
 
-    def test_record_skill_activity_events_normalizes_skill_payloads(self) -> None:
+    def test_record_action_activity_events_normalizes_action_payloads(self) -> None:
         state = {"run_id": "run-activity"}
         published: list[tuple[str, str, dict]] = []
 
-        from app.core.runtime.activity_events import record_skill_activity_events
+        from app.core.runtime.activity_events import record_action_activity_events
 
-        events = record_skill_activity_events(
+        events = record_action_activity_events(
             state,
             node_id="execute_capability",
-            skill_key="local_workspace_executor",
+            action_key="local_workspace_executor",
             binding_source="capability_state",
             raw_events=[
                 {
@@ -141,20 +141,20 @@ class RuntimeActivityEventsTests(unittest.TestCase):
         self.assertEqual(event["detail"]["removed"], 0)
         self.assertEqual(published[0][1], "activity.event")
 
-    def test_record_skill_activity_events_enriches_virtual_operation_continuation_context(self) -> None:
+    def test_record_action_activity_events_enriches_virtual_operation_continuation_context(self) -> None:
         state = {
             "run_id": "run-activity",
             "_subgraph_context": {"node_id": "operation_loop", "path": ["operation_loop"]},
         }
         published: list[tuple[str, str, dict]] = []
 
-        from app.core.runtime.activity_events import record_skill_activity_events
+        from app.core.runtime.activity_events import record_action_activity_events
 
-        events = record_skill_activity_events(
+        events = record_action_activity_events(
             state,
             node_id="execute_page_operation",
-            skill_key="toograph_page_operator",
-            binding_source="node_skill",
+            action_key="toograph_page_operator",
+            binding_source="node_config",
             raw_events=[
                 {
                     "kind": "virtual_ui_operation",
@@ -204,7 +204,7 @@ class RuntimeActivityEventsTests(unittest.TestCase):
         )
         self.assertEqual(published[0][2]["detail"]["expected_continuation"]["mode"], "auto_resume_after_ui_operation")
 
-    def test_record_skill_activity_events_stores_virtual_operation_continuation_on_root_state(self) -> None:
+    def test_record_action_activity_events_stores_virtual_operation_continuation_on_root_state(self) -> None:
         parent_state = {"run_id": "run-activity"}
         state = {
             "run_id": "run-activity",
@@ -212,12 +212,12 @@ class RuntimeActivityEventsTests(unittest.TestCase):
             "_subgraph_context": {"node_id": "buddy_capability_loop", "path": ["buddy_capability_loop"]},
         }
 
-        from app.core.runtime.activity_events import record_skill_activity_events
+        from app.core.runtime.activity_events import record_action_activity_events
 
-        record_skill_activity_events(
+        record_action_activity_events(
             state,
             node_id="run_visible_template_operation",
-            skill_key="toograph_page_operator",
+            action_key="toograph_page_operator",
             binding_source="node_config",
             raw_events=[
                 {

@@ -73,7 +73,7 @@ test("RunDetailPage supports restrained expandable long content cards", () => {
   assert.match(componentSource, /\.run-detail__content--expanded \{[\s\S]*max-height:\s*none;/);
 });
 
-test("RunDetailPage renders skill artifact document lists with a paged reader", () => {
+test("RunDetailPage renders action artifact document lists with a paged reader", () => {
   assert.match(componentSource, /import ArtifactDocumentPager from "\.\/ArtifactDocumentPager\.vue";/);
   assert.match(componentSource, /v-if="artifact\.documentRefs\.length > 0"/);
   assert.match(componentSource, /<ArtifactDocumentPager\s+:documents="artifact\.documentRefs"/);

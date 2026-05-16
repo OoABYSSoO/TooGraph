@@ -17,6 +17,7 @@ import type {
   PresetDocument,
   StateDefinition,
   SubgraphNode,
+  ToolNode,
 } from "../types/node-system.ts";
 
 type CreatedNodeResult = {
@@ -162,6 +163,20 @@ function buildSubgraphNode(position: GraphPosition): SubgraphNode {
   };
 }
 
+function buildToolNode(position: GraphPosition): ToolNode {
+  return {
+    kind: "tool",
+    name: "Tool",
+    description: "Run deterministic processing without an LLM turn.",
+    ui: normalizeCreatedNodeUi(position),
+    reads: [],
+    writes: [],
+    config: {
+      toolKey: "",
+    },
+  };
+}
+
 export function buildGenericInputNode(params: { id: string; position: GraphPosition }): CreatedNodeResult {
   return {
     id: params.id,
@@ -190,6 +205,14 @@ export function buildGenericSubgraphNode(params: { id: string; position: GraphPo
   return {
     id: params.id,
     node: buildSubgraphNode(params.position),
+    state_schema: {},
+  };
+}
+
+export function buildGenericToolNode(params: { id: string; position: GraphPosition }): CreatedNodeResult {
+  return {
+    id: params.id,
+    node: buildToolNode(params.position),
     state_schema: {},
   };
 }

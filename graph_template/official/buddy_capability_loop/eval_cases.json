@@ -51,7 +51,7 @@
         {
           "kind": "rule",
           "key": "single_capability_state",
-          "expectation": "selected_capability 必须是单个互斥对象，kind 只能是 skill、subgraph 或 none；不得输出 capability 列表或同一 LLM 节点连续执行多个能力。"
+          "expectation": "selected_capability 必须是单个互斥对象，kind 只能是 action、subgraph 或 none；不得输出 capability 列表或同一 LLM 节点连续执行多个能力。"
         }
       ]
     }

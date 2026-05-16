@@ -38,7 +38,7 @@
     },
     "memory_request": {
       "name": "记忆召回请求",
-      "description": "面向 buddy_session_recall Skill 的只读召回参数。",
+      "description": "面向 buddy_session_recall Action 的只读召回参数。",
       "type": "json",
       "value": {},
       "color": "#4f46e5",
@@ -46,7 +46,7 @@
     },
     "buddy_session_recall_success": {
       "name": "记忆召回成功",
-      "description": "buddy_session_recall Skill 是否成功执行。",
+      "description": "buddy_session_recall Action 是否成功执行。",
       "type": "boolean",
       "value": false,
       "color": "#16a34a",
@@ -74,7 +74,7 @@
     },
     "buddy_session_recall_result": {
       "name": "记忆召回摘要",
-      "description": "buddy_session_recall Skill 返回的召回摘要。",
+      "description": "buddy_session_recall Action 返回的召回摘要。",
       "type": "markdown",
       "value": "",
       "color": "#6d28d9",
@@ -373,7 +373,7 @@
     "recall_policy_memory": {
       "kind": "agent",
       "name": "召回用户相关记忆",
-      "description": "运行 buddy_session_recall Skill，只透传召回结果。",
+      "description": "运行 buddy_session_recall Action，只透传召回结果。",
       "ui": {
         "position": {
           "x": 1060,
@@ -426,7 +426,7 @@
           "buddy_session_recall": {
             "actionKey": "buddy_session_recall",
             "title": "Buddy session recall instruction",
-            "content": "你已绑定 Buddy 会话召回技能。只把 memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
+            "content": "你已绑定 Buddy 会话召回 Action。只把 memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
             "source": "node.override"
           }
         },

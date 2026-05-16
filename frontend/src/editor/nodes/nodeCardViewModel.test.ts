@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { buildNodeCardViewModel } from "./nodeCardViewModel.ts";
 import { VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "../../lib/virtual-any-input.ts";
 import type { GraphNode, StateDefinition } from "../../types/node-system.ts";
-import type { SkillDefinition } from "../../types/actions.ts";
+import type { ActionDefinition } from "../../types/actions.ts";
 
 const stateSchema: Record<string, StateDefinition> = {
   question: {
@@ -196,7 +196,7 @@ test("buildNodeCardViewModel derives agent body, ports, and labels", () => {
   assert.equal(model.body.kind, "agent");
   assert.ok(!("systemInstruction" in model.body));
   assert.equal(model.body.taskInstruction, "请直接用中文回答用户问题。");
-  assert.equal(model.body.skillLabel, "No skill");
+  assert.equal(model.body.actionLabel, "No action");
   assert.equal(model.body.primaryInput?.label, "question");
   assert.equal(model.body.primaryOutput?.label, "answer");
   assert.equal(model.body.primaryInput?.typeLabel, "text");
@@ -267,7 +267,7 @@ test("buildNodeCardViewModel derives batch body and per-input modes", () => {
   assert.deepEqual(model.outputs.map((port) => port.label), ["reports"]);
 });
 
-test("buildNodeCardViewModel derives displayed skill instruction from the selected skill definition", () => {
+test("buildNodeCardViewModel derives displayed action instruction from the selected action definition", () => {
   const node: GraphNode = {
     kind: "agent",
     name: "search_helper",
@@ -287,32 +287,32 @@ test("buildNodeCardViewModel derives displayed skill instruction from the select
   };
 
   const model = buildNodeCardViewModel("search_helper", node, stateSchema, {
-    skillDefinitions: [
+    actionDefinitions: [
       {
-        skillKey: "web_search",
+        actionKey: "web_search",
         name: "Web Search",
         description: "Search the web.",
         llmInstruction: "Use the graph state to create a search query.",
       },
-    ] as SkillDefinition[],
+    ] as ActionDefinition[],
   });
 
   assert.equal(model.body.kind, "agent");
   assert.deepEqual(model.body.actionInstructionBlocks, {
     web_search: {
       actionKey: "web_search",
-      title: "Web Search skill instruction",
+      title: "Web Search action instruction",
       content: "Use the graph state to create a search query.",
       source: "action.llmInstruction",
     },
   });
 });
 
-test("buildNodeCardViewModel marks skill-managed output ports", () => {
+test("buildNodeCardViewModel marks action-managed output ports", () => {
   const node: GraphNode = {
     kind: "agent",
     name: "search_helper",
-    description: "Run a selected skill.",
+    description: "Run a selected action.",
     ui: { position: { x: 520, y: 220 } },
     reads: [{ state: "question", required: true }],
     writes: [{ state: "search_artifacts", mode: "replace" }],
@@ -344,24 +344,24 @@ test("buildNodeCardViewModel marks skill-managed output ports", () => {
     },
   });
 
-  assert.deepEqual(model.outputs[0]?.managedBySkill, {
+  assert.deepEqual(model.outputs[0]?.managedByAction, {
     role: "output",
-    skillKey: "web_search",
+    actionKey: "web_search",
     fieldKey: "artifact_paths",
   });
   assert.equal(model.body.kind, "agent");
-  assert.deepEqual(model.body.primaryOutput?.managedBySkill, {
+  assert.deepEqual(model.body.primaryOutput?.managedByAction, {
     role: "output",
-    skillKey: "web_search",
+    actionKey: "web_search",
     fieldKey: "artifact_paths",
   });
 });
 
-test("buildNodeCardViewModel marks skill-managed input ports", () => {
+test("buildNodeCardViewModel marks action-managed input ports", () => {
   const node: GraphNode = {
     kind: "agent",
     name: "search_helper",
-    description: "Run a selected skill.",
+    description: "Run a selected action.",
     ui: { position: { x: 520, y: 220 } },
     reads: [
       {
@@ -388,9 +388,9 @@ test("buildNodeCardViewModel marks skill-managed input ports", () => {
 
   const model = buildNodeCardViewModel("search_helper", node, stateSchema);
 
-  assert.deepEqual(model.inputs[0]?.managedBySkill, {
+  assert.deepEqual(model.inputs[0]?.managedByAction, {
     role: "input",
-    skillKey: "web_search",
+    actionKey: "web_search",
     fieldKey: "user_question",
   });
 });
@@ -422,7 +422,7 @@ test("buildNodeCardViewModel marks dynamic capability input and result package o
       name: "Selected Capability",
       description: "Chosen runtime capability.",
       type: "capability",
-      value: { kind: "skill", key: "web_search" },
+      value: { kind: "action", key: "web_search" },
       color: "#2563eb",
     },
     dynamic_result: {
@@ -1475,10 +1475,10 @@ test("buildNodeCardViewModel marks exhausted condition routes as neutral", () =>
   ]);
 });
 
-test("buildNodeCardViewModel derives unlimited loop label and selected skill", () => {
+test("buildNodeCardViewModel derives unlimited loop label and selected action", () => {
   const node: GraphNode = {
     kind: "agent",
-    name: "multi_skill_agent",
+    name: "multi_action_agent",
     description: "",
     ui: { position: { x: 0, y: 0 } },
     reads: [{ state: "question", required: true }],
@@ -1493,10 +1493,10 @@ test("buildNodeCardViewModel derives unlimited loop label and selected skill", (
     },
   };
 
-  const model = buildNodeCardViewModel("multi_skill_agent", node, stateSchema);
+  const model = buildNodeCardViewModel("multi_action_agent", node, stateSchema);
 
   assert.equal(model.body.kind, "agent");
-  assert.equal(model.body.skillLabel, "browser.search");
+  assert.equal(model.body.actionLabel, "browser.search");
   assert.equal(model.body.modelLabel, "gpt-5.4");
   assert.equal(model.body.thinkingLabel, "thinking off");
 });

@@ -21,7 +21,7 @@
               : 'node-card__port-pill--output node-card__port-pill--dock-end',
             {
               'node-card__port-pill--create': port.virtual,
-              'node-card__port-pill--skill-managed': isManagedPort,
+              'node-card__port-pill--action-managed': isManagedPort,
               'node-card__port-pill--revealed': !port.virtual && isStateEditorPillRevealed(anchorId),
               'node-card__port-pill--confirm': !port.virtual && isStateEditorConfirmOpen(anchorId),
             },
@@ -237,13 +237,13 @@ const popoverWidth = computed(() => {
   }
   return props.isStateEditorOpen(anchorId.value) ? 320 : undefined;
 });
-const isManagedPort = computed(() => Boolean(props.port?.managedBySkill || props.port?.managedByCapability));
+const isManagedPort = computed(() => Boolean(props.port?.managedByAction || props.port?.managedByCapability));
 const canEditPort = computed(() => Boolean(props.port && !props.port.virtual && !isManagedPort.value));
 const managedPortTitle = computed(() => {
-  if (props.port?.managedBySkill?.role === "input") {
+  if (props.port?.managedByAction?.role === "input") {
     return "Action managed input";
   }
-  if (props.port?.managedBySkill?.role === "output") {
+  if (props.port?.managedByAction?.role === "output") {
     return "Action managed output";
   }
   return "Dynamic capability managed state";
@@ -323,12 +323,12 @@ function handlePortClick() {
   color: #1f2937;
 }
 
-.node-card__port-pill--skill-managed {
+.node-card__port-pill--action-managed {
   cursor: default;
 }
 
-.node-card__port-pill--skill-managed:focus-visible,
-.node-card__port-pill--skill-managed.node-card__port-pill--revealed {
+.node-card__port-pill--action-managed:focus-visible,
+.node-card__port-pill--action-managed.node-card__port-pill--revealed {
   border-color: color-mix(in srgb, var(--node-card-port-accent) 22%, transparent);
   background: color-mix(in srgb, var(--node-card-port-accent) 8%, #fff);
 }

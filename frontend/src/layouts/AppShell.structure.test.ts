@@ -99,7 +99,7 @@ test("AppShell keeps the editor navigation entry active for graph-specific edito
   assert.match(componentSource, /\.app-shell__link\.app-shell__link--active \{[\s\S]*box-shadow:\s*inset 3px 0 0 rgba\(154,\s*52,\s*18,\s*0\.7\);/);
 });
 
-test("AppShell exposes preset node and skill management as primary sidebar destinations", () => {
+test("AppShell exposes preset node and action management as primary sidebar destinations", () => {
   assert.match(componentSource, /import \{[\s\S]*CollectionTag[\s\S]*Opportunity[\s\S]*\} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /to="\/presets"[\s\S]*activeNavigationSection === 'presets'[\s\S]*t\("nav\.presets"\)/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><CollectionTag \/><\/ElIcon>/);

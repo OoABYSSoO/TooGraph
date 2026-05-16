@@ -339,7 +339,7 @@ export function attachPageOperationRuntimeContext<T extends { metadata?: Record<
     ...graph,
     metadata: {
       ...(isPlainRecord(graph.metadata) ? graph.metadata : {}),
-      skill_runtime_context: runtimeContext,
+      action_runtime_context: runtimeContext,
     },
   };
 }

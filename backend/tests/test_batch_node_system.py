@@ -190,7 +190,7 @@ def test_batch_validation_requires_template_worker_when_source_is_subgraph() -> 
 def test_execute_batch_node_zips_batch_inputs_and_collects_outputs_by_index() -> None:
     calls: list[dict[str, Any]] = []
 
-    def generate_agent_response_func(agent_node, input_values, skill_context, runtime_config, **kwargs):
+    def generate_agent_response_func(agent_node, input_values, action_context, runtime_config, **kwargs):
         calls.append(dict(input_values))
         return (
             {"summary": "", "reports": f"{input_values['segments']} / {input_values['question']}"},
@@ -237,7 +237,7 @@ def test_execute_batch_node_retries_failed_item_before_collecting_outputs_by_ind
     calls: list[str] = []
     attempts_by_segment: dict[str, int] = {}
 
-    def generate_agent_response_func(agent_node, input_values, skill_context, runtime_config, **kwargs):
+    def generate_agent_response_func(agent_node, input_values, action_context, runtime_config, **kwargs):
         segment = str(input_values["segments"])
         calls.append(segment)
         attempts_by_segment[segment] = attempts_by_segment.get(segment, 0) + 1
@@ -293,7 +293,7 @@ def test_execute_batch_node_defaults_to_continue_after_retry_exhaustion() -> Non
     )
     calls: list[str] = []
 
-    def generate_agent_response_func(agent_node, input_values, skill_context, runtime_config, **kwargs):
+    def generate_agent_response_func(agent_node, input_values, action_context, runtime_config, **kwargs):
         segment = str(input_values["segments"])
         calls.append(segment)
         if segment == "s1":
@@ -396,7 +396,7 @@ def test_execute_batch_node_rejects_mismatched_batch_input_lengths() -> None:
 
 
 def test_langgraph_runtime_executes_batch_node_with_default_llm_worker(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_generate_agent_response(node, input_values, skill_context, runtime_config, **kwargs):
+    def fake_generate_agent_response(node, input_values, action_context, runtime_config, **kwargs):
         return (
             {"summary": "", "reports": f"{input_values['segments']}::{input_values['question']}"},
             "",

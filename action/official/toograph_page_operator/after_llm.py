@@ -32,9 +32,9 @@ KNOWN_CLICK_TARGETS = {
         "target_id": "app.nav.presets",
         "target_label": "预设节点",
     },
-    "click app.nav.skills": {
-        "target_id": "app.nav.skills",
-        "target_label": "技能",
+    "click app.nav.actions": {
+        "target_id": "app.nav.actions",
+        "target_label": "Actions",
     },
     "click app.nav.models": {
         "target_id": "app.nav.models",
@@ -64,18 +64,18 @@ BUDDY_SELF_TARGETS = {
 }
 
 
-def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
-    commands = _normalize_commands(skill_inputs.get("commands"))
+def toograph_page_operator(**action_inputs: Any) -> dict[str, Any]:
+    commands = _normalize_commands(action_inputs.get("commands"))
     template_target = _normalize_template_target(
-        skill_inputs.get("template_target"),
-        fallback_input_text=_resolve_template_input_text(skill_inputs),
+        action_inputs.get("template_target"),
+        fallback_input_text=_resolve_template_input_text(action_inputs),
     )
-    graph_edit_intents = _normalize_graph_edit_intents(skill_inputs.get("graph_edit_intents"))
-    cursor_lifecycle = _normalize_cursor_lifecycle(skill_inputs.get("cursor_lifecycle"))
-    reason = _compact_text(skill_inputs.get("reason"))
-    runtime_context = _resolve_runtime_context(skill_inputs)
-    page_path = _resolve_page_path(skill_inputs, runtime_context)
-    operation_book = _resolve_operation_book(skill_inputs, runtime_context)
+    graph_edit_intents = _normalize_graph_edit_intents(action_inputs.get("graph_edit_intents"))
+    cursor_lifecycle = _normalize_cursor_lifecycle(action_inputs.get("cursor_lifecycle"))
+    reason = _compact_text(action_inputs.get("reason"))
+    runtime_context = _resolve_runtime_context(action_inputs)
+    page_path = _resolve_page_path(action_inputs, runtime_context)
+    operation_book = _resolve_operation_book(action_inputs, runtime_context)
 
     if template_target and not commands:
         if not template_target.get("input_text"):
@@ -626,14 +626,14 @@ def _normalize_template_target(value: Any, *, fallback_input_text: str = "") -> 
     }
 
 
-def _resolve_template_input_text(skill_inputs: dict[str, Any]) -> str:
+def _resolve_template_input_text(action_inputs: dict[str, Any]) -> str:
     return _compact_text(
-        skill_inputs.get("user_goal")
-        or skill_inputs.get("userGoal")
-        or skill_inputs.get("goal")
-        or skill_inputs.get("current_goal")
-        or skill_inputs.get("currentGoal")
-        or skill_inputs.get("task")
+        action_inputs.get("user_goal")
+        or action_inputs.get("userGoal")
+        or action_inputs.get("goal")
+        or action_inputs.get("current_goal")
+        or action_inputs.get("currentGoal")
+        or action_inputs.get("task")
     )
 
 
@@ -773,34 +773,34 @@ def _is_editor_page(page_path: str) -> bool:
     return normalized == "/editor" or normalized.startswith("/editor/")
 
 
-def _resolve_runtime_context(skill_inputs: dict[str, Any]) -> dict[str, Any]:
-    runtime_context = skill_inputs.get("runtime_context")
+def _resolve_runtime_context(action_inputs: dict[str, Any]) -> dict[str, Any]:
+    runtime_context = action_inputs.get("runtime_context")
     if isinstance(runtime_context, dict):
         return runtime_context
     return _load_runtime_context_from_environment()
 
 
-def _resolve_operation_book(skill_inputs: dict[str, Any], runtime_context: dict[str, Any]) -> dict[str, Any] | None:
-    direct = skill_inputs.get("page_operation_book")
+def _resolve_operation_book(action_inputs: dict[str, Any], runtime_context: dict[str, Any]) -> dict[str, Any] | None:
+    direct = action_inputs.get("page_operation_book")
     if isinstance(direct, dict):
         return direct
     nested = runtime_context.get("page_operation_book")
     return nested if isinstance(nested, dict) else None
 
 
-def _resolve_page_path(skill_inputs: dict[str, Any], runtime_context: dict[str, Any]) -> str:
-    direct = _compact_text(skill_inputs.get("page_path"))
+def _resolve_page_path(action_inputs: dict[str, Any], runtime_context: dict[str, Any]) -> str:
+    direct = _compact_text(action_inputs.get("page_path"))
     if direct:
         return direct
     nested = _compact_text(runtime_context.get("page_path"))
     if nested:
         return nested
-    operation_book = _resolve_operation_book(skill_inputs, runtime_context)
+    operation_book = _resolve_operation_book(action_inputs, runtime_context)
     return _operation_book_page_path(operation_book) if operation_book else ""
 
 
 def _load_runtime_context_from_environment() -> dict[str, Any]:
-    file_path = os.environ.get("TOOGRAPH_SKILL_RUNTIME_CONTEXT_FILE", "")
+    file_path = os.environ.get("TOOGRAPH_ACTION_RUNTIME_CONTEXT_FILE", "")
     if file_path:
         try:
             parsed = json.loads(Path(file_path).read_text(encoding="utf-8"))
@@ -808,7 +808,7 @@ def _load_runtime_context_from_environment() -> dict[str, Any]:
             parsed = {}
         if isinstance(parsed, dict):
             return parsed
-    raw = os.environ.get("TOOGRAPH_SKILL_RUNTIME_CONTEXT", "")
+    raw = os.environ.get("TOOGRAPH_ACTION_RUNTIME_CONTEXT", "")
     if not raw:
         return {}
     try:

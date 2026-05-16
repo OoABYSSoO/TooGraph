@@ -367,17 +367,17 @@ function buildPermissionTimelineItem(
   subgraphNodeId: string | null,
   nodeId: string | null,
 ): RunAggregatedTimelineItem | null {
-  const skillKey = normalizeText(approval.skill_key);
-  const skillName = normalizeText(approval.skill_name) || skillKey;
+  const capabilityKey = normalizeText(approval.capability_key);
+  const capabilityName = normalizeText(approval.capability_name) || capabilityKey;
   const permissions = Array.isArray(approval.permissions)
     ? approval.permissions.map((permission) => normalizeText(permission)).filter(Boolean)
     : [];
-  if (!skillKey && permissions.length === 0) {
+  if (!capabilityKey && permissions.length === 0) {
     return null;
   }
-  const label = skillName || "Permission approval";
+  const label = capabilityName || "Permission approval";
   return {
-    key: `permission:${subgraphPath.join("/")}:${nodeId ?? ""}:${skillKey || label}`,
+    key: `permission:${subgraphPath.join("/")}:${nodeId ?? ""}:${capabilityKey || label}`,
     kind: "permission",
     label,
     summary: permissions.length > 0 ? `Requires permission: ${permissions.join(", ")}` : "Requires permission approval.",
@@ -464,9 +464,13 @@ function buildActivityArtifactLabels(event: ActivityEvent) {
     }
     return labels;
   }
-  const actionKey = normalizeText(detail.action_key) || normalizeText(detail.skill_key);
+  const actionKey = normalizeText(detail.action_key);
   if (actionKey) {
     labels.push(`action: ${actionKey}`);
+  }
+  const toolKey = normalizeText(detail.tool_key);
+  if (toolKey) {
+    labels.push(`tool: ${toolKey}`);
   }
   const path = normalizeText(detail.path);
   if (path) {

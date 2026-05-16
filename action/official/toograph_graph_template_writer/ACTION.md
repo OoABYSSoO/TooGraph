@@ -5,7 +5,7 @@ description: Validate and write one TooGraph user graph template with a recovera
 
 # 图模板写入器
 
-Use this Skill only after a graph workflow has generated, previewed, and validated a full graph template JSON payload.
+Use this Action only after a graph workflow has generated, previewed, and validated a full graph template JSON payload.
 
 Input:
 

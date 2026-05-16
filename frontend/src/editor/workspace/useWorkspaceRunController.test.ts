@@ -294,7 +294,7 @@ test("useWorkspaceRunController resumes Human Review runs with the restored snap
 
 test("useWorkspaceRunController surfaces run request failures in feedback and a visible toast", async () => {
   const backendMessage =
-    "POST /api/graphs/run failed with status 422: 节点 generate_skill_json 的输出 state 缺少绑定";
+    "POST /api/graphs/run failed with status 422: 节点 generate_action_json 的输出 state 缺少绑定";
   const harness = createRunHarness({
     runGraph: async () => {
       throw new Error(backendMessage);

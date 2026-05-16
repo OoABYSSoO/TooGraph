@@ -128,6 +128,7 @@ function countNodesByKind(document: GraphPayload | GraphDocument): Record<GraphN
     output: 0,
     condition: 0,
     subgraph: 0,
+    tool: 0,
   };
 
   for (const node of Object.values(document.nodes)) {

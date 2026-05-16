@@ -279,9 +279,9 @@ test("capability state type is available and uses a single structured capability
   assert.ok(STATE_FIELD_TYPE_OPTIONS.includes("capability"));
   assert.equal(STATE_FIELD_TYPE_OPTIONS.includes("skill"), false);
   assert.deepEqual(defaultValueForStateType("capability"), { kind: "none" });
-  assert.equal(formatStateValueInput("capability", { kind: "skill", key: "web_search" }), '{\n  "kind": "skill",\n  "key": "web_search"\n}');
-  assert.deepEqual(parseStateValueInput("capability", '{"kind":"skill","key":"file_reader"}'), {
-    kind: "skill",
+  assert.equal(formatStateValueInput("capability", { kind: "action", key: "web_search" }), '{\n  "kind": "action",\n  "key": "web_search"\n}');
+  assert.deepEqual(parseStateValueInput("capability", '{"kind":"action","key":"file_reader"}'), {
+    kind: "action",
     key: "file_reader",
   });
 });

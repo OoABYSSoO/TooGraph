@@ -22,7 +22,7 @@
     },
     "current_query": {
       "name": "当前搜索词",
-      "description": "本轮要交给联网搜索技能的查询词。",
+      "description": "本轮要交给联网搜索 Action的查询词。",
       "type": "text",
       "value": "",
       "color": "#0f766e",
@@ -30,7 +30,7 @@
     },
     "executed_queries": {
       "name": "联网搜索 Query",
-      "description": "联网搜索技能实际执行过的查询词列表。",
+      "description": "联网搜索 Action实际执行过的查询词列表。",
       "type": "json",
       "value": [],
       "color": "#7c3aed",
@@ -182,7 +182,7 @@
     "run_web_search": {
       "kind": "agent",
       "name": "运行联网搜索",
-      "description": "根据当前搜索词运行联网搜索技能，只透传技能输出。",
+      "description": "根据当前搜索词运行联网搜索 Action，只透传Action 输出。",
       "ui": {
         "position": {
           "x": 916,
@@ -242,12 +242,12 @@
         "actionInstructionBlocks": {
           "web_search": {
             "actionKey": "web_search",
-            "title": "联网搜索 skill instruction",
-            "content": "你已绑定联网搜索技能，因此本节点需要运行它。根据当前输入生成一个清晰、可检索的 query，并把 query 交给技能执行；如果问题具有时效性，应结合 Skill Pre-LLM Context 中的当前日期生成查询词；不要在本节点整理、评价或总结搜索结果。技能结果会通过绑定 state 透传给下游节点。",
+            "title": "联网搜索 action instruction",
+            "content": "你已绑定联网搜索 Action，因此本节点需要运行它。根据当前输入生成一个清晰、可检索的 query，并把 query 交给Action 执行；如果问题具有时效性，应结合 Action Pre-LLM Context 中的当前日期生成查询词；不要在本节点整理、评价或总结搜索结果。Action 结果会通过绑定 state 透传给下游节点。",
             "source": "node.override"
           }
         },
-        "taskInstruction": "本节点只负责运行联网搜索技能。优先把 current_query 原样作为技能 query；如果 current_query 为空，才从用户问题和研究计划中生成一个 query。不要总结、评价或改写搜索结果。",
+        "taskInstruction": "本节点只负责运行联网搜索 Action。优先把 current_query 原样作为Action query；如果 current_query 为空，才从用户问题和研究计划中生成一个 query。不要总结、评价或改写搜索结果。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",

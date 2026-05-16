@@ -9,7 +9,7 @@
 - 图协议与校验：`backend/app/core/schemas/`、`backend/app/core/compiler/`
 - 运行时：`backend/app/core/langgraph/`、`backend/app/core/runtime/`
 - Buddy 前端链路：`frontend/src/buddy/`
-- 模板与固定能力选择测试：`backend/tests/test_template_layouts.py`、`backend/tests/test_toograph_capability_selector_skill.py`
+- 模板与固定能力选择测试：`backend/tests/test_template_layouts.py`、`backend/tests/test_toograph_capability_selector_action.py`
 
 ## 长期约束
 
@@ -106,8 +106,8 @@
 已完成：
 
 - 后台复盘模板 `buddy_autonomous_review` 输出 `autonomous_review`、`improvement_candidates` 和 `memory_update_plan`，并且只在存在低风险记忆沉淀时通过 `buddy_home_writer` 写入完整 `MEMORY.md` 更新命令。
-- 能力缺口链路已输出 `capability_builder_handoff`：当缺的是 Action 且用户明确要补能力时，交接目标指向 `toograph_skill_creation_workflow`；当缺的是图模板创建能力时，交接目标指向 `toograph_graph_template_creation_workflow`，不绕过官方创建、校验、审查和受控写入链路。
-- Action 改进链路已接入现有创建模板：新增只读 `toograph_skill_package_reader`，`toograph_skill_creation_workflow` 可读取目标 Action 包，把旧 `action.json`、`ACTION.md`、生命周期脚本和 requirements 纳入 builder context，再沿用生成、脚本测试、审查和受控 `action/user/<actionKey>/` 写入路径。
+- 能力缺口链路已输出 `capability_builder_handoff`：当缺的是 Action 且用户明确要补能力时，交接目标指向 `toograph_action_creation_workflow`；当缺的是图模板创建能力时，交接目标指向 `toograph_graph_template_creation_workflow`，不绕过官方创建、校验、审查和受控写入链路。
+- Action 改进链路已接入现有创建模板：新增只读 `toograph_action_package_reader`，`toograph_action_creation_workflow` 可读取目标 Action 包，把旧 `action.json`、`ACTION.md`、生命周期脚本和 requirements 纳入 builder context，再沿用生成、脚本测试、审查和受控 `action/user/<actionKey>/` 写入路径。
 - 图模板改进链路已接入官方工作流：新增只读 `toograph_graph_template_reader`、只读 `toograph_graph_template_validator` 和受控写入 `toograph_graph_template_writer`，`toograph_graph_template_creation_workflow` 可读取已有模板、生成 graph diff 草案与预览、校验 node_system 与运行时兼容性、经运行时确认写入 `graph_template/user/<template_id>/template.json`，并记录 `backend/data/template_revisions` 下的可恢复 revision artifact；写入后可选通过页面操作工作流进行可见试运行。
 
 长期权限约束：
@@ -137,7 +137,7 @@
 - 每个 Eval Case 发起独立 graph run，保留 run id、状态、错误、输出、artifacts 和节点失败信息：case result 已能保存关联 graph run id、状态、错误、最终输出、artifacts、节点失败和 human review；`/api/evals/runs/{eval_run_id}/cases/{case_id}/run` 已能从 suite 目标 graph/template 启动独立 LangGraph run，把 case `input_values` 注入 input state 默认值，在 run metadata 中记录 eval/suite/case/target 关联，并在复跑时清空旧输出、artifacts、节点失败和 check results；`/api/evals/runs/{eval_run_id}/cases/{case_id}/collect` 已能从完成的 graph run 抽取 output previews、saved artifacts、errors 和 node failures，生成 final output/artifacts 并触发确定性检查。
 - 支持 schema 检查、artifact 检查、引用检查、规则检查、LLM judge 和人工评审记录：check result 已支持任意 `kind`、状态、score、expected/actual/details/message/reviewer，human review 已作为 case result 的结构化记录保存；确定性的 schema/artifact/citation/rule 执行器与 `/api/evals/runs/{eval_run_id}/cases/{case_id}/evaluate` 已接入，可基于已有 final output/artifacts 生成并持久化 check results；`llm_judge` / `judge` 检查已接入显式 opt-in 的模型评审执行器，支持 check 级 `rubric`、`criteria`、`min_score`、`model_ref`，并把结构化判定、模型元数据和 reviewer=`llm_judge` 写入 check result。
 - 前端或 API 展示 suite 结果、case diff、失败原因和可复跑入口：API 已能创建/列出 suite、case、eval run、case results/check results，并提供单 case run/rerun 与 completed run collection 入口；`/api/evals/runs/{eval_run_id}/cases/run` 和 `/api/evals/runs/{eval_run_id}/cases/collect` 已提供批量运行/采集入口，并返回部分成功与逐 case 错误摘要；`/api/evals/runs/{eval_run_id}/cases/{case_id}/evaluate`、单 case collect、批量 collect 均支持 `run_llm_judge=true` 显式开启 LLM judge；`/evals` 评测中心已接入 suite/run/case/check/artifact 展示、单 case 运行/复跑、批量运行/采集、结果采集、LLM Judge 开关、图运行跳转、expected/final-output/check expected-actual 紧凑对比，以及由 case error、node failure、failed/error check 汇总出的失败诊断视图。
-- 覆盖 Buddy 主循环、能力循环、页面操作、Action 创建、联网搜索和至少一个业务模板：官方 `eval_cases.json` 包已覆盖 `buddy_autonomous_loop`、`buddy_capability_loop`、`toograph_page_operation_workflow`、`toograph_skill_creation_workflow`、`advanced_web_research_loop` 和现有业务模板；启动时 `app.evaluator.official_seed` 会把这些包注册为 Eval Suite/Case，并把旧的描述性检查归一化为显式 `llm_judge`，避免不可执行规则被误当成确定性检查通过。
+- 覆盖 Buddy 主循环、能力循环、页面操作、Action 创建、联网搜索和至少一个业务模板：官方 `eval_cases.json` 包已覆盖 `buddy_autonomous_loop`、`buddy_capability_loop`、`toograph_page_operation_workflow`、`toograph_action_creation_workflow`、`advanced_web_research_loop` 和现有业务模板；启动时 `app.evaluator.official_seed` 会把这些包注册为 Eval Suite/Case，并把旧的描述性检查归一化为显式 `llm_judge`，避免不可执行规则被误当成确定性检查通过。
 
 ## 图模板计划
 

@@ -141,8 +141,8 @@
               <section>
                 <h4>{{ t("presets.requiredActions") }}</h4>
                 <div class="presets-page__badges">
-                  <span v-for="skill in presetSkills(preset)" :key="skill">{{ skill }}</span>
-                  <span v-if="presetSkills(preset).length === 0">{{ t("common.none") }}</span>
+                  <span v-for="action in presetActions(preset)" :key="action">{{ action }}</span>
+                  <span v-if="presetActions(preset).length === 0">{{ t("common.none") }}</span>
                 </div>
               </section>
             </div>
@@ -215,9 +215,9 @@ function stateSchemaKeys(preset: PresetDocument) {
   return Object.keys(preset.definition.state_schema);
 }
 
-function presetSkills(preset: PresetDocument) {
-  const skillKey = preset.definition.node.kind === "agent" ? preset.definition.node.config.actionKey.trim() : "";
-  return skillKey ? [skillKey] : [];
+function presetActions(preset: PresetDocument) {
+  const actionKey = preset.definition.node.kind === "agent" ? preset.definition.node.config.actionKey.trim() : "";
+  return actionKey ? [actionKey] : [];
 }
 
 function replacePreset(updatedPreset: PresetDocument) {

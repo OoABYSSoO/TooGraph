@@ -14,17 +14,17 @@ MAX_TEMPLATE_CHARS = 600_000
 SAFE_TEMPLATE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,96}$")
 
 
-def toograph_graph_template_reader(**skill_inputs: Any) -> dict[str, Any]:
+def toograph_graph_template_reader(**action_inputs: Any) -> dict[str, Any]:
     template_id = _safe_template_id(
-        skill_inputs.get("template_id")
-        or skill_inputs.get("target_template_id")
-        or skill_inputs.get("templateKey")
-        or skill_inputs.get("template")
+        action_inputs.get("template_id")
+        or action_inputs.get("target_template_id")
+        or action_inputs.get("templateKey")
+        or action_inputs.get("template")
     )
     if not template_id:
         return _failed("invalid_template_id", "template_id must contain only letters, numbers, underscores, or hyphens.")
 
-    source_scope = _normalize_source_scope(skill_inputs.get("source_scope") or skill_inputs.get("sourceScope"))
+    source_scope = _normalize_source_scope(action_inputs.get("source_scope") or action_inputs.get("sourceScope"))
     candidates = _candidate_paths(template_id, source_scope)
     for scope, path in candidates:
         if not path.is_file():

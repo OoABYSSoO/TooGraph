@@ -43,9 +43,9 @@ test("parseStructuredStateDraft validates structured state types", () => {
     ok: true,
     value: [1, 2],
   });
-  assert.deepEqual(parseStructuredStateDraft("capability", "{\"kind\":\"skill\",\"key\":\"web_search\"}"), {
+  assert.deepEqual(parseStructuredStateDraft("capability", "{\"kind\":\"action\",\"key\":\"web_search\"}"), {
     ok: true,
-    value: { kind: "skill", key: "web_search" },
+    value: { kind: "action", key: "web_search" },
   });
   assert.deepEqual(parseStructuredStateDraft("capability", "[]"), {
     ok: false,

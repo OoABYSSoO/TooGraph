@@ -5,7 +5,7 @@ description: Internal controlled Buddy Home writer that applies safe command-bas
 
 # 伙伴之家写入器
 
-This is an internal TooGraph Skill used by Buddy autonomous review templates.
+This is an internal TooGraph Action used by Buddy autonomous review templates.
 
 It does not write files directly. It validates a small command list and calls the existing Buddy command/store path so every applied change creates a command record and revision.
 
@@ -39,7 +39,7 @@ Allowed actions:
 
 Safety boundary:
 
-- Do not use this Skill for arbitrary file writes, script execution, graph patches, revision restore, or permission escalation.
+- Do not use this Action for arbitrary file writes, script execution, graph patches, revision restore, or permission escalation.
 - `policy.update` is limited to `communication_preferences`.
 - `policy.update` cannot modify `graph_permission_mode`, `behavior_boundaries`, or undeclared policy fields.
 - Unsupported or unsafe commands are skipped and returned in `skipped_commands`.

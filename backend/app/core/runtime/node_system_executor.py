@@ -15,7 +15,7 @@ from app.core.runtime.agent_prompt import (
 )
 from app.core.runtime.agent_runtime_config import resolve_agent_runtime_config
 from app.core.runtime.agent_response_generation import generate_agent_response
-from app.core.runtime.agent_skill_input_generation import generate_agent_skill_inputs
+from app.core.runtime.agent_action_input_generation import generate_agent_action_inputs
 from app.core.runtime.agent_subgraph_input_generation import (
     SubgraphCapabilityDefinition,
     SubgraphCapabilityField,
@@ -50,6 +50,7 @@ from app.core.runtime.node_handlers import (
     execute_batch_node as _execute_batch_node_impl,
     execute_condition_node as _execute_condition_node_impl,
     execute_input_node as _execute_input_node_impl,
+    execute_tool_node as _execute_tool_node_impl,
 )
 from app.core.runtime.output_artifacts import (
     apply_loop_limit_exhausted_output_message as _apply_loop_limit_exhausted_output_message,
@@ -80,9 +81,9 @@ from app.core.runtime.state_io import (
     collect_node_inputs as _collect_node_inputs,
     initialize_graph_state as _initialize_graph_state,
 )
-from app.core.runtime.skill_invocation import (
+from app.core.runtime.action_invocation import (
     callable_accepts_keyword as _callable_accepts_keyword,
-    invoke_skill as _invoke_skill,
+    invoke_action as _invoke_action,
 )
 from app.core.runtime.state import touch_run_lifecycle
 from app.core.schemas.node_system import (
@@ -93,10 +94,11 @@ from app.core.schemas.node_system import (
     NodeSystemInputNode,
     NodeSystemOutputNode,
     NodeSystemStateDefinition,
+    NodeSystemToolNode,
 )
 from app.core.storage.run_store import save_run
 from app.templates.loader import load_template_record
-from app.skills.registry import get_skill_registry
+from app.actions.registry import get_action_registry
 from app.tools.local_llm import (
     _chat_with_local_model_with_meta,
     get_default_agent_temperature,
@@ -166,6 +168,8 @@ def _execute_node(
         return _execute_output_node(node_name, node, input_values, state)
     if isinstance(node, NodeSystemConditionNode):
         return _execute_condition_node(node, input_values, graph_context)
+    if isinstance(node, NodeSystemToolNode):
+        return _execute_tool_node(graph.state_schema, node, input_values, graph_context, node_name=node_name, state=state)
     raise ValueError(f"Unsupported node kind '{node.kind}'.")
 
 
@@ -200,12 +204,12 @@ def _execute_agent_node(
         graph_context,
         node_name=node_name,
         state=state,
-        get_skill_registry_func=get_skill_registry,
-        invoke_skill_func=_invoke_skill,
+        get_action_registry_func=get_action_registry,
+        invoke_action_func=_invoke_action,
         resolve_agent_runtime_config_func=_resolve_agent_runtime_config,
         build_agent_stream_delta_callback_func=_build_agent_stream_delta_callback,
         callable_accepts_keyword_func=_callable_accepts_keyword,
-        generate_agent_skill_inputs_func=_generate_agent_skill_inputs,
+        generate_agent_action_inputs_func=_generate_agent_action_inputs,
         generate_agent_subgraph_inputs_func=_generate_agent_subgraph_inputs,
         generate_agent_response_func=_generate_agent_response,
         resolve_subgraph_capability_definition_func=_resolve_subgraph_capability_definition,
@@ -254,10 +258,30 @@ def _execute_condition_node(
     )
 
 
+def _execute_tool_node(
+    state_schema: dict[str, NodeSystemStateDefinition],
+    node: NodeSystemToolNode,
+    input_values: dict[str, Any],
+    graph_context: dict[str, Any],
+    *,
+    node_name: str,
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    return _execute_tool_node_impl(
+        state_schema,
+        node,
+        input_values,
+        graph_context,
+        node_name=node_name,
+        state=state,
+        first_truthy_func=_first_truthy,
+    )
+
+
 def _generate_agent_response(
     node: NodeSystemAgentNode,
     input_values: dict[str, Any],
-    skill_context: dict[str, Any],
+    action_context: dict[str, Any],
     runtime_config: dict[str, Any],
     *,
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
@@ -266,7 +290,7 @@ def _generate_agent_response(
     return generate_agent_response(
         node,
         input_values,
-        skill_context,
+        action_context,
         runtime_config,
         state_schema=state_schema,
         on_delta=on_delta,
@@ -278,8 +302,8 @@ def _generate_agent_response(
     )
 
 
-def _generate_agent_skill_inputs(**kwargs: Any) -> tuple[dict[str, dict[str, Any]], str, list[str], dict[str, Any]]:
-    return generate_agent_skill_inputs(**kwargs)
+def _generate_agent_action_inputs(**kwargs: Any) -> tuple[dict[str, dict[str, Any]], str, list[str], dict[str, Any]]:
+    return generate_agent_action_inputs(**kwargs)
 
 
 def _generate_agent_subgraph_inputs(**kwargs: Any) -> tuple[dict[str, dict[str, Any]], str, list[str], dict[str, Any]]:

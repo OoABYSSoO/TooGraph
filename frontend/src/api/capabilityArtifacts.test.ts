@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildSkillArtifactFileUrl, fetchSkillArtifactContent } from "./capabilityArtifacts.ts";
+import { buildCapabilityArtifactFileUrl, fetchCapabilityArtifactContent } from "./capabilityArtifacts.ts";
 
 const originalFetch = globalThis.fetch;
 
-test("fetchSkillArtifactContent reads artifact content by encoded relative path", async () => {
+test("fetchCapabilityArtifactContent reads artifact content by encoded relative path", async () => {
   let requestedUrl = "";
 
   globalThis.fetch = (async (input: string | URL | Request) => {
@@ -27,7 +27,7 @@ test("fetchSkillArtifactContent reads artifact content by encoded relative path"
     );
   }) as typeof fetch;
 
-  const response = await fetchSkillArtifactContent("run_1/search/doc 001.md");
+  const response = await fetchCapabilityArtifactContent("run_1/search/doc 001.md");
 
   assert.equal(requestedUrl, "/api/capability-artifacts/content?path=run_1%2Fsearch%2Fdoc+001.md");
   assert.deepEqual(response, {
@@ -41,9 +41,9 @@ test("fetchSkillArtifactContent reads artifact content by encoded relative path"
   globalThis.fetch = originalFetch;
 });
 
-test("buildSkillArtifactFileUrl encodes artifact file paths for media preview", () => {
+test("buildCapabilityArtifactFileUrl encodes artifact file paths for media preview", () => {
   assert.equal(
-    buildSkillArtifactFileUrl("run_1/downloader/clip 001.mp4"),
+    buildCapabilityArtifactFileUrl("run_1/downloader/clip 001.mp4"),
     "/api/capability-artifacts/file?path=run_1%2Fdownloader%2Fclip+001.mp4",
   );
 });

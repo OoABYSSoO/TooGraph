@@ -42,7 +42,7 @@
 - `validation_plan.md`
 - `final_research_package.md`
 
-## Required Skills/Subgraphs
+## Required Actions/Subgraphs
 
 - `buddy_session_recall`: 只读召回产品偏好、历史调研结论和验证经验。
 

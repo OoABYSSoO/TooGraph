@@ -22,6 +22,7 @@ import {
   updateInputNodeConfigInDocument,
   updateNodeMetadataInDocument,
   updateOutputNodeConfigInDocument,
+  updateToolNodeConfigInDocument,
 } from "@/lib/graph-document";
 import { connectStateInputSourceToTarget } from "@/lib/graph-node-creation";
 import { isVirtualAnyOutputStateKey } from "@/lib/virtual-any-input";
@@ -38,8 +39,10 @@ import type {
   OutputNode,
   StateDefinition,
   TemplateRecord,
+  ToolNode,
 } from "@/types/node-system";
-import type { SkillDefinition } from "@/types/actions";
+import type { ActionDefinition } from "@/types/actions";
+import type { ToolDefinition } from "@/types/tools";
 
 import { addStateBindingToDocument, removeStateBindingFromDocument } from "./statePanelBindings.ts";
 import {
@@ -61,7 +64,8 @@ type WorkspaceGraphMutationMessage = {
 type WorkspaceGraphMutationActionsInput = {
   documentsByTabId: Ref<Record<string, GraphPayload | GraphDocument>>;
   focusedNodeIdByTabId: Ref<Record<string, string | null>>;
-  skillDefinitions: Ref<SkillDefinition[]>;
+  actionDefinitions: Ref<ActionDefinition[]>;
+  toolDefinitions: Ref<ToolDefinition[]>;
   markDocumentDirty: (tabId: string, nextDocument: GraphPayload | GraphDocument) => void;
   focusNodeForTab: (tabId: string, nodeId: string | null) => void;
   setMessageFeedbackForTab: (tabId: string, feedback: WorkspaceGraphMutationMessage) => void;
@@ -374,7 +378,26 @@ export function useWorkspaceGraphMutationActions(input: WorkspaceGraphMutationAc
         updateAgentNodeConfigInDocument(document, nodeId, (current) => ({
           ...current,
           ...patch,
-        }), { skillDefinitions: input.skillDefinitions.value }),
+        }), { actionDefinitions: input.actionDefinitions.value }),
+      {
+        focusNodeId: nodeId,
+      },
+    );
+  }
+
+  function updateToolConfigForTab(tabId: string, nodeId: string, patch: Partial<ToolNode["config"]>) {
+    commitDocumentMutationForTab(
+      tabId,
+      (document) =>
+        updateToolNodeConfigInDocument(
+          document,
+          nodeId,
+          (current) => ({
+            ...current,
+            ...patch,
+          }),
+          { toolDefinitions: input.toolDefinitions.value },
+        ),
       {
         focusNodeId: nodeId,
       },
@@ -544,6 +567,7 @@ export function useWorkspaceGraphMutationActions(input: WorkspaceGraphMutationAc
     updateInputConfigForTab,
     updateNodeMetadataForTab,
     updateAgentConfigForTab,
+    updateToolConfigForTab,
     updateBatchConfigForTab,
     updateBatchWorkerForTab,
     toggleAgentBreakpointForTab,

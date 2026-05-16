@@ -45,6 +45,7 @@ def refresh_run_artifacts(
     state_last_writers = dict(state.get("state_last_writers", {}))
     state["artifacts"] = {
         "action_outputs": state.get("action_outputs", []),
+        "tool_outputs": state.get("tool_outputs", []),
         "activity_events": activity_events,
         "capability_outputs": state.get("capability_outputs", []),
         "output_previews": state.get("output_previews", []),

@@ -27,36 +27,37 @@ test("buddy visible chat template does not run autonomous review in the foregrou
   );
 });
 
-test("buddy autonomous review is an internal background template with candidate writeback", () => {
+test("buddy autonomous review is an internal background template with memory writeback", () => {
   const template = readTemplate("buddy_autonomous_review");
 
   assert.equal(template.template_id, "buddy_autonomous_review");
   assert.equal(template.label, "自主复盘");
   assert.equal(template.metadata?.internal, true);
-  assert.deepEqual(template.metadata?.permissions, ["memory_candidate_write"]);
+  assert.deepEqual(template.metadata?.permissions, ["buddy_session_read", "buddy_home_write"]);
   assert.equal(template.nodes.review_buddy_memory, undefined);
-  assert.equal(template.nodes.decide_autonomous_review.kind, "agent");
+  assert.equal(template.nodes.extract_memory_candidates.kind, "agent");
+  assert.equal(template.nodes.merge_memory_document.kind, "agent");
   assert.equal(template.nodes.should_write_buddy_home, undefined);
   assert.equal(template.nodes.apply_buddy_home_writeback, undefined);
-  assert.equal(template.nodes.has_memory_candidates.kind, "condition");
-  assert.equal(template.nodes.write_memory_candidates.kind, "agent");
-  assert.equal(template.nodes.write_memory_candidates.config.skillKey, "memory_candidate_writer");
+  assert.equal(template.nodes.has_memory_updates.kind, "condition");
+  assert.equal(template.nodes.write_memory_updates.kind, "agent");
+  assert.equal(template.nodes.write_memory_updates.config.actionKey, "buddy_home_writer");
   assert.equal(
-    template.nodes.write_memory_candidates.writes.some((binding) => binding.state === "candidate_memories"),
+    template.nodes.write_memory_updates.writes.some((binding) => binding.state === "memory_write_result"),
     true,
   );
   assert.equal(
     template.conditional_edges.some(
       (edge) =>
-        edge.source === "has_memory_candidates" &&
-        edge.branches.true === "write_memory_candidates" &&
-        edge.branches.false === "output_improvement_candidates",
+        edge.source === "has_memory_updates" &&
+        edge.branches.true === "write_memory_updates" &&
+        edge.branches.false === "output_memory_review_result",
     ),
     true,
   );
 });
 
-test("buddy autonomous review stays out of visible template and capability catalogs", () => {
+test("buddy autonomous review stays out of visible templates and fixed selector output", () => {
   const templateList = runPython(
     [
       "import json",
@@ -69,20 +70,19 @@ test("buddy autonomous review stays out of visible template and capability catal
   assert.equal(templateList.includes("buddy_self_review"), false);
   assert.equal(templateList.includes("buddy_autonomous_review"), false);
 
-  const capabilityList = runPython(
+  const selectedCapability = runPython(
     [
       "import json, sys",
-      `sys.path.insert(0, ${JSON.stringify(resolve("skill/official/toograph_capability_selector"))})`,
-      "from capability_catalog import load_capability_catalog",
-      "print(json.dumps([item['key'] for item in load_capability_catalog(origin='buddy')['templates']]))",
+      `sys.path.insert(0, ${JSON.stringify(resolve("action/official/toograph_capability_selector"))})`,
+      "from after_llm import toograph_capability_selector",
+      "print(json.dumps(toograph_capability_selector()['capability']))",
     ].join("; "),
     { TOOGRAPH_REPO_ROOT: process.cwd() },
   );
-  assert.equal(capabilityList.includes("buddy_autonomous_loop"), false);
-  assert.equal(capabilityList.includes("buddy_capability_loop"), false);
-  assert.equal(capabilityList.includes("buddy_self_review"), false);
-  assert.equal(capabilityList.includes("buddy_autonomous_review"), false);
-  assert.equal(capabilityList.includes("buddy_home_writer"), false);
+  assert.deepEqual(selectedCapability, {
+    kind: "subgraph",
+    key: "toograph_page_operation_workflow",
+  });
 });
 
 function runPython(script, extraEnv = {}) {

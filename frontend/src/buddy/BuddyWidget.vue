@@ -557,7 +557,7 @@ import {
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
 import {
   attachPageOperationRuntimeContext,
-  buildPageOperationRuntimeContext as buildPageOperationSkillRuntimeContext,
+  buildPageOperationRuntimeContext as buildPageOperationActionRuntimeContext,
   collectPageOperationSnapshot,
 } from "./pageOperationAffordances.ts";
 import {
@@ -2495,8 +2495,8 @@ async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequ
     status,
     routeBefore,
     routeAfter: route.fullPath,
-    pageOperationContextBefore: pageOperationContextBefore.skillRuntimeContext,
-    pageOperationContextAfter: pageOperationContextAfterBase.skillRuntimeContext,
+    pageOperationContextBefore: pageOperationContextBefore.actionRuntimeContext,
+    pageOperationContextAfter: pageOperationContextAfterBase.actionRuntimeContext,
     triggeredRunId: triggeredRun?.runId ?? null,
     triggeredGraphId: triggeredRun?.graphId ?? null,
     triggeredRunInitialStatus: triggeredRun?.initialStatus ?? null,
@@ -2581,7 +2581,7 @@ async function maybeAutoResumePageOperationRun(
     buildPageOperationResumePayload({
       operationResult,
       pageContext: pageOperationContextAfter.pageContext,
-      pageOperationContext: pageOperationContextAfter.skillRuntimeContext,
+      pageOperationContext: pageOperationContextAfter.actionRuntimeContext,
     }),
   );
   activeRunId.value = response.run_id;
@@ -2627,7 +2627,7 @@ async function executeBuddyBackgroundRunTemplateOperation(
     templateId: operation.templateId || template.template_id,
     templateName: operation.templateName || template.label || template.default_graph_name,
   });
-  const response = await runGraph(attachPageOperationRuntimeContext(graph, pageOperationContext.skillRuntimeContext));
+  const response = await runGraph(attachPageOperationRuntimeContext(graph, pageOperationContext.actionRuntimeContext));
   const triggeredRun: BuddyVirtualOperationTriggeredRun = {
     operationRequestId,
     targetId: operation.runTargetId || "editor.action.runActiveGraph",
@@ -4422,7 +4422,7 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
         userMessage: turn.userMessage,
         history,
         pageContext: pageOperationContext.pageContext,
-        pageOperationContext: pageOperationContext.skillRuntimeContext,
+        pageOperationContext: pageOperationContext.actionRuntimeContext,
         buddyMode: buddyMode.value,
         buddyModel: buddyModelRef.value,
       },
@@ -5845,7 +5845,7 @@ function buildPageOperationRuntimeContext(options: BuddyPageOperationRuntimeCont
     routePath: route.fullPath,
     root: typeof document === "undefined" ? null : document,
   });
-  const skillRuntimeContext = buildPageOperationSkillRuntimeContext({
+  const actionRuntimeContext = buildPageOperationActionRuntimeContext({
     routePath: route.fullPath,
     root: typeof document === "undefined" ? null : document,
     snapshot,
@@ -5858,10 +5858,10 @@ function buildPageOperationRuntimeContext(options: BuddyPageOperationRuntimeCont
       routePath: route.fullPath,
       editor: buddyContextStore.editorSnapshot,
       activeBuddyRunId: activeRunId.value,
-      pageOperationBook: skillRuntimeContext.page_operation_book,
-      pageFacts: skillRuntimeContext.page_facts,
+      pageOperationBook: actionRuntimeContext.page_operation_book,
+      pageFacts: actionRuntimeContext.page_facts,
     }),
-    skillRuntimeContext,
+    actionRuntimeContext,
   };
 }
 

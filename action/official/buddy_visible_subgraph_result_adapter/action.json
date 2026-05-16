@@ -53,7 +53,7 @@
       "key": "operation_report",
       "name": "Operation Report",
       "valueType": "json",
-      "description": "固定模板运行 Skill 分支的紧凑结构化操作报告。"
+      "description": "固定模板运行 Action 分支的紧凑结构化操作报告。"
     },
     {
       "key": "page_operation_final_reply",

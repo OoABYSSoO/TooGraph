@@ -43,7 +43,7 @@
 - `xiaohongshu_notes.md`
 - `final_review_mining_package.md`
 
-## Required Skills/Subgraphs
+## Required Actions/Subgraphs
 
 - `buddy_session_recall`: 只读召回历史卖点、禁用词和评论洞察经验。
 

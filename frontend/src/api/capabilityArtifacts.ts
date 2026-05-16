@@ -1,6 +1,6 @@
 import { apiGet, apiPostForm } from "./http.ts";
 
-export type SkillArtifactContent = {
+export type CapabilityArtifactContent = {
   path: string;
   name: string;
   size: number;
@@ -8,25 +8,25 @@ export type SkillArtifactContent = {
   content: string;
 };
 
-export type SkillArtifactUpload = {
+export type CapabilityArtifactUpload = {
   local_path: string;
   filename: string;
   content_type: string;
   size: number;
 };
 
-export async function fetchSkillArtifactContent(path: string): Promise<SkillArtifactContent> {
+export async function fetchCapabilityArtifactContent(path: string): Promise<CapabilityArtifactContent> {
   const searchParams = new URLSearchParams({ path });
-  return apiGet<SkillArtifactContent>(`/api/capability-artifacts/content?${searchParams.toString()}`);
+  return apiGet<CapabilityArtifactContent>(`/api/capability-artifacts/content?${searchParams.toString()}`);
 }
 
-export function buildSkillArtifactFileUrl(path: string): string {
+export function buildCapabilityArtifactFileUrl(path: string): string {
   const searchParams = new URLSearchParams({ path });
   return `/api/capability-artifacts/file?${searchParams.toString()}`;
 }
 
-export async function uploadSkillArtifactFile(file: File): Promise<SkillArtifactUpload> {
+export async function uploadCapabilityArtifactFile(file: File): Promise<CapabilityArtifactUpload> {
   const payload = new FormData();
   payload.append("file", file);
-  return apiPostForm<SkillArtifactUpload>("/api/capability-artifacts/uploads", payload);
+  return apiPostForm<CapabilityArtifactUpload>("/api/capability-artifacts/uploads", payload);
 }

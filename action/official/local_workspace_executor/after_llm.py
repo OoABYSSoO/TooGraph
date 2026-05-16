@@ -21,21 +21,21 @@ DENIED_ROOTS = [".git", ".env", "backend/data/settings"]
 EXECUTE_EXTENSIONS = {".py", ".js", ".mjs", ".sh", ".bat", ".ps1"}
 
 
-def local_workspace_executor(**skill_inputs: Any) -> dict[str, Any]:
-    operation = _as_text(skill_inputs.get("operation")).strip().lower()
+def local_workspace_executor(**action_inputs: Any) -> dict[str, Any]:
+    operation = _as_text(action_inputs.get("operation")).strip().lower()
     if operation == "edit":
         operation = "write"
     repo_root = _repo_root()
     if operation == "read":
-        return _read_file(repo_root, skill_inputs)
+        return _read_file(repo_root, action_inputs)
     if operation == "list":
-        return _list_files(repo_root, skill_inputs)
+        return _list_files(repo_root, action_inputs)
     if operation == "search":
-        return _search_files(repo_root, skill_inputs)
+        return _search_files(repo_root, action_inputs)
     if operation == "write":
-        return _write_file(repo_root, skill_inputs)
+        return _write_file(repo_root, action_inputs)
     if operation == "execute":
-        return _execute_script(repo_root, skill_inputs)
+        return _execute_script(repo_root, action_inputs)
     return _failed("invalid_operation", "operation must be one of read, list, search, write, execute.")
 
 

@@ -6,40 +6,40 @@ from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
-from app.core.schemas.skills import SkillDefinition, SkillFileContentResponse, SkillFileTreeResponse
-from app.core.storage.skill_store import (
-    delete_skill,
-    disable_skill,
-    enable_skill,
-    extract_skill_archive,
-    import_skill_from_directory,
+from app.core.schemas.actions import ActionDefinition, ActionFileContentResponse, ActionFileTreeResponse
+from app.core.storage.action_store import (
+    delete_action,
+    disable_action,
+    enable_action,
+    extract_action_archive,
+    import_action_from_directory,
 )
-from app.skills.definitions import (
-    get_skill_catalog_registry,
-    list_skill_catalog,
-    list_skill_definitions,
+from app.actions.definitions import (
+    get_action_catalog_registry,
+    list_action_catalog,
+    list_action_definitions,
 )
-from app.skills.files import build_skill_file_tree, read_skill_file_content
+from app.actions.files import build_action_file_tree, read_action_file_content
 
 
 router = APIRouter(prefix="/api/actions", tags=["actions"])
 
 
-@router.get("/definitions", response_model=list[SkillDefinition])
-def list_skill_definitions_endpoint(include_disabled: bool = False) -> list[SkillDefinition]:
-    return list_skill_definitions(include_disabled=include_disabled)
+@router.get("/definitions", response_model=list[ActionDefinition])
+def list_action_definitions_endpoint(include_disabled: bool = False) -> list[ActionDefinition]:
+    return list_action_definitions(include_disabled=include_disabled)
 
 
-@router.get("/catalog", response_model=list[SkillDefinition])
-def list_skill_catalog_endpoint(include_disabled: bool = True) -> list[SkillDefinition]:
-    return list_skill_catalog(include_disabled=include_disabled)
+@router.get("/catalog", response_model=list[ActionDefinition])
+def list_action_catalog_endpoint(include_disabled: bool = True) -> list[ActionDefinition]:
+    return list_action_catalog(include_disabled=include_disabled)
 
 
-@router.post("/imports/upload", response_model=SkillDefinition)
-async def import_uploaded_skill_endpoint(
+@router.post("/imports/upload", response_model=ActionDefinition)
+async def import_uploaded_action_endpoint(
     files: list[UploadFile] = File(...),
     relative_paths: list[str] | None = Form(default=None, alias="relativePaths"),
-) -> SkillDefinition:
+) -> ActionDefinition:
     if not files:
         raise HTTPException(status_code=400, detail="Upload an Action archive or folder.")
     try:
@@ -47,85 +47,85 @@ async def import_uploaded_skill_endpoint(
             temp_root = Path(temp_dir)
             upload_root = temp_root / "upload"
             if len(files) == 1 and _is_zip_upload(files[0]):
-                archive_path = temp_root / "skill.zip"
+                archive_path = temp_root / "action.zip"
                 await _write_upload_file(files[0], archive_path)
-                source_root = extract_skill_archive(archive_path, upload_root)
+                source_root = extract_action_archive(archive_path, upload_root)
             else:
                 source_root = upload_root
                 await _write_uploaded_folder(files, relative_paths or [], source_root)
-            skill_key = import_skill_from_directory(source_root)
+            action_key = import_action_from_directory(source_root)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    definition = get_skill_catalog_registry(include_disabled=True).get(skill_key)
+    definition = get_action_catalog_registry(include_disabled=True).get(action_key)
     if definition is None:
-        raise HTTPException(status_code=500, detail=f"Imported Action '{skill_key}' could not be loaded.")
+        raise HTTPException(status_code=500, detail=f"Imported Action '{action_key}' could not be loaded.")
     return definition
 
 
-@router.post("/{skill_key}/disable", response_model=SkillDefinition)
-def disable_skill_endpoint(skill_key: str) -> SkillDefinition:
-    definition = get_skill_catalog_registry(include_disabled=True).get(skill_key)
+@router.post("/{action_key}/disable", response_model=ActionDefinition)
+def disable_action_endpoint(action_key: str) -> ActionDefinition:
+    definition = get_action_catalog_registry(include_disabled=True).get(action_key)
     if definition is None:
-        raise HTTPException(status_code=404, detail=f"Action '{skill_key}' does not exist.")
-    disable_skill(skill_key)
-    return get_skill_catalog_registry(include_disabled=True)[skill_key]
+        raise HTTPException(status_code=404, detail=f"Action '{action_key}' does not exist.")
+    disable_action(action_key)
+    return get_action_catalog_registry(include_disabled=True)[action_key]
 
 
-@router.post("/{skill_key}/enable", response_model=SkillDefinition)
-def enable_skill_endpoint(skill_key: str) -> SkillDefinition:
-    definition = get_skill_catalog_registry(include_disabled=True).get(skill_key)
+@router.post("/{action_key}/enable", response_model=ActionDefinition)
+def enable_action_endpoint(action_key: str) -> ActionDefinition:
+    definition = get_action_catalog_registry(include_disabled=True).get(action_key)
     if definition is None:
-        raise HTTPException(status_code=404, detail=f"Action '{skill_key}' does not exist.")
-    enable_skill(skill_key)
-    return get_skill_catalog_registry(include_disabled=True)[skill_key]
+        raise HTTPException(status_code=404, detail=f"Action '{action_key}' does not exist.")
+    enable_action(action_key)
+    return get_action_catalog_registry(include_disabled=True)[action_key]
 
 
-@router.patch("/{skill_key}/settings")
-def update_skill_settings_endpoint(skill_key: str, payload: dict[str, Any] | None = None) -> None:
+@router.patch("/{action_key}/settings")
+def update_action_settings_endpoint(action_key: str, payload: dict[str, Any] | None = None) -> None:
     _ = payload
-    definition = get_skill_catalog_registry(include_disabled=True).get(skill_key)
+    definition = get_action_catalog_registry(include_disabled=True).get(action_key)
     if definition is None:
-        raise HTTPException(status_code=404, detail=f"Action '{skill_key}' does not exist.")
+        raise HTTPException(status_code=404, detail=f"Action '{action_key}' does not exist.")
     raise HTTPException(
         status_code=410,
         detail="Action capability policies were removed; enable or disable the action to control visibility.",
     )
 
 
-@router.get("/{skill_key}/files", response_model=SkillFileTreeResponse)
-def get_skill_files_endpoint(skill_key: str) -> SkillFileTreeResponse:
-    definition = get_skill_catalog_registry(include_disabled=True).get(skill_key)
+@router.get("/{action_key}/files", response_model=ActionFileTreeResponse)
+def get_action_files_endpoint(action_key: str) -> ActionFileTreeResponse:
+    definition = get_action_catalog_registry(include_disabled=True).get(action_key)
     if definition is None:
-        raise HTTPException(status_code=404, detail=f"Action '{skill_key}' does not exist.")
+        raise HTTPException(status_code=404, detail=f"Action '{action_key}' does not exist.")
     try:
-        return build_skill_file_tree(definition)
+        return build_action_file_tree(definition)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.get("/{skill_key}/files/content", response_model=SkillFileContentResponse)
-def get_skill_file_content_endpoint(skill_key: str, path: str = Query(..., min_length=1)) -> SkillFileContentResponse:
-    definition = get_skill_catalog_registry(include_disabled=True).get(skill_key)
+@router.get("/{action_key}/files/content", response_model=ActionFileContentResponse)
+def get_action_file_content_endpoint(action_key: str, path: str = Query(..., min_length=1)) -> ActionFileContentResponse:
+    definition = get_action_catalog_registry(include_disabled=True).get(action_key)
     if definition is None:
-        raise HTTPException(status_code=404, detail=f"Action '{skill_key}' does not exist.")
+        raise HTTPException(status_code=404, detail=f"Action '{action_key}' does not exist.")
     try:
-        return read_skill_file_content(definition, path)
+        return read_action_file_content(definition, path)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.delete("/{skill_key}")
-def delete_skill_endpoint(skill_key: str) -> dict[str, str]:
-    definition = get_skill_catalog_registry(include_disabled=True).get(skill_key)
+@router.delete("/{action_key}")
+def delete_action_endpoint(action_key: str) -> dict[str, str]:
+    definition = get_action_catalog_registry(include_disabled=True).get(action_key)
     if definition is None:
-        raise HTTPException(status_code=404, detail=f"Action '{skill_key}' does not exist.")
+        raise HTTPException(status_code=404, detail=f"Action '{action_key}' does not exist.")
     if not definition.can_manage:
         raise HTTPException(status_code=400, detail="Only imported TooGraph actions can be deleted.")
-    delete_skill(skill_key)
-    return {"skillKey": skill_key, "status": "deleted"}
+    delete_action(action_key)
+    return {"actionKey": action_key, "status": "deleted"}
 
 
 def _is_zip_upload(upload: UploadFile) -> bool:

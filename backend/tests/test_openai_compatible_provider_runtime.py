@@ -638,7 +638,7 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
             payload, reasoning, warnings, updated = node_system_executor._generate_agent_response(
                 node=node,
                 input_values={"question": "hi"},
-                skill_context={},
+                action_context={},
                 runtime_config=runtime_config,
             )
 

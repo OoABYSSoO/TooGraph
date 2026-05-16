@@ -86,7 +86,7 @@ def _paused_run(run_id: str = "run_paused", status: str = "awaiting_human") -> d
         "current_node_id": "human_review",
         "metadata": {
             "origin": "buddy",
-            "pending_permission_approval": {"skill_key": "write_file"},
+            "pending_permission_approval": {"action_key": "write_file"},
             "pending_permission_approval_resume_payload": {"answer": "ok"},
             "pending_subgraph_breakpoint": {"node_id": "inner_review"},
             "pending_subgraph_resume_payload": {"draft": "hello"},

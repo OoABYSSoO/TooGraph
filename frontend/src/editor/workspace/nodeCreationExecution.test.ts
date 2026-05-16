@@ -143,6 +143,35 @@ test("createNodeFromCreationEntry builds the builtin empty agent preset and auto
   assert.deepEqual(result.document.edges, [{ source: "input_question", target: "agent_created" }]);
 });
 
+test("createNodeFromCreationEntry builds a generic tool node", () => {
+  const document = createBaseDocument();
+  const entry: NodeCreationEntry = {
+    id: "node-tool",
+    family: "tool" as NodeCreationEntry["family"],
+    label: "Tool",
+    description: "Run a deterministic tool.",
+    mode: "node",
+    origin: "builtin",
+    nodeKind: "tool" as NodeCreationEntry["nodeKind"],
+    acceptsValueTypes: null,
+  };
+
+  const result = createNodeFromCreationEntry(document, {
+    entry,
+    createdNodeId: "tool_created",
+    persistedPresets: [],
+    context: { position: { x: 320, y: 80 } },
+  });
+
+  const node = result.document.nodes.tool_created;
+  assert.equal(node?.kind, "tool");
+  if (node?.kind === "tool") {
+    assert.equal(node.name, "Tool");
+    assert.equal(node.description, "Run deterministic processing without an LLM turn.");
+    assert.equal(node.config.toolKey, "");
+  }
+});
+
 test("createNodeFromCreationEntry creates input boundary nodes with a virtual output slot", () => {
   const document = {
     ...createBaseDocument(),

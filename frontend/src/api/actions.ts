@@ -1,25 +1,25 @@
-import type { SkillDefinition, SkillFileContentResponse, SkillFileTreeResponse } from "@/types/actions";
+import type { ActionDefinition, ActionFileContentResponse, ActionFileTreeResponse } from "@/types/actions";
 
 import { apiDelete, apiGet, apiPost, apiPostForm } from "./http.ts";
 
-export async function fetchSkillDefinitions(): Promise<SkillDefinition[]> {
-  return apiGet<SkillDefinition[]>("/api/actions/definitions");
+export async function fetchActionDefinitions(): Promise<ActionDefinition[]> {
+  return apiGet<ActionDefinition[]>("/api/actions/definitions");
 }
 
-export async function fetchSkillCatalog(options: { includeDisabled?: boolean } = {}): Promise<SkillDefinition[]> {
+export async function fetchActionCatalog(options: { includeDisabled?: boolean } = {}): Promise<ActionDefinition[]> {
   const includeDisabled = options.includeDisabled ?? true;
-  return apiGet<SkillDefinition[]>(`/api/actions/catalog?include_disabled=${includeDisabled ? "true" : "false"}`);
+  return apiGet<ActionDefinition[]>(`/api/actions/catalog?include_disabled=${includeDisabled ? "true" : "false"}`);
 }
 
-export async function fetchSkillFiles(skillKey: string): Promise<SkillFileTreeResponse> {
-  return apiGet<SkillFileTreeResponse>(`/api/actions/${skillKey}/files`);
+export async function fetchActionFiles(actionKey: string): Promise<ActionFileTreeResponse> {
+  return apiGet<ActionFileTreeResponse>(`/api/actions/${actionKey}/files`);
 }
 
-export async function fetchSkillFileContent(skillKey: string, path: string): Promise<SkillFileContentResponse> {
-  return apiGet<SkillFileContentResponse>(`/api/actions/${skillKey}/files/content?path=${encodeURIComponent(path)}`);
+export async function fetchActionFileContent(actionKey: string, path: string): Promise<ActionFileContentResponse> {
+  return apiGet<ActionFileContentResponse>(`/api/actions/${actionKey}/files/content?path=${encodeURIComponent(path)}`);
 }
 
-export async function importSkillUpload(files: File[], relativePaths: string[] = []): Promise<SkillDefinition> {
+export async function importActionUpload(files: File[], relativePaths: string[] = []): Promise<ActionDefinition> {
   const payload = new FormData();
   files.forEach((file) => {
     payload.append("files", file);
@@ -27,14 +27,14 @@ export async function importSkillUpload(files: File[], relativePaths: string[] =
   relativePaths.forEach((relativePath) => {
     payload.append("relativePaths", relativePath);
   });
-  return apiPostForm<SkillDefinition>("/api/actions/imports/upload", payload);
+  return apiPostForm<ActionDefinition>("/api/actions/imports/upload", payload);
 }
 
-export async function updateSkillStatus(skillKey: string, status: SkillDefinition["status"]): Promise<SkillDefinition> {
+export async function updateActionStatus(actionKey: string, status: ActionDefinition["status"]): Promise<ActionDefinition> {
   const action = status === "active" ? "enable" : "disable";
-  return apiPost<SkillDefinition>(`/api/actions/${skillKey}/${action}`, null);
+  return apiPost<ActionDefinition>(`/api/actions/${actionKey}/${action}`, null);
 }
 
-export async function deleteSkill(skillKey: string): Promise<{ skillKey: string; status: "deleted" }> {
-  return apiDelete<{ skillKey: string; status: "deleted" }>(`/api/actions/${skillKey}`);
+export async function deleteAction(actionKey: string): Promise<{ actionKey: string; status: "deleted" }> {
+  return apiDelete<{ actionKey: string; status: "deleted" }>(`/api/actions/${actionKey}`);
 }

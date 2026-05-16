@@ -113,17 +113,17 @@
     @update:thinking-mode="emit('update:thinking-mode', $event)"
   />
   <AgentActionPicker
-    :selected-skill-key="selectedSkillKey"
-    :loading="skillDefinitionsLoading"
-    :error="skillDefinitionsError"
-    :available-skill-definitions="availableSkillDefinitions"
+    :selected-action-key="selectedActionKey"
+    :loading="actionDefinitionsLoading"
+    :error="actionDefinitionsError"
+    :available-action-definitions="availableActionDefinitions"
     :breakpoint-enabled="breakpointEnabled"
     :confirm-popover-style="confirmPopoverStyle"
-    @update:selected-skill="emit('select-skill', $event)"
+    @update:selected-action="emit('select-action', $event)"
     @update:breakpoint-enabled="emit('update:breakpoint-enabled', $event)"
   />
   <div class="node-card__surface node-card__prompt-surface">
-    <div v-if="actionInstructionBlocks.length > 0" class="node-card__skill-instruction-capsules">
+    <div v-if="actionInstructionBlocks.length > 0" class="node-card__action-instruction-capsules">
       <ElPopover
         v-for="block in actionInstructionBlocks"
         :key="block.actionKey"
@@ -137,7 +137,7 @@
         <template #reference>
           <button
             type="button"
-            class="node-card__skill-instruction-capsule"
+            class="node-card__action-instruction-capsule"
             :title="block.title"
             @pointerdown.stop
             @click.stop
@@ -145,13 +145,13 @@
             {{ block.title }}
           </button>
         </template>
-        <div class="node-card__skill-instruction-editor" data-node-popup-surface="true" @pointerdown.stop @click.stop>
-          <div class="node-card__skill-instruction-editor-title">{{ block.title }}</div>
+        <div class="node-card__action-instruction-editor" data-node-popup-surface="true" @pointerdown.stop @click.stop>
+          <div class="node-card__action-instruction-editor-title">{{ block.title }}</div>
           <ElInput
             :model-value="block.content"
             type="textarea"
             :autosize="{ minRows: 6, maxRows: 10 }"
-            @update:model-value="emit('update-skill-instruction', { skillKey: block.actionKey, content: String($event) })"
+            @update:model-value="emit('update-action-instruction', { actionKey: block.actionKey, content: String($event) })"
           />
         </div>
       </ElPopover>
@@ -183,7 +183,7 @@ import StatePortList from "./StatePortList.vue";
 import type { AgentThinkingControlMode } from "./agentConfigModel";
 import type { StatePortExistingStateOption } from "./statePortCreateModel";
 import type { NodeCardViewModel, NodePortViewModel } from "./nodeCardViewModel";
-import type { SkillDefinition } from "@/types/actions";
+import type { ActionDefinition } from "@/types/actions";
 import type { StateColorOption, StateFieldDraft, StateFieldType } from "@/editor/workspace/statePanelFields";
 
 type AgentBodyViewModel = Extract<NodeCardViewModel["body"], { kind: "agent" }>;
@@ -239,10 +239,10 @@ const props = defineProps<{
   thinkingOptions: AgentThinkingOption[];
   thinkingEnabled: boolean;
   breakpointEnabled: boolean;
-  selectedSkillKey: string;
-  skillDefinitionsLoading: boolean;
-  skillDefinitionsError: string | null;
-  availableSkillDefinitions: SkillDefinition[];
+  selectedActionKey: string;
+  actionDefinitionsLoading: boolean;
+  actionDefinitionsError: string | null;
+  availableActionDefinitions: ActionDefinition[];
 }>();
 
 const emit = defineEmits<{
@@ -268,8 +268,8 @@ const emit = defineEmits<{
   (event: "update:model-value", value: string | number | boolean | undefined): void;
   (event: "update:thinking-mode", value: string | number | boolean | undefined): void;
   (event: "update:breakpoint-enabled", value: string | number | boolean): void;
-  (event: "select-skill", skillKey: string): void;
-  (event: "update-skill-instruction", payload: { skillKey: string; content: string }): void;
+  (event: "select-action", actionKey: string): void;
+  (event: "update-action-instruction", payload: { actionKey: string; content: string }): void;
   (event: "task-input", inputEvent: Event): void;
 }>();
 
@@ -341,14 +341,14 @@ defineExpose({
   cursor: text;
 }
 
-.node-card__skill-instruction-capsules {
+.node-card__action-instruction-capsules {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   cursor: default;
 }
 
-.node-card__skill-instruction-capsule {
+.node-card__action-instruction-capsule {
   max-width: 100%;
   border: 1px solid rgba(37, 99, 235, 0.2);
   border-radius: 999px;
@@ -368,15 +368,15 @@ defineExpose({
     box-shadow 160ms ease;
 }
 
-.node-card__skill-instruction-capsule:hover,
-.node-card__skill-instruction-capsule:focus-visible {
+.node-card__action-instruction-capsule:hover,
+.node-card__action-instruction-capsule:focus-visible {
   border-color: rgba(37, 99, 235, 0.34);
   background: rgba(219, 234, 254, 0.96);
   box-shadow: 0 6px 14px rgba(37, 99, 235, 0.12);
   outline: none;
 }
 
-.node-card__skill-instruction-editor {
+.node-card__action-instruction-editor {
   display: grid;
   gap: 10px;
   border: 1px solid rgba(154, 52, 18, 0.14);
@@ -386,13 +386,13 @@ defineExpose({
   box-shadow: 0 18px 36px rgba(60, 41, 20, 0.14);
 }
 
-.node-card__skill-instruction-editor-title {
+.node-card__action-instruction-editor-title {
   color: #1f2937;
   font-size: 0.86rem;
   font-weight: 700;
 }
 
-.node-card__skill-instruction-editor :deep(.el-textarea__inner) {
+.node-card__action-instruction-editor :deep(.el-textarea__inner) {
   background: rgba(255, 255, 255, 0.9);
   border-color: rgba(154, 52, 18, 0.16);
   box-shadow: inset 0 0 0 1px rgba(154, 52, 18, 0.08);

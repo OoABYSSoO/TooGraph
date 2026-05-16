@@ -19,7 +19,7 @@ test("PrimaryStatePort owns primary input and output state-pill popover presenta
   assert.match(componentSource, /`\$\{props\.nodeId\}:\$\{anchorSlotKind\.value\}:\$\{props\.port\.key\}`/);
   assert.match(componentSource, /emit\("open-create", props\.side\)/);
   assert.match(componentSource, /emit\("port-click", anchorId\.value, props\.port\.key\)/);
-  assert.match(componentSource, /const isManagedPort = computed\(\(\) => Boolean\(props\.port\?\.managedBySkill \|\| props\.port\?\.managedByCapability\)\);/);
+  assert.match(componentSource, /const isManagedPort = computed\(\(\) => Boolean\(props\.port\?\.managedByAction \|\| props\.port\?\.managedByCapability\)\);/);
   assert.match(componentSource, /if \(isManagedPort\.value\) \{[\s\S]*return;/);
   assert.match(componentSource, /v-if="isManagedPort"/);
   assert.match(componentSource, /<Connection \/>/);
@@ -32,7 +32,7 @@ test("PrimaryStatePort carries primary state-pill scoped styles", () => {
   assert.match(componentSource, /\.node-card__port-pill-row \{/);
   assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*display:\s*inline-flex;/);
   assert.match(componentSource, /\.node-card__port-pill-source-icon \{/);
-  assert.match(componentSource, /\.node-card__port-pill--skill-managed \{/);
+  assert.match(componentSource, /\.node-card__port-pill--action-managed \{/);
   assert.match(componentSource, /\.node-card__port-pill--dock-start \{[\s\S]*margin-left:\s*calc\(var\(--node-card-inline-padding\) \* -1 - 10px\);/);
   assert.match(componentSource, /\.node-card__port-pill--dock-end \{[\s\S]*margin-right:\s*calc\(var\(--node-card-inline-padding\) \* -1 - 10px\);/);
   assert.doesNotMatch(componentSource, /text-overflow:\s*ellipsis;/);

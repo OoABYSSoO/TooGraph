@@ -37,7 +37,7 @@
 - `publishing_plan.json`
 - `final_distribution_pack.md`
 
-## Required Skills/Subgraphs
+## Required Actions/Subgraphs
 
 - `buddy_session_recall`
 

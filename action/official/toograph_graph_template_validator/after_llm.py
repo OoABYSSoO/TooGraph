@@ -10,11 +10,11 @@ from app.core.langgraph import get_langgraph_runtime_unsupported_reasons
 from app.core.schemas.node_system import NodeSystemGraphPayload, NodeSystemTemplate
 
 
-def toograph_graph_template_validator(**skill_inputs: Any) -> dict[str, Any]:
+def toograph_graph_template_validator(**action_inputs: Any) -> dict[str, Any]:
     template_payload, parse_error = _coerce_template_payload(
-        skill_inputs.get("template_json")
-        or skill_inputs.get("generated_template_json")
-        or skill_inputs.get("template")
+        action_inputs.get("template_json")
+        or action_inputs.get("generated_template_json")
+        or action_inputs.get("template")
     )
     if parse_error:
         report = _base_report(valid=False, issues=[{"type": "parse_error", "message": parse_error}])

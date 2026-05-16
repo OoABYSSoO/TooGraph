@@ -1,71 +1,71 @@
-import type { SkillDefinition } from "../types/actions.ts";
+import type { ActionDefinition } from "../types/actions.ts";
 
-export type SkillStatusFilter = "all" | "active" | "disabled";
+export type ActionStatusFilter = "all" | "active" | "disabled";
 
-export type SkillManagementFilters = {
+export type ActionManagementFilters = {
   query: string;
-  status: SkillStatusFilter;
+  status: ActionStatusFilter;
 };
 
-export type SkillOverview = {
+export type ActionOverview = {
   total: number;
   active: number;
   visibleActions: number;
 };
 
-export function buildSkillStatusOptions(): SkillStatusFilter[] {
+export function buildActionStatusOptions(): ActionStatusFilter[] {
   return ["all", "active", "disabled"];
 }
 
-export function filterSkillsForManagement(
-  actions: SkillDefinition[],
-  filters: SkillManagementFilters,
-): SkillDefinition[] {
+export function filterActionsForManagement(
+  actions: ActionDefinition[],
+  filters: ActionManagementFilters,
+): ActionDefinition[] {
   const normalizedQuery = filters.query.trim().toLowerCase();
 
-  return actions.filter((skill) => {
-    if (!matchesSkillStatus(skill, filters.status)) {
+  return actions.filter((action) => {
+    if (!matchesActionStatus(action, filters.status)) {
       return false;
     }
     if (!normalizedQuery) {
       return true;
     }
-    return buildSkillSearchText(skill).includes(normalizedQuery);
+    return buildActionSearchText(action).includes(normalizedQuery);
   });
 }
 
-export function buildSkillOverview(actions: SkillDefinition[]): SkillOverview {
+export function buildActionOverview(actions: ActionDefinition[]): ActionOverview {
   return {
     total: actions.length,
-    active: actions.filter((skill) => skill.status === "active").length,
-    visibleActions: actions.filter((skill) => skill.status === "active").length,
+    active: actions.filter((action) => action.status === "active").length,
+    visibleActions: actions.filter((action) => action.status === "active").length,
   };
 }
 
-function matchesSkillStatus(skill: SkillDefinition, filter: SkillStatusFilter): boolean {
+function matchesActionStatus(action: ActionDefinition, filter: ActionStatusFilter): boolean {
   if (filter === "active") {
-    return skill.status === "active";
+    return action.status === "active";
   }
   if (filter === "disabled") {
-    return skill.status === "disabled";
+    return action.status === "disabled";
   }
   return true;
 }
 
-function buildSkillSearchText(skill: SkillDefinition): string {
+function buildActionSearchText(action: ActionDefinition): string {
   return [
-    skill.skillKey,
-    skill.name,
-    skill.description,
-    skill.llmInstruction,
-    skill.version,
-    skill.sourceScope,
-    skill.sourcePath,
-    skill.status,
-    ...skill.permissions,
-    ...(skill.stateInputSchema ?? []).map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
-    ...skill.llmOutputSchema.map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
-    ...skill.stateOutputSchema.map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
+    action.actionKey,
+    action.name,
+    action.description,
+    action.llmInstruction,
+    action.version,
+    action.sourceScope,
+    action.sourcePath,
+    action.status,
+    ...action.permissions,
+    ...(action.stateInputSchema ?? []).map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
+    ...action.llmOutputSchema.map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
+    ...action.stateOutputSchema.map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
   ]
     .join(" ")
     .toLowerCase();

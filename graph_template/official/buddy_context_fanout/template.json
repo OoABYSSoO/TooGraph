@@ -279,7 +279,7 @@
     "assemble_context_fanout": {
       "kind": "agent",
       "name": "装配上下文 Fanout",
-      "description": "调用只读 Fanout Skill，并合并本轮 context_only 上下文。",
+      "description": "调用只读 Fanout Action，并合并本轮 context_only 上下文。",
       "ui": {
         "position": {
           "x": 616,

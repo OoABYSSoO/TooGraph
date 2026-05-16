@@ -33,8 +33,8 @@
     <div v-if="pausedBuddyPermissionApproval" class="buddy-widget__pause-section">
       <strong>{{ t("buddy.pause.permissionTitle") }}</strong>
       <div class="buddy-widget__pause-row">
-        <span>{{ pausedBuddyPermissionApproval.skillName }}</span>
-        <small>{{ pausedBuddyPermissionApproval.skillKey }}</small>
+        <span>{{ pausedBuddyPermissionApproval.capabilityName }}</span>
+        <small>{{ pausedBuddyPermissionApproval.capabilityKey }}</small>
         <div class="buddy-widget__pause-permissions">
           <span v-for="permission in pausedBuddyPermissionApproval.permissions" :key="permission">
             {{ permission }}
@@ -242,7 +242,7 @@ function denyPausedBuddyPermissionApproval() {
     permission_approval: {
       decision: "denied",
       reason: t("buddy.pause.deniedReason", {
-        skill: approval.skillName || approval.skillKey,
+        capability: approval.capabilityName || approval.capabilityKey,
       }),
     },
   });

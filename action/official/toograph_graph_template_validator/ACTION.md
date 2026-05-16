@@ -5,7 +5,7 @@ description: Validate one generated TooGraph graph template JSON payload against
 
 # 图模板校验器
 
-Use this Skill before any workflow writes or test-runs a generated graph template.
+Use this Action before any workflow writes or test-runs a generated graph template.
 
 Input:
 
@@ -16,4 +16,4 @@ Outputs:
 - `success`: true only when the template passes Pydantic protocol validation, graph validation, and LangGraph runtime support checks.
 - `validation_report`: includes `valid`, `template_id`, counts, graph validation issues, runtime unsupported reasons, and parse errors when present.
 
-This Skill is read-only and does not repair or write templates.
+This Action is read-only and does not repair or write templates.

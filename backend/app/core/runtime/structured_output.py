@@ -4,7 +4,7 @@ import json
 from typing import Any
 
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
-from app.core.schemas.skills import SkillDefinition, SkillIoField
+from app.core.schemas.actions import ActionDefinition, ActionIoField
 
 
 STRUCTURED_OUTPUT_SCHEMA_NAME = "toograph_structured_output"
@@ -40,32 +40,32 @@ def build_agent_state_output_schema(
     return _object_schema(properties, required=output_keys, additional_properties=False)
 
 
-def build_skill_llm_output_schema(
+def build_action_llm_output_schema(
     bindings: list[Any],
-    skill_definitions: dict[str, SkillDefinition],
+    action_definitions: dict[str, ActionDefinition],
 ) -> dict[str, Any]:
     properties: dict[str, Any] = {}
-    required_skill_keys: list[str] = []
+    required_action_keys: list[str] = []
     for resolved_binding in bindings:
-        skill_key = resolved_binding.binding.skill_key
-        required_skill_keys.append(skill_key)
-        definition = skill_definitions.get(skill_key)
+        action_key = resolved_binding.binding.action_key
+        required_action_keys.append(action_key)
+        definition = action_definitions.get(action_key)
         field_properties: dict[str, Any] = {}
         required_fields: list[str] = []
         for field in getattr(definition, "llm_output_schema", []) or []:
-            field_schema = schema_for_skill_io_field(field)
+            field_schema = schema_for_action_io_field(field)
             field_properties[field.key] = field_schema
             required_fields.append(field.key)
-        properties[skill_key] = _object_schema(
+        properties[action_key] = _object_schema(
             field_properties,
             required=required_fields,
             additional_properties=False,
         )
 
-    return _object_schema(properties, required=required_skill_keys, additional_properties=False)
+    return _object_schema(properties, required=required_action_keys, additional_properties=False)
 
 
-def schema_for_skill_io_field(field: SkillIoField) -> dict[str, Any]:
+def schema_for_action_io_field(field: ActionIoField) -> dict[str, Any]:
     field_schema = _schema_for_value_type(field.value_type)
     _apply_schema_metadata(field_schema, name=field.name or field.key, description=field.description)
     return field_schema
@@ -167,7 +167,7 @@ def _schema_for_value_type(value_type: str) -> dict[str, Any]:
     if normalized == NodeSystemStateType.CAPABILITY.value:
         return _object_schema(
             {
-                "kind": {"type": "string", "enum": ["skill", "subgraph", "none"]},
+                "kind": {"type": "string", "enum": ["action", "tool", "subgraph", "none"]},
                 "key": {"type": "string"},
                 "name": {"type": "string"},
                 "description": {"type": "string"},

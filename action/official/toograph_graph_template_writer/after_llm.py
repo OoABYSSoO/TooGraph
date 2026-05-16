@@ -22,13 +22,13 @@ TEMPLATE_FILE_NAME = "template.json"
 SAFE_TEMPLATE_ID_RE = re.compile(r"^[a-z][a-z0-9_]{2,80}$")
 
 
-def toograph_graph_template_writer(**skill_inputs: Any) -> dict[str, Any]:
+def toograph_graph_template_writer(**action_inputs: Any) -> dict[str, Any]:
     template_payload, parse_error = _coerce_template_payload(
-        skill_inputs.get("template_json")
-        or skill_inputs.get("generated_template_json")
-        or skill_inputs.get("template")
+        action_inputs.get("template_json")
+        or action_inputs.get("generated_template_json")
+        or action_inputs.get("template")
     )
-    reason = _compact_text(skill_inputs.get("reason")) or "Save graph template from TooGraph graph-template workflow."
+    reason = _compact_text(action_inputs.get("reason")) or "Save graph template from TooGraph graph-template workflow."
     if parse_error:
         return _failed("invalid_template_json", parse_error)
     if not isinstance(template_payload, dict):

@@ -2,18 +2,18 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  deleteSkill,
-  fetchSkillCatalog,
-  fetchSkillFileContent,
-  fetchSkillFiles,
-  fetchSkillDefinitions,
-  importSkillUpload,
-  updateSkillStatus,
+  deleteAction,
+  fetchActionCatalog,
+  fetchActionFileContent,
+  fetchActionFiles,
+  fetchActionDefinitions,
+  importActionUpload,
+  updateActionStatus,
 } from "./actions.ts";
 
 const originalFetch = globalThis.fetch;
 
-test("fetchSkillDefinitions requests the skill definitions endpoint", async () => {
+test("fetchActionDefinitions requests the action definitions endpoint", async () => {
   let requestedUrl = "";
 
   globalThis.fetch = (async (input: string | URL | Request) => {
@@ -21,10 +21,10 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
     return new Response(
       JSON.stringify([
         {
-          skillKey: "web_search",
+          actionKey: "web_search",
           name: "Web Search",
           description: "Searches the web.",
-          llmInstruction: "Choose the query and run the bound web search skill.",
+          llmInstruction: "Choose the query and run the bound web search action.",
           schemaVersion: "toograph.action/v1",
           llmOutputSchema: [
             {
@@ -68,15 +68,15 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
     );
   }) as typeof fetch;
 
-  const skillDefinitions = await fetchSkillDefinitions();
+  const actionDefinitions = await fetchActionDefinitions();
 
   assert.equal(requestedUrl, "/api/actions/definitions");
-  assert.deepEqual(skillDefinitions, [
+  assert.deepEqual(actionDefinitions, [
     {
-      skillKey: "web_search",
+      actionKey: "web_search",
       name: "Web Search",
       description: "Searches the web.",
-      llmInstruction: "Choose the query and run the bound web search skill.",
+      llmInstruction: "Choose the query and run the bound web search action.",
       schemaVersion: "toograph.action/v1",
       llmOutputSchema: [
         {
@@ -115,7 +115,7 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
   globalThis.fetch = originalFetch;
 });
 
-test("fetchSkillCatalog requests the full management catalog including disabled actions", async () => {
+test("fetchActionCatalog requests the full management catalog including disabled actions", async () => {
   let requestedUrl = "";
 
   globalThis.fetch = (async (input: string | URL | Request) => {
@@ -128,15 +128,15 @@ test("fetchSkillCatalog requests the full management catalog including disabled 
     });
   }) as typeof fetch;
 
-  const skillDefinitions = await fetchSkillCatalog();
+  const actionDefinitions = await fetchActionCatalog();
 
   assert.equal(requestedUrl, "/api/actions/catalog?include_disabled=true");
-  assert.deepEqual(skillDefinitions, []);
+  assert.deepEqual(actionDefinitions, []);
 
   globalThis.fetch = originalFetch;
 });
 
-test("skill file helpers request tree and content endpoints", async () => {
+test("action file helpers request tree and content endpoints", async () => {
   const requestedUrls: string[] = [];
 
   globalThis.fetch = (async (input: string | URL | Request) => {
@@ -145,7 +145,7 @@ test("skill file helpers request tree and content endpoints", async () => {
     if (url.endsWith("/files")) {
       return new Response(
         JSON.stringify({
-          skillKey: "rewrite_text",
+          actionKey: "rewrite_text",
           root: {
             name: "rewrite_text",
             path: "",
@@ -165,7 +165,7 @@ test("skill file helpers request tree and content endpoints", async () => {
     }
     return new Response(
       JSON.stringify({
-        skillKey: "rewrite_text",
+        actionKey: "rewrite_text",
         path: "ACTION.md",
         name: "ACTION.md",
         size: 12,
@@ -183,8 +183,8 @@ test("skill file helpers request tree and content endpoints", async () => {
   }) as typeof fetch;
 
   try {
-    const files = await fetchSkillFiles("rewrite_text");
-    const content = await fetchSkillFileContent("rewrite_text", "ACTION.md");
+    const files = await fetchActionFiles("rewrite_text");
+    const content = await fetchActionFileContent("rewrite_text", "ACTION.md");
 
     assert.deepEqual(requestedUrls, [
       "/api/actions/rewrite_text/files",
@@ -197,7 +197,7 @@ test("skill file helpers request tree and content endpoints", async () => {
   }
 });
 
-test("skill management helpers call status and delete endpoints", async () => {
+test("action management helpers call status and delete endpoints", async () => {
   const requests: Array<{ url: string; method: string | undefined; body: string | null }> = [];
 
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -206,7 +206,7 @@ test("skill management helpers call status and delete endpoints", async () => {
       method: init?.method,
       body: typeof init?.body === "string" ? init.body : null,
     });
-    return new Response(JSON.stringify({ skillKey: "rewrite_text", status: "active" }), {
+    return new Response(JSON.stringify({ actionKey: "rewrite_text", status: "active" }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
@@ -215,9 +215,9 @@ test("skill management helpers call status and delete endpoints", async () => {
   }) as typeof fetch;
 
   try {
-    await updateSkillStatus("rewrite_text", "disabled");
-    await updateSkillStatus("rewrite_text", "active");
-    await deleteSkill("rewrite_text");
+    await updateActionStatus("rewrite_text", "disabled");
+    await updateActionStatus("rewrite_text", "active");
+    await deleteAction("rewrite_text");
 
     assert.deepEqual(requests, [
       { url: "/api/actions/rewrite_text/disable", method: "POST", body: "null" },
@@ -229,17 +229,17 @@ test("skill management helpers call status and delete endpoints", async () => {
   }
 });
 
-test("importSkillUpload posts files and relative paths as multipart form data", async () => {
+test("importActionUpload posts files and relative paths as multipart form data", async () => {
   let requestedUrl = "";
   let requestMethod: string | undefined;
   let requestBody: BodyInit | null | undefined;
-  const skillFile = new File(["---\nname: Uploaded\n---\nBody"], "ACTION.md", { type: "text/markdown" });
+  const actionFile = new File(["---\nname: Uploaded\n---\nBody"], "ACTION.md", { type: "text/markdown" });
 
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     requestedUrl = String(input);
     requestMethod = init?.method;
     requestBody = init?.body;
-    return new Response(JSON.stringify({ skillKey: "uploaded_folder_skill", status: "active" }), {
+    return new Response(JSON.stringify({ actionKey: "uploaded_folder_action", status: "active" }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
@@ -248,13 +248,13 @@ test("importSkillUpload posts files and relative paths as multipart form data", 
   }) as typeof fetch;
 
   try {
-    await importSkillUpload([skillFile], ["uploaded_folder_skill/ACTION.md"]);
+    await importActionUpload([actionFile], ["uploaded_folder_action/ACTION.md"]);
 
     assert.equal(requestedUrl, "/api/actions/imports/upload");
     assert.equal(requestMethod, "POST");
     assert.ok(requestBody instanceof FormData);
-    assert.equal(requestBody.get("files"), skillFile);
-    assert.equal(requestBody.get("relativePaths"), "uploaded_folder_skill/ACTION.md");
+    assert.equal(requestBody.get("files"), actionFile);
+    assert.equal(requestBody.get("relativePaths"), "uploaded_folder_action/ACTION.md");
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -3,7 +3,7 @@
   "actionKey": "toograph_graph_template_reader",
   "name": "图模板读取器",
   "description": "读取 TooGraph 官方或用户图模板的 template.json，供模板改进工作流生成可审查草案。",
-  "llmInstruction": "你已绑定图模板读取器。只选择一个 target_template_id 或 template_id，并可选 source_scope 为 user 或 official。此 Skill 只读，不生成写入、审批或执行决策。",
+  "llmInstruction": "你已绑定图模板读取器。只选择一个 target_template_id 或 template_id，并可选 source_scope 为 user 或 official。此 Action 只读，不生成写入、审批或执行决策。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [

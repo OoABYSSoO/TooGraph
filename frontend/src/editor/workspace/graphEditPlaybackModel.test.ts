@@ -611,7 +611,7 @@ test("graph edit playback supports updating and connecting existing graph nodes"
   assert.deepEqual(result.document.edges, [{ source: "input_1", target: "agent_1" }]);
 });
 
-test("graph edit playback supports movement, state updates, skill selection, delete, and restore commands", () => {
+test("graph edit playback supports movement, state updates, action selection, delete, and restore commands", () => {
   const document = documentWithEditableGraph();
   const plan = buildGraphEditPlaybackPlan(document, {
     operations: [

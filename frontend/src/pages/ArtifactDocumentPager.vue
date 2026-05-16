@@ -57,7 +57,7 @@ import { ElIcon } from "element-plus";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
-import { buildSkillArtifactFileUrl, fetchSkillArtifactContent } from "@/api/capabilityArtifacts";
+import { buildCapabilityArtifactFileUrl, fetchCapabilityArtifactContent } from "@/api/capabilityArtifacts";
 
 import type { ArtifactDocumentReference } from "./runDetailModel";
 
@@ -73,7 +73,7 @@ const error = ref("");
 let requestId = 0;
 
 const activeDocument = computed(() => props.documents[Math.min(activeIndex.value, Math.max(props.documents.length - 1, 0))] ?? null);
-const activeArtifactUrl = computed(() => (activeDocument.value ? buildSkillArtifactFileUrl(activeDocument.value.localPath) : ""));
+const activeArtifactUrl = computed(() => (activeDocument.value ? buildCapabilityArtifactFileUrl(activeDocument.value.localPath) : ""));
 const displayText = computed(() => {
   if (loading.value) {
     return t("common.loading");
@@ -116,7 +116,7 @@ async function loadActiveDocument() {
 
   loading.value = true;
   try {
-    const response = await fetchSkillArtifactContent(document.localPath);
+    const response = await fetchCapabilityArtifactContent(document.localPath);
     if (requestId === currentRequestId) {
       content.value = response.content;
     }

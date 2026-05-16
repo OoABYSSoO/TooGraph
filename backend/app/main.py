@@ -20,6 +20,7 @@ from app.api.routes_settings import router as settings_router
 from app.api.routes_actions import router as actions_router
 from app.api.routes_capability_artifacts import router as capability_artifacts_router
 from app.api.routes_templates import router as templates_router
+from app.api.routes_tools import router as tools_router
 from app.buddy.store import initialize_buddy_home
 from app.core.runtime.run_recovery import mark_interrupted_active_runs
 from app.core.storage.database import initialize_storage
@@ -104,6 +105,7 @@ app.include_router(runs_router)
 app.include_router(settings_router)
 app.include_router(capability_artifacts_router)
 app.include_router(actions_router)
+app.include_router(tools_router)
 app.include_router(templates_router)
 
 

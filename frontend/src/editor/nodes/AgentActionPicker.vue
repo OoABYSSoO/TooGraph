@@ -1,30 +1,30 @@
 <template>
   <div class="node-card__agent-capability-stack">
     <div class="node-card__agent-capability-row">
-      <div class="node-card__agent-skill-select-shell" @pointerdown.stop @click.stop>
+      <div class="node-card__agent-action-select-shell" @pointerdown.stop @click.stop>
         <ToographSelect
-          class="node-card__agent-skill-select"
-          :class="{ 'node-card__agent-skill-select--empty': isSkillEmpty }"
-          :model-value="selectedSkillKey"
-          :placeholder="skillPlaceholder"
-          :disabled="skillSelectDisabled"
+          class="node-card__agent-action-select"
+          :class="{ 'node-card__agent-action-select--empty': isActionEmpty }"
+          :model-value="selectedActionKey"
+          :placeholder="actionPlaceholder"
+          :disabled="actionSelectDisabled"
           filterable
-          popper-class="node-card__agent-skill-popper"
+          popper-class="node-card__agent-action-popper"
           :aria-label="t('nodeCard.selectAction')"
-          @update:model-value="emit('update:selected-skill', String($event ?? ''))"
+          @update:model-value="emit('update:selected-action', String($event ?? ''))"
         >
           <ElOption :label="t('nodeCard.noActionOption')" value="" />
           <ElOption
-            v-if="selectedSkillMissing"
-            :label="selectedSkillKey"
-            :value="selectedSkillKey"
+            v-if="selectedActionMissing"
+            :label="selectedActionKey"
+            :value="selectedActionKey"
             disabled
           />
           <ElOption
-            v-for="definition in availableSkillDefinitions"
-            :key="definition.skillKey"
+            v-for="definition in availableActionDefinitions"
+            :key="definition.actionKey"
             :label="definition.name"
-            :value="definition.skillKey"
+            :value="definition.actionKey"
           />
         </ToographSelect>
       </div>
@@ -62,10 +62,10 @@
         <div class="node-card__confirm-hint node-card__confirm-hint--toggle">{{ t("nodeCard.setBreakpoint") }}</div>
       </ElPopover>
     </div>
-    <div v-if="loading" class="node-card__skill-panel-message">
+    <div v-if="loading" class="node-card__action-panel-message">
       {{ t("nodeCard.loadingActions") }}
     </div>
-    <div v-else-if="error" class="node-card__skill-panel-message node-card__skill-panel-message--error">
+    <div v-else-if="error" class="node-card__action-panel-message node-card__action-panel-message--error">
       {{ error }}
     </div>
   </div>
@@ -80,38 +80,38 @@ import { useI18n } from "vue-i18n";
 
 import ToographCapsuleSwitch from "@/components/ToographCapsuleSwitch.vue";
 import ToographSelect from "@/components/ToographSelect.vue";
-import type { SkillDefinition } from "@/types/actions";
+import type { ActionDefinition } from "@/types/actions";
 
 const props = defineProps<{
-  selectedSkillKey: string;
+  selectedActionKey: string;
   loading: boolean;
   error: string | null;
-  availableSkillDefinitions: SkillDefinition[];
+  availableActionDefinitions: ActionDefinition[];
   breakpointEnabled: boolean;
   confirmPopoverStyle: CSSProperties;
 }>();
 
 const emit = defineEmits<{
-  (event: "update:selected-skill", skillKey: string): void;
+  (event: "update:selected-action", actionKey: string): void;
   (event: "update:breakpoint-enabled", value: string | number | boolean): void;
 }>();
 
 const { t } = useI18n();
-const isSkillEmpty = computed(() => !props.selectedSkillKey.trim());
-const selectedSkillMissing = computed(
-  () => Boolean(props.selectedSkillKey) && !props.availableSkillDefinitions.some((definition) => definition.skillKey === props.selectedSkillKey),
+const isActionEmpty = computed(() => !props.selectedActionKey.trim());
+const selectedActionMissing = computed(
+  () => Boolean(props.selectedActionKey) && !props.availableActionDefinitions.some((definition) => definition.actionKey === props.selectedActionKey),
 );
-const skillSelectDisabled = computed(
+const actionSelectDisabled = computed(
   () => props.loading || Boolean(props.error),
 );
-const skillPlaceholder = computed(() => {
+const actionPlaceholder = computed(() => {
   if (props.loading) {
     return t("nodeCard.loadingActions");
   }
   if (props.error) {
     return t("nodeCard.actionLoadFailed");
   }
-  return isSkillEmpty.value ? t("nodeCard.noAction") : t("nodeCard.selectAction");
+  return isActionEmpty.value ? t("nodeCard.noAction") : t("nodeCard.selectAction");
 });
 </script>
 
@@ -129,12 +129,12 @@ const skillPlaceholder = computed(() => {
   justify-content: stretch;
 }
 
-.node-card__agent-skill-select-shell {
+.node-card__agent-action-select-shell {
   width: 100%;
   min-width: 0;
 }
 
-.node-card__agent-skill-select {
+.node-card__agent-action-select {
   width: 100%;
   --el-color-primary: #2563eb;
   --el-border-radius-base: 16px;
@@ -142,7 +142,7 @@ const skillPlaceholder = computed(() => {
   --el-text-color-primary: #1d4ed8;
 }
 
-.node-card__agent-skill-select :deep(.el-select__wrapper) {
+.node-card__agent-action-select :deep(.el-select__wrapper) {
   min-height: 48px;
   border-radius: 16px;
   border: 1px solid rgba(37, 99, 235, 0.18);
@@ -151,43 +151,43 @@ const skillPlaceholder = computed(() => {
   padding: 0 14px;
 }
 
-.node-card__agent-skill-select--empty :deep(.el-select__wrapper) {
+.node-card__agent-action-select--empty :deep(.el-select__wrapper) {
   border-style: dashed;
   border-width: 1.5px;
   border-color: rgba(37, 99, 235, 0.5);
   background: rgba(239, 246, 255, 0.58);
 }
 
-.node-card__agent-skill-select--empty :deep(.el-select__wrapper:hover) {
+.node-card__agent-action-select--empty :deep(.el-select__wrapper:hover) {
   border-color: rgba(37, 99, 235, 0.68);
   background: rgba(219, 234, 254, 0.66);
 }
 
-.node-card__agent-skill-select :deep(.el-select__wrapper:hover) {
+.node-card__agent-action-select :deep(.el-select__wrapper:hover) {
   border-color: rgba(37, 99, 235, 0.3);
   background: rgba(219, 234, 254, 0.82);
 }
 
-.node-card__agent-skill-select :deep(.el-select__wrapper.is-focused) {
+.node-card__agent-action-select :deep(.el-select__wrapper.is-focused) {
   border-color: rgba(37, 99, 235, 0.42);
   box-shadow:
     0 0 0 3px rgba(37, 99, 235, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.58);
 }
 
-.node-card__agent-skill-select :deep(.el-select__placeholder) {
+.node-card__agent-action-select :deep(.el-select__placeholder) {
   color: rgba(29, 78, 216, 0.62);
 }
 
-.node-card__agent-skill-select :deep(.el-select__selected-item),
-.node-card__agent-skill-select :deep(.el-select__input-text),
-.node-card__agent-skill-select :deep(.el-select__selection .el-tag) {
+.node-card__agent-action-select :deep(.el-select__selected-item),
+.node-card__agent-action-select :deep(.el-select__input-text),
+.node-card__agent-action-select :deep(.el-select__selection .el-tag) {
   color: #1d4ed8;
   font-size: 0.92rem;
   font-weight: 650;
 }
 
-.node-card__agent-skill-select :deep(.is-disabled .el-select__wrapper) {
+.node-card__agent-action-select :deep(.is-disabled .el-select__wrapper) {
   opacity: 0.62;
   background: rgba(239, 246, 255, 0.58);
 }
@@ -283,7 +283,7 @@ const skillPlaceholder = computed(() => {
   color: rgb(154, 52, 18);
 }
 
-.node-card__skill-panel-message {
+.node-card__action-panel-message {
   border-radius: 14px;
   border: 1px solid rgba(37, 99, 235, 0.12);
   background: rgba(239, 246, 255, 0.74);
@@ -293,7 +293,7 @@ const skillPlaceholder = computed(() => {
   color: rgba(30, 58, 138, 0.76);
 }
 
-.node-card__skill-panel-message--error {
+.node-card__action-panel-message--error {
   border-color: rgba(185, 28, 28, 0.18);
   background: rgba(254, 242, 242, 0.92);
   color: rgb(153, 27, 27);

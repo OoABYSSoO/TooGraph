@@ -66,7 +66,7 @@ def resolve_ffmpeg_tools(
             return installed
 
     raise RuntimeError(
-        "ffmpeg is required for video frame fallback. Install ffmpeg, place an app-private ffmpeg binary under "
+        "ffmpeg is required for video processing. Install ffmpeg, place an app-private ffmpeg binary under "
         f"{root / 'ffmpeg' / tag}, or set {AUTO_INSTALL_ENV}=1 to allow TooGraph to install a private runtime package."
     )
 

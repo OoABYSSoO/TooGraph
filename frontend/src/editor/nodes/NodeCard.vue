@@ -11,6 +11,7 @@
       'node-card--condition': view.body.kind === 'condition',
       'node-card--output': view.body.kind === 'output',
       'node-card--subgraph': view.body.kind === 'subgraph',
+      'node-card--tool': view.body.kind === 'tool',
       'node-card--floating-panel-open': hasFloatingPanelOpen,
     }"
     @pointerdown.capture="handleLockedNodeCardInteractionCapture"
@@ -297,10 +298,10 @@
         :thinking-options="agentThinkingOptions"
         :thinking-enabled="agentThinkingEnabled"
         :breakpoint-enabled="Boolean(agentBreakpointEnabled)"
-        :selected-skill-key="selectedSkillKey"
-        :skill-definitions-loading="skillDefinitionsLoading"
-        :skill-definitions-error="skillDefinitionsError"
-        :available-skill-definitions="availableSkillDefinitions"
+        :selected-action-key="selectedActionKey"
+        :action-definitions-loading="actionDefinitionsLoading"
+        :action-definitions-error="actionDefinitionsError"
+        :available-action-definitions="availableActionDefinitions"
         @pointer-enter="handleStateEditorPillPointerEnter"
         @pointer-leave="handleStateEditorPillPointerLeave"
         @reorder-pointer-down="handlePortReorderPointerDown"
@@ -323,8 +324,8 @@
         @update:model-value="handleAgentModelValueChange"
         @update:thinking-mode="handleAgentThinkingModeSelect"
         @update:breakpoint-enabled="handleAgentBreakpointToggleValue"
-        @select-skill="selectAgentSkill"
-        @update-skill-instruction="handleSkillInstructionInput"
+        @select-action="selectAgentAction"
+        @update-action-instruction="handleActionInstructionInput"
         @task-input="handleAgentTaskInstructionInput"
       />
     </section>
@@ -356,6 +357,56 @@
         @update:type="handleStateEditorTypeValue"
         @update:color="handleStateEditorColorInput"
         @update:description="handleStateEditorDescriptionInput"
+      />
+    </section>
+
+    <section v-else-if="view.body.kind === 'tool'" class="node-card__body node-card__body--tool">
+      <ToolNodeBody
+        :node-id="nodeId"
+        :body="view.body"
+        :selected-tool-key="selectedToolKey"
+        :tool-definitions="toolDefinitions"
+        :tool-definitions-loading="toolDefinitionsLoading"
+        :tool-definitions-error="toolDefinitionsError"
+        :ordered-input-ports="orderedAgentInputPorts"
+        :ordered-output-ports="orderedAgentOutputPorts"
+        :state-editor-popover-style="stateEditorPopoverStyle"
+        :agent-add-popover-style="agentAddPopoverStyle"
+        :state-editor-draft="stateEditorDraft"
+        :state-editor-error="stateEditorError"
+        :type-options="stateTypeOptions"
+        :color-options="stateColorOptions"
+        :is-state-editor-open="isStateEditorOpen"
+        :is-state-editor-confirm-open="isStateEditorConfirmOpen"
+        :is-remove-port-state-confirm-open="isRemovePortStateConfirmOpen"
+        :is-state-editor-pill-revealed="isStateEditorPillRevealed"
+        :is-port-reordering="isPortReordering"
+        :is-port-reorder-placeholder="isPortReorderPlaceholder"
+        :create-draft="portStateDraft"
+        :create-title="portPickerTitle"
+        :create-error="portStateError"
+        :create-hint="t('nodeCard.createStateBindHint')"
+        :create-selection-value="portStateSelectionValue"
+        :create-existing-state-options="existingPortStateOptions"
+        @pointer-enter="handleStateEditorPillPointerEnter"
+        @pointer-leave="handleStateEditorPillPointerLeave"
+        @reorder-pointer-down="handlePortReorderPointerDown"
+        @port-click="handlePortStatePillClick"
+        @remove-click="handleRemovePortStateClick"
+        @open-create="openPortStateCreate"
+        @update:name="handleStateEditorNameInput"
+        @update:type="handleStateEditorTypeValue"
+        @update:color="handleStateEditorColorInput"
+        @update:description="handleStateEditorDescriptionInput"
+        @update:create-selection="handlePortStateSelectionValue"
+        @update:create-name="handlePortDraftNameValue"
+        @update:create-type="handlePortDraftTypeSelect"
+        @update:create-color="handlePortDraftColorSelect"
+        @update:create-description="handlePortDraftDescriptionValue"
+        @update:create-value="updatePortDraftValue"
+        @cancel-create="closePortPicker"
+        @commit-create="commitPortStateCreate"
+        @select-tool="selectTool"
       />
     </section>
 
@@ -561,12 +612,14 @@ import NodeCardTopActions from "./NodeCardTopActions.vue";
 import OutputNodeBody from "./OutputNodeBody.vue";
 import PrimaryStatePort from "./PrimaryStatePort.vue";
 import SubgraphNodeBody from "./SubgraphNodeBody.vue";
+import ToolNodeBody from "./ToolNodeBody.vue";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
-import type { AgentNode, BatchNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition, TemplateRecord } from "@/types/node-system";
-import type { SkillDefinition } from "@/types/actions";
+import type { AgentNode, BatchNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition, TemplateRecord, ToolNode } from "@/types/node-system";
+import type { ActionDefinition } from "@/types/actions";
+import type { ToolDefinition } from "@/types/tools";
 import type { RunNodeTiming } from "../workspace/runNodeTimingModel.ts";
 import { fetchLocalFolderTree, type LocalFolderTreeEntry } from "@/api/localInputSources";
-import { buildSkillArtifactFileUrl, uploadSkillArtifactFile } from "@/api/capabilityArtifacts";
+import { buildCapabilityArtifactFileUrl, uploadCapabilityArtifactFile } from "@/api/capabilityArtifacts";
 import { isAgentOutputManagedByDynamicCapability } from "@/lib/agent-capability-management";
 import { formatRunDuration, formatRunTokenUsageKTokens } from "@/lib/run-display-name";
 import {
@@ -625,9 +678,9 @@ import {
 import { resolveOutputPreviewContent } from "./outputPreviewContentModel";
 import { usePortReorder } from "./usePortReorder";
 import {
-  listSelectableSkillDefinitions,
-  resolveSkillInstructionOverridePatch,
-  resolveSelectAgentSkillPatch,
+  listSelectableActionDefinitions,
+  resolveActionInstructionOverridePatch,
+  resolveSelectAgentActionPatch,
 } from "./actionPickerModel";
 import {
   buildStateEditorDraftFromSchema,
@@ -674,10 +727,13 @@ const props = defineProps<{
   node: GraphNode;
   stateSchema: Record<string, StateDefinition>;
   knowledgeBases: KnowledgeBaseRecord[];
-  skillDefinitions: SkillDefinition[];
+  actionDefinitions: ActionDefinition[];
+  toolDefinitions: ToolDefinition[];
   templates: TemplateRecord[];
-  skillDefinitionsLoading: boolean;
-  skillDefinitionsError: string | null;
+  actionDefinitionsLoading: boolean;
+  actionDefinitionsError: string | null;
+  toolDefinitionsLoading: boolean;
+  toolDefinitionsError: string | null;
   availableAgentModelRefs: string[];
   agentModelDisplayLookup: Record<string, string>;
   globalTextModelRef: string;
@@ -707,6 +763,7 @@ const emit = defineEmits<{
   (event: "reorder-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string; targetIndex: number }): void;
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
+  (event: "update-tool-config", payload: { nodeId: string; patch: Partial<ToolNode["config"]> }): void;
   (event: "update-batch-config", payload: { nodeId: string; patch: Partial<BatchNode["config"]> }): void;
   (event: "update-batch-worker", payload: { nodeId: string; workerValue: string }): void;
   (event: "toggle-agent-breakpoint", payload: { nodeId: string; enabled: boolean }): void;
@@ -775,7 +832,8 @@ const agentThinkingOptions = computed<Array<{ value: AgentThinkingControlMode; l
 const view = computed(() =>
   buildNodeCardViewModel(props.nodeId, props.node, props.stateSchema, {
     conditionRouteTargets: props.conditionRouteTargets,
-    skillDefinitions: props.skillDefinitions,
+    actionDefinitions: props.actionDefinitions,
+    toolDefinitions: props.toolDefinitions,
     runtime: {
       latestRunStatus: props.latestRunStatus ?? null,
       outputPreviewText: props.runOutputPreviewText ?? null,
@@ -786,12 +844,16 @@ const view = computed(() =>
   }),
 );
 const agentInputPorts = computed<NodePortViewModel[]>(() =>
-  view.value.body.kind === "agent" || view.value.body.kind === "batch" || view.value.body.kind === "subgraph" ? view.value.inputs.filter((port) => !port.virtual) : [],
+  view.value.body.kind === "agent" || view.value.body.kind === "batch" || view.value.body.kind === "subgraph" || view.value.body.kind === "tool"
+    ? view.value.inputs.filter((port) => !port.virtual)
+    : [],
 );
 const agentOutputPorts = computed<NodePortViewModel[]>(() =>
-  view.value.body.kind === "agent" || view.value.body.kind === "batch" || view.value.body.kind === "subgraph" ? view.value.outputs.filter((port) => !port.virtual) : [],
+  view.value.body.kind === "agent" || view.value.body.kind === "batch" || view.value.body.kind === "subgraph" || view.value.body.kind === "tool"
+    ? view.value.outputs.filter((port) => !port.virtual)
+    : [],
 );
-const isAgentOutputManagedBySkill = computed(() => props.node.kind === "agent" && props.node.config.actionKey.trim().length > 0);
+const isAgentOutputManagedByAction = computed(() => props.node.kind === "agent" && props.node.config.actionKey.trim().length > 0);
 const isAgentOutputManagedByCapability = computed(() =>
   isAgentOutputManagedByDynamicCapability({
     nodeId: props.nodeId,
@@ -801,7 +863,7 @@ const isAgentOutputManagedByCapability = computed(() =>
 );
 const shouldShowAgentCreateInputPort = computed(() => agentInputPorts.value.length === 0);
 const shouldShowAgentCreateOutputPort = computed(
-  () => !isAgentOutputManagedBySkill.value && !isAgentOutputManagedByCapability.value && agentOutputPorts.value.length === 0,
+  () => !isAgentOutputManagedByAction.value && !isAgentOutputManagedByCapability.value && agentOutputPorts.value.length === 0,
 );
 const agentCreateInputAnchorStateKey = computed(() =>
   props.pendingStateInputSource ? CREATE_AGENT_INPUT_STATE_KEY : VIRTUAL_ANY_INPUT_STATE_KEY,
@@ -988,7 +1050,7 @@ const inputAssetPreviewUrl = computed(() => {
   if (!asset || !asset.localPath || !["image", "audio", "video"].includes(asset.detectedType)) {
     return "";
   }
-  return buildSkillArtifactFileUrl(asset.localPath);
+  return buildCapabilityArtifactFileUrl(asset.localPath);
 });
 const showLegacyUploadedAssetHint = computed(
   () => showAssetUploadInput.value && !inputAssetEnvelope.value && inputValueText.value.trim().length > 0,
@@ -1033,9 +1095,10 @@ const batchDefaultThinkingEnabled = computed(() =>
 const agentModelOptions = computed(() =>
   buildAgentModelSelectOptions(trimmedGlobalTextModelRef.value, props.availableAgentModelRefs, props.agentModelDisplayLookup),
 );
-const selectedSkillKey = computed(() => props.node.kind === "agent" ? props.node.config.actionKey.trim() : "");
-const availableSkillDefinitions = computed(() =>
-  props.node.kind === "agent" ? listSelectableSkillDefinitions(props.skillDefinitions) : [],
+const selectedActionKey = computed(() => props.node.kind === "agent" ? props.node.config.actionKey.trim() : "");
+const selectedToolKey = computed(() => props.node.kind === "tool" ? props.node.config.toolKey.trim() : "");
+const availableActionDefinitions = computed(() =>
+  props.node.kind === "agent" ? listSelectableActionDefinitions(props.actionDefinitions) : [],
 );
 const portPickerTitle = computed(() => {
   if (!activePortPickerSide.value) {
@@ -1089,7 +1152,7 @@ const hasFloatingPanelOpen = computed(
 const shouldRevealAgentCreateInputPort = computed(() => shouldShowAgentCreateInputPort.value || props.selected || Boolean(props.hovered) || hasFloatingPanelOpen.value);
 const shouldRevealAgentCreateOutputPort = computed(
   () =>
-    !isAgentOutputManagedBySkill.value &&
+    !isAgentOutputManagedByAction.value &&
     !isAgentOutputManagedByCapability.value &&
     (shouldShowAgentCreateOutputPort.value || props.selected || Boolean(props.hovered) || hasFloatingPanelOpen.value),
 );
@@ -1353,6 +1416,16 @@ function emitBatchConfigPatch(patch: Partial<BatchNode["config"]>) {
   emit("update-batch-config", { nodeId: props.nodeId, patch });
 }
 
+function emitToolConfigPatch(patch: Partial<ToolNode["config"]>) {
+  if (guardLockedGraphInteraction()) {
+    return;
+  }
+  if (props.node.kind !== "tool") {
+    return;
+  }
+  emit("update-tool-config", { nodeId: props.nodeId, patch });
+}
+
 function emitBatchWorkerUpdate(workerValue: string) {
   if (guardLockedGraphInteraction()) {
     return;
@@ -1432,17 +1505,17 @@ function handleBatchDefaultTaskInstructionInput(event: Event) {
   emitBatchDefaultWorkerConfigPatch({ taskInstruction: target.value });
 }
 
-function selectAgentSkill(skillKey: string) {
+function selectAgentAction(actionKey: string) {
   if (guardLockedGraphInteraction()) {
     return;
   }
   if (props.node.kind !== "agent") {
     return;
   }
-  const patch = resolveSelectAgentSkillPatch(
+  const patch = resolveSelectAgentActionPatch(
     props.node.config.actionKey,
-    skillKey,
-    props.skillDefinitions,
+    actionKey,
+    props.actionDefinitions,
     props.node.config.actionInstructionBlocks ?? {},
   );
   if (!patch) {
@@ -1451,7 +1524,11 @@ function selectAgentSkill(skillKey: string) {
   emitAgentConfigPatch(patch);
 }
 
-function handleSkillInstructionInput(payload: { skillKey: string; content: string }) {
+function selectTool(toolKey: string) {
+  emitToolConfigPatch({ toolKey });
+}
+
+function handleActionInstructionInput(payload: { actionKey: string; content: string }) {
   if (guardLockedGraphInteraction()) {
     return;
   }
@@ -1459,10 +1536,10 @@ function handleSkillInstructionInput(payload: { skillKey: string; content: strin
     return;
   }
   const currentBlocks = props.node.config.actionInstructionBlocks ?? {};
-  const patch = resolveSkillInstructionOverridePatch(
-    payload.skillKey,
+  const patch = resolveActionInstructionOverridePatch(
+    payload.actionKey,
     payload.content,
-    props.skillDefinitions,
+    props.actionDefinitions,
     currentBlocks,
   );
   if (!patch) {
@@ -1475,7 +1552,7 @@ function openPortStateCreate(side: "input" | "output") {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  if (side === "output" && (isAgentOutputManagedBySkill.value || isAgentOutputManagedByCapability.value)) {
+  if (side === "output" && (isAgentOutputManagedByAction.value || isAgentOutputManagedByCapability.value)) {
     return;
   }
   clearTopActionTimeout();
@@ -1666,7 +1743,7 @@ function handleStateEditorPillPointerLeave(anchorId: string) {
   }
 }
 
-function isSkillManagedOutputState(stateKey: string) {
+function isActionManagedOutputState(stateKey: string) {
   const binding = props.stateSchema[stateKey]?.binding;
   return (
     props.node.kind === "agent" &&
@@ -1676,7 +1753,7 @@ function isSkillManagedOutputState(stateKey: string) {
   );
 }
 
-function isSkillManagedInputState(stateKey: string) {
+function isActionManagedInputState(stateKey: string) {
   return (
     props.node.kind === "agent" &&
     props.node.reads.some(
@@ -1688,11 +1765,36 @@ function isSkillManagedInputState(stateKey: string) {
   );
 }
 
+function isToolManagedOutputState(stateKey: string) {
+  const binding = props.stateSchema[stateKey]?.binding;
+  return (
+    props.node.kind === "tool" &&
+    binding?.kind === "tool_output" &&
+    binding.nodeId === props.nodeId &&
+    binding.managed !== false
+  );
+}
+
+function isToolManagedInputState(stateKey: string) {
+  return (
+    props.node.kind === "tool" &&
+    props.node.reads.some(
+      (binding) =>
+        binding.state === stateKey &&
+        binding.binding?.kind === "tool_input" &&
+        binding.binding.managed !== false,
+    )
+  );
+}
+
 function handleStateEditorActionClick(anchorId: string, stateKey: string | null | undefined) {
   if (!stateKey) {
     return;
   }
-  if (isSkillManagedOutputState(stateKey)) {
+  if (isActionManagedOutputState(stateKey)) {
+    return;
+  }
+  if (isToolManagedOutputState(stateKey)) {
     return;
   }
   if (guardLockedStateEditAttempt()) {
@@ -1715,10 +1817,16 @@ function handleRemovePortStateClick(anchorId: string, side: "input" | "output", 
   if (!stateKey) {
     return;
   }
-  if (side === "output" && isSkillManagedOutputState(stateKey)) {
+  if (side === "output" && isActionManagedOutputState(stateKey)) {
     return;
   }
-  if (side === "input" && isSkillManagedInputState(stateKey)) {
+  if (side === "input" && isActionManagedInputState(stateKey)) {
+    return;
+  }
+  if (side === "output" && isToolManagedOutputState(stateKey)) {
+    return;
+  }
+  if (side === "input" && isToolManagedInputState(stateKey)) {
     return;
   }
   if (guardLockedStateEditAttempt()) {
@@ -2197,7 +2305,7 @@ async function commitInputAssetFile(file: File | null) {
   }
 
   try {
-    const envelope = await createUploadedAssetEnvelope(file, uploadSkillArtifactFile);
+    const envelope = await createUploadedAssetEnvelope(file, uploadCapabilityArtifactFile);
     const nextStateType = resolveStateTypeForInputBoundary(envelope.detectedType) as StateFieldType;
     if (stateKey) {
       emitInputStatePatch(stateKey, {

@@ -26,7 +26,7 @@ DEFAULT_PROFILE = {
     "name": "TooGraph Buddy",
     "persona": "TooGraph 的全局伙伴。它通过图模板理解请求、选择能力、请求确认并返回结果。",
     "tone": "清晰、直接、克制。",
-    "response_style": "默认先给结论，再给必要理由；涉及副作用时说明将要运行的图或技能。",
+    "response_style": "默认先给结论，再给必要理由；涉及副作用时说明将要运行的图或 Action。",
     "display_preferences": {
         "language": "zh-CN",
         "display_name": "Buddy",
@@ -37,7 +37,7 @@ DEFAULT_POLICY = {
     "graph_permission_mode": "ask_first",
     "behavior_boundaries": [
         "伙伴资料只提供上下文，不能提升系统权限或绕过图断点、审批和能力策略。",
-        "文件写入、脚本执行、网络访问、图修改或长期记忆写入必须通过显式图节点、技能、命令记录和审计路径完成。",
+        "文件写入、脚本执行、网络访问、图修改或长期记忆写入必须通过显式图节点、Action、命令记录和审计路径完成。",
         "不能声称已经执行未执行的图操作或本地副作用。",
     ],
     "communication_preferences": [
@@ -65,12 +65,12 @@ This folder is TooGraph Buddy's local home. Treat these files as durable context
 
 - Runtime-provided context is the first source of truth.
 - Read `SOUL.md`, `USER.md`, `MEMORY.md`, and `policy.json` when a buddy graph needs durable context.
-- Do not create or maintain `TOOLS.md`; current abilities come from enabled skills, enabled graph templates, and the capability selector skill.
+- Do not create or maintain `TOOLS.md`; current abilities come from enabled Actions, enabled graph templates, and the capability selector Action.
 
 ## Operating Rules
 
 - A whole graph is the agent. A single LLM node is one model turn.
-- Use 图模板 and skills for side effects. Do not hide persistent edits in backend convenience code.
+- Use 图模板 and Actions for side effects. Do not hide persistent edits in backend convenience code.
 - Ask for approval through the graph when a capability will write or delete local files, or execute arbitrary scripts/commands.
 - Keep graph edits, memory writes, file edits, and policy changes auditable through commands, revisions, run records, or reports.
 
@@ -90,7 +90,7 @@ Learn about the person you are helping. Update this through explicit graph flows
 - **Pronouns:** optional
 - **Timezone:**
 - **Communication preferences:** Prefers clear, direct Chinese unless they ask otherwise.
-- **Current focus:** Building TooGraph as a graph-first workspace where Buddy runs through templates and auditable skills.
+- **Current focus:** Building TooGraph as a graph-first workspace where Buddy runs through templates and auditable Actions.
 
 ## Context
 
@@ -419,7 +419,7 @@ def render_profile_markdown(profile: dict[str, Any]) -> str:
     response_style = _as_text(profile.get("response_style")) or DEFAULT_PROFILE["response_style"]
     return f"""# SOUL.md - TooGraph Buddy
 
-This file defines Buddy's durable identity, voice, and baseline behavior. It is inspired by the Hermes/OpenClaw `SOUL.md` pattern, but remains subordinate to TooGraph runtime rules, graph validation, skill permissions, and user approval.
+This file defines Buddy's durable identity, voice, and baseline behavior. It is inspired by the Hermes/OpenClaw `SOUL.md` pattern, but remains subordinate to TooGraph runtime rules, graph validation, capability permissions, and user approval.
 
 ## Name
 

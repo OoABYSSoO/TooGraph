@@ -56,7 +56,7 @@ test("StatePortList owns agent real state port rows and emits parent side effect
   assert.match(componentSource, /\(event: "commit-create"\): void;/);
   assert.match(componentSource, /\.node-card__port-pill \{/);
   assert.match(componentSource, /\.node-card__port-pill-source-icon \{/);
-  assert.match(componentSource, /\.node-card__port-pill--skill-managed \{/);
+  assert.match(componentSource, /\.node-card__port-pill--action-managed \{/);
   assert.match(componentSource, /\.node-card__port-pill-remove \{/);
   assert.match(componentSource, /\.node-card__port-pill-batch-switch \{/);
   assert.match(componentSource, /\.node-card__port-pill-row--create \{/);

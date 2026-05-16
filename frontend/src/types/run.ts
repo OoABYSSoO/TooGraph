@@ -47,7 +47,7 @@ export type ContextAssemblyReport = {
   result_outputs: Array<Record<string, unknown>>;
   memories: Array<Record<string, unknown>>;
   knowledge_chunks: Array<Record<string, unknown>>;
-  skill_results: Array<Record<string, unknown>>;
+  action_results: Array<Record<string, unknown>>;
 };
 
 export type SubgraphExecutionArtifact = {
@@ -73,6 +73,8 @@ export type NodeExecutionArtifacts = {
   runtime_config?: Record<string, unknown> | null;
   selected_capabilities?: Array<Record<string, unknown>>;
   capability_outputs?: Array<Record<string, unknown>>;
+  selected_tools?: string[];
+  tool_outputs?: Array<Record<string, unknown>>;
   context_assembly_report?: ContextAssemblyReport | null;
   state_reads: NodeStateReadRecord[];
   state_writes: NodeStateWriteRecord[];
@@ -208,6 +210,7 @@ export type RunSnapshotOption = {
 
 export type RunArtifacts = {
   action_outputs?: Array<Record<string, unknown>>;
+  tool_outputs?: Array<Record<string, unknown>>;
   activity_events?: ActivityEvent[];
   capability_outputs?: Array<Record<string, unknown>>;
   output_previews?: OutputPreview[];
@@ -245,6 +248,8 @@ export type RunDetail = RunSummary & {
   metadata: Record<string, unknown>;
   selected_actions: string[];
   action_outputs: Array<Record<string, unknown>>;
+  selected_tools: string[];
+  tool_outputs: Array<Record<string, unknown>>;
   selected_capabilities?: Array<Record<string, unknown>>;
   capability_outputs?: Array<Record<string, unknown>>;
   evaluation_result: Record<string, unknown>;

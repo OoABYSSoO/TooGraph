@@ -11,7 +11,7 @@ PAGE_OPERATION_CAPABILITY = {
 }
 
 
-def toograph_capability_selector(**_skill_inputs: Any) -> dict[str, Any]:
+def toograph_capability_selector(**_action_inputs: Any) -> dict[str, Any]:
     return {
         "capability": dict(PAGE_OPERATION_CAPABILITY),
         "found": True,

@@ -9,13 +9,13 @@ from app.core.runtime.agent_prompt import build_context_assembly_report, collect
 from app.core.runtime.agent_streaming import build_agent_stream_delta_callback, finalize_agent_stream_delta
 from app.core.runtime.agent_runtime_config import resolve_agent_runtime_config
 from app.core.runtime.agent_response_generation import generate_agent_response
-from app.core.runtime.agent_skill_input_generation import generate_agent_skill_inputs
+from app.core.runtime.agent_action_input_generation import generate_agent_action_inputs
 from app.core.runtime.agent_subgraph_input_generation import (
     SubgraphCapabilityDefinition,
     SubgraphCapabilityField,
     generate_agent_subgraph_inputs,
 )
-from app.core.runtime.activity_events import record_activity_event, record_skill_activity_events
+from app.core.runtime.activity_events import record_activity_event, record_action_activity_events
 from app.core.runtime.condition_eval import evaluate_condition_rule, resolve_branch_key
 from app.core.runtime.input_boundary import coerce_input_boundary_value, first_truthy
 from app.core.runtime.reference_resolution import resolve_condition_source
@@ -23,30 +23,36 @@ from app.core.runtime.permission_approval import (
     build_pending_permission_approval,
     consume_pending_permission_approval,
     find_pending_permission_approval_for_node,
-    should_pause_for_skill_permission_approval,
+    should_pause_for_action_permission_approval,
 )
-from app.core.runtime.skill_bindings import (
-    ResolvedAgentSkillBinding,
-    build_skill_output_mapping_details,
+from app.core.runtime.action_bindings import (
+    ResolvedAgentActionBinding,
+    build_action_output_mapping_details,
     iter_capability_state_subgraph_keys,
-    map_skill_outputs,
-    resolve_agent_skill_output_binding,
-    resolve_agent_skill_bindings,
+    map_action_outputs,
+    resolve_agent_action_output_binding,
+    resolve_agent_action_bindings,
 )
-from app.core.runtime.skill_invocation import callable_accepts_keyword, invoke_skill
+from app.core.runtime.action_invocation import callable_accepts_keyword, invoke_action
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
     NodeSystemBatchNode,
     NodeSystemConditionNode,
     NodeSystemInputNode,
+    NodeSystemReadBindingKind,
     NodeSystemStateDefinition,
+    NodeSystemStateBindingKind,
     NodeSystemStateType,
     NodeSystemSubgraphNode,
+    NodeSystemToolNode,
     StateWriteMode,
 )
-from app.core.storage.skill_artifact_store import create_skill_artifact_context
-from app.skills.definitions import get_skill_definition_registry
-from app.skills.registry import get_skill_registry
+from app.core.storage.capability_artifact_store import create_capability_artifact_context
+from app.actions.definitions import get_action_definition_registry
+from app.actions.registry import get_action_registry
+from app.graph_tools.definitions import get_tool_definition_registry
+from app.graph_tools.registry import get_tool_registry
+from app.graph_tools.runtime import invoke_tool
 
 
 class _BatchItemExecutionError(Exception):
@@ -104,6 +110,100 @@ def execute_condition_node(
         "outputs": {branch_key: True},
         "selected_branch": branch_key,
         "final_result": branch_key,
+    }
+
+
+def execute_tool_node(
+    state_schema: dict[str, NodeSystemStateDefinition],
+    node: NodeSystemToolNode,
+    input_values: dict[str, Any],
+    graph_context: dict[str, Any],
+    *,
+    node_name: str,
+    state: dict[str, Any],
+    get_tool_registry_func: Callable[..., dict[str, Any]] = get_tool_registry,
+    get_tool_definition_registry_func: Callable[..., dict[str, Any]] = get_tool_definition_registry,
+    invoke_tool_func: Callable[..., dict[str, Any]] = invoke_tool,
+    first_truthy_func: Callable[..., Any] = first_truthy,
+    record_activity_event_func: Callable[..., dict[str, Any]] = record_activity_event,
+) -> dict[str, Any]:
+    _ = graph_context
+    tool_key = node.config.tool_key
+    if not tool_key:
+        raise ValueError(f"Tool node '{node_name}' must select a toolKey.")
+
+    registry = get_tool_registry_func(include_disabled=False)
+    tool_func = registry.get(tool_key)
+    if tool_func is None:
+        raise ValueError(f"Tool '{tool_key}' is not registered.")
+    tool_definitions = get_tool_definition_registry_func(include_disabled=False)
+    tool_definition = tool_definitions.get(tool_key)
+
+    tool_inputs = _collect_tool_inputs(node, input_values, tool_key=tool_key)
+    started_at = perf_counter()
+    tool_result = invoke_tool_func(
+        tool_func,
+        tool_inputs,
+        context=_build_tool_invocation_context(
+            state=state,
+            node_name=node_name,
+            tool_key=tool_key,
+        ),
+    )
+    duration_ms = int((perf_counter() - started_at) * 1000)
+    if not isinstance(tool_result, dict):
+        tool_result = {
+            "status": "failed",
+            "error_type": "invalid_tool_output",
+            "error": "Tool runtime returned a non-object result.",
+        }
+    status, error = _resolve_tool_invocation_status(tool_key, tool_result)
+    error_type = _resolve_action_error_type(tool_result)
+    state_writes = _map_tool_outputs(
+        node,
+        state_schema,
+        tool_key=tool_key,
+        node_name=node_name,
+        tool_result=tool_result,
+    )
+    warnings: list[str] = []
+    if status == "failed":
+        warnings.append(f"Tool '{tool_key}' failed: {error or 'Unknown error.'}")
+    output_values = {binding.state: state_writes.get(binding.state) for binding in node.writes}
+    final_result_value = first_truthy_func(output_values.values())
+    tool_output_record = {
+        "tool_name": str(getattr(tool_definition, "name", "") or tool_key),
+        "tool_key": tool_key,
+        "input_source": "state",
+        "inputs": tool_inputs,
+        "outputs": tool_result,
+        "state_writes": state_writes,
+        "duration_ms": duration_ms,
+        "status": status,
+        "error": error,
+        "error_type": error_type,
+    }
+    record_activity_event_func(
+        state,
+        kind="tool_invocation",
+        summary=_tool_invocation_activity_summary(tool_key, status),
+        node_id=node_name,
+        status=status,
+        duration_ms=duration_ms,
+        detail={
+            "tool_key": tool_key,
+            "input_keys": sorted(tool_inputs.keys()),
+            "output_keys": sorted(tool_result.keys()),
+            **({"error_type": error_type} if error_type else {}),
+        },
+        error=error,
+    )
+    return {
+        "outputs": output_values,
+        "selected_tools": [tool_key],
+        "tool_outputs": [tool_output_record],
+        "warnings": warnings,
+        "final_result": "" if final_result_value in (None, "", [], {}) else str(final_result_value),
     }
 
 
@@ -355,13 +455,13 @@ def execute_agent_node(
     *,
     node_name: str,
     state: dict[str, Any],
-    get_skill_registry_func: Callable[..., dict[str, Any]] = get_skill_registry,
-    get_skill_definition_registry_func: Callable[..., dict[str, Any]] = get_skill_definition_registry,
-    invoke_skill_func: Callable[..., dict[str, Any]] = invoke_skill,
+    get_action_registry_func: Callable[..., dict[str, Any]] = get_action_registry,
+    get_action_definition_registry_func: Callable[..., dict[str, Any]] = get_action_definition_registry,
+    invoke_action_func: Callable[..., dict[str, Any]] = invoke_action,
     resolve_agent_runtime_config_func: Callable[..., dict[str, Any]] = resolve_agent_runtime_config,
     build_agent_stream_delta_callback_func: Callable[..., Any] = build_agent_stream_delta_callback,
     callable_accepts_keyword_func: Callable[..., bool] = callable_accepts_keyword,
-    generate_agent_skill_inputs_func: Callable[..., tuple[dict[str, dict[str, Any]], str, list[str], dict[str, Any]]] = generate_agent_skill_inputs,
+    generate_agent_action_inputs_func: Callable[..., tuple[dict[str, dict[str, Any]], str, list[str], dict[str, Any]]] = generate_agent_action_inputs,
     generate_agent_subgraph_inputs_func: Callable[..., tuple[dict[str, dict[str, Any]], str, list[str], dict[str, Any]]] = generate_agent_subgraph_inputs,
     generate_agent_response_func: Callable[..., tuple[dict[str, Any], str, list[str], dict[str, Any]]] = generate_agent_response,
     resolve_subgraph_capability_definition_func: Callable[..., SubgraphCapabilityDefinition] | None = None,
@@ -374,8 +474,8 @@ def execute_agent_node(
     selected_capabilities: list[dict[str, str]] = []
     action_outputs: list[dict[str, Any]] = []
     capability_outputs: list[dict[str, Any]] = []
-    skill_context: dict[str, Any] = {}
-    registry = get_skill_registry_func(include_disabled=False)
+    action_context: dict[str, Any] = {}
+    registry = get_action_registry_func(include_disabled=False)
     response_payload: dict[str, Any] = {}
     response_reasoning = ""
     warnings: list[str] = []
@@ -387,27 +487,27 @@ def execute_agent_node(
             node_type="agent",
             input_values=input_values,
             state_schema=state_schema,
-            skill_context=skill_context,
+            action_context=action_context,
             llm_phases=llm_phases,
         )
     runtime_config = resolve_agent_runtime_config_func(node)
     graph_metadata = graph_context.get("metadata") if isinstance(graph_context.get("metadata"), dict) else {}
-    skill_runtime_context = graph_metadata.get("skill_runtime_context") if isinstance(graph_metadata, dict) else None
-    if isinstance(skill_runtime_context, dict):
+    action_runtime_context = graph_metadata.get("action_runtime_context") if isinstance(graph_metadata, dict) else None
+    if isinstance(action_runtime_context, dict):
         runtime_config = {
             **runtime_config,
-            "skill_runtime_context": dict(skill_runtime_context),
+            "action_runtime_context": dict(action_runtime_context),
         }
-    skill_definitions = get_skill_definition_registry_func(include_disabled=False)
-    resolved_bindings = resolve_agent_skill_bindings(node, input_values=input_values, state_schema=state_schema)
+    action_definitions = get_action_definition_registry_func(include_disabled=False)
+    resolved_bindings = resolve_agent_action_bindings(node, input_values=input_values, state_schema=state_schema)
     resolved_bindings = [
-        ResolvedAgentSkillBinding(
+        ResolvedAgentActionBinding(
             binding=(
-                resolve_agent_skill_output_binding(
+                resolve_agent_action_output_binding(
                     resolved_binding.binding,
                     node=node,
                     state_schema=state_schema,
-                    skill_definition=skill_definitions.get(resolved_binding.binding.skill_key),
+                    action_definition=action_definitions.get(resolved_binding.binding.action_key),
                 )
                 if resolved_binding.source == "node_config"
                 else resolved_binding.binding
@@ -416,62 +516,62 @@ def execute_agent_node(
         )
         for resolved_binding in resolved_bindings
     ]
-    generated_skill_inputs: dict[str, dict[str, Any]] = {}
-    skill_input_reasoning = ""
+    generated_action_inputs: dict[str, dict[str, Any]] = {}
+    action_input_reasoning = ""
     pending_permission_approval = find_pending_permission_approval_for_node(
         state,
         node_name=node_name,
-        skill_keys={resolved_binding.binding.skill_key for resolved_binding in resolved_bindings},
+        action_keys={resolved_binding.binding.action_key for resolved_binding in resolved_bindings},
     )
     if pending_permission_approval:
-        pending_skill_key = str(pending_permission_approval.get("skill_key") or "")
-        pending_skill_inputs = pending_permission_approval.get("skill_inputs")
-        generated_skill_inputs[pending_skill_key] = dict(pending_skill_inputs) if isinstance(pending_skill_inputs, dict) else {}
-        skill_input_reasoning = "Resuming approved risky Skill execution with stored Skill LLM output."
+        pending_action_key = str(pending_permission_approval.get("capability_key") or "")
+        pending_action_inputs = pending_permission_approval.get("inputs")
+        generated_action_inputs[pending_action_key] = dict(pending_action_inputs) if isinstance(pending_action_inputs, dict) else {}
+        action_input_reasoning = "Resuming approved risky Action execution with stored Action LLM output."
     elif resolved_bindings:
         record_file_context_activity_events(
             state=state,
             node_name=node_name,
             input_values=input_values,
             state_schema=state_schema,
-            phase="skill_input_planning",
+            phase="action_input_planning",
             record_activity_event_func=record_activity_event_func,
         )
-        generated_skill_inputs, skill_input_reasoning, skill_input_warnings, runtime_config = generate_agent_skill_inputs_func(
+        generated_action_inputs, action_input_reasoning, action_input_warnings, runtime_config = generate_agent_action_inputs_func(
             node=node,
             input_values=input_values,
             bindings=resolved_bindings,
-            skill_definitions=skill_definitions,
+            action_definitions=action_definitions,
             runtime_config=runtime_config,
             state_schema=state_schema,
         )
-        llm_phases.append("skill_input_planning")
-        warnings.extend(skill_input_warnings)
+        llm_phases.append("action_input_planning")
+        warnings.extend(action_input_warnings)
 
     mapped_action_outputs: dict[str, Any] = {}
     mapped_capability_outputs: dict[str, Any] = {}
     for resolved_binding in resolved_bindings:
         binding = resolved_binding.binding
-        skill_key = binding.skill_key
-        skill_func = registry.get(skill_key)
-        if skill_func is None:
-            raise ValueError(f"Skill '{skill_key}' is not registered.")
+        action_key = binding.action_key
+        action_func = registry.get(action_key)
+        if action_func is None:
+            raise ValueError(f"Action '{action_key}' is not registered.")
 
         started_at = perf_counter()
-        skill_definition = skill_definitions.get(skill_key)
-        input_schema = list(getattr(skill_definition, "llm_output_schema", []) or [])
-        skill_inputs = dict(generated_skill_inputs.get(skill_key) or {})
-        missing_inputs = missing_skill_llm_output_fields(skill_inputs, input_schema)
+        action_definition = action_definitions.get(action_key)
+        input_schema = list(getattr(action_definition, "llm_output_schema", []) or [])
+        action_inputs = dict(generated_action_inputs.get(action_key) or {})
+        missing_inputs = missing_action_llm_output_fields(action_inputs, input_schema)
         if missing_inputs:
             missing_label = ", ".join(missing_inputs)
-            skill_result = {
+            action_result = {
                 "status": "failed",
-                "error_type": "missing_skill_llm_output",
-                "error": f"Missing Skill LLM output field(s) for skill '{skill_key}': {missing_label}.",
+                "error_type": "missing_action_llm_output",
+                "error": f"Missing Action LLM output field(s) for action '{action_key}': {missing_label}.",
                 "errors": [
                     {
-                        "type": "missing_skill_llm_output",
-                        "message": f"Missing Skill LLM output field '{input_key}'.",
+                        "type": "missing_action_llm_output",
+                        "message": f"Missing Action LLM output field '{input_key}'.",
                         "input": input_key,
                     }
                     for input_key in missing_inputs
@@ -483,45 +583,45 @@ def execute_agent_node(
             approved_pending = consume_pending_permission_approval(
                 state,
                 node_name=node_name,
-                skill_key=skill_key,
+                action_key=action_key,
                 binding_source=resolved_binding.source,
             )
             if approved_pending is not None:
-                approved_inputs = approved_pending.get("skill_inputs")
+                approved_inputs = approved_pending.get("inputs")
                 if isinstance(approved_inputs, dict):
-                    skill_inputs = dict(approved_inputs)
+                    action_inputs = dict(approved_inputs)
                 if str(approved_pending.get("status") or "") == "denied":
                     denial_reason = _compact_text(approved_pending.get("denial_reason")) or "The user denied this permission request."
-                    skill_result = _permission_denied_skill_result(skill_key, denial_reason)
+                    action_result = _permission_denied_action_result(action_key, denial_reason)
                 else:
-                    skill_invoke_kwargs: dict[str, Any] = {}
-                    if callable_accepts_keyword_func(invoke_skill_func, "context"):
-                        skill_invoke_kwargs["context"] = _build_action_invocation_context(
+                    action_invoke_kwargs: dict[str, Any] = {}
+                    if callable_accepts_keyword_func(invoke_action_func, "context"):
+                        action_invoke_kwargs["context"] = _build_action_invocation_context(
                             state=state,
                             node_name=node_name,
-                            skill_key=skill_key,
+                            action_key=action_key,
                             runtime_config=runtime_config,
                         )
-                    skill_result = invoke_skill_func(skill_func, skill_inputs, **skill_invoke_kwargs)
+                    action_result = invoke_action_func(action_func, action_inputs, **action_invoke_kwargs)
             else:
-                approval_decision = should_pause_for_skill_permission_approval(
+                approval_decision = should_pause_for_action_permission_approval(
                     state=state,
                     node_name=node_name,
-                    skill_key=skill_key,
-                    skill_definition=skill_definition,
+                    action_key=action_key,
+                    action_definition=action_definition,
                 )
                 if approval_decision.required:
                     record_activity_event_func(
                         state,
                         kind="permission_pause",
-                        summary=_permission_pause_activity_summary(skill_key, approval_decision.risky_permissions),
+                        summary=_permission_pause_activity_summary(action_key, approval_decision.risky_permissions),
                         node_id=node_name,
                         status="awaiting_human",
                         detail={
-                            "action_key": skill_key,
+                            "action_key": action_key,
                             "binding_source": resolved_binding.source,
                             "permissions": approval_decision.risky_permissions,
-                            "input_keys": sorted(skill_inputs.keys()),
+                            "input_keys": sorted(action_inputs.keys()),
                         },
                     )
                     return {
@@ -530,17 +630,17 @@ def execute_agent_node(
                         "pending_permission_approval": build_pending_permission_approval(
                             state=state,
                             node_name=node_name,
-                            skill_key=skill_key,
-                            skill_name=str(getattr(skill_definition, "name", "") or skill_key),
+                            action_key=action_key,
+                            action_name=str(getattr(action_definition, "name", "") or action_key),
                             binding_source=resolved_binding.source,
                             permissions=approval_decision.risky_permissions,
-                            skill_inputs=skill_inputs,
+                            inputs=action_inputs,
                         ),
-                        "skill_input_reasoning": skill_input_reasoning,
+                        "action_input_reasoning": action_input_reasoning,
                         "subgraph_input_reasoning": "",
-                        "selected_actions": [skill_key],
+                        "selected_actions": [action_key],
                         "selected_capabilities": [
-                            {"kind": "action", "key": skill_key}
+                            {"kind": "action", "key": action_key}
                         ]
                         if resolved_binding.source == "capability_state"
                         else [],
@@ -552,89 +652,89 @@ def execute_agent_node(
                         "context_assembly_report": context_assembly_report(),
                         "final_result": "",
                     }
-                skill_invoke_kwargs: dict[str, Any] = {}
-                if callable_accepts_keyword_func(invoke_skill_func, "context"):
-                    skill_invoke_kwargs["context"] = _build_action_invocation_context(
+                action_invoke_kwargs: dict[str, Any] = {}
+                if callable_accepts_keyword_func(invoke_action_func, "context"):
+                    action_invoke_kwargs["context"] = _build_action_invocation_context(
                         state=state,
                         node_name=node_name,
-                        skill_key=skill_key,
+                        action_key=action_key,
                         runtime_config=runtime_config,
                     )
-                skill_result = invoke_skill_func(skill_func, skill_inputs, **skill_invoke_kwargs)
+                action_result = invoke_action_func(action_func, action_inputs, **action_invoke_kwargs)
         duration_ms = int((perf_counter() - started_at) * 1000)
-        skill_status, skill_error = _resolve_action_invocation_status(skill_key, skill_result)
-        skill_error_type = _resolve_skill_error_type(skill_result)
+        action_status, action_error = _resolve_action_invocation_status(action_key, action_result)
+        action_error_type = _resolve_action_error_type(action_result)
         if resolved_binding.source == "capability_state":
-            state_writes = map_dynamic_skill_result_package(
+            state_writes = map_dynamic_action_result_package(
                 node,
                 state_schema,
-                skill_key=skill_key,
-                skill_definition=skill_definition,
-                skill_inputs=skill_inputs,
-                skill_result=skill_result,
-                status=skill_status,
-                error=skill_error,
-                error_type=skill_error_type,
+                action_key=action_key,
+                action_definition=action_definition,
+                inputs=action_inputs,
+                action_result=action_result,
+                status=action_status,
+                error=action_error,
+                error_type=action_error_type,
                 duration_ms=duration_ms,
             )
         else:
-            state_writes = map_skill_outputs(binding, skill_result)
+            state_writes = map_action_outputs(binding, action_result)
         if missing_inputs:
-            warnings.append(f"Action '{skill_key}' failed before execution: {skill_error or 'Unknown error.'}")
-        elif skill_status == "failed":
-            warnings.append(f"Action '{skill_key}' failed: {skill_error or 'Unknown error.'}")
+            warnings.append(f"Action '{action_key}' failed before execution: {action_error or 'Unknown error.'}")
+        elif action_status == "failed":
+            warnings.append(f"Action '{action_key}' failed: {action_error or 'Unknown error.'}")
         mapped_action_outputs.update(state_writes)
-        selected_actions.append(skill_key)
-        skill_context[skill_key] = skill_result
+        selected_actions.append(action_key)
+        action_context[action_key] = action_result
         action_outputs.append(
             {
-                "action_name": skill_key,
-                "action_key": skill_key,
+                "action_name": action_key,
+                "action_key": action_key,
                 "binding_source": resolved_binding.source,
                 "input_source": "agent_llm",
-                "inputs": skill_inputs,
-                "outputs": skill_result,
+                "inputs": action_inputs,
+                "outputs": action_result,
                 "output_mapping": dict(binding.output_mapping),
-                "output_mapping_details": build_skill_output_mapping_details(
+                "output_mapping_details": build_action_output_mapping_details(
                     binding,
-                    skill_definition=skill_definition,
+                    action_definition=action_definition,
                     state_schema=state_schema,
                 ),
                 "state_writes": state_writes,
                 "duration_ms": duration_ms,
-                "status": skill_status,
-                "error": skill_error,
-                "error_type": skill_error_type,
+                "status": action_status,
+                "error": action_error,
+                "error_type": action_error_type,
             }
         )
         record_activity_event_func(
             state,
             kind="action_invocation",
-            summary=_action_invocation_activity_summary(skill_key, skill_status),
+            summary=_action_invocation_activity_summary(action_key, action_status),
             node_id=node_name,
-            status=skill_status,
+            status=action_status,
             duration_ms=duration_ms,
             detail={
-                "action_key": skill_key,
+                "action_key": action_key,
                 "binding_source": resolved_binding.source,
-                "input_keys": sorted(skill_inputs.keys()),
-                "output_keys": sorted(skill_result.keys()),
-                **({"error_type": skill_error_type} if skill_error_type else {}),
+                "input_keys": sorted(action_inputs.keys()),
+                "output_keys": sorted(action_result.keys()),
+                **({"error_type": action_error_type} if action_error_type else {}),
             },
-            error=skill_error,
+            error=action_error,
         )
-        record_skill_activity_events(
+        record_action_activity_events(
             state,
             node_id=node_name,
-            skill_key=skill_key,
+            action_key=action_key,
             binding_source=resolved_binding.source,
-            raw_events=skill_result.get("activity_events"),
+            raw_events=action_result.get("activity_events"),
             record_activity_event_func=record_activity_event_func,
         )
 
     subgraph_keys = (
         iter_capability_state_subgraph_keys(node, input_values=input_values, state_schema=state_schema)[:1]
-        if not resolved_bindings and not node.config.skill_key
+        if not resolved_bindings and not node.config.action_key
         else []
     )
     subgraph_definitions = [
@@ -697,7 +797,7 @@ def execute_agent_node(
                 "awaiting_human": True,
                 "pending_subgraph_breakpoint": execution_result.get("pending_subgraph_breakpoint"),
                 "subgraph": execution_result.get("subgraph"),
-                "skill_input_reasoning": skill_input_reasoning,
+                "action_input_reasoning": action_input_reasoning,
                 "subgraph_input_reasoning": subgraph_input_reasoning,
                 "selected_actions": selected_actions,
                 "selected_capabilities": [{"kind": "subgraph", "key": subgraph_key}],
@@ -782,7 +882,7 @@ def execute_agent_node(
             "outputs": output_values,
             "response": response_payload,
             "reasoning": response_reasoning,
-            "skill_input_reasoning": skill_input_reasoning,
+            "action_input_reasoning": action_input_reasoning,
             "subgraph_input_reasoning": subgraph_input_reasoning,
             "selected_actions": selected_actions,
             "selected_capabilities": selected_capabilities,
@@ -820,7 +920,7 @@ def execute_agent_node(
     response_payload, response_reasoning, response_warnings, runtime_config = generate_agent_response_func(
         node,
         input_values,
-        skill_context,
+        action_context,
         runtime_config,
         **generate_kwargs,
     )
@@ -848,7 +948,7 @@ def execute_agent_node(
         "outputs": output_values,
         "response": response_payload,
         "reasoning": response_reasoning,
-        "skill_input_reasoning": skill_input_reasoning,
+        "action_input_reasoning": action_input_reasoning,
         "subgraph_input_reasoning": subgraph_input_reasoning,
         "selected_actions": selected_actions,
         "selected_capabilities": selected_capabilities,
@@ -903,13 +1003,56 @@ def record_file_context_activity_events(
         )
 
 
-def _next_skill_artifact_invocation_index(state: dict[str, Any], node_name: str, skill_key: str) -> int:
-    raw_counters = state.get("action_invocation_counts")
+def _collect_tool_inputs(
+    node: NodeSystemToolNode,
+    input_values: dict[str, Any],
+    *,
+    tool_key: str,
+) -> dict[str, Any]:
+    tool_inputs: dict[str, Any] = {}
+    for read in node.reads:
+        binding = read.binding
+        if binding is None or binding.kind != NodeSystemReadBindingKind.TOOL_INPUT:
+            continue
+        if binding.tool_key != tool_key:
+            continue
+        tool_inputs[binding.field_key] = copy.deepcopy(input_values.get(read.state))
+    return tool_inputs
+
+
+def _map_tool_outputs(
+    node: NodeSystemToolNode,
+    state_schema: dict[str, NodeSystemStateDefinition],
+    *,
+    tool_key: str,
+    node_name: str,
+    tool_result: dict[str, Any],
+) -> dict[str, Any]:
+    state_writes: dict[str, Any] = {}
+    for write in node.writes:
+        definition = state_schema.get(write.state)
+        binding = getattr(definition, "binding", None)
+        if binding is None or binding.kind != NodeSystemStateBindingKind.TOOL_OUTPUT:
+            continue
+        if binding.tool_key != tool_key or binding.node_id != node_name:
+            continue
+        state_writes[write.state] = copy.deepcopy(tool_result.get(binding.field_key))
+    return state_writes
+
+
+def _next_capability_artifact_invocation_index(
+    state: dict[str, Any],
+    node_name: str,
+    capability_key: str,
+    *,
+    capability_kind: str = "action",
+) -> int:
+    raw_counters = state.get("capability_invocation_counts")
     if not isinstance(raw_counters, dict):
         raw_counters = {}
-        state["action_invocation_counts"] = raw_counters
+        state["capability_invocation_counts"] = raw_counters
 
-    counter_key = f"{node_name}:{skill_key}"
+    counter_key = f"{capability_kind}:{node_name}:{capability_key}"
     try:
         current_index = int(raw_counters.get(counter_key, 0))
     except (TypeError, ValueError):
@@ -919,14 +1062,14 @@ def _next_skill_artifact_invocation_index(state: dict[str, Any], node_name: str,
     return next_index
 
 
-def map_dynamic_skill_result_package(
+def map_dynamic_action_result_package(
     node: NodeSystemAgentNode,
     state_schema: dict[str, NodeSystemStateDefinition],
     *,
-    skill_key: str,
-    skill_definition: Any | None,
-    skill_inputs: dict[str, Any],
-    skill_result: dict[str, Any],
+    action_key: str,
+    action_definition: Any | None,
+    inputs: dict[str, Any],
+    action_result: dict[str, Any],
     status: str,
     error: str,
     error_type: str,
@@ -939,14 +1082,14 @@ def map_dynamic_skill_result_package(
         and state_schema[write.state].type == NodeSystemStateType.RESULT_PACKAGE
     ]
     if len(output_state_keys) != 1:
-        raise ValueError("Dynamic skill execution requires exactly one result_package output state.")
+        raise ValueError("Dynamic action execution requires exactly one result_package output state.")
     state_key = output_state_keys[0]
     return {
-        state_key: build_dynamic_skill_result_package(
-            skill_key=skill_key,
-            skill_definition=skill_definition,
-            skill_inputs=skill_inputs,
-            skill_result=skill_result,
+        state_key: build_dynamic_action_result_package(
+            action_key=action_key,
+            action_definition=action_definition,
+            inputs=inputs,
+            action_result=action_result,
             status=status,
             error=error,
             error_type=error_type,
@@ -955,18 +1098,18 @@ def map_dynamic_skill_result_package(
     }
 
 
-def build_dynamic_skill_result_package(
+def build_dynamic_action_result_package(
     *,
-    skill_key: str,
-    skill_definition: Any | None,
-    skill_inputs: dict[str, Any],
-    skill_result: dict[str, Any],
+    action_key: str,
+    action_definition: Any | None,
+    inputs: dict[str, Any],
+    action_result: dict[str, Any],
     status: str,
     error: str,
     error_type: str,
     duration_ms: int,
 ) -> dict[str, Any]:
-    output_fields = list(getattr(skill_definition, "state_output_schema", []) or [])
+    output_fields = list(getattr(action_definition, "state_output_schema", []) or [])
     outputs: dict[str, Any] = {}
     if output_fields:
         for field in output_fields:
@@ -974,10 +1117,10 @@ def build_dynamic_skill_result_package(
                 "name": field.name,
                 "description": field.description,
                 "type": field.value_type,
-                "value": skill_result.get(field.key),
+                "value": action_result.get(field.key),
             }
     else:
-        for key, value in skill_result.items():
+        for key, value in action_result.items():
             if key in {"status", "error", "error_type", "recoverable", "missing_inputs"}:
                 continue
             outputs[key] = {
@@ -989,11 +1132,11 @@ def build_dynamic_skill_result_package(
 
     return {
         "kind": "result_package",
-        "sourceType": "skill",
-        "sourceKey": skill_key,
-        "sourceName": str(getattr(skill_definition, "name", "") or skill_key),
+        "sourceType": "action",
+        "sourceKey": action_key,
+        "sourceName": str(getattr(action_definition, "name", "") or action_key),
         "status": status,
-        "inputs": skill_inputs,
+        "inputs": inputs,
         "outputs": outputs,
         "durationMs": duration_ms,
         "error": error,
@@ -1086,10 +1229,10 @@ def build_dynamic_subgraph_result_package(
     }
 
 
-def missing_skill_llm_output_fields(skill_inputs: dict[str, Any], input_schema: list[Any] | None) -> list[str]:
+def missing_action_llm_output_fields(action_inputs: dict[str, Any], input_schema: list[Any] | None) -> list[str]:
     missing: list[str] = []
     for field in input_schema or []:
-        if field.key not in skill_inputs or skill_inputs.get(field.key) is None:
+        if field.key not in action_inputs or action_inputs.get(field.key) is None:
             missing.append(field.key)
     return missing
 
@@ -1100,12 +1243,12 @@ def missing_required_subgraph_inputs(
 ) -> list[str]:
     missing: list[str] = []
     for field in input_schema or []:
-        if field.required and is_missing_skill_input_value(subgraph_inputs.get(field.key)):
+        if field.required and is_missing_action_input_value(subgraph_inputs.get(field.key)):
             missing.append(field.key)
     return missing
 
 
-def is_missing_skill_input_value(value: Any) -> bool:
+def is_missing_action_input_value(value: Any) -> bool:
     if value is None:
         return True
     if isinstance(value, str) and not value.strip():
@@ -1117,25 +1260,51 @@ def _build_action_invocation_context(
     *,
     state: dict[str, Any],
     node_name: str,
-    skill_key: str,
+    action_key: str,
     runtime_config: dict[str, Any],
 ) -> dict[str, Any]:
-    invocation_index = _next_skill_artifact_invocation_index(state, node_name, skill_key)
-    context = create_skill_artifact_context(
+    invocation_index = _next_capability_artifact_invocation_index(
+        state,
+        node_name,
+        action_key,
+        capability_kind="action",
+    )
+    context = create_capability_artifact_context(
         run_id=str(state.get("run_id") or "run"),
         node_id=node_name,
-        skill_key=skill_key,
+        action_key=action_key,
         invocation_index=invocation_index,
     )
-    skill_runtime_context = runtime_config.get("skill_runtime_context")
-    if isinstance(skill_runtime_context, dict):
-        context["skill_runtime_context"] = dict(skill_runtime_context)
+    action_runtime_context = runtime_config.get("action_runtime_context")
+    if isinstance(action_runtime_context, dict):
+        context["action_runtime_context"] = dict(action_runtime_context)
     return context
 
 
-def _resolve_action_invocation_status(skill_key: str, skill_result: dict[str, Any]) -> tuple[str, str]:
-    status = _compact_text(skill_result.get("status")).lower()
-    error = _compact_text(skill_result.get("error"))
+def _build_tool_invocation_context(
+    *,
+    state: dict[str, Any],
+    node_name: str,
+    tool_key: str,
+) -> dict[str, Any]:
+    invocation_index = _next_capability_artifact_invocation_index(
+        state,
+        node_name,
+        tool_key,
+        capability_kind="tool",
+    )
+    return create_capability_artifact_context(
+        run_id=str(state.get("run_id") or "run"),
+        node_id=node_name,
+        capability_kind="tool",
+        capability_key=tool_key,
+        invocation_index=invocation_index,
+    )
+
+
+def _resolve_action_invocation_status(action_key: str, action_result: dict[str, Any]) -> tuple[str, str]:
+    status = _compact_text(action_result.get("status")).lower()
+    error = _compact_text(action_result.get("error"))
     if status in {"failed", "error"}:
         return "failed", error
     if status in {"succeeded", "success", "ok"}:
@@ -1145,35 +1314,53 @@ def _resolve_action_invocation_status(skill_key: str, skill_result: dict[str, An
     return "succeeded", ""
 
 
-def _resolve_skill_error_type(skill_result: dict[str, Any]) -> str:
-    explicit = _compact_text(skill_result.get("error_type"))
+def _resolve_tool_invocation_status(tool_key: str, tool_result: dict[str, Any]) -> tuple[str, str]:
+    status = _compact_text(tool_result.get("status")).lower()
+    error = _compact_text(tool_result.get("error"))
+    if status in {"failed", "error"}:
+        return "failed", error
+    if status in {"succeeded", "success", "ok"}:
+        return "succeeded", error
+    if error:
+        return "failed", error
+    return "succeeded", ""
+
+
+def _resolve_action_error_type(action_result: dict[str, Any]) -> str:
+    explicit = _compact_text(action_result.get("error_type"))
     if explicit:
         return explicit
-    error = _compact_text(skill_result.get("error")).lower()
+    error = _compact_text(action_result.get("error")).lower()
     if "required" in error and ("missing" in error or "required input" in error or "query" in error):
         return "missing_required_input"
     return ""
 
 
-def _permission_denied_skill_result(skill_key: str, reason: str) -> dict[str, Any]:
+def _permission_denied_action_result(action_key: str, reason: str) -> dict[str, Any]:
     return {
         "status": "failed",
         "error_type": "permission_denied",
-        "error": f"Permission denied for skill '{skill_key}': {reason}",
+        "error": f"Permission denied for action '{action_key}': {reason}",
         "denial_reason": reason,
         "recoverable": True,
     }
 
 
-def _action_invocation_activity_summary(skill_key: str, status: str) -> str:
+def _action_invocation_activity_summary(action_key: str, status: str) -> str:
     if status == "failed":
-        return f"Action '{skill_key}' failed."
-    return f"Action '{skill_key}' succeeded."
+        return f"Action '{action_key}' failed."
+    return f"Action '{action_key}' succeeded."
 
 
-def _permission_pause_activity_summary(skill_key: str, permissions: list[str]) -> str:
+def _tool_invocation_activity_summary(tool_key: str, status: str) -> str:
+    if status == "failed":
+        return f"Tool '{tool_key}' failed."
+    return f"Tool '{tool_key}' succeeded."
+
+
+def _permission_pause_activity_summary(action_key: str, permissions: list[str]) -> str:
     permission_label = ", ".join(permissions) or "risky permission"
-    return f"Paused for {permission_label} approval before Action '{skill_key}'."
+    return f"Paused for {permission_label} approval before Action '{action_key}'."
 
 
 def _subgraph_invocation_activity_summary(subgraph_key: str, status: str) -> str:

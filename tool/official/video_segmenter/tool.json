@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "toograph.tool/v1",
+  "toolKey": "video_segmenter",
+  "name": "视频分段",
+  "description": "把一个视频切成 30 秒以内的短视频片段，供 Batch 节点逐段交给 LLM 分析。",
+  "version": "0.1.0",
+  "timeoutSeconds": 600,
+  "permissions": ["subprocess", "file_read", "file_write"],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 600
+  },
+  "inputSchema": [
+    {
+      "key": "video",
+      "name": "Video",
+      "valueType": "video",
+      "description": "需要切分的本地视频文件。"
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "segments",
+      "name": "Segments",
+      "valueType": "json",
+      "description": "切分后的视频片段数组，每项包含 index、start_sec、end_sec、local_path 和 mime_type。"
+    }
+  ]
+}

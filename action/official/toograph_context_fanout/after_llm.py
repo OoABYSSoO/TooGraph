@@ -14,9 +14,9 @@ MAX_TOTAL_BUDGET_CHARS = 20000
 BRANCH_KEYS = ("memory", "knowledge", "page", "capabilities")
 
 
-def toograph_context_fanout(**skill_inputs: Any) -> dict[str, Any]:
-    request = _dict(skill_inputs.get("fanout_request"))
-    merged_inputs = {**request, **{key: value for key, value in skill_inputs.items() if key != "fanout_request"}}
+def toograph_context_fanout(**action_inputs: Any) -> dict[str, Any]:
+    request = _dict(action_inputs.get("fanout_request"))
+    merged_inputs = {**request, **{key: value for key, value in action_inputs.items() if key != "fanout_request"}}
     user_message = _text(merged_inputs.get("user_message"))
     conversation_history = _text(merged_inputs.get("conversation_history"))
     page_context = _text(merged_inputs.get("page_context"))
@@ -246,16 +246,16 @@ def _capabilities_branch(*, query: str, origin: str, budget_chars: int) -> dict[
             "score": 0,
         }
     ]
-    skills: list[dict[str, Any]] = []
+    actions: list[dict[str, Any]] = []
     value = {
         "kind": "capability_candidates",
         "origin": origin or "buddy",
         "query": query,
         "templates": templates,
-        "skills": skills,
+        "actions": actions,
         "counts": {
             "templates": len(templates),
-            "skills": 0,
+            "actions": 0,
             "errors": 0,
         },
         "errors": [],
@@ -269,7 +269,7 @@ def _capabilities_branch(*, query: str, origin: str, budget_chars: int) -> dict[
         summary="\n".join(summary_lines),
         budget_chars=budget_chars,
         omitted=[],
-        source_count=len(value["templates"]) + len(value["skills"]),
+        source_count=len(value["templates"]) + len(value["actions"]),
     )
 
 
@@ -466,8 +466,8 @@ def _empty_capability_candidates() -> dict[str, Any]:
         "origin": "buddy",
         "query": "",
         "templates": [],
-        "skills": [],
-        "counts": {"templates": 0, "skills": 0, "errors": 0},
+        "actions": [],
+        "counts": {"templates": 0, "actions": 0, "errors": 0},
         "errors": [],
     }
 

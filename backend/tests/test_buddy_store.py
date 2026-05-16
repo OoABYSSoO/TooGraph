@@ -742,14 +742,14 @@ class BuddyStoreTests(unittest.TestCase):
                     {
                         "entries": [
                             {
-                                "capability": {"kind": "skill", "key": "web_search", "name": "联网搜索"},
+                                "capability": {"kind": "action", "key": "web_search", "name": "联网搜索"},
                                 "success": True,
                                 "run_id": "run_capability_1",
                                 "summary": "用于查找资料。",
                                 "duration_ms": 1250,
                             },
                             {
-                                "capability": {"kind": "skill", "key": "web_search", "name": "联网搜索"},
+                                "capability": {"kind": "action", "key": "web_search", "name": "联网搜索"},
                                 "success": False,
                                 "run_id": "run_capability_2",
                                 "summary": "外部搜索失败。",
@@ -762,14 +762,14 @@ class BuddyStoreTests(unittest.TestCase):
                 revisions = store.list_revisions(target_type="capability_usage_stats", target_id="capability_usage_stats")
                 loaded = store.load_capability_usage_stats()
 
-        web_search = stats["capabilities"]["skill:web_search"]
+        web_search = stats["capabilities"]["action:web_search"]
         self.assertEqual(web_search["use_count"], 2)
         self.assertEqual(web_search["success_count"], 1)
         self.assertEqual(web_search["failure_count"], 1)
         self.assertEqual(web_search["recent_runs"][0]["run_id"], "run_capability_2")
-        self.assertEqual(loaded["capabilities"]["skill:web_search"]["use_count"], 2)
+        self.assertEqual(loaded["capabilities"]["action:web_search"]["use_count"], 2)
         self.assertEqual(len(revisions), 1)
-        self.assertEqual(revisions[0]["next_value"]["capabilities"]["skill:web_search"]["last_summary"], "外部搜索失败。")
+        self.assertEqual(revisions[0]["next_value"]["capabilities"]["action:web_search"]["last_summary"], "外部搜索失败。")
 
     def test_capability_usage_stats_restore_returns_previous_value(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

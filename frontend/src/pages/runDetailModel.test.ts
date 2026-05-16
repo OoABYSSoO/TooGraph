@@ -30,6 +30,8 @@ function createRunDetail(overrides: Partial<RunDetail> = {}): RunDetail {
     metadata: {},
     selected_actions: [],
     action_outputs: [],
+    selected_tools: [],
+    tool_outputs: [],
     evaluation_result: {},
     memory_summary: "",
     final_result: "",
@@ -40,6 +42,7 @@ function createRunDetail(overrides: Partial<RunDetail> = {}): RunDetail {
     output_previews: [],
     artifacts: {
       action_outputs: [],
+      tool_outputs: [],
       output_previews: [],
       saved_outputs: [],
       exported_outputs: [],
@@ -329,9 +332,10 @@ test("buildRunAggregatedTimeline includes subgraph permission approvals as pause
         subgraph_path: ["run_capability_cycle"],
         metadata: {
           pending_permission_approval: {
-            kind: "skill_permission_approval",
-            skill_key: "local_workspace_executor",
-            skill_name: "Local Workspace Executor",
+            kind: "capability_permission_approval",
+            capability_kind: "action",
+            capability_key: "local_workspace_executor",
+            capability_name: "Local Workspace Executor",
             permissions: ["file_write", "command_run"],
           },
         },
@@ -430,6 +434,33 @@ test("buildRunAggregatedTimeline summarizes Buddy session recall activity", () =
   assert.match(item?.detailText ?? "", /verification evidence/);
 });
 
+test("buildRunAggregatedTimeline labels deterministic tool invocation activity", () => {
+  const run = createRunDetail({
+    artifacts: createRunArtifacts({
+      activity_events: [
+        {
+          sequence: 3,
+          kind: "tool_invocation",
+          summary: "Tool video_segmenter succeeded.",
+          node_id: "segment_video",
+          status: "succeeded",
+          duration_ms: 18,
+          detail: {
+            tool_key: "video_segmenter",
+          },
+          created_at: "2026-05-12T01:00:02.500Z",
+        },
+      ],
+    }),
+  });
+
+  const [item] = buildRunAggregatedTimeline(run);
+
+  assert.equal(item?.label, "tool_invocation");
+  assert.deepEqual(item?.artifactLabels, ["tool: video_segmenter"]);
+  assert.match(item?.detailText ?? "", /video_segmenter/);
+});
+
 test("buildRunAggregatedTimeline summarizes virtual template operation activity", () => {
   const run = createRunDetail({
     artifacts: createRunArtifacts({
@@ -444,7 +475,7 @@ test("buildRunAggregatedTimeline summarizes virtual template operation activity"
           status: "requested",
           duration_ms: 12,
           detail: {
-            skill_key: "toograph_page_operator",
+            action_key: "toograph_page_operator",
             operation_request_id: "vop_template1234",
             operation: {
               kind: "run_template",
@@ -452,7 +483,7 @@ test("buildRunAggregatedTimeline summarizes virtual template operation activity"
               template_id: "advanced_web_research_loop",
               template_name: "高级联网搜索",
               search_text: "advanced_web_research_loop",
-              input_text: "研究 TooGraph 页面操作技能的最新差距。",
+              input_text: "研究 TooGraph 页面操作 Action的最新差距。",
             },
             expected_continuation: {
               mode: "auto_resume_after_ui_operation",
@@ -469,7 +500,7 @@ test("buildRunAggregatedTimeline summarizes virtual template operation activity"
   const [item] = buildRunAggregatedTimeline(run);
 
   assert.equal(item?.label, "Virtual template run");
-  assert.equal(item?.summary, "Template: 高级联网搜索 · Input: 研究 TooGraph 页面操作技能的最新差距。");
+  assert.equal(item?.summary, "Template: 高级联网搜索 · Input: 研究 TooGraph 页面操作 Action的最新差距。");
   assert.deepEqual(item?.artifactLabels, [
     "operation: run_template",
     "template: advanced_web_research_loop",
@@ -563,7 +594,7 @@ test("buildRunAggregatedTimeline summarizes completed virtual operation triggere
   ]);
 });
 
-test("listRunOutputArtifacts keeps skill artifact document references for paged display", () => {
+test("listRunOutputArtifacts keeps action artifact document references for paged display", () => {
   const artifacts = listRunOutputArtifacts(
     createRunDetail({
       artifacts: {

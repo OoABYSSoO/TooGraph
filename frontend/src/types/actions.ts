@@ -1,40 +1,40 @@
-export type SkillIoField = {
+export type ActionIoField = {
   key: string;
   name: string;
   valueType: string;
   description: string;
 };
 
-export type SkillRuntimeSpec = {
+export type ActionRuntimeSpec = {
   type: string;
   entrypoint: string;
   command?: string[];
   timeoutSeconds?: number;
 };
 
-export type SkillCapabilityPolicy = {
+export type ActionCapabilityPolicy = {
   selectable: boolean;
   requiresApproval: boolean;
 };
 
-export type SkillCapabilityPolicies = {
-  default: SkillCapabilityPolicy;
-  origins: Record<string, SkillCapabilityPolicy>;
+export type ActionCapabilityPolicies = {
+  default: ActionCapabilityPolicy;
+  origins: Record<string, ActionCapabilityPolicy>;
 };
 
-export type SkillDefinition = {
-  skillKey: string;
+export type ActionDefinition = {
+  actionKey: string;
   name: string;
   description: string;
   llmInstruction: string;
   schemaVersion: string;
   version: string;
-  capabilityPolicy: SkillCapabilityPolicies;
+  capabilityPolicy: ActionCapabilityPolicies;
   permissions: string[];
-  runtime: SkillRuntimeSpec;
-  stateInputSchema?: SkillIoField[];
-  llmOutputSchema: SkillIoField[];
-  stateOutputSchema: SkillIoField[];
+  runtime: ActionRuntimeSpec;
+  stateInputSchema?: ActionIoField[];
+  llmOutputSchema: ActionIoField[];
+  stateOutputSchema: ActionIoField[];
   llmNodeEligibility: string;
   llmNodeBlockers: string[];
   sourceScope: string;
@@ -45,7 +45,7 @@ export type SkillDefinition = {
   canManage: boolean;
 };
 
-export type SkillFileNode = {
+export type ActionFileNode = {
   name: string;
   path: string;
   type: "directory" | "file";
@@ -53,16 +53,16 @@ export type SkillFileNode = {
   language: string;
   previewable: boolean;
   executable: boolean;
-  children: SkillFileNode[];
+  children: ActionFileNode[];
 };
 
-export type SkillFileTreeResponse = {
-  skillKey: string;
-  root: SkillFileNode;
+export type ActionFileTreeResponse = {
+  actionKey: string;
+  root: ActionFileNode;
 };
 
-export type SkillFileContentResponse = {
-  skillKey: string;
+export type ActionFileContentResponse = {
+  actionKey: string;
   path: string;
   name: string;
   size: number;

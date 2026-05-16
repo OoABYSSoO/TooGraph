@@ -32,7 +32,7 @@ class RuntimeRunArtifactsTests(unittest.TestCase):
             "state_values": {"answer": "done"},
             "state_events": [{"state_key": "answer"}],
             "state_stream_events": [{"state_key": "answer", "status": "completed"}],
-            "activity_events": [{"kind": "action_invocation", "summary": "Skill ran"}],
+            "activity_events": [{"kind": "action_invocation", "summary": "Action ran"}],
             "state_last_writers": {"answer": {"node_id": "agent"}},
             "streaming_outputs": {"agent": {"text": "done"}},
             "cycle_iterations": [{"iteration": 1}],
@@ -50,7 +50,7 @@ class RuntimeRunArtifactsTests(unittest.TestCase):
         self.assertGreaterEqual(state["duration_ms"], 0)
         self.assertEqual(state["artifacts"]["active_edge_ids"], ["edge:a", "edge:b"])
         self.assertEqual(state["artifacts"]["node_outputs"], {"agent": {"answer": "done"}})
-        self.assertEqual(state["artifacts"]["activity_events"], [{"kind": "action_invocation", "summary": "Skill ran"}])
+        self.assertEqual(state["artifacts"]["activity_events"], [{"kind": "action_invocation", "summary": "Action ran"}])
         self.assertEqual(state["artifacts"]["state_stream_events"], [{"state_key": "answer", "status": "completed"}])
         self.assertEqual(state["artifacts"]["exported_outputs"][0]["saved_file"]["path"], "answer.txt")
         self.assertEqual(state["state_snapshot"], {"values": {"answer": "done"}, "last_writers": {"answer": {"node_id": "agent"}}})

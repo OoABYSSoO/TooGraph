@@ -240,7 +240,7 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses fixed template ru
             template_id: "advanced_web_research_loop",
             template_name: "高级联网搜索",
             search_text: "advanced_web_research_loop",
-            input_text: "研究 TooGraph 页面操作技能的最新差距。",
+            input_text: "研究 TooGraph 页面操作 Action的最新差距。",
             run_target_id: "editor.action.runActiveGraph",
           },
         ],
@@ -262,7 +262,7 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses fixed template ru
       templateId: "advanced_web_research_loop",
       templateName: "高级联网搜索",
       searchText: "advanced_web_research_loop",
-      inputText: "研究 TooGraph 页面操作技能的最新差距。",
+      inputText: "研究 TooGraph 页面操作 Action的最新差距。",
       runTargetId: "editor.action.runActiveGraph",
     },
   ]);

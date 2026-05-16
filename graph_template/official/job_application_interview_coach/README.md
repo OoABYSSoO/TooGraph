@@ -44,7 +44,7 @@
 - `salary_strategy.md`
 - `final_application_package.md`
 
-## Required Skills/Subgraphs
+## Required Actions/Subgraphs
 
 - `buddy_session_recall`: 只读召回候选人画像、项目故事和历史面试反馈。
 

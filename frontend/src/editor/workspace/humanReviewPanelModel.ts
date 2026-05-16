@@ -36,8 +36,9 @@ export type HumanReviewPanelModel = {
 };
 
 export type PermissionApprovalDetails = {
-  skillKey: string;
-  skillName: string;
+  capabilityKind: string;
+  capabilityKey: string;
+  capabilityName: string;
   permissions: string[];
   inputPreview: string;
   reason: string;
@@ -335,20 +336,22 @@ function stringFromUnknown(value: unknown) {
 
 function resolvePendingPermissionApproval(run: RunDetail | null): PermissionApprovalDetails | null {
   const pending = recordFromUnknown(run?.metadata?.pending_permission_approval);
-  if (stringFromUnknown(pending.kind) !== "skill_permission_approval") {
+  if (stringFromUnknown(pending.kind) !== "capability_permission_approval") {
     return null;
   }
-  const skillKey = stringFromUnknown(pending.skill_key);
-  const skillName = stringFromUnknown(pending.skill_name) || skillKey;
+  const capabilityKind = stringFromUnknown(pending.capability_kind) || "action";
+  const capabilityKey = stringFromUnknown(pending.capability_key);
+  const capabilityName = stringFromUnknown(pending.capability_name) || capabilityKey;
   const permissions = Array.isArray(pending.permissions)
     ? pending.permissions.map((permission) => stringFromUnknown(permission)).filter(Boolean)
     : [];
-  if (!skillKey && permissions.length === 0) {
+  if (!capabilityKey && permissions.length === 0) {
     return null;
   }
   return {
-    skillKey,
-    skillName,
+    capabilityKind,
+    capabilityKey,
+    capabilityName,
     permissions,
     inputPreview: stringFromUnknown(pending.input_preview),
     reason: stringFromUnknown(pending.reason),
@@ -357,7 +360,7 @@ function resolvePendingPermissionApproval(run: RunDetail | null): PermissionAppr
 
 function resolvePermissionApprovalSummary(approval: PermissionApprovalDetails) {
   return translate("humanReview.permissionSummary", {
-    skill: approval.skillName || approval.skillKey,
+    capability: approval.capabilityName || approval.capabilityKey,
     permissions: approval.permissions.join("、"),
   });
 }

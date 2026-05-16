@@ -11,7 +11,8 @@ class LangGraphNodePlan(BaseModel):
     description: str = ""
     reads: list[str] = Field(default_factory=list)
     writes: list[str] = Field(default_factory=list)
-    skill_keys: list[str] = Field(default_factory=list)
+    action_keys: list[str] = Field(default_factory=list)
+    tool_keys: list[str] = Field(default_factory=list)
     config: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -49,7 +50,8 @@ class LangGraphRuntimeRequirements(BaseModel):
     terminal_nodes: list[str] = Field(default_factory=list)
     runtime_entry_nodes: list[str] = Field(default_factory=list)
     runtime_terminal_nodes: list[str] = Field(default_factory=list)
-    skill_keys: list[str] = Field(default_factory=list)
+    action_keys: list[str] = Field(default_factory=list)
+    tool_keys: list[str] = Field(default_factory=list)
     knowledge_base_states: list[str] = Field(default_factory=list)
     unsupported_reasons: list[str] = Field(default_factory=list)
 

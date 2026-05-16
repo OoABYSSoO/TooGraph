@@ -6,67 +6,67 @@ import { fileURLToPath } from "node:url";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const componentSource = readFileSync(resolve(currentDirectory, "ActionsPage.vue"), "utf8");
-const skillsApiSource = readFileSync(resolve(currentDirectory, "../api/actions.ts"), "utf8");
+const actionsApiSource = readFileSync(resolve(currentDirectory, "../api/actions.ts"), "utf8");
 const sourceCoverageTest = readFileSync(resolve(currentDirectory, "../i18n/sourceCoverage.test.ts"), "utf8");
 
-test("ActionsPage loads the full skill catalog into a searchable management surface", () => {
-  assert.match(skillsApiSource, /export async function fetchSkillCatalog/);
-  assert.match(componentSource, /fetchSkillCatalog/);
-  assert.match(componentSource, /fetchSkillFiles/);
-  assert.match(componentSource, /const actions = ref<SkillDefinition\[\]>\(\[\]\);/);
-  assert.match(componentSource, /const filteredSkills = computed\(\(\) => filterSkillsForManagement/);
+test("ActionsPage loads the full action catalog into a searchable management surface", () => {
+  assert.match(actionsApiSource, /export async function fetchActionCatalog/);
+  assert.match(componentSource, /fetchActionCatalog/);
+  assert.match(componentSource, /fetchActionFiles/);
+  assert.match(componentSource, /const actions = ref<ActionDefinition\[\]>\(\[\]\);/);
+  assert.match(componentSource, /const filteredActions = computed\(\(\) => filterActionsForManagement/);
   assert.match(componentSource, /<ElInput[\s\S]*v-model="query"[\s\S]*class="actions-page__search"/);
   assert.match(componentSource, /role="tablist"[\s\S]*class="actions-page__filter-tabs"/);
-  assert.match(componentSource, /v-for="skill in filteredSkills"/);
-  assert.doesNotMatch(componentSource, /skill\.compatibility/);
+  assert.match(componentSource, /v-for="action in filteredActions"/);
+  assert.doesNotMatch(componentSource, /action\.compatibility/);
   assert.doesNotMatch(componentSource, /actions\.compatibility/);
 });
 
-test("ActionsPage uses a two-column inspector with a compact enabled Skill list", () => {
+test("ActionsPage uses a two-column inspector with a compact enabled Action list", () => {
   assert.match(componentSource, /class="actions-page__workspace"/);
   assert.match(componentSource, /class="actions-page__selector"/);
   assert.match(componentSource, /class="actions-page__detail"/);
-  assert.match(componentSource, /selectedSkillKey/);
-  assert.match(componentSource, /<ElSwitch[\s\S]*:model-value="skill\.status === 'active'"/);
-  assert.match(componentSource, /:disabled="actionSkillKey === skill\.skillKey"/);
-  assert.doesNotMatch(componentSource, /!skill\.canManage \|\| actionSkillKey/);
+  assert.match(componentSource, /selectedActionKey/);
+  assert.match(componentSource, /<ElSwitch[\s\S]*:model-value="action\.status === 'active'"/);
+  assert.match(componentSource, /:disabled="busyActionKey === action\.actionKey"/);
+  assert.doesNotMatch(componentSource, /!action\.canManage \|\| busyActionKey/);
   assert.doesNotMatch(componentSource, /<details[\s\S]*class="actions-page__card"/);
 });
 
-test("ActionsPage exposes a read-only Skill package file browser", () => {
-  assert.match(componentSource, /fetchSkillFiles/);
-  assert.match(componentSource, /fetchSkillFileContent/);
+test("ActionsPage exposes a read-only Action package file browser", () => {
+  assert.match(componentSource, /fetchActionFiles/);
+  assert.match(componentSource, /fetchActionFileContent/);
   assert.match(componentSource, /class="actions-page__file-browser"/);
   assert.match(componentSource, /class="actions-page__file-tree"/);
   assert.match(componentSource, /class="actions-page__file-preview"/);
   assert.match(componentSource, /selectedFilePath/);
 });
 
-test("ActionsPage surfaces Skill capability metadata without internal runtime status fields", () => {
+test("ActionsPage surfaces Action capability metadata without internal runtime status fields", () => {
   assert.match(componentSource, /overview\.visibleActions/);
   assert.doesNotMatch(componentSource, /overview\.runtimeReady/);
   assert.doesNotMatch(componentSource, /overview\.runtimeRegistered/);
   assert.doesNotMatch(componentSource, /overview\.needsAttention/);
   assert.doesNotMatch(componentSource, /capabilityPolicyOriginEntries/);
-  assert.doesNotMatch(componentSource, /selectedSkill\.kind/);
-  assert.doesNotMatch(componentSource, /selectedSkill\.mode/);
-  assert.doesNotMatch(componentSource, /selectedSkill\.scope/);
-  assert.match(componentSource, /selectedSkill\.permissions/);
-  assert.match(componentSource, /selectedSkill\.stateInputSchema/);
+  assert.doesNotMatch(componentSource, /selectedAction\.kind/);
+  assert.doesNotMatch(componentSource, /selectedAction\.mode/);
+  assert.doesNotMatch(componentSource, /selectedAction\.scope/);
+  assert.match(componentSource, /selectedAction\.permissions/);
+  assert.match(componentSource, /selectedAction\.stateInputSchema/);
   assert.match(componentSource, /t\("actions\.stateInputSchema"\)/);
   assert.match(componentSource, /t\("actions\.llmOutputSchema"\)/);
   assert.match(componentSource, /t\("actions\.stateOutputSchema"\)/);
   assert.doesNotMatch(componentSource, /field\.required/);
   assert.doesNotMatch(componentSource, /t\("actions\.required"\)/);
   assert.doesNotMatch(componentSource, /t\("actions\.optional"\)/);
-  assert.doesNotMatch(componentSource, /selectedSkill\.runtimeReady/);
-  assert.doesNotMatch(componentSource, /selectedSkill\.runtimeRegistered/);
-  assert.doesNotMatch(componentSource, /selectedSkill\.runtime\.type/);
-  assert.doesNotMatch(componentSource, /selectedSkill\.runtime\.entrypoint/);
-  assert.doesNotMatch(componentSource, /selectedSkill\.configured/);
-  assert.doesNotMatch(componentSource, /selectedSkill\.healthy/);
-  assert.doesNotMatch(componentSource, /selectedSkill\.llmNodeEligibility/);
-  assert.doesNotMatch(componentSource, /selectedSkill\.llmNodeBlockers/);
+  assert.doesNotMatch(componentSource, /selectedAction\.runtimeReady/);
+  assert.doesNotMatch(componentSource, /selectedAction\.runtimeRegistered/);
+  assert.doesNotMatch(componentSource, /selectedAction\.runtime\.type/);
+  assert.doesNotMatch(componentSource, /selectedAction\.runtime\.entrypoint/);
+  assert.doesNotMatch(componentSource, /selectedAction\.configured/);
+  assert.doesNotMatch(componentSource, /selectedAction\.healthy/);
+  assert.doesNotMatch(componentSource, /selectedAction\.llmNodeEligibility/);
+  assert.doesNotMatch(componentSource, /selectedAction\.llmNodeBlockers/);
   assert.doesNotMatch(componentSource, /t\("actions\.capabilityPolicy"\)/);
   assert.match(componentSource, /t\("actions\.permissions"\)/);
   assert.doesNotMatch(componentSource, /t\("actions\.runtimeReady"\)/);
@@ -77,30 +77,30 @@ test("ActionsPage surfaces Skill capability metadata without internal runtime st
   assert.doesNotMatch(componentSource, /t\("actions\.llmNodeBlockers"\)/);
 });
 
-test("ActionsPage avoids legacy per-Skill capability policy controls", () => {
+test("ActionsPage avoids legacy per-Action capability policy controls", () => {
   assert.doesNotMatch(componentSource, /class="actions-page__policy-grid"/);
   assert.doesNotMatch(componentSource, /class="actions-page__policy-row"/);
   assert.doesNotMatch(componentSource, /class="actions-page__policy-control"/);
-  assert.doesNotMatch(componentSource, /updateSkillCapabilityPolicy/);
+  assert.doesNotMatch(componentSource, /updateActionCapabilityPolicy/);
   assert.doesNotMatch(componentSource, /policyActionKey/);
-  assert.doesNotMatch(componentSource, /setSkillCapabilityPolicy/);
+  assert.doesNotMatch(componentSource, /setActionCapabilityPolicy/);
   assert.doesNotMatch(componentSource, /capabilityPolicySwitchLabel/);
   assert.doesNotMatch(componentSource, /requiresApproval/);
   assert.doesNotMatch(componentSource, /formatCapabilityPolicy/);
 });
 
 test("ActionsPage exposes upload, status, and delete management actions with local button styling", () => {
-  assert.match(componentSource, /const confirmingSkillDeleteKey = ref<string \| null>\(null\);/);
-  assert.match(componentSource, /async function setSkillEnabled/);
-  assert.match(componentSource, /async function setSkillStatus/);
-  assert.match(componentSource, /async function deleteSkillFromCatalog/);
-  assert.match(componentSource, /async function importUploadedSkill/);
-  assert.match(componentSource, /importSkillUpload\(files, relativePaths\)/);
-  assert.match(componentSource, /updateSkillStatus\(skill\.skillKey, status\)/);
-  assert.match(componentSource, /deleteSkill\(skill\.skillKey\)/);
+  assert.match(componentSource, /const confirmingActionDeleteKey = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /async function setActionEnabled/);
+  assert.match(componentSource, /async function setActionStatus/);
+  assert.match(componentSource, /async function deleteActionFromCatalog/);
+  assert.match(componentSource, /async function importUploadedAction/);
+  assert.match(componentSource, /importActionUpload\(files, relativePaths\)/);
+  assert.match(componentSource, /updateActionStatus\(action\.actionKey, status\)/);
+  assert.match(componentSource, /deleteAction\(action\.actionKey\)/);
   assert.match(componentSource, /class="actions-page__actions"/);
-  assert.match(componentSource, /ref="skillArchiveInput"/);
-  assert.match(componentSource, /ref="skillDirectoryInput"/);
+  assert.match(componentSource, /ref="actionArchiveInput"/);
+  assert.match(componentSource, /ref="actionDirectoryInput"/);
   assert.match(componentSource, /accept="\.zip,application\/zip"/);
   assert.match(componentSource, /webkitdirectory/);
   assert.match(componentSource, /t\("actions\.importArchive"\)/);

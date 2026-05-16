@@ -72,11 +72,11 @@ def record_activity_event(
     return event
 
 
-def record_skill_activity_events(
+def record_action_activity_events(
     state: dict[str, Any],
     *,
     node_id: str,
-    skill_key: str,
+    action_key: str,
     binding_source: str,
     raw_events: Any,
     publish_run_event_func: Callable[[str | None, str, dict[str, Any] | None], None] | None = None,
@@ -95,7 +95,7 @@ def record_skill_activity_events(
             continue
         detail = raw_event.get("detail") if isinstance(raw_event.get("detail"), dict) else {}
         detail = {
-            "action_key": skill_key,
+            "action_key": action_key,
             "binding_source": binding_source,
             **detail,
         }

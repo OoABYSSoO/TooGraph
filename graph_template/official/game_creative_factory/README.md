@@ -48,7 +48,7 @@
 - `todo_video_generation.md`
 - `final_summary.md`
 
-## Required Skills/Subgraphs
+## Required Actions/Subgraphs
 
 - `buddy_session_recall`: 只读召回品牌偏好、历史素材表现、禁用表达和审核反馈。
 

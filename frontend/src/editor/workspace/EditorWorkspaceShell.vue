@@ -95,9 +95,12 @@
                 v-else-if="documentsByTabId[tab.tabId]"
                 :document="documentsByTabId[tab.tabId]!"
                 :knowledge-bases="knowledgeBases"
-                :skill-definitions="skillDefinitions"
-                :skill-definitions-loading="skillDefinitionsLoading"
-                :skill-definitions-error="skillDefinitionsError"
+                :action-definitions="actionDefinitions"
+                :tool-definitions="toolDefinitions"
+                :action-definitions-loading="actionDefinitionsLoading"
+                :action-definitions-error="actionDefinitionsError"
+                :tool-definitions-loading="toolDefinitionsLoading"
+                :tool-definitions-error="toolDefinitionsError"
                 :templates="graphTemplates"
                 :available-agent-model-refs="agentRuntimeCatalog.availableModelRefs"
                 :agent-model-display-lookup="agentRuntimeCatalog.modelDisplayLookup"
@@ -126,6 +129,7 @@
                 @reorder-port-state="reorderNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.stateKey, $event.targetIndex)"
                 @disconnect-data-edge="disconnectDataEdgeForTab(tab.tabId, $event.sourceNodeId, $event.targetNodeId, $event.stateKey, $event.mode)"
                 @update-agent-config="updateAgentConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
+                @update-tool-config="updateToolConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-batch-config="updateBatchConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-batch-worker="updateBatchWorkerForTab(tab.tabId, $event.nodeId, resolveBatchWorkerSelection($event.workerValue))"
                 @toggle-agent-breakpoint="toggleAgentBreakpointForTab(tab.tabId, $event.nodeId, $event.enabled)"
@@ -393,7 +397,8 @@ import { fetchPreset, fetchPresets, savePreset } from "@/api/presets";
 import { fetchKnowledgeBases } from "@/api/knowledge";
 import { fetchRun, resumeRun } from "@/api/runs";
 import { fetchSettings } from "@/api/settings";
-import { fetchSkillDefinitions } from "@/api/actions";
+import { fetchActionDefinitions } from "@/api/actions";
+import { fetchToolCatalog } from "@/api/tools";
 import { attachPageOperationRuntimeContext, buildPageOperationRuntimeContext } from "@/buddy/pageOperationAffordances";
 import { resolveBuddyVirtualOperationPlanFromActivityEvent } from "@/buddy/virtualOperationProtocol";
 import {
@@ -409,7 +414,7 @@ import {
 } from "@/api/graphs";
 import { resolveAgentRuntimeCatalog } from "@/editor/nodes/agentConfigModel";
 import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
-import { clonePlainValue, reconcileAgentSkillOutputBindingsInDocument } from "@/lib/graph-document";
+import { clonePlainValue, reconcileAgentActionOutputBindingsInDocument } from "@/lib/graph-document";
 import { buildGraphRevisionHistoryRows, type GraphRevisionHistoryRow } from "@/lib/graphRevisionHistoryModel";
 import type { NodeFocusRequest } from "@/editor/canvas/useNodeSelectionFocus";
 import type { CreatedStateEdgeEditorRequest, NodeCreationMenuState } from "@/editor/workspace/nodeCreationMenuModel";
@@ -552,16 +557,20 @@ const graphReplayDebugBusy = ref(false);
 const {
   knowledgeBases,
   settings,
-  skillDefinitions,
-  skillDefinitionsLoading,
-  skillDefinitionsError,
+  actionDefinitions,
+  actionDefinitionsLoading,
+  actionDefinitionsError,
+  toolDefinitions,
+  toolDefinitionsLoading,
+  toolDefinitionsError,
   persistedPresets,
   loadInitialWorkspaceResources,
   refreshAgentModels,
 } = useWorkspaceResourceController({
   fetchKnowledgeBases,
   fetchSettings,
-  fetchSkillDefinitions,
+  fetchActionDefinitions,
+  fetchToolDefinitions: fetchToolCatalog,
   fetchPresets,
 });
 
@@ -1626,6 +1635,7 @@ const {
   updateInputConfigForTab,
   updateNodeMetadataForTab,
   updateAgentConfigForTab,
+  updateToolConfigForTab,
   updateBatchConfigForTab,
   updateBatchWorkerForTab,
   toggleAgentBreakpointForTab,
@@ -1640,7 +1650,8 @@ const {
 } = useWorkspaceGraphMutationActions({
   documentsByTabId,
   focusedNodeIdByTabId,
-  skillDefinitions,
+  actionDefinitions,
+  toolDefinitions,
   markDocumentDirty,
   focusNodeForTab,
   setMessageFeedbackForTab,
@@ -1787,8 +1798,8 @@ watch(
   { deep: true },
 );
 
-function reconcileOpenDocumentsWithSkillDefinitions() {
-  if (!hydrated.value || skillDefinitions.value.length === 0) {
+function reconcileOpenDocumentsWithActionDefinitions() {
+  if (!hydrated.value || actionDefinitions.value.length === 0) {
     return;
   }
 
@@ -1797,7 +1808,7 @@ function reconcileOpenDocumentsWithSkillDefinitions() {
     if (!tab?.dirty) {
       continue;
     }
-    const nextDocument = reconcileAgentSkillOutputBindingsInDocument(document, skillDefinitions.value);
+    const nextDocument = reconcileAgentActionOutputBindingsInDocument(document, actionDefinitions.value);
     if (nextDocument !== document) {
       markDocumentDirty(tabId, nextDocument);
     }
@@ -1805,8 +1816,8 @@ function reconcileOpenDocumentsWithSkillDefinitions() {
 }
 
 watch(
-  [() => documentsByTabId.value, () => skillDefinitions.value],
-  reconcileOpenDocumentsWithSkillDefinitions,
+  [() => documentsByTabId.value, () => actionDefinitions.value],
+  reconcileOpenDocumentsWithActionDefinitions,
   { deep: false },
 );
 

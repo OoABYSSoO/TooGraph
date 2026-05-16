@@ -904,8 +904,8 @@ def _build_export_node_config(
 
 def _build_export_agent_config(node: NodeSystemAgentNode) -> dict[str, Any]:
     config: dict[str, Any] = {}
-    if node.config.skill_key:
-        config["actionKey"] = node.config.skill_key
+    if node.config.action_key:
+        config["actionKey"] = node.config.action_key
     if node.config.task_instruction:
         config["taskInstruction"] = node.config.task_instruction
     if node.config.model_source == AgentModelSource.OVERRIDE:

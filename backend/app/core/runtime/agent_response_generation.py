@@ -22,7 +22,7 @@ from app.tools.model_provider_client import chat_with_model_ref_with_meta
 def generate_agent_response(
     node: NodeSystemAgentNode,
     input_values: dict[str, Any],
-    skill_context: dict[str, Any],
+    action_context: dict[str, Any],
     runtime_config: dict[str, Any],
     *,
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
@@ -52,7 +52,7 @@ def generate_agent_response(
     system_prompt = build_effective_system_prompt_func(
         output_keys,
         input_values,
-        skill_context,
+        action_context,
         state_schema=state_schema,
     )
     structured_output_schema = build_agent_state_output_schema(output_keys, state_schema or {})
@@ -232,7 +232,7 @@ def _build_agent_user_prompt(node: NodeSystemAgentNode) -> str:
     return (
         node.config.task_instruction
         if node.config.task_instruction
-        else "根据输入和技能结果完成输出。"
+        else "根据输入和Action 结果完成输出。"
     ).strip()
 
 

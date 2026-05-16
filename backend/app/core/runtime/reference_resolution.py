@@ -18,7 +18,7 @@ def resolve_reference(
     *,
     inputs: dict[str, Any],
     response: dict[str, Any],
-    skills: dict[str, Any],
+    actions: dict[str, Any],
     context: dict[str, Any],
     graph: dict[str, Any],
     state_values: dict[str, Any],
@@ -29,8 +29,8 @@ def resolve_reference(
         return read_path(inputs, reference[len("$inputs."):])
     if reference.startswith("$response."):
         return read_path(response, reference[len("$response."):])
-    if reference.startswith("$skills."):
-        return read_path(skills, reference[len("$skills."):])
+    if reference.startswith("$actions."):
+        return read_path(actions, reference[len("$actions."):])
     if reference.startswith("$context."):
         return read_path(context, reference[len("$context."):])
     if reference.startswith("$state."):
@@ -52,7 +52,7 @@ def resolve_condition_source(
             source,
             inputs=inputs,
             response={},
-            skills={},
+            actions={},
             context={},
             graph=graph,
             state_values=state_values,

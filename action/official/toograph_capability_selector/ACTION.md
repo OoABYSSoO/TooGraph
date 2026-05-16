@@ -5,7 +5,7 @@ description: Use when a TooGraph workflow needs the fixed page-operation subgrap
 
 # TooGraph 能力选择器
 
-This Skill is intentionally constrained. It does not build a catalog, ask the LLM to rank candidates, validate a selected key, or return audit metadata.
+This Action is intentionally constrained. It does not build a catalog, ask the LLM to rank candidates, validate a selected key, or return audit metadata.
 
 State outputs:
 

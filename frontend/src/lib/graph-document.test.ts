@@ -6,7 +6,8 @@ import * as graphDocument from "./graph-document.ts";
 import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "./virtual-any-input.ts";
 import { removeStateBindingFromDocument } from "../editor/workspace/statePanelBindings.ts";
 import type { AgentNode, GraphCorePayload, GraphDocument, GraphPayload, TemplateRecord } from "../types/node-system.ts";
-import type { SkillDefinition } from "../types/actions.ts";
+import type { ActionDefinition } from "../types/actions.ts";
+import type { ToolDefinition } from "../types/tools.ts";
 
 const {
   cloneGraphDocument,
@@ -15,7 +16,7 @@ const {
   createEmptyDraftGraph,
   isAgentBreakpointEnabledInDocument,
   pruneUnreferencedStateSchemaInDocument,
-  reconcileAgentSkillOutputBindingsInDocument,
+  reconcileAgentActionOutputBindingsInDocument,
   reorderNodePortStateInDocument,
   resolveEditorSeedTemplate,
   updateAgentNodeConfigInDocument,
@@ -23,11 +24,12 @@ const {
   connectStateBindingInDocument,
   updateBatchNodeDefaultWorkerInDocument,
   updateBatchNodeSubgraphWorkerInDocument,
+  updateToolNodeConfigInDocument,
   updateSubgraphNodeGraphInDocument,
 } = graphDocument;
 
-const webSearchSkill: SkillDefinition = {
-  skillKey: "web_search",
+const webSearchAction: ActionDefinition = {
+  actionKey: "web_search",
   name: "联网搜索",
   description: "Search the public web.",
   llmInstruction: "Decide a query and run web_search.",
@@ -59,13 +61,31 @@ const webSearchSkill: SkillDefinition = {
   canManage: true,
 };
 
-const webSearchSkillWithoutStateInputs: SkillDefinition = {
-  ...webSearchSkill,
+const jsonPassthroughTool: ToolDefinition = {
+  toolKey: "json_passthrough",
+  name: "JSON Passthrough",
+  description: "Return the JSON input.",
+  schemaVersion: "toograph.tool/v1",
+  version: "1",
+  permissions: [],
+  runtime: { type: "python", entrypoint: "run.py" },
+  inputSchema: [{ key: "value", name: "Value", valueType: "json", description: "" }],
+  outputSchema: [{ key: "result", name: "Result", valueType: "json", description: "" }],
+  sourceScope: "installed",
+  sourcePath: "/tool/json_passthrough/tool.json",
+  runtimeReady: true,
+  runtimeRegistered: true,
+  status: "active",
+  canManage: false,
+};
+
+const webSearchActionWithoutStateInputs: ActionDefinition = {
+  ...webSearchAction,
   stateInputSchema: [],
 };
 
-const localWorkspaceExecutorSkill: SkillDefinition = {
-  skillKey: "local_workspace_executor",
+const localWorkspaceExecutorAction: ActionDefinition = {
+  actionKey: "local_workspace_executor",
   name: "Local Workspace Executor",
   description: "Run one local workspace operation.",
   llmInstruction: "Prepare one local workspace operation.",
@@ -771,7 +791,7 @@ test("cloneGraphDocument accepts Vue reactive graph documents", () => {
 });
 
 test("cloneGraphDocument unwraps nested reactive action bindings inside graph documents", () => {
-  const reactiveSkillBindings = reactive([{ actionKey: "web_search" }]) as unknown as NonNullable<AgentNode["config"]["actionBindings"]>;
+  const reactiveActionBindings = reactive([{ actionKey: "web_search" }]) as unknown as NonNullable<AgentNode["config"]["actionBindings"]>;
   const graph: GraphDocument = {
     graph_id: "graph_nested_reactive",
     name: "Nested Reactive",
@@ -794,7 +814,7 @@ test("cloneGraphDocument unwraps nested reactive action bindings inside graph do
         writes: [],
         config: {
           actionKey: "web_search",
-          actionBindings: reactiveSkillBindings,
+          actionBindings: reactiveActionBindings,
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -820,10 +840,10 @@ test("cloneGraphDocument unwraps nested reactive action bindings inside graph do
   assert.notEqual(clonedNode.config.actionBindings, reactiveNode.config.actionBindings);
 });
 
-test("updateAgentNodeConfigInDocument materializes attached skill outputs as managed state writes", () => {
+test("updateAgentNodeConfigInDocument materializes attached action outputs as managed state writes", () => {
   const document: GraphPayload = {
     graph_id: null,
-    name: "Skill Output Binding Graph",
+    name: "Action Output Binding Graph",
     state_schema: {},
     nodes: {
       search_agent: {
@@ -857,7 +877,7 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
       ...config,
       actionKey: "web_search",
     }),
-    { skillDefinitions: [webSearchSkillWithoutStateInputs] },
+    { actionDefinitions: [webSearchActionWithoutStateInputs] },
   );
 
   const node = nextDocument.nodes.search_agent;
@@ -896,10 +916,10 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
   assert.deepEqual(document.nodes.search_agent.writes, []);
 });
 
-test("updateAgentNodeConfigInDocument suspends free agent outputs while a static skill owns outputs", () => {
+test("updateAgentNodeConfigInDocument suspends free agent outputs while a static action owns outputs", () => {
   const document: GraphPayload = {
     graph_id: null,
-    name: "Skill Managed Output Graph",
+    name: "Action Managed Output Graph",
     state_schema: {
       free_answer: {
         name: "Free Answer",
@@ -958,33 +978,33 @@ test("updateAgentNodeConfigInDocument suspends free agent outputs while a static
     metadata: {},
   };
 
-  const withSkill = updateAgentNodeConfigInDocument(
+  const withAction = updateAgentNodeConfigInDocument(
     document,
     "search_agent",
     (config) => ({ ...config, actionKey: "web_search" }),
-    { skillDefinitions: [webSearchSkillWithoutStateInputs] },
+    { actionDefinitions: [webSearchActionWithoutStateInputs] },
   );
-  const skillNode = withSkill.nodes.search_agent;
+  const actionNode = withAction.nodes.search_agent;
 
-  assert.equal(skillNode.kind, "agent");
-  assert.deepEqual(skillNode.writes.map((binding) => binding.state), ["state_1", "state_2", "state_3", "state_4"]);
-  assert.deepEqual(skillNode.config.suspendedFreeWrites, [
+  assert.equal(actionNode.kind, "agent");
+  assert.deepEqual(actionNode.writes.map((binding) => binding.state), ["state_1", "state_2", "state_3", "state_4"]);
+  assert.deepEqual(actionNode.config.suspendedFreeWrites, [
     { state: "free_answer", mode: "replace" },
     { state: "free_notes", mode: "append" },
   ]);
-  assert.equal(withSkill.state_schema.free_answer?.name, "Free Answer");
+  assert.equal(withAction.state_schema.free_answer?.name, "Free Answer");
 
-  const connectedSkillDocument = cloneGraphDocument(withSkill);
-  connectedSkillDocument.nodes.output_artifacts.reads = [{ state: "state_3", required: true }];
-  connectedSkillDocument.edges = [{ source: "search_agent", target: "output_artifacts" }];
+  const connectedActionDocument = cloneGraphDocument(withAction);
+  connectedActionDocument.nodes.output_artifacts.reads = [{ state: "state_3", required: true }];
+  connectedActionDocument.edges = [{ source: "search_agent", target: "output_artifacts" }];
 
-  const withoutSkill = updateAgentNodeConfigInDocument(
-    connectedSkillDocument,
+  const withoutAction = updateAgentNodeConfigInDocument(
+    connectedActionDocument,
     "search_agent",
     (config) => ({ ...config, actionKey: "" }),
-    { skillDefinitions: [webSearchSkillWithoutStateInputs] },
+    { actionDefinitions: [webSearchActionWithoutStateInputs] },
   );
-  const restoredNode = withoutSkill.nodes.search_agent;
+  const restoredNode = withoutAction.nodes.search_agent;
 
   assert.equal(restoredNode.kind, "agent");
   assert.deepEqual(restoredNode.writes, [
@@ -993,15 +1013,15 @@ test("updateAgentNodeConfigInDocument suspends free agent outputs while a static
   ]);
   assert.deepEqual(restoredNode.config.actionBindings, []);
   assert.equal(restoredNode.config.suspendedFreeWrites, undefined);
-  assert.deepEqual(Object.keys(withoutSkill.state_schema).sort(), ["free_answer", "free_notes"]);
-  assert.deepEqual(withoutSkill.nodes.output_artifacts.reads, []);
-  assert.deepEqual(withoutSkill.edges, []);
+  assert.deepEqual(Object.keys(withoutAction.state_schema).sort(), ["free_answer", "free_notes"]);
+  assert.deepEqual(withoutAction.nodes.output_artifacts.reads, []);
+  assert.deepEqual(withoutAction.edges, []);
 });
 
-test("updateAgentNodeConfigInDocument does not create static skill input mappings", () => {
+test("updateAgentNodeConfigInDocument does not create static action input mappings", () => {
   const document: GraphPayload = {
     graph_id: null,
-    name: "Skill Input Binding Graph",
+    name: "Action Input Binding Graph",
     state_schema: {
       search_content: {
         name: "Search Content",
@@ -1043,7 +1063,7 @@ test("updateAgentNodeConfigInDocument does not create static skill input mapping
       ...config,
       actionKey: "web_search",
     }),
-    { skillDefinitions: [webSearchSkill] },
+    { actionDefinitions: [webSearchAction] },
   );
 
   const node = nextDocument.nodes.search_agent;
@@ -1051,10 +1071,10 @@ test("updateAgentNodeConfigInDocument does not create static skill input mapping
   assert.equal("inputMapping" in (node.config.actionBindings?.[0] ?? {}), false);
 });
 
-test("updateAgentNodeConfigInDocument automatically binds matching skill state inputs", () => {
+test("updateAgentNodeConfigInDocument automatically binds matching action state inputs", () => {
   const document: GraphPayload = {
     graph_id: null,
-    name: "Skill Managed Input Graph",
+    name: "Action Managed Input Graph",
     state_schema: {
       user_question: {
         name: "User Question",
@@ -1110,7 +1130,7 @@ test("updateAgentNodeConfigInDocument automatically binds matching skill state i
       ...config,
       actionKey: "web_search",
     }),
-    { skillDefinitions: [webSearchSkill] },
+    { actionDefinitions: [webSearchAction] },
   );
 
   const node = nextDocument.nodes.search_agent;
@@ -1123,10 +1143,10 @@ test("updateAgentNodeConfigInDocument automatically binds matching skill state i
   assert.deepEqual(document.nodes.search_agent.reads, [{ state: "extra_notes", required: false }]);
 });
 
-test("updateAgentNodeConfigInDocument materializes missing skill state inputs", () => {
+test("updateAgentNodeConfigInDocument materializes missing action state inputs", () => {
   const document: GraphPayload = {
     graph_id: null,
-    name: "Skill Missing Input Graph",
+    name: "Action Missing Input Graph",
     state_schema: {},
     nodes: {
       search_agent: {
@@ -1160,7 +1180,7 @@ test("updateAgentNodeConfigInDocument materializes missing skill state inputs", 
       ...config,
       actionKey: "web_search",
     }),
-    { skillDefinitions: [webSearchSkill] },
+    { actionDefinitions: [webSearchAction] },
   );
 
   const node = nextDocument.nodes.search_agent;
@@ -1175,7 +1195,7 @@ test("updateAgentNodeConfigInDocument materializes missing skill state inputs", 
   assert.deepEqual(document.nodes.search_agent.reads, []);
 });
 
-test("reconcileAgentSkillOutputBindingsInDocument prunes stale managed outputs for the attached skill schema", () => {
+test("reconcileAgentActionOutputBindingsInDocument prunes stale managed outputs for the attached action schema", () => {
   const document: GraphPayload = {
     graph_id: null,
     name: "Stale Local Executor Outputs",
@@ -1254,7 +1274,7 @@ test("reconcileAgentSkillOutputBindingsInDocument prunes stale managed outputs f
     metadata: {},
   };
 
-  const nextDocument = reconcileAgentSkillOutputBindingsInDocument(document, [localWorkspaceExecutorSkill]);
+  const nextDocument = reconcileAgentActionOutputBindingsInDocument(document, [localWorkspaceExecutorAction]);
   const executor = nextDocument.nodes.executor;
 
   assert.notEqual(nextDocument, document);
@@ -1279,7 +1299,7 @@ test("reconcileAgentSkillOutputBindingsInDocument prunes stale managed outputs f
   assert.equal(nextDocument.state_schema.state_2?.type, "markdown");
 });
 
-test("reconcileAgentSkillOutputBindingsInDocument shortens existing managed output names", () => {
+test("reconcileAgentActionOutputBindingsInDocument shortens existing managed output names", () => {
   const document: GraphPayload = {
     graph_id: null,
     name: "Long Managed Output Names",
@@ -1349,7 +1369,7 @@ test("reconcileAgentSkillOutputBindingsInDocument shortens existing managed outp
     metadata: {},
   };
 
-  const nextDocument = reconcileAgentSkillOutputBindingsInDocument(document, [localWorkspaceExecutorSkill]);
+  const nextDocument = reconcileAgentActionOutputBindingsInDocument(document, [localWorkspaceExecutorAction]);
 
   assert.notEqual(nextDocument, document);
   assert.equal(nextDocument.state_schema.executor_success?.name, "Success");
@@ -1367,7 +1387,7 @@ test("connectStateBindingInDocument materializes dynamic capability result packa
         name: "Selected Capability",
         description: "Capability selected by an upstream node.",
         type: "capability",
-        value: { kind: "skill", key: "web_search" },
+        value: { kind: "action", key: "web_search" },
         color: "#2563eb",
       },
       question: {
@@ -4148,4 +4168,58 @@ test("removeNodeFromDocument returns the original document when the node does no
 
   const nextDocument = graphDocument.removeNodeFromDocument(document, "missing_node");
   assert.equal(nextDocument, document);
+});
+
+test("updateToolNodeConfigInDocument syncs managed tool input and output state bindings", () => {
+  assert.equal(typeof updateToolNodeConfigInDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Tool Graph",
+    state_schema: {},
+    nodes: {
+      tool_node: {
+        kind: "tool",
+        name: "Tool",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: { toolKey: "" },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = updateToolNodeConfigInDocument(
+    document,
+    "tool_node",
+    (current) => ({ ...current, toolKey: "json_passthrough" }),
+    { toolDefinitions: [jsonPassthroughTool] },
+  );
+  const node = nextDocument.nodes.tool_node;
+
+  assert.equal(node.kind, "tool");
+  if (node.kind === "tool") {
+    assert.equal(node.config.toolKey, "json_passthrough");
+    assert.deepEqual(node.reads.map((binding) => binding.binding), [
+      {
+        kind: "tool_input",
+        toolKey: "json_passthrough",
+        fieldKey: "value",
+        managed: true,
+      },
+    ]);
+    assert.deepEqual(node.writes.map((binding) => nextDocument.state_schema[binding.state]?.binding), [
+      {
+        kind: "tool_output",
+        toolKey: "json_passthrough",
+        nodeId: "tool_node",
+        fieldKey: "result",
+        managed: true,
+      },
+    ]);
+  }
 });

@@ -87,7 +87,7 @@ INHERITED_PERMISSION_METADATA_KEYS = {
     "buddy_mode",
     "buddy_requires_approval",
     "buddy_can_execute_actions",
-    "skill_runtime_context",
+    "action_runtime_context",
 }
 
 
@@ -507,6 +507,10 @@ def _build_langgraph_node_callable(
                     state["selected_actions"] = [*state.get("selected_actions", []), *body["selected_actions"]]
                 if body.get("action_outputs"):
                     state["action_outputs"] = [*state.get("action_outputs", []), *body["action_outputs"]]
+                if body.get("selected_tools"):
+                    state["selected_tools"] = [*state.get("selected_tools", []), *body["selected_tools"]]
+                if body.get("tool_outputs"):
+                    state["tool_outputs"] = [*state.get("tool_outputs", []), *body["tool_outputs"]]
                 if body.get("selected_capabilities"):
                     state["selected_capabilities"] = [
                         *state.get("selected_capabilities", []),
@@ -540,6 +544,8 @@ def _build_langgraph_node_callable(
                         "reasoning": body.get("reasoning"),
                         "runtime_config": body.get("runtime_config"),
                         "batch": body.get("batch"),
+                        "selected_tools": body.get("selected_tools", []),
+                        "tool_outputs": body.get("tool_outputs", []),
                         "selected_capabilities": body.get("selected_capabilities", []),
                         "capability_outputs": body.get("capability_outputs", []),
                         "context_assembly_report": body.get("context_assembly_report"),
@@ -719,10 +725,10 @@ def _apply_permission_approval_waiting_state(
         node_execution,
         status="paused",
         duration_ms=duration_ms,
-        input_summary=_summarize_values(pending.get("skill_inputs", {})),
+        input_summary=_summarize_values(pending.get("inputs", {})),
         output_summary="",
         artifacts={
-            "inputs": pending.get("skill_inputs", {}),
+            "inputs": pending.get("inputs", {}),
             "outputs": {},
             "family": node.kind,
             "state_reads": state_reads,
@@ -741,7 +747,7 @@ def _apply_permission_approval_waiting_state(
         state,
         snapshot_id=f"pause_{len([item for item in state.get('run_snapshots', []) if item.get('kind') == 'pause']) + 1}",
         kind="pause",
-        label=f"Approval required for {pending.get('skill_name') or node.name or node_name}",
+        label=f"Approval required for {pending.get('capability_name') or node.name or node_name}",
     )
 
 
@@ -770,9 +776,9 @@ def _resolve_runtime_interrupt_after_nodes(
 def _is_runtime_page_operation_node(node: Any) -> bool:
     if not isinstance(node, NodeSystemAgentNode):
         return False
-    if node.config.skill_key == "toograph_page_operator":
+    if node.config.action_key == "toograph_page_operator":
         return True
-    return any(binding.skill_key == "toograph_page_operator" for binding in node.config.skill_bindings)
+    return any(binding.action_key == "toograph_page_operator" for binding in node.config.action_bindings)
 
 
 def _subgraph_output_boundaries(node: NodeSystemSubgraphNode) -> list[tuple[str, str]]:

@@ -244,7 +244,7 @@ class BuddyCommandRouteTests(unittest.TestCase):
                         json={
                             "action": "capability_usage_stats.update",
                             "payload": {
-                                "capability": {"kind": "skill", "key": "web_search", "name": "联网搜索"},
+                                "capability": {"kind": "action", "key": "web_search", "name": "联网搜索"},
                                 "success": True,
                                 "run_id": "run_stats_1",
                                 "summary": "能力调用成功。",
@@ -263,7 +263,7 @@ class BuddyCommandRouteTests(unittest.TestCase):
         self.assertEqual(body["command"]["action"], "capability_usage_stats.update")
         self.assertEqual(body["command"]["target_type"], "capability_usage_stats")
         self.assertEqual(body["command"]["target_id"], "capability_usage_stats")
-        self.assertEqual(body["result"]["capabilities"]["skill:web_search"]["use_count"], 1)
+        self.assertEqual(body["result"]["capabilities"]["action:web_search"]["use_count"], 1)
         self.assertTrue(body["command"]["revision_id"].startswith("rev_"))
         self.assertEqual(revisions_response.status_code, 200)
         self.assertEqual(revisions_response.json()[-1]["target_id"], "capability_usage_stats")

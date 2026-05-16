@@ -2,19 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  listSelectableSkillDefinitions,
-  resolveDisplayAgentSkillInstructionBlocks,
-  resolveSelectAgentSkillPatch,
-  resolveSkillInstructionOverridePatch,
+  listSelectableActionDefinitions,
+  resolveDisplayAgentActionInstructionBlocks,
+  resolveSelectAgentActionPatch,
+  resolveActionInstructionOverridePatch,
 } from "./actionPickerModel.ts";
-import type { SkillDefinition } from "../../types/actions.ts";
+import type { ActionDefinition } from "../../types/actions.ts";
 
-const skillDefinitions: SkillDefinition[] = [
+const actionDefinitions: ActionDefinition[] = [
   {
-    skillKey: "web_search",
+    actionKey: "web_search",
     name: "Web Search",
     description: "Searches the public web.",
-    llmInstruction: "Decide the search query and execute this bound web search skill. Do not summarize the result.",
+    llmInstruction: "Decide the search query and execute this bound web search action. Do not summarize the result.",
     schemaVersion: "toograph.action/v1",
     llmOutputSchema: [],
     stateOutputSchema: [],
@@ -35,7 +35,7 @@ const skillDefinitions: SkillDefinition[] = [
     canManage: true,
   },
   {
-    skillKey: "append_usage_introduction",
+    actionKey: "append_usage_introduction",
     name: "Append Usage Introduction",
     description: "Appends usage instructions to the answer.",
     llmInstruction: "Use append_usage_introduction only when it is explicitly bound to the LLM node.",
@@ -60,56 +60,56 @@ const skillDefinitions: SkillDefinition[] = [
   },
 ];
 
-const unavailableSkillDefinitions: SkillDefinition[] = [
-  skillDefinitions[0],
+const unavailableActionDefinitions: ActionDefinition[] = [
+  actionDefinitions[0],
   {
-    ...skillDefinitions[1],
-    skillKey: "desktop_buddy_profile",
+    ...actionDefinitions[1],
+    actionKey: "desktop_buddy_profile",
     name: "Desktop Buddy Profile",
   },
   {
-    ...skillDefinitions[1],
-    skillKey: "runtime_pending",
+    ...actionDefinitions[1],
+    actionKey: "runtime_pending",
     name: "Runtime Pending",
     runtimeRegistered: false,
   },
   {
-    ...skillDefinitions[1],
-    skillKey: "disabled_skill",
-    name: "Disabled Skill",
+    ...actionDefinitions[1],
+    actionKey: "disabled_action",
+    name: "Disabled Action",
     status: "disabled",
   },
   {
-    ...skillDefinitions[1],
-    skillKey: "needs_manifest",
+    ...actionDefinitions[1],
+    actionKey: "needs_manifest",
     name: "Needs Manifest",
     llmNodeEligibility: "needs_manifest",
-    llmNodeBlockers: ["Skill manifest is missing a script runtime entrypoint."],
+    llmNodeBlockers: ["Action manifest is missing a script runtime entrypoint."],
   },
 ];
 
-test("listSelectableSkillDefinitions exposes active runtime-ready LLM node actions", () => {
+test("listSelectableActionDefinitions exposes active runtime-ready LLM node actions", () => {
   assert.deepEqual(
-    listSelectableSkillDefinitions(unavailableSkillDefinitions).map((definition) => definition.skillKey),
+    listSelectableActionDefinitions(unavailableActionDefinitions).map((definition) => definition.actionKey),
     ["web_search", "desktop_buddy_profile"],
   );
 });
 
-test("resolveSelectAgentSkillPatch replaces the selected skill without persisting default instructions", () => {
-  assert.deepEqual(resolveSelectAgentSkillPatch("web_search", "append_usage_introduction", skillDefinitions, {}), {
+test("resolveSelectAgentActionPatch replaces the selected action without persisting default instructions", () => {
+  assert.deepEqual(resolveSelectAgentActionPatch("web_search", "append_usage_introduction", actionDefinitions, {}), {
     actionKey: "append_usage_introduction",
     actionInstructionBlocks: {},
   });
-  assert.equal(resolveSelectAgentSkillPatch("web_search", "web_search", skillDefinitions, {}), null);
+  assert.equal(resolveSelectAgentActionPatch("web_search", "web_search", actionDefinitions, {}), null);
 });
 
-test("resolveSelectAgentSkillPatch clears the selected skill and stale instruction blocks", () => {
+test("resolveSelectAgentActionPatch clears the selected action and stale instruction blocks", () => {
   assert.deepEqual(
-    resolveSelectAgentSkillPatch("web_search", "", skillDefinitions, {
+    resolveSelectAgentActionPatch("web_search", "", actionDefinitions, {
       web_search: {
         actionKey: "web_search",
-        title: "Web Search skill instruction",
-        content: "Decide the search query and execute this bound web search skill. Do not summarize the result.",
+        title: "Web Search action instruction",
+        content: "Decide the search query and execute this bound web search action. Do not summarize the result.",
         source: "action.llmInstruction",
       },
     }),
@@ -120,20 +120,20 @@ test("resolveSelectAgentSkillPatch clears the selected skill and stale instructi
   );
 });
 
-test("resolveDisplayAgentSkillInstructionBlocks derives the default capsule from the selected skill", () => {
-  assert.deepEqual(resolveDisplayAgentSkillInstructionBlocks("web_search", skillDefinitions, {}), {
+test("resolveDisplayAgentActionInstructionBlocks derives the default capsule from the selected action", () => {
+  assert.deepEqual(resolveDisplayAgentActionInstructionBlocks("web_search", actionDefinitions, {}), {
     web_search: {
       actionKey: "web_search",
-      title: "Web Search skill instruction",
-      content: "Decide the search query and execute this bound web search skill. Do not summarize the result.",
+      title: "Web Search action instruction",
+      content: "Decide the search query and execute this bound web search action. Do not summarize the result.",
       source: "action.llmInstruction",
     },
   });
 });
 
-test("resolveDisplayAgentSkillInstructionBlocks preserves blank node overrides", () => {
+test("resolveDisplayAgentActionInstructionBlocks preserves blank node overrides", () => {
   assert.deepEqual(
-    resolveDisplayAgentSkillInstructionBlocks("web_search", skillDefinitions, {
+    resolveDisplayAgentActionInstructionBlocks("web_search", actionDefinitions, {
       web_search: {
         actionKey: "web_search",
         title: "",
@@ -144,7 +144,7 @@ test("resolveDisplayAgentSkillInstructionBlocks preserves blank node overrides",
     {
       web_search: {
         actionKey: "web_search",
-        title: "Web Search skill instruction",
+        title: "Web Search action instruction",
         content: "",
         source: "node.override",
       },
@@ -152,12 +152,12 @@ test("resolveDisplayAgentSkillInstructionBlocks preserves blank node overrides",
   );
 });
 
-test("resolveSkillInstructionOverridePatch persists only user-edited skill instructions", () => {
-  assert.deepEqual(resolveSkillInstructionOverridePatch("web_search", "Use the edited rule.", skillDefinitions, {}), {
+test("resolveActionInstructionOverridePatch persists only user-edited action instructions", () => {
+  assert.deepEqual(resolveActionInstructionOverridePatch("web_search", "Use the edited rule.", actionDefinitions, {}), {
     actionInstructionBlocks: {
       web_search: {
         actionKey: "web_search",
-        title: "Web Search skill instruction",
+        title: "Web Search action instruction",
         content: "Use the edited rule.",
         source: "node.override",
       },

@@ -577,10 +577,11 @@ function resolveTraceActivityLabel(
   if (virtualOperation) {
     return `${nodeLabel} / ${virtualOperation.label}`;
   }
+  const detail = recordFromUnknown(payload.detail) ?? {};
   const capabilityLabel =
-    normalizeText(recordFromUnknown(payload.detail)?.action_key)
-    || normalizeText(recordFromUnknown(payload.detail)?.skill_key)
-    || normalizeText(recordFromUnknown(payload.detail)?.capability_key)
+    normalizeText(detail.action_key)
+    || normalizeText(detail.tool_key)
+    || normalizeText(detail.capability_key)
     || normalizeText(payload.kind)
     || "activity";
   return `${nodeLabel} / ${capabilityLabel}`;

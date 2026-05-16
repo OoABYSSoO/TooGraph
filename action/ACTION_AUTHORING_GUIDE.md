@@ -76,7 +76,7 @@ Python Action 的依赖规则：
 1. 如果 Action 没有 `requirements.txt`，生命周期脚本直接使用当前 TooGraph 后端 Python 运行。
 2. 如果 Action 有 `requirements.txt`，TooGraph 会先检查当前执行 Python 是否已经满足依赖版本。
 3. 如果当前 Python 已满足依赖，继续使用当前 Python，不额外创建环境。
-4. 如果当前 Python 不满足依赖，TooGraph 会在 `backend/data/skills/envs/` 下按 `actionKey + requirements.txt 内容 + Python 版本 + 平台` 的哈希创建或复用虚拟环境。
+4. 如果当前 Python 不满足依赖，TooGraph 会在 `backend/data/actions/envs/` 下按 `actionKey + requirements.txt 内容 + Python 版本 + 平台` 的哈希创建或复用虚拟环境。
 5. 创建和安装依赖时优先使用 `uv`；如果当前机器没有 `uv`，再回退到标准库 `venv` 加 `pip`。
 6. 该虚拟环境属于运行时缓存和用户数据，不进入 Git 管理，也不应该被手工移动到官方 `action/` 目录。
 
@@ -211,7 +211,7 @@ Action IO 字段不再支持 `required`。不要声明“可选输入”：`stat
 
 ```json
 {
-  "skill_key": "web_search",
+  "action_key": "web_search",
   "runtime_context": {
     "current_date": "2026-05-08"
   },
@@ -330,7 +330,7 @@ if __name__ == "__main__":
 - 和下游无关的过程字段。
 - runtime 已经能在 run detail 中记录的审计细节。
 
-如果某个字段只用于审计，优先放在运行记录或完整 skill output 中，不一定要做成单独 state。
+如果某个字段只用于审计，优先放在运行记录或完整 action output 中，不一定要做成单独 state。
 
 ## 权限和安全
 

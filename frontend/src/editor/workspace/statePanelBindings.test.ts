@@ -209,7 +209,7 @@ test("removeStateBindingFromDocument never removes input node state outputs", ()
   assert.deepEqual(nextInputWriteDocument.edges, document.edges);
 });
 
-test("removeStateBindingFromDocument does not remove managed skill input reads", () => {
+test("removeStateBindingFromDocument does not remove managed action input reads", () => {
   const document = buildDocument();
   const agent = document.nodes.answer_helper;
   assert.equal(agent.kind, "agent");

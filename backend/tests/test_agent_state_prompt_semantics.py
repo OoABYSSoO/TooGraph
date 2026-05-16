@@ -13,7 +13,7 @@ from app.core.runtime import agent_prompt
 from app.core.runtime.agent_prompt import build_auto_system_prompt
 from app.core.runtime.llm_output_parser import parse_llm_json_response
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
-from app.core.storage.skill_artifact_store import create_uploaded_skill_artifact, resolve_skill_artifact_path
+from app.core.storage.capability_artifact_store import create_uploaded_capability_artifact, resolve_capability_artifact_path
 
 
 class AgentStatePromptSemanticTests(unittest.TestCase):
@@ -130,7 +130,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             prompt.index('"draft": "在此填写完整内容"'),
         )
 
-    def test_auto_prompt_requires_fact_answers_to_stay_grounded_in_skill_results(self) -> None:
+    def test_auto_prompt_requires_fact_answers_to_stay_grounded_in_action_results(self) -> None:
         prompt = build_auto_system_prompt(
             ["answer"],
             {"question": "今天的日期是什么？"},
@@ -144,17 +144,17 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             state_schema={"answer": NodeSystemStateDefinition(type=NodeSystemStateType.TEXT)},
         )
 
-        self.assertIn("涉及事实、日期、天气、新闻或外部资料时，必须以技能结果为依据", prompt)
-        self.assertIn("不要编造技能结果中不存在的事实", prompt)
+        self.assertIn("涉及事实、日期、天气、新闻或外部资料时，必须以Action 结果为依据", prompt)
+        self.assertIn("不要编造Action 结果中不存在的事实", prompt)
         self.assertIn("searched_date: 2026-05-01", prompt)
 
     def test_auto_prompt_expands_file_states_to_filename_and_full_text(self) -> None:
-        first_artifact = create_uploaded_skill_artifact(
+        first_artifact = create_uploaded_capability_artifact(
             file_name="primary.md",
             content_type="text/markdown",
             payload=b"Primary evidence line one.\nPrimary evidence line two.",
         )
-        second_artifact = create_uploaded_skill_artifact(
+        second_artifact = create_uploaded_capability_artifact(
             file_name="secondary.md",
             content_type="text/markdown",
             payload=b"Secondary evidence body for the downstream summarizer.",
@@ -191,7 +191,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             self.assertNotIn("uploads/", prompt)
         finally:
             for relative_path in artifact_paths:
-                resolve_skill_artifact_path(relative_path).unlink(missing_ok=True)
+                resolve_capability_artifact_path(relative_path).unlink(missing_ok=True)
 
     def test_auto_prompt_expands_selected_local_folder_files_to_full_text(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -230,7 +230,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertNotIn(str(folder), prompt)
 
     def test_auto_prompt_budgets_large_file_state_text_and_keeps_omission_marker(self) -> None:
-        large_artifact = create_uploaded_skill_artifact(
+        large_artifact = create_uploaded_capability_artifact(
             file_name="large-context.md",
             content_type="text/markdown",
             payload=("FILE-START " + ("context " * 900) + "FILE-END").encode("utf-8"),
@@ -255,10 +255,10 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             self.assertNotIn("FILE-END", prompt)
             self.assertNotIn(large_artifact["local_path"], prompt)
         finally:
-            resolve_skill_artifact_path(large_artifact["local_path"]).unlink(missing_ok=True)
+            resolve_capability_artifact_path(large_artifact["local_path"]).unlink(missing_ok=True)
 
     def test_auto_prompt_expands_result_package_outputs_as_virtual_states(self) -> None:
-        artifact = create_uploaded_skill_artifact(
+        artifact = create_uploaded_capability_artifact(
             file_name="search-source.md",
             content_type="text/markdown",
             payload=b"Original source paragraph from the downloaded page.",
@@ -269,7 +269,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
                 {
                     "dynamic_search_result": {
                         "kind": "result_package",
-                        "sourceType": "skill",
+                        "sourceType": "action",
                         "sourceKey": "web_search",
                         "sourceName": "联网搜索",
                         "status": "succeeded",
@@ -283,7 +283,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
                             },
                             "artifact_paths": {
                                 "name": "Artifact Paths",
-                                "description": "搜索技能下载到本地的原文文档路径",
+                                "description": "搜索 Action下载到本地的原文文档路径",
                                 "type": "file",
                                 "value": [artifact["local_path"]],
                             },
@@ -295,7 +295,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
                     "dynamic_search_result": NodeSystemStateDefinition.model_validate(
                         {
                             "name": "动态能力运行结果",
-                            "description": "动态选择的技能运行后得到的完整结果包",
+                            "description": "动态选择的 Action运行后得到的完整结果包",
                             "type": "result_package",
                         }
                     ),
@@ -303,7 +303,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
                 },
             )
 
-            self.assertIn("sourceType: skill", prompt)
+            self.assertIn("sourceType: action", prompt)
             self.assertIn("sourceKey: web_search", prompt)
             self.assertIn("sourceName: 联网搜索", prompt)
             self.assertIn("key: source_urls", prompt)
@@ -316,7 +316,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             self.assertIn("Original source paragraph from the downloaded page.", prompt)
             self.assertNotIn(artifact["local_path"], prompt)
         finally:
-            resolve_skill_artifact_path(artifact["local_path"]).unlink(missing_ok=True)
+            resolve_capability_artifact_path(artifact["local_path"]).unlink(missing_ok=True)
 
     def test_auto_prompt_budgets_result_package_values_and_keeps_compact_artifact_refs(self) -> None:
         long_reply = "FINAL-START " + ("answer " * 600) + "FINAL-END"
@@ -406,7 +406,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             hasattr(agent_prompt, "build_context_assembly_report"),
             "agent_prompt.build_context_assembly_report should produce auditable LLM context metadata",
         )
-        artifact = create_uploaded_skill_artifact(
+        artifact = create_uploaded_capability_artifact(
             file_name="search-source.md",
             content_type="text/markdown",
             payload=b"Downloaded source paragraph for the capability result.",
@@ -475,7 +475,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
                         llm_phases=["agent_response"],
                     )
             finally:
-                resolve_skill_artifact_path(artifact["local_path"]).unlink(missing_ok=True)
+                resolve_capability_artifact_path(artifact["local_path"]).unlink(missing_ok=True)
 
         self.assertEqual(report["node_id"], "buddy_final_reply")
         self.assertEqual(report["llm_phases"], ["agent_response"])
@@ -500,7 +500,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertEqual(report["knowledge_chunks"][0]["char_count"], len("Knowledge chunk body."))
 
     def test_auto_prompt_does_not_read_media_paths_as_text_file_content(self) -> None:
-        image_artifact = create_uploaded_skill_artifact(
+        image_artifact = create_uploaded_capability_artifact(
             file_name="reference.png",
             content_type="image/png",
             payload=b"fake-png",
@@ -525,7 +525,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             self.assertNotIn("fake-png", prompt)
             self.assertNotIn(image_artifact["local_path"], prompt)
         finally:
-            resolve_skill_artifact_path(image_artifact["local_path"]).unlink(missing_ok=True)
+            resolve_capability_artifact_path(image_artifact["local_path"]).unlink(missing_ok=True)
 
     def test_auto_prompt_does_not_leak_file_paths_when_file_state_cannot_be_read(self) -> None:
         missing_path = "uploads/missing-local-document.md"
@@ -545,7 +545,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
 
         self.assertIn("文件读取失败", prompt)
         self.assertNotIn(missing_path, prompt)
-        self.assertNotIn("Skill artifact", prompt)
+        self.assertNotIn("Capability artifact", prompt)
 
     def test_auto_prompt_describes_uploaded_image_without_leaking_local_path(self) -> None:
         image_payload = {

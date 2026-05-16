@@ -15,12 +15,18 @@ from app.core.schemas.node_system import (
     NodeSystemInputNode,
     NodeSystemOutputNode,
     NodeSystemSubgraphNode,
+    NodeSystemToolNode,
+    NodeSystemReadBindingKind,
+    NodeSystemStateBindingKind,
     NodeSystemStateType,
     ValidationIssue,
 )
-from app.core.schemas.skills import SkillLlmNodeEligibility, SkillCatalogStatus, SkillDefinition
-from app.skills.definitions import get_skill_catalog_registry
-from app.skills.registry import get_skill_registry
+from app.core.schemas.actions import ActionLlmNodeEligibility, ActionCatalogStatus, ActionDefinition
+from app.core.schemas.tools import ToolCatalogStatus, ToolDefinition
+from app.actions.definitions import get_action_catalog_registry
+from app.actions.registry import get_action_registry
+from app.graph_tools.definitions import get_tool_catalog_registry
+from app.graph_tools.registry import get_tool_registry
 
 LEGACY_BREAKPOINT_METADATA_KEYS = (
     "interrupt_before",
@@ -32,8 +38,10 @@ LEGACY_BREAKPOINT_METADATA_KEYS = (
 
 def validate_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
     issues: list[ValidationIssue] = []
-    runtime_skill_keys = set(get_skill_registry().keys())
-    skill_catalog = get_skill_catalog_registry(include_disabled=True)
+    runtime_action_keys = set(get_action_registry().keys())
+    action_catalog = get_action_catalog_registry(include_disabled=True)
+    runtime_tool_keys = set(get_tool_registry().keys())
+    tool_catalog = get_tool_catalog_registry(include_disabled=True)
 
     nodes_by_name = graph.nodes
     state_schema = graph.state_schema
@@ -56,13 +64,24 @@ def validate_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
     for node_name, node in nodes_by_name.items():
         issues.extend(_validate_node_shape(node_name, node))
         if isinstance(node, NodeSystemAgentNode):
-            issues.extend(_validate_agent_node(node_name, node, state_schema, runtime_skill_keys, skill_catalog))
+            issues.extend(_validate_agent_node(node_name, node, state_schema, runtime_action_keys, action_catalog))
         elif isinstance(node, NodeSystemBatchNode):
             issues.extend(_validate_batch_node(node_name, node))
         elif isinstance(node, NodeSystemConditionNode):
             issues.extend(_validate_condition_node(node_name, node, graph))
         elif isinstance(node, NodeSystemSubgraphNode):
-            issues.extend(_validate_subgraph_node(node_name, node, runtime_skill_keys, skill_catalog))
+            issues.extend(
+                _validate_subgraph_node(
+                    node_name,
+                    node,
+                    runtime_action_keys,
+                    action_catalog,
+                    runtime_tool_keys,
+                    tool_catalog,
+                )
+            )
+        elif isinstance(node, NodeSystemToolNode):
+            issues.extend(_validate_tool_node(node_name, node, state_schema, runtime_tool_keys, tool_catalog))
 
     for index, edge in enumerate(graph.edges):
         issues.extend(_validate_edge(index, edge, graph))
@@ -185,8 +204,10 @@ def _validate_graph_metadata(graph: object, path_prefix: str) -> list[Validation
 def _validate_embedded_graph(
     graph: object,
     *,
-    runtime_skill_keys: set[str],
-    skill_catalog: dict[str, SkillDefinition],
+    runtime_action_keys: set[str],
+    action_catalog: dict[str, ActionDefinition],
+    runtime_tool_keys: set[str],
+    tool_catalog: dict[str, ToolDefinition],
     path_prefix: str,
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
@@ -200,8 +221,8 @@ def _validate_embedded_graph(
                         node_name,
                         node,
                         getattr(graph, "state_schema", {}),
-                        runtime_skill_keys,
-                        skill_catalog,
+                        runtime_action_keys,
+                        action_catalog,
                     ),
                     f"{path_prefix}.nodes.{node_name}",
                 )
@@ -213,7 +234,27 @@ def _validate_embedded_graph(
         elif isinstance(node, NodeSystemSubgraphNode):
             issues.extend(
                 _prefix_issues(
-                    _validate_subgraph_node(node_name, node, runtime_skill_keys, skill_catalog),
+                    _validate_subgraph_node(
+                        node_name,
+                        node,
+                        runtime_action_keys,
+                        action_catalog,
+                        runtime_tool_keys,
+                        tool_catalog,
+                    ),
+                    f"{path_prefix}.nodes.{node_name}",
+                )
+            )
+        elif isinstance(node, NodeSystemToolNode):
+            issues.extend(
+                _prefix_issues(
+                    _validate_tool_node(
+                        node_name,
+                        node,
+                        getattr(graph, "state_schema", {}),
+                        runtime_tool_keys,
+                        tool_catalog,
+                    ),
                     f"{path_prefix}.nodes.{node_name}",
                 )
             )
@@ -388,8 +429,10 @@ def _batch_subgraph_worker_node(node: NodeSystemBatchNode) -> NodeSystemSubgraph
 def _validate_subgraph_node(
     node_name: str,
     node: NodeSystemSubgraphNode,
-    runtime_skill_keys: set[str],
-    skill_catalog: dict[str, SkillDefinition],
+    runtime_action_keys: set[str],
+    action_catalog: dict[str, ActionDefinition],
+    runtime_tool_keys: set[str],
+    tool_catalog: dict[str, ToolDefinition],
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     input_boundaries = _subgraph_input_boundaries(node)
@@ -445,11 +488,149 @@ def _validate_subgraph_node(
     issues.extend(
         _validate_embedded_graph(
             node.config.graph,
-            runtime_skill_keys=runtime_skill_keys,
-            skill_catalog=skill_catalog,
+            runtime_action_keys=runtime_action_keys,
+            action_catalog=action_catalog,
+            runtime_tool_keys=runtime_tool_keys,
+            tool_catalog=tool_catalog,
             path_prefix=f"nodes.{node_name}.config.graph",
         )
     )
+    return issues
+
+
+def _validate_tool_node(
+    node_name: str,
+    node: NodeSystemToolNode,
+    state_schema: dict[str, object],
+    runtime_tool_keys: set[str],
+    tool_catalog: dict[str, ToolDefinition],
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    tool_key = node.config.tool_key
+    if not tool_key:
+        issues.append(
+            ValidationIssue(
+                code="tool_key_missing",
+                message=f"Tool node '{node_name}' must select a toolKey.",
+                path=f"nodes.{node_name}.config.toolKey",
+            )
+        )
+        return issues
+
+    definition = tool_catalog.get(tool_key)
+    if definition is None or tool_key not in runtime_tool_keys or not getattr(definition, "runtime_registered", False):
+        issues.append(
+            ValidationIssue(
+                code="tool_not_runtime_registered",
+                message=f"Tool node '{node_name}' selects tool '{tool_key}', but the tool is not runtime-registered.",
+                path=f"nodes.{node_name}.config.toolKey",
+            )
+        )
+        return issues
+
+    if definition.status != ToolCatalogStatus.ACTIVE:
+        issues.append(
+            ValidationIssue(
+                code="tool_disabled",
+                message=f"Tool node '{node_name}' selects tool '{tool_key}', but the tool is disabled.",
+                path=f"nodes.{node_name}.config.toolKey",
+            )
+        )
+
+    input_fields = {field.key for field in definition.input_schema}
+    output_fields = {field.key for field in definition.output_schema}
+    bound_input_fields: set[str] = set()
+
+    for read_index, read in enumerate(node.reads):
+        binding = read.binding
+        if binding is None or binding.kind != NodeSystemReadBindingKind.TOOL_INPUT:
+            issues.append(
+                ValidationIssue(
+                    code="tool_input_binding_missing",
+                    message=f"Tool node '{node_name}' input state '{read.state}' must use a managed tool_input binding.",
+                    path=f"nodes.{node_name}.reads.{read_index}.binding",
+                )
+            )
+            continue
+        if binding.tool_key != tool_key:
+            issues.append(
+                ValidationIssue(
+                    code="tool_input_binding_tool_mismatch",
+                    message=(
+                        f"Tool node '{node_name}' input state '{read.state}' is bound to tool "
+                        f"'{binding.tool_key}', expected '{tool_key}'."
+                    ),
+                    path=f"nodes.{node_name}.reads.{read_index}.binding.toolKey",
+                )
+            )
+        if binding.field_key not in input_fields:
+            issues.append(
+                ValidationIssue(
+                    code="tool_input_binding_field_unknown",
+                    message=(
+                        f"Tool node '{node_name}' input state '{read.state}' is bound to unknown "
+                        f"Tool input field '{binding.field_key}'."
+                    ),
+                    path=f"nodes.{node_name}.reads.{read_index}.binding.fieldKey",
+                )
+            )
+        bound_input_fields.add(binding.field_key)
+
+    for field_key in sorted(input_fields - bound_input_fields):
+        issues.append(
+            ValidationIssue(
+                code="tool_input_binding_missing",
+                message=f"Tool node '{node_name}' is missing a state input for Tool field '{field_key}'.",
+                path=f"nodes.{node_name}.reads",
+            )
+        )
+
+    for write_index, write in enumerate(node.writes):
+        state_definition = state_schema.get(write.state)
+        binding = getattr(state_definition, "binding", None)
+        if binding is None or binding.kind != NodeSystemStateBindingKind.TOOL_OUTPUT:
+            issues.append(
+                ValidationIssue(
+                    code="tool_output_binding_missing",
+                    message=f"Tool node '{node_name}' output state '{write.state}' must use a managed tool_output binding.",
+                    path=f"nodes.{node_name}.writes.{write_index}",
+                )
+            )
+            continue
+        if binding.tool_key != tool_key:
+            issues.append(
+                ValidationIssue(
+                    code="tool_output_binding_tool_mismatch",
+                    message=(
+                        f"Tool node '{node_name}' output state '{write.state}' is bound to tool "
+                        f"'{binding.tool_key}', expected '{tool_key}'."
+                    ),
+                    path=f"state_schema.{write.state}.binding.toolKey",
+                )
+            )
+        if binding.node_id != node_name:
+            issues.append(
+                ValidationIssue(
+                    code="tool_output_binding_node_mismatch",
+                    message=(
+                        f"Tool output state '{write.state}' is bound to node '{binding.node_id}', "
+                        f"expected '{node_name}'."
+                    ),
+                    path=f"state_schema.{write.state}.binding.nodeId",
+                )
+            )
+        if binding.field_key not in output_fields:
+            issues.append(
+                ValidationIssue(
+                    code="tool_output_binding_field_unknown",
+                    message=(
+                        f"Tool node '{node_name}' output state '{write.state}' is bound to unknown "
+                        f"Tool output field '{binding.field_key}'."
+                    ),
+                    path=f"state_schema.{write.state}.binding.fieldKey",
+                )
+            )
+
     return issues
 
 
@@ -457,8 +638,8 @@ def _validate_agent_node(
     node_name: str,
     node: NodeSystemAgentNode,
     state_schema: dict[str, object],
-    runtime_skill_keys: set[str],
-    skill_catalog: dict[str, SkillDefinition],
+    runtime_action_keys: set[str],
+    action_catalog: dict[str, ActionDefinition],
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     dynamic_capability_state_reads = _agent_capability_state_reads(node, state_schema)
@@ -515,63 +696,63 @@ def _validate_agent_node(
                 )
             )
 
-    skill_refs = _iter_agent_skill_refs(node_name, node)
-    for skill_key, skill_path in skill_refs:
-        definition = skill_catalog.get(skill_key)
+    action_refs = _iter_agent_action_refs(node_name, node)
+    for action_key, action_path in action_refs:
+        definition = action_catalog.get(action_key)
         if definition is None:
             issues.append(
                 ValidationIssue(
-                    code="agent_skill_not_runtime_registered",
+                    code="agent_action_not_runtime_registered",
                     message=(
-                        f"LLM node '{node_name}' attaches skill '{skill_key}', "
-                        "but the skill is not runtime-registered."
+                        f"LLM node '{node_name}' attaches action '{action_key}', "
+                        "but the action is not runtime-registered."
                     ),
-                    path=skill_path,
+                    path=action_path,
                 )
             )
             continue
 
-        if definition.status != SkillCatalogStatus.ACTIVE:
+        if definition.status != ActionCatalogStatus.ACTIVE:
             issues.append(
                 ValidationIssue(
-                    code="agent_skill_disabled",
-                    message=f"LLM node '{node_name}' attaches skill '{skill_key}', but the skill is disabled.",
-                    path=skill_path,
+                    code="agent_action_disabled",
+                    message=f"LLM node '{node_name}' attaches action '{action_key}', but the action is disabled.",
+                    path=action_path,
                 )
             )
             continue
 
-        if definition.llm_node_eligibility != SkillLlmNodeEligibility.READY:
+        if definition.llm_node_eligibility != ActionLlmNodeEligibility.READY:
             blockers = "; ".join(definition.llm_node_blockers) or "No readiness details provided."
             issues.append(
                 ValidationIssue(
-                    code="agent_skill_not_agent_node_ready",
+                    code="agent_action_not_agent_node_ready",
                     message=(
-                        f"Skill '{skill_key}' needs a TooGraph LLM-node manifest before it can be used by LLM nodes. "
+                        f"Action '{action_key}' needs a TooGraph LLM-node manifest before it can be used by LLM nodes. "
                         f"{blockers}"
                     ),
-                    path=skill_path,
+                    path=action_path,
                 )
             )
 
-        if skill_key not in runtime_skill_keys or not definition.runtime_registered:
+        if action_key not in runtime_action_keys or not definition.runtime_registered:
             issues.append(
                 ValidationIssue(
-                    code="agent_skill_not_runtime_registered",
+                    code="agent_action_not_runtime_registered",
                     message=(
-                        f"LLM node '{node_name}' attaches skill '{skill_key}', "
-                        "but the skill is not runtime-registered."
+                        f"LLM node '{node_name}' attaches action '{action_key}', "
+                        "but the action is not runtime-registered."
                     ),
-                    path=skill_path,
+                    path=action_path,
                 )
             )
 
-    issues.extend(_validate_agent_action_bindings(node_name, node, state_schema, skill_catalog))
+    issues.extend(_validate_agent_action_bindings(node_name, node, state_schema, action_catalog))
 
     return issues
 
 
-def _iter_agent_skill_refs(node_name: str, node: NodeSystemAgentNode) -> list[tuple[str, str]]:
+def _iter_agent_action_refs(node_name: str, node: NodeSystemAgentNode) -> list[tuple[str, str]]:
     refs: list[tuple[str, str]] = []
     if node.config.action_key:
         refs.append((node.config.action_key, f"nodes.{node_name}.config.actionKey"))
@@ -668,11 +849,11 @@ def _validate_agent_action_bindings(
     node_name: str,
     node: NodeSystemAgentNode,
     state_schema: dict[str, object],
-    skill_catalog: dict[str, SkillDefinition],
+    action_catalog: dict[str, ActionDefinition],
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     for binding_index, binding in enumerate(node.config.action_bindings):
-        definition = skill_catalog.get(binding.action_key)
+        definition = action_catalog.get(binding.action_key)
         if definition is None:
             continue
         for output_key, state_key in binding.output_mapping.items():
@@ -714,7 +895,7 @@ def _validate_edge(index: int, edge: NodeSystemGraphEdge, graph: NodeSystemGraph
         )
         return issues
 
-    if source_node.kind not in {"input", "agent", "subgraph"}:
+    if source_node.kind not in {"input", "agent", "subgraph", "tool"}:
         issues.append(
             ValidationIssue(
                 code="edge_source_kind_invalid",
@@ -723,7 +904,7 @@ def _validate_edge(index: int, edge: NodeSystemGraphEdge, graph: NodeSystemGraph
             )
         )
 
-    if target_node.kind not in {"agent", "condition", "output", "subgraph"}:
+    if target_node.kind not in {"agent", "condition", "output", "subgraph", "tool"}:
         issues.append(
             ValidationIssue(
                 code="edge_target_kind_invalid",

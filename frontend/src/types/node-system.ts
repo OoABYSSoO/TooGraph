@@ -8,7 +8,7 @@ export type GraphNodeSize = {
   height: number;
 };
 
-export type NodeFamily = "input" | "output" | "agent" | "batch" | "condition" | "subgraph";
+export type NodeFamily = "input" | "output" | "agent" | "batch" | "condition" | "subgraph" | "tool";
 
 export type StateDefinition = {
   name: string;
@@ -19,6 +19,12 @@ export type StateDefinition = {
   binding?: {
     kind: "action_output";
     actionKey: string;
+    nodeId: string;
+    fieldKey: string;
+    managed?: boolean;
+  } | {
+    kind: "tool_output";
+    toolKey: string;
     nodeId: string;
     fieldKey: string;
     managed?: boolean;
@@ -36,6 +42,11 @@ export type ReadBinding = {
   binding?: {
     kind: "action_input";
     actionKey: string;
+    fieldKey: string;
+    managed?: boolean;
+  } | {
+    kind: "tool_input";
+    toolKey: string;
     fieldKey: string;
     managed?: boolean;
   } | null;
@@ -192,7 +203,19 @@ export type SubgraphNode = {
   };
 };
 
-export type GraphNode = InputNode | AgentNode | BatchNode | ConditionNode | OutputNode | SubgraphNode;
+export type ToolNode = {
+  kind: "tool";
+  name: string;
+  description: string;
+  ui: NodeUi;
+  reads: ReadBinding[];
+  writes: WriteBinding[];
+  config: {
+    toolKey: string;
+  };
+};
+
+export type GraphNode = InputNode | AgentNode | BatchNode | ConditionNode | OutputNode | SubgraphNode | ToolNode;
 
 export type GraphEdge = {
   source: string;
@@ -359,7 +382,7 @@ export type NodeCreationEntry = {
   description: string;
   mode: "node" | "preset" | "subgraph";
   origin?: "builtin" | "persisted";
-  nodeKind?: "input" | "output" | "batch" | "subgraph";
+  nodeKind?: "input" | "output" | "batch" | "subgraph" | "tool";
   presetId?: string;
   graphId?: string;
   templateId?: string;

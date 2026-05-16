@@ -4,7 +4,8 @@ import test from "node:test";
 import type { PresetDocument } from "@/types/node-system";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { SettingsPayload } from "@/types/settings";
-import type { SkillDefinition } from "@/types/actions";
+import type { ActionDefinition } from "@/types/actions";
+import type { ToolDefinition } from "@/types/tools";
 
 import { useWorkspaceResourceController } from "./useWorkspaceResourceController.ts";
 
@@ -82,10 +83,10 @@ function createSettings(baseUrl = "1"): SettingsPayload {
   };
 }
 
-function createSkillDefinition(): SkillDefinition {
+function createActionDefinition(): ActionDefinition {
   return {
-    skillKey: "skill_a",
-    name: "Skill",
+    actionKey: "action_a",
+    name: "Action",
     description: "",
     llmInstruction: "",
     schemaVersion: "toograph.action/v1",
@@ -109,24 +110,49 @@ function createSkillDefinition(): SkillDefinition {
   };
 }
 
+function createToolDefinition(): ToolDefinition {
+  return {
+    toolKey: "tool_a",
+    name: "Tool",
+    description: "",
+    schemaVersion: "toograph.tool/v1",
+    version: "1",
+    permissions: [],
+    runtime: { type: "python", entrypoint: "run.py" },
+    inputSchema: [],
+    outputSchema: [],
+    sourceScope: "installed",
+    sourcePath: "",
+    runtimeReady: true,
+    runtimeRegistered: true,
+    status: "active",
+    canManage: true,
+  };
+}
+
 test("useWorkspaceResourceController loads editor resources into refs", async () => {
   const controller = useWorkspaceResourceController({
     fetchKnowledgeBases: async () => [createKnowledgeBase()],
     fetchSettings: async () => createSettings(),
-    fetchSkillDefinitions: async () => [createSkillDefinition()],
+    fetchActionDefinitions: async () => [createActionDefinition()],
+    fetchToolDefinitions: async () => [createToolDefinition()],
     fetchPresets: async () => [createPreset()],
   });
 
   await controller.loadKnowledgeBases();
   await controller.loadSettings();
-  await controller.loadSkillDefinitions();
+  await controller.loadActionDefinitions();
+  await controller.loadToolDefinitions();
   await controller.loadPersistedPresets();
 
   assert.equal(controller.knowledgeBases.value[0]?.label, "KB");
   assert.equal(controller.settings.value?.model.text_model, "gpt");
-  assert.equal(controller.skillDefinitions.value[0]?.skillKey, "skill_a");
-  assert.equal(controller.skillDefinitionsLoading.value, false);
-  assert.equal(controller.skillDefinitionsError.value, null);
+  assert.equal(controller.actionDefinitions.value[0]?.actionKey, "action_a");
+  assert.equal(controller.actionDefinitionsLoading.value, false);
+  assert.equal(controller.actionDefinitionsError.value, null);
+  assert.equal(controller.toolDefinitions.value[0]?.toolKey, "tool_a");
+  assert.equal(controller.toolDefinitionsLoading.value, false);
+  assert.equal(controller.toolDefinitionsError.value, null);
   assert.equal(controller.persistedPresets.value[0]?.presetId, "preset_a");
 });
 
@@ -138,21 +164,28 @@ test("useWorkspaceResourceController preserves fallback behavior on resource fai
     fetchSettings: async () => {
       throw new Error("settings down");
     },
-    fetchSkillDefinitions: async () => {
-      throw new Error("skills down");
+    fetchActionDefinitions: async () => {
+      throw new Error("actions down");
+    },
+    fetchToolDefinitions: async () => {
+      throw new Error("tools down");
     },
     fetchPresets: async () => [],
   });
 
   await controller.loadKnowledgeBases();
   await controller.loadSettings();
-  await controller.loadSkillDefinitions();
+  await controller.loadActionDefinitions();
+  await controller.loadToolDefinitions();
 
   assert.deepEqual(controller.knowledgeBases.value, []);
   assert.equal(controller.settings.value, null);
-  assert.deepEqual(controller.skillDefinitions.value, []);
-  assert.equal(controller.skillDefinitionsLoading.value, false);
-  assert.equal(controller.skillDefinitionsError.value, "skills down");
+  assert.deepEqual(controller.actionDefinitions.value, []);
+  assert.equal(controller.actionDefinitionsLoading.value, false);
+  assert.equal(controller.actionDefinitionsError.value, "actions down");
+  assert.deepEqual(controller.toolDefinitions.value, []);
+  assert.equal(controller.toolDefinitionsLoading.value, false);
+  assert.equal(controller.toolDefinitionsError.value, "tools down");
 });
 
 test("useWorkspaceResourceController refreshes agent models through settings reload", async () => {
@@ -163,7 +196,8 @@ test("useWorkspaceResourceController refreshes agent models through settings rel
       settingsCalls += 1;
       return createSettings(String(settingsCalls));
     },
-    fetchSkillDefinitions: async () => [],
+    fetchActionDefinitions: async () => [],
+    fetchToolDefinitions: async () => [],
     fetchPresets: async () => [],
   });
 

@@ -5,7 +5,7 @@ description: Read one official or user TooGraph graph template package for revie
 
 # 图模板读取器
 
-Use this Skill when a graph workflow needs read-only access to one existing TooGraph graph template.
+Use this Action when a graph workflow needs read-only access to one existing TooGraph graph template.
 
 Inputs:
 
@@ -18,4 +18,4 @@ Outputs:
 - `template_package`: `{ template_id, source_scope, template_path, template_json, size_chars }`.
 - `result`: concise read summary or failure reason.
 
-This Skill never writes files, edits settings, executes scripts, or reads runtime artifacts.
+This Action never writes files, edits settings, executes scripts, or reads runtime artifacts.

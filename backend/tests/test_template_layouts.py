@@ -116,9 +116,9 @@ class TemplateLayoutTests(unittest.TestCase):
                 "multi_platform_content_repurposer",
                 "policy_navigator_agent",
                 "product_competitor_research_agent",
+                "toograph_action_creation_workflow",
                 "toograph_graph_template_creation_workflow",
                 "toograph_page_operation_workflow",
-                "toograph_skill_creation_workflow",
             ],
         )
         templates = {record["template_id"]: record for record in records}
@@ -127,11 +127,11 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(research_template["label"], "高级联网搜索")
         self.assertEqual(research_template["default_graph_name"], "高级联网搜索")
         self.assertIn("多轮搜索", research_template["description"])
-        skill_template = templates["toograph_skill_creation_workflow"]
-        self.assertEqual(skill_template["source"], "official")
-        self.assertEqual(skill_template["label"], "创建自定义 Action")
-        self.assertEqual(skill_template["default_graph_name"], "创建自定义 Action")
-        self.assertIn("需求澄清", skill_template["description"])
+        action_template = templates["toograph_action_creation_workflow"]
+        self.assertEqual(action_template["source"], "official")
+        self.assertEqual(action_template["label"], "创建自定义 Action")
+        self.assertEqual(action_template["default_graph_name"], "创建自定义 Action")
+        self.assertIn("需求澄清", action_template["description"])
 
         buddy_template = templates["buddy_autonomous_loop"]
         self.assertEqual(buddy_template["source"], "official")
@@ -1357,11 +1357,11 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual([issue.model_dump() for issue in validation.issues], [])
         self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
 
-    def test_toograph_skill_creation_workflow_contract(self) -> None:
+    def test_toograph_action_creation_workflow_contract(self) -> None:
         template = next(
             record
             for record in _official_template_records()
-            if record["template_id"] == "toograph_skill_creation_workflow"
+            if record["template_id"] == "toograph_action_creation_workflow"
         )
         states = template["state_schema"]
         nodes = template["nodes"]
@@ -1369,16 +1369,16 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
         self.assertNotIn("interrupt_after", template["metadata"])
         self.assertNotIn("agent_breakpoint_timing", template["metadata"])
-        self.assertEqual(states["target_skill_key"]["type"], "text")
-        self.assertEqual(states["existing_skill_package_success"]["type"], "boolean")
-        self.assertEqual(states["existing_skill_package"]["type"], "json")
-        self.assertEqual(states["existing_skill_package_result"]["type"], "markdown")
+        self.assertEqual(states["target_action_key"]["type"], "text")
+        self.assertEqual(states["existing_action_package_success"]["type"], "boolean")
+        self.assertEqual(states["existing_action_package"]["type"], "json")
+        self.assertEqual(states["existing_action_package_result"]["type"], "markdown")
         self.assertNotIn("existing_capability", states)
         self.assertNotIn("existing_capability_found", states)
         self.assertEqual(states["capability_gap"]["type"], "json")
-        self.assertEqual(states["generated_skill_key"]["type"], "text")
-        self.assertEqual(states["generated_skill_json"]["type"], "json")
-        self.assertEqual(states["generated_skill_md"]["type"], "markdown")
+        self.assertEqual(states["generated_action_key"]["type"], "text")
+        self.assertEqual(states["generated_action_json"]["type"], "json")
+        self.assertEqual(states["generated_action_md"]["type"], "markdown")
         self.assertEqual(states["generated_before_llm_py"]["type"], "text")
         self.assertEqual(states["generated_after_llm_py"]["type"], "text")
         self.assertEqual(states["generated_requirements_txt"]["type"], "text")
@@ -1410,39 +1410,39 @@ class TemplateLayoutTests(unittest.TestCase):
             with self.subTest(capability_context_reader=node_id):
                 self.assertNotIn("existing_capability", [read["state"] for read in nodes[node_id]["reads"]])
         self.assertNotIn({"state": "existing_capability_found", "required": False}, _read_contracts(nodes["review_requirement"]["reads"]))
-        package_reader_node = nodes["read_existing_skill_package"]
+        package_reader_node = nodes["read_existing_action_package"]
         self.assertEqual(package_reader_node["kind"], "agent")
-        self.assertEqual(package_reader_node["config"]["actionKey"], "toograph_skill_package_reader")
+        self.assertEqual(package_reader_node["config"]["actionKey"], "toograph_action_package_reader")
         self.assertEqual(
             package_reader_node["config"]["actionBindings"],
             [
                 {
-                    "actionKey": "toograph_skill_package_reader",
+                    "actionKey": "toograph_action_package_reader",
                     "outputMapping": {
-                        "success": "existing_skill_package_success",
-                        "skill_package": "existing_skill_package",
-                        "result": "existing_skill_package_result",
+                        "success": "existing_action_package_success",
+                        "action_package": "existing_action_package",
+                        "result": "existing_action_package_result",
                     },
                 }
             ],
         )
-        self.assertIn({"state": "existing_skill_package", "required": False}, _read_contracts(nodes["review_requirement"]["reads"]))
+        self.assertIn({"state": "existing_action_package", "required": False}, _read_contracts(nodes["review_requirement"]["reads"]))
         self.assertIn("改进已有 Action", nodes["review_requirement"]["config"]["taskInstruction"])
-        self.assertIn({"state": "existing_skill_package", "required": False}, _read_contracts(nodes["prepare_builder_context"]["reads"]))
-        self.assertIn("existing_skill_package", nodes["prepare_builder_context"]["config"]["taskInstruction"])
+        self.assertIn({"state": "existing_action_package", "required": False}, _read_contracts(nodes["prepare_builder_context"]["reads"]))
+        self.assertIn("existing_action_package", nodes["prepare_builder_context"]["config"]["taskInstruction"])
 
-        builder_node = nodes["build_skill_files"]
+        builder_node = nodes["build_action_files"]
         self.assertEqual(builder_node["kind"], "agent")
-        self.assertEqual(builder_node["config"]["actionKey"], "toograph_skill_builder")
+        self.assertEqual(builder_node["config"]["actionKey"], "toograph_action_builder")
         self.assertEqual(
             builder_node["config"]["actionBindings"],
             [
                 {
-                    "actionKey": "toograph_skill_builder",
+                    "actionKey": "toograph_action_builder",
                     "outputMapping": {
-                        "skill_key": "generated_skill_key",
-                        "skill_json": "generated_skill_json",
-                        "skill_md": "generated_skill_md",
+                        "action_key": "generated_action_key",
+                        "action_json": "generated_action_json",
+                        "action_md": "generated_action_md",
                         "before_llm_py": "generated_before_llm_py",
                         "after_llm_py": "generated_after_llm_py",
                         "requirements_txt": "generated_requirements_txt",
@@ -1470,8 +1470,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             executor_nodes,
             {
-                "write_skill_json",
-                "write_skill_md",
+                "write_action_json",
+                "write_action_md",
                 "write_before_llm_py",
                 "write_after_llm_py",
                 "write_requirements_txt",
@@ -1493,10 +1493,10 @@ class TemplateLayoutTests(unittest.TestCase):
                 self.assertIn("operation 必须是 write", nodes[node_id]["config"]["taskInstruction"])
                 self.assertIn("需确认", nodes[node_id]["config"]["taskInstruction"])
 
-        review_node = nodes["review_generated_skill"]
+        review_node = nodes["review_generated_action"]
         self.assertNotIn("批准写入", review_node["config"]["taskInstruction"])
         self.assertIn("运行时权限", review_node["config"]["taskInstruction"])
-        self.assertIn({"source": "review_generated_skill", "target": "write_skill_json"}, template["edges"])
+        self.assertIn({"source": "review_generated_action", "target": "write_action_json"}, template["edges"])
         self.assertNotIn("review_write_approval", nodes)
         self.assertNotIn("write_approved", nodes)
         self.assertNotIn("finalize_no_write", nodes)
@@ -1513,10 +1513,10 @@ class TemplateLayoutTests(unittest.TestCase):
             ],
         )
         self.assertIn({"source": "ask_clarification", "target": "output_final"}, template["edges"])
-        self.assertIn({"source": "input_target_skill_key", "target": "read_existing_skill_package"}, template["edges"])
-        self.assertNotIn({"source": "input_skill_request", "target": "select_existing_capability"}, template["edges"])
+        self.assertIn({"source": "input_target_action_key", "target": "read_existing_action_package"}, template["edges"])
+        self.assertNotIn({"source": "input_action_request", "target": "select_existing_capability"}, template["edges"])
         self.assertNotIn({"source": "select_existing_capability", "target": "review_requirement"}, template["edges"])
-        self.assertIn({"source": "read_existing_skill_package", "target": "review_requirement"}, template["edges"])
+        self.assertIn({"source": "read_existing_action_package", "target": "review_requirement"}, template["edges"])
         self.assertIn({"source": "draft_example_io", "target": "prepare_builder_context"}, template["edges"])
         self.assertNotIn({"source": "draft_example_io", "target": "review_example_feedback"}, template["edges"])
         self.assertTrue(nodes)
@@ -1529,7 +1529,7 @@ class TemplateLayoutTests(unittest.TestCase):
             condition_node_ids,
             [
                 "need_clarification",
-                "should_create_skill",
+                "should_create_action",
                 "needs_script_test",
                 "script_test_passed",
                 "has_before_llm",
@@ -1553,11 +1553,11 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertEqual(_read_contracts(nodes["output_final"]["reads"]), [{"state": "final_summary", "required": True}])
 
-    def test_toograph_skill_creation_workflow_is_runtime_compatible(self) -> None:
+    def test_toograph_action_creation_workflow_is_runtime_compatible(self) -> None:
         template = next(
             record
             for record in _official_template_records()
-            if record["template_id"] == "toograph_skill_creation_workflow"
+            if record["template_id"] == "toograph_action_creation_workflow"
         )
         payload = {
             key: value
@@ -1567,7 +1567,7 @@ class TemplateLayoutTests(unittest.TestCase):
         graph = NodeSystemGraphPayload.model_validate(
             {
                 **payload,
-                "graph_id": "test_toograph_skill_creation_workflow",
+                "graph_id": "test_toograph_action_creation_workflow",
                 "name": template["default_graph_name"],
             }
         )
@@ -2101,7 +2101,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn({"state": "capability_builder_handoff", "mode": "replace"}, missing_node["writes"])
         self.assertIn("should_offer_build", missing_node["config"]["taskInstruction"])
         self.assertIn("capability_builder_handoff", missing_node["config"]["taskInstruction"])
-        self.assertIn("toograph_skill_creation_workflow", missing_node["config"]["taskInstruction"])
+        self.assertIn("toograph_action_creation_workflow", missing_node["config"]["taskInstruction"])
         self.assertIn("toograph_graph_template_creation_workflow", missing_node["config"]["taskInstruction"])
         review_node = cycle_graph["nodes"]["review_capability_result"]
         self.assertIn({"state": "capability_trace", "mode": "append"}, review_node["writes"])

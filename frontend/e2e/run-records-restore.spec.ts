@@ -51,12 +51,13 @@ test("permission approval snapshots restore into the human review panel", async 
     snapshotLabel: "Approval required for Local Workspace Executor",
     metadata: {
       pending_permission_approval: {
-        kind: "skill_permission_approval",
-        skill_key: "local_workspace_executor",
-        skill_name: "Local Workspace Executor",
+        kind: "capability_permission_approval",
+        capability_kind: "action",
+        capability_key: "local_workspace_executor",
+        capability_name: "Local Workspace Executor",
         permissions: ["file_write", "subprocess"],
-        input_preview: '{\n  "path": "skill/user/demo/SKILL.md"\n}',
-        reason: "Skill declares risky permissions.",
+        input_preview: '{\n  "path": "action/user/demo/ACTION.md"\n}',
+        reason: "Action declares risky permissions.",
       },
     },
   });
@@ -71,9 +72,9 @@ test("permission approval snapshots restore into the human review panel", async 
     await expect(panel).toContainText("local_workspace_executor");
     await expect(panel).toContainText("file_write");
     await expect(panel).toContainText("subprocess");
-    await expect(panel).toContainText("Skill declares risky permissions.");
+    await expect(panel).toContainText("Action declares risky permissions.");
     await expect(panel).toContainText("Planned inputs");
-    await expect(panel).toContainText("skill/user/demo/SKILL.md");
+    await expect(panel).toContainText("action/user/demo/ACTION.md");
     await expect(panel.getByRole("button", { name: "Continue Run" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     expect(problems).toEqual([]);
@@ -153,6 +154,7 @@ function seedRunRecord(testInfo: TestInfo, options: SeedRunOptions = {}) {
     last_writers: {},
   };
   const artifacts = {
+    action_outputs: [],
     output_previews: [
       {
         node_id: "final_policy_package_output",
@@ -205,8 +207,8 @@ function seedRunRecord(testInfo: TestInfo, options: SeedRunOptions = {}) {
     },
     revision_round: 0,
     max_revision_round: 1,
-    selected_skills: [],
-    skill_outputs: [],
+    selected_actions: [],
+    action_outputs: [],
     activity_events: [],
     selected_capabilities: [],
     capability_outputs: [],

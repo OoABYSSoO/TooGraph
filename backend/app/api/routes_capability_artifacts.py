@@ -3,10 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 
-from app.core.storage.skill_artifact_store import (
-    create_uploaded_skill_artifact,
-    read_skill_artifact_file_metadata,
-    read_skill_artifact_text,
+from app.core.storage.capability_artifact_store import (
+    create_uploaded_capability_artifact,
+    read_capability_artifact_file_metadata,
+    read_capability_artifact_text,
 )
 
 
@@ -14,9 +14,9 @@ router = APIRouter(prefix="/api/capability-artifacts", tags=["capability-artifac
 
 
 @router.get("/content")
-def get_skill_artifact_content(path: str = Query(..., min_length=1)) -> dict[str, object]:
+def get_capability_artifact_content(path: str = Query(..., min_length=1)) -> dict[str, object]:
     try:
-        return read_skill_artifact_text(path)
+        return read_capability_artifact_text(path)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
@@ -24,9 +24,9 @@ def get_skill_artifact_content(path: str = Query(..., min_length=1)) -> dict[str
 
 
 @router.get("/file")
-def get_skill_artifact_file(path: str = Query(..., min_length=1)) -> FileResponse:
+def get_capability_artifact_file(path: str = Query(..., min_length=1)) -> FileResponse:
     try:
-        metadata = read_skill_artifact_file_metadata(path)
+        metadata = read_capability_artifact_file_metadata(path)
         return FileResponse(
             metadata["filesystem_path"],
             media_type=str(metadata["content_type"]),
@@ -40,11 +40,11 @@ def get_skill_artifact_file(path: str = Query(..., min_length=1)) -> FileRespons
 
 
 @router.post("/uploads")
-async def upload_skill_artifact_file(file: UploadFile = File(...)) -> dict[str, object]:
+async def upload_capability_artifact_file(file: UploadFile = File(...)) -> dict[str, object]:
     payload = await file.read()
     if not payload:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
-    return create_uploaded_skill_artifact(
+    return create_uploaded_capability_artifact(
         file_name=file.filename or "upload.bin",
         content_type=file.content_type or "",
         payload=payload,

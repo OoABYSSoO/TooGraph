@@ -8,6 +8,16 @@
 
 **Tech Stack:** Python/FastAPI/Pydantic backend, TypeScript/Vue frontend, JSON graph templates, Python capability packages, pytest/Vitest/Playwright verification.
 
+## Current Execution Status
+
+As of the Action/Tool migration pass on 2026-05-20:
+
+- The active graph/node capability implementation uses Action terminology: `actionKey`, `actionBindings`, `actionInstructionBlocks`, `action_input`, `action_output`, `selected_actions`, `action_outputs`, and `action_invocation`.
+- Current node capability packages live under `action/official` and `action/user`; tracked `skill/` package roots are no longer used for Action packages.
+- The graph Tool foundation exists as an independent deterministic path with Tool manifests, Tool registry/API, `tool` nodes, `tool_input`, `tool_output`, `selected_tools`, `tool_outputs`, `tool_invocation`, backend runtime support, and frontend node UI.
+- Legacy Skill graph protocol names are rejected by schema/runtime validation and can be migrated explicitly with `scripts/migrate-node-system-actions.mjs`; there is no hidden load-time repair.
+- Remaining valid `Skill` wording is limited to historical migration notes, legacy rejection tests, and the future Agent/Buddy operation-book namespace. Video segmenter Tool and a future Agent Skill catalog remain separate follow-up features, not part of this migration closure.
+
 ---
 
 ## Scan Summary
@@ -369,10 +379,10 @@ npm --prefix frontend test -- src/lib/run-restore.test.ts src/pages/runDetailMod
     {
       "toolKey": "video_segmenter",
       "name": "视频分段",
-      "description": "把视频切成可并行处理的片段和帧 artifact。",
+      "description": "把一个视频切成 30 秒以内的短视频片段，供 Batch 节点逐段交给 LLM 分析。",
       "version": "0.1.0",
-      "inputSchema": [],
-      "outputSchema": [],
+      "inputSchema": [{ "key": "video", "name": "Video", "valueType": "video" }],
+      "outputSchema": [{ "key": "segments", "name": "Segments", "valueType": "json" }],
       "permissions": ["file_read", "file_write", "subprocess"],
       "runtime": { "type": "python" }
     }

@@ -10,8 +10,9 @@ import {
 } from "../../lib/virtual-any-input.ts";
 import { normalizeInputBoundaryConfigType } from "../../lib/input-boundary.ts";
 import type { GraphNode, StateDefinition } from "../../types/node-system.ts";
-import type { SkillDefinition } from "../../types/actions.ts";
-import { resolveDisplayAgentSkillInstructionBlocks } from "./actionPickerModel.ts";
+import type { ActionDefinition } from "../../types/actions.ts";
+import type { ToolDefinition } from "../../types/tools.ts";
+import { resolveDisplayAgentActionInstructionBlocks } from "./actionPickerModel.ts";
 import { resolveNodeDisplayDescription, resolveNodeDisplayTitle } from "./nodeDefaultTextModel.ts";
 
 export type NodePortViewModel = {
@@ -22,9 +23,14 @@ export type NodePortViewModel = {
   stateColor: string;
   virtual?: boolean;
   batchMode?: "shared" | "batch";
-  managedBySkill?: {
+  managedByAction?: {
     role: "input" | "output";
-    skillKey: string;
+    actionKey: string;
+    fieldKey: string;
+  };
+  managedByTool?: {
+    role: "input" | "output";
+    toolKey: string;
     fieldKey: string;
   };
   managedByCapability?: {
@@ -68,7 +74,8 @@ export type SubgraphRuntimeSummaryViewModel = {
 
 export type BuildNodeCardViewModelOptions = {
   conditionRouteTargets?: Record<string, string | null>;
-  skillDefinitions?: SkillDefinition[];
+  actionDefinitions?: ActionDefinition[];
+  toolDefinitions?: ToolDefinition[];
   runtime?: {
     latestRunStatus?: string | null;
     outputPreviewText?: string | null;
@@ -112,7 +119,7 @@ export type NodeCardViewModel = {
         actionInstructionBlocks: NonNullable<Extract<GraphNode, { kind: "agent" }>["config"]["actionInstructionBlocks"]>;
         modelLabel: string;
         thinkingLabel: string;
-        skillLabel: string;
+        actionLabel: string;
         primaryInput: NodePortViewModel | null;
         primaryOutput: NodePortViewModel | null;
       }
@@ -150,6 +157,14 @@ export type NodeCardViewModel = {
         primaryOutput: NodePortViewModel | null;
       }
     | {
+        kind: "tool";
+        toolKey: string;
+        toolLabel: string;
+        toolDescription: string;
+        primaryInput: NodePortViewModel | null;
+        primaryOutput: NodePortViewModel | null;
+      }
+    | {
         kind: "output";
         previewTitle: string;
         displayMode: string;
@@ -180,7 +195,8 @@ export function buildNodeCardViewModel(
         typeLabel: getStateTypeLabel(binding.state, stateSchema),
         stateColor: stateSchema[binding.state]?.color ?? "#d97706",
         batchMode: node.kind === "batch" ? resolveBatchInputMode(node, binding.state) : undefined,
-        managedBySkill: resolveManagedSkillInputPort(binding),
+        managedByAction: resolveManagedActionInputPort(binding),
+        managedByTool: resolveManagedToolInputPort(binding),
         managedByCapability: resolveManagedCapabilityInputPort(node, binding.state, stateSchema),
       }));
 
@@ -193,7 +209,8 @@ export function buildNodeCardViewModel(
           label: getStateLabel(binding.state, stateSchema),
           typeLabel: getStateTypeLabel(binding.state, stateSchema),
           stateColor: stateSchema[binding.state]?.color ?? "#d97706",
-          managedBySkill: resolveManagedSkillOutputPort(nodeId, binding.state, stateSchema),
+          managedByAction: resolveManagedActionOutputPort(nodeId, binding.state, stateSchema),
+          managedByTool: resolveManagedToolOutputPort(nodeId, binding.state, stateSchema),
           managedByCapability: resolveManagedCapabilityOutputPort(nodeId, binding.state, stateSchema),
         }));
 
@@ -288,14 +305,14 @@ function buildBody(
     return {
       kind: "agent",
       taskInstruction: node.config.taskInstruction?.trim() || "",
-      actionInstructionBlocks: resolveDisplayAgentSkillInstructionBlocks(
+      actionInstructionBlocks: resolveDisplayAgentActionInstructionBlocks(
         node.config.actionKey,
-        options.skillDefinitions ?? [],
+        options.actionDefinitions ?? [],
         node.config.actionInstructionBlocks ?? {},
       ),
       modelLabel: resolveAgentModelLabel(node),
       thinkingLabel: resolveThinkingLabel(node),
-      skillLabel: node.config.actionKey.trim() || "No skill",
+      actionLabel: node.config.actionKey.trim() || "No action",
       primaryInput: inputs[0] ?? null,
       primaryOutput: outputs[0] ?? null,
     };
@@ -341,6 +358,19 @@ function buildBody(
       thumbnailRowCount: thumbnail.rowCount,
       runtimeSummary: summarizeSubgraphRuntime(thumbnail.nodes),
       capabilities: listSubgraphCapabilities(node),
+      primaryInput: inputs[0] ?? null,
+      primaryOutput: outputs[0] ?? null,
+    };
+  }
+
+  if (node.kind === "tool") {
+    const toolKey = node.config.toolKey.trim();
+    const definition = options.toolDefinitions?.find((candidate) => candidate.toolKey === toolKey);
+    return {
+      kind: "tool",
+      toolKey,
+      toolLabel: definition?.name?.trim() || toolKey || "No tool",
+      toolDescription: definition?.description?.trim() || "",
       primaryInput: inputs[0] ?? null,
       primaryOutput: outputs[0] ?? null,
     };
@@ -561,9 +591,9 @@ function listSubgraphCapabilities(node: Extract<GraphNode, { kind: "subgraph" }>
   const capabilities = new Set<string>();
   for (const innerNode of Object.values(node.config.graph.nodes)) {
     if (innerNode.kind === "agent") {
-      const skillKey = innerNode.config.actionKey.trim();
-      if (skillKey) {
-        capabilities.add(skillKey);
+      const actionKey = innerNode.config.actionKey.trim();
+      if (actionKey) {
+        capabilities.add(actionKey);
       }
     }
     if (innerNode.kind === "subgraph") {
@@ -584,29 +614,56 @@ function getStateTypeLabel(stateKey: string, stateSchema: Record<string, StateDe
   return stateType.replace(/_/g, " ");
 }
 
-function resolveManagedSkillOutputPort(
+function resolveManagedActionOutputPort(
   nodeId: string,
   stateKey: string,
   stateSchema: Record<string, StateDefinition>,
-): NodePortViewModel["managedBySkill"] {
+): NodePortViewModel["managedByAction"] {
   const binding = stateSchema[stateKey]?.binding;
   if (binding?.kind !== "action_output" || binding.nodeId !== nodeId || binding.managed === false) {
     return undefined;
   }
   return {
     role: "output",
-    skillKey: binding.actionKey,
+    actionKey: binding.actionKey,
     fieldKey: binding.fieldKey,
   };
 }
 
-function resolveManagedSkillInputPort(binding: Extract<GraphNode, { kind: "agent" }>["reads"][number]): NodePortViewModel["managedBySkill"] {
+function resolveManagedActionInputPort(binding: Extract<GraphNode, { kind: "agent" }>["reads"][number]): NodePortViewModel["managedByAction"] {
   if (binding.binding?.kind !== "action_input" || binding.binding.managed === false) {
     return undefined;
   }
   return {
     role: "input",
-    skillKey: binding.binding.actionKey,
+    actionKey: binding.binding.actionKey,
+    fieldKey: binding.binding.fieldKey,
+  };
+}
+
+function resolveManagedToolOutputPort(
+  nodeId: string,
+  stateKey: string,
+  stateSchema: Record<string, StateDefinition>,
+): NodePortViewModel["managedByTool"] {
+  const binding = stateSchema[stateKey]?.binding;
+  if (binding?.kind !== "tool_output" || binding.nodeId !== nodeId || binding.managed === false) {
+    return undefined;
+  }
+  return {
+    role: "output",
+    toolKey: binding.toolKey,
+    fieldKey: binding.fieldKey,
+  };
+}
+
+function resolveManagedToolInputPort(binding: Extract<GraphNode, { kind: "tool" }>["reads"][number]): NodePortViewModel["managedByTool"] {
+  if (binding.binding?.kind !== "tool_input" || binding.binding.managed === false) {
+    return undefined;
+  }
+  return {
+    role: "input",
+    toolKey: binding.binding.toolKey,
     fieldKey: binding.binding.fieldKey,
   };
 }

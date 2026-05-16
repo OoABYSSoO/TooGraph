@@ -33,7 +33,7 @@
                 : 'node-card__port-pill--output node-card__port-pill--dock-end',
               {
                 'node-card__port-pill--removable': canRemovePort(port),
-                'node-card__port-pill--skill-managed': isManagedPort(port),
+                'node-card__port-pill--action-managed': isManagedPort(port),
                 'node-card__port-pill--revealed': isStateEditorPillRevealed(anchorId(port.key)),
                 'node-card__port-pill--confirm': isStateEditorConfirmOpen(anchorId(port.key)),
                 'node-card__port-pill--reordering': canReorderPort(port) && isPortReordering(side, port.key),
@@ -356,19 +356,19 @@ function canReorderPort(port: NodePortViewModel) {
 }
 
 function isManagedPort(port: NodePortViewModel) {
-  return Boolean(port.managedBySkill || port.managedByCapability);
+  return Boolean(port.managedByAction || port.managedByTool || port.managedByCapability);
 }
 
 function isRemovalLockedManagedPort(port: NodePortViewModel) {
-  return Boolean(port.managedBySkill || (props.side === "output" && port.managedByCapability));
+  return Boolean(port.managedByAction || port.managedByTool || (props.side === "output" && port.managedByCapability));
 }
 
 function isLeadingManagedIcon(port: NodePortViewModel) {
-  return isManagedPort(port) && !(props.side === "input" && port.managedBySkill?.role === "input");
+  return isManagedPort(port) && !(props.side === "input" && (port.managedByAction?.role === "input" || port.managedByTool?.role === "input"));
 }
 
 function isTrailingManagedIcon(port: NodePortViewModel) {
-  return props.side === "input" && port.managedBySkill?.role === "input";
+  return props.side === "input" && (port.managedByAction?.role === "input" || port.managedByTool?.role === "input");
 }
 
 function shouldShowBatchModeSwitch(port: NodePortViewModel) {
@@ -376,11 +376,17 @@ function shouldShowBatchModeSwitch(port: NodePortViewModel) {
 }
 
 function managedPortTitle(port: NodePortViewModel) {
-  if (port.managedBySkill?.role === "input") {
+  if (port.managedByAction?.role === "input") {
     return "Action managed input";
   }
-  if (port.managedBySkill?.role === "output") {
+  if (port.managedByAction?.role === "output") {
     return "Action managed output";
+  }
+  if (port.managedByTool?.role === "input") {
+    return "Tool managed input";
+  }
+  if (port.managedByTool?.role === "output") {
+    return "Tool managed output";
   }
   return "Dynamic capability managed state";
 }
@@ -502,12 +508,12 @@ function handlePortClick(port: NodePortViewModel) {
   color: #1f2937;
 }
 
-.node-card__port-pill--skill-managed {
+.node-card__port-pill--action-managed {
   cursor: default;
 }
 
-.node-card__port-pill--skill-managed:focus-visible,
-.node-card__port-pill--skill-managed.node-card__port-pill--revealed {
+.node-card__port-pill--action-managed:focus-visible,
+.node-card__port-pill--action-managed.node-card__port-pill--revealed {
   border-color: color-mix(in srgb, var(--node-card-port-accent) 22%, transparent);
   background: color-mix(in srgb, var(--node-card-port-accent) 8%, #fff);
 }

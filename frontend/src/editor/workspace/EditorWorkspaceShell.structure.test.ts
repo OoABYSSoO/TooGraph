@@ -133,6 +133,27 @@ test("EditorWorkspaceShell refreshes settings when an agent model menu opens", (
   assert.match(resourceControllerSource, /settings\.value = await input\.fetchSettings\(\)/);
 });
 
+test("EditorWorkspaceShell loads Tool definitions and routes Tool node edits through the canvas", () => {
+  assert.match(componentSource, /import \{ fetchToolCatalog \} from "@\/api\/tools";/);
+  assert.match(componentSource, /:tool-definitions="toolDefinitions"/);
+  assert.match(componentSource, /:tool-definitions-loading="toolDefinitionsLoading"/);
+  assert.match(componentSource, /:tool-definitions-error="toolDefinitionsError"/);
+  assert.match(componentSource, /@update-tool-config="updateToolConfigForTab\(tab\.tabId, \$event\.nodeId, \$event\.patch\)"/);
+  assert.match(
+    componentSource,
+    /const \{[\s\S]*actionDefinitions,[\s\S]*toolDefinitions,[\s\S]*toolDefinitionsLoading,[\s\S]*toolDefinitionsError,[\s\S]*\} = useWorkspaceResourceController\(\{/,
+  );
+  assert.match(componentSource, /fetchToolDefinitions: fetchToolCatalog,/);
+  assert.match(componentSource, /const \{[\s\S]*updateAgentConfigForTab,[\s\S]*updateToolConfigForTab,[\s\S]*\} = useWorkspaceGraphMutationActions\(\{/);
+  assert.match(componentSource, /useWorkspaceGraphMutationActions\(\{[\s\S]*actionDefinitions,[\s\S]*toolDefinitions,[\s\S]*\}\);/);
+  assert.match(resourceControllerSource, /fetchToolDefinitions: \(\) => Promise<ToolDefinition\[\]>;/);
+  assert.match(resourceControllerSource, /const toolDefinitions = ref<ToolDefinition\[\]>\(\[\]\);/);
+  assert.match(resourceControllerSource, /async function loadToolDefinitions\(\)/);
+  assert.match(resourceControllerSource, /toolDefinitions\.value = await input\.fetchToolDefinitions\(\)/);
+  assert.match(graphMutationActionsSource, /function updateToolConfigForTab\(tabId: string, nodeId: string, patch: Partial<ToolNode\["config"\]>\)/);
+  assert.match(graphMutationActionsSource, /updateToolNodeConfigInDocument\([\s\S]*document,[\s\S]*nodeId,[\s\S]*\{ toolDefinitions: input\.toolDefinitions\.value \}/);
+});
+
 test("EditorWorkspaceShell persists node resize updates into the graph draft", () => {
   assert.match(componentSource, /import \{ useWorkspaceEditGuardController \} from "\.\/useWorkspaceEditGuardController\.ts";/);
   assert.match(editGuardControllerSource, /import type \{[\s\S]*GraphNodeSize,[\s\S]*GraphPayload,[\s\S]*GraphPosition[\s\S]*\} from "\.\.\/\.\.\/types\/node-system\.ts";/);
@@ -239,9 +260,9 @@ test("EditorWorkspaceShell delegates graph mutation actions to a workspace compo
   assert.doesNotMatch(componentSource, /function deleteStateField/);
 });
 
-test("EditorWorkspaceShell does not mark clean opened graphs dirty during skill binding reconciliation", () => {
+test("EditorWorkspaceShell does not mark clean opened graphs dirty during action binding reconciliation", () => {
   const reconcileSource =
-    componentSource.match(/function reconcileOpenDocumentsWithSkillDefinitions\(\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+    componentSource.match(/function reconcileOpenDocumentsWithActionDefinitions\(\) \{[\s\S]*?\n\}/)?.[0] ?? "";
 
   assert.match(reconcileSource, /for \(const \[tabId, document\] of Object\.entries\(documentsByTabId\.value\)\)/);
   assert.match(reconcileSource, /const tab = workspace\.value\.tabs\.find\(\(candidate\) => candidate\.tabId === tabId\) \?\? null;/);
@@ -892,7 +913,7 @@ test("EditorWorkspaceShell centralizes simple graph mutation commits", () => {
     connectFlowSource,
     /commitDocumentMutationForTab\(\s*tabId,\s*\(document\) => connectFlowNodesInDocument\(document, sourceNodeId, targetNodeId\),\s*\{\s*focusNodeId: targetNodeId,\s*\}\s*\);/,
   );
-  assert.match(updateAgentSource, /commitDocumentMutationForTab\(\s*tabId,[\s\S]*updateAgentNodeConfigInDocument\(document, nodeId, \(current\) => \(\{[\s\S]*\.\.\.current,[\s\S]*\.\.\.patch,[\s\S]*\}\), \{ skillDefinitions: input\.skillDefinitions\.value \}\),[\s\S]*focusNodeId: nodeId,[\s\S]*\);/);
+  assert.match(updateAgentSource, /commitDocumentMutationForTab\(\s*tabId,[\s\S]*updateAgentNodeConfigInDocument\(document, nodeId, \(current\) => \(\{[\s\S]*\.\.\.current,[\s\S]*\.\.\.patch,[\s\S]*\}\), \{ actionDefinitions: input\.actionDefinitions\.value \}\),[\s\S]*focusNodeId: nodeId,[\s\S]*\);/);
   assert.match(updateStateFieldSource, /commitDocumentMutationForTab\(\s*tabId,[\s\S]*updateStateFieldInDocument\(document, stateKey, \(current\) => \(\{[\s\S]*\.\.\.current,[\s\S]*\.\.\.patch,[\s\S]*\}\)\),[\s\S]*\);/);
   assert.doesNotMatch(addStateReaderSource, /const nextDocument = addStateBindingToDocument/);
   assert.doesNotMatch(bindPortSource, /const nextDocument = addStateBindingToDocument/);

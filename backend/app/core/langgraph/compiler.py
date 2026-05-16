@@ -21,11 +21,12 @@ from app.core.schemas.node_system import (
     NodeSystemOutputNode,
     NodeSystemStateType,
     NodeSystemSubgraphNode,
+    NodeSystemToolNode,
 )
 
 RUNTIME_START = "__start__"
 RUNTIME_END = "__end__"
-RUNTIME_NODE_TYPES = (NodeSystemAgentNode, NodeSystemBatchNode, NodeSystemSubgraphNode)
+RUNTIME_NODE_TYPES = (NodeSystemAgentNode, NodeSystemBatchNode, NodeSystemSubgraphNode, NodeSystemToolNode)
 
 
 def get_langgraph_runtime_unsupported_reasons(
@@ -58,21 +59,27 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
     }
 
     graph_nodes: dict[str, LangGraphNodePlan] = {}
-    skill_keys: set[str] = set()
+    action_keys: set[str] = set()
+    tool_keys: set[str] = set()
     for node_name, node in graph.nodes.items():
-        attached_skills = [node.config.skill_key] if isinstance(node, NodeSystemAgentNode) and node.config.skill_key else []
+        attached_actions = [node.config.action_key] if isinstance(node, NodeSystemAgentNode) and node.config.action_key else []
+        attached_tools = [node.config.tool_key] if isinstance(node, NodeSystemToolNode) and node.config.tool_key else []
         if isinstance(node, NodeSystemSubgraphNode):
             for inner_node in node.config.graph.nodes.values():
-                if isinstance(inner_node, NodeSystemAgentNode) and inner_node.config.skill_key:
-                    skill_keys.add(inner_node.config.skill_key)
-        skill_keys.update(attached_skills)
+                if isinstance(inner_node, NodeSystemAgentNode) and inner_node.config.action_key:
+                    action_keys.add(inner_node.config.action_key)
+                if isinstance(inner_node, NodeSystemToolNode) and inner_node.config.tool_key:
+                    tool_keys.add(inner_node.config.tool_key)
+        action_keys.update(attached_actions)
+        tool_keys.update(attached_tools)
         graph_nodes[node_name] = LangGraphNodePlan(
             name=node.name or node_name,
             kind=node.kind,
             description=node.description,
             reads=[binding.state for binding in node.reads],
             writes=[binding.state for binding in node.writes],
-            skill_keys=attached_skills,
+            action_keys=attached_actions,
+            tool_keys=attached_tools,
             config=node.config.model_dump(by_alias=True),
         )
 
@@ -272,7 +279,8 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
             terminal_nodes=terminal_nodes,
             runtime_entry_nodes=runtime_entry_nodes,
             runtime_terminal_nodes=runtime_terminal_nodes,
-            skill_keys=sorted(skill_keys),
+            action_keys=sorted(action_keys),
+            tool_keys=sorted(tool_keys),
             knowledge_base_states=knowledge_base_states,
             unsupported_reasons=list(dict.fromkeys(unsupported_reasons)),
         ),

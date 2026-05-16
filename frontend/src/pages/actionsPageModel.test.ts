@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import type { SkillDefinition } from "../types/actions.ts";
+import type { ActionDefinition } from "../types/actions.ts";
 
-import { buildSkillOverview, buildSkillStatusOptions, filterSkillsForManagement } from "./actionsPageModel.ts";
+import { buildActionOverview, buildActionStatusOptions, filterActionsForManagement } from "./actionsPageModel.ts";
 
-const actions: SkillDefinition[] = [
+const actions: ActionDefinition[] = [
   {
-    skillKey: "rewrite_text",
+    actionKey: "rewrite_text",
     name: "Rewrite Text",
     description: "Rewrite text with a specified style.",
     llmInstruction: "Rewrite the provided text.",
@@ -32,9 +32,9 @@ const actions: SkillDefinition[] = [
     canManage: true,
   },
   {
-    skillKey: "draft_search",
+    actionKey: "draft_search",
     name: "Draft Search",
-    description: "Installed skill that still needs a runtime manifest.",
+    description: "Installed action that still needs a runtime manifest.",
     llmInstruction: "",
     schemaVersion: "toograph.action/v1",
     stateInputSchema: [],
@@ -42,7 +42,7 @@ const actions: SkillDefinition[] = [
     stateOutputSchema: [],
     runtime: { type: "future", entrypoint: "" },
     llmNodeEligibility: "needs_manifest",
-    llmNodeBlockers: ["Skill manifest is missing a script runtime entrypoint."],
+    llmNodeBlockers: ["Action manifest is missing a script runtime entrypoint."],
     version: "0.1.0",
     capabilityPolicy: {
       default: { selectable: true, requiresApproval: false },
@@ -59,7 +59,7 @@ const actions: SkillDefinition[] = [
     canManage: true,
   },
   {
-    skillKey: "desktop_buddy_profile",
+    actionKey: "desktop_buddy_profile",
     name: "Desktop Buddy Profile",
     description: "A buddy context profile.",
     llmInstruction: "",
@@ -69,7 +69,7 @@ const actions: SkillDefinition[] = [
     stateOutputSchema: [],
     runtime: { type: "none", entrypoint: "" },
     llmNodeEligibility: "needs_manifest",
-    llmNodeBlockers: ["Skill manifest is missing stateOutputSchema."],
+    llmNodeBlockers: ["Action manifest is missing stateOutputSchema."],
     version: "0.1.0",
     capabilityPolicy: {
       default: { selectable: false, requiresApproval: true },
@@ -87,75 +87,75 @@ const actions: SkillDefinition[] = [
   },
 ];
 
-test("filterSkillsForManagement searches skill metadata and permission fields", () => {
+test("filterActionsForManagement searches action metadata and permission fields", () => {
   assert.deepEqual(
-    filterSkillsForManagement(actions, { query: "rewrite", status: "all" }).map((skill) => skill.skillKey),
+    filterActionsForManagement(actions, { query: "rewrite", status: "all" }).map((action) => action.actionKey),
     ["rewrite_text"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(actions, { query: "model_vision", status: "all" }).map((skill) => skill.skillKey),
+    filterActionsForManagement(actions, { query: "model_vision", status: "all" }).map((action) => action.actionKey),
     ["draft_search"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(actions, { query: "profile", status: "all" }).map((skill) => skill.skillKey),
+    filterActionsForManagement(actions, { query: "profile", status: "all" }).map((action) => action.actionKey),
     ["desktop_buddy_profile"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(actions, { query: "profile_context", status: "all" }).map((skill) => skill.skillKey),
+    filterActionsForManagement(actions, { query: "profile_context", status: "all" }).map((action) => action.actionKey),
     ["desktop_buddy_profile"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(actions, { query: "bound graph state input", status: "all" }).map((skill) => skill.skillKey),
+    filterActionsForManagement(actions, { query: "bound graph state input", status: "all" }).map((action) => action.actionKey),
     ["rewrite_text"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(actions, { query: "action.json", status: "all" }).map((skill) => skill.skillKey),
+    filterActionsForManagement(actions, { query: "action.json", status: "all" }).map((action) => action.actionKey),
     ["draft_search", "desktop_buddy_profile"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(actions, { query: "run.py python runtime", status: "all" }).map((skill) => skill.skillKey),
+    filterActionsForManagement(actions, { query: "run.py python runtime", status: "all" }).map((action) => action.actionKey),
     [],
   );
   assert.deepEqual(
-    filterSkillsForManagement(actions, { query: "missing a script runtime", status: "all" }).map((skill) => skill.skillKey),
+    filterActionsForManagement(actions, { query: "missing a script runtime", status: "all" }).map((action) => action.actionKey),
     [],
   );
 });
 
-test("filterSkillsForManagement filters by user-facing availability", () => {
+test("filterActionsForManagement filters by user-facing availability", () => {
   assert.deepEqual(
-    filterSkillsForManagement(actions, { query: "", status: "disabled" }).map((skill) => skill.skillKey),
+    filterActionsForManagement(actions, { query: "", status: "disabled" }).map((action) => action.actionKey),
     ["desktop_buddy_profile"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(actions, { query: "", status: "active" }).map((skill) => skill.skillKey),
+    filterActionsForManagement(actions, { query: "", status: "active" }).map((action) => action.actionKey),
     ["rewrite_text", "draft_search"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(actions, { query: "", status: "all" }).map((skill) => skill.skillKey),
+    filterActionsForManagement(actions, { query: "", status: "all" }).map((action) => action.actionKey),
     ["rewrite_text", "draft_search", "desktop_buddy_profile"],
   );
 });
 
-test("filterSkillsForManagement ignores removed runtime and attention filters", () => {
+test("filterActionsForManagement ignores removed runtime and attention filters", () => {
   assert.deepEqual(
-    filterSkillsForManagement(actions, { query: "", status: "runtime" as never }).map((skill) => skill.skillKey),
+    filterActionsForManagement(actions, { query: "", status: "runtime" as never }).map((action) => action.actionKey),
     ["rewrite_text", "draft_search", "desktop_buddy_profile"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(actions, { query: "", status: "attention" as never }).map((skill) => skill.skillKey),
+    filterActionsForManagement(actions, { query: "", status: "attention" as never }).map((action) => action.actionKey),
     ["rewrite_text", "draft_search", "desktop_buddy_profile"],
   );
 });
 
-test("buildSkillOverview summarizes user-facing management counts", () => {
-  assert.deepEqual(buildSkillOverview(actions), {
+test("buildActionOverview summarizes user-facing management counts", () => {
+  assert.deepEqual(buildActionOverview(actions), {
     total: 3,
     active: 2,
     visibleActions: 2,
   });
 });
 
-test("buildSkillStatusOptions keeps user-facing management filters stable", () => {
-  assert.deepEqual(buildSkillStatusOptions(), ["all", "active", "disabled"]);
+test("buildActionStatusOptions keeps user-facing management filters stable", () => {
+  assert.deepEqual(buildActionStatusOptions(), ["all", "active", "disabled"]);
 });

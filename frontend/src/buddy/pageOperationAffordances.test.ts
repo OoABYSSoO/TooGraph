@@ -289,7 +289,7 @@ test("buildPageOperationRuntimeContext adds structured page facts for goal verif
   assert.deepEqual(runtimeContext.operation_report, runtimeContext.page_facts.latestOperationResult);
 });
 
-test("attachPageOperationRuntimeContext preserves graph metadata while adding skill runtime context", () => {
+test("attachPageOperationRuntimeContext preserves graph metadata while adding action runtime context", () => {
   const runtimeContext = buildPageOperationRuntimeContext({
     routePath: "/runs",
     root: null,
@@ -304,5 +304,5 @@ test("attachPageOperationRuntimeContext preserves graph metadata while adding sk
 
   assert.notEqual(result, graph);
   assert.deepEqual(result.metadata.existing, "keep");
-  assert.deepEqual(result.metadata.skill_runtime_context, runtimeContext);
+  assert.deepEqual(result.metadata.action_runtime_context, runtimeContext);
 });

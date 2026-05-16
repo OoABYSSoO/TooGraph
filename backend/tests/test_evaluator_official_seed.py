@@ -29,7 +29,7 @@ def isolated_eval_database():
 
 
 class OfficialEvalSeedTests(unittest.TestCase):
-    def test_seed_official_eval_suites_covers_core_buddy_web_skill_and_business_templates(self) -> None:
+    def test_seed_official_eval_suites_covers_core_buddy_web_action_and_business_templates(self) -> None:
         with isolated_eval_database():
             first_summary = seed_official_eval_suites()
             second_summary = seed_official_eval_suites()
@@ -39,14 +39,14 @@ class OfficialEvalSeedTests(unittest.TestCase):
                 "buddy_autonomous_loop_core",
                 "buddy_capability_loop_core",
                 "toograph_page_operation_workflow_core",
-                "toograph_skill_creation_workflow_core",
+                "toograph_action_creation_workflow_core",
                 "advanced_web_research_loop_core",
                 "policy_navigator_agent_lightweight",
             }
             self.assertTrue(expected_suite_ids.issubset(suite_ids))
 
             buddy_case = store.load_eval_case("buddy_autonomous_loop_core", "buddy-main-loop-clarifies-ambiguous-request")
-            skill_case = store.load_eval_case("toograph_skill_creation_workflow_core", "skill-creation-clarifies-unsafe-write")
+            action_case = store.load_eval_case("toograph_action_creation_workflow_core", "action-creation-clarifies-unsafe-write")
             policy_case = store.load_eval_case(
                 "policy_navigator_agent_lightweight",
                 "policy-navigator-mock-housing-subsidy",
@@ -58,7 +58,7 @@ class OfficialEvalSeedTests(unittest.TestCase):
         self.assertEqual(buddy_case["checks"][0]["kind"], "schema")
         self.assertEqual(buddy_case["checks"][1]["kind"], "llm_judge")
         self.assertEqual(buddy_case["checks"][1]["details"]["original_kind"], "rule")
-        self.assertEqual(skill_case["metadata"]["template_id"], "toograph_skill_creation_workflow")
+        self.assertEqual(action_case["metadata"]["template_id"], "toograph_action_creation_workflow")
         self.assertIn("policy_sources", policy_case["input_values"])
         self.assertEqual(policy_case["checks"][0]["kind"], "llm_judge")
         self.assertEqual(policy_case["checks"][0]["details"]["original_kind"], "schema")

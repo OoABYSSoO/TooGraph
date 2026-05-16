@@ -9,7 +9,7 @@ TooGraph Buddy 的记忆系统已经拆成两层：
 
 本设计说明下一步如何把 TooGraph 的会话检索能力看齐 `demo/hermes-agent` 的 `session_search`，并给出后台“记忆落盘模板图”的搭建蓝图。
 
-这里的“看齐 Hermes”不是复制 Hermes 的隐藏 agent loop，而是把 Hermes 已验证有效的检索语义翻译成 TooGraph 的图模板、Skill、状态和审计路径。
+这里的“看齐 Hermes”不是复制 Hermes 的隐藏 agent loop，而是把 Hermes 已验证有效的检索语义翻译成 TooGraph 的图模板、Action、状态和审计路径。
 
 ## 当前状态
 
@@ -18,7 +18,7 @@ TooGraph 已完成：
 - 删除平台 `memories` 体系。
 - 删除 `memory_recall` 和 `memory_candidate_writer`。
 - 删除 `buddy_memories` 长期记忆表。
-- 新增 `buddy_session_recall` Skill。
+- 新增 `buddy_session_recall` Action。
 - `buddy_messages` 建立 `buddy_messages_fts` 和 `buddy_messages_fts_trigram`。
 - `buddy_autonomous_review` 通过 `buddy_home_writer` 写完整 `MEMORY.md`，并留下 command/revision。
 
@@ -88,7 +88,7 @@ flowchart TD
     SoulMd[SOUL.md] --> ContextPack
     Policy[policy.json] --> ContextPack
 
-    RecallSkill[buddy_session_recall Skill] --> DBRead[只读 buddy.db]
+    RecallAction[buddy_session_recall Action] --> DBRead[只读 buddy.db]
     DBRead --> FTS
     DBRead --> RecallResult[真实历史消息窗口]
 
@@ -109,7 +109,7 @@ flowchart TD
 
 - `buddy_session_recall` 只读会话历史，不写 `MEMORY.md`。
 - `toograph_context_fanout` 可以读取 `MEMORY.md`，但不做会话 FTS。
-- `buddy_home_writer` 是写入 Buddy Home 的唯一受控 Skill。
+- `buddy_home_writer` 是写入 Buddy Home 的唯一受控 Action。
 - 后台整理是否写入由图模板决定，不由后端隐藏逻辑决定。
 
 ## 数据模型目标
@@ -155,7 +155,7 @@ flowchart TD
 - `created_at`
 - `updated_at`
 
-检索默认只索引 `content`。`metadata_json` 里有运行胶囊、output trace 和 UI 展示信息，直接索引会让召回噪音变高。后续如果需要检索 tool/output trace，应增加单独的 operation/run 检索 Skill，而不是混进普通会话记忆召回。
+检索默认只索引 `content`。`metadata_json` 里有运行胶囊、output trace 和 UI 展示信息，直接索引会让召回噪音变高。后续如果需要检索 tool/output trace，应增加单独的 operation/run 检索 Action，而不是混进普通会话记忆召回。
 
 ### FTS 表
 
@@ -189,7 +189,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS buddy_messages_fts_trigram USING fts5(
 
 ## buddy_session_recall 接口
 
-Skill 输入保持一个 `recall_request`。
+Action 输入保持一个 `recall_request`。
 
 ```json
 {
@@ -365,7 +365,7 @@ TooGraph 当前可以先保持 `before/after/around`，但为了看齐 Hermes，
 flowchart TD
     Input[输入<br/>completed_run_snapshot<br/>recent_chat<br/>page_context] --> LoadHome[读取 Buddy Home Context<br/>SOUL/USER/MEMORY/policy]
     Input --> BuildRecallRequest[LLM: 构造 session recall request]
-    BuildRecallRequest --> Recall[Skill: buddy_session_recall<br/>discover/browse/scroll]
+    BuildRecallRequest --> Recall[Action: buddy_session_recall<br/>discover/browse/scroll]
     LoadHome --> Analyze[LLM: 分析是否有长期价值]
     Recall --> Analyze
     Input --> Analyze
@@ -381,7 +381,7 @@ flowchart TD
 
     Merge --> Diff[生成 diff / summary]
     Diff --> WritePlan[构造 memory_update_plan<br/>memory_document.update]
-    WritePlan --> Writer[Skill: buddy_home_writer]
+    WritePlan --> Writer[Action: buddy_home_writer]
     Writer --> Revision[buddy_commands + buddy_revisions]
     Revision --> Output[输出<br/>写入结果 / revision_id / diff / skipped_reason]
     ReportOnly --> Output
@@ -394,14 +394,14 @@ flowchart TD
 | 输入 | input | `completed_run_snapshot` | 当前已完成 Buddy run 的快照。 |
 | 输入 | input | `recent_chat_context` | 当前可见聊天上下文。 |
 | 输入 | input | `page_context` | 可选页面/图编辑上下文。 |
-| 读取 | skill/subgraph | `load_buddy_home_context` | 读取 `MEMORY.md`、`USER.md`、`SOUL.md`、`policy.json`。 |
+| 读取 | action/subgraph | `load_buddy_home_context` | 读取 `MEMORY.md`、`USER.md`、`SOUL.md`、`policy.json`。 |
 | 规划 | llm | `prepare_session_recall_request` | 生成 `recall_request`，只包含检索参数。 |
-| 检索 | llm+skill | `recall_related_sessions` | 调用 `buddy_session_recall`，返回真实历史消息。 |
+| 检索 | llm+action | `recall_related_sessions` | 调用 `buddy_session_recall`，返回真实历史消息。 |
 | 判断 | llm | `extract_memory_candidates` | 从 run、当前对话、召回结果中提取“可能沉淀”的事实。 |
 | 过滤 | llm/condition | `filter_memory_candidates` | 剔除临时信息、敏感信息、可重读信息、权限相关内容。 |
 | 合并 | llm | `merge_memory_document` | 基于旧 `MEMORY.md` 生成完整新 `MEMORY.md`。 |
 | 校验 | condition | `has_memory_updates` | 没有更新则走报告分支。 |
-| 写入 | llm+skill | `write_memory_updates` | 调用 `buddy_home_writer`，只允许 `memory_document.update`。 |
+| 写入 | llm+action | `write_memory_updates` | 调用 `buddy_home_writer`，只允许 `memory_document.update`。 |
 | 输出 | output | `memory_review_result` | 展示写入摘要、revision、diff 或 skipped reason。 |
 
 ### 记忆候选判断规则
@@ -566,7 +566,7 @@ flowchart TD
 - 中文、英文、混合 token 查询都不因 FTS 语法报错而失败。
 - 同一会话多个命中不会挤掉其他相关会话。
 - scroll 可以从 discover 的锚点继续展开上下文。
-- 召回 Skill 不做总结、不写记忆、不触碰 `MEMORY.md`。
+- 召回 Action 不做总结、不写记忆、不触碰 `MEMORY.md`。
 
 记忆落盘模板完成后：
 
@@ -596,7 +596,7 @@ TooGraph：
 
 - `backend/app/buddy/home.py`
 - `backend/app/buddy/store.py`
-- `skill/official/buddy_session_recall/`
-- `skill/official/buddy_home_writer/`
+- `action/official/buddy_session_recall/`
+- `action/official/buddy_home_writer/`
 - `graph_template/official/buddy_autonomous_review/template.json`
 

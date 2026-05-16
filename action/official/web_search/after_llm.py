@@ -24,8 +24,8 @@ PAGE_FETCH_USER_AGENT = "TooGraph/1.0 (+https://github.com/OoABYSSoO/TooGraph)"
 HTTP_PROXY_ENV_KEYS = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy")
 
 
-def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
-    query = _compact_text(skill_inputs.get("query"))
+def web_search_action(**action_inputs: Any) -> dict[str, Any]:
+    query = _compact_text(action_inputs.get("query"))
     if not query:
         return _final_response(
             query="",
@@ -44,7 +44,7 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
             ],
         )
 
-    api_key = _resolve_tavily_api_key(skill_inputs)
+    api_key = _resolve_tavily_api_key(action_inputs)
     provider = "tavily" if api_key else "duckduckgo"
 
     try:
@@ -250,8 +250,8 @@ def _fetch_source_documents(
 ) -> list[dict[str, Any]]:
     if not results:
         return []
-    artifact_dir = _compact_text(os.getenv("TOOGRAPH_SKILL_ARTIFACT_DIR"))
-    artifact_relative_dir = _compact_text(os.getenv("TOOGRAPH_SKILL_ARTIFACT_RELATIVE_DIR")).replace("\\", "/").strip("/")
+    artifact_dir = _compact_text(os.getenv("TOOGRAPH_ACTION_ARTIFACT_DIR"))
+    artifact_relative_dir = _compact_text(os.getenv("TOOGRAPH_ACTION_ARTIFACT_RELATIVE_DIR")).replace("\\", "/").strip("/")
     if not artifact_dir or not artifact_relative_dir:
         return []
 
@@ -599,8 +599,8 @@ def _web_download_summary(downloaded_count: int) -> str:
     return f"Downloaded {downloaded_count} {noun}."
 
 
-def _resolve_tavily_api_key(skill_inputs: dict[str, Any]) -> str:
-    return _compact_text(skill_inputs.get("api_key")) or _compact_text(os.getenv("TAVILY_API_KEY"))
+def _resolve_tavily_api_key(action_inputs: dict[str, Any]) -> str:
+    return _compact_text(action_inputs.get("api_key")) or _compact_text(os.getenv("TAVILY_API_KEY"))
 
 
 def _http_client_kwargs(*, timeout_seconds: float, follow_redirects: bool = False) -> dict[str, Any]:
@@ -661,7 +661,7 @@ def _compact_multiline_text(value: object) -> str:
 def _truncate_text(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
-    return f"{text[:max_chars].rstrip()}\n\n[Content truncated by web_search skill at {max_chars} characters.]"
+    return f"{text[:max_chars].rstrip()}\n\n[Content truncated by web_search action at {max_chars} characters.]"
 
 
 def _source_url_key(url: str) -> str:
@@ -693,8 +693,8 @@ def main() -> None:
     except json.JSONDecodeError as exc:
         payload = {"query": "", "error": f"Invalid JSON input: {exc}"}
     if not isinstance(payload, dict):
-        payload = {"query": "", "error": "Skill LLM output must be a JSON object."}
-    result = web_search_skill(**payload)
+        payload = {"query": "", "error": "Action LLM output must be a JSON object."}
+    result = web_search_action(**payload)
     print(json.dumps(result, ensure_ascii=False))
 
 

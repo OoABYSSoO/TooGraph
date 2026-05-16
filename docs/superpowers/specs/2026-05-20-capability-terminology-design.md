@@ -104,7 +104,6 @@ Action 的关键特征：
 适合 Tool 的例子：
 
 - 视频分段。
-- 视频抽帧。
 - 文档切块。
 - OCR 预处理。
 - 图片压缩或格式转换。
@@ -199,31 +198,24 @@ Batch 节点负责把数组输入拆成多个并行或并发 worker 运行，并
 ```text
 Input 节点暴露 source_video
 -> Tool 节点执行 video_segmenter
--> 输出 video_segments
+-> 输出 segments
 -> Batch 节点逐段分析
 -> 汇总 LLM
 ```
 
 Input 节点可以提供快捷入口，例如“添加视频分段 Tool”，但不应在用户拖入视频时静默产生重型处理副作用。
 
-`video_segments` 的目标输出形状：
+`video_segmenter` 的输出应尽量简单：只输出切割后的视频片段数组，不抽帧，不判断模型能力，不封装长流程。目标输出形状：
 
 ```json
 {
-  "kind": "video_segments",
-  "source": {
-    "stateKey": "source_video",
-    "path": "/path/to/source.mp4"
-  },
-  "segmentDurationSec": 30,
   "segments": [
     {
       "index": 0,
-      "startSec": 0,
-      "endSec": 30,
-      "durationSec": 30,
-      "path": "/path/to/segment-000.mp4",
-      "mimeType": "video/mp4"
+      "start_sec": 0,
+      "end_sec": 30,
+      "local_path": "run/node/video_segmenter/invocation_001/segment_000.mp4",
+      "mime_type": "video/mp4"
     }
   ]
 }
@@ -231,20 +223,19 @@ Input 节点可以提供快捷入口，例如“添加视频分段 Tool”，但
 
 ## 迁移策略
 
-这次设计不要求立刻重命名代码目录或协议字段。
+这次设计的迁移已经进入 Action/Tool 协议落地阶段。
 
-推荐迁移顺序：
+推荐维护顺序：
 
-1. 先在文档和 UI 文案中建立新术语：Skill、Capability、Action、Tool、Subgraph。
-2. 新功能优先使用新术语。视频分段能力按 Tool 设计，不再新增 LLM-only Skill 变体。
-3. 设计 Tool 节点和 Tool manifest 时，不复用 Action 的 `llmOutputSchema` 作为必需字段。
+1. 文档和 UI 文案中继续保持新术语：Skill、Capability、Action、Tool、Subgraph。
+2. 新功能必须使用新术语。视频分段能力按 Tool 设计，不新增 LLM-only Skill 变体。
+3. Tool 节点和 Tool manifest 不复用 Action 的 `llmOutputSchema` 作为必需字段。
 4. 动态 capability payload 的目标 `kind` 使用 `action`、`tool`、`subgraph`。
-5. 现有 `kind: "skill"`、`skillKey`、`skillBindings` 等命名应通过一次明确的协议迁移处理，不做隐藏修复。
-6. 未来 Agent 操作书型 Skill 管理单独设计，不复用当前 `skill/official` 的节点能力语义。
+5. 旧 `kind: "skill"`、`skillKey`、`skillBindings` 等命名只能通过显式迁移脚本或重建路径处理，不做隐藏修复。
+6. 未来 Agent 操作书型 Skill 管理单独设计，不复用 Action 包语义。
 
 ## 不做的事
 
-- 不把当前所有 `skill/official` 立即改名。
 - 不把视频分段放进 Input 节点作为隐藏自动行为。
 - 不新增 `Workflow` 术语。
 - 不把 Tool 伪装成 LLM 节点挂载的 Action。
@@ -255,8 +246,9 @@ Input 节点可以提供快捷入口，例如“添加视频分段 Tool”，但
 当前实现中：
 
 - `NodeSystemStateType` 已有 `capability`，没有单独的 `subgraph` state 类型。
-- 动态 capability 读取目前支持 `kind: "skill"` 和 `kind: "subgraph"`。
-- 当前官方能力包位于 `skill/official`，运行时入口以 `before_llm.py` 和 `after_llm.py` 为主。
+- 动态 capability 读取使用 `kind: "action"` 和 `kind: "subgraph"`；`tool` 作为独立 Tool 节点运行，不挂载在 LLM 节点上。
+- 当前官方节点能力包位于 `action/official`，运行时入口以 `before_llm.py` 和 `after_llm.py` 为主。
+- Tool 节点已有独立的 `toolKey`、`tool_input`、`tool_output`、`selected_tools`、`tool_outputs` 和 `tool_invocation` 路径。
 - Batch worker source 已有 `default_llm` 和 `subgraph`。
 
 这些是迁移起点，不是目标术语的最终形态。

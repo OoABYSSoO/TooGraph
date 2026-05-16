@@ -8,7 +8,8 @@ from pydantic import ValidationError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemGraphDocument
+from app.core.schemas import node_system
+from app.core.schemas.node_system import NodeSystemAgentActionBinding, NodeSystemAgentConfig, NodeSystemAgentNode, NodeSystemGraphDocument
 
 
 def _minimal_agent_graph(config: dict) -> dict:
@@ -54,6 +55,13 @@ def _minimal_agent_graph(config: dict) -> dict:
 
 
 class NodeSystemActionProtocolTests(unittest.TestCase):
+    def test_node_system_schema_does_not_export_legacy_skill_protocol_aliases(self) -> None:
+        self.assertFalse(hasattr(node_system, "NodeSystemAgentSkillBinding"))
+        self.assertFalse(hasattr(node_system, "NodeSystemSkillInstructionBlock"))
+        self.assertFalse(hasattr(NodeSystemAgentActionBinding(actionKey="web_search"), "skill_key"))
+        self.assertFalse(hasattr(NodeSystemAgentConfig(actionKey="web_search"), "skill_key"))
+        self.assertFalse(hasattr(NodeSystemAgentConfig(actionKey="web_search"), "skill_bindings"))
+
     def test_agent_config_accepts_action_protocol_fields(self) -> None:
         graph = NodeSystemGraphDocument.model_validate(
             _minimal_agent_graph(

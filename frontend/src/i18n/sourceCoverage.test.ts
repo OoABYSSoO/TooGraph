@@ -52,7 +52,7 @@ const hardcodedUiFragments = [
   "Edit state?",
   "No configured models",
   "Select model",
-  "Remove skill",
+  "Remove action",
   "Describe what this node should do",
   "Primary Output",
   "Cycle Summary",

@@ -5,7 +5,7 @@ description: Read, list, search, write one file, or execute one script inside To
 
 # 本地工作区执行器
 
-Use this skill when a graph needs one explicit local workspace operation on one repository path.
+Use this action when a graph needs one explicit local workspace operation on one repository path.
 
 State inputs:
 
@@ -18,7 +18,7 @@ The LLM node generates only this structured LLM output:
 - `content`: complete final file content for `write`; return an empty string for other operations.
 - `query`: search text for `search`; return an empty string for other operations.
 
-The skill exposes these state outputs:
+The action exposes these state outputs:
 
 - `success`: whether the operation succeeded.
 - `result`: the successful output or failure detail.
@@ -52,4 +52,4 @@ Default policy:
 - Execute roots: `backend/data/tmp`, `action/user`.
 - Execute extensions: `.py`, `.js`, `.mjs`, `.sh`, `.bat`, `.ps1`.
 
-Execution is not an OS sandbox. It is constrained by path policy before launch, but the launched script still runs as a local process. This Skill declares file-write and subprocess capability; the current runtime approval gate is skill-level, so `需确认` mode can pause before invoking this Skill even when the generated operation is read-only. `完全访问` mode can run it without an extra prompt.
+Execution is not an OS sandbox. It is constrained by path policy before launch, but the launched script still runs as a local process. This Action declares file-write and subprocess capability; the current runtime approval gate is action-level, so `需确认` mode can pause before invoking this Action even when the generated operation is read-only. `完全访问` mode can run it without an extra prompt.

@@ -56,8 +56,8 @@
           <div class="editor-human-review-panel__state-head">
             <span class="editor-human-review-panel__state-dot" aria-hidden="true" />
             <div>
-              <div class="editor-human-review-panel__state-label">{{ panelModel.permissionApproval.skillName }}</div>
-              <div class="editor-human-review-panel__state-meta">{{ panelModel.permissionApproval.skillKey }}</div>
+              <div class="editor-human-review-panel__state-label">{{ panelModel.permissionApproval.capabilityName }}</div>
+              <div class="editor-human-review-panel__state-meta">{{ panelModel.permissionApproval.capabilityKey }}</div>
             </div>
           </div>
           <p v-if="panelModel.permissionApproval.reason" class="editor-human-review-panel__state-description">

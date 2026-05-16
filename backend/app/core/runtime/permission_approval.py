@@ -27,15 +27,15 @@ class PermissionApprovalDecision:
     mode: str
 
 
-def should_pause_for_skill_permission_approval(
+def should_pause_for_action_permission_approval(
     *,
     state: dict[str, Any],
     node_name: str,
-    skill_key: str,
-    skill_definition: Any,
+    action_key: str,
+    action_definition: Any,
 ) -> PermissionApprovalDecision:
-    _ = (node_name, skill_key)
-    permissions = [str(item).strip() for item in getattr(skill_definition, "permissions", []) or [] if str(item).strip()]
+    _ = (node_name, action_key)
+    permissions = [str(item).strip() for item in getattr(action_definition, "permissions", []) or [] if str(item).strip()]
     risky_permissions = _ordered_risky_permissions(permissions)
     mode = resolve_permission_mode(state)
     return PermissionApprovalDecision(
@@ -64,35 +64,37 @@ def build_pending_permission_approval(
     *,
     state: dict[str, Any],
     node_name: str,
-    skill_key: str,
-    skill_name: str,
+    action_key: str,
+    action_name: str,
     binding_source: str,
     permissions: list[str],
-    skill_inputs: dict[str, Any],
+    inputs: dict[str, Any],
 ) -> dict[str, Any]:
     normalized_permissions = _ordered_risky_permissions(permissions)
     approval_seed = {
         "run_id": str(state.get("run_id") or ""),
         "node_id": node_name,
-        "skill_key": skill_key,
+        "capability_kind": "action",
+        "capability_key": action_key,
         "binding_source": binding_source,
         "permissions": normalized_permissions,
-        "skill_inputs": skill_inputs,
+        "inputs": inputs,
     }
     approval_id = hashlib.sha256(
         json.dumps(approval_seed, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")
     ).hexdigest()[:16]
     return {
-        "kind": "skill_permission_approval",
+        "kind": "capability_permission_approval",
         "approval_id": approval_id,
         "node_id": node_name,
-        "skill_key": skill_key,
-        "skill_name": skill_name or skill_key,
+        "capability_kind": "action",
+        "capability_key": action_key,
+        "capability_name": action_name or action_key,
         "binding_source": binding_source,
         "permissions": normalized_permissions,
-        "skill_inputs": skill_inputs,
-        "input_preview": _preview_value(skill_inputs),
-        "reason": _approval_reason(normalized_permissions, skill_name or skill_key),
+        "inputs": inputs,
+        "input_preview": _preview_value(inputs),
+        "reason": _approval_reason(normalized_permissions, action_name or action_key),
         "requested_at": utc_now_iso(),
     }
 
@@ -101,18 +103,20 @@ def consume_pending_permission_approval(
     state: dict[str, Any],
     *,
     node_name: str,
-    skill_key: str,
+    action_key: str,
     binding_source: str,
 ) -> dict[str, Any] | None:
     metadata = state.get("metadata") if isinstance(state.get("metadata"), dict) else {}
     pending = metadata.get("pending_permission_approval")
     if not isinstance(pending, dict):
         return None
-    if str(pending.get("kind") or "") != "skill_permission_approval":
+    if str(pending.get("kind") or "") != "capability_permission_approval":
         return None
     if str(pending.get("node_id") or "") != node_name:
         return None
-    if str(pending.get("skill_key") or "") != skill_key:
+    if str(pending.get("capability_kind") or "") != "action":
+        return None
+    if str(pending.get("capability_key") or "") != action_key:
         return None
     if str(pending.get("binding_source") or "") != binding_source:
         return None
@@ -140,18 +144,20 @@ def find_pending_permission_approval_for_node(
     state: dict[str, Any],
     *,
     node_name: str,
-    skill_keys: set[str],
+    action_keys: set[str],
 ) -> dict[str, Any] | None:
     metadata = state.get("metadata") if isinstance(state.get("metadata"), dict) else {}
     pending = metadata.get("pending_permission_approval")
     if not isinstance(pending, dict):
         return None
-    if str(pending.get("kind") or "") != "skill_permission_approval":
+    if str(pending.get("kind") or "") != "capability_permission_approval":
         return None
     if str(pending.get("node_id") or "") != node_name:
         return None
-    pending_skill_key = str(pending.get("skill_key") or "")
-    if pending_skill_key not in skill_keys:
+    if str(pending.get("capability_kind") or "") != "action":
+        return None
+    pending_action_key = str(pending.get("capability_key") or "")
+    if pending_action_key not in action_keys:
         return None
     return pending
 
@@ -163,11 +169,11 @@ def _ordered_risky_permissions(permissions: list[str]) -> list[str]:
     return [*ordered, *extras]
 
 
-def _approval_reason(permissions: list[str], skill_name: str) -> str:
+def _approval_reason(permissions: list[str], action_name: str) -> str:
     if not permissions:
         return ""
     label = ", ".join(permissions)
-    return f"Skill '{skill_name}' declares risky permission(s): {label}."
+    return f"Action '{action_name}' declares risky permission(s): {label}."
 
 
 def _resolve_resume_decision(resume_payload: dict[str, Any]) -> str:

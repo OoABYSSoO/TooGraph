@@ -128,7 +128,7 @@ test("buddy mascot debug store attributes fixed template run operations to the e
         templateId: "advanced_web_research_loop",
         templateName: "高级联网搜索",
         searchText: "advanced_web_research_loop",
-        inputText: "研究 TooGraph 页面操作技能的最新差距。",
+        inputText: "研究 TooGraph 页面操作 Action的最新差距。",
         runTargetId: "editor.action.runActiveGraph",
       },
     ],

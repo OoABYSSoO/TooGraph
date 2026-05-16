@@ -18,7 +18,7 @@ TooGraph Buddy 的记忆系统采用 Hermes 风格的两层模型：
 - 平台 `memories` 体系从产品中删除，不做隐藏入口，不作为备用记忆库。
 - 用户不再看到候选记忆、应用、拒绝、替代、归档这类判断流程。
 - 后台整理记忆由图模板完成。
-- 单元能力继续封装成 Skill，图模板负责流程编排。
+- 单元能力继续封装成 Action，图模板负责流程编排。
 - 自动写入不需要用户逐条确认，但必须有 command、revision、diff 或等价历史。
 
 ## 不做的事
@@ -26,7 +26,7 @@ TooGraph Buddy 的记忆系统采用 Hermes 风格的两层模型：
 - 不接入 Honcho、Mem0、Holographic 或其他外部记忆 provider。
 - 不保留平台 memory 作为隐藏 fallback。
 - 不维护两个可编辑长期记忆源。
-- 不让 Skill 承担多步自治、记忆策略或后台整理循环。
+- 不让 Action 承担多步自治、记忆策略或后台整理循环。
 - 不把候选记忆审批作为用户体验的一部分。
 
 ## 当前问题
@@ -104,7 +104,7 @@ Buddy DB 是运行状态和审计存储，不是长期记忆权威。
 - `discover`：根据查询词搜索历史消息，返回命中会话和命中消息附近窗口。
 - `scroll`：根据 `session_id` 和消息锚点继续向前或向后展开窗口。
 
-召回结果必须来自真实 DB 消息，不能由 LLM 生成历史摘要。LLM 可以在后续节点理解召回结果，但召回 Skill 本身只做检索和裁剪。
+召回结果必须来自真实 DB 消息，不能由 LLM 生成历史摘要。LLM 可以在后续节点理解召回结果，但召回 Action 本身只做检索和裁剪。
 
 中文和混合语言检索需要 `buddy_messages_fts_trigram`，避免普通 FTS 对中文短语和子串检索效果差。
 
@@ -129,18 +129,18 @@ Buddy DB 是运行状态和审计存储，不是长期记忆权威。
 
 输出和副作用：
 
-- 通过受控 Skill 更新 `MEMORY.md`、`USER.md` 或其他允许的 Buddy Home 文件。
+- 通过受控 Action 更新 `MEMORY.md`、`USER.md` 或其他允许的 Buddy Home 文件。
 - 写入 `buddy_commands`。
 - 写入 `buddy_revisions`。
 - 必要时生成 `buddy_home/reports/*.md`。
 
 默认第一阶段只允许自动更新 `MEMORY.md`。`SOUL.md`、`policy.json` 这类高影响设定不应由后台整理自动修改，除非后续单独设计权限规则。
 
-### 5. Skill 边界
+### 5. Action 边界
 
-Skill 只做单次受控能力调用。
+Action 只做单次受控能力调用。
 
-目标 Skill：
+目标 Action：
 
 - `buddy_home_reader`：读取 Buddy Home 文件，返回结构化上下文。
 - `buddy_home_writer`：通过 command/revision 路径写 Buddy Home 文件。
@@ -205,8 +205,8 @@ Skill 只做单次受控能力调用。
 
 1. 后台整理图读取 Buddy Home 和会话召回上下文。
 2. LLM 节点生成结构化写入计划。
-3. 写入 Skill 校验目标文件、写入范围和风险。
-4. 写入 Skill 通过 command/revision 路径更新 `MEMORY.md`。
+3. 写入 Action 校验目标文件、写入范围和风险。
+4. 写入 Action 通过 command/revision 路径更新 `MEMORY.md`。
 5. 运行详情展示本次整理活动。
 6. Buddy 页面变更历史可恢复到整理前版本。
 
@@ -223,10 +223,10 @@ Skill 只做单次受控能力调用。
 - `memories`、`memory_revisions`、`memory_events`、`memories_fts` 的 schema 初始化和迁移路径
 - 平台 memory 相关测试
 
-Skill 删除候选：
+Action 删除候选：
 
-- `skill/official/memory_recall/`
-- `skill/official/memory_candidate_writer/`
+- `action/official/memory_recall/`
+- `action/official/memory_candidate_writer/`
 
 前端删除候选：
 
@@ -245,7 +245,7 @@ Skill 删除候选：
 
 - `README.md`
 - `docs/future/buddy-autonomous-agent-roadmap.md`
-- `skill/SKILL_AUTHORING_GUIDE.md`
+- `action/ACTION_AUTHORING_GUIDE.md`
 - 任何把 platform memory candidate 描述为产品能力的文档。
 
 ## 迁移策略
@@ -253,7 +253,7 @@ Skill 删除候选：
 1. 检查现有 platform `memories` 中是否有需要保留的内容。
 2. 如有必要，生成一次迁移报告。
 3. 把确实有价值的内容人工或一次性脚本合并进 `buddy_home/MEMORY.md`。
-4. 删除 platform memory UI、API、Skill 和模板依赖。
+4. 删除 platform memory UI、API、Action 和模板依赖。
 5. 删除 `buddy_memories` 长期记忆表及其 UI/command 路径。
 6. 增加 `buddy_messages` FTS 和 `buddy_session_recall`。
 7. 改造后台整理模板，让它直接写 `MEMORY.md` 并记录 revision。
@@ -266,10 +266,10 @@ Skill 删除候选：
 第一阶段只做最小闭环：
 
 1. 明确 `MEMORY.md` 是唯一长期记忆权威。
-2. 删除 platform memory 的 UI、API、Skill 和模板依赖。
+2. 删除 platform memory 的 UI、API、Action 和模板依赖。
 3. 删除 `buddy_memories` 作为长期记忆源。
 4. 给 `buddy_messages` 增加 FTS 和 trigram FTS。
-5. 新增 `buddy_session_recall` Skill。
+5. 新增 `buddy_session_recall` Action。
 6. 后台整理图模板只允许自动更新 `MEMORY.md`。
 7. 所有自动更新都走 `buddy_commands` 和 `buddy_revisions`。
 
@@ -278,5 +278,5 @@ Skill 删除候选：
 - 长期记忆：`MEMORY.md`
 - 会话召回：`buddy_messages` + FTS
 - 自动整理：图模板
-- 原子能力：Skill
+- 原子能力：Action
 - 用户恢复：revision history

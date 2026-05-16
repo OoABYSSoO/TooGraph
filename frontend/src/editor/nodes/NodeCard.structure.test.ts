@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,11 +17,13 @@ const batchNodeBodySource = readFileSync(resolve(currentDirectory, "BatchNodeBod
 const inputNodeBodySource = readFileSync(resolve(currentDirectory, "InputNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 const outputNodeBodySource = readFileSync(resolve(currentDirectory, "OutputNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 const subgraphNodeBodySource = readFileSync(resolve(currentDirectory, "SubgraphNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
+const toolNodeBodyPath = resolve(currentDirectory, "ToolNodeBody.vue");
+const toolNodeBodySource = existsSync(toolNodeBodyPath) ? readFileSync(toolNodeBodyPath, "utf8").replace(/\r\n/g, "\n") : "";
 const conditionNodeBodySource = readFileSync(resolve(currentDirectory, "ConditionNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 const topActionsSource = readFileSync(resolve(currentDirectory, "NodeCardTopActions.vue"), "utf8").replace(/\r\n/g, "\n");
 const primaryStatePortSource = readFileSync(resolve(currentDirectory, "PrimaryStatePort.vue"), "utf8").replace(/\r\n/g, "\n");
 const floatingStatePortPillSource = readFileSync(resolve(currentDirectory, "FloatingStatePortPill.vue"), "utf8").replace(/\r\n/g, "\n");
-const agentSkillPickerSource = readFileSync(resolve(currentDirectory, "AgentActionPicker.vue"), "utf8").replace(/\r\n/g, "\n");
+const agentActionPickerSource = readFileSync(resolve(currentDirectory, "AgentActionPicker.vue"), "utf8").replace(/\r\n/g, "\n");
 const agentRuntimeControlsSource = readFileSync(resolve(currentDirectory, "AgentRuntimeControls.vue"), "utf8").replace(/\r\n/g, "\n");
 const statePortListSource = readFileSync(resolve(currentDirectory, "StatePortList.vue"), "utf8").replace(/\r\n/g, "\n");
 const portListSurfaceSource = `${statePortListSource}\n${conditionNodeBodySource}\n${primaryStatePortSource}\n${floatingStatePortPillSource}`;
@@ -103,6 +105,21 @@ test("BatchNodeBody uses the shared select wrapper for worker selection", () => 
   assert.doesNotMatch(batchNodeBodySource, /workerSelectRenderKey/);
   assert.doesNotMatch(batchNodeBodySource, /collapseWorkerSelect/);
   assert.doesNotMatch(batchNodeBodySource, /batch-node-body__worker-popper/);
+});
+
+test("ToolNodeBody renders deterministic tool selection with managed ports", () => {
+  assert.notEqual(toolNodeBodySource, "", "expected ToolNodeBody.vue to exist");
+  assert.match(componentSource, /import ToolNodeBody from "\.\/ToolNodeBody\.vue";/);
+  assert.match(componentSource, /'node-card--tool': view\.body\.kind === 'tool'/);
+  assert.match(componentSource, /<section v-else-if="view\.body\.kind === 'tool'" class="node-card__body node-card__body--tool">/);
+  assert.match(componentSource, /<ToolNodeBody[\s\S]*:selected-tool-key="selectedToolKey"[\s\S]*:tool-definitions="toolDefinitions"[\s\S]*:tool-definitions-loading="toolDefinitionsLoading"[\s\S]*:tool-definitions-error="toolDefinitionsError"[\s\S]*@select-tool="selectTool"/);
+  assert.match(toolNodeBodySource, /import ToographSelect from "@\/components\/ToographSelect\.vue";/);
+  assert.match(toolNodeBodySource, /<ToographSelect[\s\S]*class="tool-node-body__tool-select"[\s\S]*:model-value="selectedToolKey"[\s\S]*filterable[\s\S]*popper-class="tool-node-body__tool-popper"[\s\S]*@update:model-value="emit\('select-tool', String\(\$event \?\? ''\)\)"/);
+  assert.match(toolNodeBodySource, /<StatePortList[\s\S]*side="input"[\s\S]*:ports="orderedInputPorts"/);
+  assert.match(toolNodeBodySource, /<StatePortList[\s\S]*side="output"[\s\S]*:ports="orderedOutputPorts"/);
+  assert.doesNotMatch(toolNodeBodySource, /<AgentRuntimeControls/);
+  assert.doesNotMatch(toolNodeBodySource, /<AgentActionPicker/);
+  assert.doesNotMatch(toolNodeBodySource, /<ElSelect/);
 });
 
 test("NodeCard renders output state pills with an integrated anchor slot", () => {
@@ -240,7 +257,7 @@ test("SubgraphNodeBody renders a status-aware DAG mini map with node names", () 
   assert.doesNotMatch(subgraphNodeBodySource, /v-for="item in body\.thumbnailNodes"[\s\S]*class="subgraph-node-body__mini-node"/);
 });
 
-test("SubgraphNodeBody shows subgraph skill capability pills in the same blue skill tone", () => {
+test("SubgraphNodeBody shows subgraph action capability pills in the same blue action tone", () => {
   assert.match(subgraphNodeBodySource, /class="subgraph-node-body__capabilities"/);
   assert.match(subgraphNodeBodySource, /\.subgraph-node-body__capabilities span \{[\s\S]*border-color:\s*rgba\(37,\s*99,\s*235,\s*0\.22\);/);
   assert.match(subgraphNodeBodySource, /\.subgraph-node-body__capabilities span \{[\s\S]*background:\s*rgba\(239,\s*246,\s*255,\s*0\.92\);/);
@@ -544,7 +561,7 @@ test("NodeCard keeps agent model selection in the dropdown without rendering dup
   assert.doesNotMatch(componentSource, /\.node-card__model-pill--active \{/);
 });
 
-test("NodeCard keeps skill actions below the agent while creating ports from plus state pills", () => {
+test("NodeCard keeps action actions below the agent while creating ports from plus state pills", () => {
   const agentSectionMatch = componentSource.match(
     /<section v-else-if="view\.body\.kind === 'agent'"[\s\S]*?<\/section>/,
   );
@@ -552,18 +569,18 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   const agentSection = agentSectionMatch[0];
 
   assert.match(agentNodeBodySource, /import AgentActionPicker from "\.\/AgentActionPicker\.vue";/);
-  assert.match(agentNodeBodySource, /<AgentActionPicker[\s\S]*:selected-skill-key="selectedSkillKey"[\s\S]*:available-skill-definitions="availableSkillDefinitions"[\s\S]*:breakpoint-enabled="breakpointEnabled"[\s\S]*@update:selected-skill="emit\('select-skill', \$event\)"[\s\S]*@update:breakpoint-enabled="emit\('update:breakpoint-enabled', \$event\)"/);
-  assert.match(agentSection, /@select-skill="selectAgentSkill"/);
-  assert.match(agentSkillPickerSource, /<ToographSelect[\s\S]*class="node-card__agent-skill-select"[\s\S]*:model-value="selectedSkillKey"[\s\S]*popper-class="node-card__agent-skill-popper"/);
-  assert.match(agentSkillPickerSource, /class="node-card__agent-toggle-card node-card__agent-toggle-card--breakpoint"/);
+  assert.match(agentNodeBodySource, /<AgentActionPicker[\s\S]*:selected-action-key="selectedActionKey"[\s\S]*:available-action-definitions="availableActionDefinitions"[\s\S]*:breakpoint-enabled="breakpointEnabled"[\s\S]*@update:selected-action="emit\('select-action', \$event\)"[\s\S]*@update:breakpoint-enabled="emit\('update:breakpoint-enabled', \$event\)"/);
+  assert.match(agentSection, /@select-action="selectAgentAction"/);
+  assert.match(agentActionPickerSource, /<ToographSelect[\s\S]*class="node-card__agent-action-select"[\s\S]*:model-value="selectedActionKey"[\s\S]*popper-class="node-card__agent-action-popper"/);
+  assert.match(agentActionPickerSource, /class="node-card__agent-toggle-card node-card__agent-toggle-card--breakpoint"/);
   assert.match(componentSource, /from "\.\/actionPickerModel";/);
-  assert.match(componentSource, /resolveSelectAgentSkillPatch/);
-  assert.match(componentSource, /const selectedSkillKey = computed\(\(\) => props\.node\.kind === "agent" \? props\.node\.config\.actionKey\.trim\(\) : ""\);/);
-  assert.match(componentSource, /const patch = resolveSelectAgentSkillPatch\(\s*props\.node\.config\.actionKey,\s*skillKey,\s*props\.skillDefinitions,\s*props\.node\.config\.actionInstructionBlocks \?\? \{\},\s*\);/);
-  assert.match(componentSource, /function selectAgentSkill\(skillKey: string\) \{[\s\S]*if \(!patch\) \{[\s\S]*return;[\s\S]*\}[\s\S]*emitAgentConfigPatch\(patch\);/);
-  assert.doesNotMatch(componentSource, /resolveAttachAgentSkillPatch/);
-  assert.doesNotMatch(componentSource, /resolveRemoveAgentSkillPatch/);
-  assert.doesNotMatch(componentSource, /props\.node\.config\.skills/);
+  assert.match(componentSource, /resolveSelectAgentActionPatch/);
+  assert.match(componentSource, /const selectedActionKey = computed\(\(\) => props\.node\.kind === "agent" \? props\.node\.config\.actionKey\.trim\(\) : ""\);/);
+  assert.match(componentSource, /const patch = resolveSelectAgentActionPatch\(\s*props\.node\.config\.actionKey,\s*actionKey,\s*props\.actionDefinitions,\s*props\.node\.config\.actionInstructionBlocks \?\? \{\},\s*\);/);
+  assert.match(componentSource, /function selectAgentAction\(actionKey: string\) \{[\s\S]*if \(!patch\) \{[\s\S]*return;[\s\S]*\}[\s\S]*emitAgentConfigPatch\(patch\);/);
+  assert.doesNotMatch(componentSource, /resolveAttachAgentActionPatch/);
+  assert.doesNotMatch(componentSource, /resolveRemoveAgentActionPatch/);
+  assert.doesNotMatch(componentSource, /props\.node\.config\.actions/);
   assert.match(agentSection, /@open-create="openPortStateCreate"/);
   assert.doesNotMatch(agentSection, /@dblclick\.stop="openPortStateCreate\('input'\)"/);
   assert.doesNotMatch(agentSection, /@dblclick\.stop="openPortStateCreate\('output'\)"/);
@@ -587,7 +604,7 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.match(componentSource, /const transparentPopoverStyle = \{/);
   assert.match(componentSource, /const agentAddPopoverStyle = transparentPopoverStyle;/);
   assert.match(componentSource, /"--el-popover-bg-color":\s*"transparent"/);
-  assert.match(agentSkillPickerSource, /\.node-card__agent-skill-select \{[\s\S]*--el-color-primary:\s*#2563eb;/);
+  assert.match(agentActionPickerSource, /\.node-card__agent-action-select \{[\s\S]*--el-color-primary:\s*#2563eb;/);
   assert.match(createPopoverSource, /\.node-card__agent-create-port-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
   assert.equal((componentSource.match(/<StatePortCreatePopover/g) ?? []).length, 0);
   assert.equal((statePortListSource.match(/<StatePortCreatePopover/g) ?? []).length, 1);
@@ -599,8 +616,8 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.doesNotMatch(agentSection, /node-card__action-pill--input/);
   assert.doesNotMatch(agentSection, /node-card__action-pill--output/);
   assert.doesNotMatch(agentSection, /<div v-if="activePortPickerSide" class="node-card__port-picker"/);
-  assert.doesNotMatch(agentSection, /<div v-if="isSkillPickerOpen" class="node-card__skill-picker"/);
-  assert.doesNotMatch(agentSection, /v-for="definition in availableSkillDefinitions"/);
+  assert.doesNotMatch(agentSection, /<div v-if="isActionPickerOpen" class="node-card__action-picker"/);
+  assert.doesNotMatch(agentSection, /v-for="definition in availableActionDefinitions"/);
 });
 
 test("NodeCard keeps new state drafts while the create popover switches to existing states", () => {
@@ -650,12 +667,12 @@ test("NodeCard renders plus input and plus output as virtual agent state port ro
   assert.match(agentSection, /:ordered-output-ports="orderedAgentOutputPorts"/);
   assert.match(statePortListSource, /v-for="port in ports"/);
   assert.match(componentSource, /const shouldShowAgentCreateInputPort = computed\(\(\) => agentInputPorts\.value\.length === 0\);/);
-  assert.match(componentSource, /const isAgentOutputManagedBySkill = computed\(\(\) => props\.node\.kind === "agent" && props\.node\.config\.actionKey\.trim\(\)\.length > 0\);/);
+  assert.match(componentSource, /const isAgentOutputManagedByAction = computed\(\(\) => props\.node\.kind === "agent" && props\.node\.config\.actionKey\.trim\(\)\.length > 0\);/);
   assert.match(componentSource, /import \{ isAgentOutputManagedByDynamicCapability \} from "@\/lib\/agent-capability-management";/);
   assert.match(componentSource, /const isAgentOutputManagedByCapability = computed\(\(\) =>[\s\S]*isAgentOutputManagedByDynamicCapability\(\{[\s\S]*nodeId: props\.nodeId,[\s\S]*node: props\.node,[\s\S]*stateSchema: props\.stateSchema,[\s\S]*\}\)/);
-  assert.match(componentSource, /const shouldShowAgentCreateOutputPort = computed\([\s\S]*!isAgentOutputManagedBySkill\.value && !isAgentOutputManagedByCapability\.value && agentOutputPorts\.value\.length === 0/);
+  assert.match(componentSource, /const shouldShowAgentCreateOutputPort = computed\([\s\S]*!isAgentOutputManagedByAction\.value && !isAgentOutputManagedByCapability\.value && agentOutputPorts\.value\.length === 0/);
   assert.match(componentSource, /const shouldRevealAgentCreateInputPort = computed\(\(\) =>[\s\S]*shouldShowAgentCreateInputPort\.value[\s\S]*props\.selected[\s\S]*props\.hovered[\s\S]*hasFloatingPanelOpen\.value/);
-  assert.match(componentSource, /const shouldRevealAgentCreateOutputPort = computed\([\s\S]*!isAgentOutputManagedBySkill\.value[\s\S]*shouldShowAgentCreateOutputPort\.value[\s\S]*props\.selected[\s\S]*props\.hovered[\s\S]*hasFloatingPanelOpen\.value/);
+  assert.match(componentSource, /const shouldRevealAgentCreateOutputPort = computed\([\s\S]*!isAgentOutputManagedByAction\.value[\s\S]*shouldShowAgentCreateOutputPort\.value[\s\S]*props\.selected[\s\S]*props\.hovered[\s\S]*hasFloatingPanelOpen\.value/);
   assert.match(statePortListSource, /:data-agent-create-port="side"/);
   assert.match(statePortListSource, /'node-card__port-pill-row--create-visible': createVisible/);
   assert.match(agentSection, /:input-create-visible="shouldRevealAgentCreateInputPort"/);
@@ -917,7 +934,7 @@ test("NodeCard blocks every in-canvas control while graph editing is locked", ()
   assert.match(componentSource, /function emitConditionConfigPatch\(patch: Partial<ConditionNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function handleAgentBreakpointToggleValue\(value: string \| number \| boolean\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function toggleAdvancedPanel\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
-  assert.match(componentSource, /function selectAgentSkill\(skillKey: string\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function selectAgentAction\(actionKey: string\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function openPortStateCreate\(side: "input" \| "output"\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function commitPortStateCreate\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
 });
@@ -1357,7 +1374,7 @@ test("NodeCard uses a shared capsule switch card for output persistence like the
   assert.doesNotMatch(componentSource, /DocumentChecked/);
   assert.match(outputNodeBodySource, /import \{ DocumentChecked \} from "@element-plus\/icons-vue";/);
   assert.match(agentRuntimeControlsSource, /import \{ Opportunity \} from "@element-plus\/icons-vue";/);
-  assert.match(agentSkillPickerSource, /import \{ Flag \} from "@element-plus\/icons-vue";/);
+  assert.match(agentActionPickerSource, /import \{ Flag \} from "@element-plus\/icons-vue";/);
   assert.match(outputNodeBodySource, /class="node-card__output-persist-card"/);
   assert.match(outputNodeBodySource, /class="node-card__output-persist-icon"/);
   assert.match(outputNodeBodySource, /<DocumentChecked \/>/);
@@ -1394,7 +1411,7 @@ test("NodeCard closes floating panels on focus loss and keeps popup surfaces on 
   assert.match(floatingPanelsComposableSource, /options\.closeFloatingPanels\(\{ commitTextEditor: false \}\);/);
   assert.match(componentSource, /data-node-popup-surface="true"/);
   assert.match(componentSource, /\.node-card__text-editor-popper/);
-  assert.match(agentSkillPickerSource, /popper-class="node-card__agent-skill-popper"/);
+  assert.match(agentActionPickerSource, /popper-class="node-card__agent-action-popper"/);
   assert.match(floatingPanelsComposableSource, /"\.toograph-select-popper"/);
   assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);
   assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);

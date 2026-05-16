@@ -16,13 +16,13 @@ from app.main import app
 class CapabilityArtifactRouteTests(unittest.TestCase):
     def test_capability_artifact_content_endpoint_reads_only_whitelisted_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir) / "skill_artifacts"
+            root = Path(temp_dir) / "capability_artifacts"
             artifact_path = root / "run_1" / "searcher" / "doc_001.md"
             artifact_path.parent.mkdir(parents=True)
             artifact_path.write_text("# Saved Page\n\nVisible content.", encoding="utf-8")
 
             with (
-                patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", root),
+                patch("app.core.storage.capability_artifact_store.CAPABILITY_ARTIFACT_DATA_DIR", root),
                 TestClient(app) as client,
             ):
                 response = client.get("/api/capability-artifacts/content", params={"path": "run_1/searcher/doc_001.md"})
@@ -34,13 +34,13 @@ class CapabilityArtifactRouteTests(unittest.TestCase):
 
     def test_capability_artifact_file_endpoint_streams_media_inside_whitelist(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir) / "skill_artifacts"
+            root = Path(temp_dir) / "capability_artifacts"
             artifact_path = root / "run_1" / "downloader" / "clip.mp4"
             artifact_path.parent.mkdir(parents=True)
             artifact_path.write_bytes(b"fake-mp4-bytes")
 
             with (
-                patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", root),
+                patch("app.core.storage.capability_artifact_store.CAPABILITY_ARTIFACT_DATA_DIR", root),
                 TestClient(app) as client,
             ):
                 response = client.get("/api/capability-artifacts/file", params={"path": "run_1/downloader/clip.mp4"})
@@ -53,10 +53,10 @@ class CapabilityArtifactRouteTests(unittest.TestCase):
 
     def test_capability_artifact_upload_endpoint_persists_input_files_inside_upload_folder(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir) / "skill_artifacts"
+            root = Path(temp_dir) / "capability_artifacts"
 
             with (
-                patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", root),
+                patch("app.core.storage.capability_artifact_store.CAPABILITY_ARTIFACT_DATA_DIR", root),
                 TestClient(app) as client,
             ):
                 response = client.post(

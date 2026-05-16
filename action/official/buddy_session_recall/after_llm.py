@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 
-def buddy_session_recall(**skill_inputs: Any) -> dict[str, Any]:
+def buddy_session_recall(**action_inputs: Any) -> dict[str, Any]:
     repo_root = _repo_root()
     backend_path = repo_root / "backend"
     if str(backend_path) not in sys.path:
@@ -19,8 +19,8 @@ def buddy_session_recall(**skill_inputs: Any) -> dict[str, Any]:
     if buddy_home_override:
         buddy_store.BUDDY_HOME_DIR = Path(buddy_home_override).expanduser().resolve()
 
-    request = _dict(skill_inputs.get("recall_request"))
-    merged = {**request, **{key: value for key, value in skill_inputs.items() if key != "recall_request"}}
+    request = _dict(action_inputs.get("recall_request"))
+    merged = {**request, **{key: value for key, value in action_inputs.items() if key != "recall_request"}}
     try:
         context = buddy_store.recall_chat_messages(
             mode=_as_text(merged.get("mode")) or "browse",

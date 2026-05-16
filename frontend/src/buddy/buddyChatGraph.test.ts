@@ -689,9 +689,9 @@ test("buildBuddyChatGraph records ask-first mode without injecting permission or
   });
 
   assert.equal(graph.state_schema.buddy_mode, undefined);
-  assert.equal(graph.state_schema.skill_catalog_snapshot, undefined);
+  assert.equal(graph.state_schema.action_catalog_snapshot, undefined);
   assert.equal(graph.nodes.input_buddy_mode, undefined);
-  assert.equal(graph.nodes.input_skill_catalog_snapshot, undefined);
+  assert.equal(graph.nodes.input_action_catalog_snapshot, undefined);
   assert.deepEqual(graph.metadata.interrupt_after, ["request_approval_agent"]);
   assert.equal(graph.metadata.buddy_mode, "ask_first");
   assert.equal(graph.metadata.buddy_requires_approval, true);
@@ -765,7 +765,7 @@ test("buildBuddyChatGraph marks ask-first mode without a blanket reply breakpoin
   assert.equal(graph.metadata.agent_breakpoint_timing, undefined);
 });
 
-test("buildBuddyChatGraph carries page operation context for skill runtime", () => {
+test("buildBuddyChatGraph carries page operation context for action runtime", () => {
   const graph = buildBuddyChatGraph(createTemplate(), {
     userMessage: "打开运行历史",
     history: [],
@@ -791,7 +791,7 @@ test("buildBuddyChatGraph carries page operation context for skill runtime", () 
     buddyMode: "ask_first",
   });
 
-  assert.deepEqual(graph.metadata.skill_runtime_context, {
+  assert.deepEqual(graph.metadata.action_runtime_context, {
     page_path: "/editor",
     page_operation_book: {
       page: { path: "/editor", title: "图编辑器", snapshotId: "snapshot-graph" },
@@ -832,7 +832,7 @@ test("buildBuddyChatGraph overrides template agent models with the buddy model",
   assert.equal(graph.metadata.buddy_model_ref, "openai/gpt-4.1");
 });
 
-test("buildBuddyChatGraph leaves buddy self config states for graph template skills", () => {
+test("buildBuddyChatGraph leaves buddy self config states for graph template actions", () => {
   const graph = buildBuddyChatGraph(createTemplate(), {
     userMessage: "你好",
     history: [],

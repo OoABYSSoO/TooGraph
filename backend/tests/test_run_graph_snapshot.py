@@ -28,9 +28,9 @@ class RunGraphSnapshotTests(unittest.TestCase):
                 "multi_platform_content_repurposer",
                 "policy_navigator_agent",
                 "product_competitor_research_agent",
+                "toograph_action_creation_workflow",
                 "toograph_graph_template_creation_workflow",
                 "toograph_page_operation_workflow",
-                "toograph_skill_creation_workflow",
             ],
         )
 

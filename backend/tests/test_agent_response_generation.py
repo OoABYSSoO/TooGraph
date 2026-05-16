@@ -71,7 +71,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(reasoning, "")
         self.assertEqual(warnings, [])
         self.assertEqual(captured["system_prompt"], "system prompt")
-        self.assertEqual(captured["user_prompt"], "根据输入和技能结果完成输出。")
+        self.assertEqual(captured["user_prompt"], "根据输入和Action 结果完成输出。")
         self.assertEqual(captured["model"], "test-model")
         self.assertEqual(captured["provider_id"], "local")
         self.assertEqual(captured["temperature"], 0.7)
@@ -179,7 +179,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(updated_config["structured_output_validation_errors"], [])
         self.assertIn("$.answer expected string", updated_config["structured_output_initial_validation_errors"][0])
 
-    def test_user_prompt_does_not_append_skill_instruction_blocks_for_final_response(self) -> None:
+    def test_user_prompt_does_not_append_action_instruction_blocks_for_final_response(self) -> None:
         captured: dict[str, object] = {}
 
         def chat_with_local_model_with_meta_func(**kwargs):
@@ -194,12 +194,12 @@ class AgentResponseGenerationTests(unittest.TestCase):
                 "writes": [{"state": "answer"}],
                 "config": {
                     "actionKey": "web_search",
-                    "taskInstruction": "Summarize the skill result.",
+                    "taskInstruction": "Summarize the action result.",
                     "actionInstructionBlocks": {
                         "web_search": {
                             "actionKey": "web_search",
-                            "title": "联网搜索 skill instruction",
-                            "content": "Use this only while invoking the skill.",
+                            "title": "联网搜索 action instruction",
+                            "content": "Use this only while invoking the action.",
                             "source": "node.override",
                         }
                     },
@@ -225,8 +225,8 @@ class AgentResponseGenerationTests(unittest.TestCase):
             build_output_key_aliases_func=lambda output_keys, state_schema: {"answer": ["answer"]},
         )
 
-        self.assertEqual(captured["user_prompt"], "Summarize the skill result.")
-        self.assertNotIn("Bound Skill Instructions", str(captured["user_prompt"]))
+        self.assertEqual(captured["user_prompt"], "Summarize the action result.")
+        self.assertNotIn("Bound Action Instructions", str(captured["user_prompt"]))
 
     def test_routes_image_upload_inputs_as_model_attachments_from_local_paths(self) -> None:
         captured: dict[str, object] = {}
@@ -236,7 +236,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
             return ('{"answer": "ok"}', {"warnings": []})
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            artifact_root = Path(temp_dir) / "skill_artifacts"
+            artifact_root = Path(temp_dir) / "capability_artifacts"
             image_path = artifact_root / "uploads" / "reference.png"
             image_path.parent.mkdir(parents=True)
             image_path.write_bytes(b"fake-png")
@@ -251,7 +251,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
                 "contentType": "image/png",
             }
 
-            with patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", artifact_root):
+            with patch("app.core.storage.capability_artifact_store.CAPABILITY_ARTIFACT_DATA_DIR", artifact_root):
                 payload, _reasoning, warnings, _updated_config = generate_agent_response(
                     _agent_node(writes=[{"state": "answer"}], task_instruction="描述图片。"),
                     {"reference_image": image_payload},
@@ -292,7 +292,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
             raise AssertionError("provider should not be called for over-limit ordinary LLM video inputs")
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            artifact_root = Path(temp_dir) / "skill_artifacts"
+            artifact_root = Path(temp_dir) / "capability_artifacts"
             video_path = artifact_root / "uploads" / "long_clip.mp4"
             video_path.parent.mkdir(parents=True)
             video_path.write_bytes(b"fake-video")
@@ -308,7 +308,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
             }
 
             with (
-                patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", artifact_root),
+                patch("app.core.storage.capability_artifact_store.CAPABILITY_ARTIFACT_DATA_DIR", artifact_root),
                 patch(
                     "app.core.runtime.agent_multimodal.probe_video_duration_seconds",
                     return_value=30.25,
@@ -346,7 +346,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
             return ('{"answer": "ok"}', {"warnings": []})
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            artifact_root = Path(temp_dir) / "skill_artifacts"
+            artifact_root = Path(temp_dir) / "capability_artifacts"
             video_path = artifact_root / "uploads" / "clip.mp4"
             video_path.parent.mkdir(parents=True)
             video_path.write_bytes(b"fake-mp4")
@@ -361,7 +361,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
                 "contentType": "video/mp4",
             }
 
-            with patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", artifact_root):
+            with patch("app.core.storage.capability_artifact_store.CAPABILITY_ARTIFACT_DATA_DIR", artifact_root):
                 payload, _reasoning, warnings, _updated_config = generate_agent_response(
                     _agent_node(writes=[{"state": "answer"}], task_instruction="描述视频。"),
                     {"clip": video_payload},
@@ -397,11 +397,11 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(attachments[0]["state_key"], "clip")
         self.assertTrue(str(attachments[0]["file_url"]).startswith("file://"))
 
-    def test_routes_skill_artifact_media_references_as_model_attachments(self) -> None:
+    def test_routes_capability_artifact_media_references_as_model_attachments(self) -> None:
         captured: dict[str, object] = {}
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            artifact_root = Path(temp_dir) / "skill_artifacts"
+            artifact_root = Path(temp_dir) / "capability_artifacts"
             image_path = artifact_root / "run_1" / "download" / "image.png"
             video_path = artifact_root / "run_1" / "download" / "clip.mp4"
             image_path.parent.mkdir(parents=True)
@@ -412,7 +412,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
                 captured.update(kwargs)
                 return ('{"answer": "ok"}', {"warnings": []})
 
-            with patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", artifact_root):
+            with patch("app.core.storage.capability_artifact_store.CAPABILITY_ARTIFACT_DATA_DIR", artifact_root):
                 payload, _reasoning, warnings, _updated_config = generate_agent_response(
                     _agent_node(writes=[{"state": "answer"}], task_instruction="分析这些素材。"),
                     {
@@ -467,7 +467,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
         captured: dict[str, object] = {}
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            artifact_root = Path(temp_dir) / "skill_artifacts"
+            artifact_root = Path(temp_dir) / "capability_artifacts"
             audio_path = artifact_root / "run_1" / "download" / "voice.mp3"
             audio_path.parent.mkdir(parents=True)
             audio_path.write_bytes(b"fake-mp3")
@@ -476,7 +476,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
                 captured.update(kwargs)
                 return ('{"answer": "ok"}', {"warnings": []})
 
-            with patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", artifact_root):
+            with patch("app.core.storage.capability_artifact_store.CAPABILITY_ARTIFACT_DATA_DIR", artifact_root):
                 payload, _reasoning, warnings, _updated_config = generate_agent_response(
                     _agent_node(writes=[{"state": "answer"}], task_instruction="Analyze the audio."),
                     {"audio_files": ["run_1/download/voice.mp3"]},
@@ -510,11 +510,11 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(attachments[0]["name"], "voice.mp3")
         self.assertEqual(attachments[0]["file_url"], audio_path.resolve().as_uri())
 
-    def test_does_not_route_skill_result_artifacts_as_model_attachments(self) -> None:
+    def test_does_not_route_action_result_artifacts_as_model_attachments(self) -> None:
         captured: dict[str, object] = {}
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            artifact_root = Path(temp_dir) / "skill_artifacts"
+            artifact_root = Path(temp_dir) / "capability_artifacts"
             video_path = artifact_root / "run_1" / "collector" / "videos" / "clip.mp4"
             video_path.parent.mkdir(parents=True)
             video_path.write_bytes(b"fake-mp4")
@@ -523,9 +523,9 @@ class AgentResponseGenerationTests(unittest.TestCase):
                 captured.update(kwargs)
                 return ('{"answer": "ok"}', {"warnings": []})
 
-            with patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", artifact_root):
+            with patch("app.core.storage.capability_artifact_store.CAPABILITY_ARTIFACT_DATA_DIR", artifact_root):
                 payload, _reasoning, warnings, _updated_config = generate_agent_response(
-                    _agent_node(writes=[{"state": "answer"}], task_instruction="整理技能结果。"),
+                    _agent_node(writes=[{"state": "answer"}], task_instruction="整理Action 结果。"),
                     {"genre": "SLG"},
                     {
                         "artifact_collector": {
@@ -567,7 +567,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
             return ('{"answer": "ok"}', {"warnings": []})
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            artifact_root = Path(temp_dir) / "skill_artifacts"
+            artifact_root = Path(temp_dir) / "capability_artifacts"
             image_path = artifact_root / "uploads" / "reference.png"
             image_path.parent.mkdir(parents=True)
             image_path.write_bytes(b"fake-png")
@@ -582,7 +582,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
                 "contentType": "image/png",
             }
 
-            with patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", artifact_root):
+            with patch("app.core.storage.capability_artifact_store.CAPABILITY_ARTIFACT_DATA_DIR", artifact_root):
                 _payload, _reasoning, warnings, updated_config = generate_agent_response(
                     _agent_node(writes=[{"state": "answer"}], task_instruction="描述图片。"),
                     {"reference_image": image_payload},

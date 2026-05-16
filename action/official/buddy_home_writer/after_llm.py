@@ -20,7 +20,7 @@ POLICY_PERMISSION_FIELDS = {"behavior_boundaries", "graph_permission_mode"}
 POLICY_AUTONOMOUS_ALLOWED_FIELDS = {"communication_preferences"}
 
 
-def buddy_home_writer(**skill_inputs: Any) -> dict[str, Any]:
+def buddy_home_writer(**action_inputs: Any) -> dict[str, Any]:
     repo_root = _repo_root()
     if str(repo_root / "backend") not in sys.path:
         sys.path.insert(0, str(repo_root / "backend"))
@@ -33,7 +33,7 @@ def buddy_home_writer(**skill_inputs: Any) -> dict[str, Any]:
         buddy_store.BUDDY_HOME_DIR = Path(buddy_home_override).expanduser().resolve()
     buddy_store.initialize_buddy_home()
 
-    command_items = _coerce_commands(skill_inputs.get("commands"))
+    command_items = _coerce_commands(action_inputs.get("commands"))
     if isinstance(command_items, dict):
         return _failed(
             command_items["error_type"],
@@ -41,7 +41,7 @@ def buddy_home_writer(**skill_inputs: Any) -> dict[str, Any]:
             skipped_commands=[command_items],
         )
 
-    source_run_id = _as_text(skill_inputs.get("run_id")).strip() or None
+    source_run_id = _as_text(action_inputs.get("run_id")).strip() or None
     applied_commands: list[dict[str, Any]] = []
     skipped_commands: list[dict[str, Any]] = []
     revisions: list[dict[str, Any]] = []

@@ -280,7 +280,7 @@ test("revision history includes capability usage stats target", () => {
         target_id: "capability_usage_stats",
         operation: "update",
         previous_value: {},
-        next_value: { capabilities: { "skill:web_search": { use_count: 1 } } },
+        next_value: { capabilities: { "action:web_search": { use_count: 1 } } },
         changed_by: "buddy_command",
         change_reason: "自主复盘更新能力使用统计。",
         created_at: "2026-05-14T00:00:00Z",

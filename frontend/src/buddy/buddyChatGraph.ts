@@ -72,12 +72,12 @@ export type BuildBuddyChatGraphInput = {
   userMessage: string;
   history: BuddyChatMessage[];
   pageContext: string;
-  pageOperationContext?: BuddySkillRuntimeContext | null;
+  pageOperationContext?: BuddyActionRuntimeContext | null;
   buddyMode?: unknown;
   buddyModel?: unknown;
 };
 
-export type BuddySkillRuntimeContext = {
+export type BuddyActionRuntimeContext = {
   page_path?: string;
   page_snapshot?: unknown;
   page_operation_book?: unknown;
@@ -181,7 +181,7 @@ export function buildBuddyChatGraph(
       buddy_template_binding: cloneJson(binding),
       buddy_mode: buddyMode,
       buddy_can_execute_actions: buddyMode === "full_access",
-      skill_runtime_context: cloneJson(input.pageOperationContext ?? {}),
+      action_runtime_context: cloneJson(input.pageOperationContext ?? {}),
     },
   };
   applyBuddyModePolicy(graph, buddyMode);
@@ -783,7 +783,7 @@ function resolveBuddyReplyStateKeys(graphSnapshot: Record<string, unknown> | nul
             "direct_reply",
             "denied_reply",
             "approval_prompt",
-            "missing_skill_proposal",
+            "missing_action_proposal",
           ].includes(String((definition as { name: string }).name)),
         )
         .map(([stateKey]) => stateKey)

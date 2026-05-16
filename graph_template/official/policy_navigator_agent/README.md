@@ -36,7 +36,7 @@
 - `uncertainty_report.md`
 - `final_policy_package.md`
 
-## Required Skills/Subgraphs
+## Required Actions/Subgraphs
 
 - `buddy_session_recall`
 

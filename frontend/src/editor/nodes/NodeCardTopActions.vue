@@ -241,7 +241,7 @@ import { useI18n } from "vue-i18n";
 import type { NodeTopAction } from "./useNodeFloatingPanels";
 import type { OutputNode } from "@/types/node-system";
 
-type BodyKind = "input" | "agent" | "batch" | "output" | "condition" | "subgraph";
+type BodyKind = "input" | "agent" | "batch" | "output" | "condition" | "subgraph" | "tool";
 type OutputDisplayModeOption = {
   value: OutputNode["config"]["displayMode"];
   label: string;

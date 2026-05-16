@@ -226,7 +226,7 @@ test("reduceBuddyOutputTraceEvent keeps subgraph headers before indented inner r
   assert.equal(segment.durationMs, 900);
 });
 
-test("reduceBuddyOutputTraceEvent records skill activity inside the active segment", () => {
+test("reduceBuddyOutputTraceEvent records action activity inside the active segment", () => {
   const graph = fiveNodeGraph();
   const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));
   let state = createBuddyOutputTraceRuntimeState(plan);
@@ -240,11 +240,11 @@ test("reduceBuddyOutputTraceEvent records skill activity inside the active segme
     {
       sequence: 1,
       kind: "action_invocation",
-      summary: "Skill web_search succeeded.",
+      summary: "Action web_search succeeded.",
       node_id: "node_a",
       status: "succeeded",
       duration_ms: 420,
-      detail: { skill_key: "web_search" },
+      detail: { action_key: "web_search" },
     },
     1500,
   );
@@ -253,6 +253,35 @@ test("reduceBuddyOutputTraceEvent records skill activity inside the active segme
   assert.equal(segment.records[1].kind, "activity");
   assert.equal(segment.records[1].label, "A / web_search");
   assert.equal(segment.records[1].durationMs, 420);
+});
+
+test("reduceBuddyOutputTraceEvent records tool activity inside the active segment", () => {
+  const graph = fiveNodeGraph();
+  const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));
+  let state = createBuddyOutputTraceRuntimeState(plan);
+
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.started", { node_id: "node_a", node_type: "tool" }, 1000);
+  state = reduceBuddyOutputTraceEvent(
+    state,
+    plan,
+    graph,
+    "activity.event",
+    {
+      sequence: 2,
+      kind: "tool_invocation",
+      summary: "Tool video_segmenter succeeded.",
+      node_id: "node_a",
+      status: "succeeded",
+      duration_ms: 120,
+      detail: { tool_key: "video_segmenter" },
+    },
+    1500,
+  );
+
+  const [segment] = listBuddyOutputTraceSegmentsForDisplay(state);
+  assert.equal(segment.records[1].kind, "activity");
+  assert.equal(segment.records[1].label, "A / video_segmenter");
+  assert.equal(segment.records[1].durationMs, 120);
 });
 
 test("reduceBuddyOutputTraceEvent records readable virtual operation activity", () => {
@@ -274,14 +303,14 @@ test("reduceBuddyOutputTraceEvent records readable virtual operation activity", 
       status: "requested",
       duration_ms: 10,
       detail: {
-        skill_key: "toograph_page_operator",
+        action_key: "toograph_page_operator",
         operation_request_id: "vop_template1234",
         operation: {
           kind: "run_template",
           target_id: "library.template.advanced_web_research_loop.open",
           template_id: "advanced_web_research_loop",
           template_name: "高级联网搜索",
-          input_text: "研究 TooGraph 页面操作技能的最新差距。",
+          input_text: "研究 TooGraph 页面操作 Action的最新差距。",
         },
       },
     },
@@ -291,7 +320,7 @@ test("reduceBuddyOutputTraceEvent records readable virtual operation activity", 
   const [segment] = listBuddyOutputTraceSegmentsForDisplay(state);
   assert.equal(segment.records[1].kind, "activity");
   assert.equal(segment.records[1].label, "A / Virtual template run");
-  assert.equal(segment.records[1].summary, "Template: 高级联网搜索 · Input: 研究 TooGraph 页面操作技能的最新差距。");
+  assert.equal(segment.records[1].summary, "Template: 高级联网搜索 · Input: 研究 TooGraph 页面操作 Action的最新差距。");
 });
 
 test("reduceBuddyOutputTraceEvent includes triggered run status for completed virtual operations", () => {
@@ -483,11 +512,11 @@ test("buildBuddyOutputTraceStateFromRunDetail rebuilds completed segments from r
         {
           sequence: 1,
           kind: "action_invocation",
-          summary: "Skill ran.",
+          summary: "Action ran.",
           node_id: "node_c",
           status: "succeeded",
           duration_ms: 100,
-          detail: { skill_key: "toograph_script_tester" },
+          detail: { action_key: "toograph_script_tester" },
           created_at: "2026-05-13T10:00:01.050Z",
         },
       ],

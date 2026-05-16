@@ -136,7 +136,7 @@ test("buildRunNodeTimingByNodeIdFromRun restores model token usage on the writer
                 prompt_tokens: 35,
                 completion_tokens: 15,
               },
-              skill_input_provider_usage: {
+              action_input_provider_usage: {
                 total_tokens: 420,
               },
             },

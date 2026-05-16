@@ -3,12 +3,12 @@ name: 联网搜索
 description: Search the public web and return successful source URLs, local readable page artifacts, and URL-specific errors for downstream graph nodes.
 ---
 
-Use this skill when a workflow or buddy agent needs current public web information, recent news, version details, price checks, external fact verification, or cited web evidence. It prefers Tavily when `TAVILY_API_KEY` is configured and falls back to DuckDuckGo HTML search when no key is available.
+Use this action when a workflow or buddy agent needs current public web information, recent news, version details, price checks, external fact verification, or cited web evidence. It prefers Tavily when `TAVILY_API_KEY` is configured and falls back to DuckDuckGo HTML search when no key is available.
 
-The skill asks the search provider for extra candidates, then keeps fetching candidates until it saves the target number of readable local documents or runs out of candidates. It first uses a fast HTTP fetch; if that fails or produces no readable text, it uses Playwright browser rendering as a fallback.
+The action asks the search provider for extra candidates, then keeps fetching candidates until it saves the target number of readable local documents or runs out of candidates. It first uses a fast HTTP fetch; if that fails or produces no readable text, it uses Playwright browser rendering as a fallback.
 
 Lifecycle:
-- `before_llm.py` adds the current local date to the Skill LLM output planning context.
+- `before_llm.py` adds the current local date to the Action LLM output planning context.
 - `after_llm.py` receives the LLM-generated `query`, performs the search and page download, and returns structured outputs.
 
 State inputs:
@@ -29,4 +29,4 @@ Runtime requirements:
 - Python package: `playwright`
 - Browser runtime: `python -m playwright install chromium`
 
-When `artifact_paths` contains paths, those paths are relative to TooGraph's whitelisted skill artifact directory and can be opened by the Output viewer. Downstream LLM nodes can receive the file state and read text documents into model context.
+When `artifact_paths` contains paths, those paths are relative to TooGraph's whitelisted action artifact directory and can be opened by the Output viewer. Downstream LLM nodes can receive the file state and read text documents into model context.

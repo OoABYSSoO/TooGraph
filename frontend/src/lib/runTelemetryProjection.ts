@@ -25,8 +25,8 @@ type RunTimingSource = {
 const RUNTIME_CONFIG_USAGE_KEYS = [
   "provider_usage",
   "structured_output_repair_provider_usage",
-  "skill_input_provider_usage",
-  "skill_input_structured_output_repair_provider_usage",
+  "action_input_provider_usage",
+  "action_input_structured_output_repair_provider_usage",
   "subgraph_input_provider_usage",
   "subgraph_input_structured_output_repair_provider_usage",
 ] as const;

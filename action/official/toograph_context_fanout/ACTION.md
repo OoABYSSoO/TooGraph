@@ -1,6 +1,6 @@
 # TooGraph Context Fanout
 
-Read-only Buddy context assembly. This skill fans out across Buddy Home MEMORY.md,
+Read-only Buddy context assembly. This action fans out across Buddy Home MEMORY.md,
 knowledge retrieval, current page context, and the fixed page-operation
 capability, then returns one budgeted `context_brief` plus an auditable merge
 report.

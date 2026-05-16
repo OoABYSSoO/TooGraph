@@ -28,7 +28,7 @@
       "key": "template_target",
       "name": "Template Target",
       "valueType": "json",
-      "description": "需要固定化可见运行图模板时填写的目标模板对象。字段可包含 template_id、template_name、search_text、input_text；此时不要输出 commands，技能会映射为打开图与模板、搜索、打开模板、写入 input 节点、运行并等待结果。"
+      "description": "需要固定化可见运行图模板时填写的目标模板对象。字段可包含 template_id、template_name、search_text、input_text；此时不要输出 commands，该 Action 会映射为打开图与模板、搜索、打开模板、写入 input 节点、运行并等待结果。"
     },
     {
       "key": "graph_edit_intents",
@@ -66,7 +66,7 @@
       "key": "operation_request_id",
       "name": "Operation Request ID",
       "valueType": "text",
-      "description": "Skill/runtime 确定性生成的页面操作请求 ID，用于把 activity event、前端执行确认和 run resume 关联起来。"
+      "description": "Action/runtime 确定性生成的页面操作请求 ID，用于把 activity event、前端执行确认和 run resume 关联起来。"
     },
     {
       "key": "journal",

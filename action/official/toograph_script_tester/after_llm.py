@@ -17,11 +17,11 @@ MAX_FILE_CHARS = 300000
 ALLOWED_COMMANDS = {"python", "python3", "node", "npm", "bash", "sh", "pwsh", "powershell", "cmd"}
 
 
-def toograph_script_tester(**skill_inputs: Any) -> dict[str, Any]:
-    files = _normalize_files(skill_inputs.get("files"))
+def toograph_script_tester(**action_inputs: Any) -> dict[str, Any]:
+    files = _normalize_files(action_inputs.get("files"))
     if isinstance(files, str):
         return _result(False, files, activity_events=[_validation_event(files)])
-    command = _normalize_command(skill_inputs.get("command"))
+    command = _normalize_command(action_inputs.get("command"))
     if isinstance(command, str):
         return _result(False, command, activity_events=[_validation_event(command)])
     if not files:

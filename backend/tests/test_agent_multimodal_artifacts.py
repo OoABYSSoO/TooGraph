@@ -10,18 +10,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.runtime.agent_multimodal import collect_input_attachments, prepare_model_input_attachments
 from app.core.schemas.node_system import NodeSystemStateDefinition
-from app.core.storage.skill_artifact_store import create_uploaded_skill_artifact, resolve_skill_artifact_path
+from app.core.storage.capability_artifact_store import create_uploaded_capability_artifact, resolve_capability_artifact_path
 
 
 class AgentMultimodalArtifactTests(unittest.TestCase):
-    def test_collects_only_safe_skill_artifact_media_references(self) -> None:
+    def test_collects_only_safe_capability_artifact_media_references(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            artifact_root = Path(temp_dir) / "skill_artifacts"
+            artifact_root = Path(temp_dir) / "capability_artifacts"
             video_path = artifact_root / "run_1" / "download" / "clip.mp4"
             video_path.parent.mkdir(parents=True)
             video_path.write_bytes(b"fake-mp4")
 
-            with patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", artifact_root):
+            with patch("app.core.storage.capability_artifact_store.CAPABILITY_ARTIFACT_DATA_DIR", artifact_root):
                 attachments = collect_input_attachments(
                     {
                         "downloaded_files": [
@@ -35,12 +35,12 @@ class AgentMultimodalArtifactTests(unittest.TestCase):
 
         self.assertEqual(len(attachments), 1)
         self.assertEqual(attachments[0]["type"], "video")
-        self.assertEqual(attachments[0]["source"], "skill_artifact")
+        self.assertEqual(attachments[0]["source"], "capability_artifact")
         self.assertEqual(attachments[0]["state_key"], "downloaded_files")
         self.assertEqual(attachments[0]["local_path"], "run_1/download/clip.mp4")
 
     def test_collects_media_references_inside_result_package_outputs(self) -> None:
-        artifact = create_uploaded_skill_artifact(
+        artifact = create_uploaded_capability_artifact(
             file_name="reference.png",
             content_type="image/png",
             payload=b"fake-png",
@@ -69,7 +69,7 @@ class AgentMultimodalArtifactTests(unittest.TestCase):
             self.assertEqual(attachments[0]["state_key"], "dynamic_result")
             self.assertEqual(attachments[0]["local_path"], artifact["local_path"])
         finally:
-            resolve_skill_artifact_path(artifact["local_path"]).unlink(missing_ok=True)
+            resolve_capability_artifact_path(artifact["local_path"]).unlink(missing_ok=True)
 
     def test_prepare_large_video_artifact_uses_frame_fallback_through_same_attachment_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -98,7 +98,7 @@ class AgentMultimodalArtifactTests(unittest.TestCase):
                 [
                     {
                         "type": "video",
-                        "source": "skill_artifact",
+                        "source": "capability_artifact",
                         "state_key": "downloaded_files",
                         "name": "clip.mp4",
                         "mime_type": "video/mp4",

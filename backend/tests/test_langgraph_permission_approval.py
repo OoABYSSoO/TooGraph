@@ -19,7 +19,7 @@ def _approval_graph() -> NodeSystemGraphDocument:
                     "type": "capability",
                     "value": {"kind": "action", "key": "local_workspace_executor"},
                 },
-                "request": {"type": "text", "value": "write a user skill file"},
+                "request": {"type": "text", "value": "write a user action file"},
                 "dynamic_result": {"type": "result_package"},
             },
             "nodes": {
@@ -33,7 +33,7 @@ def _approval_graph() -> NodeSystemGraphDocument:
                     "kind": "input",
                     "ui": {"position": {"x": 0, "y": 160}},
                     "writes": [{"state": "request"}],
-                    "config": {"value": "write a user skill file"},
+                    "config": {"value": "write a user action file"},
                 },
                 "execute_capability": {
                     "kind": "agent",
@@ -70,7 +70,7 @@ def _subgraph_approval_graph() -> NodeSystemGraphDocument:
                 "type": "capability",
                 "value": {"kind": "action", "key": "local_workspace_executor"},
             },
-            "request": {"type": "text", "value": "write a user skill file"},
+            "request": {"type": "text", "value": "write a user action file"},
             "dynamic_result": {"type": "result_package"},
         },
         "nodes": {
@@ -84,7 +84,7 @@ def _subgraph_approval_graph() -> NodeSystemGraphDocument:
                 "kind": "input",
                 "ui": {"position": {"x": 0, "y": 160}},
                 "writes": [{"state": "request"}],
-                "config": {"value": "write a user skill file"},
+                "config": {"value": "write a user action file"},
             },
             "execute_capability": {
                 "kind": "agent",
@@ -117,7 +117,7 @@ def _subgraph_approval_graph() -> NodeSystemGraphDocument:
                     "type": "capability",
                     "value": {"kind": "action", "key": "local_workspace_executor"},
                 },
-                "request": {"type": "text", "value": "write a user skill file"},
+                "request": {"type": "text", "value": "write a user action file"},
                 "dynamic_result": {"type": "result_package"},
             },
             "nodes": {
@@ -131,7 +131,7 @@ def _subgraph_approval_graph() -> NodeSystemGraphDocument:
                     "kind": "input",
                     "ui": {"position": {"x": 0, "y": 160}},
                     "writes": [{"state": "request"}],
-                    "config": {"value": "write a user skill file"},
+                    "config": {"value": "write a user action file"},
                 },
                 "run_capability_cycle": {
                     "kind": "subgraph",
@@ -161,7 +161,7 @@ def _subgraph_approval_graph() -> NodeSystemGraphDocument:
     )
 
 
-def test_langgraph_runtime_pauses_before_risky_skill_permission(monkeypatch) -> None:
+def test_langgraph_runtime_pauses_before_risky_action_permission(monkeypatch) -> None:
     import app.core.langgraph.runtime as runtime_module
     import app.core.runtime.node_system_executor as executor_module
 
@@ -170,7 +170,7 @@ def test_langgraph_runtime_pauses_before_risky_skill_permission(monkeypatch) -> 
     monkeypatch.setattr(runtime_module, "save_run", lambda _state: None)
     monkeypatch.setattr(
         executor_module,
-        "_generate_agent_skill_inputs",
+        "_generate_agent_action_inputs",
         lambda **kwargs: (
             {
                 "local_workspace_executor": {
@@ -180,15 +180,15 @@ def test_langgraph_runtime_pauses_before_risky_skill_permission(monkeypatch) -> 
                     "query": "",
                 }
             },
-            "planned skill inputs",
+            "planned action inputs",
             [],
             kwargs["runtime_config"],
         ),
     )
     monkeypatch.setattr(
         executor_module,
-        "_invoke_skill",
-        lambda skill_func, skill_inputs, **kwargs: invoked.append(dict(skill_inputs))
+        "_invoke_action",
+        lambda action_func, action_inputs, **kwargs: invoked.append(dict(action_inputs))
         or {"status": "succeeded", "success": True, "result": "wrote file"},
     )
 
@@ -199,10 +199,10 @@ def test_langgraph_runtime_pauses_before_risky_skill_permission(monkeypatch) -> 
     assert result["node_status_map"]["execute_capability"] == "paused"
     assert invoked == []
     pending = result["metadata"]["pending_permission_approval"]
-    assert pending["kind"] == "skill_permission_approval"
-    assert pending["skill_key"] == "local_workspace_executor"
+    assert pending["kind"] == "capability_permission_approval"
+    assert pending["capability_key"] == "local_workspace_executor"
     assert pending["permissions"] == ["file_write", "subprocess"]
-    assert pending["skill_inputs"]["path"] == "action/user/demo/ACTION.md"
+    assert pending["inputs"]["path"] == "action/user/demo/ACTION.md"
     assert result["lifecycle"]["pause_reason"] == "permission_approval"
 
 
@@ -213,7 +213,7 @@ def test_langgraph_runtime_resumes_permission_approval_with_stored_inputs(monkey
     planned_inputs_calls = 0
     invoked: list[dict[str, object]] = []
 
-    def generate_skill_inputs(**kwargs):
+    def generate_action_inputs(**kwargs):
         nonlocal planned_inputs_calls
         planned_inputs_calls += 1
         return (
@@ -225,17 +225,17 @@ def test_langgraph_runtime_resumes_permission_approval_with_stored_inputs(monkey
                     "query": "",
                 }
             },
-            "planned skill inputs",
+            "planned action inputs",
             [],
             kwargs["runtime_config"],
         )
 
     monkeypatch.setattr(runtime_module, "save_run", lambda _state: None)
-    monkeypatch.setattr(executor_module, "_generate_agent_skill_inputs", generate_skill_inputs)
+    monkeypatch.setattr(executor_module, "_generate_agent_action_inputs", generate_action_inputs)
     monkeypatch.setattr(
         executor_module,
-        "_invoke_skill",
-        lambda skill_func, skill_inputs, **kwargs: invoked.append(dict(skill_inputs))
+        "_invoke_action",
+        lambda action_func, action_inputs, **kwargs: invoked.append(dict(action_inputs))
         or {"status": "succeeded", "success": True, "result": "wrote file"},
     )
 
@@ -275,7 +275,7 @@ def test_langgraph_runtime_propagates_permission_approval_through_subgraph(monke
     planned_inputs_calls = 0
     invoked: list[dict[str, object]] = []
 
-    def generate_skill_inputs(**kwargs):
+    def generate_action_inputs(**kwargs):
         nonlocal planned_inputs_calls
         planned_inputs_calls += 1
         return (
@@ -287,17 +287,17 @@ def test_langgraph_runtime_propagates_permission_approval_through_subgraph(monke
                     "query": "",
                 }
             },
-            "planned skill inputs",
+            "planned action inputs",
             [],
             kwargs["runtime_config"],
         )
 
     monkeypatch.setattr(runtime_module, "save_run", lambda _state: None)
-    monkeypatch.setattr(executor_module, "_generate_agent_skill_inputs", generate_skill_inputs)
+    monkeypatch.setattr(executor_module, "_generate_agent_action_inputs", generate_action_inputs)
     monkeypatch.setattr(
         executor_module,
-        "_invoke_skill",
-        lambda skill_func, skill_inputs, **kwargs: invoked.append(dict(skill_inputs))
+        "_invoke_action",
+        lambda action_func, action_inputs, **kwargs: invoked.append(dict(action_inputs))
         or {"status": "succeeded", "success": True, "result": "wrote file"},
     )
 
@@ -308,7 +308,7 @@ def test_langgraph_runtime_propagates_permission_approval_through_subgraph(monke
     assert paused["current_node_id"] == "run_capability_cycle"
     pending_subgraph = paused["metadata"]["pending_subgraph_breakpoint"]
     assert pending_subgraph["inner_node_id"] == "execute_capability"
-    assert pending_subgraph["metadata"]["pending_permission_approval"]["skill_key"] == "local_workspace_executor"
+    assert pending_subgraph["metadata"]["pending_permission_approval"]["capability_key"] == "local_workspace_executor"
     assert invoked == []
 
     paused["metadata"]["pending_subgraph_resume_payload"] = {}

@@ -13,23 +13,23 @@ from app.core.runtime.node_handlers import (
     execute_input_node,
 )
 from app.core.runtime.permission_approval import build_pending_permission_approval
-from app.core.runtime.skill_invocation import callable_accepts_keyword
+from app.core.runtime.action_invocation import callable_accepts_keyword
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemConditionNode, NodeSystemInputNode, NodeSystemStateDefinition
-from app.core.schemas.skills import SkillDefinition, SkillIoField
+from app.core.schemas.actions import ActionDefinition, ActionIoField
 
 
-def pass_through_skill_inputs_func(**kwargs):
+def pass_through_action_inputs_func(**kwargs):
     return (
-        {resolved.binding.skill_key: dict(kwargs["input_values"]) for resolved in kwargs["bindings"]},
+        {resolved.binding.action_key: dict(kwargs["input_values"]) for resolved in kwargs["bindings"]},
         "",
         [],
         kwargs["runtime_config"],
     )
 
 
-def fixed_skill_inputs_func(inputs_by_skill: dict[str, dict[str, object]]):
+def fixed_action_inputs_func(inputs_by_action: dict[str, dict[str, object]]):
     def generate(**kwargs):
-        return inputs_by_skill, "", [], kwargs["runtime_config"]
+        return inputs_by_action, "", [], kwargs["runtime_config"]
 
     return generate
 
@@ -98,7 +98,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 resolve_branch_key_func=lambda branches, branch_mapping, condition_result: None,
             )
 
-    def test_execute_agent_node_invokes_skills_streaming_and_generation(self) -> None:
+    def test_execute_agent_node_invokes_actions_streaming_and_generation(self) -> None:
         state_schema = {
             "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -122,13 +122,13 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="writer",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {"custom": object()},
-            invoke_skill_func=lambda skill_func, skill_inputs: {"echo": skill_inputs["question"]},
+            get_action_registry_func=lambda *, include_disabled: {"custom": object()},
+            invoke_action_func=lambda action_func, action_inputs: {"echo": action_inputs["question"]},
             resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: "delta",
             callable_accepts_keyword_func=lambda func, keyword: keyword in {"on_delta", "state_schema"},
-            generate_agent_skill_inputs_func=pass_through_skill_inputs_func,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+            generate_agent_action_inputs_func=pass_through_action_inputs_func,
+            generate_agent_response_func=lambda agent_node, input_values, action_context, runtime_config, **kwargs: (
                 {"answer": "value", "summary": "summary"},
                 "reason",
                 ["warn", "warn"],
@@ -152,7 +152,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["final_result"], "value")
         self.assertEqual(finalized, {"answer": "value"})
 
-    def test_execute_agent_node_passes_graph_skill_runtime_context_to_skill_input_planning(self) -> None:
+    def test_execute_agent_node_passes_graph_action_runtime_context_to_action_input_planning(self) -> None:
         state_schema = {
             "user_goal": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "ok": NodeSystemStateDefinition.model_validate({"type": "boolean"}),
@@ -177,7 +177,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
         captured: dict[str, Any] = {}
 
-        def generate_skill_inputs(**kwargs: Any):
+        def generate_action_inputs(**kwargs: Any):
             captured["runtime_config"] = kwargs["runtime_config"]
             return (
                 {
@@ -196,40 +196,40 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             state_schema,
             node,
             {"user_goal": "打开运行历史"},
-            {"metadata": {"skill_runtime_context": {"page_path": "/editor"}}, "state": {}},
+            {"metadata": {"action_runtime_context": {"page_path": "/editor"}}, "state": {}},
             node_name="operate_page",
-            state={"run_id": "run-1", "metadata": {"skill_runtime_context": {"page_path": "/editor"}}, "activity_events": []},
-            get_skill_registry_func=lambda *, include_disabled: {"toograph_page_operator": "toograph_page_operator"},
-            get_skill_definition_registry_func=lambda *, include_disabled: {
-                "toograph_page_operator": SkillDefinition(
-                    skillKey="toograph_page_operator",
+            state={"run_id": "run-1", "metadata": {"action_runtime_context": {"page_path": "/editor"}}, "activity_events": []},
+            get_action_registry_func=lambda *, include_disabled: {"toograph_page_operator": "toograph_page_operator"},
+            get_action_definition_registry_func=lambda *, include_disabled: {
+                "toograph_page_operator": ActionDefinition(
+                    actionKey="toograph_page_operator",
                     name="页面操作",
                     llmOutputSchema=[
-                        SkillIoField(key="commands", name="Commands", valueType="json"),
-                        SkillIoField(key="cursor_lifecycle", name="Cursor Lifecycle", valueType="text"),
-                        SkillIoField(key="reason", name="Reason", valueType="text"),
+                        ActionIoField(key="commands", name="Commands", valueType="json"),
+                        ActionIoField(key="cursor_lifecycle", name="Cursor Lifecycle", valueType="text"),
+                        ActionIoField(key="reason", name="Reason", valueType="text"),
                     ],
-                    stateOutputSchema=[SkillIoField(key="ok", name="OK", valueType="boolean")],
+                    stateOutputSchema=[ActionIoField(key="ok", name="OK", valueType="boolean")],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
             },
-            invoke_skill_func=lambda skill_func, skill_inputs: {"ok": True},
+            invoke_action_func=lambda action_func, action_inputs: {"ok": True},
             resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_skill_inputs_func=generate_skill_inputs,
+            generate_agent_action_inputs_func=generate_action_inputs,
             generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
-                AssertionError("mapped skill output should satisfy node writes")
+                AssertionError("mapped action output should satisfy node writes")
             ),
             finalize_agent_stream_delta_func=lambda **kwargs: None,
             first_truthy_func=lambda values: next((value for value in values if value), None),
         )
 
-        self.assertEqual(captured["runtime_config"]["skill_runtime_context"], {"page_path": "/editor"})
+        self.assertEqual(captured["runtime_config"]["action_runtime_context"], {"page_path": "/editor"})
         self.assertEqual(result["outputs"], {"ok": True})
 
-    def test_execute_agent_node_passes_graph_skill_runtime_context_to_action_invocation(self) -> None:
+    def test_execute_agent_node_passes_graph_action_runtime_context_to_action_invocation(self) -> None:
         state_schema = {
             "user_goal": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "ok": NodeSystemStateDefinition.model_validate({"type": "boolean"}),
@@ -254,7 +254,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
         captured: dict[str, Any] = {}
 
-        def generate_skill_inputs(**kwargs: Any):
+        def generate_action_inputs(**kwargs: Any):
             return (
                 {
                     "toograph_page_operator": {
@@ -271,7 +271,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 kwargs["runtime_config"],
             )
 
-        def invoke_skill(skill_func: Any, skill_inputs: dict[str, Any], context: dict[str, Any] | None = None) -> dict[str, Any]:
+        def invoke_action(action_func: Any, action_inputs: dict[str, Any], context: dict[str, Any] | None = None) -> dict[str, Any]:
             captured["context"] = context
             return {"ok": True}
 
@@ -279,41 +279,41 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             state_schema,
             node,
             {"user_goal": "创建一个 input 节点"},
-            {"metadata": {"skill_runtime_context": {"page_path": "/editor/new"}}, "state": {}},
+            {"metadata": {"action_runtime_context": {"page_path": "/editor/new"}}, "state": {}},
             node_name="operate_page",
-            state={"run_id": "run-1", "metadata": {"skill_runtime_context": {"page_path": "/editor/new"}}, "activity_events": []},
-            get_skill_registry_func=lambda *, include_disabled: {"toograph_page_operator": "toograph_page_operator"},
-            get_skill_definition_registry_func=lambda *, include_disabled: {
-                "toograph_page_operator": SkillDefinition(
-                    skillKey="toograph_page_operator",
+            state={"run_id": "run-1", "metadata": {"action_runtime_context": {"page_path": "/editor/new"}}, "activity_events": []},
+            get_action_registry_func=lambda *, include_disabled: {"toograph_page_operator": "toograph_page_operator"},
+            get_action_definition_registry_func=lambda *, include_disabled: {
+                "toograph_page_operator": ActionDefinition(
+                    actionKey="toograph_page_operator",
                     name="页面操作",
                     llmOutputSchema=[
-                        SkillIoField(key="commands", name="Commands", valueType="json"),
-                        SkillIoField(key="graph_edit_intents", name="Graph Edit Intents", valueType="json"),
-                        SkillIoField(key="cursor_lifecycle", name="Cursor Lifecycle", valueType="text"),
-                        SkillIoField(key="reason", name="Reason", valueType="text"),
+                        ActionIoField(key="commands", name="Commands", valueType="json"),
+                        ActionIoField(key="graph_edit_intents", name="Graph Edit Intents", valueType="json"),
+                        ActionIoField(key="cursor_lifecycle", name="Cursor Lifecycle", valueType="text"),
+                        ActionIoField(key="reason", name="Reason", valueType="text"),
                     ],
-                    stateOutputSchema=[SkillIoField(key="ok", name="OK", valueType="boolean")],
+                    stateOutputSchema=[ActionIoField(key="ok", name="OK", valueType="boolean")],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
             },
-            invoke_skill_func=invoke_skill,
+            invoke_action_func=invoke_action,
             resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=callable_accepts_keyword,
-            generate_agent_skill_inputs_func=generate_skill_inputs,
+            generate_agent_action_inputs_func=generate_action_inputs,
             generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
-                AssertionError("mapped skill output should satisfy node writes")
+                AssertionError("mapped action output should satisfy node writes")
             ),
             finalize_agent_stream_delta_func=lambda **kwargs: None,
             first_truthy_func=lambda values: next((value for value in values if value), None),
         )
 
-        self.assertEqual(captured["context"]["skill_runtime_context"], {"page_path": "/editor/new"})
+        self.assertEqual(captured["context"]["action_runtime_context"], {"page_path": "/editor/new"})
         self.assertEqual(result["outputs"], {"ok": True})
 
-    def test_execute_agent_node_records_skill_activity_event(self) -> None:
+    def test_execute_agent_node_records_action_activity_event(self) -> None:
         state_schema = {
             "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -341,13 +341,13 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="writer",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {"custom": object()},
-            invoke_skill_func=lambda skill_func, skill_inputs: {"echo": skill_inputs["question"]},
+            get_action_registry_func=lambda *, include_disabled: {"custom": object()},
+            invoke_action_func=lambda action_func, action_inputs: {"echo": action_inputs["question"]},
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_skill_inputs_func=pass_through_skill_inputs_func,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+            generate_agent_action_inputs_func=pass_through_action_inputs_func,
+            generate_agent_response_func=lambda agent_node, input_values, action_context, runtime_config, **kwargs: (
                 {"answer": "value"},
                 "",
                 [],
@@ -369,7 +369,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(event["detail"]["input_keys"], ["question"])
         self.assertEqual(event["detail"]["output_keys"], ["echo"])
 
-    def test_execute_agent_node_records_skill_returned_activity_events(self) -> None:
+    def test_execute_agent_node_records_action_returned_activity_events(self) -> None:
         state_schema = {
             "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -397,9 +397,9 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="writer",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {"custom": object()},
-            invoke_skill_func=lambda skill_func, skill_inputs: {
-                "echo": skill_inputs["question"],
+            get_action_registry_func=lambda *, include_disabled: {"custom": object()},
+            invoke_action_func=lambda action_func, action_inputs: {
+                "echo": action_inputs["question"],
                 "activity_events": [
                     {
                         "kind": "file_read",
@@ -411,8 +411,8 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_skill_inputs_func=pass_through_skill_inputs_func,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+            generate_agent_action_inputs_func=pass_through_action_inputs_func,
+            generate_agent_response_func=lambda agent_node, input_values, action_context, runtime_config, **kwargs: (
                 {"answer": "value"},
                 "",
                 [],
@@ -466,14 +466,14 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="writer",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {},
-            get_skill_definition_registry_func=lambda *, include_disabled: {},
-            invoke_skill_func=lambda skill_func, skill_inputs: {},
+            get_action_registry_func=lambda *, include_disabled: {},
+            get_action_definition_registry_func=lambda *, include_disabled: {},
+            invoke_action_func=lambda action_func, action_inputs: {},
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_skill_inputs_func=pass_through_skill_inputs_func,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+            generate_agent_action_inputs_func=pass_through_action_inputs_func,
+            generate_agent_response_func=lambda agent_node, input_values, action_context, runtime_config, **kwargs: (
                 {"answer": "ok"},
                 "",
                 [],
@@ -495,7 +495,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(event["detail"]["file_count"], 2)
         self.assertEqual(event["detail"]["files"], ["SOUL.md", "MEMORY.md"])
 
-    def test_execute_agent_node_records_local_folder_context_for_skill_input_planning(self) -> None:
+    def test_execute_agent_node_records_local_folder_context_for_action_input_planning(self) -> None:
         state_schema = {
             "buddy_context": NodeSystemStateDefinition.model_validate({"type": "file"}),
             "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -529,36 +529,36 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="writer",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {"custom": object()},
-            get_skill_definition_registry_func=lambda *, include_disabled: {
-                "custom": SkillDefinition(
-                    skillKey="custom",
+            get_action_registry_func=lambda *, include_disabled: {"custom": object()},
+            get_action_definition_registry_func=lambda *, include_disabled: {
+                "custom": ActionDefinition(
+                    actionKey="custom",
                     name="Custom",
-                    stateOutputSchema=[SkillIoField(key="answer", name="Answer", valueType="text")],
+                    stateOutputSchema=[ActionIoField(key="answer", name="Answer", valueType="text")],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
             },
-            invoke_skill_func=lambda skill_func, skill_inputs: {"answer": "skill answer"},
+            invoke_action_func=lambda action_func, action_inputs: {"answer": "action answer"},
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"custom": {}}),
+            generate_agent_action_inputs_func=fixed_action_inputs_func({"custom": {}}),
             generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
-                AssertionError("mapped skill output should skip final response generation")
+                AssertionError("mapped action output should skip final response generation")
             ),
             finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
             first_truthy_func=lambda values: next((value for value in values if value), None),
             record_activity_event_func=record_activity_event_func,
         )
 
-        self.assertEqual(result["outputs"], {"answer": "skill answer"})
+        self.assertEqual(result["outputs"], {"answer": "action answer"})
         self.assertEqual([event["kind"] for event in recorded_events], ["file_context_read", "action_invocation"])
         self.assertEqual(recorded_events[0]["summary"], "Prepared 1 selected local input file for LLM context.")
-        self.assertEqual(recorded_events[0]["detail"]["phase"], "skill_input_planning")
+        self.assertEqual(recorded_events[0]["detail"]["phase"], "action_input_planning")
         self.assertEqual(recorded_events[0]["detail"]["files"], ["SOUL.md"])
 
-    def test_execute_agent_node_treats_knowledge_base_state_as_normal_skill_input(self) -> None:
+    def test_execute_agent_node_treats_knowledge_base_state_as_normal_action_input(self) -> None:
         state_schema = {
             "kb": NodeSystemStateDefinition.model_validate({"type": "knowledge_base"}),
             "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -582,14 +582,14 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="writer",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {"custom_retrieval": object()},
-            invoke_skill_func=lambda skill_func, skill_inputs: {"context": skill_inputs["question"]},
+            get_action_registry_func=lambda *, include_disabled: {"custom_retrieval": object()},
+            invoke_action_func=lambda action_func, action_inputs: {"context": action_inputs["question"]},
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_skill_inputs_func=pass_through_skill_inputs_func,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
-                {"answer": skill_context["custom_retrieval"]["context"]},
+            generate_agent_action_inputs_func=pass_through_action_inputs_func,
+            generate_agent_response_func=lambda agent_node, input_values, action_context, runtime_config, **kwargs: (
+                {"answer": action_context["custom_retrieval"]["context"]},
                 "",
                 [],
                 runtime_config,
@@ -601,7 +601,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["action_outputs"][0]["inputs"], {"kb": "docs", "question": "q"})
         self.assertEqual(result["outputs"], {"answer": "q"})
 
-    def test_execute_agent_node_static_skill_ignores_capability_state_inputs(self) -> None:
+    def test_execute_agent_node_static_action_ignores_capability_state_inputs(self) -> None:
         state_schema = {
             "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
             "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -619,9 +619,9 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
         invoked: list[str] = []
 
-        def invoke_skill_func(skill_func: str, skill_inputs: dict[str, object]) -> dict[str, object]:
-            invoked.append(skill_func)
-            return {"status": "succeeded", "summary": f"{skill_func} result"}
+        def invoke_action_func(action_func: str, action_inputs: dict[str, object]) -> dict[str, object]:
+            invoked.append(action_func)
+            return {"status": "succeeded", "summary": f"{action_func} result"}
 
         result = execute_agent_node(
             state_schema,
@@ -633,18 +633,18 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="writer",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {
+            get_action_registry_func=lambda *, include_disabled: {
                 "web_search": "web_search",
                 "file_reader": "file_reader",
             },
-            get_skill_definition_registry_func=lambda *, include_disabled: {},
-            invoke_skill_func=invoke_skill_func,
+            get_action_definition_registry_func=lambda *, include_disabled: {},
+            invoke_action_func=invoke_action_func,
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_skill_inputs_func=pass_through_skill_inputs_func,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
-                {"answer": ",".join(skill_context)},
+            generate_agent_action_inputs_func=pass_through_action_inputs_func,
+            generate_agent_response_func=lambda agent_node, input_values, action_context, runtime_config, **kwargs: (
+                {"answer": ",".join(action_context)},
                 "",
                 [],
                 runtime_config,
@@ -657,7 +657,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["selected_actions"], ["web_search"])
         self.assertEqual(result["outputs"], {"answer": "web_search"})
 
-    def test_execute_agent_node_uses_llm_generated_skill_inputs(self) -> None:
+    def test_execute_agent_node_uses_llm_generated_action_inputs(self) -> None:
         state_schema = {
             "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -684,32 +684,32 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="searcher",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {"web_search": "web_search"},
-            get_skill_definition_registry_func=lambda *, include_disabled: {
-                "web_search": SkillDefinition(
-                    skillKey="web_search",
+            get_action_registry_func=lambda *, include_disabled: {"web_search": "web_search"},
+            get_action_definition_registry_func=lambda *, include_disabled: {
+                "web_search": ActionDefinition(
+                    actionKey="web_search",
                     name="Web Search",
                     llmOutputSchema=[
-                        SkillIoField(key="query", name="Query", valueType="text"),
+                        ActionIoField(key="query", name="Query", valueType="text"),
                     ],
-                    stateOutputSchema=[SkillIoField(key="summary", name="Summary", valueType="markdown")],
+                    stateOutputSchema=[ActionIoField(key="summary", name="Summary", valueType="markdown")],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
             },
-            generate_agent_skill_inputs_func=lambda **kwargs: (
+            generate_agent_action_inputs_func=lambda **kwargs: (
                 {"web_search": {"query": "鸣潮 最新版本 更新内容"}},
-                "planned skill inputs",
+                "planned action inputs",
                 [],
                 kwargs["runtime_config"],
             ),
-            invoke_skill_func=lambda skill_func, skill_inputs: captured_inputs.append(dict(skill_inputs))
+            invoke_action_func=lambda action_func, action_inputs: captured_inputs.append(dict(action_inputs))
             or {"status": "succeeded", "summary": "searched"},
             resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
-                {"answer": skill_context["web_search"]["summary"]},
+            generate_agent_response_func=lambda agent_node, input_values, action_context, runtime_config, **kwargs: (
+                {"answer": action_context["web_search"]["summary"]},
                 "",
                 [],
                 runtime_config,
@@ -724,7 +724,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["reasoning"], "")
         self.assertEqual(result["outputs"], {"answer": "searched"})
 
-    def test_execute_agent_node_uses_llm_inputs_for_capability_state_selected_skill(self) -> None:
+    def test_execute_agent_node_uses_llm_inputs_for_capability_state_selected_action(self) -> None:
         state_schema = {
             "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
             "query": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -752,17 +752,17 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="tool_executor",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {"web_search": "web_search"},
-            get_skill_definition_registry_func=lambda *, include_disabled: {
-                "web_search": SkillDefinition(
-                    skillKey="web_search",
+            get_action_registry_func=lambda *, include_disabled: {"web_search": "web_search"},
+            get_action_definition_registry_func=lambda *, include_disabled: {
+                "web_search": ActionDefinition(
+                    actionKey="web_search",
                     name="Web Search",
                     llmOutputSchema=[
-                        SkillIoField(key="query", name="Query", valueType="text"),
-                        SkillIoField(key="max_results", name="Max Results", valueType="text"),
+                        ActionIoField(key="query", name="Query", valueType="text"),
+                        ActionIoField(key="max_results", name="Max Results", valueType="text"),
                     ],
                     stateOutputSchema=[
-                        SkillIoField(
+                        ActionIoField(
                             key="summary",
                             name="Summary",
                             valueType="markdown",
@@ -773,16 +773,16 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     runtimeRegistered=True,
                 )
             },
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func(
+            generate_agent_action_inputs_func=fixed_action_inputs_func(
                 {"web_search": {"query": "Wuthering Waves latest version", "max_results": "8"}}
             ),
-            invoke_skill_func=lambda skill_func, skill_inputs: captured_inputs.append(dict(skill_inputs))
+            invoke_action_func=lambda action_func, action_inputs: captured_inputs.append(dict(action_inputs))
             or {"status": "succeeded", "summary": "searched"},
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
             generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
-                AssertionError("dynamic skill results should be packaged without an extra LLM response")
+                AssertionError("dynamic action results should be packaged without an extra LLM response")
             ),
             finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
             first_truthy_func=lambda values: next((value for value in values if value), None),
@@ -801,7 +801,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {
                 "dynamic_result": {
                     "kind": "result_package",
-                    "sourceType": "skill",
+                    "sourceType": "action",
                     "sourceKey": "web_search",
                     "sourceName": "Web Search",
                     "status": "succeeded",
@@ -823,7 +823,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertIsInstance(result["final_result"], str)
         self.assertIn('"kind": "result_package"', result["final_result"].replace("'", '"'))
 
-    def test_execute_agent_node_pauses_before_ask_first_risky_dynamic_skill(self) -> None:
+    def test_execute_agent_node_pauses_before_ask_first_risky_dynamic_action(self) -> None:
         state_schema = {
             "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
             "request": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -855,28 +855,28 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="execute_capability",
             state={"run_id": "run-1", "metadata": {"graph_permission_mode": "ask_first"}},
-            get_skill_registry_func=lambda *, include_disabled: {"local_workspace_executor": "local_workspace_executor"},
-            get_skill_definition_registry_func=lambda *, include_disabled: {
-                "local_workspace_executor": SkillDefinition(
-                    skillKey="local_workspace_executor",
+            get_action_registry_func=lambda *, include_disabled: {"local_workspace_executor": "local_workspace_executor"},
+            get_action_definition_registry_func=lambda *, include_disabled: {
+                "local_workspace_executor": ActionDefinition(
+                    actionKey="local_workspace_executor",
                     name="Local Workspace Executor",
                     permissions=["file_write", "subprocess"],
-                    llmOutputSchema=[SkillIoField(key="path", name="Path", valueType="text")],
+                    llmOutputSchema=[ActionIoField(key="path", name="Path", valueType="text")],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
             },
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func(
+            generate_agent_action_inputs_func=fixed_action_inputs_func(
                 {"local_workspace_executor": {"path": "action/user/demo/ACTION.md"}}
             ),
-            invoke_skill_func=lambda skill_func, skill_inputs: (_ for _ in ()).throw(
-                AssertionError("risky skill should not execute before approval")
+            invoke_action_func=lambda action_func, action_inputs: (_ for _ in ()).throw(
+                AssertionError("risky action should not execute before approval")
             ),
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
             generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
-                AssertionError("dynamic skill approval should pause before response generation")
+                AssertionError("dynamic action approval should pause before response generation")
             ),
             finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
             first_truthy_func=lambda values: next((value for value in values if value), None),
@@ -885,19 +885,19 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
 
         self.assertTrue(result["awaiting_human"])
         approval = result["pending_permission_approval"]
-        self.assertEqual(approval["kind"], "skill_permission_approval")
+        self.assertEqual(approval["kind"], "capability_permission_approval")
         self.assertEqual(approval["node_id"], "execute_capability")
-        self.assertEqual(approval["skill_key"], "local_workspace_executor")
+        self.assertEqual(approval["capability_key"], "local_workspace_executor")
         self.assertEqual(approval["binding_source"], "capability_state")
         self.assertEqual(approval["permissions"], ["file_write", "subprocess"])
-        self.assertEqual(approval["skill_inputs"], {"path": "action/user/demo/ACTION.md"})
+        self.assertEqual(approval["inputs"], {"path": "action/user/demo/ACTION.md"})
         self.assertEqual(recorded_events[0]["kind"], "permission_pause")
         self.assertEqual(recorded_events[0]["node_id"], "execute_capability")
         self.assertEqual(recorded_events[0]["status"], "awaiting_human")
         self.assertEqual(recorded_events[0]["detail"]["action_key"], "local_workspace_executor")
         self.assertEqual(recorded_events[0]["detail"]["permissions"], ["file_write", "subprocess"])
 
-    def test_execute_agent_node_resumes_risky_skill_with_stored_approval_inputs(self) -> None:
+    def test_execute_agent_node_resumes_risky_action_with_stored_approval_inputs(self) -> None:
         state_schema = {
             "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
             "request": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -921,11 +921,11 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "pending_permission_approval": build_pending_permission_approval(
                     state={"run_id": "run-1", "metadata": {"graph_permission_mode": "ask_first"}},
                     node_name="execute_capability",
-                    skill_key="local_workspace_executor",
-                    skill_name="Local Workspace Executor",
+                    action_key="local_workspace_executor",
+                    action_name="Local Workspace Executor",
                     binding_source="capability_state",
                     permissions=["file_write"],
-                    skill_inputs=stored_inputs,
+                    inputs=stored_inputs,
                 ),
                 "pending_permission_approval_resume_payload": {},
             },
@@ -942,26 +942,26 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="execute_capability",
             state=state,
-            get_skill_registry_func=lambda *, include_disabled: {"local_workspace_executor": "local_workspace_executor"},
-            get_skill_definition_registry_func=lambda *, include_disabled: {
-                "local_workspace_executor": SkillDefinition(
-                    skillKey="local_workspace_executor",
+            get_action_registry_func=lambda *, include_disabled: {"local_workspace_executor": "local_workspace_executor"},
+            get_action_definition_registry_func=lambda *, include_disabled: {
+                "local_workspace_executor": ActionDefinition(
+                    actionKey="local_workspace_executor",
                     name="Local Workspace Executor",
                     permissions=["file_write"],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
             },
-            generate_agent_skill_inputs_func=lambda **kwargs: (_ for _ in ()).throw(
-                AssertionError("approved resume should reuse stored skill inputs")
+            generate_agent_action_inputs_func=lambda **kwargs: (_ for _ in ()).throw(
+                AssertionError("approved resume should reuse stored action inputs")
             ),
-            invoke_skill_func=lambda skill_func, skill_inputs: captured_inputs.append(dict(skill_inputs))
-            or {"status": "succeeded", "path": skill_inputs["path"]},
+            invoke_action_func=lambda action_func, action_inputs: captured_inputs.append(dict(action_inputs))
+            or {"status": "succeeded", "path": action_inputs["path"]},
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
             generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
-                AssertionError("dynamic skill results should be packaged without an extra LLM response")
+                AssertionError("dynamic action results should be packaged without an extra LLM response")
             ),
             finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
             first_truthy_func=lambda values: next((value for value in values if value), None),
@@ -972,7 +972,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(state["permission_approvals"][0]["status"], "approved")
         self.assertEqual(result["outputs"]["dynamic_result"]["inputs"], stored_inputs)
 
-    def test_execute_agent_node_resumes_risky_skill_denial_as_result_package_failure(self) -> None:
+    def test_execute_agent_node_resumes_risky_action_denial_as_result_package_failure(self) -> None:
         state_schema = {
             "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
             "request": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -996,11 +996,11 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "pending_permission_approval": build_pending_permission_approval(
                     state={"run_id": "run-1", "metadata": {"graph_permission_mode": "ask_first"}},
                     node_name="execute_capability",
-                    skill_key="local_workspace_executor",
-                    skill_name="Local Workspace Executor",
+                    action_key="local_workspace_executor",
+                    action_name="Local Workspace Executor",
                     binding_source="capability_state",
                     permissions=["file_write"],
-                    skill_inputs=stored_inputs,
+                    inputs=stored_inputs,
                 ),
                 "pending_permission_approval_resume_payload": {
                     "permission_approval": {
@@ -1021,21 +1021,21 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="execute_capability",
             state=state,
-            get_skill_registry_func=lambda *, include_disabled: {"local_workspace_executor": "local_workspace_executor"},
-            get_skill_definition_registry_func=lambda *, include_disabled: {
-                "local_workspace_executor": SkillDefinition(
-                    skillKey="local_workspace_executor",
+            get_action_registry_func=lambda *, include_disabled: {"local_workspace_executor": "local_workspace_executor"},
+            get_action_definition_registry_func=lambda *, include_disabled: {
+                "local_workspace_executor": ActionDefinition(
+                    actionKey="local_workspace_executor",
                     name="Local Workspace Executor",
                     permissions=["file_write"],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
             },
-            generate_agent_skill_inputs_func=lambda **kwargs: (_ for _ in ()).throw(
+            generate_agent_action_inputs_func=lambda **kwargs: (_ for _ in ()).throw(
                 AssertionError("denied resume should reuse stored permission inputs")
             ),
-            invoke_skill_func=lambda skill_func, skill_inputs: (_ for _ in ()).throw(
-                AssertionError("denied permission should not execute the skill")
+            invoke_action_func=lambda action_func, action_inputs: (_ for _ in ()).throw(
+                AssertionError("denied permission should not execute the action")
             ),
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
@@ -1053,7 +1053,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         package = result["outputs"]["dynamic_result"]
         self.assertEqual(package["status"], "failed")
         self.assertEqual(package["errorType"], "permission_denied")
-        self.assertEqual(package["error"], "Permission denied for skill 'local_workspace_executor': 不要写本地文件")
+        self.assertEqual(package["error"], "Permission denied for action 'local_workspace_executor': 不要写本地文件")
         self.assertEqual(package["inputs"], stored_inputs)
         self.assertEqual(result["action_outputs"][0]["status"], "failed")
         self.assertEqual(result["action_outputs"][0]["error_type"], "permission_denied")
@@ -1110,8 +1110,8 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="subgraph_executor",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {},
-            get_skill_definition_registry_func=lambda *, include_disabled: {},
+            get_action_registry_func=lambda *, include_disabled: {},
+            get_action_definition_registry_func=lambda *, include_disabled: {},
             generate_agent_subgraph_inputs_func=lambda **kwargs: (
                 {"advanced_web_research_loop": {"user_question": "总结今天 AI 新闻"}},
                 "planned subgraph inputs",
@@ -1197,8 +1197,8 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="subgraph_executor",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {},
-            get_skill_definition_registry_func=lambda *, include_disabled: {},
+            get_action_registry_func=lambda *, include_disabled: {},
+            get_action_definition_registry_func=lambda *, include_disabled: {},
             generate_agent_subgraph_inputs_func=lambda **kwargs: (
                 {"advanced_web_research_loop": {"user_question": "总结今天 AI 新闻"}},
                 "planned subgraph inputs",
@@ -1237,20 +1237,20 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(recorded_events[0]["detail"]["input_keys"], ["user_question"])
         self.assertEqual(recorded_events[0]["detail"]["output_keys"], ["final_reply"])
 
-    def test_execute_agent_node_infers_skill_output_mapping_from_state_outputs(self) -> None:
+    def test_execute_agent_node_infers_action_output_mapping_from_state_outputs(self) -> None:
         state_schema = {
             "query": NodeSystemStateDefinition.model_validate({"name": "Search Query", "type": "text"}),
             "source_urls": NodeSystemStateDefinition.model_validate(
                 {
                     "name": "联网搜索 Source URLs",
-                    "description": "搜索技能返回的原文网页 URL 列表。",
+                    "description": "搜索 Action返回的原文网页 URL 列表。",
                     "type": "json",
                 }
             ),
             "artifact_paths": NodeSystemStateDefinition.model_validate(
                 {
                     "name": "联网搜索 Artifact Paths",
-                    "description": "搜索技能写入本地的原文文档路径。",
+                    "description": "搜索 Action写入本地的原文文档路径。",
                     "type": "file",
                 }
             ),
@@ -1265,7 +1265,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "config": {"actionKey": "web_search"},
             }
         )
-        skill_result = {
+        action_result = {
             "status": "succeeded",
             "source_urls": ["https://example.test/source"],
             "artifact_paths": ["run/doc_001.md"],
@@ -1279,43 +1279,43 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="searcher",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {"web_search": "web_search"},
-            get_skill_definition_registry_func=lambda *, include_disabled: {
-                "web_search": SkillDefinition(
-                    skillKey="web_search",
+            get_action_registry_func=lambda *, include_disabled: {"web_search": "web_search"},
+            get_action_definition_registry_func=lambda *, include_disabled: {
+                "web_search": ActionDefinition(
+                    actionKey="web_search",
                     name="Web Search",
-                    llmOutputSchema=[SkillIoField(key="query", name="Query", valueType="text")],
+                    llmOutputSchema=[ActionIoField(key="query", name="Query", valueType="text")],
                     stateOutputSchema=[
-                        SkillIoField(
+                        ActionIoField(
                             key="source_urls",
                             name="Source URLs",
                             valueType="json",
                             description="Original source URLs.",
                         ),
-                        SkillIoField(
+                        ActionIoField(
                             key="artifact_paths",
                             name="Artifact Paths",
                             valueType="file",
                             description="Downloaded local documents.",
                         ),
-                        SkillIoField(key="errors", name="Errors", valueType="json"),
+                        ActionIoField(key="errors", name="Errors", valueType="json"),
                     ],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
             },
-            generate_agent_skill_inputs_func=lambda **kwargs: (
+            generate_agent_action_inputs_func=lambda **kwargs: (
                 {"web_search": {"query": "TooGraph latest"}},
-                "planned skill inputs",
+                "planned action inputs",
                 [],
                 kwargs["runtime_config"],
             ),
-            invoke_skill_func=lambda skill_func, skill_inputs: skill_result,
+            invoke_action_func=lambda action_func, action_inputs: action_result,
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
             generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
-                AssertionError("mapped skill outputs should not be repackaged by the LLM")
+                AssertionError("mapped action outputs should not be repackaged by the LLM")
             ),
             finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
             first_truthy_func=lambda values: next((value for value in values if value), None),
@@ -1353,7 +1353,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     "state_key": "source_urls",
                     "state_name": "联网搜索 Source URLs",
                     "state_type": "json",
-                    "state_description": "搜索技能返回的原文网页 URL 列表。",
+                    "state_description": "搜索 Action返回的原文网页 URL 列表。",
                 },
                 {
                     "output_key": "artifact_paths",
@@ -1363,12 +1363,12 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     "state_key": "artifact_paths",
                     "state_name": "联网搜索 Artifact Paths",
                     "state_type": "file",
-                    "state_description": "搜索技能写入本地的原文文档路径。",
+                    "state_description": "搜索 Action写入本地的原文文档路径。",
                 },
             ],
         )
 
-    def test_execute_agent_node_reports_missing_llm_generated_skill_input_without_invoking_script(self) -> None:
+    def test_execute_agent_node_reports_missing_llm_generated_action_input_without_invoking_script(self) -> None:
         state_schema = {
             "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
             "dynamic_result": NodeSystemStateDefinition.model_validate({"type": "result_package"}),
@@ -1392,26 +1392,26 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="tool_executor",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {"web_search": "web_search"},
-            get_skill_definition_registry_func=lambda *, include_disabled: {
-                "web_search": SkillDefinition(
-                    skillKey="web_search",
+            get_action_registry_func=lambda *, include_disabled: {"web_search": "web_search"},
+            get_action_definition_registry_func=lambda *, include_disabled: {
+                "web_search": ActionDefinition(
+                    actionKey="web_search",
                     name="Web Search",
                     llmOutputSchema=[
-                        SkillIoField(key="query", name="Query", valueType="text"),
+                        ActionIoField(key="query", name="Query", valueType="text"),
                     ],
-                    stateOutputSchema=[SkillIoField(key="error", name="Error", valueType="text")],
+                    stateOutputSchema=[ActionIoField(key="error", name="Error", valueType="text")],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
             },
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {}}),
-            invoke_skill_func=lambda skill_func, skill_inputs: invoked.append(str(skill_func)) or {},
+            generate_agent_action_inputs_func=fixed_action_inputs_func({"web_search": {}}),
+            invoke_action_func=lambda action_func, action_inputs: invoked.append(str(action_func)) or {},
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
             generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
-                AssertionError("dynamic skill failures should be packaged without an extra LLM response")
+                AssertionError("dynamic action failures should be packaged without an extra LLM response")
             ),
             finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
             first_truthy_func=lambda values: next((value for value in values if value), None),
@@ -1423,11 +1423,11 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["action_outputs"][0]["output_mapping"], {})
         self.assertEqual(result["action_outputs"][0]["output_mapping_details"], [])
         self.assertEqual(result["action_outputs"][0]["status"], "failed")
-        self.assertEqual(result["action_outputs"][0]["error_type"], "missing_skill_llm_output")
+        self.assertEqual(result["action_outputs"][0]["error_type"], "missing_action_llm_output")
         self.assertIn("query", result["action_outputs"][0]["error"])
         self.assertEqual(result["outputs"]["dynamic_result"]["kind"], "result_package")
         self.assertEqual(result["outputs"]["dynamic_result"]["status"], "failed")
-        self.assertEqual(result["outputs"]["dynamic_result"]["errorType"], "missing_skill_llm_output")
+        self.assertEqual(result["outputs"]["dynamic_result"]["errorType"], "missing_action_llm_output")
         self.assertIn("query", result["outputs"]["dynamic_result"]["error"])
         self.assertIsInstance(result["final_result"], str)
         self.assertIn("Action 'web_search' failed before execution", result["warnings"][0])
@@ -1464,21 +1464,21 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="writer",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {
+            get_action_registry_func=lambda *, include_disabled: {
                 "summarize_text": object(),
             },
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func(
+            generate_agent_action_inputs_func=fixed_action_inputs_func(
                 {"summarize_text": {"text": "Long text", "max_sentences": 2}}
             ),
-            invoke_skill_func=lambda skill_func, skill_inputs: {
-                "summary": f"{skill_inputs['text']} / {skill_inputs['max_sentences']}",
+            invoke_action_func=lambda action_func, action_inputs: {
+                "summary": f"{action_inputs['text']} / {action_inputs['max_sentences']}",
                 "key_points": ["one"],
             },
             resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: "delta",
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
-                {"answer": f"Final using {skill_context['summarize_text']['summary']}"},
+            generate_agent_response_func=lambda agent_node, input_values, action_context, runtime_config, **kwargs: (
+                {"answer": f"Final using {action_context['summarize_text']['summary']}"},
                 "",
                 [],
                 runtime_config,
@@ -1529,7 +1529,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         finalized: dict[str, object] = {}
 
         def generate_agent_response_func(*args, **kwargs):
-            raise AssertionError("skill-only LLM nodes must not call the language model")
+            raise AssertionError("action-only LLM nodes must not call the language model")
 
         result = execute_agent_node(
             state_schema,
@@ -1538,9 +1538,9 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="context_loader",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {"load_context": object()},
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"load_context": {"question": "q"}}),
-            invoke_skill_func=lambda skill_func, skill_inputs: {
+            get_action_registry_func=lambda *, include_disabled: {"load_context": object()},
+            generate_agent_action_inputs_func=fixed_action_inputs_func({"load_context": {"question": "q"}}),
+            invoke_action_func=lambda action_func, action_inputs: {
                 "status": "succeeded",
                 "context": "loaded context",
                 "snapshot": {"ok": True},
@@ -1559,7 +1559,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["runtime_config"], {"runtime": "initial"})
         self.assertEqual(finalized, {"context": "loaded context", "snapshot": {"ok": True}})
 
-    def test_execute_agent_node_preserves_mapped_skill_output_when_response_omits_that_state(self) -> None:
+    def test_execute_agent_node_preserves_mapped_action_output_when_response_omits_that_state(self) -> None:
         state_schema = {
             "query": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "search_report": NodeSystemStateDefinition.model_validate({"type": "markdown"}),
@@ -1598,16 +1598,16 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="web_search_agent",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {"web_search": object()},
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "TooGraph"}}),
-            invoke_skill_func=lambda skill_func, skill_inputs: {
+            get_action_registry_func=lambda *, include_disabled: {"web_search": object()},
+            generate_agent_action_inputs_func=fixed_action_inputs_func({"web_search": {"query": "TooGraph"}}),
+            invoke_action_func=lambda action_func, action_inputs: {
                 "status": "succeeded",
                 "source_documents": source_documents,
             },
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+            generate_agent_response_func=lambda agent_node, input_values, action_context, runtime_config, **kwargs: (
                 {"search_report": "report"},
                 "",
                 [],
@@ -1656,16 +1656,16 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="web_search_agent",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {"web_search": object()},
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "TooGraph"}}),
-            invoke_skill_func=lambda skill_func, skill_inputs: {
+            get_action_registry_func=lambda *, include_disabled: {"web_search": object()},
+            generate_agent_action_inputs_func=fixed_action_inputs_func({"web_search": {"query": "TooGraph"}}),
+            invoke_action_func=lambda action_func, action_inputs: {
                 "status": "succeeded",
                 "source_documents": source_documents,
             },
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+            generate_agent_response_func=lambda agent_node, input_values, action_context, runtime_config, **kwargs: (
                 {
                     "search_report": "report",
                     "source_documents": [{"local_path": "llm_summary_only.md"}],
@@ -1708,17 +1708,17 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="writer",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {
+            get_action_registry_func=lambda *, include_disabled: {
                 "web_search": object(),
             },
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "Beijing weather today"}}),
-            invoke_skill_func=lambda skill_func, skill_inputs: captured_inputs.update(skill_inputs)
+            generate_agent_action_inputs_func=fixed_action_inputs_func({"web_search": {"query": "Beijing weather today"}}),
+            invoke_action_func=lambda action_func, action_inputs: captured_inputs.update(action_inputs)
             or {"status": "succeeded", "summary": "联网结果", "context": "联网上下文"},
             resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: "delta",
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
-                {"answer": skill_context["web_search"]["summary"]},
+            generate_agent_response_func=lambda agent_node, input_values, action_context, runtime_config, **kwargs: (
+                {"answer": action_context["web_search"]["summary"]},
                 "",
                 [],
                 runtime_config,
@@ -1731,7 +1731,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["action_outputs"][0]["inputs"], {"query": "Beijing weather today"})
         self.assertEqual(result["outputs"]["answer"], "联网结果")
 
-    def test_execute_agent_node_rejects_static_skill_input_mapping(self) -> None:
+    def test_execute_agent_node_rejects_static_action_input_mapping(self) -> None:
         with self.assertRaisesRegex(ValueError, "inputMapping"):
             NodeSystemAgentNode.model_validate(
                 {
@@ -1752,7 +1752,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 }
             )
 
-    def test_execute_agent_node_passes_skill_artifact_invocation_context(self) -> None:
+    def test_execute_agent_node_passes_capability_artifact_invocation_context(self) -> None:
         state_schema = {
             "query": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -1783,17 +1783,17 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="searcher",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {
+            get_action_registry_func=lambda *, include_disabled: {
                 "web_search": object(),
             },
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "TooGraph"}}),
-            invoke_skill_func=lambda skill_func, skill_inputs, *, context=None: captured_contexts.append(context or {})
+            generate_agent_action_inputs_func=fixed_action_inputs_func({"web_search": {"query": "TooGraph"}}),
+            invoke_action_func=lambda action_func, action_inputs, *, context=None: captured_contexts.append(context or {})
             or {"status": "succeeded", "summary": "联网结果"},
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=callable_accepts_keyword,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
-                {"answer": skill_context["web_search"]["summary"]},
+            generate_agent_response_func=lambda agent_node, input_values, action_context, runtime_config, **kwargs: (
+                {"answer": action_context["web_search"]["summary"]},
                 "",
                 [],
                 runtime_config,
@@ -1807,10 +1807,10 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         context = captured_contexts[0]
         self.assertEqual(context["run_id"], "run-1")
         self.assertEqual(context["node_id"], "searcher")
-        self.assertEqual(context["skill_key"], "web_search")
+        self.assertEqual(context["capability_key"], "web_search")
         self.assertTrue(str(context["artifact_relative_dir"]).startswith("run-1/searcher/web_search/invocation_001"))
 
-    def test_execute_agent_node_increments_skill_artifact_invocation_context_across_repeated_node_runs(self) -> None:
+    def test_execute_agent_node_increments_capability_artifact_invocation_context_across_repeated_node_runs(self) -> None:
         state_schema = {
             "query": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -1835,7 +1835,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         run_state: dict[str, object] = {"run_id": "run-1"}
         captured_contexts: list[dict[str, object]] = []
 
-        def invoke_skill_func(skill_func: object, skill_inputs: dict[str, object], *, context=None) -> dict[str, object]:
+        def invoke_action_func(action_func: object, action_inputs: dict[str, object], *, context=None) -> dict[str, object]:
             captured_contexts.append(context or {})
             return {"status": "succeeded", "summary": "联网结果"}
 
@@ -1847,16 +1847,16 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 {"state": {}},
                 node_name="searcher",
                 state=run_state,
-                get_skill_registry_func=lambda *, include_disabled: {
+                get_action_registry_func=lambda *, include_disabled: {
                     "web_search": object(),
                 },
-                generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "TooGraph"}}),
-                invoke_skill_func=invoke_skill_func,
+                generate_agent_action_inputs_func=fixed_action_inputs_func({"web_search": {"query": "TooGraph"}}),
+                invoke_action_func=invoke_action_func,
                 resolve_agent_runtime_config_func=lambda agent_node: {},
                 build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
                 callable_accepts_keyword_func=callable_accepts_keyword,
-                generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
-                    {"answer": skill_context["web_search"]["summary"]},
+                generate_agent_response_func=lambda agent_node, input_values, action_context, runtime_config, **kwargs: (
+                    {"answer": action_context["web_search"]["summary"]},
                     "",
                     [],
                     runtime_config,
@@ -1877,7 +1877,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             )
         )
 
-    def test_execute_agent_node_surfaces_failed_skill_result_status(self) -> None:
+    def test_execute_agent_node_surfaces_failed_action_result_status(self) -> None:
         state_schema = {
             "name": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -1900,18 +1900,18 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             {"state": {}},
             node_name="writer",
             state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {
+            get_action_registry_func=lambda *, include_disabled: {
                 "web_search": object(),
             },
-            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "TooGraph"}}),
-            invoke_skill_func=lambda skill_func, skill_inputs: {
+            generate_agent_action_inputs_func=fixed_action_inputs_func({"web_search": {"query": "TooGraph"}}),
+            invoke_action_func=lambda action_func, action_inputs: {
                 "status": "failed",
                 "error": "Search query is required.",
             },
             resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: "delta",
             callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+            generate_agent_response_func=lambda agent_node, input_values, action_context, runtime_config, **kwargs: (
                 {"answer": "fallback"},
                 "",
                 [],

@@ -225,19 +225,21 @@ test("buildHumanReviewPanelModel extracts pending permission approval details", 
   run.lifecycle.pause_reason = "permission_approval";
   run.metadata = {
     pending_permission_approval: {
-      kind: "skill_permission_approval",
-      skill_key: "local_workspace_executor",
-      skill_name: "Local Workspace Executor",
+      kind: "capability_permission_approval",
+      capability_kind: "action",
+      capability_key: "local_workspace_executor",
+      capability_name: "Local Workspace Executor",
       permissions: ["file_write", "subprocess"],
       input_preview: '{\n  "path": "action/user/demo/ACTION.md"\n}',
-      reason: "Skill declares risky permissions.",
+      reason: "Action declares risky permissions.",
     },
   };
 
   const panel = buildHumanReviewPanelModel(run, createDocument());
 
-  assert.equal(panel.permissionApproval?.skillKey, "local_workspace_executor");
-  assert.equal(panel.permissionApproval?.skillName, "Local Workspace Executor");
+  assert.equal(panel.permissionApproval?.capabilityKind, "action");
+  assert.equal(panel.permissionApproval?.capabilityKey, "local_workspace_executor");
+  assert.equal(panel.permissionApproval?.capabilityName, "Local Workspace Executor");
   assert.deepEqual(panel.permissionApproval?.permissions, ["file_write", "subprocess"]);
   assert.equal(panel.permissionApproval?.inputPreview, '{\n  "path": "action/user/demo/ACTION.md"\n}');
   assert.equal(panel.summaryText, "Local Workspace Executor 需要确认：file_write、subprocess");
@@ -249,7 +251,7 @@ test("buildHumanReviewPanelModel extracts permission approval from scoped subgra
     name: "selected_capability",
     description: "",
     type: "capability",
-    value: { kind: "skill", key: "local_workspace_executor" },
+    value: { kind: "action", key: "local_workspace_executor" },
     color: "#2563eb",
   };
   document.state_schema.dynamic_result = {
@@ -307,15 +309,16 @@ test("buildHumanReviewPanelModel extracts permission approval from scoped subgra
       inner_node_id: "execute_capability",
       inner_node_name: "执行能力",
       state_values: {
-        selected_capability: { kind: "skill", key: "local_workspace_executor" },
+        selected_capability: { kind: "action", key: "local_workspace_executor" },
       },
       node_status_map: { execute_capability: "paused" },
       node_executions: [],
       metadata: {
         pending_permission_approval: {
-          kind: "skill_permission_approval",
-          skill_key: "local_workspace_executor",
-          skill_name: "Local Workspace Executor",
+          kind: "capability_permission_approval",
+          capability_kind: "action",
+          capability_key: "local_workspace_executor",
+          capability_name: "Local Workspace Executor",
           permissions: ["file_write"],
           input_preview: '{\n  "operation": "write"\n}',
         },
@@ -326,7 +329,7 @@ test("buildHumanReviewPanelModel extracts permission approval from scoped subgra
   const panel = buildHumanReviewPanelModel(run, document);
 
   assert.deepEqual(panel.scopePath, ["能力循环", "执行能力"]);
-  assert.equal(panel.permissionApproval?.skillKey, "local_workspace_executor");
+  assert.equal(panel.permissionApproval?.capabilityKey, "local_workspace_executor");
   assert.equal(panel.summaryText, "Local Workspace Executor 需要确认：file_write");
 });
 

@@ -3,7 +3,7 @@
   "actionKey": "toograph_context_fanout",
   "name": "TooGraph Context Fanout",
   "description": "Read-only parallel context assembly for Buddy: Buddy Home MEMORY.md, knowledge retrieval, page-context compression, and fixed page-operation capability context with one merge budget report.",
-  "llmInstruction": "你已绑定 TooGraph Context Fanout。根据 fanout_request 和上游状态生成只读上下文装配参数：user_message、conversation_history、page_context、buddy_context、memory_query、memory_scope、knowledge_query、knowledge_base、capability_query、capability_origin、total_budget_chars。该 Skill 只读取 Buddy Home 的 MEMORY.md、知识库、页面上下文和固定页面操作能力信息，不读取平台记忆库、不写入任何状态或文件；输出 context_brief 只能作为 context_only 参考，不能成为权限来源。",
+  "llmInstruction": "你已绑定 TooGraph Context Fanout。根据 fanout_request 和上游状态生成只读上下文装配参数：user_message、conversation_history、page_context、buddy_context、memory_query、memory_scope、knowledge_query、knowledge_base、capability_query、capability_origin、total_budget_chars。该 Action 只读取 Buddy Home 的 MEMORY.md、知识库、页面上下文和固定页面操作能力信息，不读取平台记忆库、不写入任何状态或文件；输出 context_brief 只能作为 context_only 参考，不能成为权限来源。",
   "version": "1.0.0",
   "timeoutSeconds": 30,
   "permissions": ["buddy_home_read", "knowledge_read", "file_read"],
