@@ -9,6 +9,7 @@ from typing import Any
 
 SUPPORTED_CURSOR_LIFECYCLES = {"keep", "return_after_step", "return_at_end"}
 AUTO_RESUME_STATE_KEYS = ["page_operation_context", "page_context", "operation_result"]
+SUPPORTED_PAGE_ACTIONS = {"click", "focus", "clear", "type", "press", "wait"}
 KNOWN_CLICK_TARGETS = {
     "click app.nav.home": {
         "target_id": "app.nav.home",
@@ -67,7 +68,9 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
     graph_edit_intents = _normalize_graph_edit_intents(skill_inputs.get("graph_edit_intents"))
     cursor_lifecycle = _normalize_cursor_lifecycle(skill_inputs.get("cursor_lifecycle"))
     reason = _compact_text(skill_inputs.get("reason"))
-    page_path = _resolve_page_path(skill_inputs)
+    runtime_context = _resolve_runtime_context(skill_inputs)
+    page_path = _resolve_page_path(skill_inputs, runtime_context)
+    operation_book = _resolve_operation_book(skill_inputs, runtime_context)
 
     if not commands:
         return _failed(
@@ -93,7 +96,17 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
             detail={"commands": commands},
         )
 
-    action, target_id = parsed
+    action, target_id, payload = parsed
+    command_match = _validate_current_operation_book_command(
+        operation_book=operation_book,
+        command=command,
+        action=action,
+        target_id=target_id,
+        page_path=page_path,
+    )
+    if command_match is not None and command_match.get("ok") is False:
+        return command_match
+
     if _is_self_surface_target(target_id):
         return _failed(
             code="forbidden_self_surface",
@@ -110,22 +123,70 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
             reason=reason,
             page_path=page_path,
         )
-    if action != "click":
+    if action not in SUPPORTED_PAGE_ACTIONS:
         return _failed(
             code="unsupported_action",
-            message="TooGraph 页面操作器只支持 click 或 graph_edit 命令。",
+            message="TooGraph 页面操作器只支持 click、focus、clear、type、press、wait 或 graph_edit 命令。",
             recoverable=True,
             detail={"commands": commands},
         )
-    command_info = KNOWN_CLICK_TARGETS.get(command, {})
-    target_id = _compact_text(command_info.get("target_id")) or target_id
-    target_label = _compact_text(command_info.get("target_label")) or target_id
+    if action == "type" and (not payload or payload == "<text>"):
+        return _failed(
+            code="missing_type_text",
+            message="type 命令需要把 <text> 占位符替换为真实输入文本。",
+            recoverable=True,
+            detail={"commands": commands, "target_id": target_id},
+        )
+    if action == "press" and (not payload or payload == "<key>"):
+        return _failed(
+            code="missing_press_key",
+            message="press 命令需要把 <key> 占位符替换为真实按键名称。",
+            recoverable=True,
+            detail={"commands": commands, "target_id": target_id},
+        )
 
-    operation = {
-        "kind": "click",
-        "target_id": target_id,
-        "target_label": target_label,
-    }
+    return _build_page_operation_result(
+        command=command,
+        commands=commands,
+        action=action,
+        target_id=target_id,
+        payload=payload,
+        target_info=command_match,
+        cursor_lifecycle=cursor_lifecycle,
+        reason=reason,
+    )
+
+
+def _build_page_operation_result(
+    *,
+    command: str,
+    commands: list[str],
+    action: str,
+    target_id: str,
+    payload: str,
+    target_info: dict[str, Any] | None,
+    cursor_lifecycle: str,
+    reason: str,
+) -> dict[str, Any]:
+    command_info = KNOWN_CLICK_TARGETS.get(command, {})
+    target_id = _compact_text(target_info.get("target_id") if target_info else "") or _compact_text(command_info.get("target_id")) or target_id
+    target_label = _compact_text(target_info.get("target_label") if target_info else "") or _compact_text(command_info.get("target_label")) or target_id
+
+    if action == "wait":
+        operation: dict[str, Any] = {
+            "kind": "wait",
+            "option": payload or target_id,
+        }
+    else:
+        operation = {
+            "kind": action,
+            "target_id": target_id,
+            "target_label": target_label,
+        }
+        if action == "type":
+            operation["text"] = payload
+        if action == "press":
+            operation["key"] = payload
     operation_request = {
         "version": 1,
         "commands": commands,
@@ -136,7 +197,7 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
     operation_request_id = _operation_request_id(operation_request)
     operation_request["operation_request_id"] = operation_request_id
     journal_entry = {
-        "kind": "click",
+        "kind": action,
         "command": command,
         "target_id": target_id,
         "target_label": target_label,
@@ -153,7 +214,7 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
         "activity_events": [
             {
                 "kind": "virtual_ui_operation",
-                "summary": f"Requested virtual click on {target_label}.",
+                "summary": f"Requested virtual {action} on {target_label}.",
                 "status": "requested",
                 "detail": {
                     "commands": commands,
@@ -280,6 +341,109 @@ def _failed(*, code: str, message: str, recoverable: bool, detail: dict[str, Any
     }
 
 
+def _validate_current_operation_book_command(
+    *,
+    operation_book: dict[str, Any] | None,
+    command: str,
+    action: str,
+    target_id: str,
+    page_path: str,
+) -> dict[str, Any] | None:
+    if not operation_book:
+        return None
+
+    book_path = _operation_book_page_path(operation_book)
+    if book_path and page_path and _normalize_route_path(book_path) != _normalize_route_path(page_path):
+        return _failed(
+            code="stale_page_operation_book",
+            message="当前页面操作书与实际页面路径不一致，请刷新页面上下文后重试。",
+            recoverable=True,
+            detail={"command": command, "page_path": page_path, "operation_book_path": book_path},
+        )
+
+    command_match = _find_operation_book_command(operation_book, action, target_id, command)
+    if command_match:
+        return command_match
+
+    unavailable_reason = _find_unavailable_reason(operation_book, target_id)
+    if unavailable_reason:
+        return _failed(
+            code="target_unavailable",
+            message="目标在当前页面操作书中不可用。",
+            recoverable=True,
+            detail={"command": command, "target_id": target_id, "reason": unavailable_reason},
+        )
+    return _failed(
+        code="command_not_in_operation_book",
+        message="命令不在当前页面操作书中，可能来自过期页面上下文或不可见目标。",
+        recoverable=True,
+        detail={"command": command, "target_id": target_id},
+    )
+
+
+def _find_operation_book_command(
+    operation_book: dict[str, Any],
+    action: str,
+    target_id: str,
+    command: str,
+) -> dict[str, Any] | None:
+    parsed = _parse_command(command)
+    if not parsed:
+        return None
+    _command_action, _command_target_id, payload = parsed
+    for collection_key in ("allowedOperations", "inputs"):
+        for operation in _list_records(operation_book.get(collection_key)):
+            operation_target_id = _compact_text(operation.get("targetId"))
+            if operation_target_id != target_id:
+                continue
+            for template in _list_text(operation.get("commands")):
+                if _command_matches_template(template, action, target_id, payload):
+                    return {
+                        "target_id": operation_target_id,
+                        "target_label": _compact_text(operation.get("label")) or operation_target_id,
+                        "command_template": template,
+                    }
+    return None
+
+
+def _command_matches_template(template: str, action: str, target_id: str, payload: str) -> bool:
+    parsed_template = _parse_command(template)
+    if not parsed_template:
+        return False
+    template_action, template_target_id, template_payload = parsed_template
+    if template_action != action or template_target_id != target_id:
+        return False
+    if action in {"type", "press"}:
+        placeholder = "<text>" if action == "type" else "<key>"
+        if template_payload == placeholder:
+            return bool(payload) and payload != placeholder
+    return payload == template_payload
+
+
+def _find_unavailable_reason(operation_book: dict[str, Any], target_id: str) -> str:
+    for item in _list_records(operation_book.get("unavailable")):
+        if _compact_text(item.get("targetId")) == target_id:
+            return _compact_text(item.get("reason")) or "unavailable"
+    return ""
+
+
+def _operation_book_page_path(operation_book: dict[str, Any]) -> str:
+    page = operation_book.get("page") if isinstance(operation_book.get("page"), dict) else {}
+    return _compact_text(page.get("path"))
+
+
+def _list_records(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _list_text(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [_compact_text(item) for item in value if _compact_text(item)]
+
+
 def _normalize_commands(value: Any) -> list[str]:
     if isinstance(value, dict):
         return _normalize_commands(value.get("commands"))
@@ -296,11 +460,12 @@ def _normalize_commands(value: Any) -> list[str]:
     return commands
 
 
-def _parse_command(command: str) -> tuple[str, str] | None:
-    parts = command.strip().split(maxsplit=1)
-    if len(parts) != 2:
+def _parse_command(command: str) -> tuple[str, str, str] | None:
+    parts = command.strip().split(maxsplit=2)
+    if len(parts) < 2:
         return None
-    return parts[0].lower(), parts[1].strip()
+    payload = parts[2].strip() if len(parts) == 3 else ""
+    return parts[0].lower(), parts[1].strip(), payload
 
 
 def _operation_request_id(operation_request: dict[str, Any]) -> str:
@@ -342,7 +507,7 @@ def _sanitize_graph_edit_intent(item: dict[str, Any]) -> dict[str, Any] | None:
     kind = _compact_text(item.get("kind"))
     if kind == "create_node":
         node_type = _compact_text(item.get("nodeType") or item.get("node_type"))
-        if node_type not in {"input", "agent", "output", "condition"}:
+        if node_type not in {"input", "agent", "output", "condition", "subgraph"}:
             return None
         ref = _compact_text(item.get("ref"))
         if not ref:
@@ -431,17 +596,30 @@ def _is_editor_page(page_path: str) -> bool:
     return normalized == "/editor" or normalized.startswith("/editor/")
 
 
-def _resolve_page_path(skill_inputs: dict[str, Any]) -> str:
+def _resolve_runtime_context(skill_inputs: dict[str, Any]) -> dict[str, Any]:
+    runtime_context = skill_inputs.get("runtime_context")
+    if isinstance(runtime_context, dict):
+        return runtime_context
+    return _load_runtime_context_from_environment()
+
+
+def _resolve_operation_book(skill_inputs: dict[str, Any], runtime_context: dict[str, Any]) -> dict[str, Any] | None:
+    direct = skill_inputs.get("page_operation_book")
+    if isinstance(direct, dict):
+        return direct
+    nested = runtime_context.get("page_operation_book")
+    return nested if isinstance(nested, dict) else None
+
+
+def _resolve_page_path(skill_inputs: dict[str, Any], runtime_context: dict[str, Any]) -> str:
     direct = _compact_text(skill_inputs.get("page_path"))
     if direct:
         return direct
-    runtime_context = skill_inputs.get("runtime_context")
-    if isinstance(runtime_context, dict):
-        nested = _compact_text(runtime_context.get("page_path"))
-        if nested:
-            return nested
-    env_context = _load_runtime_context_from_environment()
-    return _compact_text(env_context.get("page_path"))
+    nested = _compact_text(runtime_context.get("page_path"))
+    if nested:
+        return nested
+    operation_book = _resolve_operation_book(skill_inputs, runtime_context)
+    return _operation_book_page_path(operation_book) if operation_book else ""
 
 
 def _load_runtime_context_from_environment() -> dict[str, Any]:
@@ -464,6 +642,11 @@ def _normalize_cursor_lifecycle(value: Any) -> str:
 
 def _compact_text(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _normalize_route_path(value: str) -> str:
+    path = value.split("?", 1)[0].split("#", 1)[0].strip()
+    return path or "/"
 
 
 def main() -> None:

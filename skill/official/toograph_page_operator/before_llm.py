@@ -18,6 +18,11 @@ def toograph_page_operator_before_llm(**payload: Any) -> dict[str, str]:
         for operation in operation_book["allowedOperations"]
         for command in operation.get("commands", [])
     ]
+    available_commands.extend(
+        command
+        for operation in operation_book["inputs"]
+        for command in operation.get("commands", [])
+    )
     graph_edit_commands = [command for command in available_commands if command.startswith("graph_edit ")]
     context = {
         "current_page_path": page_path,
@@ -30,10 +35,12 @@ def toograph_page_operator_before_llm(**payload: Any) -> dict[str, str]:
             "reason": "用一句话说明为什么选择这些命令。",
         },
         "rules": [
-            "commands 必须逐字来自 available_commands。",
-            "一次只输出一条 commands 命令；普通页面操作使用 click，图编辑使用 graph_edit editor.graph.playback。",
+            "commands 必须来自 available_commands；type/press 可将占位符替换为真实文本或按键。",
+            "一次只输出一条 commands 命令；支持 click、focus、clear、type、press、wait 和 graph_edit。",
+            "type 与 press 命令中的 <text>/<key> 是占位符，输出时替换成真实输入文本或按键。",
             "选择 graph_edit editor.graph.playback 时，graph_edit_intents 必须是产品语义图编辑意图数组。",
-            "graph_edit_intents 支持 create_node、create_state、bind_state、connect_nodes、update_node；不要描述双击、菜单、DOM selector 或坐标。",
+            "graph_edit_intents 支持 create_node、create_state、bind_state、connect_nodes、update_node；create_node.nodeType 可为 input、agent、output、condition 或 subgraph。",
+            "不要描述双击、菜单、DOM selector 或坐标。",
             "不要输出 DOM selector、坐标、鼠标轨迹或截图描述。",
             "伙伴页面、伙伴浮窗、伙伴形象和调试入口不可操作。",
         ],
@@ -65,6 +72,27 @@ def _sanitize_operation_book(value: Any, page_path: str) -> dict[str, Any]:
                 "resultHint": _sanitize_result_hint(operation.get("resultHint")),
             }
         )
+    inputs = []
+    for operation in _list_records(source.get("inputs")):
+        target_id = _compact_text(operation.get("targetId"))
+        if _is_self_surface_target(target_id):
+            continue
+        commands = [
+            command
+            for command in _list_text(operation.get("commands"))
+            if _is_supported_command(command, target_id, page_path)
+        ]
+        if not commands:
+            continue
+        inputs.append(
+            {
+                "targetId": target_id,
+                "label": _compact_text(operation.get("label")),
+                "commands": commands,
+                "valuePreview": _compact_text(operation.get("valuePreview")),
+                "maxLength": operation.get("maxLength") if isinstance(operation.get("maxLength"), int) else None,
+            }
+        )
 
     forbidden = _list_text(source.get("forbidden"))
     if DEFAULT_FORBIDDEN_NOTE not in forbidden:
@@ -77,7 +105,7 @@ def _sanitize_operation_book(value: Any, page_path: str) -> dict[str, Any]:
             "snapshotId": _compact_text(page.get("snapshotId")),
         },
         "allowedOperations": allowed_operations,
-        "inputs": [],
+        "inputs": inputs,
         "unavailable": _sanitize_unavailable(source.get("unavailable")),
         "forbidden": forbidden,
     }
@@ -111,7 +139,7 @@ def _example_graph_edit_intents() -> list[dict[str, Any]]:
         {
             "kind": "create_node",
             "ref": "stable_reference_name",
-            "nodeType": "input | agent | output | condition",
+            "nodeType": "input | agent | output | condition | subgraph",
             "title": "节点标题",
             "description": "节点简介",
             "taskInstruction": "仅 agent 节点需要的单轮 LLM 任务说明",
@@ -156,20 +184,27 @@ def _list_text(value: Any) -> list[str]:
 
 
 def _is_supported_command(command: str, target_id: str, page_path: str) -> bool:
-    parts = command.strip().split(maxsplit=1)
-    if len(parts) != 2:
+    parsed = _parse_command(command)
+    if not parsed:
         return False
-    action = parts[0].lower()
-    command_target_id = parts[1].strip()
+    action, command_target_id, _payload = parsed
     if target_id and command_target_id != target_id:
         return False
-    if action not in {"click", "graph_edit"}:
+    if action not in {"click", "focus", "clear", "type", "press", "wait", "graph_edit"}:
         return False
     if action == "graph_edit" and command_target_id != "editor.graph.playback":
         return False
     if action == "graph_edit" and not _is_editor_page(page_path):
         return False
     return not _is_self_surface_target(command_target_id)
+
+
+def _parse_command(command: str) -> tuple[str, str, str] | None:
+    parts = command.strip().split(maxsplit=2)
+    if len(parts) < 2:
+        return None
+    payload = parts[2].strip() if len(parts) == 3 else ""
+    return parts[0].lower(), parts[1].strip(), payload
 
 
 def _is_editor_page(page_path: str) -> bool:

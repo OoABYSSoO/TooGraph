@@ -2,8 +2,8 @@
   "schemaVersion": "toograph.skill/v1",
   "skillKey": "toograph_page_operator",
   "name": "TooGraph 页面操作器",
-  "description": "根据结构化页面操作书执行页面命令请求。支持非伙伴页面 click 命令，以及编辑器页 graph_edit 语义图编辑意图，并通过伙伴虚拟鼠标播放可见操作。",
-  "llmInstruction": "你已绑定 TooGraph 页面操作器。根据页面操作书和用户目标，只输出 commands、graph_edit_intents、cursor_lifecycle、reason。commands 必须来自页面操作书里的命令字符串，例如 [\"click app.nav.runs\"]、[\"click editor.canvas.node.agent_1\"] 或 [\"graph_edit editor.graph.playback\"]。普通页面导航或选择目标时输出一条 click 命令。需要创建或编辑当前图时，输出 [\"graph_edit editor.graph.playback\"]，并在 graph_edit_intents 中给出产品语义操作，如 create_node、create_state、bind_state、connect_nodes、update_node。不要选择伙伴页面、伙伴浮窗、伙伴形象或调试入口。不要输出 DOM selector、坐标、鼠标轨迹或浏览器点击细节。",
+  "description": "根据结构化页面操作书执行页面命令请求。支持非伙伴页面 click、focus、clear、type、press、wait 命令，以及编辑器页 graph_edit 语义图编辑意图，并通过伙伴虚拟鼠标播放可见操作。",
+  "llmInstruction": "你已绑定 TooGraph 页面操作器。根据当前页面操作书和用户目标，只输出 commands、graph_edit_intents、cursor_lifecycle、reason。commands 必须来自当前页面操作书；普通页面操作可使用 click、focus、clear、type、press 或 wait。type 与 press 命令中的 <text>/<key> 是占位符，输出时替换为真实输入文本或按键。需要创建或编辑当前图时，输出 [\"graph_edit editor.graph.playback\"]，并在 graph_edit_intents 中给出产品语义操作，如 create_node、create_state、bind_state、connect_nodes、update_node；create_node.nodeType 可为 input、agent、output、condition 或 subgraph。不要选择伙伴页面、伙伴浮窗、伙伴形象或调试入口。不要输出 DOM selector、坐标、鼠标轨迹或浏览器点击细节。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [
@@ -22,13 +22,13 @@
       "key": "commands",
       "name": "Commands",
       "valueType": "text_array",
-      "description": "LLM 从页面操作书中选择的一条命令字符串数组。例如 [\"click app.nav.library\"]、[\"click editor.canvas.node.agent_1\"] 或 [\"graph_edit editor.graph.playback\"]。"
+      "description": "LLM 从当前页面操作书中选择的一条命令字符串数组。例如 [\"click app.nav.library\"]、[\"focus library.search.query\"]、[\"type library.search.query 页面操作\"]、[\"press library.search.query Enter\"] 或 [\"graph_edit editor.graph.playback\"]。"
     },
     {
       "key": "graph_edit_intents",
       "name": "Graph Edit Intents",
       "valueType": "json",
-      "description": "当 commands 为 [\"graph_edit editor.graph.playback\"] 时填写的图编辑语义意图数组。每项使用 create_node、create_state、bind_state、connect_nodes 或 update_node；不要包含 UI 点击细节。"
+      "description": "当 commands 为 [\"graph_edit editor.graph.playback\"] 时填写的图编辑语义意图数组。每项使用 create_node、create_state、bind_state、connect_nodes 或 update_node；create_node.nodeType 支持 input、agent、output、condition 和 subgraph；不要包含 UI 点击细节。"
     },
     {
       "key": "cursor_lifecycle",

@@ -105,7 +105,20 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
                                 "resultHint": {"path": "/buddy"},
                             },
                         ],
-                        "inputs": [],
+                        "inputs": [
+                            {
+                                "targetId": "library.search.query",
+                                "label": "图库搜索",
+                                "commands": [
+                                    "focus library.search.query",
+                                    "clear library.search.query",
+                                    "type library.search.query <text>",
+                                    "press library.search.query <key>",
+                                ],
+                                "valuePreview": "",
+                                "maxLength": None,
+                            },
+                        ],
                         "unavailable": [],
                         "forbidden": ["伙伴页面、伙伴浮窗、伙伴形象和伙伴调试入口已过滤。"],
                     },
@@ -125,12 +138,24 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertIn('"click editor.canvas.node.agent_1"', context)
         self.assertIn('"targetId": "editor.graph.playback"', context)
         self.assertIn('"graph_edit editor.graph.playback"', context)
+        self.assertIn('"targetId": "library.search.query"', context)
+        self.assertIn('"type library.search.query <text>"', context)
         context_payload = json.loads(context)
         self.assertEqual(
             context_payload["available_commands"],
-            ["click app.nav.runs", "click app.nav.library", "click editor.canvas.node.agent_1", "graph_edit editor.graph.playback"],
+            [
+                "click app.nav.runs",
+                "click app.nav.library",
+                "click editor.canvas.node.agent_1",
+                "graph_edit editor.graph.playback",
+                "focus library.search.query",
+                "clear library.search.query",
+                "type library.search.query <text>",
+                "press library.search.query <key>",
+            ],
         )
         self.assertEqual(context_payload["output_contract"]["commands"], ["click app.nav.runs"])
+        self.assertEqual(context_payload["page_operation_book"]["inputs"][0]["targetId"], "library.search.query")
         self.assertIn("graph_edit_intents", context_payload["output_contract"])
         self.assertIn("伙伴页面、伙伴浮窗、伙伴形象", context)
         self.assertNotIn("app.nav.buddy", context)
@@ -215,6 +240,127 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertEqual(event["detail"]["reason"], "用户要打开运行历史页。")
         self.assertEqual(event["detail"]["cursor_lifecycle"], "return_after_step")
 
+    def test_after_llm_accepts_current_operation_book_input_and_wait_commands(self) -> None:
+        operation_book = {
+            "page": {"path": "/library", "title": "图库", "snapshotId": "snapshot-library"},
+            "allowedOperations": [
+                {
+                    "targetId": "library.filter.status.active",
+                    "label": "启用",
+                    "role": "tab",
+                    "commands": ["click library.filter.status.active"],
+                },
+                {
+                    "targetId": "library.loading.idle",
+                    "label": "等待图库刷新",
+                    "role": "button",
+                    "commands": ["wait library.loading.idle"],
+                },
+            ],
+            "inputs": [
+                {
+                    "targetId": "library.search.query",
+                    "label": "图库搜索",
+                    "commands": [
+                        "focus library.search.query",
+                        "clear library.search.query",
+                        "type library.search.query <text>",
+                        "press library.search.query <key>",
+                    ],
+                    "valuePreview": "",
+                    "maxLength": 120,
+                }
+            ],
+            "unavailable": [],
+            "forbidden": [],
+        }
+
+        cases = [
+            ("focus library.search.query", "focus", {}),
+            ("clear library.search.query", "clear", {}),
+            ("type library.search.query 页面操作", "type", {"text": "页面操作"}),
+            ("press library.search.query Enter", "press", {"key": "Enter"}),
+            ("wait library.loading.idle", "wait", {"option": "library.loading.idle"}),
+        ]
+        for command, expected_kind, expected_fields in cases:
+            with self.subTest(command=command):
+                result = _run_skill_script(
+                    PAGE_OPERATOR_AFTER_LLM_PATH,
+                    {
+                        "commands": [command],
+                        "reason": "根据当前页面操作书执行。",
+                        "runtime_context": {
+                            "page_path": "/library",
+                            "page_operation_book": operation_book,
+                        },
+                    },
+                )
+
+                self.assertEqual(result["ok"], True)
+                operation = result["activity_events"][0]["detail"]["operation"]
+                self.assertEqual(operation["kind"], expected_kind)
+                for key, value in expected_fields.items():
+                    self.assertEqual(operation[key], value)
+                self.assertEqual(result["activity_events"][0]["detail"]["commands"], [command])
+
+    def test_after_llm_rejects_commands_missing_from_current_operation_book(self) -> None:
+        result = _run_skill_script(
+            PAGE_OPERATOR_AFTER_LLM_PATH,
+            {
+                "commands": ["click app.nav.settings"],
+                "runtime_context": {
+                    "page_path": "/library",
+                    "page_operation_book": {
+                        "page": {"path": "/library", "title": "图库", "snapshotId": "snapshot-library"},
+                        "allowedOperations": [
+                            {
+                                "targetId": "library.action.newBlankGraph",
+                                "label": "新建空白图",
+                                "role": "button",
+                                "commands": ["click library.action.newBlankGraph"],
+                            }
+                        ],
+                        "inputs": [],
+                        "unavailable": [],
+                        "forbidden": [],
+                    },
+                },
+            },
+        )
+
+        self.assertEqual(result["ok"], False)
+        self.assertEqual(result["error"]["code"], "command_not_in_operation_book")
+        self.assertEqual(result["activity_events"][0]["status"], "failed")
+
+    def test_after_llm_rejects_stale_operation_book_page(self) -> None:
+        result = _run_skill_script(
+            PAGE_OPERATOR_AFTER_LLM_PATH,
+            {
+                "page_path": "/runs",
+                "commands": ["click library.action.newBlankGraph"],
+                "runtime_context": {
+                    "page_path": "/library",
+                    "page_operation_book": {
+                        "page": {"path": "/library", "title": "图库", "snapshotId": "snapshot-old"},
+                        "allowedOperations": [
+                            {
+                                "targetId": "library.action.newBlankGraph",
+                                "label": "新建空白图",
+                                "role": "button",
+                                "commands": ["click library.action.newBlankGraph"],
+                            }
+                        ],
+                        "inputs": [],
+                        "unavailable": [],
+                        "forbidden": [],
+                    },
+                },
+            },
+        )
+
+        self.assertEqual(result["ok"], False)
+        self.assertEqual(result["error"]["code"], "stale_page_operation_book")
+
     def test_after_llm_emits_virtual_click_event_for_canvas_targets(self) -> None:
         result = _run_skill_script(
             PAGE_OPERATOR_AFTER_LLM_PATH,
@@ -271,6 +417,46 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertEqual(operation["graph_edit_intents"], intents)
         self.assertEqual(event["detail"]["operation_request"]["operations"][0]["graph_edit_intents"], intents)
         self.assertEqual(event["detail"]["cursor_lifecycle"], "return_at_end")
+
+    def test_after_llm_accepts_subgraph_graph_edit_intent(self) -> None:
+        intents = [
+            {
+                "kind": "create_node",
+                "ref": "review_subgraph",
+                "nodeType": "subgraph",
+                "title": "复核子图",
+                "description": "封装复核流程。",
+            }
+        ]
+
+        result = _run_skill_script(
+            PAGE_OPERATOR_AFTER_LLM_PATH,
+            {
+                "commands": ["graph_edit editor.graph.playback"],
+                "graph_edit_intents": intents,
+                "runtime_context": {
+                    "page_path": "/editor",
+                    "page_operation_book": {
+                        "page": {"path": "/editor", "title": "图编辑器", "snapshotId": "snapshot-editor"},
+                        "allowedOperations": [
+                            {
+                                "targetId": "editor.graph.playback",
+                                "label": "图编辑回放",
+                                "role": "button",
+                                "commands": ["graph_edit editor.graph.playback"],
+                            }
+                        ],
+                        "inputs": [],
+                        "unavailable": [],
+                        "forbidden": [],
+                    },
+                },
+            },
+        )
+
+        self.assertEqual(result["ok"], True)
+        operation = result["activity_events"][0]["detail"]["operation"]
+        self.assertEqual(operation["graph_edit_intents"], intents)
 
     def test_after_llm_rejects_graph_edit_outside_editor_page(self) -> None:
         result = _run_skill_script(

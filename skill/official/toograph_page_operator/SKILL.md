@@ -10,8 +10,9 @@ This official Skill validates one page-operation command sequence and asks TooGr
 Current phase:
 
 - Supports one operation per invocation.
-- Supports safe `click` commands from the current page operation book, including application navigation and editor canvas targets.
+- Supports safe `click`, `focus`, `clear`, `type`, `press`, and `wait` commands from the current page operation book.
 - Supports `graph_edit editor.graph.playback` on editor pages. For graph editing, the LLM outputs product-semantic `graph_edit_intents`; the frontend compiles them into graph commands and visible playback steps.
+- Validates commands against the current runtime page operation book. Off-book, stale-page, hidden, disabled, destructive, or confirmation-gated targets are rejected before a virtual operation event is accepted.
 - Emits a deterministic `operation_request_id` plus `expected_continuation` metadata so the frontend can resume the paused graph with `page_operation_context`, `page_context`, and `operation_result` after real UI execution.
 - Rejects Buddy self surfaces such as the Buddy page, Buddy floating window, Buddy avatar, and debug controls.
 - Does not expose DOM selectors, screen coordinates, double-click recipes, or low-level mouse trajectories to the LLM.
@@ -27,8 +28,8 @@ Runtime context:
 
 LLM output:
 
-- `commands`: array of command strings copied from the page operation book, such as `["click app.nav.library"]` or `["click editor.canvas.node.agent_1"]`.
-- `graph_edit_intents`: required only when `commands` is `["graph_edit editor.graph.playback"]`. Use semantic operations such as `create_node`, `create_state`, `bind_state`, `connect_nodes`, and `update_node`.
+- `commands`: array containing one command from the current page operation book, such as `["click app.nav.library"]`, `["focus library.search.query"]`, `["type library.search.query 页面操作"]`, `["press library.search.query Enter"]`, or `["graph_edit editor.graph.playback"]`. Replace `<text>` and `<key>` placeholders with the actual text or key.
+- `graph_edit_intents`: required only when `commands` is `["graph_edit editor.graph.playback"]`. Use semantic operations such as `create_node`, `create_state`, `bind_state`, `connect_nodes`, and `update_node`. `create_node.nodeType` supports `input`, `agent`, `output`, `condition`, and `subgraph`.
 - `cursor_lifecycle`: virtual cursor lifecycle, such as `return_after_step`.
 - `reason`: short audit reason for choosing the command.
 
