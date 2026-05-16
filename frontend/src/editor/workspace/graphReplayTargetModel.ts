@@ -234,9 +234,10 @@ function ensureNodeLocalOperations(
       operations.push(buildCreateStateIntent(binding.state, graph.state_schema[binding.state]));
       context.createdStateKeys.add(binding.state);
     }
+    const writerNodeRef = context.writerByState.get(binding.state);
     emitStateBinding(nodeId, binding.state, "read", context, operations, {
       required: binding.required === true,
-      sourceNodeRef: context.writerByState.get(binding.state),
+      sourceNodeRef: writerNodeRef && context.createdNodeIds.has(writerNodeRef) ? writerNodeRef : undefined,
     });
   }
 }

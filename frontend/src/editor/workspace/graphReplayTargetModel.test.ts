@@ -180,6 +180,53 @@ test("buildGraphReplayIntentsFromTargetGraph handles cyclic flow graphs without 
   ]);
 });
 
+test("buildGraphReplayIntentsFromTargetGraph handles multi-root joins without forward source-node references", () => {
+  const graph = targetGraph();
+  graph.state_schema.context = {
+    name: "上下文",
+    description: "第二个输入提供的上下文。",
+    type: "markdown",
+    value: "",
+    color: "#0891b2",
+  };
+  graph.nodes.input_context = {
+    kind: "input",
+    name: "上下文输入",
+    description: "输入上下文。",
+    ui: { position: { x: 120, y: 300 }, collapsed: false },
+    reads: [],
+    writes: [{ state: "context", mode: "replace" }],
+    config: { value: "" },
+  };
+  graph.nodes.ask_name = {
+    ...graph.nodes.ask_name,
+    reads: [
+      { state: "name", required: true },
+      { state: "context", required: true },
+    ],
+  };
+  graph.edges = [
+    { source: "input_name", target: "ask_name" },
+    { source: "input_context", target: "ask_name" },
+    { source: "ask_name", target: "output_name" },
+  ];
+
+  const result = buildGraphReplayIntentsFromTargetGraph(graph);
+  const plan = buildGraphEditPlaybackPlan(createEmptyDraftGraph(), result.intentPackage);
+  const applied = applyGraphEditPlaybackPlan(createEmptyDraftGraph(), plan);
+
+  assert.equal(result.valid, true);
+  assert.deepEqual(result.warnings, []);
+  assert.equal(plan.valid, true);
+  assert.deepEqual(plan.issues, []);
+  assert.equal(applied.applied, true);
+  assert.deepEqual(applied.document.nodes.ask_name?.reads, [
+    { state: "name", required: true },
+    { state: "context", required: true },
+  ]);
+  assert.deepEqual(sortEdges(applied.document.edges), sortEdges(graph.edges));
+});
+
 test("buildGraphReplayIntentsFromTargetGraph replays condition routes from graph protocol conditional_edges", () => {
   const graph = targetGraph();
   graph.nodes.ask_name = {
@@ -297,6 +344,10 @@ function operationLabel(operation: ReturnType<typeof buildGraphReplayIntentsFrom
     return `${operation.nodeRef}:${operation.stateRef}`;
   }
   return `${operation.sourceRef}:${operation.targetRef}`;
+}
+
+function sortEdges(edges: GraphPayload["edges"]) {
+  return [...edges].sort((left, right) => `${left.source}->${left.target}`.localeCompare(`${right.source}->${right.target}`));
 }
 
 test("buildGraphReplayIntentsFromTargetGraph reports invalid condition route sources without asking an LLM", () => {
