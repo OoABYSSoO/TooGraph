@@ -235,6 +235,34 @@ export function createUnsavedWorkspaceTab(params?: {
   };
 }
 
+function isBlankGraphDraft(document: GraphPayload | GraphDocument): boolean {
+  return (
+    (document.graph_id ?? null) === null &&
+    Object.keys(document.state_schema).length === 0 &&
+    Object.keys(document.nodes).length === 0 &&
+    document.edges.length === 0 &&
+    document.conditional_edges.length === 0
+  );
+}
+
+export function isReusableBlankWorkspaceTab(
+  tab: EditorWorkspaceTab,
+  document?: GraphPayload | GraphDocument | null,
+): boolean {
+  if (
+    tab.kind !== "new" ||
+    tab.graphId ||
+    tab.templateId ||
+    tab.defaultTemplateId ||
+    tab.subgraphSource ||
+    tab.dirty
+  ) {
+    return false;
+  }
+
+  return document ? isBlankGraphDraft(document) : true;
+}
+
 export function formatSubgraphWorkspaceTabTitle(nodeName: string | null | undefined) {
   const resolvedNodeName = typeof nodeName === "string" && nodeName.trim() ? nodeName.trim() : "Subgraph";
   return `子图 · ${resolvedNodeName}`;

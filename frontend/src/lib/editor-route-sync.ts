@@ -65,6 +65,14 @@ export function resolveEditorRouteInstruction(params: {
     };
   }
 
+  if (params.routeMode === "root" && !params.activeTabRouteSignature) {
+    return {
+      type: "open-new",
+      templateId: null,
+      navigation: "replace",
+    };
+  }
+
   return {
     type: "noop",
   };

@@ -1,5 +1,12 @@
 <template>
   <AppShell>
+    <input
+      ref="pythonGraphImportInput"
+      class="graph-library-page__file-input"
+      type="file"
+      accept=".py,text/x-python,text/plain"
+      @change="handlePythonGraphImportSelection"
+    />
     <section class="graph-library-page">
       <header class="graph-library-page__hero">
         <div>
@@ -11,6 +18,15 @@
           {{ loading ? t("graphLibrary.refreshing") : t("graphLibrary.refresh") }}
         </button>
       </header>
+
+      <EditorWelcomeState
+        :templates="launchTemplates"
+        :graphs="launchGraphs"
+        @create-new="openBlankEditorGraph"
+        @import-python-graph="openPythonGraphImportDialog"
+        @open-template="openEditorTemplate"
+        @open-graph="openEditorGraph"
+      />
 
       <section class="graph-library-page__overview" :aria-label="t('graphLibrary.overviewLabel')">
         <article class="graph-library-page__metric">
@@ -147,6 +163,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import { ElInput, ElSwitch } from "element-plus";
 import { useI18n } from "vue-i18n";
 
@@ -155,11 +172,21 @@ import {
   deleteTemplate,
   fetchGraphs,
   fetchTemplates,
+  importGraphFromPythonSource,
   updateGraphStatus,
   updateTemplateStatus,
 } from "@/api/graphs";
+import EditorWelcomeState from "@/editor/workspace/EditorWelcomeState.vue";
+import { isTooGraphPythonExportSource } from "@/editor/workspace/pythonImportModel";
 import AppShell from "@/layouts/AppShell.vue";
-import type { GraphCatalogStatus, GraphDocument, TemplateRecord } from "@/types/node-system";
+import { cloneGraphDocument } from "@/lib/graph-document";
+import {
+  createUnsavedWorkspaceTab,
+  readPersistedEditorWorkspace,
+  writePersistedEditorDocumentDraft,
+  writePersistedEditorWorkspace,
+} from "@/lib/editor-workspace";
+import type { GraphCatalogStatus, GraphDocument, GraphPayload, TemplateRecord } from "@/types/node-system";
 
 import {
   buildGraphLibraryItems,
@@ -177,12 +204,16 @@ const error = ref<string | null>(null);
 const actionError = ref<string | null>(null);
 const actionItemKey = ref<string | null>(null);
 const confirmingDeleteKey = ref<string | null>(null);
+const pythonGraphImportInput = ref<HTMLInputElement | null>(null);
 const query = ref("");
 const statusFilter = ref<GraphLibraryStatusFilter>("all");
 const { t } = useI18n();
+const router = useRouter();
 
 const items = computed(() => buildGraphLibraryItems(graphs.value, templates.value));
 const overview = computed(() => buildGraphLibraryOverview(items.value));
+const launchTemplates = computed(() => templates.value.filter((template) => (template.status ?? "active") === "active"));
+const launchGraphs = computed(() => graphs.value.filter((graph) => (graph.status ?? "active") === "active"));
 const filteredItems = computed(() =>
   filterGraphLibraryItems(items.value, { query: query.value, kind: "all", status: statusFilter.value }),
 );
@@ -232,6 +263,67 @@ function itemKey(item: GraphLibraryItem): string {
 
 function enabledToggleLabel(item: GraphLibraryItem): string {
   return item.status === "active" ? t("graphLibrary.disable") : t("graphLibrary.enable");
+}
+
+function openBlankEditorGraph() {
+  void router.push("/editor/new");
+}
+
+function openEditorTemplate(templateId: string) {
+  void router.push(`/editor/new?template=${encodeURIComponent(templateId)}`);
+}
+
+function openEditorGraph(graphId: string) {
+  void router.push(`/editor/${encodeURIComponent(graphId)}`);
+}
+
+function openPythonGraphImportDialog() {
+  pythonGraphImportInput.value?.click();
+}
+
+async function handlePythonGraphImportSelection(event: Event) {
+  const target = event.target instanceof HTMLInputElement ? event.target : null;
+  const file = target?.files?.[0] ?? null;
+  if (target) {
+    target.value = "";
+  }
+  if (!file) {
+    return;
+  }
+
+  actionError.value = null;
+  try {
+    const source = await file.text();
+    if (!isTooGraphPythonExportSource(source)) {
+      actionError.value = t("graphLibrary.importPythonNotExport", { file: file.name });
+      return;
+    }
+    openImportedGraphDraft(await importGraphFromPythonSource(source), file.name);
+    void router.push("/editor/new");
+  } catch (importError) {
+    actionError.value = importError instanceof Error ? importError.message : t("graphLibrary.importPythonFailed");
+  }
+}
+
+function openImportedGraphDraft(graph: GraphPayload, fileName: string) {
+  const importedGraph = cloneGraphDocument({
+    ...graph,
+    graph_id: null,
+    name: graph.name?.trim() || fileName.replace(/\.py$/i, "") || "Imported Graph",
+  });
+  const tab = {
+    ...createUnsavedWorkspaceTab({
+      kind: "new",
+      title: importedGraph.name,
+    }),
+    dirty: true,
+  };
+  const workspace = readPersistedEditorWorkspace();
+  writePersistedEditorDocumentDraft(tab.tabId, importedGraph);
+  writePersistedEditorWorkspace({
+    activeTabId: tab.tabId,
+    tabs: [...workspace.tabs, tab],
+  });
 }
 
 function replaceGraph(updatedGraph: GraphDocument) {
@@ -305,6 +397,10 @@ onMounted(loadCatalog);
   width: 100%;
   min-width: 0;
   overflow-x: hidden;
+}
+
+.graph-library-page__file-input {
+  display: none;
 }
 
 .graph-library-page__hero,

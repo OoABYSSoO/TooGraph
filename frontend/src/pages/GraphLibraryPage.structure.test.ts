@@ -19,3 +19,15 @@ test("GraphLibraryPage renders templates and graphs as separate side-by-side col
   assert.match(componentSource, /\.graph-library-page__columns \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(0,\s*1fr\);/);
   assert.match(componentSource, /@media \(max-width:\s*980px\) \{[\s\S]*\.graph-library-page__columns \{[\s\S]*grid-template-columns:\s*1fr;/);
 });
+
+test("GraphLibraryPage hosts the editor start actions that used to live on the editor welcome page", () => {
+  assert.match(componentSource, /import EditorWelcomeState from "@\/editor\/workspace\/EditorWelcomeState\.vue";/);
+  assert.match(componentSource, /ref="pythonGraphImportInput"/);
+  assert.match(componentSource, /accept="\.py,text\/x-python,text\/plain"/);
+  assert.match(componentSource, /<EditorWelcomeState[\s\S]*@create-new="openBlankEditorGraph"[\s\S]*@import-python-graph="openPythonGraphImportDialog"[\s\S]*@open-template="openEditorTemplate"[\s\S]*@open-graph="openEditorGraph"/);
+  assert.match(componentSource, /router\.push\("\/editor\/new"\)/);
+  assert.match(componentSource, /router\.push\(`\/editor\/new\?template=\$\{encodeURIComponent\(templateId\)\}`\)/);
+  assert.match(componentSource, /router\.push\(`\/editor\/\$\{encodeURIComponent\(graphId\)\}`\)/);
+  assert.match(componentSource, /writePersistedEditorWorkspace/);
+  assert.match(componentSource, /writePersistedEditorDocumentDraft/);
+});
