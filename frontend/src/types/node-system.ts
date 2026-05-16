@@ -282,7 +282,7 @@ export type NodeCreationEntry = {
   description: string;
   mode: "node" | "preset" | "subgraph";
   origin?: "builtin" | "persisted";
-  nodeKind?: "input" | "output";
+  nodeKind?: "input" | "output" | "subgraph";
   presetId?: string;
   graphId?: string;
   templateId?: string;

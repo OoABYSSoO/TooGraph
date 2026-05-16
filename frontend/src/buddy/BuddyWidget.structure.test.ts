@@ -415,6 +415,7 @@ test("BuddyWidget executes virtual UI operation events through the virtual curso
   assert.match(componentSource, /case "graph_edit":[\s\S]*executeBuddyVirtualGraphEditOperation/);
   assert.match(componentSource, /function executeBuddyVirtualClickOperation\(operation: BuddyVirtualOperation\)/);
   assert.match(componentSource, /async function executeBuddyVirtualGraphEditOperation\(operation: BuddyVirtualOperation\)/);
+  assert.match(componentSource, /import type \{ GraphEditCommand, GraphEditIntent, GraphEditPlaybackStep \} from "\.\.\/editor\/workspace\/graphEditPlaybackModel\.ts";/);
   assert.match(componentSource, /requestGraphEditPlaybackPlan\(\{[\s\S]*requestId,[\s\S]*graphEditIntents: operation\.graphEditIntents,[\s\S]*\}\);/);
   assert.match(componentSource, /window\.dispatchEvent\(new CustomEvent\("toograph:graph-edit-playback-plan-request", \{ detail \}\)\);/);
   assert.doesNotMatch(componentSource, /v-if="virtualGraphDragLine"/);
@@ -435,10 +436,14 @@ test("BuddyWidget executes virtual UI operation events through the virtual curso
   assert.match(componentSource, /function shouldSkipGraphEditPlaybackTextStep\(/);
   assert.match(componentSource, /if \(step\.kind === "choose_node_type" && targetElement\) \{[\s\S]*const beforeNodeIds = listGraphEditPlaybackNodeAffordanceIds\(\);[\s\S]*dispatchVirtualClick\(targetElement\);[\s\S]*rememberCreatedNodeAlias\(step, beforeNodeIds, playbackState\);/);
   assert.match(componentSource, /if \(step\.kind === "commit_state_field" && targetElement\) \{[\s\S]*const beforeStateKeys = listGraphEditPlaybackPortStateKeys\(step, playbackState\);[\s\S]*dispatchVirtualClick\(targetElement\);[\s\S]*rememberCreatedStateAlias\(step, beforeStateKeys, playbackState\);/);
+  assert.match(componentSource, /if \(step\.kind === "apply_graph_command"\) \{[\s\S]*dispatchGraphEditPlaybackApplyCommand\(step, response\.graphCommands, playbackState\);[\s\S]*\}/);
+  assert.match(componentSource, /graphCommands: GraphEditCommand\[\];/);
   assert.doesNotMatch(componentSource, /dispatchGraphEditPlaybackOpenMenu/);
   assert.doesNotMatch(componentSource, /toograph:graph-edit-playback-open-node-menu/);
-  assert.doesNotMatch(componentSource, /dispatchGraphEditPlaybackApplyCommand/);
-  assert.doesNotMatch(componentSource, /toograph:graph-edit-playback-apply-command/);
+  assert.match(componentSource, /function dispatchGraphEditPlaybackApplyCommand\(/);
+  assert.match(componentSource, /TOOGRAPH_GRAPH_EDIT_PLAYBACK_APPLY_COMMAND_EVENT = "toograph:graph-edit-playback-apply-command"/);
+  assert.match(componentSource, /window\.dispatchEvent\(new CustomEvent\(TOOGRAPH_GRAPH_EDIT_PLAYBACK_APPLY_COMMAND_EVENT, \{ detail \}\)\);/);
+  assert.match(componentSource, /function resolveAliasedGraphEditPlaybackCommand\(command: GraphEditCommand, playbackState: GraphEditPlaybackUiState\): GraphEditCommand/);
   assert.match(componentSource, /function resolveAliasedGraphEditPlaybackTarget\(targetId: string, playbackState: GraphEditPlaybackUiState\)/);
   assert.match(componentSource, /function resolveVirtualOperationAffordance\(targetId: string\)/);
   assert.match(componentSource, /const targetId = resolveAliasedGraphEditPlaybackTarget\(step\.target, playbackState\);/);

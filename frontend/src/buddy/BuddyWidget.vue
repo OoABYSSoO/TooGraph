@@ -469,7 +469,7 @@ import {
   isSmoothNumberDisplaySettled,
   type SmoothNumberDisplayState,
 } from "../lib/smoothNumberDisplay.ts";
-import type { GraphEditIntent, GraphEditPlaybackStep } from "../editor/workspace/graphEditPlaybackModel.ts";
+import type { GraphEditCommand, GraphEditIntent, GraphEditPlaybackStep } from "../editor/workspace/graphEditPlaybackModel.ts";
 import { useBuddyContextStore } from "../stores/buddyContext.ts";
 import {
   useBuddyMascotDebugStore,
@@ -653,6 +653,7 @@ const TOOGRAPH_VIRTUAL_POINTER_EVENT_KEY = "__toographVirtualPointerEvent";
 const TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY = "__toographVirtualEmptyCanvasPointerEvent";
 const TOOGRAPH_GRAPH_EDIT_PLAYBACK_RUNNING_EVENT = "toograph:graph-edit-playback-running";
 const TOOGRAPH_GRAPH_EDIT_PLAYBACK_ENSURE_VISIBLE_EVENT = "toograph:graph-edit-playback-ensure-visible";
+const TOOGRAPH_GRAPH_EDIT_PLAYBACK_APPLY_COMMAND_EVENT = "toograph:graph-edit-playback-apply-command";
 const BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_WAIT_MS = 2400;
 const BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_RETRY_MS = 80;
 const BUDDY_GRAPH_EDIT_PLAYBACK_VIEWPORT_SETTLE_MS = 80;
@@ -2518,6 +2519,7 @@ async function executeBuddyVirtualWaitOperation(operation: BuddyVirtualOperation
 type GraphEditPlaybackPlanRequestResponse = {
   requestId: string;
   ok: boolean;
+  graphCommands: GraphEditCommand[];
   playbackSteps: GraphEditPlaybackStep[];
   issues: string[];
 };
@@ -2530,6 +2532,12 @@ type GraphEditPlaybackUiState = {
 type GraphEditPlaybackEnsureVisibleResponse = {
   ok: boolean;
   moved: boolean;
+};
+
+type GraphEditPlaybackApplyCommandResponse = {
+  ok: boolean;
+  applied: boolean;
+  issues: string[];
 };
 
 async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOperation) {
@@ -2603,6 +2611,8 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
         dispatchVirtualClick(targetElement);
         await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
         rememberCreatedStateAlias(step, beforeStateKeys, playbackState);
+      } else if (step.kind === "apply_graph_command") {
+        dispatchGraphEditPlaybackApplyCommand(step, response.graphCommands, playbackState);
       }
       await waitForVirtualOperation(resolveGraphEditPlaybackStepDelayMs(step));
     }
@@ -2777,6 +2787,30 @@ function requestGraphEditPlaybackEnsureVisible(input: {
   return detail.response;
 }
 
+function dispatchGraphEditPlaybackApplyCommand(
+  step: GraphEditPlaybackStep,
+  graphCommands: GraphEditCommand[],
+  playbackState: GraphEditPlaybackUiState,
+): GraphEditPlaybackApplyCommandResponse | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const commandId = step.commandId ?? step.commandIds?.[0] ?? "";
+  const command = graphCommands.find((candidate) => candidate.commandId === commandId) ?? null;
+  if (!command) {
+    return null;
+  }
+  const detail: {
+    command: GraphEditCommand;
+    response: GraphEditPlaybackApplyCommandResponse | null;
+  } = {
+    command: resolveAliasedGraphEditPlaybackCommand(command, playbackState),
+    response: null,
+  };
+  window.dispatchEvent(new CustomEvent(TOOGRAPH_GRAPH_EDIT_PLAYBACK_APPLY_COMMAND_EVENT, { detail }));
+  return detail.response;
+}
+
 async function resolveGraphEditPlaybackStepElementWithRetry(
   step: GraphEditPlaybackStep,
   playbackState: GraphEditPlaybackUiState,
@@ -2837,6 +2871,63 @@ function resolveAliasedGraphEditPlaybackStep(step: GraphEditPlaybackStep, playba
     sourceNodeId: step.sourceNodeId ? playbackState.nodeIdAliases.get(step.sourceNodeId) ?? step.sourceNodeId : undefined,
     sourceStateKey: step.sourceStateKey ? playbackState.stateKeyAliases.get(step.sourceStateKey) ?? step.sourceStateKey : undefined,
   };
+}
+
+function resolveAliasedGraphEditPlaybackCommand(command: GraphEditCommand, playbackState: GraphEditPlaybackUiState): GraphEditCommand {
+  switch (command.kind) {
+    case "create_node":
+      return {
+        ...command,
+        nodeId: resolveGraphEditPlaybackNodeAlias(command.nodeId, playbackState),
+        creationSource: command.creationSource
+          ? {
+              ...command.creationSource,
+              sourceNodeId: resolveGraphEditPlaybackNodeAlias(command.creationSource.sourceNodeId, playbackState),
+              ...(command.creationSource.kind === "state"
+                ? { stateKey: resolveGraphEditPlaybackStateAlias(command.creationSource.stateKey, playbackState) }
+                : {}),
+            }
+          : null,
+      };
+    case "update_node":
+      return {
+        ...command,
+        nodeId: resolveGraphEditPlaybackNodeAlias(command.nodeId, playbackState),
+      };
+    case "create_state":
+      return {
+        ...command,
+        stateKey: resolveGraphEditPlaybackStateAlias(command.stateKey, playbackState),
+        targetNodeId: command.targetNodeId ? resolveGraphEditPlaybackNodeAlias(command.targetNodeId, playbackState) : undefined,
+      };
+    case "bind_state":
+      return {
+        ...command,
+        nodeId: resolveGraphEditPlaybackNodeAlias(command.nodeId, playbackState),
+        stateKey: resolveGraphEditPlaybackStateAlias(command.stateKey, playbackState),
+        sourceNodeId: command.sourceNodeId ? resolveGraphEditPlaybackNodeAlias(command.sourceNodeId, playbackState) : undefined,
+      };
+    case "connect_nodes":
+      return {
+        ...command,
+        sourceNodeId: resolveGraphEditPlaybackNodeAlias(command.sourceNodeId, playbackState),
+        targetNodeId: resolveGraphEditPlaybackNodeAlias(command.targetNodeId, playbackState),
+      };
+    case "connect_route":
+      return {
+        ...command,
+        sourceNodeId: resolveGraphEditPlaybackNodeAlias(command.sourceNodeId, playbackState),
+        targetNodeId: resolveGraphEditPlaybackNodeAlias(command.targetNodeId, playbackState),
+      };
+  }
+}
+
+function resolveGraphEditPlaybackNodeAlias(nodeId: string, playbackState: GraphEditPlaybackUiState) {
+  return playbackState.nodeIdAliases.get(nodeId) ?? nodeId;
+}
+
+function resolveGraphEditPlaybackStateAlias(stateKey: string, playbackState: GraphEditPlaybackUiState) {
+  return playbackState.stateKeyAliases.get(stateKey) ?? stateKey;
 }
 
 function resolveAliasedGraphEditPlaybackTarget(targetId: string, playbackState: GraphEditPlaybackUiState) {

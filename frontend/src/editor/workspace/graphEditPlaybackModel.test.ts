@@ -377,6 +377,139 @@ test("applyGraphEditCommandToDocument applies one playback command at a time", (
   assert.deepEqual(afterBinding.nodes.input_name_input?.writes, [{ state: "state_name", mode: "replace" }]);
 });
 
+test("buildGraphEditPlaybackPlan applies embedded subgraph graphs immediately after visible node creation", () => {
+  const plan = buildGraphEditPlaybackPlan(emptyDocument(), {
+    operations: [
+      {
+        kind: "create_node",
+        ref: "intake",
+        nodeId: "intake_request",
+        nodeType: "subgraph",
+        title: "理解请求",
+        description: "把用户请求转成结构化意图。",
+        subgraphGraph: {
+          state_schema: {
+            user_message: {
+              name: "user_message",
+              description: "",
+              type: "text",
+              value: "",
+              color: "#d97706",
+            },
+          },
+          nodes: {
+            input_user_message: {
+              kind: "input",
+              name: "用户消息",
+              description: "",
+              ui: { position: { x: 60, y: 60 }, collapsed: false },
+              reads: [],
+              writes: [{ state: "user_message", mode: "replace" }],
+              config: { value: "", boundaryType: "text" },
+            },
+          },
+          edges: [],
+          conditional_edges: [],
+          metadata: { role: "buddy_request_intake" },
+        },
+      },
+    ],
+  });
+
+  assert.equal(plan.valid, true);
+  const chooseIndex = plan.playbackSteps.findIndex((step) => step.kind === "choose_node_type");
+  const applyIndex = plan.playbackSteps.findIndex((step) => step.kind === "apply_graph_command");
+  const titleIndex = plan.playbackSteps.findIndex((step) => step.kind === "focus_node_field");
+
+  assert.ok(chooseIndex >= 0);
+  assert.ok(applyIndex > chooseIndex);
+  assert.ok(titleIndex > applyIndex);
+  assert.equal(plan.playbackSteps[applyIndex]?.target, "editor.canvas.node.intake_request");
+  assert.equal(plan.playbackSteps[applyIndex]?.nodeId, "intake_request");
+  assert.equal(plan.playbackSteps[applyIndex]?.commandId, "graph-command-1");
+});
+
+test("applyGraphEditCommandToDocument patches an existing subgraph shell with the embedded graph", () => {
+  const plan = buildGraphEditPlaybackPlan(emptyDocument(), {
+    operations: [
+      {
+        kind: "create_node",
+        ref: "intake",
+        nodeId: "intake_request",
+        nodeType: "subgraph",
+        title: "理解请求",
+        description: "把用户请求转成结构化意图。",
+        subgraphGraph: {
+          state_schema: {
+            user_message: {
+              name: "user_message",
+              description: "",
+              type: "text",
+              value: "",
+              color: "#d97706",
+            },
+          },
+          nodes: {
+            input_user_message: {
+              kind: "input",
+              name: "用户消息",
+              description: "",
+              ui: { position: { x: 60, y: 60 }, collapsed: false },
+              reads: [],
+              writes: [{ state: "user_message", mode: "replace" }],
+              config: { value: "", boundaryType: "text" },
+            },
+          },
+          edges: [],
+          conditional_edges: [],
+          metadata: { role: "buddy_request_intake" },
+        },
+      },
+    ],
+  });
+  const command = plan.graphCommands[0];
+  assert.equal(command?.kind, "create_node");
+  if (!command || command.kind !== "create_node") {
+    return;
+  }
+
+  const shellDocument: GraphPayload = {
+    ...emptyDocument(),
+    nodes: {
+      subgraph_created: {
+        kind: "subgraph",
+        name: "",
+        description: "",
+        ui: { position: { x: 10, y: 20 }, collapsed: false },
+        reads: [],
+        writes: [],
+        config: {
+          graph: {
+            state_schema: {},
+            nodes: {},
+            edges: [],
+            conditional_edges: [],
+            metadata: {},
+          },
+        },
+      },
+    },
+  };
+
+  const result = applyGraphEditCommandToDocument(shellDocument, {
+    ...command,
+    nodeId: "subgraph_created",
+  });
+
+  assert.notEqual(result, shellDocument);
+  const patchedNode = result.nodes.subgraph_created;
+  assert.equal(patchedNode?.kind, "subgraph");
+  assert.equal(patchedNode?.name, "理解请求");
+  assert.equal(patchedNode?.description, "把用户请求转成结构化意图。");
+  assert.equal(patchedNode?.kind === "subgraph" ? patchedNode.config.graph.metadata.role : null, "buddy_request_intake");
+  assert.equal(patchedNode?.kind === "subgraph" ? patchedNode.config.graph.nodes.input_user_message?.kind : null, "input");
+});
+
 test("buildGraphEditPlaybackPlan reports unresolved references before any document mutation", () => {
   const plan = buildGraphEditPlaybackPlan(emptyDocument(), {
     operations: [

@@ -341,6 +341,36 @@ test("createNodeFromCreationEntry creates subgraphs from graph templates", () =>
   );
 });
 
+test("createNodeFromCreationEntry creates builtin empty subgraph nodes", () => {
+  const document = createBaseDocument();
+  const entry: NodeCreationEntry = {
+    id: "node-subgraph",
+    family: "subgraph",
+    label: "Subgraph",
+    description: "Create an empty embedded subgraph instance.",
+    mode: "node",
+    origin: "builtin",
+    nodeKind: "subgraph",
+    acceptsValueTypes: null,
+  };
+
+  const result = createNodeFromCreationEntry(document, {
+    entry,
+    createdNodeId: "subgraph_created",
+    persistedPresets: [],
+    templates: [],
+    context: {
+      position: { x: 320, y: 80 },
+    },
+  });
+
+  assert.equal(result.createdNodeId, "subgraph_created");
+  const createdNode = result.document.nodes.subgraph_created;
+  assert.equal(createdNode.kind, "subgraph");
+  assert.deepEqual(createdNode.kind === "subgraph" ? createdNode.config.graph.nodes : null, {});
+  assert.deepEqual(createdNode.kind === "subgraph" ? createdNode.config.graph.state_schema : null, {});
+});
+
 test("createNodeFromDroppedFile builds an input node from the uploaded asset envelope", async () => {
   const document = createBaseDocument();
   const file = new File(["fake-png"], "diagram.png", { type: "image/png" });

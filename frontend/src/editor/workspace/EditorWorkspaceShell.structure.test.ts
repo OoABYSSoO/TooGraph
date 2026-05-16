@@ -681,20 +681,23 @@ test("EditorWorkspaceShell delegates run visual tab-state writes to the runtime 
   assert.doesNotMatch(pollRunSource, /\[tabId\]: run,/);
 });
 
-test("EditorWorkspaceShell only returns graph edit playback plans and leaves edits to real canvas events", () => {
-  assert.match(componentSource, /import \{[\s\S]*buildGraphEditPlaybackPlan,[\s\S]*type GraphEditIntent[\s\S]*\} from "\.\/graphEditPlaybackModel\.ts";/);
-  assert.doesNotMatch(componentSource, /applyGraphEditCommandToDocument/);
+test("EditorWorkspaceShell returns graph edit playback plans and applies explicit semantic playback commands", () => {
+  assert.match(componentSource, /import \{[\s\S]*applyGraphEditCommandToDocument,[\s\S]*buildGraphEditPlaybackPlan,[\s\S]*type GraphEditCommand,[\s\S]*type GraphEditIntent[\s\S]*\} from "\.\/graphEditPlaybackModel\.ts";/);
   assert.doesNotMatch(componentSource, /type GraphEditPlaybackPlan[,}\s]/);
   assert.doesNotMatch(componentSource, /pendingGraphEditPlaybackPlans/);
   assert.doesNotMatch(componentSource, /pendingGraphEditPlaybackAppliedCommandIds/);
   assert.match(componentSource, /window\.addEventListener\("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener\);/);
   assert.match(componentSource, /window\.removeEventListener\("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener\);/);
+  assert.match(componentSource, /window\.addEventListener\("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener\);/);
+  assert.match(componentSource, /window\.removeEventListener\("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener\);/);
   assert.doesNotMatch(componentSource, /toograph:graph-edit-playback-open-node-menu/);
-  assert.doesNotMatch(componentSource, /toograph:graph-edit-playback-apply-command/);
   assert.match(componentSource, /function handleGraphEditPlaybackPlanRequest\(event: Event\)/);
+  assert.match(componentSource, /function handleGraphEditPlaybackApplyCommand\(event: Event\)/);
   assert.match(componentSource, /openNewTab\(null, "replace"\);/);
   assert.match(componentSource, /const plan = buildGraphEditPlaybackPlan\(document, \{ operations: detail\.graphEditIntents \}\);/);
-  assert.match(componentSource, /detail\.response = \{[\s\S]*ok: plan\.valid,[\s\S]*playbackSteps: plan\.playbackSteps,[\s\S]*issues: plan\.issues,[\s\S]*\};/);
+  assert.match(componentSource, /detail\.response = \{[\s\S]*ok: plan\.valid,[\s\S]*graphCommands: plan\.graphCommands,[\s\S]*playbackSteps: plan\.playbackSteps,[\s\S]*issues: plan\.issues,[\s\S]*\};/);
+  assert.match(componentSource, /const nextDocument = applyGraphEditCommandToDocument\(document, command\);/);
+  assert.match(componentSource, /if \(nextDocument !== document\) \{[\s\S]*markDocumentDirty\(tab\.tabId, nextDocument\);[\s\S]*\}/);
 });
 
 test("EditorWorkspaceShell delegates document load tab-state writes to the runtime model", () => {

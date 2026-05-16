@@ -55,6 +55,16 @@ export function buildBuiltinNodeCreationEntries(): NodeCreationEntry[] {
       presetId: "preset.condition.empty.v0",
       acceptsValueTypes: null,
     },
+    {
+      id: "node-subgraph",
+      family: "subgraph",
+      label: "Subgraph",
+      description: "Create an empty embedded subgraph instance.",
+      mode: "node",
+      origin: "builtin",
+      nodeKind: "subgraph",
+      acceptsValueTypes: null,
+    },
   ];
 }
 

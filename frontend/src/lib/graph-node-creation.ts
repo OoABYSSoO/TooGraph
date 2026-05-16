@@ -114,6 +114,26 @@ function buildOutputNode(position: GraphPosition): OutputNode {
   };
 }
 
+function buildSubgraphNode(position: GraphPosition): SubgraphNode {
+  return {
+    kind: "subgraph",
+    name: "",
+    description: "",
+    ui: normalizeCreatedNodeUi(position),
+    reads: [],
+    writes: [],
+    config: {
+      graph: {
+        state_schema: {},
+        nodes: {},
+        edges: [],
+        conditional_edges: [],
+        metadata: {},
+      },
+    },
+  };
+}
+
 export function buildGenericInputNode(params: { id: string; position: GraphPosition }): CreatedNodeResult {
   return {
     id: params.id,
@@ -126,6 +146,14 @@ export function buildGenericOutputNode(params: { id: string; position: GraphPosi
   return {
     id: params.id,
     node: buildOutputNode(params.position),
+    state_schema: {},
+  };
+}
+
+export function buildGenericSubgraphNode(params: { id: string; position: GraphPosition }): CreatedNodeResult {
+  return {
+    id: params.id,
+    node: buildSubgraphNode(params.position),
     state_schema: {},
   };
 }

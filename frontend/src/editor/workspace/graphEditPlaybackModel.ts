@@ -907,10 +907,24 @@ function buildCreateNodePlaybackSteps(
       nodeId: command.nodeId,
     },
   ];
+  if (shouldApplyCreateNodeGraphCommandAfterVisibleCreation(command)) {
+    steps.push({
+      kind: "apply_graph_command",
+      target: canvasNodeTarget(command.nodeId),
+      label: command.summary,
+      commandId: command.commandId,
+      commandIds,
+      nodeId: command.nodeId,
+    });
+  }
   if (options.includeTextSteps) {
     steps.push(...nodeTextPlaybackSteps(command));
   }
   return steps;
+}
+
+function shouldApplyCreateNodeGraphCommandAfterVisibleCreation(command: GraphEditCreateNodeCommand) {
+  return command.nodeType === "subgraph";
 }
 
 function openNodeCreationMenuStep(command: GraphEditCreateNodeCommand, label: string): GraphEditPlaybackStep {
@@ -1083,7 +1097,7 @@ function bindStateInDocument<T extends GraphPayload | GraphDocument>(document: T
 
 function createNodeInDocument<T extends GraphPayload | GraphDocument>(document: T, command: GraphEditCreateNodeCommand): T {
   if (document.nodes[command.nodeId]) {
-    return document;
+    return patchExistingCreatedNodeInDocument(document, command);
   }
   const nextDocument = cloneGraphDocument(document);
   const node = buildGraphNodeFromCommand(command);
@@ -1096,6 +1110,31 @@ function createNodeInDocument<T extends GraphPayload | GraphDocument>(document: 
         node,
         context: placementContextFromCreateNodeCommand(command),
       }),
+    },
+  };
+  return nextDocument;
+}
+
+function patchExistingCreatedNodeInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  command: GraphEditCreateNodeCommand,
+): T {
+  const existingNode = document.nodes[command.nodeId];
+  if (!existingNode || command.nodeType !== "subgraph" || existingNode.kind !== "subgraph") {
+    return document;
+  }
+  const nextDocument = cloneGraphDocument(document);
+  const nextNode = nextDocument.nodes[command.nodeId];
+  if (!nextNode || nextNode.kind !== "subgraph") {
+    return document;
+  }
+  nextDocument.nodes[command.nodeId] = {
+    ...nextNode,
+    name: command.title,
+    description: command.description,
+    config: {
+      ...nextNode.config,
+      graph: cloneGraphCorePayload(command.subgraphGraph ?? emptyGraphCorePayload()),
     },
   };
   return nextDocument;

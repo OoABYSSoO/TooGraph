@@ -387,7 +387,9 @@ import {
   type SaveMetadataTarget,
 } from "./saveMetadataModel.ts";
 import {
+  applyGraphEditCommandToDocument,
   buildGraphEditPlaybackPlan,
+  type GraphEditCommand,
   type GraphEditIntent,
 } from "./graphEditPlaybackModel.ts";
 import {
@@ -1164,6 +1166,11 @@ type GraphEditPlaybackPlanRequestDetail = {
   response?: unknown;
 };
 
+type GraphEditPlaybackApplyCommandDetail = {
+  command?: GraphEditCommand;
+  response?: unknown;
+};
+
 function handleGraphEditPlaybackPlanRequest(event: Event) {
   const detail = (event as CustomEvent<GraphEditPlaybackPlanRequestDetail>).detail;
   if (!detail || !Array.isArray(detail.graphEditIntents)) {
@@ -1179,6 +1186,7 @@ function handleGraphEditPlaybackPlanRequest(event: Event) {
     detail.response = {
       requestId,
       ok: false,
+      graphCommands: [],
       playbackSteps: [],
       issues: ["No editable graph tab is open."],
     };
@@ -1189,8 +1197,37 @@ function handleGraphEditPlaybackPlanRequest(event: Event) {
   detail.response = {
     requestId,
     ok: plan.valid,
+    graphCommands: plan.graphCommands,
     playbackSteps: plan.playbackSteps,
     issues: plan.issues,
+  };
+}
+
+function handleGraphEditPlaybackApplyCommand(event: Event) {
+  const detail = (event as CustomEvent<GraphEditPlaybackApplyCommandDetail>).detail;
+  const command = detail?.command;
+  if (!detail || !command) {
+    return;
+  }
+  const tab = ensureGraphEditPlaybackTab();
+  const document = tab ? documentsByTabId.value[tab.tabId] : null;
+  if (!tab || !document) {
+    detail.response = {
+      ok: false,
+      applied: false,
+      issues: ["No editable graph tab is open."],
+    };
+    return;
+  }
+
+  const nextDocument = applyGraphEditCommandToDocument(document, command);
+  if (nextDocument !== document) {
+    markDocumentDirty(tab.tabId, nextDocument);
+  }
+  detail.response = {
+    ok: true,
+    applied: nextDocument !== document,
+    issues: [],
   };
 }
 
@@ -1450,12 +1487,14 @@ watch(
 
 onBeforeUnmount(() => {
   window.removeEventListener("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener);
+  window.removeEventListener("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener);
   buddyContextStore.clearEditorSnapshot();
   teardownRunLifecycle();
 });
 
 onMounted(() => {
   window.addEventListener("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener);
+  window.addEventListener("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener);
   loadInitialWorkspaceResources();
   updateWorkspace(readPersistedEditorWorkspace());
   ensureTabViewportDrafts();
