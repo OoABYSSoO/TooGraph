@@ -2527,7 +2527,10 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
       break;
     }
     const step = response.playbackSteps[stepIndex]!;
-    const targetElement = await resolveGraphEditPlaybackStepElementWithRetry(step, playbackState);
+    const targetElement = await resolveGraphEditPlaybackStepElementWithRetry(step, playbackState, token);
+    if (isVirtualOperationInterrupted(token)) {
+      break;
+    }
     if (shouldSkipGraphEditPlaybackTextStep(step, response.playbackSteps, stepIndex, playbackState, targetElement)) {
       continue;
     }
@@ -2657,14 +2660,21 @@ function requestGraphEditPlaybackPlan(input: { requestId: string; graphEditInten
   return detail.response;
 }
 
-async function resolveGraphEditPlaybackStepElementWithRetry(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState) {
+async function resolveGraphEditPlaybackStepElementWithRetry(
+  step: GraphEditPlaybackStep,
+  playbackState: GraphEditPlaybackUiState,
+  token: BuddyVirtualOperationToken | null,
+) {
   const deadlineMs = Date.now() + BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_WAIT_MS;
-  while (Date.now() <= deadlineMs) {
+  while (!isVirtualOperationInterrupted(token) && Date.now() <= deadlineMs) {
     const targetElement = resolveGraphEditPlaybackStepElement(step, playbackState);
     if (targetElement) {
       return targetElement;
     }
     await waitForVirtualOperation(BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_RETRY_MS);
+  }
+  if (isVirtualOperationInterrupted(token)) {
+    return null;
   }
   return resolveGraphEditPlaybackStepElement(step, playbackState);
 }
@@ -4819,37 +4829,40 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__virtual-operation-banner {
   position: fixed;
-  right: 22px;
-  top: 22px;
+  left: 50%;
+  top: calc(var(--editor-canvas-floating-top-clearance, 18px) + 64px);
   z-index: 4528;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
-  max-width: min(360px, calc(100vw - 44px));
-  min-height: 40px;
-  padding: 8px 9px 8px 12px;
-  border: 1px solid rgba(245, 158, 11, 0.42);
+  min-width: min(420px, calc(100vw - 56px));
+  max-width: min(620px, calc(100vw - 56px));
+  padding: 14px 16px 14px 24px;
+  border: 1px solid rgba(255, 247, 237, 0.34);
   border-radius: 999px;
-  color: #3d2f13;
-  background: rgba(255, 251, 235, 0.92);
+  color: #fff7ed;
+  background: linear-gradient(135deg, rgba(154, 52, 18, 0.96), rgba(131, 43, 13, 0.94));
   box-shadow:
-    0 14px 34px rgba(146, 64, 14, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+    0 0 0 1px rgba(255, 247, 237, 0.16) inset,
+    0 18px 42px rgba(124, 45, 18, 0.24),
+    0 0 34px rgba(217, 119, 6, 0.24);
+  translate: -50% 0;
   pointer-events: auto;
-  backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(28px) saturate(1.4) contrast(1.08);
+  animation: buddy-widget-virtual-operation-breathe 2.4s ease-in-out infinite;
 }
 
 .buddy-widget__virtual-operation-banner--stopping {
-  border-color: rgba(217, 119, 6, 0.54);
-  background: rgba(254, 243, 199, 0.94);
+  background: linear-gradient(135deg, rgba(180, 83, 9, 0.98), rgba(154, 52, 18, 0.96));
 }
 
 .buddy-widget__virtual-operation-pulse {
   width: 9px;
   height: 9px;
   border-radius: 999px;
-  background: #f59e0b;
-  box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.16);
+  background: #fed7aa;
+  box-shadow: 0 0 0 6px rgba(255, 247, 237, 0.16);
   animation: buddy-widget-virtual-operation-pulse 1.1s ease-in-out infinite;
   flex: 0 0 auto;
 }
@@ -4858,7 +4871,7 @@ function formatErrorMessage(error: unknown): string {
   min-width: 0;
   overflow: hidden;
   font-size: 13px;
-  font-weight: 720;
+  font-weight: 800;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4871,16 +4884,16 @@ function formatErrorMessage(error: unknown): string {
   place-items: center;
   width: 26px;
   height: 26px;
-  border: 1px solid rgba(146, 64, 14, 0.28);
+  border: 1px solid rgba(255, 247, 237, 0.42);
   border-radius: 999px;
-  color: #7c2d12;
-  background: rgba(255, 255, 255, 0.74);
+  color: #fff7ed;
+  background: rgba(255, 247, 237, 0.12);
   cursor: pointer;
 }
 
 .buddy-widget__virtual-operation-stop:hover {
-  border-color: rgba(180, 83, 9, 0.48);
-  background: rgba(255, 247, 237, 0.96);
+  border-color: rgba(255, 247, 237, 0.74);
+  background: rgba(255, 247, 237, 0.22);
 }
 
 .buddy-widget__virtual-operation-stop-icon {
@@ -5026,10 +5039,35 @@ function formatErrorMessage(error: unknown): string {
 @keyframes buddy-widget-virtual-operation-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 5px rgba(245, 158, 11, 0.1);
+    box-shadow: 0 0 0 5px rgba(255, 247, 237, 0.08);
   }
   50% {
-    box-shadow: 0 0 0 9px rgba(245, 158, 11, 0.22);
+    box-shadow: 0 0 0 9px rgba(255, 247, 237, 0.2);
+  }
+}
+
+@keyframes buddy-widget-virtual-operation-breathe {
+  0%,
+  100% {
+    scale: 1;
+    box-shadow:
+      0 0 0 1px rgba(255, 247, 237, 0.16) inset,
+      0 18px 42px rgba(124, 45, 18, 0.24),
+      0 0 28px rgba(217, 119, 6, 0.22);
+  }
+  48% {
+    scale: 1.018;
+    box-shadow:
+      0 0 0 1px rgba(255, 247, 237, 0.26) inset,
+      0 22px 50px rgba(124, 45, 18, 0.32),
+      0 0 42px rgba(234, 88, 12, 0.34);
+  }
+  58% {
+    scale: 1.006;
+    box-shadow:
+      0 0 0 1px rgba(255, 247, 237, 0.2) inset,
+      0 18px 42px rgba(124, 45, 18, 0.26),
+      0 0 32px rgba(217, 119, 6, 0.26);
   }
 }
 
