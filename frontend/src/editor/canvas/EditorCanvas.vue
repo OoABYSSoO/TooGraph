@@ -624,7 +624,7 @@ import { useNodeSelectionFocus, type NodeFocusRequest } from "./useNodeSelection
 import { useViewport } from "./useViewport";
 import { isAgentBreakpointEnabledInDocument } from "@/lib/graph-document";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
-import type { SkillDefinition } from "@/types/skills";
+import type { SkillDefinition } from "@/types/actions";
 import type { RunNodeTiming } from "../workspace/runNodeTimingModel.ts";
 import type { AgentNode, BatchNode, ConditionNode, GraphDocument, GraphNode, GraphNodeSize, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition, TemplateRecord } from "@/types/node-system";
 

@@ -867,7 +867,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 )
             },
             generate_agent_skill_inputs_func=fixed_skill_inputs_func(
-                {"local_workspace_executor": {"path": "skill/user/demo/SKILL.md"}}
+                {"local_workspace_executor": {"path": "action/user/demo/ACTION.md"}}
             ),
             invoke_skill_func=lambda skill_func, skill_inputs: (_ for _ in ()).throw(
                 AssertionError("risky skill should not execute before approval")
@@ -890,7 +890,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(approval["skill_key"], "local_workspace_executor")
         self.assertEqual(approval["binding_source"], "capability_state")
         self.assertEqual(approval["permissions"], ["file_write", "subprocess"])
-        self.assertEqual(approval["skill_inputs"], {"path": "skill/user/demo/SKILL.md"})
+        self.assertEqual(approval["skill_inputs"], {"path": "action/user/demo/ACTION.md"})
         self.assertEqual(recorded_events[0]["kind"], "permission_pause")
         self.assertEqual(recorded_events[0]["node_id"], "execute_capability")
         self.assertEqual(recorded_events[0]["status"], "awaiting_human")
@@ -913,7 +913,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "config": {"actionKey": ""},
             }
         )
-        stored_inputs = {"path": "skill/user/demo/SKILL.md", "content": "# Demo"}
+        stored_inputs = {"path": "action/user/demo/ACTION.md", "content": "# Demo"}
         state = {
             "run_id": "run-1",
             "metadata": {
@@ -988,7 +988,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "config": {"actionKey": ""},
             }
         )
-        stored_inputs = {"path": "skill/user/demo/SKILL.md", "content": "# Demo"}
+        stored_inputs = {"path": "action/user/demo/ACTION.md", "content": "# Demo"}
         state = {
             "run_id": "run-1",
             "metadata": {

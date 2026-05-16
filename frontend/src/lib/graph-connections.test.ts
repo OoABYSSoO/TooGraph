@@ -35,7 +35,7 @@ const document: GraphPayload = {
       reads: [{ state: "question", required: true }],
       writes: [],
       config: {
-        skillKey: "",
+        actionKey: "",
         taskInstruction: "",
         modelSource: "global",
         model: "",
@@ -316,7 +316,7 @@ test("canCompleteGraphConnection allows reverse virtual input drags to target co
         reads: [],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -421,7 +421,7 @@ test("canCompleteGraphConnection allows a concrete state input source to be repl
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -578,7 +578,7 @@ test("canCompleteGraphConnection allows virtual state outputs to materialize int
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -706,7 +706,7 @@ test("canCompleteGraphConnection treats batch nodes as array-capable state reade
           retryCount: 3,
           continueOnError: false,
           defaultWorker: {
-            skillKey: "",
+            actionKey: "",
             taskInstruction: "",
             modelSource: "global",
             model: "",
@@ -799,7 +799,7 @@ test("canCompleteGraphConnection allows virtual input outputs to target concrete
         ],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -874,7 +874,7 @@ test("canCompleteGraphConnection allows multiple reachable writers for the same 
         reads: [],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -890,7 +890,7 @@ test("canCompleteGraphConnection allows multiple reachable writers for the same 
         reads: [],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -906,7 +906,7 @@ test("canCompleteGraphConnection allows multiple reachable writers for the same 
         reads: [{ state: "draft_question", required: true }],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",

@@ -12,7 +12,7 @@ from app.core.storage.json_file_utils import read_json_file, write_json_file
 
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
-SKILLS_ROOT = ROOT_DIR / "skill"
+SKILLS_ROOT = ROOT_DIR / "action"
 OFFICIAL_SKILLS_DIR = SKILLS_ROOT / "official"
 USER_SKILLS_DIR = SKILLS_ROOT / "user"
 SKILL_SETTINGS_PATH = SKILLS_ROOT / "settings.json"
@@ -20,7 +20,7 @@ SKILL_SETTINGS_PATH = SKILLS_ROOT / "settings.json"
 SKILLS_DIR = OFFICIAL_SKILLS_DIR
 SKILL_STATE_DATA_DIR = SKILLS_ROOT
 SKILL_STATE_PATH = SKILL_SETTINGS_PATH
-SKILL_SETTINGS_SCHEMA_VERSION = "toograph.skill-settings/v1"
+SKILL_SETTINGS_SCHEMA_VERSION = "toograph.action-settings/v1"
 
 
 def skill_directory_for(skill_key: str) -> Path:
@@ -52,7 +52,7 @@ def _list_skill_keys(root: Path) -> set[str]:
     if not root.exists():
         return keys
     for path in root.iterdir():
-        if path.is_dir() and ((path / "skill.json").is_file() or (path / "SKILL.md").is_file()):
+        if path.is_dir() and ((path / "action.json").is_file() or (path / "ACTION.md").is_file()):
             keys.add(path.name)
     return keys
 
@@ -191,38 +191,38 @@ def _find_single_skill_manifest(source_root: Path) -> Path:
         raise ValueError("Uploaded Skill source does not exist.")
     native_candidates = [
         path
-        for path in source_root.rglob("skill.json")
+        for path in source_root.rglob("action.json")
         if path.is_file() and "__MACOSX" not in path.relative_to(source_root).parts
     ]
     if len(native_candidates) > 1:
-        raise ValueError("Uploaded Skill must contain exactly one skill.json file.")
+        raise ValueError("Uploaded Action must contain exactly one action.json file.")
     if native_candidates:
         return native_candidates[0]
     legacy_candidates = [
         path
-        for path in source_root.rglob("SKILL.md")
+        for path in source_root.rglob("ACTION.md")
         if path.is_file() and "__MACOSX" not in path.relative_to(source_root).parts
     ]
     if not legacy_candidates:
-        raise ValueError("Uploaded Skill must contain one skill.json or SKILL.md file.")
+        raise ValueError("Uploaded Action must contain one action.json or ACTION.md file.")
     if len(legacy_candidates) > 1:
-        raise ValueError("Uploaded Skill must contain exactly one SKILL.md file.")
+        raise ValueError("Uploaded Action must contain exactly one ACTION.md file.")
     return legacy_candidates[0]
 
 
 def _derive_skill_key(skill_file: Path) -> str:
-    if skill_file.name == "skill.json":
+    if skill_file.name == "action.json":
         try:
             payload = json.loads(skill_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
-            raise ValueError(f"Skill manifest '{skill_file}' must be valid JSON.") from exc
-        skill_key = str(payload.get("skillKey") or payload.get("skill_key") or skill_file.parent.name).strip()
+            raise ValueError(f"Action manifest '{skill_file}' must be valid JSON.") from exc
+        skill_key = str(payload.get("actionKey") or payload.get("action_key") or payload.get("skillKey") or payload.get("skill_key") or skill_file.parent.name).strip()
         return _validate_skill_key(skill_key)
     raw = skill_file.read_text(encoding="utf-8")
     frontmatter = _read_frontmatter(raw, skill_file)
     payload = yaml.safe_load(frontmatter) or {}
     toograph = payload.get("toograph") or {}
-    skill_key = str(toograph.get("skill_key") or skill_file.parent.name).strip()
+    skill_key = str(toograph.get("action_key") or toograph.get("skill_key") or skill_file.parent.name).strip()
     return _validate_skill_key(skill_key)
 
 

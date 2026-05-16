@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "toograph.action/v1",
+  "actionKey": "toograph_page_operator",
+  "name": "TooGraph 页面操作器",
+  "description": "根据结构化页面操作书执行页面命令请求。支持固定化运行目标模板、非伙伴页面 click、focus、clear、type、press、wait 命令，以及编辑器页 graph_edit 语义图编辑意图，并通过伙伴虚拟鼠标播放可见操作。",
+  "llmInstruction": "你已绑定 TooGraph 页面操作器。需要运行某个图模板时，只输出 template_target、cursor_lifecycle、reason；template_target 至少包含 template_id 或 template_name，并必须能提供 input_text 或依赖 user_goal 作为本次目标输入，运行时会程序化映射为打开左侧图与模板、搜索模板、打开模板、写入 input 节点、点击运行并等待结果。普通页面操作才输出 commands、graph_edit_intents、cursor_lifecycle、reason。commands 必须来自当前页面操作书；普通页面操作可使用 click、focus、clear、type、press 或 wait。type 与 press 命令中的 <text>/<key> 是占位符，输出时替换为真实输入文本或按键。需要创建或编辑当前图时，输出 [\"graph_edit editor.graph.playback\"]，并在 graph_edit_intents 中给出产品语义操作，如 create_node、create_state、bind_state、connect_nodes、update_node；create_node.nodeType 可为 input、agent、output、condition 或 subgraph。不要选择伙伴页面、伙伴浮窗、伙伴形象或调试入口。不要输出 DOM selector、坐标、鼠标轨迹或浏览器点击细节。",
+  "version": "0.1.0",
+  "timeoutSeconds": 30,
+  "permissions": [
+    "virtual_ui_operation"
+  ],
+  "stateInputSchema": [
+    {
+      "key": "user_goal",
+      "name": "User Goal",
+      "valueType": "text",
+      "description": "用户希望完成的页面操作目标。"
+    }
+  ],
+  "llmOutputSchema": [
+    {
+      "key": "commands",
+      "name": "Commands",
+      "valueType": "text_array",
+      "description": "LLM 从当前页面操作书中选择的一条命令字符串数组。例如 [\"click app.nav.library\"]、[\"focus library.search.query\"]、[\"type library.search.query 页面操作\"]、[\"press library.search.query Enter\"] 或 [\"graph_edit editor.graph.playback\"]。"
+    },
+    {
+      "key": "template_target",
+      "name": "Template Target",
+      "valueType": "json",
+      "description": "需要固定化可见运行图模板时填写的目标模板对象。字段可包含 template_id、template_name、search_text、input_text；此时不要输出 commands，技能会映射为打开图与模板、搜索、打开模板、写入 input 节点、运行并等待结果。"
+    },
+    {
+      "key": "graph_edit_intents",
+      "name": "Graph Edit Intents",
+      "valueType": "json",
+      "description": "当 commands 为 [\"graph_edit editor.graph.playback\"] 时填写的图编辑语义意图数组。每项使用 create_node、create_state、bind_state、connect_nodes 或 update_node；create_node.nodeType 支持 input、agent、output、condition 和 subgraph；不要包含 UI 点击细节。"
+    },
+    {
+      "key": "cursor_lifecycle",
+      "name": "Cursor Lifecycle",
+      "valueType": "text",
+      "description": "虚拟鼠标生命周期，keep、return_after_step 或 return_at_end；没有连续操作时返回 return_after_step。"
+    },
+    {
+      "key": "reason",
+      "name": "Reason",
+      "valueType": "text",
+      "description": "选择这些页面命令的简短理由，用于审计。"
+    }
+  ],
+  "stateOutputSchema": [
+    {
+      "key": "ok",
+      "name": "OK",
+      "valueType": "boolean",
+      "description": "语义操作是否被接受。"
+    },
+    {
+      "key": "cursor_session_id",
+      "name": "Cursor Session ID",
+      "valueType": "text",
+      "description": "虚拟鼠标会话 ID，首期为空字符串。"
+    },
+    {
+      "key": "operation_request_id",
+      "name": "Operation Request ID",
+      "valueType": "text",
+      "description": "Skill/runtime 确定性生成的页面操作请求 ID，用于把 activity event、前端执行确认和 run resume 关联起来。"
+    },
+    {
+      "key": "journal",
+      "name": "Journal",
+      "valueType": "json",
+      "description": "操作日志摘要。"
+    },
+    {
+      "key": "error",
+      "name": "Error",
+      "valueType": "json",
+      "description": "失败时的结构化错误。"
+    }
+  ]
+}

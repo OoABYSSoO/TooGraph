@@ -150,19 +150,19 @@
           <span class="app-shell__link-label">{{ t("nav.presets") }}</span>
         </RouterLink>
         <RouterLink
-          to="/skills"
+          to="/actions"
           class="app-shell__link"
-          data-virtual-affordance-id="app.nav.skills"
-          data-virtual-affordance-label="技能"
+          data-virtual-affordance-id="app.nav.actions"
+          data-virtual-affordance-label="Actions"
           data-virtual-affordance-role="navigation-link"
           data-virtual-affordance-zone="app-shell"
           data-virtual-affordance-actions="click"
-          data-virtual-affordance-path-after-click="/skills"
-          :class="{ 'app-shell__link--active': activeNavigationSection === 'skills' }"
-          :title="t('nav.skills')"
+          data-virtual-affordance-path-after-click="/actions"
+          :class="{ 'app-shell__link--active': activeNavigationSection === 'actions' }"
+          :title="t('nav.actions')"
         >
           <ElIcon class="app-shell__link-icon"><Opportunity /></ElIcon>
-          <span class="app-shell__link-label">{{ t("nav.skills") }}</span>
+          <span class="app-shell__link-label">{{ t("nav.actions") }}</span>
         </RouterLink>
         <RouterLink
           to="/models"

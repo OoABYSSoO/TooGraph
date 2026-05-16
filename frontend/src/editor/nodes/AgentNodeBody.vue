@@ -112,7 +112,7 @@
     @update:model-value="emit('update:model-value', $event)"
     @update:thinking-mode="emit('update:thinking-mode', $event)"
   />
-  <AgentSkillPicker
+  <AgentActionPicker
     :selected-skill-key="selectedSkillKey"
     :loading="skillDefinitionsLoading"
     :error="skillDefinitionsError"
@@ -178,12 +178,12 @@ import { ElInput, ElPopover } from "element-plus";
 import { useI18n } from "vue-i18n";
 
 import AgentRuntimeControls from "./AgentRuntimeControls.vue";
-import AgentSkillPicker from "./AgentSkillPicker.vue";
+import AgentActionPicker from "./AgentActionPicker.vue";
 import StatePortList from "./StatePortList.vue";
 import type { AgentThinkingControlMode } from "./agentConfigModel";
 import type { StatePortExistingStateOption } from "./statePortCreateModel";
 import type { NodeCardViewModel, NodePortViewModel } from "./nodeCardViewModel";
-import type { SkillDefinition } from "@/types/skills";
+import type { SkillDefinition } from "@/types/actions";
 import type { StateColorOption, StateFieldDraft, StateFieldType } from "@/editor/workspace/statePanelFields";
 
 type AgentBodyViewModel = Extract<NodeCardViewModel["body"], { kind: "agent" }>;

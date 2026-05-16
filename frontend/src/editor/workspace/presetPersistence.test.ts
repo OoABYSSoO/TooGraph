@@ -30,7 +30,7 @@ const document: GraphPayload = {
       reads: [{ state: "question", required: true }],
       writes: [{ state: "answer" }],
       config: {
-        skillKey: "",
+        actionKey: "",
         taskInstruction: "Answer the question.",
         modelSource: "global",
         model: "",

@@ -19,7 +19,7 @@ function graphDocument(): GraphPayload {
         reads: [{ state: "topic" }],
         writes: [{ state: "summary" }],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",

@@ -42,7 +42,7 @@ const graph: GraphPayload = {
       reads: [{ state: "question", required: true }],
       writes: [{ state: "answer", mode: "replace" }],
       config: {
-        skillKey: "",
+        actionKey: "",
         taskInstruction: "请直接用中文回答用户问题。",
         modelSource: "global",
         model: "",
@@ -183,7 +183,7 @@ test("projectCanvasEdges shows every reachable data writer for a state read", ()
         reads: [],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -199,7 +199,7 @@ test("projectCanvasEdges shows every reachable data writer for a state read", ()
         reads: [],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -256,7 +256,7 @@ test("projectCanvasEdges shows the web research search query flowing from the pl
         ui: { position: { x: 0, y: 0 } },
         reads: [],
         writes: [{ state: "search_query", mode: "replace" }],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "off", temperature: 0 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "off", temperature: 0 },
       },
       web_search_agent: {
         kind: "agent",
@@ -265,7 +265,7 @@ test("projectCanvasEdges shows the web research search query flowing from the pl
         ui: { position: { x: 480, y: 0 } },
         reads: [{ state: "search_query", required: true }],
         writes: [{ state: "search_result", mode: "replace" }],
-        config: { skillKey: "web_search", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "off", temperature: 0 },
+        config: { actionKey: "web_search", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "off", temperature: 0 },
       },
     },
     edges: [{ source: "plan_search_query", target: "web_search_agent" }],
@@ -295,7 +295,7 @@ test("projectCanvasEdges shows a self feedback data edge for nodes that read and
         ui: { position: { x: 120, y: 120 } },
         reads: [{ state: "retry_state", required: false }],
         writes: [{ state: "retry_state", mode: "replace" }],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "off", temperature: 0 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "off", temperature: 0 },
       },
     },
     edges: [],
@@ -457,7 +457,7 @@ test("projectCanvasEdges assigns separate routing lanes to sibling outgoing flow
         reads: [{ state: "answer", required: true }],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",

@@ -3,7 +3,7 @@ import { ref } from "vue";
 import type { KnowledgeBaseRecord } from "../../types/knowledge.ts";
 import type { PresetDocument } from "../../types/node-system.ts";
 import type { SettingsPayload } from "../../types/settings.ts";
-import type { SkillDefinition } from "../../types/skills.ts";
+import type { SkillDefinition } from "../../types/actions.ts";
 
 type WorkspaceResourceControllerInput = {
   fetchKnowledgeBases: () => Promise<KnowledgeBaseRecord[]>;

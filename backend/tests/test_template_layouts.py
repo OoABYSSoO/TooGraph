@@ -129,8 +129,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn("多轮搜索", research_template["description"])
         skill_template = templates["toograph_skill_creation_workflow"]
         self.assertEqual(skill_template["source"], "official")
-        self.assertEqual(skill_template["label"], "创建自定义 Skill")
-        self.assertEqual(skill_template["default_graph_name"], "创建自定义 Skill")
+        self.assertEqual(skill_template["label"], "创建自定义 Action")
+        self.assertEqual(skill_template["default_graph_name"], "创建自定义 Action")
         self.assertIn("需求澄清", skill_template["description"])
 
         buddy_template = templates["buddy_autonomous_loop"]
@@ -1427,7 +1427,7 @@ class TemplateLayoutTests(unittest.TestCase):
             ],
         )
         self.assertIn({"state": "existing_skill_package", "required": False}, _read_contracts(nodes["review_requirement"]["reads"]))
-        self.assertIn("改进已有 Skill", nodes["review_requirement"]["config"]["taskInstruction"])
+        self.assertIn("改进已有 Action", nodes["review_requirement"]["config"]["taskInstruction"])
         self.assertIn({"state": "existing_skill_package", "required": False}, _read_contracts(nodes["prepare_builder_context"]["reads"]))
         self.assertIn("existing_skill_package", nodes["prepare_builder_context"]["config"]["taskInstruction"])
 

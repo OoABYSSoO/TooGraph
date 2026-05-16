@@ -11,7 +11,7 @@ const criticalUiFiles = [
   "src/pages/PresetsPage.vue",
   "src/pages/RunsPage.vue",
   "src/pages/RunDetailPage.vue",
-  "src/pages/SkillsPage.vue",
+  "src/pages/ActionsPage.vue",
   "src/pages/SettingsPage.vue",
   "src/pages/ModelProvidersPage.vue",
   "src/pages/EditorPage.vue",

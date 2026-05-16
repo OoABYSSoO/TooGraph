@@ -19,7 +19,7 @@ from app.skills.definitions import _parse_native_skill_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONTEXT_FANOUT_SKILL_DIR = REPO_ROOT / "skill" / "official" / "toograph_context_fanout"
+CONTEXT_FANOUT_SKILL_DIR = REPO_ROOT / "action" / "official" / "toograph_context_fanout"
 
 
 @contextmanager
@@ -111,11 +111,11 @@ def _write_template(repo_root: Path) -> None:
 
 
 def _write_skill(repo_root: Path) -> None:
-    skill_dir = repo_root / "skill" / "official" / "web_search"
+    skill_dir = repo_root / "action" / "official" / "web_search"
     _write_json(
-        skill_dir / "skill.json",
+        skill_dir / "action.json",
         {
-            "schemaVersion": "toograph.skill/v1",
+            "schemaVersion": "toograph.action/v1",
             "skillKey": "web_search",
             "name": "Web Search",
             "description": "Search public web pages and save evidence.",
@@ -157,7 +157,7 @@ def _seed_knowledge_base() -> None:
 class TooGraphContextFanoutSkillTests(unittest.TestCase):
     def test_manifest_exposes_read_only_fanout_contract(self) -> None:
         definition = _parse_native_skill_manifest(
-            CONTEXT_FANOUT_SKILL_DIR / "skill.json",
+            CONTEXT_FANOUT_SKILL_DIR / "action.json",
             SkillSourceScope.OFFICIAL,
         ).definition
 

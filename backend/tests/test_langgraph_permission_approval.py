@@ -175,7 +175,7 @@ def test_langgraph_runtime_pauses_before_risky_skill_permission(monkeypatch) -> 
             {
                 "local_workspace_executor": {
                     "operation": "write",
-                    "path": "skill/user/demo/SKILL.md",
+                    "path": "action/user/demo/ACTION.md",
                     "content": "# Demo",
                     "query": "",
                 }
@@ -202,7 +202,7 @@ def test_langgraph_runtime_pauses_before_risky_skill_permission(monkeypatch) -> 
     assert pending["kind"] == "skill_permission_approval"
     assert pending["skill_key"] == "local_workspace_executor"
     assert pending["permissions"] == ["file_write", "subprocess"]
-    assert pending["skill_inputs"]["path"] == "skill/user/demo/SKILL.md"
+    assert pending["skill_inputs"]["path"] == "action/user/demo/ACTION.md"
     assert result["lifecycle"]["pause_reason"] == "permission_approval"
 
 
@@ -220,7 +220,7 @@ def test_langgraph_runtime_resumes_permission_approval_with_stored_inputs(monkey
             {
                 "local_workspace_executor": {
                     "operation": "write",
-                    "path": "skill/user/demo/SKILL.md",
+                    "path": "action/user/demo/ACTION.md",
                     "content": "# Demo",
                     "query": "",
                 }
@@ -255,7 +255,7 @@ def test_langgraph_runtime_resumes_permission_approval_with_stored_inputs(monkey
     assert invoked == [
             {
                 "operation": "write",
-                "path": "skill/user/demo/SKILL.md",
+                "path": "action/user/demo/ACTION.md",
                 "content": "# Demo",
                 "query": "",
             }
@@ -265,7 +265,7 @@ def test_langgraph_runtime_resumes_permission_approval_with_stored_inputs(monkey
     package = resumed["state_values"]["dynamic_result"]
     assert package["kind"] == "result_package"
     assert package["sourceKey"] == "local_workspace_executor"
-    assert package["inputs"]["path"] == "skill/user/demo/SKILL.md"
+    assert package["inputs"]["path"] == "action/user/demo/ACTION.md"
 
 
 def test_langgraph_runtime_propagates_permission_approval_through_subgraph(monkeypatch) -> None:
@@ -282,7 +282,7 @@ def test_langgraph_runtime_propagates_permission_approval_through_subgraph(monke
             {
                 "local_workspace_executor": {
                     "operation": "write",
-                    "path": "skill/user/demo/SKILL.md",
+                    "path": "action/user/demo/ACTION.md",
                     "content": "# Demo",
                     "query": "",
                 }
@@ -324,7 +324,7 @@ def test_langgraph_runtime_propagates_permission_approval_through_subgraph(monke
     assert invoked == [
         {
             "operation": "write",
-            "path": "skill/user/demo/SKILL.md",
+            "path": "action/user/demo/ACTION.md",
             "content": "# Demo",
             "query": "",
         }

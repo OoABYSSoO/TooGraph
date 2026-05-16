@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { buildNodeCardViewModel } from "./nodeCardViewModel.ts";
 import { VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "../../lib/virtual-any-input.ts";
 import type { GraphNode, StateDefinition } from "../../types/node-system.ts";
-import type { SkillDefinition } from "../../types/skills.ts";
+import type { SkillDefinition } from "../../types/actions.ts";
 
 const stateSchema: Record<string, StateDefinition> = {
   question: {
@@ -179,7 +179,7 @@ test("buildNodeCardViewModel derives agent body, ports, and labels", () => {
     reads: [{ state: "question", required: true }],
     writes: [{ state: "answer", mode: "replace" }],
     config: {
-      skillKey: "",
+      actionKey: "",
       taskInstruction: "请直接用中文回答用户问题。",
       modelSource: "global",
       model: "",
@@ -225,7 +225,7 @@ test("buildNodeCardViewModel derives batch body and per-input modes", () => {
       retryCount: 3,
       continueOnError: true,
       defaultWorker: {
-        skillKey: "",
+        actionKey: "",
         taskInstruction: "Analyze one segment.",
         modelSource: "global",
         model: "",
@@ -276,8 +276,8 @@ test("buildNodeCardViewModel derives displayed skill instruction from the select
     reads: [{ state: "question", required: true }],
     writes: [{ state: "answer", mode: "replace" }],
     config: {
-      skillKey: "web_search",
-      skillInstructionBlocks: {},
+      actionKey: "web_search",
+      actionInstructionBlocks: {},
       taskInstruction: "生成搜索参数。",
       modelSource: "global",
       model: "",
@@ -298,12 +298,12 @@ test("buildNodeCardViewModel derives displayed skill instruction from the select
   });
 
   assert.equal(model.body.kind, "agent");
-  assert.deepEqual(model.body.skillInstructionBlocks, {
+  assert.deepEqual(model.body.actionInstructionBlocks, {
     web_search: {
-      skillKey: "web_search",
+      actionKey: "web_search",
       title: "Web Search skill instruction",
       content: "Use the graph state to create a search query.",
-      source: "skill.llmInstruction",
+      source: "action.llmInstruction",
     },
   });
 });
@@ -317,7 +317,7 @@ test("buildNodeCardViewModel marks skill-managed output ports", () => {
     reads: [{ state: "question", required: true }],
     writes: [{ state: "search_artifacts", mode: "replace" }],
     config: {
-      skillKey: "web_search",
+      actionKey: "web_search",
       taskInstruction: "准备 LLM 输出。",
       modelSource: "global",
       model: "",
@@ -335,8 +335,8 @@ test("buildNodeCardViewModel marks skill-managed output ports", () => {
       value: [],
       color: "#2563eb",
       binding: {
-        kind: "skill_output",
-        skillKey: "web_search",
+        kind: "action_output",
+        actionKey: "web_search",
         nodeId: "search_helper",
         fieldKey: "artifact_paths",
         managed: true,
@@ -368,8 +368,8 @@ test("buildNodeCardViewModel marks skill-managed input ports", () => {
         state: "question",
         required: true,
         binding: {
-          kind: "skill_input",
-          skillKey: "web_search",
+          kind: "action_input",
+          actionKey: "web_search",
           fieldKey: "user_question",
           managed: true,
         },
@@ -377,7 +377,7 @@ test("buildNodeCardViewModel marks skill-managed input ports", () => {
     ],
     writes: [],
     config: {
-      skillKey: "web_search",
+      actionKey: "web_search",
       taskInstruction: "准备 LLM 输出。",
       modelSource: "global",
       model: "",
@@ -407,7 +407,7 @@ test("buildNodeCardViewModel marks dynamic capability input and result package o
     ],
     writes: [{ state: "dynamic_result", mode: "replace" }],
     config: {
-      skillKey: "",
+      actionKey: "",
       taskInstruction: "准备动态能力输入。",
       modelSource: "global",
       model: "",
@@ -456,7 +456,7 @@ test("buildNodeCardViewModel exposes a virtual plus input for empty non-input no
     reads: [],
     writes: [{ state: "answer", mode: "replace" }],
     config: {
-      skillKey: "",
+      actionKey: "",
       taskInstruction: "",
       modelSource: "global",
       model: "",
@@ -549,7 +549,7 @@ test("buildNodeCardViewModel exposes virtual plus outputs for empty agent and in
     reads: [{ state: "question", required: true }],
     writes: [],
     config: {
-      skillKey: "",
+      actionKey: "",
       taskInstruction: "",
       modelSource: "global",
       model: "",
@@ -1026,7 +1026,7 @@ test("buildNodeCardViewModel exposes node-level latest run failure notes", () =>
     reads: [{ state: "question", required: true }],
     writes: [{ state: "answer", mode: "replace" }],
     config: {
-      skillKey: "",
+      actionKey: "",
       taskInstruction: "请直接用中文回答用户问题。",
       modelSource: "global",
       model: "",
@@ -1172,7 +1172,7 @@ test("buildNodeCardViewModel derives subgraph boundary and thumbnail summary", (
             reads: [{ state: "internal_question", required: true }],
             writes: [{ state: "internal_answer", mode: "replace" }],
             config: {
-              skillKey: "web_search",
+              actionKey: "web_search",
               taskInstruction: "",
               modelSource: "global",
               model: "",
@@ -1253,7 +1253,7 @@ test("buildNodeCardViewModel projects subgraph runtime status onto thumbnail nod
             reads: [],
             writes: [],
             config: {
-              skillKey: "web_search",
+              actionKey: "web_search",
               taskInstruction: "",
               modelSource: "global",
               model: "",
@@ -1269,7 +1269,7 @@ test("buildNodeCardViewModel projects subgraph runtime status onto thumbnail nod
             reads: [],
             writes: [],
             config: {
-              skillKey: "",
+              actionKey: "",
               taskInstruction: "",
               modelSource: "global",
               model: "",
@@ -1318,7 +1318,7 @@ test("buildNodeCardViewModel projects subgraph runtime status onto thumbnail nod
 
 test("buildNodeCardViewModel compacts subgraph thumbnails and includes condition branches", () => {
   const agentConfig = {
-    skillKey: "",
+    actionKey: "",
     taskInstruction: "",
     modelSource: "global" as const,
     model: "",
@@ -1484,7 +1484,7 @@ test("buildNodeCardViewModel derives unlimited loop label and selected skill", (
     reads: [{ state: "question", required: true }],
     writes: [{ state: "answer", mode: "replace" }],
     config: {
-      skillKey: "browser.search",
+      actionKey: "browser.search",
       taskInstruction: "",
       modelSource: "override",
       model: "gpt-5.4",
@@ -1510,7 +1510,7 @@ test("buildNodeCardViewModel presents xhigh thinking as Extra High", () => {
     reads: [],
     writes: [],
     config: {
-      skillKey: "",
+      actionKey: "",
       taskInstruction: "",
       modelSource: "override",
       model: "gpt-5.5",

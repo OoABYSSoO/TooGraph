@@ -86,7 +86,7 @@ test("appendRunActivityEvent appends low-level activity events", () => {
       summary: "Action 'web_search' succeeded.",
       node_id: "execute_capability",
       status: "succeeded",
-      detail: { skill_key: "web_search" },
+      detail: { action_key: "web_search" },
       created_at: "2026-05-03T01:00:02Z",
     },
   });
@@ -215,7 +215,7 @@ test("buildRunActivityEntriesFromRun replays stored low-level activity events", 
           kind: "action_invocation",
           summary: "Action 'web_search' succeeded.",
           status: "succeeded",
-          detail: { skill_key: "web_search" },
+          detail: { action_key: "web_search" },
           sequence: 1,
           created_at: "2026-05-03T01:00:02Z",
         },
@@ -245,9 +245,9 @@ test("buildRunActivityEntriesFromRun replays file write activity summaries", () 
         {
           node_id: "execute_capability",
           kind: "file_write",
-          summary: "Editing skill/user/demo/SKILL.md +3 -0",
+          summary: "Editing action/user/demo/ACTION.md +3 -0",
           status: "succeeded",
-          detail: { path: "skill/user/demo/SKILL.md", added: 3, removed: 0 },
+          detail: { path: "action/user/demo/ACTION.md", added: 3, removed: 0 },
           sequence: 1,
           created_at: "2026-05-12T01:00:00Z",
         },
@@ -258,7 +258,7 @@ test("buildRunActivityEntriesFromRun replays file write activity summaries", () 
 
   assert.deepEqual(
     buildRunActivityEntriesFromRun(run).map((entry) => ({ title: entry.title, nodeId: entry.nodeId })),
-    [{ title: "Editing skill/user/demo/SKILL.md +3 -0", nodeId: "execute_capability" }],
+    [{ title: "Editing action/user/demo/ACTION.md +3 -0", nodeId: "execute_capability" }],
   );
 });
 

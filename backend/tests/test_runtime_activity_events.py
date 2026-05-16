@@ -117,9 +117,9 @@ class RuntimeActivityEventsTests(unittest.TestCase):
             raw_events=[
                 {
                     "kind": "file_write",
-                    "summary": "Editing skill/user/demo/SKILL.md +3 -0",
+                    "summary": "Editing action/user/demo/ACTION.md +3 -0",
                     "status": "succeeded",
-                    "detail": {"path": "skill/user/demo/SKILL.md", "added": 3, "removed": 0},
+                    "detail": {"path": "action/user/demo/ACTION.md", "added": 3, "removed": 0},
                 },
                 {"summary": "missing kind"},
                 "not an event",
@@ -133,10 +133,10 @@ class RuntimeActivityEventsTests(unittest.TestCase):
         event = events[0]
         self.assertEqual(event["kind"], "file_write")
         self.assertEqual(event["node_id"], "execute_capability")
-        self.assertEqual(event["summary"], "Editing skill/user/demo/SKILL.md +3 -0")
+        self.assertEqual(event["summary"], "Editing action/user/demo/ACTION.md +3 -0")
         self.assertEqual(event["detail"]["action_key"], "local_workspace_executor")
         self.assertEqual(event["detail"]["binding_source"], "capability_state")
-        self.assertEqual(event["detail"]["path"], "skill/user/demo/SKILL.md")
+        self.assertEqual(event["detail"]["path"], "action/user/demo/ACTION.md")
         self.assertEqual(event["detail"]["added"], 3)
         self.assertEqual(event["detail"]["removed"], 0)
         self.assertEqual(published[0][1], "activity.event")

@@ -16,7 +16,7 @@ from app.skills.registry import get_skill_registry
 
 
 WEB_SEARCH_AFTER_LLM_PATH = (
-    Path(__file__).resolve().parents[2] / "skill" / "official" / "web_search" / "after_llm.py"
+    Path(__file__).resolve().parents[2] / "action" / "official" / "web_search" / "after_llm.py"
 )
 
 

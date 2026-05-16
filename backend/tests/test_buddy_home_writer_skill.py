@@ -15,8 +15,8 @@ from app.skills.definitions import _parse_native_skill_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-WRITER_SKILL_DIR = REPO_ROOT / "skill" / "official" / "buddy_home_writer"
-WRITER_MANIFEST_PATH = WRITER_SKILL_DIR / "skill.json"
+WRITER_SKILL_DIR = REPO_ROOT / "action" / "official" / "buddy_home_writer"
+WRITER_MANIFEST_PATH = WRITER_SKILL_DIR / "action.json"
 WRITER_AFTER_LLM_PATH = WRITER_SKILL_DIR / "after_llm.py"
 
 

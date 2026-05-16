@@ -126,8 +126,8 @@ def _iter_skill_dirs(root: Path) -> list[Path]:
 
 
 def _parse_skill_dir(skill_dir: Path, source_scope: SkillSourceScope) -> SkillDefinitionRecord | None:
-    manifest = skill_dir / "skill.json"
-    skill_file = skill_dir / "SKILL.md"
+    manifest = skill_dir / "action.json"
+    skill_file = skill_dir / "ACTION.md"
     if manifest.is_file():
         return _parse_native_skill_manifest(manifest, source_scope)
     if skill_file.is_file():
@@ -141,7 +141,7 @@ def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> 
     _reject_legacy_label(payload)
     _reject_legacy_llm_fields(payload)
     _reject_legacy_skill_protocol_fields(payload)
-    skill_key = str(payload.get("skillKey") or payload.get("skill_key") or path.parent.name)
+    skill_key = str(payload.get("actionKey") or payload.get("action_key") or payload.get("skillKey") or payload.get("skill_key") or path.parent.name)
     name = str(payload.get("name") or skill_key)
     definition = SkillDefinition(
         skillKey=skill_key,
@@ -179,7 +179,7 @@ def _parse_skill_file(path: Path, source_scope: SkillSourceScope) -> SkillDefini
     _reject_legacy_llm_fields(toograph)
     _reject_legacy_skill_protocol_fields(toograph)
 
-    skill_key = str(toograph.get("skill_key") or payload.get("name") or path.stem)
+    skill_key = str(toograph.get("action_key") or toograph.get("skill_key") or payload.get("name") or path.stem)
     name = str(payload.get("name") or toograph.get("name") or skill_key)
     description = str(payload.get("description") or "").strip()
 

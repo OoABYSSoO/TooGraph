@@ -15,7 +15,7 @@ from app.skills.definitions import _parse_native_skill_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SESSION_RECALL_SKILL_DIR = REPO_ROOT / "skill" / "official" / "buddy_session_recall"
+SESSION_RECALL_SKILL_DIR = REPO_ROOT / "action" / "official" / "buddy_session_recall"
 
 
 def _load_skill_module():
@@ -33,7 +33,7 @@ def _load_skill_module():
 class BuddySessionRecallSkillTests(unittest.TestCase):
     def test_manifest_exposes_browse_discover_scroll_contract(self) -> None:
         definition = _parse_native_skill_manifest(
-            SESSION_RECALL_SKILL_DIR / "skill.json",
+            SESSION_RECALL_SKILL_DIR / "action.json",
             SkillSourceScope.OFFICIAL,
         ).definition
 

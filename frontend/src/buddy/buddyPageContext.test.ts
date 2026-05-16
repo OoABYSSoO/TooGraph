@@ -33,8 +33,8 @@ function createGraph(): GraphPayload {
         reads: [{ state: "state_1", required: true }],
         writes: [{ state: "state_2", mode: "replace" }],
         config: {
-          skillKey: "video_understanding",
-          skillBindings: [],
+          actionKey: "video_understanding",
+          actionBindings: [],
           taskInstruction: "",
           modelSource: "global",
           model: "",

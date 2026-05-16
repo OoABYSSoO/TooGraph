@@ -4,7 +4,7 @@ import test from "node:test";
 import type { PresetDocument } from "@/types/node-system";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { SettingsPayload } from "@/types/settings";
-import type { SkillDefinition } from "@/types/skills";
+import type { SkillDefinition } from "@/types/actions";
 
 import { useWorkspaceResourceController } from "./useWorkspaceResourceController.ts";
 
@@ -24,7 +24,7 @@ function createPreset(): PresetDocument {
         reads: [],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -88,7 +88,7 @@ function createSkillDefinition(): SkillDefinition {
     name: "Skill",
     description: "",
     llmInstruction: "",
-    schemaVersion: "toograph.skill/v1",
+    schemaVersion: "toograph.action/v1",
     version: "1",
     capabilityPolicy: {
       default: { selectable: true, requiresApproval: false },

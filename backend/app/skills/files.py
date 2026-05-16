@@ -133,9 +133,9 @@ def _relative_posix(root: Path, path: Path) -> str:
 
 
 def _detect_language(path: Path) -> str:
-    if path.name == "SKILL.md":
+    if path.name == "ACTION.md":
         return "markdown"
-    if path.name == "skill.json":
+    if path.name == "action.json":
         return "json"
     return LANGUAGE_BY_SUFFIX.get(path.suffix.lower(), "")
 
@@ -143,4 +143,4 @@ def _detect_language(path: Path) -> str:
 def _is_previewable(path: Path, size: int) -> bool:
     if size > MAX_PREVIEW_BYTES:
         return False
-    return _detect_language(path) != "" or path.name in {"SKILL.md", "skill.json"}
+    return _detect_language(path) != "" or path.name in {"ACTION.md", "action.json"}

@@ -139,7 +139,7 @@
                 </div>
               </section>
               <section>
-                <h4>{{ t("presets.skills") }}</h4>
+                <h4>{{ t("presets.requiredActions") }}</h4>
                 <div class="presets-page__badges">
                   <span v-for="skill in presetSkills(preset)" :key="skill">{{ skill }}</span>
                   <span v-if="presetSkills(preset).length === 0">{{ t("common.none") }}</span>

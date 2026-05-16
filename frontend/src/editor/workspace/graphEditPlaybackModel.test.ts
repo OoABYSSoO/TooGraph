@@ -44,7 +44,7 @@ function documentWithExistingNodes(): GraphPayload {
         reads: [],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "旧任务",
           modelSource: "global",
           model: "",
@@ -630,10 +630,10 @@ test("graph edit playback supports movement, state updates, skill selection, del
         color: "#0ea5e9",
       },
       {
-        kind: "select_skill",
+        kind: "select_action",
         nodeRef: "agent_1",
-        skillKey: "local/file_writer",
-        taskInstruction: "调用选中的 Skill 写入受控文件。",
+        actionKey: "local/file_writer",
+        taskInstruction: "调用选中的 Action 写入受控文件。",
       },
       {
         kind: "delete_node",
@@ -650,7 +650,7 @@ test("graph edit playback supports movement, state updates, skill selection, del
   assert.deepEqual(plan.graphCommands.map((command) => command.kind), [
     "move_node",
     "update_state",
-    "select_skill",
+    "select_action",
     "delete_node",
     "restore_node",
   ]);
@@ -665,13 +665,13 @@ test("graph edit playback supports movement, state updates, skill selection, del
   assert.deepEqual(result.appliedCommands.map((command) => command.kind), [
     "move_node",
     "update_state",
-    "select_skill",
+    "select_action",
     "delete_node",
     "restore_node",
   ]);
   assert.deepEqual(agent?.ui.position, { x: 520, y: 180 });
-  assert.equal(agent?.kind === "agent" ? agent.config.skillKey : "", "local/file_writer");
-  assert.equal(agent?.kind === "agent" ? agent.config.taskInstruction : "", "调用选中的 Skill 写入受控文件。");
+  assert.equal(agent?.kind === "agent" ? agent.config.actionKey : "", "local/file_writer");
+  assert.equal(agent?.kind === "agent" ? agent.config.taskInstruction : "", "调用选中的 Action 写入受控文件。");
   assert.deepEqual(result.document.state_schema.user_request, {
     name: "规范化请求",
     description: "可由后续节点直接处理的结构化请求。",

@@ -13,8 +13,8 @@ from app.skills.definitions import _parse_native_skill_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-BUILDER_SKILL_DIR = REPO_ROOT / "skill" / "official" / "toograph_skill_builder"
-BUILDER_MANIFEST_PATH = BUILDER_SKILL_DIR / "skill.json"
+BUILDER_SKILL_DIR = REPO_ROOT / "action" / "official" / "toograph_skill_builder"
+BUILDER_MANIFEST_PATH = BUILDER_SKILL_DIR / "action.json"
 BUILDER_BEFORE_LLM_PATH = BUILDER_SKILL_DIR / "before_llm.py"
 BUILDER_AFTER_LLM_PATH = BUILDER_SKILL_DIR / "after_llm.py"
 
@@ -55,9 +55,9 @@ class TooGraphSkillBuilderSkillTests(unittest.TestCase):
         payload = _run_skill_script(BUILDER_BEFORE_LLM_PATH, {"graph_state": {"requirement": "Create a skill."}})
 
         context = str(payload.get("context") or "")
-        self.assertIn("TooGraph Skill 编写指南", context)
-        self.assertIn("skill.json", context)
-        self.assertIn("SKILL.md", context)
+        self.assertIn("TooGraph Action 编写指南", context)
+        self.assertIn("action.json", context)
+        self.assertIn("ACTION.md", context)
         self.assertIn("requirements.txt", context)
         self.assertIn("before_llm.py", context)
         self.assertIn("after_llm.py", context)
@@ -65,8 +65,8 @@ class TooGraphSkillBuilderSkillTests(unittest.TestCase):
 
     def test_after_llm_returns_exactly_the_skill_identity_and_file_content_fields(self) -> None:
         skill_json = {
-            "schemaVersion": "toograph.skill/v1",
-            "skillKey": "tone_rewriter",
+            "schemaVersion": "toograph.action/v1",
+            "actionKey": "tone_rewriter",
             "name": "Tone Rewriter",
             "description": "当用户需要改写文本语气时选择此技能。",
             "llmInstruction": "Rewrite the text.",
@@ -116,7 +116,7 @@ class TooGraphSkillBuilderSkillTests(unittest.TestCase):
             {
                 "skill_key": "safe_generated_skill",
                 "skill_json": {
-                    "schemaVersion": "toograph.skill/v1",
+                    "schemaVersion": "toograph.action/v1",
                     "skillKey": "safe_generated_skill",
                     "name": "Safe Generated Skill",
                     "description": "Generate safe output.",
@@ -150,8 +150,8 @@ class TooGraphSkillBuilderSkillTests(unittest.TestCase):
         self.assertEqual(
             payload["skill_json"],
             {
-                "schemaVersion": "toograph.skill/v1",
-                "skillKey": "safe_generated_skill",
+                "schemaVersion": "toograph.action/v1",
+                "actionKey": "safe_generated_skill",
                 "name": "Safe Generated Skill",
                 "description": "Generate safe output.",
                 "stateInputSchema": [

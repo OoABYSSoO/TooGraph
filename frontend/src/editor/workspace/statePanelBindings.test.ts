@@ -36,7 +36,7 @@ function buildDocument(): GraphPayload {
         reads: [{ state: "question", required: true }],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -58,7 +58,7 @@ function buildDocument(): GraphPayload {
           retryCount: 3,
           continueOnError: false,
           defaultWorker: {
-            skillKey: "",
+            actionKey: "",
             taskInstruction: "",
             modelSource: "global",
             model: "",
@@ -214,14 +214,14 @@ test("removeStateBindingFromDocument does not remove managed skill input reads",
   const agent = document.nodes.answer_helper;
   assert.equal(agent.kind, "agent");
   if (agent.kind === "agent") {
-    agent.config.skillKey = "web_search";
+    agent.config.actionKey = "web_search";
     agent.reads = [
       {
         state: "question",
         required: true,
         binding: {
-          kind: "skill_input",
-          skillKey: "web_search",
+          kind: "action_input",
+          actionKey: "web_search",
           fieldKey: "user_question",
           managed: true,
         },
@@ -237,8 +237,8 @@ test("removeStateBindingFromDocument does not remove managed skill input reads",
       state: "question",
       required: true,
       binding: {
-        kind: "skill_input",
-        skillKey: "web_search",
+        kind: "action_input",
+        actionKey: "web_search",
         fieldKey: "user_question",
         managed: true,
       },

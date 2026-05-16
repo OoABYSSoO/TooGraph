@@ -1,4 +1,4 @@
-import { uploadSkillArtifactFile } from "../../api/skillArtifacts.ts";
+import { uploadSkillArtifactFile } from "../../api/capabilityArtifacts.ts";
 import { createUploadedAssetEnvelope, type UploadedAssetUploadResult } from "../nodes/uploadedAssetModel.ts";
 import {
   applyNodeCreationResult,

@@ -28,7 +28,7 @@ test("resolvePrimaryNavigationSection keeps graph editor detail routes inside th
   assert.equal(resolvePrimaryNavigationSection("/buddy"), "buddy");
   assert.equal(resolvePrimaryNavigationSection("/buddy/memories"), "buddy");
   assert.equal(resolvePrimaryNavigationSection("/presets"), "presets");
-  assert.equal(resolvePrimaryNavigationSection("/skills"), "skills");
+  assert.equal(resolvePrimaryNavigationSection("/actions"), "actions");
   assert.equal(resolvePrimaryNavigationSection("/models"), "models");
   assert.equal(resolvePrimaryNavigationSection("/model-logs"), "modelLogs");
   assert.equal(resolvePrimaryNavigationSection("/runs"), "runs");

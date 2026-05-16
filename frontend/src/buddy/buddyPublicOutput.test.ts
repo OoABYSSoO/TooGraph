@@ -22,8 +22,8 @@ test("buildBuddyPublicOutputBindings scans only root output nodes", () => {
         reads: [],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skillKey: "",
-          skillBindings: [],
+          actionKey: "",
+          actionBindings: [],
           taskInstruction: "",
           modelSource: "global",
           model: "",

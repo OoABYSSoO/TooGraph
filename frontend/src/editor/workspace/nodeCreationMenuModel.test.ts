@@ -78,7 +78,7 @@ const presets: PresetDocument[] = [
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -124,7 +124,7 @@ const presets: PresetDocument[] = [
         ],
         writes: [],
         config: {
-          skillKey: "web_search",
+          actionKey: "web_search",
           taskInstruction: "",
           modelSource: "global",
           model: "",

@@ -14,8 +14,8 @@ from app.skills.definitions import _parse_native_skill_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ADAPTER_SKILL_DIR = REPO_ROOT / "skill" / "official" / "buddy_visible_subgraph_result_adapter"
-ADAPTER_MANIFEST_PATH = ADAPTER_SKILL_DIR / "skill.json"
+ADAPTER_SKILL_DIR = REPO_ROOT / "action" / "official" / "buddy_visible_subgraph_result_adapter"
+ADAPTER_MANIFEST_PATH = ADAPTER_SKILL_DIR / "action.json"
 ADAPTER_AFTER_LLM_PATH = ADAPTER_SKILL_DIR / "after_llm.py"
 
 

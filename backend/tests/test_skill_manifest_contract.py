@@ -11,17 +11,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.schemas.skills import SkillLlmNodeEligibility, SkillSourceScope
 from app.skills.definitions import _parse_native_skill_manifest
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 
 def _write_manifest(skill_dir: Path, payload: dict[str, object]) -> Path:
-    manifest = skill_dir / "skill.json"
+    manifest = skill_dir / "action.json"
     manifest.write_text(json.dumps(payload), encoding="utf-8")
     return manifest
 
 
 def _ready_manifest(skill_key: str) -> dict[str, object]:
     return {
-        "schemaVersion": "toograph.skill/v1",
-        "skillKey": skill_key,
+        "schemaVersion": "toograph.action/v1",
+        "actionKey": skill_key,
         "name": skill_key.replace("_", " ").title(),
         "llmInstruction": f"Use {skill_key} only when it is explicitly bound to the LLM node.",
         "llmOutputSchema": [
@@ -35,6 +37,18 @@ def _ready_manifest(skill_key: str) -> dict[str, object]:
 
 
 class SkillManifestContractTests(unittest.TestCase):
+    def test_official_action_packages_use_action_file_names(self) -> None:
+        official_root = REPO_ROOT / "action" / "official"
+        self.assertTrue(official_root.is_dir())
+        action_dirs = sorted(path for path in official_root.iterdir() if path.is_dir())
+        self.assertGreater(len(action_dirs), 0)
+        for action_dir in action_dirs:
+            with self.subTest(action=action_dir.name):
+                self.assertTrue((action_dir / "action.json").is_file())
+                self.assertTrue((action_dir / "ACTION.md").is_file())
+                self.assertFalse((action_dir / "skill.json").exists())
+                self.assertFalse((action_dir / "SKILL.md").exists())
+
     def test_skill_definition_payload_uses_default_local_policy_shape_and_omits_legacy_targets(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             skill_dir = Path(temp_dir) / "summarize_text"
@@ -106,7 +120,7 @@ class SkillManifestContractTests(unittest.TestCase):
 
             definition = _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED).definition
 
-        self.assertEqual(definition.schema_version, "toograph.skill/v1")
+        self.assertEqual(definition.schema_version, "toograph.action/v1")
         self.assertEqual(definition.runtime.type, "python")
         self.assertEqual(definition.runtime.entrypoint, "run.py")
         self.assertEqual(definition.runtime.timeout_seconds, 91)
@@ -273,8 +287,8 @@ class SkillManifestContractTests(unittest.TestCase):
             manifest = _write_manifest(
                 skill_dir,
                 {
-                    "schemaVersion": "toograph.skill/v1",
-                    "skillKey": "legacy_agent_skill",
+                    "schemaVersion": "toograph.action/v1",
+                    "actionKey": "legacy_agent_skill",
                     "name": "Legacy Agent Skill",
                 },
             )
@@ -285,7 +299,7 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertIn("Skill manifest is missing a script runtime entrypoint.", definition.llm_node_blockers)
 
     def test_web_search_manifest_is_ready_without_local_policy_fields_and_with_network_permissions(self) -> None:
-        manifest = Path(__file__).resolve().parents[2] / "skill" / "official" / "web_search" / "skill.json"
+        manifest = Path(__file__).resolve().parents[2] / "action" / "official" / "web_search" / "action.json"
 
         definition = _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED).definition
         serialized = definition.model_dump(by_alias=True)

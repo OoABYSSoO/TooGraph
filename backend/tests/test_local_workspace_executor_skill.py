@@ -15,8 +15,8 @@ from app.skills.definitions import _parse_native_skill_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EXECUTOR_SKILL_DIR = REPO_ROOT / "skill" / "official" / "local_workspace_executor"
-EXECUTOR_MANIFEST_PATH = EXECUTOR_SKILL_DIR / "skill.json"
+EXECUTOR_SKILL_DIR = REPO_ROOT / "action" / "official" / "local_workspace_executor"
+EXECUTOR_MANIFEST_PATH = EXECUTOR_SKILL_DIR / "action.json"
 EXECUTOR_BEFORE_LLM_PATH = EXECUTOR_SKILL_DIR / "before_llm.py"
 EXECUTOR_AFTER_LLM_PATH = EXECUTOR_SKILL_DIR / "after_llm.py"
 

@@ -27,7 +27,7 @@ function graphDocument(name: string, graphId: string | null = null): GraphPayloa
         reads: [],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -488,12 +488,12 @@ test("useWorkspaceGraphPersistenceController preserves agent runtime and capabil
   const harness = createHarness();
   const document = graphDocument("Runtime Config");
   const config = agentConfig(document);
-  config.skillKey = "web_search";
-  config.skillBindings = [{ skillKey: "web_search", outputMapping: { result: "answer" } }];
+  config.actionKey = "web_search";
+  config.actionBindings = [{ actionKey: "web_search", outputMapping: { result: "answer" } }];
   config.suspendedFreeWrites = [{ state: "draft", mode: "append" }];
-  config.skillInstructionBlocks = {
+  config.actionInstructionBlocks = {
     web_search: {
-      skillKey: "web_search",
+      actionKey: "web_search",
       title: "搜索说明",
       content: "只搜索公开网页。",
       source: "node.override",

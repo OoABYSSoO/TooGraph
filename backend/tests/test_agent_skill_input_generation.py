@@ -118,7 +118,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                         name="Web Search",
                         llmInstruction="Generate a query.",
                         llmOutputSchema=[SkillIoField(key="query", name="Query", valueType="text")],
-                        sourcePath=str(skill_dir / "skill.json"),
+                        sourcePath=str(skill_dir / "action.json"),
                     )
                 },
             )
@@ -154,7 +154,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                         skillKey="toograph_page_operator",
                         name="TooGraph Page Operator",
                         llmOutputSchema=[SkillIoField(key="commands", name="Commands", valueType="json")],
-                        sourcePath=str(skill_dir / "skill.json"),
+                        sourcePath=str(skill_dir / "action.json"),
                     )
                 },
                 runtime_context={"page_path": "/editor"},
@@ -198,7 +198,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                         skillKey="local_workspace_executor",
                         name="Local Workspace Executor",
                         llmOutputSchema=[SkillIoField(key="path", name="Path", valueType="text")],
-                        sourcePath=str(skill_dir / "skill.json"),
+                        sourcePath=str(skill_dir / "action.json"),
                     )
                 },
                 node=node,
@@ -234,7 +234,7 @@ class AgentSkillInputGenerationTests(unittest.TestCase):
                             SkillIoField(key="capability", name="Capability", valueType="capability"),
                         ],
                         stateOutputSchema=[SkillIoField(key="capability", name="Capability", valueType="capability")],
-                        sourcePath=str(skill_dir / "skill.json"),
+                        sourcePath=str(skill_dir / "action.json"),
                         runtimeReady=True,
                         runtimeRegistered=True,
                     )

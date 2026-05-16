@@ -10,8 +10,8 @@ import {
 } from "../../lib/virtual-any-input.ts";
 import { normalizeInputBoundaryConfigType } from "../../lib/input-boundary.ts";
 import type { GraphNode, StateDefinition } from "../../types/node-system.ts";
-import type { SkillDefinition } from "../../types/skills.ts";
-import { resolveDisplayAgentSkillInstructionBlocks } from "./skillPickerModel.ts";
+import type { SkillDefinition } from "../../types/actions.ts";
+import { resolveDisplayAgentSkillInstructionBlocks } from "./actionPickerModel.ts";
 import { resolveNodeDisplayDescription, resolveNodeDisplayTitle } from "./nodeDefaultTextModel.ts";
 
 export type NodePortViewModel = {

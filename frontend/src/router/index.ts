@@ -12,7 +12,7 @@ const PresetsPage = () => import("@/pages/PresetsPage.vue");
 const RunDetailPage = () => import("@/pages/RunDetailPage.vue");
 const RunsPage = () => import("@/pages/RunsPage.vue");
 const SettingsPage = () => import("@/pages/SettingsPage.vue");
-const SkillsPage = () => import("@/pages/SkillsPage.vue");
+const ActionsPage = () => import("@/pages/ActionsPage.vue");
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -27,7 +27,7 @@ export const router = createRouter({
     { path: "/evals", component: EvalsPage },
     { path: "/buddy", component: BuddyPage },
     { path: "/presets", component: PresetsPage },
-    { path: "/skills", component: SkillsPage },
+    { path: "/actions", component: ActionsPage },
     { path: "/models", component: ModelProvidersPage },
     { path: "/model-logs", component: ModelLogsPage },
     { path: "/runs", component: RunsPage },

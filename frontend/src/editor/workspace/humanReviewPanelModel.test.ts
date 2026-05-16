@@ -62,7 +62,7 @@ function createDocument(): GraphPayload {
         reads: [{ state: "question", required: true }],
         writes: [{ state: "draft", mode: "replace" }],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -82,7 +82,7 @@ function createDocument(): GraphPayload {
         ],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -229,7 +229,7 @@ test("buildHumanReviewPanelModel extracts pending permission approval details", 
       skill_key: "local_workspace_executor",
       skill_name: "Local Workspace Executor",
       permissions: ["file_write", "subprocess"],
-      input_preview: '{\n  "path": "skill/user/demo/SKILL.md"\n}',
+      input_preview: '{\n  "path": "action/user/demo/ACTION.md"\n}',
       reason: "Skill declares risky permissions.",
     },
   };
@@ -239,7 +239,7 @@ test("buildHumanReviewPanelModel extracts pending permission approval details", 
   assert.equal(panel.permissionApproval?.skillKey, "local_workspace_executor");
   assert.equal(panel.permissionApproval?.skillName, "Local Workspace Executor");
   assert.deepEqual(panel.permissionApproval?.permissions, ["file_write", "subprocess"]);
-  assert.equal(panel.permissionApproval?.inputPreview, '{\n  "path": "skill/user/demo/SKILL.md"\n}');
+  assert.equal(panel.permissionApproval?.inputPreview, '{\n  "path": "action/user/demo/ACTION.md"\n}');
   assert.equal(panel.summaryText, "Local Workspace Executor 需要确认：file_write、subprocess");
 });
 
@@ -283,7 +283,7 @@ test("buildHumanReviewPanelModel extracts permission approval from scoped subgra
             reads: [{ state: "selected_capability", required: true }],
             writes: [{ state: "dynamic_result", mode: "replace" }],
             config: {
-              skillKey: "",
+              actionKey: "",
               taskInstruction: "",
               modelSource: "global",
               model: "",
@@ -384,7 +384,7 @@ test("buildHumanReviewPanelModel renders an inner subgraph breakpoint against th
                   { state: "manual_feedback", required: true },
                 ],
                 writes: [],
-                config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+                config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
               },
             },
             edges: [{ source: "inner_input", target: "inner_review" }],
@@ -481,7 +481,7 @@ test("buildHumanReviewPanelModel renders a dynamic subgraph breakpoint from the 
     ],
     writes: [{ state: "dynamic_result", mode: "replace" }],
     config: {
-      skillKey: "",
+      actionKey: "",
       taskInstruction: "",
       modelSource: "global",
       model: "",
@@ -565,7 +565,7 @@ test("buildHumanReviewPanelModel renders a dynamic subgraph breakpoint from the 
               ui: { position: { x: 0, y: 0 } },
               reads: [{ state: "final_reply", required: true }],
               writes: [{ state: "final_reply", mode: "replace" }],
-              config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+              config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
             },
             inner_output: {
               kind: "agent",
@@ -577,7 +577,7 @@ test("buildHumanReviewPanelModel renders a dynamic subgraph breakpoint from the 
                 { state: "approval_note", required: true },
               ],
               writes: [],
-              config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+              config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
             },
           },
           edges: [{ source: "inner_agent", target: "inner_output" }],
@@ -638,7 +638,7 @@ test("buildHumanReviewPanelModel restores buddy clarification pause from run met
                 ui: { position: { x: -240, y: 0 } },
                 reads: [{ state: "user_message", required: true }],
                 writes: [{ state: "request_understanding", mode: "replace" }],
-                config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+                config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
               },
               ask_clarification: {
                 kind: "agent",
@@ -650,7 +650,7 @@ test("buildHumanReviewPanelModel restores buddy clarification pause from run met
                   { state: "request_understanding", required: true },
                 ],
                 writes: [{ state: "clarification_prompt", mode: "replace" }],
-                config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+                config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
               },
               merge_clarification: {
                 kind: "agent",
@@ -663,7 +663,7 @@ test("buildHumanReviewPanelModel restores buddy clarification pause from run met
                   { state: "clarification_answer", required: true },
                 ],
                 writes: [{ state: "request_understanding", mode: "replace" }],
-                config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+                config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
               },
             },
             edges: [
@@ -857,7 +857,7 @@ function createBranchingDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [{ state: "question", required: true }],
         writes: [{ state: "draft", mode: "replace" }],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       score_gate: {
         kind: "condition",
@@ -878,7 +878,7 @@ function createBranchingDocument(): GraphPayload {
           { state: "branch_context", mode: "replace" },
           { state: "pass_only_note", mode: "replace" },
         ],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       branch_writer_retry: {
         kind: "agent",
@@ -890,7 +890,7 @@ function createBranchingDocument(): GraphPayload {
           { state: "branch_context", mode: "replace" },
           { state: "retry_only_note", mode: "replace" },
         ],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       revision_writer: {
         kind: "agent",
@@ -905,7 +905,7 @@ function createBranchingDocument(): GraphPayload {
           { state: "retry_only_note", required: true },
         ],
         writes: [],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       followup_writer: {
         kind: "agent",
@@ -914,7 +914,7 @@ function createBranchingDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [{ state: "approval_note", required: true }],
         writes: [],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
     },
     edges: [
@@ -1015,7 +1015,7 @@ function createPreNodeReviewDocument(): GraphPayload {
           { state: "manual_feedback", required: true },
         ],
         writes: [],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       review_entry: {
         kind: "agent",
@@ -1024,7 +1024,7 @@ function createPreNodeReviewDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [{ state: "question", required: true }],
         writes: [],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
     },
     edges: [
@@ -1067,7 +1067,7 @@ function createLoopWithoutWriterDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [{ state: "loop_note", required: true }],
         writes: [],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       loop_body: {
         kind: "agent",
@@ -1076,7 +1076,7 @@ function createLoopWithoutWriterDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [{ state: "loop_note", required: true }],
         writes: [],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
     },
     edges: [
@@ -1129,7 +1129,7 @@ function createSharedUsagePriorityDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [],
         writes: [],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       consumer_one: {
         kind: "agent",
@@ -1141,7 +1141,7 @@ function createSharedUsagePriorityDocument(): GraphPayload {
           { state: "zeta_shared", required: true },
         ],
         writes: [],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       consumer_two: {
         kind: "agent",
@@ -1150,7 +1150,7 @@ function createSharedUsagePriorityDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [{ state: "zeta_shared", required: true }],
         writes: [],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
     },
     edges: [
@@ -1205,7 +1205,7 @@ function createOffWindowJoinDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [],
         writes: [],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       side_writer: {
         kind: "agent",
@@ -1214,7 +1214,7 @@ function createOffWindowJoinDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [],
         writes: [{ state: "auto_note", mode: "replace" }],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
       join: {
         kind: "agent",
@@ -1223,7 +1223,7 @@ function createOffWindowJoinDocument(): GraphPayload {
         ui: { position: { x: 0, y: 0 } },
         reads: [{ state: "auto_note", required: true }],
         writes: [],
-        config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+        config: { actionKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
       },
     },
     edges: [

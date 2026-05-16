@@ -21,7 +21,7 @@ const conditionNodeBodySource = readFileSync(resolve(currentDirectory, "Conditio
 const topActionsSource = readFileSync(resolve(currentDirectory, "NodeCardTopActions.vue"), "utf8").replace(/\r\n/g, "\n");
 const primaryStatePortSource = readFileSync(resolve(currentDirectory, "PrimaryStatePort.vue"), "utf8").replace(/\r\n/g, "\n");
 const floatingStatePortPillSource = readFileSync(resolve(currentDirectory, "FloatingStatePortPill.vue"), "utf8").replace(/\r\n/g, "\n");
-const agentSkillPickerSource = readFileSync(resolve(currentDirectory, "AgentSkillPicker.vue"), "utf8").replace(/\r\n/g, "\n");
+const agentSkillPickerSource = readFileSync(resolve(currentDirectory, "AgentActionPicker.vue"), "utf8").replace(/\r\n/g, "\n");
 const agentRuntimeControlsSource = readFileSync(resolve(currentDirectory, "AgentRuntimeControls.vue"), "utf8").replace(/\r\n/g, "\n");
 const statePortListSource = readFileSync(resolve(currentDirectory, "StatePortList.vue"), "utf8").replace(/\r\n/g, "\n");
 const portListSurfaceSource = `${statePortListSource}\n${conditionNodeBodySource}\n${primaryStatePortSource}\n${floatingStatePortPillSource}`;
@@ -91,7 +91,7 @@ test("BatchNodeBody renders Default LLM mode through the LLM prompt and runtime 
   assert.match(batchNodeBodySource, /const isDefaultWorker = computed\(\(\) => props\.body\.workerValue === "default_llm"\);/);
   assert.match(batchNodeBodySource, /<AgentRuntimeControls[\s\S]*v-if="isDefaultWorker"[\s\S]*:model-value="modelValue"[\s\S]*:thinking-mode-value="thinkingModeValue"[\s\S]*@update:model-value="emit\('update:model-value', \$event\)"/);
   assert.match(batchNodeBodySource, /<div v-if="isDefaultWorker" class="node-card__surface node-card__prompt-surface">[\s\S]*<textarea[\s\S]*:value="body\.taskInstruction"[\s\S]*:placeholder="t\('nodeCard\.nodePromptPlaceholder'\)"[\s\S]*@input="emit\('task-input', \$event\)"/);
-  assert.doesNotMatch(batchNodeBodySource, /<AgentSkillPicker/);
+  assert.doesNotMatch(batchNodeBodySource, /<AgentActionPicker/);
 });
 
 test("BatchNodeBody uses the shared select wrapper for worker selection", () => {
@@ -551,15 +551,15 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.ok(agentSectionMatch, "expected to find the LLM node section");
   const agentSection = agentSectionMatch[0];
 
-  assert.match(agentNodeBodySource, /import AgentSkillPicker from "\.\/AgentSkillPicker\.vue";/);
-  assert.match(agentNodeBodySource, /<AgentSkillPicker[\s\S]*:selected-skill-key="selectedSkillKey"[\s\S]*:available-skill-definitions="availableSkillDefinitions"[\s\S]*:breakpoint-enabled="breakpointEnabled"[\s\S]*@update:selected-skill="emit\('select-skill', \$event\)"[\s\S]*@update:breakpoint-enabled="emit\('update:breakpoint-enabled', \$event\)"/);
+  assert.match(agentNodeBodySource, /import AgentActionPicker from "\.\/AgentActionPicker\.vue";/);
+  assert.match(agentNodeBodySource, /<AgentActionPicker[\s\S]*:selected-skill-key="selectedSkillKey"[\s\S]*:available-skill-definitions="availableSkillDefinitions"[\s\S]*:breakpoint-enabled="breakpointEnabled"[\s\S]*@update:selected-skill="emit\('select-skill', \$event\)"[\s\S]*@update:breakpoint-enabled="emit\('update:breakpoint-enabled', \$event\)"/);
   assert.match(agentSection, /@select-skill="selectAgentSkill"/);
   assert.match(agentSkillPickerSource, /<ToographSelect[\s\S]*class="node-card__agent-skill-select"[\s\S]*:model-value="selectedSkillKey"[\s\S]*popper-class="node-card__agent-skill-popper"/);
   assert.match(agentSkillPickerSource, /class="node-card__agent-toggle-card node-card__agent-toggle-card--breakpoint"/);
-  assert.match(componentSource, /from "\.\/skillPickerModel";/);
+  assert.match(componentSource, /from "\.\/actionPickerModel";/);
   assert.match(componentSource, /resolveSelectAgentSkillPatch/);
-  assert.match(componentSource, /const selectedSkillKey = computed\(\(\) => props\.node\.kind === "agent" \? props\.node\.config\.skillKey\.trim\(\) : ""\);/);
-  assert.match(componentSource, /const patch = resolveSelectAgentSkillPatch\(\s*props\.node\.config\.skillKey,\s*skillKey,\s*props\.skillDefinitions,\s*props\.node\.config\.skillInstructionBlocks \?\? \{\},\s*\);/);
+  assert.match(componentSource, /const selectedSkillKey = computed\(\(\) => props\.node\.kind === "agent" \? props\.node\.config\.actionKey\.trim\(\) : ""\);/);
+  assert.match(componentSource, /const patch = resolveSelectAgentSkillPatch\(\s*props\.node\.config\.actionKey,\s*skillKey,\s*props\.skillDefinitions,\s*props\.node\.config\.actionInstructionBlocks \?\? \{\},\s*\);/);
   assert.match(componentSource, /function selectAgentSkill\(skillKey: string\) \{[\s\S]*if \(!patch\) \{[\s\S]*return;[\s\S]*\}[\s\S]*emitAgentConfigPatch\(patch\);/);
   assert.doesNotMatch(componentSource, /resolveAttachAgentSkillPatch/);
   assert.doesNotMatch(componentSource, /resolveRemoveAgentSkillPatch/);
@@ -650,7 +650,7 @@ test("NodeCard renders plus input and plus output as virtual agent state port ro
   assert.match(agentSection, /:ordered-output-ports="orderedAgentOutputPorts"/);
   assert.match(statePortListSource, /v-for="port in ports"/);
   assert.match(componentSource, /const shouldShowAgentCreateInputPort = computed\(\(\) => agentInputPorts\.value\.length === 0\);/);
-  assert.match(componentSource, /const isAgentOutputManagedBySkill = computed\(\(\) => props\.node\.kind === "agent" && props\.node\.config\.skillKey\.trim\(\)\.length > 0\);/);
+  assert.match(componentSource, /const isAgentOutputManagedBySkill = computed\(\(\) => props\.node\.kind === "agent" && props\.node\.config\.actionKey\.trim\(\)\.length > 0\);/);
   assert.match(componentSource, /import \{ isAgentOutputManagedByDynamicCapability \} from "@\/lib\/agent-capability-management";/);
   assert.match(componentSource, /const isAgentOutputManagedByCapability = computed\(\(\) =>[\s\S]*isAgentOutputManagedByDynamicCapability\(\{[\s\S]*nodeId: props\.nodeId,[\s\S]*node: props\.node,[\s\S]*stateSchema: props\.stateSchema,[\s\S]*\}\)/);
   assert.match(componentSource, /const shouldShowAgentCreateOutputPort = computed\([\s\S]*!isAgentOutputManagedBySkill\.value && !isAgentOutputManagedByCapability\.value && agentOutputPorts\.value\.length === 0/);

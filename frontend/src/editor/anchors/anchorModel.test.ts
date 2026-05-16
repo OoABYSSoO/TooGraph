@@ -16,7 +16,7 @@ test("buildAnchorModel creates flow and state anchors for LLM nodes", () => {
     reads: [{ state: "question", required: true }],
     writes: [{ state: "answer", mode: "replace" }],
     config: {
-      skillKey: "",
+      actionKey: "",
       taskInstruction: "请直接回答。",
       modelSource: "global",
       model: "",
@@ -79,7 +79,7 @@ test("buildAnchorModel exposes a virtual any state input for non-input nodes wit
     reads: [],
     writes: [],
     config: {
-      skillKey: "",
+      actionKey: "",
       taskInstruction: "",
       modelSource: "global",
       model: "",
@@ -131,7 +131,7 @@ test("buildAnchorModel exposes a virtual plus output for empty agent and input n
     reads: [{ state: "question", required: true }],
     writes: [],
     config: {
-      skillKey: "",
+      actionKey: "",
       taskInstruction: "",
       modelSource: "global",
       model: "",

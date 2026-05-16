@@ -563,10 +563,10 @@ import PrimaryStatePort from "./PrimaryStatePort.vue";
 import SubgraphNodeBody from "./SubgraphNodeBody.vue";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { AgentNode, BatchNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition, TemplateRecord } from "@/types/node-system";
-import type { SkillDefinition } from "@/types/skills";
+import type { SkillDefinition } from "@/types/actions";
 import type { RunNodeTiming } from "../workspace/runNodeTimingModel.ts";
 import { fetchLocalFolderTree, type LocalFolderTreeEntry } from "@/api/localInputSources";
-import { buildSkillArtifactFileUrl, uploadSkillArtifactFile } from "@/api/skillArtifacts";
+import { buildSkillArtifactFileUrl, uploadSkillArtifactFile } from "@/api/capabilityArtifacts";
 import { isAgentOutputManagedByDynamicCapability } from "@/lib/agent-capability-management";
 import { formatRunDuration, formatRunTokenUsageKTokens } from "@/lib/run-display-name";
 import {
@@ -628,7 +628,7 @@ import {
   listSelectableSkillDefinitions,
   resolveSkillInstructionOverridePatch,
   resolveSelectAgentSkillPatch,
-} from "./skillPickerModel";
+} from "./actionPickerModel";
 import {
   buildStateEditorDraftFromSchema,
   resolveStateEditorAnchorStateKey,

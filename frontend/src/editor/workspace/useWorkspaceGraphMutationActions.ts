@@ -39,7 +39,7 @@ import type {
   StateDefinition,
   TemplateRecord,
 } from "@/types/node-system";
-import type { SkillDefinition } from "@/types/skills";
+import type { SkillDefinition } from "@/types/actions";
 
 import { addStateBindingToDocument, removeStateBindingFromDocument } from "./statePanelBindings.ts";
 import {

@@ -22,8 +22,8 @@ function fiveNodeGraph(): GraphPayload {
     reads: [],
     writes: [{ state: stateKey, mode: "replace" as const }],
     config: {
-      skillKey: "",
-      skillBindings: [],
+      actionKey: "",
+      actionBindings: [],
       taskInstruction: "",
       modelSource: "global" as const,
       model: "",
@@ -178,8 +178,8 @@ test("reduceBuddyOutputTraceEvent keeps subgraph headers before indented inner r
             reads: [],
             writes: [],
             config: {
-              skillKey: "",
-              skillBindings: [],
+              actionKey: "",
+              actionBindings: [],
               taskInstruction: "",
               modelSource: "global",
               model: "",

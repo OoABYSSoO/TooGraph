@@ -241,10 +241,10 @@ const isManagedPort = computed(() => Boolean(props.port?.managedBySkill || props
 const canEditPort = computed(() => Boolean(props.port && !props.port.virtual && !isManagedPort.value));
 const managedPortTitle = computed(() => {
   if (props.port?.managedBySkill?.role === "input") {
-    return "Skill managed input";
+    return "Action managed input";
   }
   if (props.port?.managedBySkill?.role === "output") {
-    return "Skill managed output";
+    return "Action managed output";
   }
   return "Dynamic capability managed state";
 });

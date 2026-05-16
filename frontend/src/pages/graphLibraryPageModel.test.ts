@@ -26,7 +26,7 @@ const graphs: GraphDocument[] = [
         reads: [],
         writes: [],
         config: {
-          skillKey: "web_search",
+          actionKey: "web_search",
           taskInstruction: "Write.",
           modelSource: "global",
           model: "",
@@ -70,7 +70,7 @@ const templates: TemplateRecord[] = [
         valueProposition: "Turns source material into an auditable workflow package.",
         mockRun: "mock_data/sample.md",
       },
-      requiredSkills: ["buddy_session_recall", "web_search"],
+      requiredActions: ["buddy_session_recall", "web_search"],
       requiredPermissions: ["buddy_session_read", "network"],
       mockMode: { input: "examples/mock_input.json" },
       artifactContract: [
@@ -156,7 +156,7 @@ test("buildGraphLibraryItems exposes gallery metadata for template cards", () =>
 
   assert.equal(official?.galleryValue, "Turns source material into an auditable workflow package.");
   assert.equal(official?.targetUsersPreview, "Operators, Researchers");
-  assert.equal(official?.requiredSkillsPreview, "buddy_session_recall, web_search");
+  assert.equal(official?.requiredActionsPreview, "buddy_session_recall, web_search");
   assert.equal(official?.permissionsPreview, "buddy_session_read, network");
   assert.equal(official?.mockEntry, "examples/mock_input.json");
   assert.equal(official?.sampleOutput, "final_package.md +1");

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "toograph.action/v1",
+  "actionKey": "toograph_graph_template_reader",
+  "name": "图模板读取器",
+  "description": "读取 TooGraph 官方或用户图模板的 template.json，供模板改进工作流生成可审查草案。",
+  "llmInstruction": "你已绑定图模板读取器。只选择一个 target_template_id 或 template_id，并可选 source_scope 为 user 或 official。此 Skill 只读，不生成写入、审批或执行决策。",
+  "version": "0.1.0",
+  "timeoutSeconds": 30,
+  "permissions": [
+    "file_read"
+  ],
+  "stateInputSchema": [
+    {
+      "key": "target_template_id",
+      "name": "Target Template ID",
+      "valueType": "text",
+      "description": "需要读取的已有图模板 ID。"
+    }
+  ],
+  "llmOutputSchema": [
+    {
+      "key": "template_id",
+      "name": "Template ID",
+      "valueType": "text",
+      "description": "需要读取的图模板 ID。"
+    },
+    {
+      "key": "source_scope",
+      "name": "Source Scope",
+      "valueType": "text",
+      "description": "可选读取范围：user 或 official。为空时优先用户模板，再读官方模板。"
+    }
+  ],
+  "stateOutputSchema": [
+    {
+      "key": "success",
+      "name": "Success",
+      "valueType": "boolean",
+      "description": "是否成功读取模板。"
+    },
+    {
+      "key": "template_package",
+      "name": "Template Package",
+      "valueType": "json",
+      "description": "读取到的模板 JSON、来源和路径摘要。"
+    },
+    {
+      "key": "result",
+      "name": "Result",
+      "valueType": "markdown",
+      "description": "读取摘要或失败原因。"
+    }
+  ]
+}

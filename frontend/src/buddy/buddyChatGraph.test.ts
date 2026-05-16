@@ -115,8 +115,8 @@ function createTemplate(): TemplateRecord {
         ],
         writes: [{ state: "state_4", mode: "replace" }],
         config: {
-          skillKey: "graph_editor",
-          skillBindings: [{ skillKey: "graph_editor", enabled: true }],
+          actionKey: "graph_editor",
+          actionBindings: [{ actionKey: "graph_editor", enabled: true }],
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -205,8 +205,8 @@ function createAgenticTemplate(): TemplateRecord {
         reads: [],
         writes: [{ state: "state_16", mode: "replace" }],
         config: {
-          skillKey: "",
-          skillBindings: [],
+          actionKey: "",
+          actionBindings: [],
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -324,8 +324,8 @@ function createReviewTemplate(): TemplateRecord {
           { state: "memory_update_plan", mode: "replace" },
         ],
         config: {
-          skillKey: "",
-          skillBindings: [],
+          actionKey: "",
+          actionBindings: [],
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -349,10 +349,10 @@ function createReviewTemplate(): TemplateRecord {
           { state: "memory_write_result", mode: "replace" },
         ],
         config: {
-          skillKey: "buddy_home_writer",
-          skillBindings: [
+          actionKey: "buddy_home_writer",
+          actionBindings: [
             {
-              skillKey: "buddy_home_writer",
+              actionKey: "buddy_home_writer",
               outputMapping: {
                 success: "memory_write_success",
                 applied_commands: "applied_memory_commands",
@@ -419,7 +419,7 @@ function createActivityGraph() {
             reads: [],
             writes: [{ state: "state_10", mode: "replace" }],
             config: {
-              skillKey: "",
+              actionKey: "",
               taskInstruction: "",
               modelSource: "global",
               model: "",
@@ -453,7 +453,7 @@ function createActivityGraph() {
             reads: [],
             writes: [],
             config: {
-              skillKey: "toograph_capability_selector",
+              actionKey: "toograph_capability_selector",
               taskInstruction: "",
               modelSource: "global",
               model: "",
@@ -742,8 +742,8 @@ test("buildBuddyChatGraph injects only configured input-node bindings", () => {
   assert.equal(graph.metadata.buddy_permission_tier, undefined);
   assert.equal(graph.metadata.buddy_graph_patch_drafts_enabled, undefined);
   assertAgentNode(graph.nodes.buddy_reply_agent);
-  assert.equal(graph.nodes.buddy_reply_agent.config.skillKey, "graph_editor");
-  assert.deepEqual(graph.nodes.buddy_reply_agent.config.skillBindings, [{ skillKey: "graph_editor", enabled: true }]);
+  assert.equal(graph.nodes.buddy_reply_agent.config.actionKey, "graph_editor");
+  assert.deepEqual(graph.nodes.buddy_reply_agent.config.actionBindings, [{ actionKey: "graph_editor", enabled: true }]);
 });
 
 test("buildBuddyChatGraph marks ask-first mode without a blanket reply breakpoint", () => {

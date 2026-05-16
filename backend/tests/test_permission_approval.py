@@ -61,7 +61,7 @@ class PermissionApprovalTests(unittest.TestCase):
             skill_name="Local Workspace Executor",
             binding_source="capability_state",
             permissions=["file_write"],
-            skill_inputs={"operation": "write", "path": "skill/user/demo/SKILL.md"},
+            skill_inputs={"operation": "write", "path": "action/user/demo/ACTION.md"},
         )
         state = {
             "metadata": {
@@ -79,7 +79,7 @@ class PermissionApprovalTests(unittest.TestCase):
         )
 
         self.assertIsNotNone(consumed)
-        self.assertEqual(consumed["skill_inputs"], {"operation": "write", "path": "skill/user/demo/SKILL.md"})
+        self.assertEqual(consumed["skill_inputs"], {"operation": "write", "path": "action/user/demo/ACTION.md"})
         self.assertNotIn("pending_permission_approval", state["metadata"])
         self.assertEqual(state["permission_approvals"][0]["status"], "approved")
 

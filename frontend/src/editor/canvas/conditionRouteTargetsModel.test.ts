@@ -48,7 +48,7 @@ const document: GraphPayload = {
       reads: [],
       writes: [],
       config: {
-        skillKey: "",
+        actionKey: "",
         taskInstruction: "",
         modelSource: "global",
         model: "",

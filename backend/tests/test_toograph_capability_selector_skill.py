@@ -6,7 +6,7 @@ from pathlib import Path
 import unittest
 
 
-SELECTOR_SKILL_DIR = Path(__file__).resolve().parents[2] / "skill" / "official" / "toograph_capability_selector"
+SELECTOR_SKILL_DIR = Path(__file__).resolve().parents[2] / "action" / "official" / "toograph_capability_selector"
 SELECTOR_AFTER_LLM_PATH = SELECTOR_SKILL_DIR / "after_llm.py"
 FIXED_PAGE_OPERATION_CAPABILITY = {
     "kind": "subgraph",
@@ -25,9 +25,9 @@ def _load_selector_module(path: Path, module_name: str):
 
 class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
     def test_manifest_declares_only_fixed_capability_and_found_outputs(self) -> None:
-        manifest = json.loads((SELECTOR_SKILL_DIR / "skill.json").read_text(encoding="utf-8"))
+        manifest = json.loads((SELECTOR_SKILL_DIR / "action.json").read_text(encoding="utf-8"))
 
-        self.assertEqual(manifest["skillKey"], "toograph_capability_selector")
+        self.assertEqual(manifest["actionKey"], "toograph_capability_selector")
         self.assertEqual(manifest["timeoutSeconds"], 30)
         self.assertEqual(manifest.get("stateInputSchema", []), [])
         self.assertEqual(manifest.get("llmOutputSchema", []), [])

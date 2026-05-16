@@ -377,10 +377,10 @@ function shouldShowBatchModeSwitch(port: NodePortViewModel) {
 
 function managedPortTitle(port: NodePortViewModel) {
   if (port.managedBySkill?.role === "input") {
-    return "Skill managed input";
+    return "Action managed input";
   }
   if (port.managedBySkill?.role === "output") {
-    return "Skill managed output";
+    return "Action managed output";
   }
   return "Dynamic capability managed state";
 }

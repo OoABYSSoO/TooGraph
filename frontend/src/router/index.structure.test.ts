@@ -11,13 +11,13 @@ test("router resets page scroll on route navigation while preserving browser bac
   assert.match(routerSource, /scrollBehavior:\s*\(_to,\s*_from,\s*savedPosition\)\s*=>\s*savedPosition\s*\?\?\s*\{\s*left:\s*0,\s*top:\s*0\s*\}/);
 });
 
-test("router exposes first-class management pages for presets and skills", () => {
+test("router exposes first-class management pages for presets and actions", () => {
   assert.doesNotMatch(routerSource, /import \w+Page from "@\/pages\//);
   assert.match(routerSource, /const GraphLibraryPage = \(\) => import\("@\/pages\/GraphLibraryPage\.vue"\);/);
   assert.match(routerSource, /const KnowledgePage = \(\) => import\("@\/pages\/KnowledgePage\.vue"\);/);
   assert.match(routerSource, /const EvalsPage = \(\) => import\("@\/pages\/EvalsPage\.vue"\);/);
   assert.match(routerSource, /const PresetsPage = \(\) => import\("@\/pages\/PresetsPage\.vue"\);/);
-  assert.match(routerSource, /const SkillsPage = \(\) => import\("@\/pages\/SkillsPage\.vue"\);/);
+  assert.match(routerSource, /const ActionsPage = \(\) => import\("@\/pages\/ActionsPage\.vue"\);/);
   assert.match(routerSource, /const ModelProvidersPage = \(\) => import\("@\/pages\/ModelProvidersPage\.vue"\);/);
   assert.match(routerSource, /const ModelLogsPage = \(\) => import\("@\/pages\/ModelLogsPage\.vue"\);/);
   assert.match(routerSource, /const BuddyPage = \(\) => import\("@\/pages\/BuddyPage\.vue"\);/);
@@ -26,7 +26,7 @@ test("router exposes first-class management pages for presets and skills", () =>
   assert.match(routerSource, /\{ path: "\/evals", component: EvalsPage \}/);
   assert.match(routerSource, /\{ path: "\/buddy", component: BuddyPage \}/);
   assert.match(routerSource, /\{ path: "\/presets", component: PresetsPage \}/);
-  assert.match(routerSource, /\{ path: "\/skills", component: SkillsPage \}/);
+  assert.match(routerSource, /\{ path: "\/actions", component: ActionsPage \}/);
   assert.match(routerSource, /\{ path: "\/models", component: ModelProvidersPage \}/);
   assert.match(routerSource, /\{ path: "\/model-logs", component: ModelLogsPage \}/);
 });
@@ -45,7 +45,7 @@ test("router lazy-loads page components to keep the production entry chunk small
     "RunDetailPage",
     "RunsPage",
     "SettingsPage",
-    "SkillsPage",
+    "ActionsPage",
   ]) {
     assert.match(routerSource, new RegExp(`const ${pageName} = \\(\\) => import\\("@/pages/${pageName}\\.vue"\\);`));
   }

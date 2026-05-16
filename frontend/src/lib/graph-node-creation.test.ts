@@ -168,7 +168,7 @@ test("buildNodeFromPreset preserves preset node semantics while replacing the ca
         reads: [],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -265,7 +265,7 @@ test("applyNodeCreationResult only adds a read binding for blank agent presets s
         reads: [],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -297,7 +297,7 @@ test("applyNodeCreationResult only adds a read binding for blank agent presets s
         reads: [],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -353,7 +353,7 @@ test("applyNodeCreationResult uses a locked result package when a new agent is s
         reads: [],
         writes: [{ state: "selected_capability", mode: "replace" }],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -385,7 +385,7 @@ test("applyNodeCreationResult uses a locked result package when a new agent is s
         reads: [],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -448,7 +448,7 @@ test("applyNodeCreationResult materializes a virtual agent any output when it sp
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -661,7 +661,7 @@ test("applyNodeCreationResult materializes capability virtual outputs with an em
         reads: [],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -718,7 +718,7 @@ test("applyNodeCreationResult wires a created input node upstream of an existing
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -769,7 +769,7 @@ test("applyNodeCreationResult materializes a virtual target input when creating 
         reads: [],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -849,7 +849,7 @@ test("connectStateInputSourceToTarget wires an empty input node upstream of a co
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -920,7 +920,7 @@ test("connectStateInputSourceToTarget preserves previous same-state source edges
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -972,7 +972,7 @@ test("connectStateInputSourceToTarget materializes a virtual input through an ex
         reads: [],
         writes: [{ state: "draft", mode: "replace" }],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -988,7 +988,7 @@ test("connectStateInputSourceToTarget materializes a virtual input through an ex
         reads: [],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",

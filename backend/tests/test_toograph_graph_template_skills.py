@@ -11,7 +11,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILLS_ROOT = REPO_ROOT / "skill" / "official"
+SKILLS_ROOT = REPO_ROOT / "action" / "official"
 
 
 def _load_skill_module(skill_key: str):

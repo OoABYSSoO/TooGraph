@@ -103,7 +103,7 @@ test("AppShell exposes preset node and skill management as primary sidebar desti
   assert.match(componentSource, /import \{[\s\S]*CollectionTag[\s\S]*Opportunity[\s\S]*\} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /to="\/presets"[\s\S]*activeNavigationSection === 'presets'[\s\S]*t\("nav\.presets"\)/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><CollectionTag \/><\/ElIcon>/);
-  assert.match(componentSource, /to="\/skills"[\s\S]*activeNavigationSection === 'skills'[\s\S]*t\("nav\.skills"\)/);
+  assert.match(componentSource, /to="\/actions"[\s\S]*activeNavigationSection === 'actions'[\s\S]*t\("nav\.actions"\)/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Opportunity \/><\/ElIcon>/);
 });
 

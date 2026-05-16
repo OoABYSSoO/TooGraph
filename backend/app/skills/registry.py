@@ -26,14 +26,14 @@ SkillFunc = ScriptSkillRunner
 def _build_runtime_skill_registry() -> dict[str, SkillFunc]:
     registry: dict[str, SkillFunc] = {}
     for skill_dir in _iter_skill_dirs([OFFICIAL_SKILLS_DIR, USER_SKILLS_DIR]):
-        manifest = skill_dir / "skill.json"
+        manifest = skill_dir / "action.json"
         if not manifest.is_file():
             continue
         try:
             payload = json.loads(manifest.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             continue
-        skill_key = str(payload.get("skillKey") or payload.get("skill_key") or skill_dir.name).strip()
+        skill_key = str(payload.get("actionKey") or payload.get("action_key") or payload.get("skillKey") or payload.get("skill_key") or skill_dir.name).strip()
         runtime = payload.get("runtime") if isinstance(payload.get("runtime"), dict) else {}
         runtime_type = str(runtime.get("type") or "none")
         entrypoint = str(runtime.get("entrypoint") or "")

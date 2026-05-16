@@ -57,7 +57,7 @@ import { ElIcon } from "element-plus";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
-import { buildSkillArtifactFileUrl, fetchSkillArtifactContent } from "@/api/skillArtifacts";
+import { buildSkillArtifactFileUrl, fetchSkillArtifactContent } from "@/api/capabilityArtifacts";
 
 import type { ArtifactDocumentReference } from "./runDetailModel";
 

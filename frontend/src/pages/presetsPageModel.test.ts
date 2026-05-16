@@ -26,7 +26,7 @@ const presets: PresetDocument[] = [
         reads: [{ state: "brief", required: true }],
         writes: [{ state: "draft" }],
         config: {
-          skillKey: "rewrite_text",
+          actionKey: "rewrite_text",
           taskInstruction: "Draft copy",
           modelSource: "global",
           model: "",

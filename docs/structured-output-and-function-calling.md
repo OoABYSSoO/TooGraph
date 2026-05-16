@@ -1,6 +1,6 @@
 # 结构化输出与 Function Calling 待办
 
-TooGraph 的产品主协议仍是 `node_system`、`state_schema`、Skill、Subgraph 和 graph run。Provider 原生 structured output、JSON Schema、tool/function calling 只应作为模型调用适配层，用来提高单个 LLM 节点写 state 的稳定性，不能绕过 Skill registry、权限、审批和审计。
+TooGraph 的产品主协议仍是 `node_system`、`state_schema`、Action、Subgraph 和 graph run。Provider 原生 structured output、JSON Schema、tool/function calling 只应作为模型调用适配层，用来提高单个 LLM 节点写 state 的稳定性，不能绕过 Action registry、权限、审批和审计。
 
 当前代码已经有 `structured_output_schema` 参数、OpenAI-compatible `response_format` / Codex Responses text format 适配、provider 拒绝后的 fallback 和运行时校验基础。本文只记录后续还要补齐的部分。
 
@@ -15,8 +15,8 @@ TooGraph 的产品主协议仍是 `node_system`、`state_schema`、Skill、Subgr
 ### Function/Tool Calling 适配层
 
 - 增加 provider 级 tool/function schema 归一化，把 TooGraph 的 LLM 输出 schema 转成对应 provider 的工具调用格式。
-- Tool/function calling 只服务“结构化输出约束”，不直接执行 TooGraph Skill；Skill 执行仍由图运行时在结构化参数通过校验后触发。
-- 禁止模型通过 provider tool call 名称绕过 `config.skillKey`、`capability` state、权限模式或 human review。
+- Tool/function calling 只服务“结构化输出约束”，不直接执行 TooGraph Action；Action 执行仍由图运行时在结构化参数通过校验后触发。
+- 禁止模型通过 provider tool call 名称绕过 `config.actionKey`、`capability` state、权限模式或 human review。
 - 对不支持 tool calling 的本地模型继续使用 JSON Schema prompt fallback。
 
 ### Repair Retry
@@ -28,13 +28,13 @@ TooGraph 的产品主协议仍是 `node_system`、`state_schema`、Skill、Subgr
 ### 审计与运行详情
 
 - 运行详情展示 schema、provider 策略、原始模型文本、解析结果、validation errors、repair 次数和 fallback 原因。
-- 对 Skill 输入规划、动态 capability 输入规划和普通 LLM state 写入使用同一套审计字段。
+- 对 Action 输入规划、动态 capability 输入规划和普通 LLM state 写入使用同一套审计字段。
 - 模型日志页只展示必要摘要和可展开原文，避免长 JSON 把 UI 撑爆。
 
 ### 测试覆盖
 
 - Provider client 单元测试覆盖 native schema、provider 拒绝、fallback、repair 和 streaming。
-- Runtime 测试覆盖 LLM 节点按 `state_schema` 写 state、Skill 入参规划、动态 `result_package` 写入和错误回传。
+- Runtime 测试覆盖 LLM 节点按 `state_schema` 写 state、Action 入参规划、动态 `result_package` 写入和错误回传。
 - 为至少一个本地 OpenAI-compatible 网关保留手动验证说明，但不要把本机网关配置写进启动环境变量文档。
 
 ## 非目标

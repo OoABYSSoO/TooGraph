@@ -15,8 +15,8 @@ from app.skills.definitions import _parse_native_skill_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_TESTER_SKILL_DIR = REPO_ROOT / "skill" / "official" / "toograph_script_tester"
-SCRIPT_TESTER_MANIFEST_PATH = SCRIPT_TESTER_SKILL_DIR / "skill.json"
+SCRIPT_TESTER_SKILL_DIR = REPO_ROOT / "action" / "official" / "toograph_script_tester"
+SCRIPT_TESTER_MANIFEST_PATH = SCRIPT_TESTER_SKILL_DIR / "action.json"
 SCRIPT_TESTER_BEFORE_LLM_PATH = SCRIPT_TESTER_SKILL_DIR / "before_llm.py"
 SCRIPT_TESTER_AFTER_LLM_PATH = SCRIPT_TESTER_SKILL_DIR / "after_llm.py"
 

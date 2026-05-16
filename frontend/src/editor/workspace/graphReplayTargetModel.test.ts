@@ -40,7 +40,7 @@ function targetGraph(): GraphPayload {
         reads: [{ state: "name", required: true }],
         writes: [],
         config: {
-          skillKey: "",
+          actionKey: "",
           taskInstruction: "读取姓名，给这个姓名加问号。",
           modelSource: "global",
           model: "",
@@ -155,7 +155,7 @@ test("buildGraphReplayIntentsFromTargetGraph handles cyclic flow graphs without 
     reads: [{ state: "name" }],
     writes: [],
     config: {
-      skillKey: "",
+      actionKey: "",
       taskInstruction: "复核姓名处理结果。",
       modelSource: "global",
       model: "",

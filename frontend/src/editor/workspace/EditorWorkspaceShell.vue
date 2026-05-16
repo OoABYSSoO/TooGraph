@@ -393,7 +393,7 @@ import { fetchPreset, fetchPresets, savePreset } from "@/api/presets";
 import { fetchKnowledgeBases } from "@/api/knowledge";
 import { fetchRun, resumeRun } from "@/api/runs";
 import { fetchSettings } from "@/api/settings";
-import { fetchSkillDefinitions } from "@/api/skills";
+import { fetchSkillDefinitions } from "@/api/actions";
 import { attachPageOperationRuntimeContext, buildPageOperationRuntimeContext } from "@/buddy/pageOperationAffordances";
 import { resolveBuddyVirtualOperationPlanFromActivityEvent } from "@/buddy/virtualOperationProtocol";
 import {

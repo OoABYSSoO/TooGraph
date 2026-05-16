@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "toograph.action/v1",
+  "actionKey": "toograph_skill_package_reader",
+  "name": "Action Package Reader",
+  "description": "Read an existing TooGraph Action package into structured state for review, improvement, or migration workflows.",
+  "llmInstruction": "You are bound to the Action Package Reader. Choose exactly one target action key from the graph state or user request, and optionally choose source_scope as user or official. This action is read-only: do not propose writes, patches, execution, deletion, or approval decisions. Return only skill_key and source_scope.",
+  "version": "1.0.0",
+  "timeoutSeconds": 20,
+  "permissions": ["skill_read"],
+  "stateInputSchema": [
+    {
+      "key": "target_skill_key",
+      "name": "Target Action Key",
+      "valueType": "text",
+      "description": "Existing Action key to read. Optional when the LLM can infer the key from the request."
+    }
+  ],
+  "llmOutputSchema": [
+    {
+      "key": "skill_key",
+      "name": "Action Key",
+      "valueType": "text",
+      "description": "Existing Action key to read."
+    },
+    {
+      "key": "source_scope",
+      "name": "Source Scope",
+      "valueType": "text",
+      "description": "Optional source scope: user or official. Leave empty to prefer user then official."
+    }
+  ],
+  "stateOutputSchema": [
+    {
+      "key": "success",
+      "name": "Success",
+      "valueType": "boolean",
+      "description": "Whether an Action package was found and read."
+    },
+    {
+      "key": "skill_package",
+      "name": "Action Package",
+      "valueType": "json",
+      "description": "Structured Action package metadata and UTF-8 file contents."
+    },
+    {
+      "key": "result",
+      "name": "Result",
+      "valueType": "markdown",
+      "description": "Short read summary or validation error."
+    }
+  ]
+}

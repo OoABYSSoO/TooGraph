@@ -30,7 +30,7 @@ import type {
   TemplateRecord,
   WriteBinding,
 } from "../types/node-system.ts";
-import type { SkillDefinition, SkillIoField } from "../types/skills.ts";
+import type { SkillDefinition, SkillIoField } from "../types/actions.ts";
 
 const STATE_KEY_COUNTER_METADATA_KEY = "toograph_state_key_counter";
 const DEFAULT_MATERIALIZED_STATE_COLORS = [
