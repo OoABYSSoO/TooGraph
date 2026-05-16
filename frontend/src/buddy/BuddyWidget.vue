@@ -475,6 +475,7 @@ import {
   useBuddyMascotDebugStore,
   type BuddyVirtualOperation,
   type BuddyVirtualOperationRequest,
+  type BuddyVirtualOperationTriggeredRun,
 } from "../stores/buddyMascotDebug.ts";
 import type { BuddyChatMessageRecord, BuddyChatSession } from "../types/buddy.ts";
 import type { GraphPayload, GraphPosition } from "../types/node-system.ts";
@@ -621,6 +622,15 @@ type BuddyModelOption = {
   value: string;
   label: string;
 };
+type BuddyPageOperationForegroundRun = {
+  runId: string;
+  status: string;
+  resultSummary: string;
+};
+type BuddyPageOperationRuntimeContextOptions = {
+  latestOperationReport?: Record<string, unknown> | null;
+  latestForegroundRun?: BuddyPageOperationForegroundRun | null;
+};
 
 const BUDDY_HISTORY_STORAGE_KEY = "toograph:buddy-history";
 const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "toograph:buddy-active-session";
@@ -658,6 +668,9 @@ const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_REACHED_DISTANCE_PX = 12;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 1.25;
 const BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS = 80;
 const BUDDY_VIRTUAL_OPERATION_TYPE_CHARACTER_DELAY_MS = 18;
+const BUDDY_VIRTUAL_OPERATION_TRIGGERED_RUN_WAIT_MS = 4000;
+const BUDDY_VIRTUAL_OPERATION_TRIGGERED_RUN_POLL_MS = 80;
+const BUDDY_PAGE_OPERATION_TRIGGERED_RUN_MAX_WAIT_MS = 120000;
 const BUDDY_VIRTUAL_POINTER_ID = 9001;
 const TOOGRAPH_VIRTUAL_POINTER_EVENT_KEY = "__toographVirtualPointerEvent";
 const TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY = "__toographVirtualEmptyCanvasPointerEvent";
@@ -2327,14 +2340,22 @@ async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequ
   const routeBefore = route.fullPath;
   let status: PageOperationResultStatus = "succeeded";
   let error: string | null = null;
+  let triggeredRun: BuddyVirtualOperationTriggeredRun | null = null;
+  let triggeredRunDetail: RunDetail | null = null;
   try {
+    buddyMascotDebugStore.beginVirtualOperationRunAttribution(operationPlan);
     status = await executeVirtualOperationCommands(operationPlan);
+    if (status !== "interrupted") {
+      triggeredRun = await waitForVirtualOperationTriggeredRun(operationPlan);
+      triggeredRunDetail = triggeredRun ? await waitForTriggeredRunCompletion(triggeredRun) : null;
+    }
   } catch (caughtError) {
     status = "failed";
     error = caughtError instanceof Error ? caughtError.message : String(caughtError);
   }
   await nextTick();
-  const pageOperationContextAfterBase = buildPageOperationRuntimeContext();
+  const latestForegroundRun = buildTriggeredForegroundRunFact(triggeredRun, triggeredRunDetail);
+  const pageOperationContextAfterBase = buildPageOperationRuntimeContext({ latestForegroundRun });
   const operationResult = buildPageOperationResult({
     operationPlan,
     status,
@@ -2342,9 +2363,16 @@ async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequ
     routeAfter: route.fullPath,
     pageOperationContextBefore: pageOperationContextBefore.skillRuntimeContext,
     pageOperationContextAfter: pageOperationContextAfterBase.skillRuntimeContext,
+    triggeredRunId: triggeredRun?.runId ?? null,
+    triggeredGraphId: triggeredRun?.graphId ?? null,
+    triggeredRunInitialStatus: triggeredRun?.initialStatus ?? null,
+    triggeredRunStatus: triggeredRunDetail?.status ?? triggeredRun?.initialStatus ?? null,
     error,
   });
-  const pageOperationContextAfter = buildPageOperationRuntimeContext(operationResult.operation_report);
+  const pageOperationContextAfter = buildPageOperationRuntimeContext({
+    latestOperationReport: operationResult.operation_report,
+    latestForegroundRun,
+  });
   await maybeAutoResumePageOperationRun(operationPlan, operationResult, pageOperationContextAfter);
 }
 
@@ -2449,6 +2477,68 @@ function interruptVirtualOperation() {
     label: t("buddy.virtualOperation.stopping"),
     tone: "stopping",
   };
+}
+
+async function waitForVirtualOperationTriggeredRun(
+  operationPlan: BuddyVirtualOperationPlan,
+): Promise<BuddyVirtualOperationTriggeredRun | null> {
+  const operationRequestId = String(operationPlan.operationRequestId ?? "").trim();
+  if (!operationRequestId || !hasRunActiveGraphOperation(operationPlan)) {
+    return null;
+  }
+  const deadline = Date.now() + BUDDY_VIRTUAL_OPERATION_TRIGGERED_RUN_WAIT_MS;
+  while (Date.now() <= deadline) {
+    const triggeredRun = buddyMascotDebugStore.resolveVirtualOperationTriggeredRun(operationRequestId);
+    if (triggeredRun) {
+      return triggeredRun;
+    }
+    await waitForFrontendObservation(BUDDY_VIRTUAL_OPERATION_TRIGGERED_RUN_POLL_MS);
+  }
+  return buddyMascotDebugStore.resolveVirtualOperationTriggeredRun(operationRequestId);
+}
+
+async function waitForTriggeredRunCompletion(triggeredRun: BuddyVirtualOperationTriggeredRun): Promise<RunDetail | null> {
+  const deadline = Date.now() + BUDDY_PAGE_OPERATION_TRIGGERED_RUN_MAX_WAIT_MS;
+  let latestRun: RunDetail | null = null;
+  while (Date.now() <= deadline) {
+    try {
+      latestRun = await fetchRun(triggeredRun.runId);
+      if (!shouldPollRunStatus(latestRun.status)) {
+        return latestRun;
+      }
+    } catch {
+      return latestRun;
+    }
+    await waitForFrontendObservation(RUN_POLL_INTERVAL_MS);
+  }
+  return latestRun;
+}
+
+function buildTriggeredForegroundRunFact(
+  triggeredRun: BuddyVirtualOperationTriggeredRun | null,
+  runDetail: RunDetail | null,
+): BuddyPageOperationForegroundRun | null {
+  if (runDetail) {
+    return {
+      runId: runDetail.run_id,
+      status: runDetail.status,
+      resultSummary: compactPageFactText(runDetail.final_result),
+    };
+  }
+  if (!triggeredRun) {
+    return null;
+  }
+  return {
+    runId: triggeredRun.runId,
+    status: triggeredRun.initialStatus,
+    resultSummary: "",
+  };
+}
+
+function hasRunActiveGraphOperation(operationPlan: BuddyVirtualOperationPlan) {
+  return operationPlan.operations.some(
+    (operation) => "targetId" in operation && operation.targetId === "editor.action.runActiveGraph",
+  );
 }
 
 function finishVirtualOperation(token: BuddyVirtualOperationToken) {
@@ -4849,7 +4939,7 @@ function buildPageContext() {
   return buildPageOperationRuntimeContext().pageContext;
 }
 
-function buildPageOperationRuntimeContext(latestOperationReport: Record<string, unknown> | null = null) {
+function buildPageOperationRuntimeContext(options: BuddyPageOperationRuntimeContextOptions = {}) {
   const snapshot = collectPageOperationSnapshot({
     routePath: route.fullPath,
     root: typeof document === "undefined" ? null : document,
@@ -4859,7 +4949,8 @@ function buildPageOperationRuntimeContext(latestOperationReport: Record<string, 
     root: typeof document === "undefined" ? null : document,
     snapshot,
     editor: buildBuddyPageOperationEditorFacts(),
-    latestOperationReport,
+    latestForegroundRun: options.latestForegroundRun ?? null,
+    latestOperationReport: options.latestOperationReport ?? null,
   });
   return {
     pageContext: buildBuddyPageContext({
@@ -4888,6 +4979,11 @@ function buildBuddyPageOperationEditorFacts() {
     activeGraphName: editor.activeGraphName ?? documentName ?? editor.activeTabTitle,
     activeGraphDirty: editor.activeGraphDirty === true,
   };
+}
+
+function compactPageFactText(value: unknown) {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  return text.length > 180 ? `${text.slice(0, 177)}...` : text;
 }
 
 function createMessage(
@@ -4973,6 +5069,13 @@ function delay(timeoutMs: number, signal: AbortSignal) {
       },
       { once: true },
     );
+  });
+}
+
+function waitForFrontendObservation(timeoutMs: number) {
+  return new Promise<void>((resolve) => {
+    const setTimer = typeof window === "undefined" ? globalThis.setTimeout : window.setTimeout;
+    setTimer(resolve, Math.max(0, Math.round(timeoutMs)));
   });
 }
 

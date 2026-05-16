@@ -1,3 +1,9 @@
+export const TERMINAL_RUN_STATUSES = ["completed", "failed", "cancelled"] as const;
+
+export function isTerminalRunStatus(status: string | null | undefined) {
+  return TERMINAL_RUN_STATUSES.includes(status as (typeof TERMINAL_RUN_STATUSES)[number]);
+}
+
 export type RunLifecycleRecord = {
   updated_at: string;
   paused_at?: string | null;

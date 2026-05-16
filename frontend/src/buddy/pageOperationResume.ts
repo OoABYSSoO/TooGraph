@@ -15,6 +15,7 @@ export type PageOperationResult = {
   page_snapshot_after: PageOperationSnapshot;
   triggered_run_id: string | null;
   triggered_graph_id: string | null;
+  triggered_run_initial_status: string | null;
   triggered_run_status: string | null;
   graph_edit_summary: Record<string, unknown> | null;
   operation_report: PageOperationReport;
@@ -30,6 +31,7 @@ export type PageOperationReport = {
   route_after: string;
   triggered_run_id: string | null;
   triggered_graph_id: string | null;
+  triggered_run_initial_status: string | null;
   triggered_run_status: string | null;
   graph_edit_summary: Record<string, unknown> | null;
   error: string | null;
@@ -44,6 +46,7 @@ export function buildPageOperationResult(input: {
   pageOperationContextAfter: PageOperationRuntimeContext;
   triggeredRunId?: string | null;
   triggeredGraphId?: string | null;
+  triggeredRunInitialStatus?: string | null;
   triggeredRunStatus?: string | null;
   graphEditSummary?: Record<string, unknown> | null;
   error?: string | null;
@@ -52,6 +55,7 @@ export function buildPageOperationResult(input: {
   const targetId = firstOperationTargetId(input.operationPlan);
   const triggeredRunId = normalizeNullableText(input.triggeredRunId);
   const triggeredGraphId = normalizeNullableText(input.triggeredGraphId);
+  const triggeredRunInitialStatus = normalizeNullableText(input.triggeredRunInitialStatus);
   const triggeredRunStatus = normalizeNullableText(input.triggeredRunStatus);
   const graphEditSummary = input.graphEditSummary ?? defaultGraphEditSummary(input.operationPlan);
   const error = normalizeNullableText(input.error);
@@ -64,6 +68,7 @@ export function buildPageOperationResult(input: {
     route_after: input.routeAfter,
     triggered_run_id: triggeredRunId,
     triggered_graph_id: triggeredGraphId,
+    triggered_run_initial_status: triggeredRunInitialStatus,
     triggered_run_status: triggeredRunStatus,
     graph_edit_summary: graphEditSummary,
     error,
@@ -79,6 +84,7 @@ export function buildPageOperationResult(input: {
     page_snapshot_after: input.pageOperationContextAfter.page_snapshot,
     triggered_run_id: triggeredRunId,
     triggered_graph_id: triggeredGraphId,
+    triggered_run_initial_status: triggeredRunInitialStatus,
     triggered_run_status: triggeredRunStatus,
     graph_edit_summary: graphEditSummary,
     operation_report: report,

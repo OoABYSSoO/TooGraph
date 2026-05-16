@@ -64,6 +64,10 @@ test("buildPageOperationResult captures route, snapshots, commands, and target i
     routeAfter: "/runs",
     pageOperationContextBefore,
     pageOperationContextAfter,
+    triggeredRunId: "run_123",
+    triggeredGraphId: "graph_1",
+    triggeredRunInitialStatus: "queued",
+    triggeredRunStatus: "completed",
   });
 
   assert.deepEqual(result, {
@@ -75,9 +79,10 @@ test("buildPageOperationResult captures route, snapshots, commands, and target i
     route_after: "/runs",
     page_snapshot_before: pageOperationContextBefore.page_snapshot,
     page_snapshot_after: pageOperationContextAfter.page_snapshot,
-    triggered_run_id: null,
-    triggered_graph_id: null,
-    triggered_run_status: null,
+    triggered_run_id: "run_123",
+    triggered_graph_id: "graph_1",
+    triggered_run_initial_status: "queued",
+    triggered_run_status: "completed",
     graph_edit_summary: null,
     operation_report: {
       operation_request_id: "vop_1234567890abcdef",
@@ -86,9 +91,10 @@ test("buildPageOperationResult captures route, snapshots, commands, and target i
       commands: ["click app.nav.runs"],
       route_before: "/",
       route_after: "/runs",
-      triggered_run_id: null,
-      triggered_graph_id: null,
-      triggered_run_status: null,
+      triggered_run_id: "run_123",
+      triggered_graph_id: "graph_1",
+      triggered_run_initial_status: "queued",
+      triggered_run_status: "completed",
       graph_edit_summary: null,
       error: null,
     },

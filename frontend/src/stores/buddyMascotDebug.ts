@@ -20,6 +20,21 @@ export type BuddyVirtualOperationRequest = {
   request: BuddyVirtualOperationPlan;
 };
 
+export type BuddyVirtualOperationRunAttribution = {
+  operationRequestId: string;
+  targetId: string;
+  commands: string[];
+};
+
+export type BuddyVirtualOperationTriggeredRun = {
+  operationRequestId: string;
+  targetId: string;
+  tabId: string;
+  runId: string;
+  graphId: string | null;
+  initialStatus: string;
+};
+
 export type BuddyMascotMotionDebugConfig = {
   moveDurationMs: number;
   stepPauseMs: number;
@@ -54,6 +69,8 @@ const BUDDY_MASCOT_MOTION_CONFIG_LIMITS = {
 export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {
   const latestRequest = ref<BuddyMascotDebugRequest | null>(null);
   const latestVirtualOperationRequest = ref<BuddyVirtualOperationRequest | null>(null);
+  const pendingRunAttribution = ref<BuddyVirtualOperationRunAttribution | null>(null);
+  const triggeredRunByOperationRequestId = ref<Record<string, BuddyVirtualOperationTriggeredRun>>({});
   const virtualCursorEnabled = ref(false);
   const motionConfig = ref<BuddyMascotMotionDebugConfig>(readStoredMotionConfig());
   const nextRequestId = ref(0);
@@ -90,6 +107,56 @@ export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {
     };
   }
 
+  function beginVirtualOperationRunAttribution(request: BuddyVirtualOperationPlan) {
+    const targetId = resolveRunButtonOperationTarget(request);
+    const operationRequestId = normalizeText(request.operationRequestId);
+    if (!targetId || !operationRequestId) {
+      pendingRunAttribution.value = null;
+      return;
+    }
+    pendingRunAttribution.value = {
+      operationRequestId,
+      targetId,
+      commands: [...request.commands],
+    };
+  }
+
+  function consumeVirtualOperationRunAttribution(targetId: string): BuddyVirtualOperationRunAttribution | null {
+    const pending = pendingRunAttribution.value;
+    if (!pending || pending.targetId !== normalizeText(targetId)) {
+      return null;
+    }
+    pendingRunAttribution.value = null;
+    return {
+      ...pending,
+      commands: [...pending.commands],
+    };
+  }
+
+  function recordVirtualOperationTriggeredRun(record: BuddyVirtualOperationTriggeredRun) {
+    const operationRequestId = normalizeText(record.operationRequestId);
+    const runId = normalizeText(record.runId);
+    if (!operationRequestId || !runId) {
+      return;
+    }
+    triggeredRunByOperationRequestId.value = {
+      ...triggeredRunByOperationRequestId.value,
+      [operationRequestId]: {
+        operationRequestId,
+        targetId: normalizeText(record.targetId),
+        tabId: normalizeText(record.tabId),
+        runId,
+        graphId: normalizeText(record.graphId) || null,
+        initialStatus: normalizeText(record.initialStatus) || "unknown",
+      },
+    };
+  }
+
+  function resolveVirtualOperationTriggeredRun(operationRequestId: string): BuddyVirtualOperationTriggeredRun | null {
+    const record = triggeredRunByOperationRequestId.value[normalizeText(operationRequestId)];
+    return record ? { ...record } : null;
+  }
+
   function setMotionConfig(patch: Partial<BuddyMascotMotionDebugConfig>) {
     motionConfig.value = normalizeMotionConfig({
       ...motionConfig.value,
@@ -111,10 +178,23 @@ export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {
     trigger,
     setVirtualCursorEnabled,
     requestVirtualOperation,
+    beginVirtualOperationRunAttribution,
+    consumeVirtualOperationRunAttribution,
+    recordVirtualOperationTriggeredRun,
+    resolveVirtualOperationTriggeredRun,
     setMotionConfig,
     resetMotionConfig,
   };
 });
+
+function resolveRunButtonOperationTarget(request: BuddyVirtualOperationPlan) {
+  const operation = request.operations.find((item) => "targetId" in item && item.targetId === "editor.action.runActiveGraph");
+  return operation && "targetId" in operation ? operation.targetId : "";
+}
+
+function normalizeText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
 
 function readStoredMotionConfig(): BuddyMascotMotionDebugConfig {
   if (typeof window === "undefined") {

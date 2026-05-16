@@ -9,6 +9,21 @@ import type { RunActivityState } from "./runActivityModel.ts";
 import type { RunNodeTimingByNodeId } from "./runNodeTimingModel.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 
+type VirtualOperationRunAttribution = {
+  operationRequestId: string;
+  targetId: string;
+  commands: string[];
+};
+
+type VirtualOperationTriggeredRunRecord = {
+  operationRequestId: string;
+  targetId: string;
+  tabId: string;
+  runId: string;
+  graphId: string | null;
+  initialStatus: string;
+};
+
 type WorkspaceRunControllerInput = {
   activeTab: ComputedRef<EditorWorkspaceTab | null> | Ref<EditorWorkspaceTab | null>;
   documentsByTabId: Ref<Record<string, GraphPayload | GraphDocument>>;
@@ -25,6 +40,8 @@ type WorkspaceRunControllerInput = {
   runActivityByTabId: Ref<Record<string, RunActivityState>>;
   refreshAgentModels: () => Promise<void>;
   runGraph: (document: GraphPayload | GraphDocument) => Promise<GraphRunResponse>;
+  consumeVirtualOperationRunAttribution?: (targetId: string) => VirtualOperationRunAttribution | null;
+  recordVirtualOperationTriggeredRun?: (record: VirtualOperationTriggeredRunRecord) => void;
   resumeRun: (runId: string, payload: Record<string, unknown>, snapshotId: string | null) => Promise<GraphRunResponse>;
   cancelRunPolling: (tabId: string) => void;
   getRunGeneration: (tabId: string) => number;
@@ -77,7 +94,18 @@ export function useWorkspaceRunController(input: WorkspaceRunControllerInput) {
         return;
       }
 
+      const runAttribution = input.consumeVirtualOperationRunAttribution?.("editor.action.runActiveGraph") ?? null;
       const response = await input.runGraph(latestDocument);
+      if (runAttribution) {
+        input.recordVirtualOperationTriggeredRun?.({
+          operationRequestId: runAttribution.operationRequestId,
+          targetId: runAttribution.targetId,
+          tabId: tab.tabId,
+          runId: response.run_id,
+          graphId: resolveGraphId(latestDocument, tab),
+          initialStatus: response.status,
+        });
+      }
       clearQueuedRunVisualState(tab.tabId);
       input.markRunActivityPanelHintForTab(tab.tabId);
       input.setFeedbackForTab(tab.tabId, {
@@ -149,4 +177,11 @@ export function useWorkspaceRunController(input: WorkspaceRunControllerInput) {
     runActiveGraph,
     resumeHumanReviewRun,
   };
+}
+
+function resolveGraphId(document: GraphPayload | GraphDocument, tab: EditorWorkspaceTab) {
+  if ("graph_id" in document && typeof document.graph_id === "string" && document.graph_id.trim()) {
+    return document.graph_id;
+  }
+  return tab.graphId;
 }

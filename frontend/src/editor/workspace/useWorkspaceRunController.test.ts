@@ -40,6 +40,15 @@ function createRunHarness(
   options: {
     refreshAgentModels?: () => Promise<void>;
     runGraph?: (document: GraphPayload | GraphDocument) => Promise<GraphRunResponse>;
+    consumeVirtualOperationRunAttribution?: () => { operationRequestId: string; targetId: string; commands: string[] } | null;
+    recordVirtualOperationTriggeredRun?: (record: {
+      operationRequestId: string;
+      targetId: string;
+      tabId: string;
+      runId: string;
+      graphId: string | null;
+      initialStatus: string;
+    }) => void;
   } = {},
 ) {
   const activeTab = ref<EditorWorkspaceTab | null>({
@@ -125,6 +134,8 @@ function createRunHarness(
       }
       return { run_id: "run_started", status: "queued" } satisfies GraphRunResponse;
     },
+    consumeVirtualOperationRunAttribution: options.consumeVirtualOperationRunAttribution,
+    recordVirtualOperationTriggeredRun: options.recordVirtualOperationTriggeredRun,
     resumeRun: async (runId, payload, snapshotId) => {
       resumedRuns.push({ runId, payload, snapshotId });
       return { run_id: "run_resumed", status: "queued" } satisfies GraphRunResponse;
@@ -212,6 +223,48 @@ test("useWorkspaceRunController runs the latest document after model refresh and
   assert.deepEqual(harness.runActivityHints, ["tab_a"]);
   assert.deepEqual(harness.streams, [{ tabId: "tab_a", runId: "run_started" }]);
   assert.deepEqual(harness.polls, [{ tabId: "tab_a", runId: "run_started", generation: 8 }]);
+});
+
+test("useWorkspaceRunController records virtual operation run attribution for the next run", async () => {
+  const records: Array<{
+    operationRequestId: string;
+    targetId: string;
+    tabId: string;
+    runId: string;
+    graphId: string | null;
+    initialStatus: string;
+  }> = [];
+  const harness = createRunHarness({
+    refreshAgentModels: async () => {
+      harness.documentsByTabId.value = {
+        tab_a: {
+          ...graphDocument("Saved", ["run_node"]),
+          graph_id: "graph_saved",
+        } as GraphPayload,
+      };
+    },
+    consumeVirtualOperationRunAttribution: () => ({
+      operationRequestId: "vop_1234567890abcdef",
+      targetId: "editor.action.runActiveGraph",
+      commands: ["click editor.action.runActiveGraph"],
+    }),
+    recordVirtualOperationTriggeredRun: (record) => {
+      records.push(record);
+    },
+  });
+
+  await harness.controller.runActiveGraph();
+
+  assert.deepEqual(records, [
+    {
+      operationRequestId: "vop_1234567890abcdef",
+      targetId: "editor.action.runActiveGraph",
+      tabId: "tab_a",
+      runId: "run_started",
+      graphId: "graph_saved",
+      initialStatus: "queued",
+    },
+  ]);
 });
 
 test("useWorkspaceRunController resumes Human Review runs with the restored snapshot", async () => {

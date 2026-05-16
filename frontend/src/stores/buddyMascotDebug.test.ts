@@ -73,6 +73,46 @@ test("buddy mascot debug store records virtual operation requests", () => {
   });
 });
 
+test("buddy mascot debug store attributes run creation to virtual run button operations", () => {
+  setActivePinia(createPinia());
+  const store = useBuddyMascotDebugStore();
+
+  store.beginVirtualOperationRunAttribution({
+    version: 1,
+    operationRequestId: "vop_1234567890abcdef",
+    commands: ["click editor.action.runActiveGraph"],
+    operations: [{ kind: "click", targetId: "editor.action.runActiveGraph" }],
+    cursorLifecycle: "return_after_step",
+    reason: "运行当前图。",
+  });
+
+  const attribution = store.consumeVirtualOperationRunAttribution("editor.action.runActiveGraph");
+  assert.deepEqual(attribution, {
+    operationRequestId: "vop_1234567890abcdef",
+    targetId: "editor.action.runActiveGraph",
+    commands: ["click editor.action.runActiveGraph"],
+  });
+  assert.equal(store.consumeVirtualOperationRunAttribution("editor.action.runActiveGraph"), null);
+
+  store.recordVirtualOperationTriggeredRun({
+    operationRequestId: "vop_1234567890abcdef",
+    targetId: "editor.action.runActiveGraph",
+    tabId: "tab_a",
+    runId: "run_started",
+    graphId: "graph_1",
+    initialStatus: "queued",
+  });
+
+  assert.deepEqual(store.resolveVirtualOperationTriggeredRun("vop_1234567890abcdef"), {
+    operationRequestId: "vop_1234567890abcdef",
+    targetId: "editor.action.runActiveGraph",
+    tabId: "tab_a",
+    runId: "run_started",
+    graphId: "graph_1",
+    initialStatus: "queued",
+  });
+});
+
 test("buddy mascot debug store snapshots graph edit operation requests", () => {
   setActivePinia(createPinia());
   const store = useBuddyMascotDebugStore();

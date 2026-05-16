@@ -1,7 +1,7 @@
 import type { Ref } from "vue";
 
 import type { GraphDocument, GraphPayload } from "../../types/node-system.ts";
-import type { RunDetail } from "../../types/run.ts";
+import { isTerminalRunStatus, type RunDetail } from "../../types/run.ts";
 
 import {
   buildRunEventOutputPreviewUpdate,
@@ -221,7 +221,7 @@ export function useWorkspaceRunLifecycleController(input: WorkspaceRunLifecycleC
 
       input.persistRunStateValuesForTab(tabId, run);
       reconcileRunActivityFromRun(tabId, run);
-      if (isFinishedRunStatus(run.status)) {
+      if (isTerminalRunStatus(run.status)) {
         input.clearRunActivityPanelHintForTab(tabId);
       }
       runPollTimerByTabId.delete(tabId);
@@ -266,8 +266,4 @@ function buildStateNameByKey(document: GraphPayload | GraphDocument | undefined)
     stateNameByKey[stateKey] = definition.name?.trim() || stateKey;
   }
   return stateNameByKey;
-}
-
-function isFinishedRunStatus(status: string | null | undefined) {
-  return status === "completed" || status === "failed" || status === "cancelled";
 }

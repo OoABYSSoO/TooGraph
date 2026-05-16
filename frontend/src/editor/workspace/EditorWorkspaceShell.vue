@@ -1140,6 +1140,8 @@ const { runActiveGraph, resumeHumanReviewRun } = useWorkspaceRunController({
   runActivityByTabId,
   refreshAgentModels,
   runGraph: runGraphWithPageOperationContext,
+  consumeVirtualOperationRunAttribution: (targetId) => buddyMascotDebugStore.consumeVirtualOperationRunAttribution(targetId),
+  recordVirtualOperationTriggeredRun: (record) => buddyMascotDebugStore.recordVirtualOperationTriggeredRun(record),
   resumeRun,
   cancelRunPolling,
   getRunGeneration,
