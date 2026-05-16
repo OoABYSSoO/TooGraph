@@ -55,7 +55,7 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertEqual(llm_output_types["graph_edit_intents"], "json")
         self.assertEqual(
             [field.key for field in definition.state_output_schema],
-            ["ok", "cursor_session_id", "journal", "error"],
+            ["ok", "cursor_session_id", "operation_request_id", "journal", "error"],
         )
 
     def test_before_llm_returns_operation_book_without_buddy_targets(self) -> None:
@@ -190,11 +190,23 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         )
 
         self.assertEqual(result["ok"], True)
+        self.assertRegex(str(result["operation_request_id"]), r"^vop_[0-9a-f]{16}$")
         self.assertNotIn("next_page_path", result)
         self.assertEqual(result["journal"][0]["target_id"], "app.nav.runs")
+        self.assertEqual(result["journal"][0]["operation_request_id"], result["operation_request_id"])
         event = result["activity_events"][0]
         self.assertEqual(event["kind"], "virtual_ui_operation")
         self.assertEqual(event["status"], "requested")
+        self.assertEqual(event["detail"]["operation_request_id"], result["operation_request_id"])
+        self.assertEqual(event["detail"]["operation_request"]["operation_request_id"], result["operation_request_id"])
+        self.assertEqual(
+            event["detail"]["expected_continuation"],
+            {
+                "mode": "auto_resume_after_ui_operation",
+                "operation_request_id": result["operation_request_id"],
+                "resume_state_keys": ["page_operation_context", "page_context", "operation_result"],
+            },
+        )
         self.assertEqual(event["detail"]["operation"]["kind"], "click")
         self.assertEqual(event["detail"]["operation"]["target_id"], "app.nav.runs")
         self.assertNotIn("next_page_path", event["detail"])
@@ -247,8 +259,12 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         )
 
         self.assertEqual(result["ok"], True)
+        self.assertRegex(str(result["operation_request_id"]), r"^vop_[0-9a-f]{16}$")
         self.assertEqual(result["journal"][0]["kind"], "graph_edit")
         event = result["activity_events"][0]
+        self.assertEqual(event["detail"]["operation_request_id"], result["operation_request_id"])
+        self.assertEqual(event["detail"]["operation_request"]["operation_request_id"], result["operation_request_id"])
+        self.assertEqual(event["detail"]["expected_continuation"]["mode"], "auto_resume_after_ui_operation")
         operation = event["detail"]["operation"]
         self.assertEqual(operation["kind"], "graph_edit")
         self.assertEqual(operation["target_id"], "editor.canvas.surface")

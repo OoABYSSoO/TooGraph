@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any, Callable
 
 from app.core.runtime.run_events import publish_run_event
 from app.core.runtime.state import utc_now_iso
+
+AUTO_RESUME_AFTER_UI_OPERATION = "auto_resume_after_ui_operation"
+PAGE_OPERATION_RESUME_STATE_KEYS = ["page_operation_context", "page_context", "operation_result"]
 
 
 def record_activity_event(
@@ -77,6 +82,18 @@ def record_skill_activity_events(
         if not kind or not summary:
             continue
         detail = raw_event.get("detail") if isinstance(raw_event.get("detail"), dict) else {}
+        detail = {
+            "skill_key": skill_key,
+            "binding_source": binding_source,
+            **detail,
+        }
+        detail = _enrich_virtual_ui_operation_detail(
+            state,
+            kind=kind,
+            status=_compact_text(raw_event.get("status")),
+            node_id=node_id,
+            detail=detail,
+        )
         event = record_activity_event_func(
             state,
             kind=kind,
@@ -84,11 +101,7 @@ def record_skill_activity_events(
             node_id=_compact_text(raw_event.get("node_id")) or node_id,
             status=_compact_text(raw_event.get("status")) or None,
             duration_ms=_optional_int(raw_event.get("duration_ms")),
-            detail={
-                "skill_key": skill_key,
-                "binding_source": binding_source,
-                **detail,
-            },
+            detail=detail,
             error=_compact_text(raw_event.get("error")) or None,
             publish_run_event_func=publish_run_event_func,
         )
@@ -121,6 +134,87 @@ def _subgraph_context(state: dict[str, Any]) -> dict[str, Any] | None:
         "node_id": node_id,
         "path": [_compact_text(item) for item in path if _compact_text(item)],
     }
+
+
+def _enrich_virtual_ui_operation_detail(
+    state: dict[str, Any],
+    *,
+    kind: str,
+    status: str,
+    node_id: str,
+    detail: dict[str, Any],
+) -> dict[str, Any]:
+    if kind != "virtual_ui_operation" or status == "failed":
+        return detail
+
+    enriched = dict(detail)
+    operation_request = enriched.get("operation_request")
+    operation_request_record = dict(operation_request) if isinstance(operation_request, dict) else {}
+    operation_request_id = _compact_text(
+        enriched.get("operation_request_id")
+        or enriched.get("operationRequestId")
+        or operation_request_record.get("operation_request_id")
+        or operation_request_record.get("operationRequestId")
+    )
+    if not operation_request_id:
+        operation_request_id = _stable_virtual_operation_request_id(state, node_id=node_id, detail=enriched)
+
+    enriched["operation_request_id"] = operation_request_id
+    if operation_request_record:
+        operation_request_record["operation_request_id"] = operation_request_id
+        enriched["operation_request"] = operation_request_record
+    enriched["expected_continuation"] = _normalize_expected_continuation(
+        enriched.get("expected_continuation") or enriched.get("expectedContinuation"),
+        operation_request_id=operation_request_id,
+    )
+
+    root_state = _root_run_state(state)
+    run_id = _compact_text(root_state.get("run_id") or state.get("run_id"))
+    if run_id:
+        enriched["run_id"] = run_id
+    normalized_node_id = _compact_text(node_id)
+    if normalized_node_id:
+        enriched["node_id"] = normalized_node_id
+    context = _subgraph_context(state)
+    if context:
+        enriched["subgraph_node_id"] = context["node_id"]
+        enriched["subgraph_path"] = context["path"]
+    return enriched
+
+
+def _normalize_expected_continuation(value: Any, *, operation_request_id: str) -> dict[str, Any]:
+    source = value if isinstance(value, dict) else {}
+    resume_state_keys = _list_text(source.get("resume_state_keys") or source.get("resumeStateKeys"))
+    if not resume_state_keys:
+        resume_state_keys = list(PAGE_OPERATION_RESUME_STATE_KEYS)
+    for required_key in PAGE_OPERATION_RESUME_STATE_KEYS:
+        if required_key not in resume_state_keys:
+            resume_state_keys.append(required_key)
+    return {
+        "mode": AUTO_RESUME_AFTER_UI_OPERATION,
+        "operation_request_id": operation_request_id,
+        "resume_state_keys": resume_state_keys,
+    }
+
+
+def _stable_virtual_operation_request_id(state: dict[str, Any], *, node_id: str, detail: dict[str, Any]) -> str:
+    root_state = _root_run_state(state)
+    payload = {
+        "run_id": _compact_text(root_state.get("run_id") or state.get("run_id")),
+        "node_id": _compact_text(node_id),
+        "operation_request": detail.get("operation_request"),
+        "commands": detail.get("commands"),
+        "operation": detail.get("operation"),
+    }
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return f"vop_{digest[:16]}"
+
+
+def _list_text(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [_compact_text(item) for item in value if _compact_text(item)]
 
 
 def _next_activity_event_sequence(events: list[dict[str, Any]]) -> int:

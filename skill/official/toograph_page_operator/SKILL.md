@@ -12,6 +12,7 @@ Current phase:
 - Supports one operation per invocation.
 - Supports safe `click` commands from the current page operation book, including application navigation and editor canvas targets.
 - Supports `graph_edit editor.graph.playback` on editor pages. For graph editing, the LLM outputs product-semantic `graph_edit_intents`; the frontend compiles them into graph commands and visible playback steps.
+- Emits a deterministic `operation_request_id` plus `expected_continuation` metadata so the frontend can resume the paused graph with `page_operation_context`, `page_context`, and `operation_result` after real UI execution.
 - Rejects Buddy self surfaces such as the Buddy page, Buddy floating window, Buddy avatar, and debug controls.
 - Does not expose DOM selectors, screen coordinates, double-click recipes, or low-level mouse trajectories to the LLM.
 
@@ -35,7 +36,8 @@ State outputs:
 
 - `ok`: whether the semantic operation was accepted.
 - `cursor_session_id`: reserved virtual cursor session ID.
+- `operation_request_id`: deterministic request ID used to correlate the activity event, frontend operation result, and run resume.
 - `journal`: operation journal summary.
 - `error`: structured failure detail.
 
-`before_llm.py` injects the current page operation book from runtime context, not graph state. `after_llm.py` validates the LLM command list and emits a `virtual_ui_operation` activity event for the frontend runtime to execute. Page routing and graph mutations are observed from the real UI after the operation, not returned as Skill state.
+`before_llm.py` injects the current page operation book from runtime context, not graph state. `after_llm.py` validates the LLM command list and emits a `virtual_ui_operation` activity event for the frontend runtime to execute. Successful events include `expected_continuation.mode = "auto_resume_after_ui_operation"` and `resume_state_keys = ["page_operation_context", "page_context", "operation_result"]`. Page routing and graph mutations are observed from the real UI after the operation, not guessed by the Skill.

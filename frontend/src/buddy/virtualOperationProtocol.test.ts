@@ -9,20 +9,32 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses operation request
     detail: {
       operation_request: {
         version: 1,
+        operation_request_id: "vop_1234567890abcdef",
         commands: ["click app.nav.runs"],
         operations: [{ kind: "click", target_id: "app.nav.runs" }],
         cursor_lifecycle: "return_after_step",
         next_page_path: "/runs",
         reason: "用户要打开运行历史页。",
       },
+      expected_continuation: {
+        mode: "auto_resume_after_ui_operation",
+        operation_request_id: "vop_1234567890abcdef",
+        resume_state_keys: ["page_operation_context", "page_context", "operation_result"],
+      },
     },
   });
 
   assert.deepEqual(plan, {
     version: 1,
+    operationRequestId: "vop_1234567890abcdef",
     commands: ["click app.nav.runs"],
     operations: [{ kind: "click", targetId: "app.nav.runs" }],
     cursorLifecycle: "return_after_step",
+    expectedContinuation: {
+      mode: "auto_resume_after_ui_operation",
+      operationRequestId: "vop_1234567890abcdef",
+      resumeStateKeys: ["page_operation_context", "page_context", "operation_result"],
+    },
     reason: "用户要打开运行历史页。",
   });
   assert.equal("nextPagePath" in (plan ?? {}), false);
@@ -58,12 +70,28 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent rejects legacy single op
   assert.equal(plan, null);
 });
 
+test("resolveBuddyVirtualOperationPlanFromActivityEvent rejects operation requests without stable ids", () => {
+  const plan = resolveBuddyVirtualOperationPlanFromActivityEvent({
+    kind: "virtual_ui_operation",
+    detail: {
+      operation_request: {
+        version: 1,
+        commands: ["click app.nav.runs"],
+        operations: [{ kind: "click", target_id: "app.nav.runs" }],
+      },
+    },
+  });
+
+  assert.equal(plan, null);
+});
+
 test("resolveBuddyVirtualOperationPlanFromActivityEvent parses keyboard command operations", () => {
   const plan = resolveBuddyVirtualOperationPlanFromActivityEvent({
     kind: "virtual_ui_operation",
     detail: {
       operation_request: {
         version: 1,
+        operation_request_id: "vop_keyboard123456",
         commands: [
           "focus settings.input",
           "clear settings.input",
@@ -80,6 +108,11 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses keyboard command 
         ],
         cursor_lifecycle: "keep",
         reason: "test input",
+      },
+      expected_continuation: {
+        mode: "auto_resume_after_ui_operation",
+        operation_request_id: "vop_keyboard123456",
+        resume_state_keys: ["page_operation_context", "page_context", "operation_result"],
       },
     },
   });
@@ -101,6 +134,7 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses graph edit playba
     detail: {
       operation_request: {
         version: 1,
+        operation_request_id: "vop_graphedit1234",
         commands: ["graph_edit editor.graph.playback"],
         operations: [
           {
@@ -116,11 +150,17 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses graph edit playba
         cursor_lifecycle: "return_at_end",
         reason: "创建一个姓名输入图。",
       },
+      expected_continuation: {
+        mode: "auto_resume_after_ui_operation",
+        operation_request_id: "vop_graphedit1234",
+        resume_state_keys: ["page_operation_context", "page_context", "operation_result"],
+      },
     },
   });
 
   assert.deepEqual(plan, {
     version: 1,
+    operationRequestId: "vop_graphedit1234",
     commands: ["graph_edit editor.graph.playback"],
     operations: [
       {
@@ -134,6 +174,11 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses graph edit playba
       },
     ],
     cursorLifecycle: "return_at_end",
+    expectedContinuation: {
+      mode: "auto_resume_after_ui_operation",
+      operationRequestId: "vop_graphedit1234",
+      resumeStateKeys: ["page_operation_context", "page_context", "operation_result"],
+    },
     reason: "创建一个姓名输入图。",
   });
 });

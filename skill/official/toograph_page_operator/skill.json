@@ -57,6 +57,12 @@
       "description": "虚拟鼠标会话 ID，首期为空字符串。"
     },
     {
+      "key": "operation_request_id",
+      "name": "Operation Request ID",
+      "valueType": "text",
+      "description": "Skill/runtime 确定性生成的页面操作请求 ID，用于把 activity event、前端执行确认和 run resume 关联起来。"
+    },
+    {
       "key": "journal",
       "name": "Journal",
       "valueType": "json",

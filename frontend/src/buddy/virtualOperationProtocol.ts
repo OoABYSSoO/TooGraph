@@ -51,10 +51,18 @@ export type BuddyVirtualOperation =
 
 export type BuddyVirtualOperationPlan = {
   version: 1;
+  operationRequestId?: string;
   commands: string[];
   operations: BuddyVirtualOperation[];
   cursorLifecycle: BuddyVirtualOperationCursorLifecycle;
+  expectedContinuation?: BuddyVirtualOperationExpectedContinuation;
   reason: string;
+};
+
+export type BuddyVirtualOperationExpectedContinuation = {
+  mode: "auto_resume_after_ui_operation";
+  operationRequestId: string;
+  resumeStateKeys: string[];
 };
 
 export function resolveBuddyVirtualOperationPlanFromActivityEvent(payload: Record<string, unknown>): BuddyVirtualOperationPlan | null {
@@ -62,11 +70,31 @@ export function resolveBuddyVirtualOperationPlanFromActivityEvent(payload: Recor
     return null;
   }
   const detail = recordFromUnknown(payload.detail);
-  const operationRequest = recordFromUnknown(detail?.operation_request ?? detail?.operationRequest);
+  if (!detail) {
+    return null;
+  }
+  const operationRequest = recordFromUnknown(detail.operation_request ?? detail.operationRequest);
   if (!operationRequest) {
     return null;
   }
   if (operationRequest.version !== 1) {
+    return null;
+  }
+
+  const operationRequestId = normalizeText(
+    operationRequest.operation_request_id
+      ?? operationRequest.operationRequestId
+      ?? detail.operation_request_id
+      ?? detail.operationRequestId,
+  );
+  if (!operationRequestId) {
+    return null;
+  }
+  const expectedContinuation = normalizeExpectedContinuation(
+    detail.expected_continuation ?? detail.expectedContinuation,
+    operationRequestId,
+  );
+  if (!expectedContinuation) {
     return null;
   }
 
@@ -81,9 +109,11 @@ export function resolveBuddyVirtualOperationPlanFromActivityEvent(payload: Recor
 
   return {
     version: 1,
+    operationRequestId,
     commands,
     operations,
     cursorLifecycle: normalizeCursorLifecycle(operationRequest.cursor_lifecycle ?? operationRequest.cursorLifecycle),
+    expectedContinuation,
     reason: normalizeText(operationRequest.reason),
   };
 }
@@ -138,6 +168,30 @@ function listOperations(value: unknown): BuddyVirtualOperation[] {
     return [];
   }
   return operations;
+}
+
+function normalizeExpectedContinuation(value: unknown, operationRequestId: string): BuddyVirtualOperationExpectedContinuation | null {
+  const record = recordFromUnknown(value);
+  if (!record) {
+    return null;
+  }
+  if (normalizeText(record.mode) !== "auto_resume_after_ui_operation") {
+    return null;
+  }
+  const continuationRequestId = normalizeText(record.operation_request_id ?? record.operationRequestId) || operationRequestId;
+  if (continuationRequestId !== operationRequestId) {
+    return null;
+  }
+  const resumeStateKeys = listText(record.resume_state_keys ?? record.resumeStateKeys);
+  const requiredKeys = ["page_operation_context", "page_context", "operation_result"];
+  if (!requiredKeys.every((key) => resumeStateKeys.includes(key))) {
+    return null;
+  }
+  return {
+    mode: "auto_resume_after_ui_operation",
+    operationRequestId,
+    resumeStateKeys,
+  };
 }
 
 function listGraphEditIntents(value: unknown): GraphEditIntent[] {

@@ -86,6 +86,57 @@ class RuntimeActivityEventsTests(unittest.TestCase):
         self.assertEqual(event["detail"]["removed"], 0)
         self.assertEqual(published[0][1], "activity.event")
 
+    def test_record_skill_activity_events_enriches_virtual_operation_continuation_context(self) -> None:
+        state = {
+            "run_id": "run-activity",
+            "_subgraph_context": {"node_id": "operation_loop", "path": ["operation_loop"]},
+        }
+        published: list[tuple[str, str, dict]] = []
+
+        from app.core.runtime.activity_events import record_skill_activity_events
+
+        events = record_skill_activity_events(
+            state,
+            node_id="execute_page_operation",
+            skill_key="toograph_page_operator",
+            binding_source="node_skill",
+            raw_events=[
+                {
+                    "kind": "virtual_ui_operation",
+                    "summary": "Requested virtual click on 运行历史.",
+                    "status": "requested",
+                    "detail": {
+                        "operation_request_id": "vop_1234567890abcdef",
+                        "operation_request": {
+                            "version": 1,
+                            "commands": ["click app.nav.runs"],
+                            "operations": [{"kind": "click", "target_id": "app.nav.runs"}],
+                        },
+                    },
+                }
+            ],
+            publish_run_event_func=lambda run_id, event_type, payload=None: published.append(
+                (str(run_id), event_type, dict(payload or {}))
+            ),
+        )
+
+        event = events[0]
+        detail = event["detail"]
+        self.assertEqual(detail["run_id"], "run-activity")
+        self.assertEqual(detail["node_id"], "execute_page_operation")
+        self.assertEqual(detail["subgraph_node_id"], "operation_loop")
+        self.assertEqual(detail["subgraph_path"], ["operation_loop"])
+        self.assertEqual(detail["operation_request"]["operation_request_id"], "vop_1234567890abcdef")
+        self.assertEqual(
+            detail["expected_continuation"],
+            {
+                "mode": "auto_resume_after_ui_operation",
+                "operation_request_id": "vop_1234567890abcdef",
+                "resume_state_keys": ["page_operation_context", "page_context", "operation_result"],
+            },
+        )
+        self.assertEqual(published[0][2]["detail"]["expected_continuation"]["mode"], "auto_resume_after_ui_operation")
+
 
 if __name__ == "__main__":
     unittest.main()

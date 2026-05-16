@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -7,6 +8,7 @@ from typing import Any
 
 
 SUPPORTED_CURSOR_LIFECYCLES = {"keep", "return_after_step", "return_at_end"}
+AUTO_RESUME_STATE_KEYS = ["page_operation_context", "page_context", "operation_result"]
 KNOWN_CLICK_TARGETS = {
     "click app.nav.home": {
         "target_id": "app.nav.home",
@@ -131,17 +133,21 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
         "cursor_lifecycle": cursor_lifecycle,
         "reason": reason,
     }
+    operation_request_id = _operation_request_id(operation_request)
+    operation_request["operation_request_id"] = operation_request_id
     journal_entry = {
         "kind": "click",
         "command": command,
         "target_id": target_id,
         "target_label": target_label,
+        "operation_request_id": operation_request_id,
         "status": "requested",
         "reason": reason,
     }
     return {
         "ok": True,
         "cursor_session_id": "",
+        "operation_request_id": operation_request_id,
         "journal": [journal_entry],
         "error": None,
         "activity_events": [
@@ -151,7 +157,9 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
                 "status": "requested",
                 "detail": {
                     "commands": commands,
+                    "operation_request_id": operation_request_id,
                     "operation_request": operation_request,
+                    "expected_continuation": _expected_continuation(operation_request_id),
                     "operation": operation,
                     "cursor_lifecycle": cursor_lifecycle,
                     "journal": [journal_entry],
@@ -206,11 +214,14 @@ def _build_graph_edit_result(
         "cursor_lifecycle": cursor_lifecycle,
         "reason": reason,
     }
+    operation_request_id = _operation_request_id(operation_request)
+    operation_request["operation_request_id"] = operation_request_id
     journal_entry = {
         "kind": "graph_edit",
         "command": commands[0],
         "target_id": "editor.graph.playback",
         "target_label": "图编辑回放",
+        "operation_request_id": operation_request_id,
         "intent_count": len(graph_edit_intents),
         "status": "requested",
         "reason": reason,
@@ -218,6 +229,7 @@ def _build_graph_edit_result(
     return {
         "ok": True,
         "cursor_session_id": "",
+        "operation_request_id": operation_request_id,
         "journal": [journal_entry],
         "error": None,
         "activity_events": [
@@ -227,7 +239,9 @@ def _build_graph_edit_result(
                 "status": "requested",
                 "detail": {
                     "commands": commands,
+                    "operation_request_id": operation_request_id,
                     "operation_request": operation_request,
+                    "expected_continuation": _expected_continuation(operation_request_id),
                     "operation": operation,
                     "cursor_lifecycle": cursor_lifecycle,
                     "journal": [journal_entry],
@@ -287,6 +301,20 @@ def _parse_command(command: str) -> tuple[str, str] | None:
     if len(parts) != 2:
         return None
     return parts[0].lower(), parts[1].strip()
+
+
+def _operation_request_id(operation_request: dict[str, Any]) -> str:
+    canonical = json.dumps(operation_request, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return f"vop_{digest[:16]}"
+
+
+def _expected_continuation(operation_request_id: str) -> dict[str, Any]:
+    return {
+        "mode": "auto_resume_after_ui_operation",
+        "operation_request_id": operation_request_id,
+        "resume_state_keys": list(AUTO_RESUME_STATE_KEYS),
+    }
 
 
 def _normalize_graph_edit_intents(value: Any) -> list[dict[str, Any]]:
