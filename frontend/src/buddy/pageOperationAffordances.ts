@@ -75,6 +75,14 @@ export type PageOperationBook = {
   forbidden: string[];
 };
 
+const EDITOR_GRAPH_PLAYBACK_OPERATION: PageOperationBook["allowedOperations"][number] = {
+  targetId: "editor.graph.playback",
+  label: "图编辑回放",
+  role: "button",
+  commands: ["graph_edit editor.graph.playback"],
+  resultHint: null,
+};
+
 export type PageOperationRuntimeContext = {
   page_path: string;
   page_snapshot: PageOperationSnapshot;
@@ -167,6 +175,10 @@ export function buildPageOperationBook(snapshot: PageOperationSnapshotInit | Pag
     });
   }
 
+  if (isEditorRoutePath(snapshot.path) && !allowedOperations.some((operation) => operation.targetId === EDITOR_GRAPH_PLAYBACK_OPERATION.targetId)) {
+    allowedOperations.push({ ...EDITOR_GRAPH_PLAYBACK_OPERATION, commands: [...EDITOR_GRAPH_PLAYBACK_OPERATION.commands] });
+  }
+
   return {
     page: {
       path: normalizeRoutePath(snapshot.path),
@@ -178,6 +190,11 @@ export function buildPageOperationBook(snapshot: PageOperationSnapshotInit | Pag
     unavailable,
     forbidden: ["伙伴页面、伙伴浮窗、伙伴形象、伙伴调试入口不可由伙伴自己操作。"],
   };
+}
+
+function isEditorRoutePath(routePath: string): boolean {
+  const normalized = normalizeRoutePath(routePath);
+  return normalized === "/editor" || normalized.startsWith("/editor/");
 }
 
 export function buildPageOperationRuntimeContext(input: {

@@ -18,18 +18,22 @@ def toograph_page_operator_before_llm(**payload: Any) -> dict[str, str]:
         for operation in operation_book["allowedOperations"]
         for command in operation.get("commands", [])
     ]
+    graph_edit_commands = [command for command in available_commands if command.startswith("graph_edit ")]
     context = {
         "current_page_path": page_path,
         "page_operation_book": operation_book,
         "available_commands": available_commands,
         "output_contract": {
             "commands": available_commands[:1],
+            "graph_edit_intents": _example_graph_edit_intents() if graph_edit_commands else [],
             "cursor_lifecycle": "return_after_step",
             "reason": "用一句话说明为什么选择这些命令。",
         },
         "rules": [
             "commands 必须逐字来自 available_commands。",
-            "当前阶段一次只输出一条 commands 命令。",
+            "一次只输出一条 commands 命令；普通页面操作使用 click，图编辑使用 graph_edit editor.graph.playback。",
+            "选择 graph_edit editor.graph.playback 时，graph_edit_intents 必须是产品语义图编辑意图数组。",
+            "graph_edit_intents 支持 create_node、create_state、bind_state、connect_nodes、update_node；不要描述双击、菜单、DOM selector 或坐标。",
             "不要输出 DOM selector、坐标、鼠标轨迹或截图描述。",
             "伙伴页面、伙伴浮窗、伙伴形象和调试入口不可操作。",
         ],
@@ -48,7 +52,7 @@ def _sanitize_operation_book(value: Any, page_path: str) -> dict[str, Any]:
         commands = [
             command
             for command in _list_text(operation.get("commands"))
-            if _is_supported_click_command(command, target_id)
+            if _is_supported_command(command, target_id, page_path)
         ]
         if not commands:
             continue
@@ -102,6 +106,36 @@ def _sanitize_unavailable(value: Any) -> list[dict[str, str]]:
     return unavailable
 
 
+def _example_graph_edit_intents() -> list[dict[str, Any]]:
+    return [
+        {
+            "kind": "create_node",
+            "ref": "stable_reference_name",
+            "nodeType": "input | agent | output | condition",
+            "title": "节点标题",
+            "description": "节点简介",
+            "taskInstruction": "仅 agent 节点需要的单轮 LLM 任务说明",
+        },
+        {
+            "kind": "create_state",
+            "ref": "state_reference_name",
+            "name": "状态名称",
+            "valueType": "text",
+        },
+        {
+            "kind": "bind_state",
+            "nodeRef": "stable_reference_name",
+            "stateRef": "state_reference_name",
+            "mode": "read | write",
+        },
+        {
+            "kind": "connect_nodes",
+            "sourceRef": "source_node_ref",
+            "targetRef": "target_node_ref",
+        },
+    ]
+
+
 def _extract_book_path(value: Any) -> str:
     if not isinstance(value, dict):
         return ""
@@ -121,14 +155,26 @@ def _list_text(value: Any) -> list[str]:
     return [_compact_text(item) for item in value if _compact_text(item)]
 
 
-def _is_supported_click_command(command: str, target_id: str) -> bool:
+def _is_supported_command(command: str, target_id: str, page_path: str) -> bool:
     parts = command.strip().split(maxsplit=1)
-    if len(parts) != 2 or parts[0].lower() != "click":
+    if len(parts) != 2:
         return False
+    action = parts[0].lower()
     command_target_id = parts[1].strip()
     if target_id and command_target_id != target_id:
         return False
+    if action not in {"click", "graph_edit"}:
+        return False
+    if action == "graph_edit" and command_target_id != "editor.graph.playback":
+        return False
+    if action == "graph_edit" and not _is_editor_page(page_path):
+        return False
     return not _is_self_surface_target(command_target_id)
+
+
+def _is_editor_page(page_path: str) -> bool:
+    normalized = page_path.strip()
+    return normalized == "/editor" or normalized.startswith("/editor/")
 
 
 def _is_self_surface_target(target_id: str) -> bool:

@@ -11,8 +11,9 @@ Current phase:
 
 - Supports one operation per invocation.
 - Supports safe `click` commands from the current page operation book, including application navigation and editor canvas targets.
+- Supports `graph_edit editor.graph.playback` on editor pages. For graph editing, the LLM outputs product-semantic `graph_edit_intents`; the frontend compiles them into graph commands and visible playback steps.
 - Rejects Buddy self surfaces such as the Buddy page, Buddy floating window, Buddy avatar, and debug controls.
-- Does not expose DOM selectors, screen coordinates, or low-level mouse trajectories to the LLM.
+- Does not expose DOM selectors, screen coordinates, double-click recipes, or low-level mouse trajectories to the LLM.
 
 Graph state inputs:
 
@@ -26,6 +27,7 @@ Runtime context:
 LLM output:
 
 - `commands`: array of command strings copied from the page operation book, such as `["click app.nav.library"]` or `["click editor.canvas.node.agent_1"]`.
+- `graph_edit_intents`: required only when `commands` is `["graph_edit editor.graph.playback"]`. Use semantic operations such as `create_node`, `create_state`, `bind_state`, `connect_nodes`, and `update_node`.
 - `cursor_lifecycle`: virtual cursor lifecycle, such as `return_after_step`.
 - `reason`: short audit reason for choosing the command.
 
@@ -36,4 +38,4 @@ State outputs:
 - `journal`: operation journal summary.
 - `error`: structured failure detail.
 
-`before_llm.py` injects the current page operation book from runtime context, not graph state. `after_llm.py` validates the LLM command list and emits a `virtual_ui_operation` activity event for the frontend runtime to execute. Page routing is observed from the real UI after the operation, not returned as Skill state.
+`before_llm.py` injects the current page operation book from runtime context, not graph state. `after_llm.py` validates the LLM command list and emits a `virtual_ui_operation` activity event for the frontend runtime to execute. Page routing and graph mutations are observed from the real UI after the operation, not returned as Skill state.

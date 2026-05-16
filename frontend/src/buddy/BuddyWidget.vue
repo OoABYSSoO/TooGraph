@@ -449,6 +449,7 @@ import {
   isSmoothNumberDisplaySettled,
   type SmoothNumberDisplayState,
 } from "../lib/smoothNumberDisplay.ts";
+import type { GraphEditIntent, GraphEditPlaybackStep } from "../editor/workspace/graphEditPlaybackModel.ts";
 import { useBuddyContextStore } from "../stores/buddyContext.ts";
 import {
   useBuddyMascotDebugStore,
@@ -2285,6 +2286,9 @@ async function executeBuddyVirtualOperationCommand(operation: BuddyVirtualOperat
     case "wait":
       await executeBuddyVirtualWaitOperation(operation);
       return;
+    case "graph_edit":
+      await executeBuddyVirtualGraphEditOperation(operation);
+      return;
   }
 }
 
@@ -2357,6 +2361,100 @@ async function executeBuddyVirtualWaitOperation(operation: BuddyVirtualOperation
     return;
   }
   await waitForVirtualOperation(operation.option === "short" ? 300 : 120);
+}
+
+type GraphEditPlaybackPlanRequestResponse = {
+  requestId: string;
+  ok: boolean;
+  playbackSteps: GraphEditPlaybackStep[];
+  issues: string[];
+};
+
+async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOperation) {
+  if (operation.kind !== "graph_edit") {
+    return;
+  }
+  const affordance = resolveVirtualOperationAffordance(operation.targetId);
+  if (affordance) {
+    await moveVirtualCursorToElement(affordance.element);
+  }
+  const requestId = `graph-edit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const response = requestGraphEditPlaybackPlan({
+    requestId,
+    graphEditIntents: operation.graphEditIntents,
+  });
+  if (!response?.ok) {
+    return;
+  }
+  for (const step of response.playbackSteps) {
+    const targetElement = resolveGraphEditPlaybackStepElement(step) ?? affordance?.element ?? null;
+    if (targetElement) {
+      await moveVirtualCursorToElement(targetElement);
+    }
+    if (step.kind === "apply_graph_command" && step.commandId) {
+      dispatchGraphEditPlaybackApplyCommand(requestId, step.commandId);
+    }
+    await waitForVirtualOperation(resolveGraphEditPlaybackStepDelayMs(step));
+  }
+}
+
+function requestGraphEditPlaybackPlan(input: { requestId: string; graphEditIntents: GraphEditIntent[] }): GraphEditPlaybackPlanRequestResponse | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const detail: {
+    requestId: string;
+    graphEditIntents: GraphEditIntent[];
+    response: GraphEditPlaybackPlanRequestResponse | null;
+  } = {
+    requestId: input.requestId,
+    graphEditIntents: input.graphEditIntents.map((intent) => ({ ...intent })),
+    response: null,
+  };
+  window.dispatchEvent(new CustomEvent("toograph:graph-edit-playback-plan-request", { detail }));
+  return detail.response;
+}
+
+function dispatchGraphEditPlaybackApplyCommand(requestId: string, commandId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.dispatchEvent(
+    new CustomEvent("toograph:graph-edit-playback-apply-command", {
+      detail: { requestId, commandId },
+    }),
+  );
+}
+
+function resolveGraphEditPlaybackStepElement(step: GraphEditPlaybackStep): HTMLElement | null {
+  if (step.target.startsWith("editor.canvas.")) {
+    return resolveVirtualOperationAffordance(step.target)?.element ?? null;
+  }
+  const nodeId = resolveGraphEditPlaybackStepNodeId(step);
+  if (nodeId) {
+    return resolveVirtualOperationAffordance(`editor.canvas.node.${nodeId}`)?.element ?? null;
+  }
+  return resolveVirtualOperationAffordance("editor.canvas.surface")?.element ?? null;
+}
+
+function resolveGraphEditPlaybackStepNodeId(step: GraphEditPlaybackStep): string {
+  if (step.target.includes("->")) {
+    return "";
+  }
+  const [nodeId = ""] = step.target.split(".", 1);
+  return nodeId.startsWith("input_") || nodeId.startsWith("agent_") || nodeId.startsWith("output_") || nodeId.startsWith("condition_")
+    ? nodeId
+    : "";
+}
+
+function resolveGraphEditPlaybackStepDelayMs(step: GraphEditPlaybackStep): number {
+  if (step.kind === "apply_graph_command") {
+    return 180;
+  }
+  if (step.kind === "type_node_field") {
+    return 160;
+  }
+  return 90;
 }
 
 function resolveVirtualOperationAffordance(targetId: string): { element: HTMLElement } | null {

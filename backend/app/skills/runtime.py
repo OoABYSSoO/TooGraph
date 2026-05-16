@@ -140,6 +140,9 @@ class ScriptSkillRunner:
             env["TOOGRAPH_SKILL_ARTIFACT_DIR"] = artifact_dir
         if artifact_relative_dir:
             env["TOOGRAPH_SKILL_ARTIFACT_RELATIVE_DIR"] = artifact_relative_dir
+        skill_runtime_context = context.get("skill_runtime_context")
+        if isinstance(skill_runtime_context, dict):
+            env["TOOGRAPH_SKILL_RUNTIME_CONTEXT"] = json.dumps(skill_runtime_context, ensure_ascii=False)
         return env
 
     def _build_command(self, *, python_executable: str) -> list[str]:

@@ -73,6 +73,35 @@ test("buddy mascot debug store records virtual operation requests", () => {
   });
 });
 
+test("buddy mascot debug store snapshots graph edit operation requests", () => {
+  setActivePinia(createPinia());
+  const store = useBuddyMascotDebugStore();
+  const intents = [
+    { kind: "create_node", ref: "input", nodeType: "input", title: "input节点" },
+    { kind: "create_state", ref: "name", name: "姓名", valueType: "text" },
+  ];
+
+  store.requestVirtualOperation({
+    version: 1,
+    commands: ["graph_edit editor.graph.playback"],
+    operations: [{ kind: "graph_edit", targetId: "editor.canvas.surface", graphEditIntents: intents }],
+    cursorLifecycle: "return_at_end",
+    reason: "创建姓名图。",
+  });
+  intents.push({ kind: "create_node", ref: "late", nodeType: "output", title: "迟到节点" });
+
+  assert.deepEqual(store.latestVirtualOperationRequest?.request.operations, [
+    {
+      kind: "graph_edit",
+      targetId: "editor.canvas.surface",
+      graphEditIntents: [
+        { kind: "create_node", ref: "input", nodeType: "input", title: "input节点" },
+        { kind: "create_state", ref: "name", name: "姓名", valueType: "text" },
+      ],
+    },
+  ]);
+});
+
 test("buddy mascot debug store exposes live motion timing controls", () => {
   setActivePinia(createPinia());
   const store = useBuddyMascotDebugStore();

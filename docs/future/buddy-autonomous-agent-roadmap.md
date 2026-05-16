@@ -750,6 +750,8 @@ LLM 目标图编辑意图
   -> graph diff / revision / undo / activity journal
 ```
 
+当前已落地的阶段一链路是：页面操作书在编辑器页暴露 `graph_edit editor.graph.playback`；`toograph_page_operator` 接受 `graph_edit_intents`；Buddy 虚拟操作协议解析 `graph_edit` operation；虚拟鼠标定位到 `editor.canvas.surface` 后，通过前端 `toograph:graph-edit-playback-plan-request` 和 `toograph:graph-edit-playback-apply-command` 事件驱动 `EditorWorkspaceShell` 编译并逐命令应用图编辑。后续仍应把 UI playback steps 的菜单展开、字段聚焦、逐字键入、连线拖拽和图变更审计做得更完整。
+
 ### Skill 生命周期边界
 
 页面操作应通过一个语义级 Skill 和运行时虚拟操作层协作完成，而不是把每个鼠标动作拆成独立 Skill。

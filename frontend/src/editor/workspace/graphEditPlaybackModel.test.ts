@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import type { GraphPayload } from "../../types/node-system.ts";
 import {
+  applyGraphEditCommandToDocument,
   applyGraphEditPlaybackPlan,
   buildGraphEditPlaybackPlan,
   GRAPH_EDIT_PLAYBACK_CAPABILITY_MANUAL,
@@ -159,6 +160,41 @@ test("applyGraphEditPlaybackPlan applies semantic graph commands to the current 
     "create_state",
     "bind_state",
   ]);
+});
+
+test("applyGraphEditCommandToDocument applies one playback command at a time", () => {
+  const plan = buildGraphEditPlaybackPlan(emptyDocument(), {
+    operations: [
+      {
+        kind: "create_node",
+        ref: "name_input",
+        nodeType: "input",
+        title: "input节点",
+        description: "输入姓名。",
+      },
+      {
+        kind: "create_state",
+        ref: "name",
+        name: "姓名",
+        valueType: "text",
+      },
+      {
+        kind: "bind_state",
+        nodeRef: "name_input",
+        stateRef: "name",
+        mode: "write",
+      },
+    ],
+  });
+
+  const afterNode = applyGraphEditCommandToDocument(emptyDocument(), plan.graphCommands[0]!);
+  const afterState = applyGraphEditCommandToDocument(afterNode, plan.graphCommands[1]!);
+  const afterBinding = applyGraphEditCommandToDocument(afterState, plan.graphCommands[2]!);
+
+  assert.equal(afterNode.nodes.input_name_input?.kind, "input");
+  assert.equal(afterNode.state_schema.state_name, undefined);
+  assert.equal(afterState.state_schema.state_name?.name, "姓名");
+  assert.deepEqual(afterBinding.nodes.input_name_input?.writes, [{ state: "state_name", mode: "replace" }]);
 });
 
 test("buildGraphEditPlaybackPlan reports unresolved references before any document mutation", () => {

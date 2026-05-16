@@ -94,3 +94,46 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses keyboard command 
   assert.equal(plan?.cursorLifecycle, "keep");
   assert.equal(plan?.reason, "test input");
 });
+
+test("resolveBuddyVirtualOperationPlanFromActivityEvent parses graph edit playback operations", () => {
+  const plan = resolveBuddyVirtualOperationPlanFromActivityEvent({
+    kind: "virtual_ui_operation",
+    detail: {
+      operation_request: {
+        version: 1,
+        commands: ["graph_edit editor.graph.playback"],
+        operations: [
+          {
+            kind: "graph_edit",
+            target_id: "editor.canvas.surface",
+            graph_edit_intents: [
+              { kind: "create_node", ref: "name_input", nodeType: "input", title: "input节点", description: "输入姓名。" },
+              { kind: "create_state", ref: "name", name: "姓名", valueType: "text" },
+              { kind: "bind_state", nodeRef: "name_input", stateRef: "name", mode: "write" },
+            ],
+          },
+        ],
+        cursor_lifecycle: "return_at_end",
+        reason: "创建一个姓名输入图。",
+      },
+    },
+  });
+
+  assert.deepEqual(plan, {
+    version: 1,
+    commands: ["graph_edit editor.graph.playback"],
+    operations: [
+      {
+        kind: "graph_edit",
+        targetId: "editor.canvas.surface",
+        graphEditIntents: [
+          { kind: "create_node", ref: "name_input", nodeType: "input", title: "input节点", description: "输入姓名。" },
+          { kind: "create_state", ref: "name", name: "姓名", valueType: "text" },
+          { kind: "bind_state", nodeRef: "name_input", stateRef: "name", mode: "write" },
+        ],
+      },
+    ],
+    cursorLifecycle: "return_at_end",
+    reason: "创建一个姓名输入图。",
+  });
+});

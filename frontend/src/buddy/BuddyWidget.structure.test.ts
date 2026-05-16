@@ -412,7 +412,13 @@ test("BuddyWidget executes virtual UI operation events through the virtual curso
   assert.match(componentSource, /case "type":[\s\S]*executeBuddyVirtualTypeOperation/);
   assert.match(componentSource, /case "press":[\s\S]*executeBuddyVirtualPressOperation/);
   assert.match(componentSource, /case "wait":[\s\S]*executeBuddyVirtualWaitOperation/);
+  assert.match(componentSource, /case "graph_edit":[\s\S]*executeBuddyVirtualGraphEditOperation/);
   assert.match(componentSource, /function executeBuddyVirtualClickOperation\(operation: BuddyVirtualOperation\)/);
+  assert.match(componentSource, /async function executeBuddyVirtualGraphEditOperation\(operation: BuddyVirtualOperation\)/);
+  assert.match(componentSource, /requestGraphEditPlaybackPlan\(\{[\s\S]*requestId,[\s\S]*graphEditIntents: operation\.graphEditIntents,[\s\S]*\}\);/);
+  assert.match(componentSource, /window\.dispatchEvent\(new CustomEvent\("toograph:graph-edit-playback-plan-request", \{ detail \}\)\);/);
+  assert.match(componentSource, /dispatchGraphEditPlaybackApplyCommand\(requestId, step\.commandId\);/);
+  assert.match(componentSource, /window\.dispatchEvent\([\s\S]*new CustomEvent\("toograph:graph-edit-playback-apply-command"/);
   assert.match(componentSource, /function resolveVirtualOperationAffordance\(targetId: string\)/);
   assert.match(componentSource, /querySelector<HTMLElement>\(`\[data-virtual-affordance-id="\$\{escapeVirtualOperationTargetId\(targetId\)\}"\]`\)/);
   assert.doesNotMatch(componentSource, /"app\.nav\.buddy":/);

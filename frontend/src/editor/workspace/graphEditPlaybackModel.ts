@@ -268,6 +268,10 @@ export function applyGraphEditPlaybackPlan<T extends GraphPayload | GraphDocumen
   };
 }
 
+export function applyGraphEditCommandToDocument<T extends GraphPayload | GraphDocument>(document: T, command: GraphEditCommand): T {
+  return applyGraphEditCommand(document, command);
+}
+
 function compileGraphEditIntent(
   operation: GraphEditIntent,
   index: number,
