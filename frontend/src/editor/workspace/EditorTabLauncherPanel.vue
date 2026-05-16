@@ -6,7 +6,16 @@
         <div class="editor-tab-launcher-panel__hint">{{ t("launcher.hint") }}</div>
       </div>
 
-      <button type="button" class="editor-tab-launcher-panel__entry" @click="$emit('create-new')">
+      <button
+        type="button"
+        class="editor-tab-launcher-panel__entry"
+        data-virtual-affordance-id="editor.launcher.createNew"
+        :data-virtual-affordance-label="blankEntryTitle"
+        data-virtual-affordance-role="button"
+        data-virtual-affordance-zone="editor.launcher"
+        data-virtual-affordance-actions="click"
+        @click="$emit('create-new')"
+      >
         <span class="editor-tab-launcher-panel__entry-icon" aria-hidden="true">
           <ElIcon><DocumentAdd /></ElIcon>
         </span>
@@ -17,7 +26,16 @@
         <ElIcon class="editor-tab-launcher-panel__entry-arrow" aria-hidden="true"><ArrowRight /></ElIcon>
       </button>
 
-      <button type="button" class="editor-tab-launcher-panel__entry" @click="$emit('import-python-graph')">
+      <button
+        type="button"
+        class="editor-tab-launcher-panel__entry"
+        data-virtual-affordance-id="editor.launcher.importPython"
+        :data-virtual-affordance-label="t('launcher.importPythonTitle')"
+        data-virtual-affordance-role="button"
+        data-virtual-affordance-zone="editor.launcher"
+        data-virtual-affordance-actions="click"
+        @click="$emit('import-python-graph')"
+      >
         <span class="editor-tab-launcher-panel__entry-icon" aria-hidden="true">
           <ElIcon><Upload /></ElIcon>
         </span>
@@ -28,7 +46,16 @@
         <ElIcon class="editor-tab-launcher-panel__entry-arrow" aria-hidden="true"><ArrowRight /></ElIcon>
       </button>
 
-      <button type="button" class="editor-tab-launcher-panel__entry" @click="$emit('open-graph-replay-debug')">
+      <button
+        type="button"
+        class="editor-tab-launcher-panel__entry"
+        data-virtual-affordance-id="editor.launcher.openReplayDebug"
+        :data-virtual-affordance-label="t('launcher.graphReplayTitle')"
+        data-virtual-affordance-role="button"
+        data-virtual-affordance-zone="editor.launcher"
+        data-virtual-affordance-actions="click"
+        @click="$emit('open-graph-replay-debug')"
+      >
         <span class="editor-tab-launcher-panel__entry-icon" aria-hidden="true">
           <ElIcon><VideoPlay /></ElIcon>
         </span>
@@ -39,7 +66,16 @@
         <ElIcon class="editor-tab-launcher-panel__entry-arrow" aria-hidden="true"><ArrowRight /></ElIcon>
       </button>
 
-      <button type="button" class="editor-tab-launcher-panel__entry" @click="openSecondaryView('template')">
+      <button
+        type="button"
+        class="editor-tab-launcher-panel__entry"
+        data-virtual-affordance-id="editor.launcher.browseTemplates"
+        :data-virtual-affordance-label="t('launcher.templateTitle')"
+        data-virtual-affordance-role="button"
+        data-virtual-affordance-zone="editor.launcher"
+        data-virtual-affordance-actions="click"
+        @click="openSecondaryView('template')"
+      >
         <span class="editor-tab-launcher-panel__entry-icon" aria-hidden="true">
           <ElIcon><CollectionTag /></ElIcon>
         </span>
@@ -50,7 +86,16 @@
         <ElIcon class="editor-tab-launcher-panel__entry-arrow" aria-hidden="true"><ArrowRight /></ElIcon>
       </button>
 
-      <button type="button" class="editor-tab-launcher-panel__entry" @click="openSecondaryView('graph')">
+      <button
+        type="button"
+        class="editor-tab-launcher-panel__entry"
+        data-virtual-affordance-id="editor.launcher.browseGraphs"
+        :data-virtual-affordance-label="t('launcher.graphTitle')"
+        data-virtual-affordance-role="button"
+        data-virtual-affordance-zone="editor.launcher"
+        data-virtual-affordance-actions="click"
+        @click="openSecondaryView('graph')"
+      >
         <span class="editor-tab-launcher-panel__entry-icon" aria-hidden="true">
           <ElIcon><FolderOpened /></ElIcon>
         </span>
@@ -80,6 +125,11 @@
           :key="option.value"
           type="button"
           class="editor-tab-launcher-panel__option"
+          :data-virtual-affordance-id="activeView === 'template' ? `editor.launcher.createFromTemplate.${option.value}` : `editor.launcher.openGraph.${option.value}`"
+          :data-virtual-affordance-label="option.label"
+          data-virtual-affordance-role="option"
+          data-virtual-affordance-zone="editor.launcher.options"
+          data-virtual-affordance-actions="click"
           @click="selectActiveOption(option.value)"
         >
           <span class="editor-tab-launcher-panel__option-label">{{ option.label }}</span>

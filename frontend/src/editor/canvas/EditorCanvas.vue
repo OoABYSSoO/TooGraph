@@ -156,6 +156,8 @@
         <button
           type="button"
           class="editor-canvas__edge-delete-button"
+          data-virtual-affordance-destructive="true"
+          data-virtual-affordance-requires-confirmation="true"
           @pointerdown.stop
           @click.stop="confirmFlowEdgeDelete"
         >

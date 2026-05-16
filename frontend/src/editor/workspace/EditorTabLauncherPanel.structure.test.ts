@@ -38,6 +38,14 @@ test("EditorTabLauncherPanel offers creation, import, replay, template, and exis
   assert.doesNotMatch(componentSource, /<WorkspaceSelect/);
 });
 
+test("EditorTabLauncherPanel exposes official page-operation affordance ids", () => {
+  assert.match(componentSource, /data-virtual-affordance-id="editor\.launcher\.createNew"/);
+  assert.match(
+    componentSource,
+    /:data-virtual-affordance-id="activeView === 'template' \? `editor\.launcher\.createFromTemplate\.\$\{option\.value\}` : `editor\.launcher\.openGraph\.\$\{option\.value\}`"/,
+  );
+});
+
 test("EditorTabLauncherPanel keeps the launcher light by using compact cards instead of a full dialog", () => {
   assert.match(componentSource, /class="editor-tab-launcher-panel__entry"/);
   assert.match(componentSource, /\.editor-tab-launcher-panel \{[\s\S]*width:\s*min\(336px,\s*calc\(100vw - 32px\)\);/);

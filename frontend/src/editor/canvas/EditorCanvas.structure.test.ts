@@ -172,6 +172,10 @@ test("EditorCanvas exposes canvas objects to the virtual page operation book", (
   assert.match(componentSource, /function resolveCanvasVirtualAnchorLabel\(anchor: ProjectedCanvasAnchor\)/);
 });
 
+test("EditorCanvas marks destructive virtual operation affordances", () => {
+  assert.match(componentSource, /data-virtual-affordance-destructive="true"/);
+});
+
 test("EditorCanvas keeps virtual connection drags owned by the synthetic pointer while real pointers can pan", () => {
   const canvasConnectionInteractionsSource = readCanvasConnectionInteractionsSource();
 

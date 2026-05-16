@@ -7,7 +7,17 @@
           <h2 class="runs-page__title">{{ t("runs.title") }}</h2>
           <p class="runs-page__body">{{ t("runs.body") }}</p>
         </div>
-        <button type="button" class="runs-page__refresh" :disabled="loading" @click="loadRuns">
+        <button
+          type="button"
+          class="runs-page__refresh"
+          :disabled="loading"
+          data-virtual-affordance-id="runs.action.refresh"
+          :data-virtual-affordance-label="loading ? t('runs.refreshing') : t('runs.refresh')"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="runs.header"
+          data-virtual-affordance-actions="click"
+          @click="loadRuns"
+        >
           {{ loading ? t("runs.refreshing") : t("runs.refresh") }}
         </button>
       </header>
@@ -22,11 +32,43 @@
       <section class="runs-page__toolbar" :aria-label="t('runs.filterLabel')">
         <label class="runs-page__search-field">
           <span>{{ t("runs.searchGraphName") }}</span>
-          <ElInput v-model="graphNameQuery" class="runs-page__search" :placeholder="t('runs.searchPlaceholder')" clearable />
+          <ElInput
+            v-model="graphNameQuery"
+            class="runs-page__search"
+            :placeholder="t('runs.searchPlaceholder')"
+            clearable
+            data-virtual-affordance-id="runs.search.graphName"
+            :data-virtual-affordance-label="t('runs.searchGraphName')"
+            data-virtual-affordance-role="textbox"
+            data-virtual-affordance-zone="runs.toolbar"
+            data-virtual-affordance-actions="focus,clear,type,press"
+            data-virtual-affordance-input-kind="text"
+            :data-virtual-affordance-value-preview="graphNameQuery"
+          />
         </label>
         <div class="runs-page__status-filter">
           <span>{{ t("runs.statusFilter") }}</span>
-          <ElSegmented v-model="statusFilter" class="runs-page__segments" :options="statusOptions" />
+          <div class="runs-page__segments" role="tablist" :aria-label="t('runs.statusFilter')">
+            <button
+              v-for="option in statusOptions"
+              :key="option.value || 'all'"
+              type="button"
+              class="runs-page__segment"
+              :class="{ 'runs-page__segment--active': statusFilter === option.value }"
+              role="tab"
+              :aria-selected="statusFilter === option.value"
+              :tabindex="statusFilter === option.value ? 0 : -1"
+              :data-virtual-affordance-id="`runs.filter.status.${option.value || 'all'}`"
+              :data-virtual-affordance-label="option.label"
+              data-virtual-affordance-role="tab"
+              data-virtual-affordance-zone="runs.toolbar"
+              data-virtual-affordance-actions="click"
+              :data-virtual-affordance-current="statusFilter === option.value ? 'true' : undefined"
+              @click="statusFilter = option.value"
+            >
+              {{ option.label }}
+            </button>
+          </div>
         </div>
       </section>
 
@@ -45,6 +87,11 @@
           role="link"
           tabindex="0"
           :aria-label="t('runs.detailAria', { name: formatRunDisplayName(run) })"
+          :data-virtual-affordance-id="`runs.run.${run.run_id}.openDetail`"
+          :data-virtual-affordance-label="t('runs.detailAria', { name: formatRunDisplayName(run) })"
+          data-virtual-affordance-role="navigation-link"
+          data-virtual-affordance-zone="runs.list"
+          data-virtual-affordance-actions="click"
           @click="openRunDetail(run.run_id)"
           @keydown="handleRunRowKeydown($event, run.run_id)"
         >
@@ -71,13 +118,29 @@
                 class="runs-page__restore-target"
                 :class="{ 'runs-page__restore-target--active': target.key === selectedRestoreTargetKey(run) }"
                 :title="target.detail"
+                :data-virtual-affordance-id="`runs.run.${run.run_id}.restoreTarget.${target.key}`"
+                :data-virtual-affordance-label="target.label"
+                data-virtual-affordance-role="button"
+                data-virtual-affordance-zone="runs.restore"
+                data-virtual-affordance-actions="click"
+                :data-virtual-affordance-current="target.key === selectedRestoreTargetKey(run) ? 'true' : undefined"
                 @click.stop="selectRestoreTarget(run.run_id, target.key)"
               >
                 {{ target.label }}
               </button>
             </div>
             <button type="button" class="runs-page__detail-link" @click.stop="openRunDetail(run.run_id)">{{ runCardDetail }}</button>
-            <RouterLink v-if="canRestoreRunSummary(run)" class="runs-page__restore-link" @click.stop :to="restoreUrlForRun(run)">
+            <RouterLink
+              v-if="canRestoreRunSummary(run)"
+              class="runs-page__restore-link"
+              :data-virtual-affordance-id="`runs.run.${run.run_id}.restoreEdit`"
+              :data-virtual-affordance-label="t('common.restoreEdit')"
+              data-virtual-affordance-role="navigation-link"
+              data-virtual-affordance-zone="runs.restore"
+              data-virtual-affordance-actions="click"
+              @click.stop
+              :to="restoreUrlForRun(run)"
+            >
               <ElIcon class="runs-page__restore-icon" aria-hidden="true"><Promotion /></ElIcon>
               <span>{{ t("common.restoreEdit") }}</span>
             </RouterLink>
@@ -104,7 +167,7 @@
 import { Promotion } from "@element-plus/icons-vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { ElIcon, ElInput, ElPagination, ElSegmented } from "element-plus";
+import { ElIcon, ElInput, ElPagination } from "element-plus";
 import { useI18n } from "vue-i18n";
 
 import { fetchRuns } from "@/api/runs";
@@ -380,54 +443,48 @@ function statusBadgeClass(status: string) {
 }
 
 .runs-page__segments {
-  --el-segmented-bg-color: rgba(255, 248, 240, 0.72);
-  --el-segmented-item-selected-bg-color: rgba(255, 255, 255, 0.96);
-  --el-segmented-item-selected-color: var(--toograph-accent-strong);
-  --el-segmented-color: rgba(90, 58, 28, 0.74);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
   width: 100%;
   overflow-x: auto;
-}
-
-.runs-page__segments :deep(.el-segmented) {
-  min-height: 40px;
   border: 1px solid rgba(154, 52, 18, 0.1);
   border-radius: 999px;
+  background: rgba(255, 248, 240, 0.72);
   padding: 4px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68);
 }
 
-.runs-page__segments :deep(.el-segmented__item) {
+.runs-page__segment {
+  flex: 0 0 auto;
   min-height: 32px;
+  border: 0;
   border-radius: 999px;
+  background: transparent;
+  padding: 0 12px;
   color: rgba(90, 58, 28, 0.74);
+  font-weight: 700;
+  cursor: pointer;
   transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
 }
 
-.runs-page__segments :deep(.el-segmented__group) {
-  gap: 4px;
-  min-width: max-content;
-}
-
-.runs-page__segments :deep(.el-segmented__item:not(.is-selected):hover) {
+.runs-page__segment:not(.runs-page__segment--active):hover {
   background: rgba(255, 255, 255, 0.56);
   color: rgba(124, 45, 18, 0.92);
 }
 
-.runs-page__segments :deep(.el-segmented__item.is-selected) {
+.runs-page__segment--active {
+  border: 1px solid rgba(154, 52, 18, 0.18);
+  background: rgba(255, 255, 255, 0.96);
   color: var(--toograph-accent-strong);
   font-weight: 800;
-}
-
-.runs-page__segments :deep(.el-segmented__item-label) {
-  padding: 0 10px;
-  font-weight: 700;
-}
-
-.runs-page__segments :deep(.el-segmented__item-selected) {
-  border: 1px solid rgba(154, 52, 18, 0.18);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 8px 18px rgba(120, 53, 15, 0.1);
+}
+
+.runs-page__segment:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3);
 }
 
 .runs-page__list {

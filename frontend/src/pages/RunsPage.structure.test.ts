@@ -62,11 +62,20 @@ test("RunsPage presents a restrained dashboard toolbar with status segments and 
   assert.match(componentSource, /const statusOptions = computed\(\(\) => \{[\s\S]*return buildRunStatusFilterOptions\(\);/);
   assert.match(componentSource, /const runOverview = computed\(\(\) => \{[\s\S]*return buildRunStatusOverview\(runs\.value\);/);
   assert.match(componentSource, /<ElInput[\s\S]*v-model="graphNameQuery"[\s\S]*class="runs-page__search"/);
-  assert.match(componentSource, /<ElSegmented[\s\S]*v-model="statusFilter"[\s\S]*:options="statusOptions"/);
+  assert.match(componentSource, /v-for="option in statusOptions"/);
   assert.match(componentSource, /class="runs-page__refresh"[\s\S]*@click="loadRuns"/);
   assert.match(componentSource, /v-for="item in runOverview"/);
   assert.match(componentSource, /\.runs-page__toolbar \{[\s\S]*background:\s*var\(--toograph-glass-specular\),\s*var\(--toograph-glass-lens\),\s*var\(--toograph-glass-bg-strong\);/);
   assert.match(componentSource, /\.runs-page__overview-card \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.62\);/);
+});
+
+test("RunsPage exposes official page-operation affordance ids", () => {
+  assert.match(componentSource, /data-virtual-affordance-id="runs\.action\.refresh"/);
+  assert.match(componentSource, /data-virtual-affordance-id="runs\.search\.graphName"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`runs\.filter\.status\.\$\{option\.value \|\| 'all'\}`"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`runs\.run\.\$\{run\.run_id\}\.openDetail`"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`runs\.run\.\$\{run\.run_id\}\.restoreTarget\.\$\{target\.key\}`"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`runs\.run\.\$\{run\.run_id\}\.restoreEdit`"/);
 });
 
 test("RunsPage paginates run history instead of rendering every run at once", () => {
@@ -107,11 +116,11 @@ test("RunsPage uses a two-column run card grid on wide screens and returns to on
 });
 
 test("RunsPage gives status segments warm hover and selected states instead of Element Plus defaults", () => {
-  assert.match(componentSource, /\.runs-page__segments\s+:deep\(\.el-segmented__group\) \{[\s\S]*gap:\s*4px;/);
-  assert.match(componentSource, /\.runs-page__segments\s+:deep\(\.el-segmented__item:not\(\.is-selected\):hover\) \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.56\);/);
-  assert.match(componentSource, /\.runs-page__segments\s+:deep\(\.el-segmented__item\.is-selected\) \{[\s\S]*color:\s*var\(--toograph-accent-strong\);/);
-  assert.match(componentSource, /\.runs-page__segments\s+:deep\(\.el-segmented__item-selected\) \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.18\);/);
-  assert.match(componentSource, /\.runs-page__segments\s+:deep\(\.el-segmented__item-selected\) \{[\s\S]*box-shadow:\s*0 8px 18px rgba\(120,\s*53,\s*15,\s*0\.1\);/);
+  assert.match(componentSource, /\.runs-page__segments\s*\{[\s\S]*display:\s*inline-flex;[\s\S]*gap:\s*4px;/);
+  assert.match(componentSource, /\.runs-page__segment:not\(\.runs-page__segment--active\):hover\s*\{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.56\);/);
+  assert.match(componentSource, /\.runs-page__segment--active\s*\{[\s\S]*color:\s*var\(--toograph-accent-strong\);/);
+  assert.match(componentSource, /\.runs-page__segment--active\s*\{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.18\);/);
+  assert.match(componentSource, /\.runs-page__segment--active\s*\{[\s\S]*box-shadow:\s*0 8px 18px rgba\(120,\s*53,\s*15,\s*0\.1\);/);
 });
 
 test("RunsPage renders run cards as clickable log rows with a clear status rail", () => {

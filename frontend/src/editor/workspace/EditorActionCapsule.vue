@@ -2,7 +2,17 @@
   <div class="editor-action-capsule">
     <div class="editor-action-capsule__tools">
       <ElTooltip :content="resolvedSaveGraphLabel" placement="bottom">
-        <button type="button" class="editor-action-capsule__icon-button" :aria-label="resolvedSaveGraphLabel" @click="$emit('save-active-graph')">
+        <button
+          type="button"
+          class="editor-action-capsule__icon-button"
+          :aria-label="resolvedSaveGraphLabel"
+          data-virtual-affordance-id="editor.action.saveActiveGraph"
+          :data-virtual-affordance-label="resolvedSaveGraphLabel"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor.actions"
+          data-virtual-affordance-actions="click"
+          @click="$emit('save-active-graph')"
+        >
           <ElIcon aria-hidden="true"><CollectionTag /></ElIcon>
         </button>
       </ElTooltip>
@@ -27,7 +37,17 @@
         </button>
       </ElTooltip>
       <ElTooltip :content="t('editor.validateGraph')" placement="bottom">
-        <button type="button" class="editor-action-capsule__icon-button" :aria-label="t('editor.validateGraph')" @click="$emit('validate-active-graph')">
+        <button
+          type="button"
+          class="editor-action-capsule__icon-button"
+          :aria-label="t('editor.validateGraph')"
+          data-virtual-affordance-id="editor.action.validateActiveGraph"
+          :data-virtual-affordance-label="t('editor.validateGraph')"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor.actions"
+          data-virtual-affordance-actions="click"
+          @click="$emit('validate-active-graph')"
+        >
           <ElIcon aria-hidden="true"><CircleCheck /></ElIcon>
         </button>
       </ElTooltip>
@@ -42,6 +62,12 @@
       type="button"
       class="editor-action-capsule__state-pill"
       :class="{ 'editor-action-capsule__state-pill--active': isStatePanelOpen }"
+      data-virtual-affordance-id="editor.action.toggleStatePanel"
+      :data-virtual-affordance-label="t('editor.statePanel')"
+      data-virtual-affordance-role="button"
+      data-virtual-affordance-zone="editor.actions"
+      data-virtual-affordance-actions="click"
+      :data-virtual-affordance-current="isStatePanelOpen ? 'true' : undefined"
       @click="$emit('toggle-state-panel')"
     >
       <span>{{ t("editor.statePanel") }}</span>
@@ -55,12 +81,27 @@
         'editor-action-capsule__state-pill--active': isRunActivityPanelOpen,
         'editor-action-capsule__state-pill--hint': hasRunActivityHint && !isRunActivityPanelOpen,
       }"
+      data-virtual-affordance-id="editor.action.toggleRunActivity"
+      :data-virtual-affordance-label="t('editor.runActivityPanel')"
+      data-virtual-affordance-role="button"
+      data-virtual-affordance-zone="editor.actions"
+      data-virtual-affordance-actions="click"
+      :data-virtual-affordance-current="isRunActivityPanelOpen ? 'true' : undefined"
       @click="$emit('toggle-run-activity-panel')"
     >
       <span>{{ t("editor.runActivityPanel") }}</span>
     </button>
 
-    <button type="button" class="editor-action-capsule__run" @click="$emit('run-active-graph')">
+    <button
+      type="button"
+      class="editor-action-capsule__run"
+      data-virtual-affordance-id="editor.action.runActiveGraph"
+      :data-virtual-affordance-label="t('editor.runGraph')"
+      data-virtual-affordance-role="button"
+      data-virtual-affordance-zone="editor.actions"
+      data-virtual-affordance-actions="click"
+      @click="$emit('run-active-graph')"
+    >
       <ElIcon class="editor-action-capsule__run-icon" aria-hidden="true"><VideoPlay /></ElIcon>
       <span>{{ t("editor.runGraph") }}</span>
     </button>

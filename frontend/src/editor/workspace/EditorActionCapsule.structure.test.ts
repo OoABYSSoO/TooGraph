@@ -62,6 +62,14 @@ test("EditorActionCapsule renders non-primary graph actions as icon buttons with
   assert.doesNotMatch(componentSource, /copy\.newGraph/);
 });
 
+test("EditorActionCapsule exposes official page-operation affordance ids", () => {
+  assert.match(componentSource, /data-virtual-affordance-id="editor\.action\.saveActiveGraph"/);
+  assert.match(componentSource, /data-virtual-affordance-id="editor\.action\.validateActiveGraph"/);
+  assert.match(componentSource, /data-virtual-affordance-id="editor\.action\.toggleRunActivity"/);
+  assert.match(componentSource, /data-virtual-affordance-id="editor\.action\.toggleStatePanel"/);
+  assert.match(componentSource, /data-virtual-affordance-id="editor\.action\.runActiveGraph"/);
+});
+
 test("EditorActionCapsule styles the state pill state and interactive controls", () => {
   assert.match(
     componentSource,

@@ -40,7 +40,16 @@
               <small>{{ option.statusLabel }}</small>
             </button>
           </div>
-          <RouterLink v-if="canRestore" class="run-detail__restore-link" :to="restoreEditorHref">
+          <RouterLink
+            v-if="canRestore"
+            class="run-detail__restore-link"
+            data-virtual-affordance-id="runDetail.action.restoreEdit"
+            :data-virtual-affordance-label="t('common.restoreEdit')"
+            data-virtual-affordance-role="navigation-link"
+            data-virtual-affordance-zone="runDetail.restore"
+            data-virtual-affordance-actions="click"
+            :to="restoreEditorHref"
+          >
             <ElIcon class="run-detail__restore-icon" aria-hidden="true"><Promotion /></ElIcon>
             <span>{{ t("common.restoreEdit") }}</span>
           </RouterLink>

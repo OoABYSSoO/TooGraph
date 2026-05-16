@@ -49,3 +49,12 @@ test("GraphLibraryPage makes each management card openable while keeping managem
   assert.match(componentSource, /router\.push\(`\/editor\/\$\{encodeURIComponent\(item\.id\)\}`\)/);
   assert.match(componentSource, /function openTemplateDraft\(template: TemplateRecord\)/);
 });
+
+test("GraphLibraryPage exposes official page-operation affordance ids", () => {
+  assert.match(componentSource, /data-virtual-affordance-id="library\.action\.newBlankGraph"/);
+  assert.match(componentSource, /data-virtual-affordance-id="library\.action\.importPython"/);
+  assert.match(componentSource, /data-virtual-affordance-id="library\.search\.query"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`library\.filter\.status\.\$\{option\.value\}`"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="item\.kind === 'template' \? `library\.template\.\$\{item\.id\}\.open` : `library\.graph\.\$\{item\.id\}\.open`"/);
+  assert.match(componentSource, /data-virtual-affordance-destructive="true"/);
+});

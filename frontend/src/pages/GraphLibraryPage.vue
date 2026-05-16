@@ -15,10 +15,28 @@
           <p class="graph-library-page__body">{{ t("graphLibrary.body") }}</p>
         </div>
         <div class="graph-library-page__quick-actions" role="group" :aria-label="t('graphLibrary.quickActions')">
-          <button type="button" class="graph-library-page__primary-action" @click="openBlankEditorGraph">
+          <button
+            type="button"
+            class="graph-library-page__primary-action"
+            data-virtual-affordance-id="library.action.newBlankGraph"
+            :data-virtual-affordance-label="t('graphLibrary.newBlankGraph')"
+            data-virtual-affordance-role="button"
+            data-virtual-affordance-zone="library.quickActions"
+            data-virtual-affordance-actions="click"
+            @click="openBlankEditorGraph"
+          >
             {{ t("graphLibrary.newBlankGraph") }}
           </button>
-          <button type="button" class="graph-library-page__secondary-action" @click="openPythonGraphImportDialog">
+          <button
+            type="button"
+            class="graph-library-page__secondary-action"
+            data-virtual-affordance-id="library.action.importPython"
+            :data-virtual-affordance-label="t('graphLibrary.importPython')"
+            data-virtual-affordance-role="button"
+            data-virtual-affordance-zone="library.quickActions"
+            data-virtual-affordance-actions="click"
+            @click="openPythonGraphImportDialog"
+          >
             {{ t("graphLibrary.importPython") }}
           </button>
           <button type="button" class="graph-library-page__secondary-action" :disabled="loading" @click="loadCatalog">
@@ -53,7 +71,19 @@
       <section class="graph-library-page__toolbar" :aria-label="t('graphLibrary.filterLabel')">
         <label class="graph-library-page__search-field">
           <span>{{ t("common.search") }}</span>
-          <ElInput v-model="query" class="graph-library-page__search" :placeholder="t('graphLibrary.searchPlaceholder')" clearable />
+          <ElInput
+            v-model="query"
+            class="graph-library-page__search"
+            :placeholder="t('graphLibrary.searchPlaceholder')"
+            clearable
+            data-virtual-affordance-id="library.search.query"
+            :data-virtual-affordance-label="t('common.search')"
+            data-virtual-affordance-role="textbox"
+            data-virtual-affordance-zone="library.toolbar"
+            data-virtual-affordance-actions="focus,clear,type,press"
+            data-virtual-affordance-input-kind="text"
+            :data-virtual-affordance-value-preview="query"
+          />
         </label>
         <div class="graph-library-page__filter-group">
           <span>{{ t("graphLibrary.statusFilter") }}</span>
@@ -67,6 +97,12 @@
               :class="{ 'graph-library-page__filter-tab--active': statusFilter === option.value }"
               :aria-selected="statusFilter === option.value"
               :tabindex="statusFilter === option.value ? 0 : -1"
+              :data-virtual-affordance-id="`library.filter.status.${option.value}`"
+              :data-virtual-affordance-label="option.label"
+              data-virtual-affordance-role="tab"
+              data-virtual-affordance-zone="library.toolbar"
+              data-virtual-affordance-actions="click"
+              :data-virtual-affordance-current="statusFilter === option.value ? 'true' : undefined"
               @click="statusFilter = option.value"
             >
               {{ option.label }}
@@ -107,6 +143,11 @@
                     type="button"
                     class="graph-library-page__card-open"
                     :aria-label="openItemLabel(item)"
+                    :data-virtual-affordance-id="item.kind === 'template' ? `library.template.${item.id}.open` : `library.graph.${item.id}.open`"
+                    :data-virtual-affordance-label="openItemLabel(item)"
+                    data-virtual-affordance-role="button"
+                    data-virtual-affordance-zone="library.catalog"
+                    data-virtual-affordance-actions="click"
                     @click="openLibraryItem(item)"
                   >
                     <div class="graph-library-page__card-heading">
@@ -153,6 +194,8 @@
                         class="graph-library-page__action"
                         :class="{ 'graph-library-page__action--danger': confirmingDeleteKey === itemKey(item) }"
                         :disabled="actionItemKey === itemKey(item)"
+                        data-virtual-affordance-destructive="true"
+                        data-virtual-affordance-requires-confirmation="true"
                         @click="deleteItemFromCatalog(item)"
                       >
                         {{ confirmingDeleteKey === itemKey(item) ? t("graphLibrary.confirmDelete") : t("graphLibrary.delete") }}

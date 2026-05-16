@@ -102,6 +102,12 @@ test("EditorTabBar keeps the plus launcher on the same visual strip as the tabs 
   assert.match(componentSource, /\.editor-tab-bar__add-tab \{[\s\S]*flex:\s*0 0 auto;/);
 });
 
+test("EditorTabBar exposes official page-operation affordance ids", () => {
+  assert.match(componentSource, /:data-virtual-affordance-id="`editor\.tab\.\$\{tab\.tabId\}\.activate`"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`editor\.tab\.\$\{tab\.tabId\}\.close`"/);
+  assert.match(componentSource, /data-virtual-affordance-id="editor\.launcher\.open"/);
+});
+
 test("EditorTabBar behaves like a floating card group instead of reserving a full-width header lane", () => {
   assert.match(componentSource, /--editor-tab-strip-max-width:\s*100%;/);
   assert.match(componentSource, /\.editor-tab-bar \{[\s\S]*pointer-events:\s*auto;/);

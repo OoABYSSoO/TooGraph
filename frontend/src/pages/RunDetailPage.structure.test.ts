@@ -29,6 +29,10 @@ test("RunDetailPage exposes a restore editor action when the loaded run can be r
   assert.match(componentSource, /v-for="option in snapshotOptions"/);
 });
 
+test("RunDetailPage exposes official page-operation affordance ids", () => {
+  assert.match(componentSource, /data-virtual-affordance-id="runDetail\.action\.restoreEdit"/);
+});
+
 test("RunDetailPage keeps restore action on the same row as snapshot selection", () => {
   const heroTopSource = componentSource.match(/<div class="run-detail__hero-top">[\s\S]*?<\/div>\s*<\/div>/)?.[0] ?? "";
 

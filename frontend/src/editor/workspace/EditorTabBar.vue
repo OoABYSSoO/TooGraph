@@ -50,6 +50,12 @@
                       v-else
                       class="editor-tab-bar__tab-activate"
                       :title="buildEditorTabHint(tab, copy)"
+                      :data-virtual-affordance-id="`editor.tab.${tab.tabId}.activate`"
+                      :data-virtual-affordance-label="tab.title"
+                      data-virtual-affordance-role="tab"
+                      data-virtual-affordance-zone="editor.tabs"
+                      data-virtual-affordance-actions="click"
+                      :data-virtual-affordance-current="tab.tabId === activeTabId ? 'true' : undefined"
                       @dblclick.stop="startTabRename(tab)"
                     >
                       <span v-if="tab.kind === 'subgraph'" class="editor-tab-bar__tab-kind">SUB</span>
@@ -62,6 +68,11 @@
                         type="button"
                         class="editor-tab-bar__close"
                         :aria-label="t('tab.close')"
+                        :data-virtual-affordance-id="`editor.tab.${tab.tabId}.close`"
+                        :data-virtual-affordance-label="t('tab.close')"
+                        data-virtual-affordance-role="button"
+                        data-virtual-affordance-zone="editor.tabs"
+                        data-virtual-affordance-actions="click"
                         @mousedown.stop.prevent
                         @click.stop="$emit('close-tab', tab.tabId)"
                       >
@@ -83,7 +94,16 @@
           popper-class="editor-tab-bar__launcher-popper"
         >
           <template #reference>
-            <button type="button" class="editor-tab-bar__add-tab" :aria-label="t('tab.add')">
+            <button
+              type="button"
+              class="editor-tab-bar__add-tab"
+              :aria-label="t('tab.add')"
+              data-virtual-affordance-id="editor.launcher.open"
+              :data-virtual-affordance-label="t('tab.add')"
+              data-virtual-affordance-role="button"
+              data-virtual-affordance-zone="editor.tabs"
+              data-virtual-affordance-actions="click"
+            >
               <ElIcon aria-hidden="true"><Plus /></ElIcon>
             </button>
           </template>
