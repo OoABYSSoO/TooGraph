@@ -209,6 +209,63 @@ class RunRouteTests(unittest.TestCase):
         resume_worker.assert_called_once()
         self.assertIsNone(resume_worker.call_args.args[2])
 
+    def test_resume_run_rejects_mismatched_page_operation_continuation(self) -> None:
+        run = _paused_run()
+        run["metadata"] = {
+            "origin": "buddy",
+            "pending_page_operation_continuation": {
+                "mode": "auto_resume_after_ui_operation",
+                "operation_request_id": "vop_expected",
+                "resume_state_keys": ["page_operation_context", "page_context", "operation_result"],
+            },
+        }
+
+        with (
+            patch("app.api.routes_runs.load_run", return_value=run),
+            patch("app.api.routes_runs.save_run") as save_run,
+            patch("app.api.routes_runs._resume_run_worker") as resume_worker,
+        ):
+            with TestClient(app) as client:
+                response = client.post(
+                    "/api/runs/run_paused/resume",
+                    json={"resume": {"operation_result": {"operation_request_id": "vop_actual", "status": "succeeded"}}},
+                )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("operation_request_id", response.text)
+        save_run.assert_not_called()
+        resume_worker.assert_not_called()
+
+    def test_resume_run_accepts_matching_page_operation_continuation(self) -> None:
+        run = _paused_run()
+        run["metadata"] = {
+            "origin": "buddy",
+            "pending_page_operation_continuation": {
+                "mode": "auto_resume_after_ui_operation",
+                "operation_request_id": "vop_expected",
+                "resume_state_keys": ["page_operation_context", "page_context", "operation_result"],
+            },
+        }
+        resume_payload = {
+            "operation_result": {"operation_request_id": "vop_expected", "status": "succeeded"},
+            "page_context": "当前路径: /runs",
+            "page_operation_context": {"page_path": "/runs"},
+        }
+
+        with (
+            patch("app.api.routes_runs.load_run", return_value=run),
+            patch("app.api.routes_runs.save_run") as save_run,
+            patch("app.api.routes_runs._resume_run_worker") as resume_worker,
+        ):
+            with TestClient(app) as client:
+                response = client.post("/api/runs/run_paused/resume", json={"resume": resume_payload})
+
+        self.assertEqual(response.status_code, 200)
+        saved_run = save_run.call_args.args[0]
+        self.assertNotIn("pending_page_operation_continuation", saved_run["metadata"])
+        resume_worker.assert_called_once()
+        self.assertEqual(resume_worker.call_args.args[2], resume_payload)
+
 
 if __name__ == "__main__":
     unittest.main()

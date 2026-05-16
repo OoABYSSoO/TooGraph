@@ -21,12 +21,16 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses operation request
         operation_request_id: "vop_1234567890abcdef",
         resume_state_keys: ["page_operation_context", "page_context", "operation_result"],
       },
+      run_id: "run_page_operation",
+      node_id: "execute_page_operation",
     },
   });
 
   assert.deepEqual(plan, {
     version: 1,
     operationRequestId: "vop_1234567890abcdef",
+    runId: "run_page_operation",
+    nodeId: "execute_page_operation",
     commands: ["click app.nav.runs"],
     operations: [{ kind: "click", targetId: "app.nav.runs" }],
     cursorLifecycle: "return_after_step",

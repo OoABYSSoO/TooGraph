@@ -128,6 +128,18 @@ class RuntimeActivityEventsTests(unittest.TestCase):
         self.assertEqual(detail["subgraph_path"], ["operation_loop"])
         self.assertEqual(detail["operation_request"]["operation_request_id"], "vop_1234567890abcdef")
         self.assertEqual(
+            state["metadata"]["pending_page_operation_continuation"],
+            {
+                "mode": "auto_resume_after_ui_operation",
+                "operation_request_id": "vop_1234567890abcdef",
+                "resume_state_keys": ["page_operation_context", "page_context", "operation_result"],
+                "run_id": "run-activity",
+                "node_id": "execute_page_operation",
+                "subgraph_node_id": "operation_loop",
+                "subgraph_path": ["operation_loop"],
+            },
+        )
+        self.assertEqual(
             detail["expected_continuation"],
             {
                 "mode": "auto_resume_after_ui_operation",

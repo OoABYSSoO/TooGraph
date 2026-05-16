@@ -590,6 +590,15 @@ test("BuddyWidget builds page context from the shared editor snapshot", () => {
   assert.match(componentSource, /skillRuntimeContext: \{[\s\S]*page_path: snapshot\.path,[\s\S]*page_snapshot: snapshot,[\s\S]*page_operation_book: pageOperationBook,[\s\S]*\}/);
 });
 
+test("BuddyWidget resumes page operation runs after virtual UI execution", () => {
+  assert.match(componentSource, /import \{[\s\S]*buildPageOperationResult,[\s\S]*buildPageOperationResumePayload,[\s\S]*canAutoResumePageOperationRun,[\s\S]*\} from "\.\/pageOperationResume\.ts";/);
+  assert.match(componentSource, /const pageOperationContextBefore = buildPageOperationRuntimeContext\(\);[\s\S]*await executeVirtualOperationCommands\(operationPlan\);[\s\S]*const pageOperationContextAfter = buildPageOperationRuntimeContext\(\);/);
+  assert.match(componentSource, /buildPageOperationResult\(\{[\s\S]*operationPlan,[\s\S]*routeBefore,[\s\S]*routeAfter: route\.fullPath,[\s\S]*pageOperationContextBefore: pageOperationContextBefore\.skillRuntimeContext,[\s\S]*pageOperationContextAfter: pageOperationContextAfter\.skillRuntimeContext,[\s\S]*\}\);/);
+  assert.match(componentSource, /async function maybeAutoResumePageOperationRun\(/);
+  assert.match(componentSource, /const runDetail = await fetchRun\(operationPlan\.runId\);[\s\S]*canAutoResumePageOperationRun\(runDetail, operationPlan\.operationRequestId\)/);
+  assert.match(componentSource, /await resumeRun\([\s\S]*operationPlan\.runId,[\s\S]*buildPageOperationResumePayload\(\{[\s\S]*operationResult,[\s\S]*pageContext: pageOperationContextAfter\.pageContext,[\s\S]*pageOperationContext: pageOperationContextAfter\.skillRuntimeContext,[\s\S]*\}\),[\s\S]*\);/);
+});
+
 test("BuddyWidget notifies buddy pages to refresh after a completed chat graph run", () => {
   assert.match(componentSource, /if \(runDetail\.status === "completed"\) \{[\s\S]*buddyContextStore\.notifyBuddyDataChanged\(\);[\s\S]*\}/);
 });

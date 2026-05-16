@@ -26,6 +26,7 @@ PENDING_RESUME_METADATA_KEYS = (
     "pending_permission_approval_resume_payload",
     "pending_subgraph_breakpoint",
     "pending_subgraph_resume_payload",
+    "pending_page_operation_continuation",
 )
 
 
@@ -167,6 +168,8 @@ def resume_run_endpoint(
     if previous_run.get("status") not in {"failed", "paused", "awaiting_human"} and resume_snapshot is None:
         raise HTTPException(status_code=409, detail=f"Run '{run_id}' cannot be resumed from status '{previous_run.get('status')}'.")
 
+    _validate_page_operation_resume_payload(previous_run, payload)
+
     graph_snapshot = (
         resume_snapshot.get("graph_snapshot")
         if isinstance(resume_snapshot, dict) and isinstance(resume_snapshot.get("graph_snapshot"), dict)
@@ -265,6 +268,25 @@ def _resume_run_worker(graph, resumed_run: dict, resume_payload: Any | None = No
             str(resumed_run.get("run_id") or ""),
             "run.failed",
             {"status": "failed", "error": str(exc)},
+        )
+
+
+def _validate_page_operation_resume_payload(previous_run: dict[str, Any], payload: dict[str, Any] | None) -> None:
+    metadata = previous_run.get("metadata") if isinstance(previous_run.get("metadata"), dict) else {}
+    pending = metadata.get("pending_page_operation_continuation") if isinstance(metadata, dict) else None
+    if not isinstance(pending, dict):
+        return
+    expected_request_id = str(pending.get("operation_request_id") or "").strip()
+    resume_payload = payload.get("resume") if isinstance(payload, dict) else None
+    operation_result = resume_payload.get("operation_result") if isinstance(resume_payload, dict) else None
+    actual_request_id = str(operation_result.get("operation_request_id") or "").strip() if isinstance(operation_result, dict) else ""
+    if not expected_request_id or actual_request_id != expected_request_id:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Run is waiting for page operation operation_request_id "
+                f"'{expected_request_id}', but resume payload provided '{actual_request_id or 'missing'}'."
+            ),
         )
 
 

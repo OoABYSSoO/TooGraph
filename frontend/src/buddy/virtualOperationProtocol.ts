@@ -52,6 +52,10 @@ export type BuddyVirtualOperation =
 export type BuddyVirtualOperationPlan = {
   version: 1;
   operationRequestId?: string;
+  runId?: string;
+  nodeId?: string;
+  subgraphNodeId?: string;
+  subgraphPath?: string[];
   commands: string[];
   operations: BuddyVirtualOperation[];
   cursorLifecycle: BuddyVirtualOperationCursorLifecycle;
@@ -107,7 +111,7 @@ export function resolveBuddyVirtualOperationPlanFromActivityEvent(payload: Recor
     return null;
   }
 
-  return {
+  const plan: BuddyVirtualOperationPlan = {
     version: 1,
     operationRequestId,
     commands,
@@ -116,6 +120,23 @@ export function resolveBuddyVirtualOperationPlanFromActivityEvent(payload: Recor
     expectedContinuation,
     reason: normalizeText(operationRequest.reason),
   };
+  const runId = normalizeText(detail.run_id ?? detail.runId);
+  const nodeId = normalizeText(detail.node_id ?? detail.nodeId);
+  const subgraphNodeId = normalizeText(detail.subgraph_node_id ?? detail.subgraphNodeId);
+  const subgraphPath = listText(detail.subgraph_path ?? detail.subgraphPath);
+  if (runId) {
+    plan.runId = runId;
+  }
+  if (nodeId) {
+    plan.nodeId = nodeId;
+  }
+  if (subgraphNodeId) {
+    plan.subgraphNodeId = subgraphNodeId;
+  }
+  if (subgraphPath.length > 0) {
+    plan.subgraphPath = subgraphPath;
+  }
+  return plan;
 }
 
 export function normalizeCursorLifecycle(value: unknown): BuddyVirtualOperationCursorLifecycle {

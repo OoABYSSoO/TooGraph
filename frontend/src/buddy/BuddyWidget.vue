@@ -490,6 +490,13 @@ import {
 } from "./buddyMessageMetadata.ts";
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
 import { buildPageOperationBook, collectPageOperationSnapshot } from "./pageOperationAffordances.ts";
+import {
+  buildPageOperationResult,
+  buildPageOperationResumePayload,
+  canAutoResumePageOperationRun,
+  type PageOperationResult,
+  type PageOperationResultStatus,
+} from "./pageOperationResume.ts";
 import { resolveBuddyVirtualOperationPlanFromActivityEvent } from "./virtualOperationProtocol.ts";
 import type { BuddyVirtualOperationPlan } from "./virtualOperationProtocol.ts";
 import {
@@ -2312,10 +2319,32 @@ async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequ
   if (!request) {
     return;
   }
-  await executeVirtualOperationCommands(request.request);
+  const operationPlan = request.request;
+  const pageOperationContextBefore = buildPageOperationRuntimeContext();
+  const routeBefore = route.fullPath;
+  let status: PageOperationResultStatus = "succeeded";
+  let error: string | null = null;
+  try {
+    status = await executeVirtualOperationCommands(operationPlan);
+  } catch (caughtError) {
+    status = "failed";
+    error = caughtError instanceof Error ? caughtError.message : String(caughtError);
+  }
+  await nextTick();
+  const pageOperationContextAfter = buildPageOperationRuntimeContext();
+  const operationResult = buildPageOperationResult({
+    operationPlan,
+    status,
+    routeBefore,
+    routeAfter: route.fullPath,
+    pageOperationContextBefore: pageOperationContextBefore.skillRuntimeContext,
+    pageOperationContextAfter: pageOperationContextAfter.skillRuntimeContext,
+    error,
+  });
+  await maybeAutoResumePageOperationRun(operationPlan, operationResult, pageOperationContextAfter);
 }
 
-async function executeVirtualOperationCommands(operationPlan: BuddyVirtualOperationPlan) {
+async function executeVirtualOperationCommands(operationPlan: BuddyVirtualOperationPlan): Promise<PageOperationResultStatus> {
   stopBuddyIdleAnimation();
   const token = beginVirtualOperation();
   try {
@@ -2335,9 +2364,36 @@ async function executeVirtualOperationCommands(operationPlan: BuddyVirtualOperat
     if (isVirtualOperationInterrupted(token)) {
       buddyMascotDebugStore.setVirtualCursorEnabled(false);
     }
+    return isVirtualOperationInterrupted(token) ? "interrupted" : "succeeded";
   } finally {
     finishVirtualOperation(token);
   }
+}
+
+async function maybeAutoResumePageOperationRun(
+  operationPlan: BuddyVirtualOperationPlan,
+  operationResult: PageOperationResult,
+  pageOperationContextAfter: ReturnType<typeof buildPageOperationRuntimeContext>,
+) {
+  if (!operationPlan.runId || !operationPlan.operationRequestId || !operationPlan.expectedContinuation) {
+    return;
+  }
+  if (operationResult.status === "interrupted") {
+    return;
+  }
+  const runDetail = await fetchRun(operationPlan.runId);
+  if (!canAutoResumePageOperationRun(runDetail, operationPlan.operationRequestId)) {
+    return;
+  }
+  const response = await resumeRun(
+    operationPlan.runId,
+    buildPageOperationResumePayload({
+      operationResult,
+      pageContext: pageOperationContextAfter.pageContext,
+      pageOperationContext: pageOperationContextAfter.skillRuntimeContext,
+    }),
+  );
+  activeRunId.value = response.run_id;
 }
 
 function beginVirtualOperation(): BuddyVirtualOperationToken {

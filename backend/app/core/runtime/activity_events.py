@@ -179,6 +179,7 @@ def _enrich_virtual_ui_operation_detail(
     if context:
         enriched["subgraph_node_id"] = context["node_id"]
         enriched["subgraph_path"] = context["path"]
+    _store_pending_page_operation_continuation(state, enriched)
     return enriched
 
 
@@ -209,6 +210,25 @@ def _stable_virtual_operation_request_id(state: dict[str, Any], *, node_id: str,
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return f"vop_{digest[:16]}"
+
+
+def _store_pending_page_operation_continuation(state: dict[str, Any], detail: dict[str, Any]) -> None:
+    continuation = detail.get("expected_continuation")
+    if not isinstance(continuation, dict):
+        return
+    operation_request_id = _compact_text(continuation.get("operation_request_id") or detail.get("operation_request_id"))
+    if not operation_request_id:
+        return
+    pending: dict[str, Any] = {
+        "mode": AUTO_RESUME_AFTER_UI_OPERATION,
+        "operation_request_id": operation_request_id,
+        "resume_state_keys": _list_text(continuation.get("resume_state_keys")) or list(PAGE_OPERATION_RESUME_STATE_KEYS),
+    }
+    for key in ("run_id", "node_id", "subgraph_node_id", "subgraph_path"):
+        value = detail.get(key)
+        if value:
+            pending[key] = value
+    state.setdefault("metadata", {})["pending_page_operation_continuation"] = pending
 
 
 def _list_text(value: Any) -> list[str]:
