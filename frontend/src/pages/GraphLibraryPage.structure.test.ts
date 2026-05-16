@@ -20,14 +20,25 @@ test("GraphLibraryPage renders templates and graphs as separate side-by-side col
   assert.match(componentSource, /@media \(max-width:\s*980px\) \{[\s\S]*\.graph-library-page__columns \{[\s\S]*grid-template-columns:\s*1fr;/);
 });
 
-test("GraphLibraryPage hosts the editor start actions that used to live on the editor welcome page", () => {
-  assert.match(componentSource, /import EditorWelcomeState from "@\/editor\/workspace\/EditorWelcomeState\.vue";/);
+test("GraphLibraryPage keeps start actions compact instead of repeating the full editor welcome catalog", () => {
+  assert.doesNotMatch(componentSource, /import EditorWelcomeState from "@\/editor\/workspace\/EditorWelcomeState\.vue";/);
   assert.match(componentSource, /ref="pythonGraphImportInput"/);
   assert.match(componentSource, /accept="\.py,text\/x-python,text\/plain"/);
-  assert.match(componentSource, /<EditorWelcomeState[\s\S]*@create-new="openBlankEditorGraph"[\s\S]*@import-python-graph="openPythonGraphImportDialog"[\s\S]*@open-template="openEditorTemplate"[\s\S]*@open-graph="openEditorGraph"/);
+  assert.match(componentSource, /class="graph-library-page__quick-actions"/);
+  assert.match(componentSource, /@click="openBlankEditorGraph"/);
+  assert.match(componentSource, /@click="openPythonGraphImportDialog"/);
   assert.match(componentSource, /router\.push\("\/editor\/new"\)/);
-  assert.match(componentSource, /router\.push\(`\/editor\/new\?template=\$\{encodeURIComponent\(templateId\)\}`\)/);
-  assert.match(componentSource, /router\.push\(`\/editor\/\$\{encodeURIComponent\(graphId\)\}`\)/);
   assert.match(componentSource, /writePersistedEditorWorkspace/);
   assert.match(componentSource, /writePersistedEditorDocumentDraft/);
+});
+
+test("GraphLibraryPage makes each management card openable while keeping management actions secondary", () => {
+  assert.match(componentSource, /class="graph-library-page__card-open"/);
+  assert.match(componentSource, /<button[\s\S]*class="graph-library-page__card-open"/);
+  assert.match(componentSource, /@click="openLibraryItem\(item\)"/);
+  assert.match(componentSource, /class="graph-library-page__open-hint"/);
+  assert.match(componentSource, /@click\.stop/);
+  assert.match(componentSource, /function openLibraryItem\(item: GraphLibraryItem\)/);
+  assert.match(componentSource, /router\.push\(`\/editor\/\$\{encodeURIComponent\(item\.id\)\}`\)/);
+  assert.match(componentSource, /function openTemplateDraft\(template: TemplateRecord\)/);
 });
