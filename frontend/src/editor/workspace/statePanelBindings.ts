@@ -59,6 +59,11 @@ export function addStateBindingToDocument<T extends GraphPayload | GraphDocument
       return nextDocument;
     }
 
+    if (nextNode.kind === "subgraph") {
+      nextNode.reads = [...nextNode.reads, { state: stateKey, required: false }];
+      return nextDocument;
+    }
+
     return document;
   }
 
@@ -70,6 +75,11 @@ export function addStateBindingToDocument<T extends GraphPayload | GraphDocument
 
   if (nextNode.kind === "input") {
     nextNode.writes = [{ state: stateKey, mode: "replace" }];
+    return nextDocument;
+  }
+
+  if (nextNode.kind === "subgraph") {
+    nextNode.writes = [...nextNode.writes, { state: stateKey, mode: "replace" }];
     return nextDocument;
   }
 
@@ -88,7 +98,7 @@ export function removeStateBindingFromDocument<T extends GraphPayload | GraphDoc
   }
 
   if (mode === "read") {
-    if (node.kind !== "agent" && node.kind !== "condition" && node.kind !== "output") {
+    if (node.kind !== "agent" && node.kind !== "condition" && node.kind !== "output" && node.kind !== "subgraph") {
       return document;
     }
     const readBinding = node.reads.find((binding) => binding.state === stateKey);
@@ -105,7 +115,7 @@ export function removeStateBindingFromDocument<T extends GraphPayload | GraphDoc
     return nextDocument;
   }
 
-  if (node.kind !== "agent") {
+  if (node.kind !== "agent" && node.kind !== "subgraph") {
     return document;
   }
   if (document.state_schema[stateKey]?.binding?.kind === "skill_output" || document.state_schema[stateKey]?.binding?.kind === "capability_result") {
@@ -155,6 +165,9 @@ function canNodeBindState(document: GraphPayload | GraphDocument, node: GraphNod
     if (node.kind === "output") {
       return node.reads[0]?.state !== stateKey;
     }
+    if (node.kind === "subgraph") {
+      return !node.reads.some((binding) => binding.state === stateKey);
+    }
     return false;
   }
 
@@ -166,6 +179,9 @@ function canNodeBindState(document: GraphPayload | GraphDocument, node: GraphNod
   }
   if (node.kind === "input") {
     return node.writes[0]?.state !== stateKey;
+  }
+  if (node.kind === "subgraph") {
+    return !node.writes.some((binding) => binding.state === stateKey);
   }
   return false;
 }

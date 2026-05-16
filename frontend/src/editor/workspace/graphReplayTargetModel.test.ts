@@ -231,6 +231,64 @@ test("buildGraphReplayIntentsFromTargetGraph replays condition routes from graph
   assert.deepEqual(applied.document.conditional_edges, graph.conditional_edges);
 });
 
+test("buildGraphReplayIntentsFromTargetGraph replays subgraph nodes and their outer ports", () => {
+  const graph = targetGraph();
+  graph.state_schema.answer = {
+    name: "回答",
+    description: "子图输出回答。",
+    type: "markdown",
+    value: "",
+    color: "#16a34a",
+  };
+  graph.nodes.ask_name = {
+    kind: "subgraph",
+    name: "问答子图",
+    description: "嵌入的问答流程。",
+    ui: { position: { x: 360, y: 160 }, collapsed: false },
+    reads: [{ state: "name", required: true }],
+    writes: [{ state: "answer", mode: "replace" }],
+    config: {
+      graph: {
+        state_schema: {
+          inner_question: {
+            name: "内部问题",
+            description: "",
+            type: "text",
+            value: "",
+            color: "#2563eb",
+          },
+        },
+        nodes: {},
+        edges: [],
+        conditional_edges: [],
+        metadata: { role: "embedded_test" },
+      },
+    },
+  };
+  graph.nodes.output_name.reads = [{ state: "answer", required: true }];
+
+  const result = buildGraphReplayIntentsFromTargetGraph(graph);
+  const plan = buildGraphEditPlaybackPlan(createEmptyDraftGraph(), result.intentPackage);
+  const applied = applyGraphEditPlaybackPlan(createEmptyDraftGraph(), plan);
+
+  assert.equal(result.valid, true);
+  assert.deepEqual(result.warnings, []);
+  assert.equal(result.intentPackage.operations.some((operation) => operation.kind === "create_node" && operation.nodeType === "subgraph"), true);
+  assert.equal(plan.valid, true);
+  assert.equal(applied.applied, true);
+  assert.equal(applied.document.nodes.ask_name?.kind, "subgraph");
+  assert.deepEqual(applied.document.nodes.ask_name?.reads, [{ state: "name", required: true }]);
+  assert.deepEqual(applied.document.nodes.ask_name?.writes, [{ state: "answer", mode: "replace" }]);
+  assert.deepEqual(
+    applied.document.nodes.ask_name?.kind === "subgraph" ? applied.document.nodes.ask_name.config.graph : null,
+    graph.nodes.ask_name.kind === "subgraph" ? graph.nodes.ask_name.config.graph : null,
+  );
+  assert.deepEqual(applied.document.edges, [
+    { source: "input_name", target: "ask_name" },
+    { source: "ask_name", target: "output_name" },
+  ]);
+});
+
 function operationLabel(operation: ReturnType<typeof buildGraphReplayIntentsFromTargetGraph>["intentPackage"]["operations"][number]) {
   if ("ref" in operation) {
     return operation.ref;
@@ -241,33 +299,14 @@ function operationLabel(operation: ReturnType<typeof buildGraphReplayIntentsFrom
   return `${operation.sourceRef}:${operation.targetRef}`;
 }
 
-test("buildGraphReplayIntentsFromTargetGraph reports unsupported graph features without asking an LLM", () => {
+test("buildGraphReplayIntentsFromTargetGraph reports invalid condition route sources without asking an LLM", () => {
   const graph = targetGraph();
-  graph.nodes.subflow = {
-    kind: "subgraph",
-    name: "子图",
-    description: "",
-    ui: { position: { x: 0, y: 0 } },
-    reads: [],
-    writes: [],
-    config: {
-      graph: {
-        state_schema: {},
-        nodes: {},
-        edges: [],
-        conditional_edges: [],
-        metadata: {},
-      },
-    },
-  };
   graph.conditional_edges = [{ source: "ask_name", branches: { true: "output_name" } }];
 
   const result = buildGraphReplayIntentsFromTargetGraph(graph);
 
   assert.equal(result.valid, true);
-  assert.match(result.warnings.join("\n"), /subgraph nodes are not replayable yet: subflow/);
   assert.match(result.warnings.join("\n"), /condition route skipped because source is not a replayable condition node: ask_name/);
-  assert.equal(result.intentPackage.operations.some((operation) => operation.kind === "create_node" && operation.ref === "subflow"), false);
 });
 
 test("parseGraphReplayTargetJson accepts GraphPayload JSON and rejects incomplete JSON", () => {

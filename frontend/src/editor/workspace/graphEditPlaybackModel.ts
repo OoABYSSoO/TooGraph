@@ -20,6 +20,7 @@ import {
 import type {
   AgentNode,
   ConditionNode,
+  GraphCorePayload,
   GraphDocument,
   GraphNode,
   GraphPayload,
@@ -27,12 +28,13 @@ import type {
   InputNode,
   OutputNode,
   StateDefinition,
+  SubgraphNode,
 } from "../../types/node-system.ts";
 
 export const GRAPH_EDIT_PLAYBACK_CAPABILITY_MANUAL = [
   "Graph Edit Playback capability:",
   "- LLM 输出产品语义，不输出浏览器实现细节或 UI 点击手法。",
-  "- 支持 create_node: 创建 input、agent、output、condition 节点，并提供 title、description、taskInstruction、positionHint。",
+  "- 支持 create_node: 创建 input、agent、output、condition、subgraph 节点，并提供 title、description、taskInstruction、positionHint。",
   "- 支持 create_state: 创建 state，并提供 name、description、valueType、value。",
   "- 支持 bind_state: 把 state 绑定到节点 read/write 端口。",
   "- 支持 connect_nodes: 连接两个节点的流程边。",
@@ -41,7 +43,7 @@ export const GRAPH_EDIT_PLAYBACK_CAPABILITY_MANUAL = [
   "- 执行器会把语义命令编译成可见 UI playback 和可审计 graph commands。",
 ].join("\n");
 
-export type GraphEditNodeType = "input" | "agent" | "output" | "condition";
+export type GraphEditNodeType = "input" | "agent" | "output" | "condition" | "subgraph";
 export type GraphEditStateBindingMode = "read" | "write";
 export type GraphEditWriteBindingMode = "replace" | "append";
 export type GraphEditNodeCreationSource =
@@ -77,6 +79,7 @@ export type GraphEditCreateNodeIntent = {
   title?: string;
   description?: string;
   taskInstruction?: string;
+  subgraphGraph?: GraphCorePayload;
   position?: Partial<GraphPosition> | null;
   positionHint?: string;
   creationSource?: GraphEditNodeCreationSource;
@@ -151,6 +154,7 @@ export type GraphEditCreateNodeCommand = GraphEditCommandBase & {
   title: string;
   description: string;
   taskInstruction: string;
+  subgraphGraph: GraphCorePayload | null;
   position: GraphPosition;
   positionHint: string;
   menuTarget: string;
@@ -437,6 +441,9 @@ function compileCreateNodeCommand(
   const positionIndex = context.nextPositionIndex;
   context.nextPositionIndex += 1;
   const title = compactText(operation.title) || defaultNodeTitle(operation.nodeType);
+  const subgraphGraph = operation.nodeType === "subgraph"
+    ? cloneGraphCorePayload(operation.subgraphGraph ?? emptyGraphCorePayload())
+    : null;
   const defaultPosition = normalizePosition(operation.position, positionIndex);
   const position = hasExplicitPosition(operation.position)
     ? defaultPosition
@@ -446,6 +453,7 @@ function compileCreateNodeCommand(
         title,
         description: compactText(operation.description),
         taskInstruction: compactText(operation.taskInstruction),
+        subgraphGraph,
         finalPosition: defaultPosition,
         creationSource,
       });
@@ -458,6 +466,7 @@ function compileCreateNodeCommand(
     title,
     description: compactText(operation.description),
     taskInstruction: compactText(operation.taskInstruction),
+    subgraphGraph,
     position,
     positionHint: compactText(operation.positionHint),
     menuTarget: creationSource ? "editor.canvas.surface" : isFirstNode ? "editor.canvas.empty.createFirstNode" : "editor.canvas.surface",
@@ -1137,6 +1146,7 @@ function buildGraphNodeFromCommand(command: GraphEditCreateNodeCommand): GraphNo
     title: command.title,
     description: command.description,
     taskInstruction: command.taskInstruction,
+    subgraphGraph: command.subgraphGraph,
     position: command.position,
   });
 }
@@ -1146,6 +1156,7 @@ function buildGraphNodeFromCreationFields(input: {
   title: string;
   description: string;
   taskInstruction: string;
+  subgraphGraph?: GraphCorePayload | null;
   position: GraphPosition;
 }): GraphNode {
   switch (input.nodeType) {
@@ -1201,6 +1212,18 @@ function buildGraphNodeFromCreationFields(input: {
           temperature: 0.2,
         },
       } satisfies AgentNode;
+    case "subgraph":
+      return {
+        kind: "subgraph",
+        name: input.title,
+        description: input.description || "Embedded graph instance.",
+        ui: { position: input.position, collapsed: false },
+        reads: [],
+        writes: [],
+        config: {
+          graph: cloneGraphCorePayload(input.subgraphGraph ?? emptyGraphCorePayload()),
+        },
+      } satisfies SubgraphNode;
   }
 }
 
@@ -1243,6 +1266,7 @@ function resolveDefaultNodeCreationGesturePosition(input: {
   title: string;
   description: string;
   taskInstruction: string;
+  subgraphGraph: GraphCorePayload | null;
   finalPosition: GraphPosition;
   creationSource: GraphEditNodeCreationSourceCommand | null;
 }): GraphPosition {
@@ -1251,6 +1275,7 @@ function resolveDefaultNodeCreationGesturePosition(input: {
     title: input.title,
     description: input.description,
     taskInstruction: input.taskInstruction,
+    subgraphGraph: input.subgraphGraph,
     position: input.finalPosition,
   });
   return resolveNodeCreationGesturePositionForFinalPosition({
@@ -1295,7 +1320,23 @@ function defaultNodeTitle(nodeType: GraphEditNodeType): string {
       return "Output";
     case "condition":
       return "Condition";
+    case "subgraph":
+      return "Subgraph";
   }
+}
+
+function emptyGraphCorePayload(): GraphCorePayload {
+  return {
+    state_schema: {},
+    nodes: {},
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+}
+
+function cloneGraphCorePayload(graph: GraphCorePayload): GraphCorePayload {
+  return JSON.parse(JSON.stringify(graph)) as GraphCorePayload;
 }
 
 function slugFromText(value: string): string {

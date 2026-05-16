@@ -85,7 +85,7 @@ export function buildGraphReplayIntentsFromTargetGraph(graph: GraphPayload | Gra
   for (const [nodeId, node] of Object.entries(graph.nodes)) {
     const nodeType = graphEditNodeType(node);
     if (!nodeType) {
-      context.warnings.push(`subgraph nodes are not replayable yet: ${nodeId}.`);
+      context.warnings.push(`node is not replayable yet: ${nodeId}.`);
       continue;
     }
     context.supportedNodeIds.add(nodeId);
@@ -351,6 +351,7 @@ function buildCreateNodeIntent(
     title: node.name,
     description: node.description,
     taskInstruction: node.kind === "agent" ? agentTaskInstruction(node) : "",
+    ...(node.kind === "subgraph" ? { subgraphGraph: node.config.graph } : {}),
     position,
     creationSource: creationSource ?? undefined,
   };
@@ -374,7 +375,7 @@ function placementContextFromCreationSource(
 }
 
 function graphEditNodeType(node: GraphNode): GraphEditNodeType | null {
-  return node.kind === "input" || node.kind === "agent" || node.kind === "output" || node.kind === "condition"
+  return node.kind === "input" || node.kind === "agent" || node.kind === "output" || node.kind === "condition" || node.kind === "subgraph"
     ? node.kind
     : null;
 }
