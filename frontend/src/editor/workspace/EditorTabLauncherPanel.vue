@@ -17,6 +17,28 @@
         <ElIcon class="editor-tab-launcher-panel__entry-arrow" aria-hidden="true"><ArrowRight /></ElIcon>
       </button>
 
+      <button type="button" class="editor-tab-launcher-panel__entry" @click="$emit('import-python-graph')">
+        <span class="editor-tab-launcher-panel__entry-icon" aria-hidden="true">
+          <ElIcon><Upload /></ElIcon>
+        </span>
+        <div class="editor-tab-launcher-panel__entry-copy">
+          <div class="editor-tab-launcher-panel__entry-title">{{ t("launcher.importPythonTitle") }}</div>
+          <div class="editor-tab-launcher-panel__entry-meta">{{ t("launcher.importPythonMeta") }}</div>
+        </div>
+        <ElIcon class="editor-tab-launcher-panel__entry-arrow" aria-hidden="true"><ArrowRight /></ElIcon>
+      </button>
+
+      <button type="button" class="editor-tab-launcher-panel__entry" @click="$emit('open-graph-replay-debug')">
+        <span class="editor-tab-launcher-panel__entry-icon" aria-hidden="true">
+          <ElIcon><VideoPlay /></ElIcon>
+        </span>
+        <div class="editor-tab-launcher-panel__entry-copy">
+          <div class="editor-tab-launcher-panel__entry-title">{{ t("launcher.graphReplayTitle") }}</div>
+          <div class="editor-tab-launcher-panel__entry-meta">{{ t("launcher.graphReplayMeta") }}</div>
+        </div>
+        <ElIcon class="editor-tab-launcher-panel__entry-arrow" aria-hidden="true"><ArrowRight /></ElIcon>
+      </button>
+
       <button type="button" class="editor-tab-launcher-panel__entry" @click="openSecondaryView('template')">
         <span class="editor-tab-launcher-panel__entry-icon" aria-hidden="true">
           <ElIcon><CollectionTag /></ElIcon>
@@ -78,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowLeft, ArrowRight, CollectionTag, DocumentAdd, FolderOpened } from "@element-plus/icons-vue";
+import { ArrowLeft, ArrowRight, CollectionTag, DocumentAdd, FolderOpened, Upload, VideoPlay } from "@element-plus/icons-vue";
 import { ElIcon } from "element-plus";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -95,6 +117,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: "create-new"): void;
+  (event: "import-python-graph"): void;
+  (event: "open-graph-replay-debug"): void;
   (event: "create-from-template", templateId: string): void;
   (event: "open-graph", graphId: string): void;
 }>();

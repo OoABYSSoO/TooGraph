@@ -95,6 +95,8 @@
             :template-placeholder="selectPlaceholders.template"
             :graph-placeholder="selectPlaceholders.graph"
             @create-new="handleLauncherCreateNew"
+            @import-python-graph="handleLauncherImportPythonGraph"
+            @open-graph-replay-debug="handleLauncherOpenGraphReplayDebug"
             @create-from-template="handleLauncherCreateFromTemplate"
             @open-graph="handleLauncherOpenGraph"
           />
@@ -133,6 +135,8 @@ const emit = defineEmits<{
   (event: "close-tab", tabId: string): void;
   (event: "reorder-tab", sourceTabId: string, targetTabId: string, placement: "before" | "after"): void;
   (event: "create-new"): void;
+  (event: "import-python-graph"): void;
+  (event: "open-graph-replay-debug"): void;
   (event: "create-from-template", templateId: string): void;
   (event: "open-graph", graphId: string): void;
   (event: "rename-active-graph", name: string): void;
@@ -244,6 +248,16 @@ function handleTabChange(value: string | number) {
 function handleLauncherCreateNew() {
   launcherPopoverOpen.value = false;
   emit("create-new");
+}
+
+function handleLauncherImportPythonGraph() {
+  launcherPopoverOpen.value = false;
+  emit("import-python-graph");
+}
+
+function handleLauncherOpenGraphReplayDebug() {
+  launcherPopoverOpen.value = false;
+  emit("open-graph-replay-debug");
 }
 
 function handleLauncherCreateFromTemplate(templateId: string) {

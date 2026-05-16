@@ -7,6 +7,13 @@
       accept=".py,text/x-python,text/plain"
       @change="handlePythonGraphImportSelection"
     />
+    <input
+      ref="graphReplayPythonImportInput"
+      class="editor-workspace-shell__file-input"
+      type="file"
+      accept=".py,text/x-python,text/plain"
+      @change="handleGraphReplayPythonImportSelection"
+    />
 
     <div v-if="workspace.tabs.length === 0" class="editor-workspace-shell__welcome">
       <div v-if="routeRestoreError" class="editor-workspace-shell__status-card editor-workspace-shell__status-card--danger">
@@ -39,6 +46,8 @@
           @close-tab="requestCloseTab"
           @reorder-tab="reorderTab"
           @create-new="openNewTab(null)"
+          @import-python-graph="openPythonGraphImportDialog"
+          @open-graph-replay-debug="openGraphReplayDebugDialog"
           @create-from-template="openNewTab"
           @open-graph="openExistingGraph"
           @rename-active-graph="renameActiveGraph"
@@ -59,7 +68,6 @@
             @save-active-graph-as-new="saveActiveGraphAsNewGraph"
             @save-active-graph-as-template="saveActiveGraphAsTemplate"
             @validate-active-graph="validateActiveGraph"
-            @import-python-graph="openPythonGraphImportDialog"
             @export-active-graph="exportActiveGraph"
             @run-active-graph="runActiveGraph"
           />
@@ -213,6 +221,55 @@
     />
 
     <ElDialog
+      v-model="graphReplayDebugDialogOpen"
+      class="editor-workspace-shell__graph-replay-dialog"
+      :title="t('editor.graphReplayDebugTitle')"
+      width="min(760px, calc(100vw - 32px))"
+      :close-on-click-modal="false"
+    >
+      <div class="editor-workspace-shell__graph-replay-body">
+        <p class="editor-workspace-shell__graph-replay-copy">
+          {{ t("editor.graphReplayDebugCopy") }}
+        </p>
+        <ElInput
+          v-model="graphReplayDebugJsonText"
+          type="textarea"
+          :autosize="{ minRows: 12, maxRows: 18 }"
+          :placeholder="t('editor.graphReplayDebugJsonPlaceholder')"
+        />
+        <div v-if="graphReplayDebugCompileResult" class="editor-workspace-shell__graph-replay-summary">
+          <span>{{ t("editor.graphReplayDebugSummaryStates", { count: graphReplayDebugCompileResult.summary.states }) }}</span>
+          <span>{{ t("editor.graphReplayDebugSummaryNodes", { count: graphReplayDebugCompileResult.summary.nodes }) }}</span>
+          <span>{{ t("editor.graphReplayDebugSummaryEdges", { count: graphReplayDebugCompileResult.summary.flowEdges }) }}</span>
+          <span>{{ t("editor.graphReplayDebugSummaryCommands", { count: graphReplayDebugCompileResult.summary.playbackIntents }) }}</span>
+        </div>
+        <div v-if="graphReplayDebugError" class="editor-workspace-shell__graph-replay-alert editor-workspace-shell__graph-replay-alert--danger">
+          {{ graphReplayDebugError }}
+        </div>
+        <div
+          v-if="graphReplayDebugCompileResult?.warnings.length"
+          class="editor-workspace-shell__graph-replay-alert editor-workspace-shell__graph-replay-alert--warning"
+        >
+          <div v-for="warning in graphReplayDebugCompileResult.warnings" :key="warning">{{ warning }}</div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="editor-workspace-shell__graph-replay-actions">
+          <ElButton @click="openGraphReplayPythonImportDialog">{{ t("editor.graphReplayDebugImportPython") }}</ElButton>
+          <ElButton @click="previewGraphReplayDebugJson">{{ t("editor.graphReplayDebugPreview") }}</ElButton>
+          <ElButton
+            type="primary"
+            :loading="graphReplayDebugBusy"
+            :disabled="!graphReplayDebugCanStart"
+            @click="startGraphReplayDebugPlayback"
+          >
+            {{ t("editor.graphReplayDebugStart") }}
+          </ElButton>
+        </div>
+      </template>
+    </ElDialog>
+
+    <ElDialog
       :model-value="saveMetadataDialog.open"
       class="editor-workspace-shell__save-metadata-dialog"
       :title="saveMetadataDialogTitle"
@@ -258,7 +315,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElButton, ElDialog, ElInput, ElMessage } from "element-plus";
 import { useI18n } from "vue-i18n";
@@ -336,6 +393,11 @@ import {
   type GraphEditIntent,
   type GraphEditPlaybackPlan,
 } from "./graphEditPlaybackModel.ts";
+import {
+  buildGraphReplayIntentsFromTargetGraph,
+  parseGraphReplayTargetJson,
+  type GraphReplayTargetCompileResult,
+} from "./graphReplayTargetModel.ts";
 import { useWorkspaceDocumentState } from "./useWorkspaceDocumentState.ts";
 import { useWorkspaceEditGuardController } from "./useWorkspaceEditGuardController.ts";
 import { useWorkspaceGraphPersistenceController } from "./useWorkspaceGraphPersistenceController.ts";
@@ -383,6 +445,7 @@ const loadingByTabId = ref<Record<string, boolean>>({});
 const errorByTabId = ref<Record<string, string | null>>({});
 const pendingCloseTabId = ref<string | null>(null);
 const pythonGraphImportInput = ref<HTMLInputElement | null>(null);
+const graphReplayPythonImportInput = ref<HTMLInputElement | null>(null);
 const closeBusy = ref(false);
 const closeError = ref<string | null>(null);
 const handledRouteSignature = ref<string | null>(null);
@@ -410,6 +473,11 @@ const routeRestoreError = ref<string | null>(null);
 const nodeCreationMenuByTabId = ref<Record<string, NodeCreationMenuState>>({});
 const pendingGraphEditPlaybackPlans = new Map<string, { tabId: string; plan: GraphEditPlaybackPlan }>();
 const pendingGraphEditPlaybackAppliedCommandIds = new Map<string, Set<string>>();
+const graphReplayDebugDialogOpen = ref(false);
+const graphReplayDebugJsonText = ref("");
+const graphReplayDebugCompileResult = ref<GraphReplayTargetCompileResult | null>(null);
+const graphReplayDebugError = ref<string | null>(null);
+const graphReplayDebugBusy = ref(false);
 const {
   knowledgeBases,
   settings,
@@ -443,6 +511,13 @@ const activeStateCount = computed(() => {
     return 0;
   }
   return Object.keys(document.state_schema ?? {}).length;
+});
+const graphReplayDebugCanStart = computed(() => {
+  const compileResult = graphReplayDebugCompileResult.value;
+  return (
+    !graphReplayDebugBusy.value &&
+    (Boolean(compileResult?.valid && compileResult.intentPackage.operations.length > 0) || graphReplayDebugJsonText.value.trim().length > 0)
+  );
 });
 
 type SaveMetadataDialogState = {
@@ -871,6 +946,104 @@ const {
   isTooGraphPythonExportSource,
   setMessageFeedbackForTab,
 });
+
+function openGraphReplayDebugDialog() {
+  graphReplayDebugDialogOpen.value = true;
+  graphReplayDebugError.value = null;
+}
+
+function openGraphReplayPythonImportDialog() {
+  graphReplayPythonImportInput.value?.click();
+}
+
+async function handleGraphReplayPythonImportSelection(event: Event) {
+  const target = event.target instanceof HTMLInputElement ? event.target : null;
+  const file = target?.files?.[0] ?? null;
+  if (target) {
+    target.value = "";
+  }
+  if (!file) {
+    return;
+  }
+
+  graphReplayDebugBusy.value = true;
+  graphReplayDebugError.value = null;
+  try {
+    const source = await file.text();
+    const importedGraph = await importGraphFromPythonSource(source);
+    graphReplayDebugDialogOpen.value = true;
+    graphReplayDebugJsonText.value = JSON.stringify(importedGraph, null, 2);
+    previewGraphReplayDebugTarget(importedGraph);
+  } catch (error) {
+    graphReplayDebugDialogOpen.value = true;
+    graphReplayDebugCompileResult.value = null;
+    graphReplayDebugError.value = error instanceof Error ? error.message : t("editor.graphReplayDebugImportFailed");
+  } finally {
+    graphReplayDebugBusy.value = false;
+  }
+}
+
+function previewGraphReplayDebugJson() {
+  const parsed = parseGraphReplayTargetJson(graphReplayDebugJsonText.value);
+  if (!parsed.graph) {
+    graphReplayDebugCompileResult.value = null;
+    graphReplayDebugError.value = parsed.issues.join("\n");
+    return false;
+  }
+
+  return previewGraphReplayDebugTarget(parsed.graph);
+}
+
+function previewGraphReplayDebugTarget(graph: GraphPayload | GraphDocument) {
+  const compileResult = buildGraphReplayIntentsFromTargetGraph(graph);
+  graphReplayDebugCompileResult.value = compileResult;
+  graphReplayDebugError.value = compileResult.valid ? null : compileResult.issues.join("\n");
+  return compileResult.valid;
+}
+
+async function startGraphReplayDebugPlayback() {
+  if (graphReplayDebugBusy.value) {
+    return;
+  }
+
+  graphReplayDebugBusy.value = true;
+  try {
+    if (!previewGraphReplayDebugJson()) {
+      return;
+    }
+    const compileResult = graphReplayDebugCompileResult.value;
+    if (!compileResult?.valid || compileResult.intentPackage.operations.length === 0) {
+      graphReplayDebugError.value = t("editor.graphReplayDebugNoCommands");
+      return;
+    }
+
+    openNewTab(null);
+    await nextTick();
+    const tab = activeTab.value;
+    buddyMascotDebugStore.requestVirtualOperation({
+      version: 1,
+      commands: ["graph_edit editor.graph.playback"],
+      operations: [
+        {
+          kind: "graph_edit",
+          targetId: "editor.canvas.surface",
+          graphEditIntents: compileResult.intentPackage.operations,
+        },
+      ],
+      cursorLifecycle: "return_at_end",
+      reason: t("editor.graphReplayDebugReason"),
+    });
+    graphReplayDebugDialogOpen.value = false;
+    if (tab) {
+      setMessageFeedbackForTab(tab.tabId, {
+        tone: "neutral",
+        message: t("editor.graphReplayDebugStarted"),
+      });
+    }
+  } finally {
+    graphReplayDebugBusy.value = false;
+  }
+}
 const {
   closeNodeCreationMenu: closeNodeCreationMenuController,
   createNodeFromFileForTab,
@@ -1575,6 +1748,102 @@ onMounted(() => {
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+:global(.editor-workspace-shell__graph-replay-dialog.el-dialog) {
+  border: 1px solid rgba(154, 52, 18, 0.18);
+  border-radius: 20px;
+  background:
+    linear-gradient(140deg, rgba(255, 252, 247, 0.98), rgba(247, 250, 252, 0.97)),
+    rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 70px rgba(60, 41, 20, 0.2);
+  overflow: hidden;
+}
+
+:global(.editor-workspace-shell__graph-replay-dialog .el-dialog__header) {
+  padding: 22px 24px 8px;
+}
+
+:global(.editor-workspace-shell__graph-replay-dialog .el-dialog__title) {
+  color: #1f2937;
+  font-size: 1.12rem;
+  font-weight: 850;
+}
+
+:global(.editor-workspace-shell__graph-replay-dialog .el-dialog__body) {
+  padding: 10px 24px 4px;
+}
+
+:global(.editor-workspace-shell__graph-replay-dialog .el-dialog__footer) {
+  padding: 14px 24px 22px;
+}
+
+.editor-workspace-shell__graph-replay-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.editor-workspace-shell__graph-replay-copy {
+  margin: 0;
+  color: #6b5a4a;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.editor-workspace-shell__graph-replay-body :deep(.el-textarea__inner) {
+  border-radius: 14px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  resize: none;
+  box-shadow:
+    0 0 0 1px rgba(154, 52, 18, 0.14) inset,
+    0 8px 22px rgba(60, 41, 20, 0.06);
+}
+
+.editor-workspace-shell__graph-replay-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.editor-workspace-shell__graph-replay-summary span {
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 999px;
+  background: rgba(239, 246, 255, 0.82);
+  padding: 5px 10px;
+  color: rgba(30, 64, 175, 0.96);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.editor-workspace-shell__graph-replay-alert {
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.editor-workspace-shell__graph-replay-alert--danger {
+  border: 1px solid rgba(190, 18, 60, 0.2);
+  background: rgba(255, 241, 242, 0.92);
+  color: #881337;
+}
+
+.editor-workspace-shell__graph-replay-alert--warning {
+  border: 1px solid rgba(217, 119, 6, 0.24);
+  background: rgba(255, 251, 235, 0.92);
+  color: #92400e;
+}
+
+.editor-workspace-shell__graph-replay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 @keyframes editor-workspace-shell-locked-toast-float {

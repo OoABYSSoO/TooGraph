@@ -48,6 +48,8 @@ test("EditorTabBar keeps only the tab strip and a browser-style plus launcher in
   assert.match(componentSource, /class="editor-tab-bar__add-tab"/);
   assert.match(componentSource, /<ElPopover[\s\S]*trigger="click"[\s\S]*placement="bottom-start"/);
   assert.match(componentSource, /<EditorTabLauncherPanel[\s\S]*@create-new="handleLauncherCreateNew"/);
+  assert.match(componentSource, /@import-python-graph="handleLauncherImportPythonGraph"/);
+  assert.match(componentSource, /@open-graph-replay-debug="handleLauncherOpenGraphReplayDebug"/);
   assert.doesNotMatch(componentSource, /editor-tab-bar__controls-dock/);
   assert.doesNotMatch(componentSource, /copy\.run/);
   assert.doesNotMatch(componentSource, /copy\.save/);
@@ -69,7 +71,6 @@ test("EditorTabBar does not declare or reference the retired toolbar boundary", 
   assert.doesNotMatch(componentSource, /toggle-state-panel/);
   assert.doesNotMatch(componentSource, /save-active-graph/);
   assert.doesNotMatch(componentSource, /validate-active-graph/);
-  assert.doesNotMatch(componentSource, /import-python-graph/);
   assert.doesNotMatch(componentSource, /export-active-graph/);
   assert.doesNotMatch(componentSource, /run-active-graph/);
   assert.doesNotMatch(componentSource, /selectedTemplateId/);

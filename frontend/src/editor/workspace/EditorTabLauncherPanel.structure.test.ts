@@ -12,14 +12,18 @@ const entryTitleMatches = componentSource.match(/class="editor-tab-launcher-pane
 const entryIconMatches = componentSource.match(/class="editor-tab-launcher-panel__entry-icon"/g) ?? [];
 const optionListMatches = componentSource.match(/class="editor-tab-launcher-panel__option-list"/g) ?? [];
 
-test("EditorTabLauncherPanel offers blank, template, and existing-graph entry points behind the plus launcher", () => {
+test("EditorTabLauncherPanel offers creation, import, replay, template, and existing-graph entry points behind the plus launcher", () => {
   assert.match(componentSource, /const activeView = ref<"root" \| "template" \| "graph">\("root"\);/);
   assert.match(componentSource, /@click="\$emit\('create-new'\)"/);
+  assert.match(componentSource, /@click="\$emit\('import-python-graph'\)"/);
+  assert.match(componentSource, /@click="\$emit\('open-graph-replay-debug'\)"/);
   assert.match(componentSource, /@click="openSecondaryView\('template'\)"/);
   assert.match(componentSource, /@click="openSecondaryView\('graph'\)"/);
-  assert.equal(entryButtonMatches.length, 3);
-  assert.equal(entryTitleMatches.length, 3);
+  assert.equal(entryButtonMatches.length, 5);
+  assert.equal(entryTitleMatches.length, 5);
   assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">\{\{ t\("launcher\.blankTitle"\) \}\}</);
+  assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">\{\{ t\("launcher\.importPythonTitle"\) \}\}</);
+  assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">\{\{ t\("launcher\.graphReplayTitle"\) \}\}</);
   assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">\{\{ t\("launcher\.templateTitle"\) \}\}</);
   assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">\{\{ t\("launcher\.graphTitle"\) \}\}</);
   assert.equal(optionListMatches.length, 1);
@@ -61,9 +65,11 @@ test("EditorTabLauncherPanel paginates secondary menu options inside the popover
 
 test("EditorTabLauncherPanel uses the shared liquid glass visual language", () => {
   assert.match(componentSource, /import \{ ElIcon \} from "element-plus";/);
-  assert.match(componentSource, /import \{[\s\S]*ArrowLeft[\s\S]*ArrowRight[\s\S]*CollectionTag[\s\S]*DocumentAdd[\s\S]*FolderOpened[\s\S]*\} from "@element-plus\/icons-vue";/);
-  assert.equal(entryIconMatches.length, 3);
+  assert.match(componentSource, /import \{[\s\S]*ArrowLeft[\s\S]*ArrowRight[\s\S]*CollectionTag[\s\S]*DocumentAdd[\s\S]*FolderOpened[\s\S]*Upload[\s\S]*VideoPlay[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.equal(entryIconMatches.length, 5);
   assert.match(componentSource, /<ElIcon><DocumentAdd \/><\/ElIcon>/);
+  assert.match(componentSource, /<ElIcon><Upload \/><\/ElIcon>/);
+  assert.match(componentSource, /<ElIcon><VideoPlay \/><\/ElIcon>/);
   assert.match(componentSource, /<ElIcon><CollectionTag \/><\/ElIcon>/);
   assert.match(componentSource, /<ElIcon><FolderOpened \/><\/ElIcon>/);
   assert.match(componentSource, /\.editor-tab-launcher-panel \{[\s\S]*border:\s*1px solid var\(--toograph-glass-border\);/);

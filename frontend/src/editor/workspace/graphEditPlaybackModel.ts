@@ -35,10 +35,12 @@ export const GRAPH_EDIT_PLAYBACK_CAPABILITY_MANUAL = [
 
 export type GraphEditNodeType = "input" | "agent" | "output" | "condition";
 export type GraphEditStateBindingMode = "read" | "write";
+export type GraphEditWriteBindingMode = "replace" | "append";
 
 export type GraphEditCreateNodeIntent = {
   kind: "create_node";
   ref: string;
+  nodeId?: string;
   nodeType: GraphEditNodeType;
   title?: string;
   description?: string;
@@ -58,6 +60,7 @@ export type GraphEditUpdateNodeIntent = {
 export type GraphEditCreateStateIntent = {
   kind: "create_state";
   ref: string;
+  stateKey?: string;
   name?: string;
   description?: string;
   valueType?: string;
@@ -71,6 +74,7 @@ export type GraphEditBindStateIntent = {
   stateRef: string;
   mode: GraphEditStateBindingMode;
   required?: boolean;
+  writeMode?: GraphEditWriteBindingMode;
 };
 
 export type GraphEditConnectNodesIntent = {
@@ -135,6 +139,7 @@ export type GraphEditBindStateCommand = GraphEditCommandBase & {
   stateKey: string;
   mode: GraphEditStateBindingMode;
   required: boolean;
+  writeMode: GraphEditWriteBindingMode;
 };
 
 export type GraphEditConnectNodesCommand = GraphEditCommandBase & {
@@ -307,7 +312,7 @@ function compileCreateNodeCommand(
     issues.push(`operations[${index}] create_node ref already exists: ${nodeRef}.`);
     return null;
   }
-  const nodeId = reserveUniqueId(context.nodeIds, `${operation.nodeType}_${slugFromText(nodeRef)}`);
+  const nodeId = reserveUniqueId(context.nodeIds, compactText(operation.nodeId) || `${operation.nodeType}_${slugFromText(nodeRef)}`);
   context.nodeRefs[nodeRef] = nodeId;
   const positionIndex = context.nextPositionIndex;
   context.nextPositionIndex += 1;
@@ -366,7 +371,7 @@ function compileCreateStateCommand(
     issues.push(`operations[${index}] create_state ref already exists: ${stateRef}.`);
     return null;
   }
-  const stateKey = reserveUniqueId(context.stateKeys, `state_${slugFromText(stateRef)}`);
+  const stateKey = reserveUniqueId(context.stateKeys, compactText(operation.stateKey) || `state_${slugFromText(stateRef)}`);
   context.stateRefs[stateRef] = stateKey;
   const name = compactText(operation.name) || stateRef;
   const valueType = compactText(operation.valueType) || "text";
@@ -412,6 +417,7 @@ function compileBindStateCommand(
     stateKey,
     mode: operation.mode,
     required: operation.required === true,
+    writeMode: operation.writeMode === "append" ? "append" : "replace",
     summary: `${operation.mode === "read" ? "Read" : "Write"} ${stateKey} on ${nodeId}.`,
   };
 }
@@ -592,10 +598,34 @@ function applyGraphEditCommand<T extends GraphPayload | GraphDocument>(document:
     case "create_state":
       return createStateInDocument(document, command);
     case "bind_state":
-      return addStateBindingToDocument(document, command.stateKey, command.nodeId, command.mode);
+      return bindStateInDocument(document, command);
     case "connect_nodes":
       return connectFlowNodesInDocument(document, command.sourceNodeId, command.targetNodeId);
   }
+}
+
+function bindStateInDocument<T extends GraphPayload | GraphDocument>(document: T, command: GraphEditBindStateCommand): T {
+  const nextDocument = addStateBindingToDocument(document, command.stateKey, command.nodeId, command.mode);
+  if (nextDocument === document) {
+    return document;
+  }
+  const node = nextDocument.nodes[command.nodeId];
+  if (!node) {
+    return nextDocument;
+  }
+  if (command.mode === "read" && command.required) {
+    const readIndex = node.reads.findIndex((binding) => binding.state === command.stateKey);
+    if (readIndex >= 0) {
+      node.reads[readIndex] = { ...node.reads[readIndex], required: true };
+    }
+  }
+  if (command.mode === "write" && command.writeMode === "append") {
+    const writeIndex = node.writes.findIndex((binding) => binding.state === command.stateKey);
+    if (writeIndex >= 0) {
+      node.writes[writeIndex] = { ...node.writes[writeIndex], mode: "append" };
+    }
+  }
+  return nextDocument;
 }
 
 function createNodeInDocument<T extends GraphPayload | GraphDocument>(document: T, command: GraphEditCreateNodeCommand): T {

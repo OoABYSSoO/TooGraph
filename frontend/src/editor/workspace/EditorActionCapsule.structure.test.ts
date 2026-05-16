@@ -9,7 +9,7 @@ const currentDirectory = dirname(currentFilePath);
 const componentSource = readFileSync(resolve(currentDirectory, "EditorActionCapsule.vue"), "utf8");
 
 test("EditorActionCapsule keeps graph tools compact while preserving Run as the only primary action", () => {
-  assert.match(componentSource, /import \{ CircleCheck, CollectionTag, Download, Upload, VideoPlay \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import \{ CircleCheck, CollectionTag, Download, VideoPlay \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /import \{ ElIcon, ElTooltip \} from "element-plus";/);
   assert.match(
     componentSource,
@@ -46,10 +46,9 @@ test("EditorActionCapsule renders non-primary graph actions as icon buttons with
     componentSource,
     /<ElTooltip :content="t\('editor\.validateGraph'\)" placement="bottom">[\s\S]*:aria-label="t\('editor\.validateGraph'\)"[\s\S]*@click="\$emit\('validate-active-graph'\)"/,
   );
-  assert.match(
-    componentSource,
-    /<ElTooltip :content="t\('editor\.importPythonGraph'\)" placement="bottom">[\s\S]*:aria-label="t\('editor\.importPythonGraph'\)"[\s\S]*@click="\$emit\('import-python-graph'\)"/,
-  );
+  assert.doesNotMatch(componentSource, /editor\.importPythonGraph/);
+  assert.doesNotMatch(componentSource, /import-python-graph/);
+  assert.doesNotMatch(componentSource, /<Upload \/>/);
   assert.match(
     componentSource,
     /<ElTooltip :content="t\('editor\.exportPythonGraph'\)" placement="bottom">[\s\S]*:aria-label="t\('editor\.exportPythonGraph'\)"[\s\S]*@click="\$emit\('export-active-graph'\)"/,

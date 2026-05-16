@@ -360,6 +360,19 @@ test("EditorWorkspaceShell imports marked TooGraph Python files as new graph tab
   assert.doesNotMatch(componentSource, /async function importPythonGraphFile\(/);
 });
 
+test("EditorWorkspaceShell opens a graph replay debug dialog from the new-graph launcher", () => {
+  assert.match(componentSource, /ref="graphReplayPythonImportInput"/);
+  assert.match(componentSource, /@open-graph-replay-debug="openGraphReplayDebugDialog"/);
+  assert.match(componentSource, /<ElDialog[\s\S]*graphReplayDebugDialogOpen/);
+  assert.match(componentSource, /v-model="graphReplayDebugJsonText"/);
+  assert.match(componentSource, /@click="previewGraphReplayDebugJson"/);
+  assert.match(componentSource, /@click="openGraphReplayPythonImportDialog"/);
+  assert.match(componentSource, /@change="handleGraphReplayPythonImportSelection"/);
+  assert.match(componentSource, /@click="startGraphReplayDebugPlayback"/);
+  assert.match(componentSource, /buildGraphReplayIntentsFromTargetGraph/);
+  assert.match(componentSource, /buddyMascotDebugStore\.requestVirtualOperation\(\{[\s\S]*commands: \["graph_edit editor\.graph\.playback"\],[\s\S]*kind: "graph_edit",[\s\S]*graphEditIntents:/);
+});
+
 test("EditorWorkspaceShell opens the right sidebar in Human Review mode for awaiting-human runs", () => {
   assert.match(componentSource, /import EditorHumanReviewPanel from "\.\/EditorHumanReviewPanel\.vue";/);
   assert.match(componentSource, /import type \{ WorkspaceSidePanelMode \} from "\.\/workspaceSidePanelModel\.ts";/);
@@ -887,7 +900,7 @@ test("EditorWorkspaceShell renders the graph action controls as a detached capsu
   assert.match(componentSource, /@toggle-run-activity-panel="toggleActiveRunActivityPanelFromActionCapsule"/);
   assert.match(componentSource, /@save-active-graph="saveActiveGraph"/);
   assert.match(componentSource, /@validate-active-graph="validateActiveGraph"/);
-  assert.match(componentSource, /@import-python-graph="openPythonGraphImportDialog"/);
+  assert.doesNotMatch(componentSource, /<EditorActionCapsule[\s\S]*@import-python-graph=/);
   assert.match(componentSource, /@export-active-graph="exportActiveGraph"/);
   assert.match(componentSource, /@run-active-graph="runActiveGraph"/);
   assert.match(editorTabBarUsage, /<EditorTabBar/);

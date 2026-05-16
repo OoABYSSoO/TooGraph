@@ -31,11 +31,6 @@
           <ElIcon aria-hidden="true"><CircleCheck /></ElIcon>
         </button>
       </ElTooltip>
-      <ElTooltip :content="t('editor.importPythonGraph')" placement="bottom">
-        <button type="button" class="editor-action-capsule__icon-button" :aria-label="t('editor.importPythonGraph')" @click="$emit('import-python-graph')">
-          <ElIcon aria-hidden="true"><Upload /></ElIcon>
-        </button>
-      </ElTooltip>
       <ElTooltip :content="t('editor.exportPythonGraph')" placement="bottom">
         <button type="button" class="editor-action-capsule__icon-button" :aria-label="t('editor.exportPythonGraph')" @click="$emit('export-active-graph')">
           <ElIcon aria-hidden="true"><Download /></ElIcon>
@@ -73,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { CircleCheck, CollectionTag, Download, Upload, VideoPlay } from "@element-plus/icons-vue";
+import { CircleCheck, CollectionTag, Download, VideoPlay } from "@element-plus/icons-vue";
 import { ElIcon, ElTooltip } from "element-plus";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -95,7 +90,6 @@ defineEmits<{
   (event: "save-active-graph-as-new"): void;
   (event: "save-active-graph-as-template"): void;
   (event: "validate-active-graph"): void;
-  (event: "import-python-graph"): void;
   (event: "export-active-graph"): void;
   (event: "run-active-graph"): void;
 }>();
