@@ -3,6 +3,10 @@ from __future__ import annotations
 from collections import Counter
 
 from app.core.control_flow_state_analysis import find_ambiguous_state_reads
+from app.core.runtime.condition_eval import (
+    resolve_condition_source_state_type,
+    validate_condition_rule_value_for_state_type,
+)
 from app.core.schemas.node_system import (
     FIXED_CONDITION_BRANCHES,
     FIXED_CONDITION_BRANCH_MAPPING,
@@ -842,6 +846,22 @@ def _validate_condition_node(
                 )
             )
 
+    source_type = resolve_condition_source_state_type(node.config.rule.source, graph.state_schema)
+    try:
+        validate_condition_rule_value_for_state_type(
+            source_type,
+            node.config.rule.operator.value,
+            node.config.rule.value,
+        )
+    except ValueError as exc:
+        issues.append(
+            ValidationIssue(
+                code="condition_rule_value_type_mismatch",
+                message=f"Condition node '{node_name}' has an invalid value for {source_type} state '{node.config.rule.source}': {exc}",
+                path=f"nodes.{node_name}.config.rule.value",
+            )
+        )
+
     return issues
 
 
@@ -895,7 +915,7 @@ def _validate_edge(index: int, edge: NodeSystemGraphEdge, graph: NodeSystemGraph
         )
         return issues
 
-    if source_node.kind not in {"input", "agent", "subgraph", "tool"}:
+    if source_node.kind not in {"input", "agent", "batch", "subgraph", "tool"}:
         issues.append(
             ValidationIssue(
                 code="edge_source_kind_invalid",
@@ -904,7 +924,7 @@ def _validate_edge(index: int, edge: NodeSystemGraphEdge, graph: NodeSystemGraph
             )
         )
 
-    if target_node.kind not in {"agent", "condition", "output", "subgraph", "tool"}:
+    if target_node.kind not in {"agent", "batch", "condition", "output", "subgraph", "tool"}:
         issues.append(
             ValidationIssue(
                 code="edge_target_kind_invalid",

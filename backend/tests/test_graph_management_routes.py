@@ -64,6 +64,28 @@ def _agent_graph_payload(graph_id: str | None = None, name: str = "Agent Flow") 
     }
 
 
+def _invalid_draft_graph_payload(graph_id: str | None = None, name: str = "Draft Flow") -> dict[str, object]:
+    return {
+        "graph_id": graph_id,
+        "name": name,
+        "state_schema": {},
+        "nodes": {
+            "draft_input": {
+                "kind": "input",
+                "name": "Draft Input",
+                "description": "",
+                "ui": {"position": {"x": 0, "y": 0}, "collapsed": False},
+                "reads": [],
+                "writes": [],
+                "config": {"value": "", "boundaryType": "text"},
+            }
+        },
+        "edges": [],
+        "conditional_edges": [],
+        "metadata": {},
+    }
+
+
 class GraphManagementRouteTests(unittest.TestCase):
     def test_graphs_can_be_disabled_enabled_listed_and_deleted(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -159,6 +181,27 @@ class GraphManagementRouteTests(unittest.TestCase):
                 self.assertEqual(second_graph["name"], "Managed Flow_1")
                 self.assertEqual(third_graph["name"], "Managed Flow_2")
                 self.assertEqual(client.get("/api/graphs/graph_first").json()["name"], "Managed Flow")
+
+    def test_save_accepts_structurally_valid_draft_without_execution_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            graph_dir = Path(temp_dir) / "graphs"
+            with (
+                patch("app.core.storage.database.GRAPH_DATA_DIR", graph_dir),
+                patch("app.core.storage.graph_store.GRAPH_DATA_DIR", graph_dir),
+                TestClient(app) as client,
+            ):
+                payload = _invalid_draft_graph_payload("graph_draft_invalid")
+
+                save_response = client.post("/api/graphs/save", json=payload)
+                validate_response = client.post("/api/graphs/validate", json=payload)
+                run_response = client.post("/api/graphs/run", json=payload)
+
+                self.assertEqual(save_response.status_code, 200)
+                self.assertEqual(save_response.json()["graph_id"], "graph_draft_invalid")
+                self.assertEqual(client.get("/api/graphs/graph_draft_invalid").status_code, 200)
+                self.assertEqual(validate_response.status_code, 200)
+                self.assertEqual(validate_response.json()["valid"], False)
+                self.assertEqual(run_response.status_code, 422)
 
     def test_saving_graph_preserves_agent_config_ui_and_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

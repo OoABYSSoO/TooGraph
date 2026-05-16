@@ -112,9 +112,23 @@
         </label>
         <label class="node-card__control-row">
           <span class="node-card__control-label">{{ t("nodeCard.value") }}</span>
+          <ElSwitch
+            v-if="conditionRuleValueEditorMode === 'boolean'"
+            class="node-card__condition-value-switch"
+            :model-value="conditionRuleBooleanValue"
+            :disabled="conditionRuleValueDisabled"
+            inline-prompt
+            active-text="true"
+            inactive-text="false"
+            @pointerdown.stop
+            @click.stop
+            @update:model-value="emit('rule-boolean-value', Boolean($event))"
+          />
           <input
+            v-else
             class="node-card__control-input"
-            type="text"
+            :type="conditionRuleValueInputType"
+            :inputmode="conditionRuleValueEditorMode === 'number' ? 'decimal' : undefined"
             :value="conditionRuleValueDraft"
             :placeholder="body.valueLabel"
             :disabled="conditionRuleValueDisabled"
@@ -146,7 +160,7 @@
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
-import { ElIcon, ElInputNumber, ElOption, ElPopover } from "element-plus";
+import { ElIcon, ElInputNumber, ElOption, ElPopover, ElSwitch } from "element-plus";
 import { Check, Delete } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
@@ -171,6 +185,9 @@ const props = defineProps<{
   ruleOperatorValue: ConditionNode["config"]["rule"]["operator"] | "";
   conditionRuleValueDraft: string;
   conditionRuleValueDisabled: boolean;
+  conditionRuleValueEditorMode: "text" | "number" | "boolean" | "disabled";
+  conditionRuleValueInputType: "text" | "number";
+  conditionRuleBooleanValue: boolean;
   conditionLoopLimitValue: number;
   conditionRuleOperatorOptions: ConditionRuleOperatorOption[];
   stateEditorPopoverStyle: CSSProperties;
@@ -213,6 +230,7 @@ const emit = defineEmits<{
   (event: "update:operator", value: string | number | boolean | undefined): void;
   (event: "update:loop-limit", value: number | undefined): void;
   (event: "rule-value-input", inputEvent: Event): void;
+  (event: "rule-boolean-value", value: boolean): void;
   (event: "commit-rule-value"): void;
   (event: "rule-value-enter", keyboardEvent: KeyboardEvent): void;
 }>();
@@ -317,6 +335,11 @@ const conditionInputAnchorId = computed(() =>
 
 .node-card__condition-loop-limit-input {
   width: 100%;
+}
+
+.node-card__condition-value-switch {
+  align-self: center;
+  justify-self: start;
 }
 
 .node-card__control-select {

@@ -243,6 +243,39 @@ def _resolve_condition_source(source: str, *, inputs: dict[str, Any], graph: dic
     return source
 
 
+def _resolve_condition_source_state_key(source: str, state_schema: dict[str, Any]) -> str | None:
+    if source in state_schema:
+        return source
+    if not source.startswith("$state."):
+        return None
+    state_path = source[len("$state."):]
+    if state_path and "." not in state_path and state_path in state_schema:
+        return state_path
+    return None
+
+
+def _resolve_condition_source_state_type(source: str, state_schema: dict[str, Any]) -> str | None:
+    state_key = _resolve_condition_source_state_key(source, state_schema)
+    if state_key is None:
+        return None
+    definition = state_schema.get(state_key)
+    if isinstance(definition, dict):
+        raw_type = definition.get("type")
+    else:
+        raw_type = getattr(definition, "type", None)
+    raw_value = getattr(raw_type, "value", raw_type)
+    return str(raw_value) if raw_value else None
+
+
+def _validate_condition_rule_value_for_state_type(source_type: str | None, operator: str, right_value: Any) -> None:
+    if operator == "exists":
+        return
+    if source_type == "boolean" and not isinstance(right_value, bool):
+        raise ValueError("Boolean condition value must be true or false.")
+    if source_type == "number" and (isinstance(right_value, bool) or not isinstance(right_value, (int, float))):
+        raise ValueError("Number condition value must be a finite number.")
+
+
 def _parse_condition_number(value: Any) -> int | float | None:
     if isinstance(value, bool):
         return None
@@ -626,6 +659,8 @@ def _run_condition_node(graph: dict[str, Any], node_name: str, node: dict[str, A
     source = str(rule.get("source") or "result")
     operator = str(rule.get("operator") or "exists")
     rule_value = _resolve_condition_source(source, inputs=input_values, graph={"metadata": graph.get("metadata", {})}, state_values=state_values)
+    source_type = _resolve_condition_source_state_type(source, graph.get("state_schema") or {})
+    _validate_condition_rule_value_for_state_type(source_type, operator, rule.get("value"))
     condition_result = _evaluate_condition_rule(rule_value, operator, rule.get("value"))
     branch_key = _resolve_branch_key(branches, branch_mapping, condition_result)
     if branch_key is None:

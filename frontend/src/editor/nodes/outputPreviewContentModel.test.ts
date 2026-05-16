@@ -266,6 +266,20 @@ test("resolveOutputPreviewContent treats string arrays as local document paths",
   assert.match(preview.text, /Local: run_1\/search\/doc_001\.md/);
 });
 
+test("resolveOutputPreviewContent does not treat batch text arrays as artifact paths in auto mode", () => {
+  const preview = resolveOutputPreviewContent(
+    JSON.stringify([
+      "这段视频展示了一款移动端第一人称射击游戏。",
+      "第二段内容继续描述角色移动、武器切换和界面元素。",
+    ]),
+    "auto",
+  );
+
+  assert.equal(preview.kind, "json");
+  assert.deepEqual(preview.documentRefs, []);
+  assert.match(preview.text, /移动端第一人称射击/);
+});
+
 test("resolveOutputPreviewContent treats a single local path as a document reference in document mode", () => {
   const preview = resolveOutputPreviewContent("run_1/search/doc_001.md", "documents");
 

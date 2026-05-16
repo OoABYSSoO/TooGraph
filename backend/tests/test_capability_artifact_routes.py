@@ -51,6 +51,19 @@ class CapabilityArtifactRouteTests(unittest.TestCase):
         self.assertEqual(response.headers["content-type"], "video/mp4")
         self.assertEqual(blocked.status_code, 400)
 
+    def test_capability_artifact_content_endpoint_handles_overlong_nonexistent_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "capability_artifacts"
+            long_path = "x" * 5000
+
+            with (
+                patch("app.core.storage.capability_artifact_store.CAPABILITY_ARTIFACT_DATA_DIR", root),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                response = client.get("/api/capability-artifacts/content", params={"path": long_path})
+
+        self.assertEqual(response.status_code, 404)
+
     def test_capability_artifact_upload_endpoint_persists_input_files_inside_upload_folder(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "capability_artifacts"

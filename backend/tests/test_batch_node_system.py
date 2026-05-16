@@ -187,6 +187,49 @@ def test_batch_validation_requires_template_worker_when_source_is_subgraph() -> 
     assert "batch_subgraph_worker_missing" in [issue.code for issue in validation.issues]
 
 
+def test_batch_validation_accepts_plain_control_flow_edges() -> None:
+    graph = NodeSystemGraphDocument.model_validate(
+        {
+            "graph_id": "graph_batch_flow",
+            "name": "Batch Flow",
+            "state_schema": {
+                "segments": {"type": "json", "value": ["intro", "middle"]},
+                "question": {"type": "text", "value": "summarize"},
+                "reports": {"type": "json", "value": []},
+            },
+            "nodes": {
+                "input_segments": {
+                    "kind": "input",
+                    "ui": {"position": {"x": 0, "y": 0}},
+                    "writes": [{"state": "segments"}],
+                    "config": {"value": ["intro", "middle"], "boundaryType": "json"},
+                },
+                "input_question": {
+                    "kind": "input",
+                    "ui": {"position": {"x": 0, "y": 100}},
+                    "writes": [{"state": "question"}],
+                    "config": {"value": "summarize"},
+                },
+                "batch": _batch_node().model_dump(by_alias=True),
+                "output_reports": {
+                    "kind": "output",
+                    "ui": {"position": {"x": 500, "y": 0}},
+                    "reads": [{"state": "reports", "required": True}],
+                },
+            },
+            "edges": [
+                {"source": "input_segments", "target": "batch"},
+                {"source": "input_question", "target": "batch"},
+                {"source": "batch", "target": "output_reports"},
+            ],
+        }
+    )
+
+    validation = validate_graph(graph)
+
+    assert validation.valid
+
+
 def test_execute_batch_node_zips_batch_inputs_and_collects_outputs_by_index() -> None:
     calls: list[dict[str, Any]] = []
 

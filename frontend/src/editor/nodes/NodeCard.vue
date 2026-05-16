@@ -538,6 +538,9 @@
         :rule-operator-value="node.kind === 'condition' ? node.config.rule.operator : ''"
         :condition-rule-value-draft="conditionRuleValueDraft"
         :condition-rule-value-disabled="conditionRuleValueDisabled"
+        :condition-rule-value-editor-mode="conditionRuleValueEditorMode"
+        :condition-rule-value-input-type="conditionRuleValueInputType"
+        :condition-rule-boolean-value="conditionRuleBooleanValue"
         :condition-loop-limit-value="conditionLoopLimitValue"
         :condition-rule-operator-options="conditionRuleOperatorOptions"
         :state-editor-popover-style="stateEditorPopoverStyle"
@@ -577,6 +580,7 @@
         @update:operator="handleConditionRuleOperatorSelect"
         @update:loop-limit="handleConditionLoopLimitValue"
         @rule-value-input="handleConditionRuleValueInput"
+        @rule-boolean-value="handleConditionRuleBooleanValue"
         @commit-rule-value="commitConditionRuleValue"
         @rule-value-enter="handleConditionRuleValueEnter"
       />
@@ -644,8 +648,9 @@ import {
   resolveConditionLoopLimitPatch,
 } from "./conditionLoopLimit";
 import {
+  buildConditionRuleEditorModel,
   CONDITION_RULE_OPERATOR_OPTIONS,
-  isConditionRuleValueInputDisabled,
+  resolveConditionRuleBooleanValuePatch,
   resolveConditionRuleOperatorPatch,
   resolveConditionRuleValueDraft,
   resolveConditionRuleValuePatch,
@@ -883,6 +888,9 @@ const batchWorkerTemplateOptions = computed(() =>
 );
 const existingPortStateOptions = computed(() => buildStatePortExistingStateOptions(props.stateSchema));
 const conditionRuleValueDraft = ref("");
+const conditionRuleEditorModel = computed(() =>
+  props.node.kind === "condition" ? buildConditionRuleEditorModel(props.node.config.rule, props.stateSchema) : null,
+);
 const activePortPickerSide = ref<"input" | "output" | null>(null);
 const portStateSelectionValue = ref(PORT_STATE_CREATE_NEW_VALUE);
 const portStateDraft = ref<StateFieldDraft | null>(null);
@@ -1106,9 +1114,10 @@ const portPickerTitle = computed(() => {
   }
   return activePortPickerSide.value === "input" ? t("nodeCard.createInputState") : t("nodeCard.createOutputState");
 });
-const conditionRuleValueDisabled = computed(
-  () => props.node.kind === "condition" && isConditionRuleValueInputDisabled(props.node.config.rule.operator),
-);
+const conditionRuleValueDisabled = computed(() => conditionRuleEditorModel.value?.isValueDisabled ?? false);
+const conditionRuleValueEditorMode = computed(() => conditionRuleEditorModel.value?.valueEditorMode ?? "text");
+const conditionRuleValueInputType = computed(() => conditionRuleEditorModel.value?.inputType ?? "text");
+const conditionRuleBooleanValue = computed(() => conditionRuleEditorModel.value?.booleanValue ?? false);
 const conditionLoopLimitValue = computed(() =>
   props.node.kind === "condition" ? normalizeConditionLoopLimit(props.node.config.loopLimit) : 5,
 );
@@ -1230,8 +1239,11 @@ function shouldAnimateNodeRunTimingDisplay() {
 }
 
 watch(
-  () => (props.node.kind === "condition" ? props.node.config.rule.value : null),
-  (ruleValue) => {
+  () =>
+    props.node.kind === "condition"
+      ? ([props.node.config.rule.value, conditionRuleEditorModel.value?.sourceType ?? ""] as const)
+      : ([null, ""] as const),
+  ([ruleValue]) => {
     conditionRuleValueDraft.value = resolveConditionRuleValueDraft(ruleValue);
   },
   { immediate: true },
@@ -2390,7 +2402,22 @@ function commitConditionRuleValue() {
   if (props.node.kind !== "condition") {
     return;
   }
-  const patch = resolveConditionRuleValuePatch(conditionRuleValueDraft.value, props.node.config.rule.value);
+  const patch = resolveConditionRuleValuePatch(
+    conditionRuleValueDraft.value,
+    props.node.config.rule.value,
+    conditionRuleEditorModel.value?.sourceType ?? "",
+  );
+  if (!patch) {
+    return;
+  }
+  updateConditionRule(patch);
+}
+
+function handleConditionRuleBooleanValue(value: boolean) {
+  if (props.node.kind !== "condition") {
+    return;
+  }
+  const patch = resolveConditionRuleBooleanValuePatch(value, props.node.config.rule.value);
   if (!patch) {
     return;
   }

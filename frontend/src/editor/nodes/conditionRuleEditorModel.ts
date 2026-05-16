@@ -8,7 +8,11 @@ export type ConditionRuleSourceOption = {
 export type ConditionRuleEditorModel = {
   sourceOptions: ConditionRuleSourceOption[];
   resolvedSource: string;
+  sourceType: string;
   isValueDisabled: boolean;
+  valueEditorMode: "text" | "number" | "boolean" | "disabled";
+  inputType: "text" | "number";
+  booleanValue: boolean;
 };
 
 export const CONDITION_RULE_OPERATOR_OPTIONS: Array<{
@@ -35,11 +39,18 @@ export function buildConditionRuleEditorModel(
     label: definition.name?.trim() || stateKey,
   }));
   const resolvedSource = sourceOptions.some((option) => option.value === rule.source) ? rule.source : (sourceOptions[0]?.value ?? "");
+  const sourceType = resolveConditionRuleSourceType(rule.source, stateSchema);
+  const isValueDisabled = isConditionRuleValueInputDisabled(rule.operator);
+  const valueEditorMode = isValueDisabled ? "disabled" : resolveConditionRuleValueEditorMode(sourceType);
 
   return {
     sourceOptions,
     resolvedSource,
-    isValueDisabled: rule.operator === "exists",
+    sourceType,
+    isValueDisabled,
+    valueEditorMode,
+    inputType: valueEditorMode === "number" ? "number" : "text",
+    booleanValue: resolveConditionRuleBooleanValue(rule.value),
   };
 }
 
@@ -60,9 +71,66 @@ export function resolveConditionRuleOperatorPatch(
 export function resolveConditionRuleValuePatch(
   nextDraftValue: string,
   currentValue: ConditionNode["config"]["rule"]["value"] | undefined,
+  sourceType = "",
 ): Pick<ConditionNode["config"]["rule"], "value"> | null {
+  if (sourceType === "number") {
+    const nextNumber = Number(nextDraftValue);
+    if (!Number.isFinite(nextNumber)) {
+      return null;
+    }
+    return currentValue === nextNumber ? null : { value: nextNumber };
+  }
+
   if (nextDraftValue === resolveConditionRuleValueDraft(currentValue)) {
     return null;
   }
   return { value: nextDraftValue };
+}
+
+export function resolveConditionRuleBooleanValuePatch(
+  nextValue: boolean,
+  currentValue: ConditionNode["config"]["rule"]["value"] | undefined,
+): Pick<ConditionNode["config"]["rule"], "value"> | null {
+  return currentValue === nextValue ? null : { value: nextValue };
+}
+
+export function resolveConditionRuleSourceType(
+  source: string,
+  stateSchema: Record<string, StateDefinition>,
+) {
+  const sourceStateKey = resolveConditionRuleSourceStateKey(source, stateSchema);
+  return sourceStateKey ? stateSchema[sourceStateKey]?.type?.trim() ?? "" : "";
+}
+
+function resolveConditionRuleValueEditorMode(sourceType: string): ConditionRuleEditorModel["valueEditorMode"] {
+  if (sourceType === "boolean") {
+    return "boolean";
+  }
+  if (sourceType === "number") {
+    return "number";
+  }
+  return "text";
+}
+
+function resolveConditionRuleBooleanValue(value: ConditionNode["config"]["rule"]["value"] | undefined) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  return String(value).trim().toLowerCase() === "true";
+}
+
+function resolveConditionRuleSourceStateKey(
+  source: string,
+  stateSchema: Record<string, StateDefinition>,
+) {
+  if (stateSchema[source]) {
+    return source;
+  }
+
+  if (!source.startsWith("$state.")) {
+    return "";
+  }
+
+  const statePath = source.slice("$state.".length);
+  return statePath && !statePath.includes(".") && stateSchema[statePath] ? statePath : "";
 }

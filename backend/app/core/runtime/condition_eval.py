@@ -1,7 +1,43 @@
 from __future__ import annotations
 
+import math
 import re
 from typing import Any
+
+
+def resolve_condition_source_state_key(source: str, state_schema: dict[str, Any]) -> str | None:
+    if source in state_schema:
+        return source
+    if not source.startswith("$state."):
+        return None
+
+    state_path = source[len("$state.") :]
+    if state_path and "." not in state_path and state_path in state_schema:
+        return state_path
+    return None
+
+
+def resolve_condition_source_state_type(source: str, state_schema: dict[str, Any]) -> str | None:
+    state_key = resolve_condition_source_state_key(source, state_schema)
+    if state_key is None:
+        return None
+
+    definition = state_schema.get(state_key)
+    if isinstance(definition, dict):
+        raw_type = definition.get("type")
+    else:
+        raw_type = getattr(definition, "type", None)
+    raw_value = getattr(raw_type, "value", raw_type)
+    return str(raw_value) if raw_value else None
+
+
+def validate_condition_rule_value_for_state_type(source_type: str | None, operator: str, right_value: Any) -> None:
+    if operator == "exists":
+        return
+    if source_type == "boolean" and not isinstance(right_value, bool):
+        raise ValueError("Boolean condition value must be true or false.")
+    if source_type == "number" and not _is_condition_rule_number_value(right_value):
+        raise ValueError("Number condition value must be a finite number.")
 
 
 def evaluate_condition_rule(left_value: Any, operator: str, right_value: Any) -> bool:
@@ -59,6 +95,10 @@ def coerce_condition_text(value: Any) -> str:
     if isinstance(value, str):
         return value
     return str(value)
+
+
+def _is_condition_rule_number_value(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(float(value))
 
 
 def resolve_branch_key(branches: list[str], branch_mapping: dict[str, str], condition_result: Any) -> str | None:

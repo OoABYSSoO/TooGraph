@@ -10,7 +10,10 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 
-DEFAULT_SEGMENT_SECONDS = 30.0
+SHORT_LLM_VIDEO_LIMIT_SECONDS = 30.0
+DEFAULT_SEGMENT_HEADROOM_SECONDS = 0.5
+DEFAULT_SEGMENT_SECONDS = SHORT_LLM_VIDEO_LIMIT_SECONDS - DEFAULT_SEGMENT_HEADROOM_SECONDS
+COPY_DURATION_TOLERANCE_SECONDS = 0.25
 MIN_SEGMENT_SECONDS = 0.1
 OUTPUT_MIME_TYPE = "video/mp4"
 
@@ -111,7 +114,7 @@ def _write_segment(
         str(output_path),
     ]
     copy_error = _run_media_command(copy_command, timeout_seconds=_segment_timeout(duration_sec))
-    if copy_error is None and output_path.is_file() and output_path.stat().st_size > 0:
+    if copy_error is None and _segment_file_is_batch_ready(output_path, requested_duration_sec=duration_sec):
         return
 
     reencode_command = [
@@ -119,10 +122,10 @@ def _write_segment(
         "-hide_banner",
         "-loglevel",
         "error",
-        "-ss",
-        f"{start_sec:.3f}",
         "-i",
         str(source_path),
+        "-ss",
+        f"{start_sec:.3f}",
         "-t",
         f"{duration_sec:.3f}",
         "-map",
@@ -143,11 +146,38 @@ def _write_segment(
         str(output_path),
     ]
     reencode_error = _run_media_command(reencode_command, timeout_seconds=_segment_timeout(duration_sec))
-    if reencode_error is None and output_path.is_file() and output_path.stat().st_size > 0:
+    if reencode_error is None and _segment_file_is_batch_ready(output_path, requested_duration_sec=duration_sec):
         return
 
-    detail = reencode_error or copy_error or "ffmpeg did not create an output file."
+    detail = reencode_error or copy_error or "ffmpeg did not create a batch-ready output file."
     raise VideoSegmenterError("segment_write_failed", detail[:800])
+
+
+def _segment_file_is_batch_ready(output_path: Path, *, requested_duration_sec: float) -> bool:
+    if not output_path.is_file() or output_path.stat().st_size <= 0:
+        return False
+    actual_duration = _probe_segment_duration_seconds(output_path)
+    if actual_duration is None:
+        return True
+    max_accepted_duration = min(
+        SHORT_LLM_VIDEO_LIMIT_SECONDS,
+        float(requested_duration_sec) + COPY_DURATION_TOLERANCE_SECONDS,
+    )
+    return actual_duration <= max_accepted_duration
+
+
+def _probe_segment_duration_seconds(output_path: Path) -> float | None:
+    try:
+        from app.tools.video_frame_fallback import probe_video_duration_seconds
+
+        duration = probe_video_duration_seconds(output_path)
+    except Exception:
+        return None
+    try:
+        normalized = float(duration)
+    except (TypeError, ValueError):
+        return None
+    return normalized if normalized > 0 else None
 
 
 def _run_media_command(command: list[str], *, timeout_seconds: int) -> str | None:

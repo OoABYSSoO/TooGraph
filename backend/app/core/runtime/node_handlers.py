@@ -16,7 +16,12 @@ from app.core.runtime.agent_subgraph_input_generation import (
     generate_agent_subgraph_inputs,
 )
 from app.core.runtime.activity_events import record_activity_event, record_action_activity_events
-from app.core.runtime.condition_eval import evaluate_condition_rule, resolve_branch_key
+from app.core.runtime.condition_eval import (
+    evaluate_condition_rule,
+    resolve_branch_key,
+    resolve_condition_source_state_type,
+    validate_condition_rule_value_for_state_type,
+)
 from app.core.runtime.input_boundary import coerce_input_boundary_value, first_truthy
 from app.core.runtime.reference_resolution import resolve_condition_source
 from app.core.runtime.permission_approval import (
@@ -101,6 +106,11 @@ def execute_condition_node(
         graph=graph_context,
         state_values=graph_context.get("state", {}),
     )
+    source_type = resolve_condition_source_state_type(
+        node.config.rule.source,
+        graph_context.get("state_schema", {}),
+    )
+    validate_condition_rule_value_for_state_type(source_type, node.config.rule.operator.value, node.config.rule.value)
     condition_result = evaluate_condition_rule_func(rule_value, node.config.rule.operator.value, node.config.rule.value)
     branch_key = resolve_branch_key_func(node.config.branches, node.config.branch_mapping, condition_result)
     if branch_key is None:

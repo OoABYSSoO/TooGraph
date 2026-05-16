@@ -20,7 +20,7 @@ export function collectLocalArtifactReferences(value: unknown, options: { allowS
 
 function collectArtifactRecordReferences(value: unknown, references: LocalArtifactReference[], allowStringPath: boolean) {
   if (typeof value === "string") {
-    if (allowStringPath) {
+    if (allowStringPath && looksLikeStandaloneArtifactPath(value)) {
       appendArtifactReference({ local_path: value }, references);
     }
     return;
@@ -177,6 +177,11 @@ function normalizeLocalArtifactPath(value: unknown) {
     return "";
   }
   return path;
+}
+
+function looksLikeStandaloneArtifactPath(value: string) {
+  const path = normalizeText(value).replaceAll("\\", "/");
+  return Boolean(path && path.length <= 1024 && !/[\r\n]/.test(path) && path.includes("/"));
 }
 
 function normalizeText(value: unknown) {

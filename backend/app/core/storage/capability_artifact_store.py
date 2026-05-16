@@ -56,30 +56,41 @@ def read_capability_artifact_text_for_prompt(relative_path: str) -> dict[str, An
 def _read_capability_artifact_text(relative_path: str, *, max_bytes: int | None) -> dict[str, Any]:
     normalized_path = normalize_capability_artifact_relative_path(relative_path)
     target = resolve_capability_artifact_path(normalized_path)
-    if not target.is_file():
-        raise FileNotFoundError(f"Capability artifact '{normalized_path}' does not exist.")
-    size = target.stat().st_size
+    try:
+        if not target.is_file():
+            raise FileNotFoundError(f"Capability artifact '{normalized_path}' does not exist.")
+        size = target.stat().st_size
+    except OSError as exc:
+        raise FileNotFoundError(f"Capability artifact '{normalized_path}' does not exist.") from exc
     if max_bytes is not None and size > max_bytes:
         raise ValueError(f"Capability artifact '{normalized_path}' is too large to preview.")
     content_type = _guess_text_content_type(target)
+    try:
+        content = target.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        raise FileNotFoundError(f"Capability artifact '{normalized_path}' does not exist.") from exc
     return {
         "path": normalized_path,
         "name": target.name,
         "size": size,
         "content_type": content_type,
-        "content": target.read_text(encoding="utf-8", errors="replace"),
+        "content": content,
     }
 
 
 def read_capability_artifact_file_metadata(relative_path: str) -> dict[str, Any]:
     normalized_path = normalize_capability_artifact_relative_path(relative_path)
     target = resolve_capability_artifact_path(normalized_path)
-    if not target.is_file():
-        raise FileNotFoundError(f"Capability artifact '{normalized_path}' does not exist.")
+    try:
+        if not target.is_file():
+            raise FileNotFoundError(f"Capability artifact '{normalized_path}' does not exist.")
+        size = target.stat().st_size
+    except OSError as exc:
+        raise FileNotFoundError(f"Capability artifact '{normalized_path}' does not exist.") from exc
     return {
         "path": normalized_path,
         "name": target.name,
-        "size": target.stat().st_size,
+        "size": size,
         "content_type": mimetypes.guess_type(target.name)[0] or "application/octet-stream",
         "filesystem_path": target,
     }

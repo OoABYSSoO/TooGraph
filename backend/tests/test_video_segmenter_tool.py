@@ -43,6 +43,12 @@ class VideoSegmenterToolTests(unittest.TestCase):
         self.assertEqual(definition.output_schema[0].value_type, "json")
         self.assertIn("video_segmenter", get_tool_registry(include_disabled=True).keys())
 
+    def test_default_segment_duration_leaves_headroom_for_llm_video_limit(self):
+        module = _load_video_segmenter_module()
+
+        self.assertLess(module.DEFAULT_SEGMENT_SECONDS, module.SHORT_LLM_VIDEO_LIMIT_SECONDS)
+        self.assertEqual(module.DEFAULT_SEGMENT_SECONDS, 29.5)
+
     def test_segments_video_into_batch_ready_short_video_files(self):
         if not (TOOL_DIR / "run.py").is_file():
             self.skipTest("video_segmenter script has not been implemented yet")
@@ -104,6 +110,60 @@ class VideoSegmenterToolTests(unittest.TestCase):
                 self.assertTrue((artifact_dir / Path(segment["local_path"]).name).is_file())
                 previous_end = segment["end_sec"]
 
+    def test_default_segments_remain_under_llm_limit_with_sparse_keyframes(self):
+        if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+            self.skipTest("ffmpeg and ffprobe are required for the integration test")
+
+        module = _load_video_segmenter_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            source_video = tmp_path / "sparse_keyframes.mp4"
+            artifact_dir = tmp_path / "artifacts"
+            relative_dir = "run/test/video_segmenter/invocation_sparse"
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "testsrc=size=160x90:rate=4",
+                    "-t",
+                    "66.2",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-g",
+                    "60",
+                    "-keyint_min",
+                    "60",
+                    "-sc_threshold",
+                    "0",
+                    "-y",
+                    str(source_video),
+                ],
+                check=True,
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    "TOOGRAPH_REPO_ROOT": str(REPO_ROOT),
+                    "TOOGRAPH_ACTION_ARTIFACT_DIR": str(artifact_dir),
+                    "TOOGRAPH_ACTION_ARTIFACT_RELATIVE_DIR": relative_dir,
+                },
+            ):
+                result = module.video_segmenter({"filesystem_path": str(source_video), "mime_type": "video/mp4"})
+
+            self.assertEqual(result["status"], "succeeded")
+            self.assertGreater(len(result["segments"]), 1)
+            for segment in result["segments"]:
+                segment_path = artifact_dir / Path(segment["local_path"]).name
+                duration = _probe_duration(segment_path)
+                self.assertLessEqual(duration, module.SHORT_LLM_VIDEO_LIMIT_SECONDS)
+
     def test_tool_runner_invokes_video_segmenter_script(self):
         if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
             self.skipTest("ffmpeg and ffprobe are required for the integration test")
@@ -148,6 +208,25 @@ class VideoSegmenterToolTests(unittest.TestCase):
             self.assertEqual(segment["mime_type"], "video/mp4")
             self.assertTrue(segment["local_path"].startswith(relative_dir + "/"))
             self.assertTrue((artifact_dir / Path(segment["local_path"]).name).is_file())
+
+
+def _probe_duration(path: Path) -> float:
+    completed = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=nw=1:nk=1",
+            str(path),
+        ],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return float(completed.stdout.strip())
 
 
 if __name__ == "__main__":
