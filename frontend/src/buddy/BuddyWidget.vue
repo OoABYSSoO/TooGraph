@@ -645,6 +645,7 @@ const BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS = 80;
 const BUDDY_VIRTUAL_OPERATION_TYPE_CHARACTER_DELAY_MS = 18;
 const BUDDY_VIRTUAL_POINTER_ID = 9001;
 const TOOGRAPH_VIRTUAL_POINTER_EVENT_KEY = "__toographVirtualPointerEvent";
+const TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY = "__toographVirtualEmptyCanvasPointerEvent";
 const BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_WAIT_MS = 2400;
 const BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_RETRY_MS = 80;
 const VIRTUAL_CURSOR_STAR_PATH =
@@ -2602,16 +2603,26 @@ async function dispatchVirtualGraphDragPointerEvents(step: GraphEditPlaybackStep
   const pointerSurface = resolveVirtualOperationAffordance("editor.canvas.surface")?.element ?? targetElement;
   const startPoint = resolveElementCenterPoint(targetElement);
   const endPoint = resolveGraphEditPlaybackDragEndPoint(step) ?? startPoint;
+  const forceEmptyCanvasDrop = shouldForceGraphEditPlaybackEmptyCanvasDrop(step);
   dispatchVirtualPointerEvent(targetElement, "pointerdown", startPoint.x, startPoint.y);
   const dragPoints = buildVirtualDragPoints(startPoint, endPoint);
   for (const point of dragPoints) {
     if (isVirtualOperationInterrupted(token)) {
       break;
     }
-    dispatchVirtualPointerEvent(pointerSurface, "pointermove", point.x, point.y);
+    dispatchVirtualPointerEvent(pointerSurface, "pointermove", point.x, point.y, { forceEmptyCanvasDrop });
     await waitForVirtualOperation(moveVirtualCursorToClientPoint(point, { durationMs: 80 }));
   }
-  dispatchVirtualPointerEvent(pointerSurface, "pointerup", endPoint.x, endPoint.y);
+  dispatchVirtualPointerEvent(pointerSurface, "pointerup", endPoint.x, endPoint.y, { forceEmptyCanvasDrop });
+}
+
+function shouldForceGraphEditPlaybackEmptyCanvasDrop(step: GraphEditPlaybackStep) {
+  const endTarget = typeof step.endTarget === "string" ? step.endTarget : "";
+  return (
+    (step.kind === "drag_state_edge_to_canvas" || step.kind === "draw_flow_edge") &&
+    Boolean(step.position) &&
+    (!endTarget || endTarget === "editor.canvas.surface" || endTarget === "editor.canvas.empty.createFirstNode")
+  );
 }
 
 function buildVirtualDragPoints(startPoint: BuddyPosition, endPoint: BuddyPosition) {
@@ -2638,9 +2649,22 @@ function resolveGraphEditPlaybackDragEndPoint(step: GraphEditPlaybackStep): Budd
     if (endAffordance) {
       return resolveElementCenterPoint(endAffordance.element);
     }
+    const anchorFallbackPoint = resolveGraphEditPlaybackAnchorNodeFallbackPoint(endTarget);
+    if (anchorFallbackPoint) {
+      return anchorFallbackPoint;
+    }
   }
   const surface = resolveVirtualOperationAffordance("editor.canvas.surface");
   return surface ? resolveElementCenterPoint(surface.element) : null;
+}
+
+function resolveGraphEditPlaybackAnchorNodeFallbackPoint(targetId: string) {
+  const nodeId = /^editor\.canvas\.anchor\.([^:]+):/.exec(targetId)?.[1] ?? "";
+  if (!nodeId) {
+    return null;
+  }
+  const nodeAffordance = resolveVirtualOperationAffordance(`editor.canvas.node.${nodeId}`);
+  return nodeAffordance ? resolveElementCenterPoint(nodeAffordance.element) : null;
 }
 
 function requestGraphEditPlaybackPlan(input: { requestId: string; graphEditIntents: GraphEditIntent[] }): GraphEditPlaybackPlanRequestResponse | null {
@@ -2769,7 +2793,7 @@ function shouldSkipGraphEditPlaybackConnectionStep(step: GraphEditPlaybackStep, 
       : step.kind === "draw_flow_edge"
         ? resolveGraphEditPlaybackFlowEdgeTarget(step, playbackState)
         : "";
-  return Boolean(edgeTargetId && resolveVirtualOperationAffordance(edgeTargetId));
+  return Boolean(edgeTargetId && hasVirtualOperationAffordanceElement(edgeTargetId));
 }
 
 function resolveGraphEditPlaybackDataEdgeTarget(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState) {
@@ -2931,7 +2955,7 @@ function resolveVirtualOperationAffordance(targetId: string): { element: HTMLEle
   if (typeof document === "undefined") {
     return null;
   }
-  const affordanceElements = document.querySelectorAll<HTMLElement>(`[data-virtual-affordance-id="${escapeVirtualOperationTargetId(targetId)}"]`);
+  const affordanceElements = queryVirtualOperationAffordanceElements(targetId);
   let visibleElement: HTMLElement | null = null;
   for (const element of affordanceElements) {
     const rect = element.getBoundingClientRect();
@@ -2941,6 +2965,17 @@ function resolveVirtualOperationAffordance(targetId: string): { element: HTMLEle
     visibleElement = element;
   }
   return visibleElement ? { element: visibleElement } : null;
+}
+
+function hasVirtualOperationAffordanceElement(targetId: string) {
+  if (targetId.startsWith("buddy.") || targetId === "app.nav.buddy" || typeof document === "undefined") {
+    return false;
+  }
+  return queryVirtualOperationAffordanceElements(targetId).length > 0;
+}
+
+function queryVirtualOperationAffordanceElements(targetId: string) {
+  return document.querySelectorAll<HTMLElement>(`[data-virtual-affordance-id="${escapeVirtualOperationTargetId(targetId)}"]`);
 }
 
 function resolveVirtualOperationTextInput(targetId: string): HTMLInputElement | HTMLTextAreaElement | null {
@@ -3147,7 +3182,13 @@ function normalizeVirtualText(value: unknown) {
   return String(value ?? "").replace(/\r\n/g, "\n").trim();
 }
 
-function dispatchVirtualPointerEvent(element: HTMLElement, type: "pointerdown" | "pointermove" | "pointerup", clientX: number, clientY: number) {
+function dispatchVirtualPointerEvent(
+  element: HTMLElement,
+  type: "pointerdown" | "pointermove" | "pointerup",
+  clientX: number,
+  clientY: number,
+  options: { forceEmptyCanvasDrop?: boolean } = {},
+) {
   const eventInit = {
     bubbles: true,
     cancelable: true,
@@ -3160,17 +3201,23 @@ function dispatchVirtualPointerEvent(element: HTMLElement, type: "pointerdown" |
     view: window,
   };
   if (typeof PointerEvent === "function") {
-    element.dispatchEvent(markVirtualPointerEvent(new PointerEvent(type, eventInit)));
+    element.dispatchEvent(markVirtualPointerEvent(new PointerEvent(type, eventInit), options));
     return;
   }
-  element.dispatchEvent(markVirtualPointerEvent(new MouseEvent(type, eventInit)));
+  element.dispatchEvent(markVirtualPointerEvent(new MouseEvent(type, eventInit), options));
 }
 
-function markVirtualPointerEvent<T extends Event>(event: T): T {
+function markVirtualPointerEvent<T extends Event>(event: T, options: { forceEmptyCanvasDrop?: boolean } = {}): T {
   Object.defineProperty(event, TOOGRAPH_VIRTUAL_POINTER_EVENT_KEY, {
     configurable: true,
     value: true,
   });
+  if (options.forceEmptyCanvasDrop) {
+    Object.defineProperty(event, TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY, {
+      configurable: true,
+      value: true,
+    });
+  }
   return event;
 }
 

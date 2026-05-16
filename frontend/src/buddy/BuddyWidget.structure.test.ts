@@ -489,11 +489,18 @@ test("BuddyWidget can interrupt virtual operations and skips graph connections t
   assert.match(componentSource, /while \(!isVirtualOperationInterrupted\(token\) && Date\.now\(\) <= deadlineMs\) \{/);
   assert.match(componentSource, /if \(isVirtualOperationInterrupted\(token\)\) \{[\s\S]*return null;/);
   assert.match(componentSource, /shouldSkipGraphEditPlaybackConnectionStep\(step, playbackState\)/);
+  assert.match(componentSource, /function hasVirtualOperationAffordanceElement\(targetId: string\)/);
+  assert.match(componentSource, /return Boolean\(edgeTargetId && hasVirtualOperationAffordanceElement\(edgeTargetId\)\);/);
   assert.match(componentSource, /function resolveGraphEditPlaybackDataEdgeTarget\(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState\)/);
   assert.match(componentSource, /function resolveGraphEditPlaybackFlowEdgeTarget\(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState\)/);
-  assert.match(componentSource, /resolveVirtualOperationAffordance\(edgeTargetId\)/);
   assert.match(componentSource, /const BUDDY_VIRTUAL_POINTER_ID = 9001;/);
+  assert.match(componentSource, /const TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY = "__toographVirtualEmptyCanvasPointerEvent";/);
   assert.match(componentSource, /function markVirtualPointerEvent/);
+  assert.match(componentSource, /function shouldForceGraphEditPlaybackEmptyCanvasDrop\(step: GraphEditPlaybackStep\)/);
+  assert.match(componentSource, /dispatchVirtualPointerEvent\(pointerSurface, "pointermove", point\.x, point\.y, \{ forceEmptyCanvasDrop \}\)/);
+  assert.match(componentSource, /dispatchVirtualPointerEvent\(pointerSurface, "pointerup", endPoint\.x, endPoint\.y, \{ forceEmptyCanvasDrop \}\)/);
+  assert.match(componentSource, /Object\.defineProperty\(event, TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY,/);
+  assert.match(componentSource, /function resolveGraphEditPlaybackAnchorNodeFallbackPoint\(targetId: string\)/);
   assert.match(componentSource, /pointerId: BUDDY_VIRTUAL_POINTER_ID,/);
 });
 

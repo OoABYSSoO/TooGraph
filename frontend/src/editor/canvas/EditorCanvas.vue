@@ -600,6 +600,8 @@ import type { SkillDefinition } from "@/types/skills";
 import type { RunNodeTiming } from "../workspace/runNodeTimingModel.ts";
 import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphNodeSize, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 
+const TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY = "__toographVirtualEmptyCanvasPointerEvent";
+
 const props = defineProps<{
   document: GraphPayload | GraphDocument;
   knowledgeBases: KnowledgeBaseRecord[];
@@ -1314,10 +1316,11 @@ function handleCanvasPointerMove(event: PointerEvent) {
     return;
   }
   if (activeConnection.value && !isForeignPendingConnectionPointer(event.pointerId)) {
+    const forceEmptyCanvasDrop = isVirtualEmptyCanvasPointerEvent(event);
     const connectionPointerMoveRequest = resolveCanvasConnectionPointerMoveRequest({
       connection: activeConnection.value,
       hoverNodeId: resolveNodeIdAtPointer(event),
-      targetAnchor: resolveAutoSnappedTargetAnchor(event),
+      targetAnchor: forceEmptyCanvasDrop ? null : resolveAutoSnappedTargetAnchor(event),
       fallbackPoint: resolveCanvasPoint(event),
     });
     if (connectionPointerMoveRequest) {
@@ -1368,7 +1371,7 @@ function handleCanvasPointerUp(event: PointerEvent) {
     const connectionPointerUpAction = resolveCanvasConnectionPointerUpAction({
       connection: activeConnection.value,
       interactionLocked: isGraphEditingLocked(),
-      autoSnappedTargetAnchor: autoSnappedTargetAnchor.value,
+      autoSnappedTargetAnchor: isVirtualEmptyCanvasPointerEvent(event) ? null : autoSnappedTargetAnchor.value,
     });
     switch (connectionPointerUpAction?.type) {
       case "clear-connection-interaction":
@@ -1451,6 +1454,10 @@ function resolveAutoSnappedTargetAnchor(event: PointerEvent) {
     pendingAgentInputSourceByNodeId: pendingAgentInputSourceByNodeId.value,
     canComplete: canCompleteCanvasConnection,
   });
+}
+
+function isVirtualEmptyCanvasPointerEvent(event: PointerEvent) {
+  return (event as PointerEvent & Record<string, unknown>)[TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY] === true;
 }
 
 function isPointerWithinNodeElement(nodeElement: HTMLElement, event: PointerEvent) {

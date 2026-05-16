@@ -1290,11 +1290,13 @@ test("EditorCanvas snaps flow drags to eligible target node bodies before mouseu
   assert.match(componentSource, /import \{[\s\S]*resolveCanvasAutoSnappedTargetAnchor as resolveCanvasAutoSnappedTargetAnchorModel,[\s\S]*\} from "\.\/canvasConnectionInteractionModel";/);
   assert.match(componentSource, /function resolveAutoSnappedTargetAnchor\(event: PointerEvent\)/);
   assert.match(componentSource, /function resolveEligibleTargetAnchorForNodeBody\(nodeId: string\)/);
-  assert.match(componentSource, /if \(activeConnection\.value && !isForeignPendingConnectionPointer\(event\.pointerId\)\) \{[\s\S]*const connectionPointerMoveRequest = resolveCanvasConnectionPointerMoveRequest\(\{[\s\S]*targetAnchor: resolveAutoSnappedTargetAnchor\(event\),[\s\S]*fallbackPoint: resolveCanvasPoint\(event\),/);
+  assert.match(componentSource, /const TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY = "__toographVirtualEmptyCanvasPointerEvent";/);
+  assert.match(componentSource, /function isVirtualEmptyCanvasPointerEvent\(event: PointerEvent\)/);
+  assert.match(componentSource, /if \(activeConnection\.value && !isForeignPendingConnectionPointer\(event\.pointerId\)\) \{[\s\S]*const forceEmptyCanvasDrop = isVirtualEmptyCanvasPointerEvent\(event\);[\s\S]*const connectionPointerMoveRequest = resolveCanvasConnectionPointerMoveRequest\(\{[\s\S]*targetAnchor: forceEmptyCanvasDrop \? null : resolveAutoSnappedTargetAnchor\(event\),[\s\S]*fallbackPoint: resolveCanvasPoint\(event\),/);
   assert.match(componentSource, /updatePendingConnectionTarget\(\{[\s\S]*targetAnchor: connectionPointerMoveRequest\.targetAnchor,[\s\S]*fallbackPoint: connectionPointerMoveRequest\.fallbackPoint,/);
   assert.match(canvasConnectionInteractionsSource, /autoSnappedTargetAnchor\.value = input\.targetAnchor;/);
   assert.match(canvasConnectionInteractionsSource, /pendingConnectionPoint\.value = input\.targetAnchor[\s\S]*\? \{ x: input\.targetAnchor\.x, y: input\.targetAnchor\.y \}[\s\S]*: input\.fallbackPoint;/);
-  assert.match(componentSource, /const connectionPointerUpAction = resolveCanvasConnectionPointerUpAction\(\{[\s\S]*connection: activeConnection\.value,[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*autoSnappedTargetAnchor: autoSnappedTargetAnchor\.value,[\s\S]*\}\);/);
+  assert.match(componentSource, /const connectionPointerUpAction = resolveCanvasConnectionPointerUpAction\(\{[\s\S]*connection: activeConnection\.value,[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*autoSnappedTargetAnchor: isVirtualEmptyCanvasPointerEvent\(event\) \? null : autoSnappedTargetAnchor\.value,[\s\S]*\}\);/);
   assert.match(componentSource, /case "complete-connection":[\s\S]*completePendingConnection\(connectionPointerUpAction\.targetAnchor\);[\s\S]*return;/);
   assert.match(componentSource, /case "open-creation-menu":[\s\S]*openCreationMenuFromPendingConnection\(event\);[\s\S]*break;/);
   assert.match(canvasConnectionInteractionModelSource, /export type CanvasConnectionPointerUpAction/);
@@ -1407,7 +1409,7 @@ test("EditorCanvas keeps transient input capsules aligned while dragging over no
   assert.match(canvasConnectionInteractionsSource, /function setActiveConnectionHoverNode\(nodeId: string \| null\)/);
   assert.match(canvasConnectionInteractionModelSource, /export type CanvasConnectionPointerMoveRequest/);
   assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasConnectionPointerMoveRequest/);
-  assert.match(componentSource, /const connectionPointerMoveRequest = resolveCanvasConnectionPointerMoveRequest\(\{[\s\S]*connection: activeConnection\.value,[\s\S]*hoverNodeId: resolveNodeIdAtPointer\(event\),[\s\S]*targetAnchor: resolveAutoSnappedTargetAnchor\(event\),[\s\S]*fallbackPoint: resolveCanvasPoint\(event\),[\s\S]*\}\);/);
+  assert.match(componentSource, /const connectionPointerMoveRequest = resolveCanvasConnectionPointerMoveRequest\(\{[\s\S]*connection: activeConnection\.value,[\s\S]*hoverNodeId: resolveNodeIdAtPointer\(event\),[\s\S]*targetAnchor: forceEmptyCanvasDrop \? null : resolveAutoSnappedTargetAnchor\(event\),[\s\S]*fallbackPoint: resolveCanvasPoint\(event\),[\s\S]*\}\);/);
   assert.match(componentSource, /setActiveConnectionHoverNode\(connectionPointerMoveRequest\.hoverNodeId\);/);
   assert.match(componentSource, /updatePendingConnectionTarget\(\{[\s\S]*targetAnchor: connectionPointerMoveRequest\.targetAnchor,[\s\S]*fallbackPoint: connectionPointerMoveRequest\.fallbackPoint,[\s\S]*\}\);/);
 });
