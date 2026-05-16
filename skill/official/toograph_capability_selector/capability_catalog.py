@@ -139,6 +139,7 @@ def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], li
             if _is_template_hidden_from_capability_selector(payload):
                 continue
             permissions = _template_permissions(payload, skill_permissions)
+            target_flows = _template_target_flow_summaries(payload.get("metadata"))
             candidates.append(
                 {
                     "kind": "subgraph",
@@ -147,6 +148,7 @@ def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], li
                     "description": _compact_text(payload.get("description")),
                     "source": source,
                     "permissions": permissions,
+                    "target_flows": target_flows,
                 }
             )
     return candidates, errors
@@ -275,6 +277,24 @@ def _template_permissions(payload: dict[str, Any], skill_permissions: dict[str, 
     return _unique_permissions(permissions)
 
 
+def _template_target_flow_summaries(metadata: Any) -> list[str]:
+    if not isinstance(metadata, dict):
+        return []
+    flows = metadata.get("targetFlows")
+    if not isinstance(flows, list):
+        return []
+    summaries: list[str] = []
+    for flow in flows:
+        if not isinstance(flow, dict):
+            continue
+        flow_id = _compact_text(flow.get("id"))
+        if not flow_id:
+            continue
+        sample_goal = _compact_text(flow.get("sampleGoal"))
+        summaries.append(f"{flow_id} ({sample_goal})" if sample_goal else flow_id)
+    return summaries
+
+
 def _permissions_from_nodes(nodes: Any, skill_permissions: dict[str, list[str]]) -> list[str]:
     if not isinstance(nodes, dict):
         return []
@@ -342,6 +362,9 @@ def _format_candidate_lines(candidates: list[dict[str, Any]]) -> list[str]:
                 f"  permissions: {', '.join(candidate.get('permissions') or []) or 'none'}",
             ]
         )
+        target_flows = candidate.get("target_flows") or []
+        if target_flows:
+            lines.append(f"  targetFlows: {'; '.join(target_flows)}")
     return lines
 
 

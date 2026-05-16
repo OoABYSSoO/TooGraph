@@ -74,7 +74,7 @@
 - 作用：根据 LLM 节点技能 LLM 输出规划阶段看到的本地可用能力清单，让模型选择并校验规范化单个 `capability`。
 - 生命周期：`before_llm.py` 读取当前启用的图模板和启用的 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`、`selection_reason` 和 `rejected_candidates`，按同一清单做真实性与启用状态校验，并保留 `permissions` 供候选描述、审计和后续运行时策略使用。它不输出 `requiresApproval`，也不恢复 per-skill 审批协议。
 - 审计输出：除 `capability` 和 `found` 外，选择器返回 `audit`，记录候选数量、按类型计数、选中能力、选择原因、选中权限摘要、被拒绝候选原因、缺口说明和 catalog 读取错误；同时返回 `capability_selection` 低层 `activity_events`，Buddy 主模板会把 `audit` 映射到 `capability_selection_audit` state。
-- 选择对象包括当前启用的图模板和启用的 Skill；图模板优先于 Skill。
+- 选择对象包括当前启用的图模板和启用的 Skill；图模板优先于 Skill。页面操作官方模板 `toograph_page_operation_workflow` 会作为可见 subgraph 候选出现，并在候选上下文中暴露 `targetFlows`，方便模型把“打开运行记录、打开图、运行当前图、可见搭建/编辑图”等目标路由到图模板而不是单次页面操作 Skill。
 - 它不执行被选能力，不生成被选能力的运行入参，也不做程序字段匹配；模型基于候选项的名称和描述判断，脚本只做真实性与启用状态校验。
 
 ### `toograph_page_operator`
@@ -143,6 +143,7 @@
 - 作用：把“打开页面、查看运行、切换页签、新建/编辑/运行图”等页面目标表达成可审计图流程：解析目标 -> 进入页面操作子图 -> 调用 `toograph_page_operator` 请求一次可见 UI 操作 -> 在操作节点后暂停，等待前端虚拟操作确认 -> 用刷新后的页面事实验证目标 -> 未完成且可继续时通过 condition 回到规划节点 -> 最终输出 `final_reply` 和结构化 `operation_report`。
 - 断点语义：内部 `operation_loop` 子图声明 `interrupt_after: ["execute_page_operation"]`。页面操作器的 activity event 带 `expected_continuation`，前端执行虚拟点击、输入、等待或 Graph Edit Playback 后，只在 `operation_request_id` 匹配时自动恢复 run。
 - 验证语义：模板不会把“发出操作请求”当作完成。运行图目标必须看到 `triggered_run_id` 且触发 run 进入 `completed`、`failed` 或 `cancelled`；页面/页签/图编辑目标必须由最新 `page_facts`、路由、活跃图或 `graph_edit_summary` 支撑。无法完成时最终回复要明确是找不到目标、需要澄清、操作被阻止、页面快照过期、run 失败或用户中断。
+- 失败口径：模板 metadata 维护规范化 `failureGuidance`，当前覆盖 `target_graph_not_found`、`run_record_not_found`、`stale_page_snapshot`、`destructive_operation_blocked`、`triggered_run_failed` 和 `operation_interrupted`，最终回复应按这些原因给出简洁解释和必要的下一步信息。
 - 边界：模板只使用现有 `input / agent / condition / subgraph / output` 节点类型，不新增页面专用节点；每轮只通过 `toograph_page_operator` 发出一个受控页面操作，LLM 不接触 DOM selector、坐标、截图或外部浏览器自动化。
 
 ### `toograph_skill_creation_workflow`

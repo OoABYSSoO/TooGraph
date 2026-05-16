@@ -16,6 +16,7 @@ Current phase:
 - Emits a deterministic `operation_request_id` plus `expected_continuation` metadata so the frontend can resume the paused graph with `page_operation_context`, `page_context`, and `operation_result` after real UI execution.
 - Rejects Buddy self surfaces such as the Buddy page, Buddy floating window, Buddy avatar, and debug controls.
 - Does not expose DOM selectors, screen coordinates, double-click recipes, or low-level mouse trajectories to the LLM.
+- The official `toograph_page_operation_workflow` graph template is the preferred multi-step wrapper around this Skill. The Skill accepts or rejects one semantic operation; the template loops, waits for frontend confirmation, verifies refreshed page facts, and writes the final user explanation.
 
 Graph state inputs:
 
@@ -40,5 +41,14 @@ State outputs:
 - `operation_request_id`: deterministic request ID used to correlate the activity event, frontend operation result, and run resume.
 - `journal`: operation journal summary.
 - `error`: structured failure detail.
+
+Common workflow failure reasons:
+
+- `target_graph_not_found`: the current page facts do not show the requested graph.
+- `run_record_not_found`: no visible or triggered run record matches the user target.
+- `stale_page_snapshot`: the operation was planned against an outdated page snapshot.
+- `destructive_operation_blocked`: the requested target is destructive or confirmation-gated.
+- `triggered_run_failed`: a run was triggered but reached a failed terminal status.
+- `operation_interrupted`: the frontend, user, or runtime interrupted the requested operation.
 
 `before_llm.py` injects the current page operation book from runtime context, not graph state. `after_llm.py` validates the LLM command list and emits a `virtual_ui_operation` activity event for the frontend runtime to execute. Successful events include `expected_continuation.mode = "auto_resume_after_ui_operation"` and `resume_state_keys = ["page_operation_context", "page_context", "operation_result"]`. Page routing and graph mutations are observed from the real UI after the operation, not guessed by the Skill.

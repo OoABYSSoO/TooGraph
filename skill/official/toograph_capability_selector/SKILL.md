@@ -33,6 +33,7 @@ Selection rules:
 
 - Only enabled capabilities are listed for the model.
 - Graph templates are preferred over Skills when both can satisfy the requirement.
+- Template metadata can add concise discovery signals. Official page-operation templates expose `targetFlows` in the catalog so Buddy can choose `toograph_page_operation_workflow` for multi-step TooGraph UI goals before considering the single-operation page operator Skill.
 - Skill candidates are available when they are enabled in `skill/settings.json`.
 - The selector does not call an LLM, run text matching, or invent capabilities.
 - Saved ordinary graphs are not candidates; reusable graph capabilities come from templates.

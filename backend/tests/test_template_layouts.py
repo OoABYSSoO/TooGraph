@@ -748,6 +748,33 @@ class TemplateLayoutTests(unittest.TestCase):
                 self.assertTrue(flow["completionEvidence"])
                 self.assertLessEqual(len(flow["operationTargets"]), 5)
 
+    def test_toograph_page_operation_workflow_declares_failure_guidance(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "toograph_page_operation_workflow"
+        )
+        failure_guidance = template["metadata"].get("failureGuidance")
+        self.assertIsInstance(failure_guidance, dict)
+
+        self.assertEqual(
+            list(failure_guidance),
+            [
+                "target_graph_not_found",
+                "run_record_not_found",
+                "stale_page_snapshot",
+                "destructive_operation_blocked",
+                "triggered_run_failed",
+                "operation_interrupted",
+            ],
+        )
+        for reason, guidance in failure_guidance.items():
+            with self.subTest(reason=reason):
+                self.assertEqual(guidance["failureReason"], reason)
+                self.assertGreater(len(guidance["replyGuidance"]), 12)
+                self.assertLessEqual(len(guidance["replyGuidance"]), 120)
+                self.assertGreater(len(guidance["evidence"]), 0)
+
     def test_buddy_autonomous_review_template_contract(self) -> None:
         template = load_template_record("buddy_autonomous_review")
         states = template["state_schema"]

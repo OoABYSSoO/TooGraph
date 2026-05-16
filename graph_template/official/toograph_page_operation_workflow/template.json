@@ -420,7 +420,7 @@
                 "skillKey": "",
                 "skillBindings": [],
                 "skillInstructionBlocks": {},
-                "taskInstruction": "使用 page_operation_context.page_facts、operation_result 和 goal_plan 验证用户目标。goal_review 必须是 JSON 对象，包含 goal_completed(boolean)、needs_more_operations(boolean)、needs_clarification(boolean)、failure_reason、next_requirement、evidence。只有最新页面事实或 operation_result 明确匹配 success_criteria 时才把 goal_completed 设为 true。运行图目标必须看到 operation_result.triggered_run_id 且 triggered_run_status 为 completed、failed 或 cancelled；若 triggered_run_status 仍是 queued/running/resuming/awaiting_human，则 needs_more_operations 设为 true。关注 triggered_run_status、triggered_run_id、triggered_graph_id、route_after、page_snapshot_after、page_facts.activeGraph 和 graph_edit_summary。page_snapshot 写 operation_result.page_snapshot_after 或 page_operation_context.page_snapshot。operation_report 写紧凑对象，包含 operation_request_id、status、route_before、route_after、target_id、triggered_run_id、triggered_run_status、graph_edit_summary、goal_completed、failure_reason。loop_trace 写追加后的紧凑数组。",
+                "taskInstruction": "使用 page_operation_context.page_facts、operation_result 和 goal_plan 验证用户目标。goal_review 必须是 JSON 对象，包含 goal_completed(boolean)、needs_more_operations(boolean)、needs_clarification(boolean)、failure_reason、next_requirement、evidence。只有最新页面事实或 operation_result 明确匹配 success_criteria 时才把 goal_completed 设为 true。运行图目标必须看到 operation_result.triggered_run_id 且 triggered_run_status 为 completed、failed 或 cancelled；若 triggered_run_status 仍是 queued/running/resuming/awaiting_human，则 needs_more_operations 设为 true。失败时优先使用 canonical failure_reason：target_graph_not_found、run_record_not_found、stale_page_snapshot、destructive_operation_blocked、triggered_run_failed、operation_interrupted。关注 triggered_run_status、triggered_run_id、triggered_graph_id、route_after、page_snapshot_after、page_facts.activeGraph 和 graph_edit_summary。page_snapshot 写 operation_result.page_snapshot_after 或 page_operation_context.page_snapshot。operation_report 写紧凑对象，包含 operation_request_id、status、route_before、route_after、target_id、triggered_run_id、triggered_run_status、graph_edit_summary、goal_completed、failure_reason。loop_trace 写追加后的紧凑数组。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "high",
@@ -585,7 +585,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "生成最终用户回复。只有 goal_review.goal_completed 为 true 时才说明已完成，并包含可用的 route、graph id/name、run id、触发 run 终态或保存结果。若 needs_clarification 为 true，明确需要用户补充什么。若失败，简洁说明失败原因，例如找不到目标图、找不到运行记录、页面快照过期、破坏性操作被阻止、run 失败或操作被中断。不要声称只是发出请求就完成。",
+        "taskInstruction": "生成最终用户回复。只有 goal_review.goal_completed 为 true 时才说明已完成，并包含可用的 route、graph id/name、run id、触发 run 终态或保存结果。若 needs_clarification 为 true，明确需要用户补充什么。若失败，按 goal_review.failure_reason 简洁说明失败原因：target_graph_not_found=找不到目标图；run_record_not_found=找不到匹配运行记录；stale_page_snapshot=页面快照过期；destructive_operation_blocked=破坏性操作被阻止；triggered_run_failed=触发的 run 失败；operation_interrupted=操作被用户或运行时中断。不要声称只是发出请求就完成。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "low",
@@ -675,6 +675,38 @@
         "operationTargets": ["editor.canvas.node.<nodeId>", "editor.graph.playback", "editor.action.saveActiveGraph"],
         "completionEvidence": ["graph_edit_summary.applied is true", "page_facts.activeGraph.dirty or saved revision updated", "target node label changed"]
       }
-    ]
+    ],
+    "failureGuidance": {
+      "target_graph_not_found": {
+        "failureReason": "target_graph_not_found",
+        "replyGuidance": "说明没有找到目标图，请用户确认图名称或先打开目标图。",
+        "evidence": ["page_facts.visibleGraphs", "page_facts.activeGraph", "goal_plan.target_hints"]
+      },
+      "run_record_not_found": {
+        "failureReason": "run_record_not_found",
+        "replyGuidance": "说明没有找到匹配的运行记录，请用户提供 run id 或更明确的图名称。",
+        "evidence": ["page_facts.visibleRuns", "operation_result.triggered_run_id", "goal_plan.target_hints"]
+      },
+      "stale_page_snapshot": {
+        "failureReason": "stale_page_snapshot",
+        "replyGuidance": "说明当前页面快照已过期，需要刷新页面上下文后再继续。",
+        "evidence": ["operation_result.page_snapshot_after", "page_operation_context.page_snapshot", "operation_request_id"]
+      },
+      "destructive_operation_blocked": {
+        "failureReason": "destructive_operation_blocked",
+        "replyGuidance": "说明目标属于破坏性或需确认操作，页面操作器已阻止执行。",
+        "evidence": ["operation_error.code", "operation_request.blocked_reason", "operation_journal"]
+      },
+      "triggered_run_failed": {
+        "failureReason": "triggered_run_failed",
+        "replyGuidance": "说明已触发运行但 run 以失败终态结束，并给出 run id。",
+        "evidence": ["operation_result.triggered_run_id", "operation_result.triggered_run_status", "page_facts.latestForegroundRun"]
+      },
+      "operation_interrupted": {
+        "failureReason": "operation_interrupted",
+        "replyGuidance": "说明页面操作被用户、运行时或前端流程中断，未完成目标。",
+        "evidence": ["operation_result.status", "operation_result.error", "operation_journal"]
+      }
+    }
   }
 }

@@ -190,6 +190,23 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
         self.assertNotIn("requiresApproval", context)
         self.assertNotIn("blocked_skill", context)
 
+    def test_before_llm_exposes_page_operation_template_target_flows(self) -> None:
+        selector = _load_selector_module(
+            SELECTOR_BEFORE_LLM_PATH,
+            "toograph_capability_selector_before_page_operation_test",
+        )
+        repo_root = Path(__file__).resolve().parents[2]
+
+        with patch.dict("os.environ", {"TOOGRAPH_REPO_ROOT": str(repo_root)}, clear=True):
+            result = selector.toograph_capability_selector_before_llm(runtime_context={})
+
+        context = result["context"]
+        self.assertIn("key: toograph_page_operation_workflow", context)
+        self.assertIn("targetFlows: open_runs_page (打开运行记录)", context)
+        self.assertIn("run_current_graph (运行当前图并告诉我结果)", context)
+        self.assertIn("create_basic_llm_graph (新建一个包含输入、LLM、输出的图)", context)
+        self.assertIn("rename_current_node (编辑当前图，给某个节点改名)", context)
+
     def test_selector_normalizes_llm_selected_template_capability(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_test")
         with tempfile.TemporaryDirectory() as temp_dir:
