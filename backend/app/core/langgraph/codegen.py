@@ -10,11 +10,13 @@ from app.core.schemas.node_system import (
     ConditionOperator,
     NodeSystemAgentNode,
     NodeSystemConditionNode,
+    NodeSystemGraphCore,
     NodeSystemGraphPayload,
     NodeSystemInputNode,
     NodeSystemOutputNode,
     NodeSystemStateDefinition,
     NodeSystemStateType,
+    NodeSystemSubgraphNode,
     StateWriteMode,
 )
 
@@ -49,7 +51,7 @@ TOOGRAPH_EDITOR_GRAPH = {editor_payload_literal}
 INTERRUPT_AFTER_CONFIG = {interrupt_after_literal}
 
 
-def _inflate_graph_payload(payload: dict[str, Any]) -> dict[str, Any]:
+def _inflate_graph_core_payload(payload: dict[str, Any]) -> dict[str, Any]:
     inflated = dict(payload)
     inflated["metadata"] = dict(payload.get("metadata", {{}}))
     inflated["state_schema"] = dict(payload.get("state_schema", {{}}))
@@ -61,9 +63,18 @@ def _inflate_graph_payload(payload: dict[str, Any]) -> dict[str, Any]:
         inflated_node.setdefault("ui", {{"position": {{"x": 0, "y": 0}}}})
         inflated_node.setdefault("reads", [])
         inflated_node.setdefault("writes", [])
+        config = inflated_node.get("config")
+        if inflated_node.get("kind") == "subgraph" and isinstance(config, dict) and isinstance(config.get("graph"), dict):
+            inflated_config = dict(config)
+            inflated_config["graph"] = _inflate_graph_core_payload(config["graph"])
+            inflated_node["config"] = inflated_config
         inflated_nodes[node_name] = inflated_node
     inflated["nodes"] = inflated_nodes
     return inflated
+
+
+def _inflate_graph_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    return _inflate_graph_core_payload(payload)
 
 
 GRAPH = NodeSystemGraphPayload.model_validate(_inflate_graph_payload(GRAPH_PAYLOAD))
@@ -262,8 +273,13 @@ def _build_editor_graph_payload(graph: NodeSystemGraphPayload) -> dict[str, Any]
 
 
 def _build_export_graph_payload(graph: NodeSystemGraphPayload) -> dict[str, Any]:
+    payload = _build_export_graph_core_payload(graph)
+    payload["name"] = graph.name
+    return payload
+
+
+def _build_export_graph_core_payload(graph: NodeSystemGraphCore) -> dict[str, Any]:
     payload: dict[str, Any] = {
-        "name": graph.name,
         "nodes": {
             node_name: _build_export_node_payload(node)
             for node_name, node in graph.nodes.items()
@@ -304,7 +320,7 @@ def _build_export_state_definition(definition: NodeSystemStateDefinition) -> dic
 
 
 def _build_export_node_payload(
-    node: NodeSystemInputNode | NodeSystemAgentNode | NodeSystemConditionNode | NodeSystemOutputNode,
+    node: NodeSystemInputNode | NodeSystemAgentNode | NodeSystemConditionNode | NodeSystemOutputNode | NodeSystemSubgraphNode,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {"kind": node.kind}
     if node.reads:
@@ -326,12 +342,14 @@ def _build_export_write_binding(binding: Any) -> dict[str, Any]:
 
 
 def _build_export_node_config(
-    node: NodeSystemInputNode | NodeSystemAgentNode | NodeSystemConditionNode | NodeSystemOutputNode,
+    node: NodeSystemInputNode | NodeSystemAgentNode | NodeSystemConditionNode | NodeSystemOutputNode | NodeSystemSubgraphNode,
 ) -> dict[str, Any]:
     if isinstance(node, NodeSystemAgentNode):
         return _build_export_agent_config(node)
     if isinstance(node, NodeSystemConditionNode):
         return _build_export_condition_config(node)
+    if isinstance(node, NodeSystemSubgraphNode):
+        return {"graph": _build_export_graph_core_payload(node.config.graph)}
     return {}
 
 
