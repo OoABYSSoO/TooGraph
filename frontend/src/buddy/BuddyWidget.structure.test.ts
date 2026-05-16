@@ -478,6 +478,9 @@ test("BuddyWidget can interrupt virtual operations and skips graph connections t
   assert.match(componentSource, /@keyframes buddy-widget-virtual-operation-breathe/);
   assert.match(componentSource, /type BuddyVirtualOperationToken = \{/);
   assert.match(componentSource, /const virtualOperationStatus = ref<BuddyVirtualOperationStatus \| null>\(null\);/);
+  assert.match(componentSource, /import \{[\s\S]*shallowRef[\s\S]*\} from "vue";/);
+  assert.match(componentSource, /const activeVirtualOperationToken = shallowRef<BuddyVirtualOperationToken \| null>\(null\);/);
+  assert.doesNotMatch(componentSource, /const activeVirtualOperationToken = ref<BuddyVirtualOperationToken \| null>\(null\);/);
   assert.match(componentSource, /function interruptVirtualOperation\(\)/);
   assert.match(componentSource, /function isVirtualOperationInterrupted\(token: BuddyVirtualOperationToken \| null\)/);
   assert.match(componentSource, /waitForVirtualOperation\([^)]*, activeVirtualOperationToken\.value\)/);

@@ -442,7 +442,7 @@ import { Check, Clock, Close, Delete, FullScreen, Plus, Promotion, SemiSelect } 
 import { ElButton, ElInput } from "element-plus";
 import { ElIcon, ElOption, ElPopover, ElSelect } from "element-plus";
 import { storeToRefs } from "pinia";
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
@@ -680,7 +680,7 @@ const virtualCursorDetached = ref(false);
 const virtualCursorDragging = ref(false);
 const virtualCursorIdleActionMode = ref<VirtualCursorIdleActionMode>("none");
 const virtualOperationStatus = ref<BuddyVirtualOperationStatus | null>(null);
-const activeVirtualOperationToken = ref<BuddyVirtualOperationToken | null>(null);
+const activeVirtualOperationToken = shallowRef<BuddyVirtualOperationToken | null>(null);
 const isPanelOpen = ref(false);
 const draft = ref("");
 const avatarHopCycle = ref(0);
