@@ -1,93 +1,93 @@
 # 页面操作官方模板长期实现计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` or `executing-plans` to implement this plan phase-by-phase. Each phase must end with targeted tests, a real TooGraph restart/smoke check when runtime behavior changed, and a Chinese commit message.
+> **给后续执行代理的要求：** 实施本计划时，必须使用 `subagent-driven-development` 或 `executing-plans`，并按阶段推进。每个阶段都必须完成有针对性的测试；只要改动影响运行时行为，就要做真实 TooGraph 重启或冒烟验证；每个阶段结束后使用中文提交信息提交。
 
-**Goal:** Build a complete official page-operation graph template that takes a user intent, operates the current TooGraph UI, and ends only when the user's concrete goal is completed.
+**目标：** 构建一个完整的官方页面操作图模板。它接收用户意图，操作当前 TooGraph 页面，并且只有在用户的具体目标真正完成后才结束。
 
-**Architecture:** Use the existing `node_system` graph protocol and existing node kinds only: `input`, `agent`, `condition`, `subgraph`, and `output`. The implementation extends the current app-native virtual operation path, page operation book, activity events, and run resume flow so graph templates can request one visible UI operation, wait for the real UI outcome, refresh page context, verify completion, and loop.
+**架构：** 继续使用现有 `node_system` 图协议和现有节点类型：`input`、`agent`、`condition`、`subgraph`、`output`。实现方式是扩展当前应用内虚拟操作链路、页面操作书、活动事件和 run 恢复流程，让图模板可以请求一次可见 UI 操作，等待真实 UI 结果，刷新页面上下文，验证目标是否完成，并在必要时循环。
 
-**Tech Stack:** Vue 3, Pinia, Element Plus, FastAPI, LangGraph runtime, official Skill packages, official graph templates, existing run/activity event storage.
+**技术栈：** Vue 3、Pinia、Element Plus、FastAPI、LangGraph runtime、官方 Skill 包、官方图模板、现有 run 与 activity event 存储。
 
 ---
 
-## Non-Negotiables
+## 不可破坏的约束
 
-- Do not add a new graph node type. Existing node kinds are enough.
-- Do not bypass TooGraph's graph protocol with hidden imperative Buddy-only behavior.
-- Do not use DOM selectors, screen coordinates, screenshots, or external browser automation as the planning surface for the LLM.
-- Keep each LLM node to at most one explicit capability source.
-- Use `toograph_page_operator` for controlled UI operation requests.
-- Use graph templates and subgraphs for multi-step intelligence.
-- Every page operation must leave auditable activity events.
-- The official template must stop only when a verifier can say the requested goal is complete, or when it reaches a clear, user-visible failure/clarification state.
-- Each development phase must be testable, committed, and pushed before moving to the next phase.
+- 不新增图节点类型。现有节点类型已经足够。
+- 不用隐藏的 Buddy 专属命令绕过 TooGraph 图协议。
+- 不把 DOM selector、屏幕坐标、截图或外部浏览器自动化暴露给 LLM 作为规划依据。
+- 每个 LLM 节点最多只能使用一个显式能力来源。
+- 受控 UI 操作请求必须通过 `toograph_page_operator`。
+- 多步智能必须用图模板和子图表达。
+- 每一次页面操作都必须留下可审计 activity event。
+- 官方模板只能在 verifier 判断用户目标已完成时结束；否则必须进入清晰的失败、澄清或继续操作状态。
+- 每个开发阶段必须可测试、可提交、可推送，然后再进入下一阶段。
 
-## Current Baseline From Code
+## 当前代码基线
 
-- `skill/official/toograph_page_operator/` already exists and emits `virtual_ui_operation` activity events.
-- `frontend/src/buddy/pageOperationAffordances.ts` already builds a structured page operation book from `data-virtual-affordance-id` elements.
-- `frontend/src/buddy/virtualOperationProtocol.ts` already parses `click`, `focus`, `clear`, `type`, `press`, `wait`, and `graph_edit` operations.
-- `frontend/src/buddy/BuddyWidget.vue` and `frontend/src/editor/workspace/EditorWorkspaceShell.vue` already consume virtual operation activity events and dispatch visible virtual cursor playback.
-- `frontend/src/editor/workspace/graphEditPlaybackModel.ts` already supports semantic graph edit intents, including `subgraph` nodes.
-- `GraphLibraryPage`, `RunsPage`, editor tabs, and editor action buttons are not yet fully exposed as semantic page operation affordances.
-- `toograph_page_operator` currently accepts only one `click` or `graph_edit` operation per invocation and does not return real UI completion state.
-- Run resume and `awaiting_human` already exist and should be reused for operation continuation instead of introducing a new node type.
+- `skill/official/toograph_page_operator/` 已存在，并且会发出 `virtual_ui_operation` activity event。
+- `frontend/src/buddy/pageOperationAffordances.ts` 已能从带有 `data-virtual-affordance-id` 的元素生成结构化页面操作书。
+- `frontend/src/buddy/virtualOperationProtocol.ts` 已能解析 `click`、`focus`、`clear`、`type`、`press`、`wait` 和 `graph_edit` 操作。
+- `frontend/src/buddy/BuddyWidget.vue` 与 `frontend/src/editor/workspace/EditorWorkspaceShell.vue` 已能消费虚拟操作 activity event，并交给可见虚拟光标回放。
+- `frontend/src/editor/workspace/graphEditPlaybackModel.ts` 已支持语义化图编辑意图，包括 `subgraph` 节点。
+- `GraphLibraryPage`、`RunsPage`、编辑器页签和编辑器操作按钮还没有完整暴露为语义页面操作目标。
+- `toograph_page_operator` 当前每次只接受一个 `click` 或 `graph_edit` 操作，而且不会返回真实 UI 完成状态。
+- run resume 和 `awaiting_human` 已存在，应复用它们表达操作后的等待与继续，而不是新增节点类型。
 
-## Target User Goals
+## 目标用户意图范围
 
-The official template must handle these goal classes:
+官方模板必须支持这些目标类别：
 
-- View records: open run history, optionally open a specific run detail, restore an editable run snapshot when requested.
-- Open a page/tab: navigate to a top-level page, switch editor tabs, open graph/template picker panels, or focus a known editor panel.
-- Run a graph: find/open the requested graph, start the run, wait until it reaches a terminal state, and expose a concise result summary.
-- Edit a graph: find/open or create the target graph, apply semantic graph edit playback, save when the goal implies persistence, and verify the graph changed.
-- Create a graph: create/open a blank graph or template-based graph, optionally apply requested edits, optionally save, and verify the intended canvas exists.
+- 查看记录：打开运行历史；按需打开某个运行详情；当用户明确要求时，恢复可编辑的运行快照。
+- 打开页面或页签：导航到顶层页面；切换编辑器页签；打开图/模板选择面板；聚焦已知编辑器面板。
+- 运行某个图：找到并打开目标图，启动运行，等待运行进入终态，并输出简洁结果摘要。
+- 编辑某个图：找到、打开或创建目标图，执行语义图编辑回放；当目标意味着持久保存时保存，并验证图确实发生变化。
+- 新建某个图：创建空白图或基于模板创建图；按需应用用户要求的编辑；按需保存；验证目标画布已经存在。
 
-## Completion Semantics
+## 完成语义
 
-The template is complete only when all of the following are true:
+只有同时满足以下条件，模板才算完成：
 
-- The latest page snapshot or run result matches the parsed user goal.
-- The verifier has written `goal_completed=true`.
-- The final output explains what was completed and includes important identifiers such as route, graph name/id, run id, or saved template/graph id when available.
+- 最新页面快照或运行结果与解析出的用户目标匹配。
+- verifier 写入 `goal_completed=true`。
+- 最终输出说明完成了什么，并在可用时包含关键标识，例如路由、图名称/ID、run id、保存后的图或模板 id。
 
-The template is not complete when:
+以下情况不算完成：
 
-- A virtual operation was merely requested.
-- A click happened but the route or selected object did not change as expected.
-- A graph run was started but has not reached `completed`, `failed`, or `cancelled`.
-- A graph edit was visually played but failed validation, failed application, or was not saved when saving is part of the goal.
+- 只是发出了虚拟操作请求。
+- 点击已经发生，但路由或选中对象没有按预期变化。
+- 图运行已经启动，但还没有进入 `completed`、`failed` 或 `cancelled`。
+- 图编辑已经可视化回放，但校验失败、应用失败，或在目标要求保存时没有保存。
 
-## Target Official Template
+## 目标官方模板
 
-Template id: `toograph_page_operation_workflow`
+模板 ID：`toograph_page_operation_workflow`
 
-Visible name: `操作 TooGraph 页面`
+显示名称：`操作 TooGraph 页面`
 
-Default graph name: `操作 TooGraph 页面`
+默认图名称：`操作 TooGraph 页面`
 
-Inputs:
+输入：
 
-- `user_goal` (`text`): user intent.
-- `page_context` (`markdown`): human-readable current page context.
-- `page_operation_context` (`json`): latest structured operation book and page snapshot. This is updated by frontend resume payloads.
-- `conversation_history` (`markdown`, optional): recent instruction context, only for resolving pronouns such as "刚才那个图".
+- `user_goal`（`text`）：用户意图。
+- `page_context`（`markdown`）：人类可读的当前页面上下文。
+- `page_operation_context`（`json`）：最新结构化页面操作书和页面快照。它由前端 resume payload 更新。
+- `conversation_history`（`markdown`，可选）：最近指令上下文，只用于解析“刚才那个图”这类指代。
 
-Outputs:
+输出：
 
-- `final_reply` (`markdown`): user-visible result.
-- `operation_report` (`json`, optional but useful in run detail): structured route/run/graph/action outcome.
+- `final_reply`（`markdown`）：用户可见结果。
+- `operation_report`（`json`，可选但对 run detail 有帮助）：结构化路由、运行、图和操作结果。
 
-Core states:
+核心 state：
 
-- `goal_plan` (`json`): classified goal, target object hints, required side effects, and success criteria.
-- `operation_request` (`json`): the next operation that should be attempted.
-- `operation_result` (`json`): latest frontend execution ack, including status, route before/after, target id, errors, triggered run id, and graph edit summary.
-- `page_snapshot` (`json`): latest page snapshot after operation.
-- `goal_review` (`json`): verifier result with `goal_completed`, `needs_more_operations`, `needs_clarification`, `failure_reason`, `next_requirement`.
-- `loop_trace` (`json`): compact list of attempted operations.
+- `goal_plan`（`json`）：目标分类、目标对象线索、所需副作用和成功标准。
+- `operation_request`（`json`）：下一步要尝试的操作。
+- `operation_result`（`json`）：最新前端执行确认，包括状态、操作前后路由、目标 id、错误、触发的 run id 和图编辑摘要。
+- `page_snapshot`（`json`）：操作后的最新页面快照。
+- `goal_review`（`json`）：verifier 结果，包括 `goal_completed`、`needs_more_operations`、`needs_clarification`、`failure_reason`、`next_requirement`。
+- `loop_trace`（`json`）：已尝试操作的紧凑摘要列表。
 
-Top-level flow:
+顶层流程：
 
 ```text
 input_user_goal
@@ -97,7 +97,7 @@ input_user_goal
   -> output_final_reply
 ```
 
-`operation_loop_subgraph` uses only existing node kinds:
+`operation_loop_subgraph` 只使用现有节点类型：
 
 ```text
 plan_next_operation
@@ -107,13 +107,13 @@ plan_next_operation
   -> continue_condition
 ```
 
-The pause is expressed through existing graph run pause/resume mechanics. The frontend auto-resumes only for safe virtual operation continuations that came from `toograph_page_operator`.
+暂停必须用现有图运行暂停/恢复机制表达。只有来自 `toograph_page_operator` 的安全虚拟操作 continuation，前端才可以自动恢复。
 
-## Phase 1: Formalize Virtual Operation Outcome Contract
+## 阶段 1：正式化虚拟操作结果协议
 
-**Purpose:** Make a page operation request traceable from Skill output to frontend execution and back into graph state.
+**目的：** 让页面操作请求可以从 Skill 输出追踪到前端真实执行，再回写到图 state。
 
-Files to modify:
+需要修改的文件：
 
 - `skill/official/toograph_page_operator/after_llm.py`
 - `skill/official/toograph_page_operator/skill.json`
@@ -124,33 +124,33 @@ Files to modify:
 - `backend/app/core/runtime/activity_events.py`
 - `backend/tests/test_toograph_page_operator_skill.py`
 
-Implementation:
+实现要求：
 
-- Add a stable `operation_request_id` to every successful `virtual_ui_operation` event.
-- Add `expected_continuation` detail:
+- 为每个成功的 `virtual_ui_operation` event 增加稳定的 `operation_request_id`。
+- 增加 `expected_continuation` 详情：
   - `mode: "auto_resume_after_ui_operation"`
   - `resume_state_keys: ["page_operation_context", "page_context", "operation_result"]`
-- Keep LLM output unchanged; the id and continuation metadata are generated deterministically by the Skill/runtime.
-- Keep one operation per Skill call.
-- Ensure activity events include enough node/run context for the frontend to resume the correct run.
+- 不改变 LLM 输出字段；id 和 continuation metadata 由 Skill/runtime 确定性生成。
+- 仍然保持每次 Skill 调用只请求一个操作。
+- activity event 必须包含足够的节点和 run 上下文，以便前端恢复正确的 run。
 
-Tests:
+测试：
 
-- Backend: `py -3 -m pytest backend/tests/test_toograph_page_operator_skill.py -q`
-- Frontend: `node --test frontend/src/buddy/virtualOperationProtocol.test.ts`
-- Build: `cd frontend; npm run build`
+- 后端：`py -3 -m pytest backend/tests/test_toograph_page_operator_skill.py -q`
+- 前端：`node --test frontend/src/buddy/virtualOperationProtocol.test.ts`
+- 构建：`cd frontend; npm run build`
 
-Commit:
+提交信息：
 
 ```text
 建立页面操作结果协议
 ```
 
-## Phase 2: Add Frontend Operation Ack And Auto-Resume
+## 阶段 2：增加前端操作确认与自动恢复
 
-**Purpose:** Let a paused graph continue with fresh UI state after the real UI operation finishes.
+**目的：** 让暂停中的图在真实 UI 操作完成后，带着新 UI 状态继续运行。
 
-Files to modify:
+需要修改的文件：
 
 - `frontend/src/stores/buddyMascotDebug.ts`
 - `frontend/src/buddy/BuddyWidget.vue`
@@ -164,10 +164,10 @@ Files to modify:
 - `frontend/src/buddy/BuddyWidget.structure.test.ts`
 - `frontend/src/editor/workspace/EditorWorkspaceShell.structure.test.ts`
 
-Implementation:
+实现要求：
 
-- When a `virtual_ui_operation` event includes `expected_continuation`, execute it visibly as today.
-- Capture an `operation_result` object:
+- 当 `virtual_ui_operation` event 包含 `expected_continuation` 时，前端像现在一样可视化执行操作。
+- 捕获 `operation_result` 对象：
   - `operation_request_id`
   - `status: "succeeded" | "failed" | "interrupted"`
   - `target_id`
@@ -179,32 +179,32 @@ Implementation:
   - `triggered_run_id`
   - `graph_edit_summary`
   - `error`
-- After execution, rebuild page operation context using `buildPageOperationRuntimeContext`.
-- Resume the paused run with:
+- 操作执行后，用 `buildPageOperationRuntimeContext` 重新生成页面操作上下文。
+- 用以下内容 resume 暂停中的 run：
   - `operation_result`
-  - refreshed `page_context`
-  - refreshed `page_operation_context`
-- Auto-resume only when the paused run metadata confirms the pending continuation belongs to the same `operation_request_id`.
-- If the operation is interrupted by the stop button, resume only if the graph expects failure handling; otherwise leave the run paused with a clear message.
+  - 刷新的 `page_context`
+  - 刷新的 `page_operation_context`
+- 只有当暂停 run metadata 确认 pending continuation 属于同一个 `operation_request_id` 时，才允许自动恢复。
+- 如果用户通过停止按钮中断操作，只有当图明确期望失败处理时才恢复；否则保持 run 暂停，并显示清楚原因。
 
-Tests:
+测试：
 
-- Backend targeted resume tests: `py -3 -m pytest backend/tests/test_langgraph_runtime_setup.py backend/tests/test_langgraph_runtime_progress_events.py -q`
-- Frontend structure and model tests for event-to-resume wiring.
-- Build: `cd frontend; npm run build`
-- Runtime smoke: `npm.cmd start`, run a simple page-operation graph that navigates to `/runs`, verify the graph resumes with route `/runs`.
+- 后端恢复链路：`py -3 -m pytest backend/tests/test_langgraph_runtime_setup.py backend/tests/test_langgraph_runtime_progress_events.py -q`
+- 前端结构和模型测试：覆盖 event 到 resume 的连线。
+- 构建：`cd frontend; npm run build`
+- 运行时冒烟：`npm.cmd start`，运行一个导航到 `/runs` 的简单页面操作图，确认图恢复后拿到 `/runs` 路由。
 
-Commit:
+提交信息：
 
 ```text
 接通页面操作自动恢复
 ```
 
-## Phase 3: Expand Semantic Affordance Coverage
+## 阶段 3：扩展语义操作目标覆盖
 
-**Purpose:** Give the operation template enough stable UI targets to accomplish real goals.
+**目的：** 给操作模板足够稳定的 UI 目标，真正完成页面目标。
 
-Files to modify:
+需要修改的文件：
 
 - `frontend/src/layouts/AppShell.vue`
 - `frontend/src/pages/GraphLibraryPage.vue`
@@ -214,9 +214,9 @@ Files to modify:
 - `frontend/src/editor/workspace/EditorTabLauncherPanel.vue`
 - `frontend/src/editor/workspace/EditorActionCapsule.vue`
 - `frontend/src/editor/canvas/EditorCanvas.vue`
-- Related structure tests in the same folders.
+- 以上文件附近对应的结构测试。
 
-Affordance ids to add:
+需要增加的 affordance id：
 
 - `library.action.newBlankGraph`
 - `library.action.importPython`
@@ -243,33 +243,33 @@ Affordance ids to add:
 - `editor.action.toggleRunActivity`
 - `editor.action.toggleStatePanel`
 
-Safety:
+安全要求：
 
-- Mark destructive or irreversible actions with `data-virtual-affordance-requires-confirmation="true"` or `data-virtual-affordance-destructive="true"`.
-- Keep Buddy self surfaces forbidden.
-- Do not expose hidden disabled controls as allowed operations.
+- 破坏性或不可逆操作必须标记 `data-virtual-affordance-requires-confirmation="true"` 或 `data-virtual-affordance-destructive="true"`。
+- Buddy 自身表面继续保持 forbidden。
+- 隐藏或禁用控件不能作为 allowed operation 暴露。
 
-Tests:
+测试：
 
 - `node --test frontend/src/layouts/AppShell.structure.test.ts`
 - `node --test frontend/src/pages/GraphLibraryPage.structure.test.ts`
 - `node --test frontend/src/pages/RunsPage.structure.test.ts`
 - `node --test frontend/src/editor/workspace/EditorTabBar.structure.test.ts`
 - `node --test frontend/src/editor/workspace/EditorActionCapsule.structure.test.ts`
-- Build: `cd frontend; npm run build`
-- Runtime smoke: use the operation book display/context to verify card and action targets appear on `/library`, `/runs`, and `/editor`.
+- 构建：`cd frontend; npm run build`
+- 运行时冒烟：检查 `/library`、`/runs`、`/editor` 的页面操作书中出现卡片和操作目标。
 
-Commit:
+提交信息：
 
 ```text
 补齐页面操作语义目标
 ```
 
-## Phase 4: Expand `toograph_page_operator`
+## 阶段 4：扩展 `toograph_page_operator`
 
-**Purpose:** Allow the Skill to execute the operations the frontend already understands.
+**目的：** 让 Skill 能执行前端已经理解的操作。
 
-Files to modify:
+需要修改的文件：
 
 - `skill/official/toograph_page_operator/before_llm.py`
 - `skill/official/toograph_page_operator/after_llm.py`
@@ -279,32 +279,32 @@ Files to modify:
 - `frontend/src/buddy/virtualOperationProtocol.ts`
 - `frontend/src/buddy/virtualOperationProtocol.test.ts`
 
-Implementation:
+实现要求：
 
-- Accept `click`, `focus`, `clear`, `type`, `press`, `wait`, and `graph_edit` commands when they come from the current operation book.
-- Preserve one operation per Skill invocation.
-- Add text input validation using the operation book's `inputs`.
-- Support `graph_edit` intents with `nodeType: "subgraph"` to match the editor playback model.
-- Reject commands not present in the latest operation book unless they are the built-in safe wait command.
-- Return clear recoverable errors for stale affordances, missing inputs, and unsupported graph edit intents.
+- 当命令来自当前页面操作书时，接受 `click`、`focus`、`clear`、`type`、`press`、`wait` 和 `graph_edit`。
+- 每次 Skill 调用仍然只执行一个操作。
+- 根据操作书中的 `inputs` 做文本输入校验。
+- 支持 `nodeType: "subgraph"` 的 `graph_edit` intent，与编辑器回放模型保持一致。
+- 除内置安全等待命令外，拒绝不在最新操作书里的命令。
+- 对过期 affordance、缺少输入、unsupported graph edit intent 返回清晰的 recoverable error。
 
-Tests:
+测试：
 
-- Backend: `py -3 -m pytest backend/tests/test_toograph_page_operator_skill.py -q`
-- Frontend: `node --test frontend/src/buddy/virtualOperationProtocol.test.ts`
-- Build: `cd frontend; npm run build`
+- 后端：`py -3 -m pytest backend/tests/test_toograph_page_operator_skill.py -q`
+- 前端：`node --test frontend/src/buddy/virtualOperationProtocol.test.ts`
+- 构建：`cd frontend; npm run build`
 
-Commit:
+提交信息：
 
 ```text
 扩展页面操作器命令范围
 ```
 
-## Phase 5: Add Page Goal Observation And Verification Inputs
+## 阶段 5：增加页面目标观察和验证输入
 
-**Purpose:** Give the graph enough structured evidence to decide whether the user's goal is done.
+**目的：** 给图足够的结构化证据，让它判断用户目标是否完成。
 
-Files to modify:
+需要修改的文件：
 
 - `frontend/src/buddy/pageOperationAffordances.ts`
 - `frontend/src/buddy/buddyPageContext.ts`
@@ -312,39 +312,39 @@ Files to modify:
 - `frontend/src/buddy/BuddyWidget.vue`
 - `frontend/src/pages/runDetailModel.ts`
 - `frontend/src/editor/workspace/runActivityModel.ts`
-- Related tests.
+- 相关测试。
 
-Implementation:
+实现要求：
 
-- Extend page operation runtime context with structured page facts:
-  - current route
-  - current page title
-  - active editor tab id/title/kind
-  - active graph id/name/dirty status
-  - visible graph/template/run cards with ids and labels
-  - latest foreground run id/status/result summary when available
-  - latest operation result
-- Keep `page_context` as readable markdown for LLMs, but put machine-checkable data in `page_operation_context`.
-- Add a compact `operation_report` helper projection for run details.
+- 扩展页面操作 runtime context，加入结构化页面事实：
+  - 当前路由
+  - 当前页面标题
+  - 活跃编辑器页签 id、标题和类型
+  - 活跃图 id、名称和 dirty 状态
+  - 可见图、模板、run 卡片的 id 和标签
+  - 可用时的最新前台 run id、状态和结果摘要
+  - 最新 operation result
+- `page_context` 保持为 LLM 友好的可读 markdown；机器可检查数据放在 `page_operation_context`。
+- 增加一个紧凑的 `operation_report` 投影，供 run detail 展示。
 
-Tests:
+测试：
 
 - `node --test frontend/src/buddy/pageOperationAffordances.test.ts`
 - `node --test frontend/src/buddy/buddyPageContext.test.ts`
 - `node --test frontend/src/editor/workspace/runActivityModel.test.ts`
-- Build: `cd frontend; npm run build`
+- 构建：`cd frontend; npm run build`
 
-Commit:
+提交信息：
 
 ```text
 增加页面目标验证上下文
 ```
 
-## Phase 6: Attribute Graph Runs Triggered By Virtual Operations
+## 阶段 6：归因虚拟操作触发的图运行
 
-**Purpose:** Make "run this graph" verifiable rather than just clicking the run button.
+**目的：** 让“运行这个图”可以被验证，而不是只点击运行按钮。
 
-Files to modify:
+需要修改的文件：
 
 - `frontend/src/editor/workspace/useWorkspaceRunController.ts`
 - `frontend/src/editor/workspace/useWorkspaceRunLifecycleController.ts`
@@ -352,224 +352,224 @@ Files to modify:
 - `frontend/src/buddy/BuddyWidget.vue`
 - `frontend/src/stores/buddyMascotDebug.ts`
 - `frontend/src/types/run.ts`
-- Related tests.
+- 相关测试。
 
-Implementation:
+实现要求：
 
-- When a virtual operation clicks `editor.action.runActiveGraph`, link the next run created from that editor tab to the operation result.
-- Store `triggered_run_id`, `triggered_graph_id`, and initial run status in `operation_result`.
-- Keep watching the triggered run until terminal status when the operation template goal requires run completion.
-- Add a small frontend wait/observe loop for run completion, then auto-resume the operation workflow with updated run detail summary.
+- 当虚拟操作点击 `editor.action.runActiveGraph` 时，把这个编辑器页签创建的下一个 run 关联到该 operation result。
+- 在 `operation_result` 中记录 `triggered_run_id`、`triggered_graph_id` 和初始 run 状态。
+- 当操作模板的目标要求运行完成时，持续观察这个 run，直到进入终态。
+- 增加一个小型前端等待/观察循环，等待 run 完成后用更新后的 run detail 摘要自动恢复页面操作工作流。
 
-Tests:
+测试：
 
 - `node --test frontend/src/editor/workspace/useWorkspaceRunController.test.ts`
 - `node --test frontend/src/editor/workspace/useWorkspaceRunLifecycleController.test.ts`
-- Build: `cd frontend; npm run build`
-- Runtime smoke: open a known small graph, ask the workflow to run it, verify final reply includes run id and terminal status.
+- 构建：`cd frontend; npm run build`
+- 运行时冒烟：打开一个已知小图，让工作流运行它，确认最终回复包含 run id 和终态状态。
 
-Commit:
+提交信息：
 
 ```text
 归因虚拟操作触发的图运行
 ```
 
-## Phase 7: Build The Official Graph Template
+## 阶段 7：构建官方图模板
 
-**Purpose:** Add the graph template users and Buddy can run as an enabled capability.
+**目的：** 新增用户和 Buddy 都能运行的官方图模板。
 
-Files to create:
+需要创建的文件：
 
 - `graph_template/official/toograph_page_operation_workflow/template.json`
 
-Files to modify:
+需要修改的文件：
 
 - `backend/tests/test_template_layouts.py`
 - `backend/tests/test_run_graph_snapshot.py`
 - `docs/current_project_status.md`
 - `docs/future/buddy-autonomous-agent-roadmap.md`
 
-Template structure:
+模板结构：
 
-- `input_user_goal` writes `user_goal`.
-- `input_page_context` writes `page_context`.
-- `input_page_operation_context` writes `page_operation_context`.
-- `classify_goal` writes `goal_plan`.
-- `operation_loop` is a `subgraph` node that:
-  - plans next operation from `goal_plan`, `page_operation_context`, `operation_result`, and `loop_trace`;
-  - invokes `toograph_page_operator`;
-  - pauses for frontend virtual operation continuation;
-  - verifies goal completion after resume;
-  - loops through a condition node with a conservative loop limit.
-- `draft_final_reply` writes `final_reply`.
-- `output_final_reply` displays `final_reply`.
-- Optional `output_operation_report` displays `operation_report`.
+- `input_user_goal` 写入 `user_goal`。
+- `input_page_context` 写入 `page_context`。
+- `input_page_operation_context` 写入 `page_operation_context`。
+- `classify_goal` 写入 `goal_plan`。
+- `operation_loop` 是 `subgraph` 节点，内部负责：
+  - 根据 `goal_plan`、`page_operation_context`、`operation_result` 和 `loop_trace` 规划下一步操作；
+  - 调用 `toograph_page_operator`；
+  - 暂停等待前端虚拟操作 continuation；
+  - resume 后验证目标完成情况；
+  - 通过 condition 节点循环，并设置保守 loop limit。
+- `draft_final_reply` 写入 `final_reply`。
+- `output_final_reply` 展示 `final_reply`。
+- 可选 `output_operation_report` 展示 `operation_report`。
 
-Verifier behavior:
+Verifier 行为：
 
-- For record viewing: complete when route and selected run detail match target.
-- For tab opening: complete when active tab/route matches target.
-- For new graph: complete when active editor canvas is a blank or requested template draft.
-- For graph editing: complete when graph edit playback applied and expected graph facts changed.
-- For graph running: complete when triggered run reaches terminal state and result summary is available.
+- 查看记录：当路由和选中的 run detail 匹配目标时完成。
+- 打开页签：当 active tab 或 route 匹配目标时完成。
+- 新建图：当活跃编辑器画布是空白图或指定模板草稿时完成。
+- 编辑图：当 graph edit playback 已应用，并且预期图事实发生变化时完成。
+- 运行图：当触发的 run 进入终态并且结果摘要可用时完成。
 
-Tests:
+测试：
 
 - `py -3 -m pytest backend/tests/test_template_layouts.py::TemplateLayoutTests -q`
 - `py -3 -m pytest backend/tests/test_run_graph_snapshot.py -q`
 - `py -3 -m pytest backend/tests/test_node_system_validator_skills.py -q`
-- Build: `cd frontend; npm run build`
+- 构建：`cd frontend; npm run build`
 
-Commit:
+提交信息：
 
 ```text
 新增页面操作官方模板
 ```
 
-## Phase 8: End-To-End Goal Flows
+## 阶段 8：端到端目标流程
 
-**Purpose:** Make the feature real, not just structurally valid.
+**目的：** 让功能真实可用，而不只是结构合法。
 
-Add or update tests and smoke scripts for:
+需要新增或更新测试与冒烟脚本，覆盖：
 
-- "打开运行记录"
-- "打开某个运行详情"
-- "打开图与模板页面"
-- "新建一个空白图"
-- "打开名为 X 的图"
-- "运行当前图并告诉我结果"
-- "新建一个包含输入、LLM、输出的图"
-- "编辑当前图，给某个节点改名"
+- “打开运行记录”
+- “打开某个运行详情”
+- “打开图与模板页面”
+- “新建一个空白图”
+- “打开名为 X 的图”
+- “运行当前图并告诉我结果”
+- “新建一个包含输入、LLM、输出的图”
+- “编辑当前图，给某个节点改名”
 
-Files likely to modify:
+可能需要修改的文件：
 
 - `frontend/src/buddy/BuddyWidget.structure.test.ts`
 - `frontend/src/editor/workspace/EditorWorkspaceShell.structure.test.ts`
 - `frontend/src/buddy/pageOperationAffordances.test.ts`
 - `backend/tests/test_template_layouts.py`
-- Add focused model tests where new pure helpers are introduced.
+- 如果引入新的纯函数 helper，则在对应 model test 中增加覆盖。
 
-Manual verification:
+手动验证：
 
-1. Run `npm.cmd start`.
-2. Open `http://127.0.0.1:3477`.
-3. Run the official template from the editor with a direct input first.
-4. Bind it as a Buddy capability/template candidate only after direct editor runs work.
-5. Verify the virtual cursor operates visibly.
-6. Verify the graph run does not finish until the requested UI goal is truly complete.
-7. Verify stop button interruption is respected and does not get auto-resumed as success.
+1. 运行 `npm.cmd start`。
+2. 打开 `http://127.0.0.1:3477`。
+3. 先从编辑器直接运行官方模板，输入明确目标。
+4. 只有当直接编辑器运行通过后，再把它作为 Buddy 可发现能力或模板候选。
+5. 确认虚拟光标可见地执行操作。
+6. 确认图运行不会在目标未完成时提前结束。
+7. 确认停止按钮中断被尊重，并且不会被自动恢复成成功。
 
-Commit:
+提交信息：
 
 ```text
 验证页面操作模板端到端流程
 ```
 
-## Phase 9: Documentation, Capability Selection, And Product Polish
+## 阶段 9：文档、能力发现和产品打磨
 
-**Purpose:** Make the feature discoverable and safe to use.
+**目的：** 让功能可发现、可理解、安全可用。
 
-Files to modify:
+需要修改的文件：
 
 - `docs/current_project_status.md`
 - `docs/future/buddy-autonomous-agent-roadmap.md`
 - `skill/official/toograph_page_operator/SKILL.md`
 - `graph_template/official/toograph_page_operation_workflow/template.json`
-- Capability selector tests if candidate scoring needs updates.
+- 如果候选评分需要调整，则修改 capability selector 相关测试。
 
-Implementation:
+实现要求：
 
-- Document that `toograph_page_operation_workflow` is the official page-operation template.
-- Make sure the capability selector can discover it for page operation goals.
-- Keep Buddy self-surface restrictions explicit.
-- Add concise failure messages for impossible goals:
-  - missing target graph
-  - no matching run record
-  - stale page snapshot
-  - blocked destructive action
-  - run failed
-  - operation interrupted
+- 文档明确 `toograph_page_operation_workflow` 是官方页面操作模板。
+- 确保 capability selector 能在页面操作目标中发现它。
+- 保持 Buddy 自身表面限制明确。
+- 为无法完成的目标提供简洁失败说明：
+  - 找不到目标图
+  - 找不到匹配运行记录
+  - 页面快照过期
+  - 破坏性操作被阻止
+  - run 失败
+  - 操作被中断
 
-Tests:
+测试：
 
 - `py -3 -m pytest backend/tests/test_toograph_capability_selector_skill.py -q`
 - `py -3 -m pytest backend/tests/test_template_layouts.py -q`
-- Build: `cd frontend; npm run build`
-- Runtime smoke with Buddy: ask Buddy to open a page, run a graph, and create a simple graph.
+- 构建：`cd frontend; npm run build`
+- Buddy 运行时冒烟：让 Buddy 打开页面、运行图、创建简单图。
 
-Commit:
+提交信息：
 
 ```text
 完善页面操作模板文档和发现能力
 ```
 
-## Phase 10: Final Hardening
+## 阶段 10：最终硬化
 
-**Purpose:** Close reliability gaps before declaring the plan complete.
+**目的：** 在宣布计划完成前关闭可靠性缺口。
 
-Checklist:
+检查清单：
 
-- Full backend tests: `py -3 -m pytest backend/tests -q`
-- Full frontend structure/model tests:
-  - PowerShell: `Get-ChildItem frontend/src -Recurse -Filter *.test.ts | ForEach-Object { $_.FullName } | node --test`
-  - Bash equivalent: `node --test $(find frontend/src -name '*.test.ts' -print)`
-- Frontend build: `cd frontend; npm run build`
-- Restart: `npm.cmd start`
-- Visual smoke on:
+- 完整后端测试：`py -3 -m pytest backend/tests -q`
+- 完整前端结构/模型测试：
+  - PowerShell：`Get-ChildItem frontend/src -Recurse -Filter *.test.ts | ForEach-Object { $_.FullName } | node --test`
+  - Bash：`node --test $(find frontend/src -name '*.test.ts' -print)`
+- 前端构建：`cd frontend; npm run build`
+- 重启：`npm.cmd start`
+- 页面视觉冒烟：
   - `/library`
   - `/runs`
   - `/editor`
-  - Buddy floating window operation flow
-- Confirm no local artifacts are staged:
+  - Buddy 浮窗操作流程
+- 确认没有本地 artifact 被 stage：
   - `backend/data/settings`
   - `.toograph_*`
   - `.dev_*`
   - `frontend/dist`
   - `.worktrees`
   - `buddy_home`
-  - root `package-lock.json` unless explicitly intended.
+  - 根目录 `package-lock.json`，除非明确决定提交它。
 
-Commit:
+提交信息：
 
 ```text
 完成页面操作模板硬化验证
 ```
 
-## Suggested Development Order
+## 推荐开发顺序
 
-1. Complete Phase 1 and Phase 2 before adding more affordances. Without ack/resume, the template cannot know whether a goal is done.
-2. Complete Phase 3 before expanding goal classes. Without stable affordances, the LLM will not have trustworthy targets.
-3. Complete Phase 4 before template creation. The template depends on `toograph_page_operator` being able to use the operation book.
-4. Complete Phase 5 and Phase 6 before claiming graph running is supported.
-5. Add the official template only after direct operation-loop mechanics work in a small test graph.
-6. Bind or advertise the official template to Buddy after the template works from the editor.
+1. 先完成阶段 1 和阶段 2，再继续增加 affordance。没有 ack/resume，模板无法知道目标是否完成。
+2. 再完成阶段 3。没有稳定 affordance，LLM 就没有可信目标。
+3. 阶段 4 必须在创建模板前完成。模板依赖 `toograph_page_operator` 正确使用操作书。
+4. 阶段 5 和阶段 6 必须在声明支持图运行前完成。
+5. 只有当直接的小型测试图能跑通操作循环后，才新增官方模板。
+6. 只有当官方模板能在编辑器直接运行后，才让 Buddy 绑定或推荐它。
 
-## Risks And Mitigations
+## 风险与缓解
 
-- **Stale page snapshots:** Require every operation continuation to refresh `page_operation_context` before verification.
-- **Wrong target clicked:** Use stable semantic affordance ids and labels; verifier checks route/object identity after the click.
-- **Run starts asynchronously:** Attribute the next editor run to the virtual operation request id and wait for terminal status.
-- **Graph edit playback succeeds visually but not structurally:** Apply graph edit commands through the existing graph mutation path and verify document facts after application.
-- **User interrupts operation:** Mark `operation_result.status="interrupted"` and let the graph produce a clear non-success final reply.
-- **Capability selector loops into itself:** Ensure template metadata and selector instructions avoid choosing the currently running page-operation workflow as a nested capability unless explicitly intended.
-- **Over-broad permissions:** Keep destructive operations blocked unless the existing approval path handles them.
+- **页面快照过期：** 每次 operation continuation 都必须刷新 `page_operation_context`，然后再验证。
+- **点击了错误目标：** 使用稳定语义 affordance id 和 label；点击后由 verifier 检查路由和对象身份。
+- **运行异步启动：** 将下一个编辑器 run 归因到虚拟操作请求 id，并等待终态。
+- **图编辑可视回放成功但结构失败：** 图编辑命令必须通过现有图 mutation 路径应用，并在应用后验证 document facts。
+- **用户中断操作：** 写入 `operation_result.status="interrupted"`，由图输出清楚的非成功最终回复。
+- **能力选择器递归选择自身：** 模板 metadata 和 selector 指令必须避免把当前运行中的页面操作 workflow 作为嵌套能力，除非用户明确要求。
+- **权限过宽：** 破坏性操作继续阻止，除非现有审批路径明确处理。
 
-## Definition Of Done
+## 完成定义
 
-- `toograph_page_operation_workflow` exists as an official visible template.
-- The template uses only existing node types.
-- The template can open pages, open tabs, view run records, create graphs, edit graphs, and run graphs from user intent.
-- Every operation is visible through the virtual cursor or graph edit playback.
-- The graph run waits for real UI completion and resumes with fresh page context.
-- The final reply is emitted only after verifier success or a clear terminal failure.
-- Activity events show request, execution, outcome, retry/failure, and triggered run attribution.
-- Targeted tests and runtime smoke checks pass for every phase.
-- Final full backend/frontend verification passes.
+- `toograph_page_operation_workflow` 作为官方可见模板存在。
+- 模板只使用现有节点类型。
+- 模板可以从用户意图打开页面、打开页签、查看运行记录、新建图、编辑图和运行图。
+- 每个操作都通过虚拟光标或图编辑回放可见执行。
+- 图运行会等待真实 UI 完成，并带着刷新后的页面上下文恢复。
+- 只有 verifier 成功或明确终态失败后，才输出最终回复。
+- activity events 展示请求、执行、结果、重试/失败和触发 run 归因。
+- 每个阶段的针对性测试和运行时冒烟通过。
+- 最终完整后端/前端验证通过。
 
-## Plan Self-Review
+## 计划自检
 
-- No new graph node type is required.
-- The plan uses existing Skill, Subgraph, Condition, Output, and run resume mechanisms.
-- Each phase has a test command and a commit boundary.
-- The official template is created only after the operation loop can truly close.
-- Known gaps from the current codebase are mapped to explicit phases.
+- 不需要新增图节点类型。
+- 计划复用现有 Skill、Subgraph、Condition、Output 和 run resume 机制。
+- 每个阶段都有测试命令和提交边界。
+- 只有当操作循环可以真正闭环后，才创建官方模板。
+- 当前代码中的已知缺口已经映射到明确阶段。
