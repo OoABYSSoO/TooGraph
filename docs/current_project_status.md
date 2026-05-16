@@ -13,7 +13,7 @@
 - 动态 `capability.kind=subgraph` 已支持内部断点向父级 run 传播。动态子图遇到 `interrupt_after` 时，父级 run 会进入标准 `awaiting_human`，恢复仍走父级 run 的 resume API。
 - 伙伴浮窗已复用标准 `awaiting_human` 暂停卡片：能展示子图 scope、必填 state、当前已产出的内容和上下文，并在卡片内通过“执行当前方案 / 补充内容”的单一操作区恢复原 run；暂停时不会把本轮当作最终完成，底部聊天输入不会续跑旧断点。
 - 伙伴运行过程胶囊已经进入会话持久化路径：它作为不进入模型上下文的助手消息显示元数据保存到 `buddy_messages.metadata_json`，`metadata.kind=output_trace` 表示该消息只负责展示 run capsule；刷新页面、切换历史会话或恢复运行记录后仍能还原胶囊。
-- 当前普通模板列表提供三个可见官方图模板：`advanced_web_research_loop`（高级联网搜索）、`buddy_autonomous_loop`（伙伴自主循环）和 `toograph_skill_creation_workflow`（创建自定义 Skill），并会合并 `graph_template/user/` 下的用户模板。仓库还包含内部后台模板 `buddy_autonomous_review`（自主复盘），它不进入普通模板列表和能力选择候选。
+- 当前普通模板列表提供四个可见官方图模板：`advanced_web_research_loop`（高级联网搜索）、`buddy_autonomous_loop`（伙伴自主循环）、`toograph_page_operation_workflow`（操作 TooGraph 页面）和 `toograph_skill_creation_workflow`（创建自定义 Skill），并会合并 `graph_template/user/` 下的用户模板。仓库还包含内部后台模板 `buddy_autonomous_review`（自主复盘），它不进入普通模板列表和能力选择候选。
 - 技能系统已收束为统一技能库，不再区分“伙伴技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
 - 当前官方技能包包括 `web_search`、`toograph_capability_selector`、`toograph_page_operator`、`toograph_skill_builder`、`toograph_script_tester`、`local_workspace_executor` 和内部 `buddy_home_writer`。后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
@@ -82,9 +82,9 @@
 - 位置：`skill/official/toograph_page_operator/`
 - 显示名称：`TooGraph 页面操作器`
 - 作用：读取运行时提供的结构化页面操作书，让模型选择一个语义页面命令，并把合法请求交给 TooGraph 应用内虚拟操作层执行。
-- 当前能力：支持非伙伴自表面的 `click` 命令；在编辑器页支持 `graph_edit editor.graph.playback`，由 LLM 输出 `graph_edit_intents`，前端再编译成 graph commands 和可见 playback steps。
+- 当前能力：支持非伙伴自表面的 `click`、`focus`、`clear`、`type`、`press` 和安全 `wait` 命令；在编辑器页支持 `graph_edit editor.graph.playback`，由 LLM 输出 `graph_edit_intents`，前端再编译成 graph commands 和可见 playback steps。成功请求会带稳定 `operation_request_id` 和 `expected_continuation`，让前端执行后用刷新后的 `page_context`、`page_operation_context` 和 `operation_result` 自动恢复暂停 run。
 - 边界：LLM 只看到页面操作书和产品语义意图，不输出 DOM selector、屏幕坐标、鼠标轨迹或浏览器自动化脚本；伙伴页面、伙伴浮窗、伙伴形象和调试入口会被过滤或拒绝。
-- 当前缺口：操作会生成虚拟 UI 请求和基础 journal，但仍需补齐统一 operation journal、图变更 diff、graph revision、undo/redo、失败重试和运行详情归因。
+- 当前缺口：操作会生成虚拟 UI 请求和基础 journal，并且运行图按钮触发的 run 已能归因和等待终态；仍需补齐更完整的统一 operation journal、图变更 diff、graph revision、undo/redo、失败重试和低层操作摘要。
 
 ### `toograph_script_tester`
 
@@ -136,6 +136,15 @@
 - 可见性：该模板标记为 `metadata.internal=true`，不会进入普通模板列表和 `toograph_capability_selector` 候选清单，但可以通过明确模板 ID 读取并发起 graph run。
 - 边界：用户不确认每次 Buddy Home 是否应该更新；是否更新由模型在本后台图中判断。正常低风险 memory、session summary、profile、非权限沟通偏好、精炼复盘报告和能力使用统计写回自动应用并留下 command、revision 与 activity event；涉及权限升级、行为边界扩大、任意文件写入、脚本执行、图补丁或 revision restore 的变化会被 writer 拒绝，不静默提权。
 
+### `toograph_page_operation_workflow`
+
+- 位置：`graph_template/official/toograph_page_operation_workflow/template.json`
+- 显示名称：`操作 TooGraph 页面`
+- 作用：把“打开页面、查看运行、切换页签、新建/编辑/运行图”等页面目标表达成可审计图流程：解析目标 -> 进入页面操作子图 -> 调用 `toograph_page_operator` 请求一次可见 UI 操作 -> 在操作节点后暂停，等待前端虚拟操作确认 -> 用刷新后的页面事实验证目标 -> 未完成且可继续时通过 condition 回到规划节点 -> 最终输出 `final_reply` 和结构化 `operation_report`。
+- 断点语义：内部 `operation_loop` 子图声明 `interrupt_after: ["execute_page_operation"]`。页面操作器的 activity event 带 `expected_continuation`，前端执行虚拟点击、输入、等待或 Graph Edit Playback 后，只在 `operation_request_id` 匹配时自动恢复 run。
+- 验证语义：模板不会把“发出操作请求”当作完成。运行图目标必须看到 `triggered_run_id` 且触发 run 进入 `completed`、`failed` 或 `cancelled`；页面/页签/图编辑目标必须由最新 `page_facts`、路由、活跃图或 `graph_edit_summary` 支撑。无法完成时最终回复要明确是找不到目标、需要澄清、操作被阻止、页面快照过期、run 失败或用户中断。
+- 边界：模板只使用现有 `input / agent / condition / subgraph / output` 节点类型，不新增页面专用节点；每轮只通过 `toograph_page_operator` 发出一个受控页面操作，LLM 不接触 DOM selector、坐标、截图或外部浏览器自动化。
+
 ### `toograph_skill_creation_workflow`
 
 - 位置：`graph_template/official/toograph_skill_creation_workflow/template.json`
@@ -182,14 +191,14 @@
 
 ## 当前仍在路线图中
 
-- 近期顺序：阶段 3 已启动。基础页面操作书、`toograph_page_operator`、可见虚拟鼠标/键盘、Graph Edit Playback、编辑器调试入口和目标图回放搭建已落地；下一步集中在审计闭环、编辑已有图和从运行结果自我修复。
+- 近期顺序：页面操作官方模板已经落地为 `toograph_page_operation_workflow`，基础页面操作书、`toograph_page_operator`、可见虚拟鼠标/键盘、Graph Edit Playback、编辑器调试入口、目标图回放搭建、自动恢复和运行图归因已接入；下一步集中在端到端目标覆盖、审计闭环、编辑已有图和从运行结果自我修复。
 - 伙伴运行来源巩固：保持 Buddy 图统一使用 `metadata.origin=buddy`、模板绑定和明确策略字段，继续补充运行详情、伙伴页面和测试中的来源/权限展示，避免重新引入旧 metadata 或第二套运行协议。
 - 继续收束 `subgraph` 子图体验：父子图运行详情审计聚合已有基础，仍需补齐从缩略图点击跳转到内部节点，以及动态子图断点在运行详情中的更完整定位。
 - 完善伙伴断点交互：浮窗和伙伴页面确认页签都已复用标准暂停卡；仍需继续打磨多暂停 run 的优先级、跨会话定位、失败恢复提示和低层操作摘要。
 - 完善动态能力审批体验：当前已能在 `需确认` 模式下对写文件、删除类权限和 `subprocess` Skill 进入标准 `awaiting_human`，并能在 Buddy 浮窗和伙伴页面内恢复、拒绝或取消；仍需补齐更细的低层操作摘要和审批后的结果归因。
-- 扩展低层 `activity_events` 覆盖面：第一阶段已覆盖 Skill 调用、权限暂停、动态子图调用、本地文件读取/列表/搜索/写入/脚本、本地文件夹输入上下文读取、脚本测试、`web_search` 下载、图补丁草案和 Buddy Home 写回；仍需补齐伙伴虚拟 UI 操作、affordance 选择、操作失败/重试、图变更 diff、graph revision、run 点击和结果归因。
+- 扩展低层 `activity_events` 覆盖面：第一阶段已覆盖 Skill 调用、权限暂停、动态子图调用、本地文件读取/列表/搜索/写入/脚本、本地文件夹输入上下文读取、脚本测试、`web_search` 下载、图补丁草案、Buddy Home 写回和页面虚拟 UI 操作请求；仍需补齐更细的 affordance 选择、操作失败/重试、图变更 diff、graph revision、undo/redo 和低层操作摘要。
 - 替代历史 `graph_patch.draft` stub：以当前虚拟 UI 操作链路为主线补齐 operation journal、graph diff、graph revision、undo/redo、审计回放和审批路径。
 - 扩展图编辑范围：在空白画布回放搭建之外，继续支持选择节点、移动节点、重命名、编辑关键配置、选择 Skill、调整连接、删除或恢复节点，并在每步后更新结构化快照和操作日志。
-- 建立运行与结果校验：伙伴能点击运行、等待 run 状态、读取结构化 run capsule / activity events 判断是否成功，失败时基于错误和页面快照继续修复。
+- 建立运行与结果校验：页面操作链路已经能把虚拟点击运行按钮触发的 run 归因到 `operation_result`，等待 run 进入终态，并把 run id、图 id 和终态状态写入页面事实；仍需扩展失败后基于错误和页面快照继续修复的覆盖面。
 - 继续完善上下文预算和性能策略：已有节点耗时、公开 output 耗时和可用 token 用量显示；仍需为历史、Buddy Home、`result_package`、大日志和大 artifact 建立预算、摘要和按需展开规则。
 - 将内部 `agent` kind 迁移为面向用户和协议一致的 LLM 节点语义。

@@ -28,7 +28,12 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(
             [record["template_id"] for record in records],
-            ["advanced_web_research_loop", "buddy_autonomous_loop", "toograph_skill_creation_workflow"],
+            [
+                "advanced_web_research_loop",
+                "buddy_autonomous_loop",
+                "toograph_page_operation_workflow",
+                "toograph_skill_creation_workflow",
+            ],
         )
         templates = {record["template_id"]: record for record in records}
         research_template = templates["advanced_web_research_loop"]
@@ -47,6 +52,12 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(buddy_template["label"], "伙伴自主循环")
         self.assertEqual(buddy_template["default_graph_name"], "伙伴自主循环")
         self.assertIn("Buddy Home", buddy_template["description"])
+
+        page_operation_template = templates["toograph_page_operation_workflow"]
+        self.assertEqual(page_operation_template["source"], "official")
+        self.assertEqual(page_operation_template["label"], "操作 TooGraph 页面")
+        self.assertEqual(page_operation_template["default_graph_name"], "操作 TooGraph 页面")
+        self.assertIn("页面操作", page_operation_template["description"])
 
     def test_advanced_web_research_loop_contract(self) -> None:
         template = next(record for record in _official_template_records() if record["template_id"] == "advanced_web_research_loop")
@@ -549,6 +560,155 @@ class TemplateLayoutTests(unittest.TestCase):
             _read_contracts(draft_graph["nodes"]["output_final_reply"]["reads"]),
             [{"state": "final_reply", "required": True}],
         )
+
+    def test_toograph_page_operation_workflow_contract(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "toograph_page_operation_workflow"
+        )
+        states = template["state_schema"]
+        nodes = template["nodes"]
+
+        self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
+        self.assertEqual(template["metadata"]["role"], "page_operation_workflow")
+        self.assertEqual(template["metadata"]["pageOperationTemplate"], True)
+        self.assertEqual(
+            set(states),
+            {
+                "user_goal",
+                "page_context",
+                "page_operation_context",
+                "conversation_history",
+                "goal_plan",
+                "operation_request",
+                "operation_ok",
+                "operation_request_id",
+                "operation_journal",
+                "operation_error",
+                "operation_result",
+                "page_snapshot",
+                "goal_review",
+                "loop_trace",
+                "final_reply",
+                "operation_report",
+            },
+        )
+        self.assertEqual(states["user_goal"]["type"], "text")
+        self.assertEqual(states["page_context"]["type"], "markdown")
+        self.assertEqual(states["page_operation_context"]["type"], "json")
+        self.assertEqual(states["conversation_history"]["type"], "markdown")
+        self.assertEqual(states["goal_plan"]["type"], "json")
+        self.assertEqual(states["operation_request_id"]["binding"]["fieldKey"], "operation_request_id")
+        self.assertEqual(states["operation_report"]["type"], "json")
+
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "input"],
+            [
+                "input_user_goal",
+                "input_page_context",
+                "input_page_operation_context",
+                "input_conversation_history",
+            ],
+        )
+        self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "subgraph"], ["operation_loop"])
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
+            ["output_final_reply", "output_operation_report"],
+        )
+        self.assertEqual(_read_contracts(nodes["output_final_reply"]["reads"]), [{"state": "final_reply", "required": True}])
+        self.assertEqual(_read_contracts(nodes["output_operation_report"]["reads"]), [{"state": "operation_report", "required": False}])
+        self.assertIn({"source": "classify_goal", "target": "operation_loop"}, template["edges"])
+        self.assertIn({"source": "operation_loop", "target": "draft_final_reply"}, template["edges"])
+
+        loop_graph = nodes["operation_loop"]["config"]["graph"]
+        self.assertEqual(loop_graph["metadata"]["role"], "page_operation_loop")
+        self.assertEqual(loop_graph["metadata"]["interrupt_after"], ["execute_page_operation"])
+        self.assertEqual(
+            loop_graph["conditional_edges"],
+            [
+                {
+                    "source": "continue_operation_loop",
+                    "branches": {
+                        "true": "plan_next_operation",
+                        "false": "output_goal_review",
+                        "exhausted": "output_goal_review",
+                    },
+                }
+            ],
+        )
+        self.assertEqual(loop_graph["nodes"]["continue_operation_loop"]["config"]["loopLimit"], 6)
+        self.assertEqual(
+            loop_graph["nodes"]["continue_operation_loop"]["config"]["rule"],
+            {"source": "$state.goal_review.needs_more_operations", "operator": "==", "value": True},
+        )
+
+        operator_node = loop_graph["nodes"]["execute_page_operation"]
+        self.assertEqual(operator_node["kind"], "agent")
+        self.assertEqual(operator_node["config"]["skillKey"], "toograph_page_operator")
+        self.assertEqual(
+            operator_node["config"]["skillBindings"],
+            [
+                {
+                    "skillKey": "toograph_page_operator",
+                    "outputMapping": {
+                        "ok": "operation_ok",
+                        "operation_request_id": "operation_request_id",
+                        "journal": "operation_journal",
+                        "error": "operation_error",
+                    },
+                }
+            ],
+        )
+        self.assertNotIn("inputMapping", operator_node["config"]["skillBindings"][0])
+        self.assertEqual(
+            {binding["state"]: binding["mode"] for binding in operator_node["writes"]},
+            {
+                "operation_ok": "replace",
+                "operation_request_id": "replace",
+                "operation_journal": "replace",
+                "operation_error": "replace",
+            },
+        )
+        self.assertIn("只调用一次 toograph_page_operator", operator_node["config"]["taskInstruction"])
+        verifier_node = loop_graph["nodes"]["verify_goal_against_refreshed_context"]
+        self.assertIn("goal_completed", verifier_node["config"]["taskInstruction"])
+        self.assertIn("triggered_run_status", verifier_node["config"]["taskInstruction"])
+        self.assertIn({"state": "operation_report", "mode": "replace"}, verifier_node["writes"])
+
+    def test_toograph_page_operation_workflow_is_runtime_compatible(self) -> None:
+        template = next(
+            record
+            for record in _official_template_records()
+            if record["template_id"] == "toograph_page_operation_workflow"
+        )
+        payload = {
+            key: value
+            for key, value in template.items()
+            if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+        }
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                **payload,
+                "graph_id": "test_toograph_page_operation_workflow",
+                "name": template["default_graph_name"],
+            }
+        )
+
+        validation = validate_graph(graph)
+        self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+        self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+        loop_graph = NodeSystemGraphPayload.model_validate(
+            {
+                **template["nodes"]["operation_loop"]["config"]["graph"],
+                "graph_id": "test_toograph_page_operation_loop",
+                "name": "页面操作循环",
+            }
+        )
+        cycle_tracker = build_langgraph_cycle_tracker(loop_graph, build_execution_edges(loop_graph))
+        self.assertTrue(cycle_tracker["has_cycle"])
+        self.assertEqual(cycle_tracker["loop_limits_by_source"], {"continue_operation_loop": 6})
 
     def test_buddy_autonomous_review_template_contract(self) -> None:
         template = load_template_record("buddy_autonomous_review")
