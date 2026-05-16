@@ -180,6 +180,7 @@ Current editor capabilities reflected in code:
 - Python export/import UI wiring
 - human review panel plumbing in the editor workspace
 - Buddy floating-window graph run flow and pause-card integration
+- Buddy app-native virtual cursor/keyboard playback for graph edit replay
 
 ### Frontend Tests
 
@@ -318,6 +319,16 @@ Current official templates live in `graph_template/official/<template_id>/templa
 - `buddy_autonomous_loop`
 - `toograph_skill_creation_workflow`
 - `buddy_autonomous_review` - internal background Buddy autonomous review and Buddy Home writeback template, not a normal user-facing template entry
+
+Current official Skill packages live in `skill/official/<skill_key>/`:
+
+- `web_search`
+- `toograph_capability_selector`
+- `toograph_page_operator`
+- `toograph_skill_builder`
+- `toograph_script_tester`
+- `local_workspace_executor`
+- `buddy_home_writer` - internal Buddy Home command/revision writer
 
 ## Working Expectations For Agents
 

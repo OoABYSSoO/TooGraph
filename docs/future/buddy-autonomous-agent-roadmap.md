@@ -74,9 +74,8 @@
 
 仍然存在的关键缺口：
 
-- 第一阶段可见运行闭环已完成：低层 `activity_events` 覆盖 Skill 调用、能力选择审计、权限暂停、动态子图调用、本地文件读取/列表/搜索/写入/脚本、本地文件夹输入上下文读取、脚本测试、`web_search` 下载、图补丁草案和 Buddy Home 写回；运行详情已能聚合父图、子图、低层活动、artifact badge 和权限暂停。
-- Buddy Home 自主写回阶段已完成：显式后台模板、受控 writer Skill、command、revision、activity event、运行详情展示和 Buddy Home 历史前后值/来源 run 展示已经落地；Buddy 页面 History 已支持 profile、policy、memory、session summary、run template binding、report 和 capability usage stats 的筛选、字段级紧凑 diff、来源 run/command 和 revision 恢复。
-- 伙伴原生虚拟 UI 操作流仍缺结构化页面快照、affordance registry、虚拟鼠标/键盘驱动、操作日志、图变更 diff、graph revision、undo/redo 和完整审计；历史 `graph_patch.draft` stub 不能视为完成方案。
+- 伙伴原生虚拟 UI 操作已启动：基础页面操作书、`toograph_page_operator`、虚拟鼠标/键盘、Graph Edit Playback、编辑器调试入口和目标图回放搭建已经落地。后续重点是统一 operation journal / activity events、图变更 diff、graph revision、undo/redo、失败重试、运行结果归因和编辑已有图。
+- 历史 `graph_patch.draft` stub 不能视为完成方案；图编辑应继续沿当前应用内虚拟操作链路接入验证、审计、revision 和恢复机制。
 - 子图运行详情后续仍可增强从图预览或缩略图跳转内部节点，但父子运行链路、`subgraph_path` 定位和动态子图断点定位已经进入标准运行详情和确认卡片路径。
 - 上下文预算、结果包摘要、大 artifact 按需展开和只读 fanout 并行仍未完成；当前只完成了节点/output 耗时和可用 token 用量展示这类遥测基础。
 - 内部协议仍使用 `agent` kind 表示 LLM 节点，用户心智已收束为 LLM 节点；后续应迁移命名但不能引入第二套协议。
@@ -750,7 +749,7 @@ LLM 目标图编辑意图
   -> graph diff / revision / undo / activity journal
 ```
 
-当前已落地的阶段一链路是：页面操作书在编辑器页暴露 `graph_edit editor.graph.playback`；`toograph_page_operator` 接受 `graph_edit_intents`；Buddy 虚拟操作协议解析 `graph_edit` operation；虚拟鼠标定位到 `editor.canvas.surface` 后，通过前端 `toograph:graph-edit-playback-plan-request` 和 `toograph:graph-edit-playback-apply-command` 事件驱动 `EditorWorkspaceShell` 编译并逐命令应用图编辑。后续仍应把 UI playback steps 的菜单展开、字段聚焦、逐字键入、连线拖拽和图变更审计做得更完整。
+当前已落地的基础链路是：页面操作书在编辑器页暴露 `graph_edit editor.graph.playback`；`toograph_page_operator` 接受 `graph_edit_intents`；Buddy 虚拟操作协议解析 `graph_edit` operation；虚拟鼠标定位到 `editor.canvas.surface` 后，通过前端 `toograph:graph-edit-playback-*` 事件驱动 `EditorWorkspaceShell` 编译 playback steps，并沿编辑器已有交互路径可见地展开菜单、创建节点、逐字键入、按目标位置落点、拖拽连线和跳过已存在的重命名或连线。编辑器“新建图”子菜单里的可见调试板支持粘贴 JSON 或导入 Python 图后回放搭建。后续仍应把 operation journal、activity events、graph diff、revision、undo/redo、失败重试和编辑已有图做完整。
 
 ### Skill 生命周期边界
 
@@ -1022,9 +1021,11 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 - condition 回边控制补搜，`exhausted` 用已有证据收束。
 - 模板只公开 `final_reply`。
 
-## 阶段性任务
+## 后续阶段性任务
 
-这些阶段不是一次性大重构计划，而是长期目标的交付顺序。每个阶段都可以继续拆成小提交；后续阶段不能通过绕开前一阶段的协议、权限和审计约束来提速。
+本节只保留未来工作。已经落地的可见运行闭环、Buddy Home 写回、HTML state 输出和页面操作系统基础事实，统一折叠进 `docs/current_project_status.md`。
+
+这些阶段不是一次性大重构计划，而是长期目标的交付顺序。每个阶段都可以继续拆成小提交；后续阶段不能通过绕开已有协议、权限和审计约束来提速。
 
 小目标粒度规则：
 
@@ -1033,77 +1034,27 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 - 小目标也不能大到横跨多个互相独立的子系统；如果需要同时改运行时、模板、前端和存储，应优先拆成多个小目标。
 - 每次提交信息应能直接对应下面一个小目标；完成后在本文或 `docs/current_project_status.md` 中更新状态。
 
-### 阶段 1：可见运行闭环和审计补全
-
-目标：让每一次伙伴可见运行都能被用户理解、暂停、恢复、拒绝、取消和回看。
-
-状态：已完成。后续只接受围绕可见运行链路的修正和回归修复，不再新增阶段 1 的主目标。
-
-小目标：
-
-1. [已完成] 文件列表/搜索活动事件：`local_workspace_executor` 已支持图内 `list` 和 `search` 操作，并返回 `file_list` / `file_search` 低层 `activity_events`，记录 path、query、结果数量、跳过项和失败原因；通用 run capsule 和运行详情可回放这些事件。
-2. [已完成] 澄清暂停协议核验：`buddy_turn_intake` 的澄清等待由 `interrupt_after=["ask_clarification"]`、`pending_subgraph_breakpoint`、resume payload 和标准 `awaiting_human` 表达；已补充历史 pause snapshot 恢复时保留 pending 子图协议、悬浮窗刷新后按 run metadata 还原澄清卡片、取消清理 pending metadata、权限拒绝走 resume payload 的测试覆盖，不再依赖缺必填 state 报错来驱动澄清暂停。
-3. [已完成] 暂停期间队列策略：新增共享 `buddyPauseQueuePolicy`，明确全局输入框在存在 paused run 时只定位到当前暂停卡，补充当前断点必须走暂停卡的 `supplement` 模式，开启新用户回合必须先完成或取消当前暂停；队列 drain 遇到 paused run 会保持剩余回合不继续执行，悬浮窗和全局 Buddy 入口使用同一套状态转换。
-4. [已完成] 伙伴页面确认视图：已抽出共享 `BuddyPauseCard` 作为标准暂停卡片，悬浮窗和 Buddy 页面都通过它处理确认继续、权限拒绝、取消、补充输入和恢复；Buddy 页面新增“确认”页签，加载 `awaiting_human` 的伙伴运行并通过 `resumeRun` / `cancelRun` 走统一 run 协议，不复制第二套确认 UI 状态机。
-5. [已完成] 父子图运行详情聚合：运行详情页已通过统一 timeline model 展开父图节点、静态/动态子图节点、低层 `activity_events` 和权限暂停项，按时间排序并保留 `subgraph_path` / 内部节点路径，用户可以从同一条时间线回看父子图执行链路。
-6. [已完成] 能力选择审计摘要：`toograph_capability_selector` 已返回 `audit` 输出并记录 `capability_selection` 低层活动事件，包含候选能力数量、按类型计数、选中能力、选择原因、被拒绝候选简短原因、选中权限摘要、缺口说明和 catalog 读取错误；`buddy_autonomous_loop` 已把该输出映射到 `capability_selection_audit` state 并提供输出节点，运行详情可回看 Buddy 为什么用了某个 Skill 或 Subgraph。
-7. [已完成] 父图公开输出协议：伙伴聊天窗口只消费父图 root-level output 节点；子图 output 和中间 state 不再直接生成聊天消息。每个 output 独立流式、独立计时，计时从上游节点开始运行时启动，并在对应 state 到达时结束。
-8. [已完成] 节点运行遥测：后端持久化 `node_executions`，前端通过共享 `runTelemetryProjection` 驱动画布节点计时胶囊、公开 output 耗时、运行恢复计时还原和可用模型 token 用量显示。
-9. [已完成] 伙伴运行模板绑定：伙伴页面新增运行模板绑定页签，可选择可见模板，并把当前消息、对话历史、页面上下文和 Buddy Home 上下文绑定到 input 节点；默认绑定指向 `buddy_autonomous_loop`，权限模式只保留为运行 metadata。
-10. [已完成] 运行胶囊持久化：伙伴运行过程胶囊按父图公开输出分组生成，并作为 `metadata.kind=output_trace` 的助手消息保存到 `buddy_messages.metadata_json`；刷新、切换历史会话或恢复运行记录后能还原胶囊，同时不进入 LLM 上下文。
-
-完成口径：
-
-- 每组父图公开输出前都有配对 run capsule，能展示过程回应、能力调用、权限暂停、错误和低层活动摘要。
-- 运行刷新、重新打开会话、拒绝、取消和断点续跑都走同一套 run 协议，不依赖前端临时状态。
-- 运行详情能解释“做了什么、为什么暂停、用了什么能力、产出了什么 artifact”。
-
-### 阶段 2：受控 Buddy Home 写回
-
-目标：把后台复盘产出的记忆、人设、偏好和策略更新，从“计划”推进到模型自主判断、低风险自动写入、用户可见历史和可恢复版本。
-
-状态：已完成。后续只接受围绕 Buddy Home 写回链路的修正和回归修复，不再新增阶段 2 的主目标；下一步进入阶段 3 的图补丁草案协议。
-
-小目标：
-
-1. [已完成] 自主复盘模板：`buddy_autonomous_review` 已替代旧后台复盘模板，显示名为“自主复盘”，从可见 run snapshot 读取上下文，模型自行判断 `autonomous_review.should_write` 并产出 `writeback_commands`。
-2. [已完成] Buddy Home writer Skill：`buddy_home_writer` 已新增为内部官方 Skill，只通过 Buddy command/store 写入，返回 applied/skipped commands、revision 列表和 `buddy_home_write` activity event，并拒绝 `graph_permission_mode` 等权限边界修改。
-3. [已完成] Buddy Home revision 存储：Buddy profile、policy、memory、session summary 的 command / revision / restore 基础路径已存在，writer 写回会复用该路径。
-4. [已完成] 写回结果展示：`buddy_home_write` activity event 会携带 applied/skipped/revision 明细；run capsule、运行详情和 Buddy Home 历史页能展示写回摘要、前后值、revision、来源 run / command、跳过原因和失败原因。
-5. [已完成] 基础版本切换体验：Buddy 页面 History 已支持按目标筛选、字段级紧凑 diff、来源 run/command 展示和 revision 恢复。后续如果继续优化，应集中在批量比较、预览恢复影响和更清晰的恢复确认文案。
-6. [已完成] 写回范围扩展：`buddy_home_writer` 已将自主 `policy.update` 收紧到 `communication_preferences`，并新增 `report.create` 与 `capability_usage_stats.update`；报告写入 `buddy_home/reports/`，能力统计写入 `buddy_kv.capability_usage_stats` 并进入 Buddy Home context pack，二者都走 command / revision / restore 路径，也进入 Buddy 页面 History 筛选。
-
-完成口径：
-
-- `buddy_autonomous_review` 能完成模型自主判断和低风险自动写回。
-- 每次 Buddy Home 修改都有 command、revision、回滚线索和 run activity。
-- 用户不需要确认是否写入，但能看到历史、理解来源，并恢复到旧版本。
-
 ### 阶段 3：图编辑、模板生成和能力演进
 
 目标：让伙伴通过 App-Native Virtual Operator 像人一样在 TooGraph 页面中搭建和编辑图，同时保留结构化页面理解、操作审计、图变更 diff、revision、undo/redo 和能力演进闭环。
 
-状态：待开始。阶段 2 已完成，阶段 3 不再以外部 MCP、系统鼠标、视觉识别或历史 `graph_patch.draft` stub 为起点；优先建立 TooGraph 内建虚拟 UI 操作流。
+状态：进行中。基础页面操作书、`toograph_page_operator`、可见虚拟鼠标/键盘、Graph Edit Playback、编辑器可见调试入口和目标图回放搭建已经落地；后续不以外部 MCP、系统鼠标、视觉识别或历史 `graph_patch.draft` stub 为起点。
 
 小目标：
 
-1. 结构化页面快照：为图编辑页输出 `page_context_snapshot`，包含当前图、画布视口、选区、运行状态、虚拟鼠标、伙伴形象位置和可操作 affordances；该快照供伙伴理解页面，不依赖截图或视觉模型。
-2. Affordance Registry：为画布、工具栏、节点创建入口、节点卡片、端口、连线目标、保存和运行入口注册稳定 affordance，并把伙伴形象、伙伴浮窗和伙伴页面标记为 forbidden 或从伙伴可操作集合中排除。
-3. 虚拟鼠标/键盘展示层：实现伙伴自己的虚拟指针、点击态、拖拽轨迹、逐字键入、焦点提示和失败状态；虚拟指针不移动系统鼠标。伙伴形象按距离阈值自动靠近或跟随虚拟指针，但该移动只是展示行为。
-4. Virtual Input Driver：支持 `click`、`type`、`drag`、`wait_for`、`cancel` 等最小操作集合。每个操作根据 affordance bounds 播放动画，调用 editor action adapter，返回 before/after、状态变化和错误。
-5. 空白画布搭建 MVP：伙伴能在空白画布上通过虚拟操作创建 input、LLM、condition、output 等基础节点，拖拽节点到合理位置，从端口拖拽连线，补齐必要配置，然后自己点击运行。能成功进入 run 并看到运行状态即视为第一步成功。
-6. Operation Journal 和 activity events：记录每次点击、键入、拖拽、等待、失败和重试；图变更附带 nodes/edges/config/state_schema diff、validator 结果、run id 或错误。运行详情和伙伴胶囊都能回放这些操作摘要。
-7. Graph revision 和 undo/redo：对由虚拟 UI 操作导致的持久图变更建立 revision 和 undo/redo 记录。操作路径可以像人类一样通过 UI 触发，但最终 graph 资产必须可校验、可审计、可恢复。
-8. 编辑已有图：支持选择节点、移动节点、重命名、编辑关键配置、选择 Skill、调整连接、删除或恢复节点，并在每步后更新结构化快照和操作日志。
-9. 运行和结果校验：伙伴能点击运行，等待 run 状态，读取结构化 run capsule / activity events 判断是否成功；失败时能基于错误和 affordance 快照继续修复，而不是看截图猜测。
-10. 快速生成与可见搭建并存：保留直接生成完整 graph JSON 的快速路径；当用户要求可见协作或正在编辑当前画布时，优先通过 virtual_ui_operation 表演搭建和编辑。
-11. 创建模板/子图流程：从用户目标生成新模板或可复用子图，校验公开输入输出，可选试跑；可通过快速生成保存，也可通过可见搭建展示过程。
-12. 能力缺口到创建流程：当能力选择发现缺口时，把缺口转成可审查的 Skill、模板或子图创建候选，而不是只在最终回复中给文字建议。
-13. Skill 创建工作流巩固：保持 `toograph_skill_creation_workflow` 的澄清、示例确认、文件生成、脚本测试、审查、审批和受控写入闭环。
+1. Operation Journal 和 activity events：记录每次点击、键入、拖拽、等待、停止、失败和重试；图变更附带 nodes/edges/config/state_schema diff、validator 结果、run id 或错误。运行详情和伙伴胶囊都能回放这些操作摘要。
+2. Graph revision 和 undo/redo：对由虚拟 UI 操作导致的持久图变更建立 revision 和 undo/redo 记录。操作路径可以像人类一样通过 UI 触发，但最终 graph 资产必须可校验、可审计、可恢复。
+3. 编辑已有图：支持选择节点、移动节点、重命名、编辑关键配置、选择 Skill、调整连接、删除或恢复节点，并在每步后更新结构化快照和操作日志。
+4. 运行和结果校验：伙伴能点击运行，等待 run 状态，读取结构化 run capsule / activity events 判断是否成功；失败时能基于错误和 affordance 快照继续修复，而不是看截图猜测。
+5. 页面上下文扩展：把当前编辑器页的 page context snapshot 和 affordance registry 扩展到技能页、运行历史、模型日志、模板库等页面，让 Buddy 能从 A 页面判断应先前往 B 页面再找目标内容。
+6. 快速生成与可见搭建并存：保留直接生成完整 graph JSON 的快速路径；当用户要求可见协作或正在编辑当前画布时，优先通过 virtual_ui_operation 表演搭建和编辑。
+7. 创建模板/子图流程：从用户目标生成新模板或可复用子图，校验公开输入输出，可选试跑；可通过快速生成保存，也可通过可见搭建展示过程。
+8. 能力缺口到创建流程：当能力选择发现缺口时，把缺口转成可审查的 Skill、模板或子图创建候选，而不是只在最终回复中给文字建议。
+9. Skill 创建工作流巩固：保持 `toograph_skill_creation_workflow` 的澄清、示例确认、文件生成、脚本测试、审查、审批和受控写入闭环，并让新能力被能力选择器发现。
 
 完成口径：
 
-- 第一阶段成功口径：伙伴在空白画布上可见地创建节点、拖拽布局、连线、补齐配置并点击运行，运行进入有效状态；用户能在审计中看到每次点击、键入、拖拽和对应图变化。
+- 当前阶段成功口径：伙伴能在空白画布或已有图上可见地搭建、编辑、运行和修复；用户能在审计中看到每次点击、键入、拖拽、停止、失败重试和对应图变化。
 - 成熟口径：伙伴编辑图时像人一样操作 TooGraph 页面，但底层不依赖系统鼠标、截图视觉、裸 DOM selector 或外部浏览器自动化；所有操作都有 journal、activity event、graph diff、revision 和 undo/redo。
 - 伙伴不能操作自己的形象、伙伴浮窗或伙伴页面；形象跟随虚拟鼠标只属于展示层距离管理。
 - 新模板和新 Skill 能被能力选择发现，并保留来源、测试和审批记录。
@@ -1117,7 +1068,7 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 
 1. 上下文预算策略：为历史、Buddy Home 文件、`result_package`、大日志和大 artifact 定义预算与摘要规则，避免直接把超大内容塞进 LLM prompt。
 2. 结果包展开预算：调整下游 prompt assembly 和运行详情展示，让 `result_package` 能按类型、大小和重要性展开或摘要。
-3. [部分完成] 模型与能力耗时统计：节点执行耗时、公开 output 耗时和可用模型 token 用量已经进入画布、伙伴输出和运行恢复路径；仍需补齐 Skill/Subgraph 细粒度耗时、artifact 大小、结果体积和运行详情聚合分析。
+3. 模型与能力统计增强：补齐 Skill/Subgraph 细粒度耗时、artifact 大小、结果体积和运行详情聚合分析。
 4. 运行详情按需展开：大日志、大文件和长 activity detail 默认摘要展示，用户需要时再打开完整 artifact 或详情。
 5. 固定 fanout 只读并行试点：先支持图中明确 fanout 的只读子图并行运行，保留每个分支独立 state、artifact、activity 和错误归属。
 6. 并行安全边界：明确写文件、图修改、Buddy Home 写回、脚本执行和权限审批不能被默认并行化；需要显式图结构和审批顺序。

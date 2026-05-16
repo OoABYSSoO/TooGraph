@@ -12,6 +12,7 @@ TooGraph 当前适合做这些事情：
 - 把知识库通过 input 节点接给 LLM 节点；检索能力不再隐式内置，需要通过显式 Skill 接入。
 - 使用 `web_search` Skill 做联网搜索、网页正文抓取和本地 source document 输出。
 - 使用 `toograph_capability_selector` 在 Buddy 或模板内选择一个启用的 Skill 或图模板能力。
+- 使用 `toograph_page_operator` 通过结构化页面操作书发起普通页面 click，或在编辑器中用 `graph_edit editor.graph.playback` 可见回放目标图搭建。
 - 使用 `toograph_skill_builder`、`toograph_script_tester` 和 `local_workspace_executor` 组成用户自定义 Skill 创建流程。
 - 用 output 节点实时预览 state，并展示本地 artifact 路径指向的文档、图片和视频。
 - 在 Run Detail 里查看节点执行结果、技能输出、状态快照、输出产物、warnings 和 errors。
@@ -29,10 +30,9 @@ TooGraph 当前适合做这些事情：
 
 当前仍在推进的能力主要是：
 
-- 动态能力低层审批：声明 `file_write`、删除类权限或 `subprocess` 的 Skill 会按图或 Buddy 权限模式进入标准 `awaiting_human` 或自动放行。
-- Buddy 暂停交互剩余项：拒绝、取消、刷新后找回、暂停期间队列策略和伙伴页面确认视图。
-- Buddy Home 写回流程：把记忆、会话摘要、用户资料、人设调整、能力使用统计和自我复盘报告表达为显式模板、受控 Skill、command 和 revision。
-- 子图运行详情：父子图事件聚合、动态子图断点定位、scope path 展示和从缩略图跳到内部节点。
-- 低层 `activity_events`：文件读取、搜索、命令执行、脚本测试、写入、下载、图编辑和 Skill/subgraph 执行的程序化摘要。
-- 图编辑命令流：图补丁预览、GraphCommandBus、graph revision、undo/redo 和完整审计闭环。
+- Buddy 原生虚拟 UI 操作：补齐 operation journal、activity events、graph diff、revision、undo/redo、失败重试和运行结果归因。
+- 编辑已有图：选择、移动、重命名、改配置、选 Skill、调整连接、删除、恢复、运行和基于错误继续修复。
+- 页面操作书扩展：覆盖技能页、运行历史、模型日志、模板库等页面，让 Buddy 可以跨页面导航后再操作目标内容。
+- 子图运行详情：继续增强从缩略图跳到内部节点、动态子图断点定位和 scope path 展示。
+- 低层 `activity_events`：继续扩展伙伴虚拟 UI 操作、图变更、运行点击和结果归因的程序化摘要。
 - 内部 `agent` kind 命名向 LLM 节点语义迁移。
