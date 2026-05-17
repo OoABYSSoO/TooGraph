@@ -893,7 +893,7 @@ test("BuddyWidget does not surface paused runs as an in-chat action card", () =>
   assert.match(componentSource, /void persistBuddyMessage\(sessionId,[\s\S]*runId:\s*run\.run_id,[\s\S]*includeInContext:\s*false/);
 });
 
-test("BuddyWidget persists awaiting-human paused run placeholders outside model context", () => {
+test("BuddyWidget persists only conversational awaiting-human pauses outside model context", () => {
   assert.match(componentSource, /type BuddyPauseHandlingOptions = \{[\s\S]*persist\?: boolean;[\s\S]*\};/);
   assert.match(componentSource, /handleBuddyRunAwaitingHuman\(runDetail,\s*assistantMessage\.id,\s*\{ persist: true \}\)/);
   assert.match(componentSource, /handleBuddyRunAwaitingHuman\(resumedRunDetail,\s*assistantMessageId,\s*\{ persist: true \}\)/);
@@ -903,7 +903,7 @@ test("BuddyWidget persists awaiting-human paused run placeholders outside model 
   );
   assert.match(
     componentSource,
-    /if \(options\.persist && activeSessionId\.value\) \{[\s\S]*persistBuddyMessage\(activeSessionId\.value,[\s\S]*runId:\s*run\.run_id,[\s\S]*includeInContext:\s*!isAutoResumablePageOperationPause/,
+    /if \(options\.persist && activeSessionId\.value && !isAutoResumablePageOperationPause\) \{[\s\S]*persistBuddyMessage\(activeSessionId\.value,[\s\S]*runId:\s*run\.run_id,[\s\S]*includeInContext:\s*!isAutoResumablePageOperationPause/,
   );
 });
 
@@ -915,8 +915,9 @@ test("BuddyWidget finishes auto-resumed page-operation runs back into the chat r
   assert.match(componentSource, /async function finishAutoResumedPageOperationRun\(/);
   assert.match(
     componentSource,
-    /startRunEventStream\(runId,\s*assistantMessageId,\s*graph,\s*buildBuddyPublicOutputBindings\(graph\)\);[\s\S]*const resumedRunDetail = await pollRunUntilFinished\(runId,\s*controller\.signal\);[\s\S]*finishBuddyVisibleRun\(resumedRunDetail,\s*assistantMessageId,\s*sessionId,\s*runId\);/,
+    /startRunEventStream\(runId,\s*assistantMessageId,\s*graph,\s*buildBuddyPublicOutputBindings\(graph\)\);[\s\S]*const resumedRunDetail = await pollRunUntilFinished\(runId,\s*controller\.signal\);[\s\S]*clearAutoResumingPageOperationPlaceholder\(assistantMessageId,\s*runId\);[\s\S]*finishBuddyVisibleRun\(resumedRunDetail,\s*assistantMessageId,\s*sessionId,\s*runId\);/,
   );
+  assert.match(componentSource, /function clearAutoResumingPageOperationPlaceholder\(assistantMessageId: string, runId: string\)/);
 });
 
 test("BuddyWidget recovers awaiting-human paused runs after session activation", () => {

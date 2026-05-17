@@ -4247,6 +4247,7 @@ async function finishAutoResumedPageOperationRun({
       handleBuddyRunAwaitingHuman(resumedRunDetail, assistantMessageId, { persist: true });
       return;
     }
+    clearAutoResumingPageOperationPlaceholder(assistantMessageId, runId);
     finishBuddyVisibleRun(resumedRunDetail, assistantMessageId, sessionId, runId);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
@@ -4275,6 +4276,17 @@ async function finishAutoResumedPageOperationRun({
     scheduleBuddySpeakingIdleIfNeeded();
     await scrollMessagesToBottom();
   }
+}
+
+function clearAutoResumingPageOperationPlaceholder(assistantMessageId: string, runId: string) {
+  const message = messages.value.find((entry) => entry.id === assistantMessageId);
+  if (!message || message.content.trim() !== t("buddy.pause.autoResumingPageOperation")) {
+    return;
+  }
+  updateAssistantMessage(assistantMessageId, "", {
+    includeInContext: false,
+    runId,
+  });
 }
 
 async function cancelPausedBuddyRun() {
@@ -4340,7 +4352,7 @@ function handleBuddyRunAwaitingHuman(
     includeInContext: !isAutoResumablePageOperationPause,
     runId: run.run_id,
   });
-  if (options.persist && activeSessionId.value) {
+  if (options.persist && activeSessionId.value && !isAutoResumablePageOperationPause) {
     void persistBuddyMessage(activeSessionId.value, messages.value.find((message) => message.id === assistantMessageId), {
       runId: run.run_id,
       includeInContext: !isAutoResumablePageOperationPause,
