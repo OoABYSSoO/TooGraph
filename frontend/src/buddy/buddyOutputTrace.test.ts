@@ -324,6 +324,81 @@ test("buildBuddyOutputTraceStateFromRunDetail rebuilds completed segments from r
   assert.deepEqual(segments[1].records.map((record) => record.label), ["C", "C / toograph_script_tester"]);
 });
 
+test("buildBuddyOutputTraceStateFromRunDetail hides abandoned output branches after a terminal run", () => {
+  const graph = fiveNodeGraph();
+  graph.edges = [
+    { source: "node_a", target: "node_b" },
+    { source: "node_b", target: "output_b1" },
+    { source: "node_a", target: "node_c" },
+    { source: "node_c", target: "node_e" },
+    { source: "node_e", target: "output_e1" },
+  ];
+  const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));
+  const run = {
+    status: "completed",
+    node_executions: [
+      {
+        node_id: "node_a",
+        node_type: "agent",
+        status: "success",
+        started_at: "2026-05-13T10:00:00.000Z",
+        finished_at: "2026-05-13T10:00:00.300Z",
+        duration_ms: 300,
+        input_summary: "",
+        output_summary: "",
+        artifacts: { inputs: {}, outputs: {}, family: "agent", state_reads: [], state_writes: [] },
+        warnings: [],
+        errors: [],
+      },
+      {
+        node_id: "node_c",
+        node_type: "agent",
+        status: "success",
+        started_at: "2026-05-13T10:00:00.400Z",
+        finished_at: "2026-05-13T10:00:00.900Z",
+        duration_ms: 500,
+        input_summary: "",
+        output_summary: "",
+        artifacts: { inputs: {}, outputs: {}, family: "agent", state_reads: [], state_writes: [] },
+        warnings: [],
+        errors: [],
+      },
+      {
+        node_id: "node_e",
+        node_type: "agent",
+        status: "success",
+        started_at: "2026-05-13T10:00:01.000Z",
+        finished_at: "2026-05-13T10:00:01.200Z",
+        duration_ms: 200,
+        input_summary: "",
+        output_summary: "",
+        artifacts: { inputs: {}, outputs: {}, family: "agent", state_reads: [], state_writes: [] },
+        warnings: [],
+        errors: [],
+      },
+    ],
+    output_previews: [
+      {
+        node_id: "output_e1",
+        source_kind: "state",
+        source_key: "state_e1",
+        display_mode: "markdown",
+        persist_enabled: false,
+        persist_format: "auto",
+        value: "final answer",
+      },
+    ],
+    artifacts: {},
+  } as Partial<RunDetail> as RunDetail;
+
+  const state = buildBuddyOutputTraceStateFromRunDetail(run, plan, graph);
+  const segments = listBuddyOutputTraceSegmentsForDisplay(state);
+
+  assert.equal(segments.length, 1);
+  assert.equal(segments[0].segmentId, "boundary:node_e");
+  assert.deepEqual(segments[0].records.map((record) => record.label), ["C", "E"]);
+});
+
 test("buildBuddyOutputTraceStateFromRunDetail keeps in-progress executions running", () => {
   const graph = fiveNodeGraph();
   const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));

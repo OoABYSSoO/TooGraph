@@ -910,13 +910,20 @@ test("BuddyWidget persists only conversational awaiting-human pauses outside mod
 test("BuddyWidget finishes auto-resumed page-operation runs back into the chat reply", () => {
   assert.match(
     componentSource,
+    /const completedTriggeredRunDetail = await waitForTriggeredRunCompletion\(triggeredRun,[\s\S]*\);[\s\S]*triggeredRunDetail = completedTriggeredRunDetail;[\s\S]*if \(completedTriggeredRunDetail\) \{[\s\S]*promoteBackgroundTemplateRunResultToBuddyReply\(operationPlan,\s*completedTriggeredRunDetail,\s*execution\.graph\);[\s\S]*\}[\s\S]*status = isVirtualOperationInterrupted\(token\) \? "interrupted" : "succeeded";/,
+  );
+  assert.match(componentSource, /function promoteBackgroundTemplateRunResultToBuddyReply\(/);
+  assert.match(componentSource, /function findPrimaryCompletedTextPublicOutput\(/);
+  assert.match(
+    componentSource,
     /const assistantMessageId = resolveBuddyRunControllerMessageId\(operationPlan\.runId\);[\s\S]*const sessionId = activeSessionId\.value;[\s\S]*resetPausedBuddyPause\(\);[\s\S]*await finishAutoResumedPageOperationRun\(\{[\s\S]*runId:\s*response\.run_id,[\s\S]*assistantMessageId,[\s\S]*sessionId,[\s\S]*graph:[\s\S]*runDetail\.graph_snapshot/,
   );
   assert.match(componentSource, /async function finishAutoResumedPageOperationRun\(/);
   assert.match(
     componentSource,
-    /startRunEventStream\(runId,\s*assistantMessageId,\s*graph,\s*buildBuddyPublicOutputBindings\(graph\)\);[\s\S]*const resumedRunDetail = await pollRunUntilFinished\(runId,\s*controller\.signal\);[\s\S]*clearAutoResumingPageOperationPlaceholder\(assistantMessageId,\s*runId\);[\s\S]*finishBuddyVisibleRun\(resumedRunDetail,\s*assistantMessageId,\s*sessionId,\s*runId\);/,
+    /const resumedRunDetail = await pollRunUntilFinished\(runId,\s*controller\.signal\);[\s\S]*clearAutoResumingPageOperationPlaceholder\(assistantMessageId,\s*runId\);[\s\S]*finishBuddyVisibleRun\(resumedRunDetail,\s*assistantMessageId,\s*sessionId,\s*runId,\s*\{ includeOutputTrace: false \}\);/,
   );
+  assert.doesNotMatch(extractSourceBetween("async function finishAutoResumedPageOperationRun(", "function clearAutoResumingPageOperationPlaceholder"), /startRunEventStream/);
   assert.match(componentSource, /function clearAutoResumingPageOperationPlaceholder\(assistantMessageId: string, runId: string\)/);
 });
 

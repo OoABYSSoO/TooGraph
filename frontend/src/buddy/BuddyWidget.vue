@@ -669,6 +669,9 @@ type BuddyAutoResumedPageOperationFinishOptions = {
   sessionId: string;
   graph: GraphPayload;
 };
+type BuddyFinishVisibleRunOptions = {
+  includeOutputTrace?: boolean;
+};
 
 const BUDDY_HISTORY_STORAGE_KEY = "toograph:buddy-history";
 const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "toograph:buddy-active-session";
@@ -688,6 +691,8 @@ const BUDDY_ROAM_TARGET_MIN_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
 const BUDDY_ROAM_TARGET_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 3;
 const BUDDY_ROAM_TARGET_REACHED_DISTANCE_PX = 1;
 const BUDDY_VIRTUAL_CURSOR_SIZE = { width: 42, height: 42 };
+const BUDDY_CAPABILITY_PASSTHROUGH_OUTPUT_NODE_ID = "output_capability_passthrough";
+const BUDDY_CAPABILITY_PASSTHROUGH_STATE_KEY = "capability_result.final_reply";
 const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_PERIOD_MS = 1600;
 const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX = BUDDY_VIRTUAL_CURSOR_SIZE.width * 0.86;
 const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_Y_RADIUS_PX = BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX * 0.62;
@@ -2402,10 +2407,14 @@ async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequ
         if (isVirtualOperationInterrupted(token)) {
           status = "interrupted";
         } else {
-          triggeredRunDetail = await waitForTriggeredRunCompletion(triggeredRun, {
+          const completedTriggeredRunDetail = await waitForTriggeredRunCompletion(triggeredRun, {
             token,
             onSnapshot: (runDetail) => syncBackgroundTemplateRunDisplay(operationPlan, runDetail, execution.graph),
           });
+          triggeredRunDetail = completedTriggeredRunDetail;
+          if (completedTriggeredRunDetail) {
+            promoteBackgroundTemplateRunResultToBuddyReply(operationPlan, completedTriggeredRunDetail, execution.graph);
+          }
           status = isVirtualOperationInterrupted(token) ? "interrupted" : "succeeded";
         }
       } finally {
@@ -4241,14 +4250,13 @@ async function finishAutoResumedPageOperationRun({
   activeAbortController = controller;
 
   try {
-    startRunEventStream(runId, assistantMessageId, graph, buildBuddyPublicOutputBindings(graph));
     const resumedRunDetail = await pollRunUntilFinished(runId, controller.signal);
     if (resumedRunDetail.status === "awaiting_human") {
       handleBuddyRunAwaitingHuman(resumedRunDetail, assistantMessageId, { persist: true });
       return;
     }
     clearAutoResumingPageOperationPlaceholder(assistantMessageId, runId);
-    finishBuddyVisibleRun(resumedRunDetail, assistantMessageId, sessionId, runId);
+    finishBuddyVisibleRun(resumedRunDetail, assistantMessageId, sessionId, runId, { includeOutputTrace: false });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return;
@@ -4360,11 +4368,19 @@ function handleBuddyRunAwaitingHuman(
   }
 }
 
-function finishBuddyVisibleRun(runDetail: RunDetail, assistantMessageId: string, sessionId: string, runId: string) {
+function finishBuddyVisibleRun(
+  runDetail: RunDetail,
+  assistantMessageId: string,
+  sessionId: string,
+  runId: string,
+  options: BuddyFinishVisibleRunOptions = {},
+) {
   const graph = runDetail.graph_snapshot as unknown as GraphPayload;
   const publicOutputBindings = buildBuddyPublicOutputBindings(graph);
   const outputTracePlan = buildBuddyOutputTracePlan(graph, publicOutputBindings);
-  const outputTraceState = buildBuddyOutputTraceStateFromRunDetail(runDetail, outputTracePlan, graph);
+  const outputTraceState = options.includeOutputTrace === false
+    ? createEmptyBuddyOutputTraceRuntimeState()
+    : buildBuddyOutputTraceStateFromRunDetail(runDetail, outputTracePlan, graph);
   const outputState = buildPublicOutputRuntimeStateFromRunDetail(runDetail, publicOutputBindings, graph);
   const { publicOutputMessages, outputTraceMessages } = syncBuddyRunDisplayMessages(assistantMessageId, runId, outputTraceState, outputState);
   const includeReplyInContext = runDetail.status === "completed";
@@ -5033,11 +5049,90 @@ function syncBackgroundTemplateRunDisplay(
   void scrollMessagesToBottom();
 }
 
+function promoteBackgroundTemplateRunResultToBuddyReply(
+  operationPlan: BuddyVirtualOperationPlan,
+  runDetail: RunDetail,
+  graph: GraphPayload,
+) {
+  if (runDetail.status !== "completed") {
+    return;
+  }
+  const parentRunId = String(operationPlan.runId ?? "").trim();
+  const assistantMessageId = resolveBuddyRunControllerMessageId(parentRunId);
+  if (!parentRunId || !assistantMessageId) {
+    return;
+  }
+  const outputBindings = buildBuddyPublicOutputBindings(graph);
+  const outputState = buildPublicOutputRuntimeStateFromRunDetail(runDetail, outputBindings, graph);
+  const primaryOutput = findPrimaryCompletedTextPublicOutput(outputState);
+  if (!primaryOutput) {
+    return;
+  }
+
+  removeBuddyRunDisplayMessages(buildBackgroundTemplateRunDisplayControllerId(operationPlan, runDetail.run_id));
+  clearAutoResumingPageOperationPlaceholder(assistantMessageId, parentRunId);
+  const promotedOutput = buildPromotedCapabilityPassthroughOutput(primaryOutput);
+  const promotedOutputState = createBuddyPublicOutputRuntimeState();
+  promotedOutputState.order.push(promotedOutput.outputNodeId);
+  promotedOutputState.messagesByOutputNodeId[promotedOutput.outputNodeId] = promotedOutput;
+  const { publicOutputMessages } = syncBuddyRunDisplayMessages(
+    assistantMessageId,
+    parentRunId,
+    createEmptyBuddyOutputTraceRuntimeState(),
+    promotedOutputState,
+  );
+  if (publicOutputMessages.length === 0) {
+    return;
+  }
+  const controllerMessage = messages.value.find((message) => message.id === assistantMessageId);
+  if (controllerMessage) {
+    controllerMessage.activityText = "";
+    controllerMessage.runId = parentRunId;
+    controllerMessage.includeInContext = false;
+  }
+  mood.value = "speaking";
+  void scrollMessagesToBottom();
+}
+
+function findPrimaryCompletedTextPublicOutput(
+  outputState: BuddyPublicOutputRuntimeState,
+): BuddyPublicOutputMessage | null {
+  for (const outputNodeId of outputState.order) {
+    const output = outputState.messagesByOutputNodeId[outputNodeId];
+    if (output?.kind === "text" && output.status === "completed" && stringifyPublicOutputContent(output.content).trim()) {
+      return output;
+    }
+  }
+  return null;
+}
+
+function buildPromotedCapabilityPassthroughOutput(output: BuddyPublicOutputMessage): BuddyPublicOutputMessage {
+  return {
+    ...output,
+    outputNodeId: BUDDY_CAPABILITY_PASSTHROUGH_OUTPUT_NODE_ID,
+    outputNodeName: "能力结果",
+    stateKey: BUDDY_CAPABILITY_PASSTHROUGH_STATE_KEY,
+    stateName: "final_reply",
+    stateType: "markdown",
+    displayMode: "markdown",
+    kind: "text",
+  };
+}
+
 function buildBackgroundTemplateRunDisplayControllerId(operationPlan: BuddyVirtualOperationPlan, runId: string) {
   const parentControllerMessageId = resolveBuddyRunControllerMessageId(operationPlan.runId ?? "");
   const operationRequestId = String(operationPlan.operationRequestId ?? "").trim();
   const suffix = operationRequestId || runId;
   return parentControllerMessageId ? `${parentControllerMessageId}:target:${suffix}` : `buddy-target-run:${suffix}`;
+}
+
+function createEmptyBuddyOutputTraceRuntimeState(): BuddyOutputTraceRuntimeState {
+  return {
+    order: [],
+    segmentsById: {},
+    activeSegmentId: null,
+    nextSegmentIndex: 0,
+  };
 }
 
 function resolveBuddyRunControllerMessageId(runId: string) {
