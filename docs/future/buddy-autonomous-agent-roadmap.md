@@ -12,15 +12,17 @@
 用户消息和会话上下文
   -> 创建与该用户消息配对的助手消息和 run capsule
   -> 读取 Buddy Home、页面上下文、历史摘要和运行策略
+  -> 生成受预算约束的 context_brief
   -> 生成 request_understanding 和运行过程/暂停上下文中的早期 visible_reply
+  -> 必要时生成或更新本轮 task_plan
   -> 判断是否需要能力
   -> 选择一个 capability(kind=skill|subgraph|none)
   -> 由下游 LLM 节点为该能力准备输入
   -> 若能力是 Skill，运行时执行单次 Skill
   -> 若 capability.kind=subgraph，伙伴启动原生虚拟鼠标/键盘，多步选择或打开对应图模板、绑定输入、点击运行、等待完成并读取公开结果
   -> 将结果封装为 result_package state
-  -> 复盘结果并判断是否继续能力循环
-  -> 生成 final_reply 或其他父图 root output state
+  -> 对结果做结构化分类、复盘结果并判断是否继续能力循环
+  -> 基于事实简报、能力轨迹和缺口生成 final_reply 或其他父图 root output state
   -> 从完成的 run snapshot 启动后台自主复盘图
   -> 模型自行判断低风险 Buddy Home 写回，并通过受控 writer 生成 command / revision
 ```
@@ -85,23 +87,27 @@
 
 ## 目标主模板
 
-伙伴可见主模板应继续从 `buddy_autonomous_loop` 演进。下一版目标可以称为 `buddy_autonomous_loop_v2`，但不要求立刻改模板 ID。
+伙伴可见主模板应继续使用 `buddy_autonomous_loop` 作为默认官方模板 ID。文档描述的是该模板的完整目标形态；不要用版本后缀制造并行心智。模板内部可以迭代，但对外保持一个可演进的正式主循环。
 
 顶层只保留用户和维护者都能理解的稳定阶段：
 
 ```mermaid
 flowchart TD
-  U[Input: user_message] --> I[Subgraph: buddy_turn_intake]
-  H[Input: conversation_history] --> I
-  P[Input: page_context] --> I
-  B[Input: buddy_context Buddy Home] --> I
+  U[Input: user_message] --> R[Subgraph: buddy_context_recall]
+  H[Input: conversation_history] --> R
+  P[Input: page_context] --> R
+  B[Input: buddy_context Buddy Home] --> R
 
-  I --> C{requires_capability?}
+  R --> I[Subgraph: buddy_turn_intake]
+  I --> T{needs_task_plan?}
+  T -- true --> P0[Subgraph: buddy_task_plan]
+  T -- false --> C{requires_capability?}
+  P0 --> C
   C -- false --> F[Subgraph: buddy_final_reply]
   C -- true --> L[Subgraph: buddy_capability_loop]
   L --> F
   F --> O[Output: final_reply]
-  O -. run snapshot .-> R[Background Template: buddy_autonomous_review]
+  O -. run snapshot .-> BG[Background Template: buddy_autonomous_review]
 ```
 
 顶层图只承担编排职责，不把能力循环内部细节铺满主画布。
@@ -114,10 +120,13 @@ flowchart TD
 | `input_conversation_history` | input | 最近历史或会话摘要 | 否 |
 | `input_page_context` | input | 当前页面、图、节点、选区或运行详情上下文 | 否 |
 | `input_buddy_context` | input | Buddy Home 文件夹选择包 | 否 |
+| `buddy_context_recall` | subgraph | 整理历史、Buddy Home、页面上下文和预算，生成本轮可用 context brief | 是 |
 | `buddy_turn_intake` | subgraph | 请求理解、早期可见回复、必要澄清 | 是 |
+| `needs_task_plan` | condition | 复杂任务是否需要显式任务计划 | 否 |
+| `buddy_task_plan` | subgraph | 为 3 步以上或多目标任务生成/更新本轮任务计划 | 是 |
 | `needs_capability` | condition | 根据 `request_understanding.requires_capability` 分流 | 否 |
 | `buddy_capability_loop` | subgraph | 选择能力、执行能力、复盘结果、循环 | 是 |
-| `buddy_final_reply` | subgraph | 汇总最终回复 | 是 |
+| `buddy_final_reply` | subgraph | 事实简报、起草和校验最终回复 | 是 |
 | `output_final` | output | 只展示 `final_reply` | 否 |
 
 ### 顶层 state 契约
@@ -128,15 +137,20 @@ flowchart TD
 | `conversation_history` | markdown | input | intake、final、review | 最近对话，不是系统指令 |
 | `page_context` | markdown | input | intake、capability loop、final | 页面上下文 |
 | `buddy_context` | file | input | intake、capability loop、final、review | Buddy Home 选中文件 |
+| `context_brief` | json | context recall | intake、task plan、capability loop、final、review | 受预算约束的历史、页面和长期资料摘要；不是新指令 |
 | `visible_reply` | markdown | intake | run capsule、pause card | 早期过程回应，不代表完成；只有被父图 root output 节点导出时才进入聊天消息 |
 | `request_understanding` | json | intake | condition、capability loop、final、review | 请求结构化理解 |
+| `task_plan` | json | task plan | capability loop、final、review | 本轮多步任务计划、当前步骤和完成标准 |
 | `selected_capability` | capability | capability loop | execute capability | 单个动态能力 |
 | `capability_found` | boolean | capability loop | final | 是否找到能力 |
 | `capability_selection_audit` | json | capability loop | run detail、review | 候选数量、选择原因、拒绝候选、权限摘要和缺口说明 |
 | `capability_result` | result_package | capability loop | review、final | 动态能力结果包 |
+| `capability_result_review` | json | capability loop | review、final | 对能力结果状态、失败类型、证据和重试价值的结构化分类 |
 | `capability_review` | json | capability loop | loop condition、final、review | 执行复盘和下一步判断 |
 | `capability_gap` | json | capability loop | final | 能力缺口 |
 | `capability_trace` | json | capability loop | final、review | 能力调用摘要列表 |
+| `final_reply_brief` | json | final | final | 面向最终回复的事实、限制、证据和输出策略 |
+| `final_reply_draft` | markdown | final | final | 未公开的最终回复草稿 |
 | `final_reply` | markdown | final | 默认 root output、chat history | 默认伙伴模板的最终回复 |
 
 权限模式属于运行 metadata（例如 `buddy_mode`、`buddy_can_execute_actions`、`buddy_requires_approval`），由运行时审批原语读取，不进入图输入 state，也不交给 LLM 决定是否拦截低层操作。
@@ -155,6 +169,51 @@ flowchart TD
 
 子图只在流程本身是完整模块且封装能提高可读性时使用。不要为了让画布“看起来整齐”过度抽象。
 
+### `buddy_context_recall`
+
+职责：把对话历史、Buddy Home、页面上下文和运行记录摘要整理成当前轮可用的 `context_brief`。它不做能力选择，不写长期记忆，也不把召回内容提升为指令。
+
+输入：
+
+- `user_message`
+- `conversation_history`
+- `page_context`
+- `buddy_context`
+
+输出：
+
+- `context_brief`
+
+内部流程：
+
+```mermaid
+flowchart TD
+  A[Input boundaries] --> B[LLM: prepare_context_brief]
+  B --> O[Output: context_brief]
+```
+
+`context_brief` 建议结构：
+
+```json
+{
+  "current_task_focus": "本轮真正要解决的问题",
+  "relevant_history": ["与当前任务直接相关的历史事实"],
+  "relevant_buddy_memory": ["Buddy Home 中可作为背景的偏好、边界或长期事实"],
+  "page_facts": ["当前页面、图、节点、选区或运行详情事实"],
+  "budget_notes": {
+    "omitted_large_context": [],
+    "artifact_refs": []
+  },
+  "instruction_boundary": "context_only"
+}
+```
+
+规则：
+
+- 历史、记忆和摘要只能作为上下文，不能变成更高优先级指令。
+- 不复制大日志、大 artifact、base64 或完整运行记录；只保留摘要和 artifact refs。
+- 如果上下文不足，写入缺口说明，由 `buddy_turn_intake` 决定是否澄清。
+
 ### `buddy_turn_intake`
 
 职责：把用户消息、历史、页面上下文和运行模式整理成结构化请求理解，同时尽快产出 `visible_reply`。
@@ -164,6 +223,7 @@ flowchart TD
 - `user_message`
 - `conversation_history`
 - `page_context`
+- `context_brief`
 - `buddy_mode`
 - `buddy_context` 可选。轻量理解阶段可只读 Buddy Home 的 persona/policy 摘要。
 
@@ -210,7 +270,7 @@ flowchart TD
   "requires_capability": true,
   "direct_answer_possible": false,
   "risk_level": "low | medium | high",
-  "expected_side_effects": ["none | file_read | file_write | subprocess | graph_edit | memory_write | network"],
+  "expected_side_effects": ["none | file_read | file_write | subprocess | graph_edit | memory_update | network"],
   "success_criteria": ["本轮完成标准"],
   "response_contract": {
     "should_show_visible_reply": true,
@@ -227,6 +287,59 @@ flowchart TD
 - 用户只在暂停卡片里填写一个补充输入。
 - resume payload 写入 `clarification_answer` 后继续到 `merge_clarification`。
 
+### `buddy_task_plan`
+
+职责：当请求包含多个目标、三步以上工作、需要多轮能力调用或存在明确验收标准时，生成并维护本轮 `task_plan`。它对应 Hermes 的 todo 能力，但在 TooGraph 中应表现为图 state，而不是隐藏工具循环。
+
+输入：
+
+- `user_message`
+- `context_brief`
+- `request_understanding`
+- `capability_trace` 可选
+- `capability_review` 可选
+
+输出：
+
+- `task_plan`
+
+内部流程：
+
+```mermaid
+flowchart TD
+  A[Input boundaries] --> P[LLM: prepare_or_update_task_plan]
+  P --> O[Output: task_plan]
+```
+
+`task_plan` 建议结构：
+
+```json
+{
+  "required": true,
+  "success_criteria": ["用户会认为任务完成的条件"],
+  "items": [
+    {
+      "id": "understand",
+      "content": "明确当前目标和限制",
+      "status": "completed"
+    },
+    {
+      "id": "run_capability",
+      "content": "选择并运行一个合适能力",
+      "status": "in_progress"
+    }
+  ],
+  "active_item_id": "run_capability",
+  "plan_notes": []
+}
+```
+
+规则：
+
+- 同一时间最多一个 `in_progress` item。
+- 简单问答、闲聊和单步任务应跳过本子图，不制造空计划。
+- 计划只服务本轮运行，不写入长期记忆；是否沉淀经验由后台复盘决定。
+
 ### `buddy_capability_loop`
 
 职责：选择一个能力、执行一次能力、复盘结果、决定继续能力循环或收束。它是伙伴 Agent 循环的核心模块，必须是子图。
@@ -237,7 +350,9 @@ flowchart TD
 - `conversation_history`
 - `page_context`
 - `buddy_context`
+- `context_brief`
 - `request_understanding`
+- `task_plan` 可选
 - `visible_page_operation_capability`
 - `capability_review` 可选，供下一轮选择能力时读取上一轮复盘
 
@@ -246,6 +361,7 @@ flowchart TD
 - `selected_capability`
 - `capability_found`
 - `capability_result`
+- `capability_result_review`
 - `capability_review`
 - `capability_gap`
 - `capability_trace`
@@ -262,8 +378,9 @@ flowchart TD
   K -- false --> X[LLM + dynamic Skill: execute_capability]
   K -- true --> V[LLM + internal page operation subgraph: execute_visible_subgraph_operation]
   V --> A2[LLM + Skill: adapt_visible_subgraph_result]
-  A2 --> R[LLM: review_capability_result]
-  X --> R[LLM: review_capability_result]
+  A2 --> Q[LLM: classify_capability_result]
+  X --> Q[LLM: classify_capability_result]
+  Q --> R[LLM: review_capability_result]
   R --> C{needs_another_capability?}
   C -- true --> S
   C -- false --> Z
@@ -282,7 +399,8 @@ flowchart TD
 | `execute_capability` | LLM | 1 次，用于生成被选 Skill 输入 | 输入 `selected_capability`，仅处理 kind=skill | 用户消息、页面上下文、Buddy Home、请求理解 | `capability_result` |
 | `execute_visible_subgraph_operation` | LLM | 1 次，用于生成页面操作 workflow 的 `user_goal` | 输入固定 `visible_page_operation_capability`，目标模板来自 `capability_selection_audit.selected` | 用户消息、页面上下文、Buddy Home、请求理解、能力选择审计 | `visible_subgraph_operation_result` |
 | `adapt_visible_subgraph_result` | LLM + Skill | 1 次，用于复制适配参数 | 静态 `buddy_visible_subgraph_result_adapter` | 能力选择审计、可见页面操作结果、用户目标 | `capability_result` |
-| `review_capability_result` | LLM | 1 次 | 无 | 用户消息、请求理解、能力结果包 | `capability_review`、append `capability_trace` |
+| `classify_capability_result` | LLM | 1 次 | 无 | 用户消息、请求理解、任务计划、能力选择审计、能力结果包、既有轨迹 | `capability_result_review` |
+| `review_capability_result` | LLM | 1 次 | 无 | 用户消息、请求理解、任务计划、能力结果包、结果分类 | `capability_review`、append `capability_trace` |
 | `continue_capability_loop` | condition | 0 次 | 无 | `capability_review.needs_another_capability` | true/false/exhausted |
 | `finalize_capability_cycle` | LLM | 1 次 | 无 | found、result、review、gap、trace | 规整 `capability_review` |
 
@@ -317,12 +435,30 @@ flowchart TD
 - false 分支进入 `finalize_capability_cycle`。
 - exhausted 分支进入 `finalize_capability_cycle`，不视为运行失败。最终回复应说明已达到本轮能力调用上限，并基于已有结果收束。
 
+`capability_result_review` 建议结构：
+
+```json
+{
+  "status": "succeeded | failed | awaiting_human | cancelled | partial",
+  "success": true,
+  "retryable": false,
+  "failure_reason": "",
+  "failure_category": "none | missing_input | permission_denied | target_not_found | run_failed | interrupted | no_progress | invalid_result",
+  "evidence": ["可引用的简短证据、run id、artifact 或错误摘要"],
+  "artifact_refs": [],
+  "result_size_class": "small | medium | large",
+  "overclaim_risk": "low | medium | high",
+  "no_progress_signature": ""
+}
+```
+
 `capability_review` 建议结构：
 
 ```json
 {
   "executed": true,
   "success": true,
+  "stop_reason": "success",
   "summary": "本轮能力调用得到什么",
   "missing_information": [],
   "needs_another_capability": false,
@@ -334,11 +470,22 @@ flowchart TD
 }
 ```
 
+`stop_reason` 允许值：
+
+- `success`：已有结果足够进入最终回复。
+- `needs_another_capability`：需要回到能力选择，但仍遵守一次只运行一个能力。
+- `no_capability`：没有可用能力。
+- `loop_exhausted`：达到本轮能力调用上限，用已有结果收束。
+- `blocked`：权限、用户补充或安全边界阻止继续。
+- `failed`：能力失败且当前没有可恢复路径。
+- `partial`：已有部分结果，可以诚实回复并说明缺口。
+
 `capability_trace` 条目建议：
 
 ```json
 {
   "round": 1,
+  "task_item_id": "run_capability",
   "capability": {
     "kind": "skill",
     "key": "web_search",
@@ -382,9 +529,12 @@ flowchart TD
 - `conversation_history`
 - `page_context`
 - `buddy_context`
+- `context_brief`
 - `request_understanding`
+- `task_plan`
 - `capability_found`
 - `capability_result`
+- `capability_result_review`
 - `capability_review`
 - `capability_gap`
 - `capability_trace`
@@ -393,7 +543,45 @@ flowchart TD
 
 - `final_reply`
 
-内部只需要一个 `draft_final_reply` LLM 节点和一个 output 边界。除非后续明确引入“起草 -> 校验 -> 修正”流程，否则不要继续拆小。
+内部流程：
+
+```mermaid
+flowchart TD
+  A[Input boundaries] --> B[LLM: prepare_final_reply_brief]
+  B --> D[LLM: draft_final_reply]
+  D --> V[LLM: finalize_final_reply]
+  V --> O[Output: final_reply]
+```
+
+节点契约：
+
+| 节点 | 类型 | LLM 调用 | Skill | reads | writes |
+| --- | --- | --- | --- | --- | --- |
+| `prepare_final_reply_brief` | LLM | 1 次 | 无 | 用户消息、context brief、请求理解、任务计划、能力结果、结果分类、复盘、缺口、轨迹 | `final_reply_brief` |
+| `draft_final_reply` | LLM | 1 次 | 无 | 用户消息、context brief、final reply brief | `final_reply_draft` |
+| `finalize_final_reply` | LLM | 1 次 | 无 | final reply brief、final reply draft、能力复盘、能力缺口 | `final_reply` |
+
+`final_reply_brief` 建议结构：
+
+```json
+{
+  "answer_mode": "direct_answer | result_summary | ask_user | explain_gap | partial_result",
+  "must_say": ["用户必须知道的结论、路径、run id、artifact 或限制"],
+  "must_not_say": ["不能声称已经完成、不能暴露的内部字段、不能承诺的能力"],
+  "evidence": [],
+  "completed_actions": [],
+  "limitations": [],
+  "suggested_next_action": "",
+  "style": "concise"
+}
+```
+
+规则：
+
+- `prepare_final_reply_brief` 只做事实压缩和边界整理，不写用户可见最终文本。
+- `draft_final_reply` 不调用能力，不继续规划执行。
+- `finalize_final_reply` 只做诚实性、格式和用户可见性校验；它可以修正草稿，但不能补造事实。
+- 最终只通过父图 root output 展示 `final_reply`，`final_reply_brief` 和 `final_reply_draft` 属于内部 run 详情。
 
 `final_reply` 规则：
 
@@ -1013,22 +1201,26 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 默认可见伙伴主循环。它应继续承担：
 
 - 输入用户消息、历史、页面上下文、Buddy Home 和固定的可见页面操作能力。
-- 从 internal 模板 `buddy_request_intake`、`buddy_capability_loop`、`buddy_final_reply` 装配三个嵌入式 Subgraph 节点。
+- 从 internal 模板装配上下文整理、请求理解、任务计划、能力循环和最终回复等嵌入式 Subgraph 节点；已落地模板应逐步向本文完整形态收敛。
+- `buddy_context_recall` 产出 `context_brief`，把历史、页面事实和 Buddy Home 资料压缩成上下文而不是新指令。
 - `buddy_turn_intake` 产出 `visible_reply` 和 `request_understanding`。
+- `buddy_task_plan` 在复杂任务中维护本轮任务计划，简单任务跳过。
 - 简单闲聊或可直接回答时绕过能力循环。
-- `buddy_capability_loop` 选择能力、执行能力、复盘结果、必要时循环；当 `selected_capability.kind` 为 `subgraph` 时，经固定内部 `toograph_page_operation_workflow` 启动原生虚拟鼠标/键盘，多步定位并运行对应图模板，等待结果并把公开输出包装回能力复盘。
-- `buddy_final_reply` 产出唯一 `final_reply`。
+- `buddy_capability_loop` 选择能力、执行能力、分类结果、复盘结果、必要时循环；当 `selected_capability.kind` 为 `subgraph` 时，经固定内部 `toograph_page_operation_workflow` 启动原生虚拟鼠标/键盘，多步定位并运行对应图模板，等待结果并把公开输出包装回能力复盘。
+- `buddy_final_reply` 通过事实简报、草稿和最终校验产出唯一 `final_reply`。
 - `output_final` 只展示 `final_reply`。
 
 ### Buddy 内部子图模板
 
 这些模板是搭建 `buddy_autonomous_loop` 的来源资产，标记为 `metadata.internal=true`，不进入普通模板列表和能力选择候选：
 
+- `buddy_context_recall`：整理历史、Buddy Home、页面上下文和预算，生成 `context_brief`。
 - `buddy_request_intake`：请求理解、早期可见回复和必要澄清。
-- `buddy_capability_loop`：能力选择、Skill 或可见图模板运行、结果复盘和循环判断。
-- `buddy_final_reply`：把请求理解、能力结果、复盘、Buddy Home 上下文汇总为唯一 `final_reply`。
+- `buddy_task_plan`：复杂任务的本轮任务计划和当前步骤。
+- `buddy_capability_loop`：能力选择、Skill 或可见图模板运行、结果分类、结果复盘和循环判断。
+- `buddy_final_reply`：把请求理解、任务计划、能力结果、复盘、Buddy Home 上下文整理为事实简报，再起草和校验唯一 `final_reply`。
 
-当前 Subgraph 节点仍保存嵌入式 `config.graph`，所以主循环不会在运行时引用模板 ID；模板优先的约束由契约测试保证：主循环三份嵌入图必须等于对应 internal 模板去掉 `metadata.internal` 后的 graph core。
+当前 Subgraph 节点仍保存嵌入式 `config.graph`，所以主循环不会在运行时引用模板 ID；模板优先的约束由契约测试保证：主循环嵌入图必须等于对应 internal 模板去掉 `metadata.internal` 后的 graph core。
 
 ### `buddy_autonomous_review`
 
