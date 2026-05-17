@@ -1,0 +1,1053 @@
+{
+  "template_id": "buddy_capability_loop",
+  "label": "伙伴能力循环",
+  "description": "内部子图模板：选择单个显式能力，执行 Skill 或经可见页面操作运行图模板，复盘结果并判断是否继续。",
+  "default_graph_name": "伙伴能力循环",
+  "state_schema": {
+    "user_message": {
+      "name": "user_message",
+      "description": "用户本轮消息。",
+      "type": "text",
+      "value": "",
+      "color": "#d97706",
+      "binding": null
+    },
+    "conversation_history": {
+      "name": "conversation_history",
+      "description": "伙伴对话历史摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#64748b",
+      "binding": null
+    },
+    "page_context": {
+      "name": "page_context",
+      "description": "当前页面上下文。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0891b2",
+      "binding": null
+    },
+    "buddy_context": {
+      "name": "buddy_context",
+      "description": "从 Buddy Home 文件夹中选择并注入的长期上下文文件。",
+      "type": "file",
+      "value": {
+        "kind": "local_folder",
+        "root": "buddy_home",
+        "selected": [
+          "AGENTS.md",
+          "SOUL.md",
+          "USER.md",
+          "MEMORY.md",
+          "policy.json"
+        ]
+      },
+      "color": "#0f766e",
+      "binding": null
+    },
+    "request_understanding": {
+      "name": "request_understanding",
+      "description": "结构化请求理解。",
+      "type": "json",
+      "value": {},
+      "color": "#16a34a",
+      "binding": null
+    },
+    "selected_capability": {
+      "name": "selected_capability",
+      "description": "能力选择技能返回的单个能力。",
+      "type": "capability",
+      "value": {
+        "kind": "none"
+      },
+      "color": "#2563eb",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "toograph_capability_selector",
+        "nodeId": "select_capability",
+        "fieldKey": "capability",
+        "managed": true
+      }
+    },
+    "capability_found": {
+      "name": "capability_found",
+      "description": "是否找到适合能力。",
+      "type": "boolean",
+      "value": false,
+      "color": "#2563eb",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "toograph_capability_selector",
+        "nodeId": "select_capability",
+        "fieldKey": "found",
+        "managed": true
+      }
+    },
+    "capability_selection_audit": {
+      "name": "capability_selection_audit",
+      "description": "能力选择审计摘要。",
+      "type": "json",
+      "value": {},
+      "color": "#7c2d12",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "toograph_capability_selector",
+        "nodeId": "select_capability",
+        "fieldKey": "audit",
+        "managed": true
+      }
+    },
+    "capability_result": {
+      "name": "capability_result",
+      "description": "动态能力执行结果包。",
+      "type": "result_package",
+      "value": {},
+      "color": "#0284c7",
+      "binding": {
+        "kind": "capability_result",
+        "nodeId": "execute_capability",
+        "managed": true
+      }
+    },
+    "visible_page_operation_capability": {
+      "name": "visible_page_operation_capability",
+      "description": "伙伴运行目标图模板时使用的内部可见页面操作子图能力。",
+      "type": "capability",
+      "value": {
+        "kind": "subgraph",
+        "key": "toograph_page_operation_workflow",
+        "name": "操作 TooGraph 页面",
+        "description": "内部可见页面操作通道，用于打开并运行选中的目标图模板。"
+      },
+      "color": "#0ea5e9",
+      "binding": null
+    },
+    "visible_subgraph_operation_result": {
+      "name": "visible_subgraph_operation_result",
+      "description": "通过页面操作 workflow 可见运行目标图模板后的原始结果包。",
+      "type": "result_package",
+      "value": {},
+      "color": "#0ea5e9",
+      "binding": {
+        "kind": "capability_result",
+        "nodeId": "execute_visible_subgraph_operation",
+        "managed": true
+      }
+    },
+    "capability_review": {
+      "name": "capability_review",
+      "description": "能力执行后的复盘。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": null
+    },
+    "capability_gap": {
+      "name": "capability_gap",
+      "description": "找不到能力时的结构化能力缺口。",
+      "type": "json",
+      "value": {},
+      "color": "#dc2626",
+      "binding": null
+    },
+    "capability_trace": {
+      "name": "capability_trace",
+      "description": "能力循环步骤摘要列表。",
+      "type": "json",
+      "value": [],
+      "color": "#4f46e5",
+      "binding": null
+    }
+  },
+  "nodes": {
+    "input_user_message": {
+      "kind": "input",
+      "name": "用户消息",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 60
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "user_message",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
+    },
+    "input_conversation_history": {
+      "kind": "input",
+      "name": "对话历史",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 180
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "conversation_history",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "markdown"
+      }
+    },
+    "input_page_context": {
+      "kind": "input",
+      "name": "页面上下文",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 300
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "page_context",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "markdown"
+      }
+    },
+    "input_buddy_context": {
+      "kind": "input",
+      "name": "伙伴上下文",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 540
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "buddy_context",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": {
+          "kind": "local_folder",
+          "root": "buddy_home",
+          "selected": [
+            "AGENTS.md",
+            "SOUL.md",
+            "USER.md",
+            "MEMORY.md",
+            "policy.json"
+          ]
+        },
+        "boundaryType": "file"
+      }
+    },
+    "input_request_understanding": {
+      "kind": "input",
+      "name": "请求理解",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 660
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "request_understanding",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": {},
+        "boundaryType": "json"
+      }
+    },
+    "input_visible_page_operation_capability": {
+      "kind": "input",
+      "name": "可见页面操作能力",
+      "description": "内部固定能力，用于把目标图模板运行映射到可见页面操作 workflow。",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 780
+        },
+        "collapsed": true
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "visible_page_operation_capability",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": {
+          "kind": "subgraph",
+          "key": "toograph_page_operation_workflow",
+          "name": "操作 TooGraph 页面",
+          "description": "内部可见页面操作通道，用于打开并运行选中的目标图模板。"
+        },
+        "boundaryType": "capability"
+      }
+    },
+    "select_capability": {
+      "kind": "agent",
+      "name": "选择能力",
+      "description": "从启用模板和 Skill 中选择一个能力。",
+      "ui": {
+        "position": {
+          "x": 430,
+          "y": 360
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "user_message",
+          "required": true
+        },
+        {
+          "state": "request_understanding",
+          "required": true
+        },
+        {
+          "state": "capability_review",
+          "required": false
+        }
+      ],
+      "writes": [
+        {
+          "state": "selected_capability",
+          "mode": "replace"
+        },
+        {
+          "state": "capability_found",
+          "mode": "replace"
+        },
+        {
+          "state": "capability_selection_audit",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "toograph_capability_selector",
+        "skillBindings": [
+          {
+            "skillKey": "toograph_capability_selector",
+            "outputMapping": {
+              "capability": "selected_capability",
+              "found": "capability_found",
+              "audit": "capability_selection_audit"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {
+          "toograph_capability_selector": {
+            "skillKey": "toograph_capability_selector",
+            "title": "能力选择 skill instruction",
+            "content": "根据 request_understanding 和 user_message 从候选清单中选择一个启用能力。优先图模板，其次 Skill；不要选择 buddy_autonomous_loop 自身；如果用户请求可以直接回答或没有合适能力，选择 {\"kind\":\"none\"}。",
+            "source": "node.override"
+          }
+        },
+        "taskInstruction": "选择一个能完成当前请求的能力。能力必须是单个 capability(kind=skill|subgraph|none)，不能输出能力列表。\n不要把本伙伴循环模板自身作为候选答案。若 capability_review 表示需要继续调用另一个能力，则以 capability_review.next_requirement 为当前需求。\n只选择能力，不执行能力，也不生成最终回复；执行由下游节点和运行时完成。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "capability_found_condition": {
+      "kind": "condition",
+      "name": "找到能力?",
+      "description": "没有合适能力时进入缺失能力复盘。",
+      "ui": {
+        "position": {
+          "x": 810,
+          "y": 360
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "capability_found",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
+        "loopLimit": 3,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.capability_found",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "selected_capability_is_subgraph": {
+      "kind": "condition",
+      "name": "目标是图模板?",
+      "description": "图模板能力走可见页面操作通道；Skill 能力继续走动态 Skill 执行。",
+      "ui": {
+        "position": {
+          "x": 1120,
+          "y": 320
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "selected_capability",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
+        "loopLimit": 3,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.selected_capability.kind",
+          "operator": "==",
+          "value": "subgraph"
+        }
+      }
+    },
+    "review_missing_capability": {
+      "kind": "agent",
+      "name": "无匹配能力复盘",
+      "description": "没有能力可用时给出结构化能力缺口和构建建议。",
+      "ui": {
+        "position": {
+          "x": 1180,
+          "y": 560
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "user_message",
+          "required": true
+        },
+        {
+          "state": "request_understanding",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "capability_review",
+          "mode": "replace"
+        },
+        {
+          "state": "capability_gap",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "输出 capability_review JSON 和 capability_gap JSON。capability_review 说明 found=false、reason、direct_response_strategy，并把 needs_another_capability 设为 false。capability_gap 必须包含 gap_detected(true)、gap_type(skill|graph_template|unknown)、reason、missing_capability、suggested_asset_type(skill|graph_template|none)、build_requirement、should_offer_build(boolean)、should_route_to_builder(boolean)。只有用户明确要求创建、补齐、以后具备某能力，或 request_understanding 表明目标就是构建能力时，should_route_to_builder 才为 true；普通任务缺能力时只 should_offer_build=true，交由最终回复询问用户。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "execute_capability": {
+      "kind": "agent",
+      "name": "执行能力",
+      "description": "根据 capability state 动态执行一个 Skill，并把原始结果写入 result_package。",
+      "ui": {
+        "position": {
+          "x": 3000,
+          "y": 80
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "selected_capability",
+          "required": true
+        },
+        {
+          "state": "user_message",
+          "required": true
+        },
+        {
+          "state": "page_context",
+          "required": false
+        },
+        {
+          "state": "buddy_context",
+          "required": true
+        },
+        {
+          "state": "request_understanding",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "capability_result",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "你只负责为 selected_capability.kind=skill 的能力准备一次运行输入。若 selected_capability.kind 是 subgraph，本节点不应被条件路由调用；图模板能力会走 execute_visible_subgraph_operation，经页面操作器可见打开模板、写入 input 节点、点击运行并等待结果。Skill 执行结果会写入 capability_result result_package。\n不要总结、改写或二次包装执行结果；动态能力执行结果必须保持 outputs.<outputKey> = { name, description, type, value }。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "execute_visible_subgraph_operation": {
+      "kind": "agent",
+      "name": "可见运行图模板能力",
+      "description": "把原始目标图模板转成页面操作 workflow，通过虚拟鼠标打开、输入目标并运行模板。",
+      "ui": {
+        "position": {
+          "x": 3000,
+          "y": 300
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "visible_page_operation_capability",
+          "required": true
+        },
+        {
+          "state": "user_message",
+          "required": true
+        },
+        {
+          "state": "page_context",
+          "required": false
+        },
+        {
+          "state": "buddy_context",
+          "required": true
+        },
+        {
+          "state": "request_understanding",
+          "required": true
+        },
+        {
+          "state": "capability_selection_audit",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "visible_subgraph_operation_result",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "你只负责为 visible_page_operation_capability 准备一次 toograph_page_operation_workflow 的输入；本节点唯一的动态 capability 来源是 visible_page_operation_capability，不要直接执行 capability_selection_audit.selected 指向的目标图模板。必须从 capability_selection_audit.selected 读取目标模板 key/name，并把 toograph_page_operation_workflow 的 user_goal 写成：运行图模板 <selected.name 或 selected.key>；本次目标：<request_understanding.user_goal 或 user_message>。如果 selected.key 存在，也把模板 key 放进 user_goal。之后由页面操作器的 template_target 固定映射执行打开图与模板、搜索目标模板、点开模板、把本次目标写入 input 节点、点击运行并等待结果。不要输出 DOM selector、坐标或逐步鼠标命令。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "adapt_visible_subgraph_result": {
+      "kind": "agent",
+      "name": "适配可见图模板结果",
+      "description": "把页面操作 workflow 的结果包重新标记为原始目标图模板能力的结果包。",
+      "ui": {
+        "position": {
+          "x": 3370,
+          "y": 300
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "capability_selection_audit",
+          "required": true
+        },
+        {
+          "state": "visible_subgraph_operation_result",
+          "required": true
+        },
+        {
+          "state": "user_message",
+          "required": true
+        },
+        {
+          "state": "request_understanding",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "capability_result",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "buddy_visible_subgraph_result_adapter",
+        "skillBindings": [
+          {
+            "skillKey": "buddy_visible_subgraph_result_adapter",
+            "outputMapping": {
+              "result_package": "capability_result"
+            }
+          }
+        ],
+        "skillInstructionBlocks": {
+          "buddy_visible_subgraph_result_adapter": {
+            "skillKey": "buddy_visible_subgraph_result_adapter",
+            "title": "可见子图结果适配 skill instruction",
+            "content": "只调用 buddy_visible_subgraph_result_adapter。selected_capability 必须从 capability_selection_audit.selected 复制；visible_operation_result 必须完整复制 visible_subgraph_operation_result；user_goal 优先使用 request_understanding.user_goal，其次 user_message。不要总结、重写或发明运行结果。",
+            "source": "node.override"
+          }
+        },
+        "taskInstruction": "本节点只负责把可见页面操作结果适配回原始目标图模板能力结果。不要读取 selected_capability capability state；使用 capability_selection_audit.selected 作为原始目标能力。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "low",
+        "temperature": 0.1
+      }
+    },
+    "review_capability_result": {
+      "kind": "agent",
+      "name": "复盘能力结果",
+      "description": "判断能力结果是否足够，是否还需要调用另一个能力。",
+      "ui": {
+        "position": {
+          "x": 3370,
+          "y": 80
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "user_message",
+          "required": true
+        },
+        {
+          "state": "request_understanding",
+          "required": true
+        },
+        {
+          "state": "capability_result",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "capability_review",
+          "mode": "replace"
+        },
+        {
+          "state": "capability_trace",
+          "mode": "append"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "输出 capability_review JSON，并向 capability_trace append 一个本轮能力调用摘要。capability_review 字段包含 executed(true)、success(boolean)、summary、missing_information、needs_another_capability(boolean)、next_requirement、final_response_strategy。capability_trace 条目包含 capability、success、summary、next_requirement、timestamp_note；只记录摘要，不复制大段结果。只有确实需要另一个不同能力时才把 needs_another_capability 设为 true。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "continue_capability_loop": {
+      "kind": "condition",
+      "name": "继续调用能力?",
+      "description": "最多三轮能力循环。",
+      "ui": {
+        "position": {
+          "x": 3740,
+          "y": 80
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "capability_review",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
+        "loopLimit": 3,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.capability_review.needs_another_capability",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "finalize_capability_cycle": {
+      "kind": "agent",
+      "name": "整理能力循环结果",
+      "description": "把能力循环的最终状态整理为统一复盘，供多个输出边界读取。",
+      "ui": {
+        "position": {
+          "x": 4140,
+          "y": 220
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "capability_found",
+          "required": true
+        },
+        {
+          "state": "capability_result",
+          "required": false
+        },
+        {
+          "state": "capability_review",
+          "required": true
+        },
+        {
+          "state": "capability_gap",
+          "required": false
+        },
+        {
+          "state": "capability_trace",
+          "required": false
+        }
+      ],
+      "writes": [
+        {
+          "state": "capability_review",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "整理 capability_review JSON，保留上游判断，并补充 final_status、user_visible_summary、needs_another_capability(false)。如果存在 capability_gap，保留缺口摘要和 should_offer_build/should_route_to_builder 判断；如果存在 capability_trace，保留简短轨迹摘要。不要读取或执行能力，不要修改 capability_result。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "output_selected_capability": {
+      "kind": "output",
+      "name": "输出选中能力",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 4520,
+          "y": 220
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "selected_capability",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_capability_found": {
+      "kind": "output",
+      "name": "输出能力存在",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 4840,
+          "y": 220
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "capability_found",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "auto",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_capability_selection_audit": {
+      "kind": "output",
+      "name": "输出能力选择审计",
+      "description": "输出候选数量、选择原因、拒绝候选、权限摘要和缺口说明。",
+      "ui": {
+        "position": {
+          "x": 5160,
+          "y": 360
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "capability_selection_audit",
+          "required": false
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_capability_result": {
+      "kind": "output",
+      "name": "输出能力结果",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 5160,
+          "y": 220
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "capability_result",
+          "required": false
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "auto",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_capability_review": {
+      "kind": "output",
+      "name": "输出能力复盘",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 5480,
+          "y": 220
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "capability_review",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_capability_gap": {
+      "kind": "output",
+      "name": "输出能力缺口",
+      "description": "输出找不到能力时的结构化缺口。",
+      "ui": {
+        "position": {
+          "x": 4660,
+          "y": 620
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "capability_gap",
+          "required": false
+        }
+      ],
+      "writes": [],
+      "config": {}
+    },
+    "output_capability_trace": {
+      "kind": "output",
+      "name": "输出能力轨迹",
+      "description": "输出能力循环的步骤摘要列表。",
+      "ui": {
+        "position": {
+          "x": 4660,
+          "y": 760
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "capability_trace",
+          "required": false
+        }
+      ],
+      "writes": [],
+      "config": {}
+    }
+  },
+  "edges": [
+    {
+      "source": "input_user_message",
+      "target": "select_capability"
+    },
+    {
+      "source": "input_request_understanding",
+      "target": "select_capability"
+    },
+    {
+      "source": "select_capability",
+      "target": "capability_found_condition"
+    },
+    {
+      "source": "review_missing_capability",
+      "target": "finalize_capability_cycle"
+    },
+    {
+      "source": "execute_capability",
+      "target": "review_capability_result"
+    },
+    {
+      "source": "execute_visible_subgraph_operation",
+      "target": "adapt_visible_subgraph_result"
+    },
+    {
+      "source": "adapt_visible_subgraph_result",
+      "target": "review_capability_result"
+    },
+    {
+      "source": "review_capability_result",
+      "target": "continue_capability_loop"
+    },
+    {
+      "source": "finalize_capability_cycle",
+      "target": "output_selected_capability"
+    },
+    {
+      "source": "finalize_capability_cycle",
+      "target": "output_capability_found"
+    },
+    {
+      "source": "finalize_capability_cycle",
+      "target": "output_capability_selection_audit"
+    },
+    {
+      "source": "finalize_capability_cycle",
+      "target": "output_capability_result"
+    },
+    {
+      "source": "finalize_capability_cycle",
+      "target": "output_capability_review"
+    },
+    {
+      "source": "finalize_capability_cycle",
+      "target": "output_capability_gap"
+    },
+    {
+      "source": "finalize_capability_cycle",
+      "target": "output_capability_trace"
+    }
+  ],
+  "conditional_edges": [
+    {
+      "source": "capability_found_condition",
+      "branches": {
+        "true": "selected_capability_is_subgraph",
+        "false": "review_missing_capability",
+        "exhausted": "review_missing_capability"
+      }
+    },
+    {
+      "source": "selected_capability_is_subgraph",
+      "branches": {
+        "true": "execute_visible_subgraph_operation",
+        "false": "execute_capability",
+        "exhausted": "execute_capability"
+      }
+    },
+    {
+      "source": "continue_capability_loop",
+      "branches": {
+        "true": "select_capability",
+        "false": "finalize_capability_cycle",
+        "exhausted": "finalize_capability_cycle"
+      }
+    }
+  ],
+  "metadata": {
+    "graphProtocol": "node_system",
+    "role": "buddy_capability_loop",
+    "interrupt_after": [],
+    "internal": true
+  }
+}

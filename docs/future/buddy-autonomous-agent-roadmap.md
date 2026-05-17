@@ -60,7 +60,7 @@
 - 动态能力来自单个 `capability` state，执行结果必须写入唯一 `result_package` state。在伙伴自主循环中，`capability.kind=subgraph` 的产品语义是“可见运行对应图模板”，应作为可审计页面操作流程触发，不把目标模板偷换成后台直连调用。
 - 后台动态 Subgraph 执行原语已能执行内部子图或模板化子流程，内部断点可以传播到父级 run 的标准 `awaiting_human`；该原语保留为运行时底座和内部能力实现细节，不是伙伴自主循环里 `capability.kind=subgraph` 的默认用户体验。
 - `subgraph` 是正式节点类型，内部 state 与父图隔离，只通过公开 input/output 边界通信。
-- 官方 `buddy_autonomous_loop` 已存在：顶层使用 Buddy Home 文件夹输入、请求理解子图、能力循环子图、最终回复子图和唯一 `final_reply` output。
+- 官方 `buddy_autonomous_loop` 已存在：顶层使用 Buddy Home 文件夹输入、请求理解子图、能力循环子图、最终回复子图和唯一 `final_reply` output。请求理解、能力循环和最终回复已经分别沉淀为 internal 模板 `buddy_request_intake`、`buddy_capability_loop`、`buddy_final_reply`，主循环嵌入副本由测试约束与这些来源保持一致。
 - 伙伴可见运行已经支持模板绑定：Buddy 页面可从可见模板列表选择运行模板，并按 input 节点把当前消息、对话历史、页面上下文和 Buddy Home 上下文绑定进去；权限模式只保留为运行 metadata，不作为图输入。
 - 官方 `buddy_autonomous_review` 已存在：主回复完成后由前端用 run snapshot 启动，模型自行判断是否需要低风险写回 Buddy Home，并通过 `buddy_home_writer` 走 command / revision 路径；它不进入普通模板列表和能力选择候选。
 - 官方 `toograph_skill_creation_workflow` 已存在：Skill 创建、测试、审查、写入通过图流程表达。
@@ -1013,11 +1013,22 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 默认可见伙伴主循环。它应继续承担：
 
 - 输入用户消息、历史、页面上下文、Buddy Home 和固定的可见页面操作能力。
+- 从 internal 模板 `buddy_request_intake`、`buddy_capability_loop`、`buddy_final_reply` 装配三个嵌入式 Subgraph 节点。
 - `buddy_turn_intake` 产出 `visible_reply` 和 `request_understanding`。
 - 简单闲聊或可直接回答时绕过能力循环。
 - `buddy_capability_loop` 选择能力、执行能力、复盘结果、必要时循环；当 `selected_capability.kind` 为 `subgraph` 时，经固定内部 `toograph_page_operation_workflow` 启动原生虚拟鼠标/键盘，多步定位并运行对应图模板，等待结果并把公开输出包装回能力复盘。
 - `buddy_final_reply` 产出唯一 `final_reply`。
 - `output_final` 只展示 `final_reply`。
+
+### Buddy 内部子图模板
+
+这些模板是搭建 `buddy_autonomous_loop` 的来源资产，标记为 `metadata.internal=true`，不进入普通模板列表和能力选择候选：
+
+- `buddy_request_intake`：请求理解、早期可见回复和必要澄清。
+- `buddy_capability_loop`：能力选择、Skill 或可见图模板运行、结果复盘和循环判断。
+- `buddy_final_reply`：把请求理解、能力结果、复盘、Buddy Home 上下文汇总为唯一 `final_reply`。
+
+当前 Subgraph 节点仍保存嵌入式 `config.graph`，所以主循环不会在运行时引用模板 ID；模板优先的约束由契约测试保证：主循环三份嵌入图必须等于对应 internal 模板去掉 `metadata.internal` 后的 graph core。
 
 ### `buddy_autonomous_review`
 

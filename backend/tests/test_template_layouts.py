@@ -22,6 +22,36 @@ def _read_contracts(reads: list[dict]) -> list[dict]:
     return [{key: value for key, value in read.items() if not (key == "binding" and value is None)} for read in reads]
 
 
+BUDDY_INTERNAL_TEMPLATE_IDS = {
+    "buddy_request_intake",
+    "buddy_capability_loop",
+    "buddy_final_reply",
+    "buddy_autonomous_review",
+}
+
+BUDDY_MAIN_LOOP_SUBGRAPH_TEMPLATE_IDS = {
+    "buddy_turn_intake": "buddy_request_intake",
+    "buddy_capability_loop": "buddy_capability_loop",
+    "buddy_final_reply": "buddy_final_reply",
+}
+
+
+def _template_core(record: dict) -> dict:
+    return {
+        "state_schema": record["state_schema"],
+        "nodes": record["nodes"],
+        "edges": record["edges"],
+        "conditional_edges": record["conditional_edges"],
+        "metadata": record["metadata"],
+    }
+
+
+def _without_internal_metadata(core: dict) -> dict:
+    metadata = dict(core["metadata"])
+    metadata.pop("internal", None)
+    return {**core, "metadata": metadata}
+
+
 class TemplateLayoutTests(unittest.TestCase):
     def test_builtin_template_registry_contains_official_templates(self) -> None:
         records = _official_template_records()
@@ -638,6 +668,44 @@ class TemplateLayoutTests(unittest.TestCase):
             _read_contracts(draft_graph["nodes"]["output_final_reply"]["reads"]),
             [{"state": "final_reply", "required": True}],
         )
+
+    def test_buddy_internal_templates_are_hidden_but_loadable(self) -> None:
+        public_template_ids = {record["template_id"] for record in _official_template_records()}
+
+        self.assertTrue(BUDDY_INTERNAL_TEMPLATE_IDS.isdisjoint(public_template_ids))
+        for template_id in sorted(BUDDY_INTERNAL_TEMPLATE_IDS):
+            with self.subTest(template_id=template_id):
+                template = load_template_record(template_id)
+                self.assertEqual(template["template_id"], template_id)
+                self.assertIs(template["metadata"]["internal"], True)
+                self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
+                payload = {
+                    key: value
+                    for key, value in template.items()
+                    if key not in {"template_id", "label", "description", "default_graph_name", "source"}
+                }
+                graph = NodeSystemGraphPayload.model_validate(
+                    {
+                        **payload,
+                        "graph_id": f"test_{template_id}",
+                        "name": template["default_graph_name"],
+                    }
+                )
+                validation = validate_graph(graph)
+                self.assertEqual([issue.model_dump() for issue in validation.issues], [])
+                self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+
+    def test_buddy_main_loop_embeds_internal_subgraph_template_sources(self) -> None:
+        template = load_template_record("buddy_autonomous_loop")
+
+        for node_id, template_id in BUDDY_MAIN_LOOP_SUBGRAPH_TEMPLATE_IDS.items():
+            with self.subTest(node_id=node_id, template_id=template_id):
+                embedded_graph = template["nodes"][node_id]["config"]["graph"]
+                source_template = load_template_record(template_id)
+                self.assertEqual(
+                    embedded_graph,
+                    _without_internal_metadata(_template_core(source_template)),
+                )
 
     def test_toograph_page_operation_workflow_contract(self) -> None:
         template = next(
