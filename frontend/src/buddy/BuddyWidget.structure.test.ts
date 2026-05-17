@@ -727,11 +727,16 @@ test("BuddyWidget renders output-segment run trace capsules instead of per-messa
   assert.match(componentSource, /buildBuddyOutputTracePlan/);
   assert.match(componentSource, /reduceBuddyOutputTraceEvent/);
   assert.match(componentSource, /buildBuddyOutputTraceStateFromRunDetail/);
+  assert.match(componentSource, /import \{[\s\S]*buildBuddyOutputTraceTreeRows,[\s\S]*type BuddyOutputTraceTreeRow[\s\S]*\} from "\.\/buddyOutputTraceTree\.ts";/);
   assert.match(componentSource, /outputTrace\?:/);
   assert.match(componentSource, /class="buddy-widget__run-trace"/);
   assert.match(componentSource, /class="buddy-widget__run-trace-summary"/);
-  assert.match(componentSource, /class="buddy-widget__run-trace-open"/);
-  assert.match(componentSource, /function openRunPlayback\(runId: string \| null \| undefined\)/);
+  assert.match(componentSource, /v-for="row in buildTraceTreeRows\(message\.outputTrace\)"/);
+  assert.match(componentSource, /class="buddy-widget__run-trace-row-open"/);
+  assert.match(componentSource, /v-if="row\.playbackTarget && message\.runId"/);
+  assert.match(componentSource, /@click="openTraceTreeRowPlayback\(message\.runId, row\)"/);
+  assert.doesNotMatch(componentSource, /class="buddy-widget__run-trace-open"/);
+  assert.match(componentSource, /function openTraceTreeRowPlayback\(runId: string \| null \| undefined, row: BuddyOutputTraceTreeRow\)/);
   assert.match(componentSource, /router\.push\(resolveRunRestoreUrl\(normalizedRunId\)\)/);
   assert.match(componentSource, /buddy-widget__run-trace-dot--running/);
   assert.match(componentSource, /formatTraceDuration/);
@@ -925,6 +930,18 @@ test("BuddyWidget finishes auto-resumed page-operation runs back into the chat r
   );
   assert.doesNotMatch(extractSourceBetween("async function finishAutoResumedPageOperationRun(", "function clearAutoResumingPageOperationPlaceholder"), /startRunEventStream/);
   assert.match(componentSource, /function clearAutoResumingPageOperationPlaceholder\(assistantMessageId: string, runId: string\)/);
+});
+
+test("BuddyWidget hides parent trace capsules while a background template target is running", () => {
+  assert.match(componentSource, /function syncBackgroundTemplateRunDisplay\(/);
+  assert.match(
+    componentSource,
+    /const parentControllerMessageId = resolveBuddyRunControllerMessageId\(operationPlan\.runId \?\? ""\);[\s\S]*if \(parentControllerMessageId\) \{[\s\S]*removeBuddyRunDisplayMessages\(parentControllerMessageId\);[\s\S]*\}/,
+  );
+  assert.match(
+    componentSource,
+    /syncBuddyRunDisplayMessages\([\s\S]*buildBackgroundTemplateRunDisplayControllerId\(operationPlan, runDetail\.run_id\),[\s\S]*runDetail\.run_id,[\s\S]*outputTraceState,[\s\S]*outputState,/,
+  );
 });
 
 test("BuddyWidget recovers awaiting-human paused runs after session activation", () => {
