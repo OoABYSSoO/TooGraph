@@ -20,6 +20,8 @@ def build_capability_catalog_context(*, origin: str = DEFAULT_ORIGIN) -> str:
         "Choose exactly one item by returning {\"kind\":\"subgraph\",\"key\":\"...\"} or {\"kind\":\"skill\",\"key\":\"...\"}.",
         "If no item fits, return {\"kind\":\"none\"}. Do not invent keys outside this catalog.",
         "Also provide selection_reason and rejected_candidates so the run audit can explain the choice.",
+        "Set invocation_purpose before execution: answer_delegate when the selected capability should directly answer the user, evidence_gathering when it only gathers material, action_execution when it performs an operation or side effect.",
+        "Set expected_final_response_strategy: pass_through for answer_delegate results that can become the final reply, compose when the outer loop must synthesize, ask_user when more user input is needed, continue when another capability will be needed.",
         "",
         "Graph Templates:",
     ]
@@ -351,6 +353,8 @@ def _none_response(audit: dict[str, Any] | None = None) -> dict[str, Any]:
         "candidate_counts": {"subgraph": 0, "skill": 0},
         "selected": {"kind": "none", "key": "", "name": ""},
         "selection_reason": "",
+        "invocation_purpose": "evidence_gathering",
+        "expected_final_response_strategy": "compose",
         "selected_permissions": [],
         "permission_summary": "none",
         "rejected_candidates": [],
@@ -402,6 +406,11 @@ def _build_selection_audit(
     selection_reason = _compact_text(skill_inputs.get("selection_reason"))
     if not selection_reason and candidate:
         selection_reason = f"Selected {selected_name or candidate['key']} from the enabled catalog."
+    invocation_purpose = _normalize_invocation_purpose(skill_inputs.get("invocation_purpose"), candidate=candidate)
+    expected_strategy = _normalize_final_response_strategy(
+        skill_inputs.get("expected_final_response_strategy"),
+        invocation_purpose=invocation_purpose,
+    )
     return {
         "candidate_count": len(all_candidates),
         "candidate_counts": {
@@ -410,6 +419,8 @@ def _build_selection_audit(
         },
         "selected": selected_record,
         "selection_reason": selection_reason,
+        "invocation_purpose": invocation_purpose,
+        "expected_final_response_strategy": expected_strategy,
         "selected_permissions": selected_permissions,
         "permission_summary": ", ".join(selected_permissions) if selected_permissions else "none",
         "rejected_candidates": _normalize_rejected_candidates(
@@ -421,6 +432,24 @@ def _build_selection_audit(
         "gap": gap,
         "catalog_errors": [_compact_text(item.get("message")) for item in catalog.get("errors") or [] if isinstance(item, dict) and _compact_text(item.get("message"))],
     }
+
+
+def _normalize_invocation_purpose(value: Any, *, candidate: dict[str, Any] | None) -> str:
+    purpose = _compact_text(value).lower()
+    if purpose in {"answer_delegate", "evidence_gathering", "action_execution"}:
+        return purpose
+    if candidate and candidate.get("kind") == "subgraph":
+        return "answer_delegate"
+    if candidate and candidate.get("kind") == "skill":
+        return "evidence_gathering"
+    return "evidence_gathering"
+
+
+def _normalize_final_response_strategy(value: Any, *, invocation_purpose: str) -> str:
+    strategy = _compact_text(value).lower()
+    if strategy in {"pass_through", "compose", "ask_user", "continue"}:
+        return strategy
+    return "pass_through" if invocation_purpose == "answer_delegate" else "compose"
 
 
 def _normalize_rejected_candidates(

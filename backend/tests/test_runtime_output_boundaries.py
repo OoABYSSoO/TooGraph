@@ -144,6 +144,42 @@ class RuntimeOutputBoundariesTests(unittest.TestCase):
         self.assertEqual(body["output_previews"][0]["display_mode"], "auto")
         self.assertEqual(body["output_previews"][0]["value"], package)
 
+    def test_execute_output_node_prefers_final_reply_from_multi_output_result_package(self) -> None:
+        node = NodeSystemOutputNode.model_validate(
+            {
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "capability_result"}],
+                "config": {"displayMode": "markdown"},
+            }
+        )
+        package = {
+            "kind": "result_package",
+            "sourceType": "subgraph",
+            "sourceKey": "advanced_web_research_loop",
+            "outputs": {
+                "final_reply": {
+                    "name": "最终回复",
+                    "description": "子图已经生成的用户可见答案。",
+                    "type": "markdown",
+                    "value": "# Done",
+                },
+                "operation_report": {
+                    "name": "运行报告",
+                    "description": "审计信息。",
+                    "type": "json",
+                    "value": {"status": "completed"},
+                },
+            },
+        }
+
+        body = execute_output_node("output_capability_passthrough", node, {"capability_result": package}, {"run_id": "run_1"})
+
+        self.assertEqual(body["outputs"], {"capability_result": "# Done"})
+        self.assertEqual(body["output_previews"][0]["label"], "最终回复")
+        self.assertEqual(body["output_previews"][0]["source_key"], "capability_result.final_reply")
+        self.assertEqual(body["output_previews"][0]["display_mode"], "markdown")
+        self.assertEqual(body["final_result"], "# Done")
+
     def test_collect_output_boundaries_refreshes_only_active_outputs(self) -> None:
         graph = NodeSystemGraphDocument.model_validate(
             {

@@ -455,7 +455,21 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(nodes["buddy_context_recall"]["kind"], "agent")
         self.assertEqual(nodes["buddy_task_plan"]["kind"], "agent")
         self.assertEqual(nodes["buddy_final_reply"]["kind"], "agent")
-        self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "output"], ["output_final"])
+        self.assertEqual(
+            [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
+            ["output_capability_passthrough", "output_final"],
+        )
+        self.assertIn("should_pass_through_capability_result", nodes)
+        self.assertEqual(nodes["should_pass_through_capability_result"]["kind"], "condition")
+        self.assertEqual(
+            nodes["should_pass_through_capability_result"]["config"]["rule"],
+            {"source": "$state.capability_review.final_response_strategy", "operator": "==", "value": "pass_through"},
+        )
+        self.assertEqual(
+            _read_contracts(nodes["output_capability_passthrough"]["reads"]),
+            [{"state": "capability_result", "required": True}],
+        )
+        self.assertEqual(nodes["output_capability_passthrough"]["config"]["displayMode"], "markdown")
         self.assertEqual(_read_contracts(nodes["output_final"]["reads"]), [{"state": "final_reply", "required": True}])
         expected_positions = {
             "input_user_message": {"x": 80, "y": 100},
@@ -468,8 +482,10 @@ class TemplateLayoutTests(unittest.TestCase):
             "buddy_task_plan": {"x": 2400, "y": 120},
             "needs_capability": {"x": 2400, "y": 660},
             "buddy_capability_loop": {"x": 3040, "y": 360},
-            "buddy_final_reply": {"x": 3740, "y": 360},
-            "output_final": {"x": 4440, "y": 360},
+            "should_pass_through_capability_result": {"x": 3740, "y": 260},
+            "output_capability_passthrough": {"x": 4300, "y": 120},
+            "buddy_final_reply": {"x": 4300, "y": 520},
+            "output_final": {"x": 5000, "y": 520},
         }
         for node_id, expected_position in expected_positions.items():
             with self.subTest(layout_node=node_id):
@@ -490,7 +506,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn({"source": "buddy_context_recall", "target": "buddy_turn_intake"}, template["edges"])
         self.assertIn({"source": "buddy_turn_intake", "target": "needs_task_plan"}, template["edges"])
         self.assertIn({"source": "buddy_task_plan", "target": "needs_capability"}, template["edges"])
-        self.assertIn({"source": "buddy_capability_loop", "target": "buddy_final_reply"}, template["edges"])
+        self.assertIn({"source": "buddy_capability_loop", "target": "should_pass_through_capability_result"}, template["edges"])
+        self.assertNotIn({"source": "buddy_capability_loop", "target": "buddy_final_reply"}, template["edges"])
         self.assertIn({"source": "buddy_final_reply", "target": "output_final"}, template["edges"])
         self.assertNotIn({"source": "buddy_final_reply", "target": "review_buddy_memory"}, template["edges"])
         self.assertNotIn("review_buddy_memory", nodes)
@@ -515,7 +532,15 @@ class TemplateLayoutTests(unittest.TestCase):
                         "false": "buddy_final_reply",
                         "exhausted": "buddy_final_reply",
                     },
-                }
+                },
+                {
+                    "source": "should_pass_through_capability_result",
+                    "branches": {
+                        "true": "output_capability_passthrough",
+                        "false": "buddy_final_reply",
+                        "exhausted": "buddy_final_reply",
+                    },
+                },
             ],
         )
         for node_id, node in nodes.items():

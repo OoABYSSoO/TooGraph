@@ -153,6 +153,8 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
         self.assertNotIn("capabilityPolicy", manifest)
         self.assertEqual(manifest["timeoutSeconds"], 30)
         self.assertIn("selection_reason", input_keys)
+        self.assertIn("invocation_purpose", input_keys)
+        self.assertIn("expected_final_response_strategy", input_keys)
         self.assertIn("rejected_candidates", input_keys)
         self.assertEqual(capability_inputs[0]["valueType"], "capability")
         self.assertEqual([field["key"] for field in manifest["stateOutputSchema"]], ["capability", "found", "audit"])
@@ -263,6 +265,8 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
                     requirement="Research the latest materials.",
                     capability={"kind": "subgraph", "key": "advanced_web_research_loop"},
                     selection_reason="Research is better handled by a multi-step graph template.",
+                    invocation_purpose="answer_delegate",
+                    expected_final_response_strategy="pass_through",
                     rejected_candidates=[
                         {
                             "kind": "skill",
@@ -289,6 +293,8 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
                     "name": "Advanced Web Research",
                 },
                 "selection_reason": "Research is better handled by a multi-step graph template.",
+                "invocation_purpose": "answer_delegate",
+                "expected_final_response_strategy": "pass_through",
                 "selected_permissions": [],
                 "permission_summary": "none",
                 "rejected_candidates": [

@@ -71,10 +71,18 @@ def resolve_output_preview_value(
         return fallback
 
     outputs = value.get("outputs")
-    if not isinstance(outputs, dict) or len(outputs) != 1:
+    if not isinstance(outputs, dict):
         return fallback
 
-    output_key, raw_output = next(iter(outputs.items()))
+    if len(outputs) == 1:
+        output_key, raw_output = next(iter(outputs.items()))
+    else:
+        if configured_display_mode not in {"auto", "plain", "markdown"}:
+            return fallback
+        output_key = resolve_preferred_result_package_output_key(outputs)
+        if output_key is None:
+            return fallback
+        raw_output = outputs[output_key]
     output_key_text = str(output_key or "").strip()
     if not output_key_text:
         return fallback
@@ -95,6 +103,17 @@ def resolve_output_preview_value(
         "file_name_template": output_key_text,
         "value": output_value,
     }
+
+
+def resolve_preferred_result_package_output_key(outputs: dict[str, Any]) -> str | None:
+    if "final_reply" not in outputs:
+        return None
+    raw_output = outputs.get("final_reply")
+    if isinstance(raw_output, dict):
+        output_value = raw_output.get("value")
+    else:
+        output_value = raw_output
+    return "final_reply" if output_value not in (None, "", [], {}) else None
 
 
 def resolve_result_package_output_display_mode(
