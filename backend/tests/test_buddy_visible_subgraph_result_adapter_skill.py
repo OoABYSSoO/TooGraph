@@ -43,7 +43,17 @@ class BuddyVisibleSubgraphResultAdapterSkillTests(unittest.TestCase):
         self.assertEqual(definition.permissions, [])
         self.assertEqual(
             [field.key for field in definition.llm_output_schema],
-            ["selected_capability", "visible_operation_result", "user_goal", "reason"],
+            [
+                "selected_capability",
+                "operation_result",
+                "page_operation_context",
+                "operation_report",
+                "page_operation_final_reply",
+                "page_operation_workflow_report",
+                "visible_operation_result",
+                "user_goal",
+                "reason",
+            ],
         )
         self.assertEqual(
             {field.key: field.value_type for field in definition.state_output_schema},
@@ -54,7 +64,7 @@ class BuddyVisibleSubgraphResultAdapterSkillTests(unittest.TestCase):
             },
         )
 
-    def test_after_llm_wraps_visible_page_operation_result_as_original_subgraph_result(self) -> None:
+    def test_after_llm_wraps_visible_template_operation_result_as_original_subgraph_result(self) -> None:
         result = _run_skill_script(
             ADAPTER_AFTER_LLM_PATH,
             {
@@ -64,36 +74,29 @@ class BuddyVisibleSubgraphResultAdapterSkillTests(unittest.TestCase):
                     "name": "高级联网搜索",
                     "description": "多轮搜索并产出答案。",
                 },
-                "visible_operation_result": {
-                    "kind": "result_package",
-                    "sourceType": "subgraph",
-                    "sourceKey": "toograph_page_operation_workflow",
-                    "sourceName": "操作 TooGraph 页面",
+                "operation_result": {
+                    "operation_request_id": "vop_template_123",
                     "status": "succeeded",
-                    "inputs": {"user_goal": "运行图模板 高级联网搜索。本次目标：研究 TooGraph。"},
-                    "outputs": {
-                        "final_reply": {
-                            "name": "最终回复",
-                            "description": "页面操作结果。",
-                            "type": "markdown",
-                            "value": "已运行模板并拿到结果。",
-                        },
-                        "operation_report": {
-                            "name": "操作报告",
-                            "description": "页面操作结构化结果。",
-                            "type": "json",
-                            "value": {
-                                "operation_result": {
-                                    "triggered_run_id": "run_template_123",
-                                    "triggered_run_status": "completed",
-                                    "input_text": "研究 TooGraph。",
-                                }
-                            },
-                        },
+                    "commands": ["run_template advanced_web_research_loop"],
+                    "triggered_run_id": "run_template_123",
+                    "triggered_run_status": "completed",
+                    "input_text": "研究 TooGraph。",
+                    "route_after": "/editor/advanced_web_research_loop",
+                },
+                "operation_report": {
+                    "operation_request_id": "vop_template_123",
+                    "status": "succeeded",
+                    "triggered_run_id": "run_template_123",
+                    "triggered_run_status": "completed",
+                },
+                "page_operation_context": {
+                    "page_facts": {
+                        "latestForegroundRun": {
+                            "runId": "run_template_123",
+                            "status": "completed",
+                            "resultSummary": "已运行模板并拿到结果。",
+                        }
                     },
-                    "durationMs": 321,
-                    "error": "",
-                    "errorType": "",
                 },
                 "user_goal": "研究 TooGraph。",
                 "reason": "目标模板通过可见页面操作运行。",
@@ -108,18 +111,40 @@ class BuddyVisibleSubgraphResultAdapterSkillTests(unittest.TestCase):
         self.assertEqual(package["sourceName"], "高级联网搜索")
         self.assertEqual(package["status"], "succeeded")
         self.assertEqual(package["inputs"]["user_goal"], "研究 TooGraph。")
-        self.assertEqual(package["inputs"]["visible_operation_capability"], "toograph_page_operation_workflow")
+        self.assertEqual(package["inputs"]["visible_operation_capability"], "toograph_page_operator")
         self.assertEqual(package["outputs"]["final_reply"]["value"], "已运行模板并拿到结果。")
         self.assertEqual(package["outputs"]["operation_report"]["value"]["operation_result"]["triggered_run_id"], "run_template_123")
-        self.assertEqual(package["outputs"]["visible_operation_result"]["value"]["sourceKey"], "toograph_page_operation_workflow")
+        self.assertEqual(package["outputs"]["visible_operation_result"]["value"]["triggered_run_id"], "run_template_123")
         self.assertNotIn("fieldKey", package["outputs"]["final_reply"])
+
+    def test_after_llm_wraps_page_operation_workflow_outputs(self) -> None:
+        result = _run_skill_script(
+            ADAPTER_AFTER_LLM_PATH,
+            {
+                "selected_capability": {
+                    "kind": "subgraph",
+                    "key": "toograph_page_operation_workflow",
+                    "name": "操作 TooGraph 页面",
+                },
+                "page_operation_final_reply": "已打开运行历史。",
+                "page_operation_workflow_report": {"goal_completed": True, "route_after": "/runs"},
+                "user_goal": "打开运行历史。",
+                "reason": "页面目标模糊，使用页面操作子图。",
+            },
+        )
+
+        self.assertEqual(result["ok"], True)
+        package = result["result_package"]
+        self.assertEqual(package["sourceKey"], "toograph_page_operation_workflow")
+        self.assertEqual(package["outputs"]["final_reply"]["value"], "已打开运行历史。")
+        self.assertEqual(package["outputs"]["operation_report"]["value"]["route_after"], "/runs")
 
     def test_after_llm_rejects_non_subgraph_capability(self) -> None:
         result = _run_skill_script(
             ADAPTER_AFTER_LLM_PATH,
             {
                 "selected_capability": {"kind": "skill", "key": "web_search", "name": "Web Search"},
-                "visible_operation_result": {"kind": "result_package"},
+                "operation_result": {"status": "succeeded"},
                 "user_goal": "研究 TooGraph。",
             },
         )

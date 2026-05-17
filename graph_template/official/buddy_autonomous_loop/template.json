@@ -1156,31 +1156,6 @@
                 "managed": true
               }
             },
-            "visible_page_operation_capability": {
-              "name": "visible_page_operation_capability",
-              "description": "伙伴运行目标图模板时使用的内部可见页面操作子图能力。",
-              "type": "capability",
-              "value": {
-                "kind": "subgraph",
-                "key": "toograph_page_operation_workflow",
-                "name": "操作 TooGraph 页面",
-                "description": "内部可见页面操作通道，用于打开并运行选中的目标图模板。"
-              },
-              "color": "#0ea5e9",
-              "binding": null
-            },
-            "visible_subgraph_operation_result": {
-              "name": "visible_subgraph_operation_result",
-              "description": "通过页面操作 workflow 可见运行目标图模板后的原始结果包。",
-              "type": "result_package",
-              "value": {},
-              "color": "#0ea5e9",
-              "binding": {
-                "kind": "capability_result",
-                "nodeId": "execute_visible_subgraph_operation",
-                "managed": true
-              }
-            },
             "capability_review": {
               "name": "capability_review",
               "description": "能力执行后的复盘。",
@@ -1220,6 +1195,102 @@
               "value": {},
               "color": "#a16207",
               "binding": null
+            },
+            "operation_result": {
+              "name": "operation_result",
+              "description": "固定模板运行 Skill 完成后由前端续跑注入的页面操作结果。",
+              "type": "json",
+              "value": {},
+              "color": "#0ea5e9",
+              "binding": null
+            },
+            "page_operation_context": {
+              "name": "page_operation_context",
+              "description": "页面操作完成后刷新得到的页面事实和最新前台运行摘要。",
+              "type": "json",
+              "value": {},
+              "color": "#0891b2",
+              "binding": null
+            },
+            "operation_report": {
+              "name": "operation_report",
+              "description": "固定模板运行 Skill 和前端续跑返回的结构化操作报告。",
+              "type": "json",
+              "value": {},
+              "color": "#0369a1",
+              "binding": null
+            },
+            "visible_page_operation_final_reply": {
+              "name": "visible_page_operation_final_reply",
+              "description": "模糊页面操作子图输出的最终回复。",
+              "type": "markdown",
+              "value": "",
+              "color": "#0f766e",
+              "binding": null
+            },
+            "visible_page_operation_report": {
+              "name": "visible_page_operation_report",
+              "description": "模糊页面操作子图输出的结构化报告。",
+              "type": "json",
+              "value": {},
+              "color": "#0f766e",
+              "binding": null
+            },
+            "visible_template_operation_ok": {
+              "name": "visible_template_operation_ok",
+              "description": "固定模板运行 Skill 是否成功发起页面操作。",
+              "type": "boolean",
+              "value": false,
+              "color": "#0ea5e9",
+              "binding": {
+                "kind": "skill_output",
+                "skillKey": "toograph_page_operator",
+                "nodeId": "run_visible_template_operation",
+                "fieldKey": "ok",
+                "managed": true
+              }
+            },
+            "visible_template_operation_request_id": {
+              "name": "visible_template_operation_request_id",
+              "description": "固定模板运行页面操作请求 ID。",
+              "type": "text",
+              "value": "",
+              "color": "#0ea5e9",
+              "binding": {
+                "kind": "skill_output",
+                "skillKey": "toograph_page_operator",
+                "nodeId": "run_visible_template_operation",
+                "fieldKey": "operation_request_id",
+                "managed": true
+              }
+            },
+            "visible_template_operation_journal": {
+              "name": "visible_template_operation_journal",
+              "description": "固定模板运行页面操作日志。",
+              "type": "json",
+              "value": [],
+              "color": "#0ea5e9",
+              "binding": {
+                "kind": "skill_output",
+                "skillKey": "toograph_page_operator",
+                "nodeId": "run_visible_template_operation",
+                "fieldKey": "journal",
+                "managed": true
+              }
+            },
+            "visible_template_operation_error": {
+              "name": "visible_template_operation_error",
+              "description": "固定模板运行页面操作失败信息。",
+              "type": "json",
+              "value": {},
+              "color": "#dc2626",
+              "binding": {
+                "kind": "skill_output",
+                "skillKey": "toograph_page_operator",
+                "nodeId": "run_visible_template_operation",
+                "fieldKey": "error",
+                "managed": true
+              }
             }
           },
           "nodes": {
@@ -1355,7 +1426,7 @@
               "ui": {
                 "position": {
                   "x": 60,
-                  "y": 620
+                  "y": 780
                 },
                 "collapsed": false
               },
@@ -1378,7 +1449,7 @@
               "ui": {
                 "position": {
                   "x": 60,
-                  "y": 740
+                  "y": 900
                 },
                 "collapsed": false
               },
@@ -1507,11 +1578,11 @@
             "selected_capability_is_subgraph": {
               "kind": "condition",
               "name": "目标是图模板?",
-              "description": "图模板能力走可见页面操作通道；Skill 能力继续走动态 Skill 执行。",
+              "description": "图模板能力走固定模板运行 Skill；Skill 能力继续走动态 Skill 执行。",
               "ui": {
                 "position": {
-                  "x": 1120,
-                  "y": 320
+                  "x": 1560,
+                  "y": 360
                 },
                 "collapsed": false
               },
@@ -1588,7 +1659,7 @@
               "description": "根据 capability state 动态执行一个 Skill，并把原始结果写入 result_package。",
               "ui": {
                 "position": {
-                  "x": 3000,
+                  "x": 2120,
                   "y": 80
                 },
                 "collapsed": false
@@ -1633,69 +1704,7 @@
                 "skillKey": "",
                 "skillBindings": [],
                 "skillInstructionBlocks": {},
-                "taskInstruction": "你只负责为 selected_capability.kind=skill 的能力准备一次运行输入。若 selected_capability.kind 是 subgraph，本节点不应被条件路由调用；图模板能力会走 execute_visible_subgraph_operation，经页面操作器可见打开模板、写入 input 节点、点击运行并等待结果。Skill 执行结果会写入 capability_result result_package。\n不要总结、改写或二次包装执行结果；动态能力执行结果必须保持 outputs.<outputKey> = { name, description, type, value }。",
-                "modelSource": "global",
-                "model": "",
-                "thinkingMode": "high",
-                "temperature": 0.1
-              }
-            },
-            "execute_visible_subgraph_operation": {
-              "kind": "agent",
-              "name": "可见运行图模板能力",
-              "description": "把原始目标图模板转成页面操作 workflow，通过虚拟鼠标打开、输入目标并运行模板。",
-              "ui": {
-                "position": {
-                  "x": 3000,
-                  "y": 300
-                },
-                "collapsed": false
-              },
-              "reads": [
-                {
-                  "state": "visible_page_operation_capability",
-                  "required": true
-                },
-                {
-                  "state": "user_message",
-                  "required": true
-                },
-                {
-                  "state": "page_context",
-                  "required": false
-                },
-                {
-                  "state": "buddy_context",
-                  "required": true
-                },
-                {
-                  "state": "request_understanding",
-                  "required": true
-                },
-                {
-                  "state": "capability_selection_audit",
-                  "required": true
-                },
-                {
-                  "state": "context_brief",
-                  "required": false
-                },
-                {
-                  "state": "task_plan",
-                  "required": false
-                }
-              ],
-              "writes": [
-                {
-                  "state": "visible_subgraph_operation_result",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "skillKey": "",
-                "skillBindings": [],
-                "skillInstructionBlocks": {},
-                "taskInstruction": "你只负责为 visible_page_operation_capability 准备一次 toograph_page_operation_workflow 的输入；本节点唯一的动态 capability 来源是 visible_page_operation_capability，不要直接执行 capability_selection_audit.selected 指向的目标图模板。必须从 capability_selection_audit.selected 读取目标模板 key/name，并把 toograph_page_operation_workflow 的 user_goal 写成：运行图模板 <selected.name 或 selected.key>；本次目标：<request_understanding.user_goal 或 user_message>。如果 selected.key 存在，也把模板 key 放进 user_goal。之后由页面操作器的 template_target 固定映射执行打开图与模板、搜索目标模板、点开模板、把本次目标写入 input 节点、点击运行并等待结果。不要输出 DOM selector、坐标或逐步鼠标命令。",
+                "taskInstruction": "你只负责为 selected_capability.kind=skill 的能力准备一次运行输入。若 selected_capability.kind 是 subgraph，本节点不应被条件路由调用；图模板能力会走 run_visible_template_operation，经固定页面操作 Skill 打开模板、写入 input 节点、点击运行并等待结果。Skill 执行结果会写入 capability_result result_package。\n不要总结、改写或二次包装执行结果；动态能力执行结果必须保持 outputs.<outputKey> = { name, description, type, value }。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "high",
@@ -1708,8 +1717,8 @@
               "description": "把页面操作 workflow 的结果包重新标记为原始目标图模板能力的结果包。",
               "ui": {
                 "position": {
-                  "x": 3370,
-                  "y": 300
+                  "x": 2640,
+                  "y": 420
                 },
                 "collapsed": false
               },
@@ -1719,8 +1728,24 @@
                   "required": true
                 },
                 {
-                  "state": "visible_subgraph_operation_result",
-                  "required": true
+                  "state": "operation_result",
+                  "required": false
+                },
+                {
+                  "state": "page_operation_context",
+                  "required": false
+                },
+                {
+                  "state": "operation_report",
+                  "required": false
+                },
+                {
+                  "state": "visible_page_operation_final_reply",
+                  "required": false
+                },
+                {
+                  "state": "visible_page_operation_report",
+                  "required": false
                 },
                 {
                   "state": "user_message",
@@ -1751,7 +1776,7 @@
                   "buddy_visible_subgraph_result_adapter": {
                     "skillKey": "buddy_visible_subgraph_result_adapter",
                     "title": "可见子图结果适配 skill instruction",
-                    "content": "只调用 buddy_visible_subgraph_result_adapter。selected_capability 必须从 capability_selection_audit.selected 复制；visible_operation_result 必须完整复制 visible_subgraph_operation_result；user_goal 优先使用 request_understanding.user_goal，其次 user_message。不要总结、重写或发明运行结果。",
+                    "content": "只调用 buddy_visible_subgraph_result_adapter。selected_capability 必须从 capability_selection_audit.selected 复制；固定模板运行分支复制 operation_result、page_operation_context、operation_report；页面操作 workflow 分支复制 visible_page_operation_final_reply 到 page_operation_final_reply、visible_page_operation_report 到 page_operation_workflow_report；user_goal 优先使用 request_understanding.user_goal，其次 user_message。不要总结、重写或发明运行结果。",
                     "source": "node.override"
                   }
                 },
@@ -1768,8 +1793,8 @@
               "description": "判断能力结果是否足够，是否还需要调用另一个能力。",
               "ui": {
                 "position": {
-                  "x": 3370,
-                  "y": 80
+                  "x": 3140,
+                  "y": 220
                 },
                 "collapsed": false
               },
@@ -1822,8 +1847,8 @@
               "description": "最多三轮能力循环。",
               "ui": {
                 "position": {
-                  "x": 3740,
-                  "y": 80
+                  "x": 3560,
+                  "y": 220
                 },
                 "collapsed": false
               },
@@ -1858,7 +1883,7 @@
               "description": "把能力循环的最终状态整理为统一复盘，供多个输出边界读取。",
               "ui": {
                 "position": {
-                  "x": 4140,
+                  "x": 3980,
                   "y": 220
                 },
                 "collapsed": false
@@ -2074,6 +2099,1507 @@
               ],
               "writes": [],
               "config": {}
+            },
+            "selected_capability_is_page_operation": {
+              "kind": "condition",
+              "name": "目标是页面操作?",
+              "description": "模糊页面目标走多节点页面操作子图；其他图模板目标走固定模板运行 Skill。",
+              "ui": {
+                "position": {
+                  "x": 1180,
+                  "y": 220
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "selected_capability",
+                  "required": true
+                }
+              ],
+              "writes": [],
+              "config": {
+                "branches": [
+                  "true",
+                  "false",
+                  "exhausted"
+                ],
+                "loopLimit": 3,
+                "branchMapping": {
+                  "true": "true",
+                  "false": "false"
+                },
+                "rule": {
+                  "source": "$state.selected_capability.key",
+                  "operator": "==",
+                  "value": "toograph_page_operation_workflow"
+                }
+              }
+            },
+            "run_page_operation_workflow": {
+              "kind": "subgraph",
+              "name": "页面操作子图",
+              "description": "目标本身是模糊页面操作时，交给多节点页面操作 workflow 澄清并执行。",
+              "ui": {
+                "position": {
+                  "x": 2120,
+                  "y": 560
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "user_message",
+                  "required": true
+                }
+              ],
+              "writes": [
+                {
+                  "state": "visible_page_operation_final_reply",
+                  "mode": "replace"
+                },
+                {
+                  "state": "visible_page_operation_report",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "graph": {
+                  "state_schema": {
+                    "user_goal": {
+                      "name": "用户目标",
+                      "description": "用户希望 TooGraph 当前页面完成的具体目标。",
+                      "type": "text",
+                      "value": "打开运行记录",
+                      "color": "#d97706",
+                      "binding": null
+                    },
+                    "page_context": {
+                      "name": "页面上下文",
+                      "description": "当前页面、可见目标和近期操作的可读摘要。",
+                      "type": "markdown",
+                      "value": "",
+                      "color": "#0891b2",
+                      "binding": null
+                    },
+                    "page_operation_context": {
+                      "name": "页面操作上下文",
+                      "description": "结构化页面操作书、页面快照和页面事实，由前端在运行或恢复时注入。",
+                      "type": "json",
+                      "value": {},
+                      "color": "#0284c7",
+                      "binding": null
+                    },
+                    "goal_plan": {
+                      "name": "目标计划",
+                      "description": "目标类型、目标对象线索、副作用、成功标准和停止条件。",
+                      "type": "json",
+                      "value": {},
+                      "color": "#16a34a",
+                      "binding": null
+                    },
+                    "operation_request": {
+                      "name": "下一步操作请求",
+                      "description": "本轮计划交给页面操作器的目标、命令候选和验证预期。",
+                      "type": "json",
+                      "value": {},
+                      "color": "#7c3aed",
+                      "binding": null
+                    },
+                    "operation_ok": {
+                      "name": "操作请求已接受",
+                      "description": "页面操作器是否接受本轮语义操作请求。",
+                      "type": "boolean",
+                      "value": false,
+                      "color": "#16a34a",
+                      "binding": {
+                        "kind": "skill_output",
+                        "skillKey": "toograph_page_operator",
+                        "nodeId": "execute_page_operation",
+                        "fieldKey": "ok",
+                        "managed": true
+                      }
+                    },
+                    "operation_request_id": {
+                      "name": "操作请求 ID",
+                      "description": "页面操作器生成的稳定请求 ID，用于关联 activity event、前端执行确认和自动恢复。",
+                      "type": "text",
+                      "value": "",
+                      "color": "#2563eb",
+                      "binding": {
+                        "kind": "skill_output",
+                        "skillKey": "toograph_page_operator",
+                        "nodeId": "execute_page_operation",
+                        "fieldKey": "operation_request_id",
+                        "managed": true
+                      }
+                    },
+                    "operation_journal": {
+                      "name": "操作日志",
+                      "description": "页面操作器返回的请求日志和校验摘要。",
+                      "type": "json",
+                      "value": {},
+                      "color": "#4f46e5",
+                      "binding": {
+                        "kind": "skill_output",
+                        "skillKey": "toograph_page_operator",
+                        "nodeId": "execute_page_operation",
+                        "fieldKey": "journal",
+                        "managed": true
+                      }
+                    },
+                    "operation_error": {
+                      "name": "操作错误",
+                      "description": "页面操作器拒绝请求时返回的结构化错误。",
+                      "type": "json",
+                      "value": {},
+                      "color": "#dc2626",
+                      "binding": {
+                        "kind": "skill_output",
+                        "skillKey": "toograph_page_operator",
+                        "nodeId": "execute_page_operation",
+                        "fieldKey": "error",
+                        "managed": true
+                      }
+                    },
+                    "operation_result": {
+                      "name": "前端操作结果",
+                      "description": "前端执行虚拟 UI 操作后的确认结果，包含前后路由、快照、触发 run 和错误。",
+                      "type": "json",
+                      "value": {},
+                      "color": "#0f766e",
+                      "binding": null
+                    },
+                    "page_snapshot": {
+                      "name": "页面快照",
+                      "description": "最新页面快照，用于验证路由、活跃图、可见卡片和运行状态。",
+                      "type": "json",
+                      "value": {},
+                      "color": "#0891b2",
+                      "binding": null
+                    },
+                    "goal_review": {
+                      "name": "目标验证",
+                      "description": "目标是否完成、是否继续操作、是否需要澄清或失败收束的结构化判断。",
+                      "type": "json",
+                      "value": {},
+                      "color": "#0f766e",
+                      "binding": null
+                    },
+                    "loop_trace": {
+                      "name": "循环轨迹",
+                      "description": "已尝试页面操作和验证结果的紧凑摘要列表。",
+                      "type": "json",
+                      "value": [],
+                      "color": "#9333ea",
+                      "binding": null
+                    },
+                    "final_reply": {
+                      "name": "最终回复",
+                      "description": "面向用户展示的页面操作结果。",
+                      "type": "markdown",
+                      "value": "",
+                      "color": "#b45309",
+                      "binding": null
+                    },
+                    "operation_report": {
+                      "name": "操作报告",
+                      "description": "供运行详情展示的结构化路由、图、run、操作和验证摘要。",
+                      "type": "json",
+                      "value": {},
+                      "color": "#7c2d12",
+                      "binding": null
+                    }
+                  },
+                  "nodes": {
+                    "input_user_goal": {
+                      "kind": "input",
+                      "name": "输入用户目标",
+                      "description": "提供要完成的页面操作目标。",
+                      "ui": {
+                        "position": {
+                          "x": 80,
+                          "y": 100
+                        },
+                        "collapsed": false
+                      },
+                      "reads": [],
+                      "writes": [
+                        {
+                          "state": "user_goal",
+                          "mode": "replace"
+                        }
+                      ],
+                      "config": {
+                        "value": "打开运行记录",
+                        "boundaryType": "text"
+                      }
+                    },
+                    "classify_goal": {
+                      "kind": "agent",
+                      "name": "解析页面目标",
+                      "description": "把用户意图转成可验证页面目标和成功标准。",
+                      "ui": {
+                        "position": {
+                          "x": 460,
+                          "y": 320
+                        },
+                        "collapsed": false
+                      },
+                      "reads": [
+                        {
+                          "state": "user_goal",
+                          "required": true
+                        }
+                      ],
+                      "writes": [
+                        {
+                          "state": "goal_plan",
+                          "mode": "replace"
+                        },
+                        {
+                          "state": "loop_trace",
+                          "mode": "replace"
+                        }
+                      ],
+                      "config": {
+                        "skillKey": "",
+                        "skillBindings": [],
+                        "skillInstructionBlocks": {},
+                        "taskInstruction": "分析 user_goal，写入 goal_plan JSON。必须包含 goal_type、target_hints、required_side_effects、success_criteria、requires_run_terminal_status(boolean)、requires_save(boolean)、risk_notes、failure_boundaries。支持查看记录、打开页面或页签、新建图、编辑图、运行当前图、运行指定图模板。loop_trace 初始化为空数组。不要发起页面操作；页面操作书由后续页面操作器 Skill 的 runtime context 自动注入。",
+                        "modelSource": "global",
+                        "model": "",
+                        "thinkingMode": "high",
+                        "temperature": 0.1
+                      }
+                    },
+                    "operation_loop": {
+                      "kind": "subgraph",
+                      "name": "页面操作循环",
+                      "description": "计划一步页面操作，调用页面操作器，暂停等待前端执行，恢复后验证目标并决定是否继续。",
+                      "ui": {
+                        "position": {
+                          "x": 900,
+                          "y": 320
+                        },
+                        "collapsed": false
+                      },
+                      "reads": [
+                        {
+                          "state": "user_goal",
+                          "required": true
+                        },
+                        {
+                          "state": "goal_plan",
+                          "required": true
+                        },
+                        {
+                          "state": "loop_trace",
+                          "required": true
+                        }
+                      ],
+                      "writes": [
+                        {
+                          "state": "operation_request",
+                          "mode": "replace"
+                        },
+                        {
+                          "state": "operation_ok",
+                          "mode": "replace"
+                        },
+                        {
+                          "state": "operation_request_id",
+                          "mode": "replace"
+                        },
+                        {
+                          "state": "operation_journal",
+                          "mode": "replace"
+                        },
+                        {
+                          "state": "operation_error",
+                          "mode": "replace"
+                        },
+                        {
+                          "state": "operation_result",
+                          "mode": "replace"
+                        },
+                        {
+                          "state": "page_snapshot",
+                          "mode": "replace"
+                        },
+                        {
+                          "state": "goal_review",
+                          "mode": "replace"
+                        },
+                        {
+                          "state": "loop_trace",
+                          "mode": "replace"
+                        },
+                        {
+                          "state": "operation_report",
+                          "mode": "replace"
+                        }
+                      ],
+                      "config": {
+                        "graph": {
+                          "state_schema": {
+                            "user_goal": {
+                              "name": "用户目标",
+                              "description": "用户希望完成的页面操作目标。",
+                              "type": "text",
+                              "value": "",
+                              "color": "#d97706",
+                              "binding": null
+                            },
+                            "page_context": {
+                              "name": "页面上下文",
+                              "description": "当前页面可读上下文。",
+                              "type": "markdown",
+                              "value": "",
+                              "color": "#0891b2",
+                              "binding": null
+                            },
+                            "page_operation_context": {
+                              "name": "页面操作上下文",
+                              "description": "页面操作书、快照和事实。",
+                              "type": "json",
+                              "value": {},
+                              "color": "#0284c7",
+                              "binding": null
+                            },
+                            "goal_plan": {
+                              "name": "目标计划",
+                              "description": "目标分类、成功标准和停止条件。",
+                              "type": "json",
+                              "value": {},
+                              "color": "#16a34a",
+                              "binding": null
+                            },
+                            "operation_request": {
+                              "name": "下一步操作请求",
+                              "description": "本轮页面操作计划。",
+                              "type": "json",
+                              "value": {},
+                              "color": "#7c3aed",
+                              "binding": null
+                            },
+                            "operation_ok": {
+                              "name": "操作请求已接受",
+                              "description": "页面操作器是否接受本轮请求。",
+                              "type": "boolean",
+                              "value": false,
+                              "color": "#16a34a",
+                              "binding": {
+                                "kind": "skill_output",
+                                "skillKey": "toograph_page_operator",
+                                "nodeId": "execute_page_operation",
+                                "fieldKey": "ok",
+                                "managed": true
+                              }
+                            },
+                            "operation_request_id": {
+                              "name": "操作请求 ID",
+                              "description": "关联 activity event、前端执行确认和恢复的稳定 ID。",
+                              "type": "text",
+                              "value": "",
+                              "color": "#2563eb",
+                              "binding": {
+                                "kind": "skill_output",
+                                "skillKey": "toograph_page_operator",
+                                "nodeId": "execute_page_operation",
+                                "fieldKey": "operation_request_id",
+                                "managed": true
+                              }
+                            },
+                            "operation_journal": {
+                              "name": "操作日志",
+                              "description": "页面操作器返回的请求日志和校验摘要。",
+                              "type": "json",
+                              "value": {},
+                              "color": "#4f46e5",
+                              "binding": {
+                                "kind": "skill_output",
+                                "skillKey": "toograph_page_operator",
+                                "nodeId": "execute_page_operation",
+                                "fieldKey": "journal",
+                                "managed": true
+                              }
+                            },
+                            "operation_error": {
+                              "name": "操作错误",
+                              "description": "页面操作器拒绝请求时返回的结构化错误。",
+                              "type": "json",
+                              "value": {},
+                              "color": "#dc2626",
+                              "binding": {
+                                "kind": "skill_output",
+                                "skillKey": "toograph_page_operator",
+                                "nodeId": "execute_page_operation",
+                                "fieldKey": "error",
+                                "managed": true
+                              }
+                            },
+                            "operation_result": {
+                              "name": "前端操作结果",
+                              "description": "前端执行后的确认结果。",
+                              "type": "json",
+                              "value": {},
+                              "color": "#0f766e",
+                              "binding": null
+                            },
+                            "page_snapshot": {
+                              "name": "页面快照",
+                              "description": "恢复后的最新页面快照。",
+                              "type": "json",
+                              "value": {},
+                              "color": "#0891b2",
+                              "binding": null
+                            },
+                            "goal_review": {
+                              "name": "目标验证",
+                              "description": "目标完成、继续、澄清或失败判断。",
+                              "type": "json",
+                              "value": {},
+                              "color": "#0f766e",
+                              "binding": null
+                            },
+                            "loop_trace": {
+                              "name": "循环轨迹",
+                              "description": "已尝试操作与验证摘要。",
+                              "type": "json",
+                              "value": [],
+                              "color": "#9333ea",
+                              "binding": null
+                            },
+                            "operation_report": {
+                              "name": "操作报告",
+                              "description": "供运行详情展示的结构化报告。",
+                              "type": "json",
+                              "value": {},
+                              "color": "#7c2d12",
+                              "binding": null
+                            }
+                          },
+                          "nodes": {
+                            "input_user_goal": {
+                              "kind": "input",
+                              "name": "用户目标边界",
+                              "description": "从父图读取用户目标。",
+                              "ui": {
+                                "position": {
+                                  "x": 60,
+                                  "y": 120
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [],
+                              "writes": [
+                                {
+                                  "state": "user_goal",
+                                  "mode": "replace"
+                                }
+                              ],
+                              "config": {
+                                "value": "",
+                                "boundaryType": "text"
+                              }
+                            },
+                            "input_goal_plan": {
+                              "kind": "input",
+                              "name": "目标计划边界",
+                              "description": "从父图读取目标计划。",
+                              "ui": {
+                                "position": {
+                                  "x": 60,
+                                  "y": 280
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [],
+                              "writes": [
+                                {
+                                  "state": "goal_plan",
+                                  "mode": "replace"
+                                }
+                              ],
+                              "config": {
+                                "value": {},
+                                "boundaryType": "json"
+                              }
+                            },
+                            "input_loop_trace": {
+                              "kind": "input",
+                              "name": "循环轨迹边界",
+                              "description": "从父图读取已有循环轨迹。",
+                              "ui": {
+                                "position": {
+                                  "x": 60,
+                                  "y": 440
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [],
+                              "writes": [
+                                {
+                                  "state": "loop_trace",
+                                  "mode": "replace"
+                                }
+                              ],
+                              "config": {
+                                "value": [],
+                                "boundaryType": "json"
+                              }
+                            },
+                            "plan_next_operation": {
+                              "kind": "agent",
+                              "name": "规划下一步页面操作",
+                              "description": "根据目标计划、最新页面操作书和循环轨迹选择下一步可验证操作。",
+                              "ui": {
+                                "position": {
+                                  "x": 480,
+                                  "y": 460
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [
+                                {
+                                  "state": "user_goal",
+                                  "required": true
+                                },
+                                {
+                                  "state": "goal_plan",
+                                  "required": true
+                                },
+                                {
+                                  "state": "operation_result",
+                                  "required": false
+                                },
+                                {
+                                  "state": "goal_review",
+                                  "required": false
+                                },
+                                {
+                                  "state": "loop_trace",
+                                  "required": false
+                                }
+                              ],
+                              "writes": [
+                                {
+                                  "state": "operation_request",
+                                  "mode": "replace"
+                                }
+                              ],
+                              "config": {
+                                "skillKey": "",
+                                "skillBindings": [],
+                                "skillInstructionBlocks": {},
+                                "taskInstruction": "根据 user_goal、goal_plan、operation_result、goal_review 和 loop_trace 选择下一步页面操作意图并写 operation_request JSON。不要输出 DOM selector、坐标、截图描述或浏览器自动化步骤；具体可用命令由下一节点绑定的页面操作器 Skill 从 runtime context 的页面操作书中选择。若目标是运行指定图模板，operation_request 必须包含 semantic_intent=run_template、target_template_id、target_template_name、search_text、input_text=user_goal、requires_terminal_run=true，并让下一节点只输出 template_target，不输出逐步 commands。字段至少包含 target_hint、semantic_intent、reason、expected_route、expected_entity、expected_run、expected_graph_change、requires_terminal_run、blocked_reason。若目标已完成，blocked_reason 写 already_completed；若缺少必要信息，blocked_reason 写 needs_clarification。不要调用技能。",
+                                "modelSource": "global",
+                                "model": "",
+                                "thinkingMode": "high",
+                                "temperature": 0.1
+                              }
+                            },
+                            "execute_page_operation": {
+                              "kind": "agent",
+                              "name": "执行页面操作",
+                              "description": "调用 TooGraph 页面操作器请求一次可见 UI 操作；运行时在本节点后暂停等待前端确认。",
+                              "ui": {
+                                "position": {
+                                  "x": 940,
+                                  "y": 460
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [
+                                {
+                                  "state": "user_goal",
+                                  "required": true
+                                },
+                                {
+                                  "state": "goal_plan",
+                                  "required": true
+                                },
+                                {
+                                  "state": "operation_request",
+                                  "required": true
+                                },
+                                {
+                                  "state": "loop_trace",
+                                  "required": false
+                                }
+                              ],
+                              "writes": [
+                                {
+                                  "state": "operation_ok",
+                                  "mode": "replace"
+                                },
+                                {
+                                  "state": "operation_request_id",
+                                  "mode": "replace"
+                                },
+                                {
+                                  "state": "operation_journal",
+                                  "mode": "replace"
+                                },
+                                {
+                                  "state": "operation_error",
+                                  "mode": "replace"
+                                }
+                              ],
+                              "config": {
+                                "skillKey": "toograph_page_operator",
+                                "skillBindings": [
+                                  {
+                                    "skillKey": "toograph_page_operator",
+                                    "outputMapping": {
+                                      "ok": "operation_ok",
+                                      "operation_request_id": "operation_request_id",
+                                      "journal": "operation_journal",
+                                      "error": "operation_error"
+                                    }
+                                  }
+                                ],
+                                "skillInstructionBlocks": {
+                                  "toograph_page_operator": {
+                                    "skillKey": "toograph_page_operator",
+                                    "title": "页面操作器 skill instruction",
+                                    "content": "你已绑定 TooGraph 页面操作器。本节点只调用一次 toograph_page_operator。若 operation_request.semantic_intent 是 run_template 或包含 target_template_id/target_template_name，直接输出 template_target 对象，包含 template_id、template_name、search_text、input_text；input_text 必须是本次要写入目标模板 input 节点的目标文本，通常直接使用 user_goal。不要把打开图库、搜索、点开模板、写 input、运行拆成 commands。其他普通页面操作才根据 operation_request 和当前页面操作书输出一条合法 commands；如果 operation_request.command 为空或 blocked_reason 非空，优先选择安全 wait short 或返回不可执行原因。不要输出 DOM selector、坐标、截图、伙伴自表面目标或多步计划。",
+                                    "source": "node.override"
+                                  }
+                                },
+                                "taskInstruction": "本节点只调用一次 toograph_page_operator，并把 operation_request 转成该 Skill 的结构化输出。运行指定图模板时只输出 template_target，让 Skill/frontend 程序化执行打开图与模板、搜索目标模板、点开模板、把本次目标写入 input 节点、运行并等待结果。普通操作只能选择当前页面操作书中的 click、focus、clear、type、press 或 wait；图编辑只能使用 graph_edit editor.graph.playback 和语义 graph_edit_intents。不要在本节点总结结果，前端执行后会恢复并进入验证节点。",
+                                "modelSource": "global",
+                                "model": "",
+                                "thinkingMode": "high",
+                                "temperature": 0.1
+                              }
+                            },
+                            "verify_goal_against_refreshed_context": {
+                              "kind": "agent",
+                              "name": "验证刷新后的页面目标",
+                              "description": "读取前端恢复写入的操作结果和最新页面上下文，判断目标是否真正完成。",
+                              "ui": {
+                                "position": {
+                                  "x": 1400,
+                                  "y": 460
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [
+                                {
+                                  "state": "user_goal",
+                                  "required": true
+                                },
+                                {
+                                  "state": "page_context",
+                                  "required": true
+                                },
+                                {
+                                  "state": "page_operation_context",
+                                  "required": true
+                                },
+                                {
+                                  "state": "goal_plan",
+                                  "required": true
+                                },
+                                {
+                                  "state": "operation_request",
+                                  "required": true
+                                },
+                                {
+                                  "state": "operation_ok",
+                                  "required": true
+                                },
+                                {
+                                  "state": "operation_request_id",
+                                  "required": false
+                                },
+                                {
+                                  "state": "operation_journal",
+                                  "required": false
+                                },
+                                {
+                                  "state": "operation_error",
+                                  "required": false
+                                },
+                                {
+                                  "state": "operation_result",
+                                  "required": true
+                                },
+                                {
+                                  "state": "loop_trace",
+                                  "required": false
+                                }
+                              ],
+                              "writes": [
+                                {
+                                  "state": "page_snapshot",
+                                  "mode": "replace"
+                                },
+                                {
+                                  "state": "goal_review",
+                                  "mode": "replace"
+                                },
+                                {
+                                  "state": "loop_trace",
+                                  "mode": "replace"
+                                },
+                                {
+                                  "state": "operation_report",
+                                  "mode": "replace"
+                                }
+                              ],
+                              "config": {
+                                "skillKey": "",
+                                "skillBindings": [],
+                                "skillInstructionBlocks": {},
+                                "taskInstruction": "使用 page_operation_context.page_facts、operation_result 和 goal_plan 验证用户目标。goal_review 必须是 JSON 对象，包含 goal_completed(boolean)、needs_more_operations(boolean)、needs_clarification(boolean)、failure_reason、next_requirement、evidence。只有最新页面事实或 operation_result 明确匹配 success_criteria 时才把 goal_completed 设为 true。运行图目标必须看到 operation_result.triggered_run_id 且 triggered_run_status 为 completed、failed 或 cancelled；若 triggered_run_status 仍是 queued/running/resuming/awaiting_human，则 needs_more_operations 设为 true。失败时优先使用 canonical failure_reason：target_graph_not_found、run_record_not_found、stale_page_snapshot、destructive_operation_blocked、triggered_run_failed、operation_interrupted。关注 triggered_run_status、triggered_run_id、triggered_graph_id、route_after、page_snapshot_after、page_facts.activeGraph 和 graph_edit_summary。page_snapshot 写 operation_result.page_snapshot_after 或 page_operation_context.page_snapshot。operation_report 写紧凑对象，包含 operation_request_id、status、route_before、route_after、target_id、triggered_run_id、triggered_run_status、graph_edit_summary、goal_completed、failure_reason。loop_trace 写追加后的紧凑数组。",
+                                "modelSource": "global",
+                                "model": "",
+                                "thinkingMode": "high",
+                                "temperature": 0.1
+                              }
+                            },
+                            "continue_operation_loop": {
+                              "kind": "condition",
+                              "name": "继续页面操作?",
+                              "description": "目标未完成且仍可继续时回到规划节点；达到上限时输出失败或待澄清结果。",
+                              "ui": {
+                                "position": {
+                                  "x": 1860,
+                                  "y": 500
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [
+                                {
+                                  "state": "goal_review",
+                                  "required": true
+                                }
+                              ],
+                              "writes": [],
+                              "config": {
+                                "branches": [
+                                  "true",
+                                  "false",
+                                  "exhausted"
+                                ],
+                                "loopLimit": 6,
+                                "branchMapping": {
+                                  "true": "true",
+                                  "false": "false"
+                                },
+                                "rule": {
+                                  "source": "$state.goal_review.needs_more_operations",
+                                  "operator": "==",
+                                  "value": true
+                                }
+                              }
+                            },
+                            "output_operation_request": {
+                              "kind": "output",
+                              "name": "输出操作请求",
+                              "description": "公开最后一次操作请求。",
+                              "ui": {
+                                "position": {
+                                  "x": 2200,
+                                  "y": 120
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [
+                                {
+                                  "state": "operation_request",
+                                  "required": false
+                                }
+                              ],
+                              "writes": [],
+                              "config": {
+                                "displayMode": "json",
+                                "persistEnabled": false,
+                                "persistFormat": "auto",
+                                "fileNameTemplate": ""
+                              }
+                            },
+                            "output_operation_ok": {
+                              "kind": "output",
+                              "name": "输出操作接受状态",
+                              "description": "公开页面操作器接受状态。",
+                              "ui": {
+                                "position": {
+                                  "x": 2200,
+                                  "y": 240
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [
+                                {
+                                  "state": "operation_ok",
+                                  "required": false
+                                }
+                              ],
+                              "writes": [],
+                              "config": {
+                                "displayMode": "auto",
+                                "persistEnabled": false,
+                                "persistFormat": "auto",
+                                "fileNameTemplate": ""
+                              }
+                            },
+                            "output_operation_request_id": {
+                              "kind": "output",
+                              "name": "输出操作请求 ID",
+                              "description": "公开最后一次操作请求 ID。",
+                              "ui": {
+                                "position": {
+                                  "x": 2200,
+                                  "y": 360
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [
+                                {
+                                  "state": "operation_request_id",
+                                  "required": false
+                                }
+                              ],
+                              "writes": [],
+                              "config": {
+                                "displayMode": "plain",
+                                "persistEnabled": false,
+                                "persistFormat": "auto",
+                                "fileNameTemplate": ""
+                              }
+                            },
+                            "output_operation_journal": {
+                              "kind": "output",
+                              "name": "输出操作日志",
+                              "description": "公开页面操作器日志。",
+                              "ui": {
+                                "position": {
+                                  "x": 2200,
+                                  "y": 480
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [
+                                {
+                                  "state": "operation_journal",
+                                  "required": false
+                                }
+                              ],
+                              "writes": [],
+                              "config": {
+                                "displayMode": "json",
+                                "persistEnabled": false,
+                                "persistFormat": "auto",
+                                "fileNameTemplate": ""
+                              }
+                            },
+                            "output_operation_error": {
+                              "kind": "output",
+                              "name": "输出操作错误",
+                              "description": "公开页面操作器错误。",
+                              "ui": {
+                                "position": {
+                                  "x": 2200,
+                                  "y": 600
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [
+                                {
+                                  "state": "operation_error",
+                                  "required": false
+                                }
+                              ],
+                              "writes": [],
+                              "config": {
+                                "displayMode": "json",
+                                "persistEnabled": false,
+                                "persistFormat": "auto",
+                                "fileNameTemplate": ""
+                              }
+                            },
+                            "output_operation_result": {
+                              "kind": "output",
+                              "name": "输出前端操作结果",
+                              "description": "公开前端执行确认。",
+                              "ui": {
+                                "position": {
+                                  "x": 2200,
+                                  "y": 720
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [
+                                {
+                                  "state": "operation_result",
+                                  "required": false
+                                }
+                              ],
+                              "writes": [],
+                              "config": {
+                                "displayMode": "json",
+                                "persistEnabled": false,
+                                "persistFormat": "auto",
+                                "fileNameTemplate": ""
+                              }
+                            },
+                            "output_page_snapshot": {
+                              "kind": "output",
+                              "name": "输出页面快照",
+                              "description": "公开最新页面快照。",
+                              "ui": {
+                                "position": {
+                                  "x": 2200,
+                                  "y": 840
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [
+                                {
+                                  "state": "page_snapshot",
+                                  "required": false
+                                }
+                              ],
+                              "writes": [],
+                              "config": {
+                                "displayMode": "json",
+                                "persistEnabled": false,
+                                "persistFormat": "auto",
+                                "fileNameTemplate": ""
+                              }
+                            },
+                            "output_goal_review": {
+                              "kind": "output",
+                              "name": "输出目标验证",
+                              "description": "公开目标验证结果。",
+                              "ui": {
+                                "position": {
+                                  "x": 2200,
+                                  "y": 960
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [
+                                {
+                                  "state": "goal_review",
+                                  "required": false
+                                }
+                              ],
+                              "writes": [],
+                              "config": {
+                                "displayMode": "json",
+                                "persistEnabled": false,
+                                "persistFormat": "auto",
+                                "fileNameTemplate": ""
+                              }
+                            },
+                            "output_loop_trace": {
+                              "kind": "output",
+                              "name": "输出循环轨迹",
+                              "description": "公开循环轨迹。",
+                              "ui": {
+                                "position": {
+                                  "x": 2200,
+                                  "y": 1080
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [
+                                {
+                                  "state": "loop_trace",
+                                  "required": false
+                                }
+                              ],
+                              "writes": [],
+                              "config": {
+                                "displayMode": "json",
+                                "persistEnabled": false,
+                                "persistFormat": "auto",
+                                "fileNameTemplate": ""
+                              }
+                            },
+                            "output_operation_report": {
+                              "kind": "output",
+                              "name": "输出操作报告",
+                              "description": "公开紧凑操作报告。",
+                              "ui": {
+                                "position": {
+                                  "x": 2200,
+                                  "y": 1200
+                                },
+                                "collapsed": false
+                              },
+                              "reads": [
+                                {
+                                  "state": "operation_report",
+                                  "required": false
+                                }
+                              ],
+                              "writes": [],
+                              "config": {
+                                "displayMode": "json",
+                                "persistEnabled": false,
+                                "persistFormat": "auto",
+                                "fileNameTemplate": ""
+                              }
+                            }
+                          },
+                          "edges": [
+                            {
+                              "source": "input_user_goal",
+                              "target": "plan_next_operation"
+                            },
+                            {
+                              "source": "input_goal_plan",
+                              "target": "plan_next_operation"
+                            },
+                            {
+                              "source": "input_loop_trace",
+                              "target": "plan_next_operation"
+                            },
+                            {
+                              "source": "plan_next_operation",
+                              "target": "execute_page_operation"
+                            },
+                            {
+                              "source": "execute_page_operation",
+                              "target": "verify_goal_against_refreshed_context"
+                            },
+                            {
+                              "source": "verify_goal_against_refreshed_context",
+                              "target": "continue_operation_loop"
+                            }
+                          ],
+                          "conditional_edges": [
+                            {
+                              "source": "continue_operation_loop",
+                              "branches": {
+                                "true": "plan_next_operation",
+                                "false": "output_goal_review",
+                                "exhausted": "output_goal_review"
+                              }
+                            }
+                          ],
+                          "metadata": {
+                            "graphProtocol": "node_system",
+                            "role": "page_operation_loop",
+                            "interrupt_after": [
+                              "execute_page_operation"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "draft_final_reply": {
+                      "kind": "agent",
+                      "name": "起草最终回复",
+                      "description": "根据目标验证和操作报告生成用户可见结果。",
+                      "ui": {
+                        "position": {
+                          "x": 1320,
+                          "y": 320
+                        },
+                        "collapsed": false
+                      },
+                      "reads": [
+                        {
+                          "state": "user_goal",
+                          "required": true
+                        },
+                        {
+                          "state": "goal_plan",
+                          "required": true
+                        },
+                        {
+                          "state": "goal_review",
+                          "required": true
+                        },
+                        {
+                          "state": "operation_result",
+                          "required": false
+                        },
+                        {
+                          "state": "operation_report",
+                          "required": false
+                        },
+                        {
+                          "state": "loop_trace",
+                          "required": false
+                        }
+                      ],
+                      "writes": [
+                        {
+                          "state": "final_reply",
+                          "mode": "replace"
+                        }
+                      ],
+                      "config": {
+                        "skillKey": "",
+                        "skillBindings": [],
+                        "skillInstructionBlocks": {},
+                        "taskInstruction": "生成最终用户回复。只有 goal_review.goal_completed 为 true 时才说明已完成，并包含可用的 route、graph id/name、run id、触发 run 终态或保存结果。若 needs_clarification 为 true，明确需要用户补充什么。若失败，按 goal_review.failure_reason 简洁说明失败原因：target_graph_not_found=找不到目标图；run_record_not_found=找不到匹配运行记录；stale_page_snapshot=页面快照过期；destructive_operation_blocked=破坏性操作被阻止；triggered_run_failed=触发的 run 失败；operation_interrupted=操作被用户或运行时中断。不要声称只是发出请求就完成。",
+                        "modelSource": "global",
+                        "model": "",
+                        "thinkingMode": "low",
+                        "temperature": 0.2
+                      }
+                    },
+                    "output_final_reply": {
+                      "kind": "output",
+                      "name": "输出最终回复",
+                      "description": "展示页面操作工作流的最终回复。",
+                      "ui": {
+                        "position": {
+                          "x": 1740,
+                          "y": 260
+                        },
+                        "collapsed": false
+                      },
+                      "reads": [
+                        {
+                          "state": "final_reply",
+                          "required": true
+                        }
+                      ],
+                      "writes": [],
+                      "config": {
+                        "displayMode": "markdown",
+                        "persistEnabled": false,
+                        "persistFormat": "auto",
+                        "fileNameTemplate": ""
+                      }
+                    },
+                    "output_operation_report": {
+                      "kind": "output",
+                      "name": "输出操作报告",
+                      "description": "展示结构化页面操作报告，供运行详情审计。",
+                      "ui": {
+                        "position": {
+                          "x": 1740,
+                          "y": 440
+                        },
+                        "collapsed": false
+                      },
+                      "reads": [
+                        {
+                          "state": "operation_report",
+                          "required": false
+                        }
+                      ],
+                      "writes": [],
+                      "config": {
+                        "displayMode": "json",
+                        "persistEnabled": false,
+                        "persistFormat": "auto",
+                        "fileNameTemplate": ""
+                      }
+                    }
+                  },
+                  "edges": [
+                    {
+                      "source": "input_user_goal",
+                      "target": "classify_goal"
+                    },
+                    {
+                      "source": "classify_goal",
+                      "target": "operation_loop"
+                    },
+                    {
+                      "source": "operation_loop",
+                      "target": "draft_final_reply"
+                    },
+                    {
+                      "source": "draft_final_reply",
+                      "target": "output_final_reply"
+                    },
+                    {
+                      "source": "operation_loop",
+                      "target": "output_operation_report"
+                    }
+                  ],
+                  "conditional_edges": [],
+                  "metadata": {
+                    "graphProtocol": "node_system",
+                    "role": "page_operation_workflow",
+                    "pageOperationTemplate": true,
+                    "targetFlows": [
+                      {
+                        "id": "open_runs_page",
+                        "sampleGoal": "打开运行记录",
+                        "operationTargets": [
+                          "app.nav.runs",
+                          "runs.action.refresh"
+                        ],
+                        "completionEvidence": [
+                          "page_facts.route.path == /runs",
+                          "visibleRuns contains run cards"
+                        ]
+                      },
+                      {
+                        "id": "open_run_detail",
+                        "sampleGoal": "打开某个运行详情",
+                        "operationTargets": [
+                          "app.nav.runs",
+                          "runs.search.graphName",
+                          "runs.run.<runId>.openDetail"
+                        ],
+                        "completionEvidence": [
+                          "page_facts.route.path starts with /runs/",
+                          "visible run detail matches requested run id"
+                        ]
+                      },
+                      {
+                        "id": "open_library_page",
+                        "sampleGoal": "打开图与模板页面",
+                        "operationTargets": [
+                          "app.nav.library",
+                          "library.search.query"
+                        ],
+                        "completionEvidence": [
+                          "page_facts.route.path == /library",
+                          "visibleGraphs or visibleTemplates are available"
+                        ]
+                      },
+                      {
+                        "id": "create_blank_graph",
+                        "sampleGoal": "新建一个空白图",
+                        "operationTargets": [
+                          "app.nav.library",
+                          "library.action.newBlankGraph",
+                          "editor.launcher.createNew"
+                        ],
+                        "completionEvidence": [
+                          "page_facts.route.path starts with /editor",
+                          "page_facts.activeGraph exists",
+                          "active graph is dirty or unnamed draft"
+                        ]
+                      },
+                      {
+                        "id": "open_named_graph",
+                        "sampleGoal": "打开名为 X 的图",
+                        "operationTargets": [
+                          "app.nav.library",
+                          "library.search.query",
+                          "library.graph.<graphId>.open",
+                          "editor.launcher.openGraph.<graphId>"
+                        ],
+                        "completionEvidence": [
+                          "page_facts.activeGraph.name matches target",
+                          "page_facts.activeGraph.graphId matches visible graph id"
+                        ]
+                      },
+                      {
+                        "id": "run_named_template",
+                        "sampleGoal": "运行名为 X 的图模板并拿取结果",
+                        "operationTargets": [
+                          "template_target",
+                          "app.nav.library",
+                          "library.search.query",
+                          "library.template.<templateId>.open",
+                          "editor.canvas.node.<inputNodeId>.input.value",
+                          "editor.action.runActiveGraph"
+                        ],
+                        "completionEvidence": [
+                          "operation_result.commands includes run_template",
+                          "operation_result.input_text matches user_goal",
+                          "triggered_run_id present",
+                          "triggered_run_status terminal",
+                          "page_facts.latestForegroundRun.runId matches triggered_run_id"
+                        ]
+                      },
+                      {
+                        "id": "run_current_graph",
+                        "sampleGoal": "运行当前图并告诉我结果",
+                        "operationTargets": [
+                          "editor.action.runActiveGraph",
+                          "editor.action.toggleRunActivity"
+                        ],
+                        "completionEvidence": [
+                          "triggered_run_id present",
+                          "triggered_run_status terminal",
+                          "page_facts.latestForegroundRun.runId matches triggered_run_id"
+                        ]
+                      },
+                      {
+                        "id": "create_basic_llm_graph",
+                        "sampleGoal": "新建一个包含输入、LLM、输出的图",
+                        "operationTargets": [
+                          "app.nav.library",
+                          "library.action.newBlankGraph",
+                          "editor.graph.playback",
+                          "editor.action.saveActiveGraph"
+                        ],
+                        "completionEvidence": [
+                          "graph_edit_summary.applied is true",
+                          "page_facts.activeGraph exists",
+                          "node labels include input, LLM, output"
+                        ]
+                      },
+                      {
+                        "id": "rename_current_node",
+                        "sampleGoal": "编辑当前图，给某个节点改名",
+                        "operationTargets": [
+                          "editor.canvas.node.<nodeId>",
+                          "editor.graph.playback",
+                          "editor.action.saveActiveGraph"
+                        ],
+                        "completionEvidence": [
+                          "graph_edit_summary.applied is true",
+                          "page_facts.activeGraph.dirty or saved revision updated",
+                          "target node label changed"
+                        ]
+                      }
+                    ],
+                    "failureGuidance": {
+                      "target_graph_not_found": {
+                        "failureReason": "target_graph_not_found",
+                        "replyGuidance": "说明没有找到目标图，请用户确认图名称或先打开目标图。",
+                        "evidence": [
+                          "page_facts.visibleGraphs",
+                          "page_facts.activeGraph",
+                          "goal_plan.target_hints"
+                        ]
+                      },
+                      "run_record_not_found": {
+                        "failureReason": "run_record_not_found",
+                        "replyGuidance": "说明没有找到匹配的运行记录，请用户提供 run id 或更明确的图名称。",
+                        "evidence": [
+                          "page_facts.visibleRuns",
+                          "operation_result.triggered_run_id",
+                          "goal_plan.target_hints"
+                        ]
+                      },
+                      "stale_page_snapshot": {
+                        "failureReason": "stale_page_snapshot",
+                        "replyGuidance": "说明当前页面快照已过期，需要刷新页面上下文后再继续。",
+                        "evidence": [
+                          "operation_result.page_snapshot_after",
+                          "page_operation_context.page_snapshot",
+                          "operation_request_id"
+                        ]
+                      },
+                      "destructive_operation_blocked": {
+                        "failureReason": "destructive_operation_blocked",
+                        "replyGuidance": "说明目标属于破坏性或需确认操作，页面操作器已阻止执行。",
+                        "evidence": [
+                          "operation_error.code",
+                          "operation_request.blocked_reason",
+                          "operation_journal"
+                        ]
+                      },
+                      "triggered_run_failed": {
+                        "failureReason": "triggered_run_failed",
+                        "replyGuidance": "说明已触发运行但 run 以失败终态结束，并给出 run id。",
+                        "evidence": [
+                          "operation_result.triggered_run_id",
+                          "operation_result.triggered_run_status",
+                          "page_facts.latestForegroundRun"
+                        ]
+                      },
+                      "operation_interrupted": {
+                        "failureReason": "operation_interrupted",
+                        "replyGuidance": "说明页面操作被用户、运行时或前端流程中断，未完成目标。",
+                        "evidence": [
+                          "operation_result.status",
+                          "operation_result.error",
+                          "operation_journal"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "run_visible_template_operation": {
+              "kind": "agent",
+              "name": "可见运行目标模板",
+              "description": "通过固定页面操作 Skill 打开图与模板、搜索目标模板、写入 input 节点、运行并等待结果。",
+              "ui": {
+                "position": {
+                  "x": 2120,
+                  "y": 300
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "user_message",
+                  "required": true
+                },
+                {
+                  "state": "page_context",
+                  "required": false
+                },
+                {
+                  "state": "buddy_context",
+                  "required": false
+                },
+                {
+                  "state": "request_understanding",
+                  "required": true
+                },
+                {
+                  "state": "capability_selection_audit",
+                  "required": true
+                },
+                {
+                  "state": "context_brief",
+                  "required": false
+                },
+                {
+                  "state": "task_plan",
+                  "required": false
+                }
+              ],
+              "writes": [
+                {
+                  "state": "visible_template_operation_ok",
+                  "mode": "replace"
+                },
+                {
+                  "state": "visible_template_operation_request_id",
+                  "mode": "replace"
+                },
+                {
+                  "state": "visible_template_operation_journal",
+                  "mode": "replace"
+                },
+                {
+                  "state": "visible_template_operation_error",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "skillKey": "toograph_page_operator",
+                "skillBindings": [
+                  {
+                    "skillKey": "toograph_page_operator",
+                    "outputMapping": {
+                      "ok": "visible_template_operation_ok",
+                      "operation_request_id": "visible_template_operation_request_id",
+                      "journal": "visible_template_operation_journal",
+                      "error": "visible_template_operation_error"
+                    }
+                  }
+                ],
+                "skillInstructionBlocks": {
+                  "toograph_page_operator": {
+                    "skillKey": "toograph_page_operator",
+                    "title": "固定模板运行 skill instruction",
+                    "content": "只输出 template_target、cursor_lifecycle、reason。template_target 必须包含 template_id 或 template_name、search_text、input_text；不要输出 commands 或 graph_edit_intents。input_text 是本次用户目标，用来写入目标模板的 input 节点。",
+                    "source": "node.override"
+                  }
+                },
+                "taskInstruction": "本节点只调用一次 toograph_page_operator。不要输出 commands，不要输出 DOM selector、坐标、鼠标轨迹或浏览器点击细节。\n从 capability_selection_audit.selected 读取目标模板，输出 template_target JSON：template_id 使用 selected.key，template_name 使用 selected.name，search_text 优先 selected.name 其次 selected.key。\ntemplate_target.input_text 必须写入本次 user_goal：优先 request_understanding.user_goal，其次 user_message；需要保留用户的原始目标，不要改成“打开模板”这种操作目标。\ncursor_lifecycle 使用 return_at_end，reason 简短说明伙伴通过固定页面操作运行目标模板。Skill 会程序化执行：点击左侧栏图与模板、搜索目标模板、点开模板、修改 input 节点为本次目标、点击运行、等待图运行完成并把 operation_result/page_operation_context 写回后再继续决策。",
+                "modelSource": "global",
+                "model": "",
+                "thinkingMode": "low",
+                "temperature": 0.1
+              }
             }
           },
           "edges": [
@@ -2096,10 +3622,6 @@
             {
               "source": "execute_capability",
               "target": "review_capability_result"
-            },
-            {
-              "source": "execute_visible_subgraph_operation",
-              "target": "adapt_visible_subgraph_result"
             },
             {
               "source": "adapt_visible_subgraph_result",
@@ -2144,21 +3666,37 @@
             {
               "source": "input_task_plan",
               "target": "select_capability"
+            },
+            {
+              "source": "run_page_operation_workflow",
+              "target": "adapt_visible_subgraph_result"
+            },
+            {
+              "source": "run_visible_template_operation",
+              "target": "adapt_visible_subgraph_result"
             }
           ],
           "conditional_edges": [
             {
               "source": "capability_found_condition",
               "branches": {
-                "true": "selected_capability_is_subgraph",
+                "true": "selected_capability_is_page_operation",
                 "false": "review_missing_capability",
                 "exhausted": "review_missing_capability"
               }
             },
             {
+              "source": "selected_capability_is_page_operation",
+              "branches": {
+                "true": "run_page_operation_workflow",
+                "false": "selected_capability_is_subgraph",
+                "exhausted": "selected_capability_is_subgraph"
+              }
+            },
+            {
               "source": "selected_capability_is_subgraph",
               "branches": {
-                "true": "execute_visible_subgraph_operation",
+                "true": "run_visible_template_operation",
                 "false": "execute_capability",
                 "exhausted": "execute_capability"
               }
@@ -2175,7 +3713,9 @@
           "metadata": {
             "graphProtocol": "node_system",
             "role": "buddy_capability_loop",
-            "interrupt_after": []
+            "interrupt_after": [
+              "run_visible_template_operation"
+            ]
           }
         }
       }

@@ -149,6 +149,51 @@ class RuntimeActivityEventsTests(unittest.TestCase):
         )
         self.assertEqual(published[0][2]["detail"]["expected_continuation"]["mode"], "auto_resume_after_ui_operation")
 
+    def test_record_skill_activity_events_stores_virtual_operation_continuation_on_root_state(self) -> None:
+        parent_state = {"run_id": "run-activity"}
+        state = {
+            "run_id": "run-activity",
+            "_parent_run_state": parent_state,
+            "_subgraph_context": {"node_id": "buddy_capability_loop", "path": ["buddy_capability_loop"]},
+        }
+
+        from app.core.runtime.activity_events import record_skill_activity_events
+
+        record_skill_activity_events(
+            state,
+            node_id="run_visible_template_operation",
+            skill_key="toograph_page_operator",
+            binding_source="node_config",
+            raw_events=[
+                {
+                    "kind": "virtual_ui_operation",
+                    "summary": "Requested virtual template run.",
+                    "status": "requested",
+                    "detail": {
+                        "operation_request_id": "vop_template",
+                        "operation_request": {
+                            "version": 1,
+                            "commands": ["run_template advanced_web_research_loop"],
+                            "operations": [{"kind": "run_template", "target_id": "library.template.advanced_web_research_loop.open"}],
+                        },
+                    },
+                }
+            ],
+            publish_run_event_func=lambda *_args, **_kwargs: None,
+        )
+
+        expected = {
+            "mode": "auto_resume_after_ui_operation",
+            "operation_request_id": "vop_template",
+            "resume_state_keys": ["page_operation_context", "page_context", "operation_result"],
+            "run_id": "run-activity",
+            "node_id": "run_visible_template_operation",
+            "subgraph_node_id": "buddy_capability_loop",
+            "subgraph_path": ["buddy_capability_loop"],
+        }
+        self.assertEqual(state["metadata"]["pending_page_operation_continuation"], expected)
+        self.assertEqual(parent_state["metadata"]["pending_page_operation_continuation"], expected)
+
 
 if __name__ == "__main__":
     unittest.main()

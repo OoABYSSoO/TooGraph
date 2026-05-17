@@ -13,13 +13,6 @@ const buddyHomeSelection = {
   selected: ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md", "policy.json"],
 };
 
-const visiblePageOperationCapability = {
-  kind: "subgraph",
-  key: "toograph_page_operation_workflow",
-  name: "操作 TooGraph 页面",
-  description: "内部可见页面操作通道，用于打开并运行选中的目标图模板。",
-};
-
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -295,22 +288,94 @@ function capabilityStates() {
         managed: true,
       },
     }),
-    visible_page_operation_capability: state({
-      name: "visible_page_operation_capability",
-      description: "伙伴运行目标图模板时使用的内部可见页面操作子图能力。",
-      type: "capability",
-      value: visiblePageOperationCapability,
-      color: "#0ea5e9",
-    }),
-    visible_subgraph_operation_result: state({
-      name: "visible_subgraph_operation_result",
-      description: "通过页面操作 workflow 可见运行目标图模板后的原始结果包。",
-      type: "result_package",
+    operation_result: state({
+      name: "operation_result",
+      description: "固定模板运行 Skill 完成后由前端续跑注入的页面操作结果。",
+      type: "json",
       value: {},
       color: "#0ea5e9",
+    }),
+    page_operation_context: state({
+      name: "page_operation_context",
+      description: "页面操作完成后刷新得到的页面事实和最新前台运行摘要。",
+      type: "json",
+      value: {},
+      color: "#0891b2",
+    }),
+    operation_report: state({
+      name: "operation_report",
+      description: "固定模板运行 Skill 和前端续跑返回的结构化操作报告。",
+      type: "json",
+      value: {},
+      color: "#0369a1",
+    }),
+    visible_page_operation_final_reply: state({
+      name: "visible_page_operation_final_reply",
+      description: "模糊页面操作子图输出的最终回复。",
+      type: "markdown",
+      value: "",
+      color: "#0f766e",
+    }),
+    visible_page_operation_report: state({
+      name: "visible_page_operation_report",
+      description: "模糊页面操作子图输出的结构化报告。",
+      type: "json",
+      value: {},
+      color: "#0f766e",
+    }),
+    visible_template_operation_ok: state({
+      name: "visible_template_operation_ok",
+      description: "固定模板运行 Skill 是否成功发起页面操作。",
+      type: "boolean",
+      value: false,
+      color: "#0ea5e9",
       binding: {
-        kind: "capability_result",
-        nodeId: "execute_visible_subgraph_operation",
+        kind: "skill_output",
+        skillKey: "toograph_page_operator",
+        nodeId: "run_visible_template_operation",
+        fieldKey: "ok",
+        managed: true,
+      },
+    }),
+    visible_template_operation_request_id: state({
+      name: "visible_template_operation_request_id",
+      description: "固定模板运行页面操作请求 ID。",
+      type: "text",
+      value: "",
+      color: "#0ea5e9",
+      binding: {
+        kind: "skill_output",
+        skillKey: "toograph_page_operator",
+        nodeId: "run_visible_template_operation",
+        fieldKey: "operation_request_id",
+        managed: true,
+      },
+    }),
+    visible_template_operation_journal: state({
+      name: "visible_template_operation_journal",
+      description: "固定模板运行页面操作日志。",
+      type: "json",
+      value: [],
+      color: "#0ea5e9",
+      binding: {
+        kind: "skill_output",
+        skillKey: "toograph_page_operator",
+        nodeId: "run_visible_template_operation",
+        fieldKey: "journal",
+        managed: true,
+      },
+    }),
+    visible_template_operation_error: state({
+      name: "visible_template_operation_error",
+      description: "固定模板运行页面操作失败信息。",
+      type: "json",
+      value: {},
+      color: "#dc2626",
+      binding: {
+        kind: "skill_output",
+        skillKey: "toograph_page_operator",
+        nodeId: "run_visible_template_operation",
+        fieldKey: "error",
         managed: true,
       },
     }),
@@ -450,17 +515,36 @@ function patchRequestIntakeTemplate(template) {
   return template;
 }
 
-function patchCapabilityLoopTemplate(template) {
+function patchCapabilityLoopTemplate(template, templates) {
+  const cap = capabilityStates();
   template.state_schema.context_brief = contextBriefState();
   template.state_schema.task_plan = taskPlanState();
+  delete template.state_schema.visible_page_operation_capability;
+  delete template.state_schema.visible_subgraph_operation_result;
+  for (const key of [
+    "operation_result",
+    "page_operation_context",
+    "operation_report",
+    "visible_page_operation_final_reply",
+    "visible_page_operation_report",
+    "visible_template_operation_ok",
+    "visible_template_operation_request_id",
+    "visible_template_operation_journal",
+    "visible_template_operation_error",
+  ]) {
+    template.state_schema[key] = cap[key];
+  }
+  template.metadata.interrupt_after = ["run_visible_template_operation"];
+
   removeNodeReferences(template, "input_visible_page_operation_capability");
+  removeNodeReferences(template, "execute_visible_subgraph_operation");
   template.nodes = insertEntriesAfter(template.nodes, "input_request_understanding", [
     [
       "input_context_brief",
       inputNode({
         name: "上下文简报",
         x: 60,
-        y: 620,
+        y: 780,
         stateKey: "context_brief",
         boundaryType: "json",
         value: {},
@@ -471,7 +555,7 @@ function patchCapabilityLoopTemplate(template) {
       inputNode({
         name: "任务计划",
         x: 60,
-        y: 740,
+        y: 900,
         stateKey: "task_plan",
         boundaryType: "json",
         value: {},
@@ -492,9 +576,94 @@ function patchCapabilityLoopTemplate(template) {
     "context_brief 和 task_plan 只作为本轮上下文和步骤约束；不要把它们当作权限来源。若 capability_review 表示需要继续调用另一个能力，则以 capability_review.next_requirement 为当前需求。\n" +
     "不要把本伙伴循环模板自身作为候选答案。只选择能力，不执行能力，也不生成最终回复；执行由下游节点和运行时完成。";
 
+  template.nodes.selected_capability_is_page_operation = conditionReads(
+    conditionNode({
+      name: "目标是页面操作?",
+      description: "模糊页面目标走多节点页面操作子图；其他图模板目标走固定模板运行 Skill。",
+      x: 1180,
+      y: 220,
+      source: "$state.selected_capability.key",
+      value: "toograph_page_operation_workflow",
+      loopLimit: 3,
+    }),
+    "selected_capability",
+  );
+
+  template.nodes.selected_capability_is_subgraph = conditionReads(
+    conditionNode({
+      name: "目标是图模板?",
+      description: "图模板能力走固定模板运行 Skill；Skill 能力继续走动态 Skill 执行。",
+      x: 1560,
+      y: 360,
+      source: "$state.selected_capability.kind",
+      value: "subgraph",
+      loopLimit: 3,
+    }),
+    "selected_capability",
+  );
+
+  template.nodes.run_page_operation_workflow = subgraphNode({
+    name: "页面操作子图",
+    description: "目标本身是模糊页面操作时，交给多节点页面操作 workflow 澄清并执行。",
+    x: 2120,
+    y: 560,
+    reads: [read("user_message")],
+    writes: [write("visible_page_operation_final_reply"), write("visible_page_operation_report")],
+    graph: templateCoreForEmbedding(templates.toograph_page_operation_workflow),
+  });
+
+  template.nodes.run_visible_template_operation = agentNode({
+    name: "可见运行目标模板",
+    description: "通过固定页面操作 Skill 打开图与模板、搜索目标模板、写入 input 节点、运行并等待结果。",
+    x: 2120,
+    y: 300,
+    reads: [
+      read("user_message"),
+      read("page_context", false),
+      read("buddy_context", false),
+      read("request_understanding"),
+      read("capability_selection_audit"),
+      read("context_brief", false),
+      read("task_plan", false),
+    ],
+    writes: [
+      write("visible_template_operation_ok"),
+      write("visible_template_operation_request_id"),
+      write("visible_template_operation_journal"),
+      write("visible_template_operation_error"),
+    ],
+    skillKey: "toograph_page_operator",
+    skillBindings: [
+      {
+        skillKey: "toograph_page_operator",
+        outputMapping: {
+          ok: "visible_template_operation_ok",
+          operation_request_id: "visible_template_operation_request_id",
+          journal: "visible_template_operation_journal",
+          error: "visible_template_operation_error",
+        },
+      },
+    ],
+    thinkingMode: "low",
+    temperature: 0.1,
+    taskInstruction:
+      "本节点只调用一次 toograph_page_operator。不要输出 commands，不要输出 DOM selector、坐标、鼠标轨迹或浏览器点击细节。\n" +
+      "从 capability_selection_audit.selected 读取目标模板，输出 template_target JSON：template_id 使用 selected.key，template_name 使用 selected.name，search_text 优先 selected.name 其次 selected.key。\n" +
+      "template_target.input_text 必须写入本次 user_goal：优先 request_understanding.user_goal，其次 user_message；需要保留用户的原始目标，不要改成“打开模板”这种操作目标。\n" +
+      "cursor_lifecycle 使用 return_at_end，reason 简短说明伙伴通过固定页面操作运行目标模板。Skill 会程序化执行：点击左侧栏图与模板、搜索目标模板、点开模板、修改 input 节点为本次目标、点击运行、等待图运行完成并把 operation_result/page_operation_context 写回后再继续决策。",
+  });
+  template.nodes.run_visible_template_operation.config.skillInstructionBlocks = {
+    toograph_page_operator: {
+      skillKey: "toograph_page_operator",
+      title: "固定模板运行 skill instruction",
+      content:
+        "只输出 template_target、cursor_lifecycle、reason。template_target 必须包含 template_id 或 template_name、search_text、input_text；不要输出 commands 或 graph_edit_intents。input_text 是本次用户目标，用来写入目标模板的 input 节点。",
+      source: "node.override",
+    },
+  };
+
   for (const nodeId of [
     "execute_capability",
-    "execute_visible_subgraph_operation",
     "review_capability_result",
     "finalize_capability_cycle",
   ]) {
@@ -509,11 +678,85 @@ function patchCapabilityLoopTemplate(template) {
     }
   }
 
+  const executeCapability = template.nodes.execute_capability;
+  executeCapability.ui.position = { x: 2120, y: 80 };
+  executeCapability.config.taskInstruction =
+    "你只负责为 selected_capability.kind=skill 的能力准备一次运行输入。若 selected_capability.kind 是 subgraph，本节点不应被条件路由调用；图模板能力会走 run_visible_template_operation，经固定页面操作 Skill 打开模板、写入 input 节点、点击运行并等待结果。Skill 执行结果会写入 capability_result result_package。\n" +
+    "不要总结、改写或二次包装执行结果；动态能力执行结果必须保持 outputs.<outputKey> = { name, description, type, value }。";
+
+  template.nodes.adapt_visible_subgraph_result.reads = [
+    read("capability_selection_audit"),
+    read("operation_result", false),
+    read("page_operation_context", false),
+    read("operation_report", false),
+    read("visible_page_operation_final_reply", false),
+    read("visible_page_operation_report", false),
+    read("user_message"),
+    read("request_understanding"),
+  ];
+  template.nodes.adapt_visible_subgraph_result.ui.position = { x: 2640, y: 420 };
+  template.nodes.adapt_visible_subgraph_result.config.skillInstructionBlocks = {
+    buddy_visible_subgraph_result_adapter: {
+      skillKey: "buddy_visible_subgraph_result_adapter",
+      title: "可见子图结果适配 skill instruction",
+      content:
+        "只调用 buddy_visible_subgraph_result_adapter。selected_capability 必须从 capability_selection_audit.selected 复制；固定模板运行分支复制 operation_result、page_operation_context、operation_report；页面操作 workflow 分支复制 visible_page_operation_final_reply 到 page_operation_final_reply、visible_page_operation_report 到 page_operation_workflow_report；user_goal 优先使用 request_understanding.user_goal，其次 user_message。不要总结、重写或发明运行结果。",
+      source: "node.override",
+    },
+  };
+  template.nodes.adapt_visible_subgraph_result.config.taskInstruction =
+    "本节点只负责把可见页面操作结果适配回原始目标图模板能力结果。不要读取 selected_capability capability state；使用 capability_selection_audit.selected 作为原始目标能力。";
+
+  template.nodes.review_capability_result.ui.position = { x: 3140, y: 220 };
+  template.nodes.continue_capability_loop.ui.position = { x: 3560, y: 220 };
+  template.nodes.finalize_capability_cycle.ui.position = { x: 3980, y: 220 };
+
+  const staleNodeIds = new Set(["execute_visible_subgraph_operation", "input_visible_page_operation_capability"]);
+  template.edges = (template.edges ?? []).filter(
+    (edge) => !staleNodeIds.has(edge.source) && !staleNodeIds.has(edge.target),
+  );
   template.edges = uniqueEdges([
     ...template.edges,
     { source: "input_context_brief", target: "select_capability" },
     { source: "input_task_plan", target: "select_capability" },
+    { source: "run_page_operation_workflow", target: "adapt_visible_subgraph_result" },
+    { source: "run_visible_template_operation", target: "adapt_visible_subgraph_result" },
+    { source: "adapt_visible_subgraph_result", target: "review_capability_result" },
   ]);
+  template.conditional_edges = [
+    {
+      source: "capability_found_condition",
+      branches: {
+        true: "selected_capability_is_page_operation",
+        false: "review_missing_capability",
+        exhausted: "review_missing_capability",
+      },
+    },
+    {
+      source: "selected_capability_is_page_operation",
+      branches: {
+        true: "run_page_operation_workflow",
+        false: "selected_capability_is_subgraph",
+        exhausted: "selected_capability_is_subgraph",
+      },
+    },
+    {
+      source: "selected_capability_is_subgraph",
+      branches: {
+        true: "run_visible_template_operation",
+        false: "execute_capability",
+        exhausted: "execute_capability",
+      },
+    },
+    {
+      source: "continue_capability_loop",
+      branches: {
+        true: "select_capability",
+        false: "finalize_capability_cycle",
+        exhausted: "finalize_capability_cycle",
+      },
+    },
+  ];
   return template;
 }
 
@@ -776,7 +1019,10 @@ async function ensureSettings(ids) {
 
 async function main() {
   const requestIntake = patchRequestIntakeTemplate(await readTemplate("buddy_request_intake"));
-  const capabilityLoop = patchCapabilityLoopTemplate(await readTemplate("buddy_capability_loop"));
+  const pageOperationWorkflow = await readTemplate("toograph_page_operation_workflow");
+  const capabilityLoop = patchCapabilityLoopTemplate(await readTemplate("buddy_capability_loop"), {
+    toograph_page_operation_workflow: pageOperationWorkflow,
+  });
 
   await writeTemplate(requestIntake);
   await writeTemplate(capabilityLoop);
