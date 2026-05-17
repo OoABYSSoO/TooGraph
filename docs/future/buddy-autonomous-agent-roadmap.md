@@ -145,7 +145,6 @@ flowchart TD
 | `capability_found` | boolean | capability loop | final | 是否找到能力 |
 | `capability_selection_audit` | json | capability loop | run detail、review | 候选数量、选择原因、拒绝候选、权限摘要和缺口说明 |
 | `capability_result` | result_package | capability loop | review、final | 动态能力结果包 |
-| `capability_result_review` | json | capability loop | review、final | 对能力结果状态、失败类型、证据和重试价值的结构化分类 |
 | `capability_review` | json | capability loop | loop condition、final、review | 执行复盘和下一步判断 |
 | `capability_gap` | json | capability loop | final | 能力缺口 |
 | `capability_trace` | json | capability loop | final、review | 能力调用摘要列表 |
@@ -351,15 +350,14 @@ flowchart TD
 - `context_brief`
 - `request_understanding`
 - `task_plan` 可选
-- `visible_page_operation_capability`：内部 state 默认值，不展示为用户可编辑 input 节点。
 - `capability_review` 可选，供下一轮选择能力时读取上一轮复盘
 
 输出：
 
 - `selected_capability`
 - `capability_found`
+- `capability_selection_audit`
 - `capability_result`
-- `capability_result_review`
 - `capability_review`
 - `capability_gap`
 - `capability_trace`
@@ -372,13 +370,15 @@ flowchart TD
   S --> F{capability_found?}
   F -- false --> G[LLM: review_missing_capability]
   G --> Z[LLM: finalize_capability_cycle]
-  F -- true --> K{selected kind=subgraph?}
+  F -- true --> P{selected key=toograph_page_operation_workflow?}
+  P -- true --> W[Subgraph: run_page_operation_workflow]
+  P -- false --> K{selected kind=subgraph?}
   K -- false --> X[LLM + dynamic Skill: execute_capability]
-  K -- true --> V[LLM + internal page operation subgraph: execute_visible_subgraph_operation]
+  K -- true --> V[LLM + Skill: run_visible_template_operation]
+  W --> A2[LLM + Skill: adapt_visible_subgraph_result]
   V --> A2[LLM + Skill: adapt_visible_subgraph_result]
-  A2 --> Q[LLM: classify_capability_result]
-  X --> Q[LLM: classify_capability_result]
-  Q --> R[LLM: review_capability_result]
+  A2 --> R[LLM: review_capability_result]
+  X --> R[LLM: review_capability_result]
   R --> C{needs_another_capability?}
   C -- true --> S
   C -- false --> Z
@@ -393,12 +393,13 @@ flowchart TD
 | `select_capability` | LLM | 1 次，用于生成 Skill 输入 | 静态 `toograph_capability_selector` | 用户消息、请求理解、上一轮复盘 | `selected_capability`、`capability_found`、`capability_selection_audit` |
 | `capability_found_condition` | condition | 0 次 | 无 | `capability_found` | true/false/exhausted |
 | `review_missing_capability` | LLM | 1 次 | 无 | 用户消息、请求理解 | `capability_review`、`capability_gap` |
+| `selected_capability_is_page_operation` | condition | 0 次 | 无 | `selected_capability.key` | true/false/exhausted |
 | `selected_capability_is_subgraph` | condition | 0 次 | 无 | `selected_capability.kind` | true/false/exhausted |
 | `execute_capability` | LLM | 1 次，用于生成被选 Skill 输入 | 输入 `selected_capability`，仅处理 kind=skill | 用户消息、页面上下文、Buddy Home、请求理解 | `capability_result` |
-| `execute_visible_subgraph_operation` | LLM | 1 次，用于生成页面操作 workflow 的 `user_goal` | 输入固定 `visible_page_operation_capability`，目标模板来自 `capability_selection_audit.selected` | 用户消息、页面上下文、Buddy Home、请求理解、能力选择审计 | `visible_subgraph_operation_result` |
-| `adapt_visible_subgraph_result` | LLM + Skill | 1 次，用于复制适配参数 | 静态 `buddy_visible_subgraph_result_adapter` | 能力选择审计、可见页面操作结果、用户目标 | `capability_result` |
-| `classify_capability_result` | LLM | 1 次 | 无 | 用户消息、请求理解、任务计划、能力选择审计、能力结果包、既有轨迹 | `capability_result_review` |
-| `review_capability_result` | LLM | 1 次 | 无 | 用户消息、请求理解、任务计划、能力结果包、结果分类 | `capability_review`、append `capability_trace` |
+| `run_visible_template_operation` | LLM + Skill | 1 次，用于生成 `toograph_page_operator` 的 `template_target` | 静态 `toograph_page_operator`，目标模板来自 `capability_selection_audit.selected` | 用户消息、页面上下文、Buddy Home、请求理解、能力选择审计 | `visible_template_operation_ok`、`visible_template_operation_request_id`、`visible_template_operation_journal`、`visible_template_operation_error` |
+| `run_page_operation_workflow` | Subgraph | 子图内部决定 | 静态嵌入 `toograph_page_operation_workflow` | 用户消息 | `visible_page_operation_final_reply`、`visible_page_operation_report` |
+| `adapt_visible_subgraph_result` | LLM + Skill | 1 次，用于复制适配参数 | 静态 `buddy_visible_subgraph_result_adapter` | 能力选择审计、固定模板运行结果或页面操作子图输出、用户目标 | `capability_result` |
+| `review_capability_result` | LLM | 1 次 | 无 | 用户消息、请求理解、任务计划、能力结果包、既有轨迹 | `capability_review`、append `capability_trace` |
 | `continue_capability_loop` | condition | 0 次 | 无 | `capability_review.needs_another_capability` | true/false/exhausted |
 | `finalize_capability_cycle` | LLM | 1 次 | 无 | found、result、review、gap、trace | 规整 `capability_review` |
 
@@ -409,18 +410,24 @@ flowchart TD
 - 它只处理 `kind=skill` 的动态能力，并让 LLM 生成该 Skill 的一次输入。
 - 它不总结结果、不决定下一步、不生成最终回复。
 
-`execute_visible_subgraph_operation` 的边界：
+`run_visible_template_operation` 的边界：
 
-- 它读取一个 `capability` state：固定的 `visible_page_operation_capability`，其 key 是 `toograph_page_operation_workflow`。
-- 原始目标模板不再作为第二个 capability 输入读取，而是从普通 JSON 审计 state `capability_selection_audit.selected` 复制。
-- 它把页面操作 workflow 的 `user_goal` 组织为“运行图模板 <目标模板名或 key>；本次目标：<用户目标>”。
-- 页面操作 workflow 内部再通过 `toograph_page_operator` 的 `template_target -> run_template` 固定映射打开模板库、搜索、打开模板、写入 input、点击运行、等待终态并读取公开结果。
-- `adapt_visible_subgraph_result` 使用 `buddy_visible_subgraph_result_adapter` 把内部页面操作 workflow 的 `result_package` 重新包装为原目标模板的 `capability_result`，保持 `outputs.<outputKey> = { name, description, type, value }`，不添加 `fieldKey`。
+- 它不读取 `selected_capability` 这个 capability state，目标模板从普通 JSON 审计 state `capability_selection_audit.selected` 复制。
+- 它绑定静态 Skill `toograph_page_operator`，LLM 只输出 `template_target`、`cursor_lifecycle`、`reason`，不输出 DOM selector、坐标、逐步鼠标命令或动态 subgraph 调用。
+- `template_target.input_text` 必须是本次用户目标，优先 `request_understanding.user_goal`，其次 `user_message`；这份文本会写入目标模板的 input 节点。
+- `toograph_page_operator` 通过固定映射打开模板库、搜索、打开模板、写入 input、点击运行、等待终态并读取公开结果。
+- `adapt_visible_subgraph_result` 使用 `buddy_visible_subgraph_result_adapter` 把固定模板运行结果重新包装为原目标模板的 `capability_result`，保持 `outputs.<outputKey> = { name, description, type, value }`，不添加 `fieldKey`。
+
+`run_page_operation_workflow` 的边界：
+
+- 它只用于目标本身是模糊页面操作的情况，例如“打开运行历史”“帮我看当前页面”等，需要多节点页面操作子图先澄清目标、规划操作、执行并验证。
+- 它不是运行任意目标图模板的默认路径；明确图模板能力必须走 `run_visible_template_operation` 的固定模板运行 Skill。
 
 `capability.kind=subgraph` 的可见运行规则：
 
-- 只要 `toograph_capability_selector` 返回 `capability.kind=subgraph`，能力循环必须先经 `selected_capability_is_subgraph` 分流，不能让 `execute_capability` 直接走后台模板调用 API。
-- 这类目标应立即启动原生虚拟鼠标/键盘，并路由到固定内部能力 `toograph_page_operation_workflow`；`selected_capability` 仍是单个能力对象，目标模板 ID、名称、输入绑定目标和选择理由放在 `capability_selection_audit.selected` 及相关审计信息中。
+- 只要 `toograph_capability_selector` 返回 `capability.kind=subgraph`，能力循环必须先经 `selected_capability_is_page_operation` / `selected_capability_is_subgraph` 分流，不能让 `execute_capability` 直接走后台模板调用 API。
+- `selected_capability.key == "toograph_page_operation_workflow"` 表示目标是页面操作能力本身，应进入页面操作子图；其他图模板能力应立即启动原生虚拟鼠标/键盘，并通过 `toograph_page_operator` 的固定 `template_target -> run_template` 映射执行。
+- `selected_capability` 仍是单个能力对象，目标模板 ID、名称、输入绑定目标和选择理由放在 `capability_selection_audit.selected` 及相关审计信息中。
 - 页面操作流程可以包含多步：打开模板库、搜索或定位模板、选择或打开目标模板、确认输入绑定、点击运行、等待 run 进入 completed、failed、cancelled 或 `awaiting_human`，再读取 root output、run capsule、activity events 和 artifact 引用。
 - 如果目标模板进入 `awaiting_human`，当前能力执行应通过标准暂停卡暴露已产出的内容和所需补充；用户补充后继续等待该模板完成，再回到 `review_capability_result`。
 - `review_capability_result` 只能基于可见运行返回的结构化结果判断下一步：停止、解释失败、请求用户补充，或回到 `select_capability` 继续运行别的图模板或 Skill。
@@ -433,32 +440,20 @@ flowchart TD
 - false 分支进入 `finalize_capability_cycle`。
 - exhausted 分支进入 `finalize_capability_cycle`，不视为运行失败。最终回复应说明已达到本轮能力调用上限，并基于已有结果收束。
 
-`capability_result_review` 建议结构：
-
-```json
-{
-  "status": "succeeded | failed | awaiting_human | cancelled | partial",
-  "success": true,
-  "retryable": false,
-  "failure_reason": "",
-  "failure_category": "none | missing_input | permission_denied | target_not_found | run_failed | interrupted | no_progress | invalid_result",
-  "evidence": ["可引用的简短证据、run id、artifact 或错误摘要"],
-  "artifact_refs": [],
-  "result_size_class": "small | medium | large",
-  "overclaim_risk": "low | medium | high",
-  "no_progress_signature": ""
-}
-```
-
 `capability_review` 建议结构：
 
 ```json
 {
   "executed": true,
   "success": true,
+  "status": "succeeded | failed | awaiting_human | cancelled | partial",
   "stop_reason": "success",
   "summary": "本轮能力调用得到什么",
   "missing_information": [],
+  "retryable": false,
+  "failure_reason": "",
+  "failure_category": "none | missing_input | permission_denied | target_not_found | run_failed | interrupted | no_progress | invalid_result",
+  "evidence": ["可引用的简短证据、run id、artifact 或错误摘要"],
   "needs_another_capability": false,
   "next_requirement": "",
   "final_response_strategy": "answer_with_result | ask_user | offer_skill_creation | explain_failure",
@@ -532,7 +527,6 @@ flowchart TD
 - `task_plan`
 - `capability_found`
 - `capability_result`
-- `capability_result_review`
 - `capability_review`
 - `capability_gap`
 - `capability_trace`
