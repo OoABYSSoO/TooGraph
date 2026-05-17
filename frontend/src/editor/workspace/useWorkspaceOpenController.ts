@@ -2,6 +2,7 @@ import type { ComputedRef, Ref } from "vue";
 
 import type { GraphDocument, GraphPayload, TemplateRecord } from "../../types/node-system.ts";
 import type { RunDetail } from "../../types/run.ts";
+import { shouldPollRunStatus } from "../../lib/run-event-stream.ts";
 import {
   buildRestoredGraphFromRun,
   buildSnapshotScopedRun,
@@ -53,6 +54,8 @@ type WorkspaceOpenControllerInput = {
   fetchRun: (runId: string) => Promise<RunDetail>;
   applyRunVisualStateToTab: (tabId: string, run: RunDetail, document: GraphDraft | undefined, visualRun?: RunDetail) => void;
   openHumanReviewPanelForTab: (tabId: string, nodeId: string | null) => void;
+  startRunEventStreamForTab?: (tabId: string, runId: string) => void;
+  pollRunForTab?: (tabId: string, runId: string) => Promise<void>;
   syncRouteToTab: (tab: WorkspaceRouteTab, mode?: "push" | "replace") => void;
 };
 
@@ -166,6 +169,11 @@ export function useWorkspaceOpenController(input: WorkspaceOpenControllerInput) 
 
       if (visualRun.status === "awaiting_human" && visualRun.current_node_id) {
         input.openHumanReviewPanelForTab(tab.tabId, visualRun.current_node_id);
+      }
+
+      if (shouldPollRunStatus(visualRun.status)) {
+        input.startRunEventStreamForTab?.(tab.tabId, run.run_id);
+        void input.pollRunForTab?.(tab.tabId, run.run_id);
       }
 
       if (navigation !== "none") {

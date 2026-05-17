@@ -86,7 +86,12 @@ function createRunDetail(overrides: Partial<RunDetail> = {}): RunDetail {
   } as RunDetail;
 }
 
-function createHarness(options: { templates?: TemplateRecord[]; graphs?: GraphDocument[]; documentDrafts?: Record<string, GraphPayload | GraphDocument> } = {}) {
+function createHarness(options: {
+  templates?: TemplateRecord[];
+  graphs?: GraphDocument[];
+  documentDrafts?: Record<string, GraphPayload | GraphDocument>;
+  runDetail?: RunDetail;
+} = {}) {
   const workspace = ref<PersistedEditorWorkspace>({ activeTabId: null, tabs: [] });
   const documentsByTabId = ref<Record<string, GraphPayload | GraphDocument>>({});
   const loadingByTabId = ref<Record<string, boolean>>({});
@@ -102,6 +107,7 @@ function createHarness(options: { templates?: TemplateRecord[]; graphs?: GraphDo
   const visualStates: Array<{ tabId: string; status: string; documentName: string | undefined }> = [];
   const openedHumanReview: Array<{ tabId: string; nodeId: string | null }> = [];
   const fetchedGraphIds: string[] = [];
+  const attachedRuns: Array<{ kind: "stream" | "poll"; tabId: string; runId: string }> = [];
 
   const controller = useWorkspaceOpenController({
     workspace,
@@ -127,12 +133,18 @@ function createHarness(options: { templates?: TemplateRecord[]; graphs?: GraphDo
       fetchedGraphIds.push(graphId);
       return createGraph(graphId, "Fetched Graph");
     },
-    fetchRun: async () => createRunDetail(),
+    fetchRun: async () => options.runDetail ?? createRunDetail(),
     applyRunVisualStateToTab: (tabId, run, document) => {
       visualStates.push({ tabId, status: run.status, documentName: document?.name });
     },
     openHumanReviewPanelForTab: (tabId, nodeId) => {
       openedHumanReview.push({ tabId, nodeId });
+    },
+    startRunEventStreamForTab: (tabId, runId) => {
+      attachedRuns.push({ kind: "stream", tabId, runId });
+    },
+    pollRunForTab: async (tabId, runId) => {
+      attachedRuns.push({ kind: "poll", tabId, runId });
     },
     syncRouteToTab: (tab, mode) => {
       routeSyncs.push({ mode: mode ?? "push", tab });
@@ -141,6 +153,7 @@ function createHarness(options: { templates?: TemplateRecord[]; graphs?: GraphDo
 
   return {
     controller,
+    attachedRuns,
     documentsByTabId,
     errorByTabId,
     fetchedGraphIds,
@@ -382,4 +395,23 @@ test("useWorkspaceOpenController restores runs into dirty tabs and opens Human R
   assert.equal(harness.routeSyncs[0]?.mode, "replace");
   assert.equal(harness.handledRouteSignature.value, "restore:run_1:");
   assert.equal(harness.routeRestoreError.value, null);
+});
+
+test("useWorkspaceOpenController attaches running restored runs to the live playback channel", async () => {
+  const harness = createHarness({
+    runDetail: createRunDetail({
+      status: "running",
+      current_node_id: "agent_running",
+    }),
+  });
+
+  await harness.controller.openRestoredRunTab("run_1", null, "replace");
+
+  const tab = harness.workspace.value.tabs[0];
+  assert.ok(tab);
+  assert.deepEqual(harness.visualStates, [{ tabId: tab.tabId, status: "running", documentName: "Saved Graph" }]);
+  assert.deepEqual(harness.attachedRuns, [
+    { kind: "stream", tabId: tab.tabId, runId: "run_1" },
+    { kind: "poll", tabId: tab.tabId, runId: "run_1" },
+  ]);
 });

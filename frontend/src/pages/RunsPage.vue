@@ -92,7 +92,7 @@
           data-virtual-affordance-role="navigation-link"
           data-virtual-affordance-zone="runs.list"
           data-virtual-affordance-actions="click"
-          @click="openRunDetail(run.run_id)"
+          @click="openRunPlayback(run)"
           @keydown="handleRunRowKeydown($event, run.run_id)"
         >
           <span class="runs-page__status-rail" :class="statusBadgeClass(run.status)" aria-hidden="true"></span>
@@ -172,6 +172,7 @@ import { useI18n } from "vue-i18n";
 
 import { fetchRuns } from "@/api/runs";
 import { formatRunDisplayName, formatRunDisplayTimestamp, formatRunDuration } from "@/lib/run-display-name";
+import { shouldPollRunStatus } from "@/lib/run-event-stream";
 import { canRestoreRunSummary, resolveRunRestoreUrl } from "@/lib/run-restore";
 import AppShell from "@/layouts/AppShell.vue";
 import type { RunSummary } from "@/types/run";
@@ -250,12 +251,25 @@ function openRunDetail(runId: string) {
   void router.push(`/runs/${runId}`);
 }
 
+function openRunPlayback(run: RunSummary) {
+  if (shouldPollRunStatus(run.status) && canRestoreRunSummary(run)) {
+    void router.push(restoreUrlForRun(run));
+    return;
+  }
+  openRunDetail(run.run_id);
+}
+
 function handleRunRowKeydown(event: KeyboardEvent, runId: string) {
   if (event.key !== "Enter" && event.key !== " ") {
     return;
   }
   event.preventDefault();
-  openRunDetail(runId);
+  const run = runs.value.find((candidate) => candidate.run_id === runId);
+  if (run) {
+    openRunPlayback(run);
+  } else {
+    openRunDetail(runId);
+  }
 }
 
 function restoreTargetsForRun(run: RunSummary) {
@@ -701,6 +715,22 @@ function statusBadgeClass(status: string) {
 @media (max-width: 980px) {
   .runs-page__list {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1680px) {
+  .runs-page__run-row {
+    grid-template-columns: 5px minmax(0, 1fr);
+  }
+
+  .runs-page__status-rail {
+    grid-row: 1 / span 2;
+  }
+
+  .runs-page__card-actions {
+    grid-column: 2;
+    align-self: start;
+    justify-content: flex-start;
   }
 }
 

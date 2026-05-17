@@ -15,14 +15,15 @@ import {
   resolveRunSnapshot,
 } from "./run-restore.ts";
 
-test("canRestoreRunStatus only enables restore for terminal run states", () => {
+test("canRestoreRunStatus enables restore for attachable and terminal run states", () => {
+  assert.equal(canRestoreRunStatus("queued"), true);
+  assert.equal(canRestoreRunStatus("running"), true);
+  assert.equal(canRestoreRunStatus("resuming"), true);
   assert.equal(canRestoreRunStatus("completed"), true);
   assert.equal(canRestoreRunStatus("failed"), true);
   assert.equal(canRestoreRunStatus("cancelled"), true);
   assert.equal(canRestoreRunStatus("paused"), true);
   assert.equal(canRestoreRunStatus("awaiting_human"), true);
-  assert.equal(canRestoreRunStatus("running"), false);
-  assert.equal(canRestoreRunStatus("queued"), false);
   assert.equal(canRestoreRunStatus("pending"), false);
 });
 
@@ -58,7 +59,7 @@ test("canRestoreRunDetail requires both a restorable status and graph snapshot",
   const malformedSnapshotRun = createRunDetail({ graph_snapshot: {} });
 
   assert.equal(canRestoreRunDetail(completedRun), true);
-  assert.equal(canRestoreRunDetail(runningRun), false);
+  assert.equal(canRestoreRunDetail(runningRun), true);
   assert.equal(canRestoreRunDetail(missingSnapshotRun), false);
   assert.equal(canRestoreRunDetail(malformedSnapshotRun), false);
 });
