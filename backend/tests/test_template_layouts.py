@@ -23,18 +23,14 @@ def _read_contracts(reads: list[dict]) -> list[dict]:
 
 
 BUDDY_INTERNAL_TEMPLATE_IDS = {
-    "buddy_context_recall",
     "buddy_request_intake",
-    "buddy_task_plan",
     "buddy_capability_loop",
     "buddy_final_reply",
     "buddy_autonomous_review",
 }
 
 BUDDY_MAIN_LOOP_SUBGRAPH_TEMPLATE_IDS = {
-    "buddy_context_recall": "buddy_context_recall",
     "buddy_turn_intake": "buddy_request_intake",
-    "buddy_task_plan": "buddy_task_plan",
     "buddy_capability_loop": "buddy_capability_loop",
     "buddy_final_reply": "buddy_final_reply",
 }
@@ -437,15 +433,32 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "subgraph"],
             [
-                "buddy_context_recall",
                 "buddy_turn_intake",
-                "buddy_task_plan",
                 "buddy_capability_loop",
                 "buddy_final_reply",
             ],
         )
+        self.assertEqual(nodes["buddy_context_recall"]["kind"], "agent")
+        self.assertEqual(nodes["buddy_task_plan"]["kind"], "agent")
         self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "output"], ["output_final"])
         self.assertEqual(_read_contracts(nodes["output_final"]["reads"]), [{"state": "final_reply", "required": True}])
+        expected_positions = {
+            "input_user_message": {"x": 80, "y": 100},
+            "input_conversation_history": {"x": 80, "y": 300},
+            "input_page_context": {"x": 80, "y": 500},
+            "input_buddy_context": {"x": 80, "y": 700},
+            "buddy_context_recall": {"x": 660, "y": 360},
+            "buddy_turn_intake": {"x": 1240, "y": 360},
+            "needs_task_plan": {"x": 1820, "y": 360},
+            "buddy_task_plan": {"x": 2400, "y": 120},
+            "needs_capability": {"x": 2400, "y": 660},
+            "buddy_capability_loop": {"x": 3040, "y": 360},
+            "buddy_final_reply": {"x": 3740, "y": 360},
+            "output_final": {"x": 4440, "y": 360},
+        }
+        for node_id, expected_position in expected_positions.items():
+            with self.subTest(layout_node=node_id):
+                self.assertEqual(nodes[node_id]["ui"]["position"], expected_position)
         self.assertIn("needs_task_plan", nodes)
         self.assertEqual(nodes["needs_task_plan"]["kind"], "condition")
         self.assertEqual(
@@ -504,14 +517,10 @@ class TemplateLayoutTests(unittest.TestCase):
             buddy_context_node["config"]["value"]["selected"],
             ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md", "policy.json"],
         )
-        context_graph = nodes["buddy_context_recall"]["config"]["graph"]
-        self.assertEqual(context_graph["metadata"]["role"], "buddy_context_recall")
-        self.assertEqual(context_graph["state_schema"]["context_brief"]["type"], "json")
-        self.assertEqual(
-            _read_contracts(context_graph["nodes"]["output_context_brief"]["reads"]),
-            [{"state": "context_brief", "required": True}],
-        )
-        self.assertIn("context_only", context_graph["nodes"]["prepare_context_brief"]["config"]["taskInstruction"])
+        context_node = nodes["buddy_context_recall"]
+        self.assertEqual(context_node["config"]["skillKey"], "")
+        self.assertIn("context_only", context_node["config"]["taskInstruction"])
+        self.assertIn({"state": "buddy_context", "required": True}, _read_contracts(context_node["reads"]))
         self.assertIn({"state": "context_brief", "mode": "replace"}, nodes["buddy_context_recall"]["writes"])
 
         self.assertNotIn("input_visible_page_operation_capability", nodes)
@@ -568,14 +577,10 @@ class TemplateLayoutTests(unittest.TestCase):
             _read_contracts(merge_clarification_node["reads"]),
         )
 
-        task_plan_graph = nodes["buddy_task_plan"]["config"]["graph"]
-        self.assertEqual(task_plan_graph["metadata"]["role"], "buddy_task_plan")
-        self.assertEqual(task_plan_graph["state_schema"]["task_plan"]["type"], "json")
-        self.assertEqual(
-            _read_contracts(task_plan_graph["nodes"]["output_task_plan"]["reads"]),
-            [{"state": "task_plan", "required": True}],
-        )
-        self.assertIn("最多一个 in_progress", task_plan_graph["nodes"]["prepare_or_update_task_plan"]["config"]["taskInstruction"])
+        task_plan_node = nodes["buddy_task_plan"]
+        self.assertEqual(task_plan_node["config"]["skillKey"], "")
+        self.assertIn("最多一个 in_progress", task_plan_node["config"]["taskInstruction"])
+        self.assertIn({"state": "request_understanding", "required": True}, _read_contracts(task_plan_node["reads"]))
         self.assertIn({"state": "task_plan", "mode": "replace"}, nodes["buddy_task_plan"]["writes"])
 
         cycle_graph = nodes["buddy_capability_loop"]["config"]["graph"]

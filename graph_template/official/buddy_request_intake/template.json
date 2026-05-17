@@ -160,7 +160,7 @@
     "input_context_brief": {
       "kind": "input",
       "name": "上下文简报",
-      "description": "由上下文召回子图生成的本轮 context_only 摘要。",
+      "description": "由上下文召回 LLM 节点生成的本轮 context_only 摘要。",
       "ui": {
         "position": {
           "x": 60,

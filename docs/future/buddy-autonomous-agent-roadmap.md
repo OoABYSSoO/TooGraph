@@ -62,7 +62,7 @@
 - 动态能力来自单个 `capability` state，执行结果必须写入唯一 `result_package` state。在伙伴自主循环中，`capability.kind=subgraph` 的产品语义是“可见运行对应图模板”，应作为可审计页面操作流程触发，不把目标模板偷换成后台直连调用。
 - 后台动态 Subgraph 执行原语已能执行内部子图或模板化子流程，内部断点可以传播到父级 run 的标准 `awaiting_human`；该原语保留为运行时底座和内部能力实现细节，不是伙伴自主循环里 `capability.kind=subgraph` 的默认用户体验。
 - `subgraph` 是正式节点类型，内部 state 与父图隔离，只通过公开 input/output 边界通信。
-- 官方 `buddy_autonomous_loop` 已存在：顶层使用 Buddy Home 文件夹输入、上下文召回子图、请求理解子图、按需任务计划子图、能力循环子图、最终回复子图和唯一 `final_reply` output。上下文召回、请求理解、任务计划、能力循环和最终回复已经分别沉淀为 internal 模板 `buddy_context_recall`、`buddy_request_intake`、`buddy_task_plan`、`buddy_capability_loop`、`buddy_final_reply`，主循环嵌入副本由测试约束与这些来源保持一致。
+- 官方 `buddy_autonomous_loop` 已存在：顶层使用 Buddy Home 文件夹输入、上下文召回 LLM 节点、请求理解子图、按需任务计划 LLM 节点、能力循环子图、最终回复子图和唯一 `final_reply` output。只有多节点流程继续沉淀为 internal 模板：`buddy_request_intake`、`buddy_capability_loop`、`buddy_final_reply`，主循环嵌入副本由测试约束与这些来源保持一致。
 - 伙伴可见运行已经支持模板绑定：Buddy 页面可从可见模板列表选择运行模板，并按 input 节点把当前消息、对话历史、页面上下文和 Buddy Home 上下文绑定进去；权限模式只保留为运行 metadata，不作为图输入。
 - 官方 `buddy_autonomous_review` 已存在：主回复完成后由前端用 run snapshot 启动，模型自行判断是否需要低风险写回 Buddy Home，并通过 `buddy_home_writer` 走 command / revision 路径；它不进入普通模板列表和能力选择候选。
 - 官方 `toograph_skill_creation_workflow` 已存在：Skill 创建、测试、审查、写入通过图流程表达。
@@ -93,14 +93,14 @@
 
 ```mermaid
 flowchart TD
-  U[Input: user_message] --> R[Subgraph: buddy_context_recall]
+  U[Input: user_message] --> R[LLM: buddy_context_recall]
   H[Input: conversation_history] --> R
   P[Input: page_context] --> R
   B[Input: buddy_context Buddy Home] --> R
 
   R --> I[Subgraph: buddy_turn_intake]
   I --> T{needs_task_plan?}
-  T -- true --> P0[Subgraph: buddy_task_plan]
+  T -- true --> P0[LLM: buddy_task_plan]
   T -- false --> C{requires_capability?}
   P0 --> C
   C -- false --> F[Subgraph: buddy_final_reply]
@@ -120,10 +120,10 @@ flowchart TD
 | `input_conversation_history` | input | 最近历史或会话摘要 | 否 |
 | `input_page_context` | input | 当前页面、图、节点、选区或运行详情上下文 | 否 |
 | `input_buddy_context` | input | Buddy Home 文件夹选择包 | 否 |
-| `buddy_context_recall` | subgraph | 整理历史、Buddy Home、页面上下文和预算，生成本轮可用 context brief | 是 |
+| `buddy_context_recall` | LLM | 整理历史、Buddy Home、页面上下文和预算，生成本轮可用 context brief | 否 |
 | `buddy_turn_intake` | subgraph | 请求理解、早期可见回复、必要澄清 | 是 |
 | `needs_task_plan` | condition | 复杂任务是否需要显式任务计划 | 否 |
-| `buddy_task_plan` | subgraph | 为 3 步以上或多目标任务生成/更新本轮任务计划 | 是 |
+| `buddy_task_plan` | LLM | 为 3 步以上或多目标任务生成/更新本轮任务计划 | 否 |
 | `needs_capability` | condition | 根据 `request_understanding.requires_capability` 分流 | 否 |
 | `buddy_capability_loop` | subgraph | 选择能力、执行能力、复盘结果、循环 | 是 |
 | `buddy_final_reply` | subgraph | 事实简报、起草和校验最终回复 | 是 |
@@ -165,9 +165,9 @@ flowchart TD
 | `clarification_answer` | markdown | 用户在暂停卡片内补充的内容 |
 | `activity_summary` | json | 低层 activity events 的摘要索引，正式实现后由 runtime 维护 |
 
-## 子图边界
+## 阶段边界
 
-子图只在流程本身是完整模块且封装能提高可读性时使用。不要为了让画布“看起来整齐”过度抽象。
+子图只在流程本身是完整模块且封装能提高可读性时使用。不要为了让画布“看起来整齐”过度抽象。上下文召回和任务计划当前都只有一个业务 LLM 节点，因此保留为主图普通 LLM 节点，不再包装成单节点子图。
 
 ### `buddy_context_recall`
 
@@ -184,7 +184,7 @@ flowchart TD
 
 - `context_brief`
 
-内部流程：
+节点流程：
 
 ```mermaid
 flowchart TD
@@ -233,7 +233,7 @@ flowchart TD
 - `request_understanding`
 - `clarification_prompt` 可选
 
-内部流程：
+节点流程：
 
 ```mermaid
 flowchart TD
@@ -1311,10 +1311,10 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 默认可见伙伴主循环。它应继续承担：
 
 - 输入用户消息、历史、页面上下文和 Buddy Home；固定的可见页面操作能力由 `buddy_capability_loop` 子图内部 state 默认值持有，不作为父图 state 或用户可编辑 input 节点展示。
-- 从 internal 模板装配上下文整理、请求理解、任务计划、能力循环和最终回复等嵌入式 Subgraph 节点。
-- `buddy_context_recall` 产出 `context_brief`，把历史、页面事实和 Buddy Home 资料压缩成上下文而不是新指令。
+- 从 internal 模板装配请求理解、能力循环和最终回复等嵌入式 Subgraph 节点；上下文召回和任务计划作为主图普通 LLM 节点保留。
+- `buddy_context_recall` 作为普通 LLM 节点产出 `context_brief`，把历史、页面事实和 Buddy Home 资料压缩成上下文而不是新指令。
 - `buddy_turn_intake` 产出 `visible_reply` 和 `request_understanding`。
-- `buddy_task_plan` 在复杂任务中维护本轮任务计划，简单任务跳过。
+- `buddy_task_plan` 作为普通 LLM 节点在复杂任务中维护本轮任务计划，简单任务跳过。
 - 简单闲聊或可直接回答时绕过能力循环。
 - `buddy_capability_loop` 选择能力、执行能力、分类结果、复盘结果、必要时循环；当 `selected_capability.kind` 为 `subgraph` 时，经固定内部 `toograph_page_operation_workflow` 启动原生虚拟鼠标/键盘，多步定位并运行对应图模板，等待结果并把公开输出包装回能力复盘。
 - `buddy_final_reply` 通过事实简报、草稿和最终校验产出唯一 `final_reply`。
@@ -1322,11 +1322,9 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 
 ### Buddy 内部子图模板
 
-这些模板是搭建 `buddy_autonomous_loop` 的来源资产，标记为 `metadata.internal=true`，不进入普通模板列表和能力选择候选：
+这些模板是搭建 `buddy_autonomous_loop` 的多节点来源资产，标记为 `metadata.internal=true`，不进入普通模板列表和能力选择候选。只有一个业务 LLM 节点的阶段不再单独保存为 internal 子图模板。
 
-- `buddy_context_recall`：整理历史、Buddy Home、页面上下文和预算，生成 `context_brief`。
 - `buddy_request_intake`：请求理解、早期可见回复和必要澄清。
-- `buddy_task_plan`：复杂任务的本轮任务计划和当前步骤。
 - `buddy_capability_loop`：能力选择、Skill 或可见图模板运行、结果分类、结果复盘和循环判断。
 - `buddy_final_reply`：把请求理解、任务计划、能力结果、复盘、Buddy Home 上下文整理为事实简报，再起草和校验唯一 `final_reply`。
 
