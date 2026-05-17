@@ -25,14 +25,12 @@ def _read_contracts(reads: list[dict]) -> list[dict]:
 BUDDY_INTERNAL_TEMPLATE_IDS = {
     "buddy_request_intake",
     "buddy_capability_loop",
-    "buddy_final_reply",
     "buddy_autonomous_review",
 }
 
 BUDDY_MAIN_LOOP_SUBGRAPH_TEMPLATE_IDS = {
     "buddy_turn_intake": "buddy_request_intake",
     "buddy_capability_loop": "buddy_capability_loop",
-    "buddy_final_reply": "buddy_final_reply",
 }
 
 
@@ -435,11 +433,11 @@ class TemplateLayoutTests(unittest.TestCase):
             [
                 "buddy_turn_intake",
                 "buddy_capability_loop",
-                "buddy_final_reply",
             ],
         )
         self.assertEqual(nodes["buddy_context_recall"]["kind"], "agent")
         self.assertEqual(nodes["buddy_task_plan"]["kind"], "agent")
+        self.assertEqual(nodes["buddy_final_reply"]["kind"], "agent")
         self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "output"], ["output_final"])
         self.assertEqual(_read_contracts(nodes["output_final"]["reads"]), [{"state": "final_reply", "required": True}])
         expected_positions = {
@@ -706,28 +704,13 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn({"source": "adapt_visible_subgraph_result", "target": "review_capability_result"}, cycle_graph["edges"])
         self.assertNotIn("output_approval_prompt", cycle_graph["nodes"])
 
-        draft_graph = nodes["buddy_final_reply"]["config"]["graph"]
-        self.assertEqual(draft_graph["metadata"]["role"], "buddy_final_reply")
-        self.assertEqual([node_id for node_id, node in draft_graph["nodes"].items() if node["kind"] == "output"], ["output_final_reply"])
-        self.assertEqual(draft_graph["state_schema"]["context_brief"]["type"], "json")
-        self.assertEqual(draft_graph["state_schema"]["task_plan"]["type"], "json")
-        self.assertEqual(draft_graph["state_schema"]["final_reply_brief"]["type"], "json")
-        self.assertEqual(draft_graph["state_schema"]["final_reply_draft"]["type"], "markdown")
-        self.assertEqual(
-            [
-                node_id
-                for node_id, node in draft_graph["nodes"].items()
-                if node["kind"] == "agent"
-            ],
-            ["prepare_final_reply_brief", "draft_final_reply", "finalize_final_reply"],
-        )
-        self.assertEqual(draft_graph["nodes"]["draft_final_reply"]["writes"], [{"state": "final_reply_draft", "mode": "replace"}])
-        self.assertEqual(draft_graph["nodes"]["finalize_final_reply"]["writes"], [{"state": "final_reply", "mode": "replace"}])
-        self.assertEqual(draft_graph["nodes"]["draft_final_reply"]["config"]["thinkingMode"], "low")
-        self.assertEqual(
-            _read_contracts(draft_graph["nodes"]["output_final_reply"]["reads"]),
-            [{"state": "final_reply", "required": True}],
-        )
+        final_reply_node = nodes["buddy_final_reply"]
+        self.assertEqual(final_reply_node["config"]["skillKey"], "")
+        self.assertEqual(final_reply_node["config"]["thinkingMode"], "low")
+        self.assertEqual(final_reply_node["writes"], [{"state": "final_reply", "mode": "replace"}])
+        self.assertIn({"state": "capability_result", "required": False}, _read_contracts(final_reply_node["reads"]))
+        self.assertIn({"state": "capability_review", "required": False}, _read_contracts(final_reply_node["reads"]))
+        self.assertIn("不要暴露内部 state 名称", final_reply_node["config"]["taskInstruction"])
 
     def test_buddy_internal_templates_are_hidden_but_loadable(self) -> None:
         public_template_ids = {record["template_id"] for record in _official_template_records()}

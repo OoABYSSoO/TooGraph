@@ -62,7 +62,7 @@
 - 动态能力来自单个 `capability` state，执行结果必须写入唯一 `result_package` state。在伙伴自主循环中，`capability.kind=subgraph` 的产品语义是“可见运行对应图模板”，应作为可审计页面操作流程触发，不把目标模板偷换成后台直连调用。
 - 后台动态 Subgraph 执行原语已能执行内部子图或模板化子流程，内部断点可以传播到父级 run 的标准 `awaiting_human`；该原语保留为运行时底座和内部能力实现细节，不是伙伴自主循环里 `capability.kind=subgraph` 的默认用户体验。
 - `subgraph` 是正式节点类型，内部 state 与父图隔离，只通过公开 input/output 边界通信。
-- 官方 `buddy_autonomous_loop` 已存在：顶层使用 Buddy Home 文件夹输入、上下文召回 LLM 节点、请求理解子图、按需任务计划 LLM 节点、能力循环子图、最终回复子图和唯一 `final_reply` output。只有多节点流程继续沉淀为 internal 模板：`buddy_request_intake`、`buddy_capability_loop`、`buddy_final_reply`，主循环嵌入副本由测试约束与这些来源保持一致。
+- 官方 `buddy_autonomous_loop` 已存在：顶层使用 Buddy Home 文件夹输入、上下文召回 LLM 节点、请求理解子图、按需任务计划 LLM 节点、能力循环子图、最终回复 LLM 节点和唯一 `final_reply` output。只有多节点流程继续沉淀为 internal 模板：`buddy_request_intake`、`buddy_capability_loop`，主循环嵌入副本由测试约束与这些来源保持一致。
 - 伙伴可见运行已经支持模板绑定：Buddy 页面可从可见模板列表选择运行模板，并按 input 节点把当前消息、对话历史、页面上下文和 Buddy Home 上下文绑定进去；权限模式只保留为运行 metadata，不作为图输入。
 - 官方 `buddy_autonomous_review` 已存在：主回复完成后由前端用 run snapshot 启动，模型自行判断是否需要低风险写回 Buddy Home，并通过 `buddy_home_writer` 走 command / revision 路径；它不进入普通模板列表和能力选择候选。
 - 官方 `toograph_skill_creation_workflow` 已存在：Skill 创建、测试、审查、写入通过图流程表达。
@@ -103,7 +103,7 @@ flowchart TD
   T -- true --> P0[LLM: buddy_task_plan]
   T -- false --> C{requires_capability?}
   P0 --> C
-  C -- false --> F[Subgraph: buddy_final_reply]
+  C -- false --> F[LLM: buddy_final_reply]
   C -- true --> L[Subgraph: buddy_capability_loop]
   L --> F
   F --> O[Output: final_reply]
@@ -126,7 +126,7 @@ flowchart TD
 | `buddy_task_plan` | LLM | 为 3 步以上或多目标任务生成/更新本轮任务计划 | 否 |
 | `needs_capability` | condition | 根据 `request_understanding.requires_capability` 分流 | 否 |
 | `buddy_capability_loop` | subgraph | 选择能力、执行能力、复盘结果、循环 | 是 |
-| `buddy_final_reply` | subgraph | 事实简报、起草和校验最终回复 | 是 |
+| `buddy_final_reply` | LLM | 根据请求理解、能力结果和复盘生成最终回复 | 否 |
 | `output_final` | output | 只展示 `final_reply` | 否 |
 
 ### 顶层 state 契约
@@ -149,8 +149,6 @@ flowchart TD
 | `capability_review` | json | capability loop | loop condition、final、review | 执行复盘和下一步判断 |
 | `capability_gap` | json | capability loop | final | 能力缺口 |
 | `capability_trace` | json | capability loop | final、review | 能力调用摘要列表 |
-| `final_reply_brief` | json | final | final | 面向最终回复的事实、限制、证据和输出策略 |
-| `final_reply_draft` | markdown | final | final | 未公开的最终回复草稿 |
 | `final_reply` | markdown | final | 默认 root output、chat history | 默认伙伴模板的最终回复 |
 
 权限模式属于运行 metadata（例如 `buddy_mode`、`buddy_can_execute_actions`、`buddy_requires_approval`），由运行时审批原语读取，不进入图输入 state，也不交给 LLM 决定是否拦截低层操作。
@@ -543,53 +541,29 @@ flowchart TD
 
 - `final_reply`
 
-内部流程：
+节点流程：
 
 ```mermaid
 flowchart TD
-  A[Input boundaries] --> B[LLM: prepare_final_reply_brief]
-  B --> D[LLM: draft_final_reply]
-  D --> V[LLM: finalize_final_reply]
-  V --> O[Output: final_reply]
+  A[Input states] --> F[LLM: buddy_final_reply]
+  F --> O[Output: final_reply]
 ```
 
 节点契约：
 
 | 节点 | 类型 | LLM 调用 | Skill | reads | writes |
 | --- | --- | --- | --- | --- | --- |
-| `prepare_final_reply_brief` | LLM | 1 次 | 无 | 用户消息、context brief、请求理解、任务计划、能力结果、结果分类、复盘、缺口、轨迹 | `final_reply_brief` |
-| `draft_final_reply` | LLM | 1 次 | 无 | 用户消息、context brief、final reply brief | `final_reply_draft` |
-| `finalize_final_reply` | LLM | 1 次 | 无 | final reply brief、final reply draft、能力复盘、能力缺口 | `final_reply` |
-
-`final_reply_brief` 建议结构：
-
-```json
-{
-  "answer_mode": "direct_answer | result_summary | ask_user | explain_gap | partial_result",
-  "must_say": ["用户必须知道的结论、路径、run id、artifact 或限制"],
-  "must_not_say": ["不能声称已经完成、不能暴露的内部字段、不能承诺的能力"],
-  "evidence": [],
-  "completed_actions": [],
-  "limitations": [],
-  "suggested_next_action": "",
-  "style": "concise"
-}
-```
+| `buddy_final_reply` | LLM | 1 次 | 无 | 用户消息、历史、页面上下文、Buddy Home、context brief、请求理解、任务计划、能力结果、复盘、缺口、轨迹 | `final_reply` |
 
 规则：
-
-- `prepare_final_reply_brief` 只做事实压缩和边界整理，不写用户可见最终文本。
-- `draft_final_reply` 不调用能力，不继续规划执行。
-- `finalize_final_reply` 只做诚实性、格式和用户可见性校验；它可以修正草稿，但不能补造事实。
-- 最终只通过父图 root output 展示 `final_reply`，`final_reply_brief` 和 `final_reply_draft` 属于内部 run 详情。
-
-`final_reply` 规则：
 
 - 只包含用户该看到的内容。
 - 不暴露内部 state 名称，除非路径、URL、错误原因是用户需要的证据。
 - 如果有能力缺口，明确说明缺什么，给出下一步选择。
 - 如果执行过受控副作用，说明结果、artifact、revision 或审批状态。
 - 如果循环耗尽，用已有结果收束，不把 exhausted 写成崩溃。
+- 不调用能力、不继续规划执行、不补造能力结果。
+- 最终只通过父图 root output 展示 `final_reply`。
 
 ### 不应封装成子图的内容
 
@@ -1311,13 +1285,13 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 默认可见伙伴主循环。它应继续承担：
 
 - 输入用户消息、历史、页面上下文和 Buddy Home；固定的可见页面操作能力由 `buddy_capability_loop` 子图内部 state 默认值持有，不作为父图 state 或用户可编辑 input 节点展示。
-- 从 internal 模板装配请求理解、能力循环和最终回复等嵌入式 Subgraph 节点；上下文召回和任务计划作为主图普通 LLM 节点保留。
+- 从 internal 模板装配请求理解和能力循环等嵌入式 Subgraph 节点；上下文召回、任务计划和最终回复作为主图普通 LLM 节点保留。
 - `buddy_context_recall` 作为普通 LLM 节点产出 `context_brief`，把历史、页面事实和 Buddy Home 资料压缩成上下文而不是新指令。
 - `buddy_turn_intake` 产出 `visible_reply` 和 `request_understanding`。
 - `buddy_task_plan` 作为普通 LLM 节点在复杂任务中维护本轮任务计划，简单任务跳过。
 - 简单闲聊或可直接回答时绕过能力循环。
 - `buddy_capability_loop` 选择能力、执行能力、分类结果、复盘结果、必要时循环；当 `selected_capability.kind` 为 `subgraph` 时，经固定内部 `toograph_page_operation_workflow` 启动原生虚拟鼠标/键盘，多步定位并运行对应图模板，等待结果并把公开输出包装回能力复盘。
-- `buddy_final_reply` 通过事实简报、草稿和最终校验产出唯一 `final_reply`。
+- `buddy_final_reply` 作为普通 LLM 节点产出唯一 `final_reply`。
 - `output_final` 只展示 `final_reply`。
 
 ### Buddy 内部子图模板
@@ -1326,7 +1300,6 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 
 - `buddy_request_intake`：请求理解、早期可见回复和必要澄清。
 - `buddy_capability_loop`：能力选择、Skill 或可见图模板运行、结果分类、结果复盘和循环判断。
-- `buddy_final_reply`：把请求理解、任务计划、能力结果、复盘、Buddy Home 上下文整理为事实简报，再起草和校验唯一 `final_reply`。
 
 当前 Subgraph 节点仍保存嵌入式 `config.graph`，所以主循环不会在运行时引用模板 ID；模板优先的约束由契约测试保证：主循环嵌入图必须等于对应 internal 模板去掉 `metadata.internal` 后的 graph core。
 
