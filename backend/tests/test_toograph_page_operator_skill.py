@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -417,6 +418,27 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertEqual(operation["graph_edit_intents"], intents)
         self.assertEqual(event["detail"]["operation_request"]["operations"][0]["graph_edit_intents"], intents)
         self.assertEqual(event["detail"]["cursor_lifecycle"], "return_at_end")
+
+    def test_after_llm_reads_runtime_context_from_file_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_context_path = Path(temp_dir) / "runtime_context.json"
+            runtime_context_path.write_text(json.dumps({"page_path": "/editor/new"}), encoding="utf-8")
+
+            result = _run_skill_script(
+                PAGE_OPERATOR_AFTER_LLM_PATH,
+                {
+                    "commands": ["graph_edit editor.graph.playback"],
+                    "graph_edit_intents": [
+                        {"kind": "create_node", "ref": "input", "nodeType": "input", "title": "输入"},
+                    ],
+                    "cursor_lifecycle": "return_at_end",
+                    "reason": "用户要编辑当前图。",
+                },
+                env={"TOOGRAPH_SKILL_RUNTIME_CONTEXT_FILE": str(runtime_context_path)},
+            )
+
+        self.assertEqual(result["ok"], True)
+        self.assertEqual(result["journal"][0]["kind"], "graph_edit")
 
     def test_after_llm_accepts_subgraph_graph_edit_intent(self) -> None:
         intents = [

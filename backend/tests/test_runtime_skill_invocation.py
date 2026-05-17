@@ -118,6 +118,64 @@ class RuntimeSkillInvocationTests(unittest.TestCase):
         self.assertEqual(result["artifact_dir"], str(artifact_dir))
         self.assertEqual(result["artifact_relative_dir"], "run_1/writer/web_search/invocation_001")
 
+    def test_script_skill_runner_spools_large_runtime_context_to_file_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skill_dir = Path(temp_dir) / "runtime_context_echo"
+            skill_dir.mkdir()
+            entrypoint = skill_dir / "run.py"
+            entrypoint.write_text(
+                "\n".join(
+                    [
+                        "import json",
+                        "import os",
+                        "from pathlib import Path",
+                        "runtime_context_path = os.environ.get('TOOGRAPH_SKILL_RUNTIME_CONTEXT_FILE', '')",
+                        "inline_context = os.environ.get('TOOGRAPH_SKILL_RUNTIME_CONTEXT', '')",
+                        "if not runtime_context_path:",
+                        "    print(json.dumps({",
+                        "      'status': 'failed',",
+                        "      'error': 'missing runtime context file',",
+                        "      'inline_context_length': len(inline_context),",
+                        "    }))",
+                        "else:",
+                        "    runtime_context = json.loads(Path(runtime_context_path).read_text(encoding='utf-8'))",
+                        "    print(json.dumps({",
+                        "      'status': 'succeeded',",
+                        "      'runtime_context_file': runtime_context_path,",
+                        "      'inline_context_present': bool(inline_context),",
+                        "      'marker': runtime_context.get('marker'),",
+                        "    }))",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            large_runtime_context = {
+                "marker": "large-context",
+                "page_snapshot": {
+                    "affordances": [
+                        {"id": f"target-{index}", "label": "x" * 1000}
+                        for index in range(180)
+                    ]
+                },
+            }
+            runner = ScriptSkillRunner(
+                skill_key="runtime_context_echo",
+                skill_dir=skill_dir,
+                runtime_type="python",
+                entrypoint="run.py",
+            )
+
+            result = invoke_skill(
+                runner,
+                {},
+                context={"skill_runtime_context": large_runtime_context},
+            )
+
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(result["marker"], "large-context")
+        self.assertFalse(result["inline_context_present"])
+        self.assertFalse(Path(result["runtime_context_file"]).exists())
+
     def test_script_skill_runner_uses_current_python_when_requirements_are_satisfied(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             skill_dir = Path(temp_dir) / "current_env"

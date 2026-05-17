@@ -10,12 +10,14 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from typing import Any
 
 
 SUPPORTED_SCRIPT_RUNTIME_TYPES = {"script", "python", "node", "javascript", "command"}
 DEFAULT_SKILL_TIMEOUT_SECONDS = 30.0
 MAX_SKILL_ERROR_CHARS = 4000
+MAX_INLINE_RUNTIME_CONTEXT_ENV_CHARS = 60_000
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BEFORE_LLM_ENTRYPOINT = "before_llm.py"
 AFTER_LLM_ENTRYPOINT = "after_llm.py"
@@ -33,6 +35,21 @@ class SkillPythonEnvironment:
 
 class SkillDependencyError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class SkillProcessEnvironment:
+    env: dict[str, str]
+    cleanup_paths: tuple[Path, ...] = field(default_factory=tuple)
+
+    def cleanup(self) -> None:
+        for path in self.cleanup_paths:
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                continue
+            except OSError:
+                continue
 
 
 @dataclass(frozen=True)
@@ -60,8 +77,8 @@ class ScriptSkillRunner:
         try:
             python_environment = self._resolve_python_environment()
             command = self._build_command(python_executable=python_environment.python_executable)
-            env = self._build_environment(context or {}, python_environment=python_environment)
-        except SkillDependencyError as exc:
+            process_environment = self._build_environment(context or {}, python_environment=python_environment)
+        except (OSError, SkillDependencyError) as exc:
             return _failed_result(str(exc))
         try:
             completed = subprocess.run(
@@ -70,7 +87,7 @@ class ScriptSkillRunner:
                 text=True,
                 capture_output=True,
                 cwd=self.skill_dir,
-                env=env,
+                env=process_environment.env,
                 timeout=self.timeout_seconds,
                 check=False,
             )
@@ -78,6 +95,8 @@ class ScriptSkillRunner:
             return _failed_result(f"Skill script timed out after {self.timeout_seconds:g} seconds.")
         except OSError as exc:
             return _failed_result(str(exc))
+        finally:
+            process_environment.cleanup()
 
         stdout = completed.stdout.strip()
         stderr = completed.stderr.strip()
@@ -121,7 +140,7 @@ class ScriptSkillRunner:
         context: dict[str, Any],
         *,
         python_environment: SkillPythonEnvironment,
-    ) -> dict[str, str]:
+    ) -> SkillProcessEnvironment:
         env = {
             **os.environ,
             "TOOGRAPH_SKILL_KEY": self.skill_key,
@@ -140,10 +159,20 @@ class ScriptSkillRunner:
             env["TOOGRAPH_SKILL_ARTIFACT_DIR"] = artifact_dir
         if artifact_relative_dir:
             env["TOOGRAPH_SKILL_ARTIFACT_RELATIVE_DIR"] = artifact_relative_dir
+        cleanup_paths: list[Path] = []
         skill_runtime_context = context.get("skill_runtime_context")
         if isinstance(skill_runtime_context, dict):
-            env["TOOGRAPH_SKILL_RUNTIME_CONTEXT"] = json.dumps(skill_runtime_context, ensure_ascii=False)
-        return env
+            runtime_context_json = json.dumps(skill_runtime_context, ensure_ascii=False)
+            if len(runtime_context_json) <= MAX_INLINE_RUNTIME_CONTEXT_ENV_CHARS:
+                env["TOOGRAPH_SKILL_RUNTIME_CONTEXT"] = runtime_context_json
+            else:
+                runtime_context_path = _write_temp_runtime_context(
+                    skill_key=self.skill_key,
+                    runtime_context_json=runtime_context_json,
+                )
+                env["TOOGRAPH_SKILL_RUNTIME_CONTEXT_FILE"] = str(runtime_context_path)
+                cleanup_paths.append(runtime_context_path)
+        return SkillProcessEnvironment(env=env, cleanup_paths=tuple(cleanup_paths))
 
     def _build_command(self, *, python_executable: str) -> list[str]:
         if self.command:
@@ -376,6 +405,19 @@ def _requirements_environment_hash(requirements_path: Path) -> str:
     digest.update(f"\npython={sys.version_info.major}.{sys.version_info.minor}\n".encode("utf-8"))
     digest.update(f"platform={sys.platform}\n".encode("utf-8"))
     return digest.hexdigest()
+
+
+def _write_temp_runtime_context(*, skill_key: str, runtime_context_json: str) -> Path:
+    safe_skill_key = _safe_env_skill_key(skill_key)
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        prefix=f"toograph_skill_{safe_skill_key}_context_",
+        suffix=".json",
+        delete=False,
+    ) as file:
+        file.write(runtime_context_json)
+        return Path(file.name)
 
 
 def _safe_env_skill_key(skill_key: str) -> str:
