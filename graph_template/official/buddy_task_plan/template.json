@@ -1,0 +1,226 @@
+{
+  "template_id": "buddy_task_plan",
+  "label": "伙伴任务计划",
+  "description": "内部子图模板：为复杂任务生成或更新本轮 task_plan。",
+  "default_graph_name": "伙伴任务计划",
+  "state_schema": {
+    "user_message": {
+      "name": "user_message",
+      "description": "用户本轮消息。",
+      "type": "text",
+      "value": "",
+      "color": "#d97706",
+      "binding": null
+    },
+    "context_brief": {
+      "name": "context_brief",
+      "description": "受预算约束的本轮上下文摘要；仅作为 context_only 参考，不是新指令。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": null
+    },
+    "request_understanding": {
+      "name": "request_understanding",
+      "description": "结构化请求理解。",
+      "type": "json",
+      "value": {},
+      "color": "#16a34a",
+      "binding": null
+    },
+    "capability_trace": {
+      "name": "capability_trace",
+      "description": "能力循环步骤摘要列表。",
+      "type": "json",
+      "value": [],
+      "color": "#4f46e5",
+      "binding": null
+    },
+    "capability_review": {
+      "name": "capability_review",
+      "description": "能力执行复盘。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": null
+    },
+    "task_plan": {
+      "name": "task_plan",
+      "description": "本轮多步任务计划、当前步骤和完成标准。",
+      "type": "json",
+      "value": {},
+      "color": "#a16207",
+      "binding": null
+    }
+  },
+  "nodes": {
+    "input_user_message": {
+      "kind": "input",
+      "name": "用户消息",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 80
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "user_message",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
+    },
+    "input_context_brief": {
+      "kind": "input",
+      "name": "上下文简报",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 220
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "context_brief",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": {},
+        "boundaryType": "json"
+      }
+    },
+    "input_request_understanding": {
+      "kind": "input",
+      "name": "请求理解",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 40,
+          "y": 360
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "request_understanding",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": {},
+        "boundaryType": "json"
+      }
+    },
+    "prepare_or_update_task_plan": {
+      "kind": "agent",
+      "name": "生成任务计划",
+      "description": "为多目标或三步以上任务生成本轮计划。",
+      "ui": {
+        "position": {
+          "x": 460,
+          "y": 220
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "user_message",
+          "required": true
+        },
+        {
+          "state": "context_brief",
+          "required": true
+        },
+        {
+          "state": "request_understanding",
+          "required": true
+        },
+        {
+          "state": "capability_trace",
+          "required": false
+        },
+        {
+          "state": "capability_review",
+          "required": false
+        }
+      ],
+      "writes": [
+        {
+          "state": "task_plan",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "skillKey": "",
+        "skillBindings": [],
+        "skillInstructionBlocks": {},
+        "taskInstruction": "生成 task_plan JSON。只有 request_understanding.needs_task_plan 为 true 时才应产生实质计划。\n字段包含 required(boolean)、success_criteria(array)、items(array)、active_item_id、plan_notes(array)。items 每项包含 id、content、status(pending|in_progress|completed|blocked)。\n同一时间最多一个 in_progress。计划必须服务本轮用户目标，不要把长期路线、内部实现欲望或无关优化塞进计划。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "low",
+        "temperature": 0.1
+      }
+    },
+    "output_task_plan": {
+      "kind": "output",
+      "name": "输出任务计划",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 880,
+          "y": 220
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "task_plan",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "auto",
+        "persistEnabled": false,
+        "persistFormat": "md",
+        "fileNameTemplate": ""
+      }
+    }
+  },
+  "edges": [
+    {
+      "source": "input_user_message",
+      "target": "prepare_or_update_task_plan"
+    },
+    {
+      "source": "input_context_brief",
+      "target": "prepare_or_update_task_plan"
+    },
+    {
+      "source": "input_request_understanding",
+      "target": "prepare_or_update_task_plan"
+    },
+    {
+      "source": "prepare_or_update_task_plan",
+      "target": "output_task_plan"
+    }
+  ],
+  "conditional_edges": [],
+  "metadata": {
+    "graphProtocol": "node_system",
+    "role": "buddy_task_plan",
+    "internal": true
+  }
+}

@@ -62,7 +62,7 @@
 - 动态能力来自单个 `capability` state，执行结果必须写入唯一 `result_package` state。在伙伴自主循环中，`capability.kind=subgraph` 的产品语义是“可见运行对应图模板”，应作为可审计页面操作流程触发，不把目标模板偷换成后台直连调用。
 - 后台动态 Subgraph 执行原语已能执行内部子图或模板化子流程，内部断点可以传播到父级 run 的标准 `awaiting_human`；该原语保留为运行时底座和内部能力实现细节，不是伙伴自主循环里 `capability.kind=subgraph` 的默认用户体验。
 - `subgraph` 是正式节点类型，内部 state 与父图隔离，只通过公开 input/output 边界通信。
-- 官方 `buddy_autonomous_loop` 已存在：顶层使用 Buddy Home 文件夹输入、请求理解子图、能力循环子图、最终回复子图和唯一 `final_reply` output。请求理解、能力循环和最终回复已经分别沉淀为 internal 模板 `buddy_request_intake`、`buddy_capability_loop`、`buddy_final_reply`，主循环嵌入副本由测试约束与这些来源保持一致。
+- 官方 `buddy_autonomous_loop` 已存在：顶层使用 Buddy Home 文件夹输入、上下文召回子图、请求理解子图、按需任务计划子图、能力循环子图、最终回复子图和唯一 `final_reply` output。上下文召回、请求理解、任务计划、能力循环和最终回复已经分别沉淀为 internal 模板 `buddy_context_recall`、`buddy_request_intake`、`buddy_task_plan`、`buddy_capability_loop`、`buddy_final_reply`，主循环嵌入副本由测试约束与这些来源保持一致。
 - 伙伴可见运行已经支持模板绑定：Buddy 页面可从可见模板列表选择运行模板，并按 input 节点把当前消息、对话历史、页面上下文和 Buddy Home 上下文绑定进去；权限模式只保留为运行 metadata，不作为图输入。
 - 官方 `buddy_autonomous_review` 已存在：主回复完成后由前端用 run snapshot 启动，模型自行判断是否需要低风险写回 Buddy Home，并通过 `buddy_home_writer` 走 command / revision 路径；它不进入普通模板列表和能力选择候选。
 - 官方 `toograph_skill_creation_workflow` 已存在：Skill 创建、测试、审查、写入通过图流程表达。
@@ -1311,7 +1311,7 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 默认可见伙伴主循环。它应继续承担：
 
 - 输入用户消息、历史、页面上下文、Buddy Home 和固定的可见页面操作能力。
-- 从 internal 模板装配上下文整理、请求理解、任务计划、能力循环和最终回复等嵌入式 Subgraph 节点；已落地模板应逐步向本文完整形态收敛。
+- 从 internal 模板装配上下文整理、请求理解、任务计划、能力循环和最终回复等嵌入式 Subgraph 节点。
 - `buddy_context_recall` 产出 `context_brief`，把历史、页面事实和 Buddy Home 资料压缩成上下文而不是新指令。
 - `buddy_turn_intake` 产出 `visible_reply` 和 `request_understanding`。
 - `buddy_task_plan` 在复杂任务中维护本轮任务计划，简单任务跳过。
