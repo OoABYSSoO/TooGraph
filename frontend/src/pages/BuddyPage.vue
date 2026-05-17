@@ -41,10 +41,12 @@
             <ElForm label-position="top" class="buddy-page__form buddy-page__form--wide">
               <ElFormItem :label="t('buddyPage.binding.template')">
                 <ElSelect
+                  ref="bindingTemplateSelectRef"
                   v-model="bindingDraft.template_id"
                   class="buddy-page__template-select toograph-select"
                   :loading="isLoadingBindingTemplate"
                   :teleported="false"
+                  :fit-input-width="true"
                   popper-class="toograph-select-popper buddy-page__binding-select-popper"
                   filterable
                   @change="selectBindingTemplate"
@@ -92,15 +94,17 @@
                   <label class="buddy-page__binding-picker">
                     <span>{{ t("buddyPage.binding.inputNode") }}</span>
                     <ElSelect
+                      :ref="(select) => setBindingInputSelectRef(row.source, select)"
                       class="buddy-page__binding-select toograph-select"
                       :model-value="row.selectedNodeId"
                       :placeholder="t('buddyPage.binding.selectInputNode')"
                       :clearable="!row.required"
                       :disabled="!selectedBindingTemplate"
                       :teleported="false"
+                      :fit-input-width="true"
                       popper-class="toograph-select-popper buddy-page__binding-select-popper"
                       filterable
-                      @update:model-value="setBindingInputNode(row.source, $event)"
+                      @change="setBindingInputNode(row.source, $event)"
                     >
                       <ElOption
                         v-if="!row.required"
@@ -597,7 +601,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import {
   ElAlert,
   ElButton,
@@ -711,6 +715,12 @@ const summaryDraft = ref<BuddySessionSummary>(defaultSummaryDraft());
 const availableTemplates = ref<TemplateRecord[]>([]);
 const selectedBindingTemplate = ref<TemplateRecord | null>(null);
 const bindingDraft = ref<BuddyRunTemplateBinding>(buildDefaultBuddyRunTemplateBinding());
+type BindingSelectInstance = {
+  blur?: () => void;
+  handleClose?: () => void;
+};
+const bindingTemplateSelectRef = ref<BindingSelectInstance | null>(null);
+const bindingInputSelectRefs = new Map<BuddyRunInputSource, BindingSelectInstance>();
 const revisions = ref<BuddyRevision[]>([]);
 const commands = ref<BuddyCommandRecord[]>([]);
 const lastCommand = ref<BuddyCommandRecord | null>(null);
@@ -869,6 +879,25 @@ function selectedBindingInputRow(nodeId: string): BuddyRunTemplateInputRow | nul
     return null;
   }
   return bindingInputRows.value.find((row) => row.nodeId === nodeId) ?? null;
+}
+
+function setBindingInputSelectRef(source: BuddyRunInputSource, select: unknown) {
+  if (!select) {
+    bindingInputSelectRefs.delete(source);
+    return;
+  }
+  bindingInputSelectRefs.set(source, select as BindingSelectInstance);
+}
+
+function closeSelect(select: BindingSelectInstance | null | undefined) {
+  select?.handleClose?.();
+  select?.blur?.();
+}
+
+function closeBindingSelect(source?: BuddyRunInputSource) {
+  void nextTick(() => {
+    closeSelect(source ? bindingInputSelectRefs.get(source) : bindingTemplateSelectRef.value);
+  });
 }
 
 function setError(error: unknown, fallbackKey = "common.failedToLoad") {
@@ -1174,6 +1203,7 @@ async function saveSummary() {
 }
 
 async function selectBindingTemplate(value: unknown) {
+  closeBindingSelect();
   const templateId = String(value || "");
   bindingDraft.value = {
     ...bindingDraft.value,
@@ -1185,6 +1215,7 @@ async function selectBindingTemplate(value: unknown) {
 
 function setBindingInputNode(source: BuddyRunInputSource, value: unknown) {
   bindingDraft.value = setBuddyRunTemplateSourceBinding(bindingDraft.value, source, String(value || ""));
+  closeBindingSelect(source);
 }
 
 function resetBindingToDefault() {
@@ -1535,6 +1566,21 @@ onMounted(loadAll);
     rgba(255, 255, 255, 0.72);
 }
 
+.buddy-page__template-select :deep(.el-select__selection),
+.buddy-page__binding-select :deep(.el-select__selection),
+.buddy-page__template-select :deep(.el-select__selected-item),
+.buddy-page__binding-select :deep(.el-select__selected-item) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.buddy-page__template-select :deep(.el-select__selected-item),
+.buddy-page__binding-select :deep(.el-select__selected-item) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .buddy-page__binding-card--required .buddy-page__binding-select :deep(.el-select__wrapper) {
   border-color: rgba(217, 119, 6, 0.2);
   background:
@@ -1634,6 +1680,8 @@ onMounted(loadAll);
 
 :global(.buddy-page__binding-select-popper.el-popper) {
   border-color: rgba(154, 52, 18, 0.14);
+  max-width: calc(100vw - 32px);
+  overflow: hidden;
   background: rgb(255, 252, 247);
   box-shadow:
     var(--toograph-glass-highlight),
@@ -1641,10 +1689,17 @@ onMounted(loadAll);
 }
 
 :global(.buddy-page__binding-select-popper .el-select-dropdown) {
+  max-width: 100%;
   border-radius: 16px;
   background:
     var(--toograph-glass-specular),
     rgb(255, 252, 247);
+}
+
+:global(.buddy-page__binding-select-popper .el-select-dropdown__wrap),
+:global(.buddy-page__binding-select-popper .el-select-dropdown__list) {
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 :global(.buddy-page__binding-select-popper .el-popper__arrow::before) {
