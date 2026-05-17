@@ -622,6 +622,31 @@ test("canvas connection interaction model prioritizes create-input snapping over
   assert.equal(anchor?.stateKey, CREATE_AGENT_INPUT_STATE_KEY);
 });
 
+test("canvas connection interaction model skips ineligible state inputs when snapping from node bodies", () => {
+  const connection: PendingGraphConnection = {
+    sourceNodeId: "writer",
+    sourceKind: "state-out",
+    sourceStateKey: "answer",
+  };
+  const ineligibleInput = stateAnchor("target:stale", "target", "state-in", "stale", 206, 150);
+  const eligibleInput = stateAnchor("target:answer", "target", "state-in", "answer", 206, 194);
+
+  const anchor = resolveCanvasEligibleTargetAnchorForNodeBody({
+    connection,
+    nodeId: "target",
+    node: document.nodes.target,
+    projectedAnchors: [ineligibleInput, eligibleInput],
+    baseProjectedAnchors: [ineligibleInput, eligibleInput],
+    measuredAnchorOffsets: {},
+    measuredNodeSize: undefined,
+    eligibleTargetAnchorIds: new Set([eligibleInput.id]),
+    pendingAgentInputSource: null,
+    canComplete: (candidate) => candidate.id === eligibleInput.id,
+  });
+
+  assert.equal(anchor, eligibleInput);
+});
+
 test("canvas connection interaction model builds fallback virtual outputs for reverse input snapping", () => {
   const connection: PendingGraphConnection = {
     sourceNodeId: "target",

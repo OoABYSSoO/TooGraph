@@ -1148,6 +1148,7 @@ const {
   downloadPythonSource,
   requestSaveMetadata: requestSaveMetadataForDocument,
   showSaveSuccessToast,
+  showSaveErrorToast,
   setMessageFeedbackForTab,
 });
 const {
@@ -1742,6 +1743,18 @@ function showSaveSuccessToast(message: string) {
   });
 }
 
+function showSaveErrorToast(message: string) {
+  ElMessage({
+    customClass: "editor-workspace-shell__save-error-toast",
+    type: "error",
+    duration: 9000,
+    grouping: true,
+    placement: "top",
+    showClose: true,
+    message,
+  });
+}
+
 function showStateDeleteBlockedToast(message: string) {
   ElMessage({
     customClass: "editor-workspace-shell__state-delete-toast",
@@ -2085,7 +2098,8 @@ onMounted(() => {
   font-weight: 700;
 }
 
-:global(.editor-workspace-shell__run-error-toast.el-message) {
+:global(.editor-workspace-shell__run-error-toast.el-message),
+:global(.editor-workspace-shell__save-error-toast.el-message) {
   min-width: min(560px, calc(100vw - 40px));
   max-width: min(820px, calc(100vw - 40px));
   align-items: flex-start;
@@ -2096,7 +2110,8 @@ onMounted(() => {
   backdrop-filter: blur(20px) saturate(1.45);
 }
 
-:global(.editor-workspace-shell__run-error-toast .el-message__content) {
+:global(.editor-workspace-shell__run-error-toast .el-message__content),
+:global(.editor-workspace-shell__save-error-toast .el-message__content) {
   color: #881337;
   font-weight: 750;
   line-height: 1.45;

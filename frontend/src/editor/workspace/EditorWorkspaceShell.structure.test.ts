@@ -595,7 +595,18 @@ test("EditorWorkspaceShell surfaces run request errors as a prominent toast", ()
     /ElMessage\(\{[\s\S]*customClass:\s*"editor-workspace-shell__run-error-toast",[\s\S]*type:\s*"error",[\s\S]*duration:\s*9000,/,
   );
   assert.match(componentSource, /:global\(\.editor-workspace-shell__run-error-toast\.el-message\)/);
-  assert.match(componentSource, /:global\(\.editor-workspace-shell__run-error-toast \.el-message__content\) \{[\s\S]*white-space:\s*pre-wrap;/);
+  assert.match(componentSource, /:global\(\.editor-workspace-shell__run-error-toast \.el-message__content\)[\s\S]*\{[\s\S]*white-space:\s*pre-wrap;/);
+});
+
+test("EditorWorkspaceShell surfaces template save errors as a prominent toast", () => {
+  assert.match(componentSource, /useWorkspaceGraphPersistenceController\(\{[\s\S]*showSaveSuccessToast,[\s\S]*showSaveErrorToast,[\s\S]*setMessageFeedbackForTab,[\s\S]*\}\);/);
+  assert.match(graphPersistenceControllerSource, /showSaveErrorToast\?: \(message: string\) => void;/);
+  assert.match(graphPersistenceControllerSource, /function setSaveErrorFeedback\(tabId: string, error: unknown, fallbackMessage: string\)/);
+  assert.match(graphPersistenceControllerSource, /input\.showSaveErrorToast\?\.\(message\);/);
+  assert.match(graphPersistenceControllerSource, /setSaveErrorFeedback\(tab\.tabId, error, "Failed to save graph as template\."\);[\s\S]*return false;/);
+  assert.match(componentSource, /function showSaveErrorToast\(message: string\) \{[\s\S]*customClass:\s*"editor-workspace-shell__save-error-toast"[\s\S]*type:\s*"error"[\s\S]*duration:\s*9000,/);
+  assert.match(componentSource, /:global\(\.editor-workspace-shell__save-error-toast\.el-message\)/);
+  assert.match(componentSource, /:global\(\.editor-workspace-shell__save-error-toast \.el-message__content\)/);
 });
 
 test("EditorWorkspaceShell persists graph document drafts across route changes and app restarts", () => {

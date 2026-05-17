@@ -1498,7 +1498,8 @@ test("EditorCanvas snaps state drags to transient or matching state inputs from 
   assert.doesNotMatch(componentSource, /resolveCanvasConcreteStateTargetAnchorAtPointerY\(\{/);
   assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasAgentCreateInputTargetAnchor/);
   assert.match(canvasConnectionInteractionModelSource, /connection\.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY/);
-  assert.match(canvasConnectionInteractionModelSource, /anchor\.stateKey === CREATE_AGENT_INPUT_STATE_KEY \|\|[\s\S]*anchor\.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY \|\|[\s\S]*anchor\.stateKey === connection\.sourceStateKey/);
+  assert.match(canvasConnectionInteractionModelSource, /export function isCanvasStateTargetAnchorAllowedForConnection/);
+  assert.match(canvasConnectionInteractionModelSource, /const candidateAnchor = input\.projectedAnchors\.find\([\s\S]*isCanvasStateTargetAnchorAllowedForConnection\(input\.connection, anchor\)[\s\S]*input\.eligibleTargetAnchorIds\.has\(anchor\.id\)[\s\S]*input\.canComplete\(anchor\)/);
   assert.match(canvasConnectionInteractionModelSource, /const createInputAnchor = resolveCanvasAgentCreateInputTargetAnchor\(\{[\s\S]*if \(createInputAnchor && input\.canComplete\(createInputAnchor\)\) \{[\s\S]*return createInputAnchor;/);
   assert.match(canvasConnectionInteractionModelSource, /const fallbackInputAnchor = input\.baseProjectedAnchors\.find[\s\S]*anchor\.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY/);
   assert.match(componentSource, /function isPointerWithinNodeElement\(nodeElement: HTMLElement, event: PointerEvent\)/);

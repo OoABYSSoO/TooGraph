@@ -749,12 +749,11 @@ export function resolveCanvasEligibleStateTargetAnchorForNodeBody(input: {
     (anchor) =>
       anchor.nodeId === input.nodeId &&
       anchor.kind === "state-in" &&
-      isCanvasStateTargetAnchorAllowedForConnection(input.connection, anchor),
+      isCanvasStateTargetAnchorAllowedForConnection(input.connection, anchor) &&
+      input.eligibleTargetAnchorIds.has(anchor.id) &&
+      input.canComplete(anchor),
   );
-  if (!candidateAnchor || !input.eligibleTargetAnchorIds.has(candidateAnchor.id)) {
-    return null;
-  }
-  return candidateAnchor;
+  return candidateAnchor ?? null;
 }
 
 export function resolveCanvasConcreteStateTargetAnchorAtPointerY(input: {

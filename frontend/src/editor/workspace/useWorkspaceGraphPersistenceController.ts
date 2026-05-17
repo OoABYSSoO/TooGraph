@@ -48,6 +48,7 @@ type WorkspaceGraphPersistenceControllerInput = {
   downloadPythonSource: (source: string, fileName: string) => void;
   requestSaveMetadata?: (request: SaveMetadataRequest) => Promise<GraphPayload | GraphDocument | null>;
   showSaveSuccessToast?: (message: string) => void;
+  showSaveErrorToast?: (message: string) => void;
   setMessageFeedbackForTab: (
     tabId: string,
     feedback: { tone: WorkspaceRunFeedback["tone"]; message: string; activeRunId?: string | null; activeRunStatus?: string | null },
@@ -77,6 +78,16 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
       message,
     });
     input.showSaveSuccessToast?.(message);
+  }
+
+  function setSaveErrorFeedback(tabId: string, error: unknown, fallbackMessage: string) {
+    const message = error instanceof Error ? error.message : fallbackMessage;
+    input.setMessageFeedbackForTab(tabId, {
+      tone: "danger",
+      message,
+    });
+    input.showSaveErrorToast?.(message);
+    return message;
   }
 
   function formatSaveSuccessMessage(kind: "graph" | "template", savedName: string, requestedName: string) {
@@ -306,11 +317,8 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
       setSaveSuccessFeedback(tab.tabId, formatSaveSuccessMessage("template", response.template.label, documentToSave.name));
       return response.saved;
     } catch (error) {
-      input.setMessageFeedbackForTab(tab.tabId, {
-        tone: "danger",
-        message: error instanceof Error ? error.message : "Failed to save graph as template.",
-      });
-      throw error;
+      setSaveErrorFeedback(tab.tabId, error, "Failed to save graph as template.");
+      return false;
     }
   }
 

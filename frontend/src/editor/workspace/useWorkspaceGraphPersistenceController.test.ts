@@ -84,6 +84,7 @@ function createHarness(options: {
   locked?: boolean;
   savedGraph?: GraphDocument;
   savedTemplateLabel?: string;
+  saveGraphAsTemplateError?: Error;
   requestSaveMetadata?: (request: {
     document: GraphPayload | GraphDocument;
     target: "graph" | "template";
@@ -116,6 +117,7 @@ function createHarness(options: {
   const feedback: Array<{ tabId: string; feedback: Partial<WorkspaceRunFeedback> }> = [];
   const downloads: Array<{ source: string; fileName: string }> = [];
   const saveToasts: string[] = [];
+  const saveErrorToasts: string[] = [];
   let graphLoadCount = 0;
   let templateLoadCount = 0;
 
@@ -163,6 +165,9 @@ function createHarness(options: {
     },
     saveGraphAsTemplate: async (document) => {
       savedTemplateDocuments.push(document);
+      if (options.saveGraphAsTemplateError) {
+        throw options.saveGraphAsTemplateError;
+      }
       const savedTemplateLabel = options.savedTemplateLabel ?? document.name;
       return {
         template_id: "user_template_1",
@@ -198,6 +203,9 @@ function createHarness(options: {
     showSaveSuccessToast: (message) => {
       saveToasts.push(message);
     },
+    showSaveErrorToast: (message) => {
+      saveErrorToasts.push(message);
+    },
   });
 
   return {
@@ -212,6 +220,7 @@ function createHarness(options: {
     committedDocuments,
     feedback,
     saveToasts,
+    saveErrorToasts,
     downloads,
     get graphLoadCount() {
       return graphLoadCount;
@@ -435,6 +444,20 @@ test("useWorkspaceGraphPersistenceController saves the active graph as a user te
   assert.equal(harness.feedback.at(-1)?.feedback.tone, "success");
   assert.equal(harness.feedback.at(-1)?.feedback.message, 'Saved template "Draft".');
   assert.deepEqual(harness.saveToasts, ['Saved template "Draft".']);
+});
+
+test("useWorkspaceGraphPersistenceController surfaces template save failures without rejecting toolbar actions", async () => {
+  const harness = createHarness({
+    saveGraphAsTemplateError: new Error("Template validation failed."),
+  });
+
+  const saved = await harness.controller.saveActiveGraphAsTemplate();
+
+  assert.equal(saved, false);
+  assert.equal(harness.templateLoadCount, 0);
+  assert.equal(harness.feedback.at(-1)?.feedback.tone, "danger");
+  assert.equal(harness.feedback.at(-1)?.feedback.message, "Template validation failed.");
+  assert.deepEqual(harness.saveErrorToasts, ["Template validation failed."]);
 });
 
 test("useWorkspaceGraphPersistenceController warns with the resolved name when duplicate graph or template names are renamed", async () => {
