@@ -5,14 +5,16 @@ description: Internal Buddy adapter that re-labels a visible page-operation temp
 
 # 伙伴可见子图结果适配器
 
-This internal Skill is used by `buddy_autonomous_loop` after Buddy routes a selected `capability.kind=subgraph` through the visible `toograph_page_operation_workflow`.
+This internal Skill is used by `buddy_autonomous_loop` after Buddy routes a selected `capability.kind=subgraph` through either the fixed visible template runner or the multi-step `toograph_page_operation_workflow`.
 
-It does not run templates, click UI, summarize results, or choose follow-up capabilities. It only wraps the page-operation workflow result package so downstream Buddy nodes can read a normal `capability_result` whose `sourceKey` is the originally selected target template.
+It does not run templates, click UI, summarize results, read full page snapshots, or choose follow-up capabilities. It only wraps compact visible-operation results so downstream Buddy nodes can read a normal `capability_result` whose `sourceKey` is the originally selected target template.
 
 LLM output:
 
 - `selected_capability`: the original selected target capability, copied from `capability_selection_audit.selected`; must be `kind=subgraph`.
-- `visible_operation_result`: the full result package produced by `toograph_page_operation_workflow`.
+- `operation_report`: compact fixed-template operation report produced by the frontend resume payload.
+- `page_operation_final_reply` and `page_operation_workflow_report`: workflow outputs produced by `toograph_page_operation_workflow`.
+- `visible_operation_result`: compatibility path for a full result package produced by `toograph_page_operation_workflow`.
 - `user_goal`: the original user goal, preferably `request_understanding.user_goal`.
 - `reason`: short audit reason.
 

@@ -9,7 +9,7 @@ from typing import Any
 
 
 SUPPORTED_CURSOR_LIFECYCLES = {"keep", "return_after_step", "return_at_end"}
-AUTO_RESUME_STATE_KEYS = ["page_operation_context", "page_context", "operation_result"]
+AUTO_RESUME_STATE_KEYS = ["page_operation_context", "page_context", "operation_result", "operation_report"]
 SUPPORTED_PAGE_ACTIONS = {"click", "focus", "clear", "type", "press", "wait"}
 KNOWN_CLICK_TARGETS = {
     "click app.nav.home": {

@@ -10,7 +10,7 @@ import {
 const expectedContinuation = {
   mode: "auto_resume_after_ui_operation" as const,
   operationRequestId: "vop_1234567890abcdef",
-  resumeStateKeys: ["page_operation_context", "page_context", "operation_result"],
+  resumeStateKeys: ["page_operation_context", "page_context", "operation_result", "operation_report"],
 };
 
 const pageOperationContextBefore = {
@@ -83,6 +83,8 @@ test("buildPageOperationResult captures route, snapshots, commands, and target i
     triggered_graph_id: "graph_1",
     triggered_run_initial_status: "queued",
     triggered_run_status: "completed",
+    triggered_run_result_summary: null,
+    triggered_run_final_result: null,
     input_text: null,
     graph_edit_summary: null,
     operation_report: {
@@ -96,6 +98,8 @@ test("buildPageOperationResult captures route, snapshots, commands, and target i
       triggered_graph_id: "graph_1",
       triggered_run_initial_status: "queued",
       triggered_run_status: "completed",
+      triggered_run_result_summary: null,
+      triggered_run_final_result: null,
       input_text: null,
       graph_edit_summary: null,
       error: null,
@@ -136,6 +140,63 @@ test("buildPageOperationResult records template run input text", () => {
   assert.equal(result.operation_report.input_text, "把最新产品路线整理成三条可执行任务。");
 });
 
+test("buildPageOperationResult records compact triggered run outputs in the report", () => {
+  const result = buildPageOperationResult({
+    operationPlan: {
+      version: 1,
+      operationRequestId: "vop_template5678",
+      commands: ["run_template advanced_web_research_loop"],
+      operations: [
+        {
+          kind: "run_template",
+          targetId: "library.template.advanced_web_research_loop.open",
+          templateId: "advanced_web_research_loop",
+          templateName: "高级联网搜索",
+          searchText: "高级联网搜索",
+          inputText: "鸣潮最新资讯",
+          runTargetId: "editor.action.runActiveGraph",
+        },
+      ],
+      cursorLifecycle: "return_at_end",
+      expectedContinuation,
+      reason: "运行模板。",
+    },
+    status: "succeeded",
+    routeBefore: "/library",
+    routeAfter: "/editor",
+    pageOperationContextBefore,
+    pageOperationContextAfter: {
+      ...pageOperationContextAfter,
+      page_facts: {
+        route: { path: "/editor", title: "编辑器", snapshotId: "after" },
+        activeEditorTab: null,
+        activeGraph: null,
+        visibleGraphs: [],
+        visibleTemplates: [],
+        visibleRuns: [],
+        latestForegroundRun: {
+          runId: "run_search",
+          status: "completed",
+          resultSummary: "已拿到《鸣潮》最新资讯摘要。",
+        },
+        latestOperationResult: null,
+      },
+      operation_report: null,
+    },
+    triggeredRunId: "run_search",
+    triggeredGraphId: "advanced_web_research_loop",
+    triggeredRunInitialStatus: "queued",
+    triggeredRunStatus: "completed",
+    triggeredRunFinalResult: "# 《鸣潮》最新资讯汇总\n\n完整结果正文。",
+  });
+
+  assert.equal(result.triggered_run_result_summary, "已拿到《鸣潮》最新资讯摘要。");
+  assert.equal(result.triggered_run_final_result, "# 《鸣潮》最新资讯汇总\n\n完整结果正文。");
+  assert.equal(result.operation_report.triggered_run_result_summary, "已拿到《鸣潮》最新资讯摘要。");
+  assert.equal(result.operation_report.triggered_run_final_result, "# 《鸣潮》最新资讯汇总\n\n完整结果正文。");
+  assert.equal("page_snapshot_after" in result.operation_report, false);
+});
+
 test("buildPageOperationResumePayload writes the required resume state keys", () => {
   const operationResult = buildPageOperationResult({
     operationPlan: {
@@ -166,6 +227,28 @@ test("buildPageOperationResumePayload writes the required resume state keys", ()
       page_context: "当前路径: /runs",
       page_operation_context: pageOperationContextAfter,
     },
+  );
+});
+
+test("canAutoResumePageOperationRun detects nested subgraph page-operation checkpoints", () => {
+  assert.equal(
+    canAutoResumePageOperationRun(
+      {
+        status: "awaiting_human",
+        metadata: {
+          pending_subgraph_breakpoint: {
+            metadata: {
+              pending_page_operation_continuation: {
+                mode: "auto_resume_after_ui_operation",
+                operation_request_id: "vop_nested",
+              },
+            },
+          },
+        },
+      },
+      "vop_nested",
+    ),
+    true,
   );
 });
 

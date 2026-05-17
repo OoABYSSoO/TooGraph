@@ -16,13 +16,13 @@ def buddy_visible_subgraph_result_adapter(**skill_inputs: Any) -> dict[str, Any]
 
     user_goal = _compact_text(skill_inputs.get("user_goal"))
     operation_result = _normalize_json_object(skill_inputs.get("operation_result"))
-    if operation_result:
+    operation_report = _normalize_json_object(skill_inputs.get("operation_report"))
+    direct_operation = operation_report or operation_result
+    if direct_operation:
         return _wrap_direct_template_operation(
             selected=selected,
             user_goal=user_goal,
-            operation_result=operation_result,
-            operation_report=_normalize_json_object(skill_inputs.get("operation_report")),
-            page_operation_context=_normalize_json_object(skill_inputs.get("page_operation_context")),
+            operation_report=direct_operation,
         )
 
     page_operation_final_reply = _compact_text(skill_inputs.get("page_operation_final_reply"))
@@ -45,9 +45,9 @@ def buddy_visible_subgraph_result_adapter(**skill_inputs: Any) -> dict[str, Any]
 
     return _failed(
         code="invalid_visible_operation_result",
-        message="需要 operation_result 或页面操作 workflow 输出，才能适配可见图模板结果。",
+        message="需要 operation_report 或页面操作 workflow 输出，才能适配可见图模板结果。",
         detail={
-            "operation_result": skill_inputs.get("operation_result"),
+            "operation_report": skill_inputs.get("operation_report"),
             "page_operation_final_reply": skill_inputs.get("page_operation_final_reply"),
             "page_operation_workflow_report": skill_inputs.get("page_operation_workflow_report"),
             "visible_operation_result": skill_inputs.get("visible_operation_result"),
@@ -59,25 +59,21 @@ def _wrap_direct_template_operation(
     *,
     selected: dict[str, Any],
     user_goal: str,
-    operation_result: dict[str, Any],
     operation_report: dict[str, Any],
-    page_operation_context: dict[str, Any],
 ) -> dict[str, Any]:
     source_key = selected["key"]
     source_name = selected.get("name") or source_key
-    status = _operation_status(operation_result)
-    error = _compact_text(operation_result.get("error") or operation_report.get("error"))
-    latest_run = _latest_foreground_run(page_operation_context)
+    status = _operation_status(operation_report)
+    error = _compact_text(operation_report.get("error"))
+    latest_run = _latest_run_from_operation_report(operation_report)
     final_reply = _direct_template_final_reply(
         source_name=source_name,
-        operation_result=operation_result,
+        operation_result=operation_report,
         latest_run=latest_run,
         error=error,
     )
     report_value = {
-        "operation_result": operation_result,
         "operation_report": operation_report,
-        "page_operation_context": page_operation_context,
         "latest_foreground_run": latest_run,
     }
     package = _base_package(
@@ -87,16 +83,16 @@ def _wrap_direct_template_operation(
         status="failed" if _is_failure_status(status) or error else status,
         final_reply=final_reply,
         operation_report=report_value,
-        visible_operation_result=operation_result,
-        duration_ms=_coerce_int(operation_result.get("durationMs") or operation_result.get("duration_ms")),
+        visible_operation_result=operation_report,
+        duration_ms=_coerce_int(operation_report.get("durationMs") or operation_report.get("duration_ms")),
         error=error,
-        error_type=_compact_text(operation_result.get("errorType") or operation_result.get("error_type")),
+        error_type=_compact_text(operation_report.get("errorType") or operation_report.get("error_type")),
         final_reply_name="可见模板运行回复",
         final_reply_description="页面操作 Skill 在运行目标模板后得到的用户可见摘要。",
         operation_report_name="可见模板运行报告",
         operation_report_description="固定模板运行 Skill 和前端续跑返回的结构化操作报告。",
         visible_result_name="固定模板页面操作结果",
-        visible_result_description="toograph_page_operator 触发并等待目标模板运行后的原始操作结果。",
+        visible_result_description="toograph_page_operator 触发并等待目标模板运行后的紧凑操作结果。",
     )
     return _success(package, selected=selected, source_name=source_name, visible_operation_source="toograph_page_operator")
 
@@ -353,12 +349,21 @@ def _is_failure_status(status: str) -> bool:
     return status.lower() in {"failed", "failure", "error", "cancelled", "canceled", "interrupted"}
 
 
-def _latest_foreground_run(page_operation_context: dict[str, Any]) -> dict[str, Any]:
-    page_facts = page_operation_context.get("page_facts")
-    if not isinstance(page_facts, dict):
+def _latest_run_from_operation_report(operation_report: dict[str, Any]) -> dict[str, Any]:
+    run_id = _compact_text(operation_report.get("triggered_run_id"))
+    if not run_id:
         return {}
-    latest = page_facts.get("latestForegroundRun")
-    return dict(latest) if isinstance(latest, dict) else {}
+    return {
+        "runId": run_id,
+        "graphId": _compact_text(operation_report.get("triggered_graph_id")),
+        "status": _compact_text(operation_report.get("triggered_run_status")),
+        "resultSummary": _compact_text(
+            operation_report.get("triggered_run_result_summary") or operation_report.get("result_summary")
+        ),
+        "finalResult": _compact_text(
+            operation_report.get("triggered_run_final_result") or operation_report.get("final_result")
+        ),
+    }
 
 
 def _direct_template_final_reply(
@@ -368,6 +373,9 @@ def _direct_template_final_reply(
     latest_run: dict[str, Any],
     error: str,
 ) -> str:
+    final_result = _compact_text(latest_run.get("finalResult"))
+    if final_result:
+        return final_result
     result_summary = _compact_text(latest_run.get("resultSummary"))
     if result_summary:
         return result_summary

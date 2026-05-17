@@ -593,10 +593,10 @@ test("BuddyWidget builds page context from the shared editor snapshot", () => {
 });
 
 test("BuddyWidget resumes page operation runs after virtual UI execution", () => {
-  assert.match(componentSource, /import \{[\s\S]*buildPageOperationResult,[\s\S]*buildPageOperationResumePayload,[\s\S]*canAutoResumePageOperationRun,[\s\S]*\} from "\.\/pageOperationResume\.ts";/);
+  assert.match(componentSource, /import \{[\s\S]*buildPageOperationResult,[\s\S]*buildPageOperationResumePayload,[\s\S]*canAutoResumePageOperationRun,[\s\S]*findAutoResumablePageOperationRequestId,[\s\S]*\} from "\.\/pageOperationResume\.ts";/);
   assert.match(componentSource, /buddyMascotDebugStore\.beginVirtualOperationRunAttribution\(operationPlan\);[\s\S]*status = await executeVirtualOperationCommands\(operationPlan\);[\s\S]*triggeredRun = await waitForVirtualOperationTriggeredRun\(operationPlan\);[\s\S]*triggeredRunDetail = triggeredRun \? await waitForTriggeredRunCompletion\(triggeredRun\) : null;/);
   assert.match(componentSource, /const pageOperationContextAfterBase = buildPageOperationRuntimeContext\(\{ latestForegroundRun \}\);/);
-  assert.match(componentSource, /buildPageOperationResult\(\{[\s\S]*operationPlan,[\s\S]*routeBefore,[\s\S]*routeAfter: route\.fullPath,[\s\S]*pageOperationContextBefore: pageOperationContextBefore\.skillRuntimeContext,[\s\S]*pageOperationContextAfter: pageOperationContextAfterBase\.skillRuntimeContext,[\s\S]*triggeredRunId: triggeredRun\?\.runId \?\? null,[\s\S]*triggeredGraphId: triggeredRun\?\.graphId \?\? null,[\s\S]*triggeredRunInitialStatus: triggeredRun\?\.initialStatus \?\? null,[\s\S]*triggeredRunStatus: triggeredRunDetail\?\.status \?\? triggeredRun\?\.initialStatus \?\? null,[\s\S]*\}\);/);
+  assert.match(componentSource, /buildPageOperationResult\(\{[\s\S]*operationPlan,[\s\S]*routeBefore,[\s\S]*routeAfter: route\.fullPath,[\s\S]*pageOperationContextBefore: pageOperationContextBefore\.skillRuntimeContext,[\s\S]*pageOperationContextAfter: pageOperationContextAfterBase\.skillRuntimeContext,[\s\S]*triggeredRunId: triggeredRun\?\.runId \?\? null,[\s\S]*triggeredGraphId: triggeredRun\?\.graphId \?\? null,[\s\S]*triggeredRunInitialStatus: triggeredRun\?\.initialStatus \?\? null,[\s\S]*triggeredRunStatus: triggeredRunDetail\?\.status \?\? triggeredRun\?\.initialStatus \?\? null,[\s\S]*triggeredRunFinalResult: triggeredRunDetail\?\.final_result \?\? null,[\s\S]*\}\);/);
   assert.match(componentSource, /const pageOperationContextAfter = buildPageOperationRuntimeContext\(\{[\s\S]*latestOperationReport: operationResult\.operation_report,[\s\S]*latestForegroundRun,[\s\S]*\}\);/);
   assert.match(componentSource, /async function waitForTriggeredRunCompletion\(triggeredRun: BuddyVirtualOperationTriggeredRun\): Promise<RunDetail \| null> \{[\s\S]*latestRun = await fetchRun\(triggeredRun\.runId\);[\s\S]*if \(!shouldPollRunStatus\(latestRun\.status\)\) \{/);
   assert.match(componentSource, /async function maybeAutoResumePageOperationRun\(/);
@@ -877,11 +877,11 @@ test("BuddyWidget persists awaiting-human paused run placeholders outside model 
   assert.match(componentSource, /handleBuddyRunAwaitingHuman\(resumedRunDetail,\s*assistantMessageId,\s*\{ persist: true \}\)/);
   assert.match(
     componentSource,
-    /updateAssistantMessage\(assistantMessageId,\s*buildBuddyConversationalPausePrompt\(run,\s*graph\),\s*\{[\s\S]*includeInContext:\s*true,[\s\S]*runId:\s*run\.run_id/,
+    /const isAutoResumablePageOperationPause = Boolean\(findAutoResumablePageOperationRequestId\(run\)\);[\s\S]*const pauseReply = isAutoResumablePageOperationPause[\s\S]*t\("buddy\.pause\.autoResumingPageOperation"\)[\s\S]*buildBuddyConversationalPausePrompt\(run,\s*graph\);[\s\S]*updateAssistantMessage\(assistantMessageId,\s*pauseReply,\s*\{[\s\S]*includeInContext:\s*!isAutoResumablePageOperationPause,[\s\S]*runId:\s*run\.run_id/,
   );
   assert.match(
     componentSource,
-    /if \(options\.persist && activeSessionId\.value\) \{[\s\S]*persistBuddyMessage\(activeSessionId\.value,[\s\S]*runId:\s*run\.run_id,[\s\S]*includeInContext:\s*true/,
+    /if \(options\.persist && activeSessionId\.value\) \{[\s\S]*persistBuddyMessage\(activeSessionId\.value,[\s\S]*runId:\s*run\.run_id,[\s\S]*includeInContext:\s*!isAutoResumablePageOperationPause/,
   );
 });
 

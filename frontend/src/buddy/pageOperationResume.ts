@@ -17,6 +17,8 @@ export type PageOperationResult = {
   triggered_graph_id: string | null;
   triggered_run_initial_status: string | null;
   triggered_run_status: string | null;
+  triggered_run_result_summary: string | null;
+  triggered_run_final_result: string | null;
   input_text: string | null;
   graph_edit_summary: Record<string, unknown> | null;
   operation_report: PageOperationReport;
@@ -34,6 +36,8 @@ export type PageOperationReport = {
   triggered_graph_id: string | null;
   triggered_run_initial_status: string | null;
   triggered_run_status: string | null;
+  triggered_run_result_summary: string | null;
+  triggered_run_final_result: string | null;
   input_text: string | null;
   graph_edit_summary: Record<string, unknown> | null;
   error: string | null;
@@ -50,6 +54,7 @@ export function buildPageOperationResult(input: {
   triggeredGraphId?: string | null;
   triggeredRunInitialStatus?: string | null;
   triggeredRunStatus?: string | null;
+  triggeredRunFinalResult?: string | null;
   graphEditSummary?: Record<string, unknown> | null;
   error?: string | null;
 }): PageOperationResult {
@@ -59,6 +64,8 @@ export function buildPageOperationResult(input: {
   const triggeredGraphId = normalizeNullableText(input.triggeredGraphId);
   const triggeredRunInitialStatus = normalizeNullableText(input.triggeredRunInitialStatus);
   const triggeredRunStatus = normalizeNullableText(input.triggeredRunStatus);
+  const triggeredRunResultSummary = latestForegroundRunResultSummary(input.pageOperationContextAfter);
+  const triggeredRunFinalResult = normalizeNullableText(input.triggeredRunFinalResult);
   const inputText = firstRunTemplateInputText(input.operationPlan);
   const graphEditSummary = input.graphEditSummary ?? defaultGraphEditSummary(input.operationPlan);
   const error = normalizeNullableText(input.error);
@@ -73,6 +80,8 @@ export function buildPageOperationResult(input: {
     triggered_graph_id: triggeredGraphId,
     triggered_run_initial_status: triggeredRunInitialStatus,
     triggered_run_status: triggeredRunStatus,
+    triggered_run_result_summary: triggeredRunResultSummary,
+    triggered_run_final_result: triggeredRunFinalResult,
     input_text: inputText,
     graph_edit_summary: graphEditSummary,
     error,
@@ -90,6 +99,8 @@ export function buildPageOperationResult(input: {
     triggered_graph_id: triggeredGraphId,
     triggered_run_initial_status: triggeredRunInitialStatus,
     triggered_run_status: triggeredRunStatus,
+    triggered_run_result_summary: triggeredRunResultSummary,
+    triggered_run_final_result: triggeredRunFinalResult,
     input_text: inputText,
     graph_edit_summary: graphEditSummary,
     operation_report: report,
@@ -118,13 +129,17 @@ export function canAutoResumePageOperationRun(
   if (!requestId || run.status !== "awaiting_human") {
     return false;
   }
+  return findAutoResumablePageOperationRequestId(run) === requestId;
+}
+
+export function findAutoResumablePageOperationRequestId(
+  run: Pick<RunDetail, "status" | "metadata"> | { status?: string | null; metadata?: Record<string, unknown> | null },
+): string | null {
+  if (run.status !== "awaiting_human") {
+    return null;
+  }
   const metadata = isPlainRecord(run.metadata) ? run.metadata : {};
-  const pending = isPlainRecord(metadata.pending_page_operation_continuation) ? metadata.pending_page_operation_continuation : null;
-  return (
-    pending !== null
-    && pending.mode === "auto_resume_after_ui_operation"
-    && pending.operation_request_id === requestId
-  );
+  return findAutoResumablePageOperationRequestIdInMetadata(metadata);
 }
 
 function firstOperationTargetId(operationPlan: BuddyVirtualOperationPlan): string | null {
@@ -154,6 +169,27 @@ function defaultGraphEditSummary(operationPlan: BuddyVirtualOperationPlan): Reco
     target_id: graphEditOperation.targetId,
     intent_count: graphEditOperation.graphEditIntents.length,
   };
+}
+
+function latestForegroundRunResultSummary(pageOperationContext: PageOperationRuntimeContext): string | null {
+  return normalizeNullableText(pageOperationContext.page_facts?.latestForegroundRun?.resultSummary);
+}
+
+function findAutoResumablePageOperationRequestIdInMetadata(metadata: Record<string, unknown>): string | null {
+  const direct = extractAutoResumablePageOperationRequestId(metadata.pending_page_operation_continuation);
+  if (direct) {
+    return direct;
+  }
+  const pendingSubgraph = isPlainRecord(metadata.pending_subgraph_breakpoint) ? metadata.pending_subgraph_breakpoint : null;
+  const nestedMetadata = isPlainRecord(pendingSubgraph?.metadata) ? pendingSubgraph.metadata : null;
+  return nestedMetadata ? extractAutoResumablePageOperationRequestId(nestedMetadata.pending_page_operation_continuation) : null;
+}
+
+function extractAutoResumablePageOperationRequestId(value: unknown): string | null {
+  if (!isPlainRecord(value) || value.mode !== "auto_resume_after_ui_operation") {
+    return null;
+  }
+  return normalizeNullableText(value.operation_request_id);
 }
 
 function normalizeNullableText(value: unknown): string | null {

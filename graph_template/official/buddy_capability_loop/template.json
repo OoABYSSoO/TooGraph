@@ -682,14 +682,6 @@
           "required": true
         },
         {
-          "state": "operation_result",
-          "required": false
-        },
-        {
-          "state": "page_operation_context",
-          "required": false
-        },
-        {
           "state": "operation_report",
           "required": false
         },
@@ -730,7 +722,7 @@
           "buddy_visible_subgraph_result_adapter": {
             "skillKey": "buddy_visible_subgraph_result_adapter",
             "title": "可见子图结果适配 skill instruction",
-            "content": "只调用 buddy_visible_subgraph_result_adapter。selected_capability 必须从 capability_selection_audit.selected 复制；固定模板运行分支复制 operation_result、page_operation_context、operation_report；页面操作 workflow 分支复制 visible_page_operation_final_reply 到 page_operation_final_reply、visible_page_operation_report 到 page_operation_workflow_report；user_goal 优先使用 request_understanding.user_goal，其次 user_message。不要总结、重写或发明运行结果。",
+            "content": "只调用 buddy_visible_subgraph_result_adapter。selected_capability 必须从 capability_selection_audit.selected 复制；固定模板运行分支只复制紧凑 operation_report；页面操作 workflow 分支复制 visible_page_operation_final_reply 到 page_operation_final_reply、visible_page_operation_report 到 page_operation_workflow_report；user_goal 优先使用 request_understanding.user_goal，其次 user_message。不要总结、重写或发明运行结果。",
             "source": "node.override"
           }
         },
@@ -2552,7 +2544,7 @@
             "source": "node.override"
           }
         },
-        "taskInstruction": "本节点只调用一次 toograph_page_operator。不要输出 commands，不要输出 DOM selector、坐标、鼠标轨迹或浏览器点击细节。\n从 capability_selection_audit.selected 读取目标模板，输出 template_target JSON：template_id 使用 selected.key，template_name 使用 selected.name，search_text 优先 selected.name 其次 selected.key。\ntemplate_target.input_text 必须写入本次已经明确的用户目标：优先 request_understanding.user_goal，其次 user_message；如果上一轮伙伴刚询问过澄清问题，本轮用户回答已经在 conversation_history/context_brief/request_understanding 中被整理，应把整理后的完整目标写入 input_text，而不是只写孤立回答，也不要改成“打开模板”这种操作目标。\ncursor_lifecycle 使用 return_at_end，reason 简短说明伙伴通过固定页面操作运行目标模板。Skill 会程序化执行：点击左侧栏图与模板、搜索目标模板、点开模板、修改 input 节点为本次目标、点击运行、等待图运行完成并把 operation_result/page_operation_context 写回后再继续决策。",
+        "taskInstruction": "本节点只调用一次 toograph_page_operator。不要输出 commands，不要输出 DOM selector、坐标、鼠标轨迹或浏览器点击细节。\n从 capability_selection_audit.selected 读取目标模板，输出 template_target JSON：template_id 使用 selected.key，template_name 使用 selected.name，search_text 优先 selected.name 其次 selected.key。\ntemplate_target.input_text 必须写入本次已经明确的用户目标：优先 request_understanding.user_goal，其次 user_message；如果上一轮伙伴刚询问过澄清问题，本轮用户回答已经在 conversation_history/context_brief/request_understanding 中被整理，应把整理后的完整目标写入 input_text，而不是只写孤立回答，也不要改成“打开模板”这种操作目标。\ncursor_lifecycle 使用 return_at_end，reason 简短说明伙伴通过固定页面操作运行目标模板。Skill 会程序化执行：点击左侧栏图与模板、搜索目标模板、点开模板、修改 input 节点为本次目标、点击运行、等待图运行完成并把 operation_report 与必要的页面续跑状态写回后再继续决策。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "low",

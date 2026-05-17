@@ -19,7 +19,7 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses operation request
       expected_continuation: {
         mode: "auto_resume_after_ui_operation",
         operation_request_id: "vop_1234567890abcdef",
-        resume_state_keys: ["page_operation_context", "page_context", "operation_result"],
+        resume_state_keys: ["page_operation_context", "page_context", "operation_result", "operation_report"],
       },
       run_id: "run_page_operation",
       node_id: "execute_page_operation",
@@ -37,7 +37,7 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses operation request
     expectedContinuation: {
       mode: "auto_resume_after_ui_operation",
       operationRequestId: "vop_1234567890abcdef",
-      resumeStateKeys: ["page_operation_context", "page_context", "operation_result"],
+      resumeStateKeys: ["page_operation_context", "page_context", "operation_result", "operation_report"],
     },
     reason: "用户要打开运行历史页。",
   });
@@ -89,6 +89,28 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent rejects operation reques
   assert.equal(plan, null);
 });
 
+test("resolveBuddyVirtualOperationPlanFromActivityEvent accepts existing continuation events without compact reports", () => {
+  const plan = resolveBuddyVirtualOperationPlanFromActivityEvent({
+    kind: "virtual_ui_operation",
+    detail: {
+      operation_request: {
+        version: 1,
+        operation_request_id: "vop_existing1234",
+        commands: ["click app.nav.runs"],
+        operations: [{ kind: "click", target_id: "app.nav.runs" }],
+      },
+      expected_continuation: {
+        mode: "auto_resume_after_ui_operation",
+        operation_request_id: "vop_existing1234",
+        resume_state_keys: ["page_operation_context", "page_context", "operation_result"],
+      },
+    },
+  });
+
+  assert.equal(plan?.operationRequestId, "vop_existing1234");
+  assert.deepEqual(plan?.expectedContinuation?.resumeStateKeys, ["page_operation_context", "page_context", "operation_result"]);
+});
+
 test("resolveBuddyVirtualOperationPlanFromActivityEvent parses keyboard command operations", () => {
   const plan = resolveBuddyVirtualOperationPlanFromActivityEvent({
     kind: "virtual_ui_operation",
@@ -116,7 +138,7 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses keyboard command 
       expected_continuation: {
         mode: "auto_resume_after_ui_operation",
         operation_request_id: "vop_keyboard123456",
-        resume_state_keys: ["page_operation_context", "page_context", "operation_result"],
+        resume_state_keys: ["page_operation_context", "page_context", "operation_result", "operation_report"],
       },
     },
   });
@@ -157,7 +179,7 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses graph edit playba
       expected_continuation: {
         mode: "auto_resume_after_ui_operation",
         operation_request_id: "vop_graphedit1234",
-        resume_state_keys: ["page_operation_context", "page_context", "operation_result"],
+        resume_state_keys: ["page_operation_context", "page_context", "operation_result", "operation_report"],
       },
     },
   });
@@ -181,7 +203,7 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses graph edit playba
     expectedContinuation: {
       mode: "auto_resume_after_ui_operation",
       operationRequestId: "vop_graphedit1234",
-      resumeStateKeys: ["page_operation_context", "page_context", "operation_result"],
+      resumeStateKeys: ["page_operation_context", "page_context", "operation_result", "operation_report"],
     },
     reason: "创建一个姓名输入图。",
   });
@@ -212,7 +234,7 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses fixed template ru
       expected_continuation: {
         mode: "auto_resume_after_ui_operation",
         operation_request_id: "vop_template1234",
-        resume_state_keys: ["page_operation_context", "page_context", "operation_result"],
+        resume_state_keys: ["page_operation_context", "page_context", "operation_result", "operation_report"],
       },
     },
   });

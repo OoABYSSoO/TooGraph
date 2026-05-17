@@ -717,9 +717,14 @@ class TemplateLayoutTests(unittest.TestCase):
             ],
         )
         self.assertNotIn({"state": "selected_capability", "required": True}, _read_contracts(adapt_node["reads"]))
-        self.assertIn({"state": "operation_result", "required": False}, _read_contracts(adapt_node["reads"]))
-        self.assertIn({"state": "page_operation_context", "required": False}, _read_contracts(adapt_node["reads"]))
+        self.assertNotIn({"state": "operation_result", "required": False}, _read_contracts(adapt_node["reads"]))
+        self.assertNotIn({"state": "page_operation_context", "required": False}, _read_contracts(adapt_node["reads"]))
+        self.assertIn({"state": "operation_report", "required": False}, _read_contracts(adapt_node["reads"]))
         self.assertIn({"state": "visible_page_operation_final_reply", "required": False}, _read_contracts(adapt_node["reads"]))
+        self.assertNotIn(
+            "page_operation_context",
+            adapt_node["config"]["skillInstructionBlocks"]["buddy_visible_subgraph_result_adapter"]["content"],
+        )
         self.assertEqual(
             _read_contracts(cycle_graph["nodes"]["output_capability_selection_audit"]["reads"]),
             [{"state": "capability_selection_audit", "required": False}],

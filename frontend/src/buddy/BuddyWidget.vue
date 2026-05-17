@@ -488,6 +488,7 @@ import {
   buildPageOperationResult,
   buildPageOperationResumePayload,
   canAutoResumePageOperationRun,
+  findAutoResumablePageOperationRequestId,
   type PageOperationResult,
   type PageOperationResultStatus,
 } from "./pageOperationResume.ts";
@@ -2362,6 +2363,7 @@ async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequ
     triggeredGraphId: triggeredRun?.graphId ?? null,
     triggeredRunInitialStatus: triggeredRun?.initialStatus ?? null,
     triggeredRunStatus: triggeredRunDetail?.status ?? triggeredRun?.initialStatus ?? null,
+    triggeredRunFinalResult: triggeredRunDetail?.final_result ?? null,
     error,
   });
   const pageOperationContextAfter = buildPageOperationRuntimeContext({
@@ -4099,14 +4101,18 @@ function handleBuddyRunAwaitingHuman(
   mood.value = "thinking";
   setAssistantActivityText(assistantMessageId, t("buddy.pause.activity"));
   const graph = run.graph_snapshot as unknown as GraphPayload;
-  updateAssistantMessage(assistantMessageId, buildBuddyConversationalPausePrompt(run, graph), {
-    includeInContext: true,
+  const isAutoResumablePageOperationPause = Boolean(findAutoResumablePageOperationRequestId(run));
+  const pauseReply = isAutoResumablePageOperationPause
+    ? t("buddy.pause.autoResumingPageOperation")
+    : buildBuddyConversationalPausePrompt(run, graph);
+  updateAssistantMessage(assistantMessageId, pauseReply, {
+    includeInContext: !isAutoResumablePageOperationPause,
     runId: run.run_id,
   });
   if (options.persist && activeSessionId.value) {
     void persistBuddyMessage(activeSessionId.value, messages.value.find((message) => message.id === assistantMessageId), {
       runId: run.run_id,
-      includeInContext: true,
+      includeInContext: !isAutoResumablePageOperationPause,
     });
   }
 }

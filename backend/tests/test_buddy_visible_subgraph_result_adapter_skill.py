@@ -41,12 +41,12 @@ class BuddyVisibleSubgraphResultAdapterSkillTests(unittest.TestCase):
         self.assertEqual(definition.skill_key, "buddy_visible_subgraph_result_adapter")
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
         self.assertEqual(definition.permissions, [])
+        self.assertNotIn("page_operation_context", [field.key for field in definition.state_input_schema])
+        self.assertNotIn("operation_result", [field.key for field in definition.state_input_schema])
         self.assertEqual(
             [field.key for field in definition.llm_output_schema],
             [
                 "selected_capability",
-                "operation_result",
-                "page_operation_context",
                 "operation_report",
                 "page_operation_final_reply",
                 "page_operation_workflow_report",
@@ -74,29 +74,16 @@ class BuddyVisibleSubgraphResultAdapterSkillTests(unittest.TestCase):
                     "name": "高级联网搜索",
                     "description": "多轮搜索并产出答案。",
                 },
-                "operation_result": {
+                "operation_report": {
                     "operation_request_id": "vop_template_123",
                     "status": "succeeded",
                     "commands": ["run_template advanced_web_research_loop"],
                     "triggered_run_id": "run_template_123",
                     "triggered_run_status": "completed",
+                    "triggered_run_result_summary": "已运行模板并拿到结果。",
+                    "triggered_run_final_result": "已运行模板并拿到结果。",
                     "input_text": "研究 TooGraph。",
                     "route_after": "/editor/advanced_web_research_loop",
-                },
-                "operation_report": {
-                    "operation_request_id": "vop_template_123",
-                    "status": "succeeded",
-                    "triggered_run_id": "run_template_123",
-                    "triggered_run_status": "completed",
-                },
-                "page_operation_context": {
-                    "page_facts": {
-                        "latestForegroundRun": {
-                            "runId": "run_template_123",
-                            "status": "completed",
-                            "resultSummary": "已运行模板并拿到结果。",
-                        }
-                    },
                 },
                 "user_goal": "研究 TooGraph。",
                 "reason": "目标模板通过可见页面操作运行。",
@@ -113,7 +100,8 @@ class BuddyVisibleSubgraphResultAdapterSkillTests(unittest.TestCase):
         self.assertEqual(package["inputs"]["user_goal"], "研究 TooGraph。")
         self.assertEqual(package["inputs"]["visible_operation_capability"], "toograph_page_operator")
         self.assertEqual(package["outputs"]["final_reply"]["value"], "已运行模板并拿到结果。")
-        self.assertEqual(package["outputs"]["operation_report"]["value"]["operation_result"]["triggered_run_id"], "run_template_123")
+        self.assertEqual(package["outputs"]["operation_report"]["value"]["operation_report"]["triggered_run_id"], "run_template_123")
+        self.assertNotIn("page_operation_context", package["outputs"]["operation_report"]["value"])
         self.assertEqual(package["outputs"]["visible_operation_result"]["value"]["triggered_run_id"], "run_template_123")
         self.assertNotIn("fieldKey", package["outputs"]["final_reply"])
 
@@ -144,7 +132,7 @@ class BuddyVisibleSubgraphResultAdapterSkillTests(unittest.TestCase):
             ADAPTER_AFTER_LLM_PATH,
             {
                 "selected_capability": {"kind": "skill", "key": "web_search", "name": "Web Search"},
-                "operation_result": {"status": "succeeded"},
+                "operation_report": {"status": "succeeded"},
                 "user_goal": "研究 TooGraph。",
             },
         )
