@@ -188,6 +188,9 @@ export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {
 });
 
 function resolveRunButtonOperationTarget(request: BuddyVirtualOperationPlan) {
+  if (request.operations.some((item) => item.kind === "run_template")) {
+    return "editor.action.runActiveGraph";
+  }
   const operation = request.operations.find((item) => "targetId" in item && item.targetId === "editor.action.runActiveGraph");
   return operation && "targetId" in operation ? operation.targetId : "";
 }

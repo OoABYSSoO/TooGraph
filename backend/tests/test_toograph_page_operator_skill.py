@@ -49,10 +49,11 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         )
         self.assertEqual(
             [field.key for field in definition.llm_output_schema],
-            ["commands", "graph_edit_intents", "cursor_lifecycle", "reason"],
+            ["commands", "template_target", "graph_edit_intents", "cursor_lifecycle", "reason"],
         )
         llm_output_types = {field.key: field.value_type for field in definition.llm_output_schema}
         self.assertEqual(llm_output_types["commands"], "text_array")
+        self.assertEqual(llm_output_types["template_target"], "json")
         self.assertEqual(llm_output_types["graph_edit_intents"], "json")
         self.assertEqual(
             [field.key for field in definition.state_output_schema],
@@ -156,6 +157,7 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
             ],
         )
         self.assertEqual(context_payload["output_contract"]["commands"], ["click app.nav.runs"])
+        self.assertEqual(context_payload["output_contract"]["template_target"]["template_id"], "target_template_id")
         self.assertEqual(context_payload["page_operation_book"]["inputs"][0]["targetId"], "library.search.query")
         self.assertIn("graph_edit_intents", context_payload["output_contract"])
         self.assertIn("伙伴页面、伙伴浮窗、伙伴形象", context)
@@ -240,6 +242,81 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertEqual(event["detail"]["commands"], ["click app.nav.runs"])
         self.assertEqual(event["detail"]["reason"], "用户要打开运行历史页。")
         self.assertEqual(event["detail"]["cursor_lifecycle"], "return_after_step")
+
+    def test_after_llm_emits_template_run_event_from_high_level_target(self) -> None:
+        result = _run_skill_script(
+            PAGE_OPERATOR_AFTER_LLM_PATH,
+            {
+                "template_target": {
+                    "template_id": "advanced_web_research_loop",
+                    "template_name": "高级联网搜索",
+                    "input_text": "研究 TooGraph 页面操作技能的最新差距。",
+                },
+                "cursor_lifecycle": "return_at_end",
+                "reason": "能力选择器选中了这个图模板。",
+            },
+        )
+
+        self.assertEqual(result["ok"], True)
+        self.assertRegex(str(result["operation_request_id"]), r"^vop_[0-9a-f]{16}$")
+        self.assertEqual(result["journal"][0]["kind"], "run_template")
+        self.assertEqual(result["journal"][0]["target_id"], "library.template.advanced_web_research_loop.open")
+        self.assertEqual(result["journal"][0]["template_id"], "advanced_web_research_loop")
+        event = result["activity_events"][0]
+        self.assertEqual(event["kind"], "virtual_ui_operation")
+        self.assertEqual(event["status"], "requested")
+        self.assertEqual(event["detail"]["commands"], ["run_template advanced_web_research_loop"])
+        self.assertEqual(event["detail"]["cursor_lifecycle"], "return_at_end")
+        operation_request = event["detail"]["operation_request"]
+        self.assertEqual(operation_request["operation_request_id"], result["operation_request_id"])
+        self.assertEqual(operation_request["commands"], ["run_template advanced_web_research_loop"])
+        self.assertEqual(
+            operation_request["operations"],
+            [
+                {
+                    "kind": "run_template",
+                    "target_id": "library.template.advanced_web_research_loop.open",
+                    "target_label": "高级联网搜索",
+                    "template_id": "advanced_web_research_loop",
+                    "template_name": "高级联网搜索",
+                    "search_text": "advanced_web_research_loop",
+                    "input_text": "研究 TooGraph 页面操作技能的最新差距。",
+                    "run_target_id": "editor.action.runActiveGraph",
+                }
+            ],
+        )
+
+    def test_after_llm_rejects_template_run_without_input_text(self) -> None:
+        result = _run_skill_script(
+            PAGE_OPERATOR_AFTER_LLM_PATH,
+            {
+                "template_target": {
+                    "template_id": "advanced_web_research_loop",
+                    "template_name": "高级联网搜索",
+                },
+                "reason": "缺少本次目标输入。",
+            },
+        )
+
+        self.assertEqual(result["ok"], False)
+        self.assertEqual(result["error"]["code"], "missing_template_input_text")
+
+    def test_after_llm_uses_user_goal_as_template_input_text(self) -> None:
+        result = _run_skill_script(
+            PAGE_OPERATOR_AFTER_LLM_PATH,
+            {
+                "user_goal": "把最新产品路线整理成三条可执行任务。",
+                "template_target": {
+                    "template_id": "planning_summary_template",
+                    "template_name": "规划摘要模板",
+                },
+                "reason": "LLM 只选择目标模板，当前目标来自输入 state。",
+            },
+        )
+
+        operation = result["activity_events"][0]["detail"]["operation_request"]["operations"][0]
+        self.assertEqual(result["ok"], True)
+        self.assertEqual(operation["input_text"], "把最新产品路线整理成三条可执行任务。")
 
     def test_after_llm_accepts_current_operation_book_input_and_wait_commands(self) -> None:
         operation_book = {

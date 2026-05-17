@@ -604,6 +604,17 @@ test("BuddyWidget resumes page operation runs after virtual UI execution", () =>
   assert.match(componentSource, /await resumeRun\([\s\S]*operationPlan\.runId,[\s\S]*buildPageOperationResumePayload\(\{[\s\S]*operationResult,[\s\S]*pageContext: pageOperationContextAfter\.pageContext,[\s\S]*pageOperationContext: pageOperationContextAfter\.skillRuntimeContext,[\s\S]*\}\),[\s\S]*\);/);
 });
 
+test("BuddyWidget runs template targets through a fixed virtual page operation sequence", () => {
+  assert.match(componentSource, /case "run_template":[\s\S]*await executeBuddyVirtualRunTemplateOperation\(operation\);/);
+  assert.match(componentSource, /async function executeBuddyVirtualRunTemplateOperation\(operation: BuddyVirtualOperation\)/);
+  assert.match(componentSource, /await clickVirtualOperationTargetWithRetry\("app\.nav\.library", token\);/);
+  assert.match(componentSource, /await replaceVirtualText\(searchInput, operation\.searchText\);/);
+  assert.match(componentSource, /const templateAffordance = await waitForTemplateRunTargetAffordance\(operation, token\);/);
+  assert.match(componentSource, /await fillTemplateRunInputNode\(operation, token\);/);
+  assert.match(componentSource, /await clickVirtualOperationTargetWithRetry\(operation\.runTargetId, token\);/);
+  assert.match(componentSource, /operation\.kind === "run_template"/);
+});
+
 test("BuddyWidget notifies buddy pages to refresh after a completed chat graph run", () => {
   assert.match(componentSource, /if \(runDetail\.status === "completed"\) \{[\s\S]*buddyContextStore\.notifyBuddyDataChanged\(\);[\s\S]*\}/);
 });

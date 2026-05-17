@@ -37,7 +37,7 @@
 - Skill 生命周期脚本使用固定文件名而不是在 manifest 中配置入口。存在 `before_llm.py` 时，运行时会在技能 LLM 输出规划前执行它，只向它传入运行时上下文和节点任务说明，并把返回的上下文注入 LLM 提示词；图 state 直接进入 LLM 输出规划提示词，不传给 `before_llm.py`。存在 `after_llm.py` 时，运行时会在 LLM 生成结构化 LLM 输出后执行它，并把它返回的 JSON 当作技能结果。写入 state 仍由 TooGraph runtime 根据 `stateOutputSchema` 和 `skillBindings.outputMapping` 完成，脚本不直接绑定 state。
 - 在 LLM 节点卡片选择带 `stateOutputSchema` 的静态 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
 - 动态能力执行来自输入 `capability` state，不复用 `skillBindings.outputMapping`，也不会推断普通输出映射。这类节点必须只写一个 `result_package` state。包内 `outputs.<outputKey>` 保存 `{ name, description, type, value }`，不额外捏造 `fieldKey`；下游 LLM 节点会把这些虚拟输出拆开并复用普通 state/file 展开逻辑。
-- 当 `capability.kind=subgraph` 进入 LLM 节点时，该节点只负责根据当前 state 和目标模板公开输入 schema 生成子图输入；运行时负责执行对应图模板，并把公开 output 边界封装为同一套 `result_package`。这条路径不经过静态 Subgraph 节点端口 mapping，也不让 LLM 二次总结子图结果。若动态子图内部触发 `interrupt_after`，父级 run 会进入标准 `awaiting_human`，并通过 `pending_subgraph_breakpoint` 与父级 resume API 恢复。
+- 后台动态 `capability.kind=subgraph` 运行时原语仍负责根据当前 state 和目标模板公开 input schema 生成子图输入，并把公开 output 边界封装为同一套 `result_package`；若动态子图内部触发 `interrupt_after`，父级 run 会进入标准 `awaiting_human`。Buddy 面向用户的可见模板运行路径已经开始从这条后台直连语义中分离：目标模板由 LLM 选定后，应通过页面操作器的 `template_target -> run_template` 映射在前端可见运行，并在点击运行前把本次目标写入模板 input 节点。
 - 图运行前不再做旧草稿兼容补齐。提交到运行时的图必须已经符合当前协议。
 - `promptVisible` 已移除。上下文边界由节点 `reads` 决定：LLM 节点只接收自己显式读取的 state。
 - `state_schema` 支持 `binding` 元数据，用来标记某个 state 是否由技能输出自动绑定。
@@ -74,17 +74,17 @@
 - 作用：根据 LLM 节点技能 LLM 输出规划阶段看到的本地可用能力清单，让模型选择并校验规范化单个 `capability`。
 - 生命周期：`before_llm.py` 读取当前启用的图模板和启用的 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`、`selection_reason` 和 `rejected_candidates`，按同一清单做真实性与启用状态校验，并保留 `permissions` 供候选描述、审计和后续运行时策略使用。它不输出 `requiresApproval`，也不恢复 per-skill 审批协议。
 - 审计输出：除 `capability` 和 `found` 外，选择器返回 `audit`，记录候选数量、按类型计数、选中能力、选择原因、选中权限摘要、被拒绝候选原因、缺口说明和 catalog 读取错误；同时返回 `capability_selection` 低层 `activity_events`，Buddy 主模板会把 `audit` 映射到 `capability_selection_audit` state。
-- 选择对象包括当前启用的图模板和启用的 Skill；图模板优先于 Skill。页面操作官方模板 `toograph_page_operation_workflow` 会作为可见 subgraph 候选出现，并在候选上下文中暴露 `targetFlows`，方便模型把“打开运行记录、打开图、运行当前图、可见搭建/编辑图”等目标路由到图模板而不是单次页面操作 Skill。
+- 选择对象包括当前启用的图模板和启用的 Skill；图模板优先于 Skill。页面操作官方模板 `toograph_page_operation_workflow` 会作为可见 subgraph 候选出现，并在候选上下文中暴露 `targetFlows`，方便模型把“打开运行记录、打开图、运行当前图、运行指定图模板、可见搭建/编辑图”等目标路由到图模板而不是单次页面操作 Skill。
 - 它不执行被选能力，不生成被选能力的运行入参，也不做程序字段匹配；模型基于候选项的名称和描述判断，脚本只做真实性与启用状态校验。
 
 ### `toograph_page_operator`
 
 - 位置：`skill/official/toograph_page_operator/`
 - 显示名称：`TooGraph 页面操作器`
-- 作用：读取运行时提供的结构化页面操作书，让模型选择一个语义页面命令，并把合法请求交给 TooGraph 应用内虚拟操作层执行。
+- 作用：读取运行时提供的结构化页面操作书，让模型选择一个语义页面命令；当目标是运行图模板时，模型只输出 `template_target`，技能把它确定性映射成 `run_template` 虚拟操作请求，再交给 TooGraph 应用内虚拟操作层执行，并在运行前写入本次目标到模板 input 节点。
 - 当前能力：支持非伙伴自表面的 `click`、`focus`、`clear`、`type`、`press` 和安全 `wait` 命令；在编辑器页支持 `graph_edit editor.graph.playback`，由 LLM 输出 `graph_edit_intents`，前端再编译成 graph commands 和可见 playback steps。成功请求会带稳定 `operation_request_id` 和 `expected_continuation`，让前端执行后用刷新后的 `page_context`、`page_operation_context` 和 `operation_result` 自动恢复暂停 run。
 - 边界：LLM 只看到页面操作书和产品语义意图，不输出 DOM selector、屏幕坐标、鼠标轨迹或浏览器自动化脚本；伙伴页面、伙伴浮窗、伙伴形象和调试入口会被过滤或拒绝。
-- 当前缺口：操作会生成虚拟 UI 请求和基础 journal，并且运行图按钮触发的 run 已能归因和等待终态；仍需补齐更完整的统一 operation journal、图变更 diff、graph revision、undo/redo、失败重试和低层操作摘要。
+- 当前缺口：操作会生成虚拟 UI 请求和基础 journal，`template_target -> run_template` 已能驱动前端点击图与模板、搜索、打开模板、写入 input 节点、运行并把触发 run 归因和等待终态；仍需补齐更完整的统一 operation journal、图变更 diff、graph revision、undo/redo、失败重试和低层操作摘要。
 
 ### `toograph_script_tester`
 
@@ -140,7 +140,7 @@
 
 - 位置：`graph_template/official/toograph_page_operation_workflow/template.json`
 - 显示名称：`操作 TooGraph 页面`
-- 作用：把“打开页面、查看运行、切换页签、新建/编辑/运行图”等页面目标表达成可审计图流程：解析目标 -> 进入页面操作子图 -> 调用 `toograph_page_operator` 请求一次可见 UI 操作 -> 在操作节点后暂停，等待前端虚拟操作确认 -> 用刷新后的页面事实验证目标 -> 未完成且可继续时通过 condition 回到规划节点 -> 最终输出 `final_reply` 和结构化 `operation_report`。
+- 作用：把“打开页面、查看运行、切换页签、新建/编辑/运行图、运行指定图模板”等页面目标表达成可审计图流程：解析目标 -> 进入页面操作子图 -> 调用 `toograph_page_operator` 请求一次可见 UI 操作或一次固定化 `run_template` 操作 -> 在操作节点后暂停，等待前端虚拟操作确认 -> 用刷新后的页面事实验证目标 -> 未完成且可继续时通过 condition 回到规划节点 -> 最终输出 `final_reply` 和结构化 `operation_report`。
 - 输入契约：作为可复用子图能力时只公开一个 input 节点 `user_goal`，内容是用户希望 TooGraph 页面达成的期望。页面操作书、当前页面事实和恢复后的操作结果都由运行时 `skill_runtime_context`、`toograph_page_operator` 和自动 resume payload 补充，不要求调用方手动绑定。
 - 断点语义：内部 `operation_loop` 子图声明 `interrupt_after: ["execute_page_operation"]`。页面操作器的 activity event 带 `expected_continuation`，前端执行虚拟点击、输入、等待或 Graph Edit Playback 后，只在 `operation_request_id` 匹配时自动恢复 run。
 - 验证语义：模板不会把“发出操作请求”当作完成。运行图目标必须看到 `triggered_run_id` 且触发 run 进入 `completed`、`failed` 或 `cancelled`；页面/页签/图编辑目标必须由最新 `page_facts`、路由、活跃图或 `graph_edit_summary` 支撑。无法完成时最终回复要明确是找不到目标、需要澄清、操作被阻止、页面快照过期、run 失败或用户中断。
@@ -193,7 +193,7 @@
 
 ## 当前仍在路线图中
 
-- 近期顺序：页面操作官方模板已经落地为 `toograph_page_operation_workflow`，基础页面操作书、`toograph_page_operator`、可见虚拟鼠标/键盘、Graph Edit Playback、编辑器调试入口、目标图回放搭建、自动恢复和运行图归因已接入；下一步集中在端到端目标覆盖、审计闭环、编辑已有图和从运行结果自我修复。
+- 近期顺序：页面操作官方模板已经落地为 `toograph_page_operation_workflow`，基础页面操作书、`toograph_page_operator`、`template_target -> run_template` 固定模板运行映射、运行前写入 input 节点目标、可见虚拟鼠标/键盘、Graph Edit Playback、编辑器调试入口、目标图回放搭建、自动恢复和运行图归因已接入；下一步集中在端到端目标覆盖、审计闭环、编辑已有图和从运行结果自我修复。
 - 伙伴运行来源巩固：保持 Buddy 图统一使用 `metadata.origin=buddy`、模板绑定和明确策略字段，继续补充运行详情、伙伴页面和测试中的来源/权限展示，避免重新引入旧 metadata 或第二套运行协议。
 - 继续收束 `subgraph` 子图体验：父子图运行详情审计聚合已有基础，仍需补齐从缩略图点击跳转到内部节点，以及动态子图断点在运行详情中的更完整定位。
 - 完善伙伴断点交互：浮窗和伙伴页面确认页签都已复用标准暂停卡；仍需继续打磨多暂停 run 的优先级、跨会话定位、失败恢复提示和低层操作摘要。

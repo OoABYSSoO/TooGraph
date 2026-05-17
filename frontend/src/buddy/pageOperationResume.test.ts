@@ -83,6 +83,7 @@ test("buildPageOperationResult captures route, snapshots, commands, and target i
     triggered_graph_id: "graph_1",
     triggered_run_initial_status: "queued",
     triggered_run_status: "completed",
+    input_text: null,
     graph_edit_summary: null,
     operation_report: {
       operation_request_id: "vop_1234567890abcdef",
@@ -95,11 +96,44 @@ test("buildPageOperationResult captures route, snapshots, commands, and target i
       triggered_graph_id: "graph_1",
       triggered_run_initial_status: "queued",
       triggered_run_status: "completed",
+      input_text: null,
       graph_edit_summary: null,
       error: null,
     },
     error: null,
   });
+});
+
+test("buildPageOperationResult records template run input text", () => {
+  const result = buildPageOperationResult({
+    operationPlan: {
+      version: 1,
+      operationRequestId: "vop_template1234",
+      commands: ["run_template planning_summary_template"],
+      operations: [
+        {
+          kind: "run_template",
+          targetId: "library.template.planning_summary_template.open",
+          templateId: "planning_summary_template",
+          templateName: "规划摘要模板",
+          searchText: "planning_summary_template",
+          inputText: "把最新产品路线整理成三条可执行任务。",
+          runTargetId: "editor.action.runActiveGraph",
+        },
+      ],
+      cursorLifecycle: "return_at_end",
+      expectedContinuation,
+      reason: "运行模板。",
+    },
+    status: "succeeded",
+    routeBefore: "/library",
+    routeAfter: "/editor",
+    pageOperationContextBefore,
+    pageOperationContextAfter,
+  });
+
+  assert.equal(result.input_text, "把最新产品路线整理成三条可执行任务。");
+  assert.equal(result.operation_report.input_text, "把最新产品路线整理成三条可执行任务。");
 });
 
 test("buildPageOperationResumePayload writes the required resume state keys", () => {

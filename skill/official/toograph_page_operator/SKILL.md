@@ -5,11 +5,12 @@ description: Execute one semantic app-page operation through Buddy's virtual cur
 
 # TooGraph 页面操作器
 
-This official Skill validates one page-operation command sequence and asks TooGraph's app-native virtual operator layer to play the operation through Buddy's virtual cursor.
+This official Skill validates one page-operation command sequence or one fixed template-run target and asks TooGraph's app-native virtual operator layer to play the operation through Buddy's virtual cursor.
 
 Current phase:
 
-- Supports one operation per invocation.
+- Supports one ordinary operation per invocation.
+- Supports fixed template runs through `template_target`: the LLM names the target template, and the frontend maps it to the visible sequence of opening Graphs/Templates, searching, opening the template, writing the current goal into the template input node, running it, and waiting for the run result.
 - Supports safe `click`, `focus`, `clear`, `type`, `press`, and `wait` commands from the current page operation book.
 - Supports `graph_edit editor.graph.playback` on editor pages. For graph editing, the LLM outputs product-semantic `graph_edit_intents`; the frontend compiles them into graph commands and visible playback steps.
 - Validates commands against the current runtime page operation book. Off-book, stale-page, hidden, disabled, destructive, or confirmation-gated targets are rejected before a virtual operation event is accepted.
@@ -29,7 +30,8 @@ Runtime context:
 
 LLM output:
 
-- `commands`: array containing one command from the current page operation book, such as `["click app.nav.library"]`, `["focus library.search.query"]`, `["type library.search.query 页面操作"]`, `["press library.search.query Enter"]`, or `["graph_edit editor.graph.playback"]`. Replace `<text>` and `<key>` placeholders with the actual text or key.
+- `template_target`: when running a graph template, output this instead of `commands`. It should contain `template_id` when known, and may include `template_name`, `search_text`, and `input_text`. If `input_text` is omitted, the Skill uses `user_goal` as the current goal text; if neither exists, the request is rejected.
+- `commands`: for ordinary page operations, array containing one command from the current page operation book, such as `["click app.nav.library"]`, `["focus library.search.query"]`, `["type library.search.query 页面操作"]`, `["press library.search.query Enter"]`, or `["graph_edit editor.graph.playback"]`. Replace `<text>` and `<key>` placeholders with the actual text or key.
 - `graph_edit_intents`: required only when `commands` is `["graph_edit editor.graph.playback"]`. Use semantic operations such as `create_node`, `create_state`, `bind_state`, `connect_nodes`, and `update_node`. `create_node.nodeType` supports `input`, `agent`, `output`, `condition`, and `subgraph`.
 - `cursor_lifecycle`: virtual cursor lifecycle, such as `return_after_step`.
 - `reason`: short audit reason for choosing the command.
@@ -51,4 +53,4 @@ Common workflow failure reasons:
 - `triggered_run_failed`: a run was triggered but reached a failed terminal status.
 - `operation_interrupted`: the frontend, user, or runtime interrupted the requested operation.
 
-`before_llm.py` injects the current page operation book from runtime context, not graph state. `after_llm.py` validates the LLM command list and emits a `virtual_ui_operation` activity event for the frontend runtime to execute. Successful events include `expected_continuation.mode = "auto_resume_after_ui_operation"` and `resume_state_keys = ["page_operation_context", "page_context", "operation_result"]`. Page routing and graph mutations are observed from the real UI after the operation, not guessed by the Skill.
+`before_llm.py` injects the current page operation book from runtime context, not graph state. `after_llm.py` validates the LLM command list or template target and emits a `virtual_ui_operation` activity event for the frontend runtime to execute. Successful events include `expected_continuation.mode = "auto_resume_after_ui_operation"` and `resume_state_keys = ["page_operation_context", "page_context", "operation_result"]`. Page routing and graph mutations are observed from the real UI after the operation, not guessed by the Skill.

@@ -1295,7 +1295,7 @@
                 "skillKey": "",
                 "skillBindings": [],
                 "skillInstructionBlocks": {},
-                "taskInstruction": "你只负责为 selected_capability 准备一次运行输入。运行时会执行该 Skill 或图模板，并把原始输出写入 capability_result result_package。\n不要总结、改写或二次包装执行结果；动态能力执行结果必须保持 outputs.<outputKey> = { name, description, type, value }。",
+                "taskInstruction": "你只负责为 selected_capability 准备一次运行输入。若 selected_capability.kind 是 subgraph，LLM 只需要保留目标模板 key/name；具体打开图与模板、搜索目标模板、点开模板、把本次目标写入 input 节点、点击运行、等待结果由页面操作器的 template_target 固定映射完成，不要规划逐步鼠标命令，也不要把模板作为不可见后台调用来总结。若 selected_capability.kind 是 skill，运行时执行该 Skill。执行结果会写入 capability_result result_package。\n不要总结、改写或二次包装执行结果；动态能力执行结果必须保持 outputs.<outputKey> = { name, description, type, value }。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "high",

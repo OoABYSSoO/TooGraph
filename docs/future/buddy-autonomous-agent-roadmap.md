@@ -77,7 +77,7 @@
 
 仍然存在的关键缺口：
 
-- 伙伴原生虚拟 UI 操作已启动：基础页面操作书、`toograph_page_operator`、虚拟鼠标/键盘、Graph Edit Playback、编辑器调试入口、目标图回放搭建、页面操作官方模板、自动恢复和运行图归因已经落地。后续重点是统一 operation journal / activity events、图变更 diff、graph revision、undo/redo、失败重试、端到端目标覆盖和编辑已有图。
+- 伙伴原生虚拟 UI 操作已启动：基础页面操作书、`toograph_page_operator`、`template_target -> run_template` 固定模板运行映射、运行前写入 input 节点目标、虚拟鼠标/键盘、Graph Edit Playback、编辑器调试入口、目标图回放搭建、页面操作官方模板、自动恢复和运行图归因已经落地。后续重点是统一 operation journal / activity events、图变更 diff、graph revision、undo/redo、失败重试、端到端目标覆盖和编辑已有图。
 - 历史 `graph_patch.draft` stub 不能视为完成方案；图编辑应继续沿当前应用内虚拟操作链路接入验证、审计、revision 和恢复机制。
 - 子图运行详情后续仍可增强从图预览或缩略图跳转内部节点，但父子运行链路、`subgraph_path` 定位和动态子图断点定位已经进入标准运行详情和确认卡片路径。
 - 上下文预算、结果包摘要、大 artifact 按需展开和只读 fanout 并行仍未完成；当前只完成了节点/output 耗时和可用 token 用量展示这类遥测基础。
@@ -765,7 +765,7 @@ LLM 目标图编辑意图
 
 `toograph_page_operation_workflow` 是这条链路的官方图模板入口。能力选择器应优先把“操作 TooGraph 页面”的多步目标路由到该模板，而不是直接选择单次 `toograph_page_operator` Skill；只有模板内部的单步执行节点才绑定页面操作器。该模板作为子图能力时只接收用户期望 `user_goal`，不把页面操作书或页面上下文暴露为调用方 input。模板最终回复必须按结构化验证结果解释失败，尤其区分找不到目标图、找不到运行记录、页面快照过期、破坏性操作被阻止、触发 run 失败和操作中断。
 
-运行已有图模板也属于这条可见页面操作链路。伙伴在自主循环中判定 `capability.kind=subgraph` 后，应立即进入可见模板运行目标，像用户一样在页面中定位模板、打开或选择它、确认输入绑定、点击运行、等待运行状态，并从公开 output、run capsule、activity events 和 artifacts 中拿结果；这个过程允许跨页面、搜索、打开模板草稿、填充输入和等待运行等多步操作。这样用户能看见窗口状态变化、运行胶囊和失败原因，也能在审计里追溯伙伴为什么运行了这个模板。后台动态 Subgraph 执行只适合内部稳定子图能力，不应作为伙伴自主循环里 `kind=subgraph` 的默认体验。
+运行已有图模板也属于这条可见页面操作链路。伙伴在自主循环中判定 `capability.kind=subgraph` 后，应立即进入可见模板运行目标，LLM 只输出目标模板的 `template_id` / `template_name` / `search_text`，由 `toograph_page_operator` 的 `template_target` 固定映射生成 `run_template` 虚拟操作；前端再像用户一样点击左侧图与模板、搜索目标模板、打开模板、把本次目标写入模板的 input 节点、点击运行、等待运行状态，并从公开 output、run capsule、activity events 和 artifacts 中拿结果。这样用户能看见窗口状态变化、输入目标、运行胶囊和失败原因，也能在审计里追溯伙伴为什么运行了这个模板。后台动态 Subgraph 执行只适合内部稳定子图能力，不应作为伙伴自主循环里 `kind=subgraph` 的默认体验。
 
 ### Skill 生命周期边界
 

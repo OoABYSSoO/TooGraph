@@ -163,6 +163,7 @@
 
     <section v-if="view.body.kind === 'input'" class="node-card__body node-card__body--input">
       <InputNodeBody
+        :node-id="nodeId"
         :body="view.body"
         :input-boundary-selection="inputBoundarySelection"
         :input-type-options="inputTypeOptions"

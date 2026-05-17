@@ -203,6 +203,7 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
         context = result["context"]
         self.assertIn("key: toograph_page_operation_workflow", context)
         self.assertIn("targetFlows: open_runs_page (打开运行记录)", context)
+        self.assertIn("run_named_template (运行名为 X 的图模板并拿取结果)", context)
         self.assertIn("run_current_graph (运行当前图并告诉我结果)", context)
         self.assertIn("create_basic_llm_graph (新建一个包含输入、LLM、输出的图)", context)
         self.assertIn("rename_current_node (编辑当前图，给某个节点改名)", context)

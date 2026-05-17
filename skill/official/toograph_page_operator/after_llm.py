@@ -66,6 +66,10 @@ BUDDY_SELF_TARGETS = {
 
 def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
     commands = _normalize_commands(skill_inputs.get("commands"))
+    template_target = _normalize_template_target(
+        skill_inputs.get("template_target"),
+        fallback_input_text=_resolve_template_input_text(skill_inputs),
+    )
     graph_edit_intents = _normalize_graph_edit_intents(skill_inputs.get("graph_edit_intents"))
     cursor_lifecycle = _normalize_cursor_lifecycle(skill_inputs.get("cursor_lifecycle"))
     reason = _compact_text(skill_inputs.get("reason"))
@@ -73,10 +77,24 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
     page_path = _resolve_page_path(skill_inputs, runtime_context)
     operation_book = _resolve_operation_book(skill_inputs, runtime_context)
 
+    if template_target and not commands:
+        if not template_target.get("input_text"):
+            return _failed(
+                code="missing_template_input_text",
+                message="运行图模板前需要本次目标输入，用来写入模板的 input 节点。",
+                recoverable=True,
+                detail={"template_target": template_target},
+            )
+        return _build_template_run_result(
+            template_target=template_target,
+            cursor_lifecycle=cursor_lifecycle,
+            reason=reason,
+        )
+
     if not commands:
         return _failed(
             code="missing_commands",
-            message="页面操作器需要 commands 数组，且命令必须来自页面操作书。",
+            message="页面操作器需要 commands 数组或 template_target 目标模板。",
             recoverable=True,
         )
     if len(commands) != 1:
@@ -156,6 +174,78 @@ def toograph_page_operator(**skill_inputs: Any) -> dict[str, Any]:
         cursor_lifecycle=cursor_lifecycle,
         reason=reason,
     )
+
+
+def _build_template_run_result(
+    *,
+    template_target: dict[str, str],
+    cursor_lifecycle: str,
+    reason: str,
+) -> dict[str, Any]:
+    template_id = template_target["template_id"]
+    template_name = template_target["template_name"]
+    search_text = template_target["search_text"]
+    input_text = template_target["input_text"]
+    target_id = f"library.template.{template_id}.open" if template_id else "library.template.search.open"
+    target_label = template_name or template_id or search_text
+    command = f"run_template {search_text}"
+    commands = [command]
+    operation = {
+        "kind": "run_template",
+        "target_id": target_id,
+        "target_label": target_label,
+        "template_id": template_id,
+        "template_name": template_name,
+        "search_text": search_text,
+        "input_text": input_text,
+        "run_target_id": "editor.action.runActiveGraph",
+    }
+    operation_request = {
+        "version": 1,
+        "commands": commands,
+        "operations": [operation],
+        "cursor_lifecycle": cursor_lifecycle if cursor_lifecycle != "return_after_step" else "return_at_end",
+        "reason": reason,
+    }
+    operation_request_id = _operation_request_id(operation_request)
+    operation_request["operation_request_id"] = operation_request_id
+    journal_entry = {
+        "kind": "run_template",
+        "command": command,
+        "target_id": target_id,
+        "target_label": target_label,
+        "template_id": template_id,
+        "template_name": template_name,
+        "search_text": search_text,
+        "input_text": input_text,
+        "operation_request_id": operation_request_id,
+        "status": "requested",
+        "reason": reason,
+    }
+    return {
+        "ok": True,
+        "cursor_session_id": "",
+        "operation_request_id": operation_request_id,
+        "journal": [journal_entry],
+        "error": None,
+        "activity_events": [
+            {
+                "kind": "virtual_ui_operation",
+                "summary": f"Requested virtual template run for {target_label}.",
+                "status": "requested",
+                "detail": {
+                    "commands": commands,
+                    "operation_request_id": operation_request_id,
+                    "operation_request": operation_request,
+                    "expected_continuation": _expected_continuation(operation_request_id),
+                    "operation": operation,
+                    "cursor_lifecycle": operation_request["cursor_lifecycle"],
+                    "journal": [journal_entry],
+                    "reason": reason,
+                },
+            }
+        ],
+    }
 
 
 def _build_page_operation_result(
@@ -459,6 +549,70 @@ def _normalize_commands(value: Any) -> list[str]:
         if command:
             commands.append(command)
     return commands
+
+
+def _normalize_template_target(value: Any, *, fallback_input_text: str = "") -> dict[str, str]:
+    if isinstance(value, str):
+        text = _compact_text(value)
+        if not text:
+            return {}
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, (dict, list)):
+            return _normalize_template_target(parsed, fallback_input_text=fallback_input_text)
+        return {"template_id": text, "template_name": "", "search_text": text, "input_text": fallback_input_text}
+    if not isinstance(value, dict):
+        return {}
+
+    template_id = _compact_text(
+        value.get("template_id")
+        or value.get("templateId")
+        or value.get("key")
+        or value.get("id")
+    )
+    template_name = _compact_text(
+        value.get("template_name")
+        or value.get("templateName")
+        or value.get("name")
+        or value.get("label")
+    )
+    search_text = _compact_text(
+        value.get("search_text")
+        or value.get("searchText")
+        or template_id
+        or template_name
+    )
+    input_text = _compact_text(
+        value.get("input_text")
+        or value.get("inputText")
+        or value.get("run_input")
+        or value.get("runInput")
+        or value.get("goal")
+        or value.get("user_goal")
+        or value.get("userGoal")
+        or fallback_input_text
+    )
+    if not search_text:
+        return {}
+    return {
+        "template_id": template_id,
+        "template_name": template_name,
+        "search_text": search_text,
+        "input_text": input_text,
+    }
+
+
+def _resolve_template_input_text(skill_inputs: dict[str, Any]) -> str:
+    return _compact_text(
+        skill_inputs.get("user_goal")
+        or skill_inputs.get("userGoal")
+        or skill_inputs.get("goal")
+        or skill_inputs.get("current_goal")
+        or skill_inputs.get("currentGoal")
+        or skill_inputs.get("task")
+    )
 
 
 def _parse_command(command: str) -> tuple[str, str, str] | None:

@@ -224,6 +224,13 @@
     <textarea
       v-else-if="isInputValueEditable"
       class="node-card__surface node-card__surface-textarea"
+      :data-virtual-affordance-id="`editor.canvas.node.${nodeId}.input.value`"
+      :data-virtual-affordance-label="`输入节点值：${nodeId}`"
+      data-virtual-affordance-role="textbox"
+      data-virtual-affordance-zone="editor-canvas.node"
+      data-virtual-affordance-actions="focus,clear,type"
+      data-virtual-affordance-input-kind="text"
+      :data-virtual-affordance-value-preview="inputValueText"
       :value="inputValueText"
       :placeholder="t('nodeCard.enterInputValue')"
       @pointerdown.stop
@@ -253,6 +260,7 @@ type InputTypeOption = {
 };
 
 const props = defineProps<{
+  nodeId: string;
   body: InputBodyViewModel;
   inputBoundarySelection: "text" | "file" | "folder" | "knowledge_base";
   inputTypeOptions: InputTypeOption[];

@@ -175,7 +175,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "分析 user_goal，写入 goal_plan JSON。必须包含 goal_type、target_hints、required_side_effects、success_criteria、requires_run_terminal_status(boolean)、requires_save(boolean)、risk_notes、failure_boundaries。支持查看记录、打开页面或页签、新建图、编辑图、运行图。loop_trace 初始化为空数组。不要发起页面操作；页面操作书由后续页面操作器 Skill 的 runtime context 自动注入。",
+        "taskInstruction": "分析 user_goal，写入 goal_plan JSON。必须包含 goal_type、target_hints、required_side_effects、success_criteria、requires_run_terminal_status(boolean)、requires_save(boolean)、risk_notes、failure_boundaries。支持查看记录、打开页面或页签、新建图、编辑图、运行当前图、运行指定图模板。loop_trace 初始化为空数组。不要发起页面操作；页面操作书由后续页面操作器 Skill 的 runtime context 自动注入。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -267,7 +267,7 @@
                 "skillKey": "",
                 "skillBindings": [],
                 "skillInstructionBlocks": {},
-                "taskInstruction": "根据 user_goal、goal_plan、operation_result、goal_review 和 loop_trace 选择下一步页面操作意图并写 operation_request JSON。不要输出 DOM selector、坐标、截图描述或浏览器自动化步骤；具体可用命令由下一节点绑定的页面操作器 Skill 从 runtime context 的页面操作书中选择。字段至少包含 target_hint、semantic_intent、reason、expected_route、expected_entity、expected_run、expected_graph_change、requires_terminal_run、blocked_reason。若目标已完成，blocked_reason 写 already_completed；若缺少必要信息，blocked_reason 写 needs_clarification。不要调用技能。",
+                "taskInstruction": "根据 user_goal、goal_plan、operation_result、goal_review 和 loop_trace 选择下一步页面操作意图并写 operation_request JSON。不要输出 DOM selector、坐标、截图描述或浏览器自动化步骤；具体可用命令由下一节点绑定的页面操作器 Skill 从 runtime context 的页面操作书中选择。若目标是运行指定图模板，operation_request 必须包含 semantic_intent=run_template、target_template_id、target_template_name、search_text、input_text=user_goal、requires_terminal_run=true，并让下一节点只输出 template_target，不输出逐步 commands。字段至少包含 target_hint、semantic_intent、reason、expected_route、expected_entity、expected_run、expected_graph_change、requires_terminal_run、blocked_reason。若目标已完成，blocked_reason 写 already_completed；若缺少必要信息，blocked_reason 写 needs_clarification。不要调用技能。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "high",
@@ -308,11 +308,11 @@
                   "toograph_page_operator": {
                     "skillKey": "toograph_page_operator",
                     "title": "页面操作器 skill instruction",
-                    "content": "你已绑定 TooGraph 页面操作器。本节点只调用一次 toograph_page_operator。根据 operation_request 和当前页面操作书输出一条合法 commands；如果 operation_request.command 为空或 blocked_reason 非空，优先选择安全 wait short 或返回不可执行原因。不要输出 DOM selector、坐标、截图、伙伴自表面目标或多步计划。",
+                    "content": "你已绑定 TooGraph 页面操作器。本节点只调用一次 toograph_page_operator。若 operation_request.semantic_intent 是 run_template 或包含 target_template_id/target_template_name，直接输出 template_target 对象，包含 template_id、template_name、search_text、input_text；input_text 必须是本次要写入目标模板 input 节点的目标文本，通常直接使用 user_goal。不要把打开图库、搜索、点开模板、写 input、运行拆成 commands。其他普通页面操作才根据 operation_request 和当前页面操作书输出一条合法 commands；如果 operation_request.command 为空或 blocked_reason 非空，优先选择安全 wait short 或返回不可执行原因。不要输出 DOM selector、坐标、截图、伙伴自表面目标或多步计划。",
                     "source": "node.override"
                   }
                 },
-                "taskInstruction": "本节点只调用一次 toograph_page_operator，并把 operation_request 转成该 Skill 的结构化输出。普通操作只能选择当前页面操作书中的 click、focus、clear、type、press 或 wait；图编辑只能使用 graph_edit editor.graph.playback 和语义 graph_edit_intents。不要在本节点总结结果，前端执行后会恢复并进入验证节点。",
+                "taskInstruction": "本节点只调用一次 toograph_page_operator，并把 operation_request 转成该 Skill 的结构化输出。运行指定图模板时只输出 template_target，让 Skill/frontend 程序化执行打开图与模板、搜索目标模板、点开模板、把本次目标写入 input 节点、运行并等待结果。普通操作只能选择当前页面操作书中的 click、focus、clear、type、press 或 wait；图编辑只能使用 graph_edit editor.graph.playback 和语义 graph_edit_intents。不要在本节点总结结果，前端执行后会恢复并进入验证节点。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "high",
@@ -575,6 +575,12 @@
         "sampleGoal": "打开名为 X 的图",
         "operationTargets": ["app.nav.library", "library.search.query", "library.graph.<graphId>.open", "editor.launcher.openGraph.<graphId>"],
         "completionEvidence": ["page_facts.activeGraph.name matches target", "page_facts.activeGraph.graphId matches visible graph id"]
+      },
+      {
+        "id": "run_named_template",
+        "sampleGoal": "运行名为 X 的图模板并拿取结果",
+        "operationTargets": ["template_target", "app.nav.library", "library.search.query", "library.template.<templateId>.open", "editor.canvas.node.<inputNodeId>.input.value", "editor.action.runActiveGraph"],
+        "completionEvidence": ["operation_result.commands includes run_template", "operation_result.input_text matches user_goal", "triggered_run_id present", "triggered_run_status terminal", "page_facts.latestForegroundRun.runId matches triggered_run_id"]
       },
       {
         "id": "run_current_graph",

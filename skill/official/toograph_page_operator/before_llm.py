@@ -30,11 +30,18 @@ def toograph_page_operator_before_llm(**payload: Any) -> dict[str, str]:
         "available_commands": available_commands,
         "output_contract": {
             "commands": available_commands[:1],
+            "template_target": {
+                "template_id": "target_template_id",
+                "template_name": "目标模板名称",
+                "search_text": "用于图库搜索栏的模板 id 或名称",
+                "input_text": "本次要写入目标模板 input 节点的目标文本；未填写时必须能从 user_goal 取得。",
+            },
             "graph_edit_intents": _example_graph_edit_intents() if graph_edit_commands else [],
             "cursor_lifecycle": "return_after_step",
             "reason": "用一句话说明为什么选择这些命令。",
         },
         "rules": [
+            "当目标是运行某个图模板时，只输出 template_target，不要输出 commands；template_target 必须能提供 input_text 或依赖 user_goal 作为本次目标输入；运行时会固定映射为打开图与模板、搜索目标模板、点开模板、写入 input 节点、点击运行并等待结果。",
             "commands 必须来自 available_commands；type/press 可将占位符替换为真实文本或按键。",
             "一次只输出一条 commands 命令；支持 click、focus、clear、type、press、wait 和 graph_edit。",
             "type 与 press 命令中的 <text>/<key> 是占位符，输出时替换成真实输入文本或按键。",

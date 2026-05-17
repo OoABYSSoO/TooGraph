@@ -730,6 +730,7 @@ class TemplateLayoutTests(unittest.TestCase):
                 "open_library_page",
                 "create_blank_graph",
                 "open_named_graph",
+                "run_named_template",
                 "run_current_graph",
                 "create_basic_llm_graph",
                 "rename_current_node",
@@ -740,15 +741,19 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn("app.nav.library", flows_by_id["open_library_page"]["operationTargets"])
         self.assertIn("library.action.newBlankGraph", flows_by_id["create_blank_graph"]["operationTargets"])
         self.assertIn("library.graph.<graphId>.open", flows_by_id["open_named_graph"]["operationTargets"])
+        self.assertIn("template_target", flows_by_id["run_named_template"]["operationTargets"])
+        self.assertIn("library.template.<templateId>.open", flows_by_id["run_named_template"]["operationTargets"])
+        self.assertIn("editor.canvas.node.<inputNodeId>.input.value", flows_by_id["run_named_template"]["operationTargets"])
         self.assertIn("editor.action.runActiveGraph", flows_by_id["run_current_graph"]["operationTargets"])
         self.assertIn("editor.graph.playback", flows_by_id["create_basic_llm_graph"]["operationTargets"])
         self.assertIn("editor.graph.playback", flows_by_id["rename_current_node"]["operationTargets"])
+        self.assertIn("operation_result.commands includes run_template", flows_by_id["run_named_template"]["completionEvidence"])
         self.assertIn("triggered_run_status terminal", flows_by_id["run_current_graph"]["completionEvidence"])
         for flow_id, flow in flows_by_id.items():
             with self.subTest(flow_id=flow_id):
                 self.assertTrue(flow["sampleGoal"])
                 self.assertTrue(flow["completionEvidence"])
-                self.assertLessEqual(len(flow["operationTargets"]), 5)
+                self.assertLessEqual(len(flow["operationTargets"]), 6)
 
     def test_toograph_page_operation_workflow_declares_failure_guidance(self) -> None:
         template = next(

@@ -186,3 +186,47 @@ test("resolveBuddyVirtualOperationPlanFromActivityEvent parses graph edit playba
     reason: "创建一个姓名输入图。",
   });
 });
+
+test("resolveBuddyVirtualOperationPlanFromActivityEvent parses fixed template run operations", () => {
+  const plan = resolveBuddyVirtualOperationPlanFromActivityEvent({
+    kind: "virtual_ui_operation",
+    detail: {
+      operation_request: {
+        version: 1,
+        operation_request_id: "vop_template1234",
+        commands: ["run_template advanced_web_research_loop"],
+        operations: [
+          {
+            kind: "run_template",
+            target_id: "library.template.advanced_web_research_loop.open",
+            template_id: "advanced_web_research_loop",
+            template_name: "高级联网搜索",
+            search_text: "advanced_web_research_loop",
+            input_text: "研究 TooGraph 页面操作技能的最新差距。",
+            run_target_id: "editor.action.runActiveGraph",
+          },
+        ],
+        cursor_lifecycle: "return_at_end",
+        reason: "运行选中的图模板。",
+      },
+      expected_continuation: {
+        mode: "auto_resume_after_ui_operation",
+        operation_request_id: "vop_template1234",
+        resume_state_keys: ["page_operation_context", "page_context", "operation_result"],
+      },
+    },
+  });
+
+  assert.deepEqual(plan?.operations, [
+    {
+      kind: "run_template",
+      targetId: "library.template.advanced_web_research_loop.open",
+      templateId: "advanced_web_research_loop",
+      templateName: "高级联网搜索",
+      searchText: "advanced_web_research_loop",
+      inputText: "研究 TooGraph 页面操作技能的最新差距。",
+      runTargetId: "editor.action.runActiveGraph",
+    },
+  ]);
+  assert.equal(plan?.cursorLifecycle, "return_at_end");
+});

@@ -17,6 +17,7 @@ export type PageOperationResult = {
   triggered_graph_id: string | null;
   triggered_run_initial_status: string | null;
   triggered_run_status: string | null;
+  input_text: string | null;
   graph_edit_summary: Record<string, unknown> | null;
   operation_report: PageOperationReport;
   error: string | null;
@@ -33,6 +34,7 @@ export type PageOperationReport = {
   triggered_graph_id: string | null;
   triggered_run_initial_status: string | null;
   triggered_run_status: string | null;
+  input_text: string | null;
   graph_edit_summary: Record<string, unknown> | null;
   error: string | null;
 };
@@ -57,6 +59,7 @@ export function buildPageOperationResult(input: {
   const triggeredGraphId = normalizeNullableText(input.triggeredGraphId);
   const triggeredRunInitialStatus = normalizeNullableText(input.triggeredRunInitialStatus);
   const triggeredRunStatus = normalizeNullableText(input.triggeredRunStatus);
+  const inputText = firstRunTemplateInputText(input.operationPlan);
   const graphEditSummary = input.graphEditSummary ?? defaultGraphEditSummary(input.operationPlan);
   const error = normalizeNullableText(input.error);
   const report: PageOperationReport = {
@@ -70,6 +73,7 @@ export function buildPageOperationResult(input: {
     triggered_graph_id: triggeredGraphId,
     triggered_run_initial_status: triggeredRunInitialStatus,
     triggered_run_status: triggeredRunStatus,
+    input_text: inputText,
     graph_edit_summary: graphEditSummary,
     error,
   };
@@ -86,6 +90,7 @@ export function buildPageOperationResult(input: {
     triggered_graph_id: triggeredGraphId,
     triggered_run_initial_status: triggeredRunInitialStatus,
     triggered_run_status: triggeredRunStatus,
+    input_text: inputText,
     graph_edit_summary: graphEditSummary,
     operation_report: report,
     error,
@@ -126,6 +131,15 @@ function firstOperationTargetId(operationPlan: BuddyVirtualOperationPlan): strin
   for (const operation of operationPlan.operations) {
     if ("targetId" in operation && operation.targetId.trim()) {
       return operation.targetId.trim();
+    }
+  }
+  return null;
+}
+
+function firstRunTemplateInputText(operationPlan: BuddyVirtualOperationPlan): string | null {
+  for (const operation of operationPlan.operations) {
+    if (operation.kind === "run_template" && operation.inputText.trim()) {
+      return operation.inputText.trim();
     }
   }
   return null;

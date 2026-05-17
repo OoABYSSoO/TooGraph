@@ -113,6 +113,36 @@ test("buddy mascot debug store attributes run creation to virtual run button ope
   });
 });
 
+test("buddy mascot debug store attributes fixed template run operations to the editor run button", () => {
+  setActivePinia(createPinia());
+  const store = useBuddyMascotDebugStore();
+
+  store.beginVirtualOperationRunAttribution({
+    version: 1,
+    operationRequestId: "vop_template1234",
+    commands: ["run_template advanced_web_research_loop"],
+    operations: [
+      {
+        kind: "run_template",
+        targetId: "library.template.advanced_web_research_loop.open",
+        templateId: "advanced_web_research_loop",
+        templateName: "高级联网搜索",
+        searchText: "advanced_web_research_loop",
+        inputText: "研究 TooGraph 页面操作技能的最新差距。",
+        runTargetId: "editor.action.runActiveGraph",
+      },
+    ],
+    cursorLifecycle: "return_at_end",
+    reason: "运行选中的图模板。",
+  });
+
+  assert.deepEqual(store.consumeVirtualOperationRunAttribution("editor.action.runActiveGraph"), {
+    operationRequestId: "vop_template1234",
+    targetId: "editor.action.runActiveGraph",
+    commands: ["run_template advanced_web_research_loop"],
+  });
+});
+
 test("buddy mascot debug store snapshots graph edit operation requests", () => {
   setActivePinia(createPinia());
   const store = useBuddyMascotDebugStore();

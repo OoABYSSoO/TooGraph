@@ -670,6 +670,9 @@ const BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS = 80;
 const BUDDY_VIRTUAL_OPERATION_TYPE_CHARACTER_DELAY_MS = 18;
 const BUDDY_VIRTUAL_OPERATION_TRIGGERED_RUN_WAIT_MS = 4000;
 const BUDDY_VIRTUAL_OPERATION_TRIGGERED_RUN_POLL_MS = 80;
+const BUDDY_VIRTUAL_OPERATION_TARGET_WAIT_MS = 4000;
+const BUDDY_VIRTUAL_OPERATION_TARGET_RETRY_MS = 80;
+const BUDDY_VIRTUAL_TEMPLATE_SEARCH_SETTLE_MS = 180;
 const BUDDY_PAGE_OPERATION_TRIGGERED_RUN_MAX_WAIT_MS = 120000;
 const BUDDY_VIRTUAL_POINTER_ID = 9001;
 const TOOGRAPH_VIRTUAL_POINTER_EVENT_KEY = "__toographVirtualPointerEvent";
@@ -2537,7 +2540,7 @@ function buildTriggeredForegroundRunFact(
 
 function hasRunActiveGraphOperation(operationPlan: BuddyVirtualOperationPlan) {
   return operationPlan.operations.some(
-    (operation) => "targetId" in operation && operation.targetId === "editor.action.runActiveGraph",
+    (operation) => operation.kind === "run_template" || ("targetId" in operation && operation.targetId === "editor.action.runActiveGraph"),
   );
 }
 
@@ -2576,6 +2579,9 @@ async function executeBuddyVirtualOperationCommand(operation: BuddyVirtualOperat
       return;
     case "graph_edit":
       await executeBuddyVirtualGraphEditOperation(operation);
+      return;
+    case "run_template":
+      await executeBuddyVirtualRunTemplateOperation(operation);
       return;
   }
 }
@@ -2664,6 +2670,53 @@ async function executeBuddyVirtualWaitOperation(operation: BuddyVirtualOperation
     return;
   }
   await waitForVirtualOperation(operation.option === "short" ? 300 : 120);
+}
+
+async function executeBuddyVirtualRunTemplateOperation(operation: BuddyVirtualOperation) {
+  if (operation.kind !== "run_template") {
+    return;
+  }
+  const token = activeVirtualOperationToken.value;
+  await clickVirtualOperationTargetWithRetry("app.nav.library", token);
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
+  await waitForRoutePath("/library", token);
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
+  const searchInput = await waitForVirtualOperationTextInput("library.search.query", token);
+  if (!searchInput) {
+    throw new Error("找不到图与模板搜索栏。");
+  }
+  await moveVirtualCursorToElement(searchInput);
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
+  searchInput.focus();
+  await replaceVirtualText(searchInput, operation.searchText);
+  await waitForVirtualOperation(BUDDY_VIRTUAL_TEMPLATE_SEARCH_SETTLE_MS, token);
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
+  const templateAffordance = await waitForTemplateRunTargetAffordance(operation, token);
+  if (!templateAffordance) {
+    throw new Error(`找不到目标图模板：${operation.templateName || operation.templateId || operation.searchText}`);
+  }
+  await moveVirtualCursorToElement(templateAffordance.element);
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
+  dispatchVirtualClick(templateAffordance.element);
+  await waitForRoutePath("/editor", token);
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
+  await fillTemplateRunInputNode(operation, token);
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
+  await clickVirtualOperationTargetWithRetry(operation.runTargetId, token);
 }
 
 type GraphEditPlaybackPlanRequestResponse = {
@@ -3299,6 +3352,174 @@ function resolveVirtualOperationAffordance(targetId: string): { element: HTMLEle
     visibleElement = element;
   }
   return visibleElement ? { element: visibleElement } : null;
+}
+
+async function clickVirtualOperationTargetWithRetry(targetId: string, token: BuddyVirtualOperationToken | null) {
+  const affordance = await waitForVirtualOperationAffordance(targetId, token);
+  if (!affordance) {
+    throw new Error(`找不到可见页面目标：${targetId}`);
+  }
+  await moveVirtualCursorToElement(affordance.element);
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
+  dispatchVirtualClick(affordance.element);
+  await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS, token);
+}
+
+async function waitForVirtualOperationAffordance(targetId: string, token: BuddyVirtualOperationToken | null) {
+  const deadline = Date.now() + BUDDY_VIRTUAL_OPERATION_TARGET_WAIT_MS;
+  while (!isVirtualOperationInterrupted(token) && Date.now() <= deadline) {
+    const affordance = resolveVirtualOperationAffordance(targetId);
+    if (affordance) {
+      return affordance;
+    }
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TARGET_RETRY_MS, token);
+    await nextTick();
+  }
+  return resolveVirtualOperationAffordance(targetId);
+}
+
+async function waitForVirtualOperationTextInput(targetId: string, token: BuddyVirtualOperationToken | null) {
+  const deadline = Date.now() + BUDDY_VIRTUAL_OPERATION_TARGET_WAIT_MS;
+  while (!isVirtualOperationInterrupted(token) && Date.now() <= deadline) {
+    const input = resolveVirtualOperationTextInput(targetId);
+    if (input) {
+      return input;
+    }
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TARGET_RETRY_MS, token);
+    await nextTick();
+  }
+  return resolveVirtualOperationTextInput(targetId);
+}
+
+async function waitForTemplateRunTargetAffordance(operation: BuddyVirtualOperation, token: BuddyVirtualOperationToken | null) {
+  if (operation.kind !== "run_template") {
+    return null;
+  }
+  const deadline = Date.now() + BUDDY_VIRTUAL_OPERATION_TARGET_WAIT_MS;
+  while (!isVirtualOperationInterrupted(token) && Date.now() <= deadline) {
+    const affordance = resolveTemplateRunTargetAffordance(operation);
+    if (affordance) {
+      return affordance;
+    }
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TARGET_RETRY_MS, token);
+    await nextTick();
+  }
+  return resolveTemplateRunTargetAffordance(operation);
+}
+
+async function fillTemplateRunInputNode(
+  operation: Extract<BuddyVirtualOperation, { kind: "run_template" }>,
+  token: BuddyVirtualOperationToken | null,
+) {
+  const input = await waitForTemplateRunInputTextInput(token);
+  if (!input) {
+    throw new Error("找不到可编辑的图模板 input 节点。");
+  }
+  await moveVirtualCursorToElement(input);
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
+  dispatchVirtualClick(input);
+  input.focus();
+  await replaceVirtualText(input, operation.inputText);
+  await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS, token);
+}
+
+async function waitForTemplateRunInputTextInput(token: BuddyVirtualOperationToken | null) {
+  const deadline = Date.now() + BUDDY_VIRTUAL_OPERATION_TARGET_WAIT_MS;
+  while (!isVirtualOperationInterrupted(token) && Date.now() <= deadline) {
+    const input = resolveTemplateRunInputTextInput();
+    if (input) {
+      return input;
+    }
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TARGET_RETRY_MS, token);
+    await nextTick();
+  }
+  return resolveTemplateRunInputTextInput();
+}
+
+async function waitForRoutePath(expectedPath: string, token: BuddyVirtualOperationToken | null) {
+  const deadline = Date.now() + BUDDY_VIRTUAL_OPERATION_TARGET_WAIT_MS;
+  while (!isVirtualOperationInterrupted(token) && Date.now() <= deadline) {
+    await nextTick();
+    if (routeMatchesVirtualOperationTargetPath(route.fullPath, expectedPath)) {
+      return true;
+    }
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TARGET_RETRY_MS, token);
+  }
+  return routeMatchesVirtualOperationTargetPath(route.fullPath, expectedPath);
+}
+
+function resolveTemplateRunTargetAffordance(operation: Extract<BuddyVirtualOperation, { kind: "run_template" }>) {
+  const exactTargetIds = [
+    operation.targetId,
+    operation.templateId ? `library.template.${operation.templateId}.open` : "",
+  ].filter(Boolean);
+  for (const targetId of exactTargetIds) {
+    const affordance = resolveVirtualOperationAffordance(targetId);
+    if (affordance) {
+      return affordance;
+    }
+  }
+  if (typeof document === "undefined") {
+    return null;
+  }
+  const candidates = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-virtual-affordance-id^="library.template."][data-virtual-affordance-id$=".open"]'),
+  ).filter(isVisibleVirtualOperationElement);
+  if (candidates.length === 0) {
+    return null;
+  }
+  const expectedTexts = [operation.templateId, operation.templateName, operation.searchText]
+    .map(normalizeTemplateRunMatchText)
+    .filter(Boolean);
+  if (expectedTexts.length === 0) {
+    return { element: candidates[0]! };
+  }
+  for (const element of candidates) {
+    const haystack = normalizeTemplateRunMatchText(
+      `${element.dataset.virtualAffordanceId ?? ""} ${element.dataset.virtualAffordanceLabel ?? ""} ${element.textContent ?? ""}`,
+    );
+    if (expectedTexts.some((text) => haystack.includes(text))) {
+      return { element };
+    }
+  }
+  return null;
+}
+
+function resolveTemplateRunInputTextInput() {
+  if (typeof document === "undefined") {
+    return null;
+  }
+  const candidates = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      '[data-virtual-affordance-id^="editor.canvas.node."][data-virtual-affordance-id$=".input.value"]',
+    ),
+  ).filter(isVisibleVirtualOperationElement);
+  for (const element of candidates) {
+    const input = resolveVirtualOperationTextInputElement(element);
+    if (input) {
+      return input;
+    }
+  }
+  return null;
+}
+
+function routeMatchesVirtualOperationTargetPath(currentPath: string, expectedPath: string) {
+  const current = currentPath.split("?", 1)[0]?.split("#", 1)[0] || "/";
+  const expected = expectedPath.split("?", 1)[0]?.split("#", 1)[0] || "/";
+  return current === expected || current.startsWith(`${expected}/`);
+}
+
+function isVisibleVirtualOperationElement(element: HTMLElement) {
+  const rect = element.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+function normalizeTemplateRunMatchText(value: unknown) {
+  return String(value ?? "").trim().toLowerCase();
 }
 
 function hasVirtualOperationAffordanceElement(targetId: string) {

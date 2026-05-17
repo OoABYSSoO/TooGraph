@@ -10,7 +10,7 @@ const currentDirectory = dirname(currentFilePath);
 test("InputNodeBody owns input presentation and forwards parent side effects", () => {
   const componentSource = readFileSync(resolve(currentDirectory, "InputNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 
-  assert.match(componentSource, /defineProps<\{[\s\S]*body: InputBodyViewModel;[\s\S]*inputBoundarySelection: "text" \| "file" \| "folder" \| "knowledge_base";[\s\S]*inputTypeOptions: InputTypeOption\[\];[\s\S]*inputAssetEnvelope: UploadedAssetEnvelope \| null;[\s\S]*localFolderRoot: string;[\s\S]*localFolderEntries: LocalFolderTreeEntry\[\];[\s\S]*inputKnowledgeBaseOptions: InputKnowledgeBaseOption\[\];[\s\S]*inputValueText: string;[\s\S]*\}>/);
+  assert.match(componentSource, /defineProps<\{[\s\S]*nodeId: string;[\s\S]*body: InputBodyViewModel;[\s\S]*inputBoundarySelection: "text" \| "file" \| "folder" \| "knowledge_base";[\s\S]*inputTypeOptions: InputTypeOption\[\];[\s\S]*inputAssetEnvelope: UploadedAssetEnvelope \| null;[\s\S]*localFolderRoot: string;[\s\S]*localFolderEntries: LocalFolderTreeEntry\[\];[\s\S]*inputKnowledgeBaseOptions: InputKnowledgeBaseOption\[\];[\s\S]*inputValueText: string;[\s\S]*\}>/);
   assert.match(componentSource, /defineEmits<\{[\s\S]*\(event: "update:boundary-selection", value: string \| number \| boolean\): void;[\s\S]*\(event: "update:knowledge-base", value: string \| number \| boolean \| undefined\): void;[\s\S]*\(event: "local-folder-root-input", value: string\): void;[\s\S]*\(event: "local-folder-refresh"\): void;[\s\S]*\(event: "local-folder-selection-toggle", path: string, selected: boolean\): void;[\s\S]*\(event: "local-folder-select-all"\): void;[\s\S]*\(event: "local-folder-clear"\): void;[\s\S]*\(event: "asset-file-change", inputEvent: Event\): void;[\s\S]*\(event: "asset-drop", dragEvent: DragEvent\): void;[\s\S]*\(event: "clear-asset"\): void;[\s\S]*\(event: "input-value", inputEvent: Event\): void;[\s\S]*\}>/);
   assert.match(componentSource, /<div class="node-card__input-body">/);
   assert.match(componentSource, /<div class="node-card__port-row node-card__port-row--single node-card__port-row--input-boundary">/);
@@ -36,6 +36,8 @@ test("InputNodeBody owns input presentation and forwards parent side effects", (
   assert.match(componentSource, /v-else-if="inputAssetEnvelope\.detectedType === 'video' && inputAssetPreviewUrl"/);
   assert.match(componentSource, /@click\.stop="emit\('clear-asset'\)"/);
   assert.match(componentSource, /v-else-if="isInputValueEditable"[\s\S]*class="node-card__surface node-card__surface-textarea"[\s\S]*:value="inputValueText"[\s\S]*@input="emit\('input-value', \$event\)"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`editor\.canvas\.node\.\$\{nodeId\}\.input\.value`"/);
+  assert.match(componentSource, /data-virtual-affordance-actions="focus,clear,type"/);
   assert.match(componentSource, /<div v-else class="node-card__surface node-card__surface--tall">\{\{ body\.valueText \|\| t\("nodeCard\.emptyInput"\) \}\}<\/div>/);
   assert.match(componentSource, /\.node-card__input-body \{[\s\S]*display:\s*flex;[\s\S]*flex:\s*1 1 auto;/);
   assert.match(componentSource, /\.node-card__input-boundary-toggle \{/);

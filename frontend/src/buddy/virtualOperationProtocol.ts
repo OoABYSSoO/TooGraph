@@ -40,6 +40,16 @@ export type BuddyVirtualGraphEditOperation = {
   graphEditIntents: GraphEditIntent[];
 };
 
+export type BuddyVirtualRunTemplateOperation = {
+  kind: "run_template";
+  targetId: string;
+  templateId: string;
+  templateName: string;
+  searchText: string;
+  inputText: string;
+  runTargetId: string;
+};
+
 export type BuddyVirtualOperation =
   | BuddyVirtualClickOperation
   | BuddyVirtualFocusOperation
@@ -47,7 +57,8 @@ export type BuddyVirtualOperation =
   | BuddyVirtualTypeOperation
   | BuddyVirtualPressOperation
   | BuddyVirtualWaitOperation
-  | BuddyVirtualGraphEditOperation;
+  | BuddyVirtualGraphEditOperation
+  | BuddyVirtualRunTemplateOperation;
 
 export type BuddyVirtualOperationPlan = {
   version: 1;
@@ -172,6 +183,25 @@ function listOperations(value: unknown): BuddyVirtualOperation[] {
         return [];
       }
       operations.push({ kind: "graph_edit", targetId, graphEditIntents });
+      continue;
+    }
+    if (kind === "run_template") {
+      const templateId = normalizeText(record.template_id ?? record.templateId);
+      const templateName = normalizeText(record.template_name ?? record.templateName);
+      const searchText = normalizeText(record.search_text ?? record.searchText) || templateId || templateName;
+      const inputText = normalizeText(record.input_text ?? record.inputText);
+      if (!searchText || !inputText) {
+        return [];
+      }
+      operations.push({
+        kind: "run_template",
+        targetId: targetId || (templateId ? `library.template.${templateId}.open` : "library.template.search.open"),
+        templateId,
+        templateName,
+        searchText,
+        inputText,
+        runTargetId: normalizeText(record.run_target_id ?? record.runTargetId) || "editor.action.runActiveGraph",
+      });
       continue;
     }
     if (kind === "click" || kind === "focus" || kind === "clear") {
@@ -318,8 +348,8 @@ function normalizeGraphEditIntent(record: Record<string, unknown>): GraphEditInt
   return null;
 }
 
-function isGraphEditNodeType(value: string): value is "input" | "agent" | "output" | "condition" {
-  return value === "input" || value === "agent" || value === "output" || value === "condition";
+function isGraphEditNodeType(value: string): value is "input" | "agent" | "output" | "condition" | "subgraph" {
+  return value === "input" || value === "agent" || value === "output" || value === "condition" || value === "subgraph";
 }
 
 function normalizeGraphEditPosition(value: unknown) {
