@@ -279,7 +279,7 @@
                     class="buddy-widget__run-trace-summary"
                     :aria-expanded="isTraceMessageExpanded(message.id)"
                     :aria-label="isTraceMessageExpanded(message.id) ? t('buddy.runTraceCollapse') : t('buddy.runTraceExpand')"
-                    @click="toggleTraceMessage(message.id)"
+                    @click="toggleTraceMessage(message.id, message.runId)"
                   >
                     <span
                       class="buddy-widget__run-trace-dot"
@@ -303,9 +303,15 @@
                   v-if="isTraceMessageExpanded(message.id)"
                   class="buddy-widget__run-trace-detail"
                 >
+                  <p v-if="isTraceRunTreeLoading(message.runId)" class="buddy-widget__run-trace-state">
+                    {{ t("common.loading") }}
+                  </p>
+                  <p v-else-if="traceRunTreeError(message.runId)" class="buddy-widget__run-trace-state">
+                    {{ t("common.failedToLoad", { error: traceRunTreeError(message.runId) }) }}
+                  </p>
                   <ol class="buddy-widget__run-trace-list">
                     <li
-                      v-for="row in buildTraceTreeRows(message.outputTrace)"
+                      v-for="row in buildTraceTreeRows(message.outputTrace, message.runId)"
                       :key="row.rowId"
                       class="buddy-widget__run-trace-row"
                       :class="[
@@ -491,7 +497,7 @@ import {
   fetchBuddyRunTemplateBinding,
 } from "../api/buddy.ts";
 import { fetchTemplate, fetchTemplates, restoreGraphRevision, runGraph } from "../api/graphs.ts";
-import { fetchRun, resumeRun } from "../api/runs.ts";
+import { fetchRun, fetchRunTree, resumeRun } from "../api/runs.ts";
 import { fetchSettings } from "../api/settings.ts";
 import SandboxedHtmlFrame from "../components/SandboxedHtmlFrame.vue";
 import { resolveOutputPreviewContent } from "../editor/nodes/outputPreviewContentModel.ts";
@@ -516,7 +522,7 @@ import {
 import { buildBuddyBubblePreviewLabel } from "./buddyBubblePreviewModel.ts";
 import type { BuddyChatMessageRecord, BuddyChatSession } from "../types/buddy.ts";
 import type { GraphPayload, GraphPosition, TemplateRecord } from "../types/node-system.ts";
-import type { RunDetail } from "../types/run.ts";
+import type { RunDetail, RunTreeNode } from "../types/run.ts";
 import type { SettingsPayload } from "../types/settings.ts";
 
 import BuddyMascot from "./BuddyMascot.vue";
@@ -829,6 +835,9 @@ const debugDragging = ref(false);
 const traceClockNowMs = ref(Date.now());
 const traceDurationDisplayByKey = ref<Record<string, SmoothNumberDisplayState>>({});
 const expandedTraceMessageIds = ref<Set<string>>(new Set());
+const traceRunTreeByRunId = ref<Record<string, RunTreeNode>>({});
+const traceRunTreeLoadingByRunId = ref<Record<string, boolean>>({});
+const traceRunTreeErrorByRunId = ref<Record<string, string>>({});
 const restoringTraceGraphRevisionRowId = ref<string | null>(null);
 const pointerDrag = ref<{
   pointerId: number;
@@ -5473,18 +5482,69 @@ function isTraceMessageExpanded(messageId: string) {
   return expandedTraceMessageIds.value.has(messageId);
 }
 
-function toggleTraceMessage(messageId: string) {
+function toggleTraceMessage(messageId: string, runId?: string | null) {
   const next = new Set(expandedTraceMessageIds.value);
   if (next.has(messageId)) {
     next.delete(messageId);
   } else {
     next.add(messageId);
+    void ensureTraceRunTreeLoaded(runId);
   }
   expandedTraceMessageIds.value = next;
 }
 
-function buildTraceTreeRows(segment: BuddyOutputTraceSegment) {
-  return buildBuddyOutputTraceTreeRows(segment, { rootLabel: t("buddy.runTraceMainGraph") });
+function buildTraceTreeRows(segment: BuddyOutputTraceSegment, runId?: string | null) {
+  return buildBuddyOutputTraceTreeRows(segment, {
+    rootLabel: t("buddy.runTraceMainGraph"),
+    runTree: resolveTraceRunTree(runId),
+  });
+}
+
+async function ensureTraceRunTreeLoaded(runId: string | null | undefined) {
+  const normalizedRunId = String(runId ?? "").trim();
+  if (!normalizedRunId || traceRunTreeByRunId.value[normalizedRunId] || traceRunTreeLoadingByRunId.value[normalizedRunId]) {
+    return;
+  }
+  traceRunTreeLoadingByRunId.value = {
+    ...traceRunTreeLoadingByRunId.value,
+    [normalizedRunId]: true,
+  };
+  traceRunTreeErrorByRunId.value = {
+    ...traceRunTreeErrorByRunId.value,
+    [normalizedRunId]: "",
+  };
+  try {
+    const tree = await fetchRunTree(normalizedRunId);
+    traceRunTreeByRunId.value = {
+      ...traceRunTreeByRunId.value,
+      [normalizedRunId]: tree,
+    };
+  } catch (treeError) {
+    traceRunTreeErrorByRunId.value = {
+      ...traceRunTreeErrorByRunId.value,
+      [normalizedRunId]: treeError instanceof Error ? treeError.message : String(treeError),
+    };
+  } finally {
+    traceRunTreeLoadingByRunId.value = {
+      ...traceRunTreeLoadingByRunId.value,
+      [normalizedRunId]: false,
+    };
+  }
+}
+
+function resolveTraceRunTree(runId: string | null | undefined) {
+  const normalizedRunId = String(runId ?? "").trim();
+  return normalizedRunId ? traceRunTreeByRunId.value[normalizedRunId] ?? null : null;
+}
+
+function isTraceRunTreeLoading(runId: string | null | undefined) {
+  const normalizedRunId = String(runId ?? "").trim();
+  return normalizedRunId ? Boolean(traceRunTreeLoadingByRunId.value[normalizedRunId]) : false;
+}
+
+function traceRunTreeError(runId: string | null | undefined) {
+  const normalizedRunId = String(runId ?? "").trim();
+  return normalizedRunId ? traceRunTreeErrorByRunId.value[normalizedRunId] ?? "" : "";
 }
 
 function traceTreeRowStyle(row: BuddyOutputTraceTreeRow) {
@@ -5497,7 +5557,7 @@ function openTraceTreeRowPlayback(runId: string | null | undefined, row: BuddyOu
   if (!row.playbackTarget) {
     return;
   }
-  openRunPlayback(runId);
+  openRunPlayback(row.evidenceRunId || runId);
 }
 
 function openRunPlayback(runId: string | null | undefined) {
@@ -5608,7 +5668,7 @@ function collectTraceDurationTargets(nowMs: number) {
         animateInitial: message.outputTrace.status === "running",
       };
     }
-    for (const row of buildTraceTreeRows(message.outputTrace)) {
+    for (const row of buildTraceTreeRows(message.outputTrace, message.runId)) {
       const rowDurationMs = resolveTraceTreeRowDurationMsAt(row, nowMs);
       if (rowDurationMs !== null) {
         targets[buildTraceTreeRowDurationKey(message.id, row)] = {
@@ -6972,6 +7032,13 @@ function formatErrorMessage(error: unknown): string {
   border-radius: 8px;
   background: rgba(255, 252, 247, 0.78);
   box-shadow: 0 14px 34px rgba(60, 41, 20, 0.08);
+}
+
+.buddy-widget__run-trace-state {
+  margin: 0;
+  color: rgba(70, 53, 38, 0.66);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .buddy-widget__run-trace-list {

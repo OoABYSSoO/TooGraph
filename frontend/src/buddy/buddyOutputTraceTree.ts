@@ -5,6 +5,12 @@ import type {
   BuddyOutputTraceStatus,
 } from "./buddyOutputTrace.ts";
 import type { VirtualOperationGraphRevision } from "../lib/virtual-operation-activity.ts";
+import type { RunTreeNode } from "../types/run.ts";
+import {
+  buildRunTreeDisplayItems,
+  type RunTreeDisplayBatchGroup,
+  type RunTreeDisplayRunRow,
+} from "../lib/runTreeDisplayModel.ts";
 
 export type BuddyOutputTraceTreeRowKind = "root" | "subgraph" | "node" | "activity";
 
@@ -31,8 +37,15 @@ export type BuddyOutputTraceTreeRow = {
 
 export function buildBuddyOutputTraceTreeRows(
   segment: BuddyOutputTraceSegment,
-  options: { rootLabel: string },
+  options: { rootLabel: string; runTree?: RunTreeNode | null },
 ): BuddyOutputTraceTreeRow[] {
+  if (options.runTree) {
+    const runTreeRows = buildBuddyRunTreeRows(options.runTree);
+    if (runTreeRows.length > 0) {
+      return runTreeRows;
+    }
+  }
+
   const subgraphLabelById = buildSubgraphLabelById(segment.records);
   const rows: BuddyOutputTraceTreeRow[] = [
     {
@@ -74,6 +87,76 @@ export function buildBuddyOutputTraceTreeRows(
   }
 
   return rows;
+}
+
+function buildBuddyRunTreeRows(runTree: RunTreeNode): BuddyOutputTraceTreeRow[] {
+  return buildRunTreeDisplayItems(runTree).flatMap((item) => {
+    if (item.kind === "batch_group") {
+      return [
+        buildBuddyRunTreeBatchGroupRow(item),
+        ...item.rows.map(buildBuddyRunTreeRunRow),
+      ];
+    }
+    return [buildBuddyRunTreeRunRow(item)];
+  });
+}
+
+function buildBuddyRunTreeBatchGroupRow(group: RunTreeDisplayBatchGroup): BuddyOutputTraceTreeRow {
+  return {
+    rowId: group.key,
+    kind: "subgraph",
+    label: group.label,
+    depth: group.depth,
+    status: resolveRunTreeGroupStatus(group.rows),
+    startedAtMs: null,
+    completedAtMs: null,
+    durationMs: null,
+    record: null,
+    playbackTarget: null,
+    artifactLabels: [`batch: ${group.count}`, group.statusSummary].filter(Boolean),
+    evidenceRunId: null,
+    graphRevision: null,
+  };
+}
+
+function buildBuddyRunTreeRunRow(row: RunTreeDisplayRunRow): BuddyOutputTraceTreeRow {
+  return {
+    rowId: row.key,
+    kind: row.depth === 0 ? "root" : row.relation.includes("subgraph") ? "subgraph" : "node",
+    label: row.graphName,
+    depth: row.depth,
+    status: normalizeRunTreeStatus(row.status),
+    startedAtMs: null,
+    completedAtMs: null,
+    durationMs: null,
+    record: null,
+    playbackTarget: { kind: "run", nodeId: null },
+    artifactLabels: [row.relation !== "root" ? row.relation : "", ...row.labels].filter(Boolean),
+    evidenceRunId: row.runId || null,
+    graphRevision: null,
+  };
+}
+
+function resolveRunTreeGroupStatus(rows: RunTreeDisplayRunRow[]): BuddyOutputTraceTreeRow["status"] {
+  const statuses = rows.map((row) => normalizeRunTreeStatus(row.status));
+  if (statuses.includes("failed")) {
+    return "failed";
+  }
+  if (statuses.includes("running")) {
+    return "running";
+  }
+  return "completed";
+}
+
+function normalizeRunTreeStatus(status: string): BuddyOutputTraceTreeRow["status"] {
+  const normalized = status.trim().toLowerCase();
+  if (normalized === "failed" || normalized === "cancelled" || normalized === "error") {
+    return "failed";
+  }
+  if (normalized === "completed" || normalized === "success" || normalized === "succeeded") {
+    return "completed";
+  }
+  return "running";
 }
 
 function buildSubgraphLabelById(records: BuddyOutputTraceRecord[]) {

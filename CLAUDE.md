@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TooGraph is a visual node-based editor and runtime workspace for LangGraph-style agent workflows. Users compose workflows by creating nodes, connecting state/data edges and control-flow edges, configuring agent skills and runtime defaults, validating the graph, then running it against a FastAPI + LangGraph backend.
+TooGraph is a visual node-based editor and runtime workspace for LangGraph-style agent workflows. Users compose workflows by creating nodes, connecting state/data edges and control-flow edges, configuring agent Actions and runtime defaults, validating the graph, then running it against a FastAPI + LangGraph backend.
 
 `node_system` is the only formal graph protocol in active use. `state_schema` is the single source of truth for graph data, while nodes declare what state they read and write.
 
@@ -18,7 +18,7 @@ When repository guidance overlaps, prefer the current files in this order:
 
 1. `AGENTS.md`
 2. `README.md`
-3. `docs/future/buddy-autonomous-agent-roadmap.md`
+3. `docs/README.md`
 4. The code itself
 
 Keep this file aligned with those sources and with the actual codebase.
@@ -130,7 +130,7 @@ Expected response:
   - `/library` -> `GraphLibraryPage.vue`
   - `/buddy` -> `BuddyPage.vue`
   - `/presets` -> `PresetsPage.vue`
-  - `/skills` -> `SkillsPage.vue`
+  - `/actions` -> `ActionsPage.vue`
   - `/models` -> `ModelProvidersPage.vue`
   - `/model-logs` -> `ModelLogsPage.vue`
   - `/runs` -> `RunsPage.vue`
@@ -195,15 +195,17 @@ The frontend includes many colocated `*.test.ts` and `*.structure.test.ts` files
 - `routes_graphs.py`
 - `routes_knowledge.py`
 - `routes_local_input_sources.py`
-- `routes_memories.py`
+- `routes_actions.py`
+- `routes_buddy.py`
+- `routes_evals.py`
+- `routes_capability_artifacts.py`
 - `routes_model_logs.py`
+- `routes_operation_journal.py`
 - `routes_presets.py`
 - `routes_runs.py`
 - `routes_settings.py`
-- `routes_skill_artifacts.py`
-- `routes_skills.py`
 - `routes_templates.py`
-- `routes_buddy.py`
+- `routes_tools.py`
 
 ### Backend Modules
 
@@ -213,11 +215,12 @@ The frontend includes many colocated `*.test.ts` and `*.structure.test.ts` files
 - Pydantic schemas: `backend/app/core/schemas/`
 - JSON and SQLite storage: `backend/app/core/storage/`
 - Knowledge loading and search: `backend/app/knowledge/`
-- Memory loading: `backend/app/memory/`
-- Skill definitions and registry: `backend/app/skills/`
+- Action definitions and registry: `backend/app/actions/`
+- Buddy Home, sessions, commands, and revisions: `backend/app/buddy/`
+- Eval storage and execution helpers: `backend/app/evaluator/`
+- Tool definitions and registry: `backend/app/graph_tools/`
 - Model-provider and local LLM helpers: `backend/app/tools/`
 - Template registry and loader: `backend/app/templates/`
-- Buddy Home and command storage: `backend/app/buddy/`
 
 ### Persistence Layout
 
@@ -229,8 +232,7 @@ Under `backend/data/`:
 - `runs/` - run records as JSON
 - `checkpoints/` - LangGraph checkpoint data
 - `settings/` - saved app settings
-- `skills/` - imported skill state
-- `memories/` - memory records loaded by `/api/memories`
+- `actions/` - imported Action state and runtime caches
 - `toograph.db` - SQLite database for knowledge base metadata and FTS search
 
 Some directories are created on demand. Indexed knowledge base content lives in SQLite plus FTS tables, while `backend/data/kb/` stores import manifests and download artifacts used by the knowledge importer.
@@ -239,7 +241,7 @@ Project-level reusable assets are stored outside `backend/data/`:
 
 - `graph_template/official/` and `graph_template/user/` - graph templates
 - `node_preset/official/` and `node_preset/user/` - node presets
-- `skill/official/` and `skill/user/` - Skill packages
+- `action/official/` and `action/user/` - Action packages
 - `knowledge/TooGraph-official/` - official TooGraph knowledge-source Markdown
 
 ### Runtime Model And Tool Configuration
@@ -264,8 +266,8 @@ Model execution reads saved Model Providers configuration and default model sele
 Important runtime constraints:
 
 - LLM nodes are still represented by the internal `agent` kind; do not introduce a parallel graph protocol while migrating naming.
-- One LLM node may use at most one explicit capability source: no capability, one selected Skill, or one incoming `capability` state.
-- Static Skill use stores scalar `config.skillKey` and runtime-owned `skillBindings.outputMapping`.
+- One LLM node may use at most one explicit capability source: no capability, one selected Action, or one incoming `capability` state.
+- Static Action use stores scalar `config.actionKey` and runtime-owned `actionBindings.outputMapping`.
 - Dynamic capability execution writes exactly one `result_package` state.
 - `subgraph` nodes run isolated child graph state and expose only their input/output boundaries to the parent graph.
 
@@ -299,15 +301,14 @@ Resume support exists for runs with available LangGraph checkpoints and valid gr
 | `POST /api/settings/model-providers/discover` | Discover model provider models |
 | `GET /api/knowledge` | Search knowledge chunks |
 | `GET /api/knowledge/bases` | List knowledge bases |
-| `GET /api/skills/definitions` | List active skill definitions |
-| `GET /api/skills/catalog` | List skill catalog |
-| `POST /api/skills/imports/upload` | Import a user Skill package |
-| `POST /api/skills/{skill_key}/disable` | Disable a managed skill |
-| `POST /api/skills/{skill_key}/enable` | Enable a managed skill |
-| `DELETE /api/skills/{skill_key}` | Delete a user Skill |
-| `GET /api/skill-artifacts/content` | Read text-like skill artifact content |
+| `GET /api/actions/definitions` | List active Action definitions |
+| `GET /api/actions/catalog` | List Action catalog |
+| `POST /api/actions/imports/upload` | Import a user Action package |
+| `POST /api/actions/{action_key}/disable` | Disable a managed Action |
+| `POST /api/actions/{action_key}/enable` | Enable a managed Action |
+| `DELETE /api/actions/{action_key}` | Delete a user Action |
+| `GET /api/tools/catalog` | List Tool catalog |
 | `GET /api/local-input-sources/folder` | List an allowed local folder input |
-| `GET /api/memories` | List stored memories, optionally filtered by type |
 | `GET /api/buddy/profile` | Read Buddy Home profile |
 | `GET /api/buddy/sessions` | List Buddy chat sessions |
 
@@ -318,19 +319,34 @@ Current official templates live in `graph_template/official/<template_id>/templa
 - `advanced_web_research_loop`
 - `buddy_autonomous_loop`
 - `buddy_capability_loop`
+- `buddy_context_fanout` - internal Buddy context fanout subgraph
 - `buddy_request_intake` - internal Buddy request intake subgraph template, not a normal user-facing template entry
 - `toograph_page_operation_workflow`
-- `toograph_skill_creation_workflow`
+- `toograph_action_creation_workflow`
+- `toograph_graph_template_creation_workflow`
 - `buddy_autonomous_review` - internal background Buddy autonomous review and Buddy Home writeback template, not a normal user-facing template entry
+- `policy_navigator_agent`
+- `ai_news_digest_to_wechat_article`
+- `multi_platform_content_repurposer`
+- `job_application_interview_coach`
+- `game_creative_factory`
+- `product_competitor_research_agent`
+- `ecommerce_review_mining_agent`
 
-Current official Skill packages live in `skill/official/<skill_key>/`:
+Current official Action packages live in `action/official/<action_key>/`:
 
 - `web_search`
 - `toograph_capability_selector`
+- `toograph_context_fanout`
 - `toograph_page_operator`
-- `toograph_skill_builder`
+- `toograph_action_builder`
+- `toograph_action_package_reader`
+- `toograph_graph_template_reader`
+- `toograph_graph_template_validator`
+- `toograph_graph_template_writer`
 - `toograph_script_tester`
 - `local_workspace_executor`
+- `buddy_session_recall`
 - `buddy_home_writer` - internal Buddy Home command/revision writer
 - `buddy_visible_subgraph_result_adapter` - internal Buddy visible subgraph result adapter
 
@@ -340,4 +356,4 @@ Current official Skill packages live in `skill/official/<skill_key>/`:
 - Follow the existing Vue + Pinia + Element Plus patterns on the frontend.
 - Follow the existing FastAPI + Pydantic + storage-layer separation on the backend.
 - Keep edits scoped to the current request. Do not revive stale planning work or broad refactors unless the task clearly needs them.
-- When updating docs, keep `README.md`, `AGENTS.md`, `CLAUDE.md`, `AGENT_ZH.md`, and `docs/future/buddy-autonomous-agent-roadmap.md` mutually consistent.
+- When updating docs, keep `README.md`, `AGENTS.md`, `CLAUDE.md`, `AGENT_ZH.md`, and `docs/README.md` mutually consistent.

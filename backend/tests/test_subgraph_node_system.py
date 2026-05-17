@@ -381,6 +381,64 @@ def test_langgraph_runtime_resumes_parent_after_subgraph_breakpoint(monkeypatch)
     assert "pending_subgraph_breakpoint" not in resumed["metadata"]
 
 
+def test_langgraph_runtime_resumes_subgraph_breakpoint_against_original_child_run(monkeypatch, tmp_path) -> None:
+    import app.core.langgraph.checkpoints as checkpoint_module
+    import app.core.langgraph.runtime as runtime_module
+
+    original_execute_node = runtime_module._execute_node
+    saved_runs_by_id: dict[str, dict] = {}
+    saved_runs: list[dict] = []
+
+    def save_state(state: dict) -> None:
+        snapshot = copy.deepcopy(state)
+        saved_runs_by_id[str(snapshot["run_id"])] = snapshot
+        saved_runs.append(snapshot)
+
+    def execute_node_without_llm(graph, node_name, node, input_values, state, **kwargs):
+        if node_name == "inner_agent":
+            return {
+                "outputs": {"internal_question": input_values["internal_question"]},
+                "final_result": input_values["internal_question"],
+            }
+        return original_execute_node(graph, node_name, node, input_values, state, **kwargs)
+
+    monkeypatch.setattr(checkpoint_module, "CHECKPOINT_DATA_DIR", tmp_path)
+    monkeypatch.setattr(runtime_module, "save_run", save_state)
+    monkeypatch.setattr(runtime_module, "load_run", lambda run_id: copy.deepcopy(saved_runs_by_id[run_id]), raising=False)
+    monkeypatch.setattr(runtime_module, "_execute_node", execute_node_without_llm)
+    graph = NodeSystemGraphDocument.model_validate(
+        _parent_graph_payload_with_inner_graph(
+            _inner_breakpoint_graph(),
+            subgraph_reads=[{"state": "question", "required": True}],
+            subgraph_writes=[{"state": "answer", "mode": "replace"}],
+        )
+    )
+
+    paused = execute_node_system_graph_langgraph(graph)
+    pending = paused["metadata"]["pending_subgraph_breakpoint"]
+    child_run_id = pending["child_run_id"]
+    paused["metadata"]["pending_subgraph_resume_payload"] = {}
+
+    assert child_run_id != paused["run_id"]
+    assert pending["checkpoint_metadata"]["thread_id"] == child_run_id
+    assert saved_runs_by_id[child_run_id]["status"] == "awaiting_human"
+
+    resumed = execute_node_system_graph_langgraph(
+        graph,
+        paused,
+        resume_from_checkpoint=True,
+        resume_command=None,
+    )
+
+    assert resumed["status"] == "completed"
+    assert resumed["state_values"]["answer"] == "来自父图的明确输入"
+    child_saves = [run for run in saved_runs if run.get("run_id") == child_run_id]
+    assert child_saves[-1]["status"] == "completed"
+    subgraph_execution = next(item for item in resumed["node_executions"] if item["node_id"] == "nested_research")
+    assert subgraph_execution["artifacts"]["subgraph"]["child_run_id"] == child_run_id
+    assert "pending_subgraph_breakpoint" not in resumed["metadata"]
+
+
 def test_langgraph_runtime_publishes_subgraph_event_context(monkeypatch) -> None:
     import app.core.langgraph.runtime as runtime_module
 
@@ -594,6 +652,119 @@ def test_langgraph_runtime_resumes_parent_after_dynamic_subgraph_breakpoint(monk
     assert package["sourceKey"] == "dynamic_breakpoint_subgraph"
     assert package["inputs"] == {"final_reply": "dynamic pause input"}
     assert package["outputs"]["final_reply"]["value"] == "dynamic pause input"
+
+
+def test_langgraph_runtime_resumes_dynamic_subgraph_against_original_child_run(monkeypatch, tmp_path) -> None:
+    import app.core.langgraph.checkpoints as checkpoint_module
+    import app.core.langgraph.runtime as runtime_module
+    import app.core.runtime.node_system_executor as executor_module
+
+    original_execute_node = runtime_module._execute_node
+    saved_runs_by_id: dict[str, dict] = {}
+    saved_runs: list[dict] = []
+    planned_inputs_calls = 0
+
+    def save_state(state: dict) -> None:
+        snapshot = copy.deepcopy(state)
+        saved_runs_by_id[str(snapshot["run_id"])] = snapshot
+        saved_runs.append(snapshot)
+
+    def execute_node_without_llm(graph, node_name, node, input_values, state, **kwargs):
+        if node_name == "inner_agent":
+            return {
+                "outputs": {"final_reply": input_values["final_reply"]},
+                "final_result": input_values["final_reply"],
+            }
+        return original_execute_node(graph, node_name, node, input_values, state, **kwargs)
+
+    def generate_subgraph_inputs(**kwargs):
+        nonlocal planned_inputs_calls
+        planned_inputs_calls += 1
+        return (
+            {"dynamic_breakpoint_subgraph": {"final_reply": "dynamic pause input"}},
+            "planned subgraph inputs",
+            [],
+            kwargs["runtime_config"],
+        )
+
+    template = _dynamic_breakpoint_template()
+    monkeypatch.setattr(checkpoint_module, "CHECKPOINT_DATA_DIR", tmp_path)
+    monkeypatch.setattr(runtime_module, "save_run", save_state)
+    monkeypatch.setattr(runtime_module, "load_run", lambda run_id: copy.deepcopy(saved_runs_by_id[run_id]), raising=False)
+    monkeypatch.setattr(runtime_module, "_execute_node", execute_node_without_llm)
+    monkeypatch.setattr(runtime_module, "load_template_record", lambda template_key: template)
+    monkeypatch.setattr(executor_module, "load_template_record", lambda template_key: template)
+    monkeypatch.setattr(executor_module, "_generate_agent_subgraph_inputs", generate_subgraph_inputs)
+
+    graph = NodeSystemGraphDocument.model_validate(
+        {
+            "graph_id": "graph_dynamic_subgraph_child_resume",
+            "name": "Dynamic Subgraph Child Resume",
+            "state_schema": {
+                "selected_capability": {"type": "capability", "value": {"kind": "subgraph", "key": "dynamic_breakpoint_subgraph"}},
+                "requirement": {"type": "text", "value": "resume a pausing subgraph"},
+                "dynamic_result": {"type": "result_package"},
+            },
+            "nodes": {
+                "capability_input": {
+                    "kind": "input",
+                    "ui": {"position": {"x": 0, "y": 0}},
+                    "writes": [{"state": "selected_capability"}],
+                    "config": {"value": {"kind": "subgraph", "key": "dynamic_breakpoint_subgraph"}},
+                },
+                "requirement_input": {
+                    "kind": "input",
+                    "ui": {"position": {"x": 0, "y": 180}},
+                    "writes": [{"state": "requirement"}],
+                    "config": {"value": "resume a pausing subgraph"},
+                },
+                "run_selected_subgraph": {
+                    "kind": "agent",
+                    "ui": {"position": {"x": 320, "y": 80}},
+                    "reads": [{"state": "selected_capability"}, {"state": "requirement"}],
+                    "writes": [{"state": "dynamic_result"}],
+                    "config": {"actionKey": ""},
+                },
+                "result_output": {
+                    "kind": "output",
+                    "ui": {"position": {"x": 640, "y": 80}},
+                    "reads": [{"state": "dynamic_result"}],
+                },
+            },
+            "edges": [
+                {"source": "capability_input", "target": "run_selected_subgraph"},
+                {"source": "requirement_input", "target": "run_selected_subgraph"},
+                {"source": "run_selected_subgraph", "target": "result_output"},
+            ],
+            "conditional_edges": [],
+        }
+    )
+
+    paused = execute_node_system_graph_langgraph(graph)
+    pending = paused["metadata"]["pending_subgraph_breakpoint"]
+    child_run_id = pending["child_run_id"]
+    paused["metadata"]["pending_subgraph_resume_payload"] = {}
+
+    assert child_run_id != paused["run_id"]
+    assert pending["checkpoint_metadata"]["thread_id"] == child_run_id
+    assert saved_runs_by_id[child_run_id]["status"] == "awaiting_human"
+
+    resumed = execute_node_system_graph_langgraph(
+        graph,
+        paused,
+        resume_from_checkpoint=True,
+        resume_command=None,
+    )
+
+    assert resumed["status"] == "completed"
+    assert planned_inputs_calls == 1
+    child_saves = [run for run in saved_runs if run.get("run_id") == child_run_id]
+    assert child_saves[-1]["status"] == "completed"
+    package = resumed["state_values"]["dynamic_result"]
+    assert package["childRunId"] == child_run_id
+    assert package["child_run_id"] == child_run_id
+    dynamic_execution = next(item for item in resumed["node_executions"] if item["node_id"] == "run_selected_subgraph")
+    assert dynamic_execution["artifacts"]["subgraph"]["child_run_id"] == child_run_id
 
 
 def test_langgraph_runtime_runs_dynamic_subgraph_capability_and_packages_outputs(monkeypatch) -> None:

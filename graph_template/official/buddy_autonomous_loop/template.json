@@ -56,7 +56,7 @@
     },
     "fanout_context": {
       "name": "fanout_context",
-      "description": "只读 fanout 的分支结果：记忆、知识库、页面上下文和固定页面操作能力信息。",
+      "description": "只读 fanout 的分支结果：记忆、知识库、页面上下文和可发现能力候选信息。",
       "type": "json",
       "value": {},
       "color": "#2563eb",
@@ -283,7 +283,7 @@
     "buddy_context_fanout": {
       "kind": "subgraph",
       "name": "上下文 Fanout",
-      "description": "并行读取记忆、知识库、页面上下文和固定页面操作能力信息，生成本轮 context_only 摘要。",
+      "description": "并行读取记忆、知识库、页面上下文和可发现能力候选信息，生成本轮 context_only 摘要。",
       "ui": {
         "position": {
           "x": 660,
@@ -454,7 +454,7 @@
             },
             "fanout_capability_candidates": {
               "name": "fanout_capability_candidates",
-              "description": "固定页面操作能力的只读上下文摘要。",
+              "description": "可发现模板、Action 和 Tool 候选的只读上下文摘要。",
               "type": "json",
               "value": {},
               "color": "#9333ea",
@@ -2684,7 +2684,7 @@
       "subgraph"
     ],
     "role": "buddy_autonomous_loop",
-    "roadmap": "docs/future/buddy-autonomous-agent-roadmap.md",
+    "roadmap": "docs/README.md",
     "capabilityDiscoverableDefault": false
   }
 }

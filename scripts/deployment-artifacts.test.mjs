@@ -44,9 +44,9 @@ test("Docker ignore file keeps local runtime state and generated build output ou
   }
 });
 
-test("deployment documentation describes source and Docker paths without model environment variables", () => {
-  assert.equal(existsSync(resolve(rootDir, "docs", "deployment.md")), true);
-  const docs = readText("docs/deployment.md");
+test("consolidated documentation describes source and Docker paths without model environment variables", () => {
+  assert.equal(existsSync(resolve(rootDir, "docs", "README.md")), true);
+  const docs = readText("docs/README.md");
   const readme = readText("README.md");
 
   assert.match(docs, /npm start/);
@@ -56,5 +56,5 @@ test("deployment documentation describes source and Docker paths without model e
   assert.match(docs, /\/app\/backend\/data/);
   assert.match(docs, /Model Providers/);
   assert.doesNotMatch(docs, /OPENAI_API_KEY/);
-  assert.match(readme, /docs\/deployment\.md/);
+  assert.match(readme, /docs\/README\.md/);
 });

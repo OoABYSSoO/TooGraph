@@ -747,7 +747,7 @@ test("BuddyWidget renders output-segment run trace capsules instead of per-messa
   assert.match(componentSource, /outputTrace\?:/);
   assert.match(componentSource, /class="buddy-widget__run-trace"/);
   assert.match(componentSource, /class="buddy-widget__run-trace-summary"/);
-  assert.match(componentSource, /v-for="row in buildTraceTreeRows\(message\.outputTrace\)"/);
+  assert.match(componentSource, /v-for="row in buildTraceTreeRows\(message\.outputTrace, message\.runId\)"/);
   assert.match(componentSource, /class="buddy-widget__run-trace-row-open"/);
   assert.match(componentSource, /v-if="row\.playbackTarget && message\.runId"/);
   assert.match(componentSource, /@click="openTraceTreeRowPlayback\(message\.runId, row\)"/);
@@ -767,6 +767,7 @@ test("BuddyWidget renders output-segment run trace capsules instead of per-messa
   assert.match(componentSource, /router\.push\(`\/runs\/\$\{encodeURIComponent\(normalizedRunId\)\}`\)/);
   assert.doesNotMatch(componentSource, /class="buddy-widget__run-trace-open"/);
   assert.match(componentSource, /function openTraceTreeRowPlayback\(runId: string \| null \| undefined, row: BuddyOutputTraceTreeRow\)/);
+  assert.match(componentSource, /openRunPlayback\(row\.evidenceRunId \|\| runId\);/);
   assert.match(componentSource, /router\.push\(resolveRunRestoreUrl\(normalizedRunId\)\)/);
   assert.match(componentSource, /buddy-widget__run-trace-dot--running/);
   assert.match(componentSource, /formatTraceDuration/);
@@ -781,6 +782,17 @@ test("BuddyWidget renders output-segment run trace capsules instead of per-messa
   assert.match(componentSource, /outputTrace:\s*resolveOutputTraceBuddyMessageMetadata\(record\.metadata\) \?\? undefined/);
   assert.doesNotMatch(componentSource, /formatPublicOutputDuration/);
   assert.doesNotMatch(componentSource, /runTraceStartedAtByKey/);
+});
+
+test("BuddyWidget fetches real run trees when expanded trace capsules are opened", () => {
+  assert.match(componentSource, /import \{ fetchRun, fetchRunTree, resumeRun \} from "\.\.\/api\/runs\.ts";/);
+  assert.match(componentSource, /import type \{ RunDetail, RunTreeNode \} from "\.\.\/types\/run\.ts";/);
+  assert.match(componentSource, /const traceRunTreeByRunId = ref<Record<string, RunTreeNode>>\(\{\}\);/);
+  assert.match(componentSource, /const traceRunTreeLoadingByRunId = ref<Record<string, boolean>>\(\{\}\);/);
+  assert.match(componentSource, /@click="toggleTraceMessage\(message\.id, message\.runId\)"/);
+  assert.match(componentSource, /void ensureTraceRunTreeLoaded\(runId\);/);
+  assert.match(componentSource, /fetchRunTree\(normalizedRunId/);
+  assert.match(componentSource, /buildBuddyOutputTraceTreeRows\(segment,\s*\{\s*rootLabel: t\("buddy\.runTraceMainGraph"\),\s*runTree:/);
 });
 
 test("BuddyWidget seeds streaming run trace capsules from the current run snapshot", () => {
@@ -906,7 +918,7 @@ test("BuddyWidget starts autonomous review as a separate background run after th
 });
 
 test("BuddyWidget keeps awaiting-human runs out of the normal chat resume flow", () => {
-  assert.match(componentSource, /import \{ fetchRun, resumeRun \} from "\.\.\/api\/runs\.ts";/);
+  assert.match(componentSource, /import \{ fetchRun, fetchRunTree, resumeRun \} from "\.\.\/api\/runs\.ts";/);
   assert.doesNotMatch(componentSource, /buildBuddyConversationalPausePrompt/);
   assert.doesNotMatch(componentSource, /buildBuddyConversationalPauseResumePayload/);
   assert.match(componentSource, /const pausedBuddyRun = ref<RunDetail \| null>\(null\);/);

@@ -45,8 +45,7 @@ TOOGRAPH_PROJECT_DOC_FILES = [
     REPO_ROOT / "knowledge" / "TooGraph-official" / "current-architecture.md",
     REPO_ROOT / "knowledge" / "TooGraph-official" / "runtime-and-roadmap.md",
     REPO_ROOT / "README.md",
-    REPO_ROOT / "docs" / "future" / "buddy-autonomous-agent-roadmap.md",
-    REPO_ROOT / "docs" / "structured-output-and-function-calling.md",
+    REPO_ROOT / "docs" / "README.md",
 ]
 
 
@@ -679,7 +678,7 @@ def _score_project_specific_boosts(*, title: str, section: str, query_lower: str
     architecture_terms = ("架构", "architecture", "runtime", "运行态", "协议")
     state_terms = ("state panel", "state", "状态面板", "状态", "reader", "writer")
 
-    if source_path.startswith("docs/future/") or source_path.endswith("runtime-and-roadmap.md"):
+    if source_path == "docs/README.md" or source_path.endswith("runtime-and-roadmap.md"):
         if any(term in query_lower for term in roadmap_terms):
             score += 20
 
