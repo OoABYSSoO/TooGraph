@@ -17,7 +17,7 @@
   -> 选择一个 capability(kind=skill|subgraph|none)
   -> 由下游 LLM 节点为该能力准备输入
   -> 若能力是 Skill，运行时执行单次 Skill
-  -> 若目标是可见图模板，伙伴通过原生虚拟 UI 选择或打开模板、绑定输入、点击运行、等待完成并读取公开结果
+  -> 若 capability.kind=subgraph，伙伴启动原生虚拟鼠标/键盘，多步选择或打开对应图模板、绑定输入、点击运行、等待完成并读取公开结果
   -> 将结果封装为 result_package state
   -> 复盘结果并判断是否继续能力循环
   -> 生成 final_reply 或其他父图 root output state
@@ -38,7 +38,7 @@
 - 权限显式：安装 Skill 不等于授权任意使用。写入、删除、脚本执行、联网、成本、敏感文件和图修改都需要清晰权限路径。
 - 审计可见：重要副作用必须留下 run detail、activity event、artifact、revision、diff、warning、error 或 undo record。
 - 原生虚拟操作：伙伴搭建和编辑图的成熟方向是 TooGraph 内建的 App-Native Virtual Operator。伙伴读取结构化页面状态和 affordance 清单，控制自己的虚拟鼠标和虚拟键盘在页面内操作；不移动系统鼠标，不依赖截图或 LLM 视觉理解，也不从外部浏览器自动化或 MCP 作为起点。
-- 模板运行可见：自主循环中若能力选择命中用户可见图模板，伙伴不应在后台直接调用该模板。它应通过 App-Native Virtual Operator 在 TooGraph 页面中选择或打开模板、绑定输入、点击运行、等待运行结束，再从 run capsule、root output 和 activity events 读取结果，之后才由 `review_capability_result` 判断是否继续运行其他模板或能力。
+- Subgraph 能力可见运行：自主循环中若能力选择结果是 `capability.kind=subgraph`，伙伴不应在后台直接调用该模板。它应立即启动 App-Native Virtual Operator，用自己的虚拟鼠标和虚拟键盘在 TooGraph 页面中完成可能多步的可见流程：定位对应图模板，选择或打开模板，按模板 input 节点绑定当前消息、历史、页面上下文和 Buddy Home，点击运行，等待运行结束，再从 run capsule、root output 和 activity events 读取结果，之后才由 `review_capability_result` 判断是否继续运行其他模板或能力。
 - 操作即审计：伙伴的点击、拖拽、键入、等待、失败恢复和最终图变更都必须进入 operation journal / activity events。用户应能看到伙伴点击了什么、输入了什么、拖拽了什么、产生了什么 graph diff、revision 或 run 结果。
 - 自我操作边界：伙伴不能操作自己的形象、伙伴浮窗或伙伴页面。伙伴形象跟随虚拟鼠标保持适当距离属于运行时展示行为，不是伙伴可选择的页面操作，也不能被用来修改伙伴自身设置。
 - 记忆卫生：Buddy Home、人设、记忆、会话摘要和自我复盘是上下文，不是系统指令，不能提升权限或覆盖更高优先级规则。
@@ -57,8 +57,8 @@
 - 静态 Skill 绑定使用单值 `config.skillKey`，不能使用旧 `config.skills` 数组。
 - 静态 Skill 输出通过协议拥有的 `skillBindings.outputMapping` 写入 managed state。
 - 结构化 LLM 输出由 LLM 节点在运行前根据输入 state、技能 `description`、有效 `llmInstruction` 和 `llmOutputSchema` 生成。
-- 动态能力来自单个 `capability` state，执行结果必须写入唯一 `result_package` state。普通可见图模板运行应作为可审计页面操作流程触发，不把目标模板偷换成后台直连调用。
-- `capability.kind=subgraph` 已能动态执行内部子图或模板化子流程，内部断点可以传播到父级 run 的标准 `awaiting_human`；该原语保留为内部能力底座，不是普通可见模板运行的默认入口。
+- 动态能力来自单个 `capability` state，执行结果必须写入唯一 `result_package` state。在伙伴自主循环中，`capability.kind=subgraph` 的产品语义是“可见运行对应图模板”，应作为可审计页面操作流程触发，不把目标模板偷换成后台直连调用。
+- 后台动态 Subgraph 执行原语已能执行内部子图或模板化子流程，内部断点可以传播到父级 run 的标准 `awaiting_human`；该原语保留为运行时底座和内部能力实现细节，不是伙伴自主循环里 `capability.kind=subgraph` 的默认用户体验。
 - `subgraph` 是正式节点类型，内部 state 与父图隔离，只通过公开 input/output 边界通信。
 - 官方 `buddy_autonomous_loop` 已存在：顶层使用 Buddy Home 文件夹输入、请求理解子图、能力循环子图、最终回复子图和唯一 `final_reply` output。
 - 伙伴可见运行已经支持模板绑定：Buddy 页面可从可见模板列表选择运行模板，并按 input 节点把当前消息、对话历史、页面上下文和 Buddy Home 上下文绑定进去；权限模式只保留为运行 metadata，不作为图输入。
@@ -283,17 +283,18 @@ flowchart TD
 
 - 它读取一个 `capability` state。
 - 它只写一个 `result_package` state。
-- 它可以让 LLM 生成被选 Skill 或 Subgraph 的输入。
+- 它可以让 LLM 生成被选 Skill 的输入，或生成可见运行对应图模板的页面操作目标。
 - 运行时执行能力并封装结果。
 - 它不总结结果、不决定下一步、不生成最终回复。
 
-可见图模板运行的特殊规则：
+`capability.kind=subgraph` 的可见运行规则：
 
-- 如果 `toograph_capability_selector` 找到的是普通用户可见图模板，`execute_capability` 不应直接走后台模板调用 API。
-- 这类目标应路由到 `toograph_page_operation_workflow` 或后续专门的可见模板运行官方模板；`selected_capability` 仍是单个能力对象，目标模板 ID、名称、输入绑定目标和选择理由放在该能力的参数或审计信息中。
-- 页面操作流程必须让伙伴在 TooGraph 页面内选择或打开目标模板，按模板 input 节点绑定当前消息、历史、页面上下文和 Buddy Home，点击运行，等待 run 进入 completed、failed、cancelled 或 `awaiting_human`，再读取 root output、run capsule、activity events 和 artifact 引用。
+- 只要 `toograph_capability_selector` 返回 `capability.kind=subgraph`，`execute_capability` 就不应直接走后台模板调用 API。
+- 这类目标应立即启动原生虚拟鼠标/键盘，并路由到 `toograph_page_operation_workflow` 或后续专门的可见模板运行官方模板；`selected_capability` 仍是单个能力对象，目标模板 ID、名称、输入绑定目标和选择理由放在该能力的参数或审计信息中。
+- 页面操作流程可以包含多步：打开模板库、搜索或定位模板、选择或打开目标模板、确认输入绑定、点击运行、等待 run 进入 completed、failed、cancelled 或 `awaiting_human`，再读取 root output、run capsule、activity events 和 artifact 引用。
 - 如果目标模板进入 `awaiting_human`，当前能力执行应通过标准暂停卡暴露已产出的内容和所需补充；用户补充后继续等待该模板完成，再回到 `review_capability_result`。
 - `review_capability_result` 只能基于可见运行返回的结构化结果判断下一步：停止、解释失败、请求用户补充，或回到 `select_capability` 继续运行别的图模板或 Skill。
+- 后台动态 Subgraph 执行只作为内部运行时原语保留；伙伴自主循环不应把 `kind=subgraph` 当成无窗口变化的直连调用。
 
 `continue_capability_loop` 的建议：
 
@@ -764,7 +765,7 @@ LLM 目标图编辑意图
 
 `toograph_page_operation_workflow` 是这条链路的官方图模板入口。能力选择器应优先把“操作 TooGraph 页面”的多步目标路由到该模板，而不是直接选择单次 `toograph_page_operator` Skill；只有模板内部的单步执行节点才绑定页面操作器。该模板作为子图能力时只接收用户期望 `user_goal`，不把页面操作书或页面上下文暴露为调用方 input。模板最终回复必须按结构化验证结果解释失败，尤其区分找不到目标图、找不到运行记录、页面快照过期、破坏性操作被阻止、触发 run 失败和操作中断。
 
-运行已有图模板也属于这条可见页面操作链路。伙伴在自主循环中决定“这个模板适合当前目标”后，应像用户一样在页面中定位模板、打开或选择它、确认输入绑定、点击运行、等待运行状态，并从公开 output、run capsule、activity events 和 artifacts 中拿结果。这样用户能看见窗口状态变化、运行胶囊和失败原因，也能在审计里追溯伙伴为什么运行了这个模板。后台动态 Subgraph 执行只适合内部稳定子图能力，不应作为普通可见模板运行的默认体验。
+运行已有图模板也属于这条可见页面操作链路。伙伴在自主循环中判定 `capability.kind=subgraph` 后，应立即进入可见模板运行目标，像用户一样在页面中定位模板、打开或选择它、确认输入绑定、点击运行、等待运行状态，并从公开 output、run capsule、activity events 和 artifacts 中拿结果；这个过程允许跨页面、搜索、打开模板草稿、填充输入和等待运行等多步操作。这样用户能看见窗口状态变化、运行胶囊和失败原因，也能在审计里追溯伙伴为什么运行了这个模板。后台动态 Subgraph 执行只适合内部稳定子图能力，不应作为伙伴自主循环里 `kind=subgraph` 的默认体验。
 
 ### Skill 生命周期边界
 
@@ -1000,7 +1001,7 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 - 输入用户消息、历史、页面上下文、伙伴模式、Buddy Home。
 - `buddy_turn_intake` 产出 `visible_reply` 和 `request_understanding`。
 - 简单闲聊或可直接回答时绕过能力循环。
-- `buddy_capability_loop` 选择能力、执行能力、复盘结果、必要时循环；当能力目标是可见图模板时，通过原生虚拟 UI 点击运行、等待结果并把公开输出带回复盘。
+- `buddy_capability_loop` 选择能力、执行能力、复盘结果、必要时循环；当 `selected_capability.kind` 为 `subgraph` 时，直接启动原生虚拟鼠标/键盘，多步定位并运行对应图模板，等待结果并把公开输出带回复盘。
 - `buddy_final_reply` 产出唯一 `final_reply`。
 - `output_final` 只展示 `final_reply`。
 
@@ -1060,7 +1061,7 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 1. Operation Journal 和 activity events：记录每次点击、键入、拖拽、等待、停止、失败和重试；图变更附带 nodes/edges/config/state_schema diff、validator 结果、run id 或错误。运行详情和伙伴胶囊都能回放这些操作摘要。
 2. Graph revision 和 undo/redo：对由虚拟 UI 操作导致的持久图变更建立 revision 和 undo/redo 记录。操作路径可以像人类一样通过 UI 触发，但最终 graph 资产必须可校验、可审计、可恢复。
 3. 编辑已有图：支持选择节点、移动节点、重命名、编辑关键配置、选择 Skill、调整连接、删除或恢复节点，并在每步后更新结构化快照和操作日志。
-4. 运行和结果校验：伙伴能从模板库或可见模板列表定位目标图模板，点击运行，等待 run 状态，读取结构化 root output、run capsule / activity events 判断是否成功；失败时能基于错误和 affordance 快照继续修复，而不是看截图猜测或后台直连调用。
+4. 运行和结果校验：伙伴能在 `capability.kind=subgraph` 后直接启动虚拟鼠标，从模板库或可见模板列表定位目标图模板，必要时多步打开模板草稿并绑定输入，点击运行，等待 run 状态，读取结构化 root output、run capsule / activity events 判断是否成功；失败时能基于错误和 affordance 快照继续修复，而不是看截图猜测或后台直连调用。
 5. 页面上下文扩展：把当前编辑器页的 page context snapshot 和 affordance registry 扩展到技能页、运行历史、模型日志、模板库等页面，让 Buddy 能从 A 页面判断应先前往 B 页面再找目标内容。
 6. 快速生成与可见搭建并存：保留直接生成完整 graph JSON 的快速路径；当用户要求可见协作或正在编辑当前画布时，优先通过 virtual_ui_operation 表演搭建和编辑。
 7. 创建模板/子图流程：从用户目标生成新模板或可复用子图，校验公开输入输出，可选试跑；可通过快速生成保存，也可通过可见搭建展示过程。
