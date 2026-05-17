@@ -268,96 +268,87 @@
               <span v-if="shouldShowMessageRoleLabel(messageIndex)" class="buddy-widget__message-label">
                 {{ message.role === "user" ? t("buddy.user") : t("buddy.name") }}
               </span>
-              <BuddyPauseCard
-                v-if="shouldShowPausedRunCard(message)"
-                :run="pausedBuddyRun"
-                :busy="pausedBuddyResumeBusy"
-                @resume="resumePausedBuddyRun"
-                @cancel="cancelPausedBuddyRun"
-              />
-              <template v-else>
-                <section
-                  v-if="message.role === 'assistant' && message.outputTrace"
-                  class="buddy-widget__run-trace"
-                  :class="`buddy-widget__run-trace--${message.outputTrace.status}`"
+              <section
+                v-if="message.role === 'assistant' && message.outputTrace"
+                class="buddy-widget__run-trace"
+                :class="`buddy-widget__run-trace--${message.outputTrace.status}`"
+              >
+                <button
+                  type="button"
+                  class="buddy-widget__run-trace-summary"
+                  :aria-expanded="isTraceMessageExpanded(message.id)"
+                  :aria-label="isTraceMessageExpanded(message.id) ? t('buddy.runTraceCollapse') : t('buddy.runTraceExpand')"
+                  @click="toggleTraceMessage(message.id)"
                 >
-                  <button
-                    type="button"
-                    class="buddy-widget__run-trace-summary"
-                    :aria-expanded="isTraceMessageExpanded(message.id)"
-                    :aria-label="isTraceMessageExpanded(message.id) ? t('buddy.runTraceCollapse') : t('buddy.runTraceExpand')"
-                    @click="toggleTraceMessage(message.id)"
-                  >
-                    <span
-                      class="buddy-widget__run-trace-dot"
-                      :class="`buddy-widget__run-trace-dot--${message.outputTrace.status}`"
-                      aria-hidden="true"
-                    />
-                    <span class="buddy-widget__run-trace-title">
-                      {{ resolveTraceSegmentSummary(message.outputTrace) }}
-                    </span>
-                    <span class="buddy-widget__run-trace-duration">
-                      {{ formatTraceDuration(buildTraceSegmentDurationKey(message.id), resolveTraceSegmentDurationMs(message.outputTrace)) }}
-                    </span>
-                    <span
-                      class="buddy-widget__run-trace-chevron"
-                      :class="{ 'buddy-widget__run-trace-chevron--expanded': isTraceMessageExpanded(message.id) }"
-                      aria-hidden="true"
-                    />
-                  </button>
-                  <div
-                    v-if="isTraceMessageExpanded(message.id)"
-                    class="buddy-widget__run-trace-detail"
-                  >
-                    <ol class="buddy-widget__run-trace-list">
-                      <li
-                        v-for="record in message.outputTrace.records"
-                        :key="record.recordId"
-                        class="buddy-widget__run-trace-row"
-                      >
-                        <span
-                          class="buddy-widget__run-trace-dot buddy-widget__run-trace-dot--small"
-                          :class="`buddy-widget__run-trace-dot--${record.status}`"
-                          aria-hidden="true"
-                        />
-                        <span class="buddy-widget__run-trace-row-label">{{ record.label }}</span>
-                        <span class="buddy-widget__run-trace-row-duration">
-                          {{ formatTraceDuration(buildTraceRecordDurationKey(message.id, record.recordId), resolveTraceRecordDurationMs(record)) }}
-                        </span>
-                      </li>
-                    </ol>
-                    <div class="buddy-widget__run-trace-total">
-                      <span>{{ t("buddy.runTraceLabel") }}</span>
-                      <strong>{{ formatTraceDuration(buildTraceSegmentDurationKey(message.id), resolveTraceSegmentDurationMs(message.outputTrace)) }}</strong>
-                    </div>
-                  </div>
-                </section>
-                <section
-                  v-if="message.role === 'assistant' && message.publicOutput?.kind === 'card'"
-                  class="buddy-widget__public-output-card"
-                  :class="`buddy-widget__public-output-card--${message.publicOutput.status}`"
-                >
-                  <header class="buddy-widget__public-output-card-header">
-                    <strong>{{ message.publicOutput.stateName }}</strong>
-                    <span>{{ t("buddy.outputCard") }}</span>
-                  </header>
-                  <pre>{{ formatPublicOutputCardContent(message.content) }}</pre>
-                </section>
-                <SandboxedHtmlFrame
-                  v-else-if="message.role === 'assistant' && message.content && resolveBuddyRenderedContent(message).kind === 'html'"
-                  class="buddy-widget__message-html-frame"
-                  :source="resolveBuddyRenderedContent(message).html"
-                  title="Buddy HTML reply"
-                />
+                  <span
+                    class="buddy-widget__run-trace-dot"
+                    :class="`buddy-widget__run-trace-dot--${message.outputTrace.status}`"
+                    aria-hidden="true"
+                  />
+                  <span class="buddy-widget__run-trace-title">
+                    {{ resolveTraceSegmentSummary(message.outputTrace) }}
+                  </span>
+                  <span class="buddy-widget__run-trace-duration">
+                    {{ formatTraceDuration(buildTraceSegmentDurationKey(message.id), resolveTraceSegmentDurationMs(message.outputTrace)) }}
+                  </span>
+                  <span
+                    class="buddy-widget__run-trace-chevron"
+                    :class="{ 'buddy-widget__run-trace-chevron--expanded': isTraceMessageExpanded(message.id) }"
+                    aria-hidden="true"
+                  />
+                </button>
                 <div
-                  v-else-if="message.role === 'assistant' && message.content"
-                  class="buddy-widget__message-bubble buddy-widget__message-markdown"
-                  v-html="renderBuddyMarkdown(message.content)"
-                />
-                <p v-else-if="message.role === 'user'" class="buddy-widget__message-bubble">
-                  {{ message.content }}
-                </p>
-              </template>
+                  v-if="isTraceMessageExpanded(message.id)"
+                  class="buddy-widget__run-trace-detail"
+                >
+                  <ol class="buddy-widget__run-trace-list">
+                    <li
+                      v-for="record in message.outputTrace.records"
+                      :key="record.recordId"
+                      class="buddy-widget__run-trace-row"
+                    >
+                      <span
+                        class="buddy-widget__run-trace-dot buddy-widget__run-trace-dot--small"
+                        :class="`buddy-widget__run-trace-dot--${record.status}`"
+                        aria-hidden="true"
+                      />
+                      <span class="buddy-widget__run-trace-row-label">{{ record.label }}</span>
+                      <span class="buddy-widget__run-trace-row-duration">
+                        {{ formatTraceDuration(buildTraceRecordDurationKey(message.id, record.recordId), resolveTraceRecordDurationMs(record)) }}
+                      </span>
+                    </li>
+                  </ol>
+                  <div class="buddy-widget__run-trace-total">
+                    <span>{{ t("buddy.runTraceLabel") }}</span>
+                    <strong>{{ formatTraceDuration(buildTraceSegmentDurationKey(message.id), resolveTraceSegmentDurationMs(message.outputTrace)) }}</strong>
+                  </div>
+                </div>
+              </section>
+              <section
+                v-if="message.role === 'assistant' && message.publicOutput?.kind === 'card'"
+                class="buddy-widget__public-output-card"
+                :class="`buddy-widget__public-output-card--${message.publicOutput.status}`"
+              >
+                <header class="buddy-widget__public-output-card-header">
+                  <strong>{{ message.publicOutput.stateName }}</strong>
+                  <span>{{ t("buddy.outputCard") }}</span>
+                </header>
+                <pre>{{ formatPublicOutputCardContent(message.content) }}</pre>
+              </section>
+              <SandboxedHtmlFrame
+                v-else-if="message.role === 'assistant' && message.content && resolveBuddyRenderedContent(message).kind === 'html'"
+                class="buddy-widget__message-html-frame"
+                :source="resolveBuddyRenderedContent(message).html"
+                title="Buddy HTML reply"
+              />
+              <div
+                v-else-if="message.role === 'assistant' && message.content"
+                class="buddy-widget__message-bubble buddy-widget__message-markdown"
+                v-html="renderBuddyMarkdown(message.content)"
+              />
+              <p v-else-if="message.role === 'user'" class="buddy-widget__message-bubble">
+                {{ message.content }}
+              </p>
             </article>
           </template>
           <p v-if="errorMessage" class="buddy-widget__error">{{ errorMessage }}</p>
@@ -371,14 +362,13 @@
             v-model="draft"
             class="buddy-widget__input"
             rows="2"
-            :placeholder="pausedBuddyRun ? t('buddy.pause.composerLocked') : t('buddy.placeholder')"
-            :disabled="Boolean(pausedBuddyRun)"
+            :placeholder="t('buddy.placeholder')"
             @keydown.enter.exact.prevent="sendMessage"
           />
           <button
             type="submit"
             class="buddy-widget__send"
-            :disabled="Boolean(pausedBuddyRun) || !draft.trim()"
+            :disabled="!draft.trim()"
             :title="t('buddy.send')"
             :aria-label="t('buddy.send')"
           >
@@ -480,8 +470,11 @@ import type { RunDetail } from "../types/run.ts";
 import type { SettingsPayload } from "../types/settings.ts";
 
 import BuddyMascot from "./BuddyMascot.vue";
-import BuddyPauseCard from "./BuddyPauseCard.vue";
 import type { BuddyMascotDebugAction } from "./buddyMascotDebug.ts";
+import {
+  buildBuddyConversationalPausePrompt,
+  buildBuddyConversationalPauseResumePayload,
+} from "./buddyConversationalPause.ts";
 import {
   buildOutputTraceBuddyMessageMetadata,
   resolveOutputTraceBuddyMessageMetadata,
@@ -3826,9 +3819,15 @@ async function sendMessage() {
   if (!sessionId) {
     return;
   }
-  if (composerDecision.kind === "route_to_pause_card") {
-    errorMessage.value = t("buddy.pause.useCard");
-    await scrollPausedBuddyCardIntoView();
+  if (composerDecision.kind === "resume_paused_run") {
+    draft.value = "";
+    const userEntry = createMessage("user", userMessage, undefined, allocateBuddyMessageClientOrder());
+    const assistantEntry = createMessage("assistant", "", undefined, allocateBuddyMessageClientOrder());
+    messages.value.push(userEntry, assistantEntry);
+    showBuddyImmediatePendingTrace(assistantEntry.id);
+    void persistBuddyMessage(sessionId, userEntry);
+    await resumePausedBuddyRunFromChatReply(userMessage, assistantEntry.id);
+    await scrollMessagesToBottom();
     return;
   }
 
@@ -3935,7 +3934,7 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
     activeAbortController = null;
     scheduleBuddySpeakingIdleIfNeeded();
     if (keepRunPaused) {
-      await scrollPausedBuddyCardIntoView();
+      await scrollMessagesToBottom();
     } else {
       await scrollMessagesToBottom();
     }
@@ -3986,10 +3985,62 @@ async function resumePausedBuddyRun(resumePayloadOverride: Record<string, unknow
     activeAbortController = null;
     scheduleBuddySpeakingIdleIfNeeded();
     if (pausedBuddyRun.value) {
-      await scrollPausedBuddyCardIntoView();
+      await scrollMessagesToBottom();
     } else {
       await scrollMessagesToBottom();
     }
+  }
+}
+
+async function resumePausedBuddyRunFromChatReply(userMessage: string, assistantMessageId: string) {
+  const run = pausedBuddyRun.value;
+  const sessionId = activeSessionId.value;
+  if (!run || !sessionId || pausedBuddyResumeBusy.value) {
+    return;
+  }
+
+  clearSpeakingIdleTimer();
+  errorMessage.value = "";
+  mood.value = "thinking";
+  pausedBuddyResumeBusy.value = true;
+  pausedBuddyAssistantMessageId.value = assistantMessageId;
+  setAssistantActivityText(assistantMessageId, t("buddy.activity.resuming"));
+
+  try {
+    const graph = run.graph_snapshot as unknown as GraphPayload;
+    const resumePayload = buildBuddyConversationalPauseResumePayload(run, graph, userMessage);
+    activeAbortController = new AbortController();
+    const response = await resumeRun(run.run_id, resumePayload);
+    activeRunId.value = response.run_id;
+    resetPausedBuddyPause();
+    startRunEventStream(response.run_id, assistantMessageId, graph, buildBuddyPublicOutputBindings(graph));
+    const resumedRunDetail = await pollRunUntilFinished(response.run_id, activeAbortController.signal);
+    if (resumedRunDetail.status === "awaiting_human") {
+      handleBuddyRunAwaitingHuman(resumedRunDetail, assistantMessageId, { persist: true });
+      return;
+    }
+    finishBuddyVisibleRun(resumedRunDetail, assistantMessageId, sessionId, response.run_id);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return;
+    }
+    mood.value = "error";
+    const message = error instanceof Error ? error.message : t("buddy.runFailed");
+    errorMessage.value = message;
+    removeBuddyRunDisplayMessages(assistantMessageId);
+    updateAssistantMessage(assistantMessageId, t("buddy.errorReply", { error: message }), { includeInContext: false });
+    void persistBuddyMessage(sessionId, messages.value.find((entry) => entry.id === assistantMessageId), {
+      includeInContext: false,
+    });
+  } finally {
+    pausedBuddyResumeBusy.value = false;
+    closeEventSource();
+    if (!pausedBuddyRun.value) {
+      activeRunId.value = null;
+    }
+    activeAbortController = null;
+    scheduleBuddySpeakingIdleIfNeeded();
+    await scrollMessagesToBottom();
   }
 }
 
@@ -4030,7 +4081,7 @@ async function cancelPausedBuddyRun() {
     activeAbortController = null;
     scheduleBuddySpeakingIdleIfNeeded();
     if (pausedBuddyRun.value) {
-      await scrollPausedBuddyCardIntoView();
+      await scrollMessagesToBottom();
     } else {
       await scrollMessagesToBottom();
     }
@@ -4047,14 +4098,15 @@ function handleBuddyRunAwaitingHuman(
   activeRunId.value = run.run_id;
   mood.value = "thinking";
   setAssistantActivityText(assistantMessageId, t("buddy.pause.activity"));
-  updateAssistantMessage(assistantMessageId, t("buddy.pause.persistedReply"), {
-    includeInContext: false,
+  const graph = run.graph_snapshot as unknown as GraphPayload;
+  updateAssistantMessage(assistantMessageId, buildBuddyConversationalPausePrompt(run, graph), {
+    includeInContext: true,
     runId: run.run_id,
   });
   if (options.persist && activeSessionId.value) {
     void persistBuddyMessage(activeSessionId.value, messages.value.find((message) => message.id === assistantMessageId), {
       runId: run.run_id,
-      includeInContext: false,
+      includeInContext: true,
     });
   }
 }
@@ -4291,7 +4343,7 @@ async function recoverPausedBuddyRunFromLoadedMessages(sessionId: string, activa
       return;
     }
     handleBuddyRunAwaitingHuman(run, candidate.messageId);
-    await scrollPausedBuddyCardIntoView();
+    await scrollMessagesToBottom();
   } catch (error) {
     if (isCurrentChatSessionActivation(sessionId, activationGeneration)) {
       errorMessage.value = t("buddy.pause.recoveryFailed", { error: formatErrorMessage(error) });
@@ -4654,21 +4706,12 @@ function shouldRenderMessage(message: BuddyMessage) {
   return (
     message.role === "user" ||
     Boolean(message.content.trim()) ||
-    Boolean(message.outputTrace) ||
-    shouldShowPausedRunCard(message)
+    Boolean(message.outputTrace)
   );
 }
 
 function shouldShowMessageRoleLabel(messageIndex: number) {
   return shouldShowGroupedBuddyMessageLabel(messages.value, messageIndex, shouldRenderMessage);
-}
-
-function shouldShowPausedRunCard(message: BuddyMessage) {
-  return (
-    message.role === "assistant" &&
-    pausedBuddyRun.value?.status === "awaiting_human" &&
-    pausedBuddyAssistantMessageId.value === message.id
-  );
 }
 
 function removeBuddyRunDisplayMessages(controllerMessageId: string) {
@@ -5142,18 +5185,6 @@ async function scrollMessagesToBottom() {
     return;
   }
   element.scrollTop = element.scrollHeight;
-}
-
-async function scrollPausedBuddyCardIntoView() {
-  await nextTick();
-  const listElement = messageListElement.value;
-  const pauseCardElement = listElement?.querySelector<HTMLElement>(".buddy-widget__pause-card");
-  if (!listElement || !pauseCardElement) {
-    return;
-  }
-  const listRect = listElement.getBoundingClientRect();
-  const cardRect = pauseCardElement.getBoundingClientRect();
-  listElement.scrollTop = Math.max(0, listElement.scrollTop + cardRect.top - listRect.top - 12);
 }
 
 function buildPageContext() {

@@ -13,7 +13,7 @@
   -> 创建与该用户消息配对的助手消息和 run capsule
   -> 读取 Buddy Home、页面上下文、历史摘要和运行策略
   -> 生成受预算约束的 context_brief
-  -> 生成 request_understanding 和运行过程/暂停上下文中的早期 visible_reply
+  -> 生成 request_understanding 和运行过程/会话式澄清中的早期 visible_reply
   -> 必要时生成或更新本轮 task_plan
   -> 判断是否需要能力
   -> 选择一个 capability(kind=skill|subgraph|none)
@@ -72,7 +72,7 @@
 - 伙伴聊天消息已经收敛到父图 root output 协议：一次用户提问可以产生多个由 output 节点声明的独立输出，每个输出独立流式、独立计时；默认 `buddy_autonomous_loop` 只公开 `final_reply`。
 - 伙伴运行过程胶囊已经作为 `metadata.kind=output_trace` 的助手消息持久化，刷新页面、切换历史会话或从运行记录恢复后可以还原；这类消息 `include_in_context=false`，只服务聊天 UI 的 run capsule 展示。
 - 画布节点计时胶囊、公开 output 耗时和可用模型 token 用量已经通过共享运行遥测投影落地，并能从运行记录恢复。
-- 伙伴浮窗已复用标准 `awaiting_human` 暂停卡片，能展示当前产物、上下文、需要补充的字段，并在卡片内续跑当前断点；底部输入在暂停时不会续跑旧断点。
+- 伙伴浮窗已把标准 `awaiting_human` 转译为会话式暂停：聊天区只出现普通助手回复，外层桥接逻辑根据断点需要的 state 或权限审批生成追问文本；用户下一条底部输入会被映射为 resume payload 并自动续跑原 run，不再透传暂停卡片。
 - 伙伴页面已提供资料、策略、记忆、摘要、运行模板绑定、确认、历史和桌宠调试页签；确认页签复用标准暂停卡，历史页签支持目标筛选、字段级 diff、来源 run/command 和 revision 恢复。
 - 前端不再设置固定整轮 Buddy 运行超时。
 - Buddy Home 默认生成和基础存储已存在，正式形态收束为根目录 `buddy_home/AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json`、`buddy.db` 和 `reports/`。
@@ -138,7 +138,7 @@ flowchart TD
 | `page_context` | markdown | input | intake、capability loop、final | 页面上下文 |
 | `buddy_context` | file | input | intake、capability loop、final、review | Buddy Home 选中文件 |
 | `context_brief` | json | context recall | intake、task plan、capability loop、final、review | 受预算约束的历史、页面和长期资料摘要；不是新指令 |
-| `visible_reply` | markdown | intake | run capsule、pause card | 早期过程回应，不代表完成；只有被父图 root output 节点导出时才进入聊天消息 |
+| `visible_reply` | markdown | intake | run capsule、final reply | 早期过程回应，不代表完成；只有被父图 root output 节点导出时才进入聊天消息 |
 | `request_understanding` | json | intake | condition、capability loop、final、review | 请求结构化理解 |
 | `task_plan` | json | task plan | capability loop、final、review | 本轮多步任务计划、当前步骤和完成标准 |
 | `selected_capability` | capability | capability loop | execute capability | 单个动态能力 |
@@ -158,8 +158,7 @@ flowchart TD
 | --- | --- | --- |
 | `turn_policy` | json | 本轮权限、预算、排队/中断/后台复盘策略 |
 | `run_budget` | json | 最大能力轮数、上下文预算、无活动超时策略 |
-| `clarification_prompt` | markdown | 澄清暂停卡片展示内容 |
-| `clarification_answer` | markdown | 用户在暂停卡片内补充的内容 |
+| `clarification_prompt` | markdown | 澄清回复候选内容；由最终回复询问用户，下一轮从普通对话历史读取回答 |
 | `activity_summary` | json | 低层 activity events 的摘要索引，正式实现后由 runtime 维护 |
 
 ## 阶段边界
@@ -239,9 +238,8 @@ flowchart TD
   C -- false --> O1[Output: request_understanding]
   C -- false --> O2[Output: visible_reply]
   C -- true --> D[LLM: ask_clarification]
-  D --> P[awaiting_human breakpoint]
-  P --> E[LLM: merge_clarification]
-  E --> O1
+  D --> O1
+  D --> O2
   B --> O2
 ```
 
@@ -251,8 +249,7 @@ flowchart TD
 | --- | --- | --- | --- | --- | --- |
 | `understand_request` | LLM | 1 次 | 无 | 用户消息、历史、页面上下文、模式 | `visible_reply`、`request_understanding` |
 | `need_clarification` | condition | 0 次 | 无 | `request_understanding` | 分支 |
-| `ask_clarification` | LLM | 1 次 | 无 | 用户消息、请求理解 | `clarification_prompt` |
-| `merge_clarification` | LLM | 1 次 | 无 | 用户消息、请求理解、澄清问题、用户回答 | `request_understanding` |
+| `ask_clarification` | LLM | 1 次 | 无 | 用户消息、请求理解 | `clarification_prompt`、`visible_reply`、`request_understanding` |
 
 `request_understanding` 建议结构：
 
@@ -276,13 +273,12 @@ flowchart TD
 }
 ```
 
-澄清暂停必须协议化：
+澄清必须会话化：
 
-- 子图内部 graph metadata 应声明 `interrupt_after: ["ask_clarification"]`。
-- `ask_clarification` 完成后进入 `awaiting_human`。
-- 暂停卡片展示 `visible_reply`、`clarification_prompt` 和当前请求理解。
-- 用户只在暂停卡片里填写一个补充输入。
-- resume payload 写入 `clarification_answer` 后继续到 `merge_clarification`。
+- `buddy_request_intake` 不声明 `interrupt_after`，也不通过 `awaiting_human` 等待用户澄清。
+- `ask_clarification` 把同一追问写入 `clarification_prompt` 和 `visible_reply`，并保持 `request_understanding.needs_clarification=true`。
+- 只要 `needs_clarification=true`，必须同时让 `requires_capability=false`、`needs_task_plan=false`，本轮由父图 `buddy_final_reply` 用普通回复询问用户并正常结束。
+- 用户回答是下一轮普通消息；intake 从 `conversation_history` 和新 `user_message` 中整理补充信息，不续跑旧断点、不保留 `clarification_answer` state。
 
 ### `buddy_task_plan`
 
@@ -429,7 +425,7 @@ flowchart TD
 - `selected_capability.key == "toograph_page_operation_workflow"` 表示目标是页面操作能力本身，应进入页面操作子图；其他图模板能力应立即启动原生虚拟鼠标/键盘，并通过 `toograph_page_operator` 的固定 `template_target -> run_template` 映射执行。
 - `selected_capability` 仍是单个能力对象，目标模板 ID、名称、输入绑定目标和选择理由放在 `capability_selection_audit.selected` 及相关审计信息中。
 - 页面操作流程可以包含多步：打开模板库、搜索或定位模板、选择或打开目标模板、确认输入绑定、点击运行、等待 run 进入 completed、failed、cancelled 或 `awaiting_human`，再读取 root output、run capsule、activity events 和 artifact 引用。
-- 如果目标模板进入 `awaiting_human`，当前能力执行应通过标准暂停卡暴露已产出的内容和所需补充；用户补充后继续等待该模板完成，再回到 `review_capability_result`。
+- 如果目标模板进入 `awaiting_human`，Buddy 浮窗不能透传标准暂停卡；外层会话桥接应根据断点所需 state、权限审批或当前产物生成普通助手回复询问用户。用户下一条底部输入会被映射为 resume payload，自动恢复目标 run，继续等待目标模板完成，再回到 `review_capability_result`。
 - `review_capability_result` 只能基于可见运行返回的结构化结果判断下一步：停止、解释失败、请求用户补充，或回到 `select_capability` 继续运行别的图模板或 Skill。
 - 后台动态 Subgraph 执行只作为内部运行时原语保留；伙伴自主循环不应把 `kind=subgraph` 当成无窗口变化的直连调用。
 
@@ -591,29 +587,28 @@ flowchart TD
 
 伙伴循环至少有四类停顿或用户介入。
 
-### 澄清暂停
+### 澄清追问
 
-来源：`buddy_turn_intake.ask_clarification` 后的 `interrupt_after`。
-
-UI 行为：
-
-- 当前助手消息继续显示 run capsule。
-- capsule 内出现暂停卡片。
-- 卡片先展示已产出的 `visible_reply` 和 `clarification_prompt`。
-- 只有一个补充输入区域。
-- 用户提交后写入 `clarification_answer` 并 resume 原 run。
-
-### 权限审批暂停
-
-来源：Skill 或动态 Subgraph 内部触发 risky permission，例如 `file_write`、`file_delete`、`subprocess`。
+来源：`buddy_turn_intake` 判定 `request_understanding.needs_clarification=true`，或能力复盘判定 `capability_review.needs_user_reply=true`。
 
 UI 行为：
 
-- 暂停卡片展示技能名、权限类型、输入预览、风险说明、已产出上下文。
-- 主操作：执行当前方案。
-- 补充操作：补充内容，写入当前 pause resume payload。
-- 必须补齐：拒绝本次能力。
-- 必须补齐：取消整轮 run。
+- 不触发 `awaiting_human`，不渲染暂停卡片，不续跑旧 run。
+- 当前 run 正常完成，父图 `final_reply` 用普通助手回复询问用户。
+- 用户下一条回复作为新的普通消息进入下一轮；intake 从新消息和 `conversation_history` 中合并补充信息。
+- 只有需求已经明确后，才进入任务计划、能力选择和能力调用。
+
+### 机制性断点
+
+来源：Skill、动态 Subgraph、页面操作子图或目标模板内部触发运行时断点，例如 `file_write`、`file_delete`、`subprocess` 权限审批、页面操作自动续跑、目标模板必填 state 等。
+
+UI 行为：
+
+- 运行时仍使用标准 `awaiting_human`、checkpoint 和 resume API；这是底座协议，不是聊天 UX。
+- Buddy 浮窗不透传暂停卡片。外层会话桥接读取当前断点模型，生成普通助手回复，说明需要补充什么或需要批准什么。
+- 用户下一条底部输入用于恢复当前暂停 run：普通 state 缺口写入对应 resume payload；明确同意/拒绝写入 `permission_approval.decision`。
+- 如果断点属于页面操作自动续跑，前端在虚拟操作完成后用刷新后的页面事实和 `operation_result` 自动 resume，不要求用户输入。
+- 编辑器 Human Review 面板和伙伴页面确认页签可以继续展示标准暂停面板；聊天 lane 始终只出现消息。
 
 拒绝不等于失败。拒绝应产生结构化 denial result，让 `review_capability_result` 能继续生成解释或替代方案。
 
@@ -633,11 +628,11 @@ UI 行为：
 
 | 语义 | 适用场景 | UI |
 | --- | --- | --- |
-| queue | 用户发起新问题 | 底部输入发送后排队为下一轮 |
-| supplement | 用户补充当前 run | 当前 run capsule 内的“补充当前运行”操作 |
-| interrupt | 用户停止当前任务改问 | 当前 run capsule 内“停止并改问” |
+| queue | 没有暂停 run 时，用户发起新问题 | 底部输入发送后排队为下一轮 |
+| resume | 存在暂停 run 时，用户补充当前 run 或答复审批 | 底部输入发送后映射为 resume payload 并续跑当前 run |
+| interrupt | 用户停止当前任务改问 | 显式中止/取消操作，再把新问题作为新一轮 |
 
-不要出现多个并列输入框。底部输入是会话输入，暂停卡片输入是当前断点输入，二者同一时间只能有一个承担“继续当前 run”的含义。
+不要出现多个并列输入框。Buddy 浮窗只有底部会话输入；当存在暂停 run 时，这个输入临时承担“继续当前 run”的含义，恢复完成后回到普通会话输入。
 
 ## 伙伴悬浮窗口方针
 

@@ -74,14 +74,6 @@
       "color": "#0891b2",
       "binding": null
     },
-    "clarification_answer": {
-      "name": "用户澄清回答",
-      "description": "用户对澄清问题的回答，可以选择选项，也可以自由补充。",
-      "type": "markdown",
-      "value": "",
-      "color": "#d97706",
-      "binding": null
-    },
     "confirmed_skill_requirement": {
       "name": "确认后的需求",
       "description": "经过澄清后确认的 Skill 需求、边界、输入输出和约束。",
@@ -95,22 +87,6 @@
       "description": "用于给用户确认的示例输入、预期输出和边界示例。",
       "type": "markdown",
       "value": "",
-      "color": "#7c3aed",
-      "binding": null
-    },
-    "example_feedback": {
-      "name": "样例反馈",
-      "description": "用户对示例输入输出的认可或修改意见。",
-      "type": "markdown",
-      "value": "",
-      "color": "#d97706",
-      "binding": null
-    },
-    "example_decision": {
-      "name": "样例决策",
-      "description": "样例是否获得用户认可，以及需要修改的点。",
-      "type": "json",
-      "value": {},
       "color": "#7c3aed",
       "binding": null
     },
@@ -519,7 +495,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "评估用户是否真的需要创建新 Skill。capability_gap 是可选的上游能力缺口上下文；如果它存在，应把缺口类型、缺口原因、建议能力形态纳入判断。requirement_review 必须写 JSON 对象，包含 needs_clarification(boolean)、existing_capability_summary(string)、capability_gap_summary(string)、unclear_points(array)、questions(array)、reason(string)。如果 existing_capability_found 为 true，说明已有启用能力可能满足需求，应把 needs_clarification 设为 true，并在 questions 中询问用户是否仍要创建新 Skill；不要读取或执行 capability 对象本身。creation_decision 必须写 JSON 对象，包含 approved_to_create(boolean)、reason(string)；除非已有能力明显满足且用户没有表达仍要创建，否则默认 approved_to_create 为 true。confirmed_skill_requirement 写 Markdown，概括当前已确认的目标、输入、输出、权限、是否需要 before_llm.py、是否需要 after_llm.py、是否需要第三方依赖和限制。",
+        "taskInstruction": "评估用户是否真的需要创建新 Skill。capability_gap 是可选的上游能力缺口上下文；如果它存在，应把缺口类型、缺口原因、建议能力形态纳入判断。requirement_review 必须写 JSON 对象，包含 needs_clarification(boolean)、existing_capability_summary(string)、capability_gap_summary(string)、unclear_points(array)、questions(array)、reason(string)。如果 existing_capability_found 为 true，说明已有启用能力可能满足需求，应把 needs_clarification 设为 true，并在 questions 中询问用户是否仍要创建新 Skill；不要读取或执行 capability 对象本身。creation_decision 必须写 JSON 对象，包含 approved_to_create(boolean)、reason(string)；需求不明确时 approved_to_create 必须为 false，本轮通过 final_summary 询问用户，用户回答应在下一轮作为更完整的 skill_request 进入。除非已有能力明显满足且用户没有表达仍要创建，否则需求明确时默认 approved_to_create 为 true。confirmed_skill_requirement 写 Markdown，概括当前已确认的目标、输入、输出、权限、是否需要 before_llm.py、是否需要 after_llm.py、是否需要第三方依赖和限制。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -587,51 +563,9 @@
         {
           "state": "clarification_questions",
           "mode": "replace"
-        }
-      ],
-      "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
-        "taskInstruction": "根据 requirement_review 生成需要用户回答的澄清问题。优先用带选项的问题，每题给 2 到 4 个选项；允许用户不认可选项并自由补充。问题应覆盖输入格式、输出格式、是否需要确定性脚本、权限范围、失败处理、依赖和是否已有能力已经足够。最后明确请用户在“用户澄清回答”中作答。",
-        "modelSource": "global",
-        "model": "",
-        "thinkingMode": "high",
-        "temperature": 0.2
-      }
-    },
-    "merge_clarification": {
-      "kind": "agent",
-      "name": "合并澄清回答",
-      "description": "把用户回答合并成确认后的需求和创建决策。",
-      "ui": {
-        "position": {
-          "x": 2600,
-          "y": 170
-        },
-        "collapsed": false
-      },
-      "reads": [
-        {
-          "state": "skill_request",
-          "required": true
         },
         {
-          "state": "clarification_questions",
-          "required": true
-        },
-        {
-          "state": "clarification_answer",
-          "required": true
-        }
-      ],
-      "writes": [
-        {
-          "state": "confirmed_skill_requirement",
-          "mode": "replace"
-        },
-        {
-          "state": "creation_decision",
+          "state": "final_summary",
           "mode": "replace"
         }
       ],
@@ -639,7 +573,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "根据用户澄清回答更新确认后的需求。confirmed_skill_requirement 写 Markdown，明确目标、输入、输出、权限、是否需要 before_llm.py、是否需要 after_llm.py、是否需要 requirements.txt、边界情况和失败处理。creation_decision 写 JSON 对象，包含 approved_to_create(boolean)、reason(string)。如果用户明确表示已有能力足够或不需要创建新 Skill，则 approved_to_create 为 false；否则为 true。",
+        "taskInstruction": "根据 requirement_review 生成需要用户回答的澄清问题，并把问题写入 clarification_questions 与 final_summary。优先用带选项的问题，每题给 2 到 4 个选项；允许用户不认可选项并自由补充。问题应覆盖输入格式、输出格式、是否需要确定性脚本、权限范围、失败处理、依赖和是否已有能力已经足够。\n不要使用断点等待用户，也不要继续创建文件；本轮最终回复直接询问用户，用户回答会在下一轮作为更完整的 skill_request 重新进入模板。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -713,93 +647,11 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "根据确认后的需求生成示例输入输出。必须包含至少一个典型输入、一个边界输入、对应的期望输出、输出字段解释，以及需要用户确认的问题。不要开始生成 Skill 文件。最后明确请用户在“样例反馈”中写“认可”或提出修改意见。",
+        "taskInstruction": "根据确认后的需求生成用于构建和测试的示例输入输出。必须包含至少一个典型输入、一个边界输入、对应的期望输出、输出字段解释，以及会用于测试的断言重点。不要开始生成 Skill 文件之外的解释，不要要求用户在断点或样例反馈字段中确认；如果需求仍不足以生成示例，应把缺口反映在示例说明中，后续节点会在最终结果中诚实说明。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
         "temperature": 0.2
-      }
-    },
-    "review_example_feedback": {
-      "kind": "agent",
-      "name": "判断样例反馈",
-      "description": "根据用户反馈判断样例是否通过；不通过则修订需求后回到样例生成。",
-      "ui": {
-        "position": {
-          "x": 4260,
-          "y": 360
-        },
-        "collapsed": false
-      },
-      "reads": [
-        {
-          "state": "confirmed_skill_requirement",
-          "required": true
-        },
-        {
-          "state": "example_io",
-          "required": true
-        },
-        {
-          "state": "example_feedback",
-          "required": true
-        }
-      ],
-      "writes": [
-        {
-          "state": "example_decision",
-          "mode": "replace"
-        },
-        {
-          "state": "confirmed_skill_requirement",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "skillKey": "",
-        "skillBindings": [],
-        "skillInstructionBlocks": {},
-        "taskInstruction": "判断用户是否认可示例输入输出。example_decision 写 JSON 对象，包含 approved(boolean)、reason(string)、requested_changes(array)。如果用户写了“认可”、“可以”、“没问题”或等价表达，approved 为 true。否则 approved 为 false，并把修改意见合并进 confirmed_skill_requirement，方便下一轮重新生成示例。",
-        "modelSource": "global",
-        "model": "",
-        "thinkingMode": "high",
-        "temperature": 0.2
-      }
-    },
-    "examples_approved": {
-      "kind": "condition",
-      "name": "样例是否通过",
-      "description": "样例未通过时回到示例生成，最多循环五轮。",
-      "ui": {
-        "position": {
-          "x": 4760,
-          "y": 430
-        },
-        "collapsed": false
-      },
-      "reads": [
-        {
-          "state": "example_decision",
-          "required": true
-        }
-      ],
-      "writes": [],
-      "config": {
-        "branches": [
-          "true",
-          "false",
-          "exhausted"
-        ],
-        "loopLimit": 5,
-        "branchMapping": {
-          "true": "true",
-          "false": "false"
-        },
-        "rule": {
-          "source": "$state.example_decision.approved",
-          "operator": "==",
-          "value": true
-        }
       }
     },
     "prepare_builder_context": {
@@ -827,10 +679,6 @@
           "required": true
         },
         {
-          "state": "example_feedback",
-          "required": true
-        },
-        {
           "state": "capability_gap",
           "required": false
         }
@@ -845,7 +693,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "整理给 TooGraph Skill Builder 的最终上下文。builder_context 写 Markdown，包含：目标 Skill 名称建议、稳定 skillKey 建议、用户需求、上游 capability_gap 摘要、已认可示例输入输出、outputSchema 字段建议、是否需要 before_llm.py、是否需要 after_llm.py、requirements.txt 需求、权限声明、测试重点和禁止事项。强调生成结果只包含 skill_key、skill_json、skill_md、before_llm_py、after_llm_py、requirements_txt。",
+        "taskInstruction": "整理给 TooGraph Skill Builder 的最终上下文。builder_context 写 Markdown，包含：目标 Skill 名称建议、稳定 skillKey 建议、用户需求、上游 capability_gap 摘要、示例输入输出、outputSchema 字段建议、是否需要 before_llm.py、是否需要 after_llm.py、requirements.txt 需求、权限声明、测试重点和禁止事项。强调生成结果只包含 skill_key、skill_json、skill_md、before_llm_py、after_llm_py、requirements_txt。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1177,7 +1025,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "给用户审查生成结果。generation_review 写 Markdown，包含 Skill 名称、skillKey、description、outputSchema 摘要、会写入的文件列表、目标目录 skill/user/<skillKey>/、脚本测试 success/result、权限声明和风险提示。不要执行写入，不要把这里当成低层文件操作审批；真正的写文件或脚本执行由运行时权限模式处理，需确认 模式会在受控执行器实际写入前暂停，完全访问 模式会自动继续。",
+        "taskInstruction": "审查生成结果并写 generation_review Markdown，包含 Skill 名称、skillKey、description、outputSchema 摘要、将写入的文件列表、目标目录 skill/user/<skillKey>/、脚本测试 success/result、权限声明和风险提示。不要把这里当成用户审批断点；真正的写文件或脚本执行由运行时权限模式处理，需确认模式会在受控执行器实际写入前暂停，完全访问模式会自动继续。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -1733,22 +1581,6 @@
       "target": "need_clarification"
     },
     {
-      "source": "ask_clarification",
-      "target": "merge_clarification"
-    },
-    {
-      "source": "merge_clarification",
-      "target": "should_create_skill"
-    },
-    {
-      "source": "draft_example_io",
-      "target": "review_example_feedback"
-    },
-    {
-      "source": "review_example_feedback",
-      "target": "examples_approved"
-    },
-    {
       "source": "prepare_builder_context",
       "target": "build_skill_files"
     },
@@ -1795,6 +1627,14 @@
     {
       "source": "review_generated_skill",
       "target": "write_skill_json"
+    },
+    {
+      "source": "ask_clarification",
+      "target": "output_final"
+    },
+    {
+      "source": "draft_example_io",
+      "target": "prepare_builder_context"
     }
   ],
   "conditional_edges": [
@@ -1812,14 +1652,6 @@
         "true": "draft_example_io",
         "false": "finalize_no_create",
         "exhausted": "finalize_no_create"
-      }
-    },
-    {
-      "source": "examples_approved",
-      "branches": {
-        "true": "prepare_builder_context",
-        "false": "draft_example_io",
-        "exhausted": "prepare_builder_context"
       }
     },
     {
@@ -1867,11 +1699,6 @@
     "category": "skill",
     "templateVersion": "2026-05-09",
     "graphProtocol": "node_system",
-    "interrupt_after": [
-      "ask_clarification",
-      "draft_example_io",
-      "review_generated_skill"
-    ],
     "description": "用普通编辑器可创建的 input、LLM、condition、output 节点搭建创建自定义 Skill 的完整流程；节点使用前端默认尺寸，Skill 输出由单 Skill 绑定托管。"
   }
 }

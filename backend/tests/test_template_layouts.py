@@ -210,10 +210,7 @@ class TemplateLayoutTests(unittest.TestCase):
         nodes = template["nodes"]
 
         self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
-        self.assertEqual(
-            template["metadata"]["interrupt_after"],
-            ["ask_clarification", "draft_example_io", "review_generated_skill"],
-        )
+        self.assertNotIn("interrupt_after", template["metadata"])
         self.assertNotIn("agent_breakpoint_timing", template["metadata"])
         self.assertEqual(states["existing_capability"]["type"], "json")
         self.assertEqual(states["existing_capability_found"]["type"], "boolean")
@@ -256,7 +253,13 @@ class TemplateLayoutTests(unittest.TestCase):
                 }
             ],
         )
-        for node_id in ["review_requirement", "ask_clarification", "merge_clarification", "finalize_no_create"]:
+        self.assertNotIn("merge_clarification", nodes)
+        self.assertNotIn("review_example_feedback", nodes)
+        self.assertNotIn("examples_approved", nodes)
+        self.assertNotIn("clarification_answer", states)
+        self.assertNotIn("example_feedback", states)
+        self.assertNotIn("example_decision", states)
+        for node_id in ["review_requirement", "ask_clarification", "finalize_no_create"]:
             with self.subTest(capability_context_reader=node_id):
                 self.assertNotIn("existing_capability", [read["state"] for read in nodes[node_id]["reads"]])
         self.assertIn(
@@ -338,6 +341,16 @@ class TemplateLayoutTests(unittest.TestCase):
             nodes["need_clarification"]["config"]["rule"],
             {"source": "$state.requirement_review.needs_clarification", "operator": "==", "value": True},
         )
+        self.assertEqual(
+            nodes["ask_clarification"]["writes"],
+            [
+                {"state": "clarification_questions", "mode": "replace"},
+                {"state": "final_summary", "mode": "replace"},
+            ],
+        )
+        self.assertIn({"source": "ask_clarification", "target": "output_final"}, template["edges"])
+        self.assertIn({"source": "draft_example_io", "target": "prepare_builder_context"}, template["edges"])
+        self.assertNotIn({"source": "draft_example_io", "target": "review_example_feedback"}, template["edges"])
         self.assertTrue(nodes)
         for node_id, node in nodes.items():
             with self.subTest(node_id=node_id):
@@ -349,7 +362,6 @@ class TemplateLayoutTests(unittest.TestCase):
             [
                 "need_clarification",
                 "should_create_skill",
-                "examples_approved",
                 "needs_script_test",
                 "script_test_passed",
                 "has_before_llm",
@@ -361,11 +373,6 @@ class TemplateLayoutTests(unittest.TestCase):
             with self.subTest(condition_node=node_id):
                 self.assertEqual(nodes[node_id]["config"]["branches"], ["true", "false", "exhausted"])
                 self.assertEqual(nodes[node_id]["config"]["branchMapping"], {"true": "true", "false": "false"})
-        self.assertEqual(
-            nodes["examples_approved"]["config"]["rule"],
-            {"source": "$state.example_decision.approved", "operator": "==", "value": True},
-        )
-        self.assertEqual(nodes["examples_approved"]["config"]["loopLimit"], 5)
         self.assertEqual(
             nodes["script_test_passed"]["config"]["rule"],
             {"source": "$state.script_test_success", "operator": "==", "value": True},
@@ -405,7 +412,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertTrue(cycle_tracker["has_cycle"])
         self.assertEqual(
             cycle_tracker["loop_limits_by_source"],
-            {"examples_approved": 5, "script_test_passed": 3},
+            {"script_test_passed": 3},
         )
 
     def test_buddy_autonomous_loop_contract(self) -> None:
@@ -538,11 +545,11 @@ class TemplateLayoutTests(unittest.TestCase):
         )
 
         intake_graph = nodes["buddy_turn_intake"]["config"]["graph"]
-        self.assertEqual(intake_graph["metadata"]["interrupt_after"], ["ask_clarification"])
+        self.assertNotIn("interrupt_after", intake_graph["metadata"])
         self.assertEqual(intake_graph["metadata"]["role"], "buddy_request_intake")
         self.assertEqual(intake_graph["state_schema"]["context_brief"]["type"], "json")
         self.assertEqual(intake_graph["state_schema"]["visible_reply"]["type"], "markdown")
-        self.assertEqual(intake_graph["state_schema"]["clarification_answer"]["type"], "markdown")
+        self.assertNotIn("clarification_answer", intake_graph["state_schema"])
         self.assertIn({"state": "context_brief", "required": True}, _read_contracts(nodes["buddy_turn_intake"]["reads"]))
         self.assertIn({"state": "buddy_context", "required": True}, _read_contracts(nodes["buddy_turn_intake"]["reads"]))
         self.assertEqual(nodes["buddy_turn_intake"]["writes"][0], {"state": "visible_reply", "mode": "replace"})
@@ -574,16 +581,21 @@ class TemplateLayoutTests(unittest.TestCase):
             {"source": "$state.request_understanding.needs_clarification", "operator": "==", "value": True},
         )
         ask_clarification_node = intake_graph["nodes"]["ask_clarification"]
-        self.assertEqual(ask_clarification_node["writes"], [{"state": "clarification_prompt", "mode": "replace"}])
+        self.assertEqual(
+            ask_clarification_node["writes"],
+            [
+                {"state": "clarification_prompt", "mode": "replace"},
+                {"state": "visible_reply", "mode": "replace"},
+                {"state": "request_understanding", "mode": "replace"},
+            ],
+        )
         self.assertNotIn(
             {"state": "clarification_answer", "required": True},
             _read_contracts(ask_clarification_node["reads"]),
         )
-        merge_clarification_node = intake_graph["nodes"]["merge_clarification"]
-        self.assertIn(
-            {"state": "clarification_answer", "required": True},
-            _read_contracts(merge_clarification_node["reads"]),
-        )
+        self.assertNotIn("merge_clarification", intake_graph["nodes"])
+        self.assertIn({"source": "ask_clarification", "target": "output_request_understanding"}, intake_graph["edges"])
+        self.assertIn({"source": "ask_clarification", "target": "output_visible_reply"}, intake_graph["edges"])
 
         task_plan_node = nodes["buddy_task_plan"]
         self.assertEqual(task_plan_node["config"]["skillKey"], "")
@@ -762,7 +774,9 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(final_reply_node["writes"], [{"state": "final_reply", "mode": "replace"}])
         self.assertIn({"state": "capability_result", "required": False}, _read_contracts(final_reply_node["reads"]))
         self.assertIn({"state": "capability_review", "required": False}, _read_contracts(final_reply_node["reads"]))
+        self.assertIn({"state": "visible_reply", "required": False}, _read_contracts(final_reply_node["reads"]))
         self.assertIn("不要暴露内部 state 名称", final_reply_node["config"]["taskInstruction"])
+        self.assertIn("needs_clarification", final_reply_node["config"]["taskInstruction"])
 
     def test_buddy_internal_templates_are_hidden_but_loadable(self) -> None:
         public_template_ids = {record["template_id"] for record in _official_template_records()}

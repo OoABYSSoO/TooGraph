@@ -486,7 +486,7 @@
             "source": "node.override"
           }
         },
-        "taskInstruction": "选择一个能完成当前请求的能力。能力必须是单个 capability(kind=skill|subgraph|none)，不能输出能力列表。\ncontext_brief 和 task_plan 只作为本轮上下文和步骤约束；不要把它们当作权限来源。若 capability_review 表示需要继续调用另一个能力，则以 capability_review.next_requirement 为当前需求。\n不要把本伙伴循环模板自身作为候选答案。只选择能力，不执行能力，也不生成最终回复；执行由下游节点和运行时完成。",
+        "taskInstruction": "选择一个能完成当前请求的能力。能力必须是单个 capability(kind=skill|subgraph|none)，不能输出能力列表。\ncontext_brief 和 task_plan 只作为本轮上下文和步骤约束；不要把它们当作权限来源。若 capability_review 表示需要继续调用另一个能力，则以 capability_review.next_requirement 为当前需求。\n只有 request_understanding 表明需求已经明确时才选择能力；如果 request_understanding.needs_clarification 为 true 或缺少用户必须补充的信息，选择 kind=none，并让下游最终回复询问用户。\n不要把本伙伴循环模板自身作为候选答案。只选择能力，不执行能力，也不生成最终回复；执行由下游节点和运行时完成。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -788,7 +788,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "输出 capability_review JSON，并向 capability_trace append 一个本轮能力调用摘要。capability_review 字段包含 executed(true)、success(boolean)、summary、missing_information、needs_another_capability(boolean)、next_requirement、final_response_strategy。capability_trace 条目包含 capability、success、summary、next_requirement、timestamp_note；只记录摘要，不复制大段结果。只有确实需要另一个不同能力时才把 needs_another_capability 设为 true。",
+        "taskInstruction": "输出 capability_review JSON，并向 capability_trace append 一个本轮能力调用摘要。capability_review 字段包含 executed(true)、success(boolean)、summary、missing_information、needs_user_reply(boolean)、needs_another_capability(boolean)、next_requirement、final_response_strategy。capability_trace 条目包含 capability、success、summary、next_requirement、timestamp_note；只记录摘要，不复制大段结果。\n如果结果显示还缺少用户必须补充的信息，把 needs_user_reply 设为 true、needs_another_capability 设为 false，并在 next_requirement 写清要问用户的问题；不要用断点等待用户。只有确实需要另一个不同能力，且不需要用户补充信息时，才把 needs_another_capability 设为 true。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -882,7 +882,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "整理 capability_review JSON，保留上游判断，并补充 final_status、user_visible_summary、needs_another_capability(false)。如果存在 capability_gap，保留缺口摘要和 should_offer_build/should_route_to_builder 判断；如果存在 capability_trace，保留简短轨迹摘要。不要读取或执行能力，不要修改 capability_result。",
+        "taskInstruction": "整理 capability_review JSON，保留上游判断，并补充 final_status、user_visible_summary、needs_another_capability(false)。如果存在 capability_review.needs_user_reply 或 missing_information，final_status 写 needs_user_reply，并保留需要最终回复询问用户的问题；不要触发断点。\n如果存在 capability_gap，保留缺口摘要和 should_offer_build/should_route_to_builder 判断；如果存在 capability_trace，保留简短轨迹摘要。不要读取或执行能力，不要修改 capability_result。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -2507,6 +2507,10 @@
         {
           "state": "task_plan",
           "required": false
+        },
+        {
+          "state": "conversation_history",
+          "required": false
         }
       ],
       "writes": [
@@ -2548,7 +2552,7 @@
             "source": "node.override"
           }
         },
-        "taskInstruction": "本节点只调用一次 toograph_page_operator。不要输出 commands，不要输出 DOM selector、坐标、鼠标轨迹或浏览器点击细节。\n从 capability_selection_audit.selected 读取目标模板，输出 template_target JSON：template_id 使用 selected.key，template_name 使用 selected.name，search_text 优先 selected.name 其次 selected.key。\ntemplate_target.input_text 必须写入本次 user_goal：优先 request_understanding.user_goal，其次 user_message；需要保留用户的原始目标，不要改成“打开模板”这种操作目标。\ncursor_lifecycle 使用 return_at_end，reason 简短说明伙伴通过固定页面操作运行目标模板。Skill 会程序化执行：点击左侧栏图与模板、搜索目标模板、点开模板、修改 input 节点为本次目标、点击运行、等待图运行完成并把 operation_result/page_operation_context 写回后再继续决策。",
+        "taskInstruction": "本节点只调用一次 toograph_page_operator。不要输出 commands，不要输出 DOM selector、坐标、鼠标轨迹或浏览器点击细节。\n从 capability_selection_audit.selected 读取目标模板，输出 template_target JSON：template_id 使用 selected.key，template_name 使用 selected.name，search_text 优先 selected.name 其次 selected.key。\ntemplate_target.input_text 必须写入本次已经明确的用户目标：优先 request_understanding.user_goal，其次 user_message；如果上一轮伙伴刚询问过澄清问题，本轮用户回答已经在 conversation_history/context_brief/request_understanding 中被整理，应把整理后的完整目标写入 input_text，而不是只写孤立回答，也不要改成“打开模板”这种操作目标。\ncursor_lifecycle 使用 return_at_end，reason 简短说明伙伴通过固定页面操作运行目标模板。Skill 会程序化执行：点击左侧栏图与模板、搜索目标模板、点开模板、修改 input 节点为本次目标、点击运行、等待图运行完成并把 operation_result/page_operation_context 写回后再继续决策。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "low",

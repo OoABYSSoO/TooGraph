@@ -18,14 +18,14 @@ test("resolveBuddyComposerDecision enqueues a new turn when no run is paused", (
   );
 });
 
-test("resolveBuddyComposerDecision routes paused input to the current pause card", () => {
+test("resolveBuddyComposerDecision resumes paused runs from the normal chat composer", () => {
   assert.deepEqual(
     resolveBuddyComposerDecision({
       draftText: "这是给当前断点的补充",
       hasPausedRun: true,
       isResumeBusy: false,
     }),
-    { kind: "route_to_pause_card", userMessage: "这是给当前断点的补充" },
+    { kind: "resume_paused_run", userMessage: "这是给当前断点的补充" },
   );
 });
 

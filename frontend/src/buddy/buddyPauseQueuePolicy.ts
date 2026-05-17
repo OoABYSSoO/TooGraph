@@ -3,7 +3,7 @@ export type BuddyPauseActionMode = "execute" | "supplement";
 export type BuddyComposerDecision =
   | { kind: "ignore_empty"; userMessage: "" }
   | { kind: "ignore_resume_busy"; userMessage: string }
-  | { kind: "route_to_pause_card"; userMessage: string }
+  | { kind: "resume_paused_run"; userMessage: string }
   | { kind: "enqueue_new_turn"; userMessage: string };
 
 export function resolveBuddyComposerDecision(input: {
@@ -19,7 +19,7 @@ export function resolveBuddyComposerDecision(input: {
     return { kind: "ignore_resume_busy", userMessage };
   }
   if (input.hasPausedRun) {
-    return { kind: "route_to_pause_card", userMessage };
+    return { kind: "resume_paused_run", userMessage };
   }
   return { kind: "enqueue_new_turn", userMessage };
 }
