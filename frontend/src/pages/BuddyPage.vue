@@ -45,8 +45,10 @@
                   v-model="bindingDraft.template_id"
                   class="buddy-page__template-select toograph-select"
                   :loading="isLoadingBindingTemplate"
-                  :teleported="false"
+                  :teleported="true"
                   :fit-input-width="true"
+                  placement="bottom-start"
+                  :fallback-placements="buddyBindingSelectFallbackPlacements"
                   popper-class="toograph-select-popper buddy-page__binding-select-popper"
                   filterable
                   @change="selectBindingTemplate"
@@ -100,8 +102,10 @@
                       :placeholder="t('buddyPage.binding.selectInputNode')"
                       :clearable="!row.required"
                       :disabled="!selectedBindingTemplate"
-                      :teleported="false"
+                      :teleported="true"
                       :fit-input-width="true"
+                      placement="bottom-start"
+                      :fallback-placements="buddyBindingSelectFallbackPlacements"
                       popper-class="toograph-select-popper buddy-page__binding-select-popper"
                       filterable
                       @change="setBindingInputNode(row.source, $event)"
@@ -715,6 +719,7 @@ const summaryDraft = ref<BuddySessionSummary>(defaultSummaryDraft());
 const availableTemplates = ref<TemplateRecord[]>([]);
 const selectedBindingTemplate = ref<TemplateRecord | null>(null);
 const bindingDraft = ref<BuddyRunTemplateBinding>(buildDefaultBuddyRunTemplateBinding());
+const buddyBindingSelectFallbackPlacements: ("bottom-start" | "top-start")[] = ["bottom-start", "top-start"];
 type BindingSelectInstance = {
   blur?: () => void;
   handleClose?: () => void;

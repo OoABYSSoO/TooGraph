@@ -51,6 +51,18 @@ test("BuddyPage opens template binding first and renders it as Buddy input rows"
   assert.match(source, /class="buddy-page__template-select toograph-select"/);
   assert.match(source, /popper-class="toograph-select-popper buddy-page__binding-select-popper"/);
   assert.match(source, /:fit-input-width="true"/);
+  assert.match(
+    source,
+    /const buddyBindingSelectFallbackPlacements: \("bottom-start" \| "top-start"\)\[] = \["bottom-start", "top-start"\];/,
+  );
+  const bindingSelectBlocks =
+    source.match(/<ElSelect[\s\S]*?class="buddy-page__(?:template-select|binding-select) toograph-select"[\s\S]*?>/g) ?? [];
+  assert.equal(bindingSelectBlocks.length, 2);
+  for (const block of bindingSelectBlocks) {
+    assert.match(block, /:teleported="true"/);
+    assert.match(block, /placement="bottom-start"/);
+    assert.match(block, /:fallback-placements="buddyBindingSelectFallbackPlacements"/);
+  }
   assert.match(source, /class="buddy-page__binding-select toograph-select"/);
   assert.match(source, /class="buddy-page__binding-option"/);
   assert.match(source, /bindingOptionDisabledReason\(option\)/);
