@@ -104,6 +104,7 @@ class TemplateRouteTests(unittest.TestCase):
             templates = response.json()
             self.assertEqual([template["template_id"] for template in templates], ["advanced_web_research_loop", "custom_research"])
             self.assertEqual([template["source"] for template in templates], ["official", "user"])
+            self.assertEqual([template["capabilityDiscoverable"] for template in templates], [True, True])
 
     def test_save_template_writes_user_template_under_graph_template_user_folder(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -132,6 +133,7 @@ class TemplateRouteTests(unittest.TestCase):
             self.assertNotIn("status", json.loads(saved_path.read_text(encoding="utf-8")))
             settings_payload = json.loads((root / "settings.json").read_text(encoding="utf-8"))
             self.assertTrue(settings_payload["entries"][saved_payload["template_id"]]["enabled"])
+            self.assertTrue(settings_payload["entries"][saved_payload["template_id"]]["capabilityDiscoverable"])
             self.assertEqual(list_response.json(), [saved_payload["template"]])
 
     def test_save_template_resolves_duplicate_names_with_numbered_suffixes(self) -> None:
@@ -208,10 +210,12 @@ class TemplateRouteTests(unittest.TestCase):
                 disabled_response = client.post(f"/api/templates/{template_id}/disable")
                 self.assertEqual(disabled_response.status_code, 200)
                 self.assertEqual(disabled_response.json()["status"], "disabled")
+                self.assertFalse(disabled_response.json()["capabilityDiscoverable"])
                 saved_path = user_dir / template_id / "template.json"
                 self.assertNotIn("status", json.loads(saved_path.read_text(encoding="utf-8")))
                 settings_payload = json.loads((root / "settings.json").read_text(encoding="utf-8"))
                 self.assertFalse(settings_payload["entries"][template_id]["enabled"])
+                self.assertFalse(settings_payload["entries"][template_id]["capabilityDiscoverable"])
 
                 active_only_response = client.get("/api/templates")
                 self.assertEqual(active_only_response.status_code, 200)
@@ -225,6 +229,7 @@ class TemplateRouteTests(unittest.TestCase):
                 enabled_response = client.post(f"/api/templates/{template_id}/enable")
                 self.assertEqual(enabled_response.status_code, 200)
                 self.assertEqual(enabled_response.json()["status"], "active")
+                self.assertFalse(enabled_response.json()["capabilityDiscoverable"])
 
                 delete_response = client.delete(f"/api/templates/{template_id}")
                 self.assertEqual(delete_response.status_code, 200)
@@ -262,6 +267,55 @@ class TemplateRouteTests(unittest.TestCase):
             self.assertEqual(listed_response.status_code, 200)
             self.assertEqual(listed_response.json()[0]["source"], "official")
             self.assertEqual(listed_response.json()[0]["status"], "active")
+
+    def test_template_capability_discovery_can_be_toggled_without_editing_template_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            official_dir = root / "official"
+            user_dir = root / "user"
+            official_dir.mkdir()
+            user_dir.mkdir()
+            official_template_dir = official_dir / "official_loop"
+            user_template_dir = user_dir / "custom_loop"
+            official_template_dir.mkdir()
+            user_template_dir.mkdir()
+            (official_template_dir / "template.json").write_text(
+                json.dumps(_template_payload("official_loop", "Official Loop")),
+                encoding="utf-8",
+            )
+            (user_template_dir / "template.json").write_text(
+                json.dumps(_template_payload("custom_loop", "Custom Loop")),
+                encoding="utf-8",
+            )
+
+            with (
+                patch("app.templates.loader.OFFICIAL_TEMPLATES_ROOT", official_dir),
+                patch("app.templates.loader.USER_TEMPLATES_ROOT", user_dir),
+                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.json", create=True),
+                TestClient(app) as client,
+            ):
+                official_response = client.post(
+                    "/api/templates/official_loop/capability-discoverable",
+                    json={"capabilityDiscoverable": False},
+                )
+                user_response = client.post(
+                    "/api/templates/custom_loop/capability-discoverable",
+                    json={"capabilityDiscoverable": False},
+                )
+                list_response = client.get("/api/templates?include_disabled=true")
+
+            self.assertEqual(official_response.status_code, 200)
+            self.assertEqual(user_response.status_code, 200)
+            self.assertFalse(official_response.json()["capabilityDiscoverable"])
+            self.assertFalse(user_response.json()["capabilityDiscoverable"])
+            self.assertNotIn("capabilityDiscoverable", json.loads((official_template_dir / "template.json").read_text(encoding="utf-8")))
+            settings_payload = json.loads((root / "settings.json").read_text(encoding="utf-8"))
+            self.assertFalse(settings_payload["entries"]["official_loop"]["capabilityDiscoverable"])
+            self.assertFalse(settings_payload["entries"]["custom_loop"]["capabilityDiscoverable"])
+            self.assertEqual(
+                {template["template_id"]: template["capabilityDiscoverable"] for template in list_response.json()},
+                {"official_loop": False, "custom_loop": False},
+            )
 
 
 if __name__ == "__main__":

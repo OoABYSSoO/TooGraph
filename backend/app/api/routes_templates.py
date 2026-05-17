@@ -3,14 +3,28 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.core.compiler.validator import validate_graph
 from app.core.schemas.node_system import GraphValidationResponse, NodeSystemGraphPayload
-from app.templates import delete_template, disable_template, enable_template, get_template, list_templates, save_template
+from app.templates import (
+    delete_template,
+    disable_template,
+    enable_template,
+    get_template,
+    list_templates,
+    save_template,
+    update_template_capability_discoverable,
+)
 
 
 router = APIRouter(prefix="/api/templates", tags=["templates"])
+
+
+class TemplateCapabilityDiscoverablePayload(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    capability_discoverable: bool = Field(alias="capabilityDiscoverable")
 
 
 def _schema_errors_to_paths(exc: ValidationError) -> list[dict[str, str]]:
@@ -71,6 +85,17 @@ def enable_template_endpoint(template_id: str) -> dict[str, Any]:
         return enable_template(template_id)
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Template '{template_id}' does not exist.") from exc
+
+
+@router.post("/{template_id}/capability-discoverable")
+def update_template_capability_discoverable_endpoint(
+    template_id: str,
+    payload: TemplateCapabilityDiscoverablePayload,
+) -> dict[str, Any]:
+    try:
+        return update_template_capability_discoverable(template_id, payload.capability_discoverable)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=f"Template '{template_id}' does not exist.") from exc
 

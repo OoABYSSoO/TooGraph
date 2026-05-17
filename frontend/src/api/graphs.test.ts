@@ -11,6 +11,7 @@ import {
   runGraph,
   saveGraphAsTemplate,
   updateGraphStatus,
+  updateTemplateCapabilityDiscoverable,
   updateTemplateStatus,
 } from "./graphs.ts";
 import type { GraphPayload } from "@/types/node-system";
@@ -198,6 +199,7 @@ test("graph and template management helpers call status and delete endpoints", a
     await deleteGraph("graph_1");
     await updateTemplateStatus("template_1", "disabled");
     await updateTemplateStatus("template_1", "active");
+    await updateTemplateCapabilityDiscoverable("template_1", false);
     await deleteTemplate("template_1");
 
     assert.deepEqual(requests, [
@@ -206,6 +208,11 @@ test("graph and template management helpers call status and delete endpoints", a
       { url: "/api/graphs/graph_1", method: "DELETE", body: null },
       { url: "/api/templates/template_1/disable", method: "POST", body: "null" },
       { url: "/api/templates/template_1/enable", method: "POST", body: "null" },
+      {
+        url: "/api/templates/template_1/capability-discoverable",
+        method: "POST",
+        body: JSON.stringify({ capabilityDiscoverable: false }),
+      },
       { url: "/api/templates/template_1", method: "DELETE", body: null },
     ]);
   } finally {

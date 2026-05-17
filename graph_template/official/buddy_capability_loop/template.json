@@ -1,7 +1,7 @@
 {
   "template_id": "buddy_capability_loop",
   "label": "伙伴能力循环",
-  "description": "内部子图模板：选择单个显式能力，执行 Skill 或经可见页面操作运行图模板，复盘结果并判断是否继续。",
+  "description": "官方基础子图模板：选择单个显式能力，执行 Skill 或经可见页面操作运行图模板，复盘结果并判断是否继续。",
   "default_graph_name": "伙伴能力循环",
   "state_schema": {
     "user_message": {
@@ -2667,9 +2667,9 @@
   "metadata": {
     "graphProtocol": "node_system",
     "role": "buddy_capability_loop",
+    "capabilityDiscoverableDefault": false,
     "interrupt_after": [
       "run_visible_template_operation"
-    ],
-    "internal": true
+    ]
   }
 }

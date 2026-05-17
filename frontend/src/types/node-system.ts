@@ -215,6 +215,7 @@ export type TemplateRecord = {
   default_graph_name: string;
   source?: TemplateSource;
   status?: GraphCatalogStatus;
+  capabilityDiscoverable?: boolean;
   state_schema: Record<string, StateDefinition>;
   nodes: Record<string, GraphNode>;
   edges: GraphEdge[];

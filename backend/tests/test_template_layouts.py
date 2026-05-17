@@ -24,7 +24,6 @@ def _read_contracts(reads: list[dict]) -> list[dict]:
 
 BUDDY_INTERNAL_TEMPLATE_IDS = {
     "buddy_request_intake",
-    "buddy_capability_loop",
     "buddy_autonomous_review",
 }
 
@@ -59,6 +58,7 @@ class TemplateLayoutTests(unittest.TestCase):
             [
                 "advanced_web_research_loop",
                 "buddy_autonomous_loop",
+                "buddy_capability_loop",
                 "toograph_page_operation_workflow",
                 "toograph_skill_creation_workflow",
             ],
@@ -80,6 +80,16 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(buddy_template["label"], "伙伴自主循环")
         self.assertEqual(buddy_template["default_graph_name"], "伙伴自主循环")
         self.assertIn("Buddy Home", buddy_template["description"])
+        self.assertIs(buddy_template["capabilityDiscoverable"], False)
+        self.assertNotIn("hideFromCapabilitySelector", buddy_template["metadata"])
+
+        capability_loop_template = templates["buddy_capability_loop"]
+        self.assertEqual(capability_loop_template["source"], "official")
+        self.assertEqual(capability_loop_template["label"], "伙伴能力循环")
+        self.assertEqual(capability_loop_template["default_graph_name"], "伙伴能力循环")
+        self.assertNotEqual(capability_loop_template["metadata"].get("internal"), True)
+        self.assertIs(capability_loop_template["capabilityDiscoverable"], False)
+        self.assertNotIn("hideFromCapabilitySelector", capability_loop_template["metadata"])
 
         page_operation_template = templates["toograph_page_operation_workflow"]
         self.assertEqual(page_operation_template["source"], "official")

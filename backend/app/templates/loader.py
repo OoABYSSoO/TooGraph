@@ -29,12 +29,14 @@ def list_template_records(include_disabled: bool = False) -> list[dict[str, Any]
         load_template_record_from_path(path, source=USER_TEMPLATE_SOURCE)
         for path in _iter_template_paths(USER_TEMPLATES_ROOT)
     ]
+    all_records = [*official_records, *user_records]
     settings_entries = ensure_template_settings(
-        {record["template_id"]: True for record in [*official_records, *user_records]}
+        {record["template_id"]: True for record in all_records},
+        {record["template_id"]: _template_default_capability_discoverable(record) for record in all_records},
     )
     records = [
         _with_template_status(record, settings_entries.get(record["template_id"]))
-        for record in [*official_records, *user_records]
+        for record in all_records
     ]
     records = [record for record in records if not _is_internal_template(record)]
     if include_disabled:
@@ -46,12 +48,18 @@ def load_template_record(template_id: str) -> dict[str, Any]:
     official_path = _template_path(OFFICIAL_TEMPLATES_ROOT, template_id)
     if official_path.exists():
         record = load_template_record_from_path(official_path, source=OFFICIAL_TEMPLATE_SOURCE)
-        settings_entries = ensure_template_settings({record["template_id"]: True})
+        settings_entries = ensure_template_settings(
+            {record["template_id"]: True},
+            {record["template_id"]: _template_default_capability_discoverable(record)},
+        )
         return _with_template_status(record, settings_entries.get(record["template_id"]))
     user_path = _template_path(USER_TEMPLATES_ROOT, template_id)
     if user_path.exists():
         record = load_template_record_from_path(user_path, source=USER_TEMPLATE_SOURCE)
-        settings_entries = ensure_template_settings({record["template_id"]: True})
+        settings_entries = ensure_template_settings(
+            {record["template_id"]: True},
+            {record["template_id"]: _template_default_capability_discoverable(record)},
+        )
         return _with_template_status(record, settings_entries.get(record["template_id"]))
     raise KeyError(template_id)
 
@@ -78,7 +86,8 @@ def save_user_template_record(graph_payload: NodeSystemGraphPayload) -> dict[str
     path.parent.mkdir(parents=True, exist_ok=True)
     write_json_file(path, record)
     set_template_enabled(template_id, True)
-    return _with_template_status(_with_template_source(record, USER_TEMPLATE_SOURCE), {"enabled": True})
+    settings_entries = ensure_template_settings({template_id: True}, {template_id: True})
+    return _with_template_status(_with_template_source(record, USER_TEMPLATE_SOURCE), settings_entries.get(template_id))
 
 
 def load_template_record_from_path(path: Path, *, source: str) -> dict[str, Any]:
@@ -105,7 +114,23 @@ def set_user_template_status(template_id: str, status: NodeSystemCatalogStatus) 
         raise KeyError(template_id)
     set_template_enabled(template_id, status == NodeSystemCatalogStatus.ACTIVE)
     record = load_template_record_from_path(path, source=USER_TEMPLATE_SOURCE)
-    return _with_template_status(record, {"enabled": status == NodeSystemCatalogStatus.ACTIVE})
+    settings_entries = ensure_template_settings({template_id: status == NodeSystemCatalogStatus.ACTIVE}, {template_id: True})
+    return _with_template_status(record, settings_entries.get(template_id))
+
+
+def set_template_capability_discoverable(template_id: str, capability_discoverable: bool) -> dict[str, Any]:
+    path, source = _resolve_template_path_and_source(template_id)
+    payload, _changed = _read_template_settings_payload()
+    entry = payload["entries"].get(template_id)
+    if not isinstance(entry, dict):
+        entry = {}
+    enabled = entry.get("enabled", True) is not False
+    entry["enabled"] = enabled
+    entry["capabilityDiscoverable"] = bool(capability_discoverable) and enabled
+    payload["entries"][template_id] = entry
+    write_json_file(TEMPLATE_SETTINGS_PATH, payload)
+    record = load_template_record_from_path(path, source=source)
+    return _with_template_status(record, entry)
 
 
 def delete_user_template_record(template_id: str) -> None:
@@ -117,16 +142,34 @@ def delete_user_template_record(template_id: str) -> None:
     remove_template_settings_entry(template_id)
 
 
-def ensure_template_settings(default_enabled: dict[str, bool]) -> dict[str, dict]:
+def ensure_template_settings(
+    default_enabled: dict[str, bool],
+    default_capability_discoverable: dict[str, bool] | None = None,
+) -> dict[str, dict]:
     payload, changed = _read_template_settings_payload()
     entries = payload["entries"]
     for template_id, enabled in default_enabled.items():
+        default_discoverable = (
+            default_capability_discoverable.get(template_id, bool(enabled))
+            if isinstance(default_capability_discoverable, dict)
+            else bool(enabled)
+        )
         entry = entries.get(template_id)
         if not isinstance(entry, dict):
-            entries[template_id] = {"enabled": bool(enabled)}
+            entries[template_id] = {
+                "enabled": bool(enabled),
+                "capabilityDiscoverable": bool(enabled) and default_discoverable,
+            }
             changed = True
-        elif not isinstance(entry.get("enabled"), bool):
+            continue
+        if not isinstance(entry.get("enabled"), bool):
             entry["enabled"] = bool(entry.get("enabled", enabled))
+            changed = True
+        if not isinstance(entry.get("capabilityDiscoverable"), bool):
+            entry["capabilityDiscoverable"] = entry.get("enabled", enabled) is not False and default_discoverable
+            changed = True
+        if entry.get("enabled") is False and entry.get("capabilityDiscoverable") is not False:
+            entry["capabilityDiscoverable"] = False
             changed = True
     if changed or not TEMPLATE_SETTINGS_PATH.exists():
         write_json_file(TEMPLATE_SETTINGS_PATH, payload)
@@ -140,6 +183,10 @@ def set_template_enabled(template_id: str, enabled: bool) -> None:
         entry = {}
         changed = True
     entry["enabled"] = bool(enabled)
+    if not enabled:
+        entry["capabilityDiscoverable"] = False
+    elif not isinstance(entry.get("capabilityDiscoverable"), bool):
+        entry["capabilityDiscoverable"] = True
     payload["entries"][template_id] = entry
     write_json_file(TEMPLATE_SETTINGS_PATH, payload)
 
@@ -167,6 +214,16 @@ def _template_path(root: Path, template_id: str) -> Path:
     return root / template_id / TEMPLATE_FILE_NAME
 
 
+def _resolve_template_path_and_source(template_id: str) -> tuple[Path, str]:
+    official_path = _template_path(OFFICIAL_TEMPLATES_ROOT, template_id)
+    if official_path.exists():
+        return official_path, OFFICIAL_TEMPLATE_SOURCE
+    user_path = _template_path(USER_TEMPLATES_ROOT, template_id)
+    if user_path.exists():
+        return user_path, USER_TEMPLATE_SOURCE
+    raise KeyError(template_id)
+
+
 def _ensure_user_template_is_manageable(template_id: str) -> None:
     official_path = _template_path(OFFICIAL_TEMPLATES_ROOT, template_id)
     if official_path.exists():
@@ -179,10 +236,19 @@ def _with_template_source(record: dict[str, Any], source: str) -> dict[str, Any]
 
 def _with_template_status(record: dict[str, Any], settings_entry: object) -> dict[str, Any]:
     enabled = True
+    capability_discoverable = True
     if isinstance(settings_entry, dict):
         enabled = settings_entry.get("enabled", True) is not False
+        capability_discoverable = enabled and settings_entry.get("capabilityDiscoverable", enabled) is not False
     status = NodeSystemCatalogStatus.ACTIVE if enabled else NodeSystemCatalogStatus.DISABLED
-    return {**record, "status": status.value}
+    return {**record, "status": status.value, "capabilityDiscoverable": capability_discoverable}
+
+
+def _template_default_capability_discoverable(record: dict[str, Any]) -> bool:
+    metadata = record.get("metadata")
+    if isinstance(metadata, dict) and metadata.get("capabilityDiscoverableDefault") is False:
+        return False
+    return True
 
 
 def _read_template_settings_payload() -> tuple[dict[str, object], bool]:

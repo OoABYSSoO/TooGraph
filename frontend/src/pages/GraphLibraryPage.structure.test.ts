@@ -50,6 +50,13 @@ test("GraphLibraryPage makes each management card openable while keeping managem
   assert.match(componentSource, /function openTemplateDraft\(template: TemplateRecord\)/);
 });
 
+test("GraphLibraryPage exposes a separate capability discovery switch for templates", () => {
+  assert.match(componentSource, /item\.kind === ['"]template['"]/);
+  assert.match(componentSource, /graphLibrary\.capabilityDiscoverable/);
+  assert.match(componentSource, /updateTemplateCapabilityDiscoverable/);
+  assert.match(componentSource, /setTemplateCapabilityDiscoverable\(item, Boolean\(\$event\)\)/);
+});
+
 test("GraphLibraryPage exposes official page-operation affordance ids", () => {
   assert.match(componentSource, /data-virtual-affordance-id="library\.action\.newBlankGraph"/);
   assert.match(componentSource, /data-virtual-affordance-id="library\.action\.importPython"/);

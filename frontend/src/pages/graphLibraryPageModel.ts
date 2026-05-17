@@ -12,6 +12,7 @@ export type GraphLibraryItem = {
   status: GraphCatalogStatus;
   source: TemplateSource;
   canManage: boolean;
+  capabilityDiscoverable: boolean;
   nodeCount: number;
   edgeCount: number;
   stateCount: number;
@@ -46,6 +47,7 @@ export function buildGraphLibraryItems(graphs: GraphDocument[], templates: Templ
       status: graph.status ?? "active",
       source: "user" as const,
       canManage: true,
+      capabilityDiscoverable: false,
       nodeCount: Object.keys(graph.nodes).length,
       edgeCount: graph.edges.length + graph.conditional_edges.length,
       stateCount: Object.keys(graph.state_schema).length,
@@ -60,6 +62,7 @@ export function buildGraphLibraryItems(graphs: GraphDocument[], templates: Templ
         status: template.status ?? "active",
         source,
         canManage: source === "user",
+        capabilityDiscoverable: template.status !== "disabled" && template.capabilityDiscoverable !== false,
         nodeCount: Object.keys(template.nodes).length,
         edgeCount: template.edges.length + template.conditional_edges.length,
         stateCount: Object.keys(template.state_schema).length,

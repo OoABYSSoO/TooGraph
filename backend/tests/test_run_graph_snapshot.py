@@ -20,6 +20,7 @@ class RunGraphSnapshotTests(unittest.TestCase):
             [
                 "advanced_web_research_loop",
                 "buddy_autonomous_loop",
+                "buddy_capability_loop",
                 "toograph_page_operation_workflow",
                 "toograph_skill_creation_workflow",
             ],

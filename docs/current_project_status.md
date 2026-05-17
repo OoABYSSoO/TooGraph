@@ -13,7 +13,7 @@
 - 动态 `capability.kind=subgraph` 已支持内部断点向父级 run 传播。动态子图遇到 `interrupt_after` 时，父级 run 会进入标准 `awaiting_human`，恢复仍走父级 run 的 resume API。
 - 伙伴浮窗已复用标准 `awaiting_human` 暂停卡片：能展示子图 scope、必填 state、当前已产出的内容和上下文，并在卡片内通过“执行当前方案 / 补充内容”的单一操作区恢复原 run；暂停时不会把本轮当作最终完成，底部聊天输入不会续跑旧断点。
 - 伙伴运行过程胶囊已经进入会话持久化路径：它作为不进入模型上下文的助手消息显示元数据保存到 `buddy_messages.metadata_json`，`metadata.kind=output_trace` 表示该消息只负责展示 run capsule；刷新页面、切换历史会话或恢复运行记录后仍能还原胶囊。
-- 当前普通模板列表提供四个可见官方图模板：`advanced_web_research_loop`（高级联网搜索）、`buddy_autonomous_loop`（伙伴自主循环）、`toograph_page_operation_workflow`（操作 TooGraph 页面）和 `toograph_skill_creation_workflow`（创建自定义 Skill），并会合并 `graph_template/user/` 下的用户模板。仓库还包含 Buddy 内部多节点模板 `buddy_request_intake`、`buddy_capability_loop` 和后台模板 `buddy_autonomous_review`，它们都标记 `metadata.internal=true`，不进入普通模板列表和能力选择候选。
+- 当前普通模板列表提供五个可见官方图模板：`advanced_web_research_loop`（高级联网搜索）、`buddy_autonomous_loop`（伙伴自主循环）、`buddy_capability_loop`（伙伴能力循环）、`toograph_page_operation_workflow`（操作 TooGraph 页面）和 `toograph_skill_creation_workflow`（创建自定义 Skill），并会合并 `graph_template/user/` 下的用户模板。仓库还包含 Buddy 内部请求理解模板 `buddy_request_intake` 和后台模板 `buddy_autonomous_review`，它们标记 `metadata.internal=true`，不进入普通模板列表和能力选择候选。模板启用状态和“可被能力发现”开关都写入本地忽略的 `graph_template/settings.json`；官方模板可通过 `metadata.capabilityDiscoverableDefault=false` 声明初始默认值。启用/停用影响人类使用与自主能力选择，停用时会同步关闭能力发现；能力发现只影响 `toograph_capability_selector` 的自主候选清单。`buddy_autonomous_loop` 和 `buddy_capability_loop` 是可见官方模板，但默认不可被能力发现，避免被伙伴当作业务能力递归选择。
 - 技能系统已收束为统一技能库，不再区分“伙伴技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
 - 当前官方技能包包括 `web_search`、`toograph_capability_selector`、`toograph_page_operator`、`toograph_skill_builder`、`toograph_script_tester`、`local_workspace_executor`，以及内部 `buddy_home_writer`、`buddy_visible_subgraph_result_adapter`。后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
@@ -37,7 +37,7 @@
 - Skill 生命周期脚本使用固定文件名而不是在 manifest 中配置入口。存在 `before_llm.py` 时，运行时会在技能 LLM 输出规划前执行它，只向它传入运行时上下文和节点任务说明，并把返回的上下文注入 LLM 提示词；图 state 直接进入 LLM 输出规划提示词，不传给 `before_llm.py`。存在 `after_llm.py` 时，运行时会在 LLM 生成结构化 LLM 输出后执行它，并把它返回的 JSON 当作技能结果。写入 state 仍由 TooGraph runtime 根据 `stateOutputSchema` 和 `skillBindings.outputMapping` 完成，脚本不直接绑定 state。
 - 在 LLM 节点卡片选择带 `stateOutputSchema` 的静态 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
 - 动态能力执行来自输入 `capability` state，不复用 `skillBindings.outputMapping`，也不会推断普通输出映射。这类节点必须只写一个 `result_package` state。包内 `outputs.<outputKey>` 保存 `{ name, description, type, value }`，不额外捏造 `fieldKey`；下游 LLM 节点会把这些虚拟输出拆开并复用普通 state/file 展开逻辑。
-- 后台动态 `capability.kind=subgraph` 运行时原语仍负责根据当前 state 和目标模板公开 input schema 生成子图输入，并把公开 output 边界封装为同一套 `result_package`；若动态子图内部触发 `interrupt_after`，父级 run 会进入标准 `awaiting_human`。Buddy 面向用户的可见模板运行路径已经从目标模板后台直连中分离：`buddy_capability_loop` 在 `selected_capability.kind=subgraph` 时改走固定内部能力 `toograph_page_operation_workflow`，由页面操作器的 `template_target -> run_template` 映射在前端可见运行，并在点击运行前把本次目标写入模板 input 节点；完成后再通过内部 `buddy_visible_subgraph_result_adapter` 把结果包装回原目标模板的 `capability_result`。
+- 后台动态 `capability.kind=subgraph` 运行时原语仍负责根据当前 state 和目标模板公开 input schema 生成子图输入，并把公开 output 边界封装为同一套 `result_package`；若动态子图内部触发 `interrupt_after`，父级 run 会进入标准 `awaiting_human`。Buddy 面向用户的可见模板运行路径已经从目标模板后台直连中分离：`buddy_capability_loop` 在 `selected_capability.kind=subgraph` 时改走固定模板运行 Skill；若目标本身是模糊页面操作才进入 `toograph_page_operation_workflow`，否则由页面操作器的 `template_target -> run_template` 映射在前端可见运行，并在点击运行前把本次目标写入模板 input 节点；完成后再通过内部 `buddy_visible_subgraph_result_adapter` 把结果包装回原目标模板的 `capability_result`。
 - 图运行前不再做旧草稿兼容补齐。提交到运行时的图必须已经符合当前协议。
 - `promptVisible` 已移除。上下文边界由节点 `reads` 决定：LLM 节点只接收自己显式读取的 state。
 - `state_schema` 支持 `binding` 元数据，用来标记某个 state 是否由技能输出自动绑定。
@@ -72,10 +72,10 @@
 - 位置：`skill/official/toograph_capability_selector/`
 - 显示名称：`TooGraph Capability Selector`
 - 作用：根据 LLM 节点技能 LLM 输出规划阶段看到的本地可用能力清单，让模型选择并校验规范化单个 `capability`。
-- 生命周期：`before_llm.py` 读取当前启用的图模板和启用的 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`、`selection_reason` 和 `rejected_candidates`，按同一清单做真实性与启用状态校验，并保留 `permissions` 供候选描述、审计和后续运行时策略使用。它不输出 `requiresApproval`，也不恢复 per-skill 审批协议。
+- 生命周期：`before_llm.py` 读取当前启用且 `capabilityDiscoverable=true` 的图模板和启用的 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`、`selection_reason` 和 `rejected_candidates`，按同一清单做真实性、启用状态和能力发现状态校验，并保留 `permissions` 供候选描述、审计和后续运行时策略使用。它不输出 `requiresApproval`，也不恢复 per-skill 审批协议。
 - 审计输出：除 `capability` 和 `found` 外，选择器返回 `audit`，记录候选数量、按类型计数、选中能力、选择原因、选中权限摘要、被拒绝候选原因、缺口说明和 catalog 读取错误；同时返回 `capability_selection` 低层 `activity_events`，Buddy 主模板会把 `audit` 映射到 `capability_selection_audit` state。
 - 选择对象包括当前启用的图模板和启用的 Skill；图模板优先于 Skill。页面操作官方模板 `toograph_page_operation_workflow` 会作为可见 subgraph 候选出现，并在候选上下文中暴露 `targetFlows`，方便模型把“打开运行记录、打开图、运行当前图、运行指定图模板、可见搭建/编辑图”等目标路由到图模板而不是单次页面操作 Skill。
-- 它不执行被选能力，不生成被选能力的运行入参，也不做程序字段匹配；模型基于候选项的名称和描述判断，脚本只做真实性与启用状态校验。
+- 它不执行被选能力，不生成被选能力的运行入参，也不做程序字段匹配；模型基于候选项的名称和描述判断，脚本只做真实性、启用状态和能力发现状态校验。
 
 ### `toograph_page_operator`
 
@@ -123,7 +123,7 @@
 - 显示名称：`伙伴自主循环`
 - 作用：作为伙伴浮窗和伙伴页面的默认图循环，把本轮用户消息、对话历史、页面上下文和 Buddy Home 长期资料转成一次可审计 graph run。
 - 主要流程：通过伙伴运行绑定把当前消息、对话历史、页面上下文和 Buddy Home 上下文注入模板 input 节点 -> `buddy_context_recall` LLM 节点生成 `context_brief` -> `buddy_request_intake` 子图理解请求并写 `visible_reply` 作为运行过程/暂停上下文中的早期回应，必要时在 `ask_clarification` 断点等待用户澄清 -> `needs_task_plan` 判断复杂任务是否进入 `buddy_task_plan` LLM 节点生成本轮 `task_plan` -> `needs_capability` 判断是否需要启用能力；不需要时直接进入 `buddy_final_reply` LLM 节点，需要时进入 `buddy_capability_loop` 调用 `toograph_capability_selector`，并把能力选择审计写入 `capability_selection_audit`；找到 Skill 能力后由 `execute_capability` 写唯一 `capability_result` 结果包；找到模糊页面操作子图能力时走 `run_page_operation_workflow`；找到其他图模板能力时走 `run_visible_template_operation`，由 `toograph_page_operator` 的固定模板运行映射可见打开图与模板、搜索模板、写入 input 节点、点击运行并等待结果，再由 `buddy_visible_subgraph_result_adapter` 包装回原目标模板结果；找不到能力时写 `capability_gap` 并在最终回复中询问是否构建该能力；多轮能力调用摘要写入 `capability_trace` -> `buddy_final_reply` LLM 节点只写 `final_reply` -> `output_final` 展示 `final_reply` 并结束可见主运行。写文件、删改文件或执行脚本的确认不在模板内由 LLM 判断，而由运行时根据 `需确认` / `完全访问` 模式处理。
-- 内部来源：主循环中的两个 Subgraph 节点分别来自 internal 模板 `buddy_request_intake` 和 `buddy_capability_loop`。当前协议仍要求 Subgraph 节点嵌入 `config.graph`，因此主循环保存的是模板内容副本；契约测试会校验这些嵌入副本与 internal 模板保持一致。官方 JSON 模板就是当前事实来源，维护时直接修改对应模板 JSON 及其主循环嵌入副本，不再保留额外的 Buddy 模板重建脚本。
+- 子图来源：主循环中的两个 Subgraph 节点分别来自 `buddy_request_intake` 和 `buddy_capability_loop` 模板。当前协议仍要求 Subgraph 节点嵌入 `config.graph`，因此主循环保存的是模板内容副本；契约测试会校验这些嵌入副本与来源模板保持一致。官方 JSON 模板就是当前事实来源，维护时直接修改对应模板 JSON 及其主循环嵌入副本，不再保留额外的 Buddy 模板重建脚本。
 - 动态能力语义：`execute_capability` 只读取 `selected_capability` 这个 `capability` state 并处理 `kind=skill`；明确图模板能力不通过动态 subgraph 执行，而是由 `run_visible_template_operation` 绑定 `toograph_page_operator`，让 LLM 只输出 `template_target` 并交给固定页面操作映射运行模板。`toograph_page_operation_workflow` 仅用于模糊页面操作目标。执行结果统一适配为 `capability_result` result_package。其他复盘节点不能读取 `capability` state，否则会被运行协议视为动态能力执行节点。
 - 断点语义：澄清和人工确认类断点使用子图内部 `interrupt_after`。静态 Subgraph 节点和动态 `capability.kind=subgraph` 的内部断点都会通过父级 Buddy run 的标准暂停/恢复路径展示子图 scope，而不是由伙伴前端额外发明确认协议。写文件、删改文件或执行脚本这类低层操作审批由运行时权限原语转换为标准 `awaiting_human`。
 - 边界：当前模板已经表达完整可见回复主干；低风险 Buddy Home 写回已由后台自主复盘模板和受控 writer Skill 接管。图编辑方向已收束为 TooGraph 内建 App-Native Virtual Operator：伙伴读取结构化页面快照和 affordance registry，控制自己的虚拟鼠标/键盘在图编辑页操作，不移动系统鼠标、不依赖截图视觉、不从外部 MCP 或浏览器自动化起步；可借鉴 OpenAI Computer Use / CUA 的 action loop 和基础动作词表，但在 TooGraph 中由结构化快照、Virtual Input Driver、Editor Action Adapter 和 operation journal 承接。

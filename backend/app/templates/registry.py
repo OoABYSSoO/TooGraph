@@ -8,6 +8,7 @@ from app.templates.loader import (
     load_template_record,
     list_template_records,
     save_user_template_record,
+    set_template_capability_discoverable,
 )
 
 
@@ -29,6 +30,10 @@ def disable_template(template_id: str) -> dict:
 
 def enable_template(template_id: str) -> dict:
     return enable_user_template_record(template_id)
+
+
+def update_template_capability_discoverable(template_id: str, capability_discoverable: bool) -> dict:
+    return set_template_capability_discoverable(template_id, capability_discoverable)
 
 
 def delete_template(template_id: str) -> None:

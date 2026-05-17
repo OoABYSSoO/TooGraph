@@ -28,7 +28,10 @@ def _write_json(path: Path, payload: dict[str, object]) -> None:
 
 
 def _write_settings(path: Path, schema_version: str, entry_key: str, entry: dict[str, object]) -> None:
-    _write_json(path, {"schemaVersion": schema_version, "entries": {entry_key: entry}})
+    existing = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    entries = existing.get("entries") if isinstance(existing.get("entries"), dict) else {}
+    entries[entry_key] = entry
+    _write_json(path, {"schemaVersion": schema_version, "entries": entries})
 
 
 def _write_template(
@@ -39,7 +42,9 @@ def _write_template(
     description: str,
     source: str = "official",
     status: str = "active",
+    capability_discoverable: bool = True,
 ) -> None:
+    metadata: dict[str, object] = {"tags": ["research", "web"]}
     _write_json(
         repo_root / "graph_template" / source / template_id / "template.json",
         {
@@ -58,15 +63,15 @@ def _write_template(
             "nodes": {},
             "edges": [],
             "conditional_edges": [],
-            "metadata": {"tags": ["research", "web"]},
+            "metadata": metadata,
         },
     )
-    if status != "active":
+    if status != "active" or not capability_discoverable:
         _write_settings(
             repo_root / "graph_template" / "settings.json",
             "toograph.template-settings/v1",
             template_id,
-            {"enabled": False},
+            {"enabled": status == "active", "capabilityDiscoverable": capability_discoverable},
         )
 
 
@@ -207,6 +212,35 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
         self.assertIn("run_current_graph (运行当前图并告诉我结果)", context)
         self.assertIn("create_basic_llm_graph (新建一个包含输入、LLM、输出的图)", context)
         self.assertIn("rename_current_node (编辑当前图，给某个节点改名)", context)
+        self.assertNotIn("key: buddy_autonomous_loop", context)
+        self.assertNotIn("key: buddy_capability_loop", context)
+
+    def test_before_llm_hides_templates_marked_non_discoverable_from_capability_catalog(self) -> None:
+        selector = _load_selector_module(
+            SELECTOR_BEFORE_LLM_PATH,
+            "toograph_capability_selector_before_non_discoverable_template_test",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _write_template(
+                repo_root,
+                template_id="buddy_capability_loop",
+                label="Buddy Capability Loop",
+                description="Reusable official building-block template.",
+                capability_discoverable=False,
+            )
+            _write_template(
+                repo_root,
+                template_id="advanced_web_research_loop",
+                label="Advanced Web Research",
+                description="Multi-round web research with evidence review.",
+            )
+            with patch.dict("os.environ", {"TOOGRAPH_REPO_ROOT": str(repo_root)}, clear=True):
+                result = selector.toograph_capability_selector_before_llm(runtime_context={})
+
+        context = result["context"]
+        self.assertIn("key: advanced_web_research_loop", context)
+        self.assertNotIn("buddy_capability_loop", context)
 
     def test_selector_normalizes_llm_selected_template_capability(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_test")
@@ -302,7 +336,7 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
         self.assertEqual(result["capability"]["name"], "Web Search")
         self.assertNotIn("requiresApproval", result["capability"])
 
-    def test_selector_ignores_disabled_capabilities_but_not_legacy_selectable_policy(self) -> None:
+    def test_selector_ignores_disabled_or_non_discoverable_templates_but_not_legacy_selectable_policy(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_test_disabled")
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
@@ -313,6 +347,14 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
                 description="Web research.",
                 source="user",
                 status="disabled",
+            )
+            _write_template(
+                repo_root,
+                template_id="private_planning_loop",
+                label="Private Planning",
+                description="Hidden from autonomous capability selection.",
+                source="user",
+                capability_discoverable=False,
             )
             _write_skill(
                 repo_root,
@@ -326,6 +368,10 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
                     requirement="Search for materials.",
                     capability={"kind": "subgraph", "key": "disabled_research"},
                 )
+                non_discoverable_result = selector.toograph_capability_selector(
+                    requirement="Plan privately.",
+                    capability={"kind": "subgraph", "key": "private_planning_loop"},
+                )
                 enabled_legacy_result = selector.toograph_capability_selector(
                     requirement="Search for materials.",
                     capability={"kind": "skill", "key": "web_search"},
@@ -334,7 +380,16 @@ class TooGraphCapabilitySelectorSkillTests(unittest.TestCase):
         self.assertEqual(set(disabled_result), {"capability", "found", "audit", "activity_events"})
         self.assertFalse(disabled_result["found"])
         self.assertEqual(disabled_result["capability"], {"kind": "none"})
-        self.assertEqual(disabled_result["audit"]["gap"], "Selected capability 'disabled_research' is not enabled or no longer exists.")
+        self.assertEqual(
+            disabled_result["audit"]["gap"],
+            "Selected capability 'disabled_research' is not enabled, not discoverable, or no longer exists.",
+        )
+        self.assertFalse(non_discoverable_result["found"])
+        self.assertEqual(non_discoverable_result["capability"], {"kind": "none"})
+        self.assertEqual(
+            non_discoverable_result["audit"]["gap"],
+            "Selected capability 'private_planning_loop' is not enabled, not discoverable, or no longer exists.",
+        )
         self.assertTrue(enabled_legacy_result["found"])
         self.assertEqual(enabled_legacy_result["capability"]["key"], "web_search")
 

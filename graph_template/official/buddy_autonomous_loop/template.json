@@ -3713,6 +3713,7 @@
           "metadata": {
             "graphProtocol": "node_system",
             "role": "buddy_capability_loop",
+            "capabilityDiscoverableDefault": false,
             "interrupt_after": [
               "run_visible_template_operation"
             ]
@@ -3891,6 +3892,7 @@
       "subgraph"
     ],
     "role": "buddy_autonomous_loop",
-    "roadmap": "docs/future/buddy-autonomous-agent-roadmap.md"
+    "roadmap": "docs/future/buddy-autonomous-agent-roadmap.md",
+    "capabilityDiscoverableDefault": false
   }
 }

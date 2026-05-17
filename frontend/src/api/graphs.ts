@@ -33,6 +33,13 @@ export async function updateTemplateStatus(templateId: string, status: GraphCata
   return apiPost<TemplateRecord>(`/api/templates/${templateId}/${action}`, null);
 }
 
+export async function updateTemplateCapabilityDiscoverable(
+  templateId: string,
+  capabilityDiscoverable: boolean,
+): Promise<TemplateRecord> {
+  return apiPost<TemplateRecord>(`/api/templates/${templateId}/capability-discoverable`, { capabilityDiscoverable });
+}
+
 export async function deleteTemplate(templateId: string): Promise<TemplateDeleteResponse> {
   return apiDelete<TemplateDeleteResponse>(`/api/templates/${templateId}`);
 }

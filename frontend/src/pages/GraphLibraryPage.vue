@@ -177,6 +177,21 @@
                   </button>
 
                   <div class="graph-library-page__actions" role="group" :aria-label="t('graphLibrary.actions')" @click.stop>
+                    <label v-if="item.kind === 'template'" class="graph-library-page__toggle">
+                      <span>
+                        {{
+                          item.capabilityDiscoverable && item.status === "active"
+                            ? t("graphLibrary.capabilityDiscoverableOn")
+                            : t("graphLibrary.capabilityDiscoverableOff")
+                        }}
+                      </span>
+                      <ElSwitch
+                        :model-value="item.status === 'active' && item.capabilityDiscoverable"
+                        :disabled="item.status !== 'active' || isItemActionPending(item)"
+                        :aria-label="capabilityDiscoverableToggleLabel(item)"
+                        @change="setTemplateCapabilityDiscoverable(item, Boolean($event))"
+                      />
+                    </label>
                     <template v-if="item.canManage">
                       <label class="graph-library-page__toggle">
                         <span>
@@ -184,7 +199,7 @@
                         </span>
                         <ElSwitch
                           :model-value="item.status === 'active'"
-                          :disabled="actionItemKey === itemKey(item)"
+                          :disabled="isItemActionPending(item)"
                           :aria-label="enabledToggleLabel(item)"
                           @change="setItemEnabled(item, Boolean($event))"
                         />
@@ -193,7 +208,7 @@
                         type="button"
                         class="graph-library-page__action"
                         :class="{ 'graph-library-page__action--danger': confirmingDeleteKey === itemKey(item) }"
-                        :disabled="actionItemKey === itemKey(item)"
+                        :disabled="isItemActionPending(item)"
                         data-virtual-affordance-destructive="true"
                         data-virtual-affordance-requires-confirmation="true"
                         @click="deleteItemFromCatalog(item)"
@@ -226,6 +241,7 @@ import {
   fetchTemplates,
   importGraphFromPythonSource,
   updateGraphStatus,
+  updateTemplateCapabilityDiscoverable,
   updateTemplateStatus,
 } from "@/api/graphs";
 import { isTooGraphPythonExportSource } from "@/editor/workspace/pythonImportModel";
@@ -312,6 +328,20 @@ function itemKey(item: GraphLibraryItem): string {
 
 function enabledToggleLabel(item: GraphLibraryItem): string {
   return item.status === "active" ? t("graphLibrary.disable") : t("graphLibrary.enable");
+}
+
+function capabilityActionKey(item: GraphLibraryItem): string {
+  return `capability:${itemKey(item)}`;
+}
+
+function isItemActionPending(item: GraphLibraryItem): boolean {
+  return actionItemKey.value === itemKey(item) || actionItemKey.value === capabilityActionKey(item);
+}
+
+function capabilityDiscoverableToggleLabel(item: GraphLibraryItem): string {
+  return item.capabilityDiscoverable && item.status === "active"
+    ? t("graphLibrary.disableCapabilityDiscovery")
+    : t("graphLibrary.enableCapabilityDiscovery");
 }
 
 function openBlankEditorGraph() {
@@ -430,6 +460,22 @@ async function setItemEnabled(item: GraphLibraryItem, enabled: boolean) {
     } else {
       replaceTemplate(await updateTemplateStatus(item.id, nextStatus));
     }
+  } catch (updateError) {
+    actionError.value = updateError instanceof Error ? updateError.message : t("common.loading");
+  } finally {
+    actionItemKey.value = null;
+  }
+}
+
+async function setTemplateCapabilityDiscoverable(item: GraphLibraryItem, capabilityDiscoverable: boolean) {
+  if (item.kind !== "template" || item.status !== "active") {
+    return;
+  }
+  actionItemKey.value = capabilityActionKey(item);
+  actionError.value = null;
+  confirmingDeleteKey.value = null;
+  try {
+    replaceTemplate(await updateTemplateCapabilityDiscoverable(item.id, capabilityDiscoverable));
   } catch (updateError) {
     actionError.value = updateError instanceof Error ? updateError.message : t("common.loading");
   } finally {

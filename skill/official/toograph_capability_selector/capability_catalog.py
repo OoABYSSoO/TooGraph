@@ -68,7 +68,7 @@ def normalize_selected_capability(**skill_inputs: Any) -> dict[str, Any]:
             selected=selected,
             candidate=None,
             skill_inputs=skill_inputs,
-            gap=f"Selected capability '{selected['key']}' is not enabled or no longer exists.",
+            gap=f"Selected capability '{selected['key']}' is not enabled, not discoverable, or no longer exists.",
         )
         return _none_response(audit)
 
@@ -134,7 +134,7 @@ def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], li
             template_id = _compact_text(payload.get("template_id") or payload.get("templateId") or path.parent.name)
             if not template_id:
                 continue
-            if not _is_asset_enabled(settings_entries.get(template_id)):
+            if not _is_template_enabled_for_capability_selection(settings_entries.get(template_id), payload):
                 continue
             if _is_template_hidden_from_capability_selector(payload):
                 continue
@@ -219,6 +219,21 @@ def _is_asset_enabled(settings_entry: Any) -> bool:
     if not isinstance(settings_entry, dict):
         return True
     return settings_entry.get("enabled", True) is not False
+
+
+def _is_template_enabled_for_capability_selection(settings_entry: Any, payload: dict[str, Any]) -> bool:
+    default_discoverable = _template_default_capability_discoverable(payload)
+    if not isinstance(settings_entry, dict):
+        return default_discoverable
+    return (
+        settings_entry.get("enabled", True) is not False
+        and settings_entry.get("capabilityDiscoverable", default_discoverable) is not False
+    )
+
+
+def _template_default_capability_discoverable(payload: dict[str, Any]) -> bool:
+    metadata = payload.get("metadata")
+    return not (isinstance(metadata, dict) and metadata.get("capabilityDiscoverableDefault") is False)
 
 
 def _is_template_hidden_from_capability_selector(payload: dict[str, Any]) -> bool:
