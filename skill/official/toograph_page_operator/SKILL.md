@@ -16,7 +16,7 @@ Current phase:
 - Emits a deterministic `operation_request_id` plus `expected_continuation` metadata so the frontend can resume the paused graph with `page_operation_context`, `page_context`, and `operation_result` after real UI execution.
 - Rejects Buddy self surfaces such as the Buddy page, Buddy floating window, Buddy avatar, and debug controls.
 - Does not expose DOM selectors, screen coordinates, double-click recipes, or low-level mouse trajectories to the LLM.
-- The official `toograph_page_operation_workflow` graph template is the preferred multi-step wrapper around this Skill. The Skill accepts or rejects one semantic operation; the template loops, waits for frontend confirmation, verifies refreshed page facts, and writes the final user explanation.
+- The official `toograph_page_operation_workflow` graph template is the preferred multi-step wrapper around this Skill. As a subgraph capability it exposes only the user's `user_goal`; page operation books and refreshed page facts come from Skill runtime context and resume payloads. The Skill accepts or rejects one semantic operation; the template loops, waits for frontend confirmation, verifies refreshed page facts, and writes the final user explanation.
 
 Graph state inputs:
 

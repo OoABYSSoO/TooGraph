@@ -141,6 +141,7 @@
 - 位置：`graph_template/official/toograph_page_operation_workflow/template.json`
 - 显示名称：`操作 TooGraph 页面`
 - 作用：把“打开页面、查看运行、切换页签、新建/编辑/运行图”等页面目标表达成可审计图流程：解析目标 -> 进入页面操作子图 -> 调用 `toograph_page_operator` 请求一次可见 UI 操作 -> 在操作节点后暂停，等待前端虚拟操作确认 -> 用刷新后的页面事实验证目标 -> 未完成且可继续时通过 condition 回到规划节点 -> 最终输出 `final_reply` 和结构化 `operation_report`。
+- 输入契约：作为可复用子图能力时只公开一个 input 节点 `user_goal`，内容是用户希望 TooGraph 页面达成的期望。页面操作书、当前页面事实和恢复后的操作结果都由运行时 `skill_runtime_context`、`toograph_page_operator` 和自动 resume payload 补充，不要求调用方手动绑定。
 - 断点语义：内部 `operation_loop` 子图声明 `interrupt_after: ["execute_page_operation"]`。页面操作器的 activity event 带 `expected_continuation`，前端执行虚拟点击、输入、等待或 Graph Edit Playback 后，只在 `operation_request_id` 匹配时自动恢复 run。
 - 验证语义：模板不会把“发出操作请求”当作完成。运行图目标必须看到 `triggered_run_id` 且触发 run 进入 `completed`、`failed` 或 `cancelled`；页面/页签/图编辑目标必须由最新 `page_facts`、路由、活跃图或 `graph_edit_summary` 支撑。无法完成时最终回复要明确是找不到目标、需要澄清、操作被阻止、页面快照过期、run 失败或用户中断。
 - 失败口径：模板 metadata 维护规范化 `failureGuidance`，当前覆盖 `target_graph_not_found`、`run_record_not_found`、`stale_page_snapshot`、`destructive_operation_blocked`、`triggered_run_failed` 和 `operation_interrupted`，最终回复应按这些原因给出简洁解释和必要的下一步信息。

@@ -62,7 +62,7 @@
 - 伙伴可见运行已经支持模板绑定：Buddy 页面可从可见模板列表选择运行模板，并按 input 节点把当前消息、对话历史、页面上下文和 Buddy Home 上下文绑定进去；权限模式只保留为运行 metadata，不作为图输入。
 - 官方 `buddy_autonomous_review` 已存在：主回复完成后由前端用 run snapshot 启动，模型自行判断是否需要低风险写回 Buddy Home，并通过 `buddy_home_writer` 走 command / revision 路径；它不进入普通模板列表和能力选择候选。
 - 官方 `toograph_skill_creation_workflow` 已存在：Skill 创建、测试、审查、写入通过图流程表达。
-- 官方 `toograph_page_operation_workflow` 已存在：页面目标解析、一次受控页面操作、前端虚拟操作确认、刷新页面上下文、目标验证和循环收束通过图模板表达，并只通过 `toograph_page_operator` 请求页面操作。它是能力选择器可发现的页面操作官方模板，候选上下文暴露目标流，失败解释收束为 `target_graph_not_found`、`run_record_not_found`、`stale_page_snapshot`、`destructive_operation_blocked`、`triggered_run_failed` 和 `operation_interrupted`。
+- 官方 `toograph_page_operation_workflow` 已存在：页面目标解析、一次受控页面操作、前端虚拟操作确认、刷新页面上下文、目标验证和循环收束通过图模板表达，并只通过 `toograph_page_operator` 请求页面操作。它是能力选择器可发现的页面操作官方模板，作为子图能力只公开 `user_goal` 一个 input；页面操作书、当前页面事实和操作结果由 Skill runtime context 与自动 resume payload 补充。候选上下文暴露目标流，失败解释收束为 `target_graph_not_found`、`run_record_not_found`、`stale_page_snapshot`、`destructive_operation_blocked`、`triggered_run_failed` 和 `operation_interrupted`。
 - `advanced_web_research_loop` 已证明“Skill 执行 -> 证据评估 -> 条件循环 -> final_reply”的图式工具循环可行。
 - 伙伴浮窗已有按父图公开输出分组的运行过程胶囊、节点级流式输出预览、每步耗时、完成后折叠摘要、请求理解阶段的 `visible_reply` 上下文、正式 root output 回复和后台复盘解耦。
 - 伙伴聊天消息已经收敛到父图 root output 协议：一次用户提问可以产生多个由 output 节点声明的独立输出，每个输出独立流式、独立计时；默认 `buddy_autonomous_loop` 只公开 `final_reply`。
@@ -752,7 +752,7 @@ LLM 目标图编辑意图
 
 当前已落地的基础链路是：页面操作书在编辑器页暴露 `graph_edit editor.graph.playback`；`toograph_page_operator` 接受 `graph_edit_intents`；Buddy 虚拟操作协议解析 `graph_edit` operation；虚拟鼠标定位到 `editor.canvas.surface` 后，通过前端 `toograph:graph-edit-playback-*` 事件驱动 `EditorWorkspaceShell` 编译 playback steps，并沿编辑器已有交互路径可见地展开菜单、创建节点、逐字键入、按目标位置落点、拖拽连线和跳过已存在的重命名或连线。编辑器“新建图”子菜单里的可见调试板支持粘贴 JSON 或导入 Python 图后回放搭建。后续仍应把 operation journal、activity events、graph diff、revision、undo/redo、失败重试和编辑已有图做完整。
 
-`toograph_page_operation_workflow` 是这条链路的官方图模板入口。能力选择器应优先把“操作 TooGraph 页面”的多步目标路由到该模板，而不是直接选择单次 `toograph_page_operator` Skill；只有模板内部的单步执行节点才绑定页面操作器。模板最终回复必须按结构化验证结果解释失败，尤其区分找不到目标图、找不到运行记录、页面快照过期、破坏性操作被阻止、触发 run 失败和操作中断。
+`toograph_page_operation_workflow` 是这条链路的官方图模板入口。能力选择器应优先把“操作 TooGraph 页面”的多步目标路由到该模板，而不是直接选择单次 `toograph_page_operator` Skill；只有模板内部的单步执行节点才绑定页面操作器。该模板作为子图能力时只接收用户期望 `user_goal`，不把页面操作书或页面上下文暴露为调用方 input。模板最终回复必须按结构化验证结果解释失败，尤其区分找不到目标图、找不到运行记录、页面快照过期、破坏性操作被阻止、触发 run 失败和操作中断。
 
 ### Skill 生命周期边界
 

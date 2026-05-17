@@ -28,14 +28,6 @@
       "color": "#0284c7",
       "binding": null
     },
-    "conversation_history": {
-      "name": "对话历史",
-      "description": "可选的近期会话上下文，用于解析“刚才那个图”等指代。",
-      "type": "markdown",
-      "value": "",
-      "color": "#64748b",
-      "binding": null
-    },
     "goal_plan": {
       "name": "目标计划",
       "description": "目标类型、目标对象线索、副作用、成功标准和停止条件。",
@@ -167,43 +159,13 @@
       "writes": [{ "state": "user_goal", "mode": "replace" }],
       "config": { "value": "打开运行记录", "boundaryType": "text" }
     },
-    "input_page_context": {
-      "kind": "input",
-      "name": "输入页面上下文",
-      "description": "当前页面的可读上下文。",
-      "ui": { "position": { "x": 80, "y": 260 }, "collapsed": false },
-      "reads": [],
-      "writes": [{ "state": "page_context", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "markdown" }
-    },
-    "input_page_operation_context": {
-      "kind": "input",
-      "name": "输入页面操作书",
-      "description": "当前页面结构化操作书和页面事实。",
-      "ui": { "position": { "x": 80, "y": 420 }, "collapsed": false },
-      "reads": [],
-      "writes": [{ "state": "page_operation_context", "mode": "replace" }],
-      "config": { "value": {}, "boundaryType": "json" }
-    },
-    "input_conversation_history": {
-      "kind": "input",
-      "name": "输入会话历史",
-      "description": "可选近期上下文。",
-      "ui": { "position": { "x": 80, "y": 580 }, "collapsed": false },
-      "reads": [],
-      "writes": [{ "state": "conversation_history", "mode": "replace" }],
-      "config": { "value": "", "boundaryType": "markdown" }
-    },
     "classify_goal": {
       "kind": "agent",
       "name": "解析页面目标",
       "description": "把用户意图转成可验证页面目标和成功标准。",
       "ui": { "position": { "x": 460, "y": 320 }, "collapsed": false },
       "reads": [
-        { "state": "user_goal", "required": true },
-        { "state": "page_context", "required": true },
-        { "state": "page_operation_context", "required": true },
-        { "state": "conversation_history", "required": false }
+        { "state": "user_goal", "required": true }
       ],
       "writes": [
         { "state": "goal_plan", "mode": "replace" },
@@ -213,7 +175,7 @@
         "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "分析 user_goal、page_context、page_operation_context 和 conversation_history，写入 goal_plan JSON。必须包含 goal_type、target_hints、required_side_effects、success_criteria、requires_run_terminal_status(boolean)、requires_save(boolean)、risk_notes、failure_boundaries。支持查看记录、打开页面或页签、新建图、编辑图、运行图。loop_trace 初始化为空数组。不要发起页面操作。",
+        "taskInstruction": "分析 user_goal，写入 goal_plan JSON。必须包含 goal_type、target_hints、required_side_effects、success_criteria、requires_run_terminal_status(boolean)、requires_save(boolean)、risk_notes、failure_boundaries。支持查看记录、打开页面或页签、新建图、编辑图、运行图。loop_trace 初始化为空数组。不要发起页面操作；页面操作书由后续页面操作器 Skill 的 runtime context 自动注入。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "high",
@@ -227,9 +189,6 @@
       "ui": { "position": { "x": 900, "y": 320 }, "collapsed": false },
       "reads": [
         { "state": "user_goal", "required": true },
-        { "state": "page_context", "required": true },
-        { "state": "page_operation_context", "required": true },
-        { "state": "conversation_history", "required": true },
         { "state": "goal_plan", "required": true },
         { "state": "loop_trace", "required": true }
       ],
@@ -251,7 +210,6 @@
             "user_goal": { "name": "用户目标", "description": "用户希望完成的页面操作目标。", "type": "text", "value": "", "color": "#d97706", "binding": null },
             "page_context": { "name": "页面上下文", "description": "当前页面可读上下文。", "type": "markdown", "value": "", "color": "#0891b2", "binding": null },
             "page_operation_context": { "name": "页面操作上下文", "description": "页面操作书、快照和事实。", "type": "json", "value": {}, "color": "#0284c7", "binding": null },
-            "conversation_history": { "name": "对话历史", "description": "可选近期上下文。", "type": "markdown", "value": "", "color": "#64748b", "binding": null },
             "goal_plan": { "name": "目标计划", "description": "目标分类、成功标准和停止条件。", "type": "json", "value": {}, "color": "#16a34a", "binding": null },
             "operation_request": { "name": "下一步操作请求", "description": "本轮页面操作计划。", "type": "json", "value": {}, "color": "#7c3aed", "binding": null },
             "operation_ok": { "name": "操作请求已接受", "description": "页面操作器是否接受本轮请求。", "type": "boolean", "value": false, "color": "#16a34a", "binding": { "kind": "skill_output", "skillKey": "toograph_page_operator", "nodeId": "execute_page_operation", "fieldKey": "ok", "managed": true } },
@@ -274,38 +232,11 @@
               "writes": [{ "state": "user_goal", "mode": "replace" }],
               "config": { "value": "", "boundaryType": "text" }
             },
-            "input_page_context": {
-              "kind": "input",
-              "name": "页面上下文边界",
-              "description": "从父图读取页面上下文。",
-              "ui": { "position": { "x": 60, "y": 280 }, "collapsed": false },
-              "reads": [],
-              "writes": [{ "state": "page_context", "mode": "replace" }],
-              "config": { "value": "", "boundaryType": "markdown" }
-            },
-            "input_page_operation_context": {
-              "kind": "input",
-              "name": "页面操作书边界",
-              "description": "从父图读取结构化页面操作上下文。",
-              "ui": { "position": { "x": 60, "y": 440 }, "collapsed": false },
-              "reads": [],
-              "writes": [{ "state": "page_operation_context", "mode": "replace" }],
-              "config": { "value": {}, "boundaryType": "json" }
-            },
-            "input_conversation_history": {
-              "kind": "input",
-              "name": "会话历史边界",
-              "description": "从父图读取可选会话历史。",
-              "ui": { "position": { "x": 60, "y": 600 }, "collapsed": false },
-              "reads": [],
-              "writes": [{ "state": "conversation_history", "mode": "replace" }],
-              "config": { "value": "", "boundaryType": "markdown" }
-            },
             "input_goal_plan": {
               "kind": "input",
               "name": "目标计划边界",
               "description": "从父图读取目标计划。",
-              "ui": { "position": { "x": 60, "y": 760 }, "collapsed": false },
+              "ui": { "position": { "x": 60, "y": 280 }, "collapsed": false },
               "reads": [],
               "writes": [{ "state": "goal_plan", "mode": "replace" }],
               "config": { "value": {}, "boundaryType": "json" }
@@ -314,7 +245,7 @@
               "kind": "input",
               "name": "循环轨迹边界",
               "description": "从父图读取已有循环轨迹。",
-              "ui": { "position": { "x": 60, "y": 920 }, "collapsed": false },
+              "ui": { "position": { "x": 60, "y": 440 }, "collapsed": false },
               "reads": [],
               "writes": [{ "state": "loop_trace", "mode": "replace" }],
               "config": { "value": [], "boundaryType": "json" }
@@ -326,9 +257,6 @@
               "ui": { "position": { "x": 480, "y": 460 }, "collapsed": false },
               "reads": [
                 { "state": "user_goal", "required": true },
-                { "state": "page_context", "required": true },
-                { "state": "page_operation_context", "required": true },
-                { "state": "conversation_history", "required": false },
                 { "state": "goal_plan", "required": true },
                 { "state": "operation_result", "required": false },
                 { "state": "goal_review", "required": false },
@@ -339,7 +267,7 @@
                 "skillKey": "",
                 "skillBindings": [],
                 "skillInstructionBlocks": {},
-                "taskInstruction": "选择下一步页面操作并写 operation_request JSON。必须只使用 page_operation_context.page_operation_book 中可用的语义目标，不输出 DOM selector、坐标、截图描述或浏览器自动化步骤。字段至少包含 target_id、command、reason、expected_route、expected_entity、expected_run、expected_graph_change、requires_terminal_run、blocked_reason。若目标已完成，blocked_reason 写 already_completed，且 command 为空；若缺少必要信息，blocked_reason 写 needs_clarification。不要调用技能。",
+                "taskInstruction": "根据 user_goal、goal_plan、operation_result、goal_review 和 loop_trace 选择下一步页面操作意图并写 operation_request JSON。不要输出 DOM selector、坐标、截图描述或浏览器自动化步骤；具体可用命令由下一节点绑定的页面操作器 Skill 从 runtime context 的页面操作书中选择。字段至少包含 target_hint、semantic_intent、reason、expected_route、expected_entity、expected_run、expected_graph_change、requires_terminal_run、blocked_reason。若目标已完成，blocked_reason 写 already_completed；若缺少必要信息，blocked_reason 写 needs_clarification。不要调用技能。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "high",
@@ -353,7 +281,6 @@
               "ui": { "position": { "x": 940, "y": 460 }, "collapsed": false },
               "reads": [
                 { "state": "user_goal", "required": true },
-                { "state": "page_operation_context", "required": true },
                 { "state": "goal_plan", "required": true },
                 { "state": "operation_request", "required": true },
                 { "state": "loop_trace", "required": false }
@@ -538,9 +465,6 @@
           },
           "edges": [
             { "source": "input_user_goal", "target": "plan_next_operation" },
-            { "source": "input_page_context", "target": "plan_next_operation" },
-            { "source": "input_page_operation_context", "target": "plan_next_operation" },
-            { "source": "input_conversation_history", "target": "plan_next_operation" },
             { "source": "input_goal_plan", "target": "plan_next_operation" },
             { "source": "input_loop_trace", "target": "plan_next_operation" },
             { "source": "plan_next_operation", "target": "execute_page_operation" },
@@ -576,9 +500,7 @@
         { "state": "goal_review", "required": true },
         { "state": "operation_result", "required": false },
         { "state": "operation_report", "required": false },
-        { "state": "loop_trace", "required": false },
-        { "state": "page_context", "required": true },
-        { "state": "page_operation_context", "required": true }
+        { "state": "loop_trace", "required": false }
       ],
       "writes": [{ "state": "final_reply", "mode": "replace" }],
       "config": {
@@ -613,9 +535,6 @@
   },
   "edges": [
     { "source": "input_user_goal", "target": "classify_goal" },
-    { "source": "input_page_context", "target": "classify_goal" },
-    { "source": "input_page_operation_context", "target": "classify_goal" },
-    { "source": "input_conversation_history", "target": "classify_goal" },
     { "source": "classify_goal", "target": "operation_loop" },
     { "source": "operation_loop", "target": "draft_final_reply" },
     { "source": "draft_final_reply", "target": "output_final_reply" },

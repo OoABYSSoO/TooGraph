@@ -579,7 +579,6 @@ class TemplateLayoutTests(unittest.TestCase):
                 "user_goal",
                 "page_context",
                 "page_operation_context",
-                "conversation_history",
                 "goal_plan",
                 "operation_request",
                 "operation_ok",
@@ -597,18 +596,21 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["user_goal"]["type"], "text")
         self.assertEqual(states["page_context"]["type"], "markdown")
         self.assertEqual(states["page_operation_context"]["type"], "json")
-        self.assertEqual(states["conversation_history"]["type"], "markdown")
         self.assertEqual(states["goal_plan"]["type"], "json")
         self.assertEqual(states["operation_request_id"]["binding"]["fieldKey"], "operation_request_id")
         self.assertEqual(states["operation_report"]["type"], "json")
 
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "input"],
+            ["input_user_goal"],
+        )
+        self.assertEqual(_read_contracts(nodes["classify_goal"]["reads"]), [{"state": "user_goal", "required": True}])
+        self.assertEqual(
+            _read_contracts(nodes["operation_loop"]["reads"]),
             [
-                "input_user_goal",
-                "input_page_context",
-                "input_page_operation_context",
-                "input_conversation_history",
+                {"state": "user_goal", "required": True},
+                {"state": "goal_plan", "required": True},
+                {"state": "loop_trace", "required": True},
             ],
         )
         self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "subgraph"], ["operation_loop"])
