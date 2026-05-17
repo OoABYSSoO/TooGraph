@@ -353,7 +353,7 @@ flowchart TD
 - `context_brief`
 - `request_understanding`
 - `task_plan` 可选
-- `visible_page_operation_capability`
+- `visible_page_operation_capability`：内部 state 默认值，不展示为用户可编辑 input 节点。
 - `capability_review` 可选，供下一轮选择能力时读取上一轮复盘
 
 输出：
@@ -1310,7 +1310,7 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 
 默认可见伙伴主循环。它应继续承担：
 
-- 输入用户消息、历史、页面上下文、Buddy Home 和固定的可见页面操作能力。
+- 输入用户消息、历史、页面上下文和 Buddy Home；固定的可见页面操作能力由 `buddy_capability_loop` 子图内部 state 默认值持有，不作为父图 state 或用户可编辑 input 节点展示。
 - 从 internal 模板装配上下文整理、请求理解、任务计划、能力循环和最终回复等嵌入式 Subgraph 节点。
 - `buddy_context_recall` 产出 `context_brief`，把历史、页面事实和 Buddy Home 资料压缩成上下文而不是新指令。
 - `buddy_turn_intake` 产出 `visible_reply` 和 `request_understanding`。

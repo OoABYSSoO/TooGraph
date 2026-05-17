@@ -126,19 +126,6 @@
         "managed": true
       }
     },
-    "visible_page_operation_capability": {
-      "name": "visible_page_operation_capability",
-      "description": "伙伴运行目标图模板时使用的内部可见页面操作子图能力。",
-      "type": "capability",
-      "value": {
-        "kind": "subgraph",
-        "key": "toograph_page_operation_workflow",
-        "name": "操作 TooGraph 页面",
-        "description": "内部可见页面操作通道，用于打开并运行选中的目标图模板。"
-      },
-      "color": "#0ea5e9",
-      "binding": null
-    },
     "capability_review": {
       "name": "capability_review",
       "description": "能力执行复盘。",
@@ -281,34 +268,6 @@
           ]
         },
         "boundaryType": "file"
-      }
-    },
-    "input_visible_page_operation_capability": {
-      "kind": "input",
-      "name": "可见页面操作能力",
-      "description": "",
-      "ui": {
-        "position": {
-          "x": 80,
-          "y": 760
-        },
-        "collapsed": true
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "visible_page_operation_capability",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": {
-          "kind": "subgraph",
-          "key": "toograph_page_operation_workflow",
-          "name": "操作 TooGraph 页面",
-          "description": "内部可见页面操作通道，用于打开并运行选中的目标图模板。"
-        },
-        "boundaryType": "capability"
       }
     },
     "buddy_context_recall": {
@@ -1509,10 +1468,6 @@
         {
           "state": "task_plan",
           "required": true
-        },
-        {
-          "state": "visible_page_operation_capability",
-          "required": true
         }
       ],
       "writes": [
@@ -1890,34 +1845,6 @@
               "config": {
                 "value": {},
                 "boundaryType": "json"
-              }
-            },
-            "input_visible_page_operation_capability": {
-              "kind": "input",
-              "name": "可见页面操作能力",
-              "description": "内部固定能力，用于把目标图模板运行映射到可见页面操作 workflow。",
-              "ui": {
-                "position": {
-                  "x": 40,
-                  "y": 780
-                },
-                "collapsed": true
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "visible_page_operation_capability",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": {
-                  "kind": "subgraph",
-                  "key": "toograph_page_operation_workflow",
-                  "name": "操作 TooGraph 页面",
-                  "description": "内部可见页面操作通道，用于打开并运行选中的目标图模板。"
-                },
-                "boundaryType": "capability"
               }
             },
             "select_capability": {

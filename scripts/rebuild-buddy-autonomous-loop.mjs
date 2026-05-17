@@ -165,6 +165,17 @@ function insertEntriesAfter(source, afterKey, insertedEntries) {
   return result;
 }
 
+function removeNodeReferences(template, nodeId) {
+  delete template.nodes[nodeId];
+  template.edges = (template.edges ?? []).filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
+  template.conditional_edges = (template.conditional_edges ?? []).map((edge) => {
+    const branches = Object.fromEntries(
+      Object.entries(edge.branches ?? {}).filter(([, target]) => target !== nodeId),
+    );
+    return { ...edge, branches };
+  });
+}
+
 function commonStateSchema() {
   return {
     user_message: state({
@@ -563,6 +574,7 @@ function patchRequestIntakeTemplate(template) {
 function patchCapabilityLoopTemplate(template) {
   template.state_schema.context_brief = contextBriefState();
   template.state_schema.task_plan = taskPlanState();
+  removeNodeReferences(template, "input_visible_page_operation_capability");
   template.nodes = insertEntriesAfter(template.nodes, "input_request_understanding", [
     [
       "input_context_brief",
@@ -887,7 +899,6 @@ function buildBuddyAutonomousLoopTemplate(templates) {
     capability_found: cap.capability_found,
     capability_selection_audit: cap.capability_selection_audit,
     capability_result: cap.capability_result,
-    visible_page_operation_capability: cap.visible_page_operation_capability,
     capability_review: cap.capability_review,
     capability_gap: cap.capability_gap,
     capability_trace: cap.capability_trace,
@@ -945,15 +956,6 @@ function buildBuddyAutonomousLoopTemplate(templates) {
         stateKey: "buddy_context",
         boundaryType: "file",
         value: buddyHomeSelection,
-      }),
-      input_visible_page_operation_capability: inputNode({
-        name: "可见页面操作能力",
-        x: 80,
-        y: 760,
-        stateKey: "visible_page_operation_capability",
-        boundaryType: "capability",
-        value: visiblePageOperationCapability,
-        collapsed: true,
       }),
       buddy_context_recall: subgraphNode({
         name: "上下文召回",
@@ -1030,7 +1032,6 @@ function buildBuddyAutonomousLoopTemplate(templates) {
           read("request_understanding"),
           read("context_brief"),
           read("task_plan"),
-          read("visible_page_operation_capability"),
         ],
         writes: [
           write("selected_capability"),

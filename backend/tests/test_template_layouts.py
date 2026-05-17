@@ -417,19 +417,10 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["selected_capability"]["type"], "capability")
         self.assertEqual(states["capability_found"]["type"], "boolean")
         self.assertEqual(states["capability_result"]["type"], "result_package")
-        self.assertEqual(states["visible_page_operation_capability"]["type"], "capability")
-        self.assertEqual(
-            states["visible_page_operation_capability"]["value"],
-            {
-                "kind": "subgraph",
-                "key": "toograph_page_operation_workflow",
-                "name": "操作 TooGraph 页面",
-                "description": "内部可见页面操作通道，用于打开并运行选中的目标图模板。",
-            },
-        )
         self.assertEqual(states["capability_selection_audit"]["type"], "json")
         self.assertEqual(states["capability_gap"]["type"], "json")
         self.assertEqual(states["capability_trace"]["type"], "json")
+        self.assertNotIn("visible_page_operation_capability", states)
         self.assertEqual(states["visible_reply"]["type"], "markdown")
         self.assertEqual(states["final_reply"]["type"], "markdown")
         self.assertNotIn("buddy_mode", states)
@@ -523,14 +514,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn("context_only", context_graph["nodes"]["prepare_context_brief"]["config"]["taskInstruction"])
         self.assertIn({"state": "context_brief", "mode": "replace"}, nodes["buddy_context_recall"]["writes"])
 
-        visible_page_operation_input = nodes["input_visible_page_operation_capability"]
-        self.assertEqual(visible_page_operation_input["kind"], "input")
-        self.assertEqual(visible_page_operation_input["config"]["boundaryType"], "capability")
-        self.assertEqual(
-            visible_page_operation_input["config"]["value"]["key"],
-            "toograph_page_operation_workflow",
-        )
-        self.assertIn(
+        self.assertNotIn("input_visible_page_operation_capability", nodes)
+        self.assertNotIn(
             {"state": "visible_page_operation_capability", "required": True},
             _read_contracts(nodes["buddy_capability_loop"]["reads"]),
         )
@@ -644,7 +629,10 @@ class TemplateLayoutTests(unittest.TestCase):
             },
         )
         self.assertEqual(cycle_graph["state_schema"]["visible_subgraph_operation_result"]["type"], "result_package")
-        self.assertIn("input_visible_page_operation_capability", cycle_graph["nodes"])
+        self.assertNotIn("input_visible_page_operation_capability", cycle_graph["nodes"])
+        for edge in cycle_graph["edges"]:
+            self.assertNotEqual(edge.get("source"), "input_visible_page_operation_capability")
+            self.assertNotEqual(edge.get("target"), "input_visible_page_operation_capability")
         self.assertEqual(
             cycle_graph["nodes"]["selected_capability_is_subgraph"]["config"]["rule"],
             {"source": "$state.selected_capability.kind", "operator": "==", "value": "subgraph"},

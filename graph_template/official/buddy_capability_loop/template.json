@@ -348,34 +348,6 @@
         "boundaryType": "json"
       }
     },
-    "input_visible_page_operation_capability": {
-      "kind": "input",
-      "name": "可见页面操作能力",
-      "description": "内部固定能力，用于把目标图模板运行映射到可见页面操作 workflow。",
-      "ui": {
-        "position": {
-          "x": 40,
-          "y": 780
-        },
-        "collapsed": true
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "visible_page_operation_capability",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": {
-          "kind": "subgraph",
-          "key": "toograph_page_operation_workflow",
-          "name": "操作 TooGraph 页面",
-          "description": "内部可见页面操作通道，用于打开并运行选中的目标图模板。"
-        },
-        "boundaryType": "capability"
-      }
-    },
     "select_capability": {
       "kind": "agent",
       "name": "选择能力",
