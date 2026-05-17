@@ -110,6 +110,19 @@
         "managed": true
       }
     },
+    "visible_page_operation_capability": {
+      "name": "visible_page_operation_capability",
+      "description": "伙伴运行目标图模板时使用的内部可见页面操作子图能力。",
+      "type": "capability",
+      "value": {
+        "kind": "subgraph",
+        "key": "toograph_page_operation_workflow",
+        "name": "操作 TooGraph 页面",
+        "description": "内部可见页面操作通道，用于打开并运行选中的目标图模板。"
+      },
+      "color": "#0ea5e9",
+      "binding": null
+    },
     "capability_review": {
       "name": "capability_review",
       "description": "对能力选择、权限、执行结果和是否继续调用能力的复盘。",
@@ -252,6 +265,34 @@
           ]
         },
         "boundaryType": "file"
+      }
+    },
+    "input_visible_page_operation_capability": {
+      "kind": "input",
+      "name": "可见页面操作能力",
+      "description": "内部固定能力，用于把目标图模板运行映射到可见页面操作 workflow。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 920
+        },
+        "collapsed": true
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "visible_page_operation_capability",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": {
+          "kind": "subgraph",
+          "key": "toograph_page_operation_workflow",
+          "name": "操作 TooGraph 页面",
+          "description": "内部可见页面操作通道，用于打开并运行选中的目标图模板。"
+        },
+        "boundaryType": "capability"
       }
     },
     "buddy_turn_intake": {
@@ -816,6 +857,10 @@
         {
           "state": "request_understanding",
           "required": true
+        },
+        {
+          "state": "visible_page_operation_capability",
+          "required": true
         }
       ],
       "writes": [
@@ -954,6 +999,31 @@
               "binding": {
                 "kind": "capability_result",
                 "nodeId": "execute_capability",
+                "managed": true
+              }
+            },
+            "visible_page_operation_capability": {
+              "name": "visible_page_operation_capability",
+              "description": "伙伴运行目标图模板时使用的内部可见页面操作子图能力。",
+              "type": "capability",
+              "value": {
+                "kind": "subgraph",
+                "key": "toograph_page_operation_workflow",
+                "name": "操作 TooGraph 页面",
+                "description": "内部可见页面操作通道，用于打开并运行选中的目标图模板。"
+              },
+              "color": "#0ea5e9",
+              "binding": null
+            },
+            "visible_subgraph_operation_result": {
+              "name": "visible_subgraph_operation_result",
+              "description": "通过页面操作 workflow 可见运行目标图模板后的原始结果包。",
+              "type": "result_package",
+              "value": {},
+              "color": "#0ea5e9",
+              "binding": {
+                "kind": "capability_result",
+                "nodeId": "execute_visible_subgraph_operation",
                 "managed": true
               }
             },
@@ -1108,6 +1178,34 @@
                 "boundaryType": "json"
               }
             },
+            "input_visible_page_operation_capability": {
+              "kind": "input",
+              "name": "可见页面操作能力",
+              "description": "内部固定能力，用于把目标图模板运行映射到可见页面操作 workflow。",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 780
+                },
+                "collapsed": true
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "visible_page_operation_capability",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": {
+                  "kind": "subgraph",
+                  "key": "toograph_page_operation_workflow",
+                  "name": "操作 TooGraph 页面",
+                  "description": "内部可见页面操作通道，用于打开并运行选中的目标图模板。"
+                },
+                "boundaryType": "capability"
+              }
+            },
             "select_capability": {
               "kind": "agent",
               "name": "选择能力",
@@ -1210,6 +1308,42 @@
                 }
               }
             },
+            "selected_capability_is_subgraph": {
+              "kind": "condition",
+              "name": "目标是图模板?",
+              "description": "图模板能力走可见页面操作通道；Skill 能力继续走动态 Skill 执行。",
+              "ui": {
+                "position": {
+                  "x": 1120,
+                  "y": 320
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "selected_capability",
+                  "required": true
+                }
+              ],
+              "writes": [],
+              "config": {
+                "branches": [
+                  "true",
+                  "false",
+                  "exhausted"
+                ],
+                "loopLimit": 3,
+                "branchMapping": {
+                  "true": "true",
+                  "false": "false"
+                },
+                "rule": {
+                  "source": "$state.selected_capability.kind",
+                  "operator": "==",
+                  "value": "subgraph"
+                }
+              }
+            },
             "review_missing_capability": {
               "kind": "agent",
               "name": "无匹配能力复盘",
@@ -1255,7 +1389,7 @@
             "execute_capability": {
               "kind": "agent",
               "name": "执行能力",
-              "description": "根据 capability state 动态执行一个 Skill 或图模板，并把原始结果写入 result_package。",
+              "description": "根据 capability state 动态执行一个 Skill，并把原始结果写入 result_package。",
               "ui": {
                 "position": {
                   "x": 3000,
@@ -1295,10 +1429,124 @@
                 "skillKey": "",
                 "skillBindings": [],
                 "skillInstructionBlocks": {},
-                "taskInstruction": "你只负责为 selected_capability 准备一次运行输入。若 selected_capability.kind 是 subgraph，LLM 只需要保留目标模板 key/name；具体打开图与模板、搜索目标模板、点开模板、把本次目标写入 input 节点、点击运行、等待结果由页面操作器的 template_target 固定映射完成，不要规划逐步鼠标命令，也不要把模板作为不可见后台调用来总结。若 selected_capability.kind 是 skill，运行时执行该 Skill。执行结果会写入 capability_result result_package。\n不要总结、改写或二次包装执行结果；动态能力执行结果必须保持 outputs.<outputKey> = { name, description, type, value }。",
+                "taskInstruction": "你只负责为 selected_capability.kind=skill 的能力准备一次运行输入。若 selected_capability.kind 是 subgraph，本节点不应被条件路由调用；图模板能力会走 execute_visible_subgraph_operation，经页面操作器可见打开模板、写入 input 节点、点击运行并等待结果。Skill 执行结果会写入 capability_result result_package。\n不要总结、改写或二次包装执行结果；动态能力执行结果必须保持 outputs.<outputKey> = { name, description, type, value }。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "high",
+                "temperature": 0.1
+              }
+            },
+            "execute_visible_subgraph_operation": {
+              "kind": "agent",
+              "name": "可见运行图模板能力",
+              "description": "把原始目标图模板转成页面操作 workflow，通过虚拟鼠标打开、输入目标并运行模板。",
+              "ui": {
+                "position": {
+                  "x": 3000,
+                  "y": 300
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "visible_page_operation_capability",
+                  "required": true
+                },
+                {
+                  "state": "user_message",
+                  "required": true
+                },
+                {
+                  "state": "page_context",
+                  "required": false
+                },
+                {
+                  "state": "buddy_context",
+                  "required": true
+                },
+                {
+                  "state": "request_understanding",
+                  "required": true
+                },
+                {
+                  "state": "capability_selection_audit",
+                  "required": true
+                }
+              ],
+              "writes": [
+                {
+                  "state": "visible_subgraph_operation_result",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "skillKey": "",
+                "skillBindings": [],
+                "skillInstructionBlocks": {},
+                "taskInstruction": "你只负责为 visible_page_operation_capability 准备一次 toograph_page_operation_workflow 的输入；本节点唯一的动态 capability 来源是 visible_page_operation_capability，不要直接执行 capability_selection_audit.selected 指向的目标图模板。必须从 capability_selection_audit.selected 读取目标模板 key/name，并把 toograph_page_operation_workflow 的 user_goal 写成：运行图模板 <selected.name 或 selected.key>；本次目标：<request_understanding.user_goal 或 user_message>。如果 selected.key 存在，也把模板 key 放进 user_goal。之后由页面操作器的 template_target 固定映射执行打开图与模板、搜索目标模板、点开模板、把本次目标写入 input 节点、点击运行并等待结果。不要输出 DOM selector、坐标或逐步鼠标命令。",
+                "modelSource": "global",
+                "model": "",
+                "thinkingMode": "high",
+                "temperature": 0.1
+              }
+            },
+            "adapt_visible_subgraph_result": {
+              "kind": "agent",
+              "name": "适配可见图模板结果",
+              "description": "把页面操作 workflow 的结果包重新标记为原始目标图模板能力的结果包。",
+              "ui": {
+                "position": {
+                  "x": 3370,
+                  "y": 300
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "capability_selection_audit",
+                  "required": true
+                },
+                {
+                  "state": "visible_subgraph_operation_result",
+                  "required": true
+                },
+                {
+                  "state": "user_message",
+                  "required": true
+                },
+                {
+                  "state": "request_understanding",
+                  "required": true
+                }
+              ],
+              "writes": [
+                {
+                  "state": "capability_result",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "skillKey": "buddy_visible_subgraph_result_adapter",
+                "skillBindings": [
+                  {
+                    "skillKey": "buddy_visible_subgraph_result_adapter",
+                    "outputMapping": {
+                      "result_package": "capability_result"
+                    }
+                  }
+                ],
+                "skillInstructionBlocks": {
+                  "buddy_visible_subgraph_result_adapter": {
+                    "skillKey": "buddy_visible_subgraph_result_adapter",
+                    "title": "可见子图结果适配 skill instruction",
+                    "content": "只调用 buddy_visible_subgraph_result_adapter。selected_capability 必须从 capability_selection_audit.selected 复制；visible_operation_result 必须完整复制 visible_subgraph_operation_result；user_goal 优先使用 request_understanding.user_goal，其次 user_message。不要总结、重写或发明运行结果。",
+                    "source": "node.override"
+                  }
+                },
+                "taskInstruction": "本节点只负责把可见页面操作结果适配回原始目标图模板能力结果。不要读取 selected_capability capability state；使用 capability_selection_audit.selected 作为原始目标能力。",
+                "modelSource": "global",
+                "model": "",
+                "thinkingMode": "low",
                 "temperature": 0.1
               }
             },
@@ -1622,6 +1870,14 @@
               "target": "review_capability_result"
             },
             {
+              "source": "execute_visible_subgraph_operation",
+              "target": "adapt_visible_subgraph_result"
+            },
+            {
+              "source": "adapt_visible_subgraph_result",
+              "target": "review_capability_result"
+            },
+            {
               "source": "review_capability_result",
               "target": "continue_capability_loop"
             },
@@ -1658,9 +1914,17 @@
             {
               "source": "capability_found_condition",
               "branches": {
-                "true": "execute_capability",
+                "true": "selected_capability_is_subgraph",
                 "false": "review_missing_capability",
                 "exhausted": "review_missing_capability"
+              }
+            },
+            {
+              "source": "selected_capability_is_subgraph",
+              "branches": {
+                "true": "execute_visible_subgraph_operation",
+                "false": "execute_capability",
+                "exhausted": "execute_capability"
               }
             },
             {

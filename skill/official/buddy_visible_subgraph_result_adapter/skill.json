@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "toograph.skill/v1",
+  "skillKey": "buddy_visible_subgraph_result_adapter",
+  "name": "伙伴可见子图结果适配器",
+  "description": "Internal adapter that wraps a visible page-operation template run back into the originally selected Buddy subgraph capability result package.",
+  "llmInstruction": "你已绑定伙伴可见子图结果适配器。只把上游 capability_selection_audit.selected、visible_subgraph_operation_result、user_message/request_understanding.user_goal 复制进结构化参数：selected_capability、visible_operation_result、user_goal、reason。不要改写运行结果，不要总结，不要发明 run id 或输出字段。",
+  "version": "0.1.0",
+  "timeoutSeconds": 30,
+  "permissions": [],
+  "metadata": {
+    "internal": true
+  },
+  "stateInputSchema": [
+    {
+      "key": "capability_selection_audit",
+      "name": "Capability Selection Audit",
+      "valueType": "json",
+      "description": "能力选择审计，其中 selected 表示原始目标 subgraph capability。"
+    },
+    {
+      "key": "visible_subgraph_operation_result",
+      "name": "Visible Subgraph Operation Result",
+      "valueType": "result_package",
+      "description": "内部页面操作 workflow 返回的 result_package。"
+    },
+    {
+      "key": "user_message",
+      "name": "User Message",
+      "valueType": "text",
+      "description": "用户本轮原始消息。"
+    },
+    {
+      "key": "request_understanding",
+      "name": "Request Understanding",
+      "valueType": "json",
+      "description": "请求理解，可包含 user_goal。"
+    }
+  ],
+  "llmOutputSchema": [
+    {
+      "key": "selected_capability",
+      "name": "Selected Capability",
+      "valueType": "json",
+      "description": "从 capability_selection_audit.selected 复制的原始目标能力，必须是 kind=subgraph。"
+    },
+    {
+      "key": "visible_operation_result",
+      "name": "Visible Operation Result",
+      "valueType": "json",
+      "description": "从 visible_subgraph_operation_result 复制的完整页面操作 result_package。"
+    },
+    {
+      "key": "user_goal",
+      "name": "User Goal",
+      "valueType": "text",
+      "description": "原始用户目标，优先使用 request_understanding.user_goal，其次 user_message。"
+    },
+    {
+      "key": "reason",
+      "name": "Reason",
+      "valueType": "text",
+      "description": "一句话说明这是把可见页面操作结果重新包装为原目标 subgraph 能力结果。"
+    }
+  ],
+  "stateOutputSchema": [
+    {
+      "key": "ok",
+      "name": "OK",
+      "valueType": "boolean",
+      "description": "适配是否成功。"
+    },
+    {
+      "key": "result_package",
+      "name": "Result Package",
+      "valueType": "result_package",
+      "description": "以原始目标 subgraph 为 sourceKey 的能力执行结果包。"
+    },
+    {
+      "key": "error",
+      "name": "Error",
+      "valueType": "json",
+      "description": "失败时的结构化错误。"
+    }
+  ]
+}

@@ -381,6 +381,16 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["selected_capability"]["type"], "capability")
         self.assertEqual(states["capability_found"]["type"], "boolean")
         self.assertEqual(states["capability_result"]["type"], "result_package")
+        self.assertEqual(states["visible_page_operation_capability"]["type"], "capability")
+        self.assertEqual(
+            states["visible_page_operation_capability"]["value"],
+            {
+                "kind": "subgraph",
+                "key": "toograph_page_operation_workflow",
+                "name": "操作 TooGraph 页面",
+                "description": "内部可见页面操作通道，用于打开并运行选中的目标图模板。",
+            },
+        )
         self.assertEqual(states["capability_selection_audit"]["type"], "json")
         self.assertEqual(states["capability_gap"]["type"], "json")
         self.assertEqual(states["capability_trace"]["type"], "json")
@@ -447,6 +457,17 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             buddy_context_node["config"]["value"]["selected"],
             ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md", "policy.json"],
+        )
+        visible_page_operation_input = nodes["input_visible_page_operation_capability"]
+        self.assertEqual(visible_page_operation_input["kind"], "input")
+        self.assertEqual(visible_page_operation_input["config"]["boundaryType"], "capability")
+        self.assertEqual(
+            visible_page_operation_input["config"]["value"]["key"],
+            "toograph_page_operation_workflow",
+        )
+        self.assertIn(
+            {"state": "visible_page_operation_capability", "required": True},
+            _read_contracts(nodes["buddy_capability_loop"]["reads"]),
         )
 
         intake_graph = nodes["buddy_turn_intake"]["config"]["graph"]
@@ -529,6 +550,50 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(cycle_graph["state_schema"]["capability_selection_audit"]["type"], "json")
         self.assertEqual(cycle_graph["state_schema"]["capability_gap"]["type"], "json")
         self.assertEqual(cycle_graph["state_schema"]["capability_trace"]["type"], "json")
+        self.assertEqual(cycle_graph["state_schema"]["visible_page_operation_capability"]["type"], "capability")
+        self.assertEqual(
+            cycle_graph["state_schema"]["visible_page_operation_capability"]["value"],
+            {
+                "kind": "subgraph",
+                "key": "toograph_page_operation_workflow",
+                "name": "操作 TooGraph 页面",
+                "description": "内部可见页面操作通道，用于打开并运行选中的目标图模板。",
+            },
+        )
+        self.assertEqual(cycle_graph["state_schema"]["visible_subgraph_operation_result"]["type"], "result_package")
+        self.assertIn("input_visible_page_operation_capability", cycle_graph["nodes"])
+        self.assertEqual(
+            cycle_graph["nodes"]["selected_capability_is_subgraph"]["config"]["rule"],
+            {"source": "$state.selected_capability.kind", "operator": "==", "value": "subgraph"},
+        )
+        visible_executor = cycle_graph["nodes"]["execute_visible_subgraph_operation"]
+        self.assertEqual(visible_executor["config"]["skillKey"], "")
+        self.assertEqual(
+            _read_contracts(visible_executor["reads"])[:1],
+            [
+                {"state": "visible_page_operation_capability", "required": True},
+            ],
+        )
+        self.assertNotIn({"state": "selected_capability", "required": True}, _read_contracts(visible_executor["reads"]))
+        self.assertIn({"state": "capability_selection_audit", "required": True}, _read_contracts(visible_executor["reads"]))
+        self.assertEqual(visible_executor["writes"], [{"state": "visible_subgraph_operation_result", "mode": "replace"}])
+        self.assertIn("toograph_page_operation_workflow", visible_executor["config"]["taskInstruction"])
+        self.assertIn("user_goal", visible_executor["config"]["taskInstruction"])
+        adapt_node = cycle_graph["nodes"]["adapt_visible_subgraph_result"]
+        self.assertEqual(adapt_node["config"]["skillKey"], "buddy_visible_subgraph_result_adapter")
+        self.assertEqual(
+            adapt_node["config"]["skillBindings"],
+            [
+                {
+                    "skillKey": "buddy_visible_subgraph_result_adapter",
+                    "outputMapping": {
+                        "result_package": "capability_result",
+                    },
+                }
+            ],
+        )
+        self.assertNotIn({"state": "selected_capability", "required": True}, _read_contracts(adapt_node["reads"]))
+        self.assertIn({"state": "visible_subgraph_operation_result", "required": True}, _read_contracts(adapt_node["reads"]))
         self.assertEqual(
             _read_contracts(cycle_graph["nodes"]["output_capability_selection_audit"]["reads"]),
             [{"state": "capability_selection_audit", "required": False}],
@@ -544,12 +609,25 @@ class TemplateLayoutTests(unittest.TestCase):
             {
                 "source": "capability_found_condition",
                 "branches": {
-                    "true": "execute_capability",
+                    "true": "selected_capability_is_subgraph",
                     "false": "review_missing_capability",
                     "exhausted": "review_missing_capability",
                 },
             },
         )
+        self.assertEqual(
+            cycle_graph["conditional_edges"][1],
+            {
+                "source": "selected_capability_is_subgraph",
+                "branches": {
+                    "true": "execute_visible_subgraph_operation",
+                    "false": "execute_capability",
+                    "exhausted": "execute_capability",
+                },
+            },
+        )
+        self.assertIn({"source": "execute_visible_subgraph_operation", "target": "adapt_visible_subgraph_result"}, cycle_graph["edges"])
+        self.assertIn({"source": "adapt_visible_subgraph_result", "target": "review_capability_result"}, cycle_graph["edges"])
         self.assertNotIn("output_approval_prompt", cycle_graph["nodes"])
 
         draft_graph = nodes["buddy_final_reply"]["config"]["graph"]

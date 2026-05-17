@@ -236,9 +236,9 @@ flowchart TD
 - `user_message`
 - `conversation_history`
 - `page_context`
-- `buddy_mode`
 - `buddy_context`
 - `request_understanding`
+- `visible_page_operation_capability`
 - `capability_review` 可选，供下一轮选择能力时读取上一轮复盘
 
 输出：
@@ -258,7 +258,11 @@ flowchart TD
   S --> F{capability_found?}
   F -- false --> G[LLM: review_missing_capability]
   G --> Z[LLM: finalize_capability_cycle]
-  F -- true --> X[LLM + dynamic capability or visible template run: execute_capability]
+  F -- true --> K{selected kind=subgraph?}
+  K -- false --> X[LLM + dynamic Skill: execute_capability]
+  K -- true --> V[LLM + internal page operation subgraph: execute_visible_subgraph_operation]
+  V --> A2[LLM + Skill: adapt_visible_subgraph_result]
+  A2 --> R[LLM: review_capability_result]
   X --> R[LLM: review_capability_result]
   R --> C{needs_another_capability?}
   C -- true --> S
@@ -274,23 +278,33 @@ flowchart TD
 | `select_capability` | LLM | 1 次，用于生成 Skill 输入 | 静态 `toograph_capability_selector` | 用户消息、请求理解、上一轮复盘 | `selected_capability`、`capability_found`、`capability_selection_audit` |
 | `capability_found_condition` | condition | 0 次 | 无 | `capability_found` | true/false/exhausted |
 | `review_missing_capability` | LLM | 1 次 | 无 | 用户消息、请求理解 | `capability_review`、`capability_gap` |
-| `execute_capability` | LLM | 1 次，用于生成被选能力输入或可见模板运行目标 | 输入 `selected_capability`，kind 为 skill/subgraph/none；可见模板运行通过页面操作官方模板承载 | 用户消息、页面上下文、Buddy Home、请求理解 | `capability_result` |
+| `selected_capability_is_subgraph` | condition | 0 次 | 无 | `selected_capability.kind` | true/false/exhausted |
+| `execute_capability` | LLM | 1 次，用于生成被选 Skill 输入 | 输入 `selected_capability`，仅处理 kind=skill | 用户消息、页面上下文、Buddy Home、请求理解 | `capability_result` |
+| `execute_visible_subgraph_operation` | LLM | 1 次，用于生成页面操作 workflow 的 `user_goal` | 输入固定 `visible_page_operation_capability`，目标模板来自 `capability_selection_audit.selected` | 用户消息、页面上下文、Buddy Home、请求理解、能力选择审计 | `visible_subgraph_operation_result` |
+| `adapt_visible_subgraph_result` | LLM + Skill | 1 次，用于复制适配参数 | 静态 `buddy_visible_subgraph_result_adapter` | 能力选择审计、可见页面操作结果、用户目标 | `capability_result` |
 | `review_capability_result` | LLM | 1 次 | 无 | 用户消息、请求理解、能力结果包 | `capability_review`、append `capability_trace` |
 | `continue_capability_loop` | condition | 0 次 | 无 | `capability_review.needs_another_capability` | true/false/exhausted |
 | `finalize_capability_cycle` | LLM | 1 次 | 无 | found、result、review、gap、trace | 规整 `capability_review` |
 
 `execute_capability` 的边界：
 
-- 它读取一个 `capability` state。
+- 它读取一个 `capability` state：`selected_capability`。
 - 它只写一个 `result_package` state。
-- 它可以让 LLM 生成被选 Skill 的输入，或生成可见运行对应图模板的页面操作目标。
-- 运行时执行能力并封装结果。
+- 它只处理 `kind=skill` 的动态能力，并让 LLM 生成该 Skill 的一次输入。
 - 它不总结结果、不决定下一步、不生成最终回复。
+
+`execute_visible_subgraph_operation` 的边界：
+
+- 它读取一个 `capability` state：固定的 `visible_page_operation_capability`，其 key 是 `toograph_page_operation_workflow`。
+- 原始目标模板不再作为第二个 capability 输入读取，而是从普通 JSON 审计 state `capability_selection_audit.selected` 复制。
+- 它把页面操作 workflow 的 `user_goal` 组织为“运行图模板 <目标模板名或 key>；本次目标：<用户目标>”。
+- 页面操作 workflow 内部再通过 `toograph_page_operator` 的 `template_target -> run_template` 固定映射打开模板库、搜索、打开模板、写入 input、点击运行、等待终态并读取公开结果。
+- `adapt_visible_subgraph_result` 使用 `buddy_visible_subgraph_result_adapter` 把内部页面操作 workflow 的 `result_package` 重新包装为原目标模板的 `capability_result`，保持 `outputs.<outputKey> = { name, description, type, value }`，不添加 `fieldKey`。
 
 `capability.kind=subgraph` 的可见运行规则：
 
-- 只要 `toograph_capability_selector` 返回 `capability.kind=subgraph`，`execute_capability` 就不应直接走后台模板调用 API。
-- 这类目标应立即启动原生虚拟鼠标/键盘，并路由到 `toograph_page_operation_workflow` 或后续专门的可见模板运行官方模板；`selected_capability` 仍是单个能力对象，目标模板 ID、名称、输入绑定目标和选择理由放在该能力的参数或审计信息中。
+- 只要 `toograph_capability_selector` 返回 `capability.kind=subgraph`，能力循环必须先经 `selected_capability_is_subgraph` 分流，不能让 `execute_capability` 直接走后台模板调用 API。
+- 这类目标应立即启动原生虚拟鼠标/键盘，并路由到固定内部能力 `toograph_page_operation_workflow`；`selected_capability` 仍是单个能力对象，目标模板 ID、名称、输入绑定目标和选择理由放在 `capability_selection_audit.selected` 及相关审计信息中。
 - 页面操作流程可以包含多步：打开模板库、搜索或定位模板、选择或打开目标模板、确认输入绑定、点击运行、等待 run 进入 completed、failed、cancelled 或 `awaiting_human`，再读取 root output、run capsule、activity events 和 artifact 引用。
 - 如果目标模板进入 `awaiting_human`，当前能力执行应通过标准暂停卡暴露已产出的内容和所需补充；用户补充后继续等待该模板完成，再回到 `review_capability_result`。
 - `review_capability_result` 只能基于可见运行返回的结构化结果判断下一步：停止、解释失败、请求用户补充，或回到 `select_capability` 继续运行别的图模板或 Skill。
@@ -998,10 +1012,10 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 
 默认可见伙伴主循环。它应继续承担：
 
-- 输入用户消息、历史、页面上下文、伙伴模式、Buddy Home。
+- 输入用户消息、历史、页面上下文、Buddy Home 和固定的可见页面操作能力。
 - `buddy_turn_intake` 产出 `visible_reply` 和 `request_understanding`。
 - 简单闲聊或可直接回答时绕过能力循环。
-- `buddy_capability_loop` 选择能力、执行能力、复盘结果、必要时循环；当 `selected_capability.kind` 为 `subgraph` 时，直接启动原生虚拟鼠标/键盘，多步定位并运行对应图模板，等待结果并把公开输出带回复盘。
+- `buddy_capability_loop` 选择能力、执行能力、复盘结果、必要时循环；当 `selected_capability.kind` 为 `subgraph` 时，经固定内部 `toograph_page_operation_workflow` 启动原生虚拟鼠标/键盘，多步定位并运行对应图模板，等待结果并把公开输出包装回能力复盘。
 - `buddy_final_reply` 产出唯一 `final_reply`。
 - `output_final` 只展示 `final_reply`。
 
@@ -1061,7 +1075,7 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 1. Operation Journal 和 activity events：记录每次点击、键入、拖拽、等待、停止、失败和重试；图变更附带 nodes/edges/config/state_schema diff、validator 结果、run id 或错误。运行详情和伙伴胶囊都能回放这些操作摘要。
 2. Graph revision 和 undo/redo：对由虚拟 UI 操作导致的持久图变更建立 revision 和 undo/redo 记录。操作路径可以像人类一样通过 UI 触发，但最终 graph 资产必须可校验、可审计、可恢复。
 3. 编辑已有图：支持选择节点、移动节点、重命名、编辑关键配置、选择 Skill、调整连接、删除或恢复节点，并在每步后更新结构化快照和操作日志。
-4. 运行和结果校验：伙伴能在 `capability.kind=subgraph` 后直接启动虚拟鼠标，从模板库或可见模板列表定位目标图模板，必要时多步打开模板草稿并绑定输入，点击运行，等待 run 状态，读取结构化 root output、run capsule / activity events 判断是否成功；失败时能基于错误和 affordance 快照继续修复，而不是看截图猜测或后台直连调用。
+4. 运行和结果校验：伙伴能在 `capability.kind=subgraph` 后通过固定页面操作 workflow 启动虚拟鼠标，从模板库或可见模板列表定位目标图模板，必要时多步打开模板草稿并绑定输入，点击运行，等待 run 状态，读取结构化 root output、run capsule / activity events 判断是否成功；失败时能基于错误和 affordance 快照继续修复，而不是看截图猜测或后台直连调用。
 5. 页面上下文扩展：把当前编辑器页的 page context snapshot 和 affordance registry 扩展到技能页、运行历史、模型日志、模板库等页面，让 Buddy 能从 A 页面判断应先前往 B 页面再找目标内容。
 6. 快速生成与可见搭建并存：保留直接生成完整 graph JSON 的快速路径；当用户要求可见协作或正在编辑当前画布时，优先通过 virtual_ui_operation 表演搭建和编辑。
 7. 创建模板/子图流程：从用户目标生成新模板或可复用子图，校验公开输入输出，可选试跑；可通过快速生成保存，也可通过可见搭建展示过程。

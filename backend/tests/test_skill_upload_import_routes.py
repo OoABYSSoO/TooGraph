@@ -173,6 +173,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                     sorted(
                         [
                             "buddy_home_writer",
+                            "buddy_visible_subgraph_result_adapter",
                             "toograph_script_tester",
                             "toograph_skill_builder",
                             "toograph_capability_selector",
@@ -221,6 +222,15 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue(
                     source_path["local_workspace_executor"].endswith(
                         "/skill/official/local_workspace_executor/skill.json"
+                    )
+                )
+                self.assertEqual(catalog_items["buddy_visible_subgraph_result_adapter"]["sourceScope"], "official")
+                self.assertFalse(catalog_items["buddy_visible_subgraph_result_adapter"]["canManage"])
+                self.assertTrue(catalog_items["buddy_visible_subgraph_result_adapter"]["runtimeReady"])
+                self.assertTrue(catalog_items["buddy_visible_subgraph_result_adapter"]["runtimeRegistered"])
+                self.assertTrue(
+                    source_path["buddy_visible_subgraph_result_adapter"].endswith(
+                        "/skill/official/buddy_visible_subgraph_result_adapter/skill.json"
                     )
                 )
                 self.assertNotIn("compatibility", catalog_items["web_search"])
