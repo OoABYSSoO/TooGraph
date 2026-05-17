@@ -684,21 +684,20 @@ test("BuddyWidget renders assistant replies from parent graph output nodes only"
   assert.doesNotMatch(componentSource, /resolveBuddyRunTraceFromRunEvent/);
 });
 
-test("BuddyWidget closed reply bubble uses compact maximum dimensions and renders markdown or sandboxed html", () => {
-  assert.match(componentSource, /const bubblePreviewContent = computed/);
-  assert.match(componentSource, /v-if="bubblePreviewContent\.kind === 'html'"/);
-  assert.match(componentSource, /v-else-if="bubblePreviewContent\.kind === 'markdown'"/);
-  assert.match(componentSource, /v-html="bubblePreviewContent\.html"/);
-  assert.match(componentSource, /--buddy-widget-bubble-max-width:\s*320px;/);
-  assert.match(componentSource, /--buddy-widget-bubble-max-height:\s*256px;/);
-  assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*width:\s*max-content;/);
-  assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*max-width:\s*min\(var\(--buddy-widget-bubble-max-width\), calc\(100vw - 32px\)\);/);
-  assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*max-height:\s*min\(var\(--buddy-widget-bubble-max-height\), calc\(100vh - 120px\)\);/);
-  assert.doesNotMatch(componentSource, /\.buddy-widget__bubble \{[\s\S]*\n\s*width:\s*min\(var\(--buddy-widget-bubble-max-width/);
-  assert.doesNotMatch(componentSource, /\.buddy-widget__bubble \{[\s\S]*\n\s*height:\s*min\(var\(--buddy-widget-bubble-max-height/);
-  assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*box-sizing:\s*border-box;/);
-  assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*overflow:\s*auto;/);
-  assert.match(componentSource, /\.buddy-widget__bubble-html-frame \{[\s\S]*width:\s*100%;/);
+test("BuddyWidget closed reply bubble is a four-character opener instead of a content preview", () => {
+  assert.match(componentSource, /import \{ buildBuddyBubblePreviewLabel \} from "\.\/buddyBubblePreviewModel\.ts";/);
+  assert.match(componentSource, /const bubblePreviewLabel = computed\(\(\) => buildBuddyBubblePreviewLabel\(bubbleText\.value\)\);/);
+  assert.match(componentSource, /v-if="bubblePreviewLabel && !isPanelOpen"/);
+  assert.match(componentSource, /type="button"[\s\S]*class="buddy-widget__bubble"[\s\S]*@click="openBubblePreviewPanel"/);
+  assert.match(componentSource, /\{\{ bubblePreviewLabel \}\}/);
+  assert.match(componentSource, /function openBubblePreviewPanel\(\)/);
+  assert.doesNotMatch(componentSource, /const bubblePreviewContent = computed/);
+  assert.doesNotMatch(componentSource, /class="buddy-widget__bubble-html-frame"/);
+  assert.doesNotMatch(componentSource, /class="buddy-widget__bubble-markdown"/);
+  assert.doesNotMatch(componentSource, /v-html="bubblePreviewContent\.html"/);
+  assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*max-width:\s*min\(9em, calc\(100vw - 32px\)\);/);
+  assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*overflow:\s*hidden;/);
+  assert.match(componentSource, /\.buddy-widget__bubble \{[\s\S]*white-space:\s*nowrap;/);
 });
 
 test("BuddyWidget renders output-segment run trace capsules instead of per-message duration chips", () => {

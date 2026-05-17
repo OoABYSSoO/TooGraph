@@ -387,20 +387,16 @@
         </form>
       </section>
 
-      <div v-if="bubblePreviewContent.text && !isPanelOpen" class="buddy-widget__bubble">
-        <SandboxedHtmlFrame
-          v-if="bubblePreviewContent.kind === 'html'"
-          class="buddy-widget__bubble-html-frame"
-          :source="bubblePreviewContent.html"
-          title="Buddy HTML reply"
-        />
-        <div
-          v-else-if="bubblePreviewContent.kind === 'markdown'"
-          class="buddy-widget__bubble-markdown"
-          v-html="bubblePreviewContent.html"
-        />
-        <span v-else>{{ bubblePreviewContent.text }}</span>
-      </div>
+      <button
+        v-if="bubblePreviewLabel && !isPanelOpen"
+        type="button"
+        class="buddy-widget__bubble"
+        :title="bubbleText"
+        :aria-label="t('buddy.open')"
+        @click="openBubblePreviewPanel"
+      >
+        {{ bubblePreviewLabel }}
+      </button>
 
       <button
         ref="avatarElement"
@@ -477,6 +473,7 @@ import {
   type BuddyVirtualOperationRequest,
   type BuddyVirtualOperationTriggeredRun,
 } from "../stores/buddyMascotDebug.ts";
+import { buildBuddyBubblePreviewLabel } from "./buddyBubblePreviewModel.ts";
 import type { BuddyChatMessageRecord, BuddyChatSession } from "../types/buddy.ts";
 import type { GraphPayload, GraphPosition } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
@@ -889,13 +886,7 @@ const bubbleText = computed(() => {
   }
   return latestBuddyMessageForBubble.value?.content.trim() || t("buddy.readyBubble");
 });
-const bubblePreviewContent = computed(() => {
-  const latestMessage = latestBuddyMessageForBubble.value;
-  if (latestMessage && bubbleText.value === latestMessage.content.trim()) {
-    return resolveBuddyRenderedContent(latestMessage);
-  }
-  return resolveOutputPreviewContent(bubbleText.value, "plain");
-});
+const bubblePreviewLabel = computed(() => buildBuddyBubblePreviewLabel(bubbleText.value));
 
 onMounted(() => {
   hydratePosition();
@@ -1050,6 +1041,14 @@ function closePanel() {
   isSessionPanelOpen.value = false;
   isPanelFullscreen.value = false;
   clearSessionDeleteConfirmState();
+}
+
+function openBubblePreviewPanel() {
+  tapNonce.value += 1;
+  isPanelOpen.value = true;
+  isSessionPanelOpen.value = false;
+  clearSessionDeleteConfirmState();
+  void scrollMessagesToBottom();
 }
 
 function togglePanelFullscreen() {
@@ -5319,9 +5318,6 @@ function formatErrorMessage(error: unknown): string {
 
 <style scoped>
 .buddy-widget {
-  --buddy-widget-bubble-max-width: 320px;
-  --buddy-widget-bubble-max-height: 256px;
-
   position: fixed;
   inset: 0;
   z-index: 4500;
@@ -6151,12 +6147,7 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__message-markdown :deep(ul),
 .buddy-widget__message-markdown :deep(ol),
 .buddy-widget__message-markdown :deep(blockquote),
-.buddy-widget__message-markdown :deep(pre),
-.buddy-widget__bubble-markdown :deep(p),
-.buddy-widget__bubble-markdown :deep(ul),
-.buddy-widget__bubble-markdown :deep(ol),
-.buddy-widget__bubble-markdown :deep(blockquote),
-.buddy-widget__bubble-markdown :deep(pre) {
+.buddy-widget__message-markdown :deep(pre) {
   margin: 0 0 8px;
 }
 
@@ -6164,36 +6155,26 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__message-markdown :deep(ul:last-child),
 .buddy-widget__message-markdown :deep(ol:last-child),
 .buddy-widget__message-markdown :deep(blockquote:last-child),
-.buddy-widget__message-markdown :deep(pre:last-child),
-.buddy-widget__bubble-markdown :deep(p:last-child),
-.buddy-widget__bubble-markdown :deep(ul:last-child),
-.buddy-widget__bubble-markdown :deep(ol:last-child),
-.buddy-widget__bubble-markdown :deep(blockquote:last-child),
-.buddy-widget__bubble-markdown :deep(pre:last-child) {
+.buddy-widget__message-markdown :deep(pre:last-child) {
   margin-bottom: 0;
 }
 
 .buddy-widget__message-markdown :deep(ul),
-.buddy-widget__message-markdown :deep(ol),
-.buddy-widget__bubble-markdown :deep(ul),
-.buddy-widget__bubble-markdown :deep(ol) {
+.buddy-widget__message-markdown :deep(ol) {
   padding-left: 18px;
 }
 
-.buddy-widget__message-markdown :deep(a),
-.buddy-widget__bubble-markdown :deep(a) {
+.buddy-widget__message-markdown :deep(a) {
   color: #2563eb;
   font-weight: 650;
   text-decoration: none;
 }
 
-.buddy-widget__message-markdown :deep(a:hover),
-.buddy-widget__bubble-markdown :deep(a:hover) {
+.buddy-widget__message-markdown :deep(a:hover) {
   text-decoration: underline;
 }
 
-.buddy-widget__message-markdown :deep(code),
-.buddy-widget__bubble-markdown :deep(code) {
+.buddy-widget__message-markdown :deep(code) {
   padding: 1px 4px;
   border-radius: 5px;
   background: rgba(37, 99, 235, 0.08);
@@ -6202,8 +6183,7 @@ function formatErrorMessage(error: unknown): string {
   font-size: 0.92em;
 }
 
-.buddy-widget__message-markdown :deep(pre),
-.buddy-widget__bubble-markdown :deep(pre) {
+.buddy-widget__message-markdown :deep(pre) {
   max-width: 100%;
   overflow: auto;
   padding: 9px 10px;
@@ -6212,8 +6192,7 @@ function formatErrorMessage(error: unknown): string {
   background: rgba(248, 250, 252, 0.92);
 }
 
-.buddy-widget__message-markdown :deep(pre code),
-.buddy-widget__bubble-markdown :deep(pre code) {
+.buddy-widget__message-markdown :deep(pre code) {
   padding: 0;
   background: transparent;
   color: #1f2937;
@@ -6493,35 +6472,30 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__bubble {
   bottom: calc(100% + 10px);
   width: max-content;
-  max-width: min(var(--buddy-widget-bubble-max-width), calc(100vw - 32px));
-  max-height: min(var(--buddy-widget-bubble-max-height), calc(100vh - 120px));
+  max-width: min(9em, calc(100vw - 32px));
   box-sizing: border-box;
-  overflow: auto;
-  padding: 9px 11px;
+  overflow: hidden;
+  padding: 6px 9px;
   border: 1px solid rgba(154, 52, 18, 0.14);
-  border-radius: 8px;
+  border-radius: 999px;
   background: rgba(255, 252, 247, 0.94);
   color: var(--toograph-text);
   box-shadow: var(--toograph-glass-highlight), 0 14px 34px rgba(61, 43, 24, 0.12);
   font-size: 13px;
-  line-height: 1.45;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  font-weight: 750;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   backdrop-filter: blur(14px) saturate(1.18);
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
-.buddy-widget__bubble-markdown {
-  white-space: normal;
-}
-
-.buddy-widget__bubble-html-frame {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  border: 1px solid rgba(154, 52, 18, 0.12);
-  border-radius: 8px;
-  background: #ffffff;
+.buddy-widget__bubble:hover,
+.buddy-widget__bubble:focus-visible {
+  border-color: rgba(154, 52, 18, 0.24);
+  box-shadow: var(--toograph-glass-highlight), 0 16px 38px rgba(61, 43, 24, 0.16);
+  transform: translateY(-1px);
 }
 
 .buddy-widget__anchor--left .buddy-widget__bubble {
