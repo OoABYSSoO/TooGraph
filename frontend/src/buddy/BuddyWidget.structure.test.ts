@@ -907,6 +907,18 @@ test("BuddyWidget persists awaiting-human paused run placeholders outside model 
   );
 });
 
+test("BuddyWidget finishes auto-resumed page-operation runs back into the chat reply", () => {
+  assert.match(
+    componentSource,
+    /const assistantMessageId = resolveBuddyRunControllerMessageId\(operationPlan\.runId\);[\s\S]*const sessionId = activeSessionId\.value;[\s\S]*resetPausedBuddyPause\(\);[\s\S]*await finishAutoResumedPageOperationRun\(\{[\s\S]*runId:\s*response\.run_id,[\s\S]*assistantMessageId,[\s\S]*sessionId,[\s\S]*graph:[\s\S]*runDetail\.graph_snapshot/,
+  );
+  assert.match(componentSource, /async function finishAutoResumedPageOperationRun\(/);
+  assert.match(
+    componentSource,
+    /startRunEventStream\(runId,\s*assistantMessageId,\s*graph,\s*buildBuddyPublicOutputBindings\(graph\)\);[\s\S]*const resumedRunDetail = await pollRunUntilFinished\(runId,\s*controller\.signal\);[\s\S]*finishBuddyVisibleRun\(resumedRunDetail,\s*assistantMessageId,\s*sessionId,\s*runId\);/,
+  );
+});
+
 test("BuddyWidget recovers awaiting-human paused runs after session activation", () => {
   assert.match(
     componentSource,

@@ -663,6 +663,12 @@ type BuddyBackgroundTemplateRunExecution = {
   triggeredRun: BuddyVirtualOperationTriggeredRun;
   graph: GraphPayload;
 };
+type BuddyAutoResumedPageOperationFinishOptions = {
+  runId: string;
+  assistantMessageId: string;
+  sessionId: string;
+  graph: GraphPayload;
+};
 
 const BUDDY_HISTORY_STORAGE_KEY = "toograph:buddy-history";
 const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "toograph:buddy-active-session";
@@ -2482,6 +2488,8 @@ async function maybeAutoResumePageOperationRun(
   if (!canAutoResumePageOperationRun(runDetail, operationPlan.operationRequestId)) {
     return;
   }
+  const assistantMessageId = resolveBuddyRunControllerMessageId(operationPlan.runId);
+  const sessionId = activeSessionId.value;
   const response = await resumeRun(
     operationPlan.runId,
     buildPageOperationResumePayload({
@@ -2491,6 +2499,17 @@ async function maybeAutoResumePageOperationRun(
     }),
   );
   activeRunId.value = response.run_id;
+  resetPausedBuddyPause();
+  if (!assistantMessageId || !sessionId) {
+    activeRunId.value = null;
+    return;
+  }
+  await finishAutoResumedPageOperationRun({
+    runId: response.run_id,
+    assistantMessageId,
+    sessionId,
+    graph: runDetail.graph_snapshot as unknown as GraphPayload,
+  });
 }
 
 function resolveBackgroundTemplateRunOperation(
@@ -4203,6 +4222,56 @@ async function resumePausedBuddyRunFromChatReply(userMessage: string, assistantM
       activeRunId.value = null;
     }
     activeAbortController = null;
+    scheduleBuddySpeakingIdleIfNeeded();
+    await scrollMessagesToBottom();
+  }
+}
+
+async function finishAutoResumedPageOperationRun({
+  runId,
+  assistantMessageId,
+  sessionId,
+  graph,
+}: BuddyAutoResumedPageOperationFinishOptions) {
+  clearSpeakingIdleTimer();
+  errorMessage.value = "";
+  mood.value = "thinking";
+  setAssistantActivityText(assistantMessageId, t("buddy.activity.resuming"));
+  const controller = new AbortController();
+  activeAbortController = controller;
+
+  try {
+    startRunEventStream(runId, assistantMessageId, graph, buildBuddyPublicOutputBindings(graph));
+    const resumedRunDetail = await pollRunUntilFinished(runId, controller.signal);
+    if (resumedRunDetail.status === "awaiting_human") {
+      handleBuddyRunAwaitingHuman(resumedRunDetail, assistantMessageId, { persist: true });
+      return;
+    }
+    finishBuddyVisibleRun(resumedRunDetail, assistantMessageId, sessionId, runId);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return;
+    }
+    mood.value = "error";
+    const message = error instanceof Error ? error.message : t("buddy.runFailed");
+    errorMessage.value = message;
+    removeBuddyRunDisplayMessages(assistantMessageId);
+    updateAssistantMessage(assistantMessageId, t("buddy.errorReply", { error: formatErrorMessage(error) }), {
+      includeInContext: false,
+      runId,
+    });
+    void persistBuddyMessage(sessionId, messages.value.find((entry) => entry.id === assistantMessageId), {
+      runId,
+      includeInContext: false,
+    });
+  } finally {
+    closeEventSource();
+    if (!pausedBuddyRun.value) {
+      activeRunId.value = null;
+    }
+    if (activeAbortController === controller) {
+      activeAbortController = null;
+    }
     scheduleBuddySpeakingIdleIfNeeded();
     await scrollMessagesToBottom();
   }
