@@ -625,6 +625,7 @@ test("BuddyWidget returns speaking replies to idle so the next message can be ty
     /if \(mood\.value === "speaking" && queuedTurns\.value\.length === 0\) \{[\s\S]*scheduleSpeakingIdle\(\);[\s\S]*\}/,
   );
   assert.match(componentSource, /speakingIdleTimerId = window\.setTimeout\(\(\) => \{[\s\S]*mood\.value = "idle";[\s\S]*\}, 1400\);/);
+  assert.match(componentSource, /speakingIdleTimerId = window\.setTimeout\(\(\) => \{[\s\S]*mood\.value = "idle";[\s\S]*scheduleBuddyRoam\(\);[\s\S]*\}, 1400\);/);
   assert.match(componentSource, /clearSpeakingIdleTimer\(\);/);
   assert.doesNotMatch(componentSource, /if \(!isBusy\.value\) \{[\s\S]*mood\.value = "idle";/);
 });

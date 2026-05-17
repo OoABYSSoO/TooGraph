@@ -5114,6 +5114,7 @@ function scheduleSpeakingIdle() {
     speakingIdleTimerId = null;
     if (mood.value === "speaking" && queuedTurns.value.length === 0 && !isDrainingBuddyQueue) {
       mood.value = "idle";
+      scheduleBuddyRoam();
     }
   }, 1400);
 }
