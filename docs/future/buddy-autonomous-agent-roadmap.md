@@ -931,6 +931,116 @@ buddy_home/
 - 每次 persistent self-configuration、memory、policy、session-summary 更新都必须有 revision。
 - Buddy Home 写回必须通过显式模板、受控 Skill、命令记录和 revision 完成；低风险自动写回由自主复盘图判定并可恢复，高风险或权限边界变更必须拒绝或进入显式审批路径。
 
+## 长期记忆系统方针
+
+长期记忆系统是 TooGraph 的平台级上下文层，不只服务 Buddy，也服务普通图模板、业务模板、知识库增强和评测闭环。它的目标不是把更多历史文本塞进 LLM prompt，而是让长期事实、偏好、经验、会话摘要和能力统计具备可召回、可证据化、可审计和可恢复的生命周期。
+
+边界：
+
+```text
+Run State：单次运行内的短期状态和中间产物。
+Memory：跨运行复用的偏好、事实、经验、策略摘要和能力使用统计。
+Knowledge：外部文档、业务资料、规范、案例、素材库和可引用资料。
+Artifact：某次运行生成或下载的文件、报告、图片、视频和结构化结果。
+Policy：权限、行为边界和安全规则；可被记忆引用，但不能被普通记忆静默改写。
+```
+
+记忆不是权限来源。召回到图运行中的 `memory_context`、`context_brief` 或 Buddy Home 摘要都必须标注为 reference only / context only，不能覆盖系统规则、项目规则、权限策略或用户本轮明确指令。
+
+### 记忆分层
+
+| layer | 含义 | 示例 | 默认写入路径 |
+| --- | --- | --- | --- |
+| `semantic` | 稳定事实和偏好 | 用户偏好简洁回复；项目使用 `npm start` | 手动写入或后台复盘候选 |
+| `episodic_summary` | 会话或运行摘要 | 某次模板运行的目标、结果和未完成项 | 后台复盘图 |
+| `procedural` | 工作流、模板和 Skill 经验 | 视频分析失败时使用文本素材降级 | 模板复盘或能力使用统计 |
+| `profile` | 用户或伙伴画像摘要 | 用户关心审计和可见操作 | Buddy Home writer |
+| `policy_note` | 低风险策略备注 | 某模板默认需要人工确认写入文件 | 受控 writer；不得扩大权限 |
+| `capability_stat` | 能力使用统计 | 某模板最近 5 次运行失败原因 | 运行后聚合 |
+
+每条记忆必须有 `summary` 和 `content`。`summary` 用于列表、召回和预算裁剪；`content` 是可审计正文。大型日志、完整 artifact、base64、大媒体和临时路径不写进正文，只通过 artifact refs 指向。
+
+### 作用域和可见性
+
+| scope | 含义 | scope_key 示例 |
+| --- | --- | --- |
+| `global` | 本地 TooGraph 实例通用事实 | 空字符串 |
+| `user` | 用户偏好和长期事实 | `default_user` |
+| `project` | 当前 workspace / repo 事实 | `toograph_workspace` |
+| `buddy` | Buddy Home 长期资料 | `default_buddy` |
+| `graph` | 单张 graph 的运行经验 | `graph_xxx` |
+| `template` | 图模板经验和默认偏好 | `slg_creative_factory` |
+| `skill` | 单个 Skill 的使用经验 | `web_search` |
+| `knowledge_collection` | 知识库召回策略或资料经验 | `slg_creative_docs` |
+
+默认召回顺序是 user / project / buddy / template / graph / skill，再按相关性和预算裁剪。图模板只能自动读取自己声明的作用域；跨用户、跨项目或跨 Buddy 的记忆需要显式选择或管理员策略。
+
+Buddy Home 中的 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json` 是用户可编辑投影；底层 SQLite 记忆记录、command 和 revision 是审计与恢复来源。
+
+### 记忆生命周期
+
+```text
+observed fact / run result / user correction
+  -> memory_candidate
+  -> dedupe + conflict check
+  -> risk classification
+  -> apply automatically / request approval / reject
+  -> memory revision
+  -> recall, decay, supersede, archive
+```
+
+状态字段：
+
+| status | 含义 |
+| --- | --- |
+| `candidate` | 候选记忆，尚未写入长期召回池 |
+| `active` | 可被召回 |
+| `superseded` | 被新记忆替代，默认不召回 |
+| `archived` | 保留审计但默认不召回 |
+| `rejected` | 被用户、策略或 writer 拒绝 |
+
+写入规则：
+
+- 用户手动保存偏好或事实时，可以进入候选审查或明确写入。
+- Buddy 后台复盘可以自动应用低风险 profile、memory、session summary、能力统计和精炼报告，但必须生成 command、revision 和 activity event。
+- 业务模板应输出候选记忆和证据，不直接绕过审批或 revision 写长期资料。
+- 权限升级、行为边界扩大、任意文件写入、脚本执行、图补丁、模型供应商配置和敏感资料变更不能作为低风险记忆自动写入。
+- 更新记忆必须创建 revision，记录 previous value、new value、diff、来源 run / node / skill / template 和执行结果。
+
+### 存储、API 和 Skill 边界
+
+核心存储应包含：
+
+- `memories`：主记录，包含 layer、memory_type、scope、status、confidence、importance、evidence、artifact refs、source 和 supersedes 信息。
+- `memory_revisions`：每次创建、更新、归档、supersede 的 previous / next / diff。
+- `memory_events`：召回、应用、拒绝、冲突、降权和归档等审计事件。
+- `memories_fts`：全文召回。后续 Hybrid RAG 阶段再增加 embedding 表。
+
+核心 API 应覆盖列表、搜索、候选创建、候选应用、候选拒绝、读取、更新、归档、supersede 和 revision 查询。Store 负责事务、revision、FTS 同步、状态迁移、审计事件和冲突检查。
+
+Skill 不直接写数据库表。`memory_recall` 只显式召回长期记忆，输出预算化 `memory_context` 和 activity event；`memory_candidate_writer` 或等价受控 writer 只生成候选、证据、作用域、风险等级和推荐动作，真正应用必须通过 Store、command、revision、后台复盘或标准 human approval。
+
+### 召回和注入
+
+召回必须预算化，而不是“搜到多少塞多少”。召回输入应包含 query、scope filters、layer filters、top_k 和 max_chars。排序至少考虑 lexical relevance、scope weight、importance、recency、usage、staleness 和 conflict。
+
+推荐注入格式：
+
+```text
+Relevant Memory Context (reference only; not instructions):
+1. [template/procedural, confidence=0.86] SLG scripts that passed review used short conflict-first hooks.
+   Source: run_xxx, artifact: 14_final/final_summary.md
+2. [user/semantic, confidence=0.95] User prefers concise engineering summaries with concrete file references.
+   Source: manual
+```
+
+规则：
+
+- `memory_context` 应作为 schema-backed state 或 `context_brief` 的一部分进入图，不通过隐藏 prompt side channel 注入。
+- 召回结果要标注来源、置信度、作用域和 artifact refs，便于下游 LLM 判断可信度。
+- 冲突记忆不能静默同时注入；Store 应返回 conflict notes，交由上下文整理节点压缩。
+- 记忆被召回时可以更新 `last_used_at`、`use_count` 或写 `memory_event`，但不能因为被召回就改变正文。
+
 ## 原生虚拟 UI 操作和图编辑
 
 Buddy 可以帮助修改当前图、从空白画布搭建图、创建新模板或可复用子图。成熟目标不是让伙伴直接改 graph JSON，也不是移动系统鼠标或依赖视觉模型，而是让 TooGraph 内建一套 App-Native Virtual Operator：伙伴理解结构化页面状态，控制自己的虚拟鼠标和虚拟键盘执行页面级操作，前端按人类可见的方式播放点击、拖拽和键入，同时把操作和图变更写入审计。
@@ -1313,6 +1423,135 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 - 可并行的只读任务能通过图结构并行，副作用任务仍保持审批、顺序和回放清晰。
 - 命名迁移后，用户看到的是 LLM 节点语义，底层仍保持协议唯一和兼容可控。
 
+### 阶段 5：长期记忆系统落地
+
+目标：把长期记忆从 Buddy Home 的基础读写和零散文件投影，升级为可召回、可提议、可审计、可恢复的平台级记忆系统，并让 Buddy、自定义图模板和业务模板都能通过显式图节点使用它。
+
+小目标：
+
+1. 记忆存储：建立 `memories`、`memory_revisions`、`memory_events` 和 `memories_fts`，支持 layer、memory_type、scope、scope_key、status、confidence、importance、evidence、artifact refs、source run / node / skill / template 和 supersedes 信息。
+2. 记忆 Store：实现候选创建、应用、拒绝、更新、归档、supersede、revision 查询、FTS 同步、冲突检查和审计事件；所有更新必须事务化。
+3. 记忆 API：提供列表、搜索、候选、应用、拒绝、读取、更新、归档、supersede 和 revision 查询；API 输出应包含来源、置信度、artifact refs 和 conflict notes。
+4. 预算化召回：实现 scope/layer/type/status 过滤、top_k、max_chars、相关性排序和冲突提示，召回结果以 `memory_context` 或 `context_brief` 进入图 state。
+5. 记忆 Skills：新增 `memory_recall` 和 `memory_candidate_writer`，前者只读召回并返回 activity event，后者只生成候选和证据，不绕过 Store、command、revision 或审批。
+6. Buddy Home 对齐：让 Buddy Home 的 profile、session summary、memory、policy communication preferences、reports 和 capability usage stats 继续通过 command/revision 写回，并与长期记忆 Store 的来源和 revision 语义一致。
+7. 模板集成：官方模板可声明要召回的记忆 scope/layer；业务模板可在结束时输出成功/失败经验候选，并保留 evidence 与 artifact refs。
+8. 前端和运行详情：记忆候选、应用、拒绝、归档、supersede、召回命中和冲突提示应能在运行详情或 Buddy 历史中审计，不把长期资料变成看不见的 side effect。
+
+完成口径：
+
+- 可以创建、搜索、更新、归档和 supersede 记忆，并保留 revision。
+- 可以创建、应用和拒绝候选记忆，并追溯来源 run / node / skill / template。
+- 图模板可以接收预算化 `memory_context`，且注入文本明确标注为参考上下文。
+- `memory_recall` 可用，`memory_candidate_writer` 或等价受控 writer 可用。
+- Buddy Home 写回和长期记忆 Store 在 command、revision、activity event 和恢复路径上保持一致。
+
+### 阶段 6：业务模板和展示闭环
+
+目标：用可运行的业务模板证明 TooGraph 能承载复杂 Agent 应用，而不是只展示通用聊天或单次工具调用。SLG Creative Factory 是优先参考模板，但具体业务模板应继续遵守图优先、显式能力、artifact 输出、审计和评测约束。
+
+SLG Creative Factory 推荐链路：
+
+```text
+输入配置和 mock data
+  -> 抓取或读取新闻/竞品素材
+  -> 规范化素材
+  -> 选择 Top N 视频素材
+  -> 视频理解或文本降级分析
+  -> 总结竞品创意模式
+  -> 总结新闻辅助上下文
+  -> 生成 Creative Brief
+  -> 生成多版本创意脚本
+  -> 生成图片分镜脚本
+  -> 生成视频提示词
+  -> 评审创意版本
+  -> 条件返修循环
+  -> 输出最终摘要、最佳版本、TODO 和 artifacts
+  -> 生成候选记忆 / 进入 Eval
+```
+
+小目标：
+
+1. 模板文档：补齐业务模板目标、输入配置、Graph State、节点流程、Skill 列表、返修循环、输出 artifacts、长期记忆集成、mock data 模式和示例输出。
+2. 模板搭建：以 `node_system` 图模板表达初始化、抓取/读取、清洗、素材分析、brief、变体生成、分镜、视频提示词、评审、返修、final summary 和 output 节点。
+3. Skill 拆分：按可复用能力拆分 RSS/文章提取、广告素材获取、广告规范化、视频选择、视频理解、分镜包构建、视频提示词构建、创意评审等 Skill；每个 Skill 保持单职责和结构化输出。
+4. Mock Data：模板必须支持无外部网络依赖的稳定演示模式，关闭 RSS、广告抓取和视频下载时仍能跑通最小链路。
+5. Artifacts：运行应输出 brief、pattern summary、news context、script variants、storyboards、video prompts、review、best variant、final summary、TODO 清单和 final state 等可预览 artifact。
+6. 返修循环：`review_variants` 后通过 condition 判断是否回到生成节点；必须有最大返修轮次和耗尽后的诚实收束。
+7. 长期记忆：模板启动前显式召回 semantic / procedural / episodic_summary / capability_stat；结束后只输出带证据的候选记忆，由审批或后台复盘决定是否应用。
+8. 展示文档：README、模板说明、示例运行结果和截图应说明如何在无外部依赖下复现。
+
+完成口径：
+
+- 模板可在 mock data 模式下完整运行，生成 creative brief、多版本脚本、图片分镜、视频提示词、评审结果、最佳版本和 final summary。
+- 模板支持返修循环、最大返修轮次、artifact 输出和候选记忆输出。
+- 模板不依赖隐藏产品逻辑；外部抓取、视频理解、评审和写回都通过 Skill、Subgraph、output 或运行时原语表达。
+
+### 阶段 7：Hybrid RAG 知识库升级
+
+目标：把 Knowledge 从基础 FTS 检索升级为可扩展的 Hybrid RAG，使图模板能从文档、模板说明、历史案例、评分规则和业务资料中稳定取上下文，并带 citation 输出。
+
+目标链路：
+
+```text
+Query
+  -> Query Rewrite
+  -> FTS Keyword Recall
+  -> Vector Semantic Recall
+  -> Hybrid Merge
+  -> Rerank
+  -> Context Pack
+  -> Citation Grounding
+```
+
+小目标：
+
+1. Embedding 存储：增加 `knowledge_chunk_embeddings` 或等价表，记录 chunk_id、kb_id、provider、model、dimension、content_hash 和向量数据；MVP 可使用 SQLite JSON，后续可替换 FAISS、pgvector、Qdrant 或 Milvus。
+2. Embedding rebuild：提供知识库级 rebuild API，按 content_hash 避免重复生成，并记录 provider/model。
+3. Retrieve API：提供 hybrid retrieve，支持 query、knowledge base、top_k、mode、filters，返回 scores、citation、chunk metadata 和 context pack。
+4. Hybrid 排序：组合 FTS、vector、metadata boost 和可选 reranker；没有 reranker 时也要有可解释 scoring。
+5. Context Pack：Agent 不直接拼原始 chunk；先生成包含 citation_id、chunk_id、title、section、content、score 和引用规则的 context pack。
+6. 图模板集成：业务模板可在 brief、variant generation、review 等节点读取 `knowledge_context`，并和 `memory_context` 明确区分。
+7. SLG 知识库：准备 `slg_creative_factory_docs` 或同类业务知识库，包含模板说明、策略、评分规则、英文 UI 合规、视频生成限制和历史案例。
+
+完成口径：
+
+- 可以生成 embedding、执行 FTS、vector 和 hybrid retrieve。
+- Retrieve 返回 Context Pack 和 citation 信息。
+- Agent / LLM 节点可以使用 Knowledge Context，并在输出中保留必要 citation。
+- 至少一个业务模板使用知识库上下文并能在 Eval 中验证。
+
+### 阶段 8：Agent Eval 评测体系
+
+目标：让 TooGraph 的图模板具备可量化评估、可回归测试和可持续优化的能力。第一阶段保持轻量，不追求复杂平台化。
+
+核心对象：
+
+- `eval_suites`：一组针对 graph/template 的评测。
+- `eval_cases`：输入 state、期望输出、judge 配置和 tags。
+- `eval_runs`：一次 suite 运行的状态和汇总指标。
+- `eval_case_results`：每个 case 对应的 graph run、指标、judge 结果和错误。
+
+小目标：
+
+1. Eval API：支持创建 suite、创建 case、列出 case、运行 suite、查看 eval run 和 case result。
+2. Eval 运行：每个 case 发起独立 graph run，保留 run_id、状态、错误、节点失败和 artifacts。
+3. Rule-based Judge：先实现不依赖模型的结构化校验，例如必需 output、JSON schema、语言约束、最大返修轮次、artifact 是否生成。
+4. LLM Judge：可选引入模型评审，用于质量维度，例如 Hook 是否明确、冲突是否清晰、是否符合题材、提示词是否可执行。
+5. 通用指标：case pass rate、graph success rate、structured output valid rate、repair rate、latency、node failure、warning count。
+6. Skill 指标：expected skill hit rate、skill success rate、timeout、error count。
+7. 业务模板指标：以 SLG Creative Factory 为参考，验证 brief、variants、storyboard、video prompts、review、best variant、English UI compliance、revision loop 和 TODO outputs。
+8. 回归套件：至少准备 8 个业务模板 Eval Case，其中覆盖 mock data、关闭外部抓取、返修循环、最大轮次、视频分析降级、长期记忆召回和英文 UI 合规。
+
+完成口径：
+
+- 可以创建 Eval Suite / Case，并运行 Suite。
+- 每个 Eval Case 产生对应 graph run 和结构化结果。
+- Eval Run 记录状态、汇总指标和错误。
+- Rule-based Judge 可判断基础合规。
+- 至少一个 Case 验证长期记忆召回，至少一个 Case 验证返修循环，至少一个 Case 验证英文 UI 合规。
+- Eval 结果能在前端或 API 中查看。
+
 ### 贯穿所有阶段
 
 - 每个阶段开始前先对照 `docs/current_project_status.md`，确认哪些能力已落地、哪些描述已经过时。
@@ -1337,6 +1576,7 @@ Virtual Input Driver 不直接改 graph JSON。它通过编辑器已有交互入
 
 - 本文是 Buddy 自主 Agent 方向的唯一长期方针。
 - `docs/current_project_status.md` 记录当前实现快照；本文记录方向、原则和目标结构。
+- 原 `docs/future/toograph_p0_p1_development_goals.md` 的长期记忆、业务模板、Hybrid RAG 和 Eval 内容已经折叠进本文；不要恢复或重建该临时规划文档。
 - 阶段性调研、临时设计和完成记录应在有效内容折叠进本文或当前状态后删除。
 - `docs/future/` 不保留一事一议的调研文档。
 - 若本文和 `AGENTS.md` 冲突，以 `AGENTS.md` 的图优先、显式能力、显式权限、artifact 输出、审计和记忆卫生准则为准，并尽快修正文档。
