@@ -126,18 +126,18 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(research_template["source"], "official")
         self.assertEqual(research_template["label"], "高级联网搜索")
         self.assertEqual(research_template["default_graph_name"], "高级联网搜索")
-        self.assertIn("多轮搜索", research_template["description"])
+        self.assertIn("联网调研", research_template["description"])
         action_template = templates["toograph_action_creation_workflow"]
         self.assertEqual(action_template["source"], "official")
         self.assertEqual(action_template["label"], "创建自定义 Action")
         self.assertEqual(action_template["default_graph_name"], "创建自定义 Action")
-        self.assertIn("需求澄清", action_template["description"])
+        self.assertIn("创建新的 TooGraph Action", action_template["description"])
 
         buddy_template = templates["buddy_autonomous_loop"]
         self.assertEqual(buddy_template["source"], "official")
         self.assertEqual(buddy_template["label"], "伙伴自主循环")
         self.assertEqual(buddy_template["default_graph_name"], "伙伴自主循环")
-        self.assertIn("Buddy Home", buddy_template["description"])
+        self.assertIn("完整 Buddy 对话主流程", buddy_template["description"])
         self.assertIs(buddy_template["capabilityDiscoverable"], False)
         self.assertNotIn("hideFromCapabilitySelector", buddy_template["metadata"])
 
@@ -153,7 +153,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(page_operation_template["source"], "official")
         self.assertEqual(page_operation_template["label"], "操作 TooGraph 页面")
         self.assertEqual(page_operation_template["default_graph_name"], "操作 TooGraph 页面")
-        self.assertIn("页面操作", page_operation_template["description"])
+        self.assertIn("打开页面", page_operation_template["description"])
 
         graph_template = templates["toograph_graph_template_creation_workflow"]
         self.assertEqual(graph_template["source"], "official")
@@ -165,7 +165,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(policy_template["source"], "official")
         self.assertEqual(policy_template["label"], "政策导航助手")
         self.assertEqual(policy_template["default_graph_name"], "政策导航助手")
-        self.assertIn("政策正文", policy_template["description"])
+        self.assertIn("政策原文", policy_template["description"])
         self.assertIs(policy_template["capabilityDiscoverable"], True)
 
         news_template = templates["ai_news_digest_to_wechat_article"]
@@ -179,28 +179,28 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(repurposer_template["source"], "official")
         self.assertEqual(repurposer_template["label"], "一文多发内容改写助手")
         self.assertEqual(repurposer_template["default_graph_name"], "一文多发内容改写助手")
-        self.assertIn("多平台内容包", repurposer_template["description"])
+        self.assertIn("多个平台适配版本", repurposer_template["description"])
         self.assertIs(repurposer_template["capabilityDiscoverable"], True)
 
         game_template = templates["game_creative_factory"]
         self.assertEqual(game_template["source"], "official")
         self.assertEqual(game_template["label"], "游戏广告创意工厂")
         self.assertEqual(game_template["default_graph_name"], "游戏广告创意工厂")
-        self.assertIn("Creative Brief", game_template["description"])
+        self.assertIn("游戏广告", game_template["description"])
         self.assertIs(game_template["capabilityDiscoverable"], True)
 
         ecommerce_template = templates["ecommerce_review_mining_agent"]
         self.assertEqual(ecommerce_template["source"], "official")
         self.assertEqual(ecommerce_template["label"], "电商评论洞察挖掘助手")
         self.assertEqual(ecommerce_template["default_graph_name"], "电商评论洞察挖掘助手")
-        self.assertIn("详情页文案", ecommerce_template["description"])
+        self.assertIn("电商营销内容", ecommerce_template["description"])
         self.assertIs(ecommerce_template["capabilityDiscoverable"], True)
 
         job_template = templates["job_application_interview_coach"]
         self.assertEqual(job_template["source"], "official")
         self.assertEqual(job_template["label"], "求职简历与面试教练")
         self.assertEqual(job_template["default_graph_name"], "求职简历与面试教练")
-        self.assertIn("岗位匹配报告", job_template["description"])
+        self.assertIn("求职匹配", job_template["description"])
         self.assertIs(job_template["capabilityDiscoverable"], True)
 
         product_template = templates["product_competitor_research_agent"]
@@ -1978,6 +1978,15 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn({"state": "context_brief", "required": True}, _read_contracts(selector_node["reads"]))
         self.assertIn({"state": "task_plan", "required": False}, _read_contracts(selector_node["reads"]))
         self.assertEqual(selector_node["config"]["actionKey"], "toograph_capability_selector")
+        selector_action_inputs = [
+            read
+            for read in selector_node["reads"]
+            if isinstance(read.get("binding"), dict) and read["binding"].get("kind") == "action_input"
+        ]
+        self.assertEqual(
+            [(read["state"], read["binding"]["fieldKey"]) for read in selector_action_inputs],
+            [("user_message", "requirement")],
+        )
         self.assertEqual(
             selector_node["config"]["actionBindings"],
             [

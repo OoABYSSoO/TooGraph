@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.action/v1",
   "actionKey": "local_workspace_executor",
   "name": "本地工作区执行器",
-  "description": "当用户需要在 TooGraph 本地工作区白名单内读取、列出、搜索、局部编辑、写入或执行一个明确路径时选择此 Action。",
+  "description": "当用户需要在 TooGraph 本地工作区白名单内读取文件、列目录、搜索内容、局部编辑、写入文件或执行明确路径下的受控命令时使用。",
   "llmInstruction": "你已绑定本地工作区执行器。根据当前图 state、节点任务和 Action Pre-LLM Context 中的运行时文件摘要生成一个受控本地操作。operation 只能是 read、list、search、edit、write 或 execute。path 必须是仓库内相对路径。search 必须提供 query。edit 必须提供 old_string、new_string、expected_sha256、expected_mtime_ns；只有确认所有匹配都要替换时才设置 replace_all=true。write 必须提供 content；覆盖已有文件时必须带 expected_sha256 和 expected_mtime_ns，创建新文件可不带。execute 只执行 path 指向的脚本，可提供 args JSON 数组，不要伪造运行结果。默认只能写 backend/data、action/user、graph_template/user 或 node_preset/user，默认只能执行 backend/data/tmp 或 action/user。不要尝试访问 .git、.env 或 backend/data/settings。该 Action 只返回 success 和 result。",
   "version": "1.0.0",
   "timeoutSeconds": 120,

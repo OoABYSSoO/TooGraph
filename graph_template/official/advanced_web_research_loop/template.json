@@ -1,7 +1,7 @@
 {
   "template_id": "advanced_web_research_loop",
   "label": "高级联网搜索",
-  "description": "多轮搜索、证据评估、补充检索和最终依据整理的联网研究图模板。",
+  "description": "当用户需要联网调研、搜索最新信息、核验证据、比较多个来源并形成带依据的研究结论时使用。",
   "default_graph_name": "高级联网搜索",
   "state_schema": {
     "user_question": {

@@ -1,7 +1,7 @@
 {
   "template_id": "job_application_interview_coach",
   "label": "求职简历与面试教练",
-  "description": "根据候选人画像、简历、项目经历和目标 JD，生成岗位匹配报告、差距分析、简历改写、项目故事库、面试题预测、模拟面试反馈、学习计划和会话召回参考。",
+  "description": "当用户需要根据简历、项目经历和目标 JD 做求职匹配、简历改写、面试准备或学习计划时使用。",
   "default_graph_name": "求职简历与面试教练",
   "state_schema": {
     "candidate_profile": {

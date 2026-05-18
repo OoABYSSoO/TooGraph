@@ -1,7 +1,7 @@
 {
   "template_id": "toograph_action_creation_workflow",
   "label": "创建自定义 Action",
-  "description": "需求澄清、样例确认、Action 文件生成、脚本测试修复、生成方案审查和运行时权限控制写入的自定义 Action 创作图模板。",
+  "description": "当用户需要创建新的 TooGraph Action，从需求澄清到文件生成、测试、审查和受控写入时使用。",
   "default_graph_name": "创建自定义 Action",
   "state_schema": {
     "action_request": {

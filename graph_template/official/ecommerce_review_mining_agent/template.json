@@ -1,7 +1,7 @@
 {
   "template_id": "ecommerce_review_mining_agent",
   "label": "电商评论洞察挖掘助手",
-  "description": "批量分析商品评论、竞品评论和店铺反馈，提炼好评点、差评点、用户画像、购买动机、卖点、风险点，并生成详情页文案、短视频脚本和小红书种草笔记。",
+  "description": "当用户需要批量分析商品评论、竞品评论或店铺反馈，提炼卖点风险并生成电商营销内容时使用。",
   "default_graph_name": "电商评论洞察挖掘助手",
   "state_schema": {
     "product_context": {

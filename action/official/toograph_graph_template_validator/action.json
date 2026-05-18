@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.action/v1",
   "actionKey": "toograph_graph_template_validator",
   "name": "图模板校验器",
-  "description": "校验生成的 TooGraph 图模板 JSON 是否符合 node_system 协议、图校验器和 LangGraph 运行时兼容要求。",
+  "description": "当用户已经生成或修改 TooGraph 图模板 JSON，需要在写入或运行前检查 node_system 协议、图校验器和运行时兼容性时使用。",
   "llmInstruction": "你已绑定图模板校验器。只把 graph template JSON 作为 template_json 传入，不修改、不总结、不写文件。此 Action 返回 success 和 validation_report。",
   "version": "0.1.0",
   "timeoutSeconds": 30,

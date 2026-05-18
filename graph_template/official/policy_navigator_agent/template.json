@@ -1,7 +1,7 @@
 {
   "template_id": "policy_navigator_agent",
   "label": "政策导航助手",
-  "description": "把政策正文、来源信息和用户画像整理成带引用的白话摘要、权益卡片、资格初判、办理清单和风险提示。",
+  "description": "当用户需要理解政策原文、判断资格、整理办理清单、权益摘要和风险提示时使用。",
   "default_graph_name": "政策导航助手",
   "state_schema": {
     "policy_sources": {

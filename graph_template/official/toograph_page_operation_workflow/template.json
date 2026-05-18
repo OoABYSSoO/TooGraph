@@ -1,7 +1,7 @@
 {
   "template_id": "toograph_page_operation_workflow",
   "label": "操作 TooGraph 页面",
-  "description": "解析用户页面操作目标，通过 TooGraph 页面操作器执行一次可见 UI 操作，等待前端确认并用刷新后的页面上下文验证目标，必要时循环，最终只在目标完成或明确终态失败后回复。",
+  "description": "当用户要求打开页面、点击按钮、操作 UI 或编辑当前 TooGraph 图，并且需要可见执行和结果验证时使用。",
   "default_graph_name": "操作 TooGraph 页面",
   "state_schema": {
     "user_goal": {

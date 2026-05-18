@@ -10,12 +10,14 @@ CURRENT_DIR = Path(__file__).resolve().parent
 if str(CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(CURRENT_DIR))
 
-from capability_catalog import discover_capability_catalog, normalize_selected_capability
+from capability_catalog import discover_capability_catalog, format_capability_catalog_context
 
 
-def toograph_capability_selector(**action_inputs: Any) -> dict[str, Any]:
+def toograph_capability_selector_before_llm(**payload: Any) -> dict[str, str]:
+    del payload
     catalog = discover_capability_catalog()
-    return normalize_selected_capability(action_inputs.get("capability"), catalog=catalog)
+    context = format_capability_catalog_context(catalog)
+    return {"context": context}
 
 
 def main() -> None:
@@ -25,7 +27,7 @@ def main() -> None:
         payload = {}
     if not isinstance(payload, dict):
         payload = {}
-    print(json.dumps(toograph_capability_selector(**payload), ensure_ascii=False))
+    print(json.dumps(toograph_capability_selector_before_llm(**payload), ensure_ascii=False))
 
 
 if __name__ == "__main__":

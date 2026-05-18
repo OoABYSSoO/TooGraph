@@ -1,7 +1,7 @@
 {
   "template_id": "product_competitor_research_agent",
   "label": "产品竞品研究助手",
-  "description": "把产品方向、竞品资料、用户评论和访谈材料转成竞品画像、功能矩阵、用户痛点、机会点排序、MVP 方案、PRD 草稿、验证计划和最终研究包。",
+  "description": "当用户需要做产品竞品研究、用户痛点分析、机会排序、MVP 方案或 PRD 草稿时使用。",
   "default_graph_name": "产品竞品研究助手",
   "state_schema": {
     "product_idea": {

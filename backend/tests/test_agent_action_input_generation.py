@@ -325,8 +325,10 @@ class AgentActionInputGenerationTests(unittest.TestCase):
                     "toograph_capability_selector": ActionDefinition(
                         actionKey="toograph_capability_selector",
                         name="TooGraph Capability Selector",
-                        llmOutputSchema=[
+                        stateInputSchema=[
                             ActionIoField(key="requirement", name="Requirement", valueType="text"),
+                        ],
+                        llmOutputSchema=[
                             ActionIoField(key="capability", name="Capability", valueType="capability"),
                         ],
                         stateOutputSchema=[ActionIoField(key="capability", name="Capability", valueType="capability")],

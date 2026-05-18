@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.action/v1",
   "actionKey": "toograph_graph_template_writer",
   "name": "图模板写入器",
-  "description": "校验并写入一个用户图模板到 graph_template/user，同时记录可恢复的模板 revision artifact。",
+  "description": "当用户已经审查并准备保存一个用户图模板时使用；它会校验后写入 graph_template/user 并记录可恢复 revision。",
   "llmInstruction": "你已绑定图模板写入器。只在上游已经生成并校验 template_json 后调用。template_json 必须是完整 template.json 对象；reason 简短说明写入原因。此 Action 只能写 graph_template/user/<template_id>/template.json，拒绝覆盖官方模板，并返回 template_id、template_path、revision_id。",
   "version": "0.1.0",
   "timeoutSeconds": 30,

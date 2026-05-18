@@ -1,7 +1,7 @@
 {
   "template_id": "multi_platform_content_repurposer",
   "label": "一文多发内容改写助手",
-  "description": "把原始文章、README 或脚本改写成公众号、小红书、知乎、B站、抖音、X 和 YouTube 等多平台内容包。",
+  "description": "当用户需要把一篇文章、README、脚本或草稿改写成多个平台适配版本时使用。",
   "default_graph_name": "一文多发内容改写助手",
   "state_schema": {
     "source_content": {

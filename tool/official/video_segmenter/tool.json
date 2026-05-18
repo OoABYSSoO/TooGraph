@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "video_segmenter",
   "name": "视频分段",
-  "description": "把一个视频切成 30 秒以内的短视频片段，供 Batch 节点逐段交给 LLM 分析。",
+  "description": "当用户需要把本地视频切成短片段，供后续 Batch 或 LLM 节点逐段分析时使用。",
   "version": "0.1.0",
   "timeoutSeconds": 600,
   "permissions": ["subprocess", "file_read", "file_write"],

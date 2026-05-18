@@ -1,7 +1,7 @@
 {
   "template_id": "game_creative_factory",
   "label": "游戏广告创意工厂",
-  "description": "把游戏类型、产品卖点、市场信息、竞品广告素材分析和平台约束组织成可审查的 Creative Brief、多版本脚本、图片分镜、视频提示词、审核评分、生成任务清单和最终创意包。",
+  "description": "当用户需要为游戏广告生成创意简报、脚本、分镜、视频提示词、审核评分和素材生产任务包时使用。",
   "default_graph_name": "游戏广告创意工厂",
   "state_schema": {
     "game_genre": {

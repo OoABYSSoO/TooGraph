@@ -1,7 +1,7 @@
 {
   "template_id": "toograph_graph_template_creation_workflow",
   "label": "创建图模板",
-  "description": "需求澄清、已有图模板读取、graph diff 草案、模板预览、node_system 校验、受控用户模板写入和可选可见试运行的图模板创作流程。",
+  "description": "当用户需要创建或改进 TooGraph 图模板，从需求澄清、模板草案、预览、校验到受控保存时使用。",
   "default_graph_name": "创建图模板",
   "state_schema": {
     "template_request": {

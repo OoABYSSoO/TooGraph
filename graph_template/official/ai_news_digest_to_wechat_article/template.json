@@ -1,7 +1,7 @@
 {
   "template_id": "ai_news_digest_to_wechat_article",
   "label": "AI 新闻公众号助手",
-  "description": "整理 AI 新闻，完成清洗去重、主题聚类、重要性排序、公众号文章、事实检查和多平台分发稿。",
+  "description": "当用户需要整理 AI 新闻、去重聚类、筛选重要事件，并生成公众号文章或多平台分发稿时使用。",
   "default_graph_name": "AI 新闻公众号助手",
   "state_schema": {
     "topic": {

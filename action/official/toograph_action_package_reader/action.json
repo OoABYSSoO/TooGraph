@@ -2,7 +2,7 @@
   "schemaVersion": "toograph.action/v1",
   "actionKey": "toograph_action_package_reader",
   "name": "Action Package Reader",
-  "description": "Read an existing TooGraph Action package into structured state for review, improvement, or migration workflows.",
+  "description": "当用户需要审查、改进、迁移或复用一个已有 TooGraph Action 包时使用；它会只读读取该包的 manifest、文档和脚本内容。",
   "llmInstruction": "You are bound to the Action Package Reader. Choose exactly one target action key from the graph state or user request, and optionally choose source_scope as user or official. This action is read-only: do not propose writes, patches, execution, deletion, or approval decisions. Return only action_key and source_scope.",
   "version": "1.0.0",
   "timeoutSeconds": 20,
