@@ -127,6 +127,51 @@ class AgentActionInputGenerationTests(unittest.TestCase):
         self.assertIn("actionKey: web_search", prompt)
         self.assertIn("Current date: 2026-05-08", prompt)
 
+    def test_action_input_prompt_renders_managed_action_input_slots_by_field_key(self) -> None:
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [
+                    {
+                        "state": "source_text",
+                        "binding": {
+                            "kind": "action_input",
+                            "actionKey": "summarize_text",
+                            "fieldKey": "text",
+                            "managed": True,
+                        },
+                    }
+                ],
+                "config": {"actionKey": "summarize_text"},
+            }
+        )
+
+        prompt = build_action_input_system_prompt(
+            input_values={"source_text": "Draft article body."},
+            bindings=[
+                ResolvedAgentActionBinding(
+                    binding=NodeSystemAgentActionBinding(actionKey="summarize_text"),
+                    source="node_config",
+                )
+            ],
+            action_definitions={
+                "summarize_text": ActionDefinition(
+                    actionKey="summarize_text",
+                    name="Summarize Text",
+                    stateInputSchema=[ActionIoField(key="text", name="Text", valueType="text")],
+                    llmOutputSchema=[ActionIoField(key="summary_style", name="Summary Style", valueType="text")],
+                )
+            },
+            node=node,
+        )
+
+        self.assertIn("== Action State Input Slots ==", prompt)
+        self.assertIn("- actionKey: summarize_text", prompt)
+        self.assertIn("fieldKey: text", prompt)
+        self.assertIn("source_state: source_text", prompt)
+        self.assertIn("Draft article body.", prompt)
+
     def test_before_llm_receives_runtime_context_without_graph_state(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             action_dir = Path(temp_dir) / "toograph_page_operator"
@@ -164,6 +209,57 @@ class AgentActionInputGenerationTests(unittest.TestCase):
         self.assertIn('"has_graph_state": false', before_llm_context)
         self.assertIn('"page_path": "/editor"', before_llm_context)
         self.assertNotIn("/stale-graph-state", before_llm_context)
+
+    def test_before_llm_receives_managed_action_state_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            action_dir = Path(temp_dir) / "local_workspace_executor"
+            action_dir.mkdir()
+            (action_dir / "before_llm.py").write_text(
+                "import json, sys\n"
+                "payload = json.loads(sys.stdin.read() or '{}')\n"
+                "print(json.dumps({'context': json.dumps(payload.get('action_state_inputs', {}), ensure_ascii=False)}))\n",
+                encoding="utf-8",
+            )
+            node = NodeSystemAgentNode.model_validate(
+                {
+                    "kind": "agent",
+                    "ui": {"position": {"x": 0, "y": 0}},
+                    "reads": [
+                        {
+                            "state": "workspace_request_state",
+                            "binding": {
+                                "kind": "action_input",
+                                "actionKey": "local_workspace_executor",
+                                "fieldKey": "workspace_request",
+                                "managed": True,
+                            },
+                        }
+                    ],
+                    "config": {"actionKey": "local_workspace_executor"},
+                }
+            )
+            prompt = build_action_input_system_prompt(
+                input_values={"workspace_request_state": "写入 backend/data/tmp/example.txt"},
+                bindings=[
+                    ResolvedAgentActionBinding(
+                        binding=NodeSystemAgentActionBinding(actionKey="local_workspace_executor"),
+                        source="node_config",
+                    )
+                ],
+                action_definitions={
+                    "local_workspace_executor": ActionDefinition(
+                        actionKey="local_workspace_executor",
+                        name="Local Workspace Executor",
+                        stateInputSchema=[ActionIoField(key="workspace_request", name="Workspace Request", valueType="text")],
+                        llmOutputSchema=[ActionIoField(key="path", name="Path", valueType="text")],
+                        sourcePath=str(action_dir / "action.json"),
+                    )
+                },
+                node=node,
+            )
+
+        before_llm_context = prompt.split("== Action Pre-LLM Context ==", 1)[1]
+        self.assertIn('"workspace_request": "写入 backend/data/tmp/example.txt"', before_llm_context)
 
     def test_action_input_prompt_passes_node_task_instruction_to_before_llm(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

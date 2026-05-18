@@ -9,9 +9,9 @@ import {
   shouldExposeVirtualAnyOutput,
 } from "../../lib/virtual-any-input.ts";
 import { normalizeInputBoundaryConfigType } from "../../lib/input-boundary.ts";
-import { resolveManagedToolInputSlotKey } from "../../lib/managed-state-slots.ts";
+import { resolveManagedActionInputSlotKey, resolveManagedToolInputSlotKey } from "../../lib/managed-state-slots.ts";
 import type { GraphNode, StateDefinition } from "../../types/node-system.ts";
-import type { ActionDefinition } from "../../types/actions.ts";
+import type { ActionDefinition, ActionIoField } from "../../types/actions.ts";
 import type { ToolDefinition } from "../../types/tools.ts";
 import { resolveDisplayAgentActionInstructionBlocks } from "./actionPickerModel.ts";
 import { resolveNodeDisplayDescription, resolveNodeDisplayTitle } from "./nodeDefaultTextModel.ts";
@@ -196,7 +196,7 @@ export function buildNodeCardViewModel(
         const managedByTool = resolveManagedToolInputPort(binding);
         return {
           key: binding.state,
-          anchorKey: resolveManagedToolInputSlotKey(binding) ?? undefined,
+          anchorKey: resolveManagedActionInputSlotKey(binding) ?? resolveManagedToolInputSlotKey(binding) ?? undefined,
           label: resolveReadBindingPortLabel(binding, stateSchema, {
             managedByAction,
             managedByTool,
@@ -208,7 +208,9 @@ export function buildNodeCardViewModel(
           stateColor: stateSchema[binding.state]?.color ?? "#d97706",
           batchMode: node.kind === "batch" ? resolveBatchInputMode(node, binding.state) : undefined,
           managedSlot: resolveManagedInputSlot(binding, stateSchema, {
+            managedByAction,
             managedByTool,
+            actionDefinitions: options.actionDefinitions,
             toolDefinitions: options.toolDefinitions,
           }),
           managedByAction,
@@ -646,9 +648,7 @@ function resolveReadBindingPortLabel(
   }
 
   if (context.managedByAction?.role === "input") {
-    const definition = context.actionDefinitions?.find((action) => action.actionKey === context.managedByAction?.actionKey);
-    const field = definition?.stateInputSchema?.find((candidate) => candidate.key === context.managedByAction?.fieldKey);
-    return field?.name?.trim() || field?.key || context.managedByAction.fieldKey;
+    return getStateLabel(binding.state, stateSchema);
   }
 
   return getStateLabel(binding.state, stateSchema);
@@ -658,10 +658,19 @@ function resolveManagedInputSlot(
   binding: GraphNode["reads"][number],
   stateSchema: Record<string, StateDefinition>,
   context: {
+    managedByAction?: NodePortViewModel["managedByAction"];
     managedByTool?: NodePortViewModel["managedByTool"];
+    actionDefinitions?: ActionDefinition[];
     toolDefinitions?: ToolDefinition[];
   },
 ) {
+  const managedByAction = context.managedByAction;
+  if (managedByAction?.role === "input") {
+    const definition = context.actionDefinitions?.find((action) => action.actionKey === managedByAction.actionKey);
+    const field = definition?.stateInputSchema?.find((candidate) => candidate.key === managedByAction.fieldKey);
+    return Boolean(definition && field && isManagedInputPlaceholderState(stateSchema[binding.state], binding.state, definition.name, definition.actionKey, field));
+  }
+
   const managedByTool = context.managedByTool;
   if (managedByTool?.role !== "input") {
     return false;
@@ -669,16 +678,21 @@ function resolveManagedInputSlot(
 
   const definition = context.toolDefinitions?.find((tool) => tool.toolKey === managedByTool.toolKey);
   const field = definition?.inputSchema.find((candidate) => candidate.key === managedByTool.fieldKey);
-  if (!definition || !field) {
-    return false;
-  }
+  return Boolean(definition && field && isManagedInputPlaceholderState(stateSchema[binding.state], binding.state, definition.name, definition.toolKey, field));
+}
 
-  const stateDefinition = stateSchema[binding.state];
-  const stateName = stateDefinition?.name?.trim() || binding.state;
+function isManagedInputPlaceholderState(
+  stateDefinition: StateDefinition | undefined,
+  stateKey: string,
+  ownerName: string,
+  ownerKey: string,
+  field: Pick<ActionIoField, "key" | "name" | "description">,
+) {
+  const stateName = stateDefinition?.name?.trim() || stateKey;
   const fieldName = field.name.trim() || field.key;
   const stateDescription = stateDefinition?.description?.trim() || "";
   const fieldDescription = field.description.trim();
-  const generatedDescription = `${definition.name.trim() || definition.toolKey} input: ${field.key}`;
+  const generatedDescription = `${ownerName.trim() || ownerKey} input: ${field.key}`;
   return stateName === fieldName && (!stateDescription || stateDescription === fieldDescription || stateDescription === generatedDescription);
 }
 

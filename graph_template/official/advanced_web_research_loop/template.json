@@ -197,7 +197,13 @@
       "reads": [
         {
           "state": "user_question",
-          "required": true
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "web_search",
+            "fieldKey": "user_question",
+            "managed": true
+          }
         },
         {
           "state": "research_plan",

@@ -225,6 +225,13 @@
         "fieldKey": "recalled_sessions",
         "managed": true
       }
+    },
+    "state_1": {
+      "name": "Recall Request",
+      "description": "会话召回请求，可包含 mode、query、session_id、anchor_message_id、direction、limit、window、bookend、sort、role_filter、current_session_id。",
+      "type": "json",
+      "value": {},
+      "color": "#d97706"
     }
   },
   "nodes": {
@@ -483,6 +490,16 @@
         }
       },
       "reads": [
+        {
+          "state": "state_1",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "buddy_session_recall",
+            "fieldKey": "recall_request",
+            "managed": true
+          }
+        },
         {
           "state": "product_memory_request",
           "required": true
@@ -1461,6 +1478,7 @@
       "不得把少量评论包装成统计结论。",
       "不得编造竞品功能、定价、用户数量或市场数据。",
       "PRD 中必须区分证据、推断和假设。"
-    ]
+    ],
+    "toograph_state_key_counter": 1
   }
 }

@@ -209,6 +209,13 @@
         "fieldKey": "recalled_sessions",
         "managed": true
       }
+    },
+    "state_1": {
+      "name": "Recall Request",
+      "description": "会话召回请求，可包含 mode、query、session_id、anchor_message_id、direction、limit、window、bookend、sort、role_filter、current_session_id。",
+      "type": "json",
+      "value": {},
+      "color": "#d97706"
     }
   },
   "nodes": {
@@ -386,6 +393,16 @@
         }
       },
       "reads": [
+        {
+          "state": "state_1",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "buddy_session_recall",
+            "fieldKey": "recall_request",
+            "managed": true
+          }
+        },
         {
           "state": "memory_request",
           "required": true
@@ -1063,6 +1080,7 @@
       "资格初判只能输出可能符合、可能不符合或信息不足。",
       "不得承诺行政审批结果、法律意见或财务收益。",
       "来源、引用和人工确认事项必须保留在最终输出。"
-    ]
+    ],
+    "toograph_state_key_counter": 1
   }
 }

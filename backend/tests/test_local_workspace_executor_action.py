@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -48,7 +49,18 @@ class LocalWorkspaceExecutorActionTests(unittest.TestCase):
         self.assertEqual([field.key for field in definition.state_input_schema], ["workspace_request"])
         self.assertEqual(
             [field.key for field in definition.llm_output_schema],
-            ["path", "operation", "content", "query"],
+            [
+                "path",
+                "operation",
+                "content",
+                "query",
+                "old_string",
+                "new_string",
+                "replace_all",
+                "expected_sha256",
+                "expected_mtime_ns",
+                "args",
+            ],
         )
         self.assertEqual(
             [field.key for field in definition.state_output_schema],
@@ -62,6 +74,7 @@ class LocalWorkspaceExecutorActionTests(unittest.TestCase):
         context = str(payload.get("context") or "")
         self.assertIn("backend/data", context)
         self.assertIn("write", context)
+        self.assertIn("edit", context)
         self.assertIn("execute", context)
 
     def test_before_llm_reads_existing_repository_file_context(self) -> None:
@@ -82,6 +95,8 @@ class LocalWorkspaceExecutorActionTests(unittest.TestCase):
         context = str(payload.get("context") or "")
         self.assertIn("docs/note.md", context)
         self.assertIn("existing context", context)
+        self.assertIn("sha256:", context)
+        self.assertIn("mtime_ns:", context)
 
     def test_before_llm_reports_missing_path_as_write_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -124,12 +139,128 @@ class LocalWorkspaceExecutorActionTests(unittest.TestCase):
         self.assertEqual(write_result["success"], True)
         self.assertEqual(write_result["result"], "Wrote `backend/data/tmp/note.txt` (15 characters).")
         self.assertEqual(write_result["activity_events"][0]["kind"], "file_write")
-        self.assertEqual(write_result["activity_events"][0]["summary"], "Editing backend/data/tmp/note.txt +1 -0")
+        self.assertEqual(write_result["activity_events"][0]["summary"], "Writing backend/data/tmp/note.txt +1 -0")
         self.assertEqual(write_result["activity_events"][0]["detail"]["path"], "backend/data/tmp/note.txt")
         self.assertTrue(read_result["success"])
         self.assertIn("hello workspace", str(read_result["result"]))
         self.assertEqual(read_result["activity_events"][0]["kind"], "file_read")
         self.assertEqual(read_result["activity_events"][0]["detail"]["characters"], len("hello workspace"))
+
+    def test_write_existing_file_requires_matching_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            target = repo_root / "backend" / "data" / "tmp" / "note.txt"
+            target.parent.mkdir(parents=True)
+            target.write_text("old content\n", encoding="utf-8")
+
+            missing_snapshot = _run_action_script(
+                EXECUTOR_AFTER_LLM_PATH,
+                {
+                    "path": "backend/data/tmp/note.txt",
+                    "operation": "write",
+                    "content": "new content\n",
+                },
+                repo_root=repo_root,
+            )
+            stale_snapshot = _run_action_script(
+                EXECUTOR_AFTER_LLM_PATH,
+                {
+                    "path": "backend/data/tmp/note.txt",
+                    "operation": "write",
+                    "content": "new content\n",
+                    "expected_sha256": "0" * 64,
+                    "expected_mtime_ns": str(target.stat().st_mtime_ns),
+                },
+                repo_root=repo_root,
+            )
+            current_snapshot = _file_snapshot(target)
+            write_result = _run_action_script(
+                EXECUTOR_AFTER_LLM_PATH,
+                {
+                    "path": "backend/data/tmp/note.txt",
+                    "operation": "write",
+                    "content": "new content\n",
+                    **current_snapshot,
+                },
+                repo_root=repo_root,
+            )
+
+        self.assertEqual(missing_snapshot["success"], False)
+        self.assertIn("missing_snapshot", str(missing_snapshot["result"]))
+        self.assertEqual(stale_snapshot["success"], False)
+        self.assertIn("stale_file", str(stale_snapshot["result"]))
+        self.assertEqual(write_result["success"], True)
+        event = write_result["activity_events"][0]
+        self.assertEqual(event["kind"], "file_write")
+        self.assertEqual(event["detail"]["old_sha256"], current_snapshot["expected_sha256"])
+        self.assertIn("patch", event["detail"])
+
+    def test_edit_replaces_unique_string_with_snapshot_and_patch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            target = repo_root / "backend" / "data" / "tmp" / "note.txt"
+            target.parent.mkdir(parents=True)
+            target.write_text("alpha\nneedle\nomega\n", encoding="utf-8")
+            snapshot = _file_snapshot(target)
+
+            result = _run_action_script(
+                EXECUTOR_AFTER_LLM_PATH,
+                {
+                    "path": "backend/data/tmp/note.txt",
+                    "operation": "edit",
+                    "old_string": "needle",
+                    "new_string": "replacement",
+                    **snapshot,
+                },
+                repo_root=repo_root,
+            )
+            next_text = target.read_text(encoding="utf-8")
+
+        self.assertEqual(result["success"], True)
+        self.assertEqual(next_text, "alpha\nreplacement\nomega\n")
+        self.assertIn("Edited `backend/data/tmp/note.txt`", str(result["result"]))
+        event = result["activity_events"][0]
+        self.assertEqual(event["kind"], "file_edit")
+        self.assertEqual(event["detail"]["path"], "backend/data/tmp/note.txt")
+        self.assertEqual(event["detail"]["match_count"], 1)
+        self.assertIn("-needle", event["detail"]["patch"])
+        self.assertIn("+replacement", event["detail"]["patch"])
+
+    def test_edit_rejects_non_unique_match_unless_replace_all_is_true(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            target = repo_root / "backend" / "data" / "tmp" / "note.txt"
+            target.parent.mkdir(parents=True)
+            target.write_text("needle\nneedle\n", encoding="utf-8")
+            snapshot = _file_snapshot(target)
+            unique_result = _run_action_script(
+                EXECUTOR_AFTER_LLM_PATH,
+                {
+                    "path": "backend/data/tmp/note.txt",
+                    "operation": "edit",
+                    "old_string": "needle",
+                    "new_string": "replacement",
+                    **snapshot,
+                },
+                repo_root=repo_root,
+            )
+            replace_all_result = _run_action_script(
+                EXECUTOR_AFTER_LLM_PATH,
+                {
+                    "path": "backend/data/tmp/note.txt",
+                    "operation": "edit",
+                    "old_string": "needle",
+                    "new_string": "replacement",
+                    "replace_all": True,
+                    **snapshot,
+                },
+                repo_root=repo_root,
+            )
+
+        self.assertEqual(unique_result["success"], False)
+        self.assertIn("non_unique_match", str(unique_result["result"]))
+        self.assertEqual(replace_all_result["success"], True)
+        self.assertEqual(replace_all_result["activity_events"][0]["detail"]["match_count"], 2)
 
     def test_list_directory_returns_file_list_activity_event(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -218,7 +349,7 @@ class LocalWorkspaceExecutorActionTests(unittest.TestCase):
             script_path = repo_root / "backend" / "data" / "tmp" / "hello.py"
             script_path.parent.mkdir(parents=True)
             script_path.write_text(
-                "print('hello workspace')\n",
+                "import sys\nprint('hello ' + ' '.join(sys.argv[1:]))\n",
                 encoding="utf-8",
             )
             result = _run_action_script(
@@ -226,16 +357,18 @@ class LocalWorkspaceExecutorActionTests(unittest.TestCase):
                 {
                     "path": "backend/data/tmp/hello.py",
                     "operation": "execute",
+                    "args": ["workspace", "args"],
                 },
                 repo_root=repo_root,
             )
 
         self.assertEqual(result["success"], True)
         self.assertIn("exit code 0", str(result["result"]))
-        self.assertIn("hello workspace", str(result["result"]))
+        self.assertIn("hello workspace args", str(result["result"]))
         self.assertEqual(result["activity_events"][0]["kind"], "command")
         self.assertEqual(result["activity_events"][0]["status"], "succeeded")
         self.assertEqual(result["activity_events"][0]["detail"]["exit_code"], 0)
+        self.assertEqual(result["activity_events"][0]["detail"]["args"], ["workspace", "args"])
 
     def test_execute_outside_execute_roots_is_denied(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -254,6 +387,13 @@ class LocalWorkspaceExecutorActionTests(unittest.TestCase):
 
         self.assertEqual(result["success"], False)
         self.assertIn("permission_denied", str(result["result"]))
+
+
+def _file_snapshot(path: Path) -> dict[str, str]:
+    return {
+        "expected_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "expected_mtime_ns": str(path.stat().st_mtime_ns),
+    }
 
 
 if __name__ == "__main__":

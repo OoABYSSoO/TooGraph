@@ -120,7 +120,7 @@ export function canConnectStateBinding(
     return false;
   }
 
-  if (isManagedToolInputReadBinding(targetReadBinding) && !areConcreteStateTypesCompatible(document, sourceStateKey, targetStateKey)) {
+  if (isManagedConcreteInputReadBinding(targetReadBinding) && !areConcreteStateTypesCompatible(document, sourceStateKey, targetStateKey)) {
     return false;
   }
 
@@ -176,8 +176,11 @@ function isConcreteStateInputKey(stateKey: string) {
   return !isCreateAgentInputStateKey(stateKey) && !isVirtualAnyInputStateKey(stateKey) && !isVirtualAnyOutputStateKey(stateKey);
 }
 
-function isManagedToolInputReadBinding(binding: GraphPayload["nodes"][string]["reads"][number]) {
-  return binding.binding?.kind === "tool_input" && binding.binding.managed !== false;
+function isManagedConcreteInputReadBinding(binding: GraphPayload["nodes"][string]["reads"][number]) {
+  return (
+    (binding.binding?.kind === "tool_input" || binding.binding?.kind === "action_input") &&
+    binding.binding.managed !== false
+  );
 }
 
 function areConcreteStateTypesCompatible(

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import difflib
+import hashlib
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
@@ -11,6 +14,7 @@ from typing import Any
 
 MAX_READ_CHARS = 200_000
 MAX_OUTPUT_CHARS = 200_000
+MAX_PATCH_CHARS = 40_000
 DEFAULT_TIMEOUT_SECONDS = 30
 MAX_LIST_ENTRIES = 200
 MAX_SEARCH_MATCHES = 100
@@ -23,8 +27,6 @@ EXECUTE_EXTENSIONS = {".py", ".js", ".mjs", ".sh", ".bat", ".ps1"}
 
 def local_workspace_executor(**action_inputs: Any) -> dict[str, Any]:
     operation = _as_text(action_inputs.get("operation")).strip().lower()
-    if operation == "edit":
-        operation = "write"
     repo_root = _repo_root()
     if operation == "read":
         return _read_file(repo_root, action_inputs)
@@ -32,11 +34,13 @@ def local_workspace_executor(**action_inputs: Any) -> dict[str, Any]:
         return _list_files(repo_root, action_inputs)
     if operation == "search":
         return _search_files(repo_root, action_inputs)
+    if operation == "edit":
+        return _edit_file(repo_root, action_inputs)
     if operation == "write":
         return _write_file(repo_root, action_inputs)
     if operation == "execute":
         return _execute_script(repo_root, action_inputs)
-    return _failed("invalid_operation", "operation must be one of read, list, search, write, execute.")
+    return _failed("invalid_operation", "operation must be one of read, list, search, edit, write, execute.")
 
 
 def _read_file(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
@@ -228,27 +232,95 @@ def _write_file(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
     if "content" not in payload or payload.get("content") is None:
         return _failed("missing_content", "content is required for write.")
     target = target_result
+    if target.exists() and not target.is_file():
+        return _failed("not_file", "Path exists but is not a file.")
+    snapshot = _verify_existing_file_snapshot(target, payload)
+    if isinstance(snapshot, dict) and "type" in snapshot:
+        return _failed(snapshot["type"], snapshot["message"])
     content = _as_text(payload.get("content"))
     previous_text = target.read_text(encoding="utf-8", errors="replace") if target.is_file() else ""
-    previous_lines = _line_count(previous_text)
-    next_lines = _line_count(content)
-    added = max(next_lines - previous_lines, 0)
-    removed = max(previous_lines - next_lines, 0)
+    patch = _unified_text_patch(_display_path(repo_root, target), previous_text, content)
+    added, removed = _patch_line_counts(patch)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")
     display_path = _display_path(repo_root, target)
+    next_snapshot = _file_snapshot(target)
     return _succeeded(
         f"Wrote `{display_path}` ({len(content)} characters).",
         activity_events=[
             _activity_event(
                 kind="file_write",
-                summary=f"Editing {display_path} +{added} -{removed}",
+                summary=f"Writing {display_path} +{added} -{removed}",
                 status="succeeded",
                 detail={
                     "path": display_path,
                     "characters": len(content),
                     "added": added,
                     "removed": removed,
+                    "old_sha256": snapshot.get("sha256") if snapshot else None,
+                    "old_mtime_ns": snapshot.get("mtime_ns") if snapshot else None,
+                    "new_sha256": next_snapshot["sha256"],
+                    "new_mtime_ns": next_snapshot["mtime_ns"],
+                    "patch": _truncate_patch(patch),
+                },
+            )
+        ],
+    )
+
+
+def _edit_file(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    target_result = _resolve_allowed_path(repo_root, payload.get("path"), WRITE_ROOTS)
+    if isinstance(target_result, dict):
+        return _failed(target_result["type"], target_result["message"])
+    target = target_result
+    if not target.is_file():
+        return _failed("not_found", "Path is not a file.")
+    if not _is_text_file(target):
+        return _failed("unsupported_binary", "Existing file is not a UTF-8 text file.")
+
+    old_string = _as_text(payload.get("old_string"))
+    if old_string == "":
+        return _failed("missing_old_string", "old_string is required for edit.")
+    if "new_string" not in payload or payload.get("new_string") is None:
+        return _failed("missing_new_string", "new_string is required for edit.")
+    new_string = _as_text(payload.get("new_string"))
+    replace_all = _as_bool(payload.get("replace_all"))
+
+    snapshot = _verify_existing_file_snapshot(target, payload)
+    if isinstance(snapshot, dict) and "type" in snapshot:
+        return _failed(snapshot["type"], snapshot["message"])
+
+    previous_text = target.read_text(encoding="utf-8", errors="replace")
+    match_count = previous_text.count(old_string)
+    if match_count == 0:
+        return _failed("old_string_not_found", "old_string was not found in the target file.")
+    if match_count > 1 and not replace_all:
+        return _failed("non_unique_match", "old_string matched multiple locations; set replace_all=true or provide a unique old_string.")
+
+    next_text = previous_text.replace(old_string, new_string) if replace_all else previous_text.replace(old_string, new_string, 1)
+    patch = _unified_text_patch(_display_path(repo_root, target), previous_text, next_text)
+    added, removed = _patch_line_counts(patch)
+    target.write_text(next_text, encoding="utf-8")
+    display_path = _display_path(repo_root, target)
+    next_snapshot = _file_snapshot(target)
+    return _succeeded(
+        f"Edited `{display_path}` ({match_count} match{'es' if match_count != 1 else ''}, +{added} -{removed}).",
+        activity_events=[
+            _activity_event(
+                kind="file_edit",
+                summary=f"Editing {display_path} +{added} -{removed}",
+                status="succeeded",
+                detail={
+                    "path": display_path,
+                    "match_count": match_count,
+                    "replace_all": replace_all,
+                    "old_sha256": snapshot["sha256"],
+                    "old_mtime_ns": snapshot["mtime_ns"],
+                    "new_sha256": next_snapshot["sha256"],
+                    "new_mtime_ns": next_snapshot["mtime_ns"],
+                    "added": added,
+                    "removed": removed,
+                    "patch": _truncate_patch(patch),
                 },
             )
         ],
@@ -268,10 +340,14 @@ def _execute_script(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
     command_result = _build_execute_command(target)
     if isinstance(command_result, dict):
         return _failed(command_result["type"], command_result["message"])
+    args_result = _normalize_execute_args(payload.get("args"))
+    if isinstance(args_result, dict):
+        return _failed(args_result["type"], args_result["message"])
+    command = [*command_result, *args_result]
 
     try:
         completed = subprocess.run(
-            command_result,
+            command,
             text=True,
             capture_output=True,
             cwd=target.parent,
@@ -282,7 +358,8 @@ def _execute_script(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
         event = _command_activity_event(
             repo_root=repo_root,
             target=target,
-            command=command_result,
+            command=command,
+            args=args_result,
             exit_code=124,
             stdout=_truncate(exc.stdout or ""),
             stderr=_truncate(exc.stderr or ""),
@@ -304,7 +381,8 @@ def _execute_script(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
     event = _command_activity_event(
         repo_root=repo_root,
         target=target,
-        command=command_result,
+        command=command,
+        args=args_result,
         exit_code=completed.returncode,
         stdout=_truncate(completed.stdout),
         stderr=_truncate(completed.stderr),
@@ -340,6 +418,38 @@ def _build_execute_command(target: Path) -> list[str] | dict[str, str]:
             return {"type": "missing_command", "message": "pwsh or powershell is required to run .ps1 scripts."}
         return [shell, "-File", str(target)]
     return {"type": "unsupported_extension", "message": "Script extension is not allowed."}
+
+
+def _normalize_execute_args(value: Any) -> list[str] | dict[str, str]:
+    if value in (None, "", []):
+        return []
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        if text.startswith("["):
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                return {"type": "invalid_args", "message": "args JSON array could not be parsed."}
+            return _normalize_execute_args(parsed)
+        try:
+            return shlex.split(text)
+        except ValueError as exc:
+            return {"type": "invalid_args", "message": str(exc)}
+    if not isinstance(value, list):
+        return {"type": "invalid_args", "message": "args must be a JSON array or shell-style string."}
+    args: list[str] = []
+    for item in value:
+        if isinstance(item, (dict, list)):
+            return {"type": "invalid_args", "message": "args entries must be scalar values."}
+        text = _as_text(item)
+        if "\x00" in text:
+            return {"type": "invalid_args", "message": "args entries must not contain NUL bytes."}
+        args.append(text)
+    if len(args) > 32:
+        return {"type": "invalid_args", "message": "args may contain at most 32 entries."}
+    return args
 
 
 def _format_execution_result(
@@ -418,12 +528,6 @@ def _truncate(value: str | bytes | None) -> str:
         return ""
     text = value.decode("utf-8", errors="replace") if isinstance(value, bytes) else str(value)
     return text[:MAX_OUTPUT_CHARS]
-
-
-def _line_count(value: str) -> int:
-    if not value:
-        return 0
-    return len(value.splitlines())
 
 
 def _collect_readable_files(repo_root: Path, target: Path) -> tuple[list[Path], int]:
@@ -512,6 +616,7 @@ def _command_activity_event(
     repo_root: Path,
     target: Path,
     command: list[str],
+    args: list[str],
     exit_code: int,
     stdout: str,
     stderr: str,
@@ -525,6 +630,7 @@ def _command_activity_event(
         detail={
             "path": display_path,
             "command": command,
+            "args": args,
             "cwd": _display_path(repo_root, target.parent),
             "exit_code": exit_code,
             "stdout_chars": len(stdout),
@@ -545,6 +651,77 @@ def _failed(error_type: str, message: str, *, activity_events: list[dict[str, An
     if activity_events:
         payload["activity_events"] = activity_events
     return payload
+
+
+def _verify_existing_file_snapshot(target: Path, payload: dict[str, Any]) -> dict[str, Any] | None:
+    if not target.exists():
+        return None
+    if not target.is_file():
+        return {"type": "not_file", "message": "Path exists but is not a file."}
+    if not _is_text_file(target):
+        return {"type": "unsupported_binary", "message": "Existing file is not a UTF-8 text file."}
+
+    expected_sha256 = _as_text(payload.get("expected_sha256")).strip().lower()
+    expected_mtime_ns = _as_text(payload.get("expected_mtime_ns")).strip()
+    if not expected_sha256 or not expected_mtime_ns:
+        return {
+            "type": "missing_snapshot",
+            "message": "expected_sha256 and expected_mtime_ns are required before modifying an existing file.",
+        }
+
+    snapshot = _file_snapshot(target)
+    if expected_sha256 != snapshot["sha256"] or expected_mtime_ns != str(snapshot["mtime_ns"]):
+        return {
+            "type": "stale_file",
+            "message": "File changed after the provided snapshot; read the file again before editing or overwriting it.",
+        }
+    return snapshot
+
+
+def _file_snapshot(path: Path) -> dict[str, Any]:
+    return {
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "mtime_ns": path.stat().st_mtime_ns,
+    }
+
+
+def _unified_text_patch(display_path: str, old_text: str, new_text: str) -> str:
+    return "\n".join(
+        difflib.unified_diff(
+            old_text.splitlines(),
+            new_text.splitlines(),
+            fromfile=f"a/{display_path}",
+            tofile=f"b/{display_path}",
+            lineterm="",
+        )
+    )
+
+
+def _patch_line_counts(patch: str) -> tuple[int, int]:
+    added = 0
+    removed = 0
+    for line in patch.splitlines():
+        if line.startswith("+++") or line.startswith("---"):
+            continue
+        if line.startswith("+"):
+            added += 1
+        elif line.startswith("-"):
+            removed += 1
+    return added, removed
+
+
+def _truncate_patch(patch: str) -> str:
+    if len(patch) <= MAX_PATCH_CHARS:
+        return patch
+    return patch[:MAX_PATCH_CHARS] + "\n[patch truncated]"
+
+
+def _as_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    return _as_text(value).strip().lower() in {"1", "true", "yes", "y", "replace_all"}
 
 
 def main() -> None:

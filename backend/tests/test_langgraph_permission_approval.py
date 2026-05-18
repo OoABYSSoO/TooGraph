@@ -9,6 +9,21 @@ from app.core.langgraph import execute_node_system_graph_langgraph
 from app.core.schemas.node_system import NodeSystemGraphDocument
 
 
+def _workspace_write_inputs() -> dict[str, object]:
+    return {
+        "operation": "write",
+        "path": "action/user/demo/ACTION.md",
+        "content": "# Demo",
+        "query": "",
+        "old_string": "",
+        "new_string": "",
+        "replace_all": False,
+        "expected_sha256": "",
+        "expected_mtime_ns": "",
+        "args": [],
+    }
+
+
 def _approval_graph() -> NodeSystemGraphDocument:
     return NodeSystemGraphDocument.model_validate(
         {
@@ -172,14 +187,7 @@ def test_langgraph_runtime_pauses_before_risky_action_permission(monkeypatch) ->
         executor_module,
         "_generate_agent_action_inputs",
         lambda **kwargs: (
-            {
-                "local_workspace_executor": {
-                    "operation": "write",
-                    "path": "action/user/demo/ACTION.md",
-                    "content": "# Demo",
-                    "query": "",
-                }
-            },
+            {"local_workspace_executor": _workspace_write_inputs()},
             "planned action inputs",
             [],
             kwargs["runtime_config"],
@@ -217,14 +225,7 @@ def test_langgraph_runtime_resumes_permission_approval_with_stored_inputs(monkey
         nonlocal planned_inputs_calls
         planned_inputs_calls += 1
         return (
-            {
-                "local_workspace_executor": {
-                    "operation": "write",
-                    "path": "action/user/demo/ACTION.md",
-                    "content": "# Demo",
-                    "query": "",
-                }
-            },
+            {"local_workspace_executor": _workspace_write_inputs()},
             "planned action inputs",
             [],
             kwargs["runtime_config"],
@@ -252,14 +253,7 @@ def test_langgraph_runtime_resumes_permission_approval_with_stored_inputs(monkey
 
     assert resumed["status"] == "completed"
     assert planned_inputs_calls == 1
-    assert invoked == [
-            {
-                "operation": "write",
-                "path": "action/user/demo/ACTION.md",
-                "content": "# Demo",
-                "query": "",
-            }
-    ]
+    assert invoked == [_workspace_write_inputs()]
     assert "pending_permission_approval" not in resumed["metadata"]
     assert resumed["permission_approvals"][0]["status"] == "approved"
     package = resumed["state_values"]["dynamic_result"]
@@ -279,14 +273,7 @@ def test_langgraph_runtime_propagates_permission_approval_through_subgraph(monke
         nonlocal planned_inputs_calls
         planned_inputs_calls += 1
         return (
-            {
-                "local_workspace_executor": {
-                    "operation": "write",
-                    "path": "action/user/demo/ACTION.md",
-                    "content": "# Demo",
-                    "query": "",
-                }
-            },
+            {"local_workspace_executor": _workspace_write_inputs()},
             "planned action inputs",
             [],
             kwargs["runtime_config"],
@@ -321,12 +308,5 @@ def test_langgraph_runtime_propagates_permission_approval_through_subgraph(monke
 
     assert resumed["status"] == "completed"
     assert planned_inputs_calls == 1
-    assert invoked == [
-        {
-            "operation": "write",
-            "path": "action/user/demo/ACTION.md",
-            "content": "# Demo",
-            "query": "",
-        }
-    ]
+    assert invoked == [_workspace_write_inputs()]
     assert resumed["state_values"]["dynamic_result"]["sourceKey"] == "local_workspace_executor"

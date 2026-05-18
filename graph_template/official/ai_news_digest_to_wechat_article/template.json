@@ -289,6 +289,20 @@
         "fieldKey": "recalled_sessions",
         "managed": true
       }
+    },
+    "state_1": {
+      "name": "Recall Request",
+      "description": "会话召回请求，可包含 mode、query、session_id、anchor_message_id、direction、limit、window、bookend、sort、role_filter、current_session_id。",
+      "type": "json",
+      "value": {},
+      "color": "#d97706"
+    },
+    "state_2": {
+      "name": "User Question",
+      "description": "用户需要联网检索、核查或补充时效信息的问题。",
+      "type": "text",
+      "value": "",
+      "color": "#2563eb"
     }
   },
   "nodes": {
@@ -521,6 +535,16 @@
       },
       "reads": [
         {
+          "state": "state_1",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "buddy_session_recall",
+            "fieldKey": "recall_request",
+            "managed": true
+          }
+        },
+        {
           "state": "memory_request",
           "required": true
         }
@@ -685,6 +709,16 @@
         }
       },
       "reads": [
+        {
+          "state": "state_2",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "web_search",
+            "fieldKey": "user_question",
+            "managed": true
+          }
+        },
         {
           "state": "topic",
           "required": true
@@ -1361,6 +1395,7 @@
       "事实和观点必须分开表达。",
       "没有来源的新闻事实必须进入 fact_check_report。",
       "轻量 mock 模式默认不联网；联网补充需要显式开启 use_web_search。"
-    ]
+    ],
+    "toograph_state_key_counter": 2
   }
 }

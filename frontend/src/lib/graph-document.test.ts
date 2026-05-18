@@ -25,6 +25,7 @@ const {
   updateBatchNodeDefaultWorkerInDocument,
   updateBatchNodeSubgraphWorkerInDocument,
   disconnectManagedToolInputStateInDocument,
+  disconnectManagedActionInputStateInDocument,
   updateToolNodeConfigInDocument,
   updateSubgraphNodeGraphInDocument,
 } = graphDocument;
@@ -4373,5 +4374,86 @@ test("disconnectManagedToolInputStateInDocument restores a bound tool input to a
     const slotState = nextDocument.state_schema[node.reads[0]?.state ?? ""];
     assert.equal(slotState?.name, "Value");
     assert.equal(slotState?.type, "json");
+  }
+});
+
+test("disconnectManagedActionInputStateInDocument restores a bound action input to a managed slot", () => {
+  assert.equal(typeof disconnectManagedActionInputStateInDocument, "function");
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Action input disconnect",
+    state_schema: {
+      user_question: { name: "Question", description: "", type: "text", value: "What changed?", color: "#2563eb" },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "Question",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "user_question", mode: "replace" }],
+        config: { value: "" },
+      },
+      search_agent: {
+        kind: "agent",
+        name: "Search",
+        description: "",
+        ui: { position: { x: 320, y: 0 } },
+        reads: [
+          {
+            state: "user_question",
+            required: true,
+            binding: {
+              kind: "action_input",
+              actionKey: "web_search",
+              fieldKey: "user_question",
+              managed: true,
+            },
+          },
+        ],
+        writes: [],
+        config: {
+          actionKey: "web_search",
+          actionBindings: [{ actionKey: "web_search", outputMapping: {} }],
+          actionInstructionBlocks: {},
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "high",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [{ source: "input_question", target: "search_agent" }],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = disconnectManagedActionInputStateInDocument(
+    document,
+    "input_question",
+    "search_agent",
+    "user_question",
+    { actionDefinitions: [webSearchAction] },
+  );
+  const node = nextDocument.nodes.search_agent;
+
+  assert.notEqual(nextDocument, document);
+  assert.equal(nextDocument.state_schema.user_question?.name, "Question");
+  assert.deepEqual(nextDocument.edges, []);
+  assert.equal(node.kind, "agent");
+  if (node.kind === "agent") {
+    assert.equal(node.reads.length, 1);
+    assert.notEqual(node.reads[0]?.state, "user_question");
+    assert.deepEqual(node.reads[0]?.binding, {
+      kind: "action_input",
+      actionKey: "web_search",
+      fieldKey: "user_question",
+      managed: true,
+    });
+    const slotState = nextDocument.state_schema[node.reads[0]?.state ?? ""];
+    assert.equal(slotState?.name, "User Question");
+    assert.equal(slotState?.type, "text");
   }
 });

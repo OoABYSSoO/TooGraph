@@ -21,6 +21,7 @@ def _agent_action_definition(
     *,
     eligibility: ActionLlmNodeEligibility = ActionLlmNodeEligibility.READY,
     blockers: list[str] | None = None,
+    state_input_schema: list[ActionIoField] | None = None,
     input_schema: list[ActionIoField] | None = None,
     output_schema: list[ActionIoField] | None = None,
     runtime_entrypoint: str | None = None,
@@ -29,6 +30,7 @@ def _agent_action_definition(
         actionKey=action_key,
         name=action_key,
         runtime={"type": "python", "entrypoint": runtime_entrypoint or "run.py"},
+        stateInputSchema=state_input_schema or [],
         llmOutputSchema=input_schema or [],
         stateOutputSchema=output_schema or [ActionIoField(key="summary", name="Summary", valueType="text")],
         runtimeReady=True,
@@ -143,6 +145,90 @@ class NodeSystemValidatorActionTests(unittest.TestCase):
             validation = validate_graph(graph)
 
         self.assertNotIn("agent_action_required_input_missing", [issue.code for issue in validation.issues])
+
+    def test_static_action_state_inputs_require_managed_action_input_slots(self) -> None:
+        graph = _graph_with_agent_config(
+            {
+                "actionKey": "summarize_text",
+                "actionBindings": [
+                    {
+                        "actionKey": "summarize_text",
+                        "outputMapping": {"summary": "summary_text"},
+                    }
+                ],
+            }
+        )
+        definition = _agent_action_definition(
+            "summarize_text",
+            state_input_schema=[ActionIoField(key="text", name="Text", valueType="text")],
+        )
+
+        with (
+            patch("app.core.compiler.validator.get_action_registry", return_value={"summarize_text": object()}),
+            patch("app.core.compiler.validator.get_action_catalog_registry", return_value={"summarize_text": definition}),
+        ):
+            validation = validate_graph(graph)
+
+        self.assertIn("agent_action_input_binding_missing", [issue.code for issue in validation.issues])
+
+    def test_static_action_state_inputs_accept_managed_action_input_slots(self) -> None:
+        graph = NodeSystemGraphDocument.model_validate(
+            {
+                "graph_id": "graph-1",
+                "name": "Graph",
+                "state_schema": {
+                    "source_text": {"type": "text", "value": "Long text"},
+                    "summary_text": {"type": "text", "value": ""},
+                },
+                "nodes": {
+                    "input_source": {
+                        "kind": "input",
+                        "ui": {"position": {"x": 0, "y": 0}},
+                        "writes": [{"state": "source_text"}],
+                    },
+                    "agent": {
+                        "kind": "agent",
+                        "ui": {"position": {"x": 200, "y": 0}},
+                        "reads": [
+                            {
+                                "state": "source_text",
+                                "binding": {
+                                    "kind": "action_input",
+                                    "actionKey": "summarize_text",
+                                    "fieldKey": "text",
+                                    "managed": True,
+                                },
+                            }
+                        ],
+                        "writes": [{"state": "summary_text"}],
+                        "config": {
+                            "actionKey": "summarize_text",
+                            "actionBindings": [
+                                {
+                                    "actionKey": "summarize_text",
+                                    "outputMapping": {"summary": "summary_text"},
+                                }
+                            ],
+                        },
+                    },
+                },
+                "edges": [{"source": "input_source", "target": "agent"}],
+                "conditional_edges": [],
+            }
+        )
+        definition = _agent_action_definition(
+            "summarize_text",
+            state_input_schema=[ActionIoField(key="text", name="Text", valueType="text")],
+        )
+
+        with (
+            patch("app.core.compiler.validator.get_action_registry", return_value={"summarize_text": object()}),
+            patch("app.core.compiler.validator.get_action_catalog_registry", return_value={"summarize_text": definition}),
+        ):
+            validation = validate_graph(graph)
+
+        self.assertNotIn("agent_action_input_binding_missing", [issue.code for issue in validation.issues])
+        self.assertNotIn("agent_action_input_binding_action_mismatch", [issue.code for issue in validation.issues])
 
     def test_binding_only_action_is_rejected_as_legacy_attachment(self) -> None:
         graph = _graph_with_agent_config(

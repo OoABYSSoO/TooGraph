@@ -5,6 +5,7 @@ import {
   connectConditionRouteInDocument,
   connectFlowNodesInDocument,
   connectStateBindingInDocument,
+  disconnectManagedActionInputStateInDocument,
   disconnectManagedToolInputStateInDocument,
   reconnectConditionRouteInDocument,
   reconnectFlowEdgeInDocument,
@@ -150,6 +151,12 @@ export function useWorkspaceGraphMutationActions(input: WorkspaceGraphMutationAc
       (document) => {
         if (mode === "flow") {
           return removeFlowEdgeFromDocument(document, sourceNodeId, targetNodeId);
+        }
+        const restoredActionSlotDocument = disconnectManagedActionInputStateInDocument(document, sourceNodeId, targetNodeId, stateKey, {
+          actionDefinitions: input.actionDefinitions.value,
+        });
+        if (restoredActionSlotDocument !== document) {
+          return restoredActionSlotDocument;
         }
         const restoredToolSlotDocument = disconnectManagedToolInputStateInDocument(document, sourceNodeId, targetNodeId, stateKey, {
           toolDefinitions: input.toolDefinitions.value,

@@ -359,7 +359,13 @@
       "reads": [
         {
           "state": "target_template_id",
-          "required": false
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_graph_template_reader",
+            "fieldKey": "target_template_id",
+            "managed": true
+          }
         }
       ],
       "writes": [
@@ -720,7 +726,13 @@
       "reads": [
         {
           "state": "generated_template_json",
-          "required": true
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_graph_template_validator",
+            "fieldKey": "generated_template_json",
+            "managed": true
+          }
         }
       ],
       "writes": [
@@ -856,11 +868,23 @@
       "reads": [
         {
           "state": "generated_template_json",
-          "required": true
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_graph_template_writer",
+            "fieldKey": "generated_template_json",
+            "managed": true
+          }
         },
         {
           "state": "validation_report",
-          "required": true
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_graph_template_writer",
+            "fieldKey": "validation_report",
+            "managed": true
+          }
         },
         {
           "state": "save_review",
@@ -1525,7 +1549,13 @@
                       "reads": [
                         {
                           "state": "user_goal",
-                          "required": true
+                          "required": true,
+                          "binding": {
+                            "kind": "action_input",
+                            "actionKey": "toograph_page_operator",
+                            "fieldKey": "user_goal",
+                            "managed": true
+                          }
                         },
                         {
                           "state": "goal_plan",

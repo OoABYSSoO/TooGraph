@@ -289,6 +289,13 @@
         "fieldKey": "recalled_sessions",
         "managed": true
       }
+    },
+    "state_1": {
+      "name": "Recall Request",
+      "description": "会话召回请求，可包含 mode、query、session_id、anchor_message_id、direction、limit、window、bookend、sort、role_filter、current_session_id。",
+      "type": "json",
+      "value": {},
+      "color": "#d97706"
     }
   },
   "nodes": {
@@ -605,6 +612,16 @@
         }
       },
       "reads": [
+        {
+          "state": "state_1",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "buddy_session_recall",
+            "fieldKey": "recall_request",
+            "managed": true
+          }
+        },
         {
           "state": "creative_memory_request",
           "required": true
@@ -1720,6 +1737,7 @@
       "不得生成违法、歧视、成人、赌博或侵犯版权的广告素材建议。",
       "广告平台合规风险必须显式输出，最终投放前需要人工审核。",
       "轻量模式只能基于用户提供或 mock 的素材分析，不编造真实投放数据。"
-    ]
+    ],
+    "toograph_state_key_counter": 1
   }
 }

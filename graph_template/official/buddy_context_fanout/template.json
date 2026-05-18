@@ -171,6 +171,13 @@
         "fieldKey": "result",
         "managed": true
       }
+    },
+    "state_1": {
+      "name": "Fanout Request",
+      "description": "当前 Buddy 回合的上下文装配需求、预算和来源约束。",
+      "type": "json",
+      "value": {},
+      "color": "#d97706"
     }
   },
   "nodes": {
@@ -288,6 +295,16 @@
         "collapsed": false
       },
       "reads": [
+        {
+          "state": "state_1",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_context_fanout",
+            "fieldKey": "fanout_request",
+            "managed": true
+          }
+        },
         {
           "state": "user_message",
           "required": true
@@ -490,6 +507,7 @@
       "buddy_session_read",
       "knowledge_read",
       "file_read"
-    ]
+    ],
+    "toograph_state_key_counter": 1
   }
 }

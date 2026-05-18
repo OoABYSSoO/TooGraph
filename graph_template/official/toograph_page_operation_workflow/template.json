@@ -552,7 +552,13 @@
               "reads": [
                 {
                   "state": "user_goal",
-                  "required": true
+                  "required": true,
+                  "binding": {
+                    "kind": "action_input",
+                    "actionKey": "toograph_page_operator",
+                    "fieldKey": "user_goal",
+                    "managed": true
+                  }
                 },
                 {
                   "state": "goal_plan",

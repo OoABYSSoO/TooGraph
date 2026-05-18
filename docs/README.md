@@ -99,10 +99,9 @@ npm start
 | `toograph_graph_template_validator` | 校验图模板 JSON | 保留，内部 helper 可收敛 |
 | `toograph_graph_template_writer` | 写入用户图模板并记录 revision | 保留，内部 helper 可收敛 |
 | `toograph_script_tester` | 临时测试工作区和允许命令运行 | 保留 |
-| `local_workspace_executor` | 本地工作区 read/list/search/write/execute | 保留，未来补 `edit` |
+| `local_workspace_executor` | 本地工作区 read/list/search/edit/write/execute | 保留，未来补 operation 级权限和 execute 长输出 |
 | `buddy_session_recall` | 只读 Buddy 会话召回 | 保留 |
 | `buddy_home_writer` | 通过 command/revision 写 Buddy Home | 保留，记忆写回唯一出口 |
-| `buddy_visible_subgraph_result_adapter` | 旧页面操作可见子图结果适配 | 遗留内部 Action，未来降级或删除 |
 
 未完成或待做：
 
@@ -126,14 +125,20 @@ npm start
 - 普通 Subgraph node、动态 `capability.kind=subgraph` 和 batch subgraph worker 会创建 child run。
 - `/api/runs/{run_id}` 会返回直接 children，`/api/runs/{run_id}/tree` 会返回运行树。
 - 动态 subgraph result package 会写入 `childRunId`、`child_run_id`、`triggered_run_id`，并把公开输出包装到 `outputs`。
-- RunDetail 前端已有运行树和 batch group 折叠展示模型。
+- 子图暂停恢复已经能续写原 child run：
+  - pending subgraph breakpoint 会保存 `child_run_id` 和 `graph_snapshot`。
+  - 普通 Subgraph node 和动态 Subgraph capability resume 会优先加载原 child run。
+  - resume 使用 pending breakpoint 中的 checkpoint、state values、metadata、node status 和 node executions，避免测试或中间保存产生的不完整 child run 覆盖真正暂停点。
+  - 恢复完成或再次暂停后会更新同一个 child run，并把 `child_run_id` 写回父 run 的 subgraph artifact 和动态 result package。
+- 前端运行树展示模型已经抽到 `frontend/src/lib/runTreeDisplayModel.ts`，RunDetail 和 Buddy 共用同一套 run row、batch group 和 status summary 逻辑。
+- RunDetail 前端已有运行树和 batch group 折叠展示。
+- Buddy run trace 胶囊折叠态仍保持 output-boundary 摘要；展开态会按消息 `runId` 拉取 `/api/runs/{run_id}/tree`，展示 parent run、child run、动态 subgraph 和 batch group。
+- Buddy 胶囊展开态有运行树 loading/error 状态；页面刷新后，已持久化消息中的 `runId` 能在再次展开时重新拉取同一运行树。展开状态本身还不是持久化 UI 状态。
 
 仍未完成：
 
-- P0：子图暂停恢复必须续写原 child run。当前 resume 路径仍会从 pending metadata 重建临时子图状态，并把 `run_id` 设为父 run id；目标是 pending breakpoint 保存 `child_run_id`，resume 时加载原 child run 的 checkpoint、graph snapshot、state values、node executions，继续更新同一个 child run。
-- P1：Buddy 胶囊展开态要接入真实运行树。折叠态继续只显示当前 output-boundary 段，展开态应拉取 `/api/runs/{run_id}/tree`，展示 parent run、child run、动态 subgraph、batch group 和关键输出。
-- P1：`buddy_visible_subgraph_result_adapter` 需要处理。若官方模板不再依赖它，应删除；若保留，应标记为 legacy/internal/deprecated，且能力选择器不得把它当作新运行链路能力。
-- P2：运行树 display model 或后端 tree API 要统一 batch group summary，避免 RunDetail 和 Buddy 各自维护不一致的分组逻辑。
+- P2：继续补运行树回归和端到端验证，重点是再次暂停、child run 文件缺失 fallback、失败恢复、Buddy 展开真实子运行后的导航和刷新再展开。
+- P2：如果后端 tree API 未来要直接输出 batch group summary，应保持与 `frontend/src/lib/runTreeDisplayModel.ts` 的展示语义一致，不能让 Buddy 和 RunDetail 分叉。
 
 ### 2.4 Buddy 记忆系统
 
@@ -333,16 +338,22 @@ RAG 路线图：
 
 已完成：
 
-- `local_workspace_executor` 支持 `read`、`list`、`search`、`write`、`execute`。
+- `local_workspace_executor` 支持 `read`、`list`、`search`、`edit`、`write`、`execute`。
 - 它对路径做仓库内约束，拒绝 `.git`、`.env`、`backend/data/settings` 等危险位置。
 - 它会输出 activity events。
+- `edit` 已经是独立局部编辑操作，不再退化成完整 `write`：
+  - 输入 `old_string`、`new_string`、`replace_all`。
+  - 默认要求 `old_string` 唯一匹配；多处匹配必须显式 `replace_all=true`。
+  - 修改前检查 `expected_sha256` 和 `expected_mtime_ns`，文件变化后返回 `stale_file`。
+  - 成功后 activity event 写入 old/new hash、old/new mtime、匹配数、行级增删统计和统一 patch。
+- `write` 创建新文件时可直接写；覆盖已有文件时必须带 `expected_sha256` 和 `expected_mtime_ns`。
+- `before_llm.py` 在预读文件上下文中输出文件内容、`sha256` 和 `mtime_ns`，供 `edit` 或覆盖写入做 read-before-write。
+- `execute` 支持 `args` JSON 数组，并把 args 写入 command activity event detail。
 - `toograph_script_tester` 在临时目录写测试文件，使用命令 allowlist，返回命令、退出码、stdout、stderr、耗时和 activity events。
 
 仍未完成：
 
-- `local_workspace_executor` 的 `edit` 目前没有达到专业局部编辑能力，普通修改仍容易退化成完整 `write`。
-- 文件写入缺少 read-before-write 快照、mtime/hash stale 检查、唯一匹配和结构化 patch。
-- `execute` 缺少参数数组化命令协议、只读命令识别、后台任务和大输出 artifact。
+- `execute` 仍缺少只读命令识别、后台任务和大输出 artifact。
 - 权限暂停仍偏 Action 级，未来应按 operation 展示风险：read/list/search、edit/write、execute 分开。
 
 目标 operation 协议：
@@ -365,7 +376,9 @@ operation:
   "path": "action/user/example/after_llm.py",
   "old_string": "timeout=30",
   "new_string": "timeout=60",
-  "replace_all": false
+  "replace_all": false,
+  "expected_sha256": "pre-read sha256",
+  "expected_mtime_ns": "pre-read mtime_ns"
 }
 ```
 
@@ -373,9 +386,9 @@ operation:
 
 - `workspace_paths`：路径归一化、危险根拒绝、读写执行根校验。
 - `workspace_read`：文本读取、大小限制、二进制拒绝、文件快照。
-- `workspace_edit`：`old_string -> new_string`、唯一匹配、replace_all、stale 检查、patch。
-- `workspace_write`：新建文件和完整覆盖；覆盖已有文件前要求完整快照。
-- `workspace_execute`：脚本/命令执行、timeout、输出裁剪、后台任务。
+- `workspace_edit`：`old_string -> new_string`、唯一匹配、replace_all、stale 检查、patch。当前已在 `local_workspace_executor/after_llm.py` 内实现，未来可抽 helper。
+- `workspace_write`：新建文件和完整覆盖；覆盖已有文件前要求完整快照。当前已在 `local_workspace_executor/after_llm.py` 内实现，未来可抽 helper。
+- `workspace_execute`：脚本/命令执行、args 数组、timeout、输出裁剪；后台任务和大输出 artifact 仍未完成。
 - `workspace_events`：activity events、错误类型、diff 摘要和 artifact refs。
 
 ### 2.7 结构化输出与 Function Calling
@@ -464,19 +477,38 @@ operation:
 
 ### P0：运行树可信度
 
+状态：基础实现已完成。
+
+已完成：
+
 1. 子图暂停恢复续写原 child run。
-2. pending subgraph breakpoint 保存 `child_run_id`。
-3. resume 时读取原 child run 的 checkpoint、graph snapshot、state values、node executions。
-4. 恢复完成后更新同一个 child run，再回写父 run 的 pending metadata、subgraph status map 和 result package。
-5. 测试覆盖普通 Subgraph node resume、动态 Subgraph capability resume、再次暂停、失败恢复和 result package child run 标识。
+2. pending subgraph breakpoint 保存 `child_run_id` 和 `graph_snapshot`。
+3. resume 时读取原 child run，并用 pending breakpoint 的 checkpoint、state values、metadata、node status、node executions 恢复真正暂停点。
+4. 恢复完成后更新同一个 child run，再回写父 run 的 subgraph status map、subgraph artifact 和 result package child run 标识。
+5. 测试已覆盖普通 Subgraph node resume、动态 Subgraph capability resume、旧 pending metadata 兼容路径、子图内权限审批恢复和 result package child run 标识。
+
+剩余回归：
+
+1. 补再次暂停后继续恢复的端到端回归。
+2. 补 child run 文件缺失但 pending breakpoint 仍可恢复的 fallback 回归。
+3. 补失败恢复后的 run tree、snapshot 和错误展示回归。
 
 ### P1：Buddy 胶囊和运行树 UI
 
+状态：基础实现已完成。
+
+已完成：
+
 1. Buddy 胶囊折叠态保持 output-boundary 摘要。
-2. 展开态接入 `/api/runs/{run_id}/tree`。
-3. 复用 RunDetail 的运行树 display model 或抽共享模型。
-4. batch worker 子运行按 `batch_group_id` 折叠。
-5. 页面刷新后，Buddy 展开态仍能恢复同一运行树。
+2. 展开态接入 `/api/runs/{run_id}/tree`，按消息 `runId` 拉取真实运行树。
+3. RunDetail 与 Buddy 共用 `frontend/src/lib/runTreeDisplayModel.ts`。
+4. batch worker 子运行按 `batch_group_id` 折叠，并共享 status summary。
+5. 页面刷新后，持久化消息里的 `runId` 能在再次展开时重新拉取同一运行树。
+
+剩余回归：
+
+1. 补 Buddy 展开真实子运行后的浏览器级交互测试，包括打开子 run 证据、打开运行回放和加载失败态。
+2. 如需要“刷新后仍保持展开”，再把 `expandedTraceMessageIds` 做成会话级 UI 状态；当前实现是刷新后再次展开重新拉取。
 
 ### P1：RAG 标准化
 
@@ -493,19 +525,27 @@ operation:
 3. session lineage 用于 browse/discover/scroll 去重和投影。
 4. 高风险记忆只写报告，不进入 `memory_document.update`。
 
-### P1：Action/模板创建和遗留 adapter
+### P1：Action/模板创建
 
-1. 判断并处理 `buddy_visible_subgraph_result_adapter`。
-2. `toograph_graph_template_validator` 与 writer 抽共享模板校验 helper。
-3. `toograph_action_package_reader` 与 template reader 抽共享安全读取 helper。
-4. Action 创建、模板创建和改进链路继续走官方流程、测试、审查和受控写入。
+1. `toograph_graph_template_validator` 与 writer 抽共享模板校验 helper。
+2. `toograph_action_package_reader` 与 template reader 抽共享安全读取 helper。
+3. Action 创建、模板创建和改进链路继续走官方流程、测试、审查和受控写入。
 
 ### P2：本地工作区能力
 
-1. 给 `local_workspace_executor` 增加真正 `edit` operation。
-2. 引入 read-before-write 快照、mtime/hash stale 检查、唯一匹配和 patch/diff。
-3. 命令执行从脚本路径逐步升级为参数数组和大输出 artifact。
-4. 权限展示从 Action 级扩展到 operation 级风险。
+状态：Action 基础实现已完成，运行时和长输出能力仍未完成。
+
+已完成：
+
+1. `local_workspace_executor` 已有真正 `edit` operation。
+2. 已引入 read-before-write 快照、mtime/hash stale 检查、唯一匹配、`replace_all` 和 patch/diff。
+3. `execute` 已支持参数数组。
+
+剩余：
+
+1. 为 `execute` 增加只读命令识别、后台任务和大输出 artifact。
+2. 权限展示从 Action 级扩展到 operation 级风险。
+3. 将当前内联的 workspace path/read/edit/write/execute/event helper 抽成可复用模块。
 
 ### P2：结构化输出与 Provider 能力
 

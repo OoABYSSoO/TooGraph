@@ -1960,6 +1960,49 @@ export function disconnectManagedToolInputStateInDocument<T extends GraphPayload
   return nextDocument;
 }
 
+export function disconnectManagedActionInputStateInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  sourceNodeId: string,
+  targetNodeId: string,
+  stateKey: string,
+  options: { actionDefinitions?: ActionDefinition[] } = {},
+): T {
+  const sourceNode = document.nodes[sourceNodeId];
+  const targetNode = document.nodes[targetNodeId];
+  if (!sourceNode || !targetNode || targetNode.kind !== "agent") {
+    return document;
+  }
+  if (!sourceNode.writes.some((binding) => binding.state === stateKey)) {
+    return document;
+  }
+
+  const targetBindingIndex = targetNode.reads.findIndex(
+    (binding) => binding.state === stateKey && binding.binding?.kind === "action_input" && binding.binding.managed !== false,
+  );
+  const readBinding = targetNode.reads[targetBindingIndex];
+  const bindingMetadata = readBinding?.binding;
+  if (targetBindingIndex === -1 || bindingMetadata?.kind !== "action_input") {
+    return document;
+  }
+
+  const actionDefinition = (options.actionDefinitions ?? []).find((definition) => definition.actionKey === bindingMetadata.actionKey);
+  const field = actionDefinition?.stateInputSchema?.find((candidate) => candidate.key === bindingMetadata.fieldKey);
+  if (!actionDefinition || !field) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  const nextTargetNode = nextDocument.nodes[targetNodeId];
+  if (nextTargetNode.kind !== "agent") {
+    return document;
+  }
+
+  const restoredStateKey = createManagedActionInputState(nextDocument, actionDefinition, field);
+  nextTargetNode.reads[targetBindingIndex] = buildManagedActionInputReadBinding(restoredStateKey, bindingMetadata.actionKey, field);
+  pruneDisconnectedIncomingFlowEdges(nextDocument, targetNodeId);
+  return nextDocument;
+}
+
 function addImplicitFlowEdgeForStateConnection<T extends GraphPayload | GraphDocument>(
   document: T,
   sourceNodeId: string,

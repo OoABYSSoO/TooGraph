@@ -1,6 +1,6 @@
 ---
 name: 本地工作区执行器
-description: Read, list, search, write one file, or execute one script inside TooGraph's local workspace permission boundaries.
+description: Read, list, search, edit, write one file, or execute one script inside TooGraph's local workspace permission boundaries.
 ---
 
 # 本地工作区执行器
@@ -14,9 +14,15 @@ State inputs:
 The LLM node generates only this structured LLM output:
 
 - `path`: repository-relative file path.
-- `operation`: `read`, `list`, `search`, `write`, or `execute`.
+- `operation`: `read`, `list`, `search`, `edit`, `write`, or `execute`.
 - `content`: complete final file content for `write`; return an empty string for other operations.
 - `query`: search text for `search`; return an empty string for other operations.
+- `old_string`: exact existing text for `edit`; return an empty string for other operations.
+- `new_string`: replacement text for `edit`; may be empty when deleting text.
+- `replace_all`: boolean for `edit`; use `true` only when every match should be replaced.
+- `expected_sha256`: SHA-256 from the pre-read snapshot when editing or overwriting an existing file.
+- `expected_mtime_ns`: mtime in nanoseconds from the pre-read snapshot when editing or overwriting an existing file.
+- `args`: JSON array of arguments for `execute`; return an empty array when no arguments are needed.
 
 The action exposes these state outputs:
 
@@ -33,7 +39,9 @@ Read context is intentionally broad enough for editing workflows, but it still r
 - `.env`
 - `backend/data/settings`
 
-If a referenced path does not exist, the pre-read context says that only `write` can create it. `read` and `execute` will fail for missing files.
+For each pre-read file, the context includes `sha256` and `mtime_ns`. `edit` and overwriting `write` must echo those values back as `expected_sha256` and `expected_mtime_ns`; if the file changed after pre-read, the runtime refuses the mutation with `stale_file`.
+
+If a referenced path does not exist, the pre-read context says that only `write` can create it. `read`, `edit`, and `execute` will fail for missing files.
 
 ## Runtime Operations
 
@@ -42,8 +50,16 @@ Supported operations:
 - `read`: reads one UTF-8 text file and returns its content in `result`.
 - `list`: lists readable text files below one path and returns skipped-entry counts.
 - `search`: searches readable text files below one path for `query` and returns matching lines plus skipped-entry counts.
-- `write`: creates or overwrites one UTF-8 text file under `backend/data`, `action/user`, `graph_template/user`, or `node_preset/user`.
-- `execute`: runs one script under `backend/data/tmp` or `action/user`.
+- `edit`: replaces `old_string` with `new_string` in one existing UTF-8 text file under `backend/data`, `action/user`, `graph_template/user`, or `node_preset/user`.
+- `write`: creates one UTF-8 text file or overwrites one existing UTF-8 text file under `backend/data`, `action/user`, `graph_template/user`, or `node_preset/user`.
+- `execute`: runs one script under `backend/data/tmp` or `action/user`, with optional `args`.
+
+Mutation rules:
+
+- `edit` refuses missing files, binary files, missing snapshots, stale snapshots, missing `old_string`, and non-unique matches when `replace_all` is false.
+- `write` may create a new file without a snapshot.
+- `write` must include `expected_sha256` and `expected_mtime_ns` when overwriting an existing file.
+- Successful `edit` and overwriting `write` include old/new hashes, old/new mtime values, line counts, and a unified patch in activity event detail.
 
 Default policy:
 

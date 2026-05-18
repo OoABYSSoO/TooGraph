@@ -143,6 +143,27 @@
       "value": {},
       "color": "#a16207",
       "binding": null
+    },
+    "state_1": {
+      "name": "Requirement",
+      "description": "用户本轮需要完成的目标。",
+      "type": "text",
+      "value": "",
+      "color": "#d97706"
+    },
+    "state_2": {
+      "name": "Capability Candidates",
+      "description": "候选能力目录，包含 templates/actions/tools。",
+      "type": "json",
+      "value": {},
+      "color": "#2563eb"
+    },
+    "state_3": {
+      "name": "Origin",
+      "description": "调用来源，例如 buddy。",
+      "type": "text",
+      "value": "",
+      "color": "#16a34a"
     }
   },
   "nodes": {
@@ -329,6 +350,36 @@
         "collapsed": false
       },
       "reads": [
+        {
+          "state": "state_1",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_capability_selector",
+            "fieldKey": "requirement",
+            "managed": true
+          }
+        },
+        {
+          "state": "state_2",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_capability_selector",
+            "fieldKey": "capability_candidates",
+            "managed": true
+          }
+        },
+        {
+          "state": "state_3",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_capability_selector",
+            "fieldKey": "origin",
+            "managed": true
+          }
+        },
         {
           "state": "user_message",
           "required": true
@@ -934,6 +985,7 @@
   "metadata": {
     "graphProtocol": "node_system",
     "role": "buddy_capability_loop",
-    "capabilityDiscoverableDefault": false
+    "capabilityDiscoverableDefault": false,
+    "toograph_state_key_counter": 3
   }
 }

@@ -6,11 +6,11 @@ from typing import Any, Callable
 
 from app.core.model_catalog import get_default_video_model_ref, resolve_runtime_model_name
 from app.core.runtime.agent_multimodal import collect_input_attachments, prepare_model_input_attachments
-from app.core.runtime.agent_prompt import format_graph_state_input_prompt_lines
+from app.core.runtime.agent_prompt import format_graph_state_input_prompt_lines, format_prompt_value
 from app.core.runtime.agent_response_generation import _resolve_media_runtime_config, repair_structured_output_with_runtime_model
 from app.core.runtime.action_bindings import ResolvedAgentActionBinding
 from app.core.runtime.structured_output import build_action_llm_output_schema, validate_structured_output
-from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition
+from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemReadBindingKind, NodeSystemStateDefinition
 from app.core.schemas.actions import ActionDefinition, ActionIoField
 from app.core.thinking_levels import resolve_effective_thinking_level
 from app.actions.runtime import (
@@ -167,6 +167,11 @@ def build_action_input_system_prompt(
     runtime_context: dict[str, Any] | None = None,
 ) -> str:
     resolved_state_schema = state_schema or {}
+    action_state_input_slots = collect_action_state_input_slots(
+        node=node,
+        input_values=input_values,
+        bindings=bindings,
+    )
     parts = [
         "You are the Action LLM-output planning phase of a graph LLM node.",
         "Choose concrete structured LLM output for every bound action from the current graph state and the action schemas.",
@@ -179,6 +184,9 @@ def build_action_input_system_prompt(
         for key, value in input_values.items():
             definition = resolved_state_schema.get(key)
             parts.extend(format_graph_state_input_prompt_lines(key, definition, value))
+
+    if action_state_input_slots:
+        parts.extend(format_action_state_input_slot_lines(action_state_input_slots, action_definitions))
 
     parts.append("\n== Bound Actions ==")
     example: dict[str, dict[str, Any]] = {}
@@ -214,6 +222,7 @@ def build_action_input_system_prompt(
         action_definitions=action_definitions,
         node=node,
         runtime_context=runtime_context,
+        action_state_input_slots=action_state_input_slots,
     )
     if before_llm_context_lines:
         parts.extend(before_llm_context_lines)
@@ -229,8 +238,16 @@ def format_action_before_llm_context_lines(
     action_definitions: dict[str, ActionDefinition],
     node: NodeSystemAgentNode | None = None,
     runtime_context: dict[str, Any] | None = None,
+    action_state_input_slots: dict[str, dict[str, dict[str, Any]]] | None = None,
 ) -> list[str]:
     entries: list[tuple[str, str]] = []
+    action_state_inputs = {
+        action_key: {
+            field_key: slot.get("value")
+            for field_key, slot in slots.items()
+        }
+        for action_key, slots in (action_state_input_slots or {}).items()
+    }
     for resolved_binding in bindings:
         action_key = resolved_binding.binding.action_key
         definition = action_definitions.get(action_key)
@@ -242,6 +259,7 @@ def format_action_before_llm_context_lines(
         payload = {
             "action_key": action_key,
             "runtime_context": runtime_context or {},
+            "action_state_inputs": action_state_inputs.get(action_key, {}),
             "task_instruction": node.config.task_instruction if node is not None else "",
         }
         context_payload = invoke_lifecycle_before_llm(
@@ -262,6 +280,64 @@ def format_action_before_llm_context_lines(
         lines.append(f"- actionKey: {action_key}")
         lines.append("  context:")
         lines.extend(f"    {line}" for line in context_text.splitlines())
+    return lines
+
+
+def collect_action_state_input_slots(
+    *,
+    node: NodeSystemAgentNode | None,
+    input_values: dict[str, Any],
+    bindings: list[ResolvedAgentActionBinding],
+) -> dict[str, dict[str, dict[str, Any]]]:
+    if node is None:
+        return {}
+    bound_action_keys = {resolved_binding.binding.action_key for resolved_binding in bindings}
+    slots: dict[str, dict[str, dict[str, Any]]] = {}
+    for read in node.reads:
+        binding = read.binding
+        if binding is None or binding.kind != NodeSystemReadBindingKind.ACTION_INPUT:
+            continue
+        if binding.action_key not in bound_action_keys:
+            continue
+        slots.setdefault(binding.action_key, {})[binding.field_key] = {
+            "source_state": read.state,
+            "value": input_values.get(read.state),
+        }
+    return {
+        action_key: field_slots
+        for action_key, field_slots in slots.items()
+        if field_slots
+    }
+
+
+def format_action_state_input_slot_lines(
+    slots: dict[str, dict[str, dict[str, Any]]],
+    action_definitions: dict[str, ActionDefinition],
+) -> list[str]:
+    lines = ["\n== Action State Input Slots =="]
+    for action_key, field_slots in slots.items():
+        definition = action_definitions.get(action_key)
+        field_by_key = {
+            field.key: field
+            for field in (definition.state_input_schema if definition is not None else [])
+        }
+        lines.append(f"- actionKey: {action_key}")
+        for field_key, slot in field_slots.items():
+            field = field_by_key.get(field_key)
+            lines.append(f"  - fieldKey: {field_key}")
+            if field is not None and field.name and field.name != field_key:
+                lines.append(f"    name: {field.name}")
+            if field is not None:
+                lines.append(f"    type: {field.value_type}")
+                if field.description:
+                    lines.append(f"    description: {field.description}")
+            lines.append(f"    source_state: {slot.get('source_state') or ''}")
+            value = format_prompt_value(slot.get("value"))
+            if "\n" in value:
+                lines.append("    value:")
+                lines.extend(f"      {line}" for line in value.splitlines())
+            else:
+                lines.append(f"    value: {value}")
     return lines
 
 

@@ -225,6 +225,13 @@
         "fieldKey": "recalled_sessions",
         "managed": true
       }
+    },
+    "state_1": {
+      "name": "Recall Request",
+      "description": "会话召回请求，可包含 mode、query、session_id、anchor_message_id、direction、limit、window、bookend、sort、role_filter、current_session_id。",
+      "type": "json",
+      "value": {},
+      "color": "#d97706"
     }
   },
   "nodes": {
@@ -491,6 +498,16 @@
         }
       },
       "reads": [
+        {
+          "state": "state_1",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "buddy_session_recall",
+            "fieldKey": "recall_request",
+            "managed": true
+          }
+        },
         {
           "state": "memory_request",
           "required": true
@@ -1396,6 +1413,7 @@
       "不能承诺录用、薪资结果、签证或劳动法结论。",
       "简历改写必须保留事实边界，不能编造项目、指标、学历、证书或工作经历。",
       "涉及薪资、城市和职业判断时必须保留不确定项和人工确认提示。"
-    ]
+    ],
+    "toograph_state_key_counter": 1
   }
 }

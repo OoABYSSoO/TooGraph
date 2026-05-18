@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -19,16 +20,18 @@ def local_workspace_executor_before_llm(**payload: Any) -> dict[str, str]:
 
     lines = [
         "本地工作区执行器 policy:",
-        "- Generate only LLM parameter fields: path, operation, content only when operation is write, and query only when operation is search.",
-        "- operation must be one of: read, list, search, write, execute.",
+        "- Generate only LLM parameter fields needed by one operation.",
+        "- operation must be one of: read, list, search, edit, write, execute.",
         "- read/list/search are repository read operations and never write files.",
         "- read is a pre-LLM context aid: existing repository files below are read before planning, including non-artifact files.",
         "- list returns readable text files below the selected path and reports skipped entries.",
         "- search finds matching lines below the selected path and reports skipped entries.",
-        "- write creates or overwrites one text file and is limited to backend/data, action/user, graph_template/user, or node_preset/user.",
-        "- execute runs one script file and is limited to backend/data/tmp or action/user.",
+        "- edit replaces old_string with new_string in one existing text file; use replace_all only when every match is intended.",
+        "- edit and overwriting write require expected_sha256 and expected_mtime_ns from the pre-read snapshot below.",
+        "- write creates one text file or overwrites one text file with a matching snapshot; it is limited to backend/data, action/user, graph_template/user, or node_preset/user.",
+        "- execute runs one script file and may include args as a JSON array; execution is limited to backend/data/tmp or action/user.",
         "- denied roots always fail: .git, .env, backend/data/settings.",
-        "- If a target path does not exist, only write can create it; read or execute will fail.",
+        "- If a target path does not exist, only write can create it; read, edit, or execute will fail.",
     ]
 
     if candidate_paths:
@@ -85,9 +88,12 @@ def _format_path_context(repo_root: Path, raw_path: str) -> list[str]:
         return [f"- `{display_path}`: path exists but is not a file."]
 
     content = resolved.read_text(encoding="utf-8", errors="replace")
+    snapshot = _file_snapshot(resolved)
     truncated = content[:MAX_READ_CONTEXT_CHARS]
     lines = [
         f"- `{display_path}` exists and was read before planning ({len(content)} characters).",
+        f"  sha256: {snapshot['sha256']}",
+        f"  mtime_ns: {snapshot['mtime_ns']}",
         "  content:",
     ]
     lines.extend(f"    {line}" for line in truncated.splitlines())
@@ -133,6 +139,13 @@ def _display_path(repo_root: Path, path: Path) -> str:
         return str(path.relative_to(repo_root)).replace("\\", "/")
     except ValueError:
         return str(path)
+
+
+def _file_snapshot(path: Path) -> dict[str, Any]:
+    return {
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "mtime_ns": path.stat().st_mtime_ns,
+    }
 
 
 def main() -> None:

@@ -396,6 +396,114 @@ test("buildNodeCardViewModel marks action-managed input ports", () => {
   });
 });
 
+test("buildNodeCardViewModel labels connected managed action input ports by the bound state", () => {
+  const webSearchAction = {
+    actionKey: "web_search",
+    name: "Web Search",
+    description: "Search the web.",
+    stateInputSchema: [{ key: "user_question", name: "User Question", valueType: "text", description: "Question to search." }],
+    llmOutputSchema: [],
+    stateOutputSchema: [],
+  } as ActionDefinition;
+  const node: GraphNode = {
+    kind: "agent",
+    name: "search_helper",
+    description: "Run a selected action.",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [
+      {
+        state: "question",
+        required: true,
+        binding: {
+          kind: "action_input",
+          actionKey: "web_search",
+          fieldKey: "user_question",
+          managed: true,
+        },
+      },
+    ],
+    writes: [],
+    config: {
+      actionKey: "web_search",
+      taskInstruction: "准备 LLM 输出。",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "high",
+      temperature: 0.2,
+    },
+  };
+
+  const model = buildNodeCardViewModel("search_helper", node, stateSchema, { actionDefinitions: [webSearchAction] });
+
+  assert.equal(model.inputs[0]?.key, "question");
+  assert.equal(model.inputs[0]?.anchorKey, "action_input_web_search_user_question");
+  assert.equal(model.inputs[0]?.label, "question");
+  assert.equal(model.inputs[0]?.managedSlot, false);
+  assert.deepEqual(model.inputs[0]?.managedByAction, {
+    role: "input",
+    actionKey: "web_search",
+    fieldKey: "user_question",
+  });
+});
+
+test("buildNodeCardViewModel marks unconnected managed action input placeholders as slots", () => {
+  const webSearchAction = {
+    actionKey: "web_search",
+    name: "Web Search",
+    description: "Search the web.",
+    stateInputSchema: [{ key: "user_question", name: "User Question", valueType: "text", description: "Question to search." }],
+    llmOutputSchema: [],
+    stateOutputSchema: [],
+  } as ActionDefinition;
+  const node: GraphNode = {
+    kind: "agent",
+    name: "search_helper",
+    description: "Run a selected action.",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [
+      {
+        state: "action_question_slot",
+        required: true,
+        binding: {
+          kind: "action_input",
+          actionKey: "web_search",
+          fieldKey: "user_question",
+          managed: true,
+        },
+      },
+    ],
+    writes: [],
+    config: {
+      actionKey: "web_search",
+      taskInstruction: "准备 LLM 输出。",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "high",
+      temperature: 0.2,
+    },
+  };
+
+  const model = buildNodeCardViewModel(
+    "search_helper",
+    node,
+    {
+      ...stateSchema,
+      action_question_slot: {
+        name: "User Question",
+        description: "Question to search.",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+    },
+    { actionDefinitions: [webSearchAction] },
+  );
+
+  assert.equal(model.inputs[0]?.label, "User Question");
+  assert.equal(model.inputs[0]?.anchorKey, "action_input_web_search_user_question");
+  assert.equal(model.inputs[0]?.managedSlot, true);
+});
+
 test("buildNodeCardViewModel labels connected managed tool input ports by the bound state", () => {
   const videoSegmenterTool: ToolDefinition = {
     toolKey: "video_segmenter",

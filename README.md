@@ -86,14 +86,14 @@ TooGraph 的推荐模型配置入口是 Model Providers 页面。你可以在界
 - 项目自带 `knowledge/TooGraph-official/` 作为 TooGraph 官方知识库源文档，`docs/README.md` 是长期路线图来源文档之一。
 - 后端支持 knowledge base 导入、切分、SQLite FTS、本地 hash embedding、混合检索、catalog 查询和 rebuild API。
 - Git 管理的官方 Action 定义来自 `action/official/<action_key>/` 文件夹；用户自定义 Action 写入 `action/user/<action_key>/`。当前环境的启用状态只写入被忽略的 `action/settings.json`。
-- 当前官方 Action 包包括 `web_search`、`toograph_capability_selector`、`toograph_context_fanout`、`toograph_page_operator`、`toograph_action_builder`、`toograph_action_package_reader`、`toograph_graph_template_reader`、`toograph_graph_template_validator`、`toograph_graph_template_writer`、`toograph_script_tester`、`local_workspace_executor`、`buddy_session_recall`、`buddy_home_writer` 和内部遗留 `buddy_visible_subgraph_result_adapter`。
+- 当前官方 Action 包包括 `web_search`、`toograph_capability_selector`、`toograph_context_fanout`、`toograph_page_operator`、`toograph_action_builder`、`toograph_action_package_reader`、`toograph_graph_template_reader`、`toograph_graph_template_validator`、`toograph_graph_template_writer`、`toograph_script_tester`、`local_workspace_executor`、`buddy_session_recall` 和 `buddy_home_writer`。
 - `web_search` 使用 `before_llm.py` 在 Action 入参规划前补充当前日期，使用 `after_llm.py` 执行联网搜索、引用整理、可选网页正文抓取、本地 source document artifact 输出，并把原文网址写入下载后的本地文档。
 - `toograph_context_fanout` 并行读取 Buddy Home `MEMORY.md`、知识库、页面上下文和可发现能力候选，输出只读 `context_brief` 和审计报告。
 - `toograph_capability_selector` 根据 requirement 和候选选择一个 `action` / `subgraph` / `tool` / `none` capability；只有明确页面、UI、按钮、当前图或图编辑请求才优先选择 `toograph_page_operation_workflow`。
 - `toograph_page_operator` 读取当前页面操作书，支持普通页面 click 和编辑器 `graph_edit editor.graph.playback`，让 Buddy 通过应用内虚拟鼠标/键盘可见地执行页面操作。
 - `toograph_action_builder` 生成 Action 包文件内容；它不负责写入、测试、修复或启用生成的 Action。
 - `toograph_script_tester` 接收脚本内容和测试目标，由 LLM 生成临时测试工作区并运行允许的测试命令；执行前仍受当前图或 Buddy 权限模式约束。
-- `local_workspace_executor` 会在 Action 入参规划前预读节点任务或 state 中提到的仓库文件；运行时支持 `read` / `list` / `search` / `write` / `execute`，并对 `.git`、`.env`、`backend/data/settings` 做硬拒绝；它涉及本地写入和进程执行，是否暂停确认由当前图或 Buddy 的权限模式决定。
+- `local_workspace_executor` 会在 Action 入参规划前预读节点任务或 state 中提到的仓库文件；运行时支持 `read` / `list` / `search` / `edit` / `write` / `execute`，并对 `.git`、`.env`、`backend/data/settings` 做硬拒绝；它涉及本地写入和进程执行，是否暂停确认由当前图或 Buddy 的权限模式决定。
 - Output 节点可以读取 `local_path` 指向的本地 artifact，按类型预览文档、图片和视频。
 
 ## 快速开始

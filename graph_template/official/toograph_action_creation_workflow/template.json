@@ -393,6 +393,48 @@
         "fieldKey": "result",
         "managed": true
       }
+    },
+    "state_1": {
+      "name": "Script Requirement",
+      "description": "用户希望脚本测试验证的行为、边界和成功标准。",
+      "type": "markdown",
+      "value": "",
+      "color": "#d97706"
+    },
+    "state_2": {
+      "name": "Workspace Request",
+      "description": "用户或上游图节点希望在本地工作区完成的明确操作目标。",
+      "type": "text",
+      "value": "",
+      "color": "#2563eb"
+    },
+    "state_3": {
+      "name": "Workspace Request",
+      "description": "用户或上游图节点希望在本地工作区完成的明确操作目标。",
+      "type": "text",
+      "value": "",
+      "color": "#16a34a"
+    },
+    "state_4": {
+      "name": "Workspace Request",
+      "description": "用户或上游图节点希望在本地工作区完成的明确操作目标。",
+      "type": "text",
+      "value": "",
+      "color": "#7c3aed"
+    },
+    "state_5": {
+      "name": "Workspace Request",
+      "description": "用户或上游图节点希望在本地工作区完成的明确操作目标。",
+      "type": "text",
+      "value": "",
+      "color": "#db2777"
+    },
+    "state_6": {
+      "name": "Workspace Request",
+      "description": "用户或上游图节点希望在本地工作区完成的明确操作目标。",
+      "type": "text",
+      "value": "",
+      "color": "#0891b2"
     }
   },
   "nodes": {
@@ -456,7 +498,13 @@
       "reads": [
         {
           "state": "target_action_key",
-          "required": false
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_action_package_reader",
+            "fieldKey": "target_action_key",
+            "managed": true
+          }
         },
         {
           "state": "action_request",
@@ -773,11 +821,17 @@
       },
       "reads": [
         {
-          "state": "action_request",
-          "required": true
+          "state": "confirmed_action_requirement",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_action_builder",
+            "fieldKey": "confirmed_action_requirement",
+            "managed": true
+          }
         },
         {
-          "state": "confirmed_action_requirement",
+          "state": "action_request",
           "required": true
         },
         {
@@ -940,6 +994,16 @@
         "collapsed": false
       },
       "reads": [
+        {
+          "state": "state_1",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_script_tester",
+            "fieldKey": "script_requirement",
+            "managed": true
+          }
+        },
         {
           "state": "test_strategy",
           "required": true
@@ -1105,6 +1169,16 @@
       },
       "reads": [
         {
+          "state": "state_2",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "local_workspace_executor",
+            "fieldKey": "workspace_request",
+            "managed": true
+          }
+        },
+        {
           "state": "generated_action_key",
           "required": true
         },
@@ -1154,6 +1228,16 @@
         "collapsed": false
       },
       "reads": [
+        {
+          "state": "state_3",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "local_workspace_executor",
+            "fieldKey": "workspace_request",
+            "managed": true
+          }
+        },
         {
           "state": "generated_action_key",
           "required": true
@@ -1241,6 +1325,16 @@
       },
       "reads": [
         {
+          "state": "state_4",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "local_workspace_executor",
+            "fieldKey": "workspace_request",
+            "managed": true
+          }
+        },
+        {
           "state": "generated_action_key",
           "required": true
         },
@@ -1327,6 +1421,16 @@
       },
       "reads": [
         {
+          "state": "state_5",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "local_workspace_executor",
+            "fieldKey": "workspace_request",
+            "managed": true
+          }
+        },
+        {
           "state": "generated_action_key",
           "required": true
         },
@@ -1412,6 +1516,16 @@
         "collapsed": false
       },
       "reads": [
+        {
+          "state": "state_6",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "local_workspace_executor",
+            "fieldKey": "workspace_request",
+            "managed": true
+          }
+        },
         {
           "state": "generated_action_key",
           "required": true
@@ -1759,6 +1873,7 @@
     "category": "action",
     "templateVersion": "2026-05-09",
     "graphProtocol": "node_system",
-    "description": "用普通编辑器可创建的 input、LLM、condition、output 节点搭建创建自定义 Action 的完整流程；节点使用前端默认尺寸，Action 输出由单 Action 绑定托管。"
+    "description": "用普通编辑器可创建的 input、LLM、condition、output 节点搭建创建自定义 Action 的完整流程；节点使用前端默认尺寸，Action 输出由单 Action 绑定托管。",
+    "toograph_state_key_counter": 6
   }
 }

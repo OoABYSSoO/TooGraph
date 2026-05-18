@@ -910,6 +910,48 @@ def _validate_agent_action_bindings(
     action_catalog: dict[str, ActionDefinition],
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
+    static_action_definition = action_catalog.get(node.config.action_key) if node.config.action_key else None
+    if node.config.action_key and static_action_definition is not None:
+        input_fields = {field.key for field in static_action_definition.state_input_schema}
+        bound_input_fields: set[str] = set()
+        for read_index, read in enumerate(node.reads):
+            binding = read.binding
+            if binding is None or binding.kind != NodeSystemReadBindingKind.ACTION_INPUT:
+                continue
+            if binding.action_key != node.config.action_key:
+                issues.append(
+                    ValidationIssue(
+                        code="agent_action_input_binding_action_mismatch",
+                        message=(
+                            f"LLM node '{node_name}' input state '{read.state}' is bound to Action "
+                            f"'{binding.action_key}', expected '{node.config.action_key}'."
+                        ),
+                        path=f"nodes.{node_name}.reads.{read_index}.binding.actionKey",
+                    )
+                )
+            if binding.field_key not in input_fields:
+                issues.append(
+                    ValidationIssue(
+                        code="agent_action_input_binding_field_unknown",
+                        message=(
+                            f"LLM node '{node_name}' input state '{read.state}' is bound to unknown "
+                            f"Action input field '{binding.field_key}'."
+                        ),
+                        path=f"nodes.{node_name}.reads.{read_index}.binding.fieldKey",
+                    )
+                )
+            else:
+                bound_input_fields.add(binding.field_key)
+
+        for field_key in sorted(input_fields - bound_input_fields):
+            issues.append(
+                ValidationIssue(
+                    code="agent_action_input_binding_missing",
+                    message=f"LLM node '{node_name}' is missing a managed action_input slot for Action field '{field_key}'.",
+                    path=f"nodes.{node_name}.reads",
+                )
+            )
+
     for binding_index, binding in enumerate(node.config.action_bindings):
         definition = action_catalog.get(binding.action_key)
         if definition is None:

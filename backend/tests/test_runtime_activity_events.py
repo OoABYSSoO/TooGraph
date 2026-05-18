@@ -117,7 +117,7 @@ class RuntimeActivityEventsTests(unittest.TestCase):
             raw_events=[
                 {
                     "kind": "file_write",
-                    "summary": "Editing action/user/demo/ACTION.md +3 -0",
+                    "summary": "Writing action/user/demo/ACTION.md +3 -0",
                     "status": "succeeded",
                     "detail": {"path": "action/user/demo/ACTION.md", "added": 3, "removed": 0},
                 },
@@ -133,7 +133,7 @@ class RuntimeActivityEventsTests(unittest.TestCase):
         event = events[0]
         self.assertEqual(event["kind"], "file_write")
         self.assertEqual(event["node_id"], "execute_capability")
-        self.assertEqual(event["summary"], "Editing action/user/demo/ACTION.md +3 -0")
+        self.assertEqual(event["summary"], "Writing action/user/demo/ACTION.md +3 -0")
         self.assertEqual(event["detail"]["action_key"], "local_workspace_executor")
         self.assertEqual(event["detail"]["binding_source"], "capability_state")
         self.assertEqual(event["detail"]["path"], "action/user/demo/ACTION.md")

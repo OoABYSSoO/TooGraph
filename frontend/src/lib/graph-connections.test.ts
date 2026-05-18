@@ -352,6 +352,91 @@ test("canCompleteGraphConnection rejects incompatible source types for managed t
   );
 });
 
+test("canCompleteGraphConnection rejects incompatible source types for managed action input slots", () => {
+  const graphWithActionSlot: GraphPayload = {
+    ...document,
+    state_schema: {
+      search_question: { name: "Search Question", description: "", type: "text", value: "", color: "#d97706" },
+      uploaded_image: { name: "Uploaded Image", description: "", type: "image", value: "", color: "#2563eb" },
+      action_question_slot: { name: "User Question", description: "", type: "text", value: "", color: "#d97706" },
+    },
+    nodes: {
+      text_input: {
+        kind: "input",
+        name: "text_input",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "search_question", mode: "replace" }],
+        config: { value: "" },
+      },
+      image_input: {
+        kind: "input",
+        name: "image_input",
+        description: "",
+        ui: { position: { x: 0, y: 120 } },
+        reads: [],
+        writes: [{ state: "uploaded_image", mode: "replace" }],
+        config: { value: "" },
+      },
+      searcher: {
+        kind: "agent",
+        name: "Search",
+        description: "",
+        ui: { position: { x: 260, y: 0 } },
+        reads: [
+          {
+            state: "action_question_slot",
+            required: true,
+            binding: {
+              kind: "action_input",
+              actionKey: "web_search",
+              fieldKey: "user_question",
+              managed: true,
+            },
+          },
+        ],
+        writes: [],
+        config: {
+          actionKey: "web_search",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+  };
+
+  assert.equal(
+    canCompleteGraphConnection(graphWithActionSlot, {
+      sourceNodeId: "text_input",
+      sourceKind: "state-out",
+      sourceStateKey: "search_question",
+    }, {
+      nodeId: "searcher",
+      kind: "state-in",
+      stateKey: "action_question_slot",
+    }),
+    true,
+  );
+  assert.equal(
+    canCompleteGraphConnection(graphWithActionSlot, {
+      sourceNodeId: "image_input",
+      sourceKind: "state-out",
+      sourceStateKey: "uploaded_image",
+    }, {
+      nodeId: "searcher",
+      kind: "state-in",
+      stateKey: "action_question_slot",
+    }),
+    false,
+  );
+});
+
 test("canCompleteGraphConnection allows an existing state binding to restore a missing ordering edge", () => {
   const pending: PendingGraphConnection = {
     sourceNodeId: "input_question",

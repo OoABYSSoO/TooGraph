@@ -193,6 +193,13 @@
         "fieldKey": "recalled_sessions",
         "managed": true
       }
+    },
+    "state_1": {
+      "name": "Recall Request",
+      "description": "会话召回请求，可包含 mode、query、session_id、anchor_message_id、direction、limit、window、bookend、sort、role_filter、current_session_id。",
+      "type": "json",
+      "value": {},
+      "color": "#d97706"
     }
   },
   "nodes": {
@@ -393,6 +400,16 @@
         }
       },
       "reads": [
+        {
+          "state": "state_1",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "buddy_session_recall",
+            "fieldKey": "recall_request",
+            "managed": true
+          }
+        },
         {
           "state": "memory_request",
           "required": true
@@ -1035,6 +1052,7 @@
     "safetyNotes": [
       "改写不得丢失源内容中的关键事实、限制和不确定项。",
       "人工反馈通过普通输入进入下一轮，不使用用户可见断点。"
-    ]
+    ],
+    "toograph_state_key_counter": 1
   }
 }

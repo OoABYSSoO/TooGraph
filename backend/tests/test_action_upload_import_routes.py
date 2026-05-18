@@ -173,7 +173,6 @@ class ActionUploadImportRouteTests(unittest.TestCase):
                     sorted(
                         [
                             "buddy_home_writer",
-                            "buddy_visible_subgraph_result_adapter",
                             "toograph_script_tester",
                             "toograph_graph_template_reader",
                             "toograph_graph_template_validator",
@@ -241,15 +240,6 @@ class ActionUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue(
                     source_path["local_workspace_executor"].endswith(
                         "/action/official/local_workspace_executor/action.json"
-                    )
-                )
-                self.assertEqual(catalog_items["buddy_visible_subgraph_result_adapter"]["sourceScope"], "official")
-                self.assertFalse(catalog_items["buddy_visible_subgraph_result_adapter"]["canManage"])
-                self.assertTrue(catalog_items["buddy_visible_subgraph_result_adapter"]["runtimeReady"])
-                self.assertTrue(catalog_items["buddy_visible_subgraph_result_adapter"]["runtimeRegistered"])
-                self.assertTrue(
-                    source_path["buddy_visible_subgraph_result_adapter"].endswith(
-                        "/action/official/buddy_visible_subgraph_result_adapter/action.json"
                     )
                 )
                 self.assertEqual(catalog_items["buddy_session_recall"]["sourceScope"], "official")

@@ -274,6 +274,13 @@
         "fieldKey": "result",
         "managed": true
       }
+    },
+    "state_1": {
+      "name": "Autonomous Review",
+      "description": "Buddy 自主复盘或写回计划 state，供 LLM 生成低风险 Buddy Home 写回 commands。",
+      "type": "json",
+      "value": {},
+      "color": "#d97706"
     }
   },
   "nodes": {
@@ -597,7 +604,13 @@
       "reads": [
         {
           "state": "recall_request",
-          "required": true
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "buddy_session_recall",
+            "fieldKey": "recall_request",
+            "managed": true
+          }
         }
       ],
       "writes": [
@@ -900,6 +913,16 @@
         }
       },
       "reads": [
+        {
+          "state": "state_1",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "buddy_home_writer",
+            "fieldKey": "autonomous_review",
+            "managed": true
+          }
+        },
         {
           "state": "source_run_id",
           "required": false
@@ -1252,6 +1275,7 @@
     "requiredPermissions": [
       "buddy_session_read",
       "buddy_home_write"
-    ]
+    ],
+    "toograph_state_key_counter": 1
   }
 }

@@ -348,7 +348,6 @@ Current official Action packages live in `action/official/<action_key>/`:
 - `local_workspace_executor`
 - `buddy_session_recall`
 - `buddy_home_writer` - internal Buddy Home command/revision writer
-- `buddy_visible_subgraph_result_adapter` - internal Buddy visible subgraph result adapter
 
 ## Working Expectations For Agents
 
