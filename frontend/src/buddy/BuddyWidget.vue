@@ -51,25 +51,11 @@
         </path>
       </svg>
     </button>
-    <div
+    <BuddyVirtualOperationBanner
       v-if="virtualOperationStatus"
-      class="buddy-widget__virtual-operation-banner"
-      :class="`buddy-widget__virtual-operation-banner--${virtualOperationStatus.tone}`"
-      role="status"
-      aria-live="assertive"
-    >
-      <span class="buddy-widget__virtual-operation-pulse" aria-hidden="true"></span>
-      <span class="buddy-widget__virtual-operation-label">{{ virtualOperationStatus.label }}</span>
-      <button
-        type="button"
-        class="buddy-widget__virtual-operation-stop"
-        :title="t('buddy.virtualOperation.stop')"
-        :aria-label="t('buddy.virtualOperation.stop')"
-        @click="interruptVirtualOperation"
-      >
-        <span class="buddy-widget__virtual-operation-stop-icon" aria-hidden="true"></span>
-      </button>
-    </div>
+      :status="virtualOperationStatus"
+      @interrupt="interruptVirtualOperation"
+    />
     <div
       class="buddy-widget__anchor"
       :class="[
@@ -99,77 +85,17 @@
             <h2>{{ t("buddy.title") }}</h2>
           </div>
           <div class="buddy-widget__header-actions">
-            <div class="buddy-widget__history-control">
-              <button
-                type="button"
-                class="buddy-widget__icon-button"
-                :class="{ 'buddy-widget__icon-button--active': isSessionPanelOpen }"
-                :title="t('buddy.history')"
-                :aria-label="t('buddy.history')"
-                @click="toggleSessionPanel"
-              >
-                <ElIcon><Clock /></ElIcon>
-              </button>
-              <aside
-                v-if="isSessionPanelOpen"
-                class="buddy-widget__sessions-panel"
-                :aria-label="t('buddy.history')"
-              >
-                <div class="buddy-widget__sessions-header">
-                  <strong>{{ t("buddy.history") }}</strong>
-                </div>
-                <p v-if="isSessionLoading" class="buddy-widget__sessions-status">
-                  {{ t("buddy.historyLoading") }}
-                </p>
-                <p v-else-if="chatSessions.length === 0" class="buddy-widget__sessions-status">
-                  {{ t("buddy.historyEmpty") }}
-                </p>
-                <div v-else class="buddy-widget__session-list">
-                  <div
-                    v-for="session in chatSessions"
-                    :key="session.session_id"
-                    class="buddy-widget__session-row"
-                    :class="{ 'buddy-widget__session-row--active': session.session_id === activeSessionId }"
-                  >
-                    <button
-                      type="button"
-                      class="buddy-widget__session-item"
-                      :disabled="isSessionSwitchLocked && session.session_id !== activeSessionId"
-                      @click="selectChatSession(session.session_id)"
-                    >
-                      <span>{{ session.title || t("buddy.untitledSession") }}</span>
-                      <small>{{ session.last_message_preview || t("buddy.emptySession") }}</small>
-                    </button>
-                    <ElPopover
-                      :visible="isSessionDeleteConfirmOpen(session.session_id)"
-                      placement="left"
-                      :show-arrow="false"
-                      popper-class="buddy-widget__confirm-popover buddy-widget__confirm-popover--delete"
-                    >
-                      <template #reference>
-                        <button
-                          type="button"
-                          data-session-delete-surface="true"
-                          class="buddy-widget__session-delete"
-                          :class="{ 'buddy-widget__session-delete--confirm': isSessionDeleteConfirmOpen(session.session_id) }"
-                          :disabled="isSessionSwitchLocked"
-                          :title="isSessionDeleteConfirmOpen(session.session_id) ? t('buddy.confirmDeleteSession') : t('buddy.deleteSession')"
-                          :aria-label="isSessionDeleteConfirmOpen(session.session_id) ? t('buddy.confirmDeleteSession') : t('buddy.deleteSession')"
-                          @pointerdown.stop
-                          @click.stop="handleSessionDeleteActionClick(session.session_id)"
-                        >
-                          <ElIcon v-if="isSessionDeleteConfirmOpen(session.session_id)" aria-hidden="true"><Check /></ElIcon>
-                          <ElIcon v-else aria-hidden="true"><Delete /></ElIcon>
-                        </button>
-                      </template>
-                      <div class="buddy-widget__confirm-hint buddy-widget__confirm-hint--delete">
-                        {{ t("buddy.deleteSessionQuestion") }}
-                      </div>
-                    </ElPopover>
-                  </div>
-                </div>
-              </aside>
-            </div>
+            <BuddySessionHistory
+              :open="isSessionPanelOpen"
+              :sessions="chatSessions"
+              :active-session-id="activeSessionId"
+              :loading="isSessionLoading"
+              :switch-locked="isSessionSwitchLocked"
+              :delete-confirm-session-id="activeSessionDeleteId"
+              @toggle="toggleSessionPanel"
+              @select="selectChatSession"
+              @delete-action="handleSessionDeleteActionClick"
+            />
             <button
               type="button"
               class="buddy-widget__icon-button"
@@ -268,118 +194,31 @@
               <span v-if="shouldShowMessageRoleLabel(messageIndex)" class="buddy-widget__message-label">
                 {{ message.role === "user" ? t("buddy.user") : t("buddy.name") }}
               </span>
-              <section
+              <BuddyRunTrace
                 v-if="message.role === 'assistant' && message.outputTrace"
-                class="buddy-widget__run-trace"
-                :class="`buddy-widget__run-trace--${message.outputTrace.status}`"
-              >
-                <div class="buddy-widget__run-trace-summary-row">
-                  <button
-                    type="button"
-                    class="buddy-widget__run-trace-summary"
-                    :aria-expanded="isTraceMessageExpanded(message.id)"
-                    :aria-label="isTraceMessageExpanded(message.id) ? t('buddy.runTraceCollapse') : t('buddy.runTraceExpand')"
-                    @click="toggleTraceMessage(message.id, message.runId)"
-                  >
-                    <span
-                      class="buddy-widget__run-trace-dot"
-                      :class="`buddy-widget__run-trace-dot--${message.outputTrace.status}`"
-                      aria-hidden="true"
-                    />
-                    <span class="buddy-widget__run-trace-title">
-                      {{ resolveTraceSegmentSummary(message.outputTrace) }}
-                    </span>
-                    <span class="buddy-widget__run-trace-duration">
-                      {{ formatTraceDuration(buildTraceSegmentDurationKey(message.id), resolveTraceSegmentDurationMs(message.outputTrace)) }}
-                    </span>
-                    <span
-                      class="buddy-widget__run-trace-chevron"
-                      :class="{ 'buddy-widget__run-trace-chevron--expanded': isTraceMessageExpanded(message.id) }"
-                      aria-hidden="true"
-                    />
-                  </button>
-                </div>
-                <div
-                  v-if="isTraceMessageExpanded(message.id)"
-                  class="buddy-widget__run-trace-detail"
-                >
-                  <p v-if="isTraceRunTreeLoading(message.runId)" class="buddy-widget__run-trace-state">
-                    {{ t("common.loading") }}
-                  </p>
-                  <p v-else-if="traceRunTreeError(message.runId)" class="buddy-widget__run-trace-state">
-                    {{ t("common.failedToLoad", { error: traceRunTreeError(message.runId) }) }}
-                  </p>
-                  <ol class="buddy-widget__run-trace-list" role="tree">
-                    <li
-                      v-for="row in buildTraceTreeRows(message.outputTrace, message.runId)"
-                      :key="row.rowId"
-                      class="buddy-widget__run-trace-row"
-                      :class="[
-                        `buddy-widget__run-trace-row--${row.kind}`,
-                        { 'buddy-widget__run-trace-row--nested': row.depth > 0 },
-                      ]"
-                      :style="traceTreeRowStyle(row)"
-                      role="treeitem"
-                      :aria-level="row.depth + 1"
-                    >
-                      <span
-                        class="buddy-widget__run-trace-dot buddy-widget__run-trace-dot--small"
-                        :class="`buddy-widget__run-trace-dot--${row.status}`"
-                        aria-hidden="true"
-                      />
-                      <span class="buddy-widget__run-trace-row-main">
-                        <span class="buddy-widget__run-trace-row-label">{{ row.label }}</span>
-                        <span v-if="row.artifactLabels.length > 0" class="buddy-widget__run-trace-row-evidence">
-                          <span v-for="label in row.artifactLabels" :key="`${row.rowId}-${label}`">{{ label }}</span>
-                        </span>
-                      </span>
-                      <button
-                        v-if="row.evidenceRunId"
-                        type="button"
-                        class="buddy-widget__run-trace-row-evidence-open"
-                        :title="t('buddy.openEvidenceRun')"
-                        :aria-label="t('buddy.openEvidenceRun')"
-                        @click="openTraceEvidenceRun(row.evidenceRunId)"
-                      >
-                        <ElIcon><Promotion /></ElIcon>
-                      </button>
-                      <button
-                        v-if="row.graphRevision"
-                        type="button"
-                        class="buddy-widget__run-trace-row-revision-restore"
-                        :disabled="Boolean(restoringTraceGraphRevisionRowId)"
-                        :aria-busy="restoringTraceGraphRevisionRowId === row.rowId"
-                        :title="t('graphLibrary.restoreRevisionAction')"
-                        :aria-label="t('graphLibrary.restoreRevisionAction')"
-                        data-virtual-affordance-role="button"
-                        data-virtual-affordance-zone="buddy.trace.graphRevision"
-                        data-virtual-affordance-actions="click"
-                        :data-virtual-affordance-id="`buddy.trace.graphRevision.restore.${row.graphRevision.revisionId}`"
-                        @click="restoreTraceGraphRevision(row)"
-                      >
-                        <ElIcon><RefreshLeft /></ElIcon>
-                      </button>
-                      <button
-                        v-if="row.playbackTarget && message.runId"
-                        type="button"
-                        class="buddy-widget__run-trace-row-open"
-                        :title="t('buddy.attachRun')"
-                        :aria-label="t('buddy.attachRun')"
-                        @click="openTraceTreeRowPlayback(message.runId, row)"
-                      >
-                        <ElIcon><Promotion /></ElIcon>
-                      </button>
-                      <span class="buddy-widget__run-trace-row-duration">
-                        {{ formatTraceDuration(buildTraceTreeRowDurationKey(message.id, row), resolveTraceTreeRowDurationMs(row)) }}
-                      </span>
-                    </li>
-                  </ol>
-                  <div class="buddy-widget__run-trace-total">
-                    <span>{{ t("buddy.runTraceLabel") }}</span>
-                    <strong>{{ formatTraceDuration(buildTraceSegmentDurationKey(message.id), resolveTraceSegmentDurationMs(message.outputTrace)) }}</strong>
-                  </div>
-                </div>
-              </section>
+                :segment="message.outputTrace"
+                :expanded="isTraceMessageExpanded(message.id)"
+                :summary="resolveTraceSegmentSummary(message.outputTrace)"
+                :duration-label="formatTraceSegmentDurationForMessage(message.id, message.outputTrace)"
+                :rows="buildTraceTreeRows(message.outputTrace, message.runId)"
+                :loading="isTraceRunTreeLoading(message.runId)"
+                :loading-label="t('common.loading')"
+                :error-label="traceRunTreeError(message.runId) ? t('common.failedToLoad', { error: traceRunTreeError(message.runId) }) : ''"
+                :collapse-label="t('buddy.runTraceCollapse')"
+                :expand-label="t('buddy.runTraceExpand')"
+                :open-evidence-label="t('buddy.openEvidenceRun')"
+                :restore-revision-label="t('graphLibrary.restoreRevisionAction')"
+                :open-playback-label="t('buddy.attachRun')"
+                :total-label="t('buddy.runTraceLabel')"
+                :total-duration-label="formatTraceSegmentDurationForMessage(message.id, message.outputTrace)"
+                :restoring-row-id="restoringTraceGraphRevisionRowId"
+                :can-open-playback="Boolean(message.runId)"
+                :format-row-duration="(row) => formatTraceTreeRowDurationForMessage(message.id, row)"
+                @toggle="toggleTraceMessage(message.id, message.runId)"
+                @open-playback="(row) => openTraceTreeRowPlayback(message.runId, row)"
+                @open-evidence-run="openTraceEvidenceRun"
+                @restore-revision="restoreTraceGraphRevision"
+              />
               <section
                 v-if="message.role === 'assistant' && message.publicOutput?.kind === 'card'"
                 class="buddy-widget__public-output-card"
@@ -413,24 +252,12 @@
           </p>
         </div>
 
-        <form class="buddy-widget__form" @submit.prevent="sendMessage">
-          <textarea
-            v-model="draft"
-            class="buddy-widget__input"
-            rows="2"
-            :placeholder="t('buddy.placeholder')"
-            @keydown.enter.exact.prevent="sendMessage"
-          />
-          <button
-            type="submit"
-            class="buddy-widget__send"
-            :disabled="!draft.trim()"
-            :title="t('buddy.send')"
-            :aria-label="t('buddy.send')"
-          >
-            <ElIcon><Promotion /></ElIcon>
-          </button>
-        </form>
+        <BuddyComposer
+          v-model="draft"
+          :placeholder="t('buddy.placeholder')"
+          :send-label="t('buddy.send')"
+          @submit="sendMessage"
+        />
       </section>
 
       <button
@@ -481,9 +308,8 @@
 </template>
 
 <script setup lang="ts">
-import { Check, Clock, Close, Delete, FullScreen, Plus, Promotion, RefreshLeft, SemiSelect } from "@element-plus/icons-vue";
-import { ElMessage, ElMessageBox } from "element-plus";
-import { ElIcon, ElOption, ElPopover, ElSelect } from "element-plus";
+import { Close, FullScreen, Plus, SemiSelect } from "@element-plus/icons-vue";
+import { ElIcon, ElOption, ElSelect } from "element-plus";
 import { storeToRefs } from "pinia";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -491,28 +317,13 @@ import { useRoute, useRouter } from "vue-router";
 
 import {
   appendBuddyChatMessage,
-  createBuddyChatSession,
-  deleteBuddyChatSession,
-  fetchBuddyChatMessages,
-  fetchBuddyChatSessions,
   fetchBuddyMemoryReviewTemplateBinding,
   fetchBuddyRunTemplateBinding,
 } from "../api/buddy.ts";
-import { fetchTemplate, fetchTemplates, restoreGraphRevision, runGraph } from "../api/graphs.ts";
-import { fetchRun, fetchRunTree, resumeRun } from "../api/runs.ts";
-import { fetchSettings } from "../api/settings.ts";
+import { fetchTemplate, fetchTemplates, runGraph } from "../api/graphs.ts";
+import { fetchRun, resumeRun } from "../api/runs.ts";
 import SandboxedHtmlFrame from "../components/SandboxedHtmlFrame.vue";
-import { resolveOutputPreviewContent } from "../editor/nodes/outputPreviewContentModel.ts";
-import { formatRunDuration } from "../lib/run-display-name.ts";
-import { resolveRunRestoreUrl } from "../lib/run-restore.ts";
-import { buildRuntimeModelOptions } from "../lib/runtimeModelCatalog.ts";
 import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
-import { buildRunNodeTimingByNodeIdFromRun } from "../lib/runTelemetryProjection.ts";
-import {
-  advanceSmoothNumberDisplay,
-  isSmoothNumberDisplaySettled,
-  type SmoothNumberDisplayState,
-} from "../lib/smoothNumberDisplay.ts";
 import type { GraphEditCommand, GraphEditIntent, GraphEditPlaybackStep } from "../editor/workspace/graphEditPlaybackModel.ts";
 import { useBuddyContextStore } from "../stores/buddyContext.ts";
 import {
@@ -522,12 +333,19 @@ import {
   type BuddyVirtualOperationTriggeredRun,
 } from "../stores/buddyMascotDebug.ts";
 import { buildBuddyBubblePreviewLabel } from "./buddyBubblePreviewModel.ts";
-import type { BuddyChatMessageRecord, BuddyChatSession } from "../types/buddy.ts";
 import type { GraphPayload, GraphPosition, TemplateRecord } from "../types/node-system.ts";
-import type { RunDetail, RunTreeNode } from "../types/run.ts";
-import type { SettingsPayload } from "../types/settings.ts";
+import type { RunDetail } from "../types/run.ts";
 
 import BuddyMascot from "./BuddyMascot.vue";
+import BuddyComposer from "./BuddyComposer.vue";
+import BuddyRunTrace from "./BuddyRunTrace.vue";
+import BuddySessionHistory from "./BuddySessionHistory.vue";
+import BuddyVirtualOperationBanner from "./BuddyVirtualOperationBanner.vue";
+import { useBuddyChatSessions } from "./useBuddyChatSessions.ts";
+import { useBuddyMessages, type BuddyMessage, type BuddyQueuedTurn } from "./useBuddyMessages.ts";
+import { useBuddyModelSelection } from "./useBuddyModelSelection.ts";
+import { useBuddyRunDisplayMessages } from "./useBuddyRunDisplayMessages.ts";
+import { useBuddyRunTraceDisplay } from "./useBuddyRunTraceDisplay.ts";
 import type { BuddyMascotDebugAction } from "./buddyMascotDebug.ts";
 import {
   buildGraphEditPlaybackAuditSummary,
@@ -536,13 +354,6 @@ import {
   type GraphEditPlaybackAuditRevision,
   type GraphEditPlaybackAuditSummary,
 } from "./graphEditPlaybackAudit.ts";
-import {
-  buildPublicOutputBuddyMessageMetadata,
-  buildOutputTraceBuddyMessageMetadata,
-  resolvePublicOutputBuddyMessageMetadata,
-  resolveOutputTraceBuddyMessageMetadata,
-  type BuddyPublicOutputMetadata,
-} from "./buddyMessageMetadata.ts";
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
 import {
   attachPageOperationRuntimeContext,
@@ -577,34 +388,22 @@ import {
   buildBuddyChatGraph,
   buildBuddyReviewGraph,
   resolveBuddyMode,
-  resolveBuddyRunActivityFromRunEvent,
-  type BuddyChatMessage,
   type BuddyMode,
 } from "./buddyChatGraph.ts";
 import {
   buildBuddyPublicOutputBindings,
   createBuddyPublicOutputRuntimeState,
-  isBuddyPublicOutputMessageVisible,
   reduceBuddyPublicOutputEvent,
-  resolveBuddyPublicOutputMessageKind,
   type BuddyPublicOutputBinding,
-  type BuddyPublicOutputMessage,
   type BuddyPublicOutputRuntimeState,
 } from "./buddyPublicOutput.ts";
 import {
   buildBuddyOutputTracePlan,
   buildBuddyOutputTraceStateFromRunDetail,
   createBuddyOutputTraceRuntimeState,
-  createBuddyPendingOutputTraceRuntimeState,
-  listBuddyOutputTraceSegmentsForDisplay,
   reduceBuddyOutputTraceEvent,
   type BuddyOutputTraceRuntimeState,
-  type BuddyOutputTraceSegment,
 } from "./buddyOutputTrace.ts";
-import {
-  buildBuddyOutputTraceTreeRows,
-  type BuddyOutputTraceTreeRow,
-} from "./buddyOutputTraceTree.ts";
 import { buildBuddyTemplateRunGraph } from "./buddyTemplateRunGraph.ts";
 import {
   BUDDY_POSITION_STORAGE_KEY,
@@ -616,28 +415,6 @@ import {
   serializeBuddyPosition,
   type BuddyPosition,
 } from "./buddyPosition.ts";
-import { shouldShowGroupedBuddyMessageLabel } from "./buddyMessageGrouping.ts";
-
-type BuddyMessage = BuddyChatMessage & {
-  id: string;
-  clientOrder?: number | null;
-  activityText?: string;
-  runId?: string | null;
-  publicOutput?: BuddyPublicOutputMetadata;
-  outputTrace?: BuddyOutputTraceSegment;
-};
-
-type BuddyMessagePatch = Partial<
-  Pick<BuddyMessage, "content" | "includeInContext" | "activityText" | "runId" | "publicOutput" | "outputTrace">
->;
-
-type BuddyQueuedTurn = {
-  userMessageId: string;
-  assistantMessageId: string;
-  userMessage: string;
-  sessionId: string;
-  history: BuddyChatMessage[];
-};
 
 type BuddyPauseHandlingOptions = {
   persist?: boolean;
@@ -646,11 +423,6 @@ type BuddyPauseHandlingOptions = {
 type BuddyStreamingRunDisplaySnapshot = {
   publicOutputState: BuddyPublicOutputRuntimeState;
   outputTraceState: BuddyOutputTraceRuntimeState;
-};
-
-type TraceDurationTarget = {
-  durationMs: number;
-  animateInitial: boolean;
 };
 
 type BuddyMood = "idle" | "thinking" | "speaking" | "error";
@@ -676,10 +448,6 @@ type BuddyVirtualOperationToken = {
   interruptPromise: Promise<void>;
   interrupt: () => void;
 };
-type BuddyModelOption = {
-  value: string;
-  label: string;
-};
 type BuddyPageOperationForegroundRun = {
   runId: string;
   status: string;
@@ -702,8 +470,6 @@ type BuddyFinishVisibleRunOptions = {
   includeOutputTrace?: boolean;
 };
 
-const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "toograph:buddy-active-session";
-const BUDDY_MODEL_STORAGE_KEY = "toograph:buddy-model";
 const DRAG_THRESHOLD_PX = 4;
 const AVATAR_SINGLE_CLICK_DELAY_MS = 220;
 const RUN_POLL_INTERVAL_MS = 700;
@@ -718,8 +484,6 @@ const BUDDY_ROAM_TARGET_MIN_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
 const BUDDY_ROAM_TARGET_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 3;
 const BUDDY_ROAM_TARGET_REACHED_DISTANCE_PX = 1;
 const BUDDY_VIRTUAL_CURSOR_SIZE = { width: 42, height: 42 };
-const BUDDY_CAPABILITY_PASSTHROUGH_OUTPUT_NODE_ID = "output_capability_passthrough";
-const BUDDY_CAPABILITY_PASSTHROUGH_STATE_KEY = "capability_result.final_reply";
 const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_PERIOD_MS = 1600;
 const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX = BUDDY_VIRTUAL_CURSOR_SIZE.width * 0.86;
 const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_Y_RADIUS_PX = BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX * 0.62;
@@ -760,10 +524,6 @@ const VIRTUAL_CURSOR_STAR_PATH =
   "M0-72 C5-46 18-33 44-28 C18-23 5-10 0 16 C-5-10 -18-23 -44-28 C-18-33 -5-46 0-72Z";
 const VIRTUAL_CURSOR_SHAPE_PATH =
   "M0-72 C14-35 33 5 52 34 C27 35 13 46 0 64 C-13 46 -27 35 -52 34 C-33 5 -14-35 0-72Z";
-const TRACE_DURATION_SMOOTH_OPTIONS = {
-  timeConstantMs: 180,
-  snapEpsilon: 8,
-} as const;
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
@@ -796,17 +556,23 @@ const isPanelOpen = ref(false);
 const draft = ref("");
 const avatarHopCycle = ref(0);
 const buddyMode = ref<BuddyMode>(DEFAULT_BUDDY_MODE);
-const buddyModelRef = ref("");
-const buddyModelOptions = ref<BuddyModelOption[]>([]);
-const buddyModelLoadError = ref("");
-const messages = ref<BuddyMessage[]>([]);
-const chatSessions = ref<BuddyChatSession[]>([]);
-const activeSessionId = ref<string | null>(null);
-const currentSessionId = computed(() => activeSessionId.value ?? "");
-const isSessionPanelOpen = ref(false);
-const isSessionLoading = ref(false);
-const activeSessionDeleteId = ref<string | null>(null);
-const sessionDeleteConfirmTimeoutRef = ref<number | null>(null);
+const {
+  messages,
+  messageListElement,
+  renderBuddyMarkdown,
+  resolveBuddyRenderedContent,
+  updateAssistantMessage,
+  setAssistantActivityText,
+  setAssistantActivityFromRunEvent,
+  buildHistoryBeforeMessage,
+  ensureAssistantMessageForTurn,
+  scrollMessagesToBottom,
+  createMessage,
+  messageRecordToBuddyMessage,
+  buildBuddyMessageMetadata,
+  allocateBuddyMessageClientOrder,
+  resetNextBuddyMessageClientOrder,
+} = useBuddyMessages({ t });
 const isPanelFullscreen = ref(false);
 const queuedTurns = ref<BuddyQueuedTurn[]>([]);
 const errorMessage = ref("");
@@ -823,16 +589,7 @@ const mascotLook = ref({ x: 0, y: 0 });
 const mascotMotion = ref<BuddyMascotMotion>("idle");
 const mascotFacing = ref<BuddyMascotFacing>("front");
 const mascotMoveDurationMs = ref(buddyMascotMotionConfig.value.moveDurationMs);
-const messageListElement = ref<HTMLElement | null>(null);
 const debugDragging = ref(false);
-const traceClockNowMs = ref(Date.now());
-const traceDurationDisplayByKey = ref<Record<string, SmoothNumberDisplayState>>({});
-const expandedTraceMessageIds = ref<Set<string>>(new Set());
-const traceRunTreeByRunId = ref<Record<string, RunTreeNode>>({});
-const traceRunDetailByRunId = ref<Record<string, RunDetail>>({});
-const traceRunTreeLoadingByRunId = ref<Record<string, boolean>>({});
-const traceRunTreeErrorByRunId = ref<Record<string, string>>({});
-const restoringTraceGraphRevisionRowId = ref<string | null>(null);
 const pointerDrag = ref<{
   pointerId: number;
   startX: number;
@@ -875,12 +632,8 @@ let virtualCursorAngleFrameTimestampMs: number | null = null;
 let virtualCursorMorphAnimationKey = 0;
 let virtualCursorPickupPending = false;
 let buddyDebugActionTimerId: number | null = null;
-let traceClockTimerId: number | null = null;
 let pendingMascotLookPointer: { x: number; y: number } | null = null;
-let chatSessionInitializationPromise: Promise<void> | null = null;
-let chatSessionActivationGeneration = 0;
 const backgroundReviewAbortControllers = new Set<AbortController>();
-let nextBuddyMessageClientOrder = 0;
 
 const isDragging = computed(() => Boolean(pointerDrag.value?.moved));
 const isMascotDragging = computed(() => isDragging.value || debugDragging.value);
@@ -895,30 +648,50 @@ const canBuddyRoam = computed(() =>
   queuedTurns.value.length === 0 &&
   activeRunId.value === null,
 );
-const isSessionSwitchLocked = computed(
-  () =>
-    queuedTurns.value.length > 0 ||
-    activeRunId.value !== null,
-);
-const hasRunningTraceSegment = computed(() =>
-  messages.value.some((message) => message.outputTrace?.status === "running"),
-);
-const hasCurrentSessionContent = computed(() => messages.value.some((message) => message.content.trim()));
-const canCreateNewSession = computed(() => !isSessionSwitchLocked.value && hasCurrentSessionContent.value);
+const {
+  chatSessions,
+  activeSessionId,
+  currentSessionId,
+  isSessionPanelOpen,
+  isSessionLoading,
+  activeSessionDeleteId,
+  isSessionSwitchLocked,
+  canCreateNewSession,
+  startChatSessionInitialization,
+  loadChatSessions,
+  ensureActiveChatSession,
+  createNewSession,
+  selectChatSession,
+  toggleSessionPanel,
+  clearSessionDeleteConfirmTimeout,
+  clearSessionDeleteConfirmState,
+  handleSessionDeleteActionClick,
+  waitForChatSessionInitialization,
+} = useBuddyChatSessions({
+  messages,
+  queuedTurns,
+  activeRunId,
+  errorMessage,
+  t,
+  messageRecordToBuddyMessage,
+  resetNextBuddyMessageClientOrder,
+  resetVisibleBuddyRunState,
+  scrollMessagesToBottom,
+  formatErrorMessage,
+});
 const buddyModeLabel = computed(() => {
   const option = BUDDY_MODE_OPTIONS.find((candidate) => candidate.value === buddyMode.value);
   return option ? `${t(option.labelKey)} - ${t(option.descriptionKey)}` : t("buddy.modes.askFirst");
 });
-const buddyModelLabel = computed(() => {
-  const option = buddyModelOptions.value.find((candidate) => candidate.value === buddyModelRef.value);
-  if (option) {
-    return `${t("buddy.modelLabel")} - ${option.label}`;
-  }
-  return buddyModelLoadError.value || t("buddy.modelUnavailable");
-});
-const buddyModelPlaceholder = computed(() =>
-  buddyModelLoadError.value ? t("buddy.modelLoadFailed") : t("buddy.modelLoading"),
-);
+const {
+  buddyModelRef,
+  buddyModelOptions,
+  buddyModelLabel,
+  buddyModelPlaceholder,
+  hydrateBuddyModel,
+  loadBuddyModelOptions,
+  handleBuddyModelSelectVisibleChange,
+} = useBuddyModelSelection({ t });
 const anchorStyle = computed(() => ({
   "--buddy-widget-roam-duration-ms": `${mascotMoveDurationMs.value}ms`,
   "--buddy-widget-hop-duration-ms": `${mascotMoveDurationMs.value}ms`,
@@ -972,9 +745,7 @@ const bubblePreviewLabel = computed(() => buildBuddyBubblePreviewLabel(bubbleTex
 
 onMounted(() => {
   hydratePosition();
-  chatSessionInitializationPromise = initializeBuddyChatSessions().finally(() => {
-    chatSessionInitializationPromise = null;
-  });
+  void startChatSessionInitialization();
   hydrateBuddyModel();
   void loadBuddyModelOptions();
   window.addEventListener("resize", handleResize);
@@ -993,7 +764,6 @@ onBeforeUnmount(() => {
   clearAvatarSingleClickTimer();
   clearSpeakingIdleTimer();
   clearBuddyDebugActionTimer();
-  clearTraceClockTimer();
   cancelBuddyRoamTimers();
   cancelBuddyVirtualCursorFollowTimers();
   cancelBuddyVirtualCursorIdleFrame();
@@ -1009,15 +779,6 @@ watch(buddyMode, (nextMode) => {
   if (safeMode !== nextMode) {
     buddyMode.value = safeMode;
   }
-});
-
-watch(buddyModelRef, (nextModel) => {
-  const normalized = nextModel.trim();
-  if (normalized) {
-    window.localStorage.setItem(BUDDY_MODEL_STORAGE_KEY, normalized);
-    return;
-  }
-  window.localStorage.removeItem(BUDDY_MODEL_STORAGE_KEY);
 });
 
 watch(canBuddyRoam, (canRoam) => {
@@ -1038,8 +799,6 @@ watch(virtualCursorEnabled, (enabled) => {
   }
   deactivateVirtualCursor();
 });
-
-watch(hasRunningTraceSegment, refreshTraceClockTimer);
 
 watch(mascotDebugRequest, (request) => {
   if (!request) {
@@ -1137,17 +896,6 @@ function togglePanelFullscreen() {
   isPanelFullscreen.value = !isPanelFullscreen.value;
   isSessionPanelOpen.value = false;
   clearSessionDeleteConfirmState();
-}
-
-function toggleSessionPanel() {
-  isSessionPanelOpen.value = !isSessionPanelOpen.value;
-  clearSessionDeleteConfirmState();
-}
-
-function handleBuddyModelSelectVisibleChange(visible: boolean) {
-  if (visible) {
-    void loadBuddyModelOptions();
-  }
 }
 
 function handlePointerDown(event: PointerEvent) {
@@ -1906,39 +1654,6 @@ function clearBuddyDebugActionTimer() {
     buddyDebugActionTimerId = null;
   }
   debugDragging.value = false;
-}
-
-function refreshTraceClockTimer() {
-  updateTraceDurationDisplays(Date.now());
-  if (hasRunningTraceSegment.value || hasUnsettledTraceDurationDisplay()) {
-    startTraceClockTimer();
-    return;
-  }
-  clearTraceClockTimer();
-}
-
-function startTraceClockTimer() {
-  if (traceClockTimerId !== null || typeof window === "undefined") {
-    return;
-  }
-  const tick = () => {
-    updateTraceDurationDisplays(Date.now());
-    if (hasRunningTraceSegment.value || hasUnsettledTraceDurationDisplay()) {
-      traceClockTimerId = window.requestAnimationFrame(tick);
-      return;
-    }
-    traceClockTimerId = null;
-  };
-  traceClockTimerId = window.requestAnimationFrame(tick);
-}
-
-function clearTraceClockTimer() {
-  if (traceClockTimerId === null || typeof window === "undefined") {
-    traceClockTimerId = null;
-    return;
-  }
-  window.cancelAnimationFrame(traceClockTimerId);
-  traceClockTimerId = null;
 }
 
 function restartAvatarHopAnimation() {
@@ -4627,162 +4342,6 @@ function abortBackgroundReviewRuns() {
   backgroundReviewAbortControllers.clear();
 }
 
-async function initializeBuddyChatSessions() {
-  isSessionLoading.value = true;
-  try {
-    await loadChatSessions();
-    const storedSessionId = window.localStorage.getItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY)?.trim();
-    const targetSession =
-      chatSessions.value.find((session) => session.session_id === storedSessionId) ?? chatSessions.value[0] ?? null;
-    if (targetSession) {
-      await activateChatSession(targetSession.session_id, { skipInitializationWait: true });
-      return;
-    }
-    messages.value = [];
-    nextBuddyMessageClientOrder = 0;
-  } catch (error) {
-    errorMessage.value = t("buddy.historyLoadFailed", { error: formatErrorMessage(error) });
-    messages.value = [];
-    nextBuddyMessageClientOrder = 0;
-  } finally {
-    isSessionLoading.value = false;
-  }
-}
-
-async function loadChatSessions() {
-  chatSessions.value = await fetchBuddyChatSessions();
-}
-
-async function ensureActiveChatSession(): Promise<string | null> {
-  if (activeSessionId.value) {
-    return activeSessionId.value;
-  }
-  try {
-    const session = await createBuddyChatSession();
-    chatSessions.value = [session, ...chatSessions.value.filter((item) => item.session_id !== session.session_id)];
-    activeSessionId.value = session.session_id;
-    window.localStorage.setItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY, session.session_id);
-    return session.session_id;
-  } catch (error) {
-    errorMessage.value = t("buddy.historyCreateFailed", { error: formatErrorMessage(error) });
-    return null;
-  }
-}
-
-async function createNewSession() {
-  if (!canCreateNewSession.value) {
-    return;
-  }
-  await waitForChatSessionInitialization();
-  errorMessage.value = "";
-  try {
-    const session = await createBuddyChatSession();
-    chatSessions.value = [session, ...chatSessions.value.filter((item) => item.session_id !== session.session_id)];
-    await activateChatSession(session.session_id);
-    isSessionPanelOpen.value = false;
-    clearSessionDeleteConfirmState();
-  } catch (error) {
-    errorMessage.value = t("buddy.historyCreateFailed", { error: formatErrorMessage(error) });
-  }
-}
-
-async function selectChatSession(sessionId: string) {
-  await activateChatSession(sessionId);
-  isSessionPanelOpen.value = false;
-  clearSessionDeleteConfirmState();
-}
-
-async function activateChatSession(sessionId: string, options: { skipInitializationWait?: boolean } = {}) {
-  if (isSessionSwitchLocked.value && sessionId !== activeSessionId.value) {
-    return;
-  }
-  if (!options.skipInitializationWait) {
-    await waitForChatSessionInitialization();
-  }
-  const activationGeneration = ++chatSessionActivationGeneration;
-  isSessionLoading.value = true;
-  errorMessage.value = "";
-  try {
-    const records = await fetchBuddyChatMessages(sessionId);
-    activeSessionId.value = sessionId;
-    window.localStorage.setItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY, sessionId);
-    messages.value = records.map(messageRecordToBuddyMessage);
-    resetNextBuddyMessageClientOrder();
-    resetVisibleBuddyRunState();
-    void activationGeneration;
-    await scrollMessagesToBottom();
-  } catch (error) {
-    errorMessage.value = t("buddy.historyLoadFailed", { error: formatErrorMessage(error) });
-  } finally {
-    isSessionLoading.value = false;
-  }
-}
-
-async function deleteSession(sessionId: string) {
-  if (isSessionSwitchLocked.value) {
-    return;
-  }
-  clearSessionDeleteConfirmState();
-  await waitForChatSessionInitialization();
-  errorMessage.value = "";
-  try {
-    await deleteBuddyChatSession(sessionId);
-    chatSessions.value = chatSessions.value.filter((session) => session.session_id !== sessionId);
-    if (sessionId === activeSessionId.value) {
-      const nextSession = chatSessions.value[0];
-      if (nextSession) {
-        await activateChatSession(nextSession.session_id);
-      } else {
-        activeSessionId.value = null;
-        messages.value = [];
-        resetVisibleBuddyRunState();
-        window.localStorage.removeItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY);
-      }
-    }
-    await loadChatSessions();
-  } catch (error) {
-    errorMessage.value = t("buddy.historyDeleteFailed", { error: formatErrorMessage(error) });
-  }
-}
-
-function isSessionDeleteConfirmOpen(sessionId: string) {
-  return activeSessionDeleteId.value === sessionId;
-}
-
-function clearSessionDeleteConfirmTimeout() {
-  if (sessionDeleteConfirmTimeoutRef.value !== null) {
-    window.clearTimeout(sessionDeleteConfirmTimeoutRef.value);
-    sessionDeleteConfirmTimeoutRef.value = null;
-  }
-}
-
-function clearSessionDeleteConfirmState() {
-  clearSessionDeleteConfirmTimeout();
-  activeSessionDeleteId.value = null;
-}
-
-function startSessionDeleteConfirmWindow(sessionId: string) {
-  clearSessionDeleteConfirmTimeout();
-  activeSessionDeleteId.value = sessionId;
-  sessionDeleteConfirmTimeoutRef.value = window.setTimeout(() => {
-    sessionDeleteConfirmTimeoutRef.value = null;
-    if (activeSessionDeleteId.value === sessionId) {
-      activeSessionDeleteId.value = null;
-    }
-  }, 2000);
-}
-
-function handleSessionDeleteActionClick(sessionId: string) {
-  if (isSessionSwitchLocked.value) {
-    return;
-  }
-  if (activeSessionDeleteId.value === sessionId) {
-    void deleteSession(sessionId);
-    return;
-  }
-  startSessionDeleteConfirmWindow(sessionId);
-}
-
 async function persistBuddyMessage(
   sessionId: string,
   message: BuddyMessage | undefined,
@@ -4821,12 +4380,6 @@ function resetPausedBuddyPause() {
   pausedBuddyResumeBusy.value = false;
 }
 
-async function waitForChatSessionInitialization() {
-  if (chatSessionInitializationPromise) {
-    await chatSessionInitializationPromise;
-  }
-}
-
 function hydratePosition() {
   const stored = parseStoredBuddyPosition(window.localStorage.getItem(BUDDY_POSITION_STORAGE_KEY));
   position.value = clampBuddyPosition(
@@ -4835,27 +4388,6 @@ function hydratePosition() {
     DEFAULT_BUDDY_SIZE,
     DEFAULT_BUDDY_MARGIN,
   );
-}
-
-function hydrateBuddyModel() {
-  buddyModelRef.value = window.localStorage.getItem(BUDDY_MODEL_STORAGE_KEY)?.trim() ?? "";
-}
-
-async function loadBuddyModelOptions() {
-  buddyModelLoadError.value = "";
-  try {
-    const settings = await fetchSettings();
-    const options = buildBuddyModelOptions(settings);
-    buddyModelOptions.value = options;
-    if (options.length === 0) {
-      return;
-    }
-    if (!options.some((option) => option.value === buddyModelRef.value)) {
-      buddyModelRef.value = options[0].value;
-    }
-  } catch (error) {
-    buddyModelLoadError.value = error instanceof Error ? error.message : t("buddy.modelLoadFailed");
-  }
 }
 
 function handleResize() {
@@ -4876,41 +4408,6 @@ function handleResize() {
 
 function persistPosition() {
   window.localStorage.setItem(BUDDY_POSITION_STORAGE_KEY, serializeBuddyPosition(position.value));
-}
-
-function showBuddyImmediatePendingTrace(assistantMessageId: string) {
-  const outputTrace: BuddyOutputTraceSegment = {
-    segmentId: "__pending__",
-    boundaryNodeId: "__pending__",
-    boundaryLabel: t("buddy.activity.preparing"),
-    outputNodeIds: [],
-    status: "running",
-    startedAtMs: nowPublicOutputMs(),
-    completedAtMs: null,
-    durationMs: null,
-    records: [],
-  };
-  const existingMessages = new Map(messages.value.map((message) => [message.id, message]));
-  removeBuddyRunDisplayMessages(assistantMessageId);
-  messages.value.splice(resolveBuddyRunDisplayInsertionIndex(assistantMessageId), 0, buildOutputTraceMessage(assistantMessageId, "", outputTrace, existingMessages));
-}
-
-function showBuddyGraphPendingTrace(
-  assistantMessageId: string,
-  graph: GraphPayload,
-  publicOutputBindings: BuddyPublicOutputBinding[],
-) {
-  const outputTracePlan = buildBuddyOutputTracePlan(graph, publicOutputBindings);
-  const outputTraceState = createBuddyPendingOutputTraceRuntimeState(outputTracePlan, nowPublicOutputMs());
-  if (listBuddyOutputTraceSegmentsForDisplay(outputTraceState).length === 0) {
-    return;
-  }
-  syncStreamingBuddyRunDisplay(
-    assistantMessageId,
-    "",
-    outputTraceState,
-    createBuddyPublicOutputRuntimeState(),
-  );
 }
 
 function startRunEventStream(
@@ -5001,13 +4498,6 @@ async function hydrateBuddyStreamingRunDisplayFromSnapshot(
   }
 }
 
-function hasVisibleBuddyRunDisplaySnapshot(snapshot: BuddyStreamingRunDisplaySnapshot) {
-  return (
-    listBuddyOutputTraceSegmentsForDisplay(snapshot.outputTraceState).length > 0 ||
-    snapshot.publicOutputState.order.length > 0
-  );
-}
-
 async function pollRunUntilFinished(runId: string, signal: AbortSignal): Promise<RunDetail> {
   while (true) {
     const run = await fetchRun(runId, { signal });
@@ -5025,762 +4515,51 @@ function closeEventSource(source: EventSource | null = eventSource) {
   }
 }
 
-function shouldRenderMessage(message: BuddyMessage) {
-  return (
-    message.role === "user" ||
-    Boolean(message.content.trim()) ||
-    Boolean(message.outputTrace)
-  );
-}
-
-function shouldShowMessageRoleLabel(messageIndex: number) {
-  return shouldShowGroupedBuddyMessageLabel(messages.value, messageIndex, shouldRenderMessage);
-}
-
-function removeBuddyRunDisplayMessages(controllerMessageId: string) {
-  const displayPrefix = `${controllerMessageId}:`;
-  messages.value = messages.value.filter(
-    (message) => !message.id.startsWith(`${displayPrefix}trace:`) && !message.id.startsWith(`${displayPrefix}output:`),
-  );
-}
-
-function syncStreamingBuddyRunDisplay(
-  assistantMessageId: string,
-  runId: string,
-  outputTraceState: BuddyOutputTraceRuntimeState,
-  publicOutputState: BuddyPublicOutputRuntimeState,
-) {
-  const { publicOutputMessages, outputTraceMessages } = syncBuddyRunDisplayMessages(
-    assistantMessageId,
-    runId,
-    outputTraceState,
-    publicOutputState,
-  );
-  if (publicOutputMessages.length > 0) {
-    mood.value = "speaking";
-  }
-  if (publicOutputMessages.length > 0 || outputTraceMessages.length > 0) {
-    const controllerMessage = messages.value.find((message) => message.id === assistantMessageId);
-    if (controllerMessage) {
-      controllerMessage.activityText = "";
-      controllerMessage.runId = runId;
-      controllerMessage.includeInContext = false;
-    }
-    void scrollMessagesToBottom();
-  }
-  return { publicOutputMessages, outputTraceMessages };
-}
-
-function syncBackgroundTemplateRunDisplay(
-  operationPlan: BuddyVirtualOperationPlan,
-  runDetail: RunDetail,
-  graph: GraphPayload,
-) {
-  const parentControllerMessageId = resolveBuddyRunControllerMessageId(operationPlan.runId ?? "");
-  if (parentControllerMessageId) {
-    removeBuddyRunDisplayMessages(parentControllerMessageId);
-  }
-  const publicOutputBindings = buildBuddyPublicOutputBindings(graph);
-  const outputTracePlan = buildBuddyOutputTracePlan(graph, publicOutputBindings);
-  const outputTraceState = buildBuddyOutputTraceStateFromRunDetail(runDetail, outputTracePlan, graph);
-  const outputState = buildPublicOutputRuntimeStateFromRunDetail(runDetail, publicOutputBindings, graph);
-  syncBuddyRunDisplayMessages(
-    buildBackgroundTemplateRunDisplayControllerId(operationPlan, runDetail.run_id),
-    runDetail.run_id,
-    outputTraceState,
-    outputState,
-  );
-  void scrollMessagesToBottom();
-}
-
-function promoteBackgroundTemplateRunResultToBuddyReply(
-  operationPlan: BuddyVirtualOperationPlan,
-  runDetail: RunDetail,
-  graph: GraphPayload,
-) {
-  if (runDetail.status !== "completed") {
-    return;
-  }
-  const parentRunId = String(operationPlan.runId ?? "").trim();
-  const assistantMessageId = resolveBuddyRunControllerMessageId(parentRunId);
-  if (!parentRunId || !assistantMessageId) {
-    return;
-  }
-  const outputBindings = buildBuddyPublicOutputBindings(graph);
-  const outputState = buildPublicOutputRuntimeStateFromRunDetail(runDetail, outputBindings, graph);
-  const primaryOutput = findPrimaryCompletedTextPublicOutput(outputState);
-  if (!primaryOutput) {
-    return;
-  }
-
-  removeBuddyRunDisplayMessages(buildBackgroundTemplateRunDisplayControllerId(operationPlan, runDetail.run_id));
-  clearAutoResumingPageOperationPlaceholder(assistantMessageId, parentRunId);
-  const promotedOutput = buildPromotedCapabilityPassthroughOutput(primaryOutput);
-  const promotedOutputState = createBuddyPublicOutputRuntimeState();
-  promotedOutputState.order.push(promotedOutput.outputNodeId);
-  promotedOutputState.messagesByOutputNodeId[promotedOutput.outputNodeId] = promotedOutput;
-  const { publicOutputMessages } = syncBuddyRunDisplayMessages(
-    assistantMessageId,
-    parentRunId,
-    createEmptyBuddyOutputTraceRuntimeState(),
-    promotedOutputState,
-  );
-  if (publicOutputMessages.length === 0) {
-    return;
-  }
-  const controllerMessage = messages.value.find((message) => message.id === assistantMessageId);
-  if (controllerMessage) {
-    controllerMessage.activityText = "";
-    controllerMessage.runId = parentRunId;
-    controllerMessage.includeInContext = false;
-  }
-  mood.value = "speaking";
-  void scrollMessagesToBottom();
-}
-
-function findPrimaryCompletedTextPublicOutput(
-  outputState: BuddyPublicOutputRuntimeState,
-): BuddyPublicOutputMessage | null {
-  for (const outputNodeId of outputState.order) {
-    const output = outputState.messagesByOutputNodeId[outputNodeId];
-    if (output?.kind === "text" && output.status === "completed" && stringifyPublicOutputContent(output.content).trim()) {
-      return output;
-    }
-  }
-  return null;
-}
-
-function buildPromotedCapabilityPassthroughOutput(output: BuddyPublicOutputMessage): BuddyPublicOutputMessage {
-  return {
-    ...output,
-    outputNodeId: BUDDY_CAPABILITY_PASSTHROUGH_OUTPUT_NODE_ID,
-    outputNodeName: "能力结果",
-    stateKey: BUDDY_CAPABILITY_PASSTHROUGH_STATE_KEY,
-    stateName: "final_reply",
-    stateType: "markdown",
-    displayMode: "markdown",
-    kind: "text",
-  };
-}
-
-function buildBackgroundTemplateRunDisplayControllerId(operationPlan: BuddyVirtualOperationPlan, runId: string) {
-  const parentControllerMessageId = resolveBuddyRunControllerMessageId(operationPlan.runId ?? "");
-  const operationRequestId = String(operationPlan.operationRequestId ?? "").trim();
-  const suffix = operationRequestId || runId;
-  return parentControllerMessageId ? `${parentControllerMessageId}:target:${suffix}` : `buddy-target-run:${suffix}`;
-}
-
-function createEmptyBuddyOutputTraceRuntimeState(): BuddyOutputTraceRuntimeState {
-  return {
-    order: [],
-    segmentsById: {},
-    activeSegmentId: null,
-    nextSegmentIndex: 0,
-  };
-}
-
-function resolveBuddyRunControllerMessageId(runId: string) {
-  const normalizedRunId = runId.trim();
-  if (!normalizedRunId) {
-    return "";
-  }
-  return (
-    messages.value.find(
-      (message) =>
-        message.role === "assistant" &&
-        message.runId === normalizedRunId &&
-        !message.outputTrace &&
-        !message.publicOutput,
-    )?.id ?? ""
-  );
-}
-
-function syncBuddyRunDisplayMessages(
-  controllerMessageId: string,
-  runId: string,
-  outputTraceState: BuddyOutputTraceRuntimeState,
-  outputState: BuddyPublicOutputRuntimeState,
-) {
-  const existingMessages = new Map(messages.value.map((message) => [message.id, message]));
-  removeBuddyRunDisplayMessages(controllerMessageId);
-
-  const outputTraceMessages: BuddyMessage[] = [];
-  const publicOutputMessages: BuddyMessage[] = [];
-  const displayMessages: BuddyMessage[] = [];
-  const handledOutputNodeIds = new Set<string>();
-  const visibleOutputNodeIds = buildVisibleOutputNodeIdSet(outputState);
-
-  for (const segment of listBuddyOutputTraceSegmentsForDisplay(outputTraceState, { visibleOutputNodeIds })) {
-    const traceMessage = buildOutputTraceMessage(controllerMessageId, runId, segment, existingMessages);
-    displayMessages.push(traceMessage);
-    outputTraceMessages.push(traceMessage);
-    for (const outputNodeId of segment.outputNodeIds) {
-      const output = outputState.messagesByOutputNodeId[outputNodeId];
-      handledOutputNodeIds.add(outputNodeId);
-      if (!output) {
-        continue;
-      }
-      if (!isBuddyPublicOutputMessageVisible(output)) {
-        continue;
-      }
-      const outputMessage = buildPublicOutputMessage(controllerMessageId, runId, output, existingMessages);
-      displayMessages.push(outputMessage);
-      publicOutputMessages.push(outputMessage);
-    }
-  }
-
-  for (const outputNodeId of outputState.order) {
-    if (handledOutputNodeIds.has(outputNodeId)) {
-      continue;
-    }
-    const output = outputState.messagesByOutputNodeId[outputNodeId];
-    if (!output) {
-      continue;
-    }
-    if (!isBuddyPublicOutputMessageVisible(output)) {
-      continue;
-    }
-    const outputMessage = buildPublicOutputMessage(controllerMessageId, runId, output, existingMessages);
-    displayMessages.push(outputMessage);
-    publicOutputMessages.push(outputMessage);
-  }
-
-  if (displayMessages.length > 0) {
-    messages.value.splice(resolveBuddyRunDisplayInsertionIndex(controllerMessageId), 0, ...displayMessages);
-  }
-  return { publicOutputMessages, outputTraceMessages };
-}
-
-function buildVisibleOutputNodeIdSet(outputState: BuddyPublicOutputRuntimeState) {
-  const result = new Set<string>();
-  for (const outputNodeId of outputState.order) {
-    const output = outputState.messagesByOutputNodeId[outputNodeId];
-    if (isBuddyPublicOutputMessageVisible(output)) {
-      result.add(outputNodeId);
-    }
-  }
-  return result;
-}
-
-function buildOutputTraceMessage(
-  controllerMessageId: string,
-  runId: string,
-  outputTrace: BuddyOutputTraceSegment,
-  existingMessages: Map<string, BuddyMessage>,
-) {
-  const messageId = buildOutputTraceMessageId(controllerMessageId, outputTrace.segmentId);
-  const existing = existingMessages.get(messageId);
-  const message =
-    existing ?? createMessage("assistant", "", messageId, allocateBuddyMessageClientOrder());
-  message.content = "";
-  message.outputTrace = outputTrace;
-  message.publicOutput = undefined;
-  message.runId = runId;
-  message.includeInContext = false;
-  return message;
-}
-
-function buildPublicOutputMessage(
-  controllerMessageId: string,
-  runId: string,
-  output: BuddyPublicOutputMessage,
-  existingMessages: Map<string, BuddyMessage>,
-) {
-  const messageId = buildPublicOutputMessageId(controllerMessageId, output.outputNodeId);
-  const publicOutput = toBuddyPublicOutputMetadata(output);
-  const message =
-    existingMessages.get(messageId)
-    ?? createMessage("assistant", renderPublicOutputContentForStorage(output), messageId, allocateBuddyMessageClientOrder());
-  message.content = renderPublicOutputContentForStorage(output);
-  message.publicOutput = publicOutput;
-  message.outputTrace = undefined;
-  message.runId = runId;
-  message.includeInContext = publicOutput.kind === "text" && publicOutput.status === "completed";
-  return message;
-}
-
-function buildOutputTraceMessageId(controllerMessageId: string, segmentId: string) {
-  return `${controllerMessageId}:trace:${segmentId}`;
-}
-
-function buildPublicOutputMessageId(controllerMessageId: string, outputNodeId: string) {
-  return `${controllerMessageId}:output:${outputNodeId}`;
-}
-
-function resolveBuddyRunDisplayInsertionIndex(controllerMessageId: string) {
-  const controllerIndex = messages.value.findIndex((message) => message.id === controllerMessageId);
-  if (controllerIndex >= 0) {
-    return controllerIndex + 1;
-  }
-  const targetMarkerIndex = controllerMessageId.indexOf(":target:");
-  if (targetMarkerIndex > 0) {
-    const parentControllerMessageId = controllerMessageId.slice(0, targetMarkerIndex);
-    const parentIndex = messages.value.findIndex((message) => message.id === parentControllerMessageId);
-    if (parentIndex >= 0) {
-      let insertionIndex = parentIndex + 1;
-      while (messages.value[insertionIndex]?.id.startsWith(`${parentControllerMessageId}:`)) {
-        insertionIndex += 1;
-      }
-      return insertionIndex;
-    }
-  }
-  return messages.value.length;
-}
-
-function toBuddyPublicOutputMetadata(output: BuddyPublicOutputMessage): BuddyPublicOutputMetadata {
-  return {
-    outputNodeId: output.outputNodeId,
-    stateKey: output.stateKey,
-    stateName: output.stateName,
-    stateType: output.stateType,
-    displayMode: output.displayMode,
-    kind: output.kind,
-    durationMs: output.durationMs,
-    status: output.status,
-  };
-}
-
-function renderPublicOutputContentForStorage(output: BuddyPublicOutputMessage) {
-  if (output.kind === "text") {
-    return stringifyPublicOutputContent(output.content);
-  }
-  return stringifyPublicOutputContent(output.content);
-}
-
-function buildPublicOutputRuntimeStateFromRunDetail(
-  runDetail: RunDetail,
-  bindings: BuddyPublicOutputBinding[],
-  graph: GraphPayload,
-): BuddyPublicOutputRuntimeState {
-  const outputState = createBuddyPublicOutputRuntimeState();
-  const seenOutputNodeIds = new Set<string>();
-  const outputTimingByNodeId = buildRunNodeTimingByNodeIdFromRun(
-    {
-      node_executions: runDetail.node_executions,
-      artifacts: { state_events: runDetail.artifacts?.state_events ?? [] },
-    },
-    graph,
-  );
-  for (const preview of listRunDetailOutputPreviews(runDetail)) {
-    const binding = findPublicOutputBindingForPreview(bindings, preview.node_id, preview.source_key);
-    if (!binding || seenOutputNodeIds.has(binding.outputNodeId)) {
-      continue;
-    }
-    seenOutputNodeIds.add(binding.outputNodeId);
-    const timing = outputTimingByNodeId[binding.outputNodeId] ?? null;
-    outputState.order.push(binding.outputNodeId);
-    outputState.messagesByOutputNodeId[binding.outputNodeId] = {
-      outputNodeId: binding.outputNodeId,
-      outputNodeName: binding.outputNodeName,
-      stateKey: binding.stateKey,
-      stateName: binding.stateName,
-      stateType: binding.stateType,
-      displayMode: binding.displayMode,
-      kind: resolveBuddyPublicOutputMessageKind(binding),
-      content: preview.value,
-      startedAtMs: timing?.startedAtEpochMs ?? null,
-      durationMs: timing?.durationMs ?? null,
-      status: runDetail.status === "failed" ? "failed" : "completed",
-    };
-  }
-  return outputState;
-}
-
-function listRunDetailOutputPreviews(runDetail: RunDetail) {
-  return [...(runDetail.output_previews ?? []), ...(runDetail.artifacts?.output_previews ?? [])];
-}
-
-function findPublicOutputBindingForPreview(
-  bindings: BuddyPublicOutputBinding[],
-  nodeId: string | null | undefined,
-  sourceKey: string | null | undefined,
-) {
-  const normalizedNodeId = typeof nodeId === "string" ? nodeId.trim() : "";
-  const normalizedSourceKey = typeof sourceKey === "string" ? sourceKey.trim() : "";
-  return bindings.find(
-    (binding) =>
-      (normalizedNodeId && binding.outputNodeId === normalizedNodeId) ||
-      (normalizedSourceKey && binding.stateKey === normalizedSourceKey),
-  );
-}
-
-function nowPublicOutputMs() {
-  return Date.now();
-}
-
-function formatPublicOutputCardContent(content: string) {
-  return content.trim() || t("buddy.emptyReply");
-}
-
-function isTraceMessageExpanded(messageId: string) {
-  return expandedTraceMessageIds.value.has(messageId);
-}
-
-function toggleTraceMessage(messageId: string, runId?: string | null) {
-  const next = new Set(expandedTraceMessageIds.value);
-  if (next.has(messageId)) {
-    next.delete(messageId);
-  } else {
-    next.add(messageId);
-    void ensureTraceRunTreeLoaded(runId);
-  }
-  expandedTraceMessageIds.value = next;
-}
-
-function buildTraceTreeRows(segment: BuddyOutputTraceSegment, runId?: string | null) {
-  return buildBuddyOutputTraceTreeRows(segment, {
-    rootLabel: t("buddy.runTraceMainGraph"),
-    runTree: resolveTraceRunTree(runId),
-    childRunDetailsByRunId: traceRunDetailByRunId.value,
-  });
-}
-
-async function ensureTraceRunTreeLoaded(runId: string | null | undefined) {
-  const normalizedRunId = String(runId ?? "").trim();
-  if (!normalizedRunId || traceRunTreeByRunId.value[normalizedRunId] || traceRunTreeLoadingByRunId.value[normalizedRunId]) {
-    return;
-  }
-  traceRunTreeLoadingByRunId.value = {
-    ...traceRunTreeLoadingByRunId.value,
-    [normalizedRunId]: true,
-  };
-  traceRunTreeErrorByRunId.value = {
-    ...traceRunTreeErrorByRunId.value,
-    [normalizedRunId]: "",
-  };
-  try {
-    const tree = await fetchRunTree(normalizedRunId);
-    traceRunTreeByRunId.value = {
-      ...traceRunTreeByRunId.value,
-      [normalizedRunId]: tree,
-    };
-    await ensureTraceChildRunDetailsLoaded(tree);
-  } catch (treeError) {
-    traceRunTreeErrorByRunId.value = {
-      ...traceRunTreeErrorByRunId.value,
-      [normalizedRunId]: treeError instanceof Error ? treeError.message : String(treeError),
-    };
-  } finally {
-    traceRunTreeLoadingByRunId.value = {
-      ...traceRunTreeLoadingByRunId.value,
-      [normalizedRunId]: false,
-    };
-  }
-}
-
-async function ensureTraceChildRunDetailsLoaded(tree: RunTreeNode) {
-  const runIds = listTraceChildRunIds(tree).filter((runId) => !traceRunDetailByRunId.value[runId]);
-  if (runIds.length === 0) {
-    return;
-  }
-  const detailEntries = await Promise.all(
-    runIds.map(async (runId) => {
-      try {
-        return [runId, await fetchRun(runId)] as const;
-      } catch {
-        return null;
-      }
-    }),
-  );
-  const nextDetails = { ...traceRunDetailByRunId.value };
-  let changed = false;
-  for (const entry of detailEntries) {
-    if (!entry) {
-      continue;
-    }
-    nextDetails[entry[0]] = entry[1];
-    changed = true;
-  }
-  if (changed) {
-    traceRunDetailByRunId.value = nextDetails;
-  }
-}
-
-function listTraceChildRunIds(tree: RunTreeNode) {
-  const result: string[] = [];
-  const stack = [...(tree.children ?? [])];
-  while (stack.length > 0) {
-    const node = stack.shift();
-    const runId = String(node?.run_id ?? "").trim();
-    if (runId && !result.includes(runId)) {
-      result.push(runId);
-    }
-    stack.push(...(node?.children ?? []));
-  }
-  return result;
-}
-
-function resolveTraceRunTree(runId: string | null | undefined) {
-  const normalizedRunId = String(runId ?? "").trim();
-  return normalizedRunId ? traceRunTreeByRunId.value[normalizedRunId] ?? null : null;
-}
-
-function isTraceRunTreeLoading(runId: string | null | undefined) {
-  const normalizedRunId = String(runId ?? "").trim();
-  return normalizedRunId ? Boolean(traceRunTreeLoadingByRunId.value[normalizedRunId]) : false;
-}
-
-function traceRunTreeError(runId: string | null | undefined) {
-  const normalizedRunId = String(runId ?? "").trim();
-  return normalizedRunId ? traceRunTreeErrorByRunId.value[normalizedRunId] ?? "" : "";
-}
-
-function traceTreeRowStyle(row: BuddyOutputTraceTreeRow) {
-  return {
-    "--buddy-run-trace-depth": String(Math.max(0, row.depth)),
-  };
-}
-
-function openTraceTreeRowPlayback(runId: string | null | undefined, row: BuddyOutputTraceTreeRow) {
-  if (!row.playbackTarget) {
-    return;
-  }
-  openRunPlayback(row.evidenceRunId || runId);
-}
-
-function openRunPlayback(runId: string | null | undefined) {
-  const normalizedRunId = String(runId ?? "").trim();
-  if (!normalizedRunId) {
-    return;
-  }
-  void router.push(resolveRunRestoreUrl(normalizedRunId));
-}
-
-function openTraceEvidenceRun(runId: string | null | undefined) {
-  const normalizedRunId = String(runId ?? "").trim();
-  if (!normalizedRunId) {
-    return;
-  }
-  void router.push(`/runs/${encodeURIComponent(normalizedRunId)}`);
-}
-
-async function restoreTraceGraphRevision(row: BuddyOutputTraceTreeRow) {
-  if (!row.graphRevision || restoringTraceGraphRevisionRowId.value) {
-    return;
-  }
-  try {
-    await ElMessageBox.confirm(
-      t("graphLibrary.restoreRevisionConfirm", { name: `${row.graphRevision.graphId} / ${row.graphRevision.revisionId}` }),
-      t("graphLibrary.restoreRevisionTitle"),
-      {
-        confirmButtonText: t("graphLibrary.restoreRevisionAction"),
-        cancelButtonText: t("common.cancel"),
-        type: "warning",
-      },
-    );
-  } catch {
-    return;
-  }
-
-  restoringTraceGraphRevisionRowId.value = row.rowId;
-  try {
-    const response = await restoreGraphRevision(row.graphRevision.graphId, row.graphRevision.revisionId);
-    ElMessage.success(t("graphLibrary.revisionRestored", { revisionId: response.restored_revision_id }));
-  } catch (restoreError) {
-    ElMessage.error(restoreError instanceof Error ? restoreError.message : t("common.failedToSave", { error: "" }));
-  } finally {
-    restoringTraceGraphRevisionRowId.value = null;
-  }
-}
-
-function resolveTraceSegmentSummary(segment: BuddyOutputTraceSegment) {
-  if (segment.status === "running") {
-    return findCurrentTraceRecord(segment)?.label ?? segment.boundaryLabel;
-  }
-  if (segment.status === "failed") {
-    return t("buddy.runTraceFailed", { count: segment.records.length });
-  }
-  return t("buddy.runTraceCompleted", { count: segment.records.length });
-}
-
-function findCurrentTraceRecord(segment: BuddyOutputTraceSegment) {
-  return [...segment.records].reverse().find((record) => record.status === "running") ?? segment.records.at(-1) ?? null;
-}
-
-function resolveTraceSegmentDurationMs(segment: BuddyOutputTraceSegment) {
-  return resolveTraceSegmentDurationMsAt(segment, traceClockNowMs.value);
-}
-
-function resolveTraceTreeRowDurationMs(row: BuddyOutputTraceTreeRow) {
-  return resolveTraceTreeRowDurationMsAt(row, traceClockNowMs.value);
-}
-
-function resolveTraceSegmentDurationMsAt(segment: BuddyOutputTraceSegment, nowMs: number) {
-  if (segment.durationMs !== null) {
-    return segment.durationMs;
-  }
-  if (segment.status === "running" && segment.startedAtMs !== null) {
-    return Math.max(0, nowMs - segment.startedAtMs);
-  }
-  return null;
-}
-
-function resolveTraceTreeRowDurationMsAt(row: BuddyOutputTraceTreeRow, nowMs: number) {
-  if (row.durationMs !== null) {
-    return row.durationMs;
-  }
-  if (row.status === "running" && row.startedAtMs !== null) {
-    return Math.max(0, nowMs - row.startedAtMs);
-  }
-  return null;
-}
-
-function buildTraceSegmentDurationKey(messageId: string) {
-  return `segment:${messageId}`;
-}
-
-function buildTraceTreeRowDurationKey(messageId: string, row: BuddyOutputTraceTreeRow) {
-  return `tree:${messageId}:${row.rowId}`;
-}
-
-function collectTraceDurationTargets(nowMs: number) {
-  const targets: Record<string, TraceDurationTarget> = {};
-  for (const message of messages.value) {
-    if (!shouldRenderMessage(message) || !message.outputTrace) {
-      continue;
-    }
-    const segmentDurationMs = resolveTraceSegmentDurationMsAt(message.outputTrace, nowMs);
-    if (segmentDurationMs !== null) {
-      targets[buildTraceSegmentDurationKey(message.id)] = {
-        durationMs: segmentDurationMs,
-        animateInitial: message.outputTrace.status === "running",
-      };
-    }
-    for (const row of buildTraceTreeRows(message.outputTrace, message.runId)) {
-      const rowDurationMs = resolveTraceTreeRowDurationMsAt(row, nowMs);
-      if (rowDurationMs !== null) {
-        targets[buildTraceTreeRowDurationKey(message.id, row)] = {
-          durationMs: rowDurationMs,
-          animateInitial: row.status === "running",
-        };
-      }
-    }
-  }
-  return targets;
-}
-
-function updateTraceDurationDisplays(nowMs: number) {
-  traceClockNowMs.value = nowMs;
-  const previousDisplays = traceDurationDisplayByKey.value;
-  const targets = collectTraceDurationTargets(nowMs);
-  const nextDisplays: Record<string, SmoothNumberDisplayState> = {};
-  for (const [key, target] of Object.entries(targets)) {
-    nextDisplays[key] = advanceSmoothNumberDisplay(previousDisplays[key], target.durationMs, nowMs, {
-      ...TRACE_DURATION_SMOOTH_OPTIONS,
-      initialValue: target.animateInitial ? 0 : target.durationMs,
-    });
-  }
-  traceDurationDisplayByKey.value = nextDisplays;
-}
-
-function hasUnsettledTraceDurationDisplay() {
-  return Object.values(traceDurationDisplayByKey.value).some(
-    (display) => !isSmoothNumberDisplaySettled(display, TRACE_DURATION_SMOOTH_OPTIONS),
-  );
-}
-
-function formatTraceDuration(displayKey: string, durationMs: number | null | undefined) {
-  const display = traceDurationDisplayByKey.value[displayKey];
-  return formatRunDuration(display?.value ?? durationMs ?? undefined, { secondsFractionDigits: 2 });
-}
-
-function stringifyPublicOutputContent(value: unknown) {
-  if (typeof value === "string") {
-    return value.trim();
-  }
-  if (value === undefined || value === null) {
-    return "";
-  }
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
-function renderBuddyMarkdown(content: string) {
-  return resolveOutputPreviewContent(content, "markdown").html;
-}
-
-function resolveBuddyRenderedContent(message: BuddyMessage) {
-  return resolveOutputPreviewContent(message.content, resolveBuddyDisplayMode(message));
-}
-
-function resolveBuddyDisplayMode(message: BuddyMessage) {
-  const displayMode = message.publicOutput?.displayMode.trim().toLowerCase() ?? "";
-  const stateType = message.publicOutput?.stateType.trim().toLowerCase() ?? "";
-  if (displayMode === "html" || stateType === "html" || looksLikeHtmlDocument(message.content)) {
-    return "html";
-  }
-  return "markdown";
-}
-
-function looksLikeHtmlDocument(content: string) {
-  const trimmed = content.trim().toLowerCase();
-  return /^<!doctype\s+html\b/.test(trimmed) || /^<html(?:\s|>)/.test(trimmed);
-}
-
-function updateAssistantMessage(messageId: string, content: string, patch: BuddyMessagePatch = {}) {
-  const target = messages.value.find((message) => message.id === messageId);
-  if (!target) {
-    return;
-  }
-  target.content = content;
-  if (content.trim()) {
-    target.activityText = "";
-  }
-  Object.assign(target, patch);
-}
-
-function setAssistantActivityText(messageId: string, activityText: string) {
-  const target = messages.value.find((message) => message.id === messageId);
-  if (!target || target.content.trim()) {
-    return;
-  }
-  target.activityText = activityText;
-  void scrollMessagesToBottom();
-}
-
-function setAssistantActivityFromRunEvent(
-  assistantMessageId: string,
-  eventType: string,
-  payload: Record<string, unknown>,
-  graph: GraphPayload,
-) {
-  const activity = resolveBuddyRunActivityFromRunEvent(eventType, payload, graph);
-  if (!activity) {
-    return;
-  }
-  setAssistantActivityText(assistantMessageId, t(activity.labelKey, activity.params));
-}
-
-function buildHistoryBeforeMessage(messageId: string): BuddyChatMessage[] {
-  const messageIndex = messages.value.findIndex((message) => message.id === messageId);
-  const previousMessages = messageIndex >= 0 ? messages.value.slice(0, messageIndex) : messages.value;
-  return previousMessages.filter(isContextMessage).map(({ role, content }) => ({ role, content }));
-}
-
-function ensureAssistantMessageForTurn(turn: BuddyQueuedTurn): BuddyMessage {
-  const existingMessage = messages.value.find(
-    (message) => message.id === turn.assistantMessageId && message.role === "assistant",
-  );
-  if (existingMessage) {
-    return existingMessage;
-  }
-  const assistantMessage = createMessage(
-    "assistant",
-    "",
-    turn.assistantMessageId,
-    allocateBuddyMessageClientOrder(),
-  );
-  const userMessageIndex = messages.value.findIndex((message) => message.id === turn.userMessageId);
-  if (userMessageIndex >= 0 && userMessageIndex < messages.value.length - 1) {
-    messages.value.splice(userMessageIndex + 1, 0, assistantMessage);
-    return assistantMessage;
-  }
-  messages.value.push(assistantMessage);
-  return assistantMessage;
-}
+const {
+  showBuddyImmediatePendingTrace,
+  showBuddyGraphPendingTrace,
+  hasVisibleBuddyRunDisplaySnapshot,
+  shouldRenderMessage,
+  shouldShowMessageRoleLabel,
+  removeBuddyRunDisplayMessages,
+  syncStreamingBuddyRunDisplay,
+  syncBackgroundTemplateRunDisplay,
+  promoteBackgroundTemplateRunResultToBuddyReply,
+  createEmptyBuddyOutputTraceRuntimeState,
+  resolveBuddyRunControllerMessageId,
+  syncBuddyRunDisplayMessages,
+  buildPublicOutputRuntimeStateFromRunDetail,
+  nowPublicOutputMs,
+  formatPublicOutputCardContent,
+} = useBuddyRunDisplayMessages<BuddyMessage>({
+  messages,
+  mood,
+  t,
+  createMessage,
+  allocateBuddyMessageClientOrder,
+  scrollMessagesToBottom,
+  clearAutoResumingPageOperationPlaceholder,
+});
+
+const {
+  restoringTraceGraphRevisionRowId,
+  isTraceMessageExpanded,
+  toggleTraceMessage,
+  buildTraceTreeRows,
+  isTraceRunTreeLoading,
+  traceRunTreeError,
+  openTraceTreeRowPlayback,
+  openTraceEvidenceRun,
+  restoreTraceGraphRevision,
+  resolveTraceSegmentSummary,
+  formatTraceSegmentDurationForMessage,
+  formatTraceTreeRowDurationForMessage,
+} = useBuddyRunTraceDisplay({
+  messages,
+  router,
+  t,
+  shouldRenderMessage,
+});
 
 function scheduleBuddySpeakingIdleIfNeeded() {
   if (mood.value === "speaking" && queuedTurns.value.length === 0) {
@@ -5813,15 +4592,6 @@ function clearAvatarSingleClickTimer() {
   }
   window.clearTimeout(avatarSingleClickTimerId);
   avatarSingleClickTimerId = null;
-}
-
-async function scrollMessagesToBottom() {
-  await nextTick();
-  const element = messageListElement.value;
-  if (!element) {
-    return;
-  }
-  element.scrollTop = element.scrollHeight;
 }
 
 function buildPageOperationRuntimeContext(options: BuddyPageOperationRuntimeContextOptions = {}) {
@@ -5869,68 +4639,6 @@ function buildBuddyPageOperationEditorFacts() {
 function compactPageFactText(value: unknown) {
   const text = String(value ?? "").replace(/\s+/g, " ").trim();
   return text.length > 180 ? `${text.slice(0, 177)}...` : text;
-}
-
-function createMessage(
-  role: BuddyChatMessage["role"],
-  content: string,
-  id?: string,
-  clientOrder: number | null = null,
-): BuddyMessage {
-  return {
-    id: id ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-    role,
-    content,
-    clientOrder,
-    activityText: "",
-  };
-}
-
-function messageRecordToBuddyMessage(record: BuddyChatMessageRecord): BuddyMessage {
-  return {
-    id: record.message_id,
-    role: record.role,
-    content: record.content,
-    clientOrder: record.client_order,
-    includeInContext: record.include_in_context,
-    runId: record.run_id,
-    activityText: "",
-    outputTrace: resolveOutputTraceBuddyMessageMetadata(record.metadata) ?? undefined,
-    publicOutput: resolvePublicOutputBuddyMessageMetadata(record.metadata) ?? undefined,
-  };
-}
-
-function buildBuddyMessageMetadata(message: BuddyMessage) {
-  if (message.outputTrace) {
-    return buildOutputTraceBuddyMessageMetadata(message.outputTrace);
-  }
-  if (message.publicOutput) {
-    return buildPublicOutputBuddyMessageMetadata(message.publicOutput);
-  }
-  return null;
-}
-
-function allocateBuddyMessageClientOrder() {
-  const clientOrder = nextBuddyMessageClientOrder;
-  nextBuddyMessageClientOrder += 1;
-  return clientOrder;
-}
-
-function resetNextBuddyMessageClientOrder() {
-  const maxClientOrder = messages.value.reduce((maxOrder, message, index) => {
-    const order =
-      typeof message.clientOrder === "number" && Number.isFinite(message.clientOrder) ? message.clientOrder : index;
-    return Math.max(maxOrder, order);
-  }, -1);
-  nextBuddyMessageClientOrder = Math.floor(maxClientOrder) + 1;
-}
-
-function buildBuddyModelOptions(settings: SettingsPayload): BuddyModelOption[] {
-  return buildRuntimeModelOptions(settings);
-}
-
-function isContextMessage(message: BuddyMessage): boolean {
-  return message.includeInContext !== false;
 }
 
 function resolveViewport() {
@@ -6120,96 +4828,6 @@ function formatErrorMessage(error: unknown): string {
   cursor: default;
 }
 
-.buddy-widget__virtual-operation-banner {
-  position: fixed;
-  left: 50%;
-  top: calc(var(--editor-canvas-floating-top-clearance, 18px) + 64px);
-  z-index: 4528;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-width: min(420px, calc(100vw - 56px));
-  max-width: min(620px, calc(100vw - 56px));
-  padding: 14px 16px 14px 24px;
-  border: 1px solid rgba(255, 247, 237, 0.34);
-  border-radius: 999px;
-  color: #fff7ed;
-  background: linear-gradient(135deg, rgba(154, 52, 18, 0.96), rgba(131, 43, 13, 0.94));
-  box-shadow:
-    0 0 0 1px rgba(255, 247, 237, 0.16) inset,
-    0 18px 42px rgba(124, 45, 18, 0.24),
-    0 0 34px rgba(217, 119, 6, 0.24);
-  translate: -50% 0;
-  pointer-events: auto;
-  backdrop-filter: blur(28px) saturate(1.4) contrast(1.08);
-  animation: buddy-widget-virtual-operation-breathe 2.4s ease-in-out infinite;
-}
-
-.buddy-widget__virtual-operation-banner--stopping {
-  background: linear-gradient(135deg, rgba(180, 83, 9, 0.98), rgba(154, 52, 18, 0.96));
-}
-
-.buddy-widget__virtual-operation-pulse {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: #fed7aa;
-  box-shadow: 0 0 0 6px rgba(255, 247, 237, 0.16);
-  animation: buddy-widget-virtual-operation-pulse 1.1s ease-in-out infinite;
-  flex: 0 0 auto;
-}
-
-.buddy-widget__virtual-operation-label {
-  min-width: 0;
-  overflow: hidden;
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.buddy-widget__virtual-operation-stop {
-  appearance: none;
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border: 1px solid rgba(255, 247, 237, 0.42);
-  border-radius: 999px;
-  color: #fff7ed;
-  background: rgba(255, 247, 237, 0.12);
-  cursor: pointer;
-}
-
-.buddy-widget__virtual-operation-stop:hover {
-  border-color: rgba(255, 247, 237, 0.74);
-  background: rgba(255, 247, 237, 0.22);
-}
-
-.buddy-widget__virtual-operation-stop-icon {
-  position: relative;
-  display: block;
-  width: 14px;
-  height: 14px;
-  border: 1.5px solid currentColor;
-  border-radius: 999px;
-}
-
-.buddy-widget__virtual-operation-stop-icon::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  background: currentColor;
-  transform: translate(-50%, -50%);
-}
-
 .buddy-widget__avatar {
   appearance: none;
   position: relative;
@@ -6279,18 +4897,9 @@ function formatErrorMessage(error: unknown): string {
 
 .buddy-widget__avatar:focus-visible,
 .buddy-widget__virtual-cursor:focus-visible,
-.buddy-widget__icon-button:focus-visible,
-.buddy-widget__send:focus-visible,
-.buddy-widget__input:focus-visible,
-.buddy-widget__session-item:focus-visible,
-.buddy-widget__session-delete:focus-visible {
+.buddy-widget__icon-button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3);
-}
-
-.buddy-widget__virtual-operation-stop:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.28);
 }
 
 @keyframes buddy-widget-avatar-hop-path-a {
@@ -6326,41 +4935,6 @@ function formatErrorMessage(error: unknown): string {
   }
   50% {
     transform: translateY(-4px) rotate(-2deg);
-  }
-}
-
-@keyframes buddy-widget-virtual-operation-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 5px rgba(255, 247, 237, 0.08);
-  }
-  50% {
-    box-shadow: 0 0 0 9px rgba(255, 247, 237, 0.2);
-  }
-}
-
-@keyframes buddy-widget-virtual-operation-breathe {
-  0%,
-  100% {
-    scale: 1;
-    box-shadow:
-      0 0 0 1px rgba(255, 247, 237, 0.16) inset,
-      0 18px 42px rgba(124, 45, 18, 0.24),
-      0 0 28px rgba(217, 119, 6, 0.22);
-  }
-  48% {
-    scale: 1.018;
-    box-shadow:
-      0 0 0 1px rgba(255, 247, 237, 0.26) inset,
-      0 22px 50px rgba(124, 45, 18, 0.32),
-      0 0 42px rgba(234, 88, 12, 0.34);
-  }
-  58% {
-    scale: 1.006;
-    box-shadow:
-      0 0 0 1px rgba(255, 247, 237, 0.2) inset,
-      0 18px 42px rgba(124, 45, 18, 0.26),
-      0 0 32px rgba(217, 119, 6, 0.26);
   }
 }
 
@@ -6515,8 +5089,7 @@ function formatErrorMessage(error: unknown): string {
   font-size: 11px;
 }
 
-.buddy-widget__icon-button,
-.buddy-widget__send {
+.buddy-widget__icon-button {
   appearance: none;
   display: inline-flex;
   align-items: center;
@@ -6538,8 +5111,7 @@ function formatErrorMessage(error: unknown): string {
   border-radius: 8px;
 }
 
-.buddy-widget__icon-button:hover,
-.buddy-widget__send:hover {
+.buddy-widget__icon-button:hover {
   border-color: rgba(154, 52, 18, 0.24);
   background: rgba(255, 248, 240, 0.92);
   transform: translateY(-1px);
@@ -6555,167 +5127,6 @@ function formatErrorMessage(error: unknown): string {
   cursor: not-allowed;
   opacity: 0.54;
   transform: none;
-}
-
-.buddy-widget__history-control {
-  position: relative;
-}
-
-.buddy-widget__sessions-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 3;
-  width: min(330px, calc(100vw - 56px));
-  max-height: min(520px, calc(100vh - 132px));
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--toograph-glass-border);
-  border-radius: 8px;
-  background: var(--toograph-glass-specular), var(--toograph-glass-lens), rgba(255, 252, 247, 0.94);
-  box-shadow: var(--toograph-glass-highlight), 0 16px 38px rgba(61, 43, 24, 0.16);
-  backdrop-filter: blur(24px) saturate(1.45) contrast(1.02);
-}
-
-.buddy-widget__anchor--left .buddy-widget__sessions-panel {
-  right: 0;
-}
-
-.buddy-widget__anchor--right .buddy-widget__sessions-panel {
-  right: 0;
-}
-
-.buddy-widget__sessions-header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-}
-
-.buddy-widget__sessions-header strong {
-  color: var(--toograph-text-strong);
-  font-size: 12px;
-  line-height: 1.2;
-}
-
-.buddy-widget__session-delete,
-.buddy-widget__session-item {
-  appearance: none;
-  border: 0;
-  font: inherit;
-}
-
-.buddy-widget__session-list {
-  display: grid;
-  gap: 6px;
-  max-height: none;
-  overflow: visible;
-}
-
-.buddy-widget__session-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px;
-  gap: 5px;
-  align-items: stretch;
-}
-
-.buddy-widget__session-item {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  padding: 7px 9px;
-  border: 1px solid rgba(154, 52, 18, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.62);
-  color: var(--toograph-text-strong);
-  text-align: left;
-  cursor: pointer;
-}
-
-.buddy-widget__session-item span,
-.buddy-widget__session-item small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.buddy-widget__session-item span {
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.buddy-widget__session-item small,
-.buddy-widget__sessions-status {
-  color: var(--toograph-text-muted);
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.buddy-widget__session-row--active .buddy-widget__session-item {
-  border-color: rgba(37, 99, 235, 0.2);
-  background: rgba(37, 99, 235, 0.08);
-}
-
-.buddy-widget__session-delete {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(154, 52, 18, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.62);
-  color: rgba(154, 52, 18, 0.76);
-  cursor: pointer;
-}
-
-.buddy-widget__session-delete--confirm,
-.buddy-widget__session-delete--confirm:hover,
-.buddy-widget__session-delete--confirm:focus-visible {
-  border-color: rgba(185, 28, 28, 0.18);
-  background: rgb(185, 28, 28);
-  color: #fff;
-}
-
-.buddy-widget__session-item:disabled,
-.buddy-widget__session-delete:disabled {
-  cursor: not-allowed;
-  opacity: 0.54;
-}
-
-.buddy-widget__sessions-status {
-  margin: 0;
-}
-
-.buddy-widget__confirm-hint {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  white-space: nowrap;
-  border-radius: 999px;
-  border: 1px solid rgba(154, 52, 18, 0.16);
-  padding: 6px 12px;
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  box-shadow: 0 14px 32px rgba(60, 41, 20, 0.14);
-}
-
-.buddy-widget__confirm-hint--delete {
-  border-color: rgba(185, 28, 28, 0.16);
-  background: rgba(255, 248, 248, 0.98);
-  color: rgb(153, 27, 27);
-}
-
-:deep(.buddy-widget__confirm-popover.el-popper) {
-  border: none;
-  border-radius: 999px;
-  padding: 0;
-  background: transparent;
-  box-shadow: none;
 }
 
 .buddy-widget__messages {
@@ -6871,252 +5282,6 @@ function formatErrorMessage(error: unknown): string {
   color: var(--toograph-text-strong);
 }
 
-.buddy-widget__run-trace {
-  width: min(100%, 330px);
-  display: grid;
-  gap: 7px;
-}
-
-.buddy-widget__run-trace-summary-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-}
-
-.buddy-widget__run-trace-summary {
-  min-height: 34px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 8px;
-  width: fit-content;
-  max-width: 100%;
-  padding: 6px 9px;
-  border: 1px solid rgba(16, 185, 129, 0.2);
-  border-radius: 999px;
-  background: rgba(247, 255, 250, 0.88);
-  color: rgba(45, 32, 21, 0.86);
-  box-shadow: 0 10px 26px rgba(24, 105, 70, 0.1);
-  cursor: pointer;
-}
-
-.buddy-widget__run-trace-summary:hover {
-  border-color: rgba(16, 185, 129, 0.34);
-  background: rgba(244, 255, 248, 0.98);
-}
-
-.buddy-widget__run-trace-row-open,
-.buddy-widget__run-trace-row-evidence-open,
-.buddy-widget__run-trace-row-revision-restore {
-  appearance: none;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border: 1px solid rgba(154, 52, 18, 0.16);
-  border-radius: 999px;
-  color: rgba(154, 52, 18, 0.82);
-  background: rgba(255, 248, 240, 0.9);
-  cursor: pointer;
-  flex: 0 0 auto;
-}
-
-.buddy-widget__run-trace-row-open:hover,
-.buddy-widget__run-trace-row-evidence-open:hover,
-.buddy-widget__run-trace-row-revision-restore:hover {
-  border-color: rgba(154, 52, 18, 0.3);
-  background: rgba(255, 247, 237, 0.98);
-}
-
-.buddy-widget__run-trace-row-revision-restore:disabled {
-  cursor: progress;
-  opacity: 0.62;
-}
-
-.buddy-widget__run-trace-title {
-  min-width: 0;
-  overflow: hidden;
-  font-size: 12px;
-  font-weight: 750;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.buddy-widget__run-trace-duration,
-.buddy-widget__run-trace-row-duration {
-  color: rgba(70, 53, 38, 0.66);
-  font-family: var(--toograph-font-mono);
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.buddy-widget__run-trace-chevron {
-  width: 7px;
-  height: 7px;
-  border-right: 1.5px solid rgba(70, 53, 38, 0.58);
-  border-bottom: 1.5px solid rgba(70, 53, 38, 0.58);
-  transform: rotate(45deg) translateY(-1px);
-  transition: transform 140ms ease;
-}
-
-.buddy-widget__run-trace-chevron--expanded {
-  transform: rotate(225deg) translateY(-1px);
-}
-
-.buddy-widget__run-trace-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: #10b981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
-}
-
-.buddy-widget__run-trace-dot--small {
-  width: 7px;
-  height: 7px;
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
-}
-
-.buddy-widget__run-trace-dot--running {
-  animation: buddy-run-trace-pulse 1.25s ease-in-out infinite;
-}
-
-.buddy-widget__run-trace-dot--failed {
-  background: #ef4444;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
-}
-
-.buddy-widget__run-trace-detail {
-  display: grid;
-  gap: 8px;
-  max-width: 100%;
-  padding: 10px;
-  border: 1px solid rgba(154, 52, 18, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 252, 247, 0.78);
-  box-shadow: 0 14px 34px rgba(60, 41, 20, 0.08);
-}
-
-.buddy-widget__run-trace-state {
-  margin: 0;
-  color: rgba(70, 53, 38, 0.66);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.buddy-widget__run-trace-list {
-  display: grid;
-  gap: 7px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.buddy-widget__run-trace-row {
-  --buddy-run-trace-depth: 0;
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) repeat(4, auto);
-  align-items: center;
-  gap: 8px;
-  padding-left: calc(var(--buddy-run-trace-depth) * 16px);
-  color: rgba(45, 32, 21, 0.82);
-}
-
-.buddy-widget__run-trace-row--nested::before {
-  content: "";
-  position: absolute;
-  left: calc((var(--buddy-run-trace-depth) - 1) * 16px + 4px);
-  top: -7px;
-  bottom: -7px;
-  width: 10px;
-  border-left: 1px solid rgba(154, 52, 18, 0.14);
-  border-bottom: 1px solid rgba(154, 52, 18, 0.14);
-  border-bottom-left-radius: 6px;
-  pointer-events: none;
-}
-
-.buddy-widget__run-trace-row--root,
-.buddy-widget__run-trace-row--subgraph {
-  color: rgba(45, 32, 21, 0.9);
-}
-
-.buddy-widget__run-trace-row--root .buddy-widget__run-trace-row-label,
-.buddy-widget__run-trace-row--subgraph .buddy-widget__run-trace-row-label {
-  font-weight: 800;
-}
-
-.buddy-widget__run-trace-row-label {
-  min-width: 0;
-  overflow: hidden;
-  font-size: 12px;
-  font-weight: 650;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.buddy-widget__run-trace-row-main {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.buddy-widget__run-trace-row-evidence {
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.buddy-widget__run-trace-row-evidence span {
-  max-width: 100%;
-  overflow: hidden;
-  padding: 2px 5px;
-  border: 1px solid rgba(154, 52, 18, 0.12);
-  border-radius: 999px;
-  background: rgba(255, 247, 237, 0.72);
-  color: rgba(108, 82, 62, 0.78);
-  font-family: var(--toograph-font-mono);
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.buddy-widget__run-trace-total {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding-top: 7px;
-  border-top: 1px solid rgba(154, 52, 18, 0.1);
-  color: rgba(108, 82, 62, 0.72);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.buddy-widget__run-trace-total strong {
-  color: rgba(45, 32, 21, 0.82);
-  font-family: var(--toograph-font-mono);
-  font-size: 11px;
-}
-
-@keyframes buddy-run-trace-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
-    transform: scale(1);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.02);
-    transform: scale(1.12);
-  }
-}
-
 .buddy-widget__public-output-meta {
   display: flex;
   align-items: center;
@@ -7180,47 +5345,6 @@ function formatErrorMessage(error: unknown): string {
   font-size: 11px;
   line-height: 1.5;
   white-space: pre-wrap;
-}
-
-.buddy-widget__form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 38px;
-  gap: 8px;
-  padding: 12px;
-  border-top: 1px solid rgba(154, 52, 18, 0.1);
-  background: rgba(255, 248, 240, 0.56);
-}
-
-.buddy-widget__input {
-  width: 100%;
-  min-height: 42px;
-  max-height: 96px;
-  resize: vertical;
-  border: 1px solid rgba(154, 52, 18, 0.14);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.74);
-  color: var(--toograph-text-strong);
-  padding: 9px 10px;
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.buddy-widget__input:disabled {
-  cursor: not-allowed;
-  opacity: 0.72;
-}
-
-.buddy-widget__send {
-  width: 38px;
-  height: 42px;
-  border-radius: 8px;
-  background: rgba(154, 52, 18, 0.1);
-}
-
-.buddy-widget__send:disabled {
-  cursor: not-allowed;
-  opacity: 0.54;
-  transform: none;
 }
 
 .buddy-widget__bubble {

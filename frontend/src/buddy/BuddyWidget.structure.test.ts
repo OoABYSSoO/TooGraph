@@ -7,11 +7,20 @@ import { fileURLToPath } from "node:url";
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = dirname(currentFilePath);
 const componentSource = readFileSync(resolve(currentDirectory, "BuddyWidget.vue"), "utf8");
+const composerSource = readFileSync(resolve(currentDirectory, "BuddyComposer.vue"), "utf8");
+const runTraceSource = readFileSync(resolve(currentDirectory, "BuddyRunTrace.vue"), "utf8");
+const runTraceDisplaySource = readFileSync(resolve(currentDirectory, "useBuddyRunTraceDisplay.ts"), "utf8");
+const runDisplayMessagesSource = readFileSync(resolve(currentDirectory, "useBuddyRunDisplayMessages.ts"), "utf8");
+const messagesSource = readFileSync(resolve(currentDirectory, "useBuddyMessages.ts"), "utf8");
+const chatSessionsSource = readFileSync(resolve(currentDirectory, "useBuddyChatSessions.ts"), "utf8");
+const modelSelectionSource = readFileSync(resolve(currentDirectory, "useBuddyModelSelection.ts"), "utf8");
+const sessionHistorySource = readFileSync(resolve(currentDirectory, "BuddySessionHistory.vue"), "utf8");
+const virtualOperationBannerSource = readFileSync(resolve(currentDirectory, "BuddyVirtualOperationBanner.vue"), "utf8");
 const pauseCardSource = readFileSync(resolve(currentDirectory, "BuddyPauseCard.vue"), "utf8");
 
-function extractCssBlock(selector: string) {
+function extractCssBlock(selector: string, source = componentSource) {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = componentSource.match(new RegExp(`${escapedSelector}\\s*\\{([\\s\\S]*?)\\n\\}`));
+  const match = source.match(new RegExp(`${escapedSelector}\\s*\\{([\\s\\S]*?)\\n\\}`));
   return match?.[1] ?? "";
 }
 
@@ -477,10 +486,13 @@ test("BuddyWidget executes virtual UI operation events through the virtual curso
 });
 
 test("BuddyWidget can interrupt virtual operations and skips graph connections that already exist", () => {
-  assert.match(componentSource, /v-if="virtualOperationStatus"/);
-  assert.match(componentSource, /class="buddy-widget__virtual-operation-banner"/);
-  assert.match(componentSource, /@click="interruptVirtualOperation"/);
-  assert.match(componentSource, /class="buddy-widget__virtual-operation-stop-icon"/);
+  assert.match(componentSource, /import BuddyVirtualOperationBanner from "\.\/BuddyVirtualOperationBanner\.vue";/);
+  assert.match(componentSource, /<BuddyVirtualOperationBanner[\s\S]*v-if="virtualOperationStatus"[\s\S]*:status="virtualOperationStatus"[\s\S]*@interrupt="interruptVirtualOperation"/);
+  assert.doesNotMatch(componentSource, /class="buddy-widget__virtual-operation-banner"/);
+  assert.doesNotMatch(componentSource, /class="buddy-widget__virtual-operation-stop-icon"/);
+  assert.match(virtualOperationBannerSource, /class="buddy-widget__virtual-operation-banner"/);
+  assert.match(virtualOperationBannerSource, /@click="emit\('interrupt'\)"/);
+  assert.match(virtualOperationBannerSource, /class="buddy-widget__virtual-operation-stop-icon"/);
   assert.match(componentSource, /import \{[\s\S]*resolveBuddyVirtualOperationUserAction,[\s\S]*shouldHandleVirtualCursorPointerDown[\s\S]*\} from "\.\/buddyVirtualOperationInteractionPolicy\.ts";/);
   assert.match(componentSource, /const isVirtualOperationRunning = computed\(\(\) => Boolean\(activeVirtualOperationToken\.value\)\);/);
   assert.match(componentSource, /'buddy-widget__virtual-cursor--operation-active': isVirtualOperationRunning,/);
@@ -488,7 +500,7 @@ test("BuddyWidget can interrupt virtual operations and skips graph connections t
   assert.match(componentSource, /function handleAvatarClick\(\) \{[\s\S]*resolveBuddyVirtualOperationUserAction\(\{[\s\S]*source: "avatar_click"/);
   assert.match(componentSource, /function handleVirtualCursorPointerDown\(event: PointerEvent\) \{[\s\S]*shouldHandleVirtualCursorPointerDown\(\{[\s\S]*isOperationRunning: isVirtualOperationRunning\.value/);
   assert.match(componentSource, /function interruptVirtualOperation\(\) \{[\s\S]*resolveBuddyVirtualOperationUserAction\(\{[\s\S]*source: "stop_button"/);
-  const operationBannerBlock = extractCssBlock(".buddy-widget__virtual-operation-banner");
+  const operationBannerBlock = extractCssBlock(".buddy-widget__virtual-operation-banner", virtualOperationBannerSource);
   assert.match(operationBannerBlock, /left:\s*50%;/);
   assert.match(operationBannerBlock, /top:\s*calc\(var\(--editor-canvas-floating-top-clearance,\s*18px\) \+ 64px\);/);
   assert.match(operationBannerBlock, /translate:\s*-50% 0;/);
@@ -499,9 +511,9 @@ test("BuddyWidget can interrupt virtual operations and skips graph connections t
   assert.match(operationBannerBlock, /background:\s*linear-gradient\(135deg,\s*rgba\(154,\s*52,\s*18,\s*0\.96\),\s*rgba\(131,\s*43,\s*13,\s*0\.94\)\);/);
   assert.match(operationBannerBlock, /color:\s*#fff7ed;/);
   assert.match(operationBannerBlock, /animation:\s*buddy-widget-virtual-operation-breathe 2\.4s ease-in-out infinite;/);
-  assert.match(extractCssBlock(".buddy-widget__virtual-operation-stop"), /border-radius:\s*999px;/);
-  assert.match(componentSource, /\.buddy-widget__virtual-operation-stop-icon::before\s*\{[\s\S]*width:\s*8px;[\s\S]*height:\s*8px;/);
-  assert.match(componentSource, /@keyframes buddy-widget-virtual-operation-breathe/);
+  assert.match(extractCssBlock(".buddy-widget__virtual-operation-stop", virtualOperationBannerSource), /border-radius:\s*999px;/);
+  assert.match(virtualOperationBannerSource, /\.buddy-widget__virtual-operation-stop-icon::before\s*\{[\s\S]*width:\s*8px;[\s\S]*height:\s*8px;/);
+  assert.match(virtualOperationBannerSource, /@keyframes buddy-widget-virtual-operation-breathe/);
   assert.match(componentSource, /type BuddyVirtualOperationToken = \{/);
   assert.match(componentSource, /retryChain: PageOperationRetryRecord\[\];/);
   assert.match(componentSource, /const virtualOperationStatus = ref<BuddyVirtualOperationStatus \| null>\(null\);/);
@@ -582,16 +594,21 @@ test("BuddyWidget exposes ask-first and full-access permission tiers", () => {
 });
 
 test("BuddyWidget lets the buddy runtime choose its own model", () => {
-  assert.match(componentSource, /import \{ fetchSettings \} from "\.\.\/api\/settings\.ts";/);
-  assert.match(componentSource, /import \{ buildRuntimeModelOptions \} from "\.\.\/lib\/runtimeModelCatalog\.ts";/);
-  assert.match(componentSource, /const buddyModelRef = ref\("/);
-  assert.match(componentSource, /BUDDY_MODEL_STORAGE_KEY/);
+  assert.match(componentSource, /import \{ useBuddyModelSelection \} from "\.\/useBuddyModelSelection\.ts";/);
+  assert.match(modelSelectionSource, /import \{ fetchSettings \} from "\.\.\/api\/settings\.ts";/);
+  assert.match(modelSelectionSource, /import \{ buildRuntimeModelOptions \} from "\.\.\/lib\/runtimeModelCatalog\.ts";/);
+  assert.match(modelSelectionSource, /const buddyModelRef = ref\("/);
+  assert.match(modelSelectionSource, /BUDDY_MODEL_STORAGE_KEY/);
+  assert.match(componentSource, /useBuddyModelSelection\(\{ t \}\)/);
   assert.match(componentSource, /v-model="buddyModelRef"/);
   assert.match(componentSource, /@visible-change="handleBuddyModelSelectVisibleChange"/);
   assert.match(componentSource, /popper-class="toograph-select-popper buddy-widget__select-popper"/);
   assert.match(componentSource, /:global\(\.buddy-widget__select-popper\.el-popper\)[\s\S]*z-index:\s*46\d\d\s*!important;/);
   assert.match(componentSource, /buddyModelOptions/);
-  assert.match(componentSource, /return buildRuntimeModelOptions\(settings\);/);
+  assert.match(modelSelectionSource, /return buildRuntimeModelOptions\(settings\);/);
+  assert.doesNotMatch(componentSource, /function buildBuddyModelOptions/);
+  assert.doesNotMatch(componentSource, /fetchSettings/);
+  assert.doesNotMatch(componentSource, /BUDDY_MODEL_STORAGE_KEY/);
   assert.match(componentSource, /buddyModel:\s*buddyModelRef\.value/);
 });
 
@@ -622,7 +639,7 @@ test("BuddyWidget resumes page operation runs after virtual UI execution", () =>
 });
 
 test("BuddyWidget runs template targets in the background without a follow-mode branch", () => {
-  assert.match(componentSource, /import \{ fetchTemplate, fetchTemplates, restoreGraphRevision, runGraph \} from "\.\.\/api\/graphs\.ts";/);
+  assert.match(componentSource, /import \{ fetchTemplate, fetchTemplates, runGraph \} from "\.\.\/api\/graphs\.ts";/);
   assert.match(componentSource, /import \{ buildBuddyTemplateRunGraph \} from "\.\/buddyTemplateRunGraph\.ts";/);
   assert.doesNotMatch(componentSource, /BUDDY_VIRTUAL_OPERATION_FOLLOW_STORAGE_KEY/);
   assert.doesNotMatch(componentSource, /virtualOperationFollowEnabled/);
@@ -666,35 +683,42 @@ test("BuddyWidget returns speaking replies to idle so the next message can be ty
 });
 
 test("BuddyWidget keeps the composer enabled and queues sends while a reply is running", () => {
-  assert.doesNotMatch(componentSource, /class="buddy-widget__input"[\s\S]*:disabled="isBusy"/);
-  assert.doesNotMatch(componentSource, /class="buddy-widget__input"[\s\S]*:disabled="Boolean\(pausedBuddyRun\)"/);
-  assert.match(componentSource, /class="buddy-widget__send"[\s\S]*:disabled="!draft\.trim\(\)"/);
+  assert.match(componentSource, /import BuddyComposer from "\.\/BuddyComposer\.vue";/);
+  assert.match(componentSource, /<BuddyComposer[\s\S]*v-model="draft"[\s\S]*@submit="sendMessage"/);
+  assert.doesNotMatch(componentSource, /class="buddy-widget__input"/);
+  assert.doesNotMatch(composerSource, /class="buddy-widget__input"[\s\S]*:disabled="isBusy"/);
+  assert.doesNotMatch(composerSource, /class="buddy-widget__input"[\s\S]*:disabled="Boolean\(pausedBuddyRun\)"/);
+  assert.match(composerSource, /class="buddy-widget__send"[\s\S]*:disabled="!modelValue\.trim\(\)"/);
   assert.doesNotMatch(componentSource, /if \(!userMessage \|\| isBusy\.value\)/);
   assert.match(componentSource, /const queuedTurns = ref<BuddyQueuedTurn\[\]>\(\[\]\);/);
   assert.match(componentSource, /const assistantEntry = createMessage\("assistant", "", undefined, allocateBuddyMessageClientOrder\(\)\);/);
   assert.match(componentSource, /messages\.value\.push\(userEntry, assistantEntry\);/);
   assert.match(componentSource, /queuedTurns\.value\.push\(\{[\s\S]*userMessageId:[\s\S]*assistantMessageId:[\s\S]*userMessage:/);
   assert.match(componentSource, /client_order: message\.clientOrder \?\? null/);
-  assert.match(componentSource, /function resetNextBuddyMessageClientOrder\(\)/);
+  assert.match(componentSource, /import \{ useBuddyMessages,[\s\S]*type BuddyMessage,[\s\S]*type BuddyQueuedTurn[\s\S]*\} from "\.\/useBuddyMessages\.ts";/);
+  assert.match(componentSource, /resetNextBuddyMessageClientOrder,[\s\S]*= useBuddyMessages\(\{ t \}\)/);
+  assert.match(messagesSource, /function resetNextBuddyMessageClientOrder\(\)/);
   assert.match(componentSource, /void drainBuddyQueue\(\);/);
   assert.match(componentSource, /while \(queuedTurns\.value\.length > 0\)/);
   assert.match(componentSource, /const assistantMessage = ensureAssistantMessageForTurn\(turn\);/);
-  assert.match(componentSource, /function ensureAssistantMessageForTurn\(turn: BuddyQueuedTurn\): BuddyMessage/);
-  assert.match(componentSource, /function shouldRenderMessage\(message: BuddyMessage\)/);
-  assert.doesNotMatch(extractFunctionBlock("shouldRenderMessage"), /activityText/);
+  assert.match(messagesSource, /function ensureAssistantMessageForTurn\(turn: BuddyQueuedTurn\): BuddyMessage/);
+  assert.match(componentSource, /import \{ useBuddyRunDisplayMessages \} from "\.\/useBuddyRunDisplayMessages\.ts";/);
+  assert.match(componentSource, /shouldRenderMessage,[\s\S]*shouldShowMessageRoleLabel,[\s\S]*= useBuddyRunDisplayMessages<BuddyMessage>/);
+  assert.match(runDisplayMessagesSource, /function shouldRenderMessage\(message: Message\)/);
+  assert.doesNotMatch(runDisplayMessagesSource.match(/function shouldRenderMessage\(message: Message\) \{[\s\S]*?\n  \}/)?.[0] ?? "", /activityText/);
 });
 
 test("BuddyWidget keeps runtime error replies out of model context and persisted history", () => {
   assert.match(componentSource, /const history = buildHistoryBeforeMessage\(userEntry\.id\);/);
   assert.match(componentSource, /const history = turn\.history;/);
-  assert.match(componentSource, /return previousMessages\.filter\(isContextMessage\)\.map\(\(\{ role, content \}\) => \(\{ role, content \}\)\);/);
+  assert.match(messagesSource, /return previousMessages\.filter\(isContextMessage\)\.map\(\(\{ role, content \}\) => \(\{ role, content \}\)\);/);
   assert.match(componentSource, /appendBuddyChatMessage\(sessionId,[\s\S]*include_in_context: options\.includeInContext \?\? message\.includeInContext !== false,[\s\S]*\)/);
   assert.match(componentSource, /updateAssistantMessage\(assistantMessage\.id, t\("buddy\.errorReply", \{ error: message \}\), \{ includeInContext: false \}\);/);
   assert.match(componentSource, /persistBuddyMessage\(turn\.sessionId,[\s\S]*includeInContext: false,[\s\S]*\);/);
 });
 
 test("BuddyWidget keeps live run activity out of the chat transcript", () => {
-  assert.match(componentSource, /resolveBuddyRunActivityFromRunEvent/);
+  assert.match(messagesSource, /resolveBuddyRunActivityFromRunEvent/);
   assert.match(componentSource, /activityText/);
   assert.doesNotMatch(componentSource, /shouldShowAssistantActivityBubble\(message\)/);
   assert.doesNotMatch(componentSource, /message\.activityText \|\| t\("buddy\.streaming"\)/);
@@ -704,13 +728,14 @@ test("BuddyWidget keeps live run activity out of the chat transcript", () => {
 });
 
 test("BuddyWidget renders assistant replies from parent graph output nodes only", () => {
-  assert.match(componentSource, /import \{ resolveOutputPreviewContent \} from "\.\.\/editor\/nodes\/outputPreviewContentModel\.ts";/);
+  assert.doesNotMatch(componentSource, /resolveOutputPreviewContent/);
+  assert.match(messagesSource, /import \{ resolveOutputPreviewContent \} from "\.\.\/editor\/nodes\/outputPreviewContentModel\.ts";/);
   assert.match(componentSource, /import SandboxedHtmlFrame from "\.\.\/components\/SandboxedHtmlFrame\.vue";/);
   assert.match(componentSource, /buildBuddyPublicOutputBindings/);
   assert.match(componentSource, /reduceBuddyPublicOutputEvent/);
-  assert.match(componentSource, /publicOutput\?:/);
-  assert.match(componentSource, /buildPublicOutputMessageId\(controllerMessageId, output\.outputNodeId\)/);
-  assert.match(componentSource, /syncBuddyRunDisplayMessages/);
+  assert.match(messagesSource, /publicOutput\?:/);
+  assert.match(runDisplayMessagesSource, /buildPublicOutputMessageId\(controllerMessageId, output\.outputNodeId\)/);
+  assert.match(componentSource, /syncBuddyRunDisplayMessages,[\s\S]*= useBuddyRunDisplayMessages<BuddyMessage>/);
   assert.match(componentSource, /v-html="renderBuddyMarkdown\(message\.content\)"/);
   assert.match(componentSource, /v-else-if="message\.role === 'assistant' && message\.content && resolveBuddyRenderedContent\(message\)\.kind === 'html'"/);
   assert.match(componentSource, /<SandboxedHtmlFrame[\s\S]*:source="resolveBuddyRenderedContent\(message\)\.html"/);
@@ -737,62 +762,75 @@ test("BuddyWidget closed reply bubble is a four-character opener instead of a co
 });
 
 test("BuddyWidget renders output-segment run trace capsules instead of per-message duration chips", () => {
-  assert.match(componentSource, /import \{ formatRunDuration \} from "\.\.\/lib\/run-display-name\.ts";/);
-  assert.match(componentSource, /import \{[\s\S]*advanceSmoothNumberDisplay,[\s\S]*isSmoothNumberDisplaySettled,[\s\S]*\} from "\.\.\/lib\/smoothNumberDisplay\.ts";/);
-  assert.match(componentSource, /import \{[\s\S]*buildOutputTraceBuddyMessageMetadata,[\s\S]*resolveOutputTraceBuddyMessageMetadata,[\s\S]*\} from "\.\/buddyMessageMetadata\.ts";/);
+  assert.match(runTraceDisplaySource, /import \{ formatRunDuration \} from "\.\.\/lib\/run-display-name\.ts";/);
+  assert.match(runTraceDisplaySource, /import \{[\s\S]*advanceSmoothNumberDisplay,[\s\S]*isSmoothNumberDisplaySettled,[\s\S]*\} from "\.\.\/lib\/smoothNumberDisplay\.ts";/);
+  assert.match(messagesSource, /import \{[\s\S]*buildOutputTraceBuddyMessageMetadata,[\s\S]*resolveOutputTraceBuddyMessageMetadata,[\s\S]*\} from "\.\/buddyMessageMetadata\.ts";/);
+  assert.match(componentSource, /import BuddyRunTrace from "\.\/BuddyRunTrace\.vue";/);
+  assert.match(componentSource, /import \{ useBuddyRunTraceDisplay \} from "\.\/useBuddyRunTraceDisplay\.ts";/);
   assert.match(componentSource, /buildBuddyOutputTracePlan/);
   assert.match(componentSource, /reduceBuddyOutputTraceEvent/);
   assert.match(componentSource, /buildBuddyOutputTraceStateFromRunDetail/);
-  assert.match(componentSource, /import \{[\s\S]*buildBuddyOutputTraceTreeRows,[\s\S]*type BuddyOutputTraceTreeRow[\s\S]*\} from "\.\/buddyOutputTraceTree\.ts";/);
-  assert.match(componentSource, /outputTrace\?:/);
-  assert.match(componentSource, /class="buddy-widget__run-trace"/);
-  assert.match(componentSource, /class="buddy-widget__run-trace-summary"/);
-  assert.match(componentSource, /v-for="row in buildTraceTreeRows\(message\.outputTrace, message\.runId\)"/);
-  assert.match(componentSource, /class="buddy-widget__run-trace-row-open"/);
-  assert.match(componentSource, /v-if="row\.playbackTarget && message\.runId"/);
-  assert.match(componentSource, /@click="openTraceTreeRowPlayback\(message\.runId, row\)"/);
-  assert.match(componentSource, /v-for="label in row\.artifactLabels"/);
-  assert.match(componentSource, /class="buddy-widget__run-trace-row-evidence"/);
-  assert.match(componentSource, /v-if="row\.evidenceRunId"/);
-  assert.match(componentSource, /@click="openTraceEvidenceRun\(row\.evidenceRunId\)"/);
-  assert.match(componentSource, /v-if="row\.graphRevision"/);
-  assert.match(componentSource, /class="buddy-widget__run-trace-row-revision-restore"/);
-  assert.match(componentSource, /@click="restoreTraceGraphRevision\(row\)"/);
-  assert.match(componentSource, /:data-virtual-affordance-id="`buddy\.trace\.graphRevision\.restore\.\$\{row\.graphRevision\.revisionId\}`"/);
-  assert.match(componentSource, /import \{ fetchTemplate, fetchTemplates, restoreGraphRevision, runGraph \} from "\.\.\/api\/graphs\.ts";/);
-  assert.match(componentSource, /function openTraceEvidenceRun\(runId: string \| null \| undefined\)/);
-  assert.match(componentSource, /async function restoreTraceGraphRevision\(row: BuddyOutputTraceTreeRow\)/);
-  assert.match(componentSource, /await restoreGraphRevision\(row\.graphRevision\.graphId, row\.graphRevision\.revisionId\)/);
-  assert.match(componentSource, /ElMessage\.success\(t\("graphLibrary\.revisionRestored", \{ revisionId: response\.restored_revision_id \}\)\);/);
-  assert.match(componentSource, /router\.push\(`\/runs\/\$\{encodeURIComponent\(normalizedRunId\)\}`\)/);
+  assert.match(runTraceDisplaySource, /import \{[\s\S]*buildBuddyOutputTraceTreeRows,[\s\S]*type BuddyOutputTraceTreeRow[\s\S]*\} from "\.\/buddyOutputTraceTree\.ts";/);
+  assert.match(messagesSource, /outputTrace\?:/);
+  assert.match(componentSource, /useBuddyRunTraceDisplay\(\{[\s\S]*messages,[\s\S]*router,[\s\S]*t,[\s\S]*shouldRenderMessage,[\s\S]*\}\)/);
+  assert.match(componentSource, /<BuddyRunTrace[\s\S]*:segment="message\.outputTrace"[\s\S]*:rows="buildTraceTreeRows\(message\.outputTrace, message\.runId\)"/);
+  assert.match(componentSource, /@toggle="toggleTraceMessage\(message\.id, message\.runId\)"/);
+  assert.match(componentSource, /@open-playback="\(row\) => openTraceTreeRowPlayback\(message\.runId, row\)"/);
+  assert.match(componentSource, /@open-evidence-run="openTraceEvidenceRun"/);
+  assert.match(componentSource, /@restore-revision="restoreTraceGraphRevision"/);
+  assert.doesNotMatch(componentSource, /class="buddy-widget__run-trace"/);
+  assert.doesNotMatch(componentSource, /class="buddy-widget__run-trace-summary"/);
+  assert.doesNotMatch(componentSource, /class="buddy-widget__run-trace-row-open"/);
+  assert.doesNotMatch(componentSource, /\.buddy-widget__run-trace\s*\{/);
+  assert.match(componentSource, /import \{ fetchTemplate, fetchTemplates, runGraph \} from "\.\.\/api\/graphs\.ts";/);
+  assert.match(runTraceDisplaySource, /import \{ restoreGraphRevision \} from "\.\.\/api\/graphs\.ts";/);
+  assert.match(runTraceDisplaySource, /function openTraceEvidenceRun\(runId: string \| null \| undefined\)/);
+  assert.match(runTraceDisplaySource, /async function restoreTraceGraphRevision\(row: BuddyOutputTraceTreeRow\)/);
+  assert.match(runTraceDisplaySource, /await restoreGraphRevision\(row\.graphRevision\.graphId, row\.graphRevision\.revisionId\)/);
+  assert.match(runTraceDisplaySource, /ElMessage\.success\(t\("graphLibrary\.revisionRestored", \{ revisionId: response\.restored_revision_id \}\)\);/);
+  assert.match(runTraceDisplaySource, /router\.push\(`\/runs\/\$\{encodeURIComponent\(normalizedRunId\)\}`\)/);
   assert.doesNotMatch(componentSource, /class="buddy-widget__run-trace-open"/);
-  assert.match(componentSource, /function openTraceTreeRowPlayback\(runId: string \| null \| undefined, row: BuddyOutputTraceTreeRow\)/);
-  assert.match(componentSource, /openRunPlayback\(row\.evidenceRunId \|\| runId\);/);
-  assert.match(componentSource, /router\.push\(resolveRunRestoreUrl\(normalizedRunId\)\)/);
-  assert.match(componentSource, /buddy-widget__run-trace-dot--running/);
-  assert.match(componentSource, /formatTraceDuration/);
-  assert.match(componentSource, /traceClockNowMs/);
-  assert.match(componentSource, /traceDurationDisplayByKey/);
-  assert.match(componentSource, /window\.requestAnimationFrame\(tick\)/);
-  assert.match(componentSource, /buildRunNodeTimingByNodeIdFromRun/);
+  assert.match(runTraceDisplaySource, /function openTraceTreeRowPlayback\(runId: string \| null \| undefined, row: BuddyOutputTraceTreeRow\)/);
+  assert.match(runTraceDisplaySource, /openRunPlayback\(row\.evidenceRunId \|\| runId\);/);
+  assert.match(runTraceDisplaySource, /router\.push\(resolveRunRestoreUrl\(normalizedRunId\)\)/);
+  assert.match(runTraceSource, /buddy-widget__run-trace-dot--running/);
+  assert.match(runTraceSource, /class="buddy-widget__run-trace-row-evidence"/);
+  assert.match(runTraceSource, /:data-virtual-affordance-id="`buddy\.trace\.graphRevision\.restore\.\$\{row\.graphRevision\.revisionId\}`"/);
+  assert.match(runTraceDisplaySource, /formatTraceDuration/);
+  assert.match(runTraceDisplaySource, /traceClockNowMs/);
+  assert.match(runTraceDisplaySource, /traceDurationDisplayByKey/);
+  assert.match(runTraceDisplaySource, /window\.requestAnimationFrame\(tick\)/);
+  assert.doesNotMatch(componentSource, /advanceSmoothNumberDisplay/);
+  assert.doesNotMatch(componentSource, /isSmoothNumberDisplaySettled/);
+  assert.doesNotMatch(componentSource, /traceDurationDisplayByKey/);
+  assert.doesNotMatch(componentSource, /traceRunTreeByRunId/);
+  assert.doesNotMatch(componentSource, /traceRunDetailByRunId/);
+  assert.doesNotMatch(componentSource, /function ensureTraceRunTreeLoaded/);
+  assert.doesNotMatch(componentSource, /function restoreTraceGraphRevision/);
+  assert.doesNotMatch(componentSource, /function resolveTraceSegmentSummary/);
+  assert.doesNotMatch(componentSource, /function buildTraceTreeRows/);
+  assert.doesNotMatch(componentSource, /buildRunNodeTimingByNodeIdFromRun/);
+  assert.match(runDisplayMessagesSource, /buildRunNodeTimingByNodeIdFromRun/);
   assert.match(componentSource, /const \{ publicOutputMessages, outputTraceMessages \} = syncBuddyRunDisplayMessages/);
   assert.match(componentSource, /for \(const message of outputTraceMessages\) \{[\s\S]*persistBuddyMessage\(sessionId, message,[\s\S]*includeInContext:\s*false/);
   assert.match(componentSource, /const metadata = buildBuddyMessageMetadata\(message\);/);
+  assert.match(messagesSource, /function buildBuddyMessageMetadata\(message: BuddyMessage\)/);
   assert.match(componentSource, /\.\.\.\(metadata \? \{ metadata \} : \{\}\)/);
-  assert.match(componentSource, /outputTrace:\s*resolveOutputTraceBuddyMessageMetadata\(record\.metadata\) \?\? undefined/);
+  assert.match(messagesSource, /outputTrace:\s*resolveOutputTraceBuddyMessageMetadata\(record\.metadata\) \?\? undefined/);
   assert.doesNotMatch(componentSource, /formatPublicOutputDuration/);
   assert.doesNotMatch(componentSource, /runTraceStartedAtByKey/);
 });
 
 test("BuddyWidget fetches real run trees when expanded trace capsules are opened", () => {
-  assert.match(componentSource, /import \{ fetchRun, fetchRunTree, resumeRun \} from "\.\.\/api\/runs\.ts";/);
-  assert.match(componentSource, /import type \{ RunDetail, RunTreeNode \} from "\.\.\/types\/run\.ts";/);
-  assert.match(componentSource, /const traceRunTreeByRunId = ref<Record<string, RunTreeNode>>\(\{\}\);/);
-  assert.match(componentSource, /const traceRunTreeLoadingByRunId = ref<Record<string, boolean>>\(\{\}\);/);
-  assert.match(componentSource, /@click="toggleTraceMessage\(message\.id, message\.runId\)"/);
-  assert.match(componentSource, /void ensureTraceRunTreeLoaded\(runId\);/);
-  assert.match(componentSource, /fetchRunTree\(normalizedRunId/);
-  assert.match(componentSource, /buildBuddyOutputTraceTreeRows\(segment,\s*\{\s*rootLabel: t\("buddy\.runTraceMainGraph"\),\s*runTree:/);
+  assert.match(componentSource, /import \{ fetchRun, resumeRun \} from "\.\.\/api\/runs\.ts";/);
+  assert.match(runTraceDisplaySource, /import \{ fetchRun, fetchRunTree \} from "\.\.\/api\/runs\.ts";/);
+  assert.match(runTraceDisplaySource, /import type \{ RunDetail, RunTreeNode \} from "\.\.\/types\/run\.ts";/);
+  assert.match(runTraceDisplaySource, /const traceRunTreeByRunId = ref<Record<string, RunTreeNode>>\(\{\}\);/);
+  assert.match(runTraceDisplaySource, /const traceRunTreeLoadingByRunId = ref<Record<string, boolean>>\(\{\}\);/);
+  assert.match(componentSource, /@toggle="toggleTraceMessage\(message\.id, message\.runId\)"/);
+  assert.match(runTraceDisplaySource, /void ensureTraceRunTreeLoaded\(runId\);/);
+  assert.match(runTraceDisplaySource, /fetchRunTree\(normalizedRunId/);
+  assert.match(runTraceDisplaySource, /buildBuddyOutputTraceTreeRows\(segment,\s*\{\s*rootLabel: t\("buddy\.runTraceMainGraph"\),\s*runTree:/);
 });
 
 test("BuddyWidget seeds streaming run trace capsules from the current run snapshot", () => {
@@ -802,77 +840,91 @@ test("BuddyWidget seeds streaming run trace capsules from the current run snapsh
   assert.match(componentSource, /if \(eventSource !== source\) \{[\s\S]*return null;[\s\S]*\}/);
   assert.match(componentSource, /buildBuddyOutputTraceStateFromRunDetail\(runDetail, outputTracePlan, graph\)/);
   assert.match(componentSource, /buildPublicOutputRuntimeStateFromRunDetail\(runDetail, publicOutputBindings, graph\)/);
-  assert.match(componentSource, /function syncStreamingBuddyRunDisplay\(/);
+  assert.match(runDisplayMessagesSource, /function syncStreamingBuddyRunDisplay\(/);
   assert.match(componentSource, /syncStreamingBuddyRunDisplay\(assistantMessageId, runId, outputTraceState, publicOutputState\)/);
   assert.match(componentSource, /source\.addEventListener\("run\.completed", \(\) => closeEventSource\(source\)\);/);
 });
 
 test("BuddyWidget shows a pending run trace capsule immediately after sending", () => {
-  assert.match(componentSource, /import \{[\s\S]*createBuddyPendingOutputTraceRuntimeState,[\s\S]*\} from "\.\/buddyOutputTrace\.ts";/);
+  assert.match(runDisplayMessagesSource, /createBuddyPendingOutputTraceRuntimeState/);
   assert.match(
     componentSource,
     /messages\.value\.push\(userEntry, assistantEntry\);[\s\S]*showBuddyImmediatePendingTrace\(assistantEntry\.id\);[\s\S]*queuedTurns\.value\.push\(/,
   );
-  assert.match(componentSource, /function showBuddyImmediatePendingTrace\(assistantMessageId: string\)/);
-  assert.match(componentSource, /segmentId:\s*"__pending__"/);
-  assert.match(componentSource, /boundaryLabel:\s*t\("buddy\.activity\.preparing"\)/);
+  assert.match(runDisplayMessagesSource, /function showBuddyImmediatePendingTrace\(assistantMessageId: string\)/);
+  assert.match(runDisplayMessagesSource, /segmentId:\s*"__pending__"/);
+  assert.match(runDisplayMessagesSource, /boundaryLabel:\s*t\("buddy\.activity\.preparing"\)/);
   assert.match(
     componentSource,
     /const publicOutputBindings = buildBuddyPublicOutputBindings\(graph\);[\s\S]*showBuddyGraphPendingTrace\(assistantMessage\.id, graph, publicOutputBindings\);[\s\S]*const run = await runGraph\(graph\);/,
   );
-  assert.match(componentSource, /function showBuddyGraphPendingTrace\(/);
-  assert.match(componentSource, /createBuddyPendingOutputTraceRuntimeState\(outputTracePlan, nowPublicOutputMs\(\)\)/);
-  assert.match(componentSource, /function hasVisibleBuddyRunDisplaySnapshot\(/);
+  assert.match(runDisplayMessagesSource, /function showBuddyGraphPendingTrace\(/);
+  assert.match(runDisplayMessagesSource, /createBuddyPendingOutputTraceRuntimeState\(outputTracePlan, nowPublicOutputMs\(\)\)/);
+  assert.match(runDisplayMessagesSource, /function hasVisibleBuddyRunDisplaySnapshot\(/);
 });
 
 test("BuddyWidget groups consecutive visible messages by role label", () => {
-  assert.match(componentSource, /import \{ shouldShowGroupedBuddyMessageLabel \} from "\.\/buddyMessageGrouping\.ts";/);
+  assert.doesNotMatch(componentSource, /shouldShowGroupedBuddyMessageLabel/);
+  assert.match(runDisplayMessagesSource, /import \{ shouldShowGroupedBuddyMessageLabel \} from "\.\/buddyMessageGrouping\.ts";/);
   assert.match(componentSource, /v-for="\(\s*message,\s*messageIndex\s*\) in messages"/);
   assert.match(componentSource, /v-if="shouldShowMessageRoleLabel\(messageIndex\)"/);
   assert.match(componentSource, /'buddy-widget__message--grouped': !shouldShowMessageRoleLabel\(messageIndex\)/);
-  assert.match(componentSource, /function shouldShowMessageRoleLabel\(messageIndex: number\)/);
+  assert.match(runDisplayMessagesSource, /function shouldShowMessageRoleLabel\(messageIndex: number\)/);
   assert.match(componentSource, /\.buddy-widget__message--grouped\s*\{/);
 });
 
 test("BuddyWidget stores buddy chat in backend sessions and exposes a compact history dropdown", () => {
-  assert.match(componentSource, /import \{[\s\S]*appendBuddyChatMessage,[\s\S]*fetchBuddyChatMessages,[\s\S]*fetchBuddyChatSessions,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
-  assert.match(componentSource, /import \{ Check, Clock, Close, Delete, FullScreen, Plus, Promotion, RefreshLeft, SemiSelect \} from "@element-plus\/icons-vue";/);
-  assert.match(componentSource, /import \{ ElIcon, ElOption, ElPopover, ElSelect \} from "element-plus";/);
-  assert.match(componentSource, /const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "toograph:buddy-active-session";/);
-  assert.match(componentSource, /const chatSessions = ref<BuddyChatSession\[\]>\(\[\]\);/);
-  assert.match(componentSource, /const activeSessionId = ref<string \| null>\(null\);/);
-  assert.match(componentSource, /const activeSessionDeleteId = ref<string \| null>\(null\);/);
-  assert.match(componentSource, /const sessionDeleteConfirmTimeoutRef = ref<number \| null>\(null\);/);
-  assert.match(componentSource, /class="buddy-widget__history-control"/);
-  assert.match(componentSource, /class="buddy-widget__sessions-panel"/);
-  assert.match(componentSource, /v-for="session in chatSessions"/);
+  assert.match(componentSource, /import \{[\s\S]*appendBuddyChatMessage,[\s\S]*fetchBuddyMemoryReviewTemplateBinding,[\s\S]*fetchBuddyRunTemplateBinding,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
+  assert.match(chatSessionsSource, /import \{[\s\S]*createBuddyChatSession,[\s\S]*deleteBuddyChatSession,[\s\S]*fetchBuddyChatMessages,[\s\S]*fetchBuddyChatSessions,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
+  assert.match(componentSource, /import \{ Close, FullScreen, Plus, SemiSelect \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import \{ ElIcon, ElOption, ElSelect \} from "element-plus";/);
+  assert.match(componentSource, /import BuddySessionHistory from "\.\/BuddySessionHistory\.vue";/);
+  assert.match(componentSource, /import \{ useBuddyChatSessions \} from "\.\/useBuddyChatSessions\.ts";/);
+  assert.match(chatSessionsSource, /const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "toograph:buddy-active-session";/);
+  assert.match(chatSessionsSource, /const chatSessions = ref<BuddyChatSession\[\]>\(\[\]\);/);
+  assert.match(chatSessionsSource, /const activeSessionId = ref<string \| null>\(null\);/);
+  assert.match(chatSessionsSource, /const activeSessionDeleteId = ref<string \| null>\(null\);/);
+  assert.match(chatSessionsSource, /const sessionDeleteConfirmTimeoutRef = ref<number \| null>\(null\);/);
+  assert.match(componentSource, /useBuddyChatSessions\(\{[\s\S]*messages,[\s\S]*queuedTurns,[\s\S]*activeRunId,[\s\S]*errorMessage,[\s\S]*messageRecordToBuddyMessage,[\s\S]*resetVisibleBuddyRunState,[\s\S]*\}\)/);
+  assert.match(componentSource, /<BuddySessionHistory[\s\S]*:sessions="chatSessions"[\s\S]*:delete-confirm-session-id="activeSessionDeleteId"/);
+  assert.match(componentSource, /@toggle="toggleSessionPanel"/);
+  assert.match(componentSource, /@select="selectChatSession"/);
+  assert.match(componentSource, /@delete-action="handleSessionDeleteActionClick"/);
+  assert.doesNotMatch(componentSource, /class="buddy-widget__history-control"/);
+  assert.doesNotMatch(componentSource, /class="buddy-widget__sessions-panel"/);
+  assert.match(sessionHistorySource, /class="buddy-widget__history-control"/);
+  assert.match(sessionHistorySource, /class="buddy-widget__sessions-panel"/);
+  assert.match(sessionHistorySource, /v-for="session in sessions"/);
   assert.doesNotMatch(componentSource, /class="buddy-widget__session-new"/);
-  assert.match(componentSource, /@click="selectChatSession\(session\.session_id\)"/);
-  assert.match(componentSource, /@click\.stop="handleSessionDeleteActionClick\(session\.session_id\)"/);
-  assert.match(componentSource, /:visible="isSessionDeleteConfirmOpen\(session\.session_id\)"/);
-  assert.match(componentSource, /<ElIcon v-if="isSessionDeleteConfirmOpen\(session\.session_id\)" aria-hidden="true"><Check \/><\/ElIcon>/);
-  assert.match(componentSource, /function startSessionDeleteConfirmWindow\(sessionId: string\)/);
-  assert.match(componentSource, /function handleSessionDeleteActionClick\(sessionId: string\)/);
-  assert.match(componentSource, /chatSessionInitializationPromise = initializeBuddyChatSessions\(\)\.finally/);
+  assert.match(sessionHistorySource, /@click="emit\('select', session\.session_id\)"/);
+  assert.match(sessionHistorySource, /@click\.stop="emit\('deleteAction', session\.session_id\)"/);
+  assert.match(sessionHistorySource, /:visible="deleteConfirmSessionId === session\.session_id"/);
+  assert.match(sessionHistorySource, /<ElIcon v-if="deleteConfirmSessionId === session\.session_id" aria-hidden="true"><Check \/><\/ElIcon>/);
+  assert.match(chatSessionsSource, /function startSessionDeleteConfirmWindow\(sessionId: string\)/);
+  assert.match(chatSessionsSource, /function handleSessionDeleteActionClick\(sessionId: string\)/);
+  assert.match(chatSessionsSource, /chatSessionInitializationPromise = initializeBuddyChatSessions\(\)\.finally/);
+  assert.doesNotMatch(componentSource, /function startSessionDeleteConfirmWindow\(sessionId: string\)/);
+  assert.doesNotMatch(componentSource, /function handleSessionDeleteActionClick\(sessionId: string\)/);
+  assert.doesNotMatch(componentSource, /chatSessionInitializationPromise = initializeBuddyChatSessions\(\)\.finally/);
   assert.doesNotMatch(componentSource, /BUDDY_HISTORY_STORAGE_KEY/);
   assert.doesNotMatch(componentSource, /migrateLegacyBuddyHistory/);
   assert.doesNotMatch(componentSource, /readLegacyBuddyMessages/);
   assert.doesNotMatch(componentSource, /normalizeBuddyRunDisplayMessages/);
   assert.match(componentSource, /\.buddy-widget__panel\s*\{[\s\S]*overflow:\s*visible;/);
   assert.match(componentSource, /\.buddy-widget__avatar\s*\{[\s\S]*z-index:\s*4;/);
-  assert.match(componentSource, /\.buddy-widget__sessions-panel\s*\{[\s\S]*position:\s*absolute;[\s\S]*z-index:\s*3;[\s\S]*width:\s*min\(330px,[\s\S]*max-height:\s*min\(520px,[\s\S]*overflow-y:\s*auto;/);
-  assert.match(componentSource, /\.buddy-widget__session-list\s*\{[\s\S]*max-height:\s*none;[\s\S]*overflow:\s*visible;/);
+  assert.match(sessionHistorySource, /\.buddy-widget__sessions-panel\s*\{[\s\S]*position:\s*absolute;[\s\S]*z-index:\s*3;[\s\S]*width:\s*min\(330px,[\s\S]*max-height:\s*min\(520px,[\s\S]*overflow-y:\s*auto;/);
+  assert.match(sessionHistorySource, /\.buddy-widget__session-list\s*\{[\s\S]*max-height:\s*none;[\s\S]*overflow:\s*visible;/);
   assert.doesNotMatch(componentSource, /watch\(\s*messages,/);
 });
 
 test("BuddyWidget uses the top toolbar for new chat and fullscreen expansion", () => {
-  assert.match(componentSource, /import \{ Check, Clock, Close, Delete, FullScreen, Plus, Promotion, RefreshLeft, SemiSelect \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import \{ Close, FullScreen, Plus, SemiSelect \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /const isPanelFullscreen = ref\(false\);/);
   assert.match(componentSource, /const avatarStyle = computed\(\(\) => \{[\s\S]*left:\s*`\$\{position\.value\.x\}px`,[\s\S]*top:\s*`\$\{position\.value\.y\}px`,/);
-  assert.match(componentSource, /const hasCurrentSessionContent = computed\(\(\) => messages\.value\.some\(\(message\) => message\.content\.trim\(\)\)\);/);
-  assert.match(componentSource, /const canCreateNewSession = computed\(\(\) => !isSessionSwitchLocked\.value && hasCurrentSessionContent\.value\);/);
+  assert.match(chatSessionsSource, /const hasCurrentSessionContent = computed\(\(\) => messages\.value\.some\(\(message\) => message\.content\.trim\(\)\)\);/);
+  assert.match(chatSessionsSource, /const canCreateNewSession = computed\(\(\) => !isSessionSwitchLocked\.value && hasCurrentSessionContent\.value\);/);
   assert.match(componentSource, /:title="t\('buddy\.newSession'\)"[\s\S]*:disabled="!canCreateNewSession"[\s\S]*@click="createNewSession"[\s\S]*<ElIcon><Plus \/><\/ElIcon>/);
-  assert.match(componentSource, /async function createNewSession\(\) \{[\s\S]*if \(!canCreateNewSession\.value\) \{/);
+  assert.match(chatSessionsSource, /async function createNewSession\(\) \{[\s\S]*if \(!canCreateNewSession\.value\) \{/);
   assert.match(componentSource, /:title="isPanelFullscreen \? t\('buddy\.exitFullscreen'\) : t\('buddy\.fullscreen'\)"/);
   assert.match(componentSource, /@click="togglePanelFullscreen"/);
   assert.match(componentSource, /<SemiSelect v-if="isPanelFullscreen" \/>/);
@@ -921,7 +973,7 @@ test("BuddyWidget starts autonomous review as a separate background run after th
 });
 
 test("BuddyWidget keeps awaiting-human runs out of the normal chat resume flow", () => {
-  assert.match(componentSource, /import \{ fetchRun, fetchRunTree, resumeRun \} from "\.\.\/api\/runs\.ts";/);
+  assert.match(componentSource, /import \{ fetchRun, resumeRun \} from "\.\.\/api\/runs\.ts";/);
   assert.doesNotMatch(componentSource, /buildBuddyConversationalPausePrompt/);
   assert.doesNotMatch(componentSource, /buildBuddyConversationalPauseResumePayload/);
   assert.match(componentSource, /const pausedBuddyRun = ref<RunDetail \| null>\(null\);/);
@@ -956,8 +1008,8 @@ test("BuddyWidget finishes auto-resumed page-operation runs back into the chat r
     componentSource,
     /const completedTriggeredRunDetail = await waitForTriggeredRunCompletion\(triggeredRun,[\s\S]*\);[\s\S]*triggeredRunDetail = completedTriggeredRunDetail;[\s\S]*if \(completedTriggeredRunDetail\) \{[\s\S]*promoteBackgroundTemplateRunResultToBuddyReply\(operationPlan,\s*completedTriggeredRunDetail,\s*execution\.graph\);[\s\S]*\}[\s\S]*status = completedTriggeredRunDetail\?\.status === "failed" \? "failed" : "succeeded";/,
   );
-  assert.match(componentSource, /function promoteBackgroundTemplateRunResultToBuddyReply\(/);
-  assert.match(componentSource, /function findPrimaryCompletedTextPublicOutput\(/);
+  assert.match(runDisplayMessagesSource, /function promoteBackgroundTemplateRunResultToBuddyReply\(/);
+  assert.match(runDisplayMessagesSource, /function findPrimaryCompletedTextPublicOutput\(/);
   assert.match(
     componentSource,
     /const assistantMessageId = resolveBuddyRunControllerMessageId\(operationPlan\.runId\);[\s\S]*const sessionId = activeSessionId\.value;[\s\S]*resetPausedBuddyPause\(\);[\s\S]*await finishAutoResumedPageOperationRun\(\{[\s\S]*runId:\s*response\.run_id,[\s\S]*assistantMessageId,[\s\S]*sessionId,[\s\S]*graph:[\s\S]*runDetail\.graph_snapshot/,
@@ -983,13 +1035,13 @@ test("BuddyWidget still resumes page-operation runs when visible playback is int
 });
 
 test("BuddyWidget hides parent trace capsules while a background template target is running", () => {
-  assert.match(componentSource, /function syncBackgroundTemplateRunDisplay\(/);
+  assert.match(runDisplayMessagesSource, /function syncBackgroundTemplateRunDisplay\(/);
   assert.match(
-    componentSource,
+    runDisplayMessagesSource,
     /const parentControllerMessageId = resolveBuddyRunControllerMessageId\(operationPlan\.runId \?\? ""\);[\s\S]*if \(parentControllerMessageId\) \{[\s\S]*removeBuddyRunDisplayMessages\(parentControllerMessageId\);[\s\S]*\}/,
   );
   assert.match(
-    componentSource,
+    runDisplayMessagesSource,
     /syncBuddyRunDisplayMessages\([\s\S]*buildBackgroundTemplateRunDisplayControllerId\(operationPlan, runDetail\.run_id\),[\s\S]*runDetail\.run_id,[\s\S]*outputTraceState,[\s\S]*outputState,/,
   );
 });
@@ -997,16 +1049,17 @@ test("BuddyWidget hides parent trace capsules while a background template target
 test("BuddyWidget does not recover paused runs as chat-resumable prompts after session activation", () => {
   assert.doesNotMatch(componentSource, /findLatestRecoverablePausedRunMessage/);
   assert.doesNotMatch(componentSource, /isRecoverablePausedRunStatus/);
-  assert.match(componentSource, /let chatSessionActivationGeneration = 0;/);
-  assert.match(componentSource, /const activationGeneration = \+\+chatSessionActivationGeneration;/);
-  assert.match(componentSource, /void activationGeneration;/);
+  assert.doesNotMatch(componentSource, /chatSessionActivationGeneration/);
+  assert.doesNotMatch(chatSessionsSource, /chatSessionActivationGeneration/);
+  assert.doesNotMatch(componentSource, /const activationGeneration = \+\+/);
+  assert.doesNotMatch(chatSessionsSource, /const activationGeneration = \+\+/);
   assert.doesNotMatch(componentSource, /recoverPausedBuddyRunFromLoadedMessages/);
   assert.doesNotMatch(componentSource, /resetRunTraceForMessage\(candidate\.messageId\);/);
   assert.doesNotMatch(componentSource, /handleBuddyRunAwaitingHuman\(run,\s*candidate\.messageId\);/);
 });
 
 test("BuddyWidget keeps paused background runs from locking the chat queue", () => {
-  assert.match(componentSource, /const isSessionSwitchLocked = computed\([\s\S]*activeRunId\.value !== null/);
+  assert.match(chatSessionsSource, /const isSessionSwitchLocked = computed\([\s\S]*activeRunId\.value !== null/);
   assert.doesNotMatch(componentSource, /isActiveTraceUnfinished\(\)/);
   assert.match(componentSource, /shouldHoldBuddyQueueDrain\(\{ hasPausedRun: Boolean\(pausedBuddyRun\.value\) \}\)/);
   assert.doesNotMatch(componentSource, /:disabled="Boolean\(pausedBuddyRun\)"/);
