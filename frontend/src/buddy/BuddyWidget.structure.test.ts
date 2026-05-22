@@ -6,19 +6,25 @@ import { fileURLToPath } from "node:url";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = dirname(currentFilePath);
-const componentSource = readFileSync(resolve(currentDirectory, "BuddyWidget.vue"), "utf8");
+const componentVueSource = readFileSync(resolve(currentDirectory, "BuddyWidget.vue"), "utf8");
+const componentStyleSource = readFileSync(resolve(currentDirectory, "BuddyWidget.css"), "utf8");
+const componentSource = `${componentVueSource}\n${componentStyleSource}`;
 const composerSource = readFileSync(resolve(currentDirectory, "BuddyComposer.vue"), "utf8");
 const runTraceSource = readFileSync(resolve(currentDirectory, "BuddyRunTrace.vue"), "utf8");
 const runTraceDisplaySource = readFileSync(resolve(currentDirectory, "useBuddyRunTraceDisplay.ts"), "utf8");
 const runDisplayMessagesSource = readFileSync(resolve(currentDirectory, "useBuddyRunDisplayMessages.ts"), "utf8");
+const runEventStreamSource = readFileSync(resolve(currentDirectory, "useBuddyRunEventStream.ts"), "utf8");
+const autonomousReviewRunSource = readFileSync(resolve(currentDirectory, "useBuddyAutonomousReviewRun.ts"), "utf8");
 const messagesSource = readFileSync(resolve(currentDirectory, "useBuddyMessages.ts"), "utf8");
 const pageOperationContextSource = readFileSync(resolve(currentDirectory, "useBuddyPageOperationContext.ts"), "utf8");
 const graphEditPlaybackBridgeSource = readFileSync(resolve(currentDirectory, "buddyGraphEditPlaybackBridge.ts"), "utf8");
 const graphEditPlaybackTargetsSource = readFileSync(resolve(currentDirectory, "buddyGraphEditPlaybackTargets.ts"), "utf8");
+const graphEditPlaybackUiSource = readFileSync(resolve(currentDirectory, "buddyGraphEditPlaybackUi.ts"), "utf8");
 const virtualOperationTargetsSource = readFileSync(resolve(currentDirectory, "buddyVirtualOperationTargets.ts"), "utf8");
 const virtualPointerEventsSource = readFileSync(resolve(currentDirectory, "buddyVirtualPointerEvents.ts"), "utf8");
 const virtualTemplateRunTargetsSource = readFileSync(resolve(currentDirectory, "buddyVirtualTemplateRunTargets.ts"), "utf8");
 const virtualOperationLifecycleSource = readFileSync(resolve(currentDirectory, "useBuddyVirtualOperationLifecycle.ts"), "utf8");
+const virtualCursorGeometrySource = readFileSync(resolve(currentDirectory, "buddyVirtualCursorGeometry.ts"), "utf8");
 const chatSessionsSource = readFileSync(resolve(currentDirectory, "useBuddyChatSessions.ts"), "utf8");
 const modelSelectionSource = readFileSync(resolve(currentDirectory, "useBuddyModelSelection.ts"), "utf8");
 const sessionHistorySource = readFileSync(resolve(currentDirectory, "BuddySessionHistory.vue"), "utf8");
@@ -49,6 +55,8 @@ function extractSourceBetween(startText: string, endText: string) {
 test("BuddyWidget renders the mascot without a circular avatar frame and keeps a contour shadow", () => {
   const avatarBlock = extractCssBlock(".buddy-widget__avatar");
 
+  assert.match(componentVueSource, /<style scoped src="\.\/BuddyWidget\.css"><\/style>/);
+  assert.doesNotMatch(componentVueSource, /<style scoped>\s*\.buddy-widget/);
   assert.match(avatarBlock, /border:\s*0;/);
   assert.match(avatarBlock, /background:\s*transparent;/);
   assert.match(avatarBlock, /box-shadow:\s*none;/);
@@ -224,8 +232,9 @@ test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow
   assert.match(componentSource, /const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_Y_RADIUS_PX = BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX \* 0\.62;/);
   assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_MOVE_TRANSITION_MS = 180;/);
   assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_ROTATE_TRANSITION_MS = 120;/);
-  assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_MIN_FLIGHT_DURATION_MS = 140;/);
-  assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_MAX_FLIGHT_DURATION_MS = 6000;/);
+  assert.match(virtualCursorGeometrySource, /export const BUDDY_VIRTUAL_CURSOR_MIN_FLIGHT_DURATION_MS = 140;/);
+  assert.match(virtualCursorGeometrySource, /export const BUDDY_VIRTUAL_CURSOR_MAX_FLIGHT_DURATION_MS = 6000;/);
+  assert.doesNotMatch(componentSource, /const BUDDY_VIRTUAL_CURSOR_MIN_FLIGHT_DURATION_MS = 140;/);
   assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE = 0\.72;/);
   assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE = 1;/);
   assert.match(componentSource, /const VIRTUAL_CURSOR_STAR_PATH =/);
@@ -277,7 +286,8 @@ test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow
   assert.match(componentSource, /'buddy-widget__virtual-cursor--returning': virtualCursorPhase === 'returning'/);
   assert.match(componentSource, /'buddy-widget__virtual-cursor--floating': shouldFloatVirtualCursor/);
   assert.match(componentSource, /function handleVirtualCursorPointerMove\(event: PointerEvent\)/);
-  assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG = -36;/);
+  assert.match(virtualCursorGeometrySource, /export const BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG = -36;/);
+  assert.doesNotMatch(componentSource, /const BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG = -36;/);
   assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG = 0;/);
   assert.match(componentSource, /watch\(virtualCursorEnabled, \(enabled\) => \{[\s\S]*activateVirtualCursor\(\);[\s\S]*deactivateVirtualCursor\(\);/);
   assert.match(componentSource, /function deactivateVirtualCursor\(\)[\s\S]*startVirtualCursorReturn\(\);/);
@@ -293,24 +303,24 @@ test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow
   assert.match(startVirtualCursorReturnBlock, /virtualCursorScale\.value = BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE;/);
   assert.match(startVirtualCursorReturnBlock, /moveVirtualCursorTo\(dockedPosition, \{ updateAngle: false \}\)/);
   assert.match(componentSource, /function startVirtualCursorMorph\(fromPath: string, toPath: string\)/);
-  assert.match(componentSource, /function resolveVirtualCursorLaunchPosition\(currentViewport: \{ width: number; height: number \}, buddyPosition: BuddyPosition\): BuddyPosition/);
-  assert.match(componentSource, /const horizontalDirection = resolveBoxCenter\(buddyPosition, DEFAULT_BUDDY_SIZE\)\.x > currentViewport\.width \/ 2 \? -1 : 1;/);
-  assert.match(componentSource, /function resolveVirtualCursorFlightAngle\(fromPosition: BuddyPosition, toPosition: BuddyPosition\): number/);
-  assert.match(componentSource, /Math\.atan2\(deltaY, deltaX\) \* \(180 \/ Math\.PI\) \+ 90/);
+  assert.match(virtualCursorGeometrySource, /export function resolveVirtualCursorLaunchPosition\(currentViewport: BuddyViewport, buddyPosition: BuddyPosition\): BuddyPosition/);
+  assert.match(virtualCursorGeometrySource, /const horizontalDirection = buddyCenter\.x > currentViewport\.width \/ 2 \? -1 : 1;/);
+  assert.match(virtualCursorGeometrySource, /export function resolveVirtualCursorFlightAngle\(/);
+  assert.match(virtualCursorGeometrySource, /Math\.atan2\(deltaY, deltaX\) \* \(180 \/ Math\.PI\) \+ 90/);
   assert.match(componentSource, /function moveVirtualCursorTo\([\s\S]*nextPosition: BuddyPosition,[\s\S]*options: \{ updateAngle\?: boolean; durationMs\?: number; rotateDurationMs\?: number; angleDeg\?: number; smoothAngle\?: boolean \} = \{\},[\s\S]*\)/);
   assert.match(componentSource, /const currentPosition = virtualCursorPosition\.value;/);
-  assert.match(componentSource, /setVirtualCursorMoveTransitionDuration\(options\.durationMs \?\? resolveVirtualCursorMoveDurationMs\(currentPosition, nextPosition\)\);/);
-  assert.match(componentSource, /setVirtualCursorRotateTransitionDuration\(options\.rotateDurationMs \?\? resolveVirtualCursorRotateDurationMs\(targetAngleDeg\)\);/);
+  assert.match(componentSource, /resolveVirtualCursorMoveDurationMs\(\s*currentPosition,\s*nextPosition,\s*buddyMascotMotionConfig\.value\.virtualCursorFlightSpeedPxPerS,\s*\)/);
+  assert.match(componentSource, /resolveVirtualCursorRotateDurationMs\(\s*virtualCursorAngleDeg\.value,\s*targetAngleDeg,\s*buddyMascotMotionConfig\.value\.virtualCursorRotationSpeedDegPerS,\s*\)/);
   assert.match(componentSource, /const targetAngleDeg = options\.angleDeg \?\? resolveVirtualCursorFlightAngle\(currentPosition, nextPosition\);/);
-  assert.match(componentSource, /if \(options\.updateAngle !== false\) \{[\s\S]*virtualCursorAngleDeg\.value = options\.smoothAngle[\s\S]*resolveSmoothedVirtualCursorAngle\(targetAngleDeg\)[\s\S]*resolveContinuousVirtualCursorAngle\(targetAngleDeg\);[\s\S]*\}/);
-  assert.match(componentSource, /function resolveVirtualCursorMoveDurationMs\(fromPosition: BuddyPosition, toPosition: BuddyPosition\)/);
-  assert.match(componentSource, /distance \* 1000 \/ buddyMascotMotionConfig\.value\.virtualCursorFlightSpeedPxPerS/);
+  assert.match(componentSource, /if \(options\.updateAngle !== false\) \{[\s\S]*virtualCursorAngleDeg\.value = options\.smoothAngle[\s\S]*resolveSmoothedVirtualCursorAngleForFrame\(targetAngleDeg\)[\s\S]*resolveContinuousVirtualCursorAngle\(virtualCursorAngleDeg\.value, targetAngleDeg\);[\s\S]*\}/);
+  assert.doesNotMatch(componentSource, /function resolveVirtualCursorMoveDurationMs\(fromPosition: BuddyPosition, toPosition: BuddyPosition\)/);
+  assert.match(virtualCursorGeometrySource, /distance \* 1000 \/ flightSpeedPxPerS/);
   assert.match(componentSource, /function setVirtualCursorMoveTransitionDuration\(durationMs: number\)/);
   assert.match(componentSource, /function setVirtualCursorRotateTransitionDuration\(durationMs: number\)/);
-  assert.match(componentSource, /function resolveVirtualCursorRotateDurationMs\(targetAngleDeg: number\)/);
-  assert.match(componentSource, /function resolveContinuousVirtualCursorAngle\(targetAngleDeg: number\)/);
-  assert.match(componentSource, /function resolveSmoothedVirtualCursorAngle\(targetAngleDeg: number\)/);
-  assert.match(componentSource, /buddyMascotMotionConfig\.value\.virtualCursorRotationSpeedDegPerS \* elapsedMs \/ 1000/);
+  assert.doesNotMatch(componentSource, /function resolveVirtualCursorRotateDurationMs\(targetAngleDeg: number\)/);
+  assert.doesNotMatch(componentSource, /function resolveContinuousVirtualCursorAngle\(targetAngleDeg: number\)/);
+  assert.match(componentSource, /function resolveSmoothedVirtualCursorAngleForFrame\(targetAngleDeg: number\)/);
+  assert.match(virtualCursorGeometrySource, /rotationSpeedDegPerS \* elapsedMs \/ 1000/);
   assert.match(componentSource, /function settleVirtualCursorRotation\(\)/);
   assert.match(componentSource, /virtualCursorAngleDeg\.value = BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG;/);
   assert.match(componentSource, /virtualCursorDragging\.value = false;/);
@@ -333,9 +343,9 @@ test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow
   assert.match(componentSource, /resolveBuddyVirtualCursorFollowTargetPosition/);
   assert.match(componentSource, /const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_REACHED_DISTANCE_PX = 12;/);
   assert.match(componentSource, /function isBuddyVirtualCursorFollowTargetReached\(currentPosition: BuddyPosition, targetPosition: BuddyPosition\)/);
-  assert.match(componentSource, /function resolveVirtualCursorFollowTargetDistancePx\(\)/);
-  assert.match(componentSource, /resolveVirtualCursorFollowMaxDistancePx\(\) \* 0\.72/);
-  assert.match(componentSource, /const followTargetDistancePx = resolveVirtualCursorFollowTargetDistancePx\(\);/);
+  assert.doesNotMatch(componentSource, /function resolveVirtualCursorFollowTargetDistancePx\(\)/);
+  assert.match(virtualCursorGeometrySource, /maxDistancePx \* 0\.72/);
+  assert.match(componentSource, /const followTargetDistancePx = resolveVirtualCursorFollowTargetDistancePx\(resolveVirtualCursorFollowMaxDistancePx\(\)\);/);
   assert.match(componentSource, /function resolveCurrentVirtualCursorTrackingPosition\(\)/);
   assert.match(componentSource, /function resolveVirtualCursorFollowMaxDistancePx\(\)/);
   assert.match(activateVirtualCursorBlock, /cancelMascotLookFrame\(\);/);
@@ -391,7 +401,8 @@ test("BuddyWidget keeps virtual-cursor follow jumps from being flattened by slow
   assert.match(componentSource, /\{ durationMs: 0, rotateDurationMs: 0 \}/);
   assert.match(componentSource, /const chaseLoopHorizontalMarginPx = DEFAULT_BUDDY_MARGIN \+ BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX;/);
   assert.match(componentSource, /const chaseLoopVerticalMarginPx = DEFAULT_BUDDY_MARGIN \+ BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_Y_RADIUS_PX;/);
-  assert.match(componentSource, /function clampVirtualCursorFramePosition\(positionValue: BuddyPosition\): BuddyPosition/);
+  assert.match(componentSource, /clampVirtualCursorFramePosition\([\s\S]*viewport\.value,\s*\)/);
+  assert.doesNotMatch(componentSource, /function clampVirtualCursorFramePosition\(positionValue: BuddyPosition/);
   assert.match(componentSource, /watch\(canBuddyRoam, \(canRoam\) => \{[\s\S]*if \(virtualCursorIdleActionMode\.value !== "none"\) \{[\s\S]*return;[\s\S]*\}[\s\S]*cancelBuddyRoamTimers\(\);/);
   assert.match(componentSource, /if \(!wasFollowing && virtualCursorIdleActionMode\.value === "none"\) \{[\s\S]*cancelBuddyRoamTimers\(\);[\s\S]*\}/);
   assert.match(componentSource, /const isFollowingMotionActive = buddyVirtualCursorFollowMotionTimerId !== null;/);
@@ -416,7 +427,7 @@ test("BuddyWidget executes virtual UI operation events through the virtual curso
   assert.match(componentSource, /latestVirtualOperationRequest,/);
   assert.match(componentSource, /watch\(latestVirtualOperationRequest,\s*\(request\) => \{/);
   assert.match(componentSource, /executeVirtualOperationRequest\(request\);/);
-  assert.match(componentSource, /eventType === "activity\.event"[\s\S]*handleBuddyVirtualUiOperationEvent\(payload\);/);
+  assert.match(runEventStreamSource, /eventType === "activity\.event"[\s\S]*handleActivityEvent\(payload\);/);
   assert.match(componentSource, /function handleBuddyVirtualUiOperationEvent\(payload: Record<string, unknown>\)/);
   assert.match(componentSource, /const operationPlan = resolveBuddyVirtualOperationPlanFromActivityEvent\(payload\);/);
   assert.match(componentSource, /buddyMascotDebugStore\.requestVirtualOperation\(operationPlan\);/);
@@ -442,9 +453,24 @@ test("BuddyWidget executes virtual UI operation events through the virtual curso
   assert.match(componentSource, /import type \{ GraphEditPlaybackStep \} from "\.\.\/editor\/workspace\/graphEditPlaybackModel\.ts";/);
   assert.match(componentSource, /import \{[\s\S]*BUDDY_GRAPH_EDIT_PLAYBACK_VIEWPORT_SETTLE_MS,[\s\S]*BUDDY_GRAPH_EDIT_PLAYBACK_VISIBLE_MARGIN_PX,[\s\S]*createGraphEditPlaybackUiState,[\s\S]*dispatchGraphEditPlaybackApplyCommand,[\s\S]*requestGraphEditPlaybackEnsureVisible,[\s\S]*requestGraphEditPlaybackPlan,[\s\S]*requestGraphEditPlaybackSave,[\s\S]*resolveAliasedGraphEditPlaybackStep,[\s\S]*resolveAliasedGraphEditPlaybackTarget,[\s\S]*setGraphEditPlaybackRunning,[\s\S]*type GraphEditPlaybackUiState,[\s\S]*\} from "\.\/buddyGraphEditPlaybackBridge\.ts";/);
   assert.match(componentSource, /import \{[\s\S]*resolveGraphEditPlaybackStepElementWithRetry,[\s\S]*shouldSkipGraphEditPlaybackConnectionStep,[\s\S]*\} from "\.\/buddyGraphEditPlaybackTargets\.ts";/);
+  assert.match(componentSource, /import \{[\s\S]*buildVirtualDragPoints,[\s\S]*isGraphEditPlaybackDragStep,[\s\S]*listGraphEditPlaybackNodeAffordanceIds,[\s\S]*listGraphEditPlaybackPortStateKeys,[\s\S]*normalizeVirtualText,[\s\S]*resolveGraphEditPlaybackAnchorNodeId,[\s\S]*resolveGraphEditPlaybackPositionClientPoint,[\s\S]*resolveGraphEditPlaybackStepDelayMs,[\s\S]*shouldForceGraphEditPlaybackEmptyCanvasDrop,[\s\S]*\} from "\.\/buddyGraphEditPlaybackUi\.ts";/);
   assert.match(componentSource, /import \{[\s\S]*hasVirtualOperationAffordanceElement,[\s\S]*resolveVirtualOperationAffordance,[\s\S]*resolveVirtualOperationTextInput,[\s\S]*\} from "\.\/buddyVirtualOperationTargets\.ts";/);
   assert.match(componentSource, /import \{[\s\S]*dispatchVirtualClick,[\s\S]*dispatchVirtualDoubleClick,[\s\S]*dispatchVirtualInputEvents,[\s\S]*dispatchVirtualPointerEvent,[\s\S]*dispatchVirtualPointerTap,[\s\S]*\} from "\.\/buddyVirtualPointerEvents\.ts";/);
   assert.match(componentSource, /import \{[\s\S]*normalizeTemplateRunMatchText,[\s\S]*resolveTemplateRunInputTextInput,[\s\S]*resolveTemplateRunTargetAffordance,[\s\S]*routeMatchesVirtualOperationTargetPath,[\s\S]*\} from "\.\/buddyVirtualTemplateRunTargets\.ts";/);
+  assert.match(componentSource, /import \{[\s\S]*BUDDY_VIRTUAL_CURSOR_MAX_FLIGHT_DURATION_MS,[\s\S]*BUDDY_VIRTUAL_CURSOR_MAX_ROTATE_TRANSITION_MS,[\s\S]*BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG,[\s\S]*BUDDY_VIRTUAL_CURSOR_SIZE,[\s\S]*clampVirtualCursorFramePosition,[\s\S]*interpolateBuddyPosition,[\s\S]*resolveBoxCenter,[\s\S]*resolveContinuousVirtualCursorAngle,[\s\S]*resolveDefaultVirtualCursorPosition,[\s\S]*resolveElementCenterPoint,[\s\S]*resolveSmoothedVirtualCursorAngle,[\s\S]*resolveVirtualCursorFlightAngle,[\s\S]*resolveVirtualCursorFollowTargetDistancePx,[\s\S]*resolveVirtualCursorLaunchPosition,[\s\S]*resolveVirtualCursorMoveDurationMs,[\s\S]*resolveVirtualCursorPositionForClientPoint,[\s\S]*resolveVirtualCursorRotateDurationMs,[\s\S]*resolveVirtualCursorVectorAngle,[\s\S]*\} from "\.\/buddyVirtualCursorGeometry\.ts";/);
+  assert.match(virtualCursorGeometrySource, /export const BUDDY_VIRTUAL_CURSOR_SIZE(?:: BuddySize)? = \{ width: 42, height: 42 \};/);
+  assert.match(virtualCursorGeometrySource, /export function resolveDefaultVirtualCursorPosition/);
+  assert.match(virtualCursorGeometrySource, /export function resolveVirtualCursorLaunchPosition/);
+  assert.match(virtualCursorGeometrySource, /export function resolveVirtualCursorMoveDurationMs/);
+  assert.match(virtualCursorGeometrySource, /export function resolveVirtualCursorRotateDurationMs/);
+  assert.match(virtualCursorGeometrySource, /export function resolveVirtualCursorPositionForClientPoint/);
+  assert.doesNotMatch(componentSource, /const BUDDY_VIRTUAL_CURSOR_SIZE = \{ width: 42, height: 42 \};/);
+  assert.doesNotMatch(componentSource, /function resolveDefaultVirtualCursorPosition/);
+  assert.doesNotMatch(componentSource, /function resolveVirtualCursorLaunchPosition/);
+  assert.doesNotMatch(componentSource, /function interpolateBuddyPosition/);
+  assert.doesNotMatch(componentSource, /function resolveVirtualCursorMoveDurationMs/);
+  assert.doesNotMatch(componentSource, /function resolveVirtualCursorRotateDurationMs/);
+  assert.doesNotMatch(componentSource, /function resolveVirtualCursorPositionForClientPoint/);
   assert.match(graphEditPlaybackBridgeSource, /import type \{ GraphEditCommand, GraphEditIntent, GraphEditPlaybackStep \} from "\.\.\/editor\/workspace\/graphEditPlaybackModel\.ts";/);
   assert.match(graphEditPlaybackTargetsSource, /import type \{ GraphEditPlaybackStep \} from "\.\.\/editor\/workspace\/graphEditPlaybackModel\.ts";/);
   assert.match(graphEditPlaybackTargetsSource, /import \{[\s\S]*BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_RETRY_MS,[\s\S]*BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_WAIT_MS,[\s\S]*resolveAliasedGraphEditPlaybackStep,[\s\S]*resolveAliasedGraphEditPlaybackTarget,[\s\S]*type GraphEditPlaybackUiState,[\s\S]*\} from "\.\/buddyGraphEditPlaybackBridge\.ts";/);
@@ -466,8 +492,9 @@ test("BuddyWidget executes virtual UI operation events through the virtual curso
   assert.match(componentSource, /dispatchVirtualPointerEvent\(targetElement, "pointerdown"/);
   assert.match(componentSource, /dispatchVirtualPointerEvent\(pointerSurface, "pointermove"/);
   assert.match(componentSource, /dispatchVirtualPointerEvent\(pointerSurface, "pointerup"/);
-  assert.match(componentSource, /dispatchVirtualDoubleClick\(targetElement, resolveGraphEditPlaybackPositionClientPoint\(step\)\);/);
-  assert.match(componentSource, /function resolveGraphEditPlaybackPositionClientPoint\(step: GraphEditPlaybackStep\): BuddyPosition \| null/);
+  assert.match(componentSource, /dispatchVirtualDoubleClick\(targetElement, resolveGraphEditPlaybackPositionClientPoint\([\s\S]*step,[\s\S]*resolveVirtualOperationAffordance\("editor\.canvas\.surface"\)\?\.element \?\? null,[\s\S]*\)\);/);
+  assert.match(graphEditPlaybackUiSource, /export function resolveGraphEditPlaybackPositionClientPoint\(/);
+  assert.doesNotMatch(componentSource, /function resolveGraphEditPlaybackPositionClientPoint\(step: GraphEditPlaybackStep/);
   assert.match(componentSource, /async function typeVirtualText\(element: HTMLInputElement \| HTMLTextAreaElement, text: string\)/);
   assert.match(componentSource, /function shouldSkipGraphEditPlaybackTextStep\(/);
   assert.match(componentSource, /if \(step\.kind === "choose_node_type" && targetElement\) \{[\s\S]*const beforeNodeIds = listGraphEditPlaybackNodeAffordanceIds\(\);[\s\S]*dispatchVirtualClick\(targetElement\);[\s\S]*rememberCreatedNodeAlias\(step, beforeNodeIds, playbackState\);/);
@@ -595,11 +622,18 @@ test("BuddyWidget can interrupt virtual operations and skips graph connections t
   assert.doesNotMatch(componentSource, /const BUDDY_VIRTUAL_POINTER_ID = 9001;/);
   assert.doesNotMatch(componentSource, /const TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY = "__toographVirtualEmptyCanvasPointerEvent";/);
   assert.doesNotMatch(componentSource, /function markVirtualPointerEvent/);
-  assert.match(componentSource, /function shouldForceGraphEditPlaybackEmptyCanvasDrop\(step: GraphEditPlaybackStep\)/);
+  assert.match(graphEditPlaybackUiSource, /export function shouldForceGraphEditPlaybackEmptyCanvasDrop\(step: GraphEditPlaybackStep\)/);
+  assert.doesNotMatch(componentSource, /function shouldForceGraphEditPlaybackEmptyCanvasDrop\(step: GraphEditPlaybackStep\)/);
   assert.match(componentSource, /dispatchVirtualPointerEvent\(pointerSurface, "pointermove", point\.x, point\.y, \{ forceEmptyCanvasDrop \}\)/);
   assert.match(componentSource, /dispatchVirtualPointerEvent\(pointerSurface, "pointerup", endPoint\.x, endPoint\.y, \{ forceEmptyCanvasDrop \}\)/);
   assert.match(virtualPointerEventsSource, /Object\.defineProperty\(event, TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY,/);
   assert.match(componentSource, /function resolveGraphEditPlaybackAnchorNodeFallbackPoint\(targetId: string\)/);
+  assert.match(graphEditPlaybackUiSource, /export function resolveGraphEditPlaybackAnchorNodeId\(targetId: string\)/);
+  assert.doesNotMatch(componentSource, /^function buildVirtualDragPoints/m);
+  assert.doesNotMatch(componentSource, /^function listGraphEditPlaybackNodeAffordanceIds/m);
+  assert.doesNotMatch(componentSource, /^function listGraphEditPlaybackPortStateKeys/m);
+  assert.doesNotMatch(componentSource, /^function resolveGraphEditPlaybackStepDelayMs/m);
+  assert.doesNotMatch(componentSource, /^function normalizeVirtualText/m);
   assert.match(virtualPointerEventsSource, /pointerId: BUDDY_VIRTUAL_POINTER_ID,/);
 });
 
@@ -786,7 +820,7 @@ test("BuddyWidget keeps live run activity out of the chat transcript", () => {
   assert.doesNotMatch(componentSource, /shouldShowAssistantActivityBubble\(message\)/);
   assert.doesNotMatch(componentSource, /message\.activityText \|\| t\("buddy\.streaming"\)/);
   assert.match(componentSource, /setAssistantActivityText\(assistantMessage\.id, t\("buddy\.activity\.preparing"\)\);/);
-  assert.match(componentSource, /setAssistantActivityFromRunEvent\(assistantMessageId, eventType, payload, graph\);/);
+  assert.match(runEventStreamSource, /setAssistantActivityFromRunEvent\(assistantMessageId, eventType, payload, graph\);/);
   assert.match(componentSource, /if \(mood\.value === "thinking" && latestActivityText\.value\) \{/);
 });
 
@@ -795,7 +829,7 @@ test("BuddyWidget renders assistant replies from parent graph output nodes only"
   assert.match(messagesSource, /import \{ resolveOutputPreviewContent \} from "\.\.\/editor\/nodes\/outputPreviewContentModel\.ts";/);
   assert.match(componentSource, /import SandboxedHtmlFrame from "\.\.\/components\/SandboxedHtmlFrame\.vue";/);
   assert.match(componentSource, /buildBuddyPublicOutputBindings/);
-  assert.match(componentSource, /reduceBuddyPublicOutputEvent/);
+  assert.match(runEventStreamSource, /reduceBuddyPublicOutputEvent/);
   assert.match(messagesSource, /publicOutput\?:/);
   assert.match(runDisplayMessagesSource, /buildPublicOutputMessageId\(controllerMessageId, output\.outputNodeId\)/);
   assert.match(componentSource, /syncBuddyRunDisplayMessages,[\s\S]*= useBuddyRunDisplayMessages<BuddyMessage>/);
@@ -803,7 +837,7 @@ test("BuddyWidget renders assistant replies from parent graph output nodes only"
   assert.match(componentSource, /v-else-if="message\.role === 'assistant' && message\.content && resolveBuddyRenderedContent\(message\)\.kind === 'html'"/);
   assert.match(componentSource, /<SandboxedHtmlFrame[\s\S]*:source="resolveBuddyRenderedContent\(message\)\.html"/);
   assert.match(componentSource, /class="buddy-widget__public-output-card"/);
-  assert.match(componentSource, /addEventListener\("activity\.event"/);
+  assert.match(runEventStreamSource, /addEventListener\("activity\.event"/);
   assert.doesNotMatch(componentSource, /resolveBuddyReplyFromRunEvent/);
   assert.doesNotMatch(componentSource, /resolveBuddyRunTraceFromRunEvent/);
 });
@@ -831,7 +865,7 @@ test("BuddyWidget renders output-segment run trace capsules instead of per-messa
   assert.match(componentSource, /import BuddyRunTrace from "\.\/BuddyRunTrace\.vue";/);
   assert.match(componentSource, /import \{ useBuddyRunTraceDisplay \} from "\.\/useBuddyRunTraceDisplay\.ts";/);
   assert.match(componentSource, /buildBuddyOutputTracePlan/);
-  assert.match(componentSource, /reduceBuddyOutputTraceEvent/);
+  assert.match(runEventStreamSource, /reduceBuddyOutputTraceEvent/);
   assert.match(componentSource, /buildBuddyOutputTraceStateFromRunDetail/);
   assert.match(runTraceDisplaySource, /import \{[\s\S]*buildBuddyOutputTraceTreeRows,[\s\S]*type BuddyOutputTraceTreeRow[\s\S]*\} from "\.\/buddyOutputTraceTree\.ts";/);
   assert.match(messagesSource, /outputTrace\?:/);
@@ -897,15 +931,20 @@ test("BuddyWidget fetches real run trees when expanded trace capsules are opened
 });
 
 test("BuddyWidget seeds streaming run trace capsules from the current run snapshot", () => {
-  assert.match(componentSource, /const source = new EventSource\(streamUrl\);[\s\S]*eventSource = source;[\s\S]*void hydrateBuddyStreamingRunDisplayFromSnapshot\(/);
-  assert.match(componentSource, /async function hydrateBuddyStreamingRunDisplayFromSnapshot\(/);
-  assert.match(componentSource, /fetchRun\(runId\)/);
-  assert.match(componentSource, /if \(eventSource !== source\) \{[\s\S]*return null;[\s\S]*\}/);
-  assert.match(componentSource, /buildBuddyOutputTraceStateFromRunDetail\(runDetail, outputTracePlan, graph\)/);
-  assert.match(componentSource, /buildPublicOutputRuntimeStateFromRunDetail\(runDetail, publicOutputBindings, graph\)/);
+  assert.match(componentSource, /import \{ useBuddyRunEventStream \} from "\.\/useBuddyRunEventStream\.ts";/);
+  assert.match(componentSource, /useBuddyRunEventStream\(\{[\s\S]*handleActivityEvent: handleBuddyVirtualUiOperationEvent,[\s\S]*setAssistantActivityFromRunEvent,[\s\S]*syncStreamingBuddyRunDisplay,[\s\S]*buildPublicOutputRuntimeStateFromRunDetail,[\s\S]*nowPublicOutputMs,[\s\S]*\}\)/);
+  assert.match(runEventStreamSource, /const source = new EventSource\(streamUrl\);[\s\S]*activeEventSource = source;[\s\S]*void hydrateBuddyStreamingRunDisplayFromSnapshot\(/);
+  assert.match(runEventStreamSource, /async function hydrateBuddyStreamingRunDisplayFromSnapshot\(/);
+  assert.match(runEventStreamSource, /fetchRun\(runId\)/);
+  assert.match(runEventStreamSource, /if \(activeEventSource !== source\) \{[\s\S]*return null;[\s\S]*\}/);
+  assert.match(runEventStreamSource, /buildBuddyOutputTraceStateFromRunDetail\(runDetail, outputTracePlan, graph\)/);
+  assert.match(runEventStreamSource, /buildPublicOutputRuntimeStateFromRunDetail\(runDetail, publicOutputBindings, graph\)/);
   assert.match(runDisplayMessagesSource, /function syncStreamingBuddyRunDisplay\(/);
-  assert.match(componentSource, /syncStreamingBuddyRunDisplay\(assistantMessageId, runId, outputTraceState, publicOutputState\)/);
-  assert.match(componentSource, /source\.addEventListener\("run\.completed", \(\) => closeEventSource\(source\)\);/);
+  assert.match(runEventStreamSource, /syncStreamingBuddyRunDisplay\(assistantMessageId, runId, outputTraceState, publicOutputState\)/);
+  assert.match(runEventStreamSource, /source\.addEventListener\("run\.completed", \(\) => closeEventSource\(source\)\);/);
+  assert.doesNotMatch(componentSource, /let eventSource: EventSource \| null = null;/);
+  assert.doesNotMatch(componentSource, /async function hydrateBuddyStreamingRunDisplayFromSnapshot\(/);
+  assert.doesNotMatch(componentSource, /function closeEventSource\(source: EventSource/);
 });
 
 test("BuddyWidget shows a pending run trace capsule immediately after sending", () => {
@@ -937,7 +976,8 @@ test("BuddyWidget groups consecutive visible messages by role label", () => {
 });
 
 test("BuddyWidget stores buddy chat in backend sessions and exposes a compact history dropdown", () => {
-  assert.match(componentSource, /import \{[\s\S]*appendBuddyChatMessage,[\s\S]*fetchBuddyMemoryReviewTemplateBinding,[\s\S]*fetchBuddyRunTemplateBinding,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
+  assert.match(componentSource, /import \{[\s\S]*appendBuddyChatMessage,[\s\S]*fetchBuddyRunTemplateBinding,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
+  assert.match(autonomousReviewRunSource, /import \{ fetchBuddyMemoryReviewTemplateBinding \} from "\.\.\/api\/buddy\.ts";/);
   assert.match(chatSessionsSource, /import \{[\s\S]*createBuddyChatSession,[\s\S]*deleteBuddyChatSession,[\s\S]*fetchBuddyChatMessages,[\s\S]*fetchBuddyChatSessions,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
   assert.match(componentSource, /import \{ Close, FullScreen, Plus, SemiSelect \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /import \{ ElIcon, ElOption, ElSelect \} from "element-plus";/);
@@ -1019,19 +1059,24 @@ test("BuddyWidget starts visible runs from the saved template binding", () => {
 });
 
 test("BuddyWidget starts autonomous review as a separate background run after the visible reply", () => {
-  assert.match(componentSource, /buildBuddyReviewGraph/);
-  assert.match(componentSource, /fetchBuddyMemoryReviewTemplateBinding/);
+  assert.match(autonomousReviewRunSource, /buildBuddyReviewGraph/);
+  assert.match(autonomousReviewRunSource, /fetchBuddyMemoryReviewTemplateBinding/);
+  assert.match(componentSource, /import \{ useBuddyAutonomousReviewRun \} from "\.\/useBuddyAutonomousReviewRun\.ts";/);
+  assert.match(componentSource, /const \{[\s\S]*startBuddyAutonomousReviewRun,[\s\S]*abortBackgroundReviewRuns,[\s\S]*\} = useBuddyAutonomousReviewRun\(\{[\s\S]*currentSessionId,[\s\S]*buddyModelRef,[\s\S]*pollRunUntilFinished,[\s\S]*notifyBuddyDataChanged: buddyContextStore\.notifyBuddyDataChanged,[\s\S]*\}\);/);
   assert.match(componentSource, /void startBuddyAutonomousReviewRun\(runDetail\);/);
-  assert.match(componentSource, /async function startBuddyAutonomousReviewRun\(mainRun: RunDetail\)/);
-  assert.match(componentSource, /const binding = await fetchBuddyMemoryReviewTemplateBinding\(\);/);
-  assert.match(componentSource, /fetchTemplate\(binding\.template_id\)/);
-  assert.match(componentSource, /const graph = buildBuddyReviewGraph\(template,\s*\{[\s\S]*mainRun,[\s\S]*buddyModel: buddyModelRef\.value,[\s\S]*\}\);/);
-  assert.match(componentSource, /binding,/);
-  assert.match(componentSource, /currentSessionId: currentSessionId\.value/);
-  assert.match(componentSource, /const reviewRun = await runGraph\(graph\);/);
-  assert.match(componentSource, /void pollBuddyAutonomousReviewRun\(reviewRun\.run_id\);/);
-  assert.match(componentSource, /const backgroundReviewAbortControllers = new Set<AbortController>\(\);/);
+  assert.match(autonomousReviewRunSource, /async function startBuddyAutonomousReviewRun\(mainRun: RunDetail\)/);
+  assert.match(autonomousReviewRunSource, /const binding = await fetchBuddyMemoryReviewTemplateBinding\(\);/);
+  assert.match(autonomousReviewRunSource, /fetchTemplate\(binding\.template_id\)/);
+  assert.match(autonomousReviewRunSource, /const graph = buildBuddyReviewGraph\(template,\s*\{[\s\S]*mainRun,[\s\S]*buddyModel: buddyModelRef\.value,[\s\S]*\}\);/);
+  assert.match(autonomousReviewRunSource, /binding,/);
+  assert.match(autonomousReviewRunSource, /currentSessionId: currentSessionId\.value \?\? ""/);
+  assert.match(autonomousReviewRunSource, /const reviewRun = await runGraph\(graph\);/);
+  assert.match(autonomousReviewRunSource, /void pollBuddyAutonomousReviewRun\(reviewRun\.run_id\);/);
+  assert.match(autonomousReviewRunSource, /const backgroundReviewAbortControllers = new Set<AbortController>\(\);/);
   assert.match(componentSource, /abortBackgroundReviewRuns\(\);/);
+  assert.doesNotMatch(componentSource, /async function startBuddyAutonomousReviewRun\(mainRun: RunDetail\)/);
+  assert.doesNotMatch(componentSource, /async function pollBuddyAutonomousReviewRun\(runId: string\)/);
+  assert.doesNotMatch(componentSource, /const backgroundReviewAbortControllers = new Set<AbortController>\(\);/);
   assert.doesNotMatch(componentSource, /activeRunId\.value = reviewRun\.run_id/);
 });
 
@@ -1170,7 +1215,8 @@ test("BuddyWidget does not resume paused runs from the next chat reply", () => {
 
 test("BuddyWidget does not impose a whole-run polling timeout", () => {
   assert.doesNotMatch(componentSource, /RUN_POLL_TIMEOUT_MS/);
-  assert.match(componentSource, /async function pollRunUntilFinished\([^)]*\): Promise<RunDetail> \{[\s\S]*while \(true\) \{/);
-  assert.match(componentSource, /async function pollRunUntilFinished\([^)]*\): Promise<RunDetail> \{[\s\S]*await delay\(RUN_POLL_INTERVAL_MS, signal\);/);
-  assert.doesNotMatch(componentSource.match(/async function pollRunUntilFinished[\s\S]*?\n\}/)?.[0] ?? "", /buddy\.runTimeout/);
+  assert.doesNotMatch(runEventStreamSource, /RUN_POLL_TIMEOUT_MS/);
+  assert.match(runEventStreamSource, /export async function pollBuddyRunUntilFinished\([\s\S]*while \(true\) \{/);
+  assert.match(runEventStreamSource, /export async function pollBuddyRunUntilFinished\([\s\S]*await waitForDelay\(intervalMs, signal\);/);
+  assert.doesNotMatch(runEventStreamSource.match(/export async function pollBuddyRunUntilFinished[\s\S]*?\n\}/)?.[0] ?? "", /buddy\.runTimeout/);
 });

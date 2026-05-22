@@ -317,13 +317,12 @@ import { useRoute, useRouter } from "vue-router";
 
 import {
   appendBuddyChatMessage,
-  fetchBuddyMemoryReviewTemplateBinding,
   fetchBuddyRunTemplateBinding,
 } from "../api/buddy.ts";
 import { fetchTemplate, fetchTemplates, runGraph } from "../api/graphs.ts";
 import { fetchRun, resumeRun } from "../api/runs.ts";
 import SandboxedHtmlFrame from "../components/SandboxedHtmlFrame.vue";
-import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
+import { shouldPollRunStatus } from "../lib/run-event-stream.ts";
 import type { GraphEditPlaybackStep } from "../editor/workspace/graphEditPlaybackModel.ts";
 import { useBuddyContextStore } from "../stores/buddyContext.ts";
 import {
@@ -341,11 +340,13 @@ import BuddyComposer from "./BuddyComposer.vue";
 import BuddyRunTrace from "./BuddyRunTrace.vue";
 import BuddySessionHistory from "./BuddySessionHistory.vue";
 import BuddyVirtualOperationBanner from "./BuddyVirtualOperationBanner.vue";
+import { useBuddyAutonomousReviewRun } from "./useBuddyAutonomousReviewRun.ts";
 import { useBuddyChatSessions } from "./useBuddyChatSessions.ts";
 import { useBuddyMessages, type BuddyMessage, type BuddyQueuedTurn } from "./useBuddyMessages.ts";
 import { useBuddyModelSelection } from "./useBuddyModelSelection.ts";
 import { useBuddyPageOperationContext } from "./useBuddyPageOperationContext.ts";
 import { useBuddyRunDisplayMessages } from "./useBuddyRunDisplayMessages.ts";
+import { useBuddyRunEventStream } from "./useBuddyRunEventStream.ts";
 import { useBuddyRunTraceDisplay } from "./useBuddyRunTraceDisplay.ts";
 import type { BuddyMascotDebugAction } from "./buddyMascotDebug.ts";
 import {
@@ -365,6 +366,17 @@ import {
   resolveGraphEditPlaybackStepElementWithRetry,
   shouldSkipGraphEditPlaybackConnectionStep,
 } from "./buddyGraphEditPlaybackTargets.ts";
+import {
+  buildVirtualDragPoints,
+  isGraphEditPlaybackDragStep,
+  listGraphEditPlaybackNodeAffordanceIds,
+  listGraphEditPlaybackPortStateKeys,
+  normalizeVirtualText,
+  resolveGraphEditPlaybackAnchorNodeId,
+  resolveGraphEditPlaybackPositionClientPoint,
+  resolveGraphEditPlaybackStepDelayMs,
+  shouldForceGraphEditPlaybackEmptyCanvasDrop,
+} from "./buddyGraphEditPlaybackUi.ts";
 import {
   hasVirtualOperationAffordanceElement,
   resolveVirtualOperationAffordance,
@@ -388,6 +400,26 @@ import {
   type GraphEditPlaybackAuditApplyResult,
   type GraphEditPlaybackAuditSummary,
 } from "./graphEditPlaybackAudit.ts";
+import {
+  BUDDY_VIRTUAL_CURSOR_MAX_FLIGHT_DURATION_MS,
+  BUDDY_VIRTUAL_CURSOR_MAX_ROTATE_TRANSITION_MS,
+  BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG,
+  BUDDY_VIRTUAL_CURSOR_SIZE,
+  clampVirtualCursorFramePosition,
+  interpolateBuddyPosition,
+  resolveBoxCenter,
+  resolveContinuousVirtualCursorAngle,
+  resolveDefaultVirtualCursorPosition,
+  resolveElementCenterPoint,
+  resolveSmoothedVirtualCursorAngle,
+  resolveVirtualCursorFlightAngle,
+  resolveVirtualCursorFollowTargetDistancePx,
+  resolveVirtualCursorLaunchPosition,
+  resolveVirtualCursorMoveDurationMs,
+  resolveVirtualCursorPositionForClientPoint,
+  resolveVirtualCursorRotateDurationMs,
+  resolveVirtualCursorVectorAngle,
+} from "./buddyVirtualCursorGeometry.ts";
 import { attachPageOperationRuntimeContext } from "./pageOperationAffordances.ts";
 import {
   buildPageOperationArtifactRefs,
@@ -415,23 +447,15 @@ import {
   BUDDY_MODE_OPTIONS,
   DEFAULT_BUDDY_MODE,
   buildBuddyChatGraph,
-  buildBuddyReviewGraph,
   resolveBuddyMode,
   type BuddyMode,
 } from "./buddyChatGraph.ts";
 import {
   buildBuddyPublicOutputBindings,
-  createBuddyPublicOutputRuntimeState,
-  reduceBuddyPublicOutputEvent,
-  type BuddyPublicOutputBinding,
-  type BuddyPublicOutputRuntimeState,
 } from "./buddyPublicOutput.ts";
 import {
   buildBuddyOutputTracePlan,
   buildBuddyOutputTraceStateFromRunDetail,
-  createBuddyOutputTraceRuntimeState,
-  reduceBuddyOutputTraceEvent,
-  type BuddyOutputTraceRuntimeState,
 } from "./buddyOutputTrace.ts";
 import { buildBuddyTemplateRunGraph } from "./buddyTemplateRunGraph.ts";
 import {
@@ -447,11 +471,6 @@ import {
 
 type BuddyPauseHandlingOptions = {
   persist?: boolean;
-};
-
-type BuddyStreamingRunDisplaySnapshot = {
-  publicOutputState: BuddyPublicOutputRuntimeState;
-  outputTraceState: BuddyOutputTraceRuntimeState;
 };
 
 type BuddyMood = "idle" | "thinking" | "speaking" | "error";
@@ -492,24 +511,18 @@ const BUDDY_ROAM_STEP_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
 const BUDDY_ROAM_TARGET_MIN_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
 const BUDDY_ROAM_TARGET_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 3;
 const BUDDY_ROAM_TARGET_REACHED_DISTANCE_PX = 1;
-const BUDDY_VIRTUAL_CURSOR_SIZE = { width: 42, height: 42 };
 const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_PERIOD_MS = 1600;
 const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX = BUDDY_VIRTUAL_CURSOR_SIZE.width * 0.86;
 const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_Y_RADIUS_PX = BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX * 0.62;
 const BUDDY_VIRTUAL_CURSOR_STAR_ANGLE_DEG = 0;
-const BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG = -36;
 const BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS = 360;
 const BUDDY_VIRTUAL_CURSOR_READY_FRAME_DELAY_MS = 80;
 const BUDDY_VIRTUAL_CURSOR_MOVE_TRANSITION_MS = 180;
 const BUDDY_VIRTUAL_CURSOR_ROTATE_TRANSITION_MS = 120;
-const BUDDY_VIRTUAL_CURSOR_MIN_FLIGHT_DURATION_MS = 140;
-const BUDDY_VIRTUAL_CURSOR_MAX_FLIGHT_DURATION_MS = 6000;
-const BUDDY_VIRTUAL_CURSOR_MAX_ROTATE_TRANSITION_MS = 900;
 const BUDDY_VIRTUAL_CURSOR_FLIGHT_SETTLE_MS = 80;
 const BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE = 0.72;
 const BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE = 1;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_REACHED_DISTANCE_PX = 12;
-const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 1.25;
 const BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS = 80;
 const BUDDY_VIRTUAL_OPERATION_TYPE_CHARACTER_DELAY_MS = 18;
 const BUDDY_VIRTUAL_OPERATION_TRIGGERED_RUN_WAIT_MS = 4000;
@@ -621,7 +634,6 @@ let virtualCursorDrag: {
   startPosition: BuddyPosition;
 } | null = null;
 let suppressNextClick = false;
-let eventSource: EventSource | null = null;
 let activeAbortController: AbortController | null = null;
 let isDrainingBuddyQueue = false;
 let avatarSingleClickTimerId: number | null = null;
@@ -648,7 +660,6 @@ let virtualCursorMorphAnimationKey = 0;
 let virtualCursorPickupPending = false;
 let buddyDebugActionTimerId: number | null = null;
 let pendingMascotLookPointer: { x: number; y: number } | null = null;
-const backgroundReviewAbortControllers = new Set<AbortController>();
 
 const isDragging = computed(() => Boolean(pointerDrag.value?.moved));
 const isMascotDragging = computed(() => isDragging.value || debugDragging.value);
@@ -1275,7 +1286,11 @@ function moveBuddyIdleVirtualCursorChaseTarget(sequenceId: number) {
   }
   cancelBuddyVirtualCursorIdleFrame();
   const targetPosition = resolveRandomVirtualCursorChasePosition();
-  const flightDurationMs = resolveVirtualCursorMoveDurationMs(virtualCursorPosition.value, targetPosition);
+  const flightDurationMs = resolveVirtualCursorMoveDurationMs(
+    virtualCursorPosition.value,
+    targetPosition,
+    buddyMascotMotionConfig.value.virtualCursorFlightSpeedPxPerS,
+  );
   const flightWaitMs = moveVirtualCursorToWithArmedTransition(targetPosition, { durationMs: flightDurationMs });
   buddyRoamMotionTimerId = window.setTimeout(() => {
     buddyRoamMotionTimerId = null;
@@ -1301,6 +1316,7 @@ function runBuddyIdleVirtualCursorChaseLoop(sequenceId: number, centerPosition: 
         x: centerPosition.x + Math.sin(angle) * BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX,
         y: centerPosition.y + Math.sin(angle * 2) * BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_Y_RADIUS_PX,
       },
+      viewport.value,
     ),
     {
       angleDeg: resolveVirtualCursorChaseLoopTangentAngle(angle),
@@ -1345,6 +1361,7 @@ function resolveVirtualCursorOrbitPosition(angle: number): BuddyPosition {
       x: buddyCenter.x + Math.cos(angle) * BUDDY_IDLE_VIRTUAL_CURSOR_ORBIT_RADIUS_PX - BUDDY_VIRTUAL_CURSOR_SIZE.width / 2,
       y: buddyCenter.y + Math.sin(angle) * BUDDY_IDLE_VIRTUAL_CURSOR_ORBIT_RADIUS_PX - BUDDY_VIRTUAL_CURSOR_SIZE.height / 2,
     },
+    viewport.value,
   );
 }
 
@@ -1615,7 +1632,7 @@ function resolveBuddyVirtualCursorFollowTargetPosition(): BuddyPosition {
 
   const unitX = distance < 1 ? -0.82 : deltaX / distance;
   const unitY = distance < 1 ? 0.58 : deltaY / distance;
-  const followTargetDistancePx = resolveVirtualCursorFollowTargetDistancePx();
+  const followTargetDistancePx = resolveVirtualCursorFollowTargetDistancePx(resolveVirtualCursorFollowMaxDistancePx());
   return clampBuddyPosition(
     {
       x: cursorCenter.x + unitX * followTargetDistancePx - DEFAULT_BUDDY_SIZE.width / 2,
@@ -1907,32 +1924,6 @@ function clearVirtualCursorTransition() {
   virtualCursorMorphAnimation.value = null;
 }
 
-function resolveDefaultVirtualCursorPosition(currentViewport: { width: number; height: number }, buddyPosition: BuddyPosition): BuddyPosition {
-  return clampBuddyPosition(
-    {
-      x: buddyPosition.x + DEFAULT_BUDDY_SIZE.width * 0.28,
-      y: buddyPosition.y - BUDDY_VIRTUAL_CURSOR_SIZE.height * 0.22,
-    },
-    currentViewport,
-    BUDDY_VIRTUAL_CURSOR_SIZE,
-    DEFAULT_BUDDY_MARGIN,
-  );
-}
-
-function resolveVirtualCursorLaunchPosition(currentViewport: { width: number; height: number }, buddyPosition: BuddyPosition): BuddyPosition {
-  const buddyCenter = resolveBoxCenter(buddyPosition, DEFAULT_BUDDY_SIZE);
-  const horizontalDirection = resolveBoxCenter(buddyPosition, DEFAULT_BUDDY_SIZE).x > currentViewport.width / 2 ? -1 : 1;
-  return clampBuddyPosition(
-    {
-      x: buddyCenter.x + horizontalDirection * DEFAULT_BUDDY_SIZE.width * 0.52 - BUDDY_VIRTUAL_CURSOR_SIZE.width / 2,
-      y: buddyPosition.y - BUDDY_VIRTUAL_CURSOR_SIZE.height * 0.38,
-    },
-    currentViewport,
-    BUDDY_VIRTUAL_CURSOR_SIZE,
-    DEFAULT_BUDDY_MARGIN,
-  );
-}
-
 function moveVirtualCursorTo(
   nextPosition: BuddyPosition,
   options: { updateAngle?: boolean; durationMs?: number; rotateDurationMs?: number; angleDeg?: number; smoothAngle?: boolean } = {},
@@ -1940,12 +1931,26 @@ function moveVirtualCursorTo(
   clearVirtualCursorFlightFrame();
   const currentPosition = virtualCursorPosition.value;
   const targetAngleDeg = options.angleDeg ?? resolveVirtualCursorFlightAngle(currentPosition, nextPosition);
-  setVirtualCursorMoveTransitionDuration(options.durationMs ?? resolveVirtualCursorMoveDurationMs(currentPosition, nextPosition));
-  setVirtualCursorRotateTransitionDuration(options.rotateDurationMs ?? resolveVirtualCursorRotateDurationMs(targetAngleDeg));
+  setVirtualCursorMoveTransitionDuration(
+    options.durationMs ??
+      resolveVirtualCursorMoveDurationMs(
+        currentPosition,
+        nextPosition,
+        buddyMascotMotionConfig.value.virtualCursorFlightSpeedPxPerS,
+      ),
+  );
+  setVirtualCursorRotateTransitionDuration(
+    options.rotateDurationMs ??
+      resolveVirtualCursorRotateDurationMs(
+        virtualCursorAngleDeg.value,
+        targetAngleDeg,
+        buddyMascotMotionConfig.value.virtualCursorRotationSpeedDegPerS,
+      ),
+  );
   if (options.updateAngle !== false) {
     virtualCursorAngleDeg.value = options.smoothAngle
-      ? resolveSmoothedVirtualCursorAngle(targetAngleDeg)
-      : resolveContinuousVirtualCursorAngle(targetAngleDeg);
+      ? resolveSmoothedVirtualCursorAngleForFrame(targetAngleDeg)
+      : resolveContinuousVirtualCursorAngle(virtualCursorAngleDeg.value, targetAngleDeg);
   } else {
     virtualCursorAngleFrameTimestampMs = null;
   }
@@ -1958,8 +1963,18 @@ function moveVirtualCursorToWithArmedTransition(
 ) {
   const currentPosition = virtualCursorPosition.value;
   const targetAngleDeg = options.angleDeg ?? resolveVirtualCursorFlightAngle(currentPosition, nextPosition);
-  const durationMs = options.durationMs ?? resolveVirtualCursorMoveDurationMs(currentPosition, nextPosition);
-  const rotateDurationMs = options.rotateDurationMs ?? resolveVirtualCursorRotateDurationMs(targetAngleDeg);
+  const durationMs = options.durationMs ??
+    resolveVirtualCursorMoveDurationMs(
+      currentPosition,
+      nextPosition,
+      buddyMascotMotionConfig.value.virtualCursorFlightSpeedPxPerS,
+    );
+  const rotateDurationMs = options.rotateDurationMs ??
+    resolveVirtualCursorRotateDurationMs(
+      virtualCursorAngleDeg.value,
+      targetAngleDeg,
+      buddyMascotMotionConfig.value.virtualCursorRotationSpeedDegPerS,
+    );
   clearVirtualCursorFlightFrame();
   setVirtualCursorMoveTransitionDuration(durationMs);
   setVirtualCursorRotateTransitionDuration(rotateDurationMs);
@@ -2026,26 +2041,12 @@ function runVirtualCursorFlightTrackingFrame() {
   }
 }
 
-function interpolateBuddyPosition(fromPosition: BuddyPosition, toPosition: BuddyPosition, progress: number): BuddyPosition {
-  return {
-    x: fromPosition.x + (toPosition.x - fromPosition.x) * progress,
-    y: fromPosition.y + (toPosition.y - fromPosition.y) * progress,
-  };
-}
-
 function resolveCurrentVirtualCursorTrackingPosition() {
   return virtualCursorTrackingPosition ?? virtualCursorPosition.value;
 }
 
 function resolveVirtualCursorFollowMaxDistancePx() {
   return buddyMascotMotionConfig.value.virtualCursorFollowMaxDistancePx;
-}
-
-function resolveVirtualCursorFollowTargetDistancePx() {
-  return Math.min(
-    BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_DISTANCE_PX,
-    Math.max(BUDDY_VIRTUAL_CURSOR_SIZE.width * 0.38, resolveVirtualCursorFollowMaxDistancePx() * 0.72),
-  );
 }
 
 function setVirtualCursorMoveTransitionDuration(durationMs: number) {
@@ -2056,85 +2057,22 @@ function setVirtualCursorRotateTransitionDuration(durationMs: number) {
   virtualCursorRotateDurationMs.value = Math.round(clampNumber(durationMs, 0, BUDDY_VIRTUAL_CURSOR_MAX_ROTATE_TRANSITION_MS));
 }
 
-function resolveVirtualCursorMoveDurationMs(fromPosition: BuddyPosition, toPosition: BuddyPosition) {
-  const distance = Math.hypot(toPosition.x - fromPosition.x, toPosition.y - fromPosition.y);
-  if (distance < 1) {
-    return 0;
-  }
-  return clampNumber(
-    distance * 1000 / buddyMascotMotionConfig.value.virtualCursorFlightSpeedPxPerS,
-    BUDDY_VIRTUAL_CURSOR_MIN_FLIGHT_DURATION_MS,
-    BUDDY_VIRTUAL_CURSOR_MAX_FLIGHT_DURATION_MS,
-  );
-}
-
-function resolveVirtualCursorRotateDurationMs(targetAngleDeg: number) {
-  const nextAngleDeg = resolveContinuousVirtualCursorAngle(targetAngleDeg);
-  const deltaDeg = Math.abs(nextAngleDeg - virtualCursorAngleDeg.value);
-  if (deltaDeg < 1) {
-    return 0;
-  }
-  return clampNumber(
-    deltaDeg * 1000 / buddyMascotMotionConfig.value.virtualCursorRotationSpeedDegPerS,
-    0,
-    BUDDY_VIRTUAL_CURSOR_MAX_ROTATE_TRANSITION_MS,
-  );
-}
-
 function settleVirtualCursorRotation() {
   setVirtualCursorRotateTransitionDuration(BUDDY_VIRTUAL_CURSOR_ROTATE_TRANSITION_MS);
   virtualCursorAngleFrameTimestampMs = null;
   virtualCursorAngleDeg.value = BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG;
 }
 
-function resolveContinuousVirtualCursorAngle(targetAngleDeg: number) {
-  const currentAngleDeg = virtualCursorAngleDeg.value;
-  const deltaDeg = ((((targetAngleDeg - currentAngleDeg + 180) % 360) + 360) % 360) - 180;
-  return currentAngleDeg + deltaDeg;
-}
-
-function resolveSmoothedVirtualCursorAngle(targetAngleDeg: number) {
+function resolveSmoothedVirtualCursorAngleForFrame(targetAngleDeg: number) {
   const nowMs = typeof performance === "undefined" ? Date.now() : performance.now();
   const elapsedMs = virtualCursorAngleFrameTimestampMs === null ? 16 : Math.max(0, nowMs - virtualCursorAngleFrameTimestampMs);
   virtualCursorAngleFrameTimestampMs = nowMs;
-  const nextAngleDeg = resolveContinuousVirtualCursorAngle(targetAngleDeg);
-  const deltaDeg = nextAngleDeg - virtualCursorAngleDeg.value;
-  const maxDeltaDeg = buddyMascotMotionConfig.value.virtualCursorRotationSpeedDegPerS * elapsedMs / 1000;
-  return virtualCursorAngleDeg.value + clampNumber(deltaDeg, -maxDeltaDeg, maxDeltaDeg);
-}
-
-function resolveVirtualCursorFlightAngle(fromPosition: BuddyPosition, toPosition: BuddyPosition): number {
-  const deltaX = toPosition.x - fromPosition.x;
-  const deltaY = toPosition.y - fromPosition.y;
-  if (Math.hypot(deltaX, deltaY) < 1) {
-    return BUDDY_VIRTUAL_CURSOR_RESTING_ANGLE_DEG;
-  }
-  return resolveVirtualCursorVectorAngle(deltaX, deltaY);
-}
-
-function resolveVirtualCursorVectorAngle(deltaX: number, deltaY: number) {
-  if (Math.hypot(deltaX, deltaY) < 0.001) {
-    return virtualCursorAngleDeg.value;
-  }
-  return Math.atan2(deltaY, deltaX) * (180 / Math.PI) + 90;
-}
-
-function resolveBoxCenter(positionValue: BuddyPosition, size: { width: number; height: number }) {
-  return {
-    x: positionValue.x + size.width / 2,
-    y: positionValue.y + size.height / 2,
-  };
-}
-
-function clampVirtualCursorFramePosition(positionValue: BuddyPosition): BuddyPosition {
-  const minX = DEFAULT_BUDDY_MARGIN;
-  const minY = DEFAULT_BUDDY_MARGIN;
-  const maxX = Math.max(minX, viewport.value.width - BUDDY_VIRTUAL_CURSOR_SIZE.width - DEFAULT_BUDDY_MARGIN);
-  const maxY = Math.max(minY, viewport.value.height - BUDDY_VIRTUAL_CURSOR_SIZE.height - DEFAULT_BUDDY_MARGIN);
-  return {
-    x: clampNumber(positionValue.x, minX, maxX),
-    y: clampNumber(positionValue.y, minY, maxY),
-  };
+  return resolveSmoothedVirtualCursorAngle(
+    virtualCursorAngleDeg.value,
+    targetAngleDeg,
+    elapsedMs,
+    buddyMascotMotionConfig.value.virtualCursorRotationSpeedDegPerS,
+  );
 }
 
 function handleBuddyVirtualUiOperationEvent(payload: Record<string, unknown>) {
@@ -2709,7 +2647,10 @@ async function executeBuddyVirtualGraphEditOperation(
       }
       if (step.kind === "open_node_creation_menu") {
         if (!step.sourceAnchorKind && targetElement) {
-          dispatchVirtualDoubleClick(targetElement, resolveGraphEditPlaybackPositionClientPoint(step));
+          dispatchVirtualDoubleClick(targetElement, resolveGraphEditPlaybackPositionClientPoint(
+            step,
+            resolveVirtualOperationAffordance("editor.canvas.surface")?.element ?? null,
+          ));
         }
       } else if (step.kind === "choose_node_type" && targetElement) {
         const beforeNodeIds = listGraphEditPlaybackNodeAffordanceIds();
@@ -2761,10 +2702,6 @@ async function executeBuddyVirtualGraphEditOperation(
   });
 }
 
-function isGraphEditPlaybackDragStep(step: GraphEditPlaybackStep) {
-  return step.kind === "drag_state_edge_to_canvas" || step.kind === "drag_state_edge_to_node" || step.kind === "draw_flow_edge";
-}
-
 async function ensureGraphEditPlaybackStepVisible(
   step: GraphEditPlaybackStep,
   playbackState: GraphEditPlaybackUiState,
@@ -2814,31 +2751,12 @@ async function dispatchVirtualGraphDragPointerEvents(step: GraphEditPlaybackStep
   dispatchVirtualPointerEvent(pointerSurface, "pointerup", endPoint.x, endPoint.y, { forceEmptyCanvasDrop });
 }
 
-function shouldForceGraphEditPlaybackEmptyCanvasDrop(step: GraphEditPlaybackStep) {
-  const endTarget = typeof step.endTarget === "string" ? step.endTarget : "";
-  return (
-    (step.kind === "drag_state_edge_to_canvas" || step.kind === "draw_flow_edge") &&
-    Boolean(step.position) &&
-    (!endTarget || endTarget === "editor.canvas.surface" || endTarget === "editor.canvas.empty.createFirstNode")
-  );
-}
-
-function buildVirtualDragPoints(startPoint: BuddyPosition, endPoint: BuddyPosition) {
-  const points: BuddyPosition[] = [];
-  const steps = 5;
-  for (let index = 1; index <= steps; index += 1) {
-    const progress = index / steps;
-    points.push({
-      x: startPoint.x + (endPoint.x - startPoint.x) * progress,
-      y: startPoint.y + (endPoint.y - startPoint.y) * progress,
-    });
-  }
-  return points;
-}
-
 function resolveGraphEditPlaybackDragEndPoint(step: GraphEditPlaybackStep): BuddyPosition | null {
   const endTarget = typeof step.endTarget === "string" ? step.endTarget : "";
-  const positionPoint = resolveGraphEditPlaybackPositionClientPoint(step);
+  const positionPoint = resolveGraphEditPlaybackPositionClientPoint(
+    step,
+    resolveVirtualOperationAffordance("editor.canvas.surface")?.element ?? null,
+  );
   if (positionPoint && (!endTarget || endTarget === "editor.canvas.surface" || endTarget === "editor.canvas.empty.createFirstNode")) {
     return positionPoint;
   }
@@ -2857,7 +2775,7 @@ function resolveGraphEditPlaybackDragEndPoint(step: GraphEditPlaybackStep): Budd
 }
 
 function resolveGraphEditPlaybackAnchorNodeFallbackPoint(targetId: string) {
-  const nodeId = /^editor\.canvas\.anchor\.([^:]+):/.exec(targetId)?.[1] ?? "";
+  const nodeId = resolveGraphEditPlaybackAnchorNodeId(targetId);
   if (!nodeId) {
     return null;
   }
@@ -2946,21 +2864,6 @@ function dispatchGraphEditPlaybackTextCommit(element: HTMLElement, targetId: str
   element.dispatchEvent(new KeyboardEvent("keyup", eventInit));
 }
 
-function listGraphEditPlaybackNodeAffordanceIds() {
-  if (typeof document === "undefined") {
-    return new Set<string>();
-  }
-  const nodeIds = new Set<string>();
-  document.querySelectorAll<HTMLElement>("[data-virtual-affordance-id]").forEach((element) => {
-    const targetId = element.dataset.virtualAffordanceId ?? "";
-    const nodeId = targetId.match(/^editor\.canvas\.node\.([^.]+)$/)?.[1] ?? "";
-    if (nodeId) {
-      nodeIds.add(nodeId);
-    }
-  });
-  return nodeIds;
-}
-
 function rememberCreatedNodeAlias(step: GraphEditPlaybackStep, beforeNodeIds: Set<string>, playbackState: GraphEditPlaybackUiState) {
   const plannedNodeId = step.nodeId ?? "";
   if (!plannedNodeId || playbackState.nodeIdAliases.has(plannedNodeId)) {
@@ -2972,31 +2875,6 @@ function rememberCreatedNodeAlias(step: GraphEditPlaybackStep, beforeNodeIds: Se
   }
 }
 
-function listGraphEditPlaybackPortStateKeys(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState) {
-  if (typeof document === "undefined") {
-    return new Set<string>();
-  }
-  const plannedNodeId = step.nodeId ?? "";
-  const nodeId = plannedNodeId ? playbackState.nodeIdAliases.get(plannedNodeId) ?? plannedNodeId : "";
-  const side = step.bindingMode === "read" ? "input" : step.bindingMode === "write" ? "output" : "";
-  if (!nodeId || !side) {
-    return new Set<string>();
-  }
-  const stateKeys = new Set<string>();
-  const prefix = `editor.canvas.node.${nodeId}.port.${side}.`;
-  document.querySelectorAll<HTMLElement>("[data-virtual-affordance-id]").forEach((element) => {
-    const targetId = element.dataset.virtualAffordanceId ?? "";
-    if (!targetId.startsWith(prefix) || targetId.endsWith(".create") || targetId.endsWith(".remove")) {
-      return;
-    }
-    const stateKey = targetId.slice(prefix.length);
-    if (stateKey && !stateKey.includes(".")) {
-      stateKeys.add(stateKey);
-    }
-  });
-  return stateKeys;
-}
-
 function rememberCreatedStateAlias(step: GraphEditPlaybackStep, beforeStateKeys: Set<string>, playbackState: GraphEditPlaybackUiState) {
   const plannedStateKey = step.stateKey ?? "";
   if (!plannedStateKey || playbackState.stateKeyAliases.has(plannedStateKey)) {
@@ -3006,16 +2884,6 @@ function rememberCreatedStateAlias(step: GraphEditPlaybackStep, beforeStateKeys:
   if (createdStateKeys.length === 1) {
     playbackState.stateKeyAliases.set(plannedStateKey, createdStateKeys[0]!);
   }
-}
-
-function resolveGraphEditPlaybackStepDelayMs(step: GraphEditPlaybackStep): number {
-  if (step.kind === "apply_graph_command") {
-    return 180;
-  }
-  if (step.kind === "type_node_field" || step.kind === "type_state_field" || step.kind === "commit_state_field") {
-    return 160;
-  }
-  return 90;
 }
 
 async function clickVirtualOperationTargetWithRetry(targetId: string, token: BuddyVirtualOperationToken | null) {
@@ -3199,68 +3067,19 @@ async function moveVirtualCursorToElement(element: HTMLElement) {
 }
 
 function moveVirtualCursorToClientPoint(point: BuddyPosition, options: { durationMs?: number } = {}) {
-  return moveVirtualCursorToWithArmedTransition(resolveVirtualCursorPositionForClientPoint(point), options);
-}
-
-function resolveElementCenterPoint(element: HTMLElement): BuddyPosition {
-  const rect = element.getBoundingClientRect();
-  return {
-    x: rect.left + rect.width / 2,
-    y: rect.top + rect.height / 2,
-  };
+  return moveVirtualCursorToWithArmedTransition(resolveVirtualCursorPositionForClientPoint(point, viewport.value), options);
 }
 
 async function moveVirtualCursorToGraphEditStep(step: GraphEditPlaybackStep, element: HTMLElement) {
-  const positionPoint = resolveGraphEditPlaybackPositionClientPoint(step);
+  const positionPoint = resolveGraphEditPlaybackPositionClientPoint(
+    step,
+    resolveVirtualOperationAffordance("editor.canvas.surface")?.element ?? null,
+  );
   if (positionPoint && (step.kind === "move_virtual_cursor" || step.kind === "open_node_creation_menu")) {
     await waitForVirtualOperation(moveVirtualCursorToClientPoint(positionPoint));
     return;
   }
   await moveVirtualCursorToElement(element);
-}
-
-function resolveGraphEditPlaybackPositionClientPoint(step: GraphEditPlaybackStep): BuddyPosition | null {
-  const position = step.position;
-  if (!position || typeof position.x !== "number" || typeof position.y !== "number") {
-    return null;
-  }
-  const canvas = resolveVirtualOperationAffordance("editor.canvas.surface")?.element;
-  const viewportElement = canvas?.querySelector<HTMLElement>(".editor-canvas__viewport") ?? null;
-  if (!canvas) {
-    return null;
-  }
-  const canvasRect = canvas.getBoundingClientRect();
-  const viewportTransform = resolveGraphEditPlaybackViewportTransform(viewportElement);
-  return {
-    x: canvasRect.left + viewportTransform.x + position.x * viewportTransform.scaleX,
-    y: canvasRect.top + viewportTransform.y + position.y * viewportTransform.scaleY,
-  };
-}
-
-function resolveGraphEditPlaybackViewportTransform(viewportElement: HTMLElement | null) {
-  if (!viewportElement || typeof window === "undefined" || typeof window.getComputedStyle !== "function") {
-    return { x: 0, y: 0, scaleX: 1, scaleY: 1 };
-  }
-  const transform = window.getComputedStyle(viewportElement).transform;
-  if (!transform || transform === "none") {
-    return { x: 0, y: 0, scaleX: 1, scaleY: 1 };
-  }
-  try {
-    if (typeof DOMMatrixReadOnly === "function") {
-      const matrix = new DOMMatrixReadOnly(transform);
-      return { x: matrix.e, y: matrix.f, scaleX: matrix.a || 1, scaleY: matrix.d || 1 };
-    }
-  } catch {
-    // Fall through to the lightweight matrix parser below.
-  }
-  const matrixMatch = transform.match(/^matrix\(([^)]+)\)$/);
-  const values = matrixMatch?.[1]?.split(",").map((value) => Number(value.trim())) ?? [];
-  return {
-    x: Number.isFinite(values[4]) ? values[4]! : 0,
-    y: Number.isFinite(values[5]) ? values[5]! : 0,
-    scaleX: Number.isFinite(values[0]) && values[0] !== 0 ? values[0]! : 1,
-    scaleY: Number.isFinite(values[3]) && values[3] !== 0 ? values[3]! : 1,
-  };
 }
 
 async function ensureVirtualCursorReadyForOperation() {
@@ -3273,14 +3092,7 @@ async function ensureVirtualCursorReadyForOperation() {
 }
 
 function resolveVirtualCursorPositionForElement(element: HTMLElement): BuddyPosition {
-  return resolveVirtualCursorPositionForClientPoint(resolveElementCenterPoint(element));
-}
-
-function resolveVirtualCursorPositionForClientPoint(point: BuddyPosition): BuddyPosition {
-  return clampVirtualCursorFramePosition({
-    x: point.x - BUDDY_VIRTUAL_CURSOR_SIZE.width / 2,
-    y: point.y - BUDDY_VIRTUAL_CURSOR_SIZE.height / 2,
-  });
+  return resolveVirtualCursorPositionForClientPoint(resolveElementCenterPoint(element), viewport.value);
 }
 
 async function replaceVirtualText(element: HTMLInputElement | HTMLTextAreaElement, text: string) {
@@ -3308,10 +3120,6 @@ async function typeVirtualText(element: HTMLInputElement | HTMLTextAreaElement, 
     dispatchVirtualInputEvents(element, "insertText", character);
     await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TYPE_CHARACTER_DELAY_MS);
   }
-}
-
-function normalizeVirtualText(value: unknown) {
-  return String(value ?? "").replace(/\r\n/g, "\n").trim();
 }
 
 function clampNumber(value: number, min: number, max: number) {
@@ -3585,52 +3393,6 @@ function finishBuddyVisibleRun(
   }
 }
 
-async function startBuddyAutonomousReviewRun(mainRun: RunDetail) {
-  if (mainRun.status !== "completed") {
-    return;
-  }
-  try {
-    const binding = await fetchBuddyMemoryReviewTemplateBinding();
-    const template = await fetchTemplate(binding.template_id);
-    const graph = buildBuddyReviewGraph(template, {
-      mainRun,
-      binding,
-      currentSessionId: currentSessionId.value,
-      buddyModel: buddyModelRef.value,
-    });
-    const reviewRun = await runGraph(graph);
-    void pollBuddyAutonomousReviewRun(reviewRun.run_id);
-  } catch (error) {
-    console.warn("[Buddy] Background autonomous review failed to start.", error);
-  }
-}
-
-async function pollBuddyAutonomousReviewRun(runId: string) {
-  const controller = new AbortController();
-  backgroundReviewAbortControllers.add(controller);
-  try {
-    const run = await pollRunUntilFinished(runId, controller.signal);
-    if (run.status === "completed") {
-      buddyContextStore.notifyBuddyDataChanged();
-    } else if (run.status === "failed") {
-      console.warn("[Buddy] Background autonomous review failed.", run.errors);
-    }
-  } catch (error) {
-    if (!(error instanceof DOMException && error.name === "AbortError")) {
-      console.warn("[Buddy] Background autonomous review polling failed.", error);
-    }
-  } finally {
-    backgroundReviewAbortControllers.delete(controller);
-  }
-}
-
-function abortBackgroundReviewRuns() {
-  for (const controller of backgroundReviewAbortControllers) {
-    controller.abort();
-  }
-  backgroundReviewAbortControllers.clear();
-}
-
 async function persistBuddyMessage(
   sessionId: string,
   message: BuddyMessage | undefined,
@@ -3699,115 +3461,9 @@ function persistPosition() {
   window.localStorage.setItem(BUDDY_POSITION_STORAGE_KEY, serializeBuddyPosition(position.value));
 }
 
-function startRunEventStream(
-  runId: string,
-  assistantMessageId: string,
-  graph: GraphPayload,
-  publicOutputBindings: BuddyPublicOutputBinding[],
-) {
-  closeEventSource();
-  const streamUrl = buildRunEventStreamUrl(runId);
-  if (!streamUrl || typeof EventSource === "undefined") {
-    return;
-  }
-
-  let publicOutputState = createBuddyPublicOutputRuntimeState();
-  const outputTracePlan = buildBuddyOutputTracePlan(graph, publicOutputBindings);
-  let outputTraceState = createBuddyOutputTraceRuntimeState(outputTracePlan);
-  const source = new EventSource(streamUrl);
-  eventSource = source;
-  void hydrateBuddyStreamingRunDisplayFromSnapshot(runId, source, graph, publicOutputBindings, outputTracePlan).then((snapshot) => {
-    if (!snapshot || eventSource !== source) {
-      return;
-    }
-    if (!hasVisibleBuddyRunDisplaySnapshot(snapshot)) {
-      return;
-    }
-    outputTraceState = snapshot.outputTraceState;
-    publicOutputState = snapshot.publicOutputState;
-    syncStreamingBuddyRunDisplay(assistantMessageId, runId, outputTraceState, publicOutputState);
-  });
-  const handleStreamingEvent = (eventType: string, event: Event) => {
-    const payload = parseRunEventPayload(event);
-    if (!payload) {
-      return;
-    }
-    if (eventType === "activity.event") {
-      handleBuddyVirtualUiOperationEvent(payload);
-    }
-    outputTraceState = reduceBuddyOutputTraceEvent(
-      outputTraceState,
-      outputTracePlan,
-      graph,
-      eventType,
-      payload,
-      nowPublicOutputMs(),
-    );
-    publicOutputState = reduceBuddyPublicOutputEvent(
-      publicOutputState,
-      publicOutputBindings,
-      eventType,
-      payload,
-      nowPublicOutputMs(),
-    );
-    syncStreamingBuddyRunDisplay(assistantMessageId, runId, outputTraceState, publicOutputState);
-    setAssistantActivityFromRunEvent(assistantMessageId, eventType, payload, graph);
-  };
-  source.addEventListener("node.started", (event) => handleStreamingEvent("node.started", event));
-  source.addEventListener("node.output.delta", (event) => handleStreamingEvent("node.output.delta", event));
-  source.addEventListener("node.output.completed", (event) => handleStreamingEvent("node.output.completed", event));
-  source.addEventListener("state.updated", (event) => handleStreamingEvent("state.updated", event));
-  source.addEventListener("activity.event", (event) => handleStreamingEvent("activity.event", event));
-  source.addEventListener("node.completed", (event) => handleStreamingEvent("node.completed", event));
-  source.addEventListener("node.failed", (event) => handleStreamingEvent("node.failed", event));
-  source.addEventListener("run.completed", () => closeEventSource(source));
-  source.addEventListener("run.failed", () => closeEventSource(source));
-  source.addEventListener("run.cancelled", () => closeEventSource(source));
-  source.onerror = () => closeEventSource(source);
-}
-
-async function hydrateBuddyStreamingRunDisplayFromSnapshot(
-  runId: string,
-  source: EventSource,
-  graph: GraphPayload,
-  publicOutputBindings: BuddyPublicOutputBinding[],
-  outputTracePlan: ReturnType<typeof buildBuddyOutputTracePlan>,
-): Promise<BuddyStreamingRunDisplaySnapshot | null> {
-  try {
-    const runDetail = await fetchRun(runId);
-    if (eventSource !== source) {
-      return null;
-    }
-    return {
-      outputTraceState: buildBuddyOutputTraceStateFromRunDetail(runDetail, outputTracePlan, graph),
-      publicOutputState: buildPublicOutputRuntimeStateFromRunDetail(runDetail, publicOutputBindings, graph),
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function pollRunUntilFinished(runId: string, signal: AbortSignal): Promise<RunDetail> {
-  while (true) {
-    const run = await fetchRun(runId, { signal });
-    if (!shouldPollRunStatus(run.status)) {
-      return run;
-    }
-    await delay(RUN_POLL_INTERVAL_MS, signal);
-  }
-}
-
-function closeEventSource(source: EventSource | null = eventSource) {
-  source?.close();
-  if (eventSource === source) {
-    eventSource = null;
-  }
-}
-
 const {
   showBuddyImmediatePendingTrace,
   showBuddyGraphPendingTrace,
-  hasVisibleBuddyRunDisplaySnapshot,
   shouldRenderMessage,
   shouldShowMessageRoleLabel,
   removeBuddyRunDisplayMessages,
@@ -3828,6 +3484,28 @@ const {
   allocateBuddyMessageClientOrder,
   scrollMessagesToBottom,
   clearAutoResumingPageOperationPlaceholder,
+});
+
+const {
+  startRunEventStream,
+  closeEventSource,
+  pollRunUntilFinished,
+} = useBuddyRunEventStream({
+  handleActivityEvent: handleBuddyVirtualUiOperationEvent,
+  setAssistantActivityFromRunEvent,
+  syncStreamingBuddyRunDisplay,
+  buildPublicOutputRuntimeStateFromRunDetail,
+  nowPublicOutputMs,
+});
+
+const {
+  startBuddyAutonomousReviewRun,
+  abortBackgroundReviewRuns,
+} = useBuddyAutonomousReviewRun({
+  currentSessionId,
+  buddyModelRef,
+  pollRunUntilFinished,
+  notifyBuddyDataChanged: buddyContextStore.notifyBuddyDataChanged,
 });
 
 const {
@@ -3893,24 +3571,6 @@ function resolveViewport() {
   };
 }
 
-function delay(timeoutMs: number, signal: AbortSignal) {
-  return new Promise<void>((resolve, reject) => {
-    if (signal.aborted) {
-      reject(new DOMException("Aborted", "AbortError"));
-      return;
-    }
-    const timerId = window.setTimeout(resolve, timeoutMs);
-    signal.addEventListener(
-      "abort",
-      () => {
-        window.clearTimeout(timerId);
-        reject(new DOMException("Aborted", "AbortError"));
-      },
-      { once: true },
-    );
-  });
-}
-
 function waitForFrontendObservation(timeoutMs: number) {
   return new Promise<void>((resolve) => {
     const setTimer = typeof window === "undefined" ? globalThis.setTimeout : window.setTimeout;
@@ -3923,728 +3583,4 @@ function formatErrorMessage(error: unknown): string {
 }
 </script>
 
-<style scoped>
-.buddy-widget {
-  position: fixed;
-  inset: 0;
-  z-index: 4500;
-  pointer-events: none;
-  font-family: var(--toograph-font-ui);
-}
-
-.buddy-widget__anchor {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 96px;
-  height: 96px;
-  pointer-events: none;
-  transition: transform 120ms ease;
-}
-
-.buddy-widget__anchor--roaming {
-  transition: transform var(--buddy-widget-roam-duration-ms, 360ms) cubic-bezier(0.2, 1.05, 0.32, 1);
-}
-
-.buddy-widget__anchor--fullscreen {
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 4510;
-}
-
-.buddy-widget__graph-drag-line {
-  position: fixed;
-  inset: 0;
-  z-index: 4523;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none;
-}
-
-.buddy-widget__graph-drag-line line {
-  stroke: #dfad50;
-  stroke-width: 3.5;
-  stroke-linecap: round;
-  filter:
-    drop-shadow(0 2px 4px rgba(40, 32, 20, 0.28))
-    drop-shadow(0 0 8px rgba(242, 201, 104, 0.45));
-}
-
-.buddy-widget__graph-drag-line--state line {
-  stroke: #2563eb;
-}
-
-.buddy-widget__backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: auto;
-  background:
-    radial-gradient(circle at 20% 16%, rgba(255, 255, 255, 0.42), transparent 34%),
-    linear-gradient(135deg, rgba(45, 32, 21, 0.16), rgba(154, 52, 18, 0.08));
-  backdrop-filter: blur(18px) saturate(1.22);
-}
-
-.buddy-widget__virtual-cursor {
-  appearance: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 4524;
-  width: 42px;
-  height: 42px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: grab;
-  pointer-events: auto;
-  touch-action: none;
-  user-select: none;
-  transform-origin: 50% 58%;
-  will-change: translate, rotate;
-  filter:
-    drop-shadow(0 5px 9px rgba(40, 32, 20, 0.22))
-    drop-shadow(0 0 8px rgba(242, 201, 104, 0.32))
-    drop-shadow(0 0 2px rgba(255, 251, 235, 0.82));
-  transition:
-    translate var(--buddy-widget-virtual-cursor-move-duration-ms, 180ms) linear,
-    rotate var(--buddy-widget-virtual-cursor-rotate-duration-ms, 120ms) ease,
-    filter 140ms ease;
-}
-
-.buddy-widget__virtual-cursor--launching {
-  transition:
-    translate var(--buddy-widget-virtual-cursor-morph-duration-ms, 360ms) cubic-bezier(0.2, 0.9, 0.22, 1),
-    rotate 120ms ease,
-    filter 140ms ease;
-}
-
-.buddy-widget__virtual-cursor--returning {
-  transition:
-    translate var(--buddy-widget-virtual-cursor-morph-duration-ms, 360ms) cubic-bezier(0.2, 0.9, 0.22, 1),
-    filter 140ms ease;
-}
-
-.buddy-widget__virtual-cursor-svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  user-select: none;
-  scale: var(--buddy-widget-virtual-cursor-scale);
-  transition: scale 160ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.buddy-widget__virtual-cursor-shape {
-  stroke: #171818;
-  stroke-width: 8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  paint-order: stroke fill;
-}
-
-.buddy-widget__virtual-cursor--returning .buddy-widget__virtual-cursor-shape {
-  stroke-width: 0;
-}
-
-.buddy-widget__virtual-cursor--floating .buddy-widget__virtual-cursor-svg {
-  animation: buddy-widget-virtual-cursor-float 1.5s ease-in-out infinite;
-}
-
-.buddy-widget__virtual-cursor--launching .buddy-widget__virtual-cursor-svg,
-.buddy-widget__virtual-cursor--returning .buddy-widget__virtual-cursor-svg {
-  transition: scale var(--buddy-widget-virtual-cursor-morph-duration-ms, 360ms) cubic-bezier(0.2, 0.9, 0.22, 1);
-}
-
-.buddy-widget__virtual-cursor:active {
-  cursor: grabbing;
-  filter:
-    drop-shadow(0 4px 7px rgba(40, 32, 20, 0.26))
-    drop-shadow(0 0 8px rgba(242, 201, 104, 0.36))
-    drop-shadow(0 0 2px rgba(255, 251, 235, 0.9));
-}
-
-.buddy-widget__virtual-cursor--operation-active {
-  pointer-events: none;
-  cursor: default;
-}
-
-.buddy-widget__avatar {
-  appearance: none;
-  position: relative;
-  z-index: 4;
-  width: 96px;
-  height: 96px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  cursor: grab;
-  isolation: isolate;
-  overflow: visible;
-  pointer-events: auto;
-  touch-action: none;
-  transition: transform 160ms ease;
-}
-
-.buddy-widget__avatar > .buddy-mascot {
-  position: relative;
-  z-index: 1;
-  filter:
-    drop-shadow(0 8px 12px rgba(255, 255, 255, 0.86))
-    drop-shadow(0 2px 5px rgba(255, 255, 255, 0.72))
-    drop-shadow(0 0 3px rgba(255, 255, 255, 0.94));
-  transition: filter 160ms ease;
-}
-
-.buddy-widget__avatar:hover {
-  transform: translateY(-2px);
-}
-
-.buddy-widget__avatar:hover > .buddy-mascot {
-  filter:
-    drop-shadow(0 9px 14px rgba(255, 255, 255, 0.9))
-    drop-shadow(0 3px 6px rgba(255, 255, 255, 0.76))
-    drop-shadow(0 0 4px rgba(255, 255, 255, 0.98));
-}
-
-.buddy-widget__avatar--roaming.buddy-widget__avatar--hop-cycle-a {
-  animation: buddy-widget-avatar-hop-path-a var(--buddy-widget-roam-duration-ms, 360ms) cubic-bezier(0.2, 1.05, 0.32, 1) both;
-}
-
-.buddy-widget__avatar--roaming.buddy-widget__avatar--hop-cycle-b {
-  animation: buddy-widget-avatar-hop-path-b var(--buddy-widget-roam-duration-ms, 360ms) cubic-bezier(0.2, 1.05, 0.32, 1) both;
-}
-
-.buddy-widget__avatar--hopping.buddy-widget__avatar--hop-cycle-a {
-  animation: buddy-widget-avatar-hop-path-a var(--buddy-widget-hop-duration-ms, 360ms) cubic-bezier(0.2, 1.05, 0.32, 1) both;
-}
-
-.buddy-widget__avatar--hopping.buddy-widget__avatar--hop-cycle-b {
-  animation: buddy-widget-avatar-hop-path-b var(--buddy-widget-hop-duration-ms, 360ms) cubic-bezier(0.2, 1.05, 0.32, 1) both;
-}
-
-.buddy-widget__avatar:active {
-  cursor: grabbing;
-  transform: translateY(0) scale(0.98);
-}
-
-.buddy-widget__avatar:active > .buddy-mascot {
-  filter:
-    drop-shadow(0 7px 10px rgba(255, 255, 255, 0.82))
-    drop-shadow(0 2px 4px rgba(255, 255, 255, 0.68))
-    drop-shadow(0 0 3px rgba(255, 255, 255, 0.9));
-}
-
-.buddy-widget__avatar:focus-visible,
-.buddy-widget__virtual-cursor:focus-visible,
-.buddy-widget__icon-button:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3);
-}
-
-@keyframes buddy-widget-avatar-hop-path-a {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  34% {
-    transform: translateY(-18px);
-  }
-  66% {
-    transform: translateY(-6px);
-  }
-}
-
-@keyframes buddy-widget-avatar-hop-path-b {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  34% {
-    transform: translateY(-18px);
-  }
-  66% {
-    transform: translateY(-6px);
-  }
-}
-
-@keyframes buddy-widget-virtual-cursor-float {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-4px) rotate(-2deg);
-  }
-}
-
-.buddy-widget__panel,
-.buddy-widget__bubble {
-  position: absolute;
-  pointer-events: auto;
-}
-
-.buddy-widget__panel {
-  bottom: calc(100% + 12px);
-  z-index: 1;
-  width: min(420px, calc(100vw - 32px));
-  max-height: min(640px, calc(100vh - 132px));
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  overflow: visible;
-  border: 1px solid var(--toograph-glass-border);
-  border-radius: 8px;
-  background: var(--toograph-glass-specular), var(--toograph-glass-lens), rgba(255, 252, 247, 0.88);
-  box-shadow: var(--toograph-glass-shadow), var(--toograph-glass-highlight), var(--toograph-glass-rim);
-  backdrop-filter: blur(28px) saturate(1.55) contrast(1.02);
-}
-
-.buddy-widget__panel--fullscreen {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  right: auto;
-  bottom: auto;
-  width: min(1440px, calc(100vw - 96px));
-  height: min(920px, calc(100vh - 80px));
-  max-height: calc(100vh - 80px);
-  transform: translate(-50%, -50%);
-  z-index: 1;
-}
-
-.buddy-widget__anchor--fullscreen .buddy-widget__avatar {
-  position: fixed;
-  right: auto;
-  bottom: auto;
-  z-index: 4;
-}
-
-.buddy-widget__anchor--left .buddy-widget__panel {
-  right: 0;
-}
-
-.buddy-widget__anchor--right .buddy-widget__panel {
-  left: 0;
-}
-
-.buddy-widget__anchor--fullscreen .buddy-widget__panel {
-  top: 50%;
-  left: 50%;
-  right: auto;
-  bottom: auto;
-}
-
-.buddy-widget__header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  padding: 14px 14px 12px;
-  border-bottom: 1px solid rgba(154, 52, 18, 0.1);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 248, 240, 0.5));
-}
-
-.buddy-widget__heading {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.buddy-widget__eyebrow {
-  display: block;
-  color: var(--toograph-accent);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
-
-.buddy-widget__heading h2 {
-  margin: 3px 0 0;
-  color: var(--toograph-text-strong);
-  font-size: 16px;
-  line-height: 1.2;
-}
-
-.buddy-widget__header-actions {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.buddy-widget__runtime-controls {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(116px, 136px);
-  gap: 8px;
-}
-
-.buddy-widget__model,
-.buddy-widget__mode {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.buddy-widget__control-label {
-  color: var(--toograph-text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.buddy-widget__model-select,
-.buddy-widget__mode-select {
-  width: 100%;
-}
-
-.buddy-widget__model-select :deep(.el-select__wrapper),
-.buddy-widget__mode-select :deep(.el-select__wrapper) {
-  min-height: 30px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.66);
-  box-shadow: 0 0 0 1px rgba(154, 52, 18, 0.14) inset;
-}
-
-.buddy-widget__model-select :deep(.el-select__wrapper.is-focused),
-.buddy-widget__mode-select :deep(.el-select__wrapper.is-focused) {
-  box-shadow:
-    0 0 0 1px rgba(154, 52, 18, 0.22) inset,
-    0 0 0 3px rgba(210, 162, 117, 0.22);
-}
-
-:global(.buddy-widget__select-popper.el-popper) {
-  z-index: 4600 !important;
-}
-
-.buddy-widget__mode-option {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  line-height: 1.2;
-}
-
-.buddy-widget__mode-option small {
-  color: var(--toograph-text-muted);
-  font-size: 11px;
-}
-
-.buddy-widget__icon-button {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(154, 52, 18, 0.14);
-  background: rgba(255, 255, 255, 0.62);
-  color: var(--toograph-accent-strong);
-  cursor: pointer;
-  transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
-}
-
-.buddy-widget__icon-button {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-}
-
-.buddy-widget__icon-button:hover {
-  border-color: rgba(154, 52, 18, 0.24);
-  background: rgba(255, 248, 240, 0.92);
-  transform: translateY(-1px);
-}
-
-.buddy-widget__icon-button--active {
-  border-color: rgba(37, 99, 235, 0.22);
-  background: rgba(37, 99, 235, 0.08);
-  color: #1d4ed8;
-}
-
-.buddy-widget__icon-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.54;
-  transform: none;
-}
-
-.buddy-widget__messages {
-  display: grid;
-  align-content: start;
-  gap: 10px;
-  min-height: 240px;
-  max-height: 430px;
-  overflow: auto;
-  padding: 14px;
-}
-
-.buddy-widget__panel--fullscreen .buddy-widget__messages {
-  max-height: none;
-}
-
-.buddy-widget__empty,
-.buddy-widget__error,
-.buddy-widget__queue {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.buddy-widget__empty {
-  color: var(--toograph-text-muted);
-}
-
-.buddy-widget__error {
-  padding: 10px 12px;
-  border: 1px solid rgba(220, 38, 38, 0.16);
-  border-radius: 8px;
-  background: rgba(254, 242, 242, 0.92);
-  color: rgb(185, 28, 28);
-}
-
-.buddy-widget__queue {
-  color: rgba(108, 82, 62, 0.72);
-  font-size: 12px;
-}
-
-.buddy-widget__message {
-  display: grid;
-  gap: 4px;
-}
-
-.buddy-widget__message--grouped {
-  margin-top: -5px;
-}
-
-.buddy-widget__message-label {
-  color: var(--toograph-text-muted);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.buddy-widget__message-bubble {
-  width: fit-content;
-  max-width: 100%;
-  margin: 0;
-  padding: 9px 11px;
-  border: 1px solid rgba(154, 52, 18, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.64);
-  color: var(--toograph-text);
-  font-size: 13px;
-  line-height: 1.55;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.buddy-widget__message-markdown {
-  white-space: normal;
-}
-
-.buddy-widget__message-html-frame {
-  width: 100%;
-  min-height: 300px;
-  overflow: hidden;
-  border: 1px solid rgba(154, 52, 18, 0.12);
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.buddy-widget__message-markdown :deep(p),
-.buddy-widget__message-markdown :deep(ul),
-.buddy-widget__message-markdown :deep(ol),
-.buddy-widget__message-markdown :deep(blockquote),
-.buddy-widget__message-markdown :deep(pre) {
-  margin: 0 0 8px;
-}
-
-.buddy-widget__message-markdown :deep(p:last-child),
-.buddy-widget__message-markdown :deep(ul:last-child),
-.buddy-widget__message-markdown :deep(ol:last-child),
-.buddy-widget__message-markdown :deep(blockquote:last-child),
-.buddy-widget__message-markdown :deep(pre:last-child) {
-  margin-bottom: 0;
-}
-
-.buddy-widget__message-markdown :deep(ul),
-.buddy-widget__message-markdown :deep(ol) {
-  padding-left: 18px;
-}
-
-.buddy-widget__message-markdown :deep(a) {
-  color: #2563eb;
-  font-weight: 650;
-  text-decoration: none;
-}
-
-.buddy-widget__message-markdown :deep(a:hover) {
-  text-decoration: underline;
-}
-
-.buddy-widget__message-markdown :deep(code) {
-  padding: 1px 4px;
-  border-radius: 5px;
-  background: rgba(37, 99, 235, 0.08);
-  color: #1d4ed8;
-  font-family: var(--toograph-font-mono);
-  font-size: 0.92em;
-}
-
-.buddy-widget__message-markdown :deep(pre) {
-  max-width: 100%;
-  overflow: auto;
-  padding: 9px 10px;
-  border: 1px solid rgba(37, 99, 235, 0.12);
-  border-radius: 8px;
-  background: rgba(248, 250, 252, 0.92);
-}
-
-.buddy-widget__message-markdown :deep(pre code) {
-  padding: 0;
-  background: transparent;
-  color: #1f2937;
-}
-
-.buddy-widget__message-markdown :deep(blockquote) {
-  padding: 6px 10px;
-  border-left: 3px solid rgba(154, 52, 18, 0.22);
-  color: rgba(70, 53, 38, 0.88);
-  background: rgba(255, 248, 240, 0.58);
-}
-
-.buddy-widget__message--user {
-  justify-items: end;
-}
-
-.buddy-widget__message--user .buddy-widget__message-bubble {
-  background: rgba(154, 52, 18, 0.08);
-  color: var(--toograph-text-strong);
-}
-
-.buddy-widget__public-output-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.buddy-widget__public-output-duration {
-  width: fit-content;
-  padding: 3px 7px;
-  border: 1px solid rgba(154, 52, 18, 0.12);
-  border-radius: 999px;
-  background: rgba(255, 248, 240, 0.68);
-  color: rgba(108, 82, 62, 0.76);
-  font-family: var(--toograph-font-mono);
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.buddy-widget__public-output-duration--streaming {
-  font-family: var(--toograph-font-ui);
-}
-
-.buddy-widget__public-output-card {
-  width: min(100%, 320px);
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid rgba(154, 52, 18, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 252, 247, 0.72);
-  overflow-wrap: anywhere;
-}
-
-.buddy-widget__public-output-card-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  color: rgba(45, 32, 21, 0.84);
-  font-size: 12px;
-}
-
-.buddy-widget__public-output-card-header span {
-  color: rgba(108, 82, 62, 0.62);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.buddy-widget__public-output-card pre {
-  max-width: 100%;
-  max-height: 260px;
-  margin: 0;
-  overflow: auto;
-  padding: 9px;
-  border: 1px solid rgba(154, 52, 18, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.66);
-  color: rgba(45, 32, 21, 0.86);
-  font-family: var(--toograph-font-mono);
-  font-size: 11px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
-
-.buddy-widget__bubble {
-  bottom: calc(100% + 10px);
-  width: max-content;
-  max-width: min(9em, calc(100vw - 32px));
-  box-sizing: border-box;
-  overflow: hidden;
-  padding: 6px 9px;
-  border: 1px solid rgba(154, 52, 18, 0.14);
-  border-radius: 999px;
-  background: rgba(255, 252, 247, 0.94);
-  color: var(--toograph-text);
-  box-shadow: var(--toograph-glass-highlight), 0 14px 34px rgba(61, 43, 24, 0.12);
-  font-size: 13px;
-  font-weight: 750;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  backdrop-filter: blur(14px) saturate(1.18);
-  cursor: pointer;
-  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
-}
-
-.buddy-widget__bubble:hover,
-.buddy-widget__bubble:focus-visible {
-  border-color: rgba(154, 52, 18, 0.24);
-  box-shadow: var(--toograph-glass-highlight), 0 16px 38px rgba(61, 43, 24, 0.16);
-  transform: translateY(-1px);
-}
-
-.buddy-widget__anchor--left .buddy-widget__bubble {
-  right: 0;
-}
-
-.buddy-widget__anchor--right .buddy-widget__bubble {
-  left: 0;
-}
-
-@media (max-width: 560px) {
-  .buddy-widget__panel {
-    width: calc(100vw - 32px);
-    max-height: min(600px, calc(100vh - 120px));
-  }
-
-  .buddy-widget__panel--fullscreen {
-    width: calc(100vw - 18px);
-    height: calc(100vh - 18px);
-    max-height: calc(100vh - 18px);
-  }
-
-  .buddy-widget__messages {
-    max-height: 390px;
-  }
-
-  .buddy-widget__panel--fullscreen .buddy-widget__messages {
-    max-height: none;
-  }
-}
-
-</style>
+<style scoped src="./BuddyWidget.css"></style>
