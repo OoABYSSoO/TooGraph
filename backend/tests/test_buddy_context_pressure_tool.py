@@ -98,6 +98,28 @@ class BuddyContextPressureToolTests(unittest.TestCase):
         self.assertEqual(result["reason"], "none")
         self.assertGreater(result["context_budget_report"]["context_compaction_summary_chars"], 0)
 
+    def test_pressure_check_reports_page_context_pressure_without_session_compaction(self) -> None:
+        module = _load_pressure_tool_module()
+
+        result = module.buddy_context_pressure_check(
+            {
+                "trigger": "preflight",
+                "raw_conversation_history": "recent",
+                "conversation_history": "recent",
+                "user_message": "hi",
+                "page_context": "page-operation " * 700,
+                "existing_session_summary": "",
+                "capability_result": {},
+                "public_response": "",
+            }
+        )
+
+        self.assertEqual(result["status"], "succeeded")
+        self.assertIs(result["needs_context_compaction"], False)
+        self.assertEqual(result["reason"], "page_context_pressure")
+        self.assertIs(result["context_budget_report"]["should_compact"], False)
+        self.assertEqual(result["context_budget_report"]["pressure_sources"], ["page_context"])
+
 
 if __name__ == "__main__":
     unittest.main()

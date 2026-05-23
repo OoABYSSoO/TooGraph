@@ -349,6 +349,105 @@ test("buildBuddyOutputTracePlan prefers conditional gates as formal output bound
   assert.deepEqual(segments[1].records.map((record) => record.label), ["C", "D", "Review Gate"]);
 });
 
+test("buildBuddyOutputTraceStateFromRunDetail keeps decision nodes before the visible final branch", () => {
+  const state = (name: string) => ({ name, description: "", type: "markdown", value: "", color: "#000" });
+  const condition = (name: string) => ({
+    kind: "condition" as const,
+    name,
+    description: "",
+    reads: [],
+    writes: [],
+    config: { branches: ["true", "false"], loopLimit: 1, branchMapping: {}, rule: null },
+    ui: { position: { x: 0, y: 0 } },
+  });
+  const graph: GraphPayload = {
+    graph_id: null,
+    name: "Buddy",
+    state_schema: {
+      final_response: state("Final response"),
+      result_package: state("Result package"),
+    },
+    nodes: {
+      reply: {
+        kind: "agent",
+        name: "Reply and select capability",
+        description: "",
+        reads: [],
+        writes: [{ state: "final_response", mode: "replace" }],
+        config: {
+          actionKey: "",
+          actionBindings: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "medium",
+          temperature: 0.4,
+        },
+        ui: { position: { x: 0, y: 0 } },
+      },
+      output_final: {
+        kind: "output",
+        name: "Final",
+        description: "",
+        reads: [{ state: "final_response", required: true }],
+        writes: [],
+        config: { displayMode: "markdown", persistEnabled: false, persistFormat: "auto", fileNameTemplate: "" },
+        ui: { position: { x: 0, y: 0 } },
+      },
+      output_result: {
+        kind: "output",
+        name: "Result package",
+        description: "",
+        reads: [{ state: "result_package", required: true }],
+        writes: [],
+        config: { displayMode: "auto", persistEnabled: false, persistFormat: "auto", fileNameTemplate: "" },
+        ui: { position: { x: 0, y: 0 } },
+      },
+      can_direct: condition("Can direct output?"),
+      needs: condition("Needs capability?"),
+    },
+    edges: [{ source: "reply", target: "can_direct" }],
+    conditional_edges: [
+      { source: "can_direct", branches: { true: "output_result", false: "needs" } },
+      { source: "needs", branches: { false: "output_final" } },
+    ],
+    metadata: {},
+  };
+  const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));
+  const run = {
+    status: "completed",
+    node_executions: [
+      execution("reply", "agent", "Reply and select capability", "2026-05-13T10:00:00.000Z", 500),
+      execution("can_direct", "condition", "Can direct output?", "2026-05-13T10:00:00.600Z", 0),
+      execution("needs", "condition", "Needs capability?", "2026-05-13T10:00:00.700Z", 0),
+    ],
+    output_previews: [
+      {
+        node_id: "output_final",
+        source_kind: "state",
+        source_key: "final_response",
+        display_mode: "markdown",
+        persist_enabled: false,
+        persist_format: "auto",
+        value: "hello",
+      },
+    ],
+    artifacts: {},
+  } as Partial<RunDetail> as RunDetail;
+
+  assert.deepEqual(plan.order, ["boundary:can_direct", "boundary:needs"]);
+
+  const stateFromRun = buildBuddyOutputTraceStateFromRunDetail(run, plan, graph);
+  const segments = listBuddyOutputTraceSegmentsForDisplay(stateFromRun, { visibleOutputNodeIds: new Set(["output_final"]) });
+
+  assert.equal(segments.length, 1);
+  assert.equal(segments[0].segmentId, "boundary:needs");
+  assert.deepEqual(
+    segments[0].records.map((record) => record.label),
+    ["Reply and select capability", "Can direct output?", "Needs capability?"],
+  );
+});
+
 test("reduceBuddyOutputTraceEvent appends a new segment when a loop reaches the same output boundary again", () => {
   const graph = fiveNodeGraph();
   graph.nodes.node_b = {
@@ -967,6 +1066,56 @@ test("buildBuddyOutputTraceStateFromRunDetail keeps trace-only empty outputs wit
   assert.equal(segments.length, 1);
   assert.equal(segments[0].segmentId, "boundary:node_final");
   assert.deepEqual(segments[0].records.map((record) => record.label), ["A", "能力选择结果", "动态能力", "最终回复判断"]);
+});
+
+test("listBuddyOutputTraceSegmentsForDisplay keeps merged running trace duration live", () => {
+  const graph = fiveNodeGraph();
+  graph.nodes.node_gate = {
+    kind: "condition",
+    name: "Capability gate",
+    description: "",
+    reads: [{ state: "state_b1", required: true }],
+    writes: [],
+    config: { branches: ["direct", "continue"], loopLimit: 5, branchMapping: {}, rule: null },
+    ui: { position: { x: 0, y: 0 } },
+  };
+  graph.nodes.node_dynamic = {
+    ...graph.nodes.node_c,
+    name: "Dynamic capability",
+  };
+  graph.nodes.node_final = {
+    kind: "condition",
+    name: "Final gate",
+    description: "",
+    reads: [{ state: "state_e1", required: true }],
+    writes: [],
+    config: { branches: ["done"], loopLimit: 5, branchMapping: {}, rule: null },
+    ui: { position: { x: 0, y: 0 } },
+  };
+  graph.edges = [
+    { source: "node_a", target: "node_gate" },
+    { source: "node_dynamic", target: "node_final" },
+  ];
+  graph.conditional_edges = [
+    { source: "node_gate", branches: { direct: "output_b1", continue: "node_dynamic" } },
+    { source: "node_final", branches: { done: "output_e1" } },
+  ];
+
+  const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));
+  let state = createBuddyOutputTraceRuntimeState(plan);
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.started", { node_id: "node_a", node_type: "agent" }, 1000);
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.completed", { node_id: "node_a", node_type: "agent", duration_ms: 100 }, 1100);
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.started", { node_id: "node_gate", node_type: "condition" }, 1200);
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.completed", { node_id: "node_gate", node_type: "condition", duration_ms: 0 }, 1200);
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.started", { node_id: "node_dynamic", node_type: "agent" }, 1300);
+
+  const segments = listBuddyOutputTraceSegmentsForDisplay(state, { visibleOutputNodeIds: new Set(["output_e1"]) });
+
+  assert.equal(segments.length, 1);
+  assert.equal(segments[0].status, "running");
+  assert.equal(segments[0].durationMs, null);
+  assert.equal(segments[0].completedAtMs, null);
+  assert.deepEqual(segments[0].records.map((record) => record.label), ["A", "Capability gate", "Dynamic capability"]);
 });
 
 test("buildBuddyOutputTraceStateFromRunDetail nests dynamic subgraph node executions below the selected ability", () => {

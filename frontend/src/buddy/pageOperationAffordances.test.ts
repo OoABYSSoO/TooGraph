@@ -209,6 +209,43 @@ test("formatPageOperationBookLines renders commands without selectors or coordin
   assert.doesNotMatch(text, /querySelector|selector|x:|y:/i);
 });
 
+test("formatPageOperationBookLines keeps the prompt preview bounded for dense editor pages", () => {
+  const affordances = Array.from({ length: 90 }, (_, index) => ({
+    id: `editor.canvas.node.node_${index}`,
+    label: `Editor node ${index} with a deliberately verbose operation label that should be clamped before it reaches the LLM prompt`,
+    role: "button" as const,
+    zone: "editor-canvas.node",
+    actions: ["click"],
+    enabled: true,
+    visible: true,
+  }));
+  const unavailable = Array.from({ length: 60 }, (_, index) => ({
+    id: `editor.canvas.node.node_${index}.port.input.remove`,
+    label: `Hidden remove binding ${index} with verbose state binding details`,
+    role: "button" as const,
+    zone: "editor-canvas.port",
+    actions: ["click"],
+    enabled: true,
+    visible: false,
+  }));
+
+  const lines = formatPageOperationBookLines(
+    buildPageOperationBook({
+      snapshotId: "snapshot-dense-editor",
+      path: "/editor/new",
+      title: "Graph editor",
+      affordances: [...affordances, ...unavailable],
+    }),
+  );
+  const text = lines.join("\n");
+
+  assert.ok(text.length < 6000, `expected bounded page operation preview, received ${text.length} chars`);
+  assert.match(text, /editor\.graph\.playback/);
+  assert.match(text, /omitted allowed operations: \d+ more/);
+  assert.match(text, /omitted unavailable operations: \d+ more/);
+  assert.doesNotMatch(text, /node_89/);
+});
+
 test("buildPageOperationRuntimeContext packages snapshot and operation book for graph runs", () => {
   const runtimeContext = buildPageOperationRuntimeContext({
     routePath: "/editor?tab=active",

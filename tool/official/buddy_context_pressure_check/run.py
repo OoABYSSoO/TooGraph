@@ -34,7 +34,7 @@ def buddy_context_pressure_check(payload: dict[str, Any] | None) -> dict[str, An
         "capability_result_chars": CAPABILITY_RESULT_COMPACTION_THRESHOLD_CHARS,
         "public_response_chars": PUBLIC_RESPONSE_COMPACTION_THRESHOLD_CHARS,
     }
-    reason = _resolve_pressure_reason(
+    pressure_sources = _resolve_pressure_sources(
         trigger=trigger,
         raw_history_chars=raw_history_chars,
         rendered_history_chars=rendered_history_chars,
@@ -44,6 +44,8 @@ def buddy_context_pressure_check(payload: dict[str, Any] | None) -> dict[str, An
         public_response_chars=public_response_chars,
         thresholds=thresholds,
     )
+    reason = _resolve_pressure_reason(trigger=trigger, pressure_sources=pressure_sources)
+    should_compact = reason in {"history_pressure", "result_pressure", "overflow_recovery"}
     report = {
         "version": 1,
         "trigger": trigger,
@@ -57,12 +59,13 @@ def buddy_context_pressure_check(payload: dict[str, Any] | None) -> dict[str, An
         "capability_result_chars": capability_result_chars,
         "public_response_chars": public_response_chars,
         "thresholds": thresholds,
+        "pressure_sources": pressure_sources,
         "reason": reason,
-        "should_compact": reason != "none",
+        "should_compact": should_compact,
     }
     return {
         "status": "succeeded",
-        "needs_context_compaction": reason != "none",
+        "needs_context_compaction": should_compact,
         "context_budget_report": report,
         "context_compaction_trigger": trigger,
         "reason": reason,
@@ -78,7 +81,7 @@ def _normalize_trigger(value: Any, capability_result: Any) -> str:
     return "preflight"
 
 
-def _resolve_pressure_reason(
+def _resolve_pressure_sources(
     *,
     trigger: str,
     raw_history_chars: int,
@@ -88,20 +91,32 @@ def _resolve_pressure_reason(
     capability_result_chars: int,
     public_response_chars: int,
     thresholds: dict[str, int],
-) -> str:
-    if trigger == "overflow_recovery":
-        return "overflow_recovery"
+) -> list[str]:
+    sources: list[str] = []
     if (
         (raw_history_chars >= thresholds["raw_history_chars"] and session_summary_chars <= 0)
         or rendered_history_chars >= thresholds["rendered_history_chars"]
-        or page_context_chars >= thresholds["page_context_chars"]
     ):
-        return "history_pressure"
+        sources.append("history")
+    if page_context_chars >= thresholds["page_context_chars"]:
+        sources.append("page_context")
     if (
         capability_result_chars >= thresholds["capability_result_chars"]
         or public_response_chars >= thresholds["public_response_chars"]
     ):
+        sources.append("result")
+    return sources
+
+
+def _resolve_pressure_reason(*, trigger: str, pressure_sources: list[str]) -> str:
+    if trigger == "overflow_recovery":
+        return "overflow_recovery"
+    if "history" in pressure_sources:
+        return "history_pressure"
+    if "result" in pressure_sources:
         return "result_pressure"
+    if "page_context" in pressure_sources:
+        return "page_context_pressure"
     return "none"
 
 

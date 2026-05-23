@@ -90,7 +90,7 @@
       "key": "reason",
       "name": "Reason",
       "valueType": "text",
-      "description": "The primary pressure reason."
+      "description": "The primary pressure reason. page_context_pressure is reported for oversized UI snapshots but does not trigger buddy_context_compaction by itself."
     }
   ]
 }

@@ -83,6 +83,12 @@ const EDITOR_GRAPH_PLAYBACK_OPERATION: PageOperationBook["allowedOperations"][nu
   resultHint: null,
 };
 
+const PAGE_OPERATION_ALLOWED_PREVIEW_LIMIT = 18;
+const PAGE_OPERATION_INPUT_PREVIEW_LIMIT = 6;
+const PAGE_OPERATION_UNAVAILABLE_PREVIEW_LIMIT = 4;
+const PAGE_OPERATION_LINE_MAX_CHARS = 260;
+const IMPORTANT_OPERATION_TARGET_IDS = new Set(["editor.graph.playback"]);
+
 export type PageOperationRuntimeContext = {
   page_path: string;
   page_snapshot: PageOperationSnapshot;
@@ -356,25 +362,81 @@ export function formatPageOperationBookLines(book: PageOperationBook | null | un
     "页面操作书:",
     `- page: ${book.page.title || "当前页面"} (${book.page.path || "/"}, snapshot: ${book.page.snapshotId || "unknown"})`,
   ];
-  for (const operation of book.allowedOperations) {
-    lines.push(
+  const allowedOperations = uniqueBy(book.allowedOperations, (operation) => operation.targetId);
+  const allowedPreview = selectPreviewItems(
+    allowedOperations,
+    PAGE_OPERATION_ALLOWED_PREVIEW_LIMIT,
+    (operation) => IMPORTANT_OPERATION_TARGET_IDS.has(operation.targetId),
+  );
+  for (const operation of allowedPreview) {
+    lines.push(clampPageOperationBookLine(
       `- ${operation.targetId}: ${operation.label}; role: ${operation.role}; commands: ${operation.commands.join(", ")}${
         operation.resultHint?.path ? `; result path: ${operation.resultHint.path}` : ""
       }.`,
-    );
+    ));
   }
-  for (const input of book.inputs) {
-    lines.push(
+  appendOmittedLine(lines, "allowed operations", allowedOperations.length - allowedPreview.length);
+
+  const inputs = uniqueBy(book.inputs, (input) => input.targetId);
+  const inputPreview = inputs.slice(0, PAGE_OPERATION_INPUT_PREVIEW_LIMIT);
+  for (const input of inputPreview) {
+    lines.push(clampPageOperationBookLine(
       `- ${input.targetId}: ${input.label}; input; commands: ${input.commands.join(", ")}; current value: ${input.valuePreview || "empty"}.`,
-    );
+    ));
   }
-  for (const item of book.unavailable) {
-    lines.push(`- unavailable ${item.targetId}: ${item.label}; reason: ${item.reason}.`);
+  appendOmittedLine(lines, "input operations", inputs.length - inputPreview.length);
+
+  const unavailable = uniqueBy(book.unavailable, (item) => item.targetId);
+  const unavailablePreview = unavailable.slice(0, PAGE_OPERATION_UNAVAILABLE_PREVIEW_LIMIT);
+  for (const item of unavailablePreview) {
+    lines.push(clampPageOperationBookLine(`- unavailable ${item.targetId}: ${item.label}; reason: ${item.reason}.`));
   }
+  appendOmittedLine(lines, "unavailable operations", unavailable.length - unavailablePreview.length);
+
   for (const item of book.forbidden) {
-    lines.push(`- forbidden: ${item}`);
+    lines.push(clampPageOperationBookLine(`- forbidden: ${item}`));
   }
   return lines;
+}
+
+function selectPreviewItems<T>(items: T[], limit: number, isImportant: (item: T) => boolean): T[] {
+  const normalizedLimit = Math.max(0, limit);
+  if (items.length <= normalizedLimit) {
+    return items;
+  }
+  const importantItems = items.filter(isImportant);
+  const ordinaryItems = items.filter((item) => !isImportant(item));
+  return [
+    ...ordinaryItems.slice(0, Math.max(0, normalizedLimit - importantItems.length)),
+    ...importantItems,
+  ].slice(0, normalizedLimit);
+}
+
+function appendOmittedLine(lines: string[], label: string, count: number) {
+  if (count > 0) {
+    lines.push(`- omitted ${label}: ${count} more.`);
+  }
+}
+
+function uniqueBy<T>(items: T[], resolveKey: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  const uniqueItems: T[] = [];
+  for (const item of items) {
+    const key = resolveKey(item);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    uniqueItems.push(item);
+  }
+  return uniqueItems;
+}
+
+function clampPageOperationBookLine(line: string): string {
+  if (line.length <= PAGE_OPERATION_LINE_MAX_CHARS) {
+    return line;
+  }
+  return `${line.slice(0, PAGE_OPERATION_LINE_MAX_CHARS - 3)}...`;
 }
 
 function readElementAffordance(element: HTMLElement): PageAffordanceInit {

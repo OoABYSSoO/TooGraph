@@ -107,13 +107,79 @@ export function buildBuddyOutputTracePlan(
     segmentIdByOutputNodeId[binding.outputNodeId] = segmentId;
   }
 
+  const orderedSegmentIds = orderBoundarySegmentIds(graph, order, segmentsById);
+
   return {
-    order,
+    order: orderedSegmentIds,
     segmentsById,
     segmentIdByBoundaryNodeId,
     segmentIdByOutputNodeId,
     segmentIdByNodeId: buildNearestBoundarySegmentByNodeId(graph, segmentIdByBoundaryNodeId),
   };
+}
+
+function orderBoundarySegmentIds(
+  graph: Pick<GraphPayload, "nodes" | "edges" | "conditional_edges">,
+  segmentIds: string[],
+  segmentsById: Record<string, BuddyOutputTraceSegmentPlan>,
+) {
+  const originalIndex = new Map(segmentIds.map((segmentId, index) => [segmentId, index]));
+  const adjacency = buildGraphAdjacency(graph.edges ?? [], graph.conditional_edges ?? []);
+  const distanceFromEntry = buildGraphEntryDistances(graph, adjacency);
+  return [...segmentIds].sort((left, right) => {
+    const leftBoundary = segmentsById[left]?.boundaryNodeId ?? "";
+    const rightBoundary = segmentsById[right]?.boundaryNodeId ?? "";
+    const leftEntryDistance = distanceFromEntry[leftBoundary] ?? null;
+    const rightEntryDistance = distanceFromEntry[rightBoundary] ?? null;
+    if (leftEntryDistance !== null && rightEntryDistance !== null && leftEntryDistance !== rightEntryDistance) {
+      return leftEntryDistance - rightEntryDistance;
+    }
+    if (leftEntryDistance !== null && rightEntryDistance === null) {
+      return -1;
+    }
+    if (rightEntryDistance !== null && leftEntryDistance === null) {
+      return 1;
+    }
+    const leftToRightDistance = findGraphDistance(leftBoundary, rightBoundary, adjacency);
+    const rightToLeftDistance = findGraphDistance(rightBoundary, leftBoundary, adjacency);
+    if (leftToRightDistance !== null && rightToLeftDistance === null) {
+      return -1;
+    }
+    if (rightToLeftDistance !== null && leftToRightDistance === null) {
+      return 1;
+    }
+    return (originalIndex.get(left) ?? 0) - (originalIndex.get(right) ?? 0);
+  });
+}
+
+function buildGraphEntryDistances(
+  graph: Pick<GraphPayload, "nodes">,
+  adjacency: Record<string, string[]>,
+) {
+  const incomingNodeIds = new Set(Object.values(adjacency).flat());
+  const nonOutputNodeIds = Object.entries(graph.nodes ?? {})
+    .filter(([, node]) => node.kind !== "output")
+    .map(([nodeId]) => nodeId);
+  const entryNodeIds = nonOutputNodeIds.filter((nodeId) => !incomingNodeIds.has(nodeId));
+  const queue = (entryNodeIds.length > 0 ? entryNodeIds : nonOutputNodeIds).map((nodeId) => ({ nodeId, distance: 0 }));
+  const distances: Record<string, number> = {};
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+    const currentNodeId = current.nodeId;
+    if (!currentNodeId || distances[currentNodeId] !== undefined) {
+      continue;
+    }
+    distances[currentNodeId] = current.distance;
+    for (const next of adjacency[currentNodeId] ?? []) {
+      if (distances[next] === undefined) {
+        queue.push({ nodeId: next, distance: current.distance + 1 });
+      }
+    }
+  }
+  return distances;
 }
 
 function resolveOutputTraceBoundaryNodeId(
@@ -418,6 +484,9 @@ function pruneInactiveTerminalOutputSegments(
     if (producedBySegment) {
       continue;
     }
+    if (segment.records.some((record) => record.kind === "node" && record.nodeId === segment.boundaryNodeId && !record.subgraphNodeId)) {
+      continue;
+    }
     changed = true;
     segmentsById[segmentId] = {
       ...segment,
@@ -676,6 +745,34 @@ function findNearestBoundarySegmentId(
   return null;
 }
 
+function findGraphDistance(source: string, target: string, adjacency: Record<string, string[]>) {
+  if (!source || !target || source === target) {
+    return null;
+  }
+  const queue = (adjacency[source] ?? []).map((nodeId) => ({ nodeId, distance: 1 }));
+  const seen = new Set<string>();
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+    const currentNodeId = current.nodeId;
+    if (!currentNodeId || seen.has(currentNodeId)) {
+      continue;
+    }
+    if (currentNodeId === target) {
+      return current.distance;
+    }
+    seen.add(currentNodeId);
+    for (const next of adjacency[currentNodeId] ?? []) {
+      if (!seen.has(next)) {
+        queue.push({ nodeId: next, distance: current.distance + 1 });
+      }
+    }
+  }
+  return null;
+}
+
 function findSegmentIdWithRunningRecord(state: BuddyOutputTraceRuntimeState, runtimeKey: string) {
   for (const segmentId of state.order) {
     const segment = state.segmentsById[segmentId];
@@ -913,17 +1010,18 @@ function mergeTraceSegments(
   options: { keepRightIdentity: boolean },
 ): BuddyOutputTraceSegment {
   const startedAtMs = minNullableNumber(left.startedAtMs, right.startedAtMs);
-  const completedAtMs = right.completedAtMs ?? left.completedAtMs;
+  const status = right.status === "idle" ? left.status : right.status;
+  const completedAtMs = status === "running" ? null : right.completedAtMs ?? left.completedAtMs;
   return {
     ...right,
     segmentId: options.keepRightIdentity ? right.segmentId : left.segmentId,
     boundaryNodeId: options.keepRightIdentity ? right.boundaryNodeId : left.boundaryNodeId,
     boundaryLabel: options.keepRightIdentity ? right.boundaryLabel : left.boundaryLabel,
     outputNodeIds: unionTextLists(left.outputNodeIds, right.outputNodeIds),
-    status: right.status === "idle" ? left.status : right.status,
+    status,
     startedAtMs,
     completedAtMs,
-    durationMs: resolveDurationMs(startedAtMs, completedAtMs) ?? right.durationMs ?? left.durationMs,
+    durationMs: status === "running" ? null : resolveDurationMs(startedAtMs, completedAtMs) ?? right.durationMs ?? left.durationMs,
     records: [...left.records, ...right.records],
   };
 }
