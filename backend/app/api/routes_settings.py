@@ -35,14 +35,14 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 
 class SettingsModelPayload(BaseModel):
-    text_model_ref: str = Field(alias="text_model_ref", min_length=1)
-    video_model_ref: str = Field(alias="video_model_ref", min_length=1)
+    text_model_ref: str = Field(alias="text_model_ref")
+    video_model_ref: str = Field(alias="video_model_ref")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
 
 class AgentRuntimeDefaultsPayload(BaseModel):
-    model: str = Field(min_length=1)
+    model: str
     thinking_enabled: bool | None = Field(default=None, alias="thinking_enabled")
     thinking_level: str | None = Field(default=None, alias="thinking_level")
     temperature: float = Field(ge=0, le=2)
@@ -211,6 +211,13 @@ def _build_settings_payload(*, force_refresh_models: bool = False) -> dict:
     }
 
 
+def _normalize_optional_model_ref(model_ref: str | None, *, default_provider: str = "local") -> str:
+    trimmed = str(model_ref or "").strip()
+    if not trimmed:
+        return ""
+    return normalize_model_ref(trimmed, default_provider=default_provider)
+
+
 @router.get("")
 def get_settings_endpoint() -> dict:
     return _build_settings_payload(force_refresh_models=False)
@@ -218,11 +225,11 @@ def get_settings_endpoint() -> dict:
 
 @router.post("")
 def update_settings_endpoint(payload: SettingsUpdatePayload) -> dict:
-    normalized_text_model_ref = normalize_model_ref(payload.model.text_model_ref, default_provider="local")
-    normalized_video_model_ref = normalize_model_ref(payload.model.video_model_ref, default_provider="local")
-    normalized_agent_model_ref = normalize_model_ref(payload.agent_runtime_defaults.model, default_provider="local")
+    normalized_text_model_ref = _normalize_optional_model_ref(payload.model.text_model_ref, default_provider="local")
+    normalized_video_model_ref = _normalize_optional_model_ref(payload.model.video_model_ref, default_provider="local")
+    normalized_agent_model_ref = _normalize_optional_model_ref(payload.agent_runtime_defaults.model, default_provider="local")
 
-    if normalized_agent_model_ref != normalized_text_model_ref:
+    if normalized_agent_model_ref and normalized_agent_model_ref != normalized_text_model_ref:
         normalized_text_model_ref = normalized_agent_model_ref
 
     existing_settings = load_app_settings()

@@ -131,6 +131,51 @@ class SettingsModelProviderTests(unittest.TestCase):
         self.assertEqual(saved_payload["model_providers"]["openai"]["transport"], "openai-compatible")
         build_payload.assert_called_once_with(force_refresh_models=False)
 
+    def test_update_settings_allows_empty_model_refs_when_no_models_are_available(self) -> None:
+        saved_payload: dict = {}
+
+        def capture_save(payload: dict) -> dict:
+            saved_payload.update(payload)
+            return payload
+
+        with patch("app.api.routes_settings.load_app_settings", return_value={}):
+            with patch("app.api.routes_settings.save_app_settings", side_effect=capture_save):
+                with patch("app.api.routes_settings._build_settings_payload", return_value={"ok": True}) as build_payload:
+                    with TestClient(app) as client:
+                        response = client.post(
+                            "/api/settings",
+                            json={
+                                "model": {
+                                    "text_model_ref": "",
+                                    "video_model_ref": "",
+                                },
+                                "agent_runtime_defaults": {
+                                    "model": "",
+                                    "thinking_enabled": False,
+                                    "thinking_level": "off",
+                                    "temperature": 0.2,
+                                },
+                                "model_providers": {
+                                    "local": {
+                                        "label": "OpenAI-compatible Custom Provider",
+                                        "transport": "openai-compatible",
+                                        "base_url": "http://127.0.0.1:8888/v1",
+                                        "api_key": "",
+                                        "enabled": False,
+                                        "auth_header": "Authorization",
+                                        "auth_scheme": "Bearer",
+                                        "models": [],
+                                    }
+                                },
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(saved_payload["text_model_ref"], "")
+        self.assertEqual(saved_payload["video_model_ref"], "")
+        self.assertEqual(saved_payload["agent_runtime_defaults"]["thinking_level"], "off")
+        build_payload.assert_called_once_with(force_refresh_models=False)
+
     def test_build_settings_payload_refreshes_catalog_once(self) -> None:
         catalog = {
             "default_text_model_ref": "local/current-text",

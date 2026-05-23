@@ -56,6 +56,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Root npm wrapper has no dependencies; keep frontend/package-lock.json tracked.
+/package-lock.json
+
 # Frontend env and caches
 frontend/.env.local
 frontend/.env.development.local

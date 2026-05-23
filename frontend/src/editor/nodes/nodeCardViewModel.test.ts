@@ -677,8 +677,10 @@ test("buildNodeCardViewModel marks dynamic capability input and result package o
 
   assert.equal(model.inputs[0]?.managedByCapability, undefined);
   assert.deepEqual(model.inputs[1]?.managedByCapability, { role: "input" });
+  assert.equal(model.outputs[0]?.label, "结果包");
   assert.deepEqual(model.outputs[0]?.managedByCapability, { role: "result_package" });
   assert.equal(model.body.kind, "agent");
+  assert.equal(model.body.primaryOutput?.label, "结果包");
   assert.deepEqual(model.body.primaryOutput?.managedByCapability, { role: "result_package" });
 });
 

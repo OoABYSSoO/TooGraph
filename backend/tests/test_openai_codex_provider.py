@@ -96,15 +96,22 @@ class FakeHttpClient:
 
 
 class OpenAICodexProviderTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from app.tools import openai_codex_client
+
+        openai_codex_client._browser_login_sessions.clear()
+
     def test_codex_browser_auth_start_builds_pkce_authorize_url(self) -> None:
         from app.tools.openai_codex_client import poll_codex_browser_login, start_codex_browser_login
 
         with tempfile.TemporaryDirectory() as temp_dir:
             auth_path = Path(temp_dir) / "openai_codex_auth.json"
+            session_path = Path(temp_dir) / "openai_codex_browser_sessions.json"
             with patch("app.tools.openai_codex_client.CODEX_AUTH_PATH", auth_path):
-                with patch("app.tools.openai_codex_client._start_codex_browser_callback_server") as callback_server:
-                    session = start_codex_browser_login()
-                    pending = poll_codex_browser_login(state=session["state"])
+                with patch("app.tools.openai_codex_client.CODEX_BROWSER_SESSION_PATH", session_path):
+                    with patch("app.tools.openai_codex_client._start_codex_browser_callback_server") as callback_server:
+                        session = start_codex_browser_login()
+                        pending = poll_codex_browser_login(state=session["state"])
 
         callback_server.assert_called_once()
         self.assertEqual(session["callback_url"], "http://localhost:1455/auth/callback")
@@ -125,6 +132,57 @@ class OpenAICodexProviderTests(unittest.TestCase):
         self.assertEqual(pending["status"], "pending")
         self.assertFalse(pending["authenticated"])
 
+    def test_codex_browser_callback_pages_match_toograph_return_experience(self) -> None:
+        from app.tools.openai_codex_client import CODEX_BROWSER_FAILURE_HTML, CODEX_BROWSER_SUCCESS_HTML
+
+        for html in (CODEX_BROWSER_SUCCESS_HTML, CODEX_BROWSER_FAILURE_HTML):
+            self.assertIn("toograph-auth-return", html)
+            self.assertIn("TooGraph", html)
+            self.assertIn("buddy-mascot-tail-sway", html)
+            self.assertIn("buddy-mascot-ear-idle-left", html)
+            self.assertIn("buddy-mascot-blink", html)
+            self.assertIn("data-buddy-eye-follow", html)
+            self.assertIn("initBuddyMascotEyeFollow", html)
+            self.assertIn("pointermove", html)
+            self.assertIn("mousemove", html)
+            self.assertIn("--buddy-mascot-look-x", html)
+            self.assertIn("--buddy-mascot-look-y", html)
+            self.assertIn("getBoundingClientRect", html)
+            self.assertIn("window.close()", html)
+            self.assertIn("\u5173\u95ed\u6b64\u9875\u9762", html)
+            self.assertIn("@media (prefers-reduced-motion: reduce)", html)
+            self.assertNotIn("http://127.0.0.1:3477/models", html)
+            self.assertNotIn("href=", html)
+            self.assertNotIn("border-radius: 24px", html)
+            self.assertNotIn("radial-gradient(80% 100% at 50% 18%", html)
+
+        self.assertIn("\u767b\u5f55\u6210\u529f", CODEX_BROWSER_SUCCESS_HTML)
+        self.assertIn("\u4f1a\u81ea\u52a8\u8bc6\u522b\u8fd9\u6b21\u767b\u5f55", CODEX_BROWSER_SUCCESS_HTML)
+        self.assertIn('class="buddy-mascot buddy-mascot--idle buddy-mascot--motion-idle', CODEX_BROWSER_SUCCESS_HTML)
+        self.assertNotIn('class="buddy-mascot buddy-mascot--error', CODEX_BROWSER_SUCCESS_HTML)
+        self.assertNotIn("\u8fd4\u56de TooGraph \u6a21\u578b\u7ba1\u7406", CODEX_BROWSER_SUCCESS_HTML)
+        self.assertIn("\u767b\u5f55\u6ca1\u6709\u5b8c\u6210", CODEX_BROWSER_FAILURE_HTML)
+        self.assertIn("\u6a21\u578b\u7ba1\u7406\u9875\u91cd\u8bd5", CODEX_BROWSER_FAILURE_HTML)
+        self.assertIn("\u5907\u7528\u767b\u5f55\u65b9\u5f0f", CODEX_BROWSER_FAILURE_HTML)
+        self.assertIn('class="buddy-mascot buddy-mascot--error buddy-mascot--motion-idle', CODEX_BROWSER_FAILURE_HTML)
+        self.assertIn("buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--left", CODEX_BROWSER_FAILURE_HTML)
+        self.assertIn("buddy-mascot-error-eye-spin", CODEX_BROWSER_FAILURE_HTML)
+        self.assertNotIn("buddy-mascot--idle buddy-mascot--motion-idle", CODEX_BROWSER_FAILURE_HTML)
+        self.assertNotIn("Authentication successful. You can close this window", CODEX_BROWSER_SUCCESS_HTML)
+
+    def test_codex_browser_failure_page_can_show_safe_failure_reason(self) -> None:
+        from app.tools.openai_codex_client import _build_codex_browser_failure_html
+
+        missing_session_html = _build_codex_browser_failure_html("Codex browser login session was not found.")
+        denied_html = _build_codex_browser_failure_html("access_denied")
+        escaped_html = _build_codex_browser_failure_html("<script>alert('x')</script>")
+
+        self.assertIn("\u767b\u5f55\u4f1a\u8bdd\u5df2\u5931\u6548", missing_session_html)
+        self.assertIn("\u6388\u6743\u6ca1\u6709\u5b8c\u6210", denied_html)
+        self.assertIn("toograph-auth-return__detail", missing_session_html)
+        self.assertIn("&lt;script&gt;alert", escaped_html)
+        self.assertNotIn("<script>alert", escaped_html)
+
     def test_codex_browser_callback_exchanges_code_and_stores_token(self) -> None:
         from app.tools.openai_codex_client import complete_codex_browser_login_callback, start_codex_browser_login
 
@@ -141,14 +199,16 @@ class OpenAICodexProviderTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as temp_dir:
             auth_path = Path(temp_dir) / "openai_codex_auth.json"
+            session_path = Path(temp_dir) / "openai_codex_browser_sessions.json"
             with patch("app.tools.openai_codex_client.CODEX_AUTH_PATH", auth_path):
-                with patch("app.tools.openai_codex_client._start_codex_browser_callback_server"):
-                    session = start_codex_browser_login()
-                with patch.dict(os.environ, PROXY_ENV, clear=False):
-                    with patch("app.tools.openai_codex_client.httpx.Client", return_value=fake_client) as client_factory:
-                        status = complete_codex_browser_login_callback(state=session["state"], code="auth-code")
+                with patch("app.tools.openai_codex_client.CODEX_BROWSER_SESSION_PATH", session_path):
+                    with patch("app.tools.openai_codex_client._start_codex_browser_callback_server"):
+                        session = start_codex_browser_login()
+                    with patch.dict(os.environ, PROXY_ENV, clear=False):
+                        with patch("app.tools.openai_codex_client.httpx.Client", return_value=fake_client) as client_factory:
+                            status = complete_codex_browser_login_callback(state=session["state"], code="auth-code")
 
-                stored = json.loads(auth_path.read_text(encoding="utf-8"))
+                    stored = json.loads(auth_path.read_text(encoding="utf-8"))
 
         self.assertEqual(status["status"], "authenticated")
         self.assertTrue(status["authenticated"])
@@ -161,6 +221,84 @@ class OpenAICodexProviderTests(unittest.TestCase):
         self.assertEqual(fake_client.post_calls[0]["data"]["grant_type"], "authorization_code")
         self.assertEqual(fake_client.post_calls[0]["data"]["code"], "auth-code")
         self.assertEqual(fake_client.post_calls[0]["data"]["redirect_uri"], "http://localhost:1455/auth/callback")
+
+    def test_codex_browser_callback_recovers_session_after_backend_restart(self) -> None:
+        from app.tools import openai_codex_client
+
+        fake_client = FakeHttpClient(
+            [
+                FakeResponse(
+                    {
+                        "access_token": "access-token-after-restart",
+                        "refresh_token": "refresh-token-after-restart",
+                        "expires_in": 3600,
+                    }
+                )
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            auth_path = Path(temp_dir) / "openai_codex_auth.json"
+            session_path = Path(temp_dir) / "openai_codex_browser_sessions.json"
+            with patch("app.tools.openai_codex_client.CODEX_AUTH_PATH", auth_path):
+                with patch("app.tools.openai_codex_client.CODEX_BROWSER_SESSION_PATH", session_path):
+                    with patch("app.tools.openai_codex_client._start_codex_browser_callback_server"):
+                        session = openai_codex_client.start_codex_browser_login()
+                    openai_codex_client._browser_login_sessions.clear()
+                    with patch("app.tools.openai_codex_client.httpx.Client", return_value=fake_client):
+                        status = openai_codex_client.complete_codex_browser_login_callback(
+                            state=session["state"],
+                            code="auth-code-after-restart",
+                        )
+                    poll_status = openai_codex_client.poll_codex_browser_login(state=session["state"])
+                    stored = json.loads(auth_path.read_text(encoding="utf-8"))
+                    stored_sessions = json.loads(session_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(status["status"], "authenticated")
+        self.assertTrue(status["authenticated"])
+        self.assertEqual(poll_status["status"], "authenticated")
+        self.assertEqual(stored["source"], "browser-oauth")
+        self.assertEqual(stored["tokens"]["access_token"], "access-token-after-restart")
+        self.assertEqual(fake_client.post_calls[0]["data"]["code"], "auth-code-after-restart")
+        self.assertEqual(stored_sessions[session["state"]]["status"], "authenticated")
+        self.assertEqual(stored_sessions[session["state"]]["code_verifier"], "")
+
+    def test_codex_browser_failed_session_drops_pkce_verifier(self) -> None:
+        from app.tools import openai_codex_client
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            auth_path = Path(temp_dir) / "openai_codex_auth.json"
+            session_path = Path(temp_dir) / "openai_codex_browser_sessions.json"
+            with patch("app.tools.openai_codex_client.CODEX_AUTH_PATH", auth_path):
+                with patch("app.tools.openai_codex_client.CODEX_BROWSER_SESSION_PATH", session_path):
+                    with patch("app.tools.openai_codex_client._start_codex_browser_callback_server"):
+                        session = openai_codex_client.start_codex_browser_login()
+                    openai_codex_client._mark_codex_browser_login_failed(state=session["state"], error="access_denied")
+                    poll_status = openai_codex_client.poll_codex_browser_login(state=session["state"])
+                    stored_sessions = json.loads(session_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(poll_status["status"], "failed")
+        self.assertEqual(poll_status["error"], "access_denied")
+        self.assertEqual(stored_sessions[session["state"]]["status"], "failed")
+        self.assertEqual(stored_sessions[session["state"]]["code_verifier"], "")
+
+    def test_codex_browser_restore_starts_callback_server_for_persisted_pending_session(self) -> None:
+        from app.tools import openai_codex_client
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            auth_path = Path(temp_dir) / "openai_codex_auth.json"
+            session_path = Path(temp_dir) / "openai_codex_browser_sessions.json"
+            with patch("app.tools.openai_codex_client.CODEX_AUTH_PATH", auth_path):
+                with patch("app.tools.openai_codex_client.CODEX_BROWSER_SESSION_PATH", session_path):
+                    with patch("app.tools.openai_codex_client._start_codex_browser_callback_server"):
+                        session = openai_codex_client.start_codex_browser_login()
+                    openai_codex_client._browser_login_sessions.clear()
+                    with patch("app.tools.openai_codex_client._start_codex_browser_callback_server") as callback_server:
+                        restored_count = openai_codex_client.restore_pending_codex_browser_login_sessions()
+                    poll_status = openai_codex_client.poll_codex_browser_login(state=session["state"])
+
+        self.assertEqual(restored_count, 1)
+        callback_server.assert_called_once()
+        self.assertEqual(poll_status["status"], "pending")
 
     def test_codex_cli_auth_import_copies_existing_codex_login(self) -> None:
         from app.tools.openai_codex_client import import_codex_cli_auth_state

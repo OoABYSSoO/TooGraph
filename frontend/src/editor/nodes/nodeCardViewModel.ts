@@ -223,15 +223,18 @@ export function buildNodeCardViewModel(
     ? [buildVirtualAnyOutputPort()]
     : node.kind === "condition"
       ? []
-      : node.writes.map((binding) => ({
-          key: binding.state,
-          label: getStateLabel(binding.state, stateSchema),
-          typeLabel: getStateTypeLabel(binding.state, stateSchema),
-          stateColor: stateSchema[binding.state]?.color ?? "#d97706",
-          managedByAction: resolveManagedActionOutputPort(nodeId, binding.state, stateSchema),
-          managedByTool: resolveManagedToolOutputPort(nodeId, binding.state, stateSchema),
-          managedByCapability: resolveManagedCapabilityOutputPort(nodeId, binding.state, stateSchema),
-        }));
+      : node.writes.map((binding) => {
+          const managedByCapability = resolveManagedCapabilityOutputPort(nodeId, binding.state, stateSchema);
+          return {
+            key: binding.state,
+            label: resolveWriteBindingPortLabel(binding.state, stateSchema, { managedByCapability }),
+            typeLabel: getStateTypeLabel(binding.state, stateSchema),
+            stateColor: stateSchema[binding.state]?.color ?? "#d97706",
+            managedByAction: resolveManagedActionOutputPort(nodeId, binding.state, stateSchema),
+            managedByTool: resolveManagedToolOutputPort(nodeId, binding.state, stateSchema),
+            managedByCapability,
+          };
+        });
 
   const branches =
     node.kind === "condition"
@@ -652,6 +655,19 @@ function resolveReadBindingPortLabel(
   }
 
   return getStateLabel(binding.state, stateSchema);
+}
+
+function resolveWriteBindingPortLabel(
+  stateKey: string,
+  stateSchema: Record<string, StateDefinition>,
+  context: {
+    managedByCapability?: NodePortViewModel["managedByCapability"];
+  },
+) {
+  if (context.managedByCapability?.role === "result_package") {
+    return "结果包";
+  }
+  return getStateLabel(stateKey, stateSchema);
 }
 
 function resolveManagedInputSlot(

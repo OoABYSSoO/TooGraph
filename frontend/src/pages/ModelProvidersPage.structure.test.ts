@@ -70,6 +70,13 @@ test("ModelProvidersPage applies provider changes immediately without a manual s
   assert.match(pageSource, /@click="handleRemoveProvider\(provider\.provider_id\)"/);
 });
 
+test("ModelProvidersPage keeps the page usable when no models are available", () => {
+  assert.match(pageSource, /:disabled="configuredModelOptions\.length === 0"/);
+  assert.match(pageSource, /v-if="configuredModelOptions\.length === 0" class="model-providers-page__hint"/);
+  assert.match(pageSource, /settings\.noConfiguredProviders/);
+  assert.match(pageSource, /class="model-providers-page__provider-cards"/);
+});
+
 test("ModelProvidersPage discovers model options through add model instead of separate refresh controls", () => {
   assert.doesNotMatch(pageSource, /allow-create/);
   assert.doesNotMatch(pageSource, /model-providers-page__refresh-icon-button/);

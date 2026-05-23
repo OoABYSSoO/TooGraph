@@ -33,6 +33,7 @@
                 class="model-providers-page__select toograph-select"
                 :teleported="false"
                 popper-class="toograph-select-popper"
+                :disabled="configuredModelOptions.length === 0"
                 @change="handleRuntimeDraftChange"
               >
                 <ElOption v-for="option in configuredModelOptions" :key="option.value" :label="option.label" :value="option.value" />
@@ -45,11 +46,15 @@
                 class="model-providers-page__select toograph-select"
                 :teleported="false"
                 popper-class="toograph-select-popper"
+                :disabled="configuredModelOptions.length === 0"
                 @change="handleRuntimeDraftChange"
               >
                 <ElOption v-for="option in configuredModelOptions" :key="option.value" :label="option.label" :value="option.value" />
               </ElSelect>
             </label>
+            <div v-if="configuredModelOptions.length === 0" class="model-providers-page__hint">
+              {{ t("settings.noConfiguredProviders") }}
+            </div>
           </article>
 
           <article class="model-providers-page__panel">

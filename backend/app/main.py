@@ -25,6 +25,7 @@ from app.buddy.store import initialize_buddy_home
 from app.core.runtime.run_recovery import mark_interrupted_active_runs
 from app.core.storage.database import initialize_storage
 from app.evaluator.official_seed import seed_official_eval_suites
+from app.tools.openai_codex_client import restore_pending_codex_browser_login_sessions
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 FRONTEND_DIST_DIR = Path(os.environ.get("TOOGRAPH_FRONTEND_DIST", ROOT_DIR / "frontend" / "dist"))
@@ -35,6 +36,7 @@ def startup() -> None:
     seed_official_eval_suites()
     initialize_buddy_home()
     mark_interrupted_active_runs()
+    restore_pending_codex_browser_login_sessions()
 
 
 @asynccontextmanager
