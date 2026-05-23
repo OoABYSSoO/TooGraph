@@ -73,6 +73,33 @@ class RuntimeActionInvocationTests(unittest.TestCase):
 
             self.assertEqual(invoke_action(runner, {"text": "hello"}), {"status": "succeeded", "echo": "hello"})
 
+    def test_script_action_runner_uses_utf8_for_non_gbk_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            action_dir = Path(temp_dir) / "unicode_echo"
+            action_dir.mkdir()
+            entrypoint = action_dir / "run.py"
+            entrypoint.write_text(
+                "\n".join(
+                    [
+                        "import json",
+                        "import sys",
+                        "payload = json.loads(sys.stdin.read() or '{}')",
+                        "print(json.dumps({'status': 'succeeded', 'echo': payload['text']}, ensure_ascii=False))",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            runner = ScriptActionRunner(
+                action_key="unicode_echo",
+                action_dir=action_dir,
+                runtime_type="python",
+                entrypoint="run.py",
+                timeout_seconds=1,
+            )
+
+            self.assertEqual(invoke_action(runner, {"text": "hello 👋"}), {"status": "succeeded", "echo": "hello 👋"})
+
     def test_script_action_runner_passes_artifact_context_as_environment_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             action_dir = Path(temp_dir) / "artifact_echo"

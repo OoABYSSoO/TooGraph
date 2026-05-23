@@ -217,7 +217,9 @@ export function reduceBuddyOutputTraceEvent(
 
   const eventTimeMs = resolveNodeEventTime(payload, eventType, nowEpochMs);
   if (eventType === "node.started") {
-    const segmentId = resolveSegmentIdForEvent(state, plan, nodeId, segmentScopeNodeId);
+    const resolvedSegment = resolveSegmentIdForEventWithInstances(state, plan, nodeId, segmentScopeNodeId);
+    state = resolvedSegment.state;
+    const segmentId = resolvedSegment.segmentId;
     if (!segmentId) {
       return state;
     }
@@ -238,8 +240,12 @@ export function reduceBuddyOutputTraceEvent(
     });
   }
 
-  const segmentId = findSegmentIdWithRunningRecord(state, runtimeKey)
-    ?? resolveSegmentIdForEvent(state, plan, nodeId, segmentScopeNodeId);
+  const runningSegmentId = findSegmentIdWithRunningRecord(state, runtimeKey);
+  const resolvedSegment = runningSegmentId
+    ? { state, segmentId: runningSegmentId }
+    : resolveSegmentIdForEventWithInstances(state, plan, nodeId, segmentScopeNodeId);
+  state = resolvedSegment.state;
+  const segmentId = resolvedSegment.segmentId;
   if (!segmentId) {
     return state;
   }
@@ -260,7 +266,7 @@ export function reduceBuddyOutputTraceEvent(
     dynamicCapabilityRunId: dynamicCapabilityContext.runId || null,
   });
 
-  if (!segmentScopeNodeId && plan.segmentIdByBoundaryNodeId[nodeId] === segmentId) {
+  if (!segmentScopeNodeId && isSegmentInstanceForBoundary(segmentId, plan.segmentIdByBoundaryNodeId[nodeId])) {
     return completeSegment(nextState, plan, segmentId, status === "failed" ? "failed" : "completed", eventTimeMs);
   }
   return nextState;
@@ -475,7 +481,7 @@ function completeSegment(
     return state;
   }
   const startedAtMs = segment.startedAtMs;
-  const segmentIndex = plan.order.indexOf(segmentId);
+  const segmentIndex = state.order.indexOf(segmentId);
   return {
     ...state,
     activeSegmentId: state.activeSegmentId === segmentId ? null : state.activeSegmentId,
@@ -511,6 +517,74 @@ function resolveSegmentIdForEvent(
     return state.activeSegmentId;
   }
   return plan.order.slice(state.nextSegmentIndex).find((segmentId) => state.segmentsById[segmentId]?.status !== "completed") ?? null;
+}
+
+function isSegmentInstanceForBoundary(segmentId: string, boundarySegmentId: string | undefined) {
+  return Boolean(boundarySegmentId) && (segmentId === boundarySegmentId || segmentId.startsWith(`${boundarySegmentId}:`));
+}
+
+function resolveSegmentIdForEventWithInstances(
+  state: BuddyOutputTraceRuntimeState,
+  plan: BuddyOutputTracePlan,
+  nodeId: string,
+  subgraphNodeId: string,
+) {
+  const segmentId = resolveSegmentIdForEvent(state, plan, nodeId, subgraphNodeId);
+  if (segmentId) {
+    return { state, segmentId };
+  }
+  const baseSegmentId = resolveBaseSegmentIdForEvent(plan, nodeId, subgraphNodeId);
+  if (!baseSegmentId || state.segmentsById[baseSegmentId]?.status !== "completed") {
+    return { state, segmentId: null };
+  }
+  const nextState = appendRepeatedBoundarySegmentInstance(state, plan, baseSegmentId);
+  return { state: nextState, segmentId: nextState.order[nextState.order.length - 1] ?? null };
+}
+
+function resolveBaseSegmentIdForEvent(
+  plan: BuddyOutputTracePlan,
+  nodeId: string,
+  subgraphNodeId: string,
+) {
+  if (!subgraphNodeId && plan.segmentIdByBoundaryNodeId[nodeId]) {
+    return plan.segmentIdByBoundaryNodeId[nodeId];
+  }
+  return plan.segmentIdByNodeId[subgraphNodeId || nodeId] ?? "";
+}
+
+function appendRepeatedBoundarySegmentInstance(
+  state: BuddyOutputTraceRuntimeState,
+  plan: BuddyOutputTracePlan,
+  baseSegmentId: string,
+): BuddyOutputTraceRuntimeState {
+  const basePlan = plan.segmentsById[baseSegmentId];
+  if (!basePlan) {
+    return state;
+  }
+  const repeatedCount = state.order.filter((segmentId) => segmentId === baseSegmentId || segmentId.startsWith(`${baseSegmentId}:`)).length;
+  let segmentId = `${baseSegmentId}:iteration:${repeatedCount + 1}`;
+  let suffix = repeatedCount + 1;
+  while (state.segmentsById[segmentId]) {
+    suffix += 1;
+    segmentId = `${baseSegmentId}:iteration:${suffix}`;
+  }
+  return {
+    ...state,
+    order: [...state.order, segmentId],
+    activeSegmentId: segmentId,
+    segmentsById: {
+      ...state.segmentsById,
+      [segmentId]: {
+        ...basePlan,
+        segmentId,
+        status: "idle",
+        startedAtMs: null,
+        completedAtMs: null,
+        durationMs: null,
+        records: [],
+      },
+    },
+  };
 }
 
 function buildNearestBoundarySegmentByNodeId(

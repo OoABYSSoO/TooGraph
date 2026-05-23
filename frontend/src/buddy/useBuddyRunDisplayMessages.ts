@@ -2,7 +2,7 @@ import type { Ref } from "vue";
 
 import { buildRunNodeTimingByNodeIdFromRun } from "../lib/runTelemetryProjection.ts";
 import type { GraphPayload } from "../types/node-system.ts";
-import type { RunDetail } from "../types/run.ts";
+import type { RunDetail, StateEvent } from "../types/run.ts";
 import type {
   BuddyPublicOutputBinding,
   BuddyPublicOutputMessage,
@@ -14,6 +14,7 @@ import {
   isBuddyPublicOutputMessageVisible,
   listBuddyPublicOutputMessageIdsForOutputNode,
   listVisibleBuddyPublicOutputNodeIds,
+  upsertBuddyPublicOutputMessagesForState,
   upsertBuddyPublicOutputMessagesForBinding,
 } from "./buddyPublicOutput.ts";
 import type { BuddyPublicOutputMetadata } from "./buddyMessageMetadata.ts";
@@ -432,12 +433,28 @@ function renderPublicOutputContentForStorage(output: BuddyPublicOutputMessage) {
   return stringifyPublicOutputContent(output.content);
 }
 
-function buildPublicOutputRuntimeStateFromRunDetail(
+export function buildPublicOutputRuntimeStateFromRunDetail(
   runDetail: RunDetail,
   bindings: BuddyPublicOutputBinding[],
   graph: GraphPayload,
 ): BuddyPublicOutputRuntimeState {
   let outputState = createBuddyPublicOutputRuntimeState();
+  const outputStateEvents = listRunDetailOutputStateEvents(runDetail, bindings);
+  if (outputStateEvents.length > 0) {
+    const status = runDetail.status === "failed" ? "failed" : "completed";
+    for (const event of outputStateEvents) {
+      outputState = upsertBuddyPublicOutputMessagesForState(
+        outputState,
+        bindings,
+        event.state_key,
+        event.value,
+        status,
+        parseRunDetailEventMs(event.created_at) ?? nowPublicOutputMs(),
+      );
+    }
+    return outputState;
+  }
+
   const seenOutputNodeIds = new Set<string>();
   const outputTimingByNodeId = buildRunNodeTimingByNodeIdFromRun(
     {
@@ -469,6 +486,31 @@ function buildPublicOutputRuntimeStateFromRunDetail(
     );
   }
   return outputState;
+}
+
+function listRunDetailOutputStateEvents(
+  runDetail: RunDetail,
+  bindings: BuddyPublicOutputBinding[],
+) {
+  const outputStateKeys = new Set(bindings.map((binding) => binding.stateKey));
+  const artifactEvents = runDetail.artifacts?.state_events ?? [];
+  const rootEvents = ((runDetail as RunDetail & { state_events?: StateEvent[] }).state_events) ?? [];
+  const events = artifactEvents.length > 0 ? artifactEvents : rootEvents;
+  return events
+    .filter((event) => outputStateKeys.has(event.state_key))
+    .sort((left, right) => {
+      const leftMs = parseRunDetailEventMs(left.created_at) ?? Number.MAX_SAFE_INTEGER;
+      const rightMs = parseRunDetailEventMs(right.created_at) ?? Number.MAX_SAFE_INTEGER;
+      return leftMs - rightMs || (left.sequence ?? 0) - (right.sequence ?? 0);
+    });
+}
+
+function parseRunDetailEventMs(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function listRunDetailOutputPreviews(runDetail: RunDetail) {

@@ -220,11 +220,9 @@ function startOutputTimersForNode(
     if (!binding.upstreamNodeIds.includes(nodeId)) {
       continue;
     }
-    const existingMessage = state.messagesByOutputNodeId[binding.outputNodeId];
-    if (existingMessage?.status === "completed" || existingMessage?.status === "failed") {
-      continue;
-    }
-    if (state.startedAtByOutputNodeId[binding.outputNodeId] !== undefined) {
+    const hasActiveMessage = listBuddyPublicOutputMessageIdsForOutputNode(state, binding.outputNodeId)
+      .some((messageId) => state.messagesByOutputNodeId[messageId]?.status === "streaming");
+    if (hasActiveMessage) {
       continue;
     }
     nextStartedAt ??= { ...state.startedAtByOutputNodeId };
@@ -370,9 +368,10 @@ function upsertMessage(
 ): BuddyPublicOutputRuntimeState {
   const sourceOutputNodeId = binding.sourceOutputNodeId || binding.outputNodeId;
   const startedAtMs = state.startedAtByOutputNodeId[sourceOutputNodeId] ?? state.startedAtByOutputNodeId[binding.outputNodeId] ?? null;
-  const existing = state.messagesByOutputNodeId[binding.outputNodeId];
+  const messageId = resolveOutputMessageIdForUpsert(state, binding, sourceOutputNodeId, status);
+  const existing = state.messagesByOutputNodeId[messageId];
   const message: BuddyPublicOutputMessage = {
-    outputNodeId: binding.outputNodeId,
+    outputNodeId: messageId,
     sourceOutputNodeId,
     outputNodeName: binding.outputNodeName,
     stateKey: binding.stateKey,
@@ -387,12 +386,72 @@ function upsertMessage(
   };
   return {
     ...state,
-    order: existing ? state.order : [...state.order, binding.outputNodeId],
+    order: existing ? state.order : [...state.order, messageId],
     messagesByOutputNodeId: {
       ...state.messagesByOutputNodeId,
-      [binding.outputNodeId]: message,
+      [messageId]: message,
     },
   };
+}
+
+function resolveOutputMessageIdForUpsert(
+  state: BuddyPublicOutputRuntimeState,
+  binding: BuddyPublicOutputMessageBinding,
+  sourceOutputNodeId: string,
+  status: BuddyPublicOutputMessageStatus,
+) {
+  const latestStreamingMessageId = findLatestMessageIdForSource(state, sourceOutputNodeId, binding.stateKey, "streaming");
+  if (latestStreamingMessageId) {
+    return latestStreamingMessageId;
+  }
+  const existing = state.messagesByOutputNodeId[binding.outputNodeId];
+  if (!existing) {
+    return binding.outputNodeId;
+  }
+  if (existing.status === "streaming" || status === "streaming") {
+    return existing.status === "streaming" ? binding.outputNodeId : nextOutputMessageId(state, binding.outputNodeId, sourceOutputNodeId);
+  }
+  return nextOutputMessageId(state, binding.outputNodeId, sourceOutputNodeId);
+}
+
+function findLatestMessageIdForSource(
+  state: BuddyPublicOutputRuntimeState,
+  sourceOutputNodeId: string,
+  stateKey: string,
+  status: BuddyPublicOutputMessageStatus,
+) {
+  for (let index = state.order.length - 1; index >= 0; index -= 1) {
+    const messageId = state.order[index];
+    const message = state.messagesByOutputNodeId[messageId];
+    if (
+      message?.status === status &&
+      resolveBuddyPublicOutputSourceNodeId(message) === sourceOutputNodeId &&
+      message.stateKey === stateKey
+    ) {
+      return messageId;
+    }
+  }
+  return "";
+}
+
+function nextOutputMessageId(
+  state: BuddyPublicOutputRuntimeState,
+  baseOutputNodeId: string,
+  sourceOutputNodeId: string,
+) {
+  let count = 0;
+  for (const messageId of state.order) {
+    const message = state.messagesByOutputNodeId[messageId];
+    if (resolveBuddyPublicOutputSourceNodeId(message) === sourceOutputNodeId) {
+      count += 1;
+    }
+  }
+  let candidate = `${baseOutputNodeId}:${Math.max(2, count + 1)}`;
+  while (state.messagesByOutputNodeId[candidate]) {
+    count += 1;
+    candidate = `${baseOutputNodeId}:${count + 1}`;
+  }
+  return candidate;
 }
 
 function listResultPackageOutputMessages(
@@ -438,7 +497,11 @@ function removeOutputMessagesForSource(
   const nextMessages = { ...state.messagesByOutputNodeId };
   const nextOrder = state.order.filter((messageId) => {
     const message = state.messagesByOutputNodeId[messageId];
-    if (resolveBuddyPublicOutputSourceNodeId(message) !== sourceOutputNodeId || keepMessageIds.has(messageId)) {
+    if (
+      resolveBuddyPublicOutputSourceNodeId(message) !== sourceOutputNodeId ||
+      keepMessageIds.has(messageId) ||
+      message?.status !== "streaming"
+    ) {
       return true;
     }
     changed = true;

@@ -18,6 +18,7 @@ SUPPORTED_SCRIPT_RUNTIME_TYPES = {"script", "python", "node", "javascript", "com
 DEFAULT_ACTION_TIMEOUT_SECONDS = 30.0
 MAX_ACTION_ERROR_CHARS = 4000
 MAX_INLINE_RUNTIME_CONTEXT_ENV_CHARS = 60_000
+SCRIPT_PROCESS_ENCODING = "utf-8"
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BEFORE_LLM_ENTRYPOINT = "before_llm.py"
 AFTER_LLM_ENTRYPOINT = "after_llm.py"
@@ -85,6 +86,8 @@ class ScriptActionRunner:
                 command,
                 input=json.dumps(action_inputs, ensure_ascii=False),
                 text=True,
+                encoding=SCRIPT_PROCESS_ENCODING,
+                errors="replace",
                 capture_output=True,
                 cwd=self.action_dir,
                 env=process_environment.env,
@@ -148,6 +151,8 @@ class ScriptActionRunner:
             "TOOGRAPH_ACTION_ENTRYPOINT": str(self.entrypoint_path),
             "TOOGRAPH_REPO_ROOT": str(REPO_ROOT),
             "TOOGRAPH_ACTION_PYTHON": python_environment.python_executable,
+            "PYTHONIOENCODING": SCRIPT_PROCESS_ENCODING,
+            "PYTHONUTF8": "1",
         }
         if python_environment.venv_dir is not None:
             env["TOOGRAPH_ACTION_VENV"] = str(python_environment.venv_dir)
@@ -452,6 +457,8 @@ def _run_dependency_command(command: list[str], *, action_dir: Path) -> None:
         completed = subprocess.run(
             command,
             text=True,
+            encoding=SCRIPT_PROCESS_ENCODING,
+            errors="replace",
             capture_output=True,
             cwd=action_dir,
             timeout=DEPENDENCY_COMMAND_TIMEOUT_SECONDS,

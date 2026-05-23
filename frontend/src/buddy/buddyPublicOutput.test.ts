@@ -135,6 +135,41 @@ test("reduceBuddyPublicOutputEvent starts output timing from upstream node start
   assert.equal(state.messagesByOutputNodeId.output_answer.status, "completed");
 });
 
+test("reduceBuddyPublicOutputEvent appends repeated completed output states as timeline messages", () => {
+  const bindings = [
+    {
+      outputNodeId: "output_answer",
+      outputNodeName: "Answer",
+      stateKey: "answer",
+      stateName: "answer",
+      stateType: "markdown",
+      displayMode: "markdown",
+      upstreamNodeIds: ["gate"],
+    },
+  ];
+  let state = createBuddyPublicOutputRuntimeState();
+
+  state = reduceBuddyPublicOutputEvent(
+    state,
+    bindings,
+    "state.updated",
+    { node_id: "writer", state_key: "answer", value: "progress" },
+    1000,
+  );
+  state = reduceBuddyPublicOutputEvent(
+    state,
+    bindings,
+    "state.updated",
+    { node_id: "writer", state_key: "answer", value: "final" },
+    3000,
+  );
+
+  assert.deepEqual(state.order, ["output_answer", "output_answer:2"]);
+  assert.equal(state.messagesByOutputNodeId.output_answer.content, "progress");
+  assert.equal(state.messagesByOutputNodeId["output_answer:2"].content, "final");
+  assert.equal(state.messagesByOutputNodeId["output_answer:2"].sourceOutputNodeId, "output_answer");
+});
+
 test("reduceBuddyPublicOutputEvent splits completed result packages into independent output messages", () => {
   const bindings = [
     {

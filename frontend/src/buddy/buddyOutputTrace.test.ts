@@ -349,6 +349,60 @@ test("buildBuddyOutputTracePlan prefers conditional gates as formal output bound
   assert.deepEqual(segments[1].records.map((record) => record.label), ["C", "D", "Review Gate"]);
 });
 
+test("reduceBuddyOutputTraceEvent appends a new segment when a loop reaches the same output boundary again", () => {
+  const graph = fiveNodeGraph();
+  graph.nodes.node_b = {
+    kind: "condition",
+    name: "Needs capability?",
+    description: "",
+    reads: [{ state: "state_b1", required: true }],
+    writes: [],
+    config: { branches: ["true", "false"], loopLimit: 5, branchMapping: {}, rule: null },
+    ui: { position: { x: 0, y: 0 } },
+  };
+  graph.nodes.node_c = {
+    kind: "agent",
+    name: "Execute capability",
+    description: "",
+    reads: [],
+    writes: [{ state: "state_b1", mode: "replace" }],
+    config: {
+      actionKey: "",
+      actionBindings: [],
+      taskInstruction: "",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "medium",
+      temperature: 0.4,
+    },
+    ui: { position: { x: 0, y: 0 } },
+  };
+  graph.edges = [
+    { source: "node_a", target: "node_b" },
+    { source: "node_c", target: "node_b" },
+  ];
+  graph.conditional_edges = [
+    { source: "node_b", branches: { true: "node_c", false: "output_b1" } },
+  ];
+  const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));
+  let state = createBuddyOutputTraceRuntimeState(plan);
+
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.started", { node_id: "node_a", node_type: "agent" }, 1000);
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.completed", { node_id: "node_a", node_type: "agent" }, 1100);
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.started", { node_id: "node_b", node_type: "condition" }, 1200);
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.completed", { node_id: "node_b", node_type: "condition" }, 1201);
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.started", { node_id: "node_c", node_type: "agent" }, 1300);
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.completed", { node_id: "node_c", node_type: "agent" }, 1400);
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.started", { node_id: "node_b", node_type: "condition" }, 1500);
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.completed", { node_id: "node_b", node_type: "condition" }, 1501);
+
+  const segments = listBuddyOutputTraceSegmentsForDisplay(state);
+  assert.equal(segments.length, 2);
+  assert.deepEqual(segments[0].records.map((record) => record.label), ["A", "Needs capability?"]);
+  assert.deepEqual(segments[1].records.map((record) => record.label), ["Execute capability", "Needs capability?"]);
+  assert.deepEqual(segments.map((segment) => segment.outputNodeIds), [["output_b1"], ["output_b1"]]);
+});
+
 test("reduceBuddyOutputTraceEvent keeps subgraph headers before indented inner rows", () => {
   const graph = fiveNodeGraph();
   graph.nodes.research = {
