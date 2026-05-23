@@ -1,8 +1,7 @@
 import type { Ref } from "vue";
 
-import { buildRunNodeTimingByNodeIdFromRun } from "../lib/runTelemetryProjection.ts";
 import type { GraphPayload } from "../types/node-system.ts";
-import type { RunDetail } from "../types/run.ts";
+import type { RunDetail, StateEvent } from "../types/run.ts";
 import type {
   BuddyPublicOutputBinding,
   BuddyPublicOutputMessage,
@@ -14,6 +13,7 @@ import {
   isBuddyPublicOutputMessageVisible,
   listBuddyPublicOutputMessageIdsForOutputNode,
   listVisibleBuddyPublicOutputNodeIds,
+  reduceBuddyPublicOutputEvent,
   upsertBuddyPublicOutputMessagesForBinding,
 } from "./buddyPublicOutput.ts";
 import type { BuddyPublicOutputMetadata } from "./buddyMessageMetadata.ts";
@@ -524,36 +524,77 @@ export function buildPublicOutputRuntimeStateFromRunDetail(
   bindings: BuddyPublicOutputBinding[],
   graph: GraphPayload,
 ): BuddyPublicOutputRuntimeState {
-  let outputState = createBuddyPublicOutputRuntimeState();
-  const seenOutputNodeIds = new Set<string>();
-  const outputTimingByNodeId = buildRunNodeTimingByNodeIdFromRun(
-    {
-      node_executions: runDetail.node_executions,
-      artifacts: { state_events: runDetail.artifacts?.state_events ?? [] },
-    },
-    graph,
-  );
+  let outputState = replayPublicOutputEventsFromRunDetail(runDetail, bindings);
   for (const preview of listRunDetailOutputPreviews(runDetail)) {
     const binding = findPublicOutputBindingForPreview(bindings, preview.node_id, preview.source_key);
-    if (!binding || seenOutputNodeIds.has(binding.outputNodeId)) {
+    if (!binding || listBuddyPublicOutputMessageIdsForOutputNode(outputState, binding.outputNodeId).length > 0) {
       continue;
     }
-    seenOutputNodeIds.add(binding.outputNodeId);
-    const timing = outputTimingByNodeId[binding.outputNodeId] ?? null;
-    const startedAtMs = timing?.startedAtEpochMs ?? null;
-    if (startedAtMs !== null) {
-      outputState.startedAtByOutputNodeId[binding.outputNodeId] = startedAtMs;
-    }
-    const completedAtMs = startedAtMs !== null && timing?.durationMs !== null && timing?.durationMs !== undefined
-      ? startedAtMs + timing.durationMs
-      : nowPublicOutputMs();
     outputState = upsertBuddyPublicOutputMessagesForBinding(
       outputState,
       binding,
       preview.value,
       runDetail.status === "failed" ? "failed" : "completed",
-      completedAtMs,
+      parseRunDetailEventMs(runDetail.completed_at) ?? nowPublicOutputMs(),
     );
+  }
+  return outputState;
+}
+
+type RunDetailReplayEvent = {
+  eventType: "node.started" | "state.updated" | "node.completed" | "node.failed";
+  timestampMs: number;
+  order: number;
+  payload: Record<string, unknown>;
+};
+
+function replayPublicOutputEventsFromRunDetail(
+  runDetail: RunDetail,
+  bindings: BuddyPublicOutputBinding[],
+): BuddyPublicOutputRuntimeState {
+  const events: RunDetailReplayEvent[] = [];
+  for (const [index, execution] of (runDetail.node_executions ?? []).entries()) {
+    const startedAtMs = parseRunDetailEventMs(execution.started_at);
+    if (startedAtMs !== null) {
+      events.push({
+        eventType: "node.started",
+        timestampMs: startedAtMs,
+        order: index * 3,
+        payload: { node_id: execution.node_id, started_at: execution.started_at },
+      });
+    }
+    const finishedAtMs = parseRunDetailEventMs(execution.finished_at);
+    if (finishedAtMs !== null) {
+      const failed = execution.status === "failed" || execution.status === "error";
+      events.push({
+        eventType: failed ? "node.failed" : "node.completed",
+        timestampMs: finishedAtMs,
+        order: index * 3 + 2,
+        payload: {
+          node_id: execution.node_id,
+          selected_branch: execution.artifacts?.selected_branch ?? "",
+          created_at: execution.finished_at,
+        },
+      });
+    }
+  }
+  for (const event of listRunDetailStateEvents(runDetail)) {
+    const timestampMs = parseRunDetailEventMs(event.created_at);
+    if (timestampMs === null) {
+      continue;
+    }
+    events.push({
+      eventType: "state.updated",
+      timestampMs,
+      order: 10_000 + (event.sequence ?? 0),
+      payload: event as unknown as Record<string, unknown>,
+    });
+  }
+  events.sort((left, right) => left.timestampMs - right.timestampMs || left.order - right.order);
+
+  let outputState = createBuddyPublicOutputRuntimeState();
+  for (const event of events) {
+    outputState = reduceBuddyPublicOutputEvent(outputState, bindings, event.eventType, event.payload, event.timestampMs);
   }
   return outputState;
 }
@@ -568,6 +609,14 @@ function parseRunDetailEventMs(value: string | null | undefined) {
 
 function listRunDetailOutputPreviews(runDetail: RunDetail) {
   return [...(runDetail.output_previews ?? []), ...(runDetail.artifacts?.output_previews ?? [])];
+}
+
+function listRunDetailStateEvents(runDetail: RunDetail): StateEvent[] {
+  const artifactEvents = runDetail.artifacts?.state_events ?? [];
+  if (artifactEvents.length > 0) {
+    return artifactEvents;
+  }
+  return ((runDetail as RunDetail & { state_events?: StateEvent[] }).state_events ?? []);
 }
 
 function findPublicOutputBindingForPreview(

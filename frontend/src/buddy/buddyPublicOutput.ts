@@ -364,16 +364,47 @@ function activateCompletedOutputBranches(
       activationEdges.some((edge) => edge.kind === "conditional") &&
       Object.prototype.hasOwnProperty.call(nextState.latestValuesByStateKey, binding.stateKey)
     ) {
+      const latestValue = nextState.latestValuesByStateKey[binding.stateKey];
+      if (hasCompletedOutputValue(nextState, binding.outputNodeId, binding.stateKey, latestValue)) {
+        continue;
+      }
       nextState = upsertBuddyPublicOutputMessagesForBinding(
         nextState,
         binding,
-        nextState.latestValuesByStateKey[binding.stateKey],
+        latestValue,
         "completed",
         nowMs,
       );
     }
   }
   return nextActivated ? { ...nextState, activatedOutputNodeIds: nextActivated } : nextState;
+}
+
+function hasCompletedOutputValue(
+  state: BuddyPublicOutputRuntimeState,
+  sourceOutputNodeId: string,
+  stateKey: string,
+  value: unknown,
+) {
+  return listBuddyPublicOutputMessageIdsForOutputNode(state, sourceOutputNodeId)
+    .some((messageId) => {
+      const message = state.messagesByOutputNodeId[messageId];
+      return message?.status === "completed" && message.stateKey === stateKey && isSameOutputValue(message.content, value);
+    });
+}
+
+function isSameOutputValue(left: unknown, right: unknown) {
+  if (Object.is(left, right)) {
+    return true;
+  }
+  if (typeof left !== "object" || left === null || typeof right !== "object" || right === null) {
+    return false;
+  }
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch {
+    return false;
+  }
 }
 
 function isDirectRegularOutputUpdate(binding: BuddyPublicOutputBinding, nodeId: string) {

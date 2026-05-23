@@ -196,13 +196,13 @@ test("reduceBuddyPublicOutputEvent displays only the output branch reached by th
         },
         ui: { position: { x: 0, y: 0 } },
       },
-      can_direct_output_condition: {
+      show_result_package_condition: {
         kind: "condition",
-        name: "Can Direct Output?",
+        name: "Show Result Package?",
         description: "",
-        reads: [{ state: "can_direct_output", required: true }],
+        reads: [{ state: "show_result_package", required: true }],
         writes: [],
-        config: { rule: { source: "$state.can_direct_output", operator: "==", value: true }, loopLimit: 1 },
+        config: { rule: { source: "$state.show_result_package", operator: "==", value: true }, loopLimit: 5 },
         ui: { position: { x: 0, y: 0 } },
       },
       output_capability_result: {
@@ -227,7 +227,7 @@ test("reduceBuddyPublicOutputEvent displays only the output branch reached by th
     edges: [],
     conditional_edges: [
       {
-        source: "can_direct_output_condition",
+        source: "show_result_package_condition",
         branches: {
           true: "output_capability_result",
           false: "output_final",
@@ -260,7 +260,7 @@ test("reduceBuddyPublicOutputEvent displays only the output branch reached by th
     state,
     bindings,
     "node.completed",
-    { node_id: "can_direct_output_condition", selected_branch: "true" },
+    { node_id: "show_result_package_condition", selected_branch: "true" },
     1500,
   );
 
@@ -298,6 +298,44 @@ test("reduceBuddyPublicOutputEvent does not duplicate direct regular outputs whe
   assert.equal(state.messagesByOutputNodeId.output_answer.content, "final");
 });
 
+test("reduceBuddyPublicOutputEvent does not duplicate a direct output when a terminal branch reaches the same output", () => {
+  const bindings = [
+    {
+      outputNodeId: "output_answer",
+      outputNodeName: "Answer",
+      stateKey: "answer",
+      stateName: "answer",
+      stateType: "markdown",
+      displayMode: "markdown",
+      upstreamNodeIds: ["writer", "needs_more"],
+      upstreamEdges: [
+        { kind: "regular" as const, source: "writer" },
+        { kind: "conditional" as const, source: "needs_more", branch: "false" },
+      ],
+    },
+  ];
+  let state = createBuddyPublicOutputRuntimeState();
+
+  state = reduceBuddyPublicOutputEvent(state, bindings, "node.started", { node_id: "writer" }, 1000);
+  state = reduceBuddyPublicOutputEvent(
+    state,
+    bindings,
+    "state.updated",
+    { node_id: "writer", state_key: "answer", value: "你好呀" },
+    1500,
+  );
+  state = reduceBuddyPublicOutputEvent(
+    state,
+    bindings,
+    "node.completed",
+    { node_id: "needs_more", selected_branch: "false" },
+    1600,
+  );
+
+  assert.deepEqual(state.order, ["output_answer"]);
+  assert.equal(state.messagesByOutputNodeId.output_answer.content, "你好呀");
+});
+
 test("reduceBuddyPublicOutputEvent does not display an output from an unselected branch", () => {
   const bindings = [
     {
@@ -307,8 +345,8 @@ test("reduceBuddyPublicOutputEvent does not display an output from an unselected
       stateName: "Capability Result",
       stateType: "result_package",
       displayMode: "auto",
-      upstreamNodeIds: ["can_direct_output_condition"],
-      upstreamEdges: [{ kind: "conditional" as const, source: "can_direct_output_condition", branch: "true" }],
+      upstreamNodeIds: ["show_result_package_condition"],
+      upstreamEdges: [{ kind: "conditional" as const, source: "show_result_package_condition", branch: "true" }],
     },
   ];
   let state = createBuddyPublicOutputRuntimeState();
@@ -324,7 +362,7 @@ test("reduceBuddyPublicOutputEvent does not display an output from an unselected
     state,
     bindings,
     "node.completed",
-    { node_id: "can_direct_output_condition", selected_branch: "false" },
+    { node_id: "show_result_package_condition", selected_branch: "false" },
     1500,
   );
 

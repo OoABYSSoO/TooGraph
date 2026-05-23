@@ -1721,7 +1721,7 @@ class TemplateLayoutTests(unittest.TestCase):
                 "needs_capability",
                 "capability_result",
                 "capability_trace",
-                "can_direct_output",
+                "show_result_package",
                 "public_response",
             },
         )
@@ -1744,7 +1744,7 @@ class TemplateLayoutTests(unittest.TestCase):
             "needs_capability": "boolean",
             "capability_result": "result_package",
             "capability_trace": "json",
-            "can_direct_output": "boolean",
+            "show_result_package": "boolean",
             "public_response": "markdown",
         }
         for state_key, expected_type in expected_state_types.items():
@@ -1755,7 +1755,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["context_budget_report"]["binding"]["kind"], "tool_output")
         self.assertEqual(states["context_budget_report"]["binding"]["toolKey"], "buddy_context_pressure_check")
         self.assertEqual(states["context_budget_report"]["binding"]["nodeId"], "check_context_pressure")
-        self.assertIsNone(states["can_direct_output"]["binding"])
+        self.assertIsNone(states["show_result_package"]["binding"])
         self.assertIsNone(states["public_response"]["binding"])
         self.assertEqual(states["needs_context_compaction"]["binding"]["fieldKey"], "needs_context_compaction")
         self.assertEqual(states["capability_result"]["name"], "结果包")
@@ -1789,11 +1789,11 @@ class TemplateLayoutTests(unittest.TestCase):
                 "context_pressure_condition",
                 "run_context_compaction",
                 "reply_and_select_capability",
-                "can_direct_output_condition",
-                "needs_capability_condition",
+                "condition_93972e3f",
+                "condition_3706cb6e",
                 "execute_capability",
-                "output_final",
                 "output_ab549b8d",
+                "output_161c76f3",
             },
         )
         self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "subgraph"], ["run_context_compaction"])
@@ -1803,13 +1803,13 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(nodes["reply_and_select_capability"]["kind"], "agent")
         self.assertEqual(nodes["execute_capability"]["kind"], "agent")
         self.assertEqual(nodes["context_pressure_condition"]["kind"], "condition")
-        self.assertEqual(nodes["can_direct_output_condition"]["kind"], "condition")
-        self.assertEqual(nodes["needs_capability_condition"]["kind"], "condition")
+        self.assertEqual(nodes["condition_93972e3f"]["kind"], "condition")
+        self.assertEqual(nodes["condition_3706cb6e"]["kind"], "condition")
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
-            ["output_final", "output_ab549b8d"],
+            ["output_ab549b8d", "output_161c76f3"],
         )
-        self.assertEqual(_read_contracts(nodes["output_final"]["reads"]), [{"state": "public_response", "required": True}])
+        self.assertEqual(_read_contracts(nodes["output_161c76f3"]["reads"]), [{"state": "public_response", "required": True}])
         self.assertEqual(
             _read_contracts(nodes["output_ab549b8d"]["reads"]),
             [{"state": "capability_result", "required": True}],
@@ -1826,11 +1826,11 @@ class TemplateLayoutTests(unittest.TestCase):
             "context_pressure_condition": {"x": 877, "y": 237},
             "run_context_compaction": {"x": 1601, "y": -841},
             "reply_and_select_capability": {"x": 2362, "y": 203},
-            "can_direct_output_condition": {"x": 3024, "y": 506},
-            "needs_capability_condition": {"x": 3820, "y": 760},
-            "execute_capability": {"x": 4590, "y": 546},
-            "output_final": {"x": 5160, "y": 1316},
+            "condition_93972e3f": {"x": 3200, "y": 529},
+            "condition_3706cb6e": {"x": 3962, "y": 854},
+            "execute_capability": {"x": 4790, "y": 452},
             "output_ab549b8d": {"x": 5661, "y": -376},
+            "output_161c76f3": {"x": 4783, "y": -414},
         }
         for node_id, expected_position in expected_positions.items():
             with self.subTest(layout_node=node_id):
@@ -1868,7 +1868,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             selector_node["writes"],
             [
-                {"state": "can_direct_output", "mode": "replace"},
+                {"state": "show_result_package", "mode": "replace"},
                 {"state": "public_response", "mode": "replace"},
                 {"state": "capability_trace", "mode": "replace"},
                 {"state": "selected_capability", "mode": "replace"},
@@ -1876,9 +1876,9 @@ class TemplateLayoutTests(unittest.TestCase):
             ],
         )
         self.assertIn("capability.kind=none", selector_node["config"]["taskInstruction"])
-        self.assertIn("can_direct_output=true", selector_node["config"]["taskInstruction"])
-        self.assertIn("不要把结果复制进 public_response", selector_node["config"]["taskInstruction"])
-        self.assertIn("即使包含 public_response/final_response 字段", selector_node["config"]["taskInstruction"])
+        self.assertIn("show_result_package=true", selector_node["config"]["taskInstruction"])
+        self.assertIn("public_response 只说明下一条结果包是什么内容类型或来源", selector_node["config"]["taskInstruction"])
+        self.assertIn("虽然包含 public_response/final_response 字段", selector_node["config"]["taskInstruction"])
         self.assertIn("buddy_session_recall", selector_node["config"]["taskInstruction"])
         self.assertIn("current_session_id", selector_node["config"]["taskInstruction"])
         self.assertIn(
@@ -1897,14 +1897,14 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn("buddy_session_recall", execute_node["config"]["taskInstruction"])
         self.assertIn("result_package", execute_node["config"]["taskInstruction"])
 
-        direct_condition_node = nodes["can_direct_output_condition"]
-        self.assertEqual(direct_condition_node["config"]["loopLimit"], 1)
+        direct_condition_node = nodes["condition_93972e3f"]
+        self.assertEqual(direct_condition_node["config"]["loopLimit"], 5)
         self.assertEqual(
             direct_condition_node["config"]["rule"],
-            {"source": "$state.can_direct_output", "operator": "==", "value": True},
+            {"source": "$state.show_result_package", "operator": "==", "value": True},
         )
-        self.assertIn({"state": "can_direct_output", "required": True}, _read_contracts(direct_condition_node["reads"]))
-        condition_node = nodes["needs_capability_condition"]
+        self.assertIn({"state": "show_result_package", "required": True}, _read_contracts(direct_condition_node["reads"]))
+        condition_node = nodes["condition_3706cb6e"]
         self.assertEqual(condition_node["config"]["loopLimit"], 5)
         self.assertEqual(
             condition_node["config"]["rule"],
@@ -1952,8 +1952,9 @@ class TemplateLayoutTests(unittest.TestCase):
                 {"source": "input_existing_session_summary", "target": "check_context_pressure"},
                 {"source": "check_context_pressure", "target": "context_pressure_condition"},
                 {"source": "run_context_compaction", "target": "reply_and_select_capability"},
-                {"source": "reply_and_select_capability", "target": "can_direct_output_condition"},
                 {"source": "execute_capability", "target": "check_context_pressure"},
+                {"source": "reply_and_select_capability", "target": "output_161c76f3"},
+                {"source": "reply_and_select_capability", "target": "condition_93972e3f"},
             ],
         )
         self.assertEqual(
@@ -1968,19 +1969,19 @@ class TemplateLayoutTests(unittest.TestCase):
                     },
                 },
                 {
-                    "source": "can_direct_output_condition",
+                    "source": "condition_93972e3f",
                     "branches": {
                         "true": "output_ab549b8d",
-                        "false": "needs_capability_condition",
-                        "exhausted": "needs_capability_condition",
+                        "false": "condition_3706cb6e",
+                        "exhausted": "condition_3706cb6e",
                     },
                 },
                 {
-                    "source": "needs_capability_condition",
+                    "source": "condition_3706cb6e",
                     "branches": {
                         "true": "execute_capability",
-                        "false": "output_final",
-                        "exhausted": "output_final",
+                        "false": "output_161c76f3",
+                        "exhausted": "output_161c76f3",
                     },
                 },
             ],

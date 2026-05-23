@@ -546,7 +546,8 @@ test("BuddyWidget renders output-segment run trace capsules instead of per-messa
   assert.doesNotMatch(componentSource, /function resolveTraceSegmentSummary/);
   assert.doesNotMatch(componentSource, /function buildTraceTreeRows/);
   assert.doesNotMatch(componentSource, /buildRunNodeTimingByNodeIdFromRun/);
-  assert.match(runDisplayMessagesSource, /buildRunNodeTimingByNodeIdFromRun/);
+  assert.match(runDisplayMessagesSource, /replayPublicOutputEventsFromRunDetail/);
+  assert.match(runDisplayMessagesSource, /reduceBuddyPublicOutputEvent/);
   assert.match(componentSource, /const \{ publicOutputMessages, outputTraceMessages \} = syncBuddyRunDisplayMessages/);
   assert.match(componentSource, /for \(const message of outputTraceMessages\) \{[\s\S]*persistBuddyMessage\(sessionId, message,[\s\S]*includeInContext:\s*false/);
   assert.match(componentSource, /const metadata = buildBuddyMessageMetadata\(message\);/);
