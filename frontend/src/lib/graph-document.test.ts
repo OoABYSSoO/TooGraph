@@ -1077,7 +1077,7 @@ test("updateAgentNodeConfigInDocument does not create static action input mappin
   assert.equal("inputMapping" in (node.config.actionBindings?.[0] ?? {}), false);
 });
 
-test("updateAgentNodeConfigInDocument automatically binds matching action state inputs", () => {
+test("updateAgentNodeConfigInDocument leaves action state inputs as optional user connections", () => {
   const document: GraphPayload = {
     graph_id: null,
     name: "Action Managed Input Graph",
@@ -1142,14 +1142,13 @@ test("updateAgentNodeConfigInDocument automatically binds matching action state 
   const node = nextDocument.nodes.search_agent;
   assert.equal(node.kind, "agent");
   assert.deepEqual(node.reads, [
-    { state: "user_question", required: true, binding: { kind: "action_input", actionKey: "web_search", fieldKey: "user_question", managed: true } },
     { state: "extra_notes", required: false },
   ]);
   assert.equal("inputMapping" in (node.config.actionBindings?.[0] ?? {}), false);
   assert.deepEqual(document.nodes.search_agent.reads, [{ state: "extra_notes", required: false }]);
 });
 
-test("updateAgentNodeConfigInDocument materializes missing action state inputs", () => {
+test("updateAgentNodeConfigInDocument does not materialize missing action state inputs", () => {
   const document: GraphPayload = {
     graph_id: null,
     name: "Action Missing Input Graph",
@@ -1191,13 +1190,11 @@ test("updateAgentNodeConfigInDocument materializes missing action state inputs",
 
   const node = nextDocument.nodes.search_agent;
   assert.equal(node.kind, "agent");
-  assert.deepEqual(node.reads, [
-    { state: "state_1", required: true, binding: { kind: "action_input", actionKey: "web_search", fieldKey: "user_question", managed: true } },
-  ]);
-  assert.equal(nextDocument.state_schema.state_1?.name, "User Question");
-  assert.equal(nextDocument.state_schema.state_1?.description, "Question to research.");
-  assert.equal(nextDocument.state_schema.state_1?.type, "text");
-  assert.equal(nextDocument.state_schema.state_1?.value, "");
+  assert.deepEqual(node.reads, []);
+  assert.equal(
+    Object.values(nextDocument.state_schema).some((state) => state.binding?.kind === "action_input"),
+    false,
+  );
   assert.deepEqual(document.nodes.search_agent.reads, []);
 });
 

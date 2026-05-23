@@ -30,7 +30,7 @@ State outputs:
 Rules:
 - `action_key` must match `action_json.actionKey`.
 - The generated `action_json` must distinguish `stateInputSchema` for graph state inputs, `llmOutputSchema` for structured LLM output, and `stateOutputSchema` for downstream state outputs.
-- The generated `action_json` must not include `required` on Action IO fields; `stateInputSchema` only lists state fields the Action truly needs from the graph.
+- The generated `action_json` must not include `required` on Action IO fields; `stateInputSchema` only lists graph-state connection hints that are genuinely useful for using the Action.
 - The generated Action must keep TooGraph state binding in the runtime, not inside action scripts.
 - The generated Action must declare permissions in `action.json` when it needs network, file access, browser automation, secret access, or subprocess execution.
 - The generated `action_json` must not include local usage settings. Action visibility is controlled only by `action/settings.json` with an `enabled` flag, which the app generates outside the Action package.

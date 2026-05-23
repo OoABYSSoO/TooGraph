@@ -948,7 +948,9 @@ function reconcileAgentActionStateInputBindings<T extends GraphPayload | GraphDo
     return;
   }
 
-  const existingManagedReadByField = new Map<string, ReadBinding>();
+  const preservedManagedReads: ReadBinding[] = [];
+  const boundStateKeys = new Set<string>();
+  const freeReads: ReadBinding[] = [];
   for (const readBinding of node.reads) {
     const binding = readBinding.binding;
     if (
@@ -956,42 +958,23 @@ function reconcileAgentActionStateInputBindings<T extends GraphPayload | GraphDo
       binding.actionKey === attachedActionKey &&
       binding.managed !== false &&
       activeInputKeys.has(binding.fieldKey) &&
-      document.state_schema[readBinding.state]
+      document.state_schema[readBinding.state] &&
+      !boundStateKeys.has(readBinding.state)
     ) {
-      existingManagedReadByField.set(binding.fieldKey, readBinding);
-    }
-  }
-
-  const freeReads = node.reads.filter((binding) => !isManagedActionInputReadBinding(binding));
-  const boundStateKeys = new Set<string>();
-  const managedReads: ReadBinding[] = [];
-
-  for (const field of definition.stateInputSchema) {
-    const existingRead = existingManagedReadByField.get(field.key);
-    if (existingRead && document.state_schema[existingRead.state] && !boundStateKeys.has(existingRead.state)) {
-      boundStateKeys.add(existingRead.state);
-      managedReads.push(buildManagedActionInputReadBinding(existingRead.state, attachedActionKey, field));
+      boundStateKeys.add(readBinding.state);
+      const field = definition.stateInputSchema.find((candidate) => candidate.key === binding.fieldKey);
+      if (field) {
+        preservedManagedReads.push(buildManagedActionInputReadBinding(readBinding.state, attachedActionKey, field));
+      }
       continue;
     }
-
-    const inferredStateKey = inferActionInputStateKey(
-      document,
-      field,
-      new Set([...boundStateKeys]),
-    );
-    if (inferredStateKey) {
-      boundStateKeys.add(inferredStateKey);
-      managedReads.push(buildManagedActionInputReadBinding(inferredStateKey, attachedActionKey, field));
-      continue;
+    if (!isManagedActionInputReadBinding(readBinding)) {
+      freeReads.push(readBinding);
     }
-
-    const materializedStateKey = createManagedActionInputState(document, definition, field);
-    boundStateKeys.add(materializedStateKey);
-    managedReads.push(buildManagedActionInputReadBinding(materializedStateKey, attachedActionKey, field));
   }
 
   node.reads = [
-    ...managedReads,
+    ...preservedManagedReads,
     ...freeReads.filter((binding) => !boundStateKeys.has(binding.state)),
   ];
 }
@@ -1565,53 +1548,6 @@ function buildManagedToolInputReadBinding(
   };
 }
 
-function inferActionInputStateKey(
-  document: GraphPayload | GraphDocument,
-  field: ActionIoField,
-  usedStateKeys: Set<string>,
-) {
-  const candidates: ActionInputStateCandidate[] = [];
-  const fieldKey = normalizeName(field.key);
-  const fieldName = normalizeName(field.name);
-  for (const [stateKey, definition] of Object.entries(document.state_schema)) {
-    if (usedStateKeys.has(stateKey)) {
-      continue;
-    }
-    let score = 0;
-    const stateKeyName = normalizeName(stateKey);
-    const stateDisplayName = normalizeName(definition.name);
-    if (stateKey === field.key) {
-      score = 100;
-    } else if (stateKeyName === fieldKey) {
-      score = 90;
-    } else if (fieldName && stateDisplayName === fieldName) {
-      score = 80;
-    } else if (stateTypeMatchesActionField(definition, field)) {
-      if (fieldKey && stateKeyName.includes(fieldKey)) {
-        score = 70;
-      } else if (fieldName && stateDisplayName.includes(fieldName)) {
-        score = 60;
-      }
-    }
-    if (score > 0) {
-      candidates.push({ score, stateKey });
-    }
-  }
-
-  if (candidates.length === 0) {
-    return "";
-  }
-  candidates.sort((left, right) => right.score - left.score || left.stateKey.localeCompare(right.stateKey));
-  const bestScore = candidates[0]?.score ?? 0;
-  const bestCandidates = candidates.filter((candidate) => candidate.score === bestScore);
-  return bestCandidates.length === 1 ? bestCandidates[0].stateKey : "";
-}
-
-type ActionInputStateCandidate = {
-  score: number;
-  stateKey: string;
-};
-
 function createManagedActionInputState(
   document: GraphPayload | GraphDocument,
   action: ActionDefinition,
@@ -1754,17 +1690,6 @@ function ensureToolWriteBinding(node: ToolNode, stateKey: string) {
 function normalizeActionFieldStateType(valueType: string) {
   const normalized = valueType.trim();
   return STATE_FIELD_TYPE_VALUES.has(normalized) ? normalized : "json";
-}
-
-function normalizeName(value: string) {
-  return [...value.toLowerCase()].filter((character) => /[\p{Letter}\p{Number}]/u.test(character)).join("");
-}
-
-function stateTypeMatchesActionField(definition: StateDefinition | undefined, field: ActionIoField) {
-  if (!definition) {
-    return false;
-  }
-  return definition.type?.trim() === normalizeActionFieldStateType(field.valueType);
 }
 
 export function updateConditionNodeConfigInDocument<T extends GraphPayload | GraphDocument>(

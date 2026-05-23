@@ -943,15 +943,6 @@ def _validate_agent_action_bindings(
             else:
                 bound_input_fields.add(binding.field_key)
 
-        for field_key in sorted(input_fields - bound_input_fields):
-            issues.append(
-                ValidationIssue(
-                    code="agent_action_input_binding_missing",
-                    message=f"LLM node '{node_name}' is missing a managed action_input slot for Action field '{field_key}'.",
-                    path=f"nodes.{node_name}.reads",
-                )
-            )
-
     for binding_index, binding in enumerate(node.config.action_bindings):
         definition = action_catalog.get(binding.action_key)
         if definition is None:

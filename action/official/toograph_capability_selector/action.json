@@ -2,17 +2,17 @@
   "schemaVersion": "toograph.action/v1",
   "actionKey": "toograph_capability_selector",
   "name": "TooGraph 能力选择器",
-  "description": "根据用户需求和 before_llm.py 提供的当前启用能力目录，选择一个动态 Action、Subgraph、Tool 或 none 能力。",
-  "llmInstruction": "你已绑定 TooGraph 能力选择器。读取 requirement 和 Action Pre-LLM Context 中按 Subgraphs、Actions、Tools 分区列出的当前启用能力目录；目录中的每个能力只提供 key 和使用场景 description。只输出 llmOutputSchema.capability。选择优先级：subgraph > action > tool；当多个能力都能完成需求时，选择优先级最高且描述最匹配的一个。kind 必须是 subgraph、action、tool 或 none；选择能力时 key 必须完全来自对应分区；没有合适能力时只输出 {\"kind\":\"none\"}，不需要 reason。不要执行能力，不要输出候选列表。",
-  "version": "3.0.1",
+  "description": "根据当前 LLM 节点可见的图状态和 before_llm.py 提供的启用能力目录，判断是否还需要调用一个动态 Action、Subgraph、Tool；不需要时返回 none。",
+  "llmInstruction": "你已绑定 TooGraph 能力选择器。先根据当前图状态判断本轮是否还需要调用能力；所有连接到本 LLM 节点的普通 state 都是可用上下文，stateInputSchema 只是提示用户可连接哪些信息，不代表唯一输入。如果当前状态已经足够回复用户，或上一轮 result_package/capability_review 表明能力已成功产出可用结果且不需要继续调用能力，只输出 {\"kind\":\"none\"}。只有仍需要一个显式能力完成下一步时，才读取 Action Pre-LLM Context 中按 Subgraphs、Actions、Tools 分区列出的当前启用能力目录并选择一个互斥 capability。目录中的每个能力只提供 key 和使用场景 description。只输出 llmOutputSchema.capability。选择优先级：subgraph > action > tool；当多个能力都能完成当前下一步时，选择优先级最高且描述最匹配的一个。kind 必须是 subgraph、action、tool 或 none；选择能力时 key 必须完全来自对应分区；没有合适能力或不需要能力时只输出 {\"kind\":\"none\"}，不需要 reason。不要执行能力，不要输出候选列表。",
+  "version": "3.2.0",
   "timeoutSeconds": 30,
   "permissions": [],
   "stateInputSchema": [
     {
-      "key": "requirement",
-      "name": "Requirement",
+      "key": "current_requirement",
+      "name": "Current Requirement",
       "valueType": "text",
-      "description": "用户本轮需要完成的目标。"
+      "description": "可选提示：当前这一步希望能力选择器完成的目标。未显式连接时，选择器会直接使用本 LLM 节点可见的普通图状态。"
     }
   ],
   "llmOutputSchema": [
@@ -31,10 +31,10 @@
       "description": "选中的单个动态能力；没有匹配能力时 kind 为 none。"
     },
     {
-      "key": "found",
-      "name": "Found",
+      "key": "needs_capability",
+      "name": "Needs Capability",
       "valueType": "boolean",
-      "description": "当 capability 是已启用、可发现的 action/subgraph/tool 时为 true；kind 为 none 或选择无效时为 false。"
+      "description": "当下一步仍需要调用一个已启用、可发现的 action/subgraph/tool 时为 true；kind 为 none 或选择无效时为 false。"
     }
   ]
 }

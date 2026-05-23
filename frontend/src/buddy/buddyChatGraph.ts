@@ -685,7 +685,7 @@ const BUDDY_ACTIVITY_PHASE_BY_NODE_ID: Record<string, string> = {
   needs_capability: "checkingCapabilityNeed",
   buddy_capability_loop: "selectingCapability",
   select_capability: "selectingCapability",
-  capability_found_condition: "selectingCapability",
+  should_call_capability_condition: "selectingCapability",
   review_missing_capability: "reviewingCapability",
   review_capability_permission: "checkingPermission",
   needs_capability_approval: "checkingPermission",

@@ -57,7 +57,7 @@ test("buddy autonomous review is an internal background template with memory wri
   );
 });
 
-test("buddy autonomous review stays out of visible templates and fixed selector output", () => {
+test("buddy autonomous review stays out of visible templates and selector defaults to no capability", () => {
   const templateList = runPython(
     [
       "import json",
@@ -70,18 +70,18 @@ test("buddy autonomous review stays out of visible templates and fixed selector 
   assert.equal(templateList.includes("buddy_self_review"), false);
   assert.equal(templateList.includes("buddy_autonomous_review"), false);
 
-  const selectedCapability = runPython(
+  const selectedCapabilityResult = runPython(
     [
       "import json, sys",
       `sys.path.insert(0, ${JSON.stringify(resolve("action/official/toograph_capability_selector"))})`,
       "from after_llm import toograph_capability_selector",
-      "print(json.dumps(toograph_capability_selector()['capability']))",
+      "print(json.dumps(toograph_capability_selector()))",
     ].join("; "),
     { TOOGRAPH_REPO_ROOT: process.cwd() },
   );
-  assert.deepEqual(selectedCapability, {
-    kind: "subgraph",
-    key: "toograph_page_operation_workflow",
+  assert.deepEqual(selectedCapabilityResult, {
+    capability: { kind: "none" },
+    needs_capability: false,
   });
 });
 

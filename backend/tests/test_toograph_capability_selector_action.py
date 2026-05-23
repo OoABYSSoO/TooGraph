@@ -19,14 +19,14 @@ def _load_selector_module(path: Path, module_name: str):
 
 
 class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
-    def test_manifest_declares_requirement_input_llm_selection_and_capability_outputs(self) -> None:
+    def test_manifest_declares_current_requirement_hint_llm_selection_and_capability_outputs(self) -> None:
         manifest = json.loads((SELECTOR_ACTION_DIR / "action.json").read_text(encoding="utf-8"))
 
         self.assertEqual(manifest["actionKey"], "toograph_capability_selector")
         self.assertEqual(manifest["timeoutSeconds"], 30)
         self.assertEqual(
             [field["key"] for field in manifest.get("stateInputSchema", [])],
-            ["requirement"],
+            ["current_requirement"],
         )
         self.assertEqual(
             [field["key"] for field in manifest.get("llmOutputSchema", [])],
@@ -34,11 +34,14 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         )
         self.assertEqual(
             [field["key"] for field in manifest["stateOutputSchema"]],
-            ["capability", "found"],
+            ["capability", "needs_capability"],
         )
         self.assertNotIn("audit", [field["key"] for field in manifest["stateOutputSchema"]])
         instruction = manifest["llmInstruction"]
-        self.assertIn("优先级", instruction)
+        self.assertIn("是否还需要调用能力", instruction)
+        self.assertIn("当前图状态", instruction)
+        self.assertNotIn("loop_context", instruction)
+        self.assertIn("needs_capability", json.dumps(manifest["stateOutputSchema"], ensure_ascii=False))
         self.assertLess(instruction.index("subgraph"), instruction.index("action"))
         self.assertLess(instruction.index("action"), instruction.index("tool"))
         self.assertIn('{"kind":"none"}', instruction)
@@ -110,7 +113,8 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         self.assertIn("description", result["capability"])
         self.assertEqual(result["capability"]["confidence"], 0.82)
         self.assertEqual(result["capability"]["reason"], "需要联网调研。")
-        self.assertTrue(result["found"])
+        self.assertTrue(result["needs_capability"])
+        self.assertNotIn("found", result)
 
     def test_after_llm_returns_none_when_selected_capability_is_disabled_or_unknown(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_unknown_test")
@@ -121,7 +125,8 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
 
         self.assertEqual(result["capability"]["kind"], "none")
         self.assertIn("not_enabled_template", result["capability"]["reason"])
-        self.assertFalse(result["found"])
+        self.assertFalse(result["needs_capability"])
+        self.assertNotIn("found", result)
 
     def test_after_llm_returns_none_when_llm_selects_none(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_none_test")
@@ -131,7 +136,8 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         )
 
         self.assertEqual(result["capability"], {"kind": "none"})
-        self.assertFalse(result["found"])
+        self.assertFalse(result["needs_capability"])
+        self.assertNotIn("found", result)
 
 
 if __name__ == "__main__":

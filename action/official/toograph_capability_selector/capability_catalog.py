@@ -92,7 +92,7 @@ def normalize_selected_capability(
     confidence = _coerce_confidence(capability.get("confidence"))
     if confidence is not None:
         normalized["confidence"] = confidence
-    return {"capability": normalized, "found": True}
+    return {"capability": normalized, "needs_capability": True}
 
 
 def _discover_subgraphs(repo_root: Path, *, errors: list[dict[str, str]]) -> list[dict[str, Any]]:
@@ -208,7 +208,7 @@ def _none_capability(reason: str = "") -> dict[str, Any]:
         capability["reason"] = reason
     return {
         "capability": capability,
-        "found": False,
+        "needs_capability": False,
     }
 
 

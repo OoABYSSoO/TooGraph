@@ -11,7 +11,7 @@ TooGraph 当前适合做这些事情：
 - 运行带条件分支和基础 cycles 的图，并查看 `cycle_summary / cycle_iterations`。
 - 把知识库通过 input 节点接给 LLM 节点；检索能力不再隐式内置，需要通过显式 Action 或图模板接入。
 - 使用 `web_search` Action 做联网搜索、网页正文抓取和本地 source document 输出。
-- 使用 `toograph_capability_selector` 在 Buddy 或模板内选择一个启用的 Action、Subgraph、Tool 或 `none` 能力。
+- 使用 `toograph_capability_selector` 在 Buddy 或模板内判断是否还需要能力；需要时选择一个启用的 Action、Subgraph、Tool，不需要时返回 `none`。
 - 使用 `toograph_page_operator` 通过结构化页面操作书发起普通页面操作、固定化运行图模板操作，或在编辑器中用 `graph_edit editor.graph.playback` 可见回放目标图搭建。
 - 使用 `toograph_page_operation_workflow` 让 Buddy 可见地打开模板库、搜索目标模板、写入本次目标、点击运行并读取公开输出。
 - 使用 `toograph_action_builder`、`toograph_script_tester` 和 `local_workspace_executor` 组成用户自定义 Action 创建流程。

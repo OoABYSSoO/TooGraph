@@ -461,7 +461,7 @@
     },
     "input_capability_result": {
       "kind": "input",
-      "name": "能力结果",
+      "name": "结果包",
       "description": "",
       "ui": {
         "position": {

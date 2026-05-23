@@ -146,7 +146,7 @@ class NodeSystemValidatorActionTests(unittest.TestCase):
 
         self.assertNotIn("agent_action_required_input_missing", [issue.code for issue in validation.issues])
 
-    def test_static_action_state_inputs_require_managed_action_input_slots(self) -> None:
+    def test_static_action_state_inputs_are_optional_connection_hints(self) -> None:
         graph = _graph_with_agent_config(
             {
                 "actionKey": "summarize_text",
@@ -169,7 +169,7 @@ class NodeSystemValidatorActionTests(unittest.TestCase):
         ):
             validation = validate_graph(graph)
 
-        self.assertIn("agent_action_input_binding_missing", [issue.code for issue in validation.issues])
+        self.assertNotIn("agent_action_input_binding_missing", [issue.code for issue in validation.issues])
 
     def test_static_action_state_inputs_accept_managed_action_input_slots(self) -> None:
         graph = NodeSystemGraphDocument.model_validate(

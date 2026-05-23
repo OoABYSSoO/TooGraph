@@ -402,7 +402,7 @@ function buildPromotedCapabilityPassthroughOutput(output: BuddyPublicOutputMessa
     ...output,
     outputNodeId: `${BUDDY_CAPABILITY_PASSTHROUGH_OUTPUT_NODE_ID}:${output.outputNodeId}`,
     sourceOutputNodeId: BUDDY_CAPABILITY_PASSTHROUGH_OUTPUT_NODE_ID,
-    outputNodeName: "能力结果",
+    outputNodeName: "结果包",
   };
 }
 

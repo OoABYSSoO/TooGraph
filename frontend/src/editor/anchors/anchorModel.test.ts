@@ -89,7 +89,7 @@ test("buildAnchorModel keeps managed action input anchor ids stable when the bou
         binding: {
           kind: "action_input",
           actionKey: "toograph_capability_selector",
-          fieldKey: "requirement",
+          fieldKey: "current_requirement",
           managed: true,
         },
       },
@@ -117,7 +117,7 @@ test("buildAnchorModel keeps managed action input anchor ids stable when the bou
   const slotAnchor = buildAnchorModel("capability_selector", slotNode).stateInputs[0];
   const connectedAnchor = buildAnchorModel("capability_selector", connectedNode).stateInputs[0];
 
-  assert.equal(slotAnchor?.id, "state-in:action_input_toograph_capability_selector_requirement");
+  assert.equal(slotAnchor?.id, "state-in:action_input_toograph_capability_selector_current_requirement");
   assert.equal(connectedAnchor?.id, slotAnchor?.id);
   assert.equal(slotAnchor?.stateKey, "action_requirement_slot");
   assert.equal(connectedAnchor?.stateKey, "requirement");

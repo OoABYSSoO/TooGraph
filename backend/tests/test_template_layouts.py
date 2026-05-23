@@ -1724,7 +1724,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["fanout_assembly_report"]["type"], "json")
         self.assertEqual(states["task_plan"]["type"], "json")
         self.assertEqual(states["selected_capability"]["type"], "capability")
-        self.assertEqual(states["capability_found"]["type"], "boolean")
+        self.assertEqual(states["should_call_capability"]["type"], "boolean")
+        self.assertNotIn("capability_found", states)
         self.assertEqual(states["capability_result"]["type"], "result_package")
         self.assertNotIn("capability_selection_audit", states)
         self.assertEqual(states["capability_gap"]["type"], "json")
@@ -1961,6 +1962,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertNotIn("interrupt_after", cycle_graph["metadata"])
         self.assertNotIn("auto_resume_after_ui_operation_nodes", cycle_graph["metadata"])
         self.assertEqual(cycle_graph["metadata"]["role"], "buddy_capability_loop")
+        self.assertIn({"state": "should_call_capability", "mode": "replace"}, nodes["buddy_capability_loop"]["writes"])
         self.assertIn({"state": "capability_builder_handoff", "mode": "replace"}, nodes["buddy_capability_loop"]["writes"])
         self.assertEqual(cycle_graph["state_schema"]["context_brief"]["type"], "json")
         self.assertEqual(cycle_graph["state_schema"]["task_plan"]["type"], "json")
@@ -1973,10 +1975,9 @@ class TemplateLayoutTests(unittest.TestCase):
             for read in selector_node["reads"]
             if isinstance(read.get("binding"), dict) and read["binding"].get("kind") == "action_input"
         ]
-        self.assertEqual(
-            [(read["state"], read["binding"]["fieldKey"]) for read in selector_action_inputs],
-            [("user_message", "requirement")],
-        )
+        self.assertEqual(selector_action_inputs, [])
+        self.assertIn({"state": "user_message", "required": True}, _read_contracts(selector_node["reads"]))
+        self.assertIn({"state": "capability_review", "required": False}, _read_contracts(selector_node["reads"]))
         self.assertEqual(
             selector_node["config"]["actionBindings"],
             [
@@ -1984,7 +1985,7 @@ class TemplateLayoutTests(unittest.TestCase):
                     "actionKey": "toograph_capability_selector",
                     "outputMapping": {
                         "capability": "selected_capability",
-                        "found": "capability_found",
+                        "needs_capability": "should_call_capability",
                     },
                 }
             ],
@@ -2059,7 +2060,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             cycle_graph["conditional_edges"][0],
             {
-                "source": "capability_found_condition",
+                "source": "should_call_capability_condition",
                 "branches": {
                     "true": "execute_capability",
                     "false": "review_missing_capability",

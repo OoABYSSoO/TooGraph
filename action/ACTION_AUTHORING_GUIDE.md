@@ -12,7 +12,7 @@ Action 是 TooGraph 图运行中的显式能力单元。它不是一个隐藏 Ag
 一个 LLM 节点使用 Action 时，职责链路是：
 
 ```text
-图 state 输入（由 stateInputSchema 描述，由节点 reads 绑定）
+图 state 输入（由节点 reads 绑定；stateInputSchema 只提供建议连接提示）
 运行时上下文 -> 可选 before_llm.py 生成只读 Action 上下文
 -> LLM 消费 state 输入、before_llm 上下文和有效 llmInstruction
 -> LLM 只生成 llmOutputSchema 描述的结构化 LLM 输出
@@ -22,7 +22,7 @@ Action 是 TooGraph 图运行中的显式能力单元。它不是一个隐藏 Ag
 
 因此：
 
-- `stateInputSchema` 描述 LLM 节点为了使用该 Action 希望从图里读取的 state。它是“图输入契约”，不是 `before_llm.py` 的输入契约，也不是 LLM 要编造的 JSON 参数。
+- `stateInputSchema` 描述 LLM 节点使用该 Action 时通常希望看到的图 state 语义。它是 UI 连接提示和审计说明，不会强制自动绑定；真正进入 LLM 的上下文来自节点实际连接的普通 `reads` 和显式 `action_input` 槽。它不是 `before_llm.py` 的输入契约，也不是 LLM 要编造的 JSON 参数。
 - `llmOutputSchema` 描述 LLM 要生成并传给 `after_llm.py` 的本轮结构化输出，随后会作为 `after_llm.py` 的输入。它是“LLM 输出契约”。
 - `stateOutputSchema` 描述 Action 结果中可以被 runtime 映射成下游 state 的字段。它是“图输出契约”。
 - `before_llm.py` 只做确定性、可审计、只读的运行时上下文整理。当前时间、页面操作书、可点击目标清单、运行环境摘要、文件预读摘要、候选能力列表都属于这里。
@@ -135,13 +135,13 @@ Python Action 的依赖规则：
 - `version`：Action 包版本。
 - `timeoutSeconds`：生命周期脚本执行超时时间。
 - `permissions`：声明网络、文件、子进程、浏览器自动化等能力需求。这是 Action 的客观能力边界，应该留在包定义中。
-- `stateInputSchema`：LLM 节点使用该 Action 时必须从图 state 中读取的输入字段。它用于 UI 说明、后续自动绑定和审计理解；不要把只来自运行时的页面路径、当前 DOM 摘要、当前日期、系统环境等内容放进这里。
+- `stateInputSchema`：LLM 节点使用该 Action 时建议连接的图 state 字段。它用于 UI 提示和审计理解，不会强制自动绑定；不要把只来自运行时的页面路径、当前 DOM 摘要、当前日期、系统环境等内容放进这里。
 - `llmOutputSchema`：LLM 本轮需要生成的结构化输出，也就是 `after_llm.py` 的主要输入。声明出的字段会进入结构化输出 JSON schema；当某个字段在特定操作下没有业务值时，用空字符串、空数组或空对象表达。
 - `stateOutputSchema`：Action 最终返回并由 runtime 绑定到下游 state 的字段。
 
-Action IO 字段不再支持 `required`。不要声明“可选输入”：`stateInputSchema` 只放真正必须来自图 state 的内容；运行时可重新取得的上下文放进 `before_llm.py`；人类或上游流程临时补充的额外信息可以作为普通节点 reads 加入，不属于 Action 自身契约。
+Action IO 字段不再支持 `required`。`stateInputSchema` 应只放对使用该 Action 有稳定提示价值的图 state 语义；运行时可重新取得的上下文放进 `before_llm.py`；人类或上游流程临时补充的额外信息可以直接作为普通节点 reads 加入，不需要先写进 Action 自身 schema。
 
-不要把同一个概念混在一个 schema 里。用户问题、上游文件路径、脚本原文、约束说明等“由图流程产生并需要 LLM 阅读的东西”应进入 `stateInputSchema`；当前页面路径、页面可操作目标、当前日期、启用能力清单、系统命令可用性、运行时预读文件摘要等“当次运行时可重新获取的环境信息”应由 `before_llm.py` 从运行时上下文补充；搜索词、点击目标、文件写入内容、命令数组等“需要 LLM 在本轮输出中决定的东西”应进入 `llmOutputSchema`；下游节点需要继续读取的结果进入 `stateOutputSchema`。
+不要把同一个概念混在一个 schema 里。用户问题、上游文件路径、脚本原文、约束说明等“由图流程产生并可能需要 LLM 阅读的东西”可以进入普通节点 reads；其中对 Action 使用者有稳定提示价值的字段可以写进 `stateInputSchema`。当前页面路径、页面可操作目标、当前日期、启用能力清单、系统命令可用性、运行时预读文件摘要等“当次运行时可重新获取的环境信息”应由 `before_llm.py` 从运行时上下文补充；搜索词、点击目标、文件写入内容、命令数组等“需要 LLM 在本轮输出中决定的东西”应进入 `llmOutputSchema`；下游节点需要继续读取的结果进入 `stateOutputSchema`。
 
 ## `action/settings.json`
 
@@ -219,7 +219,7 @@ Action IO 字段不再支持 `required`。不要声明“可选输入”：`stat
 }
 ```
 
-`before_llm.py` 不接收图 state，也不应依赖 `stateInputSchema`。图 state 会由 TooGraph runtime 直接放进 Action LLM 输出规划提示词，供 LLM 阅读。`before_llm.py` 只应消费 `runtime_context` 中由运行时显式提供的只读信息，例如当前页面快照、当前日期、启用能力清单、系统环境或预读文件摘要。脚本必须只使用自己需要且允许的字段，不要把无关运行时信息原样塞进上下文。
+`before_llm.py` 不应依赖普通图 state，也不应把 `stateInputSchema` 当成必然输入。图 state 会由 TooGraph runtime 根据节点实际 reads 放进 Action LLM 输出规划提示词，供 LLM 阅读；只有用户显式连接的 managed `action_input` 槽才会作为 `action_state_inputs` 随 before-LLM payload 提供给脚本。`before_llm.py` 主要消费 `runtime_context` 中由运行时显式提供的只读信息，例如当前页面快照、当前日期、启用能力清单、系统环境或预读文件摘要。脚本必须只使用自己需要且允许的字段，不要把无关运行时信息原样塞进上下文。
 
 输出必须是 JSON 对象。推荐返回：
 
@@ -362,15 +362,15 @@ Action 不负责决定输出写入哪个 state。
 
 ```text
 节点 reads / 上游 state
--> stateInputSchema 描述 Action 需要理解的 state 语义
--> LLM 直接读取这些图 state
+-> LLM 直接读取实际连接的图 state
+-> stateInputSchema 只描述建议连接的 Action state 语义
 
 运行时上下文
 -> before_llm.py 整理为短上下文
 -> LLM 结合图 state 和运行时上下文生成 llmOutputSchema 结构化输出
 ```
 
-`stateInputSchema` 是自动绑定和人类审计的依据。后续 LLM 节点选择某个 Action 时，可以根据它自动添加必要输入 state；用户仍可以额外添加输入 state，但不应删除 Action 绑定所需的 state。不要为了“可能有用”的上下文增加 Action state 输入。
+`stateInputSchema` 是 UI 提示和人类审计的依据，不是强制绑定规则。后续 LLM 节点选择某个 Action 时，用户可以根据它决定要连接哪些 state；任何普通 reads 都会进入 Action planning LLM 上下文。只有确实需要给生命周期脚本提供命名槽位时，才使用 managed `action_input` 绑定。
 
 输出侧：
 
@@ -399,7 +399,7 @@ action_result
 - `actionKey` 是否稳定、唯一、适合做目录名。
 - `description` 是否清楚说明什么时候应该选择它。
 - `llmInstruction` 是否只说明如何生成结构化 LLM 输出，而不是让同一节点总结结果。
-- `stateInputSchema` 是否只描述真正需要从图 state 读取的输入。
+- `stateInputSchema` 是否只描述对 Action 使用者有稳定提示价值的图 state 输入。
 - `llmOutputSchema` 是否只描述 LLM 需要生成并交给 `after_llm.py` 的结构化输出。
 - `stateOutputSchema` 是否只包含下游真正需要变成 state 的字段。
 - `permissions` 是否覆盖所有外部能力。

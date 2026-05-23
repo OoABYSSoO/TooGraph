@@ -90,7 +90,7 @@ npm start
 | Action | 当前职责 | 状态 |
 | --- | --- | --- |
 | `web_search` | 联网搜索、网页正文抓取、本地 source document artifact | 保留 |
-| `toograph_capability_selector` | 从候选中选择一个 `action` / `subgraph` / `tool` / `none` | 已升级，文档需保持同步 |
+| `toograph_capability_selector` | 先判断是否还需要能力；需要时选择一个 `action` / `subgraph` / `tool`，不需要时返回 `none` | 已升级，文档需保持同步 |
 | `toograph_context_fanout` | 并行装配 Buddy Home 记忆、知识库、页面上下文和能力候选 | 过渡保留，未来拆成模板 |
 | `toograph_page_operator` | 页面虚拟操作、模板运行、图编辑意图 | 保留 |
 | `toograph_action_builder` | 生成 Action 包文件内容 | 保留 |
@@ -118,10 +118,11 @@ npm start
   - 可发现图模板 -> `kind: "subgraph"`。
   - 启用 Action -> `kind: "action"`。
   - Tool catalog -> `kind: "tool"`。
-- `toograph_capability_selector` 已不再固定返回 `toograph_page_operation_workflow`。它会：
-  - 对明确页面、UI、按钮、打开页面、编辑图等请求优先选择 `toograph_page_operation_workflow`。
+- `toograph_capability_selector` 已不再固定返回 `toograph_page_operation_workflow`，也不再输出 `found`。它会：
+  - 先根据当前 LLM 节点可见的普通图 state 判断当前是否还需要调用能力；若已有可用结果或不需要能力，返回 `{"kind": "none"}` 且 `needs_capability=false`。
+  - `stateInputSchema.current_requirement` 只是连接提示；绑定 Action 不会强制创建或要求 managed `action_input` 槽，用户可以按图流程需要连接任意普通 state。
+  - 只有仍需要显式能力时，才对页面、UI、按钮、打开页面、编辑图等请求优先选择 `toograph_page_operation_workflow`。
   - 对新闻、最新、研究、联网、搜索、调研等请求优先给研究类模板加分。
-  - 没有合适候选时返回 `{"kind": "none"}` 且 `found=false`。
 - 普通 Subgraph node、动态 `capability.kind=subgraph` 和 batch subgraph worker 会创建 child run。
 - `/api/runs/{run_id}` 会返回直接 children，`/api/runs/{run_id}/tree` 会返回运行树。
 - 动态 subgraph result package 会写入 `childRunId`、`child_run_id`、`triggered_run_id`，并把公开输出包装到 `outputs`。
