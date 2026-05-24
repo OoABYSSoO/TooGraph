@@ -305,6 +305,117 @@ class BuddyStoreTests(unittest.TestCase):
             ],
         )
 
+    def test_recall_chat_messages_discover_ignores_messages_excluded_from_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+                session = store.create_chat_session({}, changed_by="user", change_reason="test recall visibility")
+                store.append_chat_message(
+                    session["session_id"],
+                    {
+                        "role": "assistant",
+                        "content": "hidden-recall-token should stay out of model recall",
+                        "client_order": 0,
+                        "include_in_context": False,
+                    },
+                    changed_by="tester",
+                    change_reason="hidden message",
+                )
+                store.append_chat_message(
+                    session["session_id"],
+                    {
+                        "role": "user",
+                        "content": "visible-control-token should remain searchable",
+                        "client_order": 1,
+                    },
+                    changed_by="tester",
+                    change_reason="visible message",
+                )
+
+                hidden_result = store.recall_chat_messages(
+                    mode="discover",
+                    query="hidden-recall-token",
+                    limit=5,
+                    window=1,
+                )
+                visible_result = store.recall_chat_messages(
+                    mode="discover",
+                    query="visible-control-token",
+                    limit=5,
+                    window=1,
+                )
+
+        self.assertEqual(hidden_result["hit_count"], 0)
+        self.assertEqual(hidden_result["sessions"], [])
+        self.assertEqual(visible_result["hit_count"], 1)
+        self.assertEqual(visible_result["sessions"][0]["session_id"], session["session_id"])
+
+    def test_recall_chat_messages_omits_messages_excluded_from_context_from_windows(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+                session = store.create_chat_session({}, changed_by="user", change_reason="test recall window visibility")
+                store.append_chat_message(
+                    session["session_id"],
+                    {"role": "user", "content": "visible before", "client_order": 0},
+                    changed_by="tester",
+                    change_reason="visible before",
+                )
+                store.append_chat_message(
+                    session["session_id"],
+                    {
+                        "role": "assistant",
+                        "content": "hidden before should not appear",
+                        "client_order": 1,
+                        "include_in_context": False,
+                    },
+                    changed_by="tester",
+                    change_reason="hidden before",
+                )
+                anchor = store.append_chat_message(
+                    session["session_id"],
+                    {"role": "user", "content": "visible-anchor-token", "client_order": 2},
+                    changed_by="tester",
+                    change_reason="visible anchor",
+                )
+                store.append_chat_message(
+                    session["session_id"],
+                    {
+                        "role": "assistant",
+                        "content": "hidden after should not appear",
+                        "client_order": 3,
+                        "include_in_context": False,
+                    },
+                    changed_by="tester",
+                    change_reason="hidden after",
+                )
+                store.append_chat_message(
+                    session["session_id"],
+                    {"role": "assistant", "content": "visible after", "client_order": 4},
+                    changed_by="tester",
+                    change_reason="visible after",
+                )
+
+                discover_result = store.recall_chat_messages(
+                    mode="discover",
+                    query="visible-anchor-token",
+                    limit=5,
+                    window=2,
+                )
+                scroll_result = store.recall_chat_messages(
+                    mode="scroll",
+                    session_id=session["session_id"],
+                    anchor_message_id=anchor["message_id"],
+                    window=2,
+                )
+
+        self.assertEqual(
+            [message["content"] for message in discover_result["sessions"][0]["messages"]],
+            ["visible before", "visible-anchor-token", "visible after"],
+        )
+        self.assertEqual(
+            [message["content"] for message in scroll_result["sessions"][0]["messages"]],
+            ["visible before", "visible-anchor-token", "visible after"],
+        )
+
     def test_recall_chat_messages_discover_returns_hermes_style_bookends(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):

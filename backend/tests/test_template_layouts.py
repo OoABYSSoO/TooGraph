@@ -2270,13 +2270,20 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["autonomous_review"]["type"], "json")
         self.assertEqual(states["improvement_candidates"]["type"], "json")
         self.assertEqual(states["memory_candidates"]["type"], "json")
+        self.assertEqual(states["profile_candidates"]["type"], "json")
         self.assertEqual(states["memory_filter_report"]["type"], "json")
         self.assertEqual(states["memory_update_plan"]["type"], "json")
         self.assertEqual(states["memory_review_result"]["type"], "markdown")
+        self.assertEqual(states["profile_update_plan"]["type"], "json")
+        self.assertEqual(states["profile_review_result"]["type"], "markdown")
         self.assertEqual(states["memory_write_success"]["type"], "boolean")
         self.assertEqual(states["applied_memory_commands"]["type"], "json")
         self.assertEqual(states["skipped_memory_commands"]["type"], "json")
         self.assertEqual(states["memory_write_result"]["type"], "markdown")
+        self.assertEqual(states["profile_write_success"]["type"], "boolean")
+        self.assertEqual(states["applied_profile_commands"]["type"], "json")
+        self.assertEqual(states["skipped_profile_commands"]["type"], "json")
+        self.assertEqual(states["profile_write_result"]["type"], "markdown")
         for removed_state in [
             "writeback_commands",
             "writeback_success",
@@ -2310,6 +2317,9 @@ class TemplateLayoutTests(unittest.TestCase):
                 "output_memory_review_result",
                 "output_applied_memory_commands",
                 "output_memory_write_result",
+                "output_profile_review_result",
+                "output_applied_profile_commands",
+                "output_profile_write_result",
             ],
         )
         self.assertEqual(nodes["prepare_session_recall_request"]["kind"], "agent")
@@ -2353,9 +2363,11 @@ class TemplateLayoutTests(unittest.TestCase):
                 {"state": "autonomous_review", "mode": "replace"},
                 {"state": "improvement_candidates", "mode": "replace"},
                 {"state": "memory_candidates", "mode": "replace"},
+                {"state": "profile_candidates", "mode": "replace"},
             ],
         )
         self.assertIn("session_recall_context", extract_node["config"]["taskInstruction"])
+        self.assertIn("profile_candidates", extract_node["config"]["taskInstruction"])
         self.assertEqual(nodes["filter_memory_candidates"]["writes"], [{"state": "memory_filter_report", "mode": "replace"}])
         self.assertEqual(
             nodes["merge_memory_document"]["writes"],
@@ -2365,10 +2377,24 @@ class TemplateLayoutTests(unittest.TestCase):
             ],
         )
         self.assertIn("完整的新 MEMORY.md 内容", nodes["merge_memory_document"]["config"]["taskInstruction"])
+        self.assertEqual(
+            nodes["merge_profile_update"]["writes"],
+            [
+                {"state": "profile_update_plan", "mode": "replace"},
+                {"state": "profile_review_result", "mode": "replace"},
+            ],
+        )
+        self.assertIn("profile.update", nodes["merge_profile_update"]["config"]["taskInstruction"])
+        self.assertIn("requires_confirmation", nodes["merge_profile_update"]["config"]["taskInstruction"])
         self.assertEqual(nodes["has_memory_updates"]["kind"], "condition")
         self.assertEqual(
             nodes["has_memory_updates"]["config"]["rule"],
             {"source": "$state.memory_update_plan.has_updates", "operator": "==", "value": True},
+        )
+        self.assertEqual(nodes["has_profile_updates"]["kind"], "condition")
+        self.assertEqual(
+            nodes["has_profile_updates"]["config"]["rule"],
+            {"source": "$state.profile_update_plan.has_updates", "operator": "==", "value": True},
         )
         writer_node = nodes["write_memory_updates"]
         self.assertEqual(writer_node["kind"], "agent")
@@ -2387,17 +2413,39 @@ class TemplateLayoutTests(unittest.TestCase):
                 }
             ],
         )
+        profile_writer_node = nodes["write_profile_updates"]
+        self.assertEqual(profile_writer_node["kind"], "agent")
+        self.assertEqual(profile_writer_node["config"]["actionKey"], "buddy_home_writer")
+        self.assertEqual(
+            profile_writer_node["config"]["actionBindings"],
+            [
+                {
+                    "actionKey": "buddy_home_writer",
+                    "outputMapping": {
+                        "success": "profile_write_success",
+                        "applied_commands": "applied_profile_commands",
+                        "skipped_commands": "skipped_profile_commands",
+                        "result": "profile_write_result",
+                    },
+                }
+            ],
+        )
+        self.assertIn("profile.update", profile_writer_node["config"]["actionInstructionBlocks"]["buddy_home_writer"]["content"])
         self.assertIn({"source": "prepare_session_recall_request", "target": "recall_related_sessions"}, template["edges"])
         self.assertIn({"source": "recall_related_sessions", "target": "extract_memory_candidates"}, template["edges"])
         self.assertIn({"source": "recall_related_sessions", "target": "output_session_recall_result"}, template["edges"])
         self.assertIn({"source": "extract_memory_candidates", "target": "filter_memory_candidates"}, template["edges"])
         self.assertIn({"source": "filter_memory_candidates", "target": "merge_memory_document"}, template["edges"])
+        self.assertIn({"source": "extract_memory_candidates", "target": "merge_profile_update"}, template["edges"])
         self.assertIn({"source": "merge_memory_document", "target": "output_autonomous_review"}, template["edges"])
         self.assertIn({"source": "merge_memory_document", "target": "output_improvement_candidates"}, template["edges"])
         self.assertIn({"source": "merge_memory_document", "target": "output_memory_filter_report"}, template["edges"])
         self.assertIn({"source": "merge_memory_document", "target": "has_memory_updates"}, template["edges"])
+        self.assertIn({"source": "merge_profile_update", "target": "has_profile_updates"}, template["edges"])
         self.assertIn({"source": "write_memory_updates", "target": "output_applied_memory_commands"}, template["edges"])
         self.assertIn({"source": "write_memory_updates", "target": "output_memory_write_result"}, template["edges"])
+        self.assertIn({"source": "write_profile_updates", "target": "output_applied_profile_commands"}, template["edges"])
+        self.assertIn({"source": "write_profile_updates", "target": "output_profile_write_result"}, template["edges"])
         self.assertEqual(
             template["conditional_edges"],
             [
@@ -2408,7 +2456,15 @@ class TemplateLayoutTests(unittest.TestCase):
                         "false": "output_memory_review_result",
                         "exhausted": "output_memory_review_result",
                     },
-                }
+                },
+                {
+                    "source": "has_profile_updates",
+                    "branches": {
+                        "true": "write_profile_updates",
+                        "false": "output_profile_review_result",
+                        "exhausted": "output_profile_review_result",
+                    },
+                },
             ],
         )
 

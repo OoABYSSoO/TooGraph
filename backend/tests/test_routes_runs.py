@@ -56,7 +56,7 @@ def _valid_resume_graph_snapshot() -> dict:
     }
 
 
-def _run_summary(run_id: str, *, internal: bool = False) -> dict:
+def _run_summary(run_id: str, *, internal: bool = False, role: str = "buddy_autonomous_review") -> dict:
     return {
         "run_id": run_id,
         "graph_id": None,
@@ -66,7 +66,7 @@ def _run_summary(run_id: str, *, internal: bool = False) -> dict:
         "completed_at": "2026-05-11T07:29:05Z",
         "duration_ms": 18445,
         "runtime_backend": "langgraph",
-        "metadata": {"internal": True, "role": "buddy_autonomous_review"} if internal else {"origin": "buddy"},
+        "metadata": {"internal": True, "role": role} if internal else {"origin": "buddy"},
         "lifecycle": {},
         "checkpoint_metadata": {},
         "graph_snapshot": {},
@@ -124,21 +124,35 @@ def _paused_run(run_id: str = "run_paused", status: str = "awaiting_human") -> d
 
 
 class RunRouteTests(unittest.TestCase):
-    def test_run_list_hides_internal_runs_by_default(self) -> None:
-        with patch("app.api.routes_runs.list_runs", return_value=[_run_summary("run_internal", internal=True), _run_summary("run_visible")]):
+    def test_run_list_keeps_buddy_background_audit_runs_visible_by_default(self) -> None:
+        with patch(
+            "app.api.routes_runs.list_runs",
+            return_value=[
+                _run_summary("run_review", internal=True),
+                _run_summary("run_compaction", internal=True, role="buddy_context_compaction"),
+                _run_summary("run_visible"),
+            ],
+        ):
             with TestClient(app) as client:
                 response = client.get("/api/runs")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual([run["run_id"] for run in response.json()], ["run_visible"])
+        self.assertEqual([run["run_id"] for run in response.json()], ["run_review", "run_compaction", "run_visible"])
 
     def test_run_list_can_include_internal_runs_explicitly(self) -> None:
-        with patch("app.api.routes_runs.list_runs", return_value=[_run_summary("run_internal", internal=True), _run_summary("run_visible")]):
+        with patch(
+            "app.api.routes_runs.list_runs",
+            return_value=[
+                _run_summary("run_review", internal=True),
+                _run_summary("run_compaction", internal=True, role="buddy_context_compaction"),
+                _run_summary("run_visible"),
+            ],
+        ):
             with TestClient(app) as client:
                 response = client.get("/api/runs", params={"include_internal": "true"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual([run["run_id"] for run in response.json()], ["run_internal", "run_visible"])
+        self.assertEqual([run["run_id"] for run in response.json()], ["run_review", "run_compaction", "run_visible"])
 
     def test_get_run_detail_includes_direct_child_run_summaries(self) -> None:
         root = _run_summary("run_root")

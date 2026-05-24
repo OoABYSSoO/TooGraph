@@ -96,6 +96,14 @@ def _coerce_commands(value: Any) -> list[Any] | dict[str, Any]:
         return _coerce_commands(parsed)
     if value is None:
         return []
+    if isinstance(value, dict):
+        nested_commands = value.get("commands")
+        if isinstance(nested_commands, list):
+            return nested_commands
+        item_commands = value.get("items")
+        if isinstance(item_commands, list):
+            return item_commands
+        return {"index": None, "error_type": "invalid_commands", "error": "commands must be an array."}
     if not isinstance(value, list):
         return {"index": None, "error_type": "invalid_commands", "error": "commands must be an array."}
     return value
@@ -109,7 +117,7 @@ def _normalize_command(
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     if not isinstance(value, dict):
         return {}, {"index": index, "error_type": "invalid_command", "error": "command must be an object."}
-    action = _as_text(value.get("action")).strip()
+    action = _as_text(value.get("action") or value.get("type")).strip()
     if action not in ALLOWED_ACTIONS:
         return {}, {
             "index": index,
@@ -117,7 +125,8 @@ def _normalize_command(
             "error_type": "unsupported_action",
             "error": f"Unsupported Buddy Home writeback action: {action or '(empty)'}",
         }
-    payload = value.get("payload") if isinstance(value.get("payload"), dict) else {}
+    payload = deepcopy(value.get("payload")) if isinstance(value.get("payload"), dict) else {}
+    payload_change_reason = _as_text(payload.pop("change_reason", "")).strip()
     if action == "policy.update":
         policy_error = _validate_policy_update_payload(payload)
         if policy_error:
@@ -125,8 +134,9 @@ def _normalize_command(
 
     normalized = {
         "action": action,
-        "payload": deepcopy(payload),
+        "payload": payload,
         "change_reason": _as_text(value.get("change_reason")).strip()
+        or payload_change_reason
         or "Buddy autonomous review applied a safe Buddy Home writeback.",
     }
     target_id = _as_text(value.get("target_id")).strip()

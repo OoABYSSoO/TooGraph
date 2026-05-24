@@ -50,6 +50,7 @@ class BuddyHomeWriterActionTests(unittest.TestCase):
         self.assertEqual(manifest["metadata"], {"internal": True})
         self.assertEqual([field.key for field in definition.state_input_schema], ["autonomous_review"])
         self.assertEqual([field.key for field in definition.llm_output_schema], ["commands", "run_id"])
+        self.assertEqual(definition.llm_output_schema[0].value_type, "json_array")
         self.assertEqual(
             [field.key for field in definition.state_output_schema],
             ["success", "result", "applied_commands", "skipped_commands", "revisions"],
@@ -87,6 +88,37 @@ class BuddyHomeWriterActionTests(unittest.TestCase):
         self.assertEqual(result["activity_events"][0]["kind"], "buddy_home_write")
         self.assertIn("Applied 1 Buddy Home command", result["result"])
         self.assertIn("用户希望先给结论", memory_text)
+
+    def test_writer_accepts_planned_profile_command_items_and_hoists_change_reason(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home_dir = Path(temp_dir) / "buddy_home"
+            result = _run_writer(
+                {
+                    "run_id": "run_review_profile",
+                    "commands": {
+                        "items": [
+                            {
+                                "type": "profile.update",
+                                "payload": {
+                                    "display_preferences": {"display_name": "图图"},
+                                    "change_reason": "用户明确要求以后称呼伙伴为图图。",
+                                },
+                            }
+                        ]
+                    },
+                },
+                buddy_home_dir=buddy_home_dir,
+            )
+
+        self.assertEqual(result["success"], True)
+        applied = result["applied_commands"][0]
+        self.assertEqual(applied["command"]["action"], "profile.update")
+        self.assertEqual(applied["command"]["run_id"], "run_review_profile")
+        self.assertEqual(applied["command"]["change_reason"], "用户明确要求以后称呼伙伴为图图。")
+        self.assertEqual(applied["command"]["payload"]["display_preferences"]["display_name"], "图图")
+        self.assertNotIn("change_reason", applied["command"]["payload"])
+        self.assertEqual(applied["result"]["display_preferences"]["display_name"], "图图")
+        self.assertTrue(applied["command"]["revision_id"].startswith("rev_"))
 
     def test_writer_rejects_permission_escalating_policy_updates(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

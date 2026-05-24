@@ -904,6 +904,7 @@ def _search_chat_message_hits_fts(
           AND bs.deleted = 0
           AND bs.archived = 0
           {source_filter}
+          AND bm.include_in_context = 1
           AND bm.role IN ({role_placeholders})
         {order_by}
         LIMIT ?
@@ -950,6 +951,7 @@ def _search_chat_message_hits_like(
           AND bs.deleted = 0
           AND bs.archived = 0
           {source_filter}
+          AND bm.include_in_context = 1
           AND bm.role IN ({role_placeholders})
         ORDER BY bm.created_at DESC, bm.rowid DESC
         LIMIT ?
@@ -1005,7 +1007,13 @@ def _get_anchored_message_view(
     role_filter: tuple[str, ...],
     direction: str = "around",
 ) -> dict[str, Any]:
-    messages = list_chat_messages(session_id)
+    messages = [
+        message
+        for message in list_chat_messages(session_id)
+        if _is_recall_context_message(message, role_filter)
+    ]
+    if not messages:
+        return _empty_anchored_message_view()
     anchor_index = 0
     if anchor_message_id:
         for index, message in enumerate(messages):
@@ -1023,21 +1031,9 @@ def _get_anchored_message_view(
     else:
         start = max(0, anchor_index - window)
         end = min(len(messages), anchor_index + window + 1)
-    window_messages = [
-        message
-        for message in messages[start:end]
-        if message["message_id"] == anchor_message_id or message.get("role") in role_filter
-    ]
-    before_candidates = [
-        message
-        for message in messages[:start]
-        if message.get("role") in role_filter and str(message.get("content") or "").strip()
-    ]
-    after_candidates = [
-        message
-        for message in messages[end:]
-        if message.get("role") in role_filter and str(message.get("content") or "").strip()
-    ]
+    window_messages = messages[start:end]
+    before_candidates = messages[:start]
+    after_candidates = messages[end:]
     return {
         "messages": window_messages,
         "bookend_start": before_candidates[:bookend] if bookend else [],
@@ -1047,6 +1043,14 @@ def _get_anchored_message_view(
         "has_more_before": start > 0,
         "has_more_after": end < len(messages),
     }
+
+
+def _is_recall_context_message(message: dict[str, Any], role_filter: tuple[str, ...]) -> bool:
+    return (
+        bool(message.get("include_in_context", True))
+        and message.get("role") in role_filter
+        and bool(str(message.get("content") or "").strip())
+    )
 
 
 def _empty_anchored_message_view() -> dict[str, Any]:

@@ -69,7 +69,21 @@ def _is_internal_run(run: dict[str, Any]) -> bool:
     metadata = run.get("metadata")
     if not isinstance(metadata, dict):
         return False
+    if _is_visible_buddy_audit_run(metadata):
+        return False
     return metadata.get("internal") is True or metadata.get("role") == "buddy_background_review"
+
+
+def _is_visible_buddy_audit_run(metadata: dict[str, Any]) -> bool:
+    role = str(metadata.get("role") or "").strip()
+    return (
+        role in {"buddy_autonomous_review", "buddy_context_compaction"}
+        or metadata.get("buddy_review_run") is True
+        or metadata.get("buddy_memory_review") is True
+        or metadata.get("buddyMemoryReview") is True
+        or metadata.get("buddy_context_compaction") is True
+        or metadata.get("buddyContextCompaction") is True
+    )
 
 
 @router.get("/{run_id}", response_model=RunDetail)
