@@ -23,6 +23,7 @@ import {
   buildBuddyOutputTraceStateFromRunDetail,
   createBuddyPendingOutputTraceRuntimeState,
   listBuddyOutputTraceSegmentsForDisplay,
+  mergeBuddyOutputTraceSegments,
 } from "./buddyOutputTrace.ts";
 import { shouldShowGroupedBuddyMessageLabel } from "./buddyMessageGrouping.ts";
 import type { BuddyVirtualOperationPlan } from "./virtualOperationProtocol.ts";
@@ -40,6 +41,11 @@ type BuddyRunDisplayMessage = {
 };
 
 type BuddyRunDisplayMood = "idle" | "thinking" | "speaking" | "error";
+
+type BuddyRunDisplaySegmentEntry = {
+  segment: BuddyOutputTraceSegment;
+  outputMessageIds: string[];
+};
 
 type BuddyRunDisplayOptions<Message extends BuddyRunDisplayMessage> = {
   messages: Ref<Message[]>;
@@ -258,53 +264,77 @@ export function useBuddyRunDisplayMessages<Message extends BuddyRunDisplayMessag
     const handledOutputMessageIds = new Set<string>();
     const visibleOutputNodeIds = buildVisibleOutputNodeIdSet(outputState);
     const visibleSegments = listBuddyOutputTraceSegmentsForDisplay(outputTraceState, { visibleOutputNodeIds });
-    const outputNodeOccurrenceTotals = countSegmentOutputNodeOccurrences(visibleSegments);
-    const outputNodeOccurrenceIndexes = new Map<string, number>();
+    const segmentEntries = buildBuddyRunDisplaySegmentEntries(visibleSegments, outputState);
+    const shouldRenderUnassignedOutputs = outputTraceState.order.length === 0 || segmentEntries.length > 0;
 
-    for (const segment of visibleSegments) {
+    for (const { segment, outputMessageIds } of segmentEntries) {
       const traceMessage = buildOutputTraceMessage(controllerMessageId, runId, segment, existingMessages);
       displayMessages.push(traceMessage);
       outputTraceMessages.push(traceMessage);
-      for (const outputNodeId of segment.outputNodeIds) {
-        const occurrenceIndex = outputNodeOccurrenceIndexes.get(outputNodeId) ?? 0;
-        outputNodeOccurrenceIndexes.set(outputNodeId, occurrenceIndex + 1);
-        const outputMessageIds = listBuddyPublicOutputMessageIdsForSegment(
-          outputState,
-          outputNodeId,
-          segment,
-          occurrenceIndex,
-          outputNodeOccurrenceTotals.get(outputNodeId) ?? 1,
-        );
-        for (const outputMessageId of outputMessageIds) {
-          const output = outputState.messagesByOutputNodeId[outputMessageId];
-          handledOutputMessageIds.add(outputMessageId);
-          if (!output || !isBuddyPublicOutputMessageVisible(output)) {
-            continue;
-          }
-          const outputMessage = buildPublicOutputMessage(controllerMessageId, runId, output, existingMessages);
-          displayMessages.push(outputMessage);
-          publicOutputMessages.push(outputMessage);
+      for (const outputMessageId of outputMessageIds) {
+        const output = outputState.messagesByOutputNodeId[outputMessageId];
+        handledOutputMessageIds.add(outputMessageId);
+        if (!output || !isBuddyPublicOutputMessageVisible(output)) {
+          continue;
         }
+        const outputMessage = buildPublicOutputMessage(controllerMessageId, runId, output, existingMessages);
+        displayMessages.push(outputMessage);
+        publicOutputMessages.push(outputMessage);
       }
     }
 
-    for (const outputMessageId of outputState.order) {
-      if (handledOutputMessageIds.has(outputMessageId)) {
-        continue;
+    if (shouldRenderUnassignedOutputs) {
+      for (const outputMessageId of outputState.order) {
+        if (handledOutputMessageIds.has(outputMessageId)) {
+          continue;
+        }
+        const output = outputState.messagesByOutputNodeId[outputMessageId];
+        if (!output || !isBuddyPublicOutputMessageVisible(output)) {
+          continue;
+        }
+        const outputMessage = buildPublicOutputMessage(controllerMessageId, runId, output, existingMessages);
+        displayMessages.push(outputMessage);
+        publicOutputMessages.push(outputMessage);
       }
-      const output = outputState.messagesByOutputNodeId[outputMessageId];
-      if (!output || !isBuddyPublicOutputMessageVisible(output)) {
-        continue;
-      }
-      const outputMessage = buildPublicOutputMessage(controllerMessageId, runId, output, existingMessages);
-      displayMessages.push(outputMessage);
-      publicOutputMessages.push(outputMessage);
     }
 
     if (displayMessages.length > 0) {
+      assignBuddyRunDisplayClientOrders(controllerMessageId, displayMessages);
       messages.value.splice(resolveBuddyRunDisplayInsertionIndex(controllerMessageId), 0, ...displayMessages);
     }
     return { publicOutputMessages, outputTraceMessages };
+  }
+
+  function assignBuddyRunDisplayClientOrders(controllerMessageId: string, displayMessages: Message[]) {
+    const controllerMessage = messages.value.find((message) => message.id === controllerMessageId);
+    const baseOrder = normalizeClientOrder(controllerMessage?.clientOrder);
+    if (baseOrder === null) {
+      return;
+    }
+    const upperOrder = resolveNextExternalClientOrder(controllerMessageId, baseOrder);
+    const span = upperOrder !== null && upperOrder > baseOrder
+      ? upperOrder - baseOrder
+      : displayMessages.length + 1;
+    const step = span / (displayMessages.length + 1);
+    displayMessages.forEach((message, index) => {
+      message.clientOrder = baseOrder + step * (index + 1);
+    });
+  }
+
+  function resolveNextExternalClientOrder(controllerMessageId: string, baseOrder: number) {
+    const displayPrefix = `${controllerMessageId}:`;
+    let nextOrder: number | null = null;
+    for (const message of messages.value) {
+      if (message.id === controllerMessageId || message.id.startsWith(displayPrefix)) {
+        continue;
+      }
+      const candidate = normalizeClientOrder(message.clientOrder);
+      if (candidate === null || candidate <= baseOrder) {
+        continue;
+      }
+      nextOrder = nextOrder === null ? candidate : Math.min(nextOrder, candidate);
+    }
+    return nextOrder;
   }
 
   function buildOutputTraceMessage(
@@ -414,10 +444,6 @@ function listBuddyPublicOutputMessageIdsForSegment(
   occurrenceTotal: number,
 ) {
   const outputMessageIds = listBuddyPublicOutputMessageIdsForOutputNode(outputState, outputNodeId);
-  if (occurrenceTotal <= 1) {
-    return outputMessageIds;
-  }
-
   const timedOutputMessageIds = outputMessageIds.filter((outputMessageId) => {
     const output = outputState.messagesByOutputNodeId[outputMessageId];
     return resolvePublicOutputEventMs(output) !== null;
@@ -430,6 +456,13 @@ function listBuddyPublicOutputMessageIdsForSegment(
     if (matchingOutputMessageIds.length > 0 || timedOutputMessageIds.length === outputMessageIds.length) {
       return matchingOutputMessageIds;
     }
+  }
+
+  if (occurrenceTotal <= 1) {
+    return outputMessageIds.filter((outputMessageId) => {
+      const output = outputState.messagesByOutputNodeId[outputMessageId];
+      return resolvePublicOutputEventMs(output) === null;
+    });
   }
 
   const outputMessageId = outputMessageIds[occurrenceIndex];
@@ -510,9 +543,116 @@ function toBuddyPublicOutputMetadata(output: BuddyPublicOutputMessage): BuddyPub
     stateType: output.stateType,
     displayMode: output.displayMode,
     kind: output.kind,
+    content: output.content,
     durationMs: output.durationMs,
     status: output.status,
   };
+}
+
+function buildBuddyRunDisplaySegmentEntries(
+  segments: BuddyOutputTraceSegment[],
+  outputState: BuddyPublicOutputRuntimeState,
+): BuddyRunDisplaySegmentEntry[] {
+  const outputNodeOccurrenceTotals = countSegmentOutputNodeOccurrences(segments);
+  const outputNodeOccurrenceIndexes = new Map<string, number>();
+  const entries = segments.map((segment) => {
+    const outputMessageIds: string[] = [];
+    for (const outputNodeId of segment.outputNodeIds) {
+      const occurrenceIndex = outputNodeOccurrenceIndexes.get(outputNodeId) ?? 0;
+      outputNodeOccurrenceIndexes.set(outputNodeId, occurrenceIndex + 1);
+      outputMessageIds.push(
+        ...listBuddyPublicOutputMessageIdsForSegment(
+          outputState,
+          outputNodeId,
+          segment,
+          occurrenceIndex,
+          outputNodeOccurrenceTotals.get(outputNodeId) ?? 1,
+        ).filter((outputMessageId) => isBuddyPublicOutputMessageVisible(outputState.messagesByOutputNodeId[outputMessageId])),
+      );
+    }
+    return { segment, outputMessageIds };
+  });
+  attachTimedOrphanOutputMessagesToSegmentEntries(entries, outputState);
+  const coalescedEntries = coalesceTraceOnlyBuddyRunDisplaySegmentEntries(entries);
+  for (const entry of coalescedEntries) {
+    entry.outputMessageIds = sortBuddyPublicOutputMessageIds(entry.outputMessageIds, outputState);
+  }
+  return coalescedEntries;
+}
+
+function attachTimedOrphanOutputMessagesToSegmentEntries(
+  entries: BuddyRunDisplaySegmentEntry[],
+  outputState: BuddyPublicOutputRuntimeState,
+) {
+  const handledOutputMessageIds = new Set(entries.flatMap((entry) => entry.outputMessageIds));
+  for (const outputMessageId of outputState.order) {
+    if (handledOutputMessageIds.has(outputMessageId)) {
+      continue;
+    }
+    const output = outputState.messagesByOutputNodeId[outputMessageId];
+    if (!output || !isBuddyPublicOutputMessageVisible(output) || resolvePublicOutputEventMs(output) === null) {
+      continue;
+    }
+    const targetEntry = entries.find((entry) => isPublicOutputInTraceSegment(output, entry.segment));
+    if (!targetEntry) {
+      continue;
+    }
+    targetEntry.outputMessageIds.push(outputMessageId);
+    handledOutputMessageIds.add(outputMessageId);
+  }
+}
+
+function sortBuddyPublicOutputMessageIds(
+  outputMessageIds: string[],
+  outputState: BuddyPublicOutputRuntimeState,
+) {
+  const orderIndex = new Map(outputState.order.map((outputMessageId, index) => [outputMessageId, index]));
+  return Array.from(new Set(outputMessageIds)).sort((left, right) => {
+    const leftMs = resolvePublicOutputEventMs(outputState.messagesByOutputNodeId[left]);
+    const rightMs = resolvePublicOutputEventMs(outputState.messagesByOutputNodeId[right]);
+    if (leftMs !== null && rightMs !== null && leftMs !== rightMs) {
+      return leftMs - rightMs;
+    }
+    if (leftMs !== null && rightMs === null) {
+      return -1;
+    }
+    if (rightMs !== null && leftMs === null) {
+      return 1;
+    }
+    return (orderIndex.get(left) ?? 0) - (orderIndex.get(right) ?? 0);
+  });
+}
+
+function coalesceTraceOnlyBuddyRunDisplaySegmentEntries(entries: BuddyRunDisplaySegmentEntry[]) {
+  const result: BuddyRunDisplaySegmentEntry[] = [];
+  let pendingTraceOnlySegment: BuddyOutputTraceSegment | null = null;
+  for (const entry of entries) {
+    const isTraceOnlyCompletedOutput =
+      entry.segment.status === "completed" &&
+      entry.segment.outputNodeIds.length > 0 &&
+      entry.outputMessageIds.length === 0;
+    if (isTraceOnlyCompletedOutput) {
+      pendingTraceOnlySegment = pendingTraceOnlySegment
+        ? mergeBuddyOutputTraceSegments(pendingTraceOnlySegment, entry.segment, { keepRightIdentity: false })
+        : entry.segment;
+      continue;
+    }
+    result.push({
+      ...entry,
+      segment: pendingTraceOnlySegment
+        ? mergeBuddyOutputTraceSegments(pendingTraceOnlySegment, entry.segment, { keepRightIdentity: true })
+        : entry.segment,
+    });
+    pendingTraceOnlySegment = null;
+  }
+  if (pendingTraceOnlySegment && result.length === 0) {
+    result.push({ segment: pendingTraceOnlySegment, outputMessageIds: [] });
+  }
+  return result;
+}
+
+function normalizeClientOrder(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function renderPublicOutputContentForStorage(output: BuddyPublicOutputMessage) {

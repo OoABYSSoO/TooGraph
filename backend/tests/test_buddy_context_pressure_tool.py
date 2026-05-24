@@ -34,6 +34,8 @@ class BuddyContextPressureToolTests(unittest.TestCase):
         self.assertIsNotNone(definition)
         self.assertEqual(definition.name, "Buddy Context Pressure Check")
         self.assertIn("deterministic", definition.description)
+        self.assertNotIn("raw_conversation_history", [field.key for field in definition.input_schema])
+        self.assertNotIn("page_context", [field.key for field in definition.input_schema])
         self.assertIn("buddy_context_pressure_check", get_tool_registry(include_disabled=True).keys())
 
     def test_pressure_check_triggers_on_large_history_and_large_result(self) -> None:
@@ -42,10 +44,9 @@ class BuddyContextPressureToolTests(unittest.TestCase):
         history_result = module.buddy_context_pressure_check(
             {
                 "trigger": "preflight",
-                "raw_conversation_history": "history " * 1400,
-                "conversation_history": "recent",
+                "raw_conversation_history": "raw history should be ignored " * 1400,
+                "conversation_history": "history " * 1400,
                 "user_message": "continue",
-                "page_context": "",
                 "existing_session_summary": "",
                 "capability_result": {},
                 "public_response": "",
@@ -56,15 +57,14 @@ class BuddyContextPressureToolTests(unittest.TestCase):
         self.assertIs(history_result["needs_context_compaction"], True)
         self.assertEqual(history_result["reason"], "history_pressure")
         self.assertEqual(history_result["context_compaction_trigger"], "preflight")
-        self.assertGreaterEqual(history_result["context_budget_report"]["raw_history_chars"], 9000)
+        self.assertNotIn("raw_history_chars", history_result["context_budget_report"])
+        self.assertGreaterEqual(history_result["context_budget_report"]["rendered_history_chars"], 9000)
 
         result_result = module.buddy_context_pressure_check(
             {
                 "trigger": "capability_result",
-                "raw_conversation_history": "",
                 "conversation_history": "",
                 "user_message": "continue",
-                "page_context": "",
                 "existing_session_summary": "",
                 "capability_result": {"kind": "result_package", "outputs": {"answer": {"value": "x" * 7000}}},
                 "public_response": "",
@@ -82,10 +82,8 @@ class BuddyContextPressureToolTests(unittest.TestCase):
         result = module.buddy_context_pressure_check(
             {
                 "trigger": "preflight",
-                "raw_conversation_history": "history " * 1400,
                 "conversation_history": "summary plus recent turns",
                 "user_message": "continue",
-                "page_context": "",
                 "existing_session_summary": "",
                 "context_compaction_summary": "durable compact summary",
                 "capability_result": {},
@@ -98,13 +96,12 @@ class BuddyContextPressureToolTests(unittest.TestCase):
         self.assertEqual(result["reason"], "none")
         self.assertGreater(result["context_budget_report"]["context_compaction_summary_chars"], 0)
 
-    def test_pressure_check_reports_page_context_pressure_without_session_compaction(self) -> None:
+    def test_pressure_check_ignores_page_context_pressure(self) -> None:
         module = _load_pressure_tool_module()
 
         result = module.buddy_context_pressure_check(
             {
                 "trigger": "preflight",
-                "raw_conversation_history": "recent",
                 "conversation_history": "recent",
                 "user_message": "hi",
                 "page_context": "page-operation " * 700,
@@ -116,9 +113,10 @@ class BuddyContextPressureToolTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "succeeded")
         self.assertIs(result["needs_context_compaction"], False)
-        self.assertEqual(result["reason"], "page_context_pressure")
+        self.assertEqual(result["reason"], "none")
         self.assertIs(result["context_budget_report"]["should_compact"], False)
-        self.assertEqual(result["context_budget_report"]["pressure_sources"], ["page_context"])
+        self.assertNotIn("page_context_chars", result["context_budget_report"])
+        self.assertEqual(result["context_budget_report"]["pressure_sources"], [])
 
 
 if __name__ == "__main__":

@@ -16,6 +16,10 @@ import type {
 
 import { apiDelete, apiGet, apiPost, apiPostText } from "./http.ts";
 
+function encodePathSegment(value: string): string {
+  return encodeURIComponent(value);
+}
+
 export async function fetchTemplates(options: { includeDisabled?: boolean } = {}): Promise<TemplateRecord[]> {
   if (options.includeDisabled) {
     return apiGet<TemplateRecord[]>("/api/templates?include_disabled=true");
@@ -24,7 +28,7 @@ export async function fetchTemplates(options: { includeDisabled?: boolean } = {}
 }
 
 export async function fetchTemplate(templateId: string): Promise<TemplateRecord> {
-  return apiGet<TemplateRecord>(`/api/templates/${templateId}`);
+  return apiGet<TemplateRecord>(`/api/templates/${encodePathSegment(templateId)}`);
 }
 
 export async function saveGraphAsTemplate(payload: GraphPayload): Promise<TemplateSaveResponse> {
@@ -33,18 +37,18 @@ export async function saveGraphAsTemplate(payload: GraphPayload): Promise<Templa
 
 export async function updateTemplateStatus(templateId: string, status: GraphCatalogStatus): Promise<TemplateRecord> {
   const action = status === "active" ? "enable" : "disable";
-  return apiPost<TemplateRecord>(`/api/templates/${templateId}/${action}`, null);
+  return apiPost<TemplateRecord>(`/api/templates/${encodePathSegment(templateId)}/${action}`, null);
 }
 
 export async function updateTemplateCapabilityDiscoverable(
   templateId: string,
   capabilityDiscoverable: boolean,
 ): Promise<TemplateRecord> {
-  return apiPost<TemplateRecord>(`/api/templates/${templateId}/capability-discoverable`, { capabilityDiscoverable });
+  return apiPost<TemplateRecord>(`/api/templates/${encodePathSegment(templateId)}/capability-discoverable`, { capabilityDiscoverable });
 }
 
 export async function deleteTemplate(templateId: string): Promise<TemplateDeleteResponse> {
-  return apiDelete<TemplateDeleteResponse>(`/api/templates/${templateId}`);
+  return apiDelete<TemplateDeleteResponse>(`/api/templates/${encodePathSegment(templateId)}`);
 }
 
 export async function fetchGraphs(options: { includeDisabled?: boolean } = {}): Promise<GraphDocument[]> {
@@ -55,15 +59,18 @@ export async function fetchGraphs(options: { includeDisabled?: boolean } = {}): 
 }
 
 export async function fetchGraph(graphId: string): Promise<GraphDocument> {
-  return apiGet<GraphDocument>(`/api/graphs/${graphId}`);
+  return apiGet<GraphDocument>(`/api/graphs/${encodePathSegment(graphId)}`);
 }
 
 export async function fetchGraphRevisions(graphId: string): Promise<GraphRevisionRecord[]> {
-  return apiGet<GraphRevisionRecord[]>(`/api/graphs/${graphId}/revisions`);
+  return apiGet<GraphRevisionRecord[]>(`/api/graphs/${encodePathSegment(graphId)}/revisions`);
 }
 
 export async function restoreGraphRevision(graphId: string, revisionId: string): Promise<GraphRevisionRestoreResponse> {
-  return apiPost<GraphRevisionRestoreResponse>(`/api/graphs/${graphId}/revisions/${revisionId}/restore`, null);
+  return apiPost<GraphRevisionRestoreResponse>(
+    `/api/graphs/${encodePathSegment(graphId)}/revisions/${encodePathSegment(revisionId)}/restore`,
+    null,
+  );
 }
 
 export async function saveGraph(
@@ -81,11 +88,11 @@ export async function saveGraph(
 
 export async function updateGraphStatus(graphId: string, status: GraphCatalogStatus): Promise<GraphDocument> {
   const action = status === "active" ? "enable" : "disable";
-  return apiPost<GraphDocument>(`/api/graphs/${graphId}/${action}`, null);
+  return apiPost<GraphDocument>(`/api/graphs/${encodePathSegment(graphId)}/${action}`, null);
 }
 
 export async function deleteGraph(graphId: string): Promise<GraphDeleteResponse> {
-  return apiDelete<GraphDeleteResponse>(`/api/graphs/${graphId}`);
+  return apiDelete<GraphDeleteResponse>(`/api/graphs/${encodePathSegment(graphId)}`);
 }
 
 export async function validateGraph(payload: GraphPayload): Promise<GraphValidationResponse> {

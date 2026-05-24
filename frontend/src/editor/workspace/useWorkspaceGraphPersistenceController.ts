@@ -138,7 +138,9 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
       if (!documentToSave) {
         return false;
       }
-      const response = await input.saveGraph(documentToSave);
+      const graphId = tab.graphId ?? documentToSave.graph_id ?? null;
+      const graphDocumentToSave = graphId ? { ...documentToSave, graph_id: graphId } : documentToSave;
+      const response = await input.saveGraph(graphDocumentToSave);
       const savedGraph = await input.fetchGraph(response.graph_id);
       input.registerDocumentForTab(tabId, savedGraph);
 
@@ -173,7 +175,7 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
         );
       }
 
-      setSaveSuccessFeedback(tabId, formatSaveSuccessMessage("graph", savedGraph.name, documentToSave.name));
+      setSaveSuccessFeedback(tabId, formatSaveSuccessMessage("graph", savedGraph.name, graphDocumentToSave.name));
       return response.saved;
     } catch (error) {
       input.setMessageFeedbackForTab(tabId, {
@@ -253,7 +255,8 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
       if (!documentToSave) {
         return false;
       }
-      const response = await input.saveGraph(documentToSave);
+      const graphDocumentToSave = { ...documentToSave, graph_id: null };
+      const response = await input.saveGraph(graphDocumentToSave);
       const savedGraph = await input.fetchGraph(response.graph_id);
       const nextWorkspace = ensureSavedGraphTab(input.workspace.value, {
         graphId: savedGraph.graph_id,
@@ -263,7 +266,7 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
       const savedTabId = nextWorkspace.activeTabId;
       if (savedTabId) {
         input.registerDocumentForTab(savedTabId, savedGraph);
-        setSaveSuccessFeedback(savedTabId, formatSaveSuccessMessage("graph", savedGraph.name, documentToSave.name));
+        setSaveSuccessFeedback(savedTabId, formatSaveSuccessMessage("graph", savedGraph.name, graphDocumentToSave.name));
       }
       await input.loadGraphs();
       input.syncRouteToTab(

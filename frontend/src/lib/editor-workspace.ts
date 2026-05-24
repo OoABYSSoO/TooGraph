@@ -508,7 +508,7 @@ export function prunePersistedEditorViewportDrafts(tabIds: string[]): void {
 }
 
 export function resolveEditorUrl(graphId: string | null): string {
-  return graphId ? `/editor/${graphId}` : "/editor";
+  return graphId ? `/editor/${encodeURIComponent(graphId)}` : "/editor";
 }
 
 export function resolveWorkspaceTabUrl(

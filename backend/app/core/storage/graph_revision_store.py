@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from app.core.storage.database import DATA_DIR
 from app.core.storage.json_file_utils import read_json_file, utc_now_iso, write_json_file
+from app.core.storage.readable_names import is_safe_storage_name
 
 
 GRAPH_REVISION_DATA_DIR = DATA_DIR / "graph_revisions"
@@ -107,7 +108,7 @@ def _graph_revision_dir(graph_id: str, *, storage_dir: Path | None = None) -> Pa
 
 def _safe_graph_id(graph_id: str) -> str:
     normalized = _compact_text(graph_id)
-    if not normalized or "/" in normalized or "\\" in normalized or normalized in {".", ".."}:
+    if not is_safe_storage_name(normalized):
         raise ValueError("graph_id is invalid.")
     return normalized
 

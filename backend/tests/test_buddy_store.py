@@ -696,8 +696,11 @@ class BuddyStoreTests(unittest.TestCase):
                 binding = store.load_run_template_binding()
 
         self.assertEqual(binding["template_id"], "buddy_autonomous_loop")
-        self.assertEqual(binding["input_bindings"]["input_raw_conversation_history"], "raw_conversation_history")
         self.assertEqual(binding["input_bindings"]["input_existing_session_summary"], "session_summary")
+        self.assertNotIn("raw_conversation_history", binding["input_bindings"].values())
+        self.assertNotIn("page_context", binding["input_bindings"].values())
+        self.assertNotIn("input_raw_conversation_history", binding["input_bindings"])
+        self.assertNotIn("input_page_context", binding["input_bindings"])
 
     def test_memory_review_template_binding_defaults_and_revision_restore(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

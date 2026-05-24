@@ -28,14 +28,6 @@
       "color": "#64748b",
       "binding": null
     },
-    "page_context": {
-      "name": "page_context",
-      "description": "当前页面、选中图、节点或其他 UI 上下文。",
-      "type": "markdown",
-      "value": "",
-      "color": "#0891b2",
-      "binding": null
-    },
     "buddy_context": {
       "name": "buddy_context",
       "description": "从 Buddy Home 文件夹中选择并注入的长期上下文文件。",
@@ -380,29 +372,6 @@
         "boundaryType": "markdown"
       }
     },
-    "input_page_context": {
-      "kind": "input",
-      "name": "页面上下文",
-      "description": "",
-      "ui": {
-        "position": {
-          "x": 60,
-          "y": 940
-        },
-        "collapsed": false
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "page_context",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": "",
-        "boundaryType": "markdown"
-      }
-    },
     "input_buddy_context": {
       "kind": "input",
       "name": "Buddy Home Files",
@@ -685,10 +654,6 @@
         },
         {
           "state": "conversation_history",
-          "required": false
-        },
-        {
-          "state": "page_context",
           "required": false
         },
         {
@@ -1182,10 +1147,6 @@
     {
       "source": "prepare_session_recall_request",
       "target": "recall_related_sessions"
-    },
-    {
-      "source": "input_page_context",
-      "target": "extract_memory_candidates"
     },
     {
       "source": "input_buddy_context",

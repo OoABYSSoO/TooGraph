@@ -19,7 +19,6 @@ type BuddyVisibleRunTemplateEffectsRequest = {
     history: BuddyChatMessage[];
     userMessage: string;
   };
-  pageContext?: string;
   sessionSummary?: string;
 };
 
@@ -56,7 +55,6 @@ export function useBuddyVisibleRunTemplateEffects({
       sourceRunId: request.runId,
       history: request.sourceTurn?.history ?? [],
       userMessage: request.sourceTurn?.userMessage ?? "",
-      pageContext: request.pageContext ?? "",
       sessionSummary: request.sessionSummary ?? "",
       publicResponse: resolveBuddyReplyText(request.runDetail),
     });

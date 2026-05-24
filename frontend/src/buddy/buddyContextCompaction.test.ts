@@ -26,7 +26,6 @@ function createCompactionTemplate(): TemplateRecord {
       user_message: { name: "user_message", description: "", type: "text", value: "", color: "#d97706" },
       conversation_history: { name: "conversation_history", description: "", type: "markdown", value: "", color: "#64748b" },
       existing_session_summary: { name: "existing_session_summary", description: "", type: "markdown", value: "", color: "#4f46e5" },
-      page_context: { name: "page_context", description: "", type: "markdown", value: "", color: "#0891b2" },
       buddy_context: { name: "buddy_context", description: "", type: "file", value: {}, color: "#0f766e" },
       context_budget_report: { name: "context_budget_report", description: "", type: "json", value: {}, color: "#0e7490" },
       capability_result: { name: "capability_result", description: "", type: "result_package", value: {}, color: "#0284c7" },
@@ -39,7 +38,6 @@ function createCompactionTemplate(): TemplateRecord {
       input_user_message: inputNode("user_message", "user_message"),
       input_conversation_history: inputNode("conversation_history", "conversation_history"),
       input_existing_session_summary: inputNode("existing_session_summary", "existing_session_summary"),
-      input_page_context: inputNode("page_context", "page_context"),
       input_buddy_context: inputNode("buddy_context", "buddy_context"),
       input_context_budget_report: inputNode("context_budget_report", "context_budget_report"),
       input_capability_result: inputNode("capability_result", "capability_result"),
@@ -160,7 +158,6 @@ test("shouldRunBuddyContextCompaction triggers on raw history pressure and high 
   const report = buildBuddyContextBudgetReport({
     history: longHistory,
     userMessage: "继续",
-    pageContext: "页面",
     sessionSummary: "",
     trigger: "preflight",
   });
@@ -171,7 +168,6 @@ test("shouldRunBuddyContextCompaction triggers on raw history pressure and high 
   const usageReport = buildBuddyContextBudgetReport({
     history: [],
     userMessage: "继续",
-    pageContext: "",
     sessionSummary: "",
     trigger: "background",
     sourceRun: runWithUsage(70000),
@@ -183,7 +179,6 @@ test("shouldRunBuddyContextCompaction triggers on raw history pressure and high 
   const resultReport = buildBuddyContextBudgetReport({
     history: [],
     userMessage: "continue",
-    pageContext: "",
     sessionSummary: "",
     trigger: "background",
     publicResponse: "large result ".repeat(800),
@@ -194,7 +189,6 @@ test("shouldRunBuddyContextCompaction triggers on raw history pressure and high 
   const maxUsageReport = buildBuddyContextBudgetReport({
     history: [],
     userMessage: "continue",
-    pageContext: "",
     sessionSummary: "",
     trigger: "background",
     sourceRun: runWithUsageSequence([1000, 75000, 2000]),
@@ -210,7 +204,6 @@ test("buildBuddyContextCompactionGraph wires runtime sources into the internal c
     currentSessionId: "session_live_1",
     userMessage: "继续讨论压缩",
     history: [{ role: "user", content: "之前说过要保护最近原文。" }],
-    pageContext: "页面上下文",
     sessionSummary: "已有摘要",
     buddyModel: "global/gpt-5.3-codex",
   });

@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 from pathlib import Path
-import re
 from typing import Any
 from uuid import uuid4
 
@@ -12,6 +11,7 @@ from pydantic import ValidationError
 from app.core.compiler.validator import validate_graph
 from app.core.langgraph import get_langgraph_runtime_unsupported_reasons
 from app.core.schemas.node_system import NodeSystemGraphPayload, NodeSystemTemplate
+from app.core.storage.readable_names import is_safe_storage_name
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -19,7 +19,6 @@ USER_TEMPLATES_ROOT = REPO_ROOT / "graph_template" / "user"
 OFFICIAL_TEMPLATES_ROOT = REPO_ROOT / "graph_template" / "official"
 TEMPLATE_REVISION_ROOT = REPO_ROOT / "backend" / "data" / "template_revisions"
 TEMPLATE_FILE_NAME = "template.json"
-SAFE_TEMPLATE_ID_RE = re.compile(r"^[a-z][a-z0-9_]{2,80}$")
 
 
 def toograph_graph_template_writer(**action_inputs: Any) -> dict[str, Any]:
@@ -39,8 +38,8 @@ def toograph_graph_template_writer(**action_inputs: Any) -> dict[str, Any]:
         return _failed("validation_failed", "Template validation failed.", validation_report=validation["validation_report"])
     template = validation["template"]
     template_id = template.template_id.strip()
-    if not SAFE_TEMPLATE_ID_RE.fullmatch(template_id):
-        return _failed("invalid_template_id", "template_id must match [a-z][a-z0-9_]{2,80}.")
+    if not is_safe_storage_name(template_id):
+        return _failed("invalid_template_id", "template_id must be a safe folder name.")
     if (OFFICIAL_TEMPLATES_ROOT / template_id / TEMPLATE_FILE_NAME).exists():
         return _failed("official_template_collision", f"Refusing to overwrite official template `{template_id}`.")
 

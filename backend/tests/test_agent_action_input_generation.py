@@ -601,6 +601,61 @@ class AgentActionInputGenerationTests(unittest.TestCase):
         self.assertEqual(schema["properties"]["web_search"]["properties"]["query"]["type"], "string")
         self.assertEqual(updated_config["action_input_structured_output_strategy"], "json_schema")
 
+    def test_generate_action_inputs_passes_on_delta_to_model(self) -> None:
+        captured: dict[str, object] = {}
+        on_delta = object()
+
+        def chat_with_local_model_with_meta_func(**kwargs):
+            captured.update(kwargs)
+            return ('{"web_search": {"query": "TooGraph streaming"}}', {"warnings": []})
+
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "config": {
+                    "actionKey": "web_search",
+                    "taskInstruction": "Build search arguments.",
+                },
+            }
+        )
+
+        generate_agent_action_inputs(
+            node=node,
+            input_values={"question": "How should action planning stream?"},
+            bindings=[
+                ResolvedAgentActionBinding(
+                    binding=NodeSystemAgentActionBinding(actionKey="web_search"),
+                    source="node_config",
+                )
+            ],
+            action_definitions={
+                "web_search": ActionDefinition(
+                    actionKey="web_search",
+                    name="Web Search",
+                    llmOutputSchema=[
+                        ActionIoField(
+                            key="query",
+                            name="Query",
+                            valueType="text",
+                            description="Search query.",
+                        )
+                    ],
+                )
+            },
+            runtime_config={
+                "resolved_provider_id": "local",
+                "runtime_model_name": "test-model",
+                "resolved_temperature": 0.2,
+                "resolved_thinking": False,
+                "resolved_thinking_level": "off",
+            },
+            chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+            on_delta=on_delta,
+        )
+
+        self.assertIs(captured["on_delta"], on_delta)
+
     def test_generate_action_inputs_returns_custom_state_outputs_in_node_write_order(self) -> None:
         captured: dict[str, object] = {}
 

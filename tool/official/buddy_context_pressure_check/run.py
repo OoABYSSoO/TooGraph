@@ -5,11 +5,9 @@ import sys
 from typing import Any
 
 
-RAW_HISTORY_COMPACTION_THRESHOLD_CHARS = 9000
 RENDERED_HISTORY_COMPACTION_THRESHOLD_CHARS = 6000
 CAPABILITY_RESULT_COMPACTION_THRESHOLD_CHARS = 6000
 PUBLIC_RESPONSE_COMPACTION_THRESHOLD_CHARS = 7000
-PAGE_CONTEXT_COMPACTION_THRESHOLD_CHARS = 6000
 
 VALID_TRIGGERS = {"preflight", "capability_result", "overflow_recovery", "background"}
 
@@ -17,10 +15,8 @@ VALID_TRIGGERS = {"preflight", "capability_result", "overflow_recovery", "backgr
 def buddy_context_pressure_check(payload: dict[str, Any] | None) -> dict[str, Any]:
     inputs = payload if isinstance(payload, dict) else {}
     trigger = _normalize_trigger(inputs.get("trigger"), inputs.get("capability_result"))
-    raw_history_chars = _text_length(inputs.get("raw_conversation_history"))
     rendered_history_chars = _text_length(inputs.get("conversation_history"))
     user_message_chars = _text_length(inputs.get("user_message"))
-    page_context_chars = _text_length(inputs.get("page_context"))
     existing_session_summary_chars = _text_length(inputs.get("existing_session_summary"))
     context_compaction_summary_chars = _text_length(inputs.get("context_compaction_summary"))
     session_summary_chars = max(existing_session_summary_chars, context_compaction_summary_chars)
@@ -28,18 +24,14 @@ def buddy_context_pressure_check(payload: dict[str, Any] | None) -> dict[str, An
     public_response_chars = _text_length(inputs.get("public_response"))
 
     thresholds = {
-        "raw_history_chars": RAW_HISTORY_COMPACTION_THRESHOLD_CHARS,
         "rendered_history_chars": RENDERED_HISTORY_COMPACTION_THRESHOLD_CHARS,
-        "page_context_chars": PAGE_CONTEXT_COMPACTION_THRESHOLD_CHARS,
         "capability_result_chars": CAPABILITY_RESULT_COMPACTION_THRESHOLD_CHARS,
         "public_response_chars": PUBLIC_RESPONSE_COMPACTION_THRESHOLD_CHARS,
     }
     pressure_sources = _resolve_pressure_sources(
         trigger=trigger,
-        raw_history_chars=raw_history_chars,
         rendered_history_chars=rendered_history_chars,
         session_summary_chars=session_summary_chars,
-        page_context_chars=page_context_chars,
         capability_result_chars=capability_result_chars,
         public_response_chars=public_response_chars,
         thresholds=thresholds,
@@ -49,10 +41,8 @@ def buddy_context_pressure_check(payload: dict[str, Any] | None) -> dict[str, An
     report = {
         "version": 1,
         "trigger": trigger,
-        "raw_history_chars": raw_history_chars,
         "rendered_history_chars": rendered_history_chars,
         "user_message_chars": user_message_chars,
-        "page_context_chars": page_context_chars,
         "existing_session_summary_chars": existing_session_summary_chars,
         "context_compaction_summary_chars": context_compaction_summary_chars,
         "session_summary_chars": session_summary_chars,
@@ -84,22 +74,15 @@ def _normalize_trigger(value: Any, capability_result: Any) -> str:
 def _resolve_pressure_sources(
     *,
     trigger: str,
-    raw_history_chars: int,
     rendered_history_chars: int,
     session_summary_chars: int,
-    page_context_chars: int,
     capability_result_chars: int,
     public_response_chars: int,
     thresholds: dict[str, int],
 ) -> list[str]:
     sources: list[str] = []
-    if (
-        (raw_history_chars >= thresholds["raw_history_chars"] and session_summary_chars <= 0)
-        or rendered_history_chars >= thresholds["rendered_history_chars"]
-    ):
+    if rendered_history_chars >= thresholds["rendered_history_chars"]:
         sources.append("history")
-    if page_context_chars >= thresholds["page_context_chars"]:
-        sources.append("page_context")
     if (
         capability_result_chars >= thresholds["capability_result_chars"]
         or public_response_chars >= thresholds["public_response_chars"]
@@ -115,8 +98,6 @@ def _resolve_pressure_reason(*, trigger: str, pressure_sources: list[str]) -> st
         return "history_pressure"
     if "result" in pressure_sources:
         return "result_pressure"
-    if "page_context" in pressure_sources:
-        return "page_context_pressure"
     return "none"
 
 

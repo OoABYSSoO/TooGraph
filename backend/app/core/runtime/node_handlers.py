@@ -9,7 +9,10 @@ from app.core.runtime.agent_prompt import build_context_assembly_report, collect
 from app.core.runtime.agent_streaming import build_agent_stream_delta_callback, finalize_agent_stream_delta
 from app.core.runtime.agent_runtime_config import resolve_agent_runtime_config
 from app.core.runtime.agent_response_generation import generate_agent_response
-from app.core.runtime.agent_action_input_generation import generate_agent_action_inputs
+from app.core.runtime.agent_action_input_generation import (
+    collect_action_planning_state_output_keys,
+    generate_agent_action_inputs,
+)
 from app.core.runtime.agent_subgraph_input_generation import (
     SubgraphCapabilityDefinition,
     SubgraphCapabilityField,
@@ -550,14 +553,32 @@ def execute_agent_node(
             phase="action_input_planning",
             record_activity_event_func=record_activity_event_func,
         )
-        action_generation_result = generate_agent_action_inputs_func(
+        action_stream_state_keys = collect_action_planning_state_output_keys(
             node=node,
-            input_values=input_values,
             bindings=resolved_bindings,
-            action_definitions=action_definitions,
-            runtime_config=runtime_config,
             state_schema=state_schema,
         )
+        action_stream_delta_callback = None
+        if action_stream_state_keys:
+            stream_delta_kwargs: dict[str, Any] = {
+                "state": state,
+                "node_name": node_name,
+                "output_keys": action_stream_state_keys,
+            }
+            if callable_accepts_keyword_func(build_agent_stream_delta_callback_func, "stream_state_keys"):
+                stream_delta_kwargs["stream_state_keys"] = action_stream_state_keys
+            action_stream_delta_callback = build_agent_stream_delta_callback_func(**stream_delta_kwargs)
+        action_generation_kwargs: dict[str, Any] = {
+            "node": node,
+            "input_values": input_values,
+            "bindings": resolved_bindings,
+            "action_definitions": action_definitions,
+            "runtime_config": runtime_config,
+            "state_schema": state_schema,
+        }
+        if callable_accepts_keyword_func(generate_agent_action_inputs_func, "on_delta"):
+            action_generation_kwargs["on_delta"] = action_stream_delta_callback
+        action_generation_result = generate_agent_action_inputs_func(**action_generation_kwargs)
         (
             generated_action_inputs,
             generated_action_state_outputs,
@@ -1026,16 +1047,7 @@ def _unpack_agent_action_input_generation_result(
             list(warnings) if isinstance(warnings, list) else [],
             dict(runtime_config) if isinstance(runtime_config, dict) else {},
         )
-    if isinstance(result, tuple) and len(result) == 4:
-        action_inputs, reasoning, warnings, runtime_config = result
-        return (
-            dict(action_inputs) if isinstance(action_inputs, dict) else {},
-            {},
-            str(reasoning or ""),
-            list(warnings) if isinstance(warnings, list) else [],
-            dict(runtime_config) if isinstance(runtime_config, dict) else {},
-        )
-    raise ValueError("Action LLM output planning returned an invalid result shape.")
+    raise ValueError("Action LLM output planning must return (action_inputs, state_outputs, reasoning, warnings, runtime_config).")
 
 
 def _ordered_output_values(output_keys: list[str], values: dict[str, Any]) -> dict[str, Any]:

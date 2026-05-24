@@ -28,7 +28,6 @@ function createTemplate(): TemplateRecord {
     state_schema: {
       state_1: { name: "user_message", description: "", type: "text", value: "", color: "#9a3412" },
       state_2: { name: "conversation_history", description: "", type: "markdown", value: "", color: "#0f766e" },
-      state_3: { name: "page_context", description: "", type: "markdown", value: "", color: "#2563eb" },
       state_4: { name: "buddy_reply", description: "", type: "markdown", value: "", color: "#d97706" },
       state_6: { name: "buddy_profile", description: "", type: "markdown", value: "", color: "#a855f7" },
       state_7: { name: "buddy_policy", description: "", type: "markdown", value: "", color: "#dc2626" },
@@ -52,15 +51,6 @@ function createTemplate(): TemplateRecord {
         ui: { position: { x: 80, y: 480 }, collapsed: false },
         reads: [],
         writes: [{ state: "state_2", mode: "replace" }],
-        config: { value: "" },
-      },
-      input_page_context: {
-        kind: "input",
-        name: "input_page_context",
-        description: "",
-        ui: { position: { x: 80, y: 880 }, collapsed: false },
-        reads: [],
-        writes: [{ state: "state_3", mode: "replace" }],
         config: { value: "" },
       },
       input_buddy_profile: {
@@ -107,7 +97,6 @@ function createTemplate(): TemplateRecord {
         reads: [
           { state: "state_1", required: true },
           { state: "state_2", required: false },
-          { state: "state_3", required: false },
           { state: "state_6", required: false },
           { state: "state_7", required: false },
           { state: "state_8", required: false },
@@ -142,7 +131,6 @@ function createTemplate(): TemplateRecord {
     edges: [
       { source: "input_user_message", target: "buddy_reply_agent" },
       { source: "input_conversation_history", target: "buddy_reply_agent" },
-      { source: "input_page_context", target: "buddy_reply_agent" },
       { source: "input_buddy_profile", target: "buddy_reply_agent" },
       { source: "input_buddy_policy", target: "buddy_reply_agent" },
       { source: "input_buddy_memory_context", target: "buddy_reply_agent" },
@@ -163,7 +151,6 @@ function createAgenticTemplate(): TemplateRecord {
     state_schema: {
       state_1: { name: "user_message", description: "", type: "text", value: "", color: "#9a3412" },
       state_2: { name: "conversation_history", description: "", type: "markdown", value: "", color: "#0f766e" },
-      state_3: { name: "page_context", description: "", type: "markdown", value: "", color: "#2563eb" },
       state_16: { name: "approval_prompt", description: "", type: "markdown", value: "", color: "#ea580c" },
       state_25: { name: "direct_reply", description: "", type: "markdown", value: "", color: "#d97706" },
       state_26: { name: "denied_reply", description: "", type: "markdown", value: "", color: "#a16207" },
@@ -186,15 +173,6 @@ function createAgenticTemplate(): TemplateRecord {
         ui: { position: { x: 80, y: 500 }, collapsed: false },
         reads: [],
         writes: [{ state: "state_2", mode: "replace" }],
-        config: { value: "" },
-      },
-      input_page_context: {
-        kind: "input",
-        name: "input_page_context",
-        description: "",
-        ui: { position: { x: 80, y: 920 }, collapsed: false },
-        reads: [],
-        writes: [{ state: "state_3", mode: "replace" }],
         config: { value: "" },
       },
       request_approval_agent: {
@@ -249,7 +227,6 @@ function createReviewTemplate(): TemplateRecord {
       current_session_id: { name: "current_session_id", description: "", type: "text", value: "", color: "#475569" },
       user_message: { name: "user_message", description: "", type: "text", value: "", color: "#d97706" },
       conversation_history: { name: "conversation_history", description: "", type: "markdown", value: "", color: "#64748b" },
-      page_context: { name: "page_context", description: "", type: "markdown", value: "", color: "#0891b2" },
       buddy_context: { name: "buddy_context", description: "", type: "file", value: "", color: "#0f766e" },
       request_understanding: { name: "request_understanding", description: "", type: "json", value: {}, color: "#16a34a" },
       capability_result: { name: "capability_result", description: "", type: "result_package", value: {}, color: "#0284c7" },
@@ -395,7 +372,6 @@ function createActivityGraph() {
   const graph = buildBuddyChatGraph(createAgenticTemplate(), {
     userMessage: "你好",
     history: [],
-    pageContext: "当前路径: /",
     buddyMode: "advisory",
   });
   graph.state_schema.state_10 = { name: "request_understanding", description: "", type: "json", value: {}, color: "#16a34a" };
@@ -495,11 +471,6 @@ function createBuddyRunTemplateBinding(
   if (!Object.values(bindings).includes("conversation_history")) {
     if (isBindableInputNodeId(template, "input_conversation_history")) {
       bindings.input_conversation_history = "conversation_history";
-    }
-  }
-  if (!Object.values(bindings).includes("page_context")) {
-    if (isBindableInputNodeId(template, "input_page_context")) {
-      bindings.input_page_context = "page_context";
     }
   }
   if (!Object.values(bindings).includes("buddy_home_context")) {
@@ -689,7 +660,6 @@ test("buildBuddyChatGraph records ask-first mode without injecting permission or
   const graph = buildBuddyChatGraph(createAgenticTemplate(), {
     userMessage: "帮我搜索最新资料",
     history: [],
-    pageContext: "当前路径: /editor",
     buddyMode: "ask_first",
   });
 
@@ -709,7 +679,6 @@ test("buildBuddyChatGraph injects only configured input-node bindings", () => {
     {
       userMessage: "帮我看当前页面",
       history: [{ role: "assistant", content: "我在。" }],
-      pageContext: "当前路径: /editor",
       buddyMode: "full_access",
     },
     {
@@ -725,14 +694,11 @@ test("buildBuddyChatGraph injects only configured input-node bindings", () => {
   assert.equal(graph.name, "伙伴对话循环");
   assert.equal(graph.state_schema.state_1.value, "帮我看当前页面");
   assert.equal(graph.state_schema.state_2.value, "伙伴: 我在。");
-  assert.equal(graph.state_schema.state_3.value, "");
   assert.equal(graph.state_schema[BUDDY_REPLY_STATE_KEY].value, "");
   assertInputNode(graph.nodes.input_user_message);
   assertInputNode(graph.nodes.input_conversation_history);
-  assertInputNode(graph.nodes.input_page_context);
   assert.equal(graph.nodes.input_user_message.config.value, "帮我看当前页面");
   assert.equal(graph.nodes.input_conversation_history.config.value, "伙伴: 我在。");
-  assert.equal(graph.nodes.input_page_context.config.value, "");
   assert.equal(graph.metadata.origin, "buddy");
   assert.equal(graph.metadata.buddy_mode, "full_access");
   assert.equal(graph.metadata.buddy_can_execute_actions, true);
@@ -775,7 +741,6 @@ test("buildBuddyChatGraph injects the current session id when the template binds
     {
       userMessage: "帮我找上次聊过的记忆策略",
       history: [],
-      pageContext: "当前路径: /buddy",
       currentSessionId: "session_live_1",
     },
     {
@@ -792,30 +757,14 @@ test("buildBuddyChatGraph injects the current session id when the template binds
   assert.equal(graph.nodes.input_current_session_id.config.value, "session_live_1");
 });
 
-test("buildBuddyChatGraph feeds official loop raw history and session summary inputs", () => {
+test("buildBuddyChatGraph feeds official loop conversation history and session summary inputs", () => {
   const template = createTemplate();
-  template.state_schema.raw_conversation_history = {
-    name: "raw_conversation_history",
-    description: "",
-    type: "markdown",
-    value: "",
-    color: "#64748b",
-  };
   template.state_schema.existing_session_summary = {
     name: "existing_session_summary",
     description: "",
     type: "markdown",
     value: "",
     color: "#4f46e5",
-  };
-  template.nodes.input_raw_conversation_history = {
-    kind: "input",
-    name: "input_raw_conversation_history",
-    description: "",
-    ui: { position: { x: 80, y: 1600 }, collapsed: false },
-    reads: [],
-    writes: [{ state: "raw_conversation_history", mode: "replace" }],
-    config: { value: "" },
   };
   template.nodes.input_existing_session_summary = {
     kind: "input",
@@ -836,7 +785,6 @@ test("buildBuddyChatGraph feeds official loop raw history and session summary in
     {
       userMessage: "continue",
       history,
-      pageContext: "",
       sessionSummary: "summary-so-far",
     },
     {
@@ -844,7 +792,6 @@ test("buildBuddyChatGraph feeds official loop raw history and session summary in
       input_bindings: {
         input_user_message: "current_message",
         input_conversation_history: "conversation_history",
-        input_raw_conversation_history: "raw_conversation_history",
         input_existing_session_summary: "session_summary",
       },
     },
@@ -852,16 +799,14 @@ test("buildBuddyChatGraph feeds official loop raw history and session summary in
 
   assert.equal(graph.state_schema.existing_session_summary.value, "summary-so-far");
   assert.match(String(graph.nodes.input_conversation_history.config.value), /summary-so-far/);
-  assert.match(String(graph.state_schema.raw_conversation_history.value), /turn-0/);
-  assert.match(String(graph.state_schema.raw_conversation_history.value), /turn-17/);
-  assert.doesNotMatch(String(graph.state_schema.raw_conversation_history.value), /summary-so-far/);
+  assert.match(String(graph.nodes.input_conversation_history.config.value), /turn-17/);
+  assert.doesNotMatch(String(graph.nodes.input_conversation_history.config.value), /turn-0/);
 });
 
 test("buildBuddyChatGraph marks ask-first mode without a blanket reply breakpoint", () => {
   const graph = buildBuddyChatGraph(createTemplate(), {
     userMessage: "请帮我生成一个图修改草案",
     history: [],
-    pageContext: "当前路径: /editor",
     buddyMode: "ask_first",
   });
 
@@ -880,7 +825,6 @@ test("buildBuddyChatGraph carries page operation context for action runtime", ()
   const graph = buildBuddyChatGraph(createTemplate(), {
     userMessage: "打开运行历史",
     history: [],
-    pageContext: "当前路径: /editor",
     pageOperationContext: {
       page_path: "/editor",
       page_operation_book: {
@@ -932,7 +876,6 @@ test("buildBuddyChatGraph overrides template agent models with the buddy model",
   const graph = buildBuddyChatGraph(template, {
     userMessage: "你好",
     history: [],
-    pageContext: "当前路径: /buddy",
     buddyMode: "advisory",
     buddyModel: "openai/gpt-4.1",
   });
@@ -947,7 +890,6 @@ test("buildBuddyChatGraph leaves buddy self config states for graph template act
   const graph = buildBuddyChatGraph(createTemplate(), {
     userMessage: "你好",
     history: [],
-    pageContext: "当前路径: /editor/new",
     buddyMode: "advisory",
   });
 

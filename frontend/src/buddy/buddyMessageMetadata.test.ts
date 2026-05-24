@@ -42,6 +42,7 @@ const publicOutput = {
   stateType: "result_package",
   displayMode: "auto",
   kind: "card" as const,
+  content: { ok: true, items: ["a", "b"] },
   durationMs: 800,
   status: "completed" as const,
 };
@@ -74,6 +75,13 @@ test("resolvePublicOutputBuddyMessageMetadata restores only valid public output 
     resolvePublicOutputBuddyMessageMetadata({
       kind: "public_output",
       publicOutput: { ...publicOutput, durationMs: "800" },
+    }),
+    null,
+  );
+  assert.equal(
+    resolvePublicOutputBuddyMessageMetadata({
+      kind: "public_output",
+      publicOutput: Object.fromEntries(Object.entries(publicOutput).filter(([key]) => key !== "content")),
     }),
     null,
   );

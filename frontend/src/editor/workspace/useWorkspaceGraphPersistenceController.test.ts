@@ -263,6 +263,30 @@ test("useWorkspaceGraphPersistenceController saves the active tab as an existing
   assert.deepEqual(harness.saveToasts, ['Saved graph "Draft".']);
 });
 
+test("useWorkspaceGraphPersistenceController preserves an existing tab graph id when the draft document lost it", async () => {
+  const harness = createHarness({
+    savedGraph: graphDocument("Existing Graph", "Existing Graph") as GraphDocument,
+  });
+  const existingTab: EditorWorkspaceTab = {
+    ...harness.workspace.value.tabs[0]!,
+    kind: "existing",
+    graphId: "Existing Graph",
+    title: "Existing Graph",
+  };
+  harness.workspace.value = {
+    activeTabId: existingTab.tabId,
+    tabs: [existingTab],
+  };
+  harness.activeTab.value = existingTab;
+  harness.documentsByTabId.value.tab_a = graphDocument("Existing Graph", null);
+
+  await harness.controller.saveTab("tab_a");
+
+  assert.equal(harness.savedDocuments[0]?.graph_id, "Existing Graph");
+  assert.equal(harness.workspace.value.tabs[0]?.graphId, "Existing Graph");
+  assert.deepEqual(harness.routeSyncs, [{ graphId: "Existing Graph", mode: "replace" }]);
+});
+
 test("useWorkspaceGraphPersistenceController asks for graph metadata before saving a default-named graph", async () => {
   const requests: Array<{ document: GraphPayload | GraphDocument; target: "graph" | "template" }> = [];
   const harness = createHarness({
@@ -440,6 +464,26 @@ test("useWorkspaceGraphPersistenceController can save a subgraph tab as a standa
   assert.equal(harness.activeTab.value?.kind, "existing");
   assert.equal(harness.activeTab.value?.graphId, "graph_saved");
   assert.deepEqual(harness.routeSyncs, [{ graphId: "graph_saved", mode: "replace" }]);
+});
+
+test("useWorkspaceGraphPersistenceController clears graph id when saving an existing graph as a new graph", async () => {
+  const harness = createHarness();
+  const existingTab: EditorWorkspaceTab = {
+    ...harness.workspace.value.tabs[0]!,
+    kind: "existing",
+    graphId: "Existing Graph",
+    title: "Existing Graph",
+  };
+  harness.workspace.value = {
+    activeTabId: existingTab.tabId,
+    tabs: [existingTab],
+  };
+  harness.activeTab.value = existingTab;
+  harness.documentsByTabId.value.tab_a = graphDocument("Existing Graph", "Existing Graph");
+
+  await harness.controller.saveActiveGraphAsNewGraph();
+
+  assert.equal(harness.savedDocuments[0]?.graph_id, null);
 });
 
 test("useWorkspaceGraphPersistenceController saves the active graph as a user template and refreshes templates", async () => {

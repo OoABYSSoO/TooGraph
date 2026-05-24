@@ -125,6 +125,7 @@ class TemplateRouteTests(unittest.TestCase):
             self.assertEqual(save_response.status_code, 200)
             saved_payload = save_response.json()
             self.assertTrue(saved_payload["saved"])
+            self.assertEqual(saved_payload["template_id"], "Reusable Flow")
             self.assertEqual(saved_payload["template"]["source"], "user")
             self.assertEqual(saved_payload["template"]["label"], "Reusable Flow")
             self.assertEqual(saved_payload["template"]["default_graph_name"], "Reusable Flow")
@@ -160,10 +161,12 @@ class TemplateRouteTests(unittest.TestCase):
 
             self.assertEqual(first_response.status_code, 200)
             self.assertEqual(second_response.status_code, 200)
-            self.assertEqual(first_response.json()["template"]["label"], "Reusable Flow_1")
-            self.assertEqual(first_response.json()["template"]["default_graph_name"], "Reusable Flow_1")
-            self.assertEqual(second_response.json()["template"]["label"], "Reusable Flow_2")
-            self.assertEqual(second_response.json()["template"]["default_graph_name"], "Reusable Flow_2")
+            self.assertEqual(first_response.json()["template_id"], "Reusable Flow(1)")
+            self.assertEqual(second_response.json()["template_id"], "Reusable Flow(2)")
+            self.assertEqual(first_response.json()["template"]["label"], "Reusable Flow(1)")
+            self.assertEqual(first_response.json()["template"]["default_graph_name"], "Reusable Flow(1)")
+            self.assertEqual(second_response.json()["template"]["label"], "Reusable Flow(2)")
+            self.assertEqual(second_response.json()["template"]["default_graph_name"], "Reusable Flow(2)")
 
     def test_save_template_preserves_agent_config_and_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

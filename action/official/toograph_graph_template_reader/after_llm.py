@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import re
 from typing import Any
+
+from app.core.storage.readable_names import is_safe_storage_name
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -11,7 +12,6 @@ OFFICIAL_TEMPLATES_ROOT = REPO_ROOT / "graph_template" / "official"
 USER_TEMPLATES_ROOT = REPO_ROOT / "graph_template" / "user"
 TEMPLATE_FILE_NAME = "template.json"
 MAX_TEMPLATE_CHARS = 600_000
-SAFE_TEMPLATE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,96}$")
 
 
 def toograph_graph_template_reader(**action_inputs: Any) -> dict[str, Any]:
@@ -22,7 +22,7 @@ def toograph_graph_template_reader(**action_inputs: Any) -> dict[str, Any]:
         or action_inputs.get("template")
     )
     if not template_id:
-        return _failed("invalid_template_id", "template_id must contain only letters, numbers, underscores, or hyphens.")
+        return _failed("invalid_template_id", "template_id must be a safe folder name.")
 
     source_scope = _normalize_source_scope(action_inputs.get("source_scope") or action_inputs.get("sourceScope"))
     candidates = _candidate_paths(template_id, source_scope)
@@ -82,9 +82,7 @@ def _candidate_paths(template_id: str, source_scope: str) -> list[tuple[str, Pat
 
 def _safe_template_id(value: Any) -> str:
     text = str(value or "").strip()
-    if not text or text in {".", ".."} or "/" in text or "\\" in text:
-        return ""
-    if not SAFE_TEMPLATE_ID_RE.fullmatch(text):
+    if not is_safe_storage_name(text):
         return ""
     return text
 

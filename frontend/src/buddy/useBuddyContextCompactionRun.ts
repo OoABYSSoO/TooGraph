@@ -23,7 +23,6 @@ type BuddyContextCompactionRunRequest = {
   trigger: BuddyContextCompactionTrigger;
   history: BuddyContextHistoryMessage[];
   userMessage: string;
-  pageContext: string;
   sessionSummary: string;
   sourceRun?: RunDetail | null;
   sourceRunId?: string;
@@ -56,7 +55,6 @@ export function useBuddyContextCompactionRun({
       trigger: enrichedRequest.trigger,
       history: enrichedRequest.history,
       userMessage: enrichedRequest.userMessage,
-      pageContext: enrichedRequest.pageContext,
       sessionSummary: enrichedRequest.sessionSummary,
       sourceRun: enrichedRequest.sourceRun,
       capabilityResult: enrichedRequest.capabilityResult,
@@ -119,7 +117,6 @@ function enrichContextCompactionRequest(request: BuddyContextCompactionRunReques
     sourceRun,
     sourceRunId: request.sourceRunId || sourceRun.run_id,
     userMessage: request.userMessage || normalizeRunStateValue(sourceRun, "user_message", ""),
-    pageContext: request.pageContext || normalizeRunStateValue(sourceRun, "page_context", ""),
     capabilityResult: request.capabilityResult ?? resolveRunStateValueByName(sourceRun, "capability_result", {}),
     publicResponse: request.publicResponse || normalizeRunStateValue(sourceRun, "public_response", resolveBuddyReplyText(sourceRun)),
   };

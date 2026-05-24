@@ -129,7 +129,7 @@ class BuddyCommandRouteTests(unittest.TestCase):
                                 "template_id": "custom_loop",
                                 "input_bindings": {
                                     "input_prompt": "current_message",
-                                    "input_context": "page_context",
+                                    "input_context": "session_summary",
                                 },
                             },
                             "run_id": "run_binding_1",
@@ -145,6 +145,7 @@ class BuddyCommandRouteTests(unittest.TestCase):
         body = response.json()
         self.assertEqual(body["result"]["template_id"], "custom_loop")
         self.assertEqual(body["result"]["input_bindings"]["input_prompt"], "current_message")
+        self.assertEqual(body["result"]["input_bindings"]["input_context"], "session_summary")
         self.assertEqual(body["command"]["action"], "run_template_binding.update")
         self.assertEqual(body["command"]["target_type"], "run_template_binding")
         self.assertEqual(body["command"]["target_id"], "run_template_binding")

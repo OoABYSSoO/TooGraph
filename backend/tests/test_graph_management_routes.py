@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import tempfile
 import unittest
 from pathlib import Path
@@ -86,13 +87,25 @@ def _invalid_draft_graph_payload(graph_id: str | None = None, name: str = "Draft
     }
 
 
+@contextmanager
+def _patched_graph_storage(root: Path):
+    graph_root = root / "graph" / "user"
+    history_root = root / "graph" / "history"
+    legacy_graph_dir = root / "backend" / "data" / "graphs"
+    with (
+        patch("app.core.storage.database.GRAPH_DATA_DIR", legacy_graph_dir),
+        patch("app.core.storage.graph_store.GRAPH_DATA_DIR", legacy_graph_dir),
+        patch("app.core.storage.graph_store.USER_GRAPHS_ROOT", graph_root, create=True),
+        patch("app.core.storage.graph_store.GRAPH_HISTORY_ROOT", history_root, create=True),
+    ):
+        yield graph_root, history_root, legacy_graph_dir
+
+
 class GraphManagementRouteTests(unittest.TestCase):
     def test_graphs_can_be_disabled_enabled_listed_and_deleted(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            graph_dir = Path(temp_dir) / "graphs"
             with (
-                patch("app.core.storage.database.GRAPH_DATA_DIR", graph_dir),
-                patch("app.core.storage.graph_store.GRAPH_DATA_DIR", graph_dir),
+                _patched_graph_storage(Path(temp_dir)),
                 TestClient(app) as client,
             ):
                 save_response = client.post("/api/graphs/save", json=_graph_payload("graph_managed"))
@@ -136,12 +149,51 @@ class GraphManagementRouteTests(unittest.TestCase):
                 missing_response = client.get("/api/graphs/graph_managed")
                 self.assertEqual(missing_response.status_code, 404)
 
+    def test_new_saved_graphs_use_readable_root_user_graph_folders(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                _patched_graph_storage(Path(temp_dir)) as (graph_root, _history_root, legacy_graph_dir),
+                TestClient(app) as client,
+            ):
+                first_response = client.post("/api/graphs/save", json=_graph_payload(None, "Research Flow"))
+                second_response = client.post("/api/graphs/save", json=_graph_payload(None, "Research Flow"))
+
+            self.assertEqual(first_response.status_code, 200)
+            self.assertEqual(second_response.status_code, 200)
+            self.assertEqual(first_response.json()["graph_id"], "Research Flow")
+            self.assertEqual(second_response.json()["graph_id"], "Research Flow(1)")
+            self.assertTrue((graph_root / "Research Flow" / "graph.json").is_file())
+            self.assertTrue((graph_root / "Research Flow(1)" / "graph.json").is_file())
+            self.assertFalse((legacy_graph_dir / "Research Flow.json").exists())
+
+    def test_existing_graph_updates_in_place_and_records_history_under_root_graph_folder(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                _patched_graph_storage(Path(temp_dir)) as (graph_root, history_root, legacy_graph_dir),
+                TestClient(app) as client,
+            ):
+                create_response = client.post("/api/graphs/save", json=_graph_payload(None, "Research Flow"))
+                graph_id = create_response.json()["graph_id"]
+
+                update_response = client.post("/api/graphs/save", json=_graph_payload(graph_id, "Renamed Research Flow"))
+                graph_response = client.get(f"/api/graphs/{graph_id}")
+                revisions_response = client.get(f"/api/graphs/{graph_id}/revisions")
+
+            self.assertEqual(create_response.status_code, 200)
+            self.assertEqual(update_response.status_code, 200)
+            self.assertEqual(update_response.json()["graph_id"], "Research Flow")
+            self.assertEqual(graph_response.status_code, 200)
+            self.assertEqual(graph_response.json()["name"], "Renamed Research Flow")
+            self.assertTrue((graph_root / "Research Flow" / "graph.json").is_file())
+            self.assertFalse((graph_root / "Renamed Research Flow").exists())
+            self.assertEqual(len(revisions_response.json()), 2)
+            self.assertEqual(len(list((history_root / "Research Flow").glob("*.json"))), 2)
+            self.assertFalse((legacy_graph_dir.parent / "graph_revisions").exists())
+
     def test_saving_existing_graph_preserves_management_status(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            graph_dir = Path(temp_dir) / "graphs"
             with (
-                patch("app.core.storage.database.GRAPH_DATA_DIR", graph_dir),
-                patch("app.core.storage.graph_store.GRAPH_DATA_DIR", graph_dir),
+                _patched_graph_storage(Path(temp_dir)),
                 TestClient(app) as client,
             ):
                 self.assertEqual(client.post("/api/graphs/save", json=_graph_payload("graph_managed")).status_code, 200)
@@ -157,10 +209,8 @@ class GraphManagementRouteTests(unittest.TestCase):
 
     def test_saving_graphs_resolves_duplicate_names_with_numbered_suffixes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            graph_dir = Path(temp_dir) / "graphs"
             with (
-                patch("app.core.storage.database.GRAPH_DATA_DIR", graph_dir),
-                patch("app.core.storage.graph_store.GRAPH_DATA_DIR", graph_dir),
+                _patched_graph_storage(Path(temp_dir)),
                 TestClient(app) as client,
             ):
                 first_response = client.post("/api/graphs/save", json=_graph_payload("graph_first", "Managed Flow"))
@@ -178,16 +228,14 @@ class GraphManagementRouteTests(unittest.TestCase):
                 third_graph = client.get(f"/api/graphs/{third_response.json()['graph_id']}").json()
 
                 self.assertEqual(first_graph["name"], "Managed Flow")
-                self.assertEqual(second_graph["name"], "Managed Flow_1")
-                self.assertEqual(third_graph["name"], "Managed Flow_2")
+                self.assertEqual(second_graph["name"], "Managed Flow(1)")
+                self.assertEqual(third_graph["name"], "Managed Flow(2)")
                 self.assertEqual(client.get("/api/graphs/graph_first").json()["name"], "Managed Flow")
 
     def test_save_accepts_structurally_valid_draft_without_execution_validation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            graph_dir = Path(temp_dir) / "graphs"
             with (
-                patch("app.core.storage.database.GRAPH_DATA_DIR", graph_dir),
-                patch("app.core.storage.graph_store.GRAPH_DATA_DIR", graph_dir),
+                _patched_graph_storage(Path(temp_dir)),
                 TestClient(app) as client,
             ):
                 payload = _invalid_draft_graph_payload("graph_draft_invalid")
@@ -205,10 +253,8 @@ class GraphManagementRouteTests(unittest.TestCase):
 
     def test_saving_graph_preserves_agent_config_ui_and_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            graph_dir = Path(temp_dir) / "graphs"
             with (
-                patch("app.core.storage.database.GRAPH_DATA_DIR", graph_dir),
-                patch("app.core.storage.graph_store.GRAPH_DATA_DIR", graph_dir),
+                _patched_graph_storage(Path(temp_dir)),
                 TestClient(app) as client,
             ):
                 payload = _agent_graph_payload("graph_runtime_config")
@@ -225,10 +271,8 @@ class GraphManagementRouteTests(unittest.TestCase):
 
     def test_saving_graph_records_revision_with_diff_and_audit_context(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            graph_dir = Path(temp_dir) / "graphs"
             with (
-                patch("app.core.storage.database.GRAPH_DATA_DIR", graph_dir),
-                patch("app.core.storage.graph_store.GRAPH_DATA_DIR", graph_dir),
+                _patched_graph_storage(Path(temp_dir)),
                 TestClient(app) as client,
             ):
                 create_payload = {
@@ -279,10 +323,8 @@ class GraphManagementRouteTests(unittest.TestCase):
 
     def test_graph_revision_restore_reverts_to_previous_graph_and_records_restore_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            graph_dir = Path(temp_dir) / "graphs"
             with (
-                patch("app.core.storage.database.GRAPH_DATA_DIR", graph_dir),
-                patch("app.core.storage.graph_store.GRAPH_DATA_DIR", graph_dir),
+                _patched_graph_storage(Path(temp_dir)),
                 TestClient(app) as client,
             ):
                 self.assertEqual(client.post("/api/graphs/save", json=_graph_payload("graph_restore_target", "Before")).status_code, 200)

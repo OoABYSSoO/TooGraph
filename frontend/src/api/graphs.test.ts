@@ -5,8 +5,10 @@ import {
   deleteGraph,
   deleteTemplate,
   exportLangGraphPython,
+  fetchGraph,
   fetchGraphRevisions,
   fetchGraphs,
+  fetchTemplate,
   fetchTemplates,
   importGraphFromPythonSource,
   restoreGraphRevision,
@@ -323,6 +325,46 @@ test("fetchGraphRevisions requests graph revision history", async () => {
 
     assert.equal(requestedUrl, "/api/graphs/graph_1/revisions");
     assert.equal(revisions[0]?.revision_id, "grev_1");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("graph and template helpers encode readable ids in path segments", async () => {
+  const requestedUrls: string[] = [];
+
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requestedUrls.push(String(input));
+    return new Response(JSON.stringify({}), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  }) as typeof fetch;
+
+  try {
+    await fetchGraph("我的 图(1)");
+    await fetchTemplate("模板 A(2)");
+    await fetchGraphRevisions("我的 图(1)");
+    await restoreGraphRevision("我的 图(1)", "grev 1");
+    await updateGraphStatus("我的 图(1)", "disabled");
+    await deleteGraph("我的 图(1)");
+    await updateTemplateStatus("模板 A(2)", "active");
+    await updateTemplateCapabilityDiscoverable("模板 A(2)", true);
+    await deleteTemplate("模板 A(2)");
+
+    assert.deepEqual(requestedUrls, [
+      "/api/graphs/%E6%88%91%E7%9A%84%20%E5%9B%BE(1)",
+      "/api/templates/%E6%A8%A1%E6%9D%BF%20A(2)",
+      "/api/graphs/%E6%88%91%E7%9A%84%20%E5%9B%BE(1)/revisions",
+      "/api/graphs/%E6%88%91%E7%9A%84%20%E5%9B%BE(1)/revisions/grev%201/restore",
+      "/api/graphs/%E6%88%91%E7%9A%84%20%E5%9B%BE(1)/disable",
+      "/api/graphs/%E6%88%91%E7%9A%84%20%E5%9B%BE(1)",
+      "/api/templates/%E6%A8%A1%E6%9D%BF%20A(2)/enable",
+      "/api/templates/%E6%A8%A1%E6%9D%BF%20A(2)/capability-discoverable",
+      "/api/templates/%E6%A8%A1%E6%9D%BF%20A(2)",
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -215,9 +215,7 @@ test("binding model exposes Buddy input rows with current message required", () 
   assert.deepEqual(rows.map((row) => [row.source, row.required, row.selectedNodeId]), [
     ["current_message", true, "input_prompt"],
     ["conversation_history", false, "input_history"],
-    ["raw_conversation_history", false, ""],
     ["session_summary", false, ""],
-    ["page_context", false, ""],
     ["buddy_home_context", false, ""],
     ["current_session_id", false, ""],
   ]);
@@ -233,7 +231,7 @@ test("binding model builds input-node options and disables nodes already used by
         input_history: "conversation_history",
       },
     },
-    "page_context",
+    "session_summary",
   );
 
   assert.deepEqual(options.map((option) => [option.value, option.label, option.disabled, option.disabledReason]), [
@@ -257,13 +255,13 @@ test("binding model updates source rows without duplicating source or input node
     input_history: "current_message",
   });
 
-  const optional = setBuddyRunTemplateSourceBinding(moved, "page_context", "input_prompt");
+  const optional = setBuddyRunTemplateSourceBinding(moved, "session_summary", "input_prompt");
   assert.deepEqual(optional.input_bindings, {
     input_history: "current_message",
-    input_prompt: "page_context",
+    input_prompt: "session_summary",
   });
 
-  const cleared = setBuddyRunTemplateSourceBinding(optional, "page_context", "");
+  const cleared = setBuddyRunTemplateSourceBinding(optional, "session_summary", "");
   assert.deepEqual(cleared.input_bindings, {
     input_history: "current_message",
   });
@@ -274,9 +272,7 @@ test("binding model exposes source options and Buddy Home folder package", () =>
     "",
     "current_message",
     "conversation_history",
-    "raw_conversation_history",
     "session_summary",
-    "page_context",
     "buddy_home_context",
     "current_session_id",
   ]);
@@ -286,9 +282,11 @@ test("binding model exposes source options and Buddy Home folder package", () =>
     selected: ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md", "policy.json"],
   });
   assert.deepEqual(buildDefaultBuddyRunTemplateBinding().input_bindings.input_user_message, "current_message");
-  assert.deepEqual(buildDefaultBuddyRunTemplateBinding().input_bindings.input_raw_conversation_history, "raw_conversation_history");
   assert.deepEqual(buildDefaultBuddyRunTemplateBinding().input_bindings.input_existing_session_summary, "session_summary");
   assert.deepEqual(buildDefaultBuddyRunTemplateBinding().input_bindings.input_current_session_id, "current_session_id");
+  const defaultRunSources = new Set<string>(Object.values(buildDefaultBuddyRunTemplateBinding().input_bindings));
+  assert.equal(defaultRunSources.has("page_context"), false);
+  assert.equal(defaultRunSources.has("raw_conversation_history"), false);
 });
 
 test("memory review binding model exposes required automatic source rows", () => {
@@ -303,7 +301,6 @@ test("memory review binding model exposes required automatic source rows", () =>
     ["public_response", true, "input_public_response"],
     ["buddy_home_context", true, "input_buddy_context"],
     ["conversation_history", false, "input_conversation_history"],
-    ["page_context", false, "input_page_context"],
     ["request_understanding", false, "input_request_understanding"],
     ["capability_result", false, "input_capability_result"],
     ["capability_review", false, "input_capability_review"],

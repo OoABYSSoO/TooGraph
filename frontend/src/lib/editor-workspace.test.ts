@@ -377,6 +377,7 @@ test("persisted editor viewport drafts normalize invalid values and can be prune
 test("resolveEditorUrl only uses graph id for saved graphs", () => {
   assert.equal(resolveEditorUrl(null), "/editor");
   assert.equal(resolveEditorUrl("graph_123"), "/editor/graph_123");
+  assert.equal(resolveEditorUrl("我的 图(1)"), "/editor/%E6%88%91%E7%9A%84%20%E5%9B%BE(1)");
 });
 
 test("resolveWorkspaceTabUrl keeps unsaved drafts on /editor/new", () => {
@@ -396,6 +397,7 @@ test("resolveWorkspaceTabUrl keeps unsaved drafts on /editor/new", () => {
   assert.equal(resolveWorkspaceTabUrl(draftTab), "/editor/new");
   assert.equal(resolveWorkspaceTabUrl(templateTab), "/editor/new?template=starter_graph");
   assert.equal(resolveWorkspaceTabUrl(savedTab), "/editor/graph_123");
+  assert.equal(resolveWorkspaceTabUrl({ ...savedTab, graphId: "我的 图(1)" }), "/editor/%E6%88%91%E7%9A%84%20%E5%9B%BE(1)");
 });
 
 test("ensureSavedGraphTab activates an existing graph tab instead of duplicating it", () => {

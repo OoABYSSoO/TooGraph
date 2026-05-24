@@ -19,12 +19,6 @@
       "description": "preflight, capability_result, overflow_recovery, or background."
     },
     {
-      "key": "raw_conversation_history",
-      "name": "Raw Conversation History",
-      "valueType": "markdown",
-      "description": "Full current-session transcript before display compaction."
-    },
-    {
       "key": "conversation_history",
       "name": "Rendered Conversation History",
       "valueType": "markdown",
@@ -35,12 +29,6 @@
       "name": "User Message",
       "valueType": "text",
       "description": "Current user message."
-    },
-    {
-      "key": "page_context",
-      "name": "Page Context",
-      "valueType": "markdown",
-      "description": "Current TooGraph UI context."
     },
     {
       "key": "existing_session_summary",
@@ -90,7 +78,7 @@
       "key": "reason",
       "name": "Reason",
       "valueType": "text",
-      "description": "The primary pressure reason. page_context_pressure is reported for oversized UI snapshots but does not trigger buddy_context_compaction by itself."
+      "description": "The primary pressure reason."
     }
   ]
 }

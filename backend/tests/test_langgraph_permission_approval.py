@@ -188,6 +188,7 @@ def test_langgraph_runtime_pauses_before_risky_action_permission(monkeypatch) ->
         "_generate_agent_action_inputs",
         lambda **kwargs: (
             {"local_workspace_executor": _workspace_write_inputs()},
+            {},
             "planned action inputs",
             [],
             kwargs["runtime_config"],
@@ -226,6 +227,7 @@ def test_langgraph_runtime_resumes_permission_approval_with_stored_inputs(monkey
         planned_inputs_calls += 1
         return (
             {"local_workspace_executor": _workspace_write_inputs()},
+            {},
             "planned action inputs",
             [],
             kwargs["runtime_config"],
@@ -274,6 +276,7 @@ def test_langgraph_runtime_propagates_permission_approval_through_subgraph(monke
         planned_inputs_calls += 1
         return (
             {"local_workspace_executor": _workspace_write_inputs()},
+            {},
             "planned action inputs",
             [],
             kwargs["runtime_config"],

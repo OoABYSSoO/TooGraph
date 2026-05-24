@@ -52,14 +52,6 @@
       "color": "#4f46e5",
       "binding": null
     },
-    "page_context": {
-      "name": "page_context",
-      "description": "当前页面上下文，只用于理解正在发生的任务，不写入长期事实。",
-      "type": "markdown",
-      "value": "",
-      "color": "#0891b2",
-      "binding": null
-    },
     "buddy_context": {
       "name": "buddy_context",
       "description": "从 Buddy Home 文件夹注入的长期上下文文件。",
@@ -348,29 +340,6 @@
         "boundaryType": "text"
       }
     },
-    "input_page_context": {
-      "kind": "input",
-      "name": "页面上下文",
-      "description": "",
-      "ui": {
-        "position": {
-          "x": 80,
-          "y": 2360
-        },
-        "collapsed": false
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "page_context",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": "",
-        "boundaryType": "text"
-      }
-    },
     "input_buddy_context": {
       "kind": "input",
       "name": "Buddy Home",
@@ -565,10 +534,6 @@
         },
         {
           "state": "existing_session_summary",
-          "required": false
-        },
-        {
-          "state": "page_context",
           "required": false
         },
         {
@@ -849,10 +814,6 @@
     },
     {
       "source": "input_user_message",
-      "target": "summarize_context"
-    },
-    {
-      "source": "input_page_context",
       "target": "summarize_context"
     },
     {

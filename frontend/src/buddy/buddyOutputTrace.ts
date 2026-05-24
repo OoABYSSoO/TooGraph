@@ -988,12 +988,12 @@ function coalesceTraceOnlyOutputSegments(
       !hasVisibleOutput;
     if (isTraceOnlyCompletedOutput) {
       pendingTraceOnlySegment = pendingTraceOnlySegment
-        ? mergeTraceSegments(pendingTraceOnlySegment, segment, { keepRightIdentity: false })
+        ? mergeBuddyOutputTraceSegments(pendingTraceOnlySegment, segment, { keepRightIdentity: false })
         : segment;
       continue;
     }
     const nextSegment = pendingTraceOnlySegment
-      ? mergeTraceSegments(pendingTraceOnlySegment, segment, { keepRightIdentity: true })
+      ? mergeBuddyOutputTraceSegments(pendingTraceOnlySegment, segment, { keepRightIdentity: true })
       : segment;
     pendingTraceOnlySegment = null;
     result.push(nextSegment);
@@ -1004,7 +1004,7 @@ function coalesceTraceOnlyOutputSegments(
   return result;
 }
 
-function mergeTraceSegments(
+export function mergeBuddyOutputTraceSegments(
   left: BuddyOutputTraceSegment,
   right: BuddyOutputTraceSegment,
   options: { keepRightIdentity: boolean },

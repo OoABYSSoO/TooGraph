@@ -8,6 +8,7 @@ export type BuddyPublicOutputMetadata = {
   stateType: string;
   displayMode: string;
   kind: "text" | "card";
+  content: unknown;
   durationMs: number | null;
   status: "streaming" | "completed" | "failed";
 };
@@ -64,6 +65,7 @@ function isBuddyPublicOutputMetadata(value: unknown): value is BuddyPublicOutput
     typeof value.stateType === "string" &&
     typeof value.displayMode === "string" &&
     (value.kind === "text" || value.kind === "card") &&
+    Object.prototype.hasOwnProperty.call(value, "content") &&
     isNullableNumber(value.durationMs) &&
     (value.status === "streaming" || value.status === "completed" || value.status === "failed")
   );

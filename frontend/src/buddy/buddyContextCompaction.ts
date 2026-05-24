@@ -20,7 +20,6 @@ export type BuddyContextBudgetReport = {
   omitted_history_message_count: number;
   raw_history_chars: number;
   rendered_history_chars: number;
-  page_context_chars: number;
   user_message_chars: number;
   session_summary_chars: number;
   capability_result_chars: number;
@@ -46,7 +45,6 @@ export type BuildBuddyContextBudgetReportInput = {
   trigger: BuddyContextCompactionTrigger;
   history: BuddyContextHistoryMessage[];
   userMessage: string;
-  pageContext: string;
   sessionSummary: string;
   capabilityResult?: unknown;
   publicResponse?: string;
@@ -105,7 +103,6 @@ export function buildBuddyContextBudgetReport(input: BuildBuddyContextBudgetRepo
     omitted_history_message_count: Math.max(0, includedHistory.length - DEFAULT_RECENT_HISTORY_MESSAGES),
     raw_history_chars: rawHistoryChars,
     rendered_history_chars: renderedHistory.length,
-    page_context_chars: normalizeText(input.pageContext).length,
     user_message_chars: normalizeText(input.userMessage).length,
     session_summary_chars: normalizeText(input.sessionSummary).length,
     capability_result_chars: countValueChars(input.capabilityResult),
@@ -178,7 +175,6 @@ export function buildBuddyContextCompactionGraph(
   setInputValue(graph, "input_user_message", input.userMessage);
   setInputValue(graph, "input_conversation_history", formatRawBuddyHistoryForCompaction(input.history));
   setInputValue(graph, "input_existing_session_summary", input.sessionSummary);
-  setInputValue(graph, "input_page_context", input.pageContext);
   setInputValue(graph, "input_buddy_context", buildBuddyHomeContextValue());
   setInputValue(graph, "input_context_budget_report", contextBudgetReport);
   setInputValue(graph, "input_capability_result", input.capabilityResult ?? {});

@@ -59,7 +59,7 @@
             v-for="template in visibleTemplatePage.items"
             :key="template.template_id"
             class="home-card"
-            :to="`/editor/new?template=${template.template_id}`"
+            :to="editorTemplateUrl(template.template_id)"
           >
             <div class="home-card__eyebrow">{{ template.template_id }}</div>
             <strong>{{ template.label }}</strong>
@@ -90,7 +90,7 @@
             <p>{{ t("home.noGraphs") }}</p>
             <RouterLink class="home-empty__action" :to="graphsEmptyAction.href">{{ graphsEmptyAction.label }}</RouterLink>
           </div>
-          <RouterLink v-for="graph in visibleGraphPage.items" :key="graph.graph_id" class="home-card" :to="`/editor/${graph.graph_id}`">
+          <RouterLink v-for="graph in visibleGraphPage.items" :key="graph.graph_id" class="home-card" :to="editorGraphUrl(graph.graph_id)">
             <div class="home-card__header">
               <strong>{{ graph.name }}</strong>
               <span class="home-card__detail">{{ graphCardDetail }}</span>
@@ -194,6 +194,14 @@ function setTemplatePage(nextPage: number) {
 
 function setGraphPage(nextPage: number) {
   graphPage.value = nextPage;
+}
+
+function editorTemplateUrl(templateId: string) {
+  return `/editor/new?template=${encodeURIComponent(templateId)}`;
+}
+
+function editorGraphUrl(graphId: string) {
+  return `/editor/${encodeURIComponent(graphId)}`;
 }
 </script>
 

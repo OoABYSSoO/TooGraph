@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -1705,8 +1706,6 @@ class TemplateLayoutTests(unittest.TestCase):
             {
                 "user_message",
                 "conversation_history",
-                "raw_conversation_history",
-                "page_context",
                 "buddy_context",
                 "current_session_id",
                 "existing_session_summary",
@@ -1728,8 +1727,6 @@ class TemplateLayoutTests(unittest.TestCase):
         expected_state_types = {
             "user_message": "text",
             "conversation_history": "markdown",
-            "raw_conversation_history": "markdown",
-            "page_context": "markdown",
             "buddy_context": "file",
             "current_session_id": "text",
             "existing_session_summary": "markdown",
@@ -1771,6 +1768,8 @@ class TemplateLayoutTests(unittest.TestCase):
             "capability_builder_handoff",
             "capability_review",
             "visible_reply",
+            "raw_conversation_history",
+            "page_context",
         ]:
             self.assertNotIn(removed_state_key, states)
 
@@ -1780,8 +1779,6 @@ class TemplateLayoutTests(unittest.TestCase):
             {
                 "input_user_message",
                 "input_conversation_history",
-                "input_raw_conversation_history",
-                "input_page_context",
                 "input_buddy_context",
                 "input_current_session_id",
                 "input_existing_session_summary",
@@ -1817,8 +1814,6 @@ class TemplateLayoutTests(unittest.TestCase):
         expected_positions = {
             "input_user_message": {"x": -1208, "y": 27},
             "input_conversation_history": {"x": -665, "y": 39},
-            "input_raw_conversation_history": {"x": -679, "y": 1128},
-            "input_page_context": {"x": -1205, "y": 389},
             "input_buddy_context": {"x": -1211, "y": 751},
             "input_current_session_id": {"x": -680, "y": 394},
             "input_existing_session_summary": {"x": -677, "y": 771},
@@ -1860,11 +1855,12 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn({"state": "conversation_history", "required": False}, _read_contracts(selector_node["reads"]))
         self.assertIn({"state": "existing_session_summary", "required": False}, _read_contracts(selector_node["reads"]))
         self.assertIn({"state": "context_compaction_summary", "required": False}, _read_contracts(selector_node["reads"]))
-        self.assertIn({"state": "page_context", "required": False}, _read_contracts(selector_node["reads"]))
         self.assertIn({"state": "buddy_context", "required": False}, _read_contracts(selector_node["reads"]))
         self.assertIn({"state": "current_session_id", "required": False}, _read_contracts(selector_node["reads"]))
         self.assertIn({"state": "capability_result", "required": False}, _read_contracts(selector_node["reads"]))
         self.assertIn({"state": "capability_trace", "required": False}, _read_contracts(selector_node["reads"]))
+        for read in selector_node["reads"]:
+            self.assertNotIn(read.get("state"), {"raw_conversation_history", "page_context"})
         self.assertEqual(
             selector_node["writes"],
             [
@@ -1918,20 +1914,8 @@ class TemplateLayoutTests(unittest.TestCase):
             {"source": "$state.needs_context_compaction", "operator": "==", "value": True},
         )
         self.assertIn({"state": "needs_context_compaction", "required": True}, _read_contracts(pressure_node["reads"]))
-        self.assertIn(
-            {
-                "state": "raw_conversation_history",
-                "required": False,
-                "binding": {
-                    "kind": "tool_input",
-                    "actionKey": "",
-                    "toolKey": "buddy_context_pressure_check",
-                    "fieldKey": "raw_conversation_history",
-                    "managed": True,
-                },
-            },
-            nodes["check_context_pressure"]["reads"],
-        )
+        for read in nodes["check_context_pressure"]["reads"]:
+            self.assertNotIn(read.get("state"), {"raw_conversation_history", "page_context"})
         self.assertEqual(
             nodes["run_context_compaction"]["writes"],
             [
@@ -1945,8 +1929,6 @@ class TemplateLayoutTests(unittest.TestCase):
             [
                 {"source": "input_user_message", "target": "check_context_pressure"},
                 {"source": "input_conversation_history", "target": "check_context_pressure"},
-                {"source": "input_raw_conversation_history", "target": "check_context_pressure"},
-                {"source": "input_page_context", "target": "check_context_pressure"},
                 {"source": "input_buddy_context", "target": "check_context_pressure"},
                 {"source": "input_current_session_id", "target": "check_context_pressure"},
                 {"source": "input_existing_session_summary", "target": "check_context_pressure"},
@@ -2003,6 +1985,8 @@ class TemplateLayoutTests(unittest.TestCase):
             buddy_context_node["config"]["value"]["selected"],
             ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md", "policy.json"],
         )
+        self.assertNotIn("page_context", json.dumps(template, ensure_ascii=False))
+        self.assertNotIn("raw_conversation_history", json.dumps(template, ensure_ascii=False))
 
     def test_buddy_internal_templates_are_hidden_but_loadable(self) -> None:
         public_template_ids = {record["template_id"] for record in _official_template_records()}
@@ -2303,13 +2287,18 @@ class TemplateLayoutTests(unittest.TestCase):
         ]:
             self.assertNotIn(removed_state, states)
         self.assertNotIn("buddy_mode", states)
+        self.assertNotIn("page_context", states)
         self.assertNotIn("input_buddy_mode", nodes)
+        self.assertNotIn("input_page_context", nodes)
         for node in nodes.values():
             for read in node.get("reads", []):
                 self.assertNotEqual(read.get("state"), "buddy_mode")
+                self.assertNotEqual(read.get("state"), "page_context")
         for edge in template["edges"]:
             self.assertNotEqual(edge.get("source"), "input_buddy_mode")
             self.assertNotEqual(edge.get("target"), "input_buddy_mode")
+            self.assertNotEqual(edge.get("source"), "input_page_context")
+            self.assertNotEqual(edge.get("target"), "input_page_context")
         self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "subgraph"], [])
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
@@ -2454,6 +2443,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["current_session_id"]["type"], "text")
         self.assertEqual(states["conversation_history"]["type"], "markdown")
         self.assertEqual(states["existing_session_summary"]["type"], "markdown")
+        self.assertNotIn("page_context", states)
+        self.assertNotIn("input_page_context", nodes)
         self.assertEqual(states["context_budget_report"]["type"], "json")
         self.assertEqual(states["capability_result"]["type"], "result_package")
         self.assertEqual(states["compaction_plan"]["type"], "json")
@@ -2475,6 +2466,9 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertEqual(nodes["plan_compaction"]["writes"], [{"state": "compaction_plan", "mode": "replace"}])
         self.assertIn("protect_first", nodes["plan_compaction"]["config"]["taskInstruction"])
+        for node in nodes.values():
+            for read in node.get("reads", []):
+                self.assertNotEqual(read.get("state"), "page_context")
         self.assertEqual(
             nodes["summarize_context"]["writes"],
             [

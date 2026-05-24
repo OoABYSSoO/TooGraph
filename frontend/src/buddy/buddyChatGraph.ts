@@ -8,10 +8,7 @@ import {
   validateBuddyMemoryReviewTemplateBinding,
   validateBuddyRunTemplateBinding,
 } from "./buddyTemplateBindingModel.ts";
-import {
-  formatBuddyHistoryWithSessionSummary,
-  formatRawBuddyHistoryForCompaction,
-} from "./buddyContextCompaction.ts";
+import { formatBuddyHistoryWithSessionSummary } from "./buddyContextCompaction.ts";
 
 export const BUDDY_REVIEW_TEMPLATE_ID = "buddy_autonomous_review";
 export const BUDDY_REPLY_STATE_KEY = "state_4";
@@ -75,7 +72,6 @@ export type BuddyRunTraceEntry = {
 export type BuildBuddyChatGraphInput = {
   userMessage: string;
   history: BuddyChatMessage[];
-  pageContext: string;
   sessionSummary?: string;
   currentSessionId?: string;
   pageOperationContext?: BuddyActionRuntimeContext | null;
@@ -445,9 +441,7 @@ function buildBuddyRuntimeSourceValues(input: BuildBuddyChatGraphInput): BuddyRu
   return {
     current_message: input.userMessage,
     conversation_history: formatBuddyHistoryWithSessionSummary(input.history, input.sessionSummary ?? ""),
-    raw_conversation_history: formatRawBuddyHistoryForCompaction(input.history),
     session_summary: input.sessionSummary ?? "",
-    page_context: input.pageContext.trim() || "当前页面上下文不可用。",
     buddy_home_context: buildBuddyHomeContextValue(),
     current_session_id: input.currentSessionId ?? "",
   };
@@ -461,7 +455,6 @@ function buildBuddyMemoryReviewRuntimeSourceValues(
     current_session_id: input.currentSessionId,
     user_message: resolveRunStateValueByName(input.mainRun, "user_message", ""),
     conversation_history: resolveRunStateValueByName(input.mainRun, "conversation_history", ""),
-    page_context: resolveRunStateValueByName(input.mainRun, "page_context", ""),
     buddy_home_context: buildBuddyHomeContextValue(),
     request_understanding: resolveRunStateValueByName(input.mainRun, "request_understanding", {}),
     capability_result: resolveRunStateValueByName(input.mainRun, "capability_result", {}),

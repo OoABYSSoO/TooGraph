@@ -19,7 +19,6 @@ type BuddyBoundRunTemplateOptions = {
   buddyMode: Ref<BuddyMode>;
   buddyModelRef: Ref<string>;
   buildPageOperationRuntimeContext: () => {
-    pageContext: string;
     actionRuntimeContext: BuildBuddyChatGraphInput["pageOperationContext"];
   };
 };
@@ -34,7 +33,6 @@ export type BuddyBoundRunTemplateResult = {
   runId: string;
   graph: GraphPayload;
   publicOutputBindings: BuddyPublicOutputBinding[];
-  pageContext: string;
   sessionSummary: string;
 };
 
@@ -55,7 +53,6 @@ export function useBuddyBoundRunTemplate({
       {
         userMessage: request.userMessage,
         history: request.history,
-        pageContext: pageOperationContext.pageContext,
         sessionSummary: sessionSummary.content,
         currentSessionId: request.sessionId,
         pageOperationContext: pageOperationContext.actionRuntimeContext,
@@ -70,7 +67,6 @@ export function useBuddyBoundRunTemplate({
       runId: run.run_id,
       graph,
       publicOutputBindings,
-      pageContext: pageOperationContext.pageContext,
       sessionSummary: sessionSummary.content,
     };
   }

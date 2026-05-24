@@ -71,6 +71,8 @@ frontend/*.tsbuildinfo
 
 # Backend local runtime files
 /buddy_home/
+/graph/history/
+/graph/user/
 /graph_template/user/
 /graph_template/settings.json
 /node_preset/settings.json
@@ -105,6 +107,7 @@ backend/data/outputs/
 .dev_*.err
 .dev_pids.json
 .toograph_*.log
+.toograph_*.err
 .toograph_pids.json
 .next/
 

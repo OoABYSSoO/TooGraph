@@ -36,6 +36,7 @@ DEFAULT_RECALL_WINDOW = 5
 MAX_RECALL_LIMIT = 50
 MAX_RECALL_WINDOW = 20
 HIDDEN_SESSION_SOURCES = {"tool"}
+DEPRECATED_BUDDY_INPUT_SOURCES = {"page_context", "raw_conversation_history"}
 RUN_TEMPLATE_BINDING_KEY = "run_template_binding"
 RUN_TEMPLATE_BINDING_TARGET_TYPE = "run_template_binding"
 RUN_TEMPLATE_BINDING_TARGET_ID = "run_template_binding"
@@ -50,9 +51,7 @@ MAX_CAPABILITY_USAGE_RECENT_RUNS = 5
 ALLOWED_RUN_TEMPLATE_INPUT_SOURCES = {
     "current_message",
     "conversation_history",
-    "raw_conversation_history",
     "session_summary",
-    "page_context",
     "buddy_home_context",
     "current_session_id",
 }
@@ -61,7 +60,6 @@ ALLOWED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES = {
     "current_session_id",
     "user_message",
     "conversation_history",
-    "page_context",
     "buddy_home_context",
     "request_understanding",
     "capability_result",
@@ -81,9 +79,7 @@ DEFAULT_RUN_TEMPLATE_BINDING = {
     "input_bindings": {
         "input_user_message": "current_message",
         "input_conversation_history": "conversation_history",
-        "input_raw_conversation_history": "raw_conversation_history",
         "input_existing_session_summary": "session_summary",
-        "input_page_context": "page_context",
         "input_buddy_context": "buddy_home_context",
         "input_current_session_id": "current_session_id",
     },
@@ -96,7 +92,6 @@ DEFAULT_MEMORY_REVIEW_TEMPLATE_BINDING = {
         "input_current_session_id": "current_session_id",
         "input_user_message": "user_message",
         "input_conversation_history": "conversation_history",
-        "input_page_context": "page_context",
         "input_buddy_context": "buddy_home_context",
         "input_request_understanding": "request_understanding",
         "input_capability_result": "capability_result",
@@ -1451,6 +1446,8 @@ def _normalize_run_template_binding(payload: dict[str, Any]) -> dict[str, Any]:
         normalized_source = str(source or "").strip()
         if not normalized_node_id or not normalized_source:
             continue
+        if normalized_source in DEPRECATED_BUDDY_INPUT_SOURCES:
+            continue
         if normalized_source not in ALLOWED_RUN_TEMPLATE_INPUT_SOURCES:
             raise ValueError(f"Unsupported Buddy input source: {normalized_source}")
         input_bindings[normalized_node_id] = normalized_source
@@ -1481,6 +1478,8 @@ def _normalize_memory_review_template_binding(payload: dict[str, Any]) -> dict[s
         normalized_node_id = str(node_id or "").strip()
         normalized_source = str(source or "").strip()
         if not normalized_node_id or not normalized_source:
+            continue
+        if normalized_source in DEPRECATED_BUDDY_INPUT_SOURCES:
             continue
         if normalized_source not in ALLOWED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES:
             raise ValueError(f"Unsupported Buddy memory review input source: {normalized_source}")

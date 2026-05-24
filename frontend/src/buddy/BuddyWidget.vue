@@ -391,7 +391,6 @@ type BuddyAutoResumedPageOperationFinishOptions = {
 type BuddyFinishVisibleRunOptions = {
   includeOutputTrace?: boolean;
   sourceTurn?: BuddyQueuedTurn;
-  pageContext?: string;
   sessionSummary?: string;
 };
 
@@ -895,7 +894,6 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
     }
     finishBuddyVisibleRun(runDetail, assistantMessage.id, turn.sessionId, boundRun.runId, {
       sourceTurn: turn,
-      pageContext: boundRun.pageContext,
       sessionSummary: boundRun.sessionSummary,
     });
   } catch (error) {
@@ -1058,7 +1056,6 @@ function finishBuddyVisibleRun(
     runDetail,
     runId,
     sourceTurn: options.sourceTurn,
-    pageContext: options.pageContext,
     sessionSummary: options.sessionSummary,
   });
   mood.value = runDetail.status === "failed" ? "error" : runDetail.status === "cancelled" ? "idle" : "speaking";

@@ -3,12 +3,16 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 from pydantic import ValidationError
 
 from app.core.schemas.node_system import NodeSystemCatalogStatus, NodeSystemGraphPayload, NodeSystemTemplate
 from app.core.storage.json_file_utils import read_json_file, write_json_file
+from app.core.storage.readable_names import (
+    is_safe_storage_name,
+    resolve_numbered_storage_name,
+    storage_name_key,
+)
 
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
@@ -20,6 +24,7 @@ TEMPLATE_FILE_NAME = "template.json"
 OFFICIAL_TEMPLATE_SOURCE = "official"
 USER_TEMPLATE_SOURCE = "user"
 TEMPLATE_SETTINGS_SCHEMA_VERSION = "toograph.template-settings/v1"
+DEFAULT_TEMPLATE_NAME = "未命名模板"
 BREAKPOINT_METADATA_KEYS = {
     "interrupt_after",
     "interrupt_before",
@@ -70,10 +75,11 @@ def load_template_record(template_id: str) -> dict[str, Any]:
 
 
 def save_user_template_record(graph_payload: NodeSystemGraphPayload) -> dict[str, Any]:
-    template_id = _generate_user_template_id()
     graph_data = graph_payload.model_dump(by_alias=True, mode="json")
     metadata = graph_data.get("metadata") if isinstance(graph_data.get("metadata"), dict) else {}
     template_name = _resolve_unique_template_name(graph_payload.name)
+    template_id = _resolve_unique_template_id(template_name)
+    template_name = template_id
     record = NodeSystemTemplate.model_validate(
         {
             "template_id": template_id,
@@ -326,36 +332,29 @@ def _is_internal_template(record: dict[str, Any]) -> bool:
     return isinstance(metadata, dict) and metadata.get("internal") is True
 
 
-def _generate_user_template_id() -> str:
-    return f"user_template_{uuid4().hex[:10]}"
-
-
 def _validate_template_id(template_id: str) -> None:
-    if not template_id or template_id in {".", ".."} or "/" in template_id or "\\" in template_id:
+    if not is_safe_storage_name(template_id):
         raise KeyError(template_id)
 
 
 def _resolve_unique_template_name(requested_name: str) -> str:
     existing_name_keys: set[str] = set()
     for record in list_template_records(include_disabled=True):
+        template_id = str(record.get("template_id") or "").strip()
         label = str(record.get("label") or "").strip()
         default_graph_name = str(record.get("default_graph_name") or "").strip()
+        if template_id:
+            existing_name_keys.add(storage_name_key(template_id))
         if label:
-            existing_name_keys.add(_name_key(label))
+            existing_name_keys.add(storage_name_key(label))
         if default_graph_name:
-            existing_name_keys.add(_name_key(default_graph_name))
-    return _resolve_unique_name(requested_name, existing_name_keys)
+            existing_name_keys.add(storage_name_key(default_graph_name))
+    return resolve_numbered_storage_name(requested_name, existing_name_keys, fallback=DEFAULT_TEMPLATE_NAME)
 
 
-def _resolve_unique_name(requested_name: str, existing_name_keys: set[str]) -> str:
-    base_name = requested_name.strip()
-    candidate = base_name
-    suffix = 1
-    while _name_key(candidate) in existing_name_keys:
-        candidate = f"{base_name}_{suffix}"
-        suffix += 1
-    return candidate
-
-
-def _name_key(name: str) -> str:
-    return name.strip().casefold()
+def _resolve_unique_template_id(requested_name: str) -> str:
+    existing_id_keys = {
+        storage_name_key(path.parent.name)
+        for path in [*_iter_template_paths(OFFICIAL_TEMPLATES_ROOT), *_iter_template_paths(USER_TEMPLATES_ROOT)]
+    }
+    return resolve_numbered_storage_name(requested_name, existing_id_keys, fallback=DEFAULT_TEMPLATE_NAME)

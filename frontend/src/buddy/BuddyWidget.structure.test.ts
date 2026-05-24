@@ -348,7 +348,8 @@ test("BuddyWidget builds page context from the shared editor snapshot", () => {
   assert.match(componentSource, /const buddyContextStore = useBuddyContextStore\(\);/);
   assert.match(componentSource, /useBuddyPageOperationContext\(\{[\s\S]*routePath: computed\(\(\) => route\.fullPath\),[\s\S]*activeRunId,[\s\S]*getEditorSnapshot: \(\) => buddyContextStore\.editorSnapshot,[\s\S]*\}\)/);
   assert.match(componentSource, /buildPageOperationRuntimeContext,/);
-  assert.match(boundRunTemplateSource, /const pageOperationContext = buildPageOperationRuntimeContext\(\);[\s\S]*pageContext: pageOperationContext\.pageContext,[\s\S]*pageOperationContext: pageOperationContext\.actionRuntimeContext/);
+  assert.match(boundRunTemplateSource, /const pageOperationContext = buildPageOperationRuntimeContext\(\);[\s\S]*pageOperationContext: pageOperationContext\.actionRuntimeContext/);
+  assert.doesNotMatch(boundRunTemplateSource, /pageContext: pageOperationContext\.pageContext/);
   assert.match(pageOperationContextSource, /const snapshot = collectPageOperationSnapshot\(\{[\s\S]*routePath: routePath\.value,[\s\S]*root,[\s\S]*\}\);/);
   assert.match(pageOperationContextSource, /const actionRuntimeContext = buildPageOperationActionRuntimeContext\(\{[\s\S]*snapshot,[\s\S]*editor: buildBuddyPageOperationEditorFacts\(editorSnapshot\),[\s\S]*latestForegroundRun: options\.latestForegroundRun \?\? null,[\s\S]*latestOperationReport: options\.latestOperationReport \?\? null,[\s\S]*\}\);/);
   assert.match(pageOperationContextSource, /pageContext: buildBuddyPageContext\(\{[\s\S]*routePath: routePath\.value,[\s\S]*editor: editorSnapshot,[\s\S]*activeBuddyRunId: activeRunId\.value,[\s\S]*pageOperationBook: actionRuntimeContext\.page_operation_book,[\s\S]*pageFacts: actionRuntimeContext\.page_facts,[\s\S]*\}\)/);

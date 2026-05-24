@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 from app.core.schemas.node_system import NodeSystemCatalogStatus, NodeSystemGraphDocument, NodeSystemGraphPayload
 from app.core.storage.database import GRAPH_DATA_DIR
@@ -10,6 +10,19 @@ from app.core.storage.graph_revision_store import list_graph_revisions as list_s
 from app.core.storage.graph_revision_store import load_graph_revision as load_stored_graph_revision
 from app.core.storage.graph_revision_store import record_graph_revision
 from app.core.storage.json_file_utils import read_json_file, write_json_file
+from app.core.storage.readable_names import (
+    is_safe_storage_name,
+    resolve_numbered_storage_name,
+    storage_name_key,
+)
+
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+GRAPH_ROOT = REPO_ROOT / "graph"
+USER_GRAPHS_ROOT = GRAPH_ROOT / "user"
+GRAPH_HISTORY_ROOT = GRAPH_ROOT / "history"
+GRAPH_FILE_NAME = "graph.json"
+DEFAULT_GRAPH_NAME = "未命名图"
 
 
 def save_graph(
@@ -41,13 +54,14 @@ def save_graph_with_revision(
     reason: str = "",
     validation: dict[str, Any] | None = None,
 ) -> tuple[NodeSystemGraphDocument, dict[str, Any]]:
-    GRAPH_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    graph_id = graph_payload.graph_id or _generate_graph_id()
+    USER_GRAPHS_ROOT.mkdir(parents=True, exist_ok=True)
+    graph_name = _resolve_unique_graph_name(graph_payload.name, graph_payload.graph_id)
+    graph_id = graph_payload.graph_id or _resolve_unique_graph_id(graph_name)
     path = _graph_path(graph_id)
     existing_payload = read_json_file(path, default=None)
     existing_document = NodeSystemGraphDocument.model_validate(existing_payload) if existing_payload else None
     graph_data = graph_payload.model_dump(exclude={"graph_id"}, by_alias=True, mode="json")
-    graph_data["name"] = _resolve_unique_graph_name(graph_payload.name, graph_id)
+    graph_data["name"] = graph_name
     graph = NodeSystemGraphDocument.model_validate(
         {
             **graph_data,
@@ -71,7 +85,7 @@ def save_graph_with_revision(
 
 
 def load_graph(graph_id: str) -> NodeSystemGraphDocument:
-    GRAPH_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    USER_GRAPHS_ROOT.mkdir(parents=True, exist_ok=True)
     path = _graph_path(graph_id)
     payload = read_json_file(path, default=None)
     if payload is None:
@@ -80,9 +94,9 @@ def load_graph(graph_id: str) -> NodeSystemGraphDocument:
 
 
 def list_graphs(include_disabled: bool = False) -> list[NodeSystemGraphDocument]:
-    GRAPH_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    USER_GRAPHS_ROOT.mkdir(parents=True, exist_ok=True)
     graphs: list[NodeSystemGraphDocument] = []
-    for path in sorted(GRAPH_DATA_DIR.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True):
+    for path in sorted(_iter_graph_paths(), key=lambda item: item.stat().st_mtime, reverse=True):
         try:
             payload = read_json_file(path, default=None)
             if payload is None:
@@ -130,7 +144,7 @@ def delete_graph(graph_id: str) -> None:
         raise FileNotFoundError(f"Graph '{graph_id}' does not exist.")
     existing_payload = read_json_file(path, default=None)
     existing_document = NodeSystemGraphDocument.model_validate(existing_payload) if existing_payload else None
-    path.unlink()
+    shutil.rmtree(path.parent)
     record_graph_revision(
         graph_id=graph_id,
         previous_graph=existing_document.model_dump(by_alias=True, mode="json") if existing_document else None,
@@ -151,7 +165,9 @@ def restore_graph_revision(graph_id: str, revision_id: str) -> dict[str, Any]:
     current_payload = read_json_file(_graph_path(graph_id), default=None)
     current_document = NodeSystemGraphDocument.model_validate(current_payload) if current_payload else None
     if target_payload is None:
-        _graph_path(graph_id).unlink(missing_ok=True)
+        path = _graph_path(graph_id)
+        if path.exists():
+            shutil.rmtree(path.parent)
         restored_graph = None
     else:
         restored_document = NodeSystemGraphDocument.model_validate(target_payload)
@@ -176,35 +192,34 @@ def restore_graph_revision(graph_id: str, revision_id: str) -> dict[str, Any]:
 
 
 def _graph_path(graph_id: str) -> Path:
-    return GRAPH_DATA_DIR / f"{graph_id}.json"
+    if not is_safe_storage_name(graph_id):
+        raise FileNotFoundError(f"Graph '{graph_id}' does not exist.")
+    return USER_GRAPHS_ROOT / graph_id / GRAPH_FILE_NAME
 
 
 def _graph_revision_data_dir() -> Path:
-    return GRAPH_DATA_DIR.parent / "graph_revisions"
+    return GRAPH_HISTORY_ROOT
 
 
-def _generate_graph_id() -> str:
-    return f"graph_{uuid4().hex[:10]}"
+def _iter_graph_paths() -> list[Path]:
+    if not USER_GRAPHS_ROOT.exists():
+        return []
+    return [
+        path / GRAPH_FILE_NAME
+        for path in USER_GRAPHS_ROOT.iterdir()
+        if (path / GRAPH_FILE_NAME).is_file()
+    ]
 
 
-def _resolve_unique_graph_name(requested_name: str, graph_id: str) -> str:
+def _resolve_unique_graph_name(requested_name: str, graph_id: str | None) -> str:
     existing_name_keys = {
-        _name_key(graph.name)
+        storage_name_key(graph.name)
         for graph in list_graphs(include_disabled=True)
         if graph.graph_id != graph_id
     }
-    return _resolve_unique_name(requested_name, existing_name_keys)
+    return resolve_numbered_storage_name(requested_name, existing_name_keys, fallback=DEFAULT_GRAPH_NAME)
 
 
-def _resolve_unique_name(requested_name: str, existing_name_keys: set[str]) -> str:
-    base_name = requested_name.strip()
-    candidate = base_name
-    suffix = 1
-    while _name_key(candidate) in existing_name_keys:
-        candidate = f"{base_name}_{suffix}"
-        suffix += 1
-    return candidate
-
-
-def _name_key(name: str) -> str:
-    return name.strip().casefold()
+def _resolve_unique_graph_id(requested_name: str) -> str:
+    existing_id_keys = {storage_name_key(path.parent.name) for path in _iter_graph_paths()}
+    return resolve_numbered_storage_name(requested_name, existing_id_keys, fallback=DEFAULT_GRAPH_NAME)

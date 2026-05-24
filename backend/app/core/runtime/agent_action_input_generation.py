@@ -40,6 +40,7 @@ def generate_agent_action_inputs(
     get_default_video_model_ref_func: Callable[..., str] = get_default_video_model_ref,
     resolve_runtime_model_name_func: Callable[[str], str] = resolve_runtime_model_name,
     resolve_effective_thinking_level_func: Callable[..., str] = resolve_effective_thinking_level,
+    on_delta: Any | None = None,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any], str, list[str], dict[str, Any]]:
     if not bindings:
         return {}, {}, "", [], runtime_config
@@ -88,6 +89,7 @@ def generate_agent_action_inputs(
                 temperature=runtime_config["resolved_temperature"],
                 thinking_enabled=runtime_config["resolved_thinking"],
                 thinking_level=thinking_level,
+                on_delta=on_delta,
                 input_attachments=input_attachments,
                 structured_output_schema=structured_output_schema,
             )
@@ -102,6 +104,7 @@ def generate_agent_action_inputs(
                 temperature=runtime_config["resolved_temperature"],
                 thinking_enabled=runtime_config["resolved_thinking"],
                 thinking_level=thinking_level,
+                on_delta=on_delta,
                 input_attachments=input_attachments,
                 structured_output_schema=structured_output_schema,
             )

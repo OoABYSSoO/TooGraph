@@ -23,7 +23,7 @@ Outputs:
 Safety behavior:
 
 - Writes only `graph_template/user/<template_id>/template.json`.
-- Rejects path traversal and template IDs outside `[a-z][a-z0-9_]{2,80}`.
+- Rejects path traversal and template IDs that are not safe local folder names.
 - Rejects writes that would collide with an official template ID.
 - Runs node-system, graph validator, and LangGraph runtime compatibility checks before writing.
 - Records a recoverable revision artifact under `backend/data/template_revisions/<template_id>/<revision_id>.json`.

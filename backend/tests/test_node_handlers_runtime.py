@@ -21,6 +21,7 @@ from app.core.schemas.actions import ActionDefinition, ActionIoField
 def pass_through_action_inputs_func(**kwargs):
     return (
         {resolved.binding.action_key: dict(kwargs["input_values"]) for resolved in kwargs["bindings"]},
+        {},
         "",
         [],
         kwargs["runtime_config"],
@@ -29,7 +30,7 @@ def pass_through_action_inputs_func(**kwargs):
 
 def fixed_action_inputs_func(inputs_by_action: dict[str, dict[str, object]]):
     def generate(**kwargs):
-        return inputs_by_action, "", [], kwargs["runtime_config"]
+        return inputs_by_action, {}, "", [], kwargs["runtime_config"]
 
     return generate
 
@@ -152,6 +153,100 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["final_result"], "value")
         self.assertEqual(finalized, {"answer": "value"})
 
+    def test_execute_agent_node_streams_action_planning_state_outputs(self) -> None:
+        state_schema = {
+            "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "public_response": NodeSystemStateDefinition.model_validate({"type": "markdown"}),
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
+            "needs_capability": NodeSystemStateDefinition.model_validate({"type": "boolean"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "reply_and_select_capability",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "question"}],
+                "writes": [
+                    {"state": "public_response", "mode": "replace"},
+                    {"state": "selected_capability", "mode": "replace"},
+                    {"state": "needs_capability", "mode": "replace"},
+                ],
+                "config": {
+                    "actionKey": "toograph_capability_selector",
+                    "actionBindings": [
+                        {
+                            "actionKey": "toograph_capability_selector",
+                            "outputMapping": {
+                                "capability": "selected_capability",
+                                "needs_capability": "needs_capability",
+                            },
+                        }
+                    ],
+                },
+            }
+        )
+        stream_callback_calls: list[dict[str, object]] = []
+        generated_kwargs: dict[str, object] = {}
+        finalized: dict[str, object] = {}
+
+        def build_stream_callback(**kwargs):
+            stream_callback_calls.append(dict(kwargs))
+            return "action-planning-delta"
+
+        def generate_action_inputs(**kwargs):
+            generated_kwargs.update(kwargs)
+            return (
+                {"toograph_capability_selector": {"capability": {"kind": "none"}, "needs_capability": False}},
+                {"public_response": "Streaming hello."},
+                "planned",
+                [],
+                kwargs["runtime_config"],
+            )
+
+        def invoke_action(action_func, action_inputs):
+            return {
+                "capability": action_inputs["capability"],
+                "needs_capability": action_inputs["needs_capability"],
+            }
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {"question": "q"},
+            {"state": {}},
+            node_name="reply_and_select_capability",
+            state={"run_id": "run-1"},
+            get_action_registry_func=lambda *, include_disabled: {"toograph_capability_selector": object()},
+            get_action_definition_registry_func=lambda *, include_disabled: {
+                "toograph_capability_selector": ActionDefinition(
+                    actionKey="toograph_capability_selector",
+                    name="Capability Selector",
+                    llmOutputSchema=[
+                        ActionIoField(key="capability", name="Capability", valueType="json"),
+                        ActionIoField(key="needs_capability", name="Needs Capability", valueType="boolean"),
+                    ],
+                )
+            },
+            invoke_action_func=invoke_action,
+            resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
+            build_agent_stream_delta_callback_func=build_stream_callback,
+            callable_accepts_keyword_func=lambda func, keyword: keyword in {"on_delta", "stream_state_keys"},
+            generate_agent_action_inputs_func=generate_action_inputs,
+            generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("Action planning outputs should satisfy all node writes.")
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: finalized.update(output_values),
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertEqual(stream_callback_calls[0]["output_keys"], ["public_response"])
+        self.assertEqual(stream_callback_calls[0]["stream_state_keys"], ["public_response"])
+        self.assertIs(generated_kwargs["on_delta"], "action-planning-delta")
+        self.assertEqual(result["outputs"]["public_response"], "Streaming hello.")
+        self.assertEqual(result["outputs"]["selected_capability"], {"kind": "none"})
+        self.assertEqual(result["outputs"]["needs_capability"], False)
+        self.assertEqual(finalized, result["outputs"])
+
     def test_execute_agent_node_passes_graph_action_runtime_context_to_action_input_planning(self) -> None:
         state_schema = {
             "user_goal": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -187,6 +282,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                         "reason": "test",
                     }
                 },
+                {},
                 "",
                 [],
                 kwargs["runtime_config"],
@@ -266,6 +362,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                         "reason": "test",
                     }
                 },
+                {},
                 "",
                 [],
                 kwargs["runtime_config"],
@@ -709,6 +806,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             },
             generate_agent_action_inputs_func=lambda **kwargs: (
                 {"web_search": {"query": "鸣潮 最新版本 更新内容"}},
+                {},
                 "planned action inputs",
                 [],
                 kwargs["runtime_config"],
@@ -1320,6 +1418,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             },
             generate_agent_action_inputs_func=lambda **kwargs: (
                 {"web_search": {"query": "TooGraph latest"}},
+                {},
                 "planned action inputs",
                 [],
                 kwargs["runtime_config"],
