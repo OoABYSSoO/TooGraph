@@ -65,6 +65,16 @@ class FakeResponse:
             )
 
 
+class FakeBrokenStreamResponse(FakeResponse):
+    def __init__(self) -> None:
+        super().__init__(None, text="", headers={"content-type": "text/event-stream"})
+
+    def iter_lines(self) -> list[str]:
+        raise httpx.RemoteProtocolError(
+            "peer closed connection without sending complete message body (incomplete chunked read)"
+        )
+
+
 class FakeHttpClient:
     def __init__(self, responses: list[FakeResponse]) -> None:
         self.responses = responses
@@ -80,7 +90,10 @@ class FakeHttpClient:
     def _next(self) -> FakeResponse:
         if not self.responses:
             raise AssertionError("No fake response queued")
-        return self.responses.pop(0)
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
     def get(self, url: str, **kwargs: Any) -> FakeResponse:
         self.get_calls.append({"url": url, **kwargs})
@@ -650,6 +663,69 @@ class OpenAICodexProviderTests(unittest.TestCase):
         self.assertEqual(fake_client.post_calls[0]["headers"]["Authorization"], "Bearer old-token")
         self.assertEqual(fake_client.post_calls[1]["headers"]["Authorization"], "Bearer new-token")
         refresh.assert_called_once_with()
+
+    def test_chat_codex_responses_retries_transient_stream_disconnect(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client = FakeHttpClient(
+            [
+                FakeBrokenStreamResponse(),
+                FakeResponse({"id": "resp_2", "model": "gpt-5.5", "output_text": "recovered"}),
+            ]
+        )
+        with patch("app.tools.model_provider_client.resolve_codex_access_token", return_value="codex-access-token"):
+            with patch("app.tools.model_provider_client.httpx.Client", return_value=fake_client):
+                with patch("app.tools.model_provider_codex.time.sleep") as sleep:
+                    with patch("app.tools.model_provider_client.append_model_request_log") as append_log:
+                        content, meta = chat_with_model_provider(
+                            provider_id="openai-codex",
+                            transport="codex-responses",
+                            base_url="https://chatgpt.com/backend-api/codex",
+                            api_key="",
+                            model="gpt-5.5",
+                            system_prompt="sys",
+                            user_prompt="user",
+                            temperature=0.2,
+                        )
+
+        self.assertEqual(content, "recovered")
+        self.assertEqual(meta["retry_count"], 1)
+        self.assertEqual(len(fake_client.post_calls), 2)
+        sleep.assert_called_once()
+        append_log.assert_called_once()
+        self.assertEqual(append_log.call_args.kwargs["response_raw"]["output_text"], "recovered")
+
+    def test_chat_codex_responses_retries_transient_ssl_eof(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client = FakeHttpClient(
+            [
+                httpx.ConnectError(
+                    "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1032)"
+                ),
+                FakeResponse({"id": "resp_2", "model": "gpt-5.5", "output_text": "recovered"}),
+            ]
+        )
+        with patch("app.tools.model_provider_client.resolve_codex_access_token", return_value="codex-access-token"):
+            with patch("app.tools.model_provider_client.httpx.Client", return_value=fake_client):
+                with patch("app.tools.model_provider_codex.time.sleep") as sleep:
+                    with patch("app.tools.model_provider_client.append_model_request_log") as append_log:
+                        content, meta = chat_with_model_provider(
+                            provider_id="openai-codex",
+                            transport="codex-responses",
+                            base_url="https://chatgpt.com/backend-api/codex",
+                            api_key="",
+                            model="gpt-5.5",
+                            system_prompt="sys",
+                            user_prompt="user",
+                            temperature=0.2,
+                        )
+
+        self.assertEqual(content, "recovered")
+        self.assertEqual(meta["retry_count"], 1)
+        self.assertEqual(len(fake_client.post_calls), 2)
+        sleep.assert_called_once()
+        append_log.assert_called_once()
 
 
 if __name__ == "__main__":

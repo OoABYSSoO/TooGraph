@@ -304,19 +304,19 @@ def _ensure_buddy_message_fts(connection: sqlite3.Connection) -> None:
         DROP TRIGGER IF EXISTS buddy_messages_ad_fts;
         DROP TRIGGER IF EXISTS buddy_messages_au_fts;
 
-        CREATE TRIGGER buddy_messages_ai_fts AFTER INSERT ON buddy_messages BEGIN
+        CREATE TRIGGER IF NOT EXISTS buddy_messages_ai_fts AFTER INSERT ON buddy_messages BEGIN
             INSERT INTO buddy_messages_fts(rowid, message_id, session_id, role, content, created_at)
             VALUES (new.rowid, new.message_id, new.session_id, new.role, new.content, new.created_at);
             INSERT INTO buddy_messages_fts_trigram(rowid, message_id, session_id, role, content, created_at)
             VALUES (new.rowid, new.message_id, new.session_id, new.role, new.content, new.created_at);
         END;
 
-        CREATE TRIGGER buddy_messages_ad_fts AFTER DELETE ON buddy_messages BEGIN
+        CREATE TRIGGER IF NOT EXISTS buddy_messages_ad_fts AFTER DELETE ON buddy_messages BEGIN
             DELETE FROM buddy_messages_fts WHERE rowid = old.rowid;
             DELETE FROM buddy_messages_fts_trigram WHERE rowid = old.rowid;
         END;
 
-        CREATE TRIGGER buddy_messages_au_fts AFTER UPDATE ON buddy_messages BEGIN
+        CREATE TRIGGER IF NOT EXISTS buddy_messages_au_fts AFTER UPDATE ON buddy_messages BEGIN
             DELETE FROM buddy_messages_fts WHERE rowid = old.rowid;
             DELETE FROM buddy_messages_fts_trigram WHERE rowid = old.rowid;
             INSERT INTO buddy_messages_fts(rowid, message_id, session_id, role, content, created_at)

@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 import json
+import inspect
 import sqlite3
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -144,6 +145,16 @@ class BuddyStoreTests(unittest.TestCase):
                     futures = [pool.submit(buddy_home.ensure_buddy_database, home_dir) for _ in range(8)]
                     for future in as_completed(futures):
                         future.result()
+
+    def test_buddy_fts_trigger_creation_is_safe_across_process_races(self) -> None:
+        source = inspect.getsource(buddy_home._ensure_buddy_message_fts)
+
+        for trigger_name in [
+            "buddy_messages_ai_fts",
+            "buddy_messages_ad_fts",
+            "buddy_messages_au_fts",
+        ]:
+            self.assertIn(f"CREATE TRIGGER IF NOT EXISTS {trigger_name}", source)
 
     def test_buddy_database_includes_session_lineage_columns(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

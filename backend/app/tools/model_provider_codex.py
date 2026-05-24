@@ -23,6 +23,28 @@ class CodexAuthExpiredError(RuntimeError):
     pass
 
 
+CODEX_TRANSIENT_RETRY_ATTEMPTS = 3
+CODEX_TRANSIENT_RETRY_DELAY_SEC = 0.25
+CODEX_TRANSIENT_ERROR_MARKERS = (
+    "peer closed connection",
+    "incomplete chunked read",
+    "server disconnected",
+    "connection reset",
+    "connection aborted",
+    "unexpected_eof_while_reading",
+    "eof occurred in violation of protocol",
+    "read operation timed out",
+    "write operation timed out",
+    "network is unreachable",
+    "temporarily unavailable",
+)
+
+
+def _is_transient_codex_request_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return any(marker in message for marker in CODEX_TRANSIENT_ERROR_MARKERS)
+
+
 def extract_codex_responses_text(response_payload: dict[str, Any]) -> tuple[str, str]:
     output_text = normalize_message_text(response_payload.get("output_text")).strip()
     if output_text:
@@ -202,23 +224,33 @@ def chat_codex_responses(
     started_at = time.monotonic()
     path = "/responses"
     access_token = resolve_access_token()
+    retry_count = 0
     try:
-        try:
-            response_payload = post_codex_responses_once(
-                base_url=base_url,
-                access_token=access_token,
-                request_payload=request_payload,
-                provider_id=provider_id,
-                on_delta=on_delta,
-            )
-        except CodexAuthExpiredError:
-            response_payload = post_codex_responses_once(
-                base_url=base_url,
-                access_token=refresh_access_token(),
-                request_payload=request_payload,
-                provider_id=provider_id,
-                on_delta=on_delta,
-            )
+        for attempt_index in range(CODEX_TRANSIENT_RETRY_ATTEMPTS):
+            try:
+                try:
+                    response_payload = post_codex_responses_once(
+                        base_url=base_url,
+                        access_token=access_token,
+                        request_payload=request_payload,
+                        provider_id=provider_id,
+                        on_delta=on_delta,
+                    )
+                except CodexAuthExpiredError:
+                    access_token = refresh_access_token()
+                    response_payload = post_codex_responses_once(
+                        base_url=base_url,
+                        access_token=access_token,
+                        request_payload=request_payload,
+                        provider_id=provider_id,
+                        on_delta=on_delta,
+                    )
+                break
+            except Exception as exc:
+                if attempt_index >= CODEX_TRANSIENT_RETRY_ATTEMPTS - 1 or not _is_transient_codex_request_error(exc):
+                    raise
+                retry_count += 1
+                time.sleep(CODEX_TRANSIENT_RETRY_DELAY_SEC * retry_count)
     except Exception as exc:
         append_request_log(
             provider_id=provider_id,
@@ -232,6 +264,12 @@ def chat_codex_responses(
             error=str(exc),
         )
         raise
+    if retry_count:
+        response_payload["_request_retry"] = {
+            "reason": "transient_codex_stream_error",
+            "retry_count": retry_count,
+            "attempts": retry_count + 1,
+        }
     append_request_log(
         provider_id=provider_id,
         transport=TRANSPORT_CODEX_RESPONSES,
@@ -252,6 +290,7 @@ def chat_codex_responses(
         "usage": response_payload.get("usage"),
         "timings": None,
         "response_id": response_payload.get("id"),
+        "retry_count": retry_count,
         "thinking_enabled": bool(native_thinking_payload),
         "thinking_level": thinking_level,
         "reasoning_format": "responses-reasoning" if native_thinking_payload else None,
