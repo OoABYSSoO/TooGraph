@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -104,6 +105,60 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         for section in ("subgraphs", "actions", "tools"):
             for item in catalog[section]:
                 self.assertTrue({"kind", "key", "description"}.issubset(set(item)))
+
+    def test_capability_catalog_does_not_offer_hidden_templates(self) -> None:
+        selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "toograph_capability_selector_before_hidden_test")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            template_dir = root / "graph_template" / "official"
+            visible_dir = template_dir / "visible_loop"
+            hidden_dir = template_dir / "hidden_loop"
+            action_dir = root / "action"
+            tool_dir = root / "tool"
+            visible_dir.mkdir(parents=True)
+            hidden_dir.mkdir(parents=True)
+            action_dir.mkdir()
+            tool_dir.mkdir()
+            (root / "graph_template" / "settings.json").write_text(
+                json.dumps(
+                    {
+                        "entries": {
+                            "visible_loop": {"enabled": True, "capabilityDiscoverable": True},
+                            "hidden_loop": {"enabled": True, "capabilityDiscoverable": True},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (visible_dir / "template.json").write_text(
+                json.dumps(
+                    {
+                        "template_id": "visible_loop",
+                        "label": "Visible Loop",
+                        "description": "Visible template.",
+                        "metadata": {},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (hidden_dir / "template.json").write_text(
+                json.dumps(
+                    {
+                        "template_id": "hidden_loop",
+                        "label": "Hidden Loop",
+                        "description": "Hidden template.",
+                        "metadata": {"visible": False},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            catalog = selector.discover_capability_catalog(root)
+
+        subgraph_keys = [item["key"] for item in catalog["subgraphs"]]
+        self.assertIn("visible_loop", subgraph_keys)
+        self.assertNotIn("hidden_loop", subgraph_keys)
 
     def test_capability_catalog_exposes_generic_selection_metadata(self) -> None:
         selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "toograph_capability_selector_before_metadata_test")

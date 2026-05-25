@@ -162,7 +162,7 @@ class BuddyHomeWriterActionTests(unittest.TestCase):
                 },
                 buddy_home_dir=buddy_home_dir,
             )
-            policy = json.loads((buddy_home_dir / "policy.json").read_text(encoding="utf-8"))
+            policy_path = buddy_home_dir / "policy.json"
 
         self.assertEqual(result["success"], False)
         self.assertEqual(result["applied_commands"], [])
@@ -170,7 +170,7 @@ class BuddyHomeWriterActionTests(unittest.TestCase):
         event_detail = result["activity_events"][0]["detail"]
         self.assertEqual(event_detail["applied_commands"], [])
         self.assertEqual(event_detail["skipped_commands"], result["skipped_commands"])
-        self.assertEqual(policy["graph_permission_mode"], "ask_first")
+        self.assertFalse(policy_path.exists())
 
     def test_writer_rejects_behavior_boundary_policy_updates(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -240,14 +240,14 @@ class BuddyHomeWriterActionTests(unittest.TestCase):
                 },
                 buddy_home_dir=buddy_home_dir,
             )
-            policy = json.loads((buddy_home_dir / "policy.json").read_text(encoding="utf-8"))
+            policy_path = buddy_home_dir / "policy.json"
 
         self.assertEqual(result["success"], False)
         self.assertEqual(result["applied_commands"], [])
         self.assertEqual(result["skipped_commands"][0]["error_type"], "unsupported_policy_field")
-        self.assertNotIn("favorite_color", policy)
+        self.assertFalse(policy_path.exists())
 
-    def test_writer_applies_report_create_commands(self) -> None:
+    def test_writer_skips_report_create_commands_as_legacy_buddy_home_design(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             buddy_home_dir = Path(temp_dir) / "buddy_home"
             result = _run_writer(
@@ -269,15 +269,13 @@ class BuddyHomeWriterActionTests(unittest.TestCase):
                 },
                 buddy_home_dir=buddy_home_dir,
             )
-            report_exists = (buddy_home_dir / result["applied_commands"][0]["result"]["path"]).exists()
 
-        self.assertEqual(result["success"], True)
-        applied = result["applied_commands"][0]
-        self.assertEqual(applied["command"]["action"], "report.create")
-        self.assertEqual(applied["command"]["target_type"], "report")
-        self.assertEqual(applied["command"]["run_id"], "run_review_report")
+        self.assertEqual(result["success"], False)
+        self.assertEqual(result["applied_commands"], [])
+        self.assertEqual(result["skipped_commands"][0]["action"], "report.create")
+        self.assertEqual(result["skipped_commands"][0]["error_type"], "unsupported_action")
         self.assertEqual(result["activity_events"][0]["kind"], "buddy_home_write")
-        self.assertTrue(report_exists)
+        self.assertFalse((buddy_home_dir / "reports").exists())
 
     def test_writer_applies_capability_usage_stats_updates(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

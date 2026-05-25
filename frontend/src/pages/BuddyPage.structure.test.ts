@@ -48,13 +48,16 @@ test("BuddyPage manages profile, policy, MEMORY.md, summary, and revisions", () 
   assert.doesNotMatch(source, /createBuddyMemory/);
 });
 
-test("BuddyPage opens template binding first and renders it as Buddy input rows", () => {
+test("BuddyPage keeps template binding as the final advanced tab and renders it as Buddy input rows", () => {
   const bindingIndex = source.indexOf('name="binding"');
   const profileIndex = source.indexOf('name="profile"');
+  const mascotDebugIndex = source.indexOf('name="mascot-debug"');
   assert.ok(bindingIndex > -1);
   assert.ok(profileIndex > -1);
-  assert.ok(bindingIndex < profileIndex);
-  assert.match(source, /const activeTab = ref\("binding"\);/);
+  assert.ok(mascotDebugIndex > -1);
+  assert.ok(profileIndex < bindingIndex);
+  assert.ok(mascotDebugIndex < bindingIndex);
+  assert.match(source, /const activeTab = ref\("profile"\);/);
   assert.match(source, /buildBuddyRunTemplateSourceRows/);
   assert.match(source, /buildBuddyRunInputNodeOptions/);
   assert.match(source, /setBuddyRunTemplateSourceBinding/);
@@ -150,6 +153,15 @@ test("BuddyPage links revision history to command audit records", () => {
   assert.match(source, /filteredRevisionRows\.length === 0/);
 });
 
+test("BuddyPage repairs stale run template binding through the command flow", () => {
+  assert.match(source, /const repairedRunBinding = await repairRunTemplateBindingIfNeeded\(runBinding\);/);
+  assert.match(source, /bindingDraft\.value = normalizeBindingDraft\(repairedRunBinding\);/);
+  assert.match(source, /async function repairRunTemplateBindingIfNeeded\(binding: BuddyRunTemplateBinding\)/);
+  assert.match(source, /if \(!binding\.repair_recommended\) \{/);
+  assert.match(source, /await updateBuddyRunTemplateBinding\(\s*normalized,\s*t\("buddyPage\.changeReasons\.bindingRepair"\),\s*\)/);
+  assert.match(source, /await refreshAuditTrail\(\);/);
+});
+
 test("BuddyPage hosts the mascot action debug panel as a tab after History", () => {
   assert.match(source, /import \{ BUDDY_DEBUG_ACTION_GROUPS \} from "@\/buddy\/buddyMascotDebug";/);
   assert.match(source, /import \{ useBuddyMascotDebugStore \} from "@\/stores\/buddyMascotDebug";/);
@@ -194,10 +206,16 @@ test("BuddyPage debug tab exposes live mascot motion timing controls", () => {
   assert.match(source, /buddy-page__debug-motion-grid/);
 });
 
-test("BuddyPage places template binding before confirmations", () => {
+test("BuddyPage places template binding after the other Buddy management tabs", () => {
   const bindingIndex = source.indexOf('name="binding"');
   const confirmationIndex = source.indexOf('name="confirmation"');
+  const historyIndex = source.indexOf('name="history"');
+  const mascotDebugIndex = source.indexOf('name="mascot-debug"');
   assert.ok(bindingIndex > -1);
   assert.ok(confirmationIndex > -1);
-  assert.ok(bindingIndex < confirmationIndex);
+  assert.ok(historyIndex > -1);
+  assert.ok(mascotDebugIndex > -1);
+  assert.ok(confirmationIndex < bindingIndex);
+  assert.ok(historyIndex < bindingIndex);
+  assert.ok(mascotDebugIndex < bindingIndex);
 });

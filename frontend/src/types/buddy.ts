@@ -53,6 +53,10 @@ export type BuddyRunTemplateBinding = {
   template_id: string;
   input_bindings: Record<string, BuddyRunInputSource>;
   updated_at?: string;
+  repair_recommended?: boolean;
+  repair_reason?: string;
+  repair_previous_template_id?: string;
+  repair_error?: string;
 };
 
 export type BuddyMemoryReviewInputSource =

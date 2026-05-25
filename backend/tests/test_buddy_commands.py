@@ -201,7 +201,7 @@ class BuddyCommandRouteTests(unittest.TestCase):
         self.assertEqual(revisions_response.status_code, 200)
         self.assertEqual(revisions_response.json()[-1]["previous_value"]["template_id"], "buddy_autonomous_review")
 
-    def test_report_create_command_records_file_report_and_revision(self) -> None:
+    def test_report_create_command_is_rejected_as_legacy_buddy_home_design(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             buddy_home = Path(temp_dir) / "buddy_home"
             with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
@@ -221,20 +221,15 @@ class BuddyCommandRouteTests(unittest.TestCase):
                         },
                     )
                     revisions_response = client.get("/api/buddy/revisions", params={"target_type": "report"})
-                    response_body = response.json()
-                    report_exists = (buddy_home / response_body["result"]["path"]).exists() if response.status_code == 200 else False
+                    commands_response = client.get("/api/buddy/commands")
 
-        self.assertEqual(response.status_code, 200)
-        body = response_body
-        self.assertEqual(body["command"]["action"], "report.create")
-        self.assertEqual(body["command"]["target_type"], "report")
-        self.assertEqual(body["command"]["run_id"], "run_report_1")
-        self.assertTrue(body["command"]["target_id"].startswith("report_"))
-        self.assertTrue(body["command"]["revision_id"].startswith("rev_"))
-        self.assertEqual(body["result"]["path"], f"reports/{body['command']['target_id']}.md")
-        self.assertTrue(report_exists)
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("Unsupported buddy command action", response.json()["detail"])
+        self.assertFalse((buddy_home / "reports").exists())
         self.assertEqual(revisions_response.status_code, 200)
-        self.assertEqual(revisions_response.json()[-1]["target_type"], "report")
+        self.assertEqual(revisions_response.json(), [])
+        self.assertEqual(commands_response.status_code, 200)
+        self.assertEqual(commands_response.json(), [])
 
     def test_capability_usage_stats_update_command_records_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

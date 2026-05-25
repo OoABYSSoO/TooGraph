@@ -1083,7 +1083,8 @@
     "category": "business",
     "graphProtocol": "node_system",
     "templateVersion": "0.1.0",
-    "capabilityDiscoverableDefault": true,
+    "visible": false,
+    "capabilityDiscoverableDefault": false,
     "gallery": {
       "headline": "把商品和竞品评论转成证据支持的卖点、风险和多平台文案。",
       "targetUsers": [

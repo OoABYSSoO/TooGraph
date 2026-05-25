@@ -390,7 +390,7 @@
       "ui": {
         "position": {
           "x": 60,
-          "y": 280
+          "y": 430
         },
         "collapsed": false,
         "size": {
@@ -417,7 +417,7 @@
       "ui": {
         "position": {
           "x": 60,
-          "y": 500
+          "y": 800
         },
         "collapsed": false
       },
@@ -440,7 +440,7 @@
       "ui": {
         "position": {
           "x": 60,
-          "y": 720
+          "y": 1170
         },
         "collapsed": false
       },
@@ -463,7 +463,7 @@
       "ui": {
         "position": {
           "x": 60,
-          "y": 1160
+          "y": 1540
         },
         "collapsed": false
       },
@@ -496,7 +496,7 @@
       "ui": {
         "position": {
           "x": 60,
-          "y": 1380
+          "y": 1910
         },
         "collapsed": false
       },
@@ -519,7 +519,7 @@
       "ui": {
         "position": {
           "x": 60,
-          "y": 1600
+          "y": 2280
         },
         "collapsed": false
       },
@@ -542,7 +542,7 @@
       "ui": {
         "position": {
           "x": 60,
-          "y": 1820
+          "y": 2650
         },
         "collapsed": false
       },
@@ -565,7 +565,7 @@
       "ui": {
         "position": {
           "x": 60,
-          "y": 2040
+          "y": 3020
         },
         "collapsed": false
       },
@@ -1246,7 +1246,7 @@
       "ui": {
         "position": {
           "x": 4460,
-          "y": 360
+          "y": 520
         },
         "collapsed": false
       },
@@ -1271,7 +1271,7 @@
       "ui": {
         "position": {
           "x": 4460,
-          "y": 600
+          "y": 920
         },
         "collapsed": false
       },
@@ -1296,7 +1296,7 @@
       "ui": {
         "position": {
           "x": 4460,
-          "y": 840
+          "y": 1320
         },
         "collapsed": false
       },
@@ -1321,7 +1321,7 @@
       "ui": {
         "position": {
           "x": 4460,
-          "y": 1080
+          "y": 1720
         },
         "collapsed": false
       },
@@ -1346,7 +1346,7 @@
       "ui": {
         "position": {
           "x": 4460,
-          "y": 1320
+          "y": 2120
         },
         "collapsed": false
       },
@@ -1371,7 +1371,7 @@
       "ui": {
         "position": {
           "x": 4460,
-          "y": 1560
+          "y": 2520
         },
         "collapsed": false
       },
@@ -1396,7 +1396,7 @@
       "ui": {
         "position": {
           "x": 4460,
-          "y": 1800
+          "y": 2920
         },
         "collapsed": false
       },
@@ -1421,7 +1421,7 @@
       "ui": {
         "position": {
           "x": 4460,
-          "y": 2040
+          "y": 3320
         },
         "collapsed": false
       },
@@ -1446,7 +1446,7 @@
       "ui": {
         "position": {
           "x": 4460,
-          "y": 2280
+          "y": 3720
         },
         "collapsed": false
       },
@@ -1586,8 +1586,8 @@
     "origin": "buddy",
     "role": "buddy_autonomous_review",
     "englishName": "Autonomous Review",
-    "internal": true,
     "templateVersion": "2026-05-20",
+    "capabilityDiscoverableDefault": false,
     "permissions": [
       "buddy_session_read",
       "buddy_home_write"

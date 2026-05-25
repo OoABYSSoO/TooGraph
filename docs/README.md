@@ -91,7 +91,6 @@ npm start
 | --- | --- | --- |
 | `web_search` | 联网搜索、网页正文抓取、本地 source document artifact | 保留 |
 | `toograph_capability_selector` | 先判断是否还需要能力；需要时选择一个 `action` / `subgraph` / `tool`，不需要时返回 `none` | 已升级，文档需保持同步 |
-| `toograph_context_fanout` | 并行装配 Buddy Home 记忆、知识库、页面上下文和能力候选 | 过渡保留，未来拆成模板 |
 | `toograph_page_operator` | 页面虚拟操作、模板运行、图编辑意图 | 保留 |
 | `toograph_action_builder` | 生成 Action 包文件内容 | 保留 |
 | `toograph_action_package_reader` | 读取已有 Action 包 | 保留 |
@@ -120,7 +119,7 @@ npm start
 已完成：
 
 - 动态 `capability` state 是单个互斥对象，合法 `kind` 为 `action`、`subgraph`、`tool`、`none`。
-- `toograph_context_fanout` 的能力分支已经从真实目录发现：
+- `toograph_capability_selector` 的能力候选已经从真实目录发现：
   - 可发现图模板 -> `kind: "subgraph"`。
   - 启用 Action -> `kind: "action"`。
   - Tool catalog -> `kind: "tool"`。
@@ -157,7 +156,7 @@ npm start
 - Buddy 长期记忆采用两层模型：
   - `buddy_home/MEMORY.md` 是唯一长期记忆权威。
   - `buddy_home/buddy.db` 保存会话、消息、索引、命令、revision 和少量状态。
-- `buddy_home/` 规范形态是 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json`、`buddy.db`、`reports/`。
+- `buddy_home/` 规范形态是 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json`、`buddy.db`。
 - 平台 `memories` 体系和旧候选记忆体验不再是目标架构。
 - `buddy_session_recall` 只读真实 `buddy_messages`，支持 `browse`、`discover`、`scroll`。
 - `buddy_messages_fts` 和 `buddy_messages_fts_trigram` 已建立，并由触发器维护。
@@ -165,7 +164,7 @@ npm start
 - `buddy_sessions` 已包含 `parent_session_id`、`source`、`ended_at`、`end_reason` 等字段。
 - `memory_review_template_binding` 已进入 Buddy store 和 command 路径，默认绑定 `buddy_autonomous_review`，变更可记录 revision。
 - `buddy_home_writer` 负责 `memory_document.update` 等低风险 Buddy Home 写回，并留下 command/revision。
-- `buddy_context_compaction` 是独立内部模板，专门处理会话压缩摘要：保护最近原文，迭代更新 `session_summary`，只允许生成 `session_summary.update` 写回命令，不触碰 `MEMORY.md`、profile、policy 或 report。
+- `buddy_context_compaction` 是独立内部模板，专门处理会话压缩摘要：保护最近原文，迭代更新 `session_summary`，只允许生成 `session_summary.update` 写回命令，不触碰 `MEMORY.md`、profile 或 policy。
 
 必须保持的边界：
 
@@ -194,7 +193,7 @@ npm start
 - 当前默认 embedding provider 是确定性的 `local-hash` / `hashing-v1`，维度 384。
 - `search_knowledge` 会合并关键词候选和本地向量候选，输出 score、retrieval mode、keyword_score、vector_score、metadata、chunk_id、citation_id。
 - `retrieve_knowledge_base_context` 会返回 `knowledge_context`，包含 `results`、`citations` 和可直接给 LLM 的 context 文本。
-- `toograph_context_fanout` 已能并行读取知识库上下文，并把它与记忆、页面和能力候选合并成 `context_brief`。
+- 知识库上下文当前通过显式知识库 input 和后续 RAG Action 方向承载，不再保留旧 fanout Action。
 - 知识库页面已有导入、检索、引用展示、重建索引、删除确认、检索质量评测等基础。
 
 当前判断：
@@ -338,7 +337,7 @@ RAG 路线图：
 
 - P0：建立标准 `context_package` 合同，明确 `knowledge_context` 和 `memory_context` 权威边界。
 - P1：新增 `knowledge_retrieval` Action，输出标准上下文包、citations、scores、budget、warnings。
-- P1：明确 Buddy Home 只读能力；如果 `toograph_context_fanout` 继续读取 `MEMORY.md`，要在输出中标注 `authority=preference`。
+- P1：明确 Buddy Home 只读能力；读取结果要在输出中标注 `authority=preference`。
 - P1：建立 `rag_question_answering` 模板：输入问题和知识库 -> query planning -> `knowledge_retrieval` -> citation-aware answer -> output。
 - P1：为 RAG 增加 eval：检索命中、引用准确、资料不足拒答、过度引用、chunk 质量、上下文预算。
 - P2：接入真实 embedding provider 和 reranker，保留 `local-hash` 作为 deterministic fallback。
@@ -434,8 +433,6 @@ operation:
 - 官方模板已经覆盖：
   - `advanced_web_research_loop`
   - `buddy_autonomous_loop`
-  - `buddy_context_fanout`
-  - `buddy_request_intake`
   - `buddy_autonomous_review`
   - `toograph_page_operation_workflow`
   - `toograph_action_creation_workflow`
@@ -472,7 +469,7 @@ operation:
 
 - 旧 `docs/future/buddy-autonomous-agent-roadmap.md` 保留了大量有效路线，但其中“selector 固定页面操作入口”的描述与当前代码冲突，已折叠并更正。
 - 旧 `docs/future/run-tree-dynamic-capability-remaining-work.md` 是有效剩余工作，已折叠进运行树章节。
-- 旧 RAG 教学和 RAG/Memory 收敛文档有效，但 `toograph_capability_selector` 与 `toograph_context_fanout` 状态已过期，已按当前代码更新。
+- 旧 RAG 教学和 RAG/Memory 收敛文档有效，但旧 fanout Action 路径已删除，剩余 RAG 工作已按当前代码更新。
 - 旧 superpowers plans/specs 属于历史计划，不能继续作为当前状态来源；有效细节已折叠进本文。
 - 旧部署文档已折叠进本文，测试应验证 `docs/README.md`。
 - 旧结构化输出待办已折叠进本文。

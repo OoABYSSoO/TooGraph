@@ -2557,6 +2557,8 @@
     "category": "graph_template",
     "templateVersion": "2026-05-18",
     "graphProtocol": "node_system",
+    "visible": false,
+    "capabilityDiscoverableDefault": false,
     "description": "生成、校验、审查、写入并可选试运行用户图模板的官方工作流。",
     "permissions": [
       "file_read",

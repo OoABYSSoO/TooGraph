@@ -1265,7 +1265,8 @@
     "category": "business",
     "graphProtocol": "node_system",
     "templateVersion": "0.1.0",
-    "capabilityDiscoverableDefault": true,
+    "visible": false,
+    "capabilityDiscoverableDefault": false,
     "gallery": {
       "headline": "把竞品资料和用户反馈变成带证据链的产品机会与 PRD 草稿。",
       "targetUsers": [

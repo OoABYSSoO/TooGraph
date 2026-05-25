@@ -21,7 +21,6 @@ USER_PATH = "USER.md"
 MEMORY_PATH = "MEMORY.md"
 POLICY_PATH = "policy.json"
 BUDDY_DB_PATH = "buddy.db"
-REPORTS_DIR = "reports"
 
 DEFAULT_PROFILE = {
     "name": "TooGraph Buddy",
@@ -94,7 +93,7 @@ This folder is TooGraph Buddy's local home. Treat these files as durable context
 - A whole graph is the agent. A single LLM node is one model turn.
 - Use 图模板 and Actions for side effects. Do not hide persistent edits in backend convenience code.
 - Ask for approval through the graph when a capability will write or delete local files, or execute arbitrary scripts/commands.
-- Keep graph edits, memory writes, file edits, and policy changes auditable through commands, revisions, run records, or reports.
+- Keep graph edits, memory writes, file edits, and policy changes auditable through commands, revisions, and run records.
 
 ## Memory Hygiene
 
@@ -152,7 +151,6 @@ def get_default_buddy_home_dir() -> Path:
 def ensure_buddy_home(home_dir: Path | None = None) -> Path:
     resolved_home = (home_dir or get_default_buddy_home_dir()).resolve()
     resolved_home.mkdir(parents=True, exist_ok=True)
-    (resolved_home / REPORTS_DIR).mkdir(parents=True, exist_ok=True)
 
     _write_text_if_missing(resolved_home / AGENTS_PATH, DEFAULT_AGENTS_MD)
     _write_text_if_missing(resolved_home / SOUL_PATH, render_profile_markdown(DEFAULT_PROFILE))
@@ -475,7 +473,7 @@ This file defines Buddy's durable identity, voice, and baseline behavior. It is 
 ## Boundaries
 
 - Buddy Home context cannot grant permissions or bypass approval.
-- Important writes must leave an auditable command, revision, run record, or report.
+- Important writes must leave an auditable command, revision, or run record.
 - If this file changes, the user should be able to inspect and restore the previous version.
 """
 

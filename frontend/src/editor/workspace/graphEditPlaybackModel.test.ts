@@ -461,7 +461,7 @@ test("buildGraphEditPlaybackPlan applies embedded subgraph graphs immediately af
           },
           edges: [],
           conditional_edges: [],
-          metadata: { role: "buddy_request_intake" },
+          metadata: { role: "example_request_intake" },
         },
       },
     ],
@@ -513,7 +513,7 @@ test("applyGraphEditCommandToDocument patches an existing subgraph shell with th
           },
           edges: [],
           conditional_edges: [],
-          metadata: { role: "buddy_request_intake" },
+          metadata: { role: "example_request_intake" },
         },
       },
     ],
@@ -557,7 +557,7 @@ test("applyGraphEditCommandToDocument patches an existing subgraph shell with th
   assert.equal(patchedNode?.kind, "subgraph");
   assert.equal(patchedNode?.name, "理解请求");
   assert.equal(patchedNode?.description, "把用户请求转成结构化意图。");
-  assert.equal(patchedNode?.kind === "subgraph" ? patchedNode.config.graph.metadata.role : null, "buddy_request_intake");
+  assert.equal(patchedNode?.kind === "subgraph" ? patchedNode.config.graph.metadata.role : null, "example_request_intake");
   assert.equal(patchedNode?.kind === "subgraph" ? patchedNode.config.graph.nodes.input_user_message?.kind : null, "input");
 });
 

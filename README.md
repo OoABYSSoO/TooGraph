@@ -86,9 +86,8 @@ TooGraph 的推荐模型配置入口是 Model Providers 页面。你可以在界
 - 项目自带 `knowledge/TooGraph-official/` 作为 TooGraph 官方知识库源文档，`docs/README.md` 是长期路线图来源文档之一。
 - 后端支持 knowledge base 导入、切分、SQLite FTS、本地 hash embedding、混合检索、catalog 查询和 rebuild API。
 - Git 管理的官方 Action 定义来自 `action/official/<action_key>/` 文件夹；用户自定义 Action 写入 `action/user/<action_key>/`。当前环境的启用状态只写入被忽略的 `action/settings.json`。
-- 当前官方 Action 包包括 `web_search`、`toograph_capability_selector`、`toograph_context_fanout`、`toograph_page_operator`、`toograph_action_builder`、`toograph_action_package_reader`、`toograph_graph_template_reader`、`toograph_graph_template_validator`、`toograph_graph_template_writer`、`toograph_script_tester`、`local_workspace_executor`、`buddy_session_recall` 和 `buddy_home_writer`。
+- 当前官方 Action 包包括 `web_search`、`toograph_capability_selector`、`toograph_page_operator`、`toograph_action_builder`、`toograph_action_package_reader`、`toograph_graph_template_reader`、`toograph_graph_template_validator`、`toograph_graph_template_writer`、`toograph_script_tester`、`local_workspace_executor`、`buddy_session_recall` 和 `buddy_home_writer`。
 - `web_search` 使用 `before_llm.py` 在 Action 入参规划前补充当前日期，使用 `after_llm.py` 执行联网搜索、引用整理、可选网页正文抓取、本地 source document artifact 输出，并把原文网址写入下载后的本地文档。
-- `toograph_context_fanout` 并行读取 Buddy Home `MEMORY.md`、知识库、页面上下文和可发现能力候选，输出只读 `context_brief` 和审计报告。
 - `toograph_capability_selector` 根据当前 LLM 节点可见的普通图 state 和候选目录判断是否还需要调用能力；需要时选择一个 `action` / `subgraph` / `tool`，不需要时返回 `none` 和 `needs_capability=false`。`stateInputSchema.current_requirement` 只是连接提示，不会强制自动绑定。
 - `toograph_page_operator` 读取当前页面操作书，支持普通页面 click 和编辑器 `graph_edit editor.graph.playback`，让 Buddy 通过应用内虚拟鼠标/键盘可见地执行页面操作。
 - `toograph_action_builder` 生成 Action 包文件内容；它不负责写入、测试、修复或启用生成的 Action。
@@ -321,25 +320,29 @@ TooGraph/
 
 官方模板位于 `graph_template/official/<template_id>/template.json`，会进入 Git 管理。前端“保存为模板”创建的是用户自定义模板，写入 `graph_template/user/<template_id>/template.json`；模板本体可以进入 Git 管理，当前环境的启用状态只写入被忽略的 `graph_template/settings.json`，缺失时程序会按现有模板自动生成和补齐。子图节点创建菜单从这两类模板中选择来源，不再直接从已保存 graph 列表创建子图。
 
-当前官方模板：
+当前可见官方模板：
 
 - `advanced_web_research_loop`（界面名称：高级联网搜索）
 - `buddy_autonomous_loop`（界面名称：伙伴自主循环）
-- `buddy_context_fanout`（界面名称：伙伴上下文并行装配，内部子图）
-- `toograph_page_operation_workflow`（界面名称：操作 TooGraph 页面）
-- `toograph_action_creation_workflow`（界面名称：创建自定义 Action）
-- `toograph_graph_template_creation_workflow`（界面名称：创建自定义图模板）
-- `buddy_autonomous_review`（界面名称：自主复盘，伙伴运行后的内部后台写回模板，不作为普通用户入口）
-- `buddy_request_intake`（界面名称：请求理解，Buddy 内部子图模板，不作为普通用户入口）
-- `policy_navigator_agent`、`ai_news_digest_to_wechat_article`、`multi_platform_content_repurposer`
-- `job_application_interview_coach`、`game_creative_factory`
-- `product_competitor_research_agent`、`ecommerce_review_mining_agent`
+- `buddy_autonomous_review`（界面名称：自主复盘）
+- `buddy_context_compaction`（界面名称：上下文压缩）
+
+当前隐藏官方模板：
+
+- `ai_news_digest_to_wechat_article`、`multi_platform_content_repurposer`
+- `policy_navigator_agent`、`product_competitor_research_agent`
+- `ecommerce_review_mining_agent`、`game_creative_factory`
+- `job_application_interview_coach`
+- `toograph_action_creation_workflow`、`toograph_graph_template_creation_workflow`
+- `toograph_page_operation_workflow`
+
+隐藏模板通过 `metadata.visible: false` 从模板列表中移除，并且不能被设置为 capability discoverable，也不会被能力选择器自动发现。
 
 `advanced_web_research_loop` 是当前联网搜索基线模板：它会规划搜索词、调用 `web_search`、判断证据是否足够、按需循环补查，并输出最终答案；证据链接和本地 source documents 作为中间 state 供后续节点使用，不直接连接 output 节点。
 
 `buddy_autonomous_loop` 是当前 Buddy 的可见运行路径：读取 Buddy Home 和用户请求，进行请求理解、按需任务计划、能力循环和最终回复。需求不明确或能力缺口通过 `public_response` 询问用户并结束本轮，不在聊天中透传断点 resume。
 
-`toograph_page_operation_workflow` 是 Buddy 可见操作 TooGraph 页面和运行指定图模板的官方入口：页面操作器负责固定化映射，例如进入图与模板、搜索目标模板、打开模板、写入本次目标、点击运行、等待结果并回收公开输出。
+`toograph_page_operation_workflow` 是 Buddy 操作 TooGraph 页面和运行指定图模板的官方入口：页面操作器负责固定化映射，例如进入图与模板、搜索目标模板、打开模板、写入本次目标、点击运行、等待结果并回收公开输出。
 
 `buddy_autonomous_review` 是当前 Buddy 的后台自主复盘路径：可见回复完成后由前端用 run snapshot 启动，模型自行判断是否需要低风险写回 Buddy Home，并通过 `buddy_home_writer` 走 command / revision 路径留下可回滚记录。
 

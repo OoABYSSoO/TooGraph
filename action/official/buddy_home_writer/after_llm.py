@@ -13,7 +13,6 @@ ALLOWED_ACTIONS = {
     "session_summary.update",
     "profile.update",
     "policy.update",
-    "report.create",
     "capability_usage_stats.update",
 }
 POLICY_PERMISSION_FIELDS = {"behavior_boundaries", "graph_permission_mode"}

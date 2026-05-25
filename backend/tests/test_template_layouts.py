@@ -12,10 +12,20 @@ from app.core.langgraph import get_langgraph_runtime_unsupported_reasons
 from app.core.langgraph.cycle_tracker import build_langgraph_cycle_tracker
 from app.core.runtime.execution_graph import build_execution_edges
 from app.core.schemas.node_system import NodeSystemGraphPayload
-from app.templates.loader import list_template_records, load_template_record
+from app.templates.loader import OFFICIAL_TEMPLATES_ROOT, TEMPLATE_FILE_NAME, list_template_records, load_template_record
 
 
 def _official_template_records() -> list[dict]:
+    return [
+        load_template_record(path.parent.name)
+        for path in sorted(
+            (template_dir / TEMPLATE_FILE_NAME for template_dir in OFFICIAL_TEMPLATES_ROOT.iterdir() if (template_dir / TEMPLATE_FILE_NAME).is_file()),
+            key=lambda item: item.parent.name.lower(),
+        )
+    ]
+
+
+def _visible_official_template_records() -> list[dict]:
     return [record for record in list_template_records() if record.get("source") == "official"]
 
 
@@ -23,9 +33,7 @@ def _read_contracts(reads: list[dict]) -> list[dict]:
     return [{key: value for key, value in read.items() if not (key == "binding" and value is None)} for read in reads]
 
 
-BUDDY_INTERNAL_TEMPLATE_IDS = {
-    "buddy_context_fanout",
-    "buddy_request_intake",
+BUDDY_SUPPORT_TEMPLATE_IDS = {
     "buddy_autonomous_review",
     "buddy_context_compaction",
 }
@@ -81,6 +89,7 @@ def _rects_overlap(a: tuple[float, float, float, float], b: tuple[float, float, 
 class TemplateLayoutTests(unittest.TestCase):
     def test_builtin_template_registry_contains_official_templates(self) -> None:
         records = _official_template_records()
+        visible_records = _visible_official_template_records()
 
         self.assertEqual(
             [record["template_id"] for record in records],
@@ -88,6 +97,8 @@ class TemplateLayoutTests(unittest.TestCase):
                 "advanced_web_research_loop",
                 "ai_news_digest_to_wechat_article",
                 "buddy_autonomous_loop",
+                "buddy_autonomous_review",
+                "buddy_context_compaction",
                 "ecommerce_review_mining_agent",
                 "game_creative_factory",
                 "job_application_interview_coach",
@@ -97,6 +108,15 @@ class TemplateLayoutTests(unittest.TestCase):
                 "toograph_action_creation_workflow",
                 "toograph_graph_template_creation_workflow",
                 "toograph_page_operation_workflow",
+            ],
+        )
+        self.assertEqual(
+            [record["template_id"] for record in visible_records],
+            [
+                "advanced_web_research_loop",
+                "buddy_autonomous_loop",
+                "buddy_autonomous_review",
+                "buddy_context_compaction",
             ],
         )
         templates = {record["template_id"]: record for record in records}
@@ -136,49 +156,50 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(policy_template["label"], "政策导航助手")
         self.assertEqual(policy_template["default_graph_name"], "政策导航助手")
         self.assertIn("政策原文", policy_template["description"])
-        self.assertIs(policy_template["capabilityDiscoverable"], True)
+        self.assertIs(policy_template["capabilityDiscoverable"], False)
+        self.assertEqual(policy_template["capabilityDiscoverableBlockedReason"], "hidden_template")
 
         news_template = templates["ai_news_digest_to_wechat_article"]
         self.assertEqual(news_template["source"], "official")
         self.assertEqual(news_template["label"], "AI 新闻公众号助手")
         self.assertEqual(news_template["default_graph_name"], "AI 新闻公众号助手")
         self.assertIn("公众号文章", news_template["description"])
-        self.assertIs(news_template["capabilityDiscoverable"], True)
+        self.assertIs(news_template["capabilityDiscoverable"], False)
 
         repurposer_template = templates["multi_platform_content_repurposer"]
         self.assertEqual(repurposer_template["source"], "official")
         self.assertEqual(repurposer_template["label"], "一文多发内容改写助手")
         self.assertEqual(repurposer_template["default_graph_name"], "一文多发内容改写助手")
         self.assertIn("多个平台适配版本", repurposer_template["description"])
-        self.assertIs(repurposer_template["capabilityDiscoverable"], True)
+        self.assertIs(repurposer_template["capabilityDiscoverable"], False)
 
         game_template = templates["game_creative_factory"]
         self.assertEqual(game_template["source"], "official")
         self.assertEqual(game_template["label"], "游戏广告创意工厂")
         self.assertEqual(game_template["default_graph_name"], "游戏广告创意工厂")
         self.assertIn("游戏广告", game_template["description"])
-        self.assertIs(game_template["capabilityDiscoverable"], True)
+        self.assertIs(game_template["capabilityDiscoverable"], False)
 
         ecommerce_template = templates["ecommerce_review_mining_agent"]
         self.assertEqual(ecommerce_template["source"], "official")
         self.assertEqual(ecommerce_template["label"], "电商评论洞察挖掘助手")
         self.assertEqual(ecommerce_template["default_graph_name"], "电商评论洞察挖掘助手")
         self.assertIn("电商营销内容", ecommerce_template["description"])
-        self.assertIs(ecommerce_template["capabilityDiscoverable"], True)
+        self.assertIs(ecommerce_template["capabilityDiscoverable"], False)
 
         job_template = templates["job_application_interview_coach"]
         self.assertEqual(job_template["source"], "official")
         self.assertEqual(job_template["label"], "求职简历与面试教练")
         self.assertEqual(job_template["default_graph_name"], "求职简历与面试教练")
         self.assertIn("求职匹配", job_template["description"])
-        self.assertIs(job_template["capabilityDiscoverable"], True)
+        self.assertIs(job_template["capabilityDiscoverable"], False)
 
         product_template = templates["product_competitor_research_agent"]
         self.assertEqual(product_template["source"], "official")
         self.assertEqual(product_template["label"], "产品竞品研究助手")
         self.assertEqual(product_template["default_graph_name"], "产品竞品研究助手")
         self.assertIn("PRD 草稿", product_template["description"])
-        self.assertIs(product_template["capabilityDiscoverable"], True)
+        self.assertIs(product_template["capabilityDiscoverable"], False)
 
     def test_official_templates_do_not_embed_breakpoint_metadata(self) -> None:
         for template in _official_template_records():
@@ -1757,9 +1778,6 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["needs_context_compaction"]["binding"]["fieldKey"], "needs_context_compaction")
         self.assertEqual(states["capability_result"]["name"], "结果包")
         for removed_state_key in [
-            "context_brief",
-            "fanout_context",
-            "fanout_assembly_report",
             "request_understanding",
             "task_plan",
             "should_call_capability",
@@ -1988,16 +2006,17 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertNotIn("page_context", json.dumps(template, ensure_ascii=False))
         self.assertNotIn("raw_conversation_history", json.dumps(template, ensure_ascii=False))
 
-    def test_buddy_internal_templates_are_hidden_but_loadable(self) -> None:
-        public_template_ids = {record["template_id"] for record in _official_template_records()}
+    def test_buddy_support_templates_are_visible_and_loadable(self) -> None:
+        public_template_ids = {record["template_id"] for record in _visible_official_template_records()}
 
-        self.assertTrue(BUDDY_INTERNAL_TEMPLATE_IDS.isdisjoint(public_template_ids))
-        for template_id in sorted(BUDDY_INTERNAL_TEMPLATE_IDS):
+        self.assertTrue(BUDDY_SUPPORT_TEMPLATE_IDS.issubset(public_template_ids))
+        for template_id in sorted(BUDDY_SUPPORT_TEMPLATE_IDS):
             with self.subTest(template_id=template_id):
                 template = load_template_record(template_id)
                 self.assertEqual(template["template_id"], template_id)
-                self.assertIs(template["metadata"]["internal"], True)
+                self.assertNotIn("internal", template["metadata"])
                 self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
+                self.assertIs(template["capabilityDiscoverable"], False)
                 payload = {
                     key: value
                     for key, value in template.items()
@@ -2022,7 +2041,6 @@ class TemplateLayoutTests(unittest.TestCase):
             ["run_context_compaction"],
         )
         self.assertEqual(template["nodes"]["run_context_compaction"]["config"]["graph"]["metadata"]["role"], "buddy_context_compaction")
-        self.assertNotIn("buddy_context_fanout", template["nodes"])
         self.assertNotIn("buddy_turn_intake", template["nodes"])
         self.assertNotIn("buddy_capability_loop", template["nodes"])
 
@@ -2256,7 +2274,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
         self.assertEqual(template["metadata"]["origin"], "buddy")
         self.assertEqual(template["metadata"]["role"], "buddy_autonomous_review")
-        self.assertIs(template["metadata"]["internal"], True)
+        self.assertNotIn("internal", template["metadata"])
+        self.assertIs(template["capabilityDiscoverable"], False)
         self.assertEqual(template["label"], "自主复盘")
         self.assertEqual(template["metadata"]["requiredActions"], ["buddy_session_recall", "buddy_home_writer"])
         self.assertEqual(template["metadata"]["permissions"], ["buddy_session_read", "buddy_home_write"])
@@ -2500,7 +2519,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
         self.assertEqual(template["metadata"]["origin"], "buddy")
         self.assertEqual(template["metadata"]["role"], "buddy_context_compaction")
-        self.assertIs(template["metadata"]["internal"], True)
+        self.assertNotIn("internal", template["metadata"])
+        self.assertIs(template["capabilityDiscoverable"], False)
         self.assertEqual(template["label"], "上下文压缩")
         self.assertEqual(template["metadata"]["requiredActions"], ["buddy_home_writer"])
         self.assertEqual(template["metadata"]["permissions"], ["buddy_home_write"])

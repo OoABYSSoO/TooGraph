@@ -48,7 +48,7 @@ def list_template_records(include_disabled: bool = False) -> list[dict[str, Any]
         _with_template_status(record, settings_entries.get(record["template_id"]))
         for record in all_records
     ]
-    records = [record for record in records if not _is_internal_template(record)]
+    records = [record for record in records if not _is_hidden_template(record)]
     if include_disabled:
         return records
     return [record for record in records if record.get("status") != NodeSystemCatalogStatus.DISABLED.value]
@@ -145,16 +145,18 @@ def set_user_template_status(template_id: str, status: NodeSystemCatalogStatus) 
 def set_template_capability_discoverable(template_id: str, capability_discoverable: bool) -> dict[str, Any]:
     path, source = _resolve_template_path_and_source(template_id)
     record = load_template_record_from_path(path, source=source)
-    has_breakpoint_metadata = template_has_breakpoint_metadata(record)
-    if capability_discoverable and has_breakpoint_metadata:
+    blocked_reason = _template_capability_blocked_reason(record)
+    if capability_discoverable and blocked_reason == "breakpoint_metadata":
         raise ValueError("Templates with breakpoint metadata cannot be capability discoverable.")
+    if capability_discoverable and blocked_reason == "hidden_template":
+        raise ValueError("Hidden templates cannot be capability discoverable.")
     payload, _changed = _read_template_settings_payload()
     entry = payload["entries"].get(template_id)
     if not isinstance(entry, dict):
         entry = {}
     enabled = entry.get("enabled", True) is not False
     entry["enabled"] = enabled
-    entry["capabilityDiscoverable"] = bool(capability_discoverable) and enabled and not has_breakpoint_metadata
+    entry["capabilityDiscoverable"] = bool(capability_discoverable) and enabled and not blocked_reason
     payload["entries"][template_id] = entry
     write_json_file(TEMPLATE_SETTINGS_PATH, payload)
     return _with_template_status(record, entry)
@@ -268,23 +270,25 @@ def _with_template_status(record: dict[str, Any], settings_entry: object) -> dic
     enabled = True
     capability_discoverable = True
     has_breakpoint_metadata = template_has_breakpoint_metadata(record)
+    hidden_template = _is_hidden_template(record)
     if isinstance(settings_entry, dict):
         enabled = settings_entry.get("enabled", True) is not False
         capability_discoverable = enabled and settings_entry.get("capabilityDiscoverable", enabled) is not False
-    if has_breakpoint_metadata:
+    if has_breakpoint_metadata or hidden_template:
         capability_discoverable = False
     status = NodeSystemCatalogStatus.ACTIVE if enabled else NodeSystemCatalogStatus.DISABLED
+    blocked_reason = _template_capability_blocked_reason(record)
     return {
         **record,
         "status": status.value,
         "capabilityDiscoverable": capability_discoverable,
         "hasBreakpointMetadata": has_breakpoint_metadata,
-        "capabilityDiscoverableBlockedReason": "breakpoint_metadata" if has_breakpoint_metadata else "",
+        "capabilityDiscoverableBlockedReason": blocked_reason,
     }
 
 
 def _template_default_capability_discoverable(record: dict[str, Any]) -> bool:
-    if template_has_breakpoint_metadata(record):
+    if template_has_breakpoint_metadata(record) or _is_hidden_template(record):
         return False
     metadata = record.get("metadata")
     if isinstance(metadata, dict) and metadata.get("capabilityDiscoverableDefault") is False:
@@ -327,9 +331,17 @@ def _read_template_settings_payload() -> tuple[dict[str, object], bool]:
     return payload, changed
 
 
-def _is_internal_template(record: dict[str, Any]) -> bool:
+def _template_capability_blocked_reason(record: dict[str, Any]) -> str:
+    if _is_hidden_template(record):
+        return "hidden_template"
+    if template_has_breakpoint_metadata(record):
+        return "breakpoint_metadata"
+    return ""
+
+
+def _is_hidden_template(record: dict[str, Any]) -> bool:
     metadata = record.get("metadata")
-    return isinstance(metadata, dict) and metadata.get("internal") is True
+    return isinstance(metadata, dict) and (metadata.get("internal") is True or metadata.get("visible") is False)
 
 
 def _validate_template_id(template_id: str) -> None:

@@ -19,7 +19,6 @@ from app.buddy.home import (
     DEFAULT_SESSION_SUMMARY,
     MEMORY_PATH,
     POLICY_PATH,
-    REPORTS_DIR,
     SOUL_PATH,
     USER_PATH,
     ensure_buddy_home,
@@ -201,32 +200,8 @@ def save_session_summary(payload: dict[str, Any], *, changed_by: str, change_rea
     return load_session_summary()
 
 
-def create_report(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
-    initialize_buddy_home()
-    now = utc_now_iso()
-    report_id = _normalize_report_id(payload.get("id")) or f"report_{uuid4().hex[:12]}"
-    report = {
-        "id": report_id,
-        "kind": str(payload.get("kind") or "autonomous_review").strip() or "autonomous_review",
-        "title": str(payload.get("title") or "Buddy report").strip() or "Buddy report",
-        "summary": str(payload.get("summary") or "").strip(),
-        "content": str(payload.get("content") or "").strip(),
-        "source": payload.get("source") if isinstance(payload.get("source"), dict) else {},
-        "path": _report_relative_path(report_id),
-        "created_at": now,
-        "updated_at": now,
-    }
-    report_path = _report_path(report_id)
-    if report_path.exists():
-        raise ValueError(f"Report already exists: {report_id}")
-    _write_with_revision("report", report_id, "create", {}, report, changed_by, change_reason)
-    _write_report_file(report)
-    return report
-
-
 def list_home_files() -> dict[str, Any]:
     initialize_buddy_home()
-    report_dir = BUDDY_HOME_DIR / REPORTS_DIR
     files = [
         _home_file_entry(BUDDY_HOME_DIR / AGENTS_PATH, AGENTS_PATH),
         _home_file_entry(BUDDY_HOME_DIR / SOUL_PATH, SOUL_PATH),
@@ -240,17 +215,7 @@ def list_home_files() -> dict[str, Any]:
             readable=False,
             summary="SQLite database backing Buddy chat sessions, messages, command audit records, revisions, and recall indexes.",
         ),
-        _home_file_entry(
-            report_dir,
-            REPORTS_DIR,
-            kind="directory",
-            readable=False,
-            summary="Folder containing Markdown reports created by Buddy review and writeback workflows.",
-        ),
     ]
-    if report_dir.exists():
-        for report_path in sorted(report_dir.glob("*.md"), key=lambda candidate: candidate.name.lower()):
-            files.append(_home_file_entry(report_path, f"{REPORTS_DIR}/{report_path.name}"))
     return {"root": str(BUDDY_HOME_DIR), "files": files}
 
 
@@ -301,9 +266,22 @@ def load_run_template_binding() -> dict[str, Any]:
     if not isinstance(value, dict):
         value = {}
     try:
-        return _normalize_run_template_binding(value)
-    except Exception:
-        return _normalize_run_template_binding(DEFAULT_RUN_TEMPLATE_BINDING)
+        binding = _normalize_run_template_binding(value)
+        if _run_template_binding_needs_repair(value, binding):
+            return _with_run_template_binding_repair_metadata(
+                binding,
+                reason="normalized_saved_binding",
+                previous_value=value,
+            )
+        return binding
+    except Exception as exc:
+        binding = _normalize_run_template_binding(DEFAULT_RUN_TEMPLATE_BINDING)
+        return _with_run_template_binding_repair_metadata(
+            binding,
+            reason="invalid_saved_binding",
+            previous_value=value,
+            error=str(exc),
+        )
 
 
 def save_run_template_binding(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
@@ -1307,19 +1285,6 @@ def restore_revision(revision_id: str, *, changed_by: str, change_reason: str) -
                 ("session_summary", _json_dumps(restored), utc_now_iso()),
             )
             connection.commit()
-    elif target_type == "report":
-        current = _load_report_value(target_id)
-        _write_with_revision("report", target_id, "restore", current, restored, changed_by, change_reason)
-        if restored:
-            restored = {
-                **restored,
-                "id": target_id,
-                "path": restored.get("path") or _report_relative_path(target_id),
-                "updated_at": utc_now_iso(),
-            }
-            _write_report_file(restored)
-        else:
-            _report_path(target_id).unlink(missing_ok=True)
     elif target_type == CAPABILITY_USAGE_STATS_TARGET_TYPE:
         current = load_capability_usage_stats()
         restored = _normalize_capability_usage_stats(restored)
@@ -1504,6 +1469,36 @@ def _normalize_run_template_binding(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _run_template_binding_needs_repair(raw_value: dict[str, Any], normalized_value: dict[str, Any]) -> bool:
+    raw_template_id = str(raw_value.get("template_id") or "").strip()
+    normalized_template_id = str(normalized_value.get("template_id") or "").strip()
+    raw_bindings = raw_value.get("input_bindings") if isinstance(raw_value.get("input_bindings"), dict) else {}
+    normalized_bindings = normalized_value.get("input_bindings")
+    raw_version = int(raw_value.get("version") or RUN_TEMPLATE_BINDING_VERSION)
+    normalized_version = int(normalized_value.get("version") or RUN_TEMPLATE_BINDING_VERSION)
+    return (
+        raw_template_id != normalized_template_id
+        or raw_bindings != normalized_bindings
+        or raw_version != normalized_version
+    )
+
+
+def _with_run_template_binding_repair_metadata(
+    binding: dict[str, Any],
+    *,
+    reason: str,
+    previous_value: dict[str, Any],
+    error: str = "",
+) -> dict[str, Any]:
+    return {
+        **binding,
+        "repair_recommended": True,
+        "repair_reason": reason,
+        "repair_previous_template_id": str(previous_value.get("template_id") or ""),
+        "repair_error": error,
+    }
+
+
 def _normalize_memory_review_template_binding(payload: dict[str, Any]) -> dict[str, Any]:
     template_id = str(payload.get("template_id") or "").strip()
     if not template_id:
@@ -1656,23 +1651,6 @@ def _coerce_non_negative_int(value: Any) -> int:
         return 0
 
 
-def _normalize_report_id(value: Any) -> str:
-    raw = str(value or "").strip()
-    if not raw:
-        return ""
-    normalized = "".join(character if character.isalnum() or character in {"_", "-"} else "_" for character in raw)
-    return normalized[:80]
-
-
-def _report_relative_path(report_id: str) -> str:
-    return f"{REPORTS_DIR}/{report_id}.md"
-
-
-def _report_path(report_id: str) -> Path:
-    initialize_buddy_home()
-    return BUDDY_HOME_DIR / REPORTS_DIR / f"{report_id}.md"
-
-
 def _home_file_entry(
     path: Path,
     relative_path: str,
@@ -1733,54 +1711,12 @@ def _home_file_summary(relative_path: str, kind: str) -> str:
     if relative_path in summaries:
         return summaries[relative_path]
     if kind == "markdown":
-        return "Markdown report or note in Buddy Home."
+        return "Markdown note in Buddy Home."
     return ""
 
 
 def _format_file_timestamp(value: float) -> str:
     return datetime.fromtimestamp(value, tz=timezone.utc).isoformat()
-
-
-def _write_report_file(report: dict[str, Any]) -> None:
-    report_id = _normalize_report_id(report.get("id"))
-    if not report_id:
-        raise ValueError("Report id is required.")
-    path = _report_path(report_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(_render_report_markdown(report), encoding="utf-8")
-
-
-def _load_report_value(report_id: str) -> dict[str, Any]:
-    path = _report_path(report_id)
-    if not path.exists():
-        return {}
-    return {
-        "id": report_id,
-        "path": _report_relative_path(report_id),
-        "content": path.read_text(encoding="utf-8"),
-    }
-
-
-def _render_report_markdown(report: dict[str, Any]) -> str:
-    title = str(report.get("title") or "Buddy report").strip() or "Buddy report"
-    summary = str(report.get("summary") or "").strip()
-    content = str(report.get("content") or "").strip()
-    source = report.get("source") if isinstance(report.get("source"), dict) else {}
-    lines = [
-        f"# {title}",
-        "",
-        f"- ID: {report.get('id') or ''}",
-        f"- Kind: {report.get('kind') or 'autonomous_review'}",
-        f"- Created: {report.get('created_at') or ''}",
-        f"- Updated: {report.get('updated_at') or ''}",
-    ]
-    if source:
-        lines.extend(["", "## Source", "", "```json", json.dumps(source, ensure_ascii=False, indent=2), "```"])
-    if summary:
-        lines.extend(["", "## Summary", "", summary])
-    if content:
-        lines.extend(["", "## Content", "", content])
-    return "\n".join(lines).rstrip() + "\n"
 
 
 @contextmanager

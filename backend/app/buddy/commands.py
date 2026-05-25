@@ -74,12 +74,6 @@ def _dispatch_command(
             "session_summary",
             "session_summary",
         )
-    if action == "report.create":
-        report_payload = {**payload}
-        if target_id:
-            report_payload["id"] = target_id
-        result = store.create_report(report_payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason)
-        return result, "report", str(result.get("id") or "")
     if action == "capability_usage_stats.update":
         result = store.update_capability_usage_stats(payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason)
         return result, "capability_usage_stats", "capability_usage_stats"

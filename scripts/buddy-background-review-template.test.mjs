@@ -27,12 +27,13 @@ test("buddy visible chat template does not run autonomous review in the foregrou
   );
 });
 
-test("buddy autonomous review is an internal background template with memory writeback", () => {
+test("buddy autonomous review is a visible background template with memory writeback", () => {
   const template = readTemplate("buddy_autonomous_review");
 
   assert.equal(template.template_id, "buddy_autonomous_review");
   assert.equal(template.label, "自主复盘");
-  assert.equal(template.metadata?.internal, true);
+  assert.equal(template.metadata?.internal, undefined);
+  assert.equal(template.metadata?.capabilityDiscoverableDefault, false);
   assert.deepEqual(template.metadata?.permissions, ["buddy_session_read", "buddy_home_write"]);
   assert.equal(template.nodes.review_buddy_memory, undefined);
   assert.equal(template.nodes.extract_memory_candidates.kind, "agent");
@@ -57,7 +58,7 @@ test("buddy autonomous review is an internal background template with memory wri
   );
 });
 
-test("buddy autonomous review stays out of visible templates and selector defaults to no capability", () => {
+test("buddy autonomous review is visible and selector defaults to no capability", () => {
   const templateList = runPython(
     [
       "import json",
@@ -68,7 +69,7 @@ test("buddy autonomous review stays out of visible templates and selector defaul
   );
   assert.equal(templateList.includes("buddy_autonomous_loop"), true);
   assert.equal(templateList.includes("buddy_self_review"), false);
-  assert.equal(templateList.includes("buddy_autonomous_review"), false);
+  assert.equal(templateList.includes("buddy_autonomous_review"), true);
 
   const selectedCapabilityResult = runPython(
     [

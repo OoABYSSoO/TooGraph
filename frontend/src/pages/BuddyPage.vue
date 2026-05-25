@@ -30,309 +30,6 @@
 
       <div v-if="isLoading && !hasLoaded" class="buddy-page__empty">{{ t("buddyPage.loading") }}</div>
       <ElTabs v-else v-model="activeTab" class="buddy-page__tabs">
-        <ElTabPane :label="t('buddyPage.tabs.binding')" name="binding">
-          <article class="buddy-page__panel">
-            <div class="buddy-page__panel-heading">
-              <div>
-                <h3>{{ t("buddyPage.binding.title") }}</h3>
-                <p>{{ t("buddyPage.binding.body") }}</p>
-              </div>
-            </div>
-            <ElForm label-position="top" class="buddy-page__form buddy-page__form--wide">
-              <ElFormItem :label="t('buddyPage.binding.template')">
-                <ElSelect
-                  ref="bindingTemplateSelectRef"
-                  v-model="bindingDraft.template_id"
-                  class="buddy-page__template-select toograph-select"
-                  :loading="isLoadingBindingTemplate"
-                  :teleported="true"
-                  :fit-input-width="true"
-                  placement="bottom-start"
-                  :fallback-placements="buddyBindingSelectFallbackPlacements"
-                  popper-class="toograph-select-popper buddy-page__binding-select-popper"
-                  filterable
-                  @change="selectBindingTemplate"
-                >
-                  <ElOption
-                    v-for="option in bindingTemplateOptions"
-                    :key="option.value"
-                    :label="option.label"
-                    :value="option.value"
-                    :disabled="option.disabled"
-                  >
-                    <span class="buddy-page__template-option">
-                      <strong>{{ option.name }}</strong>
-                      <small>{{ option.disabledReason || option.value }}</small>
-                    </span>
-                  </ElOption>
-                </ElSelect>
-              </ElFormItem>
-              <ElAlert
-                v-if="!bindingValidation.valid"
-                type="warning"
-                show-icon
-                :closable="false"
-                :title="bindingValidation.issues.join(' ')"
-              />
-              <section class="buddy-page__binding-grid" :aria-label="t('buddyPage.binding.buddyInput')">
-                <article
-                  v-for="row in bindingSourceRows"
-                  :key="row.source"
-                  class="buddy-page__binding-card"
-                  :class="{
-                    'buddy-page__binding-card--required': row.required,
-                    'buddy-page__binding-card--empty': !row.selectedNodeId,
-                  }"
-                >
-                  <header class="buddy-page__binding-card-header">
-                    <div class="buddy-page__binding-source">
-                      <span class="buddy-page__binding-source-label">{{ t(row.labelKey) }}</span>
-                      <small>{{ row.source }}</small>
-                    </div>
-                    <ElTag size="small" :type="row.required ? 'warning' : 'info'" effect="plain">
-                      {{ row.required ? t("buddyPage.binding.required") : t("buddyPage.binding.optional") }}
-                    </ElTag>
-                  </header>
-
-                  <label class="buddy-page__binding-picker">
-                    <span>{{ t("buddyPage.binding.inputNode") }}</span>
-                    <ElSelect
-                      :ref="bindingInputSelectRefHandler(row.source)"
-                      class="buddy-page__binding-select toograph-select"
-                      :model-value="row.selectedNodeId"
-                      :placeholder="t('buddyPage.binding.selectInputNode')"
-                      :clearable="!row.required"
-                      :disabled="!selectedBindingTemplate"
-                      :teleported="true"
-                      :fit-input-width="true"
-                      placement="bottom-start"
-                      :fallback-placements="buddyBindingSelectFallbackPlacements"
-                      popper-class="toograph-select-popper buddy-page__binding-select-popper"
-                      filterable
-                      @change="setBindingInputNode(row.source, $event)"
-                    >
-                      <ElOption
-                        v-if="!row.required"
-                        :label="t('buddyPage.binding.sources.none')"
-                        value=""
-                      >
-                        <span class="buddy-page__binding-option buddy-page__binding-option--empty">
-                          <strong>{{ t("buddyPage.binding.sources.none") }}</strong>
-                          <small>{{ t("buddyPage.binding.noInputNode") }}</small>
-                        </span>
-                      </ElOption>
-                      <ElOption
-                        v-for="option in bindingInputNodeOptionsForSource(row.source)"
-                        :key="option.value"
-                        :label="option.label"
-                        :value="option.value"
-                        :disabled="option.disabled"
-                      >
-                        <span
-                          class="buddy-page__binding-option"
-                          :class="{ 'buddy-page__binding-option--disabled': option.disabled }"
-                        >
-                          <span class="buddy-page__binding-option-main">
-                            <strong>{{ option.nodeName }}</strong>
-                            <small>{{ option.stateName || t("common.state") }}</small>
-                          </span>
-                          <code>{{ option.stateKey || option.value }}</code>
-                          <small v-if="bindingOptionDisabledReason(option)" class="buddy-page__binding-option-reason">
-                            {{ bindingOptionDisabledReason(option) }}
-                          </small>
-                        </span>
-                      </ElOption>
-                    </ElSelect>
-                  </label>
-
-                  <div
-                    v-if="selectedBindingInputRow(row.selectedNodeId)"
-                    class="buddy-page__binding-state-card"
-                    aria-live="polite"
-                  >
-                    <span>{{ t("buddyPage.binding.selectedState") }}</span>
-                    <strong>{{ selectedBindingInputRow(row.selectedNodeId)?.stateName || t("common.state") }}</strong>
-                    <code>{{ selectedBindingInputRow(row.selectedNodeId)?.stateKey }}</code>
-                  </div>
-                  <div v-else class="buddy-page__binding-state-card buddy-page__binding-state-card--empty">
-                    <span>{{ t("buddyPage.binding.selectedState") }}</span>
-                    <strong>{{ t("buddyPage.binding.noInputNode") }}</strong>
-                  </div>
-                </article>
-              </section>
-              <div class="buddy-page__actions buddy-page__binding-actions">
-                <ElButton
-                  class="buddy-page__binding-action buddy-page__binding-action--primary"
-                  type="primary"
-                  :loading="isSavingBinding"
-                  :disabled="!bindingValidation.valid"
-                  @click="saveBinding"
-                >
-                  <ElIcon><Check /></ElIcon>
-                  <span>{{ t("buddyPage.binding.save") }}</span>
-                </ElButton>
-                <ElButton
-                  class="buddy-page__binding-action buddy-page__binding-action--secondary"
-                  :disabled="isSavingBinding"
-                  @click="resetBindingToDefault"
-                >
-                  {{ t("buddyPage.binding.resetDefault") }}
-                </ElButton>
-              </div>
-            </ElForm>
-          </article>
-          <article class="buddy-page__panel">
-            <div class="buddy-page__panel-heading">
-              <div>
-                <h3>{{ t("buddyPage.binding.memoryReviewTitle") }}</h3>
-                <p>{{ t("buddyPage.binding.memoryReviewBody") }}</p>
-              </div>
-            </div>
-            <ElForm label-position="top" class="buddy-page__form buddy-page__form--wide">
-              <ElFormItem :label="t('buddyPage.binding.memoryReviewTemplate')">
-                <ElSelect
-                  ref="memoryReviewBindingTemplateSelectRef"
-                  v-model="memoryReviewBindingDraft.template_id"
-                  class="buddy-page__template-select toograph-select"
-                  :loading="isLoadingMemoryReviewBindingTemplate"
-                  :teleported="true"
-                  :fit-input-width="true"
-                  placement="bottom-start"
-                  :fallback-placements="buddyBindingSelectFallbackPlacements"
-                  popper-class="toograph-select-popper buddy-page__binding-select-popper"
-                  filterable
-                  @change="selectMemoryReviewBindingTemplate"
-                >
-                  <ElOption
-                    v-for="option in memoryReviewBindingTemplateOptions"
-                    :key="option.value"
-                    :label="option.label"
-                    :value="option.value"
-                    :disabled="option.disabled"
-                  >
-                    <span class="buddy-page__template-option">
-                      <strong>{{ option.name }}</strong>
-                      <small>{{ option.disabledReason || option.value }}</small>
-                    </span>
-                  </ElOption>
-                </ElSelect>
-              </ElFormItem>
-              <ElAlert
-                v-if="!memoryReviewBindingValidation.valid"
-                type="warning"
-                show-icon
-                :closable="false"
-                :title="memoryReviewBindingValidation.issues.join(' ')"
-              />
-              <section class="buddy-page__binding-grid" :aria-label="t('buddyPage.binding.memoryReviewInput')">
-                <article
-                  v-for="row in memoryReviewBindingSourceRows"
-                  :key="row.source"
-                  class="buddy-page__binding-card"
-                  :class="{
-                    'buddy-page__binding-card--required': row.required,
-                    'buddy-page__binding-card--empty': !row.selectedNodeId,
-                  }"
-                >
-                  <header class="buddy-page__binding-card-header">
-                    <div class="buddy-page__binding-source">
-                      <span class="buddy-page__binding-source-label">{{ t(row.labelKey) }}</span>
-                      <small>{{ row.source }}</small>
-                    </div>
-                    <ElTag size="small" :type="row.required ? 'warning' : 'info'" effect="plain">
-                      {{ row.required ? t("buddyPage.binding.required") : t("buddyPage.binding.optional") }}
-                    </ElTag>
-                  </header>
-
-                  <label class="buddy-page__binding-picker">
-                    <span>{{ t("buddyPage.binding.inputNode") }}</span>
-                    <ElSelect
-                      :ref="memoryReviewBindingInputSelectRefHandler(row.source)"
-                      class="buddy-page__binding-select toograph-select"
-                      :model-value="row.selectedNodeId"
-                      :placeholder="t('buddyPage.binding.selectInputNode')"
-                      :clearable="!row.required"
-                      :disabled="!selectedMemoryReviewBindingTemplate"
-                      :teleported="true"
-                      :fit-input-width="true"
-                      placement="bottom-start"
-                      :fallback-placements="buddyBindingSelectFallbackPlacements"
-                      popper-class="toograph-select-popper buddy-page__binding-select-popper"
-                      filterable
-                      @change="setMemoryReviewBindingInputNode(row.source, $event)"
-                    >
-                      <ElOption
-                        v-if="!row.required"
-                        :label="t('buddyPage.binding.sources.none')"
-                        value=""
-                      >
-                        <span class="buddy-page__binding-option buddy-page__binding-option--empty">
-                          <strong>{{ t("buddyPage.binding.sources.none") }}</strong>
-                          <small>{{ t("buddyPage.binding.noInputNode") }}</small>
-                        </span>
-                      </ElOption>
-                      <ElOption
-                        v-for="option in memoryReviewBindingInputNodeOptionsForSource(row.source)"
-                        :key="option.value"
-                        :label="option.label"
-                        :value="option.value"
-                        :disabled="option.disabled"
-                      >
-                        <span
-                          class="buddy-page__binding-option"
-                          :class="{ 'buddy-page__binding-option--disabled': option.disabled }"
-                        >
-                          <span class="buddy-page__binding-option-main">
-                            <strong>{{ option.nodeName }}</strong>
-                            <small>{{ option.stateName || t("common.state") }}</small>
-                          </span>
-                          <code>{{ option.stateKey || option.value }}</code>
-                          <small v-if="memoryReviewBindingOptionDisabledReason(option)" class="buddy-page__binding-option-reason">
-                            {{ memoryReviewBindingOptionDisabledReason(option) }}
-                          </small>
-                        </span>
-                      </ElOption>
-                    </ElSelect>
-                  </label>
-
-                  <div
-                    v-if="selectedMemoryReviewBindingInputRow(row.selectedNodeId)"
-                    class="buddy-page__binding-state-card"
-                    aria-live="polite"
-                  >
-                    <span>{{ t("buddyPage.binding.selectedState") }}</span>
-                    <strong>{{ selectedMemoryReviewBindingInputRow(row.selectedNodeId)?.stateName || t("common.state") }}</strong>
-                    <code>{{ selectedMemoryReviewBindingInputRow(row.selectedNodeId)?.stateKey }}</code>
-                  </div>
-                  <div v-else class="buddy-page__binding-state-card buddy-page__binding-state-card--empty">
-                    <span>{{ t("buddyPage.binding.selectedState") }}</span>
-                    <strong>{{ t("buddyPage.binding.noInputNode") }}</strong>
-                  </div>
-                </article>
-              </section>
-              <div class="buddy-page__actions buddy-page__binding-actions">
-                <ElButton
-                  class="buddy-page__binding-action buddy-page__binding-action--primary"
-                  type="primary"
-                  :loading="isSavingMemoryReviewBinding"
-                  :disabled="!memoryReviewBindingValidation.valid"
-                  @click="saveMemoryReviewBinding"
-                >
-                  <ElIcon><Check /></ElIcon>
-                  <span>{{ t("buddyPage.binding.saveMemoryReview") }}</span>
-                </ElButton>
-                <ElButton
-                  class="buddy-page__binding-action buddy-page__binding-action--secondary"
-                  :disabled="isSavingMemoryReviewBinding"
-                  @click="resetMemoryReviewBindingToDefault"
-                >
-                  {{ t("buddyPage.binding.resetMemoryReviewDefault") }}
-                </ElButton>
-              </div>
-            </ElForm>
-          </article>
-        </ElTabPane>
-
         <ElTabPane :label="t('buddyPage.tabs.profile')" name="profile">
           <article class="buddy-page__panel">
             <div class="buddy-page__panel-heading">
@@ -762,6 +459,309 @@
             </div>
           </article>
         </ElTabPane>
+        <ElTabPane :label="t('buddyPage.tabs.binding')" name="binding">
+          <article class="buddy-page__panel">
+            <div class="buddy-page__panel-heading">
+              <div>
+                <h3>{{ t("buddyPage.binding.title") }}</h3>
+                <p>{{ t("buddyPage.binding.body") }}</p>
+              </div>
+            </div>
+            <ElForm label-position="top" class="buddy-page__form buddy-page__form--wide">
+              <ElFormItem :label="t('buddyPage.binding.template')">
+                <ElSelect
+                  ref="bindingTemplateSelectRef"
+                  v-model="bindingDraft.template_id"
+                  class="buddy-page__template-select toograph-select"
+                  :loading="isLoadingBindingTemplate"
+                  :teleported="true"
+                  :fit-input-width="true"
+                  placement="bottom-start"
+                  :fallback-placements="buddyBindingSelectFallbackPlacements"
+                  popper-class="toograph-select-popper buddy-page__binding-select-popper"
+                  filterable
+                  @change="selectBindingTemplate"
+                >
+                  <ElOption
+                    v-for="option in bindingTemplateOptions"
+                    :key="option.value"
+                    :label="option.label"
+                    :value="option.value"
+                    :disabled="option.disabled"
+                  >
+                    <span class="buddy-page__template-option">
+                      <strong>{{ option.name }}</strong>
+                      <small>{{ option.disabledReason || option.value }}</small>
+                    </span>
+                  </ElOption>
+                </ElSelect>
+              </ElFormItem>
+              <ElAlert
+                v-if="!bindingValidation.valid"
+                type="warning"
+                show-icon
+                :closable="false"
+                :title="bindingValidation.issues.join(' ')"
+              />
+              <section class="buddy-page__binding-grid" :aria-label="t('buddyPage.binding.buddyInput')">
+                <article
+                  v-for="row in bindingSourceRows"
+                  :key="row.source"
+                  class="buddy-page__binding-card"
+                  :class="{
+                    'buddy-page__binding-card--required': row.required,
+                    'buddy-page__binding-card--empty': !row.selectedNodeId,
+                  }"
+                >
+                  <header class="buddy-page__binding-card-header">
+                    <div class="buddy-page__binding-source">
+                      <span class="buddy-page__binding-source-label">{{ t(row.labelKey) }}</span>
+                      <small>{{ row.source }}</small>
+                    </div>
+                    <ElTag size="small" :type="row.required ? 'warning' : 'info'" effect="plain">
+                      {{ row.required ? t("buddyPage.binding.required") : t("buddyPage.binding.optional") }}
+                    </ElTag>
+                  </header>
+
+                  <label class="buddy-page__binding-picker">
+                    <span>{{ t("buddyPage.binding.inputNode") }}</span>
+                    <ElSelect
+                      :ref="bindingInputSelectRefHandler(row.source)"
+                      class="buddy-page__binding-select toograph-select"
+                      :model-value="row.selectedNodeId"
+                      :placeholder="t('buddyPage.binding.selectInputNode')"
+                      :clearable="!row.required"
+                      :disabled="!selectedBindingTemplate"
+                      :teleported="true"
+                      :fit-input-width="true"
+                      placement="bottom-start"
+                      :fallback-placements="buddyBindingSelectFallbackPlacements"
+                      popper-class="toograph-select-popper buddy-page__binding-select-popper"
+                      filterable
+                      @change="setBindingInputNode(row.source, $event)"
+                    >
+                      <ElOption
+                        v-if="!row.required"
+                        :label="t('buddyPage.binding.sources.none')"
+                        value=""
+                      >
+                        <span class="buddy-page__binding-option buddy-page__binding-option--empty">
+                          <strong>{{ t("buddyPage.binding.sources.none") }}</strong>
+                          <small>{{ t("buddyPage.binding.noInputNode") }}</small>
+                        </span>
+                      </ElOption>
+                      <ElOption
+                        v-for="option in bindingInputNodeOptionsForSource(row.source)"
+                        :key="option.value"
+                        :label="option.label"
+                        :value="option.value"
+                        :disabled="option.disabled"
+                      >
+                        <span
+                          class="buddy-page__binding-option"
+                          :class="{ 'buddy-page__binding-option--disabled': option.disabled }"
+                        >
+                          <span class="buddy-page__binding-option-main">
+                            <strong>{{ option.nodeName }}</strong>
+                            <small>{{ option.stateName || t("common.state") }}</small>
+                          </span>
+                          <code>{{ option.stateKey || option.value }}</code>
+                          <small v-if="bindingOptionDisabledReason(option)" class="buddy-page__binding-option-reason">
+                            {{ bindingOptionDisabledReason(option) }}
+                          </small>
+                        </span>
+                      </ElOption>
+                    </ElSelect>
+                  </label>
+
+                  <div
+                    v-if="selectedBindingInputRow(row.selectedNodeId)"
+                    class="buddy-page__binding-state-card"
+                    aria-live="polite"
+                  >
+                    <span>{{ t("buddyPage.binding.selectedState") }}</span>
+                    <strong>{{ selectedBindingInputRow(row.selectedNodeId)?.stateName || t("common.state") }}</strong>
+                    <code>{{ selectedBindingInputRow(row.selectedNodeId)?.stateKey }}</code>
+                  </div>
+                  <div v-else class="buddy-page__binding-state-card buddy-page__binding-state-card--empty">
+                    <span>{{ t("buddyPage.binding.selectedState") }}</span>
+                    <strong>{{ t("buddyPage.binding.noInputNode") }}</strong>
+                  </div>
+                </article>
+              </section>
+              <div class="buddy-page__actions buddy-page__binding-actions">
+                <ElButton
+                  class="buddy-page__binding-action buddy-page__binding-action--primary"
+                  type="primary"
+                  :loading="isSavingBinding"
+                  :disabled="!bindingValidation.valid"
+                  @click="saveBinding"
+                >
+                  <ElIcon><Check /></ElIcon>
+                  <span>{{ t("buddyPage.binding.save") }}</span>
+                </ElButton>
+                <ElButton
+                  class="buddy-page__binding-action buddy-page__binding-action--secondary"
+                  :disabled="isSavingBinding"
+                  @click="resetBindingToDefault"
+                >
+                  {{ t("buddyPage.binding.resetDefault") }}
+                </ElButton>
+              </div>
+            </ElForm>
+          </article>
+          <article class="buddy-page__panel">
+            <div class="buddy-page__panel-heading">
+              <div>
+                <h3>{{ t("buddyPage.binding.memoryReviewTitle") }}</h3>
+                <p>{{ t("buddyPage.binding.memoryReviewBody") }}</p>
+              </div>
+            </div>
+            <ElForm label-position="top" class="buddy-page__form buddy-page__form--wide">
+              <ElFormItem :label="t('buddyPage.binding.memoryReviewTemplate')">
+                <ElSelect
+                  ref="memoryReviewBindingTemplateSelectRef"
+                  v-model="memoryReviewBindingDraft.template_id"
+                  class="buddy-page__template-select toograph-select"
+                  :loading="isLoadingMemoryReviewBindingTemplate"
+                  :teleported="true"
+                  :fit-input-width="true"
+                  placement="bottom-start"
+                  :fallback-placements="buddyBindingSelectFallbackPlacements"
+                  popper-class="toograph-select-popper buddy-page__binding-select-popper"
+                  filterable
+                  @change="selectMemoryReviewBindingTemplate"
+                >
+                  <ElOption
+                    v-for="option in memoryReviewBindingTemplateOptions"
+                    :key="option.value"
+                    :label="option.label"
+                    :value="option.value"
+                    :disabled="option.disabled"
+                  >
+                    <span class="buddy-page__template-option">
+                      <strong>{{ option.name }}</strong>
+                      <small>{{ option.disabledReason || option.value }}</small>
+                    </span>
+                  </ElOption>
+                </ElSelect>
+              </ElFormItem>
+              <ElAlert
+                v-if="!memoryReviewBindingValidation.valid"
+                type="warning"
+                show-icon
+                :closable="false"
+                :title="memoryReviewBindingValidation.issues.join(' ')"
+              />
+              <section class="buddy-page__binding-grid" :aria-label="t('buddyPage.binding.memoryReviewInput')">
+                <article
+                  v-for="row in memoryReviewBindingSourceRows"
+                  :key="row.source"
+                  class="buddy-page__binding-card"
+                  :class="{
+                    'buddy-page__binding-card--required': row.required,
+                    'buddy-page__binding-card--empty': !row.selectedNodeId,
+                  }"
+                >
+                  <header class="buddy-page__binding-card-header">
+                    <div class="buddy-page__binding-source">
+                      <span class="buddy-page__binding-source-label">{{ t(row.labelKey) }}</span>
+                      <small>{{ row.source }}</small>
+                    </div>
+                    <ElTag size="small" :type="row.required ? 'warning' : 'info'" effect="plain">
+                      {{ row.required ? t("buddyPage.binding.required") : t("buddyPage.binding.optional") }}
+                    </ElTag>
+                  </header>
+
+                  <label class="buddy-page__binding-picker">
+                    <span>{{ t("buddyPage.binding.inputNode") }}</span>
+                    <ElSelect
+                      :ref="memoryReviewBindingInputSelectRefHandler(row.source)"
+                      class="buddy-page__binding-select toograph-select"
+                      :model-value="row.selectedNodeId"
+                      :placeholder="t('buddyPage.binding.selectInputNode')"
+                      :clearable="!row.required"
+                      :disabled="!selectedMemoryReviewBindingTemplate"
+                      :teleported="true"
+                      :fit-input-width="true"
+                      placement="bottom-start"
+                      :fallback-placements="buddyBindingSelectFallbackPlacements"
+                      popper-class="toograph-select-popper buddy-page__binding-select-popper"
+                      filterable
+                      @change="setMemoryReviewBindingInputNode(row.source, $event)"
+                    >
+                      <ElOption
+                        v-if="!row.required"
+                        :label="t('buddyPage.binding.sources.none')"
+                        value=""
+                      >
+                        <span class="buddy-page__binding-option buddy-page__binding-option--empty">
+                          <strong>{{ t("buddyPage.binding.sources.none") }}</strong>
+                          <small>{{ t("buddyPage.binding.noInputNode") }}</small>
+                        </span>
+                      </ElOption>
+                      <ElOption
+                        v-for="option in memoryReviewBindingInputNodeOptionsForSource(row.source)"
+                        :key="option.value"
+                        :label="option.label"
+                        :value="option.value"
+                        :disabled="option.disabled"
+                      >
+                        <span
+                          class="buddy-page__binding-option"
+                          :class="{ 'buddy-page__binding-option--disabled': option.disabled }"
+                        >
+                          <span class="buddy-page__binding-option-main">
+                            <strong>{{ option.nodeName }}</strong>
+                            <small>{{ option.stateName || t("common.state") }}</small>
+                          </span>
+                          <code>{{ option.stateKey || option.value }}</code>
+                          <small v-if="memoryReviewBindingOptionDisabledReason(option)" class="buddy-page__binding-option-reason">
+                            {{ memoryReviewBindingOptionDisabledReason(option) }}
+                          </small>
+                        </span>
+                      </ElOption>
+                    </ElSelect>
+                  </label>
+
+                  <div
+                    v-if="selectedMemoryReviewBindingInputRow(row.selectedNodeId)"
+                    class="buddy-page__binding-state-card"
+                    aria-live="polite"
+                  >
+                    <span>{{ t("buddyPage.binding.selectedState") }}</span>
+                    <strong>{{ selectedMemoryReviewBindingInputRow(row.selectedNodeId)?.stateName || t("common.state") }}</strong>
+                    <code>{{ selectedMemoryReviewBindingInputRow(row.selectedNodeId)?.stateKey }}</code>
+                  </div>
+                  <div v-else class="buddy-page__binding-state-card buddy-page__binding-state-card--empty">
+                    <span>{{ t("buddyPage.binding.selectedState") }}</span>
+                    <strong>{{ t("buddyPage.binding.noInputNode") }}</strong>
+                  </div>
+                </article>
+              </section>
+              <div class="buddy-page__actions buddy-page__binding-actions">
+                <ElButton
+                  class="buddy-page__binding-action buddy-page__binding-action--primary"
+                  type="primary"
+                  :loading="isSavingMemoryReviewBinding"
+                  :disabled="!memoryReviewBindingValidation.valid"
+                  @click="saveMemoryReviewBinding"
+                >
+                  <ElIcon><Check /></ElIcon>
+                  <span>{{ t("buddyPage.binding.saveMemoryReview") }}</span>
+                </ElButton>
+                <ElButton
+                  class="buddy-page__binding-action buddy-page__binding-action--secondary"
+                  :disabled="isSavingMemoryReviewBinding"
+                  @click="resetMemoryReviewBindingToDefault"
+                >
+                  {{ t("buddyPage.binding.resetMemoryReviewDefault") }}
+                </ElButton>
+              </div>
+            </ElForm>
+          </article>
+        </ElTabPane>
+
       </ElTabs>
     </section>
   </AppShell>
@@ -867,7 +867,7 @@ type LoadAllOptions = {
 const { t } = useI18n();
 const buddyContextStore = useBuddyContextStore();
 const buddyMascotDebugStore = useBuddyMascotDebugStore();
-const activeTab = ref("binding");
+const activeTab = ref("profile");
 const historyTargetFilter = ref<BuddyRevisionHistoryTargetFilter>("all");
 const hasLoaded = ref(false);
 const isLoading = ref(false);
@@ -1244,6 +1244,21 @@ function normalizeBindingDraft(binding: BuddyRunTemplateBinding): BuddyRunTempla
   };
 }
 
+async function repairRunTemplateBindingIfNeeded(binding: BuddyRunTemplateBinding): Promise<BuddyRunTemplateBinding> {
+  if (!binding.repair_recommended) {
+    return binding;
+  }
+  const normalized = normalizeBindingDraft(binding);
+  const repaired = acceptCommandResult(
+    await updateBuddyRunTemplateBinding(
+      normalized,
+      t("buddyPage.changeReasons.bindingRepair"),
+    ),
+  );
+  await refreshAuditTrail();
+  return repaired;
+}
+
 function normalizeMemoryReviewBindingDraft(binding: BuddyMemoryReviewTemplateBinding): BuddyMemoryReviewTemplateBinding {
   return {
     version: binding.version ?? 1,
@@ -1308,7 +1323,8 @@ async function loadAll(options: LoadAllOptions = {}) {
     revisions.value = revisionList;
     commands.value = commandList;
     availableTemplates.value = templateList;
-    bindingDraft.value = normalizeBindingDraft(runBinding);
+    const repairedRunBinding = await repairRunTemplateBindingIfNeeded(runBinding);
+    bindingDraft.value = normalizeBindingDraft(repairedRunBinding);
     memoryReviewBindingDraft.value = normalizeMemoryReviewBindingDraft(memoryReviewBinding);
     await loadBindingTemplate(bindingDraft.value.template_id);
     await loadMemoryReviewBindingTemplate(memoryReviewBindingDraft.value.template_id);

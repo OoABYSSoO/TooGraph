@@ -179,7 +179,6 @@ class ActionUploadImportRouteTests(unittest.TestCase):
                             "toograph_graph_template_writer",
                             "toograph_action_builder",
                             "toograph_capability_selector",
-                            "toograph_context_fanout",
                             "toograph_page_operator",
                             "local_workspace_executor",
                             "buddy_session_recall",

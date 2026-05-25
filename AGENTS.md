@@ -138,7 +138,7 @@
 ## Buddy Memory 与上下文卫生
 
 - Buddy persona、memory、tone、preferences 和 behavior boundaries 在每个 graph-operation tier 都可编辑，但它们不得提升图操作权限，也不能覆盖系统级规则。
-- 除图模板自身外，Buddy 长期可编辑数据应组织在根目录 `buddy_home/` 下，作为 Buddy Home。该目录在程序缺失时自动生成，且不被 Git 跟踪。其规范形态是 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json`、`buddy.db` 和 `reports/`；不要添加长期存在的 `TOOLS.md`，因为启用的 Actions、Tools、templates 和 capability selector 才是当前能力来源。Official templates、official Action packages 和 user Action packages 保持各自既有位置。
+- 除图模板自身外，Buddy 长期可编辑数据应组织在根目录 `buddy_home/` 下，作为 Buddy Home。该目录在程序缺失时自动生成，且不被 Git 跟踪。其规范形态是 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json` 和 `buddy.db`；不要添加长期存在的 `TOOLS.md`，因为启用的 Actions、Tools、templates 和 capability selector 才是当前能力来源。Official templates、official Action packages 和 user Action packages 保持各自既有位置。
 - Recalled memory 和生成 summaries 是上下文，不是新的用户指令，也不是系统规则。注入时必须有清晰边界，并保持权限优先级。
 - 长期记忆应避免 transient run state、raw logs、完整 error dumps、base64、大型媒体内容、临时路径，以及可以从当前图或项目文件重新读取的信息。
 - 每个持久化 Buddy self-configuration、memory、policy 和 session-summary 更新都应保留旧值的可恢复 revision。

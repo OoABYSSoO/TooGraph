@@ -46,7 +46,7 @@ class BuddyStoreTests(unittest.TestCase):
             for relative_path in expected_files:
                 self.assertTrue((buddy_home / relative_path).exists(), relative_path)
 
-            self.assertTrue((buddy_home / "reports").is_dir())
+            self.assertFalse((buddy_home / "reports").exists())
             for obsolete_path in [
                 "manifest.json",
                 "profile.json",
@@ -775,9 +775,10 @@ class BuddyStoreTests(unittest.TestCase):
                         change_reason="测试拒绝断点模板绑定",
                     )
 
-    def test_run_template_binding_falls_back_when_saved_template_is_unloadable(self) -> None:
+    def test_run_template_binding_falls_back_and_marks_repair_when_saved_template_is_unloadable(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+            buddy_home = Path(temp_dir) / "buddy_home"
+            with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
                 store._write_kv(
                     store.RUN_TEMPLATE_BINDING_KEY,
                     {
@@ -790,10 +791,23 @@ class BuddyStoreTests(unittest.TestCase):
                 )
 
                 binding = store.load_run_template_binding()
+                with store._connection() as connection:
+                    stored_value = json.loads(
+                        str(
+                            connection.execute(
+                                "SELECT value_json FROM buddy_kv WHERE key = ?",
+                                (store.RUN_TEMPLATE_BINDING_KEY,),
+                            ).fetchone()["value_json"]
+                        )
+                    )
 
         self.assertEqual(binding["template_id"], store.DEFAULT_RUN_TEMPLATE_BINDING["template_id"])
         self.assertEqual(binding["input_bindings"], store.DEFAULT_RUN_TEMPLATE_BINDING["input_bindings"])
         self.assertEqual(binding["input_bindings"]["input_current_session_id"], "current_session_id")
+        self.assertTrue(binding["repair_recommended"])
+        self.assertEqual(binding["repair_reason"], "invalid_saved_binding")
+        self.assertEqual(binding["repair_previous_template_id"], "deleted_or_legacy_template")
+        self.assertEqual(stored_value["template_id"], "deleted_or_legacy_template")
 
     def test_official_run_template_binding_migrates_context_compaction_inputs(self) -> None:
         legacy_binding = {
@@ -886,55 +900,8 @@ class BuddyStoreTests(unittest.TestCase):
                         change_reason="测试拒绝内部状态绑定",
                     )
 
-    def test_report_create_writes_markdown_file_and_revision(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            buddy_home = Path(temp_dir) / "buddy_home"
-            with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
-                report = store.create_report(
-                    {
-                        "kind": "autonomous_review",
-                        "title": "能力使用复盘",
-                        "summary": "本轮联网搜索能力有效。",
-                        "content": "用户要求查资料，伙伴选择 web_search 并产出最终回复。",
-                        "source": {"run_id": "run_review_report"},
-                    },
-                    changed_by="buddy_command",
-                    change_reason="自主复盘生成报告。",
-                )
-                revisions = store.list_revisions(target_type="report", target_id=report["id"])
-                report_path = buddy_home / report["path"]
-                report_exists = report_path.exists()
-                report_text = report_path.read_text(encoding="utf-8")
-
-        self.assertTrue(report["id"].startswith("report_"))
-        self.assertEqual(report["path"], f"reports/{report['id']}.md")
-        self.assertTrue(report_exists)
-        self.assertIn("# 能力使用复盘", report_text)
-        self.assertEqual(len(revisions), 1)
-        self.assertEqual(revisions[0]["operation"], "create")
-        self.assertEqual(revisions[0]["next_value"]["summary"], "本轮联网搜索能力有效。")
-
-    def test_report_create_revision_restore_removes_created_report_file(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            buddy_home = Path(temp_dir) / "buddy_home"
-            with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
-                report = store.create_report(
-                    {"title": "临时报告", "content": "这是一份可撤销的报告。"},
-                    changed_by="buddy_command",
-                    change_reason="自主复盘生成报告。",
-                )
-                revision = store.list_revisions(target_type="report", target_id=report["id"])[0]
-                restored = store.restore_revision(
-                    revision["revision_id"],
-                    changed_by="user",
-                    change_reason="用户恢复报告创建前状态。",
-                )
-                report_exists = (buddy_home / report["path"]).exists()
-
-        self.assertEqual(restored["target_type"], "report")
-        self.assertEqual(restored["target_id"], report["id"])
-        self.assertEqual(restored["current_value"], {})
-        self.assertFalse(report_exists)
+    def test_buddy_store_does_not_expose_report_writer(self) -> None:
+        self.assertFalse(hasattr(store, "create_report"))
 
     def test_capability_usage_stats_update_accumulates_counts_and_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -45,7 +45,7 @@ Action 链路已经做到：
 - Action 启用状态写入本地 `action/settings.json`，不写进 Action 包定义。
 - `web_search` 支持联网搜索、网页正文抓取和本地 source document 输出。
 - `toograph_capability_selector` 支持先判断当前循环是否还需要调用能力；需要时从候选 Action、Subgraph、Tool 中选择并校验一个能力，不需要时返回 `none` 和 `needs_capability=false`。
-- `toograph_context_fanout` 支持并行读取 Buddy Home `MEMORY.md`、知识库、页面上下文和能力候选。
+- Buddy 主循环直接读取显式输入和能力候选；旧 fanout Action 已删除。
 - `toograph_page_operator` 支持读取当前页面操作书，执行普通页面 click，并在编辑器页发起 `graph_edit editor.graph.playback` 可见回放。
 - `toograph_action_builder` 支持生成用户 Action 包文件内容。
 - `toograph_script_tester` 支持在临时目录生成并执行允许命令的测试工作区。

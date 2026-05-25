@@ -67,33 +67,20 @@ class BuddyRouteTests(unittest.TestCase):
             buddy_home = Path(temp_dir) / "buddy_home"
             with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
                 with TestClient(app) as client:
-                    client.post(
-                        "/api/buddy/commands",
-                        json={
-                            "action": "report.create",
-                            "payload": {
-                                "id": "rename_review",
-                                "title": "Rename review",
-                                "summary": "The visible name changed.",
-                                "content": "Report body.",
-                            },
-                            "change_reason": "Create a report for file visibility testing.",
-                        },
-                    )
                     response = client.get("/api/buddy/home-files")
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         files = {entry["path"]: entry for entry in payload["files"]}
-        for path in ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md", "policy.json", "buddy.db", "reports", "reports/rename_review.md"]:
+        for path in ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md", "policy.json", "buddy.db"]:
             self.assertIn(path, files)
+        self.assertNotIn("reports", files)
         self.assertTrue(files["AGENTS.md"]["readable"])
         self.assertIn("Buddy Workspace", files["AGENTS.md"]["content"])
         self.assertEqual(files["policy.json"]["kind"], "json")
         self.assertFalse(files["buddy.db"]["readable"])
         self.assertEqual(files["buddy.db"]["kind"], "database")
         self.assertIn("SQLite", files["buddy.db"]["summary"])
-        self.assertIn("Rename review", files["reports/rename_review.md"]["content"])
 
     def test_chat_session_message_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

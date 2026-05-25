@@ -126,7 +126,7 @@ def _discover_subgraphs(repo_root: Path, *, errors: list[dict[str, str]]) -> lis
             errors.append({"source": _display_path(repo_root, template_path), "error": str(exc)})
             continue
         key = _text(payload.get("template_id")) or template_path.parent.name
-        if key in seen or _is_internal_template(payload):
+        if key in seen or _is_hidden_template(payload):
             continue
         seen.add(key)
         if not _settings_enabled(settings, key):
@@ -357,6 +357,8 @@ def _none_capability(reason: str = "") -> dict[str, Any]:
 
 
 def _template_capability_discoverable(payload: dict[str, Any], settings_entry: Any) -> bool:
+    if _is_hidden_template(payload):
+        return False
     if _template_has_breakpoint_metadata(payload):
         return False
     default = True
@@ -388,9 +390,9 @@ def _iter_graph_payloads(graph: dict[str, Any]):
             yield from _iter_graph_payloads(embedded)
 
 
-def _is_internal_template(payload: dict[str, Any]) -> bool:
+def _is_hidden_template(payload: dict[str, Any]) -> bool:
     metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
-    return metadata.get("internal") is True
+    return metadata.get("internal") is True or metadata.get("visible") is False
 
 
 def _settings_entries(path: Path) -> dict[str, Any]:

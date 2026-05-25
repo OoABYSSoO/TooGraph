@@ -1220,7 +1220,8 @@
     "category": "business",
     "templateVersion": "2026-05-18",
     "graphProtocol": "node_system",
-    "capabilityDiscoverableDefault": true,
+    "visible": false,
+    "capabilityDiscoverableDefault": false,
     "gallery": {
       "targetUsers": [
         "AI 博主",

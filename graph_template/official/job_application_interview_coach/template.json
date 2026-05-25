@@ -1235,7 +1235,8 @@
     "category": "business",
     "graphProtocol": "node_system",
     "templateVersion": "0.1.0",
-    "capabilityDiscoverableDefault": true,
+    "visible": false,
+    "capabilityDiscoverableDefault": false,
     "gallery": {
       "headline": "把简历、项目经历和 JD 变成可审查的求职准备包。",
       "targetUsers": [

@@ -696,7 +696,7 @@
           "buddy_home_writer": {
             "actionKey": "buddy_home_writer",
             "title": "session_summary writeback instruction",
-            "content": "你已绑定 Buddy Home Writer。只把 writer_input.commands 原样作为 commands 输入；每条命令必须是 session_summary.update，payload.content 必须是完整的新会话摘要。run_id 使用 source_run_id；不要新增命令、不要写 MEMORY.md、不要修改 profile/policy/report。",
+            "content": "你已绑定 Buddy Home Writer。只把 writer_input.commands 原样作为 commands 输入；每条命令必须是 session_summary.update，payload.content 必须是完整的新会话摘要。run_id 使用 source_run_id；不要新增命令、不要写 MEMORY.md、不要修改 profile/policy。",
             "source": "node.override"
           }
         },
@@ -858,7 +858,6 @@
   "metadata": {
     "origin": "buddy",
     "role": "buddy_context_compaction",
-    "internal": true,
     "graphProtocol": "node_system",
     "capabilityDiscoverableDefault": false,
     "requiredActions": [

@@ -1873,6 +1873,8 @@
     "category": "action",
     "templateVersion": "2026-05-09",
     "graphProtocol": "node_system",
+    "visible": false,
+    "capabilityDiscoverableDefault": false,
     "description": "用普通编辑器可创建的 input、LLM、condition、output 节点搭建创建自定义 Action 的完整流程；节点使用前端默认尺寸，Action 输出由单 Action 绑定托管。",
     "toograph_state_key_counter": 6
   }

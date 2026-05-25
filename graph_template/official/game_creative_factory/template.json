@@ -1513,7 +1513,8 @@
     "category": "business",
     "graphProtocol": "node_system",
     "templateVersion": "0.1.0",
-    "capabilityDiscoverableDefault": true,
+    "visible": false,
+    "capabilityDiscoverableDefault": false,
     "gallery": {
       "headline": "把游戏广告创意生产拆成可观察、可审核、可复跑的工作流。",
       "targetUsers": [
