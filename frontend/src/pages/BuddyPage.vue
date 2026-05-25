@@ -84,56 +84,39 @@
           </article>
         </ElTabPane>
 
-        <ElTabPane :label="t('buddyPage.tabs.files')" name="files">
-          <article class="buddy-page__panel buddy-page__panel--files">
+        <ElTabPane :label="t('buddyPage.tabs.agents')" name="agents">
+          <article class="buddy-page__panel buddy-page__panel--agents">
             <div class="buddy-page__panel-heading">
               <div>
-                <h3>{{ t("buddyPage.files.title") }}</h3>
-                <p>{{ t("buddyPage.files.body") }}</p>
+                <h3>{{ t("buddyPage.agents.title") }}</h3>
+                <p>{{ t("buddyPage.agents.body") }}</p>
               </div>
               <span class="buddy-page__meta">{{ homeFiles.root || "buddy_home" }}</span>
             </div>
-            <div v-if="homeFiles.files.length > 0" class="buddy-page__file-browser">
-              <nav class="buddy-page__file-list" :aria-label="t('buddyPage.files.listLabel')">
-                <button
-                  v-for="file in homeFiles.files"
-                  :key="file.path"
-                  type="button"
-                  class="buddy-page__file-row"
-                  :class="{ 'buddy-page__file-row--active': selectedHomeFile?.path === file.path }"
-                  @click="selectHomeFile(file.path)"
-                >
-                  <span class="buddy-page__file-row-name">{{ file.path }}</span>
-                  <span class="buddy-page__file-row-meta">
-                    {{ homeFileKindLabel(file) }} · {{ formatHomeFileSize(file.size_bytes) }}
-                  </span>
-                </button>
-              </nav>
-              <section v-if="selectedHomeFile" class="buddy-page__file-preview">
-                <header class="buddy-page__file-preview-header">
-                  <div>
-                    <h4>{{ selectedHomeFile.path }}</h4>
-                    <p>{{ selectedHomeFile.summary || t("buddyPage.files.noSummary") }}</p>
-                  </div>
-                  <div class="buddy-page__file-preview-meta">
-                    <ElTag :type="homeFileTagType(selectedHomeFile)" effect="plain">
-                      {{ homeFileKindLabel(selectedHomeFile) }}
-                    </ElTag>
-                    <span>{{ formatHomeFileSize(selectedHomeFile.size_bytes) }}</span>
-                    <span>{{ formatDate(selectedHomeFile.updated_at) }}</span>
-                  </div>
-                </header>
-                <pre v-if="selectedHomeFile.readable" class="buddy-page__file-content">{{ selectedHomeFile.content || t("buddyPage.files.emptyContent") }}</pre>
-                <div v-else class="buddy-page__file-unreadable">
-                  <strong>{{ t("buddyPage.files.metadataOnly") }}</strong>
-                  <p>{{ selectedHomeFile.error || selectedHomeFile.summary || t("buddyPage.files.unreadable") }}</p>
+            <section v-if="agentsHomeFile" class="buddy-page__file-preview buddy-page__file-preview--wide">
+              <header class="buddy-page__file-preview-header">
+                <div>
+                  <h4>{{ agentsHomeFile.path }}</h4>
+                  <p>{{ agentsHomeFile.summary || t("buddyPage.files.noSummary") }}</p>
                 </div>
-                <p v-if="selectedHomeFile.truncated" class="buddy-page__file-truncated">
-                  {{ t("buddyPage.files.truncated") }}
-                </p>
-              </section>
-            </div>
-            <ElEmpty v-else :description="t('buddyPage.files.empty')" />
+                <div class="buddy-page__file-preview-meta">
+                  <ElTag :type="homeFileTagType(agentsHomeFile)" effect="plain">
+                    {{ homeFileKindLabel(agentsHomeFile) }}
+                  </ElTag>
+                  <span>{{ formatHomeFileSize(agentsHomeFile.size_bytes) }}</span>
+                  <span>{{ formatDate(agentsHomeFile.updated_at) }}</span>
+                </div>
+              </header>
+              <pre v-if="agentsHomeFile.readable" class="buddy-page__file-content">{{ agentsHomeFile.content || t("buddyPage.files.emptyContent") }}</pre>
+              <div v-else class="buddy-page__file-unreadable">
+                <strong>{{ t("buddyPage.files.metadataOnly") }}</strong>
+                <p>{{ agentsHomeFile.error || agentsHomeFile.summary || t("buddyPage.files.unreadable") }}</p>
+              </div>
+              <p v-if="agentsHomeFile.truncated" class="buddy-page__file-truncated">
+                {{ t("buddyPage.files.truncated") }}
+              </p>
+            </section>
+            <ElEmpty v-else :description="t('buddyPage.agents.empty')" />
           </article>
         </ElTabPane>
 
@@ -304,133 +287,6 @@
           </article>
         </ElTabPane>
 
-        <ElTabPane :label="t('buddyPage.tabs.mascotDebug')" name="mascot-debug">
-          <article class="buddy-page__panel buddy-page__panel--mascot-debug">
-            <div class="buddy-page__panel-heading">
-              <div>
-                <h3>{{ t("buddyPage.mascotDebug.title") }}</h3>
-              </div>
-            </div>
-            <div class="buddy-page__debug-cursor-row">
-              <ElButton
-                class="buddy-page__debug-button buddy-page__debug-button--cursor"
-                :type="buddyMascotDebugStore.virtualCursorEnabled ? 'primary' : 'default'"
-                @click="buddyMascotDebugStore.setVirtualCursorEnabled(!buddyMascotDebugStore.virtualCursorEnabled)"
-              >
-                {{ buddyMascotDebugStore.virtualCursorEnabled ? t("buddyPage.mascotDebug.virtualCursor.disable") : t("buddyPage.mascotDebug.virtualCursor.enable") }}
-              </ElButton>
-            </div>
-            <section class="buddy-page__debug-motion-panel">
-              <header class="buddy-page__debug-motion-header">
-                <span>{{ t("buddyPage.mascotDebug.motion.title") }}</span>
-                <ElButton size="small" text @click="buddyMascotDebugStore.resetMotionConfig()">
-                  {{ t("buddyPage.mascotDebug.motion.reset") }}
-                </ElButton>
-              </header>
-              <div class="buddy-page__debug-motion-grid">
-                <label class="buddy-page__debug-motion-field">
-                  <span>{{ t("buddyPage.mascotDebug.motion.moveDuration") }}</span>
-                  <ElInputNumber
-                    :model-value="buddyMascotDebugStore.motionConfig.moveDurationMs"
-                    :min="120"
-                    :max="1200"
-                    :step="20"
-                    controls-position="right"
-                    size="small"
-                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ moveDurationMs: Number(value) })"
-                  />
-                </label>
-                <label class="buddy-page__debug-motion-field">
-                  <span>{{ t("buddyPage.mascotDebug.motion.stepPause") }}</span>
-                  <ElInputNumber
-                    :model-value="buddyMascotDebugStore.motionConfig.stepPauseMs"
-                    :min="0"
-                    :max="240"
-                    :step="4"
-                    controls-position="right"
-                    size="small"
-                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ stepPauseMs: Number(value) })"
-                  />
-                </label>
-                <label class="buddy-page__debug-motion-field">
-                  <span>{{ t("buddyPage.mascotDebug.motion.virtualCursorSpeed") }}</span>
-                  <ElInputNumber
-                    :model-value="buddyMascotDebugStore.motionConfig.virtualCursorFlightSpeedPxPerS"
-                    :min="40"
-                    :max="1200"
-                    :step="10"
-                    controls-position="right"
-                    size="small"
-                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ virtualCursorFlightSpeedPxPerS: Number(value) })"
-                  />
-                </label>
-                <label class="buddy-page__debug-motion-field">
-                  <span>{{ t("buddyPage.mascotDebug.motion.virtualCursorRotationSpeed") }}</span>
-                  <ElInputNumber
-                    :model-value="buddyMascotDebugStore.motionConfig.virtualCursorRotationSpeedDegPerS"
-                    :min="90"
-                    :max="1440"
-                    :step="30"
-                    controls-position="right"
-                    size="small"
-                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ virtualCursorRotationSpeedDegPerS: Number(value) })"
-                  />
-                </label>
-                <label class="buddy-page__debug-motion-field">
-                  <span>{{ t("buddyPage.mascotDebug.motion.mascotLookRangeX") }}</span>
-                  <ElInputNumber
-                    :model-value="buddyMascotDebugStore.motionConfig.mascotLookRangeX"
-                    :min="8"
-                    :max="40"
-                    :step="2"
-                    controls-position="right"
-                    size="small"
-                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ mascotLookRangeX: Number(value) })"
-                  />
-                </label>
-                <label class="buddy-page__debug-motion-field">
-                  <span>{{ t("buddyPage.mascotDebug.motion.mascotLookRangeY") }}</span>
-                  <ElInputNumber
-                    :model-value="buddyMascotDebugStore.motionConfig.mascotLookRangeY"
-                    :min="6"
-                    :max="28"
-                    :step="2"
-                    controls-position="right"
-                    size="small"
-                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ mascotLookRangeY: Number(value) })"
-                  />
-                </label>
-                <label class="buddy-page__debug-motion-field">
-                  <span>{{ t("buddyPage.mascotDebug.motion.virtualCursorFollowRange") }}</span>
-                  <ElInputNumber
-                    :model-value="buddyMascotDebugStore.motionConfig.virtualCursorFollowMaxDistancePx"
-                    :min="32"
-                    :max="360"
-                    :step="10"
-                    controls-position="right"
-                    size="small"
-                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ virtualCursorFollowMaxDistancePx: Number(value) })"
-                  />
-                </label>
-              </div>
-            </section>
-            <div class="buddy-page__debug-grid">
-              <section v-for="group in BUDDY_DEBUG_ACTION_GROUPS" :key="group.labelKey" class="buddy-page__debug-group">
-                <span class="buddy-page__debug-label">{{ t(group.labelKey) }}</span>
-                <div class="buddy-page__debug-actions">
-                  <ElButton
-                    v-for="action in group.actions"
-                    :key="action.action"
-                    class="buddy-page__debug-button"
-                    @click="buddyMascotDebugStore.trigger(action.action)"
-                  >
-                    {{ action.label }}
-                  </ElButton>
-                </div>
-              </section>
-            </div>
-          </article>
-        </ElTabPane>
         <ElTabPane :label="t('buddyPage.tabs.binding')" name="binding">
           <article class="buddy-page__panel">
             <div class="buddy-page__panel-heading">
@@ -734,6 +590,134 @@
           </article>
         </ElTabPane>
 
+        <ElTabPane :label="t('buddyPage.tabs.mascotDebug')" name="mascot-debug">
+          <article class="buddy-page__panel buddy-page__panel--mascot-debug">
+            <div class="buddy-page__panel-heading">
+              <div>
+                <h3>{{ t("buddyPage.mascotDebug.title") }}</h3>
+              </div>
+            </div>
+            <div class="buddy-page__debug-cursor-row">
+              <ElButton
+                class="buddy-page__debug-button buddy-page__debug-button--cursor"
+                :type="buddyMascotDebugStore.virtualCursorEnabled ? 'primary' : 'default'"
+                @click="buddyMascotDebugStore.setVirtualCursorEnabled(!buddyMascotDebugStore.virtualCursorEnabled)"
+              >
+                {{ buddyMascotDebugStore.virtualCursorEnabled ? t("buddyPage.mascotDebug.virtualCursor.disable") : t("buddyPage.mascotDebug.virtualCursor.enable") }}
+              </ElButton>
+            </div>
+            <section class="buddy-page__debug-motion-panel">
+              <header class="buddy-page__debug-motion-header">
+                <span>{{ t("buddyPage.mascotDebug.motion.title") }}</span>
+                <ElButton size="small" text @click="buddyMascotDebugStore.resetMotionConfig()">
+                  {{ t("buddyPage.mascotDebug.motion.reset") }}
+                </ElButton>
+              </header>
+              <div class="buddy-page__debug-motion-grid">
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.moveDuration") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.moveDurationMs"
+                    :min="120"
+                    :max="1200"
+                    :step="20"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ moveDurationMs: Number(value) })"
+                  />
+                </label>
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.stepPause") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.stepPauseMs"
+                    :min="0"
+                    :max="240"
+                    :step="4"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ stepPauseMs: Number(value) })"
+                  />
+                </label>
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.virtualCursorSpeed") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.virtualCursorFlightSpeedPxPerS"
+                    :min="40"
+                    :max="1200"
+                    :step="10"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ virtualCursorFlightSpeedPxPerS: Number(value) })"
+                  />
+                </label>
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.virtualCursorRotationSpeed") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.virtualCursorRotationSpeedDegPerS"
+                    :min="90"
+                    :max="1440"
+                    :step="30"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ virtualCursorRotationSpeedDegPerS: Number(value) })"
+                  />
+                </label>
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.mascotLookRangeX") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.mascotLookRangeX"
+                    :min="8"
+                    :max="40"
+                    :step="2"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ mascotLookRangeX: Number(value) })"
+                  />
+                </label>
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.mascotLookRangeY") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.mascotLookRangeY"
+                    :min="6"
+                    :max="28"
+                    :step="2"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ mascotLookRangeY: Number(value) })"
+                  />
+                </label>
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.virtualCursorFollowRange") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.virtualCursorFollowMaxDistancePx"
+                    :min="32"
+                    :max="360"
+                    :step="10"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ virtualCursorFollowMaxDistancePx: Number(value) })"
+                  />
+                </label>
+              </div>
+            </section>
+            <div class="buddy-page__debug-grid">
+              <section v-for="group in BUDDY_DEBUG_ACTION_GROUPS" :key="group.labelKey" class="buddy-page__debug-group">
+                <span class="buddy-page__debug-label">{{ t(group.labelKey) }}</span>
+                <div class="buddy-page__debug-actions">
+                  <ElButton
+                    v-for="action in group.actions"
+                    :key="action.action"
+                    class="buddy-page__debug-button"
+                    @click="buddyMascotDebugStore.trigger(action.action)"
+                  >
+                    {{ action.label }}
+                  </ElButton>
+                </div>
+              </section>
+            </div>
+          </article>
+        </ElTabPane>
+
       </ElTabs>
     </section>
   </AppShell>
@@ -856,7 +840,6 @@ const errorMessage = ref("");
 const profileDraft = ref<BuddyProfile>(defaultProfileDraft());
 const memoryDocumentDraft = ref<BuddyMemoryDocument>(defaultMemoryDocumentDraft());
 const homeFiles = ref<BuddyHomeFiles>(defaultHomeFiles());
-const selectedHomeFilePath = ref("");
 const summaryDraft = ref<BuddySessionSummary>(defaultSummaryDraft());
 const availableTemplates = ref<TemplateRecord[]>([]);
 const selectedBindingTemplate = ref<TemplateRecord | null>(null);
@@ -882,8 +865,8 @@ const selectedPausedRunDetail = ref<RunDetail | null>(null);
 const canSaveMemory = computed(() => {
   return Boolean(memoryDocumentDraft.value.content.trim() && !isSavingMemory.value);
 });
-const selectedHomeFile = computed(() => {
-  return homeFiles.value.files.find((file) => file.path === selectedHomeFilePath.value) ?? homeFiles.value.files[0] ?? null;
+const agentsHomeFile = computed(() => {
+  return homeFiles.value.files.find((file) => file.path === "AGENTS.md") ?? null;
 });
 const orderedRevisionRows = computed(() => buildBuddyRevisionHistoryRows(revisions.value, commands.value));
 const filteredRevisionRows = computed(() => filterBuddyRevisionHistoryRows(orderedRevisionRows.value, historyTargetFilter.value));
@@ -1024,17 +1007,6 @@ function homeFileTagType(file: BuddyHomeFileEntry) {
     return "success";
   }
   return undefined;
-}
-
-function selectHomeFile(path: string) {
-  selectedHomeFilePath.value = path;
-}
-
-function syncSelectedHomeFile() {
-  if (homeFiles.value.files.some((file) => file.path === selectedHomeFilePath.value)) {
-    return;
-  }
-  selectedHomeFilePath.value = homeFiles.value.files[0]?.path ?? "";
 }
 
 function historyDiffTagType(kind: BuddyRevisionDiffChangeKind) {
@@ -1235,7 +1207,6 @@ async function loadAll(options: LoadAllOptions = {}) {
     profileDraft.value = profile;
     memoryDocumentDraft.value = memoryDocument;
     homeFiles.value = homeFileList;
-    syncSelectedHomeFile();
     summaryDraft.value = summary;
     revisions.value = revisionList;
     commands.value = commandList;
@@ -1371,7 +1342,6 @@ async function refreshAuditTrail() {
 
 async function refreshHomeFiles() {
   homeFiles.value = await fetchBuddyHomeFiles();
-  syncSelectedHomeFile();
 }
 
 async function saveProfile() {
@@ -1382,6 +1352,7 @@ async function saveProfile() {
     );
     await refreshAuditTrail();
     await refreshHomeFiles();
+    buddyContextStore.notifyBuddyDataChanged();
     errorMessage.value = "";
     ElMessage.success(t("buddyPage.saved"));
   } catch (error) {
@@ -1527,6 +1498,7 @@ async function restoreRevision(revisionId: string) {
     restoreActionId.value = revisionId;
     acceptCommandResult(await restoreBuddyRevision(revisionId));
     await loadAll();
+    buddyContextStore.notifyBuddyDataChanged();
     ElMessage.success(t("buddyPage.history.restored"));
   } catch (error) {
     setError(error, "common.failedToSave");
@@ -1768,56 +1740,6 @@ onMounted(loadAll);
   width: 100%;
 }
 
-.buddy-page__file-browser {
-  display: grid;
-  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
-  gap: 14px;
-  min-height: 520px;
-}
-
-.buddy-page__file-list {
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  min-width: 0;
-  max-height: 640px;
-  overflow: auto;
-  padding-right: 4px;
-}
-
-.buddy-page__file-row {
-  display: grid;
-  gap: 4px;
-  width: 100%;
-  min-height: 58px;
-  border: 1px solid rgba(154, 52, 18, 0.1);
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.42);
-  color: rgba(60, 41, 20, 0.76);
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
-}
-
-.buddy-page__file-row:hover,
-.buddy-page__file-row:focus-visible,
-.buddy-page__file-row--active {
-  border-color: rgba(154, 52, 18, 0.24);
-  background: rgba(255, 248, 240, 0.84);
-  box-shadow: 0 8px 18px rgba(61, 43, 24, 0.055);
-  outline: none;
-}
-
-.buddy-page__file-row-name {
-  color: var(--toograph-text-strong);
-  font-family: var(--toograph-font-mono);
-  font-size: 0.86rem;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-
-.buddy-page__file-row-meta,
 .buddy-page__file-preview-header p,
 .buddy-page__file-preview-meta,
 .buddy-page__file-truncated,
@@ -1836,6 +1758,10 @@ onMounted(loadAll);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.38);
   overflow: hidden;
+}
+
+.buddy-page__file-preview--wide {
+  min-height: 520px;
 }
 
 .buddy-page__file-preview-header {
@@ -2424,15 +2350,6 @@ onMounted(loadAll);
 
   .buddy-page__split {
     grid-template-columns: 1fr;
-  }
-
-  .buddy-page__file-browser {
-    grid-template-columns: 1fr;
-    min-height: 0;
-  }
-
-  .buddy-page__file-list {
-    max-height: 280px;
   }
 
   .buddy-page__file-preview {

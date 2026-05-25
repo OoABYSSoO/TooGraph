@@ -5,6 +5,16 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "BuddyPage.vue"), "utf8");
+const messagesSource = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../i18n/messages.ts"), "utf8");
+
+function extractSourceBetween(startText: string, endText: string) {
+  const startIndex = source.indexOf(startText);
+  const endIndex = source.indexOf(endText, startIndex + startText.length);
+  if (startIndex === -1 || endIndex === -1) {
+    return "";
+  }
+  return source.slice(startIndex, endIndex);
+}
 
 test("BuddyPage manages profile, MEMORY.md, summary, and revisions", () => {
   assert.match(source, /fetchBuddyProfile/);
@@ -25,7 +35,8 @@ test("BuddyPage manages profile, MEMORY.md, summary, and revisions", () => {
   assert.match(source, /<ElTabs/);
   assert.match(source, /name="profile"/);
   assert.match(source, /name="memory"/);
-  assert.match(source, /name="files"/);
+  assert.match(source, /name="agents"/);
+  assert.doesNotMatch(source, /name="files"/);
   assert.match(source, /name="summary"/);
   assert.match(source, /name="binding"/);
   assert.match(source, /name="confirmation"/);
@@ -37,15 +48,31 @@ test("BuddyPage manages profile, MEMORY.md, summary, and revisions", () => {
   assert.match(source, /validateBuddyMemoryReviewTemplateBinding/);
   assert.match(source, /memoryDocumentDraft/);
   assert.match(source, /homeFiles/);
-  assert.match(source, /selectedHomeFile/);
-  assert.match(source, /buddy-page__file-browser/);
+  assert.match(source, /agentsHomeFile/);
+  assert.match(source, /file\.path === "AGENTS\.md"/);
+  assert.doesNotMatch(source, /selectedHomeFile/);
+  assert.doesNotMatch(source, /buddy-page__file-browser/);
   assert.match(source, /saveMemoryDocument/);
   assert.doesNotMatch(source, /fetchPlatformMemories/);
   assert.doesNotMatch(source, /platformMemoryCandidates/);
   assert.doesNotMatch(source, /createBuddyMemory/);
 });
 
-test("BuddyPage keeps template binding as the final advanced tab and renders it as Buddy input rows", () => {
+test("BuddyPage labels the profile surface as soul in Chinese", () => {
+  assert.match(messagesSource, /profile:\s*"灵魂"/);
+  assert.match(messagesSource, /title:\s*"伙伴灵魂"/);
+  assert.match(messagesSource, /saveProfile:\s*"保存灵魂"/);
+});
+
+test("BuddyPage notifies open Buddy widgets after SOUL.md changes", () => {
+  const saveProfileBlock = extractSourceBetween("async function saveProfile()", "async function saveMemoryDocument()");
+  const restoreRevisionBlock = extractSourceBetween("async function restoreRevision(revisionId: string)", "watch(");
+
+  assert.match(saveProfileBlock, /buddyContextStore\.notifyBuddyDataChanged\(\);/);
+  assert.match(restoreRevisionBlock, /buddyContextStore\.notifyBuddyDataChanged\(\);/);
+});
+
+test("BuddyPage keeps template binding before mascot debug and renders it as Buddy input rows", () => {
   const bindingIndex = source.indexOf('name="binding"');
   const profileIndex = source.indexOf('name="profile"');
   const mascotDebugIndex = source.indexOf('name="mascot-debug"');
@@ -53,7 +80,7 @@ test("BuddyPage keeps template binding as the final advanced tab and renders it 
   assert.ok(profileIndex > -1);
   assert.ok(mascotDebugIndex > -1);
   assert.ok(profileIndex < bindingIndex);
-  assert.ok(mascotDebugIndex < bindingIndex);
+  assert.ok(bindingIndex < mascotDebugIndex);
   assert.match(source, /const activeTab = ref\("profile"\);/);
   assert.match(source, /buildBuddyRunTemplateSourceRows/);
   assert.match(source, /buildBuddyRunInputNodeOptions/);
@@ -159,7 +186,7 @@ test("BuddyPage repairs stale run template binding through the command flow", ()
   assert.match(source, /await refreshAuditTrail\(\);/);
 });
 
-test("BuddyPage hosts the mascot action debug panel as a tab after History", () => {
+test("BuddyPage hosts the mascot action debug panel as a tab", () => {
   assert.match(source, /import \{ BUDDY_DEBUG_ACTION_GROUPS \} from "@\/buddy\/buddyMascotDebug";/);
   assert.match(source, /import \{ useBuddyMascotDebugStore \} from "@\/stores\/buddyMascotDebug";/);
   assert.match(source, /<ElTabPane :label="t\('buddyPage\.tabs\.mascotDebug'\)" name="mascot-debug">/);
@@ -203,7 +230,7 @@ test("BuddyPage debug tab exposes live mascot motion timing controls", () => {
   assert.match(source, /buddy-page__debug-motion-grid/);
 });
 
-test("BuddyPage places template binding after the other Buddy management tabs", () => {
+test("BuddyPage places mascot debug immediately after template binding", () => {
   const bindingIndex = source.indexOf('name="binding"');
   const confirmationIndex = source.indexOf('name="confirmation"');
   const historyIndex = source.indexOf('name="history"');
@@ -214,5 +241,5 @@ test("BuddyPage places template binding after the other Buddy management tabs", 
   assert.ok(mascotDebugIndex > -1);
   assert.ok(confirmationIndex < bindingIndex);
   assert.ok(historyIndex < bindingIndex);
-  assert.ok(mascotDebugIndex < bindingIndex);
+  assert.ok(bindingIndex < mascotDebugIndex);
 });

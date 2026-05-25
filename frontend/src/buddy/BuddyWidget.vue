@@ -82,7 +82,7 @@
         <header class="buddy-widget__header">
           <div class="buddy-widget__heading">
             <span class="buddy-widget__eyebrow">{{ t("buddy.eyebrow") }}</span>
-            <h2>{{ t("buddy.title") }}</h2>
+            <h2>{{ buddyDisplayName }}</h2>
           </div>
           <div class="buddy-widget__header-actions">
             <BuddySessionHistory
@@ -318,6 +318,7 @@ import { useRoute, useRouter } from "vue-router";
 
 import {
   appendBuddyChatMessage,
+  fetchBuddyProfile,
 } from "../api/buddy.ts";
 import SandboxedHtmlFrame from "../components/SandboxedHtmlFrame.vue";
 import { useBuddyContextStore } from "../stores/buddyContext.ts";
@@ -325,6 +326,8 @@ import {
   useBuddyMascotDebugStore,
 } from "../stores/buddyMascotDebug.ts";
 import { buildBuddyBubblePreviewLabel } from "./buddyBubblePreviewModel.ts";
+import { resolveBuddyWindowDisplayName } from "./buddyDisplayName.ts";
+import type { BuddyProfile } from "../types/buddy.ts";
 import type { GraphPayload } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
 
@@ -395,7 +398,7 @@ type BuddyFinishVisibleRunOptions = {
 
 const DRAG_THRESHOLD_PX = 4;
 const AVATAR_SINGLE_CLICK_DELAY_MS = 220;
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const buddyContextStore = useBuddyContextStore();
@@ -410,6 +413,7 @@ const {
 const viewport = ref(resolveViewport());
 const position = ref(resolveDefaultBuddyPosition(viewport.value));
 const isPanelOpen = ref(false);
+const buddyDisplayProfile = ref<BuddyProfile | null>(null);
 const draft = ref("");
 const isPanelFullscreen = ref(false);
 const queuedTurns = ref<BuddyQueuedTurn[]>([]);
@@ -433,6 +437,7 @@ let activeAbortController: AbortController | null = null;
 let isDrainingBuddyQueue = false;
 let avatarSingleClickTimerId: number | null = null;
 let speakingIdleTimerId: number | null = null;
+let buddyDisplayNameRequestId = 0;
 
 const isDragging = computed(() => Boolean(pointerDrag.value?.moved));
 const {
@@ -626,9 +631,26 @@ const bubbleText = computed(() => {
   return latestBuddyMessageForBubble.value?.content.trim() || t("buddy.readyBubble");
 });
 const bubblePreviewLabel = computed(() => buildBuddyBubblePreviewLabel(bubbleText.value));
+const buddyDisplayName = computed(() =>
+  resolveBuddyWindowDisplayName(buddyDisplayProfile.value, t("buddy.title"), String(locale.value)),
+);
+
+async function refreshBuddyDisplayName() {
+  const requestId = ++buddyDisplayNameRequestId;
+  try {
+    const profile = await fetchBuddyProfile();
+    if (requestId !== buddyDisplayNameRequestId) {
+      return;
+    }
+    buddyDisplayProfile.value = profile;
+  } catch {
+    // Keep the last known profile name on transient request failures.
+  }
+}
 
 onMounted(() => {
   hydratePosition();
+  void refreshBuddyDisplayName();
   void startChatSessionInitialization();
   hydrateBuddyModel();
   void hydrateBuddyPermissionMode();
@@ -679,6 +701,13 @@ watch(mascotDebugRequest, (request) => {
 watch(latestVirtualOperationRequest, (request) => {
   void executeVirtualOperationRequest(request);
 });
+
+watch(
+  () => buddyContextStore.dataRefreshNonce,
+  () => {
+    void refreshBuddyDisplayName();
+  },
+);
 
 function handleAvatarClick() {
   const action = resolveBuddyVirtualOperationUserAction({

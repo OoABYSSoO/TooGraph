@@ -20,13 +20,13 @@ POLICY_PATH = "policy.json"
 BUDDY_DB_PATH = "buddy.db"
 
 DEFAULT_PROFILE = {
-    "name": "TooGraph Buddy",
+    "name": "图图",
     "persona": "TooGraph 的全局伙伴。它通过图模板理解请求、选择能力、请求确认并返回结果。",
     "tone": "清晰、直接、克制。",
     "response_style": "默认先给结论，再给必要理由；涉及副作用时说明将要运行的图或 Action。",
     "display_preferences": {
         "language": "zh-CN",
-        "display_name": "Buddy",
+        "display_name": "TooGraph Buddy",
     },
 }
 
@@ -421,7 +421,7 @@ def render_profile_markdown(profile: dict[str, Any]) -> str:
     display_preferences = profile.get("display_preferences")
     if not isinstance(display_preferences, dict):
         display_preferences = {}
-    display_name = _as_text(display_preferences.get("display_name")) or "Buddy"
+    display_name = _as_text(display_preferences.get("display_name")) or _as_text(DEFAULT_PROFILE["display_preferences"]["display_name"])
     language = _as_text(display_preferences.get("language")) or "zh-CN"
     name = _as_text(profile.get("name")) or DEFAULT_PROFILE["name"]
     persona = _as_text(profile.get("persona")) or DEFAULT_PROFILE["persona"]

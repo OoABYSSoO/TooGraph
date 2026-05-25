@@ -51,6 +51,41 @@ test("Preset management labels localize node families in Chinese", () => {
   assert.equal(messages["en-US"].presets.agent, "LLM");
 });
 
+test("Chinese UI labels Action as execution item", () => {
+  const zh = messages["zh-CN"];
+  assert.equal(zh.nav.actions, "执行项");
+  assert.equal(zh.actions.eyebrow, "执行项");
+  assert.equal(zh.actions.title, "执行项管理");
+  assert.equal(zh.actions.total, "全部执行项");
+  assert.equal(zh.actions.resultCount, "{count} 个执行项");
+  assert.equal(zh.graphLibrary.requiredActions, "执行项");
+  assert.equal(zh.presets.requiredActions, "执行项");
+  assert.equal(zh.nodeCard.addAction, "添加执行项");
+  assert.equal(zh.nodeCard.selectAction, "选择执行项");
+  assert.equal(zh.nodeCard.noAction, "+ 执行项");
+  assert.equal(zh.nodeCard.loadingActions, "正在加载执行项...");
+
+  const actionUiText = [
+    zh.nav.actions,
+    zh.graphLibrary.requiredActions,
+    zh.presets.searchPlaceholder,
+    zh.presets.requiredActions,
+    ...flattenStringValues(zh.actions),
+    zh.nodeCard.removeAction,
+    zh.nodeCard.addAction,
+    zh.nodeCard.selectAction,
+    zh.nodeCard.noAction,
+    zh.nodeCard.actionLoadFailed,
+    zh.nodeCard.actionCopy,
+    zh.nodeCard.loadingActions,
+    zh.nodeCard.noActions,
+  ];
+  assert.deepEqual(
+    actionUiText.filter((text) => /\bActions?\b/.test(text)),
+    [],
+  );
+});
+
 test("i18n messages localize preset persistence feedback", () => {
   assert.equal(messages["zh-CN"].feedback.presetSaved, "已保存预设节点：{label}");
   assert.equal(messages["zh-CN"].feedback.presetSaveFailed, "预设节点保存失败。");
@@ -102,3 +137,13 @@ test("new language packs use handwritten localized UI copy for high-traffic surf
   assert.equal(messages["fr-FR"].runs.refresh, "Actualiser");
   assert.equal(messages["de-DE"].tab.fromTemplate, "Aus Vorlage erstellen");
 });
+
+function flattenStringValues(value: unknown): string[] {
+  if (typeof value === "string") {
+    return [value];
+  }
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+  return Object.values(value).flatMap((child) => flattenStringValues(child));
+}
