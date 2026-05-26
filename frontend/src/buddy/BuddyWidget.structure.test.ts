@@ -650,7 +650,7 @@ test("BuddyWidget stores buddy chat in backend sessions and exposes a compact hi
   assert.match(componentSource, /import \{[\s\S]*appendBuddyChatMessage,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
   assert.doesNotMatch(componentSource, /fetchBuddyRunTemplateBinding/);
   assert.match(boundRunTemplateSource, /import \{[\s\S]*fetchBuddyRunTemplateBinding,[\s\S]*fetchBuddySessionSummary,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
-  assert.match(autonomousReviewRunSource, /import \{ fetchBuddyMemoryReviewTemplateBinding \} from "\.\.\/api\/buddy\.ts";/);
+  assert.match(autonomousReviewRunSource, /import \{ enqueueBuddyBackgroundReview \} from "\.\.\/api\/buddy\.ts";/);
   assert.match(chatSessionsSource, /import \{[\s\S]*createBuddyChatSession,[\s\S]*deleteBuddyChatSession,[\s\S]*fetchBuddyChatMessages,[\s\S]*fetchBuddyChatSessions,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
   assert.match(componentSource, /import \{ Close, FullScreen, Plus, SemiSelect \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /import \{ ElIcon, ElOption, ElSelect \} from "element-plus";/);
@@ -742,8 +742,9 @@ test("BuddyWidget starts visible runs from the saved template binding", () => {
 
 test("BuddyWidget starts autonomous review as a separate background run after the visible reply", () => {
   assert.notEqual(visibleRunTemplateEffectsSource, "");
-  assert.match(autonomousReviewRunSource, /buildBuddyReviewGraph/);
-  assert.match(autonomousReviewRunSource, /fetchBuddyMemoryReviewTemplateBinding/);
+  assert.match(autonomousReviewRunSource, /enqueueBuddyBackgroundReview/);
+  assert.doesNotMatch(autonomousReviewRunSource, /buildBuddyReviewGraph/);
+  assert.doesNotMatch(autonomousReviewRunSource, /fetchBuddyMemoryReviewTemplateBinding/);
   assert.match(visibleRunTemplateEffectsSource, /useBuddyAutonomousReviewRun/);
   assert.match(visibleRunTemplateEffectsSource, /useBuddyContextCompactionRun/);
   assert.match(componentSource, /import \{ useBuddyVisibleRunTemplateEffects \} from "\.\/useBuddyVisibleRunTemplateEffects\.ts";/);
@@ -751,13 +752,8 @@ test("BuddyWidget starts autonomous review as a separate background run after th
   assert.match(componentSource, /void startBuddyVisibleRunTemplateEffects\(\{/);
   assert.match(visibleRunTemplateEffectsSource, /void startBuddyAutonomousReviewRun\(request\.runDetail\);/);
   assert.match(autonomousReviewRunSource, /async function startBuddyAutonomousReviewRun\(mainRun: RunDetail\)/);
-  assert.match(autonomousReviewRunSource, /const binding = await fetchBuddyMemoryReviewTemplateBinding\(\);/);
-  assert.match(autonomousReviewRunSource, /fetchTemplate\(binding\.template_id\)/);
-  assert.match(autonomousReviewRunSource, /const graph = buildBuddyReviewGraph\(template,\s*\{[\s\S]*mainRun,[\s\S]*buddyModel: buddyModelRef\.value,[\s\S]*\}\);/);
-  assert.match(autonomousReviewRunSource, /binding,/);
-  assert.match(autonomousReviewRunSource, /currentSessionId: currentSessionId\.value \?\? ""/);
-  assert.match(autonomousReviewRunSource, /const reviewRun = await runGraph\(graph\);/);
-  assert.match(autonomousReviewRunSource, /void pollBuddyAutonomousReviewRun\(reviewRun\.run_id\);/);
+  assert.match(autonomousReviewRunSource, /const reviewRun = await enqueueBuddyBackgroundReview\(\{[\s\S]*source_run_id: mainRun\.run_id,[\s\S]*buddy_model_ref: buddyModelRef\.value,[\s\S]*\}\);/);
+  assert.match(autonomousReviewRunSource, /void pollBuddyAutonomousReviewRun\(reviewRun\.review_run_id\);/);
   assert.match(autonomousReviewRunSource, /const backgroundReviewAbortControllers = new Set<AbortController>\(\);/);
   assert.match(componentSource, /abortBuddyVisibleRunTemplateEffects\(\);/);
   assert.doesNotMatch(componentSource, /import \{ useBuddyAutonomousReviewRun \} from "\.\/useBuddyAutonomousReviewRun\.ts";/);

@@ -3,8 +3,8 @@
   "actionKey": "toograph_capability_selector",
   "name": "TooGraph 能力选择器",
   "description": "根据当前 LLM 节点可见的图状态和 before_llm.py 提供的启用能力目录，判断是否还需要调用一个动态 Action、Subgraph、Tool；不需要时返回 none。",
-  "llmInstruction": "你已绑定 TooGraph 能力选择器。先根据当前图状态判断本轮是否还需要调用能力；所有连接到本 LLM 节点的普通 state 都是可用上下文，stateInputSchema 只是提示用户可连接哪些信息，不代表唯一输入。如果当前状态已经足够回复用户，或上一轮 result_package/capability_review 表明能力已成功产出可用结果且不需要继续调用能力，只输出 {\"kind\":\"none\"}。只有仍需要一个显式能力完成下一步时，才读取 Action Pre-LLM Context 中按 Subgraphs、Actions、Tools 分区列出的当前启用能力目录并选择一个互斥 capability。目录中的每个能力只提供 key 和使用场景 description。只输出 llmOutputSchema.capability。选择优先级：subgraph > action > tool；当多个能力都能完成当前下一步时，选择优先级最高且描述最匹配的一个。kind 必须是 subgraph、action、tool 或 none；选择能力时 key 必须完全来自对应分区；没有合适能力或不需要能力时只输出 {\"kind\":\"none\"}，不需要 reason。不要执行能力，不要输出候选列表。",
-  "version": "3.2.0",
+  "llmInstruction": "根据当前图状态判断本轮是否还需要调用能力；所有连接到本 LLM 节点的普通 state 都是可用上下文，stateInputSchema 只是提示用户可连接哪些信息，不代表唯一输入。如果当前状态已经足够回复用户，或上一轮 result_package/capability_review 表明能力已成功产出可用结果且不需要继续调用能力，输出 {\"kind\":\"none\"}。需要一个显式能力完成下一步时，读取 Action Pre-LLM Context 中按 Subgraphs、Actions、Tools 分区列出的当前启用能力目录，并选择一个互斥 capability。目录包含 key、description、selection metadata 和历史反馈摘要，用于判断覆盖范围、输出完整性、权限层级、eval 覆盖和近期表现。输出 llmOutputSchema.capability。选择优先级：subgraph > action > tool；当多个能力都能完成当前下一步时，选择优先级最高、覆盖最完整、权限层级和历史反馈最合适的一个。kind 必须是 subgraph、action、tool 或 none；选择能力时 key 必须完全来自对应分区；没有合适能力或不需要能力时输出 {\"kind\":\"none\"}，不需要 reason。本节点只输出单个 capability 对象；能力执行和候选审计由运行时与 after_llm 完成。",
+  "version": "3.3.0",
   "timeoutSeconds": 30,
   "permissions": [],
   "stateInputSchema": [
@@ -13,6 +13,12 @@
       "name": "Current Requirement",
       "valueType": "text",
       "description": "可选提示：当前这一步希望能力选择器完成的目标。未显式连接时，选择器会直接使用本 LLM 节点可见的普通图状态。"
+    },
+    {
+      "key": "agent_loop_control",
+      "name": "Agent Loop Control",
+      "valueType": "json",
+      "description": "可选循环预算状态；连接后 after_llm.py 会把能力调用预算写入 capability_selection_trace.budget_after_call。"
     }
   ],
   "llmOutputSchema": [
@@ -35,6 +41,18 @@
       "name": "Needs Capability",
       "valueType": "boolean",
       "description": "当下一步仍需要调用一个已启用、可发现的 action/subgraph/tool 时为 true；kind 为 none 或选择无效时为 false。"
+    },
+    {
+      "key": "selection_reason",
+      "name": "Selection Reason",
+      "valueType": "text",
+      "description": "能力选择器规范化后的选择理由；没有能力时说明 none 的理由。"
+    },
+    {
+      "key": "capability_selection_trace",
+      "name": "Capability Selection Trace",
+      "valueType": "json",
+      "description": "确定性能力选择审计，包含原始请求、最终选择、拒绝候选、fallback 候选、权限摘要和评分拆解。"
     }
   ]
 }

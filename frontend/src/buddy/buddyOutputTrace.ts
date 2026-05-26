@@ -1,5 +1,6 @@
 import type { ConditionalEdge, GraphEdge, GraphNode, GraphPayload } from "../types/node-system.ts";
 import type { NodeExecutionDetail, RunDetail } from "../types/run.ts";
+import { listCapabilitySelectionTraceLabels } from "../lib/capabilitySelectionTrace.ts";
 import { summarizeVirtualOperationActivity, type VirtualOperationGraphRevision } from "../lib/virtual-operation-activity.ts";
 import type { BuddyPublicOutputBinding } from "./buddyPublicOutput.ts";
 
@@ -68,6 +69,7 @@ export type BuddyOutputTraceRuntimeState = {
 };
 
 type RunEventPayload = Record<string, unknown>;
+type AgentLoopEventRecord = NonNullable<RunDetail["agent_loop_events"]>[number];
 
 type TraceTimelineItem = {
   eventType: "node.started" | "node.completed" | "node.failed" | "activity.event";
@@ -1045,11 +1047,12 @@ function minNullableNumber(left: number | null, right: number | null) {
 function buildTraceTimelineFromRunDetail(run: RunDetail) {
   const items: TraceTimelineItem[] = [];
   let order = 0;
+  const agentLoopEventsByNode = buildAgentLoopEventsByNode(run.agent_loop_events);
   for (const execution of run.node_executions ?? []) {
     appendExecutionTimelineItems(items, execution, "", [], () => {
       order += 1;
       return order;
-    });
+    }, { agentLoopEventsByNode });
   }
   for (const [index, event] of (run.artifacts?.activity_events ?? []).entries()) {
     const timeMs = parseEventEpochMs(event.created_at) ?? Number.MAX_SAFE_INTEGER;
@@ -1072,6 +1075,7 @@ function appendExecutionTimelineItems(
   options: {
     timelineTimeMs?: number | null;
     dynamicCapability?: DynamicCapabilityTraceContext;
+    agentLoopEventsByNode?: Map<string, AgentLoopEventRecord[]>;
   } = {},
 ) {
   const nodeId = normalizeText(execution.node_id);
@@ -1129,7 +1133,7 @@ function appendExecutionTimelineItems(
         status: execution.status,
         started_at: execution.started_at,
         duration_ms: execution.duration_ms,
-        artifact_labels: buildAgentLoopArtifactLabels(execution),
+        artifact_labels: buildAgentLoopArtifactLabels(execution, options.agentLoopEventsByNode?.get(nodeId) ?? []),
         ...context,
         ...buildDynamicCapabilityTimelineContext(options.dynamicCapability),
       },
@@ -1176,9 +1180,66 @@ function appendDynamicCapabilitySubgraphTimelineItems(
   }
 }
 
-function buildAgentLoopArtifactLabels(execution: NodeExecutionDetail) {
+function buildAgentLoopArtifactLabels(execution: NodeExecutionDetail, agentLoopEvents: AgentLoopEventRecord[] = []) {
   const outputs = recordFromUnknown(execution.artifacts?.outputs);
   const report = recordFromUnknown(outputs?.agent_loop_report);
+  return uniqueTextList([
+    ...buildAgentLoopEventArtifactLabels(agentLoopEvents),
+    ...buildAgentLoopReportArtifactLabels(report),
+    ...buildCapabilitySelectionArtifactLabels(execution, outputs),
+  ].filter(Boolean));
+}
+
+function buildAgentLoopEventsByNode(events: RunDetail["agent_loop_events"]) {
+  const byNode = new Map<string, AgentLoopEventRecord[]>();
+  for (const event of events ?? []) {
+    const nodeId = normalizeText(event.node_id);
+    if (!nodeId) {
+      continue;
+    }
+    byNode.set(nodeId, [...(byNode.get(nodeId) ?? []), event]);
+  }
+  return byNode;
+}
+
+function buildAgentLoopEventArtifactLabels(events: AgentLoopEventRecord[]) {
+  const event = latestAgentLoopEvent(events);
+  if (!event) {
+    return [];
+  }
+  const detail = recordFromUnknown(event.detail) ?? {};
+  const budget = recordFromUnknown(event.budget_snapshot) ?? {};
+  return buildAgentLoopReportArtifactLabels({
+    ...detail,
+    stop_reason: normalizeText(event.stop_reason) || normalizeText(detail.stop_reason),
+    decision: normalizeText(detail.decision) || normalizeText(event.event_kind),
+    capability_call_count: normalizeNumber(budget.capability_call_count) ?? normalizeNumber(detail.capability_call_count),
+    max_capability_calls: normalizeNumber(budget.max_capability_calls) ?? normalizeNumber(detail.max_capability_calls),
+  });
+}
+
+function latestAgentLoopEvent(events: AgentLoopEventRecord[]) {
+  return [...events].sort((left, right) => {
+    const iterationDelta = (normalizeNumber(right.iteration_index) ?? -1) - (normalizeNumber(left.iteration_index) ?? -1);
+    if (iterationDelta !== 0) {
+      return iterationDelta;
+    }
+    return normalizeText(right.created_at).localeCompare(normalizeText(left.created_at));
+  })[0] ?? null;
+}
+
+function uniqueTextList(values: string[]) {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    if (!value || seen.has(value)) {
+      return false;
+    }
+    seen.add(value);
+    return true;
+  });
+}
+
+function buildAgentLoopReportArtifactLabels(report: Record<string, unknown> | null) {
   if (!report) {
     return [];
   }
@@ -1192,7 +1253,23 @@ function buildAgentLoopArtifactLabels(execution: NodeExecutionDetail) {
     capabilityCallCount !== null || maxCapabilityCalls !== null
       ? `capabilities: ${capabilityCallCount ?? "?"} / ${maxCapabilityCalls ?? "?"}`
       : "",
-  ].filter(Boolean);
+  ];
+}
+
+function buildCapabilitySelectionArtifactLabels(
+  execution: NodeExecutionDetail,
+  outputs: Record<string, unknown> | null,
+) {
+  const stateWriteTrace = findStateWriteValue(execution, "capability_selection_trace");
+  const stateWriteReason = findStateWriteValue(execution, "capability_selection_reason");
+  return listCapabilitySelectionTraceLabels(
+    outputs?.capability_selection_trace ?? stateWriteTrace,
+    outputs?.capability_selection_reason ?? outputs?.selection_reason ?? stateWriteReason,
+  );
+}
+
+function findStateWriteValue(execution: NodeExecutionDetail, stateKey: string) {
+  return (execution.artifacts?.state_writes ?? []).find((write) => normalizeText(write.state_key) === stateKey)?.value;
 }
 
 function buildDynamicCapabilityTimelineContext(context: DynamicCapabilityTraceContext | undefined) {

@@ -102,6 +102,7 @@ class ToolNodeRuntimeTests(unittest.TestCase):
         self.assertIn("context", calls[0]["kwargs"])
         self.assertEqual(result["outputs"], {"result": {"echo": {"ok": True}}})
         self.assertEqual(result["selected_tools"], ["json_passthrough"])
+        self.assertEqual(result["tool_outputs"][0]["node_id"], "passthrough")
         self.assertEqual(result["tool_outputs"][0]["tool_key"], "json_passthrough")
         self.assertEqual(result["tool_outputs"][0]["state_writes"], {"result": {"echo": {"ok": True}}})
         self.assertEqual(events[0]["kind"], "tool_invocation")

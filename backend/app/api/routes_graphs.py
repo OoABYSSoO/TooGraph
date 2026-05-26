@@ -8,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
 
+from app.buddy import improvement_candidates
 from app.core.compiler.validator import validate_graph
 from app.core.langgraph import execute_node_system_graph_langgraph, get_langgraph_runtime_unsupported_reasons
 from app.core.runtime.run_events import publish_run_event
@@ -242,16 +243,25 @@ def _run_graph_worker(
 ) -> None:
     try:
         execute_node_system_graph_langgraph(graph, run_state, persist_progress=True)
+        _sync_improvement_candidate_validation_run(run_state)
     except Exception as exc:  # pragma: no cover - defensive runtime path
         logger.exception("Graph run %s failed: %s", run_state.get("run_id"), exc)
         set_run_status(run_state, "failed")
         run_state.setdefault("errors", []).append(str(exc))
         save_run(run_state)
+        _sync_improvement_candidate_validation_run(run_state)
         publish_run_event(
             str(run_state.get("run_id") or ""),
             "run.failed",
             {"status": "failed", "error": str(exc)},
         )
+
+
+def _sync_improvement_candidate_validation_run(run_state: dict[str, Any]) -> None:
+    metadata = run_state.get("metadata") if isinstance(run_state.get("metadata"), dict) else {}
+    if metadata.get("buddy_improvement_candidate_review") is not True:
+        return
+    improvement_candidates.sync_validation_run(str(run_state.get("run_id") or ""))
 
 
 def _compact_text(value: Any) -> str:

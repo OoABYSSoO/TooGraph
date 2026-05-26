@@ -48,6 +48,8 @@ class StorageDatabaseTests(unittest.TestCase):
                 "graph_outputs",
                 "graph_artifacts",
                 "graph_capability_invocations",
+                "capability_usage_events",
+                "agent_loop_events",
                 "graph_model_calls",
             }.issubset(table_names)
         )
@@ -62,6 +64,10 @@ class StorageDatabaseTests(unittest.TestCase):
                 "idx_graph_node_executions_node",
                 "idx_graph_run_events_sequence",
                 "idx_graph_run_events_type",
+                "idx_agent_loop_events_run",
+                "idx_agent_loop_events_stop_reason",
+                "idx_capability_usage_events_run",
+                "idx_capability_usage_events_key",
             }.issubset(index_names)
         )
 

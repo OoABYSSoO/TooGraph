@@ -107,6 +107,13 @@ test("AppShell exposes preset node and action management as primary sidebar dest
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Opportunity \/><\/ElIcon>/);
 });
 
+test("AppShell exposes improvement candidates as a primary sidebar destination", () => {
+  assert.match(componentSource, /import \{[\s\S]*TrendCharts[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /to="\/improvements"[\s\S]*activeNavigationSection === 'improvements'[\s\S]*t\("nav\.improvements"\)/);
+  assert.match(componentSource, /data-virtual-affordance-id="app\.nav\.improvements"/);
+  assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><TrendCharts \/><\/ElIcon>/);
+});
+
 test("AppShell exposes model provider management as a primary sidebar destination", () => {
   assert.match(componentSource, /import \{[\s\S]*DataLine[\s\S]*\} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /to="\/models"[\s\S]*activeNavigationSection === 'models'[\s\S]*t\("nav\.models"\)/);

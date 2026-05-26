@@ -185,6 +185,7 @@ def execute_tool_node(
     output_values = {binding.state: state_writes.get(binding.state) for binding in node.writes}
     final_result_value = first_truthy_func(output_values.values())
     tool_output_record = {
+        "node_id": node_name,
         "tool_name": str(getattr(tool_definition, "name", "") or tool_key),
         "tool_key": tool_key,
         "input_source": "state",
@@ -505,11 +506,11 @@ def execute_agent_node(
         )
     runtime_config = resolve_agent_runtime_config_func(node)
     graph_metadata = graph_context.get("metadata") if isinstance(graph_context.get("metadata"), dict) else {}
-    action_runtime_context = graph_metadata.get("action_runtime_context") if isinstance(graph_metadata, dict) else None
-    if isinstance(action_runtime_context, dict):
+    action_runtime_context = _resolve_action_runtime_context_from_graph_metadata(graph_metadata)
+    if action_runtime_context:
         runtime_config = {
             **runtime_config,
-            "action_runtime_context": dict(action_runtime_context),
+            "action_runtime_context": action_runtime_context,
         }
     action_definitions = get_action_definition_registry_func(include_disabled=False)
     resolved_bindings = resolve_agent_action_bindings(node, input_values=input_values, state_schema=state_schema)
@@ -639,6 +640,8 @@ def execute_agent_node(
                     if callable_accepts_keyword_func(invoke_action_func, "context"):
                         action_invoke_kwargs["context"] = _build_action_invocation_context(
                             state=state,
+                            node=node,
+                            input_values=input_values,
                             node_name=node_name,
                             action_key=action_key,
                             runtime_config=runtime_config,
@@ -698,6 +701,8 @@ def execute_agent_node(
                 if callable_accepts_keyword_func(invoke_action_func, "context"):
                     action_invoke_kwargs["context"] = _build_action_invocation_context(
                         state=state,
+                        node=node,
+                        input_values=input_values,
                         node_name=node_name,
                         action_key=action_key,
                         runtime_config=runtime_config,
@@ -730,6 +735,7 @@ def execute_agent_node(
         action_context[action_key] = action_result
         action_outputs.append(
             {
+                "node_id": node_name,
                 "action_name": action_key,
                 "action_key": action_key,
                 "binding_source": resolved_binding.source,
@@ -884,6 +890,7 @@ def execute_agent_node(
         selected_capabilities.append({"kind": "subgraph", "key": subgraph_key})
         capability_outputs.append(
             {
+                "node_id": node_name,
                 "capability_kind": "subgraph",
                 "capability_key": subgraph_key,
                 "binding_source": "capability_state",
@@ -1385,6 +1392,8 @@ def is_missing_action_input_value(value: Any) -> bool:
 def _build_action_invocation_context(
     *,
     state: dict[str, Any],
+    node: NodeSystemAgentNode,
+    input_values: dict[str, Any],
     node_name: str,
     action_key: str,
     runtime_config: dict[str, Any],
@@ -1404,6 +1413,47 @@ def _build_action_invocation_context(
     action_runtime_context = runtime_config.get("action_runtime_context")
     if isinstance(action_runtime_context, dict):
         context["action_runtime_context"] = dict(action_runtime_context)
+    action_state_inputs, action_state_input_sources = _resolve_bound_action_state_inputs(
+        node=node,
+        input_values=input_values,
+        action_key=action_key,
+    )
+    if action_state_inputs:
+        runtime_context = dict(context.get("action_runtime_context") or {})
+        runtime_context["action_state_inputs"] = action_state_inputs
+        runtime_context["action_state_input_sources"] = action_state_input_sources
+        context["action_runtime_context"] = runtime_context
+    return context
+
+
+def _resolve_bound_action_state_inputs(
+    *,
+    node: NodeSystemAgentNode,
+    input_values: dict[str, Any],
+    action_key: str,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    values: dict[str, Any] = {}
+    sources: dict[str, str] = {}
+    for read in node.reads:
+        binding = read.binding
+        if binding is None or binding.kind != NodeSystemReadBindingKind.ACTION_INPUT:
+            continue
+        if binding.action_key != action_key:
+            continue
+        field_key = str(binding.field_key or "").strip()
+        if not field_key:
+            continue
+        values[field_key] = copy.deepcopy(input_values.get(read.state))
+        sources[field_key] = read.state
+    return values, sources
+
+
+def _resolve_action_runtime_context_from_graph_metadata(graph_metadata: dict[str, Any]) -> dict[str, Any]:
+    action_runtime_context = graph_metadata.get("action_runtime_context")
+    context = copy.deepcopy(action_runtime_context) if isinstance(action_runtime_context, dict) else {}
+    capability_permission_policy = graph_metadata.get("capability_permission_policy")
+    if isinstance(capability_permission_policy, dict):
+        context["capability_permission_policy"] = copy.deepcopy(capability_permission_policy)
     return context
 
 

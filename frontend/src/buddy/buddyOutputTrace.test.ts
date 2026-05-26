@@ -1112,6 +1112,138 @@ test("buildBuddyOutputTraceStateFromRunDetail attaches agent loop diagnostics wi
   assert.ok(labels.includes("capabilities: 4 / 4"));
 });
 
+test("buildBuddyOutputTraceStateFromRunDetail attaches projected agent loop diagnostics", () => {
+  const graph = fiveNodeGraph();
+  const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));
+  const run = {
+    run_id: "run_projected_guard",
+    status: "completed",
+    node_executions: [
+      execution("node_a", "agent", "A", "2026-05-13T10:00:00.000Z", 100),
+      execution("node_b", "tool", "guard", "2026-05-13T10:00:00.200Z", 100),
+    ],
+    agent_loop_events: [
+      {
+        event_id: "loop_event_1",
+        run_id: "run_projected_guard",
+        node_id: "node_b",
+        iteration_index: 4,
+        event_kind: "stop",
+        capability_kind: "action",
+        capability_key: "web_search",
+        stop_reason: "capability_budget_exhausted",
+        budget_snapshot: {
+          capability_call_count: 4,
+          max_capability_calls: 4,
+        },
+        detail: { decision: "stop" },
+        created_at: "2026-05-13T10:00:00.300Z",
+      },
+    ],
+    artifacts: {
+      output_previews: [
+        {
+          node_id: "output_b1",
+          source_kind: "state",
+          source_key: "state_b1",
+          display_mode: "markdown",
+          persist_enabled: false,
+          persist_format: "md",
+          value: "done",
+        },
+      ],
+    },
+  } as Partial<RunDetail> as RunDetail;
+
+  const traceState = buildBuddyOutputTraceStateFromRunDetail(run, plan, graph);
+  const segments = listBuddyOutputTraceSegmentsForDisplay(traceState, { visibleOutputNodeIds: new Set(["output_b1"]) });
+  const labels = segments.flatMap((segment) => segment.records.flatMap((record) => record.artifactLabels ?? []));
+
+  assert.equal(segments.length, 1);
+  assert.ok(labels.includes("stop: capability_budget_exhausted"));
+  assert.ok(labels.includes("decision: stop"));
+  assert.ok(labels.includes("capabilities: 4 / 4"));
+});
+
+test("buildBuddyOutputTraceStateFromRunDetail exposes capability selection trace evidence labels", () => {
+  const graph = fiveNodeGraph();
+  graph.nodes.select_capability = {
+    kind: "agent",
+    name: "选择能力",
+    description: "",
+    reads: [],
+    writes: [{ state: "capability_selection_trace", mode: "replace" }],
+    config: { actionKey: "toograph_capability_selector", actionBindings: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "low", temperature: 0.2 },
+    ui: { position: { x: 0, y: 0 } },
+  };
+  graph.edges = graph.edges.filter((edge) => !(edge.source === "node_c" && edge.target === "node_d"));
+  graph.edges.push({ source: "node_c", target: "select_capability" });
+  graph.edges.push({ source: "select_capability", target: "node_d" });
+  const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));
+  const run = {
+    run_id: "run_capability_trace",
+    status: "completed",
+    node_executions: [
+      execution("node_a", "agent", "A", "2026-05-13T10:00:00.000Z", 100),
+      execution("node_b", "agent", "B", "2026-05-13T10:00:00.200Z", 100),
+      {
+        ...execution("select_capability", "agent", "选择能力", "2026-05-13T10:00:00.400Z", 100),
+        artifacts: {
+          inputs: {},
+          outputs: {
+            capability_selection_trace: {
+              requested: { kind: "action", key: "raw_search" },
+              selected: { kind: "subgraph", key: "advanced_web_research_loop" },
+              rejected_candidates: [
+                { kind: "action", key: "raw_search", reason: "higher_level_capability_preferred" },
+              ],
+              fallback_candidates: [
+                { kind: "tool", key: "web_search" },
+              ],
+              permission_summary: {
+                permissions: ["network"],
+                requires_approval: true,
+                permission_tier: "external",
+              },
+            },
+          },
+          family: "agent",
+          state_reads: [],
+          state_writes: [{ state_key: "capability_selection_trace", output_key: "capability_selection_trace" }],
+        },
+      },
+      execution("node_c", "agent", "C", "2026-05-13T10:00:00.600Z", 100),
+    ],
+    artifacts: {
+      output_previews: [
+        {
+          node_id: "output_e1",
+          source_kind: "state",
+          source_key: "state_c",
+          display_mode: "markdown",
+          persist_enabled: false,
+          persist_format: "md",
+          value: "done",
+        },
+      ],
+    },
+  } as Partial<RunDetail> as RunDetail;
+
+  const traceState = buildBuddyOutputTraceStateFromRunDetail(run, plan, graph);
+  const labels = listBuddyOutputTraceSegmentsForDisplay(traceState, { visibleOutputNodeIds: new Set(["output_e1"]) })
+    .flatMap((segment) => segment.records)
+    .find((record) => record.nodeId === "select_capability")
+    ?.artifactLabels;
+
+  assert.deepEqual(labels, [
+    "selected: subgraph:advanced_web_research_loop",
+    "requested: action:raw_search",
+    "permission: external approval",
+    "rejected: action:raw_search (higher_level_capability_preferred)",
+    "fallback: tool:web_search",
+  ]);
+});
+
 test("buildBuddyOutputTraceStateFromRunDetail keeps trace-only empty outputs with the next visible output capsule", () => {
   const graph = fiveNodeGraph();
   graph.nodes.node_gate = {

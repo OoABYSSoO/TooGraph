@@ -80,6 +80,20 @@ class CycleSummary(BaseModel):
     stop_reason: str | None = None
 
 
+class AgentLoopEvent(BaseModel):
+    event_id: str = ""
+    run_id: str = ""
+    node_id: str = ""
+    iteration_index: int | None = None
+    event_kind: str = ""
+    capability_kind: str = ""
+    capability_key: str = ""
+    stop_reason: str = ""
+    budget_snapshot: dict[str, Any] = Field(default_factory=dict)
+    detail: dict[str, Any] = Field(default_factory=dict)
+    created_at: str = ""
+
+
 class CheckpointMetadata(BaseModel):
     available: bool = False
     checkpoint_id: str | None = None
@@ -240,6 +254,7 @@ class RunDetail(RunSummary):
     graph_snapshot: dict[str, Any] = Field(default_factory=dict)
     run_snapshots: list[RunSnapshot] = Field(default_factory=list)
     cycle_summary: CycleSummary = Field(default_factory=CycleSummary)
+    agent_loop_events: list[AgentLoopEvent] = Field(default_factory=list)
 
 
 class NodeExecutionDetail(BaseModel):

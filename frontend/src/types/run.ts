@@ -114,6 +114,20 @@ export type CycleSummary = {
   stop_reason?: string | null;
 };
 
+export type AgentLoopEvent = {
+  event_id: string;
+  run_id?: string;
+  node_id?: string;
+  iteration_index?: number | null;
+  event_kind?: string;
+  capability_kind?: string;
+  capability_key?: string;
+  stop_reason?: string;
+  budget_snapshot?: Record<string, unknown>;
+  detail?: Record<string, unknown>;
+  created_at?: string;
+};
+
 export type SavedOutputArtifact = {
   node_id?: string | null;
   source_key: string;
@@ -288,4 +302,5 @@ export type RunDetail = RunSummary & {
   graph_snapshot: Record<string, unknown>;
   run_snapshots?: RunSnapshot[];
   cycle_summary?: CycleSummary;
+  agent_loop_events?: AgentLoopEvent[];
 };

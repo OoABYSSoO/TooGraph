@@ -8,6 +8,7 @@ export type PrimaryNavigationSection =
   | "buddy"
   | "presets"
   | "actions"
+  | "improvements"
   | "models"
   | "modelLogs"
   | "runs"
@@ -50,6 +51,9 @@ export function resolvePrimaryNavigationSection(pathname: string): PrimaryNaviga
   }
   if (pathname === "/actions" || pathname.startsWith("/actions/")) {
     return "actions";
+  }
+  if (pathname === "/improvements" || pathname.startsWith("/improvements/")) {
+    return "improvements";
   }
   if (pathname === "/models" || pathname.startsWith("/models/")) {
     return "models";

@@ -13,6 +13,7 @@
 - 运行记录和运行树：`backend/app/core/storage/run_store.py`、`backend/app/core/runtime/run_tree.py`、`backend/app/api/routes_runs.py`。
 - 图运行存储、运行树、Buddy 聊天历史和记忆召回设计：本文 `2.3`、`2.4`、`2.5`、`2.9`。
 - Hermes Agent 能力追赶路线图：`docs/hermes-agent-capability-parity-roadmap.md`。
+- Hermes Agent 能力差距逐项解决方案：`docs/hermes-agent-capability-gap-resolution-plan.md`。
 - 官方 Action：`action/official/*/action.json`、`action/official/*/ACTION.md`、生命周期脚本。
 - 官方图模板：`graph_template/official/*/template.json`。
 - Buddy Home 和记忆：`backend/app/buddy/`、`action/official/buddy_session_recall/`、`action/official/buddy_home_writer/`。

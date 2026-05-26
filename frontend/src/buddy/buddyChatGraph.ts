@@ -184,6 +184,7 @@ export function buildBuddyChatGraph(
       buddy_template_binding: cloneJson(effectiveBinding),
       buddy_mode: buddyMode,
       buddy_can_execute_actions: buddyMode === "full_access",
+      capability_permission_policy: buildBuddyCapabilityPermissionPolicy(buddyMode),
       runtime_context: {
         invocation_source: "buddy_chat",
         buddy_session_id: input.currentSessionId ?? "",
@@ -794,6 +795,14 @@ function applyBuddyModePolicy(graph: GraphPayload, buddyMode: BuddyMode) {
   graph.metadata.buddy_can_execute_actions = buddyMode === "full_access";
   graph.metadata.buddy_requires_approval = buddyMode === "ask_first";
   graph.metadata.graph_permission_mode = buddyMode;
+  graph.metadata.capability_permission_policy = buildBuddyCapabilityPermissionPolicy(buddyMode);
+}
+
+function buildBuddyCapabilityPermissionPolicy(buddyMode: BuddyMode) {
+  return {
+    allowed_permission_tiers: ["none", "guarded", "external", "risky"],
+    approval_required_permission_tiers: buddyMode === "ask_first" ? ["risky"] : [],
+  };
 }
 
 function applyBuddyModelOverride(graph: GraphPayload, value: unknown) {

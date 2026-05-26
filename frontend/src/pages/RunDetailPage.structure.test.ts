@@ -117,7 +117,62 @@ test("RunDetailPage renders Agent Diagnostic from run detail state", () => {
   assert.match(componentSource, /const agentDiagnostic = computed/);
   assert.match(componentSource, /run-detail__agent-diagnostic/);
   assert.match(componentSource, /agentDiagnostic\.stopReason/);
+  assert.match(componentSource, /agentDiagnostic\.stopReasonTitleKey/);
+  assert.match(componentSource, /agentDiagnostic\.stopReasonDescriptionKey/);
+  assert.match(componentSource, /agentDiagnostic\.capabilitySelection\.visible/);
+  assert.match(componentSource, /agentDiagnostic\.capabilitySelection\.rejectedLabels/);
+  assert.match(componentSource, /agentDiagnostic\.capabilitySelection\.fallbackLabels/);
   assert.match(componentSource, /t\("runDetail\.agentDiagnostic"\)/);
+});
+
+test("RunDetailPage renders Buddy background review records and rerun action", () => {
+  assert.match(componentSource, /import \{ fetchBuddyBackgroundReviews, enqueueBuddyBackgroundReview, restoreBuddyRevision, linkBuddyImprovementCandidateValidationRun, decideBuddyImprovementCandidate, applyBuddyImprovementCandidate \} from "@\/api\/buddy";/);
+  assert.match(componentSource, /import \{ fetchTemplate, restoreGraphRevision, runGraph \} from "@\/api\/graphs";/);
+  assert.match(componentSource, /import \{ buildBuddyImprovementReviewGraph, BUDDY_IMPROVEMENT_REVIEW_TEMPLATE_ID \} from "@\/buddy\/buddyImprovementReviewGraph";/);
+  assert.match(componentSource, /import \{ buildBackgroundReviewDisplayItems/);
+  assert.match(componentSource, /const backgroundReviews = ref/);
+  assert.match(componentSource, /const backgroundReviewItems = computed/);
+  assert.match(componentSource, /const restoringBackgroundReviewRevisionId = ref\(""\);/);
+  assert.match(componentSource, /const validatingImprovementCandidateKey = ref\(""\);/);
+  assert.match(componentSource, /const decidingImprovementCandidateKey = ref\(""\);/);
+  assert.match(componentSource, /const applyingImprovementCandidateKey = ref\(""\);/);
+  assert.match(componentSource, /fetchBuddyBackgroundReviews\(normalizedRunId/);
+  assert.match(componentSource, /class="run-detail__panel run-detail__panel--background-review"/);
+  assert.match(componentSource, /v-for="item in backgroundReviewItems"/);
+  assert.match(componentSource, /:to="item\.reviewRunHref"/);
+  assert.match(componentSource, /v-for="badge in item\.writebackBadges"/);
+  assert.match(componentSource, /v-for="badge in item\.improvementBadges"/);
+  assert.match(componentSource, /v-for="revision in item\.revisions"/);
+  assert.match(componentSource, /v-if="revision\.canRestore"/);
+  assert.match(componentSource, /@click="restoreBackgroundReviewRevision\(item, revision\.revisionId\)"/);
+  assert.match(componentSource, /:loading="restoringBackgroundReviewRevisionId === revision\.revisionId"/);
+  assert.match(componentSource, /v-for="skipped in item\.skippedCommands"/);
+  assert.match(componentSource, /v-for="evidence in item\.evidenceItems"/);
+  assert.match(componentSource, /v-for="candidate in item\.improvementCandidates"/);
+  assert.match(componentSource, /candidate\.status/);
+  assert.match(componentSource, /candidate\.proposedChangeSummary/);
+  assert.match(componentSource, /candidate\.expectedBenefit/);
+  assert.match(componentSource, /v-for="evidenceRef in candidate\.evidenceRefs"/);
+  assert.match(componentSource, /@click="startImprovementCandidateReview\(item, candidate\)"/);
+  assert.match(componentSource, /validatingImprovementCandidateKey === candidate\.candidateId/);
+  assert.match(componentSource, /@click="decideImprovementCandidate\(item, candidate, 'approve'\)"/);
+  assert.match(componentSource, /@click="decideImprovementCandidate\(item, candidate, 'reject'\)"/);
+  assert.match(componentSource, /decideBuddyImprovementCandidate\(candidate\.candidateId, decision, reason\)/);
+  assert.match(componentSource, /@click="applyImprovementCandidate\(item, candidate\)"/);
+  assert.match(componentSource, /Boolean\(candidate\.candidateId\) && candidate\.status === "approved" && candidate\.hasApplyCommand/);
+  assert.match(componentSource, /applyBuddyImprovementCandidate\(candidate\.candidateId, reason\)/);
+  assert.match(componentSource, /fetchTemplate\(BUDDY_IMPROVEMENT_REVIEW_TEMPLATE_ID\)/);
+  assert.match(componentSource, /buildBuddyImprovementReviewGraph/);
+  assert.match(componentSource, /runGraph\(graph\)/);
+  assert.match(componentSource, /linkBuddyImprovementCandidateValidationRun\(candidate\.candidateId, response\.run_id\)/);
+  assert.match(componentSource, /enqueueBuddyBackgroundReview\(/);
+  assert.match(componentSource, /async function startImprovementCandidateReview\(item: BackgroundReviewDisplayItem, candidate: BackgroundReviewImprovementCandidateItem\)/);
+  assert.match(componentSource, /async function restoreBackgroundReviewRevision\(item: BackgroundReviewDisplayItem, revisionId: string\)/);
+  assert.match(componentSource, /await restoreBuddyRevision\(normalizedRevisionId\)/);
+  assert.match(componentSource, /void loadBackgroundReviews\(item\.sourceRunId\)/);
+  assert.match(componentSource, /t\("runDetail\.backgroundReview"\)/);
+  assert.match(componentSource, /t\("runDetail\.rerunBackgroundReview"\)/);
+  assert.match(componentSource, /t\("runDetail\.backgroundReviewValidateCandidate"\)/);
 });
 
 test("RunDetailPage exposes operation journal entries from the dedicated journal API", () => {
@@ -138,7 +193,7 @@ test("RunDetailPage exposes operation journal entries from the dedicated journal
 test("RunDetailPage exposes graph revision restore actions from operation journal rows", () => {
   assert.match(componentSource, /import \{ Promotion, RefreshLeft \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /import \{ ElButton, ElIcon, ElMessage, ElMessageBox \} from "element-plus";/);
-  assert.match(componentSource, /import \{ restoreGraphRevision \} from "@\/api\/graphs";/);
+  assert.match(componentSource, /import \{ fetchTemplate, restoreGraphRevision, runGraph \} from "@\/api\/graphs";/);
   assert.match(
     componentSource,
     /import \{ buildOperationJournalDisplayItems, type OperationJournalDisplayItem \} from "\.\/operationJournalModel\.ts";/,

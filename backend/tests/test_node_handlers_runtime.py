@@ -325,6 +325,93 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(captured["runtime_config"]["action_runtime_context"], {"page_path": "/editor"})
         self.assertEqual(result["outputs"], {"ok": True})
 
+    def test_execute_agent_node_merges_capability_permission_policy_into_action_runtime_context(self) -> None:
+        state_schema = {
+            "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "select_capability",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "question", "required": True}],
+                "writes": [{"state": "selected_capability", "mode": "replace"}],
+                "config": {
+                    "actionKey": "toograph_capability_selector",
+                    "actionBindings": [
+                        {
+                            "actionKey": "toograph_capability_selector",
+                            "outputMapping": {"capability": "selected_capability"},
+                        }
+                    ],
+                },
+            }
+        )
+        captured: dict[str, Any] = {}
+        policy = {
+            "allowed_permission_tiers": ["none", "guarded", "external", "risky"],
+            "approval_required_permission_tiers": ["risky"],
+        }
+
+        def generate_action_inputs(**kwargs: Any):
+            captured["runtime_config"] = kwargs["runtime_config"]
+            return (
+                {"toograph_capability_selector": {"capability": {"kind": "none"}}},
+                {},
+                "",
+                [],
+                kwargs["runtime_config"],
+            )
+
+        execute_agent_node(
+            state_schema,
+            node,
+            {"question": "需要联网搜索吗"},
+            {
+                "metadata": {
+                    "action_runtime_context": {"page_path": "/editor"},
+                    "capability_permission_policy": policy,
+                },
+                "state": {},
+            },
+            node_name="select_capability",
+            state={"run_id": "run-1", "metadata": {"capability_permission_policy": policy}},
+            get_action_registry_func=lambda *, include_disabled: {"toograph_capability_selector": object()},
+            get_action_definition_registry_func=lambda *, include_disabled: {
+                "toograph_capability_selector": ActionDefinition(
+                    actionKey="toograph_capability_selector",
+                    name="Capability Selector",
+                    llmOutputSchema=[
+                        ActionIoField(key="capability", name="Capability", valueType="capability"),
+                    ],
+                    stateOutputSchema=[
+                        ActionIoField(key="capability", name="Capability", valueType="capability"),
+                    ],
+                    runtimeReady=True,
+                    runtimeRegistered=True,
+                )
+            },
+            invoke_action_func=lambda action_func, action_inputs: {"capability": action_inputs["capability"]},
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_action_inputs_func=generate_action_inputs,
+            generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("mapped action output should satisfy node writes")
+            ),
+            finalize_agent_stream_delta_func=lambda **kwargs: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertEqual(
+            captured["runtime_config"]["action_runtime_context"],
+            {
+                "page_path": "/editor",
+                "capability_permission_policy": policy,
+            },
+        )
+
     def test_execute_agent_node_passes_graph_action_runtime_context_to_action_invocation(self) -> None:
         state_schema = {
             "user_goal": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -409,6 +496,102 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
 
         self.assertEqual(captured["context"]["action_runtime_context"], {"page_path": "/editor/new"})
         self.assertEqual(result["outputs"], {"ok": True})
+
+    def test_execute_agent_node_passes_bound_action_state_inputs_to_action_invocation_context(self) -> None:
+        state_schema = {
+            "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "agent_loop_control": NodeSystemStateDefinition.model_validate({"type": "json"}),
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "select_capability",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [
+                    {"state": "question", "required": True},
+                    {
+                        "state": "agent_loop_control",
+                        "required": False,
+                        "binding": {
+                            "kind": "action_input",
+                            "actionKey": "toograph_capability_selector",
+                            "fieldKey": "agent_loop_control",
+                            "managed": True,
+                        },
+                    },
+                ],
+                "writes": [{"state": "selected_capability", "mode": "replace"}],
+                "config": {
+                    "actionKey": "toograph_capability_selector",
+                    "actionBindings": [
+                        {
+                            "actionKey": "toograph_capability_selector",
+                            "outputMapping": {"capability": "selected_capability"},
+                        }
+                    ],
+                },
+            }
+        )
+        loop_control = {
+            "iteration_index": 2,
+            "max_iterations": 6,
+            "capability_call_count": 3,
+            "max_capability_calls": 4,
+        }
+        captured: dict[str, Any] = {}
+
+        def invoke_action(action_func: Any, action_inputs: dict[str, Any], context: dict[str, Any] | None = None) -> dict[str, Any]:
+            captured["context"] = context
+            return {"capability": action_inputs["capability"]}
+
+        execute_agent_node(
+            state_schema,
+            node,
+            {"question": "需要联网搜索吗", "agent_loop_control": loop_control},
+            {"metadata": {"action_runtime_context": {"page_path": "/buddy"}}, "state": {}},
+            node_name="select_capability",
+            state={"run_id": "run-1", "metadata": {"action_runtime_context": {"page_path": "/buddy"}}},
+            get_action_registry_func=lambda *, include_disabled: {"toograph_capability_selector": object()},
+            get_action_definition_registry_func=lambda *, include_disabled: {
+                "toograph_capability_selector": ActionDefinition(
+                    actionKey="toograph_capability_selector",
+                    name="Capability Selector",
+                    stateInputSchema=[
+                        ActionIoField(key="agent_loop_control", name="Agent Loop Control", valueType="json"),
+                    ],
+                    llmOutputSchema=[
+                        ActionIoField(key="capability", name="Capability", valueType="capability"),
+                    ],
+                    stateOutputSchema=[
+                        ActionIoField(key="capability", name="Capability", valueType="capability"),
+                    ],
+                    runtimeReady=True,
+                    runtimeRegistered=True,
+                )
+            },
+            invoke_action_func=invoke_action,
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=callable_accepts_keyword,
+            generate_agent_action_inputs_func=fixed_action_inputs_func(
+                {"toograph_capability_selector": {"capability": {"kind": "none"}}}
+            ),
+            generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("mapped action output should satisfy node writes")
+            ),
+            finalize_agent_stream_delta_func=lambda **kwargs: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertEqual(
+            captured["context"]["action_runtime_context"],
+            {
+                "page_path": "/buddy",
+                "action_state_inputs": {"agent_loop_control": loop_control},
+                "action_state_input_sources": {"agent_loop_control": "agent_loop_control"},
+            },
+        )
 
     def test_execute_agent_node_records_action_activity_event(self) -> None:
         state_schema = {
@@ -897,6 +1080,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(captured_inputs, [{"query": "Wuthering Waves latest version", "max_results": "8"}])
+        self.assertEqual(result["action_outputs"][0]["node_id"], "tool_executor")
         self.assertEqual(result["action_outputs"][0]["binding_source"], "capability_state")
         self.assertEqual(result["action_outputs"][0]["output_mapping"], {})
         self.assertEqual(result["action_outputs"][0]["output_mapping_details"], [])
@@ -1241,6 +1425,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(captured_subgraph_inputs, [{"user_question": "总结今天 AI 新闻"}])
         self.assertEqual(result["selected_actions"], [])
         self.assertEqual(result["selected_capabilities"], [{"kind": "subgraph", "key": "advanced_web_research_loop"}])
+        self.assertEqual(result["capability_outputs"][0]["node_id"], "subgraph_executor")
         self.assertEqual(result["capability_outputs"][0]["binding_source"], "capability_state")
         self.assertEqual(result["capability_outputs"][0]["input_source"], "agent_llm")
         self.assertEqual(result["capability_outputs"][0]["inputs"], {"user_question": "总结今天 AI 新闻"})

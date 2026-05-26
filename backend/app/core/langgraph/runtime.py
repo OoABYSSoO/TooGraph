@@ -90,6 +90,7 @@ INHERITED_PERMISSION_METADATA_KEYS = {
     "buddy_requires_approval",
     "buddy_can_execute_actions",
     "action_runtime_context",
+    "capability_permission_policy",
 }
 
 

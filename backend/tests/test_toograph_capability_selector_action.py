@@ -27,7 +27,7 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         self.assertEqual(manifest["timeoutSeconds"], 30)
         self.assertEqual(
             [field["key"] for field in manifest.get("stateInputSchema", [])],
-            ["current_requirement"],
+            ["current_requirement", "agent_loop_control"],
         )
         self.assertEqual(
             [field["key"] for field in manifest.get("llmOutputSchema", [])],
@@ -35,10 +35,12 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         )
         self.assertEqual(
             [field["key"] for field in manifest["stateOutputSchema"]],
-            ["capability", "needs_capability"],
+            ["capability", "needs_capability", "selection_reason", "capability_selection_trace"],
         )
-        self.assertNotIn("audit", [field["key"] for field in manifest["stateOutputSchema"]])
+        self.assertIn("capability_selection_trace", [field["key"] for field in manifest["stateOutputSchema"]])
         instruction = manifest["llmInstruction"]
+        self.assertNotIn("你已绑定", instruction)
+        self.assertNotIn("不要", instruction)
         self.assertIn("是否还需要调用能力", instruction)
         self.assertIn("当前图状态", instruction)
         self.assertNotIn("loop_context", instruction)
@@ -90,6 +92,7 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
             "  covers:",
             "  produces:",
             "  taskTags:",
+            "  usage:",
         )
         for line in context.splitlines():
             if line:
@@ -173,6 +176,139 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         self.assertEqual(web_search["granularity"], "atomic")
         self.assertIn("web_research", web_search["covers"])
         self.assertIn("raw_results", web_search["produces"])
+        self.assertIn("network", web_search["permissions"])
+        self.assertEqual(web_search["permissionTier"], "external")
+
+    def test_capability_catalog_exposes_permission_tier_and_eval_status(self) -> None:
+        selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "toograph_capability_selector_before_eval_test")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            template_dir = root / "graph_template" / "official" / "visible_loop"
+            template_dir.mkdir(parents=True)
+            (root / "action").mkdir()
+            (root / "tool").mkdir()
+            (root / "graph_template" / "settings.json").write_text(
+                json.dumps({"entries": {"visible_loop": {"enabled": True, "capabilityDiscoverable": True}}}),
+                encoding="utf-8",
+            )
+            (template_dir / "template.json").write_text(
+                json.dumps(
+                    {
+                        "template_id": "visible_loop",
+                        "label": "Visible Loop",
+                        "description": "Visible template.",
+                        "metadata": {
+                            "permissions": ["file_write"],
+                            "capability": {
+                                "granularity": "workflow",
+                                "covers": ["graph_edit"],
+                                "produces": ["final_response"],
+                            },
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (template_dir / "eval_cases.json").write_text(
+                json.dumps({"cases": [{"case_id": "case_1"}, {"case_id": "case_2"}]}),
+                encoding="utf-8",
+            )
+
+            catalog = selector.discover_capability_catalog(root)
+
+        visible_loop = next(item for item in catalog["subgraphs"] if item["key"] == "visible_loop")
+        self.assertEqual(visible_loop["permissions"], ["file_write"])
+        self.assertEqual(visible_loop["permissionTier"], "risky")
+        self.assertEqual(
+            visible_loop["evalStatus"],
+            {
+                "has_cases": True,
+                "case_count": 2,
+                "source": "graph_template/official/visible_loop/eval_cases.json",
+            },
+        )
+
+    def test_capability_catalog_filters_disallowed_permission_tiers(self) -> None:
+        selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "toograph_capability_selector_before_permission_filter_test")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            safe_action_dir = root / "action" / "official" / "safe_lookup"
+            external_action_dir = root / "action" / "official" / "web_lookup"
+            safe_action_dir.mkdir(parents=True)
+            external_action_dir.mkdir(parents=True)
+            (root / "graph_template").mkdir()
+            (root / "tool").mkdir()
+            (safe_action_dir / "action.json").write_text(
+                json.dumps(
+                    {
+                        "actionKey": "safe_lookup",
+                        "description": "Read already available context.",
+                        "permissions": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (external_action_dir / "action.json").write_text(
+                json.dumps(
+                    {
+                        "actionKey": "web_lookup",
+                        "description": "Fetch public web context.",
+                        "permissions": ["network"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            catalog = selector.discover_capability_catalog(
+                root,
+                permission_policy={"allowed_permission_tiers": ["none", "guarded"]},
+            )
+
+        action_keys = [item["key"] for item in catalog["actions"]]
+        self.assertIn("safe_lookup", action_keys)
+        self.assertNotIn("web_lookup", action_keys)
+
+    def test_capability_catalog_exposes_usage_feedback_for_enabled_capabilities(self) -> None:
+        selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "toograph_capability_selector_before_usage_test")
+
+        catalog = selector.discover_capability_catalog(
+            usage_stats={
+                "capabilities": {
+                    "action:web_search": {
+                        "kind": "action",
+                        "key": "web_search",
+                        "use_count": 4,
+                        "success_count": 3,
+                        "failure_count": 1,
+                        "last_used_at": "2026-05-27T01:02:03Z",
+                        "last_run_id": "run_4",
+                        "recent_runs": [
+                            {"run_id": "run_4", "success": False},
+                            {"run_id": "run_3", "success": True},
+                            {"run_id": "run_2", "success": True},
+                        ],
+                    }
+                }
+            }
+        )
+
+        web_search = next(item for item in catalog["actions"] if item["key"] == "web_search")
+        self.assertEqual(
+            web_search["usage"],
+            {
+                "use_count": 4,
+                "success_count": 3,
+                "failure_count": 1,
+                "success_rate": 0.75,
+                "recent_failure_count": 1,
+                "last_used_at": "2026-05-27T01:02:03Z",
+                "last_run_id": "run_4",
+                "last_summary": "",
+                "last_duration_ms": 0,
+            },
+        )
 
     def test_after_llm_prefers_higher_level_capability_with_matching_coverage(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_arbitration_test")
@@ -208,6 +344,95 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         self.assertEqual(result["capability"]["key"], "research_workflow")
         self.assertEqual(result["capability"]["description"], "Search, verify, and produce a final answer.")
         self.assertTrue(result["needs_capability"])
+        self.assertEqual(result["selection_reason"], "Need current public sources.")
+        trace = result["capability_selection_trace"]
+        self.assertEqual(trace["requested"], {"kind": "action", "key": "raw_search"})
+        self.assertEqual(trace["selected"], {"kind": "subgraph", "key": "research_workflow"})
+        self.assertEqual(trace["rejected_candidates"][0]["key"], "raw_search")
+        self.assertEqual(trace["rejected_candidates"][0]["reason"], "higher_level_capability_preferred")
+        self.assertEqual(trace["score_breakdown"]["selected"]["kind_priority"], 2)
+        self.assertEqual(trace["permission_summary"]["permissions"], [])
+        self.assertEqual(trace["fallback_candidates"][0]["key"], "raw_search")
+
+    def test_after_llm_records_usage_feedback_in_selection_trace(self) -> None:
+        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_usage_trace_test")
+
+        result = selector.normalize_selected_capability(
+            {"kind": "action", "key": "raw_search", "reason": "Need current public sources."},
+            catalog={
+                "subgraphs": [
+                    {
+                        "kind": "subgraph",
+                        "key": "research_workflow",
+                        "description": "Search, verify, and produce a final answer.",
+                        "granularity": "workflow",
+                        "covers": ["web_research"],
+                        "produces": ["sources", "final_response"],
+                    }
+                ],
+                "actions": [
+                    {
+                        "kind": "action",
+                        "key": "raw_search",
+                        "description": "Search raw public sources.",
+                        "granularity": "atomic",
+                        "covers": ["web_research"],
+                        "produces": ["sources", "raw_results"],
+                    }
+                ],
+                "tools": [],
+            },
+            usage_stats={
+                "capabilities": {
+                    "subgraph:research_workflow": {
+                        "kind": "subgraph",
+                        "key": "research_workflow",
+                        "use_count": 8,
+                        "success_count": 6,
+                        "failure_count": 2,
+                        "last_used_at": "2026-05-27T02:00:00Z",
+                        "last_run_id": "run_selected",
+                        "last_summary": "Recovered with fallback.",
+                        "last_duration_ms": 1234,
+                        "recent_runs": [
+                            {"run_id": "run_selected", "success": True},
+                            {"run_id": "run_previous", "success": False},
+                        ],
+                    },
+                    "action:raw_search": {
+                        "kind": "action",
+                        "key": "raw_search",
+                        "use_count": 3,
+                        "success_count": 1,
+                        "failure_count": 2,
+                        "recent_runs": [
+                            {"run_id": "run_failed_2", "success": False},
+                            {"run_id": "run_failed_1", "success": False},
+                        ],
+                    },
+                }
+            },
+        )
+
+        trace = result["capability_selection_trace"]
+        self.assertEqual(
+            trace["usage_summary"]["selected"],
+            {
+                "use_count": 8,
+                "success_count": 6,
+                "failure_count": 2,
+                "success_rate": 0.75,
+                "recent_failure_count": 1,
+                "last_used_at": "2026-05-27T02:00:00Z",
+                "last_run_id": "run_selected",
+                "last_summary": "Recovered with fallback.",
+                "last_duration_ms": 1234,
+            },
+        )
+        self.assertEqual(trace["score_breakdown"]["selected"]["use_count"], 8)
+        self.assertEqual(trace["score_breakdown"]["selected"]["success_rate"], 0.75)
+        self.assertEqual(trace["score_breakdown"]["selected"]["recent_failure_count"], 1)
+        self.assertEqual(trace["fallback_candidates"][0]["score"]["recent_failure_count"], 2)
 
     def test_after_llm_validates_and_normalizes_selected_capability(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_validate_test")
@@ -228,7 +453,175 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         self.assertEqual(result["capability"]["confidence"], 0.82)
         self.assertEqual(result["capability"]["reason"], "需要联网调研。")
         self.assertTrue(result["needs_capability"])
+        self.assertEqual(result["selection_reason"], "需要联网调研。")
+        self.assertEqual(result["capability_selection_trace"]["selected"]["key"], "advanced_web_research_loop")
+        self.assertIn("fallback_candidates", result["capability_selection_trace"])
         self.assertNotIn("found", result)
+
+    def test_after_llm_records_permission_summary_for_selected_capability(self) -> None:
+        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_permission_test")
+
+        result = selector.normalize_selected_capability(
+            {"kind": "action", "key": "web_search", "reason": "需要公开网页资料。"},
+            catalog={
+                "subgraphs": [],
+                "actions": [
+                    {
+                        "kind": "action",
+                        "key": "web_search",
+                        "description": "Search public web pages.",
+                        "granularity": "atomic",
+                        "covers": ["web_research"],
+                        "produces": ["raw_results"],
+                        "permissions": ["network"],
+                    }
+                ],
+                "tools": [],
+            },
+        )
+
+        trace = result["capability_selection_trace"]
+        self.assertEqual(
+            trace["permission_summary"],
+            {"permissions": ["network"], "requires_approval": True, "permission_tier": "external"},
+        )
+        self.assertEqual(trace["score_breakdown"]["selected"]["permission_tier_priority"], 1)
+
+    def test_after_llm_records_budget_after_call_from_runtime_context_state_inputs(self) -> None:
+        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_budget_test")
+
+        result = selector.toograph_capability_selector(
+            capability={"kind": "action", "key": "web_search", "reason": "需要公开网页资料。"},
+            runtime_context={
+                "action_state_inputs": {
+                    "agent_loop_control": {
+                        "iteration_index": 2,
+                        "max_iterations": 6,
+                        "capability_call_count": 3,
+                        "max_capability_calls": 4,
+                        "retry_budget": 1,
+                    }
+                }
+            },
+        )
+
+        self.assertEqual(
+            result["capability_selection_trace"]["budget_after_call"],
+            {
+                "iteration_index": 2,
+                "max_iterations": 6,
+                "capability_call_count_before": 3,
+                "capability_call_count_after": 4,
+                "max_capability_calls": 4,
+                "remaining_capability_calls_after": 0,
+                "capability_budget_exhausted_after": True,
+                "retry_budget": 1,
+            },
+        )
+
+    def test_after_llm_rejects_capability_disallowed_by_permission_policy(self) -> None:
+        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_permission_filter_test")
+
+        result = selector.normalize_selected_capability(
+            {"kind": "action", "key": "web_search", "reason": "需要公开网页资料。"},
+            catalog={
+                "subgraphs": [],
+                "actions": [
+                    {
+                        "kind": "action",
+                        "key": "web_search",
+                        "description": "Search public web pages.",
+                        "granularity": "atomic",
+                        "covers": ["web_research"],
+                        "produces": ["raw_results"],
+                        "permissions": ["network"],
+                        "permissionTier": "external",
+                    }
+                ],
+                "tools": [],
+            },
+            permission_policy={"allowed_permission_tiers": ["none", "guarded"]},
+        )
+
+        self.assertEqual(result["capability"]["kind"], "none")
+        self.assertFalse(result["needs_capability"])
+        self.assertIn("not allowed by the current permission policy", result["selection_reason"])
+        rejected = result["capability_selection_trace"]["rejected_candidates"][0]
+        self.assertEqual(rejected["reason"], "permission_tier_not_allowed")
+        self.assertEqual(rejected["permission_tier"], "external")
+
+    def test_after_llm_marks_policy_required_approval_in_permission_summary(self) -> None:
+        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_approval_policy_test")
+
+        result = selector.normalize_selected_capability(
+            {"kind": "action", "key": "write_file", "reason": "需要写入文件。"},
+            catalog={
+                "subgraphs": [],
+                "actions": [
+                    {
+                        "kind": "action",
+                        "key": "write_file",
+                        "description": "Write a local file.",
+                        "granularity": "atomic",
+                        "covers": ["file_write"],
+                        "produces": ["artifact"],
+                        "permissions": ["file_write"],
+                        "permissionTier": "risky",
+                    }
+                ],
+                "tools": [],
+            },
+            permission_policy={
+                "allowed_permission_tiers": ["none", "guarded", "external", "risky"],
+                "approval_required_permission_tiers": ["risky"],
+            },
+        )
+
+        self.assertEqual(
+            result["capability_selection_trace"]["permission_summary"],
+            {
+                "permissions": ["file_write"],
+                "requires_approval": True,
+                "permission_tier": "risky",
+                "approval_reason": "permission_tier_requires_approval",
+            },
+        )
+
+    def test_after_llm_honors_policy_without_approval_required_tiers(self) -> None:
+        selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_no_approval_policy_test")
+
+        result = selector.normalize_selected_capability(
+            {"kind": "action", "key": "write_file", "reason": "需要写入文件。"},
+            catalog={
+                "subgraphs": [],
+                "actions": [
+                    {
+                        "kind": "action",
+                        "key": "write_file",
+                        "description": "Write a local file.",
+                        "granularity": "atomic",
+                        "covers": ["file_write"],
+                        "produces": ["artifact"],
+                        "permissions": ["file_write"],
+                        "permissionTier": "risky",
+                    }
+                ],
+                "tools": [],
+            },
+            permission_policy={
+                "allowed_permission_tiers": ["none", "guarded", "external", "risky"],
+                "approval_required_permission_tiers": [],
+            },
+        )
+
+        self.assertEqual(
+            result["capability_selection_trace"]["permission_summary"],
+            {
+                "permissions": ["file_write"],
+                "requires_approval": False,
+                "permission_tier": "risky",
+            },
+        )
 
     def test_after_llm_returns_none_when_selected_capability_is_disabled_or_unknown(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_unknown_test")
@@ -240,6 +633,10 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         self.assertEqual(result["capability"]["kind"], "none")
         self.assertIn("not_enabled_template", result["capability"]["reason"])
         self.assertFalse(result["needs_capability"])
+        self.assertEqual(result["selection_reason"], "Selected capability 'subgraph:not_enabled_template' is not enabled or discoverable.")
+        self.assertEqual(result["capability_selection_trace"]["requested"], {"kind": "subgraph", "key": "not_enabled_template"})
+        self.assertEqual(result["capability_selection_trace"]["selected"], {"kind": "none"})
+        self.assertEqual(result["capability_selection_trace"]["rejected_candidates"][0]["reason"], "not_enabled_or_discoverable")
         self.assertNotIn("found", result)
 
     def test_after_llm_returns_none_when_llm_selects_none(self) -> None:
@@ -251,6 +648,8 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
 
         self.assertEqual(result["capability"], {"kind": "none"})
         self.assertFalse(result["needs_capability"])
+        self.assertEqual(result["selection_reason"], "没有合适能力。")
+        self.assertEqual(result["capability_selection_trace"]["selected"], {"kind": "none"})
         self.assertNotIn("found", result)
 
 

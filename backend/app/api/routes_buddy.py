@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.buddy import commands, store
+from app.buddy import background_review, commands, improvement_candidates, store
 
 
 router = APIRouter(prefix="/api/buddy", tags=["buddy"])
@@ -93,6 +93,33 @@ class BuddyMemoryDocumentPayload(BuddyUpdatePayload):
     content: str = Field(min_length=1)
 
 
+class BuddyBackgroundReviewPayload(BaseModel):
+    source_run_id: str = Field(min_length=1)
+    buddy_model_ref: str = ""
+    trigger_reason: str = "visible_buddy_run_completed"
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class BuddyImprovementCandidateValidationRunPayload(BaseModel):
+    validation_run_id: str = Field(min_length=1)
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class BuddyImprovementCandidateDecisionPayload(BaseModel):
+    decision: Literal["approve", "reject"]
+    reason: str = ""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class BuddyImprovementCandidateApplyPayload(BaseModel):
+    change_reason: str = ""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
 @router.get("/identity")
 def get_identity_endpoint() -> dict[str, Any]:
     return store.load_buddy_identity()
@@ -152,6 +179,103 @@ def get_run_template_binding_endpoint() -> dict[str, Any]:
 @router.get("/memory-review-template-binding")
 def get_memory_review_template_binding_endpoint() -> dict[str, Any]:
     return store.load_memory_review_template_binding()
+
+
+@router.get("/background-reviews")
+def list_background_reviews_endpoint(source_run_id: str | None = Query(default=None)) -> list[dict[str, Any]]:
+    return background_review.list_background_review_runs(source_run_id=source_run_id)
+
+
+@router.get("/improvement-candidates")
+def list_improvement_candidates_endpoint(
+    source_run_id: str | None = Query(default=None),
+    review_id: str | None = Query(default=None),
+    review_run_id: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+) -> list[dict[str, Any]]:
+    return store.list_improvement_candidates(
+        source_run_id=source_run_id,
+        review_id=review_id,
+        review_run_id=review_run_id,
+        status=status,
+    )
+
+
+@router.post("/improvement-candidates/{candidate_id}/validation-run")
+def link_improvement_candidate_validation_run_endpoint(
+    candidate_id: str,
+    payload: BuddyImprovementCandidateValidationRunPayload,
+) -> dict[str, Any]:
+    try:
+        return improvement_candidates.link_validation_run(candidate_id, payload.validation_run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Improvement candidate not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/improvement-candidates/{candidate_id}/sync-validation-status")
+def sync_improvement_candidate_validation_status_endpoint(candidate_id: str) -> dict[str, Any]:
+    try:
+        return improvement_candidates.sync_validation_status(candidate_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Improvement candidate not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/improvement-candidates/{candidate_id}/decision")
+def decide_improvement_candidate_endpoint(
+    candidate_id: str,
+    payload: BuddyImprovementCandidateDecisionPayload,
+) -> dict[str, Any]:
+    try:
+        return improvement_candidates.decide_candidate(
+            candidate_id,
+            decision=payload.decision,
+            reason=payload.reason,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Improvement candidate not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/improvement-candidates/{candidate_id}/apply")
+def apply_improvement_candidate_endpoint(
+    candidate_id: str,
+    payload: BuddyImprovementCandidateApplyPayload,
+) -> dict[str, Any]:
+    try:
+        return improvement_candidates.apply_candidate(candidate_id, change_reason=payload.change_reason)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Improvement candidate not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/background-reviews")
+def enqueue_background_review_endpoint(
+    payload: BuddyBackgroundReviewPayload,
+    background_tasks: BackgroundTasks,
+) -> dict[str, Any]:
+    try:
+        record = background_review.enqueue_background_review_run(
+            source_run_id=payload.source_run_id,
+            buddy_model_ref=payload.buddy_model_ref,
+            trigger_reason=payload.trigger_reason,
+        )
+        graph, run_state = background_review.load_background_review_runtime(record["review_id"])
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 409 if "completed source run" in detail else 422
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+    background_tasks.add_task(background_review.run_background_review_worker, graph, run_state, record["review_id"])
+    return record
 
 
 @router.get("/sessions")

@@ -292,12 +292,18 @@ def test_langgraph_runtime_propagates_permission_approval_through_subgraph(monke
     )
 
     graph = _subgraph_approval_graph()
+    policy = {
+        "allowed_permission_tiers": ["none", "guarded", "external", "risky"],
+        "approval_required_permission_tiers": ["risky"],
+    }
+    graph.metadata["capability_permission_policy"] = policy
     paused = execute_node_system_graph_langgraph(graph)
 
     assert paused["status"] == "awaiting_human"
     assert paused["current_node_id"] == "run_capability_cycle"
     pending_subgraph = paused["metadata"]["pending_subgraph_breakpoint"]
     assert pending_subgraph["inner_node_id"] == "execute_capability"
+    assert pending_subgraph["metadata"]["capability_permission_policy"] == policy
     assert pending_subgraph["metadata"]["pending_permission_approval"]["capability_key"] == "local_workspace_executor"
     assert invoked == []
 

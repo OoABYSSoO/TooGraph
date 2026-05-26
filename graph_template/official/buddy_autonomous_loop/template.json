@@ -259,6 +259,36 @@
         "managed": true
       }
     },
+    "capability_selection_reason": {
+      "name": "能力选择理由",
+      "description": "toograph_capability_selector 规范化后的选择理由；没有能力时说明 none 的理由。",
+      "type": "text",
+      "value": "",
+      "color": "#0369a1",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "toograph_capability_selector",
+        "toolKey": "",
+        "nodeId": "reply_and_select_capability",
+        "fieldKey": "selection_reason",
+        "managed": true
+      }
+    },
+    "capability_selection_trace": {
+      "name": "能力选择审计",
+      "description": "toograph_capability_selector 输出的候选评分、拒绝原因、fallback 候选和权限摘要。",
+      "type": "json",
+      "value": {},
+      "color": "#1d4ed8",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "toograph_capability_selector",
+        "toolKey": "",
+        "nodeId": "reply_and_select_capability",
+        "fieldKey": "capability_selection_trace",
+        "managed": true
+      }
+    },
     "capability_result": {
       "name": "结果包",
       "description": "上一轮动态能力执行产生的结构化结果包。show_result_package=true 时直接展示；否则作为整理回复或下一轮判断的上下文。",
@@ -634,7 +664,12 @@
         {
           "state": "agent_loop_control",
           "required": false,
-          "binding": null
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_capability_selector",
+            "fieldKey": "agent_loop_control",
+            "managed": true
+          }
         },
         {
           "state": "agent_loop_report",
@@ -662,6 +697,14 @@
         {
           "state": "needs_capability",
           "mode": "replace"
+        },
+        {
+          "state": "capability_selection_reason",
+          "mode": "replace"
+        },
+        {
+          "state": "capability_selection_trace",
+          "mode": "replace"
         }
       ],
       "config": {
@@ -671,7 +714,9 @@
             "actionKey": "toograph_capability_selector",
             "outputMapping": {
               "capability": "selected_capability",
-              "needs_capability": "needs_capability"
+              "needs_capability": "needs_capability",
+              "selection_reason": "capability_selection_reason",
+              "capability_selection_trace": "capability_selection_trace"
             }
           }
         ],

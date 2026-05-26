@@ -179,6 +179,17 @@
       "color": "#14b8a6",
       "binding": null
     },
+    "capability_usage_update_plan": {
+      "name": "capability_usage_update_plan",
+      "description": "能力使用统计写入计划；复盘节点从源 run 的 capability_result、capability_review 和 run record 中生成 capability_usage_stats.update commands。",
+      "type": "json",
+      "value": {
+        "has_updates": false,
+        "commands": []
+      },
+      "color": "#6366f1",
+      "binding": null
+    },
     "memory_review_result": {
       "name": "memory_review_result",
       "description": "后台记忆复盘摘要；说明接受、拒绝、去重、风险和待人工确认项。",
@@ -385,6 +396,62 @@
         "kind": "action_output",
         "actionKey": "buddy_home_writer",
         "nodeId": "write_buddy_identity_updates",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "capability_usage_write_success": {
+      "name": "capability_usage_write_success",
+      "description": "Buddy Home Writer 是否成功应用全部 capability_usage_stats.update 命令。",
+      "type": "boolean",
+      "value": false,
+      "color": "#4f46e5",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "buddy_home_writer",
+        "nodeId": "write_capability_usage_updates",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "applied_capability_usage_commands": {
+      "name": "applied_capability_usage_commands",
+      "description": "已应用的能力使用统计写回命令和 revision 信息。",
+      "type": "json",
+      "value": [],
+      "color": "#4f46e5",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "buddy_home_writer",
+        "nodeId": "write_capability_usage_updates",
+        "fieldKey": "applied_commands",
+        "managed": true
+      }
+    },
+    "skipped_capability_usage_commands": {
+      "name": "skipped_capability_usage_commands",
+      "description": "因内容无效或写入失败而跳过的能力使用统计写回命令。",
+      "type": "json",
+      "value": [],
+      "color": "#dc2626",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "buddy_home_writer",
+        "nodeId": "write_capability_usage_updates",
+        "fieldKey": "skipped_commands",
+        "managed": true
+      }
+    },
+    "capability_usage_write_result": {
+      "name": "capability_usage_write_result",
+      "description": "能力使用统计写回摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#4338ca",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "buddy_home_writer",
+        "nodeId": "write_capability_usage_updates",
         "fieldKey": "result",
         "managed": true
       }
@@ -686,6 +753,10 @@
           "mode": "replace"
         },
         {
+          "state": "capability_usage_update_plan",
+          "mode": "replace"
+        },
+        {
           "state": "memory_review_result",
           "mode": "replace"
         },
@@ -706,7 +777,7 @@
         "actionKey": "",
         "actionBindings": [],
         "actionInstructionBlocks": {},
-        "taskInstruction": "可见 Buddy 回复完成后，执行后台自主复盘。使用 user_message、conversation_history、buddy_context、request_understanding、capability_result、capability_review、public_response、review_context_report 和 session_recall_context。当前 run 的用户消息、输出和 run record 是主要证据；召回会话作为辅助证据。\n\n先按写入目标矩阵归类候选：\n- SOUL.md / buddy_identity_update_plan: 用户明确调整 Buddy 名称、身份设定、语气、回复风格、显示名称或显示语言。Map \"call yourself X from now on\" and \"rename yourself to X\" to payload.name. Use display_preferences.display_name for a separately requested display label. Ambiguous nicknames, jokes, roleplay, or unclear intent go to requires_confirmation with commands=[].\n- USER.md / user_context_update_plan: 关于用户本人的稳定事实、长期偏好、称呼、时区、沟通方式、长期目标和反复出现的协作要求。\n- MEMORY.md / memory_update_plan: 每轮都适合注入的稳定上下文、项目级决策、长期有效的纠错、常用工作方式和跨会话经验。\n- 数据库结构化记忆 / structured_memory_update_plan: 适合未来按语义召回的事实、事件、选择依据、一次任务中的关键上下文；每条记录包含 source refs、confidence、salience、scope_kind、scope_id、layer、memory_type、title 和 content。\n- 复盘结果或改进候选 / autonomous_review、improvement_candidates、risk_flags: 临时进展、一次性错误、原始日志、较长运行细节、敏感信息、权限升级、可从项目或图运行重新读取的信息、能力改进建议、模板改进建议和需要人工确认的候选。\n\nWrite exactly nine states:\n1. autonomous_review: JSON with should_propose, source_run_id, evidence, risk_flags, skipped_reason, candidate_counts, storage_classification, and next_review_actions. Count MEMORY.md plan items, USER.md plan items, structured memory plan items, buddy identity plan items, and improvement candidates separately.\n2. improvement_candidates: JSON array of reviewable Action, template, workflow, evaluation, or policy improvement candidates. Put high-risk changes in this candidate list with risk_flags.\n3. memory_update_plan: JSON shaped as {\"has_updates\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": [], \"duplicates\": [], \"risk_flags\": []}. Commands are low-risk memory_document.update entries with complete MEMORY.md content and change_reason. Use this plan for stable, compact facts that should appear in Buddy Home context every run.\n4. user_context_update_plan: JSON shaped as {\"has_updates\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": [], \"duplicates\": [], \"risk_flags\": []}. Commands are low-risk user_context.update entries with complete USER.md content and change_reason. Use this plan for stable facts about the human, durable collaboration preferences, current long-horizon focus, and repeated corrections.\n5. structured_memory_update_plan: JSON shaped as {\"has_updates\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": [], \"duplicates\": [], \"risk_flags\": []}. Commands are memory_entry.create, memory_entry.update, or memory_entry.archive entries. Use this plan for recall-oriented facts with source refs, confidence, salience, scope_kind, scope_id, layer, memory_type, title, and content.\n6. memory_review_result: Markdown summary of accepted, rejected, duplicate, evidence-gap, confirmation-needed, MEMORY.md-ready, and structured-memory-ready candidates.\n7. user_context_review_result: Markdown summary of accepted, rejected, duplicate, evidence-gap, confirmation-needed, and USER.md-ready candidates.\n8. buddy_identity_update_plan: JSON shaped as {\"has_updates\": boolean, \"requires_confirmation\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": []}. Include buddy_identity.update commands for explicit low-risk requests to change Buddy name, persona, tone, response_style, display_preferences.display_name, or display_preferences.language.\n9. buddy_identity_review_result: Markdown summary of accepted, rejected, confirmation-needed, and write-ready buddy identity candidates.\n\nDurability rules: user corrections and explicit durable preferences have priority; stable low-risk facts that reduce future repeated steering are useful. Downstream writer nodes apply the prepared command arrays and produce auditable revisions.",
+        "taskInstruction": "可见 Buddy 回复完成后，执行后台自主复盘。使用 user_message、conversation_history、buddy_context、request_understanding、capability_result、capability_review、public_response、review_context_report 和 session_recall_context。当前 run 的用户消息、输出和 run record 是主要证据；召回会话作为辅助证据。\n\n先按写入目标矩阵归类候选：\n- SOUL.md / buddy_identity_update_plan: 用户明确调整 Buddy 名称、身份设定、语气、回复风格、显示名称或显示语言。Map \"call yourself X from now on\" and \"rename yourself to X\" to payload.name. Use display_preferences.display_name for a separately requested display label. Ambiguous nicknames, jokes, roleplay, or unclear intent go to requires_confirmation with commands=[].\n- USER.md / user_context_update_plan: 关于用户本人的稳定事实、长期偏好、称呼、时区、沟通方式、长期目标和反复出现的协作要求。\n- MEMORY.md / memory_update_plan: 每轮都适合注入的稳定上下文、项目级决策、长期有效的纠错、常用工作方式和跨会话经验。\n- 数据库结构化记忆 / structured_memory_update_plan: 适合未来按语义召回的事实、事件、选择依据、一次任务中的关键上下文；每条记录包含 source refs、confidence、salience、scope_kind、scope_id、layer、memory_type、title 和 content。\n- 能力使用统计 / capability_usage_update_plan: 从 capability_result、capability_review、review_context_report 或 run record 中识别实际运行过的 Action、Subgraph 或 Tool；commands 使用 capability_usage_stats.update，payload.entries 每项包含 capability.kind、capability.key、success、run_id、summary，存在 duration_ms 时一并写入。\n- 复盘结果或改进候选 / autonomous_review、improvement_candidates、risk_flags: 临时进展、一次性错误、原始日志、较长运行细节、敏感信息、权限升级、可从项目或图运行重新读取的信息、能力改进建议、模板改进建议和需要人工确认的候选。\n\nWrite exactly ten states:\n1. autonomous_review: JSON with should_propose, source_run_id, evidence, risk_flags, skipped_reason, candidate_counts, storage_classification, and next_review_actions. Count MEMORY.md plan items, USER.md plan items, structured memory plan items, buddy identity plan items, capability usage entries, and improvement candidates separately.\n2. improvement_candidates: JSON array of reviewable Action, template, workflow, evaluation, or policy improvement candidates. Put high-risk changes in this candidate list with risk_flags.\n3. memory_update_plan: JSON shaped as {\"has_updates\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": [], \"duplicates\": [], \"risk_flags\": []}. Commands are low-risk memory_document.update entries with complete MEMORY.md content and change_reason. Use this plan for stable, compact facts that should appear in Buddy Home context every run.\n4. user_context_update_plan: JSON shaped as {\"has_updates\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": [], \"duplicates\": [], \"risk_flags\": []}. Commands are low-risk user_context.update entries with complete USER.md content and change_reason. Use this plan for stable facts about the human, durable collaboration preferences, current long-horizon focus, and repeated corrections.\n5. structured_memory_update_plan: JSON shaped as {\"has_updates\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": [], \"duplicates\": [], \"risk_flags\": []}. Commands are memory_entry.create, memory_entry.update, or memory_entry.archive entries. Use this plan for recall-oriented facts with source refs, confidence, salience, scope_kind, scope_id, layer, memory_type, title, and content.\n6. capability_usage_update_plan: JSON shaped as {\"has_updates\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": [], \"duplicates\": [], \"risk_flags\": []}. Commands are capability_usage_stats.update entries. Each command payload can use entries for multiple capabilities from the same source_run_id.\n7. memory_review_result: Markdown summary of accepted, rejected, duplicate, evidence-gap, confirmation-needed, MEMORY.md-ready, and structured-memory-ready candidates.\n8. user_context_review_result: Markdown summary of accepted, rejected, duplicate, evidence-gap, confirmation-needed, and USER.md-ready candidates.\n9. buddy_identity_update_plan: JSON shaped as {\"has_updates\": boolean, \"requires_confirmation\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": []}. Include buddy_identity.update commands for explicit low-risk requests to change Buddy name, persona, tone, response_style, display_preferences.display_name, or display_preferences.language.\n10. buddy_identity_review_result: Markdown summary of accepted, rejected, confirmation-needed, and write-ready buddy identity candidates.\n\nDurability rules: user corrections and explicit durable preferences have priority; stable low-risk facts that reduce future repeated steering are useful. Downstream writer nodes apply the prepared command arrays and produce auditable revisions.",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "medium",
@@ -1045,6 +1116,117 @@
           }
         },
         "taskInstruction": "Build buddy_home_writer input: commands=buddy_identity_update_plan.commands and run_id=source_run_id. Use the runtime writer result as this node output.",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "low",
+        "temperature": 0
+      }
+    },
+    "has_capability_usage_updates": {
+      "kind": "condition",
+      "name": "存在能力使用统计更新?",
+      "description": "自主复盘准备 capability_usage_stats.update 命令时调用 Buddy Home Writer。",
+      "ui": {
+        "position": {
+          "x": 2000,
+          "y": 2060
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 250
+        }
+      },
+      "reads": [
+        {
+          "state": "capability_usage_update_plan",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
+        "loopLimit": 1,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.capability_usage_update_plan.has_updates",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "write_capability_usage_updates": {
+      "kind": "agent",
+      "name": "写入能力使用统计",
+      "description": "通过 Buddy Home Writer 应用 capability_usage_stats.update，并留下 revision。",
+      "ui": {
+        "position": {
+          "x": 2520,
+          "y": 2040
+        },
+        "collapsed": false,
+        "size": {
+          "width": 460,
+          "height": 320
+        }
+      },
+      "reads": [
+        {
+          "state": "source_run_id",
+          "required": false
+        },
+        {
+          "state": "capability_usage_update_plan",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "capability_usage_write_success",
+          "mode": "replace"
+        },
+        {
+          "state": "applied_capability_usage_commands",
+          "mode": "replace"
+        },
+        {
+          "state": "skipped_capability_usage_commands",
+          "mode": "replace"
+        },
+        {
+          "state": "capability_usage_write_result",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "actionKey": "buddy_home_writer",
+        "actionBindings": [
+          {
+            "actionKey": "buddy_home_writer",
+            "outputMapping": {
+              "success": "capability_usage_write_success",
+              "applied_commands": "applied_capability_usage_commands",
+              "skipped_commands": "skipped_capability_usage_commands",
+              "result": "capability_usage_write_result"
+            }
+          }
+        ],
+        "actionInstructionBlocks": {
+          "buddy_home_writer": {
+            "actionKey": "buddy_home_writer",
+            "title": "Capability usage writeback instruction",
+            "content": "输入映射：commands 使用 capability_usage_update_plan.commands，run_id 使用 source_run_id。每条命令类型为 capability_usage_stats.update，并记录实际运行能力的 kind/key、success、summary 和可用 duration_ms。",
+            "source": "node.override"
+          }
+        },
+        "taskInstruction": "生成 buddy_home_writer 输入：commands=capability_usage_update_plan.commands，run_id=source_run_id。输出使用运行时返回的能力使用统计写入结果。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "low",
@@ -1539,6 +1721,64 @@
         "fileNameTemplate": ""
       }
     },
+    "output_applied_capability_usage_commands": {
+      "kind": "output",
+      "name": "已应用能力使用统计写回",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 3060,
+          "y": 3580
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 220
+        }
+      },
+      "reads": [
+        {
+          "state": "applied_capability_usage_commands",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_capability_usage_write_result": {
+      "kind": "output",
+      "name": "能力使用统计写回摘要",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 3060,
+          "y": 3860
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 220
+        }
+      },
+      "reads": [
+        {
+          "state": "capability_usage_write_result",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
     "load_review_context": {
       "kind": "tool",
       "name": "加载复盘上下文",
@@ -1681,11 +1921,23 @@
     },
     {
       "source": "write_buddy_identity_updates",
+      "target": "has_capability_usage_updates"
+    },
+    {
+      "source": "write_buddy_identity_updates",
       "target": "output_applied_buddy_identity_commands"
     },
     {
       "source": "write_buddy_identity_updates",
       "target": "output_buddy_identity_write_result"
+    },
+    {
+      "source": "write_capability_usage_updates",
+      "target": "output_applied_capability_usage_commands"
+    },
+    {
+      "source": "write_capability_usage_updates",
+      "target": "output_capability_usage_write_result"
     }
   ],
   "conditional_edges": [
@@ -1717,6 +1969,14 @@
       "source": "has_buddy_identity_updates",
       "branches": {
         "true": "write_buddy_identity_updates",
+        "false": "has_capability_usage_updates",
+        "exhausted": "has_capability_usage_updates"
+      }
+    },
+    {
+      "source": "has_capability_usage_updates",
+      "branches": {
+        "true": "write_capability_usage_updates",
         "false": "output_buddy_identity_review_result",
         "exhausted": "output_buddy_identity_review_result"
       }

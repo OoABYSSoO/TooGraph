@@ -1,0 +1,918 @@
+{
+  "template_id": "buddy_improvement_review_workflow",
+  "label": "改进候选验证",
+  "description": "将自主复盘产出的 improvement candidate 转成可审查的验证报告、diff proposal、测试计划和 approval request；本模板只验证和请求审批，不应用改动。",
+  "default_graph_name": "改进候选验证",
+  "state_schema": {
+    "improvement_candidate": {
+      "name": "改进候选",
+      "description": "来自后台复盘或 curator 的 improvement_candidate 对象，包含 candidate_id、kind、target_ref、evidence_refs、risk_level 和 proposed_change_summary。",
+      "type": "json",
+      "value": {},
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "source_run_id": {
+      "name": "来源 Run ID",
+      "description": "产生该候选的源 run ID，用于追溯证据和审批说明。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": null
+    },
+    "candidate_review_context": {
+      "name": "候选审查上下文",
+      "description": "从 improvement_candidate 规范化得到的候选类型、目标引用、风险、证据和验证方向。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": null
+    },
+    "target_action_key": {
+      "name": "目标 Action Key",
+      "description": "候选指向的 Action key；为空表示本轮无需读取 Action 包。",
+      "type": "text",
+      "value": "",
+      "color": "#2563eb",
+      "binding": null
+    },
+    "target_template_id": {
+      "name": "目标模板 ID",
+      "description": "候选指向的图模板 ID；为空表示本轮无需读取图模板包。",
+      "type": "text",
+      "value": "",
+      "color": "#9333ea",
+      "binding": null
+    },
+    "action_read_success": {
+      "name": "Action 读取成功",
+      "description": "Action Package Reader 是否读取到目标 Action 包。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "toograph_action_package_reader",
+        "nodeId": "read_target_action",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "action_package": {
+      "name": "Action 包",
+      "description": "读取到的 Action manifest、文档和脚本内容。",
+      "type": "json",
+      "value": {},
+      "color": "#2563eb",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "toograph_action_package_reader",
+        "nodeId": "read_target_action",
+        "fieldKey": "action_package",
+        "managed": true
+      }
+    },
+    "action_read_result": {
+      "name": "Action 读取摘要",
+      "description": "Action 包读取结果摘要或错误原因。",
+      "type": "markdown",
+      "value": "",
+      "color": "#15803d",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "toograph_action_package_reader",
+        "nodeId": "read_target_action",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "template_read_success": {
+      "name": "模板读取成功",
+      "description": "图模板读取器是否读取到目标模板。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_reader",
+        "nodeId": "read_target_template",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "template_package": {
+      "name": "模板包",
+      "description": "读取到的图模板 JSON、来源和路径摘要。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_reader",
+        "nodeId": "read_target_template",
+        "fieldKey": "template_package",
+        "managed": true
+      }
+    },
+    "template_read_result": {
+      "name": "模板读取摘要",
+      "description": "图模板读取结果摘要或错误原因。",
+      "type": "markdown",
+      "value": "",
+      "color": "#15803d",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_reader",
+        "nodeId": "read_target_template",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "candidate_validation_plan": {
+      "name": "候选验证计划",
+      "description": "验证该候选需要检查的协议、权限、测试、风险和人工审批点。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": null
+    },
+    "proposed_diff": {
+      "name": "候选 Diff Proposal",
+      "description": "面向 review 的结构化 diff proposal；包含目标、变更摘要、文件或模板路径、风险和回滚说明。",
+      "type": "json",
+      "value": {},
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "candidate_template_json": {
+      "name": "候选模板 JSON",
+      "description": "当候选涉及完整图模板变更时，放入待校验的 template.json 对象。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": null
+    },
+    "should_validate_template": {
+      "name": "运行模板校验",
+      "description": "candidate_template_json 是完整 template.json 时为 true。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": null
+    },
+    "validation_success": {
+      "name": "校验成功",
+      "description": "图模板校验器是否通过协议、图校验和运行时兼容检查。",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_validator",
+        "nodeId": "validate_candidate_template",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "validation_report": {
+      "name": "校验报告",
+      "description": "协议、图校验、运行时兼容和问题列表。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "toograph_graph_template_validator",
+        "nodeId": "validate_candidate_template",
+        "fieldKey": "validation_report",
+        "managed": true
+      }
+    },
+    "test_plan": {
+      "name": "测试计划",
+      "description": "候选应用前需要运行的验证命令、eval case 或人工检查步骤。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0891b2",
+      "binding": null
+    },
+    "approval_request": {
+      "name": "审批请求",
+      "description": "面向用户或 reviewer 的结构化审批请求，包含风险、diff 摘要、验证结果和可批准操作。",
+      "type": "json",
+      "value": {},
+      "color": "#b45309",
+      "binding": null
+    },
+    "candidate_status_recommendation": {
+      "name": "候选状态建议",
+      "description": "本轮验证后建议将候选标记为 validated、needs_changes、rejected 或 waiting_for_approval。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": null
+    },
+    "final_summary": {
+      "name": "验证摘要",
+      "description": "面向用户的候选验证摘要，说明目标、diff、验证、风险和下一步审批动作。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0369a1",
+      "binding": null
+    }
+  },
+  "nodes": {
+    "input_improvement_candidate": {
+      "kind": "input",
+      "name": "输入改进候选",
+      "description": "传入后台复盘或 curator 产出的 improvement_candidate。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 80
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "improvement_candidate",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": {},
+        "boundaryType": "json"
+      }
+    },
+    "input_source_run_id": {
+      "kind": "input",
+      "name": "输入来源 Run ID",
+      "description": "可选：提供产生候选的源 run ID。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 480
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "source_run_id",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
+    },
+    "normalize_candidate": {
+      "kind": "agent",
+      "name": "规范化候选",
+      "description": "抽取候选目标引用和验证上下文。",
+      "ui": {
+        "position": {
+          "x": 660,
+          "y": 260
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "improvement_candidate",
+          "required": true
+        },
+        {
+          "state": "source_run_id",
+          "required": false
+        }
+      ],
+      "writes": [
+        {
+          "state": "candidate_review_context",
+          "mode": "replace"
+        },
+        {
+          "state": "target_action_key",
+          "mode": "replace"
+        },
+        {
+          "state": "target_template_id",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
+        "taskInstruction": "读取 improvement_candidate 和 source_run_id，写 candidate_review_context JSON：candidate_id、kind、source_run_id、target_ref、evidence_refs、risk_level、expected_benefit、proposed_change_summary、approval_required、validation_focus。若 target_ref 指向 Action，写 target_action_key；若 target_ref 指向图模板，写 target_template_id；缺少对应目标时写空字符串。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "medium",
+        "temperature": 0.1
+      }
+    },
+    "has_target_action": {
+      "kind": "condition",
+      "name": "需要读取 Action？",
+      "description": "target_action_key 非空时读取 Action 包。",
+      "ui": {
+        "position": {
+          "x": 1240,
+          "y": 260
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "target_action_key",
+          "required": false
+        }
+      ],
+      "writes": [],
+      "config": {
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.target_action_key",
+          "operator": "!=",
+          "value": ""
+        },
+        "loopLimit": 1
+      }
+    },
+    "read_target_action": {
+      "kind": "agent",
+      "name": "读取目标 Action",
+      "description": "只读读取候选指向的 Action 包。",
+      "ui": {
+        "position": {
+          "x": 1900,
+          "y": 80
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "target_action_key",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_action_package_reader",
+            "fieldKey": "target_action_key",
+            "managed": true
+          }
+        }
+      ],
+      "writes": [
+        {
+          "state": "action_read_success",
+          "mode": "replace"
+        },
+        {
+          "state": "action_package",
+          "mode": "replace"
+        },
+        {
+          "state": "action_read_result",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "actionKey": "toograph_action_package_reader",
+        "actionBindings": [
+          {
+            "actionKey": "toograph_action_package_reader",
+            "outputMapping": {
+              "success": "action_read_success",
+              "action_package": "action_package",
+              "result": "action_read_result"
+            }
+          }
+        ],
+        "actionInstructionBlocks": {},
+        "taskInstruction": "调用 Action Package Reader。action_key 使用 target_action_key，source_scope 留空，保持只读读取。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "low",
+        "temperature": 0
+      }
+    },
+    "has_target_template": {
+      "kind": "condition",
+      "name": "需要读取模板？",
+      "description": "target_template_id 非空时读取图模板。",
+      "ui": {
+        "position": {
+          "x": 2480,
+          "y": 260
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "target_template_id",
+          "required": false
+        }
+      ],
+      "writes": [],
+      "config": {
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.target_template_id",
+          "operator": "!=",
+          "value": ""
+        },
+        "loopLimit": 1
+      }
+    },
+    "read_target_template": {
+      "kind": "agent",
+      "name": "读取目标模板",
+      "description": "只读读取候选指向的图模板包。",
+      "ui": {
+        "position": {
+          "x": 3140,
+          "y": 80
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "target_template_id",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_graph_template_reader",
+            "fieldKey": "target_template_id",
+            "managed": true
+          }
+        }
+      ],
+      "writes": [
+        {
+          "state": "template_read_success",
+          "mode": "replace"
+        },
+        {
+          "state": "template_package",
+          "mode": "replace"
+        },
+        {
+          "state": "template_read_result",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "actionKey": "toograph_graph_template_reader",
+        "actionBindings": [
+          {
+            "actionKey": "toograph_graph_template_reader",
+            "outputMapping": {
+              "success": "template_read_success",
+              "template_package": "template_package",
+              "result": "template_read_result"
+            }
+          }
+        ],
+        "actionInstructionBlocks": {},
+        "taskInstruction": "调用图模板读取器。template_id 使用 target_template_id，source_scope 留空，保持只读读取。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "low",
+        "temperature": 0
+      }
+    },
+    "draft_candidate_resolution": {
+      "kind": "agent",
+      "name": "起草验证方案",
+      "description": "基于候选和目标包起草 diff、验证计划、测试计划和审批请求。",
+      "ui": {
+        "position": {
+          "x": 3800,
+          "y": 260
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "improvement_candidate",
+          "required": true
+        },
+        {
+          "state": "source_run_id",
+          "required": false
+        },
+        {
+          "state": "candidate_review_context",
+          "required": true
+        },
+        {
+          "state": "action_package",
+          "required": false
+        },
+        {
+          "state": "action_read_result",
+          "required": false
+        },
+        {
+          "state": "template_package",
+          "required": false
+        },
+        {
+          "state": "template_read_result",
+          "required": false
+        }
+      ],
+      "writes": [
+        {
+          "state": "candidate_validation_plan",
+          "mode": "replace"
+        },
+        {
+          "state": "proposed_diff",
+          "mode": "replace"
+        },
+        {
+          "state": "candidate_template_json",
+          "mode": "replace"
+        },
+        {
+          "state": "should_validate_template",
+          "mode": "replace"
+        },
+        {
+          "state": "test_plan",
+          "mode": "replace"
+        },
+        {
+          "state": "approval_request",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
+        "taskInstruction": "根据 improvement_candidate、candidate_review_context、action_package、template_package 起草候选处理方案。写 candidate_validation_plan JSON：checks、required_permissions、risk_assessment、evidence_refs、success_criteria。写 proposed_diff JSON：target_ref、change_kind、files_or_templates、diff_summary、rollback_notes、source_run_id。若候选包含完整图模板改动，写 candidate_template_json 为完整 template.json 且 should_validate_template=true；其他候选写空对象且 should_validate_template=false。写 test_plan Markdown，列出需要运行的 validator、eval case 或人工检查。写 approval_request JSON：candidate_id、target_ref、risk_level、approval_required、summary、diff_ref、validation_ref、allowed_next_actions。若候选可由现有 Buddy command 安全应用，在 approval_request.apply_command 写单个受控命令对象：action、payload、target_id、change_reason；action 取值限于 buddy_identity.update、user_context.update、memory_document.update、session_summary.update、capability_usage_stats.update、memory_entry.create、memory_entry.update、memory_entry.archive、run_template_binding.update 或 memory_review_template_binding.update；其他候选的 approval_request 仅保留人工审批信息。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "high",
+        "temperature": 0.1
+      }
+    },
+    "should_run_template_validator": {
+      "kind": "condition",
+      "name": "校验模板 JSON？",
+      "description": "候选包含完整图模板 JSON 时运行模板校验器。",
+      "ui": {
+        "position": {
+          "x": 4460,
+          "y": 260
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "should_validate_template",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.should_validate_template",
+          "operator": "==",
+          "value": true
+        },
+        "loopLimit": 1
+      }
+    },
+    "validate_candidate_template": {
+      "kind": "agent",
+      "name": "校验候选模板",
+      "description": "调用图模板校验器检查候选 template.json。",
+      "ui": {
+        "position": {
+          "x": 5120,
+          "y": 80
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "candidate_template_json",
+          "required": true,
+          "binding": {
+            "kind": "action_input",
+            "actionKey": "toograph_graph_template_validator",
+            "fieldKey": "generated_template_json",
+            "managed": true
+          }
+        }
+      ],
+      "writes": [
+        {
+          "state": "validation_success",
+          "mode": "replace"
+        },
+        {
+          "state": "validation_report",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "actionKey": "toograph_graph_template_validator",
+        "actionBindings": [
+          {
+            "actionKey": "toograph_graph_template_validator",
+            "outputMapping": {
+              "success": "validation_success",
+              "validation_report": "validation_report"
+            }
+          }
+        ],
+        "actionInstructionBlocks": {},
+        "taskInstruction": "调用图模板校验器。template_json 直接来自 candidate_template_json，保持原对象形状。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "low",
+        "temperature": 0
+      }
+    },
+    "finalize_candidate_review": {
+      "kind": "agent",
+      "name": "生成审批摘要",
+      "description": "汇总验证结论，给出候选状态建议和用户可审查摘要。",
+      "ui": {
+        "position": {
+          "x": 5780,
+          "y": 260
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "improvement_candidate",
+          "required": true
+        },
+        {
+          "state": "candidate_validation_plan",
+          "required": true
+        },
+        {
+          "state": "proposed_diff",
+          "required": true
+        },
+        {
+          "state": "validation_report",
+          "required": false
+        },
+        {
+          "state": "test_plan",
+          "required": true
+        },
+        {
+          "state": "approval_request",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "candidate_status_recommendation",
+          "mode": "replace"
+        },
+        {
+          "state": "final_summary",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "actionKey": "",
+        "actionBindings": [],
+        "actionInstructionBlocks": {},
+        "taskInstruction": "汇总候选验证结果。写 candidate_status_recommendation JSON：candidate_id、recommended_status(validated|needs_changes|rejected|waiting_for_approval)、reason、blocking_issues、next_actions。写 final_summary Markdown，包含候选目标、证据、diff 摘要、验证状态、测试计划、风险和审批动作；说明本轮只完成验证与审批请求。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "medium",
+        "temperature": 0.1
+      }
+    },
+    "output_final_summary": {
+      "kind": "output",
+      "name": "输出验证摘要",
+      "description": "展示候选验证摘要。",
+      "ui": {
+        "position": {
+          "x": 6440,
+          "y": 0
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "final_summary",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_approval_request": {
+      "kind": "output",
+      "name": "输出审批请求",
+      "description": "展示结构化 approval request。",
+      "ui": {
+        "position": {
+          "x": 6440,
+          "y": 400
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "approval_request",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_proposed_diff": {
+      "kind": "output",
+      "name": "输出 Diff Proposal",
+      "description": "展示结构化 diff proposal。",
+      "ui": {
+        "position": {
+          "x": 6440,
+          "y": 800
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "proposed_diff",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_validation_report": {
+      "kind": "output",
+      "name": "输出验证报告",
+      "description": "展示模板校验结果或候选验证计划。",
+      "ui": {
+        "position": {
+          "x": 6440,
+          "y": 1200
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "validation_report",
+          "required": false
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    }
+  },
+  "edges": [
+    {
+      "source": "input_improvement_candidate",
+      "target": "normalize_candidate"
+    },
+    {
+      "source": "input_source_run_id",
+      "target": "normalize_candidate"
+    },
+    {
+      "source": "normalize_candidate",
+      "target": "has_target_action"
+    },
+    {
+      "source": "read_target_action",
+      "target": "has_target_template"
+    },
+    {
+      "source": "read_target_template",
+      "target": "draft_candidate_resolution"
+    },
+    {
+      "source": "draft_candidate_resolution",
+      "target": "should_run_template_validator"
+    },
+    {
+      "source": "validate_candidate_template",
+      "target": "finalize_candidate_review"
+    },
+    {
+      "source": "finalize_candidate_review",
+      "target": "output_final_summary"
+    },
+    {
+      "source": "finalize_candidate_review",
+      "target": "output_approval_request"
+    },
+    {
+      "source": "finalize_candidate_review",
+      "target": "output_proposed_diff"
+    },
+    {
+      "source": "finalize_candidate_review",
+      "target": "output_validation_report"
+    }
+  ],
+  "conditional_edges": [
+    {
+      "source": "has_target_action",
+      "branches": {
+        "true": "read_target_action",
+        "false": "has_target_template",
+        "exhausted": "has_target_template"
+      }
+    },
+    {
+      "source": "has_target_template",
+      "branches": {
+        "true": "read_target_template",
+        "false": "draft_candidate_resolution",
+        "exhausted": "draft_candidate_resolution"
+      }
+    },
+    {
+      "source": "should_run_template_validator",
+      "branches": {
+        "true": "validate_candidate_template",
+        "false": "finalize_candidate_review",
+        "exhausted": "finalize_candidate_review"
+      }
+    }
+  ],
+  "metadata": {
+    "category": "buddy_improvement",
+    "templateVersion": "2026-05-27",
+    "graphProtocol": "node_system",
+    "origin": "buddy",
+    "role": "buddy_improvement_review_workflow",
+    "capabilityDiscoverableDefault": false,
+    "description": "把 improvement candidate 转成可验证、可审批、可追溯的改进工作流。",
+    "requiredActions": [
+      "toograph_action_package_reader",
+      "toograph_graph_template_reader",
+      "toograph_graph_template_validator"
+    ],
+    "permissions": [
+      "action_read",
+      "file_read"
+    ]
+  }
+}

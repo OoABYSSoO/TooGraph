@@ -1,19 +1,15 @@
 import type { Ref } from "vue";
 
-import { fetchBuddyMemoryReviewTemplateBinding } from "../api/buddy.ts";
-import { fetchTemplate, runGraph } from "../api/graphs.ts";
+import { enqueueBuddyBackgroundReview } from "../api/buddy.ts";
 import type { RunDetail } from "../types/run.ts";
-import { buildBuddyReviewGraph } from "./buddyChatGraph.ts";
 
 type BuddyAutonomousReviewRunOptions = {
-  currentSessionId: Ref<string | null>;
   buddyModelRef: Ref<string>;
   pollRunUntilFinished: (runId: string, signal: AbortSignal) => Promise<RunDetail>;
   notifyBuddyDataChanged: () => void;
 };
 
 export function useBuddyAutonomousReviewRun({
-  currentSessionId,
   buddyModelRef,
   pollRunUntilFinished,
   notifyBuddyDataChanged,
@@ -25,16 +21,11 @@ export function useBuddyAutonomousReviewRun({
       return;
     }
     try {
-      const binding = await fetchBuddyMemoryReviewTemplateBinding();
-      const template = await fetchTemplate(binding.template_id);
-      const graph = buildBuddyReviewGraph(template, {
-        mainRun,
-        binding,
-        currentSessionId: currentSessionId.value ?? "",
-        buddyModel: buddyModelRef.value,
+      const reviewRun = await enqueueBuddyBackgroundReview({
+        source_run_id: mainRun.run_id,
+        buddy_model_ref: buddyModelRef.value,
       });
-      const reviewRun = await runGraph(graph);
-      void pollBuddyAutonomousReviewRun(reviewRun.run_id);
+      void pollBuddyAutonomousReviewRun(reviewRun.review_run_id);
     } catch (error) {
       console.warn("[Buddy] Background autonomous review failed to start.", error);
     }

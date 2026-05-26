@@ -500,6 +500,54 @@ def _ensure_graph_run_schema(connection: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_graph_capability_invocations_key
             ON graph_capability_invocations(capability_kind, capability_key, started_at);
 
+        CREATE TABLE IF NOT EXISTS agent_loop_events (
+            event_id TEXT PRIMARY KEY,
+            run_id TEXT NOT NULL REFERENCES graph_runs(run_id) ON DELETE CASCADE,
+            node_id TEXT NOT NULL DEFAULT '',
+
+            iteration_index INTEGER,
+            event_kind TEXT NOT NULL DEFAULT '',
+            capability_kind TEXT NOT NULL DEFAULT '',
+            capability_key TEXT NOT NULL DEFAULT '',
+            stop_reason TEXT NOT NULL DEFAULT '',
+
+            budget_snapshot_json TEXT NOT NULL DEFAULT '{}',
+            detail_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_agent_loop_events_run
+            ON agent_loop_events(run_id, iteration_index, created_at);
+        CREATE INDEX IF NOT EXISTS idx_agent_loop_events_stop_reason
+            ON agent_loop_events(stop_reason, created_at);
+
+        CREATE TABLE IF NOT EXISTS capability_usage_events (
+            event_id TEXT PRIMARY KEY,
+            invocation_id TEXT NOT NULL,
+            run_id TEXT NOT NULL REFERENCES graph_runs(run_id) ON DELETE CASCADE,
+            node_id TEXT NOT NULL DEFAULT '',
+
+            capability_kind TEXT NOT NULL,
+            capability_key TEXT NOT NULL DEFAULT '',
+            selected_reason TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL,
+            latency_ms INTEGER,
+
+            error_type TEXT NOT NULL DEFAULT '',
+            error_message TEXT NOT NULL DEFAULT '',
+            permission_result TEXT NOT NULL DEFAULT '',
+            summary TEXT NOT NULL DEFAULT '',
+            detail_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_capability_usage_events_invocation
+            ON capability_usage_events(invocation_id);
+        CREATE INDEX IF NOT EXISTS idx_capability_usage_events_run
+            ON capability_usage_events(run_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_capability_usage_events_key
+            ON capability_usage_events(capability_kind, capability_key, created_at);
+
         CREATE TABLE IF NOT EXISTS graph_model_calls (
             model_call_id TEXT PRIMARY KEY,
             run_id TEXT NOT NULL REFERENCES graph_runs(run_id) ON DELETE CASCADE,
@@ -614,6 +662,47 @@ def _ensure_buddy_schema(connection: sqlite3.Connection) -> None:
             FOREIGN KEY(message_id) REFERENCES buddy_messages(message_id)
         );
 
+        CREATE TABLE IF NOT EXISTS buddy_background_review_runs (
+            review_id TEXT PRIMARY KEY,
+            source_run_id TEXT NOT NULL,
+            review_run_id TEXT NOT NULL,
+            template_id TEXT NOT NULL,
+            status TEXT NOT NULL,
+            trigger_reason TEXT NOT NULL,
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            error TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            started_at TEXT,
+            completed_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS improvement_candidates (
+            candidate_id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'proposed',
+            status_reason TEXT NOT NULL DEFAULT '',
+            source_run_id TEXT NOT NULL DEFAULT '',
+            review_id TEXT NOT NULL DEFAULT '',
+            review_run_id TEXT NOT NULL DEFAULT '',
+            target_ref_json TEXT NOT NULL DEFAULT '{}',
+            evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+            risk_level TEXT NOT NULL DEFAULT '',
+            expected_benefit TEXT NOT NULL DEFAULT '',
+            proposed_change_summary TEXT NOT NULL DEFAULT '',
+            approval_required INTEGER NOT NULL DEFAULT 1,
+            validation_run_id TEXT NOT NULL DEFAULT '',
+            validation_result_json TEXT NOT NULL DEFAULT '{}',
+            applied_revision_id TEXT NOT NULL DEFAULT '',
+            applied_command_json TEXT NOT NULL DEFAULT '{}',
+            applied_at TEXT NOT NULL DEFAULT '',
+            decision_json TEXT NOT NULL DEFAULT '{}',
+            decided_at TEXT NOT NULL DEFAULT '',
+            payload_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
         CREATE INDEX IF NOT EXISTS idx_buddy_revisions_target
             ON buddy_revisions (target_type, target_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_buddy_sessions_visible
@@ -630,6 +719,18 @@ def _ensure_buddy_schema(connection: sqlite3.Connection) -> None:
             ON buddy_message_revisions (message_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_buddy_message_run_refs_run
             ON buddy_message_run_refs (run_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_buddy_background_review_source
+            ON buddy_background_review_runs (source_run_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_buddy_background_review_run
+            ON buddy_background_review_runs (review_run_id);
+        CREATE INDEX IF NOT EXISTS idx_improvement_candidates_source
+            ON improvement_candidates (source_run_id, status, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_improvement_candidates_review
+            ON improvement_candidates (review_id);
+        CREATE INDEX IF NOT EXISTS idx_improvement_candidates_review_run
+            ON improvement_candidates (review_run_id);
+        CREATE INDEX IF NOT EXISTS idx_improvement_candidates_validation_run
+            ON improvement_candidates (validation_run_id);
         """
     )
     _ensure_column(connection, "buddy_sessions", "parent_session_id", "TEXT")
@@ -639,6 +740,12 @@ def _ensure_buddy_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(connection, "buddy_messages", "client_order", "REAL")
     _ensure_column(connection, "buddy_messages", "metadata_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(connection, "buddy_messages", "deleted_at", "TEXT")
+    _ensure_column(connection, "improvement_candidates", "status_reason", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(connection, "improvement_candidates", "validation_result_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(connection, "improvement_candidates", "applied_command_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(connection, "improvement_candidates", "applied_at", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(connection, "improvement_candidates", "decision_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(connection, "improvement_candidates", "decided_at", "TEXT NOT NULL DEFAULT ''")
     _ensure_buddy_message_client_order(connection)
     _ensure_buddy_message_fts(connection)
 

@@ -69,6 +69,122 @@ test("buildAgentDiagnostic reads loop report from run state values", () => {
   assert.deepEqual(diagnostic.warnings, ["budget reached"]);
 });
 
+test("buildAgentDiagnostic reads loop evidence from projected agent loop events", () => {
+  const diagnostic = buildAgentDiagnostic(
+    createRun({
+      stop_reason: "",
+      agent_loop_events: [
+        {
+          event_id: "loop_event_1",
+          run_id: "run_1",
+          node_id: "guard_agent_loop",
+          iteration_index: 4,
+          event_kind: "stop",
+          capability_kind: "action",
+          capability_key: "web_search",
+          stop_reason: "capability_budget_exhausted",
+          budget_snapshot: {
+            iteration_index: 4,
+            max_iterations: 6,
+            capability_call_count: 4,
+            max_capability_calls: 4,
+            retry_budget: 1,
+          },
+          detail: {
+            decision: "stop",
+            selected_capability_ref: "action:web_search",
+            warnings: ["budget reached"],
+          },
+          created_at: "2026-05-26T00:01:01Z",
+        },
+      ],
+    }),
+  );
+
+  assert.equal(diagnostic.visible, true);
+  assert.equal(diagnostic.stopReason, "capability_budget_exhausted");
+  assert.equal(diagnostic.decision, "stop");
+  assert.equal(diagnostic.iterationLabel, "4 / 6");
+  assert.equal(diagnostic.capabilityBudgetLabel, "4 / 4");
+  assert.deepEqual(diagnostic.badges, ["stop: capability_budget_exhausted", "decision: stop", "capability: action:web_search"]);
+  assert.deepEqual(diagnostic.warnings, ["budget reached"]);
+});
+
+test("buildAgentDiagnostic maps standard stop reasons to user-facing explanation keys", () => {
+  const reasons = ["provider_failed", "permission_required", "context_budget_exhausted"] as const;
+
+  for (const reason of reasons) {
+    const diagnostic = buildAgentDiagnostic(createRun({ stop_reason: reason }));
+
+    assert.equal(diagnostic.visible, true);
+    assert.equal(diagnostic.stopReason, reason);
+    assert.equal(diagnostic.stopReasonTitleKey, `runDetail.agentStopReasons.${reason}.title`);
+    assert.equal(diagnostic.stopReasonDescriptionKey, `runDetail.agentStopReasons.${reason}.description`);
+  }
+});
+
+test("buildAgentDiagnostic summarizes capability selection trace from state values", () => {
+  const diagnostic = buildAgentDiagnostic(
+    createRun({
+      artifacts: {
+        state_values: {
+          capability_selection_reason: "需要公开网页资料。",
+          capability_selection_trace: {
+            requested: { kind: "action", key: "raw_search" },
+            selected: { kind: "subgraph", key: "advanced_web_research_loop" },
+            selection_reason: "Need current public sources.",
+            rejected_candidates: [
+              { kind: "action", key: "raw_search", reason: "higher_level_capability_preferred" },
+            ],
+            fallback_candidates: [
+              { kind: "tool", key: "web_search" },
+            ],
+            usage_summary: {
+              selected: {
+                use_count: 8,
+                success_rate: 0.75,
+                recent_failure_count: 1,
+              },
+            },
+            budget_after_call: {
+              capability_call_count_after: 4,
+              max_capability_calls: 4,
+              remaining_capability_calls_after: 0,
+              capability_budget_exhausted_after: true,
+            },
+            permission_summary: {
+              permissions: ["network"],
+              requires_approval: true,
+              permission_tier: "external",
+              approval_reason: "permission_tier_requires_approval",
+            },
+          },
+        },
+      },
+    }),
+  );
+
+  assert.equal(diagnostic.visible, true);
+  assert.deepEqual(diagnostic.capabilitySelection, {
+    visible: true,
+    requestedRef: "action:raw_search",
+    selectedRef: "subgraph:advanced_web_research_loop",
+    selectionReason: "需要公开网页资料。",
+    permissionLabel: "permission: external approval",
+    usageLabel: "usage: 8 uses, 75% success, 1 recent failure",
+    budgetLabel: "budget: capability calls 4 / 4, remaining 0, exhausted",
+    rejectedLabels: ["rejected: action:raw_search (higher_level_capability_preferred)"],
+    fallbackLabels: ["fallback: tool:web_search"],
+    evidenceLabels: [
+      "selected: subgraph:advanced_web_research_loop",
+      "requested: action:raw_search",
+      "permission: external approval",
+      "usage: 8 uses, 75% success, 1 recent failure",
+      "budget: capability calls 4 / 4, remaining 0, exhausted",
+    ],
+  });
+});
+
 test("buildAgentDiagnostic falls back to cycle summary", () => {
   const diagnostic = buildAgentDiagnostic(
     createRun({

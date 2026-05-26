@@ -277,18 +277,196 @@
           </div>
         </article>
 
+        <article v-if="backgroundReviewVisible" class="run-detail__panel run-detail__panel--background-review">
+          <div class="run-detail__panel-heading">
+            <div>
+              <span class="run-detail__section-kicker">{{ t("runDetail.backgroundReview") }}</span>
+              <h3>{{ t("runDetail.backgroundReviewTitle", { count: backgroundReviewItems.length }) }}</h3>
+            </div>
+            <ElButton
+              v-if="backgroundReviewSourceRun"
+              size="small"
+              :loading="rerunningBackgroundReview"
+              :disabled="rerunningBackgroundReview || backgroundReviewSourceRun.status !== 'completed'"
+              @click="rerunBackgroundReview"
+            >
+              {{ t("runDetail.rerunBackgroundReview") }}
+            </ElButton>
+          </div>
+          <p v-if="backgroundReviewError" class="run-detail__muted">{{ t("common.failedToLoad", { error: backgroundReviewError }) }}</p>
+          <p v-else-if="backgroundReviewLoading" class="run-detail__muted">{{ t("common.loading") }}</p>
+          <p v-else-if="backgroundReviewItems.length === 0" class="run-detail__muted">{{ t("runDetail.backgroundReviewEmpty") }}</p>
+          <div v-else class="run-detail__background-review-list">
+            <section v-for="item in backgroundReviewItems" :key="item.key" class="run-detail__background-review-card">
+              <span class="run-detail__operation-rail" :class="statusBadgeClass(item.status)" aria-hidden="true"></span>
+              <div class="run-detail__background-review-body">
+                <div class="run-detail__timeline-heading">
+                  <div class="run-detail__timeline-title">
+                    <strong>{{ item.reviewId }}</strong>
+                    <small>{{ item.reviewRunId || t("common.none") }}</small>
+                  </div>
+                  <span :class="statusBadgeClass(item.status)">{{ item.status }}</span>
+                </div>
+                <p v-if="item.error" class="run-detail__muted">{{ item.error }}</p>
+                <div class="run-detail__badges">
+                  <span v-for="badge in item.badges" :key="`${item.key}-${badge}`">{{ badge }}</span>
+                  <span v-if="item.startedAt">{{ t("runDetail.backgroundReviewStarted", { value: formatRunDisplayTimestamp(item.startedAt) }) }}</span>
+                  <span v-if="item.completedAt">{{ t("runDetail.backgroundReviewCompleted", { value: formatRunDisplayTimestamp(item.completedAt) }) }}</span>
+                </div>
+                <div v-if="item.writebackBadges.length > 0" class="run-detail__badges run-detail__badges--writeback">
+                  <span v-for="badge in item.writebackBadges" :key="`${item.key}-writeback-${badge}`">{{ badge }}</span>
+                </div>
+                <div v-if="item.improvementBadges.length > 0" class="run-detail__badges run-detail__badges--improvement">
+                  <span v-for="badge in item.improvementBadges" :key="`${item.key}-improvement-${badge}`">{{ badge }}</span>
+                </div>
+                <div
+                  v-if="item.revisions.length > 0 || item.improvementCandidates.length > 0 || item.skippedCommands.length > 0 || item.evidenceItems.length > 0 || item.warnings.length > 0"
+                  class="run-detail__background-review-facts"
+                >
+                  <div v-if="item.revisions.length > 0">
+                    <strong>{{ t("runDetail.backgroundReviewRevisions") }}</strong>
+                    <span
+                      v-for="revision in item.revisions"
+                      :key="`${item.key}-revision-${revision.revisionId}`"
+                      class="run-detail__background-review-revision"
+                    >
+                      <span>{{ revision.label }}</span>
+                      <ElButton
+                        v-if="revision.canRestore"
+                        size="small"
+                        :loading="restoringBackgroundReviewRevisionId === revision.revisionId"
+                        :disabled="Boolean(restoringBackgroundReviewRevisionId)"
+                        @click="restoreBackgroundReviewRevision(item, revision.revisionId)"
+                      >
+                        {{ t("graphLibrary.restoreRevisionAction") }}
+                      </ElButton>
+                    </span>
+                  </div>
+                  <div v-if="item.skippedCommands.length > 0">
+                    <strong>{{ t("runDetail.backgroundReviewSkipped") }}</strong>
+                    <span v-for="skipped in item.skippedCommands" :key="`${item.key}-skipped-${skipped}`">{{ skipped }}</span>
+                  </div>
+                  <div v-if="item.improvementCandidates.length > 0">
+                    <strong>{{ t("runDetail.backgroundReviewImprovements") }}</strong>
+                    <section
+                      v-for="candidate in item.improvementCandidates"
+                      :key="`${item.key}-candidate-${candidate.candidateId}`"
+                      class="run-detail__background-review-candidate"
+                    >
+                      <div class="run-detail__badges">
+                        <span v-if="candidate.kind">{{ candidate.kind }}</span>
+                        <span v-if="candidate.status">{{ candidate.status }}</span>
+                        <span v-if="candidate.riskLevel">{{ candidate.riskLevel }}</span>
+                        <span v-if="candidate.approvalRequired">{{ t("runDetail.backgroundReviewApprovalRequired") }}</span>
+                      </div>
+                      <span v-if="candidate.proposedChangeSummary">{{ candidate.proposedChangeSummary }}</span>
+                      <span v-if="candidate.expectedBenefit">{{ t("runDetail.backgroundReviewExpectedBenefit", { value: candidate.expectedBenefit }) }}</span>
+                      <div v-if="candidate.evidenceRefs.length > 0" class="run-detail__badges">
+                        <span v-for="evidenceRef in candidate.evidenceRefs" :key="`${candidate.candidateId}-${evidenceRef}`">{{ evidenceRef }}</span>
+                      </div>
+                      <ElButton
+                        size="small"
+                        :loading="validatingImprovementCandidateKey === candidate.candidateId"
+                        :disabled="Boolean(validatingImprovementCandidateKey || decidingImprovementCandidateKey)"
+                        @click="startImprovementCandidateReview(item, candidate)"
+                      >
+                        {{ t("runDetail.backgroundReviewValidateCandidate") }}
+                      </ElButton>
+                      <ElButton
+                        v-if="canApproveImprovementCandidate(candidate)"
+                        size="small"
+                        type="primary"
+                        :loading="decidingImprovementCandidateKey === `${candidate.candidateId}:approve`"
+                        :disabled="Boolean(validatingImprovementCandidateKey || decidingImprovementCandidateKey)"
+                        @click="decideImprovementCandidate(item, candidate, 'approve')"
+                      >
+                        {{ t("runDetail.backgroundReviewApproveCandidate") }}
+                      </ElButton>
+                      <ElButton
+                        v-if="canRejectImprovementCandidate(candidate)"
+                        size="small"
+                        :loading="decidingImprovementCandidateKey === `${candidate.candidateId}:reject`"
+                        :disabled="Boolean(validatingImprovementCandidateKey || decidingImprovementCandidateKey)"
+                        @click="decideImprovementCandidate(item, candidate, 'reject')"
+                      >
+                        {{ t("runDetail.backgroundReviewRejectCandidate") }}
+                      </ElButton>
+                      <ElButton
+                        v-if="canApplyImprovementCandidate(candidate)"
+                        size="small"
+                        type="success"
+                        :loading="applyingImprovementCandidateKey === candidate.candidateId"
+                        :disabled="Boolean(validatingImprovementCandidateKey || decidingImprovementCandidateKey || applyingImprovementCandidateKey)"
+                        @click="applyImprovementCandidate(item, candidate)"
+                      >
+                        {{ t("runDetail.backgroundReviewApplyCandidate") }}
+                      </ElButton>
+                    </section>
+                  </div>
+                  <div v-if="item.evidenceItems.length > 0">
+                    <strong>{{ t("runDetail.backgroundReviewEvidence") }}</strong>
+                    <span v-for="evidence in item.evidenceItems" :key="`${item.key}-evidence-${evidence}`">{{ evidence }}</span>
+                  </div>
+                  <div v-if="item.warnings.length > 0">
+                    <strong>{{ t("runDetail.backgroundReviewWarnings") }}</strong>
+                    <span v-for="warning in item.warnings" :key="`${item.key}-warning-${warning}`">{{ warning }}</span>
+                  </div>
+                </div>
+                <RouterLink v-if="item.reviewRunHref" class="run-detail__inline-link" :to="item.reviewRunHref">
+                  {{ t("runDetail.backgroundReviewOpenRun") }}
+                </RouterLink>
+              </div>
+            </section>
+          </div>
+        </article>
+
         <section class="run-detail__grid">
           <article v-if="agentDiagnostic?.visible" class="run-detail__panel run-detail__agent-diagnostic">
             <div class="run-detail__panel-heading">
               <div>
                 <span class="run-detail__section-kicker">{{ t("runDetail.agentDiagnostic") }}</span>
-                <h3>{{ agentDiagnostic.stopReason || t("runDetail.agentRunning") }}</h3>
+                <h3>{{ agentDiagnostic.stopReasonTitleKey ? t(agentDiagnostic.stopReasonTitleKey) : agentDiagnostic.stopReason || t("runDetail.agentRunning") }}</h3>
               </div>
             </div>
+            <p v-if="agentDiagnostic.stopReasonDescriptionKey" class="run-detail__muted">
+              {{ t(agentDiagnostic.stopReasonDescriptionKey) }}
+            </p>
             <div class="run-detail__badges">
               <span v-for="badge in agentDiagnostic.badges" :key="badge">{{ badge }}</span>
               <span v-if="agentDiagnostic.iterationLabel">{{ t("runDetail.agentIterations", { value: agentDiagnostic.iterationLabel }) }}</span>
               <span v-if="agentDiagnostic.capabilityBudgetLabel">{{ t("runDetail.agentCapabilities", { value: agentDiagnostic.capabilityBudgetLabel }) }}</span>
+            </div>
+            <div v-if="agentDiagnostic.capabilitySelection.visible" class="run-detail__capability-selection">
+              <dl class="run-detail__diagnostic-facts">
+                <div v-if="agentDiagnostic.capabilitySelection.selectedRef">
+                  <dt>{{ t("runDetail.capabilitySelected") }}</dt>
+                  <dd>{{ agentDiagnostic.capabilitySelection.selectedRef }}</dd>
+                </div>
+                <div v-if="agentDiagnostic.capabilitySelection.requestedRef">
+                  <dt>{{ t("runDetail.capabilityRequested") }}</dt>
+                  <dd>{{ agentDiagnostic.capabilitySelection.requestedRef }}</dd>
+                </div>
+                <div v-if="agentDiagnostic.capabilitySelection.selectionReason">
+                  <dt>{{ t("runDetail.capabilitySelectionReason") }}</dt>
+                  <dd>{{ agentDiagnostic.capabilitySelection.selectionReason }}</dd>
+                </div>
+              </dl>
+              <div v-if="agentDiagnostic.capabilitySelection.evidenceLabels.length > 0" class="run-detail__badges">
+                <span v-for="label in agentDiagnostic.capabilitySelection.evidenceLabels" :key="label">{{ label }}</span>
+              </div>
+              <div
+                v-if="agentDiagnostic.capabilitySelection.rejectedLabels.length > 0 || agentDiagnostic.capabilitySelection.fallbackLabels.length > 0"
+                class="run-detail__capability-candidates"
+              >
+                <div v-if="agentDiagnostic.capabilitySelection.rejectedLabels.length > 0">
+                  <strong>{{ t("runDetail.capabilityRejected") }}</strong>
+                  <span v-for="label in agentDiagnostic.capabilitySelection.rejectedLabels" :key="label">{{ label }}</span>
+                </div>
+                <div v-if="agentDiagnostic.capabilitySelection.fallbackLabels.length > 0">
+                  <strong>{{ t("runDetail.capabilityFallback") }}</strong>
+                  <span v-for="label in agentDiagnostic.capabilitySelection.fallbackLabels" :key="label">{{ label }}</span>
+                </div>
+              </div>
             </div>
             <p v-for="warning in agentDiagnostic.warnings" :key="warning" class="run-detail__muted">{{ warning }}</p>
           </article>
@@ -435,12 +613,14 @@
 import { Promotion, RefreshLeft } from "@element-plus/icons-vue";
 import { ElButton, ElIcon, ElMessage, ElMessageBox } from "element-plus";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
-import { restoreGraphRevision } from "@/api/graphs";
+import { fetchBuddyBackgroundReviews, enqueueBuddyBackgroundReview, restoreBuddyRevision, linkBuddyImprovementCandidateValidationRun, decideBuddyImprovementCandidate, applyBuddyImprovementCandidate } from "@/api/buddy";
+import { fetchTemplate, restoreGraphRevision, runGraph } from "@/api/graphs";
 import { fetchOperationJournal } from "@/api/operationJournal";
 import { fetchRun, fetchRunTree } from "@/api/runs";
+import { buildBuddyImprovementReviewGraph, BUDDY_IMPROVEMENT_REVIEW_TEMPLATE_ID } from "@/buddy/buddyImprovementReviewGraph";
 import {
   buildLiveStreamingOutput,
   buildRunEventStreamUrl,
@@ -454,8 +634,10 @@ import AppShell from "@/layouts/AppShell.vue";
 import { buildCycleVisualization, describeCycleStopReason, formatCycleStopReason } from "@/lib/run-cycle-visualization";
 import { buildSnapshotScopedRun, canRestoreRunDetail, resolveRunRestoreUrl, resolveRunSnapshot } from "@/lib/run-restore";
 import type { OperationJournalPage } from "@/types/operationJournal";
+import type { BuddyBackgroundReviewRun } from "@/types/buddy";
 import type { RunDetail, RunTreeNode } from "@/types/run";
 
+import { buildBackgroundReviewDisplayItems, type BackgroundReviewDisplayItem, type BackgroundReviewImprovementCandidateItem } from "./backgroundReviewModel.ts";
 import {
   buildRunAggregatedTimeline,
   buildAgentDiagnostic,
@@ -469,6 +651,7 @@ import { buildOperationJournalDisplayItems, type OperationJournalDisplayItem } f
 import ArtifactDocumentPager from "./ArtifactDocumentPager.vue";
 
 const route = useRoute();
+const router = useRouter();
 const { t, locale } = useI18n();
 const run = ref<RunDetail | null>(null);
 const runTree = ref<RunTreeNode | null>(null);
@@ -482,6 +665,14 @@ const liveStreamingOutputs = ref<Record<string, LiveStreamingOutput>>({});
 const operationJournal = ref<OperationJournalPage | null>(null);
 const operationJournalLoading = ref(false);
 const operationJournalError = ref<string | null>(null);
+const backgroundReviews = ref<BuddyBackgroundReviewRun[]>([]);
+const backgroundReviewLoading = ref(false);
+const backgroundReviewError = ref<string | null>(null);
+const rerunningBackgroundReview = ref(false);
+const restoringBackgroundReviewRevisionId = ref("");
+const validatingImprovementCandidateKey = ref("");
+const decidingImprovementCandidateKey = ref("");
+const applyingImprovementCandidateKey = ref("");
 const restoringGraphRevisionKey = ref<string | null>(null);
 const runId = computed(() => String(route.params.runId ?? ""));
 const runDetailRequestTimeoutMs = 10_000;
@@ -540,6 +731,14 @@ const operationJournalItems = computed(() => buildOperationJournalDisplayItems(o
 const operationJournalVisible = computed(() =>
   operationJournalLoading.value || Boolean(operationJournalError.value) || operationJournalItems.value.length > 0,
 );
+const backgroundReviewItems = computed(() => buildBackgroundReviewDisplayItems(backgroundReviews.value));
+const backgroundReviewSourceRun = computed(() => (viewedRun.value && isBuddyBackgroundReviewSourceRun(viewedRun.value) ? viewedRun.value : null));
+const backgroundReviewVisible = computed(() =>
+  backgroundReviewLoading.value ||
+  Boolean(backgroundReviewError.value) ||
+  backgroundReviewItems.value.length > 0 ||
+  Boolean(backgroundReviewSourceRun.value),
+);
 const liveStreamingOutputItems = computed(() =>
   Object.values(liveStreamingOutputs.value).sort((left, right) => left.nodeId.localeCompare(right.nodeId)),
 );
@@ -551,6 +750,8 @@ let activeRunController: AbortController | null = null;
 let activeRunTimeout: number | null = null;
 let activeOperationJournalRequestId = 0;
 let activeOperationJournalController: AbortController | null = null;
+let activeBackgroundReviewRequestId = 0;
+let activeBackgroundReviewController: AbortController | null = null;
 let runEventSource: EventSource | null = null;
 
 function selectSnapshot(snapshotId: string) {
@@ -595,6 +796,11 @@ function clearPendingRunRequest() {
 function clearPendingOperationJournalRequest() {
   activeOperationJournalController?.abort();
   activeOperationJournalController = null;
+}
+
+function clearPendingBackgroundReviewRequest() {
+  activeBackgroundReviewController?.abort();
+  activeBackgroundReviewController = null;
 }
 
 function closeRunEventStream() {
@@ -708,6 +914,224 @@ async function loadOperationJournal(nextRunId = runId.value) {
   }
 }
 
+async function loadBackgroundReviews(nextRunId = runId.value) {
+  const requestId = activeBackgroundReviewRequestId + 1;
+  activeBackgroundReviewRequestId = requestId;
+  clearPendingBackgroundReviewRequest();
+
+  const normalizedRunId = nextRunId.trim();
+  if (!normalizedRunId) {
+    backgroundReviews.value = [];
+    backgroundReviewLoading.value = false;
+    backgroundReviewError.value = null;
+    return;
+  }
+
+  const controller = new AbortController();
+  activeBackgroundReviewController = controller;
+  backgroundReviewLoading.value = !backgroundReviews.value.length;
+  backgroundReviewError.value = null;
+
+  try {
+    const records = await fetchBuddyBackgroundReviews(normalizedRunId, { signal: controller.signal });
+    if (requestId !== activeBackgroundReviewRequestId) {
+      return;
+    }
+    backgroundReviews.value = records;
+  } catch (fetchError) {
+    if (requestId !== activeBackgroundReviewRequestId) {
+      return;
+    }
+    backgroundReviews.value = [];
+    backgroundReviewError.value = resolveRunFetchErrorMessage(fetchError);
+  } finally {
+    if (requestId === activeBackgroundReviewRequestId) {
+      backgroundReviewLoading.value = false;
+      if (activeBackgroundReviewController === controller) {
+        activeBackgroundReviewController = null;
+      }
+    }
+  }
+}
+
+async function rerunBackgroundReview() {
+  const sourceRun = backgroundReviewSourceRun.value;
+  if (!sourceRun || rerunningBackgroundReview.value) {
+    return;
+  }
+  rerunningBackgroundReview.value = true;
+  try {
+    const metadata = recordFromUnknown(sourceRun.metadata);
+    const review = await enqueueBuddyBackgroundReview({
+      source_run_id: sourceRun.run_id,
+      buddy_model_ref: normalizeText(metadata.buddy_model_ref),
+      trigger_reason: "run_detail_manual_review",
+    });
+    backgroundReviews.value = [
+      review,
+      ...backgroundReviews.value.filter((item) => item.review_id !== review.review_id),
+    ];
+    ElMessage.success(t("runDetail.backgroundReviewQueued"));
+    void loadBackgroundReviews(sourceRun.run_id);
+  } catch (reviewError) {
+    ElMessage.error(reviewError instanceof Error ? reviewError.message : t("common.failedToSave", { error: "" }));
+  } finally {
+    rerunningBackgroundReview.value = false;
+  }
+}
+
+async function restoreBackgroundReviewRevision(item: BackgroundReviewDisplayItem, revisionId: string) {
+  const normalizedRevisionId = revisionId.trim();
+  if (!normalizedRevisionId || restoringBackgroundReviewRevisionId.value) {
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      t("runDetail.backgroundReviewRestoreRevisionConfirm", { revisionId: normalizedRevisionId }),
+      t("runDetail.backgroundReviewRestoreRevisionTitle"),
+      {
+        confirmButtonText: t("graphLibrary.restoreRevisionAction"),
+        cancelButtonText: t("common.cancel"),
+        type: "warning",
+      },
+    );
+  } catch {
+    return;
+  }
+
+  restoringBackgroundReviewRevisionId.value = normalizedRevisionId;
+  try {
+    await restoreBuddyRevision(normalizedRevisionId);
+    ElMessage.success(t("runDetail.backgroundReviewRevisionRestored", { revisionId: normalizedRevisionId }));
+    void loadBackgroundReviews(item.sourceRunId);
+  } catch (restoreError) {
+    ElMessage.error(restoreError instanceof Error ? restoreError.message : t("common.failedToSave", { error: "" }));
+  } finally {
+    restoringBackgroundReviewRevisionId.value = "";
+  }
+}
+
+async function startImprovementCandidateReview(item: BackgroundReviewDisplayItem, candidate: BackgroundReviewImprovementCandidateItem) {
+  const candidateKey = candidate.candidateId || `${item.key}:candidate`;
+  if (validatingImprovementCandidateKey.value) {
+    return;
+  }
+
+  validatingImprovementCandidateKey.value = candidateKey;
+  try {
+    const template = await fetchTemplate(BUDDY_IMPROVEMENT_REVIEW_TEMPLATE_ID);
+    const graph = buildBuddyImprovementReviewGraph(template, {
+      candidate: candidate.payload,
+      sourceRunId: candidate.sourceRunId || item.sourceRunId,
+    });
+    const response = await runGraph(graph);
+    await linkBuddyImprovementCandidateValidationRun(candidate.candidateId, response.run_id);
+    ElMessage.success(t("runDetail.backgroundReviewValidationQueued", { runId: response.run_id }));
+    await router.push(`/runs/${encodeURIComponent(response.run_id)}`);
+  } catch (validationError) {
+    ElMessage.error(validationError instanceof Error ? validationError.message : t("common.failedToSave", { error: "" }));
+  } finally {
+    validatingImprovementCandidateKey.value = "";
+  }
+}
+
+type ImprovementCandidateDecision = "approve" | "reject";
+
+function canApproveImprovementCandidate(candidate: BackgroundReviewImprovementCandidateItem) {
+  return candidate.status === "validated" || candidate.status === "waiting_for_approval";
+}
+
+function canRejectImprovementCandidate(candidate: BackgroundReviewImprovementCandidateItem) {
+  return !["approved", "rejected", "applied", "superseded"].includes(candidate.status);
+}
+
+function canApplyImprovementCandidate(candidate: BackgroundReviewImprovementCandidateItem) {
+  return Boolean(candidate.candidateId) && candidate.status === "approved" && candidate.hasApplyCommand;
+}
+
+async function decideImprovementCandidate(
+  item: BackgroundReviewDisplayItem,
+  candidate: BackgroundReviewImprovementCandidateItem,
+  decision: ImprovementCandidateDecision,
+) {
+  const candidateKey = candidate.candidateId || `${item.key}:candidate`;
+  if (decidingImprovementCandidateKey.value) {
+    return;
+  }
+  const approving = decision === "approve";
+  const reason = approving
+    ? t("runDetail.backgroundReviewApproveCandidateReason")
+    : t("runDetail.backgroundReviewRejectCandidateReason");
+  try {
+    await ElMessageBox.confirm(
+      approving
+        ? t("runDetail.backgroundReviewApproveCandidateConfirm", { candidateId: candidateKey })
+        : t("runDetail.backgroundReviewRejectCandidateConfirm", { candidateId: candidateKey }),
+      approving ? t("runDetail.backgroundReviewApproveCandidateTitle") : t("runDetail.backgroundReviewRejectCandidateTitle"),
+      {
+        confirmButtonText: approving
+          ? t("runDetail.backgroundReviewApproveCandidate")
+          : t("runDetail.backgroundReviewRejectCandidate"),
+        cancelButtonText: t("common.cancel"),
+        type: approving ? "warning" : "info",
+      },
+    );
+  } catch {
+    return;
+  }
+
+  decidingImprovementCandidateKey.value = `${candidateKey}:${decision}`;
+  try {
+    await decideBuddyImprovementCandidate(candidate.candidateId, decision, reason);
+    ElMessage.success(
+      approving
+        ? t("runDetail.backgroundReviewCandidateApproved", { candidateId: candidateKey })
+        : t("runDetail.backgroundReviewCandidateRejected", { candidateId: candidateKey }),
+    );
+    void loadBackgroundReviews(item.sourceRunId);
+  } catch (decisionError) {
+    ElMessage.error(decisionError instanceof Error ? decisionError.message : t("common.failedToSave", { error: "" }));
+  } finally {
+    decidingImprovementCandidateKey.value = "";
+  }
+}
+
+async function applyImprovementCandidate(
+  item: BackgroundReviewDisplayItem,
+  candidate: BackgroundReviewImprovementCandidateItem,
+) {
+  const candidateKey = candidate.candidateId || `${item.key}:candidate`;
+  if (applyingImprovementCandidateKey.value) {
+    return;
+  }
+  const reason = t("runDetail.backgroundReviewApplyCandidateReason");
+  try {
+    await ElMessageBox.confirm(
+      t("runDetail.backgroundReviewApplyCandidateConfirm", { candidateId: candidateKey }),
+      t("runDetail.backgroundReviewApplyCandidateTitle"),
+      {
+        confirmButtonText: t("runDetail.backgroundReviewApplyCandidate"),
+        cancelButtonText: t("common.cancel"),
+        type: "warning",
+      },
+    );
+  } catch {
+    return;
+  }
+
+  applyingImprovementCandidateKey.value = candidateKey;
+  try {
+    await applyBuddyImprovementCandidate(candidate.candidateId, reason);
+    ElMessage.success(t("runDetail.backgroundReviewCandidateApplied", { candidateId: candidateKey }));
+    void loadBackgroundReviews(item.sourceRunId);
+  } catch (applyError) {
+    ElMessage.error(applyError instanceof Error ? applyError.message : t("common.failedToSave", { error: "" }));
+  } finally {
+    applyingImprovementCandidateKey.value = "";
+  }
+}
+
 async function restoreGraphRevisionFromOperation(item: OperationJournalDisplayItem) {
   if (!item.graphRevision || restoringGraphRevisionKey.value) {
     return;
@@ -748,6 +1172,7 @@ async function loadRun(nextRunId = runId.value) {
   if (!normalizedRunId) {
     run.value = null;
     operationJournal.value = null;
+    backgroundReviews.value = [];
     loading.value = false;
     error.value = t("runDetail.missingRunId");
     return;
@@ -789,6 +1214,7 @@ async function loadRun(nextRunId = runId.value) {
       }
     }
     void loadOperationJournal(normalizedRunId);
+    void loadBackgroundReviews(normalizedRunId);
     if (shouldPollRunStatus(nextRun.status)) {
       pollTimer = window.setTimeout(() => {
         void loadRun(normalizedRunId);
@@ -805,6 +1231,7 @@ async function loadRun(nextRunId = runId.value) {
     runTreeLoading.value = false;
     runTreeError.value = null;
     operationJournal.value = null;
+    backgroundReviews.value = [];
     error.value = resolveRunFetchErrorMessage(fetchError);
   } finally {
     if (requestId === activeRunRequestId) {
@@ -833,15 +1260,19 @@ watch(
 onBeforeUnmount(() => {
   activeRunRequestId += 1;
   activeOperationJournalRequestId += 1;
+  activeBackgroundReviewRequestId += 1;
   clearRunPollTimer();
   clearPendingRunRequest();
   clearPendingOperationJournalRequest();
+  clearPendingBackgroundReviewRequest();
   closeRunEventStream();
 });
 
 function resetRunView() {
   activeOperationJournalRequestId += 1;
+  activeBackgroundReviewRequestId += 1;
   clearPendingOperationJournalRequest();
+  clearPendingBackgroundReviewRequest();
   run.value = null;
   runTree.value = null;
   error.value = null;
@@ -850,9 +1281,31 @@ function resetRunView() {
   operationJournal.value = null;
   operationJournalLoading.value = false;
   operationJournalError.value = null;
+  backgroundReviews.value = [];
+  backgroundReviewLoading.value = false;
+  backgroundReviewError.value = null;
+  rerunningBackgroundReview.value = false;
+  restoringBackgroundReviewRevisionId.value = "";
+  validatingImprovementCandidateKey.value = "";
   selectedSnapshotIdDraft.value = null;
   expandedContentKeys.value = new Set();
   liveStreamingOutputs.value = {};
+}
+
+function isBuddyBackgroundReviewSourceRun(candidate: RunDetail) {
+  const metadata = recordFromUnknown(candidate.metadata);
+  if (metadata.buddy_review_run === true || metadata.buddy_memory_review === true || normalizeText(metadata.role) === "buddy_background_review") {
+    return false;
+  }
+  return normalizeText(metadata.origin) === "buddy" || normalizeText(metadata.buddy_template_id) === "buddy_autonomous_loop";
+}
+
+function recordFromUnknown(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function normalizeText(value: unknown) {
+  return typeof value === "string" ? value.trim() : value === null || value === undefined ? "" : String(value).trim();
 }
 
 function snapshotLabel(kind: string, order: number) {
@@ -1153,6 +1606,79 @@ function statusBadgeClass(status: string) {
   font-size: 0.84rem;
 }
 
+.run-detail__capability-selection {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  min-width: 0;
+}
+
+.run-detail__diagnostic-facts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.run-detail__diagnostic-facts div {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.34fr) minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.run-detail__diagnostic-facts dt,
+.run-detail__diagnostic-facts dd {
+  margin: 0;
+  min-width: 0;
+  line-height: 1.5;
+}
+
+.run-detail__diagnostic-facts dt {
+  color: rgba(154, 52, 18, 0.74);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.run-detail__diagnostic-facts dd {
+  overflow-wrap: anywhere;
+  color: rgba(60, 41, 20, 0.78);
+  font-family: var(--toograph-font-mono);
+  font-size: 0.84rem;
+}
+
+.run-detail__capability-candidates {
+  display: grid;
+  gap: 8px;
+}
+
+.run-detail__capability-candidates div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.run-detail__capability-candidates strong,
+.run-detail__capability-candidates span {
+  font-size: 0.82rem;
+}
+
+.run-detail__capability-candidates strong {
+  color: rgba(60, 41, 20, 0.78);
+}
+
+.run-detail__capability-candidates span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.58);
+  color: rgba(60, 41, 20, 0.68);
+  font-family: var(--toograph-font-mono);
+}
+
 .run-detail__tree-count,
 .run-detail__timeline-heading span {
   border: 1px solid var(--toograph-status-border, transparent);
@@ -1358,6 +1884,7 @@ function statusBadgeClass(status: string) {
 .run-detail__subcard,
 .run-detail__live-card,
 .run-detail__operation-card,
+.run-detail__background-review-card,
 .run-detail__info,
 .run-detail__timeline-item {
   border: 1px solid rgba(154, 52, 18, 0.12);
@@ -1371,7 +1898,8 @@ function statusBadgeClass(status: string) {
   background: rgba(255, 255, 255, 0.76);
 }
 
-.run-detail__operation-card {
+.run-detail__operation-card,
+.run-detail__background-review-card {
   display: grid;
   grid-template-columns: 5px minmax(0, 1fr);
   gap: 14px;
@@ -1385,17 +1913,97 @@ function statusBadgeClass(status: string) {
   background: var(--toograph-status-fg, rgb(14, 116, 144));
 }
 
-.run-detail__operation-body {
+.run-detail__operation-body,
+.run-detail__background-review-body {
   min-width: 0;
 }
 
-.run-detail__operation-card .run-detail__badges span {
+.run-detail__operation-card .run-detail__badges span,
+.run-detail__background-review-card .run-detail__badges span {
   max-width: 100%;
   overflow-wrap: anywhere;
 }
 
-.run-detail__operation-card .run-detail__timeline-heading > span {
+.run-detail__operation-card .run-detail__timeline-heading > span,
+.run-detail__background-review-card .run-detail__timeline-heading > span {
   width: fit-content;
+}
+
+.run-detail__background-review-list {
+  display: grid;
+  gap: 12px;
+}
+
+.run-detail__badges--writeback,
+.run-detail__badges--improvement {
+  margin-top: 8px;
+}
+
+.run-detail__background-review-facts {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.run-detail__background-review-facts > div {
+  display: grid;
+  gap: 6px;
+  border-left: 3px solid rgba(14, 116, 144, 0.18);
+  padding-left: 10px;
+}
+
+.run-detail__background-review-facts strong {
+  color: rgba(15, 23, 42, 0.72);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.run-detail__background-review-facts span {
+  color: rgba(15, 23, 42, 0.74);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.run-detail__background-review-revision {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.run-detail__background-review-revision > span {
+  min-width: 0;
+}
+
+.run-detail__background-review-revision :deep(.el-button) {
+  border-color: rgba(14, 116, 144, 0.24);
+  border-radius: 999px;
+  background: rgba(236, 254, 255, 0.82);
+  color: rgb(14, 116, 144);
+  font-weight: 800;
+}
+
+.run-detail__background-review-candidate {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(14, 116, 144, 0.12);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(236, 254, 255, 0.34);
+}
+
+.run-detail__inline-link {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 12px;
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: rgba(14, 116, 144, 0.1);
+  color: rgb(14, 116, 144);
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-decoration: none;
 }
 
 .run-detail__operation-actions {

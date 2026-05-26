@@ -37,6 +37,19 @@ MAX_RECALL_LIMIT = 50
 MAX_RECALL_WINDOW = 20
 MAX_BUDDY_HOME_FILE_CONTENT_CHARS = 200_000
 HIDDEN_SESSION_SOURCES = {"tool"}
+BACKGROUND_REVIEW_STATUSES = {"queued", "running", "paused", "awaiting_human", "completed", "failed", "cancelled", "skipped"}
+IMPROVEMENT_CANDIDATE_STATUSES = {
+    "proposed",
+    "validating",
+    "validated",
+    "needs_changes",
+    "waiting_for_approval",
+    "approved",
+    "rejected",
+    "applied",
+    "failed",
+    "superseded",
+}
 DEPRECATED_BUDDY_INPUT_SOURCES = {"page_context", "raw_conversation_history"}
 RUN_TEMPLATE_BINDING_KEY = "run_template_binding"
 RUN_TEMPLATE_BINDING_TARGET_TYPE = "run_template_binding"
@@ -201,6 +214,10 @@ def list_home_files() -> dict[str, Any]:
 
 
 def load_capability_usage_stats() -> dict[str, Any]:
+    return _with_runtime_capability_usage_events(_load_capability_usage_stats_from_kv())
+
+
+def _load_capability_usage_stats_from_kv() -> dict[str, Any]:
     with _connection() as connection:
         row = connection.execute(
             "SELECT value_json FROM buddy_kv WHERE key = ?",
@@ -216,7 +233,7 @@ def load_capability_usage_stats() -> dict[str, Any]:
 
 
 def update_capability_usage_stats(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
-    previous = load_capability_usage_stats()
+    previous = _load_capability_usage_stats_from_kv()
     next_value = deepcopy(previous)
     now = utc_now_iso()
     for entry in _coerce_capability_usage_entries(payload):
@@ -342,6 +359,469 @@ def save_memory_review_template_binding(
     )
     _write_kv(MEMORY_REVIEW_TEMPLATE_BINDING_KEY, next_value, next_value["updated_at"])
     return load_memory_review_template_binding()
+
+
+def create_background_review_run(
+    *,
+    source_run_id: str,
+    review_run_id: str,
+    template_id: str,
+    trigger_reason: str,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    normalized_source_run_id = str(source_run_id or "").strip()
+    normalized_review_run_id = str(review_run_id or "").strip()
+    normalized_template_id = str(template_id or "").strip()
+    normalized_trigger_reason = str(trigger_reason or "").strip() or "visible_buddy_run_completed"
+    if not normalized_source_run_id:
+        raise ValueError("source_run_id is required.")
+    if not normalized_review_run_id:
+        raise ValueError("review_run_id is required.")
+    if not normalized_template_id:
+        raise ValueError("template_id is required.")
+    now = utc_now_iso()
+    review_id = f"bgrev_{uuid4().hex[:12]}"
+    with _connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO buddy_background_review_runs (
+                review_id,
+                source_run_id,
+                review_run_id,
+                template_id,
+                status,
+                trigger_reason,
+                metadata_json,
+                error,
+                created_at,
+                updated_at,
+                started_at,
+                completed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                review_id,
+                normalized_source_run_id,
+                normalized_review_run_id,
+                normalized_template_id,
+                "queued",
+                normalized_trigger_reason,
+                _json_dumps(metadata or {}),
+                "",
+                now,
+                now,
+                None,
+                None,
+            ),
+        )
+        connection.commit()
+    return get_background_review_run(review_id)
+
+
+def get_background_review_run(review_id: str) -> dict[str, Any]:
+    normalized_review_id = str(review_id or "").strip()
+    with _connection() as connection:
+        row = connection.execute(
+            """
+            SELECT review_id, source_run_id, review_run_id, template_id, status, trigger_reason,
+                   metadata_json, error, created_at, updated_at, started_at, completed_at
+            FROM buddy_background_review_runs
+            WHERE review_id = ?
+            """,
+            (normalized_review_id,),
+        ).fetchone()
+    if not row:
+        raise KeyError(normalized_review_id)
+    return _background_review_from_row(row)
+
+
+def list_background_review_runs(*, source_run_id: str | None = None) -> list[dict[str, Any]]:
+    normalized_source_run_id = str(source_run_id or "").strip()
+    query = """
+        SELECT review_id, source_run_id, review_run_id, template_id, status, trigger_reason,
+               metadata_json, error, created_at, updated_at, started_at, completed_at
+        FROM buddy_background_review_runs
+    """
+    params: list[Any] = []
+    if normalized_source_run_id:
+        query += " WHERE source_run_id = ?"
+        params.append(normalized_source_run_id)
+    query += " ORDER BY created_at DESC, review_id DESC"
+    with _connection() as connection:
+        rows = connection.execute(query, params).fetchall()
+    return [_background_review_from_row(row) for row in rows]
+
+
+def mark_background_review_run_started(review_id: str, *, review_run_id: str | None = None) -> dict[str, Any]:
+    normalized_review_id = str(review_id or "").strip()
+    normalized_review_run_id = str(review_run_id or "").strip()
+    now = utc_now_iso()
+    with _connection() as connection:
+        if normalized_review_run_id:
+            connection.execute(
+                """
+                UPDATE buddy_background_review_runs
+                SET status = ?, review_run_id = ?, started_at = COALESCE(started_at, ?), updated_at = ?
+                WHERE review_id = ?
+                """,
+                ("running", normalized_review_run_id, now, now, normalized_review_id),
+            )
+        else:
+            connection.execute(
+                """
+                UPDATE buddy_background_review_runs
+                SET status = ?, started_at = COALESCE(started_at, ?), updated_at = ?
+                WHERE review_id = ?
+                """,
+                ("running", now, now, normalized_review_id),
+            )
+        connection.commit()
+    return get_background_review_run(normalized_review_id)
+
+
+def mark_background_review_run_finished(review_id: str, *, status: str, error: str = "") -> dict[str, Any]:
+    normalized_review_id = str(review_id or "").strip()
+    normalized_status = str(status or "").strip().lower()
+    if normalized_status not in BACKGROUND_REVIEW_STATUSES:
+        raise ValueError(f"Unsupported background review status: {status}")
+    now = utc_now_iso()
+    completed_at = now if normalized_status in {"completed", "failed", "cancelled", "skipped"} else None
+    with _connection() as connection:
+        connection.execute(
+            """
+            UPDATE buddy_background_review_runs
+            SET status = ?, error = ?, completed_at = COALESCE(?, completed_at), updated_at = ?
+            WHERE review_id = ?
+            """,
+            (normalized_status, str(error or ""), completed_at, now, normalized_review_id),
+        )
+        connection.commit()
+    return get_background_review_run(normalized_review_id)
+
+
+def upsert_improvement_candidates_for_review(
+    review_record: dict[str, Any],
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    review_id = str(review_record.get("review_id") or "").strip()
+    source_run_id = str(review_record.get("source_run_id") or "").strip()
+    review_run_id = str(review_record.get("review_run_id") or "").strip()
+    if not review_id or not isinstance(candidates, list):
+        return []
+    now = utc_now_iso()
+    rows: list[tuple[Any, ...]] = []
+    candidate_ids: list[str] = []
+    for index, item in enumerate(candidates):
+        if not isinstance(item, dict):
+            continue
+        candidate_id = _normalize_improvement_candidate_id(item.get("candidate_id"))
+        if not candidate_id:
+            candidate_id = f"{review_run_id or review_id}_candidate_{index + 1}"
+        item_source_run_id = _normalize_improvement_candidate_id(item.get("source_run_id")) or source_run_id
+        target_ref = item.get("target_ref") if isinstance(item.get("target_ref"), dict) else {}
+        evidence_refs = item.get("evidence_refs") if isinstance(item.get("evidence_refs"), list) else []
+        status = _normalize_improvement_candidate_status(item.get("status")) or "proposed"
+        approval_required = item.get("approval_required")
+        approval_required_bool = True if approval_required is None else bool(approval_required)
+        rows.append(
+            (
+                candidate_id,
+                _normalize_improvement_candidate_text(item.get("kind")),
+                status,
+                item_source_run_id,
+                review_id,
+                review_run_id,
+                _json_dumps(target_ref),
+                _json_dumps(evidence_refs),
+                _normalize_improvement_candidate_text(item.get("risk_level")),
+                _normalize_improvement_candidate_text(item.get("expected_benefit")),
+                _normalize_improvement_candidate_text(
+                    item.get("proposed_change_summary") or item.get("summary") or item.get("title")
+                ),
+                int(approval_required_bool),
+                _json_dumps(item),
+                now,
+                now,
+            )
+        )
+        candidate_ids.append(candidate_id)
+    if not rows:
+        return []
+    with _connection() as connection:
+        connection.executemany(
+            """
+            INSERT INTO improvement_candidates (
+                candidate_id,
+                kind,
+                status,
+                source_run_id,
+                review_id,
+                review_run_id,
+                target_ref_json,
+                evidence_refs_json,
+                risk_level,
+                expected_benefit,
+                proposed_change_summary,
+                approval_required,
+                payload_json,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(candidate_id) DO UPDATE SET
+                kind = excluded.kind,
+                source_run_id = excluded.source_run_id,
+                review_id = excluded.review_id,
+                review_run_id = excluded.review_run_id,
+                target_ref_json = excluded.target_ref_json,
+                evidence_refs_json = excluded.evidence_refs_json,
+                risk_level = excluded.risk_level,
+                expected_benefit = excluded.expected_benefit,
+                proposed_change_summary = excluded.proposed_change_summary,
+                approval_required = excluded.approval_required,
+                payload_json = excluded.payload_json,
+                updated_at = improvement_candidates.updated_at
+            """,
+            rows,
+        )
+        connection.commit()
+    return list_improvement_candidates(candidate_ids=candidate_ids)
+
+
+def list_improvement_candidates(
+    *,
+    source_run_id: str | None = None,
+    review_id: str | None = None,
+    review_run_id: str | None = None,
+    validation_run_id: str | None = None,
+    status: str | None = None,
+    candidate_ids: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    query = """
+        SELECT candidate_id, kind, status, status_reason, source_run_id, review_id, review_run_id,
+               target_ref_json, evidence_refs_json, risk_level, expected_benefit,
+               proposed_change_summary, approval_required, validation_run_id,
+               validation_result_json, applied_revision_id, applied_command_json,
+               applied_at, decision_json, decided_at, payload_json, created_at, updated_at
+        FROM improvement_candidates
+    """
+    clauses: list[str] = []
+    params: list[Any] = []
+    normalized_candidate_ids: list[str] = []
+    for candidate_id in candidate_ids or []:
+        normalized_candidate_id = _normalize_improvement_candidate_id(candidate_id)
+        if normalized_candidate_id:
+            normalized_candidate_ids.append(normalized_candidate_id)
+    if normalized_candidate_ids:
+        placeholders = ", ".join("?" for _ in normalized_candidate_ids)
+        clauses.append(f"candidate_id IN ({placeholders})")
+        params.extend(normalized_candidate_ids)
+    normalized_source_run_id = str(source_run_id or "").strip()
+    if normalized_source_run_id:
+        clauses.append("source_run_id = ?")
+        params.append(normalized_source_run_id)
+    normalized_review_id = str(review_id or "").strip()
+    if normalized_review_id:
+        clauses.append("review_id = ?")
+        params.append(normalized_review_id)
+    normalized_review_run_id = str(review_run_id or "").strip()
+    if normalized_review_run_id:
+        clauses.append("review_run_id = ?")
+        params.append(normalized_review_run_id)
+    normalized_validation_run_id = str(validation_run_id or "").strip()
+    if normalized_validation_run_id:
+        clauses.append("validation_run_id = ?")
+        params.append(normalized_validation_run_id)
+    requested_status = str(status or "").strip()
+    normalized_status = _normalize_improvement_candidate_status(status)
+    if requested_status and not normalized_status:
+        return []
+    if normalized_status:
+        clauses.append("status = ?")
+        params.append(normalized_status)
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
+    query += " ORDER BY updated_at DESC, created_at DESC, candidate_id DESC"
+    with _connection() as connection:
+        rows = connection.execute(query, params).fetchall()
+    return [_improvement_candidate_from_row(row) for row in rows]
+
+
+def get_improvement_candidate(candidate_id: str) -> dict[str, Any]:
+    normalized_candidate_id = _normalize_improvement_candidate_id(candidate_id)
+    if not normalized_candidate_id:
+        raise KeyError(candidate_id)
+    with _connection() as connection:
+        row = connection.execute(
+            """
+            SELECT candidate_id, kind, status, status_reason, source_run_id, review_id, review_run_id,
+                   target_ref_json, evidence_refs_json, risk_level, expected_benefit,
+                   proposed_change_summary, approval_required, validation_run_id,
+                   validation_result_json, applied_revision_id, applied_command_json,
+                   applied_at, decision_json, decided_at, payload_json, created_at, updated_at
+            FROM improvement_candidates
+            WHERE candidate_id = ?
+            """,
+            (normalized_candidate_id,),
+        ).fetchone()
+    if not row:
+        raise KeyError(normalized_candidate_id)
+    return _improvement_candidate_from_row(row)
+
+
+def link_improvement_candidate_validation_run(candidate_id: str, validation_run_id: str) -> dict[str, Any]:
+    normalized_candidate_id = _normalize_improvement_candidate_id(candidate_id)
+    normalized_validation_run_id = str(validation_run_id or "").strip()
+    if not normalized_candidate_id:
+        raise ValueError("candidate_id is required.")
+    if not normalized_validation_run_id:
+        raise ValueError("validation_run_id is required.")
+    now = utc_now_iso()
+    with _connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE improvement_candidates
+            SET status = ?, validation_run_id = ?, updated_at = ?
+            WHERE candidate_id = ?
+            """,
+            ("validating", normalized_validation_run_id, now, normalized_candidate_id),
+        )
+        connection.commit()
+    if cursor.rowcount <= 0:
+        raise KeyError(normalized_candidate_id)
+    return get_improvement_candidate(normalized_candidate_id)
+
+
+def update_improvement_candidate_status(
+    candidate_id: str,
+    status: str,
+    *,
+    status_reason: str = "",
+    validation_result: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    normalized_candidate_id = _normalize_improvement_candidate_id(candidate_id)
+    normalized_status = _normalize_improvement_candidate_status(status)
+    if not normalized_candidate_id:
+        raise ValueError("candidate_id is required.")
+    if not normalized_status:
+        raise ValueError(f"Unsupported improvement candidate status: {status}")
+    now = utc_now_iso()
+    validation_result_json = _json_dumps(validation_result) if validation_result is not None else None
+    normalized_status_reason = str(status_reason or "").strip()
+    with _connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE improvement_candidates
+            SET status = ?,
+                status_reason = CASE WHEN ? != '' THEN ? ELSE status_reason END,
+                validation_result_json = COALESCE(?, validation_result_json),
+                updated_at = ?
+            WHERE candidate_id = ?
+            """,
+            (
+                normalized_status,
+                normalized_status_reason,
+                normalized_status_reason,
+                validation_result_json,
+                now,
+                normalized_candidate_id,
+            ),
+        )
+        connection.commit()
+    if cursor.rowcount <= 0:
+        raise KeyError(normalized_candidate_id)
+    return get_improvement_candidate(normalized_candidate_id)
+
+
+def decide_improvement_candidate(candidate_id: str, *, decision: str, reason: str = "") -> dict[str, Any]:
+    normalized_candidate_id = _normalize_improvement_candidate_id(candidate_id)
+    normalized_decision = str(decision or "").strip().lower()
+    if not normalized_candidate_id:
+        raise ValueError("candidate_id is required.")
+    if normalized_decision not in {"approve", "reject"}:
+        raise ValueError(f"Unsupported improvement candidate decision: {decision}")
+    candidate = get_improvement_candidate(normalized_candidate_id)
+    previous_status = str(candidate.get("status") or "").strip()
+    if normalized_decision == "approve" and previous_status not in {"validated", "waiting_for_approval"}:
+        raise ValueError("Only validated or waiting_for_approval candidates can be approved.")
+    if previous_status in {"applied", "superseded"}:
+        raise ValueError(f"Candidate status '{previous_status}' cannot be changed by decision.")
+    now = utc_now_iso()
+    next_status = "approved" if normalized_decision == "approve" else "rejected"
+    normalized_reason = str(reason or "").strip()
+    decision_payload = {
+        "decision": normalized_decision,
+        "reason": normalized_reason,
+        "previous_status": previous_status,
+        "decided_at": now,
+    }
+    with _connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE improvement_candidates
+            SET status = ?,
+                status_reason = ?,
+                decision_json = ?,
+                decided_at = ?,
+                updated_at = ?
+            WHERE candidate_id = ?
+            """,
+            (
+                next_status,
+                normalized_reason,
+                _json_dumps(decision_payload),
+                now,
+                now,
+                normalized_candidate_id,
+            ),
+        )
+        connection.commit()
+    if cursor.rowcount <= 0:
+        raise KeyError(normalized_candidate_id)
+    return get_improvement_candidate(normalized_candidate_id)
+
+
+def mark_improvement_candidate_applied(
+    candidate_id: str,
+    *,
+    revision_id: str,
+    applied_command: dict[str, Any],
+    status_reason: str = "",
+) -> dict[str, Any]:
+    normalized_candidate_id = _normalize_improvement_candidate_id(candidate_id)
+    normalized_revision_id = str(revision_id or "").strip()
+    if not normalized_candidate_id:
+        raise ValueError("candidate_id is required.")
+    if not normalized_revision_id:
+        raise ValueError("revision_id is required.")
+    now = utc_now_iso()
+    normalized_status_reason = str(status_reason or "").strip()
+    with _connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE improvement_candidates
+            SET status = ?,
+                status_reason = CASE WHEN ? != '' THEN ? ELSE status_reason END,
+                applied_revision_id = ?,
+                applied_command_json = ?,
+                applied_at = ?,
+                updated_at = ?
+            WHERE candidate_id = ?
+            """,
+            (
+                "applied",
+                normalized_status_reason,
+                normalized_status_reason,
+                normalized_revision_id,
+                _json_dumps(applied_command),
+                now,
+                now,
+                normalized_candidate_id,
+            ),
+        )
+        connection.commit()
+    if cursor.rowcount <= 0:
+        raise KeyError(normalized_candidate_id)
+    return get_improvement_candidate(normalized_candidate_id)
 
 
 def list_chat_sessions(*, include_deleted: bool = False) -> list[dict[str, Any]]:
@@ -1764,6 +2244,87 @@ def _coerce_capability_usage_entries(payload: dict[str, Any]) -> list[dict[str, 
     return [payload]
 
 
+def _with_runtime_capability_usage_events(stats: dict[str, Any]) -> dict[str, Any]:
+    next_stats = deepcopy(stats)
+    persisted_run_ids_by_capability = _persisted_capability_usage_run_ids(next_stats)
+    for entry in _runtime_capability_usage_entries():
+        capability = entry.get("capability") if isinstance(entry.get("capability"), dict) else {}
+        capability_id = f"{capability.get('kind')}:{capability.get('key')}"
+        run_id = str(entry.get("run_id") or "")
+        if run_id and run_id in persisted_run_ids_by_capability.get(capability_id, set()):
+            continue
+        _apply_capability_usage_entry(next_stats, entry, now=str(entry.get("used_at") or utc_now_iso()))
+    return _normalize_capability_usage_stats(next_stats)
+
+
+def _persisted_capability_usage_run_ids(stats: dict[str, Any]) -> dict[str, set[str]]:
+    capabilities = stats.get("capabilities") if isinstance(stats.get("capabilities"), dict) else {}
+    result: dict[str, set[str]] = {}
+    for capability_id, record in capabilities.items():
+        if not isinstance(record, dict):
+            continue
+        recent_runs = record.get("recent_runs") if isinstance(record.get("recent_runs"), list) else []
+        run_ids = {
+            str(item.get("run_id") or "")
+            for item in recent_runs
+            if isinstance(item, dict) and str(item.get("run_id") or "")
+        }
+        if run_ids:
+            result[str(capability_id)] = run_ids
+    return result
+
+
+def _runtime_capability_usage_entries() -> list[dict[str, Any]]:
+    with _connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                event_id,
+                invocation_id,
+                run_id,
+                capability_kind,
+                capability_key,
+                status,
+                latency_ms,
+                error_type,
+                error_message,
+                permission_result,
+                summary,
+                created_at
+            FROM capability_usage_events
+            WHERE capability_key != ''
+            ORDER BY created_at, event_id
+            """
+        ).fetchall()
+    entries: list[dict[str, Any]] = []
+    for row in rows:
+        status = str(row["status"] or "")
+        entries.append(
+            {
+                "capability": {
+                    "kind": str(row["capability_kind"] or ""),
+                    "key": str(row["capability_key"] or ""),
+                },
+                "success": _capability_usage_status_succeeded(status),
+                "run_id": str(row["run_id"] or ""),
+                "summary": str(row["summary"] or row["error_message"] or status),
+                "duration_ms": _coerce_non_negative_int(row["latency_ms"]),
+                "used_at": str(row["created_at"] or ""),
+                "event_id": str(row["event_id"] or ""),
+                "invocation_id": str(row["invocation_id"] or ""),
+                "status": status,
+                "error_type": str(row["error_type"] or ""),
+                "error": str(row["error_message"] or ""),
+                "permission_result": str(row["permission_result"] or ""),
+            }
+        )
+    return entries
+
+
+def _capability_usage_status_succeeded(status: str) -> bool:
+    return status in {"completed", "complete", "success", "succeeded", "ok"}
+
+
 def _apply_capability_usage_entry(stats: dict[str, Any], entry: dict[str, Any], *, now: str) -> None:
     capability = entry.get("capability") if isinstance(entry.get("capability"), dict) else {}
     kind = str(capability.get("kind") or entry.get("kind") or "action").strip() or "action"
@@ -1778,6 +2339,7 @@ def _apply_capability_usage_entry(stats: dict[str, Any], entry: dict[str, Any], 
     run_id = str(entry.get("run_id") or "").strip()
     summary = str(entry.get("summary") or "").strip()
     duration_ms = _coerce_non_negative_int(entry.get("duration_ms"))
+    used_at = str(entry.get("used_at") or now)
     next_record = {
         **existing,
         "kind": kind,
@@ -1786,7 +2348,7 @@ def _apply_capability_usage_entry(stats: dict[str, Any], entry: dict[str, Any], 
         "use_count": int(existing.get("use_count") or 0) + 1,
         "success_count": int(existing.get("success_count") or 0) + (1 if success else 0),
         "failure_count": int(existing.get("failure_count") or 0) + (0 if success else 1),
-        "last_used_at": now,
+        "last_used_at": used_at,
         "last_run_id": run_id,
         "last_summary": summary,
         "last_duration_ms": duration_ms,
@@ -1796,8 +2358,12 @@ def _apply_capability_usage_entry(stats: dict[str, Any], entry: dict[str, Any], 
         "success": success,
         "summary": summary,
         "duration_ms": duration_ms,
-        "used_at": now,
+        "used_at": used_at,
     }
+    for key in ("event_id", "invocation_id", "status", "error_type", "error", "permission_result"):
+        value = str(entry.get(key) or "").strip()
+        if value:
+            recent_entry[key] = value
     next_record["recent_runs"] = [recent_entry, *existing.get("recent_runs", [])][:MAX_CAPABILITY_USAGE_RECENT_RUNS]
     capabilities[capability_id] = next_record
 
@@ -1916,6 +2482,51 @@ def _command_from_row(row: Any) -> dict[str, Any]:
     }
 
 
+def _background_review_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "review_id": str(row["review_id"] or ""),
+        "source_run_id": str(row["source_run_id"] or ""),
+        "review_run_id": str(row["review_run_id"] or ""),
+        "template_id": str(row["template_id"] or ""),
+        "status": str(row["status"] or ""),
+        "trigger_reason": str(row["trigger_reason"] or ""),
+        "metadata": _json_loads_object(row["metadata_json"]),
+        "error": str(row["error"] or ""),
+        "created_at": str(row["created_at"] or ""),
+        "updated_at": str(row["updated_at"] or ""),
+        "started_at": row["started_at"],
+        "completed_at": row["completed_at"],
+    }
+
+
+def _improvement_candidate_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "candidate_id": str(row["candidate_id"] or ""),
+        "kind": str(row["kind"] or ""),
+        "status": str(row["status"] or "proposed"),
+        "status_reason": str(row["status_reason"] or ""),
+        "source_run_id": str(row["source_run_id"] or ""),
+        "review_id": str(row["review_id"] or ""),
+        "review_run_id": str(row["review_run_id"] or ""),
+        "target_ref": _json_loads_object(row["target_ref_json"]),
+        "evidence_refs": _json_loads_list(row["evidence_refs_json"]),
+        "risk_level": str(row["risk_level"] or ""),
+        "expected_benefit": str(row["expected_benefit"] or ""),
+        "proposed_change_summary": str(row["proposed_change_summary"] or ""),
+        "approval_required": bool(row["approval_required"]),
+        "validation_run_id": str(row["validation_run_id"] or ""),
+        "validation_result": _json_loads_object(row["validation_result_json"]),
+        "applied_revision_id": str(row["applied_revision_id"] or ""),
+        "applied_command": _json_loads_object(row["applied_command_json"]),
+        "applied_at": str(row["applied_at"] or ""),
+        "decision": _json_loads_object(row["decision_json"]),
+        "decided_at": str(row["decided_at"] or ""),
+        "payload": _json_loads_object(row["payload_json"]),
+        "created_at": str(row["created_at"] or ""),
+        "updated_at": str(row["updated_at"] or ""),
+    }
+
+
 def _get_chat_message(message_id: str) -> dict[str, Any]:
     with _connection() as connection:
         row = connection.execute(
@@ -2023,6 +2634,19 @@ def _normalize_optional_text(value: Any) -> str | None:
     return normalized or None
 
 
+def _normalize_improvement_candidate_id(value: Any) -> str:
+    return str(value or "").strip()[:160]
+
+
+def _normalize_improvement_candidate_text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _normalize_improvement_candidate_status(value: Any) -> str:
+    normalized = str(value or "").strip().lower()
+    return normalized if normalized in IMPROVEMENT_CANDIDATE_STATUSES else ""
+
+
 def _normalize_session_source(value: Any) -> str:
     normalized = _normalize_optional_text(value) or "buddy"
     return normalized[:40]
@@ -2047,6 +2671,14 @@ def _json_loads_object(value: Any) -> dict[str, Any]:
     except Exception:
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+def _json_loads_list(value: Any) -> list[Any]:
+    try:
+        parsed = json.loads(str(value or "[]"))
+    except Exception:
+        return []
+    return parsed if isinstance(parsed, list) else []
 
 
 def _json_dumps(payload: Any) -> str:

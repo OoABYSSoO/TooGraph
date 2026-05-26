@@ -32,7 +32,6 @@ export function useBuddyVisibleRunTemplateEffects({
     startBuddyAutonomousReviewRun,
     abortBackgroundReviewRuns,
   } = useBuddyAutonomousReviewRun({
-    currentSessionId,
     buddyModelRef,
     pollRunUntilFinished,
     notifyBuddyDataChanged,

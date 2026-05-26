@@ -1010,6 +1010,24 @@ test("buildBuddyChatGraph marks ask-first mode without a blanket reply breakpoin
   assert.equal(graph.metadata.buddy_graph_patch_drafts_enabled, undefined);
   assert.equal(graph.metadata.interrupt_after, undefined);
   assert.equal(graph.metadata.agent_breakpoint_timing, undefined);
+  assert.deepEqual(graph.metadata.capability_permission_policy, {
+    allowed_permission_tiers: ["none", "guarded", "external", "risky"],
+    approval_required_permission_tiers: ["risky"],
+  });
+});
+
+test("buildBuddyChatGraph records full-access capability policy without approval-required tiers", () => {
+  const graph = buildBuddyChatGraph(createTemplate(), {
+    userMessage: "请直接执行可用能力",
+    history: [],
+    buddyMode: "full_access",
+  });
+
+  assert.equal(graph.metadata.buddy_mode, "full_access");
+  assert.deepEqual(graph.metadata.capability_permission_policy, {
+    allowed_permission_tiers: ["none", "guarded", "external", "risky"],
+    approval_required_permission_tiers: [],
+  });
 });
 
 test("buildBuddyChatGraph carries page operation context for action runtime", () => {

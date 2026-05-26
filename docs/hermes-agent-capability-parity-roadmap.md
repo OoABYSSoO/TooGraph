@@ -116,7 +116,11 @@ TooGraph 差距：
 - 已新增官方 `agent_loop_guard` Tool，维护 `agent_loop_control`、能力调用计数、失败计数、retry budget 和标准 stop reason。
 - 官方 `buddy_autonomous_loop` 已接入 `agent_loop_guard`，并通过 schema-backed state 暴露 `agent_loop_report`、`agent_loop_stop_reason`、`agent_loop_should_continue` 和 `agent_loop_should_retry`。
 - 已有模板测试覆盖 Buddy 主循环的 guard 节点、状态绑定和预算耗尽 eval case；新增 Tool 单测覆盖 catalog、继续、能力预算耗尽和失败重试/停止判定。
-- 后续仍需把 run record、RunDetail 和 Buddy 胶囊的诊断展示进一步统一到这些 guard state，并补齐 provider_failed、permission_required、context_budget_exhausted 等端到端 UI 场景。
+- 统一数据库已新增 `agent_loop_events` 运行时事实投影；保存 graph run 时会从 `agent_loop_report` state event 生成可查询循环事件，并保存同节点最近的 `agent_loop_control` 预算快照；加载 run detail 时会恢复 `agent_loop_events`。
+- `RunDetail` API schema 已显式返回 `agent_loop_events`；RunDetail Agent Diagnostic 会优先读取这些投影事实来还原 stop reason、decision、iteration budget、capability budget、能力引用和 warnings。
+- Buddy 胶囊运行树已可从同一 `agent_loop_events` 事实源给对应节点补充 stop、decision 和 capability budget 标签；胶囊分段逻辑仍只按 output 边界决定，不会因为循环诊断事实创建额外胶囊。
+- RunDetail Agent Diagnostic 已把标准 stop reason 接入统一用户可见解释文案，覆盖 `provider_failed`、`permission_required`、`context_budget_exhausted` 以及其他 Agent loop 停止原因；页面显示本地化标题、说明、原始 stop reason、循环预算和能力预算。
+- 后续仍需为 provider_failed、permission_required、context_budget_exhausted 补齐真实运行 fixture 或端到端 UI 场景，验证这些状态从运行时产生、数据库投影、API 返回到页面展示的完整链路。
 
 解决方案：
 
@@ -344,6 +348,17 @@ TooGraph 差距：
 - `buddy_autonomous_review` 已存在，但触发、隔离、预算、可观测性、失败处理和写回质量还需要增强。
 - 复盘输出和后续改进执行之间仍有断点。
 
+当前进展：
+
+- 已新增后端 `buddy_background_review_runs` 记录表，用统一数据库保存 `source_run_id`、`review_run_id`、`template_id`、触发原因、状态、错误和时间线。
+- 已新增 Buddy API：`POST /api/buddy/background-reviews` 只接受已完成的 source run，按当前 `memory_review_template_binding` 在后端构建并启动 `buddy_autonomous_review`；`GET /api/buddy/background-reviews` 可按 `source_run_id` 查询复盘记录。
+- 前端 Buddy 可见回复完成后不再自行拼装复盘图和调用 `/api/graphs/run`，而是请求后端复盘队列；后端把 `buddy_background_review_id`、`buddy_parent_run_id`、`buddy_review_trigger_reason` 和 `buddy_template_id` 写入 review run metadata。
+- RunDetail 已能按 source run 查询后台复盘记录，展示复盘状态、触发原因、模板、模型、错误信息、review run 链接，并提供对已完成 source run 的手动重跑入口。
+- 后台复盘列表会从 review run 的 state 中聚合写回摘要，把 applied commands、skipped commands、revision ids、structured memory ids 和 `autonomous_review.evidence` 关联到复盘记录；RunDetail 后台复盘面板已能直接展开这些审计事实。
+- RunDetail 后台复盘面板已能区分可直接恢复的 Buddy revision 和仅可审计的 structured memory revision；对 `home_file`、`buddy_identity`、session/template/capability usage 等现有 Buddy revision 提供确认后恢复入口，恢复仍走 `revision.restore` command 并写入新的 revision。
+- 后台复盘列表会从 review run 的 `improvement_candidates` state 中聚合候选摘要，包含 candidate id、kind、source run、risk level、expected benefit、proposed change summary、approval requirement 和 evidence refs；RunDetail 后台复盘面板已能直接展示候选数量、风险分布和候选详情。
+- 后续仍需把复盘产物详情、improvement candidate 的验证/应用流和 curator 周期整理接入同一能力链路。
+
 解决方案：
 
 1. 建立后台运行队列：
@@ -383,8 +398,24 @@ Hermes 能力：
 
 TooGraph 差距：
 
-- `buddy_autonomous_review` 能产出 improvement candidates，但还不能自动变成 Action、Tool、Subgraph、模板或文档 revision。
+- `buddy_autonomous_review` 能产出并展示 improvement candidates，但还不能自动变成 Action、Tool、Subgraph、模板或文档 revision。
 - 缺少周期性的“能力库整理者”。
+
+当前进展：
+
+- 已新增官方 `buddy_improvement_review_workflow` 模板，作为 improvement candidate 的图优先验证入口。
+- 该模板接收 `improvement_candidate` 和 `source_run_id`，规范化目标引用，按需只读读取目标 Action 包或图模板包，生成 `candidate_validation_plan`、`proposed_diff`、`test_plan` 和 `approval_request`。
+- 对包含完整图模板 JSON 的候选，模板会调用 `toograph_graph_template_validator` 产出 `validation_report`；模板本身只验证和请求审批，同时可在 `approval_request.apply_command` 中声明后续可由受控 Buddy command 应用的单步命令。
+- 官方模板测试已覆盖该工作流的状态合同、Action reader / template reader / validator 绑定、条件边、输出节点、无 breakpoint metadata 和运行时兼容性。
+- RunDetail 后台复盘面板已为每个 improvement candidate 提供“开始验证”入口：前端从官方模板创建标准 graph run，写入候选 JSON 与 source run id，并跳转到新验证 run 详情；不新增隐藏后端应用路径。
+- 已建立 `improvement_candidates` 持久化表；后台复盘完成后会把 run state 中的候选投影为可查询对象，并通过 `GET /api/buddy/improvement-candidates` 按 source run、review、review run 或状态查询。
+- 后台复盘 summary 继续从原始 run state 还原候选，同时叠加数据库中的候选状态、验证 run 和应用 revision 字段；RunDetail 候选卡会显示当前状态。
+- 已支持候选验证 run 关联和状态同步：启动验证后候选进入 `validating`，验证 run 完成后从 `candidate_status_recommendation.recommended_status` 同步为 `validated`、`needs_changes`、`rejected` 或 `waiting_for_approval`，失败或取消则同步为 `failed`。
+- 候选表会持久化验证产物包 `validation_result` 和 `status_reason`，包含验证计划、proposed diff、validator report、test plan、approval request、状态建议和最终摘要，为 approval / apply 流提供可审计输入。
+- 已新增候选 approve / reject 决策 API 和 RunDetail 操作入口；人工决策会写入 `decision`、`decided_at`、`status_reason`，只推进候选状态。
+- 已新增候选 apply API 和 RunDetail 操作入口；状态为 `approved` 且带 `has_apply_command` 的候选可读取验证产物中的 `approval_request.apply_command`，通过 allowlist Buddy command 执行改动，写入可恢复 revision，并把候选标记为 `applied`。
+- 已新增独立改进候选队列页面 `/improvements`，集中展示所有候选，支持状态筛选、搜索、来源/验证 run 跳转、验证、状态同步、批准、拒绝和可应用候选的 apply。
+- 后续仍需补齐更广的 Action / Tool / template writer 覆盖、curator 周期整理模板和 scheduler。
 
 解决方案：
 
@@ -435,6 +466,22 @@ TooGraph 差距：
 
 - `toograph_capability_selector` 已能发现 Action/Subgraph/Tool，但评分、拒绝理由、失败学习、预算、权限和动态上下文不够强。
 - 选择结果缺少长期统计反馈。
+
+当前进展：
+
+- `toograph_capability_selector` 已发现 Action、Subgraph、Tool，并按 subgraph > action > tool 的优先级做高层能力替换。
+- capability catalog 已暴露通用 selection metadata：`granularity`、`covers`、`produces`、`taskTags` 和 `permissions`。
+- selector after_llm 已输出 `selection_reason` 和 `capability_selection_trace`，包含原始请求、最终选择、被拒绝候选、fallback 候选、评分拆解和权限摘要。
+- 官方 `buddy_autonomous_loop` 已把 `capability_selection_reason`、`capability_selection_trace` 写入 schema-backed state，后续 RunDetail/Buddy 胶囊可直接读取。
+- selector catalog 已读取 `capability_usage_stats`，把使用次数、成功率、失败次数、近期失败数和最近运行摘要注入候选项；trace 的 `score_breakdown` 与 `usage_summary` 已能解释所选能力的历史反馈。
+- selector catalog 已暴露 `permissionTier` 和 `evalStatus`；trace 的 `permission_summary` 与 `score_breakdown` 已能体现权限层级和 eval case 覆盖。
+- selector 已支持显式 `capability_permission_policy.allowed_permission_tiers` / `blocked_permission_tiers` / `approval_required_permission_tiers`；before_llm 目录会过滤不符合权限策略的能力，after_llm 会拒绝策略外选择并记录 `permission_tier_not_allowed`，并在 `permission_summary` 中标记由策略触发的审批原因。
+- Buddy 主循环会按 ask-first / full-access 模式把 capability permission policy 写入图 metadata；LangGraph 子图和 Action runtime context 会继承该策略，使 selector 能在嵌套能力选择中使用同一权限边界。
+- RunDetail 的 Agent Diagnostic 已能从 `capability_selection_trace` 展示 selected/requested/reason、权限、使用反馈、拒绝候选和 fallback 候选；Buddy 胶囊 evidence labels 也会显示同一 selector trace。
+- `buddy_autonomous_review` 已新增 `capability_usage_update_plan` 分支，通过图内 `buddy_home_writer` 显式应用 `capability_usage_stats.update`，从源 run 的 `capability_result` / `capability_review` / run record 中把实际能力成功或失败写入统计。
+- 官方 `buddy_autonomous_loop` 已把 `agent_loop_control` 作为 `toograph_capability_selector` 的 managed Action input 注入；selector trace 会写入 `budget_after_call`，RunDetail Agent Diagnostic 与 Buddy 胶囊 evidence labels 可显示能力调用预算、剩余额度和耗尽状态。
+- 统一数据库已新增 `capability_usage_events` 运行时事实投影；保存 graph run 时会从 Action、Tool 和动态 Subgraph 调用记录生成能力使用事件，`capability_usage_stats` 读取时会合并这些事实，使 selector 的历史反馈不再只依赖后台复盘 LLM 提取。
+- 后续仍需把更多选择原因、fallback 决策和失败恢复结果投影成结构化事件，并把能力失败后的自动 fallback 评估纳入端到端测试。
 
 解决方案：
 
@@ -1001,8 +1048,8 @@ TooGraph 差距：
 工作项：
 
 1. `improvement_candidate` schema。
-2. improvement review workflow。
-3. Action/Tool/template diff + validation + approval。
+2. improvement review workflow。已完成官方验证模板、RunDetail 启动验证 run 入口、独立候选队列 UI、验证 run 关联、候选状态同步、验证产物持久化、人工决策和 command-backed apply。
+3. Action/Tool/template diff + validation + approval + apply 覆盖扩展。
 4. capability curator。
 5. curator report UI。
 
@@ -1034,7 +1081,7 @@ TooGraph 差距：
 ### `agent_loop_events`
 
 ```text
-id
+event_id
 run_id
 node_id
 iteration_index
@@ -1050,7 +1097,8 @@ created_at
 ### `capability_usage_events`
 
 ```text
-id
+event_id
+invocation_id
 run_id
 node_id
 capability_kind
@@ -1061,6 +1109,8 @@ latency_ms
 error_type
 error_message
 permission_result
+summary
+detail_json
 created_at
 ```
 
@@ -1117,16 +1167,27 @@ updated_at
 ### `improvement_candidates`
 
 ```text
-id
+candidate_id
 kind
+status
+status_reason
 source_run_id
-title
-summary
+review_id
+review_run_id
+target_ref_json
 evidence_refs_json
 risk_level
-status
-proposed_change_json
+expected_benefit
+proposed_change_summary
 approval_required
+validation_run_id
+validation_result_json
+applied_revision_id
+applied_command_json
+applied_at
+decision_json
+decided_at
+payload_json
 created_at
 updated_at
 ```

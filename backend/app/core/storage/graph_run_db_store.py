@@ -205,8 +205,26 @@ def load_run_state(run_id: str) -> dict[str, Any]:
             """,
             (normalized_run_id,),
         ).fetchall()
+        agent_loop_events = connection.execute(
+            """
+            SELECT * FROM agent_loop_events
+            WHERE run_id = ?
+            ORDER BY iteration_index, created_at, event_id
+            """,
+            (normalized_run_id,),
+        ).fetchall()
 
-    return _build_run_state(run_row, current_snapshot, snapshots, executions, events, state_events, outputs, artifacts)
+    return _build_run_state(
+        run_row,
+        current_snapshot,
+        snapshots,
+        executions,
+        events,
+        state_events,
+        outputs,
+        artifacts,
+        agent_loop_events,
+    )
 
 
 def list_run_states() -> list[dict[str, Any]]:
@@ -263,6 +281,12 @@ def build_run_tree_state(run_id: str) -> dict[str, Any]:
 
 
 def _replace_run_details(connection: Any, run_id: str, run_state: dict[str, Any]) -> None:
+    usage_event_created_at = str(
+        run_state.get("completed_at")
+        or run_state.get("started_at")
+        or (run_state.get("lifecycle") or {}).get("updated_at")
+        or ""
+    )
     for table in (
         "graph_run_snapshots",
         "graph_node_executions",
@@ -271,6 +295,8 @@ def _replace_run_details(connection: Any, run_id: str, run_state: dict[str, Any]
         "graph_outputs",
         "graph_artifacts",
         "graph_capability_invocations",
+        "agent_loop_events",
+        "capability_usage_events",
         "graph_model_calls",
     ):
         connection.execute(f"DELETE FROM {table} WHERE run_id = ?", (run_id,))
@@ -287,6 +313,7 @@ def _replace_run_details(connection: Any, run_id: str, run_state: dict[str, Any]
     for index, event in enumerate(run_state.get("state_events") or []):
         if isinstance(event, dict):
             _insert_state_event(connection, run_id, index, event)
+    _insert_agent_loop_events(connection, run_id, run_state)
     for index, preview in enumerate(run_state.get("output_previews") or []):
         if isinstance(preview, dict):
             _insert_output(connection, run_id, index, preview)
@@ -295,12 +322,15 @@ def _replace_run_details(connection: Any, run_id: str, run_state: dict[str, Any]
     for index, output in enumerate(run_state.get("capability_outputs") or []):
         if isinstance(output, dict):
             _insert_capability_invocation(connection, run_id, index, "capability", output)
+            _insert_capability_usage_event(connection, run_id, index, "capability", output, created_at=usage_event_created_at)
     for index, output in enumerate(run_state.get("action_outputs") or []):
         if isinstance(output, dict):
             _insert_capability_invocation(connection, run_id, index, "action", output)
+            _insert_capability_usage_event(connection, run_id, index, "action", output, created_at=usage_event_created_at)
     for index, output in enumerate(run_state.get("tool_outputs") or []):
         if isinstance(output, dict):
             _insert_capability_invocation(connection, run_id, index, "tool", output)
+            _insert_capability_usage_event(connection, run_id, index, "tool", output, created_at=usage_event_created_at)
 
 
 def _insert_snapshot(connection: Any, run_id: str, snapshot: dict[str, Any]) -> None:
@@ -484,6 +514,89 @@ def _insert_state_event(connection: Any, run_id: str, index: int, event: dict[st
     )
 
 
+def _insert_agent_loop_events(connection: Any, run_id: str, run_state: dict[str, Any]) -> None:
+    controls_by_node: dict[str, dict[str, Any]] = {}
+    fallback_created_at = str(run_state.get("completed_at") or run_state.get("started_at") or "")
+    loop_event_index = 0
+    for event in sorted(
+        (event for event in run_state.get("state_events") or [] if isinstance(event, dict)),
+        key=lambda item: _int(item.get("sequence"), default=0),
+    ):
+        node_id = str(event.get("node_id") or "")
+        state_key = str(event.get("state_key") or "")
+        value = event.get("value")
+        if state_key == "agent_loop_control" and isinstance(value, dict):
+            controls_by_node[node_id] = copy.deepcopy(value)
+            continue
+        if state_key != "agent_loop_report" or not isinstance(value, dict):
+            continue
+        loop_event_index += 1
+        control = controls_by_node.get(node_id) if isinstance(controls_by_node.get(node_id), dict) else {}
+        report = copy.deepcopy(value)
+        capability_kind, capability_key = _agent_loop_capability_ref(report)
+        event_id = str(event.get("state_event_id") or f"{run_id}:agent_loop:{loop_event_index}")
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO agent_loop_events (
+                event_id,
+                run_id,
+                node_id,
+                iteration_index,
+                event_kind,
+                capability_kind,
+                capability_key,
+                stop_reason,
+                budget_snapshot_json,
+                detail_json,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event_id,
+                run_id,
+                node_id,
+                _optional_int(report.get("iteration_index")),
+                str(report.get("decision") or "loop"),
+                capability_kind,
+                capability_key,
+                str(report.get("stop_reason") or ""),
+                _json(_agent_loop_budget_snapshot(control, report)),
+                _json(report),
+                str(event.get("created_at") or fallback_created_at),
+            ),
+        )
+
+
+def _agent_loop_capability_ref(report: dict[str, Any]) -> tuple[str, str]:
+    capability_kind = str(report.get("selected_capability_kind") or "").strip()
+    capability_key = str(report.get("selected_capability_key") or "").strip()
+    selected_ref = str(report.get("selected_capability_ref") or "").strip()
+    if selected_ref and (not capability_kind or not capability_key) and ":" in selected_ref:
+        ref_kind, ref_key = selected_ref.split(":", 1)
+        capability_kind = capability_kind or ref_kind
+        capability_key = capability_key or ref_key
+    return capability_kind, capability_key
+
+
+def _agent_loop_budget_snapshot(control: dict[str, Any], report: dict[str, Any]) -> dict[str, Any]:
+    snapshot: dict[str, Any] = {}
+    for key in (
+        "iteration_index",
+        "max_iterations",
+        "capability_call_count",
+        "max_capability_calls",
+        "retry_budget",
+    ):
+        value = control.get(key) if key in control else report.get(key)
+        parsed = _optional_int(value)
+        if parsed is not None:
+            snapshot[key] = parsed
+    for key in ("failure_count_by_key", "warnings", "last_stop_reason"):
+        if key in control:
+            snapshot[key] = copy.deepcopy(control.get(key))
+    return snapshot
+
+
 def _insert_output(connection: Any, run_id: str, index: int, preview: dict[str, Any]) -> None:
     output_id = str(preview.get("output_id") or f"{run_id}:output:{index}")
     connection.execute(
@@ -618,6 +731,86 @@ def _insert_capability_invocation(
     )
 
 
+def _insert_capability_usage_event(
+    connection: Any,
+    run_id: str,
+    index: int,
+    capability_kind: str,
+    output: dict[str, Any],
+    created_at: str,
+) -> None:
+    resolved_kind = _usage_capability_kind(capability_kind, output)
+    capability_key = _usage_capability_key(resolved_kind, output)
+    if not capability_key:
+        return
+    invocation_id = str(output.get("invocation_id") or f"{run_id}:{resolved_kind}:{capability_key}:{index}")
+    event_id = str(output.get("usage_event_id") or f"{invocation_id}:usage")
+    status = str(output.get("status") or "completed")
+    error_message = str(output.get("error") or "")
+    connection.execute(
+        """
+        INSERT OR REPLACE INTO capability_usage_events (
+            event_id,
+            invocation_id,
+            run_id,
+            node_id,
+            capability_kind,
+            capability_key,
+            selected_reason,
+            status,
+            latency_ms,
+            error_type,
+            error_message,
+            permission_result,
+            summary,
+            detail_json,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            event_id,
+            invocation_id,
+            run_id,
+            str(output.get("node_id") or ""),
+            resolved_kind,
+            capability_key,
+            str(output.get("selection_reason") or output.get("selected_reason") or ""),
+            status,
+            output.get("duration_ms") if isinstance(output.get("duration_ms"), int) else None,
+            str(output.get("error_type") or ""),
+            error_message,
+            _usage_permission_result(output),
+            str(output.get("summary") or error_message or ""),
+            _json(output),
+            str(output.get("completed_at") or output.get("started_at") or created_at),
+        ),
+    )
+
+
+def _usage_capability_kind(capability_kind: str, output: dict[str, Any]) -> str:
+    if capability_kind == "capability":
+        return str(output.get("capability_kind") or "capability")
+    return capability_kind
+
+
+def _usage_capability_key(capability_kind: str, output: dict[str, Any]) -> str:
+    if capability_kind == "action":
+        return str(output.get("capability_key") or output.get("action_key") or output.get("action_name") or "")
+    if capability_kind == "tool":
+        return str(output.get("capability_key") or output.get("tool_key") or output.get("tool_name") or "")
+    return str(output.get("capability_key") or output.get("action_key") or output.get("tool_key") or "")
+
+
+def _usage_permission_result(output: dict[str, Any]) -> str:
+    status = str(output.get("status") or "")
+    error_type = str(output.get("error_type") or "")
+    if error_type == "permission_denied":
+        return "denied"
+    if status in {"awaiting_human", "permission_required"}:
+        return "required"
+    return ""
+
+
 def _build_run_state(
     run_row: Any,
     current_snapshot: Any,
@@ -627,6 +820,7 @@ def _build_run_state(
     state_events: list[Any],
     outputs: list[Any],
     artifacts: list[Any],
+    agent_loop_events: list[Any],
 ) -> dict[str, Any]:
     run = dict(run_row)
     detail = _loads(run.pop("detail_json", "{}"), {})
@@ -685,6 +879,7 @@ def _build_run_state(
     state.setdefault("errors", [])
     state["state_events"] = [_state_event_payload(row) for row in state_events]
     state["activity_events"] = [_run_event_payload(row) for row in events]
+    state["agent_loop_events"] = [_agent_loop_event_payload(row) for row in agent_loop_events]
     state.setdefault("saved_outputs", [_artifact_payload(row) for row in artifacts])
     state.setdefault("cycle_summary", {})
     state.setdefault("cycle_iterations", [])
@@ -819,6 +1014,23 @@ def _run_event_payload(row: Any) -> dict[str, Any]:
     return _loads(dict(row).get("payload_json"), {})
 
 
+def _agent_loop_event_payload(row: Any) -> dict[str, Any]:
+    payload = dict(row)
+    return {
+        "event_id": payload.get("event_id") or "",
+        "run_id": payload.get("run_id") or "",
+        "node_id": payload.get("node_id") or "",
+        "iteration_index": payload.get("iteration_index"),
+        "event_kind": payload.get("event_kind") or "",
+        "capability_kind": payload.get("capability_kind") or "",
+        "capability_key": payload.get("capability_key") or "",
+        "stop_reason": payload.get("stop_reason") or "",
+        "budget_snapshot": _loads(payload.get("budget_snapshot_json"), {}),
+        "detail": _loads(payload.get("detail_json"), {}),
+        "created_at": payload.get("created_at") or "",
+    }
+
+
 def _state_event_payload(row: Any) -> dict[str, Any]:
     payload = dict(row)
     value_json = payload.get("value_json")
@@ -884,6 +1096,13 @@ def _int(value: Any, *, default: int) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _optional_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _run_path_sort_key(run: dict[str, Any]) -> tuple[int, str, str]:

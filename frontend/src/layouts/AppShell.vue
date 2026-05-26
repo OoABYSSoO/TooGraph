@@ -165,6 +165,21 @@
           <span class="app-shell__link-label">{{ t("nav.actions") }}</span>
         </RouterLink>
         <RouterLink
+          to="/improvements"
+          class="app-shell__link"
+          data-virtual-affordance-id="app.nav.improvements"
+          :data-virtual-affordance-label="t('nav.improvements')"
+          data-virtual-affordance-role="navigation-link"
+          data-virtual-affordance-zone="app-shell"
+          data-virtual-affordance-actions="click"
+          data-virtual-affordance-path-after-click="/improvements"
+          :class="{ 'app-shell__link--active': activeNavigationSection === 'improvements' }"
+          :title="t('nav.improvements')"
+        >
+          <ElIcon class="app-shell__link-icon"><TrendCharts /></ElIcon>
+          <span class="app-shell__link-label">{{ t("nav.improvements") }}</span>
+        </RouterLink>
+        <RouterLink
           to="/models"
           class="app-shell__link"
           data-virtual-affordance-id="app.nav.models"
@@ -235,6 +250,7 @@ import {
   Reading,
   Setting,
   Tickets,
+  TrendCharts,
 } from "@element-plus/icons-vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";

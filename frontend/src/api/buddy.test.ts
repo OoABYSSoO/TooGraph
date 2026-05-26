@@ -5,6 +5,9 @@ import {
   appendBuddyChatMessage,
   createBuddyChatSession,
   deleteBuddyChatSession,
+  enqueueBuddyBackgroundReview,
+  fetchBuddyBackgroundReviews,
+  fetchBuddyImprovementCandidates,
   fetchBuddyMemoryDocument,
   fetchBuddyMemoryReviewTemplateBinding,
   fetchBuddyRunTemplateBinding,
@@ -14,7 +17,11 @@ import {
   fetchBuddyChatSessions,
   fetchBuddyIdentity,
   fetchBuddyUserContextDocument,
+  linkBuddyImprovementCandidateValidationRun,
   restoreBuddyRevision,
+  syncBuddyImprovementCandidateValidationStatus,
+  decideBuddyImprovementCandidate,
+  applyBuddyImprovementCandidate,
   updateBuddyChatSession,
   updateBuddyMemoryDocument,
   updateBuddyMemoryReviewTemplateBinding,
@@ -184,6 +191,118 @@ test("buddy API manages memory review template binding through command flow", as
     payload: { template_id: "custom_memory_review", input_bindings: { input_source_run_id: "source_run_id" } },
     change_reason: "用户更新伙伴记忆复盘模板绑定。",
   });
+  globalThis.fetch = originalFetch;
+});
+
+test("buddy API enqueues and lists background review runs", async () => {
+  const requests: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    requests.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
+    const payload = init?.method === "POST"
+      ? { review_id: "bgrev_1", source_run_id: "run_1", review_run_id: "run_review_1" }
+      : [];
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  await enqueueBuddyBackgroundReview({
+    source_run_id: "run_1",
+    buddy_model_ref: "openai/gpt-4.1",
+  });
+  await fetchBuddyBackgroundReviews("run_1");
+
+  assert.equal(requests[0].url, "/api/buddy/background-reviews");
+  assert.deepEqual(requests[0].body, {
+    source_run_id: "run_1",
+    buddy_model_ref: "openai/gpt-4.1",
+  });
+  assert.equal(requests[1].url, "/api/buddy/background-reviews?source_run_id=run_1");
+  globalThis.fetch = originalFetch;
+});
+
+test("buddy API lists improvement candidates with query filters", async () => {
+  const requests: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requests.push(String(input));
+    return new Response(JSON.stringify([]), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  await fetchBuddyImprovementCandidates({ sourceRunId: "run_1", status: "proposed" });
+
+  assert.deepEqual(requests, ["/api/buddy/improvement-candidates?source_run_id=run_1&status=proposed"]);
+  globalThis.fetch = originalFetch;
+});
+
+test("buddy API links and syncs improvement candidate validation runs", async () => {
+  const requests: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    requests.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
+    return new Response(JSON.stringify({ candidate_id: "cand_1", validation_run_id: "run_validation_1" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  await linkBuddyImprovementCandidateValidationRun("cand_1", "run_validation_1");
+  await syncBuddyImprovementCandidateValidationStatus("cand_1");
+
+  assert.deepEqual(requests, [
+    {
+      url: "/api/buddy/improvement-candidates/cand_1/validation-run",
+      body: { validation_run_id: "run_validation_1" },
+    },
+    {
+      url: "/api/buddy/improvement-candidates/cand_1/sync-validation-status",
+      body: null,
+    },
+  ]);
+  globalThis.fetch = originalFetch;
+});
+
+test("buddy API records improvement candidate decisions", async () => {
+  const requests: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    requests.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
+    return new Response(JSON.stringify({ candidate_id: "cand_1", status: "approved" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  await decideBuddyImprovementCandidate("cand_1", "approve", "验证清晰，批准应用。");
+
+  assert.deepEqual(requests, [
+    {
+      url: "/api/buddy/improvement-candidates/cand_1/decision",
+      body: { decision: "approve", reason: "验证清晰，批准应用。" },
+    },
+  ]);
+  globalThis.fetch = originalFetch;
+});
+
+test("buddy API applies approved improvement candidates", async () => {
+  const requests: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    requests.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
+    return new Response(JSON.stringify({ candidate_id: "cand_1", status: "applied" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  await applyBuddyImprovementCandidate("cand_1", "应用已批准的改进候选。");
+
+  assert.deepEqual(requests, [
+    {
+      url: "/api/buddy/improvement-candidates/cand_1/apply",
+      body: { change_reason: "应用已批准的改进候选。" },
+    },
+  ]);
   globalThis.fetch = originalFetch;
 });
 
