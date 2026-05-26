@@ -19,8 +19,7 @@
     @pointermove="handleCanvasPointerMove"
     @pointerup="handleCanvasPointerUp"
     @pointercancel="handleCanvasPointerUp"
-    @keydown.delete="handleSelectedEdgeDelete"
-    @keydown.backspace="handleSelectedEdgeDelete"
+    @keydown="handleCanvasKeyboardShortcut"
     @keydown.escape.prevent="clearCanvasTransientState"
     @wheel.prevent="handleWheel"
     @dragover.prevent="handleCanvasDragOver"
@@ -489,7 +488,7 @@ import { groupProjectedCanvasAnchors, groupProjectedCanvasEdges, type ProjectedC
 import { resolveEdgeRunPresentation } from "@/editor/canvas/runEdgePresentation";
 import { resolveCanvasLayout } from "@/editor/canvas/resolvedCanvasLayout";
 import { resolveCanvasSurfaceStyle } from "@/editor/canvas/canvasSurfaceStyle";
-import { isEditableKeyboardEventTarget } from "@/editor/canvas/canvasKeyboard";
+import { isEditableKeyboardEventTarget, resolveCanvasKeyboardShortcut } from "@/editor/canvas/canvasKeyboard";
 import { DEFAULT_CANVAS_VIEWPORT as EMPTY_CANVAS_VIEWPORT, type CanvasViewport } from "@/editor/canvas/canvasViewport";
 import {
   NODE_RESIZE_HANDLES,
@@ -709,6 +708,11 @@ const emit = defineEmits<{
   (event: "bind-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
   (event: "create-port-state", payload: { nodeId: string; side: "input" | "output"; field: { key: string; definition: StateDefinition } }): void;
   (event: "delete-node", payload: { nodeId: string }): void;
+  (event: "delete-selection", payload: { nodeIds: string[] }): void;
+  (event: "copy-selection", payload: { nodeIds: string[] }): void;
+  (event: "paste-selection"): void;
+  (event: "undo"): void;
+  (event: "redo"): void;
   (event: "save-node-preset", payload: { nodeId: string }): void;
   (event: "open-human-review", payload: { nodeId: string }): void;
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
@@ -2249,7 +2253,62 @@ function emitCanvasConnectionCompletionAction(action: CanvasConnectionCompletion
   }
 }
 
-function handleSelectedEdgeDelete(event: KeyboardEvent) {
+function handleCanvasKeyboardShortcut(event: KeyboardEvent) {
+  const shortcut = resolveCanvasKeyboardShortcut(event);
+  if (!shortcut) {
+    return;
+  }
+
+  switch (shortcut) {
+    case "copy":
+      if (selection.selectedNodeIds.value.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      emit("copy-selection", { nodeIds: [...selection.selectedNodeIds.value] });
+      return;
+    case "paste":
+      event.preventDefault();
+      if (isGraphEditingLocked()) {
+        guardLockedCanvasInteraction();
+        return;
+      }
+      emit("paste-selection");
+      return;
+    case "undo":
+      event.preventDefault();
+      if (isGraphEditingLocked()) {
+        guardLockedCanvasInteraction();
+        return;
+      }
+      emit("undo");
+      return;
+    case "redo":
+      event.preventDefault();
+      if (isGraphEditingLocked()) {
+        guardLockedCanvasInteraction();
+        return;
+      }
+      emit("redo");
+      return;
+    case "delete-selection":
+      if (deleteSelectedEdgeFromKeyboardEvent(event)) {
+        return;
+      }
+      if (selection.selectedNodeIds.value.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      if (isGraphEditingLocked()) {
+        guardLockedCanvasInteraction();
+        return;
+      }
+      emit("delete-selection", { nodeIds: [...selection.selectedNodeIds.value] });
+      return;
+  }
+}
+
+function deleteSelectedEdgeFromKeyboardEvent(event: KeyboardEvent) {
   const selectedEdgeKeyboardDeleteAction = resolveSelectedEdgeKeyboardDeleteAction({
     isEditableTarget: isEditableKeyboardEventTarget(event.target),
     interactionLocked: isGraphEditingLocked(),
@@ -2260,11 +2319,11 @@ function handleSelectedEdgeDelete(event: KeyboardEvent) {
     case "ignore-editable-target":
     case "ignore-missing-edge":
     case "ignore-non-deletable-edge":
-      return;
+      return false;
     case "locked-edit-attempt":
       guardLockedCanvasInteraction();
       event.preventDefault();
-      return;
+      return true;
     case "delete-edge":
       event.preventDefault();
       break;
@@ -2289,6 +2348,7 @@ function handleSelectedEdgeDelete(event: KeyboardEvent) {
   if (selectedEdgeKeyboardDeleteAction.clearPendingConnectionPoint) {
     setPendingConnectionPoint(null);
   }
+  return true;
 }
 
 function resolveCanvasPoint(event: { clientX: number; clientY: number }) {

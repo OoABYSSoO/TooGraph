@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -264,6 +267,22 @@ class SettingsModelProviderTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"permission_mode": "full_access"})
         self.assertEqual(saved_payload["buddy_runtime"], {"permission_mode": "full_access"})
+
+    def test_buddy_runtime_ignores_legacy_policy_json_when_no_saved_setting(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home = Path(temp_dir) / "buddy_home"
+            buddy_home.mkdir()
+            (buddy_home / "policy.json").write_text(
+                json.dumps({"graph_permission_mode": "full_access"}),
+                encoding="utf-8",
+            )
+            with patch.dict(os.environ, {"TOOGRAPH_BUDDY_HOME": str(buddy_home)}):
+                with patch("app.api.routes_settings.load_app_settings", return_value={}):
+                    with TestClient(app) as client:
+                        response = client.get("/api/settings/buddy-runtime")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"permission_mode": "ask_first"})
 
     def test_get_settings_uses_cached_catalog_for_fast_page_loads(self) -> None:
         with patch("app.api.routes_settings._build_settings_payload", return_value={"ok": True}) as build_payload:

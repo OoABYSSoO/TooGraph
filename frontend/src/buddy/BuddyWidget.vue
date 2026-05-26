@@ -318,7 +318,7 @@ import { useRoute, useRouter } from "vue-router";
 
 import {
   appendBuddyChatMessage,
-  fetchBuddyProfile,
+  fetchBuddyIdentity,
 } from "../api/buddy.ts";
 import { fetchRun } from "../api/runs.ts";
 import SandboxedHtmlFrame from "../components/SandboxedHtmlFrame.vue";
@@ -328,7 +328,7 @@ import {
 } from "../stores/buddyMascotDebug.ts";
 import { buildBuddyBubblePreviewLabel } from "./buddyBubblePreviewModel.ts";
 import { resolveBuddyWindowDisplayName } from "./buddyDisplayName.ts";
-import type { BuddyChatMessageRecord, BuddyProfile } from "../types/buddy.ts";
+import type { BuddyChatMessageRecord, BuddyIdentity } from "../types/buddy.ts";
 import type { GraphPayload } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
 
@@ -415,7 +415,7 @@ const {
 const viewport = ref(resolveViewport());
 const position = ref(resolveDefaultBuddyPosition(viewport.value));
 const isPanelOpen = ref(false);
-const buddyDisplayProfile = ref<BuddyProfile | null>(null);
+const buddyDisplayIdentity = ref<BuddyIdentity | null>(null);
 const draft = ref("");
 const isPanelFullscreen = ref(false);
 const queuedTurns = ref<BuddyQueuedTurn[]>([]);
@@ -635,19 +635,19 @@ const bubbleText = computed(() => {
 });
 const bubblePreviewLabel = computed(() => buildBuddyBubblePreviewLabel(bubbleText.value));
 const buddyDisplayName = computed(() =>
-  resolveBuddyWindowDisplayName(buddyDisplayProfile.value, t("buddy.title"), String(locale.value)),
+  resolveBuddyWindowDisplayName(buddyDisplayIdentity.value, t("buddy.title"), String(locale.value)),
 );
 
 async function refreshBuddyDisplayName() {
   const requestId = ++buddyDisplayNameRequestId;
   try {
-    const profile = await fetchBuddyProfile();
+    const identity = await fetchBuddyIdentity();
     if (requestId !== buddyDisplayNameRequestId) {
       return;
     }
-    buddyDisplayProfile.value = profile;
+    buddyDisplayIdentity.value = identity;
   } catch {
-    // Keep the last known profile name on transient request failures.
+    // Keep the last known identity name on transient request failures.
   }
 }
 
@@ -910,6 +910,7 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
     activeAbortController = new AbortController();
     const boundRun = await startBuddyBoundRunTemplate({
       userMessage: turn.userMessage,
+      userMessageId: turn.userMessageId,
       history,
       sessionId: turn.sessionId,
     });

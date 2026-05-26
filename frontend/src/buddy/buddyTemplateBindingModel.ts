@@ -12,28 +12,37 @@ export const DEFAULT_BUDDY_MEMORY_REVIEW_TEMPLATE_ID = "buddy_autonomous_review"
 
 const BUDDY_MEMORY_REVIEW_REQUIRED_INPUT_SOURCES = new Set<BuddyMemoryReviewInputSource>([
   "source_run_id",
-  "current_session_id",
-  "user_message",
-  "public_response",
-  "buddy_home_context",
 ]);
 
 const BUDDY_MEMORY_REVIEW_INTERNAL_STATES = new Set([
+  "review_context_report",
   "session_recall_context",
   "autonomous_review",
   "improvement_candidates",
   "memory_update_plan",
+  "user_context_update_plan",
+  "structured_memory_update_plan",
   "memory_review_result",
+  "user_context_review_result",
   "memory_write_success",
   "applied_memory_commands",
   "skipped_memory_commands",
   "memory_write_result",
-  "profile_update_plan",
-  "profile_review_result",
-  "profile_write_success",
-  "applied_profile_commands",
-  "skipped_profile_commands",
-  "profile_write_result",
+  "user_context_write_success",
+  "applied_user_context_commands",
+  "skipped_user_context_commands",
+  "user_context_write_result",
+  "structured_memory_write_success",
+  "applied_structured_memory_commands",
+  "skipped_structured_memory_commands",
+  "written_structured_memories",
+  "structured_memory_write_result",
+  "buddy_identity_update_plan",
+  "buddy_identity_review_result",
+  "buddy_identity_write_success",
+  "applied_buddy_identity_commands",
+  "skipped_buddy_identity_commands",
+  "buddy_identity_write_result",
 ]);
 
 export type BuddyRunInputSourceOption = {
@@ -111,10 +120,6 @@ export function buildDefaultBuddyRunTemplateBinding(): BuddyRunTemplateBinding {
     template_id: DEFAULT_BUDDY_RUN_TEMPLATE_ID,
     input_bindings: {
       input_user_message: "current_message",
-      input_conversation_history: "conversation_history",
-      input_existing_session_summary: "session_summary",
-      input_buddy_context: "buddy_home_context",
-      input_current_session_id: "current_session_id",
     },
   };
 }
@@ -125,19 +130,31 @@ export function buildDefaultBuddyMemoryReviewTemplateBinding(): BuddyMemoryRevie
     template_id: DEFAULT_BUDDY_MEMORY_REVIEW_TEMPLATE_ID,
     input_bindings: {
       input_source_run_id: "source_run_id",
-      input_current_session_id: "current_session_id",
-      input_user_message: "user_message",
-      input_conversation_history: "conversation_history",
-      input_buddy_context: "buddy_home_context",
-      input_request_understanding: "request_understanding",
-      input_capability_result: "capability_result",
-      input_capability_review: "capability_review",
-      input_public_response: "public_response",
     },
   };
 }
 
-export function buildBuddyRunTemplateSourceRows(binding: Pick<BuddyRunTemplateBinding, "input_bindings">): BuddyRunTemplateSourceRow[] {
+export function buildBuddyRunTemplateSourceRows(
+  binding: Pick<BuddyRunTemplateBinding, "input_bindings">,
+  template?: TemplateRecord | null,
+): BuddyRunTemplateSourceRow[] {
+  const runtimeInputBindings = resolveBuddyRunTemplateRuntimeInputBindings(template);
+  if (Object.keys(runtimeInputBindings).length > 0) {
+    const declaredNodeIdBySource = invertRuntimeInputBindings(runtimeInputBindings);
+    return BUDDY_RUN_INPUT_SOURCE_OPTIONS
+      .filter((option): option is { value: BuddyRunInputSource; labelKey: string } => {
+        return isBuddyRunInputSource(option.value) && declaredNodeIdBySource.has(option.value);
+      })
+      .map((option) => ({
+        source: option.value,
+        labelKey: option.labelKey,
+        required: true,
+        selectedNodeId: findDeclaredBoundInputNodeIdForSource(binding, runtimeInputBindings, option.value)
+          || declaredNodeIdBySource.get(option.value)
+          || "",
+      }));
+  }
+
   return BUDDY_RUN_INPUT_SOURCE_OPTIONS
     .filter((option): option is { value: BuddyRunInputSource; labelKey: string } => isBuddyRunInputSource(option.value))
     .map((option) => ({
@@ -150,7 +167,25 @@ export function buildBuddyRunTemplateSourceRows(binding: Pick<BuddyRunTemplateBi
 
 export function buildBuddyMemoryReviewTemplateSourceRows(
   binding: Pick<BuddyMemoryReviewTemplateBinding, "input_bindings">,
+  template?: TemplateRecord | null,
 ): BuddyMemoryReviewTemplateSourceRow[] {
+  const runtimeInputBindings = resolveBuddyMemoryReviewTemplateRuntimeInputBindings(template);
+  if (Object.keys(runtimeInputBindings).length > 0) {
+    const declaredNodeIdBySource = invertRuntimeInputBindings(runtimeInputBindings);
+    return BUDDY_MEMORY_REVIEW_INPUT_SOURCE_OPTIONS
+      .filter((option): option is { value: BuddyMemoryReviewInputSource; labelKey: string } => {
+        return isBuddyMemoryReviewInputSource(option.value) && declaredNodeIdBySource.has(option.value);
+      })
+      .map((option) => ({
+        source: option.value,
+        labelKey: option.labelKey,
+        required: true,
+        selectedNodeId: findDeclaredBoundInputNodeIdForSource(binding, runtimeInputBindings, option.value)
+          || declaredNodeIdBySource.get(option.value)
+          || "",
+      }));
+  }
+
   return BUDDY_MEMORY_REVIEW_INPUT_SOURCE_OPTIONS
     .filter((option): option is { value: BuddyMemoryReviewInputSource; labelKey: string } => isBuddyMemoryReviewInputSource(option.value))
     .map((option) => ({
@@ -172,7 +207,16 @@ export function buildBuddyRunInputNodeOptions(
       .map(([nodeId, selectedSource]) => [nodeId, selectedSource]),
   );
 
-  return buildBuddyRunTemplateInputRows(template).map((row) => {
+  const runtimeInputBindings = resolveBuddyRunTemplateRuntimeInputBindings(template);
+  const allowedRuntimeInputNodeIds = new Set(
+    Object.entries(runtimeInputBindings)
+      .filter(([, declaredSource]) => declaredSource === source)
+      .map(([nodeId]) => nodeId),
+  );
+  const rows = buildBuddyRunTemplateInputRows(template)
+    .filter((row) => Object.keys(runtimeInputBindings).length === 0 || allowedRuntimeInputNodeIds.has(row.nodeId));
+
+  return rows.map((row) => {
     const selectedSource = selectedByOtherSources.get(row.nodeId);
     const disabledReason = row.disabledReason || (selectedSource ? `Already bound to ${selectedSource}.` : "");
     return {
@@ -200,7 +244,16 @@ export function buildBuddyMemoryReviewInputNodeOptions(
       .map(([nodeId, selectedSource]) => [nodeId, selectedSource]),
   );
 
-  return buildBuddyMemoryReviewTemplateInputRows(template).map((row) => {
+  const runtimeInputBindings = resolveBuddyMemoryReviewTemplateRuntimeInputBindings(template);
+  const allowedRuntimeInputNodeIds = new Set(
+    Object.entries(runtimeInputBindings)
+      .filter(([, declaredSource]) => declaredSource === source)
+      .map(([nodeId]) => nodeId),
+  );
+  const rows = buildBuddyMemoryReviewTemplateInputRows(template)
+    .filter((row) => Object.keys(runtimeInputBindings).length === 0 || allowedRuntimeInputNodeIds.has(row.nodeId));
+
+  return rows.map((row) => {
     const selectedSource = selectedByOtherSources.get(row.nodeId);
     const disabledReason = row.disabledReason || (selectedSource ? `Already bound to ${selectedSource}.` : "");
     return {
@@ -315,6 +368,48 @@ export function validateBuddyRunTemplateBinding(
     issues.push("Binding template_id does not match the selected template.");
   }
   const rows = buildBuddyRunTemplateInputRows(template);
+  const runtimeInputBindings = resolveBuddyRunTemplateRuntimeInputBindings(template);
+  const hasRuntimeInputBindings = Object.keys(runtimeInputBindings).length > 0;
+  if (hasRuntimeInputBindings) {
+    const rowByNodeId = new Map(rows.map((row) => [row.nodeId, row]));
+    const declaredSources = new Map<BuddyRunInputSource, string>();
+    for (const [nodeId, source] of Object.entries(runtimeInputBindings)) {
+      const row = rowByNodeId.get(nodeId);
+      if (!row) {
+        issues.push(`Runtime Buddy input node does not exist: ${nodeId}`);
+        continue;
+      }
+      if (row.disabledReason) {
+        issues.push(`${nodeId}: ${row.disabledReason}`);
+        continue;
+      }
+      const previousNodeId = declaredSources.get(source);
+      if (previousNodeId) {
+        issues.push(`${source} is already declared by ${previousNodeId}.`);
+      } else {
+        declaredSources.set(source, nodeId);
+      }
+    }
+    for (const [nodeId, source] of Object.entries(binding.input_bindings ?? {})) {
+      if (!isBuddyRunInputSource(source)) {
+        issues.push(`Unsupported Buddy input source for ${nodeId}: ${String(source)}`);
+        continue;
+      }
+      const declaredSource = runtimeInputBindings[nodeId];
+      if (!declaredSource) {
+        issues.push(`${nodeId} is not declared as a runtime Buddy input by the selected template.`);
+        continue;
+      }
+      if (source !== declaredSource) {
+        issues.push(`${nodeId} must be bound to ${declaredSource}.`);
+      }
+    }
+    if (!declaredSources.has("current_message")) {
+      issues.push("current_message must be bound exactly once.");
+    }
+    return { valid: issues.length === 0, issues };
+  }
+
   if (!rows.some((row) => !row.disabledReason)) {
     issues.push("Selected template has no bindable input nodes.");
   }
@@ -350,6 +445,34 @@ export function validateBuddyRunTemplateBinding(
   return { valid: issues.length === 0, issues };
 }
 
+export function resolveEffectiveBuddyRunTemplateBinding(
+  template: TemplateRecord | null | undefined,
+  binding: BuddyRunTemplateBinding,
+): BuddyRunTemplateBinding {
+  const runtimeInputBindings = resolveBuddyRunTemplateRuntimeInputBindings(template);
+  if (Object.keys(runtimeInputBindings).length === 0) {
+    return binding;
+  }
+  return {
+    ...binding,
+    input_bindings: runtimeInputBindings,
+  };
+}
+
+export function resolveEffectiveBuddyMemoryReviewTemplateBinding(
+  template: TemplateRecord | null | undefined,
+  binding: BuddyMemoryReviewTemplateBinding,
+): BuddyMemoryReviewTemplateBinding {
+  const runtimeInputBindings = resolveBuddyMemoryReviewTemplateRuntimeInputBindings(template);
+  if (Object.keys(runtimeInputBindings).length === 0) {
+    return binding;
+  }
+  return {
+    ...binding,
+    input_bindings: runtimeInputBindings,
+  };
+}
+
 export function validateBuddyMemoryReviewTemplateBinding(
   template: TemplateRecord | null | undefined,
   binding: BuddyMemoryReviewTemplateBinding,
@@ -372,6 +495,57 @@ export function validateBuddyMemoryReviewTemplateBinding(
     issues.push("Binding template_id does not match the selected memory review template.");
   }
   const rows = buildBuddyMemoryReviewTemplateInputRows(template);
+  const runtimeInputBindings = resolveBuddyMemoryReviewTemplateRuntimeInputBindings(template);
+  const hasRuntimeInputBindings = Object.keys(runtimeInputBindings).length > 0;
+  if (hasRuntimeInputBindings) {
+    const rowByNodeId = new Map(rows.map((row) => [row.nodeId, row]));
+    const declaredSources = new Map<BuddyMemoryReviewInputSource, string>();
+    for (const [nodeId, source] of Object.entries(runtimeInputBindings)) {
+      const row = rowByNodeId.get(nodeId);
+      if (!row) {
+        issues.push(`Runtime Buddy memory review input node does not exist: ${nodeId}`);
+        continue;
+      }
+      if (row.disabledReason) {
+        issues.push(`${nodeId}: ${row.disabledReason}`);
+        continue;
+      }
+      const previousNodeId = declaredSources.get(source);
+      if (previousNodeId) {
+        issues.push(`${source} is already declared by ${previousNodeId}.`);
+      } else {
+        declaredSources.set(source, nodeId);
+      }
+    }
+    for (const [nodeId, source] of Object.entries(binding.input_bindings ?? {})) {
+      if (!isBuddyMemoryReviewInputSource(source)) {
+        issues.push(`Unsupported Buddy memory review input source for ${nodeId}: ${String(source)}`);
+        continue;
+      }
+      const declaredSource = runtimeInputBindings[nodeId];
+      if (!declaredSource) {
+        issues.push(`${nodeId} is not declared as a runtime Buddy memory review input by the selected template.`);
+        continue;
+      }
+      if (source !== declaredSource) {
+        issues.push(`${nodeId} must be bound to ${declaredSource}.`);
+      }
+    }
+    const boundDeclaredSources = new Set<BuddyMemoryReviewInputSource>();
+    for (const [nodeId, source] of Object.entries(binding.input_bindings ?? {})) {
+      if (isBuddyMemoryReviewInputSource(source) && runtimeInputBindings[nodeId] === source) {
+        boundDeclaredSources.add(source);
+      }
+    }
+    if (!declaredSources.has("source_run_id")) {
+      issues.push("source_run_id must be bound exactly once.");
+    }
+    if (!boundDeclaredSources.has("source_run_id")) {
+      issues.push("source_run_id must be bound exactly once.");
+    }
+    return { valid: issues.length === 0, issues };
+  }
+
   const seenSources = new Map<BuddyMemoryReviewInputSource, string>();
   for (const [nodeId, source] of Object.entries(binding.input_bindings ?? {})) {
     const row = rows.find((candidate) => candidate.nodeId === nodeId);
@@ -443,6 +617,64 @@ function findBoundInputNodeIdForSource<TSource extends string>(
   source: TSource,
 ) {
   return Object.entries(binding.input_bindings ?? {}).find(([, boundSource]) => boundSource === source)?.[0] ?? "";
+}
+
+function findDeclaredBoundInputNodeIdForSource<TSource extends string>(
+  binding: Pick<{ input_bindings: Record<string, TSource> }, "input_bindings">,
+  declaredBindings: Record<string, TSource>,
+  source: TSource,
+) {
+  return Object.entries(binding.input_bindings ?? {}).find(([nodeId, boundSource]) => {
+    return boundSource === source && declaredBindings[nodeId] === source;
+  })?.[0] ?? "";
+}
+
+function resolveBuddyRunTemplateRuntimeInputBindings(template: TemplateRecord | null | undefined): Record<string, BuddyRunInputSource> {
+  const rawBindings = template?.metadata?.buddyRuntimeInputBindings;
+  if (!isRecord(rawBindings)) {
+    return {};
+  }
+  const bindings: Record<string, BuddyRunInputSource> = {};
+  for (const [nodeId, source] of Object.entries(rawBindings)) {
+    const normalizedNodeId = String(nodeId || "").trim();
+    if (!normalizedNodeId || !isBuddyRunInputSource(source)) {
+      continue;
+    }
+    bindings[normalizedNodeId] = source;
+  }
+  return bindings;
+}
+
+function resolveBuddyMemoryReviewTemplateRuntimeInputBindings(
+  template: TemplateRecord | null | undefined,
+): Record<string, BuddyMemoryReviewInputSource> {
+  const rawBindings = template?.metadata?.buddyMemoryReviewRuntimeInputBindings;
+  if (!isRecord(rawBindings)) {
+    return {};
+  }
+  const bindings: Record<string, BuddyMemoryReviewInputSource> = {};
+  for (const [nodeId, source] of Object.entries(rawBindings)) {
+    const normalizedNodeId = String(nodeId || "").trim();
+    if (!normalizedNodeId || !isBuddyMemoryReviewInputSource(source)) {
+      continue;
+    }
+    bindings[normalizedNodeId] = source;
+  }
+  return bindings;
+}
+
+function invertRuntimeInputBindings<TSource extends string>(bindings: Record<string, TSource>) {
+  const nodeIdBySource = new Map<TSource, string>();
+  for (const [nodeId, source] of Object.entries(bindings)) {
+    if (!nodeIdBySource.has(source)) {
+      nodeIdBySource.set(source, nodeId);
+    }
+  }
+  return nodeIdBySource;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 function formatInputNodeOptionLabel(row: BuddyRunTemplateInputRow) {

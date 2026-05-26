@@ -1,4 +1,4 @@
-export type BuddyProfile = {
+export type BuddyIdentity = {
   name: string;
   persona: string;
   tone: string;
@@ -6,13 +6,13 @@ export type BuddyProfile = {
   display_preferences: Record<string, unknown>;
 };
 
-export type BuddyPolicy = {
-  graph_permission_mode: "ask_first" | "full_access";
-  behavior_boundaries: string[];
-  communication_preferences: string[];
+export type BuddyMemoryDocument = {
+  path: string;
+  content: string;
+  updated_at: string;
 };
 
-export type BuddyMemoryDocument = {
+export type BuddyUserContextDocument = {
   path: string;
   content: string;
   updated_at: string;

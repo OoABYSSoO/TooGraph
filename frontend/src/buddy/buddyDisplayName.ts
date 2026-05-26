@@ -1,4 +1,4 @@
-import type { BuddyProfile } from "../types/buddy.ts";
+import type { BuddyIdentity } from "../types/buddy.ts";
 
 const DEFAULT_CHINESE_BUDDY_NAME = "图图";
 const DEFAULT_NON_CHINESE_BUDDY_NAME = "TooGraph Buddy";
@@ -26,12 +26,12 @@ function isDefaultBuddyDisplayName(value: string): boolean {
 }
 
 export function resolveBuddyWindowDisplayName(
-  profile: BuddyProfile | null | undefined,
+  identity: BuddyIdentity | null | undefined,
   fallback: string,
   locale: unknown = "zh-CN",
 ): string {
-  const name = readTrimmedText(profile?.name);
-  const displayName = readTrimmedText(profile?.display_preferences?.display_name);
+  const name = readTrimmedText(identity?.name);
+  const displayName = readTrimmedText(identity?.display_preferences?.display_name);
   if (isDefaultBuddyName(name) && (!displayName || isDefaultBuddyDisplayName(displayName))) {
     return resolveDefaultBuddyNameForLocale(locale);
   }

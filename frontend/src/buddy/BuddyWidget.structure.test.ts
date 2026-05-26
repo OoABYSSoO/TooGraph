@@ -416,15 +416,15 @@ test("BuddyWidget notifies buddy pages to refresh after a completed chat graph r
   assert.match(componentSource, /if \(runDetail\.status === "completed"\) \{[\s\S]*buddyContextStore\.notifyBuddyDataChanged\(\);[\s\S]*\}/);
 });
 
-test("BuddyWidget derives the panel title from the SOUL.md profile and refresh events", () => {
+test("BuddyWidget derives the panel title from the SOUL.md identity and refresh events", () => {
   assert.match(componentVueSource, /<h2>\{\{ buddyDisplayName \}\}<\/h2>/);
   assert.match(componentSource, /import \{ resolveBuddyWindowDisplayName \} from "\.\/buddyDisplayName\.ts";/);
-  assert.match(componentSource, /fetchBuddyProfile/);
-  assert.match(componentSource, /const buddyDisplayProfile = ref<.*>\(null\);/);
+  assert.match(componentSource, /fetchBuddyIdentity/);
+  assert.match(componentSource, /const buddyDisplayIdentity = ref<.*>\(null\);/);
   assert.match(componentSource, /const buddyDisplayName = computed\(\(\) =>/);
   assert.match(componentSource, /async function refreshBuddyDisplayName\(\)/);
-  assert.match(componentSource, /resolveBuddyWindowDisplayName\(buddyDisplayProfile\.value, t\("buddy\.title"\), String\(locale\.value\)\)/);
-  assert.match(componentSource, /buddyDisplayProfile\.value = profile;/);
+  assert.match(componentSource, /resolveBuddyWindowDisplayName\(buddyDisplayIdentity\.value, t\("buddy\.title"\), String\(locale\.value\)\)/);
+  assert.match(componentSource, /buddyDisplayIdentity\.value = identity;/);
   assert.match(componentSource, /onMounted\(\(\) => \{[\s\S]*void refreshBuddyDisplayName\(\);[\s\S]*\}\);/);
   assert.match(componentSource, /watch\(\s*\(\) => buddyContextStore\.dataRefreshNonce,[\s\S]*void refreshBuddyDisplayName\(\);[\s\S]*\);/);
 });
@@ -718,7 +718,7 @@ test("BuddyWidget leaves buddy self config loading and memory curation to the ch
   assert.doesNotMatch(componentSource, new RegExp("fetch" + "SelfConfigContext"));
   assert.doesNotMatch(componentSource, new RegExp("curate" + "CompletedTurnMemory"));
   assert.doesNotMatch(componentSource, /selfConfigContext,/);
-  assert.doesNotMatch(componentSource, /function formatProfileForPrompt/);
+  assert.doesNotMatch(componentSource, /function formatIdentityForPrompt/);
   assert.doesNotMatch(componentSource, /function formatPolicyForPrompt/);
   assert.doesNotMatch(componentSource, /function formatMemoriesForPrompt/);
 });

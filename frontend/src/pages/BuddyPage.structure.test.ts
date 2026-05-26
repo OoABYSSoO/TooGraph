@@ -16,9 +16,11 @@ function extractSourceBetween(startText: string, endText: string) {
   return source.slice(startIndex, endIndex);
 }
 
-test("BuddyPage manages profile, MEMORY.md, summary, and revisions", () => {
-  assert.match(source, /fetchBuddyProfile/);
-  assert.match(source, /updateBuddyProfile/);
+test("BuddyPage manages identity, USER.md, MEMORY.md, summary, and revisions", () => {
+  assert.match(source, /fetchBuddyIdentity/);
+  assert.match(source, /updateBuddyIdentity/);
+  assert.match(source, /fetchBuddyUserContextDocument/);
+  assert.match(source, /updateBuddyUserContextDocument/);
   assert.match(source, /fetchBuddyMemoryDocument/);
   assert.match(source, /updateBuddyMemoryDocument/);
   assert.match(source, /fetchBuddyHomeFiles/);
@@ -33,7 +35,8 @@ test("BuddyPage manages profile, MEMORY.md, summary, and revisions", () => {
   assert.match(source, /fetchTemplates/);
   assert.match(source, /fetchTemplate/);
   assert.match(source, /<ElTabs/);
-  assert.match(source, /name="profile"/);
+  assert.match(source, /name="identity"/);
+  assert.match(source, /name="userContext"/);
   assert.match(source, /name="memory"/);
   assert.match(source, /name="agents"/);
   assert.doesNotMatch(source, /name="files"/);
@@ -47,41 +50,47 @@ test("BuddyPage manages profile, MEMORY.md, summary, and revisions", () => {
   assert.match(source, /buildBuddyMemoryReviewTemplateInputRows/);
   assert.match(source, /validateBuddyMemoryReviewTemplateBinding/);
   assert.match(source, /memoryDocumentDraft/);
+  assert.match(source, /userContextDraft/);
   assert.match(source, /homeFiles/);
   assert.match(source, /agentsHomeFile/);
   assert.match(source, /file\.path === "AGENTS\.md"/);
   assert.doesNotMatch(source, /selectedHomeFile/);
   assert.doesNotMatch(source, /buddy-page__file-browser/);
   assert.match(source, /saveMemoryDocument/);
+  assert.match(source, /saveUserContextDocument/);
   assert.doesNotMatch(source, /fetchPlatformMemories/);
   assert.doesNotMatch(source, /platformMemoryCandidates/);
   assert.doesNotMatch(source, /createBuddyMemory/);
 });
 
-test("BuddyPage labels the profile surface as soul in Chinese", () => {
-  assert.match(messagesSource, /profile:\s*"灵魂"/);
-  assert.match(messagesSource, /title:\s*"伙伴灵魂"/);
-  assert.match(messagesSource, /saveProfile:\s*"保存灵魂"/);
+test("BuddyPage labels identity and USER.md surfaces clearly in Chinese", () => {
+  assert.match(messagesSource, /identity:\s*"伙伴身份"/);
+  assert.match(messagesSource, /userContext:\s*"USER\.md"/);
+  assert.match(messagesSource, /title:\s*"伙伴身份设定"/);
+  assert.match(messagesSource, /saveIdentity:\s*"保存伙伴身份"/);
+  assert.match(messagesSource, /saveDocument:\s*"保存 USER\.md"/);
 });
 
-test("BuddyPage notifies open Buddy widgets after SOUL.md changes", () => {
-  const saveProfileBlock = extractSourceBetween("async function saveProfile()", "async function saveMemoryDocument()");
+test("BuddyPage notifies open Buddy widgets after durable context changes", () => {
+  const saveIdentityBlock = extractSourceBetween("async function saveIdentity()", "async function saveUserContextDocument()");
+  const saveUserContextBlock = extractSourceBetween("async function saveUserContextDocument()", "async function saveMemoryDocument()");
   const restoreRevisionBlock = extractSourceBetween("async function restoreRevision(revisionId: string)", "watch(");
 
-  assert.match(saveProfileBlock, /buddyContextStore\.notifyBuddyDataChanged\(\);/);
+  assert.match(saveIdentityBlock, /buddyContextStore\.notifyBuddyDataChanged\(\);/);
+  assert.match(saveUserContextBlock, /buddyContextStore\.notifyBuddyDataChanged\(\);/);
   assert.match(restoreRevisionBlock, /buddyContextStore\.notifyBuddyDataChanged\(\);/);
 });
 
 test("BuddyPage keeps template binding before mascot debug and renders it as Buddy input rows", () => {
   const bindingIndex = source.indexOf('name="binding"');
-  const profileIndex = source.indexOf('name="profile"');
+  const identityIndex = source.indexOf('name="identity"');
   const mascotDebugIndex = source.indexOf('name="mascot-debug"');
   assert.ok(bindingIndex > -1);
-  assert.ok(profileIndex > -1);
+  assert.ok(identityIndex > -1);
   assert.ok(mascotDebugIndex > -1);
-  assert.ok(profileIndex < bindingIndex);
+  assert.ok(identityIndex < bindingIndex);
   assert.ok(bindingIndex < mascotDebugIndex);
-  assert.match(source, /const activeTab = ref\("profile"\);/);
+  assert.match(source, /const activeTab = ref\("identity"\);/);
   assert.match(source, /buildBuddyRunTemplateSourceRows/);
   assert.match(source, /buildBuddyRunInputNodeOptions/);
   assert.match(source, /setBuddyRunTemplateSourceBinding/);

@@ -59,9 +59,9 @@ const actions: ActionDefinition[] = [
     canManage: true,
   },
   {
-    actionKey: "desktop_buddy_profile",
-    name: "Desktop Buddy Profile",
-    description: "A buddy context profile.",
+    actionKey: "desktop_buddy_identity",
+    name: "Desktop Buddy Identity",
+    description: "A buddy identity context.",
     llmInstruction: "",
     schemaVersion: "toograph.action/v1",
     stateInputSchema: [],
@@ -77,9 +77,9 @@ const actions: ActionDefinition[] = [
         buddy: { selectable: false, requiresApproval: true },
       },
     },
-    permissions: ["profile_context"],
+    permissions: ["identity_context"],
     sourceScope: "installed",
-    sourcePath: "/actions/desktop_buddy_profile/action.json",
+    sourcePath: "/actions/desktop_buddy_identity/action.json",
     runtimeReady: false,
     runtimeRegistered: false,
     status: "disabled",
@@ -97,12 +97,12 @@ test("filterActionsForManagement searches action metadata and permission fields"
     ["draft_search"],
   );
   assert.deepEqual(
-    filterActionsForManagement(actions, { query: "profile", status: "all" }).map((action) => action.actionKey),
-    ["desktop_buddy_profile"],
+    filterActionsForManagement(actions, { query: "identity", status: "all" }).map((action) => action.actionKey),
+    ["desktop_buddy_identity"],
   );
   assert.deepEqual(
-    filterActionsForManagement(actions, { query: "profile_context", status: "all" }).map((action) => action.actionKey),
-    ["desktop_buddy_profile"],
+    filterActionsForManagement(actions, { query: "identity_context", status: "all" }).map((action) => action.actionKey),
+    ["desktop_buddy_identity"],
   );
   assert.deepEqual(
     filterActionsForManagement(actions, { query: "bound graph state input", status: "all" }).map((action) => action.actionKey),
@@ -110,7 +110,7 @@ test("filterActionsForManagement searches action metadata and permission fields"
   );
   assert.deepEqual(
     filterActionsForManagement(actions, { query: "action.json", status: "all" }).map((action) => action.actionKey),
-    ["draft_search", "desktop_buddy_profile"],
+    ["draft_search", "desktop_buddy_identity"],
   );
   assert.deepEqual(
     filterActionsForManagement(actions, { query: "run.py python runtime", status: "all" }).map((action) => action.actionKey),
@@ -125,7 +125,7 @@ test("filterActionsForManagement searches action metadata and permission fields"
 test("filterActionsForManagement filters by user-facing availability", () => {
   assert.deepEqual(
     filterActionsForManagement(actions, { query: "", status: "disabled" }).map((action) => action.actionKey),
-    ["desktop_buddy_profile"],
+    ["desktop_buddy_identity"],
   );
   assert.deepEqual(
     filterActionsForManagement(actions, { query: "", status: "active" }).map((action) => action.actionKey),
@@ -133,18 +133,18 @@ test("filterActionsForManagement filters by user-facing availability", () => {
   );
   assert.deepEqual(
     filterActionsForManagement(actions, { query: "", status: "all" }).map((action) => action.actionKey),
-    ["rewrite_text", "draft_search", "desktop_buddy_profile"],
+    ["rewrite_text", "draft_search", "desktop_buddy_identity"],
   );
 });
 
 test("filterActionsForManagement ignores removed runtime and attention filters", () => {
   assert.deepEqual(
     filterActionsForManagement(actions, { query: "", status: "runtime" as never }).map((action) => action.actionKey),
-    ["rewrite_text", "draft_search", "desktop_buddy_profile"],
+    ["rewrite_text", "draft_search", "desktop_buddy_identity"],
   );
   assert.deepEqual(
     filterActionsForManagement(actions, { query: "", status: "attention" as never }).map((action) => action.actionKey),
-    ["rewrite_text", "draft_search", "desktop_buddy_profile"],
+    ["rewrite_text", "draft_search", "desktop_buddy_identity"],
   );
 });
 

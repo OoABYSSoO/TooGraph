@@ -25,6 +25,7 @@ type BuddyBoundRunTemplateOptions = {
 
 export type BuddyBoundRunTemplateRequest = {
   userMessage: string;
+  userMessageId?: string;
   history: BuddyChatMessage[];
   sessionId: string;
 };
@@ -55,6 +56,7 @@ export function useBuddyBoundRunTemplate({
         history: request.history,
         sessionSummary: sessionSummary.content,
         currentSessionId: request.sessionId,
+        currentMessageId: request.userMessageId,
         pageOperationContext: pageOperationContext.actionRuntimeContext,
         buddyMode: buddyMode.value,
         buddyModel: buddyModelRef.value,

@@ -2,8 +2,8 @@
   "schemaVersion": "toograph.action/v1",
   "actionKey": "buddy_session_recall",
   "name": "Buddy Session Recall",
-  "description": "当用户需要回顾、引用、延续或查找 Buddy 历史对话时使用；它只读浏览、搜索或展开统一数据库中的会话消息、记忆和运行输出。",
-  "llmInstruction": "你已绑定 Buddy 会话召回 Action。根据 recall_request 和上游状态生成检索参数。mode 只能是 browse、discover 或 scroll。discover 使用 query 搜索真实 buddy_messages、memory_entries 和 graph outputs，返回 snippet、命中窗口、session bookends 和可追溯 source refs；browse 列出最近会话；scroll 使用 session_id 和 anchor_message_id 展开上下文。可选参数包括 limit、window、bookend、sort、role_filter、current_session_id。current_session_id 用于排除当前会话谱系，避免把正在运行的上下文当历史记忆再次召回。该 Action 只读取统一数据库事实，不总结、不改写、不写入 MEMORY.md，也不创建逐条审批记录。",
+  "description": "当用户需要回顾、引用、延续或查找 Buddy 历史对话时使用；它浏览、搜索或展开统一数据库中的会话消息、记忆和运行输出。",
+  "llmInstruction": "根据 recall_request 和上游状态生成检索参数。mode 取 browse、discover 或 scroll。discover 使用 query 搜索真实 buddy_messages、memory_entries 和 graph outputs，返回 snippet、命中窗口、session bookends 和可追溯 source refs；browse 列出最近会话；scroll 使用 session_id 和 anchor_message_id 展开上下文。可选参数包括 limit、window、bookend、sort、role_filter、current_session_id、embedding_model_ref。current_session_id 用于排除当前会话谱系，避免把正在运行的上下文再次作为历史召回。embedding_model_ref 可启用 memory_entries 和 graph outputs 的 hybrid/embedding 召回；没有可用模型时留空并使用 FTS/LIKE。输出范围聚焦检索参数，由运行时返回统一数据库事实。",
   "version": "1.0.0",
   "timeoutSeconds": 15,
   "permissions": ["buddy_session_read"],
@@ -84,6 +84,12 @@
       "name": "Current Session ID",
       "valueType": "text",
       "description": "当前 Buddy 会话 ID。discover/scroll 会排除同一 parent lineage，避免重复召回当前上下文。"
+    },
+    {
+      "key": "embedding_model_ref",
+      "name": "Embedding Model Ref",
+      "valueType": "text",
+      "description": "可选 embedding model id/provider:model。提供后 memory_entries 和 graph outputs 使用 hybrid/embedding 召回；留空时使用 FTS/LIKE。"
     }
   ],
   "stateOutputSchema": [

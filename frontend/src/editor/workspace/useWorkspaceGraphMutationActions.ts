@@ -214,6 +214,35 @@ export function useWorkspaceGraphMutationActions(input: WorkspaceGraphMutationAc
     });
   }
 
+  function deleteNodesForTab(tabId: string, nodeIds: string[]) {
+    const document = input.documentsByTabId.value[tabId];
+    if (!document) {
+      return;
+    }
+
+    const normalizedNodeIds = normalizeNodeIds(nodeIds).filter((nodeId) => Boolean(document.nodes[nodeId]));
+    if (normalizedNodeIds.length === 0) {
+      return;
+    }
+
+    let nextDocument: GraphPayload | GraphDocument = document;
+    for (const nodeId of normalizedNodeIds) {
+      nextDocument = removeNodeFromDocument(nextDocument, nodeId);
+    }
+    if (nextDocument === document) {
+      return;
+    }
+
+    input.markDocumentDirty(tabId, nextDocument);
+    if (input.focusedNodeIdByTabId.value[tabId] && normalizedNodeIds.includes(input.focusedNodeIdByTabId.value[tabId]!)) {
+      input.focusNodeForTab(tabId, null);
+    }
+    input.setMessageFeedbackForTab(tabId, {
+      tone: "neutral",
+      message: `Deleted ${normalizedNodeIds.length} node${normalizedNodeIds.length === 1 ? "" : "s"}.`,
+    });
+  }
+
   function connectFlowNodesForTab(tabId: string, sourceNodeId: string, targetNodeId: string) {
     commitDocumentMutationForTab(tabId, (document) => connectFlowNodesInDocument(document, sourceNodeId, targetNodeId), {
       focusNodeId: targetNodeId,
@@ -570,6 +599,7 @@ export function useWorkspaceGraphMutationActions(input: WorkspaceGraphMutationAc
     disconnectDataEdgeForTab,
     createNodePortStateForTab,
     deleteNodeForTab,
+    deleteNodesForTab,
     connectFlowNodesForTab,
     connectStateBindingForTab,
     connectStateInputSourceForTab,
@@ -595,4 +625,15 @@ export function useWorkspaceGraphMutationActions(input: WorkspaceGraphMutationAc
     deleteStateField,
     removeStateWriterBinding,
   };
+}
+
+function normalizeNodeIds(nodeIds: readonly string[]) {
+  const normalized: string[] = [];
+  for (const nodeId of nodeIds) {
+    const compactNodeId = nodeId.trim();
+    if (compactNodeId && !normalized.includes(compactNodeId)) {
+      normalized.push(compactNodeId);
+    }
+  }
+  return normalized;
 }

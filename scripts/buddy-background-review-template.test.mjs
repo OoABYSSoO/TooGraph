@@ -34,15 +34,27 @@ test("buddy autonomous review is a visible background template with memory write
   assert.equal(template.label, "自主复盘");
   assert.equal(template.metadata?.internal, undefined);
   assert.equal(template.metadata?.capabilityDiscoverableDefault, false);
-  assert.deepEqual(template.metadata?.permissions, ["buddy_session_read", "buddy_home_write"]);
+  assert.deepEqual(template.metadata?.permissions, ["buddy_session_read", "buddy_home_write", "buddy_memory_write"]);
+  assert.deepEqual(template.metadata?.requiredActions, [
+    "buddy_session_recall",
+    "buddy_home_writer",
+    "buddy_memory_writer",
+  ]);
   assert.equal(template.nodes.review_buddy_memory, undefined);
-  assert.equal(template.nodes.extract_memory_candidates.kind, "agent");
-  assert.equal(template.nodes.merge_memory_document.kind, "agent");
+  assert.equal(template.nodes.recall_related_sessions.kind, "agent");
+  assert.equal(template.nodes.draft_autonomous_review.kind, "agent");
+  assert.equal(template.nodes.write_structured_memory_updates.kind, "agent");
+  assert.equal(template.nodes.write_structured_memory_updates.config.actionKey, "buddy_memory_writer");
   assert.equal(template.nodes.should_write_buddy_home, undefined);
   assert.equal(template.nodes.apply_buddy_home_writeback, undefined);
   assert.equal(template.nodes.has_memory_updates.kind, "condition");
+  assert.equal(template.nodes.has_user_context_updates.kind, "condition");
+  assert.equal(template.nodes.has_structured_memory_updates.kind, "condition");
+  assert.equal(template.nodes.has_buddy_identity_updates.kind, "condition");
   assert.equal(template.nodes.write_memory_updates.kind, "agent");
   assert.equal(template.nodes.write_memory_updates.config.actionKey, "buddy_home_writer");
+  assert.equal(template.nodes.write_user_context_updates.kind, "agent");
+  assert.equal(template.nodes.write_user_context_updates.config.actionKey, "buddy_home_writer");
   assert.equal(
     template.nodes.write_memory_updates.writes.some((binding) => binding.state === "memory_write_result"),
     true,
@@ -52,7 +64,25 @@ test("buddy autonomous review is a visible background template with memory write
       (edge) =>
         edge.source === "has_memory_updates" &&
         edge.branches.true === "write_memory_updates" &&
-        edge.branches.false === "output_memory_review_result",
+        edge.branches.false === "has_user_context_updates",
+    ),
+    true,
+  );
+  assert.equal(
+    template.conditional_edges.some(
+      (edge) =>
+        edge.source === "has_user_context_updates" &&
+        edge.branches.true === "write_user_context_updates" &&
+        edge.branches.false === "has_structured_memory_updates",
+    ),
+    true,
+  );
+  assert.equal(
+    template.conditional_edges.some(
+      (edge) =>
+        edge.source === "has_structured_memory_updates" &&
+        edge.branches.true === "write_structured_memory_updates" &&
+        edge.branches.false === "has_buddy_identity_updates",
     ),
     true,
   );

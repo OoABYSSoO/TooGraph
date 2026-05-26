@@ -404,20 +404,28 @@ test("EditorCanvas forwards state pill reorder requests to the workspace", () =>
   assert.match(componentSource, /@reorder-port-state="emit\('reorder-port-state', \$event\)"/);
 });
 
-test("EditorCanvas lets editable node fields handle Backspace and Delete normally", () => {
+test("EditorCanvas routes canvas shortcuts while editable node fields keep native keys", () => {
   const flowEdgeDeleteModelSource = readFlowEdgeDeleteModelSource();
 
   assert.doesNotMatch(componentSource, /@keydown\.delete\.prevent=/);
   assert.doesNotMatch(componentSource, /@keydown\.backspace\.prevent=/);
-  assert.match(componentSource, /@keydown\.delete="handleSelectedEdgeDelete"/);
-  assert.match(componentSource, /@keydown\.backspace="handleSelectedEdgeDelete"/);
-  assert.match(componentSource, /function handleSelectedEdgeDelete\(event: KeyboardEvent\)/);
+  assert.doesNotMatch(componentSource, /@keydown\.delete="handleSelectedEdgeDelete"/);
+  assert.doesNotMatch(componentSource, /@keydown\.backspace="handleSelectedEdgeDelete"/);
+  assert.match(componentSource, /@keydown="handleCanvasKeyboardShortcut"/);
+  assert.match(componentSource, /resolveCanvasKeyboardShortcut/);
+  assert.match(componentSource, /function handleCanvasKeyboardShortcut\(event: KeyboardEvent\)/);
+  assert.match(componentSource, /function deleteSelectedEdgeFromKeyboardEvent\(event: KeyboardEvent\)/);
   assert.match(flowEdgeDeleteModelSource, /export function resolveSelectedEdgeKeyboardDeleteAction/);
   assert.match(componentSource, /const selectedEdgeKeyboardDeleteAction = resolveSelectedEdgeKeyboardDeleteAction\(\{[\s\S]*isEditableTarget: isEditableKeyboardEventTarget\(event\.target\),[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*selectedEdgeId: selectedEdgeId\.value,[\s\S]*edges: projectedEdges\.value,[\s\S]*\}\);/);
-  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*guardLockedCanvasInteraction\(\);[\s\S]*return;/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*guardLockedCanvasInteraction\(\);[\s\S]*return true;/);
   assert.match(componentSource, /case "delete-edge":[\s\S]*const action = selectedEdgeKeyboardDeleteAction\.action;[\s\S]*event\.preventDefault\(\);/);
   assert.match(componentSource, /if \(action\.kind === "route"\) \{[\s\S]*emit\("remove-route", \{[\s\S]*branchKey: action\.branchKey/);
   assert.match(componentSource, /emit\("remove-flow", \{[\s\S]*sourceNodeId: action\.sourceNodeId,[\s\S]*targetNodeId: action\.targetNodeId/);
+  assert.match(componentSource, /emit\("delete-selection", \{ nodeIds: \[\.\.\.selection\.selectedNodeIds\.value\] \}\);/);
+  assert.match(componentSource, /emit\("copy-selection", \{ nodeIds: \[\.\.\.selection\.selectedNodeIds\.value\] \}\);/);
+  assert.match(componentSource, /emit\("paste-selection"\);/);
+  assert.match(componentSource, /emit\("undo"\);/);
+  assert.match(componentSource, /emit\("redo"\);/);
   assert.match(flowEdgeDeleteModelSource, /export function resolveFlowEdgeDeleteActionFromEdge/);
   assert.doesNotMatch(componentSource, /const edge = selectedEdgeId\.value \? projectedEdges\.value\.find/);
   assert.doesNotMatch(componentSource, /if \(edge\.kind === "flow"\) \{[\s\S]*sourceNodeId: edge\.source,[\s\S]*targetNodeId: edge\.target/);

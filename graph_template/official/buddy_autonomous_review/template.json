@@ -1,7 +1,7 @@
 {
   "template_id": "buddy_autonomous_review",
   "label": "自主复盘",
-  "description": "可见 Buddy 回复完成后的后台复盘模板：召回相关会话，产出记忆、profile 和改进候选，并在同一图内通过 Buddy Home Writer 写入低风险记忆更新。",
+  "description": "可见 Buddy 回复完成后的后台复盘模板：从源 run 记录恢复上下文，召回相关会话，产出长期文件更新、结构化召回记忆、伙伴身份和改进候选，并在同一图内写入低风险更新。",
   "default_graph_name": "自主复盘",
   "state_schema": {
     "source_run_id": {
@@ -14,27 +14,45 @@
     },
     "current_session_id": {
       "name": "current_session_id",
-      "description": "当前 Buddy 会话 ID；用于会话召回时排除同一 parent lineage，避免重复召回本轮上下文。",
+      "description": "从源 Buddy run 运行时元数据或 state 中恢复的当前会话 ID。",
       "type": "text",
       "value": "",
       "color": "#475569",
-      "binding": null
+      "binding": {
+        "kind": "tool_output",
+        "toolKey": "buddy_review_context_loader",
+        "nodeId": "load_review_context",
+        "fieldKey": "current_session_id",
+        "managed": true
+      }
     },
     "user_message": {
       "name": "user_message",
-      "description": "用户本轮对伙伴说的话。",
+      "description": "从源 Buddy run 中恢复的用户本轮消息。",
       "type": "text",
       "value": "",
       "color": "#d97706",
-      "binding": null
+      "binding": {
+        "kind": "tool_output",
+        "toolKey": "buddy_review_context_loader",
+        "nodeId": "load_review_context",
+        "fieldKey": "user_message",
+        "managed": true
+      }
     },
     "conversation_history": {
       "name": "conversation_history",
-      "description": "伙伴对话历史摘要。",
-      "type": "markdown",
-      "value": "",
+      "description": "从源 Buddy run 中恢复的对话历史引用；通常是 context_assembly_ref，由 prompt 渲染层按需展开。",
+      "type": "json",
+      "value": {},
       "color": "#64748b",
-      "binding": null
+      "binding": {
+        "kind": "tool_output",
+        "toolKey": "buddy_review_context_loader",
+        "nodeId": "load_review_context",
+        "fieldKey": "conversation_history",
+        "managed": true
+      }
     },
     "buddy_context": {
       "name": "buddy_context",
@@ -55,39 +73,63 @@
     },
     "request_understanding": {
       "name": "request_understanding",
-      "description": "对用户请求的结构化理解、澄清需求、目标和约束。",
+      "description": "从源 Buddy run 中恢复的用户请求结构化理解、澄清需求、目标和约束。",
       "type": "json",
       "value": {},
       "color": "#16a34a",
-      "binding": null
+      "binding": {
+        "kind": "tool_output",
+        "toolKey": "buddy_review_context_loader",
+        "nodeId": "load_review_context",
+        "fieldKey": "request_understanding",
+        "managed": true
+      }
     },
     "capability_result": {
       "name": "capability_result",
-      "description": "动态能力执行后的结果包。包内每个输出保留原始 name、description、type 和 value。",
+      "description": "从源 Buddy run 中恢复的动态能力执行结果包。",
       "type": "result_package",
       "value": {},
       "color": "#0284c7",
-      "binding": null
+      "binding": {
+        "kind": "tool_output",
+        "toolKey": "buddy_review_context_loader",
+        "nodeId": "load_review_context",
+        "fieldKey": "capability_result",
+        "managed": true
+      }
     },
     "capability_review": {
       "name": "capability_review",
-      "description": "对能力选择、权限、执行结果和是否继续调用能力的复盘。",
+      "description": "从源 Buddy run 中恢复的能力选择、权限、执行结果和是否继续调用能力的复盘。",
       "type": "json",
       "value": {},
       "color": "#0f766e",
-      "binding": null
+      "binding": {
+        "kind": "tool_output",
+        "toolKey": "buddy_review_context_loader",
+        "nodeId": "load_review_context",
+        "fieldKey": "capability_review",
+        "managed": true
+      }
     },
     "public_response": {
       "name": "public_response",
-      "description": "展示给用户的最终伙伴回复。",
+      "description": "从源 Buddy run 中恢复的最终伙伴回复。",
       "type": "markdown",
       "value": "",
       "color": "#16a34a",
-      "binding": null
+      "binding": {
+        "kind": "tool_output",
+        "toolKey": "buddy_review_context_loader",
+        "nodeId": "load_review_context",
+        "fieldKey": "public_response",
+        "managed": true
+      }
     },
     "session_recall_context": {
       "name": "session_recall_context",
-      "description": "从 buddy.db 召回的相关会话窗口、snippet、bookends 和 lineage 信息；仅作为复盘上下文。",
+      "description": "从统一数据库召回的相关会话窗口、结构化记忆、图运行输出、snippet、bookends 和 lineage 信息；作为复盘上下文。",
       "type": "json",
       "value": {},
       "color": "#7c3aed",
@@ -117,7 +159,7 @@
     },
     "memory_update_plan": {
       "name": "memory_update_plan",
-      "description": "MEMORY.md 更新计划；复盘节点只生成低风险 writer-ready commands，下游 Buddy Home Writer 在同一模板内写入并留下 revision。",
+      "description": "MEMORY.md 更新计划；复盘节点生成低风险 writer-ready commands，下游 Buddy Home Writer 在同一模板内写入并留下 revision。",
       "type": "json",
       "value": {
         "has_updates": false,
@@ -126,32 +168,23 @@
       "color": "#22c55e",
       "binding": null
     },
+    "structured_memory_update_plan": {
+      "name": "structured_memory_update_plan",
+      "description": "结构化召回记忆写入计划；复盘节点生成 memory_entry.* commands，下游 Buddy Memory Writer 写入 memory_entries 并留下 memory revision。",
+      "type": "json",
+      "value": {
+        "has_updates": false,
+        "commands": []
+      },
+      "color": "#14b8a6",
+      "binding": null
+    },
     "memory_review_result": {
       "name": "memory_review_result",
       "description": "后台记忆复盘摘要；说明接受、拒绝、去重、风险和待人工确认项。",
       "type": "markdown",
       "value": "",
       "color": "#0369a1",
-      "binding": null
-    },
-    "profile_update_plan": {
-      "name": "profile_update_plan",
-      "description": "Buddy profile/SOUL.md 更新计划；只有明确低风险 profile.update commands 才会被下游 Writer 写入。",
-      "type": "json",
-      "value": {
-        "has_updates": false,
-        "requires_confirmation": false,
-        "commands": []
-      },
-      "color": "#f97316",
-      "binding": null
-    },
-    "profile_review_result": {
-      "name": "profile_review_result",
-      "description": "Profile/self-configuration 复盘摘要；说明接受、拒绝和需要确认的候选。",
-      "type": "markdown",
-      "value": "",
-      "color": "#c2410c",
       "binding": null
     },
     "memory_write_success": {
@@ -210,59 +243,238 @@
         "managed": true
       }
     },
-    "profile_write_success": {
-      "name": "profile_write_success",
-      "description": "Buddy Home Writer 是否成功应用全部 profile.update 命令。",
+    "structured_memory_write_success": {
+      "name": "structured_memory_write_success",
+      "description": "Buddy Memory Writer 是否成功应用全部结构化记忆命令。",
+      "type": "boolean",
+      "value": false,
+      "color": "#0d9488",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "buddy_memory_writer",
+        "nodeId": "write_structured_memory_updates",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "applied_structured_memory_commands": {
+      "name": "applied_structured_memory_commands",
+      "description": "已应用的结构化记忆命令和 memory revision 信息。",
+      "type": "json",
+      "value": [],
+      "color": "#0f766e",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "buddy_memory_writer",
+        "nodeId": "write_structured_memory_updates",
+        "fieldKey": "applied_commands",
+        "managed": true
+      }
+    },
+    "skipped_structured_memory_commands": {
+      "name": "skipped_structured_memory_commands",
+      "description": "因内容无效、风险过高或写入失败而跳过的结构化记忆命令。",
+      "type": "json",
+      "value": [],
+      "color": "#b91c1c",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "buddy_memory_writer",
+        "nodeId": "write_structured_memory_updates",
+        "fieldKey": "skipped_commands",
+        "managed": true
+      }
+    },
+    "written_structured_memories": {
+      "name": "written_structured_memories",
+      "description": "本次创建、更新或归档后的 memory_entries。",
+      "type": "json",
+      "value": [],
+      "color": "#0f766e",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "buddy_memory_writer",
+        "nodeId": "write_structured_memory_updates",
+        "fieldKey": "memories",
+        "managed": true
+      }
+    },
+    "structured_memory_write_result": {
+      "name": "structured_memory_write_result",
+      "description": "结构化召回记忆写入摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0d9488",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "buddy_memory_writer",
+        "nodeId": "write_structured_memory_updates",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "buddy_identity_update_plan": {
+      "name": "buddy_identity_update_plan",
+      "description": "SOUL.md 伙伴身份设定更新计划；明确低风险 buddy_identity.update commands 会被下游 Writer 写入。",
+      "type": "json",
+      "value": {
+        "has_updates": false,
+        "requires_confirmation": false,
+        "commands": []
+      },
+      "color": "#f97316",
+      "binding": null
+    },
+    "buddy_identity_review_result": {
+      "name": "buddy_identity_review_result",
+      "description": "伙伴身份设定复盘摘要；说明接受、拒绝和需要确认的候选。",
+      "type": "markdown",
+      "value": "",
+      "color": "#c2410c",
+      "binding": null
+    },
+    "buddy_identity_write_success": {
+      "name": "buddy_identity_write_success",
+      "description": "Buddy Home Writer 是否成功应用全部 buddy_identity.update 命令。",
       "type": "boolean",
       "value": false,
       "color": "#ea580c",
       "binding": {
         "kind": "action_output",
         "actionKey": "buddy_home_writer",
-        "nodeId": "write_profile_updates",
+        "nodeId": "write_buddy_identity_updates",
         "fieldKey": "success",
         "managed": true
       }
     },
-    "applied_profile_commands": {
-      "name": "applied_profile_commands",
-      "description": "已应用的 profile.update 命令和 revision 信息。",
+    "applied_buddy_identity_commands": {
+      "name": "applied_buddy_identity_commands",
+      "description": "已应用的 buddy_identity.update 命令和 revision 信息。",
       "type": "json",
       "value": [],
       "color": "#f97316",
       "binding": {
         "kind": "action_output",
         "actionKey": "buddy_home_writer",
-        "nodeId": "write_profile_updates",
+        "nodeId": "write_buddy_identity_updates",
         "fieldKey": "applied_commands",
         "managed": true
       }
     },
-    "skipped_profile_commands": {
-      "name": "skipped_profile_commands",
-      "description": "因意图不明确、风险过高或写入失败而跳过的 profile.update 命令。",
+    "skipped_buddy_identity_commands": {
+      "name": "skipped_buddy_identity_commands",
+      "description": "因意图不明确、风险过高或写入失败而跳过的 buddy_identity.update 命令。",
       "type": "json",
       "value": [],
       "color": "#dc2626",
       "binding": {
         "kind": "action_output",
         "actionKey": "buddy_home_writer",
-        "nodeId": "write_profile_updates",
+        "nodeId": "write_buddy_identity_updates",
         "fieldKey": "skipped_commands",
         "managed": true
       }
     },
-    "profile_write_result": {
-      "name": "profile_write_result",
-      "description": "Buddy profile 写回摘要。",
+    "buddy_identity_write_result": {
+      "name": "buddy_identity_write_result",
+      "description": "伙伴身份设定写回摘要。",
       "type": "markdown",
       "value": "",
       "color": "#ea580c",
       "binding": {
         "kind": "action_output",
         "actionKey": "buddy_home_writer",
-        "nodeId": "write_profile_updates",
+        "nodeId": "write_buddy_identity_updates",
         "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "user_context_update_plan": {
+      "name": "user_context_update_plan",
+      "description": "USER.md 用户上下文更新计划；复盘节点生成低风险 user_context.update commands，下游 Buddy Home Writer 写入完整 USER.md 并留下 revision。",
+      "type": "json",
+      "value": {
+        "has_updates": false,
+        "commands": []
+      },
+      "color": "#2563eb",
+      "binding": null
+    },
+    "user_context_review_result": {
+      "name": "user_context_review_result",
+      "description": "USER.md 用户上下文复盘摘要；说明接受、拒绝、证据缺口和待确认项。",
+      "type": "markdown",
+      "value": "",
+      "color": "#1d4ed8",
+      "binding": null
+    },
+    "user_context_write_success": {
+      "name": "user_context_write_success",
+      "description": "Buddy Home Writer 是否成功应用全部 user_context.update 命令。",
+      "type": "boolean",
+      "value": false,
+      "color": "#2563eb",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "buddy_home_writer",
+        "nodeId": "write_user_context_updates",
+        "fieldKey": "success",
+        "managed": true
+      }
+    },
+    "applied_user_context_commands": {
+      "name": "applied_user_context_commands",
+      "description": "已应用的 USER.md 写回命令和 revision 信息。",
+      "type": "json",
+      "value": [],
+      "color": "#1d4ed8",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "buddy_home_writer",
+        "nodeId": "write_user_context_updates",
+        "fieldKey": "applied_commands",
+        "managed": true
+      }
+    },
+    "skipped_user_context_commands": {
+      "name": "skipped_user_context_commands",
+      "description": "因内容无效、风险过高或写入失败而跳过的 USER.md 写回命令。",
+      "type": "json",
+      "value": [],
+      "color": "#dc2626",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "buddy_home_writer",
+        "nodeId": "write_user_context_updates",
+        "fieldKey": "skipped_commands",
+        "managed": true
+      }
+    },
+    "user_context_write_result": {
+      "name": "user_context_write_result",
+      "description": "USER.md 写回摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#1d4ed8",
+      "binding": {
+        "kind": "action_output",
+        "actionKey": "buddy_home_writer",
+        "nodeId": "write_user_context_updates",
+        "fieldKey": "result",
+        "managed": true
+      }
+    },
+    "review_context_report": {
+      "name": "review_context_report",
+      "description": "复盘上下文装载报告，说明 source_run_id、会话、消息和 state 来源。",
+      "type": "json",
+      "value": {},
+      "color": "#475569",
+      "binding": {
+        "kind": "tool_output",
+        "toolKey": "buddy_review_context_loader",
+        "nodeId": "load_review_context",
+        "fieldKey": "review_context_report",
         "managed": true
       }
     }
@@ -289,79 +501,6 @@
       "config": {
         "value": "",
         "boundaryType": "text"
-      }
-    },
-    "input_current_session_id": {
-      "kind": "input",
-      "name": "输入当前会话 ID",
-      "description": "",
-      "ui": {
-        "position": {
-          "x": 60,
-          "y": 430
-        },
-        "collapsed": false,
-        "size": {
-          "width": 430,
-          "height": 180
-        }
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "current_session_id",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": "",
-        "boundaryType": "text"
-      }
-    },
-    "input_user_message": {
-      "kind": "input",
-      "name": "用户消息",
-      "description": "",
-      "ui": {
-        "position": {
-          "x": 60,
-          "y": 800
-        },
-        "collapsed": false
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "user_message",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": "",
-        "boundaryType": "text"
-      }
-    },
-    "input_conversation_history": {
-      "kind": "input",
-      "name": "对话历史",
-      "description": "",
-      "ui": {
-        "position": {
-          "x": 60,
-          "y": 1170
-        },
-        "collapsed": false
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "conversation_history",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": "",
-        "boundaryType": "markdown"
       }
     },
     "input_buddy_context": {
@@ -394,98 +533,6 @@
           ]
         },
         "boundaryType": "file"
-      }
-    },
-    "input_request_understanding": {
-      "kind": "input",
-      "name": "请求理解",
-      "description": "",
-      "ui": {
-        "position": {
-          "x": 60,
-          "y": 1910
-        },
-        "collapsed": false
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "request_understanding",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": {},
-        "boundaryType": "json"
-      }
-    },
-    "input_capability_result": {
-      "kind": "input",
-      "name": "结果包",
-      "description": "",
-      "ui": {
-        "position": {
-          "x": 60,
-          "y": 2280
-        },
-        "collapsed": false
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "capability_result",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": {},
-        "boundaryType": "result_package"
-      }
-    },
-    "input_capability_review": {
-      "kind": "input",
-      "name": "能力复盘",
-      "description": "",
-      "ui": {
-        "position": {
-          "x": 60,
-          "y": 2650
-        },
-        "collapsed": false
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "capability_review",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": {},
-        "boundaryType": "json"
-      }
-    },
-    "input_public_response": {
-      "kind": "input",
-      "name": "最终回复",
-      "description": "",
-      "ui": {
-        "position": {
-          "x": 60,
-          "y": 3020
-        },
-        "collapsed": false
-      },
-      "reads": [],
-      "writes": [
-        {
-          "state": "public_response",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "value": "",
-        "boundaryType": "markdown"
       }
     },
     "recall_related_sessions": {
@@ -549,11 +596,11 @@
           "buddy_session_recall": {
             "actionKey": "buddy_session_recall",
             "title": "Autonomous review session recall instruction",
-            "content": "你已绑定 Buddy 会话召回 Action。本节点直接根据 source_run_id、current_session_id、user_message、conversation_history、request_understanding 和 public_response 生成一次只读召回参数。优先使用 discover；query 只包含稳定偏好、项目名、用户修正或可长期复用的关键词；limit 不超过 6，window 不超过 2，bookend 不超过 2，role_filter 使用 [\"user\",\"assistant\"]。保留 current_session_id 以排除当前会话谱系。只读取 buddy.db，不总结复盘、不写 MEMORY.md、不创建写回命令。",
+            "content": "根据 source_run_id、current_session_id、user_message、conversation_history、request_understanding 和 public_response 生成一次召回参数。关键词充分时使用 discover；关键词不足时使用 browse。query 聚焦稳定偏好、项目名、用户修正或可长期复用的关键词；limit 最大 6，window 最大 2，bookend 最大 2，role_filter 使用 [\"user\",\"assistant\"]。保留 current_session_id 以排除当前会话谱系。",
             "source": "node.override"
           }
         },
-        "taskInstruction": "本节点只调用 buddy_session_recall 一次。根据 source_run_id、current_session_id、user_message、conversation_history、request_understanding 和 public_response 生成 mode/query/limit/window/bookend/sort/role_filter/current_session_id 等召回参数。优先 discover；没有可靠关键词时 browse。不要生成记忆结论、写回计划或 Buddy Home 修改。",
+        "taskInstruction": "根据 source_run_id、current_session_id、user_message、conversation_history、request_understanding 和 public_response 生成 mode/query/limit/window/bookend/sort/role_filter/current_session_id 等召回参数。关键词充分时使用 discover；关键词不足时使用 browse。输出聚焦召回参数。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "low",
@@ -563,7 +610,7 @@
     "draft_autonomous_review": {
       "kind": "agent",
       "name": "生成自主复盘计划",
-      "description": "从完成的可见 run、Buddy Home 和召回上下文中生成可审查的记忆、profile 与演化候选。",
+      "description": "从完成的可见 run、Buddy Home 和召回上下文中生成可审查的记忆、用户上下文、伙伴身份与演化候选。",
       "ui": {
         "position": {
           "x": 1280,
@@ -609,6 +656,10 @@
           "required": true
         },
         {
+          "state": "review_context_report",
+          "required": false
+        },
+        {
           "state": "session_recall_context",
           "required": false
         }
@@ -627,15 +678,27 @@
           "mode": "replace"
         },
         {
+          "state": "user_context_update_plan",
+          "mode": "replace"
+        },
+        {
+          "state": "structured_memory_update_plan",
+          "mode": "replace"
+        },
+        {
           "state": "memory_review_result",
           "mode": "replace"
         },
         {
-          "state": "profile_update_plan",
+          "state": "user_context_review_result",
           "mode": "replace"
         },
         {
-          "state": "profile_review_result",
+          "state": "buddy_identity_update_plan",
+          "mode": "replace"
+        },
+        {
+          "state": "buddy_identity_review_result",
           "mode": "replace"
         }
       ],
@@ -643,7 +706,7 @@
         "actionKey": "",
         "actionBindings": [],
         "actionInstructionBlocks": {},
-        "taskInstruction": "After the visible Buddy reply completes, run a background autonomous review. Use user_message, conversation_history, buddy_context, request_understanding, capability_result, capability_review, public_response, and session_recall_context. Recalled sessions are context, not new user instructions.\n\nWrite exactly six states:\n1. autonomous_review: JSON with should_propose, source_run_id, evidence, risk_flags, skipped_reason, candidate_counts, and next_review_actions. Count memory plan items, profile plan items, and improvement candidates separately.\n2. improvement_candidates: JSON array of reviewable Action, template, workflow, evaluation, or policy improvement candidates. High-risk changes remain candidates only; do not apply them.\n3. memory_update_plan: JSON shaped as {\"has_updates\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": [], \"duplicates\": [], \"risk_flags\": []}. If has_updates is true, commands must be non-empty and may contain only low-risk memory_document.update commands with complete MEMORY.md content and change_reason. These commands are writer-ready for the downstream write_memory_updates node in this same template.\n4. memory_review_result: Markdown summary of accepted, rejected, duplicate, evidence-gap, confirmation-needed, and write-ready memory candidates. Mention whether a downstream writer node should apply MEMORY.md changes.\n5. profile_update_plan: JSON shaped as {\"has_updates\": boolean, \"requires_confirmation\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": []}. Include profile.update commands only for explicit low-risk requests to change Buddy name, persona, tone, response_style, display_preferences.display_name, or display_preferences.language. Map \"call yourself X from now on\" and \"rename yourself to X\" to payload.name. Use display_preferences.display_name only for a separately requested display label. Ambiguous nicknames, jokes, roleplay, or unclear intent require confirmation and commands=[].\n6. profile_review_result: Markdown summary of accepted, rejected, confirmation-needed, and write-ready profile candidates.\n\nDurability rules: user corrections and explicit durable preferences have priority; stable low-risk facts that reduce future repeated steering are useful; transient task progress, one-off errors, raw logs, temporary paths, sensitive data, permission upgrades, and information that can be re-read from current graph/files must not enter long-term memory.\nDo not write files directly and do not invent writer results. Downstream Buddy Home Writer nodes apply only low-risk commands from memory_update_plan.commands and profile_update_plan.commands, then produce auditable revisions.",
+        "taskInstruction": "可见 Buddy 回复完成后，执行后台自主复盘。使用 user_message、conversation_history、buddy_context、request_understanding、capability_result、capability_review、public_response、review_context_report 和 session_recall_context。当前 run 的用户消息、输出和 run record 是主要证据；召回会话作为辅助证据。\n\n先按写入目标矩阵归类候选：\n- SOUL.md / buddy_identity_update_plan: 用户明确调整 Buddy 名称、身份设定、语气、回复风格、显示名称或显示语言。Map \"call yourself X from now on\" and \"rename yourself to X\" to payload.name. Use display_preferences.display_name for a separately requested display label. Ambiguous nicknames, jokes, roleplay, or unclear intent go to requires_confirmation with commands=[].\n- USER.md / user_context_update_plan: 关于用户本人的稳定事实、长期偏好、称呼、时区、沟通方式、长期目标和反复出现的协作要求。\n- MEMORY.md / memory_update_plan: 每轮都适合注入的稳定上下文、项目级决策、长期有效的纠错、常用工作方式和跨会话经验。\n- 数据库结构化记忆 / structured_memory_update_plan: 适合未来按语义召回的事实、事件、选择依据、一次任务中的关键上下文；每条记录包含 source refs、confidence、salience、scope_kind、scope_id、layer、memory_type、title 和 content。\n- 复盘结果或改进候选 / autonomous_review、improvement_candidates、risk_flags: 临时进展、一次性错误、原始日志、较长运行细节、敏感信息、权限升级、可从项目或图运行重新读取的信息、能力改进建议、模板改进建议和需要人工确认的候选。\n\nWrite exactly nine states:\n1. autonomous_review: JSON with should_propose, source_run_id, evidence, risk_flags, skipped_reason, candidate_counts, storage_classification, and next_review_actions. Count MEMORY.md plan items, USER.md plan items, structured memory plan items, buddy identity plan items, and improvement candidates separately.\n2. improvement_candidates: JSON array of reviewable Action, template, workflow, evaluation, or policy improvement candidates. Put high-risk changes in this candidate list with risk_flags.\n3. memory_update_plan: JSON shaped as {\"has_updates\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": [], \"duplicates\": [], \"risk_flags\": []}. Commands are low-risk memory_document.update entries with complete MEMORY.md content and change_reason. Use this plan for stable, compact facts that should appear in Buddy Home context every run.\n4. user_context_update_plan: JSON shaped as {\"has_updates\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": [], \"duplicates\": [], \"risk_flags\": []}. Commands are low-risk user_context.update entries with complete USER.md content and change_reason. Use this plan for stable facts about the human, durable collaboration preferences, current long-horizon focus, and repeated corrections.\n5. structured_memory_update_plan: JSON shaped as {\"has_updates\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": [], \"duplicates\": [], \"risk_flags\": []}. Commands are memory_entry.create, memory_entry.update, or memory_entry.archive entries. Use this plan for recall-oriented facts with source refs, confidence, salience, scope_kind, scope_id, layer, memory_type, title, and content.\n6. memory_review_result: Markdown summary of accepted, rejected, duplicate, evidence-gap, confirmation-needed, MEMORY.md-ready, and structured-memory-ready candidates.\n7. user_context_review_result: Markdown summary of accepted, rejected, duplicate, evidence-gap, confirmation-needed, and USER.md-ready candidates.\n8. buddy_identity_update_plan: JSON shaped as {\"has_updates\": boolean, \"requires_confirmation\": boolean, \"commands\": [], \"accepted\": [], \"rejected\": []}. Include buddy_identity.update commands for explicit low-risk requests to change Buddy name, persona, tone, response_style, display_preferences.display_name, or display_preferences.language.\n9. buddy_identity_review_result: Markdown summary of accepted, rejected, confirmation-needed, and write-ready buddy identity candidates.\n\nDurability rules: user corrections and explicit durable preferences have priority; stable low-risk facts that reduce future repeated steering are useful. Downstream writer nodes apply the prepared command arrays and produce auditable revisions.",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "medium",
@@ -750,25 +813,25 @@
           "buddy_home_writer": {
             "actionKey": "buddy_home_writer",
             "title": "MEMORY.md writeback instruction",
-            "content": "你已绑定 Buddy Home Writer。只把 memory_update_plan.commands 原样作为 commands 输入；每条命令必须是 memory_document.update，并写入完整 MEMORY.md 内容。把 source_run_id 作为 run_id；不要新增命令、不要改写命令语义、不要触碰 MEMORY.md 以外的文件或策略。",
+            "content": "输入映射：commands 使用 memory_update_plan.commands，run_id 使用 source_run_id。每条命令类型为 memory_document.update，并携带完整 MEMORY.md 内容和 change_reason。",
             "source": "node.override"
           }
         },
-        "taskInstruction": "本节点只负责调用 buddy_home_writer。commands 必须来自 memory_update_plan.commands；run_id 必须来自 source_run_id。不要总结、扩展、重写或伪造写回结果。",
+        "taskInstruction": "生成 buddy_home_writer 输入：commands=memory_update_plan.commands，run_id=source_run_id。输出使用运行时返回的写入结果。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "low",
         "temperature": 0
       }
     },
-    "has_profile_updates": {
+    "has_structured_memory_updates": {
       "kind": "condition",
-      "name": "存在 Profile 更新?",
-      "description": "只有自主复盘明确准备低风险 profile.update 命令时才调用 Buddy Home Writer。",
+      "name": "存在结构化记忆更新?",
+      "description": "自主复盘准备结构化 memory_entry 命令时调用 Buddy Memory Writer。",
       "ui": {
         "position": {
           "x": 2000,
-          "y": 1120
+          "y": 1340
         },
         "collapsed": false,
         "size": {
@@ -778,7 +841,7 @@
       },
       "reads": [
         {
-          "state": "profile_update_plan",
+          "state": "structured_memory_update_plan",
           "required": true
         }
       ],
@@ -795,20 +858,20 @@
           "false": "false"
         },
         "rule": {
-          "source": "$state.profile_update_plan.has_updates",
+          "source": "$state.structured_memory_update_plan.has_updates",
           "operator": "==",
           "value": true
         }
       }
     },
-    "write_profile_updates": {
+    "write_structured_memory_updates": {
       "kind": "agent",
-      "name": "写入 Buddy profile 更新",
-      "description": "通过 Buddy Home Writer 应用 profile.update，并留下 revision。",
+      "name": "写入结构化召回记忆",
+      "description": "通过 Buddy Memory Writer 应用 memory_entry.* 命令，并留下 memory revision。",
       "ui": {
         "position": {
           "x": 2520,
-          "y": 1120
+          "y": 1300
         },
         "collapsed": false,
         "size": {
@@ -822,25 +885,141 @@
           "required": false
         },
         {
-          "state": "profile_update_plan",
+          "state": "structured_memory_update_plan",
           "required": true
         }
       ],
       "writes": [
         {
-          "state": "profile_write_success",
+          "state": "structured_memory_write_success",
           "mode": "replace"
         },
         {
-          "state": "applied_profile_commands",
+          "state": "applied_structured_memory_commands",
           "mode": "replace"
         },
         {
-          "state": "skipped_profile_commands",
+          "state": "skipped_structured_memory_commands",
           "mode": "replace"
         },
         {
-          "state": "profile_write_result",
+          "state": "written_structured_memories",
+          "mode": "replace"
+        },
+        {
+          "state": "structured_memory_write_result",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "actionKey": "buddy_memory_writer",
+        "actionBindings": [
+          {
+            "actionKey": "buddy_memory_writer",
+            "outputMapping": {
+              "success": "structured_memory_write_success",
+              "applied_commands": "applied_structured_memory_commands",
+              "skipped_commands": "skipped_structured_memory_commands",
+              "memories": "written_structured_memories",
+              "result": "structured_memory_write_result"
+            }
+          }
+        ],
+        "actionInstructionBlocks": {
+          "buddy_memory_writer": {
+            "actionKey": "buddy_memory_writer",
+            "title": "Structured memory write instruction",
+            "content": "输入映射：commands 使用 structured_memory_update_plan.commands，run_id 使用 source_run_id。命令类型为 memory_entry.create、memory_entry.update 或 memory_entry.archive，并携带 source refs、confidence、salience 和 change_reason。",
+            "source": "node.override"
+          }
+        },
+        "taskInstruction": "生成 buddy_memory_writer 输入：commands=structured_memory_update_plan.commands，run_id=source_run_id。输出使用运行时返回的结构化记忆写入结果。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "low",
+        "temperature": 0
+      }
+    },
+    "has_buddy_identity_updates": {
+      "kind": "condition",
+      "name": "存在伙伴身份更新?",
+      "description": "只有自主复盘明确准备低风险 buddy_identity.update 命令时才调用 Buddy Home Writer。",
+      "ui": {
+        "position": {
+          "x": 2000,
+          "y": 1700
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 250
+        }
+      },
+      "reads": [
+        {
+          "state": "buddy_identity_update_plan",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
+        "loopLimit": 1,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.buddy_identity_update_plan.has_updates",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "write_buddy_identity_updates": {
+      "kind": "agent",
+      "name": "写入伙伴身份设定更新",
+      "description": "通过 Buddy Home Writer 应用 buddy_identity.update，并留下 revision。",
+      "ui": {
+        "position": {
+          "x": 2520,
+          "y": 1680
+        },
+        "collapsed": false,
+        "size": {
+          "width": 460,
+          "height": 320
+        }
+      },
+      "reads": [
+        {
+          "state": "source_run_id",
+          "required": false
+        },
+        {
+          "state": "buddy_identity_update_plan",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "buddy_identity_write_success",
+          "mode": "replace"
+        },
+        {
+          "state": "applied_buddy_identity_commands",
+          "mode": "replace"
+        },
+        {
+          "state": "skipped_buddy_identity_commands",
+          "mode": "replace"
+        },
+        {
+          "state": "buddy_identity_write_result",
           "mode": "replace"
         }
       ],
@@ -850,22 +1029,133 @@
           {
             "actionKey": "buddy_home_writer",
             "outputMapping": {
-              "success": "profile_write_success",
-              "applied_commands": "applied_profile_commands",
-              "skipped_commands": "skipped_profile_commands",
-              "result": "profile_write_result"
+              "success": "buddy_identity_write_success",
+              "applied_commands": "applied_buddy_identity_commands",
+              "skipped_commands": "skipped_buddy_identity_commands",
+              "result": "buddy_identity_write_result"
             }
           }
         ],
         "actionInstructionBlocks": {
           "buddy_home_writer": {
             "actionKey": "buddy_home_writer",
-            "title": "Profile writeback instruction",
-            "content": "You are bound to Buddy Home Writer. Pass profile_update_plan.commands through as the commands input exactly as planned. Every command must be profile.update, and payload may only include name, persona, tone, response_style, display_preferences.display_name, or display_preferences.language. For rename/call-yourself writebacks, the planned payload must use name so the visible Buddy profile Name changes. Use source_run_id as run_id. Do not add commands, reinterpret command semantics, or touch MEMORY.md, policy, session_summary, or any other file.",
+            "title": "Buddy identity writeback instruction",
+            "content": "Input mapping: commands=buddy_identity_update_plan.commands, run_id=source_run_id. Each command type is buddy_identity.update. Payload fields are name, persona, tone, response_style, display_preferences.display_name, or display_preferences.language. For rename/call-yourself writebacks, use payload.name so the visible Buddy identity Name changes.",
             "source": "node.override"
           }
         },
-        "taskInstruction": "This node only calls buddy_home_writer. commands must come from profile_update_plan.commands; run_id must come from source_run_id. Do not summarize, expand, rewrite, or invent writeback results.",
+        "taskInstruction": "Build buddy_home_writer input: commands=buddy_identity_update_plan.commands and run_id=source_run_id. Use the runtime writer result as this node output.",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "low",
+        "temperature": 0
+      }
+    },
+    "has_user_context_updates": {
+      "kind": "condition",
+      "name": "存在 USER.md 更新?",
+      "description": "只有自主复盘明确准备低风险 user_context.update 命令时才调用 Buddy Home Writer。",
+      "ui": {
+        "position": {
+          "x": 2000,
+          "y": 980
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 250
+        }
+      },
+      "reads": [
+        {
+          "state": "user_context_update_plan",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
+        "loopLimit": 1,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.user_context_update_plan.has_updates",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "write_user_context_updates": {
+      "kind": "agent",
+      "name": "写入 USER.md 更新",
+      "description": "通过 Buddy Home Writer 应用 user_context.update，并留下 revision。",
+      "ui": {
+        "position": {
+          "x": 2520,
+          "y": 920
+        },
+        "collapsed": false,
+        "size": {
+          "width": 460,
+          "height": 320
+        }
+      },
+      "reads": [
+        {
+          "state": "source_run_id",
+          "required": false
+        },
+        {
+          "state": "user_context_update_plan",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "user_context_write_success",
+          "mode": "replace"
+        },
+        {
+          "state": "applied_user_context_commands",
+          "mode": "replace"
+        },
+        {
+          "state": "skipped_user_context_commands",
+          "mode": "replace"
+        },
+        {
+          "state": "user_context_write_result",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "actionKey": "buddy_home_writer",
+        "actionBindings": [
+          {
+            "actionKey": "buddy_home_writer",
+            "outputMapping": {
+              "success": "user_context_write_success",
+              "applied_commands": "applied_user_context_commands",
+              "skipped_commands": "skipped_user_context_commands",
+              "result": "user_context_write_result"
+            }
+          }
+        ],
+        "actionInstructionBlocks": {
+          "buddy_home_writer": {
+            "actionKey": "buddy_home_writer",
+            "title": "USER.md writeback instruction",
+            "content": "输入映射：commands 使用 user_context_update_plan.commands，run_id 使用 source_run_id。每条命令类型为 user_context.update，并携带完整 USER.md 内容和 change_reason。",
+            "source": "node.override"
+          }
+        },
+        "taskInstruction": "生成 buddy_home_writer 输入：commands=user_context_update_plan.commands，run_id=source_run_id。输出使用运行时返回的 USER.md 写入结果。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "low",
@@ -937,7 +1227,7 @@
       "ui": {
         "position": {
           "x": 3060,
-          "y": 1060
+          "y": 500
         },
         "collapsed": false,
         "size": {
@@ -959,6 +1249,35 @@
         "fileNameTemplate": ""
       }
     },
+    "output_user_context_review_result": {
+      "kind": "output",
+      "name": "USER.md 复盘结果",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 3060,
+          "y": 780
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 220
+        }
+      },
+      "reads": [
+        {
+          "state": "user_context_review_result",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
     "output_applied_memory_commands": {
       "kind": "output",
       "name": "已应用记忆写回",
@@ -966,7 +1285,7 @@
       "ui": {
         "position": {
           "x": 3060,
-          "y": 500
+          "y": 1060
         },
         "collapsed": false,
         "size": {
@@ -995,7 +1314,7 @@
       "ui": {
         "position": {
           "x": 3060,
-          "y": 780
+          "y": 1340
         },
         "collapsed": false,
         "size": {
@@ -1017,38 +1336,9 @@
         "fileNameTemplate": ""
       }
     },
-    "output_profile_review_result": {
+    "output_applied_user_context_commands": {
       "kind": "output",
-      "name": "Profile 复盘结果",
-      "description": "",
-      "ui": {
-        "position": {
-          "x": 3060,
-          "y": 1340
-        },
-        "collapsed": false,
-        "size": {
-          "width": 420,
-          "height": 220
-        }
-      },
-      "reads": [
-        {
-          "state": "profile_review_result",
-          "required": true
-        }
-      ],
-      "writes": [],
-      "config": {
-        "displayMode": "markdown",
-        "persistEnabled": false,
-        "persistFormat": "auto",
-        "fileNameTemplate": ""
-      }
-    },
-    "output_applied_profile_commands": {
-      "kind": "output",
-      "name": "已应用 Profile 写回",
+      "name": "已应用 USER.md 写回",
       "description": "",
       "ui": {
         "position": {
@@ -1063,7 +1353,7 @@
       },
       "reads": [
         {
-          "state": "applied_profile_commands",
+          "state": "applied_user_context_commands",
           "required": true
         }
       ],
@@ -1075,9 +1365,9 @@
         "fileNameTemplate": ""
       }
     },
-    "output_profile_write_result": {
+    "output_user_context_write_result": {
       "kind": "output",
-      "name": "Profile 写回摘要",
+      "name": "USER.md 写回摘要",
       "description": "",
       "ui": {
         "position": {
@@ -1092,7 +1382,7 @@
       },
       "reads": [
         {
-          "state": "profile_write_result",
+          "state": "user_context_write_result",
           "required": true
         }
       ],
@@ -1103,43 +1393,230 @@
         "persistFormat": "auto",
         "fileNameTemplate": ""
       }
+    },
+    "output_applied_structured_memory_commands": {
+      "kind": "output",
+      "name": "已应用结构化记忆",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 3060,
+          "y": 2180
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 220
+        }
+      },
+      "reads": [
+        {
+          "state": "applied_structured_memory_commands",
+          "required": false
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_structured_memory_write_result": {
+      "kind": "output",
+      "name": "结构化记忆写入摘要",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 3060,
+          "y": 2460
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 220
+        }
+      },
+      "reads": [
+        {
+          "state": "structured_memory_write_result",
+          "required": false
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_buddy_identity_review_result": {
+      "kind": "output",
+      "name": "伙伴身份复盘结果",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 3060,
+          "y": 2740
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 220
+        }
+      },
+      "reads": [
+        {
+          "state": "buddy_identity_review_result",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_applied_buddy_identity_commands": {
+      "kind": "output",
+      "name": "已应用伙伴身份写回",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 3060,
+          "y": 3020
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 220
+        }
+      },
+      "reads": [
+        {
+          "state": "applied_buddy_identity_commands",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_buddy_identity_write_result": {
+      "kind": "output",
+      "name": "伙伴身份写回摘要",
+      "description": "",
+      "ui": {
+        "position": {
+          "x": 3060,
+          "y": 3300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 420,
+          "height": 220
+        }
+      },
+      "reads": [
+        {
+          "state": "buddy_identity_write_result",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "load_review_context": {
+      "kind": "tool",
+      "name": "加载复盘上下文",
+      "description": "根据 source_run_id 从统一数据库恢复本轮复盘需要的源 run state。",
+      "ui": {
+        "position": {
+          "x": 700,
+          "y": -220
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "source_run_id",
+          "required": true,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "buddy_review_context_loader",
+            "fieldKey": "source_run_id",
+            "managed": true
+          }
+        }
+      ],
+      "writes": [
+        {
+          "state": "current_session_id",
+          "mode": "replace"
+        },
+        {
+          "state": "user_message",
+          "mode": "replace"
+        },
+        {
+          "state": "conversation_history",
+          "mode": "replace"
+        },
+        {
+          "state": "request_understanding",
+          "mode": "replace"
+        },
+        {
+          "state": "capability_result",
+          "mode": "replace"
+        },
+        {
+          "state": "capability_review",
+          "mode": "replace"
+        },
+        {
+          "state": "public_response",
+          "mode": "replace"
+        },
+        {
+          "state": "review_context_report",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "toolKey": "buddy_review_context_loader"
+      }
     }
   },
   "edges": [
     {
       "source": "input_source_run_id",
+      "target": "load_review_context"
+    },
+    {
+      "source": "load_review_context",
       "target": "recall_related_sessions"
     },
     {
-      "source": "input_current_session_id",
-      "target": "recall_related_sessions"
-    },
-    {
-      "source": "input_user_message",
-      "target": "recall_related_sessions"
-    },
-    {
-      "source": "input_conversation_history",
-      "target": "recall_related_sessions"
-    },
-    {
-      "source": "input_request_understanding",
-      "target": "recall_related_sessions"
-    },
-    {
-      "source": "input_public_response",
-      "target": "recall_related_sessions"
+      "source": "load_review_context",
+      "target": "draft_autonomous_review"
     },
     {
       "source": "input_buddy_context",
-      "target": "draft_autonomous_review"
-    },
-    {
-      "source": "input_capability_result",
-      "target": "draft_autonomous_review"
-    },
-    {
-      "source": "input_capability_review",
       "target": "draft_autonomous_review"
     },
     {
@@ -1156,11 +1633,19 @@
     },
     {
       "source": "draft_autonomous_review",
-      "target": "has_memory_updates"
+      "target": "output_memory_review_result"
     },
     {
       "source": "draft_autonomous_review",
-      "target": "has_profile_updates"
+      "target": "output_user_context_review_result"
+    },
+    {
+      "source": "draft_autonomous_review",
+      "target": "has_memory_updates"
+    },
+    {
+      "source": "write_memory_updates",
+      "target": "has_user_context_updates"
     },
     {
       "source": "write_memory_updates",
@@ -1171,12 +1656,36 @@
       "target": "output_memory_write_result"
     },
     {
-      "source": "write_profile_updates",
-      "target": "output_applied_profile_commands"
+      "source": "write_user_context_updates",
+      "target": "has_structured_memory_updates"
     },
     {
-      "source": "write_profile_updates",
-      "target": "output_profile_write_result"
+      "source": "write_user_context_updates",
+      "target": "output_applied_user_context_commands"
+    },
+    {
+      "source": "write_user_context_updates",
+      "target": "output_user_context_write_result"
+    },
+    {
+      "source": "write_structured_memory_updates",
+      "target": "has_buddy_identity_updates"
+    },
+    {
+      "source": "write_structured_memory_updates",
+      "target": "output_applied_structured_memory_commands"
+    },
+    {
+      "source": "write_structured_memory_updates",
+      "target": "output_structured_memory_write_result"
+    },
+    {
+      "source": "write_buddy_identity_updates",
+      "target": "output_applied_buddy_identity_commands"
+    },
+    {
+      "source": "write_buddy_identity_updates",
+      "target": "output_buddy_identity_write_result"
     }
   ],
   "conditional_edges": [
@@ -1184,16 +1693,32 @@
       "source": "has_memory_updates",
       "branches": {
         "true": "write_memory_updates",
-        "false": "output_memory_review_result",
-        "exhausted": "output_memory_review_result"
+        "false": "has_user_context_updates",
+        "exhausted": "has_user_context_updates"
       }
     },
     {
-      "source": "has_profile_updates",
+      "source": "has_user_context_updates",
       "branches": {
-        "true": "write_profile_updates",
-        "false": "output_profile_review_result",
-        "exhausted": "output_profile_review_result"
+        "true": "write_user_context_updates",
+        "false": "has_structured_memory_updates",
+        "exhausted": "has_structured_memory_updates"
+      }
+    },
+    {
+      "source": "has_structured_memory_updates",
+      "branches": {
+        "true": "write_structured_memory_updates",
+        "false": "has_buddy_identity_updates",
+        "exhausted": "has_buddy_identity_updates"
+      }
+    },
+    {
+      "source": "has_buddy_identity_updates",
+      "branches": {
+        "true": "write_buddy_identity_updates",
+        "false": "output_buddy_identity_review_result",
+        "exhausted": "output_buddy_identity_review_result"
       }
     }
   ],
@@ -1202,11 +1727,12 @@
     "origin": "buddy",
     "role": "buddy_autonomous_review",
     "englishName": "Autonomous Review",
-    "templateVersion": "2026-05-25",
+    "templateVersion": "2026-05-27",
     "capabilityDiscoverableDefault": false,
     "permissions": [
       "buddy_session_read",
-      "buddy_home_write"
+      "buddy_home_write",
+      "buddy_memory_write"
     ],
     "tags": [
       "buddy",
@@ -1215,15 +1741,24 @@
       "session-recall",
       "memory-plan",
       "evolution-plan",
-      "memory-writeback"
+      "memory-writeback",
+      "source-run-context"
     ],
     "requiredActions": [
       "buddy_session_recall",
-      "buddy_home_writer"
+      "buddy_home_writer",
+      "buddy_memory_writer"
     ],
     "requiredPermissions": [
       "buddy_session_read",
-      "buddy_home_write"
+      "buddy_home_write",
+      "buddy_memory_write"
+    ],
+    "buddyMemoryReviewRuntimeInputBindings": {
+      "input_source_run_id": "source_run_id"
+    },
+    "requiredTools": [
+      "buddy_review_context_loader"
     ]
   }
 }

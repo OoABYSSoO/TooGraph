@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "toograph.action/v1",
+  "actionKey": "buddy_memory_writer",
+  "name": "伙伴结构化记忆写入器",
+  "description": "当 Buddy 自主复盘已经产生低风险结构化记忆命令时使用；它写入 memory_entries，用于后续 FTS/embedding 召回，并保留可审计 command 与 memory revision。",
+  "llmInstruction": "根据上游复盘结果生成 commands 数组。命令集合限定为 memory_entry.create、memory_entry.update、memory_entry.archive。memory_entry.create 的 payload 包含 scope_kind、scope_id、layer、memory_type、title、content，可选 confidence、salience、sources、metadata。sources 引用原始事实来源，例如 buddy_message、graph_run、graph_output、retrieval_chunk 或 memory_entry。输出聚焦结构化记忆写入命令，用于 memory_entries 召回索引。",
+  "version": "1.0.0",
+  "timeoutSeconds": 30,
+  "permissions": ["buddy_memory_write"],
+  "metadata": {
+    "internal": true
+  },
+  "stateInputSchema": [
+    {
+      "key": "memory_review",
+      "name": "Memory Review",
+      "valueType": "json",
+      "description": "Buddy 自主复盘产生的结构化记忆写入计划，供 LLM 生成 memory_entry.* commands。"
+    }
+  ],
+  "llmOutputSchema": [
+    {
+      "key": "commands",
+      "name": "Commands",
+      "valueType": "json_array",
+      "description": "结构化记忆命令数组。每项包含 action、payload、可选 target_id、可选 change_reason。"
+    },
+    {
+      "key": "run_id",
+      "name": "Run ID",
+      "valueType": "text",
+      "description": "触发自主复盘的源运行 ID；没有可用 ID 时返回空字符串。"
+    }
+  ],
+  "stateOutputSchema": [
+    {
+      "key": "success",
+      "name": "Success",
+      "valueType": "boolean",
+      "description": "所有结构化记忆命令是否成功应用，且没有命令被安全边界拒绝。"
+    },
+    {
+      "key": "result",
+      "name": "Result",
+      "valueType": "markdown",
+      "description": "写入摘要。"
+    },
+    {
+      "key": "applied_commands",
+      "name": "Applied Commands",
+      "valueType": "json",
+      "description": "已执行命令及其结果、command 记录和 memory revision。"
+    },
+    {
+      "key": "skipped_commands",
+      "name": "Skipped Commands",
+      "valueType": "json",
+      "description": "因为无效、越权或执行失败而跳过的命令。"
+    },
+    {
+      "key": "memories",
+      "name": "Memories",
+      "valueType": "json",
+      "description": "本次创建、更新或归档后的 memory_entries。"
+    },
+    {
+      "key": "revisions",
+      "name": "Revisions",
+      "valueType": "json",
+      "description": "本次写入产生的 memory revision 列表。"
+    }
+  ]
+}

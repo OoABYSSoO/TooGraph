@@ -70,6 +70,43 @@ function template(): TemplateRecord {
   };
 }
 
+function runtimeBindingTemplate(): TemplateRecord {
+  const record = template();
+  record.state_schema.buddy_context = {
+    name: "buddy_context",
+    description: "Fixed Buddy Home context",
+    type: "file",
+    value: {
+      kind: "local_folder",
+      root: "buddy_home",
+      selected: ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
+    },
+    color: "#0f766e",
+  };
+  record.nodes.input_buddy_context = {
+    kind: "input",
+    name: "Buddy Home",
+    description: "Fixed Buddy Home input",
+    ui: { position: { x: 0, y: 360 } },
+    reads: [],
+    writes: [{ state: "buddy_context", mode: "replace" }],
+    config: {
+      boundaryType: "file",
+      value: {
+        kind: "local_folder",
+        root: "buddy_home",
+        selected: ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
+      },
+    },
+  };
+  record.metadata = {
+    buddyRuntimeInputBindings: {
+      input_prompt: "current_message",
+    },
+  };
+  return record;
+}
+
 function memoryReviewTemplate(): TemplateRecord {
   return {
     template_id: "buddy_autonomous_review",
@@ -84,6 +121,7 @@ function memoryReviewTemplate(): TemplateRecord {
       public_response: { name: "public_response", description: "", type: "markdown", value: "", color: "#16a34a" },
       buddy_context: { name: "buddy_context", description: "", type: "file", value: "", color: "#0f766e" },
       memory_update_plan: { name: "memory_update_plan", description: "", type: "json", value: {}, color: "#22c55e" },
+      structured_memory_update_plan: { name: "structured_memory_update_plan", description: "", type: "json", value: {}, color: "#14b8a6" },
     },
     nodes: {
       input_source_run_id: {
@@ -140,10 +178,25 @@ function memoryReviewTemplate(): TemplateRecord {
         writes: [{ state: "memory_update_plan", mode: "replace" }],
         config: { value: "" },
       },
+      input_structured_memory_update_plan: {
+        kind: "input",
+        name: "Structured Memory Update Plan",
+        description: "",
+        ui: { position: { x: 0, y: 720 } },
+        reads: [],
+        writes: [{ state: "structured_memory_update_plan", mode: "replace" }],
+        config: { value: "" },
+      },
     },
     edges: [],
     conditional_edges: [],
-    metadata: { role: "buddy_autonomous_review", internal: true },
+    metadata: {
+      role: "buddy_autonomous_review",
+      internal: true,
+      buddyMemoryReviewRuntimeInputBindings: {
+        input_source_run_id: "source_run_id",
+      },
+    },
   };
 }
 
@@ -221,6 +274,52 @@ test("binding model exposes Buddy input rows with current message required", () 
   ]);
 });
 
+test("binding model uses template runtime bindings when the template declares external Buddy inputs", () => {
+  const record = runtimeBindingTemplate();
+  const rows = buildBuddyRunTemplateSourceRows(
+    {
+      template_id: "custom_loop",
+      input_bindings: {},
+    },
+    record,
+  );
+
+  assert.deepEqual(rows.map((row) => [row.source, row.required, row.selectedNodeId]), [
+    ["current_message", true, "input_prompt"],
+  ]);
+
+  const options = buildBuddyRunInputNodeOptions(
+    record,
+    {
+      template_id: "custom_loop",
+      input_bindings: {
+        input_buddy_context: "buddy_home_context",
+      },
+    },
+    "current_message",
+  );
+
+  assert.deepEqual(options.map((option) => [option.value, option.disabled, option.disabledReason]), [
+    ["input_prompt", false, ""],
+  ]);
+
+  const valid = validateBuddyRunTemplateBinding(record, {
+    template_id: "custom_loop",
+    input_bindings: {},
+  });
+  assert.equal(valid.valid, true);
+
+  const extra = validateBuddyRunTemplateBinding(record, {
+    template_id: "custom_loop",
+    input_bindings: {
+      input_prompt: "current_message",
+      input_buddy_context: "buddy_home_context",
+    },
+  });
+  assert.equal(extra.valid, false);
+  assert.match(extra.issues.join("\n"), /not declared/);
+});
+
 test("binding model builds input-node options and disables nodes already used by another Buddy input", () => {
   const options = buildBuddyRunInputNodeOptions(
     template(),
@@ -282,8 +381,9 @@ test("binding model exposes source options and Buddy Home folder package", () =>
     selected: ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
   });
   assert.deepEqual(buildDefaultBuddyRunTemplateBinding().input_bindings.input_user_message, "current_message");
-  assert.deepEqual(buildDefaultBuddyRunTemplateBinding().input_bindings.input_existing_session_summary, "session_summary");
-  assert.deepEqual(buildDefaultBuddyRunTemplateBinding().input_bindings.input_current_session_id, "current_session_id");
+  assert.deepEqual(buildDefaultBuddyRunTemplateBinding().input_bindings, {
+    input_user_message: "current_message",
+  });
   const defaultRunSources = new Set<string>(Object.values(buildDefaultBuddyRunTemplateBinding().input_bindings));
   assert.equal(defaultRunSources.has("page_context"), false);
   assert.equal(defaultRunSources.has("raw_conversation_history"), false);
@@ -291,77 +391,51 @@ test("binding model exposes source options and Buddy Home folder package", () =>
 
 test("memory review binding model exposes required automatic source rows", () => {
   const binding = buildDefaultBuddyMemoryReviewTemplateBinding();
-  const rows = buildBuddyMemoryReviewTemplateSourceRows(binding);
+  const rows = buildBuddyMemoryReviewTemplateSourceRows(binding, memoryReviewTemplate());
 
   assert.equal(binding.template_id, "buddy_autonomous_review");
   assert.deepEqual(rows.map((row) => [row.source, row.required, row.selectedNodeId]), [
     ["source_run_id", true, "input_source_run_id"],
-    ["current_session_id", true, "input_current_session_id"],
-    ["user_message", true, "input_user_message"],
-    ["public_response", true, "input_public_response"],
-    ["buddy_home_context", true, "input_buddy_context"],
-    ["conversation_history", false, "input_conversation_history"],
-    ["request_understanding", false, "input_request_understanding"],
-    ["capability_result", false, "input_capability_result"],
-    ["capability_review", false, "input_capability_review"],
   ]);
 });
 
-test("memory review binding validation requires core sources and rejects internal output states", () => {
+test("memory review binding validation follows template runtime input declarations", () => {
   const good = validateBuddyMemoryReviewTemplateBinding(memoryReviewTemplate(), {
     template_id: "buddy_autonomous_review",
     input_bindings: {
       input_source_run_id: "source_run_id",
-      input_current_session_id: "current_session_id",
-      input_user_message: "user_message",
-      input_public_response: "public_response",
-      input_buddy_context: "buddy_home_context",
     },
   });
   assert.equal(good.valid, true);
 
   const missing = validateBuddyMemoryReviewTemplateBinding(memoryReviewTemplate(), {
     template_id: "buddy_autonomous_review",
-    input_bindings: {
-      input_source_run_id: "source_run_id",
-      input_user_message: "user_message",
-      input_public_response: "public_response",
-      input_buddy_context: "buddy_home_context",
-    },
+    input_bindings: {},
   });
   assert.equal(missing.valid, false);
-  assert.match(missing.issues.join("\n"), /current_session_id/);
+  assert.match(missing.issues.join("\n"), /source_run_id/);
 
-  const internal = validateBuddyMemoryReviewTemplateBinding(memoryReviewTemplate(), {
+  const extra = validateBuddyMemoryReviewTemplateBinding(memoryReviewTemplate(), {
     template_id: "buddy_autonomous_review",
     input_bindings: {
       input_source_run_id: "source_run_id",
-      input_current_session_id: "current_session_id",
       input_user_message: "user_message",
-      input_public_response: "public_response",
-      input_buddy_context: "buddy_home_context",
-      input_memory_update_plan: "memory_update_plan",
     },
   });
-  assert.equal(internal.valid, false);
-  assert.match(internal.issues.join("\n"), /Unsupported Buddy memory review input source/);
+  assert.equal(extra.valid, false);
+  assert.match(extra.issues.join("\n"), /not declared/);
 });
 
 test("memory review binding model updates source rows without duplication", () => {
   const initial = buildDefaultBuddyMemoryReviewTemplateBinding();
 
-  const moved = setBuddyMemoryReviewTemplateSourceBinding(initial, "current_session_id", "input_user_message");
-  assert.equal(moved.input_bindings.input_user_message, "current_session_id");
-  assert.equal(Object.values(moved.input_bindings).includes("user_message"), false);
+  const moved = setBuddyMemoryReviewTemplateSourceBinding(initial, "source_run_id", "input_user_message");
+  assert.equal(moved.input_bindings.input_user_message, "source_run_id");
+  assert.equal(Object.values(moved.input_bindings).filter((source) => source === "source_run_id").length, 1);
 
-  const options = buildBuddyMemoryReviewInputNodeOptions(memoryReviewTemplate(), moved, "user_message");
+  const options = buildBuddyMemoryReviewInputNodeOptions(memoryReviewTemplate(), moved, "source_run_id");
   assert.deepEqual(options.map((option) => [option.value, option.disabled, option.disabledReason]), [
-    ["input_source_run_id", true, "Already bound to source_run_id."],
-    ["input_current_session_id", false, ""],
-    ["input_user_message", true, "Already bound to current_session_id."],
-    ["input_public_response", true, "Already bound to public_response."],
-    ["input_buddy_context", true, "Already bound to buddy_home_context."],
-    ["input_memory_update_plan", true, "State is produced inside the memory review graph."],
+    ["input_source_run_id", false, ""],
   ]);
   assert.deepEqual(BUDDY_MEMORY_REVIEW_INPUT_SOURCE_OPTIONS.map((option) => option.value).slice(0, 3), [
     "",

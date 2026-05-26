@@ -218,6 +218,11 @@ test("EditorWorkspaceShell wires node top-action events into state updates, node
   assert.match(componentSource, /@reorder-port-state="reorderNodePortStateForTab\(tab\.tabId, \$event\.nodeId, \$event\.side, \$event\.stateKey, \$event\.targetIndex\)"/);
   assert.match(componentSource, /@disconnect-data-edge="disconnectDataEdgeForTab\(tab\.tabId, \$event\.sourceNodeId, \$event\.targetNodeId, \$event\.stateKey, \$event\.mode\)"/);
   assert.match(componentSource, /@delete-node="deleteNodeForTab\(tab\.tabId, \$event\.nodeId\)"/);
+  assert.match(componentSource, /@delete-selection="deleteNodesForTab\(tab\.tabId, \$event\.nodeIds\)"/);
+  assert.match(componentSource, /@copy-selection="copyCanvasSelectionForTab\(tab\.tabId, \$event\.nodeIds\)"/);
+  assert.match(componentSource, /@paste-selection="pasteCanvasSelectionForTab\(tab\.tabId\)"/);
+  assert.match(componentSource, /@undo="undoCanvasEditForTab\(tab\.tabId\)"/);
+  assert.match(componentSource, /@redo="redoCanvasEditForTab\(tab\.tabId\)"/);
   assert.match(componentSource, /@save-node-preset="saveNodePresetForTab\(tab\.tabId, \$event\.nodeId\)"/);
   assert.match(graphMutationActionsSource, /function updateNodeMetadataForTab\(tabId: string, nodeId: string, patch: Partial<Pick<GraphNode, "name" \| "description">>\)/);
   assert.match(graphMutationActionsSource, /function removeNodePortStateForTab\(tabId: string, nodeId: string, side: "input" \| "output", stateKey: string\)/);
@@ -225,6 +230,7 @@ test("EditorWorkspaceShell wires node top-action events into state updates, node
   assert.match(graphMutationActionsSource, /reorderNodePortStateInDocument\(document, nodeId, side, stateKey, targetIndex\)/);
   assert.match(graphMutationActionsSource, /function disconnectDataEdgeForTab\(tabId: string, sourceNodeId: string, targetNodeId: string, stateKey: string, mode: "state" \| "flow"\)/);
   assert.match(graphMutationActionsSource, /function deleteNodeForTab\(tabId: string, nodeId: string\)/);
+  assert.match(graphMutationActionsSource, /function deleteNodesForTab\(tabId: string, nodeIds: string\[\]\)/);
   assert.match(componentSource, /const \{ saveNodePresetForTab \} = useWorkspacePresetController\(\{/);
   assert.match(componentSource, /useWorkspacePresetController\(\{[\s\S]*documentsByTabId,[\s\S]*persistedPresets,[\s\S]*savePreset,[\s\S]*fetchPreset,[\s\S]*showPresetSaveToast,[\s\S]*translate: \(key, params\) => t\(key, params \?\? \{\}\),[\s\S]*\}\);/);
   assert.match(presetControllerSource, /buildPresetPayloadForNode\(toRaw\(document\), nodeId\)/);
@@ -242,11 +248,11 @@ test("EditorWorkspaceShell delegates graph mutation actions to a workspace compo
   assert.match(componentSource, /import \{ useWorkspaceGraphMutationActions \} from "\.\/useWorkspaceGraphMutationActions\.ts";/);
   assert.match(
     componentSource,
-    /const \{[\s\S]*addStateReaderBinding,[\s\S]*removeStateReaderBinding,[\s\S]*addStateWriterBinding,[\s\S]*bindNodePortStateForTab,[\s\S]*createNodePortStateForTab,[\s\S]*deleteNodeForTab,[\s\S]*connectStateBindingForTab,[\s\S]*connectStateInputSourceForTab,[\s\S]*deleteStateField,[\s\S]*removeStateWriterBinding,[\s\S]*\} = useWorkspaceGraphMutationActions\(\{/,
+    /const \{[\s\S]*addStateReaderBinding,[\s\S]*removeStateReaderBinding,[\s\S]*addStateWriterBinding,[\s\S]*bindNodePortStateForTab,[\s\S]*createNodePortStateForTab,[\s\S]*deleteNodeForTab,[\s\S]*deleteNodesForTab,[\s\S]*connectStateBindingForTab,[\s\S]*connectStateInputSourceForTab,[\s\S]*deleteStateField,[\s\S]*removeStateWriterBinding,[\s\S]*\} = useWorkspaceGraphMutationActions\(\{/,
   );
   assert.match(
     componentSource,
-    /useWorkspaceGraphMutationActions\(\{[\s\S]*documentsByTabId,[\s\S]*focusedNodeIdByTabId,[\s\S]*markDocumentDirty,[\s\S]*focusNodeForTab,[\s\S]*setMessageFeedbackForTab,[\s\S]*showStateDeleteBlockedToast,[\s\S]*openCreatedStateEdgeEditorForTab,[\s\S]*translate: t,[\s\S]*\}\);/,
+    /useWorkspaceGraphMutationActions\(\{[\s\S]*documentsByTabId,[\s\S]*focusedNodeIdByTabId,[\s\S]*markDocumentDirty: markDocumentDirtyWithHistoryForTab,[\s\S]*focusNodeForTab,[\s\S]*setMessageFeedbackForTab,[\s\S]*showStateDeleteBlockedToast,[\s\S]*openCreatedStateEdgeEditorForTab,[\s\S]*translate: t,[\s\S]*\}\);/,
   );
   assert.match(graphMutationActionsSource, /export function useWorkspaceGraphMutationActions\(/);
   assert.match(graphMutationActionsSource, /function commitDocumentMutationForTab\(/);
@@ -332,7 +338,7 @@ test("EditorWorkspaceShell routes menu selections and dropped files through the 
     componentSource,
     /const \{[\s\S]*createNodeFromFileForTab,[\s\S]*createNodeFromMenuForTab,[\s\S]*nodeCreationEntriesForTab,[\s\S]*nodeCreationMenuState,[\s\S]*openCreatedStateEdgeEditorForTab,[\s\S]*openNodeCreationMenuForTab,[\s\S]*updateNodeCreationQuery,[\s\S]*\} = useWorkspaceNodeCreationController\(\{/,
   );
-  assert.match(componentSource, /useWorkspaceNodeCreationController\(\{[\s\S]*documentsByTabId,[\s\S]*dataEdgeStateEditorRequestByTabId,[\s\S]*nodeCreationMenuByTabId,[\s\S]*persistedPresets,[\s\S]*guardGraphEditForTab,[\s\S]*markDocumentDirty,[\s\S]*setMessageFeedbackForTab,[\s\S]*importPythonGraphFile,[\s\S]*isTooGraphPythonExportFile,[\s\S]*\}\);/);
+  assert.match(componentSource, /useWorkspaceNodeCreationController\(\{[\s\S]*documentsByTabId,[\s\S]*dataEdgeStateEditorRequestByTabId,[\s\S]*nodeCreationMenuByTabId,[\s\S]*persistedPresets,[\s\S]*guardGraphEditForTab,[\s\S]*markDocumentDirty: markDocumentDirtyWithHistoryForTab,[\s\S]*setMessageFeedbackForTab,[\s\S]*importPythonGraphFile,[\s\S]*isTooGraphPythonExportFile,[\s\S]*\}\);/);
   assert.match(nodeCreationControllerSource, /const result = createNodeFromCreationEntry\(document, \{/);
   assert.match(nodeCreationControllerSource, /const BATCH_FILE_NODE_OFFSET = \{[\s\S]*x: 36,[\s\S]*y: 132,[\s\S]*\} as const;/);
   assert.match(nodeCreationControllerSource, /function listDroppedFiles\(payload: \{ file\?: File \| null; files\?: readonly File\[\] \| null \}\)/);
@@ -765,7 +771,7 @@ test("EditorWorkspaceShell returns graph edit playback plans and applies explici
   assert.match(componentSource, /const plan = buildGraphEditPlaybackPlan\(document, \{ operations: detail\.graphEditIntents \}\);/);
   assert.match(componentSource, /detail\.response = \{[\s\S]*ok: plan\.valid,[\s\S]*graphCommands: plan\.graphCommands,[\s\S]*playbackSteps: plan\.playbackSteps,[\s\S]*issues: plan\.issues,[\s\S]*\};/);
   assert.match(componentSource, /const nextDocument = applyGraphEditCommandToDocument\(document, command\);/);
-  assert.match(componentSource, /if \(nextDocument !== document\) \{[\s\S]*markDocumentDirty\(tab\.tabId, nextDocument\);[\s\S]*\}/);
+  assert.match(componentSource, /if \(nextDocument !== document\) \{[\s\S]*markDocumentDirtyWithHistoryForTab\(tab\.tabId, nextDocument\);[\s\S]*\}/);
   assert.match(componentSource, /const saveResponse = await saveGraph\(documentToSave, \{[\s\S]*revisionContext: \{[\s\S]*actor: "buddy",[\s\S]*run_id: detail\.runId \?\? "",[\s\S]*node_id: detail\.nodeId \?\? "",[\s\S]*reason: detail\.reason \?\? `Persist Buddy graph edit playback \(\$\{detail\.requestId\}\)\.`,[\s\S]*\},[\s\S]*\}\);/);
   assert.match(componentSource, /graphId: saveResponse\.graph_id,/);
   assert.match(componentSource, /revisionId: saveResponse\.revision_id,/);
@@ -888,8 +894,8 @@ test("EditorWorkspaceShell centralizes dirty graph document commits", () => {
   assert.match(commitSource, /applyDocumentMetaToWorkspaceTab\(input\.workspace\.value, tabId, \{/);
   assert.match(commitSource, /dirty: true,/);
   assert.match(markDocumentDirtySource, /commitDirtyDocumentForTab\(tabId, nextDocument\);/);
-  assert.match(positionSource, /input\.commitDirtyDocumentForTab\(tabId, nextDocument\);/);
-  assert.match(sizeSource, /input\.commitDirtyDocumentForTab\(tabId, nextDocument\);/);
+  assert.match(positionSource, /input\.commitDirtyDocumentForTab\(tabId, nextDocument, \{ historyMergeKey: `node-position:\$\{payload\.nodeId\}` \}\);/);
+  assert.match(sizeSource, /input\.commitDirtyDocumentForTab\(tabId, nextDocument, \{ historyMergeKey: `node-size:\$\{payload\.nodeId\}` \}\);/);
   assert.match(renameSource, /input\.commitDirtyDocumentForTab\(tab\.tabId, nextDocument\);/);
   assert.doesNotMatch(positionSource, /updateWorkspace\(/);
   assert.doesNotMatch(sizeSource, /updateWorkspace\(/);

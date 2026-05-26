@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 import sys
 from typing import Any
 
@@ -126,7 +128,35 @@ def _text_length(value: Any) -> int:
 
 
 def _text(value: Any) -> str:
-    return value.strip() if isinstance(value, str) else str(value or "").strip()
+    if isinstance(value, str):
+        return value.strip()
+    expanded = _expand_context_assembly_ref_text(value)
+    if expanded is not None:
+        return expanded.strip()
+    return str(value or "").strip()
+
+
+def _expand_context_assembly_ref_text(value: Any) -> str | None:
+    if not isinstance(value, dict) or value.get("kind") != "context_assembly_ref":
+        return None
+    try:
+        repo_root = _repo_root()
+        backend_path = repo_root / "backend"
+        if str(backend_path) not in sys.path:
+            sys.path.insert(0, str(backend_path))
+        from app.core.storage.context_assembly_store import expand_context_assembly_ref
+
+        expanded = expand_context_assembly_ref(value)
+        return str(expanded.get("text") or "")
+    except Exception:
+        return None
+
+
+def _repo_root() -> Path:
+    configured = os.environ.get("TOOGRAPH_REPO_ROOT")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return Path(__file__).resolve().parents[3]
 
 
 def main() -> None:

@@ -67,8 +67,8 @@ test("buildBuddyRevisionHistoryRows keeps legacy revisions visible without comma
     [
       {
         revision_id: "rev_legacy",
-        target_type: "profile",
-        target_id: "profile",
+        target_type: "buddy_identity",
+        target_id: "buddy_identity",
         operation: "update",
         previous_value: { name: "Old" },
         next_value: { name: "New" },
@@ -90,8 +90,8 @@ test("buildBuddyRevisionHistoryRows includes compact field-level diff entries", 
     [
       {
         revision_id: "rev_diff",
-        target_type: "profile",
-        target_id: "profile",
+        target_type: "buddy_identity",
+        target_id: "buddy_identity",
         operation: "update",
         previous_value: {
           name: "Old Buddy",
@@ -106,7 +106,7 @@ test("buildBuddyRevisionHistoryRows includes compact field-level diff entries", 
           response_style: "结论优先。",
         },
         changed_by: "user",
-        change_reason: "Manual profile update.",
+        change_reason: "Manual identity update.",
         created_at: "2026-05-12T01:00:00Z",
       },
     ],
@@ -145,14 +145,14 @@ test("filterBuddyRevisionHistoryRows narrows history by target type without reor
   const rows = buildBuddyRevisionHistoryRows(
     [
       {
-        revision_id: "rev_profile",
-        target_type: "profile",
-        target_id: "profile",
+        revision_id: "rev_buddy_identity",
+        target_type: "buddy_identity",
+        target_id: "buddy_identity",
         operation: "update",
         previous_value: { name: "Old" },
         next_value: { name: "New" },
         changed_by: "user",
-        change_reason: "Manual profile update.",
+        change_reason: "Manual identity update.",
         created_at: "2026-05-12T03:00:00Z",
       },
       {
@@ -187,7 +187,7 @@ test("filterBuddyRevisionHistoryRows narrows history by target type without reor
   );
   assert.deepEqual(
     filterBuddyRevisionHistoryRows(rows, "all").map((row) => row.revision_id),
-    ["rev_memory_newer", "rev_profile", "rev_memory_older"],
+    ["rev_memory_newer", "rev_buddy_identity", "rev_memory_older"],
   );
 });
 

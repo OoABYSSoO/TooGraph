@@ -10,19 +10,17 @@ from typing import Any
 
 ALLOWED_ACTIONS = {
     "memory_document.update",
+    "user_context.update",
     "session_summary.update",
-    "profile.update",
-    "policy.update",
+    "buddy_identity.update",
     "capability_usage_stats.update",
 }
-POLICY_PERMISSION_FIELDS = {"behavior_boundaries", "graph_permission_mode"}
-POLICY_AUTONOMOUS_ALLOWED_FIELDS = {"communication_preferences"}
-PROFILE_RENAME_INTENT_MARKERS = (
+IDENTITY_RENAME_INTENT_MARKERS = (
     "call yourself",
     "rename yourself",
     "your name",
-    "profile name",
-    "visible profile name",
+    "buddy identity name",
+    "visible buddy name",
     "\u4ee5\u540e\u5c31\u53eb",
     "\u4ee5\u540e\u53eb",
     "\u6539\u540d",
@@ -152,13 +150,8 @@ def _normalize_command(
         or payload_change_reason
         or "Buddy autonomous review applied a safe Buddy Home writeback."
     )
-    if action == "profile.update":
-        payload = _normalize_profile_update_payload(payload, change_reason=command_change_reason)
-    if action == "policy.update":
-        policy_error = _validate_policy_update_payload(payload)
-        if policy_error:
-            return {}, {"index": index, "action": action, **policy_error}
-
+    if action == "buddy_identity.update":
+        payload = _normalize_buddy_identity_update_payload(payload, change_reason=command_change_reason)
     normalized = {
         "action": action,
         "payload": payload,
@@ -173,7 +166,7 @@ def _normalize_command(
     return normalized, None
 
 
-def _normalize_profile_update_payload(payload: dict[str, Any], *, change_reason: str) -> dict[str, Any]:
+def _normalize_buddy_identity_update_payload(payload: dict[str, Any], *, change_reason: str) -> dict[str, Any]:
     normalized = deepcopy(payload)
     if "name" in normalized or _looks_like_display_name_only_intent(change_reason):
         return normalized
@@ -181,41 +174,19 @@ def _normalize_profile_update_payload(payload: dict[str, Any], *, change_reason:
     if not isinstance(display_preferences, dict):
         return normalized
     display_name = _as_text(display_preferences.get("display_name")).strip()
-    if display_name and _looks_like_profile_rename_intent(change_reason):
+    if display_name and _looks_like_buddy_identity_rename_intent(change_reason):
         normalized["name"] = display_name
     return normalized
 
 
-def _looks_like_profile_rename_intent(value: str) -> bool:
+def _looks_like_buddy_identity_rename_intent(value: str) -> bool:
     text = value.lower()
-    return any(marker in text for marker in PROFILE_RENAME_INTENT_MARKERS)
+    return any(marker in text for marker in IDENTITY_RENAME_INTENT_MARKERS)
 
 
 def _looks_like_display_name_only_intent(value: str) -> bool:
     text = value.lower()
     return any(marker in text for marker in DISPLAY_NAME_ONLY_MARKERS)
-
-
-def _contains_permission_boundary_change(payload: dict[str, Any]) -> bool:
-    return any(field in payload for field in POLICY_PERMISSION_FIELDS)
-
-
-def _validate_policy_update_payload(payload: dict[str, Any]) -> dict[str, str] | None:
-    if _contains_permission_boundary_change(payload):
-        return {
-            "error_type": "permission_boundary",
-            "error": "Autonomous Buddy Home writeback cannot change permission or behavior boundary policy fields.",
-        }
-    unsupported_fields = sorted(set(payload) - POLICY_AUTONOMOUS_ALLOWED_FIELDS)
-    if unsupported_fields:
-        return {
-            "error_type": "unsupported_policy_field",
-            "error": (
-                "Autonomous Buddy Home policy writeback only supports communication_preferences; "
-                f"unsupported fields: {', '.join(unsupported_fields)}"
-            ),
-        }
-    return None
 
 
 def _result_text(applied_commands: list[dict[str, Any]], skipped_commands: list[dict[str, Any]]) -> str:

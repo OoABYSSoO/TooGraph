@@ -44,7 +44,9 @@ test("buddy capability loop maps selector needs_capability and uses ordinary gra
     readFileSync(resolve("graph_template/official/buddy_autonomous_loop/template.json"), "utf8"),
   );
   const selector = template.nodes.reply_and_select_capability;
-  const condition = template.nodes.needs_capability_condition;
+  const condition = Object.values(template.nodes).find(
+    (node) => node.kind === "condition" && node.config?.rule?.source === "$state.needs_capability",
+  );
 
   assert.equal(
     template.state_schema.needs_capability.binding.fieldKey,
@@ -61,7 +63,10 @@ test("buddy capability loop maps selector needs_capability and uses ordinary gra
   assert.equal(selector.reads.some((read) => read.state === "capability_result"), true);
   assert.equal(selector.reads.some((read) => read.state === "capability_trace"), true);
   assert.equal(selector.reads.some((read) => read.state === "current_session_id"), true);
-  assert.equal(condition.name, "需要调用能力?");
+  assert.equal(template.metadata.buddyRuntimeInputBindings.input_user_message, "current_message");
+  assert.equal(template.nodes.load_history_context.config.toolKey, "buddy_history_context_loader");
+  assert.equal(template.nodes.input_conversation_history, undefined);
+  assert.equal(condition.name, "是否需要继续调用能力");
   assert.equal(condition.config.rule.source, "$state.needs_capability");
   assert.equal(template.state_schema.should_call_capability, undefined);
   assert.equal(template.state_schema.capability_found, undefined);

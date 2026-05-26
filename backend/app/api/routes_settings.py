@@ -12,8 +12,6 @@ from app.core.model_catalog import (
     resolve_runtime_model_name,
 )
 from app.core.model_provider_templates import get_provider_template, normalize_transport
-from app.buddy.home import POLICY_PATH, get_default_buddy_home_dir
-from app.core.storage.json_file_utils import read_json_file
 from app.core.storage.settings_store import load_app_settings, save_app_settings
 from app.tools.local_llm import (
     get_default_agent_temperature,
@@ -148,14 +146,6 @@ def _normalize_buddy_runtime_settings(value: object) -> dict[str, str]:
     }
 
 
-def _read_legacy_buddy_policy_permission_mode() -> str:
-    policy_path = get_default_buddy_home_dir() / POLICY_PATH
-    policy = read_json_file(policy_path, default={})
-    if not isinstance(policy, dict):
-        return BUDDY_PERMISSION_MODE_DEFAULT
-    return normalize_buddy_permission_mode(policy.get("graph_permission_mode"))
-
-
 def get_saved_buddy_runtime_settings(settings: dict | None = None) -> dict[str, str]:
     source = settings if isinstance(settings, dict) else load_app_settings()
     raw_runtime = source.get("buddy_runtime")
@@ -163,7 +153,7 @@ def get_saved_buddy_runtime_settings(settings: dict | None = None) -> dict[str, 
         return _normalize_buddy_runtime_settings(raw_runtime)
     if "buddy_permission_mode" in source:
         return {"permission_mode": normalize_buddy_permission_mode(source.get("buddy_permission_mode"))}
-    return {"permission_mode": _read_legacy_buddy_policy_permission_mode()}
+    return {"permission_mode": BUDDY_PERMISSION_MODE_DEFAULT}
 
 
 def save_buddy_runtime_settings(payload: BuddyRuntimeSettingsPayload) -> dict[str, str]:

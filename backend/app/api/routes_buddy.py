@@ -93,29 +93,24 @@ class BuddyMemoryDocumentPayload(BuddyUpdatePayload):
     content: str = Field(min_length=1)
 
 
-@router.get("/profile")
-def get_profile_endpoint() -> dict[str, Any]:
-    return store.load_profile()
+@router.get("/identity")
+def get_identity_endpoint() -> dict[str, Any]:
+    return store.load_buddy_identity()
 
 
-@router.put("/profile")
-def update_profile_endpoint(payload: BuddyUpdatePayload) -> dict[str, Any]:
-    return store.save_profile(payload.data(), changed_by="user", change_reason=payload.change_reason)
-
-
-@router.get("/policy")
-def get_policy_endpoint() -> dict[str, Any]:
-    return store.load_policy()
-
-
-@router.put("/policy")
-def update_policy_endpoint(payload: BuddyUpdatePayload) -> dict[str, Any]:
-    return store.save_policy(payload.data(), changed_by="user", change_reason=payload.change_reason)
+@router.put("/identity")
+def update_identity_endpoint(payload: BuddyUpdatePayload) -> dict[str, Any]:
+    return store.save_buddy_identity(payload.data(), changed_by="user", change_reason=payload.change_reason)
 
 
 @router.get("/memory-document")
 def get_memory_document_endpoint() -> dict[str, Any]:
     return store.load_memory_document()
+
+
+@router.get("/user-context")
+def get_user_context_endpoint() -> dict[str, Any]:
+    return store.load_user_context_document()
 
 
 @router.get("/home-files")
@@ -127,6 +122,14 @@ def list_home_files_endpoint() -> dict[str, Any]:
 def update_memory_document_endpoint(payload: BuddyMemoryDocumentPayload) -> dict[str, Any]:
     try:
         return store.save_memory_document(payload.data(), changed_by="user", change_reason=payload.change_reason)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.put("/user-context")
+def update_user_context_endpoint(payload: BuddyMemoryDocumentPayload) -> dict[str, Any]:
+    try:
+        return store.save_user_context_document(payload.data(), changed_by="user", change_reason=payload.change_reason)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

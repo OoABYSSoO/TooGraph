@@ -140,6 +140,11 @@
                 @bind-port-state="bindNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.stateKey)"
                 @create-port-state="createNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.field)"
                 @delete-node="deleteNodeForTab(tab.tabId, $event.nodeId)"
+                @delete-selection="deleteNodesForTab(tab.tabId, $event.nodeIds)"
+                @copy-selection="copyCanvasSelectionForTab(tab.tabId, $event.nodeIds)"
+                @paste-selection="pasteCanvasSelectionForTab(tab.tabId)"
+                @undo="undoCanvasEditForTab(tab.tabId)"
+                @redo="redoCanvasEditForTab(tab.tabId)"
                 @save-node-preset="saveNodePresetForTab(tab.tabId, $event.nodeId)"
                 @connect-state="connectStateBindingForTab(tab.tabId, $event)"
                 @connect-state-input-source="connectStateInputSourceForTab(tab.tabId, $event)"
@@ -475,6 +480,18 @@ import {
   parseGraphReplayTargetJson,
   type GraphReplayTargetCompileResult,
 } from "./graphReplayTargetModel.ts";
+import {
+  createCanvasClipboardPayload,
+  pasteCanvasClipboardPayload,
+  type CanvasClipboardPayload,
+} from "./canvasClipboardModel.ts";
+import {
+  createCanvasDocumentHistory,
+  recordCanvasDocumentHistory,
+  redoCanvasDocumentHistory,
+  undoCanvasDocumentHistory,
+  type CanvasDocumentHistory,
+} from "./canvasHistoryModel.ts";
 import { useWorkspaceDocumentState } from "./useWorkspaceDocumentState.ts";
 import { useWorkspaceEditGuardController } from "./useWorkspaceEditGuardController.ts";
 import { useWorkspaceGraphPersistenceController } from "./useWorkspaceGraphPersistenceController.ts";
@@ -533,6 +550,8 @@ const selectedNodeIdsByTabId = ref<Record<string, string[]>>({});
 const focusRequestByTabId = ref<Record<string, NodeFocusRequest | null>>({});
 const viewportByTabId = ref<Record<string, CanvasViewport>>({});
 const dataEdgeStateEditorRequestByTabId = ref<Record<string, DataEdgeStateEditorRequest | null>>({});
+const canvasClipboardPayload = ref<CanvasClipboardPayload | null>(null);
+const canvasHistoryByTabId = ref<Record<string, CanvasDocumentHistory>>({});
 const runNodeStatusByTabId = ref<Record<string, Record<string, string>>>({});
 const runNodeTimingByTabId = ref<Record<string, RunNodeTimingByNodeId>>({});
 const currentRunNodeIdByTabId = ref<Record<string, string | null>>({});
@@ -942,14 +961,7 @@ const activeBuddyEditorSnapshot = computed(() => {
     feedback: feedbackForTab(tab.tabId),
   };
 });
-const {
-  registerDocumentForTab,
-  ensureTabViewportDrafts,
-  updateCanvasViewportForTab,
-  persistRunStateValuesForTab,
-  commitDirtyDocumentForTab,
-  markDocumentDirty,
-} = useWorkspaceDocumentState({
+const documentStateController = useWorkspaceDocumentState({
   workspace,
   documentsByTabId,
   loadingByTabId,
@@ -960,10 +972,156 @@ const {
   setMessageFeedbackForTab,
   guardGraphEditForTab,
 });
+const {
+  ensureTabViewportDrafts,
+  updateCanvasViewportForTab,
+  persistRunStateValuesForTab,
+} = documentStateController;
+
+type CanvasHistoryCommitOptions = {
+  historyMergeKey?: string | null;
+};
+
+function registerDocumentForTab(tabId: string, graph: GraphPayload | GraphDocument) {
+  resetCanvasHistoryForTab(tabId);
+  documentStateController.registerDocumentForTab(tabId, graph);
+}
+
+function commitDirtyDocumentForTab(tabId: string, nextDocument: GraphPayload | GraphDocument) {
+  documentStateController.commitDirtyDocumentForTab(tabId, nextDocument);
+}
+
+function markDocumentDirty(tabId: string, nextDocument: GraphPayload | GraphDocument) {
+  documentStateController.markDocumentDirty(tabId, nextDocument);
+}
+
+function markDocumentDirtyWithHistoryForTab(
+  tabId: string,
+  nextDocument: GraphPayload | GraphDocument,
+  options: CanvasHistoryCommitOptions = {},
+) {
+  if (guardGraphEditForTab(tabId)) {
+    return;
+  }
+  commitDirtyDocumentWithHistoryForTab(tabId, nextDocument, options);
+}
+
+function commitDirtyDocumentWithHistoryForTab(
+  tabId: string,
+  nextDocument: GraphPayload | GraphDocument,
+  options: CanvasHistoryCommitOptions = {},
+) {
+  const previousDocument = documentsByTabId.value[tabId] ?? null;
+  if (previousDocument && nextDocument !== previousDocument) {
+    canvasHistoryByTabId.value = {
+      ...canvasHistoryByTabId.value,
+      [tabId]: recordCanvasDocumentHistory(resolveCanvasHistoryForTab(tabId), previousDocument, {
+        mergeKey: options.historyMergeKey ?? null,
+      }),
+    };
+  }
+  commitDirtyDocumentForTab(tabId, nextDocument);
+}
+
+function resetCanvasHistoryForTab(tabId: string) {
+  if (!canvasHistoryByTabId.value[tabId]) {
+    return;
+  }
+  const nextHistory = { ...canvasHistoryByTabId.value };
+  delete nextHistory[tabId];
+  canvasHistoryByTabId.value = nextHistory;
+}
+
+function resolveCanvasHistoryForTab(tabId: string) {
+  return canvasHistoryByTabId.value[tabId] ?? createCanvasDocumentHistory();
+}
+
+function copyCanvasSelectionForTab(tabId: string, nodeIds: string[]) {
+  const document = documentsByTabId.value[tabId] ?? null;
+  if (!document) {
+    return;
+  }
+  const payload = createCanvasClipboardPayload(document, nodeIds);
+  if (!payload) {
+    setMessageFeedbackForTab(tabId, {
+      tone: "neutral",
+      message: "No selected nodes to copy.",
+    });
+    return;
+  }
+  canvasClipboardPayload.value = payload;
+  setMessageFeedbackForTab(tabId, {
+    tone: "neutral",
+    message: `Copied ${payload.nodeIds.length} node${payload.nodeIds.length === 1 ? "" : "s"}.`,
+  });
+}
+
+function pasteCanvasSelectionForTab(tabId: string) {
+  if (guardGraphEditForTab(tabId)) {
+    return;
+  }
+  const document = documentsByTabId.value[tabId] ?? null;
+  const payload = canvasClipboardPayload.value;
+  if (!document || !payload) {
+    setMessageFeedbackForTab(tabId, {
+      tone: "neutral",
+      message: "Nothing to paste.",
+    });
+    return;
+  }
+
+  const result = pasteCanvasClipboardPayload(document, payload);
+  markDocumentDirtyWithHistoryForTab(tabId, result.document);
+  selectNodesForTab(tabId, { focusedNodeId: result.focusedNodeId, nodeIds: result.pastedNodeIds });
+  setMessageFeedbackForTab(tabId, {
+    tone: "neutral",
+    message: `Pasted ${result.pastedNodeIds.length} node${result.pastedNodeIds.length === 1 ? "" : "s"}.`,
+  });
+}
+
+function undoCanvasEditForTab(tabId: string) {
+  applyCanvasHistoryStepForTab(tabId, "undo");
+}
+
+function redoCanvasEditForTab(tabId: string) {
+  applyCanvasHistoryStepForTab(tabId, "redo");
+}
+
+function applyCanvasHistoryStepForTab(tabId: string, direction: "undo" | "redo") {
+  if (guardGraphEditForTab(tabId)) {
+    return;
+  }
+  const document = documentsByTabId.value[tabId] ?? null;
+  if (!document) {
+    return;
+  }
+  const history = resolveCanvasHistoryForTab(tabId);
+  const result = direction === "undo"
+    ? undoCanvasDocumentHistory(history, document)
+    : redoCanvasDocumentHistory(history, document);
+  canvasHistoryByTabId.value = {
+    ...canvasHistoryByTabId.value,
+    [tabId]: result.history,
+  };
+  if (!result.document) {
+    setMessageFeedbackForTab(tabId, {
+      tone: "neutral",
+      message: direction === "undo" ? "Nothing to undo." : "Nothing to redo.",
+    });
+    return;
+  }
+
+  commitDirtyDocumentForTab(tabId, result.document);
+  selectNodesForTab(tabId, { focusedNodeId: null, nodeIds: [] });
+  setMessageFeedbackForTab(tabId, {
+    tone: "neutral",
+    message: direction === "undo" ? "Undid the last canvas edit." : "Redid the canvas edit.",
+  });
+}
 const workspaceEditGuardController = useWorkspaceEditGuardController({
   documentsByTabId,
   latestRunDetailByTabId,
-  commitDirtyDocumentForTab,
+  commitDirtyDocumentForTab: commitDirtyDocumentWithHistoryForTab,
   showLockedEditToast: () => {
     ElMessage({
       customClass: "editor-workspace-shell__locked-toast",
@@ -1284,7 +1442,7 @@ const {
   persistedPresets,
   templates: graphTemplates,
   guardGraphEditForTab,
-  markDocumentDirty,
+  markDocumentDirty: markDocumentDirtyWithHistoryForTab,
   setMessageFeedbackForTab,
   importPythonGraphFile,
   isTooGraphPythonExportFile,
@@ -1510,7 +1668,7 @@ function handleGraphEditPlaybackApplyCommand(event: Event) {
   const nextDocument = applyGraphEditCommandToDocument(document, command);
   const diff = nextDocument !== document ? buildGraphEditPlaybackDocumentDiff(document, nextDocument) : [];
   if (nextDocument !== document) {
-    markDocumentDirty(tab.tabId, nextDocument);
+    markDocumentDirtyWithHistoryForTab(tab.tabId, nextDocument);
   }
   detail.response = {
     ok: true,
@@ -1625,6 +1783,7 @@ const {
   disconnectDataEdgeForTab,
   createNodePortStateForTab,
   deleteNodeForTab,
+  deleteNodesForTab,
   connectFlowNodesForTab,
   connectStateBindingForTab,
   connectStateInputSourceForTab,
@@ -1654,7 +1813,7 @@ const {
   focusedNodeIdByTabId,
   actionDefinitions,
   toolDefinitions,
-  markDocumentDirty,
+  markDocumentDirty: markDocumentDirtyWithHistoryForTab,
   focusNodeForTab,
   setMessageFeedbackForTab,
   showStateDeleteBlockedToast,

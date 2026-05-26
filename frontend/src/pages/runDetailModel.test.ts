@@ -523,9 +523,9 @@ test("buildRunAggregatedTimeline summarizes Buddy Home writeback activity", () =
             skipped_commands: [
               {
                 index: 1,
-                action: "policy.update",
-                error_type: "permission_boundary",
-                error: "Autonomous Buddy Home writeback cannot change permission or behavior boundary policy fields.",
+                action: "report.create",
+                error_type: "unsupported_action",
+                error: "Unsupported Buddy Home writeback action: report.create",
               },
             ],
           },
@@ -539,7 +539,7 @@ test("buildRunAggregatedTimeline summarizes Buddy Home writeback activity", () =
 
   assert.equal(item?.label, "Buddy Home writeback");
   assert.deepEqual(item?.artifactLabels, ["applied: 1", "skipped: 1", "revisions: rev_memory_1"]);
-  assert.match(item?.detailText ?? "", /permission_boundary/);
+  assert.match(item?.detailText ?? "", /unsupported_action/);
   assert.match(item?.detailText ?? "", /rev_memory_1/);
 });
 

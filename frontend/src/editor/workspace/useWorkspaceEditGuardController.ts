@@ -10,7 +10,7 @@ type WorkspaceEditGuardControllerInput = {
   documentsByTabId: Ref<Record<string, GraphDraft>>;
   latestRunDetailByTabId: Ref<Record<string, RunDetail | null>>;
   showLockedEditToast: () => void;
-  commitDirtyDocumentForTab: (tabId: string, nextDocument: GraphDraft) => void;
+  commitDirtyDocumentForTab: (tabId: string, nextDocument: GraphDraft, options?: { historyMergeKey?: string | null }) => void;
 };
 
 export function useWorkspaceEditGuardController(input: WorkspaceEditGuardControllerInput) {
@@ -41,7 +41,7 @@ export function useWorkspaceEditGuardController(input: WorkspaceEditGuardControl
 
     const nextDocument = cloneGraphDocument(document);
     nextDocument.nodes[payload.nodeId].ui.position = payload.position;
-    input.commitDirtyDocumentForTab(tabId, nextDocument);
+    input.commitDirtyDocumentForTab(tabId, nextDocument, { historyMergeKey: `node-position:${payload.nodeId}` });
   }
 
   function handleNodeSizeUpdate(tabId: string, payload: { nodeId: string; position: GraphPosition; size: GraphNodeSize }) {
@@ -56,7 +56,7 @@ export function useWorkspaceEditGuardController(input: WorkspaceEditGuardControl
     const nextDocument = cloneGraphDocument(document);
     nextDocument.nodes[payload.nodeId].ui.position = payload.position;
     nextDocument.nodes[payload.nodeId].ui.size = payload.size;
-    input.commitDirtyDocumentForTab(tabId, nextDocument);
+    input.commitDirtyDocumentForTab(tabId, nextDocument, { historyMergeKey: `node-size:${payload.nodeId}` });
   }
 
   return {

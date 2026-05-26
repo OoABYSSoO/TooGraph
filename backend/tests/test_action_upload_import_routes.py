@@ -173,6 +173,7 @@ class ActionUploadImportRouteTests(unittest.TestCase):
                     sorted(
                         [
                             "buddy_home_writer",
+                            "buddy_memory_writer",
                             "toograph_script_tester",
                             "toograph_graph_template_reader",
                             "toograph_graph_template_validator",

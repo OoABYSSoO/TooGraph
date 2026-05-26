@@ -64,8 +64,8 @@ const unavailableActionDefinitions: ActionDefinition[] = [
   actionDefinitions[0],
   {
     ...actionDefinitions[1],
-    actionKey: "desktop_buddy_profile",
-    name: "Desktop Buddy Profile",
+    actionKey: "desktop_buddy_identity",
+    name: "Desktop Buddy Identity",
   },
   {
     ...actionDefinitions[1],
@@ -91,7 +91,7 @@ const unavailableActionDefinitions: ActionDefinition[] = [
 test("listSelectableActionDefinitions exposes active runtime-ready LLM node actions", () => {
   assert.deepEqual(
     listSelectableActionDefinitions(unavailableActionDefinitions).map((definition) => definition.actionKey),
-    ["web_search", "desktop_buddy_profile"],
+    ["web_search", "desktop_buddy_identity"],
   );
 });
 

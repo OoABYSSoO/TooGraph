@@ -29,7 +29,7 @@ function createTemplate(): TemplateRecord {
       state_1: { name: "user_message", description: "", type: "text", value: "", color: "#9a3412" },
       state_2: { name: "conversation_history", description: "", type: "markdown", value: "", color: "#0f766e" },
       state_4: { name: "buddy_reply", description: "", type: "markdown", value: "", color: "#d97706" },
-      state_6: { name: "buddy_profile", description: "", type: "markdown", value: "", color: "#a855f7" },
+      state_6: { name: "buddy_identity", description: "", type: "markdown", value: "", color: "#a855f7" },
       state_7: { name: "buddy_policy", description: "", type: "markdown", value: "", color: "#dc2626" },
       state_8: { name: "buddy_memory_context", description: "", type: "markdown", value: "", color: "#059669" },
       state_9: { name: "buddy_session_summary", description: "", type: "markdown", value: "", color: "#4f46e5" },
@@ -53,9 +53,9 @@ function createTemplate(): TemplateRecord {
         writes: [{ state: "state_2", mode: "replace" }],
         config: { value: "" },
       },
-      input_buddy_profile: {
+      input_buddy_identity: {
         kind: "input",
-        name: "input_buddy_profile",
+        name: "input_buddy_identity",
         description: "",
         ui: { position: { x: 80, y: 1680 }, collapsed: false },
         reads: [],
@@ -131,7 +131,7 @@ function createTemplate(): TemplateRecord {
     edges: [
       { source: "input_user_message", target: "buddy_reply_agent" },
       { source: "input_conversation_history", target: "buddy_reply_agent" },
-      { source: "input_buddy_profile", target: "buddy_reply_agent" },
+      { source: "input_buddy_identity", target: "buddy_reply_agent" },
       { source: "input_buddy_policy", target: "buddy_reply_agent" },
       { source: "input_buddy_memory_context", target: "buddy_reply_agent" },
       { source: "input_buddy_session_summary", target: "buddy_reply_agent" },
@@ -215,6 +215,64 @@ function createAgenticTemplate(): TemplateRecord {
   };
 }
 
+function createRuntimeBoundTemplate(): TemplateRecord {
+  return {
+    template_id: "buddy_autonomous_loop",
+    label: "伙伴自主循环",
+    description: "Runtime-bound Buddy loop",
+    default_graph_name: "伙伴自主循环",
+    status: "active",
+    state_schema: {
+      user_message: { name: "user_message", description: "", type: "text", value: "", color: "#d97706" },
+      buddy_context: {
+        name: "buddy_context",
+        description: "",
+        type: "file",
+        value: {
+          kind: "local_folder",
+          root: "buddy_home",
+          selected: ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
+        },
+        color: "#0f766e",
+      },
+    },
+    nodes: {
+      input_user_message: {
+        kind: "input",
+        name: "用户消息",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "user_message", mode: "replace" }],
+        config: { value: "" },
+      },
+      input_buddy_context: {
+        kind: "input",
+        name: "Buddy Home",
+        description: "",
+        ui: { position: { x: 0, y: 160 } },
+        reads: [],
+        writes: [{ state: "buddy_context", mode: "replace" }],
+        config: {
+          boundaryType: "file",
+          value: {
+            kind: "local_folder",
+            root: "buddy_home",
+            selected: ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
+          },
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {
+      buddyRuntimeInputBindings: {
+        input_user_message: "current_message",
+      },
+    },
+  };
+}
+
 function createReviewTemplate(): TemplateRecord {
   return {
     template_id: "buddy_autonomous_review",
@@ -226,8 +284,18 @@ function createReviewTemplate(): TemplateRecord {
       source_run_id: { name: "source_run_id", description: "", type: "text", value: "", color: "#475569" },
       current_session_id: { name: "current_session_id", description: "", type: "text", value: "", color: "#475569" },
       user_message: { name: "user_message", description: "", type: "text", value: "", color: "#d97706" },
-      conversation_history: { name: "conversation_history", description: "", type: "markdown", value: "", color: "#64748b" },
-      buddy_context: { name: "buddy_context", description: "", type: "file", value: "", color: "#0f766e" },
+      conversation_history: { name: "conversation_history", description: "", type: "json", value: {}, color: "#64748b" },
+      buddy_context: {
+        name: "buddy_context",
+        description: "",
+        type: "file",
+        value: {
+          kind: "local_folder",
+          root: "buddy_home",
+          selected: ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
+        },
+        color: "#0f766e",
+      },
       request_understanding: { name: "request_understanding", description: "", type: "json", value: {}, color: "#16a34a" },
       capability_result: { name: "capability_result", description: "", type: "result_package", value: {}, color: "#0284c7" },
       capability_review: { name: "capability_review", description: "", type: "json", value: {}, color: "#0f766e" },
@@ -235,17 +303,29 @@ function createReviewTemplate(): TemplateRecord {
       autonomous_review: { name: "autonomous_review", description: "", type: "json", value: {}, color: "#9333ea" },
       improvement_candidates: { name: "improvement_candidates", description: "", type: "json", value: [], color: "#7c3aed" },
       memory_update_plan: { name: "memory_update_plan", description: "", type: "json", value: { has_updates: true, commands: [{ action: "stale" }] }, color: "#22c55e" },
+      user_context_update_plan: { name: "user_context_update_plan", description: "", type: "json", value: { has_updates: true, commands: [{ action: "stale" }] }, color: "#2563eb" },
+      structured_memory_update_plan: { name: "structured_memory_update_plan", description: "", type: "json", value: { has_updates: true, commands: [{ action: "stale" }] }, color: "#14b8a6" },
       memory_review_result: { name: "memory_review_result", description: "", type: "markdown", value: "stale", color: "#0369a1" },
+      user_context_review_result: { name: "user_context_review_result", description: "", type: "markdown", value: "stale", color: "#1d4ed8" },
       memory_write_success: { name: "memory_write_success", description: "", type: "boolean", value: true, color: "#16a34a" },
       applied_memory_commands: { name: "applied_memory_commands", description: "", type: "json", value: [{ action: "stale" }], color: "#059669" },
       skipped_memory_commands: { name: "skipped_memory_commands", description: "", type: "json", value: [{ action: "stale" }], color: "#dc2626" },
       memory_write_result: { name: "memory_write_result", description: "", type: "markdown", value: "stale", color: "#15803d" },
-      profile_update_plan: { name: "profile_update_plan", description: "", type: "json", value: { has_updates: true, commands: [{ action: "stale" }], requires_confirmation: true }, color: "#f97316" },
-      profile_review_result: { name: "profile_review_result", description: "", type: "markdown", value: "stale", color: "#c2410c" },
-      profile_write_success: { name: "profile_write_success", description: "", type: "boolean", value: true, color: "#ea580c" },
-      applied_profile_commands: { name: "applied_profile_commands", description: "", type: "json", value: [{ action: "stale" }], color: "#f97316" },
-      skipped_profile_commands: { name: "skipped_profile_commands", description: "", type: "json", value: [{ action: "stale" }], color: "#dc2626" },
-      profile_write_result: { name: "profile_write_result", description: "", type: "markdown", value: "stale", color: "#ea580c" },
+      user_context_write_success: { name: "user_context_write_success", description: "", type: "boolean", value: true, color: "#2563eb" },
+      applied_user_context_commands: { name: "applied_user_context_commands", description: "", type: "json", value: [{ action: "stale" }], color: "#1d4ed8" },
+      skipped_user_context_commands: { name: "skipped_user_context_commands", description: "", type: "json", value: [{ action: "stale" }], color: "#dc2626" },
+      user_context_write_result: { name: "user_context_write_result", description: "", type: "markdown", value: "stale", color: "#1d4ed8" },
+      structured_memory_write_success: { name: "structured_memory_write_success", description: "", type: "boolean", value: true, color: "#0d9488" },
+      applied_structured_memory_commands: { name: "applied_structured_memory_commands", description: "", type: "json", value: [{ action: "stale" }], color: "#0f766e" },
+      skipped_structured_memory_commands: { name: "skipped_structured_memory_commands", description: "", type: "json", value: [{ action: "stale" }], color: "#b91c1c" },
+      written_structured_memories: { name: "written_structured_memories", description: "", type: "json", value: [{ memory_id: "stale" }], color: "#0f766e" },
+      structured_memory_write_result: { name: "structured_memory_write_result", description: "", type: "markdown", value: "stale", color: "#0d9488" },
+      buddy_identity_update_plan: { name: "buddy_identity_update_plan", description: "", type: "json", value: { has_updates: true, commands: [{ action: "stale" }], requires_confirmation: true }, color: "#f97316" },
+      buddy_identity_review_result: { name: "buddy_identity_review_result", description: "", type: "markdown", value: "stale", color: "#c2410c" },
+      buddy_identity_write_success: { name: "buddy_identity_write_success", description: "", type: "boolean", value: true, color: "#ea580c" },
+      applied_buddy_identity_commands: { name: "applied_buddy_identity_commands", description: "", type: "json", value: [{ action: "stale" }], color: "#f97316" },
+      skipped_buddy_identity_commands: { name: "skipped_buddy_identity_commands", description: "", type: "json", value: [{ action: "stale" }], color: "#dc2626" },
+      buddy_identity_write_result: { name: "buddy_identity_write_result", description: "", type: "markdown", value: "stale", color: "#ea580c" },
     },
     nodes: {
       input_source_run_id: {
@@ -291,7 +371,14 @@ function createReviewTemplate(): TemplateRecord {
         ui: { position: { x: 80, y: 360 }, collapsed: false },
         reads: [],
         writes: [{ state: "buddy_context", mode: "replace" }],
-        config: { value: "" },
+        config: {
+          boundaryType: "file",
+          value: {
+            kind: "local_folder",
+            root: "buddy_home",
+            selected: ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
+          },
+        },
       },
       decide_autonomous_review: {
         kind: "agent",
@@ -306,6 +393,7 @@ function createReviewTemplate(): TemplateRecord {
           { state: "autonomous_review", mode: "replace" },
           { state: "improvement_candidates", mode: "replace" },
           { state: "memory_update_plan", mode: "replace" },
+          { state: "structured_memory_update_plan", mode: "replace" },
         ],
         config: {
           actionKey: "",
@@ -358,7 +446,13 @@ function createReviewTemplate(): TemplateRecord {
       { source: "input_public_response", target: "decide_autonomous_review" },
     ],
     conditional_edges: [],
-    metadata: { internal: true, role: "buddy_autonomous_review" },
+    metadata: {
+      internal: true,
+      role: "buddy_autonomous_review",
+      buddyMemoryReviewRuntimeInputBindings: {
+        input_source_run_id: "source_run_id",
+      },
+    },
   };
 }
 
@@ -367,10 +461,6 @@ function createMemoryReviewBinding(): BuddyMemoryReviewTemplateBinding {
     template_id: "buddy_autonomous_review",
     input_bindings: {
       input_source_run_id: "source_run_id",
-      input_current_session_id: "current_session_id",
-      input_user_message: "user_message",
-      input_public_response: "public_response",
-      input_buddy_context: "buddy_home_context",
     },
   };
 }
@@ -650,9 +740,9 @@ test("buildBuddyReviewGraph hydrates an internal autonomous review run from the 
   assert.equal(graph.metadata.buddy_parent_run_id, "run_visible_1");
   assert.equal(graph.metadata.internal, true);
   assert.equal(graph.state_schema.source_run_id.value, "run_visible_1");
-  assert.equal(graph.state_schema.current_session_id.value, "session_live_1");
-  assert.equal(graph.state_schema.user_message.value, "你好");
-  assert.equal(graph.state_schema.public_response.value, "你好，我在。");
+  assert.equal(graph.state_schema.current_session_id.value, "");
+  assert.equal(graph.state_schema.user_message.value, "");
+  assert.equal(graph.state_schema.public_response.value, "");
   assert.deepEqual(graph.state_schema.buddy_context.value, {
     kind: "local_folder",
     root: "buddy_home",
@@ -661,26 +751,32 @@ test("buildBuddyReviewGraph hydrates an internal autonomous review run from the 
   assert.deepEqual(graph.state_schema.autonomous_review.value, {});
   assert.deepEqual(graph.state_schema.improvement_candidates.value, []);
   assert.deepEqual(graph.state_schema.memory_update_plan.value, { has_updates: false, commands: [] });
+  assert.deepEqual(graph.state_schema.user_context_update_plan.value, { has_updates: false, commands: [] });
+  assert.deepEqual(graph.state_schema.structured_memory_update_plan.value, { has_updates: false, commands: [] });
   assert.equal(graph.state_schema.memory_review_result.value, "");
+  assert.equal(graph.state_schema.user_context_review_result.value, "");
   assert.equal(graph.state_schema.memory_write_success.value, false);
   assert.deepEqual(graph.state_schema.applied_memory_commands.value, []);
   assert.deepEqual(graph.state_schema.skipped_memory_commands.value, []);
   assert.equal(graph.state_schema.memory_write_result.value, "");
-  assert.deepEqual(graph.state_schema.profile_update_plan.value, { has_updates: false, requires_confirmation: false, commands: [] });
-  assert.equal(graph.state_schema.profile_review_result.value, "");
-  assert.equal(graph.state_schema.profile_write_success.value, false);
-  assert.deepEqual(graph.state_schema.applied_profile_commands.value, []);
-  assert.deepEqual(graph.state_schema.skipped_profile_commands.value, []);
-  assert.equal(graph.state_schema.profile_write_result.value, "");
+  assert.equal(graph.state_schema.user_context_write_success.value, false);
+  assert.deepEqual(graph.state_schema.applied_user_context_commands.value, []);
+  assert.deepEqual(graph.state_schema.skipped_user_context_commands.value, []);
+  assert.equal(graph.state_schema.user_context_write_result.value, "");
+  assert.equal(graph.state_schema.structured_memory_write_success.value, false);
+  assert.deepEqual(graph.state_schema.applied_structured_memory_commands.value, []);
+  assert.deepEqual(graph.state_schema.skipped_structured_memory_commands.value, []);
+  assert.deepEqual(graph.state_schema.written_structured_memories.value, []);
+  assert.equal(graph.state_schema.structured_memory_write_result.value, "");
+  assert.deepEqual(graph.state_schema.buddy_identity_update_plan.value, { has_updates: false, requires_confirmation: false, commands: [] });
+  assert.equal(graph.state_schema.buddy_identity_review_result.value, "");
+  assert.equal(graph.state_schema.buddy_identity_write_success.value, false);
+  assert.deepEqual(graph.state_schema.applied_buddy_identity_commands.value, []);
+  assert.deepEqual(graph.state_schema.skipped_buddy_identity_commands.value, []);
+  assert.equal(graph.state_schema.buddy_identity_write_result.value, "");
   assert.equal(graph.state_schema.writeback_commands, undefined);
   assertInputNode(graph.nodes.input_source_run_id);
-  assertInputNode(graph.nodes.input_current_session_id);
-  assertInputNode(graph.nodes.input_user_message);
-  assertInputNode(graph.nodes.input_public_response);
   assert.equal(graph.nodes.input_source_run_id.config.value, "run_visible_1");
-  assert.equal(graph.nodes.input_current_session_id.config.value, "session_live_1");
-  assert.equal(graph.nodes.input_user_message.config.value, "你好");
-  assert.equal(graph.nodes.input_public_response.config.value, "你好，我在。");
   assertAgentNode(graph.nodes.decide_autonomous_review);
   assert.equal(graph.nodes.decide_autonomous_review.config.modelSource, "override");
   assert.equal(graph.nodes.decide_autonomous_review.config.model, "openai/gpt-4.1");
@@ -755,6 +851,36 @@ test("buildBuddyChatGraph injects only configured input-node bindings", () => {
   assertAgentNode(graph.nodes.buddy_reply_agent);
   assert.equal(graph.nodes.buddy_reply_agent.config.actionKey, "graph_editor");
   assert.deepEqual(graph.nodes.buddy_reply_agent.config.actionBindings, [{ actionKey: "graph_editor", enabled: true }]);
+});
+
+test("buildBuddyChatGraph applies template runtime input bindings and leaves fixed input values intact", () => {
+  const graph = buildBuddyChatGraph(
+    createRuntimeBoundTemplate(),
+    {
+      userMessage: "检查绑定页规则",
+      history: [],
+      currentSessionId: "session_live_1",
+    },
+    {
+      template_id: "buddy_autonomous_loop",
+      input_bindings: {},
+    },
+  );
+
+  assert.equal(graph.state_schema.user_message.value, "检查绑定页规则");
+  assertInputNode(graph.nodes.input_user_message);
+  assert.equal(graph.nodes.input_user_message.config.value, "检查绑定页规则");
+  assertInputNode(graph.nodes.input_buddy_context);
+  assert.deepEqual(graph.nodes.input_buddy_context.config.value, {
+    kind: "local_folder",
+    root: "buddy_home",
+    selected: ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
+  });
+  assert.deepEqual(graph.state_schema.buddy_context.value, {
+    kind: "local_folder",
+    root: "buddy_home",
+    selected: ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
+  });
 });
 
 test("buildBuddyChatGraph injects the current session id when the template binds it", () => {
@@ -937,7 +1063,23 @@ test("buildBuddyChatGraph overrides template agent models with the buddy model",
   assert.equal(graph.metadata.buddy_model_ref, "openai/gpt-4.1");
 });
 
-test("buildBuddyChatGraph leaves buddy self config states for graph template actions", () => {
+test("buildBuddyChatGraph stores buddy session ids as runtime context metadata", () => {
+  const graph = buildBuddyChatGraph(createTemplate(), {
+    userMessage: "继续",
+    history: [],
+    currentSessionId: "session_123",
+    currentMessageId: "msg_current",
+    buddyMode: "advisory",
+  });
+
+  assert.deepEqual(graph.metadata.runtime_context, {
+    invocation_source: "buddy_chat",
+    buddy_session_id: "session_123",
+    buddy_current_message_id: "msg_current",
+  });
+});
+
+test("buildBuddyChatGraph leaves unbound durable context states for graph template actions", () => {
   const graph = buildBuddyChatGraph(createTemplate(), {
     userMessage: "你好",
     history: [],

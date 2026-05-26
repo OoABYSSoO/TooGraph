@@ -86,8 +86,9 @@ def buddy_session_recall(**action_inputs: Any) -> dict[str, Any]:
 def _recall_related_sources(context: dict[str, Any], merged: dict[str, Any]) -> dict[str, Any]:
     query = _as_text(context.get("query")) or _as_text(merged.get("query"))
     limit = _int(merged.get("limit"), default=10)
-    memories = _recall_memories(query, limit=limit)
-    run_outputs = _recall_run_outputs(query, limit=limit)
+    embedding_model_ref = _as_text(merged.get("embedding_model_ref"))
+    memories = _recall_memories(query, limit=limit, embedding_model_ref=embedding_model_ref)
+    run_outputs = _recall_run_outputs(query, limit=limit, embedding_model_ref=embedding_model_ref)
     context_sources = _dedupe_sources(
         [
             *_session_context_sources(context),
@@ -104,24 +105,28 @@ def _recall_related_sources(context: dict[str, Any], merged: dict[str, Any]) -> 
     }
 
 
-def _recall_memories(query: str, *, limit: int) -> list[dict[str, Any]]:
+def _recall_memories(query: str, *, limit: int, embedding_model_ref: str = "") -> list[dict[str, Any]]:
     if not query:
         return []
     try:
         from app.core.storage.memory_store import recall_memories
 
-        return recall_memories(query, filters={}, limit=limit)
+        filters = {"embedding_model_ref": embedding_model_ref} if embedding_model_ref else {}
+        return recall_memories(query, filters=filters, limit=limit)
     except Exception:
         return []
 
 
-def _recall_run_outputs(query: str, *, limit: int) -> list[dict[str, Any]]:
+def _recall_run_outputs(query: str, *, limit: int, embedding_model_ref: str = "") -> list[dict[str, Any]]:
     if not query:
         return []
     try:
-        from app.core.storage.retrieval_store import search_retrieval_fts
+        from app.core.storage.retrieval_store import hybrid_search, search_retrieval_fts
 
-        return search_retrieval_fts(query, filters={"source_kind": "graph_output"}, limit=limit)
+        filters = {"source_kind": "graph_output"}
+        if embedding_model_ref:
+            return hybrid_search(query, filters=filters, embedding_model_ref=embedding_model_ref, limit=limit)
+        return search_retrieval_fts(query, filters=filters, limit=limit)
     except Exception:
         return []
 

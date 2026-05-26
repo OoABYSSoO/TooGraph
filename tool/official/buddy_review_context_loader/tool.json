@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "toograph.tool/v1",
+  "toolKey": "buddy_review_context_loader",
+  "name": "Buddy Review Context Loader",
+  "description": "A deterministic Buddy runtime tool that reconstructs memory-review inputs from a source Buddy graph run stored in the database.",
+  "version": "0.1.0",
+  "timeoutSeconds": 30,
+  "permissions": ["buddy_session_read"],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 30
+  },
+  "inputSchema": [
+    {
+      "key": "source_run_id",
+      "name": "Source Run ID",
+      "valueType": "text",
+      "description": "Completed visible Buddy run id that triggered this background review."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "status",
+      "name": "Status",
+      "valueType": "text",
+      "description": "succeeded or failed."
+    },
+    {
+      "key": "source_run_id",
+      "name": "Source Run ID",
+      "valueType": "text",
+      "description": "Normalized source run id."
+    },
+    {
+      "key": "current_session_id",
+      "name": "Current Session ID",
+      "valueType": "text",
+      "description": "Buddy session id resolved from the source run metadata or source run state."
+    },
+    {
+      "key": "user_message",
+      "name": "User Message",
+      "valueType": "text",
+      "description": "User message reconstructed from the source run state."
+    },
+    {
+      "key": "conversation_history",
+      "name": "Conversation History",
+      "valueType": "json",
+      "description": "Conversation history state from the source run, normally a context_assembly_ref."
+    },
+    {
+      "key": "request_understanding",
+      "name": "Request Understanding",
+      "valueType": "json",
+      "description": "Structured request understanding state from the source run."
+    },
+    {
+      "key": "capability_result",
+      "name": "Capability Result",
+      "valueType": "json",
+      "description": "Capability result package from the source run."
+    },
+    {
+      "key": "capability_review",
+      "name": "Capability Review",
+      "valueType": "json",
+      "description": "Capability review state from the source run."
+    },
+    {
+      "key": "public_response",
+      "name": "Public Response",
+      "valueType": "markdown",
+      "description": "Final visible Buddy response reconstructed from source run state, outputs, or final_result."
+    },
+    {
+      "key": "review_context_report",
+      "name": "Review Context Report",
+      "valueType": "json",
+      "description": "Audit report describing how review inputs were reconstructed."
+    },
+    {
+      "key": "result",
+      "name": "Result",
+      "valueType": "markdown",
+      "description": "Short loader summary."
+    }
+  ]
+}

@@ -548,7 +548,7 @@
           "buddy_session_recall": {
             "actionKey": "buddy_session_recall",
             "title": "Buddy session recall instruction",
-            "content": "你已绑定 Buddy 会话召回 Action。只把 memory_request 转为 recall_request 参数；优先使用 discover + query 搜索 buddy.db 中的真实会话消息，不要使用 scope/layer/status/top_k/max_chars 这类旧检索字段，不要写入任何记忆。",
+            "content": "根据上游记忆检索需求生成 recall_request 参数；优先使用 discover + query 搜索统一数据库中的 Buddy 会话消息。",
             "source": "node.override"
           }
         },

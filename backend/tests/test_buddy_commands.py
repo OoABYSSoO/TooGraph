@@ -34,32 +34,32 @@ class BuddyCommandRouteTests(unittest.TestCase):
             patcher.stop()
         self._temp_dir.cleanup()
 
-    def test_profile_update_command_records_command_and_revision(self) -> None:
+    def test_buddy_identity_update_command_records_command_and_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
                 with TestClient(app) as client:
                     response = client.post(
                         "/api/buddy/commands",
                         json={
-                            "action": "profile.update",
+                            "action": "buddy_identity.update",
                             "payload": {"name": "Tutu"},
                             "run_id": "run_review_1",
-                            "change_reason": "Manual profile update.",
+                            "change_reason": "Manual buddy identity update.",
                         },
                     )
                     commands_response = client.get("/api/buddy/commands")
                     revisions_response = client.get(
                         "/api/buddy/revisions",
-                        params={"target_type": "profile", "target_id": "profile"},
+                        params={"target_type": "buddy_identity", "target_id": "buddy_identity"},
                     )
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body["result"]["name"], "Tutu")
-        self.assertEqual(body["command"]["action"], "profile.update")
+        self.assertEqual(body["command"]["action"], "buddy_identity.update")
         self.assertEqual(body["command"]["status"], "succeeded")
-        self.assertEqual(body["command"]["target_type"], "profile")
-        self.assertEqual(body["command"]["target_id"], "profile")
+        self.assertEqual(body["command"]["target_type"], "buddy_identity")
+        self.assertEqual(body["command"]["target_id"], "buddy_identity")
         self.assertEqual(body["command"]["run_id"], "run_review_1")
         self.assertTrue(body["command"]["command_id"].startswith("cmd_"))
         self.assertTrue(body["command"]["revision_id"].startswith("rev_"))
@@ -68,6 +68,36 @@ class BuddyCommandRouteTests(unittest.TestCase):
         self.assertEqual(revisions_response.json()[-1]["changed_by"], "buddy_command")
         self.assertEqual(commands_response.status_code, 200)
         self.assertEqual(commands_response.json()[-1]["command_id"], body["command"]["command_id"])
+
+    def test_user_context_update_command_records_user_md_revision(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home = Path(temp_dir) / "buddy_home"
+            with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
+                with TestClient(app) as client:
+                    response = client.post(
+                        "/api/buddy/commands",
+                        json={
+                            "action": "user_context.update",
+                            "payload": {"content": "# USER.md - About Your Human\n\n- 用户偏好直接中文回复。\n"},
+                            "run_id": "run_user_context_1",
+                            "change_reason": "Manual user context update.",
+                        },
+                    )
+                    revisions_response = client.get(
+                        "/api/buddy/revisions",
+                        params={"target_type": "home_file", "target_id": "USER.md"},
+                    )
+                    user_text = (buddy_home / "USER.md").read_text(encoding="utf-8")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["command"]["action"], "user_context.update")
+        self.assertEqual(body["command"]["target_type"], "home_file")
+        self.assertEqual(body["command"]["target_id"], "USER.md")
+        self.assertEqual(body["result"]["path"], "USER.md")
+        self.assertIn("用户偏好直接中文回复", user_text)
+        self.assertEqual(revisions_response.status_code, 200)
+        self.assertEqual(revisions_response.json()[-1]["target_id"], "USER.md")
 
     def test_memory_document_update_command_records_file_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -100,6 +130,63 @@ class BuddyCommandRouteTests(unittest.TestCase):
         self.assertTrue(body["command"]["revision_id"].startswith("rev_"))
         self.assertEqual(revisions_response.status_code, 200)
         self.assertEqual(revisions_response.json()[-1]["target_id"], "MEMORY.md")
+
+    def test_policy_update_command_is_rejected_as_legacy_design(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home = Path(temp_dir) / "buddy_home"
+            with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
+                with TestClient(app) as client:
+                    response = client.post(
+                        "/api/buddy/commands",
+                        json={
+                            "action": "policy.update",
+                            "payload": {"communication_preferences": ["先给结论。"]},
+                            "run_id": "run_policy_legacy",
+                            "change_reason": "旧 policy 写回。",
+                        },
+                    )
+                    commands_response = client.get("/api/buddy/commands")
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("Unsupported buddy command action", response.json()["detail"])
+        self.assertEqual(commands_response.status_code, 200)
+        self.assertEqual(commands_response.json(), [])
+        self.assertFalse((buddy_home / "policy.json").exists())
+
+    def test_memory_entry_create_command_records_command_memory_revision_and_retrieval_projection(self) -> None:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/buddy/commands",
+                json={
+                    "action": "memory_entry.create",
+                    "payload": {
+                        "scope_kind": "buddy_session",
+                        "scope_id": "session_1",
+                        "layer": "long_term",
+                        "memory_type": "preference",
+                        "title": "上下文偏好",
+                        "content": "用户希望长期文件稳定注入，结构化记忆服务召回。",
+                        "confidence": 0.9,
+                        "salience": 0.8,
+                        "sources": [{"source_kind": "graph_run", "source_id": "run_memory_entry_1"}],
+                    },
+                    "run_id": "run_memory_entry_1",
+                    "change_reason": "自主复盘沉淀结构化记忆。",
+                },
+            )
+
+        from app.core.storage.memory_store import recall_memories
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["command"]["action"], "memory_entry.create")
+        self.assertEqual(body["command"]["target_type"], "memory_entry")
+        self.assertEqual(body["command"]["run_id"], "run_memory_entry_1")
+        self.assertTrue(body["command"]["revision_id"].startswith("memrev_"))
+        self.assertEqual(body["revision"]["revision_id"], body["command"]["revision_id"])
+        self.assertEqual(body["result"]["content"], "用户希望长期文件稳定注入，结构化记忆服务召回。")
+        recalled = recall_memories("结构化记忆服务召回", filters={"scope_kind": "buddy_session"}, limit=3)
+        self.assertEqual(recalled[0]["memory_id"], body["result"]["memory_id"])
 
     def test_graph_patch_draft_is_rejected_in_favor_of_editor_command_flow(self) -> None:
         patch_payload = {

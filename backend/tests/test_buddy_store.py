@@ -39,10 +39,9 @@ class BuddyStoreTests(unittest.TestCase):
     def test_defaults_load_when_files_do_not_exist(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
-                profile = store.load_profile()
-                self.assertEqual(profile["name"], "图图")
-                self.assertEqual(profile["display_preferences"]["display_name"], "TooGraph Buddy")
-                self.assertEqual(store.load_policy()["graph_permission_mode"], "ask_first")
+                buddy_identity = store.load_buddy_identity()
+                self.assertEqual(buddy_identity["name"], "图图")
+                self.assertEqual(buddy_identity["display_preferences"]["display_name"], "TooGraph Buddy")
                 self.assertIn("# MEMORY.md", store.load_memory_document()["content"])
                 self.assertIn("content", store.load_session_summary())
 
@@ -50,10 +49,10 @@ class BuddyStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             buddy_home = Path(temp_dir) / "buddy_home"
             with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
-                profile = store.load_profile()
+                buddy_identity = store.load_buddy_identity()
 
-            self.assertEqual(profile["name"], "图图")
-            self.assertEqual(profile["display_preferences"]["display_name"], "TooGraph Buddy")
+            self.assertEqual(buddy_identity["name"], "图图")
+            self.assertEqual(buddy_identity["display_preferences"]["display_name"], "TooGraph Buddy")
             expected_files = [
                 "AGENTS.md",
                 "SOUL.md",
@@ -84,19 +83,26 @@ class BuddyStoreTests(unittest.TestCase):
             self.assertIn("# SOUL.md - TooGraph Buddy", soul)
             self.assertIn("图图", soul)
             self.assertIn("- display_name: TooGraph Buddy", soul)
-            self.assertIn("图模板", agents)
+            self.assertIn("# AGENTS.md - Buddy Home 使用说明", agents)
+            self.assertIn("数据库图运行记录、会话记录、结构化记忆和 embeddings", agents)
+            self.assertIn("自主复盘写入目标", agents)
+            self.assertIn("写入 `USER.md`", agents)
+            self.assertIn("写入数据库结构化记忆", agents)
             self.assertIn("# USER.md - About Your Human", user)
             self.assertIn("# MEMORY.md - Long-Term Memory", memory)
+            for home_text in [soul, agents, user, memory]:
+                for discouraged_prompt_fragment in ["Do not", "Avoid", "must not", "不要", "不得", "你已绑定", "LLM节点"]:
+                    self.assertNotIn(discouraged_prompt_fragment, home_text)
 
-    def test_profile_update_creates_revision_with_previous_and_next_values(self) -> None:
+    def test_buddy_identity_update_creates_revision_with_previous_and_next_values(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
-                updated = store.save_profile({"name": "小石墨"}, changed_by="user", change_reason="测试更新")
-                revisions = store.list_revisions(target_type="profile", target_id="profile")
+                updated = store.save_buddy_identity({"name": "小石墨"}, changed_by="user", change_reason="测试更新")
+                revisions = store.list_revisions(target_type="buddy_identity", target_id="buddy_identity")
 
         self.assertEqual(updated["name"], "小石墨")
         self.assertEqual(len(revisions), 1)
-        self.assertEqual(revisions[0]["target_type"], "profile")
+        self.assertEqual(revisions[0]["target_type"], "buddy_identity")
         self.assertEqual(revisions[0]["operation"], "update")
         self.assertEqual(revisions[0]["previous_value"]["name"], "图图")
         self.assertEqual(revisions[0]["next_value"]["name"], "小石墨")
@@ -122,6 +128,28 @@ class BuddyStoreTests(unittest.TestCase):
         self.assertEqual(restored["target_type"], "home_file")
         self.assertEqual(restored["target_id"], "MEMORY.md")
         self.assertIn("No durable memories yet.", restored_text)
+
+    def test_user_context_update_writes_user_md_and_restore_creates_revision(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home = Path(temp_dir) / "buddy_home"
+            with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
+                updated = store.save_user_context_document(
+                    {"content": "# USER.md - About Your Human\n\n- 用户偏好直接中文回复。\n"},
+                    changed_by="user_context_curator",
+                    change_reason="自动用户上下文整理",
+                )
+                document_text = (buddy_home / "USER.md").read_text(encoding="utf-8")
+                revisions = store.list_revisions(target_type="home_file", target_id="USER.md")
+                restored = store.restore_revision(revisions[-1]["revision_id"], changed_by="user", change_reason="恢复测试")
+                restored_text = (buddy_home / "USER.md").read_text(encoding="utf-8")
+
+        self.assertEqual(updated["path"], "USER.md")
+        self.assertIn("用户偏好直接中文回复", document_text)
+        self.assertEqual(revisions[0]["previous_value"]["path"], "USER.md")
+        self.assertIn("# USER.md - About Your Human", revisions[0]["previous_value"]["content"])
+        self.assertEqual(restored["target_type"], "home_file")
+        self.assertEqual(restored["target_id"], "USER.md")
+        self.assertIn("Current focus", restored_text)
 
     def test_buddy_database_uses_message_fts_without_buddy_memories_table(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -828,6 +856,105 @@ class BuddyStoreTests(unittest.TestCase):
                         change_reason="测试拒绝断点模板绑定",
                     )
 
+    def test_run_template_binding_uses_template_runtime_input_metadata(self) -> None:
+        template_payload = {
+            "template_id": "runtime_bound_loop",
+            "label": "Runtime Bound Loop",
+            "description": "Only current message is a runtime Buddy input.",
+            "default_graph_name": "Runtime Bound Loop",
+            "state_schema": {
+                "user_message": {
+                    "name": "user_message",
+                    "description": "",
+                    "type": "text",
+                    "value": "",
+                    "color": "#d97706",
+                },
+                "buddy_context": {
+                    "name": "buddy_context",
+                    "description": "",
+                    "type": "file",
+                    "value": {
+                        "kind": "local_folder",
+                        "root": "buddy_home",
+                        "selected": ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
+                    },
+                    "color": "#0f766e",
+                },
+            },
+            "nodes": {
+                "input_user_message": {
+                    "kind": "input",
+                    "name": "User Message",
+                    "description": "",
+                    "ui": {"position": {"x": 0, "y": 0}},
+                    "reads": [],
+                    "writes": [{"state": "user_message", "mode": "replace"}],
+                    "config": {"value": ""},
+                },
+                "input_buddy_context": {
+                    "kind": "input",
+                    "name": "Buddy Home",
+                    "description": "",
+                    "ui": {"position": {"x": 0, "y": 120}},
+                    "reads": [],
+                    "writes": [{"state": "buddy_context", "mode": "replace"}],
+                    "config": {
+                        "boundaryType": "file",
+                        "value": {
+                            "kind": "local_folder",
+                            "root": "buddy_home",
+                            "selected": ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
+                        },
+                    },
+                },
+            },
+            "edges": [],
+            "conditional_edges": [],
+            "metadata": {"buddyRuntimeInputBindings": {"input_user_message": "current_message"}},
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            buddy_home = root / "buddy_home"
+            official_dir = root / "official"
+            user_dir = root / "user"
+            template_dir = official_dir / "runtime_bound_loop"
+            template_dir.mkdir(parents=True)
+            user_dir.mkdir()
+            (template_dir / "template.json").write_text(json.dumps(template_payload), encoding="utf-8")
+
+            with (
+                patch.object(store, "BUDDY_HOME_DIR", buddy_home),
+                patch.object(store, "_ensure_run_template_can_be_bound", lambda _template_id: None),
+                patch("app.templates.loader.OFFICIAL_TEMPLATES_ROOT", official_dir),
+                patch("app.templates.loader.USER_TEMPLATES_ROOT", user_dir),
+                patch("app.templates.loader.TEMPLATE_SETTINGS_PATH", root / "settings.json", create=True),
+            ):
+                binding = store.save_run_template_binding(
+                    {
+                        "template_id": "runtime_bound_loop",
+                        "input_bindings": {},
+                    },
+                    changed_by="user",
+                    change_reason="测试使用模板运行时输入声明",
+                )
+                with self.assertRaisesRegex(ValueError, "not declared"):
+                    store.save_run_template_binding(
+                        {
+                            "template_id": "runtime_bound_loop",
+                            "input_bindings": {
+                                "input_user_message": "current_message",
+                                "input_buddy_context": "buddy_home_context",
+                            },
+                        },
+                        changed_by="user",
+                        change_reason="测试拒绝未声明输入绑定",
+                    )
+
+        self.assertEqual(binding["template_id"], "runtime_bound_loop")
+        self.assertEqual(binding["input_bindings"], {"input_user_message": "current_message"})
+
     def test_run_template_binding_falls_back_and_marks_repair_when_saved_template_is_unloadable(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             buddy_home = Path(temp_dir) / "buddy_home"
@@ -856,13 +983,12 @@ class BuddyStoreTests(unittest.TestCase):
 
         self.assertEqual(binding["template_id"], store.DEFAULT_RUN_TEMPLATE_BINDING["template_id"])
         self.assertEqual(binding["input_bindings"], store.DEFAULT_RUN_TEMPLATE_BINDING["input_bindings"])
-        self.assertEqual(binding["input_bindings"]["input_current_session_id"], "current_session_id")
         self.assertTrue(binding["repair_recommended"])
         self.assertEqual(binding["repair_reason"], "invalid_saved_binding")
         self.assertEqual(binding["repair_previous_template_id"], "deleted_or_legacy_template")
         self.assertEqual(stored_value["template_id"], "deleted_or_legacy_template")
 
-    def test_official_run_template_binding_migrates_context_compaction_inputs(self) -> None:
+    def test_official_run_template_binding_falls_back_from_legacy_context_inputs(self) -> None:
         legacy_binding = {
             "version": store.RUN_TEMPLATE_BINDING_VERSION,
             "template_id": "buddy_autonomous_loop",
@@ -885,7 +1011,9 @@ class BuddyStoreTests(unittest.TestCase):
                 binding = store.load_run_template_binding()
 
         self.assertEqual(binding["template_id"], "buddy_autonomous_loop")
-        self.assertEqual(binding["input_bindings"]["input_existing_session_summary"], "session_summary")
+        self.assertEqual(binding["input_bindings"], {"input_user_message": "current_message"})
+        self.assertTrue(binding["repair_recommended"])
+        self.assertEqual(binding["repair_reason"], "invalid_saved_binding")
         self.assertNotIn("raw_conversation_history", binding["input_bindings"].values())
         self.assertNotIn("page_context", binding["input_bindings"].values())
         self.assertNotIn("input_raw_conversation_history", binding["input_bindings"])
@@ -923,7 +1051,7 @@ class BuddyStoreTests(unittest.TestCase):
                 loaded = store.load_memory_review_template_binding()
 
         self.assertEqual(default_binding["template_id"], "buddy_autonomous_review")
-        self.assertEqual(default_binding["input_bindings"]["input_current_session_id"], "current_session_id")
+        self.assertEqual(default_binding["input_bindings"], {"input_source_run_id": "source_run_id"})
         self.assertEqual(updated["template_id"], "custom_memory_review")
         self.assertEqual(len(revisions), 1)
         self.assertEqual(revisions[0]["previous_value"]["template_id"], "buddy_autonomous_review")
@@ -931,12 +1059,51 @@ class BuddyStoreTests(unittest.TestCase):
         self.assertEqual(restored["target_id"], "memory_review_template_binding")
         self.assertEqual(loaded["template_id"], "buddy_autonomous_review")
 
+    def test_memory_review_template_binding_falls_back_and_marks_repair_when_saved_template_is_unloadable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home = Path(temp_dir) / "buddy_home"
+            with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
+                store._write_kv(
+                    store.MEMORY_REVIEW_TEMPLATE_BINDING_KEY,
+                    {
+                        "version": store.MEMORY_REVIEW_TEMPLATE_BINDING_VERSION,
+                        "template_id": "deleted_or_legacy_memory_review",
+                        "input_bindings": {
+                            "input_source_run_id": "source_run_id",
+                            "input_current_session_id": "current_session_id",
+                            "input_user_message": "user_message",
+                            "input_public_response": "public_response",
+                            "input_buddy_context": "buddy_home_context",
+                        },
+                        "updated_at": "2026-01-01T00:00:00Z",
+                    },
+                    "2026-01-01T00:00:00Z",
+                )
+
+                binding = store.load_memory_review_template_binding()
+                with store._connection() as connection:
+                    stored_value = json.loads(
+                        str(
+                            connection.execute(
+                                "SELECT value_json FROM buddy_kv WHERE key = ?",
+                                (store.MEMORY_REVIEW_TEMPLATE_BINDING_KEY,),
+                            ).fetchone()["value_json"]
+                        )
+                    )
+
+        self.assertEqual(binding["template_id"], store.DEFAULT_MEMORY_REVIEW_TEMPLATE_BINDING["template_id"])
+        self.assertEqual(binding["input_bindings"], store.DEFAULT_MEMORY_REVIEW_TEMPLATE_BINDING["input_bindings"])
+        self.assertTrue(binding["repair_recommended"])
+        self.assertEqual(binding["repair_reason"], "invalid_saved_binding")
+        self.assertEqual(binding["repair_previous_template_id"], "deleted_or_legacy_memory_review")
+        self.assertEqual(stored_value["template_id"], "deleted_or_legacy_memory_review")
+
     def test_memory_review_template_binding_rejects_internal_state_sources(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"), patch.object(
                 store, "_ensure_memory_review_template_can_be_bound", lambda _template_id: None
             ):
-                with self.assertRaisesRegex(ValueError, "Unsupported Buddy memory review input source"):
+                with self.assertRaisesRegex(ValueError, "not declared|Unsupported Buddy memory review input source"):
                     store.save_memory_review_template_binding(
                         {
                             "template_id": "buddy_autonomous_review",

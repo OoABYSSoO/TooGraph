@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "toograph.tool/v1",
+  "toolKey": "buddy_history_context_loader",
+  "name": "Buddy History Context Loader",
+  "description": "A deterministic Buddy runtime tool that loads conversation history from the current Buddy session runtime context and returns an auditable context_assembly_ref.",
+  "version": "0.1.0",
+  "timeoutSeconds": 30,
+  "permissions": [],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 30
+  },
+  "inputSchema": [
+    {
+      "key": "user_message",
+      "name": "User Message",
+      "valueType": "text",
+      "description": "Current user message, used only for audit metadata."
+    },
+    {
+      "key": "max_messages",
+      "name": "Max Messages",
+      "valueType": "number",
+      "description": "Maximum recent visible Buddy messages to reference."
+    },
+    {
+      "key": "max_chars",
+      "name": "Max Characters",
+      "valueType": "number",
+      "description": "Approximate rendered history character budget."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "conversation_history",
+      "name": "Conversation History Reference",
+      "valueType": "json",
+      "description": "context_assembly_ref pointing at the selected Buddy message and summary sources."
+    },
+    {
+      "key": "existing_session_summary",
+      "name": "Existing Session Summary",
+      "valueType": "markdown",
+      "description": "Current persisted Buddy session summary."
+    },
+    {
+      "key": "current_session_id",
+      "name": "Current Session ID",
+      "valueType": "text",
+      "description": "Buddy session id resolved from runtime context."
+    },
+    {
+      "key": "source_run_id",
+      "name": "Source Run ID",
+      "valueType": "text",
+      "description": "Run id available to the tool invocation context, when present."
+    },
+    {
+      "key": "history_context_report",
+      "name": "History Context Report",
+      "valueType": "json",
+      "description": "Audit report describing runtime context, selected sources, and fallback mode."
+    }
+  ]
+}

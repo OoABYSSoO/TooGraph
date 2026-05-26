@@ -140,7 +140,6 @@ def execute_tool_node(
     first_truthy_func: Callable[..., Any] = first_truthy,
     record_activity_event_func: Callable[..., dict[str, Any]] = record_activity_event,
 ) -> dict[str, Any]:
-    _ = graph_context
     tool_key = node.config.tool_key
     if not tool_key:
         raise ValueError(f"Tool node '{node_name}' must select a toolKey.")
@@ -161,6 +160,7 @@ def execute_tool_node(
             state=state,
             node_name=node_name,
             tool_key=tool_key,
+            graph_context=graph_context,
         ),
     )
     duration_ms = int((perf_counter() - started_at) * 1000)
@@ -1412,6 +1412,7 @@ def _build_tool_invocation_context(
     state: dict[str, Any],
     node_name: str,
     tool_key: str,
+    graph_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     invocation_index = _next_capability_artifact_invocation_index(
         state,
@@ -1419,13 +1420,34 @@ def _build_tool_invocation_context(
         tool_key,
         capability_kind="tool",
     )
-    return create_capability_artifact_context(
+    context = create_capability_artifact_context(
         run_id=str(state.get("run_id") or "run"),
         node_id=node_name,
         capability_kind="tool",
         capability_key=tool_key,
         invocation_index=invocation_index,
     )
+    runtime_context = _resolve_graph_runtime_context(graph_context)
+    if runtime_context:
+        context["runtime_context"] = runtime_context
+        context["action_runtime_context"] = runtime_context
+    return context
+
+
+def _resolve_graph_runtime_context(graph_context: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(graph_context, dict):
+        return {}
+    metadata = graph_context.get("metadata")
+    if not isinstance(metadata, dict):
+        return {}
+    runtime_context: dict[str, Any] = {}
+    action_runtime_context = metadata.get("action_runtime_context")
+    if isinstance(action_runtime_context, dict):
+        runtime_context.update(action_runtime_context)
+    graph_runtime_context = metadata.get("runtime_context")
+    if isinstance(graph_runtime_context, dict):
+        runtime_context.update(graph_runtime_context)
+    return runtime_context
 
 
 def _resolve_action_invocation_status(action_key: str, action_result: dict[str, Any]) -> tuple[str, str]:

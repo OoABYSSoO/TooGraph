@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -59,6 +60,10 @@ class BuddySessionRecallActionTests(unittest.TestCase):
         self.assertEqual(definition.action_key, "buddy_session_recall")
         self.assertEqual(definition.llm_node_eligibility, ActionLlmNodeEligibility.READY)
         self.assertEqual(definition.permissions, ["buddy_session_read"])
+        manifest = json.loads((SESSION_RECALL_ACTION_DIR / "action.json").read_text(encoding="utf-8"))
+        self.assertNotIn("你已绑定", manifest["llmInstruction"])
+        self.assertNotIn("不要", manifest["llmInstruction"])
+        self.assertNotIn("不得", manifest["llmInstruction"])
         self.assertEqual([field.key for field in definition.state_input_schema], ["recall_request"])
         self.assertEqual(
             [field.key for field in definition.llm_output_schema],
@@ -74,6 +79,7 @@ class BuddySessionRecallActionTests(unittest.TestCase):
                 "sort",
                 "role_filter",
                 "current_session_id",
+                "embedding_model_ref",
             ],
         )
         self.assertEqual(
@@ -209,6 +215,64 @@ class BuddySessionRecallActionTests(unittest.TestCase):
             [source["source_kind"] for source in assembly["sources"]],
             ["buddy_message", "memory_entry", "graph_output"],
         )
+
+    def test_discover_uses_embedding_model_ref_for_hybrid_memory_and_run_output_recall(self) -> None:
+        from app.core.storage.embedding_store import build_local_text_embedding, register_embedding_model, upsert_embedding_vector
+        from app.core.storage.memory_store import create_memory_entry
+        from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
+        from app.core.storage.database import get_connection
+
+        recall = _load_action_module()
+        model = register_embedding_model(provider_key="local", model="hashing-v1", dimensions=16)
+        memory = create_memory_entry(
+            scope_kind="buddy_session",
+            scope_id="session_embedding",
+            layer="long_term",
+            memory_type="preference",
+            title="Hybrid 召回偏好",
+            content="用户希望 hybrid embedding 记忆召回用于长期偏好。",
+        )
+        with get_connection() as connection:
+            memory_chunk = connection.execute(
+                "SELECT chunk_id, content_hash FROM retrieval_chunks WHERE source_id = ?",
+                (memory["memory_id"],),
+            ).fetchone()
+        upsert_embedding_vector(
+            str(memory_chunk["chunk_id"]),
+            model["embedding_model_id"],
+            build_local_text_embedding(memory["content"], dimensions=16),
+            str(memory_chunk["content_hash"]),
+        )
+        document = upsert_retrieval_document(
+            source_kind="graph_output",
+            source_id="output_embedding",
+            source_revision_id="run_embedding",
+            title="Hybrid 输出",
+        )
+        [output_chunk] = upsert_retrieval_chunks(
+            document["document_id"],
+            [{"chunk_id": "chunk_output_embedding", "content": "图运行输出也支持 hybrid embedding 召回。"}],
+        )
+        upsert_embedding_vector(
+            output_chunk["chunk_id"],
+            model["embedding_model_id"],
+            build_local_text_embedding(output_chunk["content"], dimensions=16),
+            output_chunk["content_hash"],
+        )
+
+        result = recall.buddy_session_recall(
+            mode="discover",
+            query="hybrid embedding 召回",
+            limit=5,
+            embedding_model_ref=model["embedding_model_id"],
+        )
+
+        self.assertEqual(result["success"], True)
+        self.assertEqual(result["memories"][0]["memory_id"], memory["memory_id"])
+        self.assertEqual(result["memories"][0]["retrieval"]["mode"], "hybrid")
+        self.assertGreater(result["memories"][0]["retrieval"]["vector_score"], 0)
+        self.assertEqual(result["run_outputs"][0]["retrieval"]["mode"], "hybrid")
+        self.assertGreater(result["run_outputs"][0]["retrieval"]["vector_score"], 0)
 
 
 if __name__ == "__main__":

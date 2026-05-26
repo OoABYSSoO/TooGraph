@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.compiler.validator import validate_graph
-from app.core.langgraph import get_langgraph_runtime_unsupported_reasons
+from app.core.langgraph import compile_graph_to_langgraph_plan, get_langgraph_runtime_unsupported_reasons
 from app.core.langgraph.cycle_tracker import build_langgraph_cycle_tracker
 from app.core.runtime.execution_graph import build_execution_edges
 from app.core.schemas.node_system import NodeSystemGraphPayload
@@ -139,6 +139,106 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn("官方 Buddy 可见回复主流程", buddy_template["description"])
         self.assertIs(buddy_template["capabilityDiscoverable"], False)
         self.assertNotIn("hideFromCapabilitySelector", buddy_template["metadata"])
+        self.assertEqual(
+            buddy_template["metadata"].get("buddyRuntimeInputBindings"),
+            {"input_user_message": "current_message"},
+        )
+        self.assertEqual(
+            sorted(node_id for node_id, node in buddy_template["nodes"].items() if node["kind"] == "input"),
+            ["input_buddy_context", "input_user_message"],
+        )
+        for expected_node in [
+            "load_history_context",
+            "check_context_pressure",
+            "context_pressure_condition",
+            "run_context_compaction",
+            "reply_and_select_capability",
+            "execute_capability",
+            "condition_93972e3f",
+            "condition_3706cb6e",
+        ]:
+            self.assertIn(expected_node, buddy_template["nodes"])
+        self.assertEqual(buddy_template["nodes"]["run_context_compaction"]["kind"], "subgraph")
+        self.assertEqual(buddy_template["nodes"]["load_history_context"]["config"]["toolKey"], "buddy_history_context_loader")
+        buddy_home_input = buddy_template["nodes"]["input_buddy_context"]
+        self.assertEqual(buddy_home_input["kind"], "input")
+        self.assertEqual(buddy_home_input["config"]["boundaryType"], "file")
+        self.assertEqual(buddy_home_input["writes"], [{"state": "buddy_context", "mode": "replace"}])
+        self.assertEqual(
+            buddy_home_input["config"]["value"],
+            {
+                "kind": "local_folder",
+                "root": "buddy_home",
+                "selected": ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
+            },
+        )
+        self.assertEqual(
+            buddy_template["state_schema"]["buddy_context"]["value"],
+            {
+                "kind": "local_folder",
+                "root": "buddy_home",
+                "selected": ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
+            },
+        )
+        self.assertEqual(
+            buddy_template["state_schema"]["current_session_id"]["binding"]["fieldKey"],
+            "current_session_id",
+        )
+        self.assertEqual(
+            buddy_template["state_schema"]["existing_session_summary"]["binding"]["fieldKey"],
+            "existing_session_summary",
+        )
+        self.assertIn(
+            {"source": "load_history_context", "target": "check_context_pressure"},
+            buddy_template["edges"],
+        )
+        self.assertIn(
+            {"source": "input_buddy_context", "target": "check_context_pressure"},
+            buddy_template["edges"],
+        )
+        self.assertIn(
+            {"source": "execute_capability", "target": "check_context_pressure"},
+            buddy_template["edges"],
+        )
+        test_condition_edges = {
+            edge["source"]: edge["branches"]
+            for edge in buddy_template["conditional_edges"]
+        }
+        self.assertEqual(
+            test_condition_edges["context_pressure_condition"],
+            {"true": "run_context_compaction", "false": "reply_and_select_capability", "exhausted": "reply_and_select_capability"},
+        )
+        self.assertEqual(
+            test_condition_edges["condition_93972e3f"],
+            {"true": "output_ab549b8d", "false": "condition_3706cb6e", "exhausted": "condition_3706cb6e"},
+        )
+        self.assertEqual(
+            test_condition_edges["condition_3706cb6e"],
+            {"true": "execute_capability", "false": "output_161c76f3", "exhausted": "output_161c76f3"},
+        )
+
+        review_template = templates["buddy_autonomous_review"]
+        self.assertEqual(review_template["source"], "official")
+        self.assertEqual(review_template["label"], "自主复盘")
+        self.assertEqual(
+            review_template["metadata"].get("buddyMemoryReviewRuntimeInputBindings"),
+            {"input_source_run_id": "source_run_id"},
+        )
+        self.assertIn("buddy_review_context_loader", review_template["metadata"].get("requiredTools", []))
+        self.assertEqual(
+            sorted(node_id for node_id, node in review_template["nodes"].items() if node["kind"] == "input"),
+            ["input_buddy_context", "input_source_run_id"],
+        )
+        self.assertEqual(review_template["nodes"]["load_review_context"]["kind"], "tool")
+        self.assertEqual(review_template["nodes"]["load_review_context"]["config"]["toolKey"], "buddy_review_context_loader")
+        self.assertEqual(review_template["state_schema"]["conversation_history"]["type"], "json")
+        self.assertEqual(
+            review_template["state_schema"]["current_session_id"]["binding"]["fieldKey"],
+            "current_session_id",
+        )
+        self.assertIn({"source": "input_source_run_id", "target": "load_review_context"}, review_template["edges"])
+        self.assertIn({"source": "load_review_context", "target": "recall_related_sessions"}, review_template["edges"])
+        self.assertIn({"source": "load_review_context", "target": "draft_autonomous_review"}, review_template["edges"])
 
         page_operation_template = templates["toograph_page_operation_workflow"]
         self.assertEqual(page_operation_template["source"], "official")
@@ -1732,7 +1832,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template["metadata"]["origin"], "buddy")
         self.assertEqual(template["metadata"]["role"], "buddy_autonomous_loop")
         self.assertEqual(template["metadata"]["requiredActions"], ["toograph_capability_selector", "buddy_session_recall"])
-        self.assertEqual(template["metadata"]["requiredTools"], ["buddy_context_pressure_check"])
+        self.assertEqual(template["metadata"]["requiredTools"], ["buddy_history_context_loader", "buddy_context_pressure_check"])
+        self.assertEqual(template["metadata"]["buddyRuntimeInputBindings"], {"input_user_message": "current_message"})
         self.assertEqual(
             set(states),
             {
@@ -1741,6 +1842,9 @@ class TemplateLayoutTests(unittest.TestCase):
                 "buddy_context",
                 "current_session_id",
                 "existing_session_summary",
+                "history_max_messages",
+                "history_max_chars",
+                "history_context_report",
                 "source_run_id",
                 "context_budget_report",
                 "needs_context_compaction",
@@ -1758,10 +1862,13 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         expected_state_types = {
             "user_message": "text",
-            "conversation_history": "markdown",
+            "conversation_history": "json",
             "buddy_context": "file",
             "current_session_id": "text",
             "existing_session_summary": "markdown",
+            "history_max_messages": "number",
+            "history_max_chars": "number",
+            "history_context_report": "json",
             "source_run_id": "text",
             "context_budget_report": "json",
             "needs_context_compaction": "boolean",
@@ -1784,6 +1891,13 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(states["context_budget_report"]["binding"]["kind"], "tool_output")
         self.assertEqual(states["context_budget_report"]["binding"]["toolKey"], "buddy_context_pressure_check")
         self.assertEqual(states["context_budget_report"]["binding"]["nodeId"], "check_context_pressure")
+        self.assertEqual(states["conversation_history"]["binding"]["kind"], "tool_output")
+        self.assertEqual(states["conversation_history"]["binding"]["toolKey"], "buddy_history_context_loader")
+        self.assertEqual(states["conversation_history"]["binding"]["nodeId"], "load_history_context")
+        self.assertEqual(states["current_session_id"]["binding"]["toolKey"], "buddy_history_context_loader")
+        self.assertEqual(states["existing_session_summary"]["binding"]["toolKey"], "buddy_history_context_loader")
+        self.assertEqual(states["source_run_id"]["binding"]["toolKey"], "buddy_history_context_loader")
+        self.assertEqual(states["history_context_report"]["binding"]["toolKey"], "buddy_history_context_loader")
         self.assertIsNone(states["show_result_package"]["binding"])
         self.assertIsNone(states["public_response"]["binding"])
         self.assertEqual(states["needs_context_compaction"]["binding"]["fieldKey"], "needs_context_compaction")
@@ -1807,10 +1921,8 @@ class TemplateLayoutTests(unittest.TestCase):
             set(nodes),
             {
                 "input_user_message",
-                "input_conversation_history",
+                "load_history_context",
                 "input_buddy_context",
-                "input_current_session_id",
-                "input_existing_session_summary",
                 "check_context_pressure",
                 "context_pressure_condition",
                 "run_context_compaction",
@@ -1823,6 +1935,8 @@ class TemplateLayoutTests(unittest.TestCase):
             },
         )
         self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "subgraph"], ["run_context_compaction"])
+        self.assertEqual(nodes["load_history_context"]["kind"], "tool")
+        self.assertEqual(nodes["load_history_context"]["config"]["toolKey"], "buddy_history_context_loader")
         self.assertEqual(nodes["check_context_pressure"]["kind"], "tool")
         self.assertEqual(nodes["check_context_pressure"]["config"]["toolKey"], "buddy_context_pressure_check")
         self.assertEqual(nodes["run_context_compaction"]["config"]["graph"]["metadata"]["role"], "buddy_context_compaction")
@@ -1842,10 +1956,8 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         expected_positions = {
             "input_user_message": {"x": -1208, "y": 27},
-            "input_conversation_history": {"x": -665, "y": 39},
+            "load_history_context": {"x": -520, "y": 109},
             "input_buddy_context": {"x": -1211, "y": 751},
-            "input_current_session_id": {"x": -680, "y": 394},
-            "input_existing_session_summary": {"x": -677, "y": 771},
             "check_context_pressure": {"x": 216, "y": 109},
             "context_pressure_condition": {"x": 877, "y": 237},
             "run_context_compaction": {"x": 1601, "y": -841},
@@ -1946,6 +2058,16 @@ class TemplateLayoutTests(unittest.TestCase):
         for read in nodes["check_context_pressure"]["reads"]:
             self.assertNotIn(read.get("state"), {"raw_conversation_history", "page_context"})
         self.assertEqual(
+            nodes["load_history_context"]["writes"],
+            [
+                {"state": "conversation_history", "mode": "replace"},
+                {"state": "existing_session_summary", "mode": "replace"},
+                {"state": "current_session_id", "mode": "replace"},
+                {"state": "source_run_id", "mode": "replace"},
+                {"state": "history_context_report", "mode": "replace"},
+            ],
+        )
+        self.assertEqual(
             nodes["run_context_compaction"]["writes"],
             [
                 {"state": "context_compaction_report", "mode": "replace"},
@@ -1956,11 +2078,9 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             template["edges"],
             [
-                {"source": "input_user_message", "target": "check_context_pressure"},
-                {"source": "input_conversation_history", "target": "check_context_pressure"},
+                {"source": "input_user_message", "target": "load_history_context"},
+                {"source": "load_history_context", "target": "check_context_pressure"},
                 {"source": "input_buddy_context", "target": "check_context_pressure"},
-                {"source": "input_current_session_id", "target": "check_context_pressure"},
-                {"source": "input_existing_session_summary", "target": "check_context_pressure"},
                 {"source": "check_context_pressure", "target": "context_pressure_condition"},
                 {"source": "run_context_compaction", "target": "reply_and_select_capability"},
                 {"source": "execute_capability", "target": "check_context_pressure"},
@@ -2005,6 +2125,9 @@ class TemplateLayoutTests(unittest.TestCase):
                 self.assertEqual(node["ui"].get("size"), expected_sizes.get(node_id))
 
         self.assertNotIn("pack_context", nodes)
+        self.assertNotIn("input_conversation_history", nodes)
+        self.assertNotIn("input_current_session_id", nodes)
+        self.assertNotIn("input_existing_session_summary", nodes)
         buddy_context_node = nodes["input_buddy_context"]
         self.assertEqual(buddy_context_node["kind"], "input")
         self.assertEqual(buddy_context_node["config"]["boundaryType"], "file")
@@ -2310,8 +2433,15 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertNotIn("internal", template["metadata"])
         self.assertIs(template["capabilityDiscoverable"], False)
         self.assertEqual(template["label"], "自主复盘")
-        self.assertEqual(template["metadata"]["requiredActions"], ["buddy_session_recall", "buddy_home_writer"])
-        self.assertEqual(template["metadata"]["permissions"], ["buddy_session_read", "buddy_home_write"])
+        self.assertEqual(
+            template["metadata"]["requiredActions"],
+            ["buddy_session_recall", "buddy_home_writer", "buddy_memory_writer"],
+        )
+        self.assertEqual(template["metadata"]["permissions"], ["buddy_session_read", "buddy_home_write", "buddy_memory_write"])
+        self.assertNotIn("buddy.db", json.dumps(template, ensure_ascii=False))
+        template_text = json.dumps(template, ensure_ascii=False)
+        for discouraged_prompt_fragment in ["你已绑定", "不要", "不得", "Do not", "must not"]:
+            self.assertNotIn(discouraged_prompt_fragment, template_text)
         self.assertEqual(
             set(states),
             {
@@ -2324,47 +2454,74 @@ class TemplateLayoutTests(unittest.TestCase):
                 "capability_result",
                 "capability_review",
                 "public_response",
+                "review_context_report",
                 "session_recall_context",
                 "autonomous_review",
                 "improvement_candidates",
                 "memory_update_plan",
+                "user_context_update_plan",
+                "structured_memory_update_plan",
                 "memory_review_result",
+                "user_context_review_result",
                 "memory_write_success",
                 "applied_memory_commands",
                 "skipped_memory_commands",
                 "memory_write_result",
-                "profile_update_plan",
-                "profile_review_result",
-                "profile_write_success",
-                "applied_profile_commands",
-                "skipped_profile_commands",
-                "profile_write_result",
+                "user_context_write_success",
+                "applied_user_context_commands",
+                "skipped_user_context_commands",
+                "user_context_write_result",
+                "structured_memory_write_success",
+                "applied_structured_memory_commands",
+                "skipped_structured_memory_commands",
+                "written_structured_memories",
+                "structured_memory_write_result",
+                "buddy_identity_update_plan",
+                "buddy_identity_review_result",
+                "buddy_identity_write_success",
+                "applied_buddy_identity_commands",
+                "skipped_buddy_identity_commands",
+                "buddy_identity_write_result",
             },
         )
         self.assertEqual(states["current_session_id"]["type"], "text")
+        self.assertEqual(states["conversation_history"]["type"], "json")
         self.assertEqual(states["public_response"]["type"], "markdown")
+        self.assertEqual(states["review_context_report"]["type"], "json")
         self.assertEqual(states["session_recall_context"]["type"], "json")
         self.assertEqual(states["autonomous_review"]["type"], "json")
         self.assertEqual(states["improvement_candidates"]["type"], "json")
         self.assertEqual(states["memory_update_plan"]["type"], "json")
+        self.assertEqual(states["user_context_update_plan"]["type"], "json")
+        self.assertEqual(states["structured_memory_update_plan"]["type"], "json")
         self.assertEqual(states["memory_review_result"]["type"], "markdown")
+        self.assertEqual(states["user_context_review_result"]["type"], "markdown")
         self.assertEqual(states["memory_write_success"]["type"], "boolean")
         self.assertEqual(states["applied_memory_commands"]["type"], "json")
         self.assertEqual(states["skipped_memory_commands"]["type"], "json")
         self.assertEqual(states["memory_write_result"]["type"], "markdown")
-        self.assertEqual(states["profile_update_plan"]["type"], "json")
-        self.assertEqual(states["profile_review_result"]["type"], "markdown")
-        self.assertEqual(states["profile_write_success"]["type"], "boolean")
-        self.assertEqual(states["applied_profile_commands"]["type"], "json")
-        self.assertEqual(states["skipped_profile_commands"]["type"], "json")
-        self.assertEqual(states["profile_write_result"]["type"], "markdown")
+        self.assertEqual(states["user_context_write_success"]["type"], "boolean")
+        self.assertEqual(states["applied_user_context_commands"]["type"], "json")
+        self.assertEqual(states["skipped_user_context_commands"]["type"], "json")
+        self.assertEqual(states["user_context_write_result"]["type"], "markdown")
+        self.assertEqual(states["structured_memory_write_success"]["type"], "boolean")
+        self.assertEqual(states["applied_structured_memory_commands"]["type"], "json")
+        self.assertEqual(states["skipped_structured_memory_commands"]["type"], "json")
+        self.assertEqual(states["written_structured_memories"]["type"], "json")
+        self.assertEqual(states["structured_memory_write_result"]["type"], "markdown")
+        self.assertEqual(states["buddy_identity_update_plan"]["type"], "json")
+        self.assertEqual(states["buddy_identity_review_result"]["type"], "markdown")
+        self.assertEqual(states["buddy_identity_write_success"]["type"], "boolean")
+        self.assertEqual(states["applied_buddy_identity_commands"]["type"], "json")
+        self.assertEqual(states["skipped_buddy_identity_commands"]["type"], "json")
+        self.assertEqual(states["buddy_identity_write_result"]["type"], "markdown")
         for removed_state in [
             "recall_request",
             "buddy_session_recall_success",
             "recalled_sessions",
             "buddy_session_recall_result",
             "memory_candidates",
-            "profile_candidates",
+            "buddy_identity_candidates",
             "memory_filter_report",
             "state_1",
             "writeback_commands",
@@ -2395,22 +2552,53 @@ class TemplateLayoutTests(unittest.TestCase):
                 "output_autonomous_review",
                 "output_improvement_candidates",
                 "output_memory_review_result",
+                "output_user_context_review_result",
                 "output_applied_memory_commands",
                 "output_memory_write_result",
-                "output_profile_review_result",
-                "output_applied_profile_commands",
-                "output_profile_write_result",
+                "output_applied_user_context_commands",
+                "output_user_context_write_result",
+                "output_applied_structured_memory_commands",
+                "output_structured_memory_write_result",
+                "output_buddy_identity_review_result",
+                "output_applied_buddy_identity_commands",
+                "output_buddy_identity_write_result",
             ],
         )
         for removed_node_id in [
             "prepare_session_recall_request",
             "filter_memory_candidates",
             "merge_memory_document",
-            "merge_profile_update",
+            "merge_buddy_identity_update",
+            "input_current_session_id",
+            "input_user_message",
+            "input_conversation_history",
+            "input_request_understanding",
+            "input_capability_result",
+            "input_capability_review",
+            "input_public_response",
             "output_session_recall_result",
             "output_memory_filter_report",
         ]:
             self.assertNotIn(removed_node_id, nodes)
+        loader_node = nodes["load_review_context"]
+        self.assertEqual(loader_node["kind"], "tool")
+        self.assertEqual(loader_node["config"]["toolKey"], "buddy_review_context_loader")
+        self.assertEqual(loader_node["reads"][0]["state"], "source_run_id")
+        self.assertIs(loader_node["reads"][0]["required"], True)
+        self.assertEqual(loader_node["reads"][0]["binding"]["fieldKey"], "source_run_id")
+        self.assertEqual(
+            [write["state"] for write in loader_node["writes"]],
+            [
+                "current_session_id",
+                "user_message",
+                "conversation_history",
+                "request_understanding",
+                "capability_result",
+                "capability_review",
+                "public_response",
+                "review_context_report",
+            ],
+        )
         recall_node = nodes["recall_related_sessions"]
         self.assertEqual(recall_node["kind"], "agent")
         self.assertEqual(recall_node["config"]["actionKey"], "buddy_session_recall")
@@ -2458,6 +2646,7 @@ class TemplateLayoutTests(unittest.TestCase):
                 {"state": "capability_result", "required": False},
                 {"state": "capability_review", "required": False},
                 {"state": "public_response", "required": True},
+                {"state": "review_context_report", "required": False},
                 {"state": "session_recall_context", "required": False},
             ],
         )
@@ -2467,14 +2656,24 @@ class TemplateLayoutTests(unittest.TestCase):
                 {"state": "autonomous_review", "mode": "replace"},
                 {"state": "improvement_candidates", "mode": "replace"},
                 {"state": "memory_update_plan", "mode": "replace"},
+                {"state": "user_context_update_plan", "mode": "replace"},
+                {"state": "structured_memory_update_plan", "mode": "replace"},
                 {"state": "memory_review_result", "mode": "replace"},
-                {"state": "profile_update_plan", "mode": "replace"},
-                {"state": "profile_review_result", "mode": "replace"},
+                {"state": "user_context_review_result", "mode": "replace"},
+                {"state": "buddy_identity_update_plan", "mode": "replace"},
+                {"state": "buddy_identity_review_result", "mode": "replace"},
             ],
         )
         self.assertIn("session_recall_context", review_node["config"]["taskInstruction"])
         self.assertIn("memory_update_plan", review_node["config"]["taskInstruction"])
-        self.assertIn("profile_update_plan", review_node["config"]["taskInstruction"])
+        self.assertIn("user_context_update_plan", review_node["config"]["taskInstruction"])
+        self.assertIn("structured_memory_update_plan", review_node["config"]["taskInstruction"])
+        self.assertIn("buddy_identity_update_plan", review_node["config"]["taskInstruction"])
+        self.assertIn("写入目标矩阵", review_node["config"]["taskInstruction"])
+        self.assertIn("SOUL.md / buddy_identity_update_plan", review_node["config"]["taskInstruction"])
+        self.assertIn("USER.md / user_context_update_plan", review_node["config"]["taskInstruction"])
+        self.assertIn("MEMORY.md / memory_update_plan", review_node["config"]["taskInstruction"])
+        self.assertIn("数据库结构化记忆 / structured_memory_update_plan", review_node["config"]["taskInstruction"])
         self.assertNotIn("Do not call buddy_home_writer", review_node["config"]["taskInstruction"])
         self.assertIn(
             'Map "call yourself X from now on" and "rename yourself to X" to payload.name',
@@ -2485,10 +2684,20 @@ class TemplateLayoutTests(unittest.TestCase):
             nodes["has_memory_updates"]["config"]["rule"],
             {"source": "$state.memory_update_plan.has_updates", "operator": "==", "value": True},
         )
-        self.assertEqual(nodes["has_profile_updates"]["kind"], "condition")
+        self.assertEqual(nodes["has_user_context_updates"]["kind"], "condition")
         self.assertEqual(
-            nodes["has_profile_updates"]["config"]["rule"],
-            {"source": "$state.profile_update_plan.has_updates", "operator": "==", "value": True},
+            nodes["has_user_context_updates"]["config"]["rule"],
+            {"source": "$state.user_context_update_plan.has_updates", "operator": "==", "value": True},
+        )
+        self.assertEqual(nodes["has_structured_memory_updates"]["kind"], "condition")
+        self.assertEqual(
+            nodes["has_structured_memory_updates"]["config"]["rule"],
+            {"source": "$state.structured_memory_update_plan.has_updates", "operator": "==", "value": True},
+        )
+        self.assertEqual(nodes["has_buddy_identity_updates"]["kind"], "condition")
+        self.assertEqual(
+            nodes["has_buddy_identity_updates"]["config"]["rule"],
+            {"source": "$state.buddy_identity_update_plan.has_updates", "operator": "==", "value": True},
         )
         writer_node = nodes["write_memory_updates"]
         self.assertEqual(writer_node["kind"], "agent")
@@ -2516,32 +2725,91 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertIn("memory_update_plan.commands", writer_node["config"]["actionInstructionBlocks"]["buddy_home_writer"]["content"])
         self.assertIn("memory_document.update", writer_node["config"]["actionInstructionBlocks"]["buddy_home_writer"]["content"])
-        profile_writer_node = nodes["write_profile_updates"]
-        self.assertEqual(profile_writer_node["kind"], "agent")
-        self.assertEqual(profile_writer_node["config"]["actionKey"], "buddy_home_writer")
+        user_context_writer_node = nodes["write_user_context_updates"]
+        self.assertEqual(user_context_writer_node["kind"], "agent")
+        self.assertEqual(user_context_writer_node["config"]["actionKey"], "buddy_home_writer")
         self.assertEqual(
-            _read_contracts(profile_writer_node["reads"]),
+            _read_contracts(user_context_writer_node["reads"]),
             [
                 {"state": "source_run_id", "required": False},
-                {"state": "profile_update_plan", "required": True},
+                {"state": "user_context_update_plan", "required": True},
             ],
         )
         self.assertEqual(
-            profile_writer_node["config"]["actionBindings"],
+            user_context_writer_node["config"]["actionBindings"],
             [
                 {
                     "actionKey": "buddy_home_writer",
                     "outputMapping": {
-                        "success": "profile_write_success",
-                        "applied_commands": "applied_profile_commands",
-                        "skipped_commands": "skipped_profile_commands",
-                        "result": "profile_write_result",
+                        "success": "user_context_write_success",
+                        "applied_commands": "applied_user_context_commands",
+                        "skipped_commands": "skipped_user_context_commands",
+                        "result": "user_context_write_result",
                     },
                 }
             ],
         )
-        self.assertIn("profile.update", profile_writer_node["config"]["actionInstructionBlocks"]["buddy_home_writer"]["content"])
-        self.assertIn("planned payload must use name", profile_writer_node["config"]["actionInstructionBlocks"]["buddy_home_writer"]["content"])
+        self.assertIn("user_context_update_plan.commands", user_context_writer_node["config"]["actionInstructionBlocks"]["buddy_home_writer"]["content"])
+        self.assertIn("user_context.update", user_context_writer_node["config"]["actionInstructionBlocks"]["buddy_home_writer"]["content"])
+        structured_writer_node = nodes["write_structured_memory_updates"]
+        self.assertEqual(structured_writer_node["kind"], "agent")
+        self.assertEqual(structured_writer_node["config"]["actionKey"], "buddy_memory_writer")
+        self.assertEqual(
+            _read_contracts(structured_writer_node["reads"]),
+            [
+                {"state": "source_run_id", "required": False},
+                {"state": "structured_memory_update_plan", "required": True},
+            ],
+        )
+        self.assertEqual(
+            structured_writer_node["config"]["actionBindings"],
+            [
+                {
+                    "actionKey": "buddy_memory_writer",
+                    "outputMapping": {
+                        "success": "structured_memory_write_success",
+                        "applied_commands": "applied_structured_memory_commands",
+                        "skipped_commands": "skipped_structured_memory_commands",
+                        "memories": "written_structured_memories",
+                        "result": "structured_memory_write_result",
+                    },
+                }
+            ],
+        )
+        self.assertIn(
+            "structured_memory_update_plan.commands",
+            structured_writer_node["config"]["actionInstructionBlocks"]["buddy_memory_writer"]["content"],
+        )
+        self.assertIn(
+            "memory_entry.create",
+            structured_writer_node["config"]["actionInstructionBlocks"]["buddy_memory_writer"]["content"],
+        )
+        buddy_identity_writer_node = nodes["write_buddy_identity_updates"]
+        self.assertEqual(buddy_identity_writer_node["kind"], "agent")
+        self.assertEqual(buddy_identity_writer_node["config"]["actionKey"], "buddy_home_writer")
+        self.assertEqual(
+            _read_contracts(buddy_identity_writer_node["reads"]),
+            [
+                {"state": "source_run_id", "required": False},
+                {"state": "buddy_identity_update_plan", "required": True},
+            ],
+        )
+        self.assertEqual(
+            buddy_identity_writer_node["config"]["actionBindings"],
+            [
+                {
+                    "actionKey": "buddy_home_writer",
+                    "outputMapping": {
+                        "success": "buddy_identity_write_success",
+                        "applied_commands": "applied_buddy_identity_commands",
+                        "skipped_commands": "skipped_buddy_identity_commands",
+                        "result": "buddy_identity_write_result",
+                    },
+                }
+            ],
+        )
+        self.assertIn("buddy_identity.update", buddy_identity_writer_node["config"]["actionInstructionBlocks"]["buddy_home_writer"]["content"])
+        self.assertIn("use payload.name", buddy_identity_writer_node["config"]["actionInstructionBlocks"]["buddy_home_writer"]["content"])
         self.assertEqual(
             template["conditional_edges"],
             [
@@ -2549,16 +2817,32 @@ class TemplateLayoutTests(unittest.TestCase):
                     "source": "has_memory_updates",
                     "branches": {
                         "true": "write_memory_updates",
-                        "false": "output_memory_review_result",
-                        "exhausted": "output_memory_review_result",
+                        "false": "has_user_context_updates",
+                        "exhausted": "has_user_context_updates",
                     },
                 },
                 {
-                    "source": "has_profile_updates",
+                    "source": "has_user_context_updates",
                     "branches": {
-                        "true": "write_profile_updates",
-                        "false": "output_profile_review_result",
-                        "exhausted": "output_profile_review_result",
+                        "true": "write_user_context_updates",
+                        "false": "has_structured_memory_updates",
+                        "exhausted": "has_structured_memory_updates",
+                    },
+                },
+                {
+                    "source": "has_structured_memory_updates",
+                    "branches": {
+                        "true": "write_structured_memory_updates",
+                        "false": "has_buddy_identity_updates",
+                        "exhausted": "has_buddy_identity_updates",
+                    },
+                },
+                {
+                    "source": "has_buddy_identity_updates",
+                    "branches": {
+                        "true": "write_buddy_identity_updates",
+                        "false": "output_buddy_identity_review_result",
+                        "exhausted": "output_buddy_identity_review_result",
                     },
                 },
             ],
@@ -2566,24 +2850,27 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             template["edges"],
             [
-                {"source": "input_source_run_id", "target": "recall_related_sessions"},
-                {"source": "input_current_session_id", "target": "recall_related_sessions"},
-                {"source": "input_user_message", "target": "recall_related_sessions"},
-                {"source": "input_conversation_history", "target": "recall_related_sessions"},
-                {"source": "input_request_understanding", "target": "recall_related_sessions"},
-                {"source": "input_public_response", "target": "recall_related_sessions"},
+                {"source": "input_source_run_id", "target": "load_review_context"},
+                {"source": "load_review_context", "target": "recall_related_sessions"},
+                {"source": "load_review_context", "target": "draft_autonomous_review"},
                 {"source": "input_buddy_context", "target": "draft_autonomous_review"},
-                {"source": "input_capability_result", "target": "draft_autonomous_review"},
-                {"source": "input_capability_review", "target": "draft_autonomous_review"},
                 {"source": "recall_related_sessions", "target": "draft_autonomous_review"},
                 {"source": "draft_autonomous_review", "target": "output_autonomous_review"},
                 {"source": "draft_autonomous_review", "target": "output_improvement_candidates"},
+                {"source": "draft_autonomous_review", "target": "output_memory_review_result"},
+                {"source": "draft_autonomous_review", "target": "output_user_context_review_result"},
                 {"source": "draft_autonomous_review", "target": "has_memory_updates"},
-                {"source": "draft_autonomous_review", "target": "has_profile_updates"},
+                {"source": "write_memory_updates", "target": "has_user_context_updates"},
                 {"source": "write_memory_updates", "target": "output_applied_memory_commands"},
                 {"source": "write_memory_updates", "target": "output_memory_write_result"},
-                {"source": "write_profile_updates", "target": "output_applied_profile_commands"},
-                {"source": "write_profile_updates", "target": "output_profile_write_result"},
+                {"source": "write_user_context_updates", "target": "has_structured_memory_updates"},
+                {"source": "write_user_context_updates", "target": "output_applied_user_context_commands"},
+                {"source": "write_user_context_updates", "target": "output_user_context_write_result"},
+                {"source": "write_structured_memory_updates", "target": "has_buddy_identity_updates"},
+                {"source": "write_structured_memory_updates", "target": "output_applied_structured_memory_commands"},
+                {"source": "write_structured_memory_updates", "target": "output_structured_memory_write_result"},
+                {"source": "write_buddy_identity_updates", "target": "output_applied_buddy_identity_commands"},
+                {"source": "write_buddy_identity_updates", "target": "output_buddy_identity_write_result"},
             ],
         )
 
@@ -2601,6 +2888,13 @@ class TemplateLayoutTests(unittest.TestCase):
         validation = validate_graph(graph)
         self.assertEqual([issue.model_dump() for issue in validation.issues], [])
         self.assertEqual(get_langgraph_runtime_unsupported_reasons(graph), [])
+        plan = compile_graph_to_langgraph_plan(graph)
+        route_sources = [route.source for route in plan.runtime_condition_routes]
+        self.assertEqual(
+            len(route_sources),
+            len(set(route_sources)),
+            "Buddy review template must not compile multiple LangGraph conditional routes from one runtime source.",
+        )
 
     def test_buddy_context_compaction_template_contract(self) -> None:
         template = load_template_record("buddy_context_compaction")

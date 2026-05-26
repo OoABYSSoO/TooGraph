@@ -1,6 +1,6 @@
 ---
 name: 伙伴之家写入器
-description: Internal controlled Buddy Home writer that applies safe command-based memory, session summary, profile, policy, and capability usage updates with revision records.
+description: Internal controlled Buddy Home writer that applies safe command-based memory, user context, session summary, buddy identity, and capability usage updates with revision records.
 ---
 
 # 伙伴之家写入器
@@ -28,18 +28,14 @@ State outputs:
 
 Allowed actions:
 
-- `memory.create`
-- `memory.update`
-- `memory.delete`
+- `memory_document.update`
+- `user_context.update`
 - `session_summary.update`
-- `profile.update`
-- `policy.update`
+- `buddy_identity.update`
 - `capability_usage_stats.update`
 
 Safety boundary:
 
 - Do not use this Action for arbitrary file writes, script execution, graph patches, revision restore, or permission escalation.
-- `policy.update` is limited to `communication_preferences`.
-- `policy.update` cannot modify `graph_permission_mode`, `behavior_boundaries`, or undeclared policy fields.
 - Unsupported or unsafe commands are skipped and returned in `skipped_commands`.
 - `capability_usage_stats.update` updates aggregate usage counters for capabilities that actually ran in the source run. Payloads can provide one entry or an `entries` array with `capability.kind`, `capability.key`, optional `capability.name`, `success`, `run_id`, `summary`, and optional `duration_ms`.

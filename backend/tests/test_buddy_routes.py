@@ -30,16 +30,16 @@ class BuddyRouteTests(unittest.TestCase):
             patcher.stop()
         self._data_temp_dir.cleanup()
 
-    def test_profile_roundtrip_creates_revision(self) -> None:
+    def test_buddy_identity_roundtrip_creates_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
                 with TestClient(app) as client:
-                    get_response = client.get("/api/buddy/profile")
+                    get_response = client.get("/api/buddy/identity")
                     put_response = client.put(
-                        "/api/buddy/profile",
+                        "/api/buddy/identity",
                         json={"name": "小石墨", "change_reason": "用户重命名"},
                     )
-                    revisions_response = client.get("/api/buddy/revisions", params={"target_type": "profile"})
+                    revisions_response = client.get("/api/buddy/revisions", params={"target_type": "buddy_identity"})
 
         self.assertEqual(get_response.status_code, 200)
         self.assertEqual(put_response.status_code, 200)
@@ -77,6 +77,36 @@ class BuddyRouteTests(unittest.TestCase):
         self.assertEqual(restore_response.status_code, 200)
         self.assertIn("No durable memories yet.", restored_response.json()["content"])
 
+    def test_user_context_update_and_restore(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home = Path(temp_dir) / "buddy_home"
+            with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
+                with TestClient(app) as client:
+                    initial_response = client.get("/api/buddy/user-context")
+                    update_response = client.post(
+                        "/api/buddy/commands",
+                        json={
+                            "action": "user_context.update",
+                            "payload": {"content": "# USER.md - About Your Human\n\n- 偏好直接中文回复。\n"},
+                            "change_reason": "用户直接编辑 USER.md。",
+                        },
+                    )
+                    current_response = client.get("/api/buddy/user-context")
+                    revisions = client.get(
+                        "/api/buddy/revisions",
+                        params={"target_type": "home_file", "target_id": "USER.md"},
+                    ).json()
+                    restore_response = client.post(f"/api/buddy/revisions/{revisions[-1]['revision_id']}/restore")
+                    restored_response = client.get("/api/buddy/user-context")
+
+        self.assertEqual(initial_response.status_code, 200)
+        self.assertIn("# USER.md - About Your Human", initial_response.json()["content"])
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.json()["command"]["action"], "user_context.update")
+        self.assertIn("偏好直接中文回复", current_response.json()["content"])
+        self.assertEqual(restore_response.status_code, 200)
+        self.assertIn("Current focus", restored_response.json()["content"])
+
     def test_home_files_endpoint_exposes_buddy_home_inventory_and_readable_content(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             buddy_home = Path(temp_dir) / "buddy_home"
@@ -93,7 +123,23 @@ class BuddyRouteTests(unittest.TestCase):
         self.assertNotIn("policy.json", files)
         self.assertNotIn("reports", files)
         self.assertTrue(files["AGENTS.md"]["readable"])
-        self.assertIn("Buddy Workspace", files["AGENTS.md"]["content"])
+        self.assertIn("Buddy Home 使用说明", files["AGENTS.md"]["content"])
+        self.assertIn("自主复盘写入目标", files["AGENTS.md"]["content"])
+
+    def test_policy_endpoint_is_not_exposed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home = Path(temp_dir) / "buddy_home"
+            with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
+                with TestClient(app) as client:
+                    get_response = client.get("/api/buddy/policy")
+                    put_response = client.put(
+                        "/api/buddy/policy",
+                        json={"communication_preferences": ["先给结论。"]},
+                    )
+
+        self.assertEqual(get_response.status_code, 404)
+        self.assertEqual(put_response.status_code, 404)
+        self.assertFalse((buddy_home / "policy.json").exists())
 
     def test_chat_session_message_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -177,7 +223,7 @@ class BuddyRouteTests(unittest.TestCase):
 
         self.assertEqual(default_response.status_code, 200)
         self.assertEqual(default_response.json()["template_id"], "buddy_autonomous_loop")
-        self.assertEqual(default_response.json()["input_bindings"]["input_user_message"], "current_message")
+        self.assertEqual(default_response.json()["input_bindings"], {"input_user_message": "current_message"})
         self.assertEqual(save_response.status_code, 200)
         self.assertEqual(save_response.json()["result"]["template_id"], "custom_loop")
         self.assertEqual(saved_response.json()["template_id"], "custom_loop")

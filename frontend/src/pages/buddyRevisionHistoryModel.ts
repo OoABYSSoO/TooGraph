@@ -20,8 +20,7 @@ export type BuddyRevisionHistoryRow = BuddyRevision & {
 
 export const BUDDY_REVISION_HISTORY_TARGET_FILTERS = [
   "all",
-  "profile",
-  "policy",
+  "buddy_identity",
   "memory",
   "session_summary",
   "run_template_binding",

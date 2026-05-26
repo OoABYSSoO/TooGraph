@@ -5,16 +5,14 @@ import { GLOBAL_RUNTIME_MODEL_OPTION_VALUE } from "../lib/runtimeModelCatalog.ts
 import { routeStreamingJsonStateText } from "../lib/streamingJsonStateRouter.ts";
 import {
   buildBuddyHomeContextValue,
+  resolveEffectiveBuddyMemoryReviewTemplateBinding,
+  resolveEffectiveBuddyRunTemplateBinding,
   validateBuddyMemoryReviewTemplateBinding,
   validateBuddyRunTemplateBinding,
 } from "./buddyTemplateBindingModel.ts";
 
 export const BUDDY_REVIEW_TEMPLATE_ID = "buddy_autonomous_review";
 export const BUDDY_REPLY_STATE_KEY = "state_4";
-export const BUDDY_PROFILE_STATE_KEY = "state_6";
-export const BUDDY_POLICY_STATE_KEY = "state_7";
-export const BUDDY_MEMORY_CONTEXT_STATE_KEY = "state_8";
-export const BUDDY_SESSION_SUMMARY_STATE_KEY = "state_9";
 export const BUDDY_AGENTIC_REPLY_STATE_KEYS = ["state_27", "state_25", "state_26", "state_16", "state_18"];
 export const MAX_BUDDY_HISTORY_MESSAGES = 12;
 export const MAX_BUDDY_HISTORY_CONTEXT_CHARS = 4000;
@@ -75,6 +73,7 @@ export type BuildBuddyChatGraphInput = {
   history: BuddyChatMessage[];
   sessionSummary?: string;
   currentSessionId?: string;
+  currentMessageId?: string;
   pageOperationContext?: BuddyActionRuntimeContext | null;
   buddyMode?: unknown;
   buddyModel?: unknown;
@@ -170,6 +169,7 @@ export function buildBuddyChatGraph(
   binding: BuddyRunTemplateBinding,
 ): GraphPayload {
   const buddyMode = resolveBuddyMode(input.buddyMode);
+  const effectiveBinding = resolveEffectiveBuddyRunTemplateBinding(template, binding);
   const graph: GraphPayload = {
     graph_id: null,
     name: template.default_graph_name,
@@ -181,9 +181,14 @@ export function buildBuddyChatGraph(
       ...cloneJson(template.metadata),
       origin: "buddy",
       buddy_template_id: template.template_id,
-      buddy_template_binding: cloneJson(binding),
+      buddy_template_binding: cloneJson(effectiveBinding),
       buddy_mode: buddyMode,
       buddy_can_execute_actions: buddyMode === "full_access",
+      runtime_context: {
+        invocation_source: "buddy_chat",
+        buddy_session_id: input.currentSessionId ?? "",
+        buddy_current_message_id: input.currentMessageId ?? "",
+      },
       action_runtime_context: cloneJson(input.pageOperationContext ?? {}),
     },
   };
@@ -194,7 +199,7 @@ export function buildBuddyChatGraph(
   if (!validation.valid) {
     throw new Error(`Buddy run template binding is invalid: ${validation.issues.join(" ")}`);
   }
-  applyBuddyRunTemplateBinding(graph, binding, buildBuddyRuntimeSourceValues(input));
+  applyBuddyRunTemplateBinding(graph, effectiveBinding, buildBuddyRuntimeSourceValues(input));
   return graph;
 }
 
@@ -220,23 +225,36 @@ export function buildBuddyReviewGraph(template: TemplateRecord, input: BuildBudd
   if (!validation.valid) {
     throw new Error(`Buddy memory review template binding is invalid: ${validation.issues.join(" ")}`);
   }
-  applyBuddyRunTemplateBinding(graph, input.binding, buildBuddyMemoryReviewRuntimeSourceValues(input));
+  const effectiveBinding = resolveEffectiveBuddyMemoryReviewTemplateBinding(template, input.binding);
+  applyBuddyRunTemplateBinding(graph, effectiveBinding, buildBuddyMemoryReviewRuntimeSourceValues(input));
 
   const outputDefaults: Record<string, unknown> = {
     autonomous_review: {},
     improvement_candidates: [],
     memory_update_plan: { has_updates: false, commands: [] },
+    user_context_update_plan: { has_updates: false, commands: [] },
+    structured_memory_update_plan: { has_updates: false, commands: [] },
     memory_review_result: "",
+    user_context_review_result: "",
     memory_write_success: false,
     applied_memory_commands: [],
     skipped_memory_commands: [],
     memory_write_result: "",
-    profile_update_plan: { has_updates: false, requires_confirmation: false, commands: [] },
-    profile_review_result: "",
-    profile_write_success: false,
-    applied_profile_commands: [],
-    skipped_profile_commands: [],
-    profile_write_result: "",
+    user_context_write_success: false,
+    applied_user_context_commands: [],
+    skipped_user_context_commands: [],
+    user_context_write_result: "",
+    structured_memory_write_success: false,
+    applied_structured_memory_commands: [],
+    skipped_structured_memory_commands: [],
+    written_structured_memories: [],
+    structured_memory_write_result: "",
+    buddy_identity_update_plan: { has_updates: false, requires_confirmation: false, commands: [] },
+    buddy_identity_review_result: "",
+    buddy_identity_write_success: false,
+    applied_buddy_identity_commands: [],
+    skipped_buddy_identity_commands: [],
+    buddy_identity_write_result: "",
   };
 
   for (const [stateName, value] of Object.entries(outputDefaults)) {
@@ -440,7 +458,7 @@ export function resolveBuddyRunActivityFromRunEvent(
   };
 }
 
-type BuddyRuntimeSourceValues<TSource extends string> = Record<TSource, unknown>;
+type BuddyRuntimeSourceValues<TSource extends string> = Partial<Record<TSource, unknown>>;
 
 function buildBuddyRuntimeSourceValues(input: BuildBuddyChatGraphInput): BuddyRuntimeSourceValues<BuddyRunInputSource> {
   return {
@@ -570,14 +588,6 @@ function buildBuddyMemoryReviewRuntimeSourceValues(
 ): BuddyRuntimeSourceValues<BuddyMemoryReviewInputSource> {
   return {
     source_run_id: input.mainRun.run_id,
-    current_session_id: input.currentSessionId,
-    user_message: resolveRunStateValueByName(input.mainRun, "user_message", ""),
-    conversation_history: resolveRunStateValueByName(input.mainRun, "conversation_history", ""),
-    buddy_home_context: buildBuddyHomeContextValue(),
-    request_understanding: resolveRunStateValueByName(input.mainRun, "request_understanding", {}),
-    capability_result: resolveRunStateValueByName(input.mainRun, "capability_result", {}),
-    capability_review: resolveRunStateValueByName(input.mainRun, "capability_review", {}),
-    public_response: resolveRunStateValueByName(input.mainRun, "public_response", resolveBuddyReplyText(input.mainRun)),
   };
 }
 

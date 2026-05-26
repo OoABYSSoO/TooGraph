@@ -13,20 +13,18 @@ from app.buddy.home import (
     AGENTS_PATH,
     CAPABILITY_USAGE_STATS_KEY,
     DEFAULT_CAPABILITY_USAGE_STATS,
-    DEFAULT_POLICY,
-    DEFAULT_PROFILE,
+    DEFAULT_BUDDY_IDENTITY,
     DEFAULT_SESSION_SUMMARY,
     MEMORY_PATH,
-    POLICY_PATH,
     SOUL_PATH,
     USER_PATH,
     ensure_buddy_home,
     get_default_buddy_home_dir,
     open_buddy_database,
-    read_profile_markdown,
-    render_profile_markdown,
+    read_buddy_identity_markdown,
+    render_buddy_identity_markdown,
 )
-from app.core.storage.json_file_utils import read_json_file, utc_now_iso, write_json_file
+from app.core.storage.json_file_utils import utc_now_iso
 
 
 BUDDY_HOME_DIR = get_default_buddy_home_dir()
@@ -71,20 +69,12 @@ ALLOWED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES = {
 }
 REQUIRED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES = {
     "source_run_id",
-    "current_session_id",
-    "user_message",
-    "public_response",
-    "buddy_home_context",
 }
 DEFAULT_RUN_TEMPLATE_BINDING = {
     "version": RUN_TEMPLATE_BINDING_VERSION,
     "template_id": "buddy_autonomous_loop",
     "input_bindings": {
         "input_user_message": "current_message",
-        "input_conversation_history": "conversation_history",
-        "input_existing_session_summary": "session_summary",
-        "input_buddy_context": "buddy_home_context",
-        "input_current_session_id": "current_session_id",
     },
 }
 DEFAULT_MEMORY_REVIEW_TEMPLATE_BINDING = {
@@ -92,14 +82,6 @@ DEFAULT_MEMORY_REVIEW_TEMPLATE_BINDING = {
     "template_id": "buddy_autonomous_review",
     "input_bindings": {
         "input_source_run_id": "source_run_id",
-        "input_current_session_id": "current_session_id",
-        "input_user_message": "user_message",
-        "input_conversation_history": "conversation_history",
-        "input_buddy_context": "buddy_home_context",
-        "input_request_understanding": "request_understanding",
-        "input_capability_result": "capability_result",
-        "input_capability_review": "capability_review",
-        "input_public_response": "public_response",
     },
 }
 
@@ -108,39 +90,22 @@ def initialize_buddy_home() -> None:
     ensure_buddy_home(BUDDY_HOME_DIR)
 
 
-def buddy_home_path(file_name: str) -> Path:
+def load_buddy_identity() -> dict[str, Any]:
     initialize_buddy_home()
-    return BUDDY_HOME_DIR / file_name
+    return read_buddy_identity_markdown(BUDDY_HOME_DIR / SOUL_PATH)
 
 
-def load_profile() -> dict[str, Any]:
-    initialize_buddy_home()
-    return read_profile_markdown(BUDDY_HOME_DIR / SOUL_PATH)
-
-
-def save_profile(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
-    previous = load_profile()
+def save_buddy_identity(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
+    previous = load_buddy_identity()
     cleaned = _clean_dict(payload)
     next_value = {
         **previous,
         **cleaned,
         "display_preferences": _merged_display_preferences(previous, cleaned),
     }
-    _write_with_revision("profile", "profile", "update", previous, next_value, changed_by, change_reason)
-    (BUDDY_HOME_DIR / SOUL_PATH).write_text(render_profile_markdown(next_value), encoding="utf-8")
-    return load_profile()
-
-
-def load_policy() -> dict[str, Any]:
-    return _normalize_policy(_read_dict(POLICY_PATH, DEFAULT_POLICY))
-
-
-def save_policy(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
-    previous = load_policy()
-    next_value = _normalize_policy({**previous, **_clean_dict(payload)})
-    _write_with_revision("policy", "policy", "update", previous, next_value, changed_by, change_reason)
-    _write_json(POLICY_PATH, next_value)
-    return load_policy()
+    _write_with_revision("buddy_identity", "buddy_identity", "update", previous, next_value, changed_by, change_reason)
+    (BUDDY_HOME_DIR / SOUL_PATH).write_text(render_buddy_identity_markdown(next_value), encoding="utf-8")
+    return load_buddy_identity()
 
 
 def load_memory_document() -> dict[str, Any]:
@@ -151,6 +116,31 @@ def load_memory_document() -> dict[str, Any]:
         "content": path.read_text(encoding="utf-8"),
         "updated_at": "",
     }
+
+
+def load_user_context_document() -> dict[str, Any]:
+    initialize_buddy_home()
+    path = BUDDY_HOME_DIR / USER_PATH
+    return {
+        "path": USER_PATH,
+        "content": path.read_text(encoding="utf-8"),
+        "updated_at": "",
+    }
+
+
+def save_user_context_document(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
+    previous = load_user_context_document()
+    content = str(payload.get("content") or "")
+    if not content.strip():
+        raise ValueError("USER.md content cannot be empty.")
+    next_value = {
+        "path": USER_PATH,
+        "content": content,
+        "updated_at": utc_now_iso(),
+    }
+    _write_with_revision("home_file", USER_PATH, "update", previous, next_value, changed_by, change_reason)
+    (BUDDY_HOME_DIR / USER_PATH).write_text(content, encoding="utf-8")
+    return load_user_context_document()
 
 
 def save_memory_document(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
@@ -314,7 +304,23 @@ def load_memory_review_template_binding() -> dict[str, Any]:
         value = {}
     if not isinstance(value, dict):
         value = {}
-    return _normalize_memory_review_template_binding(value)
+    try:
+        binding = _normalize_memory_review_template_binding(value)
+        if _memory_review_template_binding_needs_repair(value, binding):
+            return _with_memory_review_template_binding_repair_metadata(
+                binding,
+                reason="normalized_saved_binding",
+                previous_value=value,
+            )
+        return binding
+    except Exception as exc:
+        binding = _normalize_memory_review_template_binding(DEFAULT_MEMORY_REVIEW_TEMPLATE_BINDING)
+        return _with_memory_review_template_binding_repair_metadata(
+            binding,
+            reason="invalid_saved_binding",
+            previous_value=value,
+            error=str(exc),
+        )
 
 
 def save_memory_review_template_binding(
@@ -1277,27 +1283,22 @@ def restore_revision(revision_id: str, *, changed_by: str, change_reason: str) -
     target_type = str(revision["target_type"])
     target_id = str(revision["target_id"])
     restored = deepcopy(revision.get("previous_value") or {})
-    if target_type == "profile":
-        current = load_profile()
-        _write_with_revision("profile", "profile", "restore", current, restored, changed_by, change_reason)
-        (BUDDY_HOME_DIR / SOUL_PATH).write_text(render_profile_markdown(restored), encoding="utf-8")
-    elif target_type == "policy":
-        current = load_policy()
-        restored = _normalize_policy(restored)
-        _write_with_revision("policy", "policy", "restore", current, restored, changed_by, change_reason)
-        _write_json(POLICY_PATH, restored)
-    elif target_type == "home_file" and target_id == MEMORY_PATH:
-        current = load_memory_document()
+    if target_type == "buddy_identity":
+        current = load_buddy_identity()
+        _write_with_revision("buddy_identity", "buddy_identity", "restore", current, restored, changed_by, change_reason)
+        (BUDDY_HOME_DIR / SOUL_PATH).write_text(render_buddy_identity_markdown(restored), encoding="utf-8")
+    elif target_type == "home_file" and target_id in {MEMORY_PATH, USER_PATH}:
+        current = load_memory_document() if target_id == MEMORY_PATH else load_user_context_document()
         next_value = {
-            "path": MEMORY_PATH,
+            "path": target_id,
             "content": str(restored.get("content") or ""),
             "updated_at": utc_now_iso(),
         }
         if not next_value["content"].strip():
-            raise ValueError("Cannot restore an empty MEMORY.md revision.")
-        _write_with_revision("home_file", MEMORY_PATH, "restore", current, next_value, changed_by, change_reason)
-        (BUDDY_HOME_DIR / MEMORY_PATH).write_text(next_value["content"], encoding="utf-8")
-        restored = load_memory_document()
+            raise ValueError(f"Cannot restore an empty {target_id} revision.")
+        _write_with_revision("home_file", target_id, "restore", current, next_value, changed_by, change_reason)
+        (BUDDY_HOME_DIR / target_id).write_text(next_value["content"], encoding="utf-8")
+        restored = load_memory_document() if target_id == MEMORY_PATH else load_user_context_document()
     elif target_type == "session_summary":
         current = load_session_summary()
         _write_with_revision("session_summary", "session_summary", "restore", current, restored, changed_by, change_reason)
@@ -1448,28 +1449,42 @@ def _write_with_revision(
     return revision
 
 
-def _read_dict(file_name: str, default: dict[str, Any]) -> dict[str, Any]:
-    value = read_json_file(buddy_home_path(file_name), default=deepcopy(default))
-    return value if isinstance(value, dict) else deepcopy(default)
-
-
-def _normalize_policy(payload: dict[str, Any]) -> dict[str, Any]:
-    mode = payload.get("graph_permission_mode")
-    if mode == "full_access" or mode == "unrestricted":
-        graph_permission_mode = "full_access"
-    else:
-        graph_permission_mode = "ask_first"
-    return {**deepcopy(DEFAULT_POLICY), **payload, "graph_permission_mode": graph_permission_mode}
-
-
 def _normalize_run_template_binding(payload: dict[str, Any]) -> dict[str, Any]:
     template_id = str(payload.get("template_id") or "").strip()
     if not template_id:
         raise ValueError("template_id is required.")
     _ensure_run_template_can_be_bound(template_id)
+    template = _load_run_template_record_for_binding(template_id)
+    runtime_input_bindings = _resolve_template_runtime_input_bindings(template)
     raw_bindings = payload.get("input_bindings")
     if not isinstance(raw_bindings, dict):
         raise ValueError("input_bindings must be an object.")
+    if runtime_input_bindings:
+        _validate_template_runtime_input_binding_nodes(template, runtime_input_bindings)
+        for node_id, source in raw_bindings.items():
+            normalized_node_id = str(node_id or "").strip()
+            normalized_source = str(source or "").strip()
+            if not normalized_node_id or not normalized_source:
+                continue
+            if normalized_source in DEPRECATED_BUDDY_INPUT_SOURCES:
+                continue
+            if normalized_source not in ALLOWED_RUN_TEMPLATE_INPUT_SOURCES:
+                raise ValueError(f"Unsupported Buddy input source: {normalized_source}")
+            declared_source = runtime_input_bindings.get(normalized_node_id)
+            if not declared_source:
+                raise ValueError(f"Buddy input node is not declared as a runtime input: {normalized_node_id}")
+            if normalized_source != declared_source:
+                raise ValueError(f"Buddy input node {normalized_node_id} must be bound to {declared_source}.")
+        current_message_count = sum(1 for source in runtime_input_bindings.values() if source == "current_message")
+        if current_message_count != 1:
+            raise ValueError("current_message must be bound exactly once.")
+        return {
+            "version": RUN_TEMPLATE_BINDING_VERSION,
+            "template_id": template_id,
+            "input_bindings": dict(runtime_input_bindings),
+            "updated_at": str(payload.get("updated_at") or utc_now_iso()),
+        }
+
     input_bindings: dict[str, str] = {}
     for node_id, source in raw_bindings.items():
         normalized_node_id = str(node_id or "").strip()
@@ -1493,6 +1508,69 @@ def _normalize_run_template_binding(payload: dict[str, Any]) -> dict[str, Any]:
         "input_bindings": input_bindings,
         "updated_at": str(payload.get("updated_at") or utc_now_iso()),
     }
+
+
+def _load_run_template_record_for_binding(template_id: str) -> dict[str, Any] | None:
+    try:
+        from app.templates.loader import load_template_record
+
+        template = load_template_record(template_id)
+    except Exception:
+        return None
+    return template if isinstance(template, dict) else None
+
+
+def _resolve_template_runtime_input_bindings(template: dict[str, Any] | None) -> dict[str, str]:
+    metadata = template.get("metadata") if isinstance(template, dict) and isinstance(template.get("metadata"), dict) else {}
+    raw_bindings = metadata.get("buddyRuntimeInputBindings") if isinstance(metadata, dict) else None
+    if not isinstance(raw_bindings, dict):
+        return {}
+    input_bindings: dict[str, str] = {}
+    for node_id, source in raw_bindings.items():
+        normalized_node_id = str(node_id or "").strip()
+        normalized_source = str(source or "").strip()
+        if not normalized_node_id or not normalized_source:
+            continue
+        if normalized_source not in ALLOWED_RUN_TEMPLATE_INPUT_SOURCES:
+            raise ValueError(f"Unsupported Buddy input source: {normalized_source}")
+        if normalized_source in input_bindings.values():
+            raise ValueError(f"Buddy input source is already declared: {normalized_source}")
+        input_bindings[normalized_node_id] = normalized_source
+    return input_bindings
+
+
+def _resolve_memory_review_template_runtime_input_bindings(template: dict[str, Any] | None) -> dict[str, str]:
+    metadata = template.get("metadata") if isinstance(template, dict) and isinstance(template.get("metadata"), dict) else {}
+    raw_bindings = metadata.get("buddyMemoryReviewRuntimeInputBindings") if isinstance(metadata, dict) else None
+    if not isinstance(raw_bindings, dict):
+        return {}
+    input_bindings: dict[str, str] = {}
+    for node_id, source in raw_bindings.items():
+        normalized_node_id = str(node_id or "").strip()
+        normalized_source = str(source or "").strip()
+        if not normalized_node_id or not normalized_source:
+            continue
+        if normalized_source not in ALLOWED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES:
+            raise ValueError(f"Unsupported Buddy memory review input source: {normalized_source}")
+        if normalized_source in input_bindings.values():
+            raise ValueError(f"Buddy memory review input source is already declared: {normalized_source}")
+        input_bindings[normalized_node_id] = normalized_source
+    return input_bindings
+
+
+def _validate_template_runtime_input_binding_nodes(template: dict[str, Any] | None, input_bindings: dict[str, str]) -> None:
+    nodes = template.get("nodes") if isinstance(template, dict) and isinstance(template.get("nodes"), dict) else {}
+    state_schema = template.get("state_schema") if isinstance(template, dict) and isinstance(template.get("state_schema"), dict) else {}
+    for node_id in input_bindings:
+        node = nodes.get(node_id)
+        if not isinstance(node, dict) or node.get("kind") != "input":
+            raise ValueError(f"Buddy runtime input node is not an input node: {node_id}")
+        writes = node.get("writes")
+        if not isinstance(writes, list) or len(writes) != 1 or not isinstance(writes[0], dict):
+            raise ValueError(f"Buddy runtime input node must write exactly one state: {node_id}")
+        state_key = str(writes[0].get("state") or "").strip()
+        if not state_key or state_key not in state_schema:
+            raise ValueError(f"Buddy runtime input node writes a missing state: {node_id}")
 
 
 def _run_template_binding_needs_repair(raw_value: dict[str, Any], normalized_value: dict[str, Any]) -> bool:
@@ -1530,9 +1608,37 @@ def _normalize_memory_review_template_binding(payload: dict[str, Any]) -> dict[s
     if not template_id:
         raise ValueError("template_id is required.")
     _ensure_memory_review_template_can_be_bound(template_id)
+    template = _load_run_template_record_for_binding(template_id)
+    runtime_input_bindings = _resolve_memory_review_template_runtime_input_bindings(template)
     raw_bindings = payload.get("input_bindings")
     if not isinstance(raw_bindings, dict):
         raise ValueError("input_bindings must be an object.")
+    if runtime_input_bindings:
+        _validate_template_runtime_input_binding_nodes(template, runtime_input_bindings)
+        for node_id, source in raw_bindings.items():
+            normalized_node_id = str(node_id or "").strip()
+            normalized_source = str(source or "").strip()
+            if not normalized_node_id or not normalized_source:
+                continue
+            if normalized_source in DEPRECATED_BUDDY_INPUT_SOURCES:
+                continue
+            if normalized_source not in ALLOWED_MEMORY_REVIEW_TEMPLATE_INPUT_SOURCES:
+                raise ValueError(f"Unsupported Buddy memory review input source: {normalized_source}")
+            declared_source = runtime_input_bindings.get(normalized_node_id)
+            if not declared_source:
+                raise ValueError(f"Buddy memory review input node is not declared as a runtime input: {normalized_node_id}")
+            if normalized_source != declared_source:
+                raise ValueError(f"Buddy memory review input node {normalized_node_id} must be bound to {declared_source}.")
+        source_run_count = sum(1 for source in runtime_input_bindings.values() if source == "source_run_id")
+        if source_run_count != 1:
+            raise ValueError("source_run_id must be bound exactly once.")
+        return {
+            "version": MEMORY_REVIEW_TEMPLATE_BINDING_VERSION,
+            "template_id": template_id,
+            "input_bindings": dict(runtime_input_bindings),
+            "updated_at": str(payload.get("updated_at") or utc_now_iso()),
+        }
+
     input_bindings: dict[str, str] = {}
     for node_id, source in raw_bindings.items():
         normalized_node_id = str(node_id or "").strip()
@@ -1557,6 +1663,36 @@ def _normalize_memory_review_template_binding(payload: dict[str, Any]) -> dict[s
     }
 
 
+def _memory_review_template_binding_needs_repair(raw_value: dict[str, Any], normalized_value: dict[str, Any]) -> bool:
+    raw_template_id = str(raw_value.get("template_id") or "").strip()
+    normalized_template_id = str(normalized_value.get("template_id") or "").strip()
+    raw_bindings = raw_value.get("input_bindings") if isinstance(raw_value.get("input_bindings"), dict) else {}
+    normalized_bindings = normalized_value.get("input_bindings")
+    raw_version = int(raw_value.get("version") or MEMORY_REVIEW_TEMPLATE_BINDING_VERSION)
+    normalized_version = int(normalized_value.get("version") or MEMORY_REVIEW_TEMPLATE_BINDING_VERSION)
+    return (
+        raw_template_id != normalized_template_id
+        or raw_bindings != normalized_bindings
+        or raw_version != normalized_version
+    )
+
+
+def _with_memory_review_template_binding_repair_metadata(
+    binding: dict[str, Any],
+    *,
+    reason: str,
+    previous_value: dict[str, Any],
+    error: str = "",
+) -> dict[str, Any]:
+    return {
+        **binding,
+        "repair_recommended": True,
+        "repair_reason": reason,
+        "repair_previous_template_id": str(previous_value.get("template_id") or ""),
+        "repair_error": error,
+    }
+
+
 def _ensure_run_template_can_be_bound(template_id: str) -> None:
     from app.templates.loader import load_template_record, template_has_breakpoint_metadata
 
@@ -1576,10 +1712,6 @@ def _ensure_memory_review_template_can_be_bound(template_id: str) -> None:
     if role == "buddy_autonomous_review" or metadata.get("buddy_memory_review") is True or metadata.get("buddyMemoryReview") is True:
         return
     raise ValueError("Buddy memory review template binding must target a Buddy memory review template.")
-
-
-def _write_json(file_name: str, payload: Any) -> None:
-    write_json_file(buddy_home_path(file_name), payload)
 
 
 def _write_kv(key: str, payload: dict[str, Any], updated_at: str) -> None:
@@ -1729,10 +1861,9 @@ def _home_file_kind(relative_path: str, *, is_directory: bool) -> str:
 def _home_file_summary(relative_path: str, kind: str) -> str:
     summaries = {
         AGENTS_PATH: "Buddy Home operating instructions.",
-        SOUL_PATH: "Buddy profile, persona, tone, and display preferences.",
+        SOUL_PATH: "Buddy identity, persona, tone, and display preferences.",
         USER_PATH: "Durable context about the human Buddy helps.",
         MEMORY_PATH: "Curated long-term memory.",
-        POLICY_PATH: "Behavior and communication policy.",
     }
     if relative_path in summaries:
         return summaries[relative_path]

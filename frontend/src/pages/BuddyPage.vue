@@ -30,31 +30,54 @@
 
       <div v-if="isLoading && !hasLoaded" class="buddy-page__empty">{{ t("buddyPage.loading") }}</div>
       <ElTabs v-else v-model="activeTab" class="buddy-page__tabs">
-        <ElTabPane :label="t('buddyPage.tabs.profile')" name="profile">
+        <ElTabPane :label="t('buddyPage.tabs.identity')" name="identity">
           <article class="buddy-page__panel">
             <div class="buddy-page__panel-heading">
               <div>
-                <h3>{{ t("buddyPage.profile.title") }}</h3>
-                <p>{{ t("buddyPage.profile.body") }}</p>
+                <h3>{{ t("buddyPage.identity.title") }}</h3>
+                <p>{{ t("buddyPage.identity.body") }}</p>
               </div>
             </div>
             <ElForm label-position="top" class="buddy-page__form">
-              <ElFormItem :label="t('buddyPage.profile.name')">
-                <ElInput v-model="profileDraft.name" />
+              <ElFormItem :label="t('buddyPage.identity.name')">
+                <ElInput v-model="identityDraft.name" />
               </ElFormItem>
-              <ElFormItem :label="t('buddyPage.profile.persona')">
-                <ElInput v-model="profileDraft.persona" type="textarea" :rows="4" />
+              <ElFormItem :label="t('buddyPage.identity.persona')">
+                <ElInput v-model="identityDraft.persona" type="textarea" :rows="4" />
               </ElFormItem>
-              <ElFormItem :label="t('buddyPage.profile.tone')">
-                <ElInput v-model="profileDraft.tone" />
+              <ElFormItem :label="t('buddyPage.identity.tone')">
+                <ElInput v-model="identityDraft.tone" />
               </ElFormItem>
-              <ElFormItem :label="t('buddyPage.profile.responseStyle')">
-                <ElInput v-model="profileDraft.response_style" type="textarea" :rows="3" />
+              <ElFormItem :label="t('buddyPage.identity.responseStyle')">
+                <ElInput v-model="identityDraft.response_style" type="textarea" :rows="3" />
               </ElFormItem>
               <div class="buddy-page__actions">
-                <ElButton type="primary" :loading="isSavingProfile" @click="saveProfile">
+                <ElButton type="primary" :loading="isSavingIdentity" @click="saveIdentity">
                   <ElIcon><Check /></ElIcon>
-                  <span>{{ t("buddyPage.saveProfile") }}</span>
+                  <span>{{ t("buddyPage.saveIdentity") }}</span>
+                </ElButton>
+              </div>
+            </ElForm>
+          </article>
+        </ElTabPane>
+
+        <ElTabPane :label="t('buddyPage.tabs.userContext')" name="userContext">
+          <article class="buddy-page__panel buddy-page__panel--user-context">
+            <div class="buddy-page__panel-heading">
+              <div>
+                <h3>{{ t("buddyPage.userContext.documentTitle") }}</h3>
+                <p>{{ t("buddyPage.userContext.documentBody") }}</p>
+              </div>
+              <span class="buddy-page__meta">{{ userContextDraft.path || "USER.md" }}</span>
+            </div>
+            <ElForm label-position="top" class="buddy-page__form buddy-page__form--wide">
+              <ElFormItem :label="t('buddyPage.userContext.content')">
+                <ElInput v-model="userContextDraft.content" type="textarea" :rows="14" />
+              </ElFormItem>
+              <div class="buddy-page__actions">
+                <ElButton type="primary" :loading="isSavingUserContext" :disabled="!canSaveUserContext" @click="saveUserContextDocument">
+                  <ElIcon><Check /></ElIcon>
+                  <span>{{ t("buddyPage.userContext.saveDocument") }}</span>
                 </ElButton>
               </div>
             </ElForm>
@@ -753,16 +776,18 @@ import {
   fetchBuddyHomeFiles,
   fetchBuddyMemoryDocument,
   fetchBuddyMemoryReviewTemplateBinding,
-  fetchBuddyProfile,
+  fetchBuddyIdentity,
   fetchBuddyRevisions,
   fetchBuddyRunTemplateBinding,
   fetchBuddySessionSummary,
+  fetchBuddyUserContextDocument,
   restoreBuddyRevision,
   updateBuddyMemoryDocument,
   updateBuddyMemoryReviewTemplateBinding,
-  updateBuddyProfile,
+  updateBuddyIdentity,
   updateBuddyRunTemplateBinding,
   updateBuddySessionSummary,
+  updateBuddyUserContextDocument,
 } from "@/api/buddy";
 import { fetchTemplate, fetchTemplates } from "@/api/graphs";
 import { cancelRun, fetchRun, fetchRuns, resumeRun } from "@/api/runs";
@@ -795,11 +820,12 @@ import type {
   BuddyMemoryDocument,
   BuddyMemoryReviewInputSource,
   BuddyMemoryReviewTemplateBinding,
-  BuddyProfile,
+  BuddyIdentity,
   BuddyRevision,
   BuddyRunInputSource,
   BuddyRunTemplateBinding,
   BuddySessionSummary,
+  BuddyUserContextDocument,
 } from "@/types/buddy";
 import type { BuddyRunInputNodeOption, BuddyRunTemplateInputRow } from "@/buddy/buddyTemplateBindingModel";
 import type { TemplateRecord } from "@/types/node-system";
@@ -820,11 +846,12 @@ type LoadAllOptions = {
 const { t } = useI18n();
 const buddyContextStore = useBuddyContextStore();
 const buddyMascotDebugStore = useBuddyMascotDebugStore();
-const activeTab = ref("profile");
+const activeTab = ref("identity");
 const historyTargetFilter = ref<BuddyRevisionHistoryTargetFilter>("all");
 const hasLoaded = ref(false);
 const isLoading = ref(false);
-const isSavingProfile = ref(false);
+const isSavingIdentity = ref(false);
+const isSavingUserContext = ref(false);
 const isSavingMemory = ref(false);
 const isSavingSummary = ref(false);
 const isSavingBinding = ref(false);
@@ -837,7 +864,8 @@ const pausedRunActionBusy = ref(false);
 const restoreActionId = ref("");
 const errorMessage = ref("");
 
-const profileDraft = ref<BuddyProfile>(defaultProfileDraft());
+const identityDraft = ref<BuddyIdentity>(defaultIdentityDraft());
+const userContextDraft = ref<BuddyUserContextDocument>(defaultUserContextDraft());
 const memoryDocumentDraft = ref<BuddyMemoryDocument>(defaultMemoryDocumentDraft());
 const homeFiles = ref<BuddyHomeFiles>(defaultHomeFiles());
 const summaryDraft = ref<BuddySessionSummary>(defaultSummaryDraft());
@@ -865,16 +893,21 @@ const selectedPausedRunDetail = ref<RunDetail | null>(null);
 const canSaveMemory = computed(() => {
   return Boolean(memoryDocumentDraft.value.content.trim() && !isSavingMemory.value);
 });
+const canSaveUserContext = computed(() => {
+  return Boolean(userContextDraft.value.content.trim() && !isSavingUserContext.value);
+});
 const agentsHomeFile = computed(() => {
   return homeFiles.value.files.find((file) => file.path === "AGENTS.md") ?? null;
 });
 const orderedRevisionRows = computed(() => buildBuddyRevisionHistoryRows(revisions.value, commands.value));
 const filteredRevisionRows = computed(() => filterBuddyRevisionHistoryRows(orderedRevisionRows.value, historyTargetFilter.value));
 const bindingInputRows = computed(() => buildBuddyRunTemplateInputRows(selectedBindingTemplate.value));
-const bindingSourceRows = computed(() => buildBuddyRunTemplateSourceRows(bindingDraft.value));
+const bindingSourceRows = computed(() => buildBuddyRunTemplateSourceRows(bindingDraft.value, selectedBindingTemplate.value));
 const bindingValidation = computed(() => validateBuddyRunTemplateBinding(selectedBindingTemplate.value, bindingDraft.value));
 const memoryReviewBindingInputRows = computed(() => buildBuddyMemoryReviewTemplateInputRows(selectedMemoryReviewBindingTemplate.value));
-const memoryReviewBindingSourceRows = computed(() => buildBuddyMemoryReviewTemplateSourceRows(memoryReviewBindingDraft.value));
+const memoryReviewBindingSourceRows = computed(() =>
+  buildBuddyMemoryReviewTemplateSourceRows(memoryReviewBindingDraft.value, selectedMemoryReviewBindingTemplate.value),
+);
 const memoryReviewBindingValidation = computed(() =>
   validateBuddyMemoryReviewTemplateBinding(selectedMemoryReviewBindingTemplate.value, memoryReviewBindingDraft.value),
 );
@@ -930,13 +963,21 @@ const historyTargetOptions = computed(() =>
   })),
 );
 
-function defaultProfileDraft(): BuddyProfile {
+function defaultIdentityDraft(): BuddyIdentity {
   return {
     name: "",
     persona: "",
     tone: "",
     response_style: "",
     display_preferences: {},
+  };
+}
+
+function defaultUserContextDraft(): BuddyUserContextDocument {
+  return {
+    path: "USER.md",
+    content: "",
+    updated_at: "",
   };
 }
 
@@ -1163,8 +1204,9 @@ function normalizeMemoryReviewBindingDraft(binding: BuddyMemoryReviewTemplateBin
 
 function hasActiveBuddyPageWrite() {
   return Boolean(
-    isLoading.value ||
-      isSavingProfile.value ||
+      isLoading.value ||
+      isSavingIdentity.value ||
+      isSavingUserContext.value ||
       isSavingMemory.value ||
       isSavingSummary.value ||
       isSavingBinding.value ||
@@ -1184,7 +1226,8 @@ async function loadAll(options: LoadAllOptions = {}) {
       isLoading.value = true;
     }
     const [
-      profile,
+      identity,
+      userContextDocument,
       memoryDocument,
       homeFileList,
       summary,
@@ -1194,7 +1237,8 @@ async function loadAll(options: LoadAllOptions = {}) {
       runBinding,
       memoryReviewBinding,
     ] = await Promise.all([
-      fetchBuddyProfile(),
+      fetchBuddyIdentity(),
+      fetchBuddyUserContextDocument(),
       fetchBuddyMemoryDocument(),
       fetchBuddyHomeFiles(),
       fetchBuddySessionSummary(),
@@ -1204,7 +1248,8 @@ async function loadAll(options: LoadAllOptions = {}) {
       fetchBuddyRunTemplateBinding(),
       fetchBuddyMemoryReviewTemplateBinding(),
     ]);
-    profileDraft.value = profile;
+    identityDraft.value = identity;
+    userContextDraft.value = userContextDocument;
     memoryDocumentDraft.value = memoryDocument;
     homeFiles.value = homeFileList;
     summaryDraft.value = summary;
@@ -1344,11 +1389,11 @@ async function refreshHomeFiles() {
   homeFiles.value = await fetchBuddyHomeFiles();
 }
 
-async function saveProfile() {
+async function saveIdentity() {
   try {
-    isSavingProfile.value = true;
-    profileDraft.value = acceptCommandResult(
-      await updateBuddyProfile(profileDraft.value, t("buddyPage.changeReasons.profile")),
+    isSavingIdentity.value = true;
+    identityDraft.value = acceptCommandResult(
+      await updateBuddyIdentity(identityDraft.value, t("buddyPage.changeReasons.identity")),
     );
     await refreshAuditTrail();
     await refreshHomeFiles();
@@ -1358,7 +1403,31 @@ async function saveProfile() {
   } catch (error) {
     setError(error, "common.failedToSave");
   } finally {
-    isSavingProfile.value = false;
+    isSavingIdentity.value = false;
+  }
+}
+
+async function saveUserContextDocument() {
+  if (!canSaveUserContext.value) {
+    return;
+  }
+  try {
+    isSavingUserContext.value = true;
+    userContextDraft.value = acceptCommandResult(
+      await updateBuddyUserContextDocument(
+        { content: userContextDraft.value.content },
+        t("buddyPage.changeReasons.userContext"),
+      ),
+    );
+    await refreshAuditTrail();
+    await refreshHomeFiles();
+    buddyContextStore.notifyBuddyDataChanged();
+    errorMessage.value = "";
+    ElMessage.success(t("buddyPage.saved"));
+  } catch (error) {
+    setError(error, "common.failedToSave");
+  } finally {
+    isSavingUserContext.value = false;
   }
 }
 

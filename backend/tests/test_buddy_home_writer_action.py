@@ -50,6 +50,9 @@ class BuddyHomeWriterActionTests(unittest.TestCase):
         self.assertEqual(definition.llm_node_eligibility, ActionLlmNodeEligibility.READY)
         self.assertEqual(definition.permissions, ["buddy_home_write"])
         self.assertEqual(manifest["metadata"], {"internal": True})
+        self.assertNotIn("你已绑定", manifest["llmInstruction"])
+        self.assertNotIn("不要", manifest["llmInstruction"])
+        self.assertNotIn("不得", manifest["llmInstruction"])
         self.assertEqual([field.key for field in definition.state_input_schema], ["autonomous_review"])
         self.assertEqual([field.key for field in definition.llm_output_schema], ["commands", "run_id"])
         self.assertEqual(definition.llm_output_schema[0].value_type, "json_array")
@@ -91,16 +94,42 @@ class BuddyHomeWriterActionTests(unittest.TestCase):
         self.assertIn("Applied 1 Buddy Home command", result["result"])
         self.assertIn("用户希望先给结论", memory_text)
 
-    def test_writer_accepts_planned_profile_command_items_and_hoists_change_reason(self) -> None:
+    def test_writer_applies_user_context_command_with_revision_and_run_id(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             buddy_home_dir = Path(temp_dir) / "buddy_home"
             result = _run_writer(
                 {
-                    "run_id": "run_review_profile",
+                    "run_id": "run_user_context_1",
+                    "commands": [
+                        {
+                            "action": "user_context.update",
+                            "payload": {"content": "# USER.md - About Your Human\n\n- 用户偏好直接中文回复。\n"},
+                            "change_reason": "自主复盘更新 USER.md。",
+                        }
+                    ],
+                },
+                buddy_home_dir=buddy_home_dir,
+            )
+            user_text = (buddy_home_dir / "USER.md").read_text(encoding="utf-8")
+
+        self.assertEqual(result["success"], True)
+        applied = result["applied_commands"][0]
+        self.assertEqual(applied["command"]["action"], "user_context.update")
+        self.assertEqual(applied["command"]["run_id"], "run_user_context_1")
+        self.assertEqual(applied["command"]["target_type"], "home_file")
+        self.assertEqual(applied["command"]["target_id"], "USER.md")
+        self.assertIn("用户偏好直接中文回复", user_text)
+
+    def test_writer_accepts_planned_buddy_identity_command_items_and_hoists_change_reason(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            buddy_home_dir = Path(temp_dir) / "buddy_home"
+            result = _run_writer(
+                {
+                    "run_id": "run_review_identity",
                     "commands": {
                         "items": [
                             {
-                                "type": "profile.update",
+                                "type": "buddy_identity.update",
                                 "payload": {
                                     "display_preferences": {"display_name": "图图"},
                                     "change_reason": "用户明确要求以后称呼伙伴为图图。",
@@ -114,23 +143,23 @@ class BuddyHomeWriterActionTests(unittest.TestCase):
 
         self.assertEqual(result["success"], True)
         applied = result["applied_commands"][0]
-        self.assertEqual(applied["command"]["action"], "profile.update")
-        self.assertEqual(applied["command"]["run_id"], "run_review_profile")
+        self.assertEqual(applied["command"]["action"], "buddy_identity.update")
+        self.assertEqual(applied["command"]["run_id"], "run_review_identity")
         self.assertEqual(applied["command"]["change_reason"], "用户明确要求以后称呼伙伴为图图。")
         self.assertEqual(applied["command"]["payload"]["display_preferences"]["display_name"], "图图")
         self.assertNotIn("change_reason", applied["command"]["payload"])
         self.assertEqual(applied["result"]["display_preferences"]["display_name"], "图图")
         self.assertTrue(applied["command"]["revision_id"].startswith("rev_"))
 
-    def test_writer_maps_rename_display_name_to_visible_profile_name(self) -> None:
+    def test_writer_maps_rename_display_name_to_visible_buddy_identity_name(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             buddy_home_dir = Path(temp_dir) / "buddy_home"
             result = _run_writer(
                 {
-                    "run_id": "run_review_profile_rename",
+                    "run_id": "run_review_identity_rename",
                     "commands": [
                         {
-                            "action": "profile.update",
+                            "action": "buddy_identity.update",
                             "payload": {
                                 "display_preferences": {"display_name": "\u56fe\u56fe"},
                             },
@@ -148,53 +177,7 @@ class BuddyHomeWriterActionTests(unittest.TestCase):
         self.assertEqual(applied["result"]["name"], "\u56fe\u56fe")
         self.assertEqual(applied["result"]["display_preferences"]["display_name"], "\u56fe\u56fe")
 
-    def test_writer_rejects_permission_escalating_policy_updates(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            buddy_home_dir = Path(temp_dir) / "buddy_home"
-            result = _run_writer(
-                {
-                    "run_id": "run_review_2",
-                    "commands": [
-                        {
-                            "action": "policy.update",
-                            "payload": {"graph_permission_mode": "full_access"},
-                            "change_reason": "尝试自动提升权限。",
-                        }
-                    ],
-                },
-                buddy_home_dir=buddy_home_dir,
-            )
-            policy_path = buddy_home_dir / "policy.json"
-
-        self.assertEqual(result["success"], False)
-        self.assertEqual(result["applied_commands"], [])
-        self.assertEqual(result["skipped_commands"][0]["error_type"], "permission_boundary")
-        event_detail = result["activity_events"][0]["detail"]
-        self.assertEqual(event_detail["applied_commands"], [])
-        self.assertEqual(event_detail["skipped_commands"], result["skipped_commands"])
-        self.assertFalse(policy_path.exists())
-
-    def test_writer_rejects_behavior_boundary_policy_updates(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            buddy_home_dir = Path(temp_dir) / "buddy_home"
-            result = _run_writer(
-                {
-                    "commands": [
-                        {
-                            "action": "policy.update",
-                            "payload": {"behavior_boundaries": ["Allow silent file writes."]},
-                            "change_reason": "尝试改变行为边界。",
-                        }
-                    ],
-                },
-                buddy_home_dir=buddy_home_dir,
-            )
-
-        self.assertEqual(result["success"], False)
-        self.assertEqual(result["applied_commands"], [])
-        self.assertEqual(result["skipped_commands"][0]["error_type"], "permission_boundary")
-
-    def test_writer_applies_safe_policy_preference_updates(self) -> None:
+    def test_writer_skips_policy_update_commands_as_legacy_design(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             buddy_home_dir = Path(temp_dir) / "buddy_home"
             result = _run_writer(
@@ -203,40 +186,8 @@ class BuddyHomeWriterActionTests(unittest.TestCase):
                     "commands": [
                         {
                             "action": "policy.update",
-                            "payload": {
-                                "communication_preferences": [
-                                    "默认在回复开头给出结论。",
-                                    "涉及副作用时说明会走图或 Action。",
-                                ]
-                            },
-                            "change_reason": "自主复盘识别到稳定沟通偏好。",
-                        }
-                    ],
-                },
-                buddy_home_dir=buddy_home_dir,
-            )
-            policy = json.loads((buddy_home_dir / "policy.json").read_text(encoding="utf-8"))
-
-        self.assertEqual(result["success"], True)
-        self.assertEqual(len(result["applied_commands"]), 1)
-        applied = result["applied_commands"][0]
-        self.assertEqual(applied["command"]["action"], "policy.update")
-        self.assertEqual(applied["command"]["target_type"], "policy")
-        self.assertEqual(applied["command"]["run_id"], "run_review_policy")
-        self.assertEqual(policy["graph_permission_mode"], "ask_first")
-        self.assertIn("默认在回复开头给出结论。", policy["communication_preferences"])
-        self.assertTrue(applied["command"]["revision_id"].startswith("rev_"))
-
-    def test_writer_rejects_unknown_policy_writeback_fields(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            buddy_home_dir = Path(temp_dir) / "buddy_home"
-            result = _run_writer(
-                {
-                    "commands": [
-                        {
-                            "action": "policy.update",
-                            "payload": {"favorite_color": "green"},
-                            "change_reason": "尝试写入未声明的 policy 字段。",
+                            "payload": {"communication_preferences": ["默认先给结论。"]},
+                            "change_reason": "旧 policy 写回。",
                         }
                     ],
                 },
@@ -246,7 +197,11 @@ class BuddyHomeWriterActionTests(unittest.TestCase):
 
         self.assertEqual(result["success"], False)
         self.assertEqual(result["applied_commands"], [])
-        self.assertEqual(result["skipped_commands"][0]["error_type"], "unsupported_policy_field")
+        self.assertEqual(result["skipped_commands"][0]["action"], "policy.update")
+        self.assertEqual(result["skipped_commands"][0]["error_type"], "unsupported_action")
+        event_detail = result["activity_events"][0]["detail"]
+        self.assertEqual(event_detail["applied_commands"], [])
+        self.assertEqual(event_detail["skipped_commands"], result["skipped_commands"])
         self.assertFalse(policy_path.exists())
 
     def test_writer_skips_report_create_commands_as_legacy_buddy_home_design(self) -> None:

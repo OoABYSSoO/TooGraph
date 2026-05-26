@@ -6,11 +6,11 @@ import type {
   BuddyHomeFiles,
   BuddyMemoryReviewTemplateBinding,
   BuddyMemoryDocument,
-  BuddyPolicy,
-  BuddyProfile,
+  BuddyIdentity,
   BuddyRevision,
   BuddyRunTemplateBinding,
   BuddySessionSummary,
+  BuddyUserContextDocument,
 } from "../types/buddy.ts";
 
 import { apiDelete, apiGet, apiPatch, apiPost } from "./http.ts";
@@ -29,20 +29,23 @@ function executeBuddyCommand<T>(
   });
 }
 
-export function fetchBuddyProfile() {
-  return apiGet<BuddyProfile>("/api/buddy/profile");
+export function fetchBuddyIdentity() {
+  return apiGet<BuddyIdentity>("/api/buddy/identity");
 }
 
-export function updateBuddyProfile(payload: Partial<BuddyProfile>, changeReason: string) {
-  return executeBuddyCommand<BuddyProfile>("profile.update", payload, changeReason);
+export function updateBuddyIdentity(payload: Partial<BuddyIdentity>, changeReason: string) {
+  return executeBuddyCommand<BuddyIdentity>("buddy_identity.update", payload, changeReason);
 }
 
-export function fetchBuddyPolicy() {
-  return apiGet<BuddyPolicy>("/api/buddy/policy");
+export function fetchBuddyUserContextDocument() {
+  return apiGet<BuddyUserContextDocument>("/api/buddy/user-context");
 }
 
-export function updateBuddyPolicy(payload: Partial<BuddyPolicy>, changeReason: string) {
-  return executeBuddyCommand<BuddyPolicy>("policy.update", payload, changeReason);
+export function updateBuddyUserContextDocument(
+  payload: Pick<BuddyUserContextDocument, "content">,
+  changeReason: string,
+) {
+  return executeBuddyCommand<BuddyUserContextDocument>("user_context.update", payload, changeReason);
 }
 
 export function fetchBuddyMemoryDocument() {

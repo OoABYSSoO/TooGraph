@@ -12,18 +12,20 @@ import {
   fetchBuddyHomeFiles,
   fetchBuddyChatMessages,
   fetchBuddyChatSessions,
-  fetchBuddyProfile,
+  fetchBuddyIdentity,
+  fetchBuddyUserContextDocument,
   restoreBuddyRevision,
   updateBuddyChatSession,
   updateBuddyMemoryDocument,
   updateBuddyMemoryReviewTemplateBinding,
-  updateBuddyProfile,
+  updateBuddyIdentity,
   updateBuddyRunTemplateBinding,
+  updateBuddyUserContextDocument,
 } from "./buddy.ts";
 
 const originalFetch = globalThis.fetch;
 
-test("buddy API reads profile and sends profile writes through command flow", async () => {
+test("buddy API reads identity and sends identity writes through command flow", async () => {
   const requests: Array<{ url: string; body: unknown }> = [];
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     requests.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
@@ -34,15 +36,38 @@ test("buddy API reads profile and sends profile writes through command flow", as
     });
   }) as typeof fetch;
 
-  await fetchBuddyProfile();
-  await updateBuddyProfile({ name: "Tutu" }, "Manual profile update.");
+  await fetchBuddyIdentity();
+  await updateBuddyIdentity({ name: "Tutu" }, "Manual buddy identity update.");
 
-  assert.equal(requests[0].url, "/api/buddy/profile");
+  assert.equal(requests[0].url, "/api/buddy/identity");
   assert.equal(requests[1].url, "/api/buddy/commands");
   assert.deepEqual(requests[1].body, {
-    action: "profile.update",
+    action: "buddy_identity.update",
     payload: { name: "Tutu" },
-    change_reason: "Manual profile update.",
+    change_reason: "Manual buddy identity update.",
+  });
+  globalThis.fetch = originalFetch;
+});
+
+test("buddy API updates USER.md through user context command flow", async () => {
+  const requests: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    requests.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
+    return new Response(JSON.stringify({ result: { path: "USER.md" } }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  await fetchBuddyUserContextDocument();
+  await updateBuddyUserContextDocument({ content: "# USER.md\n\n- Prefers direct Chinese." }, "Manual user context update.");
+
+  assert.equal(requests[0].url, "/api/buddy/user-context");
+  assert.equal(requests[1].url, "/api/buddy/commands");
+  assert.deepEqual(requests[1].body, {
+    action: "user_context.update",
+    payload: { content: "# USER.md\n\n- Prefers direct Chinese." },
+    change_reason: "Manual user context update.",
   });
   globalThis.fetch = originalFetch;
 });
