@@ -185,7 +185,7 @@ test("buddy API manages chat sessions and messages directly", async () => {
     content: "我在。",
     include_in_context: false,
     run_id: "run_1",
-    metadata: { kind: "output_trace", outputTrace: { segmentId: "segment_1" } },
+    metadata: { source: "manual_note" },
   });
   await deleteBuddyChatSession("session_1");
 
@@ -203,7 +203,7 @@ test("buddy API manages chat sessions and messages directly", async () => {
     content: "我在。",
     include_in_context: false,
     run_id: "run_1",
-    metadata: { kind: "output_trace", outputTrace: { segmentId: "segment_1" } },
+    metadata: { source: "manual_note" },
   });
   assert.equal(requests[5].method, "DELETE");
   assert.equal(requests[5].url, "/api/buddy/sessions/session_1");

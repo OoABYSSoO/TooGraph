@@ -84,7 +84,9 @@ test("RunsPage paginates run history instead of rendering every run at once", ()
   assert.match(componentSource, /import \{[\s\S]*ElPagination[\s\S]*\} from "element-plus";/);
   assert.match(componentSource, /RUNS_PAGE_SIZE/);
   assert.match(componentSource, /const currentPage = ref\(1\);/);
-  assert.match(componentSource, /const paginatedRuns = computed\(\(\) => paginateRuns\(runs\.value, currentPage\.value\)\);/);
+  assert.match(componentSource, /sortRunsForHistory/);
+  assert.match(componentSource, /const sortedRuns = computed\(\(\) => sortRunsForHistory\(runs\.value\)\);/);
+  assert.match(componentSource, /const paginatedRuns = computed\(\(\) => paginateRuns\(sortedRuns\.value, currentPage\.value\)\);/);
   assert.match(componentSource, /v-for="run in paginatedRuns"/);
   assert.doesNotMatch(componentSource, /v-for="run in runs"/);
   assert.match(componentSource, /<ElPagination[\s\S]*v-model:current-page="currentPage"[\s\S]*:page-size="RUNS_PAGE_SIZE"[\s\S]*:total="runs\.length"/);

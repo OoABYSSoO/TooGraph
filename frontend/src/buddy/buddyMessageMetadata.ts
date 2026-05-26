@@ -23,20 +23,6 @@ type PublicOutputBuddyMessageMetadata = {
   publicOutput: BuddyPublicOutputMetadata;
 };
 
-export function buildOutputTraceBuddyMessageMetadata(outputTrace: BuddyOutputTraceSegment): OutputTraceBuddyMessageMetadata {
-  return {
-    kind: "output_trace",
-    outputTrace,
-  };
-}
-
-export function buildPublicOutputBuddyMessageMetadata(publicOutput: BuddyPublicOutputMetadata): PublicOutputBuddyMessageMetadata {
-  return {
-    kind: "public_output",
-    publicOutput,
-  };
-}
-
 export function resolveOutputTraceBuddyMessageMetadata(metadata: unknown): BuddyOutputTraceSegment | null {
   if (!isRecord(metadata) || metadata.kind !== "output_trace") {
     return null;

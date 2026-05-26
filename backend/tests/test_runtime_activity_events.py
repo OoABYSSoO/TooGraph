@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -9,6 +10,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.runtime.activity_events import record_activity_event
+from app.core.storage import database, run_store
 from app.core.storage.operation_journal_store import list_operation_journal_entries
 
 
@@ -102,6 +104,51 @@ class RuntimeActivityEventsTests(unittest.TestCase):
 
         self.assertEqual(state["activity_events"], [event])
         self.assertEqual(published, [("run-activity", "activity.event", event)])
+
+    def test_result_event_persistence_skips_token_delta_activity_events(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            run = {
+                "run_id": "run-activity-db",
+                "root_run_id": "run-activity-db",
+                "run_path": ["run-activity-db"],
+                "graph_id": "graph_activity",
+                "graph_name": "Activity Graph",
+                "status": "completed",
+                "started_at": "2026-05-26T00:00:00Z",
+                "activity_events": [
+                    {
+                        "sequence": 1,
+                        "kind": "node.output.delta",
+                        "summary": "stream token",
+                        "created_at": "2026-05-26T00:00:01Z",
+                    },
+                    {
+                        "sequence": 2,
+                        "kind": "action_invocation",
+                        "summary": "Action completed.",
+                        "status": "succeeded",
+                        "created_at": "2026-05-26T00:00:02Z",
+                    },
+                ],
+            }
+
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"),
+            ):
+                database.initialize_storage()
+                run_store.save_run(run)
+                with sqlite3.connect(data_dir / "toograph.db") as connection:
+                    event_types = [
+                        row[0]
+                        for row in connection.execute(
+                            "SELECT event_type FROM graph_run_events WHERE run_id = ? ORDER BY sequence",
+                            ("run-activity-db",),
+                        ).fetchall()
+                    ]
+
+        self.assertEqual(event_types, ["action_invocation"])
 
     def test_record_action_activity_events_normalizes_action_payloads(self) -> None:
         state = {"run_id": "run-activity"}

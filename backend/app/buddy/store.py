@@ -11,7 +11,6 @@ from uuid import uuid4
 
 from app.buddy.home import (
     AGENTS_PATH,
-    BUDDY_DB_PATH,
     CAPABILITY_USAGE_STATS_KEY,
     DEFAULT_CAPABILITY_USAGE_STATS,
     DEFAULT_POLICY,
@@ -207,13 +206,6 @@ def list_home_files() -> dict[str, Any]:
         _home_file_entry(BUDDY_HOME_DIR / SOUL_PATH, SOUL_PATH),
         _home_file_entry(BUDDY_HOME_DIR / USER_PATH, USER_PATH),
         _home_file_entry(BUDDY_HOME_DIR / MEMORY_PATH, MEMORY_PATH),
-        _home_file_entry(
-            BUDDY_HOME_DIR / BUDDY_DB_PATH,
-            BUDDY_DB_PATH,
-            kind="database",
-            readable=False,
-            summary="SQLite database backing Buddy chat sessions, messages, command audit records, revisions, and recall indexes.",
-        ),
     ]
     return {"root": str(BUDDY_HOME_DIR), "files": files}
 
@@ -566,8 +558,8 @@ def append_chat_message(
     if role not in {"user", "assistant"}:
         raise ValueError("Message role must be user or assistant.")
     content = str(payload.get("content") or "")
-    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
-    if not content.strip() and metadata.get("kind") != "output_trace":
+    metadata = _sanitize_chat_message_metadata(payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {})
+    if not content.strip():
         raise ValueError("Message content cannot be empty.")
     now = utc_now_iso()
     client_order = _coerce_chat_message_client_order(payload.get("client_order"))
@@ -605,6 +597,31 @@ def append_chat_message(
                 message["updated_at"],
             ),
         )
+        connection.execute(
+            """
+            INSERT INTO buddy_message_revisions
+                (revision_id, message_id, session_id, role, content, metadata_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                f"msgrev_{uuid4().hex[:12]}",
+                message["message_id"],
+                message["session_id"],
+                message["role"],
+                message["content"],
+                _json_dumps(message["metadata"]),
+                message["created_at"],
+            ),
+        )
+        if message["run_id"]:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO buddy_message_run_refs
+                    (message_id, run_id, relation, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (message["message_id"], message["run_id"], "primary", message["created_at"]),
+            )
         next_title = str(session.get("title") or DEFAULT_CHAT_SESSION_TITLE)
         if role == "user" and next_title == DEFAULT_CHAT_SESSION_TITLE:
             next_title = _derive_chat_session_title(content)
@@ -618,6 +635,16 @@ def append_chat_message(
         )
         connection.commit()
     return _get_chat_message(str(message["message_id"]))
+
+
+def _sanitize_chat_message_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    sanitized = dict(metadata)
+    derived_kind = str(sanitized.get("kind") or "").strip()
+    if derived_kind in {"output_trace", "public_output"}:
+        sanitized.pop("kind", None)
+    for key in ("outputTrace", "publicOutput", "output_trace", "public_output"):
+        sanitized.pop(key, None)
+    return sanitized
 
 
 def _recall_chat_messages_browse(*, limit: int) -> dict[str, Any]:

@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  buildPublicOutputBuddyMessageMetadata,
-  buildOutputTraceBuddyMessageMetadata,
   resolvePublicOutputBuddyMessageMetadata,
   resolveOutputTraceBuddyMessageMetadata,
 } from "./buddyMessageMetadata.ts";
@@ -46,20 +44,6 @@ const publicOutput = {
   durationMs: 800,
   status: "completed" as const,
 };
-
-test("buildOutputTraceBuddyMessageMetadata stores trace segments as buddy message metadata", () => {
-  assert.deepEqual(buildOutputTraceBuddyMessageMetadata(outputTrace), {
-    kind: "output_trace",
-    outputTrace,
-  });
-});
-
-test("buildPublicOutputBuddyMessageMetadata stores public output display metadata", () => {
-  assert.deepEqual(buildPublicOutputBuddyMessageMetadata(publicOutput), {
-    kind: "public_output",
-    publicOutput,
-  });
-});
 
 test("resolvePublicOutputBuddyMessageMetadata restores only valid public output metadata", () => {
   assert.deepEqual(resolvePublicOutputBuddyMessageMetadata({ kind: "public_output", publicOutput }), publicOutput);

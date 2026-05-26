@@ -101,6 +101,56 @@
           </div>
         </article>
 
+        <article v-if="contextAuditVisible" class="run-detail__panel run-detail__panel--context-audit">
+          <div class="run-detail__panel-heading">
+            <div>
+              <span class="run-detail__section-kicker">{{ t("runDetail.contextAudit") }}</span>
+              <h3>{{ t("runDetail.contextAuditTitle") }}</h3>
+            </div>
+          </div>
+          <div class="run-detail__badges">
+            <span>{{ t("runDetail.contextSourceCount", { count: contextAudit?.contextSourceCount ?? 0 }) }}</span>
+            <span>{{ t("runDetail.retrievalQueryCount", { count: contextAudit?.retrieval.queryCount ?? 0 }) }}</span>
+            <span>{{ t("runDetail.retrievedMemoryCount", { count: contextAudit?.retrieval.retrievedMemoriesCount ?? 0 }) }}</span>
+            <span>{{ t("runDetail.retrievedChunkCount", { count: contextAudit?.retrieval.retrievedChunksCount ?? 0 }) }}</span>
+          </div>
+          <div class="run-detail__audit-grid">
+            <section v-if="contextAuditAssemblies.length > 0" class="run-detail__audit-section">
+              <h4>{{ t("runDetail.contextAssemblies") }}</h4>
+              <div class="run-detail__audit-list">
+                <div v-for="assembly in contextAuditAssemblies" :key="assembly.key" class="run-detail__audit-item">
+                  <div class="run-detail__audit-title">
+                    <strong>{{ assembly.targetStateKey || assembly.assemblyId }}</strong>
+                    <small>{{ t("runDetail.contextSourceCount", { count: assembly.sourceCount }) }}</small>
+                  </div>
+                  <div class="run-detail__badges">
+                    <span>{{ t("runDetail.renderer") }} {{ assembly.rendererKey || "—" }}@{{ assembly.rendererVersion || "—" }}</span>
+                    <span>{{ t("runDetail.hash") }} {{ assembly.renderedHash || "—" }}</span>
+                    <span v-for="kind in assembly.sourceKinds" :key="`${assembly.key}-${kind}`">{{ kind }}</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section v-if="contextAuditSources.length > 0" class="run-detail__audit-section">
+              <h4>{{ t("runDetail.retrievalSources") }}</h4>
+              <div class="run-detail__audit-list">
+                <div v-for="source in contextAuditSources" :key="source.key" class="run-detail__audit-item">
+                  <div class="run-detail__audit-title">
+                    <strong>{{ source.sourceKind }} · {{ source.sourceId }}</strong>
+                    <small>{{ source.mode || "retrieval" }}</small>
+                  </div>
+                  <div class="run-detail__badges">
+                    <span v-if="source.sourceRevisionId">{{ source.sourceRevisionId }}</span>
+                    <span v-if="source.chunkId">chunk {{ source.chunkId }}</span>
+                    <span v-if="source.contentHash">{{ t("runDetail.hash") }} {{ source.contentHash }}</span>
+                    <span v-if="source.queryId">query {{ source.queryId }}</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </article>
+
         <article v-if="runTreeVisible" class="run-detail__panel run-detail__panel--run-tree">
           <div class="run-detail__panel-heading">
             <div>
@@ -389,6 +439,7 @@ import type { RunDetail, RunTreeNode } from "@/types/run";
 
 import {
   buildRunAggregatedTimeline,
+  buildRunContextAudit,
   buildRunStatusFacts,
   buildRunTreeDisplayItems,
   countRunTreeNodes,
@@ -446,6 +497,19 @@ const cycleVisualization = computed(() =>
 );
 const outputArtifacts = computed(() => (viewedRun.value ? listRunOutputArtifacts(viewedRun.value) : []));
 const aggregatedTimeline = computed(() => (viewedRun.value ? buildRunAggregatedTimeline(viewedRun.value) : []));
+const contextAudit = computed(() => (viewedRun.value ? buildRunContextAudit(viewedRun.value) : null));
+const contextAuditAssemblies = computed(() => contextAudit.value?.assemblies ?? []);
+const contextAuditSources = computed(() => contextAudit.value?.retrieval.sources.slice(0, 12) ?? []);
+const contextAuditVisible = computed(() =>
+  Boolean(
+    contextAudit.value &&
+      (
+        contextAudit.value.assemblies.length > 0 ||
+        contextAudit.value.retrieval.resultCount > 0 ||
+        contextAudit.value.contextSourceCount > 0
+      ),
+  ),
+);
 const runTreeDisplayItems = computed(() => buildRunTreeDisplayItems(runTree.value));
 const runTreeNodeCount = computed(() => countRunTreeNodes(runTree.value));
 const runTreeVisible = computed(() =>
@@ -885,6 +949,11 @@ function statusBadgeClass(status: string) {
   background: rgba(246, 253, 251, 0.9);
 }
 
+.run-detail__panel--context-audit {
+  border-color: rgba(79, 70, 229, 0.16);
+  background: rgba(248, 250, 252, 0.92);
+}
+
 .run-detail__panel--wide {
   grid-column: 1 / -1;
 }
@@ -1076,6 +1145,7 @@ function statusBadgeClass(status: string) {
 
 .run-detail__list,
 .run-detail__artifacts,
+.run-detail__audit-list,
 .run-detail__live-list,
 .run-detail__operation-journal-list,
 .run-detail__run-tree,
@@ -1084,6 +1154,63 @@ function statusBadgeClass(status: string) {
 .run-detail__meta-groups {
   display: grid;
   gap: 12px;
+}
+
+.run-detail__audit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.run-detail__audit-section {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.run-detail__audit-section h4 {
+  margin: 0;
+  color: var(--toograph-text-strong);
+  font-size: 0.95rem;
+}
+
+.run-detail__audit-item {
+  min-width: 0;
+  border: 1px solid rgba(79, 70, 229, 0.12);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.run-detail__audit-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.run-detail__audit-title strong,
+.run-detail__audit-title small {
+  overflow-wrap: anywhere;
+}
+
+.run-detail__audit-title strong {
+  color: var(--toograph-text-strong);
+}
+
+.run-detail__audit-title small {
+  flex: none;
+  color: rgba(60, 41, 20, 0.58);
+  font-family: var(--toograph-font-mono);
+  font-size: 0.76rem;
+}
+
+.run-detail__audit-item .run-detail__badges span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .run-detail__run-tree {
@@ -1509,7 +1636,8 @@ function statusBadgeClass(status: string) {
 }
 
 @media (max-width: 960px) {
-  .run-detail__grid {
+  .run-detail__grid,
+  .run-detail__audit-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1532,6 +1660,10 @@ function statusBadgeClass(status: string) {
   }
 
   .run-detail__memory-title {
+    display: grid;
+  }
+
+  .run-detail__audit-title {
     display: grid;
   }
 

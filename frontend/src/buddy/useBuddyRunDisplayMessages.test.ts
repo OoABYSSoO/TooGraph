@@ -244,6 +244,65 @@ function createDisplayHarness() {
   return { display, messages };
 }
 
+test("syncBuddyRunDetailDisplay rebuilds historical trace and output messages from RunDetail", () => {
+  const { display, messages } = createDisplayHarness();
+  const graph = directOutputTimelineGraph();
+  const run = {
+    run_id: "run_1",
+    status: "completed",
+    graph_snapshot: graph,
+    output_previews: [
+      {
+        node_id: "output_answer",
+        source_kind: "state",
+        source_key: "answer",
+        display_mode: "markdown",
+        persist_enabled: false,
+        persist_format: "auto",
+        value: "最终回复",
+      },
+    ],
+    node_executions: [
+      {
+        node_id: "writer",
+        node_type: "agent",
+        status: "success",
+        started_at: "2026-05-24T03:14:00.000Z",
+        finished_at: "2026-05-24T03:14:04.000Z",
+        duration_ms: 4000,
+        input_summary: "",
+        output_summary: "最终回复",
+        artifacts: { inputs: {}, outputs: {}, family: "agent", state_reads: [], state_writes: [] },
+        warnings: [],
+        errors: [],
+      },
+    ],
+    artifacts: {
+      state_events: [
+        {
+          node_id: "writer",
+          state_key: "answer",
+          output_key: "answer",
+          value: "最终回复",
+          sequence: 1,
+          created_at: "2026-05-24T03:14:04.000Z",
+        },
+      ],
+    },
+  } as Partial<RunDetail> as RunDetail;
+
+  const result = display.syncBuddyRunDetailDisplay("controller", run);
+
+  assert.equal(result.outputTraceMessages.length, 1);
+  assert.equal(result.publicOutputMessages.length, 1);
+  assert.equal(messages.value[1].id, "controller:trace:boundary:writer");
+  assert.equal(messages.value[1].runId, "run_1");
+  assert.equal(messages.value[1].outputTrace?.records[0]?.label, "Writer");
+  assert.equal(messages.value[2].id, "controller:output:output_answer");
+  assert.equal(messages.value[2].content, "最终回复");
+  assert.equal(messages.value[2].includeInContext, false);
+});
+
 function repeatedLoopTraceState() {
   return {
     order: ["segment_1", "segment_2"],

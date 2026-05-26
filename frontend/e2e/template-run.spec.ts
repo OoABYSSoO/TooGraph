@@ -1,4 +1,5 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -153,5 +154,26 @@ function collectBrowserProblems(page: Page) {
 
 function cleanupRunRecord(runId: string) {
   const rootDir = path.resolve(process.cwd(), "..");
-  fs.rmSync(path.join(rootDir, "backend/data/runs", `${runId}.json`), { force: true });
+  const result = spawnSync(
+    "python",
+    [
+      "-c",
+      [
+        "import sys",
+        "sys.path.insert(0, 'backend')",
+        "from app.core.storage.database import get_connection",
+        "run_id = sys.argv[1]",
+        "tables = ['graph_run_snapshots', 'graph_node_executions', 'graph_run_events', 'graph_state_events', 'graph_outputs', 'graph_artifacts', 'graph_capability_invocations', 'graph_model_calls']",
+        "with get_connection() as connection:",
+        "    for table in tables:",
+        "        connection.execute(f'DELETE FROM {table} WHERE run_id = ?', (run_id,))",
+        "    connection.execute('DELETE FROM graph_runs WHERE run_id = ?', (run_id,))",
+      ].join("\n"),
+      runId,
+    ],
+    { cwd: rootDir, encoding: "utf8" },
+  );
+  if (result.status !== 0) {
+    throw new Error(`Failed to clean up run record: ${result.stderr || result.stdout}`);
+  }
 }

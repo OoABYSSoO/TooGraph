@@ -11,10 +11,29 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.buddy import store
+from app.core.storage import database
 from app.main import app
 
 
 class BuddyCommandRouteTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._temp_dir = tempfile.TemporaryDirectory()
+        self._data_dir = Path(self._temp_dir.name) / "data"
+        self._buddy_home_dir = Path(self._temp_dir.name) / "buddy_home"
+        self._patchers = [
+            patch("app.core.storage.database.DATA_DIR", self._data_dir),
+            patch("app.core.storage.database.DB_PATH", self._data_dir / "toograph.db"),
+            patch.object(store, "BUDDY_HOME_DIR", self._buddy_home_dir),
+        ]
+        for patcher in self._patchers:
+            patcher.start()
+        database.initialize_storage()
+
+    def tearDown(self) -> None:
+        for patcher in reversed(self._patchers):
+            patcher.stop()
+        self._temp_dir.cleanup()
+
     def test_profile_update_command_records_command_and_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):

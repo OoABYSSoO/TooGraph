@@ -13,6 +13,7 @@ from app.core.runtime import agent_prompt
 from app.core.runtime.agent_prompt import build_auto_system_prompt
 from app.core.runtime.llm_output_parser import parse_llm_json_response
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
+from app.core.storage import database
 from app.core.storage.capability_artifact_store import create_uploaded_capability_artifact, resolve_capability_artifact_path
 
 
@@ -617,6 +618,40 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         )
 
         self.assertEqual(parsed, {"state_1": "这是中文语义字段返回的内容"})
+
+    def test_auto_prompt_expands_context_assembly_ref_to_rendered_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"),
+            ):
+                database.initialize_storage()
+                from app.core.storage.context_assembly_store import create_context_assembly
+
+                ref = create_context_assembly(
+                    target_state_key="conversation_history",
+                    renderer_key="buddy_history",
+                    renderer_version="1",
+                    rendered_text="伙伴: 我会从统一数据库事实回答。",
+                    sources=[],
+                )
+                prompt = build_auto_system_prompt(
+                    ["answer"],
+                    {"conversation_history": ref},
+                    {},
+                    state_schema={
+                        "conversation_history": NodeSystemStateDefinition(
+                            name="历史对话",
+                            type=NodeSystemStateType.MARKDOWN,
+                        ),
+                        "answer": NodeSystemStateDefinition(type=NodeSystemStateType.MARKDOWN),
+                    },
+                )
+
+        self.assertIn("伙伴: 我会从统一数据库事实回答。", prompt)
+        self.assertNotIn('"kind": "context_assembly_ref"', prompt)
+        self.assertNotIn(ref["assembly_id"], prompt)
 
 
 if __name__ == "__main__":

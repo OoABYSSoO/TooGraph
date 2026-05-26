@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.runtime.run_tree import create_child_run_state
 from app.core.runtime.state import create_initial_run_state
+from app.core.storage import database
 from app.core.storage import run_store
 
 
@@ -35,7 +36,11 @@ def test_create_child_run_state_records_parent_root_and_invocation_metadata() ->
 
 
 def test_build_run_tree_returns_nested_children(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr(run_store, "RUN_DATA_DIR", tmp_path)
+    data_dir = tmp_path / "data"
+    monkeypatch.setattr(database, "DATA_DIR", data_dir)
+    monkeypatch.setattr(database, "DB_PATH", data_dir / "toograph.db")
+    monkeypatch.setattr(run_store, "RUN_DATA_DIR", tmp_path / "legacy_runs", raising=False)
+    database.initialize_storage()
     root = create_initial_run_state("graph_root", "Root Graph")
     root["run_id"] = "run_root"
     root["root_run_id"] = "run_root"

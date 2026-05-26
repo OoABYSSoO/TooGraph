@@ -12,6 +12,7 @@ import {
   paginateRuns,
   resolveRunsCardDetail,
   resolveRunsEmptyAction,
+  sortRunsForHistory,
 } from "./runsPageModel.ts";
 
 test("resolveRunsEmptyAction points empty runs state back to the editor entry", () => {
@@ -64,6 +65,16 @@ test("paginateRuns limits run history to the requested page", () => {
     paginateRuns(runs, 2).map((run) => run.run_id),
     [`run_${RUNS_PAGE_SIZE + 1}`, `run_${RUNS_PAGE_SIZE + 2}`, `run_${RUNS_PAGE_SIZE + 3}`],
   );
+});
+
+test("sortRunsForHistory orders runs by started_at and run_id without legacy JSON fields", () => {
+  const runs = [
+    createRun("run_b", "completed", "2026-05-25T10:00:00Z"),
+    createRun("run_c", "completed", "2026-05-26T10:00:00Z"),
+    createRun("run_a", "completed", "2026-05-26T10:00:00Z"),
+  ];
+
+  assert.deepEqual(sortRunsForHistory(runs).map((run) => run.run_id), ["run_c", "run_a", "run_b"]);
 });
 
 test("clampRunsPage keeps pagination inside available pages", () => {
@@ -145,7 +156,7 @@ test("buildRunRestoreTargets falls back to the current run when no explicit term
   );
 });
 
-function createRun(runId: string, status: string): RunSummary {
+function createRun(runId: string, status: string, startedAt = "2026-04-18T00:00:00Z"): RunSummary {
   return {
     run_id: runId,
     graph_id: "graph_1",
@@ -160,6 +171,6 @@ function createRun(runId: string, status: string): RunSummary {
       available: false,
     },
     revision_round: 0,
-    started_at: "2026-04-18T00:00:00Z",
+    started_at: startedAt,
   };
 }

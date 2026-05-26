@@ -85,6 +85,16 @@ export function paginateRuns(runs: RunSummary[], page: number, pageSize = RUNS_P
   return runs.slice(start, start + normalizedPageSize);
 }
 
+export function sortRunsForHistory(runs: RunSummary[]) {
+  return [...runs].sort((left, right) => {
+    const startedDiff = Date.parse(right.started_at) - Date.parse(left.started_at);
+    if (Number.isFinite(startedDiff) && startedDiff !== 0) {
+      return startedDiff;
+    }
+    return right.run_id.localeCompare(left.run_id);
+  });
+}
+
 export function buildRunRestoreTargets(run: RunSummary): RunsRestoreTarget[] {
   if (!run.restorable_snapshot_available) {
     return [];

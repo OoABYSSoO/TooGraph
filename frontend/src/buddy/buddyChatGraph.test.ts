@@ -517,6 +517,22 @@ function assertAgentNode(node: TemplateRecord["nodes"][string]): asserts node is
   assert.equal(node.kind, "agent");
 }
 
+function assertContextAssemblyRef(value: unknown) {
+  assert.equal(typeof value, "object");
+  assert.notEqual(value, null);
+  assert.equal(Array.isArray(value), false);
+  const ref = value as Record<string, unknown>;
+  assert.equal(ref.kind, "context_assembly_ref");
+  assert.equal(ref.target_state_key, "conversation_history");
+  assert.equal(ref.renderer_key, "buddy_history");
+  assert.equal(ref.renderer_version, "1");
+  assert.equal(typeof ref.assembly_id, "string");
+  assert.equal(typeof ref.source_count, "number");
+  assert.equal("rendered_text" in ref, false);
+  assert.equal("text" in ref, false);
+  return ref;
+}
+
 test("formatBuddyHistory keeps a compact readable transcript", () => {
   assert.equal(
     formatBuddyHistory([
@@ -692,7 +708,7 @@ test("buildBuddyChatGraph injects only configured input-node bindings", () => {
     createTemplate(),
     {
       userMessage: "帮我看当前页面",
-      history: [{ role: "assistant", content: "我在。" }],
+      history: [{ id: "msg_assistant_1", role: "assistant", content: "我在。" }],
       buddyMode: "full_access",
     },
     {
@@ -707,12 +723,22 @@ test("buildBuddyChatGraph injects only configured input-node bindings", () => {
   assert.equal(graph.graph_id, null);
   assert.equal(graph.name, "伙伴对话循环");
   assert.equal(graph.state_schema.state_1.value, "帮我看当前页面");
-  assert.equal(graph.state_schema.state_2.value, "伙伴: 我在。");
+  const stateHistoryRef = assertContextAssemblyRef(graph.state_schema.state_2.value);
+  assert.equal(stateHistoryRef.source_count, 1);
   assert.equal(graph.state_schema[BUDDY_REPLY_STATE_KEY].value, "");
   assertInputNode(graph.nodes.input_user_message);
   assertInputNode(graph.nodes.input_conversation_history);
   assert.equal(graph.nodes.input_user_message.config.value, "帮我看当前页面");
-  assert.equal(graph.nodes.input_conversation_history.config.value, "伙伴: 我在。");
+  const nodeHistoryRef = assertContextAssemblyRef(graph.nodes.input_conversation_history.config.value);
+  assert.equal(nodeHistoryRef.source_count, 1);
+  assert.deepEqual(nodeHistoryRef.source_refs, [
+    {
+      source_kind: "buddy_message",
+      source_id: "msg_assistant_1",
+      role: "assistant",
+      ordinal: 0,
+    },
+  ]);
   assert.equal(graph.metadata.origin, "buddy");
   assert.equal(graph.metadata.buddy_mode, "full_access");
   assert.equal(graph.metadata.buddy_can_execute_actions, true);
@@ -790,6 +816,7 @@ test("buildBuddyChatGraph feeds official loop conversation history and session s
     config: { value: "" },
   };
   const history = Array.from({ length: 18 }, (_, index) => ({
+    id: `msg_${index}`,
     role: index % 2 === 0 ? "user" as const : "assistant" as const,
     content: `turn-${index}`,
   }));
@@ -812,9 +839,19 @@ test("buildBuddyChatGraph feeds official loop conversation history and session s
   );
 
   assert.equal(graph.state_schema.existing_session_summary.value, "summary-so-far");
-  assert.match(String(graph.nodes.input_conversation_history.config.value), /summary-so-far/);
-  assert.match(String(graph.nodes.input_conversation_history.config.value), /turn-17/);
-  assert.doesNotMatch(String(graph.nodes.input_conversation_history.config.value), /turn-0/);
+  const historyRef = assertContextAssemblyRef(graph.nodes.input_conversation_history.config.value);
+  assert.equal(historyRef.source_count, 13);
+  assert.deepEqual((historyRef.source_refs as Array<Record<string, unknown>>)[0], {
+    source_kind: "buddy_session_summary",
+    source_id: "session_summary",
+    role: "summary",
+    ordinal: 0,
+  });
+  assert.equal((historyRef.source_refs as Array<Record<string, unknown>>).at(-1)?.source_id, "msg_17");
+  assert.equal(
+    (historyRef.source_refs as Array<Record<string, unknown>>).some((source) => source.source_id === "msg_0"),
+    false,
+  );
 });
 
 test("buildBuddyChatGraph marks ask-first mode without a blanket reply breakpoint", () => {

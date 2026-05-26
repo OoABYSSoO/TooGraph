@@ -7,6 +7,9 @@ from app.core.runtime.state import utc_now_iso
 from app.core.schemas.node_system import NodeSystemGraphDocument, NodeSystemStateType, StateWriteMode
 
 
+REFERENCE_STATE_KINDS = {"content_ref", "context_assembly_ref"}
+
+
 def input_state_keys(graph: NodeSystemGraphDocument) -> set[str]:
     keys: set[str] = set()
     for node in graph.nodes.values():
@@ -27,6 +30,10 @@ def default_empty_state_value(state_type: NodeSystemStateType) -> Any:
     if state_type == NodeSystemStateType.CAPABILITY:
         return {"kind": "none"}
     return ""
+
+
+def is_reference_state_value(value: Any) -> bool:
+    return isinstance(value, dict) and str(value.get("kind") or "") in REFERENCE_STATE_KINDS
 
 
 def build_graph_state_values(

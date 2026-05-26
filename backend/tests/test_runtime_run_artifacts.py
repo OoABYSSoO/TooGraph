@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.core.storage import database
+from app.core.storage.content_blob_store import INLINE_JSON_VALUE_LIMIT_BYTES, get_content_blob
 from app.core.runtime.run_artifacts import (
     append_run_snapshot,
     refresh_run_artifacts,
@@ -55,6 +59,35 @@ class RuntimeRunArtifactsTests(unittest.TestCase):
         self.assertEqual(state["artifacts"]["exported_outputs"][0]["saved_file"]["path"], "answer.txt")
         self.assertEqual(state["state_snapshot"], {"values": {"answer": "done"}, "last_writers": {"answer": {"node_id": "agent"}}})
         self.assertNotIn("knowledge_summary", state)
+
+    def test_refresh_run_artifacts_references_large_state_values_as_content_blobs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            large_text = "A" * (INLINE_JSON_VALUE_LIMIT_BYTES + 1)
+            state = {
+                "state_values": {"essay": large_text, "answer": "short"},
+                "state_last_writers": {"essay": {"node_id": "agent"}},
+            }
+
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"),
+            ):
+                database.initialize_storage()
+                refresh_run_artifacts(
+                    state,
+                    {"agent": {"essay": large_text}},
+                    set(),
+                    started_perf=time.perf_counter(),
+                )
+                essay_snapshot = state["state_snapshot"]["values"]["essay"]
+                blob = get_content_blob(essay_snapshot["content_hash"])
+
+        self.assertEqual(state["state_values"]["essay"], large_text)
+        self.assertEqual(state["state_snapshot"]["values"]["answer"], "short")
+        self.assertEqual(essay_snapshot["kind"], "content_ref")
+        self.assertEqual(essay_snapshot["mime_type"], "application/json")
+        self.assertEqual(blob["content_text"], large_text)
 
     def test_append_run_snapshot_deep_copies_current_run_state(self) -> None:
         state = {

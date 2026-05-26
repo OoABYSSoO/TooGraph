@@ -469,7 +469,7 @@ test("BuddyWidget keeps the composer enabled and queues sends while a reply is r
 test("BuddyWidget keeps runtime error replies out of model context and persisted history", () => {
   assert.match(componentSource, /const history = buildHistoryBeforeMessage\(userEntry\.id\);/);
   assert.match(componentSource, /const history = turn\.history;/);
-  assert.match(messagesSource, /return previousMessages\.filter\(isContextMessage\)\.map\(\(\{ role, content \}\) => \(\{ role, content \}\)\);/);
+  assert.match(messagesSource, /return previousMessages\.filter\(isContextMessage\)\.map\(\(\{ id, role, content \}\) => \(\{ id, role, content \}\)\);/);
   assert.match(componentSource, /appendBuddyChatMessage\(sessionId,[\s\S]*include_in_context: options\.includeInContext \?\? message\.includeInContext !== false,[\s\S]*\)/);
   assert.match(componentSource, /updateAssistantMessage\(assistantMessage\.id, t\("buddy\.errorReply", \{ error: message \}\), \{ includeInContext: false \}\);/);
   assert.match(componentSource, /persistBuddyMessage\(turn\.sessionId,[\s\S]*includeInContext: false,[\s\S]*\);/);
@@ -522,7 +522,8 @@ test("BuddyWidget closed reply bubble is a four-character opener instead of a co
 test("BuddyWidget renders output-segment run trace capsules instead of per-message duration chips", () => {
   assert.match(runTraceDisplaySource, /import \{ formatRunDuration \} from "\.\.\/lib\/run-display-name\.ts";/);
   assert.match(runTraceDisplaySource, /import \{[\s\S]*advanceSmoothNumberDisplay,[\s\S]*isSmoothNumberDisplaySettled,[\s\S]*\} from "\.\.\/lib\/smoothNumberDisplay\.ts";/);
-  assert.match(messagesSource, /import \{[\s\S]*buildOutputTraceBuddyMessageMetadata,[\s\S]*resolveOutputTraceBuddyMessageMetadata,[\s\S]*\} from "\.\/buddyMessageMetadata\.ts";/);
+  assert.doesNotMatch(messagesSource, /buildOutputTraceBuddyMessageMetadata/);
+  assert.doesNotMatch(messagesSource, /resolveOutputTraceBuddyMessageMetadata/);
   assert.match(componentSource, /import BuddyRunTrace from "\.\/BuddyRunTrace\.vue";/);
   assert.match(componentSource, /import \{ useBuddyRunTraceDisplay \} from "\.\/useBuddyRunTraceDisplay\.ts";/);
   assert.match(componentSource, /buildBuddyOutputTracePlan/);
@@ -572,12 +573,17 @@ test("BuddyWidget renders output-segment run trace capsules instead of per-messa
   assert.doesNotMatch(componentSource, /buildRunNodeTimingByNodeIdFromRun/);
   assert.match(runDisplayMessagesSource, /replayPublicOutputEventsFromRunDetail/);
   assert.match(runDisplayMessagesSource, /reduceBuddyPublicOutputEvent/);
-  assert.match(componentSource, /const \{ publicOutputMessages, outputTraceMessages \} = syncBuddyRunDisplayMessages/);
-  assert.match(componentSource, /for \(const message of outputTraceMessages\) \{[\s\S]*persistBuddyMessage\(sessionId, message,[\s\S]*includeInContext:\s*false/);
+  assert.match(componentSource, /const \{ publicOutputMessages \} = syncBuddyRunDisplayMessages/);
+  assert.doesNotMatch(componentSource, /for \(const message of outputTraceMessages\)/);
+  assert.match(componentSource, /resolvePersistentBuddyReplyContent\(publicOutputMessages, runDetail\)/);
+  assert.match(componentSource, /transcriptOnly:\s*true/);
+  assert.match(componentSource, /hydrateLoadedRunDisplays: hydrateLoadedBuddyRunDisplays/);
+  assert.match(componentSource, /syncBuddyRunDetailDisplay/);
+  assert.match(chatSessionsSource, /hydrateLoadedRunDisplays\?: \(records: BuddyChatMessageRecord\[\]\) => Promise<void>/);
   assert.match(componentSource, /const metadata = buildBuddyMessageMetadata\(message\);/);
   assert.match(messagesSource, /function buildBuddyMessageMetadata\(message: BuddyMessage\)/);
   assert.match(componentSource, /\.\.\.\(metadata \? \{ metadata \} : \{\}\)/);
-  assert.match(messagesSource, /outputTrace:\s*resolveOutputTraceBuddyMessageMetadata\(record\.metadata\) \?\? undefined/);
+  assert.match(messagesSource, /transcriptOnly:\s*record\.role === "assistant" && Boolean\(record\.run_id\)/);
   assert.doesNotMatch(componentSource, /formatPublicOutputDuration/);
   assert.doesNotMatch(componentSource, /runTraceStartedAtByKey/);
 });

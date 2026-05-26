@@ -952,7 +952,8 @@ test("EditorWorkspaceShell delegates graph persistence actions to a workspace co
     /const \{[\s\S]*renameActiveGraph,[\s\S]*saveActiveGraph,[\s\S]*saveTab,[\s\S]*validateActiveGraph,[\s\S]*exportActiveGraph,[\s\S]*\} = useWorkspaceGraphPersistenceController\(\{/,
   );
   assert.match(graphPersistenceControllerSource, /async function saveTab\(tabId: string\)/);
-  assert.match(graphPersistenceControllerSource, /const response = await input\.saveGraph\(documentToSave\);/);
+  assert.match(graphPersistenceControllerSource, /const graphDocumentToSave = graphId \? \{ \.\.\.documentToSave, graph_id: graphId \} : documentToSave;/);
+  assert.match(graphPersistenceControllerSource, /const response = await input\.saveGraph\(graphDocumentToSave\);/);
   assert.match(graphPersistenceControllerSource, /const savedGraph = await input\.fetchGraph\(response\.graph_id\);/);
   assert.match(graphPersistenceControllerSource, /input\.syncRouteToTab\(/);
   assert.match(graphPersistenceControllerSource, /async function validateActiveGraph\(\)/);

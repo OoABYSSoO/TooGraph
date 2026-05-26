@@ -5,6 +5,7 @@ import type { NodeExecutionDetail, RunDetail, RunTreeNode } from "../types/run.t
 
 import {
   buildRunAggregatedTimeline,
+  buildRunContextAudit,
   buildRunTreeDisplayItems,
   buildRunStatusFacts,
   countRunTreeNodes,
@@ -220,6 +221,109 @@ test("listRunOutputArtifacts maps exported outputs into renderable cards", () =>
       documentRefs: [],
     },
   ]);
+});
+
+test("buildRunContextAudit summarizes context assembly refs without copying source text", () => {
+  const audit = buildRunContextAudit(
+    createRunDetail({
+      state_snapshot: {
+        values: {
+          conversation_history: {
+            kind: "context_assembly_ref",
+            assembly_id: "ctx_1",
+            target_state_key: "conversation_history",
+            renderer_key: "buddy_history",
+            renderer_version: "2",
+            rendered_content_hash: "sha256:abc",
+            source_count: 3,
+            source_refs: [
+              { source_kind: "buddy_message", source_id: "msg_1" },
+              { source_kind: "memory_entry", source_id: "mem_1" },
+            ],
+          },
+        },
+        last_writers: {},
+      },
+    }),
+  );
+
+  assert.deepEqual(audit.assemblies, [
+    {
+      key: "ctx_1",
+      assemblyId: "ctx_1",
+      targetStateKey: "conversation_history",
+      rendererKey: "buddy_history",
+      rendererVersion: "2",
+      renderedHash: "sha256:abc",
+      sourceCount: 3,
+      sourceKinds: ["buddy_message", "memory_entry"],
+    },
+  ]);
+  assert.equal(audit.contextSourceCount, 3);
+});
+
+test("buildRunContextAudit summarizes retrieval query and source refs", () => {
+  const audit = buildRunContextAudit(
+    createRunDetail({
+      action_outputs: [
+        {
+          result: {
+            memories: [
+              {
+                memory_id: "mem_1",
+                source_ref: { source_kind: "memory_entry", source_id: "mem_1", source_revision_id: "memrev_1" },
+                retrieval: { mode: "hybrid", query_id: "rq_1", vector_score: 0.74, lexical_score: 1 },
+              },
+            ],
+            run_outputs: [
+              {
+                chunk_id: "chunk_1",
+                content_hash: "sha256:def",
+                source_ref: { source_kind: "graph_output", source_id: "output_1", source_revision_id: "run_1" },
+                retrieval: { mode: "fts", query_id: "rq_1", score: 0.8 },
+              },
+            ],
+          },
+        },
+      ],
+    }),
+  );
+
+  assert.equal(audit.retrieval.queryCount, 1);
+  assert.equal(audit.retrieval.resultCount, 2);
+  assert.equal(audit.retrieval.retrievedMemoriesCount, 1);
+  assert.equal(audit.retrieval.retrievedChunksCount, 1);
+  assert.deepEqual(
+    audit.retrieval.sources.map((source) => ({
+      sourceKind: source.sourceKind,
+      sourceId: source.sourceId,
+      sourceRevisionId: source.sourceRevisionId,
+      chunkId: source.chunkId,
+      contentHash: source.contentHash,
+      queryId: source.queryId,
+      mode: source.mode,
+    })),
+    [
+      {
+        sourceKind: "memory_entry",
+        sourceId: "mem_1",
+        sourceRevisionId: "memrev_1",
+        chunkId: "",
+        contentHash: "",
+        queryId: "rq_1",
+        mode: "hybrid",
+      },
+      {
+        sourceKind: "graph_output",
+        sourceId: "output_1",
+        sourceRevisionId: "run_1",
+        chunkId: "chunk_1",
+        contentHash: "sha256:def",
+        queryId: "rq_1",
+        mode: "fts",
+      },
+    ],
+  );
 });
 
 test("buildRunAggregatedTimeline interleaves parent nodes, subgraph nodes, and activity events", () => {

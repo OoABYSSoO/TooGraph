@@ -1,4 +1,5 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -36,7 +37,7 @@ test("run records open detail and restore a completed graph snapshot", async ({ 
     await expectNoHorizontalOverflow(page);
     expect(problems).toEqual([]);
   } finally {
-    cleanupRunRecord(fixture.runPath);
+    cleanupRunRecord(fixture.runId);
   }
 });
 
@@ -79,7 +80,7 @@ test("permission approval snapshots restore into the human review panel", async 
     await expectNoHorizontalOverflow(page);
     expect(problems).toEqual([]);
   } finally {
-    cleanupRunRecord(fixture.runPath);
+    cleanupRunRecord(fixture.runId);
   }
 });
 
@@ -261,13 +262,55 @@ function seedRunRecord(testInfo: TestInfo, options: SeedRunOptions = {}) {
     cycle_iterations: [],
   };
 
-  const runDir = path.join(rootDir, "backend/data/runs");
-  fs.mkdirSync(runDir, { recursive: true });
-  const runPath = path.join(runDir, `${runId}.json`);
-  fs.writeFileSync(runPath, `${JSON.stringify(run, null, 2)}\n`, "utf8");
-  return { runId, runPath };
+  saveRunRecord(rootDir, run);
+  return { runId };
 }
 
-function cleanupRunRecord(runPath: string) {
-  fs.rmSync(runPath, { force: true });
+function saveRunRecord(rootDir: string, run: Record<string, unknown>) {
+  const result = spawnSync(
+    "python",
+    [
+      "-c",
+      [
+        "import json, sys",
+        "sys.path.insert(0, 'backend')",
+        "from app.core.storage.run_store import save_run",
+        "save_run(json.load(sys.stdin))",
+      ].join("\n"),
+    ],
+    {
+      cwd: rootDir,
+      input: JSON.stringify(run),
+      encoding: "utf8",
+    },
+  );
+  if (result.status !== 0) {
+    throw new Error(`Failed to seed run record: ${result.stderr || result.stdout}`);
+  }
+}
+
+function cleanupRunRecord(runId: string) {
+  const rootDir = path.resolve(process.cwd(), "..");
+  const result = spawnSync(
+    "python",
+    [
+      "-c",
+      [
+        "import sys",
+        "sys.path.insert(0, 'backend')",
+        "from app.core.storage.database import get_connection",
+        "run_id = sys.argv[1]",
+        "tables = ['graph_run_snapshots', 'graph_node_executions', 'graph_run_events', 'graph_state_events', 'graph_outputs', 'graph_artifacts', 'graph_capability_invocations', 'graph_model_calls']",
+        "with get_connection() as connection:",
+        "    for table in tables:",
+        "        connection.execute(f'DELETE FROM {table} WHERE run_id = ?', (run_id,))",
+        "    connection.execute('DELETE FROM graph_runs WHERE run_id = ?', (run_id,))",
+      ].join("\n"),
+      runId,
+    ],
+    { cwd: rootDir, encoding: "utf8" },
+  );
+  if (result.status !== 0) {
+    throw new Error(`Failed to clean up run record: ${result.stderr || result.stdout}`);
+  }
 }

@@ -8,7 +8,6 @@ import {
   validateBuddyMemoryReviewTemplateBinding,
   validateBuddyRunTemplateBinding,
 } from "./buddyTemplateBindingModel.ts";
-import { formatBuddyHistoryWithSessionSummary } from "./buddyContextCompaction.ts";
 
 export const BUDDY_REVIEW_TEMPLATE_ID = "buddy_autonomous_review";
 export const BUDDY_REPLY_STATE_KEY = "state_4";
@@ -49,9 +48,11 @@ export const BUDDY_MODE_OPTIONS: BuddyModeOption[] = [
 ];
 
 export type BuddyChatMessage = {
+  id?: string;
   role: BuddyChatRole;
   content: string;
   includeInContext?: boolean;
+  sourceRevisionId?: string;
 };
 
 export type BuddyRunActivityMessage = {
@@ -444,11 +445,124 @@ type BuddyRuntimeSourceValues<TSource extends string> = Record<TSource, unknown>
 function buildBuddyRuntimeSourceValues(input: BuildBuddyChatGraphInput): BuddyRuntimeSourceValues<BuddyRunInputSource> {
   return {
     current_message: input.userMessage,
-    conversation_history: formatBuddyHistoryWithSessionSummary(input.history, input.sessionSummary ?? ""),
+    conversation_history: buildBuddyConversationHistoryContextRef(input),
     session_summary: input.sessionSummary ?? "",
     buddy_home_context: buildBuddyHomeContextValue(),
     current_session_id: input.currentSessionId ?? "",
   };
+}
+
+type BuddyContextAssemblySourceRef = {
+  source_kind: "buddy_message" | "buddy_session_summary";
+  source_id: string;
+  role: BuddyChatRole | "summary";
+  ordinal: number;
+  source_revision_id?: string;
+};
+
+type BuddyContextAssemblyRef = {
+  kind: "context_assembly_ref";
+  assembly_id: string;
+  target_state_key: "conversation_history";
+  renderer_key: "buddy_history";
+  renderer_version: "1";
+  rendered_content_hash: string;
+  source_count: number;
+  source_refs: BuddyContextAssemblySourceRef[];
+  budget: {
+    max_messages: number;
+    max_chars: number;
+  };
+  metadata: {
+    current_session_id: string;
+  };
+  preview: string;
+};
+
+function buildBuddyConversationHistoryContextRef(input: BuildBuddyChatGraphInput): BuddyContextAssemblyRef {
+  const sourceRefs = buildBuddyConversationHistorySourceRefs(input);
+  return {
+    kind: "context_assembly_ref",
+    assembly_id: buildPendingContextAssemblyId(input.currentSessionId ?? "", sourceRefs),
+    target_state_key: "conversation_history",
+    renderer_key: "buddy_history",
+    renderer_version: "1",
+    rendered_content_hash: "",
+    source_count: sourceRefs.length,
+    source_refs: sourceRefs,
+    budget: {
+      max_messages: MAX_BUDDY_HISTORY_MESSAGES,
+      max_chars: MAX_BUDDY_HISTORY_CONTEXT_CHARS,
+    },
+    metadata: {
+      current_session_id: input.currentSessionId ?? "",
+    },
+    preview: buildBuddyConversationHistoryPreview(input),
+  };
+}
+
+function buildBuddyConversationHistorySourceRefs(input: BuildBuddyChatGraphInput): BuddyContextAssemblySourceRef[] {
+  const refs: BuddyContextAssemblySourceRef[] = [];
+  const sessionSummary = (input.sessionSummary ?? "").trim();
+  if (sessionSummary) {
+    refs.push({
+      source_kind: "buddy_session_summary",
+      source_id: "session_summary",
+      role: "summary",
+      ordinal: refs.length,
+    });
+  }
+
+  const messages = input.history
+    .filter((message) => message.includeInContext !== false)
+    .filter((message) => message.content.trim().length > 0)
+    .filter((message) => typeof message.id === "string" && message.id.trim().length > 0)
+    .slice(-Math.max(1, MAX_BUDDY_HISTORY_MESSAGES));
+
+  for (const message of messages) {
+    const sourceRef: BuddyContextAssemblySourceRef = {
+      source_kind: "buddy_message",
+      source_id: String(message.id),
+      role: message.role,
+      ordinal: refs.length,
+    };
+    if (message.sourceRevisionId?.trim()) {
+      sourceRef.source_revision_id = message.sourceRevisionId.trim();
+    }
+    refs.push(sourceRef);
+  }
+  return refs;
+}
+
+function buildBuddyConversationHistoryPreview(input: BuildBuddyChatGraphInput) {
+  const sourceCount = buildBuddyConversationHistorySourceRefs(input).length;
+  if (sourceCount === 0) {
+    return "暂无历史对话。";
+  }
+  return `context assembly sources: ${sourceCount}`;
+}
+
+function buildPendingContextAssemblyId(sessionId: string, sourceRefs: BuddyContextAssemblySourceRef[]) {
+  const key = JSON.stringify({
+    session_id: sessionId,
+    source_refs: sourceRefs.map((source) => [
+      source.source_kind,
+      source.source_id,
+      source.source_revision_id ?? "",
+      source.role,
+      source.ordinal,
+    ]),
+  });
+  return `ctx_pending_${stableHashString(key)}`;
+}
+
+function stableHashString(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 function buildBuddyMemoryReviewRuntimeSourceValues(

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import sqlite3
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -13,6 +16,7 @@ from app.core.runtime.state_io import (
     initialize_graph_state,
 )
 from app.core.schemas.node_system import NodeSystemGraphDocument
+from app.core.storage import database, run_store
 
 
 class RuntimeStateIoTests(unittest.TestCase):
@@ -274,6 +278,50 @@ class RuntimeStateIoTests(unittest.TestCase):
         self.assertEqual(state["state_events"][-1]["previous_value"], "old")
         self.assertEqual(state["state_events"][-1]["value"], "new")
         self.assertEqual(state["state_events"][-1]["sequence"], 2)
+
+    def test_state_write_events_persist_to_database_and_restore_state_snapshot(self) -> None:
+        mode = SimpleNamespace(value="replace")
+        state = {
+            "run_id": "run-state-db",
+            "root_run_id": "run-state-db",
+            "run_path": ["run-state-db"],
+            "graph_id": "graph_state",
+            "graph_name": "State Graph",
+            "status": "completed",
+            "started_at": "2026-05-26T00:00:00Z",
+            "state_values": {"answer": "old"},
+            "state_snapshot": {"values": {"answer": "old"}, "last_writers": {}},
+        }
+
+        apply_state_writes("agent_writer", [SimpleNamespace(state="answer", mode=mode)], {"answer": "new"}, state)
+        state["state_snapshot"] = {
+            "values": dict(state["state_values"]),
+            "last_writers": dict(state["state_last_writers"]),
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"),
+            ):
+                database.initialize_storage()
+                run_store.save_run(state)
+                loaded = run_store.load_run("run-state-db")
+                with sqlite3.connect(data_dir / "toograph.db") as connection:
+                    row = connection.execute(
+                        """
+                        SELECT state_key, previous_value_json, value_json
+                        FROM graph_state_events
+                        WHERE run_id = ?
+                        """,
+                        ("run-state-db",),
+                    ).fetchone()
+
+        self.assertEqual(row[0], "answer")
+        self.assertEqual(row[1], '"old"')
+        self.assertEqual(row[2], '"new"')
+        self.assertEqual(loaded["state_snapshot"]["values"], {"answer": "new"})
 
 
 if __name__ == "__main__":

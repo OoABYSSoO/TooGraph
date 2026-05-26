@@ -4,13 +4,7 @@ import { resolveOutputPreviewContent } from "../editor/nodes/outputPreviewConten
 import type { BuddyChatMessageRecord } from "../types/buddy.ts";
 import type { GraphPayload } from "../types/node-system.ts";
 import { resolveBuddyRunActivityFromRunEvent, type BuddyChatMessage } from "./buddyChatGraph.ts";
-import {
-  buildOutputTraceBuddyMessageMetadata,
-  buildPublicOutputBuddyMessageMetadata,
-  resolveOutputTraceBuddyMessageMetadata,
-  resolvePublicOutputBuddyMessageMetadata,
-  type BuddyPublicOutputMetadata,
-} from "./buddyMessageMetadata.ts";
+import type { BuddyPublicOutputMetadata } from "./buddyMessageMetadata.ts";
 import type { BuddyOutputTraceSegment } from "./buddyOutputTrace.ts";
 
 export type BuddyMessage = BuddyChatMessage & {
@@ -20,10 +14,11 @@ export type BuddyMessage = BuddyChatMessage & {
   runId?: string | null;
   publicOutput?: BuddyPublicOutputMetadata;
   outputTrace?: BuddyOutputTraceSegment;
+  transcriptOnly?: boolean;
 };
 
 export type BuddyMessagePatch = Partial<
-  Pick<BuddyMessage, "content" | "includeInContext" | "activityText" | "runId" | "publicOutput" | "outputTrace">
+  Pick<BuddyMessage, "content" | "includeInContext" | "activityText" | "runId" | "publicOutput" | "outputTrace" | "transcriptOnly">
 >;
 
 export type BuddyQueuedTurn = {
@@ -88,7 +83,7 @@ export function useBuddyMessages({ t }: BuddyMessagesOptions) {
   function buildHistoryBeforeMessage(messageId: string): BuddyChatMessage[] {
     const messageIndex = messages.value.findIndex((message) => message.id === messageId);
     const previousMessages = messageIndex >= 0 ? messages.value.slice(0, messageIndex) : messages.value;
-    return previousMessages.filter(isContextMessage).map(({ role, content }) => ({ role, content }));
+    return previousMessages.filter(isContextMessage).map(({ id, role, content }) => ({ id, role, content }));
   }
 
   function ensureAssistantMessageForTurn(turn: BuddyQueuedTurn): BuddyMessage {
@@ -146,18 +141,12 @@ export function useBuddyMessages({ t }: BuddyMessagesOptions) {
       includeInContext: record.include_in_context,
       runId: record.run_id,
       activityText: "",
-      outputTrace: resolveOutputTraceBuddyMessageMetadata(record.metadata) ?? undefined,
-      publicOutput: resolvePublicOutputBuddyMessageMetadata(record.metadata) ?? undefined,
+      transcriptOnly: record.role === "assistant" && Boolean(record.run_id),
     };
   }
 
   function buildBuddyMessageMetadata(message: BuddyMessage) {
-    if (message.outputTrace) {
-      return buildOutputTraceBuddyMessageMetadata(message.outputTrace);
-    }
-    if (message.publicOutput) {
-      return buildPublicOutputBuddyMessageMetadata(message.publicOutput);
-    }
+    void message;
     return null;
   }
 

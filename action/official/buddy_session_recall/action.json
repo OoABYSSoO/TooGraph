@@ -2,8 +2,8 @@
   "schemaVersion": "toograph.action/v1",
   "actionKey": "buddy_session_recall",
   "name": "Buddy Session Recall",
-  "description": "当用户需要回顾、引用、延续或查找 Buddy 历史对话时使用；它只读浏览、搜索或展开 buddy.db 中的会话消息。",
-  "llmInstruction": "你已绑定 Buddy 会话召回 Action。根据 recall_request 和上游状态生成检索参数。mode 只能是 browse、discover 或 scroll。discover 使用 query 搜索真实 buddy_messages，返回 snippet、命中窗口和 session bookends；browse 列出最近会话；scroll 使用 session_id 和 anchor_message_id 展开上下文。可选参数包括 limit、window、bookend、sort、role_filter、current_session_id。current_session_id 用于排除当前会话谱系，避免把正在运行的上下文当历史记忆再次召回。该 Action只读取 buddy.db 会话历史，不总结、不改写、不写入 MEMORY.md，也不创建逐条审批记录。",
+  "description": "当用户需要回顾、引用、延续或查找 Buddy 历史对话时使用；它只读浏览、搜索或展开统一数据库中的会话消息、记忆和运行输出。",
+  "llmInstruction": "你已绑定 Buddy 会话召回 Action。根据 recall_request 和上游状态生成检索参数。mode 只能是 browse、discover 或 scroll。discover 使用 query 搜索真实 buddy_messages、memory_entries 和 graph outputs，返回 snippet、命中窗口、session bookends 和可追溯 source refs；browse 列出最近会话；scroll 使用 session_id 和 anchor_message_id 展开上下文。可选参数包括 limit、window、bookend、sort、role_filter、current_session_id。current_session_id 用于排除当前会话谱系，避免把正在运行的上下文当历史记忆再次召回。该 Action 只读取统一数据库事实，不总结、不改写、不写入 MEMORY.md，也不创建逐条审批记录。",
   "version": "1.0.0",
   "timeoutSeconds": 15,
   "permissions": ["buddy_session_read"],
@@ -104,6 +104,24 @@
       "name": "Sessions",
       "valueType": "json",
       "description": "召回到的会话列表。"
+    },
+    {
+      "key": "memories",
+      "name": "Memories",
+      "valueType": "json",
+      "description": "召回到的长期记忆条目和 source refs。"
+    },
+    {
+      "key": "run_outputs",
+      "name": "Run Outputs",
+      "valueType": "json",
+      "description": "召回到的图运行输出片段和 source refs。"
+    },
+    {
+      "key": "context_assembly_ref",
+      "name": "Context Assembly Ref",
+      "valueType": "json",
+      "description": "由召回来源生成的 context_assembly_ref，用于后续上下文组装审计。"
     },
     {
       "key": "result",

@@ -15,6 +15,21 @@ from app.main import app
 
 
 class BuddyRouteTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._data_temp_dir = tempfile.TemporaryDirectory()
+        data_dir = Path(self._data_temp_dir.name) / "data"
+        self._patchers = [
+            patch("app.core.storage.database.DATA_DIR", data_dir),
+            patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"),
+        ]
+        for patcher in self._patchers:
+            patcher.start()
+
+    def tearDown(self) -> None:
+        for patcher in reversed(self._patchers):
+            patcher.stop()
+        self._data_temp_dir.cleanup()
+
     def test_profile_roundtrip_creates_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
@@ -72,15 +87,13 @@ class BuddyRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         files = {entry["path"]: entry for entry in payload["files"]}
-        for path in ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md", "buddy.db"]:
+        for path in ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"]:
             self.assertIn(path, files)
+        self.assertNotIn("buddy.db", files)
         self.assertNotIn("policy.json", files)
         self.assertNotIn("reports", files)
         self.assertTrue(files["AGENTS.md"]["readable"])
         self.assertIn("Buddy Workspace", files["AGENTS.md"]["content"])
-        self.assertFalse(files["buddy.db"]["readable"])
-        self.assertEqual(files["buddy.db"]["kind"], "database")
-        self.assertIn("SQLite", files["buddy.db"]["summary"])
 
     def test_chat_session_message_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -122,14 +135,13 @@ class BuddyRouteTests(unittest.TestCase):
         self.assertEqual(created_response.status_code, 200)
         self.assertEqual(user_response.status_code, 200)
         self.assertEqual(assistant_response.status_code, 200)
-        self.assertEqual(trace_response.status_code, 200)
+        self.assertEqual(trace_response.status_code, 422)
         self.assertEqual(sessions_response.status_code, 200)
         self.assertEqual(sessions_response.json()[0]["title"], "你好")
-        self.assertEqual(sessions_response.json()[0]["message_count"], 3)
+        self.assertEqual(sessions_response.json()[0]["message_count"], 2)
         self.assertEqual(messages_response.status_code, 200)
-        self.assertEqual([message["role"] for message in messages_response.json()], ["user", "assistant", "assistant"])
+        self.assertEqual([message["role"] for message in messages_response.json()], ["user", "assistant"])
         self.assertFalse(messages_response.json()[1]["include_in_context"])
-        self.assertEqual(messages_response.json()[2]["metadata"]["kind"], "output_trace")
         self.assertEqual(delete_response.status_code, 200)
         self.assertTrue(delete_response.json()["deleted"])
         self.assertEqual(sessions_after_delete_response.json(), [])

@@ -52,6 +52,43 @@ export type RunAggregatedTimelineItem = {
   detailText: string;
 };
 
+export type RunContextAssemblyAudit = {
+  key: string;
+  assemblyId: string;
+  targetStateKey: string;
+  rendererKey: string;
+  rendererVersion: string;
+  renderedHash: string;
+  sourceCount: number;
+  sourceKinds: string[];
+};
+
+export type RunRetrievalAuditSource = {
+  key: string;
+  sourceKind: string;
+  sourceId: string;
+  sourceRevisionId: string;
+  chunkId: string;
+  contentHash: string;
+  queryId: string;
+  mode: string;
+  score: number | null;
+};
+
+export type RunRetrievalAuditSummary = {
+  queryCount: number;
+  resultCount: number;
+  retrievedMemoriesCount: number;
+  retrievedChunksCount: number;
+  sources: RunRetrievalAuditSource[];
+};
+
+export type RunContextAudit = {
+  assemblies: RunContextAssemblyAudit[];
+  contextSourceCount: number;
+  retrieval: RunRetrievalAuditSummary;
+};
+
 export function formatRunArtifactValue(value: unknown) {
   if (value === null || value === undefined) {
     return "";
@@ -124,6 +161,55 @@ export function buildRunStatusFacts(run: RunDetail): RunStatusFact[] {
     { key: "duration", label: translate("runDetail.duration"), value: formatRunDuration(run.duration_ms), tone: "default" },
     { key: "revision", label: translate("runDetail.revision"), value: String(run.revision_round), tone: "default" },
   ];
+}
+
+export function buildRunContextAudit(run: RunDetail): RunContextAudit {
+  const assemblies = new Map<string, RunContextAssemblyAudit>();
+  const retrievalSources = new Map<string, RunRetrievalAuditSource>();
+  const queryIds = new Set<string>();
+  let contextSourceCount = 0;
+
+  walkUnknown(
+    {
+      state_snapshot: run.state_snapshot,
+      artifacts: run.artifacts,
+      action_outputs: run.action_outputs,
+      tool_outputs: run.tool_outputs,
+      capability_outputs: run.capability_outputs,
+      node_executions: run.node_executions,
+      metadata: run.metadata,
+    },
+    (value) => {
+      const record = recordFromUnknown(value);
+      if (record.kind === "context_assembly_ref") {
+        const assembly = contextAssemblyAuditFromRecord(record);
+        if (assembly && !assemblies.has(assembly.key)) {
+          assemblies.set(assembly.key, assembly);
+          contextSourceCount += assembly.sourceCount;
+        }
+      }
+      const retrieval = retrievalAuditSourceFromRecord(record);
+      if (retrieval && !retrievalSources.has(retrieval.key)) {
+        retrievalSources.set(retrieval.key, retrieval);
+        if (retrieval.queryId) {
+          queryIds.add(retrieval.queryId);
+        }
+      }
+    },
+  );
+
+  const sources = [...retrievalSources.values()];
+  return {
+    assemblies: [...assemblies.values()],
+    contextSourceCount,
+    retrieval: {
+      queryCount: queryIds.size,
+      resultCount: sources.length,
+      retrievedMemoriesCount: sources.filter((source) => source.sourceKind === "memory_entry").length,
+      retrievedChunksCount: sources.filter((source) => source.chunkId || source.sourceKind === "retrieval_chunk").length,
+      sources,
+    },
+  };
 }
 
 type RunAggregatedTimelineDraft = RunAggregatedTimelineItem & {
@@ -404,6 +490,86 @@ function buildNodeExecutionDetailText(execution: NodeExecutionDetail) {
 function buildActivityDetailText(event: ActivityEvent) {
   const detail = event.detail ?? (event.error ? { error: event.error } : null);
   return formatRunArtifactValue(detail);
+}
+
+function contextAssemblyAuditFromRecord(record: Record<string, unknown>): RunContextAssemblyAudit | null {
+  const assemblyId = normalizeText(record.assembly_id);
+  const targetStateKey = normalizeText(record.target_state_key);
+  const renderedHash = normalizeText(record.rendered_content_hash);
+  const key = assemblyId || `${targetStateKey}:${renderedHash}`;
+  if (!key) {
+    return null;
+  }
+  const sourceRefs = Array.isArray(record.source_refs)
+    ? record.source_refs.map((source) => recordFromUnknown(source))
+    : Array.isArray(record.sources)
+      ? record.sources.map((source) => recordFromUnknown(source))
+      : [];
+  const sourceCount = normalizeSequence(record.source_count, sourceRefs.length);
+  return {
+    key,
+    assemblyId,
+    targetStateKey,
+    rendererKey: normalizeText(record.renderer_key),
+    rendererVersion: normalizeText(record.renderer_version),
+    renderedHash,
+    sourceCount,
+    sourceKinds: uniqueNonEmpty(sourceRefs.map((source) => normalizeText(source.source_kind))),
+  };
+}
+
+function retrievalAuditSourceFromRecord(record: Record<string, unknown>): RunRetrievalAuditSource | null {
+  const sourceRef = recordFromUnknown(record.source_ref);
+  const sourceKind = normalizeText(sourceRef.source_kind);
+  const sourceId = normalizeText(sourceRef.source_id);
+  if (!sourceKind || !sourceId) {
+    return null;
+  }
+  const retrieval = recordFromUnknown(record.retrieval);
+  const queryId = normalizeText(retrieval.query_id);
+  const chunkId = normalizeText(record.chunk_id) || normalizeText(record.retrieval_chunk_id);
+  const contentHash = normalizeText(record.content_hash) || normalizeText(record.source_content_hash);
+  const mode = normalizeText(retrieval.mode);
+  const score =
+    normalizeNumber(record.score) ??
+    normalizeNumber(retrieval.score) ??
+    normalizeNumber(retrieval.vector_score) ??
+    normalizeNumber(retrieval.lexical_score);
+  return {
+    key: `${sourceKind}:${sourceId}:${normalizeText(sourceRef.source_revision_id)}:${chunkId}:${queryId}`,
+    sourceKind,
+    sourceId,
+    sourceRevisionId: normalizeText(sourceRef.source_revision_id),
+    chunkId,
+    contentHash,
+    queryId,
+    mode,
+    score,
+  };
+}
+
+function walkUnknown(
+  value: unknown,
+  visit: (value: unknown) => void,
+  seen = new WeakSet<object>(),
+) {
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  if (seen.has(value)) {
+    return;
+  }
+  seen.add(value);
+  visit(value);
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      walkUnknown(item, visit, seen);
+    }
+    return;
+  }
+  for (const item of Object.values(value)) {
+    walkUnknown(item, visit, seen);
+  }
 }
 
 function buildTimelinePathLabel(subgraphPath: string[], nodeId: string | null) {

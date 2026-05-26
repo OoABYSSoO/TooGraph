@@ -186,6 +186,7 @@ import {
   paginateRuns,
   resolveRunsCardDetail,
   resolveRunsEmptyAction,
+  sortRunsForHistory,
 } from "./runsPageModel.ts";
 
 const router = useRouter();
@@ -213,7 +214,8 @@ const runOverview = computed(() => {
   locale.value;
   return buildRunStatusOverview(runs.value);
 });
-const paginatedRuns = computed(() => paginateRuns(runs.value, currentPage.value));
+const sortedRuns = computed(() => sortRunsForHistory(runs.value));
+const paginatedRuns = computed(() => paginateRuns(sortedRuns.value, currentPage.value));
 let searchTimer: number | null = null;
 
 async function loadRuns() {

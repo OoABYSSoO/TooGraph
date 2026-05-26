@@ -23,6 +23,7 @@ type BuddyChatSessionsOptions<Message extends BuddySessionMessage> = {
   resetVisibleBuddyRunState: () => void;
   scrollMessagesToBottom: () => Promise<void>;
   formatErrorMessage: (error: unknown) => string;
+  hydrateLoadedRunDisplays?: (records: BuddyChatMessageRecord[]) => Promise<void>;
 };
 
 const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "toograph:buddy-active-session";
@@ -38,6 +39,7 @@ export function useBuddyChatSessions<Message extends BuddySessionMessage>({
   resetVisibleBuddyRunState,
   scrollMessagesToBottom,
   formatErrorMessage,
+  hydrateLoadedRunDisplays,
 }: BuddyChatSessionsOptions<Message>) {
   const chatSessions = ref<BuddyChatSession[]>([]);
   const activeSessionId = ref<string | null>(null);
@@ -144,6 +146,7 @@ export function useBuddyChatSessions<Message extends BuddySessionMessage>({
       messages.value = records.map(messageRecordToBuddyMessage);
       resetNextBuddyMessageClientOrder();
       resetVisibleBuddyRunState();
+      await hydrateLoadedRunDisplays?.(records);
       await scrollMessagesToBottom();
     } catch (error) {
       errorMessage.value = t("buddy.historyLoadFailed", { error: formatErrorMessage(error) });

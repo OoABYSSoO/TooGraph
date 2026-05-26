@@ -17,9 +17,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.buddy import home as buddy_home
 from app.buddy import store
+from app.core.storage import database
 
 
 class BuddyStoreTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._data_temp_dir = tempfile.TemporaryDirectory()
+        data_dir = Path(self._data_temp_dir.name) / "data"
+        self._patchers = [
+            patch("app.core.storage.database.DATA_DIR", data_dir),
+            patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"),
+        ]
+        for patcher in self._patchers:
+            patcher.start()
+
+    def tearDown(self) -> None:
+        for patcher in reversed(self._patchers):
+            patcher.stop()
+        self._data_temp_dir.cleanup()
+
     def test_defaults_load_when_files_do_not_exist(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
@@ -43,11 +59,11 @@ class BuddyStoreTests(unittest.TestCase):
                 "SOUL.md",
                 "USER.md",
                 "MEMORY.md",
-                "buddy.db",
             ]
             for relative_path in expected_files:
                 self.assertTrue((buddy_home / relative_path).exists(), relative_path)
 
+            self.assertFalse((buddy_home / "buddy.db").exists())
             self.assertFalse((buddy_home / "policy.json").exists())
             self.assertFalse((buddy_home / "reports").exists())
             for obsolete_path in [
@@ -112,7 +128,8 @@ class BuddyStoreTests(unittest.TestCase):
             buddy_home = Path(temp_dir) / "buddy_home"
             with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
                 store.initialize_buddy_home()
-            with closing(sqlite3.connect(buddy_home / "buddy.db")) as connection:
+            self.assertFalse((buddy_home / "buddy.db").exists())
+            with closing(sqlite3.connect(database.DB_PATH)) as connection:
                 table_names = {
                     str(row[0])
                     for row in connection.execute(
@@ -123,11 +140,13 @@ class BuddyStoreTests(unittest.TestCase):
         self.assertNotIn("buddy_memories", table_names)
         self.assertIn("buddy_messages_fts", table_names)
         self.assertIn("buddy_messages_fts_trigram", table_names)
+        self.assertIn("buddy_message_revisions", table_names)
+        self.assertIn("buddy_message_run_refs", table_names)
 
     def test_buddy_database_initialization_is_serialized_for_same_home_dir(self) -> None:
         active_initializers = 0
         initializer_lock = Lock()
-        original_ensure_fts = buddy_home._ensure_buddy_message_fts
+        original_ensure_fts = database._ensure_buddy_message_fts
 
         def guarded_ensure_fts(connection: sqlite3.Connection) -> None:
             nonlocal active_initializers
@@ -144,14 +163,14 @@ class BuddyStoreTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temp_dir:
             home_dir = Path(temp_dir) / "buddy_home"
-            with patch.object(buddy_home, "_ensure_buddy_message_fts", guarded_ensure_fts):
+            with patch.object(database, "_ensure_buddy_message_fts", guarded_ensure_fts):
                 with ThreadPoolExecutor(max_workers=8) as pool:
                     futures = [pool.submit(buddy_home.ensure_buddy_database, home_dir) for _ in range(8)]
                     for future in as_completed(futures):
                         future.result()
 
     def test_buddy_fts_trigger_creation_is_safe_across_process_races(self) -> None:
-        source = inspect.getsource(buddy_home._ensure_buddy_message_fts)
+        source = inspect.getsource(database._ensure_buddy_message_fts)
 
         for trigger_name in [
             "buddy_messages_ai_fts",
@@ -165,7 +184,7 @@ class BuddyStoreTests(unittest.TestCase):
             buddy_home = Path(temp_dir) / "buddy_home"
             with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
                 store.initialize_buddy_home()
-            with closing(sqlite3.connect(buddy_home / "buddy.db")) as connection:
+            with closing(sqlite3.connect(database.DB_PATH)) as connection:
                 session_columns = {
                     str(row[1])
                     for row in connection.execute("PRAGMA table_info(buddy_sessions)").fetchall()
@@ -206,6 +225,15 @@ class BuddyStoreTests(unittest.TestCase):
                 )
                 visible_after_delete = store.list_chat_sessions()
                 all_after_delete = store.list_chat_sessions(include_deleted=True)
+                with sqlite3.connect(database.DB_PATH) as connection:
+                    revision_count = connection.execute(
+                        "SELECT COUNT(*) FROM buddy_message_revisions WHERE message_id IN (?, ?)",
+                        (user_message["message_id"], assistant_message["message_id"]),
+                    ).fetchone()[0]
+                    run_ref = connection.execute(
+                        "SELECT run_id FROM buddy_message_run_refs WHERE message_id = ?",
+                        (assistant_message["message_id"],),
+                    ).fetchone()
 
         self.assertEqual(user_message["role"], "user")
         self.assertEqual(assistant_message["run_id"], "run_1")
@@ -217,6 +245,8 @@ class BuddyStoreTests(unittest.TestCase):
         self.assertTrue(deleted["deleted"])
         self.assertEqual(visible_after_delete, [])
         self.assertEqual(all_after_delete[0]["session_id"], session["session_id"])
+        self.assertEqual(revision_count, 2)
+        self.assertEqual(run_ref[0], "run_1")
 
     def test_chat_messages_order_by_client_order_when_replies_are_persisted_later(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -252,7 +282,7 @@ class BuddyStoreTests(unittest.TestCase):
             ],
         )
 
-    def test_chat_messages_persist_display_metadata_for_trace_records(self) -> None:
+    def test_chat_messages_reject_derived_trace_records_as_message_facts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
                 session = store.create_chat_session({}, changed_by="user", change_reason="测试创建会话")
@@ -264,25 +294,44 @@ class BuddyStoreTests(unittest.TestCase):
                         "boundaryLabel": "回复",
                     },
                 }
-                trace_message = store.append_chat_message(
+                with self.assertRaises(ValueError):
+                    store.append_chat_message(
+                        session["session_id"],
+                        {
+                            "role": "assistant",
+                            "content": "",
+                            "client_order": 1,
+                            "include_in_context": False,
+                            "run_id": "run_1",
+                            "metadata": trace_metadata,
+                        },
+                        changed_by="buddy",
+                        change_reason="测试追加运行胶囊",
+                    )
+
+    def test_chat_messages_strip_derived_public_output_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+                session = store.create_chat_session({}, changed_by="user", change_reason="测试创建会话")
+                message = store.append_chat_message(
                     session["session_id"],
                     {
                         "role": "assistant",
-                        "content": "",
+                        "content": "最终回复文本。",
                         "client_order": 1,
                         "include_in_context": False,
                         "run_id": "run_1",
-                        "metadata": trace_metadata,
+                        "metadata": {
+                            "kind": "public_output",
+                            "publicOutput": {"nodeId": "output"},
+                            "ordinary": "keep",
+                        },
                     },
                     changed_by="buddy",
-                    change_reason="测试追加运行胶囊",
+                    change_reason="测试追加伙伴消息",
                 )
-                messages = store.list_chat_messages(session["session_id"])
 
-        self.assertEqual(trace_message["metadata"], trace_metadata)
-        self.assertEqual(messages[0]["metadata"], trace_metadata)
-        self.assertEqual(messages[0]["content"], "")
-        self.assertFalse(messages[0]["include_in_context"])
+        self.assertEqual(message["metadata"], {"ordinary": "keep"})
 
     def test_recall_chat_messages_discovers_real_message_windows(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -970,7 +1019,7 @@ class BuddyStoreTests(unittest.TestCase):
         self.assertEqual(restored["target_id"], "capability_usage_stats")
         self.assertEqual(loaded["capabilities"], {})
 
-    def test_buddy_database_migrates_legacy_messages_before_client_order_index(self) -> None:
+    def test_buddy_database_does_not_migrate_legacy_buddy_home_database(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             buddy_home = Path(temp_dir) / "buddy_home"
             buddy_home.mkdir()
@@ -1027,11 +1076,15 @@ class BuddyStoreTests(unittest.TestCase):
 
             with patch.object(store, "BUDDY_HOME_DIR", buddy_home):
                 store.initialize_buddy_home()
-                messages = store.list_chat_messages("session_1")
+                with self.assertRaises(KeyError):
+                    store.list_chat_messages("session_1")
+                with sqlite3.connect(database.DB_PATH) as connection:
+                    count = connection.execute(
+                        "SELECT COUNT(*) FROM buddy_sessions WHERE session_id = ?",
+                        ("session_1",),
+                    ).fetchone()[0]
 
-        self.assertEqual(messages[0]["client_order"], 0)
-        self.assertEqual(messages[0]["content"], "旧消息")
-        self.assertEqual(messages[0]["metadata"], {})
+        self.assertEqual(count, 0)
 
 
 if __name__ == "__main__":

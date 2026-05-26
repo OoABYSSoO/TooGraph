@@ -21,6 +21,7 @@ WRITER_AFTER_LLM_PATH = WRITER_ACTION_DIR / "after_llm.py"
 
 
 def _run_writer(payload: dict[str, object], *, buddy_home_dir: Path) -> dict[str, object]:
+    data_dir = buddy_home_dir.parent / "data"
     completed = subprocess.run(
         [sys.executable, str(WRITER_AFTER_LLM_PATH)],
         input=json.dumps(payload),
@@ -30,6 +31,7 @@ def _run_writer(payload: dict[str, object], *, buddy_home_dir: Path) -> dict[str
         env={
             **os.environ,
             "TOOGRAPH_REPO_ROOT": str(REPO_ROOT),
+            "TOOGRAPH_DATA_DIR": str(data_dir),
             "TOOGRAPH_BUDDY_HOME_DIR": str(buddy_home_dir),
         },
         check=True,

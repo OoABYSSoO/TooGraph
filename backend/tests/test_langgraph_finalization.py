@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -11,6 +13,7 @@ from app.core.langgraph.finalization import (
     finalize_completed_langgraph_state,
     finalize_failed_langgraph_state,
 )
+from app.core.storage import database, run_store
 
 
 class LangGraphFinalizationTest(unittest.TestCase):
@@ -106,6 +109,88 @@ class LangGraphFinalizationTest(unittest.TestCase):
         self.assertEqual(state["errors"], ["existing", "boom"])
         self.assertEqual([call[0] for call in calls], ["status", "sync", "refresh", "snapshot", "save", "event"])
         self.assertEqual(calls[-1][1], ("run-1", "run.failed", {"status": "failed", "error": "boom"}))
+
+    def test_finalize_completed_state_persists_completed_snapshot_to_database(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            state = _runtime_state("run-completed-db")
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"),
+            ):
+                database.initialize_storage()
+                finalize_completed_langgraph_state(
+                    SimpleNamespace(name="graph"),
+                    state,
+                    {"edge-1"},
+                    {},
+                    {"agent": {"answer": "ok"}},
+                    started_perf=1.0,
+                    checkpoint_saver=SimpleNamespace(),
+                    checkpoint_lookup_config={},
+                    append_snapshot=True,
+                    clear_pending_interrupt_metadata_func=lambda _state: None,
+                    collect_output_boundaries_func=lambda *_args, **_kwargs: None,
+                    finalize_cycle_summary_func=lambda *_args, **_kwargs: None,
+                    sync_checkpoint_metadata_func=lambda *_args, **_kwargs: None,
+                    next_run_snapshot_id_func=lambda _state, kind: f"{kind}-snapshot",
+                    publish_run_event_func=lambda *_args, **_kwargs: None,
+                )
+                loaded = run_store.load_run("run-completed-db")
+
+        self.assertEqual(loaded["status"], "completed")
+        self.assertIsNotNone(loaded["completed_at"])
+        self.assertGreaterEqual(loaded["duration_ms"], 0)
+        self.assertEqual(loaded["run_snapshots"][0]["kind"], "completed")
+        self.assertEqual(loaded["run_snapshots"][0]["status"], "completed")
+
+    def test_finalize_failed_state_persists_failure_snapshot_to_database(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            state = _runtime_state("run-failed-db")
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"),
+            ):
+                database.initialize_storage()
+                finalize_failed_langgraph_state(
+                    state,
+                    {"agent": {"answer": "partial"}},
+                    {"edge-1"},
+                    exc=ValueError("boom"),
+                    started_perf=1.0,
+                    checkpoint_saver=SimpleNamespace(),
+                    checkpoint_lookup_config={},
+                    sync_checkpoint_metadata_func=lambda *_args, **_kwargs: None,
+                    next_run_snapshot_id_func=lambda _state, kind: f"{kind}-snapshot",
+                    publish_run_event_func=lambda *_args, **_kwargs: None,
+                )
+                loaded = run_store.load_run("run-failed-db")
+
+        self.assertEqual(loaded["status"], "failed")
+        self.assertIn("boom", loaded["errors"])
+        self.assertIsNotNone(loaded["completed_at"])
+        self.assertEqual(loaded["run_snapshots"][0]["kind"], "failed")
+        self.assertEqual(loaded["run_snapshots"][0]["status"], "failed")
+
+
+def _runtime_state(run_id: str) -> dict:
+    return {
+        "run_id": run_id,
+        "root_run_id": run_id,
+        "run_path": [run_id],
+        "graph_id": "graph_finalization",
+        "graph_name": "Finalization Graph",
+        "status": "running",
+        "runtime_backend": "langgraph",
+        "started_at": "2026-05-26T00:00:00Z",
+        "lifecycle": {"updated_at": "2026-05-26T00:00:00Z"},
+        "checkpoint_metadata": {},
+        "state_values": {"answer": "ok"},
+        "state_last_writers": {"answer": {"node_id": "agent"}},
+        "errors": [],
+        "warnings": [],
+    }
 
 
 if __name__ == "__main__":

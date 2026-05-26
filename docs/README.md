@@ -1,6 +1,6 @@
 # TooGraph 长期代码事实与路线图
 
-最后整理日期：2026-05-25。
+最后整理日期：2026-05-26。
 
 本文是 `docs/` 下唯一保留的长期参考文档。它的维护原则是：先看代码、官方模板 JSON、Action manifest 和测试，再写结论；已经完成的事情写成事实，未完成的事情写成路线图，历史计划只保留仍然有效的细节。
 
@@ -11,6 +11,7 @@
 - 图协议和校验：`backend/app/core/schemas/`、`backend/app/core/compiler/`。
 - 图运行时：`backend/app/core/langgraph/`、`backend/app/core/runtime/`。
 - 运行记录和运行树：`backend/app/core/storage/run_store.py`、`backend/app/core/runtime/run_tree.py`、`backend/app/api/routes_runs.py`。
+- 图运行存储与记忆召回设计：`docs/superpowers/specs/2026-05-26-graph-run-store-memory-recall-design.md`。
 - 官方 Action：`action/official/*/action.json`、`action/official/*/ACTION.md`、生命周期脚本。
 - 官方图模板：`graph_template/official/*/template.json`。
 - Buddy Home 和记忆：`backend/app/buddy/`、`action/official/buddy_session_recall/`、`action/official/buddy_home_writer/`。
@@ -130,7 +131,7 @@ npm start
   - 对新闻、最新、研究、联网、搜索、调研等请求优先给研究类模板加分。
 - 官方 `buddy_autonomous_loop` 是扁平可见主循环：先由 `buddy_context_pressure_check` Tool 做上下文压力检查；需要时运行内部 `buddy_context_compaction` Subgraph；随后同一个 LLM 节点生成回复草稿并选择一个 `capability` 或 `none`；Condition 按 `needs_capability` 决定是否执行一次动态能力；动态能力只写一个 `result_package`，再回到压力检查节点，按需压缩后继续复盘。会话召回通过 `buddy_session_recall` 作为按需动态能力进入循环，不做每轮预取。
 - Buddy 主运行会注入 `current_session_id`，供按需召回排除当前会话谱系，避免把正在发生的上下文当作历史材料重复召回。
-- Buddy 上下文压缩参考 Hermes 触发方式，但保持图优先：可见主路径的压力判断和压缩节点已经进入官方 `buddy_autonomous_loop`，不是 Buddy 窗口外层隐藏重试。Buddy 窗口只把 `raw_conversation_history`、`conversation_history`、`existing_session_summary` 等输入绑定进官方模板；真正摘要由内部官方 `buddy_context_compaction` 模板完成，并通过 `buddy_home_writer` 写回 `session_summary`，留下 command/revision。可见路径的触发点包括首轮 LLM 前和动态能力结果后；可见 run 完成后的后台压缩仍然作为独立后台图运行。
+- Buddy 上下文压缩参考 Hermes 触发方式，但保持图优先：可见主路径的压力判断和压缩节点已经进入官方 `buddy_autonomous_loop`，不是 Buddy 窗口外层隐藏重试。Buddy 窗口把 `conversation_history` 作为 `context_assembly_ref` 输入绑定进官方模板，引用具体消息和摘要来源，不在每次 run 中重复保存完整历史文本；真正摘要由内部官方 `buddy_context_compaction` 模板完成，并写回统一数据库中的 `session_summary`，留下 command/revision。可见路径的触发点包括首轮 LLM 前和动态能力结果后；可见 run 完成后的后台压缩仍然作为独立后台图运行。
 - 普通 Subgraph node、动态 `capability.kind=subgraph` 和 batch subgraph worker 会创建 child run。
 - `/api/runs/{run_id}` 会返回直接 children，`/api/runs/{run_id}/tree` 会返回运行树。
 - 动态 subgraph result package 会写入 `childRunId`、`child_run_id`、`triggered_run_id`，并把公开输出包装到 `outputs`。
@@ -153,13 +154,13 @@ npm start
 
 已完成：
 
-- Buddy 长期记忆采用两层模型：
-  - `buddy_home/MEMORY.md` 是唯一长期记忆权威。
-  - `buddy_home/buddy.db` 保存会话、消息、索引、命令、revision 和少量状态。
-- `buddy_home/` 规范形态是 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`buddy.db`。旧的 `policy.json` 只作为兼容遗留文件存在，不再作为权限配置来源，也不再注入 Buddy LLM context。
+- Buddy 记忆和历史采用统一数据库模型：
+  - `backend/data/toograph.db` 保存 Buddy 会话、消息、图运行事实、context assembly、retrieval index、embedding vectors、`memory_entries`、revision 和 event。
+  - `buddy_home/MEMORY.md` 仍是 Buddy Home 的可读文档，但长期记忆事实源是带 source/revision/event 的 `memory_entries`。
+- `buddy_home/` 规范形态是 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md` 和 `policy.json`；会话历史不再写入 `buddy_home` 下的单独数据库。
 - 平台 `memories` 体系和旧候选记忆体验不再是目标架构。
-- `buddy_session_recall` 只读真实 `buddy_messages`，支持 `browse`、`discover`、`scroll`。
-- `buddy_messages_fts` 和 `buddy_messages_fts_trigram` 已建立，并由触发器维护。
+- `buddy_session_recall` 只读统一数据库事实，支持 `browse`、`discover`、`scroll`，并可返回 Buddy messages、memory entries、graph outputs 和 `context_assembly_ref`。
+- `buddy_messages_fts`、`buddy_messages_fts_trigram`、`retrieval_chunks_fts`、`retrieval_chunks_fts_trigram`、embedding vectors 和 hybrid audit 表已进入统一数据库。
 - `discover` 支持 snippet、bookend_start、messages、bookend_end、messages_before、messages_after、rank/newest/oldest 排序、CJK trigram 和短 token LIKE fallback。
 - `buddy_sessions` 已包含 `parent_session_id`、`source`、`ended_at`、`end_reason` 等字段。
 - `memory_review_template_binding` 已进入 Buddy store 和 command 路径，默认绑定 `buddy_autonomous_review`，变更可记录 revision。
@@ -207,7 +208,7 @@ RAG 和记忆系统的共通层：
 | 共通能力 | RAG 用法 | 记忆用法 |
 | --- | --- | --- |
 | query planning | 把用户问题改写成知识库检索 query | 把目标改写成历史会话或偏好查询 |
-| retrieval | 搜知识库 chunk | 搜 Buddy Home 或 buddy.db 会话 |
+| retrieval | 搜知识库 chunk | 搜 Buddy messages、memory entries、graph outputs |
 | metadata filter | 过滤知识库、来源、section、时间、权限 | 过滤 session lineage、角色、时间、来源 |
 | rerank/dedupe | 排序知识 chunk，去重文档 | 排序历史会话，去重 lineage |
 | context budget | 控制证据长度 | 控制 MEMORY.md 和历史窗口长度 |
@@ -260,7 +261,7 @@ RAG 和记忆系统必须分开的语义层：
 
 - `evidence`：可作为事实证据，例如 RAG 文档、网页来源。
 - `preference`：长期偏好，例如 `MEMORY.md`。
-- `history`：历史会话事实，例如 buddy.db message。
+- `history`：历史会话事实，例如 `buddy_messages` message。
 - `context_only`：只可参考，不能作为权限或新指令。
 - `candidate`：候选内容，仍需审查。
 

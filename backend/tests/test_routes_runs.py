@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,6 +12,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.main import app
+from app.core.storage import database, run_store
 
 
 def _valid_resume_graph_snapshot() -> dict:
@@ -56,13 +59,31 @@ def _valid_resume_graph_snapshot() -> dict:
     }
 
 
-def _run_summary(run_id: str, *, internal: bool = False, role: str = "buddy_autonomous_review") -> dict:
+@contextmanager
+def _temporary_run_database():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        data_dir = Path(temp_dir) / "data"
+        with (
+            patch("app.core.storage.database.DATA_DIR", data_dir),
+            patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"),
+        ):
+            database.initialize_storage()
+            yield
+
+
+def _run_summary(
+    run_id: str,
+    *,
+    internal: bool = False,
+    role: str = "buddy_autonomous_review",
+    started_at: str = "2026-05-11T07:28:47Z",
+) -> dict:
     return {
         "run_id": run_id,
         "graph_id": None,
         "graph_name": "自主复盘" if internal else "伙伴自主循环",
         "status": "completed",
-        "started_at": "2026-05-11T07:28:47Z",
+        "started_at": started_at,
         "completed_at": "2026-05-11T07:29:05Z",
         "duration_ms": 18445,
         "runtime_backend": "langgraph",
@@ -125,14 +146,11 @@ def _paused_run(run_id: str = "run_paused", status: str = "awaiting_human") -> d
 
 class RunRouteTests(unittest.TestCase):
     def test_run_list_keeps_buddy_background_audit_runs_visible_by_default(self) -> None:
-        with patch(
-            "app.api.routes_runs.list_runs",
-            return_value=[
-                _run_summary("run_review", internal=True),
-                _run_summary("run_compaction", internal=True, role="buddy_context_compaction"),
-                _run_summary("run_visible"),
-            ],
-        ):
+        with _temporary_run_database():
+            run_store.save_run(_run_summary("run_hidden", internal=True, role="buddy_background_review", started_at="2026-05-11T07:28:50Z"))
+            run_store.save_run(_run_summary("run_review", internal=True, started_at="2026-05-11T07:28:49Z"))
+            run_store.save_run(_run_summary("run_compaction", internal=True, role="buddy_context_compaction", started_at="2026-05-11T07:28:48Z"))
+            run_store.save_run(_run_summary("run_visible", started_at="2026-05-11T07:28:47Z"))
             with TestClient(app) as client:
                 response = client.get("/api/runs")
 
@@ -140,26 +158,23 @@ class RunRouteTests(unittest.TestCase):
         self.assertEqual([run["run_id"] for run in response.json()], ["run_review", "run_compaction", "run_visible"])
 
     def test_run_list_can_include_internal_runs_explicitly(self) -> None:
-        with patch(
-            "app.api.routes_runs.list_runs",
-            return_value=[
-                _run_summary("run_review", internal=True),
-                _run_summary("run_compaction", internal=True, role="buddy_context_compaction"),
-                _run_summary("run_visible"),
-            ],
-        ):
+        with _temporary_run_database():
+            run_store.save_run(_run_summary("run_hidden", internal=True, role="buddy_background_review", started_at="2026-05-11T07:28:50Z"))
+            run_store.save_run(_run_summary("run_review", internal=True, started_at="2026-05-11T07:28:49Z"))
+            run_store.save_run(_run_summary("run_compaction", internal=True, role="buddy_context_compaction", started_at="2026-05-11T07:28:48Z"))
+            run_store.save_run(_run_summary("run_visible", started_at="2026-05-11T07:28:47Z"))
             with TestClient(app) as client:
                 response = client.get("/api/runs", params={"include_internal": "true"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual([run["run_id"] for run in response.json()], ["run_review", "run_compaction", "run_visible"])
+        self.assertEqual([run["run_id"] for run in response.json()], ["run_hidden", "run_review", "run_compaction", "run_visible"])
 
     def test_get_run_detail_includes_direct_child_run_summaries(self) -> None:
         root = _run_summary("run_root")
-        with (
-            patch("app.api.routes_runs.load_run", return_value=root),
-            patch("app.api.routes_runs.list_child_runs", return_value=[_child_run_summary()], create=True),
-        ):
+        child = _child_run_summary()
+        with _temporary_run_database():
+            run_store.save_run(root)
+            run_store.save_run(child)
             with TestClient(app) as client:
                 response = client.get("/api/runs/run_root")
 
@@ -170,7 +185,7 @@ class RunRouteTests(unittest.TestCase):
         self.assertEqual(payload["children"][0]["invocation_kind"], "dynamic_subgraph_capability")
 
     def test_get_run_tree_returns_nested_child_runs(self) -> None:
-        tree = {
+        root = {
             **_run_summary("run_root"),
             "parent_run_id": "",
             "root_run_id": "run_root",
@@ -183,9 +198,11 @@ class RunRouteTests(unittest.TestCase):
             "batch_item_index": None,
             "batch_item_label": "",
             "current_node_id": None,
-            "children": [{**_child_run_summary(), "children": []}],
         }
-        with patch("app.api.routes_runs.build_run_tree", return_value=tree, create=True):
+        child = _child_run_summary()
+        with _temporary_run_database():
+            run_store.save_run(root)
+            run_store.save_run(child)
             with TestClient(app) as client:
                 response = client.get("/api/runs/run_root/tree")
 
@@ -194,6 +211,33 @@ class RunRouteTests(unittest.TestCase):
         self.assertEqual(payload["run_id"], "run_root")
         self.assertEqual(payload["children"][0]["run_id"], "run_child")
         self.assertEqual(payload["children"][0]["run_path"], ["run_root", "run_child"])
+
+    def test_get_run_node_detail_reads_node_execution_from_database(self) -> None:
+        run = {
+            **_run_summary("run_node"),
+            "node_executions": [
+                {
+                    "execution_id": "exec_agent",
+                    "node_id": "agent",
+                    "node_type": "agent",
+                    "status": "success",
+                    "duration_ms": 42,
+                    "input_summary": "Question",
+                    "output_summary": "Answer",
+                    "artifacts": {"outputs": {"answer": "ok"}},
+                }
+            ],
+        }
+        with _temporary_run_database():
+            run_store.save_run(run)
+            with TestClient(app) as client:
+                response = client.get("/api/runs/run_node/nodes/agent")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["node_id"], "agent")
+        self.assertEqual(payload["duration_ms"], 42)
+        self.assertEqual(payload["artifacts"]["outputs"], {"answer": "ok"})
 
     def test_cancel_run_marks_paused_run_cancelled_and_clears_pending_resume_metadata(self) -> None:
         run = _paused_run()

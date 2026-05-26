@@ -5,6 +5,7 @@ import time
 from typing import Any
 
 from app.core.runtime.state import utc_now_iso
+from app.core.storage.content_blob_store import maybe_inline_or_ref
 
 
 def refresh_run_artifacts(
@@ -39,6 +40,10 @@ def refresh_run_artifacts(
         for preview in state.get("output_previews", [])
     ]
     state_values = dict(state.get("state_values", {}))
+    stored_state_values = {
+        key: maybe_inline_or_ref(value)
+        for key, value in state_values.items()
+    }
     state_events = list(state.get("state_events", []))
     state_stream_events = list(state.get("state_stream_events", []))
     activity_events = list(state.get("activity_events", []))
@@ -55,13 +60,13 @@ def refresh_run_artifacts(
         "active_edge_ids": sorted(active_edge_ids),
         "state_events": state_events,
         "state_stream_events": state_stream_events,
-        "state_values": state_values,
+        "state_values": stored_state_values,
         "streaming_outputs": dict(state.get("streaming_outputs", {})),
         "cycle_iterations": list(state.get("cycle_iterations", [])),
         "cycle_summary": dict(state.get("cycle_summary", {})),
     }
     state["state_snapshot"] = {
-        "values": state_values,
+        "values": stored_state_values,
         "last_writers": state_last_writers,
     }
 

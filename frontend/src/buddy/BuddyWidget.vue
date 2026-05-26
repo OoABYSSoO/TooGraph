@@ -320,6 +320,7 @@ import {
   appendBuddyChatMessage,
   fetchBuddyProfile,
 } from "../api/buddy.ts";
+import { fetchRun } from "../api/runs.ts";
 import SandboxedHtmlFrame from "../components/SandboxedHtmlFrame.vue";
 import { useBuddyContextStore } from "../stores/buddyContext.ts";
 import {
@@ -327,7 +328,7 @@ import {
 } from "../stores/buddyMascotDebug.ts";
 import { buildBuddyBubblePreviewLabel } from "./buddyBubblePreviewModel.ts";
 import { resolveBuddyWindowDisplayName } from "./buddyDisplayName.ts";
-import type { BuddyProfile } from "../types/buddy.ts";
+import type { BuddyChatMessageRecord, BuddyProfile } from "../types/buddy.ts";
 import type { GraphPayload } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
 
@@ -361,6 +362,7 @@ import {
 } from "./buddyPauseQueuePolicy.ts";
 import {
   BUDDY_MODE_OPTIONS,
+  resolveBuddyReplyText,
 } from "./buddyChatGraph.ts";
 import { useBuddyPermissionMode } from "./useBuddyPermissionMode.ts";
 import {
@@ -574,6 +576,7 @@ const {
   resetVisibleBuddyRunState,
   scrollMessagesToBottom,
   formatErrorMessage,
+  hydrateLoadedRunDisplays: hydrateLoadedBuddyRunDisplays,
 });
 const buddyModeLabel = computed(() => {
   const option = BUDDY_MODE_OPTIONS.find((candidate) => candidate.value === buddyMode.value);
@@ -1048,36 +1051,34 @@ function finishBuddyVisibleRun(
     ? createEmptyBuddyOutputTraceRuntimeState()
     : buildBuddyOutputTraceStateFromRunDetail(runDetail, outputTracePlan, graph);
   const outputState = buildPublicOutputRuntimeStateFromRunDetail(runDetail, publicOutputBindings, graph);
-  const { publicOutputMessages, outputTraceMessages } = syncBuddyRunDisplayMessages(assistantMessageId, runId, outputTraceState, outputState);
+  const { publicOutputMessages } = syncBuddyRunDisplayMessages(assistantMessageId, runId, outputTraceState, outputState);
   const includeReplyInContext = runDetail.status === "completed";
   const assistantMessage = messages.value.find((message) => message.id === assistantMessageId);
   if (assistantMessage) {
     assistantMessage.runId = runId;
     assistantMessage.activityText = "";
-    assistantMessage.includeInContext = false;
-  }
-  for (const message of outputTraceMessages) {
-    void persistBuddyMessage(sessionId, message, {
-      runId,
-      includeInContext: false,
-    });
+    assistantMessage.includeInContext = includeReplyInContext;
   }
   if (publicOutputMessages.length === 0) {
     updateAssistantMessage(assistantMessageId, t("buddy.emptyReply"), {
       includeInContext: false,
       runId,
+      transcriptOnly: false,
     });
     void persistBuddyMessage(sessionId, messages.value.find((message) => message.id === assistantMessageId), {
       runId,
       includeInContext: false,
     });
   } else {
-    for (const message of publicOutputMessages) {
-      void persistBuddyMessage(sessionId, message, {
-        runId,
-        includeInContext: message.publicOutput?.kind === "text" && includeReplyInContext,
-      });
-    }
+    updateAssistantMessage(assistantMessageId, resolvePersistentBuddyReplyContent(publicOutputMessages, runDetail), {
+      includeInContext: includeReplyInContext,
+      runId,
+      transcriptOnly: true,
+    });
+    void persistBuddyMessage(sessionId, messages.value.find((message) => message.id === assistantMessageId), {
+      runId,
+      includeInContext: includeReplyInContext,
+    });
   }
   void startBuddyVisibleRunTemplateEffects({
     runDetail,
@@ -1092,6 +1093,41 @@ function finishBuddyVisibleRun(
   if (runDetail.status === "failed") {
     errorMessage.value = runDetail.errors?.[0] ?? t("buddy.runFailed");
   }
+}
+
+async function hydrateLoadedBuddyRunDisplays(records: BuddyChatMessageRecord[]) {
+  const assistantRunRecords = records.filter((record) => record.role === "assistant" && Boolean(record.run_id));
+  for (const record of assistantRunRecords) {
+    const runId = String(record.run_id ?? "").trim();
+    if (!runId) {
+      continue;
+    }
+    try {
+      const runDetail = await fetchRun(runId);
+      syncBuddyRunDetailDisplay(record.message_id, runDetail);
+      const message = messages.value.find((entry) => entry.id === record.message_id);
+      if (message) {
+        message.runId = runId;
+        message.includeInContext = record.include_in_context;
+        message.transcriptOnly = true;
+      }
+    } catch (error) {
+      updateAssistantMessage(record.message_id, t("common.failedToLoad", { error: formatErrorMessage(error) }), {
+        includeInContext: false,
+        runId,
+        transcriptOnly: false,
+      });
+    }
+  }
+}
+
+function resolvePersistentBuddyReplyContent(publicOutputMessages: BuddyMessage[], runDetail: RunDetail) {
+  const primaryTextOutput = publicOutputMessages.find(
+    (message) => message.publicOutput?.kind === "text" && message.content.trim().length > 0,
+  );
+  const anyOutput = primaryTextOutput ?? publicOutputMessages.find((message) => message.content.trim().length > 0);
+  const content = anyOutput?.content.trim() || resolveBuddyReplyText(runDetail).trim();
+  return content || t("buddy.emptyReply");
 }
 
 async function persistBuddyMessage(
@@ -1165,6 +1201,7 @@ const {
   createEmptyBuddyOutputTraceRuntimeState,
   resolveBuddyRunControllerMessageId,
   syncBuddyRunDisplayMessages,
+  syncBuddyRunDetailDisplay,
   buildPublicOutputRuntimeStateFromRunDetail,
   nowPublicOutputMs,
   formatPublicOutputCardContent,

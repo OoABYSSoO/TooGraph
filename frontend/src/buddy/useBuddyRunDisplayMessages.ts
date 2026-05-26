@@ -38,6 +38,7 @@ type BuddyRunDisplayMessage = {
   activityText?: string;
   outputTrace?: BuddyOutputTraceSegment;
   publicOutput?: BuddyPublicOutputMetadata;
+  transcriptOnly?: boolean;
 };
 
 type BuddyRunDisplayMood = "idle" | "thinking" | "speaking" | "error";
@@ -114,6 +115,9 @@ export function useBuddyRunDisplayMessages<Message extends BuddyRunDisplayMessag
   }
 
   function shouldRenderMessage(message: Message) {
+    if (message.transcriptOnly === true) {
+      return false;
+    }
     return (
       message.role === "user" ||
       Boolean(message.content.trim()) ||
@@ -179,6 +183,15 @@ export function useBuddyRunDisplayMessages<Message extends BuddyRunDisplayMessag
       outputState,
     );
     void scrollMessagesToBottom();
+  }
+
+  function syncBuddyRunDetailDisplay(controllerMessageId: string, runDetail: RunDetail) {
+    const graph = runDetail.graph_snapshot as unknown as GraphPayload;
+    const publicOutputBindings = buildBuddyPublicOutputBindings(graph);
+    const outputTracePlan = buildBuddyOutputTracePlan(graph, publicOutputBindings);
+    const outputTraceState = buildBuddyOutputTraceStateFromRunDetail(runDetail, outputTracePlan, graph);
+    const outputState = buildPublicOutputRuntimeStateFromRunDetail(runDetail, publicOutputBindings, graph);
+    return syncBuddyRunDisplayMessages(controllerMessageId, runDetail.run_id, outputTraceState, outputState);
   }
 
   function promoteBackgroundTemplateRunResultToBuddyReply(
@@ -370,7 +383,7 @@ export function useBuddyRunDisplayMessages<Message extends BuddyRunDisplayMessag
     message.publicOutput = publicOutput;
     message.outputTrace = undefined;
     message.runId = runId;
-    message.includeInContext = publicOutput.kind === "text" && publicOutput.status === "completed";
+    message.includeInContext = false;
     return message;
   }
 
@@ -402,6 +415,7 @@ export function useBuddyRunDisplayMessages<Message extends BuddyRunDisplayMessag
     shouldShowMessageRoleLabel,
     removeBuddyRunDisplayMessages,
     syncStreamingBuddyRunDisplay,
+    syncBuddyRunDetailDisplay,
     syncBackgroundTemplateRunDisplay,
     promoteBackgroundTemplateRunResultToBuddyReply,
     createEmptyBuddyOutputTraceRuntimeState,
