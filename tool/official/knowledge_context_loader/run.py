@@ -41,6 +41,7 @@ def knowledge_context_loader(payload: dict[str, Any] | None) -> dict[str, Any]:
             max_chars=max_chars,
             rendered_text=rendered_text,
         )
+        used_chars = _context_ref_rendered_chars(context_ref, fallback=used_chars)
         package = _build_context_package(
             context_ref=context_ref,
             results=results,
@@ -195,6 +196,7 @@ def _build_context_ref(
                 "scope": "knowledge",
                 "query": query,
                 "knowledge_base": knowledge_base,
+                "context_security_policy": {"block_high_risk": True},
             },
         )
     except Exception:
@@ -213,7 +215,12 @@ def _build_context_ref(
             "source_count": len(source_refs),
             "source_refs": source_refs,
             "budget": {"max_chars": max_chars},
-            "metadata": {"scope": "knowledge", "query": query, "knowledge_base": knowledge_base},
+            "metadata": {
+                "scope": "knowledge",
+                "query": query,
+                "knowledge_base": knowledge_base,
+                "context_security_policy": {"block_high_risk": True},
+            },
         }
 
 
@@ -313,6 +320,16 @@ def _report_knowledge_base(knowledge_base: str, results: list[dict[str, Any]]) -
     if results:
         return _as_text(results[0].get("kb_id"))
     return ""
+
+
+def _context_ref_rendered_chars(context_ref: dict[str, Any], *, fallback: int) -> int:
+    try:
+        from app.core.storage.context_assembly_store import expand_context_assembly_ref
+
+        expanded = expand_context_assembly_ref(context_ref)
+        return len(str(expanded.get("text") or ""))
+    except Exception:
+        return fallback
 
 
 def _ensure_backend_path() -> None:

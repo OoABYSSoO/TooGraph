@@ -653,6 +653,7 @@ def execute_agent_node(
                     node_name=node_name,
                     action_key=action_key,
                     action_definition=action_definition,
+                    action_inputs=action_inputs,
                 )
                 if approval_decision.required:
                     record_activity_event_func(

@@ -250,6 +250,7 @@ class RunDetail(RunSummary):
     node_executions: list[NodeExecutionDetail] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
+    permission_approvals: list[dict[str, Any]] = Field(default_factory=list)
     output_previews: list[OutputPreview] = Field(default_factory=list)
     artifacts: RunArtifacts = Field(default_factory=RunArtifacts)
     state_snapshot: StateSnapshot = Field(default_factory=StateSnapshot)

@@ -1,0 +1,161 @@
+{
+  "template_id": "scheduler_retry_delivery_eval",
+  "label": "调度重试投递评测",
+  "description": "用确定性 Scheduler Run Context Loader 从数据库读取 scheduled graph job/run 和对应 graph run，输出可审计 retry、pending retry、delivery 与权限边界报告，供 eval 检查调度闭环。",
+  "default_graph_name": "调度重试投递评测",
+  "state_schema": {
+    "job_id": {
+      "name": "Job ID",
+      "description": "要检查的 scheduled graph job id。",
+      "type": "text",
+      "value": "",
+      "color": "#2563eb",
+      "binding": null
+    },
+    "job_run_id": {
+      "name": "Job Run ID",
+      "description": "要检查的 scheduled graph job run id。",
+      "type": "text",
+      "value": "",
+      "color": "#0f766e",
+      "binding": null
+    },
+    "scheduler_run_status": {
+      "name": "Scheduler Run Loader Status",
+      "description": "scheduler_run_context_loader 执行状态。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "scheduler_run_context_loader",
+        "nodeId": "load_scheduler_run_report",
+        "fieldKey": "status",
+        "managed": true
+      }
+    },
+    "scheduler_run_report": {
+      "name": "Scheduler Run Report",
+      "description": "调度运行报告，包含 retry decision、pending retry、delivery result、权限策略、source refs 和脱敏投递目标。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "scheduler_run_context_loader",
+        "nodeId": "load_scheduler_run_report",
+        "fieldKey": "scheduler_run_report",
+        "managed": true
+      }
+    }
+  },
+  "nodes": {
+    "input_job_id": {
+      "kind": "input",
+      "name": "输入 Job ID",
+      "description": "提供 scheduled graph job id。",
+      "ui": {
+        "position": {"x": 80, "y": 120},
+        "collapsed": false,
+        "size": {"width": 360, "height": 180}
+      },
+      "reads": [],
+      "writes": [{"state": "job_id", "mode": "replace"}],
+      "config": {"value": "", "boundaryType": "text"}
+    },
+    "input_job_run_id": {
+      "kind": "input",
+      "name": "输入 Job Run ID",
+      "description": "提供 scheduled graph job run id。",
+      "ui": {
+        "position": {"x": 80, "y": 360},
+        "collapsed": false,
+        "size": {"width": 360, "height": 180}
+      },
+      "reads": [],
+      "writes": [{"state": "job_run_id", "mode": "replace"}],
+      "config": {"value": "", "boundaryType": "text"}
+    },
+    "load_scheduler_run_report": {
+      "kind": "tool",
+      "name": "加载调度运行报告",
+      "description": "调用 scheduler_run_context_loader，从 DB scheduled_graph_jobs / scheduled_graph_job_runs / graph_runs 生成可审计报告。",
+      "ui": {
+        "position": {"x": 620, "y": 220},
+        "collapsed": false,
+        "size": {"width": 480, "height": 300}
+      },
+      "reads": [
+        {
+          "state": "job_id",
+          "required": true,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "scheduler_run_context_loader",
+            "fieldKey": "job_id",
+            "managed": true
+          }
+        },
+        {
+          "state": "job_run_id",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "scheduler_run_context_loader",
+            "fieldKey": "job_run_id",
+            "managed": true
+          }
+        }
+      ],
+      "writes": [
+        {"state": "scheduler_run_status", "mode": "replace"},
+        {"state": "scheduler_run_report", "mode": "replace"}
+      ],
+      "config": {"toolKey": "scheduler_run_context_loader"}
+    },
+    "output_scheduler_run_report": {
+      "kind": "output",
+      "name": "调度运行报告",
+      "description": "展示 scheduler retry/delivery/permission 评测报告。",
+      "ui": {
+        "position": {"x": 1260, "y": 220},
+        "collapsed": false,
+        "size": {"width": 480, "height": 320}
+      },
+      "reads": [{"state": "scheduler_run_report", "required": true, "binding": null}],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    }
+  },
+  "edges": [
+    {"source": "input_job_id", "target": "load_scheduler_run_report"},
+    {"source": "input_job_run_id", "target": "load_scheduler_run_report"},
+    {"source": "load_scheduler_run_report", "target": "output_scheduler_run_report"}
+  ],
+  "conditional_edges": [],
+  "metadata": {
+    "category": "scheduler",
+    "role": "scheduler_retry_delivery_eval",
+    "visible": false,
+    "capabilityDiscoverableDefault": false,
+    "tags": ["scheduler", "retry", "delivery", "permission", "eval"],
+    "required_tools": ["scheduler_run_context_loader"],
+    "output_contract": [
+      {
+        "state": "scheduler_run_report",
+        "role": "quality_report"
+      }
+    ]
+  },
+  "source": "official",
+  "status": "active"
+}

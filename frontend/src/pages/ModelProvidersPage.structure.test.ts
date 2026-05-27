@@ -154,6 +154,19 @@ test("ModelProvidersPage shows and edits provider models from each card", () => 
   assert.match(pageSource, /\.model-providers-page__model-picker-option--selected \{[\s\S]*color:\s*rgb\(37,\s*99,\s*235\);/);
 });
 
+test("ModelProvidersPage shows a provider capability matrix", () => {
+  assert.match(pageSource, /settings\.providerCapabilityMatrix/);
+  assert.match(pageSource, /class="model-providers-page__capability-matrix"/);
+  assert.match(pageSource, /v-for="capability in providerCapabilityOptions"/);
+  assert.match(pageSource, /type="checkbox"/);
+  assert.match(pageSource, /:checked="isModelCapabilityEnabled\(provider, modelName, capability\.key\)"/);
+  assert.match(pageSource, /@change="toggleProviderModelCapability\(provider, modelName, capability\.key\)"/);
+  assert.match(pageSource, /modelPermissionSummary\(provider, modelName\)/);
+  assert.match(pageSource, /function toggleProviderModelCapability\(provider: ProviderDraft, modelName: string, capabilityKey: ProviderModelCapabilityKey\)/);
+  assert.match(pageSource, /normalizePermissionsForCapabilities/);
+  assert.match(pageSource, /\.model-providers-page__capability-toggle \{[\s\S]*border:/);
+});
+
 test("ModelProvidersPage opens provider configuration in a compact popover", () => {
   assert.match(pageSource, /const activeProviderConfigProviderId = ref<string \| null>\(null\);/);
   assert.match(pageSource, /popper-class="model-providers-page__provider-editor-popper"/);

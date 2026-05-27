@@ -5,7 +5,7 @@ from typing import Any, Callable
 
 from app.core.model_catalog import get_default_video_model_ref, resolve_runtime_model_name
 from app.core.runtime.agent_multimodal import collect_input_attachments, prepare_model_input_attachments
-from app.core.runtime.agent_prompt import build_effective_system_prompt
+from app.core.runtime.agent_prompt import append_llm_prompt_snapshots, build_effective_system_prompt, build_llm_prompt_snapshot
 from app.core.runtime.llm_output_parser import build_output_key_aliases, parse_llm_json_response
 from app.core.runtime.structured_output import (
     build_agent_state_output_schema,
@@ -57,6 +57,14 @@ def generate_agent_response(
     )
     structured_output_schema = build_agent_state_output_schema(output_keys, state_schema or {})
     user_prompt = _build_agent_user_prompt(node)
+    prompt_snapshot = build_llm_prompt_snapshot(
+        phase="agent_response",
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        input_values=input_values,
+        output_keys=output_keys,
+        structured_output_schema=structured_output_schema,
+    )
 
     thinking_level = runtime_config.get("resolved_thinking_level")
     if not isinstance(thinking_level, str):
@@ -114,6 +122,8 @@ def generate_agent_response(
                 structured_output_schema=structured_output_schema,
                 validation_errors=initial_structured_output_validation_errors,
                 raw_model_output=content,
+                phase="structured_output_repair",
+                output_keys=output_keys,
                 chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
                 chat_with_model_ref_with_meta_func=chat_with_model_ref_with_meta_func,
             )
@@ -143,6 +153,7 @@ def generate_agent_response(
         }
     updated_runtime_config = {
         **runtime_config,
+        "prompt_snapshots": append_llm_prompt_snapshots(runtime_config, prompt_snapshot, repair_meta.get("prompt_snapshot")),
         "provider_model": llm_meta.get("model", runtime_config["runtime_model_name"]),
         "provider_id": llm_meta.get("provider_id", runtime_config["resolved_provider_id"]),
         "provider_temperature": llm_meta.get("temperature", runtime_config["resolved_temperature"]),
@@ -153,6 +164,9 @@ def generate_agent_response(
         "provider_response_id": llm_meta.get("response_id"),
         "provider_usage": llm_meta.get("usage"),
         "provider_timings": llm_meta.get("timings"),
+        "provider_fallback_used": bool(llm_meta.get("provider_fallback_used")),
+        "requested_model_ref": llm_meta.get("requested_model_ref"),
+        "provider_fallback_trace": llm_meta.get("provider_fallback_trace"),
         "provider_video_fallback": provider_video_fallback,
         "structured_output_strategy": structured_output_strategy,
         "structured_output_schema": structured_output_schema,
@@ -162,9 +176,14 @@ def generate_agent_response(
         "structured_output_repair_succeeded": repair_succeeded,
         "structured_output_repair_validation_errors": repair_validation_errors,
         "structured_output_repair_error": repair_error,
+        "structured_output_repair_provider_id": repair_meta.get("provider_id"),
+        "structured_output_repair_provider_model": repair_meta.get("model"),
         "structured_output_repair_provider_response_id": repair_meta.get("response_id"),
         "structured_output_repair_provider_usage": repair_meta.get("usage"),
         "structured_output_repair_provider_timings": repair_meta.get("timings"),
+        "structured_output_repair_provider_fallback_used": bool(repair_meta.get("provider_fallback_used")),
+        "structured_output_repair_requested_model_ref": repair_meta.get("requested_model_ref"),
+        "structured_output_repair_provider_fallback_trace": repair_meta.get("provider_fallback_trace"),
     }
     warnings = [*attachment_warnings, *llm_meta.get("warnings", []), *repair_meta.get("warnings", [])]
     if repair_error:
@@ -185,6 +204,10 @@ def repair_structured_output_with_runtime_model(
     raw_model_output: str,
     chat_with_local_model_with_meta_func: Callable[..., tuple[str, dict[str, Any]]],
     chat_with_model_ref_with_meta_func: Callable[..., tuple[str, dict[str, Any]]],
+    phase: str = "structured_output_repair",
+    output_keys: list[str] | None = None,
+    action_keys: list[str] | None = None,
+    subgraph_keys: list[str] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     system_prompt = build_json_repair_system_prompt()
     user_prompt = build_json_repair_user_prompt(
@@ -192,8 +215,17 @@ def repair_structured_output_with_runtime_model(
         validation_errors=validation_errors,
         raw_model_output=raw_model_output,
     )
+    prompt_snapshot = build_llm_prompt_snapshot(
+        phase=phase,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        output_keys=output_keys,
+        action_keys=action_keys,
+        subgraph_keys=subgraph_keys,
+        structured_output_schema=structured_output_schema,
+    )
     if runtime_config.get("resolved_provider_id") == "local":
-        return chat_with_local_model_with_meta_func(
+        content, meta = chat_with_local_model_with_meta_func(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             model=runtime_config["runtime_model_name"],
@@ -205,7 +237,8 @@ def repair_structured_output_with_runtime_model(
             input_attachments=[],
             structured_output_schema=structured_output_schema,
         )
-    return chat_with_model_ref_with_meta_func(
+        return content, {**meta, "prompt_snapshot": prompt_snapshot}
+    content, meta = chat_with_model_ref_with_meta_func(
         model_ref=runtime_config["resolved_model_ref"],
         system_prompt=system_prompt,
         user_prompt=user_prompt,
@@ -216,6 +249,7 @@ def repair_structured_output_with_runtime_model(
         input_attachments=[],
         structured_output_schema=structured_output_schema,
     )
+    return content, {**meta, "prompt_snapshot": prompt_snapshot}
 
 
 def _cleanup_prepared_media_paths(paths: Any) -> None:

@@ -1,0 +1,319 @@
+{
+  "template_id": "delegation_worker_eval",
+  "label": "委派 Worker 评测",
+  "description": "用确定性 Delegation Worker Result Packager 验证 worker_task_packet 到 worker_result_package 的协议边界，供后续 Subgraph worker、并发预算和结果合并复用。",
+  "default_graph_name": "委派 Worker 评测",
+  "state_schema": {
+    "worker_task_packet": {
+      "name": "Worker Task Packet",
+      "description": "委派给 worker 的任务包，包含 task_id、goal、context refs、allowed capabilities、budget 和 expected output schema。",
+      "type": "json",
+      "value": {},
+      "color": "#2563eb",
+      "binding": null
+    },
+    "worker_outputs": {
+      "name": "Worker Outputs",
+      "description": "worker 产出的原始 outputs，按 output key 组织。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": null
+    },
+    "worker_status": {
+      "name": "Worker Status",
+      "description": "worker 终态状态。",
+      "type": "text",
+      "value": "succeeded",
+      "color": "#475569",
+      "binding": null
+    },
+    "worker_summary": {
+      "name": "Worker Summary",
+      "description": "worker 结果摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#9333ea",
+      "binding": null
+    },
+    "worker_artifacts": {
+      "name": "Worker Artifacts",
+      "description": "worker 产出的 artifact references。",
+      "type": "json",
+      "value": [],
+      "color": "#0f766e",
+      "binding": null
+    },
+    "worker_errors": {
+      "name": "Worker Errors",
+      "description": "worker 错误列表。",
+      "type": "json",
+      "value": [],
+      "color": "#be123c",
+      "binding": null
+    },
+    "worker_followups": {
+      "name": "Worker Followups",
+      "description": "worker 后续事项列表。",
+      "type": "json",
+      "value": [],
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "worker_budget_usage": {
+      "name": "Worker Budget Usage",
+      "description": "worker 实际预算使用量。",
+      "type": "json",
+      "value": {},
+      "color": "#b45309",
+      "binding": null
+    },
+    "normalized_worker_task_packet": {
+      "name": "Normalized Worker Task Packet",
+      "description": "标准化后的 worker_task_packet。",
+      "type": "json",
+      "value": {},
+      "color": "#2563eb",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "delegation_worker_result_packager",
+        "nodeId": "package_worker_result",
+        "fieldKey": "worker_task_packet",
+        "managed": true
+      }
+    },
+    "worker_packager_status": {
+      "name": "Worker Packager Status",
+      "description": "delegation_worker_result_packager 执行状态。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "delegation_worker_result_packager",
+        "nodeId": "package_worker_result",
+        "fieldKey": "status",
+        "managed": true
+      }
+    },
+    "worker_result_package": {
+      "name": "Worker Result Package",
+      "description": "标准化 worker_result_package，包含 task_id、status、summary、outputs、artifacts、errors、followups、source refs 和 budget。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "delegation_worker_result_packager",
+        "nodeId": "package_worker_result",
+        "fieldKey": "worker_result_package",
+        "managed": true
+      }
+    }
+  },
+  "nodes": {
+    "input_worker_task_packet": {
+      "kind": "input",
+      "name": "输入 Worker Task Packet",
+      "description": "提供 worker_task_packet。",
+      "ui": {
+        "position": {"x": 80, "y": 120},
+        "collapsed": false,
+        "size": {"width": 400, "height": 260}
+      },
+      "reads": [],
+      "writes": [{"state": "worker_task_packet", "mode": "replace"}],
+      "config": {"value": {}, "boundaryType": "text"}
+    },
+    "input_worker_outputs": {
+      "kind": "input",
+      "name": "输入 Worker Outputs",
+      "description": "提供 worker outputs。",
+      "ui": {
+        "position": {"x": 80, "y": 440},
+        "collapsed": false,
+        "size": {"width": 400, "height": 260}
+      },
+      "reads": [],
+      "writes": [{"state": "worker_outputs", "mode": "replace"}],
+      "config": {"value": {}, "boundaryType": "text"}
+    },
+    "input_worker_status": {
+      "kind": "input",
+      "name": "输入 Worker Status",
+      "description": "提供 worker 状态。",
+      "ui": {
+        "position": {"x": 80, "y": 760},
+        "collapsed": false,
+        "size": {"width": 400, "height": 180}
+      },
+      "reads": [],
+      "writes": [{"state": "worker_status", "mode": "replace"}],
+      "config": {"value": "succeeded", "boundaryType": "text"}
+    },
+    "input_worker_summary": {
+      "kind": "input",
+      "name": "输入 Worker Summary",
+      "description": "提供 worker 摘要。",
+      "ui": {
+        "position": {"x": 80, "y": 1000},
+        "collapsed": false,
+        "size": {"width": 400, "height": 220}
+      },
+      "reads": [],
+      "writes": [{"state": "worker_summary", "mode": "replace"}],
+      "config": {"value": "", "boundaryType": "text"}
+    },
+    "package_worker_result": {
+      "kind": "tool",
+      "name": "打包 Worker Result",
+      "description": "调用 delegation_worker_result_packager，把 worker_task_packet 和 worker outputs 规范化成 worker_result_package。",
+      "ui": {
+        "position": {"x": 620, "y": 420},
+        "collapsed": false,
+        "size": {"width": 500, "height": 360}
+      },
+      "reads": [
+        {
+          "state": "worker_task_packet",
+          "required": true,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "delegation_worker_result_packager",
+            "fieldKey": "worker_task_packet",
+            "managed": true
+          }
+        },
+        {
+          "state": "worker_outputs",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "delegation_worker_result_packager",
+            "fieldKey": "worker_outputs",
+            "managed": true
+          }
+        },
+        {
+          "state": "worker_status",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "delegation_worker_result_packager",
+            "fieldKey": "worker_status",
+            "managed": true
+          }
+        },
+        {
+          "state": "worker_summary",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "delegation_worker_result_packager",
+            "fieldKey": "worker_summary",
+            "managed": true
+          }
+        },
+        {
+          "state": "worker_artifacts",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "delegation_worker_result_packager",
+            "fieldKey": "artifacts",
+            "managed": true
+          }
+        },
+        {
+          "state": "worker_errors",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "delegation_worker_result_packager",
+            "fieldKey": "errors",
+            "managed": true
+          }
+        },
+        {
+          "state": "worker_followups",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "delegation_worker_result_packager",
+            "fieldKey": "followups",
+            "managed": true
+          }
+        },
+        {
+          "state": "worker_budget_usage",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "delegation_worker_result_packager",
+            "fieldKey": "budget_usage",
+            "managed": true
+          }
+        }
+      ],
+      "writes": [
+        {"state": "worker_packager_status", "mode": "replace"},
+        {"state": "normalized_worker_task_packet", "mode": "replace"},
+        {"state": "worker_result_package", "mode": "replace"}
+      ],
+      "config": {"toolKey": "delegation_worker_result_packager"}
+    },
+    "output_worker_result_package": {
+      "kind": "output",
+      "name": "Worker Result Package",
+      "description": "展示标准化 worker_result_package。",
+      "ui": {
+        "position": {"x": 1280, "y": 360},
+        "collapsed": false,
+        "size": {"width": 500, "height": 360}
+      },
+      "reads": [{"state": "worker_result_package", "required": true, "binding": null}],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    }
+  },
+  "edges": [
+    {"source": "input_worker_task_packet", "target": "package_worker_result"},
+    {"source": "input_worker_outputs", "target": "package_worker_result"},
+    {"source": "input_worker_status", "target": "package_worker_result"},
+    {"source": "input_worker_summary", "target": "package_worker_result"},
+    {"source": "package_worker_result", "target": "output_worker_result_package"}
+  ],
+  "conditional_edges": [],
+  "metadata": {
+    "category": "delegation",
+    "role": "delegation_worker_eval",
+    "visible": false,
+    "capabilityDiscoverableDefault": false,
+    "tags": ["delegation", "worker", "eval"],
+    "required_tools": ["delegation_worker_result_packager"],
+    "output_contract": [
+      {
+        "state": "worker_result_package",
+        "role": "worker_result_package"
+      }
+    ]
+  },
+  "source": "official",
+  "status": "active"
+}

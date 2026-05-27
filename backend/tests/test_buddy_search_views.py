@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.buddy import store
+from app.buddy import commands
 from app.core.storage import database
 from app.core.storage.context_assembly_store import create_context_assembly
 from app.core.storage.run_store import save_run
@@ -61,6 +62,140 @@ class BuddySearchViewTests(unittest.TestCase):
         self.assertEqual(result["sessions"][0]["match_message_id"], hit_message["message_id"])
         self.assertIn(hit_message["message_id"], result["message_ids"])
         self.assertIn("evidence-alpha", result["sessions"][0]["snippet"])
+
+    def test_search_sessions_uses_embedding_hybrid_retrieval_for_message_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            db_path = data_dir / "toograph.db"
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", db_path),
+                patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"),
+            ):
+                database.initialize_storage()
+                from app.core.storage.embedding_store import process_pending_embedding_jobs, register_embedding_model
+
+                model = register_embedding_model(provider_key="local", model="hashing-v1", dimensions=16)
+                session = store.create_chat_session({"title": "Hybrid session"}, changed_by="user", change_reason="test")
+                message = store.append_chat_message(
+                    session["session_id"],
+                    {"role": "assistant", "content": "session-hybrid-evidence refund audit details should be semantically searchable."},
+                    changed_by="buddy",
+                    change_reason="test",
+                )
+                embedding_report = process_pending_embedding_jobs(model_ref=model["embedding_model_id"], limit=10)
+
+                result = store.search_chat_sessions(
+                    query="refund audit",
+                    embedding_model_ref=model["embedding_model_id"],
+                    limit=5,
+                )
+
+        self.assertGreaterEqual(embedding_report["completed_count"], 1)
+        self.assertEqual(result["kind"], "buddy_session_search")
+        self.assertEqual(result["embedding_model_ref"], model["embedding_model_id"])
+        self.assertEqual(result["report"]["mode"], "hybrid")
+        self.assertEqual(result["session_count"], 1)
+        self.assertEqual(result["sessions"][0]["session_id"], session["session_id"])
+        self.assertEqual(result["sessions"][0]["match_message_id"], message["message_id"])
+        self.assertEqual(result["sessions"][0]["retrieval"]["mode"], "hybrid")
+        self.assertGreater(result["sessions"][0]["retrieval"]["vector_score"], 0)
+        ranking_report = result["report"]["ranking_reports"][0]
+        self.assertEqual(ranking_report["kind"], "retrieval_ranking_report")
+        self.assertEqual(ranking_report["query_text"], "refund audit")
+        self.assertEqual(ranking_report["mode"], "hybrid")
+        self.assertEqual(ranking_report["embedding_model_ref"], model["embedding_model_id"])
+        self.assertGreaterEqual(ranking_report["result_count"], 1)
+        self.assertEqual(ranking_report["ranked_results"][0]["rank"], 1)
+        self.assertEqual(ranking_report["ranked_results"][0]["source_ref"]["source_id"], message["message_id"])
+        self.assertIn("lexical_score + vector_score", ranking_report["score_formula"])
+
+    def test_search_sessions_expands_hit_message_and_run_source_refs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            db_path = data_dir / "toograph.db"
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", db_path),
+                patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"),
+            ):
+                database.initialize_storage()
+                session = store.create_chat_session({"title": "source refs"}, changed_by="user", change_reason="test")
+                message = store.append_chat_message(
+                    session["session_id"],
+                    {"role": "assistant", "content": "source-ref-evidence came from a graph run.", "run_id": "run_source_ref"},
+                    changed_by="buddy",
+                    change_reason="test",
+                )
+
+                result = store.search_chat_sessions(query="source-ref-evidence", limit=5)
+
+        source_refs = result["sessions"][0]["source_refs"]
+        self.assertIn(
+            {"source_kind": "buddy_message", "source_id": message["message_id"], "role": "assistant"},
+            source_refs,
+        )
+        self.assertIn(
+            {"source_kind": "graph_run", "source_id": "run_source_ref", "relation": "primary", "message_id": message["message_id"]},
+            source_refs,
+        )
+
+    def test_search_sessions_expands_per_session_summary_source_refs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            db_path = data_dir / "toograph.db"
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", db_path),
+                patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"),
+            ):
+                database.initialize_storage()
+                session = store.create_chat_session({"title": "summary refs"}, changed_by="user", change_reason="test")
+                message = store.append_chat_message(
+                    session["session_id"],
+                    {"role": "assistant", "content": "summary-ref-evidence should remain traceable after compaction."},
+                    changed_by="buddy",
+                    change_reason="test",
+                )
+                save_run(
+                    {
+                        "run_id": "run_summary_ref",
+                        "graph_id": "graph_summary_ref",
+                        "graph_name": "Summary Ref Source",
+                        "status": "completed",
+                        "started_at": "2026-05-28T00:00:00Z",
+                        "completed_at": "2026-05-28T00:00:01Z",
+                        "metadata": {"runtime_context": {"buddy_session_id": session["session_id"]}},
+                    }
+                )
+                command = commands.execute_command(
+                    {
+                        "action": "session_summary.update",
+                        "payload": {
+                            "content": "摘要保留 summary-ref-evidence 的任务结论。",
+                            "source_refs": [
+                                {
+                                    "source_kind": "buddy_message",
+                                    "source_id": message["message_id"],
+                                    "role": "assistant",
+                                }
+                            ],
+                        },
+                        "run_id": "run_summary_ref",
+                        "change_reason": "test summary ref",
+                    }
+                )
+
+                result = store.search_chat_sessions(query="summary-ref-evidence", limit=5)
+
+        summary_refs = result["sessions"][0]["summary_refs"]
+        self.assertEqual(summary_refs[0]["source_kind"], "buddy_session_summary")
+        self.assertEqual(summary_refs[0]["session_id"], session["session_id"])
+        self.assertEqual(summary_refs[0]["lineage_root_session_id"], session["session_id"])
+        self.assertEqual(summary_refs[0]["source_run_id"], "run_summary_ref")
+        self.assertEqual(summary_refs[0]["source_revision_id"], command["revision"]["revision_id"])
+        self.assertEqual(summary_refs[0]["source_refs"][0]["source_id"], message["message_id"])
+        self.assertIn(summary_refs[0], result["sessions"][0]["source_refs"])
 
     def test_search_run_context_expands_context_package_sources_from_run_state(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -251,6 +386,11 @@ class BuddySearchViewTests(unittest.TestCase):
         self.assertGreater(result["memories"][0]["retrieval"]["vector_score"], 0)
         self.assertEqual(result["embedding_models"][0]["embedding_model_id"], model["embedding_model_id"])
         self.assertIn("query_ids", result["report"])
+        ranking_report = result["report"]["ranking_reports"][0]
+        self.assertEqual(ranking_report["kind"], "retrieval_ranking_report")
+        self.assertEqual(ranking_report["query_text"], "memory-search-evidence embedding")
+        self.assertEqual(ranking_report["embedding_model_ref"], model["embedding_model_id"])
+        self.assertEqual(ranking_report["ranked_results"][0]["source_ref"]["source_id"], memory["memory_id"])
 
     def test_buddy_search_routes_expose_memory_search_view(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

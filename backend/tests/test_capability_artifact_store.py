@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.storage.capability_artifact_store import (
     create_capability_artifact_context,
     read_capability_artifact_text,
+    read_capability_artifact_text_for_prompt,
 )
 
 
@@ -49,6 +50,23 @@ class ActionArtifactStoreTests(unittest.TestCase):
             self.assertEqual(payload["name"], "doc_001.md")
             self.assertEqual(payload["content"], "# Article\n\nBody text")
             self.assertEqual(payload["content_type"], "text/markdown")
+
+    def test_read_capability_artifact_text_for_prompt_redacts_secret_values(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "capability_artifacts"
+            artifact_path = root / "run_1" / "searcher" / "doc_002.md"
+            artifact_path.parent.mkdir(parents=True)
+            secret_value = "sk-artifactsecretvalue1234567890"
+            artifact_path.write_text(f"# Source\n\nOPENAI_API_KEY={secret_value}", encoding="utf-8")
+
+            with patch("app.core.storage.capability_artifact_store.CAPABILITY_ARTIFACT_DATA_DIR", root):
+                preview_payload = read_capability_artifact_text("run_1/searcher/doc_002.md")
+                prompt_payload = read_capability_artifact_text_for_prompt("run_1/searcher/doc_002.md")
+
+            self.assertIn(secret_value, preview_payload["content"])
+            self.assertNotIn(secret_value, prompt_payload["content"])
+            self.assertIn("[REDACTED_SECRET]", prompt_payload["content"])
+            self.assertIn("context_secret_redacted", {warning["code"] for warning in prompt_payload["warnings"]})
 
 
 if __name__ == "__main__":

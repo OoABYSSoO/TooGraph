@@ -176,6 +176,8 @@ export type BuddyChatMessageRecord = {
 export type BuddySessionSearchResult = {
   kind: "buddy_session_search";
   query: string;
+  embedding_model_ref?: string;
+  reranker_model_ref?: string;
   hit_count: number;
   session_count: number;
   message_ids: string[];
@@ -192,7 +194,18 @@ export type BuddySessionSearchResult = {
     has_more_before?: boolean;
     has_more_after?: boolean;
     hit_message_ids?: string[];
+    retrieval?: Record<string, unknown>;
+    summary_refs?: Array<Record<string, unknown>>;
+    source_refs?: Array<Record<string, unknown>>;
   }>;
+  report?: {
+    mode?: string;
+    embedding_model_ref?: string;
+    reranker_model_ref?: string;
+    retrieval_modes?: Record<string, number>;
+    query_ids?: string[];
+    ranking_reports?: Array<Record<string, unknown>>;
+  };
 };
 
 export type BuddyRunContextSearchMatch = {
@@ -275,6 +288,7 @@ export type BuddyMemorySearchResult = {
   kind: "memory_search";
   query: string;
   embedding_model_ref: string;
+  reranker_model_ref?: string;
   match_count: number;
   memory_count: number;
   embedding_models: BuddyEmbeddingModelRecord[];
@@ -283,8 +297,10 @@ export type BuddyMemorySearchResult = {
     mode: string;
     filters: Record<string, unknown>;
     embedding_model_ref: string;
+    reranker_model_ref?: string;
     retrieval_modes: Record<string, number>;
     query_ids: string[];
+    ranking_reports?: Array<Record<string, unknown>>;
   };
 };
 

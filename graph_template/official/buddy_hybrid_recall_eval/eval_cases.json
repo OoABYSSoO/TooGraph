@@ -1,0 +1,106 @@
+{
+  "suite": "buddy_hybrid_recall_eval_core",
+  "name": "Buddy 混合召回核心回归",
+  "description": "覆盖同一次召回同时命中 Buddy 历史消息和结构化 DB 记忆，并保留统一 context_package、source refs、预算和报告。",
+  "cases": [
+    {
+      "case_id": "hybrid-recall-finds-session-and-memory-fixtures",
+      "name": "混合召回应命中历史消息和结构化记忆",
+      "description": "安装 Buddy session/message 与 memory fixture，运行 hybrid_recall_context_loader 后用 hybrid_recall check 验证 message id、memory id、source refs 和关键文本。",
+      "inputs": {
+        "query": "hybrid",
+        "current_session_id": "session_eval_hybrid_current",
+        "embedding_model_ref": "",
+        "session_limit": 5,
+        "memory_limit": 5,
+        "window": 1,
+        "bookend": 0,
+        "max_chars": 8000,
+        "status_filter": "active"
+      },
+      "checks": [
+        {
+          "kind": "hybrid_recall",
+          "name": "hybrid_recall_finds_memory_and_session_sources",
+          "target": "hybrid_recall_report",
+          "min_memory_results": 1,
+          "min_session_results": 1,
+          "required_memory_ids": [
+            "mem_eval_hybrid_preference"
+          ],
+          "required_message_ids": [
+            "msg_eval_hybrid_user"
+          ],
+          "required_source_refs": [
+            {
+              "source_kind": "memory_entry",
+              "source_id": "mem_eval_hybrid_preference"
+            },
+            {
+              "source_kind": "buddy_message",
+              "source_id": "msg_eval_hybrid_user"
+            }
+          ],
+          "required_terms": [
+            "hybrid-memory-evidence",
+            "hybrid-session-evidence"
+          ],
+          "max_context_chars": 8000
+        }
+      ],
+      "metadata": {
+        "fixture_buddy_sessions": [
+          {
+            "session_id": "session_eval_hybrid_current",
+            "title": "当前会话",
+            "messages": [
+              {
+                "message_id": "msg_eval_hybrid_current",
+                "role": "user",
+                "content": "当前会话也提到 hybrid-session-evidence，但 discover 应排除当前 lineage。",
+                "client_order": 0
+              }
+            ]
+          },
+          {
+            "session_id": "session_eval_hybrid_history",
+            "title": "历史偏好",
+            "messages": [
+              {
+                "message_id": "msg_eval_hybrid_user",
+                "role": "user",
+                "content": "hybrid-session-evidence 表示历史对话里用户要求保留证据。",
+                "client_order": 0
+              },
+              {
+                "message_id": "msg_eval_hybrid_assistant",
+                "role": "assistant",
+                "content": "混合召回报告需要保留 Buddy message source refs。",
+                "client_order": 1
+              }
+            ]
+          }
+        ],
+        "fixture_memory_entries": [
+          {
+            "memory_id": "mem_eval_hybrid_preference",
+            "scope_kind": "buddy",
+            "scope_id": "default",
+            "layer": "long_term",
+            "memory_type": "preference",
+            "title": "混合召回偏好",
+            "content": "hybrid-memory-evidence：用户希望记忆召回同时引用长期记忆和历史消息。",
+            "confidence": 0.92,
+            "salience": 0.86,
+            "sources": [
+              {
+                "source_kind": "buddy_message",
+                "source_id": "msg_eval_hybrid_user"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

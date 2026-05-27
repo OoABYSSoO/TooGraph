@@ -24,6 +24,21 @@ def _workspace_write_inputs() -> dict[str, object]:
     }
 
 
+def _workspace_read_inputs() -> dict[str, object]:
+    return {
+        "operation": "read",
+        "path": "README.md",
+        "content": "",
+        "query": "",
+        "old_string": "",
+        "new_string": "",
+        "replace_all": False,
+        "expected_sha256": "",
+        "expected_mtime_ns": "",
+        "args": [],
+    }
+
+
 def _approval_graph() -> NodeSystemGraphDocument:
     return NodeSystemGraphDocument.model_validate(
         {
@@ -210,9 +225,42 @@ def test_langgraph_runtime_pauses_before_risky_action_permission(monkeypatch) ->
     pending = result["metadata"]["pending_permission_approval"]
     assert pending["kind"] == "capability_permission_approval"
     assert pending["capability_key"] == "local_workspace_executor"
-    assert pending["permissions"] == ["file_write", "subprocess"]
+    assert pending["permissions"] == ["file_write"]
     assert pending["inputs"]["path"] == "action/user/demo/ACTION.md"
     assert result["lifecycle"]["pause_reason"] == "permission_approval"
+
+
+def test_langgraph_runtime_does_not_pause_for_workspace_read_operation(monkeypatch) -> None:
+    import app.core.langgraph.runtime as runtime_module
+    import app.core.runtime.node_system_executor as executor_module
+
+    invoked: list[dict[str, object]] = []
+
+    monkeypatch.setattr(runtime_module, "save_run", lambda _state: None)
+    monkeypatch.setattr(
+        executor_module,
+        "_generate_agent_action_inputs",
+        lambda **kwargs: (
+            {"local_workspace_executor": _workspace_read_inputs()},
+            {},
+            "planned read action inputs",
+            [],
+            kwargs["runtime_config"],
+        ),
+    )
+    monkeypatch.setattr(
+        executor_module,
+        "_invoke_action",
+        lambda action_func, action_inputs, **kwargs: invoked.append(dict(action_inputs))
+        or {"status": "succeeded", "success": True, "result": "read file"},
+    )
+
+    result = execute_node_system_graph_langgraph(_approval_graph())
+
+    assert result["status"] == "completed"
+    assert invoked == [_workspace_read_inputs()]
+    assert "pending_permission_approval" not in result["metadata"]
+    assert result.get("permission_approvals") in (None, [])
 
 
 def test_langgraph_runtime_resumes_permission_approval_with_stored_inputs(monkeypatch) -> None:

@@ -6,6 +6,7 @@ import re
 from typing import Any
 from uuid import uuid4
 
+from app.core.context_security import redact_context_secrets
 from app.core.storage.database import DATA_DIR
 
 
@@ -50,10 +51,15 @@ def read_capability_artifact_text(relative_path: str) -> dict[str, Any]:
 
 
 def read_capability_artifact_text_for_prompt(relative_path: str) -> dict[str, Any]:
-    return _read_capability_artifact_text(relative_path, max_bytes=None)
+    return _read_capability_artifact_text(relative_path, max_bytes=None, redact_for_prompt=True)
 
 
-def _read_capability_artifact_text(relative_path: str, *, max_bytes: int | None) -> dict[str, Any]:
+def _read_capability_artifact_text(
+    relative_path: str,
+    *,
+    max_bytes: int | None,
+    redact_for_prompt: bool = False,
+) -> dict[str, Any]:
     normalized_path = normalize_capability_artifact_relative_path(relative_path)
     target = resolve_capability_artifact_path(normalized_path)
     try:
@@ -69,12 +75,26 @@ def _read_capability_artifact_text(relative_path: str, *, max_bytes: int | None)
         content = target.read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
         raise FileNotFoundError(f"Capability artifact '{normalized_path}' does not exist.") from exc
+    warnings: list[dict[str, Any]] = []
+    if redact_for_prompt:
+        content, warnings = redact_context_secrets(
+            content,
+            source_kind="capability_artifact",
+            source_refs=[
+                {
+                    "source_kind": "capability_artifact",
+                    "source_id": normalized_path,
+                    "label": target.name,
+                }
+            ],
+        )
     return {
         "path": normalized_path,
         "name": target.name,
         "size": size,
         "content_type": content_type,
         "content": content,
+        "warnings": warnings,
     }
 
 

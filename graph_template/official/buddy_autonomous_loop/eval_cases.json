@@ -159,6 +159,97 @@
           "expectation": "agent_loop_report.decision 应为 stop；agent_loop_report.last_result_stop_reason 应为 tool_failed；public_response 应说明能力失败和可选替代路径。"
         }
       ]
+    },
+    {
+      "case_id": "buddy-main-loop-selector-fallback-after-recent-failures",
+      "name": "能力近期失败时选择健康 fallback",
+      "description": "预置高级联网搜索近期连续失败、联网搜索最近成功；当 Buddy 需要联网调研时，selector 应把原始高级调研能力降级为健康的 web_search，并保留拒绝原因和 fallback 候选。",
+      "inputs": {
+        "user_message": "请联网调研 TooGraph 与 Hermes Agent 的能力差距，整理带来源的结论。",
+        "buddy_context": {
+          "enabled_capabilities": [
+            "advanced_web_research_loop",
+            "web_search"
+          ],
+          "permission_policy": {
+            "network": "allowed",
+            "browser_automation": "allowed"
+          }
+        }
+      },
+      "metadata": {
+        "fixture_capability_usage_entries": [
+          {
+            "capability": {
+              "kind": "subgraph",
+              "key": "advanced_web_research_loop",
+              "name": "高级联网搜索"
+            },
+            "success": false,
+            "run_id": "run_eval_selector_research_failed_1",
+            "summary": "高级联网搜索 provider timeout",
+            "status": "failed",
+            "error_type": "provider_timeout"
+          },
+          {
+            "capability": {
+              "kind": "subgraph",
+              "key": "advanced_web_research_loop",
+              "name": "高级联网搜索"
+            },
+            "success": false,
+            "run_id": "run_eval_selector_research_failed_2",
+            "summary": "高级联网搜索 provider timeout",
+            "status": "failed",
+            "error_type": "provider_timeout"
+          },
+          {
+            "capability": {
+              "kind": "action",
+              "key": "web_search",
+              "name": "联网搜索"
+            },
+            "success": true,
+            "run_id": "run_eval_selector_web_search_ok",
+            "summary": "联网搜索返回可读取来源",
+            "status": "completed"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "kind": "capability_selection",
+          "name": "selector_fallback_trace",
+          "target": "capability_selection_trace",
+          "required_requested": {
+            "kind": "subgraph",
+            "key": "advanced_web_research_loop"
+          },
+          "required_selected": {
+            "kind": "action",
+            "key": "web_search"
+          },
+          "required_rejected": [
+            {
+              "kind": "subgraph",
+              "key": "advanced_web_research_loop",
+              "reason": "recent_failures_fallback_preferred"
+            }
+          ],
+          "required_fallbacks": [
+            {
+              "kind": "subgraph",
+              "key": "advanced_web_research_loop",
+              "reason": "original_candidate"
+            }
+          ],
+          "min_rejected": 1,
+          "min_fallbacks": 1,
+          "required_terms": [
+            "recent_failures_fallback_preferred"
+          ]
+        }
+      ]
     }
   ]
 }

@@ -123,7 +123,7 @@ TooGraph 差距：
 - `agent_loop_events` 存储 fixture 已覆盖 `provider_failed`、`permission_required`、`context_budget_exhausted`，验证保存 run、数据库投影、加载 `RunDetail` schema 时能保留标准 stop reason、预算快照和结构化错误详情。
 - RunDetail Agent Diagnostic 模型测试已覆盖投影事件中的 provider 失败详情，会把 `error_type` / `error_message` 与 warnings 一起作为用户可见诊断证据重组。
 - RunDetail 页面结构测试已覆盖 Agent Diagnostic 的独立 warning list，页面会把这些由运行事实重组出的错误详情作为可扫描诊断证据展示。
-- 后续仍需补齐真实图运行端到端场景，验证这些状态从运行时产生、API 返回到页面展示的完整链路。
+- 已新增真实图运行端到端回归：最小 LangGraph 图实际调用 `agent_loop_guard` Tool，验证 `agent_loop_report` / `agent_loop_stop_reason` 从运行时 state 写入、投影成 `agent_loop_events`、通过 `/api/runs/{run_id}` 返回，并保留给 RunDetail 与 Buddy 胶囊共用的诊断事实。
 
 解决方案：
 
@@ -243,7 +243,16 @@ TooGraph 差距：
 - 已新增面向 UI/API 的只读搜索视图：`/api/buddy/search/sessions` 复用 Buddy message FTS、lineage 去重和当前会话谱系排除，返回 session snippets、bookends、hit message ids；`/api/buddy/search/run-context` 从 graph run 的 `state_values`、`state_snapshot`、`state_events` 和 context assembly refs 展开某次 run 实际使用过的上下文来源。
 - 前端 API/types 已能直接调用 session evidence search 和 run context evidence search。
 - 已新增 `/evidence` 证据搜索页：左侧检索 Buddy 会话历史，展示 session lineage、hit message ids、bookends 和消息窗口；右侧按 run id 展开运行上下文来源，展示 `assembly_id`、`target_state_key`、source refs、renderer、authority 和 metadata，并可跳转 Run Detail。
-- 后续仍需接入 embedding 混合检索，并让 session summary/source refs 在搜索结果中更完整地展开。
+- Buddy message 写入现在会投影为 `source_kind=buddy_message` 的 retrieval document/chunk，并为已启用 embedding models 自动排队，供 session 语义召回复用统一 embedding pipeline。
+- `/api/buddy/search/sessions` 已支持 `embedding_model_ref`，可通过 retrieval hybrid search 合并 FTS 与向量结果，并在 session hit 上返回 retrieval mode、score 和 query audit id。
+- `/evidence` 的会话历史检索已加入 embedding model 选择器，能直接发起 session hybrid search，并在结果卡片显示 retrieval mode、lexical score 和 vector score。
+- session search 结果已展开 `source_refs`，包含命中的 `buddy_message` 原子消息和通过 `buddy_message_run_refs` 关联的 `graph_run`，证据页会直接显示这些 refs。
+- `session_summary.update` 现在会在能从 source run runtime context 推断 `buddy_session_id` 时写入 `buddy_session_summaries`，保存 summary id、session id、lineage root、source run、revision 和原始 source refs。
+- session search 结果已展开 `summary_refs`，并把 `buddy_session_summary` 合并进同一 `source_refs` 事实源；`context_assembly_ref` 也能通过 per-session summary id 重建摘要文本。
+- session search 的 hybrid retrieval report 已从 `retrieval_queries` / `retrieval_results` 审计表展开 `ranking_reports`，包含 query、filter、embedding model、score formula、ranked results、source ref、lexical/vector/final score；Evidence 页会显示最高排序来源和 query id。
+- 已新增官方 `hybrid_recall_context_loader` Tool，把 Buddy 历史消息和结构化 DB 记忆召回合并为同一个 `context_package` 与 `hybrid_recall_report`；报告包含 `message_ids`、`memory_ids`、source refs、retrieval modes、budget 和 warnings。
+- Eval runner 已支持 case 级 `metadata.fixture_buddy_sessions`，能在运行 eval case 前安装 Buddy session/message fixture，并投影到 retrieval/FTS，供 session + memory 混合召回形成可重复输入。
+- 已新增官方 `buddy_hybrid_recall_eval` 模板和 `buddy_hybrid_recall_eval_core` suite，用 `hybrid_recall` 自动 check 验证同一次召回同时命中历史消息与结构化记忆，并保留 source refs 和上下文预算。
 
 解决方案：
 
@@ -300,7 +309,17 @@ TooGraph 差距：
 - 已新增只读记忆证据搜索 API：`/api/buddy/search/memories`。它直接读取 `memory_entries`、source refs、latest revision、embedding model registry 和 hybrid recall audit，供 UI 和后续 Agent 诊断使用。
 - `/evidence` 证据搜索页已加入长期记忆面板，支持关键词检索、embedding model 选择、来源 refs、latest revision、metadata 和 retrieval audit 展开；历史、记忆和 run context 现在可以在同一页面交叉核验。
 - Scheduler 页面已把官方 `embedding_maintenance` 维护任务作为一等引导展示，用户可以直接启用或立即运行该任务，让 embedding dirty queue 通过标准 graph run 被处理。
-- 仍需补齐 embedding rebuild UI、rerank/eval 报告和更细的记忆去重策略。
+- `/evidence` 证据搜索页已提供手动处理 Embedding 队列入口：页面读取官方 `embedding_maintenance` 模板，把当前选择的 embedding model 和 job limit 写入 input state，再通过 `runGraph` 启动可审计图运行，并提供运行详情链接。
+- memory search 的 hybrid retrieval report 已复用 `retrieval_queries` / `retrieval_results` 展开 ranking report，Evidence 页会显示 query id、结果数、最高排序来源和最终分数。
+- 已新增 `embedding_maintenance_core` 官方 eval suite，覆盖空队列维护时的处理状态、计数和 job 审计输出合同。
+- 已新增官方 `memory_search_context_loader` Tool，把 DB `memory_entries` 搜索结果转换成标准 `context_package` 和 `memory_search_report`，报告包含 memory ids、source refs、retrieval modes、ranking reports 和上下文预算；context package 可通过 `memory_entry` source refs 从数据库重新展开。
+- Eval runner 已支持 case 级 `fixture_memory_entries`，能在运行 eval case 前安装结构化记忆 fixture，并自动投影到 retrieval/FTS，供召回模板形成可重复测试输入。
+- 已新增官方 `buddy_memory_recall_eval` 模板和 `buddy_memory_recall_eval_core` suite，通过确定性 Tool 运行结构化记忆召回，并用新增 `memory_retrieval` check 验证 required memory ids、source refs、关键文本和上下文预算。
+- 已新增 `hybrid_recall_context_loader`、`buddy_hybrid_recall_eval_core` 和 `hybrid_recall` 自动 check，验证 DB memory 与 Buddy session history 可以在同一次 recall 中合并为可审计 context package。
+- `memory_entry.create` 已增加同 scope/layer/type 下的规范化内容去重：重复写入不会创建第二条 `memory_entries` 事实，而是返回已有 memory，合并新的 source refs，写入 `duplicate_skipped` 事件和 `dedupe_merge_sources` revision，并在返回值中给出 `dedupe.reason=duplicate_canonical_content`。
+- `memory_search_context_loader` 已透传 `reranker_model_ref`，`memory_retrieval` 自动 check 已能验证 reranker model、rerank status、首位 memory id 和 ranked memory id 前缀；官方 `buddy_memory_recall_eval_core` 已新增 rerank case，用结构化 ranking report 证明最相关记忆被重排到首位。
+- 记忆写入去重已从精确规范化 hash 扩展到保守近似匹配：同一 scope/layer/type 下，如果新旧内容达到近似重复阈值，会跳过新建、合并 source refs，并在返回值和 `duplicate_skipped` event 中记录 `dedupe.reason=near_duplicate_content` 与 `similarity_score`。
+- 后续可继续把近似去重接入 embedding 相似度或人工复核候选，以处理更弱的语义改写。
 
 解决方案：
 
@@ -320,7 +339,7 @@ TooGraph 差距：
    - 写入 memory/message/run summary 时生成 chunk。
    - 本地 hash embedding 保留为 deterministic fallback。
    - Model Providers 的 OpenAI-compatible provider 作为真实 embedding 执行路径。
-   - 增加 embedding model 的注册、启用、维度配置和重建入口。
+   - 增加 embedding model 的注册、启用、维度配置和可见维护入口。
    - 支持 rebuild、incremental update、dirty queue。
 4. Hybrid recall：
    - query planning 生成关键词 query 和 vector query。
@@ -488,7 +507,7 @@ TooGraph 差距：
 - selector after_llm 已输出 `selection_reason` 和 `capability_selection_trace`，包含原始请求、最终选择、被拒绝候选、fallback 候选、评分拆解和权限摘要。
 - 官方 `buddy_autonomous_loop` 已把 `capability_selection_reason`、`capability_selection_trace` 写入 schema-backed state，后续 RunDetail/Buddy 胶囊可直接读取。
 - selector catalog 已读取 `capability_usage_stats`，把使用次数、成功率、失败次数、近期失败数和最近运行摘要注入候选项；trace 的 `score_breakdown` 与 `usage_summary` 已能解释所选能力的历史反馈。
-- selector catalog 已暴露 `permissionTier` 和 `evalStatus`；trace 的 `permission_summary` 与 `score_breakdown` 已能体现权限层级和 eval case 覆盖。
+- selector catalog 已暴露标准 `permissionTier`、`permissionProfile` 和 `evalStatus`；trace 的 `permission_summary` 与 `score_breakdown` 已能体现权限层级和 eval case 覆盖。
 - selector 已支持显式 `capability_permission_policy.allowed_permission_tiers` / `blocked_permission_tiers` / `approval_required_permission_tiers`；before_llm 目录会过滤不符合权限策略的能力，after_llm 会拒绝策略外选择并记录 `permission_tier_not_allowed`，并在 `permission_summary` 中标记由策略触发的审批原因。
 - Buddy 主循环会按 ask-first / full-access 模式把 capability permission policy 写入图 metadata；LangGraph 子图和 Action runtime context 会继承该策略，使 selector 能在嵌套能力选择中使用同一权限边界。
 - RunDetail 的 Agent Diagnostic 已能从 `capability_selection_trace` 展示 selected/requested/reason、权限、使用反馈、拒绝候选和 fallback 候选；Buddy 胶囊 evidence labels 也会显示同一 selector trace。
@@ -496,7 +515,9 @@ TooGraph 差距：
 - 官方 `buddy_autonomous_loop` 已把 `agent_loop_control` 作为 `toograph_capability_selector` 的 managed Action input 注入；selector trace 会写入 `budget_after_call`，RunDetail Agent Diagnostic 与 Buddy 胶囊 evidence labels 可显示能力调用预算、剩余额度和耗尽状态。
 - 统一数据库已新增 `capability_usage_events` 运行时事实投影；保存 graph run 时会从 Action、Tool 和动态 Subgraph 调用记录生成能力使用事件，`capability_usage_stats` 读取时会合并这些事实，使 selector 的历史反馈不再只依赖后台复盘 LLM 提取。
 - selector 已根据 runtime `capability_usage_stats` 评估近期失败：当 LLM 请求的能力连续近期失败，并且同覆盖范围内存在更健康的候选时，`toograph_capability_selector` 会改选 fallback，并在 `capability_selection_trace.rejected_candidates` 中以 `recent_failures_fallback_preferred` 记录原请求；RunDetail 和 Buddy 胶囊可直接展示该结构化拒绝原因。
-- 后续仍需把更多运行时失败恢复结果投影成结构化事件，并把能力失败后的自动 fallback 评估扩展到完整 Buddy 图运行端到端测试。
+- Eval runner 已支持 case 级 `metadata.fixture_capability_usage_entries`，可在运行官方 eval 前预置能力成功/失败统计；新增 `capability_selection` 自动 check，可确定性验证 requested/selected/rejected/fallback 候选与 `recent_failures_fallback_preferred` 等拒绝原因。
+- 官方 `buddy_autonomous_loop_core` 已新增 selector fallback eval case，用预置的 `advanced_web_research_loop` 近期失败和 `web_search` 成功记录，验证 Buddy 主循环在能力选择 trace 中改选健康 fallback。
+- 后续仍需把更多运行时失败恢复结果投影成结构化事件，并把能力失败后的自动 fallback 评估扩展到真实 provider/tool 失败驱动的完整 Buddy 图端到端测试。
 
 解决方案：
 
@@ -617,10 +638,14 @@ TooGraph 差距：
 - `/scheduler` 已提供用户自定义任务创建入口：用户可选择 active 图模板、填写任务名、调度类型、调度表达式、时区和 input bindings JSON；创建结果仍写入 `scheduled_graph_jobs`，每次触发仍生成标准 graph run。
 - 已新增一等 `retry_policy`：调度任务可配置最大尝试次数、重试延迟和 backoff；定时运行失败后会在 `metadata.scheduler_retry_pending` 中记录下一次 retry，下一次 tick 会生成 `trigger_reason=retry` 的标准 graph run，并在 job run metadata 中保留 attempt、parent run 和 retry decision。
 - Scheduler 页面已新增官方维护任务启用引导，把 `official_embedding_maintenance` 和 `official_buddy_capability_curator` 从普通任务列表中提升为后台能力入口；禁用时显示启用入口，启用后显示立即运行入口，操作仍走现有 Scheduler API 并生成标准 graph run。
-- 已新增第一版 `delivery_target` 投递审计：终态 job run 会把 `local_audit` / `job_run_metadata` 投递结果写入 `scheduled_graph_job_runs.metadata.delivery_result`，结果包含 job、job run、graph run 引用、触发原因、终态状态和脱敏后的 target；暂不支持的外部 target 会记录为 `skipped` 和 `unsupported_delivery_target`，不产生隐藏平台副作用。
+- 已新增第一版 `delivery_target` 投递审计：终态 job run 会把 `local_audit` / `job_run_metadata` 投递结果写入 `scheduled_graph_job_runs.metadata.delivery_result`，结果包含 job、job run、graph run 引用、触发原因、终态状态和脱敏后的 target；暂不支持的非外部 target 会记录为 `skipped` 和 `unsupported_delivery_target`，不产生隐藏平台副作用。
+- 已新增外部投递权限边界：`webhook` / `http_webhook` target 会被识别为 `external_delivery`，终态 job run 记录 `approval_required=true`、`required_permissions=["external_delivery"]`、统一 `permission_profile` 和脱敏 target；当前仍跳过真实投递并标记 `external_delivery_requires_approval`，避免 Scheduler 在未审批时进行外部发送。
 - Scheduler 创建表单已暴露 `delivery_target` JSON 输入，用户创建任务时可指定本地审计投递目标。
 - 已新增 `/curator-reports` 能力整理报告页，供 Scheduler 触发的 `official_buddy_capability_curator` run 通过模板索引集中查看报告、候选和调度建议。
-- 后续仍需补齐外部投递 adapter。
+- Eval runner 已支持 case 级 `metadata.fixture_scheduled_graph_jobs` 和 `metadata.fixture_scheduled_graph_job_runs`，可在运行官方 eval 前安装 scheduled job / job run 事实；新增 `scheduler_run_context_loader` Tool 与 `scheduler_run` 自动 check，用确定性方式验证 retry decision、pending retry、delivery result、source refs 和脱敏目标。
+- 官方 `scheduler_retry_delivery_eval_core` 已覆盖失败 schedule run 触发 retry、写入 `scheduler_retry_pending`、生成本地审计投递结果并隐藏敏感 token 的回归场景。
+- Scheduler 生成的图运行 snapshot 现在会默认写入 `graph_permission_mode=ask_first` 和 `capability_permission_policy.approval_required_permission_tiers=["risky"]`；已有模板 permission policy 会被合并而不是放宽，因此定时触发、retry 触发和手动触发的 scheduled graph run 都不会以无审批边界运行高风险 Action。
+- 后续仍需补齐经审批后的真实外部投递 adapter。
 
 解决方案：
 
@@ -675,6 +700,13 @@ TooGraph 差距：
 - Subgraph 和 batch worker 有基础，但缺少通用 worker protocol、并发预算、结果合并和 UI。
 - 目前委派更多是模板作者手工组织。
 
+当前进展：
+
+- 已新增 `delegation_worker_result_packager` Tool，作为 worker 协议边界的确定性低层 primitive：输入 `worker_task_packet`、worker outputs、状态、摘要和预算使用量，输出标准 `worker_result_package`。
+- `worker_task_packet` 初版字段已覆盖 `task_id`、`goal`、`context_package_refs`、`allowed_capabilities`、`budget` 和 `expected_output_schema`；`worker_result_package` 初版字段已覆盖 `task_id`、`status`、`summary`、`outputs`、`artifacts`、`errors`、`followups`、`source_refs`、`allowed_capabilities` 和 `budget`。
+- 已新增官方隐藏模板 `delegation_worker_eval` 和 `delegation_worker_eval_core` eval suite，用 `delegation_worker` 自动 check 验证 worker result 的 task id、状态、输出键、source refs 和关键文本。
+- 后续仍需把该协议接入真实 Subgraph worker 执行、并发预算、worker run links、结果 merge/review 节点和 RunDetail/Buddy 胶囊展示。
+
 解决方案：
 
 1. 定义 `worker_task_packet`：
@@ -724,6 +756,22 @@ TooGraph 差距：
 
 - Model Providers 页面已有基础，但 provider 能力矩阵、fallback、结构化输出 repair、embedding provider、reranker provider 还不完整。
 
+当前进展：
+
+- 已新增共享 `provider_fallback` resolver primitive，定义标准 `provider_fallback_trace`，记录 requested model、selected fallback、failed candidates、fallback candidates、rejected candidates、required capabilities、required permissions、attempts 和 decision。
+- 已新增官方 `provider_fallback_resolver` Tool，作为图内确定性低层 primitive：输入 provider failure event、候选模型、能力要求和权限范围，输出 `selected_model_ref` 与可审计 fallback trace。
+- 已新增官方隐藏模板 `provider_fallback_eval` 和 `provider_fallback_eval_core` suite，用 `provider_fallback` 自动 check 验证 provider 失败后能选择兼容 fallback，并拒绝会扩大权限范围的候选。
+- RunDetail Agent Diagnostic 已能从 `provider_fallback_trace` 重组 provider fallback 诊断，展示 requested model、selected model、decision、失败模型、被拒绝模型、fallback 候选、能力/权限要求和 warnings。
+- `chat_with_model_ref_with_meta` 已接入真实 LLM 调用链：主 provider/model 调用失败后，会从保存的 Model Providers 配置构造候选，按 `chat`、`structured_output`、`vision` 等能力和 `text_generation` 权限范围调用 `provider_fallback` resolver，选择不扩大权限的兼容 fallback，并把 `provider_fallback_trace`、`requested_model_ref` 和 fallback warning 写入模型调用 meta。
+- `embed_text_with_model_ref` 已接入同一 provider fallback 机制：embedding provider 失败后按 `embedding` capability 和 `embedding` permission 选择兼容 fallback，并把 `provider_fallback_trace` 写入 embedding meta；embedding job processor 通过该入口会继承相同行为。
+- Provider fallback runtime 已支持多候选重试：第一个兼容 fallback 运行时失败后，会继续尝试后续兼容候选；`provider_fallback_trace.attempts` 和 `failed_candidates` 会记录实际失败的 fallback provider，最终 `selected` 指向真正成功的候选。
+- 结构化输出 repair 已接入可审计 provider fallback：主结构化输出调用和 repair 调用都会把实际 provider/model、requested model ref、`provider_fallback_used` 和 `provider_fallback_trace` 写入节点 runtime config；RunDetail Agent Diagnostic 在没有顶层 state trace 时，会从 node execution runtime config 读取这些 trace，展示 repair/main LLM provider fallback 证据。
+- `rerank_documents_with_model_ref` 已接入 Model Providers 的 OpenAI-compatible `/rerank` 调用和同一 provider fallback 机制：reranker provider 失败后按 `rerank` capability 和 `rerank` permission 选择兼容 fallback，并把 `provider_fallback_trace` 写入 rerank meta。
+- `hybrid_search` 已支持可选 `reranker_model_ref`：FTS + embedding 合并后可调用 reranker 对候选重排；`retrieval_queries` / `retrieval_results` 会记录 `reranker_model_ref`、`ranking_metadata`、`base_score`、`rerank_score` 和最终排序，Evidence/RunDetail 可继续从同一 retrieval ranking report 事实源展开。
+- Buddy session search、memory search 和 `hybrid_recall_context_loader` 已可透传 `reranker_model_ref`，因此 Buddy 历史召回、结构化记忆召回和混合上下文工具能复用同一 rerank provider 运行时与审计报告。
+- Model Providers 页面已加入模型级能力矩阵：每个启用模型可显式标注 `chat`、`structured_output`、`tool_calling`、`vision`、`embedding`、`rerank`、`streaming`、`reasoning`，并保存对应 `permissions`；settings API、model catalog 和前端 draft/save payload 会完整保留这些字段，fallback resolver 使用的能力与权限不再只能靠手写 settings。
+- 3.11 的 provider runtime 基础闭环已经覆盖 LLM、structured output repair、embedding、rerank、fallback trace 和 UI 能力矩阵；后续扩展应集中在更细的 provider profile 字段，如 timeout、prompt cache、credential pool 和 per-node override。
+
 解决方案：
 
 1. 扩展 provider profile：
@@ -741,10 +789,13 @@ TooGraph 差距：
 2. Runtime resolver：
    - 所有 LLM 节点、Action planning、review、scheduler、curator 都走同一路径。
    - 支持 per-template / per-node override。
+   - 已完成第一步：通用 `chat_with_model_ref_with_meta` 会在 provider failure 后通过统一 resolver 选择真实 fallback provider，所有复用该入口的 LLM 节点、Action planning、review 和 evaluator judge 都会继承该行为。
 3. Fallback policy：
    - provider failed -> model fallback。
-   - structured output failed -> repair retry -> fallback parser -> fallback model。
-   - embedding provider failed -> queue retry or local-hash fallback。
+   - structured output failed -> repair retry；主调用和 repair 调用都继承 provider fallback，并把 fallback trace 写入 runtime config。
+   - embedding provider failed -> compatible embedding model fallback；如果没有兼容 fallback，再由 embedding job 记录失败，后续可扩展为 queue retry 或 local-hash fallback。
+   - reranker provider failed -> compatible rerank model fallback；如果没有兼容 fallback，召回路径保留原 hybrid 排序，并在 retrieval ranking report 中记录 rerank failure metadata。
+   - fallback provider failed -> try next compatible fallback candidate，并把每次实际尝试写入 trace。
 4. UI：
    - Model Providers 页面展示能力矩阵。
    - RunDetail 记录实际 provider/model、fallback、repair 次数。
@@ -770,6 +821,19 @@ TooGraph 差距：
 
 - Buddy 压缩已图化，但预算报告、摘要版本、source refs、prompt snapshot 和缓存策略还不够成熟。
 
+当前进展：
+
+- RunDetail 上下文审计已能从统一 run detail 事实源中提取 `context_budget_report` 和 `compaction_report`，把触发原因、原始历史长度、保留上下文长度、摘要长度、省略数量、保护数量、provider prompt tokens、模型窗口和 prompt 压力展示在同一 Context Audit 面板中。
+- 该投影直接读取 run snapshot、artifacts、state events、node executions、Action/Tool/Capability outputs 和 metadata 中已有的结构化 state，不复制完整历史文本，也不引入新的 Buddy 专用旁路。
+- LLM 响应生成、Action 输入规划和 Subgraph 输入规划已经写入 `llm_prompt_snapshot` 运行时审计记录；记录只保存 system/user prompt 的 `sha256` hash、字符数、估算 token、输入 state keys、输出 keys、Action/Subgraph keys 和 context refs，不保存原始 prompt 文本。
+- RunDetail Context Audit 已能从 `runtime_config.prompt_snapshots` 读取这些 `llm_prompt_snapshot`，展示阶段、hash、字符数、估算 token 和上下文引用数量；胶囊和运行详情可以基于同一 run 事实源解释“这次模型调用使用了哪些上下文引用”。
+- 结构化输出 repair 调用也已写入同一 `llm_prompt_snapshot` 链路，覆盖主 LLM 响应 repair、Action 输入规划 repair 和 Subgraph 输入规划 repair；repair 快照同样只保存 hash-and-metadata，不保存 raw model output 或原始用户上下文。
+- 上下文压缩预算报告已标准化输出 `source_refs`、`summary_source_refs`、`omitted_refs` 和 `protected_recent_history_refs`；官方 `buddy_context_compaction` 模板要求 `compaction_report` 和 `session_summary.update.payload.source_refs` 直接复用这些 refs，让摘要写回可追溯到被压缩的原子消息和已有摘要。
+- RunDetail Context Audit 已能从 `compaction_report` 展示摘要来源、被省略来源、被保护最近原文的引用数量，并列出摘要来源 revision id；用户不用展开 raw JSON 就能确认一次压缩摘要覆盖了哪些来源版本。
+- `llm_prompt_snapshot` 已补齐 hash-only 的 `prompt_cache_policy` 审计元数据：稳定前缀 hash/字符数、动态后缀 hash/字符数、cache key、是否可复用、失效因子和 provider cache-control 状态都会随运行记录保存；RunDetail Context Audit 可以直接显示这些字段。
+- 当前策略明确标记为 `audit_only`，并在运行时 state、context refs、Action keys 或 Subgraph keys 被注入 system prompt 时将缓存判定为不可复用，避免把尚未启用的 provider 级缓存伪装成已生效能力。
+- 仍需补齐真正 provider 级 prompt cache-control、per-node cache override，以及把动态 state 从稳定 system prefix 中拆出去的 prompt assembly 改造。
+
 解决方案：
 
 1. 压缩输出标准化：
@@ -780,8 +844,9 @@ TooGraph 差距：
    - `risk_notes`
    - `revision_id`
 2. Prompt snapshot：
-   - 每次 run 保存模型实际输入摘要或 artifact。
+   - 每次关键模型调用保存 hash-and-metadata snapshot。
    - 保存 context assembly refs，而不是递归保存完整聊天全文。
+   - 不把 system/user prompt 原文写入 run detail，必要时通过 context refs 回查来源。
 3. 缓存策略：
    - 稳定 Buddy Home 文件在当前 run 中只读取一次。
    - 后台复盘写入影响下一轮，不修改已运行中的 prompt。
@@ -808,6 +873,27 @@ Hermes 能力：
 TooGraph 差距：
 
 - Action 权限、approval 和 revision 方向存在，但 operation 级权限、context 注入扫描、定时任务权限、能力包防护还不完整。
+
+当前进展：
+
+- 已新增共享 `context_security_v1` scanner primitive，所有通过 `context_assembly` 创建或物化的上下文文本都会扫描 prompt injection、secret exfiltration、invisible unicode 和 hidden HTML 风险。
+- 扫描结果会作为 `context_assembly_warnings` 持久化，warning metadata 记录 scanner 版本、severity、pattern id 和 source refs，不保存可疑 secret 原文。
+- LLM prompt assembly 渲染 `context_package` 时会合并 package warning 与 assembly warning，并在上下文包边界展示 warning code，让外部知识、网页、记忆或 Buddy Home 内容进入模型前被明确标记。
+- context assembly 已接入 secret 脱敏：密钥样式值、API key assignment、私钥块和常见 token 会在写入 rendered blob、从 source refs 重建以及注入 prompt 前替换为 `[REDACTED_SECRET]`，并记录 `context_secret_redacted` warning、命中模式和脱敏数量。
+- context assembly 已支持显式阻断策略：当 `metadata.context_security_policy.block_high_risk=true` 时，命中高风险 `context_prompt_injection` 或 `context_secret_exfiltration` 的 rendered context 会在写入 blob 和注入 prompt 前替换为 `[BLOCKED_CONTEXT_ITEM]`，并记录 `context_item_blocked`、被阻断 warning codes、policy 和 source refs。
+- 官方 `web_context_loader` 和 `knowledge_context_loader` 已默认启用 `context_security_policy.block_high_risk=true`，外部网页证据和知识库 chunk 在进入 `context_package` 时会自动执行高风险阻断。
+- capability artifact 的 prompt 读取路径 `read_capability_artifact_text_for_prompt` 已接入同一 secret 脱敏 primitive；UI/文件预览仍可读原始 artifact，模型 prompt 读取会返回脱敏文本和 `context_secret_redacted` warning。
+- 模型请求日志写入路径已复用 secret 脱敏 primitive，`request_raw`、`response_raw` 和顶层 `error` 写入 JSONL 前会替换密钥样式值，同时保留现有 inline media summary。
+- 权限审批已支持 `local_workspace_executor` 的 operation 级收窄：`read` / `list` / `search` 只按 `file_read` 评估，`edit` / `write` 只申请 `file_write`，`execute` 才申请 `subprocess`；运行时 pending approval 保存本次 Action inputs 和收窄后的 permissions。
+- 权限审批审计已进入 graph run 事实源和 `/api/runs/{run_id}`：已批准或拒绝的 `permission_approvals` 会随 run detail 持久化并返回给 UI，审计副本写入数据库前会递归替换密钥样式值；pending approval 的 `input_preview` 也会脱敏，同时保留运行时恢复执行所需的原始 inputs。
+- 已新增共享 capability permission profile primitive，标准化 `network`、`file_read`、`file_write`、`execute`、`graph_write`、`memory_write`、`cost`、`external_delivery` 等权限操作与 `none|guarded|external|risky` 层级；selector catalog 与运行时审批共用该分类。
+- Action 审批现在会直接消费 `capability_permission_policy.approval_required_permission_tiers`；即使没有额外 mode flag，只要策略要求 risky tier 审批，高风险 operation 仍会暂停并写入 pending approval。
+- Scheduler 运行图默认继承强制 risky 审批边界：每次 scheduled graph run 都会在 metadata 中记录 `graph_permission_mode=ask_first`、合并后的 `capability_permission_policy` 和 `scheduled_graph_permission_policy_source`，避免后台定时任务绕过人工设置的权限边界。
+- Action subprocess 环境已改为显式 allowlist：默认只继承运行进程必需的系统路径、locale、临时目录和 Buddy Home 路径，再注入 TooGraph Action runtime 变量；`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、自定义 provider token 等不会隐式透传给 Action 脚本。
+- Graph run DB store 写入时会对 run metadata/detail、state values、activity events、node executions、output previews、capability invocations 和 capability usage events 做统一 secret 脱敏，避免运行时错误、Action 输出或审计摘要把 provider token 明文落库。
+- RunDetail Agent Diagnostic 已能从 pending approval metadata 和已完成 `permission_approvals` 审计记录重组权限审批摘要，展示目标能力、审批状态、权限、binding source 和审批/拒绝原因，用户不需要读取 raw JSON 才能判断一次能力暂停的原因。
+- RunDetail 权限审批摘要已进入操作闭环：当审批仍处于 pending 状态时，诊断面板会提供“批准并继续”和“拒绝并继续”，通过现有 `/api/runs/{run_id}/resume` 协议提交 `permission_approval.decision`，由运行时消费 pending approval 并写入审计记录。
+- 当前实现已覆盖上下文扫描、审计、边界标记、上下文 secret 脱敏、可配置高风险上下文阻断、web/knowledge 官方外部上下文入口默认阻断、artifact prompt 读取脱敏、模型请求日志 secret 脱敏、本地工作区 Action 的首个 operation-level permission、权限审批审计持久化、通用 capability permission profile 基础、scheduler 高风险 Action 审批边界、scheduler 外部投递权限边界、Action subprocess provider secret 隔离、graph run 运行时日志/投影脱敏，以及 RunDetail 权限审批摘要和操作闭环；后续仍需推进经审批后的真实外部投递 adapter、能力包保护和更完整的 approval review surface。
 
 解决方案：
 
@@ -945,6 +1031,12 @@ TooGraph 差距：
 - RunDetail 有运行树，但 Agent 级诊断还不集中。
 - 用户不容易看清“为什么选这个能力、为什么停止、召回了什么、裁剪了什么”。
 
+当前进展：
+
+- RunDetail Agent Diagnostic 已聚合 Agent loop stop reason、能力选择 trace、provider fallback trace 和标准 warnings；用户可在同一个诊断面板看到停止原因、能力预算、能力候选、模型 fallback 决策、失败/拒绝/fallback 候选与上下文证据。
+- RunDetail Agent Diagnostic 已补充权限审批摘要：从当前 pending permission approval 或最近完成的 approval 审计记录读取能力引用、能力名称、权限集合、审批状态、来源和原因，并在诊断面板中作为独立分区展示。
+- Pending 权限审批已经可在 RunDetail 中直接批准或拒绝；页面复用统一 run resume API，把 approval decision 写回运行时，由运行时继续执行或产出 permission denied 结果，避免只提供只读诊断。
+
 解决方案：
 
 1. Agent Diagnostic view：
@@ -986,6 +1078,26 @@ Hermes 能力：
 TooGraph 差距：
 
 - Eval 中心已存在，但 Agent 主循环、召回、记忆、selector、scheduler、curator 的评测还需要系统化。
+
+已完成进展：
+
+- Eval runner 已支持 case 级 `metadata.fixture_runs`，启动 eval case 前会把声明的 source run fixture 写入统一 graph run store；复盘、压缩和改进验证类模板可以通过真实 `source_run_id` 从 run 事实源恢复上下文。
+- Eval runner 已支持 case 级 `metadata.fixture_buddy_sessions`，能把 Buddy session/message fixture 写入统一 DB 并投影到 retrieval，供 session search 和 hybrid recall eval 形成可重复输入。
+- Eval runner 已支持 case 级 `metadata.fixture_memory_entries`，能把结构化记忆 fixture 写入统一 DB 并投影到 retrieval，供 memory recall eval 形成可重复输入。
+- 官方 eval seed 已覆盖 `buddy_autonomous_review_core`、`buddy_context_compaction_core`、`embedding_maintenance_core`、`buddy_memory_recall_eval_core`、`buddy_hybrid_recall_eval_core`、`buddy_capability_curator_core`、`buddy_improvement_review_workflow_core` 和 `delegation_worker_eval_core`，加上既有 Buddy 主循环、页面操作、Action 创建、Web research 和业务模板 eval，核心 Buddy 后台能力已有可发现回归入口。
+- 新增的 eval cases 覆盖后台复盘产物、上下文压缩摘要、Embedding 维护计数、能力整理报告和改进候选审批请求；定性规则仍通过 LLM judge 跑，结构化输出通过 schema check 跑。
+- 新增 `memory_retrieval` 自动 check，用确定性方式验证 memory ids、source refs、required terms、forbidden terms 和上下文预算，让记忆召回质量不完全依赖 LLM judge。
+- 新增 `capability_selection` 自动 check 和 case 级 `fixture_capability_usage_entries`，Buddy 主循环 eval 已能覆盖“能力近期失败后 selector 改选健康 fallback，并留下结构化拒绝原因”的回归场景。
+- 新增 `scheduler_run` 自动 check、`scheduler_run_context_loader` Tool 和 `scheduler_retry_delivery_eval_core`，调度 retry/delivery 现在可以通过 eval 中心验证，而不只依赖 scheduler store 单元测试。
+- `scheduler_run_context_loader` 会同时读取关联 graph run 的权限 metadata；`scheduler_run` 自动 check 已支持验证 `graph_permission_mode`、`permission_policy`、`scheduled_graph_permission_policy_source` 和 `pending_permission_approval`，官方 scheduler eval case 现在覆盖后台调度运行的 risky 审批边界。
+- 新增 `delegation_worker` 自动 check、`delegation_worker_result_packager` Tool 和 `delegation_worker_eval_core`，委派 worker packet/result 协议已有可重复评测入口。
+- 新增 `hybrid_recall` 自动 check、`hybrid_recall_context_loader` Tool 和 `buddy_hybrid_recall_eval_core`，session/history + DB memory 的混合召回已有可重复评测入口。
+- 新增 `provider_fallback` 自动 check、`provider_fallback_resolver` Tool 和 `provider_fallback_eval_core`，provider/model fallback 选择合同已有可重复评测入口。
+
+后续仍需：
+
+- 为真实 Subgraph worker 执行、真实 provider/tool 失败驱动的 selector fallback，以及真实 LLM runtime provider fallback 接入增加更细的自动评测。
+- 把官方模板变更和能力包变更接入明确的本地 eval gate，而不是只依赖人工选择运行 suite。
 
 解决方案：
 
@@ -1218,7 +1330,7 @@ created_at
 updated_at
 ```
 
-`metadata_json.delivery_result` 记录终态投递审计，包含投递 kind、状态、job/run 引用、触发原因、终态状态和脱敏 target。
+`metadata_json.delivery_result` 记录终态投递审计，包含投递 kind、状态、job/run 引用、触发原因、终态状态、脱敏 target；外部投递 target 还会包含 `approval_required`、`required_permissions` 和统一 `permission_profile`。
 
 ### `improvement_candidates`
 

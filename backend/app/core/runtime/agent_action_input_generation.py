@@ -6,7 +6,12 @@ from typing import Any, Callable
 
 from app.core.model_catalog import get_default_video_model_ref, resolve_runtime_model_name
 from app.core.runtime.agent_multimodal import collect_input_attachments, prepare_model_input_attachments
-from app.core.runtime.agent_prompt import format_graph_state_input_prompt_lines, format_prompt_value
+from app.core.runtime.agent_prompt import (
+    append_llm_prompt_snapshots,
+    build_llm_prompt_snapshot,
+    format_graph_state_input_prompt_lines,
+    format_prompt_value,
+)
 from app.core.runtime.agent_response_generation import _resolve_media_runtime_config, repair_structured_output_with_runtime_model
 from app.core.runtime.action_bindings import ResolvedAgentActionBinding
 from app.core.runtime.structured_output import build_action_llm_output_schema, validate_structured_output
@@ -75,6 +80,16 @@ def generate_agent_action_inputs(
         state_schema=state_schema,
     )
     user_prompt = build_action_input_user_prompt(node)
+    action_keys = [binding.binding.action_key for binding in bindings]
+    prompt_snapshot = build_llm_prompt_snapshot(
+        phase="action_input_planning",
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        input_values=input_values,
+        output_keys=state_output_keys,
+        action_keys=action_keys,
+        structured_output_schema=structured_output_schema,
+    )
     thinking_level = runtime_config.get("resolved_thinking_level")
     if not isinstance(thinking_level, str):
         thinking_level = "medium" if runtime_config.get("resolved_thinking") else "off"
@@ -111,7 +126,6 @@ def generate_agent_action_inputs(
         finally:
             cleanup_prepared_media_paths(attachment_meta.get("cleanup_paths"))
 
-    action_keys = [binding.binding.action_key for binding in bindings]
     action_inputs, state_outputs = parse_action_planning_response(content, action_keys, state_output_keys)
     structured_output_payload = compose_action_planning_output_payload(
         action_inputs,
@@ -134,6 +148,9 @@ def generate_agent_action_inputs(
                 structured_output_schema=structured_output_schema,
                 validation_errors=initial_structured_output_validation_errors,
                 raw_model_output=content,
+                phase="action_input_structured_output_repair",
+                output_keys=state_output_keys,
+                action_keys=action_keys,
                 chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
                 chat_with_model_ref_with_meta_func=chat_with_model_ref_with_meta_func,
             )
@@ -162,6 +179,7 @@ def generate_agent_action_inputs(
     structured_output_strategy = str(llm_meta.get("structured_output_strategy") or "json_schema")
     updated_runtime_config = {
         **runtime_config,
+        "prompt_snapshots": append_llm_prompt_snapshots(runtime_config, prompt_snapshot, repair_meta.get("prompt_snapshot")),
         "action_input_provider_model": llm_meta.get("model", runtime_config["runtime_model_name"]),
         "action_input_provider_id": llm_meta.get("provider_id", runtime_config["resolved_provider_id"]),
         "action_input_provider_temperature": llm_meta.get("temperature", runtime_config["resolved_temperature"]),
@@ -169,6 +187,9 @@ def generate_agent_action_inputs(
         "action_input_provider_response_id": llm_meta.get("response_id"),
         "action_input_provider_usage": llm_meta.get("usage"),
         "action_input_provider_timings": llm_meta.get("timings"),
+        "action_input_provider_fallback_used": bool(llm_meta.get("provider_fallback_used")),
+        "action_input_requested_model_ref": llm_meta.get("requested_model_ref"),
+        "action_input_provider_fallback_trace": llm_meta.get("provider_fallback_trace"),
         "action_input_structured_output_strategy": structured_output_strategy,
         "action_input_structured_output_schema": structured_output_schema,
         "action_input_structured_output_validation_errors": structured_output_validation_errors,
@@ -177,9 +198,14 @@ def generate_agent_action_inputs(
         "action_input_structured_output_repair_succeeded": repair_succeeded,
         "action_input_structured_output_repair_validation_errors": repair_validation_errors,
         "action_input_structured_output_repair_error": repair_error,
+        "action_input_structured_output_repair_provider_id": repair_meta.get("provider_id"),
+        "action_input_structured_output_repair_provider_model": repair_meta.get("model"),
         "action_input_structured_output_repair_provider_response_id": repair_meta.get("response_id"),
         "action_input_structured_output_repair_provider_usage": repair_meta.get("usage"),
         "action_input_structured_output_repair_provider_timings": repair_meta.get("timings"),
+        "action_input_structured_output_repair_provider_fallback_used": bool(repair_meta.get("provider_fallback_used")),
+        "action_input_structured_output_repair_requested_model_ref": repair_meta.get("requested_model_ref"),
+        "action_input_structured_output_repair_provider_fallback_trace": repair_meta.get("provider_fallback_trace"),
         "action_input_state_output_keys": list(state_output_keys),
     }
     warnings = [*attachment_warnings, *llm_meta.get("warnings", []), *repair_meta.get("warnings", [])]

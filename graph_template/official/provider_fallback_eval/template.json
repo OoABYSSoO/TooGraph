@@ -1,0 +1,209 @@
+{
+  "template_id": "provider_fallback_eval",
+  "label": "Provider Fallback 评测",
+  "description": "用确定性 Provider Fallback Resolver 验证 provider/model 失败后的 fallback 选择、能力要求、权限范围和审计 trace。",
+  "default_graph_name": "Provider Fallback 评测",
+  "state_schema": {
+    "requested_model_ref": {
+      "name": "Requested Model Ref",
+      "description": "请求使用的 provider/model ref。",
+      "type": "text",
+      "value": "",
+      "color": "#2563eb",
+      "binding": null
+    },
+    "failure_event": {
+      "name": "Failure Event",
+      "description": "provider 失败事件。",
+      "type": "json",
+      "value": {},
+      "color": "#be123c",
+      "binding": null
+    },
+    "provider_candidates": {
+      "name": "Provider Candidates",
+      "description": "可选 fallback provider/model 候选列表。",
+      "type": "json",
+      "value": [],
+      "color": "#0f766e",
+      "binding": null
+    },
+    "required_capabilities": {
+      "name": "Required Capabilities",
+      "description": "模型调用所需能力。",
+      "type": "json",
+      "value": [],
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "required_permissions": {
+      "name": "Required Permissions",
+      "description": "模型调用所需权限范围。",
+      "type": "json",
+      "value": [],
+      "color": "#b45309",
+      "binding": null
+    },
+    "preserve_permission_scope": {
+      "name": "Preserve Permission Scope",
+      "description": "fallback 是否必须保持权限范围不扩大。",
+      "type": "boolean",
+      "value": true,
+      "color": "#475569",
+      "binding": null
+    },
+    "provider_fallback_status": {
+      "name": "Provider Fallback Status",
+      "description": "provider_fallback_resolver 执行状态。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "provider_fallback_resolver",
+        "nodeId": "resolve_provider_fallback",
+        "fieldKey": "status",
+        "managed": true
+      }
+    },
+    "selected_model_ref": {
+      "name": "Selected Model Ref",
+      "description": "选中的 fallback provider/model ref。",
+      "type": "text",
+      "value": "",
+      "color": "#0891b2",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "provider_fallback_resolver",
+        "nodeId": "resolve_provider_fallback",
+        "fieldKey": "selected_model_ref",
+        "managed": true
+      }
+    },
+    "provider_fallback_trace": {
+      "name": "Provider Fallback Trace",
+      "description": "标准 provider_fallback_trace，包含 requested、selected、failed candidates、fallback candidates、rejected candidates、能力与权限约束。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "provider_fallback_resolver",
+        "nodeId": "resolve_provider_fallback",
+        "fieldKey": "provider_fallback_trace",
+        "managed": true
+      }
+    }
+  },
+  "nodes": {
+    "input_requested_model_ref": {
+      "kind": "input",
+      "name": "请求模型",
+      "description": "提供 requested_model_ref。",
+      "ui": {"position": {"x": 80, "y": 120}, "collapsed": false, "size": {"width": 380, "height": 180}},
+      "reads": [],
+      "writes": [{"state": "requested_model_ref", "mode": "replace"}],
+      "config": {"value": "", "boundaryType": "text"}
+    },
+    "input_failure_event": {
+      "kind": "input",
+      "name": "失败事件",
+      "description": "提供 provider failure event。",
+      "ui": {"position": {"x": 80, "y": 340}, "collapsed": false, "size": {"width": 380, "height": 240}},
+      "reads": [],
+      "writes": [{"state": "failure_event", "mode": "replace"}],
+      "config": {"value": {}, "boundaryType": "text"}
+    },
+    "input_provider_candidates": {
+      "kind": "input",
+      "name": "候选模型",
+      "description": "提供 provider fallback candidates。",
+      "ui": {"position": {"x": 80, "y": 620}, "collapsed": false, "size": {"width": 380, "height": 300}},
+      "reads": [],
+      "writes": [{"state": "provider_candidates", "mode": "replace"}],
+      "config": {"value": [], "boundaryType": "text"}
+    },
+    "input_required_capabilities": {
+      "kind": "input",
+      "name": "能力要求",
+      "description": "提供模型调用所需能力。",
+      "ui": {"position": {"x": 80, "y": 960}, "collapsed": false, "size": {"width": 380, "height": 200}},
+      "reads": [],
+      "writes": [{"state": "required_capabilities", "mode": "replace"}],
+      "config": {"value": [], "boundaryType": "text"}
+    },
+    "input_required_permissions": {
+      "kind": "input",
+      "name": "权限范围",
+      "description": "提供模型调用所需权限。",
+      "ui": {"position": {"x": 80, "y": 1200}, "collapsed": false, "size": {"width": 380, "height": 200}},
+      "reads": [],
+      "writes": [{"state": "required_permissions", "mode": "replace"}],
+      "config": {"value": [], "boundaryType": "text"}
+    },
+    "input_preserve_permission_scope": {
+      "kind": "input",
+      "name": "保持权限范围",
+      "description": "提供 fallback 权限范围策略。",
+      "ui": {"position": {"x": 80, "y": 1440}, "collapsed": false, "size": {"width": 380, "height": 180}},
+      "reads": [],
+      "writes": [{"state": "preserve_permission_scope", "mode": "replace"}],
+      "config": {"value": true, "boundaryType": "text"}
+    },
+    "resolve_provider_fallback": {
+      "kind": "tool",
+      "name": "解析 Provider Fallback",
+      "description": "调用 provider_fallback_resolver，生成标准 provider_fallback_trace。",
+      "ui": {"position": {"x": 620, "y": 520}, "collapsed": false, "size": {"width": 520, "height": 420}},
+      "reads": [
+        {"state": "requested_model_ref", "required": true, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "provider_fallback_resolver", "fieldKey": "requested_model_ref", "managed": true}},
+        {"state": "failure_event", "required": true, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "provider_fallback_resolver", "fieldKey": "failure_event", "managed": true}},
+        {"state": "provider_candidates", "required": true, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "provider_fallback_resolver", "fieldKey": "provider_candidates", "managed": true}},
+        {"state": "required_capabilities", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "provider_fallback_resolver", "fieldKey": "required_capabilities", "managed": true}},
+        {"state": "required_permissions", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "provider_fallback_resolver", "fieldKey": "required_permissions", "managed": true}},
+        {"state": "preserve_permission_scope", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "provider_fallback_resolver", "fieldKey": "preserve_permission_scope", "managed": true}}
+      ],
+      "writes": [
+        {"state": "provider_fallback_status", "mode": "replace"},
+        {"state": "selected_model_ref", "mode": "replace"},
+        {"state": "provider_fallback_trace", "mode": "replace"}
+      ],
+      "config": {"toolKey": "provider_fallback_resolver"}
+    },
+    "output_provider_fallback_trace": {
+      "kind": "output",
+      "name": "Provider Fallback Trace",
+      "description": "展示 provider fallback 审计 trace。",
+      "ui": {"position": {"x": 1280, "y": 440}, "collapsed": false, "size": {"width": 480, "height": 320}},
+      "reads": [{"state": "provider_fallback_trace", "required": true, "binding": null}],
+      "writes": [],
+      "config": {"displayMode": "json", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": ""}
+    }
+  },
+  "edges": [
+    {"source": "input_requested_model_ref", "target": "resolve_provider_fallback"},
+    {"source": "input_failure_event", "target": "resolve_provider_fallback"},
+    {"source": "input_provider_candidates", "target": "resolve_provider_fallback"},
+    {"source": "input_required_capabilities", "target": "resolve_provider_fallback"},
+    {"source": "input_required_permissions", "target": "resolve_provider_fallback"},
+    {"source": "input_preserve_permission_scope", "target": "resolve_provider_fallback"},
+    {"source": "resolve_provider_fallback", "target": "output_provider_fallback_trace"}
+  ],
+  "conditional_edges": [],
+  "metadata": {
+    "category": "model_provider",
+    "role": "provider_fallback_eval",
+    "visible": false,
+    "capabilityDiscoverableDefault": false,
+    "tags": ["provider", "fallback", "eval"],
+    "required_tools": ["provider_fallback_resolver"],
+    "output_contract": [
+      {"state": "provider_fallback_trace", "role": "quality_report"}
+    ]
+  },
+  "source": "official",
+  "status": "active"
+}

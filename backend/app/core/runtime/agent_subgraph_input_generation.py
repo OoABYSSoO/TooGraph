@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 from app.core.model_catalog import get_default_video_model_ref, resolve_runtime_model_name
 from app.core.runtime.agent_multimodal import collect_input_attachments, prepare_model_input_attachments
-from app.core.runtime.agent_prompt import format_graph_state_input_prompt_lines
+from app.core.runtime.agent_prompt import append_llm_prompt_snapshots, build_llm_prompt_snapshot, format_graph_state_input_prompt_lines
 from app.core.runtime.agent_response_generation import _resolve_media_runtime_config, repair_structured_output_with_runtime_model
 from app.core.runtime.structured_output import schema_for_value_type, validate_structured_output
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition
@@ -66,6 +66,15 @@ def generate_agent_subgraph_inputs(
     )
     structured_output_schema = build_subgraph_input_output_schema(subgraphs)
     user_prompt = build_subgraph_input_user_prompt(node)
+    subgraph_keys = [subgraph.key for subgraph in subgraphs]
+    prompt_snapshot = build_llm_prompt_snapshot(
+        phase="subgraph_input_planning",
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        input_values=input_values,
+        subgraph_keys=subgraph_keys,
+        structured_output_schema=structured_output_schema,
+    )
     thinking_level = runtime_config.get("resolved_thinking_level")
     if not isinstance(thinking_level, str):
         thinking_level = "medium" if runtime_config.get("resolved_thinking") else "off"
@@ -100,7 +109,7 @@ def generate_agent_subgraph_inputs(
         finally:
             cleanup_prepared_media_paths(attachment_meta.get("cleanup_paths"))
 
-    subgraph_inputs = parse_subgraph_input_response(content, [subgraph.key for subgraph in subgraphs])
+    subgraph_inputs = parse_subgraph_input_response(content, subgraph_keys)
     initial_structured_output_validation_errors = validate_structured_output(subgraph_inputs, structured_output_schema)
     structured_output_validation_errors = list(initial_structured_output_validation_errors)
     repair_attempted = False
@@ -116,12 +125,14 @@ def generate_agent_subgraph_inputs(
                 structured_output_schema=structured_output_schema,
                 validation_errors=initial_structured_output_validation_errors,
                 raw_model_output=content,
+                phase="subgraph_input_structured_output_repair",
+                subgraph_keys=subgraph_keys,
                 chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
                 chat_with_model_ref_with_meta_func=chat_with_model_ref_with_meta_func,
             )
             repaired_subgraph_inputs = parse_subgraph_input_response(
                 repair_content,
-                [subgraph.key for subgraph in subgraphs],
+                subgraph_keys,
             )
             repair_validation_errors = validate_structured_output(repaired_subgraph_inputs, structured_output_schema)
             if not repair_validation_errors:
@@ -135,6 +146,7 @@ def generate_agent_subgraph_inputs(
     structured_output_strategy = str(llm_meta.get("structured_output_strategy") or "json_schema")
     updated_runtime_config = {
         **runtime_config,
+        "prompt_snapshots": append_llm_prompt_snapshots(runtime_config, prompt_snapshot, repair_meta.get("prompt_snapshot")),
         "subgraph_input_provider_model": llm_meta.get("model", runtime_config["runtime_model_name"]),
         "subgraph_input_provider_id": llm_meta.get("provider_id", runtime_config["resolved_provider_id"]),
         "subgraph_input_provider_temperature": llm_meta.get("temperature", runtime_config["resolved_temperature"]),
@@ -142,6 +154,9 @@ def generate_agent_subgraph_inputs(
         "subgraph_input_provider_response_id": llm_meta.get("response_id"),
         "subgraph_input_provider_usage": llm_meta.get("usage"),
         "subgraph_input_provider_timings": llm_meta.get("timings"),
+        "subgraph_input_provider_fallback_used": bool(llm_meta.get("provider_fallback_used")),
+        "subgraph_input_requested_model_ref": llm_meta.get("requested_model_ref"),
+        "subgraph_input_provider_fallback_trace": llm_meta.get("provider_fallback_trace"),
         "subgraph_input_structured_output_strategy": structured_output_strategy,
         "subgraph_input_structured_output_schema": structured_output_schema,
         "subgraph_input_structured_output_validation_errors": structured_output_validation_errors,
@@ -150,9 +165,14 @@ def generate_agent_subgraph_inputs(
         "subgraph_input_structured_output_repair_succeeded": repair_succeeded,
         "subgraph_input_structured_output_repair_validation_errors": repair_validation_errors,
         "subgraph_input_structured_output_repair_error": repair_error,
+        "subgraph_input_structured_output_repair_provider_id": repair_meta.get("provider_id"),
+        "subgraph_input_structured_output_repair_provider_model": repair_meta.get("model"),
         "subgraph_input_structured_output_repair_provider_response_id": repair_meta.get("response_id"),
         "subgraph_input_structured_output_repair_provider_usage": repair_meta.get("usage"),
         "subgraph_input_structured_output_repair_provider_timings": repair_meta.get("timings"),
+        "subgraph_input_structured_output_repair_provider_fallback_used": bool(repair_meta.get("provider_fallback_used")),
+        "subgraph_input_structured_output_repair_requested_model_ref": repair_meta.get("requested_model_ref"),
+        "subgraph_input_structured_output_repair_provider_fallback_trace": repair_meta.get("provider_fallback_trace"),
     }
     warnings = [*attachment_warnings, *llm_meta.get("warnings", []), *repair_meta.get("warnings", [])]
     if repair_error:

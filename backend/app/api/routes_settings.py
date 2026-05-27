@@ -64,6 +64,8 @@ class SettingsProviderModelPayload(BaseModel):
     route_target: str | None = Field(default=None, alias="route_target")
     reasoning: bool | None = None
     modalities: list[str] = Field(default_factory=lambda: ["text"])
+    capabilities: dict[str, bool] = Field(default_factory=dict)
+    permissions: list[str] = Field(default_factory=list)
     context_window: int | None = Field(default=None, alias="context_window")
     max_tokens: int | None = Field(default=None, alias="max_tokens")
 
@@ -212,6 +214,12 @@ def _merge_model_providers(
                     "route_target": model_payload.route_target or "",
                     "reasoning": model_payload.reasoning,
                     "modalities": model_payload.modalities or ["text"],
+                    "capabilities": {
+                        str(key): bool(value)
+                        for key, value in model_payload.capabilities.items()
+                        if str(key or "").strip()
+                    },
+                    "permissions": _dedupe_strings(model_payload.permissions),
                     "context_window": model_payload.context_window,
                     "max_tokens": model_payload.max_tokens,
                 }
@@ -228,6 +236,18 @@ def _merge_model_providers(
 
     next_settings["model_providers"] = merged_providers
     return next_settings
+
+
+def _dedupe_strings(values: list[str]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = str(value or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        result.append(text)
+    return result
 
 
 def _build_settings_payload(*, force_refresh_models: bool = False) -> dict:

@@ -21,6 +21,72 @@ EXECUTABLE_KNOWLEDGE_RETRIEVAL_KEYS = {
     "max_citations",
     "max_context_chars",
 }
+EXECUTABLE_MEMORY_RETRIEVAL_KEYS = {
+    "min_results",
+    "required_memory_ids",
+    "required_source_refs",
+    "required_terms",
+    "forbidden_terms",
+    "max_context_chars",
+    "required_reranker_model_ref",
+    "required_rerank_status",
+    "required_top_memory_id",
+    "required_ranked_memory_ids",
+}
+EXECUTABLE_HYBRID_RECALL_KEYS = {
+    "min_memory_results",
+    "min_session_results",
+    "required_memory_ids",
+    "required_message_ids",
+    "required_source_refs",
+    "required_terms",
+    "forbidden_terms",
+    "max_context_chars",
+}
+EXECUTABLE_CAPABILITY_SELECTION_KEYS = {
+    "required_requested",
+    "required_selected",
+    "required_rejected",
+    "required_fallbacks",
+    "required_terms",
+    "forbidden_terms",
+    "min_rejected",
+    "min_fallbacks",
+}
+EXECUTABLE_SCHEDULER_RUN_KEYS = {
+    "required_job_id",
+    "required_job_run_id",
+    "required_run_id",
+    "required_trigger_reason",
+    "required_status",
+    "required_retry_decision",
+    "required_pending_retry",
+    "required_delivery_result",
+    "required_graph_permission_mode",
+    "required_permission_policy",
+    "required_permission_policy_source",
+    "required_pending_permission_approval",
+    "required_terms",
+    "forbidden_terms",
+}
+EXECUTABLE_DELEGATION_WORKER_KEYS = {
+    "required_task_id",
+    "required_status",
+    "required_output_keys",
+    "required_source_refs",
+    "required_terms",
+    "forbidden_terms",
+}
+EXECUTABLE_PROVIDER_FALLBACK_KEYS = {
+    "required_requested",
+    "required_selected",
+    "required_failed",
+    "required_capabilities",
+    "required_permissions",
+    "required_terms",
+    "forbidden_terms",
+    "min_fallbacks",
+}
 
 
 def seed_official_eval_suites(template_root: str | Path | None = None) -> dict[str, Any]:
@@ -156,6 +222,18 @@ def _is_executable_check(record: dict[str, Any], kind: str) -> bool:
         return bool(record.get("min_citations")) and not _descriptive_only(record)
     if kind in {"knowledge_retrieval", "knowledge_context"}:
         return any(_has_concrete_value(record.get(key)) for key in EXECUTABLE_KNOWLEDGE_RETRIEVAL_KEYS)
+    if kind in {"memory_retrieval", "memory_context"}:
+        return any(_has_concrete_value(record.get(key)) for key in EXECUTABLE_MEMORY_RETRIEVAL_KEYS)
+    if kind in {"hybrid_recall", "session_memory_recall", "hybrid_memory_recall"}:
+        return any(_has_concrete_value(record.get(key)) for key in EXECUTABLE_HYBRID_RECALL_KEYS)
+    if kind in {"capability_selection", "capability_selector"}:
+        return any(_has_concrete_value(record.get(key)) for key in EXECUTABLE_CAPABILITY_SELECTION_KEYS)
+    if kind in {"scheduler_run", "scheduled_graph_job_run"}:
+        return any(_has_concrete_value(record.get(key)) for key in EXECUTABLE_SCHEDULER_RUN_KEYS)
+    if kind in {"delegation_worker", "worker_result", "worker_result_package"}:
+        return any(_has_concrete_value(record.get(key)) for key in EXECUTABLE_DELEGATION_WORKER_KEYS)
+    if kind in {"provider_fallback", "model_provider_fallback", "provider_fallback_trace"}:
+        return any(_has_concrete_value(record.get(key)) for key in EXECUTABLE_PROVIDER_FALLBACK_KEYS)
     return False
 
 

@@ -1,0 +1,100 @@
+{
+  "suite": "provider_fallback_eval_core",
+  "name": "Provider Fallback 核心回归",
+  "description": "覆盖 provider/model 失败后的 fallback 选择合同，确保实际选择、失败原因、候选过滤、能力要求和权限范围都能被审计。",
+  "cases": [
+    {
+      "case_id": "provider-fallback-selects-compatible-model",
+      "name": "Provider 失败后应选择兼容 fallback model",
+      "description": "输入一个失败的 primary provider 和多个候选模型，运行 provider_fallback_resolver 后用 provider_fallback check 验证选择的 fallback 不扩展权限范围。",
+      "inputs": {
+        "requested_model_ref": "openai/gpt-primary",
+        "failure_event": {
+          "model_ref": "openai/gpt-primary",
+          "provider_id": "openai",
+          "error_type": "provider_timeout",
+          "message": "primary provider timed out"
+        },
+        "required_capabilities": [
+          "chat",
+          "structured_output"
+        ],
+        "required_permissions": [
+          "text_generation"
+        ],
+        "preserve_permission_scope": true,
+        "provider_candidates": [
+          {
+            "model_ref": "openai/gpt-primary",
+            "enabled": true,
+            "configured": true,
+            "capabilities": {
+              "chat": true,
+              "structured_output": true
+            },
+            "permissions": [
+              "text_generation"
+            ]
+          },
+          {
+            "model_ref": "local/backup-model",
+            "enabled": true,
+            "configured": true,
+            "capabilities": {
+              "chat": true,
+              "structured_output": true
+            },
+            "permissions": [
+              "text_generation"
+            ]
+          },
+          {
+            "model_ref": "web-gateway/browsing-model",
+            "enabled": true,
+            "configured": true,
+            "capabilities": {
+              "chat": true,
+              "structured_output": true
+            },
+            "permissions": [
+              "text_generation",
+              "network_access"
+            ]
+          }
+        ]
+      },
+      "checks": [
+        {
+          "kind": "provider_fallback",
+          "name": "provider_fallback_selects_compatible_model",
+          "target": "provider_fallback_trace",
+          "required_requested": {
+            "provider_id": "openai",
+            "model": "gpt-primary"
+          },
+          "required_selected": {
+            "provider_id": "local",
+            "model": "backup-model"
+          },
+          "required_failed": {
+            "provider_id": "openai",
+            "error_type": "provider_timeout"
+          },
+          "required_capabilities": [
+            "chat",
+            "structured_output"
+          ],
+          "required_permissions": [
+            "text_generation"
+          ],
+          "min_fallbacks": 1,
+          "required_terms": [
+            "fallback_selected",
+            "provider_timeout",
+            "permission_scope_expanded"
+          ]
+        }
+      ]
+    }
+  ]
+}

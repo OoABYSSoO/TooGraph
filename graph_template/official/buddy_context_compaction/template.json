@@ -581,7 +581,7 @@
         "actionKey": "",
         "actionBindings": [],
         "actionInstructionBlocks": {},
-        "taskInstruction": "执行 Hermes 风格上下文压缩。以 existing_session_summary 为基础迭代更新，并保留仍有效内容；保护最近原文，写入 protected_recent_history Markdown；把中间历史、用户明确决策、当前任务进展、未完成事项、能力调用结论压成 session_summary_candidate Markdown。摘要内容聚焦可延续的会话状态、用户决策、任务进展、待办和能力调用结论。必须同时输出：compaction_report JSON（trigger、source_run_id、current_session_id、omitted_count、protected_count、summary_changed、risk_notes、anti_thrashing_notes）、should_write_summary boolean、writer_input JSON。writer_input.commands 只允许一个 session_summary.update 命令，payload.content 必须等于 session_summary_candidate；change_reason 写明触发来源和压缩理由。若摘要无实质变化或风险过高，should_write_summary=false 且 commands=[]。",
+        "taskInstruction": "执行 Hermes 风格上下文压缩。以 existing_session_summary 为基础迭代更新，并保留仍有效内容；保护最近原文，写入 protected_recent_history Markdown；把中间历史、用户明确决策、当前任务进展、未完成事项、能力调用结论压成 session_summary_candidate Markdown。摘要内容聚焦可延续的会话状态、用户决策、任务进展、待办和能力调用结论。必须同时输出：compaction_report JSON（trigger、source_run_id、current_session_id、omitted_count、protected_count、summary_changed、summary_source_refs、omitted_refs、protected_recent_history_refs、risk_notes、anti_thrashing_notes）、should_write_summary boolean、writer_input JSON。compaction_report.summary_source_refs、omitted_refs、protected_recent_history_refs 必须来自 context_budget_report 中同名字段。writer_input.commands 只允许一个 session_summary.update 命令，payload.content 必须等于 session_summary_candidate，payload.source_refs 必须等于 context_budget_report.summary_source_refs，payload.source_run_id 必须等于 source_run_id，payload.session_id 必须等于 current_session_id；change_reason 写明触发来源和压缩理由。若摘要无实质变化或风险过高，should_write_summary=false 且 commands=[]。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "low",

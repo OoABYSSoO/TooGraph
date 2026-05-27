@@ -1,0 +1,80 @@
+{
+  "suite": "delegation_worker_eval_core",
+  "name": "Delegation Worker 核心回归",
+  "description": "覆盖 worker_task_packet 到 worker_result_package 的标准化协议，确保委派子任务结果可被主图合并、审计和评测。",
+  "cases": [
+    {
+      "case_id": "delegation-worker-packages-task-result",
+      "name": "Worker 应打包标准结果包",
+      "description": "输入一个 worker_task_packet 和 worker outputs，运行 delegation_worker_result_packager 后用 delegation_worker check 验证 task id、状态、输出键、source refs 和关键内容。",
+      "inputs": {
+        "worker_task_packet": {
+          "task_id": "worker_eval_research_1",
+          "goal": "Compare TooGraph and Hermes delegation protocols.",
+          "context_package_refs": [
+            {
+              "source_kind": "context_package",
+              "source_id": "ctx_eval_worker_brief"
+            }
+          ],
+          "allowed_capabilities": [
+            {
+              "kind": "tool",
+              "key": "knowledge_context_loader"
+            }
+          ],
+          "budget": {
+            "max_steps": 2,
+            "max_chars": 4000
+          },
+          "expected_output_schema": {
+            "findings": {
+              "type": "markdown"
+            },
+            "source_refs": {
+              "type": "json"
+            }
+          }
+        },
+        "worker_outputs": {
+          "findings": "TooGraph should expose worker_task_packet and worker_result_package so Hermes-style delegation remains auditable.",
+          "source_refs": [
+            {
+              "source_kind": "context_package",
+              "source_id": "ctx_eval_worker_brief"
+            }
+          ]
+        },
+        "worker_status": "succeeded",
+        "worker_summary": "Compared TooGraph and Hermes delegation protocols."
+      },
+      "checks": [
+        {
+          "kind": "delegation_worker",
+          "name": "delegation_worker_result_contract",
+          "target": "worker_result_package",
+          "required_task_id": "worker_eval_research_1",
+          "required_status": "succeeded",
+          "required_output_keys": [
+            "findings",
+            "source_refs"
+          ],
+          "required_source_refs": [
+            {
+              "source_kind": "context_package",
+              "source_id": "ctx_eval_worker_brief"
+            }
+          ],
+          "required_terms": [
+            "TooGraph",
+            "Hermes",
+            "worker_result_package"
+          ],
+          "forbidden_terms": [
+            "unscoped secret"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -7,9 +7,19 @@ export const BUDDY_CONTEXT_COMPACTION_TEMPLATE_ID = "buddy_context_compaction";
 export type BuddyContextCompactionTrigger = "preflight" | "capability_result" | "overflow_recovery" | "background";
 
 export type BuddyContextHistoryMessage = {
+  id?: string;
   role: "user" | "assistant";
   content: string;
   includeInContext?: boolean;
+  sourceRevisionId?: string;
+};
+
+export type BuddyContextCompactionSourceRef = {
+  source_kind: "buddy_message" | "buddy_session_summary";
+  source_id: string;
+  role: "user" | "assistant" | "summary";
+  ordinal: number;
+  source_revision_id?: string;
 };
 
 export type BuddyContextBudgetReport = {
@@ -27,6 +37,10 @@ export type BuddyContextBudgetReport = {
   provider_prompt_tokens: number | null;
   model_context_window_tokens: number | null;
   prompt_token_pressure: number | null;
+  source_refs: BuddyContextCompactionSourceRef[];
+  summary_source_refs: BuddyContextCompactionSourceRef[];
+  omitted_refs: BuddyContextCompactionSourceRef[];
+  protected_recent_history_refs: BuddyContextCompactionSourceRef[];
   thresholds: {
     raw_history_chars: number;
     omitted_history_messages: number;
@@ -95,6 +109,15 @@ export function buildBuddyContextBudgetReport(input: BuildBuddyContextBudgetRepo
   const rawHistoryChars = includedHistory.reduce((total, message) => total + formatBuddyHistoryLine(message).length + 1, 0);
   const providerPromptTokens = resolveProviderPromptTokens(input.sourceRun);
   const modelContextWindowTokens = normalizePositiveInteger(input.modelContextWindowTokens) ?? DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS;
+  const sourceRefs = buildContextCompactionSourceRefs(input.history, input.sessionSummary);
+  const omittedRefs = buildContextCompactionMessageRefs(
+    includedHistory.slice(0, Math.max(0, includedHistory.length - DEFAULT_RECENT_HISTORY_MESSAGES)),
+    sourceRefs.some((ref) => ref.source_kind === "buddy_session_summary") ? 1 : 0,
+  );
+  const protectedRecentHistoryRefs = buildContextCompactionMessageRefs(
+    includedHistory.slice(-DEFAULT_RECENT_HISTORY_MESSAGES),
+    sourceRefs.some((ref) => ref.source_kind === "buddy_session_summary") ? 1 + omittedRefs.length : omittedRefs.length,
+  );
   return {
     version: 1,
     trigger: input.trigger,
@@ -110,6 +133,10 @@ export function buildBuddyContextBudgetReport(input: BuildBuddyContextBudgetRepo
     provider_prompt_tokens: providerPromptTokens,
     model_context_window_tokens: modelContextWindowTokens,
     prompt_token_pressure: providerPromptTokens === null ? null : providerPromptTokens / modelContextWindowTokens,
+    source_refs: sourceRefs,
+    summary_source_refs: sourceRefs,
+    omitted_refs: omittedRefs,
+    protected_recent_history_refs: protectedRecentHistoryRefs,
     thresholds: {
       raw_history_chars: RAW_HISTORY_COMPACTION_THRESHOLD_CHARS,
       omitted_history_messages: OMITTED_HISTORY_COMPACTION_THRESHOLD_MESSAGES,
@@ -234,12 +261,56 @@ export function formatRawBuddyHistoryForCompaction(messages: BuddyContextHistory
 function normalizeHistoryMessages(messages: BuddyContextHistoryMessage[]): BuddyContextHistoryMessage[] {
   return messages
     .map((message) => ({
+      id: normalizeText(message.id),
       role: message.role,
       content: normalizeText(message.content),
       includeInContext: message.includeInContext,
+      sourceRevisionId: normalizeText(message.sourceRevisionId),
     }))
     .filter((message) => message.includeInContext !== false)
     .filter((message) => message.content.length > 0);
+}
+
+function buildContextCompactionSourceRefs(
+  messages: BuddyContextHistoryMessage[],
+  sessionSummary: string,
+): BuddyContextCompactionSourceRef[] {
+  const refs: BuddyContextCompactionSourceRef[] = [];
+  if (normalizeText(sessionSummary)) {
+    refs.push({
+      source_kind: "buddy_session_summary",
+      source_id: "session_summary",
+      role: "summary",
+      ordinal: refs.length,
+    });
+  }
+  refs.push(...buildContextCompactionMessageRefs(normalizeHistoryMessages(messages), refs.length));
+  return refs;
+}
+
+function buildContextCompactionMessageRefs(
+  messages: BuddyContextHistoryMessage[],
+  startOrdinal: number,
+): BuddyContextCompactionSourceRef[] {
+  const refs: BuddyContextCompactionSourceRef[] = [];
+  for (const message of messages) {
+    const sourceId = normalizeText(message.id);
+    if (!sourceId) {
+      continue;
+    }
+    const ref: BuddyContextCompactionSourceRef = {
+      source_kind: "buddy_message",
+      source_id: sourceId,
+      role: message.role,
+      ordinal: startOrdinal + refs.length,
+    };
+    const sourceRevisionId = normalizeText(message.sourceRevisionId);
+    if (sourceRevisionId) {
+      ref.source_revision_id = sourceRevisionId;
+    }
+    refs.push(ref);
+  }
+  return refs;
 }
 
 function formatBuddyHistoryLine(message: Pick<BuddyContextHistoryMessage, "role" | "content">): string {

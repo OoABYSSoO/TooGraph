@@ -82,6 +82,89 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(updated_config["provider_id"], "local")
         self.assertEqual(updated_config["provider_thinking_level"], "medium")
 
+    def test_records_prompt_snapshot_metadata_without_storing_prompt_text(self) -> None:
+        def chat_with_local_model_with_meta_func(**kwargs):
+            return ('{"answer": "done"}', {"warnings": [], "model": "test-model"})
+
+        _payload, _reasoning, _warnings, updated_config = generate_agent_response(
+            _agent_node(writes=[{"state": "answer"}], task_instruction="USER SECRET TASK"),
+            {
+                "conversation_history": {
+                    "kind": "context_package",
+                    "package_id": "pkg_history_1",
+                    "source_kind": "session",
+                    "authority": "history",
+                    "context_ref": {
+                        "kind": "context_assembly_ref",
+                        "assembly_id": "ctx_history_1",
+                        "target_state_key": "conversation_history",
+                        "renderer_key": "buddy_history",
+                        "renderer_version": "1",
+                        "rendered_content_hash": "sha256:history",
+                        "source_count": 3,
+                    },
+                }
+            },
+            {},
+            {
+                "resolved_provider_id": "local",
+                "runtime_model_name": "test-model",
+                "resolved_temperature": 0.2,
+                "resolved_thinking": False,
+                "resolved_thinking_level": "off",
+                "resolved_model_ref": "local/test-model",
+            },
+            build_effective_system_prompt_func=lambda *args, **kwargs: "SYSTEM SECRET INPUT",
+            chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+            parse_llm_json_response_func=lambda content, output_keys, *, output_key_aliases: {"answer": "done"},
+            build_output_key_aliases_func=lambda output_keys, state_schema: {"answer": ["answer"]},
+        )
+
+        snapshots = updated_config["prompt_snapshots"]
+        self.assertEqual(len(snapshots), 1)
+        snapshot = snapshots[0]
+        self.assertEqual(snapshot["kind"], "llm_prompt_snapshot")
+        self.assertEqual(snapshot["phase"], "agent_response")
+        self.assertEqual(snapshot["system_prompt_chars"], len("SYSTEM SECRET INPUT"))
+        self.assertEqual(snapshot["user_prompt_chars"], len("USER SECRET TASK"))
+        self.assertTrue(snapshot["system_prompt_hash"].startswith("sha256:"))
+        self.assertTrue(snapshot["user_prompt_hash"].startswith("sha256:"))
+        self.assertEqual(snapshot["prompt_cache_policy"]["kind"], "prompt_cache_policy")
+        self.assertEqual(snapshot["prompt_cache_policy"]["version"], 1)
+        self.assertEqual(snapshot["prompt_cache_policy"]["storage"], "hash_and_metadata")
+        self.assertEqual(snapshot["prompt_cache_policy"]["mode"], "audit_only")
+        self.assertEqual(snapshot["prompt_cache_policy"]["provider_cache_control"], "not_applied")
+        self.assertEqual(snapshot["prompt_cache_policy"]["stable_prefix_hash"], snapshot["system_prompt_hash"])
+        self.assertEqual(snapshot["prompt_cache_policy"]["stable_prefix_chars"], len("SYSTEM SECRET INPUT"))
+        self.assertEqual(snapshot["prompt_cache_policy"]["dynamic_suffix_hash"], snapshot["user_prompt_hash"])
+        self.assertEqual(snapshot["prompt_cache_policy"]["dynamic_suffix_chars"], len("USER SECRET TASK"))
+        self.assertTrue(snapshot["prompt_cache_policy"]["cache_key"].startswith("sha256:"))
+        self.assertFalse(snapshot["prompt_cache_policy"]["eligible"])
+        self.assertEqual(snapshot["prompt_cache_policy"]["reason"], "runtime_state_in_system_prompt")
+        self.assertEqual(snapshot["prompt_cache_policy"]["invalidators"], ["input_state_keys", "context_refs"])
+        self.assertEqual(snapshot["output_keys"], ["answer"])
+        self.assertEqual(
+            snapshot["context_refs"],
+            [
+                {
+                    "state_key": "conversation_history",
+                    "kind": "context_package",
+                    "package_id": "pkg_history_1",
+                    "source_kind": "session",
+                    "authority": "history",
+                    "assembly_id": "ctx_history_1",
+                    "target_state_key": "conversation_history",
+                    "renderer_key": "buddy_history",
+                    "renderer_version": "1",
+                    "rendered_content_hash": "sha256:history",
+                    "source_count": 3,
+                }
+            ],
+        )
+        serialized_snapshot = json.dumps(snapshot, ensure_ascii=False)
+        self.assertNotIn("SYSTEM SECRET INPUT", serialized_snapshot)
+        self.assertNotIn("USER SECRET TASK", serialized_snapshot)
+
     def test_passes_structured_output_schema_for_state_outputs(self) -> None:
         captured: dict[str, object] = {}
 
@@ -126,6 +209,64 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(schema["properties"]["answer"]["type"], "string")
         self.assertEqual(schema["properties"]["confidence"]["type"], "number")
         self.assertEqual(updated_config["structured_output_strategy"], "json_schema")
+
+    def test_records_provider_fallback_trace_for_remote_structured_output_call(self) -> None:
+        fallback_trace = {
+            "kind": "provider_fallback_trace",
+            "decision": "fallback_selected",
+            "fallback_used": True,
+            "requested": {"provider_id": "openai", "model": "gpt-primary", "model_ref": "openai/gpt-primary"},
+            "selected": {"provider_id": "fallback", "model": "gpt-main", "model_ref": "fallback/gpt-main"},
+            "failed_candidates": [],
+            "fallback_candidates": [],
+            "rejected_candidates": [],
+            "required_capabilities": ["chat", "structured_output"],
+            "required_permissions": ["text_generation"],
+            "attempts": [],
+            "warnings": [],
+        }
+
+        def chat_with_model_ref_with_meta_func(**_kwargs):
+            return (
+                '{"answer": "done"}',
+                {
+                    "warnings": [],
+                    "provider_id": "fallback",
+                    "model": "gpt-main",
+                    "provider_fallback_used": True,
+                    "requested_model_ref": "openai/gpt-primary",
+                    "provider_fallback_trace": fallback_trace,
+                },
+            )
+
+        payload, _reasoning, warnings, updated_config = generate_agent_response(
+            _agent_node(writes=[{"state": "answer"}]),
+            {"question": "q"},
+            {},
+            {
+                "resolved_provider_id": "openai",
+                "runtime_model_name": "gpt-primary",
+                "resolved_temperature": 0.2,
+                "resolved_thinking": False,
+                "resolved_thinking_level": "off",
+                "resolved_model_ref": "openai/gpt-primary",
+            },
+            state_schema={
+                "answer": NodeSystemStateDefinition(
+                    name="Answer",
+                    description="Final answer.",
+                    type=NodeSystemStateType.TEXT,
+                ),
+            },
+            chat_with_model_ref_with_meta_func=chat_with_model_ref_with_meta_func,
+        )
+
+        self.assertEqual(payload["answer"], "done")
+        self.assertEqual(warnings, [])
+        self.assertEqual(updated_config["provider_id"], "fallback")
+        self.assertTrue(updated_config["provider_fallback_used"])
+        self.assertEqual(updated_config["requested_model_ref"], "openai/gpt-primary")
+        self.assertEqual(updated_config["provider_fallback_trace"]["selected"]["model_ref"], "fallback/gpt-main")
 
     def test_repairs_invalid_structured_output_without_original_prompt_context(self) -> None:
         calls: list[dict[str, object]] = []
@@ -178,6 +319,109 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertTrue(updated_config["structured_output_repair_succeeded"])
         self.assertEqual(updated_config["structured_output_validation_errors"], [])
         self.assertIn("$.answer expected string", updated_config["structured_output_initial_validation_errors"][0])
+        snapshots = updated_config["prompt_snapshots"]
+        self.assertEqual([snapshot["phase"] for snapshot in snapshots], ["agent_response", "structured_output_repair"])
+        repair_snapshot = snapshots[1]
+        self.assertTrue(repair_snapshot["system_prompt_hash"].startswith("sha256:"))
+        self.assertTrue(repair_snapshot["user_prompt_hash"].startswith("sha256:"))
+        self.assertEqual(repair_snapshot["output_keys"], ["answer"])
+        self.assertEqual(repair_snapshot["context_refs"], [])
+        serialized_repair_snapshot = json.dumps(repair_snapshot, ensure_ascii=False)
+        self.assertNotIn('{"answer": 123}', serialized_repair_snapshot)
+        self.assertNotIn("ORIGINAL SECRET INPUT", serialized_repair_snapshot)
+        self.assertNotIn("ORIGINAL TASK", serialized_repair_snapshot)
+
+    def test_repair_records_provider_fallback_trace_for_remote_model(self) -> None:
+        calls: list[dict[str, object]] = []
+        fallback_trace = {
+            "kind": "provider_fallback_trace",
+            "decision": "fallback_selected",
+            "fallback_used": True,
+            "requested": {"model_ref": "openai/gpt-primary", "provider_id": "openai", "model": "gpt-primary"},
+            "selected": {"model_ref": "fallback/gpt-repair", "provider_id": "fallback", "model": "gpt-repair"},
+            "failed_candidates": [
+                {
+                    "model_ref": "openai/gpt-primary",
+                    "provider_id": "openai",
+                    "model": "gpt-primary",
+                    "status": "failed",
+                    "reason": "provider_failed",
+                    "error_type": "provider_timeout",
+                    "message": "timeout",
+                }
+            ],
+            "fallback_candidates": [
+                {
+                    "model_ref": "fallback/gpt-repair",
+                    "provider_id": "fallback",
+                    "model": "gpt-repair",
+                    "reason": "compatible_fallback",
+                }
+            ],
+            "rejected_candidates": [],
+            "required_capabilities": ["chat", "structured_output"],
+            "required_permissions": ["text_generation"],
+            "attempts": [
+                {"model_ref": "openai/gpt-primary", "provider_id": "openai", "model": "gpt-primary", "status": "failed"},
+                {"model_ref": "fallback/gpt-repair", "provider_id": "fallback", "model": "gpt-repair", "status": "selected"},
+            ],
+            "warnings": ["Primary provider failed; fallback used."],
+        }
+
+        def chat_with_model_ref_with_meta_func(**kwargs):
+            calls.append(dict(kwargs))
+            if len(calls) == 1:
+                return ('{"answer": 123}', {"warnings": [], "provider_id": "openai", "model": "gpt-primary"})
+            return (
+                '{"answer": "repaired remotely"}',
+                {
+                    "warnings": ["Provider fallback used for repair."],
+                    "provider_id": "fallback",
+                    "model": "gpt-repair",
+                    "provider_fallback_used": True,
+                    "requested_model_ref": "openai/gpt-primary",
+                    "provider_fallback_trace": fallback_trace,
+                    "response_id": "repair-response",
+                    "usage": {"total_tokens": 42},
+                },
+            )
+
+        payload, _reasoning, warnings, updated_config = generate_agent_response(
+            _agent_node(writes=[{"state": "answer"}]),
+            {"question": "q"},
+            {},
+            {
+                "resolved_provider_id": "openai",
+                "runtime_model_name": "gpt-primary",
+                "resolved_temperature": 0.2,
+                "resolved_thinking": False,
+                "resolved_thinking_level": "off",
+                "resolved_model_ref": "openai/gpt-primary",
+            },
+            state_schema={
+                "answer": NodeSystemStateDefinition(
+                    name="Answer",
+                    description="Final answer.",
+                    type=NodeSystemStateType.TEXT,
+                ),
+            },
+            build_effective_system_prompt_func=lambda *args, **kwargs: "system prompt",
+            chat_with_model_ref_with_meta_func=chat_with_model_ref_with_meta_func,
+        )
+
+        self.assertEqual(payload["answer"], "repaired remotely")
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(warnings, ["Provider fallback used for repair."])
+        self.assertTrue(updated_config["structured_output_repair_attempted"])
+        self.assertTrue(updated_config["structured_output_repair_succeeded"])
+        self.assertEqual(updated_config["structured_output_repair_provider_id"], "fallback")
+        self.assertEqual(updated_config["structured_output_repair_provider_model"], "gpt-repair")
+        self.assertTrue(updated_config["structured_output_repair_provider_fallback_used"])
+        self.assertEqual(updated_config["structured_output_repair_requested_model_ref"], "openai/gpt-primary")
+        self.assertEqual(
+            updated_config["structured_output_repair_provider_fallback_trace"]["selected"]["model_ref"],
+            "fallback/gpt-repair",
+        )
 
     def test_user_prompt_does_not_append_action_instruction_blocks_for_final_response(self) -> None:
         captured: dict[str, object] = {}

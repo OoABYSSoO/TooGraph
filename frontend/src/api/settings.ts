@@ -23,6 +23,8 @@ export type SettingsModelProviderUpdate = {
     route_target?: string | null;
     reasoning?: boolean | null;
     modalities?: string[];
+    capabilities?: Record<string, boolean>;
+    permissions?: string[];
     context_window?: number | null;
     max_tokens?: number | null;
   }>;

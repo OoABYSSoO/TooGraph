@@ -1,0 +1,129 @@
+{
+  "suite": "scheduler_retry_delivery_eval_core",
+  "name": "Scheduler 重试投递核心回归",
+  "description": "覆盖 scheduled graph job 失败后生成 retry decision、pending retry 和本地审计投递结果，并通过确定性 scheduler_run check 验证。",
+  "cases": [
+    {
+      "case_id": "scheduler-run-records-retry-and-delivery",
+      "name": "失败调度运行应记录重试与投递",
+      "description": "安装一个带 retry_policy 和 local_audit delivery_target 的 scheduled graph job fixture，并安装一次失败的 schedule run；运行调度报告模板后验证 retry、pending retry 和 delivery_result。",
+      "inputs": {
+        "job_id": "sched_eval_retry_delivery",
+        "job_run_id": "schedrun_eval_retry_delivery_1"
+      },
+      "checks": [
+        {
+          "kind": "scheduler_run",
+          "name": "scheduler_retry_delivery_report",
+          "target": "scheduler_run_report",
+          "required_job_id": "sched_eval_retry_delivery",
+          "required_job_run_id": "schedrun_eval_retry_delivery_1",
+          "required_run_id": "run_eval_scheduler_failed_1",
+          "required_trigger_reason": "schedule",
+          "required_status": "failed",
+          "required_retry_decision": {
+            "action": "scheduled",
+            "next_attempt_number": 2,
+            "delay_seconds": 300
+          },
+          "required_pending_retry": {
+            "next_attempt_number": 2,
+            "parent_run_id": "run_eval_scheduler_failed_1"
+          },
+          "required_delivery_result": {
+            "kind": "local_audit",
+            "status": "delivered",
+            "terminal_status": "failed",
+            "run_ref": {
+              "run_id": "run_eval_scheduler_failed_1"
+            }
+          },
+          "required_graph_permission_mode": "ask_first",
+          "required_permission_policy": {
+            "approval_required_permission_tiers": [
+              "risky"
+            ]
+          },
+          "required_permission_policy_source": "scheduler_default",
+          "required_pending_permission_approval": {
+            "permissions": [
+              "file_write"
+            ]
+          },
+          "required_terms": [
+            "provider timeout",
+            "scheduler_retry_pending"
+          ],
+          "forbidden_terms": [
+            "secret-token"
+          ]
+        }
+      ],
+      "metadata": {
+        "fixture_runs": [
+          {
+            "run_id": "run_eval_scheduler_failed_1",
+            "graph_id": "scheduler_retry_delivery_eval_fixture_graph",
+            "graph_name": "Scheduler retry delivery eval fixture graph",
+            "status": "awaiting_human",
+            "metadata": {
+              "graph_permission_mode": "ask_first",
+              "capability_permission_policy": {
+                "allowed_permission_tiers": [
+                  "none",
+                  "guarded",
+                  "external",
+                  "risky"
+                ],
+                "approval_required_permission_tiers": [
+                  "risky"
+                ]
+              },
+              "scheduled_graph_permission_policy_source": "scheduler_default",
+              "pending_permission_approval": {
+                "kind": "capability_permission_approval",
+                "capability_key": "local_workspace_executor",
+                "permissions": [
+                  "file_write"
+                ]
+              }
+            },
+            "started_at": "2026-05-27T06:00:00Z"
+          }
+        ],
+        "fixture_scheduled_graph_jobs": [
+          {
+            "job_id": "sched_eval_retry_delivery",
+            "name": "调度重试投递评测",
+            "template_id": "embedding_maintenance",
+            "schedule_kind": "interval",
+            "schedule_expr": "PT6H",
+            "retry_policy": {
+              "max_attempts": 3,
+              "delay_seconds": 300
+            },
+            "delivery_target": {
+              "kind": "local_audit",
+              "label": "Scheduler eval",
+              "token": "secret-token"
+            },
+            "now": "2026-05-27T00:00:00Z"
+          }
+        ],
+        "fixture_scheduled_graph_job_runs": [
+          {
+            "job_run_id": "schedrun_eval_retry_delivery_1",
+            "job_id": "sched_eval_retry_delivery",
+            "run_id": "run_eval_scheduler_failed_1",
+            "trigger_reason": "schedule",
+            "status": "failed",
+            "error": "provider timeout",
+            "started_at": "2026-05-27T06:00:00Z",
+            "completed_at": "2026-05-27T06:05:00Z",
+            "now": "2026-05-27T06:05:00Z"
+          }
+        ]
+      }
+    }
+  ]
+}

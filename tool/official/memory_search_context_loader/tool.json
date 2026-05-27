@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "toograph.tool/v1",
+  "toolKey": "memory_search_context_loader",
+  "name": "Memory Search Context Loader",
+  "description": "A deterministic Buddy memory search tool that turns memory_entries recall results into an auditable context_package with memory refs, source refs, retrieval metadata, budget metadata, and warnings.",
+  "version": "0.1.0",
+  "timeoutSeconds": 30,
+  "permissions": [],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 30
+  },
+  "inputSchema": [
+    {
+      "key": "query",
+      "name": "Query",
+      "valueType": "text",
+      "description": "Search query used to find structured Buddy memories."
+    },
+    {
+      "key": "embedding_model_ref",
+      "name": "Embedding Model Ref",
+      "valueType": "text",
+      "description": "Optional embedding model id/provider:model to enable hybrid memory recall."
+    },
+    {
+      "key": "reranker_model_ref",
+      "name": "Reranker Model Ref",
+      "valueType": "text",
+      "description": "Optional reranker provider:model used to reorder hybrid memory recall candidates."
+    },
+    {
+      "key": "scope_kind",
+      "name": "Scope Kind",
+      "valueType": "text",
+      "description": "Optional memory scope kind filter."
+    },
+    {
+      "key": "scope_id",
+      "name": "Scope ID",
+      "valueType": "text",
+      "description": "Optional memory scope id filter."
+    },
+    {
+      "key": "layer",
+      "name": "Layer",
+      "valueType": "text",
+      "description": "Optional memory layer filter."
+    },
+    {
+      "key": "memory_type",
+      "name": "Memory Type",
+      "valueType": "text",
+      "description": "Optional memory type filter."
+    },
+    {
+      "key": "status",
+      "name": "Status",
+      "valueType": "text",
+      "description": "Memory status filter; defaults to active."
+    },
+    {
+      "key": "limit",
+      "name": "Limit",
+      "valueType": "number",
+      "description": "Maximum memories to include."
+    },
+    {
+      "key": "max_chars",
+      "name": "Max Chars",
+      "valueType": "number",
+      "description": "Maximum rendered memory context characters."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "status",
+      "name": "Status",
+      "valueType": "text",
+      "description": "Loader status."
+    },
+    {
+      "key": "memory_search_context",
+      "name": "Memory Search Context",
+      "valueType": "json",
+      "description": "Memory recall context_package."
+    },
+    {
+      "key": "memory_search_report",
+      "name": "Memory Search Report",
+      "valueType": "json",
+      "description": "Search query, memory ids, source refs, retrieval ranking reports, budget, and warnings."
+    }
+  ]
+}

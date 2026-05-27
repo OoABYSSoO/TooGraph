@@ -197,13 +197,35 @@ test("shouldRunBuddyContextCompaction triggers on raw history pressure and high 
   assert.equal(maxUsageReport.provider_prompt_tokens, 75000);
 });
 
+test("buildBuddyContextBudgetReport preserves source refs for summary compaction", () => {
+  const history = Array.from({ length: 14 }, (_, index) => ({
+    id: `msg_${index}`,
+    role: index % 2 === 0 ? "user" as const : "assistant" as const,
+    content: `第 ${index} 条需要可追溯的历史`,
+    sourceRevisionId: `rev_${index}`,
+  }));
+
+  const report = buildBuddyContextBudgetReport({
+    trigger: "preflight",
+    history,
+    userMessage: "继续",
+    sessionSummary: "已有摘要",
+  });
+
+  assert.deepEqual(report.omitted_refs.map((ref) => ref.source_id), ["msg_0", "msg_1"]);
+  assert.deepEqual(report.protected_recent_history_refs.map((ref) => ref.source_id), history.slice(-12).map((message) => message.id));
+  assert.equal(report.summary_source_refs[0]?.source_kind, "buddy_session_summary");
+  assert.equal(report.summary_source_refs[0]?.source_id, "session_summary");
+  assert.equal(report.summary_source_refs.at(-1)?.source_revision_id, "rev_13");
+});
+
 test("buildBuddyContextCompactionGraph wires runtime sources into the internal compaction template", () => {
   const graph = buildBuddyContextCompactionGraph(createCompactionTemplate(), {
     trigger: "preflight",
     sourceRunId: "",
     currentSessionId: "session_live_1",
     userMessage: "继续讨论压缩",
-    history: [{ role: "user", content: "之前说过要保护最近原文。" }],
+    history: [{ id: "msg_source_1", role: "user", content: "之前说过要保护最近原文。", sourceRevisionId: "rev_source_1" }],
     sessionSummary: "已有摘要",
     buddyModel: "global/gpt-5.3-codex",
   });
@@ -215,6 +237,8 @@ test("buildBuddyContextCompactionGraph wires runtime sources into the internal c
   assert.equal(graph.state_schema.existing_session_summary.value, "已有摘要");
   assert.equal(graph.state_schema.buddy_context.value?.["root"], "buddy_home");
   assert.equal(graph.nodes.input_user_message.config.value, "继续讨论压缩");
+  assert.equal(graph.nodes.input_context_budget_report.config.value.summary_source_refs[1].source_id, "msg_source_1");
+  assert.equal(graph.nodes.input_context_budget_report.config.value.summary_source_refs[1].source_revision_id, "rev_source_1");
 });
 
 test("isContextOverflowError recognizes provider request-size failures", () => {

@@ -39,7 +39,7 @@ test("capability selector returns no continuation signal for none", () => {
   assert.deepEqual(result.capability, { kind: "none" });
 });
 
-test("buddy capability loop maps selector needs_capability and uses ordinary graph state context", () => {
+test("buddy capability loop maps selector needs_capability and managed loop budget context", () => {
   const template = JSON.parse(
     readFileSync(resolve("graph_template/official/buddy_autonomous_loop/template.json"), "utf8"),
   );
@@ -59,7 +59,18 @@ test("buddy capability loop maps selector needs_capability and uses ordinary gra
   );
   assert.equal(selector.config.actionBindings[0].outputMapping.found, undefined);
   const selectorActionInputReads = selector.reads.filter((read) => read.binding?.kind === "action_input");
-  assert.deepEqual(selectorActionInputReads, []);
+  assert.deepEqual(selectorActionInputReads, [
+    {
+      state: "agent_loop_control",
+      required: false,
+      binding: {
+        kind: "action_input",
+        actionKey: "toograph_capability_selector",
+        fieldKey: "agent_loop_control",
+        managed: true,
+      },
+    },
+  ]);
   assert.equal(selector.reads.some((read) => read.state === "capability_result"), true);
   assert.equal(selector.reads.some((read) => read.state === "capability_trace"), true);
   assert.equal(selector.reads.some((read) => read.state === "current_session_id"), true);

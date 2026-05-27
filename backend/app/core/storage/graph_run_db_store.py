@@ -4,6 +4,7 @@ import copy
 import json
 from typing import Any
 
+from app.core.context_security import redact_context_secrets
 from app.core.runtime.run_tree import summarize_run_for_tree
 from app.core.storage.database import get_connection
 
@@ -26,6 +27,7 @@ DETAIL_KEYS = (
     "state_last_writers",
     "state_events",
     "state_stream_events",
+    "permission_approvals",
     "cycle_summary",
     "cycle_iterations",
 )
@@ -122,7 +124,7 @@ def save_run_state(run_state: dict[str, Any]) -> None:
                 str(run_state.get("started_at") or ""),
                 run_state.get("completed_at"),
                 run_state.get("duration_ms"),
-                str(run_state.get("final_result") or ""),
+                _redact_run_record_text(run_state.get("final_result")),
                 _json(run_state.get("metadata") or {}),
                 _json(run_state.get("lifecycle") or {}),
                 _json(run_state.get("checkpoint_metadata") or {}),
@@ -370,7 +372,7 @@ def _insert_snapshot(connection: Any, run_id: str, snapshot: dict[str, Any]) -> 
             _json(snapshot.get("output_previews") or []),
             _json(snapshot.get("artifacts") or {}),
             _json(snapshot.get("checkpoint_metadata") or {}),
-            str(snapshot.get("final_result") or ""),
+            _redact_run_record_text(snapshot.get("final_result")),
         ),
     )
 
@@ -425,8 +427,8 @@ def _insert_node_execution(connection: Any, run_id: str, index: int, execution: 
             execution.get("started_at"),
             execution.get("finished_at"),
             _int(execution.get("duration_ms"), default=0),
-            str(execution.get("input_summary") or ""),
-            str(execution.get("output_summary") or ""),
+            _redact_run_record_text(execution.get("input_summary")),
+            _redact_run_record_text(execution.get("output_summary")),
             _json(artifacts),
             _json(state_reads or []),
             _json(state_writes or []),
@@ -438,6 +440,7 @@ def _insert_node_execution(connection: Any, run_id: str, index: int, execution: 
 
 def _insert_run_event(connection: Any, run_id: str, index: int, event: dict[str, Any]) -> None:
     event_id = str(event.get("event_id") or f"{run_id}:event:{index}")
+    redacted_event = _redact_run_record_value(event)
     connection.execute(
         """
         INSERT INTO graph_run_events (
@@ -469,7 +472,7 @@ def _insert_run_event(connection: Any, run_id: str, index: int, event: dict[str,
             event.get("status"),
             str(event.get("created_at") or ""),
             event.get("duration_ms") if isinstance(event.get("duration_ms"), int) else None,
-            _json(event),
+            _json(redacted_event),
         ),
     )
 
@@ -746,7 +749,7 @@ def _insert_capability_usage_event(
     invocation_id = str(output.get("invocation_id") or f"{run_id}:{resolved_kind}:{capability_key}:{index}")
     event_id = str(output.get("usage_event_id") or f"{invocation_id}:usage")
     status = str(output.get("status") or "completed")
-    error_message = str(output.get("error") or "")
+    error_message = _redact_run_record_text(output.get("error"))
     connection.execute(
         """
         INSERT OR REPLACE INTO capability_usage_events (
@@ -780,7 +783,7 @@ def _insert_capability_usage_event(
             str(output.get("error_type") or ""),
             error_message,
             _usage_permission_result(output),
-            str(output.get("summary") or error_message or ""),
+            _redact_run_record_text(output.get("summary") or error_message or ""),
             _json(output),
             str(output.get("completed_at") or output.get("started_at") or created_at),
         ),
@@ -933,11 +936,30 @@ def _run_artifacts_payload(run_state: dict[str, Any]) -> dict[str, Any]:
 
 
 def _detail_payload(run_state: dict[str, Any]) -> dict[str, Any]:
-    return {
-        key: copy.deepcopy(run_state[key])
-        for key in DETAIL_KEYS
-        if key in run_state
-    }
+    payload: dict[str, Any] = {}
+    for key in DETAIL_KEYS:
+        if key not in run_state:
+            continue
+        value = copy.deepcopy(run_state[key])
+        if key == "permission_approvals":
+            value = _redact_permission_approval_audit(value)
+        payload[key] = value
+    return payload
+
+
+def _redact_permission_approval_audit(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(key): _redact_permission_approval_audit(raw_value) for key, raw_value in value.items()}
+    if isinstance(value, list):
+        return [_redact_permission_approval_audit(item) for item in value]
+    if isinstance(value, str):
+        redacted, _warnings = redact_context_secrets(
+            value,
+            source_kind="permission_approval_audit",
+            source_refs=[],
+        )
+        return redacted
+    return value
 
 
 def _activity_events(run_state: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1074,7 +1096,29 @@ def _artifact_payload(row: Any) -> dict[str, Any]:
 
 
 def _json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True)
+    return json.dumps(_redact_run_record_value(value), ensure_ascii=False, sort_keys=True)
+
+
+def _redact_run_record_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(key): _redact_run_record_value(raw_value) for key, raw_value in value.items()}
+    if isinstance(value, list):
+        return [_redact_run_record_value(item) for item in value]
+    if isinstance(value, str):
+        return _redact_run_record_text(value)
+    return value
+
+
+def _redact_run_record_text(value: Any) -> str:
+    text = str(value or "")
+    if not text:
+        return ""
+    redacted, _warnings = redact_context_secrets(
+        text,
+        source_kind="graph_run_record",
+        source_refs=[],
+    )
+    return redacted
 
 
 def _loads(value: Any, default: Any) -> Any:

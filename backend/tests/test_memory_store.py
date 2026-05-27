@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 import sys
 import tempfile
@@ -113,6 +114,104 @@ class MemoryStoreTests(unittest.TestCase):
         self.assertEqual(jobs[1][4], current_chunk[1])
         self.assertEqual(jobs[1][5], "pending")
 
+    def test_create_memory_entry_skips_duplicate_content_and_merges_sources(self) -> None:
+        from app.core.storage.memory_store import create_memory_entry
+
+        first = create_memory_entry(
+            scope_kind="buddy",
+            scope_id="default",
+            layer="long_term",
+            memory_type="preference",
+            title="回复偏好",
+            content="用户偏好先看结论，再看细节。",
+            sources=[{"source_kind": "buddy_message", "source_id": "msg_original"}],
+        )
+        duplicate = create_memory_entry(
+            scope_kind="buddy",
+            scope_id="default",
+            layer="long_term",
+            memory_type="preference",
+            title="重复回复偏好",
+            content=" 用户偏好先看结论，再看细节。 ",
+            sources=[{"source_kind": "buddy_message", "source_id": "msg_duplicate"}],
+        )
+
+        with sqlite3.connect(database.DB_PATH) as connection:
+            memory_count = connection.execute("SELECT COUNT(*) FROM memory_entries").fetchone()[0]
+            revision_operations = [
+                row[0]
+                for row in connection.execute(
+                    "SELECT operation FROM memory_revisions WHERE memory_id = ? ORDER BY revision_number",
+                    (first["memory_id"],),
+                ).fetchall()
+            ]
+            event_types = [
+                row[0]
+                for row in connection.execute(
+                    "SELECT event_type FROM memory_events WHERE memory_id = ? ORDER BY created_at, event_id",
+                    (first["memory_id"],),
+                ).fetchall()
+            ]
+
+        self.assertEqual(duplicate["memory_id"], first["memory_id"])
+        self.assertEqual(duplicate["dedupe"]["status"], "skipped_duplicate")
+        self.assertEqual(duplicate["dedupe"]["reason"], "duplicate_canonical_content")
+        self.assertEqual(duplicate["dedupe"]["requested_title"], "重复回复偏好")
+        self.assertTrue(duplicate["dedupe"]["content_fingerprint"].startswith("sha256:"))
+        self.assertEqual(memory_count, 1)
+        self.assertEqual(
+            [(source["source_kind"], source["source_id"]) for source in duplicate["sources"]],
+            [("buddy_message", "msg_original"), ("buddy_message", "msg_duplicate")],
+        )
+        self.assertEqual(revision_operations, ["create", "dedupe_merge_sources"])
+        self.assertEqual(event_types, ["created", "duplicate_skipped"])
+
+    def test_create_memory_entry_skips_near_duplicate_content(self) -> None:
+        from app.core.storage.memory_store import create_memory_entry
+
+        first = create_memory_entry(
+            scope_kind="buddy",
+            scope_id="default",
+            layer="long_term",
+            memory_type="preference",
+            title="技术方案回复偏好",
+            content="用户希望技术方案先给结论，再展开依据和取舍。",
+            sources=[{"source_kind": "buddy_message", "source_id": "msg_near_original"}],
+        )
+        duplicate = create_memory_entry(
+            scope_kind="buddy",
+            scope_id="default",
+            layer="long_term",
+            memory_type="preference",
+            title="近似技术方案偏好",
+            content="技术方案回复要先给结论，然后说明依据、取舍和验证。",
+            sources=[{"source_kind": "buddy_message", "source_id": "msg_near_duplicate"}],
+        )
+
+        with sqlite3.connect(database.DB_PATH) as connection:
+            memory_count = connection.execute("SELECT COUNT(*) FROM memory_entries").fetchone()[0]
+            duplicate_event = connection.execute(
+                """
+                SELECT detail_json
+                FROM memory_events
+                WHERE memory_id = ? AND event_type = 'duplicate_skipped'
+                ORDER BY created_at DESC, event_id DESC
+                LIMIT 1
+                """,
+                (first["memory_id"],),
+            ).fetchone()
+
+        self.assertEqual(duplicate["memory_id"], first["memory_id"])
+        self.assertEqual(duplicate["dedupe"]["status"], "skipped_duplicate")
+        self.assertEqual(duplicate["dedupe"]["reason"], "near_duplicate_content")
+        self.assertGreaterEqual(duplicate["dedupe"]["similarity_score"], 0.58)
+        self.assertEqual(memory_count, 1)
+        self.assertEqual(
+            [(source["source_kind"], source["source_id"]) for source in duplicate["sources"]],
+            [("buddy_message", "msg_near_original"), ("buddy_message", "msg_near_duplicate")],
+        )
+        self.assertEqual(json.loads(duplicate_event[0])["reason"], "near_duplicate_content")
+
     def test_memory_entry_sources_can_reference_supported_fact_types(self) -> None:
         from app.core.storage.memory_store import create_memory_entry
 
@@ -191,6 +290,49 @@ class MemoryStoreTests(unittest.TestCase):
         self.assertEqual(results[0]["memory_id"], memory["memory_id"])
         self.assertEqual(results[0]["source_ref"]["source_kind"], "memory_entry")
         self.assertEqual(results[0]["source_ref"]["source_id"], memory["memory_id"])
+
+    def test_recall_memories_uses_reranker_without_embedding_model(self) -> None:
+        from app.core.storage.memory_store import create_memory_entry, recall_memories
+
+        first = create_memory_entry(
+            memory_id="mem_base_first",
+            scope_kind="buddy",
+            scope_id="default",
+            layer="long_term",
+            memory_type="preference",
+            title="基础排序靠前",
+            content="rerank-memory-evidence older preference.",
+        )
+        second = create_memory_entry(
+            memory_id="mem_reranked_first",
+            scope_kind="buddy",
+            scope_id="default",
+            layer="long_term",
+            memory_type="preference",
+            title="重排靠前",
+            content="rerank-memory-evidence exact current preference.",
+        )
+
+        def fake_rerank(**kwargs):
+            self.assertEqual(kwargs["model_ref"], "local-rerank/bge-reranker-v2")
+            self.assertEqual(len(kwargs["documents"]), 2)
+            exact_index = 0 if "exact current" in kwargs["documents"][0] else 1
+            other_index = 1 - exact_index
+            return [
+                {"index": exact_index, "score": 0.98, "document": kwargs["documents"][exact_index]},
+                {"index": other_index, "score": 0.41, "document": kwargs["documents"][other_index]},
+            ], {"provider_id": "local-rerank", "model": "bge-reranker-v2"}
+
+        with patch("app.core.storage.retrieval_store.rerank_documents_with_model_ref", side_effect=fake_rerank):
+            results = recall_memories(
+                "rerank-memory-evidence preference",
+                filters={"reranker_model_ref": "local-rerank/bge-reranker-v2"},
+                limit=2,
+            )
+
+        self.assertEqual([memory["memory_id"] for memory in results], [second["memory_id"], first["memory_id"]])
+        self.assertEqual(results[0]["retrieval"]["mode"], "hybrid_rerank")
+        self.assertEqual(results[0]["retrieval"]["rerank_score"], 0.98)
 
 
 if __name__ == "__main__":

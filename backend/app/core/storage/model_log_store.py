@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
+from app.core.context_security import redact_context_secrets
 from app.core.storage.database import MODEL_LOG_DATA_DIR
 
 
@@ -34,7 +35,7 @@ def append_model_request_log(
         "model": str(model or "").strip(),
         "path": _normalize_log_path(path),
         "status_code": status_code,
-        "error": str(error or "").strip(),
+        "error": _sanitize_log_text(str(error or "").strip()),
         "request_raw": sanitize_payload_for_log(request_raw),
         "response_raw": sanitize_payload_for_log(response_raw),
     }
@@ -86,6 +87,8 @@ def sanitize_payload_for_log(value: Any) -> Any:
         return [sanitize_payload_for_log(item) for item in value]
     if isinstance(value, str) and value.startswith("data:"):
         return summarize_inline_media_reference(value)
+    if isinstance(value, str):
+        return _sanitize_log_text(value)
     return value
 
 
@@ -106,6 +109,11 @@ def summarize_inline_media_reference(url: str) -> str:
     if head.startswith("data:"):
         mime = head[5:].split(";", 1)[0] or "unknown"
     return f"<inline-media-reference mime={mime} chars={len(url)}>"
+
+
+def _sanitize_log_text(value: str) -> str:
+    redacted, _warnings = redact_context_secrets(value, source_kind="model_request_log", source_refs=[])
+    return redacted
 
 
 def _resolve_inline_media_mime_type(value: dict[str, Any]) -> str:

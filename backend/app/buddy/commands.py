@@ -32,6 +32,7 @@ def execute_command(payload: dict[str, Any]) -> dict[str, Any]:
         action,
         command_payload,
         target_id=target_id,
+        run_id=run_id,
         change_reason=change_reason,
     )
     revision = _latest_new_revision(previous_revision_ids) or _revision_from_command_result(
@@ -63,6 +64,7 @@ def _dispatch_command(
     payload: dict[str, Any],
     *,
     target_id: str | None,
+    run_id: str | None,
     change_reason: str,
 ) -> tuple[dict[str, Any], str, str]:
     if action == "buddy_identity.update":
@@ -78,6 +80,7 @@ def _dispatch_command(
         result = store.save_memory_document(payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason)
         return result, "home_file", "MEMORY.md"
     if action == "session_summary.update":
+        payload = _session_summary_payload_with_runtime_session(payload, run_id)
         return (
             store.save_session_summary(payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason),
             "session_summary",
@@ -134,6 +137,31 @@ def _dispatch_command(
         result = store.restore_revision(revision_id, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason)
         return result, str(result.get("target_type") or ""), str(result.get("target_id") or "")
     raise ValueError(f"Unsupported buddy command action: {action}")
+
+
+def _session_summary_payload_with_runtime_session(payload: dict[str, Any], run_id: str | None) -> dict[str, Any]:
+    if _optional_text(payload.get("session_id")) or not run_id:
+        return payload
+    session_id = _source_buddy_session_id(run_id)
+    if not session_id:
+        return payload
+    return {
+        **payload,
+        "session_id": session_id,
+        "source_run_id": _optional_text(payload.get("source_run_id")) or run_id,
+    }
+
+
+def _source_buddy_session_id(run_id: str) -> str:
+    try:
+        from app.core.storage.run_store import load_run
+
+        run = load_run(run_id)
+    except Exception:
+        return ""
+    metadata = run.get("metadata") if isinstance(run.get("metadata"), dict) else {}
+    runtime_context = metadata.get("runtime_context") if isinstance(metadata.get("runtime_context"), dict) else {}
+    return _optional_text(runtime_context.get("buddy_session_id")) or ""
 
 
 def _latest_new_revision(previous_revision_ids: set[str]) -> dict[str, Any] | None:

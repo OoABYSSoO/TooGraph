@@ -39,6 +39,7 @@ def web_context_loader(payload: dict[str, Any] | None) -> dict[str, Any]:
             max_chars=max_chars,
             rendered_text=rendered_text,
         )
+        used_chars = _context_ref_rendered_chars(context_ref, fallback=used_chars)
         package = _build_context_package(
             query=query,
             source_refs=source_refs,
@@ -265,7 +266,12 @@ def _build_context_ref(
             rendered_text=rendered_text,
             sources=source_refs,
             budget={"max_chars": max_chars},
-            metadata={"scope": "web", "query": query, "run_id": run_id},
+            metadata={
+                "scope": "web",
+                "query": query,
+                "run_id": run_id,
+                "context_security_policy": {"block_high_risk": True},
+            },
         )
     except Exception:
         source_key = [[ref.get("source_kind"), ref.get("source_id"), ref.get("source_content_hash")] for ref in source_refs]
@@ -280,7 +286,12 @@ def _build_context_ref(
             "source_count": len(source_refs),
             "source_refs": source_refs,
             "budget": {"max_chars": max_chars},
-            "metadata": {"scope": "web", "query": query, "run_id": run_id},
+            "metadata": {
+                "scope": "web",
+                "query": query,
+                "run_id": run_id,
+                "context_security_policy": {"block_high_risk": True},
+            },
         }
 
 
@@ -364,6 +375,16 @@ def _empty_context_ref() -> dict[str, Any]:
         "source_count": 0,
         "source_refs": [],
     }
+
+
+def _context_ref_rendered_chars(context_ref: dict[str, Any], *, fallback: int) -> int:
+    try:
+        from app.core.storage.context_assembly_store import expand_context_assembly_ref
+
+        expanded = expand_context_assembly_ref(context_ref)
+        return len(str(expanded.get("text") or ""))
+    except Exception:
+        return fallback
 
 
 def _read_artifact(relative_path: str) -> str:

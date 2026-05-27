@@ -1,0 +1,44 @@
+{
+  "suite": "embedding_maintenance_core",
+  "name": "Embedding 维护核心回归",
+  "description": "覆盖 embedding maintenance 模板在空队列和限定处理量下的可审计计数合同。",
+  "cases": [
+    {
+      "case_id": "embedding-maintenance-empty-queue-reports-counts",
+      "name": "空队列维护应返回稳定计数",
+      "description": "不预置 pending jobs 时，维护模板仍应完成并输出处理状态、计数和空 processed_jobs 列表。",
+      "inputs": {
+        "model_ref": "",
+        "job_limit": 1
+      },
+      "expected": {
+        "required": [
+          "processor_status",
+          "processed_count",
+          "completed_count",
+          "failed_count",
+          "processed_jobs"
+        ]
+      },
+      "checks": [
+        {
+          "kind": "schema",
+          "name": "embedding_counts_present",
+          "target": "final_output",
+          "required": [
+            "processor_status",
+            "processed_count",
+            "completed_count",
+            "failed_count",
+            "processed_jobs"
+          ]
+        },
+        {
+          "kind": "rule",
+          "key": "embedding_maintenance_audit_contract",
+          "expectation": "processor_status 应为 succeeded；processed_count、completed_count、failed_count 应为数字；processed_jobs 应保留每个 job 的审计记录，空队列时为空数组。"
+        }
+      ]
+    }
+  ]
+}

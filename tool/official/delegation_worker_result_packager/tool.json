@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "toograph.tool/v1",
+  "toolKey": "delegation_worker_result_packager",
+  "name": "Delegation Worker Result Packager",
+  "description": "Normalizes a worker_task_packet plus worker outputs into a worker_result_package with task id, status, summary, outputs, artifacts, errors, followups, source refs, allowed capabilities, and budget usage.",
+  "version": "0.1.0",
+  "timeoutSeconds": 30,
+  "permissions": [],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 30
+  },
+  "inputSchema": [
+    {
+      "key": "worker_task_packet",
+      "name": "Worker Task Packet",
+      "valueType": "json",
+      "description": "Delegation task packet containing task_id, goal, context refs, allowed capabilities, budget, and expected output schema."
+    },
+    {
+      "key": "worker_outputs",
+      "name": "Worker Outputs",
+      "valueType": "json",
+      "description": "Raw worker outputs to package by output key."
+    },
+    {
+      "key": "worker_status",
+      "name": "Worker Status",
+      "valueType": "text",
+      "description": "Worker terminal status, such as succeeded, failed, or partial."
+    },
+    {
+      "key": "worker_summary",
+      "name": "Worker Summary",
+      "valueType": "text",
+      "description": "Short worker result summary."
+    },
+    {
+      "key": "artifacts",
+      "name": "Artifacts",
+      "valueType": "json",
+      "description": "Optional artifact references produced by the worker."
+    },
+    {
+      "key": "errors",
+      "name": "Errors",
+      "valueType": "json",
+      "description": "Optional worker errors."
+    },
+    {
+      "key": "followups",
+      "name": "Followups",
+      "valueType": "json",
+      "description": "Optional follow-up tasks or notes."
+    },
+    {
+      "key": "budget_usage",
+      "name": "Budget Usage",
+      "valueType": "json",
+      "description": "Optional worker budget usage fields such as used_steps or used_chars."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "status",
+      "name": "Status",
+      "valueType": "text",
+      "description": "Packager status."
+    },
+    {
+      "key": "worker_task_packet",
+      "name": "Worker Task Packet",
+      "valueType": "json",
+      "description": "Normalized worker task packet."
+    },
+    {
+      "key": "worker_result_package",
+      "name": "Worker Result Package",
+      "valueType": "json",
+      "description": "Normalized worker result package."
+    }
+  ]
+}

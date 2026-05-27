@@ -25,6 +25,33 @@ AFTER_LLM_ENTRYPOINT = "after_llm.py"
 ACTION_ENV_ROOT = REPO_ROOT / "backend" / "data" / "actions" / "envs"
 REQUIREMENTS_FILE_NAME = "requirements.txt"
 DEPENDENCY_COMMAND_TIMEOUT_SECONDS = 300
+ACTION_SUBPROCESS_INHERITED_ENV_KEYS = {
+    "APPDATA",
+    "COMSPEC",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "LOCALAPPDATA",
+    "PATH",
+    "PATHEXT",
+    "PROGRAMDATA",
+    "PROGRAMFILES",
+    "PROGRAMFILES(X86)",
+    "REQUESTS_CA_BUNDLE",
+    "SHELL",
+    "SSL_CERT_DIR",
+    "SSL_CERT_FILE",
+    "SYSTEMROOT",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "TOOGRAPH_BUDDY_HOME",
+    "TOOGRAPH_BUDDY_HOME_DIR",
+    "USER",
+    "USERNAME",
+    "WINDIR",
+}
+ACTION_SUBPROCESS_INHERITED_ENV_PREFIXES = ("LC_",)
 
 
 @dataclass(frozen=True)
@@ -145,7 +172,7 @@ class ScriptActionRunner:
         python_environment: ActionPythonEnvironment,
     ) -> ActionProcessEnvironment:
         env = {
-            **os.environ,
+            **_action_subprocess_base_environment(),
             "TOOGRAPH_ACTION_KEY": self.action_key,
             "TOOGRAPH_ACTION_DIR": str(self.action_dir),
             "TOOGRAPH_ACTION_ENTRYPOINT": str(self.entrypoint_path),
@@ -380,6 +407,17 @@ def _parse_timeout_seconds(value: float | int | None) -> float:
     except (TypeError, ValueError):
         timeout = DEFAULT_ACTION_TIMEOUT_SECONDS
     return timeout if timeout > 0 else DEFAULT_ACTION_TIMEOUT_SECONDS
+
+
+def _action_subprocess_base_environment() -> dict[str, str]:
+    env: dict[str, str] = {}
+    for key, value in os.environ.items():
+        normalized_key = key.upper()
+        if normalized_key in ACTION_SUBPROCESS_INHERITED_ENV_KEYS or any(
+            normalized_key.startswith(prefix) for prefix in ACTION_SUBPROCESS_INHERITED_ENV_PREFIXES
+        ):
+            env[key] = value
+    return env
 
 
 def _failed_result(error: str) -> dict[str, Any]:

@@ -1,0 +1,60 @@
+{
+  "suite": "buddy_capability_curator_core",
+  "name": "Buddy 能力库整理核心回归",
+  "description": "覆盖 capability curator 从目录、使用事件、eval 覆盖和候选队列生成健康报告、候选和调度建议的基本合同。",
+  "cases": [
+    {
+      "case_id": "capability-curator-reports-health-and-candidates",
+      "name": "能力整理应输出健康报告和候选队列",
+      "description": "使用默认整理范围读取当前能力目录和 eval 覆盖，生成 capability health report、curator report、improvement candidates 和 scheduler recommendation。",
+      "inputs": {
+        "curator_scope": {
+          "capability_kinds": [
+            "action",
+            "tool",
+            "subgraph",
+            "template"
+          ],
+          "lookback_days": 30,
+          "include_official": true,
+          "include_user": true,
+          "focus": [
+            "failure_rate",
+            "duplicate_capabilities",
+            "missing_tests",
+            "missing_docs",
+            "stale_capabilities"
+          ]
+        }
+      },
+      "expected": {
+        "required": [
+          "curator_context_report",
+          "capability_health_report",
+          "curator_report",
+          "improvement_candidates",
+          "scheduler_recommendation"
+        ]
+      },
+      "checks": [
+        {
+          "kind": "schema",
+          "name": "curator_outputs_present",
+          "target": "final_output",
+          "required": [
+            "curator_context_report",
+            "capability_health_report",
+            "curator_report",
+            "improvement_candidates",
+            "scheduler_recommendation"
+          ]
+        },
+        {
+          "kind": "rule",
+          "key": "curator_candidates_are_reviewable",
+          "expectation": "improvement_candidates 中的候选应使用 improvement_candidate 合同，包含 kind、target_ref、risk_level、expected_benefit、proposed_change_summary、approval_required 和 evidence_refs；curator_report 应说明缺测试、缺文档、失败率或重复能力的证据。"
+        }
+      ]
+    }
+  ]
+}

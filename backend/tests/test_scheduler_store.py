@@ -367,6 +367,50 @@ class SchedulerStoreTests(unittest.TestCase):
         self.assertEqual(delivery["status"], "skipped")
         self.assertEqual(delivery["reason"], "unsupported_delivery_target")
 
+    def test_external_delivery_target_records_permission_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            db_path = data_dir / "toograph.db"
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", db_path),
+            ):
+                database.initialize_storage()
+
+                job = store.create_scheduled_graph_job(
+                    {
+                        "name": "能力库整理",
+                        "template_id": "buddy_capability_curator",
+                        "schedule_kind": "manual",
+                        "delivery_target": {
+                            "kind": "webhook",
+                            "url": "https://example.invalid/scheduler-hook",
+                            "authorization": "Bearer secret-token",
+                        },
+                    },
+                    now="2026-05-27T00:00:00Z",
+                )
+                completed = store.record_scheduled_graph_job_run(
+                    job["job_id"],
+                    run_id="run_curator_1",
+                    trigger_reason="manual",
+                    status="completed",
+                    started_at="2026-05-27T06:00:00Z",
+                    now="2026-05-27T06:04:00Z",
+                )
+
+        delivery = completed["metadata"]["delivery_result"]
+        self.assertEqual(delivery["kind"], "webhook")
+        self.assertEqual(delivery["status"], "skipped")
+        self.assertEqual(delivery["reason"], "external_delivery_requires_approval")
+        self.assertTrue(delivery["approval_required"])
+        self.assertEqual(delivery["required_permissions"], ["external_delivery"])
+        self.assertEqual(delivery["permission_profile"]["permission_tier"], "risky")
+        self.assertEqual(delivery["permission_profile"]["risky_permissions"], ["external_delivery"])
+        self.assertEqual(delivery["target"]["url"], "https://example.invalid/scheduler-hook")
+        self.assertEqual(delivery["target"]["authorization"], "[redacted]")
+        self.assertNotIn("secret-token", str(delivery))
+
     def test_create_job_rejects_unknown_template(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir) / "data"

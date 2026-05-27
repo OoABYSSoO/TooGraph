@@ -102,7 +102,10 @@ class TemplateLayoutTests(unittest.TestCase):
                 "buddy_autonomous_review",
                 "buddy_capability_curator",
                 "buddy_context_compaction",
+                "buddy_hybrid_recall_eval",
                 "buddy_improvement_review_workflow",
+                "buddy_memory_recall_eval",
+                "delegation_worker_eval",
                 "ecommerce_review_mining_agent",
                 "embedding_maintenance",
                 "game_creative_factory",
@@ -110,6 +113,8 @@ class TemplateLayoutTests(unittest.TestCase):
                 "multi_platform_content_repurposer",
                 "policy_navigator_agent",
                 "product_competitor_research_agent",
+                "provider_fallback_eval",
+                "scheduler_retry_delivery_eval",
                 "toograph_action_creation_workflow",
                 "toograph_graph_template_creation_workflow",
                 "toograph_page_operation_workflow",
@@ -3734,6 +3739,10 @@ class TemplateLayoutTests(unittest.TestCase):
             ],
         )
         self.assertIn("session_summary.update", nodes["summarize_context"]["config"]["taskInstruction"])
+        self.assertIn("summary_source_refs", nodes["summarize_context"]["config"]["taskInstruction"])
+        self.assertIn("omitted_refs", nodes["summarize_context"]["config"]["taskInstruction"])
+        self.assertIn("protected_recent_history_refs", nodes["summarize_context"]["config"]["taskInstruction"])
+        self.assertIn("payload.source_refs", nodes["summarize_context"]["config"]["taskInstruction"])
         self.assertEqual(
             nodes["has_summary_update"]["config"]["rule"],
             {"source": "$state.should_write_summary", "operator": "==", "value": True},

@@ -1,0 +1,107 @@
+{
+  "suite": "buddy_autonomous_review_core",
+  "name": "Buddy 后台复盘核心回归",
+  "description": "覆盖自主复盘从 source run fixture 恢复上下文、产出记忆写入计划、结构化记忆和改进候选的基本合同。",
+  "cases": [
+    {
+      "case_id": "background-review-source-run-produces-review-artifacts",
+      "name": "源运行复盘应产出可审计复盘结果",
+      "description": "使用 eval fixture source run 模拟一次已完成 Buddy 回复，复盘模板应从 run 事实源恢复上下文并产出 review artifacts。",
+      "inputs": {
+        "source_run_id": "run_eval_buddy_review_source",
+        "buddy_context": {
+          "home_files": {
+            "AGENTS.md": "回答时保持边界清晰，重要结论需要证据。",
+            "SOUL.md": "表达直接、简洁。",
+            "USER.md": "用户偏好中文技术讨论。",
+            "MEMORY.md": "长期记忆文件只写稳定偏好和持续事实。"
+          },
+          "review_policy": {
+            "memory_file_updates": "low_risk_only",
+            "structured_memory": "allowed",
+            "improvement_candidates": "allowed"
+          }
+        }
+      },
+      "expected": {
+        "required": [
+          "autonomous_review",
+          "improvement_candidates",
+          "memory_review_result",
+          "review_context_report"
+        ]
+      },
+      "checks": [
+        {
+          "kind": "schema",
+          "name": "review_artifacts_present",
+          "target": "final_output",
+          "required": [
+            "autonomous_review",
+            "improvement_candidates",
+            "memory_review_result",
+            "review_context_report"
+          ]
+        },
+        {
+          "kind": "rule",
+          "key": "review_uses_source_run_and_routes_memory_correctly",
+          "expectation": "autonomous_review 应引用 source_run_id、用户消息和最终回复证据；稳定偏好进入长期文件候选或结构化 memory，模板/能力改动进入 improvement_candidates，不应把一次性运行日志写入长期文件。"
+        }
+      ],
+      "metadata": {
+        "fixture_runs": [
+          {
+            "run_id": "run_eval_buddy_review_source",
+            "graph_id": "buddy_autonomous_loop_fixture",
+            "graph_name": "Buddy 主循环 eval fixture",
+            "status": "completed",
+            "metadata": {
+              "runtime_context": {
+                "buddy_session_id": "session_eval_review",
+                "buddy_current_message_id": "message_eval_review"
+              }
+            },
+            "state_values": {
+              "current_session_id": "session_eval_review",
+              "user_message": "以后帮我写技术设计时，先给结论再展开。",
+              "conversation_history": {
+                "kind": "context_assembly_ref",
+                "source_refs": [
+                  {
+                    "source_kind": "buddy_message",
+                    "source_id": "message_eval_review"
+                  }
+                ],
+                "metadata": {
+                  "scope": "eval_fixture"
+                }
+              },
+              "request_understanding": {
+                "intent": "record_user_preference",
+                "stable_preference": true
+              },
+              "capability_result": {
+                "status": "not_required"
+              },
+              "capability_review": {
+                "decision": "final_response_only"
+              },
+              "public_response": "已记下：以后技术设计先给结论，再展开细节。"
+            },
+            "output_previews": [
+              {
+                "node_id": "output_final_response",
+                "label": "public_response",
+                "source_kind": "state",
+                "source_key": "public_response",
+                "value": "已记下：以后技术设计先给结论，再展开细节。"
+              }
+            ],
+            "final_result": "已记下：以后技术设计先给结论，再展开细节。"
+          }
+        ]
+      }
+    }
+  ]
+}

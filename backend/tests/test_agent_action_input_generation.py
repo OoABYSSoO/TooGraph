@@ -57,6 +57,66 @@ class AgentActionInputGenerationTests(unittest.TestCase):
         self.assertIn("llmInstruction: Generate a query", prompt)
         self.assertNotIn("agentInstruction", prompt)
 
+    def test_generate_agent_action_inputs_records_prompt_snapshot_metadata(self) -> None:
+        def chat_with_local_model_with_meta_func(**kwargs):
+            return ('{"web_search": {"query": "TooGraph"}}', {"warnings": [], "model": "test-model"})
+
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "question"}],
+                "writes": [{"state": "result_package"}],
+                "config": {
+                    "actionKey": "web_search",
+                    "taskInstruction": "ACTION SECRET TASK",
+                },
+            }
+        )
+
+        _action_inputs, _state_outputs, _reasoning, _warnings, updated_config = generate_agent_action_inputs(
+            node=node,
+            input_values={"question": "ACTION SECRET INPUT"},
+            bindings=[
+                ResolvedAgentActionBinding(
+                    binding=NodeSystemAgentActionBinding(actionKey="web_search"),
+                    source="node_config",
+                )
+            ],
+            action_definitions={
+                "web_search": ActionDefinition(
+                    actionKey="web_search",
+                    name="Web Search",
+                    llmOutputSchema=[ActionIoField(key="query", name="Query", valueType="text")],
+                )
+            },
+            runtime_config={
+                "resolved_provider_id": "local",
+                "runtime_model_name": "test-model",
+                "resolved_temperature": 0.2,
+                "resolved_thinking": False,
+                "resolved_thinking_level": "off",
+            },
+            chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+        )
+
+        snapshot = updated_config["prompt_snapshots"][0]
+        self.assertEqual(snapshot["phase"], "action_input_planning")
+        self.assertTrue(snapshot["system_prompt_hash"].startswith("sha256:"))
+        self.assertTrue(snapshot["user_prompt_hash"].startswith("sha256:"))
+        self.assertEqual(snapshot["prompt_cache_policy"]["kind"], "prompt_cache_policy")
+        self.assertEqual(snapshot["prompt_cache_policy"]["stable_prefix_hash"], snapshot["system_prompt_hash"])
+        self.assertEqual(snapshot["prompt_cache_policy"]["dynamic_suffix_hash"], snapshot["user_prompt_hash"])
+        self.assertEqual(snapshot["prompt_cache_policy"]["mode"], "audit_only")
+        self.assertEqual(snapshot["prompt_cache_policy"]["provider_cache_control"], "not_applied")
+        self.assertFalse(snapshot["prompt_cache_policy"]["eligible"])
+        self.assertEqual(snapshot["prompt_cache_policy"]["reason"], "runtime_state_in_system_prompt")
+        self.assertEqual(snapshot["prompt_cache_policy"]["invalidators"], ["input_state_keys", "action_keys"])
+        self.assertEqual(snapshot["action_keys"], ["web_search"])
+        serialized_snapshot = json.dumps(snapshot, ensure_ascii=False)
+        self.assertNotIn("ACTION SECRET INPUT", serialized_snapshot)
+        self.assertNotIn("ACTION SECRET TASK", serialized_snapshot)
+
     def test_action_input_prompt_separates_state_inputs_from_llm_parameters(self) -> None:
         prompt = build_action_input_system_prompt(
             input_values={"user_goal": "打开运行历史"},
@@ -835,6 +895,19 @@ class AgentActionInputGenerationTests(unittest.TestCase):
             "$.web_search.query expected string",
             updated_config["action_input_structured_output_initial_validation_errors"][0],
         )
+        snapshots = updated_config["prompt_snapshots"]
+        self.assertEqual(
+            [snapshot["phase"] for snapshot in snapshots],
+            ["action_input_planning", "action_input_structured_output_repair"],
+        )
+        repair_snapshot = snapshots[1]
+        self.assertTrue(repair_snapshot["system_prompt_hash"].startswith("sha256:"))
+        self.assertTrue(repair_snapshot["user_prompt_hash"].startswith("sha256:"))
+        self.assertEqual(repair_snapshot["action_keys"], ["web_search"])
+        serialized_repair_snapshot = json.dumps(repair_snapshot, ensure_ascii=False)
+        self.assertNotIn('{"web_search": {"query": 7}}', serialized_repair_snapshot)
+        self.assertNotIn("ORIGINAL SECRET INPUT", serialized_repair_snapshot)
+        self.assertNotIn("ORIGINAL ACTION TASK", serialized_repair_snapshot)
 
 
 if __name__ == "__main__":

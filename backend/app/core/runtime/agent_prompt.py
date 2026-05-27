@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any
 
@@ -163,7 +164,15 @@ def format_context_package_prompt_lines(
                 budget_parts.append(f"{key_name}={budget.get(key_name)}")
         if budget_parts:
             lines.append(f"  budget: {', '.join(budget_parts)}")
-    warnings = value.get("warnings") if isinstance(value.get("warnings"), list) else []
+    raw_warnings = value.get("warnings") if isinstance(value.get("warnings"), list) else []
+    expanded_warnings: list[Any] = []
+    try:
+        expanded = expand_context_package(value)
+        text = str(expanded.get("text") or "")
+        expanded_warnings = list(expanded.get("warnings") or [])
+    except Exception:
+        text = "[上下文包读取失败。]"
+    warnings = _merge_context_package_prompt_warnings(raw_warnings, expanded_warnings)
     if warnings:
         warning_codes = [
             str(warning.get("code") or warning.get("message") or "").strip()
@@ -173,13 +182,22 @@ def format_context_package_prompt_lines(
         warning_summary = ", ".join(code for code in warning_codes if code)
         if warning_summary:
             lines.append(f"  warnings: {warning_summary}")
-    try:
-        expanded = expand_context_package(value)
-        text = str(expanded.get("text") or "")
-    except Exception:
-        text = "[上下文包读取失败。]"
     lines.append(f"  value: {text}")
     return lines
+
+
+def _merge_context_package_prompt_warnings(first: list[Any], second: list[Any]) -> list[dict[str, Any]]:
+    warnings: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in [*first, *second]:
+        if not isinstance(item, dict):
+            continue
+        code = str(item.get("code") or item.get("message") or "").strip()
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        warnings.append(dict(item))
+    return warnings
 
 
 def collect_local_input_prompt_references(
@@ -315,6 +333,190 @@ def build_context_assembly_report(
         "knowledge_chunks": knowledge_chunks,
         "action_results": action_results,
     }
+
+
+def build_llm_prompt_snapshot(
+    *,
+    phase: str,
+    system_prompt: str,
+    user_prompt: str,
+    input_values: dict[str, Any] | None = None,
+    output_keys: list[str] | None = None,
+    action_keys: list[str] | None = None,
+    subgraph_keys: list[str] | None = None,
+    structured_output_schema: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    system_prompt_text = str(system_prompt or "")
+    user_prompt_text = str(user_prompt or "")
+    system_chars = len(system_prompt_text)
+    user_chars = len(user_prompt_text)
+    total_chars = system_chars + user_chars
+    system_prompt_hash = _hash_text(system_prompt_text)
+    user_prompt_hash = _hash_text(user_prompt_text)
+    structured_output_schema_hash = _hash_json(structured_output_schema or {})
+    input_state_keys = list((input_values or {}).keys())
+    resolved_output_keys = list(output_keys or [])
+    resolved_action_keys = list(action_keys or [])
+    resolved_subgraph_keys = list(subgraph_keys or [])
+    context_refs = collect_prompt_snapshot_context_refs(input_values or {})
+    return {
+        "kind": "llm_prompt_snapshot",
+        "version": 1,
+        "phase": str(phase or ""),
+        "storage": "hash_and_metadata",
+        "system_prompt_hash": system_prompt_hash,
+        "user_prompt_hash": user_prompt_hash,
+        "system_prompt_chars": system_chars,
+        "user_prompt_chars": user_chars,
+        "total_prompt_chars": total_chars,
+        "token_estimate": _estimate_tokens(total_chars),
+        "input_state_keys": input_state_keys,
+        "output_keys": resolved_output_keys,
+        "action_keys": resolved_action_keys,
+        "subgraph_keys": resolved_subgraph_keys,
+        "structured_output_schema_hash": structured_output_schema_hash,
+        "context_refs": context_refs,
+        "prompt_cache_policy": build_prompt_cache_policy(
+            phase=str(phase or ""),
+            stable_prefix_hash=system_prompt_hash,
+            stable_prefix_chars=system_chars,
+            dynamic_suffix_hash=user_prompt_hash,
+            dynamic_suffix_chars=user_chars,
+            structured_output_schema_hash=structured_output_schema_hash,
+            input_state_keys=input_state_keys,
+            context_refs=context_refs,
+            action_keys=resolved_action_keys,
+            subgraph_keys=resolved_subgraph_keys,
+        ),
+    }
+
+
+def build_prompt_cache_policy(
+    *,
+    phase: str,
+    stable_prefix_hash: str,
+    stable_prefix_chars: int,
+    dynamic_suffix_hash: str,
+    dynamic_suffix_chars: int,
+    structured_output_schema_hash: str,
+    input_state_keys: list[str],
+    context_refs: list[dict[str, Any]],
+    action_keys: list[str],
+    subgraph_keys: list[str],
+) -> dict[str, Any]:
+    invalidators: list[str] = []
+    if input_state_keys:
+        invalidators.append("input_state_keys")
+    if context_refs:
+        invalidators.append("context_refs")
+    if action_keys:
+        invalidators.append("action_keys")
+    if subgraph_keys:
+        invalidators.append("subgraph_keys")
+
+    eligible = bool(stable_prefix_chars) and not invalidators
+    if not stable_prefix_chars:
+        reason = "empty_stable_prefix"
+    elif invalidators:
+        reason = "runtime_state_in_system_prompt"
+    else:
+        reason = "hash_only_stable_prefix"
+
+    return {
+        "kind": "prompt_cache_policy",
+        "version": 1,
+        "storage": "hash_and_metadata",
+        "mode": "audit_only",
+        "provider_cache_control": "not_applied",
+        "reuse_scope": "phase_stable_prefix",
+        "stable_prefix_hash": stable_prefix_hash,
+        "stable_prefix_chars": stable_prefix_chars,
+        "dynamic_suffix_hash": dynamic_suffix_hash,
+        "dynamic_suffix_chars": dynamic_suffix_chars,
+        "cache_key": _hash_json(
+            {
+                "phase": str(phase or ""),
+                "reuse_scope": "phase_stable_prefix",
+                "stable_prefix_hash": stable_prefix_hash,
+                "structured_output_schema_hash": structured_output_schema_hash,
+            }
+        ),
+        "eligible": eligible,
+        "reason": reason,
+        "invalidators": invalidators,
+    }
+
+
+def collect_prompt_snapshot_context_refs(input_values: dict[str, Any]) -> list[dict[str, Any]]:
+    refs: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for state_key, value in input_values.items():
+        _append_prompt_snapshot_context_refs(value, refs, state_key=str(state_key), seen=seen)
+    return refs
+
+
+def _append_prompt_snapshot_context_refs(
+    value: Any,
+    refs: list[dict[str, Any]],
+    *,
+    state_key: str,
+    seen: set[str],
+) -> None:
+    if isinstance(value, dict):
+        ref: dict[str, Any] | None = None
+        if is_context_package(value):
+            ref = {
+                "state_key": state_key,
+                "kind": "context_package",
+                "package_id": str(value.get("package_id") or ""),
+                "source_kind": str(value.get("source_kind") or ""),
+                "authority": str(value.get("authority") or ""),
+            }
+            context_ref = value.get("context_ref")
+            if is_context_assembly_ref(context_ref):
+                ref.update(_context_assembly_ref_snapshot(context_ref))
+        elif is_context_assembly_ref(value):
+            ref = {
+                "state_key": state_key,
+                "kind": "context_assembly_ref",
+                **_context_assembly_ref_snapshot(value),
+            }
+        if ref is not None:
+            identity = json.dumps(ref, ensure_ascii=False, sort_keys=True)
+            if identity not in seen:
+                seen.add(identity)
+                refs.append(ref)
+            return
+        for child in value.values():
+            _append_prompt_snapshot_context_refs(child, refs, state_key=state_key, seen=seen)
+        return
+    if isinstance(value, list):
+        for item in value:
+            _append_prompt_snapshot_context_refs(item, refs, state_key=state_key, seen=seen)
+
+
+def _context_assembly_ref_snapshot(ref: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "assembly_id": str(ref.get("assembly_id") or ""),
+        "target_state_key": str(ref.get("target_state_key") or ""),
+        "renderer_key": str(ref.get("renderer_key") or ""),
+        "renderer_version": str(ref.get("renderer_version") or ""),
+        "rendered_content_hash": str(ref.get("rendered_content_hash") or ""),
+        "source_count": _optional_positive_int(ref.get("source_count")),
+    }
+
+
+def append_llm_prompt_snapshot(runtime_config: dict[str, Any], snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    return append_llm_prompt_snapshots(runtime_config, snapshot)
+
+
+def append_llm_prompt_snapshots(runtime_config: dict[str, Any], *new_snapshots: Any) -> list[dict[str, Any]]:
+    existing = runtime_config.get("prompt_snapshots")
+    snapshots = [dict(item) for item in existing if isinstance(item, dict)] if isinstance(existing, list) else []
+    for snapshot in new_snapshots:
+        if isinstance(snapshot, dict):
+            snapshots.append(snapshot)
+    return snapshots
 
 
 def sanitize_prompt_value(value: Any) -> Any:
@@ -830,6 +1032,21 @@ def _estimate_tokens(char_count: int) -> int:
     if char_count <= 0:
         return 0
     return max(1, (char_count + 3) // 4)
+
+
+def _hash_text(value: str) -> str:
+    return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _hash_json(value: Any) -> str:
+    return _hash_text(json.dumps(value, ensure_ascii=False, sort_keys=True))
+
+
+def _optional_positive_int(value: Any) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _state_definition_name(state_key: str, definition: NodeSystemStateDefinition | None) -> str:

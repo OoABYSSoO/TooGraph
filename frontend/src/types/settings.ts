@@ -30,6 +30,8 @@ export type SettingsProviderModel = {
   route_target?: string | null;
   reasoning?: boolean;
   modalities?: string[];
+  capabilities?: Record<string, boolean>;
+  permissions?: string[];
   context_window?: number | null;
   max_tokens?: number | null;
 };
@@ -90,6 +92,8 @@ export type SettingsPayload = {
         route_target?: string | null;
         reasoning?: boolean | null;
         modalities?: string[];
+        capabilities?: Record<string, boolean>;
+        permissions?: string[];
         context_window?: number | null;
         max_tokens?: number | null;
       }>;

@@ -1,0 +1,564 @@
+{
+  "template_id": "buddy_memory_recall_eval",
+  "label": "记忆召回评测",
+  "description": "用确定性 Memory Search Context Loader 从结构化 DB 记忆中召回上下文，输出可审计 context_package 和质量报告，供 eval 检查 source refs、命中结果和上下文预算。",
+  "default_graph_name": "记忆召回评测",
+  "state_schema": {
+    "query": {
+      "name": "Query",
+      "description": "用于召回结构化 Buddy 记忆的查询。",
+      "type": "text",
+      "value": "",
+      "color": "#2563eb",
+      "binding": null
+    },
+    "embedding_model_ref": {
+      "name": "Embedding Model Ref",
+      "description": "可选 embedding model id/provider:model，用于 hybrid memory recall。",
+      "type": "text",
+      "value": "",
+      "color": "#0f766e",
+      "binding": null
+    },
+    "reranker_model_ref": {
+      "name": "Reranker Model Ref",
+      "description": "可选 reranker provider:model，用于重排 hybrid memory recall 候选。",
+      "type": "text",
+      "value": "",
+      "color": "#be185d",
+      "binding": null
+    },
+    "status_filter": {
+      "name": "Status Filter",
+      "description": "记忆状态过滤，默认 active。",
+      "type": "text",
+      "value": "active",
+      "color": "#475569",
+      "binding": null
+    },
+    "scope_kind": {
+      "name": "Scope Kind",
+      "description": "可选记忆 scope_kind 过滤。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": null
+    },
+    "scope_id": {
+      "name": "Scope ID",
+      "description": "可选记忆 scope_id 过滤。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": null
+    },
+    "layer": {
+      "name": "Layer",
+      "description": "可选记忆 layer 过滤。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": null
+    },
+    "memory_type": {
+      "name": "Memory Type",
+      "description": "可选记忆类型过滤。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": null
+    },
+    "limit": {
+      "name": "Limit",
+      "description": "最多召回的记忆数量。",
+      "type": "number",
+      "value": 5,
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "max_chars": {
+      "name": "Max Chars",
+      "description": "召回上下文最大字符预算。",
+      "type": "number",
+      "value": 8000,
+      "color": "#b45309",
+      "binding": null
+    },
+    "memory_search_status": {
+      "name": "Memory Search Status",
+      "description": "memory_search_context_loader 执行状态。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "memory_search_context_loader",
+        "nodeId": "load_memory_search_context",
+        "fieldKey": "status",
+        "managed": true
+      }
+    },
+    "memory_search_context": {
+      "name": "Memory Search Context",
+      "description": "结构化记忆召回得到的 context_package。",
+      "type": "json",
+      "value": {},
+      "color": "#0891b2",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "memory_search_context_loader",
+        "nodeId": "load_memory_search_context",
+        "fieldKey": "memory_search_context",
+        "managed": true
+      }
+    },
+    "memory_search_report": {
+      "name": "Memory Search Report",
+      "description": "记忆召回质量报告，包含 memory ids、source refs、retrieval mode、ranking reports 和预算。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "memory_search_context_loader",
+        "nodeId": "load_memory_search_context",
+        "fieldKey": "memory_search_report",
+        "managed": true
+      }
+    }
+  },
+  "nodes": {
+    "input_query": {
+      "kind": "input",
+      "name": "输入查询",
+      "description": "提供记忆召回查询。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 120
+        },
+        "collapsed": false,
+        "size": {
+          "width": 360,
+          "height": 180
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "query",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
+    },
+    "input_embedding_model_ref": {
+      "kind": "input",
+      "name": "Embedding Model",
+      "description": "可选：限定 hybrid recall 使用的 embedding 模型。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 340
+        },
+        "collapsed": false,
+        "size": {
+          "width": 360,
+          "height": 180
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "embedding_model_ref",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
+    },
+    "input_reranker_model_ref": {
+      "kind": "input",
+      "name": "Reranker Model",
+      "description": "可选：限定 memory recall 使用的 reranker 模型。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 560
+        },
+        "collapsed": false,
+        "size": {
+          "width": 360,
+          "height": 180
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "reranker_model_ref",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
+    },
+    "input_limit": {
+      "kind": "input",
+      "name": "召回数量",
+      "description": "提供最多召回的记忆数量。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 820
+        },
+        "collapsed": false,
+        "size": {
+          "width": 360,
+          "height": 220
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "limit",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": 5,
+        "boundaryType": "text"
+      }
+    },
+    "input_max_chars": {
+      "kind": "input",
+      "name": "字符预算",
+      "description": "提供召回上下文最大字符预算。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 1100
+        },
+        "collapsed": false,
+        "size": {
+          "width": 360,
+          "height": 180
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "max_chars",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": 8000,
+        "boundaryType": "text"
+      }
+    },
+    "input_status_filter": {
+      "kind": "input",
+      "name": "状态过滤",
+      "description": "提供记忆状态过滤。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 1360
+        },
+        "collapsed": false,
+        "size": {
+          "width": 360,
+          "height": 180
+        }
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "status_filter",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "active",
+        "boundaryType": "text"
+      }
+    },
+    "load_memory_search_context": {
+      "kind": "tool",
+      "name": "加载记忆召回上下文",
+      "description": "调用 memory_search_context_loader，从 DB memory_entries 生成 context_package 和质量报告。",
+      "ui": {
+        "position": {
+          "x": 620,
+          "y": 300
+        },
+        "collapsed": false,
+        "size": {
+          "width": 480,
+          "height": 360
+        }
+      },
+      "reads": [
+        {
+          "state": "query",
+          "required": true,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "memory_search_context_loader",
+            "fieldKey": "query",
+            "managed": true
+          }
+        },
+        {
+          "state": "embedding_model_ref",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "memory_search_context_loader",
+            "fieldKey": "embedding_model_ref",
+            "managed": true
+          }
+        },
+        {
+          "state": "reranker_model_ref",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "memory_search_context_loader",
+            "fieldKey": "reranker_model_ref",
+            "managed": true
+          }
+        },
+        {
+          "state": "limit",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "memory_search_context_loader",
+            "fieldKey": "limit",
+            "managed": true
+          }
+        },
+        {
+          "state": "max_chars",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "memory_search_context_loader",
+            "fieldKey": "max_chars",
+            "managed": true
+          }
+        },
+        {
+          "state": "status_filter",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "memory_search_context_loader",
+            "fieldKey": "status",
+            "managed": true
+          }
+        },
+        {
+          "state": "scope_kind",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "memory_search_context_loader",
+            "fieldKey": "scope_kind",
+            "managed": true
+          }
+        },
+        {
+          "state": "scope_id",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "memory_search_context_loader",
+            "fieldKey": "scope_id",
+            "managed": true
+          }
+        },
+        {
+          "state": "layer",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "memory_search_context_loader",
+            "fieldKey": "layer",
+            "managed": true
+          }
+        },
+        {
+          "state": "memory_type",
+          "required": false,
+          "binding": {
+            "kind": "tool_input",
+            "actionKey": "",
+            "toolKey": "memory_search_context_loader",
+            "fieldKey": "memory_type",
+            "managed": true
+          }
+        }
+      ],
+      "writes": [
+        {
+          "state": "memory_search_status",
+          "mode": "replace"
+        },
+        {
+          "state": "memory_search_context",
+          "mode": "replace"
+        },
+        {
+          "state": "memory_search_report",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "toolKey": "memory_search_context_loader"
+      }
+    },
+    "output_memory_search_context": {
+      "kind": "output",
+      "name": "记忆召回上下文",
+      "description": "展示召回得到的 context_package。",
+      "ui": {
+        "position": {
+          "x": 1260,
+          "y": 140
+        },
+        "collapsed": false,
+        "size": {
+          "width": 460,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "memory_search_context",
+          "required": true,
+          "binding": null
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_memory_search_report": {
+      "kind": "output",
+      "name": "记忆召回报告",
+      "description": "展示 memory ids、source refs、retrieval ranking 和预算。",
+      "ui": {
+        "position": {
+          "x": 1260,
+          "y": 520
+        },
+        "collapsed": false,
+        "size": {
+          "width": 460,
+          "height": 300
+        }
+      },
+      "reads": [
+        {
+          "state": "memory_search_report",
+          "required": true,
+          "binding": null
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    }
+  },
+  "edges": [
+    {
+      "source": "input_query",
+      "target": "load_memory_search_context"
+    },
+    {
+      "source": "input_embedding_model_ref",
+      "target": "load_memory_search_context"
+    },
+    {
+      "source": "input_reranker_model_ref",
+      "target": "load_memory_search_context"
+    },
+    {
+      "source": "input_limit",
+      "target": "load_memory_search_context"
+    },
+    {
+      "source": "input_max_chars",
+      "target": "load_memory_search_context"
+    },
+    {
+      "source": "input_status_filter",
+      "target": "load_memory_search_context"
+    },
+    {
+      "source": "load_memory_search_context",
+      "target": "output_memory_search_context"
+    },
+    {
+      "source": "load_memory_search_context",
+      "target": "output_memory_search_report"
+    }
+  ],
+  "conditional_edges": [],
+  "metadata": {
+    "category": "buddy_memory",
+    "role": "buddy_memory_recall_eval",
+    "visible": false,
+    "capabilityDiscoverableDefault": false,
+    "tags": [
+      "buddy",
+      "memory",
+      "recall",
+      "eval"
+    ],
+    "required_tools": [
+      "memory_search_context_loader"
+    ],
+    "output_contract": [
+      {
+        "state": "memory_search_context",
+        "role": "context_package"
+      },
+      {
+        "state": "memory_search_report",
+        "role": "quality_report"
+      }
+    ]
+  },
+  "source": "official",
+  "status": "active"
+}

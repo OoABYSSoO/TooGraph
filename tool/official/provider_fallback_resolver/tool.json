@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "toograph.tool/v1",
+  "toolKey": "provider_fallback_resolver",
+  "name": "Provider Fallback Resolver",
+  "description": "Resolves provider/model fallback after a provider failure and returns an auditable provider_fallback_trace with requested, selected, failed, fallback, rejected, capability, and permission-scope details.",
+  "version": "0.1.0",
+  "timeoutSeconds": 30,
+  "permissions": [],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 30
+  },
+  "inputSchema": [
+    {
+      "key": "requested_model_ref",
+      "name": "Requested Model Ref",
+      "valueType": "text",
+      "description": "Requested provider/model ref, such as openai/gpt-primary."
+    },
+    {
+      "key": "failure_event",
+      "name": "Failure Event",
+      "valueType": "json",
+      "description": "Provider failure event with model_ref, provider_id, error_type, and message."
+    },
+    {
+      "key": "provider_candidates",
+      "name": "Provider Candidates",
+      "valueType": "json",
+      "description": "Ordered provider/model candidates with capabilities, permissions, enabled, and configured flags."
+    },
+    {
+      "key": "required_capabilities",
+      "name": "Required Capabilities",
+      "valueType": "json",
+      "description": "Required model capabilities, for example chat or structured_output."
+    },
+    {
+      "key": "required_permissions",
+      "name": "Required Permissions",
+      "valueType": "json",
+      "description": "Required permission scope. Fallbacks with additional permissions are rejected by default."
+    },
+    {
+      "key": "preserve_permission_scope",
+      "name": "Preserve Permission Scope",
+      "valueType": "boolean",
+      "description": "Whether fallback must avoid expanding provider permission scope."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "status",
+      "name": "Status",
+      "valueType": "text",
+      "description": "Resolver status."
+    },
+    {
+      "key": "selected_model_ref",
+      "name": "Selected Model Ref",
+      "valueType": "text",
+      "description": "Selected fallback model ref."
+    },
+    {
+      "key": "provider_fallback_trace",
+      "name": "Provider Fallback Trace",
+      "valueType": "json",
+      "description": "Auditable provider fallback trace."
+    }
+  ]
+}

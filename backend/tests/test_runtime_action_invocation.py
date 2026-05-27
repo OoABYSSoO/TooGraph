@@ -145,6 +145,54 @@ class RuntimeActionInvocationTests(unittest.TestCase):
         self.assertEqual(result["artifact_dir"], str(artifact_dir))
         self.assertEqual(result["artifact_relative_dir"], "run_1/writer/web_search/invocation_001")
 
+    def test_script_action_runner_does_not_inherit_provider_secret_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            action_dir = Path(temp_dir) / "env_echo"
+            action_dir.mkdir()
+            entrypoint = action_dir / "run.py"
+            entrypoint.write_text(
+                "\n".join(
+                    [
+                        "import json",
+                        "import os",
+                        "print(json.dumps({",
+                        "  'status': 'succeeded',",
+                        "  'action_key': os.environ.get('TOOGRAPH_ACTION_KEY'),",
+                        "  'path_present': bool(os.environ.get('PATH')),",
+                        "  'openai_key_present': 'OPENAI_API_KEY' in os.environ,",
+                        "  'anthropic_key_present': 'ANTHROPIC_API_KEY' in os.environ,",
+                        "  'custom_token_present': 'CUSTOM_PROVIDER_TOKEN' in os.environ,",
+                        "}))",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            runner = ScriptActionRunner(
+                action_key="env_echo",
+                action_dir=action_dir,
+                runtime_type="python",
+                entrypoint="run.py",
+            )
+
+            with patch.dict(
+                "os.environ",
+                {
+                    "OPENAI_API_KEY": "sk-test-secret",
+                    "ANTHROPIC_API_KEY": "anthropic-secret",
+                    "CUSTOM_PROVIDER_TOKEN": "provider-token",
+                },
+                clear=False,
+            ):
+                result = invoke_action(runner, {})
+
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(result["action_key"], "env_echo")
+        self.assertTrue(result["path_present"])
+        self.assertFalse(result["openai_key_present"])
+        self.assertFalse(result["anthropic_key_present"])
+        self.assertFalse(result["custom_token_present"])
+
     def test_script_action_runner_spools_large_runtime_context_to_file_environment(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             action_dir = Path(temp_dir) / "runtime_context_echo"

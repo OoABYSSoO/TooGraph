@@ -6,6 +6,16 @@ from pathlib import Path
 import sys
 from typing import Any
 
+REPO_ROOT = Path(os.environ.get("TOOGRAPH_REPO_ROOT") or Path(__file__).resolve().parents[3]).resolve()
+BACKEND_PATH = REPO_ROOT / "backend"
+if str(BACKEND_PATH) not in sys.path:
+    sys.path.insert(0, str(BACKEND_PATH))
+
+from app.core.capability_permissions import (
+    build_capability_permission_profile,
+    permission_tier_for_permissions,
+)
+
 
 BREAKPOINT_METADATA_KEYS = {
     "interrupt_after",
@@ -29,24 +39,6 @@ GRANULARITY_PRIORITY = {
 }
 FINAL_RESULT_OUTPUTS = {"final_response", "public_response", "answer", "response"}
 RECENT_FAILURE_FALLBACK_THRESHOLD = 2
-RISKY_PERMISSIONS = {
-    "file_write",
-    "file_delete",
-    "file_remove",
-    "delete",
-    "subprocess",
-    "command",
-    "shell",
-    "buddy_home_write",
-    "buddy_memory_write",
-    "graph_write",
-}
-EXTERNAL_PERMISSIONS = {
-    "network",
-    "browser_automation",
-    "secret_read",
-    "model_vision",
-}
 PERMISSION_TIER_PRIORITY = {
     "risky": 0,
     "external": 1,
@@ -399,6 +391,7 @@ def _capability_metadata(payload: dict[str, Any]) -> dict[str, Any]:
     if permissions:
         result["permissions"] = permissions
         result["permissionTier"] = _permission_tier(permissions)
+        result["permissionProfile"] = build_capability_permission_profile(permissions)
     return result
 
 
@@ -426,14 +419,7 @@ def _capability_eval_status(repo_root: Path, source_path: Path, payload: dict[st
 
 
 def _permission_tier(permissions: list[str]) -> str:
-    permission_set = {permission.strip() for permission in permissions if permission.strip()}
-    if not permission_set:
-        return "none"
-    if permission_set.intersection(RISKY_PERMISSIONS):
-        return "risky"
-    if permission_set.intersection(EXTERNAL_PERMISSIONS):
-        return "external"
-    return "guarded"
+    return permission_tier_for_permissions(permissions)
 
 
 def resolve_permission_policy(value: Any) -> dict[str, Any]:

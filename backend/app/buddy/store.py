@@ -190,7 +190,7 @@ def load_session_summary() -> dict[str, Any]:
 def save_session_summary(payload: dict[str, Any], *, changed_by: str, change_reason: str) -> dict[str, Any]:
     previous = load_session_summary()
     next_value = {**previous, "content": str(payload.get("content") or "").strip(), "updated_at": utc_now_iso()}
-    _write_with_revision("session_summary", "session_summary", "update", previous, next_value, changed_by, change_reason)
+    revision = _write_with_revision("session_summary", "session_summary", "update", previous, next_value, changed_by, change_reason)
     with _connection() as connection:
         connection.execute(
             """
@@ -201,7 +201,84 @@ def save_session_summary(payload: dict[str, Any], *, changed_by: str, change_rea
             ("session_summary", _json_dumps(next_value), next_value["updated_at"]),
         )
         connection.commit()
+    _save_chat_session_summary_if_requested(payload, next_value, revision_id=str(revision.get("revision_id") or ""))
     return load_session_summary()
+
+
+def _save_chat_session_summary_if_requested(
+    payload: dict[str, Any],
+    summary: dict[str, Any],
+    *,
+    revision_id: str,
+) -> None:
+    session_id = str(payload.get("session_id") or "").strip()
+    if not session_id:
+        return
+    get_chat_session(session_id)
+    content = str(summary.get("content") or "").strip()
+    if not content:
+        return
+    now = str(summary.get("updated_at") or utc_now_iso())
+    lineage_root_session_id = _resolve_session_lineage_root(session_id) or session_id
+    summary_id = str(payload.get("summary_id") or "").strip() or f"summary_{uuid4().hex[:12]}"
+    source_refs = _normalize_summary_source_refs(payload.get("source_refs"))
+    source_run_id = str(payload.get("source_run_id") or "").strip()
+    with _connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO buddy_session_summaries (
+                summary_id,
+                session_id,
+                lineage_root_session_id,
+                content,
+                source_refs_json,
+                source_run_id,
+                source_revision_id,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(summary_id) DO UPDATE SET
+                session_id = excluded.session_id,
+                lineage_root_session_id = excluded.lineage_root_session_id,
+                content = excluded.content,
+                source_refs_json = excluded.source_refs_json,
+                source_run_id = excluded.source_run_id,
+                source_revision_id = excluded.source_revision_id,
+                updated_at = excluded.updated_at
+            """,
+            (
+                summary_id,
+                session_id,
+                lineage_root_session_id,
+                content,
+                _json_dumps(source_refs),
+                source_run_id,
+                revision_id,
+                now,
+                now,
+            ),
+        )
+        connection.commit()
+
+
+def _normalize_summary_source_refs(value: Any) -> list[dict[str, Any]]:
+    refs = value if isinstance(value, list) else []
+    normalized: list[dict[str, Any]] = []
+    for ref in refs:
+        if not isinstance(ref, dict):
+            continue
+        source_kind = str(ref.get("source_kind") or "").strip()
+        source_id = str(ref.get("source_id") or "").strip()
+        if not source_kind or not source_id:
+            continue
+        normalized.append(
+            {
+                **{str(key): deepcopy(item) for key, item in ref.items()},
+                "source_kind": source_kind,
+                "source_id": source_id,
+            }
+        )
+    return normalized
 
 
 def list_home_files() -> dict[str, Any]:
@@ -851,11 +928,12 @@ def create_chat_session(
 ) -> dict[str, Any]:
     del changed_by, change_reason
     now = utc_now_iso()
+    requested_session_id = _normalize_optional_text((payload or {}).get("session_id"))
     title = _normalize_chat_session_title((payload or {}).get("title"))
     parent_session_id = _normalize_optional_text((payload or {}).get("parent_session_id"))
     source = _normalize_session_source((payload or {}).get("source"))
     session = {
-        "session_id": f"session_{uuid4().hex[:12]}",
+        "session_id": requested_session_id or f"session_{uuid4().hex[:12]}",
         "title": title or DEFAULT_CHAT_SESSION_TITLE,
         "archived": False,
         "deleted": False,
@@ -1004,6 +1082,8 @@ def recall_chat_messages(
     sort: str | None = None,
     role_filter: Any = None,
     current_session_id: str | None = None,
+    embedding_model_ref: str = "",
+    reranker_model_ref: str = "",
 ) -> dict[str, Any]:
     normalized_mode = str(mode or "browse").strip().lower()
     normalized_limit = _bounded_int(limit, default=10, minimum=1, maximum=MAX_RECALL_LIMIT)
@@ -1021,6 +1101,8 @@ def recall_chat_messages(
             sort=normalized_sort,
             role_filter=normalized_roles,
             current_session_id=str(current_session_id or "").strip(),
+            embedding_model_ref=str(embedding_model_ref or "").strip(),
+            reranker_model_ref=str(reranker_model_ref or "").strip(),
         )
     if normalized_mode == "scroll":
         return _recall_chat_messages_scroll(
@@ -1037,10 +1119,12 @@ def search_chat_sessions(
     *,
     query: str = "",
     current_session_id: str | None = None,
+    embedding_model_ref: str = "",
     limit: int = 10,
     window: int = DEFAULT_RECALL_WINDOW,
     role_filter: Any = None,
     sort: str | None = None,
+    reranker_model_ref: str = "",
 ) -> dict[str, Any]:
     recall = recall_chat_messages(
         mode="discover" if str(query or "").strip() else "browse",
@@ -1050,6 +1134,8 @@ def search_chat_sessions(
         role_filter=role_filter,
         sort=sort,
         current_session_id=current_session_id,
+        embedding_model_ref=embedding_model_ref,
+        reranker_model_ref=reranker_model_ref,
     )
     sessions = list(recall.get("sessions") or [])
     message_ids: list[str] = []
@@ -1065,10 +1151,48 @@ def search_chat_sessions(
     return {
         "kind": "buddy_session_search",
         "query": str(recall.get("query") or query or ""),
+        "embedding_model_ref": str(embedding_model_ref or "").strip(),
+        "reranker_model_ref": str(reranker_model_ref or "").strip(),
         "hit_count": int(recall.get("hit_count") or 0),
         "session_count": int(recall.get("session_count") or len(sessions)),
         "message_ids": message_ids,
         "sessions": sessions,
+        "report": _session_search_report(
+            recall,
+            embedding_model_ref=embedding_model_ref,
+            reranker_model_ref=reranker_model_ref,
+        ),
+    }
+
+
+def _session_search_report(
+    recall: dict[str, Any],
+    *,
+    embedding_model_ref: str = "",
+    reranker_model_ref: str = "",
+) -> dict[str, Any]:
+    from app.core.storage.retrieval_store import load_retrieval_ranking_reports
+
+    mode = str(recall.get("retrieval_mode") or "").strip()
+    normalized_embedding_model_ref = str(embedding_model_ref or recall.get("embedding_model_ref") or "").strip()
+    normalized_reranker_model_ref = str(reranker_model_ref or recall.get("reranker_model_ref") or "").strip()
+    retrieval_modes: dict[str, int] = {}
+    query_ids: list[str] = []
+    for session in list(recall.get("sessions") or []):
+        retrieval = _coerce_dict((session or {}).get("retrieval"))
+        retrieval_mode = str(retrieval.get("mode") or "").strip()
+        if retrieval_mode:
+            retrieval_modes[retrieval_mode] = retrieval_modes.get(retrieval_mode, 0) + 1
+        query_id = str(retrieval.get("query_id") or "").strip()
+        if query_id and query_id not in query_ids:
+            query_ids.append(query_id)
+    return {
+        "mode": mode or ("hybrid" if normalized_embedding_model_ref else "keyword" if str(recall.get("query") or "").strip() else "browse"),
+        "embedding_model_ref": normalized_embedding_model_ref,
+        "reranker_model_ref": normalized_reranker_model_ref,
+        "retrieval_modes": retrieval_modes,
+        "query_ids": query_ids,
+        "ranking_reports": load_retrieval_ranking_reports(query_ids),
     }
 
 
@@ -1232,6 +1356,7 @@ def search_memories(
     *,
     query: str = "",
     embedding_model_ref: str = "",
+    reranker_model_ref: str = "",
     scope_kind: str = "",
     scope_id: str = "",
     layer: str = "",
@@ -1241,9 +1366,11 @@ def search_memories(
 ) -> dict[str, Any]:
     from app.core.storage.embedding_store import list_embedding_models
     from app.core.storage.memory_store import recall_memories
+    from app.core.storage.retrieval_store import load_retrieval_ranking_reports
 
     normalized_query = str(query or "").strip()
     normalized_embedding_model_ref = str(embedding_model_ref or "").strip()
+    normalized_reranker_model_ref = str(reranker_model_ref or "").strip()
     normalized_limit = _bounded_int(limit, default=10, minimum=1, maximum=MAX_MEMORY_SEARCH_LIMIT)
     filters = {
         key: value
@@ -1254,6 +1381,7 @@ def search_memories(
             "memory_type": str(memory_type or "").strip(),
             "status": str(status or "active").strip(),
             "embedding_model_ref": normalized_embedding_model_ref,
+            "reranker_model_ref": normalized_reranker_model_ref,
         }.items()
         if value
     }
@@ -1272,16 +1400,19 @@ def search_memories(
         "kind": "memory_search",
         "query": normalized_query,
         "embedding_model_ref": normalized_embedding_model_ref,
+        "reranker_model_ref": normalized_reranker_model_ref,
         "match_count": len(memories),
         "memory_count": len(memories),
         "embedding_models": embedding_models,
         "memories": memories,
         "report": {
             "mode": "hybrid" if normalized_embedding_model_ref else ("keyword" if normalized_query else "browse"),
-            "filters": {key: value for key, value in filters.items() if key != "embedding_model_ref"},
+            "filters": {key: value for key, value in filters.items() if key not in {"embedding_model_ref", "reranker_model_ref"}},
             "embedding_model_ref": normalized_embedding_model_ref,
+            "reranker_model_ref": normalized_reranker_model_ref,
             "retrieval_modes": retrieval_modes,
             "query_ids": query_ids,
+            "ranking_reports": load_retrieval_ranking_reports(query_ids),
         },
     }
 
@@ -1375,7 +1506,9 @@ def append_chat_message(
             (next_title, now, session_id),
         )
         connection.commit()
-    return _get_chat_message(str(message["message_id"]))
+    saved_message = _get_chat_message(str(message["message_id"]))
+    _project_chat_message_to_retrieval(saved_message)
+    return saved_message
 
 
 def _sanitize_chat_message_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
@@ -1388,6 +1521,54 @@ def _sanitize_chat_message_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     return sanitized
 
 
+def _project_chat_message_to_retrieval(message: dict[str, Any]) -> None:
+    if not bool(message.get("include_in_context", True)):
+        return
+    content = str(message.get("content") or "")
+    if not content.strip():
+        return
+    from app.core.storage.retrieval_store import upsert_retrieval_chunks, upsert_retrieval_document
+
+    message_id = str(message.get("message_id") or "")
+    metadata = {
+        "session_id": str(message.get("session_id") or ""),
+        "role": str(message.get("role") or ""),
+        "run_id": str(message.get("run_id") or ""),
+        **_coerce_dict(message.get("metadata")),
+    }
+    document = upsert_retrieval_document(
+        document_id=f"buddy_message_doc_{message_id}",
+        source_kind="buddy_message",
+        source_id=message_id,
+        title=f"{metadata['role']} message",
+        content=content,
+        scope={"session_id": metadata["session_id"], "role": metadata["role"]},
+        metadata=metadata,
+    )
+    upsert_retrieval_chunks(
+        document["document_id"],
+        [
+            {
+                "chunk_id": f"buddy_message_chunk_{message_id}",
+                "content": content,
+                "source_locator": {"field": "content"},
+                "metadata": metadata,
+            }
+        ],
+    )
+    _queue_chat_message_embedding_jobs(message_id)
+
+
+def _queue_chat_message_embedding_jobs(message_id: str) -> None:
+    try:
+        from app.core.storage.embedding_store import list_embedding_models, queue_embedding_job
+
+        for model in list_embedding_models(enabled_only=True):
+            queue_embedding_job("buddy_message", message_id, str(model["embedding_model_id"]))
+    except Exception:
+        return
+
+
 def _recall_chat_messages_browse(*, limit: int) -> dict[str, Any]:
     sessions = _list_browsable_recall_sessions(limit=limit)
     return {
@@ -1396,7 +1577,21 @@ def _recall_chat_messages_browse(*, limit: int) -> dict[str, Any]:
         "query": "",
         "hit_count": 0,
         "session_count": len(sessions),
-        "sessions": [{**session, "messages": [], "hit_message_ids": []} for session in sessions],
+        "sessions": [_browse_session_entry(session) for session in sessions],
+    }
+
+
+def _browse_session_entry(session: dict[str, Any]) -> dict[str, Any]:
+    session_id = str(session.get("session_id") or "").strip()
+    lineage_root = str(session.get("lineage_root_session_id") or _resolve_session_lineage_root(session_id) or session_id)
+    summary_refs = _session_summary_source_refs(session_id, lineage_root)
+    return {
+        **session,
+        "lineage_root_session_id": lineage_root,
+        "messages": [],
+        "hit_message_ids": [],
+        "summary_refs": summary_refs,
+        "source_refs": _session_search_source_refs([], hit_message_ids=[], summary_refs=summary_refs),
     }
 
 
@@ -1498,15 +1693,26 @@ def _recall_chat_messages_discover(
     sort: str,
     role_filter: tuple[str, ...],
     current_session_id: str = "",
+    embedding_model_ref: str = "",
+    reranker_model_ref: str = "",
 ) -> dict[str, Any]:
     if not query:
         return _recall_chat_messages_browse(limit=limit)
-    raw_hits = _search_chat_message_hits(
-        query,
-        limit=max(50, limit * 10),
-        sort=sort,
-        role_filter=role_filter,
-    )
+    if embedding_model_ref:
+        raw_hits = _search_chat_message_hits_hybrid(
+            query,
+            embedding_model_ref=embedding_model_ref,
+            reranker_model_ref=reranker_model_ref,
+            limit=max(50, limit * 10),
+            role_filter=role_filter,
+        )
+    else:
+        raw_hits = _search_chat_message_hits(
+            query,
+            limit=max(50, limit * 10),
+            sort=sort,
+            role_filter=role_filter,
+        )
     session_entries: list[dict[str, Any]] = []
     seen_lineage_roots: set[str] = set()
     current_root = _resolve_session_lineage_root(current_session_id) if current_session_id else ""
@@ -1528,12 +1734,25 @@ def _recall_chat_messages_discover(
         )
         if not view["messages"]:
             continue
+        hit_message_ids = [
+            str(candidate.get("message_id") or "")
+            for candidate in raw_hits
+            if _resolve_session_lineage_root(str(candidate.get("session_id") or "")) == dedupe_key
+        ]
+        summary_refs = _session_summary_source_refs(hit_session_id, lineage_root or hit_session_id)
         entry = {
             **session,
             "lineage_root_session_id": lineage_root or hit_session_id,
             "matched_role": str(hit.get("role") or ""),
             "match_message_id": str(hit.get("message_id") or ""),
             "snippet": str(hit.get("snippet") or ""),
+            "retrieval": _coerce_dict(hit.get("retrieval")),
+            "summary_refs": summary_refs,
+            "source_refs": _session_search_source_refs(
+                view["messages"],
+                hit_message_ids=hit_message_ids,
+                summary_refs=summary_refs,
+            ),
             "bookend_start": view["bookend_start"],
             "messages": view["messages"],
             "bookend_end": view["bookend_end"],
@@ -1541,11 +1760,7 @@ def _recall_chat_messages_discover(
             "messages_after": view["messages_after"],
             "has_more_before": view["has_more_before"],
             "has_more_after": view["has_more_after"],
-            "hit_message_ids": [
-                str(candidate.get("message_id") or "")
-                for candidate in raw_hits
-                if _resolve_session_lineage_root(str(candidate.get("session_id") or "")) == dedupe_key
-            ],
+            "hit_message_ids": hit_message_ids,
         }
         session_entries.append(entry)
         seen_lineage_roots.add(dedupe_key)
@@ -1558,6 +1773,9 @@ def _recall_chat_messages_discover(
         "hit_count": len(raw_hits),
         "session_count": len(session_entries),
         "sessions": session_entries,
+        "retrieval_mode": "hybrid" if embedding_model_ref else "keyword",
+        "embedding_model_ref": str(embedding_model_ref or "").strip(),
+        "reranker_model_ref": str(reranker_model_ref or "").strip(),
     }
 
 
@@ -1593,6 +1811,8 @@ def _recall_chat_messages_scroll(
         role_filter=("user", "assistant"),
         direction=direction,
     )
+    lineage_root = _resolve_session_lineage_root(session_id) or session_id
+    summary_refs = _session_summary_source_refs(session_id, lineage_root)
     return {
         "kind": "buddy_session_recall",
         "mode": "scroll",
@@ -1602,9 +1822,15 @@ def _recall_chat_messages_scroll(
         "sessions": [
             {
                 **session,
-                "lineage_root_session_id": _resolve_session_lineage_root(session_id) or session_id,
+                "lineage_root_session_id": lineage_root,
                 "messages": view["messages"],
                 "hit_message_ids": [anchor_message_id] if anchor_message_id else [],
+                "summary_refs": summary_refs,
+                "source_refs": _session_search_source_refs(
+                    view["messages"],
+                    hit_message_ids=[anchor_message_id] if anchor_message_id else [],
+                    summary_refs=summary_refs,
+                ),
                 "messages_before": view["messages_before"],
                 "messages_after": view["messages_after"],
                 "has_more_before": view["has_more_before"],
@@ -1648,6 +1874,50 @@ def _search_chat_message_hits(
     if rows:
         return rows
     return _search_chat_message_hits_like(query, limit=limit, role_filter=role_filter)
+
+
+def _search_chat_message_hits_hybrid(
+    query: str,
+    *,
+    embedding_model_ref: str,
+    reranker_model_ref: str = "",
+    limit: int,
+    role_filter: tuple[str, ...],
+) -> list[dict[str, Any]]:
+    from app.core.storage.retrieval_store import hybrid_search
+
+    results = hybrid_search(
+        query,
+        filters={"source_kind": "buddy_message"},
+        embedding_model_ref=embedding_model_ref,
+        reranker_model_ref=reranker_model_ref,
+        limit=limit,
+    )
+    hits: list[dict[str, Any]] = []
+    for result in results:
+        message_id = str(_coerce_dict(result.get("source_ref")).get("source_id") or result.get("source_id") or "").strip()
+        if not message_id:
+            continue
+        try:
+            message = _get_chat_message(message_id)
+            session = get_chat_session(str(message.get("session_id") or ""))
+        except KeyError:
+            continue
+        if not _is_recall_context_message(message, role_filter) or not _is_recall_visible_session(session):
+            continue
+        hits.append(
+            {
+                "message_id": message_id,
+                "session_id": str(message.get("session_id") or ""),
+                "role": str(message.get("role") or ""),
+                "snippet": str(result.get("snippet") or "") or _make_text_snippet(str(message.get("content") or ""), tokens=_query_search_tokens(query)),
+                "created_at": str(message.get("created_at") or ""),
+                "parent_session_id": session.get("parent_session_id"),
+                "source": str(session.get("source") or "buddy"),
+                "retrieval": _coerce_dict(result.get("retrieval")),
+            }
+        )
+    return _dedupe_hit_rows(hits)
 
 
 def _search_chat_message_hits_fts(
@@ -1776,6 +2046,119 @@ def _safe_message_session_id(message_id: str) -> str:
         return str(_get_chat_message(message_id).get("session_id") or "")
     except KeyError:
         return ""
+
+
+def _session_search_source_refs(
+    messages: list[dict[str, Any]],
+    *,
+    hit_message_ids: list[str],
+    summary_refs: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    source_refs: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str, str, str]] = set()
+    message_ids: list[str] = []
+
+    def append_ref(ref: dict[str, Any]) -> None:
+        key = (
+            str(ref.get("source_kind") or ""),
+            str(ref.get("source_id") or ""),
+            str(ref.get("relation") or ""),
+            str(ref.get("message_id") or ""),
+            str(ref.get("source_revision_id") or ""),
+        )
+        if not key[0] or not key[1] or key in seen:
+            return
+        seen.add(key)
+        source_refs.append(ref)
+
+    del hit_message_ids
+    for message in messages:
+        message_id = str(message.get("message_id") or "").strip()
+        if not message_id:
+            continue
+        message_ids.append(message_id)
+        append_ref(
+            {
+                "source_kind": "buddy_message",
+                "source_id": message_id,
+                "role": str(message.get("role") or ""),
+            }
+        )
+    for ref in _chat_message_run_source_refs(message_ids):
+        append_ref(ref)
+    for ref in summary_refs or []:
+        append_ref(ref)
+    return source_refs
+
+
+def _session_summary_source_refs(session_id: str, lineage_root_session_id: str) -> list[dict[str, Any]]:
+    normalized_session_id = str(session_id or "").strip()
+    normalized_lineage_root = str(lineage_root_session_id or "").strip()
+    if not normalized_session_id and not normalized_lineage_root:
+        return []
+    with _connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT summary_id, session_id, lineage_root_session_id, content, source_refs_json,
+                   source_run_id, source_revision_id, created_at, updated_at
+            FROM buddy_session_summaries
+            WHERE session_id = ?
+               OR lineage_root_session_id = ?
+            ORDER BY updated_at DESC, rowid DESC
+            LIMIT 5
+            """,
+            (normalized_session_id, normalized_lineage_root),
+        ).fetchall()
+    refs: list[dict[str, Any]] = []
+    seen_summary_ids: set[str] = set()
+    for row in rows:
+        summary_id = str(row["summary_id"] or "")
+        if not summary_id or summary_id in seen_summary_ids:
+            continue
+        seen_summary_ids.add(summary_id)
+        refs.append(_session_summary_source_ref_from_row(row))
+    return refs
+
+
+def _session_summary_source_ref_from_row(row: Any) -> dict[str, Any]:
+    content = str(row["content"] or "")
+    return {
+        "source_kind": "buddy_session_summary",
+        "source_id": str(row["summary_id"] or ""),
+        "source_revision_id": str(row["source_revision_id"] or ""),
+        "session_id": str(row["session_id"] or ""),
+        "lineage_root_session_id": str(row["lineage_root_session_id"] or ""),
+        "source_run_id": str(row["source_run_id"] or ""),
+        "updated_at": str(row["updated_at"] or ""),
+        "snippet": _make_text_snippet(content, tokens=[]),
+        "source_refs": _json_loads_list(row["source_refs_json"]),
+    }
+
+
+def _chat_message_run_source_refs(message_ids: list[str]) -> list[dict[str, Any]]:
+    normalized_ids = [message_id for message_id in dict.fromkeys(str(item or "").strip() for item in message_ids) if message_id]
+    if not normalized_ids:
+        return []
+    placeholders = ",".join("?" for _ in normalized_ids)
+    with _connection() as connection:
+        rows = connection.execute(
+            f"""
+            SELECT message_id, run_id, relation
+            FROM buddy_message_run_refs
+            WHERE message_id IN ({placeholders})
+            ORDER BY created_at ASC, rowid ASC
+            """,
+            normalized_ids,
+        ).fetchall()
+    return [
+        {
+            "source_kind": "graph_run",
+            "source_id": str(row["run_id"] or ""),
+            "relation": str(row["relation"] or "primary"),
+            "message_id": str(row["message_id"] or ""),
+        }
+        for row in rows
+    ]
 
 
 def _get_anchored_message_view(

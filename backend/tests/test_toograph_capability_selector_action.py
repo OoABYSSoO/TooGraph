@@ -229,6 +229,41 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
             },
         )
 
+    def test_capability_catalog_exposes_standard_permission_profile(self) -> None:
+        selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "toograph_capability_selector_before_permission_profile_test")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            action_dir = root / "action" / "official" / "delivery_writer"
+            action_dir.mkdir(parents=True)
+            (root / "graph_template").mkdir()
+            (root / "tool").mkdir()
+            (action_dir / "action.json").write_text(
+                json.dumps(
+                    {
+                        "actionKey": "delivery_writer",
+                        "description": "Write memory and deliver an external report.",
+                        "permissions": ["memory_write", "external_delivery", "cost"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            catalog = selector.discover_capability_catalog(root)
+
+        item = next(item for item in catalog["actions"] if item["key"] == "delivery_writer")
+        self.assertEqual(item["permissionTier"], "risky")
+        self.assertEqual(
+            item["permissionProfile"],
+            {
+                "permissions": ["memory_write", "external_delivery", "cost"],
+                "operations": ["memory_write", "cost", "external_delivery"],
+                "permission_tier": "risky",
+                "risky_permissions": ["memory_write", "cost", "external_delivery"],
+                "requires_approval_by_default": True,
+            },
+        )
+
     def test_capability_catalog_filters_disallowed_permission_tiers(self) -> None:
         selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "toograph_capability_selector_before_permission_filter_test")
 

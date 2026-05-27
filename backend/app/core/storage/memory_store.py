@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from difflib import SequenceMatcher
 import hashlib
 import json
+import re
+import unicodedata
 from typing import Any
 from uuid import uuid4
 
@@ -17,6 +20,8 @@ SUPPORTED_MEMORY_SOURCE_KINDS = {
     "memory_entry",
 }
 MEMORY_STATUSES = {"active", "archived"}
+NEAR_DUPLICATE_MIN_CHARS = 18
+NEAR_DUPLICATE_SIMILARITY_THRESHOLD = 0.58
 
 
 def create_memory_entry(
@@ -36,6 +41,7 @@ def create_memory_entry(
     changed_by: str = "system",
     change_reason: str = "create_memory_entry",
 ) -> dict[str, Any]:
+    explicit_memory_id = bool(str(memory_id or "").strip())
     payload = _normalize_memory_payload(
         {
             "memory_id": str(memory_id or "").strip() or f"mem_{uuid4().hex[:12]}",
@@ -53,65 +59,296 @@ def create_memory_entry(
     )
     normalized_sources = _normalize_sources(sources or [])
     now = _utc_now_sql()
+    duplicate_memory_id = ""
+    duplicate_result: dict[str, Any] | None = None
     with get_connection() as connection:
-        connection.execute(
-            """
-            INSERT INTO memory_entries (
-                memory_id,
-                scope_kind,
-                scope_id,
-                layer,
-                memory_type,
-                status,
-                title,
-                content,
-                confidence,
-                salience,
-                metadata_json,
-                created_at,
-                updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                payload["memory_id"],
-                payload["scope_kind"],
-                payload["scope_id"],
-                payload["layer"],
-                payload["memory_type"],
-                payload["status"],
-                payload["title"],
-                payload["content"],
-                payload["confidence"],
-                payload["salience"],
-                _json_dumps(payload["metadata"]),
-                now,
-                now,
-            ),
-        )
-        _replace_memory_sources(connection, payload["memory_id"], normalized_sources, created_at=now)
-        revision = _insert_memory_revision(
-            connection,
-            memory_id=payload["memory_id"],
-            operation="create",
-            previous={},
-            next_value={**payload, "sources": normalized_sources},
-            changed_by=changed_by,
-            change_reason=change_reason,
-            created_at=now,
-        )
-        connection.execute(
-            "UPDATE memory_entries SET latest_revision_id = ? WHERE memory_id = ?",
-            (revision["revision_id"], payload["memory_id"]),
-        )
-        _insert_memory_event(
-            connection,
-            memory_id=payload["memory_id"],
-            event_type="created",
-            detail={"revision_id": revision["revision_id"]},
-            created_at=now,
-        )
+        if not explicit_memory_id:
+            duplicate_match = _find_duplicate_memory_entry(connection, payload)
+            if duplicate_match is not None:
+                duplicate = _coerce_dict(duplicate_match.get("memory"))
+                duplicate_memory_id = str(duplicate["memory_id"])
+                _record_duplicate_memory_write(
+                    connection,
+                    existing=duplicate,
+                    requested=payload,
+                    requested_sources=normalized_sources,
+                    dedupe_reason=str(duplicate_match.get("reason") or "duplicate_canonical_content"),
+                    similarity_score=float(duplicate_match.get("similarity_score") or 1.0),
+                    changed_by=changed_by,
+                    change_reason=change_reason,
+                    created_at=now,
+                )
+                duplicate_result = _duplicate_memory_result(
+                    existing=duplicate,
+                    requested=payload,
+                    requested_sources=normalized_sources,
+                    dedupe_reason=str(duplicate_match.get("reason") or "duplicate_canonical_content"),
+                    similarity_score=float(duplicate_match.get("similarity_score") or 1.0),
+                )
+        if not duplicate_memory_id:
+            connection.execute(
+                """
+                INSERT INTO memory_entries (
+                    memory_id,
+                    scope_kind,
+                    scope_id,
+                    layer,
+                    memory_type,
+                    status,
+                    title,
+                    content,
+                    confidence,
+                    salience,
+                    metadata_json,
+                    created_at,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload["memory_id"],
+                    payload["scope_kind"],
+                    payload["scope_id"],
+                    payload["layer"],
+                    payload["memory_type"],
+                    payload["status"],
+                    payload["title"],
+                    payload["content"],
+                    payload["confidence"],
+                    payload["salience"],
+                    _json_dumps(payload["metadata"]),
+                    now,
+                    now,
+                ),
+            )
+            _replace_memory_sources(connection, payload["memory_id"], normalized_sources, created_at=now)
+            revision = _insert_memory_revision(
+                connection,
+                memory_id=payload["memory_id"],
+                operation="create",
+                previous={},
+                next_value={**payload, "sources": normalized_sources},
+                changed_by=changed_by,
+                change_reason=change_reason,
+                created_at=now,
+            )
+            connection.execute(
+                "UPDATE memory_entries SET latest_revision_id = ? WHERE memory_id = ?",
+                (revision["revision_id"], payload["memory_id"]),
+            )
+            _insert_memory_event(
+                connection,
+                memory_id=payload["memory_id"],
+                event_type="created",
+                detail={"revision_id": revision["revision_id"]},
+                created_at=now,
+            )
+    if duplicate_memory_id:
+        _project_memory_to_retrieval(duplicate_memory_id)
+        return_value = load_memory_entry(duplicate_memory_id)
+        return_value["dedupe"] = duplicate_result or {}
+        return return_value
     _project_memory_to_retrieval(payload["memory_id"])
     return load_memory_entry(payload["memory_id"])
+
+
+def _find_duplicate_memory_entry(connection: Any, payload: dict[str, Any]) -> dict[str, Any] | None:
+    fingerprint = _memory_content_fingerprint(str(payload.get("content") or ""))
+    rows = connection.execute(
+        """
+        SELECT *
+        FROM memory_entries
+        WHERE scope_kind = ?
+          AND scope_id = ?
+          AND layer = ?
+          AND memory_type = ?
+          AND status = 'active'
+        ORDER BY updated_at DESC, memory_id ASC
+        """,
+        (
+            payload["scope_kind"],
+            payload["scope_id"],
+            payload["layer"],
+            payload["memory_type"],
+        ),
+    ).fetchall()
+    best_near_match: dict[str, Any] | None = None
+    best_near_score = 0.0
+    for row in rows:
+        memory = _memory_entry_from_row_with_context(connection, row)
+        if _memory_content_fingerprint(str(row["content"] or "")) == fingerprint:
+            return {
+                "memory": memory,
+                "reason": "duplicate_canonical_content",
+                "similarity_score": 1.0,
+            }
+        near_score = _memory_near_duplicate_score(str(payload.get("content") or ""), str(row["content"] or ""))
+        if near_score >= NEAR_DUPLICATE_SIMILARITY_THRESHOLD and near_score > best_near_score:
+            best_near_score = near_score
+            best_near_match = {
+                "memory": memory,
+                "reason": "near_duplicate_content",
+                "similarity_score": round(near_score, 4),
+            }
+    return best_near_match
+
+
+def _memory_entry_from_row_with_context(connection: Any, row: Any) -> dict[str, Any]:
+    sources = connection.execute(
+        """
+        SELECT *
+        FROM memory_entry_sources
+        WHERE memory_id = ?
+        ORDER BY ordinal ASC
+        """,
+        (str(row["memory_id"]),),
+    ).fetchall()
+    revisions = connection.execute(
+        """
+        SELECT *
+        FROM memory_revisions
+        WHERE memory_id = ?
+        ORDER BY revision_number ASC
+        """,
+        (str(row["memory_id"]),),
+    ).fetchall()
+    return _memory_from_row(row, sources=sources, revisions=revisions)
+
+
+def _record_duplicate_memory_write(
+    connection: Any,
+    *,
+    existing: dict[str, Any],
+    requested: dict[str, Any],
+    requested_sources: list[dict[str, Any]],
+    dedupe_reason: str,
+    similarity_score: float,
+    changed_by: str,
+    change_reason: str,
+    created_at: str,
+) -> None:
+    merged_sources = _merge_memory_sources(_normalize_sources(existing.get("sources") or []), requested_sources)
+    revision_id = ""
+    if merged_sources != _normalize_sources(existing.get("sources") or []):
+        _replace_memory_sources(connection, existing["memory_id"], merged_sources, created_at=created_at)
+        revision = _insert_memory_revision(
+            connection,
+            memory_id=existing["memory_id"],
+            operation="dedupe_merge_sources",
+            previous=existing,
+            next_value={**existing, "sources": merged_sources},
+            changed_by=changed_by,
+            change_reason=change_reason,
+            created_at=created_at,
+        )
+        revision_id = revision["revision_id"]
+        connection.execute(
+            "UPDATE memory_entries SET latest_revision_id = ?, updated_at = ? WHERE memory_id = ?",
+            (revision_id, created_at, existing["memory_id"]),
+        )
+    _insert_memory_event(
+        connection,
+        memory_id=existing["memory_id"],
+        event_type="duplicate_skipped",
+        detail={
+            "reason": dedupe_reason,
+            "requested_title": requested["title"],
+            "requested_memory_type": requested["memory_type"],
+            "requested_source_count": len(requested_sources),
+            "merged_source_count": len(merged_sources),
+            "content_fingerprint": _memory_content_fingerprint(requested["content"]),
+            "similarity_score": similarity_score,
+            **({"revision_id": revision_id} if revision_id else {}),
+        },
+        created_at=created_at,
+    )
+
+
+def _duplicate_memory_result(
+    *,
+    existing: dict[str, Any],
+    requested: dict[str, Any],
+    requested_sources: list[dict[str, Any]],
+    dedupe_reason: str,
+    similarity_score: float,
+) -> dict[str, Any]:
+    return {
+        "status": "skipped_duplicate",
+        "reason": dedupe_reason,
+        "duplicate_of": existing["memory_id"],
+        "requested_title": requested["title"],
+        "requested_source_count": len(requested_sources),
+        "content_fingerprint": _memory_content_fingerprint(requested["content"]),
+        "similarity_score": similarity_score,
+    }
+
+
+def _merge_memory_sources(
+    existing_sources: list[dict[str, Any]],
+    requested_sources: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for source in [*existing_sources, *requested_sources]:
+        identity = _memory_source_identity(source)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        merged.append(source)
+    return merged
+
+
+def _memory_source_identity(source: dict[str, Any]) -> str:
+    return _json_dumps(
+        {
+            "source_kind": str(source.get("source_kind") or ""),
+            "source_id": str(source.get("source_id") or ""),
+            "source_revision_id": str(source.get("source_revision_id") or ""),
+            "source_locator": _coerce_dict(source.get("source_locator")),
+        }
+    )
+
+
+def _memory_content_fingerprint(content: str) -> str:
+    return "sha256:" + hashlib.sha256(_canonical_memory_content(content).encode("utf-8")).hexdigest()
+
+
+def _memory_near_duplicate_score(left: str, right: str) -> float:
+    left_canonical = _canonical_memory_content(left)
+    right_canonical = _canonical_memory_content(right)
+    if min(len(left_canonical), len(right_canonical)) < NEAR_DUPLICATE_MIN_CHARS:
+        return 0.0
+    sequence_score = SequenceMatcher(None, left_canonical, right_canonical).ratio()
+    token_score = _memory_token_overlap_score(left_canonical, right_canonical)
+    return max(sequence_score, token_score)
+
+
+def _memory_token_overlap_score(left: str, right: str) -> float:
+    left_tokens = _memory_similarity_tokens(left)
+    right_tokens = _memory_similarity_tokens(right)
+    if not left_tokens or not right_tokens:
+        return 0.0
+    overlap = len(left_tokens & right_tokens)
+    return overlap / max(1, min(len(left_tokens), len(right_tokens)))
+
+
+def _memory_similarity_tokens(content: str) -> set[str]:
+    tokens: set[str] = set()
+    for word in re.findall(r"[a-z0-9][a-z0-9._-]{1,}", content):
+        tokens.add(word)
+    cjk_runs = re.findall(r"[\u3400-\u4dbf\u4e00-\u9fff]+", content)
+    for run in cjk_runs:
+        compact = re.sub(r"[的了和与及或要先再然后以及用户希望回复说明]", "", run)
+        source = compact if len(compact) >= 2 else run
+        for index in range(0, max(0, len(source) - 1)):
+            tokens.add(source[index : index + 2])
+    return tokens
+
+
+def _canonical_memory_content(content: str) -> str:
+    normalized = unicodedata.normalize("NFKC", str(content or "")).strip().lower()
+    normalized = re.sub(r"\s+", " ", normalized)
+    normalized = re.sub(r"\s*([，。,.;；:：!?！？])\s*", r"\1", normalized)
+    return normalized
 
 
 def update_memory_entry(
@@ -260,12 +497,14 @@ def recall_memories(
     resolved_filters = _coerce_dict(filters)
     retrieval_filters = {"source_kind": "memory_entry"}
     embedding_model_ref = str(resolved_filters.get("embedding_model_ref") or "").strip()
+    reranker_model_ref = str(resolved_filters.get("reranker_model_ref") or "").strip()
     if normalized_query:
-        if embedding_model_ref:
+        if embedding_model_ref or reranker_model_ref:
             retrieval_results = hybrid_search(
                 normalized_query,
                 filters=retrieval_filters,
                 embedding_model_ref=embedding_model_ref,
+                reranker_model_ref=reranker_model_ref,
                 limit=normalized_limit * 3,
             )
         else:

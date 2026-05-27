@@ -33,6 +33,11 @@ TEMPLATE_METADATA_KEYS = {
     "capabilityDiscoverableBlockedReason",
 }
 
+SCHEDULED_GRAPH_PERMISSION_POLICY = {
+    "allowed_permission_tiers": ["none", "guarded", "external", "risky"],
+    "approval_required_permission_tiers": ["risky"],
+}
+
 
 def start_scheduled_graph_job_run(
     job_id: str,
@@ -172,7 +177,7 @@ def build_scheduled_graph_document(
         applied_input_keys.append(state_key)
     graph_data["state_schema"] = state_schema
     graph_data["metadata"] = {
-        **dict(graph.metadata),
+        **_apply_scheduled_permission_metadata(dict(graph.metadata)),
         "scheduled_graph_job": {
             "job_id": job["job_id"],
             "job_run_id": job_run_id,
@@ -213,6 +218,39 @@ def _run_scheduled_graph_worker(graph: NodeSystemGraphDocument, run_state: dict[
 
 def _scheduled_runtime_graph_id(template_id: str, job_id: str) -> str:
     return f"scheduled_{_safe_identifier(template_id)}_{_safe_identifier(job_id)}_{uuid4().hex[:8]}"
+
+
+def _apply_scheduled_permission_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    next_metadata = dict(metadata)
+    next_metadata["graph_permission_mode"] = "ask_first"
+    next_metadata["capability_permission_policy"] = _merge_scheduled_permission_policy(
+        next_metadata.get("capability_permission_policy")
+    )
+    next_metadata["scheduled_graph_permission_policy_source"] = "scheduler_default"
+    return next_metadata
+
+
+def _merge_scheduled_permission_policy(existing: Any) -> dict[str, Any]:
+    policy = copy.deepcopy(existing) if isinstance(existing, dict) else {}
+    if not isinstance(policy.get("allowed_permission_tiers"), list):
+        policy["allowed_permission_tiers"] = list(SCHEDULED_GRAPH_PERMISSION_POLICY["allowed_permission_tiers"])
+    policy["approval_required_permission_tiers"] = _merge_unique_strings(
+        policy.get("approval_required_permission_tiers"),
+        SCHEDULED_GRAPH_PERMISSION_POLICY["approval_required_permission_tiers"],
+    )
+    return policy
+
+
+def _merge_unique_strings(first: Any, second: Any) -> list[str]:
+    result: list[str] = []
+    for source in (first, second):
+        if not isinstance(source, list):
+            continue
+        for item in source:
+            text = str(item or "").strip()
+            if text and text not in result:
+                result.append(text)
+    return result
 
 
 def _safe_identifier(value: str) -> str:

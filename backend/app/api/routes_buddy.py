@@ -287,6 +287,8 @@ def list_chat_sessions_endpoint(include_deleted: bool = Query(default=False)) ->
 def search_chat_sessions_endpoint(
     query: str = Query(default=""),
     current_session_id: str | None = Query(default=None),
+    embedding_model_ref: str = Query(default=""),
+    reranker_model_ref: str = Query(default=""),
     limit: int = Query(default=10, ge=1, le=50),
     window: int = Query(default=5, ge=0, le=20),
     sort: str | None = Query(default=None),
@@ -294,6 +296,8 @@ def search_chat_sessions_endpoint(
     return store.search_chat_sessions(
         query=query,
         current_session_id=current_session_id,
+        embedding_model_ref=embedding_model_ref,
+        reranker_model_ref=reranker_model_ref,
         limit=limit,
         window=window,
         sort=sort,
@@ -318,6 +322,7 @@ def search_run_context_endpoint(
 def search_memories_endpoint(
     query: str = Query(default=""),
     embedding_model_ref: str = Query(default=""),
+    reranker_model_ref: str = Query(default=""),
     scope_kind: str = Query(default=""),
     scope_id: str = Query(default=""),
     layer: str = Query(default=""),
@@ -329,6 +334,7 @@ def search_memories_endpoint(
         return store.search_memories(
             query=query,
             embedding_model_ref=embedding_model_ref,
+            reranker_model_ref=reranker_model_ref,
             scope_kind=scope_kind,
             scope_id=scope_id,
             layer=layer,

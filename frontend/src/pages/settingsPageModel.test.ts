@@ -99,6 +99,60 @@ test("buildProviderSavePayload includes enabled providers and omits blank api ke
   assert.equal(payload.openai.transport, "openai-compatible");
 });
 
+test("provider drafts preserve model capabilities and permissions", () => {
+  const drafts = buildProviderDraftsFromSettings({
+    model: {
+      text_model: "rerank-test",
+      text_model_ref: "local/rerank-test",
+      video_model: "rerank-test",
+      video_model_ref: "local/rerank-test",
+    },
+    model_catalog: {
+      provider_templates: [],
+      providers: [
+        {
+          provider_id: "local",
+          label: "Local",
+          description: "Local gateway",
+          transport: "openai-compatible",
+          configured: true,
+          enabled: true,
+          saved: true,
+          base_url: "http://127.0.0.1:8888/v1",
+          models: [
+            {
+              model_ref: "local/rerank-test",
+              model: "rerank-test",
+              label: "rerank-test",
+              capabilities: { chat: false, structured_output: false, rerank: true },
+              permissions: ["rerank"],
+            },
+          ],
+          example_model_refs: [],
+        },
+      ],
+    },
+    revision: { max_revision_round: 1 },
+    evaluator: { default_score_threshold: 7.8, routes: [] },
+    tools: [],
+  });
+
+  assert.deepEqual(drafts.local.model_profiles["rerank-test"].capabilities, {
+    chat: false,
+    structured_output: false,
+    rerank: true,
+  });
+  assert.deepEqual(drafts.local.model_profiles["rerank-test"].permissions, ["rerank"]);
+
+  const payload = buildProviderSavePayload(drafts);
+  assert.deepEqual(payload.local.models[0].capabilities, {
+    chat: false,
+    structured_output: false,
+    rerank: true,
+  });
+  assert.deepEqual(payload.local.models[0].permissions, ["rerank"]);
+});
+
 test("buildProviderDraftsFromSettings keeps saved Codex login providers visible before auth completes", () => {
   const drafts = buildProviderDraftsFromSettings({
     model: {

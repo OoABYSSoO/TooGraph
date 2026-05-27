@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "toograph.tool/v1",
+  "toolKey": "scheduler_run_context_loader",
+  "name": "Scheduler Run Context Loader",
+  "description": "A deterministic loader for scheduled graph job runs. It reads one scheduled graph job, job run, and graph run from the database and returns retry, pending retry, delivery, permission policy, source refs, and redacted target details for eval and diagnostics.",
+  "version": "0.1.0",
+  "timeoutSeconds": 30,
+  "permissions": [],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 30
+  },
+  "inputSchema": [
+    {
+      "key": "job_id",
+      "name": "Job ID",
+      "valueType": "text",
+      "description": "Scheduled graph job id to inspect."
+    },
+    {
+      "key": "job_run_id",
+      "name": "Job Run ID",
+      "valueType": "text",
+      "description": "Optional scheduled graph job run id. If omitted, the latest run for job_id is used."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "status",
+      "name": "Status",
+      "valueType": "text",
+      "description": "Loader status."
+    },
+    {
+      "key": "scheduler_run_report",
+      "name": "Scheduler Run Report",
+      "valueType": "json",
+      "description": "Scheduler job run report with retry decision, pending retry, delivery result, graph permission policy, source refs, and redacted delivery target."
+    }
+  ]
+}

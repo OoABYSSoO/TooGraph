@@ -18,6 +18,7 @@ test("EvidenceSearchPage uses Buddy evidence search APIs as the page data source
 
 test("EvidenceSearchPage exposes separate controls for session and run context evidence", () => {
   assert.match(componentSource, /data-virtual-affordance-id="evidenceSearch\.session\.query"/);
+  assert.match(componentSource, /data-virtual-affordance-id="evidenceSearch\.session\.embeddingModel"/);
   assert.match(componentSource, /data-virtual-affordance-id="evidenceSearch\.session\.search"/);
   assert.match(componentSource, /data-virtual-affordance-id="evidenceSearch\.runContext\.runId"/);
   assert.match(componentSource, /data-virtual-affordance-id="evidenceSearch\.runContext\.query"/);
@@ -25,6 +26,11 @@ test("EvidenceSearchPage exposes separate controls for session and run context e
   assert.match(componentSource, /data-virtual-affordance-id="evidenceSearch\.memory\.query"/);
   assert.match(componentSource, /data-virtual-affordance-id="evidenceSearch\.memory\.embeddingModel"/);
   assert.match(componentSource, /data-virtual-affordance-id="evidenceSearch\.memory\.search"/);
+  assert.match(componentSource, /formatSessionRetrieval\(session\)/);
+  assert.match(componentSource, /formatSessionSourceRefs\(session\.source_refs\)/);
+  assert.match(componentSource, /formatSessionSourceRefs\(session\.summary_refs\)/);
+  assert.match(componentSource, /formatRetrievalRankingReport\(sessionResult\?\.report\?\.ranking_reports\)/);
+  assert.match(componentSource, /formatRetrievalRankingReport\(memoryResult\?\.report\?\.ranking_reports\)/);
   assert.match(componentSource, /@keyup\.enter="runSessionSearch"/);
   assert.match(componentSource, /@keyup\.enter="runRunContextSearch"/);
   assert.match(componentSource, /@keyup\.enter="runMemorySearch"/);
@@ -47,4 +53,12 @@ test("EvidenceSearchPage keeps structured metadata inspectable", () => {
   assert.match(componentSource, /highlightJson/);
   assert.match(componentSource, /evidenceSearch\.metadata/);
   assert.match(componentSource, /evidenceSearch\.retrievalAudit/);
+});
+
+test("EvidenceSearchPage exposes embedding maintenance as an auditable graph run", () => {
+  assert.match(componentSource, /fetchTemplate\(EMBEDDING_MAINTENANCE_TEMPLATE_ID\)/);
+  assert.match(componentSource, /runGraph\(graph\)/);
+  assert.match(componentSource, /buildEmbeddingMaintenanceGraph/);
+  assert.match(componentSource, /data-virtual-affordance-id="evidenceSearch\.embeddingMaintenance\.runNow"/);
+  assert.match(componentSource, /runDetailPath\(embeddingMaintenanceRunId\)/);
 });

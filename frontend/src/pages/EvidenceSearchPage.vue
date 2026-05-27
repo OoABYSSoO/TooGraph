@@ -53,6 +53,27 @@
                 <ElIcon aria-hidden="true"><Search /></ElIcon>
               </template>
             </ElInput>
+            <ElSelect
+              v-model="sessionEmbeddingModelRef"
+              class="evidence-search-page__session-select toograph-select"
+              :placeholder="t('evidenceSearch.memoryEmbeddingModelPlaceholder')"
+              :aria-label="t('evidenceSearch.memoryEmbeddingModel')"
+              popper-class="toograph-select-popper"
+              data-virtual-affordance-id="evidenceSearch.session.embeddingModel"
+              data-virtual-affordance-role="combobox"
+              data-virtual-affordance-zone="evidenceSearch.session"
+              data-virtual-affordance-actions="select"
+              clearable
+              filterable
+            >
+              <ElOption :label="t('evidenceSearch.memoryEmbeddingKeywordOnly')" value="" />
+              <ElOption
+                v-for="model in embeddingModelOptions"
+                :key="model.model_ref"
+                :label="formatEmbeddingModelOption(model)"
+                :value="model.model_ref"
+              />
+            </ElSelect>
             <ElButton
               type="primary"
               :loading="sessionLoading"
@@ -70,6 +91,13 @@
 
           <article v-if="sessionError" class="evidence-search-page__notice">
             {{ t("evidenceSearch.searchFailed", { error: sessionError }) }}
+          </article>
+          <article
+            v-if="formatRetrievalRankingReport(sessionResult?.report?.ranking_reports)"
+            class="evidence-search-page__notice"
+          >
+            {{ t("evidenceSearch.rankingReport") }}
+            {{ formatRetrievalRankingReport(sessionResult?.report?.ranking_reports) }}
           </article>
 
           <article v-if="sessionLoading && sessionRows.length === 0" class="evidence-search-page__empty">
@@ -99,6 +127,15 @@
                 <span>{{ t("evidenceSearch.lineageRoot") }} {{ session.lineage_root_session_id || t("common.none") }}</span>
                 <span>{{ t("evidenceSearch.matchMessage") }} {{ session.match_message_id || t("common.none") }}</span>
                 <span>{{ t("evidenceSearch.hitMessages") }} {{ formatIdList(session.hit_message_ids) }}</span>
+                <span v-if="formatSessionRetrieval(session)">
+                  {{ t("evidenceSearch.retrievalMode") }} {{ formatSessionRetrieval(session) }}
+                </span>
+                <span v-if="formatSessionSourceRefs(session.source_refs)">
+                  {{ t("evidenceSearch.source") }} {{ formatSessionSourceRefs(session.source_refs) }}
+                </span>
+                <span v-if="formatSessionSourceRefs(session.summary_refs)">
+                  {{ t("evidenceSearch.summaryRefs") }} {{ formatSessionSourceRefs(session.summary_refs) }}
+                </span>
               </div>
 
               <section class="evidence-search-page__message-window">
@@ -228,6 +265,27 @@
               <span>{{ t("evidenceSearch.memoryEyebrow") }}</span>
               <h3>{{ t("evidenceSearch.memoryPanel") }}</h3>
             </div>
+            <div class="evidence-search-page__panel-actions">
+              <RouterLink
+                v-if="embeddingMaintenanceRunId"
+                class="evidence-search-page__run-link"
+                :to="runDetailPath(embeddingMaintenanceRunId)"
+              >
+                {{ t("evidenceSearch.openEmbeddingMaintenanceRun") }}
+              </RouterLink>
+              <ElButton
+                :loading="embeddingMaintenanceLoading"
+                data-virtual-affordance-id="evidenceSearch.embeddingMaintenance.runNow"
+                :data-virtual-affordance-label="t('evidenceSearch.runEmbeddingMaintenance')"
+                data-virtual-affordance-role="button"
+                data-virtual-affordance-zone="evidenceSearch.memory"
+                data-virtual-affordance-actions="click"
+                @click="runEmbeddingMaintenance"
+              >
+                <ElIcon aria-hidden="true"><Refresh /></ElIcon>
+                <span>{{ t("evidenceSearch.runEmbeddingMaintenance") }}</span>
+              </ElButton>
+            </div>
           </div>
 
           <div class="evidence-search-page__memory-search">
@@ -284,6 +342,13 @@
 
           <article v-if="memoryError" class="evidence-search-page__notice">
             {{ t("evidenceSearch.searchFailed", { error: memoryError }) }}
+          </article>
+          <article
+            v-if="formatRetrievalRankingReport(memoryResult?.report?.ranking_reports)"
+            class="evidence-search-page__notice"
+          >
+            {{ t("evidenceSearch.rankingReport") }}
+            {{ formatRetrievalRankingReport(memoryResult?.report?.ranking_reports) }}
           </article>
 
           <article v-if="memoryLoading && memoryRows.length === 0" class="evidence-search-page__empty">
@@ -356,12 +421,13 @@
 </template>
 
 <script setup lang="ts">
-import { Connection, Search } from "@element-plus/icons-vue";
-import { ElButton, ElIcon, ElInput, ElOption, ElSelect } from "element-plus";
+import { Connection, Refresh, Search } from "@element-plus/icons-vue";
+import { ElButton, ElIcon, ElInput, ElMessage, ElOption, ElSelect } from "element-plus";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { searchBuddyChatSessions, searchBuddyMemories, searchBuddyRunContext } from "@/api/buddy";
+import { fetchTemplate, runGraph } from "@/api/graphs";
 import AppShell from "@/layouts/AppShell.vue";
 import type {
   BuddyChatMessageRecord,
@@ -373,6 +439,7 @@ import type {
 } from "@/types/buddy";
 
 import { highlightJson } from "./modelLogsJsonHighlight";
+import { buildEmbeddingMaintenanceGraph, EMBEDDING_MAINTENANCE_TEMPLATE_ID } from "./evidenceSearchPageModel";
 
 type SessionSearchRow = BuddySessionSearchResult["sessions"][number];
 type EmbeddingModelOption = BuddyMemorySearchResult["embedding_models"][number];
@@ -381,6 +448,7 @@ type MemorySource = BuddyMemorySearchEntry["sources"][number];
 const { t } = useI18n();
 
 const sessionQuery = ref("");
+const sessionEmbeddingModelRef = ref("");
 const sessionLoading = ref(false);
 const sessionError = ref("");
 const sessionResult = ref<BuddySessionSearchResult | null>(null);
@@ -396,6 +464,8 @@ const memoryEmbeddingModelRef = ref("");
 const memoryLoading = ref(false);
 const memoryError = ref("");
 const memoryResult = ref<BuddyMemorySearchResult | null>(null);
+const embeddingMaintenanceLoading = ref(false);
+const embeddingMaintenanceRunId = ref("");
 
 const sessionRows = computed(() => sessionResult.value?.sessions ?? []);
 const runContextMatches = computed(() => runContextResult.value?.matches ?? []);
@@ -412,6 +482,7 @@ async function runSessionSearch() {
   try {
     sessionResult.value = await searchBuddyChatSessions({
       query: sessionQuery.value.trim(),
+      embeddingModelRef: sessionEmbeddingModelRef.value,
       limit: 10,
       window: 2,
       sort: "newest",
@@ -462,6 +533,27 @@ async function runMemorySearch() {
   }
 }
 
+async function runEmbeddingMaintenance() {
+  if (embeddingMaintenanceLoading.value) {
+    return;
+  }
+  embeddingMaintenanceLoading.value = true;
+  try {
+    const template = await fetchTemplate(EMBEDDING_MAINTENANCE_TEMPLATE_ID);
+    const graph = buildEmbeddingMaintenanceGraph(template, {
+      modelRef: memoryEmbeddingModelRef.value || sessionEmbeddingModelRef.value,
+      jobLimit: 50,
+    });
+    const response = await runGraph(graph);
+    embeddingMaintenanceRunId.value = response.run_id;
+    ElMessage.success(t("evidenceSearch.embeddingMaintenanceQueued", { runId: response.run_id }));
+  } catch (error) {
+    ElMessage.error(t("evidenceSearch.embeddingMaintenanceFailed", { error: formatError(error) }));
+  } finally {
+    embeddingMaintenanceLoading.value = false;
+  }
+}
+
 function formatSnippet(value?: string) {
   const cleaned = (value || "").replace(/>{3}|<{3}/g, "").replace(/\s+/g, " ").trim();
   return cleaned || t("common.noSummary");
@@ -490,6 +582,24 @@ function runDetailPath(value: string) {
 function formatSource(match: BuddyRunContextSearchMatch) {
   const source = [match.source_kind, match.source_id].filter(Boolean).join(":");
   return source || t("common.none");
+}
+
+function formatSessionRetrieval(session: SessionSearchRow) {
+  const retrieval = session.retrieval ?? {};
+  const mode = typeof retrieval.mode === "string" ? retrieval.mode : "";
+  if (!mode) {
+    return "";
+  }
+  const lexicalScore = formatScore(retrieval.lexical_score);
+  const vectorScore = formatScore(retrieval.vector_score);
+  return `${mode} · lexical ${lexicalScore} · vector ${vectorScore}`;
+}
+
+function formatSessionSourceRefs(sourceRefs?: Array<Record<string, unknown>>) {
+  const labels = (sourceRefs ?? [])
+    .map((sourceRef) => [sourceRef.source_kind, sourceRef.source_id].filter(Boolean).join(":"))
+    .filter(Boolean);
+  return labels.length > 0 ? labels.join(", ") : "";
 }
 
 function formatRenderer(match: BuddyRunContextSearchMatch) {
@@ -529,6 +639,30 @@ function getRetrievalField(memory: BuddyMemorySearchEntry, key: string) {
 function formatEmbeddingModelOption(model: EmbeddingModelOption) {
   const label = [model.provider_key, model.model].filter(Boolean).join(" / ");
   return label ? `${label} (${model.model_ref})` : model.model_ref;
+}
+
+function formatRetrievalRankingReport(reports?: Array<Record<string, unknown>>) {
+  const report = reports?.[0];
+  if (!report) {
+    return "";
+  }
+  const queryId = String(report.query_id || "");
+  const resultCount = Number(report.result_count || 0);
+  const rankedResults = Array.isArray(report.ranked_results) ? report.ranked_results : [];
+  const topResult = rankedResults[0] instanceof Object ? rankedResults[0] as Record<string, unknown> : {};
+  const topSource = formatRankingSource(topResult.source_ref);
+  const finalScore = formatScore(topResult.final_score);
+  return [
+    queryId ? `${t("evidenceSearch.queryId")} ${queryId}` : "",
+    `${t("evidenceSearch.resultCount")} ${resultCount}`,
+    topSource ? `${t("evidenceSearch.topSource")} ${topSource}` : "",
+    topResult.final_score !== undefined ? `${t("evidenceSearch.score")} ${finalScore}` : "",
+  ].filter(Boolean).join(" · ");
+}
+
+function formatRankingSource(value: unknown) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return [source.source_kind, source.source_id].filter(Boolean).join(":");
 }
 
 function formatError(error: unknown) {
@@ -640,6 +774,21 @@ function formatError(error: unknown) {
   line-height: 1.2;
 }
 
+.evidence-search-page__panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.evidence-search-page__run-link {
+  color: rgb(154, 52, 18);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
 .evidence-search-page__search-bar,
 .evidence-search-page__run-search,
 .evidence-search-page__memory-search {
@@ -648,7 +797,7 @@ function formatError(error: unknown) {
 }
 
 .evidence-search-page__search-bar {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.5fr) auto;
 }
 
 .evidence-search-page__run-search {
@@ -842,19 +991,27 @@ function formatError(error: unknown) {
   }
 
   .evidence-search-page__run-search,
+  .evidence-search-page__search-bar,
   .evidence-search-page__memory-search {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 760px) {
-  .evidence-search-page__search-bar,
   .evidence-search-page__meta-grid {
     grid-template-columns: 1fr;
   }
 
   .evidence-search-page__result-heading {
     display: grid;
+  }
+
+  .evidence-search-page__panel-heading {
+    display: grid;
+  }
+
+  .evidence-search-page__panel-actions {
+    justify-content: flex-start;
   }
 }
 </style>

@@ -12,9 +12,12 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.storage import database
+from app.core.storage.memory_store import load_memory_entry
+from app.core.storage.run_store import load_run
 from app.evaluator.checks import evaluate_case_checks
 from app.evaluator.llm_judge import run_llm_judge
 from app.evaluator import store
+from app.buddy import store as buddy_store
 from app.main import app
 
 
@@ -204,6 +207,332 @@ class EvaluatorStoreRouteTests(unittest.TestCase):
         self.assertEqual(saved_runs[0]["metadata"]["eval"]["case_id"], "case_one")
         self.assertEqual(saved_runs[0]["metadata"]["eval"]["target_template_id"], "mock_template")
         self.assertEqual(saved_runs[0]["graph_snapshot"]["state_schema"]["prompt"]["value"], "输入材料")
+
+    def test_eval_route_installs_case_fixture_source_runs_before_starting_graph(self) -> None:
+        with isolated_eval_database():
+            with (
+                patch("app.evaluator.runner.load_template_record", return_value=_eval_template_record()),
+                patch("app.evaluator.runner.execute_node_system_graph_langgraph", return_value={}),
+                TestClient(app) as client,
+            ):
+                client.post(
+                    "/api/evals/suites",
+                    json={
+                        "suite_id": "fixture_eval",
+                        "name": "Fixture eval",
+                        "target_template_id": "mock_template",
+                    },
+                )
+                client.post(
+                    "/api/evals/suites/fixture_eval/cases",
+                    json={
+                        "case_id": "case_with_source_run",
+                        "name": "Case with source run",
+                        "input_values": {"prompt": "输入材料"},
+                        "metadata": {
+                            "fixture_runs": [
+                                {
+                                    "run_id": "run_eval_source_fixture",
+                                    "graph_id": "buddy_fixture_graph",
+                                    "graph_name": "Buddy source fixture",
+                                    "status": "completed",
+                                    "metadata": {
+                                        "runtime_context": {
+                                            "buddy_session_id": "session_eval_fixture",
+                                            "buddy_current_message_id": "message_eval_fixture",
+                                        }
+                                    },
+                                    "state_values": {
+                                        "user_message": "请记住我偏好简洁回答。",
+                                        "conversation_history": {
+                                            "kind": "context_assembly_ref",
+                                            "source_refs": [
+                                                {"source_kind": "buddy_message", "source_id": "message_eval_fixture"}
+                                            ],
+                                        },
+                                        "public_response": "我会在后续回复中保持简洁。",
+                                    },
+                                }
+                            ]
+                        },
+                    },
+                )
+                run_response = client.post("/api/evals/runs", json={"suite_id": "fixture_eval"})
+                eval_run_id = run_response.json()["eval_run_id"]
+
+                start_response = client.post(f"/api/evals/runs/{eval_run_id}/cases/case_with_source_run/run")
+                fixture_run = load_run("run_eval_source_fixture")
+
+        self.assertEqual(start_response.status_code, 200)
+        self.assertEqual(fixture_run["status"], "completed")
+        self.assertEqual(fixture_run["graph_id"], "buddy_fixture_graph")
+        self.assertEqual(
+            fixture_run["metadata"]["runtime_context"]["buddy_session_id"],
+            "session_eval_fixture",
+        )
+        self.assertEqual(fixture_run["metadata"]["eval_fixture"]["eval_run_id"], eval_run_id)
+        self.assertEqual(fixture_run["metadata"]["eval_fixture"]["case_id"], "case_with_source_run")
+        self.assertEqual(
+            fixture_run["state_snapshot"]["values"]["public_response"],
+            "我会在后续回复中保持简洁。",
+        )
+        self.assertEqual(
+            fixture_run["artifacts"]["state_values"]["user_message"],
+            "请记住我偏好简洁回答。",
+        )
+
+    def test_eval_route_installs_case_fixture_memory_entries_before_starting_graph(self) -> None:
+        with isolated_eval_database():
+            with (
+                patch("app.evaluator.runner.load_template_record", return_value=_eval_template_record()),
+                patch("app.evaluator.runner.execute_node_system_graph_langgraph", return_value={}),
+                TestClient(app) as client,
+            ):
+                client.post(
+                    "/api/evals/suites",
+                    json={
+                        "suite_id": "memory_fixture_eval",
+                        "name": "Memory fixture eval",
+                        "target_template_id": "mock_template",
+                    },
+                )
+                client.post(
+                    "/api/evals/suites/memory_fixture_eval/cases",
+                    json={
+                        "case_id": "case_with_memory_fixture",
+                        "input_values": {"prompt": "召回 memory-fixture-evidence"},
+                        "metadata": {
+                            "fixture_memory_entries": [
+                                {
+                                    "memory_id": "mem_eval_fixture_preference",
+                                    "scope_kind": "buddy",
+                                    "scope_id": "default",
+                                    "layer": "long_term",
+                                    "memory_type": "preference",
+                                    "title": "评测偏好",
+                                    "content": "memory-fixture-evidence 表示用户偏好先给结论。",
+                                    "confidence": 0.9,
+                                    "salience": 0.8,
+                                    "sources": [
+                                        {
+                                            "source_kind": "buddy_message",
+                                            "source_id": "msg_eval_fixture_preference",
+                                        }
+                                    ],
+                                }
+                            ]
+                        },
+                    },
+                )
+                run_response = client.post("/api/evals/runs", json={"suite_id": "memory_fixture_eval"})
+                eval_run_id = run_response.json()["eval_run_id"]
+
+                start_response = client.post(f"/api/evals/runs/{eval_run_id}/cases/case_with_memory_fixture/run")
+                memory = load_memory_entry("mem_eval_fixture_preference")
+
+        self.assertEqual(start_response.status_code, 200)
+        self.assertEqual(memory["title"], "评测偏好")
+        self.assertEqual(memory["metadata"]["eval_fixture"]["eval_run_id"], eval_run_id)
+        self.assertEqual(memory["metadata"]["eval_fixture"]["case_id"], "case_with_memory_fixture")
+        self.assertEqual(memory["sources"][0]["source_id"], "msg_eval_fixture_preference")
+
+    def test_eval_route_installs_case_fixture_buddy_sessions_before_starting_graph(self) -> None:
+        with isolated_eval_database():
+            with (
+                patch("app.evaluator.runner.load_template_record", return_value=_eval_template_record()),
+                patch("app.evaluator.runner.execute_node_system_graph_langgraph", return_value={}),
+                TestClient(app) as client,
+            ):
+                client.post(
+                    "/api/evals/suites",
+                    json={
+                        "suite_id": "buddy_session_fixture_eval",
+                        "name": "Buddy session fixture eval",
+                        "target_template_id": "mock_template",
+                    },
+                )
+                client.post(
+                    "/api/evals/suites/buddy_session_fixture_eval/cases",
+                    json={
+                        "case_id": "case_with_buddy_session_fixture",
+                        "input_values": {"prompt": "召回 hybrid-session-evidence"},
+                        "metadata": {
+                            "fixture_buddy_sessions": [
+                                {
+                                    "session_id": "session_eval_hybrid_history",
+                                    "title": "Hybrid history",
+                                    "messages": [
+                                        {
+                                            "message_id": "msg_eval_hybrid_user",
+                                            "role": "user",
+                                            "content": "hybrid-session-evidence 来自历史用户消息。",
+                                            "client_order": 0,
+                                        },
+                                        {
+                                            "message_id": "msg_eval_hybrid_assistant",
+                                            "role": "assistant",
+                                            "content": "历史伙伴回复保留 source ref。",
+                                            "client_order": 1,
+                                        },
+                                    ],
+                                }
+                            ]
+                        },
+                    },
+                )
+                run_response = client.post("/api/evals/runs", json={"suite_id": "buddy_session_fixture_eval"})
+                eval_run_id = run_response.json()["eval_run_id"]
+
+                start_response = client.post(
+                    f"/api/evals/runs/{eval_run_id}/cases/case_with_buddy_session_fixture/run"
+                )
+                session = buddy_store.get_chat_session("session_eval_hybrid_history")
+                messages = buddy_store.list_chat_messages("session_eval_hybrid_history")
+
+        self.assertEqual(start_response.status_code, 200)
+        self.assertEqual(session["title"], "Hybrid history")
+        self.assertEqual([message["message_id"] for message in messages], ["msg_eval_hybrid_user", "msg_eval_hybrid_assistant"])
+        self.assertEqual(messages[0]["metadata"]["eval_fixture"]["eval_run_id"], eval_run_id)
+        self.assertEqual(messages[0]["content"], "hybrid-session-evidence 来自历史用户消息。")
+
+    def test_eval_route_installs_case_fixture_capability_usage_before_starting_graph(self) -> None:
+        with isolated_eval_database():
+            with (
+                patch("app.evaluator.runner.load_template_record", return_value=_eval_template_record()),
+                patch("app.evaluator.runner.execute_node_system_graph_langgraph", return_value={}),
+                TestClient(app) as client,
+            ):
+                client.post(
+                    "/api/evals/suites",
+                    json={
+                        "suite_id": "capability_usage_fixture_eval",
+                        "name": "Capability usage fixture eval",
+                        "target_template_id": "mock_template",
+                    },
+                )
+                client.post(
+                    "/api/evals/suites/capability_usage_fixture_eval/cases",
+                    json={
+                        "case_id": "case_with_capability_usage_fixture",
+                        "input_values": {"prompt": "需要选择健康 fallback 能力"},
+                        "metadata": {
+                            "fixture_capability_usage_entries": [
+                                {
+                                    "capability": {
+                                        "kind": "subgraph",
+                                        "key": "advanced_web_research_loop",
+                                    },
+                                    "success": False,
+                                    "run_id": "run_eval_selector_failed_1",
+                                    "summary": "provider timeout",
+                                },
+                                {
+                                    "capability": {
+                                        "kind": "subgraph",
+                                        "key": "advanced_web_research_loop",
+                                    },
+                                    "success": False,
+                                    "run_id": "run_eval_selector_failed_2",
+                                    "summary": "provider timeout",
+                                },
+                                {
+                                    "capability": {"kind": "action", "key": "web_search"},
+                                    "success": True,
+                                    "run_id": "run_eval_selector_search_ok",
+                                    "summary": "search completed",
+                                },
+                            ]
+                        },
+                    },
+                )
+                run_response = client.post("/api/evals/runs", json={"suite_id": "capability_usage_fixture_eval"})
+                eval_run_id = run_response.json()["eval_run_id"]
+
+                start_response = client.post(
+                    f"/api/evals/runs/{eval_run_id}/cases/case_with_capability_usage_fixture/run"
+                )
+                second_start_response = client.post(
+                    f"/api/evals/runs/{eval_run_id}/cases/case_with_capability_usage_fixture/run"
+                )
+                from app.buddy.store import load_capability_usage_stats
+
+                stats = load_capability_usage_stats()
+
+        self.assertEqual(start_response.status_code, 200)
+        self.assertEqual(second_start_response.status_code, 200)
+        capabilities = stats["capabilities"]
+        self.assertEqual(capabilities["subgraph:advanced_web_research_loop"]["failure_count"], 2)
+        self.assertEqual(capabilities["subgraph:advanced_web_research_loop"]["recent_runs"][0]["success"], False)
+        self.assertEqual(capabilities["action:web_search"]["success_count"], 1)
+
+    def test_eval_route_installs_case_fixture_scheduler_records_before_starting_graph(self) -> None:
+        with isolated_eval_database():
+            with (
+                patch("app.evaluator.runner.load_template_record", return_value=_eval_template_record()),
+                patch("app.scheduler.store.load_template_record", return_value=_eval_template_record()),
+                patch("app.evaluator.runner.execute_node_system_graph_langgraph", return_value={}),
+                TestClient(app) as client,
+            ):
+                client.post(
+                    "/api/evals/suites",
+                    json={
+                        "suite_id": "scheduler_fixture_eval",
+                        "name": "Scheduler fixture eval",
+                        "target_template_id": "mock_template",
+                    },
+                )
+                client.post(
+                    "/api/evals/suites/scheduler_fixture_eval/cases",
+                    json={
+                        "case_id": "case_with_scheduler_fixture",
+                        "input_values": {"prompt": "读取调度运行"},
+                        "metadata": {
+                            "fixture_scheduled_graph_jobs": [
+                                {
+                                    "job_id": "sched_eval_retry_delivery",
+                                    "name": "调度重试投递评测",
+                                    "template_id": "mock_template",
+                                    "schedule_kind": "interval",
+                                    "schedule_expr": "PT6H",
+                                    "retry_policy": {"max_attempts": 3, "delay_seconds": 300},
+                                    "delivery_target": {
+                                        "kind": "local_audit",
+                                        "label": "Scheduler eval",
+                                        "token": "secret-token",
+                                    },
+                                }
+                            ],
+                            "fixture_scheduled_graph_job_runs": [
+                                {
+                                    "job_run_id": "schedrun_eval_retry_delivery_1",
+                                    "job_id": "sched_eval_retry_delivery",
+                                    "run_id": "run_eval_scheduler_failed_1",
+                                    "trigger_reason": "schedule",
+                                    "status": "failed",
+                                    "error": "provider timeout",
+                                    "started_at": "2026-05-27T06:00:00Z",
+                                    "completed_at": "2026-05-27T06:05:00Z",
+                                    "now": "2026-05-27T06:05:00Z",
+                                }
+                            ],
+                        },
+                    },
+                )
+                run_response = client.post("/api/evals/runs", json={"suite_id": "scheduler_fixture_eval"})
+                eval_run_id = run_response.json()["eval_run_id"]
+
+                start_response = client.post(f"/api/evals/runs/{eval_run_id}/cases/case_with_scheduler_fixture/run")
+                from app.scheduler import store as scheduler_store
+
+                job = scheduler_store.load_scheduled_graph_job("sched_eval_retry_delivery")
+                job_run = scheduler_store.load_scheduled_graph_job_run("schedrun_eval_retry_delivery_1")
+
+        self.assertEqual(start_response.status_code, 200)
+        self.assertEqual(job["metadata"]["scheduler_retry_pending"]["next_attempt_number"], 2)
+        self.assertEqual(job["metadata"]["scheduler_retry_pending"]["parent_run_id"], "run_eval_scheduler_failed_1")
+        self.assertEqual(job_run["metadata"]["retry_decision"]["action"], "scheduled")
+        self.assertEqual(job_run["metadata"]["delivery_result"]["status"], "delivered")
+        self.assertEqual(job_run["metadata"]["delivery_result"]["target"]["token"], "[redacted]")
 
     def test_eval_route_reruns_case_and_clears_previous_result_data(self) -> None:
         saved_runs: list[dict[str, object]] = []
@@ -486,6 +815,514 @@ class EvaluatorStoreRouteTests(unittest.TestCase):
         self.assertEqual(results[0]["actual"]["missing_source_paths"], [])
         self.assertEqual(results[0]["actual"]["missing_terms"], [])
         self.assertEqual(results[0]["actual"]["forbidden_terms_found"], [])
+
+    def test_eval_check_executor_evaluates_memory_retrieval_quality(self) -> None:
+        case = {
+            "case_id": "memory_recall_quality",
+            "checks": [
+                {
+                    "kind": "memory_retrieval",
+                    "name": "Memory recall quality",
+                    "target": "memory_search_report",
+                    "min_results": 1,
+                    "required_memory_ids": ["mem_eval_preference"],
+                    "required_source_refs": [
+                        {"source_kind": "buddy_message", "source_id": "msg_eval_preference"}
+                    ],
+                    "required_terms": ["先给结论", "memory recall"],
+                    "forbidden_terms": ["无来源"],
+                    "max_context_chars": 1200,
+                }
+            ],
+        }
+
+        results = evaluate_case_checks(
+            case,
+            final_output={
+                "memory_search_report": {
+                    "query": "memory recall",
+                    "memory_count": 1,
+                    "context_chars": 42,
+                    "memory_ids": ["mem_eval_preference"],
+                    "source_refs": [
+                        {
+                            "source_kind": "memory_entry",
+                            "source_id": "mem_eval_preference",
+                        },
+                        {
+                            "source_kind": "buddy_message",
+                            "source_id": "msg_eval_preference",
+                        },
+                    ],
+                    "results": [
+                        {
+                            "memory_id": "mem_eval_preference",
+                            "title": "回复偏好",
+                            "content": "用户偏好 memory recall 命中后先给结论。",
+                        }
+                    ],
+                }
+            },
+            artifacts={},
+        )
+
+        self.assertEqual(results[0]["status"], "passed")
+        self.assertEqual(results[0]["score"], 1.0)
+        self.assertEqual(results[0]["actual"]["memory_count"], 1)
+        self.assertEqual(results[0]["actual"]["missing_memory_ids"], [])
+        self.assertEqual(results[0]["actual"]["missing_source_refs"], [])
+        self.assertEqual(results[0]["actual"]["missing_terms"], [])
+
+    def test_eval_check_executor_fails_memory_retrieval_when_required_rerank_order_is_missing(self) -> None:
+        case = {
+            "case_id": "memory_rerank_quality",
+            "checks": [
+                {
+                    "kind": "memory_retrieval",
+                    "target": "memory_search_report",
+                    "min_results": 2,
+                    "required_memory_ids": ["mem_expected", "mem_other"],
+                    "required_reranker_model_ref": "local-rerank/bge-reranker-v2",
+                    "required_rerank_status": "succeeded",
+                    "required_top_memory_id": "mem_expected",
+                    "required_ranked_memory_ids": ["mem_expected", "mem_other"],
+                }
+            ],
+        }
+
+        results = evaluate_case_checks(
+            case,
+            final_output={
+                "memory_search_report": {
+                    "memory_count": 2,
+                    "memory_ids": ["mem_expected", "mem_other"],
+                    "ranking_reports": [
+                        {
+                            "kind": "retrieval_ranking_report",
+                            "reranker_model_ref": "local-rerank/bge-reranker-v2",
+                            "ranking_metadata": {"rerank": {"status": "succeeded"}},
+                            "ranked_results": [
+                                {
+                                    "rank": 1,
+                                    "source_ref": {"source_kind": "memory_entry", "source_id": "mem_other"},
+                                    "rerank_score": 0.91,
+                                },
+                                {
+                                    "rank": 2,
+                                    "source_ref": {"source_kind": "memory_entry", "source_id": "mem_expected"},
+                                    "rerank_score": 0.89,
+                                },
+                            ],
+                        }
+                    ],
+                    "results": [
+                        {"memory_id": "mem_expected", "content": "expected memory"},
+                        {"memory_id": "mem_other", "content": "other memory"},
+                    ],
+                }
+            },
+            artifacts={},
+        )
+
+        self.assertEqual(results[0]["status"], "failed")
+        self.assertIn("Expected top reranked memory id mem_expected", results[0]["message"])
+        self.assertEqual(results[0]["actual"]["top_memory_id"], "mem_other")
+        self.assertEqual(results[0]["actual"]["ranked_memory_ids"], ["mem_other", "mem_expected"])
+
+    def test_eval_check_executor_passes_memory_retrieval_rerank_quality(self) -> None:
+        case = {
+            "case_id": "memory_rerank_quality",
+            "checks": [
+                {
+                    "kind": "memory_retrieval",
+                    "target": "memory_search_report",
+                    "min_results": 2,
+                    "required_memory_ids": ["mem_expected", "mem_other"],
+                    "required_reranker_model_ref": "local-rerank/bge-reranker-v2",
+                    "required_rerank_status": "succeeded",
+                    "required_top_memory_id": "mem_expected",
+                    "required_ranked_memory_ids": ["mem_expected", "mem_other"],
+                }
+            ],
+        }
+
+        results = evaluate_case_checks(
+            case,
+            final_output={
+                "memory_search_report": {
+                    "memory_count": 2,
+                    "memory_ids": ["mem_expected", "mem_other"],
+                    "ranking_reports": [
+                        {
+                            "kind": "retrieval_ranking_report",
+                            "reranker_model_ref": "local-rerank/bge-reranker-v2",
+                            "ranking_metadata": {"rerank": {"status": "succeeded"}},
+                            "ranked_results": [
+                                {
+                                    "rank": 1,
+                                    "source_ref": {"source_kind": "memory_entry", "source_id": "mem_expected"},
+                                    "rerank_score": 0.97,
+                                },
+                                {
+                                    "rank": 2,
+                                    "source_ref": {"source_kind": "memory_entry", "source_id": "mem_other"},
+                                    "rerank_score": 0.61,
+                                },
+                            ],
+                        }
+                    ],
+                    "results": [
+                        {"memory_id": "mem_expected", "content": "expected memory"},
+                        {"memory_id": "mem_other", "content": "other memory"},
+                    ],
+                }
+            },
+            artifacts={},
+        )
+
+        self.assertEqual(results[0]["status"], "passed")
+        self.assertEqual(results[0]["actual"]["top_memory_id"], "mem_expected")
+        self.assertEqual(results[0]["actual"]["rerank_statuses"], ["succeeded"])
+
+    def test_eval_check_executor_evaluates_hybrid_recall_report(self) -> None:
+        case = {
+            "case_id": "hybrid_recall_quality",
+            "checks": [
+                {
+                    "kind": "hybrid_recall",
+                    "name": "Hybrid recall quality",
+                    "target": "hybrid_recall_report",
+                    "min_memory_results": 1,
+                    "min_session_results": 1,
+                    "required_memory_ids": ["mem_eval_hybrid_preference"],
+                    "required_message_ids": ["msg_eval_hybrid_user"],
+                    "required_source_refs": [
+                        {"source_kind": "memory_entry", "source_id": "mem_eval_hybrid_preference"},
+                        {"source_kind": "buddy_message", "source_id": "msg_eval_hybrid_user"},
+                    ],
+                    "required_terms": ["hybrid-memory-evidence", "hybrid-session-evidence"],
+                    "max_context_chars": 1600,
+                }
+            ],
+        }
+
+        results = evaluate_case_checks(
+            case,
+            final_output={
+                "hybrid_recall_report": {
+                    "scope": "hybrid_recall",
+                    "query": "hybrid evidence",
+                    "memory_count": 1,
+                    "session_count": 1,
+                    "context_chars": 84,
+                    "memory_ids": ["mem_eval_hybrid_preference"],
+                    "message_ids": ["msg_eval_hybrid_user"],
+                    "source_refs": [
+                        {"source_kind": "memory_entry", "source_id": "mem_eval_hybrid_preference"},
+                        {"source_kind": "buddy_message", "source_id": "msg_eval_hybrid_user"},
+                    ],
+                    "results": [
+                        {
+                            "kind": "memory",
+                            "memory_id": "mem_eval_hybrid_preference",
+                            "content": "hybrid-memory-evidence 表示用户偏好。",
+                        },
+                        {
+                            "kind": "session",
+                            "message_id": "msg_eval_hybrid_user",
+                            "content": "hybrid-session-evidence 来自历史对话。",
+                        },
+                    ],
+                }
+            },
+            artifacts={},
+        )
+
+        self.assertEqual(results[0]["status"], "passed")
+        self.assertEqual(results[0]["score"], 1.0)
+        self.assertEqual(results[0]["actual"]["memory_count"], 1)
+        self.assertEqual(results[0]["actual"]["session_count"], 1)
+        self.assertEqual(results[0]["actual"]["missing_memory_ids"], [])
+        self.assertEqual(results[0]["actual"]["missing_message_ids"], [])
+        self.assertEqual(results[0]["actual"]["missing_source_refs"], [])
+
+    def test_eval_check_executor_evaluates_capability_selection_fallback_trace(self) -> None:
+        case = {
+            "case_id": "selector_fallback_quality",
+            "checks": [
+                {
+                    "kind": "capability_selection",
+                    "name": "Selector chooses healthy fallback",
+                    "target": "capability_selection_trace",
+                    "required_requested": {"kind": "action", "key": "raw_search"},
+                    "required_selected": {"kind": "action", "key": "web_search_backup"},
+                    "required_rejected": [
+                        {
+                            "kind": "action",
+                            "key": "raw_search",
+                            "reason": "recent_failures_fallback_preferred",
+                        }
+                    ],
+                    "required_fallbacks": [
+                        {"kind": "action", "key": "raw_search", "reason": "original_candidate"}
+                    ],
+                    "min_rejected": 1,
+                    "min_fallbacks": 1,
+                    "required_terms": ["recent_failures_fallback_preferred"],
+                }
+            ],
+        }
+
+        results = evaluate_case_checks(
+            case,
+            final_output={
+                "capability_selection_trace": {
+                    "requested": {"kind": "action", "key": "raw_search"},
+                    "selected": {"kind": "action", "key": "web_search_backup"},
+                    "rejected_candidates": [
+                        {
+                            "kind": "action",
+                            "key": "raw_search",
+                            "reason": "recent_failures_fallback_preferred",
+                        }
+                    ],
+                    "fallback_candidates": [
+                        {"kind": "action", "key": "raw_search", "reason": "original_candidate"}
+                    ],
+                    "score_breakdown": {"selected": {"recent_failure_count": 0}},
+                }
+            },
+            artifacts={},
+        )
+
+        self.assertEqual(results[0]["status"], "passed")
+        self.assertEqual(results[0]["score"], 1.0)
+        self.assertEqual(results[0]["actual"]["selected"], {"kind": "action", "key": "web_search_backup"})
+        self.assertEqual(results[0]["actual"]["missing_selected"], [])
+        self.assertEqual(results[0]["actual"]["missing_rejected"], [])
+        self.assertEqual(results[0]["actual"]["missing_fallbacks"], [])
+
+    def test_eval_check_executor_evaluates_scheduler_retry_delivery_report(self) -> None:
+        case = {
+            "case_id": "scheduler_retry_delivery_quality",
+            "checks": [
+                {
+                    "kind": "scheduler_run",
+                    "name": "Scheduler retry and delivery",
+                    "target": "scheduler_run_report",
+                    "required_job_id": "sched_eval_retry_delivery",
+                    "required_job_run_id": "schedrun_eval_retry_delivery_1",
+                    "required_run_id": "run_eval_scheduler_failed_1",
+                    "required_trigger_reason": "schedule",
+                    "required_status": "failed",
+                    "required_retry_decision": {
+                        "action": "scheduled",
+                        "next_attempt_number": 2,
+                        "delay_seconds": 300,
+                    },
+                    "required_pending_retry": {
+                        "next_attempt_number": 2,
+                        "parent_run_id": "run_eval_scheduler_failed_1",
+                    },
+                    "required_delivery_result": {
+                        "kind": "local_audit",
+                        "status": "delivered",
+                        "terminal_status": "failed",
+                        "run_ref": {"run_id": "run_eval_scheduler_failed_1"},
+                    },
+                    "required_terms": ["provider timeout", "scheduler_retry_pending"],
+                    "forbidden_terms": ["secret-token"],
+                }
+            ],
+        }
+
+        results = evaluate_case_checks(
+            case,
+            final_output={
+                "scheduler_run_report": {
+                    "job_id": "sched_eval_retry_delivery",
+                    "job_run_id": "schedrun_eval_retry_delivery_1",
+                    "run_id": "run_eval_scheduler_failed_1",
+                    "trigger_reason": "schedule",
+                    "status": "failed",
+                    "error": "provider timeout",
+                    "retry_decision": {
+                        "action": "scheduled",
+                        "attempt_number": 1,
+                        "next_attempt_number": 2,
+                        "max_attempts": 3,
+                        "scheduled_for": "2026-05-27T06:10:00Z",
+                        "delay_seconds": 300,
+                    },
+                    "scheduler_retry_pending": {
+                        "parent_job_run_id": "schedrun_eval_retry_delivery_1",
+                        "parent_run_id": "run_eval_scheduler_failed_1",
+                        "next_attempt_number": 2,
+                        "scheduled_for": "2026-05-27T06:10:00Z",
+                    },
+                    "delivery_result": {
+                        "kind": "local_audit",
+                        "status": "delivered",
+                        "terminal_status": "failed",
+                        "run_ref": {"kind": "graph_run", "run_id": "run_eval_scheduler_failed_1"},
+                        "target": {"kind": "local_audit", "token": "[redacted]"},
+                    },
+                }
+            },
+            artifacts={},
+        )
+
+        self.assertEqual(results[0]["status"], "passed")
+        self.assertEqual(results[0]["score"], 1.0)
+        self.assertEqual(results[0]["actual"]["missing_retry_decision"], {})
+        self.assertEqual(results[0]["actual"]["missing_delivery_result"], {})
+        self.assertEqual(results[0]["actual"]["forbidden_terms_found"], [])
+
+    def test_eval_check_executor_fails_scheduler_report_missing_permission_policy(self) -> None:
+        case = {
+            "case_id": "scheduler_permission_boundary_quality",
+            "checks": [
+                {
+                    "kind": "scheduler_run",
+                    "name": "Scheduler permission boundary",
+                    "target": "scheduler_run_report",
+                    "required_graph_permission_mode": "ask_first",
+                    "required_permission_policy": {
+                        "approval_required_permission_tiers": ["risky"],
+                    },
+                    "required_permission_policy_source": "scheduler_default",
+                    "required_pending_permission_approval": {
+                        "permissions": ["file_write"],
+                    },
+                }
+            ],
+        }
+
+        results = evaluate_case_checks(
+            case,
+            final_output={"scheduler_run_report": {"job_id": "sched_eval_permission"}},
+            artifacts={},
+        )
+
+        self.assertEqual(results[0]["status"], "failed")
+        self.assertEqual(results[0]["actual"]["missing_fields"], ["graph_permission_mode", "permission_policy_source"])
+        self.assertEqual(
+            results[0]["actual"]["missing_permission_policy"],
+            {"approval_required_permission_tiers": ["risky"]},
+        )
+        self.assertEqual(
+            results[0]["actual"]["missing_pending_permission_approval"],
+            {"permissions": ["file_write"]},
+        )
+
+    def test_eval_check_executor_evaluates_delegation_worker_result_package(self) -> None:
+        case = {
+            "case_id": "delegation_worker_quality",
+            "checks": [
+                {
+                    "kind": "delegation_worker",
+                    "name": "Worker result package",
+                    "target": "worker_result_package",
+                    "required_task_id": "worker_eval_research_1",
+                    "required_status": "succeeded",
+                    "required_output_keys": ["findings", "source_refs"],
+                    "required_source_refs": [
+                        {"source_kind": "context_package", "source_id": "ctx_eval_worker_brief"}
+                    ],
+                    "required_terms": ["TooGraph", "Hermes"],
+                    "forbidden_terms": ["unscoped secret"],
+                }
+            ],
+        }
+
+        results = evaluate_case_checks(
+            case,
+            final_output={
+                "worker_result_package": {
+                    "kind": "worker_result_package",
+                    "task_id": "worker_eval_research_1",
+                    "status": "succeeded",
+                    "summary": "Compared TooGraph and Hermes worker delegation requirements.",
+                    "outputs": {
+                        "findings": {
+                            "name": "Findings",
+                            "type": "markdown",
+                            "value": "TooGraph should expose worker_task_packet and worker_result_package.",
+                        },
+                        "source_refs": {
+                            "name": "Source Refs",
+                            "type": "json",
+                            "value": [{"source_kind": "context_package", "source_id": "ctx_eval_worker_brief"}],
+                        },
+                    },
+                    "source_refs": [
+                        {"source_kind": "context_package", "source_id": "ctx_eval_worker_brief"}
+                    ],
+                    "budget": {"max_steps": 2, "used_steps": 1},
+                    "errors": [],
+                    "followups": [],
+                }
+            },
+            artifacts={},
+        )
+
+        self.assertEqual(results[0]["status"], "passed")
+        self.assertEqual(results[0]["score"], 1.0)
+        self.assertEqual(results[0]["actual"]["missing_output_keys"], [])
+        self.assertEqual(results[0]["actual"]["missing_source_refs"], [])
+        self.assertEqual(results[0]["actual"]["forbidden_terms_found"], [])
+
+    def test_eval_check_executor_evaluates_provider_fallback_trace(self) -> None:
+        case = {
+            "case_id": "provider_fallback_quality",
+            "checks": [
+                {
+                    "kind": "provider_fallback",
+                    "name": "Provider fallback quality",
+                    "target": "provider_fallback_trace",
+                    "required_requested": {"provider_id": "openai", "model": "gpt-primary"},
+                    "required_selected": {"provider_id": "local", "model": "backup-model"},
+                    "required_failed": {"provider_id": "openai", "error_type": "provider_timeout"},
+                    "required_capabilities": ["chat", "structured_output"],
+                    "required_permissions": ["text_generation"],
+                    "min_fallbacks": 1,
+                    "required_terms": ["fallback_selected", "provider_timeout"],
+                }
+            ],
+        }
+
+        results = evaluate_case_checks(
+            case,
+            final_output={
+                "provider_fallback_trace": {
+                    "kind": "provider_fallback_trace",
+                    "decision": "fallback_selected",
+                    "fallback_used": True,
+                    "requested": {"provider_id": "openai", "model": "gpt-primary", "model_ref": "openai/gpt-primary"},
+                    "selected": {"provider_id": "local", "model": "backup-model", "model_ref": "local/backup-model"},
+                    "failed_candidates": [
+                        {
+                            "provider_id": "openai",
+                            "model": "gpt-primary",
+                            "model_ref": "openai/gpt-primary",
+                            "error_type": "provider_timeout",
+                        }
+                    ],
+                    "fallback_candidates": [
+                        {"provider_id": "local", "model": "backup-model", "model_ref": "local/backup-model"}
+                    ],
+                    "required_capabilities": ["chat", "structured_output"],
+                    "required_permissions": ["text_generation"],
+                }
+            },
+            artifacts={},
+        )
+
+        self.assertEqual(results[0]["status"], "passed")
+        self.assertEqual(results[0]["score"], 1.0)
+        self.assertEqual(results[0]["actual"]["selected"]["model_ref"], "local/backup-model")
+        self.assertEqual(results[0]["actual"]["missing_failed"], [])
+        self.assertEqual(results[0]["actual"]["missing_capabilities"], [])
 
     def test_eval_check_executor_reports_knowledge_retrieval_quality_failures(self) -> None:
         case = {

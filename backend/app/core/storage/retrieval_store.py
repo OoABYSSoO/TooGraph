@@ -8,6 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from app.core.storage.database import get_connection
+from app.tools.model_provider_client import rerank_documents_with_model_ref
 
 
 SUPPORTED_RETRIEVAL_SOURCE_KINDS = {
@@ -206,6 +207,7 @@ def hybrid_search(
     query: str,
     filters: dict[str, Any] | None = None,
     embedding_model_ref: str = "",
+    reranker_model_ref: str = "",
     limit: int = 10,
 ) -> list[dict[str, Any]]:
     from app.core.storage.embedding_store import (
@@ -275,17 +277,87 @@ def hybrid_search(
         }
         ranked.append(entry)
     ranked.sort(key=lambda item: (-float(item.get("score") or 0.0), str(item.get("chunk_id") or "")))
+    ranking_metadata: dict[str, Any] = {}
+    if str(reranker_model_ref or "").strip() and ranked:
+        ranked, ranking_metadata = _rerank_ranked_results(
+            query=normalized_query,
+            ranked=ranked,
+            reranker_model_ref=str(reranker_model_ref or "").strip(),
+            limit=normalized_limit,
+        )
     results = ranked[:normalized_limit]
     query_id = _record_retrieval_audit(
         query=normalized_query,
         filters=resolved_filters,
         embedding_model_ref=str(embedding_model_ref or ""),
+        reranker_model_ref=str(reranker_model_ref or ""),
         mode="hybrid",
         results=results,
+        ranking_metadata=ranking_metadata,
     )
     for result in results:
         result["retrieval"]["query_id"] = query_id
     return results
+
+
+def load_retrieval_ranking_report(query_id: str) -> dict[str, Any]:
+    normalized_query_id = str(query_id or "").strip()
+    if not normalized_query_id:
+        raise FileNotFoundError("Retrieval query id is required.")
+    with get_connection() as connection:
+        query_row = connection.execute(
+            """
+            SELECT query_id, query_text, filters_json, embedding_model_ref, reranker_model_ref,
+                   mode, ranking_metadata_json, run_id, session_id, created_at
+            FROM retrieval_queries
+            WHERE query_id = ?
+            """,
+            (normalized_query_id,),
+        ).fetchone()
+        if query_row is None:
+            raise FileNotFoundError(f"Retrieval query '{normalized_query_id}' does not exist.")
+        result_rows = connection.execute(
+            """
+            SELECT rank, chunk_id, document_id, lexical_score, vector_score, base_score, rerank_score, final_score,
+                   source_ref_json, metadata_json, created_at
+            FROM retrieval_results
+            WHERE query_id = ?
+            ORDER BY rank ASC
+            """,
+            (normalized_query_id,),
+        ).fetchall()
+    ranked_results = [_ranking_result_from_row(row) for row in result_rows]
+    return {
+        "kind": "retrieval_ranking_report",
+        "query_id": str(query_row["query_id"] or ""),
+        "query_text": str(query_row["query_text"] or ""),
+        "mode": str(query_row["mode"] or ""),
+        "embedding_model_ref": str(query_row["embedding_model_ref"] or ""),
+        "reranker_model_ref": str(query_row["reranker_model_ref"] or ""),
+        "filters": _json_loads(query_row["filters_json"], {}),
+        "run_id": str(query_row["run_id"] or ""),
+        "session_id": str(query_row["session_id"] or ""),
+        "result_count": len(ranked_results),
+        "score_formula": _score_formula(str(query_row["reranker_model_ref"] or "")),
+        "ranking_metadata": _json_loads(query_row["ranking_metadata_json"], {}),
+        "ranked_results": ranked_results,
+        "created_at": str(query_row["created_at"] or ""),
+    }
+
+
+def load_retrieval_ranking_reports(query_ids: list[str]) -> list[dict[str, Any]]:
+    reports: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for query_id in query_ids:
+        normalized_query_id = str(query_id or "").strip()
+        if not normalized_query_id or normalized_query_id in seen:
+            continue
+        seen.add(normalized_query_id)
+        try:
+            reports.append(load_retrieval_ranking_report(normalized_query_id))
+        except FileNotFoundError:
+            continue
+    return reports
 
 
 def rebuild_retrieval_indexes(scope: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -504,13 +576,84 @@ def _hybrid_entry(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _rerank_ranked_results(
+    *,
+    query: str,
+    ranked: list[dict[str, Any]],
+    reranker_model_ref: str,
+    limit: int,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    candidate_count = min(len(ranked), max(limit * 4, limit))
+    candidates = ranked[:candidate_count]
+    documents = [str(candidate.get("content") or "") for candidate in candidates]
+    try:
+        reranked, meta = rerank_documents_with_model_ref(
+            model_ref=reranker_model_ref,
+            query=query,
+            documents=documents,
+            top_n=min(limit, len(documents)),
+        )
+    except Exception as exc:
+        return ranked, {
+            "rerank": {
+                "status": "failed",
+                "reranker_model_ref": reranker_model_ref,
+                "candidate_count": candidate_count,
+                "error": str(exc),
+            }
+        }
+
+    ordered: list[dict[str, Any]] = []
+    seen_indexes: set[int] = set()
+    for rerank_result in reranked:
+        index = _optional_int(rerank_result.get("index"))
+        if index is None or index < 0 or index >= len(candidates) or index in seen_indexes:
+            continue
+        seen_indexes.add(index)
+        entry = candidates[index]
+        pre_rerank_score = float(entry.get("score") or 0.0)
+        rerank_score = _bounded_float(rerank_result.get("score"), default=0.0, minimum=-1_000_000.0, maximum=1_000_000.0)
+        entry["score"] = rerank_score
+        entry["retrieval"] = {
+            **_coerce_dict(entry.get("retrieval")),
+            "mode": "hybrid_rerank",
+            "pre_rerank_score": pre_rerank_score,
+            "base_score": pre_rerank_score,
+            "rerank_score": rerank_score,
+            "reranker_model_ref": reranker_model_ref,
+            "score": rerank_score,
+        }
+        ordered.append(entry)
+
+    if not ordered:
+        return ranked, {
+            "rerank": {
+                "status": "failed",
+                "reranker_model_ref": reranker_model_ref,
+                "candidate_count": candidate_count,
+                "error": "Reranker returned no usable document indexes.",
+            }
+        }
+    return ordered + [candidate for index, candidate in enumerate(candidates) if index not in seen_indexes] + ranked[candidate_count:], {
+        "rerank": {
+            "status": "succeeded",
+            "reranker_model_ref": reranker_model_ref,
+            "candidate_count": candidate_count,
+            "result_count": len(ordered),
+            "provider_meta": meta,
+        }
+    }
+
+
 def _record_retrieval_audit(
     *,
     query: str,
     filters: dict[str, Any],
     embedding_model_ref: str,
+    reranker_model_ref: str,
     mode: str,
     results: list[dict[str, Any]],
+    ranking_metadata: dict[str, Any] | None = None,
 ) -> str:
     query_id = f"rquery_{uuid4().hex[:16]}"
     run_id = str(filters.get("run_id") or "")
@@ -523,15 +666,29 @@ def _record_retrieval_audit(
                 query_text,
                 filters_json,
                 embedding_model_ref,
+                reranker_model_ref,
                 mode,
+                ranking_metadata_json,
                 run_id,
                 session_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (query_id, query, _json_dumps(filters), embedding_model_ref, mode, run_id, session_id),
+            (
+                query_id,
+                query,
+                _json_dumps(filters),
+                embedding_model_ref,
+                reranker_model_ref,
+                mode,
+                _json_dumps(ranking_metadata or {}),
+                run_id,
+                session_id,
+            ),
         )
         for index, result in enumerate(results, start=1):
             retrieval = _coerce_dict(result.get("retrieval"))
+            base_score = float(retrieval.get("base_score") or retrieval.get("pre_rerank_score") or result.get("score") or 0.0)
+            rerank_score = float(retrieval.get("rerank_score") or 0.0)
             result_id = f"rresult_{uuid4().hex[:16]}"
             connection.execute(
                 """
@@ -543,10 +700,12 @@ def _record_retrieval_audit(
                     document_id,
                     lexical_score,
                     vector_score,
+                    base_score,
+                    rerank_score,
                     final_score,
                     source_ref_json,
                     metadata_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     result_id,
@@ -556,12 +715,36 @@ def _record_retrieval_audit(
                     str(result.get("document_id") or ""),
                     float(retrieval.get("lexical_score") or 0.0),
                     float(retrieval.get("vector_score") or 0.0),
+                    base_score,
+                    rerank_score,
                     float(result.get("score") or 0.0),
                     _json_dumps(_coerce_dict(result.get("source_ref"))),
                     _json_dumps(_coerce_dict(result.get("metadata"))),
                 ),
             )
     return query_id
+
+
+def _ranking_result_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "rank": int(row["rank"] or 0),
+        "chunk_id": str(row["chunk_id"] or ""),
+        "document_id": str(row["document_id"] or ""),
+        "lexical_score": float(row["lexical_score"] or 0.0),
+        "vector_score": float(row["vector_score"] or 0.0),
+        "base_score": float(row["base_score"] or 0.0),
+        "rerank_score": float(row["rerank_score"] or 0.0),
+        "final_score": float(row["final_score"] or 0.0),
+        "source_ref": _json_loads(row["source_ref_json"], {}),
+        "metadata": _json_loads(row["metadata_json"], {}),
+        "created_at": str(row["created_at"] or ""),
+    }
+
+
+def _score_formula(reranker_model_ref: str) -> str:
+    if str(reranker_model_ref or "").strip():
+        return "base_score = lexical_score + vector_score + recency_boost; final_score = rerank_score when rerank succeeds"
+    return "final_score = lexical_score + vector_score + recency_boost"
 
 
 def _rank_score(index: int) -> float:
@@ -616,6 +799,13 @@ def _bounded_float(value: Any, *, default: float, minimum: float, maximum: float
     except (TypeError, ValueError):
         parsed = default
     return min(max(parsed, minimum), maximum)
+
+
+def _optional_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _sanitize_fts5_query(query: str) -> str:

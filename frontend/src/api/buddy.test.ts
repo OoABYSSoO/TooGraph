@@ -370,6 +370,8 @@ test("buddy API searches session evidence and run context evidence", async () =>
   await searchBuddyChatSessions({
     query: "alpha evidence",
     currentSessionId: "session_current",
+    embeddingModelRef: "emodel_local_hashing",
+    rerankerModelRef: "local-rerank/bge",
     limit: 7,
     window: 2,
     sort: "newest",
@@ -381,7 +383,7 @@ test("buddy API searches session evidence and run context evidence", async () =>
   });
 
   assert.deepEqual(requests, [
-    "/api/buddy/search/sessions?query=alpha+evidence&current_session_id=session_current&limit=7&window=2&sort=newest",
+    "/api/buddy/search/sessions?query=alpha+evidence&current_session_id=session_current&embedding_model_ref=emodel_local_hashing&reranker_model_ref=local-rerank%2Fbge&limit=7&window=2&sort=newest",
     "/api/buddy/search/run-context?run_id=run_1&query=context+evidence&limit=12",
   ]);
   globalThis.fetch = originalFetch;
@@ -400,6 +402,7 @@ test("buddy API searches memory evidence with embedding model filters", async ()
   await searchBuddyMemories({
     query: "memory evidence",
     embeddingModelRef: "emodel_local_hashing",
+    rerankerModelRef: "local-rerank/bge",
     scopeKind: "buddy",
     scopeId: "default",
     layer: "long_term",
@@ -409,7 +412,7 @@ test("buddy API searches memory evidence with embedding model filters", async ()
   });
 
   assert.deepEqual(requests, [
-    "/api/buddy/search/memories?query=memory+evidence&embedding_model_ref=emodel_local_hashing&scope_kind=buddy&scope_id=default&layer=long_term&memory_type=preference&status=active&limit=9",
+    "/api/buddy/search/memories?query=memory+evidence&embedding_model_ref=emodel_local_hashing&reranker_model_ref=local-rerank%2Fbge&scope_kind=buddy&scope_id=default&layer=long_term&memory_type=preference&status=active&limit=9",
   ]);
   globalThis.fetch = originalFetch;
 });

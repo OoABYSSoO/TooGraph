@@ -6,6 +6,7 @@ import sqlite3
 import uuid
 from typing import Any
 
+from app.core.context_security import apply_context_security_policy, redact_context_secrets, scan_context_text
 from app.core.storage.content_blob_store import get_content_blob, put_content_blob
 from app.core.storage.database import get_connection
 
@@ -42,6 +43,17 @@ def create_context_assembly(
 ) -> dict[str, Any]:
     normalized_assembly_id = _normalize_assembly_id(assembly_id)
     normalized_sources = _normalize_sources(sources)
+    context_source_kind = (
+        str(metadata.get("scope") or renderer_key or target_state_key)
+        if isinstance(metadata, dict)
+        else str(renderer_key or target_state_key)
+    )
+    rendered_text, context_security_warnings = _apply_context_security_to_text(
+        rendered_text,
+        source_kind=context_source_kind,
+        source_refs=normalized_sources,
+        policy=_context_security_policy(metadata),
+    )
     blob = put_content_blob(
         rendered_text,
         "text/plain",
@@ -82,6 +94,7 @@ def create_context_assembly(
             ),
         )
         connection.execute("DELETE FROM context_assembly_sources WHERE assembly_id = ?", (normalized_assembly_id,))
+        connection.execute("DELETE FROM context_assembly_warnings WHERE assembly_id = ?", (normalized_assembly_id,))
         for ordinal, source in enumerate(normalized_sources):
             connection.execute(
                 """
@@ -113,6 +126,13 @@ def create_context_assembly(
                     created_at,
                 ),
             )
+    for warning in context_security_warnings:
+        _record_warning(
+            normalized_assembly_id,
+            str(warning.get("code") or "context_security_warning"),
+            str(warning.get("message") or "Context security warning."),
+            _coerce_dict(warning.get("metadata")),
+        )
 
     return _build_ref(
         assembly_id=normalized_assembly_id,
@@ -171,7 +191,13 @@ def expand_context_assembly_ref(ref: dict[str, Any]) -> dict[str, Any]:
         blob = get_content_blob(rendered_hash)
         text = _blob_text(blob)
     except FileNotFoundError:
-        text = _render_sources(assembly.get("sources") or [])
+        text, runtime_security_warnings = _apply_context_security_to_text(
+            _render_sources(assembly.get("sources") or []),
+            source_kind=str(assembly.get("metadata", {}).get("scope") or assembly.get("renderer_key") or ""),
+            source_refs=list(assembly.get("sources") or []),
+            policy=_context_security_policy(assembly.get("metadata")),
+        )
+        warnings = _merge_context_warnings(warnings, runtime_security_warnings)
         rebuilt_hash = _text_hash(text)
         put_content_blob(
             text,
@@ -196,6 +222,13 @@ def expand_context_assembly_ref(ref: dict[str, Any]) -> dict[str, Any]:
             warnings.append(warning)
             assembly = load_context_assembly(assembly["assembly_id"])
 
+    text, runtime_security_warnings = _apply_context_security_to_text(
+        text,
+        source_kind=str(assembly.get("metadata", {}).get("scope") or assembly.get("renderer_key") or ""),
+        source_refs=list(assembly.get("sources") or []),
+        policy=_context_security_policy(assembly.get("metadata")),
+    )
+    warnings = _merge_context_warnings(warnings, runtime_security_warnings)
     return {
         "text": text,
         "assembly": assembly,
@@ -282,7 +315,7 @@ def _render_sources(sources: list[dict[str, Any]]) -> str:
                 lines.append(_format_buddy_history_line(role or str(source.get("role") or ""), content))
             continue
         if source_kind == "buddy_session_summary":
-            content = _read_buddy_session_summary_source()
+            content = _read_buddy_session_summary_source(source)
             if content:
                 lines.append("已有会话摘要:")
                 lines.append(content)
@@ -348,6 +381,45 @@ def _render_sources(sources: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _apply_context_security_to_text(
+    text: str,
+    *,
+    source_kind: str,
+    source_refs: list[dict[str, Any]],
+    policy: dict[str, Any] | None = None,
+) -> tuple[str, list[dict[str, Any]]]:
+    redacted, redaction_warnings = redact_context_secrets(text, source_kind=source_kind, source_refs=source_refs)
+    warnings = [
+        *redaction_warnings,
+        *scan_context_text(redacted, source_kind=source_kind, source_refs=source_refs),
+    ]
+    secured, blocking_warnings = apply_context_security_policy(
+        redacted,
+        warnings,
+        policy=policy,
+        source_kind=source_kind,
+        source_refs=source_refs,
+    )
+    return secured, [*warnings, *blocking_warnings]
+
+
+def _merge_context_warnings(first: list[Any], second: list[Any]) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for warning in [*first, *second]:
+        if not isinstance(warning, dict):
+            continue
+        code = str(warning.get("code") or "").strip()
+        metadata = _coerce_dict(warning.get("metadata"))
+        pattern_id = str(metadata.get("pattern_id") or "").strip()
+        identity = (code, pattern_id)
+        if not code or identity in seen:
+            continue
+        seen.add(identity)
+        merged.append(dict(warning))
+    return merged
+
+
 def _read_buddy_message_source(source: dict[str, Any]) -> tuple[str, str]:
     source_id = str(source.get("source_id") or "").strip()
     revision_id = str(source.get("source_revision_id") or "").strip()
@@ -373,8 +445,16 @@ def _read_buddy_message_source(source: dict[str, Any]) -> tuple[str, str]:
     return str(row["content"] or ""), str(row["role"] or source.get("role") or "")
 
 
-def _read_buddy_session_summary_source() -> str:
+def _read_buddy_session_summary_source(source: dict[str, Any] | None = None) -> str:
+    source_id = str((source or {}).get("source_id") or "").strip()
     with get_connection() as connection:
+        if source_id and source_id != "session_summary":
+            row = connection.execute(
+                "SELECT content FROM buddy_session_summaries WHERE summary_id = ?",
+                (source_id,),
+            ).fetchone()
+            if row is not None:
+                return str(row["content"] or "").strip()
         row = connection.execute("SELECT value_json FROM buddy_kv WHERE key = ?", ("session_summary",)).fetchone()
     if row is None:
         return ""
@@ -690,6 +770,13 @@ def _stringify_source_content(value: Any) -> str:
 
 def _coerce_dict(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, dict) else {}
+
+
+def _context_security_policy(metadata: Any) -> dict[str, Any]:
+    if not isinstance(metadata, dict):
+        return {}
+    policy = metadata.get("context_security_policy")
+    return dict(policy) if isinstance(policy, dict) else {}
 
 
 def _normalize_context_package_warnings(value: Any) -> list[dict[str, Any]]:

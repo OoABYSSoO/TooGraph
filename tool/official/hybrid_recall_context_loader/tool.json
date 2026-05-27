@@ -1,0 +1,132 @@
+{
+  "schemaVersion": "toograph.tool/v1",
+  "toolKey": "hybrid_recall_context_loader",
+  "name": "Hybrid Recall Context Loader",
+  "description": "A deterministic Buddy hybrid recall tool that searches buddy_messages and memory_entries, then returns one auditable context_package with source refs, retrieval metadata, budget metadata, and warnings.",
+  "version": "0.1.0",
+  "timeoutSeconds": 30,
+  "permissions": [],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 30
+  },
+  "inputSchema": [
+    {
+      "key": "query",
+      "name": "Query",
+      "valueType": "text",
+      "description": "Search query used to find Buddy history messages and structured memories."
+    },
+    {
+      "key": "current_session_id",
+      "name": "Current Session ID",
+      "valueType": "text",
+      "description": "Optional current Buddy session id; matching lineage is excluded from session discover results."
+    },
+    {
+      "key": "embedding_model_ref",
+      "name": "Embedding Model Ref",
+      "valueType": "text",
+      "description": "Optional embedding model id/provider:model to enable hybrid memory and session recall."
+    },
+    {
+      "key": "reranker_model_ref",
+      "name": "Reranker Model Ref",
+      "valueType": "text",
+      "description": "Optional reranker provider/model ref used to rerank hybrid recall candidates."
+    },
+    {
+      "key": "session_limit",
+      "name": "Session Limit",
+      "valueType": "number",
+      "description": "Maximum session hits to include."
+    },
+    {
+      "key": "memory_limit",
+      "name": "Memory Limit",
+      "valueType": "number",
+      "description": "Maximum memory hits to include."
+    },
+    {
+      "key": "window",
+      "name": "Window",
+      "valueType": "number",
+      "description": "Message window around each session hit."
+    },
+    {
+      "key": "bookend",
+      "name": "Bookend",
+      "valueType": "number",
+      "description": "Number of session bookend messages to include."
+    },
+    {
+      "key": "sort",
+      "name": "Sort",
+      "valueType": "text",
+      "description": "rank, newest, or oldest."
+    },
+    {
+      "key": "role_filter",
+      "name": "Role Filter",
+      "valueType": "json",
+      "description": "Optional roles to search, usually user and assistant."
+    },
+    {
+      "key": "scope_kind",
+      "name": "Scope Kind",
+      "valueType": "text",
+      "description": "Optional memory scope kind filter."
+    },
+    {
+      "key": "scope_id",
+      "name": "Scope ID",
+      "valueType": "text",
+      "description": "Optional memory scope id filter."
+    },
+    {
+      "key": "layer",
+      "name": "Layer",
+      "valueType": "text",
+      "description": "Optional memory layer filter."
+    },
+    {
+      "key": "memory_type",
+      "name": "Memory Type",
+      "valueType": "text",
+      "description": "Optional memory type filter."
+    },
+    {
+      "key": "status",
+      "name": "Status",
+      "valueType": "text",
+      "description": "Memory status filter; defaults to active."
+    },
+    {
+      "key": "max_chars",
+      "name": "Max Chars",
+      "valueType": "number",
+      "description": "Maximum rendered hybrid recall context characters."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "status",
+      "name": "Status",
+      "valueType": "text",
+      "description": "Loader status."
+    },
+    {
+      "key": "hybrid_recall_context",
+      "name": "Hybrid Recall Context",
+      "valueType": "json",
+      "description": "Combined session and memory recall context_package."
+    },
+    {
+      "key": "hybrid_recall_report",
+      "name": "Hybrid Recall Report",
+      "valueType": "json",
+      "description": "Search query, memory ids, message ids, source refs, retrieval modes, budget, and warnings."
+    }
+  ]
+}

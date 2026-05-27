@@ -89,6 +89,46 @@ class ModelRequestLogTests(unittest.TestCase):
             "<inline-media-data mime=video/mp4 chars=2048>",
         )
 
+    def test_appended_model_request_log_redacts_secret_values(self) -> None:
+        from app.core.storage.model_log_store import append_model_request_log, list_model_request_logs
+
+        request_secret = "sk-requestsecretvalue1234567890"
+        response_secret = "sk-responsesecretvalue1234567890"
+        error_secret = "sk-errorsecretvalue1234567890"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "model_requests.jsonl"
+            with patch("app.core.storage.model_log_store.MODEL_REQUEST_LOG_PATH", log_path):
+                append_model_request_log(
+                    provider_id="openai",
+                    transport="openai-compatible",
+                    model="gpt-4.1",
+                    path="/v1/chat/completions",
+                    request_raw={
+                        "model": "gpt-4.1",
+                        "messages": [
+                            {"role": "user", "content": f"OPENAI_API_KEY={request_secret}"},
+                        ],
+                    },
+                    response_raw={"error": f"provider returned token {response_secret}"},
+                    duration_ms=20,
+                    status_code=500,
+                    error=f"request failed with token {error_secret}",
+                )
+                raw_log_text = log_path.read_text(encoding="utf-8")
+                payload = list_model_request_logs(page=1, size=10)
+
+        entry = payload["entries"][0]
+        serialized_entry = str(entry)
+        self.assertNotIn(request_secret, raw_log_text)
+        self.assertNotIn(response_secret, raw_log_text)
+        self.assertNotIn(error_secret, raw_log_text)
+        self.assertNotIn(request_secret, serialized_entry)
+        self.assertNotIn(response_secret, serialized_entry)
+        self.assertNotIn(error_secret, serialized_entry)
+        self.assertIn("[REDACTED_SECRET]", entry["request_raw"]["messages"][0]["content"])
+        self.assertIn("[REDACTED_SECRET]", entry["response_raw"]["error"])
+        self.assertIn("[REDACTED_SECRET]", entry["error"])
+
     def test_model_logs_route_returns_paginated_payload(self) -> None:
         with patch(
             "app.api.routes_model_logs.list_model_request_logs",

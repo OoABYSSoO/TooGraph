@@ -115,6 +115,87 @@
             <span>{{ t("runDetail.retrievedChunkCount", { count: contextAudit?.retrieval.retrievedChunksCount ?? 0 }) }}</span>
           </div>
           <div class="run-detail__audit-grid">
+            <section v-if="contextAuditBudgetReports.length > 0" class="run-detail__audit-section">
+              <h4>{{ t("runDetail.contextBudgetReports") }}</h4>
+              <div class="run-detail__audit-list">
+                <div v-for="report in contextAuditBudgetReports" :key="report.key" class="run-detail__audit-item">
+                  <div class="run-detail__audit-title">
+                    <strong>{{ report.reason || report.trigger || report.kind }}</strong>
+                    <small>{{ report.kind }}</small>
+                  </div>
+                  <div class="run-detail__badges">
+                    <span v-if="report.trigger">trigger {{ report.trigger }}</span>
+                    <span v-if="report.sourceRunId">run {{ report.sourceRunId }}</span>
+                    <span v-if="report.rawHistoryChars !== null">{{ t("runDetail.rawHistoryChars", { count: report.rawHistoryChars }) }}</span>
+                    <span v-if="report.renderedHistoryChars !== null">{{ t("runDetail.renderedHistoryChars", { count: report.renderedHistoryChars }) }}</span>
+                    <span v-if="report.sessionSummaryChars !== null">{{ t("runDetail.sessionSummaryChars", { count: report.sessionSummaryChars }) }}</span>
+                    <span v-if="report.omittedCount !== null">{{ t("runDetail.omittedContextCount", { count: report.omittedCount }) }}</span>
+                    <span v-if="report.protectedCount !== null">{{ t("runDetail.protectedContextCount", { count: report.protectedCount }) }}</span>
+                    <span v-if="report.summarySourceRefCount !== null">{{ t("runDetail.summarySourceRefs", { count: report.summarySourceRefCount }) }}</span>
+                    <span v-if="report.omittedRefCount !== null">{{ t("runDetail.omittedSourceRefs", { count: report.omittedRefCount }) }}</span>
+                    <span v-if="report.protectedRecentHistoryRefCount !== null">{{ t("runDetail.protectedRecentSourceRefs", { count: report.protectedRecentHistoryRefCount }) }}</span>
+                    <span v-if="report.providerPromptTokens !== null">{{ t("runDetail.providerPromptTokens", { count: report.providerPromptTokens }) }}</span>
+                    <span v-if="report.modelContextWindowTokens !== null">{{ t("runDetail.modelContextWindowTokens", { count: report.modelContextWindowTokens }) }}</span>
+                    <span v-if="report.promptTokenPressure !== null">{{ t("runDetail.promptTokenPressure", { value: report.promptTokenPressure.toFixed(2) }) }}</span>
+                    <span v-if="report.summaryChanged !== null">{{ report.summaryChanged ? t("runDetail.summaryChanged") : t("runDetail.summaryUnchanged") }}</span>
+                  </div>
+                  <div v-if="report.summarySourceRevisionIds.length > 0" class="run-detail__badges">
+                    <span v-for="revisionId in report.summarySourceRevisionIds" :key="`${report.key}-${revisionId}`">{{ t("runDetail.summarySourceRevision") }} {{ revisionId }}</span>
+                  </div>
+                  <div v-if="report.notes.length > 0" class="run-detail__badges">
+                    <span v-for="note in report.notes" :key="`${report.key}-${note}`">{{ note }}</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section v-if="contextAuditPromptSnapshots.length > 0" class="run-detail__audit-section">
+              <h4>{{ t("runDetail.promptSnapshots") }}</h4>
+              <div class="run-detail__audit-list">
+                <div v-for="snapshot in contextAuditPromptSnapshots" :key="snapshot.key" class="run-detail__audit-item">
+                  <div class="run-detail__audit-title">
+                    <strong>{{ snapshot.phase || "llm_prompt" }}</strong>
+                    <small v-if="snapshot.tokenEstimate !== null">{{ t("runDetail.promptSnapshotTokens", { count: snapshot.tokenEstimate }) }}</small>
+                  </div>
+                  <div class="run-detail__badges">
+                    <span v-if="snapshot.systemPromptChars !== null">{{ t("runDetail.promptSnapshotSystemChars", { count: snapshot.systemPromptChars }) }}</span>
+                    <span v-if="snapshot.userPromptChars !== null">{{ t("runDetail.promptSnapshotUserChars", { count: snapshot.userPromptChars }) }}</span>
+                    <span v-if="snapshot.totalPromptChars !== null">{{ t("runDetail.promptSnapshotTotalChars", { count: snapshot.totalPromptChars }) }}</span>
+                    <span v-if="snapshot.contextRefCount > 0">{{ t("runDetail.promptSnapshotContextRefs", { count: snapshot.contextRefCount }) }}</span>
+                  </div>
+                  <div class="run-detail__badges">
+                    <span v-if="snapshot.systemPromptHash">{{ t("runDetail.promptSnapshotSystemHash") }} {{ snapshot.systemPromptHash }}</span>
+                    <span v-if="snapshot.userPromptHash">{{ t("runDetail.promptSnapshotUserHash") }} {{ snapshot.userPromptHash }}</span>
+                  </div>
+                  <div v-if="snapshot.promptCachePolicy" class="run-detail__badges">
+                    <span>
+                      {{ t("runDetail.promptCachePolicy") }}
+                      {{ snapshot.promptCachePolicy.eligible ? t("runDetail.promptCacheEligible") : t("runDetail.promptCacheIneligible") }}
+                    </span>
+                    <span v-if="snapshot.promptCachePolicy.stablePrefixHash">
+                      {{ t("runDetail.promptCacheStablePrefix") }} {{ snapshot.promptCachePolicy.stablePrefixHash }}
+                    </span>
+                    <span v-if="snapshot.promptCachePolicy.dynamicSuffixHash">
+                      {{ t("runDetail.promptCacheDynamicSuffix") }} {{ snapshot.promptCachePolicy.dynamicSuffixHash }}
+                    </span>
+                    <span v-if="snapshot.promptCachePolicy.cacheKey">{{ t("runDetail.promptCacheKey") }} {{ snapshot.promptCachePolicy.cacheKey }}</span>
+                    <span v-if="snapshot.promptCachePolicy.providerCacheControl">{{ t("runDetail.promptCacheProvider") }} {{ snapshot.promptCachePolicy.providerCacheControl }}</span>
+                    <span v-if="snapshot.promptCachePolicy.reason">{{ snapshot.promptCachePolicy.reason }}</span>
+                    <span v-for="invalidator in snapshot.promptCachePolicy.invalidators" :key="`${snapshot.key}-cache-${invalidator}`">
+                      {{ t("runDetail.promptCacheInvalidator") }} {{ invalidator }}
+                    </span>
+                  </div>
+                  <div
+                    v-if="snapshot.inputStateKeys.length > 0 || snapshot.outputKeys.length > 0 || snapshot.actionKeys.length > 0 || snapshot.subgraphKeys.length > 0"
+                    class="run-detail__badges"
+                  >
+                    <span v-for="key in snapshot.inputStateKeys" :key="`${snapshot.key}-input-${key}`">input {{ key }}</span>
+                    <span v-for="key in snapshot.outputKeys" :key="`${snapshot.key}-output-${key}`">output {{ key }}</span>
+                    <span v-for="key in snapshot.actionKeys" :key="`${snapshot.key}-action-${key}`">action {{ key }}</span>
+                    <span v-for="key in snapshot.subgraphKeys" :key="`${snapshot.key}-subgraph-${key}`">subgraph {{ key }}</span>
+                  </div>
+                </div>
+              </div>
+            </section>
             <section v-if="contextAuditAssemblies.length > 0" class="run-detail__audit-section">
               <h4>{{ t("runDetail.contextAssemblies") }}</h4>
               <div class="run-detail__audit-list">
@@ -436,6 +517,52 @@
               <span v-if="agentDiagnostic.iterationLabel">{{ t("runDetail.agentIterations", { value: agentDiagnostic.iterationLabel }) }}</span>
               <span v-if="agentDiagnostic.capabilityBudgetLabel">{{ t("runDetail.agentCapabilities", { value: agentDiagnostic.capabilityBudgetLabel }) }}</span>
             </div>
+            <div v-if="agentDiagnostic.permissionApproval.visible" class="run-detail__capability-selection run-detail__permission-approval">
+              <h4>{{ t("runDetail.permissionApproval") }}</h4>
+              <dl class="run-detail__diagnostic-facts">
+                <div v-if="agentDiagnostic.permissionApproval.capabilityRef">
+                  <dt>{{ t("runDetail.permissionApprovalCapability") }}</dt>
+                  <dd>{{ agentDiagnostic.permissionApproval.capabilityName || agentDiagnostic.permissionApproval.capabilityRef }}</dd>
+                </div>
+                <div v-if="agentDiagnostic.permissionApproval.status">
+                  <dt>{{ t("runDetail.permissionApprovalStatus") }}</dt>
+                  <dd>{{ agentDiagnostic.permissionApproval.status }}</dd>
+                </div>
+                <div v-if="agentDiagnostic.permissionApproval.permissionLabel">
+                  <dt>{{ t("runDetail.permissionApprovalPermissions") }}</dt>
+                  <dd>{{ agentDiagnostic.permissionApproval.permissionLabel }}</dd>
+                </div>
+              </dl>
+              <div v-if="agentDiagnostic.permissionApproval.evidenceLabels.length > 0" class="run-detail__badges">
+                <span v-for="label in agentDiagnostic.permissionApproval.evidenceLabels" :key="label">{{ label }}</span>
+              </div>
+              <ul v-if="agentDiagnostic.permissionApproval.warnings.length > 0" class="run-detail__diagnostic-warnings">
+                <li v-for="warning in agentDiagnostic.permissionApproval.warnings" :key="warning" class="run-detail__diagnostic-warning">
+                  {{ warning }}
+                </li>
+              </ul>
+              <div v-if="agentDiagnostic.permissionApproval.actionable" class="run-detail__operation-actions run-detail__permission-approval-actions">
+                <ElButton
+                  size="small"
+                  type="primary"
+                  :loading="permissionApprovalActionBusy === 'approve'"
+                  :disabled="Boolean(permissionApprovalActionBusy)"
+                  @click="approvePermissionApproval"
+                >
+                  {{ t("runDetail.permissionApprovalApprove") }}
+                </ElButton>
+                <ElButton
+                  size="small"
+                  type="danger"
+                  plain
+                  :loading="permissionApprovalActionBusy === 'deny'"
+                  :disabled="Boolean(permissionApprovalActionBusy)"
+                  @click="denyPermissionApproval"
+                >
+                  {{ t("runDetail.permissionApprovalDeny") }}
+                </ElButton>
+              </div>
+            </div>
             <div v-if="agentDiagnostic.capabilitySelection.visible" class="run-detail__capability-selection">
               <dl class="run-detail__diagnostic-facts">
                 <div v-if="agentDiagnostic.capabilitySelection.selectedRef">
@@ -467,6 +594,48 @@
                   <span v-for="label in agentDiagnostic.capabilitySelection.fallbackLabels" :key="label">{{ label }}</span>
                 </div>
               </div>
+            </div>
+            <div v-if="agentDiagnostic.providerFallback.visible" class="run-detail__capability-selection run-detail__provider-fallback">
+              <h4>{{ t("runDetail.providerFallback") }}</h4>
+              <dl class="run-detail__diagnostic-facts">
+                <div v-if="agentDiagnostic.providerFallback.selectedRef">
+                  <dt>{{ t("runDetail.providerFallbackSelected") }}</dt>
+                  <dd>{{ agentDiagnostic.providerFallback.selectedRef }}</dd>
+                </div>
+                <div v-if="agentDiagnostic.providerFallback.requestedRef">
+                  <dt>{{ t("runDetail.providerFallbackRequested") }}</dt>
+                  <dd>{{ agentDiagnostic.providerFallback.requestedRef }}</dd>
+                </div>
+                <div v-if="agentDiagnostic.providerFallback.decision">
+                  <dt>{{ t("runDetail.providerFallbackDecision") }}</dt>
+                  <dd>{{ agentDiagnostic.providerFallback.decision }}</dd>
+                </div>
+              </dl>
+              <div v-if="agentDiagnostic.providerFallback.evidenceLabels.length > 0" class="run-detail__badges">
+                <span v-for="label in agentDiagnostic.providerFallback.evidenceLabels" :key="label">{{ label }}</span>
+              </div>
+              <div
+                v-if="agentDiagnostic.providerFallback.failedLabels.length > 0 || agentDiagnostic.providerFallback.rejectedLabels.length > 0 || agentDiagnostic.providerFallback.fallbackLabels.length > 0"
+                class="run-detail__capability-candidates"
+              >
+                <div v-if="agentDiagnostic.providerFallback.failedLabels.length > 0">
+                  <strong>{{ t("runDetail.providerFallbackFailed") }}</strong>
+                  <span v-for="label in agentDiagnostic.providerFallback.failedLabels" :key="label">{{ label }}</span>
+                </div>
+                <div v-if="agentDiagnostic.providerFallback.rejectedLabels.length > 0">
+                  <strong>{{ t("runDetail.providerFallbackRejected") }}</strong>
+                  <span v-for="label in agentDiagnostic.providerFallback.rejectedLabels" :key="label">{{ label }}</span>
+                </div>
+                <div v-if="agentDiagnostic.providerFallback.fallbackLabels.length > 0">
+                  <strong>{{ t("runDetail.providerFallbackCandidates") }}</strong>
+                  <span v-for="label in agentDiagnostic.providerFallback.fallbackLabels" :key="label">{{ label }}</span>
+                </div>
+              </div>
+              <ul v-if="agentDiagnostic.providerFallback.warnings.length > 0" class="run-detail__diagnostic-warnings">
+                <li v-for="warning in agentDiagnostic.providerFallback.warnings" :key="warning" class="run-detail__diagnostic-warning">
+                  {{ warning }}
+                </li>
+              </ul>
             </div>
             <ul v-if="agentDiagnostic.warnings.length > 0" class="run-detail__diagnostic-warnings">
               <li v-for="warning in agentDiagnostic.warnings" :key="warning" class="run-detail__diagnostic-warning">
@@ -623,7 +792,7 @@ import { useI18n } from "vue-i18n";
 import { fetchBuddyBackgroundReviews, enqueueBuddyBackgroundReview, restoreBuddyRevision, linkBuddyImprovementCandidateValidationRun, decideBuddyImprovementCandidate, applyBuddyImprovementCandidate } from "@/api/buddy";
 import { fetchTemplate, restoreGraphRevision, runGraph } from "@/api/graphs";
 import { fetchOperationJournal } from "@/api/operationJournal";
-import { fetchRun, fetchRunTree } from "@/api/runs";
+import { fetchRun, fetchRunTree, resumeRun } from "@/api/runs";
 import { buildBuddyImprovementReviewGraph, BUDDY_IMPROVEMENT_REVIEW_TEMPLATE_ID } from "@/buddy/buddyImprovementReviewGraph";
 import {
   buildLiveStreamingOutput,
@@ -678,6 +847,7 @@ const validatingImprovementCandidateKey = ref("");
 const decidingImprovementCandidateKey = ref("");
 const applyingImprovementCandidateKey = ref("");
 const restoringGraphRevisionKey = ref<string | null>(null);
+const permissionApprovalActionBusy = ref<"approve" | "deny" | "">("");
 const runId = computed(() => String(route.params.runId ?? ""));
 const runDetailRequestTimeoutMs = 10_000;
 const snapshotOptions = computed(() => {
@@ -715,12 +885,16 @@ const outputArtifacts = computed(() => (viewedRun.value ? listRunOutputArtifacts
 const aggregatedTimeline = computed(() => (viewedRun.value ? buildRunAggregatedTimeline(viewedRun.value) : []));
 const contextAudit = computed(() => (viewedRun.value ? buildRunContextAudit(viewedRun.value) : null));
 const contextAuditAssemblies = computed(() => contextAudit.value?.assemblies ?? []);
+const contextAuditBudgetReports = computed(() => contextAudit.value?.budgetReports ?? []);
+const contextAuditPromptSnapshots = computed(() => contextAudit.value?.promptSnapshots ?? []);
 const contextAuditSources = computed(() => contextAudit.value?.retrieval.sources.slice(0, 12) ?? []);
 const contextAuditVisible = computed(() =>
   Boolean(
     contextAudit.value &&
       (
         contextAudit.value.assemblies.length > 0 ||
+        contextAudit.value.budgetReports.length > 0 ||
+        contextAudit.value.promptSnapshots.length > 0 ||
         contextAudit.value.retrieval.resultCount > 0 ||
         contextAudit.value.contextSourceCount > 0
       ),
@@ -1163,6 +1337,85 @@ async function restoreGraphRevisionFromOperation(item: OperationJournalDisplayIt
     ElMessage.error(restoreError instanceof Error ? restoreError.message : t("common.failedToSave", { error: "" }));
   } finally {
     restoringGraphRevisionKey.value = null;
+  }
+}
+
+function permissionApprovalCapabilityLabel() {
+  const approval = agentDiagnostic.value?.permissionApproval;
+  return approval?.capabilityName || approval?.capabilityRef || t("runDetail.permissionApproval");
+}
+
+async function approvePermissionApproval() {
+  if (!viewedRun.value || permissionApprovalActionBusy.value) {
+    return;
+  }
+  const capability = permissionApprovalCapabilityLabel();
+  try {
+    await ElMessageBox.confirm(
+      t("runDetail.permissionApprovalApproveConfirm", { capability }),
+      t("runDetail.permissionApprovalApproveTitle"),
+      {
+        confirmButtonText: t("runDetail.permissionApprovalApprove"),
+        cancelButtonText: t("common.cancel"),
+        type: "warning",
+      },
+    );
+  } catch {
+    return;
+  }
+
+  permissionApprovalActionBusy.value = "approve";
+  try {
+    const response = await resumeRun(viewedRun.value.run_id, {
+      permission_approval: {
+        decision: "approved",
+        reason: t("runDetail.permissionApprovalApproveReason", { capability }),
+      },
+    });
+    ElMessage.success(t("runDetail.permissionApprovalApproved", { runId: response.run_id }));
+    await loadRun(response.run_id);
+    startRunEventStream(response.run_id);
+  } catch (approvalError) {
+    ElMessage.error(approvalError instanceof Error ? approvalError.message : t("common.failedToSave", { error: "" }));
+  } finally {
+    permissionApprovalActionBusy.value = "";
+  }
+}
+
+async function denyPermissionApproval() {
+  if (!viewedRun.value || permissionApprovalActionBusy.value) {
+    return;
+  }
+  const capability = permissionApprovalCapabilityLabel();
+  try {
+    await ElMessageBox.confirm(
+      t("runDetail.permissionApprovalDenyConfirm", { capability }),
+      t("runDetail.permissionApprovalDenyTitle"),
+      {
+        confirmButtonText: t("runDetail.permissionApprovalDeny"),
+        cancelButtonText: t("common.cancel"),
+        type: "warning",
+      },
+    );
+  } catch {
+    return;
+  }
+
+  permissionApprovalActionBusy.value = "deny";
+  try {
+    const response = await resumeRun(viewedRun.value.run_id, {
+      permission_approval: {
+        decision: "denied",
+        reason: t("runDetail.permissionApprovalDenyReason", { capability }),
+      },
+    });
+    ElMessage.success(t("runDetail.permissionApprovalDenied", { runId: response.run_id }));
+    await loadRun(response.run_id);
+    startRunEventStream(response.run_id);
+  } catch (denialError) {
+    ElMessage.error(denialError instanceof Error ? denialError.message : t("common.failedToSave", { error: "" }));
+  } finally {
+    permissionApprovalActionBusy.value = "";
   }
 }
 
@@ -1615,6 +1868,13 @@ function statusBadgeClass(status: string) {
   gap: 10px;
   margin-top: 14px;
   min-width: 0;
+}
+
+.run-detail__provider-fallback h4 {
+  margin: 0;
+  color: rgba(60, 41, 20, 0.86);
+  font-size: 0.92rem;
+  font-weight: 900;
 }
 
 .run-detail__diagnostic-facts {

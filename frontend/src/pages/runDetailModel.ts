@@ -89,8 +89,63 @@ export type RunRetrievalAuditSummary = {
   sources: RunRetrievalAuditSource[];
 };
 
+export type RunContextBudgetReport = {
+  key: string;
+  kind: "context_budget_report" | "compaction_report";
+  trigger: string;
+  reason: string;
+  sourceRunId: string;
+  rawHistoryChars: number | null;
+  renderedHistoryChars: number | null;
+  sessionSummaryChars: number | null;
+  omittedCount: number | null;
+  protectedCount: number | null;
+  providerPromptTokens: number | null;
+  modelContextWindowTokens: number | null;
+  promptTokenPressure: number | null;
+  summaryChanged: boolean | null;
+  sourceRefCount: number | null;
+  summarySourceRefCount: number | null;
+  omittedRefCount: number | null;
+  protectedRecentHistoryRefCount: number | null;
+  summarySourceRevisionIds: string[];
+  notes: string[];
+};
+
+export type RunPromptSnapshotAudit = {
+  key: string;
+  phase: string;
+  systemPromptHash: string;
+  userPromptHash: string;
+  systemPromptChars: number | null;
+  userPromptChars: number | null;
+  totalPromptChars: number | null;
+  tokenEstimate: number | null;
+  inputStateKeys: string[];
+  outputKeys: string[];
+  actionKeys: string[];
+  subgraphKeys: string[];
+  contextRefCount: number;
+  promptCachePolicy: RunPromptCachePolicyAudit | null;
+};
+
+export type RunPromptCachePolicyAudit = {
+  eligible: boolean | null;
+  cacheKey: string;
+  mode: string;
+  providerCacheControl: string;
+  reason: string;
+  stablePrefixHash: string;
+  stablePrefixChars: number | null;
+  dynamicSuffixHash: string;
+  dynamicSuffixChars: number | null;
+  invalidators: string[];
+};
+
 export type RunContextAudit = {
   assemblies: RunContextAssemblyAudit[];
+  budgetReports: RunContextBudgetReport[];
+  promptSnapshots: RunPromptSnapshotAudit[];
   contextSourceCount: number;
   retrieval: RunRetrievalAuditSummary;
 };
@@ -160,6 +215,10 @@ function normalizeNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function normalizeBoolean(value: unknown) {
+  return typeof value === "boolean" ? value : null;
+}
+
 export function buildRunStatusFacts(run: RunDetail): RunStatusFact[] {
   const facts: RunStatusFact[] = [
     { key: "status", label: translate("runDetail.status"), value: run.status, tone: "status" },
@@ -179,6 +238,10 @@ export function buildRunStatusFacts(run: RunDetail): RunStatusFact[] {
 export function buildRunContextAudit(run: RunDetail): RunContextAudit {
   const assemblies = new Map<string, RunContextAssemblyAudit>();
   const retrievalSources = new Map<string, RunRetrievalAuditSource>();
+  const budgetReports: RunContextBudgetReport[] = [];
+  const budgetReportIdentities = new Set<string>();
+  const promptSnapshots: RunPromptSnapshotAudit[] = [];
+  const promptSnapshotIdentities = new Set<string>();
   const queryIds = new Set<string>();
   let contextSourceCount = 0;
 
@@ -210,12 +273,24 @@ export function buildRunContextAudit(run: RunDetail): RunContextAudit {
           queryIds.add(retrieval.queryId);
         }
       }
+      const budgetReport = contextBudgetReportFromRecord(record, budgetReports.length);
+      if (budgetReport && !budgetReportIdentities.has(contextBudgetReportIdentity(budgetReport))) {
+        budgetReportIdentities.add(contextBudgetReportIdentity(budgetReport));
+        budgetReports.push(budgetReport);
+      }
+      const promptSnapshot = promptSnapshotAuditFromRecord(record, promptSnapshots.length);
+      if (promptSnapshot && !promptSnapshotIdentities.has(promptSnapshotIdentity(promptSnapshot))) {
+        promptSnapshotIdentities.add(promptSnapshotIdentity(promptSnapshot));
+        promptSnapshots.push(promptSnapshot);
+      }
     },
   );
 
   const sources = [...retrievalSources.values()];
   return {
     assemblies: [...assemblies.values()],
+    budgetReports,
+    promptSnapshots,
     contextSourceCount,
     retrieval: {
       queryCount: queryIds.size,
@@ -602,6 +677,191 @@ function retrievalAuditSourceFromRecord(record: Record<string, unknown>): RunRet
     mode,
     score,
   };
+}
+
+function contextBudgetReportFromRecord(record: Record<string, unknown>, sequence: number): RunContextBudgetReport | null {
+  const kind = detectContextBudgetReportKind(record);
+  if (!kind) {
+    return null;
+  }
+  const trigger = normalizeText(record.trigger);
+  const reason = normalizeText(record.reason) || normalizeText(record.pressure_reason);
+  const sourceRunId = normalizeText(record.source_run_id);
+  const omittedCount =
+    normalizeNumber(record.omitted_history_message_count) ??
+    normalizeNumber(record.omitted_count) ??
+    normalizeNumber(record.omitted_refs_count);
+  const notes = [
+    ...normalizeStringList(record.risk_notes),
+    ...normalizeStringList(record.anti_thrashing_notes),
+  ];
+  return {
+    key: `${kind}:${reason || trigger || sourceRunId || "context"}:${sequence}`,
+    kind,
+    trigger,
+    reason,
+    sourceRunId,
+    rawHistoryChars: normalizeNumber(record.raw_history_chars),
+    renderedHistoryChars: normalizeNumber(record.rendered_history_chars),
+    sessionSummaryChars:
+      normalizeNumber(record.session_summary_chars) ??
+      normalizeNumber(record.existing_session_summary_chars) ??
+      normalizeNumber(record.context_compaction_summary_chars),
+    omittedCount,
+    protectedCount: normalizeNumber(record.protected_count),
+    providerPromptTokens: normalizeNumber(record.provider_prompt_tokens),
+    modelContextWindowTokens: normalizeNumber(record.model_context_window_tokens),
+    promptTokenPressure: normalizeNumber(record.prompt_token_pressure),
+    summaryChanged: typeof record.summary_changed === "boolean" ? record.summary_changed : null,
+    sourceRefCount: arrayLengthOrNull(record.source_refs),
+    summarySourceRefCount: arrayLengthOrNull(record.summary_source_refs),
+    omittedRefCount: arrayLengthOrNull(record.omitted_refs),
+    protectedRecentHistoryRefCount: arrayLengthOrNull(record.protected_recent_history_refs),
+    summarySourceRevisionIds: sourceRevisionIds(record.summary_source_refs),
+    notes,
+  };
+}
+
+function contextBudgetReportIdentity(report: RunContextBudgetReport): string {
+  return JSON.stringify({
+    kind: report.kind,
+    trigger: report.trigger,
+    reason: report.reason,
+    sourceRunId: report.sourceRunId,
+    rawHistoryChars: report.rawHistoryChars,
+    renderedHistoryChars: report.renderedHistoryChars,
+    sessionSummaryChars: report.sessionSummaryChars,
+    omittedCount: report.omittedCount,
+    protectedCount: report.protectedCount,
+    providerPromptTokens: report.providerPromptTokens,
+    modelContextWindowTokens: report.modelContextWindowTokens,
+    promptTokenPressure: report.promptTokenPressure,
+    summaryChanged: report.summaryChanged,
+    sourceRefCount: report.sourceRefCount,
+    summarySourceRefCount: report.summarySourceRefCount,
+    omittedRefCount: report.omittedRefCount,
+    protectedRecentHistoryRefCount: report.protectedRecentHistoryRefCount,
+    summarySourceRevisionIds: report.summarySourceRevisionIds,
+    notes: report.notes,
+  });
+}
+
+function promptSnapshotAuditFromRecord(record: Record<string, unknown>, sequence: number): RunPromptSnapshotAudit | null {
+  if (record.kind !== "llm_prompt_snapshot") {
+    return null;
+  }
+  const phase = normalizeText(record.phase);
+  const systemPromptHash = normalizeText(record.system_prompt_hash);
+  const userPromptHash = normalizeText(record.user_prompt_hash);
+  if (!phase && !systemPromptHash && !userPromptHash) {
+    return null;
+  }
+  const contextRefs = Array.isArray(record.context_refs) ? record.context_refs : [];
+  return {
+    key: `${phase || "llm_prompt"}:${systemPromptHash || "no-system-hash"}:${userPromptHash || "no-user-hash"}:${sequence}`,
+    phase,
+    systemPromptHash,
+    userPromptHash,
+    systemPromptChars: normalizeNumber(record.system_prompt_chars),
+    userPromptChars: normalizeNumber(record.user_prompt_chars),
+    totalPromptChars: normalizeNumber(record.total_prompt_chars),
+    tokenEstimate: normalizeNumber(record.token_estimate),
+    inputStateKeys: normalizeStringList(record.input_state_keys),
+    outputKeys: normalizeStringList(record.output_keys),
+    actionKeys: normalizeStringList(record.action_keys),
+    subgraphKeys: normalizeStringList(record.subgraph_keys),
+    contextRefCount: contextRefs.length,
+    promptCachePolicy: promptCachePolicyAuditFromRecord(record.prompt_cache_policy),
+  };
+}
+
+function promptSnapshotIdentity(snapshot: RunPromptSnapshotAudit): string {
+  return JSON.stringify({
+    phase: snapshot.phase,
+    systemPromptHash: snapshot.systemPromptHash,
+    userPromptHash: snapshot.userPromptHash,
+    systemPromptChars: snapshot.systemPromptChars,
+    userPromptChars: snapshot.userPromptChars,
+    totalPromptChars: snapshot.totalPromptChars,
+    tokenEstimate: snapshot.tokenEstimate,
+    inputStateKeys: snapshot.inputStateKeys,
+    outputKeys: snapshot.outputKeys,
+    actionKeys: snapshot.actionKeys,
+    subgraphKeys: snapshot.subgraphKeys,
+    contextRefCount: snapshot.contextRefCount,
+    promptCachePolicy: snapshot.promptCachePolicy,
+  });
+}
+
+function promptCachePolicyAuditFromRecord(value: unknown): RunPromptCachePolicyAudit | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (normalizeText(record.kind) !== "prompt_cache_policy") {
+    return null;
+  }
+  const cacheKey = normalizeText(record.cache_key);
+  const stablePrefixHash = normalizeText(record.stable_prefix_hash);
+  const dynamicSuffixHash = normalizeText(record.dynamic_suffix_hash);
+  if (!cacheKey && !stablePrefixHash && !dynamicSuffixHash) {
+    return null;
+  }
+  return {
+    eligible: normalizeBoolean(record.eligible),
+    cacheKey,
+    mode: normalizeText(record.mode),
+    providerCacheControl: normalizeText(record.provider_cache_control),
+    reason: normalizeText(record.reason),
+    stablePrefixHash,
+    stablePrefixChars: normalizeNumber(record.stable_prefix_chars),
+    dynamicSuffixHash,
+    dynamicSuffixChars: normalizeNumber(record.dynamic_suffix_chars),
+    invalidators: normalizeStringList(record.invalidators),
+  };
+}
+
+function detectContextBudgetReportKind(record: Record<string, unknown>): RunContextBudgetReport["kind"] | null {
+  const hasBudgetShape = (
+    "raw_history_chars" in record ||
+    "rendered_history_chars" in record ||
+    "provider_prompt_tokens" in record ||
+    "prompt_token_pressure" in record ||
+    "pressure_sources" in record
+  );
+  if ((normalizeText(record.trigger) || normalizeText(record.reason)) && hasBudgetShape) {
+    return "context_budget_report";
+  }
+  const hasCompactionShape = (
+    "omitted_count" in record ||
+    "protected_count" in record ||
+    "summary_changed" in record ||
+    "risk_notes" in record ||
+    "anti_thrashing_notes" in record
+  );
+  if ((normalizeText(record.trigger) || normalizeText(record.source_run_id)) && hasCompactionShape) {
+    return "compaction_report";
+  }
+  return null;
+}
+
+function normalizeStringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return uniqueNonEmpty(value.map((item) => normalizeText(item)));
+  }
+  const text = normalizeText(value);
+  return text ? [text] : [];
+}
+
+function arrayLengthOrNull(value: unknown): number | null {
+  return Array.isArray(value) ? value.length : null;
+}
+
+function sourceRevisionIds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return uniqueNonEmpty(value.map((item) => normalizeText(recordFromUnknown(item).source_revision_id)));
 }
 
 function formatContextPackageBudget(budget: Record<string, unknown>): string {

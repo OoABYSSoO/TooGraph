@@ -134,6 +134,64 @@ class SettingsModelProviderTests(unittest.TestCase):
         self.assertEqual(saved_payload["model_providers"]["openai"]["transport"], "openai-compatible")
         build_payload.assert_called_once_with(force_refresh_models=False)
 
+    def test_update_settings_persists_model_capabilities_and_permissions(self) -> None:
+        saved_payload: dict = {}
+
+        def capture_save(payload: dict) -> dict:
+            saved_payload.update(payload)
+            return payload
+
+        with patch("app.api.routes_settings.load_app_settings", return_value={}):
+            with patch("app.api.routes_settings.save_app_settings", side_effect=capture_save):
+                with patch("app.api.routes_settings._build_settings_payload", return_value={"ok": True}):
+                    with TestClient(app) as client:
+                        response = client.post(
+                            "/api/settings",
+                            json={
+                                "model": {
+                                    "text_model_ref": "local/rerank-test",
+                                    "video_model_ref": "local/rerank-test",
+                                },
+                                "agent_runtime_defaults": {
+                                    "model": "local/rerank-test",
+                                    "thinking_enabled": False,
+                                    "thinking_level": "off",
+                                    "temperature": 0.2,
+                                },
+                                "model_providers": {
+                                    "local": {
+                                        "label": "Local",
+                                        "transport": "openai-compatible",
+                                        "base_url": "http://127.0.0.1:8888/v1",
+                                        "api_key": "",
+                                        "enabled": True,
+                                        "auth_header": "Authorization",
+                                        "auth_scheme": "Bearer",
+                                        "models": [
+                                            {
+                                                "model": "rerank-test",
+                                                "label": "rerank-test",
+                                                "modalities": ["text"],
+                                                "capabilities": {
+                                                    "chat": False,
+                                                    "structured_output": False,
+                                                    "embedding": False,
+                                                    "rerank": True,
+                                                },
+                                                "permissions": ["rerank"],
+                                            }
+                                        ],
+                                    }
+                                },
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        saved_model = saved_payload["model_providers"]["local"]["models"][0]
+        self.assertEqual(saved_model["capabilities"]["chat"], False)
+        self.assertEqual(saved_model["capabilities"]["rerank"], True)
+        self.assertEqual(saved_model["permissions"], ["rerank"])
+
     def test_update_settings_allows_empty_model_refs_when_no_models_are_available(self) -> None:
         saved_payload: dict = {}
 
@@ -336,6 +394,39 @@ class SettingsModelProviderTests(unittest.TestCase):
         self.assertEqual(local_provider["models"], [])
         self.assertEqual([model["model"] for model in local_provider["discovered_models"]], ["lm-local"])
         self.assertEqual(catalog["default_text_model_ref"], "openai-codex/gpt-5.5")
+
+    def test_catalog_exposes_model_capabilities_and_permissions(self) -> None:
+        saved_settings = {
+            "text_model_ref": "local/rerank-test",
+            "video_model_ref": "local/rerank-test",
+            "model_providers": {
+                "local": {
+                    "label": "Local",
+                    "transport": "openai-compatible",
+                    "base_url": "http://127.0.0.1:8888/v1",
+                    "enabled": True,
+                    "models": [
+                        {
+                            "model": "rerank-test",
+                            "label": "rerank-test",
+                            "capabilities": {"chat": False, "rerank": True},
+                            "permissions": ["rerank"],
+                        }
+                    ],
+                }
+            },
+        }
+
+        from app.core import model_catalog
+
+        with patch.object(model_catalog, "load_app_settings", return_value=saved_settings):
+            with patch.object(model_catalog, "get_local_gateway_runtime_config", return_value=None):
+                with patch.object(model_catalog, "get_local_route_model_names", return_value=[]):
+                    catalog = model_catalog.build_model_catalog(force_refresh=False)
+
+        local_provider = next(provider for provider in catalog["providers"] if provider["provider_id"] == "local")
+        self.assertEqual(local_provider["models"][0]["capabilities"], {"chat": False, "rerank": True})
+        self.assertEqual(local_provider["models"][0]["permissions"], ["rerank"])
 
 
 if __name__ == "__main__":

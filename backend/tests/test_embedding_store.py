@@ -265,6 +265,69 @@ class EmbeddingStoreTests(unittest.TestCase):
         self.assertEqual(result_row[0], "chunk_refund")
         self.assertEqual(json.loads(result_row[1])["source_kind"], "buddy_message")
 
+    def test_hybrid_search_uses_reranker_model_and_records_rerank_audit(self) -> None:
+        from app.core.storage.retrieval_store import hybrid_search, load_retrieval_ranking_report, upsert_retrieval_chunks, upsert_retrieval_document
+
+        document = upsert_retrieval_document(source_kind="buddy_message", source_id="msg_rerank")
+        upsert_retrieval_chunks(
+            document["document_id"],
+            [
+                {
+                    "chunk_id": "chunk_base_first",
+                    "content": "Refund audit checklist evidence from an older thread.",
+                },
+                {
+                    "chunk_id": "chunk_reranked_first",
+                    "content": "Refund audit checklist evidence with the exact current preference.",
+                },
+            ],
+        )
+
+        def fake_rerank(**kwargs):
+            self.assertEqual(kwargs["model_ref"], "local-rerank/bge-reranker-v2")
+            self.assertEqual(kwargs["query"], "refund audit checklist")
+            self.assertEqual(kwargs["top_n"], 2)
+            self.assertEqual(len(kwargs["documents"]), 2)
+            return [
+                {"index": 1, "score": 0.96, "document": kwargs["documents"][1]},
+                {"index": 0, "score": 0.42, "document": kwargs["documents"][0]},
+            ], {
+                "provider_id": "local-rerank",
+                "model": "bge-reranker-v2",
+                "provider_fallback_used": False,
+            }
+
+        with patch("app.core.storage.retrieval_store.rerank_documents_with_model_ref", side_effect=fake_rerank):
+            results = hybrid_search(
+                "refund audit checklist",
+                filters={"source_kind": "buddy_message"},
+                reranker_model_ref="local-rerank/bge-reranker-v2",
+                limit=2,
+            )
+
+        self.assertEqual([result["chunk_id"] for result in results], ["chunk_reranked_first", "chunk_base_first"])
+        self.assertEqual(results[0]["retrieval"]["mode"], "hybrid_rerank")
+        self.assertEqual(results[0]["retrieval"]["rerank_score"], 0.96)
+        self.assertGreater(results[0]["retrieval"]["pre_rerank_score"], 0)
+        self.assertEqual(results[0]["score"], 0.96)
+
+        with sqlite3.connect(database.DB_PATH) as connection:
+            query_row = connection.execute("SELECT query_id, reranker_model_ref FROM retrieval_queries").fetchone()
+            result_rows = connection.execute(
+                "SELECT chunk_id, rerank_score, base_score, final_score FROM retrieval_results WHERE query_id = ? ORDER BY rank ASC",
+                (query_row[0],),
+            ).fetchall()
+
+        self.assertEqual(query_row[1], "local-rerank/bge-reranker-v2")
+        self.assertEqual(result_rows[0][0], "chunk_reranked_first")
+        self.assertEqual(result_rows[0][1], 0.96)
+        self.assertGreater(result_rows[0][2], 0)
+        self.assertEqual(result_rows[0][3], 0.96)
+        report = load_retrieval_ranking_report(query_row[0])
+        self.assertEqual(report["reranker_model_ref"], "local-rerank/bge-reranker-v2")
+        self.assertEqual(report["ranking_metadata"]["rerank"]["status"], "succeeded")
+        self.assertEqual(report["ranked_results"][0]["rerank_score"], 0.96)
+
 
 if __name__ == "__main__":
     unittest.main()

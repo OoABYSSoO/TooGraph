@@ -153,6 +153,37 @@
                     {{ t("settings.noModelsDiscovered") }}
                   </span>
                 </div>
+                <div v-if="provider.selected_models.length > 0" class="model-providers-page__capability-matrix" :aria-label="t('settings.providerCapabilityMatrix')">
+                  <div class="model-providers-page__capability-matrix-heading">
+                    <span>{{ t("settings.enabledModels") }}</span>
+                    <span>{{ t("settings.providerCapabilityMatrix") }}</span>
+                    <span>{{ t("settings.providerModelPermissions") }}</span>
+                  </div>
+                  <div
+                    v-for="modelName in provider.selected_models"
+                    :key="`${provider.provider_id}-capability-${modelName}`"
+                    class="model-providers-page__capability-row"
+                  >
+                    <span class="model-providers-page__capability-model" :title="modelName">{{ modelName }}</span>
+                    <div class="model-providers-page__capability-toggles">
+                      <label
+                        v-for="capability in providerCapabilityOptions"
+                        :key="`${provider.provider_id}-${modelName}-${capability.key}`"
+                        class="model-providers-page__capability-toggle"
+                        :class="{ 'model-providers-page__capability-toggle--active': isModelCapabilityEnabled(provider, modelName, capability.key) }"
+                        :title="t(capability.labelKey)"
+                      >
+                        <input
+                          type="checkbox"
+                          :checked="isModelCapabilityEnabled(provider, modelName, capability.key)"
+                          @change="toggleProviderModelCapability(provider, modelName, capability.key)"
+                        />
+                        <span>{{ capability.shortLabel }}</span>
+                      </label>
+                    </div>
+                    <span class="model-providers-page__capability-permissions">{{ modelPermissionSummary(provider, modelName) }}</span>
+                  </div>
+                </div>
                 <div v-if="isLoginProvider(provider)" class="model-providers-page__provider-actions">
                   <ElPopover
                     :trigger="manualPopoverTrigger"
@@ -734,8 +765,12 @@ import {
   buildProviderDraftsFromSettings,
   buildProviderSavePayload,
   clampSettingsTemperature,
+  defaultCapabilitiesForModel,
   listAddableProviderTemplates,
+  normalizePermissionsForCapabilities,
   type ProviderDraft,
+  type ProviderModelCapabilityKey,
+  type ProviderModelProfile,
 } from "./settingsPageModel.ts";
 
 type SettingsDraft = {
@@ -795,6 +830,16 @@ const confirmPopoverStyle = {
   background: "transparent",
   boxShadow: "none",
 } as const;
+const providerCapabilityOptions: Array<{ key: ProviderModelCapabilityKey; labelKey: string; shortLabel: string }> = [
+  { key: "chat", labelKey: "settings.providerCapabilityChat", shortLabel: "Chat" },
+  { key: "structured_output", labelKey: "settings.providerCapabilityStructured", shortLabel: "JSON" },
+  { key: "tool_calling", labelKey: "settings.providerCapabilityToolCalling", shortLabel: "Tool" },
+  { key: "vision", labelKey: "settings.providerCapabilityVision", shortLabel: "Vision" },
+  { key: "embedding", labelKey: "settings.providerCapabilityEmbedding", shortLabel: "Embed" },
+  { key: "rerank", labelKey: "settings.providerCapabilityRerank", shortLabel: "Rank" },
+  { key: "streaming", labelKey: "settings.providerCapabilityStreaming", shortLabel: "Stream" },
+  { key: "reasoning", labelKey: "settings.providerCapabilityReasoning", shortLabel: "Reason" },
+];
 
 function dedupeStrings(values: string[]) {
   const items: string[] = [];
@@ -871,6 +916,18 @@ function buildProviderDraftFromTemplate(provider: SettingsModelProvider): Provid
     api_key_configured: Boolean(provider.api_key_configured),
     discovered_models: modelNames,
     selected_models: modelNames,
+    model_profiles: Object.fromEntries(
+      provider.models.map((model) => {
+        const capabilities = model.capabilities && Object.keys(model.capabilities).length > 0 ? model.capabilities : defaultCapabilitiesForModel(model);
+        return [
+          model.model,
+          {
+            capabilities,
+            permissions: model.permissions && model.permissions.length > 0 ? model.permissions : normalizePermissionsForCapabilities(capabilities),
+          },
+        ];
+      }),
+    ),
   };
 }
 
@@ -1001,6 +1058,56 @@ function isProviderModelSelected(provider: ProviderDraft, modelName: string) {
   return provider.selected_models.some((selectedModel) => selectedModel.trim().toLowerCase() === identity);
 }
 
+function ensureProviderModelProfile(provider: ProviderDraft, modelName: string): ProviderModelProfile {
+  const normalizedModel = modelName.trim();
+  const existing = provider.model_profiles?.[normalizedModel];
+  if (existing) {
+    return existing;
+  }
+  const defaultCapabilities = defaultCapabilitiesForModel();
+  const profile = {
+    capabilities: defaultCapabilities,
+    permissions: normalizePermissionsForCapabilities(defaultCapabilities),
+  };
+  provider.model_profiles = {
+    ...(provider.model_profiles ?? {}),
+    [normalizedModel]: profile,
+  };
+  return profile;
+}
+
+function isModelCapabilityEnabled(provider: ProviderDraft, modelName: string, capabilityKey: ProviderModelCapabilityKey) {
+  return Boolean(provider.model_profiles?.[modelName]?.capabilities?.[capabilityKey]);
+}
+
+function toggleProviderModelCapability(provider: ProviderDraft, modelName: string, capabilityKey: ProviderModelCapabilityKey) {
+  const profile = ensureProviderModelProfile(provider, modelName);
+  const capabilities = {
+    ...profile.capabilities,
+    [capabilityKey]: !Boolean(profile.capabilities[capabilityKey]),
+  };
+  provider.model_profiles = {
+    ...(provider.model_profiles ?? {}),
+    [modelName]: {
+      capabilities,
+      permissions: normalizePermissionsForCapabilities(capabilities, profile.permissions),
+    },
+  };
+  providerDrafts.value = {
+    ...providerDrafts.value,
+    [provider.provider_id]: provider,
+  };
+  void persistSettings();
+}
+
+function modelPermissionSummary(provider: ProviderDraft, modelName: string) {
+  const profile = provider.model_profiles?.[modelName];
+  const permissions = profile?.permissions?.length
+    ? profile.permissions
+    : normalizePermissionsForCapabilities(profile?.capabilities ?? {});
+  return permissions.length > 0 ? permissions.join(", ") : t("common.none");
+}
+
 function isProviderModelPickerLoading(provider: ProviderDraft) {
   return refreshingModelPickerProviderId.value === provider.provider_id || discoveringProviderId.value === provider.provider_id;
 }
@@ -1014,6 +1121,9 @@ function toggleProviderModel(provider: ProviderDraft, modelName: string) {
   provider.selected_models = selected
     ? provider.selected_models.filter((selectedModel) => selectedModel.trim().toLowerCase() !== normalizedModel.toLowerCase())
     : dedupeStrings([...provider.selected_models, normalizedModel]);
+  if (!selected) {
+    ensureProviderModelProfile(provider, normalizedModel);
+  }
   providerDrafts.value = {
     ...providerDrafts.value,
     [provider.provider_id]: provider,
@@ -1029,6 +1139,9 @@ function removeProviderModel(provider: ProviderDraft, modelName: string) {
   }
   provider.selected_models = provider.selected_models.filter(
     (selectedModel) => selectedModel.trim().toLowerCase() !== normalizedModel,
+  );
+  provider.model_profiles = Object.fromEntries(
+    Object.entries(provider.model_profiles ?? {}).filter(([modelName]) => modelName.trim().toLowerCase() !== normalizedModel),
   );
   providerDrafts.value = {
     ...providerDrafts.value,
@@ -2156,6 +2269,87 @@ onBeforeUnmount(() => {
   font-weight: 650;
 }
 
+.model-providers-page__capability-matrix {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 248, 240, 0.38);
+}
+
+.model-providers-page__capability-matrix-heading,
+.model-providers-page__capability-row {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.72fr) minmax(0, 2fr) minmax(120px, 0.9fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.model-providers-page__capability-matrix-heading {
+  color: rgba(60, 41, 20, 0.58);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.model-providers-page__capability-model,
+.model-providers-page__capability-permissions {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-providers-page__capability-model {
+  color: var(--toograph-text-strong);
+  font-family: var(--toograph-font-mono);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.model-providers-page__capability-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.model-providers-page__capability-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 8px;
+  padding: 4px 7px;
+  background: rgba(255, 255, 255, 0.7);
+  color: rgba(60, 41, 20, 0.68);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.model-providers-page__capability-toggle input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.model-providers-page__capability-toggle--active {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: rgba(239, 246, 255, 0.96);
+  color: rgb(37, 99, 235);
+}
+
+.model-providers-page__capability-permissions {
+  color: rgba(60, 41, 20, 0.62);
+  font-family: var(--toograph-font-mono);
+  font-size: 0.72rem;
+}
+
 .model-providers-page__provider-editor-panel,
 .model-providers-page__provider-empty {
   margin-top: 14px;
@@ -2586,6 +2780,11 @@ onBeforeUnmount(() => {
 
   .model-providers-page__provider-cards,
   .model-providers-page__provider-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .model-providers-page__capability-matrix-heading,
+  .model-providers-page__capability-row {
     grid-template-columns: 1fr;
   }
 

@@ -139,6 +139,17 @@ class ModelProviderClientTests(unittest.TestCase):
         self.assertIn("def _embed_openai_compatible(", client_source)
         self.assertNotIn("def _extract_openai_embedding_vector(", client_source)
 
+    def test_openai_compatible_rerank_transport_is_isolated_from_provider_client(self) -> None:
+        spec = importlib.util.find_spec("app.tools.model_provider_rerank")
+        self.assertIsNotNone(spec, "OpenAI-compatible rerank transport should live in a dedicated module")
+
+        from app.tools import model_provider_client
+
+        client_source = Path(model_provider_client.__file__ or "").read_text(encoding="utf-8")
+        self.assertIn("model_provider_rerank", client_source)
+        self.assertIn("def _rerank_openai_compatible(", client_source)
+        self.assertNotIn("def _extract_openai_rerank_results(", client_source)
+
     def test_anthropic_chat_transport_is_isolated_from_provider_client(self) -> None:
         spec = importlib.util.find_spec("app.tools.model_provider_anthropic")
         self.assertIsNotNone(spec, "Anthropic chat transport should live in a dedicated module")
@@ -297,6 +308,214 @@ class ModelProviderClientTests(unittest.TestCase):
         self.assertEqual(requested["headers"]["Authorization"], "Bearer sk-openai")
         self.assertEqual(requested["json"], {"model": "text-embedding-3-small", "input": "memory recall"})
 
+    def test_rerank_documents_with_model_provider_posts_openai_compatible_rerank(self) -> None:
+        from app.tools.model_provider_client import rerank_documents_with_model_provider
+
+        fake_client, client_patch = self._patched_client(
+            FakeResponse(
+                {
+                    "id": "rerank_1",
+                    "model": "bge-reranker-v2",
+                    "results": [
+                        {"index": 1, "relevance_score": 0.92},
+                        {"index": 0, "relevance_score": 0.34},
+                    ],
+                    "usage": {"total_tokens": 16},
+                }
+            )
+        )
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+            results, meta = rerank_documents_with_model_provider(
+                provider_id="local-rerank",
+                transport="openai-compatible",
+                base_url="http://127.0.0.1:8888/v1",
+                api_key="",
+                model="bge-reranker-v2",
+                query="memory recall",
+                documents=["old answer", "fresh matching answer"],
+                top_n=2,
+            )
+
+        requested = fake_client.post_calls[0]
+        self.assertEqual(results[0]["index"], 1)
+        self.assertEqual(results[0]["score"], 0.92)
+        self.assertEqual(results[0]["document"], "fresh matching answer")
+        self.assertEqual(meta["model"], "bge-reranker-v2")
+        self.assertEqual(meta["usage"], {"total_tokens": 16})
+        self.assertEqual(requested["url"], "http://127.0.0.1:8888/v1/rerank")
+        self.assertEqual(
+            requested["json"],
+            {
+                "model": "bge-reranker-v2",
+                "query": "memory recall",
+                "documents": ["old answer", "fresh matching answer"],
+                "top_n": 2,
+                "return_documents": False,
+            },
+        )
+
+    def test_embed_text_with_model_ref_falls_back_to_compatible_provider_after_primary_failure(self) -> None:
+        from app.tools import model_provider_client
+        from app.tools.model_provider_client import embed_text_with_model_ref
+
+        saved_settings = {
+            "model_providers": {
+                "openai": {
+                    "enabled": True,
+                    "base_url": "https://primary.test/v1",
+                    "api_key": "sk-primary",
+                    "models": [
+                        {
+                            "model": "text-embedding-primary",
+                            "capabilities": {"embedding": True},
+                            "permissions": ["embedding"],
+                        }
+                    ],
+                },
+                "fallback-embed": {
+                    "transport": "openai-compatible",
+                    "base_url": "https://fallback.test/v1",
+                    "api_key": "sk-fallback",
+                    "models": [
+                        {
+                            "model": "text-embedding-fallback",
+                            "capabilities": {"embedding": True},
+                            "permissions": ["embedding"],
+                        }
+                    ],
+                },
+                "web-embed": {
+                    "transport": "openai-compatible",
+                    "base_url": "https://web.test/v1",
+                    "api_key": "sk-web",
+                    "models": [
+                        {
+                            "model": "text-embedding-web",
+                            "capabilities": {"embedding": True},
+                            "permissions": ["embedding", "network_access"],
+                        }
+                    ],
+                },
+            }
+        }
+        attempted: list[str] = []
+
+        def fake_embed_with_provider(**kwargs: Any) -> tuple[list[float], dict[str, Any]]:
+            model_ref = f"{kwargs['provider_id']}/{kwargs['model']}"
+            attempted.append(model_ref)
+            if model_ref == "openai/text-embedding-primary":
+                raise RuntimeError("embedding upstream timed out")
+            self.assertEqual(kwargs["dimensions"], 3)
+            return [0.1, 0.2, 0.3], {
+                "provider_id": kwargs["provider_id"],
+                "model": kwargs["model"],
+                "dimensions": 3,
+            }
+
+        with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
+            with patch.object(model_provider_client, "embed_text_with_model_provider", side_effect=fake_embed_with_provider):
+                vector, meta = embed_text_with_model_ref(
+                    model_ref="openai/text-embedding-primary",
+                    text="memory recall",
+                    dimensions=3,
+                )
+
+        self.assertEqual(vector, [0.1, 0.2, 0.3])
+        self.assertEqual(attempted, ["openai/text-embedding-primary", "fallback-embed/text-embedding-fallback"])
+        self.assertEqual(meta["provider_id"], "fallback-embed")
+        self.assertEqual(meta["model"], "text-embedding-fallback")
+        self.assertTrue(meta["provider_fallback_used"])
+        self.assertEqual(meta["requested_model_ref"], "openai/text-embedding-primary")
+        trace = meta["provider_fallback_trace"]
+        self.assertEqual(trace["decision"], "fallback_selected")
+        self.assertEqual(trace["selected"]["model_ref"], "fallback-embed/text-embedding-fallback")
+        self.assertEqual(trace["required_capabilities"], ["embedding"])
+        self.assertEqual(trace["required_permissions"], ["embedding"])
+        self.assertEqual(trace["failed_candidates"][0]["error_type"], "provider_timeout")
+        self.assertEqual(trace["rejected_candidates"][0]["model_ref"], "web-embed/text-embedding-web")
+        self.assertEqual(trace["rejected_candidates"][0]["reason"], "permission_scope_expanded")
+
+    def test_rerank_documents_with_model_ref_falls_back_to_compatible_provider_after_primary_failure(self) -> None:
+        from app.tools import model_provider_client
+        from app.tools.model_provider_client import rerank_documents_with_model_ref
+
+        saved_settings = {
+            "model_providers": {
+                "primary-rerank": {
+                    "enabled": True,
+                    "transport": "openai-compatible",
+                    "base_url": "https://primary.test/v1",
+                    "api_key": "sk-primary",
+                    "models": [
+                        {
+                            "model": "rerank-primary",
+                            "capabilities": {"rerank": True},
+                            "permissions": ["rerank"],
+                        }
+                    ],
+                },
+                "fallback-rerank": {
+                    "transport": "openai-compatible",
+                    "base_url": "https://fallback.test/v1",
+                    "api_key": "sk-fallback",
+                    "models": [
+                        {
+                            "model": "rerank-fallback",
+                            "capabilities": {"rerank": True},
+                            "permissions": ["rerank"],
+                        }
+                    ],
+                },
+                "web-rerank": {
+                    "transport": "openai-compatible",
+                    "base_url": "https://web.test/v1",
+                    "api_key": "sk-web",
+                    "models": [
+                        {
+                            "model": "rerank-web",
+                            "capabilities": {"rerank": True},
+                            "permissions": ["rerank", "network_access"],
+                        }
+                    ],
+                },
+            }
+        }
+        attempted: list[str] = []
+
+        def fake_rerank_with_provider(**kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+            model_ref = f"{kwargs['provider_id']}/{kwargs['model']}"
+            attempted.append(model_ref)
+            if model_ref == "primary-rerank/rerank-primary":
+                raise RuntimeError("rerank upstream timed out")
+            return [{"index": 1, "score": 0.9, "document": kwargs["documents"][1]}], {
+                "provider_id": kwargs["provider_id"],
+                "model": kwargs["model"],
+            }
+
+        with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
+            with patch.object(model_provider_client, "rerank_documents_with_model_provider", side_effect=fake_rerank_with_provider):
+                results, meta = rerank_documents_with_model_ref(
+                    model_ref="primary-rerank/rerank-primary",
+                    query="memory recall",
+                    documents=["old answer", "fresh matching answer"],
+                    top_n=1,
+                )
+
+        self.assertEqual(results[0]["index"], 1)
+        self.assertEqual(attempted, ["primary-rerank/rerank-primary", "fallback-rerank/rerank-fallback"])
+        self.assertEqual(meta["provider_id"], "fallback-rerank")
+        self.assertEqual(meta["model"], "rerank-fallback")
+        self.assertTrue(meta["provider_fallback_used"])
+        self.assertEqual(meta["requested_model_ref"], "primary-rerank/rerank-primary")
+        trace = meta["provider_fallback_trace"]
+        self.assertEqual(trace["decision"], "fallback_selected")
+        self.assertEqual(trace["selected"]["model_ref"], "fallback-rerank/rerank-fallback")
+        self.assertEqual(trace["required_capabilities"], ["rerank"])
+        self.assertEqual(trace["required_permissions"], ["rerank"])
+        self.assertEqual(trace["failed_candidates"][0]["error_type"], "provider_timeout")
+        self.assertEqual(trace["rejected_candidates"][0]["model_ref"], "web-rerank/rerank-web")
+        self.assertEqual(trace["rejected_candidates"][0]["reason"], "permission_scope_expanded")
+
     def test_chat_openai_compatible_posts_structured_response_format(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider
 
@@ -373,6 +592,176 @@ class ModelProviderClientTests(unittest.TestCase):
         self.assertIn("response_format", fake_client.post_calls[1]["json"])
         self.assertNotIn("response_format", fake_client.post_calls[2]["json"])
         self.assertTrue(any("JSON Schema response_format" in warning for warning in meta["warnings"]))
+
+    def test_chat_with_model_ref_falls_back_to_compatible_provider_after_primary_failure(self) -> None:
+        from app.tools import model_provider_client
+        from app.tools.model_provider_client import chat_with_model_ref_with_meta
+
+        schema = {
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+            "additionalProperties": False,
+        }
+        saved_settings = {
+            "model_providers": {
+                "openai": {
+                    "enabled": True,
+                    "base_url": "https://primary.test/v1",
+                    "api_key": "sk-primary",
+                    "models": [
+                        {
+                            "model": "gpt-primary",
+                            "capabilities": {"chat": True, "structured_output": True},
+                            "permissions": ["text_generation"],
+                        }
+                    ],
+                },
+                "anthropic": {
+                    "base_url": "https://fallback.test/v1",
+                    "api_key": "sk-fallback",
+                    "models": [
+                        {
+                            "model": "claude-fallback",
+                            "capabilities": {"chat": True, "structured_output": True},
+                            "permissions": ["text_generation"],
+                        }
+                    ],
+                },
+                "web-gateway": {
+                    "transport": "openai-compatible",
+                    "base_url": "https://web.test/v1",
+                    "api_key": "sk-web",
+                    "models": [
+                        {
+                            "model": "browsing-model",
+                            "capabilities": {"chat": True, "structured_output": True},
+                            "permissions": ["text_generation", "network_access"],
+                        }
+                    ],
+                },
+            }
+        }
+        attempted: list[str] = []
+
+        def fake_chat_with_provider(**kwargs: Any) -> tuple[str, dict[str, Any]]:
+            model_ref = f"{kwargs['provider_id']}/{kwargs['model']}"
+            attempted.append(model_ref)
+            if model_ref == "openai/gpt-primary":
+                raise RuntimeError("upstream timed out")
+            return '{"answer":"fallback"}', {
+                "provider_id": kwargs["provider_id"],
+                "model": kwargs["model"],
+                "warnings": [],
+            }
+
+        with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
+            with patch.object(model_provider_client, "chat_with_model_provider", side_effect=fake_chat_with_provider):
+                content, meta = chat_with_model_ref_with_meta(
+                    model_ref="openai/gpt-primary",
+                    system_prompt="sys",
+                    user_prompt="user",
+                    temperature=0.2,
+                    structured_output_schema=schema,
+                )
+
+        self.assertEqual(content, '{"answer":"fallback"}')
+        self.assertEqual(attempted, ["openai/gpt-primary", "anthropic/claude-fallback"])
+        self.assertEqual(meta["provider_id"], "anthropic")
+        self.assertEqual(meta["model"], "claude-fallback")
+        self.assertTrue(meta["provider_fallback_used"])
+        self.assertEqual(meta["requested_model_ref"], "openai/gpt-primary")
+        trace = meta["provider_fallback_trace"]
+        self.assertEqual(trace["kind"], "provider_fallback_trace")
+        self.assertEqual(trace["decision"], "fallback_selected")
+        self.assertEqual(trace["selected"]["model_ref"], "anthropic/claude-fallback")
+        self.assertEqual(trace["failed_candidates"][0]["model_ref"], "openai/gpt-primary")
+        self.assertEqual(trace["failed_candidates"][0]["error_type"], "provider_timeout")
+        self.assertEqual(trace["rejected_candidates"][0]["model_ref"], "web-gateway/browsing-model")
+        self.assertEqual(trace["rejected_candidates"][0]["reason"], "permission_scope_expanded")
+        self.assertTrue(any("fallback" in warning.lower() for warning in meta["warnings"]))
+
+    def test_chat_with_model_ref_continues_to_next_fallback_when_first_fallback_fails(self) -> None:
+        from app.tools import model_provider_client
+        from app.tools.model_provider_client import chat_with_model_ref_with_meta
+
+        saved_settings = {
+            "model_providers": {
+                "openai": {
+                    "enabled": True,
+                    "base_url": "https://primary.test/v1",
+                    "api_key": "sk-primary",
+                    "models": [
+                        {
+                            "model": "gpt-primary",
+                            "capabilities": {"chat": True},
+                            "permissions": ["text_generation"],
+                        }
+                    ],
+                },
+                "fallback-a": {
+                    "transport": "openai-compatible",
+                    "base_url": "https://fallback-a.test/v1",
+                    "api_key": "sk-a",
+                    "models": [
+                        {
+                            "model": "gpt-fallback-a",
+                            "capabilities": {"chat": True},
+                            "permissions": ["text_generation"],
+                        }
+                    ],
+                },
+                "fallback-b": {
+                    "transport": "openai-compatible",
+                    "base_url": "https://fallback-b.test/v1",
+                    "api_key": "sk-b",
+                    "models": [
+                        {
+                            "model": "gpt-fallback-b",
+                            "capabilities": {"chat": True},
+                            "permissions": ["text_generation"],
+                        }
+                    ],
+                },
+            }
+        }
+        attempted: list[str] = []
+
+        def fake_chat_with_provider(**kwargs: Any) -> tuple[str, dict[str, Any]]:
+            model_ref = f"{kwargs['provider_id']}/{kwargs['model']}"
+            attempted.append(model_ref)
+            if model_ref in {"openai/gpt-primary", "fallback-a/gpt-fallback-a"}:
+                raise RuntimeError(f"{model_ref} timed out")
+            return "fallback b answer", {
+                "provider_id": kwargs["provider_id"],
+                "model": kwargs["model"],
+                "warnings": [],
+            }
+
+        with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
+            with patch.object(model_provider_client, "chat_with_model_provider", side_effect=fake_chat_with_provider):
+                content, meta = chat_with_model_ref_with_meta(
+                    model_ref="openai/gpt-primary",
+                    system_prompt="sys",
+                    user_prompt="user",
+                    temperature=0.2,
+                )
+
+        self.assertEqual(content, "fallback b answer")
+        self.assertEqual(attempted, ["openai/gpt-primary", "fallback-a/gpt-fallback-a", "fallback-b/gpt-fallback-b"])
+        trace = meta["provider_fallback_trace"]
+        self.assertEqual(trace["selected"]["model_ref"], "fallback-b/gpt-fallback-b")
+        self.assertEqual(
+            [(attempt["model_ref"], attempt["status"]) for attempt in trace["attempts"]],
+            [
+                ("openai/gpt-primary", "failed"),
+                ("fallback-a/gpt-fallback-a", "failed"),
+                ("fallback-b/gpt-fallback-b", "selected"),
+            ],
+        )
+        self.assertEqual(trace["failed_candidates"][1]["model_ref"], "fallback-a/gpt-fallback-a")
+        self.assertEqual(trace["failed_candidates"][1]["reason"], "fallback_provider_failed")
+        self.assertTrue(any("fallback-a/gpt-fallback-a" in warning for warning in trace["warnings"]))
 
     def test_chat_openai_compatible_sends_image_attachments_as_content_parts(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider

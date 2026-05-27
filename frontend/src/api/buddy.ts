@@ -217,6 +217,8 @@ export function searchBuddyChatSessions(
   filters: {
     query?: string;
     currentSessionId?: string;
+    embeddingModelRef?: string;
+    rerankerModelRef?: string;
     limit?: number;
     window?: number;
     sort?: string;
@@ -229,6 +231,12 @@ export function searchBuddyChatSessions(
   }
   if (filters.currentSessionId) {
     params.set("current_session_id", filters.currentSessionId);
+  }
+  if (filters.embeddingModelRef) {
+    params.set("embedding_model_ref", filters.embeddingModelRef);
+  }
+  if (filters.rerankerModelRef) {
+    params.set("reranker_model_ref", filters.rerankerModelRef);
   }
   if (filters.limit) {
     params.set("limit", String(filters.limit));
@@ -266,6 +274,7 @@ export function searchBuddyMemories(
   filters: {
     query?: string;
     embeddingModelRef?: string;
+    rerankerModelRef?: string;
     scopeKind?: string;
     scopeId?: string;
     layer?: string;
@@ -281,6 +290,9 @@ export function searchBuddyMemories(
   }
   if (filters.embeddingModelRef) {
     params.set("embedding_model_ref", filters.embeddingModelRef);
+  }
+  if (filters.rerankerModelRef) {
+    params.set("reranker_model_ref", filters.rerankerModelRef);
   }
   if (filters.scopeKind) {
     params.set("scope_kind", filters.scopeKind);

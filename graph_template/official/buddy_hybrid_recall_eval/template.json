@@ -1,0 +1,321 @@
+{
+  "template_id": "buddy_hybrid_recall_eval",
+  "label": "混合召回评测",
+  "description": "用确定性 Hybrid Recall Context Loader 同时召回 Buddy 历史消息和结构化 DB 记忆，输出统一可审计 context_package 和质量报告。",
+  "default_graph_name": "混合召回评测",
+  "state_schema": {
+    "query": {
+      "name": "Query",
+      "description": "用于召回历史消息和结构化记忆的查询。",
+      "type": "text",
+      "value": "",
+      "color": "#2563eb",
+      "binding": null
+    },
+    "current_session_id": {
+      "name": "Current Session ID",
+      "description": "当前 Buddy session id，用于排除当前会话谱系。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": null
+    },
+    "embedding_model_ref": {
+      "name": "Embedding Model Ref",
+      "description": "可选 embedding model id/provider:model，用于 hybrid recall。",
+      "type": "text",
+      "value": "",
+      "color": "#0f766e",
+      "binding": null
+    },
+    "session_limit": {
+      "name": "Session Limit",
+      "description": "最多召回的历史会话数量。",
+      "type": "number",
+      "value": 5,
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "memory_limit": {
+      "name": "Memory Limit",
+      "description": "最多召回的结构化记忆数量。",
+      "type": "number",
+      "value": 5,
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "window": {
+      "name": "Window",
+      "description": "历史命中消息前后展开窗口。",
+      "type": "number",
+      "value": 1,
+      "color": "#b45309",
+      "binding": null
+    },
+    "bookend": {
+      "name": "Bookend",
+      "description": "每个命中会话开头和结尾消息数量。",
+      "type": "number",
+      "value": 0,
+      "color": "#b45309",
+      "binding": null
+    },
+    "sort": {
+      "name": "Sort",
+      "description": "历史召回排序。",
+      "type": "text",
+      "value": "rank",
+      "color": "#475569",
+      "binding": null
+    },
+    "role_filter": {
+      "name": "Role Filter",
+      "description": "历史召回角色过滤。",
+      "type": "json",
+      "value": [],
+      "color": "#475569",
+      "binding": null
+    },
+    "scope_kind": {
+      "name": "Scope Kind",
+      "description": "可选记忆 scope_kind 过滤。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": null
+    },
+    "scope_id": {
+      "name": "Scope ID",
+      "description": "可选记忆 scope_id 过滤。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": null
+    },
+    "layer": {
+      "name": "Layer",
+      "description": "可选记忆 layer 过滤。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": null
+    },
+    "memory_type": {
+      "name": "Memory Type",
+      "description": "可选记忆类型过滤。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": null
+    },
+    "status_filter": {
+      "name": "Status Filter",
+      "description": "记忆状态过滤。",
+      "type": "text",
+      "value": "active",
+      "color": "#475569",
+      "binding": null
+    },
+    "max_chars": {
+      "name": "Max Chars",
+      "description": "混合召回上下文最大字符预算。",
+      "type": "number",
+      "value": 8000,
+      "color": "#b45309",
+      "binding": null
+    },
+    "hybrid_recall_status": {
+      "name": "Hybrid Recall Status",
+      "description": "hybrid_recall_context_loader 执行状态。",
+      "type": "text",
+      "value": "",
+      "color": "#475569",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "hybrid_recall_context_loader",
+        "nodeId": "load_hybrid_recall_context",
+        "fieldKey": "status",
+        "managed": true
+      }
+    },
+    "hybrid_recall_context": {
+      "name": "Hybrid Recall Context",
+      "description": "历史消息和结构化记忆混合召回得到的 context_package。",
+      "type": "json",
+      "value": {},
+      "color": "#0891b2",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "hybrid_recall_context_loader",
+        "nodeId": "load_hybrid_recall_context",
+        "fieldKey": "hybrid_recall_context",
+        "managed": true
+      }
+    },
+    "hybrid_recall_report": {
+      "name": "Hybrid Recall Report",
+      "description": "混合召回质量报告，包含 memory ids、message ids、source refs、retrieval modes 和预算。",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea",
+      "binding": {
+        "kind": "tool_output",
+        "actionKey": "",
+        "toolKey": "hybrid_recall_context_loader",
+        "nodeId": "load_hybrid_recall_context",
+        "fieldKey": "hybrid_recall_report",
+        "managed": true
+      }
+    }
+  },
+  "nodes": {
+    "input_query": {
+      "kind": "input",
+      "name": "输入查询",
+      "description": "提供混合召回查询。",
+      "ui": {"position": {"x": 80, "y": 120}, "collapsed": false, "size": {"width": 360, "height": 180}},
+      "reads": [],
+      "writes": [{"state": "query", "mode": "replace"}],
+      "config": {"value": "", "boundaryType": "text"}
+    },
+    "input_current_session_id": {
+      "kind": "input",
+      "name": "当前会话",
+      "description": "提供当前 Buddy session id。",
+      "ui": {"position": {"x": 80, "y": 340}, "collapsed": false, "size": {"width": 360, "height": 180}},
+      "reads": [],
+      "writes": [{"state": "current_session_id", "mode": "replace"}],
+      "config": {"value": "", "boundaryType": "text"}
+    },
+    "input_embedding_model_ref": {
+      "kind": "input",
+      "name": "Embedding Model",
+      "description": "可选：限定 hybrid recall 使用的 embedding 模型。",
+      "ui": {"position": {"x": 80, "y": 560}, "collapsed": false, "size": {"width": 360, "height": 180}},
+      "reads": [],
+      "writes": [{"state": "embedding_model_ref", "mode": "replace"}],
+      "config": {"value": "", "boundaryType": "text"}
+    },
+    "input_session_limit": {
+      "kind": "input",
+      "name": "历史召回数量",
+      "description": "提供历史会话召回数量。",
+      "ui": {"position": {"x": 80, "y": 780}, "collapsed": false, "size": {"width": 360, "height": 220}},
+      "reads": [],
+      "writes": [{"state": "session_limit", "mode": "replace"}],
+      "config": {"value": 5, "boundaryType": "text"}
+    },
+    "input_memory_limit": {
+      "kind": "input",
+      "name": "记忆召回数量",
+      "description": "提供结构化记忆召回数量。",
+      "ui": {"position": {"x": 80, "y": 1040}, "collapsed": false, "size": {"width": 360, "height": 220}},
+      "reads": [],
+      "writes": [{"state": "memory_limit", "mode": "replace"}],
+      "config": {"value": 5, "boundaryType": "text"}
+    },
+    "input_window": {
+      "kind": "input",
+      "name": "历史窗口",
+      "description": "提供历史消息窗口。",
+      "ui": {"position": {"x": 80, "y": 1300}, "collapsed": false, "size": {"width": 360, "height": 220}},
+      "reads": [],
+      "writes": [{"state": "window", "mode": "replace"}],
+      "config": {"value": 1, "boundaryType": "text"}
+    },
+    "input_bookend": {
+      "kind": "input",
+      "name": "历史首尾",
+      "description": "提供每个命中会话的 bookend 数量。",
+      "ui": {"position": {"x": 80, "y": 1560}, "collapsed": false, "size": {"width": 360, "height": 220}},
+      "reads": [],
+      "writes": [{"state": "bookend", "mode": "replace"}],
+      "config": {"value": 0, "boundaryType": "text"}
+    },
+    "input_max_chars": {
+      "kind": "input",
+      "name": "字符预算",
+      "description": "提供召回上下文最大字符预算。",
+      "ui": {"position": {"x": 80, "y": 1820}, "collapsed": false, "size": {"width": 360, "height": 180}},
+      "reads": [],
+      "writes": [{"state": "max_chars", "mode": "replace"}],
+      "config": {"value": 8000, "boundaryType": "text"}
+    },
+    "load_hybrid_recall_context": {
+      "kind": "tool",
+      "name": "加载混合召回上下文",
+      "description": "调用 hybrid_recall_context_loader，从 Buddy 历史消息和 DB memory_entries 生成统一 context_package 和质量报告。",
+      "ui": {"position": {"x": 620, "y": 420}, "collapsed": false, "size": {"width": 520, "height": 440}},
+      "reads": [
+        {"state": "query", "required": true, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "query", "managed": true}},
+        {"state": "current_session_id", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "current_session_id", "managed": true}},
+        {"state": "embedding_model_ref", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "embedding_model_ref", "managed": true}},
+        {"state": "session_limit", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "session_limit", "managed": true}},
+        {"state": "memory_limit", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "memory_limit", "managed": true}},
+        {"state": "window", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "window", "managed": true}},
+        {"state": "bookend", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "bookend", "managed": true}},
+        {"state": "sort", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "sort", "managed": true}},
+        {"state": "role_filter", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "role_filter", "managed": true}},
+        {"state": "scope_kind", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "scope_kind", "managed": true}},
+        {"state": "scope_id", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "scope_id", "managed": true}},
+        {"state": "layer", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "layer", "managed": true}},
+        {"state": "memory_type", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "memory_type", "managed": true}},
+        {"state": "status_filter", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "status", "managed": true}},
+        {"state": "max_chars", "required": false, "binding": {"kind": "tool_input", "actionKey": "", "toolKey": "hybrid_recall_context_loader", "fieldKey": "max_chars", "managed": true}}
+      ],
+      "writes": [
+        {"state": "hybrid_recall_status", "mode": "replace"},
+        {"state": "hybrid_recall_context", "mode": "replace"},
+        {"state": "hybrid_recall_report", "mode": "replace"}
+      ],
+      "config": {"toolKey": "hybrid_recall_context_loader"}
+    },
+    "output_hybrid_recall_context": {
+      "kind": "output",
+      "name": "混合召回上下文",
+      "description": "展示召回得到的 context_package。",
+      "ui": {"position": {"x": 1280, "y": 240}, "collapsed": false, "size": {"width": 460, "height": 300}},
+      "reads": [{"state": "hybrid_recall_context", "required": true, "binding": null}],
+      "writes": [],
+      "config": {"displayMode": "json", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": ""}
+    },
+    "output_hybrid_recall_report": {
+      "kind": "output",
+      "name": "混合召回报告",
+      "description": "展示 memory ids、message ids、source refs、retrieval modes 和预算。",
+      "ui": {"position": {"x": 1280, "y": 620}, "collapsed": false, "size": {"width": 460, "height": 300}},
+      "reads": [{"state": "hybrid_recall_report", "required": true, "binding": null}],
+      "writes": [],
+      "config": {"displayMode": "json", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": ""}
+    }
+  },
+  "edges": [
+    {"source": "input_query", "target": "load_hybrid_recall_context"},
+    {"source": "input_current_session_id", "target": "load_hybrid_recall_context"},
+    {"source": "input_embedding_model_ref", "target": "load_hybrid_recall_context"},
+    {"source": "input_session_limit", "target": "load_hybrid_recall_context"},
+    {"source": "input_memory_limit", "target": "load_hybrid_recall_context"},
+    {"source": "input_window", "target": "load_hybrid_recall_context"},
+    {"source": "input_bookend", "target": "load_hybrid_recall_context"},
+    {"source": "input_max_chars", "target": "load_hybrid_recall_context"},
+    {"source": "load_hybrid_recall_context", "target": "output_hybrid_recall_context"},
+    {"source": "load_hybrid_recall_context", "target": "output_hybrid_recall_report"}
+  ],
+  "conditional_edges": [],
+  "metadata": {
+    "category": "buddy_memory",
+    "role": "buddy_hybrid_recall_eval",
+    "visible": false,
+    "capabilityDiscoverableDefault": false,
+    "tags": ["buddy", "memory", "session", "recall", "eval"],
+    "required_tools": ["hybrid_recall_context_loader"],
+    "output_contract": [
+      {"state": "hybrid_recall_context", "role": "context_package"},
+      {"state": "hybrid_recall_report", "role": "quality_report"}
+    ]
+  },
+  "source": "official",
+  "status": "active"
+}

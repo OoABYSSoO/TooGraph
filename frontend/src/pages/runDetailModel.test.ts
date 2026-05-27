@@ -334,6 +334,208 @@ test("buildRunContextAudit summarizes context packages and nested assembly refs"
   assert.equal(audit.contextSourceCount, 2);
 });
 
+test("buildRunContextAudit summarizes context budget and compaction reports", () => {
+  const audit = buildRunContextAudit(
+    createRunDetail({
+      artifacts: createRunArtifacts({
+        state_values: {
+          context_budget_report: {
+            trigger: "preflight",
+            reason: "history_pressure",
+            raw_history_chars: 12000,
+            rendered_history_chars: 3900,
+            session_summary_chars: 800,
+            omitted_history_message_count: 14,
+            provider_prompt_tokens: 73000,
+            model_context_window_tokens: 100000,
+            prompt_token_pressure: 0.73,
+          },
+          compaction_report: {
+            trigger: "preflight",
+            source_run_id: "run_source_1",
+            omitted_count: 14,
+            protected_count: 12,
+            summary_source_refs: [
+              { source_kind: "buddy_session_summary", source_id: "session_summary", source_revision_id: "rev_summary_1" },
+              { source_kind: "buddy_message", source_id: "msg_1", source_revision_id: "msgrev_1" },
+            ],
+            omitted_refs: [
+              { source_kind: "buddy_message", source_id: "msg_old_1" },
+              { source_kind: "buddy_message", source_id: "msg_old_2" },
+            ],
+            protected_recent_history_refs: [
+              { source_kind: "buddy_message", source_id: "msg_recent_1" },
+              { source_kind: "buddy_message", source_id: "msg_recent_2" },
+              { source_kind: "buddy_message", source_id: "msg_recent_3" },
+            ],
+            summary_changed: true,
+            risk_notes: ["保留最近原文"],
+            anti_thrashing_notes: "摘要有实质变化才写回",
+          },
+        },
+      }),
+    }),
+  );
+
+  assert.deepEqual(audit.budgetReports, [
+    {
+      key: "context_budget_report:history_pressure:0",
+      kind: "context_budget_report",
+      trigger: "preflight",
+      reason: "history_pressure",
+      sourceRunId: "",
+      rawHistoryChars: 12000,
+      renderedHistoryChars: 3900,
+      sessionSummaryChars: 800,
+      omittedCount: 14,
+      protectedCount: null,
+      providerPromptTokens: 73000,
+      modelContextWindowTokens: 100000,
+      promptTokenPressure: 0.73,
+      summaryChanged: null,
+      sourceRefCount: null,
+      summarySourceRefCount: null,
+      omittedRefCount: null,
+      protectedRecentHistoryRefCount: null,
+      summarySourceRevisionIds: [],
+      notes: [],
+    },
+    {
+      key: "compaction_report:preflight:1",
+      kind: "compaction_report",
+      trigger: "preflight",
+      reason: "",
+      sourceRunId: "run_source_1",
+      rawHistoryChars: null,
+      renderedHistoryChars: null,
+      sessionSummaryChars: null,
+      omittedCount: 14,
+      protectedCount: 12,
+      providerPromptTokens: null,
+      modelContextWindowTokens: null,
+      promptTokenPressure: null,
+      summaryChanged: true,
+      sourceRefCount: null,
+      summarySourceRefCount: 2,
+      omittedRefCount: 2,
+      protectedRecentHistoryRefCount: 3,
+      summarySourceRevisionIds: ["rev_summary_1", "msgrev_1"],
+      notes: ["保留最近原文", "摘要有实质变化才写回"],
+    },
+  ]);
+});
+
+test("buildRunContextAudit summarizes LLM prompt snapshots", () => {
+  const audit = buildRunContextAudit(
+    createRunDetail({
+      node_executions: [
+        createNodeExecution({
+          node_id: "agent_answer",
+          artifacts: {
+            runtime_config: {
+              prompt_snapshots: [
+                {
+                  kind: "llm_prompt_snapshot",
+                  phase: "agent_response",
+                  system_prompt_hash: "sha256:system",
+                  user_prompt_hash: "sha256:user",
+                  system_prompt_chars: 2400,
+                  user_prompt_chars: 80,
+                  total_prompt_chars: 2480,
+                  token_estimate: 620,
+                  input_state_keys: ["conversation_history"],
+                  output_keys: ["answer"],
+                  context_refs: [
+                    {
+                      state_key: "conversation_history",
+                      kind: "context_package",
+                      package_id: "pkg_history_1",
+                      assembly_id: "ctx_history_1",
+                    },
+                  ],
+                  prompt_cache_policy: {
+                    kind: "prompt_cache_policy",
+                    version: 1,
+                    storage: "hash_and_metadata",
+                    mode: "audit_only",
+                    provider_cache_control: "not_applied",
+                    stable_prefix_hash: "sha256:system",
+                    stable_prefix_chars: 2400,
+                    dynamic_suffix_hash: "sha256:user",
+                    dynamic_suffix_chars: 80,
+                    cache_key: "sha256:cache",
+                    eligible: false,
+                    reason: "runtime_state_in_system_prompt",
+                    invalidators: ["input_state_keys", "context_refs"],
+                  },
+                },
+              ],
+            },
+          },
+        }),
+      ],
+    }),
+  );
+
+  assert.deepEqual(audit.promptSnapshots, [
+    {
+      key: "agent_response:sha256:system:sha256:user:0",
+      phase: "agent_response",
+      systemPromptHash: "sha256:system",
+      userPromptHash: "sha256:user",
+      systemPromptChars: 2400,
+      userPromptChars: 80,
+      totalPromptChars: 2480,
+      tokenEstimate: 620,
+      inputStateKeys: ["conversation_history"],
+      outputKeys: ["answer"],
+      actionKeys: [],
+      subgraphKeys: [],
+      contextRefCount: 1,
+      promptCachePolicy: {
+        eligible: false,
+        cacheKey: "sha256:cache",
+        mode: "audit_only",
+        providerCacheControl: "not_applied",
+        reason: "runtime_state_in_system_prompt",
+        stablePrefixHash: "sha256:system",
+        stablePrefixChars: 2400,
+        dynamicSuffixHash: "sha256:user",
+        dynamicSuffixChars: 80,
+        invalidators: ["input_state_keys", "context_refs"],
+      },
+    },
+  ]);
+});
+
+test("buildRunContextAudit deduplicates repeated context budget reports", () => {
+  const repeatedReport = {
+    trigger: "preflight",
+    reason: "history_pressure",
+    raw_history_chars: 12000,
+    rendered_history_chars: 3900,
+    session_summary_chars: 800,
+    omitted_history_message_count: 14,
+  };
+  const audit = buildRunContextAudit(
+    createRunDetail({
+      state_snapshot: {
+        values: {
+          context_budget_report: repeatedReport,
+        },
+        last_writers: {},
+      },
+      artifacts: createRunArtifacts({
+        state_values: {
+          context_budget_report: { ...repeatedReport },
+        },
+      }),
+    }),
+  );
+
+  assert.equal(audit.budgetReports.length, 1);
+});
+
 test("buildRunContextAudit summarizes retrieval query and source refs", () => {
   const audit = buildRunContextAudit(
     createRunDetail({

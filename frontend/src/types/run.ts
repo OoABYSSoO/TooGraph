@@ -298,6 +298,7 @@ export type RunDetail = RunSummary & {
   node_executions: NodeExecutionDetail[];
   warnings: string[];
   errors: string[];
+  permission_approvals?: Array<Record<string, unknown>>;
   output_previews: OutputPreview[];
   artifacts: RunArtifacts;
   state_snapshot: StateSnapshot;

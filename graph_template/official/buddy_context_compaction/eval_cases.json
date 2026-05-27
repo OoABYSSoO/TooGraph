@@ -1,0 +1,101 @@
+{
+  "suite": "buddy_context_compaction_core",
+  "name": "Buddy 上下文压缩核心回归",
+  "description": "覆盖上下文压缩在预算压力下保护近期原文、生成带 source refs 的会话摘要，并通过写回节点形成可审计结果。",
+  "cases": [
+    {
+      "case_id": "context-compaction-protects-recent-history",
+      "name": "上下文压力下保护近期历史并生成摘要候选",
+      "description": "模拟长会话超过上下文预算，压缩模板应保护当前用户消息和近期回复，把中间历史压缩成 session summary candidate。",
+      "inputs": {
+        "trigger": "context_budget_pressure",
+        "source_run_id": "run_eval_compaction_source",
+        "current_session_id": "session_eval_compaction",
+        "user_message": "继续刚才的设计，重点补召回评测。",
+        "conversation_history": {
+          "kind": "context_assembly_ref",
+          "source_refs": [
+            {
+              "source_kind": "buddy_message",
+              "source_id": "message_eval_compaction_1"
+            },
+            {
+              "source_kind": "buddy_message",
+              "source_id": "message_eval_compaction_2"
+            },
+            {
+              "source_kind": "buddy_message",
+              "source_id": "message_eval_compaction_3"
+            }
+          ],
+          "metadata": {
+            "message_count": 24,
+            "scope": "eval_fixture"
+          }
+        },
+        "existing_session_summary": "已经确定图运行记录是唯一事实源，Buddy 历史只保存索引。",
+        "buddy_context": {
+          "home_files": {
+            "MEMORY.md": "用户关注 Hermes 能力追赶、图运行事实源和记忆召回。"
+          }
+        },
+        "context_budget_report": {
+          "status": "over_budget",
+          "estimated_tokens": 28000,
+          "target_tokens": 16000,
+          "recent_message_window": 12,
+          "pressure_reason": "conversation_history_too_long"
+        },
+        "capability_result": {
+          "status": "succeeded",
+          "summary": "已完成上一轮 retrieval ranking report。"
+        },
+        "public_response": "召回评测需要覆盖 source refs、hybrid ranking 和失败诊断。"
+      },
+      "expected": {
+        "required": [
+          "compaction_report",
+          "session_summary_candidate",
+          "protected_recent_history"
+        ]
+      },
+      "checks": [
+        {
+          "kind": "schema",
+          "name": "compaction_outputs_present",
+          "target": "final_output",
+          "required": [
+            "compaction_report",
+            "session_summary_candidate",
+            "protected_recent_history"
+          ]
+        },
+        {
+          "kind": "rule",
+          "key": "compaction_keeps_recent_history_and_source_refs",
+          "expectation": "compaction_plan 和 compaction_report 应说明触发原因、保护最近历史、压缩范围和 source refs；session_summary_candidate 不应递归保存完整对话全文。"
+        }
+      ],
+      "metadata": {
+        "fixture_runs": [
+          {
+            "run_id": "run_eval_compaction_source",
+            "graph_id": "buddy_autonomous_loop_fixture",
+            "graph_name": "Buddy 压缩 eval fixture",
+            "status": "completed",
+            "metadata": {
+              "runtime_context": {
+                "buddy_session_id": "session_eval_compaction"
+              }
+            },
+            "state_values": {
+              "current_session_id": "session_eval_compaction",
+              "user_message": "继续刚才的设计，重点补召回评测。",
+              "public_response": "召回评测需要覆盖 source refs、hybrid ranking 和失败诊断。"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

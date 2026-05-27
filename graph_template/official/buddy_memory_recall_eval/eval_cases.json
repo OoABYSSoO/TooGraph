@@ -1,0 +1,146 @@
+{
+  "suite": "buddy_memory_recall_eval_core",
+  "name": "Buddy 记忆召回核心回归",
+  "description": "覆盖结构化 DB 记忆通过确定性 memory_search_context_loader 被召回、展开 source refs，并生成可重复质量报告。",
+  "cases": [
+    {
+      "case_id": "memory-recall-finds-fixture-memory-with-source-refs",
+      "name": "记忆召回应命中 fixture memory 并保留来源",
+      "description": "安装一条结构化记忆 fixture，运行记忆召回模板后用 memory_retrieval check 验证命中 memory id、source refs 和关键文本。",
+      "inputs": {
+        "query": "memory-recall-evidence",
+        "embedding_model_ref": "",
+        "limit": 5,
+        "max_chars": 8000,
+        "status_filter": "active"
+      },
+      "expected": {
+        "required_memory_ids": [
+          "mem_eval_recall_preference"
+        ]
+      },
+      "checks": [
+        {
+          "kind": "memory_retrieval",
+          "name": "fixture_memory_recalled_with_source_refs",
+          "target": "memory_search_report",
+          "min_results": 1,
+          "required_memory_ids": [
+            "mem_eval_recall_preference"
+          ],
+          "required_source_refs": [
+            {
+              "source_kind": "memory_entry",
+              "source_id": "mem_eval_recall_preference"
+            },
+            {
+              "source_kind": "buddy_message",
+              "source_id": "msg_eval_recall_preference"
+            }
+          ],
+          "required_terms": [
+            "memory-recall-evidence",
+            "先给结论"
+          ],
+          "max_context_chars": 8000
+        }
+      ],
+      "metadata": {
+        "fixture_memory_entries": [
+          {
+            "memory_id": "mem_eval_recall_preference",
+            "scope_kind": "buddy",
+            "scope_id": "default",
+            "layer": "long_term",
+            "memory_type": "preference",
+            "title": "技术方案回复偏好",
+            "content": "memory-recall-evidence：用户希望技术方案先给结论，再展开依据和取舍。",
+            "confidence": 0.92,
+            "salience": 0.86,
+            "sources": [
+              {
+                "source_kind": "buddy_message",
+                "source_id": "msg_eval_recall_preference"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "memory-recall-rerank-promotes-most-relevant-memory",
+      "name": "记忆召回重排应提升最相关记忆",
+      "description": "安装两条结构化记忆 fixture，运行记忆召回模板后用 memory_retrieval check 验证 rerank 审计、reranker model 和首位 memory id。",
+      "inputs": {
+        "query": "memory-rerank-evidence 技术方案",
+        "embedding_model_ref": "",
+        "reranker_model_ref": "local-rerank/bge-reranker-v2",
+        "limit": 5,
+        "max_chars": 8000,
+        "status_filter": "active"
+      },
+      "checks": [
+        {
+          "kind": "memory_retrieval",
+          "name": "rerank_promotes_precise_memory",
+          "target": "memory_search_report",
+          "min_results": 2,
+          "required_memory_ids": [
+            "mem_eval_rerank_precise",
+            "mem_eval_rerank_broad"
+          ],
+          "required_reranker_model_ref": "local-rerank/bge-reranker-v2",
+          "required_rerank_status": "succeeded",
+          "required_top_memory_id": "mem_eval_rerank_precise",
+          "required_ranked_memory_ids": [
+            "mem_eval_rerank_precise",
+            "mem_eval_rerank_broad"
+          ],
+          "required_terms": [
+            "memory-rerank-evidence",
+            "先给结论"
+          ],
+          "max_context_chars": 8000
+        }
+      ],
+      "metadata": {
+        "fixture_memory_entries": [
+          {
+            "memory_id": "mem_eval_rerank_broad",
+            "scope_kind": "buddy",
+            "scope_id": "default",
+            "layer": "long_term",
+            "memory_type": "preference",
+            "title": "较宽泛技术讨论偏好",
+            "content": "memory-rerank-evidence：用户经常讨论技术方案，需要保留依据和取舍。",
+            "confidence": 0.8,
+            "salience": 0.55,
+            "sources": [
+              {
+                "source_kind": "buddy_message",
+                "source_id": "msg_eval_rerank_broad"
+              }
+            ]
+          },
+          {
+            "memory_id": "mem_eval_rerank_precise",
+            "scope_kind": "buddy",
+            "scope_id": "default",
+            "layer": "long_term",
+            "memory_type": "preference",
+            "title": "精确技术方案回复偏好",
+            "content": "memory-rerank-evidence：用户希望技术方案先给结论，再展开依据、取舍和验证结果。",
+            "confidence": 0.94,
+            "salience": 0.9,
+            "sources": [
+              {
+                "source_kind": "buddy_message",
+                "source_id": "msg_eval_rerank_precise"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

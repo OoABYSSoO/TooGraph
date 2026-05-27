@@ -164,6 +164,81 @@ test("buildAgentDiagnostic maps standard stop reasons to user-facing explanation
   }
 });
 
+test("buildAgentDiagnostic summarizes pending permission approval", () => {
+  const diagnostic = buildAgentDiagnostic(
+    createRun({
+      status: "awaiting_human",
+      stop_reason: "permission_required",
+      lifecycle: { updated_at: "2026-05-27T00:00:00Z", pause_reason: "permission_approval", resume_count: 0 },
+      metadata: {
+        pending_permission_approval: {
+          kind: "capability_permission_approval",
+          approval_id: "approval_1",
+          capability_kind: "action",
+          capability_key: "local_workspace_executor",
+          capability_name: "Local Workspace Executor",
+          permissions: ["file_write"],
+          reason: "Action declares risky permission.",
+          binding_source: "capability_state",
+          requested_at: "2026-05-27T00:00:01Z",
+        },
+      },
+    }),
+  );
+
+  assert.equal(diagnostic.visible, true);
+  assert.equal(diagnostic.permissionApproval.visible, true);
+  assert.equal(diagnostic.permissionApproval.actionable, true);
+  assert.equal(diagnostic.permissionApproval.status, "pending");
+  assert.equal(diagnostic.permissionApproval.capabilityRef, "action:local_workspace_executor");
+  assert.equal(diagnostic.permissionApproval.capabilityName, "Local Workspace Executor");
+  assert.equal(diagnostic.permissionApproval.permissionLabel, "file_write");
+  assert.deepEqual(diagnostic.permissionApproval.evidenceLabels, [
+    "status: pending",
+    "capability: action:local_workspace_executor",
+    "permissions: file_write",
+    "source: capability_state",
+  ]);
+  assert.deepEqual(diagnostic.permissionApproval.warnings, ["Action declares risky permission."]);
+});
+
+test("buildAgentDiagnostic summarizes latest completed permission approval", () => {
+  const diagnostic = buildAgentDiagnostic(
+    createRun({
+      permission_approvals: [
+        {
+          kind: "capability_permission_approval",
+          approval_id: "approval_old",
+          capability_kind: "action",
+          capability_key: "old_action",
+          permissions: ["file_write"],
+          status: "approved",
+          approved_at: "2026-05-27T00:00:01Z",
+        },
+        {
+          kind: "capability_permission_approval",
+          approval_id: "approval_new",
+          capability_kind: "action",
+          capability_key: "local_workspace_executor",
+          permissions: ["subprocess"],
+          status: "denied",
+          denial_reason: "不执行 shell。",
+          denied_at: "2026-05-27T00:00:02Z",
+        },
+      ],
+    }),
+  );
+
+  assert.equal(diagnostic.visible, true);
+  assert.equal(diagnostic.permissionApproval.visible, true);
+  assert.equal(diagnostic.permissionApproval.actionable, false);
+  assert.equal(diagnostic.permissionApproval.status, "denied");
+  assert.equal(diagnostic.permissionApproval.approvalId, "approval_new");
+  assert.equal(diagnostic.permissionApproval.capabilityRef, "action:local_workspace_executor");
+  assert.equal(diagnostic.permissionApproval.permissionLabel, "subprocess");
+  assert.deepEqual(diagnostic.permissionApproval.warnings, ["不执行 shell。"]);
+});
+
 test("buildAgentDiagnostic summarizes capability selection trace from state values", () => {
   const diagnostic = buildAgentDiagnostic(
     createRun({
@@ -224,6 +299,134 @@ test("buildAgentDiagnostic summarizes capability selection trace from state valu
       "budget: capability calls 4 / 4, remaining 0, exhausted",
     ],
   });
+});
+
+test("buildAgentDiagnostic summarizes provider fallback trace from state values", () => {
+  const diagnostic = buildAgentDiagnostic(
+    createRun({
+      artifacts: {
+        state_values: {
+          provider_fallback_trace: {
+            kind: "provider_fallback_trace",
+            decision: "fallback_selected",
+            fallback_used: true,
+            requested: { provider_id: "openai", model: "gpt-primary", model_ref: "openai/gpt-primary" },
+            selected: { provider_id: "local", model: "backup-model", model_ref: "local/backup-model" },
+            failed_candidates: [
+              {
+                provider_id: "openai",
+                model: "gpt-primary",
+                model_ref: "openai/gpt-primary",
+                error_type: "provider_timeout",
+              },
+            ],
+            fallback_candidates: [
+              {
+                provider_id: "local",
+                model: "backup-model",
+                model_ref: "local/backup-model",
+                reason: "compatible_fallback",
+              },
+            ],
+            rejected_candidates: [
+              {
+                provider_id: "web-gateway",
+                model: "browsing-model",
+                model_ref: "web-gateway/browsing-model",
+                reason: "permission_scope_expanded",
+              },
+            ],
+            required_capabilities: ["chat", "structured_output"],
+            required_permissions: ["text_generation"],
+            warnings: ["primary provider timed out"],
+          },
+        },
+      },
+    }),
+  );
+
+  assert.equal(diagnostic.visible, true);
+  assert.deepEqual(diagnostic.providerFallback, {
+    visible: true,
+    decision: "fallback_selected",
+    fallbackUsed: true,
+    requestedRef: "openai/gpt-primary",
+    selectedRef: "local/backup-model",
+    capabilityLabel: "capabilities: chat, structured_output",
+    permissionLabel: "permissions: text_generation",
+    failedLabels: ["failed: openai/gpt-primary (provider_timeout)"],
+    fallbackLabels: ["fallback: local/backup-model (compatible_fallback)"],
+    rejectedLabels: ["rejected: web-gateway/browsing-model (permission_scope_expanded)"],
+    evidenceLabels: [
+      "decision: fallback_selected",
+      "selected: local/backup-model",
+      "requested: openai/gpt-primary",
+      "capabilities: chat, structured_output",
+      "permissions: text_generation",
+    ],
+    warnings: ["primary provider timed out"],
+  });
+});
+
+test("buildAgentDiagnostic summarizes provider fallback trace from node runtime config", () => {
+  const diagnostic = buildAgentDiagnostic(
+    createRun({
+      node_executions: [
+        {
+          node_id: "agent",
+          node_type: "agent",
+          status: "success",
+          duration_ms: 1200,
+          input_summary: "",
+          output_summary: "",
+          warnings: [],
+          errors: [],
+          artifacts: {
+            inputs: {},
+            outputs: {},
+            family: "agent",
+            state_reads: [],
+            state_writes: [],
+            runtime_config: {
+              structured_output_repair_provider_fallback_trace: {
+                kind: "provider_fallback_trace",
+                decision: "fallback_selected",
+                fallback_used: true,
+                requested: { provider_id: "openai", model: "gpt-primary", model_ref: "openai/gpt-primary" },
+                selected: { provider_id: "fallback", model: "gpt-repair", model_ref: "fallback/gpt-repair" },
+                failed_candidates: [
+                  {
+                    provider_id: "openai",
+                    model: "gpt-primary",
+                    model_ref: "openai/gpt-primary",
+                    error_type: "provider_timeout",
+                  },
+                ],
+                fallback_candidates: [
+                  {
+                    provider_id: "fallback",
+                    model: "gpt-repair",
+                    model_ref: "fallback/gpt-repair",
+                    reason: "compatible_fallback",
+                  },
+                ],
+                rejected_candidates: [],
+                required_capabilities: ["chat", "structured_output"],
+                required_permissions: ["text_generation"],
+                warnings: ["repair provider fallback used"],
+              },
+            },
+          },
+        },
+      ],
+    }),
+  );
+
+  assert.equal(diagnostic.visible, true);
+  assert.equal(diagnostic.providerFallback.visible, true);
+  assert.equal(diagnostic.providerFallback.selectedRef, "fallback/gpt-repair");
+  assert.equal(diagnostic.providerFallback.requestedRef, "openai/gpt-primary");
+  assert.deepEqual(diagnostic.providerFallback.warnings, ["repair provider fallback used"]);
 });
 
 test("buildAgentDiagnostic falls back to cycle summary", () => {

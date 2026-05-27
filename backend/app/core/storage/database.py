@@ -713,6 +713,19 @@ def _ensure_buddy_schema(connection: sqlite3.Connection) -> None:
             FOREIGN KEY(message_id) REFERENCES buddy_messages(message_id)
         );
 
+        CREATE TABLE IF NOT EXISTS buddy_session_summaries (
+            summary_id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            lineage_root_session_id TEXT NOT NULL DEFAULT '',
+            content TEXT NOT NULL,
+            source_refs_json TEXT NOT NULL DEFAULT '[]',
+            source_run_id TEXT NOT NULL DEFAULT '',
+            source_revision_id TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(session_id) REFERENCES buddy_sessions(session_id)
+        );
+
         CREATE TABLE IF NOT EXISTS buddy_background_review_runs (
             review_id TEXT PRIMARY KEY,
             source_run_id TEXT NOT NULL,
@@ -770,6 +783,10 @@ def _ensure_buddy_schema(connection: sqlite3.Connection) -> None:
             ON buddy_message_revisions (message_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_buddy_message_run_refs_run
             ON buddy_message_run_refs (run_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_buddy_session_summaries_session
+            ON buddy_session_summaries (session_id, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_buddy_session_summaries_lineage
+            ON buddy_session_summaries (lineage_root_session_id, updated_at);
         CREATE INDEX IF NOT EXISTS idx_buddy_background_review_source
             ON buddy_background_review_runs (source_run_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_buddy_background_review_run
@@ -1071,7 +1088,9 @@ def _ensure_embedding_schema(connection: sqlite3.Connection) -> None:
             query_text TEXT NOT NULL,
             filters_json TEXT NOT NULL DEFAULT '{}',
             embedding_model_ref TEXT NOT NULL DEFAULT '',
+            reranker_model_ref TEXT NOT NULL DEFAULT '',
             mode TEXT NOT NULL DEFAULT 'hybrid',
+            ranking_metadata_json TEXT NOT NULL DEFAULT '{}',
             run_id TEXT NOT NULL DEFAULT '',
             session_id TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -1085,6 +1104,8 @@ def _ensure_embedding_schema(connection: sqlite3.Connection) -> None:
             document_id TEXT NOT NULL,
             lexical_score REAL NOT NULL DEFAULT 0,
             vector_score REAL NOT NULL DEFAULT 0,
+            base_score REAL NOT NULL DEFAULT 0,
+            rerank_score REAL NOT NULL DEFAULT 0,
             final_score REAL NOT NULL DEFAULT 0,
             source_ref_json TEXT NOT NULL DEFAULT '{}',
             metadata_json TEXT NOT NULL DEFAULT '{}',
@@ -1098,6 +1119,10 @@ def _ensure_embedding_schema(connection: sqlite3.Connection) -> None:
             ON retrieval_results(chunk_id);
         """
     )
+    _ensure_column(connection, "retrieval_queries", "reranker_model_ref", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(connection, "retrieval_queries", "ranking_metadata_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(connection, "retrieval_results", "base_score", "REAL NOT NULL DEFAULT 0")
+    _ensure_column(connection, "retrieval_results", "rerank_score", "REAL NOT NULL DEFAULT 0")
 
 
 def _ensure_memory_schema(connection: sqlite3.Connection) -> None:

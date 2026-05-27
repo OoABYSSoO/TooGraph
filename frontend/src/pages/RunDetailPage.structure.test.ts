@@ -96,7 +96,7 @@ test("RunDetailPage renders the aggregated parent and subgraph timeline", () => 
 });
 
 test("RunDetailPage renders the persisted child run tree with collapsed batch groups", () => {
-  assert.match(componentSource, /import \{ fetchRun, fetchRunTree \} from "@\/api\/runs";/);
+  assert.match(componentSource, /import \{ fetchRun, fetchRunTree, resumeRun \} from "@\/api\/runs";/);
   assert.match(
     componentSource,
     /import \{[\s\S]*buildRunTreeDisplayItems,[\s\S]*countRunTreeNodes,[\s\S]*\} from "\.\/runDetailModel\.ts";/,
@@ -122,9 +122,65 @@ test("RunDetailPage renders Agent Diagnostic from run detail state", () => {
   assert.match(componentSource, /agentDiagnostic\.capabilitySelection\.visible/);
   assert.match(componentSource, /agentDiagnostic\.capabilitySelection\.rejectedLabels/);
   assert.match(componentSource, /agentDiagnostic\.capabilitySelection\.fallbackLabels/);
+  assert.match(componentSource, /agentDiagnostic\.providerFallback\.visible/);
+  assert.match(componentSource, /agentDiagnostic\.providerFallback\.requestedRef/);
+  assert.match(componentSource, /agentDiagnostic\.providerFallback\.selectedRef/);
+  assert.match(componentSource, /agentDiagnostic\.providerFallback\.failedLabels/);
+  assert.match(componentSource, /agentDiagnostic\.providerFallback\.rejectedLabels/);
+  assert.match(componentSource, /agentDiagnostic\.providerFallback\.fallbackLabels/);
+  assert.match(componentSource, /agentDiagnostic\.permissionApproval\.visible/);
+  assert.match(componentSource, /agentDiagnostic\.permissionApproval\.actionable/);
+  assert.match(componentSource, /agentDiagnostic\.permissionApproval\.capabilityRef/);
+  assert.match(componentSource, /agentDiagnostic\.permissionApproval\.permissionLabel/);
+  assert.match(componentSource, /approvePermissionApproval/);
+  assert.match(componentSource, /denyPermissionApproval/);
+  assert.match(componentSource, /resumeRun\(viewedRun\.value\.run_id,\s*\{[\s\S]*permission_approval:[\s\S]*decision: "approved"/);
+  assert.match(componentSource, /resumeRun\(viewedRun\.value\.run_id,\s*\{[\s\S]*permission_approval:[\s\S]*decision: "denied"/);
+  assert.match(componentSource, /t\("runDetail\.permissionApproval"\)/);
+  assert.match(componentSource, /t\("runDetail\.permissionApprovalApprove"\)/);
+  assert.match(componentSource, /t\("runDetail\.permissionApprovalDeny"\)/);
   assert.match(componentSource, /run-detail__diagnostic-warnings/);
   assert.match(componentSource, /run-detail__diagnostic-warning/);
+  assert.match(componentSource, /t\("runDetail\.providerFallback"\)/);
   assert.match(componentSource, /t\("runDetail\.agentDiagnostic"\)/);
+});
+
+test("RunDetailPage renders context budget reports inside context audit", () => {
+  assert.match(componentSource, /const contextAuditBudgetReports = computed/);
+  assert.match(componentSource, /contextAuditBudgetReports\.length > 0/);
+  assert.match(componentSource, /v-for="report in contextAuditBudgetReports"/);
+  assert.match(componentSource, /t\("runDetail\.contextBudgetReports"\)/);
+  assert.match(componentSource, /report\.rawHistoryChars !== null/);
+  assert.match(componentSource, /report\.renderedHistoryChars !== null/);
+  assert.match(componentSource, /report\.sessionSummaryChars !== null/);
+  assert.match(componentSource, /report\.omittedCount !== null/);
+  assert.match(componentSource, /report\.protectedCount !== null/);
+  assert.match(componentSource, /report\.summarySourceRefCount !== null/);
+  assert.match(componentSource, /report\.omittedRefCount !== null/);
+  assert.match(componentSource, /report\.protectedRecentHistoryRefCount !== null/);
+  assert.match(componentSource, /report\.summarySourceRevisionIds\.length > 0/);
+  assert.match(componentSource, /t\("runDetail\.summarySourceRefs"/);
+  assert.match(componentSource, /t\("runDetail\.omittedSourceRefs"/);
+  assert.match(componentSource, /t\("runDetail\.protectedRecentSourceRefs"/);
+  assert.match(componentSource, /report\.promptTokenPressure !== null/);
+  assert.match(componentSource, /report\.notes\.length > 0/);
+});
+
+test("RunDetailPage renders prompt snapshots inside context audit", () => {
+  assert.match(componentSource, /const contextAuditPromptSnapshots = computed/);
+  assert.match(componentSource, /contextAuditPromptSnapshots\.length > 0/);
+  assert.match(componentSource, /v-for="snapshot in contextAuditPromptSnapshots"/);
+  assert.match(componentSource, /t\("runDetail\.promptSnapshots"\)/);
+  assert.match(componentSource, /snapshot\.systemPromptChars !== null/);
+  assert.match(componentSource, /snapshot\.userPromptChars !== null/);
+  assert.match(componentSource, /snapshot\.tokenEstimate !== null/);
+  assert.match(componentSource, /snapshot\.contextRefCount > 0/);
+  assert.match(componentSource, /snapshot\.systemPromptHash/);
+  assert.match(componentSource, /snapshot\.userPromptHash/);
+  assert.match(componentSource, /snapshot\.promptCachePolicy/);
+  assert.match(componentSource, /t\("runDetail\.promptCachePolicy"\)/);
+  assert.match(componentSource, /t\("runDetail\.promptCacheStablePrefix"\)/);
+  assert.match(componentSource, /t\("runDetail\.promptCacheDynamicSuffix"\)/);
 });
 
 test("RunDetailPage renders Buddy background review records and rerun action", () => {

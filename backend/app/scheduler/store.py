@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
+from app.core.capability_permissions import build_capability_permission_profile
 from app.core.storage.database import get_connection
 from app.core.storage.json_file_utils import utc_now_iso
 from app.templates.loader import load_template_record
@@ -15,6 +16,7 @@ SCHEDULE_KINDS = {"manual", "interval", "cron"}
 TERMINAL_JOB_RUN_STATUSES = {"completed", "failed", "cancelled", "skipped"}
 RETRYABLE_TRIGGER_REASONS = {"schedule", "retry"}
 SUPPORTED_DELIVERY_TARGET_KINDS = {"local_audit", "job_run_metadata"}
+EXTERNAL_DELIVERY_TARGET_KINDS = {"webhook", "http_webhook"}
 SENSITIVE_DELIVERY_TARGET_KEYWORDS = (
     "token",
     "secret",
@@ -522,9 +524,10 @@ def _build_delivery_result(
     kind = _compact_text(delivery_target.get("kind") or delivery_target.get("type"))
     if not kind:
         return None
+    normalized_kind = kind.lower().replace("-", "_")
     result = {
         "kind": kind,
-        "status": "delivered" if kind in SUPPORTED_DELIVERY_TARGET_KINDS else "skipped",
+        "status": "delivered" if normalized_kind in SUPPORTED_DELIVERY_TARGET_KINDS else "skipped",
         "delivered_at": delivered_at,
         "job_id": _compact_text(job.get("job_id")),
         "job_run_id": _compact_text(job_run.get("job_run_id")),
@@ -533,7 +536,17 @@ def _build_delivery_result(
         "run_ref": {"kind": "graph_run", "run_id": _compact_text(job_run.get("run_id"))},
         "target": _redact_delivery_target(delivery_target),
     }
-    if result["status"] == "skipped":
+    if normalized_kind in EXTERNAL_DELIVERY_TARGET_KINDS:
+        permissions = ["external_delivery"]
+        result.update(
+            {
+                "reason": "external_delivery_requires_approval",
+                "approval_required": True,
+                "required_permissions": permissions,
+                "permission_profile": build_capability_permission_profile(permissions),
+            }
+        )
+    elif result["status"] == "skipped":
         result["reason"] = "unsupported_delivery_target"
     return result
 

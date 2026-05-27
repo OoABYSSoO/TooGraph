@@ -90,9 +90,33 @@ def _normalize_model_item(item: Any) -> dict[str, Any] | None:
         "route_target": str(item.get("route_target") or "").strip(),
         "reasoning": item.get("reasoning") if isinstance(item.get("reasoning"), bool) else None,
         "modalities": _dedupe_strings([str(modality) for modality in modalities]) or ["text"],
+        "capabilities": _normalize_model_capabilities(item.get("capabilities")),
+        "permissions": _normalize_model_permissions(item.get("permissions")),
         "context_window": item.get("context_window") if isinstance(item.get("context_window"), int) else None,
         "max_tokens": item.get("max_tokens") if isinstance(item.get("max_tokens"), int) else None,
     }
+
+
+def _normalize_model_capabilities(value: Any) -> dict[str, bool]:
+    if isinstance(value, dict):
+        return {
+            str(key).strip(): bool(flag)
+            for key, flag in value.items()
+            if str(key or "").strip()
+        }
+    if isinstance(value, list):
+        return {
+            str(item).strip(): True
+            for item in value
+            if str(item or "").strip()
+        }
+    return {}
+
+
+def _normalize_model_permissions(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return _dedupe_strings([str(permission) for permission in value])
 
 
 def _normalize_provider_models(raw_models: Any) -> list[dict[str, Any]]:
@@ -219,6 +243,8 @@ def _build_catalog_model(
         "label": model.get("label") or model["model"],
         "reasoning": model.get("reasoning") if isinstance(model.get("reasoning"), bool) else provider_id == "local",
         "modalities": model.get("modalities") or ["text"],
+        "capabilities": model.get("capabilities") if isinstance(model.get("capabilities"), dict) else {},
+        "permissions": model.get("permissions") if isinstance(model.get("permissions"), list) else [],
         "context_window": context_window if isinstance(context_window, int) else None,
         "max_tokens": max_tokens if isinstance(max_tokens, int) else None,
         "route_target": model.get("route_target") or (local_display_model_name if provider_id == "local" else None),
@@ -262,6 +288,8 @@ def _build_local_provider_models(
             "route_target": saved_by_name.get(model_name.lower(), {}).get("route_target") or "",
             "context_window": saved_by_name.get(model_name.lower(), {}).get("context_window"),
             "max_tokens": saved_by_name.get(model_name.lower(), {}).get("max_tokens"),
+            "capabilities": saved_by_name.get(model_name.lower(), {}).get("capabilities") or {},
+            "permissions": saved_by_name.get(model_name.lower(), {}).get("permissions") or [],
         }
         for model_name in local_route_models
     ]

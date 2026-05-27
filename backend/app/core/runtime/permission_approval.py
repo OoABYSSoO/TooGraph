@@ -5,19 +5,9 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from app.core.capability_permissions import permission_tier_for_permissions, risky_permissions_for_approval
+from app.core.context_security import redact_context_secrets
 from app.core.runtime.state import utc_now_iso
-
-
-RISKY_PERMISSION_ORDER = [
-    "file_write",
-    "file_delete",
-    "file_remove",
-    "delete",
-    "subprocess",
-    "command",
-    "shell",
-]
-RISKY_PERMISSION_SET = set(RISKY_PERMISSION_ORDER)
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,13 +23,22 @@ def should_pause_for_action_permission_approval(
     node_name: str,
     action_key: str,
     action_definition: Any,
+    action_inputs: dict[str, Any] | None = None,
 ) -> PermissionApprovalDecision:
     _ = (node_name, action_key)
-    permissions = [str(item).strip() for item in getattr(action_definition, "permissions", []) or [] if str(item).strip()]
+    declared_permissions = [
+        str(item).strip() for item in getattr(action_definition, "permissions", []) or [] if str(item).strip()
+    ]
+    permissions = _resolve_operation_permissions(
+        action_key=action_key,
+        declared_permissions=declared_permissions,
+        action_inputs=action_inputs or {},
+    )
     risky_permissions = _ordered_risky_permissions(permissions)
     mode = resolve_permission_mode(state)
+    policy_requires_approval = _permission_policy_requires_risky_approval(state, permissions)
     return PermissionApprovalDecision(
-        required=bool(risky_permissions) and mode == "ask_first",
+        required=bool(risky_permissions) and (mode == "ask_first" or policy_requires_approval),
         risky_permissions=risky_permissions,
         mode=mode,
     )
@@ -169,10 +168,46 @@ def find_pending_permission_approval_for_node(
 
 
 def _ordered_risky_permissions(permissions: list[str]) -> list[str]:
-    present = {permission for permission in permissions if permission in RISKY_PERMISSION_SET}
-    ordered = [permission for permission in RISKY_PERMISSION_ORDER if permission in present]
-    extras = sorted(permission for permission in present if permission not in RISKY_PERMISSION_ORDER)
-    return [*ordered, *extras]
+    return risky_permissions_for_approval(permissions)
+
+
+def _permission_policy_requires_risky_approval(state: dict[str, Any], permissions: list[str]) -> bool:
+    metadata = state.get("metadata") if isinstance(state.get("metadata"), dict) else {}
+    policy = metadata.get("capability_permission_policy")
+    if not isinstance(policy, dict):
+        return False
+    required_tiers = {
+        str(item).strip()
+        for item in policy.get("approval_required_permission_tiers", [])
+        if str(item).strip()
+    }
+    if "risky" not in required_tiers:
+        return False
+    return permission_tier_for_permissions(permissions) == "risky"
+
+
+def _resolve_operation_permissions(
+    *,
+    action_key: str,
+    declared_permissions: list[str],
+    action_inputs: dict[str, Any],
+) -> list[str]:
+    if action_key != "local_workspace_executor":
+        return declared_permissions
+    operation = str(action_inputs.get("operation") or "").strip().lower()
+    operation_permissions = {
+        "read": ["file_read"],
+        "list": ["file_read"],
+        "search": ["file_read"],
+        "edit": ["file_write"],
+        "write": ["file_write"],
+        "execute": ["subprocess"],
+    }.get(operation)
+    if not operation_permissions:
+        return declared_permissions
+    declared_set = set(declared_permissions)
+    narrowed = [permission for permission in operation_permissions if permission in declared_set]
+    return narrowed or declared_permissions
 
 
 def _approval_reason(permissions: list[str], action_name: str) -> str:
@@ -202,6 +237,7 @@ def _preview_value(value: Any, *, limit: int = 1000) -> str:
         text = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True, default=str)
     except TypeError:
         text = str(value)
+    text, _warnings = redact_context_secrets(text, source_kind="permission_approval_preview", source_refs=[])
     if len(text) <= limit:
         return text
     return f"{text[:limit].rstrip()}..."
