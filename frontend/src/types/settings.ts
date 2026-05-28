@@ -13,6 +13,10 @@ export type BuddyRuntimeSettings = {
   permission_mode: BuddyPermissionMode;
 };
 
+export type ModelLogSettings = {
+  max_root_runs: number;
+};
+
 export type OpenAICodexAuthStatus = {
   provider_id?: string;
   configured: boolean;
@@ -48,6 +52,7 @@ export type SettingsModelProvider = {
   auth_header?: string;
   auth_scheme?: string;
   auth_mode?: string;
+  request_timeout_seconds?: number;
   requires_login?: boolean;
   auth_status?: OpenAICodexAuthStatus;
   api_key_configured?: boolean;
@@ -86,6 +91,7 @@ export type SettingsPayload = {
       auth_header?: string;
       auth_scheme?: string;
       auth_mode?: string;
+      request_timeout_seconds?: number;
       models: Array<{
         model: string;
         label?: string;
@@ -100,6 +106,7 @@ export type SettingsPayload = {
     }
   >;
   buddy_runtime?: BuddyRuntimeSettings;
+  model_logs?: ModelLogSettings;
   revision: {
     max_revision_round: number;
   };

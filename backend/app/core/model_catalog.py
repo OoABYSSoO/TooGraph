@@ -11,6 +11,7 @@ from app.tools.local_llm import (
     has_local_llm_api_key_configured,
 )
 from app.tools.model_provider_client import discover_provider_models
+from app.tools.model_provider_http import normalize_request_timeout_seconds
 from app.tools.openai_codex_client import get_codex_auth_status
 
 
@@ -193,6 +194,9 @@ def _normalize_provider_config(
         "auth_scheme": auth_scheme,
         "api_key": str(saved_provider.get("api_key") or "").strip(),
         "auth_mode": str(saved_provider.get("auth_mode") or template.get("auth_mode") or "api_key"),
+        "request_timeout_seconds": normalize_request_timeout_seconds(
+            saved_provider.get("request_timeout_seconds") or template.get("request_timeout_seconds")
+        ),
         "requires_login": bool(template.get("requires_login") or saved_provider.get("requires_login")),
         "saved": existing_saved_provider,
         "models": _normalize_provider_models(saved_provider.get("models") or template.get("models")),
@@ -358,7 +362,7 @@ def _discover_provider_model_items(provider: dict[str, Any], *, force_refresh: b
             api_key=provider.get("api_key") or "",
             auth_header=provider.get("auth_header") or "Authorization",
             auth_scheme=provider.get("auth_scheme") if provider.get("auth_scheme") is not None else "Bearer",
-            timeout_sec=2.0,
+            timeout_sec=normalize_request_timeout_seconds(provider.get("request_timeout_seconds"), default=2.0),
         )
     except RuntimeError:
         return saved_models
@@ -401,6 +405,7 @@ def _build_provider_entry(
         "auth_header": provider.get("auth_header") or "Authorization",
         "auth_scheme": provider.get("auth_scheme") if provider.get("auth_scheme") is not None else "Bearer",
         "auth_mode": provider.get("auth_mode") or "api_key",
+        "request_timeout_seconds": provider.get("request_timeout_seconds"),
         "requires_login": bool(provider.get("requires_login")),
         "saved": bool(provider.get("saved")),
         "api_key_configured": api_key_configured,

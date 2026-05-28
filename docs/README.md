@@ -16,6 +16,7 @@
 - 官方 Action：`action/official/*/action.json`、`action/official/*/ACTION.md`、生命周期脚本。
 - 官方图模板：`graph_template/official/*/template.json`。
 - Buddy Home 和记忆：`backend/app/buddy/`、`action/official/buddy_session_recall/`、`action/official/buddy_home_writer/`。
+- 消息平台和外部入口：`backend/app/messaging/`、`backend/app/api/routes_message_platforms.py`、`frontend/src/pages/MessagePlatformsPage.vue`。
 - 知识库和 RAG 基础：`backend/app/knowledge/loader.py`、`backend/app/core/runtime/knowledge_retrieval.py`。
 - 前端页面和展示模型：`frontend/src/`。
 - 自动化测试：`backend/tests/`、`frontend/src/**/*.test.ts`、`scripts/*.test.mjs`。
@@ -151,6 +152,38 @@ npm start
 - P2：继续补运行树回归和端到端验证，重点是再次暂停、child run 文件缺失 fallback、失败恢复、Buddy 展开真实子运行后的导航和刷新再展开。
 - P2：如果后端 tree API 未来要直接输出 batch group summary，应保持与 `frontend/src/lib/runTreeDisplayModel.ts` 的展示语义一致，不能让 Buddy 和 RunDetail 分叉。
 
+### 2.3.1 消息平台和外部入口
+
+已完成：
+
+- 左侧栏已有 `/message-platforms` 页面，用于查看 Telegram 和 Feishu/Lark 平台 catalog、配置 binding、启停连接、查看连接状态和触发飞书自动绑定。
+- 后端消息平台入口位于 `backend/app/messaging/`，包括：
+  - `catalog.py`：平台 catalog 和支持列表。
+  - `store.py`：binding、secret、connection status、platform session、audit event 和 dedup 存储。
+  - `runtime.py`：启动已启用 binding、连接 adapter、处理 inbound event、投递 Buddy 可见输出。
+  - `adapters/telegram.py`、`adapters/feishu.py`、`adapters/fake.py`：平台 adapter。
+  - `session_resolver.py`：把外部 chat/thread/sender 映射为 Buddy session。
+  - `buddy_ingress.py`：把外部消息写入 Buddy 历史，运行官方 Buddy 主循环，并把输出追加回 Buddy 会话。
+  - `slash_commands.py`：处理 `/model`、`/new`、`/sessions` 等当前外部会话作用域命令。
+- 统一数据库已包含 `message_platform_bindings`、`message_platform_connection_status`、`message_platform_secrets`、`message_platform_sessions`、`message_platform_audit_events` 和 `message_platform_dedup`。
+- 消息平台可见回复以 Buddy output 边界为准；完整运行事实仍保存在 Buddy history、RunDetail、run tree 和 audit event 中。
+- 应用启动时会调用 `message_platform_runtime.schedule_enabled_bindings()`；关闭时会停止消息平台 runtime。
+- 当前验证覆盖：
+  - `backend/tests/test_message_platform_store.py`
+  - `backend/tests/test_message_platform_runtime.py`
+  - `backend/tests/test_message_platform_buddy_ingress.py`
+  - `backend/tests/test_message_platform_routes.py`
+  - `backend/tests/test_message_platform_session_resolver.py`
+  - `backend/tests/test_message_platform_slash_commands.py`
+  - `frontend/src/api/message-platforms.test.ts`
+  - `frontend/src/pages/MessagePlatformsPage.structure.test.ts`
+
+仍未完成：
+
+- 多模态平台消息还需要进入通用 `state_bundle` 或等价 schema-backed state，而不是只作为文本路径处理。
+- 生产级凭据轮换、连接恢复、adapter health、delivery attempt 详情、失败重试和外部平台诊断还需要继续硬化。
+- 新平台只能通过 catalog、adapter、store/runtime 合同扩展；不应改 Buddy 主循环或新增平台专用隐藏 agent 路径。
+
 ### 2.4 Buddy 记忆系统
 
 已完成：
@@ -197,12 +230,12 @@ npm start
 - `search_knowledge` 会合并关键词候选和本地向量候选，输出 score、retrieval mode、keyword_score、vector_score、metadata、chunk_id、citation_id。
 - `retrieve_knowledge_base_context` 会返回 `knowledge_context`，包含 `results`、`citations` 和可直接给 LLM 的 context 文本。
 - 知识库上下文当前通过显式知识库 input 和后续 RAG Action 方向承载，不再保留旧 fanout Action。
-- 知识库页面已有导入、检索、引用展示、重建索引、删除确认、检索质量评测等基础。
+- 知识库页面已有导入、检索、引用展示、重建索引、删除确认、检索质量检查等基础。
 
 当前判断：
 
 - TooGraph 已经能支撑基础 Hybrid RAG 原型。
-- TooGraph 还不是专业 RAG 系统。缺口集中在真实 embedding provider、reranker、用户文档 ingestion、增量索引、权限隔离、RAG 专用 Action/模板、评测和引用校验。
+- TooGraph 还不是专业 RAG 系统。缺口集中在真实 embedding provider、reranker、用户文档 ingestion、增量索引、权限隔离、RAG 专用 Action/模板、质量检查和引用校验。
 
 RAG 和记忆系统的共通层：
 
@@ -215,7 +248,7 @@ RAG 和记忆系统的共通层：
 | context budget | 控制证据长度 | 控制 MEMORY.md 和历史窗口长度 |
 | source trace | citation、chunk、URL、页码 | message_id、session_id、run_id、revision_id |
 | audit report | 分数、命中、遗漏、过滤 | 召回模式、窗口、写回 revision |
-| eval | context precision、citation accuracy | 记忆稳定性、去重、错误沉淀率 |
+| quality check | context precision、citation accuracy | 记忆稳定性、去重、错误沉淀率 |
 
 RAG 和记忆系统必须分开的语义层：
 
@@ -279,7 +312,7 @@ RAG 工作流教学：
 -> 上下文预算
 -> 引用和证据校验
 -> 生成回答
--> 评测、日志、反馈闭环
+-> 质量检查、日志、反馈闭环
 ```
 
 专业 RAG 需要注意：
@@ -292,7 +325,7 @@ RAG 工作流教学：
 - 检索第一轮追求召回，第二轮用融合和 rerank 精排。
 - 上下文拼装要控制预算、去重、保留 citation id、过滤低置信度内容。
 - 回答生成要把结论与证据绑定；资料不足时说明不足，不能编造。
-- 评测要覆盖检索命中、上下文相关性、答案忠实度、引用准确性、资料不足时的拒答能力、延迟和成本。
+- 质量检查要覆盖检索命中、上下文相关性、答案忠实度、引用准确性、资料不足时的拒答能力、延迟和成本。
 
 常见 RAG 术语：
 
@@ -342,11 +375,11 @@ RAG 路线图：
 - P1：新增 `knowledge_retrieval` Action，输出标准上下文包、citations、scores、budget、warnings。
 - P1：明确 Buddy Home 只读能力；读取结果要在输出中标注 `authority=preference`。
 - P1：建立 `rag_question_answering` 模板：输入问题和知识库 -> query planning -> `knowledge_retrieval` -> citation-aware answer -> output。
-- P1：为 RAG 增加 eval：检索命中、引用准确、资料不足拒答、过度引用、chunk 质量、上下文预算。
+- P1：为 RAG 增加质量检查：检索命中、引用准确、资料不足拒答、过度引用、chunk 质量、上下文预算。
 - P2：接入真实 embedding provider 和 reranker，保留 `local-hash` 作为 deterministic fallback。
 - P2：支持用户文档知识库 ingestion：PDF/Word/HTML/Markdown、结构化 chunk、增量索引、删除一致性、版本管理。
 - P2：权限隔离和 metadata filter 要成为检索合同的一部分，不靠 prompt。
-- P3：探索 GraphRAG、RAPTOR、多模态 RAG 和 Agentic RAG，但不要在基础检索和评测不稳时提前堆复杂度。
+- P3：探索 GraphRAG、RAPTOR、多模态 RAG 和 Agentic RAG，但先确保基础检索、引用和质量检查稳定。
 
 ### 2.6 本地工作区 Action
 
@@ -427,12 +460,10 @@ operation:
 - 不允许 provider tool call 绕过 `config.actionKey`、`capability` state、权限模式或 human review。
 - 不为旧图协议恢复 `config.skills`、绑定推断或 prompt-only 隐式工具调用。
 
-### 2.8 Eval 和官方模板
+### 2.8 官方模板
 
 已完成：
 
-- Eval 存储、API 和前端评测中心已存在，支持 suite、case、run、case result、check result、artifact、单 case run/rerun、批量运行/采集、LLM judge 开关和失败诊断。
-- 官方 `eval_cases.json` 已覆盖 Buddy 主循环、页面操作、Action 创建、联网搜索和现有业务模板。
 - 官方模板已经覆盖：
   - `advanced_web_research_loop`
   - `buddy_autonomous_loop`
@@ -450,7 +481,7 @@ operation:
 
 模板长期准入标准：
 
-- 模板必须体现固定流程、结构化中间产物、证据链、artifact 输出、Eval 和可复跑 run 记录。
+- 模板必须体现固定流程、结构化中间产物、证据链、artifact 输出和可复跑 run 记录。
 - 只有“输入一段话、输出一段话”的场景不进入官方模板重点。
 - 每个模板应有目标用户、输入 schema、Graph State、节点流程、Action/Subgraph 列表、权限说明、失败边界和 output contract。
 - 需要用户补充信息时，通过最终输出询问并结束本轮；下一轮从普通输入和历史上下文读取补充。
@@ -459,17 +490,14 @@ operation:
 本地 gate：
 
 - 修改 `graph_template/official/`、`action/official/` 或 `tool/official/` 后，运行 `npm run verify:official-assets`。
-- 该命令会从当前 Git diff 识别官方模板、Action 和 Tool 变更，自动选择模板布局/官方 eval seed、Action manifest/协议、Tool catalog/runtime 等最小相关检查，并始终运行 `git diff --check`。
-- 如果变更的官方模板目录包含 `eval_cases.json`，该命令还会读取其中的 suite id，并在隔离数据库中验证对应官方 eval suite 已 seed、包含 case，且每个 case 有自动 check 配置。
+- 该命令会从当前 Git diff 识别官方模板、Action 和 Tool 变更，自动选择模板布局、Action manifest/协议、Tool catalog/runtime 等最小相关检查，并始终运行 `git diff --check`。
 - 如果变更的官方 Action/Tool 包存在对应 `backend/tests/test_<key>_action.py`、`backend/tests/test_<key>_tool.py` 或 `backend/tests/test_<key>.py`，该命令会自动追加包级专项 unittest。
 - 官方 Action/Tool manifest 可以声明 `verificationCommands`，后端 catalog 和前端类型会保留该字段，用于补充包级专项门禁；当前 gate 只执行受限命令且不经过 shell。
-- 官方 Action/Tool manifest 可以声明 `verificationEvalSuites`，后端 catalog 和前端类型会保留该字段；当前 gate 会自动追加对应官方 eval suite 的 seed 和 case/check 合同校验。
-- 当前核心官方 Action 和高风险 Tool 已开始把所属能力链路绑定到 `verificationEvalSuites`，因此主循环、页面操作、Action 创建、Web research、复盘写入、召回、embedding、scheduler、delegation 和 provider fallback 相关能力包变更会自动触发对应 suite gate。
 
-官方业务模板完整模式仍待补齐：
+官方业务模板完整模式仍需补齐：
 
-- `policy_navigator_agent`：URL/PDF 解析、多文件新旧冲突识别、真实知识库检索执行器、评测自动运行。
-- `ai_news_digest_to_wechat_article`：RSS、定时运行、主题订阅、选题偏好闭环、封面提示词、评测自动运行。
+- `policy_navigator_agent`：URL/PDF 解析、多文件新旧冲突识别、真实知识库检索执行器、质量检查链路。
+- `ai_news_digest_to_wechat_article`：RSS、定时运行、主题订阅、选题偏好闭环、封面提示词、质量检查链路。
 - `multi_platform_content_repurposer`：更细用户反馈二次修改、平台分发评分、封面生成提示词。
 - `job_application_interview_coach`：多 JD 对比、多轮模拟面试、弱点趋势、行业薪资数据。
 - `game_creative_factory`：真实 RSS、广告素材抓取、视频理解服务、审核返修循环、生成任务下游执行。
@@ -509,15 +537,15 @@ Hermes Agent 参考基线：
 | 主循环输入边界 | `buddy_autonomous_loop` 已只暴露当前用户消息绑定；会话历史、摘要和 session id 由 `buddy_history_context_loader` 组装 | runtime 负责会话、记忆、项目上下文组装 | 主要剩余是回归覆盖、审计展示和更完整 runtime context 报告 | 保持官方主循环只绑定当前用户消息；其他上下文都由 Tool、固定文件 input 或 runtime context state 组装 |
 | 对话历史存储 | Buddy messages、context assembly、run record 已进入统一数据库；历史输入倾向引用组装 | session history 和 prompt cache 由 runtime 管理 | 官方主循环仍需完全消除重复文本输入心智负担 | run 记录保存输入引用、context assembly report 和结果 snapshot；历史文本按 message/session/run id 重建，不在每轮 run 中累加嵌套保存 |
 | 上下文压缩 | `buddy_context_pressure_check` 和 `buddy_context_compaction` 已进入官方主路径 | Hermes 有 context compressor 和 prompt cache 管理 | 预算报告、压缩触发、摘要版本和恢复链路仍需更透明 | 压缩节点输出 `context_package`、保留窗口、摘要版本、source refs、omitted refs 和写回 revision |
-| 记忆召回 | SQLite FTS、trigram、embedding vectors、`memory_entries` 和 `buddy_session_recall` 已存在 | Hermes 有本地文件记忆、外部 memory providers、turn 后 sync/prefetch | embedding 召回、rerank、去重、lineage 投影和评测还不够生产级 | 建完整 hybrid recall：query planning -> FTS/vector 多路召回 -> lineage 去重 -> rerank -> context budget -> trace/audit |
+| 记忆召回 | SQLite FTS、trigram、embedding vectors、`memory_entries` 和 `buddy_session_recall` 已存在 | Hermes 有本地文件记忆、外部 memory providers、turn 后 sync/prefetch | embedding 召回、rerank、去重、lineage 投影和质量检查还不够生产级 | 建完整 hybrid recall：query planning -> FTS/vector 多路召回 -> lineage 去重 -> rerank -> context budget -> trace/audit |
 | 长期文件记忆 | `SOUL.md`、`USER.md`、`MEMORY.md` 和结构化 DB 记忆双线存在 | Hermes 区分 SOUL、USER、MEMORY；AGENTS 是项目上下文 | 写入目标说明还需持续体现在模板 prompt 和审计结果中 | 复盘图必须显式输出写入矩阵：身份写 `SOUL.md`，用户稳定信息写 `USER.md`，长期经验写 `MEMORY.md`，可检索事实写 DB memory |
 | AGENTS.md 用途 | Buddy Home 中保留 `AGENTS.md`，作为运行/项目上下文 | Hermes 从工作目录读取 AGENTS 作为 agent 工作说明 | 容易被误解为记忆文件或自动复盘输出目标 | AGENTS 作为上下文输入和人工维护文件；自动复盘只在确有必要时产出“建议更新 AGENTS”的改进候选，不直接写入 |
 | 能力选择 | `toograph_capability_selector` 可发现 Action/Subgraph/Tool 并输出单个 capability | Hermes 直接使用丰富 tool schemas 和模型 tool call | selector 排名、置信度、失败 fallback、预算和候选解释仍弱 | selector 输出候选评分、拒绝理由、调用预算、失败记忆和可审计 selection trace |
-| 能力生态 | 官方 Action/Tool/Subgraph 已有骨架和若干关键包 | Hermes toolsets、skills、plugins 更丰富 | TooGraph 官方能力数量、质量、测试和文档不足 | 扩充官方 Action/Tool/Subgraph，并用 eval、manifest metadata、权限标签和示例 run 作为准入 |
+| 能力生态 | 官方 Action/Tool/Subgraph 已有骨架和若干关键包 | Hermes toolsets、skills、plugins 更丰富 | TooGraph 官方能力数量、质量、测试和文档不足 | 扩充官方 Action/Tool/Subgraph，并用 manifest metadata、权限标签和示例 run 作为准入 |
 | 多步骤自治 | 通过图模板、Condition、Subgraph 和动态 capability 表达 | Hermes while-loop 多轮 tool use 很成熟 | 图模板还缺统一的循环预算、stop reason、失败恢复和分支诊断 | 建立通用 Agent graph primitives：iteration budget、capability budget、stop reason、retry policy、recover path、failure output |
-| 自我改进 | `buddy_autonomous_review` 能产出 improvement candidates | Hermes background review 可写 memory 和 skill，curator 管理 skills | 候选到实际 Action/模板/子图 revision 的闭环还没打通 | 建“改进候选 -> 验证 -> diff -> approval -> revision -> eval”的图模板，不用隐藏自修改 |
+| 自我改进 | `buddy_autonomous_review` 能产出 improvement candidates | Hermes background review 可写 memory 和 skill，curator 管理 skills | 候选到实际 Action/模板/子图 revision 的闭环还没打通 | 建“改进候选 -> 验证 -> diff -> approval -> revision -> run record”的图模板，不用隐藏自修改 |
 | 技能/能力沉淀 | TooGraph 当前是 Action/Tool/Subgraph，不使用 Hermes skill 语义 | Hermes 有 skills 和 skill curator | 缺少从成功 run 中沉淀可复用能力的成熟机制 | 以 Action package、Tool package、graph template 和 reusable subgraph 承接沉淀；curator 行为表现为显式整理图 |
-| 后台任务 | 回复后可跑后台复盘图 | Hermes 有 cron、curator、后台 review、外部 memory sync | 缺少通用 scheduler、队列、周期任务和失败重试 | 增加 graph scheduler：周期复盘、记忆清理、Action 健康检查、模板 eval、知识库重建都作为图运行 |
+| 后台任务 | 回复后可跑后台复盘图 | Hermes 有 cron、curator、后台 review、外部 memory sync | 缺少通用 scheduler、队列、周期任务和失败重试 | 增加 graph scheduler：周期复盘、记忆清理、Action 健康检查、模板健康检查、知识库重建都作为图运行 |
 | 委派与子任务 | Subgraph 和 batch worker 基础存在 | Hermes 有 delegation、kanban/subagents | 缺少通用 worker task packet、结果合并、并发预算和审计 UI | 用 Subgraph worker protocol 表达委派：task packet、context package、budget、result package、merge/review 节点 |
 | 权限和审批 | command/revision、Action 权限和 Buddy Home writer 已有方向 | Hermes 有工具白名单、保护文件、运行边界 | operation 级权限、风险分类和 review surface 仍需完善 | Action/Tool manifest 标注 scope、risk、network、file、graph、cost；高风险能力必须进入 approval/revision |
 | 运行诊断 | run detail、run tree、Buddy 胶囊已有基础 | Hermes TUI/日志/错误恢复信息更成熟 | 用户还不容易看清“为什么这么选、为什么停、召回了什么” | 增加 Agent Diagnostic view：输入来源、召回命中、context budget、selection trace、capability call、stop reason、失败恢复 |
@@ -532,9 +560,9 @@ Hermes Agent 参考基线：
 | P1 | 完整 embedding 召回 | 统一 DB memory/message/run chunks embedding、hybrid search、rerank、audit | 每次召回能看到 query、命中、分数、source refs、预算和 omitted reason |
 | P1 | 记忆复盘质量提升 | 复盘模板输出写入矩阵、证据、去重、diff、revision、skipped reason | 自动写低风险记忆；高风险变更只产出改进候选和审批入口 |
 | P1 | 能力选择质量提升 | selector scoring、fallback、失败记忆、budget 和候选解释 | 每次 capability 选择都能解释为什么选、为什么不选、还剩多少预算 |
-| P2 | 自我改进闭环 | improvement candidates -> 验证图 -> diff -> approval -> revision -> eval | 成功 run 能沉淀为 Action/Tool/Subgraph/template 修订，但所有副作用可审查、可撤销 |
+| P2 | 自我改进闭环 | improvement candidates -> 验证图 -> diff -> approval -> revision -> run record | 成功 run 能沉淀为 Action/Tool/Subgraph/template 修订，但所有副作用可审查、可撤销 |
 | P2 | Agent 诊断视图 | 单页展示主循环输入、召回、压缩、能力、输出、错误和 stop reason | 用户不用读原始 JSON 也能判断一次 Buddy run 是否合理 |
-| P3 | 调度与委派 | graph scheduler、worker subgraph protocol、批量任务合并 | 周期复盘、知识库重建、模板 eval、并行子任务都作为可审计图运行 |
+| P3 | 调度与委派 | graph scheduler、worker subgraph protocol、批量任务合并 | 周期复盘、知识库重建、模板健康检查、并行子任务都作为可审计图运行 |
 
 主循环目标形态：
 
@@ -719,7 +747,7 @@ run record 和对话历史的目标存储原则：
 1. 建立 `context_package` 合同。
 2. 新增 `knowledge_retrieval` Action。
 3. 新增 `rag_question_answering` 模板。
-4. 为 RAG 加 eval cases 和 citation 检查。
+4. 为 RAG 加 citation 检查和资料不足场景检查。
 5. 接入真实 embedding provider 和 reranker。
 
 ### P1：记忆复盘增强
@@ -758,17 +786,17 @@ run record 和对话历史的目标存储原则：
 3. 加 repair retry。
 4. 运行详情展示结构化输出策略、原始输出、校验和修复记录。
 
-### P2：模板完整模式和评测
+### P2：模板完整模式和质量检查
 
 1. 把当前轻量官方模板补到完整模式。
-2. 扩大官方 eval 自动运行覆盖。
-3. 让 Gallery 展示模板说明、示例输出、mock 入口、权限需求、最近 Eval 状态和使用入口。
+2. 扩大官方模板质量检查覆盖。
+3. 让 Gallery 展示模板说明、示例输出、mock 入口、权限需求和使用入口。
 
 ### P3：更高级的自治和 RAG
 
 1. Buddy 自演化优先做窄且可逆的改进：记忆更新、会话总结、Action 修订建议、模板建议和全局运行权限设置建议。
 2. 风险更高的图编辑、文件写入、脚本执行、网络访问、自动化创建或 persona / 全局运行权限设置改动必须显式审批和可恢复 revision。
-3. 在基础检索、引用和 eval 稳定后，再探索 GraphRAG、RAPTOR、多模态 RAG 和 Agentic RAG。
+3. 在基础检索、引用和质量检查稳定后，再探索 GraphRAG、RAPTOR、多模态 RAG 和 Agentic RAG。
 
 ## 5. 验收标准
 

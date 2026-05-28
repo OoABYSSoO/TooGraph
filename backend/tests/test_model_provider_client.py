@@ -276,6 +276,68 @@ class ModelProviderClientTests(unittest.TestCase):
         self.assertEqual(requested["json"]["stream"], True)
         self.assertEqual(requested["json"]["messages"][0], {"role": "system", "content": "sys"})
 
+    def test_chat_openai_compatible_uses_request_timeout_profile(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        captured_client_kwargs: list[dict[str, Any]] = []
+        fake_client = FakeHttpClient(
+            FakeResponse({"id": "chatcmpl_1", "model": "gpt-4.1", "choices": [{"message": {"content": "hello"}}]})
+        )
+
+        def client_factory(**kwargs: Any) -> FakeHttpClient:
+            captured_client_kwargs.append(kwargs)
+            return fake_client
+
+        with patch("app.tools.model_provider_client.httpx.Client", side_effect=client_factory):
+            with patch("app.tools.model_provider_client.append_model_request_log"):
+                content, meta = chat_with_model_provider(
+                    provider_id="openai",
+                    transport="openai-compatible",
+                    base_url="https://api.openai.com/v1",
+                    api_key="sk-openai",
+                    model="gpt-4.1",
+                    system_prompt="sys",
+                    user_prompt="user",
+                    temperature=0.2,
+                    request_timeout_seconds=12.5,
+                )
+
+        self.assertEqual(content, "hello")
+        self.assertEqual(captured_client_kwargs[0]["timeout"], 12.5)
+        self.assertEqual(meta["request_timeout_seconds"], 12.5)
+
+    def test_chat_with_model_ref_passes_saved_request_timeout_profile(self) -> None:
+        from app.tools import model_provider_client
+        from app.tools.model_provider_client import chat_with_model_ref_with_meta
+
+        saved_settings = {
+            "model_providers": {
+                "openai": {
+                    "enabled": True,
+                    "base_url": "https://api.openai.com/v1",
+                    "api_key": "sk-openai",
+                    "request_timeout_seconds": 37.0,
+                    "models": [{"model": "gpt-4.1", "capabilities": {"chat": True}}],
+                }
+            }
+        }
+
+        def fake_chat_with_provider(**kwargs: Any) -> tuple[str, dict[str, Any]]:
+            self.assertEqual(kwargs["request_timeout_seconds"], 37.0)
+            return "hello", {"provider_id": kwargs["provider_id"], "model": kwargs["model"], "warnings": []}
+
+        with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
+            with patch.object(model_provider_client, "chat_with_model_provider", side_effect=fake_chat_with_provider):
+                content, meta = chat_with_model_ref_with_meta(
+                    model_ref="openai/gpt-4.1",
+                    system_prompt="sys",
+                    user_prompt="user",
+                    temperature=0.2,
+                )
+
+        self.assertEqual(content, "hello")
+        self.assertEqual(meta["provider_id"], "openai")
+
     def test_embed_text_with_model_provider_posts_openai_compatible_embeddings(self) -> None:
         from app.tools.model_provider_client import embed_text_with_model_provider
 

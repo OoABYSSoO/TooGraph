@@ -12,6 +12,7 @@ from app.api.routes_evals import router as evals_router
 from app.api.routes_graphs import router as graphs_router
 from app.api.routes_knowledge import router as knowledge_router
 from app.api.routes_local_input_sources import router as local_input_sources_router
+from app.api.routes_message_platforms import router as message_platforms_router
 from app.api.routes_model_logs import router as model_logs_router
 from app.api.routes_operation_journal import router as operation_journal_router
 from app.api.routes_presets import router as presets_router
@@ -26,6 +27,7 @@ from app.buddy.store import initialize_buddy_home
 from app.core.runtime.run_recovery import mark_interrupted_active_runs
 from app.core.storage.database import initialize_storage
 from app.evaluator.official_seed import seed_official_eval_suites
+from app.messaging.runtime import message_platform_runtime
 from app.scheduler.official_seed import seed_official_scheduled_graph_jobs
 from app.scheduler.service import start_scheduler_service, stop_scheduler_service
 from app.tools.openai_codex_client import restore_pending_codex_browser_login_sessions
@@ -47,9 +49,11 @@ def startup() -> None:
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     startup()
     start_scheduler_service()
+    message_platform_runtime.schedule_enabled_bindings()
     try:
         yield
     finally:
+        await message_platform_runtime.stop()
         stop_scheduler_service()
 
 
@@ -108,6 +112,7 @@ app.include_router(evals_router)
 app.include_router(graphs_router)
 app.include_router(knowledge_router)
 app.include_router(local_input_sources_router)
+app.include_router(message_platforms_router)
 app.include_router(model_logs_router)
 app.include_router(operation_journal_router)
 app.include_router(presets_router)

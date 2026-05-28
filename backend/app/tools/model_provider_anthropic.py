@@ -5,7 +5,7 @@ from typing import Any, Callable
 
 from app.core.model_provider_templates import TRANSPORT_ANTHROPIC_MESSAGES
 from app.core.thinking_levels import build_native_thinking_payload
-from app.tools.model_provider_http import DEFAULT_REQUEST_TIMEOUT_SEC, anthropic_headers
+from app.tools.model_provider_http import DEFAULT_REQUEST_TIMEOUT_SEC, anthropic_headers, normalize_request_timeout_seconds
 from app.tools.model_provider_multimodal import build_anthropic_user_content
 from app.tools.model_provider_response_parsing import normalize_message_text, parse_sse_json_events
 
@@ -103,7 +103,9 @@ def chat_anthropic(
     post_streaming_json_with_fallback_fn: Callable[..., tuple[dict[str, Any], dict[str, Any], str | None, bool]],
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
+    request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SEC,
 ) -> tuple[str, dict[str, Any]]:
+    timeout_sec = normalize_request_timeout_seconds(request_timeout_seconds)
     native_thinking_payload = build_native_thinking_payload(
         provider_id=provider_id,
         transport=TRANSPORT_ANTHROPIC_MESSAGES,
@@ -131,7 +133,7 @@ def chat_anthropic(
     try:
         response_payload, logged_request_payload, stream_fallback_error, _used_stream = post_streaming_json_with_fallback_fn(
             stream_url=f"{base_url}{path}",
-            timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
+            timeout_sec=timeout_sec,
             headers=anthropic_headers(api_key),
             stream_payload=request_payload,
             fallback_payload=fallback_payload,
@@ -175,4 +177,5 @@ def chat_anthropic(
         "thinking_level": thinking_level,
         "reasoning_format": "anthropic-thinking" if native_thinking_payload else None,
         "stream_fallback_error": stream_fallback_error,
+        "request_timeout_seconds": timeout_sec,
     }

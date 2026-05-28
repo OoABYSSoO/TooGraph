@@ -11,6 +11,7 @@ from app.core.thinking_levels import build_native_thinking_payload
 from app.tools.model_provider_http import (
     DEFAULT_REQUEST_TIMEOUT_SEC,
     build_auth_headers,
+    normalize_request_timeout_seconds,
     parse_json_or_stream_text,
     read_streaming_response_text,
 )
@@ -147,9 +148,11 @@ def post_codex_responses_once(
     request_payload: dict[str, Any],
     provider_id: str,
     on_delta: Callable[[str], None] | None = None,
+    request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SEC,
 ) -> dict[str, Any]:
+    timeout_sec = normalize_request_timeout_seconds(request_timeout_seconds)
     try:
-        with httpx.Client(**codex_http_client_kwargs(timeout=DEFAULT_REQUEST_TIMEOUT_SEC)) as client:
+        with httpx.Client(**codex_http_client_kwargs(timeout=timeout_sec)) as client:
             headers = build_auth_headers(api_key=access_token)
             headers["Accept"] = "text/event-stream"
 
@@ -203,7 +206,9 @@ def chat_codex_responses(
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
     structured_output_schema: dict[str, Any] | None = None,
+    request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SEC,
 ) -> tuple[str, dict[str, Any]]:
+    timeout_sec = normalize_request_timeout_seconds(request_timeout_seconds)
     request_payload: dict[str, Any] = {
         "model": model,
         "instructions": system_prompt,
@@ -235,6 +240,7 @@ def chat_codex_responses(
                         request_payload=request_payload,
                         provider_id=provider_id,
                         on_delta=on_delta,
+                        request_timeout_seconds=timeout_sec,
                     )
                 except CodexAuthExpiredError:
                     access_token = refresh_access_token()
@@ -244,6 +250,7 @@ def chat_codex_responses(
                         request_payload=request_payload,
                         provider_id=provider_id,
                         on_delta=on_delta,
+                        request_timeout_seconds=timeout_sec,
                     )
                 break
             except Exception as exc:
@@ -295,4 +302,5 @@ def chat_codex_responses(
         "thinking_level": thinking_level,
         "reasoning_format": "responses-reasoning" if native_thinking_payload else None,
         "structured_output_strategy": "json_schema" if structured_output_schema else None,
+        "request_timeout_seconds": timeout_sec,
     }

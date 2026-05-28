@@ -57,15 +57,14 @@ test("GraphLibraryPage makes each management card openable while keeping managem
 });
 
 test("GraphLibraryPage shows gallery template signals on catalog cards", () => {
-  assert.match(componentSource, /fetchEvalSuites/);
-  assert.match(componentSource, /fetchEvalRuns/);
-  assert.match(componentSource, /buildGraphLibraryTemplateEvalSummaries/);
+  assert.doesNotMatch(componentSource, /fetchEvalSuites/);
+  assert.doesNotMatch(componentSource, /fetchEvalRuns/);
+  assert.doesNotMatch(componentSource, /buildGraphLibraryTemplateEvalSummaries/);
   assert.match(componentSource, /class="graph-library-page__template-brief"/);
   assert.match(componentSource, /class="graph-library-page__template-facts"/);
   assert.match(componentSource, /graphLibrary\.mockEntry/);
   assert.match(componentSource, /graphLibrary\.sampleOutput/);
   assert.match(componentSource, /graphLibrary\.permissionNeeds/);
-  assert.match(componentSource, /graphLibrary\.recentEval/);
   assert.match(componentSource, /graphLibrary\.useTemplate/);
 });
 

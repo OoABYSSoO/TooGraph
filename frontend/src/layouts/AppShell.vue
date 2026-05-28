@@ -90,21 +90,6 @@
           <span class="app-shell__link-label">{{ t("nav.graphLibrary") }}</span>
         </RouterLink>
         <RouterLink
-          to="/evals"
-          class="app-shell__link"
-          data-virtual-affordance-id="app.nav.evals"
-          data-virtual-affordance-label="评测"
-          data-virtual-affordance-role="navigation-link"
-          data-virtual-affordance-zone="app-shell"
-          data-virtual-affordance-actions="click"
-          data-virtual-affordance-path-after-click="/evals"
-          :class="{ 'app-shell__link--active': activeNavigationSection === 'evals' }"
-          :title="t('nav.evals')"
-        >
-          <ElIcon class="app-shell__link-icon"><DataAnalysis /></ElIcon>
-          <span class="app-shell__link-label">{{ t("nav.evals") }}</span>
-        </RouterLink>
-        <RouterLink
           to="/scheduler"
           class="app-shell__link"
           data-virtual-affordance-id="app.nav.scheduler"
@@ -163,6 +148,21 @@
         >
           <ElIcon class="app-shell__link-icon"><ChatDotRound /></ElIcon>
           <span class="app-shell__link-label">{{ t("nav.buddy") }}</span>
+        </RouterLink>
+        <RouterLink
+          to="/message-platforms"
+          class="app-shell__link"
+          data-virtual-affordance-id="app.nav.messagePlatforms"
+          data-virtual-affordance-label="消息平台"
+          data-virtual-affordance-role="navigation-link"
+          data-virtual-affordance-zone="app-shell"
+          data-virtual-affordance-actions="click"
+          data-virtual-affordance-path-after-click="/message-platforms"
+          :class="{ 'app-shell__link--active': activeNavigationSection === 'messagePlatforms' }"
+          :title="t('nav.messagePlatforms')"
+        >
+          <ElIcon class="app-shell__link-icon"><Connection /></ElIcon>
+          <span class="app-shell__link-label">{{ t("nav.messagePlatforms") }}</span>
         </RouterLink>
         <RouterLink
           to="/presets"
@@ -284,12 +284,12 @@
 import { ElIcon } from "element-plus";
 import {
   ChatDotRound,
+  Connection,
   House,
   EditPen,
   Clock,
   Collection,
   CollectionTag,
-  DataAnalysis,
   DataBoard,
   DataLine,
   DocumentChecked,

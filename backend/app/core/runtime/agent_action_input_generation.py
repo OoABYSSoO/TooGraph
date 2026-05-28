@@ -13,6 +13,7 @@ from app.core.runtime.agent_prompt import (
     format_prompt_value,
 )
 from app.core.runtime.agent_response_generation import _resolve_media_runtime_config, repair_structured_output_with_runtime_model
+from app.core.runtime.model_call_context import use_model_call_context
 from app.core.runtime.action_bindings import ResolvedAgentActionBinding
 from app.core.runtime.structured_output import build_action_llm_output_schema, validate_structured_output
 from app.core.schemas.node_system import (
@@ -96,34 +97,36 @@ def generate_agent_action_inputs(
 
     if runtime_config.get("resolved_provider_id") == "local":
         try:
-            content, llm_meta = chat_with_local_model_with_meta_func(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                model=runtime_config["runtime_model_name"],
-                provider_id="local",
-                temperature=runtime_config["resolved_temperature"],
-                thinking_enabled=runtime_config["resolved_thinking"],
-                thinking_level=thinking_level,
-                on_delta=on_delta,
-                input_attachments=input_attachments,
-                structured_output_schema=structured_output_schema,
-            )
+            with use_model_call_context(phase="action_input_planning"):
+                content, llm_meta = chat_with_local_model_with_meta_func(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    model=runtime_config["runtime_model_name"],
+                    provider_id="local",
+                    temperature=runtime_config["resolved_temperature"],
+                    thinking_enabled=runtime_config["resolved_thinking"],
+                    thinking_level=thinking_level,
+                    on_delta=on_delta,
+                    input_attachments=input_attachments,
+                    structured_output_schema=structured_output_schema,
+                )
         finally:
             cleanup_prepared_media_paths(attachment_meta.get("cleanup_paths"))
     else:
         try:
-            content, llm_meta = chat_with_model_ref_with_meta_func(
-                model_ref=runtime_config["resolved_model_ref"],
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                temperature=runtime_config["resolved_temperature"],
-                thinking_enabled=runtime_config["resolved_thinking"],
-                thinking_level=thinking_level,
-                on_delta=on_delta,
-                input_attachments=input_attachments,
-                structured_output_schema=structured_output_schema,
-                model_runtime_fixture=runtime_config.get("model_runtime_fixture"),
-            )
+            with use_model_call_context(phase="action_input_planning"):
+                content, llm_meta = chat_with_model_ref_with_meta_func(
+                    model_ref=runtime_config["resolved_model_ref"],
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    temperature=runtime_config["resolved_temperature"],
+                    thinking_enabled=runtime_config["resolved_thinking"],
+                    thinking_level=thinking_level,
+                    on_delta=on_delta,
+                    input_attachments=input_attachments,
+                    structured_output_schema=structured_output_schema,
+                    model_runtime_fixture=runtime_config.get("model_runtime_fixture"),
+                )
         finally:
             cleanup_prepared_media_paths(attachment_meta.get("cleanup_paths"))
 

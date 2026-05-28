@@ -6,6 +6,7 @@ from typing import Any, Callable
 from app.core.model_catalog import get_default_video_model_ref, resolve_runtime_model_name
 from app.core.runtime.agent_multimodal import collect_input_attachments, prepare_model_input_attachments
 from app.core.runtime.agent_prompt import append_llm_prompt_snapshots, build_effective_system_prompt, build_llm_prompt_snapshot
+from app.core.runtime.model_call_context import use_model_call_context
 from app.core.runtime.llm_output_parser import build_output_key_aliases, parse_llm_json_response
 from app.core.runtime.structured_output import (
     build_agent_state_output_schema,
@@ -72,34 +73,36 @@ def generate_agent_response(
 
     if runtime_config.get("resolved_provider_id") == "local":
         try:
-            content, llm_meta = chat_with_local_model_with_meta_func(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                model=runtime_config["runtime_model_name"],
-                provider_id="local",
-                temperature=runtime_config["resolved_temperature"],
-                thinking_enabled=runtime_config["resolved_thinking"],
-                thinking_level=thinking_level,
-                on_delta=on_delta,
-                input_attachments=input_attachments,
-                structured_output_schema=structured_output_schema,
-            )
+            with use_model_call_context(phase="agent_response"):
+                content, llm_meta = chat_with_local_model_with_meta_func(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    model=runtime_config["runtime_model_name"],
+                    provider_id="local",
+                    temperature=runtime_config["resolved_temperature"],
+                    thinking_enabled=runtime_config["resolved_thinking"],
+                    thinking_level=thinking_level,
+                    on_delta=on_delta,
+                    input_attachments=input_attachments,
+                    structured_output_schema=structured_output_schema,
+                )
         finally:
             _cleanup_prepared_media_paths(attachment_meta.get("cleanup_paths"))
     else:
         try:
-            content, llm_meta = chat_with_model_ref_with_meta_func(
-                model_ref=runtime_config["resolved_model_ref"],
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                temperature=runtime_config["resolved_temperature"],
-                thinking_enabled=runtime_config["resolved_thinking"],
-                thinking_level=thinking_level,
-                on_delta=on_delta,
-                input_attachments=input_attachments,
-                structured_output_schema=structured_output_schema,
-                model_runtime_fixture=runtime_config.get("model_runtime_fixture"),
-            )
+            with use_model_call_context(phase="agent_response"):
+                content, llm_meta = chat_with_model_ref_with_meta_func(
+                    model_ref=runtime_config["resolved_model_ref"],
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    temperature=runtime_config["resolved_temperature"],
+                    thinking_enabled=runtime_config["resolved_thinking"],
+                    thinking_level=thinking_level,
+                    on_delta=on_delta,
+                    input_attachments=input_attachments,
+                    structured_output_schema=structured_output_schema,
+                    model_runtime_fixture=runtime_config.get("model_runtime_fixture"),
+                )
         finally:
             _cleanup_prepared_media_paths(attachment_meta.get("cleanup_paths"))
 
@@ -226,31 +229,33 @@ def repair_structured_output_with_runtime_model(
         structured_output_schema=structured_output_schema,
     )
     if runtime_config.get("resolved_provider_id") == "local":
-        content, meta = chat_with_local_model_with_meta_func(
+        with use_model_call_context(phase="structured_output_repair"):
+            content, meta = chat_with_local_model_with_meta_func(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                model=runtime_config["runtime_model_name"],
+                provider_id="local",
+                temperature=0.0,
+                thinking_enabled=False,
+                thinking_level="off",
+                on_delta=None,
+                input_attachments=[],
+                structured_output_schema=structured_output_schema,
+            )
+        return content, {**meta, "prompt_snapshot": prompt_snapshot}
+    with use_model_call_context(phase="structured_output_repair"):
+        content, meta = chat_with_model_ref_with_meta_func(
+            model_ref=runtime_config["resolved_model_ref"],
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            model=runtime_config["runtime_model_name"],
-            provider_id="local",
             temperature=0.0,
             thinking_enabled=False,
             thinking_level="off",
             on_delta=None,
             input_attachments=[],
             structured_output_schema=structured_output_schema,
+            model_runtime_fixture=runtime_config.get("model_runtime_fixture"),
         )
-        return content, {**meta, "prompt_snapshot": prompt_snapshot}
-    content, meta = chat_with_model_ref_with_meta_func(
-        model_ref=runtime_config["resolved_model_ref"],
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        temperature=0.0,
-        thinking_enabled=False,
-        thinking_level="off",
-        on_delta=None,
-        input_attachments=[],
-        structured_output_schema=structured_output_schema,
-        model_runtime_fixture=runtime_config.get("model_runtime_fixture"),
-    )
     return content, {**meta, "prompt_snapshot": prompt_snapshot}
 
 

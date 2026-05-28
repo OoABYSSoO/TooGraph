@@ -60,6 +60,7 @@ from app.core.runtime.execution_graph import (
 from app.core.runtime.run_artifacts import append_run_snapshot as _append_run_snapshot
 from app.core.runtime.run_artifacts import refresh_run_artifacts as _refresh_run_artifacts
 from app.core.runtime.run_tree import create_child_run_state
+from app.core.runtime.model_call_context import use_model_call_context
 from app.core.runtime.node_execution_records import finish_node_execution, start_node_execution
 from app.core.runtime.runtime_summaries import summarize_first_value as _summarize_values
 from app.core.runtime.state_io import apply_state_writes, collect_node_inputs
@@ -376,6 +377,30 @@ def _record_subgraph_node_status(state: dict[str, Any], node_name: str, status: 
         save_run(parent_state)
 
 
+def _model_call_context_for_node(
+    state: dict[str, Any],
+    graph: NodeSystemGraphDocument,
+    node_name: str,
+    node: Any,
+    node_execution: dict[str, Any],
+) -> dict[str, Any]:
+    subgraph_context = _subgraph_context(state)
+    return {
+        "run_id": str(state.get("run_id") or "").strip(),
+        "root_run_id": str(state.get("root_run_id") or state.get("run_id") or "").strip(),
+        "parent_run_id": str(state.get("parent_run_id") or "").strip(),
+        "parent_node_id": str(state.get("parent_node_id") or "").strip(),
+        "run_path": list(state.get("run_path") or []),
+        "graph_id": graph.graph_id,
+        "graph_name": graph.name,
+        "node_id": node_name,
+        "node_type": getattr(node, "kind", ""),
+        "node_name": getattr(node, "name", "") or node_name,
+        "execution_id": str(node_execution.get("execution_id") or "").strip(),
+        "subgraph_path": subgraph_context["path"] if subgraph_context else [],
+    }
+
+
 def _apply_inherited_permission_metadata(
     subgraph_document: NodeSystemGraphDocument,
     state: dict[str, Any],
@@ -483,44 +508,45 @@ def _build_langgraph_node_callable(
 
             try:
                 input_values, state_reads = collect_node_inputs(node, state)
-                if isinstance(node, NodeSystemSubgraphNode):
-                    pending_subgraph = _pending_subgraph_breakpoint_for_node(state, node_name)
-                    if pending_subgraph:
-                        body = _resume_subgraph_node_runtime(
-                            graph,
-                            node_name,
-                            node,
-                            input_values,
-                            state,
-                            pending_subgraph,
-                            resume_payload=state.setdefault("metadata", {}).pop("pending_subgraph_resume_payload", None),
-                            persist_parent_progress=persist_progress,
-                        )
+                with use_model_call_context(**_model_call_context_for_node(state, graph, node_name, node, node_execution)):
+                    if isinstance(node, NodeSystemSubgraphNode):
+                        pending_subgraph = _pending_subgraph_breakpoint_for_node(state, node_name)
+                        if pending_subgraph:
+                            body = _resume_subgraph_node_runtime(
+                                graph,
+                                node_name,
+                                node,
+                                input_values,
+                                state,
+                                pending_subgraph,
+                                resume_payload=state.setdefault("metadata", {}).pop("pending_subgraph_resume_payload", None),
+                                persist_parent_progress=persist_progress,
+                            )
+                        else:
+                            body = _execute_subgraph_node_runtime(
+                                graph,
+                                node_name,
+                                node,
+                                input_values,
+                                state,
+                                persist_parent_progress=persist_progress,
+                            )
                     else:
-                        body = _execute_subgraph_node_runtime(
+                        body = _execute_node(
                             graph,
                             node_name,
                             node,
                             input_values,
                             state,
-                            persist_parent_progress=persist_progress,
+                            execute_dynamic_subgraph_func=lambda **kwargs: _execute_dynamic_subgraph_capability(
+                                **kwargs,
+                                persist_parent_progress=persist_progress,
+                            ),
+                            execute_subgraph_worker_func=lambda **kwargs: _execute_batch_subgraph_worker_runtime(
+                                parent_graph=graph,
+                                **kwargs,
+                            ),
                         )
-                else:
-                    body = _execute_node(
-                        graph,
-                        node_name,
-                        node,
-                        input_values,
-                        state,
-                        execute_dynamic_subgraph_func=lambda **kwargs: _execute_dynamic_subgraph_capability(
-                            **kwargs,
-                            persist_parent_progress=persist_progress,
-                        ),
-                        execute_subgraph_worker_func=lambda **kwargs: _execute_batch_subgraph_worker_runtime(
-                            parent_graph=graph,
-                            **kwargs,
-                        ),
-                    )
                 if body.get("awaiting_human"):
                     duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
                     if body.get("pending_permission_approval"):

@@ -64,10 +64,10 @@ test("eval page model summarizes suite and case result status", () => {
   ];
 
   assert.deepEqual(buildEvalOverview([suite({ case_count: 3 })], runs), [
-    { key: "suites", label: "评测套件", value: 1 },
-    { key: "cases", label: "评测用例", value: 3 },
-    { key: "runs", label: "评测运行", value: 2 },
-    { key: "attention", label: "需要复核", value: 1 },
+    { key: "suites", label: "evals.suitesMetric", value: 1 },
+    { key: "cases", label: "evals.casesMetric", value: 3 },
+    { key: "runs", label: "evals.runsMetric", value: 2 },
+    { key: "attention", label: "evals.attentionMetric", value: 1 },
   ]);
   assert.deepEqual(countEvalCaseStatuses(runs[1].case_results), { passed: 1, failed: 1, running: 1, pending: 0 });
 });
@@ -193,7 +193,7 @@ test("eval page model builds failed case diagnostics from errors, nodes, and che
     {
       key: "case_one-case-error",
       kind: "case_error",
-      label: "用例错误",
+      label: "evals.caseError",
       status: "failed",
       message: "Graph run ended with failed checks.",
       detailPreview: "",

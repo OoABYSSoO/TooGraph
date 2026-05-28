@@ -4,7 +4,7 @@ import time
 from typing import Any, Callable
 
 from app.core.model_provider_templates import TRANSPORT_OPENAI_COMPATIBLE
-from app.tools.model_provider_http import DEFAULT_REQUEST_TIMEOUT_SEC, build_auth_headers, request_json
+from app.tools.model_provider_http import DEFAULT_REQUEST_TIMEOUT_SEC, build_auth_headers, normalize_request_timeout_seconds, request_json
 
 
 def extract_openai_embedding_vector(response_payload: dict[str, Any]) -> list[float]:
@@ -31,7 +31,9 @@ def embed_openai_compatible(
     auth_header: str,
     auth_scheme: str,
     append_request_log: Callable[..., None],
+    request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SEC,
 ) -> tuple[list[float], dict[str, Any]]:
+    timeout_sec = normalize_request_timeout_seconds(request_timeout_seconds)
     path = "/embeddings"
     request_payload = {"model": model, "input": text}
     started_at = time.monotonic()
@@ -39,7 +41,7 @@ def embed_openai_compatible(
         response_payload = request_json(
             method="POST",
             url=f"{base_url}{path}",
-            timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
+            timeout_sec=timeout_sec,
             headers=build_auth_headers(api_key=api_key, auth_header=auth_header, auth_scheme=auth_scheme),
             json_payload=request_payload,
             error_label=f"{provider_id} embedding request failed",
@@ -76,4 +78,5 @@ def embed_openai_compatible(
         "response_id": response_payload.get("id"),
         "usage": response_payload.get("usage"),
         "dimensions": len(vector),
+        "request_timeout_seconds": timeout_sec,
     }

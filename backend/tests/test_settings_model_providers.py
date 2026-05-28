@@ -48,6 +48,7 @@ class SettingsModelProviderTests(unittest.TestCase):
             api_key="sk-local",
             auth_header="Authorization",
             auth_scheme="Bearer",
+            timeout_sec=8.0,
         )
 
     def test_discovery_endpoint_dispatches_anthropic_transport(self) -> None:
@@ -74,6 +75,7 @@ class SettingsModelProviderTests(unittest.TestCase):
             api_key="sk-ant",
             auth_header="x-api-key",
             auth_scheme="",
+            timeout_sec=8.0,
         )
 
     def test_update_settings_preserves_existing_api_key_when_blank(self) -> None:
@@ -192,6 +194,49 @@ class SettingsModelProviderTests(unittest.TestCase):
         self.assertEqual(saved_model["capabilities"]["rerank"], True)
         self.assertEqual(saved_model["permissions"], ["rerank"])
 
+    def test_update_settings_persists_provider_request_timeout_seconds(self) -> None:
+        saved_payload: dict = {}
+
+        def capture_save(payload: dict) -> dict:
+            saved_payload.update(payload)
+            return payload
+
+        with patch("app.api.routes_settings.load_app_settings", return_value={}):
+            with patch("app.api.routes_settings.save_app_settings", side_effect=capture_save):
+                with patch("app.api.routes_settings._build_settings_payload", return_value={"ok": True}):
+                    with TestClient(app) as client:
+                        response = client.post(
+                            "/api/settings",
+                            json={
+                                "model": {
+                                    "text_model_ref": "local/gemma",
+                                    "video_model_ref": "local/gemma",
+                                },
+                                "agent_runtime_defaults": {
+                                    "model": "local/gemma",
+                                    "thinking_enabled": False,
+                                    "thinking_level": "off",
+                                    "temperature": 0.2,
+                                },
+                                "model_providers": {
+                                    "local": {
+                                        "label": "Local",
+                                        "transport": "openai-compatible",
+                                        "base_url": "http://127.0.0.1:8888/v1",
+                                        "api_key": "",
+                                        "enabled": True,
+                                        "auth_header": "Authorization",
+                                        "auth_scheme": "Bearer",
+                                        "request_timeout_seconds": 42.5,
+                                        "models": [{"model": "gemma", "label": "Gemma", "modalities": ["text"]}],
+                                    }
+                                },
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(saved_payload["model_providers"]["local"]["request_timeout_seconds"], 42.5)
+
     def test_update_settings_allows_empty_model_refs_when_no_models_are_available(self) -> None:
         saved_payload: dict = {}
 
@@ -276,6 +321,75 @@ class SettingsModelProviderTests(unittest.TestCase):
                             payload = routes_settings._build_settings_payload(force_refresh_models=False)
 
         self.assertEqual(payload["buddy_runtime"], {"permission_mode": "full_access"})
+
+    def test_settings_payload_includes_model_log_retention(self) -> None:
+        catalog = {
+            "default_text_model_ref": "local/current-text",
+            "default_video_model_ref": "local/current-video",
+            "providers": [],
+            "provider_templates": [],
+        }
+
+        with patch("app.api.routes_settings.build_model_catalog", return_value=catalog):
+            with patch("app.api.routes_settings.get_default_agent_thinking_level", return_value="medium"):
+                with patch("app.api.routes_settings.get_default_agent_temperature", return_value=0.2):
+                    with patch("app.api.routes_settings.get_tool_registry", return_value={}):
+                        with patch(
+                            "app.api.routes_settings.get_model_log_retention_settings",
+                            return_value={"max_root_runs": 42},
+                        ):
+                            payload = routes_settings._build_settings_payload(force_refresh_models=False)
+
+        self.assertEqual(payload["model_logs"], {"max_root_runs": 42})
+
+    def test_update_settings_persists_model_log_retention_from_full_payload(self) -> None:
+        saved_payload = {}
+
+        def capture_save(payload: dict) -> dict:
+            saved_payload.clear()
+            saved_payload.update(payload)
+            return payload
+
+        with patch("app.api.routes_settings.load_app_settings", return_value={}):
+            with patch("app.api.routes_settings.save_app_settings", side_effect=capture_save):
+                with patch("app.api.routes_settings._build_settings_payload", return_value={"ok": True}):
+                    with TestClient(app) as client:
+                        response = client.post(
+                            "/api/settings",
+                            json={
+                                "model": {
+                                    "text_model_ref": "local/text",
+                                    "video_model_ref": "local/video",
+                                },
+                                "agent_runtime_defaults": {
+                                    "model": "local/text",
+                                    "thinking_enabled": True,
+                                    "thinking_level": "medium",
+                                    "temperature": 0.2,
+                                },
+                                "model_logs": {"max_root_runs": 12},
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(saved_payload["model_logs"], {"max_root_runs": 12})
+
+    def test_model_log_retention_endpoint_persists_setting(self) -> None:
+        saved_payload = {}
+
+        def capture_save(payload: dict) -> dict:
+            saved_payload.clear()
+            saved_payload.update(payload)
+            return payload
+
+        with patch("app.core.storage.model_log_store.load_app_settings", return_value={}):
+            with patch("app.core.storage.model_log_store.save_app_settings", side_effect=capture_save):
+                with TestClient(app) as client:
+                    response = client.post("/api/settings/model-logs", json={"max_root_runs": 37})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"max_root_runs": 37})
+        self.assertEqual(saved_payload["model_logs"], {"max_root_runs": 37})
 
     def test_update_settings_preserves_existing_buddy_runtime_when_omitted(self) -> None:
         saved_payload = {}

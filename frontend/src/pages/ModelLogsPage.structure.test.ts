@@ -11,9 +11,17 @@ test("ModelLogsPage renders a themed paginated raw model request log", () => {
   assert.match(pageSource, /<AppShell>/);
   assert.match(pageSource, /class="model-logs-page"/);
   assert.match(pageSource, /fetchModelLogs/);
+  assert.match(pageSource, /updateModelLogRetention/);
+  assert.match(pageSource, /<ElInputNumber[\s\S]*v-model="retentionRootRuns"/);
   assert.match(pageSource, /<ElInput[\s\S]*v-model="query"/);
   assert.match(pageSource, /<ElPagination[\s\S]*v-model:current-page="currentPage"[\s\S]*:page-size="pageSize"[\s\S]*:total="total"/);
-  assert.match(pageSource, /model-logs-page__entry/);
+  assert.match(pageSource, /model-logs-page__tree-node/);
+  assert.match(pageSource, /v-for="item in treeItems"/);
+  assert.match(pageSource, /selectTreeItem\(item\)/);
+  assert.match(pageSource, /runTrees/);
+  assert.match(pageSource, /flattenTreeItems/);
+  assert.match(pageSource, /model-logs-page__tree-children/);
+  assert.match(pageSource, /model-logs-page__retention/);
   assert.match(pageSource, /model-logs-page__request-raw/);
   assert.match(pageSource, /model-logs-page__response-raw/);
   assert.doesNotMatch(pageSource, /<details open class="model-logs-page__raw-panel/);

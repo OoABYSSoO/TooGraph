@@ -23,7 +23,6 @@ PRESET_DATA_DIR = DATA_DIR / "presets"
 CHECKPOINT_DATA_DIR = DATA_DIR / "checkpoints"
 SETTINGS_DATA_DIR = DATA_DIR / "settings"
 ACTION_STATE_DATA_DIR = DATA_DIR / "actions"
-MODEL_LOG_DATA_DIR = DATA_DIR / "model_logs"
 DB_PATH = DATA_DIR / "toograph.db"
 _SCHEMA_LOCK = threading.RLock()
 
@@ -61,6 +60,7 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     _ensure_graph_run_schema(connection)
     _ensure_scheduler_schema(connection)
     _ensure_buddy_schema(connection)
+    _ensure_message_platform_schema(connection)
     _ensure_context_assembly_schema(connection)
     _ensure_retrieval_schema(connection)
     _ensure_embedding_schema(connection)
@@ -906,6 +906,100 @@ def _ensure_buddy_message_client_order(connection: sqlite3.Connection) -> None:
         next_order_by_session[session_id] = client_order + 1.0
 
 
+def _ensure_message_platform_schema(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS message_platform_bindings (
+            binding_id TEXT PRIMARY KEY,
+            platform_id TEXT NOT NULL,
+            display_name TEXT NOT NULL DEFAULT '',
+            enabled INTEGER NOT NULL DEFAULT 0,
+            configured INTEGER NOT NULL DEFAULT 0,
+            config_json TEXT NOT NULL DEFAULT '{}',
+            secret_summary_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS message_platform_connection_status (
+            binding_id TEXT PRIMARY KEY,
+            status TEXT NOT NULL DEFAULT 'not_configured',
+            last_connected_at TEXT NOT NULL DEFAULT '',
+            last_disconnected_at TEXT NOT NULL DEFAULT '',
+            last_event_at TEXT NOT NULL DEFAULT '',
+            last_delivery_at TEXT NOT NULL DEFAULT '',
+            last_error_code TEXT NOT NULL DEFAULT '',
+            last_error_message TEXT NOT NULL DEFAULT '',
+            retry_count INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS message_platform_secrets (
+            binding_id TEXT PRIMARY KEY,
+            secret_json TEXT NOT NULL DEFAULT '{}',
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS message_platform_sessions (
+            platform_session_id TEXT PRIMARY KEY,
+            platform_id TEXT NOT NULL,
+            binding_id TEXT NOT NULL,
+            external_conversation_key TEXT NOT NULL,
+            external_chat_id TEXT NOT NULL,
+            external_thread_id TEXT NOT NULL DEFAULT '',
+            external_user_id TEXT NOT NULL DEFAULT '',
+            external_chat_type TEXT NOT NULL DEFAULT 'unknown',
+            external_display_name TEXT NOT NULL DEFAULT '',
+            buddy_session_id TEXT NOT NULL,
+            routing_mode TEXT NOT NULL DEFAULT 'one_external_conversation_one_buddy_session',
+            buddy_model_ref TEXT NOT NULL DEFAULT '',
+            model_updated_at TEXT NOT NULL DEFAULT '',
+            model_updated_by_external_sender_id TEXT NOT NULL DEFAULT '',
+            trace_mode TEXT NOT NULL DEFAULT 'quiet',
+            status TEXT NOT NULL DEFAULT 'active',
+            title TEXT NOT NULL DEFAULT '',
+            last_inbound_at TEXT NOT NULL DEFAULT '',
+            last_outbound_at TEXT NOT NULL DEFAULT '',
+            last_run_id TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (platform_id, binding_id, external_conversation_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS message_platform_audit_events (
+            event_id TEXT PRIMARY KEY,
+            binding_id TEXT NOT NULL DEFAULT '',
+            platform_id TEXT NOT NULL DEFAULT '',
+            platform_session_id TEXT NOT NULL DEFAULT '',
+            event_type TEXT NOT NULL,
+            severity TEXT NOT NULL DEFAULT 'info',
+            message TEXT NOT NULL DEFAULT '',
+            payload_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS message_platform_dedup (
+            dedup_key TEXT PRIMARY KEY,
+            platform_id TEXT NOT NULL,
+            binding_id TEXT NOT NULL,
+            external_message_id TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_message_platform_bindings_platform
+            ON message_platform_bindings (platform_id);
+        CREATE INDEX IF NOT EXISTS idx_message_platform_secrets_updated
+            ON message_platform_secrets (updated_at);
+        CREATE INDEX IF NOT EXISTS idx_message_platform_sessions_buddy_session
+            ON message_platform_sessions (buddy_session_id);
+        CREATE INDEX IF NOT EXISTS idx_message_platform_sessions_binding
+            ON message_platform_sessions (binding_id, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_message_platform_audit_binding
+            ON message_platform_audit_events (binding_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_message_platform_audit_session
+            ON message_platform_audit_events (platform_session_id, created_at);
+        """
+    )
 def _ensure_context_assembly_schema(connection: sqlite3.Connection) -> None:
     connection.executescript(
         """

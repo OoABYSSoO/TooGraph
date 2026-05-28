@@ -28,6 +28,31 @@ type BuddyChatSessionsOptions<Message extends BuddySessionMessage> = {
 
 const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "toograph:buddy-active-session";
 
+export function formatBuddySessionSourceLabel(source: string | null | undefined) {
+  const normalized = (source ?? "buddy").trim();
+  if (normalized === "telegram") {
+    return "Telegram";
+  }
+  if (normalized === "feishu") {
+    return "Feishu/Lark";
+  }
+  if (!normalized || normalized === "buddy") {
+    return "";
+  }
+  return normalized;
+}
+
+function buildChatMessageRecordsSignature(records: BuddyChatMessageRecord[]) {
+  return records
+    .map((record) => [
+      record.message_id,
+      record.role,
+      record.run_id ?? "",
+      record.updated_at,
+    ].join(":"))
+    .join("|");
+}
+
 export function useBuddyChatSessions<Message extends BuddySessionMessage>({
   messages,
   queuedTurns,
@@ -49,6 +74,7 @@ export function useBuddyChatSessions<Message extends BuddySessionMessage>({
   const activeSessionDeleteId = ref<string | null>(null);
   const sessionDeleteConfirmTimeoutRef = ref<number | null>(null);
   let chatSessionInitializationPromise: Promise<void> | null = null;
+  let activeSessionMessageSignature = "";
 
   const isSessionSwitchLocked = computed(
     () =>
@@ -143,16 +169,41 @@ export function useBuddyChatSessions<Message extends BuddySessionMessage>({
       const records = await fetchBuddyChatMessages(sessionId);
       activeSessionId.value = sessionId;
       window.localStorage.setItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY, sessionId);
-      messages.value = records.map(messageRecordToBuddyMessage);
-      resetNextBuddyMessageClientOrder();
-      resetVisibleBuddyRunState();
-      await hydrateLoadedRunDisplays?.(records);
+      await applyLoadedChatMessages(records);
       await scrollMessagesToBottom();
     } catch (error) {
       errorMessage.value = t("buddy.historyLoadFailed", { error: formatErrorMessage(error) });
     } finally {
       isSessionLoading.value = false;
     }
+  }
+
+  async function refreshActiveChatSession() {
+    const sessionId = activeSessionId.value;
+    if (!sessionId || isSessionSwitchLocked.value) {
+      return false;
+    }
+    try {
+      const records = await fetchBuddyChatMessages(sessionId);
+      const nextSignature = buildChatMessageRecordsSignature(records);
+      if (nextSignature === activeSessionMessageSignature) {
+        return false;
+      }
+      await applyLoadedChatMessages(records);
+      await scrollMessagesToBottom();
+      return true;
+    } catch (error) {
+      errorMessage.value = t("buddy.historyLoadFailed", { error: formatErrorMessage(error) });
+      return false;
+    }
+  }
+
+  async function applyLoadedChatMessages(records: BuddyChatMessageRecord[]) {
+    activeSessionMessageSignature = buildChatMessageRecordsSignature(records);
+    messages.value = records.map(messageRecordToBuddyMessage);
+    resetNextBuddyMessageClientOrder();
+    resetVisibleBuddyRunState();
+    await hydrateLoadedRunDisplays?.(records);
   }
 
   async function deleteSession(sessionId: string) {
@@ -171,6 +222,7 @@ export function useBuddyChatSessions<Message extends BuddySessionMessage>({
           await activateChatSession(nextSession.session_id);
         } else {
           activeSessionId.value = null;
+          activeSessionMessageSignature = "";
           messages.value = [];
           resetVisibleBuddyRunState();
           window.localStorage.removeItem(BUDDY_ACTIVE_SESSION_STORAGE_KEY);
@@ -242,6 +294,7 @@ export function useBuddyChatSessions<Message extends BuddySessionMessage>({
     ensureActiveChatSession,
     createNewSession,
     selectChatSession,
+    refreshActiveChatSession,
     toggleSessionPanel,
     clearSessionDeleteConfirmTimeout,
     clearSessionDeleteConfirmState,

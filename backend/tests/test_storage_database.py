@@ -177,6 +177,34 @@ class StorageDatabaseTests(unittest.TestCase):
             self.assertNotIn("memories", table_names)
             self.assertNotIn("memories_fts", table_names)
 
+    def test_initialize_storage_creates_message_platform_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            db_path = data_dir / "toograph.db"
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", db_path),
+            ):
+                database.initialize_storage()
+                with sqlite3.connect(db_path) as connection:
+                    table_names = {
+                        row[0]
+                        for row in connection.execute(
+                            "SELECT name FROM sqlite_master WHERE type = 'table'"
+                        ).fetchall()
+                    }
+
+        self.assertTrue(
+            {
+                "message_platform_bindings",
+                "message_platform_connection_status",
+                "message_platform_secrets",
+                "message_platform_sessions",
+                "message_platform_audit_events",
+                "message_platform_dedup",
+            }.issubset(table_names)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

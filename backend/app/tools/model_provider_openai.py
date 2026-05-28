@@ -9,7 +9,7 @@ from app.core.runtime.structured_output import (
     should_retry_without_native_structured_output,
 )
 from app.core.thinking_levels import build_native_thinking_payload
-from app.tools.model_provider_http import DEFAULT_REQUEST_TIMEOUT_SEC, build_auth_headers
+from app.tools.model_provider_http import DEFAULT_REQUEST_TIMEOUT_SEC, build_auth_headers, normalize_request_timeout_seconds
 from app.tools.model_provider_multimodal import build_openai_user_content
 from app.tools.model_provider_response_parsing import normalize_message_text, parse_sse_json_events
 
@@ -118,7 +118,9 @@ def chat_openai_compatible(
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
     structured_output_schema: dict[str, Any] | None = None,
+    request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SEC,
 ) -> tuple[str, dict[str, Any]]:
+    timeout_sec = normalize_request_timeout_seconds(request_timeout_seconds)
     request_payload: dict[str, Any] = {
         "model": model,
         "temperature": temperature,
@@ -150,7 +152,7 @@ def chat_openai_compatible(
         try:
             response_payload, logged_request_payload, stream_fallback_error, _used_stream = post_streaming_json_with_fallback_fn(
                 stream_url=f"{base_url}{path}",
-                timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
+                timeout_sec=timeout_sec,
                 headers=build_auth_headers(api_key=api_key, auth_header=auth_header, auth_scheme=auth_scheme),
                 stream_payload=request_payload,
                 fallback_payload=fallback_payload,
@@ -167,7 +169,7 @@ def chat_openai_compatible(
             retry_payload.pop("response_format", None)
             response_payload, logged_request_payload, stream_fallback_error, _used_stream = post_streaming_json_with_fallback_fn(
                 stream_url=f"{base_url}{path}",
-                timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
+                timeout_sec=timeout_sec,
                 headers=build_auth_headers(api_key=api_key, auth_header=auth_header, auth_scheme=auth_scheme),
                 stream_payload=retry_payload,
                 fallback_payload={**retry_payload, "stream": False},
@@ -218,4 +220,5 @@ def chat_openai_compatible(
             else ("json_schema" if structured_output_schema else None)
         ),
         "structured_output_fallback_error": structured_output_fallback_error,
+        "request_timeout_seconds": timeout_sec,
     }

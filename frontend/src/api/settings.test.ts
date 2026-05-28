@@ -69,6 +69,7 @@ test("updateSettings posts through the frontend api proxy", async () => {
         enabled: true,
         auth_header: "Authorization",
         auth_scheme: "Bearer",
+        request_timeout_seconds: 45,
         models: [
           {
             model: "gpt-4.1",
@@ -106,6 +107,7 @@ test("updateSettings posts through the frontend api proxy", async () => {
         enabled: true,
         auth_header: "Authorization",
         auth_scheme: "Bearer",
+        request_timeout_seconds: 45,
         models: [
           {
             model: "gpt-4.1",

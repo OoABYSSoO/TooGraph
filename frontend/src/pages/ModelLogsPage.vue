@@ -18,6 +18,22 @@
           <span>{{ t("modelLogs.searchLabel") }}</span>
           <ElInput v-model="query" class="model-logs-page__search" :placeholder="t('modelLogs.searchPlaceholder')" clearable />
         </label>
+        <div class="model-logs-page__retention">
+          <label class="model-logs-page__retention-field">
+            <span>{{ t("modelLogs.retentionLabel") }}</span>
+            <ElInputNumber
+              v-model="retentionRootRuns"
+              :min="1"
+              :max="10000"
+              :step="10"
+              controls-position="right"
+              class="model-logs-page__retention-input"
+            />
+          </label>
+          <button type="button" class="model-logs-page__retention-save" :disabled="retentionSaving" @click="saveRetentionSettings">
+            {{ retentionSaving ? t("modelLogs.retentionSaving") : t("modelLogs.retentionSave") }}
+          </button>
+        </div>
         <div class="model-logs-page__overview" aria-live="polite">
           <span>{{ total }} total</span>
           <span>{{ errorCount }} errors</span>
@@ -27,32 +43,47 @@
 
       <section class="model-logs-page__workspace">
         <section class="model-logs-page__entry-list">
-          <article v-if="loading && logs.length === 0" class="model-logs-page__empty">{{ t("common.loadingModelLogs") }}</article>
+          <article v-if="loading && treeItems.length === 0" class="model-logs-page__empty">{{ t("common.loadingModelLogs") }}</article>
           <article v-else-if="error" class="model-logs-page__empty">{{ t("common.failedToLoad", { error }) }}</article>
           <article v-else-if="logs.length === 0" class="model-logs-page__empty">{{ t("modelLogs.empty") }}</article>
-          <button
-            v-for="entry in logs"
-            v-else
-            :key="entry.id"
-            type="button"
-            class="model-logs-page__entry"
-            :class="{ 'model-logs-page__entry--active': selectedLog?.id === entry.id, 'model-logs-page__entry--error': Boolean(entry.error) }"
-            @click="selectLog(entry.id)"
-          >
-            <span class="model-logs-page__entry-rail" aria-hidden="true"></span>
-            <span class="model-logs-page__entry-main">
-              <span class="model-logs-page__entry-heading">
-                <strong>{{ entry.model || entry.provider_id }}</strong>
-                <span class="model-logs-page__entry-kind">{{ entry.request_kind }}</span>
+          <div v-else class="model-logs-page__tree" role="tree">
+            <button
+              v-for="item in treeItems"
+              :key="item.key"
+              type="button"
+              class="model-logs-page__tree-node"
+              :class="{
+                'model-logs-page__tree-node--active': treeItemIsActive(item),
+                'model-logs-page__tree-node--error': treeItemHasError(item),
+                'model-logs-page__tree-node--muted': !item.selectable,
+                [`model-logs-page__tree-node--${item.kind}`]: true,
+              }"
+              :style="treeItemStyle(item)"
+              :disabled="!item.selectable"
+              role="treeitem"
+              @click="selectTreeItem(item)"
+            >
+              <span class="model-logs-page__tree-children" aria-hidden="true"></span>
+              <span class="model-logs-page__tree-icon" aria-hidden="true">
+                <ElIcon v-if="item.kind === 'run'"><Connection /></ElIcon>
+                <ElIcon v-else-if="item.treeNode?.node_type === 'subgraph'"><Share /></ElIcon>
+                <ElIcon v-else-if="item.kind === 'model_call'"><ChatDotRound /></ElIcon>
+                <ElIcon v-else><Cpu /></ElIcon>
               </span>
-              <span class="model-logs-page__entry-meta">
-                <span>{{ formatTimestamp(entry.timestamp) }}</span>
-                <span>{{ formatDuration(entry.duration_ms) }}</span>
-                <span>{{ entry.provider_id }}</span>
+              <span class="model-logs-page__tree-main">
+                <span class="model-logs-page__tree-heading">
+                  <strong>{{ treeItemLabel(item) }}</strong>
+                  <span class="model-logs-page__tree-kind">{{ treeItemKind(item) }}</span>
+                </span>
+                <span class="model-logs-page__tree-meta">
+                  <span>{{ treeItemTimestamp(item) }}</span>
+                  <span v-if="treeItemDuration(item)">{{ treeItemDuration(item) }}</span>
+                  <span v-if="treeItemProvider(item)">{{ treeItemProvider(item) }}</span>
+                </span>
+                <span v-if="treeItemPath(item)" class="model-logs-page__tree-path">{{ treeItemPath(item) }}</span>
               </span>
-              <span class="model-logs-page__entry-path">{{ entry.path }}</span>
-            </span>
-          </button>
+            </button>
+          </div>
         </section>
 
         <section v-if="selectedLog" class="model-logs-page__detail">
@@ -241,14 +272,14 @@
 </template>
 
 <script setup lang="ts">
-import { Refresh, View } from "@element-plus/icons-vue";
-import { ElDialog, ElIcon, ElInput, ElPagination } from "element-plus";
+import { ChatDotRound, Connection, Cpu, Refresh, Share, View } from "@element-plus/icons-vue";
+import { ElDialog, ElIcon, ElInput, ElInputNumber, ElMessage, ElPagination } from "element-plus";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
-import { fetchModelLogs } from "@/api/modelLogs";
+import { fetchModelLogs, updateModelLogRetention } from "@/api/modelLogs";
 import AppShell from "@/layouts/AppShell.vue";
-import type { ModelLogEntry } from "@/types/model-log";
+import type { ModelLogEntry, ModelLogTreeNode } from "@/types/model-log";
 import { highlightJson } from "./modelLogsJsonHighlight.ts";
 
 const { t } = useI18n();
@@ -257,15 +288,28 @@ const currentPage = ref(1);
 const total = ref(0);
 const pageCount = ref(0);
 const logs = ref<ModelLogEntry[]>([]);
+const runTrees = ref<ModelLogTreeNode[]>([]);
 const selectedLogId = ref<string | null>(null);
 const query = ref("");
 const loading = ref(true);
 const error = ref<string | null>(null);
+const retentionRootRuns = ref(200);
+const retentionSaving = ref(false);
 const outputDisplayMode = ref<"normal" | "chunks">("normal");
 const rawResponseDisplayMode = ref<"normal" | "chunks">("normal");
 const rawDialogVisible = ref(false);
 const rawDialogKind = ref<"request" | "response">("request");
 let searchTimer: number | null = null;
+
+type ModelLogTreeItem = {
+  key: string;
+  kind: "run" | "graph_node" | "model_call";
+  depth: number;
+  treeNode?: ModelLogTreeNode;
+  log?: ModelLogEntry;
+  logIds: string[];
+  selectable: boolean;
+};
 
 const selectedLog = computed(() => {
   if (!logs.value.length) {
@@ -275,6 +319,8 @@ const selectedLog = computed(() => {
 });
 
 const errorCount = computed(() => logs.value.filter((entry) => Boolean(entry.error)).length);
+const logsById = computed(() => new Map(logs.value.map((entry) => [entry.id, entry])));
+const treeItems = computed(() => flattenTreeItems(runTrees.value, logsById.value));
 const selectedStreamSummary = computed(() => (selectedLog.value ? getStreamSummary(selectedLog.value) : null));
 const rawDialogTitle = computed(() =>
   rawDialogKind.value === "request" ? t("modelLogs.rawRequest") : t("modelLogs.rawResponse"),
@@ -307,6 +353,108 @@ function getStringArray(value: unknown) {
 
 function getRecordArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => isRecord(item)) : [];
+}
+
+function flattenTreeItems(
+  nodes: ModelLogTreeNode[],
+  logIndex: Map<string, ModelLogEntry>,
+  depth = 0,
+): ModelLogTreeItem[] {
+  const items: ModelLogTreeItem[] = [];
+  for (const node of nodes) {
+    const logIds = collectModelLogIds(node);
+    items.push({
+      key: node.id,
+      kind: node.kind,
+      depth,
+      treeNode: node,
+      logIds,
+      selectable: logIds.length > 0,
+    });
+    for (const logId of node.model_log_ids || []) {
+      const log = logIndex.get(logId);
+      if (!log) {
+        continue;
+      }
+      items.push({
+        key: `model:${log.id}`,
+        kind: "model_call",
+        depth: depth + 1,
+        log,
+        logIds: [log.id],
+        selectable: true,
+      });
+    }
+    items.push(...flattenTreeItems(node.children || [], logIndex, depth + 1));
+  }
+  return items;
+}
+
+function collectModelLogIds(node: ModelLogTreeNode): string[] {
+  const ids = [...(node.model_log_ids || [])];
+  for (const child of node.children || []) {
+    ids.push(...collectModelLogIds(child));
+  }
+  return Array.from(new Set(ids));
+}
+
+function selectTreeItem(item: ModelLogTreeItem) {
+  const logId = item.log?.id ?? item.logIds[0] ?? "";
+  if (logId) {
+    selectLog(logId);
+  }
+}
+
+function treeItemIsActive(item: ModelLogTreeItem) {
+  return Boolean(selectedLogId.value && item.logIds.includes(selectedLogId.value));
+}
+
+function treeItemHasError(item: ModelLogTreeItem) {
+  return item.logIds.some((logId) => Boolean(logsById.value.get(logId)?.error));
+}
+
+function treeItemStyle(item: ModelLogTreeItem) {
+  return { "--tree-depth": String(item.depth) };
+}
+
+function treeItemLabel(item: ModelLogTreeItem) {
+  if (item.log) {
+    return item.log.phase || item.log.request_kind || item.log.model || item.log.provider_id;
+  }
+  return item.treeNode?.label || item.treeNode?.node_id || item.treeNode?.run_id || t("common.noSummary");
+}
+
+function treeItemKind(item: ModelLogTreeItem) {
+  if (item.kind === "model_call") {
+    return item.log?.request_kind || t("modelLogs.modelCall");
+  }
+  if (item.kind === "run") {
+    return t("modelLogs.rootRun");
+  }
+  if (item.treeNode?.node_type === "subgraph") {
+    return "SUBGRAPH";
+  }
+  return "LLM";
+}
+
+function treeItemTimestamp(item: ModelLogTreeItem) {
+  return formatTimestamp(item.log?.timestamp || item.treeNode?.started_at || "");
+}
+
+function treeItemDuration(item: ModelLogTreeItem) {
+  const duration = item.log?.duration_ms ?? item.treeNode?.duration_ms;
+  return typeof duration === "number" ? formatDuration(duration) : "";
+}
+
+function treeItemProvider(item: ModelLogTreeItem) {
+  return item.log?.provider_id || item.treeNode?.status || "";
+}
+
+function treeItemPath(item: ModelLogTreeItem) {
+  if (item.log) {
+    return item.log.path;
+  }
+  return item.treeNode?.execution_id || item.treeNode?.run_id || "";
 }
 
 function getStreamSummary(log: ModelLogEntry): StreamSummary | null {
@@ -377,9 +525,11 @@ async function loadLogs() {
       query: query.value,
     });
     logs.value = page.entries;
+    runTrees.value = page.run_trees;
     total.value = page.total;
     currentPage.value = page.page;
     pageCount.value = page.pages;
+    retentionRootRuns.value = page.retention?.max_root_runs ?? retentionRootRuns.value;
     if (!logs.value.some((entry) => entry.id === selectedLogId.value)) {
       selectedLogId.value = logs.value[0]?.id ?? null;
     }
@@ -393,6 +543,22 @@ async function loadLogs() {
 
 function selectLog(logId: string) {
   selectedLogId.value = logId;
+}
+
+async function saveRetentionSettings() {
+  const nextRootRuns = Math.max(1, Math.min(10000, Math.round(Number(retentionRootRuns.value) || 200)));
+  retentionRootRuns.value = nextRootRuns;
+  retentionSaving.value = true;
+  try {
+    const saved = await updateModelLogRetention({ max_root_runs: nextRootRuns });
+    retentionRootRuns.value = saved.max_root_runs;
+    ElMessage.success(t("modelLogs.retentionSaved", { count: saved.max_root_runs }));
+    await loadLogs();
+  } catch (saveError) {
+    ElMessage.error(saveError instanceof Error ? saveError.message : t("modelLogs.retentionFailed"));
+  } finally {
+    retentionSaving.value = false;
+  }
 }
 
 function openRawDialog(kind: "request" | "response") {
@@ -549,19 +715,58 @@ onBeforeUnmount(() => {
 
 .model-logs-page__toolbar {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto;
+  grid-template-columns: minmax(260px, 1fr) minmax(240px, auto) auto;
   gap: 16px;
   align-items: end;
   padding: 16px;
   background: rgba(255, 255, 255, 0.58);
 }
 
-.model-logs-page__search-field {
+.model-logs-page__search-field,
+.model-logs-page__retention-field {
   display: grid;
   gap: 8px;
   color: rgba(60, 41, 20, 0.62);
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.model-logs-page__retention {
+  display: flex;
+  min-width: 0;
+  align-items: end;
+  gap: 10px;
+}
+
+.model-logs-page__retention-field {
+  min-width: 168px;
+}
+
+.model-logs-page__retention-input {
+  width: 168px;
+}
+
+.model-logs-page__retention-save {
+  min-height: 32px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 999px;
+  padding: 0 13px;
+  background: rgba(239, 246, 255, 0.88);
+  color: rgb(37, 99, 235);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.model-logs-page__retention-save:hover:not(:disabled) {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: rgba(219, 234, 254, 0.9);
+}
+
+.model-logs-page__retention-save:disabled {
+  cursor: progress;
+  opacity: 0.64;
 }
 
 .model-logs-page__overview {
@@ -573,7 +778,7 @@ onBeforeUnmount(() => {
 
 .model-logs-page__overview span,
 .model-logs-page__status,
-.model-logs-page__entry-kind {
+.model-logs-page__tree-kind {
   border: 1px solid rgba(154, 52, 18, 0.12);
   border-radius: 999px;
   padding: 5px 10px;
@@ -603,14 +808,20 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.52);
 }
 
-.model-logs-page__entry {
+.model-logs-page__tree {
   display: grid;
-  grid-template-columns: 4px minmax(0, 1fr);
+  gap: 7px;
+}
+
+.model-logs-page__tree-node {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
   gap: 10px;
   width: 100%;
   border: 1px solid rgba(154, 52, 18, 0.1);
-  border-radius: 18px;
-  padding: 12px;
+  border-radius: 14px;
+  padding: 10px 12px 10px calc(12px + var(--tree-depth, 0) * 18px);
   background: rgba(255, 253, 249, 0.82);
   color: inherit;
   cursor: pointer;
@@ -618,58 +829,94 @@ onBeforeUnmount(() => {
   transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
-.model-logs-page__entry:hover,
-.model-logs-page__entry--active {
+.model-logs-page__tree-node:hover:not(:disabled),
+.model-logs-page__tree-node--active {
   border-color: rgba(154, 52, 18, 0.26);
   background: rgba(255, 248, 240, 0.98);
   box-shadow: 0 12px 24px rgba(61, 43, 24, 0.08);
   transform: translateY(-1px);
 }
 
-.model-logs-page__entry--error {
+.model-logs-page__tree-node--error {
   border-color: rgba(220, 38, 38, 0.16);
 }
 
-.model-logs-page__entry-rail {
-  align-self: stretch;
-  border-radius: 999px;
-  background: rgb(37, 99, 235);
+.model-logs-page__tree-node--muted {
+  cursor: default;
 }
 
-.model-logs-page__entry--error .model-logs-page__entry-rail {
-  background: rgb(220, 38, 38);
+.model-logs-page__tree-children {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 16px;
+  width: calc(var(--tree-depth, 0) * 18px);
+  pointer-events: none;
 }
 
-.model-logs-page__entry-main,
-.model-logs-page__entry-heading {
+.model-logs-page__tree-children::before {
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  left: 0;
+  border-left: 1px solid rgba(154, 52, 18, 0.14);
+  content: "";
+  opacity: calc(var(--tree-depth, 0) * 0.45);
+}
+
+.model-logs-page__tree-icon {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 9px;
+  background: rgba(239, 246, 255, 0.82);
+  color: rgb(37, 99, 235);
+}
+
+.model-logs-page__tree-node--run .model-logs-page__tree-icon {
+  border-color: rgba(154, 52, 18, 0.14);
+  background: rgba(255, 248, 240, 0.92);
+  color: rgb(154, 52, 18);
+}
+
+.model-logs-page__tree-node--error .model-logs-page__tree-icon {
+  border-color: rgba(220, 38, 38, 0.18);
+  background: rgba(254, 242, 242, 0.92);
+  color: rgb(220, 38, 38);
+}
+
+.model-logs-page__tree-main,
+.model-logs-page__tree-heading {
   display: grid;
   min-width: 0;
 }
 
-.model-logs-page__entry-heading {
+.model-logs-page__tree-heading {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
 }
 
-.model-logs-page__entry-heading strong {
+.model-logs-page__tree-heading strong {
   overflow: hidden;
   color: var(--toograph-text-strong);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.model-logs-page__entry-meta {
+.model-logs-page__tree-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 10px;
-  margin-top: 8px;
+  margin-top: 6px;
   color: rgba(60, 41, 20, 0.62);
   font-size: 0.78rem;
 }
 
-.model-logs-page__entry-path {
-  margin-top: 8px;
+.model-logs-page__tree-path {
+  margin-top: 6px;
   overflow: hidden;
   color: rgba(60, 41, 20, 0.56);
   font-family: var(--toograph-font-mono);

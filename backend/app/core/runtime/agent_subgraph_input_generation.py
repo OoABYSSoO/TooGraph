@@ -9,6 +9,7 @@ from app.core.model_catalog import get_default_video_model_ref, resolve_runtime_
 from app.core.runtime.agent_multimodal import collect_input_attachments, prepare_model_input_attachments
 from app.core.runtime.agent_prompt import append_llm_prompt_snapshots, build_llm_prompt_snapshot, format_graph_state_input_prompt_lines
 from app.core.runtime.agent_response_generation import _resolve_media_runtime_config, repair_structured_output_with_runtime_model
+from app.core.runtime.model_call_context import use_model_call_context
 from app.core.runtime.structured_output import schema_for_value_type, validate_structured_output
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition
 from app.core.thinking_levels import resolve_effective_thinking_level
@@ -81,32 +82,34 @@ def generate_agent_subgraph_inputs(
 
     if runtime_config.get("resolved_provider_id") == "local":
         try:
-            content, llm_meta = chat_with_local_model_with_meta_func(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                model=runtime_config["runtime_model_name"],
-                provider_id="local",
-                temperature=runtime_config["resolved_temperature"],
-                thinking_enabled=runtime_config["resolved_thinking"],
-                thinking_level=thinking_level,
-                input_attachments=input_attachments,
-                structured_output_schema=structured_output_schema,
-            )
+            with use_model_call_context(phase="subgraph_input_planning"):
+                content, llm_meta = chat_with_local_model_with_meta_func(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    model=runtime_config["runtime_model_name"],
+                    provider_id="local",
+                    temperature=runtime_config["resolved_temperature"],
+                    thinking_enabled=runtime_config["resolved_thinking"],
+                    thinking_level=thinking_level,
+                    input_attachments=input_attachments,
+                    structured_output_schema=structured_output_schema,
+                )
         finally:
             cleanup_prepared_media_paths(attachment_meta.get("cleanup_paths"))
     else:
         try:
-            content, llm_meta = chat_with_model_ref_with_meta_func(
-                model_ref=runtime_config["resolved_model_ref"],
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                temperature=runtime_config["resolved_temperature"],
-                thinking_enabled=runtime_config["resolved_thinking"],
-                thinking_level=thinking_level,
-                input_attachments=input_attachments,
-                structured_output_schema=structured_output_schema,
-                model_runtime_fixture=runtime_config.get("model_runtime_fixture"),
-            )
+            with use_model_call_context(phase="subgraph_input_planning"):
+                content, llm_meta = chat_with_model_ref_with_meta_func(
+                    model_ref=runtime_config["resolved_model_ref"],
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    temperature=runtime_config["resolved_temperature"],
+                    thinking_enabled=runtime_config["resolved_thinking"],
+                    thinking_level=thinking_level,
+                    input_attachments=input_attachments,
+                    structured_output_schema=structured_output_schema,
+                    model_runtime_fixture=runtime_config.get("model_runtime_fixture"),
+                )
         finally:
             cleanup_prepared_media_paths(attachment_meta.get("cleanup_paths"))
 

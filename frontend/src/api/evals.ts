@@ -1,3 +1,4 @@
+// 开发者内部遗留 API：当前冻结，保留现有内部工具兼容。
 import type { EvalBatchActionResult, EvalCase, EvalCaseResult, EvalCollectOptions, EvalRun, EvalSuite } from "@/types/eval";
 
 import { apiGet, apiPost } from "./http.ts";

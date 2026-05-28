@@ -43,6 +43,7 @@ from app.tools.model_provider_http import (
     append_model_request_log_safely,
     build_auth_headers as _build_auth_headers,
     normalize_base_url as _normalize_base_url,
+    normalize_request_timeout_seconds,
     post_streaming_json_with_fallback,
 )
 
@@ -90,6 +91,7 @@ def _chat_openai_compatible(
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
     structured_output_schema: dict[str, Any] | None = None,
+    request_timeout_seconds: float | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_openai.chat_openai_compatible(
         provider_id=provider_id,
@@ -108,6 +110,7 @@ def _chat_openai_compatible(
         on_delta=on_delta,
         input_attachments=input_attachments,
         structured_output_schema=structured_output_schema,
+        request_timeout_seconds=normalize_request_timeout_seconds(request_timeout_seconds),
     )
 
 
@@ -125,6 +128,7 @@ def _chat_anthropic(
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
     structured_output_schema: dict[str, Any] | None = None,
+    request_timeout_seconds: float | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_anthropic.chat_anthropic(
         provider_id=provider_id,
@@ -140,6 +144,7 @@ def _chat_anthropic(
         post_streaming_json_with_fallback_fn=post_streaming_json_with_fallback,
         on_delta=on_delta,
         input_attachments=input_attachments,
+        request_timeout_seconds=normalize_request_timeout_seconds(request_timeout_seconds),
     )
 
 
@@ -157,6 +162,7 @@ def _chat_gemini(
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
     structured_output_schema: dict[str, Any] | None = None,
+    request_timeout_seconds: float | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_gemini.chat_gemini(
         provider_id=provider_id,
@@ -172,6 +178,7 @@ def _chat_gemini(
         post_streaming_json_with_fallback_fn=post_streaming_json_with_fallback,
         on_delta=on_delta,
         input_attachments=input_attachments,
+        request_timeout_seconds=normalize_request_timeout_seconds(request_timeout_seconds),
     )
 
 
@@ -187,6 +194,7 @@ def _chat_codex_responses(
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
     structured_output_schema: dict[str, Any] | None = None,
+    request_timeout_seconds: float | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_codex.chat_codex_responses(
         provider_id=provider_id,
@@ -202,6 +210,7 @@ def _chat_codex_responses(
         on_delta=on_delta,
         input_attachments=input_attachments,
         structured_output_schema=structured_output_schema,
+        request_timeout_seconds=normalize_request_timeout_seconds(request_timeout_seconds),
     )
 
 
@@ -214,6 +223,7 @@ def _embed_openai_compatible(
     text: str,
     auth_header: str,
     auth_scheme: str,
+    request_timeout_seconds: float | None = None,
 ) -> tuple[list[float], dict[str, Any]]:
     return model_provider_embedding.embed_openai_compatible(
         provider_id=provider_id,
@@ -224,6 +234,7 @@ def _embed_openai_compatible(
         auth_header=auth_header,
         auth_scheme=auth_scheme,
         append_request_log=_append_model_request_log_safely,
+        request_timeout_seconds=normalize_request_timeout_seconds(request_timeout_seconds),
     )
 
 
@@ -238,6 +249,7 @@ def _rerank_openai_compatible(
     top_n: int,
     auth_header: str,
     auth_scheme: str,
+    request_timeout_seconds: float | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     return model_provider_rerank.rerank_openai_compatible(
         provider_id=provider_id,
@@ -250,6 +262,7 @@ def _rerank_openai_compatible(
         auth_header=auth_header,
         auth_scheme=auth_scheme,
         append_request_log=_append_model_request_log_safely,
+        request_timeout_seconds=normalize_request_timeout_seconds(request_timeout_seconds),
     )
 
 
@@ -264,6 +277,7 @@ def embed_text_with_model_provider(
     dimensions: int | None = None,
     auth_header: str = "Authorization",
     auth_scheme: str = "Bearer",
+    request_timeout_seconds: float | None = None,
 ) -> tuple[list[float], dict[str, Any]]:
     normalized_transport = normalize_transport(transport)
     normalized_base_url = _normalize_base_url(base_url)
@@ -278,6 +292,7 @@ def embed_text_with_model_provider(
         text=text,
         auth_header=auth_header,
         auth_scheme=auth_scheme,
+        request_timeout_seconds=request_timeout_seconds,
     )
     if dimensions is not None and int(dimensions) > 0 and len(vector) != int(dimensions):
         raise RuntimeError(f"Expected {int(dimensions)} embedding dimensions from '{provider_id}/{model}', got {len(vector)}.")
@@ -297,6 +312,7 @@ def rerank_documents_with_model_provider(
     top_n: int | None = None,
     auth_header: str = "Authorization",
     auth_scheme: str = "Bearer",
+    request_timeout_seconds: float | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     normalized_transport = normalize_transport(transport)
     normalized_base_url = _normalize_base_url(base_url)
@@ -323,6 +339,7 @@ def rerank_documents_with_model_provider(
         top_n=normalized_top_n,
         auth_header=auth_header,
         auth_scheme=auth_scheme,
+        request_timeout_seconds=request_timeout_seconds,
     )
     meta["base_url"] = normalized_base_url
     return results, meta
@@ -424,6 +441,7 @@ def _rerank_documents_with_model_ref_once(
         top_n=top_n,
         auth_header=str(provider_config.get("auth_header") or template.get("auth_header") or "Authorization"),
         auth_scheme=_provider_auth_scheme(provider_config, template),
+        request_timeout_seconds=_provider_request_timeout_seconds(provider_config, template),
     )
 
 
@@ -518,6 +536,7 @@ def _embed_text_with_model_ref_once(
         dimensions=dimensions,
         auth_header=str(provider_config.get("auth_header") or template.get("auth_header") or "Authorization"),
         auth_scheme=_provider_auth_scheme(provider_config, template),
+        request_timeout_seconds=_provider_request_timeout_seconds(provider_config, template),
     )
 
 
@@ -539,9 +558,11 @@ def chat_with_model_provider(
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
     structured_output_schema: dict[str, Any] | None = None,
+    request_timeout_seconds: float | None = None,
 ) -> tuple[str, dict[str, Any]]:
     normalized_transport = normalize_transport(transport)
     normalized_base_url = _normalize_base_url(base_url)
+    normalized_timeout_seconds = normalize_request_timeout_seconds(request_timeout_seconds)
     warnings: list[str] = []
     resolved_thinking_level = normalize_thinking_level(
         thinking_level if thinking_level is not None else (THINKING_LEVEL_HIGH if thinking_enabled else THINKING_LEVEL_OFF),
@@ -565,6 +586,7 @@ def chat_with_model_provider(
                 on_delta=on_delta,
                 input_attachments=attachments,
                 structured_output_schema=structured_output_schema,
+                request_timeout_seconds=normalized_timeout_seconds,
             )
     elif normalized_transport == TRANSPORT_ANTHROPIC_MESSAGES:
         def invoke(attachments: list[dict[str, Any]] | None) -> tuple[str, dict[str, Any]]:
@@ -581,6 +603,7 @@ def chat_with_model_provider(
                 on_delta=on_delta,
                 input_attachments=attachments,
                 structured_output_schema=structured_output_schema,
+                request_timeout_seconds=normalized_timeout_seconds,
             )
     elif normalized_transport == TRANSPORT_GEMINI_GENERATE_CONTENT:
         def invoke(attachments: list[dict[str, Any]] | None) -> tuple[str, dict[str, Any]]:
@@ -597,6 +620,7 @@ def chat_with_model_provider(
                 on_delta=on_delta,
                 input_attachments=attachments,
                 structured_output_schema=structured_output_schema,
+                request_timeout_seconds=normalized_timeout_seconds,
             )
     elif normalized_transport == TRANSPORT_CODEX_RESPONSES:
         def invoke(attachments: list[dict[str, Any]] | None) -> tuple[str, dict[str, Any]]:
@@ -611,6 +635,7 @@ def chat_with_model_provider(
                 on_delta=on_delta,
                 input_attachments=attachments,
                 structured_output_schema=structured_output_schema,
+                request_timeout_seconds=normalized_timeout_seconds,
             )
     else:  # pragma: no cover - guarded by normalize_transport
         raise RuntimeError(f"Unsupported provider transport: {normalized_transport}")
@@ -646,6 +671,7 @@ def chat_with_model_provider(
     meta.setdefault("thinking_level", resolved_thinking_level)
     meta.setdefault("reasoning_format", None)
     meta["base_url"] = normalized_base_url
+    meta["request_timeout_seconds"] = normalized_timeout_seconds
     return content, meta
 
 
@@ -708,6 +734,12 @@ def _provider_auth_scheme(provider_config: dict[str, Any], template: dict[str, A
         else template.get("auth_scheme", "Bearer")
     )
     return str(auth_scheme or "")
+
+
+def _provider_request_timeout_seconds(provider_config: dict[str, Any], template: dict[str, Any]) -> float:
+    return normalize_request_timeout_seconds(
+        provider_config.get("request_timeout_seconds") or template.get("request_timeout_seconds")
+    )
 
 
 def _resolve_model_runtime_fixture_result(
@@ -870,6 +902,7 @@ def _chat_with_model_ref_once(
         thinking_level=thinking_level,
         auth_header=str(provider_config.get("auth_header") or template.get("auth_header") or "Authorization"),
         auth_scheme=_provider_auth_scheme(provider_config, template),
+        request_timeout_seconds=_provider_request_timeout_seconds(provider_config, template),
         on_delta=on_delta,
         input_attachments=input_attachments,
         structured_output_schema=structured_output_schema,

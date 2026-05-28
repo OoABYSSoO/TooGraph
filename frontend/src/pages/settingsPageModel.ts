@@ -7,6 +7,7 @@ import type {
 } from "../types/settings.ts";
 
 const DEFAULT_AGENT_TEMPERATURE = 0.2;
+const DEFAULT_PROVIDER_REQUEST_TIMEOUT_SECONDS = 180;
 type SettingsProvider = SettingsModelProvider;
 export const PROVIDER_MODEL_CAPABILITY_KEYS = [
   "chat",
@@ -36,11 +37,12 @@ export type ProviderDraft = {
   auth_mode?: string;
   requires_login?: boolean;
   auth_status?: OpenAICodexAuthStatus;
+  request_timeout_seconds?: number;
   api_key: string;
   api_key_configured: boolean;
   discovered_models: string[];
   selected_models: string[];
-  model_profiles: Record<string, ProviderModelProfile>;
+  model_profiles?: Record<string, ProviderModelProfile>;
 };
 
 export function dedupeStrings(values: string[]) {
@@ -156,6 +158,13 @@ export function clampSettingsTemperature(value: number) {
   return Math.min(2, Math.max(0, value));
 }
 
+export function clampProviderRequestTimeoutSeconds(value: number | null | undefined) {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_PROVIDER_REQUEST_TIMEOUT_SECONDS;
+  }
+  return Math.min(3600, Math.max(1, Number(value)));
+}
+
 export function listProviderModelBadges(
   provider: SettingsProvider,
   modelDisplayLookup: Record<string, string>,
@@ -196,6 +205,7 @@ export function buildProviderDraftsFromSettings(payload: SettingsPayload): Recor
             auth_mode: provider.auth_mode ?? (provider.requires_login ? "chatgpt" : "api_key"),
             requires_login: Boolean(provider.requires_login),
             auth_status: provider.auth_status,
+            request_timeout_seconds: clampProviderRequestTimeoutSeconds(provider.request_timeout_seconds),
             api_key: "",
             api_key_configured: Boolean(provider.api_key_configured),
             discovered_models: discoveredModels,
@@ -220,6 +230,7 @@ export function buildProviderSavePayload(drafts: Record<string, ProviderDraft>):
         auth_header: draft.auth_header,
         auth_scheme: draft.auth_scheme,
         auth_mode: draft.auth_mode ?? (draft.requires_login ? "chatgpt" : "api_key"),
+        request_timeout_seconds: clampProviderRequestTimeoutSeconds(draft.request_timeout_seconds),
         models: dedupeStrings(draft.selected_models).map((model) => {
           const profile = draft.model_profiles?.[model] ?? normalizeModelProfile({ modalities: ["text"] });
           return {

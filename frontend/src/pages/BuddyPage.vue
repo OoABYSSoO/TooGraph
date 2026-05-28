@@ -107,42 +107,6 @@
           </article>
         </ElTabPane>
 
-        <ElTabPane :label="t('buddyPage.tabs.agents')" name="agents">
-          <article class="buddy-page__panel buddy-page__panel--agents">
-            <div class="buddy-page__panel-heading">
-              <div>
-                <h3>{{ t("buddyPage.agents.title") }}</h3>
-                <p>{{ t("buddyPage.agents.body") }}</p>
-              </div>
-              <span class="buddy-page__meta">{{ homeFiles.root || "buddy_home" }}</span>
-            </div>
-            <section v-if="agentsHomeFile" class="buddy-page__file-preview buddy-page__file-preview--wide">
-              <header class="buddy-page__file-preview-header">
-                <div>
-                  <h4>{{ agentsHomeFile.path }}</h4>
-                  <p>{{ agentsHomeFile.summary || t("buddyPage.files.noSummary") }}</p>
-                </div>
-                <div class="buddy-page__file-preview-meta">
-                  <ElTag :type="homeFileTagType(agentsHomeFile)" effect="plain">
-                    {{ homeFileKindLabel(agentsHomeFile) }}
-                  </ElTag>
-                  <span>{{ formatHomeFileSize(agentsHomeFile.size_bytes) }}</span>
-                  <span>{{ formatDate(agentsHomeFile.updated_at) }}</span>
-                </div>
-              </header>
-              <pre v-if="agentsHomeFile.readable" class="buddy-page__file-content">{{ agentsHomeFile.content || t("buddyPage.files.emptyContent") }}</pre>
-              <div v-else class="buddy-page__file-unreadable">
-                <strong>{{ t("buddyPage.files.metadataOnly") }}</strong>
-                <p>{{ agentsHomeFile.error || agentsHomeFile.summary || t("buddyPage.files.unreadable") }}</p>
-              </div>
-              <p v-if="agentsHomeFile.truncated" class="buddy-page__file-truncated">
-                {{ t("buddyPage.files.truncated") }}
-              </p>
-            </section>
-            <ElEmpty v-else :description="t('buddyPage.agents.empty')" />
-          </article>
-        </ElTabPane>
-
         <ElTabPane :label="t('buddyPage.tabs.summary')" name="summary">
           <article class="buddy-page__panel">
             <div class="buddy-page__panel-heading">
@@ -895,9 +859,6 @@ const canSaveMemory = computed(() => {
 });
 const canSaveUserContext = computed(() => {
   return Boolean(userContextDraft.value.content.trim() && !isSavingUserContext.value);
-});
-const agentsHomeFile = computed(() => {
-  return homeFiles.value.files.find((file) => file.path === "AGENTS.md") ?? null;
 });
 const orderedRevisionRows = computed(() => buildBuddyRevisionHistoryRows(revisions.value, commands.value));
 const filteredRevisionRows = computed(() => filterBuddyRevisionHistoryRows(orderedRevisionRows.value, historyTargetFilter.value));

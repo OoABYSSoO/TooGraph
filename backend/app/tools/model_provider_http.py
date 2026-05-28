@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import time
 from typing import Any, Callable
 
@@ -11,6 +12,18 @@ from app.core.storage.model_log_store import append_model_request_log
 
 ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_REQUEST_TIMEOUT_SEC = 180.0
+MIN_REQUEST_TIMEOUT_SEC = 1.0
+MAX_REQUEST_TIMEOUT_SEC = 3600.0
+
+
+def normalize_request_timeout_seconds(value: Any, *, default: float = DEFAULT_REQUEST_TIMEOUT_SEC) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        parsed = float(default)
+    if not math.isfinite(parsed):
+        parsed = float(default)
+    return min(max(parsed, MIN_REQUEST_TIMEOUT_SEC), MAX_REQUEST_TIMEOUT_SEC)
 
 
 def append_model_request_log_safely(

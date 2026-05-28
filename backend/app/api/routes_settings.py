@@ -12,6 +12,11 @@ from app.core.model_catalog import (
     resolve_runtime_model_name,
 )
 from app.core.model_provider_templates import get_provider_template, normalize_transport
+from app.core.storage.model_log_store import (
+    get_model_log_retention_settings,
+    normalize_model_log_retention_root_runs,
+    save_model_log_retention_settings,
+)
 from app.core.storage.settings_store import load_app_settings, save_app_settings
 from app.tools.local_llm import (
     get_default_agent_temperature,
@@ -19,6 +24,7 @@ from app.tools.local_llm import (
 )
 from app.core.thinking_levels import THINKING_LEVEL_HIGH, THINKING_LEVEL_OFF, normalize_thinking_level
 from app.tools.model_provider_client import discover_provider_models
+from app.tools.model_provider_http import normalize_request_timeout_seconds
 from app.tools.openai_codex_client import (
     clear_codex_auth_state,
     get_codex_auth_status,
@@ -81,6 +87,7 @@ class SettingsModelProviderPayload(BaseModel):
     auth_header: str | None = Field(default=None, alias="auth_header")
     auth_scheme: str | None = Field(default=None, alias="auth_scheme")
     auth_mode: str | None = Field(default=None, alias="auth_mode")
+    request_timeout_seconds: float | None = Field(default=None, alias="request_timeout_seconds", ge=1, le=3600)
     models: list[SettingsProviderModelPayload] = Field(default_factory=list)
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
@@ -101,11 +108,22 @@ class BuddyRuntimeSettingsPayload(BaseModel):
         return normalize_buddy_permission_mode(self.permission_mode)
 
 
+class ModelLogSettingsPayload(BaseModel):
+    max_root_runs: int = Field(default=200, alias="max_root_runs")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @property
+    def normalized_max_root_runs(self) -> int:
+        return normalize_model_log_retention_root_runs(self.max_root_runs)
+
+
 class SettingsUpdatePayload(BaseModel):
     model: SettingsModelPayload
     agent_runtime_defaults: AgentRuntimeDefaultsPayload = Field(alias="agent_runtime_defaults")
     model_providers: dict[str, SettingsModelProviderPayload] | None = Field(default=None, alias="model_providers")
     buddy_runtime: BuddyRuntimeSettingsPayload | None = Field(default=None, alias="buddy_runtime")
+    model_logs: ModelLogSettingsPayload | None = Field(default=None, alias="model_logs")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -117,6 +135,7 @@ class ModelDiscoveryPayload(BaseModel):
     api_key: str = Field(default="", alias="api_key")
     auth_header: str | None = Field(default=None, alias="auth_header")
     auth_scheme: str | None = Field(default=None, alias="auth_scheme")
+    request_timeout_seconds: float | None = Field(default=None, alias="request_timeout_seconds", ge=1, le=3600)
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
@@ -207,6 +226,11 @@ def _merge_model_providers(
             or template.get("auth_header")
             or "Authorization",
             "auth_scheme": "" if auth_scheme is None else str(auth_scheme),
+            "request_timeout_seconds": normalize_request_timeout_seconds(
+                provider_payload.request_timeout_seconds
+                if provider_payload.request_timeout_seconds is not None
+                else existing_provider.get("request_timeout_seconds") or template.get("request_timeout_seconds")
+            ),
             "models": [
                 {
                     "model": model_payload.model,
@@ -278,6 +302,7 @@ def _build_settings_payload(*, force_refresh_models: bool = False) -> dict:
         },
         "tools": sorted(get_tool_registry().keys()),
         "buddy_runtime": get_saved_buddy_runtime_settings(),
+        "model_logs": get_model_log_retention_settings(),
     }
 
 
@@ -321,6 +346,10 @@ def update_settings_endpoint(payload: SettingsUpdatePayload) -> dict:
         if payload.buddy_runtime is not None
         else existing_buddy_runtime
     )
+    if payload.model_logs is not None:
+        next_settings["model_logs"] = {"max_root_runs": payload.model_logs.normalized_max_root_runs}
+    elif "model_logs" in existing_settings:
+        next_settings["model_logs"] = get_model_log_retention_settings(existing_settings)
     next_settings.pop("buddy_permission_mode", None)
     save_app_settings(next_settings)
     return _build_settings_payload(force_refresh_models=False)
@@ -336,6 +365,16 @@ def update_buddy_runtime_settings_endpoint(payload: BuddyRuntimeSettingsPayload)
     return save_buddy_runtime_settings(payload)
 
 
+@router.get("/model-logs")
+def get_model_log_settings_endpoint() -> dict[str, int]:
+    return get_model_log_retention_settings()
+
+
+@router.post("/model-logs")
+def update_model_log_settings_endpoint(payload: ModelLogSettingsPayload) -> dict[str, int]:
+    return save_model_log_retention_settings(max_root_runs=payload.normalized_max_root_runs)
+
+
 @router.post("/model-providers/discover")
 def discover_model_provider_models_endpoint(payload: ModelDiscoveryPayload) -> dict:
     try:
@@ -347,6 +386,7 @@ def discover_model_provider_models_endpoint(payload: ModelDiscoveryPayload) -> d
             api_key=payload.api_key,
             auth_header=payload.auth_header or template.get("auth_header") or "Authorization",
             auth_scheme=payload.auth_scheme if payload.auth_scheme is not None else str(template.get("auth_scheme") or "Bearer"),
+            timeout_sec=normalize_request_timeout_seconds(payload.request_timeout_seconds, default=8.0),
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

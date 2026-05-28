@@ -11,3 +11,4 @@ playwright>=1.45,<2.0
 pytest>=8,<9
 uv>=0.5,<1.0
 imageio-ffmpeg>=0.6,<1.0
+lark-oapi>=1.6,<2.0

@@ -1,0 +1,1 @@
+"""Message platform adapter implementations."""

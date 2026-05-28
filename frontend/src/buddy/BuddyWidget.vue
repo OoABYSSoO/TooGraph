@@ -400,6 +400,7 @@ type BuddyFinishVisibleRunOptions = {
 
 const DRAG_THRESHOLD_PX = 4;
 const AVATAR_SINGLE_CLICK_DELAY_MS = 220;
+const ACTIVE_SESSION_REFRESH_INTERVAL_MS = 3000;
 const { t, locale } = useI18n();
 const route = useRoute();
 const router = useRouter();
@@ -440,6 +441,7 @@ let isDrainingBuddyQueue = false;
 let avatarSingleClickTimerId: number | null = null;
 let speakingIdleTimerId: number | null = null;
 let buddyDisplayNameRequestId = 0;
+let activeSessionRefreshIntervalRef: number | null = null;
 
 const isDragging = computed(() => Boolean(pointerDrag.value?.moved));
 const {
@@ -560,6 +562,7 @@ const {
   ensureActiveChatSession,
   createNewSession,
   selectChatSession,
+  refreshActiveChatSession,
   toggleSessionPanel,
   clearSessionDeleteConfirmTimeout,
   clearSessionDeleteConfirmState,
@@ -651,6 +654,26 @@ async function refreshBuddyDisplayName() {
   }
 }
 
+function startActiveSessionRefreshPolling() {
+  if (activeSessionRefreshIntervalRef !== null) {
+    return;
+  }
+  activeSessionRefreshIntervalRef = window.setInterval(() => {
+    if (!isPanelOpen.value && !isSessionPanelOpen.value) {
+      return;
+    }
+    void refreshActiveChatSession();
+  }, ACTIVE_SESSION_REFRESH_INTERVAL_MS);
+}
+
+function stopActiveSessionRefreshPolling() {
+  if (activeSessionRefreshIntervalRef === null) {
+    return;
+  }
+  window.clearInterval(activeSessionRefreshIntervalRef);
+  activeSessionRefreshIntervalRef = null;
+}
+
 onMounted(() => {
   hydratePosition();
   void refreshBuddyDisplayName();
@@ -658,6 +681,7 @@ onMounted(() => {
   hydrateBuddyModel();
   void hydrateBuddyPermissionMode();
   void loadBuddyModelOptions();
+  startActiveSessionRefreshPolling();
   window.addEventListener("resize", handleResize);
   window.addEventListener("pointermove", handleMascotLookPointerMove, { passive: true });
   scheduleBuddyRoam();
@@ -672,6 +696,7 @@ onBeforeUnmount(() => {
   clearSessionDeleteConfirmTimeout();
   clearAvatarSingleClickTimer();
   clearSpeakingIdleTimer();
+  stopActiveSessionRefreshPolling();
   disposeBuddyMascotMotionController();
   closeEventSource();
   activeAbortController?.abort();
@@ -711,6 +736,12 @@ watch(
     void refreshBuddyDisplayName();
   },
 );
+
+watch(isPanelOpen, (open) => {
+  if (open) {
+    void refreshActiveChatSession();
+  }
+});
 
 function handleAvatarClick() {
   const action = resolveBuddyVirtualOperationUserAction({
@@ -1105,12 +1136,15 @@ async function hydrateLoadedBuddyRunDisplays(records: BuddyChatMessageRecord[]) 
     }
     try {
       const runDetail = await fetchRun(runId);
-      syncBuddyRunDetailDisplay(record.message_id, runDetail);
+      const hydratedDisplay = syncBuddyRunDetailDisplay(record.message_id, runDetail);
+      const hasHydratedRunDisplay =
+        hydratedDisplay.outputTraceMessages.length > 0 ||
+        hydratedDisplay.publicOutputMessages.length > 0;
       const message = messages.value.find((entry) => entry.id === record.message_id);
       if (message) {
         message.runId = runId;
         message.includeInContext = record.include_in_context;
-        message.transcriptOnly = true;
+        message.transcriptOnly = hasHydratedRunDisplay;
       }
     } catch (error) {
       updateAssistantMessage(record.message_id, t("common.failedToLoad", { error: formatErrorMessage(error) }), {

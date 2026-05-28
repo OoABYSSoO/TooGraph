@@ -3,6 +3,7 @@ import type {
   BuddyRuntimeSettings,
   ModelProviderTransport,
   OpenAICodexAuthStatus,
+  ModelLogSettings,
   SettingsPayload,
 } from "@/types/settings";
 
@@ -17,6 +18,7 @@ export type SettingsModelProviderUpdate = {
   auth_header?: string;
   auth_scheme?: string;
   auth_mode?: string;
+  request_timeout_seconds?: number;
   models: Array<{
     model: string;
     label?: string;
@@ -43,6 +45,7 @@ export type SettingsUpdatePayload = {
   };
   model_providers?: Record<string, SettingsModelProviderUpdate>;
   buddy_runtime?: BuddyRuntimeSettings;
+  model_logs?: ModelLogSettings;
 };
 
 export async function fetchSettings(): Promise<SettingsPayload> {
@@ -68,6 +71,7 @@ export async function discoverModelProviderModels(payload: {
   api_key?: string;
   auth_header?: string;
   auth_scheme?: string;
+  request_timeout_seconds?: number;
 }): Promise<{ models: string[] }> {
   return apiPost<{ models: string[] }>("/api/settings/model-providers/discover", payload);
 }

@@ -437,6 +437,18 @@
                               @change="handleProviderDraftChange"
                             />
                           </label>
+                          <label class="model-providers-page__provider-form-field">
+                            <span class="model-providers-page__provider-field-label">{{ t("settings.providerRequestTimeout") }}</span>
+                            <input
+                              v-model.number="provider.request_timeout_seconds"
+                              class="model-providers-page__provider-text-input"
+                              type="number"
+                              min="1"
+                              max="3600"
+                              step="1"
+                              @change="handleProviderDraftChange"
+                            />
+                          </label>
                         </div>
                       </details>
                       <div class="model-providers-page__provider-editor-footer">
@@ -710,6 +722,17 @@
                       <span>{{ t("settings.providerAuthScheme") }}</span>
                       <input v-model.trim="providerEditorDraft.auth_scheme" type="text" @change="handleProviderDraftChange" />
                     </label>
+                    <label>
+                      <span>{{ t("settings.providerRequestTimeout") }}</span>
+                      <input
+                        v-model.number="providerEditorDraft.request_timeout_seconds"
+                        type="number"
+                        min="1"
+                        max="3600"
+                        step="1"
+                        @change="handleProviderDraftChange"
+                      />
+                    </label>
                   </div>
                 </details>
 
@@ -912,6 +935,7 @@ function buildProviderDraftFromTemplate(provider: SettingsModelProvider): Provid
     auth_mode: provider.auth_mode ?? (provider.requires_login ? "chatgpt" : "api_key"),
     requires_login: Boolean(provider.requires_login),
     auth_status: provider.auth_status,
+    request_timeout_seconds: provider.request_timeout_seconds ?? 180,
     api_key: "",
     api_key_configured: Boolean(provider.api_key_configured),
     discovered_models: modelNames,
@@ -1492,6 +1516,7 @@ async function handleDiscoverModels(providerId: string, options: { selectDiscove
       api_key: provider.api_key,
       auth_header: provider.auth_header,
       auth_scheme: provider.auth_scheme,
+      request_timeout_seconds: provider.request_timeout_seconds,
     });
     const discoveredModels = dedupeStrings(result.models);
     provider.discovered_models = discoveredModels;

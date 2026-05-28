@@ -299,6 +299,7 @@
 </template>
 
 <script setup lang="ts">
+// 开发者内部遗留页面：当前冻结，保留现有内部工具兼容。
 import { CirclePlus, Files, Refresh, VideoPlay } from "@element-plus/icons-vue";
 import { ElButton, ElIcon, ElSwitch } from "element-plus";
 import { computed, onMounted, ref, watch } from "vue";

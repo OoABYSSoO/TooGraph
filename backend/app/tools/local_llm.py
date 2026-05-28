@@ -26,7 +26,7 @@ from app.tools.model_provider_client import (
     discover_provider_models,
     post_streaming_json_with_fallback,
 )
-from app.tools.model_provider_http import build_auth_headers
+from app.tools.model_provider_http import build_auth_headers, normalize_request_timeout_seconds
 from app.tools.model_provider_openai import (
     coalesce_openai_chat_stream_response as _coalesce_openai_chat_stream_response,
     extract_openai_chat_stream_delta as _extract_openai_chat_stream_delta,
@@ -108,6 +108,14 @@ def get_local_llm_api_key() -> str:
     provider = _get_saved_local_provider_config()
     saved_api_key = str(provider.get("api_key") or "").strip()
     return saved_api_key
+
+
+def get_local_llm_request_timeout_seconds() -> float:
+    provider = _get_saved_local_provider_config()
+    return normalize_request_timeout_seconds(
+        provider.get("request_timeout_seconds"),
+        default=LOCAL_LLM_REQUEST_TIMEOUT_SEC,
+    )
 
 
 def get_saved_local_provider_model_names() -> list[str]:
@@ -490,7 +498,7 @@ def _request_local_chat_completion(
     try:
         payload, sent_payload, stream_fallback_error, _used_stream = post_streaming_json_with_fallback(
             stream_url=f"{base_url}/chat/completions",
-            timeout_sec=LOCAL_LLM_REQUEST_TIMEOUT_SEC,
+            timeout_sec=get_local_llm_request_timeout_seconds(),
             headers=headers,
             stream_payload=stream_payload,
             fallback_payload=fallback_payload,
@@ -694,6 +702,7 @@ def _chat_with_local_model_with_meta(
         "base_url": get_local_llm_base_url(),
         "model": response_payload.get("model") or request_payload["model"],
         "provider_id": provider_id,
+        "request_timeout_seconds": get_local_llm_request_timeout_seconds(),
         "temperature": temperature,
         "thinking_enabled": used_thinking,
         "thinking_level": resolved_thinking_level,

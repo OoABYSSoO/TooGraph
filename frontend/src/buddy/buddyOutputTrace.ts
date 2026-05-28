@@ -187,9 +187,14 @@ function buildGraphEntryDistances(
 }
 
 function resolveOutputTraceBoundaryNodeId(
-  graph: Pick<GraphPayload, "conditional_edges">,
+  graph: Pick<GraphPayload, "nodes" | "edges" | "conditional_edges">,
   binding: BuddyPublicOutputBinding,
 ) {
+  const directWriterBoundary = resolveDirectWriterOutputBoundaryNodeId(graph, binding);
+  if (directWriterBoundary) {
+    return directWriterBoundary;
+  }
+
   const outputNodeId = binding.outputNodeId.trim();
   if (outputNodeId) {
     for (const route of graph.conditional_edges ?? []) {
@@ -204,6 +209,80 @@ function resolveOutputTraceBoundaryNodeId(
     }
   }
   return binding.upstreamNodeIds[0]?.trim() ?? "";
+}
+
+function resolveDirectWriterOutputBoundaryNodeId(
+  graph: Pick<GraphPayload, "nodes" | "edges" | "conditional_edges">,
+  binding: BuddyPublicOutputBinding,
+) {
+  const outputNodeId = binding.outputNodeId.trim();
+  for (const edge of binding.upstreamEdges ?? []) {
+    if (edge.kind !== "regular") {
+      continue;
+    }
+    const sourceNodeId = edge.source.trim();
+    const sourceNode = graph.nodes?.[sourceNodeId];
+    if (
+      sourceNodeWritesState(sourceNode, binding.stateKey) &&
+      hasConditionOnlyDuplicateRouteToOutput(graph, sourceNodeId, outputNodeId)
+    ) {
+      return sourceNodeId;
+    }
+  }
+  return "";
+}
+
+function sourceNodeWritesState(node: GraphNode | undefined, stateKey: string) {
+  if (!node || !stateKey) {
+    return false;
+  }
+  return (node.writes ?? []).some((write) => write.state === stateKey);
+}
+
+function hasConditionOnlyDuplicateRouteToOutput(
+  graph: Pick<GraphPayload, "nodes" | "edges" | "conditional_edges">,
+  sourceNodeId: string,
+  outputNodeId: string,
+) {
+  if (!sourceNodeId || !outputNodeId) {
+    return false;
+  }
+
+  const adjacency = buildGraphAdjacency(graph.edges ?? [], graph.conditional_edges ?? []);
+  const queue = (adjacency[sourceNodeId] ?? []).map((nodeId) => ({ nodeId, passedCondition: false }));
+  const seen = new Set<string>();
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+    const nodeId = current.nodeId.trim();
+    const seenKey = `${nodeId}:${current.passedCondition ? "condition" : "direct"}`;
+    if (!nodeId || seen.has(seenKey)) {
+      continue;
+    }
+    seen.add(seenKey);
+
+    if (nodeId === outputNodeId) {
+      if (current.passedCondition) {
+        return true;
+      }
+      continue;
+    }
+
+    const node = graph.nodes?.[nodeId];
+    if (!isTransparentConditionNode(node)) {
+      continue;
+    }
+    for (const nextNodeId of adjacency[nodeId] ?? []) {
+      queue.push({ nodeId: nextNodeId, passedCondition: true });
+    }
+  }
+  return false;
+}
+
+function isTransparentConditionNode(node: GraphNode | undefined) {
+  return node?.kind === "condition" && (node.writes ?? []).length === 0;
 }
 
 export function createBuddyOutputTraceRuntimeState(plan: BuddyOutputTracePlan): BuddyOutputTraceRuntimeState {

@@ -248,11 +248,8 @@ python -m pytest backend/tests
 npm run verify:official-assets
 ```
 
-官方模板目录包含 `eval_cases.json` 时，这个 gate 会自动追加对应 eval suite 的 seed 和 case/check 合同校验。
 官方 Action/Tool 包存在对应 `backend/tests/test_<key>_action.py`、`backend/tests/test_<key>_tool.py` 或 `backend/tests/test_<key>.py` 时，这个 gate 会自动追加包级专项 unittest。
 官方 Action/Tool manifest 可用 `verificationCommands` 声明额外专项门禁；后端 catalog 和前端类型会保留该字段，gate 会以非 shell 方式执行受限命令。
-官方 Action/Tool manifest 可用 `verificationEvalSuites` 绑定相关官方 eval suite；gate 会自动追加 suite seed 和 case/check 合同校验。
-当前核心官方 Action 和高风险 Tool 已开始绑定 `verificationEvalSuites`，对应能力包变更会自动触发主循环、页面操作、Action 创建、Web research、复盘写入、召回、embedding、scheduler、delegation 和 provider fallback 的 suite gate。
 
 ## 项目结构
 
@@ -279,7 +276,7 @@ TooGraph/
 │   │   ├── knowledge/        # 知识库导入、切分、检索
 │   │   ├── actions/          # Action registry、definitions 和文件读取
 │   │   ├── buddy/            # Buddy Home、会话、命令和 revision
-│   │   ├── evaluator/        # Eval suite、case、run 和检查结果
+│   │   ├── evaluator/        # 内部遗留检查模块
 │   │   ├── graph_tools/      # Tool registry 和 definitions
 │   │   ├── templates/        # graph 模板加载器
 │   │   └── tools/            # OpenAI-compatible 调用工具

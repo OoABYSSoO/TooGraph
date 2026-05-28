@@ -4,10 +4,10 @@ export type PrimaryNavigationSection =
   | "editor"
   | "graphLibrary"
   | "knowledge"
-  | "evals"
   | "scheduler"
   | "curatorReports"
   | "buddy"
+  | "messagePlatforms"
   | "presets"
   | "actions"
   | "improvements"
@@ -43,9 +43,6 @@ export function resolvePrimaryNavigationSection(pathname: string): PrimaryNaviga
   if (pathname === "/knowledge" || pathname.startsWith("/knowledge/")) {
     return "knowledge";
   }
-  if (pathname === "/evals" || pathname.startsWith("/evals/")) {
-    return "evals";
-  }
   if (pathname === "/scheduler" || pathname.startsWith("/scheduler/")) {
     return "scheduler";
   }
@@ -54,6 +51,9 @@ export function resolvePrimaryNavigationSection(pathname: string): PrimaryNaviga
   }
   if (pathname === "/buddy" || pathname.startsWith("/buddy/")) {
     return "buddy";
+  }
+  if (pathname === "/message-platforms" || pathname.startsWith("/message-platforms/")) {
+    return "messagePlatforms";
   }
   if (pathname === "/presets" || pathname.startsWith("/presets/")) {
     return "presets";

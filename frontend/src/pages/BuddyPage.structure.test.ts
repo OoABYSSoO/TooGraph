@@ -38,7 +38,7 @@ test("BuddyPage manages identity, USER.md, MEMORY.md, summary, and revisions", (
   assert.match(source, /name="identity"/);
   assert.match(source, /name="userContext"/);
   assert.match(source, /name="memory"/);
-  assert.match(source, /name="agents"/);
+  assert.doesNotMatch(source, /name="agents"/);
   assert.doesNotMatch(source, /name="files"/);
   assert.match(source, /name="summary"/);
   assert.match(source, /name="binding"/);
@@ -52,8 +52,8 @@ test("BuddyPage manages identity, USER.md, MEMORY.md, summary, and revisions", (
   assert.match(source, /memoryDocumentDraft/);
   assert.match(source, /userContextDraft/);
   assert.match(source, /homeFiles/);
-  assert.match(source, /agentsHomeFile/);
-  assert.match(source, /file\.path === "AGENTS\.md"/);
+  assert.doesNotMatch(source, /agentsHomeFile/);
+  assert.doesNotMatch(source, /file\.path === "AGENTS\.md"/);
   assert.doesNotMatch(source, /selectedHomeFile/);
   assert.doesNotMatch(source, /buddy-page__file-browser/);
   assert.match(source, /saveMemoryDocument/);

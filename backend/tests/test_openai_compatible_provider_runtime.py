@@ -182,6 +182,7 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
                     "label": "Local Gateway",
                     "base_url": "http://127.0.0.1:8888/v1",
                     "api_key": "sk-local",
+                    "request_timeout_seconds": 44,
                     "models": [
                         {
                             "model": "gemma-4-26b-a4b-it",
@@ -206,6 +207,7 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
         self.assertEqual(local_provider["label"], "Local Gateway")
         self.assertEqual(local_provider["base_url"], "http://127.0.0.1:8888/v1")
         self.assertTrue(local_provider["api_key_configured"])
+        self.assertEqual(local_provider["request_timeout_seconds"], 44.0)
         self.assertEqual(local_provider["models"][0]["model_ref"], "local/gemma-4-26b-a4b-it")
         self.assertEqual(local_provider["models"][0]["label"], "Gemma 4 26B")
         self.assertEqual(openrouter_provider["base_url"], "https://openrouter.ai/api/v1")

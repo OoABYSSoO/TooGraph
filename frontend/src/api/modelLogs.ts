@@ -1,6 +1,6 @@
-import type { ModelLogPage } from "@/types/model-log";
+import type { ModelLogPage, ModelLogRetentionSettings } from "@/types/model-log";
 
-import { apiGet } from "./http.ts";
+import { apiGet, apiPost } from "./http.ts";
 
 export async function fetchModelLogs(params?: { page?: number; size?: number; query?: string }): Promise<ModelLogPage> {
   const searchParams = new URLSearchParams();
@@ -10,4 +10,10 @@ export async function fetchModelLogs(params?: { page?: number; size?: number; qu
     searchParams.set("q", params.query.trim());
   }
   return apiGet<ModelLogPage>(`/api/model-logs?${searchParams.toString()}`);
+}
+
+export async function updateModelLogRetention(
+  payload: ModelLogRetentionSettings,
+): Promise<ModelLogRetentionSettings> {
+  return apiPost<ModelLogRetentionSettings>("/api/settings/model-logs", payload);
 }

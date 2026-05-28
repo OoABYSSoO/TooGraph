@@ -10,6 +10,8 @@ from typing import Any
 
 DEFAULT_SELECTED_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"]
 DEFAULT_MAX_CHARS = 24000
+# The workspace instruction note is frozen for automated maintenance, but still
+# participates in context assembly when selected by official Buddy templates.
 FILE_AUTHORITY = {
     "AGENTS.md": "context_only",
     "SOUL.md": "identity",

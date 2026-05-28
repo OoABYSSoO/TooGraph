@@ -13,6 +13,8 @@ from app.core.storage.database import DB_PATH, get_connection, initialize_storag
 REPO_ROOT = BASE_DIR.parent
 BUDDY_HOME_DIR_NAME = "buddy_home"
 
+# Frozen Buddy Home context entry: keep read-only as part of the runtime context
+# package, but route durable self-configuration writes to SOUL/USER/MEMORY or DB memory.
 AGENTS_PATH = "AGENTS.md"
 SOUL_PATH = "SOUL.md"
 USER_PATH = "USER.md"

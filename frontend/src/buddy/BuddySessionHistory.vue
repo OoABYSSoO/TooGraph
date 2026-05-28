@@ -37,7 +37,12 @@
             :disabled="switchLocked && session.session_id !== activeSessionId"
             @click="emit('select', session.session_id)"
           >
-            <span>{{ session.title || t("buddy.untitledSession") }}</span>
+            <div class="buddy-widget__session-title-line">
+              <span class="buddy-widget__session-title">{{ session.title || t("buddy.untitledSession") }}</span>
+              <span v-if="formatBuddySessionSourceLabel(session.source)" class="buddy-widget__session-source-badge">
+                {{ formatBuddySessionSourceLabel(session.source) }}
+              </span>
+            </div>
             <small>{{ session.last_message_preview || t("buddy.emptySession") }}</small>
           </button>
           <ElPopover
@@ -78,6 +83,7 @@ import { ElIcon, ElPopover } from "element-plus";
 import { useI18n } from "vue-i18n";
 
 import type { BuddyChatSession } from "../types/buddy.ts";
+import { formatBuddySessionSourceLabel } from "./useBuddyChatSessions.ts";
 
 defineProps<{
   open: boolean;
@@ -198,16 +204,39 @@ const { t } = useI18n();
   cursor: pointer;
 }
 
-.buddy-widget__session-item span,
+.buddy-widget__session-title,
 .buddy-widget__session-item small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.buddy-widget__session-item span {
+.buddy-widget__session-title-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.buddy-widget__session-title {
+  min-width: 0;
   font-size: 12px;
   font-weight: 800;
+}
+
+.buddy-widget__session-source-badge {
+  flex: 0 0 auto;
+  max-width: 86px;
+  overflow: hidden;
+  border-radius: 999px;
+  padding: 2px 6px;
+  background: rgba(154, 52, 18, 0.08);
+  color: rgb(154, 52, 18);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .buddy-widget__session-item small,

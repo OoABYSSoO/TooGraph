@@ -72,10 +72,10 @@ export function buildEvalOverview(suites: EvalSuite[], runs: EvalRun[]): EvalOve
   const caseCount = suites.reduce((total, suite) => total + Math.max(0, Number(suite.case_count || 0)), 0);
   const attentionCount = runs.filter((run) => run.status === "failed" || run.status === "error").length;
   return [
-    { key: "suites", label: translate("evals.suitesMetric"), value: suites.length },
-    { key: "cases", label: translate("evals.casesMetric"), value: caseCount },
-    { key: "runs", label: translate("evals.runsMetric"), value: runs.length },
-    { key: "attention", label: translate("evals.attentionMetric"), value: attentionCount },
+    { key: "suites", label: legacyLabel("suitesMetric"), value: suites.length },
+    { key: "cases", label: legacyLabel("casesMetric"), value: caseCount },
+    { key: "runs", label: legacyLabel("runsMetric"), value: runs.length },
+    { key: "attention", label: legacyLabel("attentionMetric"), value: attentionCount },
   ];
 }
 
@@ -151,7 +151,7 @@ function buildCheckComparisons(caseId: string, checks: EvalCaseResult["check_res
       const actualPreview = formatPreview(check.actual);
       return {
         key: `${caseId}-${index}`,
-        label: check.name || check.kind || translate("evals.check"),
+        label: check.name || check.kind || legacyLabel("check"),
         status: check.status || "pending",
         message: check.message || "",
         expectedPreview,
@@ -172,7 +172,7 @@ function buildFailureDiagnostics(caseId: string, result: EvalCaseResult | undefi
     diagnostics.push({
       key: `${caseId}-case-error`,
       kind: "case_error",
-      label: translate("evals.caseError"),
+      label: legacyLabel("caseError"),
       status: result.status || "failed",
       message: caseError,
       detailPreview: "",
@@ -180,7 +180,7 @@ function buildFailureDiagnostics(caseId: string, result: EvalCaseResult | undefi
   }
 
   (result.node_failures ?? []).forEach((failure, index) => {
-    const label = textValue(failure.node_id) || textValue(failure.node) || translate("evals.nodeFailure");
+    const label = textValue(failure.node_id) || textValue(failure.node) || legacyLabel("nodeFailure");
     const message = textValue(failure.error) || textValue(failure.message) || formatPreview(failure);
     diagnostics.push({
       key: `${caseId}-node-${index}`,
@@ -199,7 +199,7 @@ function buildFailureDiagnostics(caseId: string, result: EvalCaseResult | undefi
       diagnostics.push({
         key: `${caseId}-check-${index}`,
         kind: "check_failure",
-        label: check.name || check.kind || translate("evals.checkFailure"),
+        label: check.name || check.kind || legacyLabel("checkFailure"),
         status: check.status || "failed",
         message,
         detailPreview: formatPreview(check.details) || formatPreview(check.actual),
@@ -207,6 +207,10 @@ function buildFailureDiagnostics(caseId: string, result: EvalCaseResult | undefi
     });
 
   return diagnostics;
+}
+
+function legacyLabel(key: string): string {
+  return `evals.${key}`;
 }
 
 function textValue(value: unknown): string {

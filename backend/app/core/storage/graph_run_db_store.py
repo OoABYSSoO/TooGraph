@@ -299,7 +299,6 @@ def _replace_run_details(connection: Any, run_id: str, run_state: dict[str, Any]
         "graph_capability_invocations",
         "agent_loop_events",
         "capability_usage_events",
-        "graph_model_calls",
     ):
         connection.execute(f"DELETE FROM {table} WHERE run_id = ?", (run_id,))
 

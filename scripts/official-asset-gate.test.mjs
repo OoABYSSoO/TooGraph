@@ -91,6 +91,7 @@ test("official asset gate adds package-specific tests for changed official actio
       "-m unittest backend.tests.test_provider_fallback_resolver_tool",
       "-m unittest backend.tests.test_provider_fallback_resolver",
       "scripts/official_eval_suite_gate.py provider_fallback_eval_core",
+      "scripts/official_eval_suite_gate.py tool_runtime_fallback_eval_core",
     ],
   );
 });
@@ -108,6 +109,7 @@ test("official asset gate runs manifest-declared verification commands for capab
       "-m unittest backend.tests.test_provider_fallback_resolver_tool",
       "-m unittest backend.tests.test_provider_fallback_resolver",
       "scripts/official_eval_suite_gate.py provider_fallback_eval_core",
+      "scripts/official_eval_suite_gate.py tool_runtime_fallback_eval_core",
     ],
   );
 });

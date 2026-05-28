@@ -5,7 +5,7 @@ from typing import Any, Callable
 
 from app.core.model_provider_templates import TRANSPORT_GEMINI_GENERATE_CONTENT
 from app.core.thinking_levels import build_native_thinking_payload
-from app.tools.model_provider_http import DEFAULT_REQUEST_TIMEOUT_SEC
+from app.tools.model_provider_http import DEFAULT_REQUEST_TIMEOUT_SEC, normalize_request_timeout_seconds
 from app.tools.model_provider_multimodal import build_gemini_user_parts
 from app.tools.model_provider_response_parsing import normalize_message_text, parse_sse_json_events
 
@@ -109,7 +109,9 @@ def chat_gemini(
     post_streaming_json_with_fallback_fn: Callable[..., tuple[dict[str, Any], dict[str, Any], str | None, bool]],
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
+    request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SEC,
 ) -> tuple[str, dict[str, Any]]:
+    timeout_sec = normalize_request_timeout_seconds(request_timeout_seconds)
     request_payload: dict[str, Any] = {
         "system_instruction": {
             "parts": {
@@ -150,7 +152,7 @@ def chat_gemini(
         response_payload, logged_request_payload, stream_fallback_error, used_stream = post_streaming_json_with_fallback_fn(
             stream_url=f"{base_url}{path}",
             fallback_url=f"{base_url}{fallback_path}",
-            timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
+            timeout_sec=timeout_sec,
             stream_params=params,
             fallback_params=fallback_params,
             stream_payload=request_payload,
@@ -195,4 +197,5 @@ def chat_gemini(
         "thinking_level": thinking_level,
         "reasoning_format": "gemini-thinking-config" if native_thinking_payload else None,
         "stream_fallback_error": stream_fallback_error,
+        "request_timeout_seconds": timeout_sec,
     }

@@ -87,16 +87,19 @@ test("buildProviderSavePayload includes enabled providers and omits blank api ke
       enabled: true,
       auth_header: "Authorization",
       auth_scheme: "Bearer",
+      request_timeout_seconds: 45,
       api_key: "",
       api_key_configured: true,
       discovered_models: ["gpt-4.1"],
       selected_models: ["gpt-4.1"],
+      model_profiles: {},
     },
   });
 
   assert.equal(payload.openai.api_key, undefined);
   assert.equal(payload.openai.enabled, true);
   assert.equal(payload.openai.transport, "openai-compatible");
+  assert.equal(payload.openai.request_timeout_seconds, 45);
 });
 
 test("provider drafts preserve model capabilities and permissions", () => {
@@ -119,6 +122,7 @@ test("provider drafts preserve model capabilities and permissions", () => {
           enabled: true,
           saved: true,
           base_url: "http://127.0.0.1:8888/v1",
+          request_timeout_seconds: 33,
           models: [
             {
               model_ref: "local/rerank-test",
@@ -143,6 +147,7 @@ test("provider drafts preserve model capabilities and permissions", () => {
     rerank: true,
   });
   assert.deepEqual(drafts.local.model_profiles["rerank-test"].permissions, ["rerank"]);
+  assert.equal(drafts.local.request_timeout_seconds, 33);
 
   const payload = buildProviderSavePayload(drafts);
   assert.deepEqual(payload.local.models[0].capabilities, {
@@ -151,6 +156,7 @@ test("provider drafts preserve model capabilities and permissions", () => {
     rerank: true,
   });
   assert.deepEqual(payload.local.models[0].permissions, ["rerank"]);
+  assert.equal(payload.local.request_timeout_seconds, 33);
 });
 
 test("buildProviderDraftsFromSettings keeps saved Codex login providers visible before auth completes", () => {

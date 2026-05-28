@@ -74,11 +74,12 @@ test("AppShell exposes graph and template management as a primary sidebar destin
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Collection \/><\/ElIcon>/);
 });
 
-test("AppShell exposes eval suite management as a primary sidebar destination", () => {
-  assert.match(componentSource, /import \{[\s\S]*DataAnalysis[\s\S]*\} from "@element-plus\/icons-vue";/);
-  assert.match(componentSource, /to="\/evals"[\s\S]*activeNavigationSection === 'evals'[\s\S]*t\("nav\.evals"\)/);
-  assert.match(componentSource, /data-virtual-affordance-id="app\.nav\.evals"/);
-  assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><DataAnalysis \/><\/ElIcon>/);
+test("AppShell keeps legacy developer-only tooling out of the primary sidebar", () => {
+  assert.doesNotMatch(componentSource, /to="\/evals"/);
+  assert.doesNotMatch(componentSource, /data-virtual-affordance-id="app\.nav\.evals"/);
+  assert.doesNotMatch(componentSource, /activeNavigationSection === 'evals'/);
+  assert.doesNotMatch(componentSource, /t\("nav\.evals"\)/);
+  assert.doesNotMatch(componentSource, /<DataAnalysis \/>/);
 });
 
 test("AppShell exposes scheduled graph jobs as a primary sidebar destination", () => {
@@ -148,6 +149,13 @@ test("AppShell exposes evidence search as a primary sidebar destination", () => 
   assert.match(componentSource, /data-virtual-affordance-id="app\.nav\.evidenceSearch"/);
   assert.match(componentSource, /data-virtual-affordance-path-after-click="\/evidence"/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><DocumentChecked \/><\/ElIcon>/);
+});
+
+test("AppShell exposes message platform management as a primary sidebar destination", () => {
+  assert.match(componentSource, /import \{[\s\S]*Connection[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /to="\/message-platforms"[\s\S]*activeNavigationSection === 'messagePlatforms'[\s\S]*t\("nav\.messagePlatforms"\)/);
+  assert.match(componentSource, /data-virtual-affordance-id="app\.nav\.messagePlatforms"/);
+  assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Connection \/><\/ElIcon>/);
 });
 
 test("AppShell registers only non-buddy navigation affordances for virtual page operations", () => {

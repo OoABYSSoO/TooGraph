@@ -11,6 +11,7 @@ from app.evaluator.llm_judge import create_llm_judge_runner
 from app.evaluator import runner
 
 
+# 开发者内部遗留入口：当前冻结，保留现有内部工具兼容。
 router = APIRouter(prefix="/api/evals", tags=["evals"])
 
 

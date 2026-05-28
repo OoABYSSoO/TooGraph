@@ -1112,6 +1112,75 @@ test("buildBuddyOutputTraceStateFromRunDetail attaches agent loop diagnostics wi
   assert.ok(labels.includes("capabilities: 4 / 4"));
 });
 
+test("buildBuddyOutputTracePlan prefers direct state writer boundary over terminal condition route", () => {
+  const state = (name: string) => ({ name, description: "", type: "markdown", value: "", color: "#000" });
+  const graph = {
+    graph_id: null,
+    name: "Buddy",
+    state_schema: {
+      public_response: state("Public Response"),
+      show_result_package: { ...state("Show Result Package"), type: "boolean" },
+      needs_capability: { ...state("Needs Capability"), type: "boolean" },
+    },
+    nodes: {
+      reply_and_select_capability: {
+        kind: "agent",
+        name: "回复并判断是否调用能力",
+        description: "",
+        reads: [],
+        writes: [
+          { state: "public_response", mode: "replace" },
+          { state: "show_result_package", mode: "replace" },
+          { state: "needs_capability", mode: "replace" },
+        ],
+        config: { actionKey: "", actionBindings: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "medium", temperature: 0.2 },
+        ui: { position: { x: 0, y: 0 } },
+      },
+      condition_show_result: {
+        kind: "condition",
+        name: "是否展示结果包",
+        description: "",
+        reads: [{ state: "show_result_package", required: true }],
+        writes: [],
+        config: { branches: ["true", "false"], loopLimit: 5, branchMapping: {}, rule: null },
+        ui: { position: { x: 0, y: 0 } },
+      },
+      condition_needs_capability: {
+        kind: "condition",
+        name: "是否需要继续调用能力",
+        description: "",
+        reads: [{ state: "needs_capability", required: true }],
+        writes: [],
+        config: { branches: ["true", "false"], loopLimit: 5, branchMapping: {}, rule: null },
+        ui: { position: { x: 0, y: 0 } },
+      },
+      output_161c76f3: {
+        kind: "output",
+        name: "模型整理回复",
+        description: "",
+        reads: [{ state: "public_response", required: true }],
+        writes: [],
+        config: { displayMode: "markdown", persistEnabled: false, persistFormat: "auto", fileNameTemplate: "" },
+        ui: { position: { x: 0, y: 0 } },
+      },
+    },
+    edges: [
+      { source: "reply_and_select_capability", target: "output_161c76f3" },
+      { source: "reply_and_select_capability", target: "condition_show_result" },
+    ],
+    conditional_edges: [
+      { source: "condition_show_result", branches: { false: "condition_needs_capability" } },
+      { source: "condition_needs_capability", branches: { false: "output_161c76f3" } },
+    ],
+    metadata: {},
+  } as unknown as GraphPayload;
+
+  const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));
+
+  assert.equal(plan.segmentIdByOutputNodeId.output_161c76f3, "boundary:reply_and_select_capability");
+  assert.deepEqual(plan.segmentsById["boundary:reply_and_select_capability"].outputNodeIds, ["output_161c76f3"]);
+});
+
 test("buildBuddyOutputTraceStateFromRunDetail attaches projected agent loop diagnostics", () => {
   const graph = fiveNodeGraph();
   const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));

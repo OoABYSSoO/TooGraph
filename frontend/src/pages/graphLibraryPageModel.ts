@@ -1,5 +1,4 @@
 import type { GraphCatalogStatus, GraphDocument, TemplateRecord, TemplateSource } from "../types/node-system.ts";
-import type { EvalRun, EvalSuite } from "../types/eval.ts";
 
 export { buildGraphRevisionHistoryRows, type GraphRevisionHistoryRow } from "../lib/graphRevisionHistoryModel.ts";
 
@@ -27,19 +26,7 @@ export type GraphLibraryItem = {
   permissionsPreview: string;
   mockEntry: string;
   sampleOutput: string;
-  evalCaseCount: number;
-  latestEvalStatus: string;
-  latestEvalRunId: string;
 };
-
-export type GraphLibraryTemplateEvalSummary = {
-  suiteCount: number;
-  caseCount: number;
-  latestStatus: string;
-  latestRunId: string;
-};
-
-export type GraphLibraryTemplateEvalSummaries = Record<string, GraphLibraryTemplateEvalSummary>;
 
 export type GraphLibraryFilters = {
   query: string;
@@ -60,11 +47,7 @@ export type GraphLibraryColumns = {
   graphs: GraphLibraryItem[];
 };
 
-export function buildGraphLibraryItems(
-  graphs: GraphDocument[],
-  templates: TemplateRecord[],
-  templateEvalSummaries: GraphLibraryTemplateEvalSummaries = {},
-): GraphLibraryItem[] {
+export function buildGraphLibraryItems(graphs: GraphDocument[], templates: TemplateRecord[]): GraphLibraryItem[] {
   return [
     ...graphs.map((graph) => ({
       id: graph.graph_id,
@@ -86,7 +69,6 @@ export function buildGraphLibraryItems(
       const source = template.source ?? "official";
       const capabilityDiscoverableBlockedReason =
         template.capabilityDiscoverableBlockedReason || (template.hasBreakpointMetadata ? "breakpoint_metadata" : "");
-      const evalSummary = templateEvalSummaries[template.template_id];
       return {
         id: template.template_id,
         kind: "template" as const,
@@ -101,39 +83,10 @@ export function buildGraphLibraryItems(
         nodeCount: Object.keys(template.nodes).length,
         edgeCount: template.edges.length + template.conditional_edges.length,
         stateCount: Object.keys(template.state_schema).length,
-        ...buildTemplateGalleryFields(template, evalSummary),
+        ...buildTemplateGalleryFields(template),
       };
     }),
   ];
-}
-
-export function buildGraphLibraryTemplateEvalSummaries(
-  suites: Array<Pick<EvalSuite, "suite_id" | "target_template_id" | "case_count">>,
-  runsBySuiteId: Record<string, Array<Pick<EvalRun, "eval_run_id" | "status"> & Partial<Pick<EvalRun, "created_at" | "updated_at" | "started_at">>>>,
-): GraphLibraryTemplateEvalSummaries {
-  const latestRunTimeByTemplate: Record<string, number> = {};
-  const summaries: GraphLibraryTemplateEvalSummaries = {};
-  for (const suite of suites) {
-    const templateId = text(suite.target_template_id);
-    if (!templateId) {
-      continue;
-    }
-    const summary = summaries[templateId] ?? { suiteCount: 0, caseCount: 0, latestStatus: "", latestRunId: "" };
-    summary.suiteCount += 1;
-    summary.caseCount += Math.max(0, Number(suite.case_count || 0));
-    const latestRun = runsBySuiteId[suite.suite_id]?.[0];
-    if (latestRun) {
-      const candidateTime = runTimestamp(latestRun);
-      const currentTime = latestRunTimeByTemplate[templateId] ?? -1;
-      if (!summary.latestRunId || candidateTime >= currentTime) {
-        summary.latestStatus = text(latestRun.status);
-        summary.latestRunId = text(latestRun.eval_run_id);
-        latestRunTimeByTemplate[templateId] = candidateTime;
-      }
-    }
-    summaries[templateId] = summary;
-  }
-  return summaries;
 }
 
 export function splitGraphLibraryItems(items: GraphLibraryItem[]): GraphLibraryColumns {
@@ -193,16 +146,12 @@ function buildSearchText(item: GraphLibraryItem): string {
     item.permissionsPreview,
     item.mockEntry,
     item.sampleOutput,
-    item.latestEvalStatus,
   ]
     .join(" ")
     .toLowerCase();
 }
 
-function buildTemplateGalleryFields(
-  template: TemplateRecord,
-  evalSummary: GraphLibraryTemplateEvalSummary | undefined,
-): Pick<
+function buildTemplateGalleryFields(template: TemplateRecord): Pick<
   GraphLibraryItem,
   | "galleryValue"
   | "targetUsersPreview"
@@ -210,14 +159,9 @@ function buildTemplateGalleryFields(
   | "permissionsPreview"
   | "mockEntry"
   | "sampleOutput"
-  | "evalCaseCount"
-  | "latestEvalStatus"
-  | "latestEvalRunId"
 > {
   const metadata = template.metadata ?? {};
   const gallery = objectValue(metadata.gallery);
-  const metadataEvalCaseCount = countMetadataEvalCases(metadata.evalCases);
-  const evalCaseCount = evalSummary?.caseCount ?? metadataEvalCaseCount;
   return {
     galleryValue: text(gallery.valueProposition),
     targetUsersPreview: previewList(stringList(gallery.targetUsers), 3),
@@ -225,9 +169,6 @@ function buildTemplateGalleryFields(
     permissionsPreview: previewList(stringList(metadata.requiredPermissions || metadata.permissions), 4),
     mockEntry: readMockEntry(metadata, gallery),
     sampleOutput: readSampleOutput(metadata),
-    evalCaseCount,
-    latestEvalStatus: evalSummary?.latestStatus || (evalCaseCount > 0 ? "ready" : ""),
-    latestEvalRunId: evalSummary?.latestRunId ?? "",
   };
 }
 
@@ -239,9 +180,6 @@ function emptyTemplateGalleryFields(): Pick<
   | "permissionsPreview"
   | "mockEntry"
   | "sampleOutput"
-  | "evalCaseCount"
-  | "latestEvalStatus"
-  | "latestEvalRunId"
 > {
   return {
     galleryValue: "",
@@ -250,9 +188,6 @@ function emptyTemplateGalleryFields(): Pick<
     permissionsPreview: "",
     mockEntry: "",
     sampleOutput: "",
-    evalCaseCount: 0,
-    latestEvalStatus: "",
-    latestEvalRunId: "",
   };
 }
 
@@ -279,19 +214,6 @@ function compactPathList(values: string[]): string {
     return "";
   }
   return values.length === 1 ? values[0] : `${values[0]} +${values.length - 1}`;
-}
-
-function countMetadataEvalCases(value: unknown): number {
-  if (Array.isArray(value)) {
-    return value.length;
-  }
-  return text(value) ? 1 : 0;
-}
-
-function runTimestamp(run: Partial<Pick<EvalRun, "created_at" | "updated_at" | "started_at">>): number {
-  const timestamp = text(run.created_at) || text(run.started_at) || text(run.updated_at);
-  const parsed = Date.parse(timestamp);
-  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function previewList(values: string[], limit: number): string {

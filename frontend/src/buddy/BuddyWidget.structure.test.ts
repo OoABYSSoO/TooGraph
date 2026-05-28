@@ -579,7 +579,14 @@ test("BuddyWidget renders output-segment run trace capsules instead of per-messa
   assert.match(componentSource, /transcriptOnly:\s*true/);
   assert.match(componentSource, /hydrateLoadedRunDisplays: hydrateLoadedBuddyRunDisplays/);
   assert.match(componentSource, /syncBuddyRunDetailDisplay/);
+  assert.match(componentSource, /const hydratedDisplay = syncBuddyRunDetailDisplay\(record\.message_id, runDetail\);/);
+  assert.match(componentSource, /const hasHydratedRunDisplay =[\s\S]*hydratedDisplay\.outputTraceMessages\.length > 0[\s\S]*hydratedDisplay\.publicOutputMessages\.length > 0/);
+  assert.match(componentSource, /message\.transcriptOnly = hasHydratedRunDisplay;/);
   assert.match(chatSessionsSource, /hydrateLoadedRunDisplays\?: \(records: BuddyChatMessageRecord\[\]\) => Promise<void>/);
+  assert.match(chatSessionsSource, /async function refreshActiveChatSession\(\)/);
+  assert.match(componentSource, /refreshActiveChatSession,/);
+  assert.match(componentSource, /function startActiveSessionRefreshPolling\(\)/);
+  assert.match(componentSource, /void refreshActiveChatSession\(\);/);
   assert.match(componentSource, /const metadata = buildBuddyMessageMetadata\(message\);/);
   assert.match(messagesSource, /function buildBuddyMessageMetadata\(message: BuddyMessage\)/);
   assert.match(componentSource, /\.\.\.\(metadata \? \{ metadata \} : \{\}\)/);
@@ -670,6 +677,8 @@ test("BuddyWidget stores buddy chat in backend sessions and exposes a compact hi
   assert.doesNotMatch(componentSource, /class="buddy-widget__sessions-panel"/);
   assert.match(sessionHistorySource, /class="buddy-widget__history-control"/);
   assert.match(sessionHistorySource, /class="buddy-widget__sessions-panel"/);
+  assert.match(sessionHistorySource, /formatBuddySessionSourceLabel/);
+  assert.match(sessionHistorySource, /class="buddy-widget__session-source-badge"/);
   assert.match(sessionHistorySource, /v-for="session in sessions"/);
   assert.doesNotMatch(componentSource, /class="buddy-widget__session-new"/);
   assert.match(sessionHistorySource, /@click="emit\('select', session\.session_id\)"/);
