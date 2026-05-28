@@ -17,6 +17,7 @@ const RunsPage = () => import("@/pages/RunsPage.vue");
 const SchedulerPage = () => import("@/pages/SchedulerPage.vue");
 const SettingsPage = () => import("@/pages/SettingsPage.vue");
 const ActionsPage = () => import("@/pages/ActionsPage.vue");
+const ToolsPage = () => import("@/pages/ToolsPage.vue");
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -34,6 +35,7 @@ export const router = createRouter({
     { path: "/message-platforms", component: MessagePlatformsPage },
     { path: "/presets", component: PresetsPage },
     { path: "/actions", component: ActionsPage },
+    { path: "/tools", component: ToolsPage },
     { path: "/improvements", component: ImprovementCandidatesPage },
     { path: "/models", component: ModelProvidersPage },
     { path: "/model-logs", component: ModelLogsPage },

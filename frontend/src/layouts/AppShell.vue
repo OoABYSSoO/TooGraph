@@ -195,6 +195,21 @@
           <span class="app-shell__link-label">{{ t("nav.actions") }}</span>
         </RouterLink>
         <RouterLink
+          to="/tools"
+          class="app-shell__link"
+          data-virtual-affordance-id="app.nav.tools"
+          data-virtual-affordance-label="工具"
+          data-virtual-affordance-role="navigation-link"
+          data-virtual-affordance-zone="app-shell"
+          data-virtual-affordance-actions="click"
+          data-virtual-affordance-path-after-click="/tools"
+          :class="{ 'app-shell__link--active': activeNavigationSection === 'tools' }"
+          :title="t('nav.tools')"
+        >
+          <ElIcon class="app-shell__link-icon"><Tools /></ElIcon>
+          <span class="app-shell__link-label">{{ t("nav.tools") }}</span>
+        </RouterLink>
+        <RouterLink
           to="/improvements"
           class="app-shell__link"
           data-virtual-affordance-id="app.nav.improvements"
@@ -294,6 +309,7 @@ import {
   DataLine,
   DocumentChecked,
   Opportunity,
+  Tools,
   Reading,
   Setting,
   Tickets,

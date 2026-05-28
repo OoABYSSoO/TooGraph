@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -84,3 +84,37 @@ class ToolDefinition(BaseModel):
             if legacy in data:
                 raise ValueError(f"Tool manifest field '{legacy}' is not supported. Use '{replacement}' instead.")
         return data
+
+
+class ToolFileNode(BaseModel):
+    name: str
+    path: str
+    type: Literal["directory", "file"]
+    size: int = 0
+    language: str = ""
+    previewable: bool = False
+    executable: bool = False
+    children: list["ToolFileNode"] = Field(default_factory=list)
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
+class ToolFileTreeResponse(BaseModel):
+    tool_key: str = Field(..., alias="toolKey")
+    root: ToolFileNode
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
+class ToolFileContentResponse(BaseModel):
+    tool_key: str = Field(..., alias="toolKey")
+    path: str
+    name: str
+    size: int
+    language: str = ""
+    previewable: bool = False
+    executable: bool = False
+    encoding: Literal["utf-8", "binary", "too_large"]
+    content: str | None = None
+
+    model_config = ConfigDict(populate_by_name=True)

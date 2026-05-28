@@ -112,12 +112,16 @@ test("AppShell keeps the editor navigation entry active for graph-specific edito
   assert.match(componentSource, /\.app-shell__link\.app-shell__link--active \{[\s\S]*box-shadow:\s*inset 3px 0 0 rgba\(154,\s*52,\s*18,\s*0\.7\);/);
 });
 
-test("AppShell exposes preset node and action management as primary sidebar destinations", () => {
-  assert.match(componentSource, /import \{[\s\S]*CollectionTag[\s\S]*Opportunity[\s\S]*\} from "@element-plus\/icons-vue";/);
+test("AppShell exposes preset node action and tool management as primary sidebar destinations", () => {
+  assert.match(componentSource, /import \{[\s\S]*CollectionTag[\s\S]*Opportunity[\s\S]*Tools[\s\S]*\} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /to="\/presets"[\s\S]*activeNavigationSection === 'presets'[\s\S]*t\("nav\.presets"\)/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><CollectionTag \/><\/ElIcon>/);
   assert.match(componentSource, /to="\/actions"[\s\S]*activeNavigationSection === 'actions'[\s\S]*t\("nav\.actions"\)/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Opportunity \/><\/ElIcon>/);
+  assert.match(componentSource, /to="\/tools"[\s\S]*activeNavigationSection === 'tools'[\s\S]*t\("nav\.tools"\)/);
+  assert.match(componentSource, /data-virtual-affordance-id="app\.nav\.tools"/);
+  assert.match(componentSource, /data-virtual-affordance-path-after-click="\/tools"/);
+  assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Tools \/><\/ElIcon>/);
 });
 
 test("AppShell exposes improvement candidates as a primary sidebar destination", () => {

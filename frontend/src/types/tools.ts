@@ -29,6 +29,34 @@ export type ToolDefinition = {
   sourcePath: string;
   runtimeReady: boolean;
   runtimeRegistered: boolean;
-  status: string;
+  status: "active" | "disabled" | "deleted";
   canManage: boolean;
+};
+
+export type ToolFileNode = {
+  name: string;
+  path: string;
+  type: "directory" | "file";
+  size: number;
+  language: string;
+  previewable: boolean;
+  executable: boolean;
+  children: ToolFileNode[];
+};
+
+export type ToolFileTreeResponse = {
+  toolKey: string;
+  root: ToolFileNode;
+};
+
+export type ToolFileContentResponse = {
+  toolKey: string;
+  path: string;
+  name: string;
+  size: number;
+  language: string;
+  previewable: boolean;
+  executable: boolean;
+  encoding: "utf-8" | "binary" | "too_large";
+  content: string | null;
 };

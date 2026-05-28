@@ -10,6 +10,7 @@ export type PrimaryNavigationSection =
   | "messagePlatforms"
   | "presets"
   | "actions"
+  | "tools"
   | "improvements"
   | "models"
   | "modelLogs"
@@ -60,6 +61,9 @@ export function resolvePrimaryNavigationSection(pathname: string): PrimaryNaviga
   }
   if (pathname === "/actions" || pathname.startsWith("/actions/")) {
     return "actions";
+  }
+  if (pathname === "/tools" || pathname.startsWith("/tools/")) {
+    return "tools";
   }
   if (pathname === "/improvements" || pathname.startsWith("/improvements/")) {
     return "improvements";

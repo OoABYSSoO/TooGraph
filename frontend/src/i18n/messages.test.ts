@@ -112,6 +112,17 @@ test("Chinese UI labels Action as execution item", () => {
   );
 });
 
+test("i18n messages expose Tool management labels", () => {
+  assert.equal(messages["zh-CN"].nav.tools, "工具");
+  assert.equal(messages["zh-CN"].tools.title, "工具管理");
+  assert.equal(messages["zh-CN"].tools.sourceFilterOptions.user, "我的");
+  assert.equal(messages["zh-CN"].tools.sourceFilterOptions.official, "官方");
+  assert.equal(messages["en-US"].nav.tools, "Tools");
+  assert.equal(messages["en-US"].tools.title, "Tool management");
+  assert.equal(messages["en-US"].tools.sourceFilterOptions.user, "Mine");
+  assert.equal(messages["en-US"].tools.sourceFilterOptions.official, "Official");
+});
+
 test("i18n messages localize preset persistence feedback", () => {
   assert.equal(messages["zh-CN"].feedback.presetSaved, "已保存预设节点：{label}");
   assert.equal(messages["zh-CN"].feedback.presetSaveFailed, "预设节点保存失败。");

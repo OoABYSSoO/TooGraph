@@ -4,7 +4,13 @@ import json
 from pathlib import Path
 from typing import Any, Iterable
 
-from app.core.storage.tool_store import OFFICIAL_TOOLS_DIR, USER_TOOLS_DIR
+from app.core.schemas.tools import ToolCatalogStatus
+from app.core.storage.tool_store import (
+    OFFICIAL_TOOLS_DIR,
+    USER_TOOLS_DIR,
+    get_tool_status_map,
+    list_managed_tool_keys,
+)
 from app.graph_tools.runtime import build_script_tool_runner, validate_tool_runtime_spec
 
 
@@ -68,5 +74,13 @@ def list_runtime_tool_keys() -> set[str]:
 
 
 def get_tool_registry(*, include_disabled: bool = False) -> dict[str, ToolFunc]:
-    _ = include_disabled
-    return _build_runtime_tool_registry()
+    registry = _build_runtime_tool_registry()
+    if include_disabled:
+        allowed_keys = list_managed_tool_keys()
+        return {key: value for key, value in registry.items() if key in allowed_keys}
+    status_map = get_tool_status_map()
+    return {
+        key: value
+        for key, value in registry.items()
+        if status_map.get(key, ToolCatalogStatus.ACTIVE) == ToolCatalogStatus.ACTIVE
+    }

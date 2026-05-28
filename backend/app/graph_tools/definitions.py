@@ -11,7 +11,7 @@ from app.core.schemas.tools import (
     ToolRuntimeSpec,
     ToolSourceScope,
 )
-from app.core.storage.tool_store import OFFICIAL_TOOLS_DIR, USER_TOOLS_DIR
+from app.core.storage.tool_store import OFFICIAL_TOOLS_DIR, USER_TOOLS_DIR, ensure_tool_settings
 from app.graph_tools.registry import get_tool_registry, list_runtime_tool_keys
 from app.graph_tools.runtime import validate_tool_runtime_spec
 
@@ -24,14 +24,27 @@ class ToolDefinitionRecord:
 
 
 def list_tool_catalog(*, include_disabled: bool = True) -> list[ToolDefinition]:
-    _ = include_disabled
-    registry_keys = set(get_tool_registry(include_disabled=True).keys())
+    registry_keys = set(get_tool_registry(include_disabled=include_disabled).keys())
     runtime_supported_keys = list_runtime_tool_keys()
-    records = _load_managed_tool_records()
+    managed_records = {record.definition.tool_key: record for record in _load_managed_tool_records()}
+    settings_entries = ensure_tool_settings(set(managed_records))
+    tool_keys = sorted(managed_records)
 
     catalog: list[ToolDefinition] = []
-    for record in records:
+    for tool_key in tool_keys:
+        record = managed_records.get(tool_key)
+        if record is None:
+            continue
+        settings_entry = settings_entries.get(tool_key)
+        status = ToolCatalogStatus.ACTIVE
+        if isinstance(settings_entry, dict) and settings_entry.get("enabled") is False:
+            status = ToolCatalogStatus.DISABLED
+        if status == ToolCatalogStatus.DELETED:
+            continue
+        if status == ToolCatalogStatus.DISABLED and not include_disabled:
+            continue
         tool_key = record.definition.tool_key
+        runtime_registered = tool_key in registry_keys and status == ToolCatalogStatus.ACTIVE
         catalog.append(
             record.definition.model_copy(
                 deep=True,
@@ -39,8 +52,8 @@ def list_tool_catalog(*, include_disabled: bool = True) -> list[ToolDefinition]:
                     "source_scope": record.source_scope,
                     "source_path": record.source_path,
                     "runtime_ready": tool_key in runtime_supported_keys,
-                    "runtime_registered": tool_key in registry_keys,
-                    "status": ToolCatalogStatus.ACTIVE,
+                    "runtime_registered": runtime_registered,
+                    "status": status,
                     "can_manage": record.source_scope == ToolSourceScope.USER,
                 },
             )
