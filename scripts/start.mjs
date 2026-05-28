@@ -5,6 +5,13 @@ import { fileURLToPath } from "node:url";
 
 import { createPortReleasePlan } from "./dev-port-ownership.mjs";
 import { resolveFrontendBuildPlan, writeFrontendBuildManifest } from "./frontend-build-plan.mjs";
+import { redactUrlCredentials, selectDownloadSource } from "./start-download-source-plan.mjs";
+import {
+  resolveBackendDependencyPlan,
+  resolveFrontendDependencyPlan,
+  writeBackendDependencyMarker,
+  writeFrontendDependencyMarker,
+} from "./start-dependency-plan.mjs";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const backendDir = resolve(rootDir, "backend");
@@ -91,6 +98,13 @@ function npmCommand(args) {
     };
   }
   return { command: npmExecutable, args };
+}
+
+function pythonCommand(python, args) {
+  return {
+    command: python.command,
+    args: [...python.prefixArgs, ...args],
+  };
 }
 
 function matchesPort(localAddress, port) {
@@ -433,6 +447,176 @@ async function resolvePythonCommand() {
   return null;
 }
 
+async function resolveConfiguredNpmRegistry() {
+  const npmConfig = npmCommand(["config", "get", "registry"]);
+  try {
+    const { stdout } = await execFileAsync(npmConfig.command, npmConfig.args, {
+      cwd: frontendDir,
+      timeout: 5000,
+    });
+    return stdout.trim();
+  } catch {
+    return "";
+  }
+}
+
+async function resolveConfiguredPipIndexUrl(basePython) {
+  if (process.env.PIP_INDEX_URL) {
+    return process.env.PIP_INDEX_URL;
+  }
+
+  const pipConfig = pythonCommand(basePython, ["-m", "pip", "config", "get", "global.index-url"]);
+  try {
+    const { stdout } = await execFileAsync(pipConfig.command, pipConfig.args, {
+      cwd: backendDir,
+      timeout: 5000,
+    });
+    return stdout.trim();
+  } catch {
+    return "";
+  }
+}
+
+function formatDownloadSourceMode(source) {
+  if (source.mode === "forced") {
+    return "forced temporary override";
+  }
+  if (source.mode === "skipped") {
+    return "source check skipped";
+  }
+  if (source.mode === "fallback") {
+    return "fallback after failed source check";
+  }
+  if (Number.isFinite(source.elapsedMs)) {
+    return `network check ${source.elapsedMs}ms`;
+  }
+  return "network check";
+}
+
+function logDownloadSource(label, source) {
+  console.log(`${label}: ${redactUrlCredentials(source.url)} (${formatDownloadSourceMode(source)})`);
+  console.log(`  probe: ${redactUrlCredentials(source.probeUrl)}`);
+  if (source.mode === "fallback") {
+    console.warn("  warning: no candidate source passed the network check; continuing with this fallback source.");
+  }
+}
+
+async function selectNpmInstallSource() {
+  const npmSource = await selectDownloadSource({
+    kind: "npm",
+    configuredUrl: await resolveConfiguredNpmRegistry(),
+    env: process.env,
+  });
+  logDownloadSource("npm install source", npmSource);
+  return npmSource;
+}
+
+async function selectPipInstallSource(basePython) {
+  const pipSource = await selectDownloadSource({
+    kind: "pip",
+    configuredUrl: await resolveConfiguredPipIndexUrl(basePython),
+    env: process.env,
+  });
+  logDownloadSource("pip install source", pipSource);
+  return pipSource;
+}
+
+async function ensureFrontendDependencies() {
+  const plan = resolveFrontendDependencyPlan({
+    frontendDir,
+    env: process.env,
+  });
+
+  if (!plan.shouldInstall) {
+    if (plan.reason === "skipped") {
+      console.log("Frontend dependency install skipped by TOOGRAPH_SKIP_DEP_INSTALL.");
+    } else {
+      console.log("Frontend dependencies are up to date; skipping install.");
+    }
+    return;
+  }
+
+  if (plan.reason === "forced") {
+    console.log("Installing frontend dependencies... (forced by TOOGRAPH_FORCE_DEP_INSTALL)");
+  } else if (plan.reason === "missing_node_modules") {
+    console.log("Installing frontend dependencies... (frontend/node_modules was not found)");
+  } else {
+    console.log("Installing frontend dependencies... (frontend dependency manifest changed)");
+  }
+
+  const npmSource = await selectNpmInstallSource();
+  const install = npmCommand(["install", "--registry", npmSource.url]);
+  await runCommand(install.command, install.args, {
+    cwd: frontendDir,
+    env: process.env,
+    label: "Frontend dependency install",
+  });
+  writeFrontendDependencyMarker({ frontendDir });
+  console.log("Frontend dependency marker updated.");
+}
+
+async function ensureBackendDependencies(basePython) {
+  const plan = resolveBackendDependencyPlan({
+    backendDir,
+    env: process.env,
+    platform: process.platform,
+  });
+
+  if (!plan.shouldCreateVenv && !plan.shouldInstall) {
+    if (plan.reason === "skipped") {
+      console.log("Backend dependency install skipped by TOOGRAPH_SKIP_DEP_INSTALL.");
+      if (existsSync(plan.pythonPath)) {
+        return { command: plan.pythonPath, prefixArgs: [] };
+      }
+      return basePython;
+    }
+    console.log("Backend dependencies are up to date; skipping install.");
+    return { command: plan.pythonPath, prefixArgs: [] };
+  }
+
+  if (plan.shouldCreateVenv) {
+    console.log(`Creating backend Python environment at ${plan.venvDir}`);
+    const createVenv = pythonCommand(basePython, ["-m", "venv", plan.venvDir]);
+    await runCommand(createVenv.command, createVenv.args, {
+      cwd: rootDir,
+      env: process.env,
+      label: "Backend Python environment setup",
+    });
+  }
+
+  if (plan.shouldInstall) {
+    if (plan.reason === "forced") {
+      console.log("Installing backend Python dependencies... (forced by TOOGRAPH_FORCE_DEP_INSTALL)");
+    } else if (plan.reason === "missing_venv") {
+      console.log("Installing backend Python dependencies... (backend environment was not found)");
+    } else {
+      console.log("Installing backend Python dependencies... (backend dependency manifest changed)");
+    }
+
+    const pipSource = await selectPipInstallSource(basePython);
+    await runCommand(plan.pythonPath, [
+      "-m",
+      "pip",
+      "install",
+      "--index-url",
+      pipSource.url,
+      "-r",
+      resolve(backendDir, "requirements.txt"),
+    ], {
+      cwd: backendDir,
+      env: process.env,
+      label: "Backend dependency install",
+    });
+    writeBackendDependencyMarker({
+      backendDir,
+      venvDir: plan.venvDir,
+    });
+    console.log("Backend dependency marker updated.");
+  }
+
+  return { command: plan.pythonPath, prefixArgs: [] };
+}
+
 async function waitForHttp(url, retries, delayMs) {
   for (let index = 0; index < retries; index += 1) {
     try {
@@ -550,10 +734,6 @@ async function buildFrontend() {
     return;
   }
 
-  if (!existsSync(resolve(frontendDir, "node_modules"))) {
-    console.warn("Warning: frontend/node_modules was not found. Run `npm --prefix frontend install` first if startup fails.");
-  }
-
   const build = npmCommand(["run", "build"]);
   if (buildPlan.reason === "forced") {
     console.log("Building frontend... (forced by TOOGRAPH_FORCE_FRONTEND_BUILD)");
@@ -588,11 +768,13 @@ async function main() {
   console.log(`  Log : ${serverLogPath}`);
   console.log("");
 
-  const python = await resolvePythonCommand();
-  if (!python) {
+  const basePython = await resolvePythonCommand();
+  if (!basePython) {
     throw new Error("Python 3.11+ was not found. Install Python or set PYTHON to its executable path.");
   }
 
+  await ensureFrontendDependencies();
+  const python = await ensureBackendDependencies(basePython);
   await buildFrontend();
   await killPortPids(appPort);
   await releaseLegacyTooGraphPort(legacyBackendPort);

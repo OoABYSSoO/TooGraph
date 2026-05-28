@@ -100,12 +100,12 @@ TooGraph 的推荐模型配置入口是 Model Providers 页面。你可以在界
 
 ### 环境要求
 
-当前是源码运行方式。正式一键安装包发布前，需要先安装这些基础工具：
+当前是源码运行方式。正式一键安装包发布前，`npm start` 不会安装系统级运行时；请先自行安装 Node.js 和 Python，并确保命令在终端中可用。
 
 | 工具 | 要求 | 下载地址 | 用途 |
 | --- | --- | --- | --- |
 | Git | 最新稳定版 | https://git-scm.com/downloads | 获取代码、更新代码、提交改动 |
-| Node.js | 20.9+，推荐 LTS | https://nodejs.org/en/download | 安装前端依赖、构建前端、运行 `npm start` 启动器 |
+| Node.js | 20.9+，推荐 LTS | https://nodejs.org/en/download | 提供 `node` 和 `npm`，用于安装前端依赖、构建前端、运行 `npm start` 启动器 |
 | Python | 3.11+ | https://www.python.org/downloads/ | 运行 FastAPI 后端、安装后端依赖、执行 Python Action |
 
 Windows 用户安装 Python 时建议勾选 `Add python.exe to PATH`；安装 Git 时可以保留默认选项。安装完成后，打开一个新的终端，确认命令可用：
@@ -119,30 +119,37 @@ python --version
 
 如果系统里的 Python 命令是 `python3`，用 `python3 --version` 检查即可。TooGraph 也支持通过 `PYTHON` 环境变量指定 Python 可执行文件路径。
 
+常用官方下载入口：
+
+- Node.js LTS：https://nodejs.org/en/download
+- Python 3.11+：https://www.python.org/downloads/
+
 如果需要运行 LLM 节点，还需要准备一个可访问的模型服务：可以是本地 OpenAI-compatible 网关、私有网关，或云端 Provider。模型入口在 TooGraph 的 Model Providers 页面配置，不通过启动环境变量配置。
 
-视频输入在模型不支持原生视频时会回退为抽帧图片。TooGraph 会优先使用系统已有的 `ffmpeg`，后端依赖中也包含跨平台的 `imageio-ffmpeg` 作为应用内兜底；如果当前 Python 环境没有安装这个依赖，可以重新执行后端依赖安装命令。需要在运行时自动安装应用私有兜底组件时，启动前设置 `TOOGRAPH_AUTO_INSTALL_FFMPEG=1`。该模式只写入 `backend/data/runtime_tools/`，不会安装系统包或修改系统 PATH。
+视频输入在模型不支持原生视频时会回退为抽帧图片。TooGraph 会优先使用系统已有的 `ffmpeg`，后端依赖中也包含跨平台的 `imageio-ffmpeg` 作为应用内兜底；`npm start` 会把后端依赖安装到 TooGraph 专用 Python 环境中。需要在运行时自动安装应用私有兜底组件时，启动前设置 `TOOGRAPH_AUTO_INSTALL_FFMPEG=1`。该模式只写入 `backend/data/runtime_tools/`，不会安装系统包或修改系统 PATH。
 
-### 安装依赖
+### 获取代码
 
 ```bash
 git clone https://github.com/OoABYSSoO/TooGraph.git
 cd TooGraph
-npm --prefix frontend install
-python -m pip install -r backend/requirements.txt
+```
+
+项目依赖由 `npm start` 自动安装和更新，不需要手动执行前端 `npm install` 或后端 `pip install`。
+
+首次需要安装依赖时，启动脚本会临时探测 npm 和 PyPI 的可用源，选择当前可达且响应更快的源用于本次安装，并在终端输出实际使用的 registry / index-url 和探测 URL。这个选择只作用于当前 `npm start` 进程，不会改写全局 `npm config` 或 `pip config`。
+
+如果你想固定自己信任的镜像源，可以继续使用 npm / pip 自身配置；启动器会把它作为候选源之一。常见示例：
+
+```bash
+npm config set registry https://registry.npmmirror.com
+python -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
 如果系统里的 Python 命令是 `python3`：
 
 ```bash
-python3 -m pip install -r backend/requirements.txt
-```
-
-如果在中国大陆访问 npm 或 PyPI 很慢，可以先配置自己信任的镜像源，再安装依赖。常见示例：
-
-```bash
-npm config set registry https://registry.npmmirror.com
-python -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+python3 -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
 镜像源只影响依赖下载；TooGraph 的启动方式仍然是 `npm start`。
@@ -165,14 +172,45 @@ npm start
 node scripts/start.mjs
 ```
 
+首次启动或依赖清单变化时，启动器会依次完成：
+
+1. 检查可用的 Python 3.11+。
+2. 在 `frontend/` 中安装或更新前端依赖。
+3. 为需要安装的依赖探测临时下载源，并打印本次实际使用的 npm registry / pip index-url。
+4. 创建或复用 `backend/.toograph_venv/`，并安装 `backend/requirements.txt` 中的后端依赖。
+5. 构建前端，或在输入文件未变化时复用已有 `frontend/dist`。
+6. 释放被既有 TooGraph 进程占用的配置端口，然后启动单端口 FastAPI 服务。
+
 默认地址：
 
 - TooGraph：http://127.0.0.1:3477
 - 健康检查：http://127.0.0.1:3477/health
 
-启动器会先构建 `frontend/dist`，释放占用的 TooGraph 端口，然后启动单个 FastAPI 服务。日志写入：
+日志写入：
 
 - `.toograph_server.log`
+
+依赖安装的控制开关：
+
+```bash
+# 跳过依赖安装检查，直接使用当前已有环境启动
+TOOGRAPH_SKIP_DEP_INSTALL=1 npm start
+
+# 强制重新执行前端 npm install 和后端 pip install
+TOOGRAPH_FORCE_DEP_INSTALL=1 npm start
+
+# 使用自定义 Python 虚拟环境目录，而不是 backend/.toograph_venv
+TOOGRAPH_PYTHON_ENV=/path/to/toograph-venv npm start
+
+# 跳过临时下载源探测，使用当前配置源
+TOOGRAPH_SKIP_SOURCE_CHECK=1 npm start
+
+# 临时指定本次前端依赖安装使用的 npm registry
+TOOGRAPH_NPM_REGISTRY=https://registry.npmmirror.com/ npm start
+
+# 临时指定本次后端依赖安装使用的 pip index-url
+TOOGRAPH_PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple npm start
+```
 
 如果需要改端口：
 
@@ -190,6 +228,13 @@ npm.cmd start
 
 ```powershell
 $env:PYTHON = "C:\ProgramData\miniconda3\python.exe"
+npm.cmd start
+```
+
+PowerShell 中也可以指定项目专用 Python 环境目录：
+
+```powershell
+$env:TOOGRAPH_PYTHON_ENV = "D:\envs\toograph"
 npm.cmd start
 ```
 
@@ -216,16 +261,16 @@ Docker、单机部署、数据卷和更新流程见 [docs/README.md](docs/README
 ## 常用命令
 
 ```bash
-# 构建前端并在单端口启动 TooGraph
+# 安装/更新项目依赖，构建前端并在单端口启动 TooGraph
 npm start
 
-# 仅安装前端依赖
+# 手动安装前端依赖，通常只用于排查启动问题
 make frontend-install
 
 # 构建前端
 make frontend-build
 
-# 仅安装后端依赖
+# 手动安装后端依赖，通常只用于排查启动问题
 make backend-install
 
 # 检查 TooGraph 健康状态

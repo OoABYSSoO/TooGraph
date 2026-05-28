@@ -80,6 +80,7 @@ frontend/*.tsbuildinfo
 /action/settings.json
 /tool/settings.json
 backend/.venv/
+backend/.toograph_venv/
 backend/*.db
 backend/*.sqlite
 backend/*.sqlite3

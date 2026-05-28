@@ -6,7 +6,7 @@ PORT ?= 3477
 
 help:
 	@echo "Available commands:"
-	@echo "  make start            Build and start TooGraph on one port"
+	@echo "  make start            Install dependencies, build and start TooGraph on one port"
 	@echo "  make frontend-install Install frontend dependencies"
 	@echo "  make frontend-build   Build the frontend"
 	@echo "  make backend-install  Install backend dependencies"
