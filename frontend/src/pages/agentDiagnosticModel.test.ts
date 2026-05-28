@@ -453,12 +453,24 @@ test("buildAgentDiagnostic summarizes provider profile from node runtime config"
                 request_timeout_seconds: 12.5,
                 cache_policy: "disabled",
                 cost_budget: { limit_usd: 1.25, window: "run" },
-                rate_profile: { requests_per_minute: 30, tokens_per_minute: 12000, concurrency: 2 },
+                rate_profile: {
+                  requests_per_minute: 30,
+                  tokens_per_minute: 12000,
+                  concurrency: 2,
+                  wait_strategy: "wait",
+                  max_wait_seconds: 3.5,
+                },
               },
               provider_request_timeout_seconds: 12.5,
               provider_cache_policy: "disabled",
               provider_cost_budget: { limit_usd: 1.25, window: "run" },
-              provider_rate_profile: { requests_per_minute: 30, tokens_per_minute: 12000, concurrency: 2 },
+              provider_rate_profile: {
+                requests_per_minute: 30,
+                tokens_per_minute: 12000,
+                concurrency: 2,
+                wait_strategy: "wait",
+                max_wait_seconds: 3.5,
+              },
               prompt_snapshots: [
                 {
                   kind: "llm_prompt_snapshot",
@@ -487,13 +499,13 @@ test("buildAgentDiagnostic summarizes provider profile from node runtime config"
     cachePolicyLabel: "disabled",
     cacheDecisionLabel: "disabled / disabled / ineligible (node_provider_cache_policy_disabled)",
     costBudgetLabel: "$1.25 / run",
-    rateProfileLabel: "30 rpm, 12000 tpm, concurrency 2",
+    rateProfileLabel: "30 rpm, 12000 tpm, concurrency 2, wait up to 3.5s",
     evidenceLabels: [
       "timeout: 12.5s",
       "cache policy: disabled",
       "cache decision: disabled / disabled / ineligible (node_provider_cache_policy_disabled)",
       "cost budget: $1.25 / run",
-      "rate: 30 rpm, 12000 tpm, concurrency 2",
+      "rate: 30 rpm, 12000 tpm, concurrency 2, wait up to 3.5s",
     ],
   });
 });

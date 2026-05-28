@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from app.core.context_security import redact_context_secrets
 from app.core.model_provider_costs import build_provider_cost_estimate, normalize_provider_model_pricing
-from app.core.model_provider_rates import build_provider_rate_decision
+from app.core.model_provider_rates import build_provider_rate_decision, normalize_provider_rate_profile
 from app.core.runtime.model_call_context import get_model_call_context
 from app.core.storage.database import get_connection
 from app.core.storage.settings_store import load_app_settings, save_app_settings
@@ -281,6 +281,425 @@ def evaluate_provider_cost_budget_preflight(
     }
 
 
+def evaluate_provider_rate_profile_preflight(
+    call_context: dict[str, Any],
+    rate_profile: Any,
+    *,
+    estimated_request_tokens: Any = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    with get_connection() as connection:
+        return _evaluate_provider_rate_profile_preflight_with_connection(
+            connection,
+            call_context,
+            rate_profile,
+            estimated_request_tokens=estimated_request_tokens,
+            now=now,
+        )
+
+
+def reserve_provider_rate_profile_capacity(
+    call_context: dict[str, Any],
+    rate_profile: Any,
+    *,
+    estimated_request_tokens: Any = None,
+    now: datetime | None = None,
+    ttl_seconds: int = 60,
+) -> dict[str, Any]:
+    profile = normalize_provider_rate_profile(rate_profile)
+    if not profile:
+        return {}
+    normalized_context = call_context if isinstance(call_context, dict) else {}
+    run_id = _text(normalized_context.get("run_id"))
+    if not run_id:
+        return {}
+    reserved_at = _normalize_datetime(now or datetime.now(timezone.utc))
+    normalized_estimated_request_tokens = _normalize_estimated_token_count(estimated_request_tokens) or 0
+    reservation_id = f"rate_res_{uuid4().hex[:12]}"
+    with get_connection() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        decision = _evaluate_provider_rate_profile_preflight_with_connection(
+            connection,
+            normalized_context,
+            profile,
+            estimated_request_tokens=normalized_estimated_request_tokens,
+            now=reserved_at,
+        )
+        if decision.get("status") == "blocked":
+            return decision
+        provider_id = _text(normalized_context.get("provider_id"))
+        expires_at = reserved_at + timedelta(seconds=max(1, int(ttl_seconds or 60)))
+        connection.execute(
+            """
+            INSERT INTO provider_rate_reservations (
+                reservation_id,
+                run_id,
+                root_run_id,
+                node_id,
+                provider,
+                model,
+                status,
+                estimated_request_tokens,
+                reserved_at,
+                expires_at,
+                metadata_json
+            ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+            """,
+            (
+                reservation_id,
+                run_id,
+                _text(normalized_context.get("root_run_id")),
+                _text(normalized_context.get("node_id")),
+                provider_id,
+                _text(normalized_context.get("model")),
+                normalized_estimated_request_tokens,
+                _format_datetime_precise(reserved_at),
+                _format_datetime_precise(expires_at),
+                _json(
+                    {
+                        "rate_profile": profile,
+                        "decision": decision,
+                    }
+                ),
+            ),
+        )
+    return {
+        "kind": "provider_rate_reservation",
+        "version": 1,
+        "status": "reserved",
+        "reservation_id": reservation_id,
+        "provider_id": _text(normalized_context.get("provider_id")),
+        "model": _text(normalized_context.get("model")),
+        "run_id": run_id,
+        "root_run_id": _text(normalized_context.get("root_run_id")),
+        "node_id": _text(normalized_context.get("node_id")),
+        "estimated_request_tokens": normalized_estimated_request_tokens,
+        "reserved_at": _format_datetime_precise(reserved_at),
+        "expires_at": _format_datetime_precise(expires_at),
+        "decision": decision,
+    }
+
+
+def release_provider_rate_reservation(reservation_id: Any, *, released_at: datetime | None = None) -> dict[str, Any]:
+    normalized_reservation_id = _text(reservation_id)
+    if not normalized_reservation_id:
+        return {}
+    normalized_released_at = _normalize_datetime(released_at or datetime.now(timezone.utc))
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT reservation_id, status
+            FROM provider_rate_reservations
+            WHERE reservation_id = ?
+            """,
+            (normalized_reservation_id,),
+        ).fetchone()
+        if row is None:
+            return {}
+        connection.execute(
+            """
+            UPDATE provider_rate_reservations
+            SET status = 'released', released_at = ?
+            WHERE reservation_id = ? AND status = 'active'
+            """,
+            (_format_datetime_precise(normalized_released_at), normalized_reservation_id),
+        )
+    return {
+        "kind": "provider_rate_reservation",
+        "version": 1,
+        "status": "released",
+        "reservation_id": normalized_reservation_id,
+        "released_at": _format_datetime_precise(normalized_released_at),
+    }
+
+
+def enqueue_provider_rate_wait_queue_entry(
+    queue_key: Any,
+    call_context: dict[str, Any] | None = None,
+    *,
+    now: datetime | None = None,
+    ttl_seconds: int = 60,
+) -> dict[str, Any]:
+    normalized_queue_key = _text(queue_key)
+    if not normalized_queue_key:
+        return {}
+    normalized_context = call_context if isinstance(call_context, dict) else {}
+    enqueued_at = _normalize_datetime(now or datetime.now(timezone.utc))
+    normalized_ttl_seconds = max(1, int(ttl_seconds or 60))
+    expires_at = enqueued_at + timedelta(seconds=normalized_ttl_seconds)
+    queue_entry_id = f"rate_wait_{uuid4().hex[:12]}"
+    payload = {
+        "queue_key": normalized_queue_key,
+        "context": normalized_context,
+        "ttl_seconds": normalized_ttl_seconds,
+    }
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO provider_rate_wait_queue (
+                queue_entry_id,
+                queue_key,
+                run_id,
+                root_run_id,
+                node_id,
+                provider,
+                model,
+                status,
+                enqueued_at,
+                expires_at,
+                metadata_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?)
+            """,
+            (
+                queue_entry_id,
+                normalized_queue_key,
+                _text(normalized_context.get("run_id")),
+                _text(normalized_context.get("root_run_id")),
+                _text(normalized_context.get("node_id")),
+                _text(normalized_context.get("provider_id")),
+                _text(normalized_context.get("model")),
+                _format_datetime_precise(enqueued_at),
+                _format_datetime_precise(expires_at),
+                _json(payload),
+            ),
+        )
+    return {
+        "kind": "provider_rate_wait_queue_entry",
+        "version": 1,
+        "status": "waiting",
+        "queue_entry_id": queue_entry_id,
+        "queue_key": normalized_queue_key,
+        "run_id": _text(normalized_context.get("run_id")),
+        "root_run_id": _text(normalized_context.get("root_run_id")),
+        "node_id": _text(normalized_context.get("node_id")),
+        "provider_id": _text(normalized_context.get("provider_id")),
+        "model": _text(normalized_context.get("model")),
+        "enqueued_at": _format_datetime_precise(enqueued_at),
+        "expires_at": _format_datetime_precise(expires_at),
+    }
+
+
+def claim_provider_rate_wait_queue_turn(queue_entry_id: Any, *, now: datetime | None = None) -> dict[str, Any]:
+    normalized_queue_entry_id = _text(queue_entry_id)
+    if not normalized_queue_entry_id:
+        return {}
+    acquired_at = _normalize_datetime(now or datetime.now(timezone.utc))
+    with get_connection() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        expired_count = _expire_provider_rate_wait_queue_entries(connection, acquired_at)
+        row = connection.execute(
+            """
+            SELECT queue_entry_id, queue_key, status, run_id, root_run_id, node_id, provider, model, enqueued_at, expires_at
+            FROM provider_rate_wait_queue
+            WHERE queue_entry_id = ?
+            """,
+            (normalized_queue_entry_id,),
+        ).fetchone()
+        if row is None:
+            return {}
+        if row["status"] not in {"waiting", "acquired"}:
+            return _provider_rate_wait_queue_payload(row, position=0, expired_count=expired_count)
+        active_rows = connection.execute(
+            """
+            SELECT queue_entry_id
+            FROM provider_rate_wait_queue
+            WHERE queue_key = ? AND status IN ('waiting', 'acquired')
+            ORDER BY enqueued_at ASC, queue_entry_id ASC
+            """,
+            (row["queue_key"],),
+        ).fetchall()
+        active_ids = [str(active_row["queue_entry_id"] or "") for active_row in active_rows]
+        try:
+            position = active_ids.index(normalized_queue_entry_id)
+        except ValueError:
+            position = 0
+        if position == 0:
+            connection.execute(
+                """
+                UPDATE provider_rate_wait_queue
+                SET status = 'acquired',
+                    acquired_at = CASE WHEN acquired_at = '' THEN ? ELSE acquired_at END
+                WHERE queue_entry_id = ? AND status IN ('waiting', 'acquired')
+                """,
+                (_format_datetime_precise(acquired_at), normalized_queue_entry_id),
+            )
+            row = connection.execute(
+                """
+                SELECT queue_entry_id, queue_key, status, run_id, root_run_id, node_id, provider, model, enqueued_at, expires_at
+                FROM provider_rate_wait_queue
+                WHERE queue_entry_id = ?
+                """,
+                (normalized_queue_entry_id,),
+            ).fetchone()
+        return _provider_rate_wait_queue_payload(row, position=position, expired_count=expired_count)
+
+
+def release_provider_rate_wait_queue_entry(
+    queue_entry_id: Any,
+    *,
+    released_at: datetime | None = None,
+) -> dict[str, Any]:
+    normalized_queue_entry_id = _text(queue_entry_id)
+    if not normalized_queue_entry_id:
+        return {}
+    normalized_released_at = _normalize_datetime(released_at or datetime.now(timezone.utc))
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE provider_rate_wait_queue
+            SET status = 'released', released_at = ?
+            WHERE queue_entry_id = ? AND status IN ('waiting', 'acquired')
+            """,
+            (_format_datetime_precise(normalized_released_at), normalized_queue_entry_id),
+        )
+        row = connection.execute(
+            """
+            SELECT queue_entry_id, queue_key, status, run_id, root_run_id, node_id, provider, model, enqueued_at, expires_at
+            FROM provider_rate_wait_queue
+            WHERE queue_entry_id = ?
+            """,
+            (normalized_queue_entry_id,),
+        ).fetchone()
+    if row is None:
+        return {}
+    return {
+        **_provider_rate_wait_queue_payload(row, position=0, expired_count=0),
+        "released_at": _format_datetime_precise(normalized_released_at),
+    }
+
+
+def _evaluate_provider_rate_profile_preflight_with_connection(
+    connection: Any,
+    call_context: dict[str, Any],
+    rate_profile: Any,
+    *,
+    estimated_request_tokens: Any = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    profile = normalize_provider_rate_profile(rate_profile)
+    if not profile:
+        return {}
+    normalized_context = call_context if isinstance(call_context, dict) else {}
+    if not _text(normalized_context.get("run_id")):
+        return {}
+
+    completed_at = now or datetime.now(timezone.utc)
+    window_seconds = 60
+    window_start = _normalize_datetime(completed_at) - timedelta(seconds=window_seconds)
+    provider_id = _text(normalized_context.get("provider_id"))
+    rows = _recent_provider_model_call_rows(
+        connection,
+        provider_id=provider_id,
+        started_at=window_start,
+        ended_at=_normalize_datetime(completed_at),
+    )
+    reservation_rows = _active_provider_rate_reservation_rows(
+        connection,
+        provider_id=provider_id,
+        started_at=window_start,
+        ended_at=_normalize_datetime(completed_at),
+    )
+    observed_requests = len(rows)
+    observed_total_tokens = sum(_usage_total_tokens(_loads(row["usage_json"], {})) for row in rows)
+    reserved_requests = len(reservation_rows)
+    reserved_total_tokens = sum(int(row["estimated_request_tokens"] or 0) for row in reservation_rows)
+    normalized_estimated_request_tokens = _normalize_estimated_token_count(estimated_request_tokens)
+    projected_total_tokens = (
+        observed_total_tokens + reserved_total_tokens + normalized_estimated_request_tokens
+        if normalized_estimated_request_tokens is not None
+        else observed_total_tokens + reserved_total_tokens
+    )
+    limit_exceeded: list[str] = []
+    requests_per_minute = profile.get("requests_per_minute")
+    tokens_per_minute = profile.get("tokens_per_minute")
+    if requests_per_minute is not None and observed_requests + reserved_requests >= requests_per_minute:
+        limit_exceeded.append("requests_per_minute")
+    if tokens_per_minute is not None and observed_total_tokens + reserved_total_tokens >= tokens_per_minute:
+        limit_exceeded.append("tokens_per_minute")
+    elif tokens_per_minute is not None and normalized_estimated_request_tokens is not None and projected_total_tokens > tokens_per_minute:
+        limit_exceeded.append("tokens_per_minute")
+    status = "blocked" if limit_exceeded else "within_profile"
+    reason = "provider_rate_profile_window_available"
+    if status == "blocked":
+        reason = (
+            "provider_rate_profile_already_exhausted"
+            if tokens_per_minute is None or observed_total_tokens >= tokens_per_minute or "requests_per_minute" in limit_exceeded
+            else "provider_rate_profile_projected_window_exhausted"
+        )
+    result: dict[str, Any] = {
+        "kind": "provider_rate_profile_preflight",
+        "version": 1,
+        "mode": "enforce_recent_window",
+        "status": status,
+        "reason": reason,
+        **profile,
+        "observed_requests": observed_requests,
+        "observed_total_tokens": observed_total_tokens,
+        "reserved_requests": reserved_requests,
+        "reserved_total_tokens": reserved_total_tokens,
+        "limit_exceeded": limit_exceeded,
+        "window_seconds": window_seconds,
+        "window_started_at": _format_datetime(window_start),
+        "window_ended_at": _format_datetime(_normalize_datetime(completed_at)),
+        "scope": {
+            "provider_id": provider_id,
+        },
+    }
+    if "concurrency" in profile:
+        result["unenforced_limits"] = ["concurrency"]
+    if normalized_estimated_request_tokens is not None:
+        result["estimated_request_tokens"] = normalized_estimated_request_tokens
+        result["projected_total_tokens"] = projected_total_tokens
+    retry_after_seconds = _provider_rate_retry_after_seconds(
+        _provider_rate_window_entries(rows, reservation_rows),
+        completed_at=_normalize_datetime(completed_at),
+        window_seconds=window_seconds,
+        requests_per_minute=requests_per_minute,
+        tokens_per_minute=tokens_per_minute,
+        estimated_request_tokens=normalized_estimated_request_tokens,
+        limit_exceeded=limit_exceeded,
+    )
+    if status == "blocked" and retry_after_seconds is not None:
+        result["retry_after_seconds"] = retry_after_seconds
+        result["retry_after_at"] = _format_datetime_precise(
+            _normalize_datetime(completed_at) + timedelta(seconds=retry_after_seconds)
+        )
+    return result
+
+
+def _expire_provider_rate_wait_queue_entries(connection: Any, now: datetime) -> int:
+    result = connection.execute(
+        """
+        UPDATE provider_rate_wait_queue
+        SET status = 'expired'
+        WHERE status IN ('waiting', 'acquired') AND expires_at <= ?
+        """,
+        (_format_datetime_precise(_normalize_datetime(now)),),
+    )
+    return max(0, int(result.rowcount or 0))
+
+
+def _provider_rate_wait_queue_payload(row: Any, *, position: int, expired_count: int) -> dict[str, Any]:
+    if row is None:
+        return {}
+    return {
+        "kind": "provider_rate_wait_queue_entry",
+        "version": 1,
+        "status": _text(row["status"]),
+        "queue_entry_id": _text(row["queue_entry_id"]),
+        "queue_key": _text(row["queue_key"]),
+        "run_id": _text(row["run_id"]),
+        "root_run_id": _text(row["root_run_id"]),
+        "node_id": _text(row["node_id"]),
+        "provider_id": _text(row["provider"]),
+        "model": _text(row["model"]),
+        "enqueued_at": _text(row["enqueued_at"]),
+        "expires_at": _text(row["expires_at"]),
+        "position": max(0, int(position or 0)),
+        "expired_count": max(0, int(expired_count or 0)),
+    }
+
+
 def _apply_provider_cost_budget_window(
     connection: Any,
     *,
@@ -316,6 +735,109 @@ def _apply_provider_cost_budget_window(
         completed_at=completed_at,
     )
     return result
+
+
+def _recent_provider_model_call_rows(
+    connection: Any,
+    *,
+    provider_id: str,
+    started_at: datetime,
+    ended_at: datetime,
+) -> list[Any]:
+    if provider_id:
+        return connection.execute(
+            """
+            SELECT usage_json, completed_at
+            FROM graph_model_calls
+            WHERE provider = ? AND completed_at >= ? AND completed_at <= ?
+            """,
+            (provider_id, _format_datetime_precise(started_at), _format_datetime_precise(ended_at)),
+        ).fetchall()
+    return connection.execute(
+        """
+        SELECT usage_json, completed_at
+        FROM graph_model_calls
+        WHERE completed_at >= ? AND completed_at <= ?
+        """,
+        (_format_datetime_precise(started_at), _format_datetime_precise(ended_at)),
+    ).fetchall()
+
+
+def _active_provider_rate_reservation_rows(
+    connection: Any,
+    *,
+    provider_id: str,
+    started_at: datetime,
+    ended_at: datetime,
+) -> list[Any]:
+    _expire_provider_rate_reservations(connection, now=ended_at)
+    if provider_id:
+        return connection.execute(
+            """
+            SELECT estimated_request_tokens, reserved_at, expires_at
+            FROM provider_rate_reservations
+            WHERE provider = ?
+              AND status = 'active'
+              AND reserved_at >= ?
+              AND reserved_at <= ?
+              AND expires_at > ?
+            """,
+            (
+                provider_id,
+                _format_datetime_precise(started_at),
+                _format_datetime_precise(ended_at),
+                _format_datetime_precise(ended_at),
+            ),
+        ).fetchall()
+    return connection.execute(
+        """
+        SELECT estimated_request_tokens, reserved_at, expires_at
+        FROM provider_rate_reservations
+        WHERE status = 'active'
+          AND reserved_at >= ?
+          AND reserved_at <= ?
+          AND expires_at > ?
+        """,
+        (
+            _format_datetime_precise(started_at),
+            _format_datetime_precise(ended_at),
+            _format_datetime_precise(ended_at),
+        ),
+    ).fetchall()
+
+
+def _expire_provider_rate_reservations(connection: Any, *, now: datetime) -> None:
+    connection.execute(
+        """
+        UPDATE provider_rate_reservations
+        SET status = 'expired'
+        WHERE status = 'active' AND expires_at <= ?
+        """,
+        (_format_datetime_precise(now),),
+    )
+
+
+def _provider_rate_window_entries(rows: list[Any], reservation_rows: list[Any]) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for row in rows:
+        completed_at = _parse_datetime_text(row["completed_at"])
+        if completed_at is not None:
+            entries.append(
+                {
+                    "completed_at": completed_at,
+                    "tokens": _usage_total_tokens(_loads(row["usage_json"], {})),
+                }
+            )
+    for row in reservation_rows:
+        reserved_at = _parse_datetime_text(row["reserved_at"])
+        if reserved_at is not None:
+            entries.append(
+                {
+                    "completed_at": reserved_at,
+                    "tokens": int(row["estimated_request_tokens"] or 0),
+                }
+            )
+    return entries
 
 
 def _previous_provider_cost_window_total_usd(
@@ -372,6 +894,84 @@ def _provider_cost_estimate_usd(metadata: Any) -> float:
     return cost if cost is not None else 0.0
 
 
+def _usage_total_tokens(usage: Any) -> int:
+    payload = usage if isinstance(usage, dict) else {}
+    total_tokens = _normalize_optional_float(
+        payload.get("total_tokens")
+        or payload.get("totalTokens")
+        or payload.get("total_token_count")
+        or payload.get("totalTokenCount")
+    )
+    if total_tokens is not None:
+        return int(total_tokens)
+    input_tokens = _normalize_optional_float(
+        payload.get("input_tokens")
+        or payload.get("prompt_tokens")
+        or payload.get("inputTokens")
+        or payload.get("promptTokens")
+        or payload.get("promptTokenCount")
+    )
+    output_tokens = _normalize_optional_float(
+        payload.get("output_tokens")
+        or payload.get("completion_tokens")
+        or payload.get("outputTokens")
+        or payload.get("completionTokens")
+        or payload.get("candidatesTokenCount")
+    )
+    return int(input_tokens or 0) + int(output_tokens or 0)
+
+
+def _provider_rate_retry_after_seconds(
+    window_entries: list[dict[str, Any]],
+    *,
+    completed_at: datetime,
+    window_seconds: int,
+    requests_per_minute: int | None,
+    tokens_per_minute: int | None,
+    estimated_request_tokens: int | None,
+    limit_exceeded: list[str],
+) -> int | None:
+    if not limit_exceeded:
+        return None
+    if not window_entries:
+        return None
+
+    ordered_rows = sorted(window_entries, key=lambda row: row["completed_at"])
+    retry_at_candidates: list[datetime] = []
+    if "requests_per_minute" in limit_exceeded and requests_per_minute is not None:
+        expire_count = len(ordered_rows) - requests_per_minute + 1
+        if expire_count > 0 and expire_count <= len(ordered_rows):
+            retry_at_candidates.append(ordered_rows[expire_count - 1]["completed_at"] + timedelta(seconds=window_seconds))
+
+    if "tokens_per_minute" in limit_exceeded and tokens_per_minute is not None:
+        remaining_tokens = sum(int(row["tokens"] or 0) for row in ordered_rows)
+        target_tokens = (
+            tokens_per_minute - estimated_request_tokens
+            if estimated_request_tokens is not None
+            else tokens_per_minute - 1
+        )
+        if target_tokens >= 0:
+            for row in ordered_rows:
+                if remaining_tokens <= target_tokens:
+                    break
+                remaining_tokens -= int(row["tokens"] or 0)
+                retry_at_candidates.append(row["completed_at"] + timedelta(seconds=window_seconds))
+
+    if not retry_at_candidates:
+        return None
+    retry_after = max(retry_at_candidates) - _normalize_datetime(completed_at)
+    return max(0, int(math.ceil(retry_after.total_seconds())))
+
+
+def _normalize_estimated_token_count(value: Any) -> int | None:
+    normalized = _normalize_optional_float(value)
+    if normalized is None:
+        return None
+    if normalized <= 0:
+        return 0
+    return int(math.ceil(normalized))
+
+
 def _provider_cost_budget_window_scope(
     *,
     call_context: dict[str, Any],
@@ -416,8 +1016,25 @@ def _normalize_datetime(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def _parse_datetime_text(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return _normalize_datetime(parsed)
+
+
 def _format_datetime(value: datetime) -> str:
     return _normalize_datetime(value).replace(microsecond=0).isoformat()
+
+
+def _format_datetime_precise(value: datetime) -> str:
+    return _normalize_datetime(value).isoformat()
 
 
 def _round_usd(value: float) -> float:
@@ -760,6 +1377,7 @@ def _append_provider_context_fields(target: dict[str, Any], source: dict[str, An
         "provider_cost_budget",
         "provider_rate_profile",
         "provider_credential",
+        "provider_rate_reservation",
         "provider_cost_estimate",
         "provider_rate_decision",
     ):

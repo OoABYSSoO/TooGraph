@@ -109,6 +109,33 @@
             <span>{{ selectedLog.path }}</span>
           </div>
 
+          <section v-if="selectedRateReservation.visible" class="model-logs-page__section model-logs-page__rate-reservation">
+            <div class="model-logs-page__section-heading">
+              <h4>{{ t("modelLogs.rateReservation") }}</h4>
+              <span
+                class="model-logs-page__section-pill"
+                :class="`model-logs-page__section-pill--${selectedRateReservation.tone}`"
+              >
+                {{ selectedRateReservation.status || t("common.noSummary") }}
+              </span>
+            </div>
+            <dl v-if="selectedRateReservation.metrics.length > 0" class="model-logs-page__diagnostic-grid">
+              <div v-for="metric in selectedRateReservation.metrics" :key="metric.key">
+                <dt>{{ rateReservationMetricLabel(metric.key) }}</dt>
+                <dd>{{ metric.value }}</dd>
+              </div>
+            </dl>
+            <dl v-if="selectedRateReservation.timeline.length > 0" class="model-logs-page__diagnostic-grid model-logs-page__diagnostic-grid--timeline">
+              <div v-for="item in selectedRateReservation.timeline" :key="item.key">
+                <dt>{{ rateReservationTimelineLabel(item.key) }}</dt>
+                <dd>{{ formatTimestamp(item.value) }}</dd>
+              </div>
+            </dl>
+            <div v-if="selectedRateReservation.evidenceLabels.length > 0" class="model-logs-page__diagnostic-chips">
+              <span v-for="label in selectedRateReservation.evidenceLabels" :key="label">{{ label }}</span>
+            </div>
+          </section>
+
           <section v-if="formatRequestThinking(selectedLog)" class="model-logs-page__section">
             <div class="model-logs-page__section-heading">
               <h4>{{ t("modelLogs.requestThinking") }}</h4>
@@ -281,6 +308,11 @@ import { fetchModelLogs, updateModelLogRetention } from "@/api/modelLogs";
 import AppShell from "@/layouts/AppShell.vue";
 import type { ModelLogEntry, ModelLogTreeNode } from "@/types/model-log";
 import { highlightJson } from "./modelLogsJsonHighlight.ts";
+import {
+  buildProviderRateReservationDiagnostic,
+  type ProviderRateReservationMetricKey,
+  type ProviderRateReservationTimelineKey,
+} from "./modelLogProviderDiagnostics.ts";
 
 const { t } = useI18n();
 const pageSize = 12;
@@ -322,6 +354,7 @@ const errorCount = computed(() => logs.value.filter((entry) => Boolean(entry.err
 const logsById = computed(() => new Map(logs.value.map((entry) => [entry.id, entry])));
 const treeItems = computed(() => flattenTreeItems(runTrees.value, logsById.value));
 const selectedStreamSummary = computed(() => (selectedLog.value ? getStreamSummary(selectedLog.value) : null));
+const selectedRateReservation = computed(() => buildProviderRateReservationDiagnostic(selectedLog.value ?? {}));
 const rawDialogTitle = computed(() =>
   rawDialogKind.value === "request" ? t("modelLogs.rawRequest") : t("modelLogs.rawResponse"),
 );
@@ -613,6 +646,14 @@ function formatResponseNormalRaw(selectedLog: ModelLogEntry) {
   const normalized = { ...selectedLog.response_raw };
   delete normalized._stream;
   return JSON.stringify(normalized, null, 2);
+}
+
+function rateReservationMetricLabel(key: ProviderRateReservationMetricKey) {
+  return t(`modelLogs.rateReservationMetric.${key}`);
+}
+
+function rateReservationTimelineLabel(key: ProviderRateReservationTimelineKey) {
+  return t(`modelLogs.rateReservationTimeline.${key}`);
 }
 
 watch(query, () => {
@@ -994,6 +1035,24 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
+.model-logs-page__section-pill--success {
+  border-color: rgba(4, 120, 87, 0.16);
+  background: rgba(236, 253, 245, 0.9);
+  color: rgb(4, 120, 87);
+}
+
+.model-logs-page__section-pill--warning {
+  border-color: rgba(194, 65, 12, 0.16);
+  background: rgba(255, 247, 237, 0.9);
+  color: rgb(194, 65, 12);
+}
+
+.model-logs-page__section-pill--danger {
+  border-color: rgba(220, 38, 38, 0.16);
+  background: rgba(254, 242, 242, 0.92);
+  color: rgb(185, 28, 28);
+}
+
 .model-logs-page__status--error {
   color: rgb(185, 28, 28);
   background: rgba(254, 242, 242, 0.92);
@@ -1017,6 +1076,65 @@ onBeforeUnmount(() => {
   font-size: 0.76rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.model-logs-page__diagnostic-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.model-logs-page__diagnostic-grid div {
+  min-width: 0;
+  border: 1px solid rgba(37, 99, 235, 0.1);
+  border-radius: 12px;
+  padding: 9px 10px;
+  background: rgba(239, 246, 255, 0.5);
+}
+
+.model-logs-page__diagnostic-grid--timeline div {
+  border-color: rgba(154, 52, 18, 0.1);
+  background: rgba(255, 248, 240, 0.62);
+}
+
+.model-logs-page__diagnostic-grid dt,
+.model-logs-page__diagnostic-grid dd {
+  overflow: hidden;
+  margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-logs-page__diagnostic-grid dt {
+  color: rgba(60, 41, 20, 0.58);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.model-logs-page__diagnostic-grid dd {
+  margin-top: 4px;
+  color: rgba(31, 23, 15, 0.82);
+  font-family: var(--toograph-font-mono);
+  font-size: 0.76rem;
+}
+
+.model-logs-page__diagnostic-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.model-logs-page__diagnostic-chips span {
+  min-height: 24px;
+  border: 1px solid rgba(4, 120, 87, 0.12);
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: rgba(236, 253, 245, 0.62);
+  color: rgb(4, 120, 87);
+  font-family: var(--toograph-font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
 .model-logs-page__section {
@@ -1465,6 +1583,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 980px) {
   .model-logs-page__toolbar,
+  .model-logs-page__diagnostic-grid,
   .model-logs-page__meta-grid {
     grid-template-columns: 1fr;
   }

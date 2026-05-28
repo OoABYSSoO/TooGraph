@@ -4,19 +4,34 @@ import math
 from typing import Any
 
 
-def normalize_provider_rate_profile(value: Any) -> dict[str, int]:
+DEFAULT_PROVIDER_RATE_MAX_WAIT_SECONDS = 10.0
+
+
+def normalize_provider_rate_profile(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
-    profile: dict[str, int] = {}
+    profile: dict[str, Any] = {}
     requests_per_minute = _positive_int(value.get("requests_per_minute") or value.get("requestsPerMinute"))
     tokens_per_minute = _positive_int(value.get("tokens_per_minute") or value.get("tokensPerMinute"))
     concurrency = _positive_int(value.get("concurrency"))
+    wait_strategy = _wait_strategy(value.get("wait_strategy") or value.get("waitStrategy"))
+    raw_max_wait_seconds = value.get("max_wait_seconds")
+    if raw_max_wait_seconds is None:
+        raw_max_wait_seconds = value.get("maxWaitSeconds")
+    max_wait_seconds = _positive_number_or_zero(raw_max_wait_seconds)
     if requests_per_minute is not None:
         profile["requests_per_minute"] = requests_per_minute
     if tokens_per_minute is not None:
         profile["tokens_per_minute"] = tokens_per_minute
     if concurrency is not None:
         profile["concurrency"] = concurrency
+    if not profile:
+        return {}
+    if wait_strategy == "wait":
+        profile["wait_strategy"] = wait_strategy
+        profile["max_wait_seconds"] = (
+            max_wait_seconds if max_wait_seconds is not None else DEFAULT_PROVIDER_RATE_MAX_WAIT_SECONDS
+        )
     return profile
 
 
@@ -75,6 +90,11 @@ def _positive_int(value: Any) -> int | None:
     if number is None or number < 1:
         return None
     return int(number)
+
+
+def _wait_strategy(value: Any) -> str:
+    normalized = str(value or "").strip().lower()
+    return "wait" if normalized == "wait" else "block"
 
 
 def _positive_number_or_zero(value: Any) -> float | None:

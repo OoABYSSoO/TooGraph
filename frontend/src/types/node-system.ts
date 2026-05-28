@@ -75,6 +75,8 @@ export type AgentProviderProfile = {
     requestsPerMinute?: number | null;
     tokensPerMinute?: number | null;
     concurrency?: number | null;
+    waitStrategy?: "block" | "wait";
+    maxWaitSeconds?: number | null;
   };
 };
 

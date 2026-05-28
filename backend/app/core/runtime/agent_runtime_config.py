@@ -81,5 +81,21 @@ def _resolved_provider_profile(node: NodeSystemAgentNode) -> dict[str, Any]:
         "request_timeout_seconds": profile.request_timeout_seconds,
         "cache_policy": profile.cache_policy.value,
         "cost_budget": profile.cost_budget.model_dump(mode="json"),
-        "rate_profile": profile.rate_profile.model_dump(mode="json"),
+        "rate_profile": _provider_rate_profile_payload(profile),
     }
+
+
+def _provider_rate_profile_payload(profile: Any) -> dict[str, Any]:
+    rate_profile = profile.rate_profile
+    payload: dict[str, Any] = {}
+    if rate_profile.requests_per_minute is not None:
+        payload["requests_per_minute"] = rate_profile.requests_per_minute
+    if rate_profile.tokens_per_minute is not None:
+        payload["tokens_per_minute"] = rate_profile.tokens_per_minute
+    if rate_profile.concurrency is not None:
+        payload["concurrency"] = rate_profile.concurrency
+    if rate_profile.wait_strategy != "block":
+        payload["wait_strategy"] = rate_profile.wait_strategy
+    if rate_profile.max_wait_seconds is not None:
+        payload["max_wait_seconds"] = rate_profile.max_wait_seconds
+    return payload

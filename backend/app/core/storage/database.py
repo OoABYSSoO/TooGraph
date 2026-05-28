@@ -573,6 +573,47 @@ def _ensure_graph_run_schema(connection: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_graph_model_calls_run
             ON graph_model_calls(run_id, started_at);
+
+        CREATE TABLE IF NOT EXISTS provider_rate_reservations (
+            reservation_id TEXT PRIMARY KEY,
+            run_id TEXT NOT NULL DEFAULT '',
+            root_run_id TEXT NOT NULL DEFAULT '',
+            node_id TEXT NOT NULL DEFAULT '',
+            provider TEXT NOT NULL DEFAULT '',
+            model TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'active',
+            estimated_request_tokens INTEGER NOT NULL DEFAULT 0,
+            reserved_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            released_at TEXT NOT NULL DEFAULT '',
+            metadata_json TEXT NOT NULL DEFAULT '{}'
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_provider_rate_reservations_provider
+            ON provider_rate_reservations(provider, status, reserved_at, expires_at);
+        CREATE INDEX IF NOT EXISTS idx_provider_rate_reservations_run
+            ON provider_rate_reservations(run_id, status, reserved_at);
+
+        CREATE TABLE IF NOT EXISTS provider_rate_wait_queue (
+            queue_entry_id TEXT PRIMARY KEY,
+            queue_key TEXT NOT NULL DEFAULT '',
+            run_id TEXT NOT NULL DEFAULT '',
+            root_run_id TEXT NOT NULL DEFAULT '',
+            node_id TEXT NOT NULL DEFAULT '',
+            provider TEXT NOT NULL DEFAULT '',
+            model TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'waiting',
+            enqueued_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            acquired_at TEXT NOT NULL DEFAULT '',
+            released_at TEXT NOT NULL DEFAULT '',
+            metadata_json TEXT NOT NULL DEFAULT '{}'
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_provider_rate_wait_queue_key
+            ON provider_rate_wait_queue(queue_key, status, enqueued_at, expires_at);
+        CREATE INDEX IF NOT EXISTS idx_provider_rate_wait_queue_run
+            ON provider_rate_wait_queue(run_id, status, enqueued_at);
         """
     )
     _ensure_column(connection, "graph_runs", "detail_json", "TEXT NOT NULL DEFAULT '{}'")

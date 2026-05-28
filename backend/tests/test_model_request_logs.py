@@ -143,6 +143,13 @@ class ModelRequestLogTests(unittest.TestCase):
                             "status": "active",
                             "source": "credential_pool",
                         },
+                        provider_rate_reservation={
+                            "kind": "provider_rate_reservation",
+                            "status": "reserved",
+                            "reservation_id": "rate_res_primary",
+                            "provider_id": "local",
+                            "estimated_request_tokens": 42,
+                        },
                         provider_pricing={
                             "input_per_million_usd": 2.0,
                             "output_per_million_usd": 8.0,
@@ -180,6 +187,16 @@ class ModelRequestLogTests(unittest.TestCase):
                 "credential_id": "primary",
                 "status": "active",
                 "source": "credential_pool",
+            },
+        )
+        self.assertEqual(
+            entry["provider_rate_reservation"],
+            {
+                "kind": "provider_rate_reservation",
+                "status": "reserved",
+                "reservation_id": "rate_res_primary",
+                "provider_id": "local",
+                "estimated_request_tokens": 42,
             },
         )
         self.assertEqual(
@@ -397,6 +414,340 @@ class ModelRequestLogTests(unittest.TestCase):
                 "budget_window_scope": {"window": "run", "root_run_id": "run_budget_guard"},
             },
         )
+
+    def test_provider_rate_profile_preflight_blocks_when_minute_window_is_exhausted(self) -> None:
+        from app.core.runtime.model_call_context import use_model_call_context
+        from app.core.runtime.state import create_initial_run_state
+        from app.core.storage import database, run_store
+        from app.core.storage.model_log_store import append_model_request_log, evaluate_provider_rate_profile_preflight
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+                    run = create_initial_run_state("graph_root", "Root Graph")
+                    run["run_id"] = "run_rate_guard"
+                    run["root_run_id"] = "run_rate_guard"
+                    run["run_path"] = ["run_rate_guard"]
+                    run_store.save_run(run)
+
+                    with use_model_call_context(
+                        run_id="run_rate_guard",
+                        root_run_id="run_rate_guard",
+                        node_id="agent",
+                        node_type="agent",
+                        phase="agent_response",
+                        provider_rate_profile={"requests_per_minute": 1, "tokens_per_minute": 1200, "concurrency": 2},
+                    ):
+                        append_model_request_log(
+                            provider_id="openai",
+                            transport="openai-compatible",
+                            model="gpt-4.1",
+                            path="/v1/chat/completions",
+                            request_raw={"model": "gpt-4.1", "messages": [{"role": "user", "content": "one"}]},
+                            response_raw={
+                                "choices": [{"message": {"content": "one"}}],
+                                "usage": {"input_tokens": 1000, "output_tokens": 500},
+                            },
+                            duration_ms=10,
+                            status_code=200,
+                        )
+
+                    preflight = evaluate_provider_rate_profile_preflight(
+                        {
+                            "run_id": "run_rate_guard",
+                            "root_run_id": "run_rate_guard",
+                            "node_id": "agent",
+                            "provider_id": "openai",
+                        },
+                        {"requests_per_minute": 1, "tokens_per_minute": 1200, "concurrency": 2},
+                    )
+
+        self.assertEqual(preflight["kind"], "provider_rate_profile_preflight")
+        self.assertEqual(preflight["version"], 1)
+        self.assertEqual(preflight["mode"], "enforce_recent_window")
+        self.assertEqual(preflight["status"], "blocked")
+        self.assertEqual(preflight["reason"], "provider_rate_profile_already_exhausted")
+        self.assertEqual(preflight["requests_per_minute"], 1)
+        self.assertEqual(preflight["tokens_per_minute"], 1200)
+        self.assertEqual(preflight["concurrency"], 2)
+        self.assertEqual(preflight["observed_requests"], 1)
+        self.assertEqual(preflight["observed_total_tokens"], 1500)
+        self.assertEqual(preflight["limit_exceeded"], ["requests_per_minute", "tokens_per_minute"])
+        self.assertEqual(preflight["window_seconds"], 60)
+        self.assertEqual(preflight["scope"]["provider_id"], "openai")
+
+    def test_provider_rate_profile_preflight_blocks_when_projected_request_tokens_exceed_window(self) -> None:
+        from app.core.runtime.state import create_initial_run_state
+        from app.core.storage import database, run_store
+        from app.core.storage.model_log_store import evaluate_provider_rate_profile_preflight
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+                    run = create_initial_run_state("graph_root", "Root Graph")
+                    run["run_id"] = "run_rate_projection"
+                    run["root_run_id"] = "run_rate_projection"
+                    run["run_path"] = ["run_rate_projection"]
+                    run_store.save_run(run)
+
+                    preflight = evaluate_provider_rate_profile_preflight(
+                        {
+                            "run_id": "run_rate_projection",
+                            "root_run_id": "run_rate_projection",
+                            "node_id": "agent",
+                            "provider_id": "openai",
+                        },
+                        {"tokens_per_minute": 1200},
+                        estimated_request_tokens=1201,
+                    )
+
+        self.assertEqual(preflight["kind"], "provider_rate_profile_preflight")
+        self.assertEqual(preflight["mode"], "enforce_recent_window")
+        self.assertEqual(preflight["status"], "blocked")
+        self.assertEqual(preflight["reason"], "provider_rate_profile_projected_window_exhausted")
+        self.assertEqual(preflight["tokens_per_minute"], 1200)
+        self.assertEqual(preflight["observed_total_tokens"], 0)
+        self.assertEqual(preflight["estimated_request_tokens"], 1201)
+        self.assertEqual(preflight["projected_total_tokens"], 1201)
+        self.assertEqual(preflight["limit_exceeded"], ["tokens_per_minute"])
+
+    def test_provider_rate_profile_preflight_reports_retry_after_for_recent_window_exhaustion(self) -> None:
+        from datetime import datetime, timedelta, timezone
+
+        from app.core.runtime.model_call_context import use_model_call_context
+        from app.core.runtime.state import create_initial_run_state
+        from app.core.storage import database, run_store
+        from app.core.storage.model_log_store import append_model_request_log, evaluate_provider_rate_profile_preflight
+
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        recent_completed_at = now - timedelta(seconds=50)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+                    run = create_initial_run_state("graph_root", "Root Graph")
+                    run["run_id"] = "run_rate_retry_after"
+                    run["root_run_id"] = "run_rate_retry_after"
+                    run["run_path"] = ["run_rate_retry_after"]
+                    run_store.save_run(run)
+
+                    with use_model_call_context(run_id="run_rate_retry_after", root_run_id="run_rate_retry_after", node_id="agent"):
+                        append_model_request_log(
+                            provider_id="openai",
+                            transport="openai-compatible",
+                            model="gpt-4.1",
+                            path="/v1/chat/completions",
+                            request_raw={"model": "gpt-4.1", "messages": [{"role": "user", "content": "one"}]},
+                            response_raw={"choices": [{"message": {"content": "one"}}], "usage": {"input_tokens": 10}},
+                            duration_ms=10,
+                            status_code=200,
+                        )
+
+                    with database.get_connection() as connection:
+                        connection.execute(
+                            "UPDATE graph_model_calls SET completed_at = ?, started_at = ? WHERE run_id = ?",
+                            (recent_completed_at.isoformat(), recent_completed_at.isoformat(), "run_rate_retry_after"),
+                        )
+
+                    preflight = evaluate_provider_rate_profile_preflight(
+                        {
+                            "run_id": "run_rate_retry_after",
+                            "root_run_id": "run_rate_retry_after",
+                            "node_id": "agent",
+                            "provider_id": "openai",
+                        },
+                        {"requests_per_minute": 1},
+                        now=now,
+                    )
+
+        self.assertEqual(preflight["status"], "blocked")
+        self.assertEqual(preflight["limit_exceeded"], ["requests_per_minute"])
+        self.assertEqual(preflight["retry_after_seconds"], 10)
+        self.assertEqual(preflight["retry_after_at"], (now + timedelta(seconds=10)).isoformat())
+
+    def test_provider_rate_profile_preflight_counts_active_reservations(self) -> None:
+        from datetime import datetime, timezone
+
+        from app.core.runtime.state import create_initial_run_state
+        from app.core.storage import database, run_store
+        from app.core.storage.model_log_store import (
+            evaluate_provider_rate_profile_preflight,
+            release_provider_rate_reservation,
+            reserve_provider_rate_profile_capacity,
+        )
+
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        call_context = {
+            "run_id": "run_rate_reservation",
+            "root_run_id": "run_rate_reservation",
+            "node_id": "agent",
+            "provider_id": "openai",
+            "model": "gpt-4.1",
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+                    run = create_initial_run_state("graph_root", "Root Graph")
+                    run["run_id"] = "run_rate_reservation"
+                    run["root_run_id"] = "run_rate_reservation"
+                    run["run_path"] = ["run_rate_reservation"]
+                    run_store.save_run(run)
+
+                    reservation = reserve_provider_rate_profile_capacity(
+                        call_context,
+                        {"requests_per_minute": 1, "tokens_per_minute": 20},
+                        estimated_request_tokens=15,
+                        now=now,
+                    )
+                    blocked = evaluate_provider_rate_profile_preflight(
+                        call_context,
+                        {"requests_per_minute": 1, "tokens_per_minute": 20},
+                        estimated_request_tokens=1,
+                        now=now,
+                    )
+                    release_provider_rate_reservation(reservation["reservation_id"], released_at=now)
+                    released = evaluate_provider_rate_profile_preflight(
+                        call_context,
+                        {"requests_per_minute": 1, "tokens_per_minute": 20},
+                        estimated_request_tokens=1,
+                        now=now,
+                    )
+
+        self.assertEqual(reservation["kind"], "provider_rate_reservation")
+        self.assertEqual(reservation["status"], "reserved")
+        self.assertEqual(reservation["provider_id"], "openai")
+        self.assertEqual(reservation["estimated_request_tokens"], 15)
+        self.assertEqual(blocked["status"], "blocked")
+        self.assertEqual(blocked["observed_requests"], 0)
+        self.assertEqual(blocked["reserved_requests"], 1)
+        self.assertEqual(blocked["reserved_total_tokens"], 15)
+        self.assertEqual(blocked["projected_total_tokens"], 16)
+        self.assertEqual(blocked["limit_exceeded"], ["requests_per_minute"])
+        self.assertEqual(released["status"], "within_profile")
+        self.assertEqual(released["reserved_requests"], 0)
+
+    def test_provider_rate_wait_queue_claims_fifo_turns_from_database(self) -> None:
+        from datetime import datetime, timedelta, timezone
+
+        from app.core.storage import database
+        from app.core.storage.model_log_store import (
+            claim_provider_rate_wait_queue_turn,
+            enqueue_provider_rate_wait_queue_entry,
+            release_provider_rate_wait_queue_entry,
+        )
+
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+
+                    first = enqueue_provider_rate_wait_queue_entry(
+                        "provider:openai",
+                        {"run_id": "run_queue_a", "provider_id": "openai", "model": "gpt-4.1"},
+                        now=now,
+                        ttl_seconds=30,
+                    )
+                    second = enqueue_provider_rate_wait_queue_entry(
+                        "provider:openai",
+                        {"run_id": "run_queue_b", "provider_id": "openai", "model": "gpt-4.1"},
+                        now=now + timedelta(milliseconds=1),
+                        ttl_seconds=30,
+                    )
+                    first_turn = claim_provider_rate_wait_queue_turn(
+                        first["queue_entry_id"],
+                        now=now + timedelta(milliseconds=2),
+                    )
+                    second_wait = claim_provider_rate_wait_queue_turn(
+                        second["queue_entry_id"],
+                        now=now + timedelta(milliseconds=3),
+                    )
+                    release = release_provider_rate_wait_queue_entry(
+                        first["queue_entry_id"],
+                        released_at=now + timedelta(milliseconds=4),
+                    )
+                    second_turn = claim_provider_rate_wait_queue_turn(
+                        second["queue_entry_id"],
+                        now=now + timedelta(milliseconds=5),
+                    )
+
+                    rows = database.get_connection().execute(
+                        """
+                        SELECT queue_entry_id, status
+                        FROM provider_rate_wait_queue
+                        ORDER BY enqueued_at ASC
+                        """
+                    ).fetchall()
+
+        self.assertEqual(first["kind"], "provider_rate_wait_queue_entry")
+        self.assertEqual(first["status"], "waiting")
+        self.assertEqual(second["status"], "waiting")
+        self.assertEqual(first_turn["status"], "acquired")
+        self.assertEqual(first_turn["position"], 0)
+        self.assertEqual(second_wait["status"], "waiting")
+        self.assertEqual(second_wait["position"], 1)
+        self.assertEqual(release["status"], "released")
+        self.assertEqual(second_turn["status"], "acquired")
+        self.assertEqual(second_turn["position"], 0)
+        self.assertEqual([row["status"] for row in rows], ["released", "acquired"])
+
+    def test_provider_rate_wait_queue_expires_abandoned_head(self) -> None:
+        from datetime import datetime, timedelta, timezone
+
+        from app.core.storage import database
+        from app.core.storage.model_log_store import (
+            claim_provider_rate_wait_queue_turn,
+            enqueue_provider_rate_wait_queue_entry,
+        )
+
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+
+                    first = enqueue_provider_rate_wait_queue_entry(
+                        "provider:openai",
+                        {"run_id": "run_expired_queue_a", "provider_id": "openai"},
+                        now=now,
+                        ttl_seconds=1,
+                    )
+                    second = enqueue_provider_rate_wait_queue_entry(
+                        "provider:openai",
+                        {"run_id": "run_expired_queue_b", "provider_id": "openai"},
+                        now=now + timedelta(milliseconds=1),
+                        ttl_seconds=60,
+                    )
+                    second_turn = claim_provider_rate_wait_queue_turn(
+                        second["queue_entry_id"],
+                        now=now + timedelta(seconds=2),
+                    )
+
+                    rows = database.get_connection().execute(
+                        """
+                        SELECT queue_entry_id, status
+                        FROM provider_rate_wait_queue
+                        ORDER BY enqueued_at ASC
+                        """
+                    ).fetchall()
+
+        self.assertEqual(first["status"], "waiting")
+        self.assertEqual(second_turn["status"], "acquired")
+        self.assertEqual(second_turn["position"], 0)
+        self.assertEqual(second_turn["expired_count"], 1)
+        self.assertEqual([row["status"] for row in rows], ["expired", "acquired"])
 
     def test_lists_model_request_logs_as_run_tree_without_legacy_jsonl(self) -> None:
         from app.core.runtime.model_call_context import use_model_call_context

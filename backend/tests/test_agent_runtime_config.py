@@ -97,6 +97,8 @@ class AgentRuntimeConfigTests(unittest.TestCase):
                         "requestsPerMinute": 6,
                         "tokensPerMinute": 12000,
                         "concurrency": 2,
+                        "waitStrategy": "wait",
+                        "maxWaitSeconds": 3.5,
                     },
                 }
             }
@@ -119,7 +121,13 @@ class AgentRuntimeConfigTests(unittest.TestCase):
         self.assertEqual(runtime_config["provider_cost_budget"], {"limit_usd": 1.25, "window": "run"})
         self.assertEqual(
             runtime_config["provider_rate_profile"],
-            {"requests_per_minute": 6, "tokens_per_minute": 12000, "concurrency": 2},
+            {
+                "requests_per_minute": 6,
+                "tokens_per_minute": 12000,
+                "concurrency": 2,
+                "wait_strategy": "wait",
+                "max_wait_seconds": 3.5,
+            },
         )
         self.assertEqual(
             runtime_config["provider_profile"],
@@ -131,6 +139,8 @@ class AgentRuntimeConfigTests(unittest.TestCase):
                     "requests_per_minute": 6,
                     "tokens_per_minute": 12000,
                     "concurrency": 2,
+                    "wait_strategy": "wait",
+                    "max_wait_seconds": 3.5,
                 },
             },
         )

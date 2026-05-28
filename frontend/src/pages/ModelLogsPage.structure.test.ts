@@ -57,6 +57,13 @@ test("ModelLogsPage renders a themed paginated raw model request log", () => {
   assert.match(pageSource, /formatReadableReasoning/);
   assert.match(pageSource, /formatRequestThinking/);
   assert.match(pageSource, /requestThinking/);
+  assert.match(pageSource, /buildProviderRateReservationDiagnostic/);
+  assert.match(pageSource, /selectedRateReservation/);
+  assert.match(pageSource, /model-logs-page__rate-reservation/);
+  assert.match(pageSource, /model-logs-page__diagnostic-grid/);
+  assert.match(pageSource, /model-logs-page__diagnostic-chips/);
+  assert.match(pageSource, /rateReservationMetricLabel/);
+  assert.match(pageSource, /rateReservationTimelineLabel/);
   assert.match(pageSource, /JSON\.stringify\(selectedLog\.request_raw, null, 2\)/);
   assert.match(pageSource, /JSON\.stringify\(selectedLog\.response_raw, null, 2\)/);
   assert.match(pageSource, /v-html="highlightJson\(rawDialogContent\)"/);
@@ -79,6 +86,9 @@ test("ModelLogsPage renders a themed paginated raw model request log", () => {
   assert.match(pageSource, /\.model-logs-page__pagination :deep\(\.btn-prev\),[\s\S]*\.model-logs-page__pagination :deep\(\.btn-next\),[\s\S]*\.model-logs-page__pagination :deep\(\.el-pager li\) \{[\s\S]*border-radius:\s*999px;/);
   assert.match(pageSource, /\.model-logs-page__pagination :deep\(\.el-pager li\.is-active\) \{[\s\S]*box-shadow:\s*0 8px 16px rgba\(120,\s*53,\s*15,\s*0\.12\);/);
   assert.match(pageSource, /\.model-logs-page__raw-grid \{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+  assert.match(pageSource, /\.model-logs-page__diagnostic-grid \{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/);
+  assert.match(pageSource, /\.model-logs-page__diagnostic-chips span \{[\s\S]*font-family:\s*var\(--toograph-font-mono\);/);
+  assert.match(pageSource, /\.model-logs-page__section-pill--danger \{[\s\S]*color:\s*rgb\(185,\s*28,\s*28\);/);
   assert.match(pageSource, /\.model-logs-page__raw-dialog-code \{[\s\S]*min-height:\s*420px;[\s\S]*overflow:\s*auto;/);
   assert.match(pageSource, /\.model-logs-page__message p \{[\s\S]*max-height:\s*220px;[\s\S]*overflow:\s*auto;/);
   assert.match(pageSource, /\.model-logs-page__output-chunk:nth-child\(odd\)/);

@@ -68,7 +68,7 @@
 | Scheduler / Cron | 进行中 | job/store/API/runner/lifespan tick、retry policy、local delivery audit、权限边界 | `backend/tests/test_scheduler_store.py`、`backend/tests/test_scheduler_routes.py`、`backend/tests/test_scheduler_service.py`、`frontend/src/pages/SchedulerPage.vue` | 经审批的真实外部投递 adapter |
 | Gateway / 多入口 / 消息平台 | 进行中 | Message Platforms 页面、Telegram / Feishu-Lark binding、runtime/adapters、外部消息进入 Buddy 会话、斜杠命令、可见回复投递、audit/dedup/session resolver | `backend/tests/test_message_platform_*.py`、`frontend/src/api/message-platforms.test.ts`、`frontend/src/pages/MessagePlatformsPage.structure.test.ts`、`frontend/src/pages/messagePlatformsPageModel.test.ts` | 多模态 `state_bundle`、生产级凭据/部署、外部投递诊断、更多平台 adapter |
 | Delegation / Subagents / Kanban | 进行中 | worker packet/result/merge/board state、Batch/Subgraph worker、RunDetail/胶囊诊断 | `backend/tests/test_delegation_worker_result_packager_tool.py`、`backend/tests/test_delegation_worker_result_merger_tool.py`、`backend/tests/test_delegation_kanban_board_builder_tool.py`、`backend/tests/test_batch_node_system.py` | 持久 board、claim/ownership、长期任务状态 |
-| Provider Runtime 与模型能力矩阵 | 进行中 | provider fallback trace、embedding/rerank fallback、模型能力矩阵、保存级请求超时 profile、节点级 `providerProfile.requestTimeoutSeconds` override、`cachePolicy=disabled` prompt cache 审计决策、model call provider profile meta、RunDetail Provider Profile 诊断、provider credential pool schema、credential failure/cooldown 写回、跨调用成本预算累计审计、预算耗尽 preflight 阻断 | `backend/tests/test_agent_runtime_config.py`、`backend/tests/test_agent_response_generation.py`、`backend/tests/test_model_request_logs.py`、`backend/tests/test_model_provider_client.py`、`backend/tests/test_settings_model_providers.py`、`backend/tests/test_provider_fallback_resolver.py`、`backend/tests/test_openai_compatible_provider_runtime.py`、`frontend/src/pages/agentDiagnosticModel.test.ts`、`frontend/src/pages/runDetailModel.test.ts`、`frontend/src/pages/settingsPageModel.test.ts`、`frontend/src/pages/ModelProvidersPage.structure.test.ts` | prompt cache payload、速率执行、credential 轮换策略、更细审批策略 |
+| Provider Runtime 与模型能力矩阵 | 进行中 | provider fallback trace、embedding/rerank fallback、模型能力矩阵、保存级请求超时 profile、节点级 `providerProfile.requestTimeoutSeconds` override、`cachePolicy=disabled` prompt cache 审计决策、model call provider profile meta、RunDetail Provider Profile 诊断、provider credential pool schema、credential failure/cooldown 写回、跨调用成本预算累计审计、预算耗尽 preflight 阻断、`rateProfile` 最近窗口 preflight 阻断、进程内 `rateProfile.concurrency` gate、`tokensPerMinute` 请求 token 预测阻断、rate preflight `retry_after` 诊断、显式 `rateProfile.waitStrategy=wait` 预算内多次等待重试、进程内 provider 级 FIFO wait 队列、DB-backed in-flight 请求/Token 预留、reservation meta/log 诊断事实、Model Logs reservation 诊断 UI、DB-backed provider rate wait queue | `backend/tests/test_agent_runtime_config.py`、`backend/tests/test_agent_response_generation.py`、`backend/tests/test_model_request_logs.py`、`backend/tests/test_model_provider_client.py`、`backend/tests/test_settings_model_providers.py`、`backend/tests/test_provider_fallback_resolver.py`、`backend/tests/test_openai_compatible_provider_runtime.py`、`frontend/src/pages/agentDiagnosticModel.test.ts`、`frontend/src/pages/runDetailModel.test.ts`、`frontend/src/pages/settingsPageModel.test.ts`、`frontend/src/pages/ModelProvidersPage.structure.test.ts`、`frontend/src/pages/modelLogProviderDiagnostics.test.ts`、`frontend/src/pages/ModelLogsPage.structure.test.ts` | prompt cache payload、credential 轮换策略、更细审批策略 |
 | 上下文压缩与 Prompt Cache | 进行中 | 上下文压力检查、压缩子图、summary source refs、prompt audit metadata | `backend/tests/test_buddy_context_pressure_tool.py`、`backend/tests/test_template_layouts.py`、`frontend/src/buddy/buddyContextCompaction.test.ts` | provider 级 cache-control、稳定前缀拆分、节点级 cache override |
 | 权限、安全与注入防护 | 进行中 | context scanner、secret redaction、高风险阻断、permission approval、artifact 路径隔离 | `backend/tests/test_context_assembly_store.py`、`backend/tests/test_permission_approval.py`、`backend/tests/test_graph_run_db_store_permission_audit.py`、`backend/tests/test_capability_artifact_store.py` | 能力包保护策略、审批 review surface、外部投递审批 |
 | 诊断与可观测性 | 进行中 | RunDetail 聚合 context audit、agent diagnostic、provider fallback、permission、review、run tree；Buddy 胶囊按 output 边界重放 | `frontend/src/pages/RunDetailPage.structure.test.ts`、`frontend/src/pages/runDetailModel.test.ts`、`frontend/src/pages/agentDiagnosticModel.test.ts`、`frontend/src/buddy/buddyOutputTrace.test.ts` | 后台任务 report、召回排名和失败恢复集中诊断 |
@@ -347,6 +347,21 @@
 - `backend/app/core/model_provider_rates.py` 提供 provider rate profile normalization 和单次调用 rate decision primitive；当前 decision 使用 provider usage 与节点 `rateProfile` 做 `audit_only` 判断，记录是否超过本次调用可观察到的 token/request/concurrency profile。
 - `backend/app/tools/model_provider_client.py` 会把节点级 `provider_rate_profile` 带入远端 chat model-ref 调用，结合 provider `usage` 写入 `provider_rate_decision`。
 - `backend/app/core/storage/model_log_store.py` 会在模型调用日志中生成并读回 `provider_rate_decision`，让模型日志能解释本次调用相对节点 rate profile 的单次判断。
+- `backend/app/core/storage/model_log_store.py` 提供 `evaluate_provider_rate_profile_preflight`，可在 provider 调用前读取最近 60 秒同 provider 的 `graph_model_calls`，统计既有请求数和 usage tokens；当 `requests_per_minute` 或 `tokens_per_minute` 已经耗尽时返回 `provider_rate_profile_preflight` blocked 决策。
+- `backend/app/tools/model_provider_client.py` 会在真实远端 provider 调用前执行 rate profile preflight；如果最近窗口已经耗尽请求或 token 配额，会抛出 `ProviderRateProfileExceeded` 并跳过 provider 请求和 fallback，避免明知超限仍发起网络调用。
+- `backend/app/tools/model_provider_client.py` 会用节点 `rateProfile.concurrency` 获取进程内 provider 级并发 slot；当同 provider 正在执行的远端 chat 调用数达到上限时，返回 `provider_rate_profile_concurrency_gate` blocked 决策并在进入 provider transport 前阻断。
+- `backend/app/tools/model_provider_client.py` 会在远端 chat 调用前按 system/user prompt、结构化输出 schema 和文本附件估算本次请求 token；`backend/app/core/storage/model_log_store.py` 的 `evaluate_provider_rate_profile_preflight` 会把该估算加到最近窗口 token 上，当 projected total 超过 `tokens_per_minute` 时返回 `provider_rate_profile_projected_window_exhausted`。
+- `backend/app/core/storage/model_log_store.py` 会在 rate preflight blocked 决策中基于窗口内最早会过期的模型调用计算 `retry_after_seconds` 和 `retry_after_at`，让后续 queue/wait/retry 可以使用同一可审计决策事实，而不是重新推断等待时间。
+- `backend/app/core/schemas/node_system.py` 的 `rateProfile` 支持 `waitStrategy` 和 `maxWaitSeconds`；`backend/app/tools/model_provider_client.py` 在显式 `waitStrategy=wait` 且累计等待不超过上限时会多次等待并重新执行 preflight，并用内部最大尝试次数避免零秒 retry 卡住；默认策略仍是立即阻断。
+- `backend/app/tools/model_provider_client.py` 为显式 `waitStrategy=wait` 的 blocked preflight 增加进程内 provider 级 FIFO wait 队列；同一 provider 的后续 waiter 会排队进入 sleep/retry 段，避免多个调用在同一个 `retry_after_seconds` 后同时醒来并冲击 provider。
+- `backend/app/core/storage/database.py` 增加 `provider_rate_reservations` 表；`backend/app/core/storage/model_log_store.py` 提供 `reserve_provider_rate_profile_capacity` / `release_provider_rate_reservation`，并让 rate preflight 把 active reservation 的请求数与预估 token 纳入最近窗口统计。
+- `backend/app/tools/model_provider_client.py` 会在远端 provider 调用前创建 DB-backed rate reservation，并在 provider 调用完成或失败后释放；同一数据库上的其他进程/线程 preflight 能看到这条 in-flight 预留，避免只统计已完成日志造成并发超发。
+- `backend/app/tools/model_provider_client.py` 会把本次 `provider_rate_reservation` 写入返回 meta；provider 调用期间的模型日志上下文保留 reserved 状态，调用返回 meta 会带上 released 状态和 `released_at`，便于后续 UI 解释容量预留生命周期。
+- `backend/app/core/storage/model_log_store.py` 会在模型日志读写路径保留 `provider_rate_reservation` 字段，和 `provider_rate_decision` / `provider_cost_estimate` 一样成为模型调用可审计 metadata。
+- `frontend/src/pages/modelLogProviderDiagnostics.ts` 会把模型日志中的 `provider_rate_reservation` 归一化为状态、容量指标、生命周期时间线和 preflight 窗口证据；`frontend/src/pages/ModelLogsPage.vue` 会在日志详情中展示速率预留诊断块，让用户能直接看到 reservation 是否已释放、预估 token 和窗口占用情况。
+- `backend/app/core/storage/database.py` 增加 `provider_rate_wait_queue` 表；`backend/app/core/storage/model_log_store.py` 提供 enqueue / claim turn / release 原语，支持同 provider wait entry 的 DB FIFO 顺序、过期队首清理和 released/expired/acquired 状态审计。
+- `backend/app/tools/model_provider_client.py` 会把 `rateProfile.waitStrategy=wait` 的等待段接入 DB-backed wait queue；进程内 condition 只负责本进程快速唤醒，DB 状态成为跨进程的队列事实源。
+- `frontend/src/pages/agentDiagnosticModel.ts` 会在 RunDetail Provider Profile 诊断中展示 wait 策略，例如 `wait up to 3.5s`，让用户能看到节点是否允许 provider rate wait/retry。
 - `backend/app/core/runtime/agent_response_generation.py`、`agent_action_input_generation.py` 和 `agent_subgraph_input_generation.py` 会把 provider rate decision 写入各自 runtime config，结构化输出修复也保留对应 rate decision。
 
 增强内容：
@@ -364,8 +379,18 @@
 - `costBudget` 已从纯 profile 进入单次 provider call 的可审计成本估算：当模型有 pricing metadata 时，运行时会把 usage 变成 USD estimate，并记录预算是否超限。
 - 模型日志现在能对 `costBudget` 做跨调用累计审计：同一个 root run 的父/子 run 模型调用会累加到同一个 run 窗口，第二次及之后的调用可以显示本次调用前窗口已用成本、合计成本和累计预算状态。
 - `costBudget` 现在也有执行前保护：当既有窗口成本已经耗尽预算时，provider client 会在网络请求前阻断本次模型调用，并且不会尝试 fallback 绕过同一个预算窗口。
-- `rateProfile` 已从纯 profile 进入单次 provider call 的可审计 rate decision：运行时会把 usage 与请求/Token/并发 profile 对照，记录 `within_profile` 或 `over_limit`，并明确当前仍是 `audit_only`。
-- credential pool metadata 仍保留为可审计 runtime/settings profile，后续可以在不改变图协议字段名的前提下继续接入真正跨调用窗口的速率执行/排队、预算审批/降级策略、失败隔离和更完整轮换策略；Anthropic 之外的 provider cache payload 也可以按同一 `provider_prompt_cache_result` 合同逐步扩展。
+- `rateProfile` 已从纯 profile 进入单次 provider call 的可审计 rate decision：运行时会把 usage 与请求/Token/并发 profile 对照，记录 `within_profile` 或 `over_limit`。
+- `rateProfile` 现在也有最近窗口执行前保护：provider client 会在网络请求前读取同 provider 最近 60 秒已完成模型调用；如果请求数或 token 数已经达到节点 profile 限额，会阻断本次调用并避免 fallback 绕过同一速率窗口。
+- `rateProfile.concurrency` 现在有进程内执行 gate：同一 provider 的并发远端 chat 调用达到节点上限时，第二条调用会在 provider transport 前被阻断，并且不会通过 fallback 绕过同一并发限制。
+- `tokensPerMinute` 不再只等 provider 返回 usage 后才发现超限：运行时会在请求前用 prompt/schema/文本附件估算本次 token，并在 projected window 会超过限额时阻断，减少明知会超限仍发送 provider 请求的情况。
+- rate preflight 的 blocked 决策现在带有窗口释放时间：上层不用再次扫描模型日志就能知道可等待多久，为后续真正的 queue/wait/retry 执行器提供稳定输入。
+- 节点现在可以显式选择 `rateProfile.waitStrategy=wait`：当 rate preflight 给出可接受的 `retry_after_seconds` 时，provider client 会在 `maxWaitSeconds` 预算内循环等待并重试 preflight，避免连续短窗口释放时仍直接失败；默认 `block` 仍保持原来的快速失败行为。
+- 进程内 provider 级 FIFO wait 队列让多个同 provider 的等待型调用按顺序进入等待/重试段，减少局部 stampede；DB-backed reservation 则补上跨进程可见的请求/Token 占用事实。
+- DB-backed in-flight reservation 让 provider 请求在网络调用期间占住请求数和预估 token 容量；同一数据库的其他 TooGraph 进程会在 preflight 中看到 `reserved_requests` / `reserved_total_tokens`，从而减少并发进程间的超发窗口。
+- reservation 生命周期现在进入返回 meta 和模型日志 metadata：用户后续可以从同一个 model-call 事实源看到 reservation id、预估 token、reserved/released 状态与释放时间，而不需要查询内部表。
+- Model Logs 详情页现在会把 reservation metadata 呈现为速率预留诊断：状态 pill、provider/model/预估 token/window 指标、reserved/released/expires 时间线以及 observed/reserved/projected 窗口证据都来自同一 model-call 事实源，用户无需阅读 raw JSON 才能判断一次调用是否正确持有和释放容量。
+- provider rate wait queue 已从进程内 `deque` 升级为 DB-backed FIFO：多个 TooGraph 进程可以围绕同一个 provider queue key 看到等待者、队首 acquisition 和过期清理，降低跨进程等待型调用在同一释放窗口同时醒来造成的局部冲击。
+- credential pool metadata 仍保留为可审计 runtime/settings profile，后续可以在不改变图协议字段名的前提下继续接入预算审批/降级策略、失败隔离和更完整轮换策略；Anthropic 之外的 provider cache payload 也可以按同一 `provider_prompt_cache_result` 合同逐步扩展。
 
 验证方式：
 
@@ -388,6 +413,12 @@
 - `PYTHONPATH=backend pytest backend/tests/test_model_request_logs.py::ModelRequestLogTests::test_provider_cost_budget_accumulates_across_root_run_model_calls -q`
 - `PYTHONPATH=backend pytest backend/tests/test_model_request_logs.py -q`
 - `PYTHONPATH=backend pytest backend/tests/test_model_request_logs.py::ModelRequestLogTests::test_provider_cost_budget_preflight_blocks_when_window_is_exhausted backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_with_model_ref_blocks_provider_call_when_cost_budget_preflight_is_exhausted -q`
+- `PYTHONPATH=backend pytest backend/tests/test_model_request_logs.py::ModelRequestLogTests::test_provider_rate_profile_preflight_blocks_when_minute_window_is_exhausted backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_with_model_ref_blocks_provider_call_when_rate_profile_preflight_is_exhausted -q`
+- `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_with_model_ref_blocks_second_call_when_rate_profile_concurrency_is_exhausted -q`
+- `PYTHONPATH=backend pytest backend/tests/test_model_request_logs.py::ModelRequestLogTests::test_provider_rate_profile_preflight_blocks_when_projected_request_tokens_exceed_window backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_with_model_ref_blocks_provider_call_when_estimated_request_tokens_exceed_rate_profile -q`
+- `PYTHONPATH=backend pytest backend/tests/test_model_request_logs.py::ModelRequestLogTests::test_provider_rate_profile_preflight_reports_retry_after_for_recent_window_exhaustion -q`
+- `PYTHONPATH=backend pytest backend/tests/test_agent_runtime_config.py::AgentRuntimeConfigTests::test_provider_profile_override_is_exposed_for_runtime_calls backend/tests/test_model_request_logs.py::ModelRequestLogTests::test_model_request_log_preserves_provider_profile_context backend/tests/test_model_request_logs.py::ModelRequestLogTests::test_provider_rate_profile_preflight_counts_active_reservations backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_with_model_ref_waits_and_retries_rate_profile_preflight_when_configured backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_with_model_ref_waits_multiple_rate_profile_windows_within_budget backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_rate_profile_wait_preflight_uses_fifo_queue_for_same_provider backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_with_model_ref_holds_rate_reservation_during_provider_call -q`
+- `node --test frontend/src/pages/agentDiagnosticModel.test.ts`
 - `PYTHONPATH=backend pytest backend/tests/test_model_request_logs.py backend/tests/test_model_provider_client.py backend/tests/test_agent_response_generation.py backend/tests/test_agent_action_input_generation.py backend/tests/test_agent_subgraph_input_generation.py backend/tests/test_settings_model_providers.py backend/tests/test_model_provider_credentials.py -q`
 
 ## 5. 未完成内容与实现方案
@@ -400,8 +431,8 @@
 
 - prompt cache 已能在 audit metadata 中体现节点级 `cachePolicy=disabled` 的实际禁用决策，并且 `cachePolicy=prefer` 已在 Anthropic Messages transport 下发 provider-specific `cache_control`；OpenAI-compatible、Gemini、Codex 等其他 transport 的 provider cache payload 仍需按各自能力继续扩展。
 - credential pool 已有设置 schema、UI 诊断摘要、secret-preserving save path、catalog configured 判断、chat provider runtime 的实际 active credential 选择，以及真实调用后的 failure/cooldown 写回；失败隔离执行、跨 provider/credential 的更完整轮换策略和更细 provider diagnostic 还没有接入 provider client。
-- 节点级 `providerProfile` 已经系统化到图协议和 runtime config，`requestTimeoutSeconds` 已进入实际 LLM 调用，`cachePolicy=disabled` 已进入 prompt cache 审计决策，Anthropic `cachePolicy=prefer` 已进入 provider payload，并且 provider profile/cache/cost/rate runtime context 已写入 model call meta；chat provider runtime 已能记录实际 credential 选择、基于单次 usage/pricing 的 cost estimate、模型日志中的跨调用 cost budget 累计、预算耗尽后的 preflight 阻断、单次 `audit_only` rate decision，以及 credential failure/cooldown 状态写回。非 Anthropic cache payload 和真正跨调用窗口的 rate limit/queue 仍尚未执行。
-- 真正速率限制/排队、预算超限后的人工审批/降级策略、credential 轮换/失败隔离策略和 provider diagnostic 中更完整的 credential 状态解释还没有统一执行。
+- 节点级 `providerProfile` 已经系统化到图协议和 runtime config，`requestTimeoutSeconds` 已进入实际 LLM 调用，`cachePolicy=disabled` 已进入 prompt cache 审计决策，Anthropic `cachePolicy=prefer` 已进入 provider payload，并且 provider profile/cache/cost/rate runtime context 已写入 model call meta；chat provider runtime 已能记录实际 credential 选择、基于单次 usage/pricing 的 cost estimate、模型日志中的跨调用 cost budget 累计、预算耗尽后的 preflight 阻断、单次 rate decision、最近 60 秒 `rateProfile` 请求/Token preflight 阻断、进程内 `rateProfile.concurrency` gate、请求 token 预测阻断、retry-after 诊断、显式预算内多次等待重试、进程内 provider 级 FIFO wait 队列、DB-backed in-flight 请求/Token 预留、reservation meta/log 诊断事实、Model Logs reservation 诊断 UI、DB-backed provider rate wait queue，以及 credential failure/cooldown 状态写回。非 Anthropic cache payload 仍尚未执行。
+- 完整速率限制队列、预算超限后的人工审批/降级策略、credential 轮换/失败隔离策略和 provider diagnostic 中更完整的 credential 状态解释还没有统一执行。
 
 实现方案：
 
@@ -419,7 +450,17 @@
 12. 已完成：把 credential 失败后的 `failure_count` / `cooldown_until` 状态写回 settings；成功调用会清理失败状态，过期 `cooling_down` credential 会重新进入可选集合。
 13. 已完成：在模型日志写入时按 `costBudget.window` 累计既有模型调用成本，记录窗口范围、调用前成本、本次后累计成本和累计预算状态。
 14. 已完成：在 provider 请求前执行 cost budget preflight；当既有窗口成本已达到 `limitUsd` 时阻断模型调用，并避免 fallback 绕过预算。
-15. 下一步：补真正跨调用窗口的 rate limit/queue；随后增强预算超限后的人工审批/降级策略、credential 失败隔离、轮换策略和 provider diagnostic。
+15. 已完成：在 provider 请求前执行 `rateProfile` 最近窗口 preflight；当同 provider 最近 60 秒请求数或 token 数已经达到节点限额时阻断模型调用，并避免 fallback 绕过速率窗口。
+16. 已完成：在 provider 请求期间获取进程内 `rateProfile.concurrency` slot；当同 provider 活跃调用数达到上限时阻断后续调用，并避免 fallback 绕过并发 gate。
+17. 已完成：在 provider 请求前估算本次 prompt/schema/文本附件 token，并把 projected window token 加入 `tokensPerMinute` preflight；当 projected total 超出限额时阻断本次调用。
+18. 已完成：rate preflight blocked 决策会返回 `retry_after_seconds` 和 `retry_after_at`，说明当前窗口最早何时释放到可重试状态。
+19. 已完成：扩展 `rateProfile.waitStrategy` / `maxWaitSeconds`；显式 `wait` 策略会在累计等待预算内多次 sleep 并重试 preflight，RunDetail 会展示 wait 策略。
+20. 已完成：为 `waitStrategy=wait` 的 blocked preflight 增加进程内 provider 级 FIFO wait 队列，同一 provider 的 waiter 会按顺序进入 sleep/retry 段，减少并发等待后的局部 stampede。
+21. 已完成：增加 DB-backed in-flight 请求/Token reservation；provider client 在远端调用期间持有 reservation，rate preflight 会把 active reservation 计入 `reserved_requests` / `reserved_total_tokens` 后再判断请求数与 token 窗口。
+22. 已完成：把 `provider_rate_reservation` 写入 provider 调用返回 meta 和模型日志 metadata；日志保留 reserved 状态，返回 meta 合并 released 状态与释放时间。
+23. 已完成：Model Logs 详情页增加 reservation 诊断 UI；前端诊断模型会归一化 `provider_rate_reservation` 的状态、容量指标、时间线和 preflight 窗口证据，页面以紧凑诊断块展示 released/reserved/blocked 状态。
+24. 已完成：增加 DB-backed provider rate wait queue；等待型 rate preflight 会写入 `provider_rate_wait_queue`，按 queue key FIFO claim turn，释放后标记 released，过期队首会被清理为 expired，跨进程能共享等待顺序事实。
+25. 下一步：增强预算超限后的人工审批/降级策略、credential 失败隔离、轮换策略和 provider diagnostic。
 
 建议验证：
 

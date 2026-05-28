@@ -212,6 +212,8 @@ class NodeSystemAgentProviderRateProfile(BaseModel):
     requests_per_minute: int | None = Field(default=None, ge=1, alias="requestsPerMinute")
     tokens_per_minute: int | None = Field(default=None, ge=1, alias="tokensPerMinute")
     concurrency: int | None = Field(default=None, ge=1)
+    wait_strategy: Literal["block", "wait"] = Field(default="block", alias="waitStrategy")
+    max_wait_seconds: float | None = Field(default=None, ge=0, le=300, alias="maxWaitSeconds")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 
@@ -239,6 +241,8 @@ class NodeSystemAgentProviderProfile(BaseModel):
             and self.rate_profile.requests_per_minute is None
             and self.rate_profile.tokens_per_minute is None
             and self.rate_profile.concurrency is None
+            and self.rate_profile.wait_strategy == "block"
+            and self.rate_profile.max_wait_seconds is None
         )
 
 

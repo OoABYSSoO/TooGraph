@@ -4,6 +4,7 @@ import json
 import importlib.util
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from typing import Any
@@ -1025,6 +1026,571 @@ class ModelProviderClientTests(unittest.TestCase):
                             )
 
         self.assertEqual(provider_calls, [])
+
+    def test_chat_with_model_ref_blocks_provider_call_when_rate_profile_preflight_is_exhausted(self) -> None:
+        from app.core.runtime.model_call_context import use_model_call_context
+        from app.tools import model_provider_client
+        from app.tools.model_provider_client import chat_with_model_ref_with_meta
+
+        saved_settings = {
+            "model_providers": {
+                "openai": {
+                    "enabled": True,
+                    "transport": "openai-compatible",
+                    "base_url": "https://primary.test/v1",
+                    "api_key": "sk-openai",
+                    "models": [
+                        {
+                            "model": "gpt-primary",
+                            "capabilities": {"chat": True},
+                            "permissions": ["text_generation"],
+                        }
+                    ],
+                },
+            }
+        }
+        provider_calls: list[dict[str, Any]] = []
+        preflight_decision = {
+            "kind": "provider_rate_profile_preflight",
+            "version": 1,
+            "mode": "enforce_recent_window",
+            "status": "blocked",
+            "reason": "provider_rate_profile_already_exhausted",
+            "requests_per_minute": 1,
+            "observed_requests": 1,
+            "limit_exceeded": ["requests_per_minute"],
+            "scope": {"provider_id": "openai"},
+        }
+
+        def fake_chat_with_provider(**kwargs: Any) -> tuple[str, dict[str, Any]]:
+            provider_calls.append(kwargs)
+            return "ok", {"provider_id": kwargs["provider_id"], "model": kwargs["model"], "warnings": []}
+
+        with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
+            with patch.object(model_provider_client, "evaluate_provider_rate_profile_preflight", return_value=preflight_decision):
+                with patch.object(model_provider_client, "chat_with_model_provider", side_effect=fake_chat_with_provider):
+                    with use_model_call_context(run_id="run_rate_guard", root_run_id="run_rate_guard", node_id="agent"):
+                        with self.assertRaisesRegex(RuntimeError, "provider_rate_profile_already_exhausted"):
+                            chat_with_model_ref_with_meta(
+                                model_ref="openai/gpt-primary",
+                                system_prompt="sys",
+                                user_prompt="user",
+                                temperature=0.2,
+                                provider_rate_profile={"requests_per_minute": 1},
+                            )
+
+        self.assertEqual(provider_calls, [])
+
+    def test_chat_with_model_ref_blocks_second_call_when_rate_profile_concurrency_is_exhausted(self) -> None:
+        from app.core.runtime.model_call_context import use_model_call_context
+        from app.tools import model_provider_client
+        from app.tools.model_provider_client import chat_with_model_ref_with_meta
+
+        saved_settings = {
+            "model_providers": {
+                "openai": {
+                    "enabled": True,
+                    "transport": "openai-compatible",
+                    "base_url": "https://primary.test/v1",
+                    "api_key": "sk-openai",
+                    "models": [
+                        {
+                            "model": "gpt-primary",
+                            "capabilities": {"chat": True},
+                            "permissions": ["text_generation"],
+                        }
+                    ],
+                },
+            }
+        }
+        first_call_entered = threading.Event()
+        release_first_call = threading.Event()
+        provider_calls: list[dict[str, Any]] = []
+        first_result: list[tuple[str, dict[str, Any]]] = []
+        first_errors: list[Exception] = []
+
+        def fake_chat_with_provider(**kwargs: Any) -> tuple[str, dict[str, Any]]:
+            provider_calls.append(kwargs)
+            if len(provider_calls) == 1:
+                first_call_entered.set()
+                release_first_call.wait(timeout=2)
+            return "ok", {"provider_id": kwargs["provider_id"], "model": kwargs["model"], "warnings": []}
+
+        def run_first_call() -> None:
+            try:
+                with use_model_call_context(run_id="run_rate_concurrency_a", root_run_id="run_rate_concurrency_a", node_id="agent"):
+                    first_result.append(
+                        chat_with_model_ref_with_meta(
+                            model_ref="openai/gpt-primary",
+                            system_prompt="sys",
+                            user_prompt="user",
+                            temperature=0.2,
+                            provider_rate_profile={"concurrency": 1},
+                        )
+                    )
+            except Exception as exc:
+                first_errors.append(exc)
+
+        with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
+            with patch.object(model_provider_client, "evaluate_provider_rate_profile_preflight", return_value={"status": "within_profile"}):
+                with patch.object(model_provider_client, "chat_with_model_provider", side_effect=fake_chat_with_provider):
+                    thread = threading.Thread(target=run_first_call)
+                    thread.start()
+                    try:
+                        self.assertTrue(first_call_entered.wait(timeout=2))
+                        with use_model_call_context(
+                            run_id="run_rate_concurrency_b",
+                            root_run_id="run_rate_concurrency_b",
+                            node_id="agent",
+                        ):
+                            with self.assertRaisesRegex(RuntimeError, "provider_rate_profile_concurrency_exhausted"):
+                                chat_with_model_ref_with_meta(
+                                    model_ref="openai/gpt-primary",
+                                    system_prompt="sys",
+                                    user_prompt="user",
+                                    temperature=0.2,
+                                    provider_rate_profile={"concurrency": 1},
+                                )
+                        self.assertEqual(len(provider_calls), 1)
+                    finally:
+                        release_first_call.set()
+                        thread.join(timeout=2)
+
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(first_errors, [])
+        self.assertEqual(first_result[0][0], "ok")
+
+    def test_chat_with_model_ref_blocks_provider_call_when_estimated_request_tokens_exceed_rate_profile(self) -> None:
+        from app.core.runtime.model_call_context import use_model_call_context
+        from app.tools import model_provider_client
+        from app.tools.model_provider_client import chat_with_model_ref_with_meta
+
+        saved_settings = {
+            "model_providers": {
+                "openai": {
+                    "enabled": True,
+                    "transport": "openai-compatible",
+                    "base_url": "https://primary.test/v1",
+                    "api_key": "sk-openai",
+                    "models": [
+                        {
+                            "model": "gpt-primary",
+                            "capabilities": {"chat": True},
+                            "permissions": ["text_generation"],
+                        }
+                    ],
+                },
+            }
+        }
+        preflight_calls: list[dict[str, Any]] = []
+        provider_calls: list[dict[str, Any]] = []
+
+        def fake_rate_preflight(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            preflight_calls.append({"args": args, "kwargs": kwargs})
+            return {
+                "kind": "provider_rate_profile_preflight",
+                "version": 1,
+                "mode": "enforce_recent_window",
+                "status": "blocked",
+                "reason": "provider_rate_profile_projected_window_exhausted",
+                "tokens_per_minute": 5,
+                "observed_total_tokens": 0,
+                "estimated_request_tokens": kwargs["estimated_request_tokens"],
+                "projected_total_tokens": kwargs["estimated_request_tokens"],
+                "limit_exceeded": ["tokens_per_minute"],
+                "scope": {"provider_id": "openai"},
+            }
+
+        def fake_chat_with_provider(**kwargs: Any) -> tuple[str, dict[str, Any]]:
+            provider_calls.append(kwargs)
+            return "ok", {"provider_id": kwargs["provider_id"], "model": kwargs["model"], "warnings": []}
+
+        with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
+            with patch.object(model_provider_client, "evaluate_provider_rate_profile_preflight", side_effect=fake_rate_preflight):
+                with patch.object(model_provider_client, "chat_with_model_provider", side_effect=fake_chat_with_provider):
+                    with use_model_call_context(run_id="run_rate_projection", root_run_id="run_rate_projection", node_id="agent"):
+                        with self.assertRaisesRegex(RuntimeError, "provider_rate_profile_projected_window_exhausted"):
+                            chat_with_model_ref_with_meta(
+                                model_ref="openai/gpt-primary",
+                                system_prompt="system prompt",
+                                user_prompt="user prompt with enough content",
+                                temperature=0.2,
+                                provider_rate_profile={"tokens_per_minute": 5},
+                            )
+
+        self.assertEqual(provider_calls, [])
+        self.assertGreaterEqual(preflight_calls[0]["kwargs"]["estimated_request_tokens"], 6)
+
+    def test_chat_with_model_ref_waits_and_retries_rate_profile_preflight_when_configured(self) -> None:
+        from app.core.runtime.model_call_context import use_model_call_context
+        from app.core.storage import database
+        from app.tools import model_provider_client
+        from app.tools.model_provider_client import chat_with_model_ref_with_meta
+
+        saved_settings = {
+            "model_providers": {
+                "openai": {
+                    "enabled": True,
+                    "transport": "openai-compatible",
+                    "base_url": "https://primary.test/v1",
+                    "api_key": "sk-openai",
+                    "models": [
+                        {
+                            "model": "gpt-primary",
+                            "capabilities": {"chat": True},
+                            "permissions": ["text_generation"],
+                        }
+                    ],
+                },
+            }
+        }
+        preflight_decisions = [
+            {
+                "kind": "provider_rate_profile_preflight",
+                "version": 1,
+                "mode": "enforce_recent_window",
+                "status": "blocked",
+                "reason": "provider_rate_profile_already_exhausted",
+                "requests_per_minute": 1,
+                "observed_requests": 1,
+                "retry_after_seconds": 0.25,
+                "limit_exceeded": ["requests_per_minute"],
+                "scope": {"provider_id": "openai"},
+            },
+            {"kind": "provider_rate_profile_preflight", "status": "within_profile"},
+        ]
+        provider_calls: list[dict[str, Any]] = []
+        slept: list[float] = []
+
+        def fake_rate_preflight(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+            return preflight_decisions.pop(0)
+
+        def fake_chat_with_provider(**kwargs: Any) -> tuple[str, dict[str, Any]]:
+            provider_calls.append(kwargs)
+            return "ok", {"provider_id": kwargs["provider_id"], "model": kwargs["model"], "warnings": []}
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+                    with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
+                        with patch.object(model_provider_client, "evaluate_provider_rate_profile_preflight", side_effect=fake_rate_preflight):
+                            with patch.object(model_provider_client, "reserve_provider_rate_profile_capacity", return_value={}):
+                                with patch.object(model_provider_client, "_sleep", side_effect=lambda seconds: slept.append(seconds)):
+                                    with patch.object(model_provider_client, "chat_with_model_provider", side_effect=fake_chat_with_provider):
+                                        with use_model_call_context(run_id="run_rate_wait", root_run_id="run_rate_wait", node_id="agent"):
+                                            content, meta = chat_with_model_ref_with_meta(
+                                                model_ref="openai/gpt-primary",
+                                                system_prompt="sys",
+                                                user_prompt="user",
+                                                temperature=0.2,
+                                                provider_rate_profile={
+                                                    "requests_per_minute": 1,
+                                                    "wait_strategy": "wait",
+                                                    "max_wait_seconds": 1,
+                                                },
+                                            )
+                    with database.get_connection() as connection:
+                        queue_statuses = [
+                            row["status"]
+                            for row in connection.execute(
+                                "SELECT status FROM provider_rate_wait_queue ORDER BY enqueued_at ASC"
+                            ).fetchall()
+                        ]
+
+        self.assertEqual(content, "ok")
+        self.assertEqual(meta["provider_id"], "openai")
+        self.assertEqual(len(provider_calls), 1)
+        self.assertEqual(slept, [0.25])
+        self.assertEqual(preflight_decisions, [])
+        self.assertEqual(queue_statuses, ["released"])
+
+    def test_chat_with_model_ref_waits_multiple_rate_profile_windows_within_budget(self) -> None:
+        from app.core.runtime.model_call_context import use_model_call_context
+        from app.core.storage import database
+        from app.tools import model_provider_client
+        from app.tools.model_provider_client import chat_with_model_ref_with_meta
+
+        saved_settings = {
+            "model_providers": {
+                "openai": {
+                    "enabled": True,
+                    "transport": "openai-compatible",
+                    "base_url": "https://primary.test/v1",
+                    "api_key": "sk-openai",
+                    "models": [
+                        {
+                            "model": "gpt-primary",
+                            "capabilities": {"chat": True},
+                            "permissions": ["text_generation"],
+                        }
+                    ],
+                },
+            }
+        }
+        preflight_decisions = [
+            {
+                "kind": "provider_rate_profile_preflight",
+                "version": 1,
+                "mode": "enforce_recent_window",
+                "status": "blocked",
+                "reason": "provider_rate_profile_already_exhausted",
+                "requests_per_minute": 1,
+                "observed_requests": 1,
+                "retry_after_seconds": 0.2,
+                "limit_exceeded": ["requests_per_minute"],
+                "scope": {"provider_id": "openai"},
+            },
+            {
+                "kind": "provider_rate_profile_preflight",
+                "version": 1,
+                "mode": "enforce_recent_window",
+                "status": "blocked",
+                "reason": "provider_rate_profile_already_exhausted",
+                "requests_per_minute": 1,
+                "observed_requests": 1,
+                "retry_after_seconds": 0.3,
+                "limit_exceeded": ["requests_per_minute"],
+                "scope": {"provider_id": "openai"},
+            },
+            {"kind": "provider_rate_profile_preflight", "status": "within_profile"},
+        ]
+        provider_calls: list[dict[str, Any]] = []
+        slept: list[float] = []
+
+        def fake_rate_preflight(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+            return preflight_decisions.pop(0)
+
+        def fake_chat_with_provider(**kwargs: Any) -> tuple[str, dict[str, Any]]:
+            provider_calls.append(kwargs)
+            return "ok", {"provider_id": kwargs["provider_id"], "model": kwargs["model"], "warnings": []}
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+                    with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
+                        with patch.object(model_provider_client, "evaluate_provider_rate_profile_preflight", side_effect=fake_rate_preflight):
+                            with patch.object(model_provider_client, "reserve_provider_rate_profile_capacity", return_value={}):
+                                with patch.object(model_provider_client, "_sleep", side_effect=lambda seconds: slept.append(seconds)):
+                                    with patch.object(model_provider_client, "chat_with_model_provider", side_effect=fake_chat_with_provider):
+                                        with use_model_call_context(run_id="run_rate_wait_chain", root_run_id="run_rate_wait_chain", node_id="agent"):
+                                            content, meta = chat_with_model_ref_with_meta(
+                                                model_ref="openai/gpt-primary",
+                                                system_prompt="sys",
+                                                user_prompt="user",
+                                                temperature=0.2,
+                                                provider_rate_profile={
+                                                    "requests_per_minute": 1,
+                                                    "wait_strategy": "wait",
+                                                    "max_wait_seconds": 1,
+                                                },
+                                            )
+                    with database.get_connection() as connection:
+                        queue_statuses = [
+                            row["status"]
+                            for row in connection.execute(
+                                "SELECT status FROM provider_rate_wait_queue ORDER BY enqueued_at ASC"
+                            ).fetchall()
+                        ]
+
+        self.assertEqual(content, "ok")
+        self.assertEqual(meta["provider_id"], "openai")
+        self.assertEqual(len(provider_calls), 1)
+        self.assertEqual(slept, [0.2, 0.3])
+        self.assertEqual(preflight_decisions, [])
+        self.assertEqual(queue_statuses, ["released"])
+
+    def test_rate_profile_wait_preflight_uses_fifo_queue_for_same_provider(self) -> None:
+        from app.core.runtime.model_call_context import use_model_call_context
+        from app.core.storage import database
+        from app.tools import model_provider_client
+
+        first_sleep_entered = threading.Event()
+        release_first_sleep = threading.Event()
+        second_preflight_seen = threading.Event()
+        lock = threading.Lock()
+        preflight_counts: dict[str, int] = {}
+        sleep_order: list[str] = []
+        errors: list[tuple[str, BaseException]] = []
+        results: list[str] = []
+        rate_profile = {
+            "requests_per_minute": 1,
+            "wait_strategy": "wait",
+            "max_wait_seconds": 1,
+        }
+
+        def fake_rate_preflight(call_context: dict[str, Any], *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+            run_id = str(call_context.get("run_id") or "")
+            with lock:
+                count = preflight_counts.get(run_id, 0)
+                preflight_counts[run_id] = count + 1
+            if run_id == "run_rate_wait_queue_b" and count == 0:
+                second_preflight_seen.set()
+            if count == 0:
+                return {
+                    "kind": "provider_rate_profile_preflight",
+                    "version": 1,
+                    "mode": "enforce_recent_window",
+                    "status": "blocked",
+                    "reason": "provider_rate_profile_already_exhausted",
+                    "requests_per_minute": 1,
+                    "observed_requests": 1,
+                    "retry_after_seconds": 0.1,
+                    "limit_exceeded": ["requests_per_minute"],
+                    "scope": {"provider_id": "openai"},
+                }
+            return {"kind": "provider_rate_profile_preflight", "status": "within_profile"}
+
+        def fake_sleep(seconds: float) -> None:
+            thread_name = threading.current_thread().name
+            with lock:
+                sleep_order.append(thread_name)
+            if thread_name == "rate-wait-a":
+                first_sleep_entered.set()
+                if not release_first_sleep.wait(timeout=2):
+                    raise AssertionError("first rate waiter was not released")
+            elif thread_name == "rate-wait-b" and not release_first_sleep.is_set():
+                raise AssertionError("second rate waiter slept before first waiter released")
+
+        def run_waiter(run_id: str) -> None:
+            try:
+                with use_model_call_context(run_id=run_id, root_run_id=run_id, node_id="agent"):
+                    model_provider_client._enforce_provider_rate_profile_preflight(
+                        {"provider_id": "openai", "model": "gpt-primary"},
+                        rate_profile,
+                        estimated_request_tokens=1,
+                    )
+                results.append(run_id)
+            except BaseException as exc:  # pragma: no cover - asserted below
+                errors.append((run_id, exc))
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+                    with patch.object(model_provider_client, "evaluate_provider_rate_profile_preflight", side_effect=fake_rate_preflight):
+                        with patch.object(model_provider_client, "reserve_provider_rate_profile_capacity", return_value={}):
+                            with patch.object(model_provider_client, "_sleep", side_effect=fake_sleep):
+                                first = threading.Thread(target=run_waiter, args=("run_rate_wait_queue_a",), name="rate-wait-a")
+                                second = threading.Thread(target=run_waiter, args=("run_rate_wait_queue_b",), name="rate-wait-b")
+                                first.start()
+                                self.assertTrue(first_sleep_entered.wait(timeout=2))
+                                second.start()
+                                self.assertTrue(second_preflight_seen.wait(timeout=2))
+                                release_first_sleep.set()
+                                first.join(timeout=2)
+                                second.join(timeout=2)
+                    with database.get_connection() as connection:
+                        queue_rows = connection.execute(
+                            """
+                            SELECT run_id, status
+                            FROM provider_rate_wait_queue
+                            ORDER BY enqueued_at ASC
+                            """
+                        ).fetchall()
+
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(sleep_order, ["rate-wait-a", "rate-wait-b"])
+        self.assertCountEqual(results, ["run_rate_wait_queue_a", "run_rate_wait_queue_b"])
+        self.assertEqual([row["run_id"] for row in queue_rows], ["run_rate_wait_queue_a", "run_rate_wait_queue_b"])
+        self.assertEqual([row["status"] for row in queue_rows], ["released", "released"])
+
+    def test_chat_with_model_ref_holds_rate_reservation_during_provider_call(self) -> None:
+        from app.core.runtime.model_call_context import use_model_call_context
+        from app.core.runtime.state import create_initial_run_state
+        from app.core.storage import database, run_store
+        from app.tools import model_provider_client
+        from app.tools.model_provider_client import chat_with_model_ref_with_meta
+
+        saved_settings = {
+            "model_providers": {
+                "openai": {
+                    "enabled": True,
+                    "transport": "openai-compatible",
+                    "base_url": "https://primary.test/v1",
+                    "api_key": "sk-openai",
+                    "models": [
+                        {
+                            "model": "gpt-primary",
+                            "capabilities": {"chat": True},
+                            "permissions": ["text_generation"],
+                        }
+                    ],
+                },
+            }
+        }
+        active_during_call: list[dict[str, Any]] = []
+
+        def fake_chat_with_provider(**kwargs: Any) -> tuple[str, dict[str, Any]]:
+            with database.get_connection() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT provider, status, estimated_request_tokens
+                    FROM provider_rate_reservations
+                    WHERE provider = ?
+                    """,
+                    (kwargs["provider_id"],),
+                ).fetchall()
+            active_during_call.extend(dict(row) for row in rows)
+            return "ok", {
+                "provider_id": kwargs["provider_id"],
+                "model": kwargs["model"],
+                "warnings": [],
+                "usage": {"input_tokens": 3, "output_tokens": 2},
+            }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+                    run = create_initial_run_state("graph_root", "Root Graph")
+                    run["run_id"] = "run_rate_reservation_client"
+                    run["root_run_id"] = "run_rate_reservation_client"
+                    run["run_path"] = ["run_rate_reservation_client"]
+                    run_store.save_run(run)
+
+                    with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
+                        with patch.object(model_provider_client, "chat_with_model_provider", side_effect=fake_chat_with_provider):
+                            with use_model_call_context(
+                                run_id="run_rate_reservation_client",
+                                root_run_id="run_rate_reservation_client",
+                                node_id="agent",
+                            ):
+                                content, meta = chat_with_model_ref_with_meta(
+                                    model_ref="openai/gpt-primary",
+                                    system_prompt="sys",
+                                    user_prompt="user",
+                                    temperature=0.2,
+                                    provider_rate_profile={"requests_per_minute": 2, "tokens_per_minute": 100},
+                                )
+
+                    with database.get_connection() as connection:
+                        reservation_rows = connection.execute(
+                            """
+                            SELECT status
+                            FROM provider_rate_reservations
+                            WHERE provider = 'openai'
+                            """
+                        ).fetchall()
+
+        self.assertEqual(content, "ok")
+        self.assertEqual(len(active_during_call), 1)
+        self.assertEqual(active_during_call[0]["provider"], "openai")
+        self.assertEqual(active_during_call[0]["status"], "active")
+        self.assertGreaterEqual(active_during_call[0]["estimated_request_tokens"], 1)
+        self.assertEqual([row["status"] for row in reservation_rows], ["released"])
+        self.assertEqual(meta["provider_rate_reservation"]["kind"], "provider_rate_reservation")
+        self.assertEqual(meta["provider_rate_reservation"]["status"], "released")
+        self.assertEqual(meta["provider_rate_reservation"]["provider_id"], "openai")
+        self.assertGreaterEqual(meta["provider_rate_reservation"]["estimated_request_tokens"], 1)
+        self.assertTrue(str(meta["provider_rate_reservation"].get("released_at") or ""))
 
     def test_chat_with_model_ref_estimates_provider_cost_from_model_pricing(self) -> None:
         from app.tools import model_provider_client

@@ -43,6 +43,7 @@ export type ModelLogEntry = {
   provider_rate_profile?: Record<string, unknown>;
   provider_cost_estimate?: Record<string, unknown>;
   provider_rate_decision?: Record<string, unknown>;
+  provider_rate_reservation?: Record<string, unknown>;
 };
 
 export type ModelLogTreeNode = {

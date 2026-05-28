@@ -267,8 +267,18 @@ function formatProviderRateProfile(record: Record<string, unknown>) {
     formatRateLimit(numberFromUnknown(record.requests_per_minute), "rpm"),
     formatRateLimit(numberFromUnknown(record.tokens_per_minute), "tpm"),
     formatRateLimit(numberFromUnknown(record.concurrency), "concurrency", { prefix: true }),
+    formatProviderRateWaitStrategy(record),
   ].filter(Boolean);
   return labels.join(", ");
+}
+
+function formatProviderRateWaitStrategy(record: Record<string, unknown>) {
+  const waitStrategy = textFromUnknown(record.wait_strategy);
+  if (waitStrategy !== "wait") {
+    return "";
+  }
+  const maxWaitSeconds = numberFromUnknown(record.max_wait_seconds);
+  return maxWaitSeconds === null ? "wait" : `wait up to ${formatCompactNumber(maxWaitSeconds)}s`;
 }
 
 function formatRateLimit(value: number | null, unit: string, options: { prefix?: boolean } = {}) {

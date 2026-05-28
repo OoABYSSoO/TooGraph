@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
+import json
 import tempfile
-from typing import Any, Callable
+import threading
+import time
+from typing import Any, Callable, Iterator
 
 import httpx
 
@@ -13,7 +16,7 @@ from app.core.model_provider_credentials import (
     select_provider_credential,
     update_provider_credential_pool_after_call,
 )
-from app.core.model_provider_rates import build_provider_rate_decision
+from app.core.model_provider_rates import build_provider_rate_decision, normalize_provider_rate_profile
 from app.core.model_provider_templates import (
     TRANSPORT_ANTHROPIC_MESSAGES,
     TRANSPORT_CODEX_RESPONSES,
@@ -23,7 +26,16 @@ from app.core.model_provider_templates import (
     normalize_transport,
 )
 from app.core.storage.settings_store import load_app_settings, save_app_settings
-from app.core.storage.model_log_store import append_model_request_log, evaluate_provider_cost_budget_preflight
+from app.core.storage.model_log_store import (
+    append_model_request_log,
+    claim_provider_rate_wait_queue_turn,
+    enqueue_provider_rate_wait_queue_entry,
+    evaluate_provider_cost_budget_preflight,
+    evaluate_provider_rate_profile_preflight,
+    release_provider_rate_reservation,
+    release_provider_rate_wait_queue_entry,
+    reserve_provider_rate_profile_capacity,
+)
 from app.core.runtime.model_call_context import get_model_call_context, use_model_call_context
 from app.core.thinking_levels import (
     THINKING_LEVEL_HIGH,
@@ -57,8 +69,18 @@ from app.tools.model_provider_http import (
 )
 
 
+_sleep = time.sleep
+
+
 def _append_model_request_log_safely(**kwargs: Any) -> None:
     append_model_request_log_safely(**kwargs, log_writer=append_model_request_log)
+
+
+_PROVIDER_RATE_CONCURRENCY_LOCK = threading.Lock()
+_PROVIDER_RATE_CONCURRENCY_ACTIVE: dict[str, int] = {}
+_PROVIDER_RATE_WAIT_MAX_ATTEMPTS = 10
+_PROVIDER_RATE_WAIT_QUEUE_POLL_SECONDS = 0.05
+_PROVIDER_RATE_WAIT_QUEUE_CONDITION = threading.Condition(threading.Lock())
 
 
 class ProviderCostBudgetExceeded(RuntimeError):
@@ -68,6 +90,21 @@ class ProviderCostBudgetExceeded(RuntimeError):
         previous_cost = decision.get("previous_window_cost_usd")
         limit = decision.get("budget_limit_usd")
         super().__init__(f"{reason}: previous_window_cost_usd={previous_cost} budget_limit_usd={limit}")
+
+
+class ProviderRateProfileExceeded(RuntimeError):
+    def __init__(self, decision: dict[str, Any]) -> None:
+        self.decision = dict(decision)
+        reason = str(decision.get("reason") or "provider_rate_profile_exceeded").strip()
+        limit_exceeded = decision.get("limit_exceeded")
+        observed_requests = decision.get("observed_requests")
+        observed_total_tokens = decision.get("observed_total_tokens")
+        observed_concurrency = decision.get("observed_concurrency")
+        super().__init__(
+            f"{reason}: limit_exceeded={limit_exceeded} "
+            f"observed_requests={observed_requests} observed_total_tokens={observed_total_tokens} "
+            f"observed_concurrency={observed_concurrency}"
+        )
 
 
 def discover_provider_models(
@@ -985,29 +1022,54 @@ def _chat_with_model_ref_once(
     if isinstance(provider_rate_profile, dict) and provider_rate_profile:
         provider_context["provider_rate_profile"] = dict(provider_rate_profile)
     _enforce_provider_cost_budget_preflight(provider_context, provider_cost_budget)
+    provider_rate_reservation = _enforce_provider_rate_profile_preflight(
+        {**provider_context, "provider_id": provider_id, "model": model_name},
+        provider_rate_profile,
+        estimated_request_tokens=_estimate_provider_request_tokens(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            input_attachments=input_attachments,
+            structured_output_schema=structured_output_schema,
+        ),
+    )
+    if provider_rate_reservation:
+        provider_context["provider_rate_reservation"] = dict(provider_rate_reservation)
+    provider_rate_concurrency_slot = _provider_rate_concurrency_slot(
+        provider_id=provider_id,
+        model=model_name,
+        provider_rate_profile=provider_rate_profile,
+    )
     provider_credential_state_update: dict[str, Any] = {}
+    provider_rate_reservation_release: dict[str, Any] = {}
     try:
-        with use_model_call_context(**provider_context) if provider_context else nullcontext():
-            content, meta = chat_with_model_provider(
-                provider_id=provider_id,
-                transport=str(provider_config.get("transport") or template["transport"]),
-                base_url=str(provider_config.get("base_url") or template["base_url"]),
-                api_key=api_key,
-                model=model_name,
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                thinking_enabled=thinking_enabled,
-                thinking_level=thinking_level,
-                auth_header=str(provider_config.get("auth_header") or template.get("auth_header") or "Authorization"),
-                auth_scheme=_provider_auth_scheme(provider_config, template),
-                request_timeout_seconds=_provider_request_timeout_seconds(provider_config, template, override=request_timeout_seconds),
-                on_delta=on_delta,
-                input_attachments=input_attachments,
-                structured_output_schema=structured_output_schema,
-                prompt_cache_policy=prompt_cache_policy,
-            )
+        with provider_rate_concurrency_slot:
+            with use_model_call_context(**provider_context) if provider_context else nullcontext():
+                content, meta = chat_with_model_provider(
+                    provider_id=provider_id,
+                    transport=str(provider_config.get("transport") or template["transport"]),
+                    base_url=str(provider_config.get("base_url") or template["base_url"]),
+                    api_key=api_key,
+                    model=model_name,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    thinking_enabled=thinking_enabled,
+                    thinking_level=thinking_level,
+                    auth_header=str(provider_config.get("auth_header") or template.get("auth_header") or "Authorization"),
+                    auth_scheme=_provider_auth_scheme(provider_config, template),
+                    request_timeout_seconds=_provider_request_timeout_seconds(
+                        provider_config,
+                        template,
+                        override=request_timeout_seconds,
+                    ),
+                    on_delta=on_delta,
+                    input_attachments=input_attachments,
+                    structured_output_schema=structured_output_schema,
+                    prompt_cache_policy=prompt_cache_policy,
+                )
+    except ProviderRateProfileExceeded:
+        raise
     except Exception:
         _record_provider_credential_call_result(
             provider_id=provider_id,
@@ -1016,6 +1078,8 @@ def _chat_with_model_ref_once(
             persist_credential_state=persist_credential_state,
         )
         raise
+    finally:
+        provider_rate_reservation_release = _release_provider_rate_profile_reservation(provider_rate_reservation)
     provider_credential_state_update = _record_provider_credential_call_result(
         provider_id=provider_id,
         provider_credential=provider_credential,
@@ -1026,6 +1090,12 @@ def _chat_with_model_ref_once(
         meta = {**meta, "provider_credential": provider_credential}
     if provider_credential_state_update:
         meta = {**meta, "provider_credential_state_update": provider_credential_state_update}
+    provider_rate_reservation_meta = _provider_rate_reservation_meta(
+        provider_rate_reservation,
+        provider_rate_reservation_release,
+    )
+    if provider_rate_reservation_meta:
+        meta = {**meta, "provider_rate_reservation": provider_rate_reservation_meta}
     if "provider_cost_estimate" not in meta:
         provider_cost_estimate = build_provider_cost_estimate(meta.get("usage"), provider_pricing, provider_cost_budget)
         if provider_cost_estimate:
@@ -1055,6 +1125,278 @@ def _enforce_provider_cost_budget_preflight(provider_context: dict[str, Any], pr
     decision = evaluate_provider_cost_budget_preflight(call_context, provider_cost_budget)
     if decision.get("status") == "blocked":
         raise ProviderCostBudgetExceeded(decision)
+
+
+def _enforce_provider_rate_profile_preflight(
+    provider_context: dict[str, Any],
+    provider_rate_profile: Any,
+    *,
+    estimated_request_tokens: int | None = None,
+) -> dict[str, Any]:
+    if not isinstance(provider_rate_profile, dict) or not provider_rate_profile:
+        return {}
+    profile = normalize_provider_rate_profile(provider_rate_profile)
+    call_context = {**get_model_call_context(), **provider_context}
+    decision = evaluate_provider_rate_profile_preflight(
+        call_context,
+        provider_rate_profile,
+        estimated_request_tokens=estimated_request_tokens,
+    )
+    if decision.get("status") != "blocked":
+        reservation, blocked_decision = _provider_rate_reservation_or_blocked_decision(
+            call_context,
+            provider_rate_profile,
+            estimated_request_tokens=estimated_request_tokens,
+        )
+        if blocked_decision is None:
+            return reservation
+        decision = blocked_decision
+    waited_seconds = 0.0
+    wait_attempts = 0
+    with _provider_rate_wait_queue_turn(provider_context, profile):
+        while True:
+            remaining_wait_seconds = _provider_rate_remaining_wait_seconds(profile, waited_seconds)
+            wait_seconds = _provider_rate_wait_seconds(
+                profile,
+                decision,
+                remaining_wait_seconds=remaining_wait_seconds,
+            )
+            if wait_seconds is None or wait_attempts >= _PROVIDER_RATE_WAIT_MAX_ATTEMPTS:
+                raise ProviderRateProfileExceeded(decision)
+            wait_attempts += 1
+            waited_seconds += wait_seconds
+            _sleep(wait_seconds)
+            decision = evaluate_provider_rate_profile_preflight(
+                call_context,
+                provider_rate_profile,
+                estimated_request_tokens=estimated_request_tokens,
+            )
+            if decision.get("status") != "blocked":
+                reservation, blocked_decision = _provider_rate_reservation_or_blocked_decision(
+                    call_context,
+                    provider_rate_profile,
+                    estimated_request_tokens=estimated_request_tokens,
+                )
+                if blocked_decision is None:
+                    return reservation
+                decision = blocked_decision
+
+
+def _estimate_provider_request_tokens(
+    *,
+    system_prompt: str,
+    user_prompt: str,
+    input_attachments: list[dict[str, Any]] | None,
+    structured_output_schema: dict[str, Any] | None,
+) -> int:
+    estimated_chars = len(str(system_prompt or "")) + len(str(user_prompt or ""))
+    estimated_chars += _estimated_text_payload_chars(input_attachments)
+    estimated_chars += _estimated_text_payload_chars(structured_output_schema)
+    if estimated_chars <= 0:
+        return 0
+    return max(1, (estimated_chars + 3) // 4)
+
+
+def _estimated_text_payload_chars(value: Any) -> int:
+    if value is None:
+        return 0
+    if isinstance(value, str):
+        if value.startswith("data:") or value.startswith("file://"):
+            return 0
+        return len(value)
+    if isinstance(value, dict):
+        total = 0
+        for key, item in value.items():
+            key_text = str(key or "")
+            if key_text in {"data", "url", "image", "video", "audio"} and isinstance(item, str):
+                total += len(key_text)
+                continue
+            total += len(key_text) + _estimated_text_payload_chars(item)
+        return total
+    if isinstance(value, list):
+        return sum(_estimated_text_payload_chars(item) for item in value)
+    try:
+        return len(json.dumps(value, ensure_ascii=False, sort_keys=True))
+    except (TypeError, ValueError):
+        return len(str(value))
+
+
+def _provider_rate_remaining_wait_seconds(profile: dict[str, Any], waited_seconds: float) -> float | None:
+    max_wait_seconds = _positive_float_or_zero(profile.get("max_wait_seconds"))
+    if max_wait_seconds is None:
+        return None
+    return max(0.0, max_wait_seconds - waited_seconds)
+
+
+def _provider_rate_reservation_or_blocked_decision(
+    call_context: dict[str, Any],
+    provider_rate_profile: Any,
+    *,
+    estimated_request_tokens: int | None,
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    reservation = reserve_provider_rate_profile_capacity(
+        call_context,
+        provider_rate_profile,
+        estimated_request_tokens=estimated_request_tokens,
+    )
+    if reservation.get("kind") == "provider_rate_reservation" and reservation.get("status") == "reserved":
+        return reservation, None
+    if reservation.get("status") == "blocked":
+        return {}, reservation
+    return {}, None
+
+
+def _release_provider_rate_profile_reservation(reservation: dict[str, Any]) -> dict[str, Any]:
+    reservation_id = str(reservation.get("reservation_id") or "").strip() if isinstance(reservation, dict) else ""
+    if reservation_id:
+        return release_provider_rate_reservation(reservation_id)
+    return {}
+
+
+def _provider_rate_reservation_meta(reservation: dict[str, Any], release_result: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(reservation, dict) or not reservation:
+        return {}
+    result = dict(reservation)
+    if isinstance(release_result, dict) and release_result:
+        result["status"] = str(release_result.get("status") or result.get("status") or "")
+        if release_result.get("released_at"):
+            result["released_at"] = release_result["released_at"]
+    return result
+
+
+@contextmanager
+def _provider_rate_wait_queue_turn(provider_context: dict[str, Any], profile: dict[str, Any]) -> Iterator[None]:
+    queue_key = _provider_rate_wait_queue_key(provider_context, profile)
+    if queue_key is None:
+        yield
+        return
+    call_context = {**get_model_call_context(), **provider_context}
+    queue_entry = enqueue_provider_rate_wait_queue_entry(
+        queue_key,
+        call_context,
+        ttl_seconds=_provider_rate_wait_queue_ttl_seconds(profile),
+    )
+    queue_entry_id = str(queue_entry.get("queue_entry_id") or "").strip()
+    if not queue_entry_id:
+        yield
+        return
+    try:
+        while True:
+            turn = claim_provider_rate_wait_queue_turn(queue_entry_id)
+            turn_status = str(turn.get("status") or "").strip() if isinstance(turn, dict) else ""
+            if turn_status == "acquired":
+                break
+            if not turn or turn_status in {"expired", "released"}:
+                raise ProviderRateProfileExceeded(
+                    {
+                        "kind": "provider_rate_wait_queue",
+                        "status": "blocked",
+                        "reason": "provider_rate_wait_queue_turn_unavailable",
+                        "queue_entry_id": queue_entry_id,
+                        "queue_key": queue_key,
+                    }
+                )
+            with _PROVIDER_RATE_WAIT_QUEUE_CONDITION:
+                _PROVIDER_RATE_WAIT_QUEUE_CONDITION.wait(timeout=_PROVIDER_RATE_WAIT_QUEUE_POLL_SECONDS)
+        yield
+    finally:
+        release_provider_rate_wait_queue_entry(queue_entry_id)
+        with _PROVIDER_RATE_WAIT_QUEUE_CONDITION:
+            _PROVIDER_RATE_WAIT_QUEUE_CONDITION.notify_all()
+
+
+def _provider_rate_wait_queue_key(provider_context: dict[str, Any], profile: dict[str, Any]) -> str | None:
+    if profile.get("wait_strategy") != "wait":
+        return None
+    provider_id = str(provider_context.get("provider_id") or "").strip()
+    if not provider_id:
+        return None
+    return f"provider:{provider_id}"
+
+
+def _provider_rate_wait_queue_ttl_seconds(profile: dict[str, Any]) -> int:
+    max_wait_seconds = _positive_float_or_zero(profile.get("max_wait_seconds"))
+    if max_wait_seconds is None:
+        return 120
+    return max(1, int(max_wait_seconds + 60))
+
+
+def _provider_rate_wait_seconds(
+    profile: dict[str, Any],
+    decision: dict[str, Any],
+    *,
+    remaining_wait_seconds: float | None = None,
+) -> float | None:
+    if profile.get("wait_strategy") != "wait":
+        return None
+    retry_after_seconds = _positive_float_or_zero(decision.get("retry_after_seconds"))
+    if retry_after_seconds is None:
+        return None
+    wait_budget_seconds = (
+        remaining_wait_seconds
+        if remaining_wait_seconds is not None
+        else _positive_float_or_zero(profile.get("max_wait_seconds"))
+    )
+    if wait_budget_seconds is None or retry_after_seconds > wait_budget_seconds:
+        return None
+    return retry_after_seconds
+
+
+def _positive_float_or_zero(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number < 0:
+        return None
+    return number
+
+
+@contextmanager
+def _provider_rate_concurrency_slot(
+    *,
+    provider_id: str,
+    model: str,
+    provider_rate_profile: Any,
+) -> Iterator[None]:
+    profile = normalize_provider_rate_profile(provider_rate_profile)
+    concurrency_limit = profile.get("concurrency")
+    if concurrency_limit is None:
+        yield
+        return
+
+    scope_provider_id = str(provider_id or "").strip() or "unknown"
+    normalized_model = str(model or "").strip()
+    with _PROVIDER_RATE_CONCURRENCY_LOCK:
+        observed_concurrency = int(_PROVIDER_RATE_CONCURRENCY_ACTIVE.get(scope_provider_id) or 0)
+        if observed_concurrency >= concurrency_limit:
+            raise ProviderRateProfileExceeded(
+                {
+                    "kind": "provider_rate_profile_concurrency_gate",
+                    "version": 1,
+                    "mode": "enforce_in_process_concurrency",
+                    "status": "blocked",
+                    "reason": "provider_rate_profile_concurrency_exhausted",
+                    **profile,
+                    "observed_concurrency": observed_concurrency,
+                    "limit_exceeded": ["concurrency"],
+                    "scope": {
+                        "provider_id": scope_provider_id,
+                        "model": normalized_model,
+                    },
+                }
+            )
+        _PROVIDER_RATE_CONCURRENCY_ACTIVE[scope_provider_id] = observed_concurrency + 1
+
+    try:
+        yield
+    finally:
+        with _PROVIDER_RATE_CONCURRENCY_LOCK:
+            current_concurrency = int(_PROVIDER_RATE_CONCURRENCY_ACTIVE.get(scope_provider_id) or 0)
+            if current_concurrency <= 1:
+                _PROVIDER_RATE_CONCURRENCY_ACTIVE.pop(scope_provider_id, None)
+            else:
+                _PROVIDER_RATE_CONCURRENCY_ACTIVE[scope_provider_id] = current_concurrency - 1
 
 
 def _record_provider_credential_call_result(
@@ -1406,7 +1748,7 @@ def chat_with_model_ref_with_meta(
             request_timeout_seconds=request_timeout_seconds,
             persist_credential_state=persist_credential_state,
         )
-    except ProviderCostBudgetExceeded:
+    except (ProviderCostBudgetExceeded, ProviderRateProfileExceeded):
         raise
     except Exception as primary_exc:
         fallback_result = resolve_provider_fallback(
@@ -1457,7 +1799,7 @@ def chat_with_model_ref_with_meta(
                     request_timeout_seconds=request_timeout_seconds,
                     persist_credential_state=persist_credential_state,
                 )
-            except ProviderCostBudgetExceeded:
+            except (ProviderCostBudgetExceeded, ProviderRateProfileExceeded):
                 raise
             except Exception as fallback_exc:
                 fallback_errors.append(f"{candidate_model_ref}: {fallback_exc}")
