@@ -179,6 +179,7 @@ class SettingsModelProviderTests(unittest.TestCase):
                                                     "structured_output": False,
                                                     "embedding": False,
                                                     "rerank": True,
+                                                    "prompt_cache": True,
                                                 },
                                                 "permissions": ["rerank"],
                                             }
@@ -192,6 +193,7 @@ class SettingsModelProviderTests(unittest.TestCase):
         saved_model = saved_payload["model_providers"]["local"]["models"][0]
         self.assertEqual(saved_model["capabilities"]["chat"], False)
         self.assertEqual(saved_model["capabilities"]["rerank"], True)
+        self.assertEqual(saved_model["capabilities"]["prompt_cache"], True)
         self.assertEqual(saved_model["permissions"], ["rerank"])
 
     def test_update_settings_persists_provider_request_timeout_seconds(self) -> None:
@@ -570,11 +572,11 @@ class SettingsModelProviderTests(unittest.TestCase):
                     with patch("app.api.routes_settings.get_tool_registry", return_value={}):
                         with patch(
                             "app.api.routes_settings.get_model_log_retention_settings",
-                            return_value={"max_root_runs": 42},
+                            return_value={"max_root_runs": 42, "cache_resource_retention_days": 21},
                         ):
                             payload = routes_settings._build_settings_payload(force_refresh_models=False)
 
-        self.assertEqual(payload["model_logs"], {"max_root_runs": 42})
+        self.assertEqual(payload["model_logs"], {"max_root_runs": 42, "cache_resource_retention_days": 21})
 
     def test_update_settings_persists_model_log_retention_from_full_payload(self) -> None:
         saved_payload = {}
@@ -601,12 +603,12 @@ class SettingsModelProviderTests(unittest.TestCase):
                                     "thinking_level": "medium",
                                     "temperature": 0.2,
                                 },
-                                "model_logs": {"max_root_runs": 12},
+                                "model_logs": {"max_root_runs": 12, "cache_resource_retention_days": 18},
                             },
                         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(saved_payload["model_logs"], {"max_root_runs": 12})
+        self.assertEqual(saved_payload["model_logs"], {"max_root_runs": 12, "cache_resource_retention_days": 18})
 
     def test_model_log_retention_endpoint_persists_setting(self) -> None:
         saved_payload = {}
@@ -619,11 +621,32 @@ class SettingsModelProviderTests(unittest.TestCase):
         with patch("app.core.storage.model_log_store.load_app_settings", return_value={}):
             with patch("app.core.storage.model_log_store.save_app_settings", side_effect=capture_save):
                 with TestClient(app) as client:
+                    response = client.post(
+                        "/api/settings/model-logs",
+                        json={"max_root_runs": 37, "cache_resource_retention_days": 22},
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"max_root_runs": 37, "cache_resource_retention_days": 22})
+        self.assertEqual(saved_payload["model_logs"], {"max_root_runs": 37, "cache_resource_retention_days": 22})
+
+    def test_model_log_retention_endpoint_preserves_cache_resource_retention_when_omitted(self) -> None:
+        saved_payload = {}
+
+        def capture_save(payload: dict) -> dict:
+            saved_payload.clear()
+            saved_payload.update(payload)
+            return payload
+
+        existing_settings = {"model_logs": {"max_root_runs": 55, "cache_resource_retention_days": 88}}
+        with patch("app.core.storage.model_log_store.load_app_settings", return_value=existing_settings):
+            with patch("app.core.storage.model_log_store.save_app_settings", side_effect=capture_save):
+                with TestClient(app) as client:
                     response = client.post("/api/settings/model-logs", json={"max_root_runs": 37})
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"max_root_runs": 37})
-        self.assertEqual(saved_payload["model_logs"], {"max_root_runs": 37})
+        self.assertEqual(response.json(), {"max_root_runs": 37, "cache_resource_retention_days": 88})
+        self.assertEqual(saved_payload["model_logs"], {"max_root_runs": 37, "cache_resource_retention_days": 88})
 
     def test_update_settings_preserves_existing_buddy_runtime_when_omitted(self) -> None:
         saved_payload = {}

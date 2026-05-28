@@ -51,8 +51,10 @@ class StorageDatabaseTests(unittest.TestCase):
                 "capability_usage_events",
                 "agent_loop_events",
                 "graph_model_calls",
+                "provider_prompt_cache_resources",
                 "scheduled_graph_jobs",
                 "scheduled_graph_job_runs",
+                "scheduled_delivery_attempts",
             }.issubset(table_names)
         )
         self.assertTrue(
@@ -70,10 +72,14 @@ class StorageDatabaseTests(unittest.TestCase):
                 "idx_agent_loop_events_stop_reason",
                 "idx_capability_usage_events_run",
                 "idx_capability_usage_events_key",
+                "idx_provider_prompt_cache_resources_lookup",
+                "idx_provider_prompt_cache_resources_status",
                 "idx_scheduled_graph_jobs_due",
                 "idx_scheduled_graph_jobs_template",
                 "idx_scheduled_graph_job_runs_job",
                 "idx_scheduled_graph_job_runs_run",
+                "idx_scheduled_delivery_attempts_run",
+                "idx_scheduled_delivery_attempts_job",
             }.issubset(index_names)
         )
 

@@ -242,7 +242,11 @@ def _apply_openai_prompt_cache_key(
     request_payload: dict[str, Any],
     prompt_cache_policy: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    if str(provider_id or "").strip().lower() != "openai":
+    is_official_openai = str(provider_id or "").strip().lower() == "openai"
+    is_compatible_opt_in = isinstance(prompt_cache_policy, dict) and bool(
+        prompt_cache_policy.get("openai_compatible_prompt_cache_key")
+    )
+    if not is_official_openai and not is_compatible_opt_in:
         return {}
     if not isinstance(prompt_cache_policy, dict):
         return {}
@@ -255,14 +259,15 @@ def _apply_openai_prompt_cache_key(
         return {}
 
     request_payload["prompt_cache_key"] = cache_key
+    provider_cache_control = "openai_prompt_cache_key" if is_official_openai else "openai_compatible_prompt_cache_key"
     result: dict[str, Any] = {
         "kind": "provider_prompt_cache_result",
         "version": 1,
         "requested_policy": "prefer",
         "eligible": True,
         "mode": "provider_applied",
-        "provider_cache_control": "openai_prompt_cache_key",
-        "reason": "openai_prompt_cache_key_applied",
+        "provider_cache_control": provider_cache_control,
+        "reason": f"{provider_cache_control}_applied",
         "cache_key": cache_key,
     }
     stable_prefix_hash = str(prompt_cache_policy.get("stable_prefix_hash") or "").strip()

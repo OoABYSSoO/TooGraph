@@ -13,6 +13,11 @@ from app.core.model_provider_costs import build_provider_cost_estimate, normaliz
 from app.core.model_provider_rates import build_provider_rate_decision, normalize_provider_rate_profile
 from app.core.runtime.model_call_context import get_model_call_context
 from app.core.storage.database import get_connection
+from app.core.storage.provider_prompt_cache_store import (
+    normalize_provider_prompt_cache_resource_retention_days,
+    prune_provider_prompt_cache_resources,
+    summarize_provider_prompt_cache_resources,
+)
 from app.core.storage.settings_store import load_app_settings, save_app_settings
 from app.core.storage import run_store
 
@@ -123,7 +128,11 @@ def append_model_request_log(
         return {}
 
     try:
-        prune_model_request_logs(max_root_runs=get_model_log_retention_settings()["max_root_runs"])
+        retention = get_model_log_retention_settings()
+        prune_model_request_logs(max_root_runs=retention["max_root_runs"])
+        prune_provider_prompt_cache_resources(
+            max_terminal_age_days=retention["cache_resource_retention_days"]
+        )
     except Exception:
         pass
     return _hydrate_log_entry(
@@ -206,6 +215,7 @@ def list_model_request_logs(*, page: int = 1, size: int = 20, query: str = "") -
             for entry in entries
             if query_text in json.dumps(entry, ensure_ascii=False).lower()
         ]
+    provider_cache_summary = build_provider_cache_summary(entries)
 
     total = len(entries)
     start = (page - 1) * size
@@ -218,6 +228,7 @@ def list_model_request_logs(*, page: int = 1, size: int = 20, query: str = "") -
         "size": size,
         "pages": math.ceil(total / size) if total else 0,
         "retention": get_model_log_retention_settings(),
+        "provider_cache_summary": provider_cache_summary,
     }
 
 
@@ -254,6 +265,63 @@ def prune_model_request_logs(*, max_root_runs: int) -> int:
     return max(0, int(deleted or 0))
 
 
+def build_provider_cache_summary(entries: list[dict[str, Any]]) -> dict[str, Any]:
+    decision_count = 0
+    provider_applied_count = 0
+    resource_created_count = 0
+    resource_reused_count = 0
+    cache_creation_input_tokens = 0
+    cache_read_input_tokens = 0
+    provider_cache_control_counts: dict[str, int] = {}
+
+    for entry in entries:
+        decision = entry.get("provider_cache_decision") if isinstance(entry, dict) else None
+        if not isinstance(decision, dict) or not decision:
+            continue
+        decision_count += 1
+        mode = _text(decision.get("mode"))
+        if mode == "provider_applied":
+            provider_applied_count += 1
+        control = _text(decision.get("provider_cache_control")) or "unknown"
+        provider_cache_control_counts[control] = provider_cache_control_counts.get(control, 0) + 1
+        resource_status = _text(decision.get("cache_resource_status"))
+        if resource_status == "created":
+            resource_created_count += 1
+        elif resource_status == "reused":
+            resource_reused_count += 1
+        usage = decision.get("provider_usage") if isinstance(decision.get("provider_usage"), dict) else decision.get("usage")
+        if not isinstance(usage, dict):
+            continue
+        cache_creation_input_tokens += _non_negative_int(usage.get("cache_creation_input_tokens"))
+        cache_read_input_tokens += _non_negative_int(
+            usage.get("cache_read_input_tokens")
+            if usage.get("cache_read_input_tokens") is not None
+            else usage.get("cached_tokens")
+        )
+
+    resource_summary = summarize_provider_prompt_cache_resources()
+    resource_status_counts = resource_summary.get("status_counts") if isinstance(resource_summary.get("status_counts"), dict) else {}
+    resource_attempt_count = resource_created_count + resource_reused_count
+    return {
+        "kind": "provider_cache_summary",
+        "version": 1,
+        "decision_count": decision_count,
+        "provider_applied_count": provider_applied_count,
+        "resource_created_count": resource_created_count,
+        "resource_reused_count": resource_reused_count,
+        "resource_hit_rate": round(resource_reused_count / resource_attempt_count, 4) if resource_attempt_count else 0,
+        "cache_creation_input_tokens": cache_creation_input_tokens,
+        "cache_read_input_tokens": cache_read_input_tokens,
+        "provider_cache_control_counts": provider_cache_control_counts,
+        "resource_status_counts": {
+            str(key): int(value)
+            for key, value in resource_status_counts.items()
+            if isinstance(value, (int, float))
+        },
+        "resource_total": int(resource_summary.get("total") or 0),
+    }
+
+
 def normalize_model_log_retention_root_runs(value: Any) -> int:
     try:
         count = int(value)
@@ -268,19 +336,35 @@ def get_model_log_retention_settings(settings: dict[str, Any] | None = None) -> 
     payload = raw_settings if isinstance(raw_settings, dict) else {}
     return {
         "max_root_runs": normalize_model_log_retention_root_runs(payload.get("max_root_runs")),
+        "cache_resource_retention_days": normalize_provider_prompt_cache_resource_retention_days(
+            payload.get("cache_resource_retention_days")
+        ),
     }
 
 
-def save_model_log_retention_settings(*, max_root_runs: int) -> dict[str, int]:
+def save_model_log_retention_settings(
+    *,
+    max_root_runs: int,
+    cache_resource_retention_days: int | None = None,
+) -> dict[str, int]:
     existing = load_app_settings()
+    existing_retention = get_model_log_retention_settings(existing)
     next_settings = dict(existing)
     next_settings["model_logs"] = {
         "max_root_runs": normalize_model_log_retention_root_runs(max_root_runs),
+        "cache_resource_retention_days": normalize_provider_prompt_cache_resource_retention_days(
+            cache_resource_retention_days
+            if cache_resource_retention_days is not None
+            else existing_retention["cache_resource_retention_days"]
+        ),
     }
     save_app_settings(next_settings)
     saved = get_model_log_retention_settings(next_settings)
     try:
         prune_model_request_logs(max_root_runs=saved["max_root_runs"])
+        prune_provider_prompt_cache_resources(
+            max_terminal_age_days=saved["cache_resource_retention_days"]
+        )
     except Exception:
         pass
     return saved
@@ -1035,6 +1119,13 @@ def _normalize_estimated_token_count(value: Any) -> int | None:
     if normalized <= 0:
         return 0
     return int(math.ceil(normalized))
+
+
+def _non_negative_int(value: Any) -> int:
+    normalized = _normalize_optional_float(value)
+    if normalized is None or normalized <= 0:
+        return 0
+    return int(normalized)
 
 
 def _provider_cost_budget_window_scope(

@@ -13,6 +13,9 @@ test("ModelLogsPage renders a themed paginated raw model request log", () => {
   assert.match(pageSource, /fetchModelLogs/);
   assert.match(pageSource, /updateModelLogRetention/);
   assert.match(pageSource, /<ElInputNumber[\s\S]*v-model="retentionRootRuns"/);
+  assert.match(pageSource, /<ElInputNumber[\s\S]*v-model="retentionCacheResourceDays"/);
+  assert.match(pageSource, /modelLogs\.cacheResourceRetentionLabel/);
+  assert.match(pageSource, /cache_resource_retention_days:\s*nextCacheResourceDays/);
   assert.match(pageSource, /<ElInput[\s\S]*v-model="query"/);
   assert.match(pageSource, /<ElPagination[\s\S]*v-model:current-page="currentPage"[\s\S]*:page-size="pageSize"[\s\S]*:total="total"/);
   assert.match(pageSource, /model-logs-page__tree-node/);
@@ -22,6 +25,10 @@ test("ModelLogsPage renders a themed paginated raw model request log", () => {
   assert.match(pageSource, /flattenTreeItems/);
   assert.match(pageSource, /model-logs-page__tree-children/);
   assert.match(pageSource, /model-logs-page__retention/);
+  assert.match(pageSource, /providerCacheSummary/);
+  assert.match(pageSource, /cacheHitRateLabel/);
+  assert.match(pageSource, /cacheResourceLabel/);
+  assert.match(pageSource, /model-logs-page__cache-summary/);
   assert.match(pageSource, /model-logs-page__request-raw/);
   assert.match(pageSource, /model-logs-page__response-raw/);
   assert.doesNotMatch(pageSource, /<details open class="model-logs-page__raw-panel/);

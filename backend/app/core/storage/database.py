@@ -614,6 +614,39 @@ def _ensure_graph_run_schema(connection: sqlite3.Connection) -> None:
             ON provider_rate_wait_queue(queue_key, status, enqueued_at, expires_at);
         CREATE INDEX IF NOT EXISTS idx_provider_rate_wait_queue_run
             ON provider_rate_wait_queue(run_id, status, enqueued_at);
+
+        CREATE TABLE IF NOT EXISTS provider_prompt_cache_resources (
+            cache_resource_id TEXT PRIMARY KEY,
+            provider TEXT NOT NULL DEFAULT '',
+            transport TEXT NOT NULL DEFAULT '',
+            base_url TEXT NOT NULL DEFAULT '',
+            model TEXT NOT NULL DEFAULT '',
+            credential_fingerprint TEXT NOT NULL DEFAULT '',
+            cache_key TEXT NOT NULL DEFAULT '',
+            stable_prefix_hash TEXT NOT NULL DEFAULT '',
+            resource_name TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL DEFAULT '',
+            last_used_at TEXT NOT NULL DEFAULT '',
+            metadata_json TEXT NOT NULL DEFAULT '{}'
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_provider_prompt_cache_resources_lookup
+            ON provider_prompt_cache_resources(
+                provider,
+                transport,
+                base_url,
+                model,
+                credential_fingerprint,
+                cache_key,
+                stable_prefix_hash,
+                status,
+                expires_at
+            );
+        CREATE INDEX IF NOT EXISTS idx_provider_prompt_cache_resources_status
+            ON provider_prompt_cache_resources(status, expires_at, updated_at);
         """
     )
     _ensure_column(connection, "graph_runs", "detail_json", "TEXT NOT NULL DEFAULT '{}'")
@@ -664,6 +697,30 @@ def _ensure_scheduler_schema(connection: sqlite3.Connection) -> None:
             ON scheduled_graph_job_runs(job_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_scheduled_graph_job_runs_run
             ON scheduled_graph_job_runs(run_id);
+
+        CREATE TABLE IF NOT EXISTS scheduled_delivery_attempts (
+            attempt_id TEXT PRIMARY KEY,
+            job_run_id TEXT NOT NULL REFERENCES scheduled_graph_job_runs(job_run_id) ON DELETE CASCADE,
+            job_id TEXT NOT NULL DEFAULT '',
+            run_id TEXT NOT NULL DEFAULT '',
+            target_kind TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT '',
+            reason TEXT NOT NULL DEFAULT '',
+            attempted_at TEXT NOT NULL,
+            completed_at TEXT NOT NULL DEFAULT '',
+            target_json TEXT NOT NULL DEFAULT '{}',
+            request_json TEXT NOT NULL DEFAULT '{}',
+            response_json TEXT NOT NULL DEFAULT '{}',
+            error TEXT NOT NULL DEFAULT '',
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_scheduled_delivery_attempts_run
+            ON scheduled_delivery_attempts(job_run_id, attempted_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_scheduled_delivery_attempts_job
+            ON scheduled_delivery_attempts(job_id, attempted_at DESC);
         """
     )
     _ensure_column(connection, "scheduled_graph_jobs", "retry_policy_json", "TEXT NOT NULL DEFAULT '{}'")

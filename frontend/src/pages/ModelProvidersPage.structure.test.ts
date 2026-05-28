@@ -156,6 +156,8 @@ test("ModelProvidersPage shows and edits provider models from each card", () => 
 
 test("ModelProvidersPage shows a provider capability matrix", () => {
   assert.match(pageSource, /settings\.providerCapabilityMatrix/);
+  assert.match(pageSource, /settings\.providerCapabilityPromptCache/);
+  assert.match(pageSource, /shortLabel:\s*"Cache"/);
   assert.match(pageSource, /class="model-providers-page__capability-matrix"/);
   assert.match(pageSource, /v-for="capability in providerCapabilityOptions"/);
   assert.match(pageSource, /type="checkbox"/);

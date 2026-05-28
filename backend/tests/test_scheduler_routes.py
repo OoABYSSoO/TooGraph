@@ -109,6 +109,30 @@ class SchedulerRouteTests(unittest.TestCase):
         self.assertEqual(run_detail["metadata"]["scheduled_graph_job"]["job_id"], create_response.json()["job_id"])
         self.assertEqual(run_detail["graph_snapshot"]["state_schema"]["request"]["value"], "整理能力库")
 
+    def test_approve_delivery_route_executes_scheduler_delivery(self) -> None:
+        with (
+            patch(
+                "app.api.routes_scheduler.store.load_scheduled_graph_job_run",
+                return_value={"job_id": "sched_webhook", "job_run_id": "schedrun_webhook"},
+            ),
+            patch(
+                "app.api.routes_scheduler.delivery.execute_approved_scheduled_delivery",
+                return_value={"kind": "webhook", "status": "delivered"},
+            ) as execute_delivery,
+            TestClient(app) as client,
+        ):
+            response = client.post(
+                "/api/scheduler/jobs/sched_webhook/runs/schedrun_webhook/delivery/approve",
+                json={"approved_by": "scheduler-test", "reason": "人工批准"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"kind": "webhook", "status": "delivered"})
+        execute_delivery.assert_called_once_with(
+            "schedrun_webhook",
+            approval={"decision": "approved", "approved_by": "scheduler-test", "reason": "人工批准"},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

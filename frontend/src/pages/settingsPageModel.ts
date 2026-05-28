@@ -19,6 +19,7 @@ export const PROVIDER_MODEL_CAPABILITY_KEYS = [
   "rerank",
   "streaming",
   "reasoning",
+  "prompt_cache",
 ] as const;
 export type ProviderModelCapabilityKey = (typeof PROVIDER_MODEL_CAPABILITY_KEYS)[number];
 export type ProviderModelProfile = {

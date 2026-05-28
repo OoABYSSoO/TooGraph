@@ -16,7 +16,19 @@ test("fetchModelLogs reads paginated model request logs", async () => {
         page: 2,
         size: 5,
         pages: 0,
-        retention: { max_root_runs: 200 },
+        retention: { max_root_runs: 200, cache_resource_retention_days: 30 },
+        provider_cache_summary: {
+          kind: "provider_cache_summary",
+          decision_count: 2,
+          provider_applied_count: 2,
+          resource_created_count: 1,
+          resource_reused_count: 1,
+          resource_hit_rate: 0.5,
+          cache_creation_input_tokens: 1000,
+          cache_read_input_tokens: 2000,
+          resource_status_counts: { active: 1, expired: 1 },
+          resource_total: 2,
+        },
       }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
@@ -32,31 +44,43 @@ test("fetchModelLogs reads paginated model request logs", async () => {
       page: 2,
       size: 5,
       pages: 0,
-      retention: { max_root_runs: 200 },
+      retention: { max_root_runs: 200, cache_resource_retention_days: 30 },
+      provider_cache_summary: {
+        kind: "provider_cache_summary",
+        decision_count: 2,
+        provider_applied_count: 2,
+        resource_created_count: 1,
+        resource_reused_count: 1,
+        resource_hit_rate: 0.5,
+        cache_creation_input_tokens: 1000,
+        cache_read_input_tokens: 2000,
+        resource_status_counts: { active: 1, expired: 1 },
+        resource_total: 2,
+      },
     });
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("updateModelLogRetention saves the root-run retention limit", async () => {
+test("updateModelLogRetention saves the root-run and cache-resource retention limits", async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl = "";
   let requestedBody = "";
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     requestedUrl = String(input);
     requestedBody = String(init?.body ?? "");
-    return new Response(JSON.stringify({ max_root_runs: 25 }), {
+    return new Response(JSON.stringify({ max_root_runs: 25, cache_resource_retention_days: 45 }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   }) as typeof fetch;
 
   try {
-    const result = await updateModelLogRetention({ max_root_runs: 25 });
+    const result = await updateModelLogRetention({ max_root_runs: 25, cache_resource_retention_days: 45 });
     assert.equal(requestedUrl, "/api/settings/model-logs");
-    assert.equal(requestedBody, JSON.stringify({ max_root_runs: 25 }));
-    assert.deepEqual(result, { max_root_runs: 25 });
+    assert.equal(requestedBody, JSON.stringify({ max_root_runs: 25, cache_resource_retention_days: 45 }));
+    assert.deepEqual(result, { max_root_runs: 25, cache_resource_retention_days: 45 });
   } finally {
     globalThis.fetch = originalFetch;
   }

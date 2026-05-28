@@ -385,6 +385,138 @@ def list_scheduled_graph_job_runs(*, job_id: str = "") -> list[dict[str, Any]]:
     return [_job_run_from_row(row) for row in rows]
 
 
+def record_scheduled_delivery_attempt(
+    *,
+    job_run_id: str,
+    status: str,
+    target_kind: str,
+    reason: str = "",
+    target: dict[str, Any] | None = None,
+    request: dict[str, Any] | None = None,
+    response: dict[str, Any] | None = None,
+    error: str = "",
+    metadata: dict[str, Any] | None = None,
+    attempt_id: str | None = None,
+    attempted_at: str | None = None,
+    completed_at: str | None = None,
+    now: str | None = None,
+) -> dict[str, Any]:
+    job_run = load_scheduled_graph_job_run(job_run_id)
+    normalized_now = _normalize_timestamp(now or completed_at or attempted_at)
+    normalized_attempted_at = _normalize_timestamp(attempted_at) if attempted_at else normalized_now
+    normalized_completed_at = _normalize_timestamp(completed_at) if completed_at else normalized_now
+    normalized_attempt_id = _compact_text(attempt_id) or f"sched_delivery_{uuid4().hex[:12]}"
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO scheduled_delivery_attempts (
+                attempt_id,
+                job_run_id,
+                job_id,
+                run_id,
+                target_kind,
+                status,
+                reason,
+                attempted_at,
+                completed_at,
+                target_json,
+                request_json,
+                response_json,
+                error,
+                metadata_json,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                normalized_attempt_id,
+                job_run["job_run_id"],
+                job_run["job_id"],
+                job_run["run_id"],
+                _compact_text(target_kind),
+                _compact_text(status),
+                _compact_text(reason),
+                normalized_attempted_at,
+                normalized_completed_at,
+                _json_dumps(_redact_delivery_target(target or {})),
+                _json_dumps(_redact_delivery_target(request or {})),
+                _json_dumps(_redact_delivery_target(response or {})),
+                _compact_text(error),
+                _json_dumps(metadata if isinstance(metadata, dict) else {}),
+                normalized_now,
+                normalized_now,
+            ),
+        )
+        row = connection.execute(
+            "SELECT * FROM scheduled_delivery_attempts WHERE attempt_id = ?",
+            (normalized_attempt_id,),
+        ).fetchone()
+    if row is None:
+        raise KeyError(normalized_attempt_id)
+    return _delivery_attempt_from_row(row)
+
+
+def list_scheduled_delivery_attempts(*, job_run_id: str = "") -> list[dict[str, Any]]:
+    normalized_job_run_id = _compact_text(job_run_id)
+    if normalized_job_run_id:
+        with get_connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM scheduled_delivery_attempts
+                WHERE job_run_id = ?
+                ORDER BY attempted_at DESC, attempt_id DESC
+                """,
+                (normalized_job_run_id,),
+            ).fetchall()
+    else:
+        with get_connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM scheduled_delivery_attempts
+                ORDER BY attempted_at DESC, attempt_id DESC
+                """
+            ).fetchall()
+    return [_delivery_attempt_from_row(row) for row in rows]
+
+
+def apply_scheduled_delivery_result(
+    job_run_id: str,
+    *,
+    delivery_result: dict[str, Any],
+    delivery_attempt: dict[str, Any] | None = None,
+    approval: dict[str, Any] | None = None,
+    now: str | None = None,
+) -> dict[str, Any]:
+    existing = load_scheduled_graph_job_run(job_run_id)
+    normalized_now = _normalize_timestamp(now)
+    next_metadata = dict(existing.get("metadata") or {})
+    result = dict(delivery_result)
+    if delivery_attempt:
+        result["delivery_attempt_id"] = _compact_text(delivery_attempt.get("attempt_id"))
+        next_metadata["latest_delivery_attempt"] = _delivery_attempt_summary(delivery_attempt)
+    if approval:
+        result["approval"] = _redact_delivery_target(approval)
+        next_metadata["delivery_approval"] = _redact_delivery_target(approval)
+    next_metadata["delivery_result"] = _redact_delivery_target(result)
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE scheduled_graph_job_runs
+            SET metadata_json = ?,
+                updated_at = ?
+            WHERE job_run_id = ?
+            """,
+            (_json_dumps(next_metadata), normalized_now, existing["job_run_id"]),
+        )
+    return load_scheduled_graph_job_run(existing["job_run_id"])
+
+
+def redact_delivery_value(value: Any) -> Any:
+    return _redact_delivery_target(value)
+
+
 def _normalize_job_payload(payload: dict[str, Any], *, now: str | None) -> dict[str, Any]:
     normalized_now = _normalize_timestamp(now)
     template_id = _compact_text(payload.get("template_id"))
@@ -674,6 +806,39 @@ def _job_run_from_row(row: Any) -> dict[str, Any]:
         "metadata": _json_loads(row["metadata_json"], {}),
         "created_at": str(row["created_at"]),
         "updated_at": str(row["updated_at"]),
+    }
+
+
+def _delivery_attempt_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "attempt_id": str(row["attempt_id"]),
+        "job_run_id": str(row["job_run_id"]),
+        "job_id": str(row["job_id"] or ""),
+        "run_id": str(row["run_id"] or ""),
+        "target_kind": str(row["target_kind"] or ""),
+        "status": str(row["status"] or ""),
+        "reason": str(row["reason"] or ""),
+        "attempted_at": str(row["attempted_at"] or ""),
+        "completed_at": str(row["completed_at"] or ""),
+        "target": _json_loads(row["target_json"], {}),
+        "request": _json_loads(row["request_json"], {}),
+        "response": _json_loads(row["response_json"], {}),
+        "error": str(row["error"] or ""),
+        "metadata": _json_loads(row["metadata_json"], {}),
+        "created_at": str(row["created_at"] or ""),
+        "updated_at": str(row["updated_at"] or ""),
+    }
+
+
+def _delivery_attempt_summary(attempt: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "attempt_id": _compact_text(attempt.get("attempt_id")),
+        "status": _compact_text(attempt.get("status")),
+        "reason": _compact_text(attempt.get("reason")),
+        "attempted_at": _compact_text(attempt.get("attempted_at")),
+        "completed_at": _compact_text(attempt.get("completed_at")),
+        "response": attempt.get("response") if isinstance(attempt.get("response"), dict) else {},
+        "error": _compact_text(attempt.get("error")),
     }
 
 

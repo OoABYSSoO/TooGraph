@@ -68,6 +68,7 @@ from app.tools.model_provider_http import (
     normalize_base_url as _normalize_base_url,
     normalize_request_timeout_seconds,
     post_streaming_json_with_fallback,
+    request_json,
 )
 
 
@@ -229,6 +230,7 @@ def _chat_gemini(
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
     structured_output_schema: dict[str, Any] | None = None,
+    prompt_cache_policy: dict[str, Any] | None = None,
     request_timeout_seconds: float | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_gemini.chat_gemini(
@@ -243,8 +245,10 @@ def _chat_gemini(
         thinking_level=thinking_level,
         append_request_log=_append_model_request_log_safely,
         post_streaming_json_with_fallback_fn=post_streaming_json_with_fallback,
+        request_json_fn=request_json,
         on_delta=on_delta,
         input_attachments=input_attachments,
+        prompt_cache_policy=prompt_cache_policy,
         request_timeout_seconds=normalize_request_timeout_seconds(request_timeout_seconds),
     )
 
@@ -696,6 +700,7 @@ def chat_with_model_provider(
                 on_delta=on_delta,
                 input_attachments=attachments,
                 structured_output_schema=structured_output_schema,
+                prompt_cache_policy=prompt_cache_policy,
                 request_timeout_seconds=normalized_timeout_seconds,
             )
     elif normalized_transport == TRANSPORT_CODEX_RESPONSES:
@@ -876,6 +881,50 @@ def _provider_request_timeout_seconds(
     )
 
 
+def _provider_model_capabilities(provider_config: dict[str, Any], model_name: str) -> dict[str, bool]:
+    models = provider_config.get("models")
+    if not isinstance(models, list):
+        return {}
+    target = str(model_name or "").strip().lower()
+    for item in models:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("model") or "").strip().lower() != target:
+            continue
+        capabilities = item.get("capabilities")
+        if not isinstance(capabilities, dict):
+            return {}
+        return {
+            str(key).strip(): bool(value)
+            for key, value in capabilities.items()
+            if str(key or "").strip()
+        }
+    return {}
+
+
+def _effective_prompt_cache_policy_for_provider_model(
+    prompt_cache_policy: dict[str, Any] | None,
+    *,
+    provider_id: str,
+    transport: str,
+    provider_config: dict[str, Any],
+    model_name: str,
+) -> dict[str, Any] | None:
+    if not isinstance(prompt_cache_policy, dict):
+        return prompt_cache_policy
+    if str(provider_id or "").strip().lower() == "openai":
+        return prompt_cache_policy
+    if normalize_transport(str(transport or TRANSPORT_OPENAI_COMPATIBLE)) != TRANSPORT_OPENAI_COMPATIBLE:
+        return prompt_cache_policy
+    capabilities = _provider_model_capabilities(provider_config, model_name)
+    if not bool(capabilities.get("prompt_cache")):
+        return prompt_cache_policy
+    return {
+        **prompt_cache_policy,
+        "openai_compatible_prompt_cache_key": True,
+    }
+
+
 def _resolve_model_runtime_fixture_result(
     model_ref: str,
     model_runtime_fixture: dict[str, Any] | None,
@@ -1031,6 +1080,14 @@ def _chat_with_model_ref_once(
         )
 
     template, provider_config = _provider_config_from_saved(provider_id, saved_providers)
+    transport = str(provider_config.get("transport") or template["transport"])
+    effective_prompt_cache_policy = _effective_prompt_cache_policy_for_provider_model(
+        prompt_cache_policy,
+        provider_id=provider_id,
+        transport=transport,
+        provider_config=provider_config,
+        model_name=model_name,
+    )
     api_key, provider_credential = select_provider_credential(provider_config)
     provider_pricing = provider_model_pricing(provider_config, model_name)
     provider_context: dict[str, Any] = {}
@@ -1077,7 +1134,7 @@ def _chat_with_model_ref_once(
             with use_model_call_context(**provider_context) if provider_context else nullcontext():
                 content, meta = chat_with_model_provider(
                     provider_id=provider_id,
-                    transport=str(provider_config.get("transport") or template["transport"]),
+                    transport=transport,
                     base_url=str(provider_config.get("base_url") or template["base_url"]),
                     api_key=api_key,
                     model=model_name,
@@ -1097,7 +1154,7 @@ def _chat_with_model_ref_once(
                     on_delta=on_delta,
                     input_attachments=input_attachments,
                     structured_output_schema=structured_output_schema,
-                    prompt_cache_policy=prompt_cache_policy,
+                    prompt_cache_policy=effective_prompt_cache_policy,
                 )
                 _annotate_last_model_request_log_with_provider_cache(meta)
     except ProviderRateProfileExceeded:

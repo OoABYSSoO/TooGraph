@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
-from app.scheduler import runner, store
+from app.scheduler import delivery, runner, store
 
 
 router = APIRouter(prefix="/api/scheduler", tags=["scheduler"])
@@ -91,5 +91,31 @@ def run_scheduled_graph_job(
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=f"Scheduled graph job '{job_id}' does not exist.") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/jobs/{job_id}/runs/{job_run_id}/delivery/approve")
+def approve_scheduled_graph_job_run_delivery(
+    job_id: str,
+    job_run_id: str,
+    payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    request_payload = payload or {}
+    try:
+        job_run = store.load_scheduled_graph_job_run(job_run_id)
+        if job_run["job_id"] != job_id:
+            raise KeyError(job_run_id)
+        approval_payload = request_payload.get("approval") if isinstance(request_payload.get("approval"), dict) else {}
+        return delivery.execute_approved_scheduled_delivery(
+            job_run_id,
+            approval={
+                "decision": approval_payload.get("decision") or request_payload.get("decision") or "approved",
+                "approved_by": approval_payload.get("approved_by") or request_payload.get("approved_by") or "scheduler_api",
+                "reason": approval_payload.get("reason") or request_payload.get("reason") or "",
+            },
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Scheduled graph job run '{job_run_id}' does not exist.") from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

@@ -128,7 +128,7 @@ test("provider drafts preserve model capabilities and permissions", () => {
               model_ref: "local/rerank-test",
               model: "rerank-test",
               label: "rerank-test",
-              capabilities: { chat: false, structured_output: false, rerank: true },
+              capabilities: { chat: false, structured_output: false, rerank: true, prompt_cache: true },
               permissions: ["rerank"],
             },
           ],
@@ -145,6 +145,7 @@ test("provider drafts preserve model capabilities and permissions", () => {
     chat: false,
     structured_output: false,
     rerank: true,
+    prompt_cache: true,
   });
   assert.deepEqual(drafts.local.model_profiles["rerank-test"].permissions, ["rerank"]);
   assert.equal(drafts.local.request_timeout_seconds, 33);
@@ -154,6 +155,7 @@ test("provider drafts preserve model capabilities and permissions", () => {
     chat: false,
     structured_output: false,
     rerank: true,
+    prompt_cache: true,
   });
   assert.deepEqual(payload.local.models[0].permissions, ["rerank"]);
   assert.equal(payload.local.request_timeout_seconds, 33);

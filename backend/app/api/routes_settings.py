@@ -22,6 +22,9 @@ from app.core.storage.model_log_store import (
     normalize_model_log_retention_root_runs,
     save_model_log_retention_settings,
 )
+from app.core.storage.provider_prompt_cache_store import (
+    normalize_provider_prompt_cache_resource_retention_days,
+)
 from app.core.storage.settings_store import load_app_settings, save_app_settings
 from app.tools.local_llm import (
     get_default_agent_temperature,
@@ -127,12 +130,19 @@ class BuddyRuntimeSettingsPayload(BaseModel):
 
 class ModelLogSettingsPayload(BaseModel):
     max_root_runs: int = Field(default=200, alias="max_root_runs")
+    cache_resource_retention_days: int | None = Field(default=None, alias="cache_resource_retention_days")
 
     model_config = ConfigDict(populate_by_name=True)
 
     @property
     def normalized_max_root_runs(self) -> int:
         return normalize_model_log_retention_root_runs(self.max_root_runs)
+
+    @property
+    def normalized_cache_resource_retention_days(self) -> int | None:
+        if self.cache_resource_retention_days is None:
+            return None
+        return normalize_provider_prompt_cache_resource_retention_days(self.cache_resource_retention_days)
 
 
 class SettingsUpdatePayload(BaseModel):
@@ -394,7 +404,16 @@ def update_settings_endpoint(payload: SettingsUpdatePayload) -> dict:
         else existing_buddy_runtime
     )
     if payload.model_logs is not None:
-        next_settings["model_logs"] = {"max_root_runs": payload.model_logs.normalized_max_root_runs}
+        existing_model_log_retention = get_model_log_retention_settings(existing_settings)
+        cache_resource_retention_days = payload.model_logs.normalized_cache_resource_retention_days
+        next_settings["model_logs"] = {
+            "max_root_runs": payload.model_logs.normalized_max_root_runs,
+            "cache_resource_retention_days": (
+                cache_resource_retention_days
+                if cache_resource_retention_days is not None
+                else existing_model_log_retention["cache_resource_retention_days"]
+            ),
+        }
     elif "model_logs" in existing_settings:
         next_settings["model_logs"] = get_model_log_retention_settings(existing_settings)
     next_settings.pop("buddy_permission_mode", None)
@@ -419,7 +438,10 @@ def get_model_log_settings_endpoint() -> dict[str, int]:
 
 @router.post("/model-logs")
 def update_model_log_settings_endpoint(payload: ModelLogSettingsPayload) -> dict[str, int]:
-    return save_model_log_retention_settings(max_root_runs=payload.normalized_max_root_runs)
+    return save_model_log_retention_settings(
+        max_root_runs=payload.normalized_max_root_runs,
+        cache_resource_retention_days=payload.normalized_cache_resource_retention_days,
+    )
 
 
 @router.post("/model-providers/discover")

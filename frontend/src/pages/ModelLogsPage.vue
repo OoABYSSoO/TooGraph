@@ -30,6 +30,17 @@
               class="model-logs-page__retention-input"
             />
           </label>
+          <label class="model-logs-page__retention-field">
+            <span>{{ t("modelLogs.cacheResourceRetentionLabel") }}</span>
+            <ElInputNumber
+              v-model="retentionCacheResourceDays"
+              :min="1"
+              :max="3650"
+              :step="1"
+              controls-position="right"
+              class="model-logs-page__retention-input"
+            />
+          </label>
           <button type="button" class="model-logs-page__retention-save" :disabled="retentionSaving" @click="saveRetentionSettings">
             {{ retentionSaving ? t("modelLogs.retentionSaving") : t("modelLogs.retentionSave") }}
           </button>
@@ -38,6 +49,9 @@
           <span>{{ total }} total</span>
           <span>{{ errorCount }} errors</span>
           <span>{{ currentPage }} / {{ pageCount || 1 }}</span>
+          <span class="model-logs-page__cache-summary">{{ cacheHitRateLabel }}</span>
+          <span class="model-logs-page__cache-summary">{{ cacheResourceLabel }}</span>
+          <span class="model-logs-page__cache-summary">{{ cacheTokenLabel }}</span>
         </div>
       </section>
 
@@ -441,7 +455,7 @@ import { useI18n } from "vue-i18n";
 
 import { fetchModelLogs, updateModelLogRetention } from "@/api/modelLogs";
 import AppShell from "@/layouts/AppShell.vue";
-import type { ModelLogEntry, ModelLogTreeNode } from "@/types/model-log";
+import type { ModelLogEntry, ModelLogTreeNode, ProviderCacheSummary } from "@/types/model-log";
 import { highlightJson } from "./modelLogsJsonHighlight.ts";
 import {
   buildProviderCacheDiagnostic,
@@ -469,11 +483,13 @@ const total = ref(0);
 const pageCount = ref(0);
 const logs = ref<ModelLogEntry[]>([]);
 const runTrees = ref<ModelLogTreeNode[]>([]);
+const providerCacheSummary = ref<ProviderCacheSummary>(emptyProviderCacheSummary());
 const selectedLogId = ref<string | null>(null);
 const query = ref("");
 const loading = ref(true);
 const error = ref<string | null>(null);
 const retentionRootRuns = ref(200);
+const retentionCacheResourceDays = ref(30);
 const retentionSaving = ref(false);
 const outputDisplayMode = ref<"normal" | "chunks">("normal");
 const rawResponseDisplayMode = ref<"normal" | "chunks">("normal");
@@ -499,6 +515,29 @@ const selectedLog = computed(() => {
 });
 
 const errorCount = computed(() => logs.value.filter((entry) => Boolean(entry.error)).length);
+const cacheHitRateLabel = computed(() => {
+  const summary = providerCacheSummary.value;
+  const attempts = summary.resource_created_count + summary.resource_reused_count;
+  return t("modelLogs.cacheHitRate", {
+    rate: formatPercent(summary.resource_hit_rate),
+    hits: formatInteger(summary.resource_reused_count),
+    attempts: formatInteger(attempts),
+  });
+});
+const cacheResourceLabel = computed(() => {
+  const counts = providerCacheSummary.value.resource_status_counts || {};
+  return t("modelLogs.cacheResources", {
+    active: formatInteger(counts.active || 0),
+    expired: formatInteger(counts.expired || 0),
+    total: formatInteger(providerCacheSummary.value.resource_total),
+  });
+});
+const cacheTokenLabel = computed(() =>
+  t("modelLogs.cacheTokens", {
+    read: formatInteger(providerCacheSummary.value.cache_read_input_tokens),
+    create: formatInteger(providerCacheSummary.value.cache_creation_input_tokens),
+  }),
+);
 const logsById = computed(() => new Map(logs.value.map((entry) => [entry.id, entry])));
 const treeItems = computed(() => flattenTreeItems(runTrees.value, logsById.value));
 const selectedStreamSummary = computed(() => (selectedLog.value ? getStreamSummary(selectedLog.value) : null));
@@ -715,10 +754,13 @@ async function loadLogs() {
     });
     logs.value = page.entries;
     runTrees.value = page.run_trees;
+    providerCacheSummary.value = normalizeProviderCacheSummary(page.provider_cache_summary);
     total.value = page.total;
     currentPage.value = page.page;
     pageCount.value = page.pages;
     retentionRootRuns.value = page.retention?.max_root_runs ?? retentionRootRuns.value;
+    retentionCacheResourceDays.value =
+      page.retention?.cache_resource_retention_days ?? retentionCacheResourceDays.value;
     if (!logs.value.some((entry) => entry.id === selectedLogId.value)) {
       selectedLogId.value = logs.value[0]?.id ?? null;
     }
@@ -736,12 +778,26 @@ function selectLog(logId: string) {
 
 async function saveRetentionSettings() {
   const nextRootRuns = Math.max(1, Math.min(10000, Math.round(Number(retentionRootRuns.value) || 200)));
+  const nextCacheResourceDays = Math.max(
+    1,
+    Math.min(3650, Math.round(Number(retentionCacheResourceDays.value) || 30)),
+  );
   retentionRootRuns.value = nextRootRuns;
+  retentionCacheResourceDays.value = nextCacheResourceDays;
   retentionSaving.value = true;
   try {
-    const saved = await updateModelLogRetention({ max_root_runs: nextRootRuns });
+    const saved = await updateModelLogRetention({
+      max_root_runs: nextRootRuns,
+      cache_resource_retention_days: nextCacheResourceDays,
+    });
     retentionRootRuns.value = saved.max_root_runs;
-    ElMessage.success(t("modelLogs.retentionSaved", { count: saved.max_root_runs }));
+    retentionCacheResourceDays.value = saved.cache_resource_retention_days;
+    ElMessage.success(
+      t("modelLogs.retentionSaved", {
+        count: saved.max_root_runs,
+        days: saved.cache_resource_retention_days,
+      }),
+    );
     await loadLogs();
   } catch (saveError) {
     ElMessage.error(saveError instanceof Error ? saveError.message : t("modelLogs.retentionFailed"));
@@ -764,6 +820,64 @@ function scheduleLogsLoad() {
     searchTimer = null;
     void loadLogs();
   }, 240);
+}
+
+function emptyProviderCacheSummary(): ProviderCacheSummary {
+  return {
+    kind: "provider_cache_summary",
+    decision_count: 0,
+    provider_applied_count: 0,
+    resource_created_count: 0,
+    resource_reused_count: 0,
+    resource_hit_rate: 0,
+    cache_creation_input_tokens: 0,
+    cache_read_input_tokens: 0,
+    provider_cache_control_counts: {},
+    resource_status_counts: {},
+    resource_total: 0,
+  };
+}
+
+function normalizeProviderCacheSummary(value: ProviderCacheSummary | undefined): ProviderCacheSummary {
+  if (!value || value.kind !== "provider_cache_summary") {
+    return emptyProviderCacheSummary();
+  }
+  return {
+    ...emptyProviderCacheSummary(),
+    ...value,
+    decision_count: nonNegativeNumber(value.decision_count),
+    provider_applied_count: nonNegativeNumber(value.provider_applied_count),
+    resource_created_count: nonNegativeNumber(value.resource_created_count),
+    resource_reused_count: nonNegativeNumber(value.resource_reused_count),
+    resource_hit_rate: Math.max(0, Math.min(1, Number(value.resource_hit_rate) || 0)),
+    cache_creation_input_tokens: nonNegativeNumber(value.cache_creation_input_tokens),
+    cache_read_input_tokens: nonNegativeNumber(value.cache_read_input_tokens),
+    provider_cache_control_counts: normalizeNumberRecord(value.provider_cache_control_counts),
+    resource_status_counts: normalizeNumberRecord(value.resource_status_counts),
+    resource_total: nonNegativeNumber(value.resource_total),
+  };
+}
+
+function normalizeNumberRecord(value: Record<string, number> | undefined) {
+  const record: Record<string, number> = {};
+  for (const [key, rawValue] of Object.entries(value || {})) {
+    record[key] = nonNegativeNumber(rawValue);
+  }
+  return record;
+}
+
+function nonNegativeNumber(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : 0;
+}
+
+function formatInteger(value: unknown) {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(nonNegativeNumber(value));
+}
+
+function formatPercent(value: unknown) {
+  const number = Math.max(0, Math.min(1, Number(value) || 0));
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1, style: "percent" }).format(number);
 }
 
 function formatTimestamp(timestamp: string) {
@@ -940,7 +1054,7 @@ onBeforeUnmount(() => {
 
 .model-logs-page__toolbar {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(240px, auto) auto;
+  grid-template-columns: minmax(260px, 1fr) minmax(380px, auto) auto;
   gap: 16px;
   align-items: end;
   padding: 16px;
@@ -959,6 +1073,7 @@ onBeforeUnmount(() => {
 .model-logs-page__retention {
   display: flex;
   min-width: 0;
+  flex-wrap: wrap;
   align-items: end;
   gap: 10px;
 }

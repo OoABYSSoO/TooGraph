@@ -375,6 +375,36 @@ test("buildProviderCacheDiagnostic highlights provider-applied cache decisions",
   ]);
 });
 
+test("buildProviderCacheDiagnostic formats provider cache resource lifecycle evidence", () => {
+  const diagnostic = buildProviderCacheDiagnostic({
+    provider_cache_policy: "prefer",
+    provider_cache_decision: {
+      kind: "prompt_cache_policy",
+      requested_policy: "prefer",
+      mode: "provider_applied",
+      provider_cache_control: "gemini_cached_content",
+      eligible: true,
+      reason: "gemini_cached_content_reused",
+      cache_resource_status: "reused",
+      cached_content_name: "cachedContents/toograph-cache-reused",
+      cached_content_expires_at: "2099-05-30T00:00:00Z",
+      usage: {
+        cache_read_input_tokens: 1234,
+      },
+    },
+  });
+
+  assert.equal(diagnostic.visible, true);
+  assert.equal(diagnostic.status, "gemini_cached_content");
+  assert.equal(diagnostic.tone, "success");
+  assert.deepEqual(diagnostic.evidenceLabels, [
+    "reason: gemini_cached_content_reused",
+    "resource: reused cachedContents/toograph-cache-reused",
+    "expires: 2099-05-30T00:00:00Z",
+    "cache usage: 0 create / 1234 read",
+  ]);
+});
+
 test("buildProviderFallbackDiagnostic hides when no fallback trace exists", () => {
   const diagnostic = buildProviderFallbackDiagnostic({});
 

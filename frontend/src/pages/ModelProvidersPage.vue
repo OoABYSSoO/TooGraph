@@ -892,6 +892,7 @@ const providerCapabilityOptions: Array<{ key: ProviderModelCapabilityKey; labelK
   { key: "rerank", labelKey: "settings.providerCapabilityRerank", shortLabel: "Rank" },
   { key: "streaming", labelKey: "settings.providerCapabilityStreaming", shortLabel: "Stream" },
   { key: "reasoning", labelKey: "settings.providerCapabilityReasoning", shortLabel: "Reason" },
+  { key: "prompt_cache", labelKey: "settings.providerCapabilityPromptCache", shortLabel: "Cache" },
 ];
 
 function dedupeStrings(values: string[]) {

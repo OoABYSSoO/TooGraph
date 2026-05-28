@@ -69,6 +69,21 @@ export type ModelLogTreeNode = {
 
 export type ModelLogRetentionSettings = {
   max_root_runs: number;
+  cache_resource_retention_days: number;
+};
+
+export type ProviderCacheSummary = {
+  kind: "provider_cache_summary";
+  decision_count: number;
+  provider_applied_count: number;
+  resource_created_count: number;
+  resource_reused_count: number;
+  resource_hit_rate: number;
+  cache_creation_input_tokens: number;
+  cache_read_input_tokens: number;
+  provider_cache_control_counts?: Record<string, number>;
+  resource_status_counts: Record<string, number>;
+  resource_total: number;
 };
 
 export type ModelLogPage = {
@@ -79,4 +94,5 @@ export type ModelLogPage = {
   size: number;
   pages: number;
   retention: ModelLogRetentionSettings;
+  provider_cache_summary?: ProviderCacheSummary;
 };

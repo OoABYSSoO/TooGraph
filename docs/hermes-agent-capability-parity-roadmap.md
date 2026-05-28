@@ -65,10 +65,10 @@
 | 自我改进与 Curator | 进行中 | improvement candidates、验证 run 链接、approve/reject/apply API、Curator reports 页面 | `backend/tests/test_buddy_background_review_routes.py`、`backend/tests/test_template_layouts.py`、`frontend/src/pages/CuratorReportsPage.vue` | 自动验证、真实 diff 应用路径、更多 writer 覆盖 |
 | Capability Selector 与能力路由 | 进行中 | capability profile、权限过滤、selection trace、usage events、失败 fallback 输入 | `backend/tests/test_toograph_capability_selector_action.py`、`scripts/capability-selector-loop.test.mjs`、`frontend/src/buddy/buddyOutputTrace.test.ts` | 跨能力组合 fallback 和长期 usage 学习 |
 | Action / Tool / Subgraph 生态 | 进行中 | 官方 Action/Tool/Subgraph 包、manifest gate、动态 Tool/Subgraph capability、artifact 输出 | `backend/tests/test_action_manifest_contract.py`、`backend/tests/test_tool_node_runtime.py`、`scripts/official-asset-gate.mjs` | 高风险写入 Action、Subgraph worker 组合、artifact 端到端覆盖 |
-| Scheduler / Cron | 进行中 | job/store/API/runner/lifespan tick、retry policy、local delivery audit、权限边界 | `backend/tests/test_scheduler_store.py`、`backend/tests/test_scheduler_routes.py`、`backend/tests/test_scheduler_service.py`、`frontend/src/pages/SchedulerPage.vue` | 经审批的真实外部投递 adapter |
+| Scheduler / Cron | 进行中 | job/store/API/runner/lifespan tick、retry policy、local delivery audit、权限边界、经审批 webhook/http delivery adapter、delivery attempt 审计 | `backend/tests/test_scheduler_store.py`、`backend/tests/test_scheduler_routes.py`、`backend/tests/test_scheduler_service.py`、`backend/tests/test_scheduler_delivery.py`、`frontend/src/pages/SchedulerPage.vue` | delivery 失败重试链、Scheduler/RunDetail 投递诊断 UI |
 | Gateway / 多入口 / 消息平台 | 进行中 | Message Platforms 页面、Telegram / Feishu-Lark binding、runtime/adapters、外部消息进入 Buddy 会话、斜杠命令、可见回复投递、audit/dedup/session resolver | `backend/tests/test_message_platform_*.py`、`frontend/src/api/message-platforms.test.ts`、`frontend/src/pages/MessagePlatformsPage.structure.test.ts`、`frontend/src/pages/messagePlatformsPageModel.test.ts` | 多模态 `state_bundle`、生产级凭据/部署、外部投递诊断、更多平台 adapter |
 | Delegation / Subagents / Kanban | 进行中 | worker packet/result/merge/board state、Batch/Subgraph worker、RunDetail/胶囊诊断 | `backend/tests/test_delegation_worker_result_packager_tool.py`、`backend/tests/test_delegation_worker_result_merger_tool.py`、`backend/tests/test_delegation_kanban_board_builder_tool.py`、`backend/tests/test_batch_node_system.py` | 持久 board、claim/ownership、长期任务状态 |
-| Provider Runtime 与模型能力矩阵 | 进行中 | provider fallback trace、embedding/rerank fallback、模型能力矩阵、保存级请求超时 profile、节点级 `providerProfile.requestTimeoutSeconds` override、`cachePolicy=disabled` prompt cache 审计决策、OpenAI/Codex Responses `prompt_cache_key` payload、model call provider profile meta、RunDetail Provider Profile 诊断、RunDetail budget degradation diagnostic UI、provider credential pool schema、credential failure/cooldown 写回、repeated-failure credential exhausted 隔离、least-recently-used credential 轮换、跨调用成本预算累计审计、预算耗尽 preflight 阻断、`costBudget.onExceeded=request_approval` 审批请求事实、预算审批 pause/resume 放行、`costBudget.onExceeded=degrade_model` 显式模型降级、`rateProfile` 最近窗口 preflight 阻断、进程内 `rateProfile.concurrency` gate、`tokensPerMinute` 请求 token 预测阻断、rate preflight `retry_after` 诊断、显式 `rateProfile.waitStrategy=wait` 预算内多次等待重试、进程内 provider 级 FIFO wait 队列、DB-backed in-flight 请求/Token 预留、reservation meta/log 诊断事实、Model Logs reservation 诊断 UI、DB-backed provider rate wait queue、Model Logs credential diagnostic UI、Model Logs cost/rate diagnostic UI、Model Logs cache diagnostic UI、Model Logs fallback diagnostic UI、Model Logs budget degradation diagnostic UI | `backend/tests/test_agent_runtime_config.py`、`backend/tests/test_agent_response_generation.py`、`backend/tests/test_agent_action_input_generation.py`、`backend/tests/test_agent_subgraph_input_generation.py`、`backend/tests/test_node_handlers_runtime.py`、`backend/tests/test_model_request_logs.py`、`backend/tests/test_model_provider_client.py`、`backend/tests/test_settings_model_providers.py`、`backend/tests/test_provider_fallback_resolver.py`、`backend/tests/test_openai_compatible_provider_runtime.py`、`frontend/src/pages/agentDiagnosticModel.test.ts`、`frontend/src/pages/runDetailModel.test.ts`、`frontend/src/pages/settingsPageModel.test.ts`、`frontend/src/pages/RunDetailPage.structure.test.ts`、`frontend/src/pages/ModelProvidersPage.structure.test.ts`、`frontend/src/pages/modelLogProviderDiagnostics.test.ts`、`frontend/src/pages/ModelLogsPage.structure.test.ts`、`backend/tests/test_model_provider_credentials.py` | Gemini prompt cache resource、其他 OpenAI-compatible cache opt-in |
+| Provider Runtime 与模型能力矩阵 | 进行中 | provider fallback trace、embedding/rerank fallback、模型能力矩阵、保存级请求超时 profile、节点级 `providerProfile.requestTimeoutSeconds` override、`cachePolicy=disabled` prompt cache 审计决策、OpenAI/Codex Responses `prompt_cache_key` payload、Gemini `cachedContents` resource payload、Gemini cachedContent 本地复用与 TTL 过期、Model Logs cache hit-rate/resource summary、cache resource retention/pruning、OpenAI-compatible `prompt_cache` capability opt-in payload、model call provider profile meta、RunDetail Provider Profile 诊断、RunDetail budget degradation diagnostic UI、provider credential pool schema、credential failure/cooldown 写回、repeated-failure credential exhausted 隔离、least-recently-used credential 轮换、跨调用成本预算累计审计、预算耗尽 preflight 阻断、`costBudget.onExceeded=request_approval` 审批请求事实、预算审批 pause/resume 放行、`costBudget.onExceeded=degrade_model` 显式模型降级、`rateProfile` 最近窗口 preflight 阻断、进程内 `rateProfile.concurrency` gate、`tokensPerMinute` 请求 token 预测阻断、rate preflight `retry_after` 诊断、显式 `rateProfile.waitStrategy=wait` 预算内多次等待重试、进程内 provider 级 FIFO wait 队列、DB-backed in-flight 请求/Token 预留、reservation meta/log 诊断事实、Model Logs reservation 诊断 UI、DB-backed provider rate wait queue、Model Logs credential diagnostic UI、Model Logs cost/rate diagnostic UI、Model Logs cache diagnostic UI、Model Logs fallback diagnostic UI、Model Logs budget degradation diagnostic UI | `backend/tests/test_agent_runtime_config.py`、`backend/tests/test_agent_response_generation.py`、`backend/tests/test_agent_action_input_generation.py`、`backend/tests/test_agent_subgraph_input_generation.py`、`backend/tests/test_node_handlers_runtime.py`、`backend/tests/test_model_request_logs.py`、`backend/tests/test_model_provider_client.py`、`backend/tests/test_settings_model_providers.py`、`backend/tests/test_provider_fallback_resolver.py`、`backend/tests/test_openai_compatible_provider_runtime.py`、`frontend/src/pages/agentDiagnosticModel.test.ts`、`frontend/src/pages/runDetailModel.test.ts`、`frontend/src/pages/settingsPageModel.test.ts`、`frontend/src/pages/RunDetailPage.structure.test.ts`、`frontend/src/pages/ModelProvidersPage.structure.test.ts`、`frontend/src/pages/modelLogProviderDiagnostics.test.ts`、`frontend/src/pages/ModelLogsPage.structure.test.ts`、`frontend/src/api/modelLogs.test.ts`、`backend/tests/test_model_provider_credentials.py`、`backend/tests/test_storage_database.py` | 更多 provider-specific cache adapter |
 | 上下文压缩与 Prompt Cache | 进行中 | 上下文压力检查、压缩子图、summary source refs、prompt audit metadata | `backend/tests/test_buddy_context_pressure_tool.py`、`backend/tests/test_template_layouts.py`、`frontend/src/buddy/buddyContextCompaction.test.ts` | provider 级 cache-control、稳定前缀拆分、节点级 cache override |
 | 权限、安全与注入防护 | 进行中 | context scanner、secret redaction、高风险阻断、permission approval、artifact 路径隔离 | `backend/tests/test_context_assembly_store.py`、`backend/tests/test_permission_approval.py`、`backend/tests/test_graph_run_db_store_permission_audit.py`、`backend/tests/test_capability_artifact_store.py` | 能力包保护策略、审批 review surface、外部投递审批 |
 | 诊断与可观测性 | 进行中 | RunDetail 聚合 context audit、agent diagnostic、provider fallback、provider budget degradation、permission、review、run tree；Buddy 胶囊按 output 边界重放 | `frontend/src/pages/RunDetailPage.structure.test.ts`、`frontend/src/pages/runDetailModel.test.ts`、`frontend/src/pages/agentDiagnosticModel.test.ts`、`frontend/src/buddy/buddyOutputTrace.test.ts` | 后台任务 report、召回排名和失败恢复集中诊断 |
@@ -198,22 +198,24 @@
 - `node scripts/capability-selector-loop.test.mjs`
 - `node --test frontend/src/buddy/buddyOutputTrace.test.ts`
 
-### 4.7 Scheduler 已经能运行图任务，但外部投递仍停在审批边界
+### 4.7 Scheduler 已经能运行图任务，并开始具备经审批外部投递
 
 代码事实：
 
-- `scheduled_graph_jobs`、`scheduled_graph_job_runs` 已入库。
+- `scheduled_graph_jobs`、`scheduled_graph_job_runs`、`scheduled_delivery_attempts` 已入库。
 - `backend/app/scheduler/store.py`、`runner.py`、`service.py` 和 `routes_scheduler.py` 提供创建、到期查询、运行、retry 和 lifespan tick。
-- 外部投递目标当前记录为 `external_delivery_requires_approval`，敏感字段会脱敏。
+- 外部投递目标默认仍记录 `external_delivery_requires_approval`，敏感字段会脱敏；`backend/app/scheduler/delivery.py` 提供经审批 webhook/http delivery adapter，审批 API 通过后才会发送请求。
+- `scheduled_delivery_attempts` 会记录每次真实外部投递的 status、reason、redacted target、redacted request、response summary 和错误，job run metadata 会回写 latest attempt、delivery approval 与 delivery result。
 
 增强内容：
 
 - 定时任务变成标准 graph run，有 run record、retry policy、delivery audit 和权限 profile。
+- Scheduler 外部投递不再只能停留在审计文本：用户或上层 review surface 批准后，webhook/http target 可以执行真实 POST/PUT/PATCH，并留下不含 secret 的 attempt 事实。
 - 官方启动会 seed 内置维护任务。
 
 验证方式：
 
-- `pytest backend/tests/test_scheduler_store.py backend/tests/test_scheduler_routes.py backend/tests/test_scheduler_service.py -q`
+- `pytest backend/tests/test_scheduler_store.py backend/tests/test_scheduler_routes.py backend/tests/test_scheduler_service.py backend/tests/test_scheduler_delivery.py -q`
 - `pytest backend/tests/test_scheduler_permission_policy.py backend/tests/test_scheduler_run_context_loader_tool.py -q`
 
 ### 4.8 Provider runtime 已经统一 fallback 和请求超时 profile
@@ -340,6 +342,14 @@
 - `backend/app/tools/model_provider_anthropic.py` 会在 `cachePolicy=prefer` 且 prompt snapshot 判定可缓存时，把 Anthropic Messages API 的 `system` payload 转为 text block 并写入 `cache_control: {"type": "ephemeral"}`；响应 usage 中的 cache token 字段会回写到 prompt snapshot 的 `provider_usage`。
 - `backend/app/tools/model_provider_openai.py` 会在官方 OpenAI Chat Completions provider 且 `cachePolicy=prefer` 可用时，把 prompt snapshot 的 `cache_key` 下发为 `prompt_cache_key`，并把 `usage.prompt_tokens_details.cached_tokens` 归一化回 `provider_prompt_cache_result.usage.cached_tokens`。
 - `backend/app/tools/model_provider_codex.py` 会在 Codex Responses transport 且 `cachePolicy=prefer` 可用时，把同一 prompt snapshot `cache_key` 下发为 Responses payload 的 `prompt_cache_key`，并把 `usage.input_tokens_details.cached_tokens` 归一化回 `provider_prompt_cache_result.usage.cached_tokens`。
+- `backend/app/tools/model_provider_gemini.py` 会在 Gemini generateContent transport 且 `cachePolicy=prefer` 可用时，为稳定 system prompt 创建 `cachedContents` 资源，并在生成请求中引用 `cachedContent`；创建与读取 token 会归一化到同一个 `provider_prompt_cache_result.usage` 合同。
+- `backend/app/core/storage/database.py` 和 `backend/app/core/storage/provider_prompt_cache_store.py` 会保存 provider prompt cache resource，按 provider、transport、base URL、模型、credential scope、`cache_key` 和 `stable_prefix_hash` 查找未过期资源；`backend/app/tools/model_provider_gemini.py` 会在创建前复用未过期 Gemini `cachedContents`，并在 lookup 时把过期资源标记为 `expired`。返回 meta 会区分 `cache_resource_status=created/reused`、`cached_content_name` 和 `cached_content_expires_at`，让创建/复用/TTL 事实进入同一个 cache 诊断合同。
+- `frontend/src/pages/modelLogProviderDiagnostics.ts` 会把 provider cache resource 状态、资源名和过期时间展示到 Model Logs cache evidence 中，帮助用户判断某次调用是新建缓存还是复用既有 `cachedContents`。
+- `backend/app/core/storage/model_log_store.py` 会在 `list_model_request_logs` 返回 `provider_cache_summary`，按当前查询范围统计 cache decision 数、provider applied 数、Gemini resource created/reused 命中率、cache creation/read token，以及 `provider_prompt_cache_resources` 的 active/expired/superseded 状态；summary 读取会复用 `provider_prompt_cache_store` 的过期标记逻辑，避免过期资源继续显示为 active。
+- `backend/app/core/storage/provider_prompt_cache_store.py` 会按保留天数 pruning 已终止 cache resource：超过窗口的 expired 资源按 `expires_at` 删除，superseded 资源按 `updated_at` 删除，未过期 active 资源保留可复用；`backend/app/core/storage/model_log_store.py` 会在模型日志保留保存和常规日志 pruning 时触发同一清理。
+- `frontend/src/types/model-log.ts`、`frontend/src/api/modelLogs.ts` 和 `frontend/src/pages/ModelLogsPage.vue` 会保留并展示 `provider_cache_summary`，在 Model Logs 顶部直接显示 cache hit rate、资源 active/expired/total 和 cache token read/create 汇总；同页保留设置现在也包含 cache resource 保留天数，便于用户控制 Gemini `cachedContents` 本地索引的生命周期。
+- `backend/app/tools/model_provider_client.py` 会读取 saved model capabilities；只有非官方 OpenAI-compatible 模型显式打开 `prompt_cache` capability 时，才把 `cache_key` 作为 `prompt_cache_key` 下发，并在诊断里标记 `openai_compatible_prompt_cache_key`。未 opt-in 的 compatible provider 仍返回 `not_supported` cache 诊断，不会偷偷发送 provider-specific 字段。
+- `frontend/src/pages/ModelProvidersPage.vue` 的能力矩阵暴露 `Prompt cache` 开关，`frontend/src/pages/settingsPageModel.ts` 和 settings API 会保留 `prompt_cache` capability，让 provider cache opt-in 成为可见、可审计的配置而不是隐藏代码路径。
 - `backend/app/tools/model_provider_client.py` 会在 model-ref 调用返回后把 `provider_prompt_cache_result` 回填到最新 model-call metadata 的 `provider_cache_decision`，让 Model Logs cache 诊断看到 provider 实际应用结果，而不是只能看到调用前审计决策。
 - `backend/app/core/model_provider_credentials.py` 提供可复用的 credential pool secret-preserving normalization、least-recently-used active credential selection primitive 和 `last_used_at` metadata；默认输出仍会移除 `api_key`，只有 settings 保存和 provider runtime 路径读取 secret。
 - `backend/app/api/routes_settings.py` 会在 Model Providers 页面用只读 metadata 回写 credential pool 时保留已有池内 `api_key`，避免 UI 保存状态、冷却时间或失败计数时意外清除 secret。
@@ -394,6 +404,8 @@
 - `cachePolicy=prefer` 在 Anthropic transport 上已从“仅审计”推进到实际 provider cache-control payload；RunDetail 和模型日志后续可以区分 provider 已应用、provider 不支持、或 policy 不符合条件。
 - `cachePolicy=prefer` 在官方 OpenAI Chat Completions provider 上已从“仅审计”推进到 `prompt_cache_key` payload；返回 usage 中的 cached token 数会进入 provider cache 诊断，模型日志也会回填 provider 应用结果。
 - `cachePolicy=prefer` 在 Codex Responses transport 上也会下发 `prompt_cache_key` payload；Responses 返回的 cached token 数进入同一 `provider_prompt_cache_result` 合同，让 Codex provider cache 结果可以被 Model Logs cache 诊断消费。
+- `cachePolicy=prefer` 在 Gemini generateContent transport 上会先查找同 scope 未过期的 `cachedContents` 资源，命中时直接复用，未命中时才创建新资源并引用 `cachedContent`；这样 Gemini 的显式 prompt cache 也进入同一 provider cache 诊断合同，Model Logs 可以展示 cache creation/read token、资源状态、过期时间和跨 run created/reused 命中率。
+- 非官方 OpenAI-compatible provider 的 prompt cache 现在有显式 opt-in：用户在 Model Providers 能力矩阵为具体模型打开 `Prompt cache` 后，runtime 才会下发 `prompt_cache_key`；没有打开时仍以 `not_supported` 记录诊断，避免对未知兼容网关发送它可能不接受的字段。
 - 模型请求日志现在保留 provider profile runtime context，后续成本估算、限速执行、credential 选择和 provider cache payload 都可以写入同一个 model-call 事实源，而不需要另开隐藏诊断链路。
 - RunDetail Agent Diagnostic 不再只显示 provider fallback；它现在也能展示当前节点 provider profile 的请求超时、cache 决策、成本预算、预算超限策略和速率 profile，使节点级配置变成可见诊断事实。
 - Provider settings 现在拥有可审计的 credential pool schema；后续冷却诊断、失败隔离和实际 credential 选择都可以复用同一设置与 catalog 事实源，而不是临时塞入 provider client 内部状态。
@@ -422,10 +434,10 @@
 - provider rate wait queue 已从进程内 `deque` 升级为 DB-backed FIFO：多个 TooGraph 进程可以围绕同一个 provider queue key 看到等待者、队首 acquisition 和过期清理，降低跨进程等待型调用在同一释放窗口同时醒来造成的局部冲击。
 - Model Logs 详情页现在会把 provider credential metadata 呈现为凭据诊断：状态 pill、credential/source/status/failure 指标、last-used/cooldown 时间线，以及 failure 后状态变化、失败计数变化、cooldown 清理等证据 chips 都来自同一 model-call 事实源。
 - Model Logs 详情页现在会把 provider cost/rate metadata 呈现为成本与速率决策诊断：用户可以直接看到 estimated cost、budget limit、累计预算状态、单次请求/token 限额、over-limit reason 和触发的 limit，而不需要展开 raw JSON。
-- Model Logs 详情页现在会把 provider cache metadata 呈现为缓存决策诊断：用户可以直接看到 requested policy、runtime mode、provider cache control、eligible/ineligible、禁用或不应用 reason、prefix/suffix 规模、invalidators 和 cache usage，而不需要展开 raw JSON。
+- Model Logs 详情页现在会把 provider cache metadata 呈现为缓存决策诊断：用户可以直接看到 requested policy、runtime mode、provider cache control、eligible/ineligible、禁用或不应用 reason、prefix/suffix 规模、invalidators 和 cache usage，而不需要展开 raw JSON；列表顶部还会展示当前查询范围内的 cache hit rate、cache resource active/expired/total 和 cache token read/create 汇总，保留设置会同步控制终止 cache resource 的 pruning 窗口。
 - Model Logs 详情页现在会把 provider fallback metadata 呈现为 fallback 诊断：用户可以直接看到 primary provider 为什么失败、哪些 fallback/rejected 候选参与选择、最终选中哪个模型，以及能力/权限/warning 证据，而不需要展开 raw JSON。
 - Model Logs 详情页现在会把 `provider_cost_budget_degradation` 呈现为预算降级诊断：用户可以直接看到 requested/selected model ref、预算上限、窗口已用成本、preflight 状态与原因、累计成本和 `onExceeded=degrade_model` 策略证据，而不需要展开 raw JSON。
-- credential pool metadata 仍保留为可审计 runtime/settings profile，预算降级已复用同一 provider fallback、runtime config 和 model-call metadata 事实源；Gemini cachedContent 和其他 OpenAI-compatible provider cache opt-in 也可以按同一 `provider_prompt_cache_result` 合同逐步扩展。
+- credential pool metadata 仍保留为可审计 runtime/settings profile，预算降级、Gemini cachedContent 创建/复用/TTL/pruning 生命周期和 compatible provider `prompt_cache` opt-in 已复用同一 provider fallback/runtime config/model-call metadata 事实源；后续 provider-specific cache adapter 也可以按同一 `provider_prompt_cache_result` 合同逐步扩展。
 
 验证方式：
 
@@ -438,6 +450,12 @@
 - `PYTHONPATH=backend pytest backend/tests/test_agent_response_generation.py::AgentResponseGenerationTests::test_provider_cache_policy_prefer_records_provider_applied_decision backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_anthropic_applies_preferred_prompt_cache_control -q`
 - `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_openai_compatible_applies_prompt_cache_key_for_openai_provider backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_with_model_ref_backfills_provider_cache_result_to_model_log -q`
 - `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_codex_responses_applies_prompt_cache_key -q`
+- `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_gemini_creates_cached_content_for_preferred_prompt_cache -q`
+- `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_gemini_reuses_cached_content_resource_before_expiry backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_gemini_does_not_reuse_expired_cached_content_resource backend/tests/test_storage_database.py::StorageDatabaseTests::test_initialize_storage_creates_graph_run_schema -q`
+- `node --test frontend/src/pages/modelLogProviderDiagnostics.test.ts`
+- `PYTHONPATH=backend pytest backend/tests/test_model_request_logs.py::ModelRequestLogTests::test_model_request_logs_report_provider_cache_hit_rate_and_resources -q`
+- `node --test frontend/src/api/modelLogs.test.ts frontend/src/pages/ModelLogsPage.structure.test.ts`
+- `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_with_model_ref_applies_prompt_cache_key_for_compatible_provider_opt_in backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_with_model_ref_does_not_apply_prompt_cache_key_without_compatible_opt_in -q`
 - `PYTHONPATH=backend pytest backend/tests/test_agent_runtime_config.py::AgentRuntimeConfigTests::test_provider_cost_budget_degrade_model_strategy_is_exposed_for_runtime_calls backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_with_model_ref_degrades_model_when_cost_budget_preflight_is_exhausted backend/tests/test_model_request_logs.py::ModelRequestLogTests::test_provider_cost_budget_preflight_marks_approval_strategy_when_window_is_exhausted -q`
 - `PYTHONPATH=backend pytest backend/tests/test_agent_response_generation.py backend/tests/test_agent_action_input_generation.py backend/tests/test_agent_subgraph_input_generation.py backend/tests/test_model_provider_client.py backend/tests/test_model_request_logs.py -q`
 - `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_chat_with_model_ref_selects_active_credential_from_pool backend/tests/test_settings_model_providers.py::SettingsModelProviderTests::test_update_settings_preserves_provider_credential_pool_api_keys_when_payload_omits_them backend/tests/test_settings_model_providers.py::SettingsModelProviderTests::test_catalog_exposes_provider_credential_pool_metadata backend/tests/test_model_request_logs.py::ModelRequestLogTests::test_model_request_log_preserves_provider_profile_context -q`
@@ -470,10 +488,10 @@
 
 当前缺口：
 
-- prompt cache 已能在 audit metadata 中体现节点级 `cachePolicy=disabled` 的实际禁用决策，`cachePolicy=prefer` 已在 Anthropic Messages transport 下发 provider-specific `cache_control`，并已在官方 OpenAI Chat Completions provider 与 Codex Responses transport 下发 `prompt_cache_key`；Gemini 的 cachedContent 资源流和其他 compatible provider 的安全 opt-in 仍需按各自能力继续扩展。
+- prompt cache 已能在 audit metadata 中体现节点级 `cachePolicy=disabled` 的实际禁用决策，`cachePolicy=prefer` 已在 Anthropic Messages transport 下发 provider-specific `cache_control`，已在官方 OpenAI Chat Completions provider 与 Codex Responses transport 下发 `prompt_cache_key`，已在 Gemini generateContent transport 创建/引用 `cachedContents`，并能把 Gemini `cachedContents` 资源保存到本地 DB，在同一 provider/model/credential/cache key 下复用未过期资源、跳过过期资源和记录资源状态；Model Logs 已能按当前查询范围展示 cache hit rate、resource status 和 token 汇总，并通过保留设置 pruning 过期或被替代的 cache resource；非官方 OpenAI-compatible 模型也已通过 `prompt_cache` capability 显式 opt-in `prompt_cache_key`。剩余工作转向更多 provider-specific cache adapter。
 - credential pool 已有设置 schema、UI 诊断摘要、secret-preserving save path、catalog configured 判断、chat provider runtime 的 least-recently-used active credential 选择、真实调用后的 failure/cooldown/last-used/exhausted 写回，以及 Model Logs 与 RunDetail 的 credential/cost/rate/cache/fallback/预算降级状态诊断。
-- 节点级 `providerProfile` 已经系统化到图协议和 runtime config，`requestTimeoutSeconds` 已进入实际 LLM 调用，`cachePolicy=disabled` 已进入 prompt cache 审计决策，Anthropic `cachePolicy=prefer`、官方 OpenAI Chat Completions `prompt_cache_key` 和 Codex Responses `prompt_cache_key` 已进入 provider payload，并且 provider profile/cache/fallback/cost/rate runtime context 已写入 model call meta；chat provider runtime 已能记录实际 credential 选择、least-recently-used credential 轮换、repeated-failure credential exhausted 隔离、基于单次 usage/pricing 的 cost estimate、模型日志中的跨调用 cost budget 累计、预算耗尽后的 preflight 阻断、预算审批放行、显式模型降级、单次 rate decision、最近 60 秒 `rateProfile` 请求/Token preflight 阻断、进程内 `rateProfile.concurrency` gate、请求 token 预测阻断、retry-after 诊断、显式预算内多次等待重试、进程内 provider 级 FIFO wait 队列、DB-backed in-flight 请求/Token 预留、reservation meta/log 诊断事实、Model Logs reservation/cache/fallback/预算降级诊断 UI、DB-backed provider rate wait queue，以及 credential failure/cooldown 状态写回。Gemini cachedContent 和其他 compatible provider cache opt-in 仍尚未执行。
-- 预算超限后已经能生成结构化 approval request，接入标准 pause/resume approval surface 执行一次性经审批预算放行，也能在 `onExceeded=degrade_model` 时改走兼容 fallback 模型；剩余工作集中在 Gemini cachedContent 和其他 compatible provider cache opt-in。
+- 节点级 `providerProfile` 已经系统化到图协议和 runtime config，`requestTimeoutSeconds` 已进入实际 LLM 调用，`cachePolicy=disabled` 已进入 prompt cache 审计决策，Anthropic `cachePolicy=prefer`、官方 OpenAI Chat Completions `prompt_cache_key`、Codex Responses `prompt_cache_key`、Gemini `cachedContents` 创建/复用/TTL 过期和 compatible provider `prompt_cache` opt-in 已进入 provider payload，并且 provider profile/cache/fallback/cost/rate runtime context 已写入 model call meta；chat provider runtime 已能记录实际 credential 选择、least-recently-used credential 轮换、repeated-failure credential exhausted 隔离、基于单次 usage/pricing 的 cost estimate、模型日志中的跨调用 cost budget 累计、预算耗尽后的 preflight 阻断、预算审批放行、显式模型降级、单次 rate decision、最近 60 秒 `rateProfile` 请求/Token preflight 阻断、进程内 `rateProfile.concurrency` gate、请求 token 预测阻断、retry-after 诊断、显式预算内多次等待重试、进程内 provider 级 FIFO wait 队列、DB-backed in-flight 请求/Token 预留、reservation meta/log 诊断事实、Model Logs reservation/cache/cache-resource/hit-rate/fallback/预算降级诊断 UI、DB-backed provider rate wait queue，以及 credential failure/cooldown 状态写回。
+- 预算超限后已经能生成结构化 approval request，接入标准 pause/resume approval surface 执行一次性经审批预算放行，也能在 `onExceeded=degrade_model` 时改走兼容 fallback 模型；剩余工作集中在更完整 provider-specific cache adapters。
 
 实现方案：
 
@@ -514,7 +532,12 @@
 24g. 已完成：`costBudget.onExceeded=degrade_model` 显式预算降级策略；预算 preflight 已耗尽时，provider client 会跳过 primary provider 请求，用现有 fallback resolver 选择能力和权限兼容的后备模型，拒绝权限扩张候选，并把 `provider_cost_budget_degradation` 与 fallback trace 写入返回 meta / model-call metadata。
 24h. 已完成：Model Logs 详情页增加预算降级诊断 UI；前端诊断模型会归一化 `provider_cost_budget_degradation`，展示 requested/selected model ref、预算上限、窗口已用成本、preflight 状态/原因、累计成本和 `onExceeded=degrade_model` 证据。
 24i. 已完成：RunDetail Agent Diagnostic 增加预算降级诊断 UI；模型调用 meta 中的 `provider_cost_budget_degradation` 会进入最终回复、Action 输入规划和 Subgraph 输入规划 runtime config，RunDetail 会展示 requested/selected model ref、预算上限、窗口成本、preflight 状态和策略证据。
-25. 下一步：继续推进 Gemini cachedContent / 其他 OpenAI-compatible provider 的显式 cache resource/payload opt-in。
+24j. 已完成：Gemini generateContent transport 增加显式 `cachedContents` resource flow；当 prompt cache policy 为 `prefer` 且稳定 system prompt eligible 时，runtime 会创建缓存资源、生成请求引用 `cachedContent`，并把缓存创建/读取 token 写入 `provider_prompt_cache_result.usage`，供模型日志 cache 诊断复用。
+24k. 已完成：非官方 OpenAI-compatible provider 增加显式 `prompt_cache` capability opt-in；Model Providers 能力矩阵可为具体模型打开 Prompt cache，model-ref runtime 只有看到该 capability 时才下发 `prompt_cache_key`，否则保持 `not_supported` 诊断，避免隐藏发送兼容网关可能不支持的字段。
+24l. 已完成：Gemini `cachedContents` 增加 DB-backed resource lifecycle；`provider_prompt_cache_resources` 会按 provider/transport/base URL/model/credential scope/cache key/stable prefix 保存资源，Gemini runtime 创建前优先复用未过期资源，lookup 时跳过并标记过期资源，返回 meta 和 Model Logs cache evidence 会展示 created/reused、资源名和过期时间，从而减少重复创建同一稳定前缀缓存并提升跨调用可审计性。
+24m. 已完成：Model Logs 增加 provider cache summary；后端按当前日志查询范围聚合 cache decision、resource created/reused 命中率、cache token 和 resource status，前端在日志页顶部展示 hit rate、active/expired/total 资源和 read/create token，让跨 run prompt cache 效果可以直接观察。
+24n. 已完成：cache resource 增加真实 pruning；`provider_prompt_cache_store` 会删除超过保留窗口的 expired/superseded 资源，模型日志保留设置新增 cache resource 保留天数，保存设置和常规模型日志 pruning 都会触发清理，避免 Gemini `cachedContents` 本地索引长期堆积，同时保留仍 active 且未过期的可复用资源。
+25. 下一步：继续推进更多 provider-specific cache adapter。
 
 建议验证：
 
@@ -527,20 +550,20 @@
 
 当前缺口：
 
-- 外部 webhook/http delivery 只记录需要审批，不真正投递。
-- 审批结果和 delivery execution 没有形成统一重试链。
+- 外部 webhook/http delivery 已能在审批 API 通过后真实投递，并写入 redacted attempt；剩余缺口是 delivery 失败后还没有进入统一 retry policy。
+- Scheduler UI 和 RunDetail 还没有集中展示 delivery attempt、response summary 和审批记录。
 
 实现方案：
 
-1. 增加 `scheduled_delivery_attempts` 或复用 job run metadata 记录每次投递尝试。
-2. 新增受控 delivery Action 或 scheduler delivery adapter，输入只接受已审批 job_run 和 redacted-safe target。
-3. 审批通过后执行外部投递；失败进入 retry policy。
-4. Scheduler UI 和 RunDetail 展示 approval、delivery attempt、response summary 和 redacted target。
+1. 已完成：增加 `scheduled_delivery_attempts` 记录每次投递尝试，保存 redacted target、request、response summary、error 和 attempt metadata。
+2. 已完成：新增 scheduler delivery adapter，输入只接受已审批 job_run，并且只支持 webhook/http 外部投递目标；未审批路径仍保留 `external_delivery_requires_approval` 事实。
+3. 已完成：审批通过后执行外部投递，并把 delivery result、approval 和 latest attempt 写回 job run metadata；敏感 header、authorization、token、secret 等字段不会落入 attempt/result。
+4. 下一步：delivery 失败进入 retry policy，并让 Scheduler UI 和 RunDetail 展示 approval、delivery attempt、response summary 和 redacted target。
 
 建议验证：
 
-- 更新 `backend/tests/test_scheduler_store.py` 和 `backend/tests/test_scheduler_routes.py`。
-- 增加外部投递 adapter 的 mock HTTP 测试，断言敏感字段不落日志。
+- 更新 `backend/tests/test_scheduler_store.py`、`backend/tests/test_scheduler_routes.py` 和 `backend/tests/test_storage_database.py`。
+- 增加或维护 `backend/tests/test_scheduler_delivery.py` 的 mock HTTP 测试，断言敏感字段不落日志。
 - 更新 `frontend/src/pages/schedulerPageModel.test.ts`。
 
 ### 阶段 B2：消息平台生产硬化
@@ -690,9 +713,9 @@ rg -n "TO[D]O|TB[D]|待[补]" docs/hermes-agent-capability-parity-roadmap.md
 
 最合理的下一轮开发顺序：
 
-1. Provider profile 完整化。它直接补 Hermes provider runtime 差距，范围清晰，能在不改主循环图结构的情况下增强所有 LLM/embedding/rerank 调用。
+1. Provider-specific cache adapter 扩展。Provider profile 主链路已基本落地，剩余适合按具体 provider/transport 继续补齐。
 2. 消息平台生产硬化。基础入口已经合并，下一步补 `state_bundle`、delivery diagnostics、凭据轮换和 adapter health。
-3. Scheduler 外部投递闭环。当前已经有 store、runner、retry、权限边界和 UI，下一步是把审批后的投递执行补上。
+3. Scheduler 外部投递闭环。当前已经有 store、runner、retry、权限边界、审批后 webhook/http 投递和 attempt 记录，下一步是 delivery 失败重试链和 Scheduler/RunDetail 诊断 UI。
 4. Delegation 持久 board。当前 worker 协议已经能跑，下一步需要长期状态、ownership 和 UI 操作。
 5. 记忆召回质量提升。当前 recall 可用，下一步提高去重、解释性和人工复核。
 6. 官方能力包端到端覆盖。作为所有能力继续扩展前的防回归基础。

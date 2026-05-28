@@ -322,6 +322,112 @@ class ModelProviderClientTests(unittest.TestCase):
         self.assertEqual(meta["provider_prompt_cache_result"]["cache_key"], "sha256:prompt-cache-key")
         self.assertEqual(meta["provider_prompt_cache_result"]["usage"]["cached_tokens"], 1024)
 
+    def test_chat_with_model_ref_applies_prompt_cache_key_for_compatible_provider_opt_in(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_ref_with_meta
+
+        saved_settings = {
+            "model_providers": {
+                "gateway": {
+                    "enabled": True,
+                    "transport": "openai-compatible",
+                    "base_url": "https://gateway.example.test/v1",
+                    "api_key": "gw-key",
+                    "models": [
+                        {
+                            "model": "gateway-model",
+                            "capabilities": {"chat": True, "prompt_cache": True},
+                        }
+                    ],
+                }
+            }
+        }
+        fake_client, client_patch = self._patched_client(
+            FakeResponse(
+                {
+                    "id": "chatcmpl_gateway_cache",
+                    "model": "gateway-model",
+                    "choices": [{"message": {"content": "hello"}}],
+                    "usage": {
+                        "prompt_tokens": 2048,
+                        "completion_tokens": 32,
+                        "total_tokens": 2080,
+                        "prompt_tokens_details": {"cached_tokens": 1536},
+                    },
+                }
+            )
+        )
+        with patch("app.tools.model_provider_client.load_app_settings", return_value=saved_settings):
+            with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+                content, meta = chat_with_model_ref_with_meta(
+                    model_ref="gateway/gateway-model",
+                    system_prompt="stable system",
+                    user_prompt="dynamic user",
+                    temperature=0.2,
+                    prompt_cache_policy={
+                        "kind": "prompt_cache_policy",
+                        "requested_policy": "prefer",
+                        "eligible": True,
+                        "stable_prefix_hash": "sha256:stable",
+                        "cache_key": "sha256:compatible-cache-key",
+                    },
+                )
+
+        requested = fake_client.post_calls[0]
+        self.assertEqual(content, "hello")
+        self.assertEqual(requested["json"]["prompt_cache_key"], "sha256:compatible-cache-key")
+        self.assertEqual(meta["provider_prompt_cache_result"]["mode"], "provider_applied")
+        self.assertEqual(
+            meta["provider_prompt_cache_result"]["provider_cache_control"],
+            "openai_compatible_prompt_cache_key",
+        )
+        self.assertEqual(meta["provider_prompt_cache_result"]["reason"], "openai_compatible_prompt_cache_key_applied")
+        self.assertEqual(meta["provider_prompt_cache_result"]["usage"]["cached_tokens"], 1536)
+
+    def test_chat_with_model_ref_does_not_apply_prompt_cache_key_without_compatible_opt_in(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_ref_with_meta
+
+        saved_settings = {
+            "model_providers": {
+                "gateway": {
+                    "enabled": True,
+                    "transport": "openai-compatible",
+                    "base_url": "https://gateway.example.test/v1",
+                    "api_key": "gw-key",
+                    "models": [{"model": "gateway-model", "capabilities": {"chat": True}}],
+                }
+            }
+        }
+        fake_client, client_patch = self._patched_client(
+            FakeResponse(
+                {
+                    "id": "chatcmpl_gateway_no_cache",
+                    "model": "gateway-model",
+                    "choices": [{"message": {"content": "hello"}}],
+                }
+            )
+        )
+        with patch("app.tools.model_provider_client.load_app_settings", return_value=saved_settings):
+            with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+                content, meta = chat_with_model_ref_with_meta(
+                    model_ref="gateway/gateway-model",
+                    system_prompt="stable system",
+                    user_prompt="dynamic user",
+                    temperature=0.2,
+                    prompt_cache_policy={
+                        "kind": "prompt_cache_policy",
+                        "requested_policy": "prefer",
+                        "eligible": True,
+                        "stable_prefix_hash": "sha256:stable",
+                        "cache_key": "sha256:compatible-cache-key",
+                    },
+                )
+
+        requested = fake_client.post_calls[0]
+        self.assertEqual(content, "hello")
+        self.assertNotIn("prompt_cache_key", requested["json"])
+        self.assertEqual(meta["provider_prompt_cache_result"]["mode"], "not_supported")
+        self.assertEqual(meta["provider_prompt_cache_result"]["provider_cache_control"], "not_supported")
+
     def test_chat_openai_compatible_uses_request_timeout_profile(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider
 
@@ -2903,6 +3009,245 @@ class ModelProviderClientTests(unittest.TestCase):
         self.assertEqual(requested["params"], {"key": "gemini-key", "alt": "sse"})
         self.assertEqual(requested["json"]["system_instruction"]["parts"]["text"], "sys")
         self.assertEqual(requested["json"]["contents"][0]["parts"][0]["text"], "user")
+
+    def test_chat_gemini_creates_cached_content_for_preferred_prompt_cache(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client, client_patch = self._patched_client(
+            [
+                FakeResponse(
+                    {
+                        "name": "cachedContents/toograph-cache-1",
+                        "usageMetadata": {"totalTokenCount": 1234},
+                    }
+                ),
+                FakeResponse(
+                    {
+                        "candidates": [
+                            {
+                                "content": {
+                                    "parts": [{"text": "hello from cache"}],
+                                }
+                            }
+                        ],
+                        "usageMetadata": {
+                            "promptTokenCount": 1300,
+                            "cachedContentTokenCount": 1234,
+                            "candidatesTokenCount": 12,
+                        },
+                    }
+                ),
+            ]
+        )
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+            content, meta = chat_with_model_provider(
+                provider_id="gemini",
+                transport="gemini-generate-content",
+                base_url="https://generativelanguage.googleapis.com/v1beta",
+                api_key="gemini-key",
+                model="models/gemini-2.0-flash",
+                system_prompt="stable system",
+                user_prompt="dynamic user",
+                temperature=0.2,
+                prompt_cache_policy={
+                    "kind": "prompt_cache_policy",
+                    "requested_policy": "prefer",
+                    "eligible": True,
+                    "stable_prefix_hash": "sha256:stable",
+                    "cache_key": "sha256:gemini-cache-key",
+                },
+            )
+
+        create_request = fake_client.post_calls[0]
+        generate_request = fake_client.post_calls[1]
+        self.assertEqual(content, "hello from cache")
+        self.assertEqual(create_request["url"], "https://generativelanguage.googleapis.com/v1beta/cachedContents")
+        self.assertEqual(create_request["params"], {"key": "gemini-key"})
+        self.assertEqual(create_request["json"]["model"], "models/gemini-2.0-flash")
+        self.assertEqual(create_request["json"]["systemInstruction"]["parts"][0]["text"], "stable system")
+        self.assertEqual(generate_request["json"]["cachedContent"], "cachedContents/toograph-cache-1")
+        self.assertNotIn("system_instruction", generate_request["json"])
+        self.assertEqual(meta["provider_prompt_cache_result"]["mode"], "provider_applied")
+        self.assertEqual(meta["provider_prompt_cache_result"]["provider_cache_control"], "gemini_cached_content")
+        self.assertEqual(meta["provider_prompt_cache_result"]["cached_content_name"], "cachedContents/toograph-cache-1")
+        self.assertEqual(meta["provider_prompt_cache_result"]["cache_key"], "sha256:gemini-cache-key")
+        self.assertEqual(meta["provider_prompt_cache_result"]["usage"]["cache_creation_input_tokens"], 1234)
+        self.assertEqual(meta["provider_prompt_cache_result"]["usage"]["cache_read_input_tokens"], 1234)
+
+    def test_chat_gemini_reuses_cached_content_resource_before_expiry(self) -> None:
+        from app.core.storage import database
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client, client_patch = self._patched_client(
+            [
+                FakeResponse(
+                    {
+                        "name": "cachedContents/toograph-cache-reused",
+                        "expireTime": "2099-05-30T00:00:00Z",
+                        "usageMetadata": {"totalTokenCount": 1234},
+                    }
+                ),
+                FakeResponse(
+                    {
+                        "candidates": [{"content": {"parts": [{"text": "first cached answer"}]}}],
+                        "usageMetadata": {
+                            "promptTokenCount": 1300,
+                            "cachedContentTokenCount": 1234,
+                            "candidatesTokenCount": 12,
+                        },
+                    }
+                ),
+                FakeResponse(
+                    {
+                        "candidates": [{"content": {"parts": [{"text": "second cached answer"}]}}],
+                        "usageMetadata": {
+                            "promptTokenCount": 1300,
+                            "cachedContentTokenCount": 1234,
+                            "candidatesTokenCount": 8,
+                        },
+                    }
+                ),
+                FakeResponse(
+                    {
+                        "candidates": [{"content": {"parts": [{"text": "second uncached answer"}]}}],
+                        "usageMetadata": {"promptTokenCount": 70, "candidatesTokenCount": 8},
+                    }
+                ),
+            ]
+        )
+        prompt_cache_policy = {
+            "kind": "prompt_cache_policy",
+            "requested_policy": "prefer",
+            "eligible": True,
+            "stable_prefix_hash": "sha256:stable",
+            "cache_key": "sha256:gemini-cache-key",
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+                    with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+                        first_content, first_meta = chat_with_model_provider(
+                            provider_id="gemini",
+                            transport="gemini-generate-content",
+                            base_url="https://generativelanguage.googleapis.com/v1beta",
+                            api_key="gemini-key",
+                            model="models/gemini-2.0-flash",
+                            system_prompt="stable system",
+                            user_prompt="dynamic user one",
+                            temperature=0.2,
+                            prompt_cache_policy=prompt_cache_policy,
+                        )
+                        second_content, second_meta = chat_with_model_provider(
+                            provider_id="gemini",
+                            transport="gemini-generate-content",
+                            base_url="https://generativelanguage.googleapis.com/v1beta",
+                            api_key="gemini-key",
+                            model="models/gemini-2.0-flash",
+                            system_prompt="stable system",
+                            user_prompt="dynamic user two",
+                            temperature=0.2,
+                            prompt_cache_policy=prompt_cache_policy,
+                        )
+
+        create_requests = [call for call in fake_client.post_calls if call["url"].endswith("/cachedContents")]
+        generate_requests = [call for call in fake_client.post_calls if ":streamGenerateContent" in call["url"]]
+        self.assertEqual(first_content, "first cached answer")
+        self.assertEqual(second_content, "second cached answer")
+        self.assertEqual(len(create_requests), 1)
+        self.assertEqual(len(generate_requests), 2)
+        self.assertEqual(generate_requests[1]["json"]["cachedContent"], "cachedContents/toograph-cache-reused")
+        self.assertNotIn("system_instruction", generate_requests[1]["json"])
+        self.assertEqual(first_meta["provider_prompt_cache_result"]["cache_resource_status"], "created")
+        self.assertEqual(second_meta["provider_prompt_cache_result"]["cache_resource_status"], "reused")
+        self.assertEqual(second_meta["provider_prompt_cache_result"]["reason"], "gemini_cached_content_reused")
+        self.assertEqual(
+            second_meta["provider_prompt_cache_result"]["cached_content_expires_at"],
+            "2099-05-30T00:00:00Z",
+        )
+        self.assertEqual(second_meta["provider_prompt_cache_result"]["usage"]["cache_read_input_tokens"], 1234)
+
+    def test_chat_gemini_does_not_reuse_expired_cached_content_resource(self) -> None:
+        from app.core.storage import database
+        from app.core.storage.provider_prompt_cache_store import (
+            build_provider_prompt_cache_scope_fingerprint,
+            remember_provider_prompt_cache_resource,
+        )
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client, client_patch = self._patched_client(
+            [
+                FakeResponse(
+                    {
+                        "name": "cachedContents/toograph-cache-fresh",
+                        "expireTime": "2099-05-30T00:00:00Z",
+                        "usageMetadata": {"totalTokenCount": 1444},
+                    }
+                ),
+                FakeResponse(
+                    {
+                        "candidates": [{"content": {"parts": [{"text": "fresh cached answer"}]}}],
+                        "usageMetadata": {
+                            "promptTokenCount": 1500,
+                            "cachedContentTokenCount": 1444,
+                            "candidatesTokenCount": 8,
+                        },
+                    }
+                ),
+            ]
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+                    remember_provider_prompt_cache_resource(
+                        provider_id="gemini",
+                        transport="gemini-generate-content",
+                        base_url="https://generativelanguage.googleapis.com/v1beta",
+                        model="gemini-2.0-flash",
+                        credential_fingerprint=build_provider_prompt_cache_scope_fingerprint(
+                            base_url="https://generativelanguage.googleapis.com/v1beta",
+                            api_key="gemini-key",
+                        ),
+                        cache_key="sha256:gemini-cache-key",
+                        stable_prefix_hash="sha256:stable",
+                        resource_name="cachedContents/toograph-cache-expired",
+                        expires_at="2000-05-28T00:00:00Z",
+                    )
+                    with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+                        content, meta = chat_with_model_provider(
+                            provider_id="gemini",
+                            transport="gemini-generate-content",
+                            base_url="https://generativelanguage.googleapis.com/v1beta",
+                            api_key="gemini-key",
+                            model="models/gemini-2.0-flash",
+                            system_prompt="stable system",
+                            user_prompt="dynamic user",
+                            temperature=0.2,
+                            prompt_cache_policy={
+                                "kind": "prompt_cache_policy",
+                                "requested_policy": "prefer",
+                                "eligible": True,
+                                "stable_prefix_hash": "sha256:stable",
+                                "cache_key": "sha256:gemini-cache-key",
+                            },
+                        )
+
+        create_requests = [call for call in fake_client.post_calls if call["url"].endswith("/cachedContents")]
+        generate_requests = [call for call in fake_client.post_calls if ":streamGenerateContent" in call["url"]]
+        self.assertEqual(content, "fresh cached answer")
+        self.assertEqual(len(create_requests), 1)
+        self.assertEqual(generate_requests[0]["json"]["cachedContent"], "cachedContents/toograph-cache-fresh")
+        self.assertEqual(meta["provider_prompt_cache_result"]["cache_resource_status"], "created")
+        self.assertEqual(meta["provider_prompt_cache_result"]["cached_content_name"], "cachedContents/toograph-cache-fresh")
+        self.assertEqual(
+            meta["provider_prompt_cache_result"]["cached_content_expires_at"],
+            "2099-05-30T00:00:00Z",
+        )
 
     def test_chat_gemini_coalesces_streaming_response(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider

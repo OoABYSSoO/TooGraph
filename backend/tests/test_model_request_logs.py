@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import tempfile
 import unittest
 from pathlib import Path
@@ -318,6 +319,115 @@ class ModelRequestLogTests(unittest.TestCase):
                 "reason": "single_call_tokens_exceed_profile",
             },
         )
+
+    def test_model_request_logs_report_provider_cache_hit_rate_and_resources(self) -> None:
+        from app.core.runtime.model_call_context import use_model_call_context
+        from app.core.runtime.state import create_initial_run_state
+        from app.core.storage import database, run_store
+        from app.core.storage.model_log_store import append_model_request_log, list_model_request_logs
+        from app.core.storage.provider_prompt_cache_store import (
+            build_provider_prompt_cache_scope_fingerprint,
+            remember_provider_prompt_cache_resource,
+        )
+
+        created_decision = {
+            "kind": "provider_prompt_cache_result",
+            "requested_policy": "prefer",
+            "mode": "provider_applied",
+            "provider_cache_control": "gemini_cached_content",
+            "eligible": True,
+            "reason": "gemini_cached_content_applied",
+            "cache_resource_status": "created",
+            "cached_content_name": "cachedContents/toograph-created",
+            "usage": {"cache_creation_input_tokens": 1000, "cache_read_input_tokens": 1000},
+        }
+        reused_decision = {
+            "kind": "provider_prompt_cache_result",
+            "requested_policy": "prefer",
+            "mode": "provider_applied",
+            "provider_cache_control": "gemini_cached_content",
+            "eligible": True,
+            "reason": "gemini_cached_content_reused",
+            "cache_resource_status": "reused",
+            "cached_content_name": "cachedContents/toograph-created",
+            "usage": {"cache_read_input_tokens": 1000},
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+                    credential_fingerprint = build_provider_prompt_cache_scope_fingerprint(
+                        base_url="https://generativelanguage.googleapis.com/v1beta",
+                        api_key="gemini-key",
+                    )
+                    remember_provider_prompt_cache_resource(
+                        provider_id="gemini",
+                        transport="gemini-generate-content",
+                        base_url="https://generativelanguage.googleapis.com/v1beta",
+                        model="gemini-2.0-flash",
+                        credential_fingerprint=credential_fingerprint,
+                        cache_key="sha256:cache-active",
+                        stable_prefix_hash="sha256:stable-active",
+                        resource_name="cachedContents/toograph-active",
+                        expires_at="2099-05-30T00:00:00Z",
+                    )
+                    remember_provider_prompt_cache_resource(
+                        provider_id="gemini",
+                        transport="gemini-generate-content",
+                        base_url="https://generativelanguage.googleapis.com/v1beta",
+                        model="gemini-2.0-flash",
+                        credential_fingerprint=credential_fingerprint,
+                        cache_key="sha256:cache-expired",
+                        stable_prefix_hash="sha256:stable-expired",
+                        resource_name="cachedContents/toograph-expired",
+                        expires_at="2000-05-30T00:00:00Z",
+                    )
+                    with patch("app.core.storage.model_log_store.prune_provider_prompt_cache_resources", return_value={}):
+                        for run_id, decision, response_text in (
+                            ("run_cache_created", created_decision, "created"),
+                            ("run_cache_reused", reused_decision, "reused"),
+                        ):
+                            run = create_initial_run_state("graph_root", "Root Graph")
+                            run["run_id"] = run_id
+                            run["root_run_id"] = run_id
+                            run["run_path"] = [run_id]
+                            run_store.save_run(run)
+                            with use_model_call_context(
+                                run_id=run_id,
+                                root_run_id=run_id,
+                                node_id="agent",
+                                node_type="agent",
+                                phase="agent_response",
+                                provider_cache_policy="prefer",
+                                provider_cache_decision=decision,
+                            ):
+                                append_model_request_log(
+                                    provider_id="gemini",
+                                    transport="gemini-generate-content",
+                                    model="gemini-2.0-flash",
+                                    path="/models/gemini-2.0-flash:generateContent",
+                                    request_raw={"contents": [{"role": "user", "parts": [{"text": "hello"}]}]},
+                                    response_raw={"candidates": [{"content": {"parts": [{"text": response_text}]}}]},
+                                    duration_ms=10,
+                                    status_code=200,
+                                )
+
+                    payload = list_model_request_logs(page=1, size=10)
+
+        summary = payload["provider_cache_summary"]
+        self.assertEqual(summary["kind"], "provider_cache_summary")
+        self.assertEqual(summary["decision_count"], 2)
+        self.assertEqual(summary["provider_applied_count"], 2)
+        self.assertEqual(summary["resource_created_count"], 1)
+        self.assertEqual(summary["resource_reused_count"], 1)
+        self.assertEqual(summary["resource_hit_rate"], 0.5)
+        self.assertEqual(summary["cache_creation_input_tokens"], 1000)
+        self.assertEqual(summary["cache_read_input_tokens"], 2000)
+        self.assertEqual(summary["resource_status_counts"]["active"], 1)
+        self.assertEqual(summary["resource_status_counts"]["expired"], 1)
+        self.assertEqual(summary["resource_total"], 2)
 
     def test_model_request_log_metadata_update_attaches_provider_fallback_trace(self) -> None:
         from app.core.runtime.model_call_context import use_model_call_context
@@ -1129,8 +1239,105 @@ class ModelRequestLogTests(unittest.TestCase):
                             saved = save_model_log_retention_settings(max_root_runs=1)
                     payload = list_model_request_logs(page=1, size=10)
 
-        self.assertEqual(saved, {"max_root_runs": 1})
+        self.assertEqual(saved, {"max_root_runs": 1, "cache_resource_retention_days": 30})
         self.assertEqual([entry["root_run_id"] for entry in payload["entries"]], ["run_new"])
+
+    def test_saving_model_log_retention_prunes_prompt_cache_resources(self) -> None:
+        from app.core.storage.model_log_store import save_model_log_retention_settings
+
+        with patch("app.core.storage.model_log_store.load_app_settings", return_value={}):
+            with patch("app.core.storage.model_log_store.save_app_settings", return_value=None):
+                with patch("app.core.storage.model_log_store.prune_model_request_logs") as prune_logs:
+                    with patch("app.core.storage.model_log_store.prune_provider_prompt_cache_resources") as prune_cache:
+                        saved = save_model_log_retention_settings(
+                            max_root_runs=7,
+                            cache_resource_retention_days=45,
+                        )
+
+        self.assertEqual(saved, {"max_root_runs": 7, "cache_resource_retention_days": 45})
+        prune_logs.assert_called_once_with(max_root_runs=7)
+        prune_cache.assert_called_once_with(max_terminal_age_days=45)
+
+    def test_prunes_old_terminal_prompt_cache_resources(self) -> None:
+        from app.core.storage import database
+        from app.core.storage.provider_prompt_cache_store import (
+            build_provider_prompt_cache_scope_fingerprint,
+            prune_provider_prompt_cache_resources,
+            remember_provider_prompt_cache_resource,
+            summarize_provider_prompt_cache_resources,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            with patch("app.core.storage.database.DATA_DIR", data_dir):
+                with patch("app.core.storage.database.DB_PATH", data_dir / "toograph.db"):
+                    database.initialize_storage()
+                    credential_fingerprint = build_provider_prompt_cache_scope_fingerprint(
+                        base_url="https://generativelanguage.googleapis.com/v1beta",
+                        api_key="gemini-key",
+                    )
+                    common = {
+                        "provider_id": "gemini",
+                        "transport": "gemini-generate-content",
+                        "base_url": "https://generativelanguage.googleapis.com/v1beta",
+                        "model": "models/gemini-2.0-flash",
+                        "credential_fingerprint": credential_fingerprint,
+                    }
+                    remember_provider_prompt_cache_resource(
+                        **common,
+                        cache_key="sha256:active",
+                        stable_prefix_hash="sha256:stable-active",
+                        resource_name="cachedContents/toograph-active",
+                        expires_at="2099-05-30T00:00:00Z",
+                        now=datetime(2026, 4, 1, tzinfo=timezone.utc),
+                    )
+                    remember_provider_prompt_cache_resource(
+                        **common,
+                        cache_key="sha256:expired",
+                        stable_prefix_hash="sha256:stable-expired",
+                        resource_name="cachedContents/toograph-expired",
+                        expires_at="2026-04-02T00:00:00Z",
+                        now=datetime(2026, 4, 1, tzinfo=timezone.utc),
+                    )
+                    remember_provider_prompt_cache_resource(
+                        **common,
+                        cache_key="sha256:superseded",
+                        stable_prefix_hash="sha256:stable-superseded",
+                        resource_name="cachedContents/toograph-superseded-old",
+                        expires_at="2099-05-30T00:00:00Z",
+                        now=datetime(2026, 4, 3, tzinfo=timezone.utc),
+                    )
+                    remember_provider_prompt_cache_resource(
+                        **common,
+                        cache_key="sha256:superseded",
+                        stable_prefix_hash="sha256:stable-superseded",
+                        resource_name="cachedContents/toograph-superseded-current",
+                        expires_at="2099-05-30T00:00:00Z",
+                        now=datetime(2026, 4, 4, tzinfo=timezone.utc),
+                    )
+
+                    result = prune_provider_prompt_cache_resources(
+                        max_terminal_age_days=14,
+                        now=datetime(2026, 5, 29, tzinfo=timezone.utc),
+                    )
+                    summary = summarize_provider_prompt_cache_resources(now=datetime(2026, 5, 29, tzinfo=timezone.utc))
+                    with database.get_connection() as connection:
+                        names = [
+                            row["resource_name"]
+                            for row in connection.execute(
+                                "SELECT resource_name FROM provider_prompt_cache_resources ORDER BY resource_name"
+                            ).fetchall()
+                        ]
+
+        self.assertEqual(result["pruned_count"], 2)
+        self.assertEqual(summary["status_counts"], {"active": 2})
+        self.assertEqual(
+            names,
+            [
+                "cachedContents/toograph-active",
+                "cachedContents/toograph-superseded-current",
+            ],
+        )
 
     def test_ignores_model_request_logs_without_run_context(self) -> None:
         from app.core.storage import database
@@ -1317,7 +1524,15 @@ class ModelRequestLogTests(unittest.TestCase):
     def test_model_logs_route_returns_paginated_payload(self) -> None:
         with patch(
             "app.api.routes_model_logs.list_model_request_logs",
-            return_value={"entries": [], "run_trees": [], "total": 0, "page": 2, "size": 5, "pages": 0, "retention": {"max_root_runs": 200}},
+            return_value={
+                "entries": [],
+                "run_trees": [],
+                "total": 0,
+                "page": 2,
+                "size": 5,
+                "pages": 0,
+                "retention": {"max_root_runs": 200, "cache_resource_retention_days": 30},
+            },
         ) as list_logs:
             with TestClient(app) as client:
                 response = client.get("/api/model-logs?page=2&size=5&q=gemma")

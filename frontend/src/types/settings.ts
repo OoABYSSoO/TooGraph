@@ -15,6 +15,7 @@ export type BuddyRuntimeSettings = {
 
 export type ModelLogSettings = {
   max_root_runs: number;
+  cache_resource_retention_days: number;
 };
 
 export type OpenAICodexAuthStatus = {

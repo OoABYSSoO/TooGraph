@@ -323,6 +323,9 @@ export function buildProviderCacheDiagnostic(source: ProviderCacheSource): Provi
   const cacheCreationTokens = numberFromUnknown(providerUsage.cache_creation_input_tokens);
   const cacheReadTokens = numberFromUnknown(providerUsage.cache_read_input_tokens);
   const invalidators = stringList(decision.invalidators);
+  const cacheResourceStatus = textFromUnknown(decision.cache_resource_status);
+  const cachedContentName = textFromUnknown(decision.cached_content_name);
+  const cachedContentExpiresAt = textFromUnknown(decision.cached_content_expires_at);
   const metrics = [
     cacheMetric("policy", policy),
     cacheMetric("mode", mode),
@@ -338,6 +341,8 @@ export function buildProviderCacheDiagnostic(source: ProviderCacheSource): Provi
       ? `dynamic suffix: ${formatCharCount(numberFromUnknown(decision.dynamic_suffix_chars))}`
       : "",
     invalidators.length > 0 ? `invalidators: ${invalidators.join(", ")}` : "",
+    cacheResourceStatus && cachedContentName ? `resource: ${cacheResourceStatus} ${cachedContentName}` : "",
+    cachedContentExpiresAt ? `expires: ${cachedContentExpiresAt}` : "",
     formatCacheUsage(cacheCreationTokens, cacheReadTokens)
       ? `cache usage: ${formatCacheUsage(cacheCreationTokens, cacheReadTokens)}`
       : "",
