@@ -3,6 +3,7 @@ import type {
   ScheduledGraphJobCreatePayload,
   ScheduledGraphJobRun,
   ScheduledGraphJobRunResponse,
+  ScheduledGraphJobUpdatePayload,
 } from "@/types/scheduler";
 
 import { apiGet, apiPatch, apiPost } from "./http.ts";
@@ -18,6 +19,13 @@ export async function fetchScheduledGraphJobRuns(jobId: string): Promise<Schedul
 
 export async function createScheduledGraphJob(payload: ScheduledGraphJobCreatePayload): Promise<ScheduledGraphJob> {
   return apiPost<ScheduledGraphJob>("/api/scheduler/jobs", payload);
+}
+
+export async function updateScheduledGraphJob(
+  jobId: string,
+  payload: ScheduledGraphJobUpdatePayload,
+): Promise<ScheduledGraphJob> {
+  return apiPatch<ScheduledGraphJob>(`/api/scheduler/jobs/${encodeURIComponent(jobId)}`, payload);
 }
 
 export async function setScheduledGraphJobEnabled(jobId: string, enabled: boolean): Promise<ScheduledGraphJob> {

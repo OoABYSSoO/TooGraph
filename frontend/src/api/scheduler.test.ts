@@ -7,6 +7,7 @@ import {
   fetchScheduledGraphJobs,
   runScheduledGraphJob,
   setScheduledGraphJobEnabled,
+  updateScheduledGraphJob,
 } from "./scheduler.ts";
 
 const originalFetch = globalThis.fetch;
@@ -73,6 +74,53 @@ test("createScheduledGraphJob posts a graph job payload", async () => {
     timezone: "UTC",
     enabled: false,
     metadata: { source: "user" },
+  });
+  globalThis.fetch = originalFetch;
+});
+
+test("updateScheduledGraphJob patches editable graph job fields", async () => {
+  let requestedUrl = "";
+  let requestBody = "";
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    requestedUrl = String(input);
+    requestBody = String(init?.body ?? "");
+    return new Response(JSON.stringify({ job_id: "job_1", template_id: "template_2" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  await updateScheduledGraphJob("job_1", {
+    name: "Daily job",
+    template_id: "template_2",
+    input_bindings: { prompt: "run" },
+    schedule_kind: "interval",
+    schedule_expr: "PT1H",
+    timezone: "UTC",
+    enabled: true,
+    delivery_target: {
+      kind: "message_outlet",
+      outlet: "buddy",
+      session_mode: "existing_session",
+      buddy_session_id: "session_1",
+    },
+  });
+
+  assert.equal(requestedUrl, "/api/scheduler/jobs/job_1");
+  assert.deepEqual(JSON.parse(requestBody), {
+    name: "Daily job",
+    template_id: "template_2",
+    input_bindings: { prompt: "run" },
+    schedule_kind: "interval",
+    schedule_expr: "PT1H",
+    timezone: "UTC",
+    enabled: true,
+    delivery_target: {
+      kind: "message_outlet",
+      outlet: "buddy",
+      session_mode: "existing_session",
+      buddy_session_id: "session_1",
+    },
   });
   globalThis.fetch = originalFetch;
 });

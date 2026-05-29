@@ -119,6 +119,15 @@ def list_bindings_endpoint() -> dict[str, Any]:
     }
 
 
+@router.get("/sessions")
+def list_platform_sessions_endpoint(
+    platform_id: str = "",
+    binding_id: str = "",
+    limit: int = 100,
+) -> dict[str, Any]:
+    return {"sessions": store.list_platform_sessions(platform_id=platform_id, binding_id=binding_id, limit=limit)}
+
+
 @router.put("/bindings/{binding_id}")
 async def upsert_binding_endpoint(binding_id: str, payload: BindingPayload) -> dict[str, Any]:
     try:

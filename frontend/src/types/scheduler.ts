@@ -17,6 +17,24 @@ export type ScheduledGraphJob = {
   updated_at: string;
 };
 
+export type ScheduledMessageOutletKind = "none" | "buddy" | "feishu" | "telegram";
+
+export type ScheduledMessageOutletSessionMode = "existing_session" | "create_session" | "new_session_per_run";
+
+export type ScheduledMessageOutletTarget = {
+  kind: "message_outlet";
+  outlet: Exclude<ScheduledMessageOutletKind, "none">;
+  session_mode: ScheduledMessageOutletSessionMode;
+  buddy_session_id?: string;
+  platform_session_id?: string;
+  binding_id?: string;
+  external_chat_id?: string;
+  external_thread_id?: string;
+  external_chat_type?: string;
+  display_name?: string;
+  title?: string;
+};
+
 export type ScheduledGraphJobRun = {
   job_run_id: string;
   job_id: string;
@@ -51,3 +69,5 @@ export type ScheduledGraphJobCreatePayload = {
   retry_policy?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
 };
+
+export type ScheduledGraphJobUpdatePayload = Partial<ScheduledGraphJobCreatePayload>;

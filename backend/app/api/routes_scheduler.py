@@ -56,6 +56,16 @@ def get_scheduled_graph_job(job_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"Scheduled graph job '{job_id}' does not exist.") from exc
 
 
+@router.patch("/jobs/{job_id}")
+def update_scheduled_graph_job(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return store.update_scheduled_graph_job(job_id, payload)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Scheduled graph job '{job_id}' does not exist.") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.patch("/jobs/{job_id}/enabled")
 def set_scheduled_graph_job_enabled(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     try:

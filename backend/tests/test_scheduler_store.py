@@ -71,6 +71,106 @@ class SchedulerStoreTests(unittest.TestCase):
         self.assertTrue(enabled["enabled"])
         self.assertEqual(due, [])
 
+    def test_update_job_edits_schedule_template_bindings_and_delivery_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            db_path = data_dir / "toograph.db"
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", db_path),
+            ):
+                database.initialize_storage()
+
+                job = store.create_scheduled_graph_job(
+                    {
+                        "name": "能力库整理",
+                        "template_id": "buddy_capability_curator",
+                        "input_bindings": {"curator_scope": "整理官方能力库"},
+                        "schedule_kind": "interval",
+                        "schedule_expr": "PT6H",
+                        "enabled": True,
+                        "delivery_target": {"kind": "local_audit"},
+                    },
+                    now="2026-05-27T00:00:00Z",
+                )
+                store.record_scheduled_graph_job_run(
+                    job["job_id"],
+                    run_id="run_curator_1",
+                    trigger_reason="manual",
+                    status="completed",
+                    started_at="2026-05-27T01:00:00Z",
+                    now="2026-05-27T01:00:00Z",
+                )
+
+                updated = store.update_scheduled_graph_job(
+                    job["job_id"],
+                    {
+                        "name": "每小时 Embedding",
+                        "template_id": "embedding_maintenance",
+                        "input_bindings": {"job_limit": 20},
+                        "schedule_kind": "interval",
+                        "schedule_expr": "PT1H",
+                        "enabled": False,
+                        "delivery_target": {
+                            "kind": "message_outlet",
+                            "outlet": "buddy",
+                            "session_mode": "existing_session",
+                            "buddy_session_id": "session_existing",
+                        },
+                    },
+                    now="2026-05-27T02:00:00Z",
+                )
+
+        self.assertEqual(updated["job_id"], job["job_id"])
+        self.assertEqual(updated["name"], "每小时 Embedding")
+        self.assertEqual(updated["template_id"], "embedding_maintenance")
+        self.assertEqual(updated["input_bindings"], {"job_limit": 20})
+        self.assertEqual(updated["schedule_expr"], "PT1H")
+        self.assertFalse(updated["enabled"])
+        self.assertEqual(updated["next_run_at"], "")
+        self.assertEqual(updated["last_run_id"], "run_curator_1")
+        self.assertEqual(updated["created_at"], job["created_at"])
+        self.assertEqual(updated["updated_at"], "2026-05-27T02:00:00Z")
+        self.assertEqual(updated["delivery_target"]["kind"], "message_outlet")
+        self.assertEqual(updated["delivery_target"]["outlet"], "buddy")
+
+    def test_message_outlet_delivery_target_is_supported_delivery_result(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "data"
+            db_path = data_dir / "toograph.db"
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", db_path),
+            ):
+                database.initialize_storage()
+
+                job = store.create_scheduled_graph_job(
+                    {
+                        "name": "定时摘要",
+                        "template_id": "buddy_capability_curator",
+                        "schedule_kind": "manual",
+                        "delivery_target": {
+                            "kind": "message_outlet",
+                            "outlet": "buddy",
+                            "session_mode": "existing_session",
+                            "buddy_session_id": "session_existing",
+                        },
+                    },
+                    now="2026-05-27T00:00:00Z",
+                )
+                job_run = store.record_scheduled_graph_job_run(
+                    job["job_id"],
+                    run_id="run_summary_1",
+                    trigger_reason="manual",
+                    status="completed",
+                    started_at="2026-05-27T01:00:00Z",
+                    now="2026-05-27T01:00:00Z",
+                )
+
+        self.assertEqual(job_run["metadata"]["delivery_result"]["kind"], "message_outlet")
+        self.assertEqual(job_run["metadata"]["delivery_result"]["status"], "delivered")
+        self.assertNotIn("reason", job_run["metadata"]["delivery_result"])
+
     def test_record_job_run_updates_history_and_next_interval(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir) / "data"

@@ -155,3 +155,42 @@ def test_build_external_conversation_key_uses_thread_scope() -> None:
         )
         == "telegram:dm:chat-1"
     )
+
+
+def test_list_platform_sessions_filters_conversation_targets_by_platform() -> None:
+    temp_dir, patchers = _init_temp_storage()
+    try:
+        from app.messaging import store
+
+        feishu = store.resolve_or_create_platform_session(
+            platform_id="feishu",
+            binding_id="mpb_feishu",
+            external_conversation_key="feishu:chat:oc_1",
+            external_chat_id="oc_1",
+            external_chat_type="group",
+            external_display_name="项目群",
+            title="Feishu/Lark / 项目群",
+            buddy_session_id="session_feishu_1",
+        )
+        store.resolve_or_create_platform_session(
+            platform_id="telegram",
+            binding_id="mpb_telegram",
+            external_conversation_key="telegram:dm:42",
+            external_chat_id="42",
+            external_chat_type="dm",
+            external_display_name="Abyss",
+            title="Telegram / Abyss",
+            buddy_session_id="session_telegram_1",
+        )
+
+        all_sessions = store.list_platform_sessions()
+        feishu_sessions = store.list_platform_sessions(platform_id="feishu")
+    finally:
+        for item in reversed(patchers):
+            item.stop()
+        temp_dir.cleanup()
+
+    assert {session["platform_session_id"] for session in all_sessions} >= {feishu["platform_session_id"]}
+    assert [session["platform_id"] for session in feishu_sessions] == ["feishu"]
+    assert feishu_sessions[0]["external_chat_id"] == "oc_1"
+    assert feishu_sessions[0]["buddy_session_id"] == "session_feishu_1"

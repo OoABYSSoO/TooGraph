@@ -10,7 +10,11 @@ const source = readFileSync(resolve(currentDirectory, "SchedulerPage.vue"), "utf
 test("SchedulerPage loads jobs including disabled official seeds and exposes primary job actions", () => {
   assert.match(source, /fetchScheduledGraphJobs\(true\)/);
   assert.match(source, /fetchTemplates/);
+  assert.match(source, /fetchBuddyChatSessions/);
+  assert.match(source, /fetchMessagePlatformBindings/);
+  assert.match(source, /fetchMessagePlatformSessions/);
   assert.match(source, /createScheduledGraphJob/);
+  assert.match(source, /updateScheduledGraphJob/);
   assert.match(source, /setScheduledGraphJobEnabled/);
   assert.match(source, /runScheduledGraphJob/);
   assert.match(source, /fetchScheduledGraphJobRuns/);
@@ -18,15 +22,22 @@ test("SchedulerPage loads jobs including disabled official seeds and exposes pri
   assert.match(source, /data-virtual-affordance-id="scheduler\.action\.createJob"/);
   assert.match(source, /data-virtual-affordance-id="scheduler\.job\.toggle"/);
   assert.match(source, /data-virtual-affordance-id="scheduler\.job\.runNow"/);
+  assert.match(source, /data-virtual-affordance-zone="scheduler\.jobList"/);
   assert.match(source, /buildOfficialSchedulerEnableRecommendations/);
   assert.match(source, /scheduler\.officialMaintenanceTitle/);
   assert.match(source, /data-virtual-affordance-id="scheduler\.officialMaintenance\.enable"/);
   assert.match(source, /data-virtual-affordance-id="scheduler\.officialMaintenance\.runNow"/);
   assert.match(source, /<ElDialog/);
   assert.match(source, /<ElSelect/);
-  assert.match(source, /createDraft\.delivery_target_json/);
-  assert.match(source, /scheduler\.deliveryTarget/);
-  assert.match(source, /retry_policy: selectedJob\.retry_policy/);
+  assert.match(source, /editDraft/);
+  assert.match(source, /scheduler\.runInputs/);
+  assert.match(source, /scheduler\.repeatEvery/);
+  assert.match(source, /scheduler\.messageOutlet/);
+  assert.match(source, /scheduler\.sessionMode/);
+  assert.doesNotMatch(source, /selectedJob\.retry_policy/);
+  assert.doesNotMatch(source, /createDraft\.delivery_target_json/);
+  assert.doesNotMatch(source, /input_bindings_json/);
+  assert.doesNotMatch(source, /data-virtual-affordance-zone="scheduler\.job"[\s\S]*data-virtual-affordance-id="scheduler\.job\.toggle"/);
 });
 
 test("SchedulerPage links scheduler runs back to run detail records", () => {

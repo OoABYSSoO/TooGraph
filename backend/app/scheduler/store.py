@@ -15,7 +15,7 @@ from app.templates.loader import load_template_record
 SCHEDULE_KINDS = {"manual", "interval", "cron"}
 TERMINAL_JOB_RUN_STATUSES = {"completed", "failed", "cancelled", "skipped"}
 RETRYABLE_TRIGGER_REASONS = {"schedule", "retry"}
-SUPPORTED_DELIVERY_TARGET_KINDS = {"local_audit", "job_run_metadata"}
+SUPPORTED_DELIVERY_TARGET_KINDS = {"local_audit", "job_run_metadata", "message_outlet"}
 EXTERNAL_DELIVERY_TARGET_KINDS = {"webhook", "http_webhook"}
 SENSITIVE_DELIVERY_TARGET_KEYWORDS = (
     "token",
@@ -67,6 +67,72 @@ def create_scheduled_graph_job(payload: dict[str, Any], *, now: str | None = Non
             ),
         )
     return load_scheduled_graph_job(job["job_id"])
+
+
+def update_scheduled_graph_job(job_id: str, payload: dict[str, Any], *, now: str | None = None) -> dict[str, Any]:
+    existing = load_scheduled_graph_job(job_id)
+    normalized_now = _normalize_timestamp(now)
+    next_payload = {
+        **existing,
+        **(payload if isinstance(payload, dict) else {}),
+        "job_id": existing["job_id"],
+    }
+    normalized = _normalize_job_payload(next_payload, now=normalized_now)
+    normalized["job_id"] = existing["job_id"]
+    normalized["created_at"] = existing["created_at"]
+    normalized["last_run_id"] = existing["last_run_id"]
+    normalized["updated_at"] = normalized_now
+    schedule_changed = any(
+        key in (payload if isinstance(payload, dict) else {})
+        for key in ("template_id", "schedule_kind", "schedule_expr", "timezone", "enabled")
+    )
+    if schedule_changed:
+        normalized["next_run_at"] = (
+            _next_run_at_for_job(normalized, normalized_now)
+            if normalized["enabled"] and normalized["schedule_kind"] == "interval"
+            else ""
+        )
+    elif "next_run_at" not in (payload if isinstance(payload, dict) else {}):
+        normalized["next_run_at"] = existing["next_run_at"]
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE scheduled_graph_jobs
+            SET name = ?,
+                template_id = ?,
+                input_bindings_json = ?,
+                schedule_kind = ?,
+                schedule_expr = ?,
+                timezone = ?,
+                enabled = ?,
+                next_run_at = ?,
+                runtime_overrides_json = ?,
+                delivery_target_json = ?,
+                retry_policy_json = ?,
+                metadata_json = ?,
+                updated_at = ?
+            WHERE job_id = ?
+            """,
+            (
+                normalized["name"],
+                normalized["template_id"],
+                _json_dumps(normalized["input_bindings"]),
+                normalized["schedule_kind"],
+                normalized["schedule_expr"],
+                normalized["timezone"],
+                1 if normalized["enabled"] else 0,
+                normalized["next_run_at"],
+                _json_dumps(normalized["runtime_overrides"]),
+                _json_dumps(normalized["delivery_target"]),
+                _json_dumps(normalized["retry_policy"]),
+                _json_dumps(normalized["metadata"]),
+                normalized["updated_at"],
+                normalized["job_id"],
+            ),
+        )
+    if cursor.rowcount == 0:
+        raise KeyError(existing["job_id"])
+    return load_scheduled_graph_job(existing["job_id"])
 
 
 def load_scheduled_graph_job(job_id: str) -> dict[str, Any]:

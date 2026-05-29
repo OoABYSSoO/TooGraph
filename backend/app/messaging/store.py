@@ -313,6 +313,32 @@ def get_platform_session(platform_session_id: str) -> dict[str, Any] | None:
     return _row_to_platform_session(row) if row else None
 
 
+def list_platform_sessions(*, platform_id: str = "", binding_id: str = "", limit: int = 100) -> list[dict[str, Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    normalized_platform_id = str(platform_id or "").strip()
+    normalized_binding_id = str(binding_id or "").strip()
+    if normalized_platform_id:
+        clauses.append("platform_id = ?")
+        params.append(normalized_platform_id)
+    if normalized_binding_id:
+        clauses.append("binding_id = ?")
+        params.append(normalized_binding_id)
+    where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    with get_connection() as connection:
+        rows = connection.execute(
+            f"""
+            SELECT *
+            FROM message_platform_sessions
+            {where_clause}
+            ORDER BY updated_at DESC, last_inbound_at DESC, platform_session_id DESC
+            LIMIT ?
+            """,
+            (*params, max(1, min(int(limit or 100), 500))),
+        ).fetchall()
+    return [_row_to_platform_session(row) for row in rows]
+
+
 def resolve_or_create_platform_session(
     *,
     platform_id: str,

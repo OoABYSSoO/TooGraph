@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  fetchMessagePlatformSessions,
   pollFeishuAutoBinding,
   startFeishuAutoBinding,
   updateMessagePlatformBinding,
@@ -121,6 +122,51 @@ test("updateMessagePlatformBinding can send Feishu App ID and App Secret", async
       config: { app_id: "cli_x", connection_mode: "websocket" },
       secrets: { app_secret: "secret" },
     });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetchMessagePlatformSessions filters by platform and binding", async () => {
+  let requestedUrl = "";
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    requestedUrl = String(input);
+    return new Response(
+      JSON.stringify({
+        sessions: [
+          {
+            platform_session_id: "mps_1",
+            platform_id: "feishu",
+            binding_id: "mpb_feishu",
+            external_chat_id: "chat_1",
+            external_thread_id: "",
+            external_chat_type: "p2p",
+            buddy_session_id: "buddy_1",
+            display_name: "设计群",
+            metadata: {},
+            last_inbound_at: "",
+            last_outbound_at: "",
+            created_at: "",
+            updated_at: "",
+          },
+        ],
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  }) as typeof fetch;
+
+  try {
+    const response = await fetchMessagePlatformSessions({
+      platformId: "feishu",
+      bindingId: "mpb_feishu",
+      limit: 20,
+    });
+
+    assert.equal(
+      requestedUrl,
+      "/api/message-platforms/sessions?platform_id=feishu&binding_id=mpb_feishu&limit=20",
+    );
+    assert.equal(response.sessions[0].buddy_session_id, "buddy_1");
   } finally {
     globalThis.fetch = originalFetch;
   }

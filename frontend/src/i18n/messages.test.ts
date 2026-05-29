@@ -42,18 +42,30 @@ test("i18n messages preserve product and technical proper nouns", () => {
 });
 
 test("i18n messages expose scheduler management labels", () => {
-  assert.equal(messages["zh-CN"].nav.scheduler, "调度任务");
-  assert.equal(messages["zh-CN"].scheduler.title, "图调度任务");
+  assert.equal(messages["zh-CN"].nav.scheduler, "定时任务");
+  assert.equal(messages["zh-CN"].scheduler.title, "图定时任务");
   assert.equal(messages["zh-CN"].scheduler.createJob, "新建任务");
   assert.equal(messages["zh-CN"].scheduler.runNow, "立即运行");
-  assert.equal(messages["zh-CN"].scheduler.deliveryTarget, "投递目标");
-  assert.doesNotMatch(messages["zh-CN"].scheduler.deliveryTargetPlaceholder, /[{}]/);
+  assert.equal(messages["zh-CN"].scheduler.messageOutlet, "消息出口");
+  assert.equal(messages["zh-CN"].scheduler.runInputs, "运行输入");
+  assert.equal(messages["zh-CN"].scheduler.repeatEvery, "每隔");
+  assert.equal(messages["zh-CN"].scheduler.intervalUnitHours, "小时");
+  assert.equal(messages["zh-CN"].scheduler.outletBuddy, "Buddy");
+  assert.equal(messages["zh-CN"].scheduler.outletFeishu, "飞书");
+  assert.equal(messages["zh-CN"].scheduler.outletTelegram, "Telegram");
+  assert.equal(messages["zh-CN"].scheduler.sessionModeExisting, "绑定现有会话");
   assert.equal(messages["en-US"].nav.scheduler, "Scheduler");
   assert.equal(messages["en-US"].scheduler.title, "Graph Scheduler");
   assert.equal(messages["en-US"].scheduler.createJob, "New job");
   assert.equal(messages["en-US"].scheduler.runNow, "Run now");
-  assert.equal(messages["en-US"].scheduler.deliveryTarget, "Delivery target");
-  assert.doesNotMatch(messages["en-US"].scheduler.deliveryTargetPlaceholder, /[{}]/);
+  assert.equal(messages["en-US"].scheduler.messageOutlet, "Message outlet");
+  assert.equal(messages["en-US"].scheduler.runInputs, "Run inputs");
+  assert.equal(messages["en-US"].scheduler.repeatEvery, "Every");
+  assert.equal(messages["en-US"].scheduler.intervalUnitHours, "hours");
+  assert.equal(messages["en-US"].scheduler.outletBuddy, "Buddy");
+  assert.equal(messages["en-US"].scheduler.outletFeishu, "Feishu");
+  assert.equal(messages["en-US"].scheduler.outletTelegram, "Telegram");
+  assert.equal(messages["en-US"].scheduler.sessionModeExisting, "Bind existing session");
 });
 
 test("i18n messages expose capability curator report labels", () => {

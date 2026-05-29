@@ -93,7 +93,7 @@
           to="/scheduler"
           class="app-shell__link"
           data-virtual-affordance-id="app.nav.scheduler"
-          data-virtual-affordance-label="调度任务"
+          data-virtual-affordance-label="定时任务"
           data-virtual-affordance-role="navigation-link"
           data-virtual-affordance-zone="app-shell"
           data-virtual-affordance-actions="click"

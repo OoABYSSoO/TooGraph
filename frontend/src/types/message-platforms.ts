@@ -29,6 +29,22 @@ export type MessagePlatformBinding = {
   updated_at: string;
 };
 
+export type MessagePlatformSession = {
+  platform_session_id: string;
+  platform_id: string;
+  binding_id: string;
+  external_chat_id: string;
+  external_thread_id: string;
+  external_chat_type: string;
+  buddy_session_id: string;
+  display_name: string;
+  metadata: Record<string, unknown>;
+  last_inbound_at: string;
+  last_outbound_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MessagePlatformConnectionStatus = {
   binding_id: string;
   status: MessagePlatformStatus;

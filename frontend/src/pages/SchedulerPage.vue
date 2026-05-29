@@ -124,26 +124,58 @@
           <article v-if="loading" class="scheduler-page__empty">{{ t("common.loading") }}</article>
           <article v-else-if="sortedJobs.length === 0" class="scheduler-page__empty">{{ t("scheduler.emptyJobs") }}</article>
           <div v-else class="scheduler-page__job-list">
-            <button
+            <article
               v-for="job in sortedJobs"
               :key="job.job_id"
-              type="button"
               class="scheduler-page__job-card"
               :class="{ 'scheduler-page__job-card--active': selectedJobId === job.job_id }"
-              @click="selectJob(job.job_id)"
             >
-              <div class="scheduler-page__job-card-heading">
-                <strong>{{ job.name || job.job_id }}</strong>
-                <span :class="job.enabled ? 'scheduler-page__status scheduler-page__status--enabled' : 'scheduler-page__status'">
-                  {{ job.enabled ? t("scheduler.enabledStatus") : t("scheduler.disabledStatus") }}
-                </span>
+              <button type="button" class="scheduler-page__job-card-main" @click="selectJob(job.job_id)">
+                <div class="scheduler-page__job-card-heading">
+                  <strong>{{ job.name || job.job_id }}</strong>
+                  <span :class="job.enabled ? 'scheduler-page__status scheduler-page__status--enabled' : 'scheduler-page__status'">
+                    {{ job.enabled ? t("scheduler.enabledStatus") : t("scheduler.disabledStatus") }}
+                  </span>
+                </div>
+                <span class="scheduler-page__id" :title="job.template_id">{{ job.template_id }}</span>
+                <div class="scheduler-page__badges">
+                  <span>{{ formatSchedule(job) }}</span>
+                  <span v-if="isOfficialJob(job)">{{ t("scheduler.official") }}</span>
+                </div>
+              </button>
+              <div class="scheduler-page__job-card-actions">
+                <label class="scheduler-page__switch-label">
+                  <span>{{ job.enabled ? t("scheduler.enabledStatus") : t("scheduler.disabledStatus") }}</span>
+                  <ElSwitch
+                    :model-value="job.enabled"
+                    :loading="pendingActionKey === jobActionKey(job.job_id, 'toggle')"
+                    :disabled="Boolean(pendingActionKey)"
+                    :aria-label="job.enabled ? t('scheduler.disable') : t('scheduler.enable')"
+                    data-virtual-affordance-id="scheduler.job.toggle"
+                    :data-virtual-affordance-label="job.enabled ? t('scheduler.disable') : t('scheduler.enable')"
+                    data-virtual-affordance-role="switch"
+                    data-virtual-affordance-zone="scheduler.jobList"
+                    data-virtual-affordance-actions="toggle"
+                    @change="(value: unknown) => toggleJobEnabled(job.job_id, Boolean(value))"
+                    @click.stop
+                  />
+                </label>
+                <ElButton
+                  class="scheduler-page__job-action"
+                  :loading="pendingActionKey === jobActionKey(job.job_id, 'run')"
+                  :disabled="Boolean(pendingActionKey) || !job.enabled"
+                  data-virtual-affordance-id="scheduler.job.runNow"
+                  :data-virtual-affordance-label="t('scheduler.runNow')"
+                  data-virtual-affordance-role="button"
+                  data-virtual-affordance-zone="scheduler.jobList"
+                  data-virtual-affordance-actions="click"
+                  @click.stop="runJobNow(job.job_id)"
+                >
+                  <ElIcon aria-hidden="true"><VideoPlay /></ElIcon>
+                  <span>{{ t("scheduler.runNow") }}</span>
+                </ElButton>
               </div>
-              <span class="scheduler-page__id" :title="job.template_id">{{ job.template_id }}</span>
-              <div class="scheduler-page__badges">
-                <span>{{ formatSchedule(job) }}</span>
-                <span v-if="isOfficialJob(job)">{{ t("scheduler.official") }}</span>
-              </div>
-            </button>
+            </article>
           </div>
         </aside>
 
@@ -153,39 +185,8 @@
             <div class="scheduler-page__detail-heading">
               <div>
                 <span class="scheduler-page__section-kicker">{{ selectedJob.job_id }}</span>
-                <h3>{{ selectedJob.name || selectedJob.job_id }}</h3>
-                <p class="scheduler-page__muted">{{ selectedJob.template_id }}</p>
-              </div>
-              <div class="scheduler-page__detail-actions">
-                <label class="scheduler-page__switch-label">
-                  <span>{{ selectedJob.enabled ? t("scheduler.enabledStatus") : t("scheduler.disabledStatus") }}</span>
-                  <ElSwitch
-                    :model-value="selectedJob.enabled"
-                    :loading="pendingActionKey === jobActionKey(selectedJob.job_id, 'toggle')"
-                    :disabled="Boolean(pendingActionKey)"
-                    :aria-label="selectedJob.enabled ? t('scheduler.disable') : t('scheduler.enable')"
-                    data-virtual-affordance-id="scheduler.job.toggle"
-                    :data-virtual-affordance-label="selectedJob.enabled ? t('scheduler.disable') : t('scheduler.enable')"
-                    data-virtual-affordance-role="switch"
-                    data-virtual-affordance-zone="scheduler.job"
-                    data-virtual-affordance-actions="toggle"
-                    @change="(value: unknown) => toggleJobEnabled(selectedJob.job_id, Boolean(value))"
-                  />
-                </label>
-                <ElButton
-                  type="primary"
-                  :loading="pendingActionKey === jobActionKey(selectedJob.job_id, 'run')"
-                  :disabled="Boolean(pendingActionKey) || !selectedJob.enabled"
-                  data-virtual-affordance-id="scheduler.job.runNow"
-                  :data-virtual-affordance-label="t('scheduler.runNow')"
-                  data-virtual-affordance-role="button"
-                  data-virtual-affordance-zone="scheduler.job"
-                  data-virtual-affordance-actions="click"
-                  @click="runJobNow(selectedJob.job_id)"
-                >
-                  <ElIcon aria-hidden="true"><VideoPlay /></ElIcon>
-                  <span>{{ t("scheduler.runNow") }}</span>
-                </ElButton>
+                <h3>{{ t("scheduler.editJob") }}</h3>
+                <p class="scheduler-page__muted">{{ selectedJob.name || selectedJob.job_id }} · {{ selectedJob.template_id }}</p>
               </div>
             </div>
 
@@ -215,64 +216,277 @@
               </article>
             </section>
 
-            <section class="scheduler-page__detail-grid">
-              <article class="scheduler-page__json-panel">
+            <ElForm class="scheduler-page__form scheduler-page__edit-form" label-position="top">
+              <section class="scheduler-page__form-section">
                 <div class="scheduler-page__panel-heading">
                   <div>
-                    <span class="scheduler-page__section-kicker">{{ t("scheduler.inputBindings") }}</span>
-                    <h4>{{ t("scheduler.template") }} · {{ selectedJob.template_id }}</h4>
+                    <span class="scheduler-page__section-kicker">{{ t("scheduler.template") }}</span>
+                    <h4>{{ t("scheduler.editJob") }}</h4>
                   </div>
                 </div>
-                <pre>{{ formatJson(selectedJob.input_bindings) }}</pre>
-              </article>
-              <article class="scheduler-page__json-panel">
-                <div class="scheduler-page__panel-heading">
-                  <div>
-                    <span class="scheduler-page__section-kicker">{{ t("scheduler.runtimeOverrides") }}</span>
-                    <h4>{{ t("scheduler.metadata") }}</h4>
-                  </div>
+                <div class="scheduler-page__form-grid">
+                  <ElFormItem :label="t('scheduler.jobName')">
+                    <ElInput v-model="editDraft.name" :placeholder="t('scheduler.jobNamePlaceholder')" />
+                  </ElFormItem>
+                  <ElFormItem :label="t('scheduler.templateSelect')" required>
+                    <ElSelect
+                      v-model="editDraft.template_id"
+                      class="scheduler-page__select toograph-select"
+                      filterable
+                      popper-class="toograph-select-popper"
+                      :loading="templatesLoading"
+                      :placeholder="t('scheduler.templatePlaceholder')"
+                      @change="syncEditDraftInputs"
+                    >
+                      <ElOption
+                        v-for="template in templates"
+                        :key="template.template_id"
+                        :label="template.label || template.template_id"
+                        :value="template.template_id"
+                      >
+                        <span>{{ template.label || template.template_id }}</span>
+                        <small class="scheduler-page__option-id">{{ template.template_id }}</small>
+                      </ElOption>
+                    </ElSelect>
+                  </ElFormItem>
+                  <ElFormItem :label="t('scheduler.scheduleKind')">
+                    <ElSelect v-model="editDraft.schedule_kind" class="scheduler-page__select toograph-select" popper-class="toograph-select-popper">
+                      <ElOption v-for="option in scheduleKindOptions" :key="option.value" :label="option.label" :value="option.value" />
+                    </ElSelect>
+                  </ElFormItem>
+                  <ElFormItem v-if="editDraft.schedule_kind === 'interval'" :label="t('scheduler.repeatEvery')">
+                    <div class="scheduler-page__interval-control">
+                      <ElInputNumber v-model="editDraft.interval_amount" :min="1" :step="1" controls-position="right" />
+                      <ElSelect v-model="editDraft.interval_unit" class="scheduler-page__select toograph-select" popper-class="toograph-select-popper">
+                        <ElOption v-for="option in intervalUnitOptions" :key="option.value" :label="option.label" :value="option.value" />
+                      </ElSelect>
+                    </div>
+                  </ElFormItem>
+                  <ElFormItem v-if="editDraft.schedule_kind === 'cron'" :label="t('scheduler.advancedCron')">
+                    <ElInput v-model="editDraft.schedule_expr" :placeholder="t('scheduler.scheduleExprPlaceholder')" />
+                  </ElFormItem>
+                  <ElFormItem :label="t('scheduler.timezone')">
+                    <ElInput v-model="editDraft.timezone" :placeholder="t('scheduler.timezonePlaceholder')" />
+                  </ElFormItem>
                 </div>
-                <pre>{{ formatJson({
-                  runtime_overrides: selectedJob.runtime_overrides,
-                  delivery_target: selectedJob.delivery_target,
-                  retry_policy: selectedJob.retry_policy,
-                  metadata: selectedJob.metadata,
-                }) }}</pre>
-              </article>
-            </section>
+              </section>
 
-            <section class="scheduler-page__runs">
-              <div class="scheduler-page__panel-heading">
-                <div>
-                  <span class="scheduler-page__section-kicker">{{ t("scheduler.jobRuns") }}</span>
-                  <h4>{{ t("scheduler.jobRuns") }}</h4>
-                </div>
-              </div>
-              <article v-if="runsLoading" class="scheduler-page__empty">{{ t("common.loading") }}</article>
-              <article v-else-if="sortedRuns.length === 0" class="scheduler-page__empty">{{ t("scheduler.emptyRuns") }}</article>
-              <div v-else class="scheduler-page__run-list">
-                <article v-for="run in sortedRuns" :key="run.job_run_id" class="scheduler-page__run-row">
-                  <span :class="statusClass(run.status)">{{ normalizeJobRunStatus(run.status) }}</span>
+              <section class="scheduler-page__form-section">
+                <div class="scheduler-page__panel-heading">
                   <div>
-                    <strong>{{ shortId(run.job_run_id) }}</strong>
-                    <p>
-                      <span>{{ t("scheduler.trigger") }}: {{ run.trigger_reason || t("common.none") }}</span>
-                      <span>{{ formatTimestamp(run.started_at || run.created_at) }}</span>
-                    </p>
-                    <p v-if="run.error" class="scheduler-page__error">{{ run.error }}</p>
+                    <span class="scheduler-page__section-kicker">{{ t("scheduler.runInputs") }}</span>
+                    <h4>{{ t("scheduler.runInputs") }}</h4>
+                    <p class="scheduler-page__muted">{{ t("scheduler.runInputsBody") }}</p>
                   </div>
-                  <RouterLink
-                    v-if="run.run_id"
-                    class="scheduler-page__run-link"
-                    :to="`/runs/${encodeURIComponent(run.run_id)}`"
+                </div>
+                <article v-if="editInputRows.length === 0" class="scheduler-page__empty">{{ t("scheduler.noRunInputs") }}</article>
+                <div v-else class="scheduler-page__input-list">
+                  <article v-for="row in editInputRows" :key="row.state_key" class="scheduler-page__input-row">
+                    <div class="scheduler-page__input-meta">
+                      <strong>{{ row.label }}</strong>
+                      <span>{{ row.state_key }} · {{ row.type }}</span>
+                      <p v-if="row.description">{{ row.description }}</p>
+                    </div>
+                    <div class="scheduler-page__input-control">
+                      <ElSwitch
+                        v-if="row.type === 'boolean'"
+                        :model-value="Boolean(editDraft.input_values[row.state_key])"
+                        @change="(value: unknown) => setDraftInputValue(editDraft, row.state_key, Boolean(value))"
+                      />
+                      <ElInput
+                        v-else-if="row.type === 'number'"
+                        :model-value="String(editDraft.input_values[row.state_key] ?? '')"
+                        type="number"
+                        @update:model-value="(value: string) => setDraftInputValue(editDraft, row.state_key, value)"
+                      />
+                      <ElInput
+                        v-else-if="row.type === 'json' || row.type === 'capability' || row.type === 'result_package'"
+                        :model-value="String(editDraft.input_values[row.state_key] ?? '')"
+                        type="textarea"
+                        :rows="5"
+                        @update:model-value="(value: string) => setDraftInputValue(editDraft, row.state_key, value)"
+                      />
+                      <ElInput
+                        v-else
+                        :model-value="String(editDraft.input_values[row.state_key] ?? '')"
+                        type="textarea"
+                        :rows="3"
+                        @update:model-value="(value: string) => setDraftInputValue(editDraft, row.state_key, value)"
+                      />
+                      <ElButton class="scheduler-page__input-reset" @click="resetEditInputValue(row.state_key)">
+                        {{ t("scheduler.resetInput") }}
+                      </ElButton>
+                    </div>
+                  </article>
+                </div>
+              </section>
+
+              <section class="scheduler-page__form-section">
+                <div class="scheduler-page__panel-heading">
+                  <div>
+                    <span class="scheduler-page__section-kicker">{{ t("scheduler.messageOutlet") }}</span>
+                    <h4>{{ t("scheduler.messageOutlet") }}</h4>
+                    <p class="scheduler-page__muted">{{ t("scheduler.messageOutletBody") }}</p>
+                  </div>
+                </div>
+                <p v-if="outletsLoading" class="scheduler-page__form-note">{{ t("scheduler.outletLoading") }}</p>
+                <div class="scheduler-page__form-grid">
+                  <ElFormItem :label="t('scheduler.messageOutlet')">
+                    <ElSelect
+                      v-model="editDraft.delivery_outlet"
+                      class="scheduler-page__select toograph-select"
+                      popper-class="toograph-select-popper"
+                      :loading="outletsLoading"
+                    >
+                      <ElOption v-for="option in outletOptions" :key="option.value" :label="option.label" :value="option.value" />
+                    </ElSelect>
+                  </ElFormItem>
+                  <ElFormItem v-if="editDraft.delivery_outlet !== 'none'" :label="t('scheduler.sessionMode')">
+                    <ElSelect v-model="editDraft.delivery_session_mode" class="scheduler-page__select toograph-select" popper-class="toograph-select-popper">
+                      <ElOption v-for="option in sessionModeOptions" :key="option.value" :label="option.label" :value="option.value" />
+                    </ElSelect>
+                  </ElFormItem>
+                  <ElFormItem
+                    v-if="editDraft.delivery_outlet === 'buddy' && editDraft.delivery_session_mode === 'existing_session'"
+                    :label="t('scheduler.buddySession')"
                   >
-                    {{ t("scheduler.openRun") }}
-                  </RouterLink>
-                </article>
+                    <ElSelect
+                      v-model="editDraft.buddy_session_id"
+                      class="scheduler-page__select toograph-select"
+                      filterable
+                      popper-class="toograph-select-popper"
+                      :placeholder="t('scheduler.buddySession')"
+                    >
+                      <ElOption v-for="session in buddySessions" :key="session.session_id" :label="session.title || session.session_id" :value="session.session_id">
+                        <span>{{ session.title || session.session_id }}</span>
+                        <small class="scheduler-page__option-id">{{ session.session_id }}</small>
+                      </ElOption>
+                    </ElSelect>
+                    <p v-if="buddySessions.length === 0" class="scheduler-page__form-note">{{ t("scheduler.noBuddySessions") }}</p>
+                  </ElFormItem>
+                  <ElFormItem
+                    v-if="isPlatformOutlet(editDraft.delivery_outlet) && editDraft.delivery_session_mode === 'existing_session'"
+                    :label="t('scheduler.platformSession')"
+                  >
+                    <ElSelect
+                      v-model="editDraft.platform_session_id"
+                      class="scheduler-page__select toograph-select"
+                      filterable
+                      popper-class="toograph-select-popper"
+                      :placeholder="t('scheduler.platformSession')"
+                    >
+                      <ElOption
+                        v-for="session in messagePlatformSessionsFor(editDraft.delivery_outlet)"
+                        :key="session.platform_session_id"
+                        :label="session.display_name || session.external_chat_id || session.platform_session_id"
+                        :value="session.platform_session_id"
+                      >
+                        <span>{{ session.display_name || session.external_chat_id || session.platform_session_id }}</span>
+                        <small class="scheduler-page__option-id">{{ session.binding_id }} · {{ session.external_chat_id }}</small>
+                      </ElOption>
+                    </ElSelect>
+                    <p v-if="messagePlatformSessionsFor(editDraft.delivery_outlet).length === 0" class="scheduler-page__form-note">
+                      {{ t("scheduler.noPlatformSessions") }}
+                    </p>
+                  </ElFormItem>
+                  <template v-if="isPlatformOutlet(editDraft.delivery_outlet) && editDraft.delivery_session_mode !== 'existing_session'">
+                    <ElFormItem :label="t('scheduler.platformBinding')">
+                      <ElSelect
+                        v-model="editDraft.message_platform_binding_id"
+                        class="scheduler-page__select toograph-select"
+                        filterable
+                        popper-class="toograph-select-popper"
+                        :placeholder="t('scheduler.platformBinding')"
+                      >
+                        <ElOption
+                          v-for="binding in messagePlatformBindingsFor(editDraft.delivery_outlet)"
+                          :key="binding.binding_id"
+                          :label="binding.display_name || binding.binding_id"
+                          :value="binding.binding_id"
+                        >
+                          <span>{{ binding.display_name || binding.binding_id }}</span>
+                          <small class="scheduler-page__option-id">{{ binding.binding_id }}</small>
+                        </ElOption>
+                      </ElSelect>
+                      <p v-if="messagePlatformBindingsFor(editDraft.delivery_outlet).length === 0" class="scheduler-page__form-note">
+                        {{ t("scheduler.noPlatformBindings") }}
+                      </p>
+                    </ElFormItem>
+                    <ElFormItem :label="t('scheduler.externalChatId')">
+                      <ElInput v-model="editDraft.external_chat_id" />
+                    </ElFormItem>
+                    <ElFormItem :label="t('scheduler.externalThreadId')">
+                      <ElInput v-model="editDraft.external_thread_id" />
+                    </ElFormItem>
+                    <ElFormItem :label="t('scheduler.externalChatType')">
+                      <ElInput v-model="editDraft.external_chat_type" />
+                    </ElFormItem>
+                  </template>
+                  <ElFormItem
+                    v-if="editDraft.delivery_outlet === 'buddy' && editDraft.delivery_session_mode !== 'existing_session'"
+                    :label="t('scheduler.externalDisplayName')"
+                  >
+                    <ElInput v-model="editDraft.external_display_name" :placeholder="t('scheduler.externalDisplayName')" />
+                  </ElFormItem>
+                  <ElFormItem
+                    v-if="isPlatformOutlet(editDraft.delivery_outlet) && editDraft.delivery_session_mode !== 'existing_session'"
+                    :label="t('scheduler.externalDisplayName')"
+                  >
+                    <ElInput v-model="editDraft.external_display_name" :placeholder="t('scheduler.externalDisplayName')" />
+                  </ElFormItem>
+                </div>
+              </section>
+
+              <div class="scheduler-page__save-row">
+                <ElButton @click="restoreSelectedJobDraft">{{ t("common.restoreEdit") }}</ElButton>
+                <ElButton
+                  type="primary"
+                  :loading="savingJob"
+                  data-virtual-affordance-id="scheduler.job.save"
+                  :data-virtual-affordance-label="t('scheduler.saveJob')"
+                  data-virtual-affordance-role="button"
+                  data-virtual-affordance-zone="scheduler.jobDetail"
+                  data-virtual-affordance-actions="click"
+                  @click="submitUpdateJob"
+                >
+                  {{ t("scheduler.saveJob") }}
+                </ElButton>
               </div>
-            </section>
+            </ElForm>
+
           </template>
         </section>
+      </section>
+
+      <section v-if="selectedJob" class="scheduler-page__runs scheduler-page__runs-panel">
+        <div class="scheduler-page__panel-heading">
+          <div>
+            <span class="scheduler-page__section-kicker">{{ t("scheduler.jobRuns") }}</span>
+            <h4>{{ t("scheduler.jobRuns") }}</h4>
+          </div>
+        </div>
+        <article v-if="runsLoading" class="scheduler-page__empty">{{ t("common.loading") }}</article>
+        <article v-else-if="sortedRuns.length === 0" class="scheduler-page__empty">{{ t("scheduler.emptyRuns") }}</article>
+        <div v-else class="scheduler-page__run-list">
+          <article v-for="run in sortedRuns" :key="run.job_run_id" class="scheduler-page__run-row">
+            <span :class="statusClass(run.status)">{{ normalizeJobRunStatus(run.status) }}</span>
+            <div>
+              <strong>{{ shortId(run.job_run_id) }}</strong>
+              <p>
+                <span>{{ t("scheduler.trigger") }}: {{ run.trigger_reason || t("common.none") }}</span>
+                <span>{{ formatTimestamp(run.started_at || run.created_at) }}</span>
+              </p>
+              <p v-if="run.error" class="scheduler-page__error">{{ run.error }}</p>
+            </div>
+            <RouterLink
+              v-if="run.run_id"
+              class="scheduler-page__run-link"
+              :to="`/runs/${encodeURIComponent(run.run_id)}`"
+            >
+              {{ t("scheduler.openRun") }}
+            </RouterLink>
+          </article>
+        </div>
       </section>
 
       <ElDialog
@@ -299,6 +513,7 @@
               data-virtual-affordance-role="select"
               data-virtual-affordance-zone="scheduler.create"
               data-virtual-affordance-actions="select"
+              @change="syncCreateDraftInputs"
             >
               <ElOption
                 v-for="template in templates"
@@ -317,23 +532,177 @@
               <ElOption v-for="option in scheduleKindOptions" :key="option.value" :label="option.label" :value="option.value" />
             </ElSelect>
           </ElFormItem>
-          <ElFormItem v-if="createDraft.schedule_kind !== 'manual'" :label="t('scheduler.scheduleExpr')">
+          <ElFormItem v-if="createDraft.schedule_kind === 'interval'" :label="t('scheduler.repeatEvery')">
+            <div class="scheduler-page__interval-control">
+              <ElInputNumber v-model="createDraft.interval_amount" :min="1" :step="1" controls-position="right" />
+              <ElSelect v-model="createDraft.interval_unit" class="scheduler-page__select toograph-select" popper-class="toograph-select-popper">
+                <ElOption v-for="option in intervalUnitOptions" :key="option.value" :label="option.label" :value="option.value" />
+              </ElSelect>
+            </div>
+          </ElFormItem>
+          <ElFormItem v-if="createDraft.schedule_kind === 'cron'" :label="t('scheduler.advancedCron')">
             <ElInput v-model="createDraft.schedule_expr" :placeholder="t('scheduler.scheduleExprPlaceholder')" />
           </ElFormItem>
           <ElFormItem :label="t('scheduler.timezone')">
             <ElInput v-model="createDraft.timezone" :placeholder="t('scheduler.timezonePlaceholder')" />
           </ElFormItem>
-          <ElFormItem :label="t('scheduler.inputBindings')">
-            <ElInput v-model="createDraft.input_bindings_json" type="textarea" :rows="8" />
-          </ElFormItem>
-          <ElFormItem :label="t('scheduler.deliveryTarget')">
-            <ElInput
-              v-model="createDraft.delivery_target_json"
-              type="textarea"
-              :rows="4"
-              :placeholder="t('scheduler.deliveryTargetPlaceholder')"
-            />
-          </ElFormItem>
+          <section class="scheduler-page__form-section scheduler-page__form-section--dialog">
+            <div class="scheduler-page__panel-heading">
+              <div>
+                <span class="scheduler-page__section-kicker">{{ t("scheduler.runInputs") }}</span>
+                <h4>{{ t("scheduler.runInputs") }}</h4>
+                <p class="scheduler-page__muted">{{ t("scheduler.runInputsBody") }}</p>
+              </div>
+            </div>
+            <article v-if="createInputRows.length === 0" class="scheduler-page__empty">{{ t("scheduler.noRunInputs") }}</article>
+            <div v-else class="scheduler-page__input-list">
+              <article v-for="row in createInputRows" :key="row.state_key" class="scheduler-page__input-row">
+                <div class="scheduler-page__input-meta">
+                  <strong>{{ row.label }}</strong>
+                  <span>{{ row.state_key }} · {{ row.type }}</span>
+                  <p v-if="row.description">{{ row.description }}</p>
+                </div>
+                <div class="scheduler-page__input-control">
+                  <ElSwitch
+                    v-if="row.type === 'boolean'"
+                    :model-value="Boolean(createDraft.input_values[row.state_key])"
+                    @change="(value: unknown) => setDraftInputValue(createDraft, row.state_key, Boolean(value))"
+                  />
+                  <ElInput
+                    v-else-if="row.type === 'number'"
+                    :model-value="String(createDraft.input_values[row.state_key] ?? '')"
+                    type="number"
+                    @update:model-value="(value: string) => setDraftInputValue(createDraft, row.state_key, value)"
+                  />
+                  <ElInput
+                    v-else-if="row.type === 'json' || row.type === 'capability' || row.type === 'result_package'"
+                    :model-value="String(createDraft.input_values[row.state_key] ?? '')"
+                    type="textarea"
+                    :rows="5"
+                    @update:model-value="(value: string) => setDraftInputValue(createDraft, row.state_key, value)"
+                  />
+                  <ElInput
+                    v-else
+                    :model-value="String(createDraft.input_values[row.state_key] ?? '')"
+                    type="textarea"
+                    :rows="3"
+                    @update:model-value="(value: string) => setDraftInputValue(createDraft, row.state_key, value)"
+                  />
+                  <ElButton class="scheduler-page__input-reset" @click="resetCreateInputValue(row.state_key)">
+                    {{ t("scheduler.resetInput") }}
+                  </ElButton>
+                </div>
+              </article>
+            </div>
+          </section>
+          <section class="scheduler-page__form-section scheduler-page__form-section--dialog">
+            <div class="scheduler-page__panel-heading">
+              <div>
+                <span class="scheduler-page__section-kicker">{{ t("scheduler.messageOutlet") }}</span>
+                <h4>{{ t("scheduler.messageOutlet") }}</h4>
+                <p class="scheduler-page__muted">{{ t("scheduler.messageOutletBody") }}</p>
+              </div>
+            </div>
+            <div class="scheduler-page__form-grid">
+              <ElFormItem :label="t('scheduler.messageOutlet')">
+                <ElSelect
+                  v-model="createDraft.delivery_outlet"
+                  class="scheduler-page__select toograph-select"
+                  popper-class="toograph-select-popper"
+                  :loading="outletsLoading"
+                >
+                  <ElOption v-for="option in outletOptions" :key="option.value" :label="option.label" :value="option.value" />
+                </ElSelect>
+              </ElFormItem>
+              <ElFormItem v-if="createDraft.delivery_outlet !== 'none'" :label="t('scheduler.sessionMode')">
+                <ElSelect v-model="createDraft.delivery_session_mode" class="scheduler-page__select toograph-select" popper-class="toograph-select-popper">
+                  <ElOption v-for="option in sessionModeOptions" :key="option.value" :label="option.label" :value="option.value" />
+                </ElSelect>
+              </ElFormItem>
+              <ElFormItem
+                v-if="createDraft.delivery_outlet === 'buddy' && createDraft.delivery_session_mode === 'existing_session'"
+                :label="t('scheduler.buddySession')"
+              >
+                <ElSelect
+                  v-model="createDraft.buddy_session_id"
+                  class="scheduler-page__select toograph-select"
+                  filterable
+                  popper-class="toograph-select-popper"
+                  :placeholder="t('scheduler.buddySession')"
+                >
+                  <ElOption v-for="session in buddySessions" :key="session.session_id" :label="session.title || session.session_id" :value="session.session_id">
+                    <span>{{ session.title || session.session_id }}</span>
+                    <small class="scheduler-page__option-id">{{ session.session_id }}</small>
+                  </ElOption>
+                </ElSelect>
+                <p v-if="buddySessions.length === 0" class="scheduler-page__form-note">{{ t("scheduler.noBuddySessions") }}</p>
+              </ElFormItem>
+              <ElFormItem
+                v-if="isPlatformOutlet(createDraft.delivery_outlet) && createDraft.delivery_session_mode === 'existing_session'"
+                :label="t('scheduler.platformSession')"
+              >
+                <ElSelect
+                  v-model="createDraft.platform_session_id"
+                  class="scheduler-page__select toograph-select"
+                  filterable
+                  popper-class="toograph-select-popper"
+                  :placeholder="t('scheduler.platformSession')"
+                >
+                  <ElOption
+                    v-for="session in messagePlatformSessionsFor(createDraft.delivery_outlet)"
+                    :key="session.platform_session_id"
+                    :label="session.display_name || session.external_chat_id || session.platform_session_id"
+                    :value="session.platform_session_id"
+                  >
+                    <span>{{ session.display_name || session.external_chat_id || session.platform_session_id }}</span>
+                    <small class="scheduler-page__option-id">{{ session.binding_id }} · {{ session.external_chat_id }}</small>
+                  </ElOption>
+                </ElSelect>
+                <p v-if="messagePlatformSessionsFor(createDraft.delivery_outlet).length === 0" class="scheduler-page__form-note">
+                  {{ t("scheduler.noPlatformSessions") }}
+                </p>
+              </ElFormItem>
+              <template v-if="isPlatformOutlet(createDraft.delivery_outlet) && createDraft.delivery_session_mode !== 'existing_session'">
+                <ElFormItem :label="t('scheduler.platformBinding')">
+                  <ElSelect
+                    v-model="createDraft.message_platform_binding_id"
+                    class="scheduler-page__select toograph-select"
+                    filterable
+                    popper-class="toograph-select-popper"
+                    :placeholder="t('scheduler.platformBinding')"
+                  >
+                    <ElOption
+                      v-for="binding in messagePlatformBindingsFor(createDraft.delivery_outlet)"
+                      :key="binding.binding_id"
+                      :label="binding.display_name || binding.binding_id"
+                      :value="binding.binding_id"
+                    >
+                      <span>{{ binding.display_name || binding.binding_id }}</span>
+                      <small class="scheduler-page__option-id">{{ binding.binding_id }}</small>
+                    </ElOption>
+                  </ElSelect>
+                  <p v-if="messagePlatformBindingsFor(createDraft.delivery_outlet).length === 0" class="scheduler-page__form-note">
+                    {{ t("scheduler.noPlatformBindings") }}
+                  </p>
+                </ElFormItem>
+                <ElFormItem :label="t('scheduler.externalChatId')">
+                  <ElInput v-model="createDraft.external_chat_id" />
+                </ElFormItem>
+                <ElFormItem :label="t('scheduler.externalThreadId')">
+                  <ElInput v-model="createDraft.external_thread_id" />
+                </ElFormItem>
+                <ElFormItem :label="t('scheduler.externalChatType')">
+                  <ElInput v-model="createDraft.external_chat_type" />
+                </ElFormItem>
+              </template>
+              <ElFormItem
+                v-if="createDraft.delivery_outlet !== 'none' && createDraft.delivery_session_mode !== 'existing_session'"
+                :label="t('scheduler.externalDisplayName')"
+              >
+                <ElInput v-model="createDraft.external_display_name" :placeholder="t('scheduler.externalDisplayName')" />
+              </ElFormItem>
+            </div>
+          </section>
           <label class="scheduler-page__switch-label scheduler-page__switch-label--form">
             <span>{{ t("scheduler.enabledOnCreate") }}</span>
             <ElSwitch v-model="createDraft.enabled" />
@@ -364,32 +733,41 @@
 
 <script setup lang="ts">
 import { CirclePlus, Refresh, VideoPlay } from "@element-plus/icons-vue";
-import { ElButton, ElDialog, ElForm, ElFormItem, ElIcon, ElInput, ElOption, ElSelect, ElSwitch } from "element-plus";
+import { ElButton, ElDialog, ElForm, ElFormItem, ElIcon, ElInput, ElInputNumber, ElMessage, ElOption, ElSelect, ElSwitch } from "element-plus";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import { fetchBuddyChatSessions } from "@/api/buddy";
 import { fetchTemplates } from "@/api/graphs";
+import { fetchMessagePlatformBindings, fetchMessagePlatformSessions } from "@/api/message-platforms";
 import {
   createScheduledGraphJob,
   fetchScheduledGraphJobRuns,
   fetchScheduledGraphJobs,
   runScheduledGraphJob,
   setScheduledGraphJobEnabled,
+  updateScheduledGraphJob,
 } from "@/api/scheduler";
 import AppShell from "@/layouts/AppShell.vue";
+import type { BuddyChatSession } from "@/types/buddy";
+import type { MessagePlatformBinding, MessagePlatformSession } from "@/types/message-platforms";
 import type { TemplateRecord } from "@/types/node-system";
-import type { ScheduledGraphJob, ScheduledGraphJobRun } from "@/types/scheduler";
+import type { ScheduledGraphJob, ScheduledGraphJobRun, ScheduledMessageOutletKind } from "@/types/scheduler";
 
 import {
   buildOfficialSchedulerEnableRecommendations,
   buildDefaultScheduledGraphJobDraft,
+  buildScheduledGraphJobDraftFromJob,
+  buildScheduledGraphJobInputRows,
   buildScheduledGraphJobPayload,
   buildSchedulerOverview,
   formatSchedule,
   normalizeJobRunStatus,
+  resetScheduledGraphJobInputValue,
   sortScheduledGraphJobRuns,
   sortScheduledGraphJobs,
   type ScheduledGraphJobDraft,
+  withTemplateInputDraft,
 } from "./schedulerPageModel.ts";
 
 const { t, locale } = useI18n();
@@ -400,15 +778,25 @@ const loading = ref(true);
 const runsLoading = ref(false);
 const templatesLoading = ref(false);
 const creatingJob = ref(false);
+const savingJob = ref(false);
+const outletsLoading = ref(false);
 const pendingActionKey = ref("");
 const error = ref<string | null>(null);
 const actionError = ref<string | null>(null);
 const createDialogVisible = ref(false);
 const templates = ref<TemplateRecord[]>([]);
+const buddySessions = ref<BuddyChatSession[]>([]);
+const messagePlatformBindings = ref<MessagePlatformBinding[]>([]);
+const messagePlatformSessions = ref<MessagePlatformSession[]>([]);
 const createDraft = ref<ScheduledGraphJobDraft>(buildDefaultScheduledGraphJobDraft());
+const editDraft = ref<ScheduledGraphJobDraft>(buildDefaultScheduledGraphJobDraft());
 
 const sortedJobs = computed(() => sortScheduledGraphJobs(jobs.value));
 const selectedJob = computed(() => jobs.value.find((job) => job.job_id === selectedJobId.value) ?? sortedJobs.value[0] ?? null);
+const selectedEditTemplate = computed(() => templateById(editDraft.value.template_id));
+const selectedCreateTemplate = computed(() => templateById(createDraft.value.template_id));
+const editInputRows = computed(() => buildScheduledGraphJobInputRows(selectedEditTemplate.value, editDraft.value));
+const createInputRows = computed(() => buildScheduledGraphJobInputRows(selectedCreateTemplate.value, createDraft.value));
 const sortedRuns = computed(() => sortScheduledGraphJobRuns(jobRuns.value));
 const officialMaintenanceRecommendations = computed(() => {
   locale.value;
@@ -421,7 +809,23 @@ const overview = computed(() => {
 const scheduleKindOptions = computed(() => [
   { label: t("scheduler.manual"), value: "manual" },
   { label: t("scheduler.interval"), value: "interval" },
-  { label: t("scheduler.cron"), value: "cron" },
+  { label: t("scheduler.advancedCron"), value: "cron" },
+]);
+const intervalUnitOptions = computed(() => [
+  { label: t("scheduler.intervalUnitMinutes"), value: "minutes" },
+  { label: t("scheduler.intervalUnitHours"), value: "hours" },
+  { label: t("scheduler.intervalUnitDays"), value: "days" },
+]);
+const outletOptions = computed(() => [
+  { label: t("scheduler.outletNone"), value: "none" },
+  { label: t("scheduler.outletBuddy"), value: "buddy" },
+  { label: t("scheduler.outletFeishu"), value: "feishu" },
+  { label: t("scheduler.outletTelegram"), value: "telegram" },
+]);
+const sessionModeOptions = computed(() => [
+  { label: t("scheduler.sessionModeExisting"), value: "existing_session" },
+  { label: t("scheduler.sessionModeCreate"), value: "create_session" },
+  { label: t("scheduler.sessionModeNewPerRun"), value: "new_session_per_run" },
 ]);
 
 async function loadSchedulerJobs() {
@@ -481,8 +885,9 @@ async function toggleJobEnabled(jobId: string, enabled: boolean) {
 
 async function openCreateDialog() {
   createDialogVisible.value = true;
-  createDraft.value = buildDefaultScheduledGraphJobDraft(templates.value[0]?.template_id ?? "");
-  await loadSchedulerTemplates();
+  await Promise.all([loadSchedulerTemplates(), loadMessageOutletOptions()]);
+  const template = templates.value[0] ?? null;
+  createDraft.value = buildDefaultScheduledGraphJobDraft(template?.template_id ?? "", template);
 }
 
 async function loadSchedulerTemplates() {
@@ -491,15 +896,38 @@ async function loadSchedulerTemplates() {
     templates.value = await fetchTemplates();
     if (!createDraft.value.template_id && templates.value[0]) {
       createDraft.value = {
-        ...createDraft.value,
+        ...withTemplateInputDraft(createDraft.value, templates.value[0]),
         template_id: templates.value[0].template_id,
       };
+    }
+    if (selectedJob.value && Object.keys(editDraft.value.input_types).length === 0) {
+      restoreSelectedJobDraft();
     }
     actionError.value = null;
   } catch (loadError) {
     actionError.value = loadError instanceof Error ? loadError.message : t("scheduler.actionFailedFallback");
   } finally {
     templatesLoading.value = false;
+  }
+}
+
+async function loadMessageOutletOptions() {
+  outletsLoading.value = true;
+  try {
+    const [nextBuddySessions, platformBindingResult, platformSessionResult] = await Promise.all([
+      fetchBuddyChatSessions(false),
+      fetchMessagePlatformBindings(),
+      fetchMessagePlatformSessions({ limit: 200 }),
+    ]);
+    buddySessions.value = nextBuddySessions.filter((session) => !session.deleted);
+    messagePlatformBindings.value = platformBindingResult.bindings;
+    messagePlatformSessions.value = platformSessionResult.sessions;
+    actionError.value = null;
+  } catch (loadError) {
+    const message = loadError instanceof Error ? loadError.message : t("scheduler.actionFailedFallback");
+    actionError.value = t("scheduler.loadOutletsFailed", { error: message });
+  } finally {
+    outletsLoading.value = false;
   }
 }
 
@@ -516,6 +944,26 @@ async function submitCreateJob() {
     actionError.value = createError instanceof Error ? createError.message : t("scheduler.actionFailedFallback");
   } finally {
     creatingJob.value = false;
+  }
+}
+
+async function submitUpdateJob() {
+  const job = selectedJob.value;
+  if (!job) {
+    return;
+  }
+  savingJob.value = true;
+  try {
+    const payload = buildScheduledGraphJobPayload(editDraft.value);
+    const updatedJob = await updateScheduledGraphJob(job.job_id, payload);
+    mergeJob(updatedJob);
+    actionError.value = null;
+    ElMessage.success(t("scheduler.saved"));
+  } catch (saveError) {
+    const message = saveError instanceof Error ? saveError.message : t("scheduler.actionFailedFallback");
+    actionError.value = t("scheduler.saveFailed", { error: message });
+  } finally {
+    savingJob.value = false;
   }
 }
 
@@ -539,12 +987,62 @@ function mergeJob(job: ScheduledGraphJob) {
   jobs.value = [job, ...jobs.value.filter((existing) => existing.job_id !== job.job_id)];
 }
 
+function restoreSelectedJobDraft() {
+  const job = selectedJob.value;
+  editDraft.value = job ? buildScheduledGraphJobDraftFromJob(job, templateById(job.template_id)) : buildDefaultScheduledGraphJobDraft();
+}
+
+function templateById(templateId: string): TemplateRecord | null {
+  return templates.value.find((template) => template.template_id === templateId) ?? null;
+}
+
+function syncEditDraftInputs() {
+  editDraft.value = withTemplateInputDraft(editDraft.value, selectedEditTemplate.value);
+}
+
+function syncCreateDraftInputs() {
+  createDraft.value = withTemplateInputDraft(createDraft.value, selectedCreateTemplate.value);
+}
+
+function setDraftInputValue(draft: ScheduledGraphJobDraft, stateKey: string, value: string | boolean) {
+  draft.input_values = {
+    ...draft.input_values,
+    [stateKey]: value,
+  };
+}
+
+function resetEditInputValue(stateKey: string) {
+  editDraft.value = resetScheduledGraphJobInputValue(editDraft.value, stateKey);
+}
+
+function resetCreateInputValue(stateKey: string) {
+  createDraft.value = resetScheduledGraphJobInputValue(createDraft.value, stateKey);
+}
+
 function jobActionKey(jobId: string, action: string) {
   return `${jobId}:${action}`;
 }
 
 function isOfficialJob(job: ScheduledGraphJob) {
   return job.metadata?.source === "official_seed" || job.metadata?.source === "official";
+}
+
+function isPlatformOutlet(outlet: ScheduledMessageOutletKind): outlet is "feishu" | "telegram" {
+  return outlet === "feishu" || outlet === "telegram";
+}
+
+function messagePlatformBindingsFor(outlet: ScheduledMessageOutletKind) {
+  if (!isPlatformOutlet(outlet)) {
+    return [];
+  }
+  return messagePlatformBindings.value.filter((binding) => binding.platform_id === outlet);
+}
+
+function messagePlatformSessionsFor(outlet: ScheduledMessageOutletKind) {
+  if (!isPlatformOutlet(outlet)) {
+    return [];
+  }
+  return messagePlatformSessions.value.filter((session) => session.platform_id === outlet);
 }
 
 function formatTimestamp(value: string) {
@@ -568,10 +1066,6 @@ function shortId(value: string) {
   return value.length > 16 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
 }
 
-function formatJson(value: unknown) {
-  return JSON.stringify(value ?? {}, null, 2);
-}
-
 function statusClass(status: string) {
   const normalized = normalizeJobRunStatus(status);
   if (normalized === "completed") {
@@ -590,8 +1084,18 @@ watch(selectedJobId, () => {
   void loadSelectedJobRuns();
 });
 
+watch(
+  selectedJob,
+  (job) => {
+    editDraft.value = job ? buildScheduledGraphJobDraftFromJob(job, templateById(job.template_id)) : buildDefaultScheduledGraphJobDraft();
+  },
+  { immediate: true },
+);
+
 onMounted(() => {
   void loadSchedulerJobs();
+  void loadSchedulerTemplates();
+  void loadMessageOutletOptions();
 });
 </script>
 
@@ -607,7 +1111,8 @@ onMounted(() => {
 .scheduler-page__overview,
 .scheduler-page__maintenance-guide,
 .scheduler-page__job-panel,
-.scheduler-page__detail-panel {
+.scheduler-page__detail-panel,
+.scheduler-page__runs-panel {
   background: var(--toograph-glass-specular), var(--toograph-glass-lens), var(--toograph-glass-bg-strong);
   border: 1px solid rgba(120, 53, 15, 0.1);
   box-shadow: 0 18px 46px rgba(30, 41, 59, 0.08);
@@ -649,6 +1154,7 @@ onMounted(() => {
 
 .scheduler-page__header-actions,
 .scheduler-page__detail-actions,
+.scheduler-page__job-card-actions,
 .scheduler-page__badges,
 .scheduler-page__run-row p {
   display: flex;
@@ -752,6 +1258,13 @@ onMounted(() => {
   padding: 16px;
 }
 
+.scheduler-page__runs-panel {
+  min-width: 0;
+  margin-top: 0;
+  border-radius: 8px;
+  padding: 16px;
+}
+
 .scheduler-page__panel-heading,
 .scheduler-page__detail-heading,
 .scheduler-page__job-card-heading,
@@ -796,14 +1309,45 @@ onMounted(() => {
   width: 100%;
   padding: 13px;
   color: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
 .scheduler-page__job-card:hover,
 .scheduler-page__job-card--active {
   border-color: rgba(154, 52, 18, 0.22);
   background: rgba(255, 255, 255, 0.86);
+}
+
+.scheduler-page__job-card-main {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.scheduler-page__job-card-main:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid rgba(216, 166, 80, 0.5);
+  outline-offset: 3px;
+}
+
+.scheduler-page__job-card-actions {
+  justify-content: space-between;
+  border-top: 1px solid rgba(120, 53, 15, 0.08);
+  padding-top: 9px;
+}
+
+.scheduler-page__job-action {
+  min-height: 32px;
+  border-color: rgba(154, 52, 18, 0.18);
+  background: rgba(255, 248, 240, 0.94);
+  color: rgb(154, 52, 18);
+  font-weight: 800;
 }
 
 .scheduler-page__id {
@@ -941,11 +1485,98 @@ onMounted(() => {
 
 .scheduler-page__form {
   display: grid;
-  gap: 2px;
+  gap: 12px;
 }
 
 .scheduler-page__form :deep(.el-select) {
   width: 100%;
+}
+
+.scheduler-page__edit-form {
+  margin-top: 16px;
+}
+
+.scheduler-page__form-section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid rgba(120, 53, 15, 0.1);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.scheduler-page__form-section--dialog {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.scheduler-page__form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.scheduler-page__interval-control {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.42fr) minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.scheduler-page__input-list {
+  display: grid;
+  gap: 10px;
+}
+
+.scheduler-page__input-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.34fr) minmax(0, 1fr);
+  gap: 14px;
+  min-width: 0;
+  border: 1px solid rgba(120, 53, 15, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.scheduler-page__input-meta {
+  min-width: 0;
+}
+
+.scheduler-page__input-meta strong,
+.scheduler-page__input-meta span,
+.scheduler-page__input-meta p {
+  display: block;
+}
+
+.scheduler-page__input-meta strong {
+  color: var(--toograph-text-strong);
+}
+
+.scheduler-page__input-meta span {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  color: var(--toograph-text-muted);
+  font-family: var(--toograph-font-mono);
+  font-size: 0.74rem;
+}
+
+.scheduler-page__input-meta p {
+  margin: 7px 0 0;
+  color: var(--toograph-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.scheduler-page__input-control {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.scheduler-page__input-reset {
+  justify-self: end;
 }
 
 .scheduler-page__form-note {
@@ -968,6 +1599,12 @@ onMounted(() => {
 }
 
 .scheduler-page__dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.scheduler-page__save-row {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -1007,7 +1644,10 @@ onMounted(() => {
 @media (max-width: 1100px) {
   .scheduler-page__layout,
   .scheduler-page__detail-grid,
-  .scheduler-page__maintenance-list {
+  .scheduler-page__maintenance-list,
+  .scheduler-page__form-grid,
+  .scheduler-page__interval-control,
+  .scheduler-page__input-row {
     grid-template-columns: 1fr;
   }
 }

@@ -15,7 +15,7 @@ from app.core.runtime.state import create_initial_run_state, set_run_status, tou
 from app.core.runtime.state_io import input_state_keys
 from app.core.schemas.node_system import NodeSystemGraphDocument
 from app.core.storage.run_store import save_run
-from app.scheduler import store
+from app.scheduler import message_outlet, store
 from app.templates.loader import load_template_record
 
 
@@ -202,6 +202,7 @@ def _run_scheduled_graph_worker(graph: NodeSystemGraphDocument, run_state: dict[
         execute_node_system_graph_langgraph(graph, run_state, persist_progress=True)
         if job_run_id:
             store.update_scheduled_graph_job_run(job_run_id, status=str(run_state.get("status") or "completed"))
+            message_outlet.deliver_scheduled_graph_job_outputs(job_run_id, run_state)
     except Exception as exc:  # pragma: no cover - defensive runtime path
         logger.exception("Scheduled graph run %s failed: %s", run_state.get("run_id"), exc)
         set_run_status(run_state, "failed")

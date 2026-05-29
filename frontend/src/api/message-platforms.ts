@@ -3,6 +3,7 @@ import type {
   MessagePlatformBinding,
   MessagePlatformCatalogEntry,
   MessagePlatformConnectionStatus,
+  MessagePlatformSession,
 } from "@/types/message-platforms";
 import { apiGet, apiPost, apiPut } from "./http.ts";
 
@@ -14,6 +15,27 @@ export function fetchMessagePlatformBindings() {
   return apiGet<{ bindings: MessagePlatformBinding[]; statuses: MessagePlatformConnectionStatus[] }>(
     "/api/message-platforms/bindings",
   );
+}
+
+export function fetchMessagePlatformSessions(
+  filters: {
+    platformId?: string;
+    bindingId?: string;
+    limit?: number;
+  } = {},
+) {
+  const params = new URLSearchParams();
+  if (filters.platformId) {
+    params.set("platform_id", filters.platformId);
+  }
+  if (filters.bindingId) {
+    params.set("binding_id", filters.bindingId);
+  }
+  if (filters.limit) {
+    params.set("limit", String(filters.limit));
+  }
+  const query = params.toString();
+  return apiGet<{ sessions: MessagePlatformSession[] }>(`/api/message-platforms/sessions${query ? `?${query}` : ""}`);
 }
 
 export function updateMessagePlatformBinding(

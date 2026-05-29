@@ -33,6 +33,7 @@ class MessagePlatformRuntime:
     def __init__(self) -> None:
         self._adapters: dict[str, PlatformAdapter] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     def schedule_enabled_bindings(self) -> None:
         for binding in store.list_platform_bindings():
@@ -59,6 +60,7 @@ class MessagePlatformRuntime:
         self._tasks[normalized_binding_id] = loop.create_task(self.connect_binding(normalized_binding_id))
 
     async def connect_binding(self, binding_id: str) -> None:
+        self._loop = asyncio.get_running_loop()
         normalized_binding_id = str(binding_id or "").strip()
         binding = store.get_platform_binding(normalized_binding_id)
         if not binding:
@@ -292,6 +294,47 @@ class MessagePlatformRuntime:
         elif delivery.status == "failed":
             self._append_delivery_failure(event, delivery.error)
         return delivery
+
+    def send_text_to_platform_session(self, platform_session_id: str, text: str) -> dict[str, Any]:
+        session = store.get_platform_session(str(platform_session_id or "").strip())
+        if not session:
+            return {"status": "failed", "error": "Message platform session does not exist."}
+        binding_id = str(session.get("binding_id") or "").strip()
+        adapter = self._adapters.get(binding_id)
+        if adapter is None:
+            return {"status": "failed", "error": "Message platform binding is not connected."}
+        event = MessagingInboundEvent(
+            platform_id=str(session.get("platform_id") or ""),
+            binding_id=binding_id,
+            chat_id=str(session.get("external_chat_id") or ""),
+            thread_id=str(session.get("external_thread_id") or ""),
+            sender_id="scheduler",
+            sender_name="Scheduler",
+            chat_type=str(session.get("external_chat_type") or "unknown"),
+            text="",
+        )
+        try:
+            loop = self._loop
+            if loop is not None and loop.is_running():
+                delivery = asyncio.run_coroutine_threadsafe(self._send_platform_text(adapter, event, text), loop).result(timeout=60)
+            else:
+                delivery = asyncio.run(self._send_platform_text(adapter, event, text))
+        except Exception as exc:
+            store.append_audit_event(
+                binding_id=binding_id,
+                platform_id=str(session.get("platform_id") or ""),
+                platform_session_id=str(session.get("platform_session_id") or ""),
+                event_type="delivery.failed",
+                severity="error",
+                message=str(exc),
+            )
+            return {"status": "failed", "error": str(exc)}
+        return {
+            "status": delivery.status,
+            "platform_message_id": delivery.platform_message_id,
+            "error": delivery.error,
+            "platform_session_id": str(session.get("platform_session_id") or ""),
+        }
 
     def _append_delivery_failure(self, event: MessagingInboundEvent, message: str) -> None:
         store.append_audit_event(

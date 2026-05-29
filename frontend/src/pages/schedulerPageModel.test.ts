@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import type { TemplateRecord } from "@/types/node-system";
 import type { ScheduledGraphJob, ScheduledGraphJobRun } from "@/types/scheduler";
 
 import {
   buildOfficialSchedulerEnableRecommendations,
   buildDefaultScheduledGraphJobDraft,
+  buildScheduledGraphJobInputRows,
+  buildScheduledGraphJobDraftFromJob,
   buildScheduledGraphJobPayload,
   buildSchedulerOverview,
   formatSchedule,
@@ -86,19 +89,35 @@ test("sortScheduledGraphJobRuns orders newest run history first", () => {
 test("buildScheduledGraphJobPayload parses input bindings and normalizes manual schedules", () => {
   assert.deepEqual(
     buildScheduledGraphJobPayload({
-      ...buildDefaultScheduledGraphJobDraft("template_1"),
+      ...buildDefaultScheduledGraphJobDraft("template_1", createInputTemplate()),
       name: " Daily job ",
       schedule_kind: "manual",
-      schedule_expr: "PT24H",
-      input_bindings_json: '{"prompt":"run"}',
-      delivery_target_json: '{"kind":"local_audit","label":"Curator report"}',
+      input_values: {
+        prompt: "run",
+        count: "3",
+        enabled_flag: false,
+        filters: '{ "tag": "design" }',
+      },
+      delivery_outlet: "buddy",
+      delivery_session_mode: "existing_session",
+      buddy_session_id: "buddy_session_1",
       enabled: true,
     }),
     {
       name: "Daily job",
       template_id: "template_1",
-      input_bindings: { prompt: "run" },
-      delivery_target: { kind: "local_audit", label: "Curator report" },
+      input_bindings: {
+        prompt: "run",
+        count: 3,
+        enabled_flag: false,
+        filters: { tag: "design" },
+      },
+      delivery_target: {
+        kind: "message_outlet",
+        outlet: "buddy",
+        session_mode: "existing_session",
+        buddy_session_id: "buddy_session_1",
+      },
       schedule_kind: "manual",
       schedule_expr: "",
       timezone: "UTC",
@@ -108,25 +127,173 @@ test("buildScheduledGraphJobPayload parses input bindings and normalizes manual 
   );
 });
 
+test("buildScheduledGraphJobPayload omits template default input values", () => {
+  const payload = buildScheduledGraphJobPayload({
+    ...buildDefaultScheduledGraphJobDraft("template_1", createInputTemplate()),
+    input_values: {
+      prompt: "默认问题",
+      count: "2",
+      enabled_flag: true,
+      filters: '{\n  "tag": "default"\n}',
+    },
+  });
+
+  assert.deepEqual(payload.input_bindings, {});
+});
+
+test("buildScheduledGraphJobInputRows lists template input nodes with defaults and overrides", () => {
+  const draft = buildDefaultScheduledGraphJobDraft("template_1", createInputTemplate(), {
+    prompt: "覆盖问题",
+    count: 5,
+  });
+
+  assert.deepEqual(
+    buildScheduledGraphJobInputRows(createInputTemplate(), draft).map((row) => ({
+      state_key: row.state_key,
+      label: row.label,
+      type: row.type,
+      value: row.value,
+      default_value: row.default_value,
+      changed: row.changed,
+    })),
+    [
+      {
+        state_key: "prompt",
+        label: "任务问题",
+        type: "text",
+        value: "覆盖问题",
+        default_value: "默认问题",
+        changed: true,
+      },
+      {
+        state_key: "count",
+        label: "循环次数",
+        type: "number",
+        value: "5",
+        default_value: 2,
+        changed: true,
+      },
+      {
+        state_key: "enabled_flag",
+        label: "启用增强",
+        type: "boolean",
+        value: true,
+        default_value: true,
+        changed: false,
+      },
+      {
+        state_key: "filters",
+        label: "过滤条件",
+        type: "json",
+        value: '{\n  "tag": "default"\n}',
+        default_value: { tag: "default" },
+        changed: false,
+      },
+    ],
+  );
+});
+
+test("buildScheduledGraphJobDraftFromJob converts interval expressions to human fields", () => {
+  const draft = buildScheduledGraphJobDraftFromJob(
+    {
+      ...createJob("job_1", true, "user"),
+      template_id: "template_1",
+      schedule_kind: "interval",
+      schedule_expr: "PT168H",
+    },
+    createInputTemplate(),
+  );
+
+  assert.equal(draft.schedule_kind, "interval");
+  assert.equal(draft.interval_amount, 7);
+  assert.equal(draft.interval_unit, "days");
+});
+
+test("buildScheduledGraphJobPayload converts human interval controls to schedule expression", () => {
+  const payload = buildScheduledGraphJobPayload({
+    ...buildDefaultScheduledGraphJobDraft("template_1", createInputTemplate()),
+    schedule_kind: "interval",
+    interval_amount: 30,
+    interval_unit: "minutes",
+  });
+
+  assert.equal(payload.schedule_expr, "PT30M");
+});
+
+test("buildScheduledGraphJobPayload maps platform message outlet fields", () => {
+  const payload = buildScheduledGraphJobPayload({
+    ...buildDefaultScheduledGraphJobDraft("template_1", createInputTemplate()),
+    name: "Feishu daily report",
+    delivery_outlet: "feishu",
+    delivery_session_mode: "create_session",
+    message_platform_binding_id: "mpb_feishu",
+    external_chat_id: "oc_chat",
+    external_thread_id: "thread_1",
+    external_chat_type: "group",
+    external_display_name: "设计群",
+  });
+
+  assert.deepEqual(payload.delivery_target, {
+    kind: "message_outlet",
+    outlet: "feishu",
+    session_mode: "create_session",
+    binding_id: "mpb_feishu",
+    external_chat_id: "oc_chat",
+    external_thread_id: "thread_1",
+    external_chat_type: "group",
+    display_name: "设计群",
+  });
+});
+
+test("buildScheduledGraphJobDraftFromJob hydrates editable message outlet fields", () => {
+  const draft = buildScheduledGraphJobDraftFromJob({
+    ...createJob("job_1", true, "user"),
+    name: "Telegram digest",
+    template_id: "template_digest",
+    schedule_kind: "cron",
+    schedule_expr: "0 9 * * *",
+    timezone: "Asia/Shanghai",
+    input_bindings: { topic: "design" },
+    delivery_target: {
+      kind: "message_outlet",
+      outlet: "telegram",
+      session_mode: "existing_session",
+      platform_session_id: "mps_telegram",
+    },
+  }, createInputTemplate());
+
+  assert.equal(draft.name, "Telegram digest");
+  assert.equal(draft.template_id, "template_digest");
+  assert.equal(draft.schedule_kind, "cron");
+  assert.equal(draft.schedule_expr, "0 9 * * *");
+  assert.equal(draft.timezone, "Asia/Shanghai");
+  assert.equal(draft.input_values.topic, undefined);
+  assert.equal(draft.delivery_outlet, "telegram");
+  assert.equal(draft.delivery_session_mode, "existing_session");
+  assert.equal(draft.platform_session_id, "mps_telegram");
+});
+
 test("buildScheduledGraphJobPayload rejects non-object JSON input bindings", () => {
   assert.throws(
     () =>
       buildScheduledGraphJobPayload({
         ...buildDefaultScheduledGraphJobDraft("template_1"),
-        input_bindings_json: "[]",
+        input_values: { filters: "{" },
+        input_types: { filters: "json" },
       }),
-    /输入绑定必须是 JSON object/,
+    /运行输入不是有效 JSON/,
   );
 });
 
-test("buildScheduledGraphJobPayload rejects non-object JSON delivery targets", () => {
+test("buildScheduledGraphJobPayload rejects missing existing Buddy session for message outlet", () => {
   assert.throws(
     () =>
       buildScheduledGraphJobPayload({
         ...buildDefaultScheduledGraphJobDraft("template_1"),
-        delivery_target_json: "[]",
+        delivery_outlet: "buddy",
+        delivery_session_mode: "existing_session",
       }),
-    /投递目标必须是 JSON object/,
+    /请选择 Buddy 会话/,
   );
 });
 
@@ -148,6 +315,86 @@ function createJob(jobId: string, enabled: boolean, source: string): ScheduledGr
     metadata: { source },
     created_at: "2026-05-27T00:00:00Z",
     updated_at: "2026-05-27T00:00:00Z",
+  };
+}
+
+function createInputTemplate(): TemplateRecord {
+  return {
+    template_id: "template_1",
+    label: "输入模板",
+    description: "",
+    default_graph_name: "输入模板",
+    state_schema: {
+      prompt: {
+        name: "任务问题",
+        description: "要定时处理的问题",
+        type: "text",
+        value: "默认问题",
+        color: "#2563eb",
+      },
+      count: {
+        name: "循环次数",
+        description: "",
+        type: "number",
+        value: 2,
+        color: "#2563eb",
+      },
+      enabled_flag: {
+        name: "启用增强",
+        description: "",
+        type: "boolean",
+        value: true,
+        color: "#2563eb",
+      },
+      filters: {
+        name: "过滤条件",
+        description: "",
+        type: "json",
+        value: { tag: "default" },
+        color: "#2563eb",
+      },
+    },
+    nodes: {
+      input_prompt: {
+        kind: "input",
+        name: "任务问题",
+        description: "要定时处理的问题",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "prompt", mode: "replace" }],
+        config: { value: "默认问题", boundaryType: "text" },
+      },
+      input_count: {
+        kind: "input",
+        name: "循环次数",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "count", mode: "replace" }],
+        config: { value: 2, boundaryType: "text" },
+      },
+      input_enabled: {
+        kind: "input",
+        name: "启用增强",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "enabled_flag", mode: "replace" }],
+        config: { value: true, boundaryType: "text" },
+      },
+      input_filters: {
+        kind: "input",
+        name: "过滤条件",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "filters", mode: "replace" }],
+        config: { value: { tag: "default" }, boundaryType: "text" },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
   };
 }
 
