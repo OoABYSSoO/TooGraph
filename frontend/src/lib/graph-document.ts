@@ -675,10 +675,16 @@ export function updateToolNodeConfigInDocument<T extends GraphPayload | GraphDoc
   }
 
   const selectedToolDefinition = options.toolDefinitions?.find((definition) => definition.toolKey === nextConfig.toolKey.trim());
+  const isContextPressureTool = nextConfig.toolKey.trim() === "buddy_context_pressure_check";
   nextNode.config = {
     ...nextConfig,
     dynamicStateInputs: Boolean(selectedToolDefinition?.dynamicStateInputs),
   };
+  if (isContextPressureTool) {
+    nextNode.config.targetAgentNodeId = nextConfig.targetAgentNodeId ?? "";
+  } else {
+    delete nextNode.config.targetAgentNodeId;
+  }
   reconcileToolStateInputBindings(nextDocument, nodeId, options.toolDefinitions ?? []);
   reconcileToolOutputBindings(nextDocument, nodeId, options.toolDefinitions ?? []);
   return nextDocument;

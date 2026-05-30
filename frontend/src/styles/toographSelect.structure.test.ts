@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
-import { dirname, extname, resolve } from "node:path";
+import { dirname, extname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -43,7 +43,7 @@ test("Vue files use themed Element Plus selects instead of native select dropdow
 
   for (const path of listVueFiles(srcDirectory)) {
     const source = readFileSync(path, "utf8");
-    const relativePath = path.replace(`${srcDirectory}/`, "");
+    const relativePath = relative(srcDirectory, path).replaceAll("\\", "/");
     if (/<select(\s|>)/.test(source)) {
       offenders.push(relativePath);
     }

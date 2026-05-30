@@ -572,6 +572,7 @@ class NodeSystemSubgraphConfig(BaseModel):
 class NodeSystemToolConfig(BaseModel):
     tool_key: str = Field(default="", alias="toolKey")
     dynamic_state_inputs: bool = Field(default=False, alias="dynamicStateInputs")
+    target_agent_node_id: str = Field(default="", alias="targetAgentNodeId", exclude_if=lambda value: not value)
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 
@@ -589,6 +590,12 @@ class NodeSystemToolConfig(BaseModel):
     def validate_optional_tool_key(cls, value: str) -> str:
         stripped = value.strip()
         return _validate_identifier(stripped, label="Tool key") if stripped else ""
+
+    @field_validator("target_agent_node_id")
+    @classmethod
+    def validate_optional_target_agent_node_id(cls, value: str) -> str:
+        stripped = value.strip()
+        return _validate_identifier(stripped, label="Target agent node ID") if stripped else ""
 
 
 class NodeSystemInputNode(BaseModel):

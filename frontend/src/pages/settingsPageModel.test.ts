@@ -128,6 +128,8 @@ test("provider model save payload stays minimal instead of routing by capabiliti
               label: "rerank-test",
               capabilities: { chat: false, structured_output: false, rerank: true, prompt_cache: true },
               permissions: ["rerank"],
+              context_window: 128000,
+              compression_threshold: 0.82,
             },
           ],
           example_model_refs: [],
@@ -140,14 +142,67 @@ test("provider model save payload stays minimal instead of routing by capabiliti
 
   assert.deepEqual(drafts.local.selected_models, ["rerank-test"]);
   assert.equal(drafts.local.request_timeout_seconds, 33);
+  assert.equal(drafts.local.model_settings["rerank-test"]?.context_window_ktokens, 128);
+  assert.equal(drafts.local.model_settings["rerank-test"]?.compression_threshold, 0.82);
 
   const payload = buildProviderSavePayload(drafts);
   assert.deepEqual(payload.local.models[0], {
     model: "rerank-test",
     label: "rerank-test",
     modalities: ["text"],
+    context_window: 128000,
+    compression_threshold: 0.82,
   });
   assert.equal(payload.local.request_timeout_seconds, 33);
+});
+
+test("provider drafts default model compression threshold and save context window in k tokens", () => {
+  const drafts = buildProviderDraftsFromSettings({
+    model: {
+      text_model: "gpt-large",
+      text_model_ref: "openai/gpt-large",
+      video_model: "gpt-large",
+      video_model_ref: "openai/gpt-large",
+    },
+    model_catalog: {
+      provider_templates: [],
+      providers: [
+        {
+          provider_id: "openai",
+          label: "OpenAI",
+          description: "OpenAI",
+          transport: "openai-compatible",
+          configured: true,
+          enabled: true,
+          base_url: "https://api.openai.com/v1",
+          models: [
+            {
+              model_ref: "openai/gpt-large",
+              model: "gpt-large",
+              label: "GPT Large",
+              context_window: 200000,
+            },
+          ],
+          example_model_refs: [],
+        },
+      ],
+    },
+    revision: { max_revision_round: 1 },
+    tools: [],
+  });
+
+  assert.equal(drafts.openai.model_settings["gpt-large"]?.context_window_ktokens, 200);
+  assert.equal(drafts.openai.model_settings["gpt-large"]?.compression_threshold, 0.9);
+
+  drafts.openai.model_settings["gpt-large"] = {
+    model: "gpt-large",
+    context_window_ktokens: 196,
+    compression_threshold: 0.88,
+  };
+  const payload = buildProviderSavePayload(drafts);
+
+  assert.equal(payload.openai.models[0]?.context_window, 196000);
+  assert.equal(payload.openai.models[0]?.compression_threshold, 0.88);
 });
 
 test("provider drafts preserve credential pool metadata", () => {

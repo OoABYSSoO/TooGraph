@@ -83,6 +83,7 @@ class SettingsProviderModelPayload(BaseModel):
     pricing: dict[str, object] | None = None
     context_window: int | None = Field(default=None, alias="context_window")
     max_tokens: int | None = Field(default=None, alias="max_tokens")
+    compression_threshold: float | None = Field(default=None, alias="compression_threshold", ge=0.01, le=1.0)
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
@@ -279,6 +280,7 @@ def _merge_model_providers(
                 "permissions": _dedupe_strings(model_payload.permissions),
                 "context_window": model_payload.context_window,
                 "max_tokens": model_payload.max_tokens,
+                "compression_threshold": model_payload.compression_threshold,
             }
             pricing = normalize_provider_model_pricing(
                 model_payload.pricing if model_payload.pricing is not None else existing_model.get("pricing")

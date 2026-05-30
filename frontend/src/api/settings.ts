@@ -32,6 +32,7 @@ export type SettingsModelProviderUpdate = {
     permissions?: string[];
     context_window?: number | null;
     max_tokens?: number | null;
+    compression_threshold?: number | null;
   }>;
 };
 

@@ -11,6 +11,7 @@ HISTORY_COMPACTION_THRESHOLD_CHARS = 6000
 TOTAL_CONTEXT_PRESSURE_THRESHOLD_CHARS = 12000
 NON_HISTORY_CONTEXT_THRESHOLD_CHARS = 9000
 MIN_HISTORY_CHARS_FOR_TOTAL_PRESSURE_COMPACTION = 3000
+DEFAULT_CONTEXT_COMPRESSION_THRESHOLD = 0.9
 
 
 def buddy_context_pressure_check(payload: dict[str, Any] | None) -> dict[str, Any]:
@@ -32,17 +33,43 @@ def buddy_context_pressure_check(payload: dict[str, Any] | None) -> dict[str, An
     )
     has_total_pressure = total_context_chars >= TOTAL_CONTEXT_PRESSURE_THRESHOLD_CHARS
     has_enough_history_to_help = max(history_used_chars, history_source_chars) >= MIN_HISTORY_CHARS_FOR_TOTAL_PRESSURE_COMPACTION
-    should_compact = bool(history_measurements and (has_history_pressure or (has_total_pressure and has_enough_history_to_help)))
+    provider_prompt_tokens, token_source = _resolve_prompt_tokens(inputs)
+    model_budget = _normalize_model_budget(inputs.get("model_budget"))
+    model_context_window_tokens = model_budget["context_window_tokens"]
+    compression_threshold = model_budget["compression_threshold"]
+    prompt_token_pressure = (
+        provider_prompt_tokens / model_context_window_tokens
+        if provider_prompt_tokens is not None and model_context_window_tokens
+        else None
+    )
+    has_token_pressure = (
+        prompt_token_pressure is not None
+        and prompt_token_pressure >= compression_threshold
+    )
+    should_compact = bool(
+        history_measurements
+        and (
+            has_token_pressure
+            or has_history_pressure
+            or (has_total_pressure and has_enough_history_to_help)
+        )
+    )
     pressure_sources = _pressure_sources(
         has_history_pressure=has_history_pressure,
         has_total_pressure=has_total_pressure,
+        has_token_pressure=has_token_pressure,
         non_history_chars=non_history_chars,
         should_compact=should_compact,
     )
-    reason = _pressure_reason(should_compact=should_compact, has_history_pressure=has_history_pressure, has_total_pressure=has_total_pressure)
+    reason = _pressure_reason(
+        should_compact=should_compact,
+        has_history_pressure=has_history_pressure,
+        has_total_pressure=has_total_pressure,
+        has_token_pressure=has_token_pressure,
+    )
     source_refs = _history_source_refs(history_measurements)
     report = {
-        "version": 2,
+        "version": 3,
         "total_context_chars": total_context_chars,
         "history_used_chars": history_used_chars,
         "history_source_chars": history_source_chars,
@@ -64,11 +91,19 @@ def buddy_context_pressure_check(payload: dict[str, Any] | None) -> dict[str, An
         ],
         "source_refs": source_refs,
         "summary_source_refs": source_refs,
+        "provider_prompt_tokens": provider_prompt_tokens,
+        "token_source": token_source,
+        "model_context_window_tokens": model_context_window_tokens,
+        "model_ref": model_budget["model_ref"],
+        "max_output_tokens": model_budget["max_output_tokens"],
+        "compression_threshold": compression_threshold,
+        "prompt_token_pressure": prompt_token_pressure,
         "thresholds": {
             "history_chars": HISTORY_COMPACTION_THRESHOLD_CHARS,
             "total_context_chars": TOTAL_CONTEXT_PRESSURE_THRESHOLD_CHARS,
             "non_history_context_chars": NON_HISTORY_CONTEXT_THRESHOLD_CHARS,
             "min_history_chars_for_total_pressure": MIN_HISTORY_CHARS_FOR_TOTAL_PRESSURE_COMPACTION,
+            "prompt_token_pressure": compression_threshold,
         },
         "pressure_sources": pressure_sources,
         "reason": reason,
@@ -154,10 +189,13 @@ def _pressure_sources(
     *,
     has_history_pressure: bool,
     has_total_pressure: bool,
+    has_token_pressure: bool,
     non_history_chars: int,
     should_compact: bool,
 ) -> list[str]:
     sources: list[str] = []
+    if has_token_pressure:
+        sources.append("provider_usage")
     if has_history_pressure:
         sources.append("history")
     if has_total_pressure:
@@ -167,7 +205,15 @@ def _pressure_sources(
     return sources
 
 
-def _pressure_reason(*, should_compact: bool, has_history_pressure: bool, has_total_pressure: bool) -> str:
+def _pressure_reason(
+    *,
+    should_compact: bool,
+    has_history_pressure: bool,
+    has_total_pressure: bool,
+    has_token_pressure: bool,
+) -> str:
+    if should_compact and has_token_pressure:
+        return "provider_usage_pressure"
     if should_compact and has_history_pressure:
         return "history_pressure"
     if should_compact and has_total_pressure:
@@ -189,6 +235,60 @@ def _history_source_refs(measurements: list[dict[str, Any]]) -> list[dict[str, A
             if isinstance(ref, dict):
                 refs.append(dict(ref))
     return refs
+
+
+def _resolve_prompt_tokens(inputs: dict[str, Any]) -> tuple[int | None, str]:
+    for source_key in ("provider_usage", "usage", "model_usage"):
+        tokens = _extract_prompt_tokens(inputs.get(source_key))
+        if tokens is not None:
+            return tokens, "provider_usage"
+
+    context_report = inputs.get("context_assembly_report")
+    if isinstance(context_report, dict):
+        tokens = _extract_prompt_tokens(context_report.get("provider_usage"))
+        if tokens is not None:
+            return tokens, "provider_usage"
+        totals = context_report.get("totals")
+        if isinstance(totals, dict):
+            estimate = _positive_int(totals.get("token_estimate"))
+            if estimate is not None:
+                return estimate, "context_assembly_estimate"
+
+    return None, "unavailable"
+
+
+def _extract_prompt_tokens(value: Any) -> int | None:
+    if not isinstance(value, dict):
+        return None
+    for key in (
+        "prompt_tokens",
+        "input_tokens",
+        "promptTokenCount",
+        "promptTokens",
+        "inputTokens",
+    ):
+        tokens = _positive_int(value.get(key))
+        if tokens is not None:
+            return tokens
+    nested_usage = value.get("usage")
+    if isinstance(nested_usage, dict):
+        return _extract_prompt_tokens(nested_usage)
+    return None
+
+
+def _normalize_model_budget(value: Any) -> dict[str, Any]:
+    budget = value if isinstance(value, dict) else {}
+    threshold = _positive_float(budget.get("compression_threshold"))
+    if threshold is None:
+        threshold = _positive_float(budget.get("context_compression_threshold"))
+    if threshold is None:
+        threshold = DEFAULT_CONTEXT_COMPRESSION_THRESHOLD
+    return {
+        "model_ref": _text(budget.get("model_ref")),
+        "context_window_tokens": _positive_int(budget.get("context_window_tokens") or budget.get("context_window")),
+        "max_output_tokens": _positive_int(budget.get("max_output_tokens") or budget.get("max_tokens")),
+        "compression_threshold": min(1.0, max(0.01, threshold)),
+    }
 
 
 def _prompt_value_length(value: Any, value_type: Any = None) -> int:
@@ -297,6 +397,22 @@ def _non_negative_int(value: Any, default: int) -> int:
     except (TypeError, ValueError):
         return default
     return parsed if parsed >= 0 else default
+
+
+def _positive_int(value: Any) -> int | None:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _positive_float(value: Any) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
 
 
 def main() -> None:

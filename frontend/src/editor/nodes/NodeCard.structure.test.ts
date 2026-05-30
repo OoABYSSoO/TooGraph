@@ -113,8 +113,12 @@ test("ToolNodeBody renders deterministic tool selection with managed ports", () 
   assert.match(componentSource, /'node-card--tool': view\.body\.kind === 'tool'/);
   assert.match(componentSource, /<section v-else-if="view\.body\.kind === 'tool'" class="node-card__body node-card__body--tool">/);
   assert.match(componentSource, /<ToolNodeBody[\s\S]*:selected-tool-key="selectedToolKey"[\s\S]*:tool-definitions="toolDefinitions"[\s\S]*:tool-definitions-loading="toolDefinitionsLoading"[\s\S]*:tool-definitions-error="toolDefinitionsError"[\s\S]*@select-tool="selectTool"/);
+  assert.match(componentSource, /<ToolNodeBody[\s\S]*:target-agent-node-id="toolTargetAgentNodeId"[\s\S]*:target-agent-node-options="toolTargetAgentNodeOptions"[\s\S]*@update-target-agent-node="updateToolTargetAgentNode"/);
   assert.match(toolNodeBodySource, /import ToographSelect from "@\/components\/ToographSelect\.vue";/);
   assert.match(toolNodeBodySource, /<ToographSelect[\s\S]*class="tool-node-body__tool-select"[\s\S]*:model-value="selectedToolKey"[\s\S]*filterable[\s\S]*popper-class="tool-node-body__tool-popper"[\s\S]*@update:model-value="emit\('select-tool', String\(\$event \?\? ''\)\)"/);
+  assert.match(toolNodeBodySource, /selectedToolKey === "buddy_context_pressure_check"/);
+  assert.match(toolNodeBodySource, /targetAgentNodeOptions/);
+  assert.match(toolNodeBodySource, /emit\('update-target-agent-node', String\(\$event \?\? ''\)\)/);
   assert.match(toolNodeBodySource, /<StatePortList[\s\S]*side="input"[\s\S]*:ports="orderedInputPorts"/);
   assert.match(toolNodeBodySource, /<StatePortList[\s\S]*side="output"[\s\S]*:ports="orderedOutputPorts"/);
   assert.match(toolNodeBodySource, /\.node-card__port-grid \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);

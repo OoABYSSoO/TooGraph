@@ -28,6 +28,27 @@
           />
         </ToographSelect>
       </label>
+      <label v-if="showsTargetAgentSelect" class="tool-node-body__tool-field">
+        <span class="tool-node-body__field-label">Target LLM</span>
+        <ToographSelect
+          class="tool-node-body__tool-select"
+          :model-value="targetAgentNodeId"
+          placeholder="Select LLM node"
+          :disabled="targetAgentNodeOptions.length === 0"
+          filterable
+          remount-on-select
+          popper-class="tool-node-body__tool-popper"
+          @update:model-value="emit('update-target-agent-node', String($event ?? ''))"
+        >
+          <ElOption label="No target" value="" />
+          <ElOption
+            v-for="option in targetAgentNodeOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </ToographSelect>
+      </label>
     </div>
 
     <div class="node-card__port-grid">
@@ -159,6 +180,8 @@ const props = defineProps<{
   nodeId: string;
   body: ToolBodyViewModel;
   selectedToolKey: string;
+  targetAgentNodeId: string;
+  targetAgentNodeOptions: Array<{ value: string; label: string }>;
   toolDefinitions: ToolDefinition[];
   toolDefinitionsLoading: boolean;
   toolDefinitionsError: string | null;
@@ -186,6 +209,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: "select-tool", toolKey: string): void;
+  (event: "update-target-agent-node", nodeId: string): void;
   (event: "pointer-enter", anchorId: string): void;
   (event: "pointer-leave", anchorId: string): void;
   (event: "reorder-pointer-down", side: "input" | "output", stateKey: string, pointerEvent: PointerEvent): void;
@@ -222,6 +246,7 @@ const toolPlaceholder = computed(() => {
   }
   return props.selectedToolKey ? "Select tool" : "No tool";
 });
+const showsTargetAgentSelect = computed(() => props.selectedToolKey === "buddy_context_pressure_check");
 </script>
 
 <style scoped>

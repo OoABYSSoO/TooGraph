@@ -365,6 +365,8 @@
         :node-id="nodeId"
         :body="view.body"
         :selected-tool-key="selectedToolKey"
+        :target-agent-node-id="toolTargetAgentNodeId"
+        :target-agent-node-options="toolTargetAgentNodeOptions"
         :tool-definitions="toolDefinitions"
         :tool-definitions-loading="toolDefinitionsLoading"
         :tool-definitions-error="toolDefinitionsError"
@@ -407,6 +409,7 @@
         @cancel-create="closePortPicker"
         @commit-create="commitPortStateCreate"
         @select-tool="selectTool"
+        @update-target-agent-node="updateToolTargetAgentNode"
       />
     </section>
 
@@ -730,6 +733,7 @@ import {
 const props = defineProps<{
   nodeId: string;
   node: GraphNode;
+  graphNodes: Record<string, GraphNode>;
   stateSchema: Record<string, StateDefinition>;
   knowledgeBases: KnowledgeBaseRecord[];
   actionDefinitions: ActionDefinition[];
@@ -884,6 +888,15 @@ const batchWorkerTemplateOptions = computed(() =>
     label: template.label.trim() || template.default_graph_name.trim() || template.template_id,
     description: template.description,
   })),
+);
+const toolTargetAgentNodeId = computed(() => (props.node.kind === "tool" ? props.node.config.targetAgentNodeId ?? "" : ""));
+const toolTargetAgentNodeOptions = computed(() =>
+  Object.entries(props.graphNodes)
+    .filter(([, node]) => node.kind === "agent")
+    .map(([nodeId, node]) => ({
+      value: nodeId,
+      label: node.name.trim() || nodeId,
+    })),
 );
 const existingPortStateOptions = computed(() => buildStatePortExistingStateOptions(props.stateSchema));
 const conditionRuleValueDraft = ref("");
@@ -1536,6 +1549,10 @@ function selectAgentAction(actionKey: string) {
 
 function selectTool(toolKey: string) {
   emitToolConfigPatch({ toolKey });
+}
+
+function updateToolTargetAgentNode(targetAgentNodeId: string) {
+  emitToolConfigPatch({ targetAgentNodeId });
 }
 
 function handleActionInstructionInput(payload: { actionKey: string; content: string }) {

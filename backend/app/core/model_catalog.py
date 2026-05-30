@@ -21,6 +21,7 @@ from app.tools.openai_codex_client import get_codex_auth_status
 
 LOCAL_PROVIDER_LABEL = "OpenAI-compatible Custom Provider"
 LOCAL_PROVIDER_DESCRIPTION = "Custom OpenAI-compatible endpoint used by TooGraph for local or private model routing."
+DEFAULT_CONTEXT_COMPRESSION_THRESHOLD = 0.9
 
 
 def build_model_ref(provider_id: str, model_id: str) -> str:
@@ -99,6 +100,7 @@ def _normalize_model_item(item: Any) -> dict[str, Any] | None:
         "permissions": _normalize_model_permissions(item.get("permissions")),
         "context_window": item.get("context_window") if isinstance(item.get("context_window"), int) else None,
         "max_tokens": item.get("max_tokens") if isinstance(item.get("max_tokens"), int) else None,
+        "compression_threshold": _normalize_compression_threshold(item.get("compression_threshold")),
     }
 
 
@@ -122,6 +124,14 @@ def _normalize_model_permissions(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return _dedupe_strings([str(permission) for permission in value])
+
+
+def _normalize_compression_threshold(value: Any) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return DEFAULT_CONTEXT_COMPRESSION_THRESHOLD
+    return min(1.0, max(0.01, parsed))
 
 
 def _normalize_provider_models(raw_models: Any) -> list[dict[str, Any]]:
@@ -245,6 +255,7 @@ def _build_catalog_model(
 ) -> dict[str, Any]:
     context_window = model.get("context_window")
     max_tokens = model.get("max_tokens")
+    compression_threshold = _normalize_compression_threshold(model.get("compression_threshold"))
     if provider_id == "local":
         context_window = context_window if isinstance(context_window, int) else local_context_window
         max_tokens = max_tokens if isinstance(max_tokens, int) else local_max_tokens
@@ -259,6 +270,7 @@ def _build_catalog_model(
         "permissions": model.get("permissions") if isinstance(model.get("permissions"), list) else [],
         "context_window": context_window if isinstance(context_window, int) else None,
         "max_tokens": max_tokens if isinstance(max_tokens, int) else None,
+        "compression_threshold": compression_threshold,
         "route_target": model.get("route_target") or (local_display_model_name if provider_id == "local" else None),
     }
 
@@ -300,6 +312,7 @@ def _build_local_provider_models(
             "route_target": saved_by_name.get(model_name.lower(), {}).get("route_target") or "",
             "context_window": saved_by_name.get(model_name.lower(), {}).get("context_window"),
             "max_tokens": saved_by_name.get(model_name.lower(), {}).get("max_tokens"),
+            "compression_threshold": saved_by_name.get(model_name.lower(), {}).get("compression_threshold"),
             "capabilities": saved_by_name.get(model_name.lower(), {}).get("capabilities") or {},
             "permissions": saved_by_name.get(model_name.lower(), {}).get("permissions") or [],
         }
@@ -467,6 +480,31 @@ def get_default_video_model_name(*, force_refresh: bool = False) -> str:
 
 def get_default_video_model_ref(*, force_refresh: bool = False) -> str:
     return build_model_catalog(force_refresh=force_refresh)["default_video_model_ref"]
+
+
+def resolve_model_context_budget(model_ref: str | None, *, force_refresh: bool = False) -> dict[str, Any]:
+    normalized_ref = normalize_model_ref(model_ref)
+    catalog = build_model_catalog(force_refresh=force_refresh)
+    for provider in catalog.get("providers") or []:
+        if not isinstance(provider, dict):
+            continue
+        for model in provider.get("models") or []:
+            if not isinstance(model, dict):
+                continue
+            if str(model.get("model_ref") or "").strip() != normalized_ref:
+                continue
+            return {
+                "model_ref": normalized_ref,
+                "context_window_tokens": model.get("context_window") if isinstance(model.get("context_window"), int) else None,
+                "max_output_tokens": model.get("max_tokens") if isinstance(model.get("max_tokens"), int) else None,
+                "compression_threshold": _normalize_compression_threshold(model.get("compression_threshold")),
+            }
+    return {
+        "model_ref": normalized_ref,
+        "context_window_tokens": None,
+        "max_output_tokens": None,
+        "compression_threshold": DEFAULT_CONTEXT_COMPRESSION_THRESHOLD,
+    }
 
 
 def build_model_catalog(*, force_refresh: bool = False) -> dict[str, Any]:

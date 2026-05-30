@@ -2,11 +2,11 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "buddy_context_pressure_check",
   "name": "Buddy Context Pressure Check",
-  "description": "A deterministic Buddy runtime tool that checks dynamically selected next-LLM context states and decides whether session history compaction should run.",
+  "description": "A deterministic Buddy runtime tool that checks the selected next-LLM node context and decides whether session history compaction should run.",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [],
-  "dynamicStateInputs": true,
+  "dynamicStateInputs": false,
   "runtime": {
     "type": "python",
     "entrypoint": "run.py",

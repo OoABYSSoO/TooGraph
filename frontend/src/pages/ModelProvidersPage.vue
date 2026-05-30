@@ -153,6 +153,40 @@
                     {{ t("settings.noModelsDiscovered") }}
                   </span>
                 </div>
+                <div v-if="provider.selected_models.length > 0" class="model-providers-page__model-budget-list">
+                  <div
+                    v-for="modelName in provider.selected_models"
+                    :key="`${provider.provider_id}-budget-${modelName}`"
+                    class="model-providers-page__model-budget-row"
+                  >
+                    <span class="model-providers-page__model-budget-name" :title="modelName">{{ modelName }}</span>
+                    <label class="model-providers-page__model-budget-field">
+                      <span>{{ t("settings.modelContextWindowKTokens") }}</span>
+                      <input
+                        class="model-providers-page__model-budget-input"
+                        :value="modelContextWindowKTokens(provider, modelName) ?? ''"
+                        type="number"
+                        min="1"
+                        step="1"
+                        inputmode="numeric"
+                        @change="handleModelContextWindowChange(provider, modelName, $event)"
+                      />
+                    </label>
+                    <label class="model-providers-page__model-budget-field">
+                      <span>{{ t("settings.modelCompressionThresholdPercent") }}</span>
+                      <input
+                        class="model-providers-page__model-budget-input"
+                        :value="modelCompressionThresholdPercent(provider, modelName)"
+                        type="number"
+                        min="1"
+                        max="100"
+                        step="1"
+                        inputmode="numeric"
+                        @change="handleModelCompressionThresholdChange(provider, modelName, $event)"
+                      />
+                    </label>
+                  </div>
+                </div>
                 <div v-if="isLoginProvider(provider)" class="model-providers-page__provider-actions">
                   <ElPopover
                     :trigger="manualPopoverTrigger"
@@ -786,8 +820,11 @@ import type { AgentThinkingLevel, SettingsModelProvider, SettingsPayload } from 
 import {
   buildProviderDraftsFromSettings,
   buildProviderSavePayload,
+  clampModelCompressionThreshold,
   clampSettingsTemperature,
+  ensureProviderModelDraft,
   listAddableProviderTemplates,
+  normalizeContextWindowKTokens,
   type ProviderDraft,
 } from "./settingsPageModel.ts";
 
@@ -907,7 +944,7 @@ function getConcreteModelName(model: {
 
 function buildProviderDraftFromTemplate(provider: SettingsModelProvider): ProviderDraft {
   const modelNames = dedupeStrings(provider.models.map((model) => model.model));
-  return {
+  const draft: ProviderDraft = {
     provider_id: provider.provider_id,
     label: provider.label,
     transport: provider.transport,
@@ -925,7 +962,25 @@ function buildProviderDraftFromTemplate(provider: SettingsModelProvider): Provid
     api_key_configured: Boolean(provider.api_key_configured),
     discovered_models: modelNames,
     selected_models: modelNames,
+    model_settings: {},
   };
+  for (const model of provider.models) {
+    const modelName = model.model.trim();
+    if (!modelName) {
+      continue;
+    }
+    draft.model_settings[modelName] = {
+      model: modelName,
+      context_window_ktokens: typeof model.context_window === "number" && model.context_window > 0
+        ? Math.round(model.context_window / 1000)
+        : null,
+      compression_threshold: clampModelCompressionThreshold(model.compression_threshold),
+    };
+  }
+  for (const modelName of modelNames) {
+    ensureProviderModelDraft(draft, modelName);
+  }
+  return draft;
 }
 
 function buildModelDisplayLookup(
@@ -1068,6 +1123,9 @@ function toggleProviderModel(provider: ProviderDraft, modelName: string) {
   provider.selected_models = selected
     ? provider.selected_models.filter((selectedModel) => selectedModel.trim().toLowerCase() !== normalizedModel.toLowerCase())
     : dedupeStrings([...provider.selected_models, normalizedModel]);
+  if (!selected) {
+    ensureProviderModelDraft(provider, normalizedModel);
+  }
   providerDrafts.value = {
     ...providerDrafts.value,
     [provider.provider_id]: provider,
@@ -1089,6 +1147,43 @@ function removeProviderModel(provider: ProviderDraft, modelName: string) {
     [provider.provider_id]: provider,
   };
   alignDefaultModelsToProviderSelection();
+  void persistSettings();
+}
+
+function modelContextWindowKTokens(provider: ProviderDraft, modelName: string) {
+  return ensureProviderModelDraft(provider, modelName).context_window_ktokens;
+}
+
+function modelCompressionThresholdPercent(provider: ProviderDraft, modelName: string) {
+  return Math.round(clampModelCompressionThreshold(ensureProviderModelDraft(provider, modelName).compression_threshold) * 100);
+}
+
+function handleModelContextWindowChange(provider: ProviderDraft, modelName: string, event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+  const modelSettings = ensureProviderModelDraft(provider, modelName);
+  modelSettings.context_window_ktokens = normalizeContextWindowKTokens(Number(target.value));
+  providerDrafts.value = {
+    ...providerDrafts.value,
+    [provider.provider_id]: provider,
+  };
+  void persistSettings();
+}
+
+function handleModelCompressionThresholdChange(provider: ProviderDraft, modelName: string, event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+  const parsedPercent = Number(target.value);
+  const modelSettings = ensureProviderModelDraft(provider, modelName);
+  modelSettings.compression_threshold = clampModelCompressionThreshold(parsedPercent / 100);
+  providerDrafts.value = {
+    ...providerDrafts.value,
+    [provider.provider_id]: provider,
+  };
   void persistSettings();
 }
 
@@ -2221,6 +2316,61 @@ onBeforeUnmount(() => {
   font-weight: 650;
 }
 
+.model-providers-page__model-budget-list {
+  display: grid;
+  gap: 8px;
+}
+
+.model-providers-page__model-budget-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(104px, 128px) minmax(104px, 128px);
+  align-items: end;
+  gap: 8px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.76);
+  padding: 8px;
+}
+
+.model-providers-page__model-budget-name {
+  min-width: 0;
+  color: rgba(30, 41, 59, 0.82);
+  font-family: var(--toograph-font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-providers-page__model-budget-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: rgba(60, 41, 20, 0.64);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.model-providers-page__model-budget-field input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.86);
+  color: rgb(30, 41, 59);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  outline: none;
+  padding: 7px 8px;
+}
+
+.model-providers-page__model-budget-field input:focus {
+  border-color: rgba(37, 99, 235, 0.48);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
 .model-providers-page__provider-editor-panel,
 .model-providers-page__provider-empty {
   margin-top: 14px;
@@ -2699,6 +2849,11 @@ onBeforeUnmount(() => {
   .model-providers-page__provider-cards,
   .model-providers-page__provider-fields {
     grid-template-columns: 1fr;
+  }
+
+  .model-providers-page__model-budget-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .model-providers-page__provider-card .model-providers-page__provider-actions {

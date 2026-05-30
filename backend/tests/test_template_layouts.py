@@ -2223,19 +2223,9 @@ class TemplateLayoutTests(unittest.TestCase):
             {"source": "$state.needs_context_compaction", "operator": "==", "value": True},
         )
         self.assertIn({"state": "needs_context_compaction", "required": True}, _read_contracts(pressure_node["reads"]))
-        for read in nodes["check_context_pressure"]["reads"]:
-            self.assertNotIn(read.get("state"), {"raw_conversation_history", "page_context"})
-            self.assertIsNone(read.get("binding"))
-        self.assertEqual(
-            _read_contracts(nodes["check_context_pressure"]["reads"]),
-            [
-                {"state": "user_message", "required": True},
-                {"state": "conversation_history", "required": False},
-                {"state": "buddy_context", "required": False},
-                {"state": "capability_result", "required": False},
-            ],
-        )
-        self.assertEqual(nodes["check_context_pressure"]["config"].get("dynamicStateInputs"), True)
+        self.assertEqual(_read_contracts(nodes["check_context_pressure"]["reads"]), [])
+        self.assertEqual(nodes["check_context_pressure"]["config"].get("dynamicStateInputs"), False)
+        self.assertEqual(nodes["check_context_pressure"]["config"].get("targetAgentNodeId"), "reply_and_select_capability")
         self.assertEqual(
             nodes["check_context_pressure"]["writes"],
             [{"state": "needs_context_compaction", "mode": "replace"}],

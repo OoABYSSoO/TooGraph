@@ -283,6 +283,7 @@
           :style="nodeCardSizeStyle(node)"
           :node-id="nodeId"
           :node="node"
+          :graph-nodes="document.nodes"
           :state-schema="document.state_schema"
           :knowledge-bases="knowledgeBases"
           :action-definitions="actionDefinitions"

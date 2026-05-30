@@ -260,6 +260,58 @@ class SettingsModelProviderTests(unittest.TestCase):
         self.assertEqual(saved_model["capabilities"]["prompt_cache"], True)
         self.assertEqual(saved_model["permissions"], ["rerank"])
 
+    def test_update_settings_persists_model_context_budget(self) -> None:
+        saved_payload: dict = {}
+
+        def capture_save(payload: dict) -> dict:
+            saved_payload.update(payload)
+            return payload
+
+        with patch("app.api.routes_settings.load_app_settings", return_value={}):
+            with patch("app.api.routes_settings.save_app_settings", side_effect=capture_save):
+                with patch("app.api.routes_settings._build_settings_payload", return_value={"ok": True}):
+                    with TestClient(app) as client:
+                        response = client.post(
+                            "/api/settings",
+                            json={
+                                "model": {
+                                    "text_model_ref": "local/gemma",
+                                    "video_model_ref": "local/gemma",
+                                },
+                                "agent_runtime_defaults": {
+                                    "model": "local/gemma",
+                                    "thinking_enabled": False,
+                                    "thinking_level": "off",
+                                    "temperature": 0.2,
+                                },
+                                "model_providers": {
+                                    "local": {
+                                        "label": "Local",
+                                        "transport": "openai-compatible",
+                                        "base_url": "http://127.0.0.1:8888/v1",
+                                        "api_key": "",
+                                        "enabled": True,
+                                        "auth_header": "Authorization",
+                                        "auth_scheme": "Bearer",
+                                        "models": [
+                                            {
+                                                "model": "gemma",
+                                                "label": "Gemma",
+                                                "modalities": ["text"],
+                                                "context_window": 128000,
+                                                "compression_threshold": 0.88,
+                                            }
+                                        ],
+                                    }
+                                },
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        saved_model = saved_payload["model_providers"]["local"]["models"][0]
+        self.assertEqual(saved_model["context_window"], 128000)
+        self.assertEqual(saved_model["compression_threshold"], 0.88)
+
     def test_update_settings_persists_provider_request_timeout_seconds(self) -> None:
         saved_payload: dict = {}
 

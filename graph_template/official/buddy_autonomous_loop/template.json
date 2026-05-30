@@ -346,28 +346,7 @@
         "collapsed": false,
         "size": null
       },
-      "reads": [
-        {
-          "state": "user_message",
-          "required": true,
-          "binding": null
-        },
-        {
-          "state": "conversation_history",
-          "required": false,
-          "binding": null
-        },
-        {
-          "state": "buddy_context",
-          "required": false,
-          "binding": null
-        },
-        {
-          "state": "capability_result",
-          "required": false,
-          "binding": null
-        }
-      ],
+      "reads": [],
       "writes": [
         {
           "state": "needs_context_compaction",
@@ -376,7 +355,8 @@
       ],
       "config": {
         "toolKey": "buddy_context_pressure_check",
-        "dynamicStateInputs": true
+        "dynamicStateInputs": false,
+        "targetAgentNodeId": "reply_and_select_capability"
       }
     },
     "context_pressure_condition": {

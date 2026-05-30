@@ -141,6 +141,8 @@ def _execute_node(
         "metadata": state.get("metadata", {}),
         "state": state.get("state_values", {}),
         "state_schema": graph.state_schema,
+        "nodes": graph.nodes,
+        "graph": graph,
     }
 
     if isinstance(node, NodeSystemInputNode):

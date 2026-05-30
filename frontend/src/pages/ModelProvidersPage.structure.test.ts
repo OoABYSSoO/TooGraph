@@ -114,6 +114,12 @@ test("ModelProvidersPage shows and edits provider models from each card", () => 
   assert.match(pageSource, /v-for="modelName in provider\.selected_models"/);
   assert.match(pageSource, /class="model-providers-page__provider-model-pill model-providers-page__provider-model-pill-button"/);
   assert.match(pageSource, /class="model-providers-page__provider-model-remove"/);
+  assert.match(pageSource, /class="model-providers-page__model-budget-list"/);
+  assert.match(pageSource, /v-for="modelName in provider\.selected_models"[\s\S]*class="model-providers-page__model-budget-row"/);
+  assert.match(pageSource, /settings\.modelContextWindowKTokens/);
+  assert.match(pageSource, /settings\.modelCompressionThresholdPercent/);
+  assert.match(pageSource, /modelContextWindowKTokens\(provider, modelName\)/);
+  assert.match(pageSource, /modelCompressionThresholdPercent\(provider, modelName\)/);
   assert.match(pageSource, /<Close \/>/);
   assert.match(pageSource, /@click\.stop="removeProviderModel\(provider, modelName\)"/);
   assert.match(pageSource, /<ElPopover[\s\S]*popper-class="model-providers-page__model-picker-popper"/);

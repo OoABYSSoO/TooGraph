@@ -65,6 +65,10 @@ from app.graph_tools.definitions import get_tool_definition_registry
 from app.graph_tools.registry import get_tool_registry
 from app.graph_tools.runtime import invoke_tool
 from app.tools.model_provider_client import ProviderCostBudgetExceeded
+from app.core.model_catalog import resolve_model_context_budget
+
+
+BUDDY_CONTEXT_PRESSURE_TOOL_KEY = "buddy_context_pressure_check"
 
 
 class _BatchItemExecutionError(Exception):
@@ -161,6 +165,8 @@ def execute_tool_node(
         state_schema=state_schema,
         tool_key=tool_key,
         tool_definition=tool_definition,
+        graph_context=graph_context,
+        state=state,
     )
     graph_metadata = graph_context.get("metadata") if isinstance(graph_context.get("metadata"), dict) else {}
     tool_runtime_fixture = _resolve_tool_runtime_fixture_from_graph_metadata(graph_metadata)
@@ -1315,7 +1321,17 @@ def _collect_tool_inputs(
     state_schema: dict[str, NodeSystemStateDefinition],
     tool_key: str,
     tool_definition: Any | None = None,
+    graph_context: dict[str, Any] | None = None,
+    state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    if tool_key == BUDDY_CONTEXT_PRESSURE_TOOL_KEY:
+        return _collect_context_pressure_tool_inputs(
+            node,
+            state_schema=state_schema,
+            graph_context=graph_context or {},
+            state=state or {},
+        )
+
     if _tool_uses_dynamic_state_inputs(node, tool_definition):
         return {
             "context_items": [
@@ -1334,6 +1350,73 @@ def _collect_tool_inputs(
             continue
         tool_inputs[binding.field_key] = copy.deepcopy(input_values.get(read.state))
     return tool_inputs
+
+
+def _collect_context_pressure_tool_inputs(
+    node: NodeSystemToolNode,
+    *,
+    state_schema: dict[str, NodeSystemStateDefinition],
+    graph_context: dict[str, Any],
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    target_agent_node_id = str(getattr(node.config, "target_agent_node_id", "") or "").strip()
+    payload: dict[str, Any] = {
+        "target_agent_node_id": target_agent_node_id,
+        "context_items": [],
+    }
+    target_node = _resolve_graph_node(graph_context, target_agent_node_id)
+    if not isinstance(target_node, NodeSystemAgentNode):
+        payload["target_error"] = "target_agent_node_missing"
+        return payload
+
+    state_values = state.get("state_values")
+    if not isinstance(state_values, dict):
+        state_values = graph_context.get("state") if isinstance(graph_context.get("state"), dict) else {}
+    target_input_values = {
+        read.state: copy.deepcopy(state_values.get(read.state))
+        for read in target_node.reads
+    }
+    runtime_config = resolve_agent_runtime_config(target_node)
+    resolved_model_ref = str(runtime_config.get("resolved_model_ref") or "").strip()
+    model_budget = resolve_model_context_budget(resolved_model_ref)
+    payload.update(
+        {
+            "target_agent_node_name": str(getattr(target_node, "name", "") or target_agent_node_id),
+            "target_agent_model_ref": resolved_model_ref,
+            "model_budget": {
+                "model_ref": resolved_model_ref,
+                "context_window_tokens": model_budget.get("context_window_tokens"),
+                "max_output_tokens": model_budget.get("max_output_tokens"),
+                "compression_threshold": model_budget.get("compression_threshold"),
+            },
+            "context_items": [
+                _dynamic_state_context_item(read, target_input_values, state_schema)
+                for read in target_node.reads
+            ],
+            "context_assembly_report": build_context_assembly_report(
+                node_id=target_agent_node_id,
+                node_type="agent",
+                input_values=target_input_values,
+                state_schema=state_schema,
+                action_context={},
+                llm_phases=["context_pressure_check"],
+            ),
+        }
+    )
+    return payload
+
+
+def _resolve_graph_node(graph_context: dict[str, Any], node_id: str) -> Any | None:
+    if not node_id:
+        return None
+    nodes = graph_context.get("nodes")
+    if isinstance(nodes, dict):
+        return nodes.get(node_id)
+    graph = graph_context.get("graph")
+    graph_nodes = getattr(graph, "nodes", None)
+    if isinstance(graph_nodes, dict):
+        return graph_nodes.get(node_id)
+    return None
 
 
 def _tool_uses_dynamic_state_inputs(node: NodeSystemToolNode, tool_definition: Any | None) -> bool:

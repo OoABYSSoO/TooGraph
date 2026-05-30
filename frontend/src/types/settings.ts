@@ -43,6 +43,7 @@ export type SettingsProviderModel = {
   permissions?: string[];
   context_window?: number | null;
   max_tokens?: number | null;
+  compression_threshold?: number | null;
 };
 
 export type SettingsProviderCredential = {
@@ -116,6 +117,7 @@ export type SettingsPayload = {
         permissions?: string[];
         context_window?: number | null;
         max_tokens?: number | null;
+        compression_threshold?: number | null;
       }>;
     }
   >;

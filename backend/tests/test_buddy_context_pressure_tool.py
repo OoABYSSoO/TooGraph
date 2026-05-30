@@ -40,7 +40,7 @@ def _context_item(state: str, value: object, *, value_type: str = "json", requir
 
 
 class BuddyContextPressureToolTests(unittest.TestCase):
-    def test_official_catalog_exposes_dynamic_context_pressure_tool(self) -> None:
+    def test_official_catalog_exposes_target_llm_context_pressure_tool(self) -> None:
         from app.graph_tools.definitions import list_tool_catalog
         from app.graph_tools.registry import get_tool_registry
 
@@ -50,10 +50,88 @@ class BuddyContextPressureToolTests(unittest.TestCase):
         self.assertIsNotNone(definition)
         self.assertEqual(definition.name, "Buddy Context Pressure Check")
         self.assertIn("deterministic", definition.description)
-        self.assertTrue(definition.dynamic_state_inputs)
+        self.assertFalse(definition.dynamic_state_inputs)
         self.assertEqual(definition.input_schema, [])
         self.assertEqual([field.key for field in definition.output_schema], ["needs_context_compaction"])
         self.assertIn("buddy_context_pressure_check", get_tool_registry(include_disabled=True).keys())
+
+    def test_pressure_check_uses_provider_usage_against_model_budget(self) -> None:
+        module = _load_pressure_tool_module()
+
+        result = module.buddy_context_pressure_check(
+            {
+                "context_items": [
+                    _context_item(
+                        "conversation_history",
+                        {
+                            "kind": "context_package",
+                            "source_kind": "session",
+                            "authority": "history",
+                            "source_refs": [
+                                {"source_kind": "buddy_message", "source_id": "msg_1", "ordinal": 0}
+                            ],
+                            "budget": {"source_chars": 2400, "used_chars": 2400, "omitted_count": 0},
+                            "metadata": {"history_view": "raw"},
+                            "items": [],
+                        },
+                    ),
+                    _context_item("user_message", "continue", value_type="text", required=True),
+                ],
+                "model_budget": {
+                    "context_window_tokens": 100000,
+                    "compression_threshold": 0.9,
+                },
+                "provider_usage": {"prompt_tokens": 91000},
+            }
+        )
+
+        self.assertEqual(result["status"], "succeeded")
+        self.assertIs(result["needs_context_compaction"], True)
+        self.assertEqual(result["reason"], "provider_usage_pressure")
+        report = result["context_budget_report"]
+        self.assertEqual(report["provider_prompt_tokens"], 91000)
+        self.assertEqual(report["token_source"], "provider_usage")
+        self.assertEqual(report["model_context_window_tokens"], 100000)
+        self.assertEqual(report["compression_threshold"], 0.9)
+        self.assertGreaterEqual(report["prompt_token_pressure"], 0.9)
+
+    def test_pressure_check_falls_back_to_context_assembly_token_estimate(self) -> None:
+        module = _load_pressure_tool_module()
+
+        result = module.buddy_context_pressure_check(
+            {
+                "context_items": [
+                    _context_item(
+                        "conversation_history",
+                        {
+                            "kind": "context_package",
+                            "source_kind": "session",
+                            "authority": "history",
+                            "source_refs": [
+                                {"source_kind": "buddy_message", "source_id": "msg_1", "ordinal": 0}
+                            ],
+                            "budget": {"source_chars": 2500, "used_chars": 2500, "omitted_count": 0},
+                            "metadata": {"history_view": "raw"},
+                            "items": [],
+                        },
+                    ),
+                    _context_item("buddy_context", "stable home context", value_type="file"),
+                ],
+                "model_budget": {
+                    "context_window_tokens": 100000,
+                    "compression_threshold": 0.9,
+                },
+                "context_assembly_report": {"totals": {"token_estimate": 89000}},
+            }
+        )
+
+        self.assertEqual(result["status"], "succeeded")
+        self.assertIs(result["needs_context_compaction"], False)
+        self.assertEqual(result["reason"], "none")
+        report = result["context_budget_report"]
+        self.assertEqual(report["provider_prompt_tokens"], 89000)
+        self.assertEqual(report["token_source"], "context_assembly_estimate")
+        self.assertAlmostEqual(report["prompt_token_pressure"], 0.89)
 
     def test_pressure_check_counts_all_dynamic_context_but_only_compacts_history(self) -> None:
         module = _load_pressure_tool_module()

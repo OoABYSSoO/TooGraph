@@ -158,7 +158,11 @@
           </label>
           <label>
             <span>{{ t("messagePlatforms.connectionMode") }}</span>
-            <ElSelect v-model="bindingDraft.connectionMode">
+            <ElSelect
+              v-model="bindingDraft.connectionMode"
+              class="toograph-select"
+              popper-class="toograph-select-popper"
+            >
               <ElOption
                 v-for="option in connectionModeOptions"
                 :key="option.value"

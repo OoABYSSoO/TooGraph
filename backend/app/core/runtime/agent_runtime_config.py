@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from app.core.model_catalog import get_default_text_model_ref, normalize_model_ref, resolve_runtime_model_name
+from app.core.model_catalog import (
+    get_default_text_model_ref,
+    normalize_model_ref,
+    resolve_model_context_budget,
+    resolve_runtime_model_name,
+)
 from app.core.schemas.node_system import NodeSystemAgentNode
 from app.core.thinking_levels import normalize_thinking_level, resolve_effective_thinking_level
 from app.tools.local_llm import (
@@ -38,6 +43,7 @@ def resolve_agent_runtime_config(
     resolved_temperature = max(0.0, min(float(node.config.temperature), 2.0))
     resolved_provider_id, _resolved_model_name = resolved_model.split("/", 1) if "/" in resolved_model else ("local", resolved_model)
     runtime_model_name = resolve_runtime_model_name_func(resolved_model)
+    model_context_budget = resolve_model_context_budget(resolved_model)
     configured_thinking_level = normalize_thinking_level_func(node.config.thinking_mode.value)
     resolved_thinking_level = resolve_effective_thinking_level_func(
         configured_level=configured_thinking_level,
@@ -65,6 +71,9 @@ def resolve_agent_runtime_config(
         "resolved_thinking_level": resolved_thinking_level,
         "resolved_temperature": resolved_temperature,
         "runtime_model_name": runtime_model_name,
+        "model_context_window_tokens": model_context_budget.get("context_window_tokens"),
+        "model_max_output_tokens": model_context_budget.get("max_output_tokens"),
+        "model_context_compression_threshold": model_context_budget.get("compression_threshold"),
         "request_return_progress": resolved_thinking and resolved_provider_id == "local",
         "request_reasoning_format": "auto" if resolved_thinking and resolved_provider_id == "local" else None,
         "provider_profile": provider_profile,
