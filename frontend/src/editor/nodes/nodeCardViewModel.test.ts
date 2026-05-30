@@ -630,6 +630,36 @@ test("buildNodeCardViewModel marks unconnected managed tool input placeholders a
   assert.equal(model.inputs[0]?.managedSlot, true);
 });
 
+test("buildNodeCardViewModel shows a virtual input for dynamic state input tools without fixed reads", () => {
+  const node: GraphNode = {
+    kind: "tool",
+    name: "Context Meter",
+    description: "Measure dynamic LLM context.",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [],
+    writes: [{ state: "needs_context_compaction", mode: "replace" }],
+    config: { toolKey: "context_meter", dynamicStateInputs: true },
+  };
+
+  const model = buildNodeCardViewModel(
+    "context_meter",
+    node,
+    {
+      ...stateSchema,
+      needs_context_compaction: {
+        name: "Needs Context Compaction",
+        description: "",
+        type: "boolean",
+        value: false,
+        color: "#0891b2",
+      },
+    },
+  );
+
+  assert.equal(model.inputs[0]?.virtual, true);
+  assert.equal(model.inputs[0]?.label, "+ input");
+});
+
 test("buildNodeCardViewModel marks dynamic capability input and result package output ports as managed", () => {
   const node: GraphNode = {
     kind: "agent",
@@ -775,6 +805,24 @@ test("buildNodeCardViewModel exposes a virtual plus input for empty non-input no
   assert.equal(conditionModel.body.primaryInput?.virtual, true);
   assert.equal(conditionModel.body.primaryInput?.label, "+ input");
   assert.deepEqual(inputModel.inputs, []);
+});
+
+test("buildNodeCardViewModel does not expose a virtual input for zero-input tools", () => {
+  const zeroInputTool: GraphNode = {
+    kind: "tool",
+    name: "history_loader",
+    description: "Read runtime history.",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [],
+    writes: [{ state: "answer", mode: "replace" }],
+    config: { toolKey: "buddy_history_context_loader" },
+  };
+
+  const model = buildNodeCardViewModel("history_loader", zeroInputTool, stateSchema);
+
+  assert.equal(model.body.kind, "tool");
+  assert.deepEqual(model.inputs, []);
+  assert.equal(model.body.primaryInput, null);
 });
 
 test("buildNodeCardViewModel exposes virtual plus outputs for empty agent and input outputs", () => {

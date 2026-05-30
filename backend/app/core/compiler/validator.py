@@ -579,12 +579,26 @@ def _validate_tool_node(
             )
         )
 
+    dynamic_state_inputs = bool(getattr(definition, "dynamic_state_inputs", False))
     input_fields = {field.key for field in definition.input_schema}
     output_fields = {field.key for field in definition.output_schema}
     bound_input_fields: set[str] = set()
 
     for read_index, read in enumerate(node.reads):
         binding = read.binding
+        if dynamic_state_inputs:
+            if binding is not None and binding.kind == NodeSystemReadBindingKind.TOOL_INPUT:
+                issues.append(
+                    ValidationIssue(
+                        code="tool_dynamic_input_binding_unexpected",
+                        message=(
+                            f"Tool node '{node_name}' selects dynamic state input tool '{tool_key}', "
+                            "so read states must be ordinary graph state reads, not managed tool_input bindings."
+                        ),
+                        path=f"nodes.{node_name}.reads.{read_index}.binding",
+                    )
+                )
+            continue
         if binding is None or binding.kind != NodeSystemReadBindingKind.TOOL_INPUT:
             issues.append(
                 ValidationIssue(
@@ -618,14 +632,15 @@ def _validate_tool_node(
             )
         bound_input_fields.add(binding.field_key)
 
-    for field_key in sorted(input_fields - bound_input_fields):
-        issues.append(
-            ValidationIssue(
-                code="tool_input_binding_missing",
-                message=f"Tool node '{node_name}' is missing a state input for Tool field '{field_key}'.",
-                path=f"nodes.{node_name}.reads",
+    if not dynamic_state_inputs:
+        for field_key in sorted(input_fields - bound_input_fields):
+            issues.append(
+                ValidationIssue(
+                    code="tool_input_binding_missing",
+                    message=f"Tool node '{node_name}' is missing a state input for Tool field '{field_key}'.",
+                    path=f"nodes.{node_name}.reads",
+                )
             )
-        )
 
     for write_index, write in enumerate(node.writes):
         state_definition = state_schema.get(write.state)

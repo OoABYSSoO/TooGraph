@@ -4380,6 +4380,59 @@ test("updateToolNodeConfigInDocument syncs managed tool input and output state b
   }
 });
 
+test("updateToolNodeConfigInDocument keeps dynamic state input tools free of managed input slots", () => {
+  const dynamicContextTool: ToolDefinition = {
+    ...jsonPassthroughTool,
+    toolKey: "context_meter",
+    name: "Context Meter",
+    dynamicStateInputs: true,
+    inputSchema: [],
+    outputSchema: [{ key: "needs_context_compaction", name: "Needs", valueType: "boolean", description: "" }],
+  };
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Dynamic Tool Graph",
+    state_schema: {
+      user_message: { name: "User Message", description: "", type: "text", value: "", color: "#d97706" },
+    },
+    nodes: {
+      tool_node: {
+        kind: "tool",
+        name: "Tool",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "user_message", required: true }],
+        writes: [],
+        config: { toolKey: "" },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = updateToolNodeConfigInDocument(
+    document,
+    "tool_node",
+    (current) => ({ ...current, toolKey: "context_meter" }),
+    { toolDefinitions: [dynamicContextTool] },
+  );
+  const node = nextDocument.nodes.tool_node;
+
+  assert.equal(node.kind, "tool");
+  if (node.kind === "tool") {
+    assert.equal(node.config.toolKey, "context_meter");
+    assert.equal(node.config.dynamicStateInputs, true);
+    assert.deepEqual(node.reads, [{ state: "user_message", required: true }]);
+    assert.equal(
+      node.writes
+        .map((binding) => nextDocument.state_schema[binding.state]?.binding)
+        .every((binding) => binding?.kind === "tool_output" && binding.toolKey === "context_meter"),
+      true,
+    );
+  }
+});
+
 test("disconnectManagedToolInputStateInDocument restores a bound tool input to a managed slot", () => {
   assert.equal(typeof disconnectManagedToolInputStateInDocument, "function");
 

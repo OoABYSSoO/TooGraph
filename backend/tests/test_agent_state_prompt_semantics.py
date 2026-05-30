@@ -707,6 +707,37 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertNotIn('"kind": "context_package"', prompt)
         self.assertNotIn(ref["assembly_id"], prompt)
 
+    def test_auto_prompt_exposes_context_package_source_refs_for_compaction_graphs(self) -> None:
+        prompt = build_auto_system_prompt(
+            ["session_summary_candidate"],
+            {
+                "conversation_history": {
+                    "kind": "context_package",
+                    "source_kind": "session",
+                    "authority": "history",
+                    "source_refs": [
+                        {"source_kind": "buddy_message", "source_id": "msg_1", "role": "user", "ordinal": 0},
+                        {"source_kind": "buddy_message", "source_id": "msg_2", "role": "assistant", "ordinal": 1},
+                    ],
+                    "budget": {"used_chars": 40, "source_chars": 40, "omitted_count": 0},
+                    "metadata": {"current_session_id": "session_1", "source_run_id": "run_1"},
+                    "items": [],
+                }
+            },
+            {},
+            state_schema={
+                "conversation_history": NodeSystemStateDefinition(
+                    name="Conversation History",
+                    type=NodeSystemStateType.JSON,
+                ),
+                "session_summary_candidate": NodeSystemStateDefinition(type=NodeSystemStateType.MARKDOWN),
+            },
+        )
+
+        self.assertIn("source_refs:", prompt)
+        self.assertIn("buddy_message:msg_1", prompt)
+        self.assertIn("buddy_message:msg_2", prompt)
+
     def test_auto_prompt_marks_context_package_security_warnings_from_assembly(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir) / "data"

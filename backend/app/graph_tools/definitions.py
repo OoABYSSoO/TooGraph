@@ -111,6 +111,7 @@ def _parse_tool_dir(tool_dir: Path, source_scope: ToolSourceScope) -> ToolDefini
             fallback_timeout_seconds=payload.get("timeoutSeconds") or payload.get("timeout_seconds"),
         ),
         verificationCommands=payload.get("verificationCommands") or payload.get("verification_commands") or [],
+        dynamicStateInputs=bool(payload.get("dynamicStateInputs") or payload.get("dynamic_state_inputs") or False),
         inputSchema=_parse_io_fields(payload.get("inputSchema") or payload.get("input_schema") or []),
         outputSchema=_parse_io_fields(payload.get("outputSchema") or payload.get("output_schema") or []),
     )

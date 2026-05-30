@@ -164,6 +164,17 @@ def format_context_package_prompt_lines(
                 budget_parts.append(f"{key_name}={budget.get(key_name)}")
         if budget_parts:
             lines.append(f"  budget: {', '.join(budget_parts)}")
+    metadata = value.get("metadata") if isinstance(value.get("metadata"), dict) else {}
+    metadata_parts = []
+    for key_name in ("current_session_id", "current_message_id", "source_run_id"):
+        metadata_value = " ".join(str(metadata.get(key_name) or "").split())
+        if metadata_value:
+            metadata_parts.append(f"{key_name}={metadata_value}")
+    if metadata_parts:
+        lines.append(f"  metadata: {', '.join(metadata_parts)}")
+    source_refs = _context_package_prompt_source_refs(value)
+    if source_refs:
+        lines.append(f"  source_refs: {', '.join(source_refs)}")
     raw_warnings = value.get("warnings") if isinstance(value.get("warnings"), list) else []
     expanded_warnings: list[Any] = []
     try:
@@ -184,6 +195,29 @@ def format_context_package_prompt_lines(
             lines.append(f"  warnings: {warning_summary}")
     lines.append(f"  value: {text}")
     return lines
+
+
+def _context_package_prompt_source_refs(value: dict[str, Any]) -> list[str]:
+    refs = value.get("source_refs")
+    if not isinstance(refs, list):
+        context_ref = value.get("context_ref")
+        refs = context_ref.get("source_refs") if isinstance(context_ref, dict) else []
+    if not isinstance(refs, list):
+        return []
+    rendered: list[str] = []
+    for ref in refs[:80]:
+        if not isinstance(ref, dict):
+            continue
+        source_kind = " ".join(str(ref.get("source_kind") or "").split())
+        source_id = " ".join(str(ref.get("source_id") or "").split())
+        if not source_kind or not source_id:
+            continue
+        ordinal = ref.get("ordinal")
+        suffix = f"#{ordinal}" if ordinal not in (None, "") else ""
+        rendered.append(f"{source_kind}:{source_id}{suffix}")
+    if len(refs) > 80:
+        rendered.append(f"...+{len(refs) - 80} more")
+    return rendered
 
 
 def _merge_context_package_prompt_warnings(first: list[Any], second: list[Any]) -> list[dict[str, Any]]:

@@ -1,6 +1,5 @@
 import type { GraphPayload, InputNode, TemplateRecord } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
-import { buildBuddyHomeContextValue } from "./buddyTemplateBindingModel.ts";
 
 export const BUDDY_CONTEXT_COMPACTION_TEMPLATE_ID = "buddy_context_compaction";
 
@@ -45,28 +44,30 @@ export type BuddyContextBudgetReport = {
     raw_history_chars: number;
     omitted_history_messages: number;
     prompt_token_pressure: number;
-    capability_result_chars: number;
-    public_response_chars: number;
   };
 };
 
 export type BuddyContextCompactionDecision = {
   shouldCompact: boolean;
-  reason: "history_pressure" | "result_pressure" | "provider_usage_pressure" | "overflow_recovery" | "none";
+  reason: "history_pressure" | "provider_usage_pressure" | "overflow_recovery" | "none";
 };
 
 export type BuildBuddyContextBudgetReportInput = {
   trigger: BuddyContextCompactionTrigger;
   history: BuddyContextHistoryMessage[];
-  userMessage: string;
-  sessionSummary: string;
+  userMessage?: string;
+  sessionSummary?: string;
   capabilityResult?: unknown;
   publicResponse?: string;
   sourceRun?: RunDetail | null;
   modelContextWindowTokens?: number | null;
 };
 
-export type BuildBuddyContextCompactionGraphInput = BuildBuddyContextBudgetReportInput & {
+export type BuildBuddyContextCompactionGraphInput = {
+  trigger: BuddyContextCompactionTrigger;
+  history: BuddyContextHistoryMessage[];
+  sessionSummary?: string;
+  sourceRun?: RunDetail | null;
   sourceRunId?: string;
   currentSessionId: string;
   buddyModel?: unknown;
@@ -79,8 +80,7 @@ const OMITTED_HISTORY_PREVIEW_CHARS = 48;
 const RAW_HISTORY_COMPACTION_THRESHOLD_CHARS = 9000;
 const OMITTED_HISTORY_COMPACTION_THRESHOLD_MESSAGES = 8;
 const PROMPT_TOKEN_PRESSURE_THRESHOLD = 0.62;
-const CAPABILITY_RESULT_COMPACTION_THRESHOLD_CHARS = 6000;
-const PUBLIC_RESPONSE_COMPACTION_THRESHOLD_CHARS = 7000;
+const PROVIDER_PRESSURE_MIN_HISTORY_CHARS = 3000;
 const DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS = 100000;
 
 export function formatBuddyHistoryWithSessionSummary(
@@ -105,11 +105,12 @@ export function formatBuddyHistoryWithSessionSummary(
 
 export function buildBuddyContextBudgetReport(input: BuildBuddyContextBudgetReportInput): BuddyContextBudgetReport {
   const includedHistory = normalizeHistoryMessages(input.history);
-  const renderedHistory = formatBuddyHistoryWithSessionSummary(input.history, input.sessionSummary);
+  const sessionSummary = normalizeText(input.sessionSummary);
+  const renderedHistory = formatBuddyHistoryWithSessionSummary(input.history, sessionSummary);
   const rawHistoryChars = includedHistory.reduce((total, message) => total + formatBuddyHistoryLine(message).length + 1, 0);
   const providerPromptTokens = resolveProviderPromptTokens(input.sourceRun);
   const modelContextWindowTokens = normalizePositiveInteger(input.modelContextWindowTokens) ?? DEFAULT_MODEL_CONTEXT_WINDOW_TOKENS;
-  const sourceRefs = buildContextCompactionSourceRefs(input.history, input.sessionSummary);
+  const sourceRefs = buildContextCompactionSourceRefs(input.history, sessionSummary);
   const omittedRefs = buildContextCompactionMessageRefs(
     includedHistory.slice(0, Math.max(0, includedHistory.length - DEFAULT_RECENT_HISTORY_MESSAGES)),
     sourceRefs.some((ref) => ref.source_kind === "buddy_session_summary") ? 1 : 0,
@@ -127,7 +128,7 @@ export function buildBuddyContextBudgetReport(input: BuildBuddyContextBudgetRepo
     raw_history_chars: rawHistoryChars,
     rendered_history_chars: renderedHistory.length,
     user_message_chars: normalizeText(input.userMessage).length,
-    session_summary_chars: normalizeText(input.sessionSummary).length,
+    session_summary_chars: sessionSummary.length,
     capability_result_chars: countValueChars(input.capabilityResult),
     public_response_chars: normalizeText(input.publicResponse).length,
     provider_prompt_tokens: providerPromptTokens,
@@ -141,13 +142,15 @@ export function buildBuddyContextBudgetReport(input: BuildBuddyContextBudgetRepo
       raw_history_chars: RAW_HISTORY_COMPACTION_THRESHOLD_CHARS,
       omitted_history_messages: OMITTED_HISTORY_COMPACTION_THRESHOLD_MESSAGES,
       prompt_token_pressure: PROMPT_TOKEN_PRESSURE_THRESHOLD,
-      capability_result_chars: CAPABILITY_RESULT_COMPACTION_THRESHOLD_CHARS,
-      public_response_chars: PUBLIC_RESPONSE_COMPACTION_THRESHOLD_CHARS,
     },
   };
 }
 
 export function shouldRunBuddyContextCompaction(report: BuddyContextBudgetReport): BuddyContextCompactionDecision {
+  const hasHistoryToCompact = report.raw_history_chars > 0 || report.session_summary_chars > 0 || report.source_refs.length > 0;
+  if (!hasHistoryToCompact) {
+    return { shouldCompact: false, reason: "none" };
+  }
   if (report.trigger === "overflow_recovery") {
     return { shouldCompact: true, reason: "overflow_recovery" };
   }
@@ -158,14 +161,9 @@ export function shouldRunBuddyContextCompaction(report: BuddyContextBudgetReport
     return { shouldCompact: true, reason: "history_pressure" };
   }
   if (
-    report.capability_result_chars >= report.thresholds.capability_result_chars
-    || report.public_response_chars >= report.thresholds.public_response_chars
-  ) {
-    return { shouldCompact: true, reason: "result_pressure" };
-  }
-  if (
     report.prompt_token_pressure !== null
     && report.prompt_token_pressure >= report.thresholds.prompt_token_pressure
+    && report.raw_history_chars >= PROVIDER_PRESSURE_MIN_HISTORY_CHARS
   ) {
     return { shouldCompact: true, reason: "provider_usage_pressure" };
   }
@@ -179,7 +177,6 @@ export function buildBuddyContextCompactionGraph(
   if (template.template_id !== BUDDY_CONTEXT_COMPACTION_TEMPLATE_ID) {
     throw new Error(`Expected ${BUDDY_CONTEXT_COMPACTION_TEMPLATE_ID}, received ${template.template_id}.`);
   }
-  const contextBudgetReport = buildBuddyContextBudgetReport(input);
   const graph: GraphPayload = {
     graph_id: null,
     name: template.default_graph_name,
@@ -196,16 +193,7 @@ export function buildBuddyContextCompactionGraph(
     },
   };
   applyBuddyModelOverride(graph, input.buddyModel);
-  setInputValue(graph, "input_trigger", input.trigger);
-  setInputValue(graph, "input_source_run_id", input.sourceRunId ?? input.sourceRun?.run_id ?? "");
-  setInputValue(graph, "input_current_session_id", input.currentSessionId);
-  setInputValue(graph, "input_user_message", input.userMessage);
-  setInputValue(graph, "input_conversation_history", formatRawBuddyHistoryForCompaction(input.history));
-  setInputValue(graph, "input_existing_session_summary", input.sessionSummary);
-  setInputValue(graph, "input_buddy_context", buildBuddyHomeContextValue());
-  setInputValue(graph, "input_context_budget_report", contextBudgetReport);
-  setInputValue(graph, "input_capability_result", input.capabilityResult ?? {});
-  setInputValue(graph, "input_public_response", input.publicResponse ?? "");
+  setInputValue(graph, "input_conversation_history", buildBuddyHistoryContextPackage(input));
   return graph;
 }
 
@@ -256,6 +244,67 @@ export function formatRawBuddyHistoryForCompaction(messages: BuddyContextHistory
     return "暂无历史对话。";
   }
   return entries.map(formatBuddyHistoryLine).join("\n");
+}
+
+function buildBuddyHistoryContextPackage(input: BuildBuddyContextCompactionGraphInput) {
+  const sessionSummary = normalizeText(input.sessionSummary);
+  const messages = normalizeHistoryMessages(input.history);
+  const sourceRefs = buildContextCompactionSourceRefs(input.history, sessionSummary);
+  const summaryRef = sourceRefs.find((ref) => ref.source_kind === "buddy_session_summary") ?? null;
+  const messageRefsById = new Map(
+    sourceRefs
+      .filter((ref) => ref.source_kind === "buddy_message" && ref.source_id)
+      .map((ref) => [ref.source_id, ref]),
+  );
+  const items: Array<Record<string, unknown>> = [];
+  if (sessionSummary) {
+    items.push({
+      id: summaryRef?.source_id || "session_summary",
+      title: "Existing session summary",
+      content: sessionSummary,
+      source_ref: summaryRef ?? undefined,
+      metadata: { source_kind: "buddy_session_summary", role: "summary" },
+    });
+  }
+  messages.forEach((message, index) => {
+    const sourceRef = message.id ? messageRefsById.get(message.id) ?? null : null;
+    items.push({
+      id: message.id || `message_${index}`,
+      title: message.role === "user" ? "User message" : "Buddy message",
+      content: formatBuddyHistoryLine(message),
+      source_ref: sourceRef ?? undefined,
+      metadata: { source_kind: "buddy_message", role: message.role, ordinal: sourceRef?.ordinal ?? index },
+    });
+  });
+  const text = [
+    sessionSummary ? sessionSummary : "",
+    ...messages.map(formatBuddyHistoryLine),
+  ].filter(Boolean).join("\n");
+  const sourceRunId = normalizeText(input.sourceRunId) || normalizeText(input.sourceRun?.run_id);
+  return {
+    kind: "context_package",
+    package_id: `pkg_buddy_history_${hashText(`${input.currentSessionId}:${sourceRunId}:${text}`)}`,
+    source_kind: "session",
+    authority: "history",
+    title: "Buddy conversation history",
+    items,
+    source_refs: sourceRefs,
+    source_count: sourceRefs.length,
+    budget: {
+      source_chars: text.length,
+      used_chars: text.length,
+      omitted_count: 0,
+    },
+    warnings: [],
+    metadata: {
+      current_session_id: normalizeText(input.currentSessionId),
+      source_run_id: sourceRunId,
+      history_view: sessionSummary ? "compacted" : "raw",
+      renderer_key: "buddy_history",
+      renderer_version: "1",
+      trigger: input.trigger,
+    },
+  };
 }
 
 function normalizeHistoryMessages(messages: BuddyContextHistoryMessage[]): BuddyContextHistoryMessage[] {
@@ -421,6 +470,15 @@ function truncateText(value: string, maxChars: number): string {
     return value.slice(0, maxChars);
   }
   return `${value.slice(0, maxChars - 3)}...`;
+}
+
+function hashText(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 function cloneJson<T>(value: T): T {

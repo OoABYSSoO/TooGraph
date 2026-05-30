@@ -571,6 +571,7 @@ class NodeSystemSubgraphConfig(BaseModel):
 
 class NodeSystemToolConfig(BaseModel):
     tool_key: str = Field(default="", alias="toolKey")
+    dynamic_state_inputs: bool = Field(default=False, alias="dynamicStateInputs")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 

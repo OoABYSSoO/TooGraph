@@ -120,9 +120,12 @@ class RuntimeContextLoaderToolTests(unittest.TestCase):
         self.assertEqual(rebuilt["package"]["source_kind"], "runtime")
 
     def _delete_blob(self, content_hash: str) -> None:
-        with sqlite3.connect(database.DB_PATH) as connection:
+        connection = sqlite3.connect(database.DB_PATH)
+        try:
             connection.execute("DELETE FROM content_blobs WHERE content_hash = ?", (content_hash,))
             connection.commit()
+        finally:
+            connection.close()
 
 
 if __name__ == "__main__":

@@ -8,8 +8,6 @@ import sys
 from typing import Any
 
 
-DEFAULT_MAX_MESSAGES = 12
-DEFAULT_MAX_CHARS = 4000
 DEFAULT_SUMMARY_PLACEHOLDERS = {"当前对话尚未形成摘要。"}
 
 
@@ -29,17 +27,14 @@ def buddy_history_context_loader(payload: dict[str, Any] | None, *, context: dic
         or inputs.get("current_message_id")
     )
     source_run_id = _resolve_source_run_id(inputs=inputs, runtime_context=runtime_context, explicit_context=context)
-    max_messages = _bounded_int(inputs.get("max_messages"), default=DEFAULT_MAX_MESSAGES, minimum=1, maximum=50)
-    max_chars = _bounded_int(inputs.get("max_chars"), default=DEFAULT_MAX_CHARS, minimum=256, maximum=50000)
 
     if not session_id:
         warnings = [_warning("missing_buddy_session", "No Buddy session runtime context was available.")]
         context_ref = _build_context_ref(
             session_id="",
             current_message_id=current_message_id,
+            source_run_id=source_run_id,
             source_refs=[],
-            max_messages=max_messages,
-            max_chars=max_chars,
             scope="standalone_run",
         )
         return {
@@ -49,44 +44,27 @@ def buddy_history_context_loader(payload: dict[str, Any] | None, *, context: dic
                 current_message_id=current_message_id,
                 context_ref=context_ref,
                 source_refs=[],
-                max_messages=max_messages,
-                max_chars=max_chars,
                 source_chars=0,
                 used_chars=0,
                 omitted_count=0,
-                warnings=warnings,
-            ),
-            "existing_session_summary": "",
-            "current_session_id": "",
-            "source_run_id": source_run_id,
-            "history_context_report": _build_report(
-                scope="standalone_run",
-                session_id="",
-                current_message_id=current_message_id,
                 source_run_id=source_run_id,
-                source_refs=[],
-                max_messages=max_messages,
-                max_chars=max_chars,
-                warning="No Buddy session runtime context was available.",
-                omitted_count=0,
-                omitted_reason="",
+                warnings=warnings,
             ),
         }
 
     try:
         _ensure_backend_path()
-        from app.buddy.store import list_chat_messages, load_session_summary
+        from app.buddy.store import list_chat_messages
 
         messages = list_chat_messages(session_id)
-        session_summary = load_session_summary()
+        session_summary = _load_latest_session_summary(session_id)
     except Exception as exc:
         warning = _warning("history_load_failed", str(exc))
         context_ref = _build_context_ref(
             session_id=session_id,
             current_message_id=current_message_id,
+            source_run_id=source_run_id,
             source_refs=[],
-            max_messages=max_messages,
-            max_chars=max_chars,
             scope="load_failed",
         )
         return {
@@ -98,62 +76,40 @@ def buddy_history_context_loader(payload: dict[str, Any] | None, *, context: dic
                 current_message_id=current_message_id,
                 context_ref=context_ref,
                 source_refs=[],
-                max_messages=max_messages,
-                max_chars=max_chars,
                 source_chars=0,
                 used_chars=0,
                 omitted_count=0,
-                warnings=[warning],
-            ),
-            "existing_session_summary": "",
-            "current_session_id": session_id,
-            "source_run_id": source_run_id,
-            "history_context_report": _build_report(
-                scope="load_failed",
-                session_id=session_id,
-                current_message_id=current_message_id,
                 source_run_id=source_run_id,
-                source_refs=[],
-                max_messages=max_messages,
-                max_chars=max_chars,
-                warning=str(exc),
-                omitted_count=0,
-                omitted_reason="",
+                warnings=[warning],
             ),
         }
 
     visible_messages = _visible_messages_before_current(messages, current_message_id=current_message_id)
-    selected_messages = _select_recent_visible_messages(visible_messages, max_messages=max_messages, max_chars=max_chars)
-    omitted_count = max(0, len(visible_messages) - len(selected_messages))
-    omitted_reason = _resolve_omitted_reason(
-        visible_messages=visible_messages,
-        selected_messages=selected_messages,
-        max_messages=max_messages,
-        max_chars=max_chars,
-    )
-    source_refs = _build_source_refs(selected_messages)
     summary_content = _text(session_summary.get("content") if isinstance(session_summary, dict) else "")
     if summary_content in DEFAULT_SUMMARY_PLACEHOLDERS:
         summary_content = ""
     if summary_content:
-        source_refs.insert(
-            0,
-            {
-                "source_kind": "buddy_session_summary",
-                "source_id": "session_summary",
-                "role": "summary",
-                "ordinal": 0,
-            },
-        )
-        source_refs = [{**ref, "ordinal": index} for index, ref in enumerate(source_refs)]
+        selected_messages = _messages_after_summary(visible_messages, session_summary=session_summary)
+        history_view = "compacted"
+        summary_id = _text(session_summary.get("summary_id"))
+        omitted_count = max(0, len(visible_messages) - len(selected_messages))
+        source_refs = [_summary_source_ref(session_summary), *_build_source_refs(selected_messages)]
+    else:
+        selected_messages = visible_messages
+        history_view = "raw"
+        summary_id = ""
+        omitted_count = 0
+        source_refs = _build_source_refs(selected_messages)
+    source_refs = [{**ref, "ordinal": index} for index, ref in enumerate(source_refs)]
 
     ref = _build_context_ref(
         session_id=session_id,
         current_message_id=current_message_id,
+        source_run_id=source_run_id,
         source_refs=source_refs,
-        max_messages=max_messages,
-        max_chars=max_chars,
-        scope="buddy_session",
+        scope="buddy_session_compacted" if history_view == "compacted" else "buddy_session",
+        history_view=history_view,
+        summary_id=summary_id,
     )
     rendered_text = _render_history_text(summary_content=summary_content, messages=selected_messages)
     source_chars = len(summary_content) + _messages_char_count(visible_messages)
@@ -164,27 +120,13 @@ def buddy_history_context_loader(payload: dict[str, Any] | None, *, context: dic
             current_message_id=current_message_id,
             context_ref=ref,
             source_refs=source_refs,
-            max_messages=max_messages,
-            max_chars=max_chars,
             source_chars=source_chars,
             used_chars=len(rendered_text),
             omitted_count=omitted_count,
-            warnings=[],
-        ),
-        "existing_session_summary": summary_content,
-        "current_session_id": session_id,
-        "source_run_id": source_run_id,
-        "history_context_report": _build_report(
-            scope="buddy_session",
-            session_id=session_id,
-            current_message_id=current_message_id,
             source_run_id=source_run_id,
-            source_refs=source_refs,
-            max_messages=max_messages,
-            max_chars=max_chars,
-            warning="",
-            omitted_count=omitted_count,
-            omitted_reason=omitted_reason,
+            history_view=history_view,
+            summary_id=summary_id,
+            warnings=[],
         ),
     }
 
@@ -226,6 +168,96 @@ def _resolve_source_run_id(
     return _text(inputs.get("source_run_id") or runtime_context.get("source_run_id") or runtime_context.get("run_id"))
 
 
+def _load_latest_session_summary(session_id: str) -> dict[str, Any]:
+    if not session_id:
+        return {}
+    _ensure_backend_path()
+    from app.core.storage.database import get_connection
+
+    lineage_root = _resolve_lineage_root(session_id)
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT summary_id, session_id, lineage_root_session_id, content, source_refs_json,
+                   source_run_id, source_revision_id, created_at, updated_at
+            FROM buddy_session_summaries
+            WHERE session_id = ?
+               OR lineage_root_session_id = ?
+            ORDER BY updated_at DESC, rowid DESC
+            LIMIT 1
+            """,
+            (session_id, lineage_root or session_id),
+        ).fetchone()
+    if row is None:
+        return {}
+    return {
+        "summary_id": _text(row["summary_id"]),
+        "session_id": _text(row["session_id"]),
+        "lineage_root_session_id": _text(row["lineage_root_session_id"]),
+        "content": _text(row["content"]),
+        "source_refs": _json_list(row["source_refs_json"]),
+        "source_run_id": _text(row["source_run_id"]),
+        "source_revision_id": _text(row["source_revision_id"]),
+        "created_at": _text(row["created_at"]),
+        "updated_at": _text(row["updated_at"]),
+    }
+
+
+def _resolve_lineage_root(session_id: str) -> str:
+    _ensure_backend_path()
+    from app.core.storage.database import get_connection
+
+    visited: set[str] = set()
+    current = session_id
+    with get_connection() as connection:
+        while current and current not in visited:
+            visited.add(current)
+            row = connection.execute(
+                "SELECT parent_session_id FROM buddy_sessions WHERE session_id = ?",
+                (current,),
+            ).fetchone()
+            if row is None:
+                return session_id
+            parent = _text(row["parent_session_id"])
+            if not parent:
+                return current
+            current = parent
+    return current or session_id
+
+
+def _json_list(raw: Any) -> list[dict[str, Any]]:
+    try:
+        value = json.loads(str(raw or "[]"))
+    except Exception:
+        value = []
+    if not isinstance(value, list):
+        return []
+    return [dict(item) for item in value if isinstance(item, dict)]
+
+
+def _messages_after_summary(
+    messages: list[dict[str, Any]],
+    *,
+    session_summary: dict[str, Any],
+) -> list[dict[str, Any]]:
+    covered_message_ids = {
+        _text(ref.get("source_id"))
+        for ref in session_summary.get("source_refs", [])
+        if isinstance(ref, dict) and ref.get("source_kind") == "buddy_message" and _text(ref.get("source_id"))
+    }
+    if covered_message_ids:
+        last_covered_index = max(
+            (index for index, message in enumerate(messages) if _text(message.get("message_id")) in covered_message_ids),
+            default=-1,
+        )
+        if last_covered_index >= 0:
+            return messages[last_covered_index + 1 :]
+    summary_updated_at = _text(session_summary.get("updated_at"))
+    if summary_updated_at:
+        return [_ for _ in messages if _text(_.get("created_at")) > summary_updated_at]
+    return []
+
+
 def _read_json_env(key: str) -> dict[str, Any]:
     raw = _text(os.environ.get(key))
     if not raw:
@@ -257,35 +289,6 @@ def _visible_messages_before_current(
     return visible
 
 
-def _select_recent_visible_messages(
-    visible: list[dict[str, Any]],
-    *,
-    max_messages: int,
-    max_chars: int,
-) -> list[dict[str, Any]]:
-    selected = visible[-max_messages:]
-    while len(selected) > 1 and _messages_char_count(selected) > max_chars:
-        selected = selected[1:]
-    return selected
-
-
-def _resolve_omitted_reason(
-    *,
-    visible_messages: list[dict[str, Any]],
-    selected_messages: list[dict[str, Any]],
-    max_messages: int,
-    max_chars: int,
-) -> str:
-    if len(visible_messages) == len(selected_messages):
-        return ""
-    reasons: list[str] = []
-    if len(visible_messages) > max_messages:
-        reasons.append("message_limit")
-    if _messages_char_count(visible_messages[-max_messages:]) > max_chars:
-        reasons.append("char_budget")
-    return ",".join(reasons) or "history_budget"
-
-
 def _build_source_refs(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     refs: list[dict[str, Any]] = []
     for message in messages:
@@ -304,10 +307,11 @@ def _build_context_ref(
     *,
     session_id: str,
     current_message_id: str,
+    source_run_id: str,
     source_refs: list[dict[str, Any]],
-    max_messages: int,
-    max_chars: int,
     scope: str,
+    history_view: str = "raw",
+    summary_id: str = "",
 ) -> dict[str, Any]:
     source_key = [
         [ref.get("source_kind"), ref.get("source_id"), ref.get("role"), ref.get("ordinal")]
@@ -318,8 +322,6 @@ def _build_context_ref(
             "session_id": session_id,
             "current_message_id": current_message_id,
             "source_refs": source_key,
-            "max_messages": max_messages,
-            "max_chars": max_chars,
             "scope": scope,
         },
         ensure_ascii=False,
@@ -336,14 +338,14 @@ def _build_context_ref(
         "rendered_content_hash": "",
         "source_count": len(source_refs),
         "source_refs": source_refs,
-        "budget": {
-            "max_messages": max_messages,
-            "max_chars": max_chars,
-        },
+        "budget": {"source_count": len(source_refs)},
         "metadata": {
             "scope": scope,
             "current_session_id": session_id,
             "current_message_id": current_message_id,
+            "source_run_id": source_run_id,
+            "history_view": history_view,
+            "summary_id": summary_id,
         },
         "preview": preview,
     }
@@ -355,11 +357,12 @@ def _build_context_package(
     current_message_id: str,
     context_ref: dict[str, Any],
     source_refs: list[dict[str, Any]],
-    max_messages: int,
-    max_chars: int,
     source_chars: int,
     used_chars: int,
     omitted_count: int,
+    source_run_id: str,
+    history_view: str = "raw",
+    summary_id: str = "",
     warnings: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
@@ -373,8 +376,6 @@ def _build_context_package(
         "source_count": len(source_refs),
         "context_ref": context_ref,
         "budget": {
-            "max_messages": max_messages,
-            "max_chars": max_chars,
             "source_chars": source_chars,
             "used_chars": used_chars,
             "omitted_count": omitted_count,
@@ -383,9 +384,24 @@ def _build_context_package(
         "metadata": {
             "current_session_id": session_id,
             "current_message_id": current_message_id,
+            "source_run_id": source_run_id,
+            "history_view": history_view,
+            "summary_id": summary_id,
             "renderer_key": "buddy_history",
             "renderer_version": "1",
         },
+    }
+
+
+def _summary_source_ref(session_summary: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "source_kind": "buddy_session_summary",
+        "source_id": _text(session_summary.get("summary_id")),
+        "source_revision_id": _text(session_summary.get("source_revision_id")),
+        "session_id": _text(session_summary.get("session_id")),
+        "lineage_root_session_id": _text(session_summary.get("lineage_root_session_id")),
+        "source_run_id": _text(session_summary.get("source_run_id")),
+        "role": "summary",
     }
 
 
@@ -426,51 +442,6 @@ def _message_title(role: str) -> str:
     return "会话消息"
 
 
-def _build_report(
-    *,
-    scope: str,
-    session_id: str,
-    current_message_id: str,
-    source_run_id: str,
-    source_refs: list[dict[str, Any]],
-    max_messages: int,
-    max_chars: int,
-    warning: str,
-    omitted_count: int,
-    omitted_reason: str,
-) -> dict[str, Any]:
-    message_ids = [
-        _text(ref.get("source_id"))
-        for ref in source_refs
-        if ref.get("source_kind") == "buddy_message" and _text(ref.get("source_id"))
-    ]
-    summary_ids = [
-        _text(ref.get("source_id"))
-        for ref in source_refs
-        if ref.get("source_kind") == "buddy_session_summary" and _text(ref.get("source_id"))
-    ]
-    return {
-        "scope": scope,
-        "session_id": session_id,
-        "current_message_id": current_message_id,
-        "source_run_id": source_run_id,
-        "source_count": len(source_refs),
-        "source_refs": source_refs,
-        "message_ids": message_ids,
-        "summary_ids": summary_ids,
-        "omitted_count": omitted_count,
-        "omitted_reason": omitted_reason,
-        "lineage": {
-            "current_session_id": session_id,
-            "current_message_id": current_message_id,
-            "source_run_id": source_run_id,
-        },
-        "max_messages": max_messages,
-        "max_chars": max_chars,
-        "warning": warning,
-    }
-
-
 def _render_history_text(*, summary_content: str, messages: list[dict[str, Any]]) -> str:
     lines: list[str] = []
     if summary_content:
@@ -495,14 +466,6 @@ def _warning(code: str, message: str) -> dict[str, Any]:
 
 def _messages_char_count(messages: list[dict[str, Any]]) -> int:
     return sum(len(_text(message.get("content"))) for message in messages)
-
-
-def _bounded_int(value: Any, *, default: int, minimum: int, maximum: int) -> int:
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
-        number = default
-    return max(minimum, min(maximum, number))
 
 
 def _text(value: Any) -> str:

@@ -6,8 +6,8 @@ import type { RunDetail } from "../types/run.ts";
 
 import {
   BUDDY_CONTEXT_COMPACTION_TEMPLATE_ID,
-  buildBuddyContextCompactionGraph,
   buildBuddyContextBudgetReport,
+  buildBuddyContextCompactionGraph,
   formatBuddyHistoryWithSessionSummary,
   isContextOverflowError,
   shouldRunBuddyContextCompaction,
@@ -16,36 +16,43 @@ import {
 function createCompactionTemplate(): TemplateRecord {
   return {
     template_id: BUDDY_CONTEXT_COMPACTION_TEMPLATE_ID,
-    label: "上下文压缩",
-    description: "Buddy context compaction",
-    default_graph_name: "上下文压缩",
+    label: "Context Compaction",
+    description: "Buddy history-only context compaction",
+    default_graph_name: "Context Compaction",
     state_schema: {
-      trigger: { name: "trigger", description: "", type: "text", value: "", color: "#475569" },
-      source_run_id: { name: "source_run_id", description: "", type: "text", value: "", color: "#475569" },
-      current_session_id: { name: "current_session_id", description: "", type: "text", value: "", color: "#475569" },
-      user_message: { name: "user_message", description: "", type: "text", value: "", color: "#d97706" },
-      conversation_history: { name: "conversation_history", description: "", type: "markdown", value: "", color: "#64748b" },
-      existing_session_summary: { name: "existing_session_summary", description: "", type: "markdown", value: "", color: "#4f46e5" },
-      buddy_context: { name: "buddy_context", description: "", type: "file", value: {}, color: "#0f766e" },
-      context_budget_report: { name: "context_budget_report", description: "", type: "json", value: {}, color: "#0e7490" },
-      capability_result: { name: "capability_result", description: "", type: "result_package", value: {}, color: "#0284c7" },
-      public_response: { name: "public_response", description: "", type: "markdown", value: "", color: "#16a34a" },
+      conversation_history: {
+        name: "conversation_history",
+        description: "",
+        type: "json",
+        value: "",
+        color: "#64748b",
+      },
+      compaction_plan: { name: "compaction_plan", description: "", type: "json", value: {}, color: "#9333ea" },
     },
     nodes: {
-      input_trigger: inputNode("trigger", "trigger"),
-      input_source_run_id: inputNode("source_run_id", "source_run_id"),
-      input_current_session_id: inputNode("current_session_id", "current_session_id"),
-      input_user_message: inputNode("user_message", "user_message"),
       input_conversation_history: inputNode("conversation_history", "conversation_history"),
-      input_existing_session_summary: inputNode("existing_session_summary", "existing_session_summary"),
-      input_buddy_context: inputNode("buddy_context", "buddy_context"),
-      input_context_budget_report: inputNode("context_budget_report", "context_budget_report"),
-      input_capability_result: inputNode("capability_result", "capability_result"),
-      input_public_response: inputNode("public_response", "public_response"),
+      plan_compaction: {
+        kind: "agent",
+        name: "Plan Compaction",
+        description: "",
+        ui: { position: { x: 0, y: 0 }, collapsed: false },
+        reads: [{ state: "conversation_history", required: true }],
+        writes: [{ state: "compaction_plan", mode: "replace" }],
+        config: {
+          actionKey: "",
+          actionBindings: [],
+          actionInstructionBlocks: {},
+          taskInstruction: "Plan history compaction.",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "low",
+          temperature: 0.1,
+        },
+      },
     },
     edges: [],
     conditional_edges: [],
-    metadata: { internal: true, role: "buddy_context_compaction" },
+    metadata: { role: "buddy_context_compaction" },
   };
 }
 
@@ -57,7 +64,7 @@ function inputNode(nodeName: string, state: string) {
     ui: { position: { x: 0, y: 0 }, collapsed: false },
     reads: [],
     writes: [{ state, mode: "replace" as const }],
-    config: { value: "" },
+    config: { value: "", boundaryType: "json" },
   };
 }
 
@@ -65,7 +72,7 @@ function runWithUsage(promptTokens: number): RunDetail {
   return {
     run_id: "run_visible_1",
     graph_id: null,
-    graph_name: "伙伴自主循环",
+    graph_name: "Buddy Autonomous Loop",
     status: "completed",
     started_at: "",
     completed_at: "",
@@ -137,27 +144,26 @@ test("formatBuddyHistoryWithSessionSummary prepends durable summary before recen
   const history = Array.from({ length: 16 }, (_, index) => ({
     id: `m${index}`,
     role: index % 2 === 0 ? "user" as const : "assistant" as const,
-    content: `第 ${index} 条消息`,
-    createdAt: "",
+    content: `message ${index}`,
     includeInContext: true,
   }));
 
-  const formatted = formatBuddyHistoryWithSessionSummary(history, "用户正在设计 Hermes 风格上下文压缩。");
+  const formatted = formatBuddyHistoryWithSessionSummary(history, "durable summary");
 
-  assert.match(formatted, /^## 会话摘要\n用户正在设计 Hermes 风格上下文压缩。/);
-  assert.match(formatted, /## 最近原文/);
-  assert.match(formatted, /省略的历史对话:/);
-  assert.doesNotMatch(formatted, /第 0 条消息\n用户/);
+  assert.match(formatted, /^## /);
+  assert.match(formatted, /durable summary/);
+  assert.match(formatted, /omitted_count:/);
+  assert.doesNotMatch(formatted, /\n用户: message 0\n/);
 });
 
-test("shouldRunBuddyContextCompaction triggers on raw history pressure and high provider usage", () => {
+test("shouldRunBuddyContextCompaction only triggers when session history can be compacted", () => {
   const longHistory = Array.from({ length: 18 }, (_, index) => ({
     role: index % 2 === 0 ? "user" as const : "assistant" as const,
-    content: "很长的历史。".repeat(500),
+    content: "long history ".repeat(500),
   }));
   const report = buildBuddyContextBudgetReport({
     history: longHistory,
-    userMessage: "继续",
+    userMessage: "continue",
     sessionSummary: "",
     trigger: "preflight",
   });
@@ -165,16 +171,29 @@ test("shouldRunBuddyContextCompaction triggers on raw history pressure and high 
   assert.equal(shouldRunBuddyContextCompaction(report).shouldCompact, true);
   assert.equal(shouldRunBuddyContextCompaction(report).reason, "history_pressure");
 
-  const usageReport = buildBuddyContextBudgetReport({
+  const usageWithoutHistory = buildBuddyContextBudgetReport({
     history: [],
-    userMessage: "继续",
+    userMessage: "continue",
     sessionSummary: "",
     trigger: "background",
     sourceRun: runWithUsage(70000),
     modelContextWindowTokens: 100000,
   });
-  assert.equal(shouldRunBuddyContextCompaction(usageReport).shouldCompact, true);
-  assert.equal(shouldRunBuddyContextCompaction(usageReport).reason, "provider_usage_pressure");
+  assert.equal(shouldRunBuddyContextCompaction(usageWithoutHistory).shouldCompact, false);
+
+  const usageWithHistory = buildBuddyContextBudgetReport({
+    history: Array.from({ length: 4 }, (_, index) => ({
+      role: index % 2 === 0 ? "user" as const : "assistant" as const,
+      content: "history worth compacting ".repeat(60),
+    })),
+    userMessage: "continue",
+    sessionSummary: "",
+    trigger: "background",
+    sourceRun: runWithUsage(70000),
+    modelContextWindowTokens: 100000,
+  });
+  assert.equal(shouldRunBuddyContextCompaction(usageWithHistory).shouldCompact, true);
+  assert.equal(shouldRunBuddyContextCompaction(usageWithHistory).reason, "provider_usage_pressure");
 
   const resultReport = buildBuddyContextBudgetReport({
     history: [],
@@ -183,8 +202,7 @@ test("shouldRunBuddyContextCompaction triggers on raw history pressure and high 
     trigger: "background",
     publicResponse: "large result ".repeat(800),
   });
-  assert.equal(shouldRunBuddyContextCompaction(resultReport).shouldCompact, true);
-  assert.equal(shouldRunBuddyContextCompaction(resultReport).reason, "result_pressure");
+  assert.equal(shouldRunBuddyContextCompaction(resultReport).shouldCompact, false);
 
   const maxUsageReport = buildBuddyContextBudgetReport({
     history: [],
@@ -201,15 +219,15 @@ test("buildBuddyContextBudgetReport preserves source refs for summary compaction
   const history = Array.from({ length: 14 }, (_, index) => ({
     id: `msg_${index}`,
     role: index % 2 === 0 ? "user" as const : "assistant" as const,
-    content: `第 ${index} 条需要可追溯的历史`,
+    content: `traceable history ${index}`,
     sourceRevisionId: `rev_${index}`,
   }));
 
   const report = buildBuddyContextBudgetReport({
     trigger: "preflight",
     history,
-    userMessage: "继续",
-    sessionSummary: "已有摘要",
+    userMessage: "continue",
+    sessionSummary: "existing summary",
   });
 
   assert.deepEqual(report.omitted_refs.map((ref) => ref.source_id), ["msg_0", "msg_1"]);
@@ -219,26 +237,32 @@ test("buildBuddyContextBudgetReport preserves source refs for summary compaction
   assert.equal(report.summary_source_refs.at(-1)?.source_revision_id, "rev_13");
 });
 
-test("buildBuddyContextCompactionGraph wires runtime sources into the internal compaction template", () => {
+test("buildBuddyContextCompactionGraph only wires conversation history into the compaction template", () => {
   const graph = buildBuddyContextCompactionGraph(createCompactionTemplate(), {
     trigger: "preflight",
-    sourceRunId: "",
+    sourceRunId: "run_visible_1",
     currentSessionId: "session_live_1",
-    userMessage: "继续讨论压缩",
-    history: [{ id: "msg_source_1", role: "user", content: "之前说过要保护最近原文。", sourceRevisionId: "rev_source_1" }],
-    sessionSummary: "已有摘要",
+    history: [{ id: "msg_source_1", role: "user", content: "preserve recent source", sourceRevisionId: "rev_source_1" }],
+    sessionSummary: "existing summary",
     buddyModel: "global/gpt-5.3-codex",
   });
 
+  const historyPackage = graph.nodes.input_conversation_history.config.value;
   assert.equal(graph.metadata.buddy_context_compaction_run, true);
   assert.equal(graph.metadata.buddy_template_id, BUDDY_CONTEXT_COMPACTION_TEMPLATE_ID);
-  assert.equal(graph.state_schema.trigger.value, "preflight");
-  assert.equal(graph.state_schema.current_session_id.value, "session_live_1");
-  assert.equal(graph.state_schema.existing_session_summary.value, "已有摘要");
-  assert.equal(graph.state_schema.buddy_context.value?.["root"], "buddy_home");
-  assert.equal(graph.nodes.input_user_message.config.value, "继续讨论压缩");
-  assert.equal(graph.nodes.input_context_budget_report.config.value.summary_source_refs[1].source_id, "msg_source_1");
-  assert.equal(graph.nodes.input_context_budget_report.config.value.summary_source_refs[1].source_revision_id, "rev_source_1");
+  assert.equal(historyPackage.kind, "context_package");
+  assert.equal(historyPackage.authority, "history");
+  assert.equal(historyPackage.metadata.current_session_id, "session_live_1");
+  assert.equal(historyPackage.metadata.source_run_id, "run_visible_1");
+  assert.equal(historyPackage.source_refs[1].source_id, "msg_source_1");
+  assert.equal(historyPackage.source_refs[1].source_revision_id, "rev_source_1");
+  assert.equal(graph.state_schema.conversation_history.value.kind, "context_package");
+  assert.equal(graph.nodes.input_user_message, undefined);
+  assert.equal(graph.nodes.input_buddy_context, undefined);
+  assert.equal(graph.nodes.input_context_budget_report, undefined);
+  assert.equal(graph.nodes.input_capability_result, undefined);
+  assert.equal(graph.nodes.input_public_response, undefined);
+  assert.equal(graph.nodes.plan_compaction.kind === "agent" ? graph.nodes.plan_compaction.config.modelSource : "", "override");
 });
 
 test("isContextOverflowError recognizes provider request-size failures", () => {

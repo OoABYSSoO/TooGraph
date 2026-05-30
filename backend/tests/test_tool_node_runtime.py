@@ -25,6 +25,21 @@ def _tool_definition(tool_key: str):
     )
 
 
+def _dynamic_tool_definition(tool_key: str):
+    from app.core.schemas.tools import ToolDefinition, ToolIoField
+
+    return ToolDefinition(
+        toolKey=tool_key,
+        name="Context Meter",
+        runtime={"type": "python", "entrypoint": "run.py"},
+        dynamicStateInputs=True,
+        inputSchema=[],
+        outputSchema=[ToolIoField(key="result", name="Result", valueType="json")],
+        runtimeReady=True,
+        runtimeRegistered=True,
+    )
+
+
 def _tool_graph() -> NodeSystemGraphDocument:
     return NodeSystemGraphDocument.model_validate(
         {
@@ -154,6 +169,90 @@ class ToolNodeRuntimeTests(unittest.TestCase):
         self.assertNotIn("tool_runtime_fixture", result["tool_outputs"][0])
         self.assertEqual(events[0]["status"], "failed")
         self.assertEqual(events[0]["detail"]["error_type"], "fixture_tool_timeout")
+
+    def test_execute_dynamic_state_tool_receives_read_states_as_context_items(self) -> None:
+        graph = NodeSystemGraphDocument.model_validate(
+            {
+                "graph_id": "graph-1",
+                "name": "Dynamic Tool Graph",
+                "state_schema": {
+                    "user_message": {"name": "User Message", "type": "text", "value": ""},
+                    "conversation_history": {"name": "History", "type": "json", "value": {}},
+                    "result": {
+                        "type": "json",
+                        "binding": {
+                            "kind": "tool_output",
+                            "toolKey": "context_meter",
+                            "nodeId": "meter",
+                            "fieldKey": "result",
+                            "managed": True,
+                        },
+                    },
+                },
+                "nodes": {
+                    "meter": {
+                        "kind": "tool",
+                        "name": "Context Meter",
+                        "ui": {"position": {"x": 0, "y": 0}},
+                        "reads": [
+                            {"state": "user_message", "required": True, "binding": None},
+                            {"state": "conversation_history", "required": False, "binding": None},
+                        ],
+                        "writes": [{"state": "result"}],
+                        "config": {"toolKey": "context_meter", "dynamicStateInputs": True},
+                    }
+                },
+                "edges": [],
+                "conditional_edges": [],
+            }
+        )
+        node = graph.nodes["meter"]
+        calls: list[dict[str, Any]] = []
+
+        def run_tool(_tool_func: object, tool_inputs: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+            calls.append({"inputs": tool_inputs, "kwargs": kwargs})
+            return {"status": "succeeded", "result": {"seen": len(tool_inputs["context_items"])}}
+
+        result = node_handlers.execute_tool_node(
+            graph.state_schema,
+            node,
+            {
+                "user_message": "hello",
+                "conversation_history": {"kind": "context_package", "metadata": {"history_view": "raw"}},
+            },
+            {"state": {}},
+            node_name="meter",
+            state={"run_id": "run-1"},
+            get_tool_registry_func=lambda *, include_disabled: {"context_meter": object()},
+            get_tool_definition_registry_func=lambda *, include_disabled: {
+                "context_meter": _dynamic_tool_definition("context_meter")
+            },
+            invoke_tool_func=run_tool,
+            record_activity_event_func=lambda state, **event: event,
+        )
+
+        self.assertEqual(
+            calls[0]["inputs"]["context_items"],
+            [
+                {
+                    "state": "user_message",
+                    "name": "User Message",
+                    "description": "",
+                    "type": "text",
+                    "required": True,
+                    "value": "hello",
+                },
+                {
+                    "state": "conversation_history",
+                    "name": "History",
+                    "description": "",
+                    "type": "json",
+                    "required": False,
+                    "value": {"kind": "context_package", "metadata": {"history_view": "raw"}},
+                },
+            ],
+        )
+        self.assertEqual(result["outputs"], {"result": {"seen": 2}})
 
 
 if __name__ == "__main__":

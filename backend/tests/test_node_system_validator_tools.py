@@ -25,7 +25,27 @@ def _tool_definition(tool_key: str):
     )
 
 
-def _tool_graph(*, tool_key: str = "json_passthrough", output_binding: dict | None = None) -> NodeSystemGraphDocument:
+def _tool_definition_dynamic(tool_key: str):
+    from app.core.schemas.tools import ToolDefinition, ToolIoField
+
+    return ToolDefinition(
+        toolKey=tool_key,
+        name=tool_key,
+        runtime={"type": "python", "entrypoint": "run.py"},
+        dynamicStateInputs=True,
+        inputSchema=[],
+        outputSchema=[ToolIoField(key="result", name="Result", valueType="json")],
+        runtimeReady=True,
+        runtimeRegistered=True,
+    )
+
+
+def _tool_graph(
+    *,
+    tool_key: str = "json_passthrough",
+    output_binding: dict | None = None,
+    dynamic_state_inputs: bool = False,
+) -> NodeSystemGraphDocument:
     return NodeSystemGraphDocument.model_validate(
         {
             "graph_id": "graph-1",
@@ -59,7 +79,9 @@ def _tool_graph(*, tool_key: str = "json_passthrough", output_binding: dict | No
                         {
                             "state": "source",
                             "required": True,
-                            "binding": {
+                            "binding": None
+                            if dynamic_state_inputs
+                            else {
                                 "kind": "tool_input",
                                 "toolKey": tool_key,
                                 "fieldKey": "value",
@@ -68,7 +90,7 @@ def _tool_graph(*, tool_key: str = "json_passthrough", output_binding: dict | No
                         }
                     ],
                     "writes": [{"state": "result"}],
-                    "config": {"toolKey": tool_key},
+                    "config": {"toolKey": tool_key, "dynamicStateInputs": dynamic_state_inputs},
                 },
             },
             "edges": [{"source": "input", "target": "passthrough"}],
@@ -114,6 +136,19 @@ class NodeSystemValidatorToolTests(unittest.TestCase):
             validation = validate_graph(graph)
 
         self.assertIn("tool_output_binding_missing", [issue.code for issue in validation.issues])
+
+    def test_dynamic_state_input_tool_accepts_unmanaged_reads(self) -> None:
+        graph = _tool_graph(tool_key="context_meter", dynamic_state_inputs=True)
+        definition = _tool_definition_dynamic("context_meter")
+
+        with (
+            patch("app.core.compiler.validator.get_tool_registry", return_value={"context_meter": object()}),
+            patch("app.core.compiler.validator.get_tool_catalog_registry", return_value={"context_meter": definition}),
+        ):
+            validation = validate_graph(graph)
+
+        self.assertEqual([], validation.issues)
+        self.assertTrue(validation.valid)
 
 
 if __name__ == "__main__":

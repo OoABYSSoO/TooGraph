@@ -674,7 +674,11 @@ export function updateToolNodeConfigInDocument<T extends GraphPayload | GraphDoc
     return document;
   }
 
-  nextNode.config = nextConfig;
+  const selectedToolDefinition = options.toolDefinitions?.find((definition) => definition.toolKey === nextConfig.toolKey.trim());
+  nextNode.config = {
+    ...nextConfig,
+    dynamicStateInputs: Boolean(selectedToolDefinition?.dynamicStateInputs),
+  };
   reconcileToolStateInputBindings(nextDocument, nodeId, options.toolDefinitions ?? []);
   reconcileToolOutputBindings(nextDocument, nodeId, options.toolDefinitions ?? []);
   return nextDocument;
@@ -1096,6 +1100,11 @@ function reconcileToolStateInputBindings<T extends GraphPayload | GraphDocument>
   const toolKey = node.config.toolKey.trim();
   const definition = toolKey ? definitionMap.get(toolKey) : undefined;
   const activeInputKeys = new Set(definition?.inputSchema?.map((field) => field.key) ?? []);
+
+  if (definition?.dynamicStateInputs) {
+    node.reads = node.reads.filter((binding) => !isManagedToolInputReadBinding(binding));
+    return;
+  }
 
   if (!definition?.inputSchema?.length) {
     node.reads = node.reads.filter((binding) => !isManagedToolInputReadBinding(binding));

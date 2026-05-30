@@ -230,6 +230,7 @@ export type ToolNode = {
   writes: WriteBinding[];
   config: {
     toolKey: string;
+    dynamicStateInputs?: boolean;
   };
 };
 

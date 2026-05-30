@@ -28,8 +28,19 @@ def _load_pressure_tool_module():
     return module
 
 
+def _context_item(state: str, value: object, *, value_type: str = "json", required: bool = False) -> dict[str, object]:
+    return {
+        "state": state,
+        "name": state,
+        "description": "",
+        "type": value_type,
+        "required": required,
+        "value": value,
+    }
+
+
 class BuddyContextPressureToolTests(unittest.TestCase):
-    def test_official_catalog_exposes_context_pressure_tool(self) -> None:
+    def test_official_catalog_exposes_dynamic_context_pressure_tool(self) -> None:
         from app.graph_tools.definitions import list_tool_catalog
         from app.graph_tools.registry import get_tool_registry
 
@@ -39,119 +50,77 @@ class BuddyContextPressureToolTests(unittest.TestCase):
         self.assertIsNotNone(definition)
         self.assertEqual(definition.name, "Buddy Context Pressure Check")
         self.assertIn("deterministic", definition.description)
-        self.assertNotIn("raw_conversation_history", [field.key for field in definition.input_schema])
-        self.assertNotIn("page_context", [field.key for field in definition.input_schema])
+        self.assertTrue(definition.dynamic_state_inputs)
+        self.assertEqual(definition.input_schema, [])
+        self.assertEqual([field.key for field in definition.output_schema], ["needs_context_compaction"])
         self.assertIn("buddy_context_pressure_check", get_tool_registry(include_disabled=True).keys())
 
-    def test_pressure_check_triggers_on_large_history_and_large_result(self) -> None:
+    def test_pressure_check_counts_all_dynamic_context_but_only_compacts_history(self) -> None:
         module = _load_pressure_tool_module()
 
-        history_result = module.buddy_context_pressure_check(
+        result = module.buddy_context_pressure_check(
             {
-                "trigger": "preflight",
-                "raw_conversation_history": "raw history should be ignored " * 1400,
-                "conversation_history": "history " * 1400,
-                "user_message": "continue",
-                "existing_session_summary": "",
-                "capability_result": {},
-                "public_response": "",
-            }
-        )
-
-        self.assertEqual(history_result["status"], "succeeded")
-        self.assertIs(history_result["needs_context_compaction"], True)
-        self.assertEqual(history_result["reason"], "history_pressure")
-        self.assertEqual(history_result["context_compaction_trigger"], "preflight")
-        self.assertNotIn("raw_history_chars", history_result["context_budget_report"])
-        self.assertGreaterEqual(history_result["context_budget_report"]["rendered_history_chars"], 9000)
-
-        result_result = module.buddy_context_pressure_check(
-            {
-                "trigger": "capability_result",
-                "conversation_history": "",
-                "user_message": "continue",
-                "existing_session_summary": "",
-                "capability_result": {"kind": "result_package", "outputs": {"answer": {"value": "x" * 7000}}},
-                "public_response": "",
-            }
-        )
-
-        self.assertEqual(result_result["status"], "succeeded")
-        self.assertIs(result_result["needs_context_compaction"], True)
-        self.assertEqual(result_result["reason"], "result_pressure")
-        self.assertEqual(result_result["context_compaction_trigger"], "capability_result")
-
-    def test_pressure_check_measures_context_assembly_ref_rendered_history(self) -> None:
-        module = _load_pressure_tool_module()
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            data_dir = Path(temp_dir) / "data"
-            with patch("app.core.storage.database.DATA_DIR", data_dir), patch(
-                "app.core.storage.database.DB_PATH",
-                data_dir / "toograph.db",
-            ):
-                database.initialize_storage()
-                long_history = "统一数据库上下文应该按原始消息展开计量。" * 420
-                with sqlite3.connect(database.DB_PATH) as connection:
-                    connection.execute(
-                        """
-                        INSERT INTO buddy_sessions (
-                            session_id, title, archived, deleted, source, created_at, updated_at
-                        ) VALUES ('session_pressure', '压力测试', 0, 0, 'buddy', ?, ?)
-                        """,
-                        ("2026-05-26T00:00:00Z", "2026-05-26T00:00:00Z"),
-                    )
-                    connection.execute(
-                        """
-                        INSERT INTO buddy_messages (
-                            message_id,
-                            session_id,
-                            role,
-                            content,
-                            client_order,
-                            include_in_context,
-                            run_id,
-                            metadata_json,
-                            created_at,
-                            updated_at
-                        ) VALUES ('msg_pressure', 'session_pressure', 'user', ?, 0, 1, NULL, '{}', ?, ?)
-                        """,
-                        (long_history, "2026-05-26T00:00:01Z", "2026-05-26T00:00:01Z"),
-                    )
-                    connection.commit()
-                ref = {
-                    "kind": "context_assembly_ref",
-                    "assembly_id": "ctx_pressure_pending",
-                    "target_state_key": "conversation_history",
-                    "renderer_key": "buddy_history",
-                    "renderer_version": "1",
-                    "rendered_content_hash": "",
-                    "source_count": 1,
-                    "source_refs": [
+                "context_items": [
+                    _context_item("user_message", "please continue " * 200, value_type="text", required=True),
+                    _context_item("buddy_context", "stable Buddy Home " * 200, value_type="file"),
+                    _context_item(
+                        "conversation_history",
                         {
-                            "source_kind": "buddy_message",
-                            "source_id": "msg_pressure",
-                            "role": "user",
-                            "ordinal": 0,
-                        }
-                    ],
-                }
-
-                result = module.buddy_context_pressure_check(
-                    {
-                        "trigger": "preflight",
-                        "conversation_history": ref,
-                        "user_message": "继续",
-                        "existing_session_summary": "",
-                        "capability_result": {},
-                        "public_response": "",
-                    }
-                )
+                            "kind": "context_package",
+                            "source_kind": "session",
+                            "authority": "history",
+                            "source_refs": [
+                                {"source_kind": "buddy_message", "source_id": f"msg_{index}", "ordinal": index}
+                                for index in range(24)
+                            ],
+                            "budget": {"source_chars": 9000, "used_chars": 9000, "omitted_count": 0},
+                            "metadata": {"history_view": "raw"},
+                            "items": [],
+                        },
+                    ),
+                ]
+            }
+        )
 
         self.assertEqual(result["status"], "succeeded")
-        self.assertTrue(result["needs_context_compaction"])
+        self.assertIs(result["needs_context_compaction"], True)
         self.assertEqual(result["reason"], "history_pressure")
-        self.assertGreaterEqual(result["context_budget_report"]["rendered_history_chars"], 6000)
+        report = result["context_budget_report"]
+        self.assertGreater(report["total_context_chars"], report["history_used_chars"])
+        self.assertGreater(report["user_message_chars"], 0)
+        self.assertGreater(report["buddy_context_chars"], 0)
+        self.assertIn("history", report["pressure_sources"])
+
+    def test_pressure_check_does_not_compact_when_only_non_history_context_is_large(self) -> None:
+        module = _load_pressure_tool_module()
+
+        result = module.buddy_context_pressure_check(
+            {
+                "context_items": [
+                    _context_item("user_message", "large current request " * 600, value_type="text", required=True),
+                    _context_item("buddy_context", "large Buddy Home " * 600, value_type="file"),
+                    _context_item(
+                        "conversation_history",
+                        {
+                            "kind": "context_package",
+                            "source_kind": "session",
+                            "authority": "history",
+                            "source_refs": [
+                                {"source_kind": "buddy_session_summary", "source_id": "summary_1", "ordinal": 0}
+                            ],
+                            "budget": {"source_chars": 1200, "used_chars": 1200, "omitted_count": 0},
+                            "metadata": {"history_view": "compacted", "summary_id": "summary_1"},
+                            "items": [],
+                        },
+                    ),
+                ]
+            }
+        )
+
+        self.assertEqual(result["status"], "succeeded")
+        self.assertIs(result["needs_context_compaction"], False)
+        self.assertEqual(result["reason"], "non_history_pressure")
+        self.assertIn("non_history", result["context_budget_report"]["pressure_sources"])
 
     def test_pressure_check_measures_context_package_rendered_history(self) -> None:
         module = _load_pressure_tool_module()
@@ -163,13 +132,14 @@ class BuddyContextPressureToolTests(unittest.TestCase):
                 data_dir / "toograph.db",
             ):
                 database.initialize_storage()
-                long_history = "context package 应按引用展开后的正文计量。" * 420
-                with sqlite3.connect(database.DB_PATH) as connection:
+                long_history = "context package should be measured after expansion. " * 180
+                connection = sqlite3.connect(database.DB_PATH)
+                try:
                     connection.execute(
                         """
                         INSERT INTO buddy_sessions (
                             session_id, title, archived, deleted, source, created_at, updated_at
-                        ) VALUES ('session_package_pressure', '压力测试', 0, 0, 'buddy', ?, ?)
+                        ) VALUES ('session_package_pressure', 'pressure', 0, 0, 'buddy', ?, ?)
                         """,
                         ("2026-05-26T00:00:00Z", "2026-05-26T00:00:00Z"),
                     )
@@ -191,6 +161,8 @@ class BuddyContextPressureToolTests(unittest.TestCase):
                         (long_history, "2026-05-26T00:00:01Z", "2026-05-26T00:00:01Z"),
                     )
                     connection.commit()
+                finally:
+                    connection.close()
                 package = {
                     "kind": "context_package",
                     "source_kind": "session",
@@ -224,113 +196,60 @@ class BuddyContextPressureToolTests(unittest.TestCase):
                         ],
                     },
                     "budget": {"used_chars": 0, "source_chars": 0, "omitted_count": 0},
+                    "metadata": {"history_view": "raw"},
                     "warnings": [],
                 }
 
                 result = module.buddy_context_pressure_check(
                     {
-                        "trigger": "preflight",
-                        "conversation_history": package,
-                        "user_message": "继续",
-                        "existing_session_summary": "",
-                        "capability_result": {},
-                        "public_response": "",
+                        "context_items": [
+                            _context_item("conversation_history", package),
+                            _context_item("user_message", "continue", value_type="text", required=True),
+                        ]
                     }
                 )
 
         self.assertEqual(result["status"], "succeeded")
         self.assertTrue(result["needs_context_compaction"])
         self.assertEqual(result["reason"], "history_pressure")
-        self.assertGreaterEqual(result["context_budget_report"]["rendered_history_chars"], 6000)
+        self.assertGreaterEqual(result["context_budget_report"]["history_used_chars"], 6000)
 
-    def test_pressure_check_triggers_on_context_package_source_chars_when_rendered_history_is_cropped(self) -> None:
+    def test_pressure_check_triggers_on_cropped_history_source_chars(self) -> None:
         module = _load_pressure_tool_module()
 
         result = module.buddy_context_pressure_check(
             {
-                "trigger": "preflight",
-                "conversation_history": {
-                    "kind": "context_package",
-                    "source_kind": "session",
-                    "authority": "history",
-                    "items": [],
-                    "source_refs": [
-                        {"source_kind": "buddy_message", "source_id": "msg_overflow_1", "role": "user", "ordinal": 0}
-                    ],
-                    "context_ref": {
-                        "kind": "context_assembly_ref",
-                        "source_refs": [
-                            {
-                                "source_kind": "buddy_message",
-                                "source_id": "msg_overflow_1",
-                                "role": "user",
-                                "ordinal": 0,
-                            }
-                        ],
-                    },
-                    "budget": {
-                        "max_chars": 4000,
-                        "source_chars": 18000,
-                        "used_chars": 4000,
-                        "omitted_count": 9,
-                    },
-                    "warnings": [],
-                },
-                "user_message": "继续",
-                "existing_session_summary": "",
-                "capability_result": {},
-                "public_response": "",
+                "context_items": [
+                    _context_item(
+                        "conversation_history",
+                        {
+                            "kind": "context_package",
+                            "source_kind": "session",
+                            "authority": "history",
+                            "items": [],
+                            "source_refs": [
+                                {"source_kind": "buddy_message", "source_id": "msg_overflow_1", "role": "user", "ordinal": 0}
+                            ],
+                            "budget": {
+                                "max_chars": 4000,
+                                "source_chars": 18000,
+                                "used_chars": 4000,
+                                "omitted_count": 9,
+                            },
+                            "metadata": {"history_view": "raw"},
+                            "warnings": [],
+                        },
+                    ),
+                    _context_item("user_message", "continue", value_type="text", required=True),
+                ]
             }
         )
 
         self.assertEqual(result["status"], "succeeded")
         self.assertTrue(result["needs_context_compaction"])
-        self.assertEqual(result["reason"], "history_pressure")
         self.assertEqual(result["context_budget_report"]["history_source_chars"], 18000)
         self.assertEqual(result["context_budget_report"]["history_omitted_count"], 9)
         self.assertIn("history", result["context_budget_report"]["pressure_sources"])
-
-    def test_pressure_check_does_not_repeat_raw_history_compaction_after_summary_exists(self) -> None:
-        module = _load_pressure_tool_module()
-
-        result = module.buddy_context_pressure_check(
-            {
-                "trigger": "preflight",
-                "conversation_history": "summary plus recent turns",
-                "user_message": "continue",
-                "existing_session_summary": "",
-                "context_compaction_summary": "durable compact summary",
-                "capability_result": {},
-                "public_response": "",
-            }
-        )
-
-        self.assertEqual(result["status"], "succeeded")
-        self.assertIs(result["needs_context_compaction"], False)
-        self.assertEqual(result["reason"], "none")
-        self.assertGreater(result["context_budget_report"]["context_compaction_summary_chars"], 0)
-
-    def test_pressure_check_ignores_page_context_pressure(self) -> None:
-        module = _load_pressure_tool_module()
-
-        result = module.buddy_context_pressure_check(
-            {
-                "trigger": "preflight",
-                "conversation_history": "recent",
-                "user_message": "hi",
-                "page_context": "page-operation " * 700,
-                "existing_session_summary": "",
-                "capability_result": {},
-                "public_response": "",
-            }
-        )
-
-        self.assertEqual(result["status"], "succeeded")
-        self.assertIs(result["needs_context_compaction"], False)
-        self.assertEqual(result["reason"], "none")
-        self.assertIs(result["context_budget_report"]["should_compact"], False)
-        self.assertNotIn("page_context_chars", result["context_budget_report"])
-        self.assertEqual(result["context_budget_report"]["pressure_sources"], [])
 
 
 if __name__ == "__main__":

@@ -209,6 +209,32 @@ test("buildAnchorModel exposes a virtual any state input for non-input nodes wit
   assert.deepEqual(inputModel.stateInputs, []);
 });
 
+test("buildAnchorModel exposes virtual input only for dynamic state input tools", () => {
+  const dynamicTool: GraphNode = {
+    kind: "tool",
+    name: "Context Meter",
+    description: "",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [],
+    writes: [{ state: "needs_context_compaction", mode: "replace" }],
+    config: { toolKey: "context_meter", dynamicStateInputs: true },
+  };
+  const zeroInputTool: GraphNode = {
+    kind: "tool",
+    name: "History Loader",
+    description: "",
+    ui: { position: { x: 520, y: 420 } },
+    reads: [],
+    writes: [{ state: "conversation_history", mode: "replace" }],
+    config: { toolKey: "buddy_history_context_loader" },
+  };
+
+  assert.deepEqual(buildAnchorModel("dynamic_tool", dynamicTool).stateInputs.map((anchor) => anchor.stateKey), [
+    VIRTUAL_ANY_INPUT_STATE_KEY,
+  ]);
+  assert.deepEqual(buildAnchorModel("zero_input_tool", zeroInputTool).stateInputs, []);
+});
+
 test("buildAnchorModel exposes a virtual plus output for empty agent and input nodes without writes", () => {
   const emptyAgent: GraphNode = {
     kind: "agent",

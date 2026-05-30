@@ -1,7 +1,7 @@
 {
   "template_id": "buddy_autonomous_loop",
   "label": "伙伴自主循环",
-  "description": "官方 Buddy 可见回复主流程：绑定页只绑定当前用户消息；会话历史、已有摘要和当前会话 ID 由 buddy_history_context_loader 从运行时上下文组装，随后保留上下文压力检查、压缩子图、能力选择、能力执行循环和 output-boundary 输出。",
+  "description": "官方 Buddy 可见回复主流程：Buddy Home 作为普通文件输入直接注入；会话历史由 buddy_history_context_loader 从运行时会话记录获取；随后进行上下文压力检查、压缩子图、能力选择、能力执行循环和 output-boundary 输出。",
   "default_graph_name": "伙伴自主循环",
   "state_schema": {
     "user_message": {
@@ -14,7 +14,7 @@
     },
     "conversation_history": {
       "name": "会话历史",
-      "description": "由 buddy_history_context_loader 从运行时上下文查询出的 context_package；LLM prompt 会通过共享上下文组装渲染路径展开。",
+      "description": "由 buddy_history_context_loader 从运行时上下文查询出的历史会话 context_package；LLM prompt 会通过共享上下文渲染路径展开。",
       "type": "json",
       "value": {},
       "color": "#64748b",
@@ -27,9 +27,9 @@
         "managed": true
       }
     },
-    "buddy_home_selection": {
-      "name": "Buddy Home 文件选择",
-      "description": "固定选择 Buddy Home 长期上下文文件，后续由 buddy_home_context_loader 组装为 context_package。",
+    "buddy_context": {
+      "name": "Buddy Home",
+      "description": "Fixed Buddy Home folder context. It is passed directly to later Buddy LLM nodes as ordinary file state.",
       "type": "file",
       "value": {
         "kind": "local_folder",
@@ -44,138 +44,9 @@
       "color": "#0f766e",
       "binding": null
     },
-    "buddy_home_max_chars": {
-      "name": "Buddy Home 字符预算",
-      "description": "Buddy Home 组装 Tool 的近似字符预算。",
-      "type": "number",
-      "value": 24000,
-      "color": "#0f766e",
-      "binding": null
-    },
-    "buddy_context": {
-      "name": "Buddy Home",
-      "description": "由 buddy_home_context_loader 从 Buddy Home 文件选择组装出的 context_package，包含文件来源、authority 边界和预算信息。",
-      "type": "json",
-      "value": {},
-      "color": "#0f766e",
-      "binding": {
-        "kind": "tool_output",
-        "actionKey": "",
-        "toolKey": "buddy_home_context_loader",
-        "nodeId": "load_buddy_home_context",
-        "fieldKey": "buddy_context",
-        "managed": true
-      }
-    },
-    "buddy_home_context_report": {
-      "name": "Buddy Home 组装报告",
-      "description": "Buddy Home context_package 的来源文件、预算、source refs 和 warning 审计报告。",
-      "type": "json",
-      "value": {},
-      "color": "#0f766e",
-      "binding": {
-        "kind": "tool_output",
-        "actionKey": "",
-        "toolKey": "buddy_home_context_loader",
-        "nodeId": "load_buddy_home_context",
-        "fieldKey": "buddy_home_context_report",
-        "managed": true
-      }
-    },
-    "current_session_id": {
-      "name": "当前会话 ID",
-      "description": "由 buddy_history_context_loader 从运行时上下文解析出的当前 Buddy 会话 ID。",
-      "type": "text",
-      "value": "",
-      "color": "#475569",
-      "binding": {
-        "kind": "tool_output",
-        "actionKey": "",
-        "toolKey": "buddy_history_context_loader",
-        "nodeId": "load_history_context",
-        "fieldKey": "current_session_id",
-        "managed": true
-      }
-    },
-    "existing_session_summary": {
-      "name": "已有会话摘要",
-      "description": "由 buddy_history_context_loader 查询出的当前持久化会话摘要。",
-      "type": "markdown",
-      "value": "",
-      "color": "#4f46e5",
-      "binding": {
-        "kind": "tool_output",
-        "actionKey": "",
-        "toolKey": "buddy_history_context_loader",
-        "nodeId": "load_history_context",
-        "fieldKey": "existing_session_summary",
-        "managed": true
-      }
-    },
-    "history_max_messages": {
-      "name": "历史消息上限",
-      "description": "历史组装 Tool 最多引用的最近消息数量。",
-      "type": "number",
-      "value": 12,
-      "color": "#64748b",
-      "binding": null
-    },
-    "history_max_chars": {
-      "name": "历史字符预算",
-      "description": "历史组装 Tool 的近似字符预算。",
-      "type": "number",
-      "value": 4000,
-      "color": "#64748b",
-      "binding": null
-    },
-    "history_context_report": {
-      "name": "历史组装报告",
-      "description": "本轮历史上下文的运行时来源、引用数量和降级状态，供运行详情审计。",
-      "type": "json",
-      "value": {},
-      "color": "#334155",
-      "binding": {
-        "kind": "tool_output",
-        "actionKey": "",
-        "toolKey": "buddy_history_context_loader",
-        "nodeId": "load_history_context",
-        "fieldKey": "history_context_report",
-        "managed": true
-      }
-    },
-    "source_run_id": {
-      "name": "来源运行 ID",
-      "description": "由历史组装 Tool 尽力解析出的来源 run ID；没有运行时来源时为空。",
-      "type": "text",
-      "value": "",
-      "color": "#475569",
-      "binding": {
-        "kind": "tool_output",
-        "actionKey": "",
-        "toolKey": "buddy_history_context_loader",
-        "nodeId": "load_history_context",
-        "fieldKey": "source_run_id",
-        "managed": true
-      }
-    },
-    "context_budget_report": {
-      "name": "上下文预算报告",
-      "description": "上下文压力检查生成的结构化报告，记录压力来源、阈值、字符统计和是否需要压缩。",
-      "type": "json",
-      "value": {},
-      "color": "#0e7490",
-      "binding": {
-        "kind": "tool_output",
-        "actionKey": "",
-        "toolKey": "buddy_context_pressure_check",
-        "nodeId": "check_context_pressure",
-        "fieldKey": "context_budget_report",
-        "managed": true
-      }
-    },
     "needs_context_compaction": {
       "name": "需要上下文压缩",
-      "description": "为 true 时先运行 buddy_context_compaction 子图，再进入下一轮回复判断；能力结果或可见历史过大时才触发会话压缩。",
+      "description": "True when the graph should run buddy_context_compaction to compress session history before the next Buddy LLM turn.",
       "type": "boolean",
       "value": false,
       "color": "#0891b2",
@@ -187,45 +58,6 @@
         "fieldKey": "needs_context_compaction",
         "managed": true
       }
-    },
-    "context_compaction_trigger": {
-      "name": "上下文压缩触发",
-      "description": "记录压力检查或运行时恢复触发压缩的来源，例如 preflight、capability_result、overflow_recovery。",
-      "type": "text",
-      "value": "",
-      "color": "#2563eb",
-      "binding": {
-        "kind": "tool_output",
-        "actionKey": "",
-        "toolKey": "buddy_context_pressure_check",
-        "nodeId": "check_context_pressure",
-        "fieldKey": "context_compaction_trigger",
-        "managed": true
-      }
-    },
-    "context_compaction_report": {
-      "name": "上下文压缩报告",
-      "description": "上下文压缩子图输出的审计报告，说明保留、摘要、跳过、风险和写回情况。",
-      "type": "markdown",
-      "value": "",
-      "color": "#0e7490",
-      "binding": null
-    },
-    "context_compaction_summary": {
-      "name": "本轮压缩摘要",
-      "description": "本轮压缩生成的可继续注入 LLM 的摘要，用于替代过长历史中的中间部分。",
-      "type": "markdown",
-      "value": "",
-      "color": "#4f46e5",
-      "binding": null
-    },
-    "context_compaction_write_result": {
-      "name": "压缩写回结果",
-      "description": "压缩摘要写入 Buddy Home 或会话摘要存储后的结构化结果。",
-      "type": "json",
-      "value": {},
-      "color": "#0f766e",
-      "binding": null
     },
     "needs_capability": {
       "name": "需要继续调用能力",
@@ -318,8 +150,8 @@
     },
     "load_history_context": {
       "kind": "tool",
-      "name": "组装当前会话历史",
-      "description": "从运行时上下文读取 Buddy session 与当前消息 ID，查询数据库并输出会话历史引用、已有摘要、当前会话 ID 和审计报告。",
+      "name": "获取历史会话",
+      "description": "从运行时上下文读取当前 Buddy session 与当前消息 ID，只查询当前消息之前的历史会话记录、已有摘要、当前会话 ID 和审计报告。",
       "ui": {
         "position": {
           "x": -520,
@@ -328,60 +160,10 @@
         "collapsed": false,
         "size": null
       },
-      "reads": [
-        {
-          "state": "user_message",
-          "required": true,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "buddy_history_context_loader",
-            "fieldKey": "user_message",
-            "managed": true
-          }
-        },
-        {
-          "state": "history_max_messages",
-          "required": false,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "buddy_history_context_loader",
-            "fieldKey": "max_messages",
-            "managed": true
-          }
-        },
-        {
-          "state": "history_max_chars",
-          "required": false,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "buddy_history_context_loader",
-            "fieldKey": "max_chars",
-            "managed": true
-          }
-        }
-      ],
+      "reads": [],
       "writes": [
         {
           "state": "conversation_history",
-          "mode": "replace"
-        },
-        {
-          "state": "existing_session_summary",
-          "mode": "replace"
-        },
-        {
-          "state": "current_session_id",
-          "mode": "replace"
-        },
-        {
-          "state": "source_run_id",
-          "mode": "replace"
-        },
-        {
-          "state": "history_context_report",
           "mode": "replace"
         }
       ],
@@ -404,7 +186,7 @@
       "reads": [],
       "writes": [
         {
-          "state": "buddy_home_selection",
+          "state": "buddy_context",
           "mode": "replace"
         }
       ],
@@ -420,56 +202,6 @@
           ]
         },
         "boundaryType": "file"
-      }
-    },
-    "load_buddy_home_context": {
-      "kind": "tool",
-      "name": "组装 Buddy Home",
-      "description": "读取固定选择的 Buddy Home 文件，输出带来源、authority 和预算审计的 context_package。",
-      "ui": {
-        "position": {
-          "x": -520,
-          "y": 751
-        },
-        "collapsed": false,
-        "size": null
-      },
-      "reads": [
-        {
-          "state": "buddy_home_selection",
-          "required": false,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "buddy_home_context_loader",
-            "fieldKey": "buddy_home_selection",
-            "managed": true
-          }
-        },
-        {
-          "state": "buddy_home_max_chars",
-          "required": false,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "buddy_home_context_loader",
-            "fieldKey": "max_chars",
-            "managed": true
-          }
-        }
-      ],
-      "writes": [
-        {
-          "state": "buddy_context",
-          "mode": "replace"
-        },
-        {
-          "state": "buddy_home_context_report",
-          "mode": "replace"
-        }
-      ],
-      "config": {
-        "toolKey": "buddy_home_context_loader"
       }
     },
     "reply_and_select_capability": {
@@ -499,27 +231,7 @@
           "binding": null
         },
         {
-          "state": "existing_session_summary",
-          "required": false,
-          "binding": null
-        },
-        {
-          "state": "context_compaction_summary",
-          "required": false,
-          "binding": null
-        },
-        {
-          "state": "context_compaction_report",
-          "required": false,
-          "binding": null
-        },
-        {
           "state": "buddy_context",
-          "required": false,
-          "binding": null
-        },
-        {
-          "state": "current_session_id",
           "required": false,
           "binding": null
         },
@@ -559,11 +271,11 @@
           "toograph_capability_selector": {
             "actionKey": "toograph_capability_selector",
             "title": "能力选择说明",
-            "content": "你是能力选择 Action。本节点的 public_response 由同一轮 LLM 根据上下文决定；你的职责是判断是否还需要一个外部能力，并在需要时选择唯一一个 action/subgraph/tool。如果当前信息已经足够回复，则返回 capability.kind=none，needs_capability=false。只有确实还缺一个明确能力步骤时，才选择一个能力；选择优先级为 subgraph > action > tool。buddy_session_recall 只在需要查找更早会话时调用；优先利用 conversation_history、existing_session_summary、context_compaction_summary 与 Buddy Home。看到 capability_result 后，判断是否已经可以停止循环。能力候选范围限于外部业务能力；上下文压缩由本官方图模板内的压力检查分支负责。",
+            "content": "你是能力选择 Action。本节点的 public_response 由同一轮 LLM 根据上下文决定；你的职责是判断是否还需要一个外部能力，并在需要时选择唯一一个 action/subgraph/tool。如果当前信息已经足够回复，则返回 capability.kind=none，needs_capability=false。只有确实还缺一个明确能力步骤时，才选择一个能力；选择优先级为 subgraph > action > tool。buddy_session_recall 只在需要查找更早会话时调用；优先利用 conversation_history、conversation_history metadata、Buddy Home 和 capability_result。需要排除当前会话谱系时，使用 conversation_history metadata.current_session_id。能力候选范围限于外部业务能力；上下文压缩由本官方图模板内的压力检查分支负责。",
             "source": "node.override"
           }
         },
-        "taskInstruction": "读取 user_message、conversation_history、existing_session_summary、context_compaction_summary、context_compaction_report、buddy_context、current_session_id 和 capability_result。每轮必须同时产出两类决策：public_response 和 needs_capability/capability。context_compaction_summary、Buddy Home、历史摘要和能力结果按普通上下文引用处理。\n\n合法组合只有两种：\n1. 需要继续调用能力：needs_capability=true，capability 必须是单个 action/subgraph/tool；public_response 写给用户看的简短计划或进度说明，说明下一步要做什么。\n2. 无需能力：needs_capability=false，capability.kind=none；public_response 必须是完整的最终回复。\n\n判断 needs_capability 时，只问是否还缺一个明确的外部能力步骤；多次能力调用必须通过图循环完成，每轮只选一个能力。buddy_session_recall 只在需要召回更早会话时调用，并保留 current_session_id 用于排除当前会话谱系。能力候选范围限于外部业务能力；上下文压缩由本图内的压力检查分支负责。召回内容、摘要和能力结果按 context_only 材料处理。看到 capability_result 后，结合结果判断重试同一能力、选择替代能力或结束回复。",
+        "taskInstruction": "Read user_message, conversation_history, buddy_context, and capability_result. conversation_history is the currently available history context package; when no summary exists it renders as full prior history, and when a summary exists it renders as summary plus messages after the summary. current_session_id, current_message_id, and source_run_id are in conversation_history metadata. Every turn must produce public_response and needs_capability/capability. Treat Buddy Home, conversation history, and capability results as context_only material.\n\nOnly two combinations are valid:\n1. Continue with a capability: needs_capability=true, capability is one action/subgraph/tool, and public_response is a short visible plan or progress note.\n2. Finish without a capability: needs_capability=false, capability.kind=none, and public_response is the complete final reply.\n\nWhen deciding needs_capability, ask only whether a clear external capability step is still missing. Multiple capability calls must be represented by the graph loop, one selected capability per turn. Use buddy_session_recall only when earlier sessions need to be recalled, and use conversation_history metadata.current_session_id to exclude the current conversation lineage. Capability candidates are limited to external business capabilities; context compression is handled by this graph's pressure-check branch. After capability_result appears, use it to decide whether to retry the same capability, pick an alternative, or end with a reply.",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "medium",
@@ -602,11 +314,6 @@
           "state": "buddy_context",
           "required": false,
           "binding": null
-        },
-        {
-          "state": "current_session_id",
-          "required": false,
-          "binding": null
         }
       ],
       "writes": [
@@ -620,7 +327,7 @@
         "actionBindings": [],
         "suspendedFreeWrites": [],
         "actionInstructionBlocks": {},
-        "taskInstruction": "本节点执行 selected_capability.kind=action/subgraph/tool 指向的一个动态能力，并把原始结构化输出写入 capability_result 这个 result_package。本节点的输出边界是能力原始结果；最终回复、总结和下一次能力选择由后续图节点处理。普通输入 state 是能力入参规划的上下文。若 selected_capability 是 buddy_session_recall，应使用 user_message、conversation_history 和 current_session_id 生成召回请求，默认保留 current_session_id 以排除当前会话谱系。",
+        "taskInstruction": "本节点执行 selected_capability.kind=action/subgraph/tool 指向的一个动态能力，并把原始结构化输出写入 capability_result 这个 result_package。本节点的输出边界是能力原始结果；最终回复、总结和下一次能力选择由后续图节点处理。普通输入 state 是能力入参规划的上下文。若 selected_capability 是 buddy_session_recall，应使用 user_message、conversation_history 和 conversation_history metadata.current_session_id 生成召回请求，默认保留该 current_session_id 以排除当前会话谱系。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "low",
@@ -630,7 +337,7 @@
     "check_context_pressure": {
       "kind": "tool",
       "name": "上下文压力检查",
-      "description": "确定性检查当前上下文、能力结果和回复草稿是否需要先压缩再进入下一轮 Buddy LLM。",
+      "description": "Checks the dynamic state set that will enter the next Buddy LLM turn and decides whether session history compaction is useful.",
       "ui": {
         "position": {
           "x": 216,
@@ -641,99 +348,35 @@
       },
       "reads": [
         {
-          "state": "context_compaction_trigger",
-          "required": false,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "buddy_context_pressure_check",
-            "fieldKey": "trigger",
-            "managed": true
-          }
+          "state": "user_message",
+          "required": true,
+          "binding": null
         },
         {
           "state": "conversation_history",
           "required": false,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "buddy_context_pressure_check",
-            "fieldKey": "conversation_history",
-            "managed": true
-          }
+          "binding": null
         },
         {
-          "state": "user_message",
-          "required": true,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "buddy_context_pressure_check",
-            "fieldKey": "user_message",
-            "managed": true
-          }
-        },
-        {
-          "state": "existing_session_summary",
+          "state": "buddy_context",
           "required": false,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "buddy_context_pressure_check",
-            "fieldKey": "existing_session_summary",
-            "managed": true
-          }
-        },
-        {
-          "state": "context_compaction_summary",
-          "required": false,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "buddy_context_pressure_check",
-            "fieldKey": "context_compaction_summary",
-            "managed": true
-          }
+          "binding": null
         },
         {
           "state": "capability_result",
           "required": false,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "buddy_context_pressure_check",
-            "fieldKey": "capability_result",
-            "managed": true
-          }
-        },
-        {
-          "state": "public_response",
-          "required": false,
-          "binding": {
-            "kind": "tool_input",
-            "actionKey": "",
-            "toolKey": "buddy_context_pressure_check",
-            "fieldKey": "public_response",
-            "managed": true
-          }
+          "binding": null
         }
       ],
       "writes": [
         {
-          "state": "context_budget_report",
-          "mode": "replace"
-        },
-        {
           "state": "needs_context_compaction",
-          "mode": "replace"
-        },
-        {
-          "state": "context_compaction_trigger",
           "mode": "replace"
         }
       ],
       "config": {
-        "toolKey": "buddy_context_pressure_check"
+        "toolKey": "buddy_context_pressure_check",
+        "dynamicStateInputs": true
       }
     },
     "context_pressure_condition": {
@@ -777,7 +420,7 @@
     "run_context_compaction": {
       "kind": "subgraph",
       "name": "运行 buddy_context_compaction",
-      "description": "压缩当前会话上下文并更新 session_summary，再把摘要交回后续 LLM 复盘。",
+      "description": "Compresses only conversation_history and refreshes that state. User message, Buddy Home, and capability results stay uncompressed for later LLM nodes.",
       "ui": {
         "position": {
           "x": 1601,
@@ -788,161 +431,34 @@
       },
       "reads": [
         {
-          "state": "context_compaction_trigger",
-          "required": true,
-          "binding": null
-        },
-        {
-          "state": "source_run_id",
-          "required": true,
-          "binding": null
-        },
-        {
-          "state": "current_session_id",
-          "required": true,
-          "binding": null
-        },
-        {
-          "state": "user_message",
-          "required": true,
-          "binding": null
-        },
-        {
           "state": "conversation_history",
-          "required": true,
-          "binding": null
-        },
-        {
-          "state": "existing_session_summary",
-          "required": true,
-          "binding": null
-        },
-        {
-          "state": "buddy_context",
-          "required": true,
-          "binding": null
-        },
-        {
-          "state": "context_budget_report",
-          "required": true,
-          "binding": null
-        },
-        {
-          "state": "capability_result",
-          "required": true,
-          "binding": null
-        },
-        {
-          "state": "public_response",
           "required": true,
           "binding": null
         }
       ],
       "writes": [
         {
-          "state": "context_compaction_report",
-          "mode": "replace"
-        },
-        {
-          "state": "context_compaction_summary",
-          "mode": "replace"
-        },
-        {
-          "state": "context_compaction_write_result",
+          "state": "conversation_history",
           "mode": "replace"
         }
       ],
       "config": {
         "graph": {
           "state_schema": {
-            "trigger": {
-              "name": "trigger",
-              "description": "触发压缩的来源：preflight、capability_result、overflow_recovery 或 background。",
-              "type": "text",
-              "value": "",
-              "color": "#475569",
-              "binding": null
-            },
-            "source_run_id": {
-              "name": "source_run_id",
-              "description": "触发本次压缩的可见 Buddy run ID；preflight 可能为空。",
-              "type": "text",
-              "value": "",
-              "color": "#475569",
-              "binding": null
-            },
-            "current_session_id": {
-              "name": "current_session_id",
-              "description": "当前 Buddy 会话 ID，用于标记摘要来源。",
-              "type": "text",
-              "value": "",
-              "color": "#475569",
-              "binding": null
-            },
-            "user_message": {
-              "name": "user_message",
-              "description": "本轮用户消息。",
-              "type": "text",
-              "value": "",
-              "color": "#d97706",
-              "binding": null
-            },
             "conversation_history": {
               "name": "conversation_history",
-              "description": "压缩前可见的完整或尽量完整的会话历史原文。",
-              "type": "markdown",
+              "description": "当前可用历史上下文包；压缩前由父图输入，写入摘要后由 buddy_history_context_loader 刷新为摘要加摘要后的原文。",
+              "type": "json",
               "value": "",
               "color": "#64748b",
-              "binding": null
-            },
-            "existing_session_summary": {
-              "name": "existing_session_summary",
-              "description": "已有会话摘要；压缩时应迭代更新而不是从零替换。",
-              "type": "markdown",
-              "value": "",
-              "color": "#4f46e5",
-              "binding": null
-            },
-            "buddy_context": {
-              "name": "buddy_context",
-              "description": "从 Buddy Home 文件夹注入的长期上下文文件。",
-              "type": "file",
-              "value": {
-                "kind": "local_folder",
-                "root": "buddy_home",
-                "selected": [
-                  "AGENTS.md",
-                  "SOUL.md",
-                  "USER.md",
-                  "MEMORY.md"
-                ]
-              },
-              "color": "#0f766e",
-              "binding": null
-            },
-            "context_budget_report": {
-              "name": "context_budget_report",
-              "description": "运行时生成的上下文预算与触发原因报告。",
-              "type": "json",
-              "value": {},
-              "color": "#0e7490",
-              "binding": null
-            },
-            "capability_result": {
-              "name": "capability_result",
-              "description": "能力执行后的结果包；只提取对会话连续性有帮助的摘要线索。",
-              "type": "result_package",
-              "value": {},
-              "color": "#0284c7",
-              "binding": null
-            },
-            "public_response": {
-              "name": "public_response",
-              "description": "本轮已展示或将展示给用户的公开回复。",
-              "type": "markdown",
-              "value": "",
-              "color": "#16a34a",
-              "binding": null
+              "binding": {
+                "kind": "tool_output",
+                "actionKey": "",
+                "toolKey": "buddy_history_context_loader",
+                "nodeId": "reload_conversation_history",
+                "fieldKey": "conversation_history",
+                "managed": true
+              }
             },
             "compaction_plan": {
               "name": "compaction_plan",
@@ -1056,102 +572,6 @@
             }
           },
           "nodes": {
-            "input_trigger": {
-              "kind": "input",
-              "name": "触发来源",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 80,
-                  "y": 80
-                },
-                "collapsed": false,
-                "size": null
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "trigger",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": "",
-                "boundaryType": "text"
-              }
-            },
-            "input_source_run_id": {
-              "kind": "input",
-              "name": "来源 Run ID",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 80,
-                  "y": 460
-                },
-                "collapsed": false,
-                "size": null
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "source_run_id",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": "",
-                "boundaryType": "text"
-              }
-            },
-            "input_current_session_id": {
-              "kind": "input",
-              "name": "当前会话 ID",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 80,
-                  "y": 840
-                },
-                "collapsed": false,
-                "size": null
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "current_session_id",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": "",
-                "boundaryType": "text"
-              }
-            },
-            "input_user_message": {
-              "kind": "input",
-              "name": "用户消息",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 80,
-                  "y": 1220
-                },
-                "collapsed": false,
-                "size": null
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "user_message",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": "",
-                "boundaryType": "text"
-              }
-            },
             "input_conversation_history": {
               "kind": "input",
               "name": "会话历史",
@@ -1173,142 +593,13 @@
               ],
               "config": {
                 "value": "",
-                "boundaryType": "text"
-              }
-            },
-            "input_existing_session_summary": {
-              "kind": "input",
-              "name": "已有摘要",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 80,
-                  "y": 1980
-                },
-                "collapsed": false,
-                "size": null
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "existing_session_summary",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": "",
-                "boundaryType": "text"
-              }
-            },
-            "input_buddy_context": {
-              "kind": "input",
-              "name": "Buddy Home",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 80,
-                  "y": 2740
-                },
-                "collapsed": false,
-                "size": null
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "buddy_context",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": {
-                  "kind": "local_folder",
-                  "root": "buddy_home",
-                  "selected": [
-                    "AGENTS.md",
-                    "SOUL.md",
-                    "USER.md",
-                    "MEMORY.md"
-                  ]
-                },
-                "boundaryType": "file"
-              }
-            },
-            "input_context_budget_report": {
-              "kind": "input",
-              "name": "预算报告",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 80,
-                  "y": 3120
-                },
-                "collapsed": false,
-                "size": null
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "context_budget_report",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": {},
-                "boundaryType": "text"
-              }
-            },
-            "input_capability_result": {
-              "kind": "input",
-              "name": "能力结果",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 80,
-                  "y": 3500
-                },
-                "collapsed": false,
-                "size": null
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "capability_result",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": {},
-                "boundaryType": "text"
-              }
-            },
-            "input_public_response": {
-              "kind": "input",
-              "name": "公开回复",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 80,
-                  "y": 3880
-                },
-                "collapsed": false,
-                "size": null
-              },
-              "reads": [],
-              "writes": [
-                {
-                  "state": "public_response",
-                  "mode": "replace"
-                }
-              ],
-              "config": {
-                "value": "",
-                "boundaryType": "text"
+                "boundaryType": "json"
               }
             },
             "plan_compaction": {
               "kind": "agent",
               "name": "规划压缩范围",
-              "description": "根据预算报告确定保护头尾、最近原文和中间摘要范围。",
+              "description": "Plans which parts of conversation_history should remain raw and which parts should be summarized.",
               "ui": {
                 "position": {
                   "x": 680,
@@ -1322,28 +613,8 @@
               },
               "reads": [
                 {
-                  "state": "trigger",
-                  "required": true,
-                  "binding": null
-                },
-                {
                   "state": "conversation_history",
                   "required": true,
-                  "binding": null
-                },
-                {
-                  "state": "existing_session_summary",
-                  "required": false,
-                  "binding": null
-                },
-                {
-                  "state": "context_budget_report",
-                  "required": true,
-                  "binding": null
-                },
-                {
-                  "state": "capability_result",
-                  "required": false,
                   "binding": null
                 }
               ],
@@ -1358,7 +629,7 @@
                 "actionBindings": [],
                 "suspendedFreeWrites": [],
                 "actionInstructionBlocks": {},
-                "taskInstruction": "根据 trigger、conversation_history、existing_session_summary、context_budget_report 和可选 capability_result 制定 Hermes 风格压缩计划，写 compaction_plan JSON。必须包含 trigger、reason、protect_first、protect_last、summary_scope、estimated_omitted_messages、should_summarize、risk_notes、anti_thrashing_notes。默认保护开头少量任务设定和最近 12 到 20 条原文；中间历史进入摘要。本节点只输出压缩计划；session_summary.update 命令由后续写回节点生成。",
+                "taskInstruction": "Use only conversation_history to create compaction_plan JSON. conversation_history is the current history context package; without an existing summary it renders full prior history, and with a summary it renders summary plus messages after the summary. Identifiers are available in conversation_history metadata. Include protect_first, protect_last, summary_scope, estimated_omitted_messages, should_summarize, risk_notes, and anti_thrashing_notes. By default preserve a small opening task setup and the most recent 12 to 20 raw messages, and summarize the middle history. This node only writes the plan; the later write node prepares the session_summary.update command.",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "low",
@@ -1368,7 +639,7 @@
             "summarize_context": {
               "kind": "agent",
               "name": "生成会话摘要",
-              "description": "迭代更新 session_summary，并准备可审计写回命令。",
+              "description": "Updates the session summary candidate and prepares an auditable writeback command.",
               "ui": {
                 "position": {
                   "x": 1260,
@@ -1382,53 +653,8 @@
               },
               "reads": [
                 {
-                  "state": "trigger",
-                  "required": true,
-                  "binding": null
-                },
-                {
-                  "state": "source_run_id",
-                  "required": false,
-                  "binding": null
-                },
-                {
-                  "state": "current_session_id",
-                  "required": false,
-                  "binding": null
-                },
-                {
-                  "state": "user_message",
-                  "required": false,
-                  "binding": null
-                },
-                {
                   "state": "conversation_history",
                   "required": true,
-                  "binding": null
-                },
-                {
-                  "state": "existing_session_summary",
-                  "required": false,
-                  "binding": null
-                },
-                {
-                  "state": "buddy_context",
-                  "required": true,
-                  "binding": null
-                },
-                {
-                  "state": "context_budget_report",
-                  "required": true,
-                  "binding": null
-                },
-                {
-                  "state": "capability_result",
-                  "required": false,
-                  "binding": null
-                },
-                {
-                  "state": "public_response",
-                  "required": false,
                   "binding": null
                 },
                 {
@@ -1464,7 +690,7 @@
                 "actionBindings": [],
                 "suspendedFreeWrites": [],
                 "actionInstructionBlocks": {},
-                "taskInstruction": "执行 Hermes 风格上下文压缩。以 existing_session_summary 为基础迭代更新，并保留仍有效内容；保护最近原文，写入 protected_recent_history Markdown；把中间历史、用户明确决策、当前任务进展、未完成事项、能力调用结论压成 session_summary_candidate Markdown。摘要内容聚焦可延续的会话状态、用户决策、任务进展、待办和能力调用结论。必须同时输出：compaction_report JSON（trigger、source_run_id、current_session_id、omitted_count、protected_count、summary_changed、risk_notes、anti_thrashing_notes）、should_write_summary boolean、writer_input JSON。writer_input.commands 只允许一个 session_summary.update 命令，payload.content 必须等于 session_summary_candidate；change_reason 写明触发来源和压缩理由。若摘要无实质变化或风险过高，should_write_summary=false 且 commands=[]。",
+                "taskInstruction": "Compress session history only. Use the rendered conversation_history value as the source, preserving any existing summary that is still valid. Read source_run_id and current_session_id from conversation_history metadata. Do not summarize current user_message, Buddy Home, capability_result, or public_response because they are not inputs to this subgraph. Preserve recent raw messages in protected_recent_history Markdown. Summarize middle history, explicit user decisions, task progress, open items, and capability conclusions that already exist in conversation_history into session_summary_candidate Markdown.\n\nWrite all of these outputs: compaction_report JSON with source_run_id, current_session_id, omitted_count, protected_count, summary_changed, summary_source_refs, omitted_refs, protected_recent_history_refs, risk_notes, and anti_thrashing_notes; should_write_summary boolean; writer_input JSON. summary_source_refs, omitted_refs, and protected_recent_history_refs must come from conversation_history.source_refs or conversation_history.context_ref.source_refs. writer_input.commands may contain only one session_summary.update command. payload.content must equal session_summary_candidate. payload.source_refs must equal summary_source_refs. payload.source_run_id must equal conversation_history metadata.source_run_id. payload.session_id must equal conversation_history metadata.current_session_id. change_reason should state that session history reached context pressure and was compacted. If the summary did not materially change or risk is too high, set should_write_summary=false and commands=[].",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "low",
@@ -1538,11 +764,6 @@
                     "fieldKey": "autonomous_review",
                     "managed": true
                   }
-                },
-                {
-                  "state": "source_run_id",
-                  "required": false,
-                  "binding": null
                 }
               ],
               "writes": [
@@ -1581,32 +802,55 @@
                   "buddy_home_writer": {
                     "actionKey": "buddy_home_writer",
                     "title": "session_summary writeback instruction",
-                    "content": "Use Buddy Home Writer with commands from writer_input.commands. Each command is session_summary.update with payload.content as the complete updated session summary. Use source_run_id as run_id.",
+                    "content": "Use Buddy Home Writer with commands from writer_input.commands. Each command is session_summary.update with payload.content as the complete updated session summary. Use writer_input.run_id as run_id.",
                     "source": "node.override"
                   }
                 },
-                "taskInstruction": "调用 buddy_home_writer。commands 来自 writer_input.commands；run_id 来自 source_run_id。返回写回结果。",
+                "taskInstruction": "调用 buddy_home_writer。commands 来自 writer_input.commands；run_id 来自 writer_input.run_id。返回写回结果。",
                 "modelSource": "global",
                 "model": "",
                 "thinkingMode": "low",
                 "temperature": 0
               }
             },
-            "output_compaction_report": {
-              "kind": "output",
-              "name": "压缩报告",
-              "description": "",
+            "reload_conversation_history": {
+              "kind": "tool",
+              "name": "刷新历史视图",
+              "description": "从运行时上下文重新读取当前 Buddy 会话历史；若刚写入摘要，则输出摘要加摘要后的原文。",
               "ui": {
                 "position": {
                   "x": 2960,
-                  "y": 760
+                  "y": 1960
+                },
+                "collapsed": false,
+                "size": null
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "conversation_history",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "toolKey": "buddy_history_context_loader"
+              }
+            },
+            "output_conversation_history": {
+              "kind": "output",
+              "name": "会话历史",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 3560,
+                  "y": 1960
                 },
                 "collapsed": false,
                 "size": null
               },
               "reads": [
                 {
-                  "state": "compaction_report",
+                  "state": "conversation_history",
                   "required": true,
                   "binding": null
                 }
@@ -1618,102 +862,12 @@
                 "persistFormat": "auto",
                 "fileNameTemplate": ""
               }
-            },
-            "output_session_summary_candidate": {
-              "kind": "output",
-              "name": "摘要候选",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 2960,
-                  "y": 1160
-                },
-                "collapsed": false,
-                "size": null
-              },
-              "reads": [
-                {
-                  "state": "session_summary_candidate",
-                  "required": true,
-                  "binding": null
-                }
-              ],
-              "writes": [],
-              "config": {
-                "displayMode": "markdown",
-                "persistEnabled": false,
-                "persistFormat": "auto",
-                "fileNameTemplate": ""
-              }
-            },
-            "output_session_summary_write_result": {
-              "kind": "output",
-              "name": "写入结果",
-              "description": "",
-              "ui": {
-                "position": {
-                  "x": 2960,
-                  "y": 1560
-                },
-                "collapsed": false,
-                "size": null
-              },
-              "reads": [
-                {
-                  "state": "session_summary_write_result",
-                  "required": false,
-                  "binding": null
-                }
-              ],
-              "writes": [],
-              "config": {
-                "displayMode": "markdown",
-                "persistEnabled": false,
-                "persistFormat": "auto",
-                "fileNameTemplate": ""
-              }
             }
           },
           "edges": [
             {
-              "source": "input_trigger",
-              "target": "plan_compaction"
-            },
-            {
               "source": "input_conversation_history",
               "target": "plan_compaction"
-            },
-            {
-              "source": "input_existing_session_summary",
-              "target": "plan_compaction"
-            },
-            {
-              "source": "input_context_budget_report",
-              "target": "plan_compaction"
-            },
-            {
-              "source": "input_capability_result",
-              "target": "plan_compaction"
-            },
-            {
-              "source": "input_source_run_id",
-              "target": "summarize_context"
-            },
-            {
-              "source": "input_current_session_id",
-              "target": "summarize_context"
-            },
-            {
-              "source": "input_user_message",
-              "target": "summarize_context"
-            },
-            {
-              "source": "input_buddy_context",
-              "target": "summarize_context"
-            },
-            {
-              "source": "input_public_response",
-              "target": "summarize_context"
             },
             {
               "source": "plan_compaction",
@@ -1724,16 +878,12 @@
               "target": "has_summary_update"
             },
             {
-              "source": "summarize_context",
-              "target": "output_session_summary_candidate"
-            },
-            {
-              "source": "summarize_context",
-              "target": "output_compaction_report"
-            },
-            {
               "source": "write_session_summary",
-              "target": "output_session_summary_write_result"
+              "target": "reload_conversation_history"
+            },
+            {
+              "source": "reload_conversation_history",
+              "target": "output_conversation_history"
             }
           ],
           "conditional_edges": [
@@ -1741,8 +891,8 @@
               "source": "has_summary_update",
               "branches": {
                 "true": "write_session_summary",
-                "false": "output_compaction_report",
-                "exhausted": "output_compaction_report"
+                "false": "reload_conversation_history",
+                "exhausted": "reload_conversation_history"
               }
             }
           ],
@@ -1757,6 +907,9 @@
             ],
             "permissions": [
               "buddy_home_write"
+            ],
+            "requiredTools": [
+              "buddy_history_context_loader"
             ]
           }
         }
@@ -1896,7 +1049,7 @@
   "edges": [
     {
       "source": "input_user_message",
-      "target": "load_history_context"
+      "target": "check_context_pressure"
     },
     {
       "source": "load_history_context",
@@ -1904,10 +1057,6 @@
     },
     {
       "source": "input_buddy_context",
-      "target": "load_buddy_home_context"
-    },
-    {
-      "source": "load_buddy_home_context",
       "target": "check_context_pressure"
     },
     {
@@ -1961,7 +1110,7 @@
     "graphProtocol": "node_system",
     "origin": "buddy",
     "role": "buddy_autonomous_loop",
-    "templateVersion": "2026-05-29-simplified-capability-loop",
+    "templateVersion": "2026-05-30-full-session-history",
     "capabilityDiscoverableDefault": false,
     "requiredActions": [
       "toograph_capability_selector",
@@ -1976,7 +1125,6 @@
     "roadmap": "docs/README.md",
     "requiredTools": [
       "buddy_history_context_loader",
-      "buddy_home_context_loader",
       "buddy_context_pressure_check"
     ],
     "buddyRuntimeInputBindings": {

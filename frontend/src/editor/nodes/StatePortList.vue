@@ -167,6 +167,7 @@
     </div>
   </TransitionGroup>
   <ElPopover
+    v-if="createVisible || createOpen"
     :visible="createOpen"
     :placement="createPlacement"
     :width="376"

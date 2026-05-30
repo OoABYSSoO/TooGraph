@@ -155,7 +155,13 @@ def execute_tool_node(
     tool_definitions = get_tool_definition_registry_func(include_disabled=False)
     tool_definition = tool_definitions.get(tool_key)
 
-    tool_inputs = _collect_tool_inputs(node, input_values, tool_key=tool_key)
+    tool_inputs = _collect_tool_inputs(
+        node,
+        input_values,
+        state_schema=state_schema,
+        tool_key=tool_key,
+        tool_definition=tool_definition,
+    )
     graph_metadata = graph_context.get("metadata") if isinstance(graph_context.get("metadata"), dict) else {}
     tool_runtime_fixture = _resolve_tool_runtime_fixture_from_graph_metadata(graph_metadata)
     fixture_result = _resolve_tool_runtime_fixture_result(
@@ -1306,8 +1312,19 @@ def _collect_tool_inputs(
     node: NodeSystemToolNode,
     input_values: dict[str, Any],
     *,
+    state_schema: dict[str, NodeSystemStateDefinition],
     tool_key: str,
+    tool_definition: Any | None = None,
 ) -> dict[str, Any]:
+    if _tool_uses_dynamic_state_inputs(node, tool_definition):
+        return {
+            "context_items": [
+                _dynamic_state_context_item(read, input_values, state_schema)
+                for read in node.reads
+                if read.binding is None or read.binding.kind != NodeSystemReadBindingKind.TOOL_INPUT
+            ]
+        }
+
     tool_inputs: dict[str, Any] = {}
     for read in node.reads:
         binding = read.binding
@@ -1317,6 +1334,31 @@ def _collect_tool_inputs(
             continue
         tool_inputs[binding.field_key] = copy.deepcopy(input_values.get(read.state))
     return tool_inputs
+
+
+def _tool_uses_dynamic_state_inputs(node: NodeSystemToolNode, tool_definition: Any | None) -> bool:
+    if bool(getattr(node.config, "dynamic_state_inputs", False)):
+        return True
+    return bool(getattr(tool_definition, "dynamic_state_inputs", False))
+
+
+def _dynamic_state_context_item(
+    read: Any,
+    input_values: dict[str, Any],
+    state_schema: dict[str, NodeSystemStateDefinition],
+) -> dict[str, Any]:
+    definition = state_schema.get(read.state)
+    state_type = getattr(definition, "type", "")
+    if hasattr(state_type, "value"):
+        state_type = state_type.value
+    return {
+        "state": read.state,
+        "name": str(getattr(definition, "name", "") or read.state),
+        "description": str(getattr(definition, "description", "") or ""),
+        "type": str(state_type or "json"),
+        "required": bool(getattr(read, "required", False)),
+        "value": copy.deepcopy(input_values.get(read.state)),
+    }
 
 
 def _collect_dynamic_tool_inputs(

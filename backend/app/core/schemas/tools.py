@@ -50,6 +50,7 @@ class ToolDefinition(BaseModel):
         default_factory=list,
         alias="verificationCommands",
     )
+    dynamic_state_inputs: bool = Field(default=False, alias="dynamicStateInputs")
     input_schema: list[ToolIoField] = Field(default_factory=list, alias="inputSchema")
     output_schema: list[ToolIoField] = Field(default_factory=list, alias="outputSchema")
     source_scope: ToolSourceScope = Field(default=ToolSourceScope.INSTALLED, alias="sourceScope")

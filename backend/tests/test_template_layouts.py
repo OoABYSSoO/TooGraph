@@ -82,6 +82,18 @@ def _node_size(node: dict) -> tuple[float, float]:
     return float(size.get("width") or default_width), float(size.get("height") or default_height)
 
 
+def _allows_runtime_context_root(graph: dict, node_id: str, node: dict) -> bool:
+    metadata = graph.get("metadata") if isinstance(graph.get("metadata"), dict) else {}
+    runtime_requirements = metadata.get("runtime_context_requirements")
+    config = node.get("config") if isinstance(node.get("config"), dict) else {}
+    return (
+        isinstance(runtime_requirements, list)
+        and node_id == "load_history_context"
+        and node.get("kind") == "tool"
+        and config.get("toolKey") == "buddy_history_context_loader"
+    )
+
+
 def _rects_overlap(a: tuple[float, float, float, float], b: tuple[float, float, float, float], *, gap: float = 32) -> bool:
     ax, ay, aw, ah = a
     bx, by, bw, bh = b
@@ -143,10 +155,17 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn("创建新的 TooGraph Action", action_template["description"])
 
         buddy_template = templates["buddy_autonomous_loop"]
+        buddy_template_json = json.dumps(buddy_template, ensure_ascii=False)
         self.assertEqual(buddy_template["source"], "official")
         self.assertEqual(buddy_template["label"], "伙伴自主循环")
         self.assertEqual(buddy_template["default_graph_name"], "伙伴自主循环")
         self.assertIn("官方 Buddy 可见回复主流程", buddy_template["description"])
+        self.assertNotIn("组装当前会话历史", buddy_template_json)
+        self.assertNotIn("历史组装", buddy_template_json)
+        self.assertNotIn("history_max_messages", buddy_template_json)
+        self.assertNotIn("history_max_chars", buddy_template_json)
+        self.assertNotIn("max_messages", buddy_template_json)
+        self.assertNotIn("max_chars", buddy_template_json)
         self.assertIs(buddy_template["capabilityDiscoverable"], False)
         self.assertNotIn("hideFromCapabilitySelector", buddy_template["metadata"])
         self.assertEqual(
@@ -159,7 +178,6 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         for expected_node in [
             "load_history_context",
-            "load_buddy_home_context",
             "check_context_pressure",
             "context_pressure_condition",
             "run_context_compaction",
@@ -173,11 +191,11 @@ class TemplateLayoutTests(unittest.TestCase):
             self.assertNotIn(removed_node, buddy_template["nodes"])
         self.assertEqual(buddy_template["nodes"]["run_context_compaction"]["kind"], "subgraph")
         self.assertEqual(buddy_template["nodes"]["load_history_context"]["config"]["toolKey"], "buddy_history_context_loader")
-        self.assertEqual(buddy_template["nodes"]["load_buddy_home_context"]["config"]["toolKey"], "buddy_home_context_loader")
+        self.assertNotIn("load_buddy_home_context", buddy_template["nodes"])
         buddy_home_input = buddy_template["nodes"]["input_buddy_context"]
         self.assertEqual(buddy_home_input["kind"], "input")
         self.assertEqual(buddy_home_input["config"]["boundaryType"], "file")
-        self.assertEqual(buddy_home_input["writes"], [{"state": "buddy_home_selection", "mode": "replace"}])
+        self.assertEqual(buddy_home_input["writes"], [{"state": "buddy_context", "mode": "replace"}])
         self.assertEqual(
             buddy_home_input["config"]["value"],
             {
@@ -187,32 +205,30 @@ class TemplateLayoutTests(unittest.TestCase):
             },
         )
         self.assertEqual(
-            buddy_template["state_schema"]["buddy_home_selection"]["value"],
+            buddy_template["state_schema"]["buddy_context"]["value"],
             {
                 "kind": "local_folder",
                 "root": "buddy_home",
                 "selected": ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
             },
         )
-        self.assertEqual(buddy_template["state_schema"]["buddy_context"]["binding"]["toolKey"], "buddy_home_context_loader")
-        self.assertEqual(
-            buddy_template["state_schema"]["current_session_id"]["binding"]["fieldKey"],
-            "current_session_id",
-        )
-        self.assertEqual(
-            buddy_template["state_schema"]["existing_session_summary"]["binding"]["fieldKey"],
-            "existing_session_summary",
-        )
+        self.assertIsNone(buddy_template["state_schema"]["buddy_context"]["binding"])
+        self.assertNotIn("current_session_id", buddy_template["state_schema"])
+        self.assertNotIn("existing_session_summary", buddy_template["state_schema"])
         self.assertIn(
             {"source": "load_history_context", "target": "check_context_pressure"},
             buddy_template["edges"],
         )
         self.assertIn(
-            {"source": "input_buddy_context", "target": "load_buddy_home_context"},
+            {"source": "input_user_message", "target": "check_context_pressure"},
+            buddy_template["edges"],
+        )
+        self.assertNotIn(
+            {"source": "input_user_message", "target": "load_history_context"},
             buddy_template["edges"],
         )
         self.assertIn(
-            {"source": "load_buddy_home_context", "target": "check_context_pressure"},
+            {"source": "input_buddy_context", "target": "check_context_pressure"},
             buddy_template["edges"],
         )
         self.assertIn(
@@ -537,7 +553,9 @@ class TemplateLayoutTests(unittest.TestCase):
                     with self.subTest(graph=graph_path, node=node_id):
                         kind = node.get("kind")
                         self.assertFalse(
-                            kind not in {"input", "output"} and incoming[node_id] == 0,
+                            kind not in {"input", "output"}
+                            and incoming[node_id] == 0
+                            and not _allows_runtime_context_root(graph, node_id, node),
                             "non-boundary node has no incoming edge",
                         )
                         self.assertFalse(kind != "output" and outgoing[node_id] == 0, "non-output node has no outgoing edge")
@@ -1948,7 +1966,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template["metadata"]["requiredActions"], ["toograph_capability_selector", "buddy_session_recall"])
         self.assertEqual(
             template["metadata"]["requiredTools"],
-            ["buddy_history_context_loader", "buddy_home_context_loader", "buddy_context_pressure_check"],
+            ["buddy_history_context_loader", "buddy_context_pressure_check"],
         )
         self.assertEqual(template["metadata"]["buddyRuntimeInputBindings"], {"input_user_message": "current_message"})
         self.assertEqual(
@@ -1956,22 +1974,8 @@ class TemplateLayoutTests(unittest.TestCase):
             {
                 "user_message",
                 "conversation_history",
-                "buddy_home_selection",
-                "buddy_home_max_chars",
                 "buddy_context",
-                "buddy_home_context_report",
-                "current_session_id",
-                "existing_session_summary",
-                "history_max_messages",
-                "history_max_chars",
-                "history_context_report",
-                "source_run_id",
-                "context_budget_report",
                 "needs_context_compaction",
-                "context_compaction_trigger",
-                "context_compaction_report",
-                "context_compaction_summary",
-                "context_compaction_write_result",
                 "needs_capability",
                 "selected_capability",
                 "capability_result",
@@ -1982,22 +1986,8 @@ class TemplateLayoutTests(unittest.TestCase):
         expected_state_types = {
             "user_message": "text",
             "conversation_history": "json",
-            "buddy_home_selection": "file",
-            "buddy_home_max_chars": "number",
-            "buddy_context": "json",
-            "buddy_home_context_report": "json",
-            "current_session_id": "text",
-            "existing_session_summary": "markdown",
-            "history_max_messages": "number",
-            "history_max_chars": "number",
-            "history_context_report": "json",
-            "source_run_id": "text",
-            "context_budget_report": "json",
+            "buddy_context": "file",
             "needs_context_compaction": "boolean",
-            "context_compaction_trigger": "text",
-            "context_compaction_report": "markdown",
-            "context_compaction_summary": "markdown",
-            "context_compaction_write_result": "json",
             "needs_capability": "boolean",
             "selected_capability": "capability",
             "capability_result": "result_package",
@@ -2013,21 +2003,10 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertEqual(states["needs_capability"]["binding"]["fieldKey"], "needs_capability")
         self.assertEqual(states["selected_capability"]["binding"]["fieldKey"], "capability")
-        self.assertEqual(states["context_budget_report"]["binding"]["kind"], "tool_output")
-        self.assertEqual(states["context_budget_report"]["binding"]["toolKey"], "buddy_context_pressure_check")
-        self.assertEqual(states["context_budget_report"]["binding"]["nodeId"], "check_context_pressure")
         self.assertEqual(states["conversation_history"]["binding"]["kind"], "tool_output")
         self.assertEqual(states["conversation_history"]["binding"]["toolKey"], "buddy_history_context_loader")
         self.assertEqual(states["conversation_history"]["binding"]["nodeId"], "load_history_context")
-        self.assertIsNone(states["buddy_home_selection"]["binding"])
-        self.assertEqual(states["buddy_context"]["binding"]["kind"], "tool_output")
-        self.assertEqual(states["buddy_context"]["binding"]["toolKey"], "buddy_home_context_loader")
-        self.assertEqual(states["buddy_context"]["binding"]["nodeId"], "load_buddy_home_context")
-        self.assertEqual(states["buddy_home_context_report"]["binding"]["fieldKey"], "buddy_home_context_report")
-        self.assertEqual(states["current_session_id"]["binding"]["toolKey"], "buddy_history_context_loader")
-        self.assertEqual(states["existing_session_summary"]["binding"]["toolKey"], "buddy_history_context_loader")
-        self.assertEqual(states["source_run_id"]["binding"]["toolKey"], "buddy_history_context_loader")
-        self.assertEqual(states["history_context_report"]["binding"]["toolKey"], "buddy_history_context_loader")
+        self.assertIsNone(states["buddy_context"]["binding"])
         self.assertIsNone(states["show_result_package"]["binding"])
         self.assertIsNone(states["public_response"]["binding"])
         self.assertEqual(states["needs_context_compaction"]["binding"]["fieldKey"], "needs_context_compaction")
@@ -2050,18 +2029,33 @@ class TemplateLayoutTests(unittest.TestCase):
             "agent_loop_should_retry",
             "capability_trace",
             "capability_selection_reason",
+            "current_session_id",
+            "existing_session_summary",
+            "source_run_id",
+            "history_context_report",
+            "context_budget_report",
+            "context_compaction_trigger",
+            "context_compaction_report",
+            "context_compaction_summary",
+            "context_compaction_write_result",
         ]:
             self.assertNotIn(removed_state_key, states)
 
-        self.assertEqual(states["buddy_home_selection"]["type"], "file")
-        self.assertEqual(states["buddy_context"]["type"], "json")
+        self.assertEqual(states["buddy_context"]["type"], "file")
+        self.assertEqual(
+            states["buddy_context"]["value"],
+            {
+                "kind": "local_folder",
+                "root": "buddy_home",
+                "selected": ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md"],
+            },
+        )
         self.assertEqual(
             set(nodes),
             {
                 "input_user_message",
                 "load_history_context",
                 "input_buddy_context",
-                "load_buddy_home_context",
                 "check_context_pressure",
                 "context_pressure_condition",
                 "run_context_compaction",
@@ -2075,11 +2069,11 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "subgraph"], ["run_context_compaction"])
         self.assertEqual(nodes["load_history_context"]["kind"], "tool")
+        self.assertEqual(nodes["load_history_context"]["name"], "获取历史会话")
         self.assertEqual(nodes["load_history_context"]["config"]["toolKey"], "buddy_history_context_loader")
         self.assertEqual(nodes["check_context_pressure"]["kind"], "tool")
         self.assertEqual(nodes["check_context_pressure"]["config"]["toolKey"], "buddy_context_pressure_check")
-        self.assertEqual(nodes["load_buddy_home_context"]["kind"], "tool")
-        self.assertEqual(nodes["load_buddy_home_context"]["config"]["toolKey"], "buddy_home_context_loader")
+        self.assertNotIn("load_buddy_home_context", nodes)
         self.assertEqual(nodes["run_context_compaction"]["config"]["graph"]["metadata"]["role"], "buddy_context_compaction")
         self.assertEqual(nodes["reply_and_select_capability"]["kind"], "agent")
         self.assertEqual(nodes["execute_capability"]["kind"], "agent")
@@ -2099,7 +2093,6 @@ class TemplateLayoutTests(unittest.TestCase):
             "input_user_message": {"x": -1208, "y": 27},
             "load_history_context": {"x": -520, "y": 109},
             "input_buddy_context": {"x": -1211, "y": 751},
-            "load_buddy_home_context": {"x": -520, "y": 751},
             "check_context_pressure": {"x": 216, "y": 109},
             "context_pressure_condition": {"x": 877, "y": 237},
             "run_context_compaction": {"x": 1601, "y": -841},
@@ -2143,15 +2136,26 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertIn({"state": "user_message", "required": True}, _read_contracts(selector_node["reads"]))
         self.assertIn({"state": "conversation_history", "required": False}, _read_contracts(selector_node["reads"]))
-        self.assertIn({"state": "existing_session_summary", "required": False}, _read_contracts(selector_node["reads"]))
-        self.assertIn({"state": "context_compaction_summary", "required": False}, _read_contracts(selector_node["reads"]))
+        self.assertNotIn({"state": "context_compaction_summary", "required": False}, _read_contracts(selector_node["reads"]))
+        self.assertNotIn({"state": "context_compaction_report", "required": False}, _read_contracts(selector_node["reads"]))
         self.assertIn({"state": "buddy_context", "required": False}, _read_contracts(selector_node["reads"]))
-        self.assertIn({"state": "current_session_id", "required": False}, _read_contracts(selector_node["reads"]))
         self.assertIn({"state": "capability_result", "required": False}, _read_contracts(selector_node["reads"]))
         for read in selector_node["reads"]:
             self.assertNotIn(
                 read.get("state"),
-                {"raw_conversation_history", "page_context", "agent_loop_control", "agent_loop_report", "capability_trace"},
+                {
+                    "raw_conversation_history",
+                    "page_context",
+                    "agent_loop_control",
+                    "agent_loop_report",
+                    "capability_trace",
+                    "existing_session_summary",
+                    "current_session_id",
+                    "source_run_id",
+                    "history_context_report",
+                    "context_compaction_summary",
+                    "context_compaction_report",
+                },
             )
         self.assertEqual(
             selector_node["writes"],
@@ -2171,10 +2175,16 @@ class TemplateLayoutTests(unittest.TestCase):
             "capability_trace",
             selector_node["config"]["actionInstructionBlocks"]["toograph_capability_selector"]["content"],
         )
+        self.assertNotIn("context_compaction_summary", selector_node["config"]["taskInstruction"])
+        self.assertNotIn(
+            "context_compaction_summary",
+            selector_node["config"]["actionInstructionBlocks"]["toograph_capability_selector"]["content"],
+        )
+        self.assertNotIn("context_compaction_report", selector_node["config"]["taskInstruction"])
         self.assertIn("capability.kind=none", selector_node["config"]["taskInstruction"])
-        self.assertIn("每轮必须同时产出两类决策：public_response 和 needs_capability/capability", selector_node["config"]["taskInstruction"])
+        self.assertIn("public_response and needs_capability/capability", selector_node["config"]["taskInstruction"])
         self.assertIn("buddy_session_recall", selector_node["config"]["taskInstruction"])
-        self.assertIn("current_session_id", selector_node["config"]["taskInstruction"])
+        self.assertIn("conversation_history metadata", selector_node["config"]["taskInstruction"])
         self.assertIn(
             "buddy_session_recall",
             selector_node["config"]["actionInstructionBlocks"]["toograph_capability_selector"]["content"],
@@ -2184,9 +2194,8 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(execute_node["config"]["actionKey"], "")
         self.assertIn({"state": "selected_capability", "required": True}, _read_contracts(execute_node["reads"]))
         self.assertIn({"state": "user_message", "required": True}, _read_contracts(execute_node["reads"]))
-        self.assertIn({"state": "current_session_id", "required": False}, _read_contracts(execute_node["reads"]))
         for read in execute_node["reads"]:
-            self.assertNotEqual(read.get("state"), "capability_trace")
+            self.assertNotIn(read.get("state"), {"capability_trace", "current_session_id"})
         self.assertEqual(execute_node["writes"], [{"state": "capability_result", "mode": "replace"}])
         self.assertIn("selected_capability.kind=action/subgraph/tool", execute_node["config"]["taskInstruction"])
         self.assertIn("buddy_session_recall", execute_node["config"]["taskInstruction"])
@@ -2216,69 +2225,114 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn({"state": "needs_context_compaction", "required": True}, _read_contracts(pressure_node["reads"]))
         for read in nodes["check_context_pressure"]["reads"]:
             self.assertNotIn(read.get("state"), {"raw_conversation_history", "page_context"})
+            self.assertIsNone(read.get("binding"))
+        self.assertEqual(
+            _read_contracts(nodes["check_context_pressure"]["reads"]),
+            [
+                {"state": "user_message", "required": True},
+                {"state": "conversation_history", "required": False},
+                {"state": "buddy_context", "required": False},
+                {"state": "capability_result", "required": False},
+            ],
+        )
+        self.assertEqual(nodes["check_context_pressure"]["config"].get("dynamicStateInputs"), True)
+        self.assertEqual(
+            nodes["check_context_pressure"]["writes"],
+            [{"state": "needs_context_compaction", "mode": "replace"}],
+        )
+        self.assertEqual(_read_contracts(nodes["load_history_context"]["reads"]), [])
         self.assertEqual(
             nodes["load_history_context"]["writes"],
             [
                 {"state": "conversation_history", "mode": "replace"},
-                {"state": "existing_session_summary", "mode": "replace"},
-                {"state": "current_session_id", "mode": "replace"},
-                {"state": "source_run_id", "mode": "replace"},
-                {"state": "history_context_report", "mode": "replace"},
             ],
         )
         self.assertEqual(
             nodes["input_buddy_context"]["writes"],
-            [{"state": "buddy_home_selection", "mode": "replace"}],
-        )
-        self.assertEqual(
-            _read_contracts(nodes["load_buddy_home_context"]["reads"]),
-            [
-                {
-                    "state": "buddy_home_selection",
-                    "required": False,
-                    "binding": {
-                        "kind": "tool_input",
-                        "actionKey": "",
-                        "toolKey": "buddy_home_context_loader",
-                        "fieldKey": "buddy_home_selection",
-                        "managed": True,
-                    },
-                },
-                {
-                    "state": "buddy_home_max_chars",
-                    "required": False,
-                    "binding": {
-                        "kind": "tool_input",
-                        "actionKey": "",
-                        "toolKey": "buddy_home_context_loader",
-                        "fieldKey": "max_chars",
-                        "managed": True,
-                    },
-                },
-            ],
-        )
-        self.assertEqual(
-            nodes["load_buddy_home_context"]["writes"],
-            [
-                {"state": "buddy_context", "mode": "replace"},
-                {"state": "buddy_home_context_report", "mode": "replace"},
-            ],
+            [{"state": "buddy_context", "mode": "replace"}],
         )
         self.assertEqual(
             nodes["run_context_compaction"]["writes"],
+            [{"state": "conversation_history", "mode": "replace"}],
+        )
+        self.assertEqual(
+            _read_contracts(nodes["run_context_compaction"]["reads"]),
+            [{"state": "conversation_history", "required": True}],
+        )
+        compaction_graph = nodes["run_context_compaction"]["config"]["graph"]
+        self.assertEqual(compaction_graph["metadata"]["requiredTools"], ["buddy_history_context_loader"])
+        self.assertEqual(compaction_graph["state_schema"]["conversation_history"]["type"], "json")
+        self.assertEqual(
+            compaction_graph["state_schema"]["conversation_history"]["binding"],
+            {
+                "kind": "tool_output",
+                "actionKey": "",
+                "toolKey": "buddy_history_context_loader",
+                "nodeId": "reload_conversation_history",
+                "fieldKey": "conversation_history",
+                "managed": True,
+            },
+        )
+        self.assertEqual(compaction_graph["nodes"]["reload_conversation_history"]["kind"], "tool")
+        self.assertEqual(
+            compaction_graph["nodes"]["reload_conversation_history"]["config"]["toolKey"],
+            "buddy_history_context_loader",
+        )
+        self.assertEqual(_read_contracts(compaction_graph["nodes"]["reload_conversation_history"]["reads"]), [])
+        self.assertEqual(
+            compaction_graph["nodes"]["reload_conversation_history"]["writes"],
+            [{"state": "conversation_history", "mode": "replace"}],
+        )
+        self.assertEqual(
+            [node_id for node_id, node in compaction_graph["nodes"].items() if node["kind"] == "output"],
+            ["output_conversation_history"],
+        )
+        self.assertEqual(
+            _read_contracts(compaction_graph["nodes"]["output_conversation_history"]["reads"]),
+            [{"state": "conversation_history", "required": True}],
+        )
+        self.assertIn(
+            {"source": "write_session_summary", "target": "reload_conversation_history"},
+            compaction_graph["edges"],
+        )
+        self.assertIn(
+            {"source": "reload_conversation_history", "target": "output_conversation_history"},
+            compaction_graph["edges"],
+        )
+        for removed_node_id in [
+            "input_trigger",
+            "input_user_message",
+            "input_buddy_context",
+            "input_context_budget_report",
+            "input_capability_result",
+            "input_public_response",
+            "output_compaction_report",
+            "output_session_summary_candidate",
+            "output_session_summary_write_result",
+        ]:
+            self.assertNotIn(removed_node_id, compaction_graph["nodes"])
+        for node_id in ["plan_compaction", "summarize_context"]:
+            for read in compaction_graph["nodes"][node_id]["reads"]:
+                self.assertIn(read["state"], {"conversation_history", "compaction_plan"})
+        self.assertEqual(
+            compaction_graph["conditional_edges"],
             [
-                {"state": "context_compaction_report", "mode": "replace"},
-                {"state": "context_compaction_summary", "mode": "replace"},
-                {"state": "context_compaction_write_result", "mode": "replace"},
+                {
+                    "source": "has_summary_update",
+                    "branches": {
+                        "true": "write_session_summary",
+                        "false": "reload_conversation_history",
+                        "exhausted": "reload_conversation_history",
+                    },
+                }
             ],
         )
         self.assertEqual(
             template["edges"],
             [
-                {"source": "input_user_message", "target": "load_history_context"},
+                {"source": "input_user_message", "target": "check_context_pressure"},
                 {"source": "load_history_context", "target": "check_context_pressure"},
-                {"source": "input_buddy_context", "target": "load_buddy_home_context"},
-                {"source": "load_buddy_home_context", "target": "check_context_pressure"},
+                {"source": "input_buddy_context", "target": "check_context_pressure"},
                 {"source": "check_context_pressure", "target": "context_pressure_condition"},
                 {"source": "run_context_compaction", "target": "reply_and_select_capability"},
                 {"source": "execute_capability", "target": "check_context_pressure"},
@@ -3640,17 +3694,43 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template["metadata"]["role"], "buddy_context_compaction")
         self.assertNotIn("internal", template["metadata"])
         self.assertIs(template["capabilityDiscoverable"], False)
-        self.assertEqual(template["label"], "上下文压缩")
         self.assertEqual(template["metadata"]["requiredActions"], ["buddy_home_writer"])
         self.assertEqual(template["metadata"]["permissions"], ["buddy_home_write"])
-        self.assertEqual(states["trigger"]["type"], "text")
-        self.assertEqual(states["current_session_id"]["type"], "text")
-        self.assertEqual(states["conversation_history"]["type"], "markdown")
-        self.assertEqual(states["existing_session_summary"]["type"], "markdown")
-        self.assertNotIn("page_context", states)
-        self.assertNotIn("input_page_context", nodes)
-        self.assertEqual(states["context_budget_report"]["type"], "json")
-        self.assertEqual(states["capability_result"]["type"], "result_package")
+        self.assertEqual(template["metadata"]["requiredTools"], ["buddy_history_context_loader"])
+        self.assertEqual(
+            set(states),
+            {
+                "conversation_history",
+                "compaction_plan",
+                "protected_recent_history",
+                "session_summary_candidate",
+                "compaction_report",
+                "should_write_summary",
+                "writer_input",
+                "session_summary_write_success",
+                "applied_session_summary_commands",
+                "skipped_session_summary_commands",
+                "session_summary_write_result",
+            },
+        )
+        for removed_state in [
+            "trigger",
+            "source_run_id",
+            "current_session_id",
+            "user_message",
+            "existing_session_summary",
+            "buddy_context",
+            "context_budget_report",
+            "capability_result",
+            "public_response",
+            "page_context",
+        ]:
+            self.assertNotIn(removed_state, states)
+            self.assertNotIn(f"input_{removed_state}", nodes)
+
+        self.assertEqual(states["conversation_history"]["type"], "json")
+        self.assertEqual(states["conversation_history"]["binding"]["toolKey"], "buddy_history_context_loader")
+        self.assertEqual(states["conversation_history"]["binding"]["nodeId"], "reload_conversation_history")
         self.assertEqual(states["compaction_plan"]["type"], "json")
         self.assertEqual(states["protected_recent_history"]["type"], "markdown")
         self.assertEqual(states["session_summary_candidate"]["type"], "markdown")
@@ -3662,17 +3742,42 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "output"],
-            [
-                "output_compaction_report",
-                "output_session_summary_candidate",
-                "output_session_summary_write_result",
-            ],
+            ["output_conversation_history"],
+        )
+        self.assertEqual(
+            _read_contracts(nodes["input_conversation_history"]["writes"]),
+            [{"state": "conversation_history", "mode": "replace"}],
+        )
+        self.assertEqual(
+            _read_contracts(nodes["plan_compaction"]["reads"]),
+            [{"state": "conversation_history", "required": True}],
         )
         self.assertEqual(nodes["plan_compaction"]["writes"], [{"state": "compaction_plan", "mode": "replace"}])
         self.assertIn("protect_first", nodes["plan_compaction"]["config"]["taskInstruction"])
         for node in nodes.values():
             for read in node.get("reads", []):
-                self.assertNotEqual(read.get("state"), "page_context")
+                self.assertNotIn(
+                    read.get("state"),
+                    {
+                        "page_context",
+                        "trigger",
+                        "source_run_id",
+                        "current_session_id",
+                        "user_message",
+                        "existing_session_summary",
+                        "buddy_context",
+                        "context_budget_report",
+                        "capability_result",
+                        "public_response",
+                    },
+                )
+        self.assertEqual(
+            _read_contracts(nodes["summarize_context"]["reads"]),
+            [
+                {"state": "conversation_history", "required": True},
+                {"state": "compaction_plan", "required": True},
+            ],
+        )
         self.assertEqual(
             nodes["summarize_context"]["writes"],
             [
@@ -3691,6 +3796,13 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             nodes["has_summary_update"]["config"]["rule"],
             {"source": "$state.should_write_summary", "operator": "==", "value": True},
+        )
+        self.assertEqual(nodes["reload_conversation_history"]["kind"], "tool")
+        self.assertEqual(nodes["reload_conversation_history"]["config"]["toolKey"], "buddy_history_context_loader")
+        self.assertEqual(nodes["reload_conversation_history"]["writes"], [{"state": "conversation_history", "mode": "replace"}])
+        self.assertEqual(
+            _read_contracts(nodes["output_conversation_history"]["reads"]),
+            [{"state": "conversation_history", "required": True}],
         )
         writer_node = nodes["write_session_summary"]
         self.assertEqual(writer_node["kind"], "agent")
@@ -3711,7 +3823,8 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertIn({"source": "plan_compaction", "target": "summarize_context"}, template["edges"])
         self.assertIn({"source": "summarize_context", "target": "has_summary_update"}, template["edges"])
-        self.assertIn({"source": "write_session_summary", "target": "output_session_summary_write_result"}, template["edges"])
+        self.assertIn({"source": "write_session_summary", "target": "reload_conversation_history"}, template["edges"])
+        self.assertIn({"source": "reload_conversation_history", "target": "output_conversation_history"}, template["edges"])
         self.assertEqual(
             template["conditional_edges"],
             [
@@ -3719,8 +3832,8 @@ class TemplateLayoutTests(unittest.TestCase):
                     "source": "has_summary_update",
                     "branches": {
                         "true": "write_session_summary",
-                        "false": "output_compaction_report",
-                        "exhausted": "output_compaction_report",
+                        "false": "reload_conversation_history",
+                        "exhausted": "reload_conversation_history",
                     },
                 }
             ],

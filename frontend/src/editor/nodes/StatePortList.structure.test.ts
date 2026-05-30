@@ -67,6 +67,12 @@ test("StatePortList owns agent real state port rows and emits parent side effect
   assert.match(componentSource, /\.node-card__port-pill--create \{/);
 });
 
+test("StatePortList does not render inactive create ports", () => {
+  const componentSource = readFileSync(resolve(currentDirectory, "StatePortList.vue"), "utf8").replace(/\r\n/g, "\n");
+
+  assert.match(componentSource, /<ElPopover\s+v-if="createVisible \|\| createOpen"[\s\S]*:visible="createOpen"/);
+});
+
 test("StatePortList exposes reusable state port operations to the virtual page operation book", () => {
   const componentSource = readFileSync(resolve(currentDirectory, "StatePortList.vue"), "utf8").replace(/\r\n/g, "\n");
 

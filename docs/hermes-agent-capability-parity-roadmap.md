@@ -34,7 +34,7 @@
 | 能力域 | 当前事实来源 |
 | --- | --- |
 | 图协议与运行记录 | `backend/app/core/schemas/node_system.py`、`backend/app/core/storage/database.py`、`backend/app/core/storage/graph_run_db_store.py`、`backend/app/core/runtime/state_io.py` |
-| Buddy 主循环 | `graph_template/official/buddy_autonomous_loop/template.json`、`tool/official/buddy_history_context_loader/run.py`、`tool/official/buddy_home_context_loader/run.py`、`tool/official/buddy_context_pressure_check/run.py` |
+| Buddy 主循环 | `graph_template/official/buddy_autonomous_loop/template.json`、`tool/official/buddy_history_context_loader/run.py`、`tool/official/buddy_context_pressure_check/run.py` |
 | 上下文装配 | `backend/app/core/storage/context_assembly_store.py`、`backend/app/core/runtime/agent_prompt.py`、`tool/official/*_context_loader/run.py` |
 | 历史、搜索、记忆 | `backend/app/buddy/store.py`、`backend/app/core/storage/memory_store.py`、`backend/app/core/storage/retrieval_store.py`、`backend/app/core/storage/embedding_store.py` |
 | 后台复盘与改进候选 | `backend/app/buddy/background_review.py`、`backend/app/buddy/improvement_candidates.py`、`graph_template/official/buddy_autonomous_review/template.json`、`graph_template/official/buddy_improvement_review_workflow/template.json` |
@@ -116,7 +116,7 @@
 
 - `pytest backend/tests/test_context_assembly_store.py -q`
 - `pytest backend/tests/test_agent_state_prompt_semantics.py -q`
-- `pytest backend/tests/test_buddy_home_context_loader_tool.py backend/tests/test_buddy_history_context_loader_tool.py backend/tests/test_runtime_context_loader_tool.py -q`
+- `pytest backend/tests/test_buddy_history_context_loader_tool.py backend/tests/test_runtime_context_loader_tool.py -q`
 
 ### 4.3 会话历史已经改为原子消息、摘要和引用重建
 

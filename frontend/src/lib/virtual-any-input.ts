@@ -20,7 +20,11 @@ export function isCreateAgentInputStateKey(stateKey: string | null | undefined) 
   return stateKey === CREATE_AGENT_INPUT_STATE_KEY;
 }
 
-export function shouldExposeVirtualAnyInput(node: Pick<GraphNode, "kind" | "reads">) {
+export function shouldExposeVirtualAnyInput(node: Pick<GraphNode, "kind" | "reads"> & { config?: object }) {
+  if (node.kind === "tool") {
+    const config = node.config as { dynamicStateInputs?: unknown } | undefined;
+    return Boolean(config?.dynamicStateInputs) && node.reads.length === 0;
+  }
   return node.kind !== "input" && node.reads.length === 0;
 }
 

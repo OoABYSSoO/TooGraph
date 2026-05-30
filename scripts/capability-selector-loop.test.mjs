@@ -62,7 +62,7 @@ test("buddy capability loop maps selector needs_capability without legacy guard 
   assert.deepEqual(selectorActionInputReads, []);
   assert.equal(selector.reads.some((read) => read.state === "capability_result"), true);
   assert.equal(selector.reads.some((read) => read.state === "capability_trace"), false);
-  assert.equal(selector.reads.some((read) => read.state === "current_session_id"), true);
+  assert.equal(selector.reads.some((read) => read.state === "current_session_id"), false);
   assert.equal(template.metadata.buddyRuntimeInputBindings.input_user_message, "current_message");
   assert.equal(template.nodes.load_history_context.config.toolKey, "buddy_history_context_loader");
   assert.equal(template.nodes.guard_agent_loop, undefined);

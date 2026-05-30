@@ -2,83 +2,23 @@
   "schemaVersion": "toograph.tool/v1",
   "toolKey": "buddy_context_pressure_check",
   "name": "Buddy Context Pressure Check",
-  "description": "A deterministic Buddy runtime tool that checks whether conversation context, capability results, or public replies should be compacted before the next LLM turn.",
+  "description": "A deterministic Buddy runtime tool that checks dynamically selected next-LLM context states and decides whether session history compaction should run.",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [],
+  "dynamicStateInputs": true,
   "runtime": {
     "type": "python",
     "entrypoint": "run.py",
     "timeoutSeconds": 30
   },
-  "inputSchema": [
-    {
-      "key": "trigger",
-      "name": "Trigger",
-      "valueType": "text",
-      "description": "preflight, capability_result, overflow_recovery, or background."
-    },
-    {
-      "key": "conversation_history",
-      "name": "Rendered Conversation History",
-      "valueType": "markdown",
-      "description": "The compact history that the main LLM will see."
-    },
-    {
-      "key": "user_message",
-      "name": "User Message",
-      "valueType": "text",
-      "description": "Current user message."
-    },
-    {
-      "key": "existing_session_summary",
-      "name": "Existing Session Summary",
-      "valueType": "markdown",
-      "description": "Current saved session summary."
-    },
-    {
-      "key": "context_compaction_summary",
-      "name": "Latest Context Compaction Summary",
-      "valueType": "markdown",
-      "description": "Summary generated earlier in the same visible Buddy loop, if any."
-    },
-    {
-      "key": "capability_result",
-      "name": "Capability Result",
-      "valueType": "result_package",
-      "description": "Latest dynamic capability result package."
-    },
-    {
-      "key": "public_response",
-      "name": "Public Response",
-      "valueType": "markdown",
-      "description": "Latest visible reply draft or final reply."
-    }
-  ],
+  "inputSchema": [],
   "outputSchema": [
     {
       "key": "needs_context_compaction",
       "name": "Needs Context Compaction",
       "valueType": "boolean",
       "description": "True when the Buddy loop should run buddy_context_compaction before the next LLM turn."
-    },
-    {
-      "key": "context_budget_report",
-      "name": "Context Budget Report",
-      "valueType": "json",
-      "description": "Measured context pressure and thresholds."
-    },
-    {
-      "key": "context_compaction_trigger",
-      "name": "Context Compaction Trigger",
-      "valueType": "text",
-      "description": "Normalized trigger to pass into buddy_context_compaction."
-    },
-    {
-      "key": "reason",
-      "name": "Reason",
-      "valueType": "text",
-      "description": "The primary pressure reason."
     }
   ]
 }

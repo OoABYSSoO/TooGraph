@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { buildSequenceFlowPath } from "./flowEdgePath.ts";
 import { groupProjectedCanvasAnchors, groupProjectedCanvasEdges, projectCanvasAnchors, projectCanvasEdges } from "./edgeProjection.ts";
+import { VIRTUAL_ANY_INPUT_STATE_KEY } from "../../lib/virtual-any-input.ts";
 import type { GraphPayload } from "../../types/node-system.ts";
 
 const graph: GraphPayload = {
@@ -134,6 +135,52 @@ test("projectCanvasAnchors returns flow and state dots for visible nodes", () =>
   assert.ok(anchors.some((anchor) => anchor.kind === "flow-in" && anchor.nodeId === "answer_helper"));
   assert.ok(anchors.some((anchor) => anchor.kind === "state-out" && anchor.stateKey === "question" && anchor.color === "#d97706"));
   assert.ok(anchors.some((anchor) => anchor.kind === "state-in" && anchor.stateKey === "question" && anchor.color === "#d97706"));
+});
+
+test("projectCanvasAnchors hides flow-in handles for runtime context root tools without inputs", () => {
+  const runtimeRootGraph: GraphPayload = {
+    graph_id: null,
+    name: "Runtime root tool",
+    state_schema: {
+      history: { name: "history", description: "", type: "json", value: {}, color: "#64748b" },
+      report: { name: "report", description: "", type: "json", value: {}, color: "#334155" },
+    },
+    nodes: {
+      load_history_context: {
+        kind: "tool",
+        name: "获取历史会话",
+        description: "",
+        ui: { position: { x: 80, y: 120 } },
+        reads: [],
+        writes: [
+          { state: "history", mode: "replace" },
+          { state: "report", mode: "replace" },
+        ],
+        config: { toolKey: "buddy_history_context_loader" },
+      },
+      check_context_pressure: {
+        kind: "tool",
+        name: "上下文压力检查",
+        description: "",
+        ui: { position: { x: 560, y: 120 } },
+        reads: [{ state: "history", required: false }],
+        writes: [],
+        config: { toolKey: "buddy_context_pressure_check" },
+      },
+    },
+    edges: [{ source: "load_history_context", target: "check_context_pressure" }],
+    conditional_edges: [],
+    metadata: {
+      runtime_context_requirements: [{ key: "buddy_session_id", optional: true, source: "buddy_chat" }],
+    },
+  };
+
+  const anchors = projectCanvasAnchors(runtimeRootGraph);
+
+  assert.equal(anchors.some((anchor) => anchor.id === "load_history_context:flow-in"), false);
+  assert.equal(anchors.some((anchor) => anchor.id === "load_history_context:flow-out"), true);
+  assert.equal(anchors.some((anchor) => anchor.id === `load_history_context:state-in:${VIRTUAL_ANY_INPUT_STATE_KEY}`), false);
+  assert.equal(anchors.some((anchor) => anchor.id === "check_context_pressure:flow-in"), true);
 });
 
 test("groupProjectedCanvasAnchors separates flow, route, and point anchors", () => {

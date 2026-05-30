@@ -23,6 +23,7 @@ export type ToolDefinition = {
   permissions: string[];
   runtime: ToolRuntimeSpec;
   verificationCommands?: VerificationCommand[];
+  dynamicStateInputs?: boolean;
   inputSchema: ToolIoField[];
   outputSchema: ToolIoField[];
   sourceScope: string;

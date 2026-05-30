@@ -182,7 +182,7 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument, optio
 export function projectCanvasAnchors(document: GraphPayload | GraphDocument, options: ProjectCanvasProjectionOptions = {}): ProjectedCanvasAnchor[] {
   const placements = buildNodePlacements(document, options);
   return Array.from(placements.entries()).flatMap(([nodeId, placement]) => [
-    ...(placement.flowIn
+    ...(placement.flowIn && shouldProjectFlowInAnchor(document, nodeId)
       ? [
           {
             id: `${nodeId}:${placement.flowIn.id}`,
@@ -206,16 +206,18 @@ export function projectCanvasAnchors(document: GraphPayload | GraphDocument, opt
           },
         ]
       : []),
-    ...placement.stateInputs.map((anchor) => ({
-      id: `${nodeId}:${anchor.id}`,
-      nodeId,
-      kind: "state-in" as const,
-      x: anchor.x,
-      y: anchor.y,
-      side: anchor.side,
-      color: document.state_schema[anchor.stateKey ?? ""]?.color ?? undefined,
-      stateKey: anchor.stateKey,
-    })),
+    ...placement.stateInputs
+      .filter(() => shouldProjectStateInputAnchors(document, nodeId))
+      .map((anchor) => ({
+        id: `${nodeId}:${anchor.id}`,
+        nodeId,
+        kind: "state-in" as const,
+        x: anchor.x,
+        y: anchor.y,
+        side: anchor.side,
+        color: document.state_schema[anchor.stateKey ?? ""]?.color ?? undefined,
+        stateKey: anchor.stateKey,
+      })),
     ...placement.stateOutputs.map((anchor) => ({
       id: `${nodeId}:${anchor.id}`,
       nodeId,
@@ -236,6 +238,37 @@ export function projectCanvasAnchors(document: GraphPayload | GraphDocument, opt
       branch: anchor.branch,
     })),
   ]);
+}
+
+function shouldProjectFlowInAnchor(document: GraphPayload | GraphDocument, nodeId: string): boolean {
+  const node = document.nodes[nodeId];
+  if (!node) {
+    return false;
+  }
+  if (!isRuntimeContextRootTool(document, nodeId)) {
+    return true;
+  }
+  return hasIncomingFlowEdge(document, nodeId);
+}
+
+function shouldProjectStateInputAnchors(document: GraphPayload | GraphDocument, nodeId: string): boolean {
+  return !isRuntimeContextRootTool(document, nodeId);
+}
+
+function isRuntimeContextRootTool(document: GraphPayload | GraphDocument, nodeId: string): boolean {
+  const node = document.nodes[nodeId];
+  return (
+    Boolean(Array.isArray(document.metadata?.runtime_context_requirements) && document.metadata.runtime_context_requirements.length > 0)
+    && node?.kind === "tool"
+    && node.reads.length === 0
+  );
+}
+
+function hasIncomingFlowEdge(document: GraphPayload | GraphDocument, nodeId: string): boolean {
+  if (document.edges.some((edge) => edge.target === nodeId)) {
+    return true;
+  }
+  return document.conditional_edges.some((edge) => Object.values(edge.branches).some((target) => target === nodeId));
 }
 
 function buildNodePlacements(document: GraphPayload | GraphDocument, options: ProjectCanvasProjectionOptions = {}) {
