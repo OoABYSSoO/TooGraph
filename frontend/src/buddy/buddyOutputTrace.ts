@@ -1,6 +1,5 @@
 import type { ConditionalEdge, GraphEdge, GraphNode, GraphPayload } from "../types/node-system.ts";
 import type { NodeExecutionDetail, RunDetail } from "../types/run.ts";
-import { listCapabilitySelectionReasonLabels } from "../lib/capabilitySelectionReason.ts";
 import { listDelegationBoardTraceLabels } from "../lib/delegationBoardDiagnostic.ts";
 import { listDelegationWorkerTraceLabels } from "../lib/delegationWorkerDiagnostic.ts";
 import { summarizeVirtualOperationActivity, type VirtualOperationGraphRevision } from "../lib/virtual-operation-activity.ts";
@@ -1267,7 +1266,6 @@ function buildAgentLoopArtifactLabels(execution: NodeExecutionDetail, agentLoopE
   return uniqueTextList([
     ...buildAgentLoopEventArtifactLabels(agentLoopEvents),
     ...buildAgentLoopReportArtifactLabels(report),
-    ...buildCapabilitySelectionArtifactLabels(execution, outputs),
     ...buildDelegationWorkerArtifactLabels(execution, outputs),
     ...buildDelegationBoardArtifactLabels(execution, outputs),
   ].filter(Boolean));
@@ -1337,14 +1335,6 @@ function buildAgentLoopReportArtifactLabels(report: Record<string, unknown> | nu
       ? `capabilities: ${capabilityCallCount ?? "?"} / ${maxCapabilityCalls ?? "?"}`
       : "",
   ];
-}
-
-function buildCapabilitySelectionArtifactLabels(
-  execution: NodeExecutionDetail,
-  outputs: Record<string, unknown> | null,
-) {
-  const stateWriteReason = findStateWriteValue(execution, "capability_selection_reason");
-  return listCapabilitySelectionReasonLabels(outputs?.capability_selection_reason ?? outputs?.selection_reason ?? stateWriteReason);
 }
 
 function buildDelegationWorkerArtifactLabels(

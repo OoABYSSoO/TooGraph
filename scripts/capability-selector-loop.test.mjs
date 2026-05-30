@@ -39,7 +39,7 @@ test("capability selector returns no continuation signal for none", () => {
   assert.deepEqual(result.capability, { kind: "none" });
 });
 
-test("buddy capability loop maps selector needs_capability and managed loop budget context", () => {
+test("buddy capability loop maps selector needs_capability without legacy guard state", () => {
   const template = JSON.parse(
     readFileSync(resolve("graph_template/official/buddy_autonomous_loop/template.json"), "utf8"),
   );
@@ -59,39 +59,22 @@ test("buddy capability loop maps selector needs_capability and managed loop budg
   );
   assert.equal(selector.config.actionBindings[0].outputMapping.found, undefined);
   const selectorActionInputReads = selector.reads.filter((read) => read.binding?.kind === "action_input");
-  assert.deepEqual(selectorActionInputReads, [
-    {
-      state: "agent_loop_control",
-      required: false,
-      binding: {
-        kind: "action_input",
-        actionKey: "toograph_capability_selector",
-        fieldKey: "agent_loop_control",
-        managed: true,
-      },
-    },
-  ]);
+  assert.deepEqual(selectorActionInputReads, []);
   assert.equal(selector.reads.some((read) => read.state === "capability_result"), true);
-  assert.equal(selector.reads.some((read) => read.state === "capability_trace"), true);
+  assert.equal(selector.reads.some((read) => read.state === "capability_trace"), false);
   assert.equal(selector.reads.some((read) => read.state === "current_session_id"), true);
   assert.equal(template.metadata.buddyRuntimeInputBindings.input_user_message, "current_message");
   assert.equal(template.nodes.load_history_context.config.toolKey, "buddy_history_context_loader");
-  assert.equal(template.nodes.guard_agent_loop.kind, "tool");
-  assert.equal(template.nodes.guard_agent_loop.config.toolKey, "agent_loop_guard");
-  assert.equal(template.nodes.agent_loop_continue_condition.kind, "condition");
-  assert.deepEqual(
-    template.conditional_edges.find((edge) => edge.source === "agent_loop_continue_condition").branches,
-    {
-      true: "check_context_pressure",
-      false: "finalize_guard_stop",
-      exhausted: "finalize_guard_stop",
-    },
-  );
+  assert.equal(template.nodes.guard_agent_loop, undefined);
+  assert.equal(template.nodes.agent_loop_continue_condition, undefined);
   assert.equal(template.nodes.input_conversation_history, undefined);
   assert.equal(condition.name, "是否需要继续调用能力");
   assert.equal(condition.config.rule.source, "$state.needs_capability");
+  assert.equal(template.state_schema.agent_loop_control, undefined);
+  assert.equal(template.state_schema.agent_loop_report, undefined);
   assert.equal(template.state_schema.should_call_capability, undefined);
   assert.equal(template.state_schema.capability_found, undefined);
+  assert.equal(template.state_schema.capability_trace, undefined);
   assert.equal(template.nodes.buddy_capability_loop, undefined);
 });
 

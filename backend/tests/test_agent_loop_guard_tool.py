@@ -34,6 +34,7 @@ class AgentLoopGuardToolTests(unittest.TestCase):
         self.assertIsNotNone(definition)
         self.assertEqual(definition.name, "Agent Loop Guard")
         self.assertIn("stop reason", definition.description)
+        self.assertNotIn("capability_trace", [field.key for field in definition.input_schema])
         self.assertIn("agent_loop_guard", get_tool_registry(include_disabled=True).keys())
 
     def test_guard_continues_and_updates_loop_control_within_budget(self) -> None:

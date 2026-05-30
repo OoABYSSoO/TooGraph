@@ -593,6 +593,7 @@ def execute_agent_node(
         action_stream_state_keys = collect_action_planning_state_output_keys(
             node=node,
             bindings=resolved_bindings,
+            action_definitions=action_definitions,
             state_schema=state_schema,
         )
         action_stream_delta_callback = None

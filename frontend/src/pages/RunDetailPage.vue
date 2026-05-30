@@ -564,14 +564,6 @@
                 </ElButton>
               </div>
             </div>
-            <div v-if="agentDiagnostic.capabilitySelection.visible" class="run-detail__capability-selection">
-              <dl class="run-detail__diagnostic-facts">
-                <div v-if="agentDiagnostic.capabilitySelection.selectionReason">
-                  <dt>{{ t("runDetail.capabilitySelectionReason") }}</dt>
-                  <dd>{{ agentDiagnostic.capabilitySelection.selectionReason }}</dd>
-                </div>
-              </dl>
-            </div>
             <div v-if="agentDiagnostic.providerProfile.visible" class="run-detail__capability-selection run-detail__provider-profile">
               <h4>{{ t("runDetail.providerProfile") }}</h4>
               <dl class="run-detail__diagnostic-facts">

@@ -24,7 +24,7 @@ def toograph_capability_selector(**action_inputs: Any) -> dict[str, Any]:
     permission_policy = resolve_permission_policy(runtime_context)
     catalog = discover_capability_catalog()
     return normalize_selected_capability(
-        action_inputs.get("capability"),
+        action_inputs,
         catalog=catalog,
         permission_policy=permission_policy,
         budget_context=resolve_budget_context(runtime_context) or resolve_budget_context(action_inputs),

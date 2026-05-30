@@ -19,12 +19,6 @@
       "description": "Current loop counters, budgets, retry budget, failure counts, and warnings."
     },
     {
-      "key": "capability_trace",
-      "name": "Capability Trace",
-      "valueType": "json",
-      "description": "LLM-maintained capability trace from the Buddy loop."
-    },
-    {
       "key": "selected_capability",
       "name": "Selected Capability",
       "valueType": "capability",

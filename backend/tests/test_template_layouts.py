@@ -1973,10 +1973,8 @@ class TemplateLayoutTests(unittest.TestCase):
                 "context_compaction_summary",
                 "context_compaction_write_result",
                 "needs_capability",
-                "capability_selection_reason",
                 "selected_capability",
                 "capability_result",
-                "capability_trace",
                 "show_result_package",
                 "public_response",
             },
@@ -2001,10 +1999,8 @@ class TemplateLayoutTests(unittest.TestCase):
             "context_compaction_summary": "markdown",
             "context_compaction_write_result": "json",
             "needs_capability": "boolean",
-            "capability_selection_reason": "text",
             "selected_capability": "capability",
             "capability_result": "result_package",
-            "capability_trace": "json",
             "show_result_package": "boolean",
             "public_response": "markdown",
         }
@@ -2012,11 +2008,10 @@ class TemplateLayoutTests(unittest.TestCase):
             with self.subTest(state_key=state_key):
                 self.assertEqual(states[state_key]["type"], expected_type)
         self.assertEqual(
-            [state_key for state_key in states if state_key in {"needs_capability", "capability_selection_reason", "selected_capability"}],
-            ["needs_capability", "capability_selection_reason", "selected_capability"],
+            [state_key for state_key in states if state_key in {"needs_capability", "selected_capability"}],
+            ["needs_capability", "selected_capability"],
         )
         self.assertEqual(states["needs_capability"]["binding"]["fieldKey"], "needs_capability")
-        self.assertEqual(states["capability_selection_reason"]["binding"]["fieldKey"], "selection_reason")
         self.assertEqual(states["selected_capability"]["binding"]["fieldKey"], "capability")
         self.assertEqual(states["context_budget_report"]["binding"]["kind"], "tool_output")
         self.assertEqual(states["context_budget_report"]["binding"]["toolKey"], "buddy_context_pressure_check")
@@ -2053,6 +2048,8 @@ class TemplateLayoutTests(unittest.TestCase):
             "agent_loop_stop_reason",
             "agent_loop_should_continue",
             "agent_loop_should_retry",
+            "capability_trace",
+            "capability_selection_reason",
         ]:
             self.assertNotIn(removed_state_key, states)
 
@@ -2126,7 +2123,6 @@ class TemplateLayoutTests(unittest.TestCase):
                     "actionKey": "toograph_capability_selector",
                     "outputMapping": {
                         "needs_capability": "needs_capability",
-                        "selection_reason": "capability_selection_reason",
                         "capability": "selected_capability",
                     },
                 }
@@ -2134,7 +2130,7 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertEqual(
             list(selector_node["config"]["actionBindings"][0]["outputMapping"]),
-            ["needs_capability", "selection_reason", "capability"],
+            ["needs_capability", "capability"],
         )
         selector_action_inputs = [
             read
@@ -2152,24 +2148,31 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn({"state": "buddy_context", "required": False}, _read_contracts(selector_node["reads"]))
         self.assertIn({"state": "current_session_id", "required": False}, _read_contracts(selector_node["reads"]))
         self.assertIn({"state": "capability_result", "required": False}, _read_contracts(selector_node["reads"]))
-        self.assertIn({"state": "capability_trace", "required": False}, _read_contracts(selector_node["reads"]))
         for read in selector_node["reads"]:
-            self.assertNotIn(read.get("state"), {"raw_conversation_history", "page_context", "agent_loop_control", "agent_loop_report"})
+            self.assertNotIn(
+                read.get("state"),
+                {"raw_conversation_history", "page_context", "agent_loop_control", "agent_loop_report", "capability_trace"},
+            )
         self.assertEqual(
             selector_node["writes"],
             [
-                {"state": "show_result_package", "mode": "replace"},
                 {"state": "public_response", "mode": "replace"},
-                {"state": "capability_trace", "mode": "replace"},
                 {"state": "needs_capability", "mode": "replace"},
-                {"state": "capability_selection_reason", "mode": "replace"},
                 {"state": "selected_capability", "mode": "replace"},
             ],
         )
+        self.assertNotIn("show_result_package", selector_node["config"]["taskInstruction"])
+        self.assertNotIn(
+            "show_result_package",
+            selector_node["config"]["actionInstructionBlocks"]["toograph_capability_selector"]["content"],
+        )
+        self.assertNotIn("capability_trace", selector_node["config"]["taskInstruction"])
+        self.assertNotIn(
+            "capability_trace",
+            selector_node["config"]["actionInstructionBlocks"]["toograph_capability_selector"]["content"],
+        )
         self.assertIn("capability.kind=none", selector_node["config"]["taskInstruction"])
-        self.assertIn("show_result_package=true", selector_node["config"]["taskInstruction"])
-        self.assertIn("public_response 只说明下一条结果包是什么内容类型或来源", selector_node["config"]["taskInstruction"])
-        self.assertIn("虽然包含 public_response/final_response 字段", selector_node["config"]["taskInstruction"])
+        self.assertIn("每轮必须同时产出两类决策：public_response 和 needs_capability/capability", selector_node["config"]["taskInstruction"])
         self.assertIn("buddy_session_recall", selector_node["config"]["taskInstruction"])
         self.assertIn("current_session_id", selector_node["config"]["taskInstruction"])
         self.assertIn(
@@ -2182,10 +2185,12 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn({"state": "selected_capability", "required": True}, _read_contracts(execute_node["reads"]))
         self.assertIn({"state": "user_message", "required": True}, _read_contracts(execute_node["reads"]))
         self.assertIn({"state": "current_session_id", "required": False}, _read_contracts(execute_node["reads"]))
-        self.assertIn({"state": "capability_trace", "required": False}, _read_contracts(execute_node["reads"]))
+        for read in execute_node["reads"]:
+            self.assertNotEqual(read.get("state"), "capability_trace")
         self.assertEqual(execute_node["writes"], [{"state": "capability_result", "mode": "replace"}])
         self.assertIn("selected_capability.kind=action/subgraph/tool", execute_node["config"]["taskInstruction"])
         self.assertIn("buddy_session_recall", execute_node["config"]["taskInstruction"])
+        self.assertNotIn("capability_trace", execute_node["config"]["taskInstruction"])
         self.assertIn("result_package", execute_node["config"]["taskInstruction"])
 
         direct_condition_node = nodes["condition_93972e3f"]

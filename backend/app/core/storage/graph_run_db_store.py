@@ -776,7 +776,7 @@ def _insert_capability_usage_event(
             str(output.get("node_id") or ""),
             resolved_kind,
             capability_key,
-            str(output.get("selection_reason") or output.get("selected_reason") or ""),
+            str(output.get("selected_reason") or ""),
             status,
             output.get("duration_ms") if isinstance(output.get("duration_ms"), int) else None,
             str(output.get("error_type") or ""),

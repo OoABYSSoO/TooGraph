@@ -46,7 +46,11 @@ def build_action_llm_output_schema(
     *,
     state_output_keys: list[str] | None = None,
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
+    output_entries: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    if output_entries is not None:
+        return _build_flat_action_llm_output_schema(output_entries, state_schema)
+
     properties: dict[str, Any] = {}
     required_action_keys: list[str] = []
     for resolved_binding in bindings:
@@ -82,6 +86,38 @@ def build_action_llm_output_schema(
         required_state_keys.append(state_key)
 
     return _object_schema(properties, required=[*required_action_keys, *required_state_keys], additional_properties=False)
+
+
+def _build_flat_action_llm_output_schema(
+    output_entries: list[dict[str, Any]],
+    state_schema: dict[str, NodeSystemStateDefinition] | None,
+) -> dict[str, Any]:
+    resolved_state_schema = state_schema or {}
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+    for entry in output_entries:
+        if entry.get("kind") == "action_field":
+            field = entry.get("field")
+            if not isinstance(field, ActionIoField):
+                continue
+            properties[field.key] = schema_for_action_io_field(field)
+            required.append(field.key)
+            continue
+
+        state_key = str(entry.get("state_key") or "")
+        if not state_key or state_key in properties:
+            continue
+        definition = resolved_state_schema.get(state_key)
+        state_type = _coerce_state_type(getattr(definition, "type", NodeSystemStateType.TEXT))
+        field_schema = _schema_for_value_type(state_type.value)
+        _apply_schema_metadata(
+            field_schema,
+            name=getattr(definition, "name", "") or state_key,
+            description=getattr(definition, "description", ""),
+        )
+        properties[state_key] = field_schema
+        required.append(state_key)
+    return _object_schema(properties, required=required, additional_properties=False)
 
 
 def schema_for_action_io_field(field: ActionIoField) -> dict[str, Any]:

@@ -119,9 +119,6 @@ test("RunDetailPage renders Agent Diagnostic from run detail state", () => {
   assert.match(componentSource, /agentDiagnostic\.stopReason/);
   assert.match(componentSource, /agentDiagnostic\.stopReasonTitleKey/);
   assert.match(componentSource, /agentDiagnostic\.stopReasonDescriptionKey/);
-  assert.match(componentSource, /agentDiagnostic\.capabilitySelection\.visible/);
-  assert.match(componentSource, /agentDiagnostic\.capabilitySelection\.rejectedLabels/);
-  assert.match(componentSource, /agentDiagnostic\.capabilitySelection\.fallbackLabels/);
   assert.match(componentSource, /agentDiagnostic\.providerFallback\.visible/);
   assert.match(componentSource, /agentDiagnostic\.providerFallback\.requestedRef/);
   assert.match(componentSource, /agentDiagnostic\.providerFallback\.selectedRef/);

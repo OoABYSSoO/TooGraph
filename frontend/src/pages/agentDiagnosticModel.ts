@@ -1,5 +1,4 @@
 import type { RunDetail } from "../types/run.ts";
-import { buildCapabilitySelectionDiagnostic, type CapabilitySelectionDiagnostic } from "../lib/capabilitySelectionReason.ts";
 import { buildDelegationBoardDiagnostic, type DelegationBoardDiagnostic } from "../lib/delegationBoardDiagnostic.ts";
 import { buildDelegationWorkerDiagnostic, type DelegationWorkerDiagnostic } from "../lib/delegationWorkerDiagnostic.ts";
 
@@ -32,7 +31,6 @@ export type AgentDiagnostic = {
   selectedCapabilityRef: string;
   warnings: string[];
   badges: string[];
-  capabilitySelection: CapabilitySelectionDiagnostic;
   providerProfile: ProviderProfileDiagnostic;
   providerFallback: ProviderFallbackDiagnostic;
   providerCostBudgetDegradation: ProviderCostBudgetDegradationDiagnostic;
@@ -118,7 +116,6 @@ export function buildAgentDiagnostic(run: RunDetail): AgentDiagnostic {
   const capabilityCallCount = numberFromUnknown(report.capability_call_count);
   const maxCapabilityCalls = numberFromUnknown(report.max_capability_calls);
   const decision = textFromUnknown(report.decision);
-  const capabilitySelection = buildCapabilitySelectionDiagnostic(stateValues.capability_selection_reason);
   const providerProfile = buildProviderProfileDiagnostic(resolveProviderProfileRuntimeConfig(run));
   const providerFallback = buildProviderFallbackDiagnostic(resolveProviderFallbackTrace(run, stateValues));
   const providerCostBudgetDegradation = buildProviderCostBudgetDegradationDiagnostic(
@@ -137,7 +134,6 @@ export function buildAgentDiagnostic(run: RunDetail): AgentDiagnostic {
     || iterationIndex !== null
     || capabilityCallCount !== null
     || warnings.length > 0
-    || capabilitySelection.visible
     || providerProfile.visible
     || providerFallback.visible
     || providerCostBudgetDegradation.visible
@@ -163,7 +159,6 @@ export function buildAgentDiagnostic(run: RunDetail): AgentDiagnostic {
     selectedCapabilityRef,
     warnings,
     badges,
-    capabilitySelection,
     providerProfile,
     providerFallback,
     providerCostBudgetDegradation,

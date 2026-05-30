@@ -238,24 +238,6 @@ test("buildAgentDiagnostic summarizes latest completed permission approval", () 
   assert.deepEqual(diagnostic.permissionApproval.warnings, ["不执行 shell。"]);
 });
 
-test("buildAgentDiagnostic summarizes capability selection reason from state values", () => {
-  const diagnostic = buildAgentDiagnostic(
-    createRun({
-      artifacts: {
-        state_values: {
-          capability_selection_reason: "需要公开网页资料。",
-        },
-      },
-    }),
-  );
-
-  assert.equal(diagnostic.visible, true);
-  assert.deepEqual(diagnostic.capabilitySelection, {
-    visible: true,
-    selectionReason: "需要公开网页资料。",
-  });
-});
-
 test("buildAgentDiagnostic summarizes provider fallback trace from state values", () => {
   const diagnostic = buildAgentDiagnostic(
     createRun({

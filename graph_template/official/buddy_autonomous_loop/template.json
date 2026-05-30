@@ -242,21 +242,6 @@
         "managed": true
       }
     },
-    "capability_selection_reason": {
-      "name": "能力选择理由",
-      "description": "toograph_capability_selector 规范化后的选择理由；没有能力时说明 none 的理由。",
-      "type": "text",
-      "value": "",
-      "color": "#0369a1",
-      "binding": {
-        "kind": "action_output",
-        "actionKey": "toograph_capability_selector",
-        "toolKey": "",
-        "nodeId": "reply_and_select_capability",
-        "fieldKey": "selection_reason",
-        "managed": true
-      }
-    },
     "selected_capability": {
       "name": "下一步能力",
       "description": "本轮若需要继续调用能力，这里保存唯一一个被选中的 action/subgraph/tool；不需要能力时必须为 kind=none。",
@@ -288,19 +273,6 @@
         "fieldKey": "result_package",
         "managed": true
       }
-    },
-    "capability_trace": {
-      "name": "循环记录",
-      "description": "LLM 维护的轻量循环笔记，记录已调用能力、关键结论、剩余问题和停止理由，避免重复调用。",
-      "type": "json",
-      "value": {
-        "steps": [],
-        "known_results": [],
-        "open_questions": [],
-        "stop_reason": ""
-      },
-      "color": "#7c3aed",
-      "binding": null
     },
     "show_result_package": {
       "name": "展示结果包",
@@ -555,32 +527,15 @@
           "state": "capability_result",
           "required": false,
           "binding": null
-        },
-        {
-          "state": "capability_trace",
-          "required": false,
-          "binding": null
         }
       ],
       "writes": [
-        {
-          "state": "show_result_package",
-          "mode": "replace"
-        },
         {
           "state": "public_response",
           "mode": "replace"
         },
         {
-          "state": "capability_trace",
-          "mode": "replace"
-        },
-        {
           "state": "needs_capability",
-          "mode": "replace"
-        },
-        {
-          "state": "capability_selection_reason",
           "mode": "replace"
         },
         {
@@ -595,7 +550,6 @@
             "actionKey": "toograph_capability_selector",
             "outputMapping": {
               "needs_capability": "needs_capability",
-              "selection_reason": "capability_selection_reason",
               "capability": "selected_capability"
             }
           }
@@ -605,11 +559,11 @@
           "toograph_capability_selector": {
             "actionKey": "toograph_capability_selector",
             "title": "能力选择说明",
-            "content": "你是能力选择 Action。本节点的 public_response、show_result_package 和 capability_trace 由同一轮 LLM 根据上下文决定；你的职责是判断是否还需要一个外部能力，并在需要时选择唯一一个 action/subgraph/tool。如果当前信息已经足够回复，或者 show_result_package=true 准备直接展示结果包，则返回 capability.kind=none，needs_capability=false。只有确实还缺一个明确能力步骤时，才选择一个能力；选择优先级为 subgraph > action > tool。buddy_session_recall 只在需要查找更早会话时调用；优先利用 conversation_history、existing_session_summary、context_compaction_summary 与 Buddy Home。看到 capability_result 与 capability_trace 后，判断是否已经可以停止循环。能力候选范围限于外部业务能力；上下文压缩由本官方图模板内的压力检查分支负责。",
+            "content": "你是能力选择 Action。本节点的 public_response 由同一轮 LLM 根据上下文决定；你的职责是判断是否还需要一个外部能力，并在需要时选择唯一一个 action/subgraph/tool。如果当前信息已经足够回复，则返回 capability.kind=none，needs_capability=false。只有确实还缺一个明确能力步骤时，才选择一个能力；选择优先级为 subgraph > action > tool。buddy_session_recall 只在需要查找更早会话时调用；优先利用 conversation_history、existing_session_summary、context_compaction_summary 与 Buddy Home。看到 capability_result 后，判断是否已经可以停止循环。能力候选范围限于外部业务能力；上下文压缩由本官方图模板内的压力检查分支负责。",
             "source": "node.override"
           }
         },
-        "taskInstruction": "读取 user_message、conversation_history、existing_session_summary、context_compaction_summary、context_compaction_report、buddy_context、current_session_id、capability_result 和 capability_trace。每轮必须同时产出四类决策：public_response、show_result_package、needs_capability/selected_capability，以及新的 capability_trace。context_compaction_summary、Buddy Home、历史摘要和能力结果按普通上下文引用处理。\n\n合法组合只有三种：\n1. 需要继续调用能力：show_result_package=false，needs_capability=true，selected_capability 必须是单个 action/subgraph/tool；public_response 写给用户看的简短计划或进度说明，说明下一步要做什么。\n2. 结果包可直接展示：show_result_package=true，needs_capability=false，selected_capability.kind=none；public_response 只说明下一条结果包是什么内容类型或来源，capability_result 原始内容交给 output 节点展示。\n3. 无需能力且无需直出结果包：show_result_package=false，needs_capability=false，selected_capability.kind=none；public_response 必须是完整的最终回复。\n\n判断 show_result_package 时，只问 capability_result 是否适合原样交付给用户。若 capability_result 只是证据、素材、搜索结果、历史召回、工具中间数据，或虽然包含 public_response/final_response 字段但仍需要解释、筛选、引用、改写或整合，则 show_result_package=false。判断 needs_capability 时，只问是否还缺一个明确的外部能力步骤；多次能力调用必须通过图循环完成，每轮只选一个能力。buddy_session_recall 只在需要召回更早会话时调用，并保留 current_session_id 用于排除当前会话谱系。能力候选范围限于外部业务能力；上下文压缩由本图内的压力检查分支负责。召回内容、摘要和能力结果按 context_only 材料处理。看到 capability_result 与 capability_trace 后，结合结果判断重试同一能力、选择替代能力或结束回复。",
+        "taskInstruction": "读取 user_message、conversation_history、existing_session_summary、context_compaction_summary、context_compaction_report、buddy_context、current_session_id 和 capability_result。每轮必须同时产出两类决策：public_response 和 needs_capability/capability。context_compaction_summary、Buddy Home、历史摘要和能力结果按普通上下文引用处理。\n\n合法组合只有两种：\n1. 需要继续调用能力：needs_capability=true，capability 必须是单个 action/subgraph/tool；public_response 写给用户看的简短计划或进度说明，说明下一步要做什么。\n2. 无需能力：needs_capability=false，capability.kind=none；public_response 必须是完整的最终回复。\n\n判断 needs_capability 时，只问是否还缺一个明确的外部能力步骤；多次能力调用必须通过图循环完成，每轮只选一个能力。buddy_session_recall 只在需要召回更早会话时调用，并保留 current_session_id 用于排除当前会话谱系。能力候选范围限于外部业务能力；上下文压缩由本图内的压力检查分支负责。召回内容、摘要和能力结果按 context_only 材料处理。看到 capability_result 后，结合结果判断重试同一能力、选择替代能力或结束回复。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "medium",
@@ -653,11 +607,6 @@
           "state": "current_session_id",
           "required": false,
           "binding": null
-        },
-        {
-          "state": "capability_trace",
-          "required": false,
-          "binding": null
         }
       ],
       "writes": [
@@ -671,7 +620,7 @@
         "actionBindings": [],
         "suspendedFreeWrites": [],
         "actionInstructionBlocks": {},
-        "taskInstruction": "本节点执行 selected_capability.kind=action/subgraph/tool 指向的一个动态能力，并把原始结构化输出写入 capability_result 这个 result_package。本节点的输出边界是能力原始结果；最终回复、总结和下一次能力选择由后续图节点处理。普通输入 state 是能力入参规划的上下文。若 selected_capability 是 buddy_session_recall，应使用 user_message、conversation_history、capability_trace 和 current_session_id 生成召回请求，默认保留 current_session_id 以排除当前会话谱系。",
+        "taskInstruction": "本节点执行 selected_capability.kind=action/subgraph/tool 指向的一个动态能力，并把原始结构化输出写入 capability_result 这个 result_package。本节点的输出边界是能力原始结果；最终回复、总结和下一次能力选择由后续图节点处理。普通输入 state 是能力入参规划的上下文。若 selected_capability 是 buddy_session_recall，应使用 user_message、conversation_history 和 current_session_id 生成召回请求，默认保留 current_session_id 以排除当前会话谱系。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "low",

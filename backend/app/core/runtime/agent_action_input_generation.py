@@ -61,6 +61,13 @@ def generate_agent_action_inputs(
     state_output_keys = collect_action_planning_state_output_keys(
         node=node,
         bindings=bindings,
+        action_definitions=action_definitions,
+        state_schema=state_schema,
+    )
+    output_entries = collect_action_planning_output_entries(
+        node=node,
+        bindings=bindings,
+        action_definitions=action_definitions,
         state_schema=state_schema,
     )
     raw_input_attachments = collect_input_attachments(input_values, state_schema=state_schema)
@@ -80,12 +87,14 @@ def generate_agent_action_inputs(
         node=node,
         runtime_context=resolve_action_runtime_context(runtime_config),
         state_output_keys=state_output_keys,
+        output_entries=output_entries,
     )
     structured_output_schema = build_action_llm_output_schema(
         bindings,
         action_definitions,
         state_output_keys=state_output_keys,
         state_schema=state_schema,
+        output_entries=output_entries,
     )
     user_prompt = build_action_input_user_prompt(node)
     action_keys = [binding.binding.action_key for binding in bindings]
@@ -141,12 +150,18 @@ def generate_agent_action_inputs(
         finally:
             cleanup_prepared_media_paths(attachment_meta.get("cleanup_paths"))
 
-    action_inputs, state_outputs = parse_action_planning_response(content, action_keys, state_output_keys)
+    action_inputs, state_outputs = parse_action_planning_response(
+        content,
+        action_keys,
+        state_output_keys,
+        action_field_keys_by_action=action_field_keys_by_action(output_entries),
+    )
     structured_output_payload = compose_action_planning_output_payload(
         action_inputs,
         state_outputs,
         action_keys=action_keys,
         state_output_keys=state_output_keys,
+        output_entries=output_entries,
     )
     initial_structured_output_validation_errors = validate_structured_output(structured_output_payload, structured_output_schema)
     structured_output_validation_errors = list(initial_structured_output_validation_errors)
@@ -173,12 +188,14 @@ def generate_agent_action_inputs(
                 repair_content,
                 action_keys,
                 state_output_keys,
+                action_field_keys_by_action=action_field_keys_by_action(output_entries),
             )
             repaired_payload = compose_action_planning_output_payload(
                 repaired_action_inputs,
                 repaired_state_outputs,
                 action_keys=action_keys,
                 state_output_keys=state_output_keys,
+                output_entries=output_entries,
             )
             repair_validation_errors = validate_structured_output(repaired_payload, structured_output_schema)
             if not repair_validation_errors:
@@ -250,9 +267,19 @@ def build_action_input_system_prompt(
     node: NodeSystemAgentNode | None = None,
     runtime_context: dict[str, Any] | None = None,
     state_output_keys: list[str] | None = None,
+    output_entries: list[dict[str, Any]] | None = None,
 ) -> str:
     resolved_state_schema = state_schema or {}
     resolved_state_output_keys = list(state_output_keys or [])
+    resolved_output_entries = list(output_entries or [])
+    if not resolved_output_entries:
+        for resolved_binding in bindings:
+            action_key = resolved_binding.binding.action_key
+            definition = action_definitions.get(action_key)
+            for field in (definition.llm_output_schema if definition is not None else []):
+                resolved_output_entries.append({"kind": "action_field", "action_key": action_key, "field": field})
+        for state_key in resolved_state_output_keys:
+            resolved_output_entries.append({"kind": "state", "state_key": state_key})
     action_state_input_slots = collect_action_state_input_slots(
         node=node,
         input_values=input_values,
@@ -260,12 +287,12 @@ def build_action_input_system_prompt(
     )
     parts = [
         "You are the Action LLM-output planning phase of a graph LLM node.",
-        "Choose concrete structured LLM output for every bound action from the current graph state and the action schemas.",
+        "Choose concrete structured LLM output from the current graph state and action schemas.",
         "Return only one JSON object. Do not add markdown fences or prose.",
-        "The top-level keys must include every bound action key and every listed custom state output key.",
-        "Action key values must be JSON objects of arguments for that action.",
-        "Custom state output values are normal LLM-authored graph state values.",
-        "Do not summarize action results. Do not answer the user here. Only produce the structured LLM output described by llmOutputSchema and the custom state outputs.",
+        "The top-level keys must include every listed LLM output field in the listed order.",
+        "Action fields are collected as after_llm.py inputs; custom state fields are written directly to graph state.",
+        "Only output the listed fields. Later action results are produced by the runtime after after_llm.py runs.",
+        "Do not summarize action results. Do not answer the user here. Only produce the structured LLM output fields listed below.",
     ]
     if input_values:
         parts.append("\n== Graph State Inputs ==")
@@ -277,14 +304,13 @@ def build_action_input_system_prompt(
         parts.extend(format_action_state_input_slot_lines(action_state_input_slots, action_definitions))
 
     parts.append("\n== Bound Actions ==")
-    example: dict[str, dict[str, Any]] = {}
+    action_field_examples: dict[tuple[str, str], Any] = {}
     for resolved_binding in bindings:
         action_key = resolved_binding.binding.action_key
         definition = action_definitions.get(action_key)
         parts.append(f"- actionKey: {action_key}")
         if definition is None:
             parts.append("  llmOutputSchema: []")
-            example[action_key] = {}
             continue
         if definition.name:
             parts.append(f"  name: {definition.name}")
@@ -300,18 +326,36 @@ def build_action_input_system_prompt(
         parts.append("  llmOutputSchema:")
         for field in definition.llm_output_schema:
             parts.extend(format_action_input_field_lines(field))
-        example[action_key] = {
-            field.key: example_action_input_value(field)
-            for field in definition.llm_output_schema
-        }
+            action_field_examples[(action_key, field.key)] = example_action_input_value(field)
 
-    if resolved_state_output_keys:
-        parts.append("\n== Custom LLM State Outputs ==")
-        parts.append("These state outputs are written directly to graph state and are not passed to after_llm.py.")
-        parts.append("Return them in the same top-to-bottom order listed here.")
-        for state_key in resolved_state_output_keys:
+    example: dict[str, Any] = {}
+    if resolved_output_entries:
+        parts.append("\n== LLM Output Fields ==")
+        parts.append("Action fields are collected as after_llm.py inputs; custom state fields are written directly.")
+        parts.append("Return these top-level fields in the same top-to-bottom order listed here.")
+        for entry in resolved_output_entries:
+            if entry.get("kind") == "action_field":
+                action_key = str(entry.get("action_key") or "")
+                field = entry.get("field")
+                if not isinstance(field, ActionIoField):
+                    continue
+                parts.append(f"- stateKey: {field.key}")
+                parts.append("  source: action_after_llm_input")
+                parts.append(f"  actionKey: {action_key}")
+                if field.name and field.name != field.key:
+                    parts.append(f"  name: {field.name}")
+                parts.append(f"  type: {field.value_type}")
+                if field.description:
+                    parts.append(f"  description: {field.description}")
+                example[field.key] = action_field_examples.get((action_key, field.key), example_action_input_value(field))
+                continue
+
+            state_key = str(entry.get("state_key") or "")
+            if not state_key:
+                continue
             definition = resolved_state_schema.get(state_key)
             parts.append(f"- stateKey: {state_key}")
+            parts.append("  source: graph_state")
             name = getattr(definition, "name", "") if definition is not None else ""
             description = getattr(definition, "description", "") if definition is not None else ""
             value_type = getattr(definition, "type", None)
@@ -494,23 +538,64 @@ def collect_action_planning_state_output_keys(
     *,
     node: NodeSystemAgentNode | None,
     bindings: list[ResolvedAgentActionBinding],
+    action_definitions: dict[str, ActionDefinition] | None = None,
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
 ) -> list[str]:
+    return [
+        str(entry.get("state_key") or "")
+        for entry in collect_action_planning_output_entries(
+            node=node,
+            bindings=bindings,
+            action_definitions=action_definitions or {},
+            state_schema=state_schema,
+        )
+        if entry.get("kind") == "state" and entry.get("state_key")
+    ]
+
+
+def collect_action_planning_output_entries(
+    *,
+    node: NodeSystemAgentNode | None,
+    bindings: list[ResolvedAgentActionBinding],
+    action_definitions: dict[str, ActionDefinition] | None = None,
+    state_schema: dict[str, NodeSystemStateDefinition] | None = None,
+) -> list[dict[str, Any]]:
     if node is None:
         return []
     resolved_state_schema = state_schema or {}
+    resolved_action_definitions = action_definitions or {}
     action_keys = {resolved.binding.action_key for resolved in bindings}
-    mapped_action_output_states = {
-        state_key
-        for resolved in bindings
-        for state_key in resolved.binding.output_mapping.values()
-        if state_key
-    }
-    output_keys: list[str] = []
+    mapped_action_output_states: dict[str, str] = {}
+    for resolved in bindings:
+        action_key = resolved.binding.action_key
+        for state_key in resolved.binding.output_mapping.values():
+            if state_key and state_key not in mapped_action_output_states:
+                mapped_action_output_states[state_key] = action_key
+
+    output_entries: list[dict[str, Any]] = []
     seen: set[str] = set()
+    emitted_actions: set[str] = set()
+
+    def append_action_fields(action_key: str) -> None:
+        if not action_key or action_key in emitted_actions:
+            return
+        emitted_actions.add(action_key)
+        definition = resolved_action_definitions.get(action_key)
+        for field in (definition.llm_output_schema if definition is not None else []):
+            entry_key = f"action:{action_key}:{field.key}"
+            if entry_key in seen or field.key in seen:
+                continue
+            seen.add(entry_key)
+            seen.add(field.key)
+            output_entries.append({"kind": "action_field", "action_key": action_key, "field": field})
+
     for write in node.writes:
         state_key = write.state
-        if state_key in seen or state_key in mapped_action_output_states or state_key in action_keys:
+        mapped_action_key = mapped_action_output_states.get(state_key)
+        if mapped_action_key:
+            append_action_fields(mapped_action_key)
+            continue
+        if state_key in seen or state_key in action_keys:
             continue
         definition = resolved_state_schema.get(state_key)
         binding = getattr(definition, "binding", None)
@@ -520,22 +605,45 @@ def collect_action_planning_state_output_keys(
             if binding.kind == NodeSystemStateBindingKind.CAPABILITY_RESULT:
                 continue
         seen.add(state_key)
-        output_keys.append(state_key)
-    return output_keys
+        output_entries.append({"kind": "state", "state_key": state_key})
+
+    for action_key in action_keys:
+        append_action_fields(action_key)
+    return output_entries
+
+
+def action_field_keys_by_action(output_entries: list[dict[str, Any]]) -> dict[str, list[str]]:
+    result: dict[str, list[str]] = {}
+    for entry in output_entries:
+        if entry.get("kind") != "action_field":
+            continue
+        action_key = str(entry.get("action_key") or "")
+        field = entry.get("field")
+        if not action_key or not isinstance(field, ActionIoField):
+            continue
+        result.setdefault(action_key, []).append(field.key)
+    return result
 
 
 def parse_action_planning_response(
     content: str,
     action_keys: list[str],
     state_output_keys: list[str],
+    *,
+    action_field_keys_by_action: dict[str, list[str]] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
     parsed = _parse_json_object(content)
     if not isinstance(parsed, dict):
         return {action_key: {} for action_key in action_keys}, {}
     result: dict[str, dict[str, Any]] = {}
+    flat_action_fields = action_field_keys_by_action or {}
     for action_key in action_keys:
         value = parsed.get(action_key)
-        result[action_key] = dict(value) if isinstance(value, dict) else {}
+        action_inputs = dict(value) if isinstance(value, dict) else {}
+        for field_key in flat_action_fields.get(action_key, []):
+            if field_key in parsed:
+                action_inputs[field_key] = parsed.get(field_key)
+        result[action_key] = action_inputs
     state_outputs = {
         state_key: parsed.get(state_key)
         for state_key in state_output_keys
@@ -555,7 +663,22 @@ def compose_action_planning_output_payload(
     *,
     action_keys: list[str],
     state_output_keys: list[str],
+    output_entries: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    if output_entries is not None:
+        payload: dict[str, Any] = {}
+        for entry in output_entries:
+            if entry.get("kind") == "action_field":
+                action_key = str(entry.get("action_key") or "")
+                field = entry.get("field")
+                if action_key and isinstance(field, ActionIoField) and field.key in action_inputs.get(action_key, {}):
+                    payload[field.key] = action_inputs[action_key][field.key]
+                continue
+            state_key = str(entry.get("state_key") or "")
+            if state_key in state_outputs:
+                payload[state_key] = state_outputs[state_key]
+        return payload
+
     payload: dict[str, Any] = {
         action_key: dict(action_inputs.get(action_key) or {})
         for action_key in action_keys

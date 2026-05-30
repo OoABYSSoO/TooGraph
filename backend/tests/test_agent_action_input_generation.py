@@ -595,7 +595,8 @@ class AgentActionInputGenerationTests(unittest.TestCase):
         self.assertNotIn("targetState: planned_query", prompt)
         self.assertNotIn("targetName: 联网搜索 Query", prompt)
         self.assertIn("== Action LLM Output JSON Shape ==", prompt)
-        self.assertIn('"web_search"', prompt)
+        shape = prompt.split("== Action LLM Output JSON Shape ==", 1)[1]
+        self.assertNotIn('"web_search"', shape)
         self.assertIn('"query"', prompt)
 
     def test_action_input_prompt_expands_result_package_inputs_before_planning_arguments(self) -> None:
@@ -713,11 +714,10 @@ class AgentActionInputGenerationTests(unittest.TestCase):
         self.assertEqual(warnings, [])
         schema = captured["structured_output_schema"]
         self.assertEqual(schema["type"], "object")
-        self.assertEqual(schema["required"], ["web_search"])
+        self.assertEqual(schema["required"], ["query", "search_context"])
         self.assertFalse(schema["additionalProperties"])
-        self.assertEqual(schema["properties"]["web_search"]["required"], ["query", "search_context"])
-        self.assertFalse(schema["properties"]["web_search"]["additionalProperties"])
-        self.assertEqual(schema["properties"]["web_search"]["properties"]["query"]["type"], "string")
+        self.assertEqual(list(schema["properties"].keys()), ["query", "search_context"])
+        self.assertEqual(schema["properties"]["query"]["type"], "string")
         self.assertEqual(updated_config["action_input_structured_output_strategy"], "json_schema")
 
     def test_generate_action_inputs_passes_on_delta_to_model(self) -> None:
@@ -783,8 +783,8 @@ class AgentActionInputGenerationTests(unittest.TestCase):
             return (
                 json.dumps(
                     {
-                        "web_search": {"query": "TooGraph RAG"},
                         "planner_notes": "Use recent docs first.",
+                        "query": "TooGraph RAG",
                         "draft_answer": "Draft response.",
                     }
                 ),
@@ -871,13 +871,140 @@ class AgentActionInputGenerationTests(unittest.TestCase):
         )
         self.assertEqual(warnings, [])
         schema = captured["structured_output_schema"]
-        self.assertEqual(list(schema["properties"].keys()), ["web_search", "planner_notes", "draft_answer"])
-        self.assertEqual(schema["required"], ["web_search", "planner_notes", "draft_answer"])
+        self.assertEqual(list(schema["properties"].keys()), ["planner_notes", "query", "draft_answer"])
+        self.assertEqual(schema["required"], ["planner_notes", "query", "draft_answer"])
         prompt = captured["system_prompt"]
-        self.assertIn("== Custom LLM State Outputs ==", prompt)
-        self.assertIn("These state outputs are written directly to graph state and are not passed to after_llm.py.", prompt)
-        self.assertLess(prompt.index("stateKey: planner_notes"), prompt.index("stateKey: draft_answer"))
+        self.assertIn("== LLM Output Fields ==", prompt)
+        self.assertIn("Action fields are collected as after_llm.py inputs; custom state fields are written directly.", prompt)
+        shape = prompt.split("== Action LLM Output JSON Shape ==", 1)[1]
+        self.assertLess(shape.index('"planner_notes"'), shape.index('"query"'))
+        self.assertLess(shape.index('"query"'), shape.index('"draft_answer"'))
+        self.assertNotIn('"web_search"', shape)
         self.assertEqual(updated_config["action_input_state_output_keys"], ["planner_notes", "draft_answer"])
+
+    def test_capability_selector_uses_flat_state_outputs_for_llm_protocol(self) -> None:
+        captured: dict[str, object] = {}
+
+        def chat_with_local_model_with_meta_func(**kwargs):
+            captured.update(kwargs)
+            return (
+                json.dumps(
+                    {
+                        "public_response": "我需要继续联网检索一下。",
+                        "needs_capability": True,
+                        "capability": {
+                            "kind": "subgraph",
+                            "key": "advanced_web_research_loop",
+                        },
+                    }
+                ),
+                {"warnings": []},
+            )
+
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "writes": [
+                    {"state": "public_response", "mode": "replace"},
+                    {"state": "needs_capability", "mode": "replace"},
+                    {"state": "selected_capability", "mode": "replace"},
+                ],
+                "config": {
+                    "actionKey": "toograph_capability_selector",
+                    "taskInstruction": "Decide whether one more capability is required.",
+                    "actionBindings": [
+                        {
+                            "actionKey": "toograph_capability_selector",
+                            "outputMapping": {
+                                "needs_capability": "needs_capability",
+                                "capability": "selected_capability",
+                            },
+                        }
+                    ],
+                },
+            }
+        )
+        state_schema = {
+            "public_response": NodeSystemStateDefinition.model_validate(
+                {"name": "Public Response", "type": "markdown"}
+            ),
+            "needs_capability": NodeSystemStateDefinition.model_validate(
+                {"name": "Needs Capability", "type": "boolean"}
+            ),
+            "selected_capability": NodeSystemStateDefinition.model_validate(
+                {"name": "Selected Capability", "type": "capability"}
+            ),
+        }
+
+        action_inputs, state_outputs, _reasoning, warnings, updated_config = generate_agent_action_inputs(
+            node=node,
+            input_values={"user_message": "远航星的告别讲了什么故事"},
+            bindings=[
+                ResolvedAgentActionBinding(
+                    binding=NodeSystemAgentActionBinding(
+                        actionKey="toograph_capability_selector",
+                        outputMapping={
+                            "needs_capability": "needs_capability",
+                            "capability": "selected_capability",
+                        },
+                    ),
+                    source="node_config",
+                )
+            ],
+            action_definitions={
+                "toograph_capability_selector": ActionDefinition(
+                    actionKey="toograph_capability_selector",
+                    name="Capability Selector",
+                    llmOutputSchema=[
+                        ActionIoField(key="needs_capability", name="Needs Capability", valueType="boolean"),
+                        ActionIoField(key="capability", name="Capability", valueType="capability"),
+                    ],
+                    stateOutputSchema=[
+                        ActionIoField(key="needs_capability", name="Needs Capability", valueType="boolean"),
+                        ActionIoField(key="capability", name="Capability", valueType="capability"),
+                    ],
+                )
+            },
+            runtime_config={
+                "resolved_provider_id": "local",
+                "runtime_model_name": "test-model",
+                "resolved_temperature": 0.2,
+                "resolved_thinking": False,
+                "resolved_thinking_level": "off",
+            },
+            state_schema=state_schema,
+            chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+        )
+
+        self.assertEqual(
+            action_inputs,
+            {
+                "toograph_capability_selector": {
+                    "needs_capability": True,
+                    "capability": {
+                        "kind": "subgraph",
+                        "key": "advanced_web_research_loop",
+                    },
+                }
+            },
+        )
+        self.assertEqual(
+            state_outputs,
+            {
+                "public_response": "我需要继续联网检索一下。",
+            },
+        )
+        self.assertEqual(warnings, [])
+        schema = captured["structured_output_schema"]
+        self.assertEqual(list(schema["properties"].keys()), ["public_response", "needs_capability", "capability"])
+        self.assertNotIn("toograph_capability_selector", schema["properties"])
+        prompt = captured["system_prompt"]
+        self.assertIn("stateKey: needs_capability", prompt)
+        self.assertIn("stateKey: capability", prompt)
+        self.assertIn("actionKey: toograph_capability_selector", prompt)
+        self.assertNotIn('"toograph_capability_selector"', prompt)
+        self.assertEqual(updated_config["action_input_state_output_keys"], ["public_response"])
 
     def test_repairs_invalid_action_inputs_without_original_prompt_context(self) -> None:
         calls: list[dict[str, object]] = []
@@ -951,7 +1078,7 @@ class AgentActionInputGenerationTests(unittest.TestCase):
         self.assertTrue(updated_config["action_input_structured_output_repair_succeeded"])
         self.assertEqual(updated_config["action_input_structured_output_validation_errors"], [])
         self.assertIn(
-            "$.web_search.query expected string",
+            "$.query expected string",
             updated_config["action_input_structured_output_initial_validation_errors"][0],
         )
         snapshots = updated_config["prompt_snapshots"]

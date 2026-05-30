@@ -112,23 +112,25 @@ def normalize_selected_capability(
     permission_policy: dict[str, Any] | None = None,
     budget_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    capability = _parse_capability(selected)
+    decision = selected if isinstance(selected, dict) else {}
+    requested_needs_capability = _coerce_optional_bool(decision.get("needs_capability"))
+    capability_source = decision.get("capability") if "capability" in decision else selected
+    capability = _parse_capability(capability_source)
     kind = _text(capability.get("kind")).lower()
     reason = _text(capability.get("reason"))
+    if requested_needs_capability is False:
+        return _none_capability(reason, include_capability_reason=False)
     if not kind or kind == "none":
-        selection_reason = reason or "No capability selected."
         return _none_capability(
-            selection_reason,
+            reason,
             include_capability_reason=False,
         )
     if kind not in SUPPORTED_KINDS:
-        selection_reason = f"Unsupported capability kind '{kind}'."
-        return _none_capability(selection_reason)
+        return _none_capability(f"Unsupported capability kind '{kind}'.")
 
     key = _text(capability.get("key"))
     if not key:
-        selection_reason = f"Capability kind '{kind}' requires a key."
-        return _none_capability(selection_reason)
+        return _none_capability(f"Capability kind '{kind}' requires a key.")
 
     resolved_permission_policy = resolve_permission_policy(permission_policy)
     if catalog is None:
@@ -156,10 +158,8 @@ def normalize_selected_capability(
     if candidate is None:
         rejected_candidate = unfiltered_index.get((kind, key))
         if rejected_candidate is not None and not _permission_policy_allows_item(rejected_candidate, resolved_permission_policy):
-            selection_reason = f"Selected capability '{kind}:{key}' is not allowed by the current permission policy."
-            return _none_capability(selection_reason)
-        selection_reason = f"Selected capability '{kind}:{key}' is not enabled or discoverable."
-        return _none_capability(selection_reason)
+            return _none_capability(f"Selected capability '{kind}:{key}' is not allowed by the current permission policy.")
+        return _none_capability(f"Selected capability '{kind}:{key}' is not enabled or discoverable.")
     candidate, _replacement_reason = _select_preferred_capability(candidate, resolved_catalog)
     kind = _text(candidate.get("kind")).lower()
     key = _text(candidate.get("key"))
@@ -176,10 +176,8 @@ def normalize_selected_capability(
     confidence = _coerce_confidence(capability.get("confidence"))
     if confidence is not None:
         normalized["confidence"] = confidence
-    selection_reason = reason or f"Selected {kind}:{key}."
     return {
         "needs_capability": True,
-        "selection_reason": selection_reason,
         "capability": normalized,
     }
 
@@ -627,6 +625,18 @@ def _parse_capability(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _coerce_optional_bool(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "y"}:
+            return True
+        if normalized in {"false", "0", "no", "n"}:
+            return False
+    return None
+
+
 def _none_capability(
     reason: str = "",
     *,
@@ -639,7 +649,6 @@ def _none_capability(
         capability["reason"] = reason
     return {
         "needs_capability": False,
-        "selection_reason": reason,
         "capability": capability,
     }
 

@@ -3,7 +3,7 @@
   "actionKey": "toograph_capability_selector",
   "name": "TooGraph 能力选择器",
   "description": "根据当前 LLM 节点可见的图状态和 before_llm.py 提供的启用能力目录，判断是否还需要调用一个动态 Action、Subgraph、Tool；不需要时返回 none。",
-  "llmInstruction": "根据当前图状态判断本轮是否还需要调用能力；所有连接到本 LLM 节点的普通 state 都是可用上下文，stateInputSchema 只是提示用户可连接哪些信息，不代表唯一输入。如果当前状态已经足够回复用户，或上一轮 result_package/capability_review 表明能力已成功产出可用结果且不需要继续调用能力，输出 {\"kind\":\"none\"}。需要一个显式能力完成下一步时，读取 Action Pre-LLM Context 中按 Subgraphs、Actions、Tools 分区列出的当前启用能力目录，并选择一个互斥 capability。目录包含 key、description、selection metadata 和历史反馈摘要，用于判断覆盖范围、输出完整性、权限层级和近期表现。输出 llmOutputSchema.capability。选择优先级：subgraph > action > tool；当多个能力都能完成当前下一步时，选择优先级最高、覆盖最完整、权限层级和历史反馈最合适的一个。kind 必须是 subgraph、action、tool 或 none；选择能力时 key 必须完全来自对应分区；没有合适能力或不需要能力时输出 {\"kind\":\"none\"}，不需要 reason。本节点只输出单个 capability 对象；能力执行由运行时与 after_llm 完成。",
+  "llmInstruction": "根据当前图状态判断本轮是否还需要调用能力；所有连接到本 LLM 节点的普通 state 都是可用上下文，stateInputSchema 只是提示用户可连接哪些信息，不代表唯一输入。如果当前状态已经足够回复用户，或上一轮能力结果表明已经产出可用内容且不需要继续调用能力，输出 needs_capability=false 且 capability.kind=none。需要一个显式能力完成下一步时，读取 Action Pre-LLM Context 中按 Subgraphs、Actions、Tools 分区列出的当前启用能力目录，并选择一个互斥 capability，同时输出 needs_capability=true。目录包含 key、description、selection metadata 和历史反馈摘要，用于判断覆盖范围、输出完整性、权限层级和近期表现。选择优先级：subgraph > action > tool；当多个能力都能完成当前下一步时，选择优先级最高、覆盖最完整、权限层级和历史反馈最合适的一个。kind 必须是 subgraph、action、tool 或 none；选择能力时 key 必须完全来自对应分区；没有合适能力或不需要能力时输出 capability.kind=none。能力选择理由由节点的 public_response 承担，本 Action 只输出 needs_capability 和 capability。",
   "version": "3.4.0",
   "timeoutSeconds": 30,
   "permissions": [],
@@ -23,6 +23,12 @@
   ],
   "llmOutputSchema": [
     {
+      "key": "needs_capability",
+      "name": "Needs Capability",
+      "valueType": "boolean",
+      "description": "当下一步仍需要调用一个已启用、可发现的 action/subgraph/tool 时为 true；当前信息足以回复或没有合适能力时为 false。"
+    },
+    {
       "key": "capability",
       "name": "Capability",
       "valueType": "capability",
@@ -35,12 +41,6 @@
       "name": "Needs Capability",
       "valueType": "boolean",
       "description": "当下一步仍需要调用一个已启用、可发现的 action/subgraph/tool 时为 true；kind 为 none 或选择无效时为 false。"
-    },
-    {
-      "key": "selection_reason",
-      "name": "Selection Reason",
-      "valueType": "text",
-      "description": "能力选择器规范化后的选择理由；没有能力时说明 none 的理由。"
     },
     {
       "key": "capability",

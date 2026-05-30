@@ -34,11 +34,11 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         )
         self.assertEqual(
             [field["key"] for field in manifest.get("llmOutputSchema", [])],
-            ["capability"],
+            ["needs_capability", "capability"],
         )
         self.assertEqual(
             [field["key"] for field in manifest["stateOutputSchema"]],
-            ["needs_capability", "selection_reason", "capability"],
+            ["needs_capability", "capability"],
         )
         self.assertNotIn(REMOVED_SELECTION_TRACE_KEY, [field["key"] for field in manifest["stateOutputSchema"]])
         instruction = manifest["llmInstruction"]
@@ -50,8 +50,9 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         self.assertIn("needs_capability", json.dumps(manifest["stateOutputSchema"], ensure_ascii=False))
         self.assertLess(instruction.index("subgraph"), instruction.index("action"))
         self.assertLess(instruction.index("action"), instruction.index("tool"))
-        self.assertIn('{"kind":"none"}', instruction)
+        self.assertIn("capability.kind=none", instruction)
         self.assertNotIn('{"kind":"none","reason"', instruction)
+        self.assertNotIn("selection_reason", instruction)
 
     def test_before_llm_publishes_enabled_capability_key_description_context(self) -> None:
         selector = _load_selector_module(SELECTOR_BEFORE_LLM_PATH, "toograph_capability_selector_before_test")
@@ -369,7 +370,7 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         self.assertEqual(result["capability"]["key"], "research_workflow")
         self.assertEqual(result["capability"]["description"], "Search, verify, and produce a final answer.")
         self.assertTrue(result["needs_capability"])
-        self.assertEqual(result["selection_reason"], "Need current public sources.")
+        self.assertEqual(result["capability"]["reason"], "Need current public sources.")
         self.assertNotIn(REMOVED_SELECTION_TRACE_KEY, result)
 
     def test_after_llm_uses_usage_feedback_without_emitting_selection_trace(self) -> None:
@@ -435,7 +436,7 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         self.assertEqual(result["capability"]["kind"], "subgraph")
         self.assertEqual(result["capability"]["key"], "research_workflow")
         self.assertTrue(result["needs_capability"])
-        self.assertEqual(result["selection_reason"], "Need current public sources.")
+        self.assertEqual(result["capability"]["reason"], "Need current public sources.")
         self.assertNotIn(REMOVED_SELECTION_TRACE_KEY, result)
 
     def test_after_llm_selects_fallback_when_requested_capability_has_repeated_recent_failures(self) -> None:
@@ -518,10 +519,9 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         self.assertEqual(result["capability"]["confidence"], 0.82)
         self.assertEqual(result["capability"]["reason"], "需要联网调研。")
         self.assertTrue(result["needs_capability"])
-        self.assertEqual(result["selection_reason"], "需要联网调研。")
         self.assertNotIn(REMOVED_SELECTION_TRACE_KEY, result)
         self.assertNotIn("found", result)
-        self.assertEqual(list(result.keys()), ["needs_capability", "selection_reason", "capability"])
+        self.assertEqual(list(result.keys()), ["needs_capability", "capability"])
 
     def test_after_llm_selects_permissioned_capability_without_selection_trace(self) -> None:
         selector = _load_selector_module(SELECTOR_AFTER_LLM_PATH, "toograph_capability_selector_after_permission_test")
@@ -546,7 +546,7 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         )
 
         self.assertNotEqual(result["capability"]["kind"], "none")
-        self.assertEqual(result["selection_reason"], "需要公开网页资料。")
+        self.assertEqual(result["capability"]["reason"], "需要公开网页资料。")
         self.assertNotIn(REMOVED_SELECTION_TRACE_KEY, result)
 
     def test_after_llm_ignores_runtime_budget_context_for_selector_outputs(self) -> None:
@@ -568,7 +568,7 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         )
 
         self.assertNotEqual(result["capability"]["kind"], "none")
-        self.assertEqual(result["selection_reason"], "需要公开网页资料。")
+        self.assertEqual(result["capability"]["reason"], "需要公开网页资料。")
         self.assertNotIn(REMOVED_SELECTION_TRACE_KEY, result)
 
     def test_after_llm_rejects_capability_disallowed_by_permission_policy(self) -> None:
@@ -597,7 +597,7 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
 
         self.assertEqual(result["capability"]["kind"], "none")
         self.assertFalse(result["needs_capability"])
-        self.assertIn("not allowed by the current permission policy", result["selection_reason"])
+        self.assertIn("not allowed by the current permission policy", result["capability"]["reason"])
         self.assertNotIn(REMOVED_SELECTION_TRACE_KEY, result)
 
     def test_after_llm_marks_policy_required_approval_in_permission_summary(self) -> None:
@@ -629,7 +629,7 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
 
         self.assertEqual(result["capability"]["kind"], "action")
         self.assertEqual(result["capability"]["key"], "write_file")
-        self.assertEqual(result["selection_reason"], "需要写入文件。")
+        self.assertEqual(result["capability"]["reason"], "需要写入文件。")
         self.assertNotIn(REMOVED_SELECTION_TRACE_KEY, result)
 
     def test_after_llm_honors_policy_without_approval_required_tiers(self) -> None:
@@ -661,7 +661,7 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
 
         self.assertEqual(result["capability"]["kind"], "action")
         self.assertEqual(result["capability"]["key"], "write_file")
-        self.assertEqual(result["selection_reason"], "需要写入文件。")
+        self.assertEqual(result["capability"]["reason"], "需要写入文件。")
         self.assertNotIn(REMOVED_SELECTION_TRACE_KEY, result)
 
     def test_after_llm_returns_none_when_selected_capability_is_disabled_or_unknown(self) -> None:
@@ -674,7 +674,6 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
         self.assertEqual(result["capability"]["kind"], "none")
         self.assertIn("not_enabled_template", result["capability"]["reason"])
         self.assertFalse(result["needs_capability"])
-        self.assertEqual(result["selection_reason"], "Selected capability 'subgraph:not_enabled_template' is not enabled or discoverable.")
         self.assertNotIn(REMOVED_SELECTION_TRACE_KEY, result)
         self.assertNotIn("found", result)
 
@@ -687,10 +686,9 @@ class TooGraphCapabilitySelectorActionTests(unittest.TestCase):
 
         self.assertEqual(result["capability"], {"kind": "none"})
         self.assertFalse(result["needs_capability"])
-        self.assertEqual(result["selection_reason"], "没有合适能力。")
         self.assertNotIn(REMOVED_SELECTION_TRACE_KEY, result)
         self.assertNotIn("found", result)
-        self.assertEqual(list(result.keys()), ["needs_capability", "selection_reason", "capability"])
+        self.assertEqual(list(result.keys()), ["needs_capability", "capability"])
 
 
 if __name__ == "__main__":

@@ -646,39 +646,39 @@ def format_result_package_prompt_lines(
     definition: NodeSystemStateDefinition | None,
     value: Any,
 ) -> list[str]:
-    lines = format_state_prompt_lines(key, definition)
     if not isinstance(value, dict) or value.get("kind") != "result_package":
+        lines = format_state_prompt_lines(key, definition)
         lines.append(f"  value: {format_prompt_value(value)}")
         return lines
 
-    for package_key in ("sourceType", "sourceKey", "sourceName", "status", "error", "errorType"):
-        package_value = value.get(package_key)
-        if package_value not in (None, "", [], {}):
-            lines.append(f"  {package_key}: {format_prompt_value(package_value)}")
-    if value.get("inputs") not in (None, "", [], {}):
-        inputs_display, inputs_truncated, inputs_original_chars = format_budgeted_prompt_value(
-            value.get("inputs"),
-            max_chars=RESULT_PACKAGE_INPUT_PROMPT_CHAR_LIMIT,
-        )
-        if inputs_truncated:
-            lines.append(f"  inputs_summary: {inputs_display}")
-            lines.append(
-                f"  inputs_omitted: truncated from {inputs_original_chars} chars to {RESULT_PACKAGE_INPUT_PROMPT_CHAR_LIMIT} chars"
-            )
-        else:
-            lines.append(f"  inputs: {inputs_display}")
-
     outputs = value.get("outputs")
     if not isinstance(outputs, dict) or not outputs:
-        return lines
+        status_text = _compact_result_package_status_text(value)
+        if not status_text:
+            return []
+        virtual_definition = NodeSystemStateDefinition(
+            name=_state_definition_name(key, definition),
+            description=_state_definition_description(definition),
+            type=NodeSystemStateType.TEXT,
+        )
+        return [
+            *format_state_prompt_lines(key, virtual_definition),
+            f"  value: {status_text}",
+        ]
 
     artifact_refs = collect_result_package_artifact_refs(value, outputs)
+    lines: list[str] = []
     if artifact_refs:
-        lines.append("  artifact_refs:")
+        artifact_definition = NodeSystemStateDefinition(
+            name=f"{_state_definition_name(key, definition)} Artifact References".strip(),
+            description="Compact artifact references returned by the capability.",
+            type=NodeSystemStateType.JSON,
+        )
+        lines.extend(format_state_prompt_lines(f"{key}_artifact_refs", artifact_definition))
+        lines.append("  value:")
         for ref in artifact_refs:
             lines.append(f"    - {json.dumps(ref, ensure_ascii=False, sort_keys=True)}")
 
-    lines.append("  outputs:")
     for output_key, raw_output in outputs.items():
         if not isinstance(raw_output, dict):
             virtual_definition = NodeSystemStateDefinition(
@@ -689,16 +689,13 @@ def format_result_package_prompt_lines(
                 raw_output,
                 max_chars=RESULT_PACKAGE_OUTPUT_PROMPT_CHAR_LIMIT,
             )
-            lines.extend(_indent_lines(format_state_prompt_lines(str(output_key), virtual_definition), 4))
+            lines.extend(format_state_prompt_lines(str(output_key), virtual_definition))
             lines.extend(
-                _indent_lines(
-                    format_budgeted_value_lines(
-                        output_display,
-                        output_truncated=output_truncated,
-                        original_chars=output_original_chars,
-                        max_chars=RESULT_PACKAGE_OUTPUT_PROMPT_CHAR_LIMIT,
-                    ),
-                    4,
+                format_budgeted_value_lines(
+                    output_display,
+                    output_truncated=output_truncated,
+                    original_chars=output_original_chars,
+                    max_chars=RESULT_PACKAGE_OUTPUT_PROMPT_CHAR_LIMIT,
                 )
             )
             continue
@@ -710,17 +707,14 @@ def format_result_package_prompt_lines(
             type=output_type,
         )
         output_value = raw_output.get("value")
-        lines.extend(_indent_lines(format_state_prompt_lines(str(output_key), virtual_definition), 4))
+        lines.extend(format_state_prompt_lines(str(output_key), virtual_definition))
         if _is_file_reference_prompt_state(virtual_definition):
             lines.extend(
-                _indent_lines(
-                    format_file_state_prompt_lines(
-                        output_value,
-                        allow_text=output_type == NodeSystemStateType.FILE,
-                        declared_state_type=output_type,
-                        max_text_chars=RESULT_PACKAGE_ARTIFACT_TEXT_CHAR_LIMIT,
-                    ),
-                    4,
+                format_file_state_prompt_lines(
+                    output_value,
+                    allow_text=output_type == NodeSystemStateType.FILE,
+                    declared_state_type=output_type,
+                    max_text_chars=RESULT_PACKAGE_ARTIFACT_TEXT_CHAR_LIMIT,
                 )
             )
         else:
@@ -729,17 +723,28 @@ def format_result_package_prompt_lines(
                 max_chars=RESULT_PACKAGE_OUTPUT_PROMPT_CHAR_LIMIT,
             )
             lines.extend(
-                _indent_lines(
-                    format_budgeted_value_lines(
-                        output_display,
-                        output_truncated=output_truncated,
-                        original_chars=output_original_chars,
-                        max_chars=RESULT_PACKAGE_OUTPUT_PROMPT_CHAR_LIMIT,
-                    ),
-                    4,
+                format_budgeted_value_lines(
+                    output_display,
+                    output_truncated=output_truncated,
+                    original_chars=output_original_chars,
+                    max_chars=RESULT_PACKAGE_OUTPUT_PROMPT_CHAR_LIMIT,
                 )
             )
     return lines
+
+
+def _compact_result_package_status_text(value: dict[str, Any]) -> str:
+    parts: list[str] = []
+    status = str(value.get("status") or "").strip()
+    if status:
+        parts.append(f"status={status}")
+    error_type = str(value.get("errorType") or "").strip()
+    error = str(value.get("error") or "").strip()
+    if error_type:
+        parts.append(f"error_type={error_type}")
+    if error:
+        parts.append(f"error={_truncate_prompt_text(error, 500)}")
+    return "; ".join(parts)
 
 
 def format_budgeted_prompt_value(value: Any, *, max_chars: int) -> tuple[str, bool, int]:
@@ -1094,6 +1099,10 @@ def _state_definition_name(state_key: str, definition: NodeSystemStateDefinition
     if definition is None:
         return state_key
     return definition.name.strip() or state_key
+
+
+def _state_definition_description(definition: NodeSystemStateDefinition | None) -> str:
+    return definition.description.strip() if definition is not None else ""
 
 
 def _state_definition_type(definition: NodeSystemStateDefinition | None) -> str:

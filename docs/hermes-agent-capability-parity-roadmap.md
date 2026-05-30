@@ -82,14 +82,14 @@
 代码事实：
 
 - 官方主循环模板是 `graph_template/official/buddy_autonomous_loop/template.json`。
-- loop 控制由模板内的 `needs_capability` 条件节点、`capability_trace` 和上下文压力检查分支表达；动态能力执行后直接回到上下文压力检查。
+- loop 控制由模板内的 `needs_capability` 条件节点和上下文压力检查分支表达；动态能力执行后直接回到上下文压力检查。
 - `backend/app/core/storage/database.py` 已有 `agent_loop_events` 和 `capability_usage_events` 表。
 - RunDetail 和 Buddy 胶囊读取同一 run fact：`frontend/src/pages/agentDiagnosticModel.ts`、`frontend/src/buddy/buddyOutputTrace.ts`。
 
 增强内容：
 
-- 每轮由 `reply_and_select_capability` 同时产出公开回复、是否直出结果包、是否继续调用能力和单个 selected capability。
-- 能力继续循环由 condition 节点预算限制，并通过 `capability_trace` 避免重复调用。
+- 每轮由 `reply_and_select_capability` 同时产出公开回复、是否继续调用能力和单个 selected capability。
+- 能力继续循环由 condition 节点预算限制；上一轮能力结果通过 `capability_result` 作为普通上下文参与下一轮判断。
 - 胶囊显示不再依赖临时文本拼接，而是从 run detail 和 output 边界重建。
 
 验证方式：
