@@ -12,10 +12,28 @@ const DEFAULT_PROVIDER_REQUEST_TIMEOUT_SECONDS = 180;
 export const DEFAULT_MODEL_COMPRESSION_THRESHOLD = 0.9;
 type SettingsProvider = SettingsModelProvider;
 
+export type ModelCapabilityKey =
+  | "chat"
+  | "embedding"
+  | "rerank"
+  | "vision"
+  | "tool_call"
+  | "structured_output";
+
+export type ProviderModelCapabilities = Record<ModelCapabilityKey, boolean>;
+
+export type ProviderModelEmbeddingDraft = {
+  dimensions: number | null;
+  use_for_memory: boolean;
+  use_for_knowledge: boolean;
+};
+
 export type ProviderModelDraft = {
   model: string;
   context_window_ktokens: number | null;
   compression_threshold: number;
+  capabilities: ProviderModelCapabilities;
+  embedding: ProviderModelEmbeddingDraft;
 };
 
 export type ProviderDraft = {
@@ -86,6 +104,100 @@ export function normalizeContextWindowKTokens(value: number | null | undefined) 
   return normalized > 0 ? normalized : null;
 }
 
+const MODEL_CAPABILITY_KEYS: ModelCapabilityKey[] = [
+  "chat",
+  "embedding",
+  "rerank",
+  "vision",
+  "tool_call",
+  "structured_output",
+];
+
+const EMBEDDING_MODEL_PATTERNS = [
+  "embedding",
+  "embed",
+  "text-embedding",
+  "qwen3-embedding",
+  "bge",
+  "e5",
+  "gte",
+  "jina-embeddings",
+  "nomic-embed",
+  "snowflake-arctic-embed",
+  "voyage",
+  "mxbai-embed",
+];
+
+const RERANK_MODEL_PATTERNS = [
+  "rerank",
+  "reranker",
+  "bge-reranker",
+  "gte-rerank",
+  "qwen-rerank",
+];
+
+function defaultModelCapabilities(chat = true): ProviderModelCapabilities {
+  return {
+    chat,
+    embedding: false,
+    rerank: false,
+    vision: false,
+    tool_call: false,
+    structured_output: false,
+  };
+}
+
+function normalizeModelCapabilities(value: unknown, fallback: ProviderModelCapabilities): ProviderModelCapabilities {
+  const normalized = { ...fallback };
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return normalized;
+  }
+  const record = value as Record<string, unknown>;
+  for (const key of MODEL_CAPABILITY_KEYS) {
+    if (key in record) {
+      normalized[key] = Boolean(record[key]);
+    }
+  }
+  return normalized;
+}
+
+function includesAnyPattern(modelName: string, patterns: string[]) {
+  const normalized = modelName.trim().toLowerCase();
+  return patterns.some((pattern) => normalized.includes(pattern));
+}
+
+export function inferModelCapabilities(modelName: string, explicit?: unknown): ProviderModelCapabilities {
+  const normalizedModel = String(modelName || "").trim();
+  const rerank = includesAnyPattern(normalizedModel, RERANK_MODEL_PATTERNS);
+  const embedding = !rerank && includesAnyPattern(normalizedModel, EMBEDDING_MODEL_PATTERNS);
+  const inferred = defaultModelCapabilities(!embedding && !rerank);
+  inferred.embedding = embedding;
+  inferred.rerank = rerank;
+  return normalizeModelCapabilities(explicit, inferred);
+}
+
+function defaultEmbeddingDraft(): ProviderModelEmbeddingDraft {
+  return {
+    dimensions: null,
+    use_for_memory: true,
+    use_for_knowledge: true,
+  };
+}
+
+function normalizeEmbeddingDraft(value: unknown): ProviderModelEmbeddingDraft {
+  const fallback = defaultEmbeddingDraft();
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return fallback;
+  }
+  const record = value as Partial<ProviderModelEmbeddingDraft>;
+  const dimensions = Number(record.dimensions);
+  return {
+    dimensions: Number.isFinite(dimensions) && dimensions > 0 ? Math.trunc(dimensions) : null,
+    use_for_memory: typeof record.use_for_memory === "boolean" ? record.use_for_memory : true,
+    use_for_knowledge: typeof record.use_for_knowledge === "boolean" ? record.use_for_knowledge : true,
+  };
+}
+
 function normalizeProviderCredentialPool(value: unknown): SettingsProviderCredential[] {
   if (!Array.isArray(value)) {
     return [];
@@ -117,16 +229,33 @@ function normalizeProviderCredentialPool(value: unknown): SettingsProviderCreden
   return credentials;
 }
 
-function buildDefaultProviderModelDraft(model: string): ProviderModelDraft {
+function buildDefaultProviderModelDraft(model: string, capabilities?: unknown): ProviderModelDraft {
   return {
     model,
     context_window_ktokens: null,
     compression_threshold: DEFAULT_MODEL_COMPRESSION_THRESHOLD,
+    capabilities: inferModelCapabilities(model, capabilities),
+    embedding: defaultEmbeddingDraft(),
   };
 }
 
 function modelSettingsKey(model: string) {
   return String(model || "").trim().toLowerCase();
+}
+
+function findProviderModelDraft(provider: ProviderDraft, modelName: string): ProviderModelDraft | null {
+  const normalizedModel = modelName.trim();
+  if (!normalizedModel || !provider.model_settings) {
+    return null;
+  }
+  const existing = provider.model_settings[normalizedModel];
+  if (existing) {
+    return existing;
+  }
+  const matchingKey = Object.keys(provider.model_settings).find(
+    (key) => modelSettingsKey(key) === modelSettingsKey(normalizedModel),
+  );
+  return matchingKey ? provider.model_settings[matchingKey] ?? null : null;
 }
 
 function buildProviderModelSettings(provider: SettingsProvider, selectedModels: string[]) {
@@ -141,12 +270,15 @@ function buildProviderModelSettings(provider: SettingsProvider, selectedModels: 
       continue;
     }
     const contextWindowTokens = Number(model.context_window);
+    const rawEmbedding = "embedding" in model ? (model as { embedding?: unknown }).embedding : undefined;
     settings[modelName] = {
       model: modelName,
       context_window_ktokens: Number.isFinite(contextWindowTokens) && contextWindowTokens > 0
         ? Math.round(contextWindowTokens / 1000)
         : null,
       compression_threshold: clampModelCompressionThreshold(model.compression_threshold),
+      capabilities: inferModelCapabilities(modelName, model.capabilities),
+      embedding: normalizeEmbeddingDraft(rawEmbedding),
     };
   }
   for (const modelName of selectedModels) {
@@ -165,6 +297,8 @@ export function ensureProviderModelDraft(provider: ProviderDraft, modelName: str
   provider.model_settings = provider.model_settings ?? {};
   const existing = provider.model_settings[normalizedModel];
   if (existing) {
+    existing.capabilities = normalizeModelCapabilities(existing.capabilities, inferModelCapabilities(normalizedModel));
+    existing.embedding = normalizeEmbeddingDraft(existing.embedding);
     return existing;
   }
   const matchingKey = Object.keys(provider.model_settings).find(
@@ -177,6 +311,24 @@ export function ensureProviderModelDraft(provider: ProviderDraft, modelName: str
   }
   provider.model_settings[normalizedModel] = buildDefaultProviderModelDraft(normalizedModel);
   return provider.model_settings[normalizedModel];
+}
+
+export function readProviderModelDraft(provider: ProviderDraft, modelName: string): ProviderModelDraft {
+  const normalizedModel = modelName.trim();
+  const existing = findProviderModelDraft(provider, normalizedModel);
+  if (!existing) {
+    return buildDefaultProviderModelDraft(normalizedModel);
+  }
+  return {
+    ...existing,
+    model: normalizedModel || existing.model,
+    capabilities: normalizeModelCapabilities(existing.capabilities, inferModelCapabilities(normalizedModel)),
+    embedding: normalizeEmbeddingDraft(existing.embedding),
+  };
+}
+
+export function modelHasCapability(provider: ProviderDraft, modelName: string, capability: ModelCapabilityKey) {
+  return Boolean(readProviderModelDraft(provider, modelName).capabilities[capability]);
 }
 
 export function listProviderModelBadges(
@@ -250,9 +402,13 @@ export function buildProviderSavePayload(drafts: Record<string, ProviderDraft>):
           return {
             model,
             label: model,
-            modalities: ["text"],
-            context_window: contextWindowKTokens === null ? null : contextWindowKTokens * 1000,
-            compression_threshold: clampModelCompressionThreshold(modelSettings.compression_threshold),
+            modalities: modelSettings.capabilities.vision ? ["text", "image"] : ["text"],
+            capabilities: { ...modelSettings.capabilities },
+            context_window: modelSettings.capabilities.chat && contextWindowKTokens !== null ? contextWindowKTokens * 1000 : null,
+            compression_threshold: modelSettings.capabilities.chat
+              ? clampModelCompressionThreshold(modelSettings.compression_threshold)
+              : null,
+            embedding: modelSettings.capabilities.embedding ? { ...modelSettings.embedding } : undefined,
           };
         }),
       },

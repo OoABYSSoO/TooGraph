@@ -8,6 +8,7 @@ from app.core.model_catalog import (
     build_model_catalog,
     get_default_text_model_ref,
     get_default_video_model_ref,
+    normalize_model_embedding_settings,
     normalize_model_ref,
     resolve_runtime_model_name,
 )
@@ -72,6 +73,14 @@ class AgentRuntimeDefaultsPayload(BaseModel):
         return THINKING_LEVEL_OFF
 
 
+class SettingsProviderModelEmbeddingPayload(BaseModel):
+    dimensions: int | None = Field(default=None, ge=1)
+    use_for_memory: bool = Field(default=True, alias="use_for_memory")
+    use_for_knowledge: bool = Field(default=True, alias="use_for_knowledge")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class SettingsProviderModelPayload(BaseModel):
     model: str = Field(min_length=1)
     label: str | None = None
@@ -79,6 +88,7 @@ class SettingsProviderModelPayload(BaseModel):
     reasoning: bool | None = None
     modalities: list[str] = Field(default_factory=lambda: ["text"])
     capabilities: dict[str, bool] = Field(default_factory=dict)
+    embedding: SettingsProviderModelEmbeddingPayload | None = None
     permissions: list[str] = Field(default_factory=list)
     pricing: dict[str, object] | None = None
     context_window: int | None = Field(default=None, alias="context_window")
@@ -266,22 +276,30 @@ def _merge_model_providers(
         model_configs: list[dict[str, object]] = []
         for model_payload in provider_payload.models:
             existing_model = existing_models_by_name.get(str(model_payload.model or "").strip().lower(), {})
+            capabilities = {
+                str(key): bool(value)
+                for key, value in model_payload.capabilities.items()
+                if str(key or "").strip()
+            }
             model_config: dict[str, object] = {
                 "model": model_payload.model,
                 "label": model_payload.label or model_payload.model,
                 "route_target": model_payload.route_target or "",
                 "reasoning": model_payload.reasoning,
                 "modalities": model_payload.modalities or ["text"],
-                "capabilities": {
-                    str(key): bool(value)
-                    for key, value in model_payload.capabilities.items()
-                    if str(key or "").strip()
-                },
+                "capabilities": capabilities,
                 "permissions": _dedupe_strings(model_payload.permissions),
                 "context_window": model_payload.context_window,
                 "max_tokens": model_payload.max_tokens,
                 "compression_threshold": model_payload.compression_threshold,
             }
+            if capabilities.get("embedding"):
+                embedding_source = (
+                    model_payload.embedding.model_dump(by_alias=True)
+                    if model_payload.embedding is not None
+                    else existing_model.get("embedding")
+                )
+                model_config["embedding"] = normalize_model_embedding_settings(embedding_source)
             pricing = normalize_provider_model_pricing(
                 model_payload.pricing if model_payload.pricing is not None else existing_model.get("pricing")
             )

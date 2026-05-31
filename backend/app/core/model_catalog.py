@@ -97,6 +97,7 @@ def _normalize_model_item(item: Any) -> dict[str, Any] | None:
         "reasoning": item.get("reasoning") if isinstance(item.get("reasoning"), bool) else None,
         "modalities": _dedupe_strings([str(modality) for modality in modalities]) or ["text"],
         "capabilities": _normalize_model_capabilities(item.get("capabilities")),
+        "embedding": normalize_model_embedding_settings(item.get("embedding")),
         "permissions": _normalize_model_permissions(item.get("permissions")),
         "context_window": item.get("context_window") if isinstance(item.get("context_window"), int) else None,
         "max_tokens": item.get("max_tokens") if isinstance(item.get("max_tokens"), int) else None,
@@ -118,6 +119,23 @@ def _normalize_model_capabilities(value: Any) -> dict[str, bool]:
             if str(item or "").strip()
         }
     return {}
+
+
+def normalize_model_embedding_settings(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    dimensions_value = value.get("dimensions")
+    try:
+        dimensions = int(dimensions_value)
+    except (TypeError, ValueError):
+        dimensions = None
+    if dimensions is not None and dimensions < 1:
+        dimensions = None
+    return {
+        "dimensions": dimensions,
+        "use_for_memory": bool(value.get("use_for_memory", True)),
+        "use_for_knowledge": bool(value.get("use_for_knowledge", True)),
+    }
 
 
 def _normalize_model_permissions(value: Any) -> list[str]:
@@ -267,6 +285,7 @@ def _build_catalog_model(
         "reasoning": model.get("reasoning") if isinstance(model.get("reasoning"), bool) else provider_id == "local",
         "modalities": model.get("modalities") or ["text"],
         "capabilities": model.get("capabilities") if isinstance(model.get("capabilities"), dict) else {},
+        "embedding": model.get("embedding") if isinstance(model.get("embedding"), dict) else {},
         "permissions": model.get("permissions") if isinstance(model.get("permissions"), list) else [],
         "context_window": context_window if isinstance(context_window, int) else None,
         "max_tokens": max_tokens if isinstance(max_tokens, int) else None,
@@ -314,6 +333,7 @@ def _build_local_provider_models(
             "max_tokens": saved_by_name.get(model_name.lower(), {}).get("max_tokens"),
             "compression_threshold": saved_by_name.get(model_name.lower(), {}).get("compression_threshold"),
             "capabilities": saved_by_name.get(model_name.lower(), {}).get("capabilities") or {},
+            "embedding": saved_by_name.get(model_name.lower(), {}).get("embedding") or {},
             "permissions": saved_by_name.get(model_name.lower(), {}).get("permissions") or [],
         }
         for model_name in local_route_models

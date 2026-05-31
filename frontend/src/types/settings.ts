@@ -32,6 +32,22 @@ export type OpenAICodexAuthStatus = {
   last_refresh?: string;
 };
 
+export type ModelCapabilityKey =
+  | "chat"
+  | "embedding"
+  | "rerank"
+  | "vision"
+  | "tool_call"
+  | "structured_output";
+
+export type SettingsProviderModelCapabilities = Partial<Record<ModelCapabilityKey, boolean>> & Record<string, boolean>;
+
+export type SettingsProviderModelEmbedding = {
+  dimensions?: number | null;
+  use_for_memory?: boolean;
+  use_for_knowledge?: boolean;
+};
+
 export type SettingsProviderModel = {
   model_ref: string;
   model: string;
@@ -39,7 +55,8 @@ export type SettingsProviderModel = {
   route_target?: string | null;
   reasoning?: boolean;
   modalities?: string[];
-  capabilities?: Record<string, boolean>;
+  capabilities?: SettingsProviderModelCapabilities;
+  embedding?: SettingsProviderModelEmbedding;
   permissions?: string[];
   context_window?: number | null;
   max_tokens?: number | null;
@@ -113,7 +130,8 @@ export type SettingsPayload = {
         route_target?: string | null;
         reasoning?: boolean | null;
         modalities?: string[];
-        capabilities?: Record<string, boolean>;
+        capabilities?: SettingsProviderModelCapabilities;
+        embedding?: SettingsProviderModelEmbedding;
         permissions?: string[];
         context_window?: number | null;
         max_tokens?: number | null;

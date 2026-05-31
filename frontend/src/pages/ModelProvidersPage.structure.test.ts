@@ -71,10 +71,19 @@ test("ModelProvidersPage applies provider changes immediately without a manual s
 });
 
 test("ModelProvidersPage keeps the page usable when no models are available", () => {
-  assert.match(pageSource, /:disabled="configuredModelOptions\.length === 0"/);
-  assert.match(pageSource, /v-if="configuredModelOptions\.length === 0" class="model-providers-page__hint"/);
+  assert.match(pageSource, /:disabled="configuredChatModelOptions\.length === 0"/);
+  assert.match(pageSource, /v-if="configuredChatModelOptions\.length === 0" class="model-providers-page__hint"/);
   assert.match(pageSource, /settings\.noConfiguredProviders/);
   assert.match(pageSource, /class="model-providers-page__provider-cards"/);
+});
+
+test("ModelProvidersPage filters default runtime selectors to chat-capable models", () => {
+  assert.match(pageSource, /const configuredChatModels = computed/);
+  assert.match(pageSource, /const configuredChatModelOptions = computed/);
+  assert.match(pageSource, /modelHasCapability\(provider, modelName, "chat"\)/);
+  assert.match(pageSource, /:disabled="configuredChatModelOptions\.length === 0"/);
+  assert.match(pageSource, /v-for="option in configuredChatModelOptions"/);
+  assert.match(pageSource, /const availableRefs = new Set\(configuredChatModelOptions\.value\.map/);
 });
 
 test("ModelProvidersPage discovers model options through add model instead of separate refresh controls", () => {
@@ -110,16 +119,16 @@ test("ModelProvidersPage keeps provider card controls on one row with capsule sw
 
 test("ModelProvidersPage shows and edits provider models from each card", () => {
   assert.match(pageSource, /settings\.addModel/);
-  assert.match(pageSource, /class="model-providers-page__provider-model-pills"/);
-  assert.match(pageSource, /v-for="modelName in provider\.selected_models"/);
-  assert.match(pageSource, /class="model-providers-page__provider-model-pill model-providers-page__provider-model-pill-button"/);
-  assert.match(pageSource, /class="model-providers-page__provider-model-remove"/);
-  assert.match(pageSource, /class="model-providers-page__model-budget-list"/);
-  assert.match(pageSource, /v-for="modelName in provider\.selected_models"[\s\S]*class="model-providers-page__model-budget-row"/);
-  assert.match(pageSource, /settings\.modelContextWindowKTokens/);
-  assert.match(pageSource, /settings\.modelCompressionThresholdPercent/);
-  assert.match(pageSource, /modelContextWindowKTokens\(provider, modelName\)/);
-  assert.match(pageSource, /modelCompressionThresholdPercent\(provider, modelName\)/);
+  assert.match(pageSource, /class="model-providers-page__provider-model-rows"/);
+  assert.match(pageSource, /class="model-providers-page__provider-model-row"/);
+  assert.match(pageSource, /class="model-providers-page__provider-model-row-main"/);
+  assert.match(pageSource, /class="model-providers-page__provider-model-capabilities"/);
+  assert.match(pageSource, /modelCapabilityBadges\(provider, modelName\)/);
+  assert.match(pageSource, /@click\.stop="toggleModelConfigPanel\(provider, modelName\)"/);
+  assert.match(pageSource, /@click\.stop="removeProviderModel\(provider, modelName\)"/);
+  assert.match(pageSource, /isModelConfigExpanded\(provider, modelName\)/);
+  assert.doesNotMatch(pageSource, /class="model-providers-page__provider-model-pills"/);
+  assert.doesNotMatch(pageSource, /class="model-providers-page__model-budget-list"/);
   assert.match(pageSource, /<Close \/>/);
   assert.match(pageSource, /@click\.stop="removeProviderModel\(provider, modelName\)"/);
   assert.match(pageSource, /<ElPopover[\s\S]*popper-class="model-providers-page__model-picker-popper"/);
@@ -156,8 +165,26 @@ test("ModelProvidersPage shows and edits provider models from each card", () => 
   assert.match(pageSource, /function removeProviderModel\(provider: ProviderDraft, modelName: string\)/);
   assert.match(pageSource, /void persistSettings\(\);/);
   assert.match(pageSource, /\.model-providers-page__model-picker \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
-  assert.match(pageSource, /\.model-providers-page__provider-model-pill \{[\s\S]*color:\s*rgb\(37,\s*99,\s*235\);/);
+  assert.match(pageSource, /\.model-providers-page__provider-model-rows \{/);
+  assert.match(pageSource, /\.model-providers-page__provider-model-row-main \{/);
+  assert.match(pageSource, /\.model-providers-page__provider-model-name \{[\s\S]*text-overflow:\s*ellipsis;/);
+  assert.match(pageSource, /\.model-providers-page__provider-model-capability \{/);
+  assert.match(pageSource, /\.model-providers-page__provider-model-config-panel \{/);
+  assert.match(pageSource, /\.model-providers-page__model-capability-grid \{/);
+  assert.match(pageSource, /@media \(max-width: 760px\) \{[\s\S]*\.model-providers-page__provider-model-row-main \{/);
   assert.match(pageSource, /\.model-providers-page__model-picker-option--selected \{[\s\S]*color:\s*rgb\(37,\s*99,\s*235\);/);
+});
+
+test("ModelProvidersPage exposes per-model capability controls inside expanded rows", () => {
+  assert.match(pageSource, /settings\.modelCapabilities/);
+  assert.match(pageSource, /settings\.modelCapabilityChat/);
+  assert.match(pageSource, /settings\.modelCapabilityEmbedding/);
+  assert.match(pageSource, /settings\.modelEmbeddingDimensions/);
+  assert.match(pageSource, /toggleModelCapability\(provider, modelName, ['"]embedding['"]\)/);
+  assert.match(pageSource, /handleModelEmbeddingDimensionsChange\(provider, modelName, \$event\)/);
+  assert.match(pageSource, /v-if="modelHasCapability\(provider, modelName, 'chat'\)"/);
+  assert.match(pageSource, /v-if="modelHasCapability\(provider, modelName, 'embedding'\)"/);
+  assert.doesNotMatch(pageSource, /model-config-placeholder/);
 });
 
 test("ModelProvidersPage does not expose provider capability routing controls", () => {

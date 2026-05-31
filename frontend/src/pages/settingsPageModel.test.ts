@@ -5,8 +5,10 @@ import {
   buildProviderDraftsFromSettings,
   buildProviderSavePayload,
   clampSettingsTemperature,
+  inferModelCapabilities,
   listAddableProviderTemplates,
   listProviderModelBadges,
+  modelHasCapability,
 } from "./settingsPageModel.ts";
 
 test("clampSettingsTemperature keeps values inside the legacy 0-2 range", () => {
@@ -100,7 +102,124 @@ test("buildProviderSavePayload includes enabled providers and omits blank api ke
   assert.equal(payload.openai.request_timeout_seconds, 45);
 });
 
-test("provider model save payload stays minimal instead of routing by capabilities", () => {
+test("inferModelCapabilities marks Qwen embedding names as embedding-only", () => {
+  assert.deepEqual(inferModelCapabilities("text-embedding-qwen3-embedding-8b"), {
+    chat: false,
+    embedding: true,
+    rerank: false,
+    vision: false,
+    tool_call: false,
+    structured_output: false,
+  });
+});
+
+test("inferModelCapabilities marks reranker names as rerank-only", () => {
+  assert.deepEqual(inferModelCapabilities("BAAI/bge-reranker-v2-m3"), {
+    chat: false,
+    embedding: false,
+    rerank: true,
+    vision: false,
+    tool_call: false,
+    structured_output: false,
+  });
+});
+
+test("model capability reads do not mutate provider drafts", () => {
+  const provider = {
+    provider_id: "local",
+    label: "Local",
+    transport: "openai-compatible",
+    base_url: "http://127.0.0.1:8888/v1",
+    enabled: true,
+    auth_header: "Authorization",
+    auth_scheme: "Bearer",
+    request_timeout_seconds: 180,
+    api_key: "",
+    api_key_configured: false,
+    discovered_models: ["text-embedding-qwen3-embedding-8b"],
+    selected_models: ["text-embedding-qwen3-embedding-8b"],
+    model_settings: {},
+  };
+
+  const before = JSON.stringify(provider.model_settings);
+  assert.equal(modelHasCapability(provider, "text-embedding-qwen3-embedding-8b", "embedding"), true);
+  assert.equal(JSON.stringify(provider.model_settings), before);
+});
+
+test("provider drafts preserve explicit capabilities and infer missing model capabilities", () => {
+  const drafts = buildProviderDraftsFromSettings({
+    model: {
+      text_model: "qwen-chat",
+      text_model_ref: "local/qwen-chat",
+      video_model: "qwen-chat",
+      video_model_ref: "local/qwen-chat",
+    },
+    model_catalog: {
+      provider_templates: [],
+      providers: [
+        {
+          provider_id: "local",
+          label: "LM Studio",
+          description: "Local gateway",
+          transport: "openai-compatible",
+          configured: true,
+          enabled: true,
+          saved: true,
+          base_url: "http://127.0.0.1:1234/v1",
+          models: [
+            {
+              model_ref: "local/text-embedding-qwen3-embedding-8b",
+              model: "text-embedding-qwen3-embedding-8b",
+              label: "text-embedding-qwen3-embedding-8b",
+            },
+            {
+              model_ref: "local/qwen-chat",
+              model: "qwen-chat",
+              label: "qwen-chat",
+              capabilities: { chat: true, structured_output: true, tool_call: true },
+            },
+          ],
+          example_model_refs: [],
+        },
+      ],
+    },
+    revision: { max_revision_round: 1 },
+    tools: [],
+  });
+
+  assert.equal(modelHasCapability(drafts.local, "text-embedding-qwen3-embedding-8b", "embedding"), true);
+  assert.equal(modelHasCapability(drafts.local, "text-embedding-qwen3-embedding-8b", "chat"), false);
+  assert.equal(modelHasCapability(drafts.local, "qwen-chat", "chat"), true);
+  assert.equal(modelHasCapability(drafts.local, "qwen-chat", "structured_output"), true);
+
+  const payload = buildProviderSavePayload(drafts);
+  assert.deepEqual(payload.local.models.map((model) => ({ model: model.model, capabilities: model.capabilities })), [
+    {
+      model: "text-embedding-qwen3-embedding-8b",
+      capabilities: {
+        chat: false,
+        embedding: true,
+        rerank: false,
+        vision: false,
+        tool_call: false,
+        structured_output: false,
+      },
+    },
+    {
+      model: "qwen-chat",
+      capabilities: {
+        chat: true,
+        embedding: false,
+        rerank: false,
+        vision: false,
+        tool_call: true,
+        structured_output: true,
+      },
+    },
+  ]);
+});
+
+test("provider model save payload preserves model capabilities", () => {
   const drafts = buildProviderDraftsFromSettings({
     model: {
       text_model: "rerank-test",
@@ -150,8 +269,17 @@ test("provider model save payload stays minimal instead of routing by capabiliti
     model: "rerank-test",
     label: "rerank-test",
     modalities: ["text"],
-    context_window: 128000,
-    compression_threshold: 0.82,
+    capabilities: {
+      chat: false,
+      embedding: false,
+      rerank: true,
+      vision: false,
+      tool_call: false,
+      structured_output: false,
+    },
+    context_window: null,
+    compression_threshold: null,
+    embedding: undefined,
   });
   assert.equal(payload.local.request_timeout_seconds, 33);
 });
@@ -198,6 +326,19 @@ test("provider drafts default model compression threshold and save context windo
     model: "gpt-large",
     context_window_ktokens: 196,
     compression_threshold: 0.88,
+    capabilities: {
+      chat: true,
+      embedding: false,
+      rerank: false,
+      vision: false,
+      tool_call: false,
+      structured_output: false,
+    },
+    embedding: {
+      dimensions: null,
+      use_for_memory: true,
+      use_for_knowledge: true,
+    },
   };
   const payload = buildProviderSavePayload(drafts);
 

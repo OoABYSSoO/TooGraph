@@ -5,6 +5,8 @@ import type {
   OpenAICodexAuthStatus,
   ModelLogSettings,
   SettingsProviderCredential,
+  SettingsProviderModelCapabilities,
+  SettingsProviderModelEmbedding,
   SettingsPayload,
   UiPreferencesSettings,
 } from "@/types/settings";
@@ -28,7 +30,8 @@ export type SettingsModelProviderUpdate = {
     route_target?: string | null;
     reasoning?: boolean | null;
     modalities?: string[];
-    capabilities?: Record<string, boolean>;
+    capabilities?: SettingsProviderModelCapabilities;
+    embedding?: SettingsProviderModelEmbedding;
     permissions?: string[];
     context_window?: number | null;
     max_tokens?: number | null;

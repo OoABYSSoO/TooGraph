@@ -246,6 +246,21 @@ class SettingsModelProviderTests(unittest.TestCase):
                                                     "prompt_cache": True,
                                                 },
                                                 "permissions": ["rerank"],
+                                            },
+                                            {
+                                                "model": "text-embedding-qwen3-embedding-8b",
+                                                "label": "text-embedding-qwen3-embedding-8b",
+                                                "modalities": ["text"],
+                                                "capabilities": {
+                                                    "chat": False,
+                                                    "embedding": True,
+                                                    "rerank": False,
+                                                },
+                                                "embedding": {
+                                                    "dimensions": 4096,
+                                                    "use_for_memory": True,
+                                                    "use_for_knowledge": False,
+                                                },
                                             }
                                         ],
                                     }
@@ -258,6 +273,12 @@ class SettingsModelProviderTests(unittest.TestCase):
         self.assertEqual(saved_model["capabilities"]["chat"], False)
         self.assertEqual(saved_model["capabilities"]["rerank"], True)
         self.assertEqual(saved_model["capabilities"]["prompt_cache"], True)
+        saved_embedding_model = saved_payload["model_providers"]["local"]["models"][1]
+        self.assertEqual(saved_embedding_model["capabilities"]["embedding"], True)
+        self.assertEqual(
+            saved_embedding_model["embedding"],
+            {"dimensions": 4096, "use_for_memory": True, "use_for_knowledge": False},
+        )
         self.assertEqual(saved_model["permissions"], ["rerank"])
 
     def test_update_settings_persists_model_context_budget(self) -> None:
@@ -978,6 +999,7 @@ class SettingsModelProviderTests(unittest.TestCase):
                             "model": "rerank-test",
                             "label": "rerank-test",
                             "capabilities": {"chat": False, "rerank": True},
+                            "embedding": {"dimensions": 1024, "use_for_memory": False, "use_for_knowledge": True},
                             "permissions": ["rerank"],
                         }
                     ],
@@ -994,6 +1016,10 @@ class SettingsModelProviderTests(unittest.TestCase):
 
         local_provider = next(provider for provider in catalog["providers"] if provider["provider_id"] == "local")
         self.assertEqual(local_provider["models"][0]["capabilities"], {"chat": False, "rerank": True})
+        self.assertEqual(
+            local_provider["models"][0]["embedding"],
+            {"dimensions": 1024, "use_for_memory": False, "use_for_knowledge": True},
+        )
         self.assertEqual(local_provider["models"][0]["permissions"], ["rerank"])
 
     def test_catalog_exposes_provider_credential_pool_metadata(self) -> None:

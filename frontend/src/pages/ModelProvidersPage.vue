@@ -33,10 +33,10 @@
                 class="model-providers-page__select toograph-select"
                 :teleported="false"
                 popper-class="toograph-select-popper"
-                :disabled="configuredModelOptions.length === 0"
+                :disabled="configuredChatModelOptions.length === 0"
                 @change="handleRuntimeDraftChange"
               >
-                <ElOption v-for="option in configuredModelOptions" :key="option.value" :label="option.label" :value="option.value" />
+                <ElOption v-for="option in configuredChatModelOptions" :key="option.value" :label="option.label" :value="option.value" />
               </ElSelect>
             </label>
             <label>
@@ -46,13 +46,13 @@
                 class="model-providers-page__select toograph-select"
                 :teleported="false"
                 popper-class="toograph-select-popper"
-                :disabled="configuredModelOptions.length === 0"
+                :disabled="configuredChatModelOptions.length === 0"
                 @change="handleRuntimeDraftChange"
               >
-                <ElOption v-for="option in configuredModelOptions" :key="option.value" :label="option.label" :value="option.value" />
+                <ElOption v-for="option in configuredChatModelOptions" :key="option.value" :label="option.label" :value="option.value" />
               </ElSelect>
             </label>
-            <div v-if="configuredModelOptions.length === 0" class="model-providers-page__hint">
+            <div v-if="configuredChatModelOptions.length === 0" class="model-providers-page__hint">
               {{ t("settings.noConfiguredProviders") }}
             </div>
           </article>
@@ -136,56 +136,169 @@
                       : provider.base_url || t("settings.providerBaseUrlNotSet")
                   }}</span>
                 </div>
-                <div class="model-providers-page__provider-model-pills" :aria-label="t('settings.enabledModels')">
-                  <button
-                    v-for="modelName in provider.selected_models"
-                    :key="`${provider.provider_id}-selected-${modelName}`"
-                    type="button"
-                    class="model-providers-page__provider-model-pill model-providers-page__provider-model-pill-button"
-                    :aria-label="t('settings.removeModel', { model: modelName })"
-                    :title="modelName"
-                    @click.stop="removeProviderModel(provider, modelName)"
-                  >
-                    <span>{{ modelName }}</span>
-                    <ElIcon class="model-providers-page__provider-model-remove" aria-hidden="true"><Close /></ElIcon>
-                  </button>
-                  <span v-if="provider.selected_models.length === 0" class="model-providers-page__provider-model-pill model-providers-page__provider-model-pill--empty">
-                    {{ t("settings.noModelsDiscovered") }}
-                  </span>
-                </div>
-                <div v-if="provider.selected_models.length > 0" class="model-providers-page__model-budget-list">
+                <div class="model-providers-page__provider-model-rows" :aria-label="t('settings.enabledModels')">
                   <div
                     v-for="modelName in provider.selected_models"
-                    :key="`${provider.provider_id}-budget-${modelName}`"
-                    class="model-providers-page__model-budget-row"
+                    :key="`${provider.provider_id}-selected-${modelName}`"
+                    class="model-providers-page__provider-model-row"
                   >
-                    <span class="model-providers-page__model-budget-name" :title="modelName">{{ modelName }}</span>
-                    <label class="model-providers-page__model-budget-field">
-                      <span>{{ t("settings.modelContextWindowKTokens") }}</span>
-                      <input
-                        class="model-providers-page__model-budget-input"
-                        :value="modelContextWindowKTokens(provider, modelName) ?? ''"
-                        type="number"
-                        min="1"
-                        step="1"
-                        inputmode="numeric"
-                        @change="handleModelContextWindowChange(provider, modelName, $event)"
-                      />
-                    </label>
-                    <label class="model-providers-page__model-budget-field">
-                      <span>{{ t("settings.modelCompressionThresholdPercent") }}</span>
-                      <input
-                        class="model-providers-page__model-budget-input"
-                        :value="modelCompressionThresholdPercent(provider, modelName)"
-                        type="number"
-                        min="1"
-                        max="100"
-                        step="1"
-                        inputmode="numeric"
-                        @change="handleModelCompressionThresholdChange(provider, modelName, $event)"
-                      />
-                    </label>
+                    <div class="model-providers-page__provider-model-row-main">
+                      <div class="model-providers-page__provider-model-identity">
+                        <span class="model-providers-page__provider-model-name" :title="modelName">{{ modelName }}</span>
+                        <div class="model-providers-page__provider-model-capabilities">
+                          <span
+                            v-for="badge in modelCapabilityBadges(provider, modelName)"
+                            :key="`${provider.provider_id}-${modelName}-${badge}`"
+                            class="model-providers-page__provider-model-capability"
+                          >
+                            {{ badge }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="model-providers-page__provider-model-actions">
+                        <button
+                          type="button"
+                          class="model-providers-page__button model-providers-page__model-config-button"
+                          @click.stop="toggleModelConfigPanel(provider, modelName)"
+                        >
+                          {{ isModelConfigExpanded(provider, modelName) ? t("settings.collapseModelSettings") : t("settings.configureModel") }}
+                        </button>
+                        <button
+                          type="button"
+                          class="model-providers-page__icon-button"
+                          :aria-label="t('settings.removeModel', { model: modelName })"
+                          :title="t('settings.removeModel', { model: modelName })"
+                          @click.stop="removeProviderModel(provider, modelName)"
+                        >
+                          <ElIcon aria-hidden="true"><Close /></ElIcon>
+                        </button>
+                      </div>
+                    </div>
+                    <div v-if="isModelConfigExpanded(provider, modelName)" class="model-providers-page__provider-model-config-panel">
+                      <div class="model-providers-page__model-capability-controls">
+                        <span class="model-providers-page__provider-field-label">{{ t("settings.modelCapabilities") }}</span>
+                        <div class="model-providers-page__model-capability-grid">
+                          <label class="model-providers-page__model-capability-toggle">
+                            <input
+                              type="checkbox"
+                              :checked="modelHasCapability(provider, modelName, 'chat')"
+                              @change="toggleModelCapability(provider, modelName, 'chat')"
+                            />
+                            <span>{{ t("settings.modelCapabilityChat") }}</span>
+                          </label>
+                          <label class="model-providers-page__model-capability-toggle">
+                            <input
+                              type="checkbox"
+                              :checked="modelHasCapability(provider, modelName, 'embedding')"
+                              @change="toggleModelCapability(provider, modelName, 'embedding')"
+                            />
+                            <span>{{ t("settings.modelCapabilityEmbedding") }}</span>
+                          </label>
+                          <label class="model-providers-page__model-capability-toggle">
+                            <input
+                              type="checkbox"
+                              :checked="modelHasCapability(provider, modelName, 'rerank')"
+                              @change="toggleModelCapability(provider, modelName, 'rerank')"
+                            />
+                            <span>{{ t("settings.modelCapabilityRerank") }}</span>
+                          </label>
+                          <label class="model-providers-page__model-capability-toggle">
+                            <input
+                              type="checkbox"
+                              :checked="modelHasCapability(provider, modelName, 'vision')"
+                              @change="toggleModelCapability(provider, modelName, 'vision')"
+                            />
+                            <span>{{ t("settings.modelCapabilityVision") }}</span>
+                          </label>
+                          <label class="model-providers-page__model-capability-toggle">
+                            <input
+                              type="checkbox"
+                              :checked="modelHasCapability(provider, modelName, 'tool_call')"
+                              @change="toggleModelCapability(provider, modelName, 'tool_call')"
+                            />
+                            <span>{{ t("settings.modelCapabilityToolCall") }}</span>
+                          </label>
+                          <label class="model-providers-page__model-capability-toggle">
+                            <input
+                              type="checkbox"
+                              :checked="modelHasCapability(provider, modelName, 'structured_output')"
+                              @change="toggleModelCapability(provider, modelName, 'structured_output')"
+                            />
+                            <span>{{ t("settings.modelCapabilityStructuredOutput") }}</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div v-if="modelHasCapability(provider, modelName, 'chat')" class="model-providers-page__model-config-section">
+                        <span class="model-providers-page__provider-field-label">{{ t("settings.modelChatSettings") }}</span>
+                        <div class="model-providers-page__model-config-fields">
+                          <label class="model-providers-page__model-budget-field">
+                            <span>{{ t("settings.modelContextWindowKTokens") }}</span>
+                            <input
+                              class="model-providers-page__model-budget-input"
+                              :value="modelContextWindowKTokens(provider, modelName) ?? ''"
+                              type="number"
+                              min="1"
+                              step="1"
+                              inputmode="numeric"
+                              @change="handleModelContextWindowChange(provider, modelName, $event)"
+                            />
+                          </label>
+                          <label class="model-providers-page__model-budget-field">
+                            <span>{{ t("settings.modelCompressionThresholdPercent") }}</span>
+                            <input
+                              class="model-providers-page__model-budget-input"
+                              :value="modelCompressionThresholdPercent(provider, modelName)"
+                              type="number"
+                              min="1"
+                              max="100"
+                              step="1"
+                              inputmode="numeric"
+                              @change="handleModelCompressionThresholdChange(provider, modelName, $event)"
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div v-if="modelHasCapability(provider, modelName, 'embedding')" class="model-providers-page__model-config-section">
+                        <span class="model-providers-page__provider-field-label">{{ t("settings.modelEmbeddingSettings") }}</span>
+                        <div class="model-providers-page__model-config-fields">
+                          <label class="model-providers-page__model-budget-field">
+                            <span>{{ t("settings.modelEmbeddingDimensions") }}</span>
+                            <input
+                              class="model-providers-page__model-budget-input"
+                              :value="modelEmbeddingDimensions(provider, modelName) ?? ''"
+                              type="number"
+                              min="1"
+                              step="1"
+                              inputmode="numeric"
+                              :placeholder="t('settings.modelEmbeddingDefaultDimensions')"
+                              @change="handleModelEmbeddingDimensionsChange(provider, modelName, $event)"
+                            />
+                          </label>
+                          <label class="model-providers-page__model-capability-toggle">
+                            <input
+                              type="checkbox"
+                              :checked="modelEmbeddingScopeEnabled(provider, modelName, 'use_for_memory')"
+                              @change="handleModelEmbeddingScopeChange(provider, modelName, 'use_for_memory')"
+                            />
+                            <span>{{ t("settings.modelEmbeddingUseForMemory") }}</span>
+                          </label>
+                          <label class="model-providers-page__model-capability-toggle">
+                            <input
+                              type="checkbox"
+                              :checked="modelEmbeddingScopeEnabled(provider, modelName, 'use_for_knowledge')"
+                              @change="handleModelEmbeddingScopeChange(provider, modelName, 'use_for_knowledge')"
+                            />
+                            <span>{{ t("settings.modelEmbeddingUseForKnowledge") }}</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
                   </div>
+                  <span v-if="provider.selected_models.length === 0" class="model-providers-page__provider-model-empty">
+                    {{ t("settings.noModelsDiscovered") }}
+                  </span>
                 </div>
                 <div v-if="isLoginProvider(provider)" class="model-providers-page__provider-actions">
                   <ElPopover
@@ -823,8 +936,12 @@ import {
   clampModelCompressionThreshold,
   clampSettingsTemperature,
   ensureProviderModelDraft,
+  inferModelCapabilities,
   listAddableProviderTemplates,
+  modelHasCapability,
   normalizeContextWindowKTokens,
+  readProviderModelDraft,
+  type ModelCapabilityKey,
   type ProviderDraft,
 } from "./settingsPageModel.ts";
 
@@ -851,6 +968,7 @@ const discoveringProviderId = ref<string | null>(null);
 const activeModelPickerProviderId = ref<string | null>(null);
 const refreshingModelPickerProviderId = ref<string | null>(null);
 const activeProviderConfigProviderId = ref<string | null>(null);
+const expandedModelConfigKeys = ref<Record<string, boolean>>({});
 const activeLogoutConfirmProviderId = ref<string | null>(null);
 const logoutConfirmTimeoutRef = ref<number | null>(null);
 const codexBrowserLoginSession = ref<OpenAICodexBrowserAuthStartResponse | null>(null);
@@ -975,6 +1093,12 @@ function buildProviderDraftFromTemplate(provider: SettingsModelProvider): Provid
         ? Math.round(model.context_window / 1000)
         : null,
       compression_threshold: clampModelCompressionThreshold(model.compression_threshold),
+      capabilities: inferModelCapabilities(modelName, model.capabilities),
+      embedding: {
+        dimensions: typeof model.embedding?.dimensions === "number" ? model.embedding.dimensions : null,
+        use_for_memory: model.embedding?.use_for_memory !== false,
+        use_for_knowledge: model.embedding?.use_for_knowledge !== false,
+      },
     };
   }
   for (const modelName of modelNames) {
@@ -1063,6 +1187,7 @@ const configuredModels = computed(() =>
         model: modelName,
         label: modelName,
         route_target: null,
+        provider,
       })),
     ),
 );
@@ -1071,6 +1196,22 @@ const configuredModelOptions = computed(() =>
   Array.from(
     new Map(
       configuredModels.value.map((model) => [
+        model.model_ref,
+        {
+          value: model.model_ref,
+          label: modelDisplayLookup.value[model.model_ref] || model.model_ref,
+        },
+      ]),
+    ).values(),
+  ),
+);
+const configuredChatModels = computed(() =>
+  configuredModels.value.filter(({ provider, model: modelName }) => modelHasCapability(provider, modelName, "chat")),
+);
+const configuredChatModelOptions = computed(() =>
+  Array.from(
+    new Map(
+      configuredChatModels.value.map((model) => [
         model.model_ref,
         {
           value: model.model_ref,
@@ -1114,6 +1255,34 @@ function isProviderModelPickerLoading(provider: ProviderDraft) {
   return refreshingModelPickerProviderId.value === provider.provider_id || discoveringProviderId.value === provider.provider_id;
 }
 
+function modelConfigKey(provider: ProviderDraft, modelName: string) {
+  return `${provider.provider_id}:${modelName.trim().toLowerCase()}`;
+}
+
+function isModelConfigExpanded(provider: ProviderDraft, modelName: string) {
+  return Boolean(expandedModelConfigKeys.value[modelConfigKey(provider, modelName)]);
+}
+
+function toggleModelConfigPanel(provider: ProviderDraft, modelName: string) {
+  const key = modelConfigKey(provider, modelName);
+  expandedModelConfigKeys.value = {
+    ...expandedModelConfigKeys.value,
+    [key]: !expandedModelConfigKeys.value[key],
+  };
+}
+
+function modelCapabilityBadges(provider: ProviderDraft, modelName: string) {
+  const capabilities = readProviderModelDraft(provider, modelName).capabilities;
+  const badges: string[] = [];
+  if (capabilities.chat) badges.push(t("settings.modelCapabilityChat"));
+  if (capabilities.embedding) badges.push(t("settings.modelCapabilityEmbedding"));
+  if (capabilities.rerank) badges.push(t("settings.modelCapabilityRerank"));
+  if (capabilities.vision) badges.push(t("settings.modelCapabilityVision"));
+  if (capabilities.tool_call) badges.push(t("settings.modelCapabilityToolCall"));
+  if (capabilities.structured_output) badges.push(t("settings.modelCapabilityStructuredOutput"));
+  return badges.length > 0 ? badges : [t("settings.modelCapabilityNone")];
+}
+
 function toggleProviderModel(provider: ProviderDraft, modelName: string) {
   const normalizedModel = modelName.trim();
   if (!normalizedModel) {
@@ -1151,11 +1320,69 @@ function removeProviderModel(provider: ProviderDraft, modelName: string) {
 }
 
 function modelContextWindowKTokens(provider: ProviderDraft, modelName: string) {
-  return ensureProviderModelDraft(provider, modelName).context_window_ktokens;
+  return readProviderModelDraft(provider, modelName).context_window_ktokens;
 }
 
 function modelCompressionThresholdPercent(provider: ProviderDraft, modelName: string) {
-  return Math.round(clampModelCompressionThreshold(ensureProviderModelDraft(provider, modelName).compression_threshold) * 100);
+  return Math.round(clampModelCompressionThreshold(readProviderModelDraft(provider, modelName).compression_threshold) * 100);
+}
+
+function toggleModelCapability(provider: ProviderDraft, modelName: string, capability: ModelCapabilityKey) {
+  const modelSettings = ensureProviderModelDraft(provider, modelName);
+  modelSettings.capabilities = {
+    ...modelSettings.capabilities,
+    [capability]: !modelSettings.capabilities[capability],
+  };
+  providerDrafts.value = {
+    ...providerDrafts.value,
+    [provider.provider_id]: provider,
+  };
+  alignDefaultModelsToProviderSelection();
+  void persistSettings();
+}
+
+function modelEmbeddingDimensions(provider: ProviderDraft, modelName: string) {
+  return readProviderModelDraft(provider, modelName).embedding.dimensions;
+}
+
+function modelEmbeddingScopeEnabled(
+  provider: ProviderDraft,
+  modelName: string,
+  scope: "use_for_memory" | "use_for_knowledge",
+) {
+  return readProviderModelDraft(provider, modelName).embedding[scope];
+}
+
+function handleModelEmbeddingDimensionsChange(provider: ProviderDraft, modelName: string, event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+  const parsed = Number(target.value);
+  const modelSettings = ensureProviderModelDraft(provider, modelName);
+  modelSettings.embedding.dimensions = Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : null;
+  providerDrafts.value = {
+    ...providerDrafts.value,
+    [provider.provider_id]: provider,
+  };
+  void persistSettings();
+}
+
+function handleModelEmbeddingScopeChange(
+  provider: ProviderDraft,
+  modelName: string,
+  scope: "use_for_memory" | "use_for_knowledge",
+) {
+  const modelSettings = ensureProviderModelDraft(provider, modelName);
+  modelSettings.embedding = {
+    ...modelSettings.embedding,
+    [scope]: !modelSettings.embedding[scope],
+  };
+  providerDrafts.value = {
+    ...providerDrafts.value,
+    [provider.provider_id]: provider,
+  };
+  void persistSettings();
 }
 
 function handleModelContextWindowChange(provider: ProviderDraft, modelName: string, event: Event) {
@@ -1266,11 +1493,11 @@ function ensureCodexProviderDraft() {
 }
 
 function alignDefaultModelsToProviderSelection() {
-  if (!draft.value || configuredModelOptions.value.length === 0) {
+  if (!draft.value || configuredChatModelOptions.value.length === 0) {
     return;
   }
-  const availableRefs = new Set(configuredModelOptions.value.map((option) => option.value));
-  const fallbackRef = configuredModelOptions.value[0].value;
+  const availableRefs = new Set(configuredChatModelOptions.value.map((option) => option.value));
+  const fallbackRef = configuredChatModelOptions.value[0].value;
   if (!availableRefs.has(draft.value.text_model_ref)) {
     draft.value.text_model_ref = fallbackRef;
   }
@@ -2258,89 +2485,145 @@ onBeforeUnmount(() => {
   overflow-wrap: anywhere;
 }
 
-.model-providers-page__provider-model-pills {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+.model-providers-page__provider-model-rows {
+  display: grid;
   gap: 8px;
-  max-height: 90px;
+  max-height: 420px;
   overflow-y: auto;
   padding-right: 2px;
 }
 
-.model-providers-page__provider-model-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(37, 99, 235, 0.18);
-  border-radius: 999px;
-  background: rgba(239, 246, 255, 0.96);
-  color: rgb(37, 99, 235);
-  font-family: var(--toograph-font-mono);
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0;
-}
-
-.model-providers-page__provider-model-pill {
-  gap: 6px;
-  max-width: 100%;
-  min-height: 30px;
-  padding: 5px 10px;
-  color: rgb(37, 99, 235);
-  overflow-wrap: anywhere;
-}
-
-.model-providers-page__provider-model-pill-button {
-  cursor: pointer;
-}
-
-.model-providers-page__provider-model-pill-button:hover {
-  border-color: rgba(37, 99, 235, 0.32);
-  background: rgba(219, 234, 254, 0.96);
-}
-
-.model-providers-page__provider-model-pill span {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.model-providers-page__provider-model-remove {
-  flex: 0 0 auto;
-  font-size: 0.78rem;
-}
-
-.model-providers-page__provider-model-pill--empty {
-  color: rgba(60, 41, 20, 0.58);
-  font-family: inherit;
-  font-weight: 650;
-}
-
-.model-providers-page__model-budget-list {
+.model-providers-page__provider-model-row {
   display: grid;
-  gap: 8px;
-}
-
-.model-providers-page__model-budget-row {
-  display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(104px, 128px) minmax(104px, 128px);
-  align-items: end;
-  gap: 8px;
-  border: 1px solid rgba(37, 99, 235, 0.12);
+  overflow: hidden;
+  border: 1px solid rgba(37, 99, 235, 0.13);
   border-radius: 12px;
-  background: rgba(248, 250, 252, 0.76);
-  padding: 8px;
+  background: rgba(255, 255, 255, 0.78);
 }
 
-.model-providers-page__model-budget-name {
+.model-providers-page__provider-model-row-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 8px 8px 10px;
+}
+
+.model-providers-page__provider-model-identity {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.model-providers-page__provider-model-name {
   min-width: 0;
   color: rgba(30, 41, 59, 0.82);
   font-family: var(--toograph-font-mono);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.model-providers-page__provider-model-capabilities,
+.model-providers-page__provider-model-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.model-providers-page__provider-model-capabilities {
+  flex-wrap: wrap;
+}
+
+.model-providers-page__provider-model-capability {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: rgba(239, 246, 255, 0.72);
+  color: rgb(37, 99, 235);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.model-providers-page__provider-model-actions {
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.model-providers-page__provider-model-config-panel {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid rgba(37, 99, 235, 0.1);
+  padding: 10px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.78), rgba(255, 250, 244, 0.78));
+}
+
+.model-providers-page__model-capability-controls,
+.model-providers-page__model-config-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.model-providers-page__model-capability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  align-items: end;
+  gap: 8px;
+}
+
+.model-providers-page__model-config-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  align-items: end;
+  gap: 8px;
+}
+
+.model-providers-page__panel .model-providers-page__model-capability-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 34px;
+  margin-top: 0;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 10px;
+  padding: 7px 9px;
+  background: rgba(255, 255, 255, 0.74);
+  color: rgba(60, 41, 20, 0.72);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.model-providers-page__panel .model-providers-page__model-capability-toggle input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  min-height: 14px;
+  margin: 0;
+  padding: 0;
+  border-radius: 3px;
+  accent-color: rgb(37, 99, 235);
+}
+
+.model-providers-page__model-capability-toggle span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.model-providers-page__provider-model-empty {
+  color: rgba(60, 41, 20, 0.58);
+  font-size: 0.84rem;
+  font-weight: 650;
 }
 
 .model-providers-page__model-budget-field {
@@ -2851,17 +3134,36 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
-  .model-providers-page__model-budget-row {
-    grid-template-columns: 1fr;
-    align-items: stretch;
-  }
-
   .model-providers-page__provider-card .model-providers-page__provider-actions {
     flex-wrap: wrap;
   }
 
   .model-providers-page__provider-card .model-providers-page__button {
     flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .model-providers-page__provider-model-rows {
+    max-height: none;
+  }
+
+  .model-providers-page__provider-model-row-main {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .model-providers-page__provider-model-actions {
+    justify-content: stretch;
+  }
+
+  .model-providers-page__provider-model-actions .model-providers-page__button {
+    flex: 1 1 auto;
+  }
+
+  .model-providers-page__model-capability-grid,
+  .model-providers-page__model-config-fields {
+    grid-template-columns: 1fr;
   }
 }
 
