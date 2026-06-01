@@ -19,8 +19,15 @@ from app.api import routes_settings
 class SettingsModelProviderTests(unittest.TestCase):
     def test_discovers_openai_compatible_models_from_base_url(self) -> None:
         with patch(
-            "app.api.routes_settings.discover_provider_models",
-            return_value=["gemma-4-26b-a4b-it", "huihui-gemma-4-26b-a4b-it-abliterated"],
+            "app.api.routes_settings.discover_provider_model_items",
+            return_value=[
+                {"model": "gemma-4-26b-a4b-it", "label": "gemma-4-26b-a4b-it", "modalities": ["text"]},
+                {
+                    "model": "huihui-gemma-4-26b-a4b-it-abliterated",
+                    "label": "huihui-gemma-4-26b-a4b-it-abliterated",
+                    "modalities": ["text"],
+                },
+            ],
         ) as discover:
             with TestClient(app) as client:
                 response = client.post(
@@ -38,7 +45,15 @@ class SettingsModelProviderTests(unittest.TestCase):
                 "models": [
                     "gemma-4-26b-a4b-it",
                     "huihui-gemma-4-26b-a4b-it-abliterated",
-                ]
+                ],
+                "model_items": [
+                    {"model": "gemma-4-26b-a4b-it", "label": "gemma-4-26b-a4b-it", "modalities": ["text"]},
+                    {
+                        "model": "huihui-gemma-4-26b-a4b-it-abliterated",
+                        "label": "huihui-gemma-4-26b-a4b-it-abliterated",
+                        "modalities": ["text"],
+                    },
+                ],
             },
         )
         discover.assert_called_once_with(
@@ -52,7 +67,10 @@ class SettingsModelProviderTests(unittest.TestCase):
         )
 
     def test_discovery_endpoint_dispatches_anthropic_transport(self) -> None:
-        with patch("app.api.routes_settings.discover_provider_models", return_value=["claude-sonnet-4-5"]) as discover:
+        with patch(
+            "app.api.routes_settings.discover_provider_model_items",
+            return_value=[{"model": "claude-sonnet-4-5", "label": "claude-sonnet-4-5", "modalities": ["text"]}],
+        ) as discover:
             with TestClient(app) as client:
                 response = client.post(
                     "/api/settings/model-providers/discover",
@@ -67,7 +85,13 @@ class SettingsModelProviderTests(unittest.TestCase):
                 )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"models": ["claude-sonnet-4-5"]})
+        self.assertEqual(
+            response.json(),
+            {
+                "models": ["claude-sonnet-4-5"],
+                "model_items": [{"model": "claude-sonnet-4-5", "label": "claude-sonnet-4-5", "modalities": ["text"]}],
+            },
+        )
         discover.assert_called_once_with(
             provider_id="anthropic",
             transport="anthropic-messages",
@@ -375,6 +399,155 @@ class SettingsModelProviderTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(saved_payload["model_providers"]["local"]["request_timeout_seconds"], 42.5)
+
+    def test_model_provider_defaults_structured_output_mode_to_validate_then_repair(self) -> None:
+        from app.core import model_catalog
+
+        with patch.object(model_catalog, "load_app_settings", return_value={"model_providers": {}}):
+            with patch.object(model_catalog, "get_local_gateway_runtime_config", return_value=None):
+                with patch.object(model_catalog, "get_local_route_model_names", return_value=[]):
+                    with TestClient(app) as client:
+                        response = client.get("/api/settings")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        provider = next(
+            item
+            for item in payload["model_catalog"]["provider_templates"]
+            if item["provider_id"] == "lmstudio"
+        )
+        self.assertEqual(provider["structured_output_mode"], "validate_then_repair")
+
+    def test_update_model_provider_persists_structured_output_mode(self) -> None:
+        saved_payload: dict = {}
+
+        def capture_save(payload: dict) -> dict:
+            saved_payload.update(payload)
+            return payload
+
+        with patch("app.api.routes_settings.load_app_settings", return_value={"model_providers": {}}):
+            with patch("app.api.routes_settings.save_app_settings", side_effect=capture_save):
+                with patch("app.api.routes_settings._build_settings_payload", return_value={"ok": True}):
+                    with TestClient(app) as client:
+                        response = client.post(
+                            "/api/settings",
+                            json={
+                                "model": {
+                                    "text_model_ref": "lmstudio/qwen/qwen3.6-27b",
+                                    "video_model_ref": "lmstudio/qwen/qwen3.6-27b",
+                                },
+                                "agent_runtime_defaults": {
+                                    "model": "lmstudio/qwen/qwen3.6-27b",
+                                    "thinking_enabled": False,
+                                    "thinking_level": "off",
+                                    "temperature": 0.2,
+                                },
+                                "model_providers": {
+                                    "lmstudio": {
+                                        "label": "LM Studio",
+                                        "transport": "openai-compatible",
+                                        "base_url": "http://127.0.0.1:1234/v1",
+                                        "enabled": True,
+                                        "structured_output_mode": "native_schema_first",
+                                        "models": [
+                                            {
+                                                "model": "qwen/qwen3.6-27b",
+                                                "capabilities": {"chat": True, "structured_output": True},
+                                                "reasoning": True,
+                                            }
+                                        ],
+                                    }
+                                },
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            saved_payload["model_providers"]["lmstudio"]["structured_output_mode"],
+            "native_schema_first",
+        )
+
+    def test_settings_payload_exposes_provider_structured_output_mode(self) -> None:
+        from app.core import model_catalog
+
+        saved_settings = {
+            "text_model_ref": "lmstudio/qwen/qwen3.6-27b",
+            "video_model_ref": "lmstudio/qwen/qwen3.6-27b",
+            "model_providers": {
+                "lmstudio": {
+                    "label": "LM Studio",
+                    "transport": "openai-compatible",
+                    "base_url": "http://127.0.0.1:1234/v1",
+                    "enabled": True,
+                    "structured_output_mode": "native_schema_first",
+                    "models": [{"model": "qwen/qwen3.6-27b", "capabilities": {"chat": True}}],
+                }
+            },
+        }
+
+        with patch.object(model_catalog, "load_app_settings", return_value=saved_settings):
+            with patch.object(model_catalog, "get_local_gateway_runtime_config", return_value=None):
+                with patch.object(model_catalog, "get_local_route_model_names", return_value=[]):
+                    with patch.object(routes_settings, "build_model_catalog", side_effect=model_catalog.build_model_catalog):
+                        with TestClient(app) as client:
+                            response = client.get("/api/settings")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        provider = next(
+            item
+            for item in payload["model_catalog"]["providers"]
+            if item["provider_id"] == "lmstudio"
+        )
+        self.assertEqual(provider["structured_output_mode"], "native_schema_first")
+
+    def test_update_model_provider_normalizes_invalid_structured_output_mode(self) -> None:
+        saved_payload: dict = {}
+
+        def capture_save(payload: dict) -> dict:
+            saved_payload.update(payload)
+            return payload
+
+        with patch("app.api.routes_settings.load_app_settings", return_value={"model_providers": {}}):
+            with patch("app.api.routes_settings.save_app_settings", side_effect=capture_save):
+                with patch("app.api.routes_settings._build_settings_payload", return_value={"ok": True}):
+                    with TestClient(app) as client:
+                        response = client.post(
+                            "/api/settings",
+                            json={
+                                "model": {
+                                    "text_model_ref": "lmstudio/qwen/qwen3.6-27b",
+                                    "video_model_ref": "lmstudio/qwen/qwen3.6-27b",
+                                },
+                                "agent_runtime_defaults": {
+                                    "model": "lmstudio/qwen/qwen3.6-27b",
+                                    "thinking_enabled": False,
+                                    "thinking_level": "off",
+                                    "temperature": 0.2,
+                                },
+                                "model_providers": {
+                                    "lmstudio": {
+                                        "label": "LM Studio",
+                                        "transport": "openai-compatible",
+                                        "base_url": "http://127.0.0.1:1234/v1",
+                                        "enabled": True,
+                                        "structured_output_mode": "bad-value",
+                                        "models": [
+                                            {
+                                                "model": "qwen/qwen3.6-27b",
+                                                "capabilities": {"chat": True},
+                                            }
+                                        ],
+                                    }
+                                },
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            saved_payload["model_providers"]["lmstudio"]["structured_output_mode"],
+            "validate_then_repair",
+        )
 
     def test_update_settings_persists_provider_credential_pool(self) -> None:
         saved_payload: dict = {}

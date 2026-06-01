@@ -5,6 +5,8 @@ export type ModelProviderTransport =
   | "gemini-generate-content"
   | "codex-responses";
 
+export type StructuredOutputMode = "validate_then_repair" | "native_schema_first";
+
 export type AgentThinkingLevel = "off" | "low" | "medium" | "high" | "xhigh";
 
 export type BuddyPermissionMode = "ask_first" | "full_access";
@@ -53,7 +55,7 @@ export type SettingsProviderModel = {
   model: string;
   label: string;
   route_target?: string | null;
-  reasoning?: boolean;
+  reasoning?: boolean | null;
   modalities?: string[];
   capabilities?: SettingsProviderModelCapabilities;
   embedding?: SettingsProviderModelEmbedding;
@@ -78,6 +80,7 @@ export type SettingsModelProvider = {
   configured: boolean;
   enabled: boolean;
   saved?: boolean;
+  structured_output_mode?: StructuredOutputMode;
   base_url: string;
   auth_header?: string;
   auth_scheme?: string;
@@ -116,6 +119,7 @@ export type SettingsPayload = {
     {
       label?: string;
       transport?: ModelProviderTransport;
+      structured_output_mode?: StructuredOutputMode;
       base_url: string;
       api_key?: string;
       enabled?: boolean;

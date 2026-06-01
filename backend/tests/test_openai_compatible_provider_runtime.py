@@ -557,6 +557,86 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
         self.assertNotIn("return_progress", sent_payloads[0])
         self.assertEqual(meta["reasoning_format"], "lmstudio:reasoning_effort")
 
+    def test_local_lmstudio_native_schema_reasoning_conflict_retries_without_schema(self) -> None:
+        saved_settings = {
+            "model_providers": {
+                "local": {
+                    "base_url": "http://127.0.0.1:1234/v1",
+                    "models": [{"model": "openai-gpt-oss-20b", "label": "GPT OSS"}],
+                }
+            }
+        }
+        schema = {
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+            "additionalProperties": False,
+        }
+
+        with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:1234/v1"):
+            local_llm, _model_catalog = self._reload_target_modules()
+
+            sent_payloads: list[dict[str, object]] = []
+
+            def fake_request(payload: dict[str, object]) -> dict[str, object]:
+                sent_payloads.append(dict(payload))
+                if len(sent_payloads) == 1:
+                    return {
+                        "id": "chatcmpl-1",
+                        "model": "openai-gpt-oss-20b",
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": "",
+                                    "reasoning": '{"answer":"buried in reasoning"}',
+                                }
+                            }
+                        ],
+                    }
+                return {
+                    "id": "chatcmpl-2",
+                    "model": "openai-gpt-oss-20b",
+                    "choices": [{"message": {"content": '{"answer":"ok"}', "reasoning": "reasoning"}}],
+                }
+
+            with patch.object(local_llm, "load_app_settings", return_value=saved_settings):
+                with patch.object(local_llm, "get_local_gateway_runtime_config", return_value=None):
+                    with patch.object(
+                        local_llm,
+                        "_request_lm_studio_model_metadata",
+                        return_value={
+                            "models": [
+                                {
+                                    "key": "openai-gpt-oss-20b",
+                                    "loaded_instances": [{"id": "openai-gpt-oss-20b"}],
+                                    "reasoning": {"type": "effort"},
+                                }
+                            ]
+                        },
+                    ):
+                        with patch.object(local_llm, "_request_local_chat_completion", side_effect=fake_request):
+                            content, meta = local_llm._chat_with_local_model_with_meta(
+                                system_prompt="sys",
+                                user_prompt="user",
+                                model="openai-gpt-oss-20b",
+                                thinking_enabled=True,
+                                thinking_level="medium",
+                                structured_output_schema=schema,
+                                structured_output_mode="native_schema_first",
+                            )
+
+        self.assertEqual(content, '{"answer":"ok"}')
+        self.assertEqual(len(sent_payloads), 2)
+        self.assertIn("response_format", sent_payloads[0])
+        self.assertEqual(sent_payloads[0]["reasoning_effort"], "medium")
+        self.assertNotIn("response_format", sent_payloads[1])
+        self.assertEqual(sent_payloads[1]["reasoning_effort"], "medium")
+        self.assertEqual(meta["structured_output_mode"], "validate_then_repair")
+        self.assertEqual(meta["structured_output_strategy"], "prompt_validation")
+        self.assertTrue(meta["structured_output_native_schema_fallback_used"])
+        self.assertEqual(meta["structured_output_native_schema_conflict_provider"], "lmstudio")
+        self.assertTrue(any("LM Studio" in warning and "Validate then repair" in warning for warning in meta["warnings"]))
+
     def test_build_model_catalog_keeps_discovered_models_separate_from_saved_models(self) -> None:
         saved_settings = {
             "text_model_ref": "local/stale-model",

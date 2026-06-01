@@ -27,12 +27,13 @@ from app.core.storage.provider_prompt_cache_store import (
     normalize_provider_prompt_cache_resource_retention_days,
 )
 from app.core.storage.settings_store import load_app_settings, save_app_settings
+from app.core.runtime.structured_output import normalize_structured_output_mode
 from app.tools.local_llm import (
     get_default_agent_temperature,
     get_default_agent_thinking_level,
 )
 from app.core.thinking_levels import THINKING_LEVEL_HIGH, THINKING_LEVEL_OFF, normalize_thinking_level
-from app.tools.model_provider_client import discover_provider_models
+from app.tools.model_provider_client import discover_provider_model_items
 from app.tools.model_provider_http import normalize_request_timeout_seconds
 from app.tools.openai_codex_client import (
     clear_codex_auth_state,
@@ -118,6 +119,7 @@ class SettingsModelProviderPayload(BaseModel):
     auth_scheme: str | None = Field(default=None, alias="auth_scheme")
     auth_mode: str | None = Field(default=None, alias="auth_mode")
     request_timeout_seconds: float | None = Field(default=None, alias="request_timeout_seconds", ge=1, le=3600)
+    structured_output_mode: str | None = Field(default=None, alias="structured_output_mode")
     credential_pool: list[SettingsProviderCredentialPayload] | None = Field(default=None, alias="credential_pool")
     models: list[SettingsProviderModelPayload] = Field(default_factory=list)
 
@@ -323,6 +325,11 @@ def _merge_model_providers(
                 if provider_payload.request_timeout_seconds is not None
                 else existing_provider.get("request_timeout_seconds") or template.get("request_timeout_seconds")
             ),
+            "structured_output_mode": normalize_structured_output_mode(
+                provider_payload.structured_output_mode
+                if provider_payload.structured_output_mode is not None
+                else existing_provider.get("structured_output_mode") or template.get("structured_output_mode")
+            ),
             "models": model_configs,
         }
 
@@ -485,7 +492,7 @@ def update_model_log_settings_endpoint(payload: ModelLogSettingsPayload) -> dict
 def discover_model_provider_models_endpoint(payload: ModelDiscoveryPayload) -> dict:
     try:
         template = get_provider_template(payload.provider_id)
-        models = discover_provider_models(
+        model_items = discover_provider_model_items(
             provider_id=payload.provider_id,
             transport=payload.transport,
             base_url=payload.base_url,
@@ -496,7 +503,12 @@ def discover_model_provider_models_endpoint(payload: ModelDiscoveryPayload) -> d
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"models": models}
+    models = [
+        str(item.get("model") or "").strip()
+        for item in model_items
+        if isinstance(item, dict) and str(item.get("model") or "").strip()
+    ]
+    return {"models": models, "model_items": model_items}
 
 
 @router.get("/model-providers/openai-codex/auth/status")

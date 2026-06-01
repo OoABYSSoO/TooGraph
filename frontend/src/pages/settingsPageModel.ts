@@ -5,11 +5,14 @@ import type {
   SettingsModelProvider,
   SettingsPayload,
   SettingsProviderCredential,
+  SettingsProviderModel,
+  StructuredOutputMode,
 } from "../types/settings.ts";
 
 const DEFAULT_AGENT_TEMPERATURE = 0.2;
 const DEFAULT_PROVIDER_REQUEST_TIMEOUT_SECONDS = 180;
 export const DEFAULT_MODEL_COMPRESSION_THRESHOLD = 0.9;
+export const DEFAULT_STRUCTURED_OUTPUT_MODE: StructuredOutputMode = "validate_then_repair";
 type SettingsProvider = SettingsModelProvider;
 
 export type ModelCapabilityKey =
@@ -30,6 +33,7 @@ export type ProviderModelEmbeddingDraft = {
 
 export type ProviderModelDraft = {
   model: string;
+  reasoning: boolean | null;
   context_window_ktokens: number | null;
   compression_threshold: number;
   capabilities: ProviderModelCapabilities;
@@ -40,6 +44,7 @@ export type ProviderDraft = {
   provider_id: string;
   label: string;
   transport: ModelProviderTransport;
+  structured_output_mode: StructuredOutputMode;
   base_url: string;
   enabled: boolean;
   saved?: boolean;
@@ -102,6 +107,10 @@ export function normalizeContextWindowKTokens(value: number | null | undefined) 
   }
   const normalized = Math.round(Number(value));
   return normalized > 0 ? normalized : null;
+}
+
+export function normalizeStructuredOutputMode(value: unknown): StructuredOutputMode {
+  return value === "native_schema_first" ? "native_schema_first" : DEFAULT_STRUCTURED_OUTPUT_MODE;
 }
 
 const MODEL_CAPABILITY_KEYS: ModelCapabilityKey[] = [
@@ -232,11 +241,16 @@ function normalizeProviderCredentialPool(value: unknown): SettingsProviderCreden
 function buildDefaultProviderModelDraft(model: string, capabilities?: unknown): ProviderModelDraft {
   return {
     model,
+    reasoning: null,
     context_window_ktokens: null,
     compression_threshold: DEFAULT_MODEL_COMPRESSION_THRESHOLD,
     capabilities: inferModelCapabilities(model, capabilities),
     embedding: defaultEmbeddingDraft(),
   };
+}
+
+function normalizeModelReasoning(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
 }
 
 function modelSettingsKey(model: string) {
@@ -273,6 +287,7 @@ function buildProviderModelSettings(provider: SettingsProvider, selectedModels: 
     const rawEmbedding = "embedding" in model ? (model as { embedding?: unknown }).embedding : undefined;
     settings[modelName] = {
       model: modelName,
+      reasoning: normalizeModelReasoning(model.reasoning),
       context_window_ktokens: Number.isFinite(contextWindowTokens) && contextWindowTokens > 0
         ? Math.round(contextWindowTokens / 1000)
         : null,
@@ -297,6 +312,7 @@ export function ensureProviderModelDraft(provider: ProviderDraft, modelName: str
   provider.model_settings = provider.model_settings ?? {};
   const existing = provider.model_settings[normalizedModel];
   if (existing) {
+    existing.reasoning = normalizeModelReasoning(existing.reasoning);
     existing.capabilities = normalizeModelCapabilities(existing.capabilities, inferModelCapabilities(normalizedModel));
     existing.embedding = normalizeEmbeddingDraft(existing.embedding);
     return existing;
@@ -322,6 +338,7 @@ export function readProviderModelDraft(provider: ProviderDraft, modelName: strin
   return {
     ...existing,
     model: normalizedModel || existing.model,
+    reasoning: normalizeModelReasoning(existing.reasoning),
     capabilities: normalizeModelCapabilities(existing.capabilities, inferModelCapabilities(normalizedModel)),
     embedding: normalizeEmbeddingDraft(existing.embedding),
   };
@@ -329,6 +346,42 @@ export function readProviderModelDraft(provider: ProviderDraft, modelName: strin
 
 export function modelHasCapability(provider: ProviderDraft, modelName: string, capability: ModelCapabilityKey) {
   return Boolean(readProviderModelDraft(provider, modelName).capabilities[capability]);
+}
+
+export function applyDiscoveredModelItemsToDraft(
+  provider: ProviderDraft,
+  modelItems: Array<Partial<SettingsProviderModel> & { model: string }> | undefined,
+) {
+  if (!Array.isArray(modelItems)) {
+    return;
+  }
+  for (const item of modelItems) {
+    const modelName = String(item.model || "").trim();
+    if (!modelName) {
+      continue;
+    }
+    const modelSettings = ensureProviderModelDraft(provider, modelName);
+    const contextWindow = Number(item.context_window);
+    const reasoning = normalizeModelReasoning(item.reasoning);
+    if (reasoning !== null) {
+      modelSettings.reasoning = reasoning;
+    }
+    modelSettings.context_window_ktokens = Number.isFinite(contextWindow) && contextWindow > 0
+      ? Math.round(contextWindow / 1000)
+      : modelSettings.context_window_ktokens;
+    modelSettings.compression_threshold = clampModelCompressionThreshold(
+      typeof item.compression_threshold === "number" ? item.compression_threshold : modelSettings.compression_threshold,
+    );
+    modelSettings.capabilities = inferModelCapabilities(modelName, item.capabilities);
+    if (item.embedding) {
+      const dimensions = Number(item.embedding.dimensions);
+      modelSettings.embedding = {
+        dimensions: Number.isFinite(dimensions) && dimensions > 0 ? Math.trunc(dimensions) : null,
+        use_for_memory: item.embedding.use_for_memory !== false,
+        use_for_knowledge: item.embedding.use_for_knowledge !== false,
+      };
+    }
+  }
 }
 
 export function listProviderModelBadges(
@@ -360,6 +413,7 @@ export function buildProviderDraftsFromSettings(payload: SettingsPayload): Recor
             provider_id: provider.provider_id,
             label: provider.label,
             transport: provider.transport,
+            structured_output_mode: normalizeStructuredOutputMode(provider.structured_output_mode),
             base_url: provider.base_url,
             enabled: provider.enabled,
             saved: Boolean(provider.saved),
@@ -388,6 +442,7 @@ export function buildProviderSavePayload(drafts: Record<string, ProviderDraft>):
       {
         label: draft.label,
         transport: draft.transport,
+        structured_output_mode: normalizeStructuredOutputMode(draft.structured_output_mode),
         base_url: draft.base_url,
         api_key: draft.requires_login ? undefined : draft.api_key.trim() || undefined,
         enabled: draft.enabled,
@@ -402,6 +457,7 @@ export function buildProviderSavePayload(drafts: Record<string, ProviderDraft>):
           return {
             model,
             label: model,
+            reasoning: modelSettings.reasoning,
             modalities: modelSettings.capabilities.vision ? ["text", "image"] : ["text"],
             capabilities: { ...modelSettings.capabilities },
             context_window: modelSettings.capabilities.chat && contextWindowKTokens !== null ? contextWindowKTokens * 1000 : null,

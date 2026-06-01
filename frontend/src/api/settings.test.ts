@@ -160,12 +160,24 @@ test("discoverModelProviderModels posts discovery payload", async () => {
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     requestedUrl = String(input);
     requestedPayload = init?.body ? JSON.parse(String(init.body)) : null;
-    return new Response(JSON.stringify({ models: ["gemma-4-26b-a4b-it"] }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
+    return new Response(
+      JSON.stringify({
+        models: ["gemma-4-26b-a4b-it"],
+        model_items: [
+          {
+            model: "gemma-4-26b-a4b-it",
+            label: "Gemma 4",
+            context_window: 131072,
+          },
+        ],
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
       },
-    });
+    );
   }) as typeof fetch;
 
   const result = await discoverModelProviderModels({
@@ -186,7 +198,16 @@ test("discoverModelProviderModels posts discovery payload", async () => {
     auth_header: "x-api-key",
     auth_scheme: "",
   });
-  assert.deepEqual(result, { models: ["gemma-4-26b-a4b-it"] });
+  assert.deepEqual(result, {
+    models: ["gemma-4-26b-a4b-it"],
+    model_items: [
+      {
+        model: "gemma-4-26b-a4b-it",
+        label: "Gemma 4",
+        context_window: 131072,
+      },
+    ],
+  });
 
   globalThis.fetch = originalFetch;
 });

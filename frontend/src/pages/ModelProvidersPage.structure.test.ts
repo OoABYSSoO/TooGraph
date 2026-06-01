@@ -242,6 +242,32 @@ test("ModelProvidersPage hides engineering provider fields inside advanced setti
   assert.match(pageSource, /v-else[\s\S]*settings\.providerBaseUrl/);
 });
 
+test("ModelProvidersPage exposes structured output mode advanced controls with LM Studio warning", () => {
+  assert.match(pageSource, /settings\.structuredOutputMode/);
+  assert.match(pageSource, /settings\.structuredOutputValidateThenRepair/);
+  assert.match(pageSource, /settings\.structuredOutputNativeSchemaFirst/);
+  assert.match(pageSource, /settings\.lmStudioNativeSchemaThinkingWarning/);
+  assert.match(pageSource, /function shouldShowLmStudioStructuredOutputWarning\(provider: ProviderDraft\)/);
+  assert.match(pageSource, /provider\.structured_output_mode === "native_schema_first"/);
+  assert.match(pageSource, /function providerHasReasoningChatModel\(provider: ProviderDraft\)/);
+
+  const configPopover = pageSource.match(/class="model-providers-page__provider-editor-panel model-providers-page__provider-editor-panel--popover"[\s\S]*?<\/ElPopover>/);
+  assert.ok(configPopover, "expected provider config popover content");
+  assert.match(configPopover[0], /v-model="provider\.structured_output_mode"/);
+  assert.match(configPopover[0], /settings\.structuredOutputModeHint/);
+  assert.match(configPopover[0], /shouldShowLmStudioStructuredOutputWarning\(provider\)/);
+
+  const addPanel = pageSource.match(/<section v-if="providerEditorDraft && providerEditorMode === 'add'" class="model-providers-page__provider-editor-panel">[\s\S]*?<\/section>/);
+  assert.ok(addPanel, "expected add-provider editor panel");
+  assert.match(addPanel[0], /v-model="providerEditorDraft\.structured_output_mode"/);
+  assert.match(addPanel[0], /settings\.structuredOutputModeHint/);
+  assert.match(addPanel[0], /shouldShowLmStudioStructuredOutputWarning\(providerEditorDraft\)/);
+
+  const structuredModeOptions = pageSource.match(/<ElOption\s+:label="t\('settings\.structuredOutputValidateThenRepair'\)"\s+value="validate_then_repair"\s+\/>[\s\S]*?<ElOption\s+:label="t\('settings\.structuredOutputNativeSchemaFirst'\)"\s+value="native_schema_first"\s+\/>/g);
+  assert.equal(structuredModeOptions?.length, 2);
+  assert.match(pageSource, /\.model-providers-page__warning \{[\s\S]*color:\s*#9f580a;[\s\S]*font-size:\s*12px;[\s\S]*line-height:\s*1\.45;/);
+});
+
 test("ModelProvidersPage surfaces credential pool metadata in advanced settings", () => {
   assert.match(pageSource, /settings\.providerCredentialPool/);
   assert.match(pageSource, /settings\.providerCredentialPoolEmpty/);

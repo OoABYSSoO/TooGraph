@@ -72,7 +72,9 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(reasoning, "")
         self.assertEqual(warnings, [])
         self.assertEqual(captured["system_prompt"], "system prompt")
-        self.assertEqual(captured["user_prompt"], "根据输入和Action 结果完成输出。")
+        self.assertIn("根据输入和Action 结果完成输出。", str(captured["user_prompt"]))
+        self.assertIn("== Graph State Inputs ==", str(captured["user_prompt"]))
+        self.assertIn("== Action Results ==", str(captured["user_prompt"]))
         self.assertEqual(captured["model"], "test-model")
         self.assertEqual(captured["provider_id"], "local")
         self.assertEqual(captured["temperature"], 0.7)
@@ -113,6 +115,54 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(warnings, [])
         self.assertEqual(captured["request_timeout_seconds"], 12.5)
         self.assertEqual(updated_config["provider_request_timeout_seconds"], 12.5)
+
+    def test_places_runtime_state_and_action_data_in_user_prompt_not_system_prompt(self) -> None:
+        captured: dict[str, object] = {}
+
+        def chat_with_local_model_with_meta_func(**kwargs):
+            captured.update(kwargs)
+            return ('{"answer": "done"}', {"warnings": [], "model": "test-model"})
+
+        payload, _reasoning, warnings, _updated_config = generate_agent_response(
+            _agent_node(writes=[{"state": "answer"}], task_instruction="请根据材料回答。"),
+            {"question": "STATE_SECRET_VALUE"},
+            {"web_search": {"summary": "ACTION_SECRET_VALUE"}},
+            {
+                "resolved_provider_id": "local",
+                "runtime_model_name": "test-model",
+                "resolved_temperature": 0.2,
+                "resolved_thinking": False,
+                "resolved_thinking_level": "off",
+                "resolved_model_ref": "local/test-model",
+            },
+            state_schema={
+                "question": NodeSystemStateDefinition(
+                    name="用户问题",
+                    description="用户输入的原始问题。",
+                    type=NodeSystemStateType.TEXT,
+                ),
+                "answer": NodeSystemStateDefinition(
+                    name="最终答案",
+                    description="给用户看的回复。",
+                    type=NodeSystemStateType.TEXT,
+                ),
+            },
+            chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+        )
+
+        self.assertEqual(payload["answer"], "done")
+        self.assertEqual(warnings, [])
+        system_prompt = str(captured["system_prompt"])
+        user_prompt = str(captured["user_prompt"])
+        self.assertIn("== 必须返回的 JSON 字段 ==", system_prompt)
+        self.assertIn("每个字段必须使用上方的 key", system_prompt)
+        self.assertNotIn("STATE_SECRET_VALUE", system_prompt)
+        self.assertNotIn("ACTION_SECRET_VALUE", system_prompt)
+        self.assertIn("请根据材料回答。", user_prompt)
+        self.assertIn("== Graph State Inputs ==", user_prompt)
+        self.assertIn("STATE_SECRET_VALUE", user_prompt)
+        self.assertIn("== Action Results ==", user_prompt)
+        self.assertIn("ACTION_SECRET_VALUE", user_prompt)
 
     def test_passes_provider_cost_budget_and_records_cost_estimate(self) -> None:
         captured: dict[str, object] = {}
@@ -265,7 +315,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(snapshot["kind"], "llm_prompt_snapshot")
         self.assertEqual(snapshot["phase"], "agent_response")
         self.assertEqual(snapshot["system_prompt_chars"], len("SYSTEM SECRET INPUT"))
-        self.assertEqual(snapshot["user_prompt_chars"], len("USER SECRET TASK"))
+        self.assertGreater(snapshot["user_prompt_chars"], len("USER SECRET TASK"))
         self.assertTrue(snapshot["system_prompt_hash"].startswith("sha256:"))
         self.assertTrue(snapshot["user_prompt_hash"].startswith("sha256:"))
         self.assertEqual(snapshot["prompt_cache_policy"]["kind"], "prompt_cache_policy")
@@ -276,11 +326,12 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(snapshot["prompt_cache_policy"]["stable_prefix_hash"], snapshot["system_prompt_hash"])
         self.assertEqual(snapshot["prompt_cache_policy"]["stable_prefix_chars"], len("SYSTEM SECRET INPUT"))
         self.assertEqual(snapshot["prompt_cache_policy"]["dynamic_suffix_hash"], snapshot["user_prompt_hash"])
-        self.assertEqual(snapshot["prompt_cache_policy"]["dynamic_suffix_chars"], len("USER SECRET TASK"))
+        self.assertEqual(snapshot["prompt_cache_policy"]["dynamic_suffix_chars"], snapshot["user_prompt_chars"])
         self.assertTrue(snapshot["prompt_cache_policy"]["cache_key"].startswith("sha256:"))
-        self.assertFalse(snapshot["prompt_cache_policy"]["eligible"])
-        self.assertEqual(snapshot["prompt_cache_policy"]["reason"], "runtime_state_in_system_prompt")
-        self.assertEqual(snapshot["prompt_cache_policy"]["invalidators"], ["input_state_keys", "context_refs"])
+        self.assertTrue(snapshot["prompt_cache_policy"]["eligible"])
+        self.assertEqual(snapshot["prompt_cache_policy"]["runtime_context_location"], "user_prompt")
+        self.assertEqual(snapshot["prompt_cache_policy"]["reason"], "hash_only_stable_prefix")
+        self.assertEqual(snapshot["prompt_cache_policy"]["invalidators"], [])
         self.assertEqual(snapshot["output_keys"], ["answer"])
         self.assertEqual(
             snapshot["context_refs"],
@@ -432,7 +483,15 @@ class AgentResponseGenerationTests(unittest.TestCase):
 
         def chat_with_local_model_with_meta_func(**kwargs):
             captured.update(kwargs)
-            return ('{"answer": "done", "confidence": 0.8}', {"warnings": []})
+            return (
+                '{"answer": "done", "confidence": 0.8}',
+                {
+                    "warnings": [],
+                    "structured_output_mode": "validate_then_repair",
+                    "structured_output_native_schema_fallback_used": True,
+                    "structured_output_native_schema_conflict_provider": "lmstudio",
+                },
+            )
 
         payload, _reasoning, warnings, updated_config = generate_agent_response(
             _agent_node(writes=[{"state": "answer"}, {"state": "confidence"}]),
@@ -469,8 +528,15 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(schema["required"], ["answer", "confidence"])
         self.assertFalse(schema["additionalProperties"])
         self.assertEqual(schema["properties"]["answer"]["type"], "string")
+        self.assertEqual(schema["properties"]["answer"]["title"], "Answer")
+        self.assertEqual(schema["properties"]["answer"]["description"], "Answer: Final answer.")
         self.assertEqual(schema["properties"]["confidence"]["type"], "number")
+        self.assertEqual(schema["properties"]["confidence"]["title"], "Confidence")
+        self.assertEqual(schema["properties"]["confidence"]["description"], "Confidence: Confidence score.")
         self.assertEqual(updated_config["structured_output_strategy"], "json_schema")
+        self.assertEqual(updated_config["structured_output_mode"], "validate_then_repair")
+        self.assertTrue(updated_config["structured_output_native_schema_fallback_used"])
+        self.assertEqual(updated_config["structured_output_native_schema_conflict_provider"], "lmstudio")
 
     def test_records_provider_fallback_trace_for_remote_structured_output_call(self) -> None:
         fallback_trace = {
@@ -649,6 +715,57 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertNotIn("ORIGINAL SECRET INPUT", serialized_repair_snapshot)
         self.assertNotIn("ORIGINAL TASK", serialized_repair_snapshot)
 
+    def test_repairs_invalid_structured_output_from_final_content_without_reasoning(self) -> None:
+        calls: list[dict[str, object]] = []
+        private_reasoning = "private chain of thought that must not enter repair"
+
+        def chat_with_local_model_with_meta_func(**kwargs):
+            calls.append(dict(kwargs))
+            if len(calls) == 1:
+                return (
+                    '{"answer": 123}',
+                    {
+                        "warnings": [],
+                        "model": "test-model",
+                        "reasoning": private_reasoning,
+                        "structured_output_mode": "validate_then_repair",
+                    },
+                )
+            return ('{"answer": "repaired answer"}', {"warnings": [], "model": "test-model"})
+
+        payload, reasoning, warnings, updated_config = generate_agent_response(
+            _agent_node(writes=[{"state": "answer"}]),
+            {"question": "q"},
+            {},
+            {
+                "resolved_provider_id": "local",
+                "runtime_model_name": "test-model",
+                "resolved_temperature": 0.2,
+                "resolved_thinking": True,
+                "resolved_thinking_level": "medium",
+                "resolved_model_ref": "local/test-model",
+            },
+            state_schema={
+                "answer": NodeSystemStateDefinition(
+                    name="Answer",
+                    description="Final answer.",
+                    type=NodeSystemStateType.TEXT,
+                ),
+            },
+            build_effective_system_prompt_func=lambda *args, **kwargs: "system prompt",
+            chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+        )
+
+        self.assertEqual(payload["answer"], "repaired answer")
+        self.assertEqual(reasoning, private_reasoning)
+        self.assertEqual(warnings, [])
+        self.assertEqual(len(calls), 2)
+        repair_prompt = f"{calls[1]['system_prompt']}\n{calls[1]['user_prompt']}"
+        repair_payload = json.loads(str(calls[1]["user_prompt"]))
+        self.assertEqual(repair_payload["raw_model_output"], '{"answer": 123}')
+        self.assertNotIn(private_reasoning, repair_prompt)
+        self.assertEqual(updated_config["structured_output_repair_source"], "content")
+
     def test_repair_records_provider_fallback_trace_for_remote_model(self) -> None:
         calls: list[dict[str, object]] = []
         fallback_trace = {
@@ -787,8 +904,10 @@ class AgentResponseGenerationTests(unittest.TestCase):
             build_output_key_aliases_func=lambda output_keys, state_schema: {"answer": ["answer"]},
         )
 
-        self.assertEqual(captured["user_prompt"], "Summarize the action result.")
+        self.assertIn("Summarize the action result.", str(captured["user_prompt"]))
+        self.assertIn("searched", str(captured["user_prompt"]))
         self.assertNotIn("Bound Action Instructions", str(captured["user_prompt"]))
+        self.assertNotIn("Use this only while invoking the action.", str(captured["user_prompt"]))
 
     def test_routes_image_upload_inputs_as_model_attachments_from_local_paths(self) -> None:
         captured: dict[str, object] = {}
@@ -841,8 +960,11 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(payload["answer"], "ok")
         self.assertEqual(warnings, [])
         system_prompt = str(captured["system_prompt"])
-        self.assertIn("reference.png", system_prompt)
+        user_prompt = str(captured["user_prompt"])
+        self.assertNotIn("reference.png", system_prompt)
+        self.assertIn("reference.png", user_prompt)
         self.assertNotIn("uploads/reference.png", system_prompt)
+        self.assertNotIn("uploads/reference.png", user_prompt)
         attachments = captured["input_attachments"]
         self.assertEqual(len(attachments), 1)
         self.assertEqual(attachments[0]["type"], "image")
@@ -951,8 +1073,11 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(payload["answer"], "ok")
         self.assertEqual(warnings, [])
         system_prompt = str(captured["system_prompt"])
-        self.assertIn("clip.mp4", system_prompt)
+        user_prompt = str(captured["user_prompt"])
+        self.assertNotIn("clip.mp4", system_prompt)
+        self.assertIn("clip.mp4", user_prompt)
         self.assertNotIn("uploads/clip.mp4", system_prompt)
+        self.assertNotIn("uploads/clip.mp4", user_prompt)
         attachments = captured["input_attachments"]
         self.assertEqual(len(attachments), 1)
         self.assertEqual(attachments[0]["type"], "video")

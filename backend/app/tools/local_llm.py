@@ -19,7 +19,11 @@ from app.core.thinking_levels import (
 from app.core.storage.model_log_store import append_model_request_log
 from app.core.storage.settings_store import load_app_settings
 from app.core.runtime.structured_output import (
+    STRUCTURED_OUTPUT_MODE_NATIVE_SCHEMA_FIRST,
+    STRUCTURED_OUTPUT_MODE_VALIDATE_THEN_REPAIR,
     build_openai_json_schema_response_format,
+    is_lmstudio_native_schema_reasoning_conflict,
+    normalize_structured_output_mode,
     should_retry_without_native_structured_output,
 )
 from app.tools.model_provider_client import (
@@ -475,6 +479,24 @@ def _build_local_thinking_request_payload(
     )
 
 
+def _native_schema_conflict_provider_id_for_local_model(
+    *,
+    provider_id: str,
+    model: str,
+    reasoning_format: str | None,
+) -> str:
+    normalized_provider_id = str(provider_id or "").strip().lower()
+    if normalized_provider_id == "lmstudio":
+        return "lmstudio"
+    if normalized_provider_id != "local":
+        return normalized_provider_id
+    if str(reasoning_format or "").startswith("lmstudio:"):
+        return "lmstudio"
+    if _get_lm_studio_model_reasoning_metadata(model) is not None:
+        return "lmstudio"
+    return normalized_provider_id
+
+
 def _request_local_chat_completion(
     request_payload: dict[str, Any],
     *,
@@ -544,8 +566,17 @@ def _chat_with_local_model_with_meta(
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
     structured_output_schema: dict[str, Any] | None = None,
+    structured_output_mode: str | None = None,
     request_timeout_seconds: float | None = None,
 ) -> tuple[str, dict[str, Any]]:
+    resolved_structured_output_mode = normalize_structured_output_mode(
+        structured_output_mode or _get_saved_local_provider_config().get("structured_output_mode")
+    )
+    first_call_structured_output_schema = (
+        structured_output_schema
+        if resolved_structured_output_mode == STRUCTURED_OUTPUT_MODE_NATIVE_SCHEMA_FIRST
+        else None
+    )
     normalized_request_timeout_seconds = normalize_request_timeout_seconds(
         request_timeout_seconds
         if request_timeout_seconds is not None
@@ -563,8 +594,8 @@ def _chat_with_local_model_with_meta(
     }
     if max_tokens is not None:
         request_payload["max_tokens"] = max_tokens
-    if structured_output_schema:
-        request_payload["response_format"] = build_openai_json_schema_response_format(structured_output_schema)
+    if first_call_structured_output_schema:
+        request_payload["response_format"] = build_openai_json_schema_response_format(first_call_structured_output_schema)
 
     warnings: list[str] = []
     resolved_thinking_level = normalize_thinking_level(
@@ -589,6 +620,8 @@ def _chat_with_local_model_with_meta(
     started_at = time.monotonic()
     logged_request_payload = request_payload
     response_payload: dict[str, Any] = {}
+    native_schema_fallback_used = False
+    native_schema_conflict_provider: str | None = None
 
     def request_completion(payload: dict[str, Any], *, delta_callback: Callable[[str], None] | None = None) -> dict[str, Any]:
         request_kwargs: dict[str, Any] = {}
@@ -606,7 +639,7 @@ def _chat_with_local_model_with_meta(
                 else request_completion(request_payload)
             )
         except Exception as exc:
-            if not structured_output_schema or not should_retry_without_native_structured_output(exc):
+            if not first_call_structured_output_schema or not should_retry_without_native_structured_output(exc):
                 raise
             retry_payload = dict(request_payload)
             retry_payload.pop("response_format", None)
@@ -624,6 +657,39 @@ def _chat_with_local_model_with_meta(
         stream_fallback = response_payload.get("_stream_fallback")
         if isinstance(stream_fallback, dict) and stream_fallback.get("error"):
             warnings.append(f"Streaming request failed; retried once without streaming. {stream_fallback['error']}")
+
+        if (
+            "response_format" in logged_request_payload
+            and not content
+            and reasoning
+            and is_lmstudio_native_schema_reasoning_conflict(
+                provider_id=_native_schema_conflict_provider_id_for_local_model(
+                    provider_id=provider_id,
+                    model=str(request_payload["model"]),
+                    reasoning_format=reasoning_format,
+                ),
+                structured_output_mode=resolved_structured_output_mode,
+                structured_output_schema=structured_output_schema,
+                content=content,
+                reasoning=reasoning,
+            )
+        ):
+            retry_payload = dict(logged_request_payload)
+            retry_payload.pop("response_format", None)
+            logged_request_payload = retry_payload
+            warnings.append(
+                "LM Studio returned schema-shaped JSON in reasoning while native structured output produced empty final content; "
+                "retried with Validate then repair."
+            )
+            response_payload = (
+                request_completion(retry_payload, delta_callback=on_delta)
+                if on_delta is not None
+                else request_completion(retry_payload)
+            )
+            content, reasoning = _extract_chat_completion_text(response_payload)
+            resolved_structured_output_mode = STRUCTURED_OUTPUT_MODE_VALIDATE_THEN_REPAIR
+            native_schema_fallback_used = True
+            native_schema_conflict_provider = "lmstudio"
 
         if not content and max_tokens is not None:
             retry_payload = dict(logged_request_payload)
@@ -685,6 +751,7 @@ def _chat_with_local_model_with_meta(
                         on_delta=on_delta,
                         input_attachments=fallback_attachments,
                         structured_output_schema=structured_output_schema,
+                        structured_output_mode=resolved_structured_output_mode,
                         request_timeout_seconds=request_timeout_seconds,
                     )
                 except Exception as fallback_exc:
@@ -719,7 +786,7 @@ def _chat_with_local_model_with_meta(
         status_code=200,
     )
 
-    return content, {
+    meta: dict[str, Any] = {
         "base_url": get_local_llm_base_url(),
         "model": response_payload.get("model") or request_payload["model"],
         "provider_id": provider_id,
@@ -738,7 +805,13 @@ def _chat_with_local_model_with_meta(
             if structured_output_schema and "response_format" not in logged_request_payload
             else ("json_schema" if structured_output_schema else None)
         ),
+        **({"structured_output_mode": resolved_structured_output_mode} if structured_output_schema else {}),
     }
+    if native_schema_fallback_used:
+        meta["structured_output_native_schema_fallback_used"] = True
+    if native_schema_conflict_provider:
+        meta["structured_output_native_schema_conflict_provider"] = native_schema_conflict_provider
+    return content, meta
 
 
 def _chat_with_local_model(

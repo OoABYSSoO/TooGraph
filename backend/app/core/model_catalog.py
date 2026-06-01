@@ -7,6 +7,7 @@ from app.core.model_provider_credentials import (
     normalize_provider_credential_pool,
 )
 from app.core.model_provider_templates import get_provider_template, list_provider_templates, normalize_transport
+from app.core.runtime.structured_output import normalize_structured_output_mode
 from app.core.storage.settings_store import load_app_settings
 from app.tools.local_llm import (
     get_default_text_model,
@@ -14,7 +15,7 @@ from app.tools.local_llm import (
     get_local_route_model_names,
     has_local_llm_api_key_configured,
 )
-from app.tools.model_provider_client import discover_provider_models
+from app.tools.model_provider_client import discover_provider_model_items
 from app.tools.model_provider_http import normalize_request_timeout_seconds
 from app.tools.openai_codex_client import get_codex_auth_status
 
@@ -229,6 +230,9 @@ def _normalize_provider_config(
         "request_timeout_seconds": normalize_request_timeout_seconds(
             saved_provider.get("request_timeout_seconds") or template.get("request_timeout_seconds")
         ),
+        "structured_output_mode": normalize_structured_output_mode(
+            saved_provider.get("structured_output_mode") or template.get("structured_output_mode")
+        ),
         "credential_pool": normalize_provider_credential_pool(
             saved_provider.get("credential_pool") or template.get("credential_pool"),
             include_secrets=True,
@@ -238,6 +242,13 @@ def _normalize_provider_config(
         "models": _normalize_provider_models(saved_provider.get("models") or template.get("models")),
         "example_model_refs": list(template.get("example_model_refs") or []),
         "template_group": str(template.get("template_group") or "custom"),
+    }
+
+
+def _normalize_provider_template_config(template: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **template,
+        "structured_output_mode": normalize_structured_output_mode(template.get("structured_output_mode")),
     }
 
 
@@ -396,7 +407,7 @@ def _discover_provider_model_items(provider: dict[str, Any], *, force_refresh: b
         return saved_models
 
     try:
-        discovered_models = discover_provider_models(
+        discovered_models = discover_provider_model_items(
             provider_id=provider["provider_id"],
             transport=provider["transport"],
             base_url=provider["base_url"],
@@ -411,12 +422,18 @@ def _discover_provider_model_items(provider: dict[str, Any], *, force_refresh: b
     saved_by_name = {model["model"].lower(): model for model in saved_models}
     return [
         {
-            **saved_by_name.get(model_name.lower(), {}),
-            "model": model_name,
-            "label": saved_by_name.get(model_name.lower(), {}).get("label") or model_name,
-            "modalities": saved_by_name.get(model_name.lower(), {}).get("modalities") or ["text"],
+            **model_item,
+            **saved_by_name.get(str(model_item.get("model") or "").lower(), {}),
+            "model": str(model_item.get("model") or "").strip(),
+            "label": saved_by_name.get(str(model_item.get("model") or "").lower(), {}).get("label")
+            or model_item.get("label")
+            or str(model_item.get("model") or "").strip(),
+            "modalities": saved_by_name.get(str(model_item.get("model") or "").lower(), {}).get("modalities")
+            or model_item.get("modalities")
+            or ["text"],
         }
-        for model_name in discovered_models
+        for model_item in discovered_models
+        if str(model_item.get("model") or "").strip()
     ]
 
 
@@ -447,6 +464,7 @@ def _build_provider_entry(
         "auth_scheme": provider.get("auth_scheme") if provider.get("auth_scheme") is not None else "Bearer",
         "auth_mode": provider.get("auth_mode") or "api_key",
         "request_timeout_seconds": provider.get("request_timeout_seconds"),
+        "structured_output_mode": provider.get("structured_output_mode"),
         "credential_pool": normalize_provider_credential_pool(provider.get("credential_pool")),
         "requires_login": bool(provider.get("requires_login")),
         "saved": bool(provider.get("saved")),
@@ -582,5 +600,5 @@ def build_model_catalog(*, force_refresh: bool = False) -> dict[str, Any]:
             fallback_ref=build_model_ref("local", local_text_model) if local_text_model else "",
         ),
         "providers": provider_entries,
-        "provider_templates": list_provider_templates(),
+        "provider_templates": [_normalize_provider_template_config(template) for template in list_provider_templates()],
     }

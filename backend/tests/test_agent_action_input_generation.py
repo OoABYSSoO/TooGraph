@@ -33,6 +33,7 @@ class AgentActionInputGenerationTests(unittest.TestCase):
 
         self.assertEqual(schema["type"], "array")
         self.assertEqual(schema["items"]["type"], "string")
+        self.assertEqual(schema["title"], "Commands")
         self.assertIn("Page operation commands", schema["description"])
 
     def test_action_input_prompt_uses_llm_instruction_protocol_field(self) -> None:
@@ -657,7 +658,15 @@ class AgentActionInputGenerationTests(unittest.TestCase):
 
         def chat_with_local_model_with_meta_func(**kwargs):
             captured.update(kwargs)
-            return ('{"web_search": {"query": "TooGraph structured output", "search_context": ""}}', {"warnings": []})
+            return (
+                '{"web_search": {"query": "TooGraph structured output", "search_context": ""}}',
+                {
+                    "warnings": [],
+                    "structured_output_mode": "validate_then_repair",
+                    "structured_output_native_schema_fallback_used": True,
+                    "structured_output_native_schema_conflict_provider": "lmstudio",
+                },
+            )
 
         node = NodeSystemAgentNode.model_validate(
             {
@@ -719,6 +728,9 @@ class AgentActionInputGenerationTests(unittest.TestCase):
         self.assertEqual(list(schema["properties"].keys()), ["query", "search_context"])
         self.assertEqual(schema["properties"]["query"]["type"], "string")
         self.assertEqual(updated_config["action_input_structured_output_strategy"], "json_schema")
+        self.assertEqual(updated_config["action_input_structured_output_mode"], "validate_then_repair")
+        self.assertTrue(updated_config["action_input_structured_output_native_schema_fallback_used"])
+        self.assertEqual(updated_config["action_input_structured_output_native_schema_conflict_provider"], "lmstudio")
 
     def test_generate_action_inputs_passes_on_delta_to_model(self) -> None:
         captured: dict[str, object] = {}

@@ -23,7 +23,15 @@ class AgentSubgraphInputGenerationTests(unittest.TestCase):
             captured.update(kwargs)
             return (
                 '{"advanced_web_research_loop": {"user_question": "AI news today"}}',
-                {"model": "gpt-test", "provider_id": "openai", "warnings": [], "structured_output_strategy": "json_schema"},
+                {
+                    "model": "gpt-test",
+                    "provider_id": "openai",
+                    "warnings": [],
+                    "structured_output_strategy": "json_schema",
+                    "structured_output_mode": "validate_then_repair",
+                    "structured_output_native_schema_fallback_used": True,
+                    "structured_output_native_schema_conflict_provider": "lmstudio",
+                },
             )
 
         node = NodeSystemAgentNode.model_validate(
@@ -80,6 +88,9 @@ class AgentSubgraphInputGenerationTests(unittest.TestCase):
         self.assertEqual(subgraph_inputs, {"advanced_web_research_loop": {"user_question": "AI news today"}})
         self.assertEqual(warnings, [])
         self.assertEqual(runtime_config["subgraph_input_provider_model"], "gpt-test")
+        self.assertEqual(runtime_config["subgraph_input_structured_output_mode"], "validate_then_repair")
+        self.assertTrue(runtime_config["subgraph_input_structured_output_native_schema_fallback_used"])
+        self.assertEqual(runtime_config["subgraph_input_structured_output_native_schema_conflict_provider"], "lmstudio")
         system_prompt = str(captured["system_prompt"])
         self.assertIn("subgraph-input planning phase", system_prompt)
         self.assertIn("== Selected Graph Templates ==", system_prompt)

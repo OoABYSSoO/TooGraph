@@ -252,6 +252,119 @@ class ModelProviderClientTests(unittest.TestCase):
         self.assertEqual(requested["url"], "https://generativelanguage.googleapis.com/v1beta/models")
         self.assertEqual(requested["params"], {"key": "gemini-key"})
 
+    def test_discovers_lmstudio_models_from_native_api(self) -> None:
+        from app.tools.model_provider_client import discover_provider_models
+
+        fake_client, client_patch = self._patched_client(
+            FakeResponse(
+                {
+                    "models": [
+                        {
+                            "type": "llm",
+                            "key": "qwen/qwen3.6-27b",
+                            "display_name": "Qwen3.6 27B",
+                            "loaded_instances": [{"id": "qwen/qwen3.6-27b"}],
+                            "max_context_length": 262144,
+                            "capabilities": {"vision": True, "trained_for_tool_use": True, "reasoning": {"default": "on"}},
+                        },
+                        {
+                            "type": "embedding",
+                            "key": "text-embedding-qwen3-embedding-8b",
+                            "display_name": "Qwen3 Embedding 8B",
+                            "loaded_instances": [],
+                            "max_context_length": 40960,
+                        },
+                    ]
+                }
+            )
+        )
+        with client_patch:
+            models = discover_provider_models(
+                provider_id="lmstudio",
+                transport="openai-compatible",
+                base_url="http://127.0.0.1:1234/v1",
+                api_key="",
+            )
+
+        requested = fake_client.get_calls[0]
+        self.assertEqual(requested["url"], "http://127.0.0.1:1234/api/v1/models")
+        self.assertEqual(models, ["qwen/qwen3.6-27b", "text-embedding-qwen3-embedding-8b"])
+
+    def test_discovers_lmstudio_native_model_items_with_capabilities(self) -> None:
+        from app.tools.model_provider_client import discover_provider_model_items
+
+        fake_client, client_patch = self._patched_client(
+            FakeResponse(
+                {
+                    "models": [
+                        {
+                            "type": "llm",
+                            "key": "qwen/qwen3.6-27b",
+                            "display_name": "Qwen3.6 27B",
+                            "loaded_instances": [{"id": "qwen/qwen3.6-27b", "config": {"context_length": 262144}}],
+                            "max_context_length": 262144,
+                            "capabilities": {"vision": True, "trained_for_tool_use": True, "reasoning": {"default": "on"}},
+                        },
+                        {
+                            "type": "embedding",
+                            "key": "text-embedding-qwen3-embedding-8b",
+                            "display_name": "Qwen3 Embedding 8B",
+                            "loaded_instances": [],
+                            "max_context_length": 40960,
+                        },
+                    ]
+                }
+            )
+        )
+        with client_patch:
+            models = discover_provider_model_items(
+                provider_id="lmstudio",
+                transport="openai-compatible",
+                base_url="http://127.0.0.1:1234/v1",
+                api_key="",
+            )
+
+        self.assertEqual(
+            models,
+            [
+                {
+                    "model": "qwen/qwen3.6-27b",
+                    "label": "Qwen3.6 27B",
+                    "reasoning": True,
+                    "modalities": ["text", "image"],
+                    "capabilities": {
+                        "chat": True,
+                        "embedding": False,
+                        "rerank": False,
+                        "vision": True,
+                        "tool_call": True,
+                        "structured_output": True,
+                    },
+                    "context_window": 262144,
+                },
+                {
+                    "model": "text-embedding-qwen3-embedding-8b",
+                    "label": "Qwen3 Embedding 8B",
+                    "reasoning": False,
+                    "modalities": ["text"],
+                    "capabilities": {
+                        "chat": False,
+                        "embedding": True,
+                        "rerank": False,
+                        "vision": False,
+                        "tool_call": False,
+                        "structured_output": False,
+                    },
+                    "context_window": 40960,
+                    "embedding": {
+                        "dimensions": None,
+                        "use_for_memory": True,
+                        "use_for_knowledge": True,
+                    },
+                },
+            ],
+        )
+
     def test_chat_openai_compatible_posts_chat_completions(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider
 
@@ -489,6 +602,120 @@ class ModelProviderClientTests(unittest.TestCase):
 
         self.assertEqual(content, "hello")
         self.assertEqual(meta["provider_id"], "openai")
+
+    def test_chat_with_model_ref_passes_saved_structured_output_mode(self) -> None:
+        from app.tools import model_provider_client
+        from app.tools.model_provider_client import chat_with_model_ref_with_meta
+
+        saved_settings = {
+            "model_providers": {
+                "openai": {
+                    "enabled": True,
+                    "base_url": "https://api.openai.com/v1",
+                    "api_key": "sk-openai",
+                    "structured_output_mode": "native_schema_first",
+                    "models": [{"model": "gpt-4.1", "capabilities": {"chat": True}}],
+                }
+            }
+        }
+        schema = {
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+        }
+
+        def fake_chat_with_provider(**kwargs: Any) -> tuple[str, dict[str, Any]]:
+            self.assertEqual(kwargs["structured_output_mode"], "native_schema_first")
+            return "hello", {"provider_id": kwargs["provider_id"], "model": kwargs["model"], "warnings": []}
+
+        with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
+            with patch.object(model_provider_client, "chat_with_model_provider", side_effect=fake_chat_with_provider):
+                content, meta = chat_with_model_ref_with_meta(
+                    model_ref="openai/gpt-4.1",
+                    system_prompt="sys",
+                    user_prompt="user",
+                    temperature=0.2,
+                    structured_output_schema=schema,
+                )
+
+        self.assertEqual(content, "hello")
+        self.assertEqual(meta["provider_id"], "openai")
+
+    def test_chat_with_model_ref_explicit_structured_output_mode_overrides_saved_profile(self) -> None:
+        from app.tools import model_provider_client
+        from app.tools.model_provider_client import chat_with_model_ref_with_meta
+
+        saved_settings = {
+            "model_providers": {
+                "openai": {
+                    "enabled": True,
+                    "base_url": "https://api.openai.com/v1",
+                    "api_key": "sk-openai",
+                    "structured_output_mode": "native_schema_first",
+                    "models": [{"model": "gpt-4.1", "capabilities": {"chat": True}}],
+                }
+            }
+        }
+        schema = {
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+        }
+
+        def fake_chat_with_provider(**kwargs: Any) -> tuple[str, dict[str, Any]]:
+            self.assertEqual(kwargs["structured_output_mode"], "validate_then_repair")
+            return "hello", {"provider_id": kwargs["provider_id"], "model": kwargs["model"], "warnings": []}
+
+        with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
+            with patch.object(model_provider_client, "chat_with_model_provider", side_effect=fake_chat_with_provider):
+                content, meta = chat_with_model_ref_with_meta(
+                    model_ref="openai/gpt-4.1",
+                    system_prompt="sys",
+                    user_prompt="user",
+                    temperature=0.2,
+                    structured_output_schema=schema,
+                    structured_output_mode="validate_then_repair",
+                )
+
+        self.assertEqual(content, "hello")
+        self.assertEqual(meta["provider_id"], "openai")
+
+    def test_local_model_ref_passes_saved_structured_output_mode_to_local_runtime(self) -> None:
+        from app.tools import local_llm, model_provider_client
+        from app.tools.model_provider_client import chat_with_model_ref_with_meta
+
+        saved_settings = {
+            "model_providers": {
+                "local": {
+                    "enabled": True,
+                    "base_url": "http://127.0.0.1:8888/v1",
+                    "structured_output_mode": "native_schema_first",
+                    "models": [{"model": "qwen", "capabilities": {"chat": True}}],
+                }
+            }
+        }
+        schema = {
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+        }
+
+        def fake_local_chat(**kwargs: Any) -> tuple[str, dict[str, Any]]:
+            self.assertEqual(kwargs["structured_output_mode"], "native_schema_first")
+            return "hello", {"provider_id": "local", "model": kwargs["model"], "warnings": []}
+
+        with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
+            with patch.object(local_llm, "_chat_with_local_model_with_meta", side_effect=fake_local_chat):
+                content, meta = chat_with_model_ref_with_meta(
+                    model_ref="local/qwen",
+                    system_prompt="sys",
+                    user_prompt="user",
+                    temperature=0.2,
+                    structured_output_schema=schema,
+                )
+
+        self.assertEqual(content, "hello")
+        self.assertEqual(meta["provider_id"], "local")
 
     def test_chat_with_model_ref_backfills_provider_cache_result_to_model_log(self) -> None:
         from app.tools import model_provider_client
@@ -739,7 +966,7 @@ class ModelProviderClientTests(unittest.TestCase):
 
         self.assertEqual(attempted, ["primary-rerank/rerank-primary"])
 
-    def test_chat_openai_compatible_posts_structured_response_format(self) -> None:
+    def test_chat_openai_compatible_validate_then_repair_omits_structured_response_format(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider
 
         schema = {
@@ -766,6 +993,39 @@ class ModelProviderClientTests(unittest.TestCase):
 
         requested = fake_client.post_calls[0]
         self.assertEqual(content, '{"answer":"hello"}')
+        self.assertEqual(meta["structured_output_mode"], "validate_then_repair")
+        self.assertEqual(meta["structured_output_strategy"], "prompt_validation")
+        self.assertNotIn("response_format", requested["json"])
+
+    def test_chat_openai_compatible_native_schema_first_posts_structured_response_format(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        schema = {
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+            "additionalProperties": False,
+        }
+        fake_client, client_patch = self._patched_client(
+            FakeResponse({"id": "chatcmpl_1", "model": "gpt-4.1", "choices": [{"message": {"content": '{"answer":"hello"}'}}]})
+        )
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+            content, meta = chat_with_model_provider(
+                provider_id="openai",
+                transport="openai-compatible",
+                base_url="https://api.openai.com/v1",
+                api_key="sk-openai",
+                model="gpt-4.1",
+                system_prompt="sys",
+                user_prompt="user",
+                temperature=0.2,
+                structured_output_schema=schema,
+                structured_output_mode="native_schema_first",
+            )
+
+        requested = fake_client.post_calls[0]
+        self.assertEqual(content, '{"answer":"hello"}')
+        self.assertEqual(meta["structured_output_mode"], "native_schema_first")
         self.assertEqual(meta["structured_output_strategy"], "json_schema")
         self.assertEqual(
             requested["json"]["response_format"],
@@ -806,6 +1066,7 @@ class ModelProviderClientTests(unittest.TestCase):
                 user_prompt="user",
                 temperature=0.2,
                 structured_output_schema=schema,
+                structured_output_mode="native_schema_first",
             )
 
         self.assertEqual(content, '{"answer":"hello"}')
@@ -895,6 +1156,7 @@ class ModelProviderClientTests(unittest.TestCase):
             }
         }
         captured: dict[str, Any] = {}
+        saved_payload: dict[str, Any] = {}
 
         def fake_chat_with_provider(**kwargs: Any) -> tuple[str, dict[str, Any]]:
             captured.update(kwargs)
@@ -904,17 +1166,23 @@ class ModelProviderClientTests(unittest.TestCase):
                 "warnings": [],
             }
 
+        def capture_save(payload: dict[str, Any]) -> dict[str, Any]:
+            saved_payload.update(payload)
+            return payload
+
         with patch.object(model_provider_client, "load_app_settings", return_value=saved_settings):
-            with patch.object(model_provider_client, "chat_with_model_provider", side_effect=fake_chat_with_provider):
-                content, meta = chat_with_model_ref_with_meta(
-                    model_ref="openai/gpt-primary",
-                    system_prompt="sys",
-                    user_prompt="user",
-                    temperature=0.2,
-                )
+            with patch.object(model_provider_client, "save_app_settings", side_effect=capture_save):
+                with patch.object(model_provider_client, "chat_with_model_provider", side_effect=fake_chat_with_provider):
+                    content, meta = chat_with_model_ref_with_meta(
+                        model_ref="openai/gpt-primary",
+                        system_prompt="sys",
+                        user_prompt="user",
+                        temperature=0.2,
+                    )
 
         self.assertEqual(content, "ok")
         self.assertEqual(captured["api_key"], "sk-primary")
+        self.assertIn("openai", saved_payload.get("model_providers", {}))
         self.assertEqual(
             meta["provider_credential"],
             {
@@ -2526,6 +2794,121 @@ class ModelProviderClientTests(unittest.TestCase):
         self.assertEqual(requested["json"]["stream"], True)
         self.assertEqual(logged["request_raw"]["stream"], True)
         self.assertEqual(logged["response_raw"]["_stream"]["output_chunks"], ["hello ", "stream"])
+
+    def test_lmstudio_native_schema_reasoning_conflict_retries_without_schema(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client, client_patch = self._patched_client(
+            [
+                FakeResponse(
+                    None,
+                    text=(
+                        'data: {"id":"chatcmpl_lmstudio","model":"qwen/qwen3.6-27b",'
+                        '"choices":[{"delta":{"role":"assistant","reasoning_content":"{\\"state_2\\":\\"你好\\"}"}}]}\n\n'
+                        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'
+                        'data: [DONE]\n\n'
+                    ),
+                    json_error=ValueError("stream"),
+                ),
+                FakeResponse(
+                    {"id": "chatcmpl_lmstudio_retry", "model": "qwen/qwen3.6-27b", "choices": [{"message": {"content": '{"state_2":"你好"}'}}]}
+                ),
+            ]
+        )
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log") as append_log:
+            content, meta = chat_with_model_provider(
+                provider_id="lmstudio",
+                transport="openai-compatible",
+                base_url="http://127.0.0.1:1234/v1",
+                api_key="",
+                model="qwen/qwen3.6-27b",
+                system_prompt="sys",
+                user_prompt="user",
+                temperature=0.2,
+                thinking_level="high",
+                structured_output_schema={
+                    "type": "object",
+                    "properties": {"state_2": {"type": "string"}},
+                    "required": ["state_2"],
+                    "additionalProperties": False,
+                },
+                structured_output_mode="native_schema_first",
+            )
+
+        self.assertEqual(content, '{"state_2":"你好"}')
+        self.assertEqual(len(fake_client.post_calls), 2)
+        self.assertIn("response_format", fake_client.post_calls[0]["json"])
+        self.assertNotIn("response_format", fake_client.post_calls[1]["json"])
+        self.assertEqual(meta["structured_output_mode"], "validate_then_repair")
+        self.assertEqual(meta["structured_output_strategy"], "prompt_validation")
+        self.assertTrue(meta["structured_output_native_schema_fallback_used"])
+        self.assertEqual(meta["structured_output_native_schema_conflict_provider"], "lmstudio")
+        self.assertTrue(any("LM Studio" in warning and "Validate then repair" in warning for warning in meta["warnings"]))
+        self.assertEqual(append_log.call_count, 2)
+
+    def test_lmstudio_does_not_promote_structured_reasoning_json_to_final_content(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client, client_patch = self._patched_client(
+            FakeResponse(
+                None,
+                text=(
+                    'data: {"id":"chatcmpl_lmstudio","model":"qwen/qwen3.6-27b",'
+                    '"choices":[{"delta":{"role":"assistant","reasoning_content":"{\\"state_2\\":\\"你好\\"}"}}]}\n\n'
+                    'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'
+                    'data: [DONE]\n\n'
+                ),
+                json_error=ValueError("stream"),
+            )
+        )
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+            with self.assertRaisesRegex(RuntimeError, "lmstudio returned an empty response"):
+                chat_with_model_provider(
+                    provider_id="lmstudio",
+                    transport="openai-compatible",
+                    base_url="http://127.0.0.1:1234/v1",
+                    api_key="",
+                    model="qwen/qwen3.6-27b",
+                    system_prompt="sys",
+                    user_prompt="user",
+                    temperature=0.2,
+                    thinking_level="high",
+                    structured_output_schema={
+                        "type": "object",
+                        "properties": {"state_2": {"type": "string"}},
+                        "required": ["state_2"],
+                        "additionalProperties": False,
+                    },
+                )
+
+    def test_lmstudio_does_not_promote_freeform_reasoning_without_schema(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client, client_patch = self._patched_client(
+            FakeResponse(
+                None,
+                text=(
+                    'data: {"id":"chatcmpl_lmstudio","model":"qwen/qwen3.6-27b",'
+                    '"choices":[{"delta":{"role":"assistant","reasoning_content":"thinking only"}}]}\n\n'
+                    'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'
+                    'data: [DONE]\n\n'
+                ),
+                json_error=ValueError("stream"),
+            )
+        )
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+            with self.assertRaisesRegex(RuntimeError, "lmstudio returned an empty response"):
+                chat_with_model_provider(
+                    provider_id="lmstudio",
+                    transport="openai-compatible",
+                    base_url="http://127.0.0.1:1234/v1",
+                    api_key="",
+                    model="qwen/qwen3.6-27b",
+                    system_prompt="sys",
+                    user_prompt="user",
+                    temperature=0.2,
+                    thinking_level="high",
+                )
 
     def test_chat_openai_compatible_emits_stream_deltas_while_coalescing(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider

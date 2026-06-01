@@ -78,12 +78,53 @@ test("buildProviderDraftsFromSettings keeps stored API keys hidden", () => {
   assert.equal(drafts.openai.api_key_configured, true);
 });
 
+test("provider drafts default structured output mode and preserve model reasoning metadata", () => {
+  const drafts = buildProviderDraftsFromSettings({
+    model: {
+      text_model: "qwen3-reasoning",
+      text_model_ref: "local/qwen3-reasoning",
+      video_model: "qwen3-reasoning",
+      video_model_ref: "local/qwen3-reasoning",
+    },
+    model_catalog: {
+      provider_templates: [],
+      providers: [
+        {
+          provider_id: "local",
+          label: "LM Studio",
+          description: "Local gateway",
+          transport: "openai-compatible",
+          configured: true,
+          enabled: true,
+          saved: true,
+          base_url: "http://127.0.0.1:1234/v1",
+          models: [
+            {
+              model_ref: "local/qwen3-reasoning",
+              model: "qwen3-reasoning",
+              label: "qwen3-reasoning",
+              reasoning: true,
+            },
+          ],
+          example_model_refs: [],
+        },
+      ],
+    },
+    revision: { max_revision_round: 1 },
+    tools: [],
+  });
+
+  assert.equal(drafts.local.structured_output_mode, "validate_then_repair");
+  assert.equal(drafts.local.model_settings["qwen3-reasoning"]?.reasoning, true);
+});
+
 test("buildProviderSavePayload includes enabled providers and omits blank api keys", () => {
   const payload = buildProviderSavePayload({
     openai: {
       provider_id: "openai",
       label: "OpenAI",
       transport: "openai-compatible",
+      structured_output_mode: "validate_then_repair",
       base_url: "https://api.openai.com/v1",
       enabled: true,
       auth_header: "Authorization",
@@ -100,6 +141,51 @@ test("buildProviderSavePayload includes enabled providers and omits blank api ke
   assert.equal(payload.openai.enabled, true);
   assert.equal(payload.openai.transport, "openai-compatible");
   assert.equal(payload.openai.request_timeout_seconds, 45);
+});
+
+test("provider save payload includes structured output mode and model reasoning metadata", () => {
+  const payload = buildProviderSavePayload({
+    local: {
+      provider_id: "local",
+      label: "LM Studio",
+      transport: "openai-compatible",
+      structured_output_mode: "native_schema_first",
+      base_url: "http://127.0.0.1:1234/v1",
+      enabled: true,
+      auth_header: "Authorization",
+      auth_scheme: "Bearer",
+      request_timeout_seconds: 180,
+      credential_pool: [],
+      api_key: "",
+      api_key_configured: false,
+      discovered_models: ["qwen3-reasoning"],
+      selected_models: ["qwen3-reasoning"],
+      model_settings: {
+        "qwen3-reasoning": {
+          model: "qwen3-reasoning",
+          reasoning: true,
+          context_window_ktokens: 128,
+          compression_threshold: 0.9,
+          capabilities: {
+            chat: true,
+            embedding: false,
+            rerank: false,
+            vision: false,
+            tool_call: false,
+            structured_output: true,
+          },
+          embedding: {
+            dimensions: null,
+            use_for_memory: true,
+            use_for_knowledge: true,
+          },
+        },
+      },
+    },
+  });
+
+  assert.equal(payload.local.structured_output_mode, "native_schema_first");
+  assert.equal(payload.local.models[0]?.reasoning, true);
 });
 
 test("inferModelCapabilities marks Qwen embedding names as embedding-only", () => {
@@ -268,6 +354,7 @@ test("provider model save payload preserves model capabilities", () => {
   assert.deepEqual(payload.local.models[0], {
     model: "rerank-test",
     label: "rerank-test",
+    reasoning: null,
     modalities: ["text"],
     capabilities: {
       chat: false,

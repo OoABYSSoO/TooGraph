@@ -8,6 +8,12 @@ from app.core.schemas.actions import ActionDefinition, ActionIoField
 
 
 STRUCTURED_OUTPUT_SCHEMA_NAME = "toograph_structured_output"
+STRUCTURED_OUTPUT_MODE_VALIDATE_THEN_REPAIR = "validate_then_repair"
+STRUCTURED_OUTPUT_MODE_NATIVE_SCHEMA_FIRST = "native_schema_first"
+STRUCTURED_OUTPUT_MODES = {
+    STRUCTURED_OUTPUT_MODE_VALIDATE_THEN_REPAIR,
+    STRUCTURED_OUTPUT_MODE_NATIVE_SCHEMA_FIRST,
+}
 JSON_REPAIR_SYSTEM_PROMPT = "\n".join(
     [
         "You are a JSON repair step for TooGraph.",
@@ -18,6 +24,50 @@ JSON_REPAIR_SYSTEM_PROMPT = "\n".join(
         "Return only the repaired JSON object. Do not add markdown fences or prose.",
     ]
 )
+
+
+def normalize_structured_output_mode(value: Any) -> str:
+    mode = str(value or "").strip().lower().replace("-", "_")
+    if mode in STRUCTURED_OUTPUT_MODES:
+        return mode
+    return STRUCTURED_OUTPUT_MODE_VALIDATE_THEN_REPAIR
+
+
+def parse_json_object_text(value: str) -> dict[str, Any] | None:
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def required_schema_keys(schema: dict[str, Any] | None) -> set[str]:
+    if not isinstance(schema, dict):
+        return set()
+    required = schema.get("required")
+    if not isinstance(required, list):
+        return set()
+    return {str(item) for item in required if str(item or "").strip()}
+
+
+def is_lmstudio_native_schema_reasoning_conflict(
+    *,
+    provider_id: str,
+    structured_output_mode: str,
+    structured_output_schema: dict[str, Any] | None,
+    content: str,
+    reasoning: str,
+) -> bool:
+    if str(provider_id or "").strip().lower() != "lmstudio":
+        return False
+    if structured_output_mode != STRUCTURED_OUTPUT_MODE_NATIVE_SCHEMA_FIRST:
+        return False
+    if not isinstance(structured_output_schema, dict) or content:
+        return False
+    parsed_reasoning = parse_json_object_text(reasoning)
+    if parsed_reasoning is None:
+        return False
+    return required_schema_keys(structured_output_schema).issubset(set(parsed_reasoning.keys()))
 
 
 def build_agent_state_output_schema(
@@ -248,6 +298,8 @@ def _schema_for_value_type(value_type: str) -> dict[str, Any]:
 
 
 def _apply_schema_metadata(schema: dict[str, Any], *, name: str, description: str) -> None:
+    if name:
+        schema["title"] = name
     if description:
         schema["description"] = f"{name}: {description}" if name else description
     elif name:

@@ -10,16 +10,36 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.runtime import agent_prompt
-from app.core.runtime.agent_prompt import build_auto_system_prompt
+from app.core.runtime.agent_prompt import build_auto_system_prompt, build_auto_user_prompt
 from app.core.runtime.llm_output_parser import parse_llm_json_response
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
 from app.core.storage import database
 from app.core.storage.capability_artifact_store import create_uploaded_capability_artifact, resolve_capability_artifact_path
 
 
+def build_auto_prompt(
+    output_keys: list[str],
+    input_values: dict[str, object],
+    action_context: dict[str, object],
+    *,
+    state_schema: dict[str, NodeSystemStateDefinition] | None = None,
+) -> str:
+    return "\n".join(
+        [
+            build_auto_system_prompt(output_keys, input_values, action_context, state_schema=state_schema),
+            build_auto_user_prompt(
+                "根据输入和Action 结果完成输出。",
+                input_values,
+                action_context,
+                state_schema=state_schema,
+            ),
+        ]
+    )
+
+
 class AgentStatePromptSemanticTests(unittest.TestCase):
     def test_auto_prompt_does_not_inject_runtime_date_context(self) -> None:
-        prompt = build_auto_system_prompt(
+        prompt = build_auto_prompt(
             ["answer"],
             {"question": "帮我查最新模型发布日期"},
             {},
@@ -46,7 +66,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             ),
         }
 
-        prompt = build_auto_system_prompt(
+        prompt = build_auto_prompt(
             ["state_1"],
             {"question_state": "请总结这段内容"},
             {},
@@ -60,6 +80,8 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertIn("name: 最终答案", prompt)
         self.assertIn("description: 给用户看的中文总结", prompt)
         self.assertIn('"state_1": "在此填写完整内容"', prompt)
+        self.assertIn("字段说明中的 name/description 只用于理解语义，不要作为 JSON 字段输出。", prompt)
+        self.assertNotIn('"name": "最终答案"', prompt)
 
     def test_auto_prompt_emphasizes_output_state_value_formats(self) -> None:
         state_schema = {
@@ -77,7 +99,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             ),
         }
 
-        prompt = build_auto_system_prompt(
+        prompt = build_auto_prompt(
             ["state_1", "state_2"],
             {},
             {},
@@ -117,7 +139,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             ),
         }
 
-        prompt = build_auto_system_prompt(
+        prompt = build_auto_prompt(
             ["summary", "draft"],
             {"context": "先读这个", "question": "再读这个"},
             {},
@@ -132,7 +154,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         )
 
     def test_auto_prompt_requires_fact_answers_to_stay_grounded_in_action_results(self) -> None:
-        prompt = build_auto_system_prompt(
+        prompt = build_auto_prompt(
             ["answer"],
             {"question": "今天的日期是什么？"},
             {
@@ -162,7 +184,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         )
         artifact_paths = [first_artifact["local_path"], second_artifact["local_path"]]
         try:
-            prompt = build_auto_system_prompt(
+            prompt = build_auto_prompt(
                 ["answer"],
                 {
                     "primary_doc": first_artifact["local_path"],
@@ -204,7 +226,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             (folder / "ignored.md").write_text("This file was not selected.", encoding="utf-8")
 
             with patch.dict(os.environ, {"TOOGRAPH_LOCAL_INPUT_READ_ROOTS": str(workspace)}):
-                prompt = build_auto_system_prompt(
+                prompt = build_auto_prompt(
                     ["answer"],
                     {
                         "buddy_context": {
@@ -237,7 +259,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             payload=("FILE-START " + ("context " * 900) + "FILE-END").encode("utf-8"),
         )
         try:
-            prompt = build_auto_system_prompt(
+            prompt = build_auto_prompt(
                 ["answer"],
                 {"buddy_context": large_artifact["local_path"]},
                 {},
@@ -265,7 +287,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             payload=b"Original source paragraph from the downloaded page.",
         )
         try:
-            prompt = build_auto_system_prompt(
+            prompt = build_auto_prompt(
                 ["answer"],
                 {
                     "dynamic_search_result": {
@@ -327,7 +349,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         long_reply = "FINAL-START " + ("answer " * 600) + "FINAL-END"
         long_log = "LOG-START " + ("raw-event " * 700) + "LOG-END"
 
-        prompt = build_auto_system_prompt(
+        prompt = build_auto_prompt(
             ["answer"],
             {
                 "capability_result": {
@@ -514,7 +536,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             payload=b"fake-png",
         )
         try:
-            prompt = build_auto_system_prompt(
+            prompt = build_auto_prompt(
                 ["answer"],
                 {"attachments": [image_artifact["local_path"]]},
                 {},
@@ -538,7 +560,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
     def test_auto_prompt_does_not_leak_file_paths_when_file_state_cannot_be_read(self) -> None:
         missing_path = "uploads/missing-local-document.md"
 
-        prompt = build_auto_system_prompt(
+        prompt = build_auto_prompt(
             ["answer"],
             {"primary_doc": missing_path},
             {},
@@ -567,7 +589,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             "contentType": "image/png",
         }
 
-        prompt = build_auto_system_prompt(
+        prompt = build_auto_prompt(
             ["answer"],
             {"reference_image": image_payload},
             {},
@@ -598,7 +620,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             "contentType": "video/mp4",
         }
 
-        prompt = build_auto_system_prompt(
+        prompt = build_auto_prompt(
             ["answer"],
             {"clip": video_payload},
             {},
@@ -643,7 +665,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
                     rendered_text="伙伴: 我会从统一数据库事实回答。",
                     sources=[],
                 )
-                prompt = build_auto_system_prompt(
+                prompt = build_auto_prompt(
                     ["answer"],
                     {"conversation_history": ref},
                     {},
@@ -677,7 +699,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
                     rendered_text="用户: 这是标准上下文包里的历史。",
                     sources=[],
                 )
-                prompt = build_auto_system_prompt(
+                prompt = build_auto_prompt(
                     ["answer"],
                     {
                         "conversation_history": {
@@ -708,7 +730,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertNotIn(ref["assembly_id"], prompt)
 
     def test_auto_prompt_exposes_context_package_source_refs_for_compaction_graphs(self) -> None:
-        prompt = build_auto_system_prompt(
+        prompt = build_auto_prompt(
             ["session_summary_candidate"],
             {
                 "conversation_history": {
@@ -761,7 +783,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
                         }
                     ],
                 )
-                prompt = build_auto_system_prompt(
+                prompt = build_auto_prompt(
                     ["answer"],
                     {
                         "web_context": {

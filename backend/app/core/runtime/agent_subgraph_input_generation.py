@@ -21,7 +21,11 @@ from app.core.runtime.agent_response_generation import (
     repair_structured_output_with_runtime_model,
 )
 from app.core.runtime.model_call_context import use_model_call_context
-from app.core.runtime.structured_output import schema_for_value_type, validate_structured_output
+from app.core.runtime.structured_output import (
+    STRUCTURED_OUTPUT_MODE_NATIVE_SCHEMA_FIRST,
+    schema_for_value_type,
+    validate_structured_output,
+)
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition
 from app.core.thinking_levels import resolve_effective_thinking_level
 from app.tools.local_llm import _chat_with_local_model_with_meta
@@ -146,6 +150,7 @@ def generate_agent_subgraph_inputs(
                 raw_model_output=content,
                 phase="subgraph_input_structured_output_repair",
                 subgraph_keys=subgraph_keys,
+                structured_output_mode=STRUCTURED_OUTPUT_MODE_NATIVE_SCHEMA_FIRST,
                 chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
                 chat_with_model_ref_with_meta_func=chat_with_model_ref_with_meta_func,
             )
@@ -181,6 +186,13 @@ def generate_agent_subgraph_inputs(
         "subgraph_input_requested_model_ref": llm_meta.get("requested_model_ref"),
         "subgraph_input_provider_fallback_trace": llm_meta.get("provider_fallback_trace"),
         "subgraph_input_structured_output_strategy": structured_output_strategy,
+        "subgraph_input_structured_output_mode": llm_meta.get("structured_output_mode"),
+        "subgraph_input_structured_output_native_schema_fallback_used": bool(
+            llm_meta.get("structured_output_native_schema_fallback_used")
+        ),
+        "subgraph_input_structured_output_native_schema_conflict_provider": llm_meta.get(
+            "structured_output_native_schema_conflict_provider"
+        ),
         "subgraph_input_structured_output_schema": structured_output_schema,
         "subgraph_input_structured_output_validation_errors": structured_output_validation_errors,
         "subgraph_input_structured_output_initial_validation_errors": initial_structured_output_validation_errors,

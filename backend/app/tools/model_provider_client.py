@@ -39,6 +39,12 @@ from app.core.storage.model_log_store import (
     update_model_request_log_metadata,
 )
 from app.core.runtime.model_call_context import get_model_call_context, use_model_call_context
+from app.core.runtime.structured_output import (
+    STRUCTURED_OUTPUT_MODE_NATIVE_SCHEMA_FIRST,
+    STRUCTURED_OUTPUT_MODE_VALIDATE_THEN_REPAIR,
+    is_lmstudio_native_schema_reasoning_conflict,
+    normalize_structured_output_mode,
+)
 from app.core.thinking_levels import (
     THINKING_LEVEL_HIGH,
     THINKING_LEVEL_OFF,
@@ -127,6 +133,29 @@ def discover_provider_models(
     timeout_sec: float = 8.0,
 ) -> list[str]:
     return model_provider_discovery.discover_provider_models(
+        provider_id=provider_id,
+        transport=transport,
+        base_url=base_url,
+        api_key=api_key,
+        auth_header=auth_header,
+        auth_scheme=auth_scheme,
+        timeout_sec=timeout_sec,
+        resolve_codex_access_token_fn=resolve_codex_access_token,
+        refresh_codex_access_token_fn=refresh_codex_access_token,
+    )
+
+
+def discover_provider_model_items(
+    *,
+    provider_id: str,
+    transport: str,
+    base_url: str,
+    api_key: str = "",
+    auth_header: str = "Authorization",
+    auth_scheme: str = "Bearer",
+    timeout_sec: float = 8.0,
+) -> list[dict[str, Any]]:
+    return model_provider_discovery.discover_provider_model_items(
         provider_id=provider_id,
         transport=transport,
         base_url=base_url,
@@ -528,6 +557,7 @@ def chat_with_model_provider(
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
     structured_output_schema: dict[str, Any] | None = None,
+    structured_output_mode: str | None = None,
     prompt_cache_policy: dict[str, Any] | None = None,
     request_timeout_seconds: float | None = None,
 ) -> tuple[str, dict[str, Any]]:
@@ -535,13 +565,22 @@ def chat_with_model_provider(
     normalized_base_url = _normalize_base_url(base_url)
     normalized_timeout_seconds = normalize_request_timeout_seconds(request_timeout_seconds)
     warnings: list[str] = []
+    resolved_structured_output_mode = normalize_structured_output_mode(structured_output_mode)
+    first_call_structured_output_schema = (
+        structured_output_schema
+        if resolved_structured_output_mode == STRUCTURED_OUTPUT_MODE_NATIVE_SCHEMA_FIRST
+        else None
+    )
     resolved_thinking_level = normalize_thinking_level(
         thinking_level if thinking_level is not None else (THINKING_LEVEL_HIGH if thinking_enabled else THINKING_LEVEL_OFF),
         fallback=THINKING_LEVEL_OFF,
     )
 
     if normalized_transport == TRANSPORT_OPENAI_COMPATIBLE:
-        def invoke(attachments: list[dict[str, Any]] | None) -> tuple[str, dict[str, Any]]:
+        def invoke(
+            attachments: list[dict[str, Any]] | None,
+            schema: dict[str, Any] | None,
+        ) -> tuple[str, dict[str, Any]]:
             return _chat_openai_compatible(
                 provider_id=provider_id,
                 base_url=normalized_base_url,
@@ -556,12 +595,15 @@ def chat_with_model_provider(
                 thinking_level=resolved_thinking_level,
                 on_delta=on_delta,
                 input_attachments=attachments,
-                structured_output_schema=structured_output_schema,
+                structured_output_schema=schema,
                 prompt_cache_policy=prompt_cache_policy,
                 request_timeout_seconds=normalized_timeout_seconds,
             )
     elif normalized_transport == TRANSPORT_ANTHROPIC_MESSAGES:
-        def invoke(attachments: list[dict[str, Any]] | None) -> tuple[str, dict[str, Any]]:
+        def invoke(
+            attachments: list[dict[str, Any]] | None,
+            schema: dict[str, Any] | None,
+        ) -> tuple[str, dict[str, Any]]:
             return _chat_anthropic(
                 provider_id=provider_id,
                 base_url=normalized_base_url,
@@ -574,12 +616,15 @@ def chat_with_model_provider(
                 thinking_level=resolved_thinking_level,
                 on_delta=on_delta,
                 input_attachments=attachments,
-                structured_output_schema=structured_output_schema,
+                structured_output_schema=schema,
                 prompt_cache_policy=prompt_cache_policy,
                 request_timeout_seconds=normalized_timeout_seconds,
             )
     elif normalized_transport == TRANSPORT_GEMINI_GENERATE_CONTENT:
-        def invoke(attachments: list[dict[str, Any]] | None) -> tuple[str, dict[str, Any]]:
+        def invoke(
+            attachments: list[dict[str, Any]] | None,
+            schema: dict[str, Any] | None,
+        ) -> tuple[str, dict[str, Any]]:
             return _chat_gemini(
                 provider_id=provider_id,
                 base_url=normalized_base_url,
@@ -592,12 +637,15 @@ def chat_with_model_provider(
                 thinking_level=resolved_thinking_level,
                 on_delta=on_delta,
                 input_attachments=attachments,
-                structured_output_schema=structured_output_schema,
+                structured_output_schema=schema,
                 prompt_cache_policy=prompt_cache_policy,
                 request_timeout_seconds=normalized_timeout_seconds,
             )
     elif normalized_transport == TRANSPORT_CODEX_RESPONSES:
-        def invoke(attachments: list[dict[str, Any]] | None) -> tuple[str, dict[str, Any]]:
+        def invoke(
+            attachments: list[dict[str, Any]] | None,
+            schema: dict[str, Any] | None,
+        ) -> tuple[str, dict[str, Any]]:
             return _chat_codex_responses(
                 provider_id=provider_id,
                 base_url=normalized_base_url,
@@ -608,7 +656,7 @@ def chat_with_model_provider(
                 thinking_level=resolved_thinking_level,
                 on_delta=on_delta,
                 input_attachments=attachments,
-                structured_output_schema=structured_output_schema,
+                structured_output_schema=schema,
                 prompt_cache_policy=prompt_cache_policy,
                 request_timeout_seconds=normalized_timeout_seconds,
             )
@@ -620,7 +668,29 @@ def chat_with_model_provider(
         invoke,
         input_attachments=request_attachments,
         transport=normalized_transport,
+        structured_output_schema=first_call_structured_output_schema,
     )
+    if _is_lmstudio_native_schema_reasoning_conflict(
+        provider_id=provider_id,
+        structured_output_mode=resolved_structured_output_mode,
+        structured_output_schema=structured_output_schema,
+        content=content,
+        meta=meta,
+    ):
+        warnings.append(
+            "LM Studio returned schema-shaped JSON in reasoning while native structured output produced empty final content; "
+            "retried with Validate then repair."
+        )
+        content, meta = _invoke_with_video_auto_fallback(
+            invoke,
+            input_attachments=request_attachments,
+            transport=normalized_transport,
+            structured_output_schema=None,
+        )
+        resolved_structured_output_mode = STRUCTURED_OUTPUT_MODE_VALIDATE_THEN_REPAIR
+        meta["structured_output_native_schema_fallback_used"] = True
+        meta["structured_output_native_schema_conflict_provider"] = "lmstudio"
+        meta["structured_output_strategy"] = "prompt_validation"
     stream_fallback_error = str(meta.get("stream_fallback_error") or "").strip()
     if stream_fallback_error:
         warnings.append(f"Streaming request failed; retried once without streaming. {stream_fallback_error}")
@@ -641,6 +711,8 @@ def chat_with_model_provider(
         )
     if structured_output_schema and not meta.get("structured_output_strategy"):
         meta["structured_output_strategy"] = "prompt_validation"
+    if structured_output_schema:
+        meta["structured_output_mode"] = resolved_structured_output_mode
     _ensure_provider_prompt_cache_result(meta, normalized_transport, prompt_cache_policy)
     meta["warnings"] = warnings
     meta.setdefault("thinking_enabled", False)
@@ -652,13 +724,14 @@ def chat_with_model_provider(
 
 
 def _invoke_with_video_auto_fallback(
-    invoke: Callable[[list[dict[str, Any]] | None], tuple[str, dict[str, Any]]],
+    invoke: Callable[[list[dict[str, Any]] | None, dict[str, Any] | None], tuple[str, dict[str, Any]]],
     *,
     input_attachments: list[dict[str, Any]] | None,
     transport: str,
+    structured_output_schema: dict[str, Any] | None,
 ) -> tuple[str, dict[str, Any]]:
     try:
-        return invoke(input_attachments)
+        return invoke(input_attachments, structured_output_schema)
     except Exception as exc:
         if not should_fallback_video_to_frames(exc, input_attachments):
             raise
@@ -669,7 +742,7 @@ def _invoke_with_video_auto_fallback(
             )
             fallback_attachments = _prepare_request_attachments_for_transport(transport, fallback_attachments)
             try:
-                content, meta = invoke(fallback_attachments)
+                content, meta = invoke(fallback_attachments, structured_output_schema)
             except Exception as fallback_exc:
                 raise RuntimeError(
                     f"Native video request failed, and frame fallback also failed: {fallback_exc}"
@@ -677,6 +750,23 @@ def _invoke_with_video_auto_fallback(
         meta["video_fallback"] = fallback_meta
         meta["_video_fallback_warning"] = f"Native video request failed; analyzed extracted frames instead. {exc}"
         return content, meta
+
+
+def _is_lmstudio_native_schema_reasoning_conflict(
+    *,
+    provider_id: str,
+    structured_output_mode: str,
+    structured_output_schema: dict[str, Any] | None,
+    content: str,
+    meta: dict[str, Any],
+) -> bool:
+    return is_lmstudio_native_schema_reasoning_conflict(
+        provider_id=provider_id,
+        structured_output_mode=structured_output_mode,
+        structured_output_schema=structured_output_schema,
+        content=content,
+        reasoning=str(meta.get("reasoning") or ""),
+    )
 
 
 def _prepare_request_attachments_for_transport(
@@ -932,6 +1022,7 @@ def _chat_with_model_ref_once(
     on_delta: Callable[[str], None] | None,
     input_attachments: list[dict[str, Any]] | None,
     structured_output_schema: dict[str, Any] | None,
+    structured_output_mode: str | None = None,
     model_runtime_fixture: dict[str, Any] | None = None,
     prompt_cache_policy: dict[str, Any] | None = None,
     provider_cost_budget: dict[str, Any] | None = None,
@@ -954,6 +1045,11 @@ def _chat_with_model_ref_once(
     if fixture_result.get("kind") == "response":
         return _model_runtime_fixture_response(fixture_result, model_ref)
 
+    template, provider_config = _provider_config_from_saved(provider_id, saved_providers)
+    effective_structured_output_mode = normalize_structured_output_mode(
+        structured_output_mode or provider_config.get("structured_output_mode")
+    )
+
     if provider_id == "local":
         from app.tools.local_llm import _chat_with_local_model_with_meta
 
@@ -969,10 +1065,10 @@ def _chat_with_model_ref_once(
             on_delta=on_delta,
             input_attachments=input_attachments,
             structured_output_schema=structured_output_schema,
+            structured_output_mode=effective_structured_output_mode,
             request_timeout_seconds=request_timeout_seconds,
         )
 
-    template, provider_config = _provider_config_from_saved(provider_id, saved_providers)
     transport = str(provider_config.get("transport") or template["transport"])
     effective_prompt_cache_policy = _effective_prompt_cache_policy_for_provider_model(
         prompt_cache_policy,
@@ -1047,6 +1143,7 @@ def _chat_with_model_ref_once(
                     on_delta=on_delta,
                     input_attachments=input_attachments,
                     structured_output_schema=structured_output_schema,
+                    structured_output_mode=effective_structured_output_mode,
                     prompt_cache_policy=effective_prompt_cache_policy,
                 )
                 _annotate_last_model_request_log_with_provider_cache(meta)
@@ -1777,6 +1874,7 @@ def chat_with_model_ref_with_meta(
     on_delta: Callable[[str], None] | None = None,
     input_attachments: list[dict[str, Any]] | None = None,
     structured_output_schema: dict[str, Any] | None = None,
+    structured_output_mode: str | None = None,
     model_runtime_fixture: dict[str, Any] | None = None,
     prompt_cache_policy: dict[str, Any] | None = None,
     provider_cost_budget: dict[str, Any] | None = None,
@@ -1811,6 +1909,7 @@ def chat_with_model_ref_with_meta(
             on_delta=on_delta,
             input_attachments=input_attachments,
             structured_output_schema=structured_output_schema,
+            structured_output_mode=structured_output_mode,
             model_runtime_fixture=fixture,
             prompt_cache_policy=prompt_cache_policy,
             provider_cost_budget=provider_cost_budget,
@@ -1834,6 +1933,7 @@ def chat_with_model_ref_with_meta(
             on_delta=on_delta,
             input_attachments=input_attachments,
             structured_output_schema=structured_output_schema,
+            structured_output_mode=structured_output_mode,
             model_runtime_fixture=fixture,
             prompt_cache_policy=prompt_cache_policy,
             provider_cost_budget=provider_cost_budget,
@@ -1858,6 +1958,7 @@ def _chat_with_model_ref_cost_budget_degradation(
     on_delta: Callable[[str], None] | None,
     input_attachments: list[dict[str, Any]] | None,
     structured_output_schema: dict[str, Any] | None,
+    structured_output_mode: str | None = None,
     model_runtime_fixture: dict[str, Any],
     prompt_cache_policy: dict[str, Any] | None,
     provider_cost_budget: dict[str, Any] | None,
@@ -1916,6 +2017,7 @@ def _chat_with_model_ref_cost_budget_degradation(
                 on_delta=on_delta,
                 input_attachments=input_attachments,
                 structured_output_schema=structured_output_schema,
+                structured_output_mode=structured_output_mode,
                 model_runtime_fixture=model_runtime_fixture,
                 prompt_cache_policy=prompt_cache_policy,
                 provider_cost_budget=provider_cost_budget,

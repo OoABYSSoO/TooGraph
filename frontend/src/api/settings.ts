@@ -5,9 +5,11 @@ import type {
   OpenAICodexAuthStatus,
   ModelLogSettings,
   SettingsProviderCredential,
+  SettingsProviderModel,
   SettingsProviderModelCapabilities,
   SettingsProviderModelEmbedding,
   SettingsPayload,
+  StructuredOutputMode,
   UiPreferencesSettings,
 } from "@/types/settings";
 
@@ -16,6 +18,7 @@ import { apiGet, apiPost } from "./http.ts";
 export type SettingsModelProviderUpdate = {
   label?: string;
   transport: ModelProviderTransport;
+  structured_output_mode?: StructuredOutputMode;
   base_url: string;
   api_key?: string;
   enabled: boolean;
@@ -80,8 +83,11 @@ export async function discoverModelProviderModels(payload: {
   auth_header?: string;
   auth_scheme?: string;
   request_timeout_seconds?: number;
-}): Promise<{ models: string[] }> {
-  return apiPost<{ models: string[] }>("/api/settings/model-providers/discover", payload);
+}): Promise<{ models: string[]; model_items?: Array<Partial<SettingsProviderModel> & { model: string }> }> {
+  return apiPost<{ models: string[]; model_items?: Array<Partial<SettingsProviderModel> & { model: string }> }>(
+    "/api/settings/model-providers/discover",
+    payload,
+  );
 }
 
 export type OpenAICodexAuthStartResponse = {

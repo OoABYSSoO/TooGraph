@@ -8,12 +8,14 @@ from app.core.runtime.agent_multimodal import collect_input_attachments, prepare
 from app.core.runtime.agent_prompt import (
     append_llm_prompt_snapshots,
     apply_provider_prompt_cache_result,
+    build_auto_user_prompt,
     build_effective_system_prompt,
     build_llm_prompt_snapshot,
 )
 from app.core.runtime.model_call_context import use_model_call_context
 from app.core.runtime.llm_output_parser import build_output_key_aliases, parse_llm_json_response
 from app.core.runtime.structured_output import (
+    STRUCTURED_OUTPUT_MODE_NATIVE_SCHEMA_FIRST,
     build_agent_state_output_schema,
     build_json_repair_system_prompt,
     build_json_repair_user_prompt,
@@ -117,7 +119,7 @@ def generate_agent_response(
         state_schema=state_schema,
     )
     structured_output_schema = build_agent_state_output_schema(output_keys, state_schema or {})
-    user_prompt = _build_agent_user_prompt(node)
+    user_prompt = _build_agent_user_prompt(node, input_values, action_context, state_schema=state_schema)
     prompt_snapshot = build_llm_prompt_snapshot(
         phase="agent_response",
         system_prompt=system_prompt,
@@ -126,6 +128,7 @@ def generate_agent_response(
         output_keys=output_keys,
         structured_output_schema=structured_output_schema,
         provider_cache_policy=runtime_config.get("provider_cache_policy", "default"),
+        runtime_context_location="user_prompt",
     )
     model_call_context = model_call_profile_context(runtime_config, prompt_snapshot)
 
@@ -179,19 +182,23 @@ def generate_agent_response(
     structured_output_validation_errors = list(initial_structured_output_validation_errors)
     repair_attempted = False
     repair_succeeded = False
+    repair_source: str | None = None
     repair_validation_errors: list[str] = []
     repair_error = ""
     repair_meta: dict[str, Any] = {}
     if initial_structured_output_validation_errors:
         repair_attempted = True
+        repair_raw_model_output = content
+        repair_source = "content"
         try:
             repair_content, repair_meta = repair_structured_output_with_runtime_model(
                 runtime_config=runtime_config,
                 structured_output_schema=structured_output_schema,
                 validation_errors=initial_structured_output_validation_errors,
-                raw_model_output=content,
+                raw_model_output=repair_raw_model_output,
                 phase="structured_output_repair",
                 output_keys=output_keys,
+                structured_output_mode=STRUCTURED_OUTPUT_MODE_NATIVE_SCHEMA_FIRST,
                 chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
                 chat_with_model_ref_with_meta_func=chat_with_model_ref_with_meta_func,
             )
@@ -241,10 +248,18 @@ def generate_agent_response(
         "provider_fallback_trace": llm_meta.get("provider_fallback_trace"),
         "provider_video_fallback": provider_video_fallback,
         "structured_output_strategy": structured_output_strategy,
+        "structured_output_mode": llm_meta.get("structured_output_mode"),
+        "structured_output_native_schema_fallback_used": bool(
+            llm_meta.get("structured_output_native_schema_fallback_used")
+        ),
+        "structured_output_native_schema_conflict_provider": llm_meta.get(
+            "structured_output_native_schema_conflict_provider"
+        ),
         "structured_output_schema": structured_output_schema,
         "structured_output_validation_errors": structured_output_validation_errors,
         "structured_output_initial_validation_errors": initial_structured_output_validation_errors,
         "structured_output_repair_attempted": repair_attempted,
+        "structured_output_repair_source": repair_source if repair_attempted else None,
         "structured_output_repair_succeeded": repair_succeeded,
         "structured_output_repair_validation_errors": repair_validation_errors,
         "structured_output_repair_error": repair_error,
@@ -283,6 +298,7 @@ def repair_structured_output_with_runtime_model(
     output_keys: list[str] | None = None,
     action_keys: list[str] | None = None,
     subgraph_keys: list[str] | None = None,
+    structured_output_mode: str = STRUCTURED_OUTPUT_MODE_NATIVE_SCHEMA_FIRST,
 ) -> tuple[str, dict[str, Any]]:
     system_prompt = build_json_repair_system_prompt()
     user_prompt = build_json_repair_user_prompt(
@@ -314,6 +330,7 @@ def repair_structured_output_with_runtime_model(
                 on_delta=None,
                 input_attachments=[],
                 structured_output_schema=structured_output_schema,
+                structured_output_mode=structured_output_mode,
                 **model_request_profile_kwargs(runtime_config),
             )
         return content, {**meta, "prompt_snapshot": prompt_snapshot}
@@ -328,6 +345,7 @@ def repair_structured_output_with_runtime_model(
             on_delta=None,
             input_attachments=[],
             structured_output_schema=structured_output_schema,
+            structured_output_mode=structured_output_mode,
             model_runtime_fixture=runtime_config.get("model_runtime_fixture"),
             **model_provider_request_profile_kwargs(runtime_config, prompt_snapshot),
         )
@@ -345,12 +363,19 @@ def _cleanup_prepared_media_paths(paths: Any) -> None:
         shutil.rmtree(path, ignore_errors=True)
 
 
-def _build_agent_user_prompt(node: NodeSystemAgentNode) -> str:
-    return (
-        node.config.task_instruction
-        if node.config.task_instruction
-        else "根据输入和Action 结果完成输出。"
-    ).strip()
+def _build_agent_user_prompt(
+    node: NodeSystemAgentNode,
+    input_values: dict[str, Any],
+    action_context: dict[str, Any],
+    *,
+    state_schema: dict[str, NodeSystemStateDefinition] | None = None,
+) -> str:
+    return build_auto_user_prompt(
+        node.config.task_instruction,
+        input_values,
+        action_context,
+        state_schema=state_schema,
+    )
 
 
 def _resolve_media_runtime_config(

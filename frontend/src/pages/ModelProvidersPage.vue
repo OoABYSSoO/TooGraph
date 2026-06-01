@@ -536,6 +536,23 @@
                             </ElSelect>
                           </label>
                           <label class="model-providers-page__provider-form-field">
+                            <span class="model-providers-page__provider-field-label">{{ t("settings.structuredOutputMode") }}</span>
+                            <ElSelect
+                              v-model="provider.structured_output_mode"
+                              class="model-providers-page__select model-providers-page__provider-select toograph-select"
+                              :teleported="false"
+                              popper-class="toograph-select-popper"
+                              @change="handleProviderDraftChange"
+                            >
+                              <ElOption :label="t('settings.structuredOutputValidateThenRepair')" value="validate_then_repair" />
+                              <ElOption :label="t('settings.structuredOutputNativeSchemaFirst')" value="native_schema_first" />
+                            </ElSelect>
+                            <span class="model-providers-page__hint">{{ t("settings.structuredOutputModeHint") }}</span>
+                            <span v-if="shouldShowLmStudioStructuredOutputWarning(provider)" class="model-providers-page__warning">
+                              {{ t("settings.lmStudioNativeSchemaThinkingWarning") }}
+                            </span>
+                          </label>
+                          <label class="model-providers-page__provider-form-field">
                             <span class="model-providers-page__provider-field-label">{{ t("settings.providerAuthHeader") }}</span>
                             <input
                               v-model.trim="provider.auth_header"
@@ -851,6 +868,23 @@
                         <ElOption label="Codex Responses" value="codex-responses" />
                       </ElSelect>
                     </label>
+                    <label>
+                      <span>{{ t("settings.structuredOutputMode") }}</span>
+                      <ElSelect
+                        v-model="providerEditorDraft.structured_output_mode"
+                        class="model-providers-page__select toograph-select"
+                        :teleported="false"
+                        popper-class="toograph-select-popper"
+                        @change="handleProviderDraftChange"
+                      >
+                        <ElOption :label="t('settings.structuredOutputValidateThenRepair')" value="validate_then_repair" />
+                        <ElOption :label="t('settings.structuredOutputNativeSchemaFirst')" value="native_schema_first" />
+                      </ElSelect>
+                      <span class="model-providers-page__hint">{{ t("settings.structuredOutputModeHint") }}</span>
+                      <span v-if="shouldShowLmStudioStructuredOutputWarning(providerEditorDraft)" class="model-providers-page__warning">
+                        {{ t("settings.lmStudioNativeSchemaThinkingWarning") }}
+                      </span>
+                    </label>
                     <label v-if="!isLoginProvider(providerEditorDraft)">
                       <span>{{ t("settings.providerAuthHeader") }}</span>
                       <input v-model.trim="providerEditorDraft.auth_header" type="text" @change="handleProviderDraftChange" />
@@ -928,9 +962,10 @@ import {
   type OpenAICodexAuthStartResponse,
 } from "@/api/settings";
 import AppShell from "@/layouts/AppShell.vue";
-import type { AgentThinkingLevel, SettingsModelProvider, SettingsPayload } from "@/types/settings";
+import type { AgentThinkingLevel, SettingsModelProvider, SettingsPayload, SettingsProviderModel } from "@/types/settings";
 
 import {
+  applyDiscoveredModelItemsToDraft,
   buildProviderDraftsFromSettings,
   buildProviderSavePayload,
   clampModelCompressionThreshold,
@@ -940,6 +975,7 @@ import {
   listAddableProviderTemplates,
   modelHasCapability,
   normalizeContextWindowKTokens,
+  normalizeStructuredOutputMode,
   readProviderModelDraft,
   type ModelCapabilityKey,
   type ProviderDraft,
@@ -1066,6 +1102,7 @@ function buildProviderDraftFromTemplate(provider: SettingsModelProvider): Provid
     provider_id: provider.provider_id,
     label: provider.label,
     transport: provider.transport,
+    structured_output_mode: normalizeStructuredOutputMode(provider.structured_output_mode),
     base_url: provider.base_url,
     enabled: true,
     saved: Boolean(provider.saved),
@@ -1089,6 +1126,7 @@ function buildProviderDraftFromTemplate(provider: SettingsModelProvider): Provid
     }
     draft.model_settings[modelName] = {
       model: modelName,
+      reasoning: typeof model.reasoning === "boolean" ? model.reasoning : null,
       context_window_ktokens: typeof model.context_window === "number" && model.context_window > 0
         ? Math.round(model.context_window / 1000)
         : null,
@@ -1242,8 +1280,27 @@ function isLoginProvider(provider: ProviderDraft) {
   return provider.requires_login || provider.auth_mode === "chatgpt";
 }
 
+function providerHasReasoningChatModel(provider: ProviderDraft) {
+  return provider.selected_models.some((modelName) => {
+    const modelSettings = readProviderModelDraft(provider, modelName);
+    return modelSettings.reasoning === true && modelSettings.capabilities.chat;
+  });
+}
+
+function shouldShowLmStudioStructuredOutputWarning(provider: ProviderDraft) {
+  return (
+    provider.provider_id.trim().toLowerCase() === "lmstudio" &&
+    provider.structured_output_mode === "native_schema_first" &&
+    providerHasReasoningChatModel(provider)
+  );
+}
+
 function providerModelOptions(provider: ProviderDraft) {
   return dedupeStrings(provider.discovered_models.length > 0 ? provider.discovered_models : provider.selected_models);
+}
+
+function applyDiscoveredModelItems(provider: ProviderDraft, modelItems: Array<Partial<SettingsProviderModel> & { model: string }> | undefined) {
+  applyDiscoveredModelItemsToDraft(provider, modelItems);
 }
 
 function isProviderModelSelected(provider: ProviderDraft, modelName: string) {
@@ -1769,6 +1826,7 @@ async function handleDiscoverModels(providerId: string, options: { selectDiscove
     });
     const discoveredModels = dedupeStrings(result.models);
     provider.discovered_models = discoveredModels;
+    applyDiscoveredModelItems(provider, result.model_items);
     if (options.selectDiscovered) {
       provider.selected_models = discoveredModels;
     }
@@ -2740,6 +2798,12 @@ onBeforeUnmount(() => {
 .model-providers-page__provider-text-input:disabled {
   color: rgba(60, 41, 20, 0.58);
   background: rgba(255, 248, 240, 0.68);
+}
+
+.model-providers-page__warning {
+  color: #9f580a;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .model-providers-page__provider-select :deep(.el-select__wrapper) {
