@@ -1,6 +1,6 @@
 # TooGraph 长期代码事实与路线图
 
-最后整理日期：2026-05-28。
+最后整理日期：2026-06-01。
 
 本文是 `docs/` 下的长期参考总入口。它的维护原则是：先看代码、官方模板 JSON、Action manifest 和测试，再写结论；已经完成的事情写成事实，未完成的事情写成路线图，历史计划只保留仍然有效的细节。独立专题路线图可以作为长期参考文档保留，但必须从本文或相关代码路径可发现。
 
@@ -12,6 +12,8 @@
 - 图运行时：`backend/app/core/langgraph/`、`backend/app/core/runtime/`。
 - 运行记录和运行树：`backend/app/core/storage/run_store.py`、`backend/app/core/runtime/run_tree.py`、`backend/app/api/routes_runs.py`。
 - 图运行存储、运行树、Buddy 聊天历史和记忆召回设计：本文 `2.3`、`2.4`、`2.5`、`2.9`。
+- Tool calling 与 TooGraph 能力调用边界：`docs/tool-calling-and-toograph-capabilities.md`。
+- Buddy tool-calling agent loop 反思和候选重设计方向：`docs/buddy-tool-calling-agent-loop-reflection.md`。
 - Hermes Agent 能力追赶路线图和当前进度事实源：`docs/hermes-agent-capability-parity-roadmap.md`。
 - 官方 Action：`action/official/*/action.json`、`action/official/*/ACTION.md`、生命周期脚本。
 - 官方图模板：`graph_template/official/*/template.json`。
@@ -87,6 +89,7 @@ npm start
 - Action 是一次受控能力调用。它可以读取上下文、执行确定性前后处理、联网、写文件或返回 artifact，但不拥有多轮自治、最终回复生成、重试循环、长期记忆策略或后续能力选择。
 - Tool 是确定性无 LLM 能力的协议方向，后端已有 `/api/tools/catalog` 和 Tool schema 路径；官方 Tool 包位于 `tool/official/<tool_key>/`。
 - Subgraph 是图级 Agent 或可复用模板能力。多步骤智能应由模板、Subgraph、Condition、Batch 和普通节点表达。
+- Provider tool calling / function calling 是模型协议层的结构化调用意图，不等同于 TooGraph 的 Tool；详细边界见 `docs/tool-calling-and-toograph-capabilities.md`。
 
 当前官方 Action：
 
